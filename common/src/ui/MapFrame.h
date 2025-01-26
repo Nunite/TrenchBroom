@@ -75,6 +75,7 @@ enum class PasteType;
 class SignalDelayer;
 class SwitchableMapViewContainer;
 class Tool;
+class AdvancedEntitySelectDialog;
 
 class MapFrame : public QMainWindow
 {
@@ -258,6 +259,7 @@ public:
   void selectTall();
   void selectByLineNumber();
   void selectInverse();
+  void selectAdvanced();
   void selectNone();
 
   bool canSelect() const;

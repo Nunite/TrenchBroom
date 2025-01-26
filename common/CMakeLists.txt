@@ -293,6 +293,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/CellLayout.cpp
         ${COMMON_SOURCE_DIR}/ui/CellView.cpp
         ${COMMON_SOURCE_DIR}/ui/ChoosePathTypeDialog.cpp
+        ${COMMON_SOURCE_DIR}/ui/AdvancedEntitySelectDialog.cpp
         ${COMMON_SOURCE_DIR}/ui/ClickableLabel.cpp
         ${COMMON_SOURCE_DIR}/ui/ClickableTitleBar.cpp
         ${COMMON_SOURCE_DIR}/ui/ClipTool.cpp
