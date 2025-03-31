@@ -47,10 +47,6 @@ int main(int argc, char* argv[])
   // a context.) see: http://doc.qt.io/qt-5/qopenglwidget.html#context-sharing
   QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
   QSettings::setDefaultFormat(QSettings::IniFormat);
-  // Set up Hi DPI scaling
-  // Enables non-integer scaling (e.g. 150% scaling on Windows)
-  QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
-    Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 
   // Workaround bug in Qt's Ctrl+Click = RMB emulation (a macOS feature.)
   // In Qt 5.13.0 / macOS 10.14.6, Ctrl+trackpad click+Drag produces no mouse events at
