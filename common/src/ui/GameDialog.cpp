@@ -26,6 +26,7 @@
 #include <QPushButton>
 
 #include "PreferenceManager.h"
+#include "Preferences.h"
 #include "TrenchBroomApp.h"
 #include "mdl/GameFactory.h"
 #include "ui/BorderLine.h"
@@ -44,17 +45,23 @@ namespace tb::ui
 std::optional<std::tuple<std::string, mdl::MapFormat>> GameDialog::showNewDocumentDialog(
   QWidget* parent)
 {
+  // 检查当前语言设置
+  auto& prefs = PreferenceManager::instance();
+  bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+  
+  QString title = isEnglish 
+    ? "Select Game" 
+    : "选择游戏";
+  
+  QString infoText = isEnglish 
+    ? R"(Select a game from the list on the right, then click OK. Once the new document is created, you can set up mod directories, entity definitions and materials by going to the map inspector, the entity inspector and the face inspector, respectively.)"
+    : R"(请从右侧列表中选择一个游戏，然后点击确定。创建新文档后，您可以通过地图检查器、实体检查器和表面检查器分别设置模组目录、实体定义和材质。)";
+  
   auto dialog = GameDialog{
-    "选择游戏",
-    R"(请从右侧列表中选择一个游戏，然后点击确定。创建新文档后，您可以通过地图检查器、实体检查器和表面检查器分别设置模组目录、实体定义和材质。)",
+    title,
+    infoText,
     GameDialog::DialogType::New,
     parent};
-
-    // auto dialog = GameDialog{
-    // "Select Game",
-    // R"(Select a game from the list on the right, then click OK. Once the new document is created, you can set up mod directories, entity definitions and materials by going to the map inspector, the entity inspector and the face inspector, respectively.)",
-    // GameDialog::DialogType::New,
-    // parent};
 
   if (dialog.exec() == QDialog::Rejected)
   {
@@ -70,11 +77,21 @@ std::optional<std::tuple<std::string, mdl::MapFormat>> GameDialog::showNewDocume
 std::optional<std::tuple<std::string, mdl::MapFormat>> GameDialog::showOpenDocumentDialog(
   QWidget* parent)
 {
-
+  // 检查当前语言设置
+  auto& prefs = PreferenceManager::instance();
+  bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+  
+  QString title = isEnglish 
+    ? "Select Game" 
+    : "选择游戏";
+  
+  QString infoText = isEnglish 
+    ? R"(TrenchBroom was unable to detect the game for the map document. Please choose a game in the game list and click OK.)"
+    : R"(TrenchBroom无法检测到地图文档的游戏类型。请在游戏列表中选择一个游戏，然后点击确定。)";
 
   auto dialog = GameDialog{
-    "Select Game",
-    R"(TrenchBroom was unable to detect the game for the map document. Please choose a game in the game list and click OK.)",
+    title,
+    infoText,
     GameDialog::DialogType::Open,
     parent};
 
@@ -175,6 +192,10 @@ void GameDialog::createGui(const QString& title, const QString& infoText)
 
 QWidget* GameDialog::createInfoPanel(const QString& title, const QString& infoText)
 {
+  // 检查当前语言设置
+  auto& prefs = PreferenceManager::instance();
+  bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+  
   auto* infoPanel = new QWidget{};
 
   auto* header = new QLabel{title};
@@ -183,20 +204,23 @@ QWidget* GameDialog::createInfoPanel(const QString& title, const QString& infoTe
   auto* info = new QLabel{infoText};
   info->setWordWrap(true);
 
-  auto* setupMsg = new QLabel{
-    R"(要设置游戏路径，请点击下方按钮打开首选项对话框。)"};
+  QString setupMsgText = isEnglish
+    ? R"(To set up the game paths, click on the button below to open the preferences dialog.)"
+    : R"(要设置游戏路径，请点击下方按钮打开首选项对话框。)";
+  
+  auto* setupMsg = new QLabel{setupMsgText};
   setupMsg->setWordWrap(true);
-  // auto* setupMsg = new QLabel{
-  //   R"(To set up the game paths, click on the button below to open the preferences dialog.)"};
-  // setupMsg->setWordWrap(true);
 
-  m_openPreferencesButton = new QPushButton{"打开首选项..."};
-  m_openPreferencesButton->setToolTip(
-    "打开首选项对话框以管理游戏路径。");
-
-  // m_openPreferencesButton = new QPushButton{"Open preferences..."};
-  // m_openPreferencesButton->setToolTip(
-  //   "Open the preferences dialog to manage game paths,");
+  QString buttonText = isEnglish 
+    ? "Open preferences..." 
+    : "打开首选项...";
+    
+  QString tooltipText = isEnglish
+    ? "Open the preferences dialog to manage game paths."
+    : "打开首选项对话框以管理游戏路径。";
+    
+  m_openPreferencesButton = new QPushButton{buttonText};
+  m_openPreferencesButton->setToolTip(tooltipText);
 
   auto* layout = new QVBoxLayout{};
   layout->setSpacing(0);
@@ -223,12 +247,25 @@ QWidget* GameDialog::createInfoPanel(const QString& title, const QString& infoTe
 
 QWidget* GameDialog::createSelectionPanel()
 {
+  // 检查当前语言设置
+  auto& prefs = PreferenceManager::instance();
+  bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+  
   auto* panel = new QWidget{};
 
   m_gameListBox = new GameListBox{};
-  m_gameListBox->setToolTip("Double click on a game to select it");
+  
+  QString toolTipText = isEnglish
+    ? "Double click on a game to select it"
+    : "双击一个游戏以选择它";
+    
+  m_gameListBox->setToolTip(toolTipText);
 
-  auto* label = new QLabel{"Map Format"};
+  QString labelText = isEnglish 
+    ? "Map Format" 
+    : "地图格式";
+    
+  auto* label = new QLabel{labelText};
   makeEmphasized(label);
 
   m_mapFormatComboBox = new QComboBox{};
@@ -265,6 +302,10 @@ QWidget* GameDialog::createSelectionPanel()
 
 void GameDialog::updateMapFormats(const std::string& gameName)
 {
+  // 检查当前语言设置
+  auto& prefs = PreferenceManager::instance();
+  bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+  
   const auto& gameFactory = mdl::GameFactory::instance();
   const auto fileFormats =
     gameName.empty() ? std::vector<std::string>{} : gameFactory.fileFormats(gameName);
@@ -272,8 +313,12 @@ void GameDialog::updateMapFormats(const std::string& gameName)
   m_mapFormatComboBox->clear();
   if (m_dialogType == DialogType::Open)
   {
+    QString autodetectText = isEnglish 
+      ? "Autodetect" 
+      : "自动检测";
+      
     m_mapFormatComboBox->addItem(
-      tr("Autodetect"), formatToUserData(mdl::MapFormat::Unknown));
+      autodetectText, formatToUserData(mdl::MapFormat::Unknown));
   }
 
   for (const auto& fileFormat : fileFormats)

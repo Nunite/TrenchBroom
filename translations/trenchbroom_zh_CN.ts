@@ -1132,7 +1132,7 @@ Font Awesome 5 Free (图标集)</translation>
     <message>
         <location filename="../common/src/ui/AppInfoPanel.cpp" line="47" />
         <source>TrenchBroom</source>
-        <translation>沟渠刷（TrenchBroom）</translation>
+        <translation>TrenchBroom</translation>
     </message>
     <message>
         <location filename="../common/src/ui/AppInfoPanel.cpp" line="51" />
