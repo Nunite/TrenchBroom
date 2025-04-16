@@ -162,46 +162,51 @@ TrenchBroomApp::TrenchBroomApp(int& argc, char** argv)
   using namespace std::chrono_literals;
   
   // 设置应用程序语言环境
-  QLocale::setDefault(QLocale(QLocale::Chinese, QLocale::China));
-  
-  // 加载翻译文件
   m_translator = new QTranslator(this);
   
-  // 强制使用中文
-  QString locale = "zh_CN";
+  // 根据用户选择设置语言
+  auto& prefs = PreferenceManager::instance();
+  QString locale;
   
-  // 查找并加载翻译文件，优先从资源文件中加载
-  bool translationLoaded = false;
-  
-  // 优先从资源文件加载
-  if (m_translator->load(QString(":/translations/trenchbroom_%1").arg(locale)))
-  {
-    translationLoaded = true;
-  }
-  // 然后尝试从应用程序目录加载
-  else if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
-                            QCoreApplication::applicationDirPath() + "/translations"))
-  {
-    translationLoaded = true;
-  }
-  // 尝试在多个可能的资源路径中查找
-  else
-  {
-    const auto resourceDirs = io::SystemPaths::findResourceDirectories("translations");
-    for (const auto& dir : resourceDirs)
+  if (prefs.get(Preferences::Language) == Preferences::languageEnglish()) {
+    // 英文无需加载翻译文件
+    QLocale::setDefault(QLocale(QLocale::English));
+  } else {
+    // 加载中文翻译
+    QLocale::setDefault(QLocale(QLocale::Chinese, QLocale::China));
+    locale = "zh_CN";
+    
+    // 查找并加载翻译文件，优先从资源文件中加载
+    bool translationLoaded = false;
+    
+    // 优先从资源文件加载
+    if (m_translator->load(QString(":/translations/trenchbroom_%1").arg(locale)))
     {
-      if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
-                            io::pathAsQString(dir)))
+      installTranslator(m_translator);
+      translationLoaded = true;
+    }
+    // 然后尝试从应用程序目录加载
+    else if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
+                              QCoreApplication::applicationDirPath() + "/translations"))
+    {
+      installTranslator(m_translator);
+      translationLoaded = true;
+    }
+    // 尝试在多个可能的资源路径中查找
+    else
+    {
+      const auto resourceDirs = io::SystemPaths::findResourceDirectories("translations");
+      for (const auto& dir : resourceDirs)
       {
-        translationLoaded = true;
-        break;
+        if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
+                              io::pathAsQString(dir)))
+        {
+          installTranslator(m_translator);
+          translationLoaded = true;
+          break;
+        }
       }
     }
-  }
-  
-  if (translationLoaded)
-  {
-    installTranslator(m_translator);
   }
 
   // When this flag is enabled, font and palette changes propagate as though the user

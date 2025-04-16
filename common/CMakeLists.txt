@@ -380,6 +380,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/KeyboardShortcutItemDelegate.cpp
         ${COMMON_SOURCE_DIR}/ui/KeyboardShortcutModel.cpp
         ${COMMON_SOURCE_DIR}/ui/KeySequenceEdit.cpp
+        ${COMMON_SOURCE_DIR}/ui/LanguagePreferencePane.cpp
         ${COMMON_SOURCE_DIR}/ui/Lasso.cpp
         ${COMMON_SOURCE_DIR}/ui/LaunchGameEngine.cpp
         ${COMMON_SOURCE_DIR}/ui/LaunchGameEngineDialog.cpp
@@ -920,6 +921,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/KeyboardShortcutItemDelegate.h
         ${COMMON_SOURCE_DIR}/ui/KeyboardShortcutModel.h
         ${COMMON_SOURCE_DIR}/ui/KeySequenceEdit.h
+        ${COMMON_SOURCE_DIR}/ui/LanguagePreferencePane.h
         ${COMMON_SOURCE_DIR}/ui/Lasso.h
         ${COMMON_SOURCE_DIR}/ui/LaunchGameEngine.h
         ${COMMON_SOURCE_DIR}/ui/LaunchGameEngineDialog.h

@@ -20,6 +20,7 @@
 #include "Preferences.h"
 
 #include <QKeySequence>
+#include <QApplication>
 
 #include "ui/MapViewLayout.h"
 
@@ -29,12 +30,16 @@ namespace tb::Preferences
 {
 
 // Must be set to false for tests, see TestPreferenceManager::initialize
-Preference<bool> AskForAutoUpdates("updater/Ask for auto updates", true);
-Preference<bool> AutoCheckForUpdates("updater/Check for updates automatically", false);
-Preference<bool> IncludePreReleaseUpdates("updater/Include pre-releases", false);
+Preference<bool> AskForAutoUpdates{"App/Startup/AskForAutoUpdates", true};
+Preference<bool> AutoCheckForUpdates{"App/Update/CheckForUpdates", true};
+Preference<bool> IncludePreReleaseUpdates{"App/Update/IncludePreReleaseUpdates", false};
 
-Preference<int> MapViewLayout(
-  "Views/Map view layout", static_cast<int>(ui::MapViewLayout::OnePane));
+// 语言设置
+QString languageEnglish() { return QApplication::tr("English"); }
+QString languageChinese() { return QApplication::tr("中文"); }
+Preference<QString> Language{"App/Ui/Language", languageChinese()};
+
+Preference<int> MapViewLayout{"Views/MapViewLayout", 1};
 
 QString systemTheme()
 {
@@ -316,6 +321,10 @@ Preference<QString> EntityLinkMode("Map view/Entity link mode", "direct");
 const std::vector<PreferenceBase*>& staticPreferences()
 {
   static const std::vector<PreferenceBase*> list{
+    &AskForAutoUpdates,
+    &AutoCheckForUpdates,
+    &IncludePreReleaseUpdates,
+    &Language,
     &MapViewLayout,
     &Theme,
     &ShowAxes,
