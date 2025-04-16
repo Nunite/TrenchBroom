@@ -35,6 +35,12 @@ private:
   QRadioButton* m_chineseRadioButton;
   QButtonGroup* m_languageButtonGroup;
 
+signals:
+  /**
+   * 当语言设置更改时发出信号
+   */
+  void languageChanged();
+
 public:
   explicit LanguagePreferencePane(QWidget* parent = nullptr);
 

@@ -41,6 +41,11 @@ private:
 public:
   explicit KeyboardPreferencePane(MapDocument* document, QWidget* parent = nullptr);
 
+  /**
+   * 返回键盘快捷键模型
+   */
+  KeyboardShortcutModel* model() const { return m_model; }
+
 private:
   bool canResetToDefaults() override;
   void doResetToDefaults() override;

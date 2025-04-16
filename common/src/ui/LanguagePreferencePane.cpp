@@ -57,6 +57,9 @@ void LanguagePreferencePane::createGui()
     auto& prefs = PreferenceManager::instance();
     prefs.set(Preferences::Language, Preferences::languageEnglish());
     
+    // 发出语言变更信号
+    emit languageChanged();
+    
     // 显示需要重启的提示
     QMessageBox::information(
       this,
@@ -68,6 +71,9 @@ void LanguagePreferencePane::createGui()
   connect(m_chineseRadioButton, &QRadioButton::clicked, this, [this]() {
     auto& prefs = PreferenceManager::instance();
     prefs.set(Preferences::Language, Preferences::languageChinese());
+    
+    // 发出语言变更信号
+    emit languageChanged();
     
     // 显示需要重启的提示
     QMessageBox::information(

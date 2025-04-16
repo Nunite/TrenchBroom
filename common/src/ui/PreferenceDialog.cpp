@@ -36,6 +36,7 @@
 #include "ui/ColorsPreferencePane.h"
 #include "ui/GamesPreferencePane.h"
 #include "ui/KeyboardPreferencePane.h"
+#include "ui/KeyboardShortcutModel.h"
 #include "ui/MousePreferencePane.h"
 #include "ui/PreferencePane.h"
 #include "ui/QtUtils.h"
@@ -124,9 +125,18 @@ void PreferenceDialog::createGui()
   m_stackedWidget->addWidget(new ViewPreferencePane{});
   m_stackedWidget->addWidget(new ColorsPreferencePane{});
   m_stackedWidget->addWidget(new MousePreferencePane{});
-  m_stackedWidget->addWidget(new KeyboardPreferencePane{m_document.get()});
-  m_stackedWidget->addWidget(new LanguagePreferencePane{});
+  
+  auto* keyboardPane = new KeyboardPreferencePane{m_document.get()};
+  m_stackedWidget->addWidget(keyboardPane);
+  
+  auto* languagePane = new LanguagePreferencePane{};
+  m_stackedWidget->addWidget(languagePane);
+  
   m_stackedWidget->addWidget(new UpdatePreferencePane{});
+  
+  // 连接语言变更信号到键盘快捷键模型，以便在语言变更时刷新显示
+  connect(languagePane, &LanguagePreferencePane::languageChanged,
+          keyboardPane->model(), &KeyboardShortcutModel::refreshAfterLanguageChange);
 
   m_buttonBox = new QDialogButtonBox{
     QDialogButtonBox::RestoreDefaults

@@ -25,6 +25,8 @@
 #include "ui/ActionContext.h"
 #include "ui/Actions.h"
 #include "ui/MapDocument.h"
+#include "PreferenceManager.h"
+#include "Preferences.h"
 
 #include "kdl/range_to_vector.h"
 #include "kdl/vector_utils.h"
@@ -74,7 +76,7 @@ const std::unordered_map<std::string, QString> pathTranslations = {
     {"Manual", QObject::tr("手册")}
 };
 
-// 将路径转换为中文显示
+// 将路径转换为多语言显示
 QString translatePath(const std::filesystem::path& path) {
     std::string pathStr = path.generic_string();
     QString result;
@@ -84,6 +86,16 @@ QString translatePath(const std::filesystem::path& path) {
         return QString();
     }
     
+    // 检查当前语言设置
+    auto& prefs = PreferenceManager::instance();
+    bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+    
+    // 如果是英文，直接使用路径原始文本
+    if (isEnglish) {
+        return QString::fromUtf8(pathStr.c_str());
+    }
+    
+    // 中文界面才进行翻译
     // 将路径按'/'分割
     std::vector<std::string> parts;
     size_t start = 0;
@@ -154,9 +166,19 @@ QVariant KeyboardShortcutModel::headerData(
 {
   if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
   {
-    return section == 0   ? QString{"Shortcut"}
-           : section == 1 ? QString{"Context"}
-                          : QString{"Description"};
+    // 检查当前语言设置
+    auto& prefs = PreferenceManager::instance();
+    bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+    
+    if (isEnglish) {
+      return section == 0   ? QString{"Shortcut"}
+             : section == 1 ? QString{"Context"}
+                            : QString{"Description"};
+    } else {
+      return section == 0   ? QObject::tr("快捷键")
+             : section == 1 ? QObject::tr("上下文")
+                            : QObject::tr("描述");
+    }
   }
   return QVariant{};
 }
@@ -177,8 +199,12 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     if (index.column() == 1)
     {
       const std::string contextName = actionContextName(actionInfo.action.actionContext());
+      // 检查当前语言设置
+      auto& prefs = PreferenceManager::instance();
+      bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+      
       if (contextName == "any") {
-        return QObject::tr("任意");
+        return isEnglish ? QString("Any") : QObject::tr("任意");
       } else {
         return QString::fromUtf8(contextName.c_str());
       }
@@ -189,7 +215,11 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     QString prefix;
     
     // 提取路径中的主要类别（如"File", "Edit"等）
-    if (!pathStr.empty()) {
+    // 检查当前语言设置
+    auto& prefs = PreferenceManager::instance();
+    bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+    
+    if (!pathStr.empty() && !isEnglish) {
       size_t firstSlash = pathStr.find('/');
       if (firstSlash != std::string::npos && firstSlash > 0) {
         std::string firstPart = pathStr.substr(0, firstSlash);
@@ -197,6 +227,12 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
         if (it != pathTranslations.end()) {
           prefix = it->second + "/";
         }
+      }
+    } else if (!pathStr.empty() && isEnglish) {
+      size_t firstSlash = pathStr.find('/');
+      if (firstSlash != std::string::npos && firstSlash > 0) {
+        std::string firstPart = pathStr.substr(0, firstSlash);
+        prefix = QString::fromUtf8(firstPart.c_str()) + "/";
       }
     }
     
@@ -253,6 +289,17 @@ bool KeyboardShortcutModel::hasConflicts(const QModelIndex& index) const
   }
 
   return kdl::wrap_set(m_conflicts).count(index.row()) > 0u;
+}
+
+void KeyboardShortcutModel::refreshAfterLanguageChange()
+{
+  // 通知视图所有数据都需要重新获取
+  if (totalActionCount() > 0)
+  {
+    emit dataChanged(createIndex(0, 0), createIndex(totalActionCount() - 1, 2));
+    // 通知表头变化
+    emit headerDataChanged(Qt::Horizontal, 0, 2);
+  }
 }
 
 void KeyboardShortcutModel::initializeActions()

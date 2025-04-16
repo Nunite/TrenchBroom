@@ -65,6 +65,12 @@ public:
   bool hasConflicts() const;
   bool hasConflicts(const QModelIndex& index) const;
 
+public slots:
+  /**
+   * 当语言更改时，刷新模型显示
+   */
+  void refreshAfterLanguageChange();
+
 private:
   void initializeActions();
 

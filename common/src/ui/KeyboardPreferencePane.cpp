@@ -99,6 +99,9 @@ KeyboardPreferencePane::KeyboardPreferencePane(MapDocument* document, QWidget* p
   connect(searchBox, &QLineEdit::textChanged, this, [&](const QString& newText) {
     m_proxy->setFilterFixedString(newText);
   });
+  
+  // 确保模型对象名称设置正确，以便可以通过findChild找到
+  m_model->setObjectName("KeyboardShortcutModel");
 }
 
 bool KeyboardPreferencePane::canResetToDefaults()
