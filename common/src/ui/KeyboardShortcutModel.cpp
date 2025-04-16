@@ -91,9 +91,9 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     }
     if (index.column() == 1)
     {
-      return QString::fromStdString(actionContextName(actionInfo.action.actionContext()));
+      return QString::fromUtf8(actionContextName(actionInfo.action.actionContext()).c_str());
     }
-    return QString::fromStdString(actionInfo.displayPath.generic_string());
+    return QString::fromUtf8(actionInfo.displayPath.generic_string().c_str());
   }
   if (role == Qt::ForegroundRole && hasConflicts(index))
   {

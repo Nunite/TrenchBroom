@@ -160,12 +160,15 @@ TrenchBroomApp::TrenchBroomApp(int& argc, char** argv)
   , m_taskManager{std::thread::hardware_concurrency()}
 {
   using namespace std::chrono_literals;
-
+  
+  // 设置应用程序语言环境
+  QLocale::setDefault(QLocale(QLocale::Chinese, QLocale::China));
+  
   // 加载翻译文件
   m_translator = new QTranslator(this);
   
-  // 设置系统语言环境或使用用户设置
-  QString locale = QLocale::system().name();
+  // 强制使用中文
+  QString locale = "zh_CN";
   
   // 查找并加载翻译文件，优先从资源文件中加载
   bool translationLoaded = false;

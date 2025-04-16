@@ -390,7 +390,7 @@
     <message>
         <location filename="../common/src/ui/Actions.cpp" line="1073" />
         <source>Map...</source>
-        <translation>地图...</translation>
+        <translation>Map...</translation>
     </message>
     <message>
         <location filename="../common/src/ui/Actions.cpp" line="1079" />
