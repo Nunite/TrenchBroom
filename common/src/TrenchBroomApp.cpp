@@ -161,6 +161,46 @@ TrenchBroomApp::TrenchBroomApp(int& argc, char** argv)
 {
   using namespace std::chrono_literals;
 
+  // 加载翻译文件
+  m_translator = new QTranslator(this);
+  
+  // 设置系统语言环境或使用用户设置
+  QString locale = QLocale::system().name();
+  
+  // 查找并加载翻译文件，优先从资源文件中加载
+  bool translationLoaded = false;
+  
+  // 优先从资源文件加载
+  if (m_translator->load(QString(":/translations/trenchbroom_%1").arg(locale)))
+  {
+    translationLoaded = true;
+  }
+  // 然后尝试从应用程序目录加载
+  else if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
+                            QCoreApplication::applicationDirPath() + "/translations"))
+  {
+    translationLoaded = true;
+  }
+  // 尝试在多个可能的资源路径中查找
+  else
+  {
+    const auto resourceDirs = io::SystemPaths::findResourceDirectories("translations");
+    for (const auto& dir : resourceDirs)
+    {
+      if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
+                            io::pathAsQString(dir)))
+      {
+        translationLoaded = true;
+        break;
+      }
+    }
+  }
+  
+  if (translationLoaded)
+  {
+    installTranslator(m_translator);
+  }
+
   // When this flag is enabled, font and palette changes propagate as though the user
   // had manually called the corresponding QWidget methods.
   setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles);

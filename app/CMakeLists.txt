@@ -5,7 +5,8 @@ set(APP_RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 
 set(APP_SOURCE
     "${APP_SOURCE_DIR}/Main.cpp"
-    "${APP_RESOURCE_DIR}/qrc/resources.qrc")
+    "${APP_RESOURCE_DIR}/qrc/resources.qrc"
+    "${CMAKE_SOURCE_DIR}/translations/translations.qrc")
 
 # OS X app bundle configuration, must happen before the executable is added
 if(APPLE)

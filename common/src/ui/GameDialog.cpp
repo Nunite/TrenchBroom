@@ -45,10 +45,16 @@ std::optional<std::tuple<std::string, mdl::MapFormat>> GameDialog::showNewDocume
   QWidget* parent)
 {
   auto dialog = GameDialog{
-    "Select Game",
-    R"(Select a game from the list on the right, then click OK. Once the new document is created, you can set up mod directories, entity definitions and materials by going to the map inspector, the entity inspector and the face inspector, respectively.)",
+    "选择游戏",
+    R"(请从右侧列表中选择一个游戏，然后点击确定。创建新文档后，您可以通过地图检查器、实体检查器和表面检查器分别设置模组目录、实体定义和材质。)",
     GameDialog::DialogType::New,
     parent};
+
+    // auto dialog = GameDialog{
+    // "Select Game",
+    // R"(Select a game from the list on the right, then click OK. Once the new document is created, you can set up mod directories, entity definitions and materials by going to the map inspector, the entity inspector and the face inspector, respectively.)",
+    // GameDialog::DialogType::New,
+    // parent};
 
   if (dialog.exec() == QDialog::Rejected)
   {
@@ -64,6 +70,8 @@ std::optional<std::tuple<std::string, mdl::MapFormat>> GameDialog::showNewDocume
 std::optional<std::tuple<std::string, mdl::MapFormat>> GameDialog::showOpenDocumentDialog(
   QWidget* parent)
 {
+
+
   auto dialog = GameDialog{
     "Select Game",
     R"(TrenchBroom was unable to detect the game for the map document. Please choose a game in the game list and click OK.)",
@@ -176,12 +184,19 @@ QWidget* GameDialog::createInfoPanel(const QString& title, const QString& infoTe
   info->setWordWrap(true);
 
   auto* setupMsg = new QLabel{
-    R"(To set up the game paths, click on the button below to open the preferences dialog.)"};
+    R"(要设置游戏路径，请点击下方按钮打开首选项对话框。)"};
   setupMsg->setWordWrap(true);
+  // auto* setupMsg = new QLabel{
+  //   R"(To set up the game paths, click on the button below to open the preferences dialog.)"};
+  // setupMsg->setWordWrap(true);
 
-  m_openPreferencesButton = new QPushButton{"Open preferences..."};
+  m_openPreferencesButton = new QPushButton{"打开首选项..."};
   m_openPreferencesButton->setToolTip(
-    "Open the preferences dialog to manage game paths,");
+    "打开首选项对话框以管理游戏路径。");
+
+  // m_openPreferencesButton = new QPushButton{"Open preferences..."};
+  // m_openPreferencesButton->setToolTip(
+  //   "Open the preferences dialog to manage game paths,");
 
   auto* layout = new QVBoxLayout{};
   layout->setSpacing(0);

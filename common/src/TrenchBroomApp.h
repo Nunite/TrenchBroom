@@ -20,6 +20,7 @@
 #pragma once
 
 #include <QApplication>
+#include <QTranslator>
 
 #include "kdl/task_manager.h"
 
@@ -58,6 +59,7 @@ private:
   upd::HttpClient* m_httpClient = nullptr;
   upd::Updater* m_updater = nullptr;
   kdl::task_manager m_taskManager = kdl::task_manager{256};
+  QTranslator* m_translator = nullptr;
   std::unique_ptr<FrameManager> m_frameManager;
   std::unique_ptr<RecentDocuments> m_recentDocuments;
   std::unique_ptr<WelcomeWindow> m_welcomeWindow;
