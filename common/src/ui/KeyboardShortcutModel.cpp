@@ -184,8 +184,24 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
       }
     }
     
-    // 使用Action的标签而不是路径作为描述
-    return actionInfo.action.label();
+    // 结合路径主要部分和Action的标签
+    std::string pathStr = actionInfo.displayPath.generic_string();
+    QString prefix;
+    
+    // 提取路径中的主要类别（如"File", "Edit"等）
+    if (!pathStr.empty()) {
+      size_t firstSlash = pathStr.find('/');
+      if (firstSlash != std::string::npos && firstSlash > 0) {
+        std::string firstPart = pathStr.substr(0, firstSlash);
+        auto it = pathTranslations.find(firstPart);
+        if (it != pathTranslations.end()) {
+          prefix = it->second + "/";
+        }
+      }
+    }
+    
+    // 返回"类别/标签"的组合
+    return prefix + actionInfo.action.label();
   }
   if (role == Qt::ForegroundRole && hasConflicts(index))
   {
