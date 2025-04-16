@@ -30,9 +30,94 @@
 #include "kdl/vector_utils.h"
 
 #include <ranges>
+#include <unordered_map>
 
 namespace tb::ui
 {
+
+// 创建路径部分翻译映射表
+const std::unordered_map<std::string, QString> pathTranslations = {
+    {"Menu", QObject::tr("菜单")},
+    {"File", QObject::tr("文件")},
+    {"Edit", QObject::tr("编辑")},
+    {"View", QObject::tr("视图")},
+    {"Run", QObject::tr("运行")},
+    {"Debug", QObject::tr("调试")},
+    {"Help", QObject::tr("帮助")},
+    {"Controls", QObject::tr("控制")},
+    {"Map View", QObject::tr("地图视图")},
+    {"Map view", QObject::tr("地图视图")},
+    {"Export", QObject::tr("导出")},
+    {"Import", QObject::tr("导入")},
+    {"Tags", QObject::tr("标签")},
+    {"Entity Definitions", QObject::tr("实体定义")},
+    {"Tools", QObject::tr("工具")},
+    {"Texture", QObject::tr("纹理")},
+    {"Entities", QObject::tr("实体")},
+    {"Open", QObject::tr("打开")},
+    {"Save", QObject::tr("保存")},
+    {"Preferences", QObject::tr("首选项")},
+    {"New", QObject::tr("新建")},
+    {"Close", QObject::tr("关闭")},
+    {"Undo", QObject::tr("撤销")},
+    {"Redo", QObject::tr("重做")},
+    {"Cut", QObject::tr("剪切")},
+    {"Copy", QObject::tr("复制")},
+    {"Paste", QObject::tr("粘贴")},
+    {"Delete", QObject::tr("删除")},
+    {"Duplicate", QObject::tr("复制")},
+    {"Select All", QObject::tr("全选")},
+    {"Select None", QObject::tr("取消选择")},
+    {"Compile", QObject::tr("编译")},
+    {"Launch", QObject::tr("启动")},
+    {"About", QObject::tr("关于")},
+    {"Manual", QObject::tr("手册")}
+};
+
+// 将路径转换为中文显示
+QString translatePath(const std::filesystem::path& path) {
+    std::string pathStr = path.generic_string();
+    QString result;
+    
+    // 如果路径为空，返回空字符串
+    if (pathStr.empty()) {
+        return QString();
+    }
+    
+    // 将路径按'/'分割
+    std::vector<std::string> parts;
+    size_t start = 0;
+    size_t end = pathStr.find('/');
+    
+    while (end != std::string::npos) {
+        parts.push_back(pathStr.substr(start, end - start));
+        start = end + 1;
+        end = pathStr.find('/', start);
+    }
+    
+    // 添加最后一部分
+    if (start < pathStr.size()) {
+        parts.push_back(pathStr.substr(start));
+    }
+    
+    // 翻译每个部分
+    for (size_t i = 0; i < parts.size(); ++i) {
+        auto it = pathTranslations.find(parts[i]);
+        if (it != pathTranslations.end()) {
+            result += it->second;
+        } else {
+            // 如果没有找到翻译，使用原始文本
+            result += QString::fromUtf8(parts[i].c_str());
+        }
+        
+        // 不是最后一个部分时，添加分隔符
+        if (i < parts.size() - 1) {
+            result += " / ";
+        }
+    }
+    
+    return result;
+}
 
 KeyboardShortcutModel::KeyboardShortcutModel(MapDocument* document, QObject* parent)
   : QAbstractTableModel{parent}
@@ -91,9 +176,16 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     }
     if (index.column() == 1)
     {
-      return QString::fromUtf8(actionContextName(actionInfo.action.actionContext()).c_str());
+      const std::string contextName = actionContextName(actionInfo.action.actionContext());
+      if (contextName == "any") {
+        return QObject::tr("任意");
+      } else {
+        return QString::fromUtf8(contextName.c_str());
+      }
     }
-    return QString::fromUtf8(actionInfo.displayPath.generic_string().c_str());
+    
+    // 使用Action的标签而不是路径作为描述
+    return actionInfo.action.label();
   }
   if (role == Qt::ForegroundRole && hasConflicts(index))
   {
