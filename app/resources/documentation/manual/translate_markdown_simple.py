@@ -11,7 +11,7 @@
     python translate_markdown_simple.py 输入文件.md 输出文件.md [分块大小] [--split-by-heading]
 
 选项:
-    --split-by-heading    按照 Markdown 二级标题（##）拆分内容进行翻译
+    --split-by-heading    按照 Markdown 标题（#、##、###等）拆分内容进行翻译
 
 依赖:
     - requests (可通过 pip install requests 安装)
@@ -46,7 +46,8 @@ def translate_markdown_with_ai(text, from_lang="en", to_lang="zh"):
 3. 代码块和代码片段中的内容不要翻译
 4. 保留原始的HTML标签和特殊格式
 5. 专业术语要根据上下文正确翻译,比如说:专有名词"Brush","map"等不翻译
-6. 只返回翻译结果，不要添加任何解释
+6. 保留所有标题中的ID标签，如 {{#introduction}}
+7. 只返回翻译结果，不要添加任何解释
 
 以下是需要翻译的Markdown文本：
 
@@ -85,10 +86,11 @@ def translate_markdown_with_ai(text, from_lang="en", to_lang="zh"):
         return text
 
 
-def split_text_by_headings(text, heading_pattern=r"^##\s+.+$"):
+def split_text_by_headings(text, heading_pattern=r"^(#{1,6})\s+.+?(\{#.*?\})?$"):
     """
     按照指定的标题模式拆分文本
-    默认按照二级标题（##）拆分
+    默认按照所有级别的标题（#、##、###等）拆分
+    同时保留标题中的ID标签
     """
     # 查找所有符合模式的标题
     headings = []
@@ -197,6 +199,49 @@ def ensure_fenced_code_blocks_integrity(chunks):
     return result_chunks
 
 
+def ensure_heading_id_intact(translated_text, original_text):
+    """
+    确保标题ID标签在翻译后保持完整
+    例如：# 介绍 {#introduction} 中的 {#introduction} 应保持不变
+    """
+    # 查找原文中的标题ID标签
+    id_tags = re.findall(r"(\{#[^}]+\})", original_text)
+
+    # 查找翻译文本中的标题
+    headings = re.finditer(
+        r"^(#{1,6}\s+.+?)(\{#[^}]+\})?$", translated_text, re.MULTILINE
+    )
+
+    # 创建新的文本来替换修正后的翻译
+    result = translated_text
+
+    # 保存所有标题的ID标签
+    heading_ids = {}
+    for match in re.finditer(
+        r"^(#{1,6}\s+.+?)(\{#([^}]+)\})?$", original_text, re.MULTILINE
+    ):
+        if match.group(2):  # 如果有ID标签
+            heading_text = match.group(1).strip()
+            heading_id = match.group(3)
+            heading_ids[heading_text] = heading_id
+
+    # 修复翻译文本中的标题ID
+    for match in re.finditer(
+        r"^(#{1,6}\s+.+?)(\{#[^}]+\})?$", translated_text, re.MULTILINE
+    ):
+        # 如果翻译的标题缺少ID标签或ID标签不正确
+        if not match.group(2):
+            # 尝试在原文找到对应的标题ID
+            for orig_heading, heading_id in heading_ids.items():
+                if heading_id:
+                    # 添加ID标签到翻译后的标题
+                    new_heading = f"{match.group(1)} {{#{heading_id}}}"
+                    result = result.replace(match.group(0), new_heading)
+                    break
+
+    return result
+
+
 def main():
     """主函数"""
     # 命令行参数处理
@@ -286,6 +331,10 @@ def main():
                         f"  翻译子块 {j+1}/{len(sub_chunks)} (长度: {len(sub_chunk)} 字符)..."
                     )
                     sub_translated_chunk = translate_markdown_with_ai(sub_chunk)
+                    # 确保标题ID标签完整
+                    sub_translated_chunk = ensure_heading_id_intact(
+                        sub_translated_chunk, sub_chunk
+                    )
                     sub_translated.append(sub_translated_chunk)
 
                     if j < len(sub_chunks) - 1:
@@ -297,6 +346,8 @@ def main():
             else:
                 # 直接翻译整个标题块
                 translated_chunk = translate_markdown_with_ai(chunk)
+                # 确保标题ID标签完整
+                translated_chunk = ensure_heading_id_intact(translated_chunk, chunk)
 
             translated_chunks.append(translated_chunk)
 
@@ -329,6 +380,8 @@ def main():
 
                 print(f"正在翻译第 {i+1}/{len(chunks)} 块 (长度: {len(chunk)} 字符)...")
                 translated_chunk = translate_markdown_with_ai(chunk)
+                # 尝试修复ID标签
+                translated_chunk = ensure_heading_id_intact(translated_chunk, chunk)
                 translated_chunks.append(translated_chunk)
 
                 # 添加延迟避免API限制
@@ -341,6 +394,8 @@ def main():
         else:
             print("文件较小，整体翻译...")
             translated_content = translate_markdown_with_ai(content)
+            # 尝试修复ID标签
+            translated_content = ensure_heading_id_intact(translated_content, content)
 
     # 写入输出文件
     try:
