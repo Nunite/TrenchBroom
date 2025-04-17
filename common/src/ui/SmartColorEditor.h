@@ -28,6 +28,9 @@ class QColor;
 class QWidget;
 class QPushButton;
 class QRadioButton;
+class QSlider;
+class QCheckBox;
+class QLabel;
 
 namespace tb::ui
 {
@@ -46,6 +49,13 @@ private:
   QRadioButton* m_byteRadio = nullptr;
   ColorButton* m_colorPicker = nullptr;
   ColorTable* m_colorHistory = nullptr;
+  
+  // 亮度相关控件
+  QCheckBox* m_alphaCheckBox = nullptr;
+  QSlider* m_alphaSlider = nullptr;
+  QLabel* m_alphaLabel = nullptr;
+  int m_currentAlpha = 255;
+  bool m_hasAlpha = true;
 
 public:
   explicit SmartColorEditor(
@@ -57,6 +67,7 @@ private:
 
   void updateColorRange(const std::vector<mdl::EntityNodeBase*>& nodes);
   void updateColorHistory();
+  void updateAlphaControls(const std::vector<mdl::EntityNodeBase*>& nodes);
 
   void setColor(const QColor& wxColor) const;
 
@@ -64,6 +75,8 @@ private:
   void byteRangeRadioButtonClicked();
   void colorPickerChanged(const QColor& color);
   void colorTableSelected(QColor color);
+  void alphaCheckBoxToggled(bool checked);
+  void alphaSliderChanged(int value);
 };
 
 } // namespace tb::ui

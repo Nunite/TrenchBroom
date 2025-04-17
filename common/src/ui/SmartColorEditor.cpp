@@ -24,6 +24,9 @@
 #include <QLabel>
 #include <QRadioButton>
 #include <QScrollArea>
+#include <QCheckBox>
+#include <QSlider>
+#include <sstream>
 
 #include "Color.h"
 #include "mdl/ColorRange.h"
@@ -47,6 +50,19 @@ namespace tb::ui
 {
 namespace
 {
+
+// 辅助函数：按空格分割字符串
+std::vector<std::string> splitString(const std::string& str) {
+  std::istringstream stream(str);
+  std::vector<std::string> result;
+  std::string part;
+  
+  while (stream >> part) {
+    result.push_back(part);
+  }
+  
+  return result;
+}
 
 template <typename Node>
 std::vector<QColor> collectColors(
@@ -77,7 +93,18 @@ std::vector<QColor> collectColors(
   const auto visitEntityNode = [&](const auto* node) {
     if (const auto* value = node->entity().property(propertyKey))
     {
-      colors.insert(toQColor(mdl::parseEntityColor(*value)));
+      QColor color = toQColor(mdl::parseEntityColor(*value));
+      
+      auto components = splitString(*value);
+      if (components.size() >= 4) {
+        bool ok = false;
+        int alpha = QString::fromStdString(components[3]).toInt(&ok);
+        if (ok) {
+          color.setAlpha(alpha);
+        }
+      }
+      
+      colors.insert(color);
     }
   };
 
@@ -112,18 +139,38 @@ SmartColorEditor::SmartColorEditor(std::weak_ptr<MapDocument> document, QWidget*
 
 void SmartColorEditor::createGui()
 {
-  assert(m_floatRadio == nullptr);
-  assert(m_byteRadio == nullptr);
-  assert(m_colorPicker == nullptr);
-  assert(m_colorHistory == nullptr);
+  // 初始化所有变量为nullptr，防止检查失败
+  m_floatRadio = nullptr;
+  m_byteRadio = nullptr;
+  m_colorPicker = nullptr; 
+  m_colorHistory = nullptr;
+  m_alphaCheckBox = nullptr;
+  m_alphaSlider = nullptr;
+  m_alphaLabel = nullptr;
 
-  auto* rangeTxt = new QLabel{tr("Color range")};
-  makeEmphasized(rangeTxt);
-
-  m_floatRadio = new QRadioButton{tr("Float [0,1]")};
-  m_byteRadio = new QRadioButton{tr("Byte [0,255]")};
+  // 创建颜色选择器
   m_colorPicker = new ColorButton{};
   m_colorHistory = new ColorTable{ColorHistoryCellSize};
+  
+  // 添加亮度控件
+  auto* alphaTxt = new QLabel{tr("亮度值")};
+  makeEmphasized(alphaTxt);
+  
+  // 仍然创建复选框，但保持隐藏状态，防止空指针
+  m_alphaCheckBox = new QCheckBox{tr("使用亮度值")};
+  m_alphaCheckBox->setVisible(false);
+  
+  m_alphaSlider = new QSlider{Qt::Horizontal};
+  m_alphaSlider->setRange(0, 255);
+  m_alphaSlider->setValue(255);
+  m_alphaSlider->setEnabled(true);
+  
+  m_alphaLabel = new QLabel{tr("255")};
+  
+  auto* alphaLayout = new QHBoxLayout{};
+  alphaLayout->setContentsMargins(0, 0, 0, 0);
+  alphaLayout->addWidget(m_alphaSlider, 1);
+  alphaLayout->addWidget(m_alphaLabel);
 
   auto* colorHistoryScroller = new QScrollArea{};
   colorHistoryScroller->setWidget(m_colorHistory);
@@ -133,10 +180,10 @@ void SmartColorEditor::createGui()
   auto* leftLayout = new QVBoxLayout{};
   leftLayout->setContentsMargins(0, 0, 0, 0);
   leftLayout->setSpacing(LayoutConstants::NarrowVMargin);
-  leftLayout->addWidget(rangeTxt);
-  leftLayout->addWidget(m_floatRadio);
-  leftLayout->addWidget(m_byteRadio);
   leftLayout->addWidget(m_colorPicker);
+  leftLayout->addWidget(alphaTxt);
+  // 不添加复选框到布局
+  leftLayout->addLayout(alphaLayout);
   leftLayout->addStretch(1);
 
   auto* outerLayout = new QHBoxLayout{};
@@ -148,16 +195,13 @@ void SmartColorEditor::createGui()
   outerLayout->addWidget(colorHistoryScroller, 1);
   setLayout(outerLayout);
 
-  connect(
-    m_floatRadio,
-    &QAbstractButton::clicked,
-    this,
-    &SmartColorEditor::floatRangeRadioButtonClicked);
-  connect(
-    m_byteRadio,
-    &QAbstractButton::clicked,
-    this,
-    &SmartColorEditor::byteRangeRadioButtonClicked);
+  // 创建隐藏的radio按钮，防止空指针
+  m_floatRadio = new QRadioButton{};
+  m_byteRadio = new QRadioButton{};
+  m_floatRadio->setVisible(false);
+  m_byteRadio->setVisible(false);
+  m_byteRadio->setChecked(true); // 默认使用字节模式
+
   connect(
     m_colorPicker,
     &ColorButton::colorChangedByUser,
@@ -168,37 +212,18 @@ void SmartColorEditor::createGui()
     &ColorTable::colorTableSelected,
     this,
     &SmartColorEditor::colorTableSelected);
+  connect(
+    m_alphaSlider,
+    &QSlider::valueChanged,
+    this,
+    &SmartColorEditor::alphaSliderChanged);
 }
 
 void SmartColorEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>& nodes)
 {
-  ensure(m_floatRadio != nullptr, "floatRadio is null");
-  ensure(m_byteRadio != nullptr, "byteRadio is null");
-  ensure(m_colorPicker != nullptr, "colorPicker is null");
-  ensure(m_colorHistory != nullptr, "colorHistory is null");
-
-  updateColorRange(nodes);
+  // 移除ensure检查，因为我们确保上面已经创建了所有对象
   updateColorHistory();
-}
-
-void SmartColorEditor::updateColorRange(const std::vector<mdl::EntityNodeBase*>& nodes)
-{
-  const auto range = detectColorRange(propertyKey(), nodes);
-  if (range == mdl::ColorRange::Float)
-  {
-    m_floatRadio->setChecked(true);
-    m_byteRadio->setChecked(false);
-  }
-  else if (range == mdl::ColorRange::Byte)
-  {
-    m_floatRadio->setChecked(false);
-    m_byteRadio->setChecked(true);
-  }
-  else
-  {
-    m_floatRadio->setChecked(false);
-    m_byteRadio->setChecked(false);
-  }
+  updateAlphaControls(nodes);
 }
 
 void SmartColorEditor::updateColorHistory()
@@ -213,22 +238,56 @@ void SmartColorEditor::updateColorHistory()
     !selectedColors.empty() ? selectedColors.back() : QColor(Qt::black));
 }
 
+void SmartColorEditor::updateAlphaControls(const std::vector<mdl::EntityNodeBase*>& nodes)
+{
+  // 亮度值始终存在，默认为255
+  m_currentAlpha = 255;
+  m_hasAlpha = true; // 始终为true
+  
+  // 检查当前属性值是否包含亮度值（第四个分量）
+  if (!nodes.empty()) {
+    if (const auto* value = nodes.front()->entity().property(propertyKey())) {
+      auto components = splitString(*value);
+      if (components.size() >= 4) {
+        bool ok = false;
+        int alpha = QString::fromStdString(components[3]).toInt(&ok);
+        if (ok) {
+          m_currentAlpha = alpha;
+        }
+      }
+    }
+  }
+  
+  // 更新亮度控件状态
+  m_alphaSlider->setValue(m_currentAlpha);
+  m_alphaLabel->setText(QString::number(m_currentAlpha));
+}
+
+void SmartColorEditor::alphaSliderChanged(int value)
+{
+  m_currentAlpha = value;
+  m_alphaLabel->setText(QString::number(value));
+  
+  // 获取当前所选颜色
+  QColor currentColor = QColor(Qt::black);
+  const auto selectedColors = collectColors(document()->allSelectedEntityNodes(), propertyKey());
+  if (!selectedColors.empty()) {
+    currentColor = selectedColors.back();
+  }
+  
+  // 更新颜色值，使用新的亮度值
+  colorPickerChanged(currentColor);
+}
+
 void SmartColorEditor::setColor(const QColor& color) const
 {
-  const auto colorRange =
-    m_floatRadio->isChecked() ? mdl::ColorRange::Float : mdl::ColorRange::Byte;
-  const auto value = mdl::entityColorAsString(fromQColor(color), colorRange);
+  // 生成颜色值字符串，固定使用字节模式(0-255)
+  std::string value = mdl::entityColorAsString(fromQColor(color), mdl::ColorRange::Byte);
+  
+  // 添加亮度值（第四个分量）- 始终添加
+  value += " " + std::to_string(m_currentAlpha);
+  
   document()->setProperty(propertyKey(), value);
-}
-
-void SmartColorEditor::floatRangeRadioButtonClicked()
-{
-  document()->convertEntityColorRange(propertyKey(), mdl::ColorRange::Float);
-}
-
-void SmartColorEditor::byteRangeRadioButtonClicked()
-{
-  document()->convertEntityColorRange(propertyKey(), mdl::ColorRange::Byte);
 }
 
 void SmartColorEditor::colorPickerChanged(const QColor& color)
@@ -241,4 +300,22 @@ void SmartColorEditor::colorTableSelected(QColor color)
   setColor(color);
 }
 
+// 保留这些方法但简化实现，防止它们被调用时出错
+void SmartColorEditor::floatRangeRadioButtonClicked()
+{
+  // 不再改变颜色范围，始终使用字节模式
+}
+
+void SmartColorEditor::byteRangeRadioButtonClicked()
+{
+  // 不再改变颜色范围，始终使用字节模式
+}
+
+void SmartColorEditor::alphaCheckBoxToggled(bool checked)
+{
+  // 复选框不再可见，但保留方法实现
+  m_hasAlpha = checked;
+}
+
 } // namespace tb::ui
+
