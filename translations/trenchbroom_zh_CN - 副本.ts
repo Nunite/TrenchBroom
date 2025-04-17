@@ -2,19 +2,6 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_CN">
 <context>
-    <name>QApplication</name>
-    <message>
-        <location filename="../common/src/Preferences.cpp" line="38"/>
-        <source>English</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/Preferences.cpp" line="39"/>
-        <source>中文</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>QLineEdit</name>
     <message>
         <location filename="../common/src/ui/QtUtils.cpp" line="501"/>
@@ -975,193 +962,6 @@
         <source>Layer</source>
         <translation>图层</translation>
     </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="42"/>
-        <source>菜单</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="43"/>
-        <source>文件</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="44"/>
-        <source>编辑</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="45"/>
-        <source>视图</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="46"/>
-        <source>运行</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="47"/>
-        <source>调试</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="48"/>
-        <source>帮助</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="49"/>
-        <source>控制</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="50"/>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="51"/>
-        <source>地图视图</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="52"/>
-        <source>导出</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="53"/>
-        <source>导入</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="54"/>
-        <source>标签</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="55"/>
-        <source>实体定义</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="56"/>
-        <source>工具</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="57"/>
-        <source>纹理</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="58"/>
-        <source>实体</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="59"/>
-        <source>打开</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="60"/>
-        <source>保存</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="61"/>
-        <source>首选项</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="62"/>
-        <source>新建</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="63"/>
-        <source>关闭</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="64"/>
-        <source>撤销</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="65"/>
-        <source>重做</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="66"/>
-        <source>剪切</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="67"/>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="70"/>
-        <source>复制</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="68"/>
-        <source>粘贴</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="69"/>
-        <source>删除</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="71"/>
-        <source>全选</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="72"/>
-        <source>取消选择</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="73"/>
-        <source>编译</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="74"/>
-        <source>启动</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="75"/>
-        <source>关于</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="76"/>
-        <source>手册</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="178"/>
-        <source>快捷键</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="179"/>
-        <source>上下文</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="180"/>
-        <source>描述</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/KeyboardShortcutModel.cpp" line="207"/>
-        <source>任意</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>tb::AppPreferenceManager</name>
@@ -1796,18 +1596,17 @@ Please create an issue report and upload all three files.</source>
 <context>
     <name>tb::ui::EntityPropertyEditor</name>
     <message>
-        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="233"/>
-        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="262"/>
+        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="200"/>
         <source>Property &quot;%1&quot;</source>
         <translation>属性 &quot;%1&quot;</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="236"/>
+        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="203"/>
         <source> (%1)</source>
         <translation>(%1)</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="290"/>
+        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="240"/>
         <source>Class &quot;%1&quot;</source>
         <translation>类 &quot;%1&quot;</translation>
     </message>
@@ -1936,8 +1735,9 @@ Please create an issue report and upload all three files.</source>
 <context>
     <name>tb::ui::GameDialog</name>
     <message>
+        <location filename="../common/src/ui/GameDialog.cpp" line="276"/>
         <source>Autodetect</source>
-        <translation type="vanished">自动检测</translation>
+        <translation>自动检测</translation>
     </message>
 </context>
 <context>
@@ -2050,36 +1850,6 @@ Please create an issue report and upload all three files.</source>
         <location filename="../common/src/ui/KeyboardPreferencePane.cpp" line="77"/>
         <source>Double-click an item to begin editing it. Click anywhere else to end editing.</source>
         <translation>双击项目开始编辑。点击其他任意位置结束编辑。</translation>
-    </message>
-</context>
-<context>
-    <name>tb::ui::LanguagePreferencePane</name>
-    <message>
-        <location filename="../common/src/ui/LanguagePreferencePane.cpp" line="46"/>
-        <source>界面语言 (UI Language)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/LanguagePreferencePane.cpp" line="47"/>
-        <source>选择应用程序界面显示的语言，更改后需要重启应用程序生效</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/LanguagePreferencePane.cpp" line="66"/>
-        <location filename="../common/src/ui/LanguagePreferencePane.cpp" line="81"/>
-        <source>需要重启</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/LanguagePreferencePane.cpp" line="67"/>
-        <location filename="../common/src/ui/LanguagePreferencePane.cpp" line="82"/>
-        <source>语言设置将在重启应用程序后生效</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../common/src/ui/LanguagePreferencePane.cpp" line="92"/>
-        <source>语言</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -2699,12 +2469,12 @@ Please choose a different file name to export to.</source>
 <context>
     <name>tb::ui::TrenchBroomApp</name>
     <message>
-        <location filename="../common/src/TrenchBroomApp.cpp" line="312"/>
+        <location filename="../common/src/TrenchBroomApp.cpp" line="264"/>
         <source>TrenchBroom can check for updates automatically. Would you like to enable this now?</source>
         <translation>TrenchBroom可以自动检查更新。您希望现在启用此功能吗？</translation>
     </message>
     <message>
-        <location filename="../common/src/TrenchBroomApp.cpp" line="620"/>
+        <location filename="../common/src/TrenchBroomApp.cpp" line="572"/>
         <source>Open Map</source>
         <translation>打开地图</translation>
     </message>

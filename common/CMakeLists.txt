@@ -446,6 +446,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/SmartColorEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartDefaultPropertyEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartFlagsEditor.cpp
+        ${COMMON_SOURCE_DIR}/ui/SmartFileBrowserEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditorManager.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartWadEditor.cpp
@@ -989,6 +990,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/SmartColorEditor.h
         ${COMMON_SOURCE_DIR}/ui/SmartDefaultPropertyEditor.h
         ${COMMON_SOURCE_DIR}/ui/SmartFlagsEditor.h
+        ${COMMON_SOURCE_DIR}/ui/SmartFileBrowserEditor.h
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditor.h
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditorManager.h
         ${COMMON_SOURCE_DIR}/ui/SmartWadEditor.h

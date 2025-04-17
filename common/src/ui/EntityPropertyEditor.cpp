@@ -32,14 +32,43 @@
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
 #include "ui/SmartPropertyEditorManager.h"
+#include "ui/SmartFileBrowserEditor.h"
 #include "ui/Splitter.h"
 
 #include "kdl/memory_utils.h"
 
 #include <algorithm>
+#include <unordered_set>
 
 namespace tb::ui
 {
+// 判断属性是否适用于文件浏览器
+bool isFileBrowserProperty(const std::string& propertyKey) {
+  // 定义一组特定的属性名，这些属性通常对应文件路径
+  static const std::unordered_set<std::string> exactMatchProperties = {
+    "model",       // 模型文件
+    "studio",      // 另一种模型文件
+    "sprite",      // 精灵文件
+    "sound"        // 单个声音文件
+  };
+  
+  // 精确匹配常见的文件属性名
+  if (exactMatchProperties.find(propertyKey) != exactMatchProperties.end()) {
+    return true;
+  }
+  
+  // 检查属性名称是否包含_name并且也包含关键词
+  if (propertyKey.find("_name") != std::string::npos) {
+    if (propertyKey.find("model") != std::string::npos || 
+        propertyKey.find("sprite") != std::string::npos || 
+        propertyKey.find("sound") != std::string::npos) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 EntityPropertyEditor::EntityPropertyEditor(
   std::weak_ptr<MapDocument> document, QWidget* parent)
   : QWidget{parent}
@@ -96,6 +125,7 @@ void EntityPropertyEditor::updateDocumentationAndSmartEditor()
   auto document = kdl::mem_lock(m_document);
   const auto& propertyKey = m_propertyGrid->selectedRowName();
 
+  // 无论是否为文件浏览属性，都使用switchEditor方法
   m_smartEditorManager->switchEditor(propertyKey, document->allSelectedEntityNodes());
 
   updateDocumentation(propertyKey);
@@ -158,14 +188,39 @@ QString EntityPropertyEditor::optionDescriptions(
     }
     return result;
   }
-  case mdl::PropertyDefinitionType::StringProperty:
-  case mdl::PropertyDefinitionType::BooleanProperty:
-  case mdl::PropertyDefinitionType::IntegerProperty:
-  case mdl::PropertyDefinitionType::FloatProperty:
-  case mdl::PropertyDefinitionType::TargetSourceProperty:
-  case mdl::PropertyDefinitionType::TargetDestinationProperty:
+  // 为文件类型添加描述，更智能地检测文件类型
+  default: {
+    const std::string& shortDesc = definition.shortDescription();
+    const std::string& key = definition.key();
+    
+    // 根据短描述确定文件类型
+    if (shortDesc.find("<sound>") != std::string::npos || 
+        shortDesc.find("WAV") != std::string::npos || 
+        shortDesc.find(".wav") != std::string::npos) {
+      return "Expected value: Sound file path (*.wav)";
+    } else if (shortDesc.find("<sprite>") != std::string::npos || 
+              shortDesc.find("Sprite Name") != std::string::npos) {
+      return "Expected value: Sprite file path (*.spr)";
+    } else if (shortDesc.find("<model>") != std::string::npos || 
+              (shortDesc.find("Model") != std::string::npos && 
+               shortDesc.find("Sprite") == std::string::npos)) {
+      return "Expected value: Model file path (*.mdl)";
+    } else if (shortDesc.find("Model / Sprite") != std::string::npos) {
+      return "Expected value: Model file path (*.mdl) or Sprite file path (*.spr)";
+    } 
+    // 如果无法从短描述确定，则回退到属性名
+    else if (isFileBrowserProperty(key)) {
+      if (key.find("model") != std::string::npos) {
+        return "Expected value: Model file path (*.mdl)";
+      } else if (key.find("sound") != std::string::npos) {
+        return "Expected value: Sound file path (*.wav)";
+      } else if (key.find("sprite") != std::string::npos) {
+        return "Expected value: Sprite file path (*.spr)";
+      }
+    }
+    
     return {};
-    switchDefault();
+  }
   }
 }
 
@@ -220,6 +275,59 @@ void EntityPropertyEditor::updateDocumentation(const std::string& propertyKey)
           m_documentationText->append("");
           m_documentationText->append("Options:");
           m_documentationText->append(optionsDescription);
+        }
+      }
+    }
+    // 对于文件类型属性，但没有属性定义时添加通用描述
+    else if (isFileBrowserProperty(propertyKey)) {
+      m_documentationText->setCurrentCharFormat(boldFormat);
+      m_documentationText->append(tr("Property \"%1\"").arg(QString::fromStdString(propertyKey)));
+      m_documentationText->setCurrentCharFormat(normalFormat);
+      
+      m_documentationText->append("");
+      
+      // 获取属性定义以检查短描述
+      const auto* propDef = mdl::selectPropertyDefinition(propertyKey, document->allSelectedEntityNodes());
+      
+      if (propDef) {
+        const std::string& desc = propDef->shortDescription();
+        
+        // 根据短描述中的标记确定文件类型
+        if (desc.find("<sound>") != std::string::npos || 
+            desc.find("WAV") != std::string::npos || 
+            desc.find(".wav") != std::string::npos) {
+          m_documentationText->append("Expected value: Sound file path (*.wav)");
+        } else if (desc.find("<sprite>") != std::string::npos || 
+                  desc.find("Sprite Name") != std::string::npos) {
+          m_documentationText->append("Expected value: Sprite file path (*.spr)");
+        } else if (desc.find("<model>") != std::string::npos || 
+                  (desc.find("Model") != std::string::npos && 
+                   desc.find("Sprite") == std::string::npos)) {
+          m_documentationText->append("Expected value: Model file path (*.mdl)");
+        } else if (desc.find("Model / Sprite") != std::string::npos) {
+          m_documentationText->append("Expected value: Model file path (*.mdl) or Sprite file path (*.spr)");
+        } else {
+          // 回退到基于属性名称的检测，仅在无法从描述确定类型时使用
+          if (propertyKey.find("model") != std::string::npos) {
+            m_documentationText->append("Expected value: Model file path (*.mdl)");
+          } else if (propertyKey.find("sound") != std::string::npos) {
+            m_documentationText->append("Expected value: Sound file path (*.wav)");
+          } else if (propertyKey.find("sprite") != std::string::npos) {
+            m_documentationText->append("Expected value: Sprite file path (*.spr)");
+          } else {
+            m_documentationText->append("File path value. Use the browser button to select a file.");
+          }
+        }
+      } else {
+        // 没有属性定义时，回退到基于名称的检测
+        if (propertyKey.find("model") != std::string::npos) {
+          m_documentationText->append("Expected value: Model file path (*.mdl)");
+        } else if (propertyKey.find("sound") != std::string::npos) {
+          m_documentationText->append("Expected value: Sound file path (*.wav)");
+        } else if (propertyKey.find("sprite") != std::string::npos) {
+          m_documentationText->append("Expected value: Sprite file path (*.spr)");
+        } else {
+          m_documentationText->append("File path value. Use the browser button to select a file.");
         }
       }
     }
