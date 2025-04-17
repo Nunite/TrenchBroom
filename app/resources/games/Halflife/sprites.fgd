@@ -1,0 +1,1433 @@
+
+// FGD that allows displaying sprites in Trenchbroom Entity Browser 
+// Like an asset browser
+
+//
+// Base Classes
+//
+
+@BaseClass = Targetname 
+[ 
+    targetname(target_source) : "Name"
+]
+
+@BaseClass = Angles
+[
+    angles(string) : "Pitch Yaw Roll (Y Z X)" : "0 0 0"
+]
+
+@BaseClass = FrameRate
+[
+    framerate(integer) : "Frames per second" : 10
+]
+
+@BaseClass = RenderFields
+[
+    renderfx(choices) :"Render FX" : 0 =
+    [
+        0: "Normal"
+        1: "Slow Pulse"
+        2: "Fast Pulse"
+        3: "Slow Wide Pulse"
+        4: "Fast Wide Pulse"
+        9: "Slow Strobe"
+        10: "Fast Strobe"
+        11: "Faster Strobe"
+        12: "Slow Flicker"
+        13: "Fast Flicker"
+        5: "Slow Fade Away"
+        6: "Fast Fade Away"
+        7: "Slow Become Solid"
+        8: "Fast Become Solid"
+        14: "Constant Glow"
+        15: "Distort"
+        16: "Hologram (Distort + fade)"
+    ]
+    rendermode(choices) : "Render Mode" : 0 =
+    [
+        0: "Normal"
+        1: "Color"
+        2: "Texture"
+        3: "Glow"
+        4: "Solid"
+        5: "Additive"
+    ]
+    rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+]
+
+@BaseClass = ToggleSprite
+[   
+    spawnflags(flags) =
+    [
+        1: "Start on" : 0
+        2: "Play Once" : 0
+    ]
+]
+
+@BaseClass = ConvertSprite
+[
+    convert_sprite(choices) : "": 1 =
+    [   
+        0: "no"
+        1: "yes"
+    ]
+]
+
+
+//
+// Sprites
+//
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/320hud1.spr") = spr_320hud1 : "Sprite" 
+[ model(string): "Path" : "models/320hud1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/320hud2.spr") = spr_320hud2 : "Sprite" 
+[ model(string): "Path" : "models/320hud2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/320hud3.spr") = spr_320hud3 : "Sprite" 
+[ model(string): "Path" : "models/320hud3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/320hud4.spr") = spr_320hud4 : "Sprite" 
+[ model(string): "Path" : "models/320hud4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/320hudof01.spr") = spr_320hudof01 : "Sprite" 
+[ model(string): "Path" : "models/320hudof01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/320_logo.spr") = spr_320_logo : "Sprite" 
+[ model(string): "Path" : "models/320_logo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/320_pain.spr") = spr_320_pain : "Sprite" 
+[ model(string): "Path" : "models/320_pain.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/320_train.spr") = spr_320_train : "Sprite" 
+[ model(string): "Path" : "models/320_train.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/3dmflaora.spr") = spr_3dmflaora : "Sprite" 
+[ model(string): "Path" : "models/3dmflaora.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/3dmflared.spr") = spr_3dmflared : "Sprite" 
+[ model(string): "Path" : "models/3dmflared.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/aexplo.spr") = spr_aexplo : "Sprite" 
+[ model(string): "Path" : "models/aexplo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/agrunt1.spr") = spr_agrunt1 : "Sprite" 
+[ model(string): "Path" : "models/agrunt1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/animglow01.spr") = spr_animglow01 : "Sprite" 
+[ model(string): "Path" : "models/animglow01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/arrow1.spr") = spr_arrow1 : "Sprite" 
+[ model(string): "Path" : "models/arrow1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/b-tele1.spr") = spr_b-tele1 : "Sprite" 
+[ model(string): "Path" : "models/b-tele1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ballsmoke.spr") = spr_ballsmoke : "Sprite" 
+[ model(string): "Path" : "models/ballsmoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bexplo.spr") = spr_bexplo : "Sprite" 
+[ model(string): "Path" : "models/bexplo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bhit.spr") = spr_bhit : "Sprite" 
+[ model(string): "Path" : "models/bhit.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bigspit.spr") = spr_bigspit : "Sprite" 
+[ model(string): "Path" : "models/bigspit.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/black_smoke1.spr") = spr_black_smoke1 : "Sprite" 
+[ model(string): "Path" : "models/black_smoke1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/black_smoke2.spr") = spr_black_smoke2 : "Sprite" 
+[ model(string): "Path" : "models/black_smoke2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/black_smoke3.spr") = spr_black_smoke3 : "Sprite" 
+[ model(string): "Path" : "models/black_smoke3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/black_smoke4.spr") = spr_black_smoke4 : "Sprite" 
+[ model(string): "Path" : "models/black_smoke4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/blast.spr") = spr_blast : "Sprite" 
+[ model(string): "Path" : "models/blast.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/blood.spr") = spr_blood : "Sprite" 
+[ model(string): "Path" : "models/blood.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/blooddrop.spr") = spr_blooddrop : "Sprite" 
+[ model(string): "Path" : "models/blooddrop.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bloodspray.spr") = spr_bloodspray : "Sprite" 
+[ model(string): "Path" : "models/bloodspray.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/blueflare1.spr") = spr_blueflare1 : "Sprite" 
+[ model(string): "Path" : "models/blueflare1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/blueflare2.spr") = spr_blueflare2 : "Sprite" 
+[ model(string): "Path" : "models/blueflare2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bluejet1.spr") = spr_bluejet1 : "Sprite" 
+[ model(string): "Path" : "models/bluejet1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bm1.spr") = spr_bm1 : "Sprite" 
+[ model(string): "Path" : "models/bm1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bolt1.spr") = spr_bolt1 : "Sprite" 
+[ model(string): "Path" : "models/bolt1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/botdeath.spr") = spr_botdeath : "Sprite" 
+[ model(string): "Path" : "models/botdeath.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bubble.spr") = spr_bubble : "Sprite" 
+[ model(string): "Path" : "models/bubble.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bubbles.spr") = spr_bubbles : "Sprite" 
+[ model(string): "Path" : "models/bubbles.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bugs.spr") = spr_bugs : "Sprite" 
+[ model(string): "Path" : "models/bugs.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bunkerbuster_explosion.spr") = spr_bunkerbuster_explosion : "Sprite" 
+[ model(string): "Path" : "models/bunkerbuster_explosion.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/bunkerbuster_smoke.spr") = spr_bunkerbuster_smoke : "Sprite" 
+[ model(string): "Path" : "models/bunkerbuster_smoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/c-tele1.spr") = spr_c-tele1 : "Sprite" 
+[ model(string): "Path" : "models/c-tele1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/camera.spr") = spr_camera : "Sprite" 
+[ model(string): "Path" : "models/camera.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cavein.spr") = spr_cavein : "Sprite" 
+[ model(string): "Path" : "models/cavein.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cexplo.spr") = spr_cexplo : "Sprite" 
+[ model(string): "Path" : "models/cexplo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/claymore_explosion1.spr") = spr_claymore_explosion1 : "Sprite" 
+[ model(string): "Path" : "models/claymore_explosion1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cloud01.spr") = spr_cloud01 : "Sprite" 
+[ model(string): "Path" : "models/cloud01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cloud02.spr") = spr_cloud02 : "Sprite" 
+[ model(string): "Path" : "models/cloud02.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cloud03.spr") = spr_cloud03 : "Sprite" 
+[ model(string): "Path" : "models/cloud03.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cloud04.spr") = spr_cloud04 : "Sprite" 
+[ model(string): "Path" : "models/cloud04.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cloud05.spr") = spr_cloud05 : "Sprite" 
+[ model(string): "Path" : "models/cloud05.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cloud06.spr") = spr_cloud06 : "Sprite" 
+[ model(string): "Path" : "models/cloud06.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cnt1.spr") = spr_cnt1 : "Sprite" 
+[ model(string): "Path" : "models/cnt1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/comicflame1.spr") = spr_comicflame1 : "Sprite" 
+[ model(string): "Path" : "models/comicflame1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cp_hud.spr") = spr_cp_hud : "Sprite" 
+[ model(string): "Path" : "models/cp_hud.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/crosshairs.spr") = spr_crosshairs : "Sprite" 
+[ model(string): "Path" : "models/crosshairs.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ct_lavasmoke.spr") = spr_ct_lavasmoke : "Sprite" 
+[ model(string): "Path" : "models/ct_lavasmoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ct_longflare1.spr") = spr_ct_longflare1 : "Sprite" 
+[ model(string): "Path" : "models/ct_longflare1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ct_longflare2.spr") = spr_ct_longflare2 : "Sprite" 
+[ model(string): "Path" : "models/ct_longflare2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ct_squareflare1.spr") = spr_ct_squareflare1 : "Sprite" 
+[ model(string): "Path" : "models/ct_squareflare1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/d-tele1.spr") = spr_d-tele1 : "Sprite" 
+[ model(string): "Path" : "models/d-tele1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/dexplo.spr") = spr_dexplo : "Sprite" 
+[ model(string): "Path" : "models/dexplo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/dot.spr") = spr_dot : "Sprite" 
+[ model(string): "Path" : "models/dot.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/drip.spr") = spr_drip : "Sprite" 
+[ model(string): "Path" : "models/drip.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/dust.spr") = spr_dust : "Sprite" 
+[ model(string): "Path" : "models/dust.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/dust2.spr") = spr_dust2 : "Sprite" 
+[ model(string): "Path" : "models/dust2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/dustybeam.spr") = spr_dustybeam : "Sprite" 
+[ model(string): "Path" : "models/dustybeam.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/e-tele1.spr") = spr_e-tele1 : "Sprite" 
+[ model(string): "Path" : "models/e-tele1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/eexplo.spr") = spr_eexplo : "Sprite" 
+[ model(string): "Path" : "models/eexplo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ef_ignitemg_hit.spr") = spr_ef_ignitemg_hit : "Sprite" 
+[ model(string): "Path" : "models/ef_ignitemg_hit.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ef_mk3a1seburn.spr") = spr_ef_mk3a1seburn : "Sprite" 
+[ model(string): "Path" : "models/ef_mk3a1seburn.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ef_supersoldier_heal.spr") = spr_ef_supersoldier_heal : "Sprite" 
+[ model(string): "Path" : "models/ef_supersoldier_heal.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ef_winggunex_ring.spr") = spr_ef_winggunex_ring : "Sprite" 
+[ model(string): "Path" : "models/ef_winggunex_ring.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ef_zbs84_boss_potal.spr") = spr_ef_zbs84_boss_potal : "Sprite" 
+[ model(string): "Path" : "models/ef_zbs84_boss_potal.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/enter1.spr") = spr_enter1 : "Sprite" 
+[ model(string): "Path" : "models/enter1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/exit1.spr") = spr_exit1 : "Sprite" 
+[ model(string): "Path" : "models/exit1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/explode1.spr") = spr_explode1 : "Sprite" 
+[ model(string): "Path" : "models/explode1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/explode2.spr") = spr_explode2 : "Sprite" 
+[ model(string): "Path" : "models/explode2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/fast_wallpuff1.spr") = spr_fast_wallpuff1 : "Sprite" 
+[ model(string): "Path" : "models/fast_wallpuff1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/fexplo.spr") = spr_fexplo : "Sprite" 
+[ model(string): "Path" : "models/fexplo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/fexplo1.spr") = spr_fexplo1 : "Sprite" 
+[ model(string): "Path" : "models/fexplo1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/fire.spr") = spr_fire : "Sprite" 
+[ model(string): "Path" : "models/fire.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flame1.spr") = spr_flame1 : "Sprite" 
+[ model(string): "Path" : "models/flame1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flame2.spr") = spr_flame2 : "Sprite" 
+[ model(string): "Path" : "models/flame2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flame3.spr") = spr_flame3 : "Sprite" 
+[ model(string): "Path" : "models/flame3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flame3_upright.spr") = spr_flame3_upright : "Sprite" 
+[ model(string): "Path" : "models/flame3_upright.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flamus.spr") = spr_flamus : "Sprite" 
+[ model(string): "Path" : "models/flamus.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flare1.spr") = spr_flare1 : "Sprite" 
+[ model(string): "Path" : "models/flare1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flare2.spr") = spr_flare2 : "Sprite" 
+[ model(string): "Path" : "models/flare2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flare3.spr") = spr_flare3 : "Sprite" 
+[ model(string): "Path" : "models/flare3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flare4.spr") = spr_flare4 : "Sprite" 
+[ model(string): "Path" : "models/flare4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flare5.spr") = spr_flare5 : "Sprite" 
+[ model(string): "Path" : "models/flare5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flare6.spr") = spr_flare6 : "Sprite" 
+[ model(string): "Path" : "models/flare6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/flaresmoke.spr") = spr_flaresmoke : "Sprite" 
+[ model(string): "Path" : "models/flaresmoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/floodlightbeam_mid.spr") = spr_floodlightbeam_mid : "Sprite" 
+[ model(string): "Path" : "models/floodlightbeam_mid.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/fog.spr") = spr_fog : "Sprite" 
+[ model(string): "Path" : "models/fog.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gargeye1.spr") = spr_gargeye1 : "Sprite" 
+[ model(string): "Path" : "models/gargeye1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gas_puff_01.spr") = spr_gas_puff_01 : "Sprite" 
+[ model(string): "Path" : "models/gas_puff_01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gaussbig.spr") = spr_gaussbig : "Sprite" 
+[ model(string): "Path" : "models/gaussbig.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gausspark.spr") = spr_gausspark : "Sprite" 
+[ model(string): "Path" : "models/gausspark.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gausspoof.spr") = spr_gausspoof : "Sprite" 
+[ model(string): "Path" : "models/gausspoof.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gaussshock.spr") = spr_gaussshock : "Sprite" 
+[ model(string): "Path" : "models/gaussshock.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gausswomp.spr") = spr_gausswomp : "Sprite" 
+[ model(string): "Path" : "models/gausswomp.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gexplo.spr") = spr_gexplo : "Sprite" 
+[ model(string): "Path" : "models/gexplo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/glow01.spr") = spr_glow01 : "Sprite" 
+[ model(string): "Path" : "models/glow01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/glow02.spr") = spr_glow02 : "Sprite" 
+[ model(string): "Path" : "models/glow02.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/glow03.spr") = spr_glow03 : "Sprite" 
+[ model(string): "Path" : "models/glow03.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/glow04.spr") = spr_glow04 : "Sprite" 
+[ model(string): "Path" : "models/glow04.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/glow05.spr") = spr_glow05 : "Sprite" 
+[ model(string): "Path" : "models/glow05.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/glow_circle.spr") = spr_glow_circle : "Sprite" 
+[ model(string): "Path" : "models/glow_circle.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/glow_lantern.spr") = spr_glow_lantern : "Sprite" 
+[ model(string): "Path" : "models/glow_lantern.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/glow_lens.spr") = spr_glow_lens : "Sprite" 
+[ model(string): "Path" : "models/glow_lens.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/grass_01.spr") = spr_grass_01 : "Sprite" 
+[ model(string): "Path" : "models/grass_01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/grass_03.spr") = spr_grass_03 : "Sprite" 
+[ model(string): "Path" : "models/grass_03.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gwave1.spr") = spr_gwave1 : "Sprite" 
+[ model(string): "Path" : "models/gwave1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hexplo.spr") = spr_hexplo : "Sprite" 
+[ model(string): "Path" : "models/hexplo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hi_rain.spr") = spr_hi_rain : "Sprite" 
+[ model(string): "Path" : "models/hi_rain.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/holo.spr") = spr_holo : "Sprite" 
+[ model(string): "Path" : "models/holo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hotglow.spr") = spr_hotglow : "Sprite" 
+[ model(string): "Path" : "models/hotglow.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hud640_01.spr") = spr_hud640_01 : "Sprite" 
+[ model(string): "Path" : "models/hud640_01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hud640_02.spr") = spr_hud640_02 : "Sprite" 
+[ model(string): "Path" : "models/hud640_02.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hud640_03.spr") = spr_hud640_03 : "Sprite" 
+[ model(string): "Path" : "models/hud640_03.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/iflagblue.spr") = spr_iflagblue : "Sprite" 
+[ model(string): "Path" : "models/iflagblue.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/iflagred.spr") = spr_iflagred : "Sprite" 
+[ model(string): "Path" : "models/iflagred.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ikgrass1.spr") = spr_ikgrass1 : "Sprite" 
+[ model(string): "Path" : "models/ikgrass1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ikgrass2.spr") = spr_ikgrass2 : "Sprite" 
+[ model(string): "Path" : "models/ikgrass2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ikgrass3.spr") = spr_ikgrass3 : "Sprite" 
+[ model(string): "Path" : "models/ikgrass3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ikgrass4.spr") = spr_ikgrass4 : "Sprite" 
+[ model(string): "Path" : "models/ikgrass4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ikgrass5.spr") = spr_ikgrass5 : "Sprite" 
+[ model(string): "Path" : "models/ikgrass5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/iunknown.spr") = spr_iunknown : "Sprite" 
+[ model(string): "Path" : "models/iunknown.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/laserbeam.spr") = spr_laserbeam : "Sprite" 
+[ model(string): "Path" : "models/laserbeam.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/laserdot.spr") = spr_laserdot : "Sprite" 
+[ model(string): "Path" : "models/laserdot.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ledglow.spr") = spr_ledglow : "Sprite" 
+[ model(string): "Path" : "models/ledglow.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/lgtning.spr") = spr_lgtning : "Sprite" 
+[ model(string): "Path" : "models/lgtning.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/lightbeam.spr") = spr_lightbeam : "Sprite" 
+[ model(string): "Path" : "models/lightbeam.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/lightbeam_ora.spr") = spr_lightbeam_ora : "Sprite" 
+[ model(string): "Path" : "models/lightbeam_ora.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/lightbulb.spr") = spr_lightbulb : "Sprite" 
+[ model(string): "Path" : "models/lightbulb.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/logo.spr") = spr_logo : "Sprite" 
+[ model(string): "Path" : "models/logo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/m3dragonm_smoke.spr") = spr_m3dragonm_smoke : "Sprite" 
+[ model(string): "Path" : "models/m3dragonm_smoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/m3dragon_flame.spr") = spr_m3dragon_flame : "Sprite" 
+[ model(string): "Path" : "models/m3dragon_flame.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/m3dragon_flame2.spr") = spr_m3dragon_flame2 : "Sprite" 
+[ model(string): "Path" : "models/m3dragon_flame2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mommablob.spr") = spr_mommablob : "Sprite" 
+[ model(string): "Path" : "models/mommablob.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mommaspit.spr") = spr_mommaspit : "Sprite" 
+[ model(string): "Path" : "models/mommaspit.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mommaspout.spr") = spr_mommaspout : "Sprite" 
+[ model(string): "Path" : "models/mommaspout.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/moths.spr") = spr_moths : "Sprite" 
+[ model(string): "Path" : "models/moths.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mushroom.spr") = spr_mushroom : "Sprite" 
+[ model(string): "Path" : "models/mushroom.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/muz1.spr") = spr_muz1 : "Sprite" 
+[ model(string): "Path" : "models/muz1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/muz2.spr") = spr_muz2 : "Sprite" 
+[ model(string): "Path" : "models/muz2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/muz3.spr") = spr_muz3 : "Sprite" 
+[ model(string): "Path" : "models/muz3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/muz4.spr") = spr_muz4 : "Sprite" 
+[ model(string): "Path" : "models/muz4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/muz5.spr") = spr_muz5 : "Sprite" 
+[ model(string): "Path" : "models/muz5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/muz6.spr") = spr_muz6 : "Sprite" 
+[ model(string): "Path" : "models/muz6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/muz7.spr") = spr_muz7 : "Sprite" 
+[ model(string): "Path" : "models/muz7.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/muz8.spr") = spr_muz8 : "Sprite" 
+[ model(string): "Path" : "models/muz8.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/nhth1.spr") = spr_nhth1 : "Sprite" 
+[ model(string): "Path" : "models/nhth1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/oriented.spr") = spr_oriented : "Sprite" 
+[ model(string): "Path" : "models/oriented.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/plasma.spr") = spr_plasma : "Sprite" 
+[ model(string): "Path" : "models/plasma.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/poison.spr") = spr_poison : "Sprite" 
+[ model(string): "Path" : "models/poison.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/portal1.spr") = spr_portal1 : "Sprite" 
+[ model(string): "Path" : "models/portal1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/rain.spr") = spr_rain : "Sprite" 
+[ model(string): "Path" : "models/rain.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/redflare1.spr") = spr_redflare1 : "Sprite" 
+[ model(string): "Path" : "models/redflare1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/redflare2.spr") = spr_redflare2 : "Sprite" 
+[ model(string): "Path" : "models/redflare2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/richo1.spr") = spr_richo1 : "Sprite" 
+[ model(string): "Path" : "models/richo1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/richo2.spr") = spr_richo2 : "Sprite" 
+[ model(string): "Path" : "models/richo2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/rjet1.spr") = spr_rjet1 : "Sprite" 
+[ model(string): "Path" : "models/rjet1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/rope.spr") = spr_rope : "Sprite" 
+[ model(string): "Path" : "models/rope.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/scope.spr") = spr_scope : "Sprite" 
+[ model(string): "Path" : "models/scope.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/scopeborder.spr") = spr_scopeborder : "Sprite" 
+[ model(string): "Path" : "models/scopeborder.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/sdrip1.spr") = spr_sdrip1 : "Sprite" 
+[ model(string): "Path" : "models/sdrip1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/shellchrome.spr") = spr_shellchrome : "Sprite" 
+[ model(string): "Path" : "models/shellchrome.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/shockwave.spr") = spr_shockwave : "Sprite" 
+[ model(string): "Path" : "models/shockwave.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/sign_facehugger.spr") = spr_sign_facehugger : "Sprite" 
+[ model(string): "Path" : "models/sign_facehugger.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/sign_praet.spr") = spr_sign_praet : "Sprite" 
+[ model(string): "Path" : "models/sign_praet.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/sign_runner.spr") = spr_sign_runner : "Sprite" 
+[ model(string): "Path" : "models/sign_runner.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/sign_xeno.spr") = spr_sign_xeno : "Sprite" 
+[ model(string): "Path" : "models/sign_xeno.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/small_logo.spr") = spr_small_logo : "Sprite" 
+[ model(string): "Path" : "models/small_logo.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/smoke.spr") = spr_smoke : "Sprite" 
+[ model(string): "Path" : "models/smoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/smokehorizontal.spr") = spr_smokehorizontal : "Sprite" 
+[ model(string): "Path" : "models/smokehorizontal.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/smokepuff.spr") = spr_smokepuff : "Sprite" 
+[ model(string): "Path" : "models/smokepuff.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/snow.spr") = spr_snow : "Sprite" 
+[ model(string): "Path" : "models/snow.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spark1.spr") = spr_spark1 : "Sprite" 
+[ model(string): "Path" : "models/spark1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spotflare3.spr") = spr_spotflare3 : "Sprite" 
+[ model(string): "Path" : "models/spotflare3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spotlight01.spr") = spr_spotlight01 : "Sprite" 
+[ model(string): "Path" : "models/spotlight01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spotlight02.spr") = spr_spotlight02 : "Sprite" 
+[ model(string): "Path" : "models/spotlight02.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spotlight03.spr") = spr_spotlight03 : "Sprite" 
+[ model(string): "Path" : "models/spotlight03.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spotlight04.spr") = spr_spotlight04 : "Sprite" 
+[ model(string): "Path" : "models/spotlight04.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spotlight_long.spr") = spr_spotlight_long : "Sprite" 
+[ model(string): "Path" : "models/spotlight_long.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/steam1.spr") = spr_steam1 : "Sprite" 
+[ model(string): "Path" : "models/steam1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/stmbal1.spr") = spr_stmbal1 : "Sprite" 
+[ model(string): "Path" : "models/stmbal1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/streak.spr") = spr_streak : "Sprite" 
+[ model(string): "Path" : "models/streak.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/sunflare.spr") = spr_sunflare : "Sprite" 
+[ model(string): "Path" : "models/sunflare.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/tele1.spr") = spr_tele1 : "Sprite" 
+[ model(string): "Path" : "models/tele1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/tile.spr") = spr_tile : "Sprite" 
+[ model(string): "Path" : "models/tile.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/tinyspit.spr") = spr_tinyspit : "Sprite" 
+[ model(string): "Path" : "models/tinyspit.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/voiceicon.spr") = spr_voiceicon : "Sprite" 
+[ model(string): "Path" : "models/voiceicon.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/vp_parallel.spr") = spr_vp_parallel : "Sprite" 
+[ model(string): "Path" : "models/vp_parallel.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/vp_parallel_oriented.spr") = spr_vp_parallel_oriented : "Sprite" 
+[ model(string): "Path" : "models/vp_parallel_oriented.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/wallpuff.spr") = spr_wallpuff : "Sprite" 
+[ model(string): "Path" : "models/wallpuff.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/wallsmoke.spr") = spr_wallsmoke : "Sprite" 
+[ model(string): "Path" : "models/wallsmoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/wall_puff1.spr") = spr_wall_puff1 : "Sprite" 
+[ model(string): "Path" : "models/wall_puff1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/wall_puff2.spr") = spr_wall_puff2 : "Sprite" 
+[ model(string): "Path" : "models/wall_puff2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/wall_puff3.spr") = spr_wall_puff3 : "Sprite" 
+[ model(string): "Path" : "models/wall_puff3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/wall_puff4.spr") = spr_wall_puff4 : "Sprite" 
+[ model(string): "Path" : "models/wall_puff4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/watersmoke.spr") = spr_watersmoke : "Sprite" 
+[ model(string): "Path" : "models/watersmoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/wdrip2.spr") = spr_wdrip2 : "Sprite" 
+[ model(string): "Path" : "models/wdrip2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/white.spr") = spr_white : "Sprite" 
+[ model(string): "Path" : "models/white.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/wsplash3.spr") = spr_wsplash3 : "Sprite" 
+[ model(string): "Path" : "models/wsplash3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/WXplo1.spr") = spr_WXplo1 : "Sprite" 
+[ model(string): "Path" : "models/WXplo1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xbeam1.spr") = spr_xbeam1 : "Sprite" 
+[ model(string): "Path" : "models/xbeam1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xbeam2.spr") = spr_xbeam2 : "Sprite" 
+[ model(string): "Path" : "models/xbeam2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xbeam3.spr") = spr_xbeam3 : "Sprite" 
+[ model(string): "Path" : "models/xbeam3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xbeam4.spr") = spr_xbeam4 : "Sprite" 
+[ model(string): "Path" : "models/xbeam4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xbeam5.spr") = spr_xbeam5 : "Sprite" 
+[ model(string): "Path" : "models/xbeam5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xenobeam.spr") = spr_xenobeam : "Sprite" 
+[ model(string): "Path" : "models/xenobeam.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xffloor.spr") = spr_xffloor : "Sprite" 
+[ model(string): "Path" : "models/xffloor.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xfire.spr") = spr_xfire : "Sprite" 
+[ model(string): "Path" : "models/xfire.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xfire2.spr") = spr_xfire2 : "Sprite" 
+[ model(string): "Path" : "models/xfire2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xfireball3.spr") = spr_xfireball3 : "Sprite" 
+[ model(string): "Path" : "models/xfireball3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xflare1.spr") = spr_xflare1 : "Sprite" 
+[ model(string): "Path" : "models/xflare1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xflare2.spr") = spr_xflare2 : "Sprite" 
+[ model(string): "Path" : "models/xflare2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xflare3.spr") = spr_xflare3 : "Sprite" 
+[ model(string): "Path" : "models/xflare3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xsmoke1.spr") = spr_xsmoke1 : "Sprite" 
+[ model(string): "Path" : "models/xsmoke1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xsmoke3.spr") = spr_xsmoke3 : "Sprite" 
+[ model(string): "Path" : "models/xsmoke3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xsmoke3_180.spr") = spr_xsmoke3_180 : "Sprite" 
+[ model(string): "Path" : "models/xsmoke3_180.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xsmoke4.spr") = spr_xsmoke4 : "Sprite" 
+[ model(string): "Path" : "models/xsmoke4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xspark1.spr") = spr_xspark1 : "Sprite" 
+[ model(string): "Path" : "models/xspark1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xspark2.spr") = spr_xspark2 : "Sprite" 
+[ model(string): "Path" : "models/xspark2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xspark3.spr") = spr_xspark3 : "Sprite" 
+[ model(string): "Path" : "models/xspark3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xspark4.spr") = spr_xspark4 : "Sprite" 
+[ model(string): "Path" : "models/xspark4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xssmke1.spr") = spr_xssmke1 : "Sprite" 
+[ model(string): "Path" : "models/xssmke1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xssmke1_fix.spr") = spr_xssmke1_fix : "Sprite" 
+[ model(string): "Path" : "models/xssmke1_fix.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/xssmke1_fix_flip.spr") = spr_xssmke1_fix_flip : "Sprite" 
+[ model(string): "Path" : "models/xssmke1_fix_flip.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/yelflare1.spr") = spr_yelflare1 : "Sprite" 
+[ model(string): "Path" : "models/yelflare1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/yelflare2.spr") = spr_yelflare2 : "Sprite" 
+[ model(string): "Path" : "models/yelflare2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zbeam1.spr") = spr_zbeam1 : "Sprite" 
+[ model(string): "Path" : "models/zbeam1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zbeam2.spr") = spr_zbeam2 : "Sprite" 
+[ model(string): "Path" : "models/zbeam2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zbeam3.spr") = spr_zbeam3 : "Sprite" 
+[ model(string): "Path" : "models/zbeam3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zbeam4.spr") = spr_zbeam4 : "Sprite" 
+[ model(string): "Path" : "models/zbeam4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zbeam5.spr") = spr_zbeam5 : "Sprite" 
+[ model(string): "Path" : "models/zbeam5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zbeam6.spr") = spr_zbeam6 : "Sprite" 
+[ model(string): "Path" : "models/zbeam6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zerogxplode.spr") = spr_zerogxplode : "Sprite" 
+[ model(string): "Path" : "models/zerogxplode.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/cd_blue.spr") = spr_cd_blue : "Sprite" 
+[ model(string): "Path" : "models/cd/cd_blue.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/cd_doll.spr") = spr_cd_doll : "Sprite" 
+[ model(string): "Path" : "models/cd/cd_doll.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/cd_fire1.spr") = spr_cd_fire1 : "Sprite" 
+[ model(string): "Path" : "models/cd/cd_fire1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/cd_to_vvn1ght.spr") = spr_cd_to_vvn1ght : "Sprite" 
+[ model(string): "Path" : "models/cd/cd_to_vvn1ght.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/cd_watersmoke.spr") = spr_cd_watersmoke : "Sprite" 
+[ model(string): "Path" : "models/cd/cd_watersmoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/fire.spr") = spr_fire_d2 : "Sprite" 
+[ model(string): "Path" : "models/cd/fire.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/glow.spr") = spr_glow : "Sprite" 
+[ model(string): "Path" : "models/cd/glow.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/light.spr") = spr_light : "Sprite" 
+[ model(string): "Path" : "models/cd/light.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/rs_glow01.spr") = spr_rs_glow01 : "Sprite" 
+[ model(string): "Path" : "models/cd/rs_glow01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x0.spr") = spr_x0 : "Sprite" 
+[ model(string): "Path" : "models/cd/x0.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x1.spr") = spr_x1 : "Sprite" 
+[ model(string): "Path" : "models/cd/x1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x2.spr") = spr_x2 : "Sprite" 
+[ model(string): "Path" : "models/cd/x2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x3.spr") = spr_x3 : "Sprite" 
+[ model(string): "Path" : "models/cd/x3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x4.spr") = spr_x4 : "Sprite" 
+[ model(string): "Path" : "models/cd/x4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x5.spr") = spr_x5 : "Sprite" 
+[ model(string): "Path" : "models/cd/x5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x6.spr") = spr_x6 : "Sprite" 
+[ model(string): "Path" : "models/cd/x6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x7.spr") = spr_x7 : "Sprite" 
+[ model(string): "Path" : "models/cd/x7.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x8.spr") = spr_x8 : "Sprite" 
+[ model(string): "Path" : "models/cd/x8.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/x9.spr") = spr_x9 : "Sprite" 
+[ model(string): "Path" : "models/cd/x9.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/ball/cd_glow01.spr") = spr_cd_glow01 : "Sprite" 
+[ model(string): "Path" : "models/cd/ball/cd_glow01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/ball/lgtning.spr") = spr_lgtning_d2 : "Sprite" 
+[ model(string): "Path" : "models/cd/ball/lgtning.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cd/flare/cd_flare2.spr") = spr_cd_flare2 : "Sprite" 
+[ model(string): "Path" : "models/cd/flare/cd_flare2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/chaosad/fire2.spr") = spr_fire2 : "Sprite" 
+[ model(string): "Path" : "models/chaosad/fire2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/cindor/cindor/light_glow02.spr") = spr_light_glow02 : "Sprite" 
+[ model(string): "Path" : "models/cindor/cindor/light_glow02.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/ckz_corsair/kzblt_flame.spr") = spr_kzblt_flame : "Sprite" 
+[ model(string): "Path" : "models/ckz_corsair/kzblt_flame.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/AmbientGeneric.spr") = spr_AmbientGeneric : "Sprite" 
+[ model(string): "Path" : "models/CS/AmbientGeneric.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/Announcement.spr") = spr_Announcement : "Sprite" 
+[ model(string): "Path" : "models/CS/Announcement.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/Armoury.spr") = spr_Armoury : "Sprite" 
+[ model(string): "Path" : "models/CS/Armoury.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/beam.spr") = spr_beam : "Sprite" 
+[ model(string): "Path" : "models/CS/beam.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/blood.spr") = spr_blood_d2 : "Sprite" 
+[ model(string): "Path" : "models/CS/blood.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/BombTarget.spr") = spr_BombTarget : "Sprite" 
+[ model(string): "Path" : "models/CS/BombTarget.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/envexplosion.spr") = spr_envexplosion : "Sprite" 
+[ model(string): "Path" : "models/CS/envexplosion.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/envfog.spr") = spr_envfog : "Sprite" 
+[ model(string): "Path" : "models/CS/envfog.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/EnvFunnel.spr") = spr_EnvFunnel : "Sprite" 
+[ model(string): "Path" : "models/CS/EnvFunnel.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/EnvGlobal.spr") = spr_EnvGlobal : "Sprite" 
+[ model(string): "Path" : "models/CS/EnvGlobal.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/envglow.spr") = spr_envglow : "Sprite" 
+[ model(string): "Path" : "models/CS/envglow.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/EnvRain.spr") = spr_EnvRain : "Sprite" 
+[ model(string): "Path" : "models/CS/EnvRain.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/EnvShake.spr") = spr_EnvShake : "Sprite" 
+[ model(string): "Path" : "models/CS/EnvShake.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/EnvSnow.spr") = spr_EnvSnow : "Sprite" 
+[ model(string): "Path" : "models/CS/EnvSnow.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/EnvSound.spr") = spr_EnvSound : "Sprite" 
+[ model(string): "Path" : "models/CS/EnvSound.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/EnvSpark.spr") = spr_EnvSpark : "Sprite" 
+[ model(string): "Path" : "models/CS/EnvSpark.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/EnvTarget.spr") = spr_EnvTarget : "Sprite" 
+[ model(string): "Path" : "models/CS/EnvTarget.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/fade.spr") = spr_fade : "Sprite" 
+[ model(string): "Path" : "models/CS/fade.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GameCounter.spr") = spr_GameCounter : "Sprite" 
+[ model(string): "Path" : "models/CS/GameCounter.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GameCounterSet.spr") = spr_GameCounterSet : "Sprite" 
+[ model(string): "Path" : "models/CS/GameCounterSet.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GameEnd.spr") = spr_GameEnd : "Sprite" 
+[ model(string): "Path" : "models/CS/GameEnd.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GamePlayerEquip.spr") = spr_GamePlayerEquip : "Sprite" 
+[ model(string): "Path" : "models/CS/GamePlayerEquip.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GamePlayerHurt.spr") = spr_GamePlayerHurt : "Sprite" 
+[ model(string): "Path" : "models/CS/GamePlayerHurt.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GamePlayerTeam.spr") = spr_GamePlayerTeam : "Sprite" 
+[ model(string): "Path" : "models/CS/GamePlayerTeam.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GameScore.spr") = spr_GameScore : "Sprite" 
+[ model(string): "Path" : "models/CS/GameScore.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GameTeamMaster.spr") = spr_GameTeamMaster : "Sprite" 
+[ model(string): "Path" : "models/CS/GameTeamMaster.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GameTeamSet.spr") = spr_GameTeamSet : "Sprite" 
+[ model(string): "Path" : "models/CS/GameTeamSet.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GameText.spr") = spr_GameText : "Sprite" 
+[ model(string): "Path" : "models/CS/GameText.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/GameZonePlayer.spr") = spr_GameZonePlayer : "Sprite" 
+[ model(string): "Path" : "models/CS/GameZonePlayer.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/gib.spr") = spr_gib : "Sprite" 
+[ model(string): "Path" : "models/CS/gib.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/HostageRescue.spr") = spr_HostageRescue : "Sprite" 
+[ model(string): "Path" : "models/CS/HostageRescue.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/InfoCompileParameters.spr") = spr_InfoCompileParameters : "Sprite" 
+[ model(string): "Path" : "models/CS/InfoCompileParameters.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/InfoLandmark.spr") = spr_InfoLandmark : "Sprite" 
+[ model(string): "Path" : "models/CS/InfoLandmark.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/infoteleportdestination.spr") = spr_infoteleportdestination : "Sprite" 
+[ model(string): "Path" : "models/CS/infoteleportdestination.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/laser.spr") = spr_laser : "Sprite" 
+[ model(string): "Path" : "models/CS/laser.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/LightEnvironment.spr") = spr_LightEnvironment : "Sprite" 
+[ model(string): "Path" : "models/CS/LightEnvironment.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/LightSpot.spr") = spr_LightSpot : "Sprite" 
+[ model(string): "Path" : "models/CS/LightSpot.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/MapParams.spr") = spr_MapParams : "Sprite" 
+[ model(string): "Path" : "models/CS/MapParams.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/MultiSource.spr") = spr_MultiSource : "Sprite" 
+[ model(string): "Path" : "models/CS/MultiSource.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/multi_manager.spr") = spr_multi_manager : "Sprite" 
+[ model(string): "Path" : "models/CS/multi_manager.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/null.spr") = spr_null : "Sprite" 
+[ model(string): "Path" : "models/CS/null.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/PathCorner.spr") = spr_PathCorner : "Sprite" 
+[ model(string): "Path" : "models/CS/PathCorner.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/PathTrack.spr") = spr_PathTrack : "Sprite" 
+[ model(string): "Path" : "models/CS/PathTrack.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/PlayerWeaponStrip.spr") = spr_PlayerWeaponStrip : "Sprite" 
+[ model(string): "Path" : "models/CS/PlayerWeaponStrip.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/render.spr") = spr_render : "Sprite" 
+[ model(string): "Path" : "models/CS/render.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/TestEffect.spr") = spr_TestEffect : "Sprite" 
+[ model(string): "Path" : "models/CS/TestEffect.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/TriggerAuto.spr") = spr_TriggerAuto : "Sprite" 
+[ model(string): "Path" : "models/CS/TriggerAuto.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/TriggerCamera.spr") = spr_TriggerCamera : "Sprite" 
+[ model(string): "Path" : "models/CS/TriggerCamera.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/TriggerChangeTarget.spr") = spr_TriggerChangeTarget : "Sprite" 
+[ model(string): "Path" : "models/CS/TriggerChangeTarget.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/CS/TriggerRelay.spr") = spr_TriggerRelay : "Sprite" 
+[ model(string): "Path" : "models/CS/TriggerRelay.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/de_dust2_2020/flame.spr") = spr_flame : "Sprite" 
+[ model(string): "Path" : "models/de_dust2_2020/flame.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/de_dust2_2020/flare.spr") = spr_flare : "Sprite" 
+[ model(string): "Path" : "models/de_dust2_2020/flare.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/de_dust2_2020/smoke.spr") = spr_smoke_d2 : "Sprite" 
+[ model(string): "Path" : "models/de_dust2_2020/smoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/effects/rain.spr") = spr_rain_d2 : "Sprite" 
+[ model(string): "Path" : "models/effects/rain.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/effects/rainsplash.spr") = spr_rainsplash : "Sprite" 
+[ model(string): "Path" : "models/effects/rainsplash.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/effects/ripple.spr") = spr_ripple : "Sprite" 
+[ model(string): "Path" : "models/effects/ripple.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/effects/snowflake.spr") = spr_snowflake : "Sprite" 
+[ model(string): "Path" : "models/effects/snowflake.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/FLasH/bluebeam1.spr") = spr_bluebeam1 : "Sprite" 
+[ model(string): "Path" : "models/FLasH/bluebeam1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/gbc_script_destroman/esf_kamehameha_blue.spr") = spr_esf_kamehameha_blue : "Sprite" 
+[ model(string): "Path" : "models/gbc_script_destroman/esf_kamehameha_blue.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hb_dilo2/3dmflaora.spr") = spr_3dmflaora_d2 : "Sprite" 
+[ model(string): "Path" : "models/hb_dilo2/3dmflaora.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hb_dilo2/3dmflared.spr") = spr_3dmflared_d2 : "Sprite" 
+[ model(string): "Path" : "models/hb_dilo2/3dmflared.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hb_dilo2/glow04.spr") = spr_glow04_d2 : "Sprite" 
+[ model(string): "Path" : "models/hb_dilo2/glow04.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hb_dropzone2/xffloor.spr") = spr_xffloor_d2 : "Sprite" 
+[ model(string): "Path" : "models/hb_dropzone2/xffloor.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hb_hamma/splash.spr") = spr_splash : "Sprite" 
+[ model(string): "Path" : "models/hb_hamma/splash.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hb_hamma/wsplash3.spr") = spr_wsplash3_d2 : "Sprite" 
+[ model(string): "Path" : "models/hb_hamma/wsplash3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/hb_vvn1ght/madarath3king.spr") = spr_madarath3king : "Sprite" 
+[ model(string): "Path" : "models/hb_vvn1ght/madarath3king.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/kzru_dydka/xffloor.spr") = spr_xffloor_d3 : "Sprite" 
+[ model(string): "Path" : "models/kzru_dydka/xffloor.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mam6ahop/rainsplash.spr") = spr_rainsplash_d2 : "Sprite" 
+[ model(string): "Path" : "models/mam6ahop/rainsplash.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mam6ahop/wsplash3.spr") = spr_wsplash3_d3 : "Sprite" 
+[ model(string): "Path" : "models/mam6ahop/wsplash3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mentalo/fire.spr") = spr_fire_d3 : "Sprite" 
+[ model(string): "Path" : "models/mentalo/fire.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mentalo/lightsmoke.spr") = spr_lightsmoke : "Sprite" 
+[ model(string): "Path" : "models/mentalo/lightsmoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mentalo/xsmoke1.spr") = spr_xsmoke1_d2 : "Sprite" 
+[ model(string): "Path" : "models/mentalo/xsmoke1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mojito/flamus.spr") = spr_flamus_d2 : "Sprite" 
+[ model(string): "Path" : "models/mojito/flamus.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/flare1.spr") = spr_flare1_d2 : "Sprite" 
+[ model(string): "Path" : "models/mujik/flare1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/timemuj.spr") = spr_timemuj : "Sprite" 
+[ model(string): "Path" : "models/mujik/timemuj.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/1.spr") = spr_1 : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/bwtreesmj.spr") = spr_bwtreesmj : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/bwtreesmj.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/funtmj1.spr") = spr_funtmj1 : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/funtmj1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/gammj5.spr") = spr_gammj5 : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/gammj5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/glitmj1.spr") = spr_glitmj1 : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/glitmj1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/glitmj2.spr") = spr_glitmj2 : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/glitmj2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/glitmj3.spr") = spr_glitmj3 : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/glitmj3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/glitmj4.spr") = spr_glitmj4 : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/glitmj4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/glow03.spr") = spr_glow03_d2 : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/glow03.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/loadmjga.spr") = spr_loadmjga : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/loadmjga.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/mujik/man/muj_game.spr") = spr_muj_game : "Sprite" 
+[ model(string): "Path" : "models/mujik/man/muj_game.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/qTemplhop/arrow_text.spr") = spr_arrow_text : "Sprite" 
+[ model(string): "Path" : "models/qTemplhop/arrow_text.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/qTemplhop/b2t.spr") = spr_b2t : "Sprite" 
+[ model(string): "Path" : "models/qTemplhop/b2t.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/qTemplhop/bluebeam.spr") = spr_bluebeam : "Sprite" 
+[ model(string): "Path" : "models/qTemplhop/bluebeam.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/qTemplhop/ezversion01.spr") = spr_ezversion01 : "Sprite" 
+[ model(string): "Path" : "models/qTemplhop/ezversion01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/qTemplhop/grass_01.spr") = spr_grass_01_d2 : "Sprite" 
+[ model(string): "Path" : "models/qTemplhop/grass_01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/qTemplhop/grass_03.spr") = spr_grass_03_d2 : "Sprite" 
+[ model(string): "Path" : "models/qTemplhop/grass_03.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/qTemplhop/hversion01.spr") = spr_hversion01 : "Sprite" 
+[ model(string): "Path" : "models/qTemplhop/hversion01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/qTemplhop/snow.spr") = spr_snow_d2 : "Sprite" 
+[ model(string): "Path" : "models/qTemplhop/snow.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/qTemplhop/u.spr") = spr_u : "Sprite" 
+[ model(string): "Path" : "models/qTemplhop/u.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/sandblock/flames.spr") = spr_flames : "Sprite" 
+[ model(string): "Path" : "models/sandblock/flames.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/slide_colors/bm_teleport_end.spr") = spr_bm_teleport_end : "Sprite" 
+[ model(string): "Path" : "models/slide_colors/bm_teleport_end.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/flame.spr") = spr_flame_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/flame.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/flare.spr") = spr_flare_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/flare.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/mapbyspr1n.spr") = spr_mapbyspr1n : "Sprite" 
+[ model(string): "Path" : "models/spr1n/mapbyspr1n.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/sp_steam.spr") = spr_sp_steam : "Sprite" 
+[ model(string): "Path" : "models/spr1n/sp_steam.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/sp_steam2.spr") = spr_sp_steam2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/sp_steam2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/sp_steam_p.spr") = spr_sp_steam_p : "Sprite" 
+[ model(string): "Path" : "models/spr1n/sp_steam_p.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/wsplash3.spr") = spr_wsplash3_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/wsplash3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x0.spr") = spr_x0_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x0.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x1.spr") = spr_x1_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x2.spr") = spr_x2_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x3.spr") = spr_x3_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x4.spr") = spr_x4_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x5.spr") = spr_x5_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x6.spr") = spr_x6_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x7.spr") = spr_x7_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x7.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x8.spr") = spr_x8_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x8.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/x9.spr") = spr_x9_d2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/x9.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/xcol.spr") = spr_xcol : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/xcol.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/blue8/xdot.spr") = spr_xdot : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/blue8/xdot.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x0.spr") = spr_x0_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x0.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x1.spr") = spr_x1_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x10.spr") = spr_x10 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x10.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x11.spr") = spr_x11 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x11.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x2.spr") = spr_x2 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x2.spr") = spr_x2_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x3.spr") = spr_x3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x3.spr") = spr_x3_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x4.spr") = spr_x4_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x5.spr") = spr_x5_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x6.spr") = spr_x6_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x7.spr") = spr_x7_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x7.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x8.spr") = spr_x8_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x8.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzblt/x9.spr") = spr_x9_d3 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzblt/x9.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x0.spr") = spr_x0_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x0.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x1.spr") = spr_x1_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x2.spr") = spr_x2_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x3.spr") = spr_x3_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x4.spr") = spr_x4_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x5.spr") = spr_x5_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x6.spr") = spr_x6_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x7.spr") = spr_x7_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x7.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x8.spr") = spr_x8_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x8.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzmad/x9.spr") = spr_x9_d4 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzmad/x9.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x0.spr") = spr_x0_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x0.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x1.spr") = spr_x1_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x2.spr") = spr_x2_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x3.spr") = spr_x3_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x4.spr") = spr_x4_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x5.spr") = spr_x5_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x6.spr") = spr_x6_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x7.spr") = spr_x7_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x7.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x8.spr") = spr_x8_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x8.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kznum/x9.spr") = spr_x9_d5 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kznum/x9.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x0.spr") = spr_x0_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x0.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x1.spr") = spr_x1_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x2.spr") = spr_x2_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x3.spr") = spr_x3_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x4.spr") = spr_x4_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x5.spr") = spr_x5_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x6.spr") = spr_x6_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x7.spr") = spr_x7_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x7.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x8.spr") = spr_x8_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x8.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/digits/kzold/x9.spr") = spr_x9_d6 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/digits/kzold/x9.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x0.spr") = spr_x0_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x0.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x1.spr") = spr_x1_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x1.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x2.spr") = spr_x2_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x3.spr") = spr_x3_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x3.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x4.spr") = spr_x4_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x4.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x5.spr") = spr_x5_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x5.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x6.spr") = spr_x6_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x6.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x7.spr") = spr_x7_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x7.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x8.spr") = spr_x8_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x8.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/spr1n/kzblt/x9.spr") = spr_x9_d7 : "Sprite" 
+[ model(string): "Path" : "models/spr1n/kzblt/x9.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/SuPM/bluefire.spr") = spr_bluefire : "Sprite" 
+[ model(string): "Path" : "models/SuPM/bluefire.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/SuPM/hugeball.spr") = spr_hugeball : "Sprite" 
+[ model(string): "Path" : "models/SuPM/hugeball.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/SuPM/krasmj2.spr") = spr_krasmj2 : "Sprite" 
+[ model(string): "Path" : "models/SuPM/krasmj2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/SuPM/particles2.spr") = spr_particles2 : "Sprite" 
+[ model(string): "Path" : "models/SuPM/particles2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/SuPM/spm.spr") = spr_spm : "Sprite" 
+[ model(string): "Path" : "models/SuPM/spm.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/SuPM/supm.spr") = spr_supm : "Sprite" 
+[ model(string): "Path" : "models/SuPM/supm.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/v4r/fire.spr") = spr_fire_d4 : "Sprite" 
+[ model(string): "Path" : "models/v4r/fire.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/v4r/fire2.spr") = spr_fire2_d2 : "Sprite" 
+[ model(string): "Path" : "models/v4r/fire2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/v4r/flame2.spr") = spr_flame2_d2 : "Sprite" 
+[ model(string): "Path" : "models/v4r/flame2.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/v4r/glow.spr") = spr_glow_d2 : "Sprite" 
+[ model(string): "Path" : "models/v4r/glow.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/v4r/glow01.spr") = spr_glow01_d2 : "Sprite" 
+[ model(string): "Path" : "models/v4r/glow01.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/v4r/glow03.spr") = spr_glow03_d3 : "Sprite" 
+[ model(string): "Path" : "models/v4r/glow03.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/v4r/light.spr") = spr_light_d2 : "Sprite" 
+[ model(string): "Path" : "models/v4r/light.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/v4r/watersmoke.spr") = spr_watersmoke_d2 : "Sprite" 
+[ model(string): "Path" : "models/v4r/watersmoke.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zs_voidzone/ef_blackhole03.spr") = spr_ef_blackhole03 : "Sprite" 
+[ model(string): "Path" : "models/zs_voidzone/ef_blackhole03.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zs_voidzone/ef_blackhole04.spr") = spr_ef_blackhole04 : "Sprite" 
+[ model(string): "Path" : "models/zs_voidzone/ef_blackhole04.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zs_voidzone/ef_blackhole_loop.spr") = spr_ef_blackhole_loop : "Sprite" 
+[ model(string): "Path" : "models/zs_voidzone/ef_blackhole_loop.spr"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ToggleSprite, ConvertSprite) size(-8 -8 -8, 8 8 8) color(204 0 255) iconsprite("sprites/zs_voidzone/ef_winggun_summon01.spr") = spr_ef_winggun_summon01 : "Sprite" 
+[ model(string): "Path" : "models/zs_voidzone/ef_winggun_summon01.spr"]
+

@@ -1,0 +1,3 @@
+@include "cs16lws.fgd"
+@include "models.fgd"
+@include "sprites.fgd"
