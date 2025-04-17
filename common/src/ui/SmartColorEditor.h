@@ -54,12 +54,19 @@ private:
   QCheckBox* m_alphaCheckBox = nullptr;
   QSlider* m_alphaSlider = nullptr;
   QLabel* m_alphaLabel = nullptr;
-  int m_currentAlpha = 255;
+  int m_currentAlpha = 200;
   bool m_hasAlpha = true;
+  
+  // 添加成员变量来跟踪当前颜色
+  QColor m_currentColor;
 
 public:
   explicit SmartColorEditor(
     std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
+
+protected:
+  // 添加事件过滤器以支持双击编辑功能
+  bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
   void createGui();
