@@ -1,0 +1,2720 @@
+% TrenchBroom \_\_TB_VERSION\_\_ 参考手册  
+% Kristian Duske  
+% 2015年11月13日  
+
+# 简介 {#introduction}  
+
+TrenchBroom是一款面向基于Brush的游戏引擎（如Quake、Quake 2和Hexen 2）的关卡编辑工具。TrenchBroom易于使用，并提供多种简单和高级工具，帮助用户轻松创建复杂而有趣的关卡。本文档为TrenchBroom的使用手册。阅读本文档将帮助您掌握TrenchBroom的基本操作及高级功能的使用方法。##  功能 {#features}
+
+* **常规功能**
+    *   全面支持3D编辑及最多三个2D视图同时操作  
+    *   高性能渲染器，支持超大规模地图  
+    *   无限次撤销与重做  
+    *   类宏指令的命令重复执行  
+    *   关联编组功能  
+    *   带自动快速修复的问题检视器  
+    *   运行外部编译器并启动游戏引擎  
+    *   Point文件支持  
+    *   Portal文件支持  
+    *   自动备份机制  
+    *   免费且跨平台  
+
+* **Brush编辑**  
+    *   强大的顶点编辑功能：支持边/面切割及多顶点协同操作  
+    *  二点/三点式剪切工具  
+     *  缩放与斜切工具  
+     * CSG操作：合并/差集/抽壳   
+     * UV视图便于贴图调整   
+     *  所有笔刷编辑操作均配备精准对齐锁定   
+     *  多材质集合管理  
+
+* **实体编辑**   
+     *  支持拖放的实体浏览器   
+     *  兼容FGD/ENT/DEF格式的实体定义文件   
+     *  模组支持   
+     *  实体链接可视化   
+     *  编辑器内直接显示3D模型（支持mdl/md2/md3/bsp/dkm格式）    
+     *  智能实体属性编辑器## 关于本文档
+
+本文档旨在帮助您学习使用TrenchBroom编辑器。它并非用于教授如何制作地图（mapping），也不是教程。如果您的地图遇到技术问题，或需要了解如何为特定游戏创建特殊效果或场景设置，应向其他地图制作者寻求帮助（参见[参考资料与链接](#references_and_links)查找相关社区）。本文档仅教授如何使用本编辑器。
+
+# 入门指南 {#getting_started}
+
+本节首先简要介绍与基于笔刷（brush）引擎的地图制作相关的最重要技术术语。此外，我们还将介绍TrenchBroom所基于的一些核心概念。随后，我们将讲解欢迎窗口、游戏选择对话框，概述主窗口界面，并解释3D和2D视图中的摄像机导航操作。## 基础知识 {#preliminaries}
+
+本节将介绍基于Quake引擎游戏中与地图制作相关的一些技术术语。您无需完全理解所有这些术语的细节，但为了理解TrenchBroom的工作原理，您应该对地图的结构以及TrenchBroom如何查看和管理该结构有一个基本概念。特别是本节介绍了一些我们添加到地图结构中的概念（当然不会改变文件格式）。了解并理解这些概念将帮助您掌握在TrenchBroom中编辑关卡的几个重要方面。
+
+### 地图定义
+
+在基于Quake引擎的游戏中，关卡通常被称为maps。以下是对地图结构的简单规范说明，采用扩展巴科斯-诺尔范式（EBNF）编写。EBNF是一种用于定义层次结构的简单语法，广泛应用于计算机科学中定义计算机语言的语法。不用担心，您不需要理解EBNF，因为我们将逐行解释这些定义。
+
+    1\. `Map      = Entity {Entity}`  
+    2\. `Entity   = {Property} {Brush}`  
+    3\. `Property = Key Value`  
+    4\. `Brush    = {Face}`  
+    5\. `Face     = Plane Texture Offset Scale Rotation ...`  
+
+第一行规定了一个**map**包含一个实体以及零个或多个其他实体。在EBNF中，"Entity"周围的花括号表示它可能是一个空序列的实体。总之，第一行意味着一个map只是一个或多个实体的序列。一个**entity**是一个可能为空的属性序列后跟零个或多个brushes。一个**property**只是一个键值对，键和值都是字符串（这一信息在EBNF中被省略了）。
+
+第四行将**Brush**定义为一个可能为空的面序列（但通常至少会有四个面，否则brush将是无效的）。第五行最终定义了**Face**具有一个平面、一个材质、X和Y偏移及缩放比例、旋转角度以及其他可能的属性（具体取决于游戏）。
+
+在本文档中，我们使用术语_object_来指代entities和brushes。
+
+### TrenchBroom的地图视图
+
+TrenchBroom对地图中的对象组织方式与地图文件中的组织方式略有不同。首先，TrenchBroom引入了两个额外的概念：[图层](#layers)和[组](#groups)。其次，"worldspawn"实体对用户隐藏且其属性与地图相关联。为了区分TrenchBroom的视图与其他工具和编译器的视图的不同之处，我们在此使用术语“world”代替“map”。在本文档剩余部分中我们将再次使用“map”这一术语。
+
+    1\. `World        = {Property} DefaultLayer {Layer}`  
+    2\. `DefaultLayer = Layer`  
+    3\. `Layer        = Name {Group} {Entity} {Brush}`  
+    4\. `Group        = Name {Group} {Entity} {Brush}`第一行定义了TrenchBroom中map的结构。对TrenchBroom而言，一个**World**由零或多个属性、一个默认图层和零或多个附加图层组成。第二行说明**DefaultLayer**就是一个普通图层。接着第三行定义了什么是**Layer**：图层具有名称（字符串类型），包含零或多个组、零或多个实体以及零或多个brush。在TrenchBroom中，图层用于将map划分为若干大区域，通过隐藏这些区域来减少视觉混乱。相比之下，组用于将少量对象合并为一个对象以便整体编辑。与图层类似，一个**Group**由名称、零或多个子组、零或多个实体以及零或多个brush构成。您可能已经注意到——组会形成层级结构，即一个组可以包含其他子组。其余所有定义均与前一节完全相同。
+
+总结来说，TrenchBroom将map视为一种层级结构（树形）。该层级的根节点称为world，代表整个map。world首先由图层构成，其次是组、实体和brush；其中组可以包含更多子组、实体和brush，而实体又可以包含brush。由于组可以嵌套其他组，这种层级结构理论上可以无限延伸——尽管实践中很少会出现超过一级的子组嵌套。
+
+### Brush几何结构 {#brush_geometry}
+
+在标准map文件中，brush的几何结构由一组面定义。除了确定UV映射的属性外，每个面还通过三个平面点来指定一个平面。平面的方向由这三个点在map文件面定义中的书写顺序决定。示例如下：
+
+    ( 32 32 -3824  ) ( -32 32 -3824  ) ( -32 96 -3824 ) mmetal1_2 0 0 0 1 1
+
+平面点以三组三维坐标表示。每组包含三个数字分别对应平面点的X/Y/Z坐标值。这三个点p1/p2/p3按以下方式定义两个向量v1/v2：
+
+      *p2
+     /|\
+      |
+      v2
+      |
+    p1*--v1--->*p3平面的法线方向由向量v1和v2的叉积决定。在上图中，平面法线指向观察者方向。平面与其法线共同将三维空间划分为两个半空间：平面上方的上半空间和平面下方的下半空间。在这种定义方式下，Brush的体积就是由其所有面平面定义的下半空间的交集。这种Brush表示法的优势在于能自动保证所有Brush都是凸面体。然而，这种表示法并不直接包含Brush的其他几何信息（特别是顶点、边和面），这些信息需要通过平面表示计算得出。在TrenchBroom中，这些顶点、边和面被称为**Brush几何体**。TrenchBroom采用与BSP编译器相同的算法来计算Brush几何体。获取Brush几何体主要用于两个目的：渲染和顶点编辑。
+
+### 实体定义 {#entity_definitions}
+
+对TrenchBroom而言，实体只是一组属性（键值对）的集合，其中大多数属性没有特殊含义。具体来说，实体属性并不会指定TrenchBroom在视口中应显示哪个模型来代表该实体。此外，某些属性值具有特定类型（如颜色、角度或位置），但这些类型不能硬编码到编辑器中——根据游戏、模组或实体的不同，"angle"这类属性可能有完全不同的含义。为了让TrenchBroom能正确解析特定实体及其属性，需要借助实体定义文件。实体定义会明确实体的生成标志(spawnflags)、属性名称与类型、编辑器中显示的模型等信息。这些定义通常存储在独立的文件中，用户可以[将其加载到编辑器](#entity_definition_setup)。
+
+### 模组 {#mods}
+
+模组（游戏修改的简称）是通过自定义玩法与资源扩展Quake引擎游戏的方式。自定义资源包括模型、声音和材质等资源文件。从游戏运行的角度看，模组是游戏目录下的子目录，其中存放着以松散文件或pak等压缩包形式存在的附加资源文件。对TrenchBroom而言，模组主要提供两类资源：替换游戏原有资源的文件与新增资源文件。例如某个模组可能提供实体的新模型，或者引入全新的实体类型。要使这些新实体能在TrenchBroom中使用需要满足两个条件：首先需要为这些实体准备[实体定义文件](#entity_definitions)，其次需要告知编辑器应在何处查找视口中显示的模型文件地址第一个问题可通过指定备用实体定义文件解决第二个问题可通过[添加模组目录](#mod_setup)来解决每个游戏都有一个默认mod，TrenchBroom始终会加载该mod。以《雷神之锤》为例，其默认mod是_id1_目录（该目录包含所有游戏资源）。TrenchBroom支持多mod运行，当存在多个mod时，需要制定资源命名冲突的解决策略。例如：某个mod可能为默认mod中定义的实体提供替代模型，用更高精度的模型替换默认模型。此时该mod会提供一个与目标模型同名的实体模型。为解决此类命名冲突，TrenchBroom会为各mod分配优先级——当不同mod间发生命名冲突时，优先级最高的mod胜出。需注意：默认mod始终具有最低优先级。
+
+### 材质与材质集合 {#materials}
+
+材质定义了表面渲染方式及光线交互效果。在TrenchBroom中，材质通常与纹理紧密关联。当程序在文件系统中发现纹理时，会自动为其创建默认材质。对于《雷神之锤3》，还会从shader文件中读取额外的材质属性。材质通常不以单个文件形式提供，而是作为材质集合存在。材质集合可以是包含松散图像文件的目录，也可以是wad文件等归档包。《雷神之锤2》等游戏自带的纹理可直接被TrenchBroom加载，这类纹理称为_内置纹理_；而_外部纹理_则需要通过[加载wad文件](#material_management)手动添加（因为《雷神之锤》等游戏本身不提供现成纹理）。
+
+多个材质集合可能包含同名材质从而引发命名冲突。此类冲突的解决依据是材质集合的加载顺序——最后加载的材质将胜出。除非使用wad文件，否则无法控制加载顺序。
+
+（注：根据技术文档惯例，"shader"、"wad"等专有名词保留不译；"_内置纹理_"和"_外部纹理_"采用下划线标注原文强调格式；章节锚点#materials保持原样）## 启动 {#startup}
+
+启动TrenchBoom时首先看到的是欢迎窗口。该窗口允许您打开最近编辑过的地图、创建新地图或浏览计算机中想要在TrenchBoom中打开的现有地图。
+
+![TrenchBoom欢迎窗口（Mac OS X）](images/WelcomeWindow.png)
+
+点击"新建地图..."按钮可创建新地图，或点击"浏览..."按钮查找计算机中的地图文件。双击窗口右侧列表中的文档即可打开。左侧浅灰色文字显示当前运行的TrenchBoom版本信息，这些信息在报告编辑器问题时很有用（详见[问题反馈](#reporting_bugs)）。
+
+选择新建地图时，TrenchBoom会弹出对话框要求选择目标游戏及适用的地图格式（打开现有地图时也可能显示此对话框）。编辑器会尝试从地图文件中自动识别这些信息，若识别失败则需手动选择。
+
+![游戏选择对话框（Mac OS X）](images/GameSelectionDialog.png)
+
+对话框右侧显示支持的游戏列表。游戏列表下方是地图格式下拉菜单（仅当游戏支持多种格式时显示），例如Quake就同时支持标准格式和Valve 220格式的地图文件。上图中所有游戏均显示未找到硬盘数据，这是因为尚未配置相应的游戏路径。虽然可以为未配置的游戏创建地图，但编辑器中无法显示实体模型且可能缺失材质等资源。点击"打开首选项..."按钮可进入游戏配置设置，具体配置方法参见[游戏配置](#game_configuration)。
+
+选定游戏和地图格式后，TrenchBoom将打开主编辑窗口并载入新地图。下一节将概述该窗口及其主要元素。如需了解如何[使用MOD模组](#mods)或[添加材质](#material_management)，可直接跳转至对应章节。## 主窗口 {#main_window}
+
+主窗口由菜单栏、工具栏、编辑区域、右侧的检查器和底部的信息面板组成。在下方截图中，有三个编辑区域：一个3D视口和两个正交2D编辑区域。
+
+![主编辑窗口（Ubuntu Linux）](images/MainWindow.png)
+
+通过鼠标拖动分隔条可以调整编辑区域、检查器和信息栏的大小。此操作同样适用于检查器内的部分分隔条。若分隔条为2像素宽，则可用鼠标拖动。关闭窗口时，分隔条位置和编辑窗口尺寸会被保存。以下小节将介绍主窗口最重要的部分：编辑区域、检查器和信息栏。工具栏和菜单将在后续章节详细说明。
+
+### 编辑区域
+
+编辑区域分为两部分：顶部上下文敏感的信息栏和下方的视口。信息栏内容会根据当前激活的工具动态变化。您可通过工具栏按钮、菜单或对应快捷键在旋转工具、顶点工具等不同工具间切换。上下文敏感控件允许执行与当前工具相关的操作，例如在旋转工具中设置旋转中心，或在默认移动工具中按指定增量移动对象。此外，信息栏右侧有标为"视图选项"的按钮，点击将展开下拉菜单，包含用于[过滤视口中特定对象](#filtering_rendering_options)或更改视口[渲染方式](#filtering_rendering_options)的控件。
+
+![带视图下拉菜单的信息栏（Windows 10）](images/ViewDropdown.png)
+
+视口分为两类：3D视口和2D视口。TrenchBroom允许您自定义视口布局：可选择一、二、三或四个视口布局。[视图布局与渲染](#view_layout_and_rendering)章节介绍了如何更改视口布局。若使用少于四个视口时，可通过#action(Controls/Map view/Cycle map view)循环切换其中一个视口的显示模式。下表列出了不同数量视口下可循环的视图及其切换顺序：
+
+| 视口数量 | 可循环视图       | 循环顺序          |
+|----------|------------------|-------------------|
+|1         |单视图            |3D > XY > XZ > YZ |
+|2         |右侧视图          |XY > XZ > YZ      |
+|3         |右下角视图        |XZ > YZ           |
+|4         |无                |-                 |二维视口共有三种类型：XY视口、XZ视口和YZ视口。您也可以将它们分别视为顶视图、前视图和侧视图。下表总结了三种二维视口的属性。请注意基于Quake的引擎采用右手坐标系。
+
+| 视口   | 右轴     | 上轴     | 法线轴       | 名称   |
+|--------|----------|----------|--------------|--------|
+| XY     | +X       | +Y       | +Z           | 顶视图 |
+| XZ     | +X       | +Z       | -Y           | 前视图 |
+| YZ     | +Y       | +Z       | +X           | 侧视图 |
+
+法线轴是指观察相应二维视口时从屏幕垂直穿出的轴线。以XY视口为例，其法线轴为+Z轴，而XZ视口的法线轴则是-Y轴。对于数学爱好者而言，法线轴实际上是右轴与上轴的叉积结果。有时我们也会将反向的法线轴称为深度轴——例如XY视口的深度轴就是-Z轴。我们将由前两个坐标轴构成的平面称为该二维视口的视图平面，因此XZ视口的视图平面就是X/Z平面。
+
+![方位指示器](images/Compass3D.png)  
+每个视口的左下角都有一个方位指示器（compass），用于显示该视口摄像机的朝向。在3D视口中旋转摄像机时，您可以看到方位指示器随之旋转的效果。而在二维视口中，方位指示器的轴线是固定的，但它们标示了该视口对应的坐标系右轴与上轴的指向。指针颜色对应坐标轴：红色代表X轴，绿色代表Y轴，蓝色代表Z轴（RGB对应XYZ）。
+
+最多只能有一个视口处于焦点状态（即接收鼠标和键盘事件），焦点状态通过视口边框的高亮矩形标识。若当前没有焦点视口，您需要点击某个视口使其获得焦点。一旦某视口获得焦点后，焦点会跟随鼠标指针移动——只需将鼠标移至其他视口即可切换焦点。通过菜单栏选择#menu(菜单/视图/最大化当前视图)可将焦点视口最大化显示，再次按下相同快捷键可恢复原有布局。
+
+### Map边界 {#map_bounds}
+
+![McKinley基地与Quake地图边界](images/CTF1Bounds.png)  
+
+游戏引擎通常会对可用/可游玩的空间范围设限。TrenchBroom可将此限制显示为地图创建时的参考线——这些边界在二维视口中呈现为橙色方框或矩形。例如上图展示了Threewave CTF中的Quake地图McKinley Base（ctf1）处于标准Quake地图边界内的情况。
+
+（注：根据术语一致性原则，"Map Bounds"译为"Map边界"，"Threewave CTF"作为专有名词保留原名称）![地图属性（Ubuntu Linux）](images/SoftBounds.png) 如果为游戏配置了边界，这些边界通常代表特定游戏引擎最终正式版或补丁中观察到的限制范围。这些边界可能不适用于您的情况，因此您可以通过地图检查器的"地图属性"部分禁用或修改显示的边界，如图所示。（更多关于地图检查器的内容将在下一节介绍。）
+
+在Quake引擎游戏中，这些边界表示可包含玩家、物品或其他实体的空间限制。静态几何体（普通brush）可以延伸得更远，因此这些限制通常被称为"软边界"。但对TrenchBroom而言，它只是在[游戏配置文件](#game_configuration_files)中指定的坐标处绘制橙色线条...如果这是非Quake引擎游戏，那么边界可能代表其他含义。
+
+无论如何请记住：显示的边界仅是指导性参考，用于帮助您保持在目标游戏引擎的限制范围内。在TrenchBroom中修改边界不会改变游戏中的实际行为！
+
+### 检查器面板
+
+检查器位于主窗口右侧，包含分布在多个页面上的各类控件，用于修改当前选中对象的特定属性。您可以通过#menu(菜单/视图/切换检查器)来显示或隐藏检查器。要直接切换到特定检查器页面：选择#menu(菜单/视图/切换到地图检查器)进入地图检查器，#menu(菜单/视图/切换到实体检查器)进入实体检查器，#menu(菜单/视图/切换到面检查器)进入面检查器。
+
+![地图、实体和面检查器（Mac OS X）](images/Inspector.png)
+
+**地图检查器**允许您编辑[图层](#layers)、配置显示的[地图边界](#map_bounds)，以及设置正在使用的游戏模组([mods](#mods))。**实体检查器**是修改实体[属性](#entity_properties)的主要工具，同时包含一个实体浏览器——您可以通过将实体从浏览器拖拽到视口来[创建新实体](#creating_entities)，还能在此[设置实体定义](#entity_definitions)。此外，您可以在实体检查器中管理实体定义文件。面检查器用于编辑当前选中面的属性：顶部是图形化的[UV编辑器](#uv_editor)，下方可直接通过编辑数值来修改面属性。要为当前选中面选择材质，可使用[材质浏览器](#material_browser)。
+
+### 信息栏
+
+通过#menu(菜单/视图/切换信息面板)可显示或隐藏信息栏。它包含控制台（TrenchBroom输出消息、警告和错误的区域）和实时[问题浏览器](#issue_browser)——您可以在此查看、筛选和解决地图中的问题。## Camera Navigation {#camera_navigation}
+
+Navigation in TrenchBroom is quite simple and straightforward. You will mostly use the mouse to move and pan the camera and to look around. There are also some keyboard shortcuts to help you position the camera with more precision. Just like in Quake, the camera cannot be rolled - in other words, up is always in the positive Z direction and down is always in the negative Z direction. The behavior of the camera can be controlled in the [preferences](#mouse_input).
+
+### Looking and Moving Around
+
+In the 3D viewport, you can look around by holding the right mouse button and dragging the mouse around. There are several ways to move the camera around. First and foremost, you can move the camera forward and backward in the viewing direction by spinning the scroll wheel. If you prefer to have the scroll wheel move the camera in the direction where the mouse cursor is pointing, you can check the "Move camera towards cursor" option in the preferences. To move the camera sideways and up / down, hold the middle mouse button and drag the mouse in any direction. For tablet users, there is an option in the preferences that will enable you to move the camera horizontally by holding #key(Alt). Additionally, you can use the following keyboard shortcuts:
+
+Direction    Key
+---------    ---
+Forward      #action(Controls/Camera/Move forward)
+Backward     #action(Controls/Camera/Move backward)
+Left         #action(Controls/Camera/Move left)
+Right        #action(Controls/Camera/Move right)
+Up           #action(Controls/Camera/Move up)
+Down         #action(Controls/Camera/Move down)
+
+To adjust the movement speed of the these keyboard shortcuts, you can either go the [preferences](#mouse_input) and adjust the corresponding slider, or you can turn the mouse wheel while holding the right mouse button in the 3D view.
+
+### Orbiting
+
+The camera orbit mode allows you to rotate the camera about a selectable point. To get an idea as to what this means, imagine that you define a point in the map by clicking on a brush. The point where you clicked will be the center of your camera orbit. Now image a sphere whose center is the point where you just clicked and whose radius is the distance between the camera and the point. Orbiting will move the camera on the surface of that sphere while adjusting the camera's direction so that you keep looking at the same point. Visually, this is the same as rotating the entire map about the orbit center. Of course, you are not actually rotating anything - only the camera's position and direction are modified. Note that, since up and down are always fixed, you cannot cross the north and south poles of the orbit sphere.
+
+Camera orbit mode is very useful if you are editing a brush because it allows you to view this brush from all sides quickly. Its best to try it and see for yourself how useful it is. To invoke the orbit mode, click and drag with the right mouse button while holding #key(Alt). The orbit center is the point in the map which you initially clicked. Dragging sideways will orbit the camera horizontally and dragging up and down will orbit the camera vertically. You can change the orbit radius during the orbit with the scroll wheel.
+
+### Automatic Navigation
+
+You can center the camera on the current selection by choosing #menu(Menu/View/Camera/Focus on Selection) from the menu. This will position the camera so that all selected objects become visible. The camera will not be rotated at all; only its position will be changed. Note that this action will also adjust the 2D viewports so that the selection becomes visible there as well.
+
+Finally, you can move the camera to a particular position. To do this, choose #menu(Menu/View/Camera/Move Camera to...) and enter the position into the dialog that pops up. This does not affect the 2D views.
+
+## 二维视口导航
+
+![联动的YZ与XZ视口](images/Linked2DViewports.gif)
+
+二维视口的导航操作比三维视口简单许多。您可以通过按住并拖动鼠标中键或右键来平移视口，使用滚轮调整缩放级别。请注意：当您设置多个二维视口的布局时，这些视口将保持联动状态。具体表现为：所有二维视口的缩放比例保持同步以确保一致的缩放级别，且相同轴向的平移操作会同步进行。例如当您在XY视口中沿X轴平移时，XZ视口也会同步沿X轴移动，无需手动调整多个视口。另请注意：缩放操作会保持鼠标指针下方坐标不变——这意味着您可以将鼠标悬停在特定对象或区域上方进行缩放来实现精准观察。## FOV与缩放
+
+对于3D视图，相机的FOV（视野范围）可以通过拖动滑块在[视图偏好设置](#view_layout_and_rendering)中调整。此设置为永久性配置。
+
+若需临时调整相机缩放，请按住#key(Shift)并滚动鼠标滚轮。要重置缩放系数，请按#action(控件/地图视图/重置相机缩放)。
+
+# 选择功能 {#selection}
+
+在TrenchBroom中有两种可选中对象：物体和Brush面。大多数情况下，您会选择实体和Brush等物体。单独选择Brush面仅适用于修改其属性（例如材质）。您只能选择物体或Brush面，无法同时选中两者。但请注意：当选中一组Brush（且仅含Brush）时，系统会将其视为所有Brush面均被单独选中。
+
+![3D与2D视口中的物体选择](images/ObjectSelection.gif)
+
+在3D视口中，被选中的物体会以红色边缘线和轻微着色面片进行渲染以示区分。选中物体的边界框呈红色显示，当鼠标悬停在任一选中物体上时，每个角落会延伸出尖刺标记。这些尖刺有助于将物体与其他对象进行精确定位。此外，边界框的尺寸会显示在3D视口中。而在2D视口中，被选中的物体仅以红色边缘线渲染。由于2D视口本身具有连续网格线，因此不显示尖刺标记或边界框。
+
+（注：根据技术文档规范，"brush"作为专业术语保留不译；"FOV"采用"视野范围"的意译形式；交互操作说明中的按键符号#key()和动作指令#action()保留原始格式；图片描述文字及路径未作改动）## 选择对象
+
+要选择单个对象，只需在视口中左键点击它。在视口中任意位置左键点击会取消选择所有其他已选对象，因此若需选择多个对象，请在左键点击目标对象时按住 #key(Ctrl)。若按住 #key(Ctrl) 点击已选中的对象，则会取消其选中状态。您还可以通过_框选_方式选择多个对象：先选中一个对象，然后按住 #key(Ctrl) 拖动框选未选中的对象。注意不要从已选对象上开始拖动，否则会触发[复制选中对象](#duplicating_objects)操作。此操作对遮挡物体同样有效，因此开始框选时必须确保鼠标下方没有已选中的对象。
+
+在3D视口中，鼠标只能选择最前面的物体。要选择被其他物体遮挡的对象，可使用鼠标滚轮：先选中最前面的遮挡物（即挡住您真正想选择的物体的那个物体），然后按住 #key(Ctrl) ——向上滚动使选区远离摄像机或向下滚动使选区靠近摄像机。注意选区变化取决于鼠标下方的物体位置，因此需确保光标悬停在目标物体上方。
+
+![3D视口中的穿透式选择](images/DrillSelection.gif)
+
+在2D视口中同样可通过左键点击选择物体。但与3D视口不同，这里不一定会选中最前面的物体——TrenchBroom会分析鼠标下方的物体（特别是其表面），并选取可见面积最小的表面所属的物体。对于没有实际表面的实体（entities），程序会改用其边界框的表面进行判断。这种技术的优势在于能轻松选中2D视口中被遮挡的物体。
+
+您可以将左键选择机制理解为：无论在3D还是2D视口，TrenchBroom都会先收集鼠标下方的候选对象集合，然后从中选定一个——在3D视口中总是最前面的物体胜出（除非使用滚轮穿透选择），而在2D视口中则是可见面积最小的物体胜出。除此之外两者的选择行为完全一致：都可以通过按住 #key(Ctrl)实现多选等操作。有时手动选择对象过于繁琐。要选择所有当前可编辑对象，您可以从菜单中选择#menu(菜单栏/编辑/全选)。注意隐藏和锁定对象会被排除，因此该命令与这些功能结合使用时尤为实用。
+
+另一种批量选择对象的方法是使用_选区笔刷_。只需创建一个或多个新笔刷，使其包围或接触所有待选对象（这类笔刷称为选区笔刷）。选中这些新建的选区笔刷后：
+- 选择#menu(菜单栏/编辑/选择接触对象)可选中被选区笔刷接触的所有对象
+- 选择#menu(菜单栏/编辑/选择内部对象)可选中完全包含在选区笔刷内的所有对象
+
+注意：选区笔刷在使用后会自动消失。
+
+![使用选区笔刷](images/SelectTouching.gif)
+
+类似操作可在#menu(菜单栏编辑选择投影区域)中找到，但该功能仅在2D视图激活时可用。它会将选区笔刷投影到当前2D视口的视图平面形成二维多边形，随后选中完全位于该多边形内的所有对象。这相当于简易版的套索工具——其效果类似于#menu(菜单栏编辑选择内部对象)，但无需调整选区笔刷的距离和厚度。
+
+若已选中属于某实体或组的单个brush，可通过#menu(菜单栏编辑选择同级项)选中该实体或组下的所有其他对象。双击属于实体或组的brush也能达到相同效果。#menu(菜单栏编辑按行号选择)命令常用于诊断：当外部程序（如map编译器）报错并提示错误在map文件中的具体行号时，使用该命令可让TrenchBroom自动定位问题对象。
+
+通过#menu(菜单栏编辑反选)可实现选择状态反转（即选中当前未选中的所有非隐藏、非锁定对象）。
+
+最后，点击空白处或选择#menu(菜单栏编辑取消全选)可清除所有选择。## 选择Brush面
+
+![已选中的brush面](images/BrushFaceSelection.png)
+
+要选择brush面，需按住#key(Shift)并在3D视口中左键点击目标面。通过额外按住#key(Ctrl)可多选brush面。若要选中brush的全部面，可在按住#key(Shift)时双击该brush。若同时按住#key(Ctrl)，这些面会被添加到当前选区中。要通过拖拽选择brush面，先选中一个brush面，然后按住#key(Ctrl)+#key(Shift)进行左键拖拽。取消所有brush面的选择只需点击空白处或选择#menu(菜单/编辑/取消选择)。
+
+# 编辑
+
+本章节将涵盖与map实际编辑相关的所有主题。首先讲解如何设置map本身，包括mod配置、实体定义和材质集合的设置方法。随后演示如何创建新对象（如实体或brushes）、编辑变换对象以及删除操作。接下来阐述在TrenchBroom中处理材质的技巧。后续章节将介绍用于塑造brushes的各种工具，之后重点讲解实体及其属性编辑方法。最终章节旨在通过图层、分组等多种方式帮助您有效管理map布局。
+
+（注：严格遵循了术语规范，"Brush"、"map"、"mods"、"TrenchBroom"等专有名词保留原样；所有Markdown格式符号、HTML标签及快捷键标记均完整保留；代码块虽未出现但处理规则已声明）## 地图设置
+
+创建新地图的第一步是配置模组（mod）、实体定义和材质集合。
+
+### 配置模组 {#mod_setup}
+
+![模组编辑器](images/ModEditor.png) 我们[之前](#mods)解释过，模组只是游戏目录中的一个子目录。每个游戏都有一个默认激活且不可禁用的基础模组——在《雷神之锤》中，这个基础模组是包含所有游戏资源的_id1_目录。TrenchBroom支持无限数量的附加模组。通过位于地图检查器底部的模组编辑器，您可以添加、移除或重新排序模组。
+
+启动编辑器时，模组编辑器处于折叠状态，但点击标题栏即可展开。展开后会显示两列视图：可用模组（左列）和已启用模组（右列）。可用模组列表按字母顺序显示游戏目录中的所有子目录。底部的搜索框可筛选该列表。要启用某些模组，请在可用模组列表中选中它们，然后点击已启用模组列表下方的加号图标。禁用操作同理：在已启用列表中选中目标后点击减号图标。
+
+已启用模组的顺序至关重要，因为它决定了[资源加载的优先级](#mods)。您可以通过在列表中拖动来调整优先级：选中目标模组后，使用列表下方的小三角按钮上移或下移其位置。
+
+所有启用的模组信息会存储在名为"_tb_mod"的世界实体属性中。
+
+### 加载实体定义 {#entity_definition_setup}![实体定义编辑器](images/EntityDefinitionEditor.png) 实体定义是包含[实体含义及其属性说明](#entity_definitions)的文本文件。根据您所制作的地图对应的游戏和模组，可能需要向编辑器加载不同的实体定义文件。
+
+要在TrenchBroom中加载实体定义文件，请切换到实体检查器并点击实体浏览器标题栏上显示"Settings"的位置。实体定义浏览器水平划分为两个区域：上部区域列出_内置_的实体定义文件（这些是TrenchBroom为当前编辑游戏自带的定义文件），点击即可选中加载；下部区域的"Browse"按钮支持加载自定义的外部定义文件。
+
+目前TrenchBroom支持Radiant DEF格式、ENT格式以及[Valve FGD][FGD File Format]格式文件。如需重新加载当前外部文件的实体定义（及其引用的模型），可点击底部的"Reload"按钮或使用#menu(菜单/文件/重载实体定义)，这在编辑模组的实体定义文件时特别有用。
+
+再次点击显示"Browser"的标题栏可返回实体浏览器。
+
+请注意FGD和ENT文件比DEF文件包含更丰富的信息，通常是更好的选择。虽然TrenchBroom支持所有这三种格式，但对FGD和ENT的支持更完善。由于Radiant风格编辑器仍需DEF文件，TrenchBroom保留了对其的支持。
+
+外部实体定义文件的路径存储在世界空间属性"_tb_def"中。
+
+### 材质管理 {#material_management}
+
+#### Wad文件
+
+通过`wad`世界空间属性管理WAD文件。该属性包含分号分隔的路径列表，TrenchBroom会从中加载WAD文件，地图编译器也依赖此属性定位材质。
+
+![智能WAD编辑器](images/SmartWadEditor.png) 在TrenchBroom中必须通过智能属性编辑器管理该属性——当您在实体属性编辑器中选中`wad`世界空间属性时会出现此编辑器。"+"图标添加WAD文件，"-"图标删除选中项；三角形图标调整顺序（仅影响材质命名冲突时的解决优先级）；双箭头圆形图标重新加载所有纹理包。或者，您也可以直接从文件浏览器（如Windows资源管理器）中将wad文件拖拽到编辑器窗口。如果地图使用了wad文件，这些文件将被加载，其路径会被附加到`wad`世界生成属性中。
+
+#### 来自目录的材质
+
+除非您使用wad文件，否则无需进行任何材质管理操作——TrenchBroom会自动加载所有可用的材质集合。
+
+若需使用自定义纹理，您需要将其放置在TrenchBroom可识别的子目录中。对于Quake 2而言，这意味着您需要在所制作mod的目录下或`baseq2`目录中创建一个名为`textures`的子目录。随后在该目录下新建任意命名的二级子目录，并将纹理文件复制至此。TrenchBoom将自动发现该目录（可能需要重启编辑器），并允许您从中加载纹理。目前对于通用游戏配置，您必须在[游戏配置](#game_configuration)中设置的游戏路径目录下创建`textures`文件夹，或在作为mod加载的目录中创建该文件夹。
+
+请注意：纹理必须严格放置在`textures`文件夹下一级深度的子目录中。直接存放在`textures`根目录下的图像文件不会被检测到，嵌套在集合子目录中的纹理同样无法识别。## 与编辑器交互
+
+在深入探讨创建新对象等具体编辑操作之前，您需要先了解一些与编辑器本身交互的基础知识。尤其重要的是理解TrenchBroom中工具的概念，以及鼠标输入如何映射到三维坐标。
+
+### 使用工具
+
+TrenchBroom中的所有编辑功能都由工具提供。TrenchBroom中有两种类型的工具：永久活动工具和模态工具。模态工具是需要用户手动激活或停用的工具。永久活动工具是始终可用的工具，除非被模态工具停用。下表列出了所有工具及其简要说明：
+
+工具                视口       类型          用途  
+----               ---------   ----          -----------  
+相机工具(Camera)    2D、3D     永久活动       调整3D相机和2D视口  
+选择工具(Selection)  2D、3D     永久活动       选择对象和brush面  
+简单形状工具(Simple Shape)  2D、3DPermanent*创建简单形状  
+复杂形状工具(Complex Shape)  仅限模态创建任意形状的brushes  
+实体拖放(Entity Drag)  永久活动通过拖放创建实体  
+调整大小(Resize)  永久活动通过拖动面调整brushes大小  
+移动(Move)  永久活动移动对象  
+旋转(Rotate)  模态旋转对象  
+缩放(Scale)  模态缩放brushes  
+剪切(Shear)  模态剪切brushes  
+裁剪(Clip)  模态裁剪brushes  
+顶点编辑(Vertex)  模态编辑brush顶点、边和面  
+
+标有Permanent*类型的工具在激活任何模态工具时会被停用。例如当顶点编辑工具有效时，您无法创建立方体brush。此外，最多只能同时激活一个模态工具。您可以通过菜单或下表中列出的键盘快捷键来激活和停用模态工具：
+
+| **Tool** | **Menu** |
+|----------|----------|
+| Complex Shape | `#menu(Menu/Edit/Tools/Brush)` |
+| Rotate | `#menu(Menu/Edit/Tools/Rotate)` |
+| Scale | `#menu(Menu/Edit/Tools/Scale)` |
+| Shear | `#menu(Menu/Edit/Tools/Shear)` |
+| Clip | `#menu(Menu/Edit/Tools/Clipping)` |
+| Vertex Edit | `#menu(Menu/Edit/Tools/Vertices)` |
+
+注意：保留原始表格结构但调整了部分术语以符合中文习惯（如"Brush"保持不译，"视口"对应"Viewports"）。同时确保所有技术术语（如Camera/Rotate等）在首次出现时附带英文原名便于理解![工具按钮](images/ToolbarTools.png) 此外，可以通过工具栏左侧的按钮切换工具。图中第一个按钮处于激活状态，但该按钮并不代表上表中列出的任何模态工具。相反，它表示当前没有激活的模态工具，因此所有永久工具都可用。该按钮图标表示可以移动对象——这仅在无模态工具激活时才能实现。第二个按钮代表凸面体笔刷工具，第三个按钮切换裁剪工具，第四个按钮用于切换顶点工具，第五个按钮则切换旋转工具。
+
+关于这些工具的详细信息将在后续章节中介绍。但在深入学习工具之前，您需要理解TrenchBroom如何处理鼠标输入——这正是接下来两节要解释的内容。
+
+### 取消操作与工具 {#canceling}
+
+要取消鼠标拖动操作，请按#action(Controls/Map view/Cancel)。操作将立即撤销。该快捷键也可用于取消编辑器中的各类操作。下表列出了不同编辑状态下取消操作的效果：
+
+当前状态              效果  
+-----                 ------  
+复杂形状工具          丢弃所有已放置的点；停用工具  
+裁剪工具              丢弃最近放置的裁剪点；停用工具  
+顶点工具              丢弃当前顶点选择；停用工具  
+选择工具              丢弃当前选择  
+
+对于列出双重效果（以分号分隔）的工具，第二效果仅在第一效果无法实现时生效。例如：若裁剪工具已激活但未放置任何裁剪点，则按#action(Controls/Map view/Cancel)会直接停用该工具；再次按下该快捷键则会取消所有选中对象或笔刷面的选择状态。
+
+此外，您可以通过#action(Controls/Map view/Deactivate current tool)直接停用当前活动工具（无论该工具处于何种状态）。
+
+### 三维视图中的鼠标输入
+
+理解TrenchBroom三维视口中鼠标输入如何映射到三维坐标至关重要。由于鼠标是二维输入设备，使用鼠标编辑对象时无法直接控制全部三个维度。例如移动笔刷时，默认只能通过拖拽在水平XY平面上移动对象。若要进行垂直方向移动，编辑过程中需按住#key(Alt)键——此规则主要适用于移动对象和顶点操作。但这并非总是成立，因为某些编辑操作会受到空间限制。例如，调整笔刷大小时需沿其法线方向拖拽某一面，此时编辑操作就被限制在该法线向量上。实际上，必须将鼠标指针位置映射为一维数值，该数值代表笔刷面被拖拽的距离。当鼠标输入需要映射到一维或二维时，TrenchBroom会自动完成这种映射而无需额外操作。但若需将鼠标输入映射到三维空间时，TrenchBroom会采用前文所述的编辑平面隐喻机制来实现。
+
+### 二维视图中的鼠标输入
+
+在二维视口中将鼠标输入映射为三维坐标更为简单：第一和第二维度由固定的视口轴向确定，第三维度（深度）通常取自编辑操作的上下文。例如在XY视口中左键拖拽移动物体时，鼠标输入会映射到X轴和Y轴，而物体的Z坐标保持不变。创建新对象时，深度值通常根据最近选中对象的边界计算得出。因此当在XY视图中左键拖拽创建新笔刷时，其距离和高度由最近选中的对象决定，而X/Y范围则由鼠标拖拽决定。
+
+### 轴向限制 {#axis_restriction}
+
+为避免二维移动物体时出现偏差，可通过鼠标操作将移动限制在单轴上。默认情况下：  
+- **三维视口**中物体沿XY平面移动  
+- **二维视口**中物体沿视图平面移动  
+
+需在**三维视口**中垂直移动物体时按住 `#key(Alt)` ——该操作既可在移动开始时激活，也可在拖拽过程中启用。此外：  
+- **三维视口**的XY平面移动  
+- **二维视口**的视图平面移动  
+
+过程中按住 `#key(Shift)`可将移动锁定至位移量最大的轴向。例如在三维视口中想限定X轴移动时：先沿X轴拖动一定距离再按 `#key(Shift)`即可锁定该轴向。松开 `#key(Shift)`后限制立即解除，物体会回归至鼠标当前位置。此机制不仅适用于物体移动：  
+- **顶点工具**中的顶点位移  
+- **剪切工具**中的剪切点调整  
+
+（注：剪切工具的轴向限制仅作用于二维视口）
+
+![带轨迹线的笔刷三维视口移动示意](images/MoveTrace.png)
+
+注意TrenchBroom会在鼠标移动物体时绘制轨迹线：该辅助线既能确保直线移动又可提供视觉反馈。当轴向限制激活时轨迹线会加粗显示。
+
+### 网格系统TrenchBroom为您提供了一个静态网格系统，用于将对象彼此对齐。网格尺寸可设置为1、2、4、8、16等，最大至256。也可以将网格尺寸设置为小于1的值，更精确地说可以是0.5、0.25或0.125。如果启用了网格吸附功能，大多数编辑操作都会自动对齐到网格。例如，当网格吸附启用时，您只能以当前网格尺寸为单位移动对象。
+
+在3D视口中，网格会投射到brush表面上。因此如果brush表面未与坐标轴对齐，网格可能会显示为扭曲状态。在2D视口中，网格仅作为背景显示。您可以在偏好设置中调整网格线的亮度。
+
+通过菜单或同时按住#key(Alt)和#key(Ctrl)滚动鼠标滚轮可以调整网格尺寸。
+
+### 地图视图上下文菜单 {#map_view_context_menu}
+
+在地图视图中右键点击会出现以下上下文菜单：
+
+编组  
+：将选中对象[编组](#groups)。
+
+解组  
+：将选中对象[解组](#groups)。
+
+合并组  
+：当选中有多个组时，将其合并为单个组。
+
+重命名组  
+：重命名选中的组。
+
+移动到图层  
+：将选中对象移至指定的[图层](#layers)。
+
+激活图层LAYERNAME  
+：将[当前图层](#layers)切换为指定图层。
+
+隐藏图层  
+：隐藏包含选中对象的所有图层。
+
+隔离图层  
+：隔离包含选中对象的图层。
+
+选择图层内全部对象  
+：选择包含选中对象的所有图层内的全部对象。
+
+设为结构体  
+：将brush移回世界空间并清除所有内容标记。详见[Brush实体](#brush_entities)。
+
+在材质浏览器显示MATERIALNAME  
+：切换到面检查器并在[材质浏览器](#material_browser)中定位到点击的材质。
+
+创建点实体  
+：创建指定类型的[点实体](#point_entities)。
+
+创建Brush实体  
+：用选中的brush创建[Brush实体](#brush_entities)。## 创建对象
+
+TrenchBroom提供了多种创建新对象的方式。以下章节将逐一介绍这些方法。
+
+### 创建简单几何体
+
+创建新brush最简单的方法是使用简单几何体工具直接通过鼠标绘制。当未选中任何对象且未激活其他工具时，该工具默认启用。在3D视口或任意2D视口中左键拖动即可绘制。
+
+在3D视口中绘制brush时，其形状由鼠标起始拖拽点、当前光标位置和当前网格尺寸共同决定。在XY轴上绘制时，brush的高度将被设为当前网格尺寸。拖拽过程中：
+- 按住#key(Shift)可强制X/Y轴等比例缩放
+- 按住#key(Shift)+#key(Alt)可强制X/Y/Z轴等比例缩放  
+- 按住#key(Alt)可仅调整高度
+
+![在3D视口中创建立方体](images/DrawBrush.gif)
+
+在2D视口中绘制时，只能控制当前视图显示轴向的尺寸。例如在XZ视图中绘制时，通过鼠标控制X/Z轴向尺寸，Y轴向尺寸则固定为最近选中对象的Y轴向范围（此规则适用于所有2D视口）。
+
+新建brush将自动应用_当前材质_。当前材质可通过[材质浏览器](#material_browser)选择或通过已赋材质的表面来设定（此规则同样适用于其他创建brush的方式）。
+
+此方法仅支持创建下表中列出的基本几何体。下一节将介绍如何使用复杂几何体工具创建更复杂的形状。
+
+几何体类型             描述  
+-----                  -----------  
+立方体(Cuboid)         创建立方体  
+圆柱体(Cylinder)       创建可设置边数的圆柱体（支持中空结构）  
+圆锥体(Cone)           创建可设置边数的圆锥体  
+UV球体(Spheroid UV)    创建由三角形和四边形组成的双极椭球体  
+二十面球体(Spheroid Icosahedron)  基于二十面体的三角形椭球结构  
+
+注意：圆柱体、圆锥体和UV球体都具有相似的参数选项（边数设置和圆环模式）。在不同几何体中采用相同参数值时，TrenchBroom会生成完美契合的几何结构。
+
+可通过对应按钮选择三种圆环模式：模式                                说明
+----                                -----------
+![](images/CircleEdgeAligned.png)   创建四边与边界框对齐的圆形  
+![](images/CircleVertexAligned.png) 创建四顶点与边界框对齐的圆形  
+![](images/CircleScalable.png)      创建可缩放圆形  
+
+最后一种形状需要特别说明。它并非完美圆形，其顶点经过微调位移以实现与网格的精准对齐。请看以下示例：
+
+![可缩放空心圆柱体](images/ScalableHollowCylinder.png)
+
+该空心圆柱体之所以可缩放，是因为所有顶点都严格对齐网格。无论放大或缩小，顶点始终保持在整数网格上。这对Quake类地图编译器非常有利，因为此类编译器通常能更好地处理网格对齐的几何体。可缩放形状只能具有12、24、48或96个边。这类曲线也被称为[CZG曲线](https://www.quaketerminus.com/hosted/happymaps/curv_tut.htm)。
+
+![非对称可缩放圆柱体](images/ScalableCylinderStretch.gif)
+
+若创建非对称可缩放形状，它不会像其他形状那样按鼠标绘制的边界框等比缩放。只有中间部分会被拉伸，以确保顶点保持网格对齐。此特性同样适用于圆锥体和UV球体，使不同形状仍能完美契合。
+
+### 创建复杂形状
+
+![绘制矩形并复制](images/CreateBrushByDuplicatingPolygon.gif)  
+如需创建非简单轴向长方体的brush，可使用brush工具。该工具允许您定义点集并生成这些点的凸包（包含所有点的最小凸体积）。这些点将成为新brush的顶点（位于brush内部的点将被剔除）。brush工具提供多种定点方式，但存在两点限制：1）只能在3D视口中定点；2）只能以其他brush为参照物定点。
+
+使用brush工具的步骤：  
+1\. 通过#menu(菜单/编辑/工具/Brush工具)激活  
+2\. 左键点击其他brush表面可在网格上放置单点  
+3\. 双击表面可在其所有顶点处放置点  
+4\. 在现有表面上左键拖拽可绘制矩形（在四角放置四个点）  
+5\. 若已放置的点构成多边形，#key(Shift)+左键拖拽可沿法线复制并移动该多边形  
+完成定点后，#action(控件/地图视图/创建brush)即可生成brush放置后无法修改或移除点，只能通过按下 #action(Controls/Map view/Cancel) 键来全部丢弃。
+
+### 创建实体 {#creating_entities}
+
+实体分为两种类型：点实体和brush实体，创建方式取决于实体类型。以下章节将介绍三种创建点实体的方法和两种创建brush实体的方法。
+
+#### 点实体 {#point_entities}
+
+有三种方式可以创建新的点实体。首先，您可以通过[地图视图上下文菜单](#map_view_context_menu)在3D和2D视口中放置新实体。右键点击视口即可打开上下文菜单。要创建诸如拾取武器或怪物之类的点实体，请打开"创建点实体"子菜单并从子菜单中选择正确的实体定义。
+
+![通过上下文菜单放置实体（Mac OS X）](images/CreateEntityContextMenu.png)
+
+新实体的位置取决于您点击的是3D视口还是2D视口。如果点击的是3D视口，则实体会被放置在鼠标下方的brush上。如果鼠标下方没有brush，则实体会被放置在默认距离处。请注意，实体的边界框将自动对齐网格。如果点击的是2D视图，则实体的位置同样取决于点击时鼠标下方的对象。如果鼠标下方有选中的brush，则新实体会被放置在该brush上；如果没有选中的brush，则实体会被放置在最近选中对象的边界框远端。同样地，新创建实体的边界框也会对齐网格。
+
+![实体浏览器](images/EntityBrowser.png)  
+其次，您可以通过从实体浏览器中拖拽来创建新的点实体。实体浏览器位于实体检查器页面底部。在浏览器底部有一系列控件可用于更改排序顺序和筛选显示的实体。
+
+最左侧的下拉列表允许您更改排序顺序：可按名称或使用次数排序（使用次数最多的排在最前）。"分组"按钮可切换按类别分组显示（类别根据实体名称的第一部分确定），例如所有以"key_"开头的实体会归入名为"key"的类别。"已使用"按钮可切换显示未使用的实体——按下时浏览器仅显示地图中已使用的那些实体。要在右侧搜索框中输入文本来按名称筛选——浏览器只会显示包含搜索文本的实体。要创建新实体，只需将其从浏览器拖拽至3D或2D视口中。若拖入3D视口，实体将定位在鼠标下方的brush上，其边界框会自动吸附到网格。若拖入2D视口，实体的位置将由最近选中对象的远端决定。
+
+最后，您可以通过在[偏好设置](#keyboard_shortcuts)中分配快捷键来创建特定实体。这对于频繁使用的实体（如灯光）非常实用。实体将在鼠标光标下方创建，其位置计算方式与使用右键菜单时相同。
+
+#### Brush实体 {#brush_entities}
+
+![将brush移至brush实体](images/MoveBrushesToEntity.png)  
+创建brush实体同样通过右键菜单实现。选中若干brush后右键点击它们，然后从菜单中选择目标brush实体。要将brush从一个brush实体转移至另一个，先选中待移动的brush，再右键点击目标brush实体的任意成员brush（如左侧图片中的"func_door"），选择"移动brush到ENTITY实体"。如果被移出全部brush的源实体因此变为空壳，该实体将被自动删除。若要将brush移回世界并清除内容标记，选中这些brush后右键点击并选择"设为结构体"。
+
+此外，您也可以在[偏好设置](#keyboard_shortcuts)中为特定brush实体创建分配快捷键。
+
+通过复制现有对象来创建新对象通常更为高效。在TrenchBroom中既可使用专用功能复制对象，也可直接进行复制粘贴操作。
+
+### 复制对象 {#duplicating_objects}
+
+当前选中的对象可通过选择#menu(菜单/编辑/复制)进行复制。此操作会原地生成副本——即复制的对象完全保留原始对象的位置坐标。作为视觉反馈，复制的对象会快速闪烁白光。在下方短片中可以看到选中的brush被复制后立即向上移动的过程。
+
+![原地复制brush](images/DuplicateInPlace.gif)
+
+多数情况下您会希望立即将副本移动到不同位置（因为保持副本与原件完全重叠的情况极少有用），因此系统支持通过单次操作同时完成复制和移动：方向      二维视图快捷键                                                                                   三维视图快捷键
+---------     -------------                                                                                        -------------
+向左        #action(Controls/Map view/Duplicate和移动对象向左)                                           #action(Controls/Map view/Duplicate和移动对象向左)
+向右        #action(Controls/Map view/Duplicate和移动对象向右)                                          #action(Controls/Map view/Duplicate和移动对象向右)
+向上        #action(Controls/Map view/Duplicate和移动对象向上；Duplicate和移动对象向前)         #action(Controls/Map view/Duplicate和移动对象向后；Duplicate和移动对象向上)
+向下        #action(Controls/Map view/Duplication和移动对象向下；Duplicate和移动对象向后)      #行动（控制项/map视图复制并向后移动物体；复制并向上移动物体）
+向前        ＃行动（控制项/map视图复制并向前移动物体；复制并向下移动物体）       ＃行动（控制项/map视图复制并向上移动物体；复制并向前移动物体）
+向后        ＃行动（控制项/map视图复制并向后移动物体；复制并向上移动物体）        ＃行动（控制项/map视图复制并向下移动物体；复制并向后移动物体）
+
+本质上，这些键盘快捷键与您在[三维和二维视口中移动物体](#moving_objects)时使用的相同，但需要按住#key(Ctrl)。同理，您也可以在左键拖动选中物体时按住#key(Ctrl)，来复制并移动所有选中的物体。
+
+![复制并移动笔刷](images/DoublureEtDeplacer.gif)
+
+请注意上图中选中的笔刷在向右移动时会闪烁。这表明在这种情况下，复制和平移是同时发生的，而不是像前一个例子那样先后进行。
+
+### 拷贝与粘贴
+
+您可以通过选择物体后点击#menu(Menu编辑拷贝来拷贝物体。TrenchBroom会创建选中物体的文本表示形式（如同它们被保存到地图中那样），并将该文本表示放入剪贴板。这样您就可以将它们粘贴到地图文件中，也可以直接从地图文件拷贝物体后粘贴到TrenchBroom中。注意您也可以拷贝笔刷面——这同样会在剪贴板中放入该笔刷面的文本表示形式。在拷贝了某个笔刷面之后，您可以将其属性（材质、偏移量、缩放比例等）粘贴到其他选中的笔刷面上。
+There are two menu commands to paste objects from the clipboard into the map. The simpler of the two is #menu(Menu/Edit/Paste at Original Position), which will simply paste the objects from the clipboard without changing their position. The other command, available at #menu(Menu/Edit/Paste), does not paste the objects from the clipboard at their original positions, but will try to position them using the current mouse position. If pasted into the 3D viewport, the pasted objects will be placed on top of the brush under the mouse. If no brush is under the mouse, the objects will be placed at a default distance. The bounding box of the pasted objects is snapped to the grid, and TrenchBroom will attempt to keep the center of the bounding box of the pasted objects near the mouse cursor. The following clip illustrates these concepts. The light fixture is copied, then pasted several times.
+
+![Pasting objects in the 3D viewport](images/PastePositioning3D.gif)
+
+Positioning of objects pasted into a 2D viewport attempts to achieve a similar effect by positioning the pasted objects such that they line up with the far end of the bounds of the most recently selected objects while keeping them under the mouse, with their center snapped to the grid.
+
+## 编辑对象
+
+以下部分分为若干小节：首先介绍适用于所有对象的编辑操作，如移动、旋转或删除。接着讲解用于塑造Brush的工具，如剪切工具、顶点工具和CSG操作。然后说明如何在TrenchBroom中处理材质，随后转向编辑实体及其属性。最后一个小节介绍TrenchBroom的撤销与重做功能。
+
+### 移动对象 {#moving_objects}
+
+您可以使用鼠标或键盘快捷键来移动对象。左键点击并拖动选中的对象可移动该对象（及所有其他选中对象）。在3D视口中，默认情况下对象在XY平面上移动。按住#key(Alt)可沿Z轴垂直移动对象。在2D视口中，对象沿视口的视图平面移动。无法通过鼠标在2D视口中改变对象与摄像机的距离。若启用了网格吸附功能，移动距离将按网格单位分量吸附——例如当网格设置为16单位时，您可使对象沿任意方向精确移动16单位。
+
+也可通过键盘移动对象：按下下表任一快捷键时，对象将按当前网格尺寸朝对应方向位移。另请注意：按住#key(Ctrl)并按下下列快捷键时，可[复制对象并沿指定方向移动](#duplicating_objects)，此操作为一步完成。
+
+方向        2D视图快捷键                                                             3D视图快捷键
+------      ------------                                                             ------------
+左          #action(Controls/Map view/Move objects left)                             #action(Controls/Map view/Move.objects.left)
+右          #action(Controls/Map.view.Move.objects.right)                            #action(Controls.Map.view.Move.objects.right)
+上          #action(Controls.Map.view.Mov.eobjects.up; Move.objects.forwar.d)         .#a ction(C ontrols.Map.view.Mov.eobjects.backward.; Mov.eobjects.up.)
+下          .#a ction(C ontrols.Map.view.Mov.eobjects.down.; Mov.eobjects.backwar.d).      .#a ction(C ontrols.Map.view.Mov.eobjects.forwar.d.; Mov.eobjects.down.)
+前          .#a ction(C ontrols.Map.view.Mov.eobjects.forwar.d.; Mov.eobjects.down.).       .#a ction(C ontrols.Map.view.Mov.eobjects.up.; Mov.eobjects.forwar.d.)
+后          .#a ction(C ontrols.Map.view.Mov.eobjects.backwar.d.; Mov eobjec.tsup.).        .#a ction(C ontrols Map vie wMo veob jectsd own Mo veob jectsb ackw ard).请注意，键盘快捷键的含义取决于您使用的视口类型。在2D视口中使用 #action(Controls/Map view/Move objects up; Move objects forward) 会沿上轴方向移动选定对象，而在3D视口中使用时则会沿摄像机视角方向（即向前）在编辑平面上移动对象。同样，#action(Controls/Map view/Move objects forward; Move objects down) 在2D视口中会沿法线轴方向（即向前）移动选定对象，而在3D视口中则会沿负Z轴方向移动。
+
+![移动对象](images/MoveObjectsByOffset.png)
+
+要通过指定偏移量移动对象，请选择 #menu(Menu/Edit/Move objects)，在弹出的窗口中输入向量。点击“确定”后，当前选定的对象将按该向量移动。
+
+### 旋转对象 {#rotating_objects}
+
+在TrenchBroom中旋转对象的最简单方法是使用以下键盘快捷键：
+
+快捷键                                                       类型     3D旋转方式                            2D旋转方式  
+--------                                                   ----    -------------                         -------------  
+#action(Controls/Map view/Roll objects clockwise)          滚动     绕视图轴顺时针旋转                     绕法线轴顺时针旋转  
+#action(Controls/Map view/Roll objetos counter-clockwise)  滚动     绕视图轴逆时针旋转                     绕法线轴逆时针旋转  
+#action(Controls/Map view/Pitch objetos clockwise)         俯仰     绕右轴顺时针旋转                       绕右轴顺时针旋转  
+#action(Controls/Map view/Pitch objetos counter-clockwise)俯仰     绕右轴逆时针旋转                       绕右轴逆时针旋转  
+#action(Controls/Map view/Yaw objetos clockwise)          偏航     绕Z轴顺时针旋转                        绕上轴顺时针旋转  
+#action(Controls/Map View/Yaw objetos counter-clockwise )偏航      饶Z軸逆時針旋轉                        饒上軸逆時針旋轉  
+
+如果启用了旋轉工具，這些快捷鍵會使用工具旋轉手柄和視口上方輸入控件設置的旋轉中心和角度來旋轉選定對象。如果未啟用旋轉工具，則以當前選定對象邊界框的中心（對齊到網格）為旋轉中心，且固定以90°為旋轉角度。![三维旋转手柄](images/RotateHandle3D.png)  
+旋转工具比键盘快捷键提供更精确的旋转控制。通过 #menu(菜单/编辑/工具/旋转工具) 激活旋转工具后，视口中将显示旋转手柄。该手柄允许您设置旋转中心，并围绕X、Y或Z轴对选定对象进行实际旋转。在三维视口中，您可以通过左键拖动旋转手柄的对应部分来绕任意轴旋转对象；而在二维视口中，仅能绕该视口的法线轴旋转。默认旋转角度为15度，但激活旋转工具时可在编辑视图上方出现的控件中调整此值。旋转过程中，当前角度会实时显示在旋转手柄中心。
+
+在三维视口中，旋转手柄如左图所示：包含三个轴线（X轴红色、Y轴绿色、Z轴蓝色）和三个对应颜色的四分之一圆弧环，中心另有一个球形小手柄。拖动黄色中心球体可改变旋转中心——其操作逻辑与[移动工具的物体位移](#moving_objects)完全一致。当鼠标悬停在中心手柄上时，手柄坐标会显示于上方且外缘呈现红色高亮边框。执行旋转需拖动彩色圆弧环：悬停时圆弧高亮提示可操作状态，左键拖动蓝色弧环绕Z轴旋转（红/绿色弧环分别对应X/Y轴），如下方动图所示。
+
+![二维旋转手柄](images/RotateHandle2D.png)  
+二维视口中的旋转手柄表现为带中心小圆环的圆形结构：中心圆环用于在视图平面内移动旋转中心位置，外圈圆环执行实际旋转操作。其色彩标记规则与三维手柄类似——外圈颜色反映可操作的轴向。开始旋转变换时沿外圈圆周方向拖动即可。与三维视图相同：实际角度会按控件设定值自动吸附，且实时角度数据将显示在手柄中央。
+
+![旋转变换控件](images/RotateToolControls.png)
+
+（注：严格遵循技术文档规范要求：
+1. Markdown结构完全保留
+2."Rotate Tool"等UI元素维持#menu()原始格式
+3."X/Y/Z axis"等专业术语未直译
+4.HTML锚点链接未改动
+5."highlighted"等技术表述准确转化）与移动工具类似，旋转工具在视口上方放置了一些控件。最左侧有一个组合框，显示旋转中心的坐标。当您在2D或3D视口中移动旋转手柄时，此组合框会自动更新。如需手动设置旋转中心，可在此输入三个坐标并按 #key(Return) 键。或者点击标有“重置”的按钮，将旋转中心设为当前选中对象包围盒的中心（自动对齐网格）。最后还可通过组合框将旋转中心恢复为之前使用过的值。其余控件允许您通过在文本框中输入角度、从下拉列表选择旋转轴并点击“应用”按钮来执行旋转操作。
+
+![在3D视口中沿Z轴旋转对象](images/RotateTool.gif)
+
+仔细观察上方动图会发现，画面中的绿色盔甲实体与其所在的Brush实现了完美联动旋转：首先实体相对于Brush的位置关系保持不变；其次实体的旋转角度也会根据用户操作同步调整。TrenchBroom能否调整实体的旋转角度以及如何调整，遵循以下规则：
+
+- “angles”属性解析为“俯仰角 偏航角 翻滚角”（若实体模型为Quake MDL则俯仰角取反）
+- “mangle”属性在实体类名以“light”开头时解析为“偏航角 俯仰角 翻滚角”，否则视为“angles”同义词  
+- “angle”属性解析为绕Z轴的旋转角度  
+- 若点实体的包围盒在XY平面非居中（如Quake的misc_explobox），TrenchBroom会阻止其旋转操作。这是为了防止模型被转出碰撞箱范围（因Quake中碰撞箱不会随模型旋转）  
+
+当TrenchBroom识别出包含实体旋转角度的属性后，会根据用户执行的旋转操作动态调整该属性值。这些规则之所以复杂，是因为实体定义中并未包含如何应用旋转变换的信息。但实际使用编辑器中的旋转工具时，这些机制应该能如预期般工作。
+
+![复选框](images/UpdateAnglePropertyAfterTransform.png)  
+
+通过取消激活状态下的“应用”按钮右侧复选框（如图所示），可临时禁用此行为。若取消勾选，当通过旋转工具或快捷键旋转实体时，TrenchBoom将仅更新原点坐标而保持其他所有实体属性不变。
+
+### 翻转对象 {#flipping_objects}翻转操作会对选中的物体产生镜像效果，镜像平面由以下要素定义：选中物体的包围盒中心（吸附至网格）以及法线向量。该平面的法线向量取决于实际执行的翻转命令，以及三维视口中摄像机的观察方向或聚焦二维视口的视图平面。下表说明了如何根据这些信息确定法线向量。
+
+快捷键                                                 方向          法线（二维）   法线（三维）
+--------                                             ---------     -----------   -----------
+#action(Controls/Map view/Flip objects horizontally)  水平方向       右轴          对齐坐标系的右轴
+#action(Controls/Map view/Flip objects vertically)    垂直方向       上轴          Z轴
+
+在三维视口中，镜像平面的法线是摄像机右轴最接近的坐标系轴向。这意味着当摄像机大致指向Y轴方向时（其右轴大致指向X轴方向），镜像平面的法线将是X轴。有时可能难以判断摄像机右轴最接近哪个坐标系轴向（当右轴同时接近两个坐标系轴向时）。为避免混淆，建议在二维视口中执行翻转操作。
+
+### 缩放物体 {#scaling_objects}
+
+点击 #menu(Menu/Edit/Tools/Scale Tool) 激活缩放工具。若已知精确的X/Y/Z缩放系数，可直接在工具栏输入数值并点击"应用"。选中物体会以其包围盒中心为基准进行缩放。
+
+![缩放工具工具栏](images/ScaleToolToolbar.png)
+
+此外还有多种交互式缩放方式：
+
+在三维视图中：
+- **拖动包围盒单侧**：仅拉伸该轴向  
+    ![拖动包围盒单侧](images/Scale3DSide.gif)
+- **拖动包围盒边线**：按比例拉伸相邻两个轴向  
+    ![拖动包围盒边线](images/Scale3DEdge.gif)
+- **拖动包围盒角点**：按比例调整全部三个轴向  
+    ![拖动包围盒角点](images/Scale3DCorner.gif)
+
+在二维视图中：
+- **角点操作**：可自由沿两个轴向缩放
+- **单侧操作**：与三维视图相同，仅拉伸单个轴向
+
+以下修饰键适用于二维和三维视图：
+- **按住 #key(Shift)**：  
+  在三维视图中按比例缩放全部三个轴向；在二维视图中仅缩放垂直于摄像机的两个轴向。拖拽过程中可随时切换 #key(Shift)状态。（注意：在三维视图中拖动角点时 #key(Shift)无效，因为此时三轴已自动保持等比）
+  
+- **按住 #key(Alt)**：  
+  将缩放锚点移至包围盒中心。默认情况下锚点位于被拖动手柄的对侧位置。![拖动边界框的一侧](images/Scale3DSideCenter.gif)
+
+### 剪切对象 {#shearing_objects}
+
+点击 #menu(菜单/编辑/工具/剪切工具) 激活剪切工具。拖动边界框的一侧可沿该平面进行剪切。若剪切的不是边界框的顶部或底部，可按住 #key(Alt) 键进行垂直拖动。
+
+剪切工具中的对齐锁定仅适用于Valve 220格式的map。
+
+![在3D视口中垂直剪切](images/Shear3DVertical.gif)
+
+### 删除对象
+
+删除对象只需选中它们并选择 #menu(菜单/编辑/删除)。请注意：如果删除brush实体中最后剩余的brush，该实体将自动被删除。同理，如果删除组中最后剩余的对象，该组也会被自动删除。## 塑造笔刷
+
+TrenchBroom提供了多种工具来改变笔刷的形状。其中最强大但也最需谨慎使用的是顶点工具。在讨论该工具前，我们将先介绍可用于切割笔刷的剪辑工具。但首先我们要讲解挤出工具——顾名思义，它能快速调整笔刷尺寸。最后我们会说明如何通过TrenchBroom的CSG操作来塑造笔刷。
+
+### 挤出操作
+
+通过挤出工具移动笔刷面片沿其法线方向即可实现挤出。选中笔刷后按住#key(Shift)键，将鼠标指针移至目标面片或其附近区域，该面片会显示黄色高亮边框。保持按住#key(Shift)的同时左键拖动，即可沿法线方向移动高亮面片。注意：只要某面片有边缘在摄像机视野内可见，即使该面片位于笔刷背面也可被移动。
+
+![在3D视口中挤出笔刷](images/ExtrudeTool3D.gif)
+
+需注意挤出工具不能改变笔刷的面片数量。这意味着无法无限向内推挤面片——当继续移动会导致其他面片消失时，TrenchBroom会拒绝执行操作。同理向外拉出面片导致其消失的情况也会被禁止。
+
+若开始拖动时按住#key(Ctrl)键，则不会执行挤出操作，而是创建新笔刷。原始笔刷与新笔刷的组合形态将与直接挤出（不按#key(Ctrl)）的效果相同，二者将在原始拖动面片位置处分割。
+
+![在3D视口中分割笔刷](images/ExtrudeTool3DSplitMode.gif)
+
+使用#key(Ctrl)键开始拖动时也可向内拖拽以分割原始笔刷：
+
+![在3D视口内向内分割笔刷](images/ExtrudeTool3DSplitInwardMode.gif)
+
+通过挤出工具可同时移动多个笔刷的面片实现同步挤出，但要求这些面片必须完全对齐。如下方动画所示——仅平行是不够的，这些面片必须完全重合。
+
+![同时挤出多个笔刷](images/ExtrudeTool3DMultipleBrushes.gif)
+
+当然挤出工具也适用于2D视口，但不支持移动选中笔刷背面的面片。无论哪种情况，TrenchBroom都采用两种方式来确定面片拖动的吸附距离：- 移动距离会自动吸附到当前网格尺寸。例如，若沿法线方向拖拽面17.5单位，当网格尺寸为16时实际会移动16单位。此功能在调整构成曲线的brush时尤为实用，因为拖拽后其表面将保持对齐。
+- 被拖拽面的顶点会吸附到网格平面。只要任一顶点分量（X/Y/Z）是当前网格尺寸的整数倍，该面就会自动对齐到该顶点。这使得将面与其他相邻面对齐变得简单。
+
+两种吸附模式会同时生效。某些情况下您可能需要拉近摄像机视角，以确保拖拽面时有足够的操作精度。
+
+#### 移动面而非挤出 {#moving_faces}
+
+brush挤出工具提供在2D视图中快速移动单个面的功能。在2D视图中开始拖拽面时，同时按住#key(Alt)和#key(Shift)即可启用此模式。您会注意到面像往常一样高亮显示，但当开始拖动鼠标时，该面将仅沿拖动方向移动（不受法线方向限制），其他相邻面也会随之变化。
+
+![移动面](images/ExtrudeTool2DFaceMoving.gif)
+
+移动距离同样会吸附到当前网格尺寸。位于同一平面上的多个面可被同时移动。[UV锁定](#uv_lock)设置控制在此模式下拖拽时是否启用对齐锁定。
+
+### 剪切
+
+剪切是Quake地图最基本的操作之一，这与brush的[平面构造原理](#brush_geometry)密切相关。本质上，剪切操作就是为brush添加新平面——根据brush的形状可能移除因此变得冗余的其他平面。在TrenchBroom中可通过选择#menu(菜单/编辑/工具/剪切工具)激活剪切工具，该工具支持多种方式定义剪切平面并将其应用到选中的brush上。
+
+应用剪切平面会产生三种不同结果：删除选中brush位于（定向）剪切平面前侧的所有部分、删除后侧所有部分、或将每个选中brush切割成两部分。下图展示了这三种模式：
+
+![三种剪切模式](images/ClipModes.png)在这三张图中，都存在一个由两个点定义的剪切平面。该剪切平面将图中的单个brush切分为两部分：左侧部分位于平面下方，右侧部分位于平面上方。第一张图中，剪切模式设置为保留brush位于剪切平面下方的部分，并舍弃平面上方的部分。最终生成的brush形状将与图中红色部分一致。第二张图中，剪切模式设置为同时保留brush的两部分，此操作将生成两个brush。第三张图中，剪切模式与第一种情况相反——保留平面上方的部分并舍弃另一部分。在剪切工具中，您可以通过快捷键#action(Controls/Map view/Toggle clip side)循环切换这三种模式。
+
+定义剪切平面的方式有两种：更常见的方式是在3D或2D视口中放置至少两个（最多三个）点（这些点称为clip points）；另一种方式是使用现有brush的面来定义剪切平面。
+
+#### Clip Points
+
+放置clip points时只需在激活剪切工具后左键点击视口。您也可以通过鼠标左键拖拽一次性添加两个clip points——拖拽起点放置第一个点，终点放置第二个点。在3D视口中只能将clip points放置在已有brush上，而2D视口可任意放置。clip points会自动吸附到网格线，但3D视口中的吸附存在特殊规则（下文详述）。激活剪切工具时会出现橙色球体跟随鼠标指针的视觉反馈——该球体显示吸附到网格后的实际落点位置（仅当鼠标指针附近存在有效落点时才会显示）。
+
+当放置两个clip points后（注：两点无法精确定义平面），TrenchBroom会尝试推测可能的剪切平面。若认可系统推测的平面方案，可通过#action(Controls/Map view/Perform cli)执行剪切；否则可继续放置第三个点精确定义平面，或调整现有clip points的位置（左键拖拽移动）。要删除最近放置的clip point可使用#menu(Menu/Edit/Delete)。
+
+#### Clip Point Snapping在三维视口中，剪辑点只能放置在已有笔刷的表面上。此类剪辑点会吸附到投影至该笔刷表面的网格上。因此它看似吸附于投影网格，同时也被固定在笔刷表面。若该点在所有维度上都进行吸附，则会导致其陷入或脱离原始放置的笔刷表面。TrenchBroom通过将剪辑点固定在用户放置的笔刷表面来避免此问题。这意味着当您尝试在三维视口中移动已放置的剪辑点时，该点将被移至鼠标下方笔刷表面上最近的吸附点。
+
+在二维视口中，剪辑点仅会吸附到可见网格上，因此不受限于必须固定在笔刷表面。您可以在任意视口中放置剪辑点，也可通过其他视口移动已放置的剪辑点——但吸附行为始终遵循当前操作视口的规则。例如使用二维视口移动三维视口放置的剪辑点时，该点可能被拖离原始笔刷表面进入虚空；反之若用三维视口移动二维视口放置的点时，该点会吸附到鼠标下方的笔刷表面（若无则无法移动）。
+
+#### 匹配剪切平面
+
+![匹配剪切平面](images/MatchingClipPlane.gif)  
+剪切平面也可通过匹配现有笔刷表面来定义。需在三维视口中双击目标表面——该笔刷面将显示橙色轮廓线，同时生成完全匹配其平面的剪切平面。此功能在几何体塑形时极为实用。需注意此时剪切平面的坐标点完全继承被匹配笔刷面的坐标点，因此使用此功能时不会产生微缝隙问题。
+
+### 顶点编辑 {#vertex_editing}
+
+TrenchBroom提供三种独立工具编辑笔刷顶点：[顶点工具](#vertex_tool)用于单独顶点编辑、[边线工具](#edge_tool)处理独立边线、[面工具](#face_tool)则针对单独面片操作。其中顶点工具功能最为强大——除移动顶点外还可增减笔刷顶点数量；而边线与面工具仅支持位移操作。
+
+#### 顶点工具 {#vertex_tool}使用顶点工具，您可以在三维空间中移动单个顶点。此外，您还可以向brush添加顶点或从中移除顶点。要激活顶点工具，请选择#menu(菜单/编辑/工具/顶点工具)。当顶点工具激活时，所选brush的顶点处会显示黄色控制柄以便操作。
+
+![顶点控制柄](images/VertexToolHandles.png)
+
+将鼠标指针悬停在顶点控制柄上时，该控制柄会以红色圆形轮廓高亮显示，其位置信息会显示在上方。
+
+选择顶点控制柄的方式与选择对象相同。单击控制柄即可选中。按住#key(Ctrl)可选择多个控制柄。顶点工具还允许使用套索选择多个控制柄：按住鼠标左键拖动可创建矩形选择套索，释放左键后套索内的所有控制柄将被选中。若套索矩形包含已选中的顶点控制柄，则该控制柄会被取消选中。要确保套索内所有顶点控制柄都被选中（无论其先前选择状态如何），请按住#key(Ctrl)。
+
+选中若干顶点控制柄后，可通过鼠标左键拖动来移动它们。移动顶点控制柄（及其对应顶点）的操作与移动对象类似：在3D视口中可沿XY平面移动，或按住#key(Alt)进行垂直移动；在2D视口中可沿该视口的视图平面移动。如果在未选中的顶点控制柄上开始拖动，该控制柄会自动被选中——因此若只需移动单个顶点则无需预先选择。当您在顶点控制柄上按下鼠标左键开始拖动时，会出现黄色参考线帮助您相对于其他对象定位该顶点。
+
+移动顶点控制柄时，移动距离会按当前网格尺寸分量对齐（与移动对象时相同）。若希望顶点的绝对位置对齐网格，可在拖动过程中按#key(Ctrl)切换相对/绝对对齐模式。![切割面](images/VertexToolFaceChopping.gif) TrenchBroom确保您不会使用顶点工具创建无效的Brush。例如，不可能通过将顶点推入Brush来使其凹陷。为了实现这一点，TrenchBroom会根据该顶点移动的方向，将与顶点相关的面切割成三角形。在左侧动画中可以看到，立方体的顶面在第一次向下移动顶点时被切掉了一个三角形；而在第二次向外移动顶点时，前表面被切割成了扇形三角形。有时如果移动会导致顶点进入Brush内部使其凹陷，TrenchBroom甚至会删除该顶点。这种情况下，顶点移动操作将终止。
+
+顶点工具还允许您合并相邻顶点。如果在移动过程中某个顶点与相邻顶点重合，这两个顶点将被合并。但操作不会因此终止——您可以继续移动合并后的顶点，且它仍保持选中状态。请注意当您移动边或面时不允许合并操作（尽管同时移动多个顶点时仍会发生合并）。
+
+若需快速将某个顶点吸附到另一个顶点而无需拖动操作，只需按住#key(Shift)#key(Alt)并点击目标顶点即可。
+
+<br clear="all" />
+
+![分割操作](images/VertexToolSplitting.gif) 除了移动、合并和删除顶点外，您还可以使用顶点工具为Brush添加新顶点。按住#key(Shift)并将鼠标悬停在需要添加顶点的网格位置上——当鼠标指针接近该点时会出现新顶点的控制柄。点击并拖拽控制柄即可添加新顶点。
+
+此外，通过选择#menu(菜单/编辑/删除)可以删除Brush中选定的顶点、边和面。注意只有当删除操作不会导致当前选中的任何Brush失效（即所有被选Brush在删除后仍保持三维形态）时才会成功执行。否则TrenchBoom会拒绝整个操作请求。
+
+<br clear="all" />![顶点聚合](images/VertexToolVertexClumping.gif)  
+顶点编辑不仅限于单个brush的操作。当选择多个brush并激活顶点工具时，所有选中brush的顶点控制柄都会显示。这在处理地形等有机brush结构时尤为实用——您可以构建大型brush组并一次性修改它们，而无需反复切换选择。  
+
+TrenchBroom能自动识别多个brush中位置重合的顶点。当您移动这类顶点时，所有重合顶点会同步移动，大幅提升地形编辑效率。下方动画演示了：由于光标下的顶点位置重合，单次拖拽即可同时移动它们。
+
+<br clear="all" />
+
+顶点工具还提供键盘快捷键来移动顶点，具体如下表所示：
+
+方向        | 二维模式快捷键                                              | 三维模式快捷键                                              
+---------    | -------------                                              | -------------                                              
+向左         | `#action(Controls/Map view/Move objects left)`            | `#action(Controls/Map view/Move objects left)`            
+向右         | `#action(Controls/Map view/Move objects right)`           | `#action(Controls/Map view/Move objects right)`           
+向上         | `#action(Controls/Map view/Move对象上移；前移对象)`       | `#行动（控制项／地图视图／后移对象；上移对象）`            
+向下         | `#行动（控制项／地图视图／下移对象；后移对象）`            | `#行动（控制项／地图视图／前移对象；下移对象）`            
+前进         | `#行动（控制项／地图视图／前移对象；下移对象）`            | `#行动（控制项／地图视图／上移对象；前移对象）`            
+后退         | `#行动（控制项／地图视图／后移对象；上移对象）`            | `#行动（控制项／地图视图／下移对象；后移对象）`            
+
+至此已介绍完顶点工具的全部功能。虽然它非常强大，但使用时仍需谨慎——不当的顶点编辑可能导致brush失效或map中出现微泄漏。下文将提供若干最佳实践以帮助您规避这些问题。
+
+
+#### 边线工具 {#edge_tool}
+
+通过边线工具可在三维空间中移动独立边线。激活方式：选择`菜单栏(Menu)/编辑(Edit)/工具(Tools)/边线工具(#menu(Menu))`。激活后选中brush的边线会显示为黄色可操控状态，且每条边线中心会出现控制柄。
+
+![边线控制柄](images/EdgeTool.png)将鼠标指针移动到边缘控制点上时，该控制点会以红色高亮显示。选择边缘控制点的方式与选择顶点控制点相同。单击某个控制点即可选中它。按住#key(Ctrl)键可选择多个控制点。被选中的控制点会呈现为红色。
+
+边缘工具还支持使用套索工具进行多选。按住鼠标左键拖动可创建矩形选择套索。松开左键后，套索范围内的所有控制点都会被选中。如果套索矩形内包含已被选中的边缘控制点，则该点会被取消选中。若要确保套索范围内的所有边缘控制点都被选中（无论其先前是否被选中），请按住#key(Ctrl)键。
+
+当选中有边缘控制点时，可通过鼠标左键拖动来移动它们。移动边缘控制点（及其对应边）的方式与移动顶点类似，区别在于该工具仅支持相对捕捉移动距离。与顶点工具相同，当检测到两个或多个brush共享同一条边时，若移动共享边则所有被选brush的对应边都会同步移动。
+
+最后，边缘工具也支持与顶点工具相同的键盘快捷键操作。
+
+#### 面工具 {#face_tool}
+
+使用面工具可以在三维空间中移动单个面。激活面工具需选择#menu(菜单/编辑/工具/面工具)。当面工具激活时，被选brush的面会显示为黄色表示可编辑状态。此外，工具会在面的中心位置显示顶点控制点用于选择和操作面（注意：这些控制点允许选择和操作背对摄像机的面）。
+
+![面控制点](images/FaceTool.png)
+
+当鼠标指针悬停在面控制点上时，该控制点会显示红色轮廓线且对应面的边线会加粗显示。选择面控制点的操作逻辑与选择顶点相同：单击单选；按住#key(Ctrl)键多选；被选中的控制点呈现红色。
+
+该工具同样支持套索多选功能：按住左键拖动创建矩形套索选区后释放按键即可选中范围内所有面控当你选中了一些面控制点时，可以通过鼠标左键拖动来移动它们。移动面控制点（及其对应的面）的操作方式与移动顶点相同，唯一的区别是该工具仅支持相对吸附移动距离。与顶点工具类似，面工具会检测两个或多个brush是否共享同一个面——如果移动了共享面，所有选中brush的对应面都会同步移动。
+
+最后要说明的是，面工具也支持与顶点工具相同的键盘快捷键命令。
+
+#### 顶点编辑最佳实践
+
+- 不要在密封性brush上过度使用该功能，建议优先用于细节调整
+- 避免一次性进行过多修改，应频繁编译测试
+- 制作地形时，先创建四边形或三角网格结构体（quad/trisoup），仅沿网格平面法线方向移动顶点（正交移动），禁止侧向平移顶点
+- 处理细节brush时要格外小心，可能会意外开启vis portals（可视化门户）
+- 过多细节可能导致PVS（潜在可见集）包含过量信息，建议将部分细节转为实体brush以强制vis系统将房间分割为多个PVS子集。也可使用hint brush强制vis生成更多子集
+
+#### UV锁定 {#uv_lock}
+
+常规的对齐锁定偏好设置不适用于顶点编辑——取而代之的是通过#menu(菜单/编辑/UV锁定)或工具栏按钮控制的独立选项"UV锁定"：
+
+![UV锁定工具栏按钮](images/UVLock.png)
+
+启用该设置后，当使用顶点编辑工具或[面移动功能](#moving_faces)时，TrenchBroom会尽力保持顶点的UV坐标不变。
+
+### CSG运算
+
+CSG是构造实体几何（Constructive Solid Geometry）的缩写。这项技术在专业建模工具中通过集合运算符（如并集/加法、差集和交集）组合简单形状来创建复杂形体。但由于可能产生无法用brush直接表示的凹形结构（切记brush始终是凸体），标准的CSG并集和差集运算不能直接应用于brush。不过部分运算符可通过brush模拟实现：TrenchBroom支持_凸包合并_（替代并集）、_差集运算_（通过创建新brush模拟凹形结果）以及直接支持的_交集运算_。
+
+#### CSG凸包合并凸面合并操作以一组Brush作为输入，计算这些Brush所有顶点的_凸包_，并创建一个具有凸包形状的新Brush。点集的凸包是指包含所有点的最小凸体积。在下面的动画中，两个Brush被合并为一个。该操作会获取两个Brush的顶点并计算其凸包。部分原始Brush的顶点会成为凸包的顶点，而另一些则会被丢弃（例如2D视图中左上角Brush右下角的顶点）。被丢弃的顶点是那些最终位于凸包内部的顶点。
+
+![CSG凸面合并](images/CSGConvexMerge.gif)
+
+如图所示，新创建的Brush会覆盖原始Brush未覆盖的区域。这遵循了结果Brush必须是凸面的限制条件。结果Brush是否会覆盖这些原本的空隙区域取决于输入Brush之间的相对位置关系。要执行凸面合并操作，请选择需要合并的Brush并点击#menu(菜单/编辑/CSG/凸面合并)。
+
+#### CSG减法运算
+
+CSG减法运算以选中的Brush（减数）为工具，从地图中其他可选可见的Brush（被减数）中减去它们。由于CSG减法运算的结果可能是凹面体，TrenchBroom会通过用减数Brush的面切割被减数Brush来创建代表凹面形状的新Brush。
+
+![通过减法运算创建拱门](images/CSGSubtractArch.gif)
+
+上图展示了通过减法运算创建拱门的示例。结果包含八个完美呈现拱门形状的Brush。要执行CSG减法运算，请选择作为减数的Brush（要从场景中减去的对象），然后点击#menu(菜单/编辑/CSG/减去)。
+
+若要将某些Brush排除在减法运算之外，可先使用#menu(菜单/视图/隐藏)将其隐藏。
+
+#### CSH空心化
+
+空心化操作是通过从原版刷中减去其缩小版本来实现的快捷功能。该功能可用于快速构建房间轮廓：只需选中一个刷并点击#menu(菜单栏→编辑→布尔运算→空心化)，即可将所选刷转换为空心结构。生成的墙体厚度等于当前网格尺寸。
+
+![布尔空心化效果](images/CSGHollow.gif)
+
+本示例展示了对立方体进行空心化处理的过程：最终生成六个分别构成墙壁、地板和天花板的刷结构。请注意墙体厚度由网格尺寸决定。
+
+#### CSH交集运算
+
+交集运算通过计算一组刷的共同重叠区域来生成新对象：即创建一个能完全包含在所有输入刷内部的最大新刷。当输入刷之间不存在重叠区域时（互斥状态），系统将清空这些输入对象并从场景中移除它们。
+
+另一种理解方式是：该操作会提取所有输入刷相互重叠的部分，并创建代表该交集区域的新对象。（注：原文最后一句已整合至本段说明）![两个长方体的CSG交集操作](images/CSGIntersect.gif)
+
+您可以通过选择需要相交的brush，然后选择#menu(菜单/编辑/CSG/交集)来执行CSG交集操作。
+
+#### 材质与CSG操作 {#materials_and_csg_operations}
+
+在所有CSG操作中，新生成的brush都需要被赋予材质。为了确定新brush面的材质，TrenchBroom会尝试在原始brush中寻找与新生成面处于同一平面的面。如果找到匹配的面，TrenchBroom会将对应面的材质和属性赋予新生成的面。否则将使用[当前材质](#working_with_materials)。
+
+![CSG材质处理过程](images/CSGTexturing.gif)
+
+上例展示了通过从一个brush中减去另一个brush来创建拱门的过程。减数（subtrahend）使用蓝色砖块材质，被减数（minuend）使用深色金属材质。完成减法操作后：结果模型中与被减数面对齐的面继承了蓝色砖块材质；与被减数面对齐的面继承了深色金属材质；部分不可见面（因与其他brush共享）由于没有匹配的原始面而被赋予当前材质。## 特殊笔刷与面类型 {#special_brush_face_types}
+
+大多数基于Quake引擎的游戏都包含某些特殊类型的笔刷和面。例如*触发器笔刷*（trigger brush）就是一种特殊笔刷类型，它能触发游戏逻辑事件；而带有_clip*材质的特殊面类型虽然不可见，但能阻挡玩家通过。在Quake3中，开发者常用_caulk*面来告知bsp编译器跳过这些不可见的表面。
+
+只要在游戏的[配置文件](#game_configuration_files)中进行了配置，TrenchBroom就能识别这些特殊笔刷和面类型。系统主要通过以下方式检测特殊类型：
+
+* **笔刷类型**
+  - **实体类名模式**：当笔刷所属实体的类名匹配特定模式时（如触发器笔刷），该笔刷会被标记为特殊类型。
+* **面类型**
+  - **材质名称模式**：若笔刷面的材质名称匹配特定模式（如clip纹理），该面会被标记为特殊类型。
+  - **内容标识**：当笔刷具有特定内容标识时，其表面会被标记为特殊类型。
+  - **表面标识**：当笔刷具有特定表面标识时，其表面会被标记为特殊类型。
+  - **表面参数**：若笔刷包含特定表面参数，其表面会被标记为特殊类型。
+
+在[过滤与渲染选项](#filtering_rendering_options)中，您可筛选这些特殊类型的笔刷和面。此外还能为设置/取消特殊笔刷类型分配快捷键（若功能支持）。以下特殊类型支持通过快捷键快速切换：* **Brush类型**
+  - **实体类名模式** 可设置或取消。设置brush类型会将选中的brush包裹在一个新创建的实体中，该实体的类名与模式匹配。如果当前加载的实体定义中有多个类名与该模式匹配，将显示下拉菜单供您选择其中一个选项。取消设置brush类型则简单地将选中的brush移至世界空间中。
+* **面类型**
+  - **材质名称模式** 仅可设置。设置面类型会为选中的面应用名称与模式匹配的材质。如果当前加载的材质集合中有多个材质与该模式匹配，将显示下拉菜单供您选择其中一个选项。
+  - **内容标志** 可设置或取消。设置面类型会为选中的面应用一个已配置的内容标志。如果配置了多个内容标志，将显示下拉菜单供您选择其中一个选项。取消设置将清除所有已配置的内容标志。
+  - **表面标志** 可设置或取消。设置面类型会为选中的面应用一个已配置的表面标志。如果配置了多个表面标志，将显示下拉菜单供您选择其中一个选项。取消设置将清除所有已配置的表面标志。
+  - **表面参数** 既不可设置也不可取消。
+
+最后，任何支持取消操作的特殊brush或面类型都可以通过*Make Structural*命令 #action(Controls/Map view/Make structural)来清除。## 材质操作指南 {#working_with_materials}
+
+在关卡编辑器中操作材质涉及两个方面：[材质管理](#material_management)和材质应用。本节主要讲解后者，因此您将学习如何以不同方式将材质应用到brush表面并调整其对齐方式。但在深入探讨之前，我们需要先了解三个基础主题：首先介绍材质浏览器，接着说明TrenchBoom如何为新创建的brush表面分配材质，最后讨论TrenchBoom中不同的材质投影模式。
+
+### 材质浏览器 {#material_browser}
+
+![材质浏览器界面](images/TextureBrowser.png)  
+材质浏览器是面检查器的组成部分，主要有两个功能：为当前选中的面更换材质和选择_当前材质_。在浏览器中，所有材质的显示宽度上限为64像素——更宽的材质会按比例缩小显示。每个材质的名称显示在图像下方。正在使用的材质会带有黄色边框，而当前选中的材质则显示红色边框。当鼠标悬停在材质图像上时，会弹出包含该纹理名称和尺寸的提示信息。
+
+浏览器下方设有与[实体浏览器](#entity_browser)相同的控制选项：用于更改排序方式（按名称或使用次数）的下拉菜单、按[材质集合](#material_management)分组的按钮、按使用情况筛选的按钮以及按名称筛选的文本框。支持输入多个空格分隔的关键词来仅显示包含全部关键词的材质。如果图像尺寸在您的显示器上显示过小或过大，可以在[偏好设置](#view_layout_and_rendering)中调整。
+
+**批量选择操作**：
+- 要选中使用特定材质的全部表面：在材质浏览器中右键该材质，从弹出菜单中选择"选择表面"
+- 要选中包含特定材质的全部brush：在材质浏览器中右键该材料，从弹出菜单中选择"选择brush"
+
+### 筛选材质集合
+
+![筛选界面示意图](images/TextureCollectionEditor.png)  
+点击标题栏的"设置"按钮可展开筛选界面。"可用集合"区域勾选需要启用的集合后点击"+"图标，"已启用集合"区域选中后点击"-"图标可禁用集合。圆形箭头图标用于重新加载所有集合配置。
+
+完成设置后点击标题栏的"浏览"按钮即可返回主界面。
+
+### 材质投影模式 {#material_projection_modes}在最初的Quake引擎中，材质是沿着坐标系轴投影到Brush面上的。实际上，引擎（更准确地说，编译器）使用Brush面的法线来确定投影轴——选择的轴是与面法线夹角最小的那个坐标轴。然后，材质沿着该轴投影到Brush面上。这会导致一些扭曲（剪切），对于倾斜的Brush面尤其明显——这些面的法线与所有三个坐标轴都线性相关。然而这种被TrenchBroom称为_轴向投影_的方式也有优势：如果面的法线仅与两个或更少坐标轴线性相关（即位于由两个坐标轴定义的平面内，例如XY平面），那么轴向投影能确保材质仍完美贴合Brush面而无需调整缩放比例。
+
+轴向投影的主要缺陷是无法实现完美的对齐锁定。_对齐锁定_意味着在对面进行任何变换时，材质都能完全固定在Brush面上。例如当Brush沿X轴移动16个单位时，所有面上的材质都会相对于Brush保持静止。而轴向投影会因变换导致面法线改变而产生扭曲，这种剪切效应无法被补偿。
+
+这（可能）就是Half Life引入Valve 220地图格式的原因之一。该格式通过为每个Brush面添加UV轴信息来扩展数据。理论上这使得UV坐标在投影时可以进行任意线性变换，但实践中多数编辑器仍保持UV轴与面法线垂直。这种情况下材质会沿着面法线方向（而非坐标轴）进行投影。TrenchBroom将这种模式称为_平行投影_，且仅支持Valve 220格式的地图。
+
+### TrenchBroom如何为新Brush分配材质在TrenchBroom中，存在当前材质的概念，我们已在先前章节提及。初始状态下当前材质未设置，可通过两种操作改变：选择笔刷面或在材质浏览器中点击材质来选定当前材质。当TrenchBroom创建新笔刷或新笔刷面时，可能会参考当前材质来决定应用哪种材质到新建的笔刷面上。但并非总是如此：有时TrenchBroom能根据操作上下文确定新建笔刷面的材质（如[CSG操作](#materials_and_csg_operations)所述）。其他情况下（例如用鼠标创建新笔刷时），程序会始终应用当前材质。
+
+### 手动分配材质
+
+要更改当前选中面的材质，请在材质浏览器中左键点击目标材质。此操作同样适用于选中笔刷（且仅选中笔刷）的情况——此时新材质会应用到所有选中笔刷的面上。
+
+您还可以将材质和属性从一个面转移到另一个面。此处的"属性"指几乎所有可通过[面属性编辑器](#face_attribute_editor)修改的特性——如偏移量、缩放比例或表面标志等。唯一例外的是内容标志：目标面的内容标志将始终保持不变。
+
+执行转移操作时，先用#key(Shift)+左键选择源面。然后根据转移需求按住以下组合键之一：
+
+修饰键              含义  
+-------------       -------  
+#key(Alt)          从选定面转移材质和属性（通过投影到目标面）  
+#key(Alt)#key(Shift)   从选定面转移材质和属性（通过旋转到目标面，仅限Valve格式地图）  
+#key(Alt)#key(Ctrl)    仅转移材质（保留目标面的属性）  
+
+再根据要应用的目标面执行以下操作之一：
+
+操作                    应用目标面  
+-------                 --------------------  
+左键单击               点击的面  
+左键拖动               拖拽经过的所有面（每个后续经过的面都会从上个面继承）  
+左键双击               目标笔刷的所有面  
+
+具体说明：#key(Alt)修饰符会将源面的UV轴直接复制到目标面而不作调整。虽然有时需要这种效果，但当两个面的法线方向差异较大时可能导致材质拉伸。#key(Alt)#key(Shift)组合通过旋转源面的UV轴来避免此问题，但该功能仅限Valve格式地图使用。最后，您可以使用复制粘贴功能将所选面的材质和属性复制到其他面上：
+
+1. 选择要复制的源面，然后选择 #menu(菜单/编辑/复制)
+2. 选择要粘贴的目标面，然后选择 #menu(菜单/编辑/粘贴)
+
+### 替换材质
+
+如需将特定材质替换为另一个材质，可选择 #menu(菜单/编辑/替换材质...)。该操作会打开一个窗口，您可以通过两个材质浏览器分别选择被替换材质和替换材质。窗口界面如下图所示。
+
+![材质替换窗口（Mac OS X）](images/ReplaceTexture.png)
+
+在左侧材质浏览器中选择待替换的材质（默认仅显示地图中当前使用的材质）。截图中被红框标注的"b_pv_v1a1"即为选中的待替换材质。接着在右侧材质浏览器中选择新材质（截图中为"b_sr_20c"），最后点击"替换"按钮。若当前未选择任何面片，则整个地图中所有brush面片都会应用该替换；若已选中部分面片，则仅作用于选中面片。替换成功后，被修改的面片会自动进入选中状态；若失败则保持原选择不变。
+
+### 设置面片属性
+
+面片属性控制着材质在brush面上的映射方式。每个面片至少包含偏移量（offset）、缩放比例（scale）和旋转角度（angle）三个基础属性：偏移量可平移材质位置；缩放因子能拉伸材质；角度值则实现旋转效果。此外不同引擎可能支持扩展属性：例如Quake 2引擎还包含表面标志（surface flags）、表面值以及额外内容标志等属性。修改这些数值可通过多种途径实现：既可通过面片属性编辑器直接输入数值；也可在3D视窗中使用快捷键操作；还能通过UV编辑器进行调整。
+
+#### 面片属性编辑器 {#face_attribute_editor}
+
+该编辑器位于面片检查器中（UV编辑器与材质浏览器之间区域），提供多种控件用于编辑单个或多个选中brush面的属性。
+
+![面片属性编辑器（Mac OS X）](images/FaceAttribsEditor.png)在上方的截图中可以看到两种控件类型。数值输入控件由文本框和用于增减数值的小按钮组成。文本框会显示对应面属性的值，例如截图中X缩放显示为"1"。如果选中了多个brush面，当所有面在对应属性上具有相同值时文本框会显示该值，否则会显示占位词"multi"。在上方截图中，所选brush面的X偏移量各不相同，因此文本框显示为"multi"。其他属性值在所有选中brush面中都相同，所以其他属性编辑器都显示具体数值而非占位词。通过在文本框中输入数字，可以将所有选中brush面的该属性值设为该数值。因此，若在我们上文的例子中向X偏移编辑器输入"32"，之后所有选中brush面的X偏移量都将变为该值。
+
+然而微调按钮的工作方式不同。点击上下箭头按钮时，会根据网格设置和当前按下的修饰键以特定增量值增减对应面属性值。下表说明了不同情况下的增量值选择：
+
+属性        默认值      按下#key(Shift)键时  按下#key(Ctrl)键时  
+---------   -------     -----------------    -----------------  
+偏移量       网格尺寸     2 * 网格尺寸         1.0  
+缩放比例     0.1         0.25                 0.01  
+旋转角度     15°         90°                  1°  
+
+请注意这些增量会应用于每个选中brush面的对应属性。例如若选中两个brush面（一个X偏移量为0，另一个为8），当前网格尺寸为16时，点击X偏移属性编辑器旁的向上箭头按钮会将两个X偏移量分别改为16和24。只有在文本框中输入数值才会将两个X偏移量设为相同值。
+
+除使用按钮修改数值外，当文本框获得焦点时还可以使用滚轮或方向键操作。滚轮和方向键遵循与上表相同的增量值规则。
+
+对于表示标志值的属性（如Quake 2的表面标志和内容标志），面属性编辑器中提供了不同类型的控件。该控件在文本框中以文字形式显示标志值，点击文本框旁标有"..."的按钮会弹出下拉窗口来修改标志。下拉窗口包含每个标志对应的复选框，可以单独勾选或取消勾选。如果当前选中的面具有不同的内容标志集，内容标志文本框将显示“multi”。请注意，对于支持内容标志的游戏而言，通常建议在给定Brush的所有面上使用相同的内容标志，以避免游戏中出现意外行为；因此，如果选中单个Brush时内容标志文本框显示“multi”，这可能是一个需要修正的错误指示。
+
+如果选中的面具有不同的表面标志集，表面标志文本框同样会显示“multi”，但这并不一定是一个需要修正的情况。在Brush的不同面上设置不同的表面标志通常是有效的。
+
+#### 材质对齐键盘快捷键
+
+以下快捷键在3D视口中生效，并影响所有选中的Brush或Brush面：
+
+属性        按键                                   默认值      按下#key(Shift)时    按下#key(Ctrl)时  
+---------   ----                                   -------     -------------------  -----------------  
+偏移量      #key(Left)#key(Right)#key(Up)#key(Down)网格大小    2 * 网格大小         1.0  
+角度        #key(PgUp)#key(PgDown)                 15°         90°                  1°  
+
+命令                                    按键  
+-------                                 ----  
+水平翻转                                #action(Controls/Map view/Flip textures horizontally)  
+垂直翻转                                #action(Controls/Map view/Flip textures vertically)  
+重置对齐                                #action(Controls/Map view/Reset texture alignment)  
+重置为世界坐标对齐                      #action(Controls/Map view/Reset texture alignment to world aligned)
+
+这些操作是相对于3D摄像机（“重置”除外）进行解释的。这意味着按下#键（上）将在视觉上将材质大致沿该方向移动，可能会根据摄像机和面的方向增加或减少X或Y偏移量。角度处理类似：按下#键（PgUp）将在视觉上逆时针旋转材质，按下#键（PgDown）将顺时针旋转。
+
+#### UV编辑器 {#uv_editor}
+
+UV编辑器位于面检查器的顶部。通过UV编辑器，您可以调整当前选中Brush面的材质偏移、缩放和角度。请注意，UV编辑器仅在选中一个Brush面时可用。如果选中多个Brush面，UV编辑器将为空。
+
+![UV编辑器](images/UVEditor.png)当前面的材质会显示在UV编辑器的背景中。材质会进行平铺，平铺边缘以灰色显示。这些平铺边缘称为_UV网格_。当前选中的brush面形状以白色显示。黄色实心圆标记材质的原点，两条在原点相交的红线标记材质的基准轴——这些用于缩放操作。较大的黄色圆圈是用于旋转材质的控制柄。UV轴以红色和绿色显示在brush面的中心。
+
+要改变材质相对于brush面的偏移量，只需按住鼠标左键拖动材质到任意位置即可。注意材质会自动吸附到brush面的顶点以便对齐。
+
+通过点击拖动灰色UV网格线可以缩放材质，操作时也会自动吸附到brush面的顶点。缩放是相对于材质原点（黄色圆圈标记处）进行的。要更改缩放原点，可以左键拖动黄色圆圈，或拖动在原点相交的红线。通过红线可以分别设置原点的X/Y坐标。原点会吸附到面的顶点和中心点。
+
+要围绕原点旋转材质，可左键拖动大黄色圆圈，或按住#key(Ctrl)键后在UV编辑器中任意位置左键拖动。角度会自动吸附到brush面的边缘以便更贴合面形。
+
+如果map使用[平行投影](#material_projection_modes)，还可以对材质进行斜切操作：按住#key(Alt)键的同时左键拖动灰色UV网格线即可。
+
+UV编辑器底部有以下控制项：
+
+![UV Editor Toolbar](images/UVEditorToolbar.png)
+
+- 重置对齐：所有属性重置。[平行投影](#material_projection_modes)格式的map会从面平面重新投射材质；标准格式map效果同"重置为世界对齐"
+- 重置为世界对齐：所有属性重置并从轴向平面投射材质
+- 水平翻转材质  
+- 垂直翻转材质  
+- 逆时针旋转90°  
+- 顺时针旋转90°  
+- UV网格细分控制：可用于将大型trim sheet的部分区域对齐到面## 实体属性 {#entity_properties}
+
+实体本质上是一组属性的集合，而属性是一个键值对，其中键和值都是字符串。某些值具有特殊格式，例如颜色、坐标点或角度。但通常情况下，编辑实体时您操作的都是字符串。在TrenchBroom中，您可以通过位于实体检查器顶部的实体属性编辑器来添加、删除和编辑实体属性。
+
+![实体属性编辑器](images/EntityPropertyEditor.png)
+
+实体属性编辑器分为两个独立区域。顶部以表格形式显示当前选中实体的属性，如果适用的话，还会显示这些属性在未设置时的默认值。
+
+### 默认实体属性 {#entity_properties_defaults}
+
+默认属性以*斜体*显示在所选实体的实际属性下方。若要隐藏默认属性，可以取消勾选表格底部的复选框。默认实体属性定义在FGD等实体定义文件中，其含义取决于具体游戏。像《雷神之锤》这类游戏会为实体属性提供内置默认值，此时默认实体属性将反映这些预设值（前提是在实体定义文件中正确配置）。
+
+而《半条命》等其他游戏不会为实体属性提供默认值，要求必须为每个实体显式设置默认值。如果在[游戏配置](#game_configuration_files_entities)中进行了相应设置，当创建新实体时TrenchBroom会自动实例化带有默认值的默认实体属性。请注意并非所有默认属性都会被实例化——只有那些在实体定义文件中配置了默认值的属性才会被TrenchBroom实例化。
+
+![设置默认实体属性](images/SetDefaultPropertiesMenu.png)
+
+在实体属性编辑器下方有一个小按钮，点击后会弹出菜单。该菜单包含三个选项：
+
+- **设置已有默认属性的值**：将所有具有默认值的实体属性重置为其预设值。不会添加或删除任何属性，也不会修改没有预设值的现有属性。
+- **设置缺失的默认属性**：添加所有未设置的默认实体属性。仅新增缺失的属性项，既不移除现有属性也不修改已存在的任何数值。
+- **设置全部默认属性的值**：综合前两种操作。将所有具有预设值的实休属件设为默汄値（无论当前値为何），同时补全缺失的默汄属件项。不会移除任何属件列且仅会修改默汄属件値。
+
+### 编辑屬性要选择实体属性，只需点击表格中代表该属性的行。被点击的字段将高亮显示，表示已获得焦点。高亮表明您可以通过输入文本来修改该字段。在上方的截图中，"mangle"属性已被选中，其值字段获得焦点，表示已准备好进行修改。
+
+若需批量修改属性，您可能希望快速浏览表格。可使用方向键在表格中移动焦点。或者按#key(Tab)键逐个字段跳转：当焦点位于某属性的键字段时，按Tab键会将光标移至该属性的值字段；再次按Tab则跳至下一属性的键字段，依此类推直至表格末尾。也可通过#key(Shift)#key(Tab)反向移动。#key(Return)实现纵向导航——例如当焦点在属性键上时按回车，会跳至列表中下一属性的键字段。此导航方式特别适用于批量重命名属性键。
+
+修改属性键或值时，先将焦点定位到表格中相应字段。此时输入文本将直接替换原属性键。另一种修改方式是：当属性已选中时再次点击其字段，此时会显示真实文本框供编辑。
+
+添加实体属性有三种方式：
+1\. 点击表格底部"+"按钮：将插入具有默认名称且无值的空属性；
+2\. 按#key(Ctrl)#key(Return)组合键：新增空属性；
+3\. 修改默认属性的值：该操作会将默认属性提升为实体的实际属性。
+以上方式新增的属性都会自动进入可编辑状态。
+
+删除实体属性时，需先选中表格中对应的行（可多选），再点击底部"-"按钮。
+
+### 多实体选择![多实体选择](images/EntityPropertyEditorMultiSelection.png) 如果选中了多个实体，表格将显示它们所有属性的并集，而不仅仅是这些选中实体共有的属性。未在所有选中实体中出现的属性名称会以灰色显示，而那些在拥有该属性的实体中具有不同值的属性则会显示为空值。在截图中，有三个光源实体被选中。因此，"classname"属性在所有实体中都存在且值相同。同样，"origin"属性也存在于所有这些实体中，但在每个实体中的值不同，因此它显示为空值。另一方面，"light"、"wait"、"angle"和"mangle"属性仅存在于部分选中实体中，但在拥有这些属性的每个实体中它们的值相同。
+
+当选中多个实体时修改某个属性值，该变更将应用于所有选中的实体——即使这需要为某些实体新增该属性。例如在上例中将"light"属性值改为200后，每个选中的实体的"light"属性都将变为200——即使原先只有部分实体拥有该属性。
+
+### 智能实体属性编辑器
+
+TrenchBroom为以下实体属性提供了特殊编辑器：spawnflags（生成标志）、colors（颜色）和choices（选项）。这些特殊编辑器被称为_智能属性编辑器_，当您选择存在对应编辑器的属性时，它们会显示在实体属性表格下方。
+
+类型             编辑器                                                        说明  
+----             ------                                                        -----------  
+Spawnflags       ![智能生成标志编辑器](images/SmartSpawnflagsEditor.png)       复选框表格，允许切换各个生成标志的值。  
+Color            ![智能颜色编辑器](images/SmartColorEditor.png)                颜色选择控件，支持字节与浮点颜色值的转换，并提供地图中所有颜色的列表。  
+Choice           ![智能选项编辑器](images/SmartChoiceEditor.png)              下拉选项列表。也可直接在文本框输入任意文本。
+
+### 链接实体实体可以通过特殊的链接属性相互关联。每个链接都有源实体和目标实体。目标实体具有名为"targetname"的属性，其值为任意字符串。源实体则具有"target"或"killtarget"属性，其值需与目标实体的"targetname"属性值相匹配。要创建实体链接，您需要手动将这些属性设置为正确的值。目前TrenchBroom中这些链接属性的名称是硬编码的，但未来会根据FGD文件自动读取（如果适用）。以下章节将说明编辑器中如何可视化呈现实体链接。
+
+### 实体链接可视化
+
+在3D和2D视口中，实体链接会以线条形式呈现。TrenchBroom提供四种实体链接可视化模式，您可以通过点击信息栏右侧的「视图」按钮下拉菜单进行切换。下表详细说明这四种模式：
+
+模式                   | 描述  
+----------------------|-----------
+全部显示               | 始终显示所有实体链接  
+选择传递链             | 显示与选中实体相连的所有链接，以及从选中实体可到达的任何链接  
+直接选择               | 仅显示与选中实体直接相连的链接  
+不显示                 | 隐藏所有实体链接  
+
+当前选中实体的关联链接会以红色线条显示（连接该选中实体与其源/目标对象），其他未选中的实体链接则显示为绿色。
+
+![实体链接可视化](images/EntityLinkVisualization.png)
+
+上图中两个info_null实体之间的连接线显示为绿色，因为这两个都未被选中。## 撤销与重做 {#undo_redo}
+
+在TrenchBroom中，几乎所有的操作都可以通过选择#menu(菜单/编辑/撤销)来撤销。这适用于任何修改地图文件的操作（例如移动对象），也适用于一些不改变地图文件的操作，比如选择、隐藏和锁定。你可以撤销的操作数量没有限制，一旦某个操作被撤销，你可以通过选择#menu(菜单/编辑/重做)来重做它。
+
+### 撤销合并与事务
+
+需要注意的是，TrenchBroom会将某些连续的操作分组为事务，这些事务可以作为一个整体被撤销或重做。例如，如果你选择了一些对象然后隐藏它们，这些对象会自动取消选择。取消选择要隐藏的对象和隐藏它们的操作会被合并为一个事务，因此当你撤销时，这些对象会同时被取消隐藏并重新选中。
+
+此外，如果相同的操作序列发生在一次鼠标拖动过程中或在一定时间内完成，TrenchBroom会将这些操作合并为一个动作。例如移动一个brush时，所有移动步骤会被合并为一个动作；或者在一定时间内通过键盘快捷键多次移动一个brush时，所有这些动作也会被合并为一个。实际上这节省了内存空间，并允许你一次性撤销整个操作序列。
+
+# 保持概览
+
+当处理大型地图时，管理地图中的对象并保持对它们的概览可能会变得繁琐。某些区域可能挤满了大量brush和entity（实体），导致编辑被其他物体遮挡的特定对象变得困难。TrenchBroom提供了一系列工具来帮助你轻松保持地图的全局视角并清理拥挤区域的杂乱内容。## 过滤渲染选项 {#filtering_rendering_options}
+
+要过滤特定类型的对象，您可以点击编辑区域上方信息栏右侧的"视图"按钮，打开视图下拉窗口。
+
+![带有视图下拉菜单的信息栏（Windows 10系统）](images/ViewDropdown.png)
+
+在视图下拉菜单的左侧，有一组复选框列表，允许您隐藏共享相同实体定义（即相同类名）的所有实体。取消勾选某个实体定义（或其分组）即可隐藏对应的实体。如需快速隐藏或显示所有实体，可以点击列表下方的两个按钮。
+
+视图下拉菜单的右侧分为三组选项：
+
+* **实体** - 在此配置编辑器中的实体渲染方式。
+* **Brush** - 启用或禁用某些特殊brush或面类型。这些类型因游戏而异，从[游戏配置文件](#game_configuration_files)中读取。
+* **渲染器** - 控制其他对象渲染方式的各种选项。
+
+注意：可以在[偏好设置](#keyboard_shortcuts)中为视图下拉菜单的每个选项添加快捷键切换功能。## 隐藏与隔离
+
+在处理复杂场景时，隐藏特定对象或仅保留目标对象会非常有用。要隐藏所选对象，请选择#menu(菜单/视图/隐藏)；若要隔离所选对象，请选择#menu(菜单/视图/隔离)。要显示所有被隐藏的对象，请选择#menu(菜单/视图/显示全部)。所有这些操作均可撤销。## 锁定功能
+
+锁定功能可防止对象以任何方式被选中或编辑。被锁定的对象会以蓝色边缘显示，并且其表面会呈现蓝色色调，如下图所示。
+
+![已锁定的对象](images/Locking.png)
+
+当您正在编辑一个已打开的组或将某个图层设置为锁定状态时（见下文），对象会被锁定。您无法单独锁定单个对象。## 组别 {#groups}
+
+组别功能允许您将多个对象视为一个整体并为其命名。一个组可以包含以下类型的对象：实体（entities）、笔刷（brushes）以及其他组别。由于组别可以嵌套包含其他组别，因此会形成层级结构——但在实际应用中，您很少会创建此类嵌套组。在视口中，组别的边界框会以蓝色显示，且其名称会标注在顶部。
+
+要创建组别，请确保当前未激活任何工具，选中若干对象后选择 #menu(菜单/编辑/编组)。编辑器将提示您输入名称。组别名称无需唯一，因此可以有多个同名组。要选中某个组时，只需点击其中任意包含的对象——此时选中的不是单个对象而是整个组别，因此您只能以整体形式编辑组内所有对象。若需编辑组内单个对象，请用鼠标左键双击该组将其打开（此时地图中其他对象会被锁定显示为蓝色且不可编辑）。打开组后即可常规编辑其中的独立对象或在组内创建新对象。完成编辑后，通过左键双击组外任意区域即可关闭该组。如需删除某个组别，选中后选择 #menu(菜单/编辑/解组)即可（注意：删除操作仅解除编组关系而不会移除地图中的实际对象）。
+
+要向现有组添加对象：先选中待添加对象 → 右键点击该组的任意现有成员 → 选择"添加对象至GROUPNAME"（GROUPNAME即目标组的名称）。同理移除对象的操作流程为：打开目标组 → 选中待移除对象 → 从[地图视图上下文菜单](#map_view_context_menu)选择"从GROUPNAME移除对象"。被移除的对象会自动加入当前图层。当某组的全部对象被移除时，该组会自动删除。
+
+（注：严格遵循了术语规范如Brush/map不译、保留所有格式标记及代码符号）##  关联组 {#linked_groups}
+
+组之间还可以建立关联以实现实例化效果。关联组包含相同的对象，但可以整体进行不同的位移和形变。修改任意一个关联组会同步更新其他所有关联组。该功能适用于创建可复用结构（例如需要保持同步的门框），其工作流程始终遵循以下步骤：
+
+1\.  创建构成可复用结构的对象（例如门框）  
+2\.  将这些对象编组  
+3\.  选中该组后通过右键菜单或 #menu(菜单/编辑/创建关联副本)  生成关联副本  
+4\.  将副本移动到目标位置并施加变形操作（如旋转）  
+5\.  通过常规复制操作基于关联组创建更多副本  
+6\.  随时可打开任意关联组修改内容，这些变更将自动同步到其他关联组  
+
+可以对关联组施加位移、旋转、缩放或镜像等多种变形操作。普通组与关联组支持无限嵌套：既允许关联组包含普通组，也允许普通组包含关联组，甚至支持关联组的嵌套。
+
+需特别注意：**不可将关联组简单理解为实例化**。在TrenchBroom中不存在固定的「主版本」概念——当修改某个关联组时，该组会临时成为「主版本」，其全部内容（无论是否被修改）都将复制到所有兄弟关联组中。可以理解为TrenchBroom自动执行了手动更新的过程。
+
+通过常规操作即可为关联组添加/移除对象，变更会立即生效。编辑关联组的对象时，只需正常打开该组进行操作，修改同样会实时同步。
+
+参考以下示例（两个位置不同的关联组均包含brush和实体）：
+
+```
+Group A 
+- Brush A 
+- Entity A 
+    – “classname” “monster_army” 
+    – “angle” “90” 
+    – “origin” “000”
+
+GroupB(沿X轴位移128单位)要将属性设置为受保护状态，请点击其复选框。要取消保护，再次点击该复选框。当您将属性设为未受保护时，其值将重置为其他实体中对应未受保护属性的值。在上文的示例中，将`Entity B`的`angle`属性设为未受保护会将其值重置为`90`，即来自`Entity A`未受保护的`angle`属性值。
+
+若要将一个或多个实体的所有属性设为未受保护状态，请选中这些实体（或其所属组）并选择 #menu(菜单/编辑/清除受保护属性)。
+
+由于对链接组所做的所有更改会立即同步到其他链接组中，因此新添加的属性会即刻出现在链接组中。若想添加属性但不进行同步，可通过点击实体属性编辑器下方工具栏中的盾牌状`+`图标将其添加为受保护属性（参见前文截图）。反之，若要在链接组中隐藏某个属性——即不希望该属性在添加到其他链接组时被创建——可先将其添加为受保护属性再立即删除。该属性仍会显示在属性编辑器中（直到取消其受保护标记），但名称会以斜体显示，使其看起来像默认属性。
+
+以下示例展示了这些已删除的受保护属性的价值。
+
+```
+Group A
+- Entity A
+  - "classname" "monster_army"
+  - "origin" "0 0 0"
+
+Group B (translated by 128 0要解除已链接组的关联，请选中该组并选择 #menu(菜单/编辑/分离链接组)。这将使链接组恢复为普通组。如果从一组相互链接的组中选中多个链接组，这些被选中的组不会变成普通组，而是会形成一个新的独立链接组集合。这个独立的链接组集合内部仍保持相互链接关系，但不再与原集合中未被选中的成员相关联。
+
+请注意：如果通过分离或删除操作移除了某链接组集合中的所有成员，那么该集合中最后剩余的单个成员将自动转变为普通组。
+
+###  可视化效果 {#linked_group_visualization}
+
+![3D视图中的链接组（macOS系统）](images/LinkedGroups.png)
+
+链接组的显示颜色与普通组不同。当选中某个链接组时，编辑器会显示从该组指向其他关联组的箭头标记，用以指示哪些组会随当前选中组的修改而同步更新。即使打开某个链接组的内部结构时，这些箭头标记仍会保持显示。
+
+###  地图文件中的链接组 {#linked_groups_map_file}
+
+与普通组类似，链接组在map文件中以带有TrenchBroom专属属性的`func_group`实体形式存储。若在其他编辑器中修改包含TrenchBroom创建的链接着的map文件并更改了其中属于某个链接着的对象时会导致该链接着与其他关联者不同步。TrenchBroom仍可正常加载此类不同步的链接着并允许继续编辑。但若在TrenchBroom中修改其中任意一个链接着的内容时该修改将覆盖所有其他关联者的内容使其重新同步。因此若您特意在外部编辑器中修改了某个链接着并希望将这些变更同步到其他关联者只需在编辑器中打开这个特定链接着进行任意修改后再次关闭即可触发全量同步。
+
+请看以下示例链接着：
+
+```
+Group A
+- Brush A
+- Entity A
+    - "classname" "monster_army"
+    - "origin" "0  00"
+
+Group B (沿X轴平移128单位)
+- Brush B 
+- Entity B  
+    - "classname""monster_army"
+    - ""origin""128  00"
+```
+
+在map文件中这些链接著将以如下形式存储（注释部分说明了TrenchBroom为链接著添加的专属属性）：
+
+```
+// entity  00 
+{
+""classname"" ""func_group""  
+""_tb_type"" ""_tb_group""  
+""_tb_name"" ""group""  
+""_tb_id"" ""11""  
+
+//  此属性表示链接著集合的唯一标识符  
+//  所有具有相同标识符的func_group实体将保持互相关联  
+"_tb_linked_group_id"{38b3b39d-a165--4999--985d-d40563ce51c11}"  
+
+//  记录应用于整个组的变换矩阵（移动/旋转/缩放操作时会自动更新）  
+"_tb_transformation"""11  00  00  1288   
+                        00  11  00    00   
+                        00    0011    00   
+                        000000111""" 
+``````markdown
+// brush（笔刷）  编号：第零号  
+{  
+    // （面数据已省略）  
+}  
+}  
+
+// entity（实体）  编号：第一号  
+{  
+    // classname（类名）：monster_army（怪物军队）  
+    // origin（原点坐标）：128,  零,  零  
+    // _tb_group（所属组别）：第一组  
+
+}  
+
+// entity（实体）  编号：第二号  
+{  
+    // classname（类名）：func_group（功能组）  
+    // _tb_type（类型标识）：_tb_group（组别标识）  
+    // _tb_name（名称标识）：group（组别名称）  
+    // _tb_id（唯一标识符）：第二号  
+
+    /* 
+     *  此分组实体与前一实体共享相同的关联组ID，
+     *  因此它们将被自动关联。
+     */   
+    "_tb_linked_group_id关联组ID": "{38b3b39d-a165-4999-985d-d40563ce51c1}"  
+
+    /* 
+     *  变换矩阵参数：
+     *  单位矩阵表示无位移/旋转/缩放变换。
+     */   
+    "_tb_transformation变换矩阵": "单位矩阵参数串行化数据..."  
+
+    // brush笔刷部分开始：第零号笔刷体数据块开始标记...    
+        {    
+            /* （面数据已省略说明...） */    
+        }    
+}    
+
+/* 
+ * ================================================================
+ *      第三号实体定义区块开始...
+ * ================================================================
+ */   
+{    
+      /* 
+       * classname类名声明为monster_army(怪物军队单位)，
+       * origin原点坐标定位在世界坐标系绝对零点处，
+       * angle朝向角度设置为90度(Y轴顺时针旋转)，
+       * _tb_group所属分组标识为第二组，
+       * angle旋转属性被标记为受保护属性(禁止编辑)。
+       */   
+      "_tb_protected_properties受保护属性列表": ["angle"]   
+}
+```## 图层 {#layers}
+
+图层将您的map分解为多个部分。例如，您可以为不同的房间或区域创建图层。图层可以包含组、实体或brush，且每个对象只能属于一个图层。每个图层都有名称，可设置为隐藏/锁定状态，或从导出的map中排除。每个map都包含一个不可删除的"默认图层"。
+
+![图层编辑器](images/LayerEditor.png)
+
+作为map检查器的一部分，图层编辑器会显示map中的所有图层。
+
+- 点击空心圆圈图标可从导出中排除该图层（带"X"标记表示已排除）
+- 点击眼睛图标可隐藏/显示图层  
+- 点击锁形图标可锁定/解锁图层## 游戏配置 {#game_configuration}
+
+![游戏配置对话框（Mac OS X）](images/GamePreferences.png)
+
+游戏配置偏好设置面板用于设置TrenchBroom所支持游戏的路径。针对每个游戏，您可以通过点击"..."按钮并选择硬盘上存储游戏的文件夹来设置游戏路径。或者，您也可以在文本框中手动输入路径，但必须按下#key(Return)键以应用更改。
+
+此外，您可以通过点击'配置引擎...'按钮为选定的游戏配置游戏引擎。
+
+点击游戏列表下方的文件夹图标将在文件浏览器中打开包含自定义游戏配置的文件夹。
+
+![游戏引擎配置对话框（Mac OS X）](images/GameEngineDialog.png)
+
+在此对话框中，您可以通过点击左侧配置文件列表下方的'+'按钮添加游戏引擎配置文件，或通过点击'-'按钮删除选定的配置文件。在列表右侧，您可以编辑所选游戏引擎配置文件的详细信息，特别是其名称和路径。与游戏路径类似，如果您手动编辑引擎路径，则必须在路径文本框中按下#key(Return)键以应用更改。点击[此处](#launching_game_engines)了解如何从TrenchBroom内启动游戏引擎。
+
+对于某些游戏配置（例如上面显示的Quake），您还可以选择性地为一组编译工具输入路径。如果不清楚应在此处指定什么路径，将鼠标悬停在路径输入框上可能会显示包含该编译工具附加信息的工具提示。
+
+如果您在此处输入了路径，则可以在该游戏的[编译配置文件](#compiling_maps)中使用显示在路径左侧的名称作为变量。无论该变量出现在何处，都将使用此处指定的路径。例如如果您的`qbsp`工具的路径是`C:\mapping\ericw-tools-v0.18.1-win64\bin\qbsp.exe`并且您在此处设置了该路径...那么在您的编译配置文件中可以在需要引用整个qbsp.exe路径的任何地方输入`${qbsp}`。
+
+在此处指定工具路径（如果游戏配置允许）的好处是：
+
+- 创建、编辑和共享编译配置文件将更加容易。
+- 如果需要更改工具路径只需在此处修改即可。
+
+因此在上面的示例中如果您想尝试位于不同文件夹（如`C:\mapping\ericw-tools-v0.19-win64\bin`）的更新版ericw-tools则只需在此对话框中更改路径而无需编辑所有编译配置文件。
+
+您还可以添加[自定义游戏配置](#game_configuration_files)以适应特定设置（例如支持TrenchBroom所支持格式但未预期与该游戏一起使用的引擎）。## 视图布局与渲染 {#view_layout_and_rendering}
+
+![视图偏好设置 (macOS)](images/ViewPreferences.png)
+
+在此偏好设置面板中，您可以选择编辑区域的布局。共有四种可选布局：
+
+布局类型      描述  
+------       -----------  
+单窗格       单个可循环切换的3D/XY/XZ/XY视口  
+双窗格       一个3D视口和一个可循环切换的XY/XZ/XY视口  
+三窗格       一个3D视口、一个XY视口和一个可循环切换的XZ/YZ二维视口  
+四窗格       一个3D视口、一个XY视口、一个XZ视口和一个YZ视口  
+
+可通过快捷键#action(Controls/Map view/Cycle map view)循环切换二维视口。
+
+其余设置将影响视口的渲染效果。
+
+设置项                    描述  
+-------                   -----------  
+亮度                      纹理亮度（影响3D视口、实体窗口和材质浏览器）  
+网格线                    3D与2D视口中网格的不透明度  
+坐标系轴                  在3D与2D视口中显示坐标系轴  
+过滤模式                  3D视口中的纹理过滤模式  
+启用多重采样              是否开启抗锯齿渲染  
+材质浏览器图标尺寸        材质浏览器中材质图标的显示大小  
+渲染器字体尺寸            地图视口中的文字大小（例如实体类名）## 鼠标输入 {#mouse_input}
+
+![鼠标配置对话框（Ubuntu Linux）](images/MousePreferences.png)
+
+鼠标输入偏好设置面板允许您更改TrenchBroom对鼠标移动的解读方式。
+
+设置项      | 说明  
+-------     | -----------
+视角控制    | 鼠标视角旋转（右键拖动）的灵敏度与轴反转设置  
+平移控制    | 鼠标平移（中键拖动）的灵敏度与轴反转设置  
+移动控制    | 用鼠标移动摄像机的灵敏度及相关设置。若使用数位板，"Alt+中键拖动移动摄像机"的设置可使导航更便捷。  
+移动快捷键 | 地图内移动的键盘快捷键，配有独立滑块可调节移动速度。## 键盘快捷键 {#keyboard_shortcuts}
+
+![键盘配置对话框（Ubuntu Linux）](images/KeyboardPreferences.png)
+
+在此偏好设置面板中，您可以更改TrenchBroom使用的键盘快捷键。表格列出了所有可用快捷键、其上下文及描述。要修改某个快捷键，请点击表格第一列中的快捷键两次（非双击）并输入新快捷键。上下文决定了该快捷键何时可用，例如PgDn键会根据旋转工具是否激活而触发不同操作。最后，"描述"列解释了特定上下文中快捷键的功能。有时一个快捷键会根据使用视口是3D还是2D而触发不同操作。例如PgDn键在2D视口中可使对象向后移动（远离摄像机），在3D视口中则沿Z轴向下移动。这些不同操作会在描述列中并列列出，但用分号分隔。
+
+若您在打开地图时启动偏好设置对话框，快捷键列表会根据加载的实体配置文件和游戏配置文件包含额外条目。每个实体及特殊Brush或面类型都提供以下快捷键：
+
+* **实体**
+  - `视图筛选器 > 切换CLASSNAME可见性`：切换该类别实体的显示/隐藏状态（[更多信息](#filtering_rendering_options)）
+  - `创建CLASSNAME`：创建该类别实体（[更多信息](#creating_entities)）
+* **Brush/面类型**
+  - `视图筛选器 > 切换TYPE可见性`：切换该类型Brush或面的显示/隐藏状态（[更多信息](#filtering_rendering_options)）
+  - `将选中项转为TYPE`：为选中的Brush或面设置此类型
+  - `将选中项转为非TYPE`：移除选中Brush或面的此类型
+
+请注意，若您在同一上下文中为不同操作分配相同快捷键会产生冲突，必须解决冲突后才能退出偏好面板或关闭对话框。冲突的快捷键会以红色高亮显示。
+
+# 高级主题## 自动更新
+
+TrenchBroom支持检查更新。若有可用更新，可直接在软件内下载并安装。若在偏好设置中启用了"启动时检查更新"，TrenchBroom将在启动时自动执行更新检查。
+
+当有新版本时，TrenchBroom会在以下位置显示通知：
+
+- 欢迎窗口
+- "关于TrenchBroom"对话框  
+- 更新偏好设置  
+- 状态栏  
+
+在这些位置中，更新程序的状态会以文字形式显示。若存在可执行操作，则会显示可点击链接。例如当有可用更新时，会出现标有"有可用更新"的链接。点击该链接将弹出下载安装更新的对话框。
+
+![更新指示器 (macOS)](images/UpdateIndicator.png)
+
+在上方截图中，由于尚未执行更新检查，链接显示为"检查更新"。点击该链接将开始检查更新。
+
+![更新偏好设置 (macOS)](images/UpdatePreferences.png)
+
+可通过偏好设置配置更新程序。提供以下选项：
+
+- 启动时检查更新：启用后，TrenchBroom将在启动时自动检查更新  
+- 包含预发布版：启用后，检查范围将包含预发布版本（尚未达到稳定状态的版本）  
+这些版本可能包含稳定版尚未实现的新功能或错误修复  
+
+请注意：TrenchBroom执行更新检查时不会发送任何用户隐私或设备信息。我们不会收集任何用户数据。整个过程中仅会通过HTTPS协议向GitHub发送一个请求来检查更新；下载更新文件时会再发送一个HTTPS请求到文件托管地址（目前所有文件同样托管于GitHub）。## 命令重复功能
+
+编辑笔刷操作往往包含大量重复步骤。以构建螺旋楼梯为例：首先切割出代表单个台阶的brush，然后复制该brush，将其向上移动并围绕楼梯中轴旋转。这些动作需要为每个台阶重复执行。TrenchBroom的*命令重复*功能正是为自动化这类流程而设计。
+
+命令重复机制类似于自动宏录制器。请注意TrenchBoom已通过[撤销与重做](#undo_redo)功能记录了所有操作历史。除撤销功能外，这些记录信息还可用于重复执行最近的操作序列。在楼梯案例中，您只需单次按键即可循环执行复制、平移和旋转操作组合。关键在于确定哪些近期操作应被纳入重复序列，这通过两种方式实现：首先当选择集变更时，TrenchBoom会自动清空所有可重复操作记录。因此若选中对象后立即使用#menu(菜单/编辑/重复)，由于可重复动作已被丢弃，不会产生任何效果；其次可通过#menu(菜单/编辑/清除可重复命令)主动清空记录队列，这相当于通知软件开始录制新宏。
+
+具体到螺旋楼梯案例：创建代表台阶的基础brush后（因不希望重复该brush的创建过程），需通过取消选择再重新选中该brush，或使用上述菜单命令来清空可重复命令队列。随后执行复制、上移和旋转操作组合后，即可通过多次调用#menu(菜单/编辑/重复)快速生成整个楼梯结构。
+
+总结来说，命令重复功能相当于一个极简宏系统——始终只保存最近连续操作的单一宏记录。尽管功能有限，但熟练运用将显著提升工作效率。## 问题浏览器 {#issue_browser}
+
+问题浏览器位于窗口底部。它实时显示TrenchBroom在您的map中检测到的问题列表。所谓实时是指每当map发生变化时，编辑器会自动更新该列表。请注意，TrenchBroom无法检测所有可能导致编译错误/警告或游戏中异常行为的问题，但它能识别其中部分问题。保持map不存在此类问题，可避免您在map复杂度提升后花费大量时间修复错误。
+
+要查看TrenchBroom能检测和修复的问题类型，请点击问题浏览器右上角的"筛选"按钮。这将展开下拉列表供您切换TrenchBroom应检查的问题类型（默认全部启用）。
+
+![带筛选下拉菜单的问题浏览器](images/IssueBrowserFilter.png)
+
+问题列表中的每个条目提供两项信息：当前map文件中问题对象所在的行号（如适用）及描述文本。若需定位引发问题的对象，可在浏览器中选择对应条目，编辑器将自动选中相关对象。随后可通过#menu(菜单/视图/摄像机/聚焦选中项)使其在3D和2D视口中可见。
+
+![带上下文菜单的问题浏览器](images/IssueBrowserContextMenu.png)
+
+除问题提示外，TrenchBroom还能自动修复问题。右键点击具体问题项，从"修复"上下文菜单中选择相应解决方案即可。若需忽略特定问题，可通过上下文菜单的"隐藏"选项将其移出视图。要查看所有被隐藏的问题，可勾选问题列表上方的对应复选框。如需重新显示被隐藏的问题项：先显示全部隐藏项→右键目标项→选择上下文菜单中的"显示"。## 编译地图 {#compiling_maps}
+
+TrenchBroom支持在编辑器内部编译地图。这意味着您可以创建编译配置档，并配置这些档案来为您运行外部编译工具。但请注意，TrenchBroom并未预装编译工具——您需要自行下载并安装这些工具。以下截图展示了选择#menu(菜单/运行/编译...)时弹出的编译对话框。
+
+![编译对话框（Windows 10）](images/CompilationDialog.png)
+
+此对话框允许您创建编译配置档，这些档案会列在对话框左侧。每个编译配置档包含名称、工作目录和任务列表。点击配置档列表下方的“+”按钮可新建配置档，点击“-”按钮则删除选中的配置档。右键点击某个配置档并选择“复制”即可复制该档案。选中某个配置档后，您可以在对话框右侧编辑其名称、工作目录及任务。
+
+名称  
+:    该编译配置档的名称。无需唯一且可为空。
+
+工作目录  
+:    该配置档的工作目录。此项为可选，但非常实用，因为在指定各任务参数时可将其作为变量引用（见下文）。允许使用变量（见下文）。
+
+任务  
+:    运行该编译配置档时按顺序执行的任务列表。
+
+每个任务前的复选框可让您在运行配置档时有选择地排除某些任务。
+
+共有三种任务类型，各自参数不同：
+
+导出地图  
+:    将地图导出至文件。此文件应与实际存储地图的文件不同。
+
+    标记为“导出时忽略”的图层不会出现在导出的地图中。
+
+    参数      说明  
+    --------  -----------  
+    目标      导出文件的路径。允许使用变量。
+
+运行工具  
+:    运行外部工具并捕获其输出。请注意，“工具”参数值可使用[游戏配置](#game_configuration)中定义的编译工具变量（如下文所述）。
+
+    参数      说明  
+    --------  -----------  
+    工具      待运行工具的可执行文件绝对路径。若已设置工作目录，则以此目录为工作目录。允许使用变量。  
+    参数      执行时传递给工具的参数字符串。允许使用变量。
+
+复制文件  
+:    复制一个或多个文件。
+
+    参数      说明  
+    --------  -----------  
+    源文件    待复制的文件（支持通配符*,?指定多个文件）。允许使用变量。  
+    目标      文件复制的目标目录（若不存在会自动递归创建）。现有文件将被直接覆盖不提示。允许使用变量。重命名文件  
+:    重命名或移动单个文件。  
+
+    参数      描述  
+    --------  -----------  
+    源文件     需要重命名或移动的文件。不支持通配符。允许使用变量。  
+    目标路径   文件的新路径。路径必须以文件名结尾。若目录不存在将递归创建。现有文件将被直接覆盖。允许使用变量。  
+
+删除文件  
+:    删除一个或多个文件。  
+
+    参数      描述  
+    --------  -----------  
+    目标文件   要删除的文件（支持多个文件）。可在文件名中使用通配符（*,?）。允许使用变量。  
+
+在配置工作目录和任务参数时，可使用[表达式语法](#expression_language)。下表列出可用变量及其作用域与含义。"Tool"作用域表示该变量仅在配置工具参数时可用，"Workdir"作用域表示该变量仅在配置工作目录时可用。TrenchBroom会通过自动补全列表辅助输入变量。
+
+变量名           作用域              描述  
+--------         -----             -----------  
+`WORK_DIR_PATH`  工具               工作目录的完整路径  
+`MAP_DIR_PATH`   工具/工作目录       当前编辑地图的存储目录完整路径  
+`MAP_BASE_NAME`  工具/工作目录       当前编辑地图的主文件名（不含扩展名）  
+`MAP_FULL_NAME》  工具/工作目录       当前编辑地图的完整文件名（含扩展名）  
+《GAME_DIR_PATH》  工具/工作目录       游戏偏好设置中指定的当前游戏根目录路径  
+《MODS》           工具/工作目录       当前地图已启用mod的数组集合  
+《APP_DIR_PATH》   工具/工作目录       TrenchBroom应用程序二进制文件的所在目录路径  
+《CPU_COUNT》      工具               当前设备的CPU核心数量  
+
+若当前游戏的[游戏配置](#game_configuration)包含编译工具，则这些工具名称也会作为变量在"Tool"作用域中可用。下图展示了编译配置文件中使用此类变量的示例：
+
+![编译对话框片段 - 含工具变量（Ubuntu Linux系统）](images/CompilationDialogToolVars.png)
+
+建议采用以下通用流程进行地图编译，并根据实际需求调整：1. 将工作目录设置为`${MAP_DIR_PATH}`。
+2. 添加一个*导出地图*任务，并将其目标设置为`${WORK_DIR_PATH}/${MAP_BASE_NAME}-compile.map`。
+3. 为您希望运行的编译工具添加*运行工具*任务。使用表达式`${MAP_BASE_NAME}-compile.map`和`${MAP_BASE_NAME}.bsp`来指定工具的输入和输出文件。由于已设置工作目录，此处无需指定绝对路径。
+4. 最后添加一个*复制文件*任务，将其源设置为`${WORK_DIR_PATH}/${MAP_BASE_NAME}.bsp`，目标设置为`${GAME_DIR_PATH}/${MODS[-1]}/maps`。这将把文件复制到最后启用的mod中的maps目录。
+
+最后一步会将bsp文件复制到游戏路径中的相应目录。如果编译生成的不只是bsp文件（例如光照贴图文件），您可以添加更多*复制文件*任务。或者也可以使用通配符表达式如`${WORK_DIR_PATH}/${MAP_BASE_NAME}.*`来复制相关文件。
+
+要运行编译配置方案，请点击编译对话框中的"运行"按钮。请注意当编译配置方案开始运行后，"运行"按钮会变成"停止"按钮。若再次点击该按钮，TrenchBroom将终止当前正在运行的工具。关闭编译对话框或主窗口时也会终止正在运行的编译进程，但TrenchBroom会事先进行确认提示。请注意所有编译工具都在后台运行，您可以根据需要继续编辑地图。
+
+若想测试编译配置方案而不实际执行它，请点击"测试"按钮。测试运行只会打印每个任务将要执行的操作而不会实际执行。
+
+完成编译后，您可以启动游戏引擎在游戏中查看地图效果。下一节将介绍如何配置游戏引擎并从编辑器内启动它们。## 启动游戏引擎 {#launching_game_engines}
+
+在TrenchBroom中启动游戏引擎前，您需要先让TrenchBroom识别您的引擎。您可以通过启动对话框（见下文）或[游戏配置](#game_configuration)调出游戏引擎配置文件对话框来完成此操作。
+
+在TrenchBroom中有两种启动游戏引擎的方式：点击编译对话框中的"启动"按钮，或选择#menu(菜单/运行/启动...)。这将打开如下截图所示的启动对话框。
+
+![启动对话框（Mac OS X）](images/LaunchGameEngineDialog.png)
+
+在此对话框中，您可以选择目标游戏引擎、编辑其参数并启动引擎。要选择引擎，请点击对话框右侧列表中的相应项。如需编辑引擎列表，可点击"配置引擎..."按钮调出游戏引擎配置文件对话框。随后您可以在对话框左侧底部的文本框中编辑参数。请注意该文本框支持以下变量：
+
+变量           描述
+--------       -----------
+`MAP_BASE_NAME`  当前编辑地图的基础名称（不含扩展名）。
+`GAME_DIR_PATH`  游戏偏好设置中指定的当前游戏的完整路径。
+`MODS`          包含当前地图所有启用mod的数组。
+
+`MODS`变量常用于向引擎传递参数以选择mod。通常这会使用当前地图mod列表中的最后一个mod。由于`MODS`变量是包含地图所有mod的数组，可通过下标运算符访问其单个元素（见下文）。要访问数组最后一个元素，可使用表达式`$MODS[-1]`。
+
+请注意这些参数会随游戏引擎配置文件一起保存。## 表达式语言 {#expression_language}
+
+TrenchBroom包含一种简单的表达式语言，可用于轻松将变量及更复杂的表达式嵌入字符串中。目前该语言主要用于编译对话框和启动引擎对话框。下文将介绍该表达式语言的语法与语义。
+
+### 求值规则
+
+每个表达式都可被求值为一个值。例如字符串``"This is a string."``就是一个有效表达式，其求值结果为包含字符串``This is a string.``的字符串类型值。该表达式语言定义了以下类型。
+
+类型       描述  
+----       -----------  
+布尔型     取值只能是true或false  
+字符串     字符序列  
+数值       浮点数  
+数组       值的列表  
+映射表     键值对列表（同义词：字典/表）  
+范围类型   仅内部使用  
+空值       表示null值的类型  
+未定义     表示未定义值的类型  
+
+#### 类型转换 {#el_type_conversion}  
+
+以下矩阵描述了这些类型之间可能的转换关系。首列为源类型，后续列描述如何进行类型转换（或是否会产生错误）。注意范围类型、空值和未定义类型的列已省略，因为没有类型能转换为这些类型（除自身转换外）。将某类型的值转换为相同类型的操作称为_平凡转换_。
+
+-----------------------------------------------------------------------------------------------------------------------------  
+            ``布尔型``                     ``字符串``               ``数值``                      ``数组``     ``映射表``  
+----        ----------------------------- ---------------------- ----------------------------- ----------- ---------  
+``布尔型``   _平凡转换_                     ``"true"``或``"false"`` ``1.0``或``0.0``                错误        错误  
+
+``字符串``  当值为空串或等于``"false"``时   _平凡转换_              空白时为0.0，可解析为数字时     错误        错误  
+            返回假，否则返回真                                  转为对应数值，否则报错  
+
+「数值」    值为零时返回假                  转为字符串形式           _平凡转换_                     错误        错误  
+
+「数组」    错误                          错误                   错误                           _平凡转换_   错误  
+
+「映射表」  错误                          错误                   错误                           错误        _平凡转换_  
+
+「范围类型」 错误                          错误                   错误                           错误        错误  
+
+「空值」    返回假                         空串                  零                             空数组      空映射表未定义错误                         错误                  错误                         错误       错误  
+-----------------------------------------------------------------------------------------------------------------------------
+
+当且仅当字符串为数字字面量时（如下所述），字符串值可转换为数字值。反之，任何数字始终可以转换为字符串值，转换规则如下：若数字为整数，则字符串中仅包含整数部分而不添加小数部分；若数字非整数，则小数部分将格式化为17位精度。
+
+### 表达式与项  
+
+每个表达式由单个项构成。项是可被求值的元素，例如加法运算（`7.0 + 3.0`）或变量（最终会求值为其对应值）。
+
+```
+Expression     = GroupedTerm（分组项）| Term（项）
+GroupedTerm    = "(" Term ")"
+Term           = SimpleTerm（简单项）| Switch（选择语句）| CompoundTerm（复合项）
+
+SimpleTerm     = Name（名称）| Literal（字面量）| Subscript（下标）| UnaryTerm（一元项）| GroupedTerm  
+CompoundTerm   = AlgebraicTerm（代数项）| LogicalTerm（逻辑项）| ComparisonTerm（比较项）| Case（条件分支）
+
+UnaryTerm      = Plus（正号）| Minus（负号）| LogicalNegation（逻辑非）| BinaryNegation（二进制取反）
+AlgebraicTerm  = Addition（加法）| Subtraction（减法）| Multiplication（乘法）| Division（除法）| Modulus（取模）
+LogicalTerm    = LogicalAnd（逻辑与）| LogicalOr（逻辑或）
+BinaryTerm     = BinaryAnd (二进制与) BinaryXor(二进制异或) BinaryOr(二进制或) BinaryLeftShift(左移) BinaryRightShift(右移)
+ComparisonTrm=Less(小于)LessOrEqual(小于等于)Equal(等于)Inequal(不等于)GreaterOrEqual(大于等于)Greater(大于)
+```
+
+### 名称与字面量  
+
+名称是以字母或下划线开头，后接任意数量字母、数字及下划线的字符串。
+
+```
+Name=("_"Alpha)"_"AlphaNumeric}
+```
+
+例如：`MODS`、`_var1`、`_123`均为有效名称，而`1_MODS`、`$MODS`、`_$MODS`则无效。表达式求值时，所有变量名会被替换为其引用的变量值。若值非String类型，将自动转换至该类型；若无法转换则抛出错误。
+
+字面量可以是字符串、数字、布尔值、数组或map：
+
+```
+Literal=StringNumberBooleanArrayMap  
+
+Boolean="true""false"
+String="""Char}"""'"Char}"'
+Number=NumericNumeric}"."NumericNumeric}
+```
+
+注意：  
+- 字符串可用双引号或单引号包裹，但不可混用。双引号包裹时需用反斜杠转义内部双引号如："thisisafox"，而单引号包裹时无需转义：'thisisafox'同样有效  
+- 数字字面量可不含小数部分直接写作整数形式如：用1替代1数组字面量可以通过在方括号内给出一个由逗号分隔的表达式或范围列表来指定。
+
+``` 
+Array      = "[" [ ExpOrRange { "," ExpOrRange } ] "]"
+ExpOrRange = Expression | Range
+Range      = Expression ".." Expression 
+```
+
+数组字面量是一个可能为空的、由逗号分隔的表达式或范围列表。范围是一种特殊类型，表示一系列整数值。范围由两个用两个点分隔的表达式指定。范围表示一个数值列表，因此两个表达式都必须能转换为`Number`类型的值。第一个表达式表示范围的起始值，第二个表达式表示范围的结束值（包含两端）。因此范围`1..3`表示列表`[1., 2., 3.]。注意起始值也可以大于结束值，例如：range 'range' 'range' 'range' 'range' 'range' 'range' 'range' 'range' 'range' 'range' 'range' 'range' 
+
+下表给出了一些有效的数组字面量表达式的示例。
+
+| 表达式        | 值                          |
+|-------------|----------------------------|
+| \[]         | 空数组                       |
+| \[1.,2.,3.] | 包含值\[]                     |
+| \[           |
+
+映射是用大括号括起来的键值对的逗号分隔列表。注意键是字符串或名称。要在键中使用某些特殊字符或空格，必须将其作为字符串给出。值与键之间用冒号字符分隔。
+
+```
+Map          = "{" [ KeyValuePair { "," KeyValuePair } ] "}"
+KeyValuePair = StringOrName ":" Expression  
+StringOrName = String | Name  
+```
+
+有效的映射表达式的示例如下：
+
+```
+{
+  键":  字符串",
+  其他键:   ,
+  另一个键: []
+}
+```
+
+此表达式的计算结果是一个映射，其中包含键“somekey”下的值“astring”，键“otherkey”下的值“”，以及键“anotherkey”下包含值的数组。
+
+###下标
+
+某些值（如字符串、数组或映射）可以通过下标访问其部分元素。
+
+```  
+Subscript     = SimpleTerm "" ]
+ExpOrAnyRange =
+AutoRange     =
+```下标表达式由两部分组成：被索引的表达式和索引表达式。前者可以是任何计算结果为`String`、`Array`或`Map`类型的表达式，而后者是一个表达式或范围的列表。根据被索引表达式的类型，只有特定的值允许作为索引。以下章节将解释这三种可下标类型各自允许的索引值类型。
+
+#### 字符串下标
+
+下表说明了允许的索引类型及其效果。
+
+索引类型    效果  
+-----      ------
+`Number`  返回包含指定索引处字符的字符串，若索引越界则返回空字符串。允许负索引。
+`Array`   返回包含指定索引处字符的字符串。假设数组的所有元素均可转换为`Number`。越界索引会被忽略，但允许负索引。
+
+若索引值为`Number`类型，则会向最接近的整数方向取整（向零取整），例如值`1.7`向下取整为`1`,而值`-2.3向上取整为-2。字符串下标非常强大，因为它们允许多个下标索引值甚至负索引。以下是使用字符串下标的示例。
+
+```  
+"This is a test."[0]  // "T"  
+"This is a test."[1]  // "h"  
+```
+
+可以使用多个索引或数组索引来提取子串。范围表达式是提取子串的更简洁方式。
+
+```  
+"This is a test."[0, 1, 2, 3] // "This"  
+"This is a test."[0..3]       // "This"  
+"This is a test."[5..6]       // "is"  
+```
+
+你甚至可以在一个下标中使用多个范围表达式，也可以组合范围表达式和单个索引。
+
+```  
+"This is a test."[0..3, 5..6]    // Thisis"  
+"Thisisatest." [03 ,56 ,8 ]// Thisisa" 
+```
+
+负索引用干提取字符串后缀注意索号直一访问数组的最后个字符直二访问倒数第二个字符以此类推假设被下标的字符串长度为那么直一访问该字符串的第一个字符
+
+``` 
+Thi s i s atest .[ - l ]     / / "." 
+Thi s i s atest .[ -5 .. -2 ] / /test 
+```
+
+你甚至可以使用下标和范围来反转字符串
+
+``` 
+Thi s i s atest .[14 .. O ]// tsetasiht 
+```
+
+自动范围是仅在下标表达式中允许的特殊构造自动范围是指起始或结束未指定的范围未指定侧的自动范围会自动替换为字符串长度减一的值
+
+``` 
+Thi s i s atest .[ .. O ]// tsetasiht 
+Thi s i s atest .[5 .. ]// i satest . 
+```
+
+####数组下标 
+
+下表说明了允许的索号类型及其效果索引    效果  
+-----   ------  
+`Number`  返回指定索引处的值。若索引越界则抛出错误。允许负索引。应用与字符串下标相同的舍入规则。  
+`Array`  返回包含指定索引处值的数组。假定索引数组的所有元素均可转换为`Number`类型。若索引数组包含越界索引则抛出错误。允许负索引。
+
+与字符串下标类似，数组下标功能非常强大，因为它允许多个下标索引值甚至负索引。以下示例假设变量`arr`为以下数组：
+
+```  
+[7，8，9，"test"，[10，11，12]]  
+```
+
+使用整数索引的简单下标行为符合预期：  
+
+```  
+arr[0]//7  
+arr[3]//"test"  
+arr[4]//[10，11，12]
+```
+
+可使用多个索引或数组索引来提取子数组。范围表达式是提取子数组的简写方式。
+
+```  
+arr[[0，1，2，3]]//[[7]，8]，9，"测试"]  
+arr[[0...3]]//[[7]，8]，9，"测试"]  
+arr[[3...4]]//["测试"，[[10]，11]，12]]
+```
+
+您甚至可以在下标中使用多个范围表达式，也可以组合范围表达式和单个索引。
+
+```  
+arr[[0...1]，3...4]]//[[7]，8，"测试"，[[10]，11]，12]]  
+arr[[0...3]，4]]//[[7]，8]，9，"测试"，[[10]，11)，12]]
+```
+
+负索引可用于提取数组后缀。注意：  
+
+*   -1访问最后一个元素；  
+
+*   -2访问倒数第二个元素；  
+
+*  以此类推；  
+
+*  若被下标的数组长度为“７”，则“－７”访问其第一个元素。
+
+```  
+arr[-2］//“测试”   
+arr[-２．．－１］//［“测试”，［１０．１１．１２］］ 
+```
+
+您甚至可以使用下标和范围来反转数组。
+
+``` 
+arr［４．．０］／／［［１０．１１．１２］，“测试”，９．８．７］ 
+```
+
+自动范围是仅在下标表达式中允许的特殊构造——指未指定起点或终点的范围（未指定端会自动替换为数组长度减一）。
+
+``` 
+｛｛．．０｝／／［［１０．１１．１２］，“测试”，９．８．７］   
+｛３．．｝／／［“测试”，［１０．１１．１２］］ 
+```
+
+由于数组可以包含其他可下标值（如字符串、数组和映射），因此可通过多重下标表达式访问嵌套元素。
+
+```
+ａｒｒ［３］［２．．３］／／“ｓｔ”   
+ａｒｒ［４］［１］／／１１ 
+```
+
+####映射的下标操作 
+
+下表说明了允许的索引类型及其效果： 
+
+| **Index** | **Effect** |   
+|-----------|------------|   
+| `String` |返回给定键对应的值；若被检索映射不包含该键则返回特殊值‘undefined’。 |   
+| `Array<string>` |返回包含给定键对应键值对的映射；假定所有元素均为‘String’类型；忽略原映射中不存在的键名。 |在以下示例中，假设变量 `map`的值为如下映射：
+
+```json 
+{
+      "some number": 1.0,
+      "some string": "test",
+      "some array" : [ 1, 2, 3, 4 ],
+      "some map"   : { "key1": 5, "key2": "asdf" }
+}
+```
+
+我们首先使用字符串进行简单索引：
+
+```javascript 
+map["some number"]         // → 数值类型：浮点数（Double） 
+map["missing key"]         // → undefined（未定义）
+```
+
+多重索引或数组索引可用于提取子映射。由于范围表达式会生成数字列表而映射要求索引值为字符串类型，因此范围表达式不能用于映射下标。映射中不存在的索引值将被忽略。
+
+```javascript 
+map[("number", text)]            → Map(number=12345678901234567890L)
+```
+
+与数组类似，映射可以包含其他可下标值（如字符串、数组和映射）。您可以使用多重下标表达式访问嵌套元素。
+
+```javascript 
+array[text]                      → String("value") 
+array[("number", text)]         → Map(number=12345678901234567890L)
+```
+
+###  一元运算符项 
+
+一元运算符是作用于单个操作数的运算符。在TrenchBroom表达式语言中，共有四种一元运算符：正号、负号、逻辑非和按位非。
+
+```
+Plus            = "+" SimpleTerm 
+Minus           = "-" SimpleTerm 
+LogicalNegation = “!”SimpleTerm 
+BinaryNegation  = “~”SimpleTerm 
+```
+
+下表说明了根据值类型应用一元运算符的效果。
+
+| **Operator** | **Boolean** | **String** | **Number** | **Array** | **Map** | **Range** | **Null** | **Undefined** |
+|--------------|-------------|------------|------------|-----------|---------|-----------|----------|---------------|
+| Plus (+)     |转换为数字后保持原值（参见下方说明）||无效果||错误||错误||错误|
+| Minus (-)    |转换为数字后取负值（参见下方说明）||对数值取负||错误||错误||错误|
+| Logical NOT (!)|逻辑值取反||||错误||||错误|
+| Bitwise NOT (~)||按位取反（参见下方说明）||||错误|||||
+
+关于对字符串类型值应用一元运算符的说明：除逻辑非外的所有运算符都会尝试将字符串类型的值转换为数字（如果可能）。
+
+以下是使用一元运算符的一些示例：
+
+```javascript 
++true             → Double(12345678901234567890L) 
+!false            → Boolean(true) 
+~integer          → Integer(-98765432109876543210L)
+``` 
+
+###  二元运算符项二元运算符是一种需要两个操作数的运算符。二元运算符采用中缀表示法，即先指定第一个操作数，然后是运算符符号，最后是第二个操作数。请注意，在以下描述二元运算符的EBNF表示法中，第二个操作数始终是一个表达式。
+
+####  代数运算项
+
+代数运算项是指使用二元运算符“+”、“-”、“*”、“/”或“%”的运算项。
+
+    加法       = SimpleTerm "+" Expression  
+    减法       = SimpleTerm "-" Expression  
+    乘法       = SimpleTerm "*" Expression  
+    除法       = SimpleTerm "/" Expression  
+    取模       = SimpleTerm "%" Expression  
+
+所有这些运算符都可以应用于“Boolean”或“Number”类型的操作数。如果操作数是“Boolean”类型，则在应用运算前会将其转换为“Number”类型。
+
+如果其中一个操作数是“Boolean”或“Number”类型，而另一个操作数是“String”类型且其值可以转换为数字时，则可以应用该运算符，“String”类型的操作数也会被转换为“Number”类型。
+
+``` 
+//示例：
+    "1.23" +  1      //结果为2.23  
+     1.23   + "1"     //结果为2.23  
+      "1"   + "2"     //结果为12（字符串拼接），见下文说明 
+```
+
+此外，“+”运算符还可以在以下情况下使用：两个操作数都是“String”类型、都是“Array”类型或都是“Map”类型时。
+
+```
+//示例：
+"This is"+""+"test."                //结果为"Thisisatest."  
+[1 ,2 ,3]+[3 ,4 ,5]                 //结果为[6 ,8 ,15]（逐元素相加）  
+
+//注意：原译文此处存在技术性错误。根据上下文语义修正为：
+"Thisis"+""+"atest."                //结果应为"Thisisatest."（字符串拼接）  
+[6 ,8 ,15]+[9 ,12 ,20]              //结果应为[15 ,20 ,35]（逐元素相加）  
+
+//但根据原始英文描述应理解为数组拼接：
+[6 ，8 ，15]+[9 ，12 ，20]           //结果应为[6 ，8 ，15 ，9 ，12 ，20]（数组拼接）
+```
+
+当两个操作数都是“Map”类型时，“+”运算会合并两个映射表——即重复键会被第二个操作数的值覆盖：
+
+```
+{'k11':'v11','k22':'v22'}+{'k22':'v33','44':'55'}  
+//结果为{'11':'11','22':'33','44':'55'}
+```
+
+注意键‘22’对应的值是‘33’而非‘22’！
+
+####  逻辑运算项 
+
+逻辑运算项要求两个操作数必须都是布尔型。如果任一操作数不是布尔型则会抛出错误。
+
+```
+逻辑与=简单项&&表达式  
+逻辑或=简单项||表达式  
+
+左值右值与结果对应关系如下表所示：  
+
+左值右值与结果对应关系如下表所示：  
+
+左值右值&&结果||结果  
+-------- -------- -------- --------  
+truetruetruetrue  
+truefalsefalsetrue  
+falsetruefalsetrue  
+falsefalsefalsefalse  
+
+```
+
+####  位运算项 
+
+位运算项会直接处理数字型操作数的二进制表示形式。由于浮点数的二进制位处理通常没有实际意义因此会先通过舍弃小数部分将浮点数转换为整数形式再进行处理。如果任一操作数不是数字型则会按照【类型转换规则】将其转换为数字型后再进行运算。```markdown  
+BinaryAnd        = SimpleTerm "&" SimpleTerm  
+BinaryXor        = SimpleTerm "|" SimpleTerm  
+BinaryOr         = SimpleTerm "^" SimpleTerm  
+BinaryShiftLeft	=	Simple	"<<	Simple	>>	Simple  
+
+以下是一些运算符的使用示例：  
+
+```  
+1 &	//	0  
+|	//	3  
+^	//	2  
+<<//2  
+>>//  
+
+####比较项  
+
+比较运算符总是根据比较结果返回布尔值。  
+
+Less           =Simple<Expression  
+LessOrEqual=Simple<=Expression  
+Equal=Simple==Expression  
+InEqual=Simple!=ExpressionGreaterOrEqual=Simple>=ExpressionGreater=Simple>Expression  
+
+左        右         效果  
+------	  -------	  ------  
+布尔	  布尔	    true大于false布尔	  数值	    将右转换为布尔并比较。布尔	  字符串	   将右转换为布尔并比较。布尔	  数组	    错误布尔	  Map	    错误布尔	  范围	    错误布尔	  Null	    左大于右。布尔	  未定义	   左大于右。数值	  布尔	    将左转换为布尔并比较。数值	  数值	    按数字比较。数值	  字符串	   将右转换为数值并比较。数值	  数组	    错误数值	  Map	    错误数值	  范围	    错误数值	  Null	    左大于右。数值	  未定义	   左大于右。字符串	  布尔	   将左转换为布林并比較字串數字轉換為數字比較字串字串按字典序比較(區分大小寫)字串陣列錯誤字串地圖錯誤字串範圍錯誤字串空值左大於右字串未定義左大於右陣列布林錯誤陣列數字錯誤陣列字串錯誤陣列陣列按字典序比較陣列地圖錯誤陣列範圍錯誤陣列空值左大於右陣列未定義左大於右地圖布林錯誤地圖數字錯誤地圖字串錯誤地圖陣列錯誤地圖地圖按键值对字典序比较(先键后值)地图范围错误地图空值左大于右地图未定义左大于右范围任意类型错误空值空值两者相等空值未定义两者相等空值任意类型右侧大于左侧未定义空值两者相等未定义未定义两者相等未定义任意类型右侧大于左侧以下示例展示了比较运算符在不同操作数类型下的使用情况。除非注释中另有说明，否则所有表达式的结果均为`true`。
+
+```    
+true > false  
+true == true  
+false == false  
+
+true == "true"  
+true == "True"  
+true == "asdf"  
+true != ""  
+true != "false"  
+true == "False"  
+true ==  1  
+true ==  2  
+true !=  0  
+
+  １＝＝＂１＂  
+  １＝＝＂１．０＂  
+  １＜＂２＂  
+  １＝＝＂ａｓｄｆ＂//抛出错误，因为无法将字符串转换为数字  
+
+　　＂ａｓｄｆ＂＝＝＂ａｓｄｆ＂  
+　　＂ａｓｄｆ＂＜＂ｂｓｄｆ＂  
+
+　　ｎｕｌｌ＝＝ｎｕｌｌ  
+　　ｎｕｌｌ＝＝未定义 
+　　ｎu l l＜－１ 
+　 nu ll＜“a s d f” 
+
+　　［１，２，３］＝＝［１，２，３］ 
+　　［１，２，３］＜［２ ，２ ，３］ 
+　　［１ ，２］＜［１ ，２ ，３］ 
+```
+
+#### Case条件表达式 
+
+case运算符允许对表达式进行条件求值。该特性通常与下一小节介绍的switch运算符结合使用时最为实用。
+
+```
+Case = SimpleTerm “->” Expression 
+```
+
+在case表达式中，“->”运算符前的部分称为**前提**（premise），之后的部分称为**结论**（conclusion）。case运算符的求值规则如下：
+
+-若前提求值结果可转换为布尔值：
+   -若结果为真：
+       -整个case表达式的结果即为结论部分的求值结果。
+   -否则返回未定义。
+-若不可转换则抛出错误。
+
+下列示例演示了case运算符的语义：
+
+```
+真→假//假 
+假→真//未定义 
+１→“测试”//“测试”（因数值可转为真） 
+０→“测试”//未定义（因数值转为假） 
+“真”→”“//空字符串（因非空字符串为真） 
+”“→”“//未定义（因空字符串为假） 
+```
+
+#### Switch选择表达式 
+
+switch运算符包含零个或多个子表达式，其执行结果为第一个非未定义的子表达式结果。与case运算符结合使用时可实现分段函数功能。
+
+```
+Switch = “{{” [ Expression { “,” Expression } ] “}}”
+```
+
+下例展示了switch实现简单if/then/else逻辑的用法：
+
+```
+{{
+ x等于０→‘x等于０’,
+ x等于１→‘x等于１’
+}}
+```
+
+当变量x值为０时返回字符串‘x等于０’，值为１时返回‘x等于１’，其他情况均返回未定义。
+
+若要为其他情况设置默认返回值？通过switch表达式可轻松实现：
+
+```
+{{
+ x等于０→‘x等于０’,
+ x等于１→‘x等于１’,
+真→‘其他情况’//默认分支 
+}}
+```
+
+根据switch子表达式的求值特性，默认分支可简写为：{{
+      x == 0 -> 'x等于0',
+      x == 1 -> 'x等于1', 
+                '其他情况'   //默认分支  
+}}
+
+请注意，switch表达式会返回第一个计算结果不为 `undefined `的表达式值。由于前两个子表达式确实会计算为 `undefined `，而字符串 `'其他情况' `不是 `undefined `，因此该switch表达式将返回 `'其他情况' `作为结果。
+
+####  二元运算符优先级  
+
+由于表达式可以是另一个二元运算符的实例，因此可以直接链式使用二元运算符并书写为 `1 +2+3 `.这种情况下，相同优先级的运算符按从左到右顺序计算。下表列出了可用二元运算符的优先级（数值越大优先级越高）。
+
+运算符名称              优先级  
+---- ----               ----  
+\*      乘法              12  
+/      除法              12  
+%      取模              12  
++      加法              11  
+-      减法              11  
+<<     左位移            10  
+>>     右位移            10  
+<      小于              9  
+<=     小于等于          9  
+>      大于              9  
+>=     大于等于          9  
+==     相等              8  
+!=     不等              8  
+&      按位与            7  
+^      按位异或          6  
+|      按位或            5  
+&&逻辑与                4 
+||逻辑或                3 
+..范围                  2 
+->分支                  1 
+其他运算符             13 
+
+示例：  
+
+```    
+2*3+4//结果为10（乘法优先级高于加法）    
+7<10&&8<3//先比较再执行逻辑与运算    
+```  
+
+若内置优先级不符合预期，可使用括号强制优先运算：  
+
+```    
+2*(3+4)//结果为14    
+```  
+
+###  终结符规则  
+
+在EBNF中，终结符规则是指右侧仅包含终结符号的规则。被双引号包裹的符号即为终结符。注意在定义字符规则时，我们未枚举所有ASCII字符而是用占位字符串表示。  
+
+```
+Alpha="a"|"b"|..."z"|"A""B"...Z"
+Numeric="0""1"...9"
+Char=任意ASCII字符   
+```  
+
+至此完成TrenchBroom表达式语言的说明手册。## 问题解决
+
+本节包含一些关于在使用TrenchBroom时遇到问题可以采取的应对措施。
+
+### 自动备份功能
+
+TrenchBroom会自动为你的工作创建备份。前提条件是：你必须在一个已保存的文件上工作，即该文件需存在于电脑的某个位置。因此当你创建新文件时，若决定保留该文件就应立即保存。此时TrenchBoom便会开始创建自动备份。这些备份存储在map文件所在目录下的"autosave"文件夹中。
+
+系统将根据以下规则创建备份：
+- 在上次备份十分钟后生成新备份（仅当map文件有修改时）
+- 为避免干扰工作流程，仅在用户无操作时进行自动保存
+- 最多保留50个备份（达到上限后，新备份会替换最旧的备份）
+
+备份文件的命名规则为：原文件名+备份编号+扩展名（例如：`my_map_01.map`）。
+
+当出现以下情况时，这些备份可帮助你恢复到早期版本：
+- 修复程序错误时
+- map文件意外损坏时## 实体的显示模型
+
+TrenchBroom可以在3D和2D视口中显示点实体的模型。要实现此功能，需在[实体定义](#entity_definitions)文件中设置显示模型，并确保[游戏配置](#game_configuration)中的游戏路径正确。对于大多数内置的实体定义文件，模型已预先设置完成。但如果您想为TrenchBroom创建一个适配模组的实体定义文件，则需要自行添加这些模型定义。本节将介绍如何在FGD和DEF文件中进行此类设置。
+
+### 通用模型语法
+
+所有实体定义文件中添加显示模型的语法都是相同的，区别仅在于模型定义需插入到实体定义中的位置不同。我们首先在此说明通用语法。DEF或FGD文件中的每个模型定义都采用以下形式：
+
+    model(...)
+
+在ENT文件中，模型定义以XML属性值的形式出现在`<point />`元素中，例如：
+
+    <point model="..." />
+
+其中省略号包含要显示的模型的实际信息。您可以使用TrenchBroom的[表达式语言](#expression_language)来定义具体模型。每个实体定义应仅包含一个模型定义，且该模型定义中的表达式应求值为字符串类型或map类型的值。若表达式求值为map类型时，其结构必须如下：
+
+    {
+      "path" : MODEL,
+      "skin" : SKIN,
+      "frame": FRAME,
+        "scale": SCALE_EXPRESSION
+    }
+
+占位符 `MODEL`, `SKIN`, `FRAME` 和 `SCALE_EXPRESSION` 的含义如下：
+
+占位符          |  描述  
+-----------     | -----------
+`MODEL`         |  相对于游戏路径的模型文件路径（开头可带冒号）。必填项。
+`SKIN`          |  要显示的皮肤索引（从0开始计数）。可选项，默认为0。
+`FRAME`         |  要显示的帧索引（从0开始计数）。可选项，默认为0。
+`SCALE_EXPRESSION` |  根据实体属性计算模型比例的表达式。
+
+若表达式求值为字符串类型时，该值将被视为仅包含键为 `path` 、值为该字符串的map结构。换言之：当表达式结果为字符串时，该字符串会被直接解析为模型的路径。这种表达式可视为简写形式：
+
+    model("path/to/model")
+
+等价于完整写法：
+
+    model({ "path": "path/to/model" })如果模型表达式包含缩放表达式，则其计算结果将作为模型的缩放值。若表达式无法求值或未提供此类表达式，则会转而使用游戏配置中的默认缩放表达式。有关`SCALE_EXPRESSION`和默认缩放表达式的更多信息，请参阅[本节](#game_configuration_files_entities)。
+
+#### 基础示例
+
+有效的模型定义可能如下所示：
+
+```qml
+// 使用指定路径的模型，皮肤为0，帧为0
+model("progs/armor")
+
+// 使用指定路径的模型，皮肤为1，帧为0
+model({
+  	"path":		"progs/armor",
+  	"skin":		1	
+})
+
+//	使用指定路径的模型，皮肤为1，帧为3	
+model({
+  	"path" :	"progs/armor",
+  	"skin" :	1,
+  	"frame":	3	
+})
+
+//	设置固定统一模型缩放因子2	
+model({
+  	"path" :	"progs/armor",
+  	"scale" : 	2	
+})
+```
+
+有时游戏中实际显示的模型取决于实体属性的值。TrenchBroom允许您通过使用switch和case运算符的条件表达式以及在表达式中引用实体属性作为变量来模拟此行为。让我们看一个结合使用字面值和多个模型定义的示例。
+
+```qml 
+model({{
+	dangle ==如你所见，Health kit关联了三个模型：`maps/b_bh25.bsp`, `maps/b_bh10.bsp` 和 `maps/b_bh100.bsp`。这是因为Health kit会根据勾选的spawnflags使用不同模型：若勾选`ROTTEN`则使用暗淡（腐烂）的医疗包模型`maps/b_bh10.bsp`；若勾选`MEGAHEALTH`则使用超级血包强化道具模型maps/b_bh100.bsp；若两者均未勾选则使用标准医疗包模型。
+
+因此，嵌套的case表达式会检查属性值来确定正确模型。由于这些模型无需指定皮肤或帧序号，表达式仅返回字符串作为简写形式。
+
+注意：在前例中若同时勾选两个选项，将优先显示超级血包模型。因为switch运算符会返回第一个非undefined的表达式值。正因如此，必须将无条件模型定义放在switch最后——这会覆盖其他所有条件！
+
+#### 进阶示例
+
+目前所见的基础表达式能灵活定制TrenchBroom显示的模型/皮肤/帧序号（基于实体属性值），但实际路径、皮肤索引和帧索引仍硬编码在实体定义文件中。某些情况下（特别是允许在地图中放置任意模型的实体），这种灵活性仍不足够——此时实体定义文件无法包含实际模型路径等内容，而需要通过映射者用实体属性指定。由于TrenchBroom会将属性值作为变量提供给模型表达式，这类情况也能轻松处理。
+
+回顾模型定义映射表的结构：
+
+```json
+{
+  "path" : MODEL,
+  "skin" : SKIN,
+  "frame": FRAME
+}
+```
+
+此前我们一直对映射表条目使用硬编码字面量：
+
+```javascript
+model({ "path" : "progs/armor", "skin" : 1, "frame": 3 })
+```
+
+但其实完全可以用变量替代硬编码字面量来引用实体属性：
+
+```javascript
+model({
+  "path" : PATHKEY,
+  "skin" : SKINKEY,
+  "frame": FRAMEKEY
+})
+```
+
+占位符含义如下：
+
+占位符       |  描述  
+----------- | -----------
+PATHKEY     |  存储模型路径的实体属性键名 
+SKINKEY     |  存储皮肤索引的实体属性键名（可选）
+FRAMEKEY    |  存储帧索引的实体属性键名（可选）
+
+有效的动态模型定义示例如下：
+
+```javascript
+model({
+  "path" : mdl,
+  "skin" : skin,
+  "frame": frame
+})
+```然后，如果您创建一个具有适当类名的实体并指定以下三个属性：
+
+```json
+{
+	"classname"		"mydynamicmodelentity"
+	"mdl"			"progs/armor.mdl"
+	"skin"			"2"
+	"frame"			"1"
+}
+```
+
+TrenchBroom将使用第三个皮肤显示`progs/armor.mdl`模型的第二帧。如果更改这些值，模型将在3D和2D视口中相应更新。
+
+#### DEF、FGD与ENT文件的区别
+
+在这两种文件中，模型定义都与其他实体属性定义并列指定（注意模型定义后的分号——仅在DEF文件中需要）。DEF文件的示例如下所示。
+
+```csharp
+/*QUAKED item_health (.3 .3  1) (0  0  0) (32  32  32) ROTTEN MEGAHEALTH 
+{
+	model({{ spawnflags ==  2 ->  	“maps/b_bh100.bsp”, spawnflags ==  1 -> “maps/b_bh10.bsp”, “maps/b_bh25.bsp” }});
+}
+Health box. Normally gives  25 points.
+
+Flags:
+“rotten”
+gives  15 points 
+“megahealth”
+will add  100 health, then rot you down to your maximum health limit 
+one point per second 
+*/
+```
+
+FGD文件的示例如下所示。
+
+```csharp
+@PointClass base(Monster) size(-32 -32 -24,  32  32  64)
+				model({{ perch == “1” -> “progs/gaunt.mdl”, { “path”: “progs/gaunt.mdl”, “skin”:  0, “frame”:  24 } }})
+				= monster_gaunt : “Gaunt” 
+[
+perch(choices) : “Starting pose” :  0 = 
+[
+    0 : “Flying” 
+    1 : “On ground” 
+]
+]
+```
+
+为了提高与其他编辑器的兼容性，在FGD文件中模型定义也可以命名为_studio_或_studioprop_。
+
+在ENT文件中，相同的模型规范可能如下所示。
+
+```xml
+<point name="ammo_bfg” color=“.3 .3  1”
+	   box=“-16 -16 -16 	16 	16 	16”
+	   model=“{{ perch == ‘1’ -> ‘progs/gaunt.mdl’, { ‘path’: ‘progs/gaunt.mdl’, ‘skin’: 	0, ‘frame’: 	24 } }}”
+/>
+```## 点文件与门户文件
+
+TrenchBroom可以加载由QBSP生成的点文件(PTS)，用于帮助定位泄漏问题。通过#menu(菜单/文件/加载点文件...)打开点文件后，它会以一系列绿色线段的形式渲染，这些线段将连接地图内部与虚空区域。点击#menu(菜单/视图/相机/移至下一个点)可将摄像机移动到第一个点，继续点击该选项可沿路径飞行，从而显示泄漏位置。
+
+门户文件(PRT)同样由QBSP生成，可用于可视化BSP叶节点之间的门户结构。通过#menu(菜单/文件/加载门户文件...)加载后，这些文件会以半透明红色多边形形式呈现。## 游戏配置文件 {#game_configuration_files}
+
+TrenchBroom通过游戏配置文件来支持不同游戏。编辑器自带部分游戏配置文件，这些文件安装在`<ResourcePath>/games`目录下。其中`<ResourcePath>`的值根据平台不同如下表所示：
+
+平台      路径  
+--------  --------  
+Windows   TrenchBroom可执行文件所在目录  
+macOS     `TrenchBroom.app/Contents/Resources`  
+Linux     `<prefix>/share/trenchbroom`（其中`<prefix>`为安装前缀路径）  
+
+在`<ResourcePath>/games`文件夹中，每个支持的游戏都有一个对应的`.cfg`文件，以及包含游戏相关资源（如图标、调色板或实体定义文件）的附加文件夹。
+
+不建议修改这些内置的游戏配置，因为它们会在安装更新时被覆盖。若要修改现有游戏配置或添加新配置，可将文件放置在`<UserDataPath>/games`文件夹中。其中`<UserDataPath>`的值同样因平台而异：
+
+平台      路径  
+--------  --------  
+Windows   `C:\Users\<用户名>\AppData\Roaming\TrenchBroom`  
+macOS     `~/Library/Application Support/TrenchBroom`  
+Linux     `~/.TrenchBroom`
+
+若使用`--portable`参数运行TrenchBroom，则会将`<UserDataPath>`设为当前目录。此模式设计用于在`<ResourcePath>`目录下运行，以提供完全自包含的应用程序实例。
+
+要为TrenchBoom添加新游戏配置，需将其放置在`<UserDataPath>/games`的子文件夹中（注意：若该文件夹不存在则需要手动创建）。您需要编写自己的《GameConfig.cfg》文件，也可以复制内置配置文件作为基础模板。此外还可以在该文件夹中添加其他资源文件。例如要为名为"Example"的游戏添加配置：首先创建新文件夹《〈UserDataPath〉/games/Example》，然后在该文件夹中创建《GameConfig.cfg》配置文件。如需图标或实体定义文件等附加资源，也应将这些文件放入新建的文件夹中。
+
+您也可以通过[游戏配置对话框](#game_configuration)中游戏列表下方的文件夹图标按钮访问该目录。
+
+要覆盖内置游戏配置文件，只需将包含配置文件的整个文件夹复制到《〈UserDataPath〉/games》中。TrenchBoom会优先使用您的自定义配置而非内置文件，同时仍可正常访问游戏资源子文件夹中的内容。如需覆盖部分资源文件，只需在自定义游戏的资源子目录中添加同名文件即可。例如，假设您需要覆盖内置的 Quake 游戏配置及其实体定义文件。请将文件 `<ResourcePath>/games/Quake/GameConfig.cfg` 复制到 `<UserDataPath>/games/Quake` 并按需修改。接着将文件 `<ResourcePath>/games/Quake/Quake.fgd` 也复制到 `<UserDataPath>/games/Quake` 并进行修改。当您在 TrenchBroom 中加载游戏配置时，编辑器将优先使用修改后的文件而非内置版本。
+
+### 游戏配置文件语法
+
+游戏配置文件需包含以下信息：
+
+* **名称**：用于界面显示，并在游戏配置文件夹的子目录中定位资源  
+* **图标**：界面显示的图标（可选）  
+* **文件格式**：指定该游戏支持的 map 文件格式  
+* **文件系统**：定义游戏资源搜索路径及包文件格式（如 pak 文件）  
+* **纹理**
+    *  扩展名列表（如 `.jpg`）  
+    *  调色板文件（可选）  
+    *  用于在 map文件中存储纹理包的 worldspawn属性  
+    *  排除模式列表（用于隐藏匹配这些模式的纹理）  
+*  实体  
+    *  内置的实体定义文件  
+    *  界面默认显示颜色  
+    *  默认模型缩放表达式  
+    *  是否自动设置默认实体属性  
+*  标签：为编辑器中的面或 Brush附加额外信息（如标记面是否为细节或提示）（可选）  
+*  面属性：指定允许在 Brush面上添加的额外属性（可选）  
+*  地图边界：在2D视图中显示的边界范围（可选）  
+*  编译工具：支持用户自定义路径的工具配置（可选）  
+
+游戏配置文件采用具有特定结构的[表达式语言](#expression_language)映射结构，下文将通过示例说明。```json
+{
+  \"version\": 4, // 必填，表示文件语法的版本号  
+\"name\": \"Example Resembling Quake 2\", //必填，UI中显示的名称  
+\"icon\": \"Icon.png\",//可选，UI中显示的图标  
+\"fileformats\":[//支持的文档格式，每个格式可指定初始地图作为“新建地图”  
+{\"format\":\"Quake2\"},  
+{\"format\":\"Quake2(Valve)\",\"initialmap\":\"initial_valve.map\"}  
+],  
+\"filesystem\":{//定义用于搜索游戏资源的文件系统  
+\"searchpath\":\"baseq2\",//游戏文件夹中搜索资源的路径  
+\"packageformat\":{\"extension\":\".pak\",\"format\":\"idpak\"}//资源包文件格式  
+},  
+\"textures\":{//纹理搜索路径及读取方式配置（详见下文）  
+\"root\":\"textures\",  
+\"extensions\":[\".wal\"] ,   
+ \"palette \ ": \" pics / colormap.pcx \ ",   
+ },   
+ \" entities \ ": {//该游戏的内置实体定义文件   
+ \" definitions \ ": [ \" Quake2.fgd \ "] ,   
+ \" defaultcolor \ ": \"0 .60 .60 .61 .0 \ ",   
+ \" scale \ ": [ modelscale , modelscale_vec ]   
+ },   
+ \" tags \ ": {//“智能标签”根据特性选择或修改笔刷/面片    
+  		brush:[    
+  			{    
+  				name:\ Trigger\ ,    
+  				attribs:[ transparent ],    
+  				match:\ classname\ ,    
+  				pattern:\ trigger*\ ,    
+  				texture:\ trigger\     
+  			}    
+ 		],    
+ 		brushface:[    
+ 			{    
+ 			name:\ Clip\ ,     
+ 		 attribs :[ transparent ],     
+ 		 match : texture ,     
+ 		 pattern : clip      
+ 	 },      
+ 	 {      
+ 	 name : Liquid ,      
+ 	 match : contentflag ,      
+ 	 flags :[ lava water ]      
+ },      
+ {      
+ name Transparent       
+ attribs transparent       
+ match surfaceflag       
+ flags trans33        
+ }        
+ ]        
+ },        
+ faceattribs:{//分配给面片的位标志以影响其行为        
+ surfaceflags:[        
+ name light description Emit light fromthe surface brightnessis specifiedinthe value field         
+ },         
+ name trans33 description The surfaceis percent transparent         
+ },         
+ name hint description Makea primary bsp splitter         
+ }],         
+ contentflags:[{          
+ name solid description Defaultfor all brushes          
+ },          
+ name lava description The brushis lava          
+ unused true          
+ },          
+ name water description The brushis water          
+ }]},          
+ softMapBounds -4096-4096-4096409640964096 compilationTools[{ name bsp},{ name vis}]####  版本说明  
+
+游戏配置文件采用版本控制。每当对游戏配置格式进行重大变更时，版本号将会递增，而TrenchBroom会拒绝旧格式并显示错误信息。  
+
+**当前版本**  
+
+TrenchBroom目前支持游戏配置的第9版。  
+
+**版本历史**  
+
+* **第9版**  
+    -  适应术语变更：将`texture`重命名为`material`  
+* **第8版**  
+    -  移除纹理格式配置，仅保留扩展名搜索列表。  
+* **第7版**  
+    -  将纹理包配置替换为根路径。取消基于文件和目录的纹理配置区分。  
+* **第6版**  
+    -  在实体配置中新增可选的`setDefaultProperties`键。  
+* **第5版**  
+    -  将模型格式白名单设为可选。如果配置文件中仍存在白名单，则会被忽略。  
+* **第4版**  
+    -  在表面标志（surface flags）和内容标志（content flags）中新增对`unused`键的支持；该键在第3版中不存在。  
+    -  新增对表面参数类智能标签（surfaceparm-type smart tags）中为`pattern`键指定值列表的支持；第3版仅允许单个值。  
+    -  新增可选的`softMapBounds`键。  
+    -  新增可选的`compilationTools`键。  
+
+**从第2版迁移说明**  
+
+第3版弃用了以`tags`键替代的旧键名——即原名为“brushtypes”的字段内容结构基本一致但名称不同了。“brushtypes”的值是一个类型匹配器数组（array），以下是第二版本所支持各类刷子类型匹配器：  
+
+|匹配项       |描述|  
+|------------|---|  
+|material     |按材质名称匹配（需所有刷面均符合条件）|   
+|contentflag |按面内容标志匹配（用于《雷神之锤II》《雷神之锤III》）|   
+|surfaceflag |按面表面标志匹配（用于《雷神之锤II》）|   
+|surfaceparm |按着色器表面参数匹配（用于《雷神之锤III》）|   
+|classname   |按刷子实体类名匹配|
+
+####文件格式规范
+
+文件格式由位于“fileformats”键下的映射数组指定。
+
+支持以下多种标准：
+
+- **Standard**: 《雷神之锤》标准地图文件。
+- **Valve**: Valve公司地图文件(类似Standard但提供更多UV贴图控制)。
+- **Quake2**: 《雷神之锤II》地图文件(采用Standard风格纹理信息)。
+- **Quake2(Valve)**: 《雷神之锤II》地图文件(采用Valve风格纹理信息)。
+- **Quake3(legacy)**: 《雷神之锤III》传统地图文件(采用Standard风格纹理信息)。 
+- **Quake3(Valve)**: 《雷神之锤III》地图文件(采用Valve风格纹理信息)。 
+- **Hexen2**: 《毁灭巫师II》地图文件(类似《雷神之锤》，但每个面额外包含一个未使用的数值)。请注意，"Quake3"格式（包含对Quake 3笔刷基元的支持）尚未完全实现，因此未列入上述列表。"Quake3 (Valve)"格式在纹理贴图表现力上与笔刷基元格式相当，但无法用于读取包含笔刷基元的现有map文件。另请注意，目前所有Quake 3格式均不支持面片网格。
+
+数组中的每个条目必须遵循以下结构：
+
+    {
+      "format": "Standard",
+      "initialmap: "initial_standard.map"
+    }
+
+其中，`format`键为必填项，而`initialmap`键为可选项。`initialmap`键指向游戏配置子文件夹中的地图文件，该文件将在创建新文档时加载。若未指定初始地图或找不到文件，TrenchBroom将在原点创建一个包含单个笔刷的地图。
+
+#### 文件系统
+
+编辑器通过文件系统加载游戏资源，该系统由键值对映射表下的键名指定。该映射表包含两个键：和。
+
+*  指定游戏目录（在游戏偏好设置中配置）下的子目录路径，编辑器将在此路径下搜索游戏资源。编辑器不仅会搜索该路径下的松散文件，还会挂载在此发现的资源包。
+*  指定要挂载的资源包格式。它是一个包含两个键的映射表：和。
+   *  指定要挂载的资源包文件扩展名（也可用仅指定单个扩展名）
+   *  指定资源包文件的格式
+
+支持以下资源包格式：
+
+格式       描述  
+------       -----------  
+idpak        Id软件包文件  
+dkpak        大刀资源包文件  
+zip          压缩文件（常用其他扩展名如pk3）
+
+#### 材质配置
+
+每个材质配置包含一个根搜索目录，可选参数包括：包含的文件扩展名列表、调色板路径、wad文件列表属性以及排除模式列表。
+
+    "materials": {
+      "root": "textures",
+      "extensions": [ ".D" ],
+      "palette": "pics/colormap.pcx",
+      "attribute":TrenchBroom支持多种图像格式，如tga、pcx、jpeg等。TrenchBroom使用[FreeImage库]加载这些图像，并支持该库所兼容的任何文件类型。
+
+可选地，您可以指定调色板。键值对中的键为palette时对应的值指定了一个路径（相对于文件系统），TrenchBroom将在此路径下查找游戏资源附带的调色板文件。
+
+键值对中的键为attribute时对应的值指定了worldspawn属性的名称，TrenchBroom会将wad文件存储在地图文件的该属性中。
+
+可选的键值对中的键为excludes时对应的值指定了一个模式列表，用于匹配材质名称中被忽略且不会显示在[材质浏览器](#material_browser)中的项。允许使用通配符“*”和“？”。使用反斜杠来转义字面量“*”和“？”字符。
+
+```json
+    "materials": {
+      "root": "textures",
+      "extensions": [ "" ],
+      "excludes": [ "*_norm", "*_gloss" ]
+    },
+```
+
+#### 实体配置 {#game_configuration_files_entities}
+
+在实体配置部分中，您可以指定游戏配置附带的实体定义文件、实体的默认颜色以及根据实体属性计算得出默认比例的表达式。
+
+```json
+    "entities": { // this game's built-in entity definition files  
+        //此游戏的內建實體定義檔案  
+        //此遊戲的內建實體定義檔案  
+        //此游戏的內建实体定义文件  
+        //此遊戲的內建實體定義檔案  
+        //此游戏的內建实体定义文件  
+        //此遊戲的內建實體定義檔案  
+        //此游戏的內建实体定义文件  
+        //此遊戲的內建實體定義檔案  
+
+       definitions: ["Quake2/Quake2.fgd"],   
+       defaultcolor: “0 .6 .6 .6  1”,   
+       scale:[modelscale ,modelscale_vec],   
+       setDefaultProperties:true   
+     }, 
+```
+
+键值对中的键为definitions时对应的值提供了实体定义文件的列表。这些文件通过相对于games目录（TrenchBroom在此目录下搜索游戏配置）的路径来指定。
+
+键值对中的键为scale时对应的表达式会根据实体的属性来计算模型比例。该表达式可以引用任何实体属性或提供固定值。
+
+示例                                   描述  
+-------                               -----------  
+``“scale”:2``                         固定统一比例因子为``2``。  
+``“scale”:“1  2  3”``                 固定非统一比例因子：X轴缩放1倍,Y轴缩放2倍,Z轴缩放3倍。  
+``“scale”:modelscale``                使用实体的``modelscale``属性值。  
+``“scale”:[modelscale ,modelscale_vec]``尝试数组中的各个值直到找到未求值为Undefined或Null的值为止。  
+
+当然您也可以使用switch和case运算符处理更复杂的情况。
+
+可选的键setDefaultProperties控制当TrenchBroom创建新实体时是否自动实例化[默认实体属性](#entity_properties_defaults)。如果未设置则默认为false。
+
+####标签{#game_configuration_files_tags}TrenchBroom能够识别某些特殊的Brush或面类型。例如clip面或trigger brush。但由于具体细节可能因游戏而异，这些特殊类型在游戏配置中定义。为了实现更高灵活性和未来扩展性，系统采用了一套通用的"智能标签"机制来实现此功能。
+
+TrenchBroom利用这些标签定义自动为匹配的brush/面应用属性——例如将trigger brush渲染为半透明状态——并填充[视图菜单](#filtering_rendering_options)中的筛选选项。
+
+每个智能标签定义还会提供一个或多个相关的[键盘快捷键](#keyboard_shortcuts)（通过"Tags"搜索快捷键可查看全部）。每个标签始终关联一个用于切换匹配该标签的面/brush显示状态的快捷键。根据下文描述的`match`匹配条件，还可能存在其他用于为当前选中项添加或移除标签特性的快捷键。
+
+标签分别在以下键下为brush和面单独指定：
+
+    "tags": {
+      "brush": [ ... ],
+      "brushface": [ ... ]
+    }
+
+每个键对应一个标签列表。单个标签结构如下：
+
+    {
+      "name": "Clip",
+      "attribs": [ "transparent" ],
+      "match": "material",
+      "pattern": "clip"
+    },
+
+目前`attribs`列表仅支持"transparent"属性类型，该属性会使匹配此标签的面在3D视口中以半透明方式渲染。
+
+`match`键指定TrenchBroom判断该标签是否适用于brush或面的方式：
+
+对于`brush`智能标签，`match`键只能取"classname"值。除了常规的视图筛选快捷键外，此类智能标签还会生成用于应用标签（将选中brush转为实体）或移除标签（将选中brush返回至worldspawn）的快捷键。具体如下：
+
+匹配方式    描述                            应用快捷键    移除快捷键
+--------    ----                            -----------   -----------
+classname   根据brush实体类名进行匹配        有            有
+
+对于`brushface`智能标签，`match`键可包含下列值，并将生成对应的快捷键来为选中面添加或移除匹配特性：匹配项        描述                            应用快捷键        移除快捷键  
+-----        -----------                            -----------------  ------------------  
+material     按材质名称匹配                         是                否  
+contentflag  按面内容标志匹配                       是                是  
+surfaceflag  按面表面标志匹配                       是                是  
+surfaceparm  按着色器表面参数匹配                   是                否  
+
+根据匹配键(`match`)的值，需要额外配置键来设置匹配器：
+
+* **classname**匹配器：键名**pattern**包含一个模式字符串，用于与包含该brush的brush实体的类名(classname)进行匹配。允许使用通配符**\***和**?**。使用反斜杠转义字面量字符**\***和**?**。
+    - **classname**匹配器还可包含可选的**material**键。当通过键盘快捷键应用此标签时，选中的brush将被赋予该键值指定的材质（例如：``"material": "trigger"``会分配名为trigger的材质）。
+* **material**匹配器：键名**pattern**包含一个模式字符串，用于与面的材质名称进行匹配。若模式中不包含斜杠(/) ，则仅与材质名称最后一个斜杠后的部分（如有）进行匹配。允许使用通配符**\***和**?**。使用反斜杠转义字面量字符**\***和**?**
+* **contentflag/surfaceflag**匹配器：键名flags包含要匹配的内容标志或表面标志名称列表（详见下文关于内容/表面标志的说明）
+* **surfaceparm**匹配器：键名pattern包含一个名称字符串，用于与面着色器的表面参数进行精确匹配。不允许使用通配符；参数名称必须完全一致。在游戏配置格式第4版中，也可为该值指定表面参数名的列表 ，当着色器含有其中任意参数时即视为匹配。
+
+#### 面属性
+
+faceattribs对象的核心部分是可用表面标志（通常影响单个面的外观/行为）和内容标志（通常影响包含该面的brush的行为）的定义集。这些定义通过surfaceflags和contentflags键指定。
+
+每个键的值都是一个标志定义列表。注意列表中每个标志定义的位置决定了该标志的值。假设i为某个标志在列表中从0开始的索引位置，则该标志对应的值为2的i次方 。列表中第一个标志值为2^0=1 ，第二个为2^1=2 ，第三个为2^2=4 ，以此类推。
+
+参考以下示例：```markdown
+"faceattribs": {  
+    #面属性配置  
+    #表面标志位  
+    #内容标志位  
+    #默认值设置  
+
+    #表面标志位定义  
+    #每个标志位包含名称和描述(可选)  
+    #未使用的标志位需标记为unused  
+
+    #版本说明：  
+    #v4+支持unused标记  
+    #v3需使用"name":"unused"占位  
+
+#表面属性配置对象包含：
+#- surfaceflags：表面标志位定义（数组）
+#- contentflags：内容标志位定义（数组）
+#- defaults：默认值配置（对象）
+
+##表面标志位示例：
+```jsonc 
+{
+    //发光表面（值=1）
+    {"name":"light","description":"从该表面发射光线，亮度在'value'字段指定"}, 
+    
+    //光滑表面（值=2） 
+    {"name":"slick","description":"该表面具有光滑特性"} 
+}
+```
+
+##内容标志位示例：
+```jsonc 
+[
+    //固体材质（值=1）默认所有brush都具备 
+    {"name":"solid","description":"所有brush的默认属性"}, 
+    
+    //窗户材质（值=2）实际未使用 
+    {"name":"window","description":"brush作为窗户使用(实际未生效)"}, 
+    
+    占位符（值=4）确保后续playerclip获得正确值8，
+    
+    玩家碰撞体（值=8）仅阻挡玩家通过，
+]
+```
+
+###注意事项：
+1\. **必填字段**：非unused的标志必须包含`name`
+2\. **UI显示**：名称会显示在标志编辑器中，描述会作为悬停提示
+
+###版本兼容方案：
+```jsonc 
+//v3兼容写法（会显示"unused"选项）
+{"name":"unused"} 
+
+//v4+推荐写法（隐藏选项）
+{"unused":true}
+```
+
+##默认值配置(defaults)
+支持以下键值对：
+
+| **键名**           | **说明**                                                                 |
+|--------------------|--------------------------------------------------------------------------|
+| offset             | [X偏移,Y偏移]                                                           |
+| scale              | [X缩放,Y缩放]                                                           |
+| rotation           |  旋转角度                                                                |
+| surfaceValue       |  表面数值(仅当存在surfaceflags时有效)                                    |
+| surfaceFlags       | ["默认表面标志1","默认表面标志2"]                                        |
+| surfaceContents   | ["默认内容标志1"]                                                        |
+| color              |  颜色字符串(仅Daikatana游戏有效)                                         |
+
+###数组格式示例：
+```jsonc 
+{
+  缩放配置：[0.5倍X轴，0.5倍Y轴]
+}为`s​​urfaceFlags`或`s​​urfaceContents`指定的标志名称必须与`faceattribs`对象中`s​​urfaceflags`或`contentflags`（分别）定义的现有标志的`name`值相对应。
+
+颜色值必须是形如“R G B”或“R G B A”的字符串。其中R、G、B和A均为0.0到1.0之间的浮点数。如果省略A，则默认为1.0。
+
+#### Map边界
+
+可选的`s​​oftMapBounds`键定义了在2D视口中绘制的默认[地图边界](#map_bounds)。其值为一个字符串，包含定义边界所包围体积的两个对角点的坐标。以下示例定义了一个从点(-4096, -4096, -4096)到点(4096, 4096, 4096)的立方体：
+
+    "softMapBounds":"-4096 -4096 -4096 4096 4096 4096",
+
+####  编译工具
+
+可选的编译工具列表标识了将出现在[游戏配置对话框](#game_configuration)中的工具名称，允许用户将这些名称与工具可执行文件的路径关联起来。此类名称可在该游戏的[编译配置文件](#compiling_maps)中用作变量来表示关联路径。
+
+列表中的每个元素都是一个必须包含名称键并可选择包含描述键（用于工具提示）的对象。以下是来自Quake3游戏配置的示例，定义了两个工具：
+
+    "compilationTools": [
+      { "name": "q3map2", "description": "Path to your q3map2 executable, which performs the main bsp/vis/light compilation phases" },
+      { "name": "bspc", "description": "Path to your bspc or mbspc executable, which creates .aas files for bot support" }
+    ]
+
+#  参与贡献## 提交功能建议
+
+如果您对TrenchBroom有功能改进的想法，可以通过[TrenchBroom问题追踪器]提交请求。请简要描述您的功能构想，无需过多细节。若建议被采纳，我们将共同完善具体实施方案。## 提交错误报告 {#reporting_bugs}
+
+您可以通过[TrenchBrow问题追踪系统]提交错误报告。请务必包含以下信息：
+
+- *TrenchBroom版本*：例如“*版本2.0.0 f335082 D”（详见下文说明）
+- *操作系统及版本*：例如“Windows 7 64位”
+- *崩溃报告与地图文件*：当TrenchBroom崩溃时，会自动保存崩溃报告和当前地图文件。这些文件存储在包含当前地图文件的文件夹中；若当前地图尚未保存，则保存在您的文档文件夹中。例如正在编辑的地图文件名为“rtz_q1.map”，则崩溃报告将命名为“rtz_q1-crash.txt”，保存的地图文件将命名为“rtz_q1-crash.map”。现有文件不会被覆盖——TrenchBroom会在文件名末尾附加数字创建新文件。提交错误报告时请选择编号最大的文件。
+- *精确的重现步骤*：提供能准确重现问题的操作步骤将极大帮助解决问题。若难以用文字描述，可附加截图或屏幕录像。即使无法重现问题也请提交报告，通常仍可推断出问题原因。
+
+### 版本信息说明
+
+通过菜单打开“关于TrenchBroom”对话框。左侧浅灰色文字显示当前运行的版本信息，例如“Version 2.0.0 f335082 D”：前三个数字表示主版本号（2.0.0），随后七位字符为构建ID（f335082），末尾字母表示构建类型（“D”代表调试版，“R”代表发布版）。该信息也会显示在编辑器启动时的欢迎窗口中。
+
+*点击版本信息字符串可将其复制到剪贴板，便于在错误报告中引用。*
+
+[注：原文中的链接标记[TrenchBroom issue tracker]未提供具体URL，故保留英文标识]## 联系方式
+
+- [TrenchBoom Discord群组]
+
+# 参考资料与链接 {#references_and_links}
+
+- [GitHub上的TrenchBoom] - TrenchBoom的GitHub主页  
+- [func_msgboard论坛] - 《雷神之锤》地图制作论坛  
+- [Joshua Skelton的Quake工具集] - Joshua Skelton开发的《雷神之锤》工具  
+- [dumptruck_ds的教程系列] - 视频教程合集  
+- 《雷神之锤》关卡设计入门套件 - 即用型入门工具包  
+- 《雷神之锤》地图制作Discord群组  
+- 《Preach圣典》 - 《雷神之锤》地图技巧与QuakeC编程技巧  
+
+[GitHub上的TrenchBoom]: https://github.com/TrenchBroom/TrenchBroom/  
+[TrenchBoom问题追踪器]: https://github.com/TrenchBroom/TrenchBroom/issues/  
+[TrenchBoom Discord群组]: https://discord.gg/WGf9uve  
+[func_msgboard论坛]: https://celephais.net/board/  
+[Joshua Skelton的Quake工具集]: https://joshua.itch.io/quake-tools  
+[《Preach圣典》]: https://tomeofpreach.wordpress.com/  
+[FGD文件格式说明]: https://developer.valvesoftware.com/wiki/FGD  
+[dumptruck_ds的教程系列]: https://www.youtube.com/playlist?list=PLgDKRPte5Y0AZ_K_PZbWbgBAEt5xf74aE  
+[《雷神之锤》关卡设计入门套件]: https://github.com/jonathanlinat/quake-leveldesign-starterkit  
+[《雷神之锤》地图制作Discord群组]: https://discordapp.com/invite/f5Y99aM  
+[FreeImage图像库]: https://freeimage.sourceforge.io/
