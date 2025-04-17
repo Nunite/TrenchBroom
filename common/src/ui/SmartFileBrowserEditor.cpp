@@ -53,9 +53,6 @@ void SmartFileBrowserEditor::setPropertyType(FilePropertyType type) {
 }
 
 void SmartFileBrowserEditor::setupFileFilters(QFileDialog& dialog) {
-  dialog.setNameFilter(getFileTypeDescription());
-  
-  // 根据属性类型设置不同的过滤器
   switch (m_propertyType) {
     case FilePropertyType::ModelFile:
       dialog.setNameFilters({"Model Files (*.mdl)", "All Files (*.*)"});
@@ -67,13 +64,8 @@ void SmartFileBrowserEditor::setupFileFilters(QFileDialog& dialog) {
       dialog.setNameFilters({"Sound Files (*.wav)", "Wave Files (*.wav)", "All Files (*.*)"});
       break;
     default:
-      // 对于不确定类型，提供所有可能的文件类型
-      dialog.setNameFilters({
-        "Model Files (*.mdl)",
-        "Sprite Files (*.spr)",
-        "Sound Files (*.wav)",
-        "All Files (*.*)"
-      });
+      // 不要使用多种文件类型的混合过滤器，选择一个默认的
+      dialog.setNameFilters({"All Files (*.*)"});
       break;
   }
 }
@@ -87,7 +79,8 @@ QString SmartFileBrowserEditor::getFileTypeFilter() const {
     case FilePropertyType::SpriteFile:
       return "*.spr";
     default:
-      return "*.mdl *.spr *.wav";  // 混合类型提供多种选择
+      // 不要返回多种文件类型混合，默认返回一种
+      return "*.*";
   }
 }
 
@@ -100,14 +93,15 @@ QString SmartFileBrowserEditor::getFileTypeDescription() const {
     case FilePropertyType::SpriteFile:
       return "Sprite Files (*.spr)";
     default:
-      return "All Supported Files (*.mdl *.spr *.wav)";
+      // 不要返回混合描述
+      return "All Files";
   }
 }
 
 void SmartFileBrowserEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>& nodes) {
   if (!m_lineEdit) return;
   
-  // 从节点获取属性值，这里我们只取一个值
+  // 从节点获取属性值
   std::unordered_set<std::string> values;
   for (const auto* node : nodes) {
     const auto* propValue = node->entity().property(propertyKey());
@@ -130,7 +124,6 @@ void SmartFileBrowserEditor::browseForFile() {
   if (!docPtr) return;
   
   // 获取游戏资源目录作为起始目录
-  // 使用gamePath()方法而不是path()
   QString startDir = io::pathAsQString(docPtr->game()->gamePath());
   
   // 对于声音文件，通常在sound子目录
@@ -142,7 +135,25 @@ void SmartFileBrowserEditor::browseForFile() {
   }
   
   QFileDialog dialog(m_lineEdit->window());
-  dialog.setWindowTitle("Select File");
+  
+  // 在对话框标题中添加文件类型信息
+  QString dialogTitle;
+  switch (m_propertyType) {
+    case FilePropertyType::ModelFile:
+      dialogTitle = "Select Model File";
+      break;
+    case FilePropertyType::SpriteFile:
+      dialogTitle = "Select Sprite File";
+      break;
+    case FilePropertyType::SoundFile:
+      dialogTitle = "Select Sound File";
+      break;
+    default:
+      dialogTitle = "Select File";
+      break;
+  }
+  
+  dialog.setWindowTitle(dialogTitle);
   dialog.setDirectory(startDir);
   dialog.setFileMode(QFileDialog::ExistingFile);
   setupFileFilters(dialog);

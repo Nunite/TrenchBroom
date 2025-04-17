@@ -178,6 +178,30 @@ void SmartPropertyEditorManager::switchEditor(
 void SmartPropertyEditorManager::switchEditor(
   const std::string& propertyKey, const std::vector<mdl::EntityNodeBase*>& nodes)
 {
+  // 如果属性键为空或没有选择实体，停用当前编辑器
+  if (propertyKey.empty() || nodes.empty()) {
+    deactivateEditor();
+    return;
+  }
+  
+  // 检查所有选中的实体是否都有指定的属性
+  bool allHaveProperty = true;
+  for (const auto* node : nodes) {
+    if (!node->entity().hasProperty(propertyKey)) {
+      allHaveProperty = false;
+      break;
+    }
+  }
+  
+  // 如果不是所有实体都有该属性，停用编辑器
+  if (!allHaveProperty) {
+    deactivateEditor();
+    return;
+  }
+  
+  // 正常处理有效的属性编辑
+  setVisible(true);
+  
   auto* editor = selectEditor(propertyKey, nodes);
   activateEditor(editor, propertyKey);
   updateEditor();
@@ -245,13 +269,65 @@ void SmartPropertyEditorManager::connectObservers()
 void SmartPropertyEditorManager::selectionDidChange(const Selection&)
 {
   auto document = kdl::mem_lock(m_document);
-  switchEditor(m_propertyKey, document->allSelectedEntityNodes());
+  
+  // 检查当前选择的实体
+  const auto entityNodes = document->allSelectedEntityNodes();
+  
+  // 如果当前没有选中属性，或者没有选中实体，清除编辑器状态
+  if (m_propertyKey.empty() || entityNodes.empty()) {
+    deactivateEditor();
+    return;
+  }
+  
+  // 检查选中的实体是否都有当前的属性
+  bool allHaveProperty = true;
+  for (const auto* node : entityNodes) {
+    if (!node->entity().hasProperty(m_propertyKey)) {
+      allHaveProperty = false;
+      break;
+    }
+  }
+  
+  // 如果不是所有选中的实体都有当前属性，重置编辑器状态
+  if (!allHaveProperty) {
+    deactivateEditor();
+    return;
+  }
+  
+  // 否则，正常更新编辑器
+  switchEditor(m_propertyKey, entityNodes);
 }
 
 void SmartPropertyEditorManager::nodesDidChange(const std::vector<mdl::Node*>&)
 {
   auto document = kdl::mem_lock(m_document);
-  switchEditor(m_propertyKey, document->allSelectedEntityNodes());
+  
+  // 检查当前选择的实体
+  const auto entityNodes = document->allSelectedEntityNodes();
+  
+  // 如果当前没有选中属性，或者没有选中实体，清除编辑器状态
+  if (m_propertyKey.empty() || entityNodes.empty()) {
+    deactivateEditor();
+    return;
+  }
+  
+  // 检查选中的实体是否都有当前的属性
+  bool allHaveProperty = true;
+  for (const auto* node : entityNodes) {
+    if (!node->entity().hasProperty(m_propertyKey)) {
+      allHaveProperty = false;
+      break;
+    }
+  }
+  
+  // 如果不是所有选中的实体都有当前属性，重置编辑器状态
+  if (!allHaveProperty) {
+    deactivateEditor();
+    return;
+  }
+  
+  // 否则，正常更新编辑器
+  switchEditor(m_propertyKey, entityNodes);
 }
 
 // 判断属性是否适用于文件浏览器
@@ -281,6 +357,11 @@ bool SmartPropertyEditorManager::isFileBrowserProperty(const std::string& proper
 SmartPropertyEditor* SmartPropertyEditorManager::selectEditor(
   const std::string& propertyKey, const std::vector<mdl::EntityNodeBase*>& nodes) const
 {
+  // 如果没有节点，使用默认编辑器
+  if (nodes.empty()) {
+    return defaultEditor();
+  }
+  
   // 检查是否为文件属性
   if (isFileBrowserProperty(propertyKey)) {
     // 获取属性定义来确定文件类型
@@ -295,32 +376,30 @@ SmartPropertyEditor* SmartPropertyEditorManager::selectEditor(
         if (propDef) {
           const std::string& desc = propDef->shortDescription();
           
-          // 1. 检查描述中的明确标记
+          // 检查特定标记和描述短语
           if (desc.find("<sound>") != std::string::npos) {
             fileType = FilePropertyType::SoundFile;
           } else if (desc.find("<sprite>") != std::string::npos) {
             fileType = FilePropertyType::SpriteFile;
           } else if (desc.find("<model>") != std::string::npos) {
             fileType = FilePropertyType::ModelFile;
-          }
-          // 2. 检查描述中的特定短语
-          else if (desc.find("Sprite Name") != std::string::npos) {
+          } else if (desc.find("Sprite Name") != std::string::npos) {
             fileType = FilePropertyType::SpriteFile;
           } else if (desc.find("Model / Sprite") != std::string::npos) {
-            // 这种情况下应该是模型文件，但也可能是精灵
-            // 此处我们默认为模型文件，因为大多数引擎中模型更常用
             fileType = FilePropertyType::ModelFile;
           } else if (desc.find("WAV") != std::string::npos || 
-                   desc.find(".wav") != std::string::npos) {
+                    desc.find(".wav") != std::string::npos ||
+                    desc.find("Path/filename.wav") != std::string::npos) {
             fileType = FilePropertyType::SoundFile;
-          } else if (desc.find("Model") != std::string::npos) {
+          } else if (desc.find("Model") != std::string::npos && 
+                    desc.find("Sprite") == std::string::npos) {
             fileType = FilePropertyType::ModelFile;
           } else if (desc.find("Sprite") != std::string::npos) {
             fileType = FilePropertyType::SpriteFile;
           }
         }
         
-        // 如果无法从描述确定类型，再根据属性名判断
+        // 如果无法从描述确定类型，则根据属性名判断
         if (fileType == FilePropertyType::AnyFile) {
           if (propertyKey == "model" || propertyKey == "studio") {
             fileType = FilePropertyType::ModelFile;
@@ -329,16 +408,17 @@ SmartPropertyEditor* SmartPropertyEditorManager::selectEditor(
           } else if (propertyKey == "sound") {
             fileType = FilePropertyType::SoundFile;
           } else if (propertyKey.find("sound") != std::string::npos || 
-                   propertyKey.find("wav") != std::string::npos) {
+                    propertyKey.find("wav") != std::string::npos) {
             fileType = FilePropertyType::SoundFile;
           } else if (propertyKey.find("sprite") != std::string::npos) {
             fileType = FilePropertyType::SpriteFile;
           } else if (propertyKey.find("model") != std::string::npos || 
-                   propertyKey.find("mdl") != std::string::npos) {
+                    propertyKey.find("mdl") != std::string::npos) {
             fileType = FilePropertyType::ModelFile;
           }
         }
         
+        // 设置文件类型并返回编辑器
         fileBrowser->setPropertyType(fileType);
         return editor;
       }
@@ -352,8 +432,7 @@ SmartPropertyEditor* SmartPropertyEditorManager::selectEditor(
     }
   }
 
-  // 应当不会到达这里，但以防万一返回默认编辑器
-  assert(false);
+  // 返回默认编辑器
   return defaultEditor();
 }
 
