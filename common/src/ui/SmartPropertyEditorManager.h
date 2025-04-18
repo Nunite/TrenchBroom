@@ -94,7 +94,6 @@ private:
   
   // 新增创建文件浏览器编辑器的方法
   SmartFileBrowserEditor* createFileBrowserEditor(FilePropertyType type);
-  bool isFileBrowserProperty(const std::string& propertyKey) const;
 };
 
 } // namespace tb::ui

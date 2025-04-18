@@ -43,21 +43,6 @@ namespace
 {
 
 /**
- * 检查属性定义是否包含特定的标记（如<model>、<sprite>、<sound>）
- */
-bool hasFileMarker(const std::string& propertyKey, const std::vector<mdl::EntityNodeBase*>& nodes) {
-  const auto* propDef = mdl::selectPropertyDefinition(propertyKey, nodes);
-  if (!propDef) {
-    return false;
-  }
-  
-  const std::string& desc = propDef->shortDescription();
-  return desc.find("<model>") != std::string::npos ||
-         desc.find("<sprite>") != std::string::npos ||
-         desc.find("<sound>") != std::string::npos;
-}
-
-/**
  * Matches if all of the nodes have a property definition for the give property key that
  * is of the type passed to the constructor.
  */
@@ -146,6 +131,85 @@ SmartPropertyEditorMatcher makeFileBrowserPropertyMatcher()
   };
 }
 
+// 添加一个函数，用于解析属性名后面的括号内容，比如"message(sound)"中的"message"和"sound"
+std::pair<std::string, std::string> parsePropertyFormat(const std::string& pattern) {
+  // 检查是否包含括号
+  auto openPos = pattern.find('(');
+  if (openPos == std::string::npos) {
+    return {pattern, ""};
+  }
+  
+  auto closePos = pattern.find(')', openPos);
+  if (closePos == std::string::npos) {
+    return {pattern, ""};
+  }
+  
+  // 提取属性名和类型
+  std::string propertyName = pattern.substr(0, openPos);
+  std::string typeName = pattern.substr(openPos + 1, closePos - openPos - 1);
+  
+  return {propertyName, typeName};
+}
+
+// 文件属性匹配器（支持括号格式）
+SmartPropertyEditorMatcher makeFilePropertyMatcher(
+  std::vector<std::string> patterns_, FilePropertyType fileType)
+{
+  return [patterns = std::move(patterns_), fileType](const auto& propertyKey, const auto& nodes) {
+    if (nodes.empty()) return false;
+    
+    // 首先检查属性键是否直接匹配任何模式
+    for (const auto& pattern : patterns) {
+      if (kdl::cs::str_matches_glob(propertyKey, pattern)) {
+        return true;
+      }
+      
+      // 解析原始格式（如"message(sound)"）
+      auto [baseName, typeName] = parsePropertyFormat(pattern);
+      
+      // 如果匹配基本名称，并且类型也匹配的话
+      if (propertyKey == baseName) {
+        // 检查属性定义是否存在并包含相应的类型信息
+        const auto* propDef = mdl::selectPropertyDefinition(propertyKey, nodes);
+        if (propDef) {
+          const std::string& desc = propDef->shortDescription();
+          
+          // 根据文件类型和类型名称匹配适当的模式
+          switch (fileType) {
+            case FilePropertyType::SoundFile:
+              if (typeName == "sound" || 
+                  desc.find("<sound>") != std::string::npos ||
+                  desc.find("WAV") != std::string::npos || 
+                  desc.find(".wav") != std::string::npos) {
+                return true;
+              }
+              break;
+            case FilePropertyType::SpriteFile:
+              if (typeName == "sprite" || 
+                  desc.find("<sprite>") != std::string::npos ||
+                  desc.find("Sprite Name") != std::string::npos) {
+                return true;
+              }
+              break;
+            case FilePropertyType::ModelFile:
+              if (typeName == "studio" || 
+                  desc.find("<model>") != std::string::npos ||
+                  (desc.find("Model") != std::string::npos && 
+                   desc.find("Sprite") == std::string::npos)) {
+                return true;
+              }
+              break;
+            default:
+              break;
+          }
+        }
+      }
+    }
+    
+    return false;
+  };
+}
+
 } // namespace
 
 SmartPropertyEditorManager::SmartPropertyEditorManager(
@@ -221,10 +285,25 @@ void SmartPropertyEditorManager::createEditors()
 {
   assert(m_editors.empty());
 
-  // 注册文件浏览器编辑器
+  // 注册精灵文件浏览器编辑器
   registerEditor(
-    makeFileBrowserPropertyMatcher(),
-    createFileBrowserEditor(FilePropertyType::AnyFile));
+    makeFilePropertyMatcher({"model(sprite)"}, FilePropertyType::SpriteFile),
+    createFileBrowserEditor(FilePropertyType::SpriteFile));
+
+  // 注册模型文件浏览器编辑器
+  registerEditor(
+    makeFilePropertyMatcher({"model(studio)"}, FilePropertyType::ModelFile),
+    createFileBrowserEditor(FilePropertyType::ModelFile));
+    
+  // 注册声音文件浏览器编辑器
+  registerEditor(
+    makeFilePropertyMatcher({"message(sound)"}, FilePropertyType::SoundFile),
+    createFileBrowserEditor(FilePropertyType::SoundFile));
+    
+  // // 注册模型和精灵通用文件浏览器编辑器
+  // registerEditor(
+  //   makeModelSpriteFileMatcher({"modelorsprite", "modelsprite", "model(*)", "*model*(*)", "*model(*)"}),
+  //   createFileBrowserEditor(FilePropertyType::ModelFile));
     
   // 添加一个新的匹配器，专门用于无亮度的颜色属性
   // 这个匹配器将匹配形如 "rgb_*" 或 "noalpha_*" 或特定的属性名
@@ -340,30 +419,6 @@ void SmartPropertyEditorManager::nodesDidChange(const std::vector<mdl::Node*>&)
   switchEditor(m_propertyKey, entityNodes);
 }
 
-// 判断属性是否适用于文件浏览器
-bool SmartPropertyEditorManager::isFileBrowserProperty(const std::string& propertyKey) const {
-  // 检查基本的属性名
-  static const std::unordered_set<std::string> exactMatchProperties = {
-    "model",    // 模型文件
-    "studio",   // 模型文件
-    "sprite",   // 精灵文件
-    "sound"     // 声音文件
-  };
-  
-  // 直接匹配常见的文件属性名
-  if (exactMatchProperties.find(propertyKey) != exactMatchProperties.end()) {
-    return true;
-  }
-  
-  // 根据属性名称的模式进行匹配
-  // 例如：WAV Name、Sprite Name等
-  if (propertyKey.find("_name") != std::string::npos) {
-    return true;
-  }
-  
-  return false;
-}
-
 SmartPropertyEditor* SmartPropertyEditorManager::selectEditor(
   const std::string& propertyKey, const std::vector<mdl::EntityNodeBase*>& nodes) const
 {
@@ -372,72 +427,10 @@ SmartPropertyEditor* SmartPropertyEditorManager::selectEditor(
     return defaultEditor();
   }
   
-  // 检查是否为文件属性
-  if (isFileBrowserProperty(propertyKey)) {
-    // 获取属性定义来确定文件类型
-    const auto* propDef = mdl::selectPropertyDefinition(propertyKey, nodes);
-    
-    for (const auto& [matcher, editor] : m_editors) {
-      if (auto* fileBrowser = dynamic_cast<SmartFileBrowserEditor*>(editor)) {
-        // 根据属性定义和属性名决定文件类型
-        FilePropertyType fileType = FilePropertyType::AnyFile;
-        
-        // 首先检查属性的描述（优先级最高）
-        if (propDef) {
-          const std::string& desc = propDef->shortDescription();
-          
-          // 检查特定标记和描述短语
-          if (desc.find("<sound>") != std::string::npos) {
-            fileType = FilePropertyType::SoundFile;
-          } else if (desc.find("<sprite>") != std::string::npos) {
-            fileType = FilePropertyType::SpriteFile;
-          } else if (desc.find("<model>") != std::string::npos) {
-            fileType = FilePropertyType::ModelFile;
-          } else if (desc.find("Sprite Name") != std::string::npos) {
-            fileType = FilePropertyType::SpriteFile;
-          } else if (desc.find("Model / Sprite") != std::string::npos) {
-            fileType = FilePropertyType::ModelFile;
-          } else if (desc.find("WAV") != std::string::npos || 
-                    desc.find(".wav") != std::string::npos ||
-                    desc.find("Path/filename.wav") != std::string::npos) {
-            fileType = FilePropertyType::SoundFile;
-          } else if (desc.find("Model") != std::string::npos && 
-                    desc.find("Sprite") == std::string::npos) {
-            fileType = FilePropertyType::ModelFile;
-          } else if (desc.find("Sprite") != std::string::npos) {
-            fileType = FilePropertyType::SpriteFile;
-          }
-        }
-        
-        // 如果无法从描述确定类型，则根据属性名判断
-        if (fileType == FilePropertyType::AnyFile) {
-          if (propertyKey == "model" || propertyKey == "studio") {
-            fileType = FilePropertyType::ModelFile;
-          } else if (propertyKey == "sprite") {
-            fileType = FilePropertyType::SpriteFile;
-          } else if (propertyKey == "sound") {
-            fileType = FilePropertyType::SoundFile;
-          } else if (propertyKey.find("sound") != std::string::npos || 
-                    propertyKey.find("wav") != std::string::npos) {
-            fileType = FilePropertyType::SoundFile;
-          } else if (propertyKey.find("sprite") != std::string::npos) {
-            fileType = FilePropertyType::SpriteFile;
-          } else if (propertyKey.find("model") != std::string::npos || 
-                    propertyKey.find("mdl") != std::string::npos) {
-            fileType = FilePropertyType::ModelFile;
-          }
-        }
-        
-        // 设置文件类型并返回编辑器
-        fileBrowser->setPropertyType(fileType);
-        return editor;
-      }
-    }
-  }
-
-  // 尝试其他匹配器
+  // 直接尝试所有匹配器，不再使用isFileBrowserProperty
   for (const auto& [matcher, editor] : m_editors) {
     if (matcher(propertyKey, nodes)) {
+      // 文件类型已在创建编辑器时设置，无需在此处设置
       return editor;
     }
   }
