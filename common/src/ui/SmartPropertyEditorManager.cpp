@@ -146,75 +146,6 @@ SmartPropertyEditorMatcher makeFileBrowserPropertyMatcher()
   };
 }
 
-static bool keyHasColorTag(
-  const std::string& propertyKey, const std::vector<mdl::EntityNodeBase*>& nodes)
-{
-  const auto* propDef = mdl::selectPropertyDefinition(propertyKey, nodes);
-  if (!propDef) {
-    return false;
-  }
-
-  // 检查属性描述是否包含颜色标记
-  const auto& description = propDef->shortDescription();
-  return kdl::ci::str_contains(description, "(color")  
-      || kdl::ci::str_contains(description, "<color>") 
-      || kdl::ci::str_contains(description, "RGB")
-      || kdl::ci::str_contains(description, "color:")
-      || kdl::ci::str_contains(description, "颜色");
-}
-
-/**
- * 给颜色编辑器创建匹配器
- */
-static SmartPropertyEditorMatcher makeSmartColorEditorMatcher()
-{
-  return [](const auto& propertyKey, const auto& nodes) {
-    // 常见的颜色属性名模式
-    const bool hasColorName = 
-      kdl::ci::str_contains(propertyKey, "color") ||
-      kdl::ci::str_contains(propertyKey, "colour") ||
-      kdl::ci::str_is_suffix(propertyKey, "_color") ||
-      kdl::ci::str_is_suffix(propertyKey, "_colour") ||
-      kdl::ci::str_contains(propertyKey, "light") ||
-      kdl::ci::str_contains(propertyKey, "diffuse") ||
-      kdl::ci::str_contains(propertyKey, "ambient") ||
-      kdl::ci::str_contains(propertyKey, "specular") ||
-      kdl::ci::str_contains(propertyKey, "rgb") ||
-      kdl::ci::str_contains(propertyKey, "tint");
-    
-    // 检查是否有描述标记表明这是颜色属性
-    const bool hasColorTag = keyHasColorTag(propertyKey, nodes);
-    
-    // 检查是否为三或四元素值，格式类似 "R G B" 或 "R G B A"
-    bool isColorValue = false;
-    if (!nodes.empty()) {
-      if (const auto* value = nodes.front()->entity().property(propertyKey)) {
-        // 简单解析颜色字符串 - 按空格分割
-        std::istringstream stream(*value);
-        std::vector<std::string> components;
-        std::string component;
-        while (stream >> component) {
-          components.push_back(component);
-        }
-        
-        // 检查是否有3或4个数字组件
-        isColorValue = (components.size() == 3 || components.size() == 4) && 
-                       std::all_of(components.begin(), components.end(), 
-                                   [](const std::string& s) {
-                                     try {
-                                       std::stoi(s);
-                                       return true;
-                                     } catch(...) {
-                                       return false;
-                                     }
-                                   });
-      }
-    }
-    
-    return hasColorName || hasColorTag || isColorValue;
-  };
-}
-
 } // namespace
 
 SmartPropertyEditorManager::SmartPropertyEditorManager(
@@ -295,9 +226,9 @@ void SmartPropertyEditorManager::createEditors()
     makeFileBrowserPropertyMatcher(),
     createFileBrowserEditor(FilePropertyType::AnyFile));
     
-  // 修改这里，使用新的颜色属性匹配器
+  // 修改这里，使用简单的键名匹配器
   registerEditor(
-    makeSmartColorEditorMatcher(),
+    makeSmartPropertyEditorKeyMatcher({"color", "*_color", "*_color2", "*_colour","_light","_diffuse_light"}),
     new SmartColorEditor{m_document, this});
     
   registerEditor(
