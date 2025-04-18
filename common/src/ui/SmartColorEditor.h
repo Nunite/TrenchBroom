@@ -57,12 +57,18 @@ private:
   int m_currentAlpha = 200;
   bool m_hasAlpha = true;
   
+  // 是否启用亮度控制
+  bool m_brightnessEnabled = true;
+  
   // 添加成员变量来跟踪当前颜色
   QColor m_currentColor;
 
 public:
   explicit SmartColorEditor(
     std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
+    
+  // 设置是否启用亮度控制
+  void setBrightnessEnabled(bool enabled);
 
 protected:
   // 添加事件过滤器以支持双击编辑功能
@@ -75,6 +81,7 @@ private:
   void updateColorRange(const std::vector<mdl::EntityNodeBase*>& nodes);
   void updateColorHistory();
   void updateAlphaControls(const std::vector<mdl::EntityNodeBase*>& nodes);
+  void updateGuiState();  // 更新控件的可见性
 
   void setColor(const QColor& wxColor) const;
 

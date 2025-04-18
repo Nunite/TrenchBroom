@@ -135,8 +135,46 @@ std::vector<QColor> collectColors(
 
 SmartColorEditor::SmartColorEditor(std::weak_ptr<MapDocument> document, QWidget* parent)
   : SmartPropertyEditor{std::move(document), parent}
+  , m_brightnessEnabled(true)  // 默认启用亮度控制
 {
   createGui();
+}
+
+void SmartColorEditor::setBrightnessEnabled(bool enabled)
+{
+  if (m_brightnessEnabled != enabled) {
+    m_brightnessEnabled = enabled;
+    updateGuiState();
+  }
+}
+
+void SmartColorEditor::updateGuiState()
+{
+  // 更新控件的可见性，根据m_brightnessEnabled控制亮度相关控件
+  if (m_alphaSlider) {
+    m_alphaSlider->setVisible(m_brightnessEnabled);
+  }
+  
+  if (m_alphaLabel) {
+    m_alphaLabel->setVisible(m_brightnessEnabled);
+  }
+  
+  // 查找亮度标签并更新其可见性
+  QList<QLabel*> labels = findChildren<QLabel*>();
+  for (QLabel* label : labels) {
+    if (label->text().contains("Brightness")) {
+      label->setVisible(m_brightnessEnabled);
+      break;
+    }
+  }
+  
+  // 查找提示标签并更新其可见性
+  for (QLabel* label : labels) {
+    if (label->text().contains("Double-click")) {
+      label->setVisible(m_brightnessEnabled);
+      break;
+    }
+  }
 }
 
 void SmartColorEditor::createGui()
@@ -249,6 +287,9 @@ void SmartColorEditor::createGui()
     &QSlider::valueChanged,
     this,
     &SmartColorEditor::alphaSliderChanged);
+    
+  // 初始更新GUI状态
+  updateGuiState();
 }
 
 void SmartColorEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>& nodes)
@@ -256,6 +297,7 @@ void SmartColorEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>& n
   // 移除ensure检查，因为我们确保上面已经创建了所有对象
   updateColorHistory();
   updateAlphaControls(nodes);
+  updateGuiState(); // 确保每次更新视图时也更新GUI状态
 }
 
 void SmartColorEditor::updateColorHistory()
@@ -340,8 +382,10 @@ void SmartColorEditor::setColor(const QColor& color) const
   // 生成颜色值字符串，固定使用字节模式(0-255)
   std::string value = mdl::entityColorAsString(fromQColor(color), mdl::ColorRange::Byte);
   
-  // 添加亮度值（第四个分量）- 始终添加
-  value += " " + std::to_string(m_currentAlpha);
+  // 仅在亮度控制启用时添加亮度值
+  if (m_brightnessEnabled) {
+    value += " " + std::to_string(m_currentAlpha);
+  }
   
   document()->setProperty(propertyKey(), value);
 }

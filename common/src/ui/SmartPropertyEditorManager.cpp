@@ -226,7 +226,15 @@ void SmartPropertyEditorManager::createEditors()
     makeFileBrowserPropertyMatcher(),
     createFileBrowserEditor(FilePropertyType::AnyFile));
     
-  // 修改这里，使用简单的键名匹配器
+  // 添加一个新的匹配器，专门用于无亮度的颜色属性
+  // 这个匹配器将匹配形如 "rgb_*" 或 "noalpha_*" 或特定的属性名
+  auto* colorEditorNoBrightness = new SmartColorEditor{m_document, this};
+  colorEditorNoBrightness->setBrightnessEnabled(false); // 禁用亮度控制
+  registerEditor(
+    makeSmartPropertyEditorKeyMatcher({"rendercolor"}),
+    colorEditorNoBrightness);
+    
+  // 标准颜色编辑器，带亮度控制  
   registerEditor(
     makeSmartPropertyEditorKeyMatcher({"color", "*_color", "*_color2", "*_colour","_light","_diffuse_light"}),
     new SmartColorEditor{m_document, this});
