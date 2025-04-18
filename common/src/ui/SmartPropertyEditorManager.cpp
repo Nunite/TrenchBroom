@@ -285,10 +285,10 @@ void SmartPropertyEditorManager::createEditors()
 {
   assert(m_editors.empty());
 
-  // 注册精灵文件浏览器编辑器
-  registerEditor(
-    makeFilePropertyMatcher({"model(sprite)"}, FilePropertyType::SpriteFile),
-    createFileBrowserEditor(FilePropertyType::SpriteFile));
+  // // 注册精灵文件浏览器编辑器
+  // registerEditor(
+  //   makeFilePropertyMatcher({"model(sprite)"}, FilePropertyType::SpriteFile),
+  //   createFileBrowserEditor(FilePropertyType::SpriteFile));
 
   // 注册模型文件浏览器编辑器
   registerEditor(

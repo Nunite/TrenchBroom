@@ -165,12 +165,53 @@ void SmartFileBrowserEditor::browseForFile() {
       QString fullPath = files.first();
       QString relativePath = fullPath;
       
-      // 如果文件在游戏资源目录下，转换为相对路径
-      if (fullPath.startsWith(startDir)) {
-        relativePath = fullPath.mid(startDir.length());
-        // 移除开头的斜杠
-        if (relativePath.startsWith('/') || relativePath.startsWith('\\')) {
-          relativePath = relativePath.mid(1);
+      // 改进的路径处理逻辑
+      // 1. 检查是否有标准子目录名称（如"models/"、"sound/"、"sprites/"等）
+      QStringList standardSubDirs = {"models", "sound", "sprites", "maps", "gfx"};
+      bool foundSubDir = false;
+      
+      // 使用Qt的QFileInfo类来处理路径
+      QFileInfo fileInfo(fullPath);
+      QString fileName = fileInfo.fileName();
+      QString filePath = fileInfo.path();
+      
+      // 遍历所有标准子目录名称
+      for (const QString& subDir : standardSubDirs) {
+        // 尝试在路径中查找这个子目录
+        int index = fullPath.lastIndexOf("/" + subDir + "/", -1, Qt::CaseInsensitive);
+        if (index == -1) {
+          // 如果未找到带斜杠的格式，尝试查找可能在路径开头的情况
+          index = fullPath.lastIndexOf("\\" + subDir + "\\", -1, Qt::CaseInsensitive);
+        }
+        
+        // 如果找到了子目录
+        if (index != -1) {
+          // 提取子目录开始的部分作为相对路径
+          relativePath = fullPath.mid(index + 1); // +1 跳过开头的斜杠
+          // 规范化斜杠为正斜杠
+          relativePath.replace('\\', '/');
+          foundSubDir = true;
+          break;
+        }
+      }
+      
+      // 如果没有找到标准子目录，还是尝试相对于游戏目录的处理
+      if (!foundSubDir) {
+        // 将startDir路径中的反斜杠转换为正斜杠以确保一致性
+        QString normalizedStartDir = startDir;
+        normalizedStartDir.replace('\\', '/');
+        
+        // 将fullPath中的反斜杠转换为正斜杠
+        QString normalizedFullPath = fullPath;
+        normalizedFullPath.replace('\\', '/');
+        
+        // 检查文件是否在游戏资源目录下
+        if (normalizedFullPath.startsWith(normalizedStartDir, Qt::CaseInsensitive)) {
+          relativePath = normalizedFullPath.mid(normalizedStartDir.length());
+          // 移除开头的斜杠
+          if (relativePath.startsWith('/')) {
+            relativePath = relativePath.mid(1);
+          }
         }
       }
       
