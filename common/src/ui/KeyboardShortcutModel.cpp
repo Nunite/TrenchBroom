@@ -77,59 +77,59 @@ const std::unordered_map<std::string, QString> pathTranslations = {
 };
 
 // 将路径转换为多语言显示
-static QString translatePath(const std::filesystem::path& path) {
-    std::string pathStr = path.generic_string();
-    QString result;
+// static QString translatePath(const std::filesystem::path& path) {
+//     std::string pathStr = path.generic_string();
+//     QString result;
     
-    // 如果路径为空，返回空字符串
-    if (pathStr.empty()) {
-        return QString();
-    }
+//     // 如果路径为空，返回空字符串
+//     if (pathStr.empty()) {
+//         return QString();
+//     }
     
-    // 检查当前语言设置
-    auto& prefs = PreferenceManager::instance();
-    bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
+//     // 检查当前语言设置
+//     auto& prefs = PreferenceManager::instance();
+//     bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
     
-    // 如果是英文，直接使用路径原始文本
-    if (isEnglish) {
-        return QString::fromUtf8(pathStr.c_str());
-    }
+//     // 如果是英文，直接使用路径原始文本
+//     if (isEnglish) {
+//         return QString::fromUtf8(pathStr.c_str());
+//     }
     
-    // 中文界面才进行翻译
-    // 将路径按'/'分割
-    std::vector<std::string> parts;
-    size_t start = 0;
-    size_t end = pathStr.find('/');
+//     // 中文界面才进行翻译
+//     // 将路径按'/'分割
+//     std::vector<std::string> parts;
+//     size_t start = 0;
+//     size_t end = pathStr.find('/');
     
-    while (end != std::string::npos) {
-        parts.push_back(pathStr.substr(start, end - start));
-        start = end + 1;
-        end = pathStr.find('/', start);
-    }
+//     while (end != std::string::npos) {
+//         parts.push_back(pathStr.substr(start, end - start));
+//         start = end + 1;
+//         end = pathStr.find('/', start);
+//     }
     
-    // 添加最后一部分
-    if (start < pathStr.size()) {
-        parts.push_back(pathStr.substr(start));
-    }
+//     // 添加最后一部分
+//     if (start < pathStr.size()) {
+//         parts.push_back(pathStr.substr(start));
+//     }
     
-    // 翻译每个部分
-    for (size_t i = 0; i < parts.size(); ++i) {
-        auto it = pathTranslations.find(parts[i]);
-        if (it != pathTranslations.end()) {
-            result += it->second;
-        } else {
-            // 如果没有找到翻译，使用原始文本
-            result += QString::fromUtf8(parts[i].c_str());
-        }
+//     // 翻译每个部分
+//     for (size_t i = 0; i < parts.size(); ++i) {
+//         auto it = pathTranslations.find(parts[i]);
+//         if (it != pathTranslations.end()) {
+//             result += it->second;
+//         } else {
+//             // 如果没有找到翻译，使用原始文本
+//             result += QString::fromUtf8(parts[i].c_str());
+//         }
         
-        // 不是最后一个部分时，添加分隔符
-        if (i < parts.size() - 1) {
-            result += " / ";
-        }
-    }
+//         // 不是最后一个部分时，添加分隔符
+//         if (i < parts.size() - 1) {
+//             result += " / ";
+//         }
+//     }
     
-    return result;
-}
+//     return result;
+// }
 
 KeyboardShortcutModel::KeyboardShortcutModel(MapDocument* document, QObject* parent)
   : QAbstractTableModel{parent}
