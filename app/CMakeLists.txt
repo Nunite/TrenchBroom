@@ -298,7 +298,10 @@ if(WIN32)
         elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
             install(FILES
                     "$<TARGET_FILE_DIR:TrenchBroom>/TrenchBroom-stripped.pdb"
-                    DESTINATION . COMPONENT TrenchBroom)
+                    DESTINATION . COMPONENT TrenchBroom OPTIONAL)
+            # install(FILES
+            #         "$<TARGET_FILE_DIR:TrenchBroom>/TrenchBroom-stripped.pdb"
+            #         DESTINATION . COMPONENT TrenchBroom)
         endif()
     endif()
 
