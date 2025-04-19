@@ -177,20 +177,17 @@ TrenchBroomApp::TrenchBroomApp(int& argc, char** argv)
     locale = "zh_CN";
     
     // 查找并加载翻译文件，优先从资源文件中加载
-    bool translationLoaded = false;
     
     // 优先从资源文件加载
     if (m_translator->load(QString(":/translations/trenchbroom_%1").arg(locale)))
     {
       installTranslator(m_translator);
-      translationLoaded = true;
     }
     // 然后尝试从应用程序目录加载
     else if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
                               QCoreApplication::applicationDirPath() + "/translations"))
     {
       installTranslator(m_translator);
-      translationLoaded = true;
     }
     // 尝试在多个可能的资源路径中查找
     else
@@ -202,7 +199,6 @@ TrenchBroomApp::TrenchBroomApp(int& argc, char** argv)
                               io::pathAsQString(dir)))
         {
           installTranslator(m_translator);
-          translationLoaded = true;
           break;
         }
       }
