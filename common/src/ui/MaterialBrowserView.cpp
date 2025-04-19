@@ -21,6 +21,8 @@
 
 #include <QMenu>
 #include <QTextStream>
+#include <QApplication>
+#include <QClipboard>
 
 #include "PreferenceManager.h"
 #include "Preferences.h"
@@ -453,6 +455,13 @@ void MaterialBrowserView::doContextMenu(
   if (const auto* cell = layout.cellAt(x, y))
   {
     auto menu = QMenu{this};
+    
+    menu.addAction(tr("Copy Material Name"), this, [&, material = &cellData(*cell)]() {
+      QApplication::clipboard()->setText(QString::fromStdString(material->name()));
+    });
+    
+    menu.addSeparator();
+    
     menu.addAction(tr("Select Faces"), this, [&, material = &cellData(*cell)]() {
       auto doc = kdl::mem_lock(m_document);
       doc->selectFacesWithMaterial(material);
