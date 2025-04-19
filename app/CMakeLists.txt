@@ -85,6 +85,7 @@ if(APPLE)
 
     # Configure manual files
     set_source_files_properties(${INDEX_OUTPUT_PATH} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/manual)
+    set_source_files_properties(${INDEX_CN_OUTPUT_PATH} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/manual)
     set_source_files_properties(${DOC_MANUAL_TARGET_FILES_ABSOLUTE} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/manual)
     set_source_files_properties(${DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/manual)
     set_source_files_properties(${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/manual/images)
@@ -112,7 +113,7 @@ get_build_platform(APP_PLATFORM_NAME)
 
 # Create the executable target and link with libraries
 add_executable(TrenchBroom WIN32 MACOSX_BUNDLE)
-target_sources(TrenchBroom PRIVATE ${APP_SOURCE} ${INDEX_OUTPUT_PATH} ${DOC_MANUAL_TARGET_FILES_ABSOLUTE} ${DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE} ${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE})
+target_sources(TrenchBroom PRIVATE ${APP_SOURCE} ${INDEX_OUTPUT_PATH} ${INDEX_CN_OUTPUT_PATH} ${DOC_MANUAL_TARGET_FILES_ABSOLUTE} ${DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE} ${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE})
 
 target_link_libraries(TrenchBroom PRIVATE common fmt::fmt-header-only)
 # Xcode "new build system" does't allow custom commands to be depended on by two unrelated targets
@@ -262,6 +263,7 @@ if(WIN32 OR ${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
             COMMAND ${CMAKE_COMMAND} -E make_directory "${APP_RESOURCE_DEST_DIR}/manual/"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${APP_RESOURCE_DEST_DIR}/manual/images"
             COMMAND ${CMAKE_COMMAND} -E copy "${INDEX_OUTPUT_PATH}" "${APP_RESOURCE_DEST_DIR}/manual/"
+            COMMAND ${CMAKE_COMMAND} -E copy "${INDEX_CN_OUTPUT_PATH}" "${APP_RESOURCE_DEST_DIR}/manual/"
             COMMAND ${CMAKE_COMMAND} -E copy "${DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE}" "${APP_RESOURCE_DEST_DIR}/manual/")
 
     foreach(MANUAL_FILE ${DOC_MANUAL_TARGET_FILES_ABSOLUTE})
@@ -331,6 +333,7 @@ if(WIN32)
     
     #Manual
     install(FILES ${INDEX_OUTPUT_PATH} DESTINATION manual COMPONENT TrenchBroom)
+    install(FILES ${INDEX_CN_OUTPUT_PATH} DESTINATION manual COMPONENT TrenchBroom)
     install(FILES ${DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE} DESTINATION manual COMPONENT TrenchBroom)
     install(FILES
             ${DOC_MANUAL_TARGET_FILES_ABSOLUTE}
