@@ -43,7 +43,7 @@
 namespace tb::ui
 {
 // 判断属性是否适用于文件浏览器
-bool isFileBrowserProperty(const std::string& propertyKey) {
+static bool isFileBrowserProperty(const std::string& propertyKey) {
   // 定义一组特定的属性名，这些属性通常对应文件路径
   static const std::unordered_set<std::string> exactMatchProperties = {
     "model",       // 模型文件
