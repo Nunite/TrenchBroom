@@ -77,7 +77,7 @@ const std::unordered_map<std::string, QString> pathTranslations = {
 };
 
 // 将路径转换为多语言显示
-QString translatePath(const std::filesystem::path& path) {
+static QString translatePath(const std::filesystem::path& path) {
     std::string pathStr = path.generic_string();
     QString result;
     
