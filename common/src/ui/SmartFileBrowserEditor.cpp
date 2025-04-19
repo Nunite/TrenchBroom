@@ -178,7 +178,7 @@ void SmartFileBrowserEditor::browseForFile() {
       // 遍历所有标准子目录名称
       for (const QString& subDir : standardSubDirs) {
         // 尝试在路径中查找这个子目录
-        int index = fullPath.lastIndexOf("/" + subDir + "/", -1, Qt::CaseInsensitive);
+        qsizetype index = fullPath.lastIndexOf("/" + subDir + "/", -1, Qt::CaseInsensitive);
         if (index == -1) {
           // 如果未找到带斜杠的格式，尝试查找可能在路径开头的情况
           index = fullPath.lastIndexOf("\\" + subDir + "\\", -1, Qt::CaseInsensitive);

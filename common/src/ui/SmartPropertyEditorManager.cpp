@@ -81,7 +81,7 @@ SmartPropertyEditorMatcher makeSmartPropertyEditorKeyMatcher(
 }
 
 // 添加一个匹配文件属性的Matcher
-SmartPropertyEditorMatcher makeFileBrowserPropertyMatcher()
+[[maybe_unused]] SmartPropertyEditorMatcher makeFileBrowserPropertyMatcher()
 {
   return [](const auto& propertyKey, const auto& nodes) {
     // 基本的文件属性名称
