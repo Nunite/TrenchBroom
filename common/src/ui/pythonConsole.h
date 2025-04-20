@@ -13,11 +13,13 @@
 #include <QString>
 #include <QProcess>
 #include <memory>
+#include <fstream>
 
 class QToolBar;
 class QPushButton;
 class QFileSystemModel;
 class QLineEdit;
+class QModelIndex;
 
 namespace tb::ui
 {
@@ -65,6 +67,9 @@ private:
   
   // 恢复 PythonInterpreter 实例
   std::unique_ptr<PythonInterpreter> m_interpreter;
+
+  // 日志文件流
+  std::ofstream m_logFile;
 
 public:
   /**
@@ -116,6 +121,9 @@ private:
   
   // 添加一个用于在 UI 控制台显示状态/错误的方法
   void appendOutput(const QString& text, bool isError = false);
+  
+  // 新增：写入日志文件并更新 UI 控制台的方法
+  void logMessage(const QString& text, bool isError = false);
 };
 
 } // namespace tb::ui

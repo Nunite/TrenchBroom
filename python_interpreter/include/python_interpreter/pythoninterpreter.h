@@ -7,18 +7,23 @@
 #include <iostream>
 #include <sstream>
 #include <optional>
+#include <fstream>
 
 class PYTHON_INTERPRETER_API PythonInterpreter {
+private:
+    std::ofstream& m_log;
+
 public:
     /*
      * Initializes Python
      * @param exePath Path to the main executable
      * @param externalSearchPaths Additional Python module search paths
+     * @param logStream Output stream for logging
      * @param useSystemPython Setup system installed Python if true, isolated mode otherwise.
      *
      * @post Python API can be called
      */
-    PythonInterpreter(::std::string exePath, ::std::vector<::std::string> externalSearchPaths, bool useSystemPython = false);
+    PythonInterpreter(::std::string exePath, ::std::vector<::std::string> externalSearchPaths, std::ofstream& logStream, bool useSystemPython = false);
     ~PythonInterpreter();
     
     /*

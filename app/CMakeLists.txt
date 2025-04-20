@@ -123,6 +123,16 @@ target_link_libraries(TrenchBroom PRIVATE common fmt::fmt-header-only)
 # In this case, ${INDEX_OUTPUT_PATH} is depended on by TrenchBroom and GenerateManual
 # so we must make TrenchBroom depend on GenerateManual (see #3608)
 add_dependencies(TrenchBroom GenerateManual)
+
+# 添加对Python运行时复制目标的依赖
+if(WIN32)
+    add_dependencies(TrenchBroom copy_python_runtime_win)
+elseif(APPLE)
+    add_dependencies(TrenchBroom copy_python_runtime_mac)
+elseif(UNIX)
+    add_dependencies(TrenchBroom copy_python_runtime_linux)
+endif()
+
 set_compiler_config(TrenchBroom)
 
 set_target_properties(TrenchBroom PROPERTIES AUTORCC TRUE)

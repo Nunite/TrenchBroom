@@ -1,3 +1,19 @@
+cmake_minimum_required(VERSION 3.16)
+
+# 查找Python解释器和开发库
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+# 查找pybind11
+find_package(pybind11 CONFIG REQUIRED)
+
+# 设置Python运行时目录
+if(WIN32)
+    set(PY_RUNTIME_DIR "${CMAKE_BINARY_DIR}/app/Release/python")
+    set(PY_INSTALL_DIR "bin/python")
+else()
+    set(PY_RUNTIME_DIR "${CMAKE_BINARY_DIR}/app/python")
+    set(PY_INSTALL_DIR "bin/python")
+endif()
+
 set(COMMON_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 set(COMMON_SOURCE
@@ -1053,14 +1069,14 @@ target_link_libraries(common
   PUBLIC 
     kdl 
     vm 
-    Qt6::Core         # 添加 Core
-    Qt6::Gui          # 添加 Gui
+    Qt6::Core
+    Qt6::Gui
     Qt6::Widgets 
     Qt6::OpenGL 
     Qt6::OpenGLWidgets 
     Qt6::Svg
-    python_interpreter # 添加 python_interpreter 库
-    pybind11::embed    # 添加 pybind11 嵌入库
+    python_interpreter
+    pybind11::embed
   PRIVATE 
     GLEW::GLEW 
     OpenGL::GL 
@@ -1135,11 +1151,56 @@ source_group(TREE "${COMMON_SOURCE_DIR}" FILES ${COMMON_SOURCE} ${COMMON_HEADER}
 
 if(WIN32)
     target_link_libraries(common PRIVATE stackwalker)
+    
+    # 创建一个单独的自定义目标来复制Python文件，而不是将命令附加到OBJECT库
+    cmake_path(GET Python3_EXECUTABLE PARENT_PATH PYTHON_DIR)
+    
+    # 先创建目标目录以确保它存在
+    add_custom_target(create_python_dirs ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${PY_RUNTIME_DIR}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${PY_RUNTIME_DIR}/Lib
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${PY_RUNTIME_DIR}/DLLs
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${PY_RUNTIME_DIR}/Lib/site-packages
+        COMMENT "Creating Python directories at ${PY_RUNTIME_DIR}"
+    )
+    
+    # 添加复制命令
+    add_custom_target(copy_python_runtime_win ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${PYTHON_DIR}/ ${PY_RUNTIME_DIR}
+        COMMENT "Copying Python runtime files to ${PY_RUNTIME_DIR} (Windows)"
+    )
+    
+    # 设置依赖关系，确保目录先创建
+    add_dependencies(copy_python_runtime_win create_python_dirs)
+    
+    # 确保common库依赖于Python文件的复制
+    add_dependencies(common copy_python_runtime_win)
 endif()
 
 if(APPLE)
     # Silence macOS OpenGL deprecation warnings
     target_compile_definitions(common PUBLIC GL_SILENCE_DEPRECATION)
+    
+    # 创建一个单独的自定义目标来复制Python文件
+    add_custom_target(copy_python_runtime_mac ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${Python3_STDLIB} ${PY_RUNTIME_DIR}/lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${Python3_EXECUTABLE} "${PY_RUNTIME_DIR}/bin/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}"
+        COMMENT "Copying Python runtime files to ${PY_RUNTIME_DIR} (macOS)"
+    )
+endif()
+
+# 对于Linux，添加复制命令
+if(UNIX AND NOT APPLE)
+    add_custom_target(copy_python_runtime_linux ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${Python3_STDLIB} ${PY_RUNTIME_DIR}/lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${Python3_EXECUTABLE} "${PY_RUNTIME_DIR}/bin/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}"
+        COMMENT "Copying Python runtime files to ${PY_RUNTIME_DIR} (Linux)"
+    )
 endif()
 
 set_compiler_config(common)
@@ -1157,30 +1218,3 @@ add_dependencies(common generate_version)
 
 add_subdirectory(test)
 add_subdirectory(benchmark)
-
-# 查找 Pybind11 (确保在使用前查找)
-find_package(pybind11 CONFIG REQUIRED)
-
-target_link_libraries(common 
-  PUBLIC 
-    kdl 
-    vm 
-    Qt6::Core         # 添加 Core
-    Qt6::Gui          # 添加 Gui
-    Qt6::Widgets 
-    Qt6::OpenGL 
-    Qt6::OpenGLWidgets 
-    Qt6::Svg
-    python_interpreter # 添加 python_interpreter 库
-    pybind11::embed    # 添加 pybind11 嵌入库
-  PRIVATE 
-    GLEW::GLEW 
-    OpenGL::GL 
-    upd 
-    tinyxml2::tinyxml2 
-    miniz::miniz 
-    freeimage::FreeImage 
-    freetype 
-    assimp::assimp 
-    fmt::fmt-header-only
-)

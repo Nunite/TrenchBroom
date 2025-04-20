@@ -36,6 +36,8 @@
 #include <stdexcept> // For std::exception
 #include <QFileInfo> // 添加 QFileInfo
 #include <QScrollBar> // 添加 QScrollBar
+#include <fstream>   // 确保 fstream 被包含
+#include <QDateTime> // 添加 QDateTime
 
 namespace tb::ui
 {
@@ -54,7 +56,12 @@ PythonConsole::PythonConsole(QWidget* parent)
   , m_interpreter{nullptr}
   , m_currentScriptPath{}
   , m_scriptsRootDir{}
+  , m_logFile{}
 {
+  // 打开日志文件
+  QString logFilePath = QCoreApplication::applicationDirPath() + "/python_console.log";
+  m_logFile.open(logFilePath.toStdString(), std::ios::app); 
+
   setupUI();
   setupConnections();
   setupPythonEnvironment();
@@ -62,7 +69,11 @@ PythonConsole::PythonConsole(QWidget* parent)
 
 PythonConsole::~PythonConsole()
 {
-  // unique_ptr will handle deletion
+  logMessage("--- Python Console Closing --- ");
+  if (m_logFile.is_open()) {
+      m_logFile.close();
+  }
+  // unique_ptr 会自动处理 m_interpreter
 }
 
 QString PythonConsole::getCurrentScriptContent() const
@@ -194,18 +205,18 @@ void PythonConsole::onSaveScriptAs()
 
 void PythonConsole::onRunScript()
 {
-  // if (!m_interpreter) { // 注释掉检查
-  //     appendOutput(tr("Python interpreter is not initialized."), true);
-  //     return;
-  // }
+  if (!m_interpreter) { 
+    logMessage(tr("Python interpreter is not initialized."), true);
+    return;
+  }
 
   QString scriptContent = m_codeEditor->toPlainText();
   if (scriptContent.isEmpty()) {
-    appendOutput(tr("Cannot run an empty script."), true);
+    logMessage(tr("Cannot run an empty script."), true);
     return;
   }
   
-  // 如果有未保存的修改，先保存
+  // 如果有未保存的修改，先保存 
   if (m_codeEditor->document()->isModified()) {
     QMessageBox::StandardButton result = QMessageBox::question(
       this,
@@ -216,36 +227,41 @@ void PythonConsole::onRunScript()
     
     if (result == QMessageBox::Yes) {
       onSaveScript();
-      // 检查保存是否成功（例如，用户可能取消了保存对话框）
       if (m_codeEditor->document()->isModified() && m_currentScriptPath.isEmpty()) {
-          appendOutput(tr("Script must be saved before running without a temporary file (or implement temporary file execution)."), true);
-          return;
+        logMessage(tr("Script must be saved before running without a temporary file. Awaiting save."), true);
+        return;
       }
     } else if (result == QMessageBox::Cancel) {
+      logMessage(tr("Run cancelled by user."));
       return;
+    } else {
+      logMessage(tr("Running script with potentially unsaved changes."));
     }
-    // 如果选 No，继续执行（可能使用未保存的内容或上次保存的版本）
   }
   
-  appendOutput(tr("Running script..."));
-
-  std::optional<std::string> error = "Python execution temporarily disabled"; // 模拟错误
-  // if (!m_currentScriptPath.isEmpty() && !m_codeEditor->document()->isModified()) { // 注释掉 Python 调用
-      // 运行已保存且未修改的文件
-      // error = m_interpreter->executeFile(m_currentScriptPath.toStdString());
-  // } else {
-      // 运行编辑器中的代码（可能是新脚本、未保存的修改或选择不保存就运行）
-      // error = m_interpreter->executeCode(scriptContent.toStdString());
-  // }
-
-  if (error) {
-    appendOutput(tr("Error: %1").arg(QString::fromStdString(*error)), true);
-  } else {
-    appendOutput(tr("Script execution finished."));
-  }
+  logMessage(tr("Running script..."));
   
-  // **注意:** Python 的 print 输出目前不会显示在这里
-  appendOutput(tr("(Note: Python print output currently goes to the system console, not this window.)"), false);
+  std::optional<std::string> error;
+  
+  try {
+    if (!m_currentScriptPath.isEmpty()) {
+      // 执行保存的脚本文件
+      logMessage(tr("Executing script file: %1").arg(m_currentScriptPath));
+      error = m_interpreter->executeFile(m_currentScriptPath.toStdString());
+    } else {
+      // 直接执行编辑器中的代码
+      logMessage(tr("Executing code from editor"));
+      error = m_interpreter->executeCode(scriptContent.toStdString());
+    }
+    
+    if (error) {
+      logMessage(tr("Error executing Python script: %1").arg(QString::fromStdString(*error)), true);
+    } else {
+      logMessage(tr("Script executed successfully."));
+    }
+  } catch (const std::exception& e) {
+    logMessage(tr("Exception during script execution: %1").arg(e.what()), true);
+  }
 }
 
 void PythonConsole::onFileSelected(const QModelIndex& index)
@@ -336,20 +352,23 @@ void PythonConsole::onCommandEntered()
   }
   m_inputLine->clear();
   
-  // if (!m_interpreter) { // 注释掉检查
-  //   appendOutput(tr("Python interpreter is not initialized."), true);
-  //   return;
-  // }
+  if (!m_interpreter) { 
+    logMessage(tr("Python interpreter is not initialized."), true);
+    return;
+  }
 
-  appendOutput(QString(">>> %1").arg(command)); // 显示输入的命令
-  auto error = std::optional<std::string>{"Python execution temporarily disabled"}; // 模拟错误
-  // auto error = m_interpreter->executeCode(command.toStdString()); // 注释掉 Python 调用
-
-  if (error) {
-    appendOutput(tr("Error: %1").arg(QString::fromStdString(*error)), true);
-  } 
-  // **注意:** 命令的输出 (print 结果) 目前不会显示在这里
-  appendOutput(tr("(Note: Command output currently goes to the system console.)"), false); 
+  logMessage(QString("Command entered: >>> %1").arg(command)); 
+  
+  try {
+    auto error = m_interpreter->executeCode(command.toStdString());
+    if (error) {
+      logMessage(tr("Command execution failed: %1").arg(QString::fromStdString(*error)), true);
+    } else {
+      logMessage(tr("Command executed successfully."));
+    }
+  } catch (const std::exception& e) {
+    logMessage(tr("Exception during command execution: %1").arg(e.what()), true);
+  }
 }
 
 void PythonConsole::setupUI()
@@ -487,57 +506,48 @@ void PythonConsole::setupConnections()
 void PythonConsole::setupPythonEnvironment()
 {
   try {
-      appendOutput(tr("Initializing embedded Python interpreter...")); 
-      
-      // 获取可执行文件路径和脚本根目录
-      QString exePathQStr = QCoreApplication::applicationDirPath();
-      ::std::string exePath = exePathQStr.toStdString();
-      if (m_scriptsRootDir.isEmpty()) {
-            QString scriptsDir = QCoreApplication::applicationDirPath() + "/Scripts";
-            QDir dir(scriptsDir);
-            if (!dir.exists()) {
-                if (!dir.mkpath(".")) {
-                    throw std::runtime_error("Could not create default scripts directory: " + scriptsDir.toStdString());
-                }
-            }
-            m_scriptsRootDir = scriptsDir;
-             if (m_fileSystemModel) {
-                 m_fileSystemModel->setRootPath(m_scriptsRootDir);
-                 m_fileTreeView->setRootIndex(m_fileSystemModel->index(m_scriptsRootDir));
-             }
-      }
-      ::std::string scriptsRootDirStd = m_scriptsRootDir.toStdString();
-      ::std::vector<::std::string> externalSearchPaths;
-      externalSearchPaths.push_back(scriptsRootDirStd); 
-      externalSearchPaths.push_back(QFileInfo(exePathQStr).dir().path().toStdString()); 
-
-      // 恢复创建解释器实例
-      m_interpreter = std::make_unique<PythonInterpreter>(exePath, externalSearchPaths, false); 
-
-      appendOutput(tr("Embedded Python interpreter initialized successfully.")); // 恢复成功消息
-      
+    // 获取应用程序目录
+    QString appPath = QCoreApplication::applicationDirPath();
+    // 创建一个日志消息
+    logMessage(tr("Initializing Python environment..."));
+    logMessage(tr("Application path: %1").arg(appPath));
+    
+    // 设置Python搜索路径
+    std::vector<std::string> searchPaths;
+    
+    // 添加脚本文件夹
+    QString scriptsDir = appPath + "/Scripts";
+    QDir scriptsDirObj(scriptsDir);
+    if (!scriptsDirObj.exists()) {
+      logMessage(tr("Creating Scripts directory: %1").arg(scriptsDir));
+      scriptsDirObj.mkpath(".");
+    }
+    searchPaths.push_back(scriptsDir.toStdString());
+    
+    // 添加应用程序目录
+    searchPaths.push_back(appPath.toStdString());
+    
+    // 初始化Python解释器
+    logMessage(tr("Creating Python interpreter..."));
+    m_interpreter = std::make_unique<PythonInterpreter>(
+      appPath.toStdString(), 
+      searchPaths,
+      m_logFile,
+      false // 使用嵌入式Python而不是系统Python
+    );
+    
+    logMessage(tr("Python environment initialized successfully."));
+    
+    // 设置脚本根目录
+    setScriptsRootDirectory(scriptsDir);
   } catch (const std::exception& e) {
-      appendOutput(tr("Failed to initialize embedded Python interpreter: %1").arg(e.what()), true);
-      m_interpreter.reset(); // 恢复 reset
-  } catch (...) {
-      appendOutput(tr("Failed to initialize embedded Python interpreter due to an unknown error."), true);
-      m_interpreter.reset(); // 恢复 reset
+    logMessage(tr("Failed to initialize Python environment: %1").arg(e.what()), true);
+    QMessageBox::critical(
+      this,
+      tr("Python Error"),
+      tr("Failed to initialize Python environment: %1").arg(e.what())
+    );
   }
-}
-
-void PythonConsole::executeCommand(const QString& command)
-{
-  // if (!m_interpreter) { // 注释掉检查
-  //   appendOutput(tr("Python interpreter is not initialized."), true);
-  //   return;
-  // }
-  appendOutput(QString(">>> %1").arg(command));
-  auto error = std::optional<std::string>{"Python execution temporarily disabled"}; // 模拟错误
-  // auto error = m_interpreter->executeCode(command.toStdString()); // 注释掉 Python 调用
-  if (error) {
-    appendOutput(tr("Error: %1").arg(QString::fromStdString(*error)), true);
-  }
-  appendOutput(tr("(Note: Command output currently goes to the system console.)"), false); 
 }
 
 void PythonConsole::updateScriptsList()
@@ -561,7 +571,7 @@ void PythonConsole::updateScriptsList()
   }
 }
 
-// 新增方法：用于向UI控制台添加文本
+// 保持不变，由 logMessage 调用
 void PythonConsole::appendOutput(const QString& text, bool isError)
 {
     if (isError) {
@@ -569,8 +579,23 @@ void PythonConsole::appendOutput(const QString& text, bool isError)
     } else {
         m_outputConsole->append(text.toHtmlEscaped());
     }
-    // 滚动到底部 (现在 QScrollBar 已包含)
     m_outputConsole->verticalScrollBar()->setValue(m_outputConsole->verticalScrollBar()->maximum());
+}
+
+// 实现新的日志方法
+void PythonConsole::logMessage(const QString& text, bool isError)
+{
+    // 1. 写入文件
+    if (m_logFile.is_open()) {
+        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz");
+        QString prefix = isError ? "[Error] " : "[Info ] ";
+        m_logFile << "[" << timestamp.toStdString() << "] " 
+                  << prefix.toStdString() 
+                  << text.toStdString() << std::endl; // 使用 std::endl 确保换行和刷新
+    }
+
+    // 2. 更新 UI (调用旧方法)
+    appendOutput(text, isError);
 }
 
 } // namespace tb::ui
