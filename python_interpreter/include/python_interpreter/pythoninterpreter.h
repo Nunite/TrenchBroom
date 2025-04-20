@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <optional>
 
 class PYTHON_INTERPRETER_API PythonInterpreter {
 public:
@@ -37,12 +38,14 @@ public:
     /*
      * Execute Python code from string
      * @param code Python code to execute
+     * @return std::nullopt on success, error message string on failure
      */
-    void executeCode(const ::std::string& code);
+    ::std::optional<::std::string> executeCode(const ::std::string& code);
     
     /*
      * Execute Python code from file
      * @param scriptPath Path to Python script file
+     * @return std::nullopt on success, error message string on failure
      */
-    void executeFile(const ::std::string& scriptPath);
+    ::std::optional<::std::string> executeFile(const ::std::string& scriptPath);
 };

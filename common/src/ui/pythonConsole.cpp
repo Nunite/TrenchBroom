@@ -1,7 +1,9 @@
 //Added by lws
 
 #include "PythonConsole.h"
+#include "python_interpreter/pythoninterpreter.h"
 
+#include <QWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -31,6 +33,9 @@
 #include <QTemporaryFile>
 #include <QCoreApplication>
 #include <QProcessEnvironment>
+#include <stdexcept> // For std::exception
+#include <QFileInfo> // 添加 QFileInfo
+#include <QScrollBar> // 添加 QScrollBar
 
 namespace tb::ui
 {
@@ -46,7 +51,7 @@ PythonConsole::PythonConsole(QWidget* parent)
   , m_outputConsole{nullptr}
   , m_toolBar{nullptr}
   , m_inputLine{nullptr}
-  , m_pythonProcess{nullptr}
+  , m_interpreter{nullptr}
   , m_currentScriptPath{}
   , m_scriptsRootDir{}
 {
@@ -57,16 +62,7 @@ PythonConsole::PythonConsole(QWidget* parent)
 
 PythonConsole::~PythonConsole()
 {
-  if (m_pythonProcess) {
-    if (m_pythonProcess->state() != QProcess::NotRunning) {
-      m_pythonProcess->terminate();
-      m_pythonProcess->waitForFinished(1000);
-      if (m_pythonProcess->state() != QProcess::NotRunning) {
-        m_pythonProcess->kill();
-      }
-    }
-    delete m_pythonProcess;
-  }
+  // unique_ptr will handle deletion
 }
 
 QString PythonConsole::getCurrentScriptContent() const
@@ -198,12 +194,14 @@ void PythonConsole::onSaveScriptAs()
 
 void PythonConsole::onRunScript()
 {
-  if (m_codeEditor->toPlainText().isEmpty()) {
-    QMessageBox::warning(
-      this,
-      tr("Warning"),
-      tr("Cannot run an empty script.")
-    );
+  // if (!m_interpreter) { // 注释掉检查
+  //     appendOutput(tr("Python interpreter is not initialized."), true);
+  //     return;
+  // }
+
+  QString scriptContent = m_codeEditor->toPlainText();
+  if (scriptContent.isEmpty()) {
+    appendOutput(tr("Cannot run an empty script."), true);
     return;
   }
   
@@ -218,81 +216,36 @@ void PythonConsole::onRunScript()
     
     if (result == QMessageBox::Yes) {
       onSaveScript();
+      // 检查保存是否成功（例如，用户可能取消了保存对话框）
+      if (m_codeEditor->document()->isModified() && m_currentScriptPath.isEmpty()) {
+          appendOutput(tr("Script must be saved before running without a temporary file (or implement temporary file execution)."), true);
+          return;
+      }
     } else if (result == QMessageBox::Cancel) {
       return;
     }
+    // 如果选 No，继续执行（可能使用未保存的内容或上次保存的版本）
   }
   
-  // 确保 Python 进程未在运行
-  if (m_pythonProcess && m_pythonProcess->state() != QProcess::NotRunning) {
-    QMessageBox::warning(
-      this,
-      tr("Warning"),
-      tr("A script is already running. Please stop it first.")
-    );
-    return;
-  }
-  
-  // 清空输出控制台
-  m_outputConsole->clear();
-  
-  // 创建 Python 进程（如果尚未创建）
-  if (!m_pythonProcess) {
-    m_pythonProcess = new QProcess(this);
-    connect(m_pythonProcess, &QProcess::readyReadStandardOutput, this, &PythonConsole::onPythonOutputReady);
-    connect(m_pythonProcess, &QProcess::readyReadStandardError, this, &PythonConsole::onPythonErrorReady);
-    connect(m_pythonProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &PythonConsole::onPythonFinished);
-  }
-  
-  // 如果脚本已保存，直接运行文件；否则，创建临时文件运行
-  if (!m_currentScriptPath.isEmpty()) {
-    // 设置Python进程的环境变量，确保使用UTF-8编码
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert("PYTHONIOENCODING", "utf-8");
-    m_pythonProcess->setProcessEnvironment(env);
-    
-    // 添加-u参数确保Python不会缓冲输出
-    m_pythonProcess->start("python", QStringList() << "-u" << m_currentScriptPath);
-  } else {
-    QTemporaryFile tempFile;
-    tempFile.setAutoRemove(false);
-    
-    if (tempFile.open()) {
-      QTextStream out(&tempFile);
-      // 设置输出文本流的编码为UTF-8
-      out.setEncoding(QStringConverter::Utf8);
-      out << m_codeEditor->toPlainText();
-      QString tempFilePath = tempFile.fileName();
-      tempFile.close();
-      // 设置Python进程的环境变量，确保使用UTF-8编码
-      QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-      env.insert("PYTHONIOENCODING", "utf-8");
-      m_pythonProcess->setProcessEnvironment(env);
-      
-      // 添加-u参数确保Python不会缓冲输出
-      m_pythonProcess->start("python", QStringList() << "-u" << tempFilePath);
-    } else {
-      QMessageBox::warning(
-        this,
-        tr("Error"),
-        tr("Could not create temporary file for script execution.")
-      );
-    }
-  }
-}
+  appendOutput(tr("Running script..."));
 
-void PythonConsole::onStopScript()
-{
-  if (m_pythonProcess && m_pythonProcess->state() != QProcess::NotRunning) {
-    m_pythonProcess->terminate();
-    
-    // 给一点时间让进程正常终止
-    if (!m_pythonProcess->waitForFinished(2000)) {
-      m_pythonProcess->kill();
-    }
-    
-    m_outputConsole->append(tr("[Process terminated by user]"));
+  std::optional<std::string> error = "Python execution temporarily disabled"; // 模拟错误
+  // if (!m_currentScriptPath.isEmpty() && !m_codeEditor->document()->isModified()) { // 注释掉 Python 调用
+      // 运行已保存且未修改的文件
+      // error = m_interpreter->executeFile(m_currentScriptPath.toStdString());
+  // } else {
+      // 运行编辑器中的代码（可能是新脚本、未保存的修改或选择不保存就运行）
+      // error = m_interpreter->executeCode(scriptContent.toStdString());
+  // }
+
+  if (error) {
+    appendOutput(tr("Error: %1").arg(QString::fromStdString(*error)), true);
+  } else {
+    appendOutput(tr("Script execution finished."));
   }
+  
+  // **注意:** Python 的 print 输出目前不会显示在这里
+  appendOutput(tr("(Note: Python print output currently goes to the system console, not this window.)"), false);
 }
 
 void PythonConsole::onFileSelected(const QModelIndex& index)
@@ -375,44 +328,28 @@ void PythonConsole::onScriptSelected(int row)
   }
 }
 
-void PythonConsole::onPythonOutputReady()
-{
-  if (!m_pythonProcess) {
-    return;
-  }
-  
-  QByteArray output = m_pythonProcess->readAllStandardOutput();
-  m_outputConsole->append(QString::fromUtf8(output));
-}
-
-void PythonConsole::onPythonErrorReady()
-{
-  if (!m_pythonProcess) {
-    return;
-  }
-  
-  QByteArray error = m_pythonProcess->readAllStandardError();
-  m_outputConsole->append(QString("<span style=\"color:red;\">%1</span>").arg(QString::fromUtf8(error)));
-}
-
-void PythonConsole::onPythonFinished(int exitCode, QProcess::ExitStatus exitStatus)
-{
-  QString message = exitStatus == QProcess::NormalExit
-    ? tr("[Process finished with exit code: %1]").arg(exitCode)
-    : tr("[Process crashed]");
-  
-  m_outputConsole->append(message);
-}
-
 void PythonConsole::onCommandEntered()
 {
   QString command = m_inputLine->text().trimmed();
   if (command.isEmpty()) {
     return;
   }
-  
   m_inputLine->clear();
-  executeCommand(command);
+  
+  // if (!m_interpreter) { // 注释掉检查
+  //   appendOutput(tr("Python interpreter is not initialized."), true);
+  //   return;
+  // }
+
+  appendOutput(QString(">>> %1").arg(command)); // 显示输入的命令
+  auto error = std::optional<std::string>{"Python execution temporarily disabled"}; // 模拟错误
+  // auto error = m_interpreter->executeCode(command.toStdString()); // 注释掉 Python 调用
+
+  if (error) {
+    appendOutput(tr("Error: %1").arg(QString::fromStdString(*error)), true);
+  } 
+  // **注意:** 命令的输出 (print 结果) 目前不会显示在这里
+  appendOutput(tr("(Note: Command output currently goes to the system console.)"), false); 
 }
 
 void PythonConsole::setupUI()
@@ -435,7 +372,6 @@ void PythonConsole::setupUI()
   
   // 添加执行按钮 - 不使用局部变量来存储这些操作
   m_toolBar->addAction(tr("Run"));     // runAction
-  m_toolBar->addAction(tr("Stop"));    // stopAction
   
   // 设置按钮图标（实际应用中应使用真实图标）
   // m_toolBar->actions()[0]->setIcon(QIcon(":/icons/new.png"));
@@ -536,8 +472,7 @@ void PythonConsole::setupConnections()
   connect(m_toolBar->actions()[1], &QAction::triggered, this, &PythonConsole::onOpenScript);
   connect(m_toolBar->actions()[2], &QAction::triggered, this, &PythonConsole::onSaveScript);
   connect(m_toolBar->actions()[3], &QAction::triggered, this, &PythonConsole::onSaveScriptAs);
-  connect(m_toolBar->actions()[5], &QAction::triggered, this, &PythonConsole::onRunScript);
-  connect(m_toolBar->actions()[6], &QAction::triggered, this, &PythonConsole::onStopScript);
+  connect(m_toolBar->actions()[4], &QAction::triggered, this, &PythonConsole::onRunScript);
   
   // 文件浏览器连接
   connect(m_fileTreeView, &QTreeView::doubleClicked, this, &PythonConsole::onFileSelected);
@@ -551,55 +486,58 @@ void PythonConsole::setupConnections()
 
 void PythonConsole::setupPythonEnvironment()
 {
-  // 检查 Python 是否可用
-  QProcess pythonCheck;
-  pythonCheck.start("python", QStringList() << "--version");
-  
-  if (!pythonCheck.waitForStarted(1000) || !pythonCheck.waitForFinished(2000)) {
-    m_outputConsole->append(tr("<span style=\"color:red;\">Error: Could not start Python. Please ensure Python is installed and available in the system PATH.</span>"));
-    return;
+  try {
+      appendOutput(tr("Initializing embedded Python interpreter...")); 
+      
+      // 获取可执行文件路径和脚本根目录
+      QString exePathQStr = QCoreApplication::applicationDirPath();
+      ::std::string exePath = exePathQStr.toStdString();
+      if (m_scriptsRootDir.isEmpty()) {
+            QString scriptsDir = QCoreApplication::applicationDirPath() + "/Scripts";
+            QDir dir(scriptsDir);
+            if (!dir.exists()) {
+                if (!dir.mkpath(".")) {
+                    throw std::runtime_error("Could not create default scripts directory: " + scriptsDir.toStdString());
+                }
+            }
+            m_scriptsRootDir = scriptsDir;
+             if (m_fileSystemModel) {
+                 m_fileSystemModel->setRootPath(m_scriptsRootDir);
+                 m_fileTreeView->setRootIndex(m_fileSystemModel->index(m_scriptsRootDir));
+             }
+      }
+      ::std::string scriptsRootDirStd = m_scriptsRootDir.toStdString();
+      ::std::vector<::std::string> externalSearchPaths;
+      externalSearchPaths.push_back(scriptsRootDirStd); 
+      externalSearchPaths.push_back(QFileInfo(exePathQStr).dir().path().toStdString()); 
+
+      // 恢复创建解释器实例
+      m_interpreter = std::make_unique<PythonInterpreter>(exePath, externalSearchPaths, false); 
+
+      appendOutput(tr("Embedded Python interpreter initialized successfully.")); // 恢复成功消息
+      
+  } catch (const std::exception& e) {
+      appendOutput(tr("Failed to initialize embedded Python interpreter: %1").arg(e.what()), true);
+      m_interpreter.reset(); // 恢复 reset
+  } catch (...) {
+      appendOutput(tr("Failed to initialize embedded Python interpreter due to an unknown error."), true);
+      m_interpreter.reset(); // 恢复 reset
   }
-  
-  QString pythonVersion = QString::fromUtf8(pythonCheck.readAllStandardOutput()).trimmed();
-  if (pythonVersion.isEmpty()) {
-    pythonVersion = QString::fromUtf8(pythonCheck.readAllStandardError()).trimmed();
-  }
-  
-  if (!pythonVersion.isEmpty()) {
-    m_outputConsole->append(tr("Using %1").arg(pythonVersion));
-  } else {
-    m_outputConsole->append(tr("Python detected, but version could not be determined."));
-  }
-  
-  m_outputConsole->append(tr("Python console ready."));
 }
 
 void PythonConsole::executeCommand(const QString& command)
 {
-  m_outputConsole->append(QString("<span style=\"color:green;\">>>> %1</span>").arg(command));
-  
-  // 如果 Python 进程未运行，启动一个交互式会话
-  if (!m_pythonProcess || m_pythonProcess->state() == QProcess::NotRunning) {
-    if (m_pythonProcess) {
-      delete m_pythonProcess;
-    }
-    
-    m_pythonProcess = new QProcess(this);
-    connect(m_pythonProcess, &QProcess::readyReadStandardOutput, this, &PythonConsole::onPythonOutputReady);
-    connect(m_pythonProcess, &QProcess::readyReadStandardError, this, &PythonConsole::onPythonErrorReady);
-    connect(m_pythonProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &PythonConsole::onPythonFinished);
-    
-    // 设置Python进程的环境变量，确保使用UTF-8编码
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert("PYTHONIOENCODING", "utf-8");
-    m_pythonProcess->setProcessEnvironment(env);
-    
-    // 启动 Python 解释器，使用-u参数确保不缓冲输出
-    m_pythonProcess->start("python", QStringList() << "-u" << "-c" << command);
-  } else {
-    // 向现有进程写入命令
-    m_pythonProcess->write((command + "\n").toUtf8());
+  // if (!m_interpreter) { // 注释掉检查
+  //   appendOutput(tr("Python interpreter is not initialized."), true);
+  //   return;
+  // }
+  appendOutput(QString(">>> %1").arg(command));
+  auto error = std::optional<std::string>{"Python execution temporarily disabled"}; // 模拟错误
+  // auto error = m_interpreter->executeCode(command.toStdString()); // 注释掉 Python 调用
+  if (error) {
+    appendOutput(tr("Error: %1").arg(QString::fromStdString(*error)), true);
   }
+  appendOutput(tr("(Note: Command output currently goes to the system console.)"), false); 
 }
 
 void PythonConsole::updateScriptsList()
@@ -621,6 +559,18 @@ void PythonConsole::updateScriptsList()
       }
     }
   }
+}
+
+// 新增方法：用于向UI控制台添加文本
+void PythonConsole::appendOutput(const QString& text, bool isError)
+{
+    if (isError) {
+        m_outputConsole->append(QString("<span style=\"color:red;\">%1</span>").arg(text.toHtmlEscaped()));
+    } else {
+        m_outputConsole->append(text.toHtmlEscaped());
+    }
+    // 滚动到底部 (现在 QScrollBar 已包含)
+    m_outputConsole->verticalScrollBar()->setValue(m_outputConsole->verticalScrollBar()->maximum());
 }
 
 } // namespace tb::ui

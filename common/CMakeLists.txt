@@ -1050,8 +1050,28 @@ add_library(common OBJECT ${COMMON_SOURCE} ${COMMON_HEADER})
 set_target_properties(common PROPERTIES AUTOMOC TRUE)
 target_include_directories(common PUBLIC ${COMMON_SOURCE_DIR})
 target_link_libraries(common 
-  PUBLIC kdl vm Qt6::Widgets Qt6::OpenGL Qt6::OpenGLWidgets Qt6::Svg
-  PRIVATE GLEW::GLEW OpenGL::GL upd tinyxml2::tinyxml2 miniz::miniz freeimage::FreeImage freetype assimp::assimp fmt::fmt-header-only)
+  PUBLIC 
+    kdl 
+    vm 
+    Qt6::Core         # 添加 Core
+    Qt6::Gui          # 添加 Gui
+    Qt6::Widgets 
+    Qt6::OpenGL 
+    Qt6::OpenGLWidgets 
+    Qt6::Svg
+    python_interpreter # 添加 python_interpreter 库
+    pybind11::embed    # 添加 pybind11 嵌入库
+  PRIVATE 
+    GLEW::GLEW 
+    OpenGL::GL 
+    upd 
+    tinyxml2::tinyxml2 
+    miniz::miniz 
+    freeimage::FreeImage 
+    freetype 
+    assimp::assimp 
+    fmt::fmt-header-only
+)
 
 # use precompiled headers on CMake 3.16 or later
 if (TB_ENABLE_PCH AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.16.0")
@@ -1137,3 +1157,30 @@ add_dependencies(common generate_version)
 
 add_subdirectory(test)
 add_subdirectory(benchmark)
+
+# 查找 Pybind11 (确保在使用前查找)
+find_package(pybind11 CONFIG REQUIRED)
+
+target_link_libraries(common 
+  PUBLIC 
+    kdl 
+    vm 
+    Qt6::Core         # 添加 Core
+    Qt6::Gui          # 添加 Gui
+    Qt6::Widgets 
+    Qt6::OpenGL 
+    Qt6::OpenGLWidgets 
+    Qt6::Svg
+    python_interpreter # 添加 python_interpreter 库
+    pybind11::embed    # 添加 pybind11 嵌入库
+  PRIVATE 
+    GLEW::GLEW 
+    OpenGL::GL 
+    upd 
+    tinyxml2::tinyxml2 
+    miniz::miniz 
+    freeimage::FreeImage 
+    freetype 
+    assimp::assimp 
+    fmt::fmt-header-only
+)

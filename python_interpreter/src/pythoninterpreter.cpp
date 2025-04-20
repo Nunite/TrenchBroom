@@ -1,6 +1,9 @@
 #include "python_interpreter/pythoninterpreter.h"
 
 #include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
 #include <iterator>
 #include <sstream>
 #include <pybind11/embed.h>
@@ -28,6 +31,13 @@ static void PyStatusExitOnError(PyStatus status)
 
 PythonInterpreter::PythonInterpreter(::std::string exePath, ::std::vector<::std::string> externalSearchPaths, bool useSystemPython) {
     
+    ::std::cerr << "[DEBUG] PythonInterpreter constructor started." << ::std::endl;
+    ::std::cerr << "[DEBUG]   exePath: " << exePath << ::std::endl;
+    ::std::cerr << "[DEBUG]   externalSearchPaths: [";
+    for (const auto& p : externalSearchPaths) { ::std::cerr << "\"" << p << "\", "; }
+    ::std::cerr << "]" << ::std::endl;
+    ::std::cerr << "[DEBUG]   useSystemPython: " << useSystemPython << ::std::endl;
+
     PyStatus status;
     PyPreConfig preconfig;
     if (useSystemPython) {
@@ -59,10 +69,14 @@ PythonInterpreter::PythonInterpreter(::std::string exePath, ::std::vector<::std:
     else {
         exeDir = ".";
     }
+    ::std::cerr << "[DEBUG]   Calculated exeDir: " << exeDir << ::std::endl;
 
     auto pythonDir = getPythonDir(exeDir);
+    ::std::cerr << "[DEBUG]   Calculated pythonDir: " << pythonDir << ::std::endl;
     
     auto pythonExe = getPythonExe(pythonDir);
+    ::std::cerr << "[DEBUG]   Calculated pythonExe: " << pythonExe << ::std::endl;
+
     status = setPyConfigString(&config, &config.program_name, pythonExe.c_str());
     PyStatusExitOnError(status);
     
@@ -74,6 +88,8 @@ PythonInterpreter::PythonInterpreter(::std::string exePath, ::std::vector<::std:
     // home/
     // home/Lib/site-packages
     auto pythonHome = pythonDir;
+    ::std::cerr << "[DEBUG]   Calculated pythonHome: " << pythonHome << ::std::endl;
+
     status = setPyConfigString(&config, &config.home, pythonHome.c_str());
     PyStatusExitOnError(status);
     
@@ -114,6 +130,15 @@ PythonInterpreter::PythonInterpreter(::std::string exePath, ::std::vector<::std:
     }
     searchPathsPtrs.push_back(nullptr); // PyConfig 需要以 nullptr 结尾
 
+    ::std::cerr << "[DEBUG]   Final module_search_paths: [" << ::std::endl;
+    for (const auto& wpath : searchPathsW) {
+        // 将宽字符串转换为多字节字符串以便打印
+        std::wstring ws(wpath);
+        std::string s(ws.begin(), ws.end());
+        ::std::cerr << "    \"" << s << "\"," << ::std::endl;
+    }
+    ::std::cerr << "  ]" << ::std::endl;
+
     status = PyConfig_SetWideStringList(&config, &config.module_search_paths, searchPathsPtrs.size() - 1, searchPathsPtrs.data());
     PyStatusExitOnError(status);
     // --- 结束修改模块搜索路径设置 --- 
@@ -122,7 +147,10 @@ PythonInterpreter::PythonInterpreter(::std::string exePath, ::std::vector<::std:
     // status = setPyConfigString(&config, &config.pythonpath_env, pyPath.str().c_str());
     // PyStatusExitOnError(status);
 
+    ::std::cerr << "[DEBUG] Calling Py_InitializeFromConfig..." << ::std::endl;
     status = Py_InitializeFromConfig(&config);
+    ::std::cerr << "[DEBUG] Py_InitializeFromConfig finished." << ::std::endl;
+
     PyConfig_Clear(&config);
     if (PyStatus_Exception(status)) {
         Py_ExitStatusException(status);
@@ -151,24 +179,33 @@ PythonInterpreter::PythonInterpreter(::std::string exePath, ::std::vector<::std:
 #endif
 }
 
-void PythonInterpreter::executeCode(const ::std::string& code) {
+::std::optional<::std::string> PythonInterpreter::executeCode(const ::std::string& code) {
     try {
         py::exec(code);
-        ::std::cout << "Python code executed successfully" << ::std::endl;
+        // ::std::cout << "Python code executed successfully" << ::std::endl;
+        return std::nullopt; // Success
     } catch(py::error_already_set& ex) {
-        ::std::cerr << "Error executing Python code: " << ex.what() << ::std::endl;
+        // ::std::cerr << "Error executing Python code: " << ex.what() << ::std::endl;
+        return ::std::string(ex.what()); // Return error message
     }
 }
 
-void PythonInterpreter::executeFile(const ::std::string& scriptPath) {
+::std::optional<::std::string> PythonInterpreter::executeFile(const ::std::string& scriptPath) {
     try {
-        // Build Python code to execute script file
+        // 构建 Python 代码来执行脚本文件
         ::std::stringstream code;
-        code << "exec(open('" << scriptPath << "').read())";
+        // 使用原始字符串处理路径，确保斜杠正确
+        ::std::string correctedPath = scriptPath;
+        #ifdef _WIN32
+            ::std::replace(correctedPath.begin(), correctedPath.end(), '\\', '/');
+        #endif
+        code << "exec(open(r'" << correctedPath << "').read())"; 
         py::exec(code.str());
-        ::std::cout << "Python script executed successfully: " << scriptPath << ::std::endl;
+        // ::std::cout << "Python script executed successfully: " << scriptPath << ::std::endl;
+        return std::nullopt; // Success
     } catch(py::error_already_set& ex) {
-        ::std::cerr << "Error executing Python script: " << ex.what() << ::std::endl;
+        // ::std::cerr << "Error executing Python script: " << ex.what() << ::std::endl;
+        return ::std::string(ex.what()); // Return error message
     }
 }
 

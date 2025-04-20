@@ -1,7 +1,7 @@
 project(python_interpreter)
 
 # 设置C++标准
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -41,10 +41,8 @@ message("Python IMPORTED_IMPLIB_RELEASE: ${py_imported_lib}")
 # 添加源文件
 set(SOURCE_FILES
     src/pythoninterpreter.cpp
-    src/embeddedmoduleexample.cpp
 )
 set(HEADER_FILES
-    include/python_interpreter/embeddedmoduleexample.h
     include/python_interpreter/pythoninterpreter.h
     include/python_interpreter/pythoninterpreterdefines.h
 )
@@ -81,13 +79,13 @@ if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE 
         /utf-8 
         /wd4819  # 禁用关于代码页的警告
-        /std:c++14  # 显式指定C++14标准
+        /std:c++17  # 显式指定C++17标准
     )
     
     # 不要同时使用/source-charset:utf-8，因为它与/utf-8冲突
 endif()
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
 # 注：以下pip相关命令被注释掉，以避免在构建时需要运行Python解释器
 # 您可以在应用程序首次运行时安装所需的Python包

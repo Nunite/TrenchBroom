@@ -9,8 +9,7 @@ set(APP_SOURCE
     "${CMAKE_SOURCE_DIR}/translations/translations.qrc")
 
 # Python示例应用程序
-add_executable(PythonExample "${CMAKE_CURRENT_SOURCE_DIR}/PythonExample.cpp")
-target_link_libraries(PythonExample PRIVATE python_interpreter)
+
 
 # OS X app bundle configuration, must happen before the executable is added
 if(APPLE)
@@ -196,9 +195,7 @@ if(WIN32)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:miniz::miniz>" "$<TARGET_FILE_DIR:TrenchBroom>"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:GLEW::GLEW>" "$<TARGET_FILE_DIR:TrenchBroom>")
 
-    # 为PythonExample复制相关DLL
-    add_custom_command(TARGET PythonExample POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Python3::Python>" "$<TARGET_FILE_DIR:PythonExample>")
+
 
     # If requested, run windeployqt which copies the Qt dlls into the deployable folder, along with necessary
     # runtime dlls by the compiler

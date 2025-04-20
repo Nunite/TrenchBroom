@@ -3,6 +3,7 @@
 #pragma once
 
 #include "ui/TabBook.h"
+#include "python_interpreter/pythoninterpreter.h"
 
 #include <QSplitter>
 #include <QTextEdit>
@@ -53,9 +54,6 @@ private:
   // 输入控制台
   QLineEdit* m_inputLine;
   
-  // Python 执行器
-  QProcess* m_pythonProcess;
-  
   // 已打开的脚本
   QMap<QString, QString> m_openScripts;
   
@@ -64,6 +62,9 @@ private:
   
   // 脚本根目录
   QString m_scriptsRootDir;
+  
+  // 恢复 PythonInterpreter 实例
+  std::unique_ptr<PythonInterpreter> m_interpreter;
 
 public:
   /**
@@ -95,18 +96,12 @@ private slots:
   
   // 脚本执行
   void onRunScript();
-  void onStopScript();
   
   // 文件浏览器事件
   void onFileSelected(const QModelIndex& index);
   
   // 脚本列表事件
   void onScriptSelected(int row);
-  
-  // Python 进程事件
-  void onPythonOutputReady();
-  void onPythonErrorReady();
-  void onPythonFinished(int exitCode, QProcess::ExitStatus exitStatus);
   
   // 命令行输入
   void onCommandEntered();
@@ -118,6 +113,9 @@ private:
   
   void executeCommand(const QString& command);
   void updateScriptsList();
+  
+  // 添加一个用于在 UI 控制台显示状态/错误的方法
+  void appendOutput(const QString& text, bool isError = false);
 };
 
 } // namespace tb::ui
