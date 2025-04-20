@@ -30,6 +30,7 @@
 #include <QProcess>
 #include <QTemporaryFile>
 #include <QCoreApplication>
+#include <QProcessEnvironment>
 
 namespace tb::ui
 {
@@ -245,18 +246,31 @@ void PythonConsole::onRunScript()
   
   // 如果脚本已保存，直接运行文件；否则，创建临时文件运行
   if (!m_currentScriptPath.isEmpty()) {
-    m_pythonProcess->start("python", QStringList() << m_currentScriptPath);
+    // 设置Python进程的环境变量，确保使用UTF-8编码
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("PYTHONIOENCODING", "utf-8");
+    m_pythonProcess->setProcessEnvironment(env);
+    
+    // 添加-u参数确保Python不会缓冲输出
+    m_pythonProcess->start("python", QStringList() << "-u" << m_currentScriptPath);
   } else {
     QTemporaryFile tempFile;
     tempFile.setAutoRemove(false);
     
     if (tempFile.open()) {
       QTextStream out(&tempFile);
+      // 设置输出文本流的编码为UTF-8
+      out.setEncoding(QStringConverter::Utf8);
       out << m_codeEditor->toPlainText();
       QString tempFilePath = tempFile.fileName();
       tempFile.close();
+      // 设置Python进程的环境变量，确保使用UTF-8编码
+      QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+      env.insert("PYTHONIOENCODING", "utf-8");
+      m_pythonProcess->setProcessEnvironment(env);
       
-      m_pythonProcess->start("python", QStringList() << tempFilePath);
+      // 添加-u参数确保Python不会缓冲输出
+      m_pythonProcess->start("python", QStringList() << "-u" << tempFilePath);
     } else {
       QMessageBox::warning(
         this,
@@ -575,8 +589,13 @@ void PythonConsole::executeCommand(const QString& command)
     connect(m_pythonProcess, &QProcess::readyReadStandardError, this, &PythonConsole::onPythonErrorReady);
     connect(m_pythonProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &PythonConsole::onPythonFinished);
     
-    // 启动 Python 解释器
-    m_pythonProcess->start("python", QStringList() << "-c" << command);
+    // 设置Python进程的环境变量，确保使用UTF-8编码
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("PYTHONIOENCODING", "utf-8");
+    m_pythonProcess->setProcessEnvironment(env);
+    
+    // 启动 Python 解释器，使用-u参数确保不缓冲输出
+    m_pythonProcess->start("python", QStringList() << "-u" << "-c" << command);
   } else {
     // 向现有进程写入命令
     m_pythonProcess->write((command + "\n").toUtf8());
