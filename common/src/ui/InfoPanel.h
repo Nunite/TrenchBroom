@@ -33,6 +33,7 @@ namespace tb::ui
 class Console;
 class IssueBrowser;
 class MapDocument;
+class PythonConsole;
 class TabBook;
 
 class InfoPanel : public QWidget
@@ -42,6 +43,7 @@ private:
   TabBook* m_tabBook = nullptr;
   Console* m_console = nullptr;
   IssueBrowser* m_issueBrowser = nullptr;
+  PythonConsole* m_pythonConsole = nullptr;
 
 public:
   explicit InfoPanel(std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
