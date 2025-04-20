@@ -77,21 +77,50 @@ PythonInterpreter::PythonInterpreter(::std::string exePath, ::std::vector<::std:
     status = setPyConfigString(&config, &config.home, pythonHome.c_str());
     PyStatusExitOnError(status);
     
-    // Add external Python module search paths
-    ::std::stringstream pyPath;
-    // Use different separators based on OS
-    // https://docs.python.org/3/c-api/init_config.html#c.PyConfig.pythonpath_env
-#ifdef _WIN32
-    const auto delim = ";";
-#else
-    const auto delim = ":";
-#endif
-    for (const auto& path : externalSearchPaths) {
-        pyPath << path << delim;
-    }
-    status = setPyConfigString(&config, &config.pythonpath_env, pyPath.str().c_str());
+    // --- 修改模块搜索路径设置 --- 
+    config.module_search_paths_set = 1; // 告诉 Python 我们要手动设置搜索路径
 
+    // 构建搜索路径列表 (宽字符串)
+    ::std::vector<::std::wstring> searchPathsW;
+    // 添加基础 Python 路径 (根据平台)
+    #ifdef _WIN32
+        ::std::wstring wPythonDir(pythonDir.begin(), pythonDir.end());
+        searchPathsW.push_back(wPythonDir);
+        searchPathsW.push_back(wPythonDir + L"/DLLs");
+        searchPathsW.push_back(wPythonDir + L"/Lib");
+    #else
+        // Linux/macOS 可能需要不同的基础路径，例如 pythonDir/lib/pythonX.Y
+        // 这里简化处理，仅添加 pythonDir
+        ::std::wstring wPythonDir(pythonDir.begin(), pythonDir.end()); // 假设路径已经是UTF-8
+        searchPathsW.push_back(wPythonDir);
+        searchPathsW.push_back(wPythonDir + L"/lib/python" + std::to_wstring(PYTHON_VERSION_MAJOR) + L"." + std::to_wstring(PYTHON_VERSION_MINOR));
+        searchPathsW.push_back(wPythonDir + L"/lib/python" + std::to_wstring(PYTHON_VERSION_MAJOR) + L"." + std::to_wstring(PYTHON_VERSION_MINOR) + L"/lib-dynload");
+    #endif
+
+    // 添加外部搜索路径
+    for (const auto& searchPath : externalSearchPaths) {
+        ::std::wstring wSearchPath(searchPath.begin(), searchPath.end());
+        // 确保路径分隔符统一为 Python 喜欢的 '/' (即使在Windows上)
+        #ifdef _WIN32
+            ::std::replace(wSearchPath.begin(), wSearchPath.end(), L'\\', L'/');
+        #endif
+        searchPathsW.push_back(wSearchPath);
+    }
+
+    // 将 wstring 转换为 wchar_t* 列表供 PyConfig 使用
+    ::std::vector<wchar_t*> searchPathsPtrs;
+    for (const auto& wpath : searchPathsW) {
+        searchPathsPtrs.push_back(const_cast<wchar_t*>(wpath.c_str()));
+    }
+    searchPathsPtrs.push_back(nullptr); // PyConfig 需要以 nullptr 结尾
+
+    status = PyConfig_SetWideStringList(&config, &config.module_search_paths, searchPathsPtrs.size() - 1, searchPathsPtrs.data());
     PyStatusExitOnError(status);
+    // --- 结束修改模块搜索路径设置 --- 
+
+    // 不再需要设置 PYTHONPATH 环境变量
+    // status = setPyConfigString(&config, &config.pythonpath_env, pyPath.str().c_str());
+    // PyStatusExitOnError(status);
 
     status = Py_InitializeFromConfig(&config);
     PyConfig_Clear(&config);
@@ -99,7 +128,6 @@ PythonInterpreter::PythonInterpreter(::std::string exePath, ::std::vector<::std:
         Py_ExitStatusException(status);
     }
     
-    // Python API can now be called
     ::std::cout << "Python interpreter initialized successfully" << ::std::endl;
 }
 

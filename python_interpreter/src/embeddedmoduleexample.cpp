@@ -1,9 +1,13 @@
 #include "python_interpreter/embeddedmoduleexample.h"
 
 #include <pybind11/embed.h>
+#include <pybind11/stl.h>
 #include <vector>
 
 namespace py = pybind11;
+
+// 这个函数没有实际作用，只是为了确保链接器包含这个编译单元
+void ensure_fast_calc_linked() {}
 
 // This defines a Python module named "fast_calc" that can be imported in Python code
 PYBIND11_EMBEDDED_MODULE(fast_calc, m) {
