@@ -19,6 +19,7 @@ Thumbs.db
 /coverity
 /JualiaExample
 /sledge
+/python3-embedded-example
 app/resources/documentation/help/index.html
 
 .cursorignore

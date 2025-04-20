@@ -16,6 +16,7 @@ if(POLICY CMP0063)
   cmake_policy(SET CMP0063 NEW)
 endif()
 
+set(VCPKG_INSTALLED_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed")
 set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake")
 set(VCPKG_OVERLAY_PORTS "${CMAKE_SOURCE_DIR}/vcpkg-overlay-ports/freeimage;${CMAKE_SOURCE_DIR}/vcpkg-overlay-ports/openexr")
 
@@ -124,6 +125,16 @@ find_package(GLEW REQUIRED)
 find_package(miniz CONFIG REQUIRED)
 find_package(tinyxml2 CONFIG REQUIRED)
 
+# Find Python and pybind11
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+find_package(pybind11 CONFIG REQUIRED)
+
+# 输出Python路径信息用于调试
+message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
+message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
+message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
+message(STATUS "Python3_VERSION: ${Python3_VERSION}")
+
 # Find Qt and OpenGL
 find_package(OpenGL REQUIRED)
 find_package(Qt6 COMPONENTS Core Widgets OpenGL OpenGLWidgets Network Svg Test REQUIRED)
@@ -147,7 +158,26 @@ set(APP_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 set(APP_DIR "${CMAKE_SOURCE_DIR}/app")
 set(APP_RESOURCE_DIR "${APP_DIR}/resources")
 
+# Python相关设置
+set(PYTHON_VERSION ${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR})
+set(PYTHON_VER_NAME python${PYTHON_VERSION})
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") 
+    # Mac特定配置
+    set(PY_RUNTIME_DIR "$<TARGET_BUNDLE_CONTENT_DIR:TrenchBroom>/Resources/python")
+    set(PY_INSTALL_DIR "${RESOURCE_INSTALL_PREFIX}/python")
+elseif("${CMAKE_HOST_SYSTEM_NAME}" MATCHES "Windows")
+    # Windows特定配置
+    set(PY_RUNTIME_DIR "$<TARGET_FILE_DIR:TrenchBroom>/python")
+    set(PY_INSTALL_DIR "${RUNTIME_INSTALL_DIR}/python")
+else()
+    # Linux特定配置
+    set(PY_RUNTIME_DIR "$<TARGET_FILE_DIR:TrenchBroom>/python")
+    set(PY_INSTALL_DIR "${RUNTIME_INSTALL_DIR}/python")
+endif()
+
 add_subdirectory(lib)
 add_subdirectory(dump-shortcuts)
 add_subdirectory(common)
 add_subdirectory(app)
+add_subdirectory(python_interpreter)

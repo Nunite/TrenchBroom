@@ -34,6 +34,14 @@
       "version>=": "2.2.0#1"
     },
     {
+      "name": "pybind11",
+      "version>=": "2.11.1"
+    },
+    {
+      "name": "python3",
+      "version>=": "3.12.9"
+    },
+    {
       "name": "tinyxml2",
       "version>=": "9.0.0",
       "platform": "!linux"
