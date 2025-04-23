@@ -97,31 +97,10 @@ bool isFaceClick(const InputState& inputState)
   return inputState.modifierKeysDown(ModifierKeys::Shift);
 }
 
-bool isMultiClick(const InputState& inputState)
-{
-  return inputState.modifierKeysDown(ModifierKeys::CtrlCmd);
-}
-
-bool isRightMouseFaceClick(const InputState& inputState)
-{
-  return inputState.modifierKeysDown(ModifierKeys::Shift) && 
-         inputState.mouseButtonsPressed(MouseButtons::Right);
-}
-
-const mdl::Hit& firstHit(const InputState& inputState, const mdl::HitFilter& hitFilter)
-{
-  return inputState.pickResult().first(hitFilter);
-}
-
-std::vector<mdl::Node*> collectSelectableChildren(
-  const mdl::EditorContext& editorContext, const mdl::Node* node)
-{
-  return mdl::collectSelectableNodes(node->children(), editorContext);
-}
-
 bool handleClick(const InputState& inputState, const mdl::EditorContext& editorContext)
 {
-  if (!inputState.mouseButtonsPressed(MouseButtons::Left))
+  if (!inputState.mouseButtonsPressed(MouseButtons::Left) && 
+      !inputState.mouseButtonsPressed(MouseButtons::Right))
   {
     return false;
   }
@@ -134,6 +113,24 @@ bool handleClick(const InputState& inputState, const mdl::EditorContext& editorC
   }
 
   return editorContext.canChangeSelection();
+}
+
+bool isMultiClick(const InputState& inputState)
+{
+  return inputState.modifierKeysDown(ModifierKeys::CtrlCmd) || 
+         (inputState.modifierKeysDown(ModifierKeys::Shift) && 
+          inputState.mouseButtonsDown(MouseButtons::Right));
+}
+
+const mdl::Hit& firstHit(const InputState& inputState, const mdl::HitFilter& hitFilter)
+{
+  return inputState.pickResult().first(hitFilter);
+}
+
+std::vector<mdl::Node*> collectSelectableChildren(
+  const mdl::EditorContext& editorContext, const mdl::Node* node)
+{
+  return mdl::collectSelectableNodes(node->children(), editorContext);
 }
 
 void adjustGrid(const InputState& inputState, Grid& grid)
@@ -516,29 +513,6 @@ std::unique_ptr<GestureTracker> SelectionTool::acceptMouseDrag(
 
   auto document = kdl::mem_lock(m_document);
   const auto& editorContext = document->editorContext();
-
-  // 处理Shift+右键拖动多选面的情况
-  if (isRightMouseFaceClick(inputState) && editorContext.canChangeSelection())
-  {
-    const auto hit = firstHit(inputState, type(mdl::BrushNode::BrushHitType));
-    if (const auto faceHandle = mdl::hitToFaceHandle(hit))
-    {
-      const auto* brush = faceHandle->node();
-      const auto& face = faceHandle->face();
-      if (editorContext.selectable(brush, face))
-      {
-        document->startTransaction(
-          "Shift+Right Click Drag Select Faces", TransactionScope::LongRunning);
-        if (!face.selected())
-        {
-          document->selectBrushFaces({*faceHandle});
-        }
-
-        return std::make_unique<PaintSelectionDragTracker>(std::move(document));
-      }
-    }
-    return nullptr;
-  }
 
   if (!handleClick(inputState, editorContext) || !isMultiClick(inputState))
   {
