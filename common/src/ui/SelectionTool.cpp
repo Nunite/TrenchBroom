@@ -102,6 +102,12 @@ bool isMultiClick(const InputState& inputState)
   return inputState.modifierKeysDown(ModifierKeys::CtrlCmd);
 }
 
+bool isRightMouseFaceClick(const InputState& inputState)
+{
+  return inputState.modifierKeysDown(ModifierKeys::Shift) && 
+         inputState.mouseButtonsPressed(MouseButtons::Right);
+}
+
 const mdl::Hit& firstHit(const InputState& inputState, const mdl::HitFilter& hitFilter)
 {
   return inputState.pickResult().first(hitFilter);
@@ -510,6 +516,29 @@ std::unique_ptr<GestureTracker> SelectionTool::acceptMouseDrag(
 
   auto document = kdl::mem_lock(m_document);
   const auto& editorContext = document->editorContext();
+
+  // 处理Shift+右键拖动多选面的情况
+  if (isRightMouseFaceClick(inputState) && editorContext.canChangeSelection())
+  {
+    const auto hit = firstHit(inputState, type(mdl::BrushNode::BrushHitType));
+    if (const auto faceHandle = mdl::hitToFaceHandle(hit))
+    {
+      const auto* brush = faceHandle->node();
+      const auto& face = faceHandle->face();
+      if (editorContext.selectable(brush, face))
+      {
+        document->startTransaction(
+          "Shift+Right Click Drag Select Faces", TransactionScope::LongRunning);
+        if (!face.selected())
+        {
+          document->selectBrushFaces({*faceHandle});
+        }
+
+        return std::make_unique<PaintSelectionDragTracker>(std::move(document));
+      }
+    }
+    return nullptr;
+  }
 
   if (!handleClick(inputState, editorContext) || !isMultiClick(inputState))
   {
