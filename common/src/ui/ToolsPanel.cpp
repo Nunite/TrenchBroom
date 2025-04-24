@@ -7,6 +7,7 @@
 #include "ui/CurveGenInspector.h"
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
+#include "ui/Selection.h" // 确保包含
 #include "ui/Splitter.h"
 #include "ui/SwitchableTitledPanel.h"
 
@@ -51,7 +52,7 @@ QWidget* ToolsPanel::createCurveGenInspector(
   auto* panel = new SwitchableTitledPanel{
     tr("Curve Generator"), {{tr("Curve Gen")}}, parent};
 
-  m_curveGenInspector = new CurveGenInspector{document, contextManager};
+  m_curveGenInspector = new CurveGenInspector{document, contextManager, panel};
 
   auto* curveGenLayout = new QVBoxLayout{};
   curveGenLayout->setContentsMargins(0, 0, 0, 0);
@@ -61,4 +62,8 @@ QWidget* ToolsPanel::createCurveGenInspector(
   return panel;
 }
 
-} // namespace tb::ui 
+void ToolsPanel::updateCurveGenSelectionContent(const Selection& selection) {
+    if (m_curveGenInspector) m_curveGenInspector->updateSelectionContent(selection);
+}
+
+} // namespace tb::ui

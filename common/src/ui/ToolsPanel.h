@@ -3,6 +3,7 @@
 #pragma once
 
 #include "ui/TabBook.h"
+#include "ui/Selection.h" // 新增
 
 #include <memory>
 
@@ -34,6 +35,9 @@ private:
     QWidget* parent, 
     std::weak_ptr<MapDocument> document,
     GLContextManager& contextManager);
+
+public slots:
+    void updateCurveGenSelectionContent(const Selection& selection); // 只声明，不实现
 };
 
-} // namespace tb::ui 
+} // namespace tb::ui

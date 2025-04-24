@@ -28,12 +28,16 @@
 #include "io/ExportOptions.h"
 #include "mdl/MapFormat.h"
 #include "ui/Selection.h"
+//#include "ui/CurveGenInspector.h"
 
 #include <chrono>
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <unordered_map>
+
+#include "ui/Inspector.h"
+#include "ui/ToolsPanel.h"
 
 class QAction;
 class QComboBox;
@@ -103,7 +107,8 @@ private:
   InfoPanel* m_infoPanel = nullptr;
   Console* m_console = nullptr;
   Inspector* m_inspector = nullptr;
-
+  //CurveGenInspector* m_curveGenInspector = nullptr;
+  ToolsPanel* m_toolsPanel = nullptr;
   QComboBox* m_gridChoice = nullptr;
   QLabel* m_statusBarLabel = nullptr;
 

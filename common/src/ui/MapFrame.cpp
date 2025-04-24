@@ -68,6 +68,7 @@
 #include "ui/ClipTool.h"
 #include "ui/ColorButton.h"
 #include "ui/CompilationDialog.h"
+//#include "ui/CurveGenInspector.h"
 #include "ui/EdgeTool.h"
 #include "ui/FaceInspector.h"
 #include "ui/FaceTool.h"
@@ -370,7 +371,14 @@ void MapFrame::createGui()
 
   m_inspector = new Inspector{m_document, *m_contextManager};
 
+  // 新增：初始化 CurveGenInspector
+  // m_curveGenInspector = new CurveGenInspector{m_document, *m_contextManager, this};
+
   m_mapView->connectTopWidgets(m_inspector);
+
+  // 新增：连接 Notifier 前确保 m_curveGenInspector 已初始化
+  // m_notifierConnection += m_document->selectionDidChangeNotifier.connect(
+  //   m_curveGenInspector, &CurveGenInspector::updateSelectionContent);
 
   // Add widgets to splitters
   m_vSplitter->addWidget(m_mapView);
@@ -379,21 +387,26 @@ void MapFrame::createGui()
   m_hSplitter->addWidget(m_vSplitter);
   m_hSplitter->addWidget(m_inspector);
 
+  // 新增：将 CurveGenInspector 加入主 splitter（可根据实际UI需求调整位置）
+  //m_hSplitter->addWidget(m_curveGenInspector);
+
   // configure minimum sizes
   m_mapView->setMinimumSize(100, 100);
   m_infoPanel->setMinimumSize(100, 100);
 
   m_vSplitter->setMinimumSize(100, 100);
   m_inspector->setMinimumSize(350, 100);
+  //m_curveGenInspector->setMinimumSize(350, 100); // 新增
 
   // resize only the map view when the window resizes
   m_vSplitter->setStretchFactor(0, 1);
   m_vSplitter->setStretchFactor(1, 0);
   m_hSplitter->setStretchFactor(0, 1);
   m_hSplitter->setStretchFactor(1, 0);
+//  m_hSplitter->setStretchFactor(2, 0); // 新增，确保 CurveGenInspector 不抢占空间
 
   // give most of the space to the map view
-  m_hSplitter->setSizes(QList<int>{1'000'000, 1});
+  m_hSplitter->setSizes(QList<int>{1'000'000, 1, 1}); // 新增第三项
   m_vSplitter->setSizes(QList<int>{1'000'000, 1});
 
   auto* frameLayout = new QVBoxLayout{};
@@ -708,6 +721,12 @@ void MapFrame::connectObservers()
     m_document->transactionUndoneNotifier.connect(this, &MapFrame::transactionUndone);
   m_notifierConnection +=
     m_document->selectionDidChangeNotifier.connect(this, &MapFrame::selectionDidChange);
+
+  m_notifierConnection += m_document->selectionDidChangeNotifier.connect(
+      m_inspector->toolsPanel(), &ToolsPanel::updateCurveGenSelectionContent);
+  m_notifierConnection += m_document->currentLayerDidChangeNotifier.connect(
+    this, &MapFrame::currentLayerDidChange);
+
   m_notifierConnection += m_document->currentLayerDidChangeNotifier.connect(
     this, &MapFrame::currentLayerDidChange);
   m_notifierConnection +=

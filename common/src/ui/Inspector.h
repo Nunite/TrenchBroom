@@ -52,7 +52,7 @@ private:
   EntityInspector* m_entityInspector = nullptr;
   FaceInspector* m_faceInspector = nullptr;
   ToolsPanel* m_toolsPanel = nullptr;
-  
+
   SyncHeightEventFilter* m_syncTabBarEventFilter = nullptr;
 
 public:
@@ -65,6 +65,9 @@ public:
   bool cancelMouseDrag();
 
   FaceInspector* faceInspector();
+
+  public:
+      ToolsPanel* toolsPanel() const { return m_toolsPanel; }
 };
 
 } // namespace tb::ui

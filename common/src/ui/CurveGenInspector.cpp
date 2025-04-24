@@ -24,6 +24,8 @@
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
 #include "ui/Splitter.h"
+#include "ui/CurveGenInspector.h"
+#include "ui/Selection.h" // 确保加上这一行
 
 namespace tb::ui
 {
@@ -31,13 +33,9 @@ namespace tb::ui
 CurveGenInspector::CurveGenInspector(
   std::weak_ptr<MapDocument> document, GLContextManager& contextManager, QWidget* parent)
   : TabBookPage{parent}
+  , m_document{document} // 新增
 {
-  createGui(std::move(document), contextManager);
-}
-
-CurveGenInspector::~CurveGenInspector()
-{
-  saveWindowState(m_splitter);
+  createGui(document, contextManager);
 }
 
 void CurveGenInspector::createGui(
@@ -46,6 +44,10 @@ void CurveGenInspector::createGui(
   m_splitter = new Splitter{Qt::Vertical};
   m_splitter->setObjectName("CurveGenInspector");
 
+  m_contentView = new QTextEdit{};
+  m_contentView->setReadOnly(true);
+  m_splitter->addWidget(m_contentView); // 新增：添加显示控件
+
   auto* layout = new QVBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(0);
@@ -53,6 +55,27 @@ void CurveGenInspector::createGui(
   setLayout(layout);
 
   restoreWindowState(m_splitter);
+}
+
+void CurveGenInspector::updateSelectionContent(const Selection& selection)
+{
+    auto doc = m_document.lock();
+    if (!doc || !m_contentView) return; // 防止空指针
+
+    QString content;
+    if (doc->hasSelectedNodes()) {
+        content = QString::fromStdString(doc->serializeSelectedNodes());
+    } else if (doc->hasSelectedBrushFaces()) {
+        content = QString::fromStdString(doc->serializeSelectedBrushFaces());
+    } else {
+        content = tr("无选中内容");
+    }
+    m_contentView->setPlainText(content);
+}
+
+CurveGenInspector::~CurveGenInspector()
+{
+  saveWindowState(m_splitter);
 }
 
 } // namespace tb::ui

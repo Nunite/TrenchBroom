@@ -19,32 +19,33 @@
 
 #pragma once
 
-#include "ui/TabBook.h"
-
 #include <memory>
+#include <QWidget>
+#include <QTextEdit>
+#include "ui/Selection.h"      // 确保包含 Selection
+#include "ui/Splitter.h"       // 确保包含 Splitter
+#include "ui/TabBook.h"    // 确保包含 TabBookPage
 
-class QSplitter;
+namespace tb::ui {
 
-namespace tb::ui
-{
 class GLContextManager;
 class MapDocument;
 
-class CurveGenInspector : public TabBookPage
-{
-  Q_OBJECT
-private:
-  QSplitter* m_splitter = nullptr;
-
+class CurveGenInspector : public TabBookPage {
+    Q_OBJECT
 public:
-  CurveGenInspector(
-    std::weak_ptr<MapDocument> document,
-    GLContextManager& contextManager,
-    QWidget* parent = nullptr);
-  ~CurveGenInspector() override;
+    CurveGenInspector(std::weak_ptr<MapDocument> document, GLContextManager& contextManager, QWidget* parent = nullptr);
+    ~CurveGenInspector();
+
+public slots:
+    void updateSelectionContent(const Selection& selection);
 
 private:
-  void createGui(std::weak_ptr<MapDocument> document, GLContextManager& contextManager);
+    std::weak_ptr<MapDocument> m_document;
+    Splitter* m_splitter = nullptr;
+    QTextEdit* m_contentView = nullptr;
+
+    void createGui(std::weak_ptr<MapDocument> document, GLContextManager& contextManager);
 };
 
 } // namespace tb::ui

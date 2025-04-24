@@ -33,25 +33,27 @@
 namespace tb::ui
 {
 Inspector::Inspector(
-  std::weak_ptr<MapDocument> document, GLContextManager& contextManager, QWidget* parent)
-  : QWidget{parent}
+    std::weak_ptr<MapDocument> document,
+    GLContextManager& contextManager,
+    QWidget* parent)
+  : QWidget(parent)
 {
-  m_tabBook = new TabBook{};
+    m_tabBook = new TabBook(this);
 
-  m_mapInspector = new MapInspector{document};
-  m_entityInspector = new EntityInspector{document, contextManager};
-  m_faceInspector = new FaceInspector{document, contextManager};
-  m_toolsPanel = new ToolsPanel{document, contextManager};
+    m_mapInspector = new MapInspector(document, this);
+    m_entityInspector = new EntityInspector(document, contextManager, this);
+    m_faceInspector = new FaceInspector(document, contextManager, this);
+    m_toolsPanel = new ToolsPanel(document, contextManager, this);
 
-  m_tabBook->addPage(m_mapInspector, "Map");
-  m_tabBook->addPage(m_entityInspector, "Entity");
-  m_tabBook->addPage(m_faceInspector, "Face");
-  m_tabBook->addPage(m_toolsPanel, "Tools");
+    m_tabBook->addPage(m_mapInspector, tr("Map"));
+    m_tabBook->addPage(m_entityInspector, tr("Entity"));
+    m_tabBook->addPage(m_faceInspector, tr("Face"));
+    m_tabBook->addPage(m_toolsPanel, tr("Tools")); // 关键：ToolsPanel作为Tab
 
-  auto* layout = new QVBoxLayout{};
-  layout->setContentsMargins(0, 0, 0, 0);
-  layout->addWidget(m_tabBook);
-  setLayout(layout);
+    auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(m_tabBook);
+    setLayout(layout);
 }
 
 void Inspector::connectTopWidgets(MapViewBar* mapViewBar)
