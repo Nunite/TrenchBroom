@@ -99,6 +99,16 @@ bool isFaceClick(const InputState& inputState)
 
 bool handleClick(const InputState& inputState, const mdl::EditorContext& editorContext)
 {
+  // 如果是单独的右键点击（没有修饰键），不处理，让它被传递到ToolBoxConnector中显示上下文菜单
+  if (inputState.mouseButtonsPressed(MouseButtons::Right) && 
+      !inputState.modifierKeysDown(ModifierKeys::Shift) &&
+      !inputState.modifierKeysDown(ModifierKeys::Alt) &&
+      !inputState.modifierKeysDown(ModifierKeys::CtrlCmd))
+  {
+    return false;
+  }
+
+  // 处理左键点击或者带修饰键的右键点击
   if (!inputState.mouseButtonsPressed(MouseButtons::Left) && 
       !inputState.mouseButtonsPressed(MouseButtons::Right))
   {

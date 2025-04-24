@@ -323,6 +323,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/CurrentGameIndicator.cpp
         ${COMMON_SOURCE_DIR}/ui/CurrentGroupCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/CyclingMapView.cpp
+        ${COMMON_SOURCE_DIR}/ui/CurveGenInspector.cpp
         ${COMMON_SOURCE_DIR}/ui/DialogHeader.cpp
         ${COMMON_SOURCE_DIR}/ui/DrawShapeTool.cpp
         ${COMMON_SOURCE_DIR}/ui/DrawShapeToolController2D.cpp
@@ -466,6 +467,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/ToolBoxConnector.cpp
         ${COMMON_SOURCE_DIR}/ui/ToolChain.cpp
         ${COMMON_SOURCE_DIR}/ui/ToolController.cpp
+        ${COMMON_SOURCE_DIR}/ui/ToolsPanel.cpp
         ${COMMON_SOURCE_DIR}/ui/Transaction.cpp
         ${COMMON_SOURCE_DIR}/ui/TwoPaneMapView.cpp
         ${COMMON_SOURCE_DIR}/ui/UndoableCommand.cpp
@@ -864,6 +866,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/CreateEntityToolController.h
         ${COMMON_SOURCE_DIR}/ui/CurrentGameIndicator.h
         ${COMMON_SOURCE_DIR}/ui/CurrentGroupCommand.h
+        ${COMMON_SOURCE_DIR}/ui/CurveGenInspector.h
         ${COMMON_SOURCE_DIR}/ui/CyclingMapView.h
         ${COMMON_SOURCE_DIR}/ui/DialogHeader.h
         ${COMMON_SOURCE_DIR}/ui/DrawShapeTool.h
@@ -1013,6 +1016,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/Transaction.h
         ${COMMON_SOURCE_DIR}/ui/TransactionScope.h
         ${COMMON_SOURCE_DIR}/ui/TwoPaneMapView.h
+        ${COMMON_SOURCE_DIR}/ui/ToolsPanel.h
         ${COMMON_SOURCE_DIR}/ui/UndoableCommand.h
         ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsCommand.h
         ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsCommandBase.h

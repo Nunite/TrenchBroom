@@ -19,52 +19,32 @@
 
 #pragma once
 
-#include <QWidget>
+#include "ui/TabBook.h"
 
 #include <memory>
 
+class QSplitter;
+
 namespace tb::ui
 {
-class FaceInspector;
-class EntityInspector;
 class GLContextManager;
 class MapDocument;
-class MapInspector;
-class MapViewBar;
-class SyncHeightEventFilter;
-class TabBook;
-class ToolsPanel;
 
-enum class InspectorPage
-{
-  Map = 0,
-  Entity = 1,
-  Face = 2,
-  Tools = 3
-};
-
-class Inspector : public QWidget
+class CurveGenInspector : public TabBookPage
 {
   Q_OBJECT
 private:
-  TabBook* m_tabBook = nullptr;
-  MapInspector* m_mapInspector = nullptr;
-  EntityInspector* m_entityInspector = nullptr;
-  FaceInspector* m_faceInspector = nullptr;
-  ToolsPanel* m_toolsPanel = nullptr;
-  
-  SyncHeightEventFilter* m_syncTabBarEventFilter = nullptr;
+  QSplitter* m_splitter = nullptr;
 
 public:
-  Inspector(
+  CurveGenInspector(
     std::weak_ptr<MapDocument> document,
     GLContextManager& contextManager,
     QWidget* parent = nullptr);
-  void connectTopWidgets(MapViewBar* mapViewBar);
-  void switchToPage(InspectorPage page);
-  bool cancelMouseDrag();
+  ~CurveGenInspector() override;
 
-  FaceInspector* faceInspector();
+private:
+  void createGui(std::weak_ptr<MapDocument> document, GLContextManager& contextManager);
 };
 
 } // namespace tb::ui
