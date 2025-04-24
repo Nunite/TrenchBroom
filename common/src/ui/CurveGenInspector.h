@@ -20,16 +20,24 @@
 #pragma once
 
 #include <memory>
-#include <QWidget>
-#include <QTextEdit>
-#include "ui/Selection.h"      // 确保包含 Selection
-#include "ui/Splitter.h"       // 确保包含 Splitter
-#include "ui/TabBook.h"    // 确保包含 TabBookPage
+#include "ui/TabBook.h"    // Ensure this is included
+
+#include <QProcess>  // Direct inclusion of QProcess definition
+
+class QLineEdit;
+class QPushButton;
+class QFileDialog;
+class QLabel;
+class QTextEdit;
+class QWidget;
+class QComboBox; // Add QComboBox class forward declaration
 
 namespace tb::ui {
 
 class GLContextManager;
 class MapDocument;
+class Selection;
+class Splitter;
 
 class CurveGenInspector : public TabBookPage {
     Q_OBJECT
@@ -40,12 +48,38 @@ public:
 public slots:
     void updateSelectionContent(const Selection& selection);
 
+private slots:
+    void browseToolPath();
+    void executeExternalTool();
+    void terminateExternalTool();
+    void processFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void readProcessOutput();
+    void processError(QProcess::ProcessError error);
+    void insertParameterTemplate(int index); // New slot for parameter template insertion
+
 private:
     std::weak_ptr<MapDocument> m_document;
     Splitter* m_splitter = nullptr;
     QTextEdit* m_contentView = nullptr;
-
+    QTextEdit* m_selectionView = nullptr;
+    
+    // External tool execution components
+    QWidget* m_toolPanel = nullptr;
+    QLineEdit* m_toolPathEdit = nullptr;
+    QLineEdit* m_toolArgsEdit = nullptr;
+    QComboBox* m_paramTemplatesCombo = nullptr; // Parameter templates combo box
+    QPushButton* m_browseButton = nullptr;
+    QPushButton* m_executeButton = nullptr;
+    QPushButton* m_terminateButton = nullptr;
+    QProcess* m_process = nullptr;
+    
+    QString m_lastTempFile; // Track the last created temporary batch file
+    QString m_currentSelectionContent; // Store current selection content
+    
     void createGui(std::weak_ptr<MapDocument> document, GLContextManager& contextManager);
+    void createToolExecutionPanel();
+    void setupParameterTemplates(); // Method to setup parameter templates
+    QString getCurrentSelectionContent() const; // Get current selection content
 };
 
 } // namespace tb::ui
