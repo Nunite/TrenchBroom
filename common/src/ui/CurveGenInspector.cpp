@@ -119,6 +119,8 @@ void CurveGenInspector::setupParameterTemplates()
   
   // Add custom parameter for selected object
   m_paramTemplatesCombo->addItem(tr("Selected Object"), "${SELECTED_OBJECT}");
+  m_paramTemplatesCombo->addItem(tr("Generate Map"), "${GENERATE_MAP}");
+  m_paramTemplatesCombo->addItem(tr("Generate Rmf"), "${GENERATE_RMF}");
   
   // Connect signal to slot
   connect(m_paramTemplatesCombo, QOverload<int>::of(&QComboBox::activated),
@@ -237,17 +239,37 @@ void CurveGenInspector::executeExternalTool()
   // Clear output area first
   m_contentView->clear();
   
-  // Get parameters and replace any template variables
-  QString args = m_toolArgsEdit->text().trimmed();
+  // Get working directory from the tool path
+  QFileInfo fileInfo(toolPath);
+  QString workDir = fileInfo.absolutePath();
   
-  // Replace SELECTED_OBJECT with actual selection content
-  if (args.contains("${SELECTED_OBJECT}")) {
+  // Get parameters
+  QString rawArgs = m_toolArgsEdit->text().trimmed();
+  
+  // Prepare argument list properly - don't use simple string splitting
+  QStringList argsList;
+  QString tempFilePath;
+  
+  // Check if we need to handle the selected object
+  if (rawArgs.contains("${SELECTED_OBJECT}")) {
     // Get the current selection content
     QString selectionContent = getCurrentSelectionContent();
     
-    // Create a temporary file to store the selection data
-    QString tempFilePath = QDir::tempPath() + "/tb_selection_" + 
-                          QString::number(QDateTime::currentMSecsSinceEpoch()) + ".txt";
+    // Create a M2C_Temp directory in the working directory
+    QString tempDirPath = workDir + "/M2C_Temp";
+    QDir tempDir(tempDirPath);
+    
+    // Create the directory if it doesn't exist
+    if (!tempDir.exists()) {
+      if (!tempDir.mkpath(".")) {
+        m_contentView->append(tr("[ERROR] Failed to create temp directory: %1").arg(tempDirPath));
+        return;
+      }
+      m_contentView->append(tr("Created temp directory: %1").arg(tempDirPath));
+    }
+    
+    // Fixed file path for the selection data
+    tempFilePath = tempDirPath + "/TempMap.map";
     QFile tempFile(tempFilePath);
     
     if (tempFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -255,28 +277,93 @@ void CurveGenInspector::executeExternalTool()
       out << selectionContent;
       tempFile.close();
       
-      // Replace the placeholder with the path to the temp file
-      args.replace("${SELECTED_OBJECT}", "\"" + tempFilePath + "\"");
+      m_contentView->append(tr("Created selection data file: %1").arg(tempFilePath));
       
-      // Store the temp file path for cleanup later
+      // Store the temp file path for reference
       m_lastTempFile = tempFilePath;
       
-      m_contentView->append(tr("Created selection data file: %1").arg(tempFilePath));
+      // If args is just the placeholder, directly use the file path
+      if (rawArgs.trimmed() == "${SELECTED_OBJECT}") {
+        argsList << tempFilePath;
+      } else {
+        // Otherwise, need to handle multiple arguments
+        // Replace the placeholder with the path (without quotes)
+        rawArgs.replace("${SELECTED_OBJECT}", tempFilePath);
+        
+        // Split the arguments properly
+        bool inQuotes = false;
+        QString currentArg;
+        
+        for (int i = 0; i < rawArgs.length(); i++) {
+          QChar c = rawArgs[i];
+          
+          if (c == '"') {
+            inQuotes = !inQuotes;
+            currentArg += c; // Keep the quotes in the argument
+          } else if (c == ' ' && !inQuotes) {
+            // Space outside quotes - end of argument
+            if (!currentArg.isEmpty()) {
+              argsList << currentArg;
+              currentArg.clear();
+            }
+          } else {
+            currentArg += c;
+          }
+        }
+        
+        // Add the last argument if any
+        if (!currentArg.isEmpty()) {
+          argsList << currentArg;
+        }
+      }
     } else {
       m_contentView->append(tr("[ERROR] Failed to create selection data file"));
+      return;
+    }
+  } else {
+    // No template to replace, just parse the arguments normally
+    if (!rawArgs.isEmpty()) {
+      // Parse arguments properly, respecting quotes
+      bool inQuotes = false;
+      QString currentArg;
+      
+      for (int i = 0; i < rawArgs.length(); i++) {
+        QChar c = rawArgs[i];
+        
+        if (c == '"') {
+          inQuotes = !inQuotes;
+          currentArg += c; // Keep the quotes in the argument
+        } else if (c == ' ' && !inQuotes) {
+          // Space outside quotes - end of argument
+          if (!currentArg.isEmpty()) {
+            argsList << currentArg;
+            currentArg.clear();
+          }
+        } else {
+          currentArg += c;
+        }
+      }
+      
+      // Add the last argument if any
+      if (!currentArg.isEmpty()) {
+        argsList << currentArg;
+      }
     }
   }
   
   // Add header
   m_contentView->append(tr("===== Starting Execution of %1 =====").arg(toolPath));
   
+  // Log the actual arguments
+  m_contentView->append(tr("Arguments:"));
+  for (const QString& arg : argsList) {
+    m_contentView->append(tr("  %1").arg(arg));
+  }
+  
   // Toggle button states
   m_executeButton->setEnabled(false);  // Disable execute button
   m_terminateButton->setEnabled(true); // Enable terminate button
   
-  // Get working directory
-  QFileInfo fileInfo(toolPath);
-  QString workDir = fileInfo.absolutePath();
   m_contentView->append(tr("Working Directory: %1").arg(workDir));
   
   // Create new process
@@ -295,17 +382,18 @@ void CurveGenInspector::executeExternalTool()
           this, &CurveGenInspector::processError);
   
 #ifdef Q_OS_WIN
-  // Windows platform - Direct execution
-  QStringList argsList;
-  if (!args.isEmpty()) {
-    argsList = args.split(' ', Qt::SkipEmptyParts);
-  }
-  
-  m_contentView->append(tr("Executing command: %1 %2").arg(toolPath).arg(args));
-  
   try {
     // Start process and keep standard input open
     m_process->setInputChannelMode(QProcess::ManagedInputChannel);
+    
+    // Build the command line string for display
+    QString cmdLine = toolPath;
+    for (const QString& arg : argsList) {
+      cmdLine += " " + arg;
+    }
+    m_contentView->append(tr("Executing command: %1").arg(cmdLine));
+    
+    // Actually start the process with the arguments list
     m_process->start(toolPath, argsList);
     
     if (!m_process->waitForStarted(3000)) {
@@ -349,16 +437,15 @@ void CurveGenInspector::executeExternalTool()
     m_terminateButton->setEnabled(false);
   }
 #else
-  // macOS/Linux platform - Direct execution
-  QStringList argsList;
-  if (!args.isEmpty()) {
-    // Simple parameter splitting, actual use may require more complex parsing
-    argsList = args.split(' ', Qt::SkipEmptyParts);
-  }
-  
-  m_contentView->append(tr("Executing command: %1 %2").arg(toolPath).arg(args));
-  
   try {
+    // Build the command line string for display
+    QString cmdLine = toolPath;
+    for (const QString& arg : argsList) {
+      cmdLine += " " + arg;
+    }
+    m_contentView->append(tr("Executing command: %1").arg(cmdLine));
+    
+    // Actually start the process with the arguments list
     m_process->start(toolPath, argsList);
     
     if (!m_process->waitForStarted(3000)) {
@@ -382,14 +469,8 @@ void CurveGenInspector::processFinished(int exitCode, QProcess::ExitStatus exitS
     m_contentView->append(tr("Process terminated abnormally"));
   }
   
-  // Clean up selection data file if it exists
-  if (!m_lastTempFile.isEmpty() && m_lastTempFile.contains("tb_selection_")) {
-    if (QFile::remove(m_lastTempFile)) {
-      m_contentView->append(tr("Cleaned up selection data file: %1").arg(m_lastTempFile));
-    }
-    m_lastTempFile.clear();
-  }
-  
+  // Note: We no longer delete the selection data file as it's now stored in a fixed location
+
   // Find and delete possible temporary script files
   QDir tempDir(QDir::tempPath());
   QStringList nameFilters;
