@@ -23,7 +23,7 @@ namespace tb::ui
 class DrawShapeTool;
 class MapDocument;
 class InputState;
-class DragState;
+struct DragState;
 
 // 框选渲染器 - 用于显示框选区域
 class SelectionBoxRenderer
