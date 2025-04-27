@@ -99,8 +99,7 @@ bool isFaceClick(const InputState& inputState)
 
 bool handleClick(const InputState& inputState, const mdl::EditorContext& editorContext)
 {
-  if (!inputState.mouseButtonsPressed(MouseButtons::Left) && 
-      !inputState.mouseButtonsPressed(MouseButtons::Right))
+  if (!inputState.mouseButtonsPressed(MouseButtons::Left))
   {
     return false;
   }
@@ -286,6 +285,12 @@ const Tool& SelectionTool::tool() const
 bool SelectionTool::mouseClick(const InputState& inputState)
 {
   using namespace mdl::HitFilters;
+
+  // 如果是右键点击，直接返回false，允许呼出菜单
+  if (inputState.mouseButtonsPressed(MouseButtons::Right))
+  {
+    return false;
+  }
 
   auto document = kdl::mem_lock(m_document);
   const auto& editorContext = document->editorContext();

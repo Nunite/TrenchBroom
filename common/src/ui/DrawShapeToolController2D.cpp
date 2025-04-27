@@ -236,49 +236,56 @@ const Tool& DrawShapeToolController2D::tool() const
 std::unique_ptr<GestureTracker> DrawShapeToolController2D::acceptMouseDrag(
   const InputState& inputState)
 {
-  if (!inputState.mouseButtonsPressed(MouseButtons::Left))
-  {
-    return nullptr;
-  }
-
-  // 检查是否按下Alt键，如果是则进入框选模式
+  // 检查是否按下Alt键，如果是则可能进入框选模式
   const auto modKeys = inputState.modifierKeys();
   const bool altDown = (modKeys & ModifierKeys::Alt) != 0;
   
-  if (altDown)
+  // 明确区分左键和右键
+  const bool leftMouseDown = inputState.mouseButtonsDown(MouseButtons::Left);
+  const bool rightMouseDown = inputState.mouseButtonsDown(MouseButtons::Right);
+  
+  // 右键按下时不进行任何操作，让系统显示右键菜单
+  if (rightMouseDown) {
+    return nullptr;
+  }
+  
+  // 只有按下左键+Alt组合才进入框选模式
+  if (leftMouseDown && altDown)
   {
     return handleBoxSelection(inputState);
   }
 
-  // 原有的创建brush逻辑保持不变
-  if (!inputState.checkModifierKeys(
-        ModifierKeyPressed::No,
-        ModifierKeyPressed::DontCare,
-        ModifierKeyPressed::DontCare))
-  {
-    return nullptr;
-  }
+  // 如果只按下左键，进入原有的创建brush逻辑
+  if (leftMouseDown) {
+    if (!inputState.checkModifierKeys(
+          ModifierKeyPressed::No,
+          ModifierKeyPressed::DontCare,
+          ModifierKeyPressed::DontCare))
+    {
+      return nullptr;
+    }
 
-  auto document = kdl::mem_lock(m_document);
-  if (document->hasSelection())
-  {
-    return nullptr;
-  }
+    auto document = kdl::mem_lock(m_document);
+    if (document->hasSelection())
+    {
+      return nullptr;
+    }
 
-  const auto& bounds = document->referenceBounds();
-  const auto& camera = inputState.camera();
-  const auto plane = vm::plane3d{
-    bounds.min, vm::vec3d{vm::get_abs_max_component_axis(camera.direction())}};
+    const auto& bounds = document->referenceBounds();
+    const auto& camera = inputState.camera();
+    const auto plane = vm::plane3d{
+      bounds.min, vm::vec3d{vm::get_abs_max_component_axis(camera.direction())}};
 
-  if (const auto distance = vm::intersect_ray_plane(inputState.pickRay(), plane))
-  {
-    const auto initialHandlePosition =
-      vm::point_at_distance(inputState.pickRay(), *distance);
-    return createHandleDragTracker(
-      DrawShapeDragDelegate{m_tool, document->worldBounds(), document->referenceBounds()},
-      inputState,
-      initialHandlePosition,
-      initialHandlePosition);
+    if (const auto distance = vm::intersect_ray_plane(inputState.pickRay(), plane))
+    {
+      const auto initialHandlePosition =
+        vm::point_at_distance(inputState.pickRay(), *distance);
+      return createHandleDragTracker(
+        DrawShapeDragDelegate{m_tool, document->worldBounds(), document->referenceBounds()},
+        inputState,
+        initialHandlePosition,
+        initialHandlePosition);
+    }
   }
 
   return nullptr;
@@ -287,6 +294,11 @@ std::unique_ptr<GestureTracker> DrawShapeToolController2D::acceptMouseDrag(
 std::unique_ptr<GestureTracker> DrawShapeToolController2D::handleBoxSelection(
   const InputState& inputState)
 {
+  // 如果是右键被按下，不执行框选操作，允许右键菜单显示
+  if (inputState.mouseButtonsDown(MouseButtons::Right)) {
+    return nullptr;
+  }
+  
   auto document = kdl::mem_lock(m_document);
   
   // 使用位于BoxSelectionTool.cpp中实现的框选工具
@@ -313,6 +325,17 @@ std::unique_ptr<GestureTracker> DrawShapeToolController2D::handleBoxSelection(
 bool DrawShapeToolController2D::cancel()
 {
   return m_tool.cancel();
+}
+
+bool DrawShapeToolController2D::mouseClick(const InputState& inputState)
+{
+  // 如果是右键点击，返回false让事件继续传递到上层
+  if (inputState.mouseButtonsDown(MouseButtons::Right)) {
+    return false;
+  }
+  
+  // 使用基类默认实现
+  return ToolController::mouseClick(inputState);
 }
 
 } // namespace tb::ui

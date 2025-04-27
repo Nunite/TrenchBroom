@@ -190,6 +190,12 @@ void BoxSelectionDragDelegate::end(
   const InputState& inputState, 
   const DragState&) 
 { 
+  // 如果是右键被按下，不执行选择操作，允许右键菜单显示
+  if (inputState.mouseButtonsDown(MouseButtons::Right)) {
+    m_renderer.clear();
+    return;
+  }
+
   // 框选结束时，执行实际选择操作
   auto document = kdl::mem_lock(m_document);
   if (document)

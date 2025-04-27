@@ -48,6 +48,8 @@ private:
   // 处理框选功能
   std::unique_ptr<GestureTracker> handleBoxSelection(const InputState& inputState);
 
+  bool mouseClick(const InputState& inputState) override;
+  
   bool cancel() override;
 };
 
