@@ -26,6 +26,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 class QScrollBar;
 
@@ -60,6 +61,7 @@ private:
   std::string m_filterText;
 
   const mdl::Material* m_selectedMaterial = nullptr;
+  std::unordered_map<std::string, bool> m_collapsedGroups;
 
   NotifierConnection m_notifierConnection;
 
@@ -79,6 +81,9 @@ public:
   void setSelectedMaterial(const mdl::Material* selectedMaterial);
 
   void revealMaterial(const mdl::Material* material);
+  
+  bool isGroupCollapsed(const std::string& groupName) const;
+  void toggleGroupCollapsed(const std::string& groupName);
 
 private:
   void resourcesWereProcessed(const std::vector<mdl::ResourceId>& resources);
@@ -117,6 +122,9 @@ private:
   void doLeftClick(Layout& layout, float x, float y) override;
   QString tooltip(const Cell& cell) override;
   void doContextMenu(Layout& layout, float x, float y, QContextMenuEvent* event) override;
+
+  void renderGroup(Layout& layout, float y, float height, size_t groupIndex);
+  void renderGroupHeader(Layout& layout, float y, float height, size_t groupIndex);
 
   const mdl::Material& cellData(const Cell& cell) const;
 signals:

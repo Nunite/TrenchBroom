@@ -132,6 +132,18 @@ void MaterialBrowserView::revealMaterial(const mdl::Material* material)
   });
 }
 
+bool MaterialBrowserView::isGroupCollapsed(const std::string& groupName) const
+{
+  const auto it = m_collapsedGroups.find(groupName);
+  return it != m_collapsedGroups.end() && it->second;
+}
+
+void MaterialBrowserView::toggleGroupCollapsed(const std::string& groupName)
+{
+  m_collapsedGroups[groupName] = !isGroupCollapsed(groupName);
+  reloadMaterials();
+}
+
 void MaterialBrowserView::resourcesWereProcessed(const std::vector<mdl::ResourceId>&)
 {
   reloadMaterials();
@@ -168,8 +180,13 @@ void MaterialBrowserView::doReloadLayout(Layout& layout)
   {
     for (const auto* collection : getCollections())
     {
-      layout.addGroup(collection->path().string(), float(fontSize) + 2.0f);
-      addMaterialsToLayout(layout, getMaterials(*collection), font);
+      const auto groupName = collection->path().string();
+      layout.addGroup(groupName, float(fontSize) + 2.0f);
+      
+      if (!isGroupCollapsed(groupName))
+      {
+        addMaterialsToLayout(layout, getMaterials(*collection), font);
+      }
     }
   }
   else
@@ -305,6 +322,15 @@ void MaterialBrowserView::doRender(Layout& layout, const float y, const float he
 
   renderBounds(layout, y, height);
   renderMaterials(layout, y, height);
+  
+  if (m_group)
+  {
+    const auto& groups = layout.groups();
+    for (size_t i = 0; i < groups.size(); ++i)
+    {
+      renderGroupHeader(layout, y, height, i);
+    }
+  }
 }
 
 bool MaterialBrowserView::shouldRenderFocusIndicator() const
@@ -418,8 +444,83 @@ void MaterialBrowserView::renderMaterials(
   }
 }
 
+void MaterialBrowserView::renderGroupHeader(Layout& layout, float y, float height, size_t groupIndex)
+{
+  const auto& groups = layout.groups();
+  if (groupIndex >= groups.size())
+  {
+    return;
+  }
+
+  const auto& group = groups[groupIndex];
+  if (!group.intersectsY(y, height))
+  {
+    return;
+  }
+
+  const auto& titleBounds = group.titleBounds();
+  const auto& groupName = group.title();
+  
+  using ButtonVertex = render::GLVertexTypes::P2C4::Vertex;
+  auto vertices = std::vector<ButtonVertex>{};
+  
+  const float buttonSize = 12.0f;
+  const float buttonLeft = titleBounds.right() - buttonSize - 10.0f;
+  const float buttonTop = titleBounds.top() + (titleBounds.height - buttonSize) / 2.0f;
+  
+  const auto& baseButtonColor = pref(Preferences::BrowserTextColor);
+  const Color buttonColor(baseButtonColor.r(), baseButtonColor.g(), baseButtonColor.b(), 1.0f);
+  
+  const bool collapsed = isGroupCollapsed(groupName);
+  
+  if (collapsed)
+  {
+    vertices.emplace_back(
+      vm::vec2f{buttonLeft, height - (buttonTop - y)}, buttonColor);
+    vertices.emplace_back(
+      vm::vec2f{buttonLeft, height - (buttonTop + buttonSize - y)}, buttonColor);
+    vertices.emplace_back(
+      vm::vec2f{buttonLeft + buttonSize, height - (buttonTop + buttonSize/2 - y)}, buttonColor);
+  }
+  else
+  {
+    vertices.emplace_back(
+      vm::vec2f{buttonLeft, height - (buttonTop - y)}, buttonColor);
+    vertices.emplace_back(
+      vm::vec2f{buttonLeft + buttonSize, height - (buttonTop - y)}, buttonColor);
+    vertices.emplace_back(
+      vm::vec2f{buttonLeft + buttonSize/2, height - (buttonTop + buttonSize - y)}, buttonColor);
+  }
+  
+  auto vertexArray = render::VertexArray::move(std::move(vertices));
+  auto shader = render::ActiveShader{shaderManager(), render::Shaders::VaryingPCShader};
+  
+  vertexArray.prepare(vboManager());
+  
+  vertexArray.render(render::PrimType::Triangles, 0, 3);
+}
+
 void MaterialBrowserView::doLeftClick(Layout& layout, const float x, const float y)
 {
+  if (m_group)
+  {
+    const auto& groups = layout.groups();
+    for (size_t i = 0; i < groups.size(); ++i)
+    {
+      const auto& group = groups[i];
+      const auto& titleBounds = group.titleBounds();
+      
+      if (titleBounds.containsPoint(x, y))
+      {
+        if (x >= titleBounds.left() + titleBounds.width / 2.0f)
+        {
+          toggleGroupCollapsed(group.title());
+          return;
+        }
+      }
+    }
+  }
+
   if (const auto* cell = layout.cellAt(x, y))
   {
     const auto& material = cellData(*cell);
