@@ -44,12 +44,7 @@ private:
   const Tool& tool() const override;
 
   std::unique_ptr<GestureTracker> acceptMouseDrag(const InputState& inputState) override;
-  
-  // 处理框选功能
-  std::unique_ptr<GestureTracker> handleBoxSelection(const InputState& inputState);
 
-  bool mouseClick(const InputState& inputState) override;
-  
   bool cancel() override;
 };
 
