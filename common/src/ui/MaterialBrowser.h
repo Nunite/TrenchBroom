@@ -38,7 +38,6 @@ namespace tb::mdl
 class BrushFaceHandle;
 class Material;
 class Node;
-class ResourceId;
 } // namespace tb::mdl
 
 namespace tb::ui
@@ -46,7 +45,6 @@ namespace tb::ui
 class GLContextManager;
 class MapDocument;
 class MaterialBrowserView;
-class SliderWithLabel;
 enum class MaterialSortOrder;
 
 class MaterialBrowser : public QWidget
@@ -60,7 +58,6 @@ private:
   QLineEdit* m_filterBox = nullptr;
   QScrollBar* m_scrollBar = nullptr;
   MaterialBrowserView* m_view = nullptr;
-  SliderWithLabel* m_sizeSlider = nullptr;
 
   NotifierConnection m_notifierConnection;
 
@@ -99,9 +96,6 @@ private:
 
   void reload();
   void updateSelectedMaterial();
-  
-private slots:
-  void sizeSliderChanged(int value);
 };
 
 } // namespace tb::ui
