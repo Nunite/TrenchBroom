@@ -154,7 +154,7 @@ void MaterialBrowser::createGui(GLContextManager& contextManager)
     m_view->setFilterText(m_filterBox->text().toStdString());
   });
   
-  m_sizeSlider = new SliderWithLabel(50, 500);
+  m_sizeSlider = new SliderWithLabel(50, 600);
   m_sizeSlider->setToolTip(tr("Adjust material preview size"));
   m_sizeSlider->setValue(int(pref(Preferences::MaterialBrowserIconSize) * 100.0f));
   
@@ -312,6 +312,19 @@ void MaterialBrowser::updateSelectedMaterial()
 
 void MaterialBrowser::sizeSliderChanged(int value)
 {
+  // 将值调整为最近的50的倍数
+  int roundedValue = ((value + 25) / 50) * 50;
+  if (roundedValue < 50) roundedValue = 50;
+  if (roundedValue > 600) roundedValue = 600;
+  
+  // 如果值被调整了，更新滑块但不触发valueChanged信号
+  if (value != roundedValue) {
+    m_sizeSlider->blockSignals(true);
+    m_sizeSlider->setValue(roundedValue);
+    m_sizeSlider->blockSignals(false);
+    value = roundedValue;
+  }
+  
   const float scaleFactor = static_cast<float>(value) / 100.0f;
   
   auto& prefs = PreferenceManager::instance();
