@@ -99,10 +99,17 @@ bool isFaceClick(const InputState& inputState)
 
 bool handleClick(const InputState& inputState, const mdl::EditorContext& editorContext)
 {
-  if (!inputState.mouseButtonsPressed(MouseButtons::Left))
+  // 同时处理左键和Shift+右键点击
+  const bool isLeftClick = inputState.mouseButtonsPressed(MouseButtons::Left);
+  const bool isShiftRightClick = inputState.mouseButtonsPressed(MouseButtons::Right) && 
+                                inputState.modifierKeysDown(ModifierKeys::Shift);
+  
+  if (!isLeftClick && !isShiftRightClick)
   {
     return false;
   }
+  
+  // Alt键不参与选择操作
   if (!inputState.checkModifierKeys(
         ModifierKeyPressed::DontCare,
         ModifierKeyPressed::No,
@@ -286,8 +293,9 @@ bool SelectionTool::mouseClick(const InputState& inputState)
 {
   using namespace mdl::HitFilters;
 
-  // 如果是右键点击，直接返回false，允许呼出菜单
-  if (inputState.mouseButtonsPressed(MouseButtons::Right))
+  // 只有普通右键点击才返回false呼出菜单，Shift+右键组合继续处理选择
+  if (inputState.mouseButtonsPressed(MouseButtons::Right) && 
+      !inputState.modifierKeysDown(ModifierKeys::Shift))
   {
     return false;
   }
