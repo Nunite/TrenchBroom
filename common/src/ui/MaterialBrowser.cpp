@@ -158,7 +158,7 @@ void MaterialBrowser::createGui(GLContextManager& contextManager)
   m_sizeSlider->setToolTip(tr("Adjust material preview size"));
   m_sizeSlider->setValue(int(pref(Preferences::MaterialBrowserIconSize) * 100.0f));
   
-  // 确保滑块只能以50为步长移动
+
   QSlider* slider = m_sizeSlider->findChild<QSlider*>();
   if (slider) {
     slider->setSingleStep(50);
