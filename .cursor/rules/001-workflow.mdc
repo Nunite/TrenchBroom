@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Cursor MDC Workflow Enhancement Rules
+
+## Basic Workflow
+1. After receiving a task, first analyze the requirements and formulate a work plan.
+2. Write the work plan into the `working.md` file.
+3. Find and read project-related specification documents.
+4. Extract specification points related to the current task from the specification documents.
+5. Add these relevant specification points to the `## Specification Items` section of the `working.md` file.
+6. Revise the work plan based on the specification points.
+7. During the work process, continuously update `## Next Tasks` in `working.md`.
+8. After completing each task, update `## Progress Tracking` in `working.md`.
+9. Automatically read the `working.md` file at the beginning of each session.
+10. When there are no new requirements, automatically execute `## Next Tasks` in `working.md`.
+11. Clean up historical records and other invalid information at the end of each task.
+
+## `working.md` File Format Specification
+1. The file structure includes: Basic Principles, Requirement Analysis, Work Plan, Specification Items, Next Tasks, Progress Tracking, Important Information.
+2. Keep all content concise, avoid redundancy, and only record information related to the current task.
+3. Use a hierarchical structure to merge related tasks.
+4. Use unified markers: ✅ (Completed), ⚙️ (In Progress), ⏱️ (To Do)
+5. Record progress in groups by function or module, and do not list details one by one.
+6. Regularly clean up details of completed tasks to keep the document concise.
+
+## Memory Management
+1. Use the `working.md` file to store all important information.
+2. Read the content of the `working.md` file before each reply.
+
+## Tool Error Handling Plan
+1. When encountering editor tool errors, record the error details.
+2. Analyze the cause of the error.
+3. Try various solutions.
+4. Record the successful solution in the `## Error Handling Plan` section of `working.md`.
+5. When encountering similar problems in the future, first check the existing error handling plan.
+
+## Technical Operation Guide
+1. Edit large files in chunks, no more than 100 lines each time.
+2. Use full backslash paths, such as `E:\\Develop\\project\\file.txt`.
+3. Read the content of a file before editing it.
+4. Before large modifications, back up the original code to the `backup` directory.
+
+## Execution Check
+1. Before each reply, check whether the above rules are followed.
+2. If not followed, adjust immediately.
+3. Review the `working.md` file once every 3-5 interactions.
