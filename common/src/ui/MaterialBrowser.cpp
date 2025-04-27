@@ -20,6 +20,7 @@
 #include "MaterialBrowser.h"
 
 #include <QComboBox>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScrollBar>
@@ -33,6 +34,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MaterialBrowserView.h"
 #include "ui/QtUtils.h"
+#include "ui/SliderWithLabel.h"
 #include "ui/ViewConstants.h"
 
 #include "kdl/memory_utils.h"
@@ -151,6 +153,20 @@ void MaterialBrowser::createGui(GLContextManager& contextManager)
   connect(m_filterBox, &QLineEdit::textEdited, this, [&]() {
     m_view->setFilterText(m_filterBox->text().toStdString());
   });
+  
+  m_sizeSlider = new SliderWithLabel(50, 500);
+  m_sizeSlider->setToolTip(tr("Adjust material preview size"));
+  m_sizeSlider->setValue(int(pref(Preferences::MaterialBrowserIconSize) * 100.0f));
+  
+  // 确保滑块只能以50为步长移动
+  QSlider* slider = m_sizeSlider->findChild<QSlider*>();
+  if (slider) {
+    slider->setSingleStep(50);
+    slider->setPageStep(50);
+    slider->setTickInterval(50);
+  }
+  
+  connect(m_sizeSlider, &SliderWithLabel::valueChanged, this, &MaterialBrowser::sizeSliderChanged);
 
   auto* controlLayout = new QHBoxLayout{};
   controlLayout->setContentsMargins(
@@ -163,12 +179,22 @@ void MaterialBrowser::createGui(GLContextManager& contextManager)
   controlLayout->addWidget(m_groupButton);
   controlLayout->addWidget(m_usedButton);
   controlLayout->addWidget(m_filterBox, 1);
+  
+  auto* sizeLayout = new QHBoxLayout{};
+  sizeLayout->setContentsMargins(
+    LayoutConstants::NarrowHMargin,
+    0,
+    LayoutConstants::NarrowHMargin,
+    LayoutConstants::NarrowVMargin);
+  sizeLayout->addWidget(new QLabel(tr("Size:")));
+  sizeLayout->addWidget(m_sizeSlider, 1);
 
   auto* outerLayout = new QVBoxLayout{};
   outerLayout->setContentsMargins(0, 0, 0, 0);
   outerLayout->setSpacing(0);
   outerLayout->addWidget(browserPanel, 1);
   outerLayout->addLayout(controlLayout, 0);
+  outerLayout->addLayout(sizeLayout, 0);
 
   setLayout(outerLayout);
 }
@@ -254,6 +280,10 @@ void MaterialBrowser::preferenceDidChange(const std::filesystem::path& path)
     path == Preferences::MaterialBrowserIconSize.path()
     || document->isGamePathPreference(path))
   {
+    if (path == Preferences::MaterialBrowserIconSize.path()) {
+      const float scaleFactor = pref(Preferences::MaterialBrowserIconSize);
+      m_sizeSlider->setValue(int(scaleFactor * 100.0f));
+    }
     reload();
   }
   else
@@ -278,6 +308,17 @@ void MaterialBrowser::updateSelectedMaterial()
   const auto& materialName = document->currentMaterialName();
   const auto* material = document->materialManager().material(materialName);
   m_view->setSelectedMaterial(material);
+}
+
+void MaterialBrowser::sizeSliderChanged(int value)
+{
+  const float scaleFactor = static_cast<float>(value) / 100.0f;
+  
+  auto& prefs = PreferenceManager::instance();
+  prefs.set(Preferences::MaterialBrowserIconSize, scaleFactor);
+  
+  // 直接刷新视图，确保滑块值改变时立即更新材质预览大小
+  reload();
 }
 
 } // namespace tb::ui
