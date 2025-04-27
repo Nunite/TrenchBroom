@@ -97,9 +97,35 @@ bool isFaceClick(const InputState& inputState)
   return inputState.modifierKeysDown(ModifierKeys::Shift);
 }
 
+bool handleClick(const InputState& inputState, const mdl::EditorContext& editorContext)
+{
+  // 同时处理左键和Shift+右键点击
+  const bool isLeftClick = inputState.mouseButtonsPressed(MouseButtons::Left);
+  const bool isShiftRightClick = inputState.mouseButtonsPressed(MouseButtons::Right) && 
+                                inputState.modifierKeysDown(ModifierKeys::Shift);
+  
+  if (!isLeftClick && !isShiftRightClick)
+  {
+    return false;
+  }
+  
+  // Alt键不参与选择操作
+  if (!inputState.checkModifierKeys(
+        ModifierKeyPressed::DontCare,
+        ModifierKeyPressed::No,
+        ModifierKeyPressed::DontCare))
+  {
+    return false;
+  }
+
+  return editorContext.canChangeSelection();
+}
+
 bool isMultiClick(const InputState& inputState)
 {
-  return inputState.modifierKeysDown(ModifierKeys::CtrlCmd);
+  return inputState.modifierKeysDown(ModifierKeys::CtrlCmd) || 
+         (inputState.modifierKeysDown(ModifierKeys::Shift) && 
+          inputState.mouseButtonsDown(MouseButtons::Right));
 }
 
 const mdl::Hit& firstHit(const InputState& inputState, const mdl::HitFilter& hitFilter)
@@ -111,23 +137,6 @@ std::vector<mdl::Node*> collectSelectableChildren(
   const mdl::EditorContext& editorContext, const mdl::Node* node)
 {
   return mdl::collectSelectableNodes(node->children(), editorContext);
-}
-
-bool handleClick(const InputState& inputState, const mdl::EditorContext& editorContext)
-{
-  if (!inputState.mouseButtonsPressed(MouseButtons::Left))
-  {
-    return false;
-  }
-  if (!inputState.checkModifierKeys(
-        ModifierKeyPressed::DontCare,
-        ModifierKeyPressed::No,
-        ModifierKeyPressed::DontCare))
-  {
-    return false;
-  }
-
-  return editorContext.canChangeSelection();
 }
 
 void adjustGrid(const InputState& inputState, Grid& grid)
@@ -283,6 +292,13 @@ const Tool& SelectionTool::tool() const
 bool SelectionTool::mouseClick(const InputState& inputState)
 {
   using namespace mdl::HitFilters;
+
+  // 只有普通右键点击才返回false呼出菜单，Shift+右键组合继续处理选择
+  if (inputState.mouseButtonsPressed(MouseButtons::Right) && 
+      !inputState.modifierKeysDown(ModifierKeys::Shift))
+  {
+    return false;
+  }
 
   auto document = kdl::mem_lock(m_document);
   const auto& editorContext = document->editorContext();
