@@ -512,10 +512,6 @@ void MaterialBrowserView::doLeftClick(Layout& layout, const float x, const float
       
       if (titleBounds.containsPoint(x, y))
       {
-        const float buttonSize = 12.0f;
-        const float buttonLeft = titleBounds.right() - buttonSize - 10.0f;
-        const float buttonTop = titleBounds.top() + (titleBounds.height - buttonSize) / 2.0f;
-        
         if (x >= titleBounds.left() + titleBounds.width / 2.0f)
         {
           toggleGroupCollapsed(group.title());
