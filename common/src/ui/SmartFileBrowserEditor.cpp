@@ -99,7 +99,9 @@ QString SmartFileBrowserEditor::getFileTypeDescription() const {
 }
 
 void SmartFileBrowserEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>& nodes) {
-  if (!m_lineEdit) return;
+  if (!m_lineEdit) {
+    return;
+  }
   
   // 从节点获取属性值
   std::unordered_set<std::string> values;
@@ -121,7 +123,9 @@ void SmartFileBrowserEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBas
 
 void SmartFileBrowserEditor::browseForFile() {
   auto docPtr = document();
-  if (!docPtr) return;
+  if (!docPtr) {
+    return;
+  }
   
   // 获取游戏资源目录作为起始目录
   QString startDir = io::pathAsQString(docPtr->game()->gamePath());

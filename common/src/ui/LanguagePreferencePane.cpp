@@ -83,16 +83,16 @@ void LanguagePreferencePane::createGui()
       QMessageBox::Ok);
   });
 
-  QVBoxLayout* languageLayout = new QVBoxLayout();
+  auto* languageLayout = new QVBoxLayout();
   languageLayout->setContentsMargins(0, 0, 0, 0);
   languageLayout->addWidget(langLabel);
   languageLayout->addWidget(m_englishRadioButton);
   languageLayout->addWidget(m_chineseRadioButton);
   
-  QGroupBox* languageGroupBox = new QGroupBox(tr("语言"));
+  auto* languageGroupBox = new QGroupBox(tr("语言"));
   languageGroupBox->setLayout(languageLayout);
   
-  QVBoxLayout* layout = new QVBoxLayout();
+  auto* layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(languageGroupBox);
   layout->addStretch(1);

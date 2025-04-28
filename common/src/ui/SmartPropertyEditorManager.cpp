@@ -93,7 +93,9 @@ SmartPropertyEditorMatcher makeSmartPropertyEditorKeyMatcher(
     };
     
     // 如果没有节点，不匹配
-    if (nodes.empty()) return false;
+    if (nodes.empty()) {
+      return false;
+    }
     
     // 1. 精确匹配常见的文件属性名
     if (exactMatchProperties.find(propertyKey) != exactMatchProperties.end()) {
@@ -156,7 +158,9 @@ SmartPropertyEditorMatcher makeFilePropertyMatcher(
   std::vector<std::string> patterns_, FilePropertyType fileType)
 {
   return [patterns = std::move(patterns_), fileType](const auto& propertyKey, const auto& nodes) {
-    if (nodes.empty()) return false;
+    if (nodes.empty()) {
+      return false;
+    }
     
     // 首先检查属性键是否直接匹配任何模式
     for (const auto& pattern : patterns) {
@@ -480,7 +484,7 @@ void SmartPropertyEditorManager::updateEditor()
 
 // 创建文件浏览器编辑器
 SmartFileBrowserEditor* SmartPropertyEditorManager::createFileBrowserEditor(FilePropertyType type) {
-  SmartFileBrowserEditor* editor = new SmartFileBrowserEditor(m_document, this);
+  auto* editor = new SmartFileBrowserEditor(m_document, this);
   editor->setPropertyType(type);
   
   return editor;
