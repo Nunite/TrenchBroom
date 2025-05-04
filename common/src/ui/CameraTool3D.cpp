@@ -34,6 +34,8 @@
 #include "vm/scalar.h"
 #include "vm/vec.h"
 
+#include <QWindow>
+
 namespace tb::ui
 {
 namespace
@@ -136,6 +138,7 @@ class OrbitDragTracker : public GestureTracker
 private:
   render::PerspectiveCamera& m_camera;
   vm::vec3f m_orbitCenter;
+  bool m_firstUpdate = true;
 
 public:
   OrbitDragTracker(render::PerspectiveCamera& camera, const vm::vec3f& orbitCenter)
@@ -162,6 +165,11 @@ public:
 
   bool update(const InputState& inputState) override
   {
+    if (m_firstUpdate) {
+      m_firstUpdate = false;
+      return true; // 跳过首次更新，避免视角突变
+    }
+    
     const auto hAngle = static_cast<float>(inputState.mouseDX()) * lookSpeedH(m_camera);
     const auto vAngle = static_cast<float>(inputState.mouseDY()) * lookSpeedV(m_camera);
     m_camera.orbit(m_orbitCenter, hAngle, vAngle);
@@ -176,6 +184,7 @@ class LookDragTracker : public GestureTracker
 {
 private:
   render::PerspectiveCamera& m_camera;
+  bool m_firstUpdate = true;
 
 public:
   explicit LookDragTracker(render::PerspectiveCamera& camera)
@@ -206,6 +215,11 @@ public:
 
   bool update(const InputState& inputState) override
   {
+    if (m_firstUpdate) {
+      m_firstUpdate = false;
+      return true; // 跳过首次更新，避免视角突变
+    }
+    
     const auto hAngle = static_cast<float>(inputState.mouseDX()) * lookSpeedH(m_camera);
     const auto vAngle = static_cast<float>(inputState.mouseDY()) * lookSpeedV(m_camera);
     m_camera.rotate(hAngle, vAngle);
@@ -259,10 +273,11 @@ public:
 
 } // namespace
 
-CameraTool3D::CameraTool3D(render::PerspectiveCamera& camera)
+CameraTool3D::CameraTool3D(render::PerspectiveCamera& camera, QWidget* widget)
   : ToolController{}
   , Tool{true}
   , m_camera{camera}
+  , m_widget(widget)
 {
 }
 
@@ -308,6 +323,9 @@ void CameraTool3D::mouseScroll(const InputState& inputState)
 
 void CameraTool3D::mouseUp(const InputState& inputState)
 {
+  if (m_cursorLocked) {
+    releaseCursorLock();
+  }
   if (inputState.mouseButtonsPressed(MouseButtons::Right))
   {
     auto& prefs = PreferenceManager::instance();
@@ -322,6 +340,23 @@ std::unique_ptr<GestureTracker> CameraTool3D::acceptMouseDrag(
   const InputState& inputState)
 {
   using namespace mdl::HitFilters;
+
+  // 右键拖动时锁定光标
+  if ((shouldLook(inputState) || shouldOrbit(inputState)) && m_widget && !m_cursorLocked) {
+    // 捕获鼠标
+    if (m_widget->windowHandle())
+      m_widget->windowHandle()->setMouseGrabEnabled(true);
+    else
+      m_widget->grabMouse();
+    // 隐藏光标
+    m_widget->setCursor(Qt::BlankCursor);
+    // 记录中心点并重置
+    m_center = m_widget->rect().center();
+    QCursor::setPos(m_widget->mapToGlobal(m_center));
+    m_cursorLocked = true;
+    // 最优解：同步InputState的鼠标参考点，消除初始delta跳变
+    const_cast<InputState&>(inputState).mouseMove(float(m_center.x()), float(m_center.y()), 0.0f, 0.0f);
+  }
 
   if (shouldOrbit(inputState))
   {
@@ -348,6 +383,17 @@ std::unique_ptr<GestureTracker> CameraTool3D::acceptMouseDrag(
 bool CameraTool3D::cancel()
 {
   return false;
+}
+
+void CameraTool3D::releaseCursorLock() {
+  if (m_cursorLocked && m_widget) {
+    if (m_widget->windowHandle())
+      m_widget->windowHandle()->setMouseGrabEnabled(false);
+    else
+      m_widget->releaseMouse();
+    m_widget->unsetCursor();
+    m_cursorLocked = false;
+  }
 }
 
 } // namespace tb::ui

@@ -23,6 +23,8 @@
 #include "ui/ToolController.h"
 
 #include <memory>
+#include <QWidget>
+#include <QPoint>
 
 namespace tb::render
 {
@@ -37,9 +39,13 @@ class CameraTool3D : public ToolController, public Tool
 {
 private:
   render::PerspectiveCamera& m_camera;
+  QWidget* m_widget = nullptr;
+  bool m_cursorLocked = false;
+  QPoint m_center;
 
 public:
-  explicit CameraTool3D(render::PerspectiveCamera& camera);
+  explicit CameraTool3D(render::PerspectiveCamera& camera, QWidget* widget);
+  void releaseCursorLock();
 
 private:
   Tool& tool() override;

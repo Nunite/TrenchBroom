@@ -99,7 +99,7 @@ void MapView3D::initializeCamera()
 
 void MapView3D::initializeToolChain(MapViewToolBox& toolBox)
 {
-  addTool(std::make_unique<CameraTool3D>(*m_camera));
+  addTool(std::make_unique<CameraTool3D>(*m_camera, this));
   addTool(std::make_unique<MoveObjectsToolController>(toolBox.moveObjectsTool()));
   addTool(std::make_unique<RotateObjectsToolController3D>(toolBox.rotateObjectsTool()));
   addTool(std::make_unique<ScaleObjectsToolController3D>(
@@ -171,6 +171,15 @@ void MapView3D::focusInEvent(QFocusEvent* event)
 void MapView3D::focusOutEvent(QFocusEvent* event)
 {
   m_flyModeHelper->resetKeys();
+
+  // 失焦时释放3D相机光标锁定
+  // 遍历toolChain，找到CameraTool3D并调用releaseCursorLock
+  if (m_toolBox.activeTool()) {
+    auto* cameraTool = dynamic_cast<tb::ui::CameraTool3D*>(m_toolBox.activeTool());
+    if (cameraTool) {
+      cameraTool->releaseCursorLock();
+    }
+  }
 
   MapViewBase::focusOutEvent(event);
 }
