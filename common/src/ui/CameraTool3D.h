@@ -51,6 +51,7 @@ private:
   Tool& tool() override;
   const Tool& tool() const override;
 
+  void mouseDown(const InputState& inputState) override;
   void mouseScroll(const InputState& inputState) override;
   void mouseUp(const InputState& inputState) override;
 

@@ -291,6 +291,26 @@ const Tool& CameraTool3D::tool() const
   return *this;
 }
 
+void CameraTool3D::mouseDown(const InputState& inputState)
+{
+  // 右键按下直接激活飞行模式
+  if (shouldLook(inputState) && m_widget && !m_cursorLocked) {
+    // 捕获鼠标
+    if (m_widget->windowHandle())
+      m_widget->windowHandle()->setMouseGrabEnabled(true);
+    else
+      m_widget->grabMouse();
+    // 隐藏光标
+    m_widget->setCursor(Qt::BlankCursor);
+    // 记录中心点并重置
+    m_center = m_widget->rect().center();
+    QCursor::setPos(m_widget->mapToGlobal(m_center));
+    m_cursorLocked = true;
+    // 同步InputState的鼠标参考点，消除初始delta跳变
+    const_cast<InputState&>(inputState).mouseMove(float(m_center.x()), float(m_center.y()), 0.0f, 0.0f);
+  }
+}
+
 void CameraTool3D::mouseScroll(const InputState& inputState)
 {
   const float factor = pref(Preferences::CameraMouseWheelInvert) ? -1.0f : 1.0f;
@@ -340,23 +360,6 @@ std::unique_ptr<GestureTracker> CameraTool3D::acceptMouseDrag(
   const InputState& inputState)
 {
   using namespace mdl::HitFilters;
-
-  // 右键拖动时锁定光标
-  if ((shouldLook(inputState) || shouldOrbit(inputState)) && m_widget && !m_cursorLocked) {
-    // 捕获鼠标
-    if (m_widget->windowHandle())
-      m_widget->windowHandle()->setMouseGrabEnabled(true);
-    else
-      m_widget->grabMouse();
-    // 隐藏光标
-    m_widget->setCursor(Qt::BlankCursor);
-    // 记录中心点并重置
-    m_center = m_widget->rect().center();
-    QCursor::setPos(m_widget->mapToGlobal(m_center));
-    m_cursorLocked = true;
-    // 最优解：同步InputState的鼠标参考点，消除初始delta跳变
-    const_cast<InputState&>(inputState).mouseMove(float(m_center.x()), float(m_center.y()), 0.0f, 0.0f);
-  }
 
   if (shouldOrbit(inputState))
   {
