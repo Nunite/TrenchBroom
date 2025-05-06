@@ -1094,6 +1094,11 @@ bool EntityPropertyModel::updateProperty(
   {
     if (const auto* oldValue = node->entity().property(key))
     {
+      if (!isPropertyValueMutable(node->entity(), key))
+      {
+        return false;
+      }
+      
       ensure(
         isPropertyValueMutable(node->entity(), key),
         "tried to modify immutable property value"); // this should be guaranteed by
