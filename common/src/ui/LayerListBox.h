@@ -24,10 +24,12 @@
 
 #include <memory>
 #include <vector>
+#include <QTreeWidget>
 
 class QLabel;
 class QAbstractButton;
-class QListWidget;
+class QLineEdit;
+class QComboBox;
 
 namespace tb::mdl
 {
@@ -39,84 +41,93 @@ namespace tb::ui
 {
 class MapDocument;
 
-class LayerListBoxWidget : public ControlListBoxItemRenderer
+class LayerTreeWidget : public QTreeWidget
 {
-  Q_OBJECT
+    Q_OBJECT
 private:
-  std::weak_ptr<MapDocument> m_document;
-  mdl::LayerNode* m_layer = nullptr;
-  QAbstractButton* m_activeButton = nullptr;
-  QLabel* m_nameText = nullptr;
-  QLabel* m_infoText = nullptr;
-  QAbstractButton* m_omitFromExportButton = nullptr;
-  QAbstractButton* m_hiddenButton = nullptr;
-  QAbstractButton* m_lockButton = nullptr;
+    std::weak_ptr<MapDocument> m_document;
+    QIcon m_worldIcon;
+    QIcon m_layerIcon;
+    QIcon m_groupIcon;
+    QIcon m_entityIcon;
+    QIcon m_brushIcon;
+    QIcon m_visibleIcon;
+    QIcon m_hiddenIcon;
+    QIcon m_lockedIcon;
+    QIcon m_unlockedIcon;
 
-public:
-  LayerListBoxWidget(
-    std::weak_ptr<MapDocument> document,
-    mdl::LayerNode* layer,
-    QWidget* parent = nullptr);
+    void loadIcons();
+    void setupTreeItem(QTreeWidgetItem* item, mdl::Node* node);
+    void addEntityToTree(QTreeWidgetItem* parentItem, mdl::Node* node);
+    void addGroupToTree(QTreeWidgetItem* parentItem, mdl::Node* node);
+    
+    // 展开状态保存和恢复方法
+    void saveExpandedState(QMap<QString, bool>& state);
+    void saveItemExpandedState(QTreeWidgetItem* item, const QString& path, QMap<QString, bool>& state);
+    void restoreExpandedState(const QMap<QString, bool>& state);
+    void restoreItemExpandedState(QTreeWidgetItem* item, const QString& path, const QMap<QString, bool>& state);
 
-  void updateItem() override;
+protected:
+    void drawRow(QPainter* painter, const QStyleOptionViewItem& options, const QModelIndex& index) const override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    
+    // 拖拽相关方法
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
-private:
-  void updateLayerItem();
-
-public:
-  mdl::LayerNode* layer() const;
-
-private:
-  bool eventFilter(QObject* target, QEvent* event) override;
 signals:
-  void layerActiveClicked(mdl::LayerNode* layer);
-  void layerOmitFromExportToggled(mdl::LayerNode* layer);
-  void layerVisibilityToggled(mdl::LayerNode* layer);
-  void layerLockToggled(mdl::LayerNode* layer);
-  void layerDoubleClicked(mdl::LayerNode* layer);
-  void layerRightClicked(mdl::LayerNode* layer);
+    void nodeVisibilityToggled(mdl::Node* node);
+    void nodeLockToggled(mdl::Node* node);
+    void nodeActivated(mdl::Node* node);
+    void nodeRightClicked(mdl::Node* node, const QPoint& pos);
+
+public:
+    explicit LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
+    void updateTree();
 };
 
-class LayerListBox : public ControlListBox
+class LayerListBox : public QWidget
 {
-  Q_OBJECT
+    Q_OBJECT
 private:
-  std::weak_ptr<MapDocument> m_document;
+    std::weak_ptr<MapDocument> m_document;
+    NotifierConnection m_notifierConnection;
+    QLineEdit* m_searchBox;
+    QComboBox* m_sortOptions;
+    LayerTreeWidget* m_treeWidget;
 
-  NotifierConnection m_notifierConnection;
+    void createGui();
+    void connectObservers();
+    void filterTree(const QString& text);
+    void sortTree(int index);
+
+    // 新增辅助方法
+    void showAllItems(QTreeWidgetItem* item);
+    bool itemMatchesFilter(QTreeWidgetItem* item, const QString& text);
+    void sortByType();
+
+    // 通知处理函数
+    void documentDidChange(MapDocument*);
+    void nodesDidChange(const std::vector<mdl::Node*>&);
 
 public:
-  explicit LayerListBox(std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
+    explicit LayerListBox(std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
 
-  mdl::LayerNode* selectedLayer() const;
-  void setSelectedLayer(mdl::LayerNode* layer);
-  void updateSelectionForRemoval();
+    mdl::LayerNode* selectedLayer() const;
+    void setSelectedLayer(mdl::LayerNode* layer);
+    void updateSelectionForRemoval();
+    void updateTree();
 
-private:
-  size_t itemCount() const override;
-
-  ControlListBoxItemRenderer* createItemRenderer(QWidget* parent, size_t index) override;
-
-  void selectedRowChanged(int index) override;
-
-private:
-  void connectObservers();
-
-  void documentDidChange(MapDocument* document);
-  void nodesDidChange(const std::vector<mdl::Node*>& nodes);
-  void currentLayerDidChange(const mdl::LayerNode* layer);
-
-  const LayerListBoxWidget* widgetAtRow(int row) const;
-  mdl::LayerNode* layerForRow(int row) const;
-
-  std::vector<mdl::LayerNode*> layers() const;
 signals:
-  void layerSelected(mdl::LayerNode* layer);
-  void layerSetCurrent(mdl::LayerNode* layer);
-  void layerRightClicked(mdl::LayerNode* layer);
-  void layerOmitFromExportToggled(mdl::LayerNode* layer);
-  void layerVisibilityToggled(mdl::LayerNode* layer);
-  void layerLockToggled(mdl::LayerNode* layer);
+    void layerSelected(mdl::LayerNode* layer);
+    void layerSetCurrent(mdl::LayerNode* layer);
+    void layerRightClicked(mdl::LayerNode* layer);
+    void layerOmitFromExportToggled(mdl::LayerNode* layer);
+    void layerVisibilityToggled(mdl::LayerNode* layer);
+    void layerLockToggled(mdl::LayerNode* layer);
+    void itemSelectionChanged();
 };
 
 } // namespace tb::ui
