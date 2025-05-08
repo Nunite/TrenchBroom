@@ -88,7 +88,7 @@ LayerTreeWidget::LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* p
     connect(this, &QTreeWidget::itemSelectionChanged, this, &LayerTreeWidget::onItemSelectionChanged);
     
     // 在文档中监听选择变化
-    auto documentS = kdl::mem_lock(m_document);
+  auto documentS = kdl::mem_lock(m_document);
     if (documentS) {
         m_notifierConnection += documentS->selectionDidChangeNotifier.connect(
             this, &LayerTreeWidget::onDocumentSelectionChanged);
@@ -273,7 +273,7 @@ void LayerTreeWidget::keyPressEvent(QKeyEvent* event)
     
     // 其他键按下，调用父类处理
     QTreeWidget::keyPressEvent(event);
-}
+  }
 
 // 重写拖拽开始事件，控制哪些项可以被拖拽
 void LayerTreeWidget::dragEnterEvent(QDragEnterEvent* event)
@@ -324,7 +324,7 @@ void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
     if (isSourceLayer && isTargetLayer) {
         event->acceptProposedAction();
         return;
-    }
+}
 
     // 允许实体拖拽到图层或组
     if (isSourceEntity && (isTargetLayer || isTargetGroup)) {
@@ -381,8 +381,8 @@ void LayerTreeWidget::dropEvent(QDropEvent* event)
             // 接受拖放事件
             event->acceptProposedAction();
             return;
-        }
     }
+  }
     
     // 对于其他类型的拖放（如图层重排序），使用默认处理
     QTreeWidget::dropEvent(event);
@@ -395,7 +395,7 @@ void LayerTreeWidget::dropEvent(QDropEvent* event)
 
 // 为LayerTreeWidget添加新方法用于同步选择
 void LayerTreeWidget::syncSelectionFromDocument()
-{
+  {
     auto document = kdl::mem_lock(m_document);
     if (!document) return;
     
@@ -415,7 +415,7 @@ void LayerTreeWidget::syncSelectionFromDocument()
 
 // 在树中查找并选择指定节点
 bool LayerTreeWidget::findAndSelectNode(const mdl::Node* targetNode, QTreeWidgetItem* startItem)
-{
+    {
     if (!startItem) return false;
     
     // 检查当前项
@@ -423,7 +423,7 @@ bool LayerTreeWidget::findAndSelectNode(const mdl::Node* targetNode, QTreeWidget
     if (node == targetNode) {
         startItem->setSelected(true);
         scrollToItem(startItem);
-        return true;
+      return true;
     }
     
     // 递归检查子项
@@ -550,7 +550,7 @@ void LayerListBox::createGui()
             [this](mdl::Node* node) {
                 if (auto* layer = dynamic_cast<mdl::LayerNode*>(node)) {
                     emit layerLockToggled(layer);
-                }
+  }
             });
     
     connect(m_treeWidget, &LayerTreeWidget::nodeActivated, this,
@@ -564,7 +564,7 @@ void LayerListBox::createGui()
             [this](mdl::Node* node, const QPoint& pos) {
                 if (auto* layer = dynamic_cast<mdl::LayerNode*>(node)) {
                     emit layerRightClicked(layer);
-                }
+  }
             });
 }
 
@@ -594,7 +594,7 @@ void LayerListBox::nodesDidChange(const std::vector<mdl::Node*>&)
 }
 
 void LayerListBox::filterTree(const QString& text)
-{
+  {
     // 清空之前的过滤状态
     for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
         QTreeWidgetItem* item = m_treeWidget->topLevelItem(i);
@@ -611,7 +611,7 @@ void LayerListBox::filterTree(const QString& text)
         QTreeWidgetItem* item = m_treeWidget->topLevelItem(i);
         bool matches = itemMatchesFilter(item, text);
         item->setHidden(!matches);
-    }
+}
 }
 
 // 显示所有项目
@@ -624,7 +624,7 @@ void LayerListBox::showAllItems(QTreeWidgetItem* item)
     // 递归处理所有子项
     for (int i = 0; i < item->childCount(); ++i) {
         showAllItems(item->child(i));
-    }
+  }
 }
 
 // 检查项目是否匹配过滤条件

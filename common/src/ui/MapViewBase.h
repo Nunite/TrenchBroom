@@ -294,6 +294,7 @@ public: // view filters
   bool event(QEvent* event) override;
   void focusInEvent(QFocusEvent* event) override;
   void focusOutEvent(QFocusEvent* event) override;
+  void enterEvent(QEnterEvent* event) override;
 
 public:
   ActionContext::Type actionContext() const;
