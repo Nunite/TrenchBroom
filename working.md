@@ -15,7 +15,7 @@
 ## 工作计划
 1. ⏱️ 调研现有UI框架，确定实现方式
 2. ⏱️ 设计统一的层级/实体列表UI组件和交互方式
-3. ⏱️ 扩展现有LayerEditor功能，增加实体列表显示
+3. ⏱️ 扩展现有LayerListBox功能，增加实体列表显示
 4. ⏱️ 添加分层、分组和排序功能
 5. ⏱️ 实现与3D视图的选择同步
 6. ⏱️ 添加搜索、过滤功能
@@ -33,14 +33,14 @@
 - 每个层级显示了包含的对象数量，以及提供了可见性和锁定控制
 - `MapInspector.h`中定义了MapInspector类，它是一个TabBookPage，包含了地图检查器的所有功能
 - 在MapInspector的createGui方法中添加各种面板，当前已有：
-  1. 图层编辑器（LayerEditor）：管理地图中的图层
+  1. 图层编辑器（LayerListBox）：管理地图中的图层
   2. 地图属性编辑器（MapPropertiesEditor）：管理地图属性如软边界
   3. Mod编辑器（ModEditor）：管理游戏Mod
-- 方案调整：不创建新的EntityListEditor组件，而是扩展现有的LayerEditor功能，将其转变为一个统一的大纲视图（类似Unreal Engine大纲面板）
+- 方案调整：不创建新的EntityListEditor组件，而是扩展现有的LayerListBox功能，将其转变为一个统一的大纲视图（类似Unreal Engine大纲面板）
 - 这样可以避免功能重复的两个面板，提供更一致的用户体验
 
 ## 下一步任务
-1. ⏱️ 扩展现有LayerEditor类：
+1. ⏱️ 扩展现有LayerListBox.cpp类：
    - 重构现有LayerEntityTreeView以支持显示整个场景层次结构（图层、实体、刷子等）
    - 添加搜索筛选和排序功能
    - 保留现有的图层管理功能
@@ -53,7 +53,7 @@
    - 实现实体的选择、定位功能
    - 保留图层的可见性和锁定控制，扩展到实体
 4. ⏱️ 更新MapInspector中的相关代码以适应改动：
-   - 更新createLayerEditor方法
+   - 更新createLayerListBox方法
 
 ## 进度跟踪
 ⚙️ 需求分析阶段
@@ -61,6 +61,16 @@
 ⚙️ 方案调整阶段
 
 ## 重要信息
+- 加载icon的方法:ResourceUtils.h 
+参考PreferenceDialog.cpp:
+  const auto gamesImage = io::loadSVGIcon("GeneralPreferences.svg");
+  const auto viewImage = io::loadSVGIcon("ViewPreferences.svg");
+  const auto colorsImage = io::loadSVGIcon("ColorPreferences.svg");
+  const auto mouseImage = io::loadSVGIcon("MousePreferences.svg");
+  const auto keyboardImage = io::loadSVGIcon("KeyboardPreferences.svg");
+  const auto languageImage = io::loadSVGIcon("LanguagePreferences.svg");
+  const auto updateImage = io::loadSVGIcon("UpdatePreferences.svg");
+
 - 功能对比：Hammer编辑器中类似功能为Entity Report模态窗口和自动Visgroups侧边栏
 - 现代标准：Max/Maya/Unity/Unreal/Godot/Blender都采用统一的场景层次结构视图
 - 关键功能点：
@@ -77,12 +87,12 @@
   - 将TB提升为现代游戏编辑器工具标准
 - 实现策略调整：
   - 不再创建单独的EntityListEditor组件
-  - 而是扩展LayerEditor成为统一的场景大纲视图
+  - 而是扩展LayerListBox成为统一的场景大纲视图
   - 这种方式更符合现代游戏引擎的设计理念（如Unreal Engine的大纲视图）
   - 避免功能重复，提供更一致的用户体验
 
 ## 错误处理方案
 - 可能问题：对于大型地图，列表也会变得很笨重，需要考虑搜索筛选功能
 - 需要更好的方法来表示世界刷子
-- 潜在问题：扩展现有LayerEditor可能需要大量修改，需要确保不破坏现有功能
+- 潜在问题：扩展现有LayerListBox可能需要大量修改，需要确保不破坏现有功能
 
