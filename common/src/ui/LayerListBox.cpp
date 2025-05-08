@@ -50,9 +50,10 @@ namespace tb::ui
 LayerTreeWidget::LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* parent)
     : QTreeWidget(parent)
     , m_document(std::move(document))
+    , m_syncingSelection(false)
 {
     setHeaderHidden(true);
-    setSelectionMode(QAbstractItemView::SingleSelection);
+    setSelectionMode(QAbstractItemView::ExtendedSelection); // 允许多选
     setDragEnabled(true);
     setDragDropMode(QAbstractItemView::InternalMove);
     setDefaultDropAction(Qt::MoveAction);
@@ -81,6 +82,16 @@ LayerTreeWidget::LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* p
     // 启用自定义拖放
     setAcceptDrops(true);
     viewport()->setAcceptDrops(true);
+    
+    // 连接选择变化信号
+    connect(this, &QTreeWidget::itemSelectionChanged, this, &LayerTreeWidget::onItemSelectionChanged);
+    
+    // 在文档中监听选择变化
+    auto documentS = kdl::mem_lock(m_document);
+    if (documentS) {
+        m_notifierConnection += documentS->selectionDidChangeNotifier.connect(
+            this, &LayerTreeWidget::onDocumentSelectionChanged);
+    }
 }
 
 void LayerTreeWidget::loadIcons()
@@ -354,6 +365,94 @@ void LayerTreeWidget::dropEvent(QDropEvent* event)
     // 确保目标项展开
     if (targetItem) {
         targetItem->setExpanded(true);
+    }
+}
+
+// 为LayerTreeWidget添加新方法用于同步选择
+void LayerTreeWidget::syncSelectionFromDocument()
+{
+    auto document = kdl::mem_lock(m_document);
+    if (!document) return;
+    
+    // 获取当前文档中选择的对象
+    const auto& selectedNodes = document->selectedNodes().nodes();
+    if (selectedNodes.empty()) {
+        clearSelection();
+        return;
+    }
+    
+    // 寻找并选择树中对应的项
+    clearSelection();
+    for (const auto* node : selectedNodes) {
+        findAndSelectNode(node, invisibleRootItem());
+    }
+}
+
+// 在树中查找并选择指定节点
+bool LayerTreeWidget::findAndSelectNode(const mdl::Node* targetNode, QTreeWidgetItem* startItem)
+{
+    if (!startItem) return false;
+    
+    // 检查当前项
+    auto* node = startItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    if (node == targetNode) {
+        startItem->setSelected(true);
+        scrollToItem(startItem);
+        return true;
+    }
+    
+    // 递归检查子项
+    for (int i = 0; i < startItem->childCount(); ++i) {
+        if (findAndSelectNode(targetNode, startItem->child(i))) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// 从树项选择同步到文档
+void LayerTreeWidget::syncSelectionToDocument()
+{
+    auto document = kdl::mem_lock(m_document);
+    if (!document) return;
+    
+    const auto selectedItems = this->selectedItems();
+    if (selectedItems.empty()) {
+        return; // 不在列表没有选择时清除主视图选择，以避免意外的选择丢失
+    }
+    
+    std::vector<mdl::Node*> nodesToSelect;
+    for (auto* item : selectedItems) {
+        auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
+        if (node) {
+            nodesToSelect.push_back(node);
+        }
+    }
+    
+    if (!nodesToSelect.empty()) {
+        document->deselectAll();
+        document->selectNodes(nodesToSelect);
+    }
+}
+
+// 处理列表选择变化
+void LayerTreeWidget::onItemSelectionChanged()
+{
+    if (!m_syncingSelection) {
+        m_syncingSelection = true;
+        syncSelectionToDocument();
+        m_syncingSelection = false;
+    }
+}
+
+// 处理文档选择变化
+void LayerTreeWidget::onDocumentSelectionChanged(const Selection& selection)
+{
+    if (!m_syncingSelection) {
+        m_syncingSelection = true;
+        syncSelectionFromDocument();
+        m_syncingSelection = false;
     }
 }
 

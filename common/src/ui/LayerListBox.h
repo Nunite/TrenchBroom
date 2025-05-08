@@ -40,6 +40,7 @@ class Node;
 namespace tb::ui
 {
 class MapDocument;
+class Selection;
 
 class LayerTreeWidget : public QTreeWidget
 {
@@ -55,11 +56,19 @@ private:
     QIcon m_hiddenIcon;
     QIcon m_lockedIcon;
     QIcon m_unlockedIcon;
+    bool m_syncingSelection;
+    NotifierConnection m_notifierConnection;
 
     void loadIcons();
     void setupTreeItem(QTreeWidgetItem* item, mdl::Node* node);
     void addEntityToTree(QTreeWidgetItem* parentItem, mdl::Node* node);
     void addGroupToTree(QTreeWidgetItem* parentItem, mdl::Node* node);
+    
+    void syncSelectionFromDocument();
+    bool findAndSelectNode(const mdl::Node* targetNode, QTreeWidgetItem* startItem);
+    void syncSelectionToDocument();
+    void onItemSelectionChanged();
+    void onDocumentSelectionChanged(const Selection& selection);
 
 protected:
     void drawRow(QPainter* painter, const QStyleOptionViewItem& options, const QModelIndex& index) const override;
