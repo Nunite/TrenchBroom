@@ -86,11 +86,11 @@ LayerTreeWidget::LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* p
 void LayerTreeWidget::loadIcons()
 {
     // 加载各种图标
-    m_worldIcon = io::loadSVGIcon("World.svg");
-    m_layerIcon = io::loadSVGIcon("Layer.svg");
-    m_groupIcon = io::loadSVGIcon("Group.svg");
-    m_entityIcon = io::loadSVGIcon("Entity.svg");
-    m_brushIcon = io::loadSVGIcon("Brush.svg");
+    m_worldIcon = io::loadSVGIcon("Map_fullcube.svg");  // 世界刷子（实心立方体）
+    m_layerIcon = io::loadSVGIcon("Layer.svg");  // 图层图标
+    m_groupIcon = io::loadSVGIcon("Map_folder.svg");  // 分组（线框文件夹）
+    m_entityIcon = io::loadSVGIcon("Map_entity.svg");  // 点实体（线框基准）
+    m_brushIcon = io::loadSVGIcon("Map_cube.svg");  // 刷子实体（线框立方体）
     m_visibleIcon = io::loadSVGIcon("Visible.svg");
     m_hiddenIcon = io::loadSVGIcon("Hidden.svg");
     m_lockedIcon = io::loadSVGIcon("Locked.svg");
@@ -110,14 +110,21 @@ void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
         item->setIcon(0, m_layerIcon);
         item->setText(1, tr("%1 objects").arg(layer->childCount()));
     } else if (auto* group = dynamic_cast<mdl::GroupNode*>(node)) {
-        item->setIcon(0, m_groupIcon);
+        item->setIcon(0, m_groupIcon);  // 使用文件夹图标表示组
         item->setText(1, tr("%1 objects").arg(group->childCount()));
     } else if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
-        item->setIcon(0, m_entityIcon);
+        // 检查是否为世界实体（属于默认图层的刷子）
+        if (entity->parent() && dynamic_cast<mdl::LayerNode*>(entity->parent()) && 
+            entity->parent()->name() == "Default Layer") {
+            item->setIcon(0, m_worldIcon);  // 使用实心立方体图标
+        } else {
+            item->setIcon(0, m_entityIcon);  // 使用线框基准图标
+        }
+        
         // 使用名称显示，不显示classname
         item->setText(0, QString::fromStdString(entity->name()));
     } else if (auto* brush = dynamic_cast<mdl::BrushNode*>(node)) {
-        item->setIcon(0, m_brushIcon);
+        item->setIcon(0, m_brushIcon);  // 使用线框立方体图标
     }
 
     // 设置可见性和锁定状态
