@@ -150,10 +150,6 @@ void LayerTreeWidget::addGroupToTree(QTreeWidgetItem* parentItem, mdl::Node* nod
 
 void LayerTreeWidget::updateTree()
 {
-    // 保存当前展开状态
-    QMap<QString, bool> expandedState;
-    saveExpandedState(expandedState);
-    
     clear();
 
     auto document = kdl::mem_lock(m_document);
@@ -187,84 +183,10 @@ void LayerTreeWidget::updateTree()
             }
         }
         
-        // 第一次加载时展开所有图层
-        if (expandedState.isEmpty()) {
-            // 只展开顶级图层，不展开子项
-            for (int i = 0; i < topLevelItemCount(); ++i) {
-                auto* item = topLevelItem(i);
-                item->setExpanded(true);
-            }
-        } else {
-            // 恢复之前的展开状态
-            restoreExpandedState(expandedState);
+        // 展开顶级项
+        for (int i = 0; i < this->topLevelItemCount(); ++i) {
+            this->topLevelItem(i)->setExpanded(true);
         }
-    }
-}
-
-// 保存树中所有项的展开状态
-void LayerTreeWidget::saveExpandedState(QMap<QString, bool>& state)
-{
-    for (int i = 0; i < topLevelItemCount(); ++i) {
-        QTreeWidgetItem* item = topLevelItem(i);
-        saveItemExpandedState(item, "", state);
-    }
-}
-
-// 递归保存单个项目的展开状态
-void LayerTreeWidget::saveItemExpandedState(QTreeWidgetItem* item, const QString& path, QMap<QString, bool>& state)
-{
-    if (!item) return;
-    
-    QString currentPath = path;
-    if (!currentPath.isEmpty()) currentPath += "/";
-    
-    auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
-    if (node) {
-        currentPath += QString::fromStdString(node->name());
-        state[currentPath] = item->isExpanded();
-    } else {
-        currentPath += item->text(0);
-        state[currentPath] = item->isExpanded();
-    }
-    
-    // 递归处理子项
-    for (int i = 0; i < item->childCount(); ++i) {
-        saveItemExpandedState(item->child(i), currentPath, state);
-    }
-}
-
-// 恢复树中所有项的展开状态
-void LayerTreeWidget::restoreExpandedState(const QMap<QString, bool>& state)
-{
-    for (int i = 0; i < topLevelItemCount(); ++i) {
-        QTreeWidgetItem* item = topLevelItem(i);
-        restoreItemExpandedState(item, "", state);
-    }
-}
-
-// 递归恢复单个项目的展开状态
-void LayerTreeWidget::restoreItemExpandedState(QTreeWidgetItem* item, const QString& path, const QMap<QString, bool>& state)
-{
-    if (!item) return;
-    
-    QString currentPath = path;
-    if (!currentPath.isEmpty()) currentPath += "/";
-    
-    auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
-    if (node) {
-        currentPath += QString::fromStdString(node->name());
-    } else {
-        currentPath += item->text(0);
-    }
-    
-    // 恢复当前项的展开状态
-    if (state.contains(currentPath)) {
-        item->setExpanded(state[currentPath]);
-    }
-    
-    // 递归处理子项
-    for (int i = 0; i < item->childCount(); ++i) {
-        restoreItemExpandedState(item->child(i), currentPath, state);
     }
 }
 
@@ -380,23 +302,49 @@ void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
 // 重写放置事件，实现实际的节点移动
 void LayerTreeWidget::dropEvent(QDropEvent* event)
 {
-    // 保存当前展开状态
-    QMap<QString, bool> expandedState;
-    saveExpandedState(expandedState);
-    
-    // 记录目标项
+    // 记录源项和目标项
+    QTreeWidgetItem* sourceItem = this->currentItem();
     QTreeWidgetItem* targetItem = itemAt(event->position().toPoint());
     
-    // 使用默认处理
+    if (!sourceItem || !targetItem) {
+        event->ignore();
+        return;
+    }
+    
+    // 获取源节点和目标节点
+    auto* sourceNode = sourceItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    auto* targetNode = targetItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    
+    if (!sourceNode || !targetNode) {
+        event->ignore();
+        return;
+    }
+    
+    // 如果源节点是实体，目标节点是图层或组，则进行实际的节点移动
+    bool isSourceEntity = dynamic_cast<mdl::EntityNode*>(sourceNode) != nullptr ||
+                         dynamic_cast<mdl::BrushNode*>(sourceNode) != nullptr;
+    bool isTargetLayer = dynamic_cast<mdl::LayerNode*>(targetNode) != nullptr;
+    bool isTargetGroup = dynamic_cast<mdl::GroupNode*>(targetNode) != nullptr;
+    
+    auto document = kdl::mem_lock(m_document);
+    
+    if (isSourceEntity && (isTargetLayer || isTargetGroup)) {
+        // 使用 MapDocument 的 API 进行实际的节点移动
+        if (document) {
+            std::map<mdl::Node*, std::vector<mdl::Node*>> nodesToReparent;
+            nodesToReparent[targetNode].push_back(sourceNode);
+            document->reparentNodes(nodesToReparent);
+            
+            // 接受拖放事件
+            event->acceptProposedAction();
+            return;
+        }
+    }
+    
+    // 对于其他类型的拖放（如图层重排序），使用默认处理
     QTreeWidget::dropEvent(event);
     
-    // 拖放完成后更新数据
-    updateTree();
-    
-    // 恢复之前的展开状态
-    restoreExpandedState(expandedState);
-    
-    // 确保拖放目标展开
+    // 确保目标项展开
     if (targetItem) {
         targetItem->setExpanded(true);
     }

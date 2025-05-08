@@ -60,12 +60,6 @@ private:
     void setupTreeItem(QTreeWidgetItem* item, mdl::Node* node);
     void addEntityToTree(QTreeWidgetItem* parentItem, mdl::Node* node);
     void addGroupToTree(QTreeWidgetItem* parentItem, mdl::Node* node);
-    
-    // 展开状态保存和恢复方法
-    void saveExpandedState(QMap<QString, bool>& state);
-    void saveItemExpandedState(QTreeWidgetItem* item, const QString& path, QMap<QString, bool>& state);
-    void restoreExpandedState(const QMap<QString, bool>& state);
-    void restoreItemExpandedState(QTreeWidgetItem* item, const QString& path, const QMap<QString, bool>& state);
 
 protected:
     void drawRow(QPainter* painter, const QStyleOptionViewItem& options, const QModelIndex& index) const override;
