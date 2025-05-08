@@ -65,17 +65,41 @@ LayerTreeWidget::LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* p
     setAllColumnsShowFocus(true);
     setColumnCount(3); // 名称、对象数量、控制按钮
     header()->setStretchLastSection(false);
-    header()->setSectionResizeMode(0, QHeaderView::Stretch);
-    header()->setSectionResizeMode(1, QHeaderView::Fixed);
-    header()->setSectionResizeMode(2, QHeaderView::Fixed);
-    header()->setDefaultSectionSize(60);
+    header()->setSectionResizeMode(0, QHeaderView::Stretch);  // 名称列自动拉伸
+    header()->setSectionResizeMode(1, QHeaderView::Fixed);    // 数量列固定宽度
+    header()->setSectionResizeMode(2, QHeaderView::Fixed);    // 控制按钮列固定宽度
+    header()->setDefaultSectionSize(80);  // 增加默认列宽
     
     // 美化样式
     setStyleSheet(
-        "QTreeWidget { background-color: #2D2D30; color: #E0E0E0; border: none; }"
-        "QTreeWidget::item { height: 24px; padding: 2px 0px; }"
-        "QTreeWidget::item:selected { background-color: #3F3F46; }"
-        "QTreeWidget::item:hover { background-color: #2A2A2D; }"
+        "QTreeWidget { "
+        "   background-color: #2D2D30;"
+        "   color: #E0E0E0;"
+        "   border: none;"
+        "   font-size: 12px;"
+        "}"
+        "QTreeWidget::item { "
+        "   height: 28px;"  // 增加项目高度
+        "   padding: 4px 0px;"
+        "}"
+        "QTreeWidget::item:selected { "
+        "   background-color: #3F3F46;"
+        "}"
+        "QTreeWidget::item:hover { "
+        "   background-color: #2A2A2D;"
+        "}"
+        // 优化滚动条样式
+        "QScrollBar:vertical {"
+        "   background-color: #2D2D30;"
+        "   width: 12px;"
+        "}"
+        "QScrollBar::handle:vertical {"
+        "   background-color: #686868;"
+        "   min-height: 20px;"
+        "}"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
+        "   height: 0px;"
+        "}"
     );
 
     loadIcons();
@@ -117,26 +141,46 @@ void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
     item->setText(0, QString::fromStdString(node->name()));
     item->setData(0, Qt::UserRole, QVariant::fromValue(node));
 
-    // 根据节点类型设置图标
+    // 设置字体
+    QFont font = item->font(1);
+    font.setPointSize(10);
+    item->setFont(1, font);
+
+    // 根据节点类型设置图标和对象数量
     if (auto* layer = dynamic_cast<mdl::LayerNode*>(node)) {
         item->setIcon(0, m_layerIcon);
-        item->setText(1, tr("%1 objects").arg(layer->childCount()));
+        auto count = static_cast<qint64>(layer->childCount());  // 使用qint64避免溢出
+        QString countText;
+        if(count > 999) {
+            countText = QString("%1K").arg(count/1000.0, 0, 'f', 1);
+        } else {
+            countText = QString::number(count);
+        }
+        countText += tr(" objects");
+        item->setText(1, countText);
+        item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
     } else if (auto* group = dynamic_cast<mdl::GroupNode*>(node)) {
-        item->setIcon(0, m_groupIcon);  // 使用文件夹图标表示组
-        item->setText(1, tr("%1 objects").arg(group->childCount()));
+        item->setIcon(0, m_groupIcon);
+        auto count = static_cast<qint64>(group->childCount());  // 使用qint64避免溢出
+        QString countText;
+        if(count > 999) {
+            countText = QString("%1K").arg(count/1000.0, 0, 'f', 1);
+        } else {
+            countText = QString::number(count);
+        }
+        countText += tr(" objects");
+        item->setText(1, countText);
+        item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
     } else if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
-        // 检查是否为世界实体（属于默认图层的刷子）
         if (entity->parent() && dynamic_cast<mdl::LayerNode*>(entity->parent()) && 
             entity->parent()->name() == "Default Layer") {
-            item->setIcon(0, m_worldIcon);  // 使用实心立方体图标
+            item->setIcon(0, m_worldIcon);
         } else {
-            item->setIcon(0, m_entityIcon);  // 使用线框基准图标
+            item->setIcon(0, m_entityIcon);
         }
-        
-        // 使用名称显示，不显示classname
         item->setText(0, QString::fromStdString(entity->name()));
     } else if (auto* brush = dynamic_cast<mdl::BrushNode*>(node)) {
-        item->setIcon(0, m_brushIcon);  // 使用线框立方体图标
+        item->setIcon(0, m_brushIcon);
     }
 
     // 设置可见性和锁定状态
@@ -316,7 +360,6 @@ void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
     bool isSourceLayer = dynamic_cast<mdl::LayerNode*>(sourceNode) != nullptr;
     bool isTargetLayer = dynamic_cast<mdl::LayerNode*>(targetNode) != nullptr;
     bool isSourceEntity = dynamic_cast<mdl::EntityNode*>(sourceNode) != nullptr;
-    bool isTargetEntity = dynamic_cast<mdl::EntityNode*>(targetNode) != nullptr;
     bool isSourceGroup = dynamic_cast<mdl::GroupNode*>(sourceNode) != nullptr;
     bool isTargetGroup = dynamic_cast<mdl::GroupNode*>(targetNode) != nullptr;
 
@@ -324,12 +367,12 @@ void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
     if (isSourceLayer && isTargetLayer) {
         event->acceptProposedAction();
         return;
-}
+    }
 
     // 允许实体拖拽到图层或组
     if (isSourceEntity && (isTargetLayer || isTargetGroup)) {
         event->acceptProposedAction();
-      return;
+        return;
     }
 
     // 允许组拖拽到图层或其他组
@@ -472,7 +515,7 @@ void LayerTreeWidget::onItemSelectionChanged()
 }
 
 // 处理文档选择变化
-void LayerTreeWidget::onDocumentSelectionChanged(const Selection& selection)
+void LayerTreeWidget::onDocumentSelectionChanged(const Selection& /* selection */)
 {
     if (!m_syncingSelection) {
         m_syncingSelection = true;
@@ -495,36 +538,69 @@ void LayerListBox::createGui()
     // 创建搜索和排序控件
     m_searchBox = new QLineEdit();
     m_searchBox->setPlaceholderText(tr("Search..."));
+    m_searchBox->setStyleSheet(
+        "QLineEdit {"
+        "   background-color: #3F3F46;"
+        "   color: #E0E0E0;"
+        "   border: 1px solid #2D2D30;"
+        "   border-radius: 2px;"
+        "   padding: 4px;"
+        "   height: 24px;"
+        "}"
+    );
     
     m_sortOptions = new QComboBox();
     m_sortOptions->addItems({tr("Name"), tr("Type"), tr("Custom")});
+    m_sortOptions->setStyleSheet(
+        "QComboBox {"
+        "   background-color: #3F3F46;"
+        "   color: #E0E0E0;"
+        "   border: 1px solid #2D2D30;"
+        "   border-radius: 2px;"
+        "   padding: 4px;"
+        "   height: 24px;"
+        "   min-width: 100px;"
+        "}"
+        "QComboBox::drop-down {"
+        "   border: none;"
+        "}"
+        "QComboBox::down-arrow {"
+        "   image: none;"
+        "   width: 12px;"
+        "}"
+    );
 
     // 创建树形控件
     m_treeWidget = new LayerTreeWidget(m_document, this);
-    m_treeWidget->setMinimumHeight(300);  // 设置最小高度
-    m_treeWidget->setIndentation(20);  // 增加缩进，使层次结构更清晰
-    m_treeWidget->setIconSize(QSize(16, 16));  // 设置图标大小
+    m_treeWidget->setMinimumHeight(400);  // 增加最小高度
+    m_treeWidget->setIndentation(20);  // 增加缩进
+    m_treeWidget->setIconSize(QSize(16, 16));
+    
+    // 设置列宽
+    m_treeWidget->setColumnWidth(0, 240); // 名称列加宽
+    m_treeWidget->setColumnWidth(1, 100); // 数量列加宽
+    m_treeWidget->setColumnWidth(2, 80);  // 控制按钮列加宽
 
     // 创建顶部工具栏布局
     auto* toolbarLayout = new QHBoxLayout();
     toolbarLayout->setContentsMargins(
-        LayoutConstants::MediumHMargin,  // 增加水平边距
-        LayoutConstants::MediumVMargin,  // 增加垂直边距
+        LayoutConstants::MediumHMargin,
+        LayoutConstants::MediumVMargin, 
         LayoutConstants::MediumHMargin,
         LayoutConstants::MediumVMargin);
-    toolbarLayout->setSpacing(LayoutConstants::MediumHMargin);
+    toolbarLayout->setSpacing(LayoutConstants::WideHMargin);  // 增加间距
     toolbarLayout->addWidget(m_searchBox, 1);
     toolbarLayout->addWidget(m_sortOptions);
 
     // 创建主布局
     auto* mainLayout = new QVBoxLayout();
     mainLayout->setContentsMargins(0, 0, 0, 0);
-    mainLayout->setSpacing(LayoutConstants::MediumVMargin);  // 增加垂直间距
+    mainLayout->setSpacing(LayoutConstants::MediumVMargin);
     mainLayout->addLayout(toolbarLayout);
     mainLayout->addWidget(m_treeWidget, 1);
 
     setLayout(mainLayout);
-    setMinimumWidth(300);  // 设置整个组件的最小宽度
+    setMinimumWidth(450);  // 增加整体最小宽度
 
     // 连接信号
     connect(m_searchBox, &QLineEdit::textChanged, this, &LayerListBox::filterTree);
@@ -561,10 +637,10 @@ void LayerListBox::createGui()
             });
     
     connect(m_treeWidget, &LayerTreeWidget::nodeRightClicked, this,
-            [this](mdl::Node* node, const QPoint& pos) {
+            [this](mdl::Node* node, const QPoint& /* pos */) {
                 if (auto* layer = dynamic_cast<mdl::LayerNode*>(node)) {
                     emit layerRightClicked(layer);
-  }
+                }
             });
 }
 
