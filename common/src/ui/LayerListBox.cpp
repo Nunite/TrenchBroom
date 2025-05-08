@@ -31,6 +31,7 @@
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
+#include <QKeyEvent>
 
 #include "mdl/LayerNode.h"
 #include "mdl/WorldNode.h"
@@ -248,6 +249,25 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
 void LayerTreeWidget::drawRow(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
     QTreeWidget::drawRow(painter, option, index);
+}
+
+// 重写键盘按键事件，处理ESC键
+void LayerTreeWidget::keyPressEvent(QKeyEvent* event)
+{
+    // 检查是否按下ESC键
+    if (event->key() == Qt::Key_Escape) {
+        // 清除当前选择
+        clearSelection();
+        // 触发selectionDidChangeNotifier，同步到文档
+        syncSelectionToDocument();
+        // 让父部件处理焦点等其他操作
+        parentWidget()->setFocus();
+        event->accept();
+        return;
+    }
+    
+    // 其他键按下，调用父类处理
+    QTreeWidget::keyPressEvent(event);
 }
 
 // 重写拖拽开始事件，控制哪些项可以被拖拽
