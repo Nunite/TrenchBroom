@@ -256,10 +256,15 @@ void LayerTreeWidget::keyPressEvent(QKeyEvent* event)
 {
     // 检查是否按下ESC键
     if (event->key() == Qt::Key_Escape) {
-        // 清除当前选择
+        // 清除当前图层树控件的选择
         clearSelection();
-        // 触发selectionDidChangeNotifier，同步到文档
-        syncSelectionToDocument();
+        
+        // 同步到文档，以清除在场景中的所有选择
+        auto document = kdl::mem_lock(m_document);
+        if (document) {
+            document->deselectAll();
+        }
+        
         // 让父部件处理焦点等其他操作
         parentWidget()->setFocus();
         event->accept();
