@@ -117,11 +117,6 @@ signals:
   void layerOmitFromExportToggled(mdl::LayerNode* layer);
   void layerVisibilityToggled(mdl::LayerNode* layer);
   void layerLockToggled(mdl::LayerNode* layer);
-
-public:
-  void setShowEntities(bool show);
-  void setFilterText(const QString& text);
-  void setSortOrder(EntityListModel::SortType type, bool ascending);
 };
 
 } // namespace tb::ui

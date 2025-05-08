@@ -336,46 +336,4 @@ std::vector<mdl::LayerNode*> LayerListBox::layers() const
          | kdl::to_vector;
 }
 
-void LayerListBox::layerLockToggled(mdl::LayerNode* layer)
-{
-  emit LayerListBox::layerLockToggled(layer);
-}
-
-void LayerListBox::setShowEntities(bool show)
-{
-  // 在此处实现显示实体的功能，需要修改LayerListBox的数据模型
-  // 这里我们需要更改模型以包含实体节点
-  // 由于这需要对模型进行较大修改，我们只做功能标记
-
-  // TODO: 实现一个结合了LayerListBox和EntityListModel的新模型
-  // 新模型将图层作为顶级节点，实体作为子节点
-  
-  // 临时解决方案，重新加载控件以反映变化
-  reload();
-
-  // 记录设置状态
-  // m_showEntities = show;
-}
-
-void LayerListBox::setFilterText(const QString& text)
-{
-  // 实现过滤功能，筛选与文本匹配的实体
-  // 这需要下传到模型层进行实现
-  
-  // TODO: 向模型传递过滤文本，使模型可以过滤不符合条件的实体
-  
-  // 临时解决方案，重新加载控件以反映变化
-  reload();
-}
-
-void LayerListBox::setSortOrder(EntityListModel::SortType type, bool ascending)
-{
-  // 实现排序功能，根据指定的排序类型和顺序对实体进行排序
-  
-  // TODO: 向模型传递排序参数，使模型可以按指定方式排序
-  
-  // 临时解决方案，重新加载控件以反映变化
-  reload();
-}
-
 } // namespace tb::ui
