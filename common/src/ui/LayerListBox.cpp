@@ -44,6 +44,7 @@
 #include "mdl/EntityNode.h"
 #include "mdl/GroupNode.h"
 #include "mdl/BrushNode.h"
+#include "mdl/EntityDefinition.h"
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
 #include "ui/ViewConstants.h"
@@ -187,11 +188,20 @@ void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
         // 非图层节点只设置可见性图标
         item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
     } else if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
-        if (entity->parent() && dynamic_cast<mdl::LayerNode*>(entity->parent()) && 
-            entity->parent()->name() == "Default Layer") {
-            item->setIcon(0, m_worldIcon);
+        // 根据实体定义类型设置图标
+        if (auto* definition = entity->entity().definition()) {
+            if (definition->type() == mdl::EntityDefinitionType::PointEntity) {
+                item->setIcon(0, m_entityIcon);  // 点实体使用实体图标
+            } else {
+                item->setIcon(0, m_worldIcon);  // 刷子实体使用世界图标
+            }
         } else {
-            item->setIcon(0, m_entityIcon);
+            // 如果没有定义，回退到基于子节点判断
+            if (entity->childCount() > 0) {
+                item->setIcon(0, m_worldIcon);
+            } else {
+                item->setIcon(0, m_entityIcon);
+            }
         }
         item->setText(0, QString::fromStdString(entity->name()));
         
