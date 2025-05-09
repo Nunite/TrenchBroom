@@ -74,6 +74,7 @@ protected:
     void drawRow(QPainter* painter, const QStyleOptionViewItem& options, const QModelIndex& index) const override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     
     // 拖拽相关方法

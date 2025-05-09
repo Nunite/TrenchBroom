@@ -55,7 +55,7 @@ LayerTreeWidget::LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* p
     , m_syncingSelection(false)
 {
     setHeaderHidden(true);
-    setSelectionMode(QAbstractItemView::SingleSelection); // 只允许单选，避免多选问题
+    setSelectionMode(QAbstractItemView::ExtendedSelection); // 改为ExtendedSelection以支持多选
     setDragEnabled(true);
     setDragDropMode(QAbstractItemView::InternalMove);
     setDefaultDropAction(Qt::MoveAction);
@@ -359,14 +359,26 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
                 } 
                 // 处理常规区域点击 - 设置选择并防止多选
                 else {
-                    // 清除之前的选择
-                    clearSelection();
-                    // 设置当前项为选中
-                    setCurrentItem(item);
-                    item->setSelected(true);
+                    // 检查是否按下了Ctrl键
+                    bool isCtrlPressed = event->modifiers() & Qt::ControlModifier;
                     
-                    // 仅当点击的是图层区域时同步选择到文档
-                    if (dynamic_cast<mdl::LayerNode*>(node)) {
+                    // 如果没有按下Ctrl键，则清除所有选择
+                    if (!isCtrlPressed) {
+                        clearSelection();
+                    }
+                    
+                    // 处理当前项的选中状态
+                    if (isCtrlPressed && item->isSelected()) {
+                        // 如果按下Ctrl并且已经选中，则取消选择
+                        item->setSelected(false);
+                    } else {
+                        // 否则选中当前项
+                        setCurrentItem(item, 0, QItemSelectionModel::Current);
+                        item->setSelected(true);
+                    }
+                    
+                    // 只有在点击图层节点且不是Ctrl多选时才同步选择到文档
+                    if (dynamic_cast<mdl::LayerNode*>(node) && !isCtrlPressed) {
                         auto document = kdl::mem_lock(m_document);
                         if (document) {
                             // 确保选择状态同步前已清除文档选择
@@ -628,7 +640,6 @@ void LayerTreeWidget::syncSelectionToDocument()
             return; // 不在列表没有选择时清除主视图选择，以避免意外的选择丢失
         }
         
-        // 确保只处理一个选中项
         if (selectedItems.size() == 1) {
             auto* item = selectedItems.first();
             auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
@@ -641,8 +652,27 @@ void LayerTreeWidget::syncSelectionToDocument()
                 document->selectNodes({node});
             }
         } else {
-            // 清除选择，避免多选情况
-            clearSelection();
+            // 处理多选情况
+            bool hasLayerNode = false;
+            std::vector<mdl::Node*> nodesToSelect;
+            
+            // 检查选中项中是否包含图层节点
+            for (auto* item : selectedItems) {
+                auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
+                if (node) {
+                    if (dynamic_cast<mdl::LayerNode*>(node)) {
+                        hasLayerNode = true;
+                    } else {
+                        nodesToSelect.push_back(node);
+                    }
+                }
+            }
+            
+            // 如果有图层节点被选中，不执行同步
+            if (!hasLayerNode && !nodesToSelect.empty()) {
+                document->deselectAll();
+                document->selectNodes(nodesToSelect);
+            }
         }
     } catch (const std::exception& e) {
         auto document = kdl::mem_lock(m_document);
@@ -1097,6 +1127,22 @@ QTreeWidgetItem* LayerTreeWidget::findNodeItem(mdl::Node* targetNode, QTreeWidge
     }
     
     return nullptr;
+}
+
+// 重写鼠标移动事件，阻止拖拽多选
+void LayerTreeWidget::mouseMoveEvent(QMouseEvent* event)
+{
+    // 只有按住Ctrl键时才允许移动选择，否则只处理拖放状态
+    if (!(event->modifiers() & Qt::ControlModifier)) {
+        // 允许拖放操作继续
+        if (state() == QAbstractItemView::DraggingState) {
+            QTreeWidget::mouseMoveEvent(event);
+        }
+        return;
+    }
+    
+    // 如果按住Ctrl键，允许正常的鼠标移动处理
+    QTreeWidget::mouseMoveEvent(event);
 }
 
 } // namespace tb::ui
