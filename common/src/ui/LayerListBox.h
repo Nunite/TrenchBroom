@@ -108,6 +108,7 @@ private:
     QLineEdit* m_searchBox;
     QComboBox* m_sortOptions;
     LayerTreeWidget* m_treeWidget;
+    int m_currentSortMode; // 当前排序模式：0=名称，1=类型，2=自定义
 
     void createGui();
     void connectObservers();

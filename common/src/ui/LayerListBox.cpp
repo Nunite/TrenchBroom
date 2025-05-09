@@ -1124,10 +1124,14 @@ void LayerTreeWidget::onDocumentSelectionChanged(const Selection& /* selection *
 LayerListBox::LayerListBox(std::weak_ptr<MapDocument> document, QWidget* parent)
     : QWidget(parent)
     , m_document(std::move(document))
+    , m_currentSortMode(0)
 {
     createGui();
     connectObservers();
     updateTree();  // 初始化时更新树
+    
+    // 应用初始排序（按名称排序）
+    sortTree(0);
 }
 
 void LayerListBox::createGui()
@@ -1260,6 +1264,16 @@ void LayerListBox::connectObservers()
 void LayerListBox::documentDidChange(MapDocument*)
 {
     updateTree();
+    
+    // 每次文档变更后，应用当前排序
+    if (m_currentSortMode == 0) {
+        // 对于名称排序，直接调用sortItems
+        m_treeWidget->sortItems(0, Qt::AscendingOrder);
+    } else if (m_currentSortMode == 1) {
+        // 对于类型排序，调用自定义排序
+        sortByType();
+    }
+    // Mode 2是自定义排序，不需处理
 }
 
 void LayerListBox::nodesDidChange(const std::vector<mdl::Node*>& nodes)
@@ -1355,6 +1369,9 @@ void LayerListBox::sortTree(int index)
 {
     // 保存当前选中的图层
     auto* currentLayer = selectedLayer();
+    
+    // 保存当前排序模式
+    m_currentSortMode = index;
     
     // 根据选择的排序方式进行排序
     switch (index) {
@@ -1467,6 +1484,24 @@ void LayerListBox::updateTree()
 {
     // 调用LayerTreeWidget的updateTree方法
     m_treeWidget->updateTree();
+    
+    // 更新树后重新应用当前排序方式
+    // 阻止重复调用updateTree()，避免无限递归
+    int tempSortMode = m_currentSortMode;
+    m_currentSortMode = -1; // 临时设置为-1，防止无限递归
+    
+    switch (tempSortMode) {
+        case 0: // 按名称排序
+            m_treeWidget->sortItems(0, Qt::AscendingOrder);
+            break;
+        case 1: // 按类型排序
+            sortByType();
+            break;
+        // 不处理自定义排序(2)，因为自定义排序本身就是调用updateTree()
+    }
+    
+    // 恢复当前排序模式
+    m_currentSortMode = tempSortMode;
 }
 
 // 在LayerTreeWidget类定义中添加新方法
