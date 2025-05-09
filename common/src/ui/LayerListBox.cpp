@@ -33,6 +33,7 @@
 #include <QDropEvent>
 #include <QKeyEvent>
 #include <QTimer>
+#include <set>
 
 #include "mdl/LayerNode.h"
 #include "mdl/WorldNode.h"
@@ -189,6 +190,25 @@ void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
         }
         item->setText(0, QString::fromStdString(entity->name()));
         
+        // 如果实体包含子节点，显示数量
+        if (entity->childCount() > 0) {
+            auto count = static_cast<qint64>(entity->childCount());
+            QString countText;
+            if(count > 999) {
+                countText = QString("%1K").arg(count/1000.0, 0, 'f', 1);
+            } else {
+                countText = QString::number(count);
+            }
+            countText += tr(" brushes");
+            item->setText(1, countText);
+            item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+            
+            // 为可展开的实体设置特殊风格
+            QFont font = item->font(0);
+            font.setBold(true);
+            item->setFont(0, font);
+        }
+        
         // 非图层节点只设置可见性图标
         item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
     } else if (auto* brush = dynamic_cast<mdl::BrushNode*>(node)) {
@@ -203,6 +223,24 @@ void LayerTreeWidget::addEntityToTree(QTreeWidgetItem* parentItem, mdl::Node* no
 {
     auto* item = new QTreeWidgetItem(parentItem);
     setupTreeItem(item, node);
+    
+    // 检查是否为实体节点并且有子节点
+    if (auto* entityNode = dynamic_cast<mdl::EntityNode*>(node)) {
+        // 如果实体有子节点（brush或其他），则添加到树中使其可展开
+        if (entityNode->childCount() > 0) {
+            for (auto* childNode : entityNode->children()) {
+                // 递归添加子节点
+                if (dynamic_cast<mdl::BrushNode*>(childNode)) {
+                    auto* brushItem = new QTreeWidgetItem(item);
+                    setupTreeItem(brushItem, childNode);
+                } else if (dynamic_cast<mdl::GroupNode*>(childNode)) {
+                    addGroupToTree(item, childNode);
+                } else if (dynamic_cast<mdl::EntityNode*>(childNode)) {
+                    addEntityToTree(item, childNode);
+                }
+            }
+        }
+    }
 }
 
 void LayerTreeWidget::addGroupToTree(QTreeWidgetItem* parentItem, mdl::Node* node)
@@ -285,7 +323,37 @@ void LayerTreeWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {
     auto* item = itemAt(event->pos());
     if (item) {
-        if (auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>()) {
+        // 检查是否为实体节点且有子节点
+        auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
+        if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
+            if (entity->childCount() > 0) {
+                // 区分单击和双击的行为
+                if (item->isExpanded()) {
+                    // 如果实体已展开，双击选择所有子节点
+                    auto document = kdl::mem_lock(m_document);
+                    if (document) {
+                        document->deselectAll();
+                        
+                        std::vector<mdl::Node*> childNodesToSelect;
+                        for (auto* child : entity->children()) {
+                            childNodesToSelect.push_back(child);
+                        }
+                        
+                        if (!childNodesToSelect.empty()) {
+                            document->selectNodes(childNodesToSelect);
+                        }
+                    }
+                } else {
+                    // 如果实体折叠，双击展开
+                    item->setExpanded(true);
+                }
+                event->accept();
+                return;
+            }
+        }
+        
+        // 其他情况传递激活信号
+        if (node) {
             emit nodeActivated(node);
         }
     }
@@ -501,6 +569,8 @@ void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
     bool isSourceLayer = dynamic_cast<mdl::LayerNode*>(sourceNode) != nullptr;
     bool isTargetLayer = dynamic_cast<mdl::LayerNode*>(targetNode) != nullptr;
     bool isSourceEntity = dynamic_cast<mdl::EntityNode*>(sourceNode) != nullptr;
+    bool isSourceBrush = dynamic_cast<mdl::BrushNode*>(sourceNode) != nullptr;
+    bool isTargetEntity = dynamic_cast<mdl::EntityNode*>(targetNode) != nullptr;
     bool isSourceGroup = dynamic_cast<mdl::GroupNode*>(sourceNode) != nullptr;
     bool isTargetGroup = dynamic_cast<mdl::GroupNode*>(targetNode) != nullptr;
 
@@ -512,6 +582,12 @@ void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
 
     // 允许实体拖拽到图层或组
     if (isSourceEntity && (isTargetLayer || isTargetGroup)) {
+        event->acceptProposedAction();
+        return;
+    }
+    
+    // 允许brush拖拽到实体、图层或组
+    if (isSourceBrush && (isTargetEntity || isTargetLayer || isTargetGroup)) {
         event->acceptProposedAction();
         return;
     }
@@ -615,41 +691,147 @@ void LayerTreeWidget::syncSelectionFromDocument()
             return;
         }
         
-        // 寻找并选择树中对应的项
-        clearSelection();
+        // 检查是否所有选中节点都是同一实体的子节点
+        const mdl::EntityNode* parentEntity = nullptr;
+        bool allAreChildrenOfSameEntity = true;
+        bool containsAllChildren = true;
+        
+        // 首先检查是否所有节点都有相同的父节点，且父节点是EntityNode
         for (const auto* node : selectedNodes) {
-            if (node) { // 确保节点有效
-                findAndSelectNode(node, invisibleRootItem());
+            const mdl::Node* parent = node->parent();
+            if (!parent || !dynamic_cast<const mdl::EntityNode*>(parent)) {
+                allAreChildrenOfSameEntity = false;
+                break;
+            }
+            
+            if (!parentEntity) {
+                parentEntity = dynamic_cast<const mdl::EntityNode*>(parent);
+            } else if (parent != parentEntity) {
+                allAreChildrenOfSameEntity = false;
+                break;
             }
         }
+        
+        // 如果所有节点都有相同的实体父节点，检查是否包含了所有子节点
+        if (allAreChildrenOfSameEntity && parentEntity) {
+            // 检查实体的所有子节点是否都在选择列表中
+            if (parentEntity->childCount() == selectedNodes.size()) {
+                std::set<const mdl::Node*> selectedNodeSet(selectedNodes.begin(), selectedNodes.end());
+                for (const auto* child : parentEntity->children()) {
+                    if (selectedNodeSet.find(child) == selectedNodeSet.end()) {
+                        containsAllChildren = false;
+                        break;
+                    }
+                }
+                
+                // 如果选中了实体的所有子节点，则直接选择实体本身
+                if (containsAllChildren) {
+                    clearSelection();
+                    
+                    // 查找并选择父实体节点
+                    for (int i = 0; i < topLevelItemCount(); ++i) {
+                        QTreeWidgetItem* foundItem = findNodeItemRecursive(parentEntity, topLevelItem(i));
+                        if (foundItem) {
+                            // 选择实体节点并折叠
+                            foundItem->setSelected(true);
+                            foundItem->setExpanded(false);
+                            scrollToItem(foundItem);
+                            
+                            // 同步到文档
+                            document->deselectAll();
+                            document->selectNodes({const_cast<mdl::EntityNode*>(parentEntity)});
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 常规处理 - 寻找并选择树中对应的项
+        clearSelection();
+        QList<QTreeWidgetItem*> itemsToSelect;
+        
+        for (const auto* node : selectedNodes) {
+            // 递归查找节点及其所有父节点
+            std::set<const mdl::Node*> nodesToFind;
+            nodesToFind.insert(node);
+            
+            // 添加所有父节点直到图层节点
+            const mdl::Node* current = node->parent();
+            while (current) {
+                if (!dynamic_cast<const mdl::LayerNode*>(current)) {
+                    nodesToFind.insert(current);
+                    current = current->parent();
+                } else {
+                    break;
+                }
+            }
+            
+            // 查找树中对应的项
+            for (const mdl::Node* targetNode : nodesToFind) {
+                QTreeWidgetItem* foundItem = nullptr;
+                for (int i = 0; i < topLevelItemCount(); ++i) {
+                    foundItem = findNodeItemRecursive(targetNode, topLevelItem(i));
+                    if (foundItem) {
+                        if (!itemsToSelect.contains(foundItem)) {
+                            itemsToSelect.append(foundItem);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // 选择找到的所有项
+        for (auto* item : itemsToSelect) {
+            item->setSelected(true);
+            // 确保项可见
+            QTreeWidgetItem* parent = item->parent();
+            while (parent) {
+                parent->setExpanded(true);
+                parent = parent->parent();
+            }
+            scrollToItem(item);
+        }
     } catch (const std::exception& e) {
-        auto document = kdl::mem_lock(m_document);
-        if (document) {
-            document->logger().error() << "Error during selection sync: " << e.what();
+        auto docLog = kdl::mem_lock(m_document);
+        if (docLog) {
+            docLog->logger().error() << "Error during selection sync: " << e.what();
         }
     }
 }
 
-// 在树中查找并选择指定节点
-bool LayerTreeWidget::findAndSelectNode(const mdl::Node* targetNode, QTreeWidgetItem* startItem)
-    {
-    if (!startItem) return false;
+// 添加递归查找节点的辅助方法
+QTreeWidgetItem* LayerTreeWidget::findNodeItemRecursive(const mdl::Node* targetNode, QTreeWidgetItem* startItem)
+{
+    if (!startItem) return nullptr;
     
     // 检查当前项
     auto* node = startItem->data(0, Qt::UserRole).value<mdl::Node*>();
     if (node == targetNode) {
-        startItem->setSelected(true);
-        scrollToItem(startItem);
-      return true;
+        return startItem;
     }
     
     // 递归检查子项
     for (int i = 0; i < startItem->childCount(); ++i) {
-        if (findAndSelectNode(targetNode, startItem->child(i))) {
-            return true;
+        QTreeWidgetItem* result = findNodeItemRecursive(targetNode, startItem->child(i));
+        if (result) {
+            return result;
         }
     }
     
+    return nullptr;
+}
+
+// 在树中查找并选择指定节点
+bool LayerTreeWidget::findAndSelectNode(const mdl::Node* targetNode, QTreeWidgetItem* startItem)
+{
+    QTreeWidgetItem* foundItem = findNodeItemRecursive(targetNode, startItem);
+    if (foundItem) {
+        foundItem->setSelected(true);
+        scrollToItem(foundItem);
+        return true;
+    }
     return false;
 }
 
@@ -712,8 +894,45 @@ void LayerTreeWidget::onItemSelectionChanged()
 {
     if (!m_syncingSelection) {
         m_syncingSelection = true;
+        
+        // 获取当前选中的项
+        QList<QTreeWidgetItem*> selectedItems = this->selectedItems();
+        if (selectedItems.size() == 1) {
+            // 如果只选中了一个项
+            QTreeWidgetItem* item = selectedItems.first();
+            auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
+            
+            // 检查是否为实体节点
+            if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
+                if (entity->childCount() > 0) {
+                    // 如果是有子节点的实体，折叠其他已展开的实体
+                    for (int i = 0; i < topLevelItemCount(); ++i) {
+                        collapseOtherEntities(topLevelItem(i), item);
+                    }
+                }
+            }
+        }
+        
         syncSelectionToDocument();
         m_syncingSelection = false;
+    }
+}
+
+// 折叠除当前选中项外的其他实体
+void LayerTreeWidget::collapseOtherEntities(QTreeWidgetItem* item, QTreeWidgetItem* selectedItem)
+{
+    if (!item || item == selectedItem) return;
+    
+    // 检查当前项是否为实体节点
+    auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
+    if (dynamic_cast<mdl::EntityNode*>(node) && item->childCount() > 0 && item->isExpanded()) {
+        // 如果是非选中的实体节点且已展开，则折叠
+        item->setExpanded(false);
+    }
+    
+    // 递归处理子项
+    for (int i = 0; i < item->childCount(); ++i) {
+        collapseOtherEntities(item->child(i), selectedItem);
     }
 }
 
@@ -725,9 +944,9 @@ void LayerTreeWidget::onDocumentSelectionChanged(const Selection& /* selection *
         try {
             syncSelectionFromDocument();
         } catch (const std::exception& e) {
-            auto document = kdl::mem_lock(m_document);
-            if (document) {
-                document->logger().error() << "Error during document selection changed: " << e.what();
+            auto docLog = kdl::mem_lock(m_document);
+            if (docLog) {
+                docLog->logger().error() << "Error during document selection changed: " << e.what();
             }
         }
         m_syncingSelection = false;
@@ -1171,3 +1390,4 @@ void LayerTreeWidget::mouseMoveEvent(QMouseEvent* event)
 }
 
 } // namespace tb::ui
+

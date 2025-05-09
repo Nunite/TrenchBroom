@@ -66,9 +66,11 @@ private:
     
     void syncSelectionFromDocument();
     bool findAndSelectNode(const mdl::Node* targetNode, QTreeWidgetItem* startItem);
+    QTreeWidgetItem* findNodeItemRecursive(const mdl::Node* targetNode, QTreeWidgetItem* startItem);
     void syncSelectionToDocument();
     void onItemSelectionChanged();
     void onDocumentSelectionChanged(const Selection& selection);
+    void collapseOtherEntities(QTreeWidgetItem* item, QTreeWidgetItem* selectedItem);
 
 protected:
     void drawRow(QPainter* painter, const QStyleOptionViewItem& options, const QModelIndex& index) const override;
