@@ -289,14 +289,50 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
         if (auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>()) {
             QRect itemRect = visualItemRect(item);
             
-            // 检查是否点击了可见性或锁定图标
-            int visibilityIconX = itemRect.right() - 48;
-            int lockIconX = itemRect.right() - 24;
+            // 根据列宽计算图标位置，而不是使用硬编码固定值
+            int visibilityColumnX = header()->sectionPosition(2); // 可见性图标列起始位置
+            int lockColumnX = header()->sectionPosition(3); // 锁定图标列起始位置
+            int visibilityColumnWidth = header()->sectionSize(2); // 可见性图标列宽度
+            int lockColumnWidth = header()->sectionSize(3); // 锁定图标列宽度
             
-            if (event->position().x() >= visibilityIconX && event->position().x() < visibilityIconX + 24) {
+            // 计算图标区域
+            QRect visibilityRect(visibilityColumnX, itemRect.top(), visibilityColumnWidth, itemRect.height());
+            QRect lockRect(lockColumnX, itemRect.top(), lockColumnWidth, itemRect.height());
+            
+            if (visibilityRect.contains(event->pos())) {
+                // 切换节点可见性状态
+                auto document = kdl::mem_lock(m_document);
+                document->logger().info() << "Clicked visibility icon for node: " << node->name();
+                
+                // 切换可见性并发射信号
+                std::vector<mdl::Node*> nodes{node};
+                if (node->visible()) {
+                    document->hide(nodes);
+                } else {
+                    document->show(nodes);
+                }
+                
+                // 立即更新图标
+                item->setIcon(2, node->visible() ? m_visibleIcon : m_hiddenIcon);
+                
                 emit nodeVisibilityToggled(node);
                 return;
-            } else if (event->position().x() >= lockIconX && event->position().x() < lockIconX + 24) {
+            } else if (lockRect.contains(event->pos())) {
+                // 切换节点锁定状态
+                auto document = kdl::mem_lock(m_document);
+                document->logger().info() << "Clicked lock icon for node: " << node->name();
+                
+                // 切换锁定状态并发射信号
+                std::vector<mdl::Node*> nodes{node};
+                if (node->locked()) {
+                    document->unlock(nodes);
+                } else {
+                    document->lock(nodes);
+                }
+                
+                // 立即更新图标
+                item->setIcon(3, node->locked() ? m_lockedIcon : m_unlockedIcon);
+                
                 emit nodeLockToggled(node);
                 return;
             } else if (event->button() == Qt::RightButton) {
@@ -427,50 +463,83 @@ void LayerTreeWidget::dropEvent(QDropEvent* event)
     // 如果源节点是实体，目标节点是图层或组，则进行实际的节点移动
     bool isSourceEntity = dynamic_cast<mdl::EntityNode*>(sourceNode) != nullptr ||
                          dynamic_cast<mdl::BrushNode*>(sourceNode) != nullptr;
+    bool isSourceGroup = dynamic_cast<mdl::GroupNode*>(sourceNode) != nullptr;
     bool isTargetLayer = dynamic_cast<mdl::LayerNode*>(targetNode) != nullptr;
     bool isTargetGroup = dynamic_cast<mdl::GroupNode*>(targetNode) != nullptr;
     
     auto document = kdl::mem_lock(m_document);
     
-    if (isSourceEntity && (isTargetLayer || isTargetGroup)) {
+    if ((isSourceEntity || isSourceGroup) && (isTargetLayer || isTargetGroup)) {
+        // 检查节点状态
+        if (sourceNode->locked()) {
+            // 锁定的节点不能移动
+            event->ignore();
+            return;
+        }
+        
+        if (!targetNode->visible() || targetNode->locked()) {
+            // 不能移动到不可见或锁定的目标
+            event->ignore();
+            return;
+        }
+        
         // 使用 MapDocument 的 API 进行实际的节点移动
         if (document) {
-            std::map<mdl::Node*, std::vector<mdl::Node*>> nodesToReparent;
-            nodesToReparent[targetNode].push_back(sourceNode);
-            document->reparentNodes(nodesToReparent);
-            
-            // 接受拖放事件
-            event->acceptProposedAction();
-            return;
+            try {
+                std::map<mdl::Node*, std::vector<mdl::Node*>> nodesToReparent;
+                nodesToReparent[targetNode].push_back(sourceNode);
+                document->reparentNodes(nodesToReparent);
+                
+                // 接受拖放事件
+                event->acceptProposedAction();
+                return;
+            } catch (const std::exception& e) {
+                document->logger().error() << "Error during node reparenting: " << e.what();
+                event->ignore();
+                return;
+            }
+        }
     }
-  }
     
-    // 对于其他类型的拖放（如图层重排序），使用默认处理
-    QTreeWidget::dropEvent(event);
-    
-    // 确保目标项展开
-    if (targetItem) {
-        targetItem->setExpanded(true);
+    // 对于图层重排序，使用默认处理
+    if (dynamic_cast<mdl::LayerNode*>(sourceNode) && dynamic_cast<mdl::LayerNode*>(targetNode)) {
+        QTreeWidget::dropEvent(event);
+        
+        // 确保目标项展开
+        if (targetItem) {
+            targetItem->setExpanded(true);
+        }
+    } else {
+        event->ignore();
     }
 }
 
 // 为LayerTreeWidget添加新方法用于同步选择
 void LayerTreeWidget::syncSelectionFromDocument()
-  {
+{
     auto document = kdl::mem_lock(m_document);
     if (!document) return;
     
-    // 获取当前文档中选择的对象
-    const auto& selectedNodes = document->selectedNodes().nodes();
-    if (selectedNodes.empty()) {
+    try {
+        // 获取当前文档中选择的对象
+        const auto& selectedNodes = document->selectedNodes().nodes();
+        if (selectedNodes.empty()) {
+            clearSelection();
+            return;
+        }
+        
+        // 寻找并选择树中对应的项
         clearSelection();
-        return;
-    }
-    
-    // 寻找并选择树中对应的项
-    clearSelection();
-    for (const auto* node : selectedNodes) {
-        findAndSelectNode(node, invisibleRootItem());
+        for (const auto* node : selectedNodes) {
+            if (node) { // 确保节点有效
+                findAndSelectNode(node, invisibleRootItem());
+            }
+        }
+    } catch (const std::exception& e) {
+        auto document = kdl::mem_lock(m_document);
+        if (document) {
+            document->logger().error() << "Error during selection sync: " << e.what();
+        }
     }
 }
 
@@ -537,7 +606,14 @@ void LayerTreeWidget::onDocumentSelectionChanged(const Selection& /* selection *
 {
     if (!m_syncingSelection) {
         m_syncingSelection = true;
-        syncSelectionFromDocument();
+        try {
+            syncSelectionFromDocument();
+        } catch (const std::exception& e) {
+            auto document = kdl::mem_lock(m_document);
+            if (document) {
+                document->logger().error() << "Error during document selection changed: " << e.what();
+            }
+        }
         m_syncingSelection = false;
     }
 }
@@ -898,7 +974,36 @@ void LayerTreeWidget::updateNodeItem(mdl::Node* node)
     // 查找节点对应的项
     QTreeWidgetItem* item = findNodeItem(node, invisibleRootItem());
     if (item) {
-        setupTreeItem(item, node);
+        // 更新项的基本信息
+        item->setText(0, QString::fromStdString(node->name()));
+        
+        // 重要：确保正确更新可见性和锁定图标
+        item->setIcon(2, node->visible() ? m_visibleIcon : m_hiddenIcon);
+        item->setIcon(3, node->locked() ? m_lockedIcon : m_unlockedIcon);
+        
+        // 更新其他属性
+        if (auto* layer = dynamic_cast<mdl::LayerNode*>(node)) {
+            auto count = static_cast<qint64>(layer->childCount());
+            QString countText;
+            if(count > 999) {
+                countText = QString("%1K").arg(count/1000.0, 0, 'f', 1);
+            } else {
+                countText = QString::number(count);
+            }
+            countText += tr(" objects");
+            item->setText(1, countText);
+        }
+        else if (auto* group = dynamic_cast<mdl::GroupNode*>(node)) {
+            auto count = static_cast<qint64>(group->childCount());
+            QString countText;
+            if(count > 999) {
+                countText = QString("%1K").arg(count/1000.0, 0, 'f', 1);
+            } else {
+                countText = QString::number(count);
+            }
+            countText += tr(" objects");
+            item->setText(1, countText);
+        }
     }
 }
 
