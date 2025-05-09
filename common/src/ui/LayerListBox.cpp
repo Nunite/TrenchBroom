@@ -478,7 +478,7 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
                     // 点击了锁定图标 - 只有图层节点才有锁定功能
                     if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
                         auto document = kdl::mem_lock(m_document);
-                        document->logger().info() << "Clicked lock icon for layer: " << layerNode->name();
+                        // document->logger().info() << "Clicked lock icon for layer: " << layerNode->name();
                         
                         // 发出信号，让LayerEditor处理
                         emit nodeLockToggled(layerNode);
@@ -495,7 +495,7 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
                 else if (visibilityRect.contains(event->pos())) {
                     // 点击了可见性图标
                     auto document = kdl::mem_lock(m_document);
-                    document->logger().info() << "Clicked visibility icon for node: " << node->name();
+                    // document->logger().info() << "Clicked visibility icon for node: " << node->name();
                     
                     if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
                         // 对于图层节点，只发出信号，让LayerEditor处理
@@ -533,26 +533,115 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
                 } 
                 // 处理常规区域点击 - 设置选择并防止多选
                 else {
-                    // 检查是否按下了Ctrl键
+                    // 检查修饰键状态
                     bool isCtrlPressed = event->modifiers() & Qt::ControlModifier;
+                    bool isShiftPressed = event->modifiers() & Qt::ShiftModifier;
                     
-                    // 如果没有按下Ctrl键，则清除所有选择
-                    if (!isCtrlPressed) {
-                        clearSelection();
+                    // 处理Shift键批量选择
+                    if (isShiftPressed) {
+                        // 找到当前的焦点项
+                        QTreeWidgetItem* focusItem = this->currentItem();
+                        if (focusItem && focusItem != item) {
+                            // 清除当前所有选择
+                            if (!isCtrlPressed) {
+                                clearSelection();
+                            }
+                            
+                            // 实现范围选择
+                            bool selectionStarted = false;
+                            bool shouldReverse = false;
+                            QList<QTreeWidgetItem*> itemsToSelect;
+                            
+                            // 确定是否需要反向选择（从下往上）
+                            if (visualItemRect(focusItem).top() > visualItemRect(item).top()) {
+                                shouldReverse = true;
+                            }
+                            
+                            // 在同一父节点内查找范围项
+                            if (item->parent() == focusItem->parent()) {
+                                // 同一父节点下的连续项
+                                QTreeWidgetItem* parent = item->parent();
+                                QTreeWidgetItem* startItem = shouldReverse ? item : focusItem;
+                                QTreeWidgetItem* endItem = shouldReverse ? focusItem : item;
+                                
+                                // 如果在根级别
+                                if (!parent) {
+                                    for (int i = 0; i < topLevelItemCount(); ++i) {
+                                        QTreeWidgetItem* checkItem = topLevelItem(i);
+                                        if (!selectionStarted && checkItem == startItem) {
+                                            selectionStarted = true;
+                                        }
+                                        
+                                        if (selectionStarted) {
+                                            itemsToSelect.append(checkItem);
+                                        }
+                                        
+                                        if (checkItem == endItem) {
+                                            break;
+                                        }
+                                    }
+                                }
+                                // 子节点
+                                else {
+                                    for (int i = 0; i < parent->childCount(); ++i) {
+                                        QTreeWidgetItem* checkItem = parent->child(i);
+                                        if (!selectionStarted && checkItem == startItem) {
+                                            selectionStarted = true;
+                                        }
+                                        
+                                        if (selectionStarted) {
+                                            itemsToSelect.append(checkItem);
+                                        }
+                                        
+                                        if (checkItem == endItem) {
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                // 选择所有找到的项
+                                for (QTreeWidgetItem* selectItem : itemsToSelect) {
+                                    selectItem->setSelected(true);
+                                }
+                                
+                                event->accept();
+                                return;
+                            }
+                            // 不同父节点情况下，简单选择当前点击的项
+                            else {
+                                // 保留现有选择
+                                setCurrentItem(item);
+                                item->setSelected(true);
+                            }
+                        } else {
+                            // 没有已选项或选了同一项，按正常方式处理
+                            if (!isCtrlPressed) {
+                                clearSelection();
+                            }
+                            setCurrentItem(item);
+                            item->setSelected(true);
+                        }
+                    }
+                    // 处理普通点击和Ctrl点击
+                    else {
+                        // 如果没有按下Ctrl键，则清除所有选择
+                        if (!isCtrlPressed) {
+                            clearSelection();
+                        }
+                        
+                        // 处理当前项的选中状态
+                        if (isCtrlPressed && item->isSelected()) {
+                            // 如果按下Ctrl并且已经选中，则取消选择
+                            item->setSelected(false);
+                        } else {
+                            // 否则选中当前项
+                            setCurrentItem(item, 0, QItemSelectionModel::Current);
+                            item->setSelected(true);
+                        }
                     }
                     
-                    // 处理当前项的选中状态
-                    if (isCtrlPressed && item->isSelected()) {
-                        // 如果按下Ctrl并且已经选中，则取消选择
-                        item->setSelected(false);
-                    } else {
-                        // 否则选中当前项
-                        setCurrentItem(item, 0, QItemSelectionModel::Current);
-                        item->setSelected(true);
-                    }
-                    
-                    // 只有在点击图层节点且不是Ctrl多选时才同步选择到文档
-                    if (dynamic_cast<mdl::LayerNode*>(node) && !isCtrlPressed) {
+                    // 只有在点击图层节点且不是多选时才同步选择到文档
+                    if (dynamic_cast<mdl::LayerNode*>(node) && !isCtrlPressed && !isShiftPressed) {
                         auto document = kdl::mem_lock(m_document);
                         if (document) {
                             // 确保选择状态同步前已清除文档选择
