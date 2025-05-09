@@ -4,7 +4,8 @@ on:
     tags:
       - '**'
     branches:
-      - master,map_inspector
+      - master
+      - map_inspector
   pull_request:
 
 name: CI
