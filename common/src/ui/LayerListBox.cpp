@@ -135,8 +135,8 @@ void LayerTreeWidget::loadIcons()
     m_groupIcon = io::loadSVGIcon("Map_folder.svg");  // 分组（线框文件夹）
     m_entityIcon = io::loadSVGIcon("Map_entity.svg");  // 点实体（线框基准）
     m_brushIcon = io::loadSVGIcon("Map_cube.svg");  // 刷子实体（线框立方体）
-    m_visibleIcon = io::loadSVGIcon("Hidden_off.svg");
-    m_hiddenIcon = io::loadSVGIcon("Hidden_on.svg");
+    m_visibleIcon = io::loadSVGIcon("object_show.svg");
+    m_hiddenIcon = io::loadSVGIcon("object_hidden.svg");
     m_lockedIcon = io::loadSVGIcon("Lock_on.svg");
     m_unlockedIcon = io::loadSVGIcon("Lock_off.svg");
 }
@@ -244,6 +244,32 @@ void LayerTreeWidget::addEntityToTree(QTreeWidgetItem* parentItem, mdl::Node* no
                     addEntityToTree(item, childNode);
                 }
             }
+            
+            // 如果实体不可见，递归设置其所有子项的可见性图标
+            if (!entityNode->visible()) {
+                updateVisibilityIconRecursively(item, false);
+            }
+            // 或者如果父节点不可见，也要更新图标
+            else if (parentItem) {
+                auto* parentNode = parentItem->data(0, Qt::UserRole).value<mdl::Node*>();
+                if (parentNode && !parentNode->visible()) {
+                    updateVisibilityIconRecursively(item, false);
+                }
+            }
+        }
+        // 即使没有子节点，也检查父节点可见性
+        else if (parentItem) {
+            auto* parentNode = parentItem->data(0, Qt::UserRole).value<mdl::Node*>();
+            if (parentNode && !parentNode->visible()) {
+                item->setIcon(3, m_hiddenIcon);
+            }
+        }
+    }
+    // 如果是其他节点类型（如Brush），也检查父节点可见性
+    else if (parentItem) {
+        auto* parentNode = parentItem->data(0, Qt::UserRole).value<mdl::Node*>();
+        if (parentNode && !parentNode->visible()) {
+            item->setIcon(3, m_hiddenIcon);
         }
     }
 }
@@ -260,6 +286,18 @@ void LayerTreeWidget::addGroupToTree(QTreeWidgetItem* parentItem, mdl::Node* nod
                 addGroupToTree(item, child);
             } else {
                 addEntityToTree(item, child);
+            }
+        }
+        
+        // 如果组不可见，递归设置其所有子项的可见性图标
+        if (!group->visible()) {
+            updateVisibilityIconRecursively(item, false);
+        }
+        // 或者如果父节点不可见，也要更新图标
+        else if (parentItem) {
+            auto* parentNode = parentItem->data(0, Qt::UserRole).value<mdl::Node*>();
+            if (parentNode && !parentNode->visible()) {
+                updateVisibilityIconRecursively(item, false);
             }
         }
     }
@@ -308,11 +346,23 @@ void LayerTreeWidget::updateTree()
                     addEntityToTree(layerItem, node);
                 }
             }
+            
+            // 如果图层不可见，递归设置其所有子项的可见性图标
+            if (!layer->visible()) {
+                updateVisibilityIconRecursively(layerItem, false);
+            }
         }
         
         // 展开顶级项
         for (int i = 0; i < this->topLevelItemCount(); ++i) {
             this->topLevelItem(i)->setExpanded(true);
+            
+            // 检查默认图层的可见性
+            auto* topItem = this->topLevelItem(i);
+            auto* topNode = topItem->data(0, Qt::UserRole).value<mdl::Node*>();
+            if (topNode && !topNode->visible()) {
+                updateVisibilityIconRecursively(topItem, false);
+            }
         }
 
         // 恢复选择
@@ -443,12 +493,18 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
                         
                         // 延迟更新图标，确保状态已变更
                         QTimer::singleShot(100, this, [this, layerNode, item]() {
-                            item->setIcon(3, layerNode->visible() ? m_visibleIcon : m_hiddenIcon);
+                            bool isVisible = layerNode->visible();
+                            item->setIcon(3, isVisible ? m_visibleIcon : m_hiddenIcon);
+                            
+                            // 递归更新所有子项的图标
+                            updateVisibilityIconRecursively(item, isVisible);
                         });
                     } else {
                         // 非图层节点仍由本地逻辑处理
                         std::vector<mdl::Node*> nodes{node};
-                        if (node->visible()) {
+                        bool willBeVisible = !node->visible();
+                        
+                        if (!willBeVisible) {
                             document->hide(nodes);
                         } else {
                             document->show(nodes);
@@ -456,6 +512,11 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
                         
                         // 立即更新图标
                         item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
+                        
+                        // 如果是组节点，递归更新其子项图标
+                        if (dynamic_cast<mdl::GroupNode*>(node) || dynamic_cast<mdl::EntityNode*>(node)) {
+                            updateVisibilityIconRecursively(item, node->visible());
+                        }
                     }
                     event->accept();
                     return;
@@ -1420,6 +1481,20 @@ QTreeWidgetItem* LayerTreeWidget::findNodeItem(mdl::Node* targetNode, QTreeWidge
     }
     
     return nullptr;
+}
+
+// 递归更新子节点的可见性图标
+void LayerTreeWidget::updateVisibilityIconRecursively(QTreeWidgetItem* item, bool isVisible)
+{
+    if (!item) return;
+    
+    // 更新当前项的可见性图标
+    item->setIcon(3, isVisible ? m_visibleIcon : m_hiddenIcon);
+    
+    // 递归更新所有子项
+    for (int i = 0; i < item->childCount(); ++i) {
+        updateVisibilityIconRecursively(item->child(i), isVisible);
+    }
 }
 
 // 重写鼠标移动事件，阻止拖拽多选

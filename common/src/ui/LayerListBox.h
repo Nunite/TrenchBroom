@@ -96,6 +96,7 @@ public:
     void updateTree();
     QTreeWidgetItem* findNodeItem(mdl::Node* targetNode, QTreeWidgetItem* startItem);
     void updateNodeItem(mdl::Node* node);
+    void updateVisibilityIconRecursively(QTreeWidgetItem* item, bool isVisible);
 };
 
 class LayerListBox : public QWidget
