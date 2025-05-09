@@ -151,9 +151,9 @@ void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
     item->setData(0, Qt::UserRole, QVariant::fromValue(node));
 
     // 设置字体
-    QFont font = item->font(1);
-    font.setPointSize(10);
-    item->setFont(1, font);
+    QFont itemFont = item->font(1);
+    itemFont.setPointSize(10);
+    item->setFont(1, itemFont);
 
     // 根据节点类型设置图标和对象数量
     if (auto* layer = dynamic_cast<mdl::LayerNode*>(node)) {
@@ -669,7 +669,6 @@ void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
     
     // 判断节点类型
     auto* sourceBrush = dynamic_cast<mdl::BrushNode*>(sourceNode);
-    auto* sourceEntity = dynamic_cast<mdl::EntityNode*>(sourceNode);
     
     auto* targetLayer = dynamic_cast<mdl::LayerNode*>(targetNode);
     auto* targetGroup = dynamic_cast<mdl::GroupNode*>(targetNode);
@@ -1051,9 +1050,9 @@ void LayerTreeWidget::syncSelectionToDocument()
             }
         }
     } catch (const std::exception& e) {
-        auto document = kdl::mem_lock(m_document);
-        if (document) {
-            document->logger().error() << "Error during selection sync to document: " << e.what();
+        auto documentPtr = kdl::mem_lock(m_document);
+        if (documentPtr) {
+            documentPtr->logger().error() << "Error during selection sync to document: " << e.what();
         }
     }
 }
@@ -1617,7 +1616,7 @@ void LayerTreeWidget::mouseMoveEvent(QMouseEvent* event)
     drag->setHotSpot(QPoint(16, 16));
     
     // 执行拖拽(阻止事件传递给父控件)
-    Qt::DropAction dropAction = drag->exec(Qt::MoveAction);
+    drag->exec(Qt::MoveAction);
     event->accept();
 }
 
