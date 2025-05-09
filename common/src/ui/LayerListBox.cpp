@@ -32,6 +32,7 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QKeyEvent>
+#include <QTimer>
 
 #include "mdl/LayerNode.h"
 #include "mdl/WorldNode.h"
@@ -307,6 +308,11 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
                 if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
                     // 对于图层节点，只发出信号，让LayerEditor处理
                     emit nodeVisibilityToggled(layerNode);
+                    
+                    // 延迟更新图标，确保状态已变更
+                    QTimer::singleShot(100, this, [this, layerNode, item]() {
+                        item->setIcon(2, layerNode->visible() ? m_visibleIcon : m_hiddenIcon);
+                    });
                 } else {
                     // 非图层节点仍由本地逻辑处理
                     std::vector<mdl::Node*> nodes{node};
@@ -328,6 +334,11 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
                 if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
                     // 对于图层节点，只发出信号，让LayerEditor处理
                     emit nodeLockToggled(layerNode);
+                    
+                    // 延迟更新图标，确保状态已变更
+                    QTimer::singleShot(100, this, [this, layerNode, item]() {
+                        item->setIcon(3, layerNode->locked() ? m_lockedIcon : m_unlockedIcon);
+                    });
                 } else {
                     // 非图层节点仍由本地逻辑处理
                     std::vector<mdl::Node*> nodes{node};
