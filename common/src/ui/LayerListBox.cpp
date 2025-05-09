@@ -213,6 +213,16 @@ void LayerTreeWidget::addGroupToTree(QTreeWidgetItem* parentItem, mdl::Node* nod
 
 void LayerTreeWidget::updateTree()
 {
+    // 保存当前选择的节点
+    std::vector<mdl::Node*> selectedNodesBefore;
+    QList<QTreeWidgetItem*> selectedItems = this->selectedItems();
+    for (auto* item : selectedItems) {
+        auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
+        if (node) {
+            selectedNodesBefore.push_back(node);
+        }
+    }
+
     clear();
 
     auto document = kdl::mem_lock(m_document);
@@ -249,6 +259,13 @@ void LayerTreeWidget::updateTree()
         // 展开顶级项
         for (int i = 0; i < this->topLevelItemCount(); ++i) {
             this->topLevelItem(i)->setExpanded(true);
+        }
+
+        // 恢复选择
+        if (!selectedNodesBefore.empty()) {
+            for (auto* node : selectedNodesBefore) {
+                findAndSelectNode(node, invisibleRootItem());
+            }
         }
     }
 }
@@ -664,9 +681,35 @@ void LayerListBox::documentDidChange(MapDocument*)
     updateTree();
 }
 
-void LayerListBox::nodesDidChange(const std::vector<mdl::Node*>&)
+void LayerListBox::nodesDidChange(const std::vector<mdl::Node*>& nodes)
 {
-    updateTree();
+    // 检查是否需要完全更新树
+    bool needFullUpdate = false;
+    
+    // 如果节点列表为空，或者有节点的父级发生变化，就需要完全更新
+    if (nodes.empty()) {
+        needFullUpdate = true;
+    } else {
+        for (mdl::Node* node : nodes) {
+            // 检查是否为图层节点或组节点或其父级发生变化
+            if (dynamic_cast<mdl::LayerNode*>(node) || 
+                dynamic_cast<mdl::GroupNode*>(node) ||
+                (node->parent() && (dynamic_cast<mdl::LayerNode*>(node->parent()) || 
+                                  dynamic_cast<mdl::GroupNode*>(node->parent())))) {
+                needFullUpdate = true;
+                break;
+            }
+        }
+    }
+    
+    if (needFullUpdate) {
+        updateTree(); // 只在必要时重建整个树
+    } else {
+        // 只更新受影响的节点
+        for (mdl::Node* node : nodes) {
+            m_treeWidget->updateNodeItem(node);
+        }
+    }
 }
 
 void LayerListBox::filterTree(const QString& text)
@@ -843,6 +886,40 @@ void LayerListBox::updateTree()
 {
     // 调用LayerTreeWidget的updateTree方法
     m_treeWidget->updateTree();
+}
+
+// 在LayerTreeWidget类定义中添加新方法
+void LayerTreeWidget::updateNodeItem(mdl::Node* node)
+{
+    if (!node) return;
+    
+    // 查找节点对应的项
+    QTreeWidgetItem* item = findNodeItem(node, invisibleRootItem());
+    if (item) {
+        setupTreeItem(item, node);
+    }
+}
+
+// 查找节点对应的项
+QTreeWidgetItem* LayerTreeWidget::findNodeItem(mdl::Node* targetNode, QTreeWidgetItem* startItem)
+{
+    if (!startItem) return nullptr;
+    
+    // 检查当前项
+    auto* node = startItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    if (node == targetNode) {
+        return startItem;
+    }
+    
+    // 递归检查子项
+    for (int i = 0; i < startItem->childCount(); ++i) {
+        QTreeWidgetItem* result = findNodeItem(targetNode, startItem->child(i));
+        if (result) {
+            return result;
+        }
+    }
+    
+    return nullptr;
 }
 
 } // namespace tb::ui

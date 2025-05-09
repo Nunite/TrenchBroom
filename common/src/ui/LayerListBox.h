@@ -90,6 +90,8 @@ signals:
 public:
     explicit LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
     void updateTree();
+    QTreeWidgetItem* findNodeItem(mdl::Node* targetNode, QTreeWidgetItem* startItem);
+    void updateNodeItem(mdl::Node* node);
 };
 
 class LayerListBox : public QWidget
