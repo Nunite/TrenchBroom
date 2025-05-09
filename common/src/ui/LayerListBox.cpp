@@ -55,7 +55,7 @@ LayerTreeWidget::LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* p
     , m_syncingSelection(false)
 {
     setHeaderHidden(true);
-    setSelectionMode(QAbstractItemView::ExtendedSelection); // 允许多选
+    setSelectionMode(QAbstractItemView::SingleSelection); // 只允许单选，避免多选问题
     setDragEnabled(true);
     setDragDropMode(QAbstractItemView::InternalMove);
     setDefaultDropAction(Qt::MoveAction);
@@ -64,12 +64,12 @@ LayerTreeWidget::LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* p
     setUniformRowHeights(false);
     setItemsExpandable(true);
     setAllColumnsShowFocus(true);
-    setColumnCount(4); // 名称、对象数量、可见性按钮、锁定按钮
+    setColumnCount(4); // 名称、对象数量、锁定按钮、可见性按钮（交换顺序）
     header()->setStretchLastSection(false);
     header()->setSectionResizeMode(0, QHeaderView::Stretch);  // 名称列自动拉伸
     header()->setSectionResizeMode(1, QHeaderView::Fixed);    // 数量列固定宽度
-    header()->setSectionResizeMode(2, QHeaderView::Fixed);    // 可见性按钮列固定宽度
-    header()->setSectionResizeMode(3, QHeaderView::Fixed);    // 锁定按钮列固定宽度
+    header()->setSectionResizeMode(2, QHeaderView::Fixed);    // 锁定按钮列固定宽度
+    header()->setSectionResizeMode(3, QHeaderView::Fixed);    // 可见性按钮列固定宽度
     header()->setDefaultSectionSize(80);  // 增加默认列宽
     
     // 美化样式
@@ -161,6 +161,10 @@ void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
         countText += tr(" objects");
         item->setText(1, countText);
         item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+        
+        // 设置锁定和可见性图标
+        item->setIcon(2, node->locked() ? m_lockedIcon : m_unlockedIcon);
+        item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
     } else if (auto* group = dynamic_cast<mdl::GroupNode*>(node)) {
         item->setIcon(0, m_groupIcon);
         auto count = static_cast<qint64>(group->childCount());  // 使用qint64避免溢出
@@ -173,6 +177,9 @@ void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
         countText += tr(" objects");
         item->setText(1, countText);
         item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+        
+        // 非图层节点只设置可见性图标
+        item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
     } else if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
         if (entity->parent() && dynamic_cast<mdl::LayerNode*>(entity->parent()) && 
             entity->parent()->name() == "Default Layer") {
@@ -181,13 +188,15 @@ void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
             item->setIcon(0, m_entityIcon);
         }
         item->setText(0, QString::fromStdString(entity->name()));
+        
+        // 非图层节点只设置可见性图标
+        item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
     } else if (auto* brush = dynamic_cast<mdl::BrushNode*>(node)) {
         item->setIcon(0, m_brushIcon);
+        
+        // 非图层节点只设置可见性图标
+        item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
     }
-
-    // 设置可见性和锁定状态
-    item->setIcon(2, node->visible() ? m_visibleIcon : m_hiddenIcon);
-    item->setIcon(3, node->locked() ? m_lockedIcon : m_unlockedIcon);
 }
 
 void LayerTreeWidget::addEntityToTree(QTreeWidgetItem* parentItem, mdl::Node* node)
@@ -285,79 +294,103 @@ void LayerTreeWidget::mouseDoubleClickEvent(QMouseEvent* event)
 
 void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
 {
-    auto* item = itemAt(event->pos());
-    if (item) {
-        if (auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>()) {
-            QRect itemRect = visualItemRect(item);
-            
-            // 根据列宽计算图标位置，而不是使用硬编码固定值
-            int visibilityColumnX = header()->sectionPosition(2); // 可见性图标列起始位置
-            int lockColumnX = header()->sectionPosition(3); // 锁定图标列起始位置
-            int visibilityColumnWidth = header()->sectionSize(2); // 可见性图标列宽度
-            int lockColumnWidth = header()->sectionSize(3); // 锁定图标列宽度
-            
-            // 计算图标区域
-            QRect visibilityRect(visibilityColumnX, itemRect.top(), visibilityColumnWidth, itemRect.height());
-            QRect lockRect(lockColumnX, itemRect.top(), lockColumnWidth, itemRect.height());
-            
-            if (visibilityRect.contains(event->pos())) {
-                // 点击了可见性图标
-                auto document = kdl::mem_lock(m_document);
-                document->logger().info() << "Clicked visibility icon for node: " << node->name();
+    // 处理左键点击
+    if (event->button() == Qt::LeftButton) {
+        auto* item = itemAt(event->pos());
+        if (item) {
+            if (auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>()) {
+                QRect itemRect = visualItemRect(item);
                 
-                if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
-                    // 对于图层节点，只发出信号，让LayerEditor处理
-                    emit nodeVisibilityToggled(layerNode);
+                // 计算点击区域
+                int lockColumnX = header()->sectionPosition(2); // 锁定图标列起始位置
+                int visibilityColumnX = header()->sectionPosition(3); // 可见性图标列起始位置
+                int lockColumnWidth = header()->sectionSize(2); // 锁定图标列宽度
+                int visibilityColumnWidth = header()->sectionSize(3); // 可见性图标列宽度
+                
+                QRect lockRect(lockColumnX, itemRect.top(), lockColumnWidth, itemRect.height());
+                QRect visibilityRect(visibilityColumnX, itemRect.top(), visibilityColumnWidth, itemRect.height());
+                
+                // 处理锁定图标点击
+                if (lockRect.contains(event->pos())) {
+                    // 点击了锁定图标 - 只有图层节点才有锁定功能
+                    if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
+                        auto document = kdl::mem_lock(m_document);
+                        document->logger().info() << "Clicked lock icon for layer: " << layerNode->name();
+                        
+                        // 发出信号，让LayerEditor处理
+                        emit nodeLockToggled(layerNode);
+                        
+                        // 延迟更新图标，确保状态已变更
+                        QTimer::singleShot(100, this, [this, layerNode, item]() {
+                            item->setIcon(2, layerNode->locked() ? m_lockedIcon : m_unlockedIcon);
+                        });
+                    }
+                    event->accept();
+                    return;
+                } 
+                // 处理可见性图标点击
+                else if (visibilityRect.contains(event->pos())) {
+                    // 点击了可见性图标
+                    auto document = kdl::mem_lock(m_document);
+                    document->logger().info() << "Clicked visibility icon for node: " << node->name();
                     
-                    // 延迟更新图标，确保状态已变更
-                    QTimer::singleShot(100, this, [this, layerNode, item]() {
-                        item->setIcon(2, layerNode->visible() ? m_visibleIcon : m_hiddenIcon);
-                    });
-                } else {
-                    // 非图层节点仍由本地逻辑处理
-                    std::vector<mdl::Node*> nodes{node};
-                    if (node->visible()) {
-                        document->hide(nodes);
+                    if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
+                        // 对于图层节点，只发出信号，让LayerEditor处理
+                        emit nodeVisibilityToggled(layerNode);
+                        
+                        // 延迟更新图标，确保状态已变更
+                        QTimer::singleShot(100, this, [this, layerNode, item]() {
+                            item->setIcon(3, layerNode->visible() ? m_visibleIcon : m_hiddenIcon);
+                        });
                     } else {
-                        document->show(nodes);
+                        // 非图层节点仍由本地逻辑处理
+                        std::vector<mdl::Node*> nodes{node};
+                        if (node->visible()) {
+                            document->hide(nodes);
+                        } else {
+                            document->show(nodes);
+                        }
+                        
+                        // 立即更新图标
+                        item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
+                    }
+                    event->accept();
+                    return;
+                } 
+                // 处理常规区域点击 - 设置选择并防止多选
+                else {
+                    // 清除之前的选择
+                    clearSelection();
+                    // 设置当前项为选中
+                    setCurrentItem(item);
+                    item->setSelected(true);
+                    
+                    // 仅当点击的是图层区域时同步选择到文档
+                    if (dynamic_cast<mdl::LayerNode*>(node)) {
+                        auto document = kdl::mem_lock(m_document);
+                        if (document) {
+                            // 确保选择状态同步前已清除文档选择
+                            document->deselectAll();
+                        }
                     }
                     
-                    // 立即更新图标
-                    item->setIcon(2, node->visible() ? m_visibleIcon : m_hiddenIcon);
+                    event->accept();
+                    return;
                 }
-                return;
-            } else if (lockRect.contains(event->pos())) {
-                // 点击了锁定图标
-                auto document = kdl::mem_lock(m_document);
-                document->logger().info() << "Clicked lock icon for node: " << node->name();
-                
-                if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
-                    // 对于图层节点，只发出信号，让LayerEditor处理
-                    emit nodeLockToggled(layerNode);
-                    
-                    // 延迟更新图标，确保状态已变更
-                    QTimer::singleShot(100, this, [this, layerNode, item]() {
-                        item->setIcon(3, layerNode->locked() ? m_lockedIcon : m_unlockedIcon);
-                    });
-                } else {
-                    // 非图层节点仍由本地逻辑处理
-                    std::vector<mdl::Node*> nodes{node};
-                    if (node->locked()) {
-                        document->unlock(nodes);
-                    } else {
-                        document->lock(nodes);
-                    }
-                    
-                    // 立即更新图标
-                    item->setIcon(3, node->locked() ? m_lockedIcon : m_unlockedIcon);
-                }
-                return;
-            } else if (event->button() == Qt::RightButton) {
+            }
+        }
+    } else if (event->button() == Qt::RightButton) {
+        auto* item = itemAt(event->pos());
+        if (item) {
+            if (auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>()) {
                 emit nodeRightClicked(node, event->globalPosition().toPoint());
+                event->accept();
                 return;
             }
         }
     }
+    
+    // 其他情况调用父类处理
     QTreeWidget::mousePressEvent(event);
 }
 
@@ -589,22 +622,33 @@ void LayerTreeWidget::syncSelectionToDocument()
     auto document = kdl::mem_lock(m_document);
     if (!document) return;
     
-    const auto selectedItems = this->selectedItems();
-    if (selectedItems.empty()) {
-        return; // 不在列表没有选择时清除主视图选择，以避免意外的选择丢失
-    }
-    
-    std::vector<mdl::Node*> nodesToSelect;
-    for (auto* item : selectedItems) {
-        auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
-        if (node) {
-            nodesToSelect.push_back(node);
+    try {
+        const auto selectedItems = this->selectedItems();
+        if (selectedItems.empty()) {
+            return; // 不在列表没有选择时清除主视图选择，以避免意外的选择丢失
         }
-    }
-    
-    if (!nodesToSelect.empty()) {
-        document->deselectAll();
-        document->selectNodes(nodesToSelect);
+        
+        // 确保只处理一个选中项
+        if (selectedItems.size() == 1) {
+            auto* item = selectedItems.first();
+            auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
+            if (node && dynamic_cast<mdl::LayerNode*>(node)) {
+                // 如果是图层节点，不同步选择到文档
+                return;
+            } else if (node) {
+                // 只选择当前节点
+                document->deselectAll();
+                document->selectNodes({node});
+            }
+        } else {
+            // 清除选择，避免多选情况
+            clearSelection();
+        }
+    } catch (const std::exception& e) {
+        auto document = kdl::mem_lock(m_document);
+        if (document) {
+            document->logger().error() << "Error during selection sync to document: " << e.what();
+        }
     }
 }
 
@@ -994,13 +1038,14 @@ void LayerTreeWidget::updateNodeItem(mdl::Node* node)
         // 更新项的基本信息
         item->setText(0, QString::fromStdString(node->name()));
         
-        // 重要：确保正确更新可见性和锁定图标
-        item->setIcon(2, node->visible() ? m_visibleIcon : m_hiddenIcon);
-        item->setIcon(3, node->locked() ? m_lockedIcon : m_unlockedIcon);
-        
-        // 更新其他属性
-        if (auto* layer = dynamic_cast<mdl::LayerNode*>(node)) {
-            auto count = static_cast<qint64>(layer->childCount());
+        // 更新图标状态
+        if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
+            // 图层节点更新锁定和可见性图标
+            item->setIcon(2, node->locked() ? m_lockedIcon : m_unlockedIcon);
+            item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
+            
+            // 更新计数
+            auto count = static_cast<qint64>(layerNode->childCount());
             QString countText;
             if(count > 999) {
                 countText = QString("%1K").arg(count/1000.0, 0, 'f', 1);
@@ -1011,6 +1056,10 @@ void LayerTreeWidget::updateNodeItem(mdl::Node* node)
             item->setText(1, countText);
         }
         else if (auto* group = dynamic_cast<mdl::GroupNode*>(node)) {
+            // 非图层节点只更新可见性图标
+            item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
+            
+            // 更新计数
             auto count = static_cast<qint64>(group->childCount());
             QString countText;
             if(count > 999) {
@@ -1020,6 +1069,10 @@ void LayerTreeWidget::updateNodeItem(mdl::Node* node)
             }
             countText += tr(" objects");
             item->setText(1, countText);
+        }
+        else {
+            // 其他节点只更新可见性图标
+            item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
         }
     }
 }
