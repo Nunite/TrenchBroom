@@ -48,6 +48,7 @@
 #include "ui/QtUtils.h"
 #include "ui/ViewConstants.h"
 #include "io/ResourceUtils.h"
+#include "ui/Transaction.h"
 
 #include "kdl/memory_utils.h"
 
@@ -675,9 +676,41 @@ void LayerTreeWidget::dropEvent(QDropEvent* event)
         return;
     }
     
-    // 处理节点重父级
     try {
-        // 使用MapDocument的API移动节点
+        // 特殊处理：如果是将Brush拖到实体上
+        auto* sourceBrush = dynamic_cast<mdl::BrushNode*>(sourceNode);
+        auto* targetEntity = dynamic_cast<mdl::EntityNode*>(targetNode);
+        
+        if (sourceBrush && targetEntity) {
+            // 将brush节点添加到目标实体中
+            const auto nodesToMove = std::vector<mdl::Node*>{sourceNode};
+            
+            // 创建事务并执行reparentNodes操作
+            auto transaction = Transaction{document, "Move Brush to Entity"};
+            document->deselectAll();
+            
+            std::map<mdl::Node*, std::vector<mdl::Node*>> reparentMap;
+            reparentMap[targetEntity] = nodesToMove;
+            
+            if (!document->reparentNodes(reparentMap)) {
+                transaction.cancel();
+                event->ignore();
+                return;
+            }
+            
+            // 选择被移动的节点
+            document->selectNodes(nodesToMove);
+            transaction.commit();
+            
+            // 确保目标项展开
+            targetItem->setExpanded(true);
+            
+            // 接受拖放事件
+            event->acceptProposedAction();
+            return;
+        }
+        
+        // 处理其他类型的节点重父级
         std::map<mdl::Node*, std::vector<mdl::Node*>> nodesToReparent;
         nodesToReparent[targetNode].push_back(sourceNode);
         document->reparentNodes(nodesToReparent);
