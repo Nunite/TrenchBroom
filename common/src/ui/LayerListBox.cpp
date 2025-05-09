@@ -298,30 +298,35 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
     if (event->button() == Qt::LeftButton) {
         auto* item = itemAt(event->pos());
         if (item) {
-            if (auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>()) {
-                QRect itemRect = visualItemRect(item);
-                
-                // 检查是否点击了折叠/展开图标区域
-                int indentation = this->indentation();
-                int itemIndentation = 0;
-                
-                // 计算项的深度级别
+            // 尝试检测是否点击在展开/折叠图标区域
+            QModelIndex index = indexAt(event->pos());
+            if (index.isValid()) {
+                // 获取父视图左侧缩进区域（包含展开图标的区域）
+                int indent = indentation();
+                int depth = 0;
                 QTreeWidgetItem* parent = item->parent();
                 while (parent) {
-                    itemIndentation += indentation;
+                    depth++;
                     parent = parent->parent();
                 }
                 
-                QRect expandButtonRect(itemRect.left() - itemIndentation, itemRect.top(), 
-                                     itemIndentation, itemRect.height());
-                                     
-                if (expandButtonRect.contains(event->pos())) {
-                    // 点击了折叠/展开区域，让基类处理
+                // 简单计算左侧区域
+                QRect itemRect = visualRect(index);
+                int expandIconAreaWidth = indent * (depth + 1);
+                QRect expandArea(itemRect.left() - expandIconAreaWidth, itemRect.top(), 
+                               expandIconAreaWidth, itemRect.height());
+                
+                // 检查是否点击了展开区域并且有子项
+                if (expandArea.contains(event->pos()) && item->childCount() > 0) {
+                    // 直接让Qt处理展开/折叠事件
                     QTreeWidget::mousePressEvent(event);
                     return;
                 }
-                
+            }
+            
+            if (auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>()) {
                 // 计算点击区域
+                QRect itemRect = visualItemRect(item);
                 int lockColumnX = header()->sectionPosition(2); // 锁定图标列起始位置
                 int visibilityColumnX = header()->sectionPosition(3); // 可见性图标列起始位置
                 int lockColumnWidth = header()->sectionSize(2); // 锁定图标列宽度
