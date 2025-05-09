@@ -667,22 +667,55 @@ void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
     // 判断目标节点是否可以接收此类源节点
     bool canAccept = false;
     
-    // 检查节点类型
-    bool isTargetLayer = dynamic_cast<mdl::LayerNode*>(targetNode) != nullptr;
-    bool isTargetGroup = dynamic_cast<mdl::GroupNode*>(targetNode) != nullptr;
-    bool isTargetEntity = dynamic_cast<mdl::EntityNode*>(targetNode) != nullptr;
+    // 判断节点类型
+    auto* sourceBrush = dynamic_cast<mdl::BrushNode*>(sourceNode);
+    auto* sourceEntity = dynamic_cast<mdl::EntityNode*>(sourceNode);
     
-    // 图层可以接收所有类型的节点
-    if (isTargetLayer) {
+    auto* targetLayer = dynamic_cast<mdl::LayerNode*>(targetNode);
+    auto* targetGroup = dynamic_cast<mdl::GroupNode*>(targetNode);
+    auto* targetEntity = dynamic_cast<mdl::EntityNode*>(targetNode);
+    auto* targetBrush = dynamic_cast<mdl::BrushNode*>(targetNode);
+    
+    // 规则1-5：详细拖拽逻辑
+    if (targetLayer) {
+        // 图层可以接收所有类型的节点
         canAccept = true;
     }
-    // 组可以接收除了图层以外的所有节点
-    else if (isTargetGroup && !dynamic_cast<mdl::LayerNode*>(sourceNode)) {
-        canAccept = true;
+    else if (targetGroup) {
+        // 组可以接收除了图层以外的所有节点
+        if (!dynamic_cast<mdl::LayerNode*>(sourceNode)) {
+            canAccept = true;
+        }
     }
-    // 实体只能接收Brush节点
-    else if (isTargetEntity && dynamic_cast<mdl::BrushNode*>(sourceNode)) {
-        canAccept = true;
+    else if (targetEntity) {
+        // 检查实体类型
+        if (auto* definition = targetEntity->entity().definition()) {
+            if (definition->type() == mdl::EntityDefinitionType::BrushEntity) {
+                // 刷子实体只能接收刷子节点
+                if (sourceBrush) {
+                    canAccept = true;
+                }
+            } else {
+                // 点实体不接收任何节点
+                canAccept = false;
+            }
+        } else {
+            // 没有定义的实体，根据是否有子节点判断
+            if (targetEntity->childCount() > 0) {
+                // 假设有子节点是刷子实体，只接收刷子
+                if (sourceBrush) {
+                    canAccept = true;
+                }
+            } else {
+                // 假设无子节点是点实体，不接收任何节点
+                canAccept = false;
+            }
+        }
+    }
+    else if (targetBrush) {
+        // 刷子节点不能直接接收拖拽
+        // 注意：规则4(生成默认组)需要在dropEvent中处理
+        canAccept = false;
     }
     
     if (canAccept) {
@@ -756,22 +789,20 @@ void LayerTreeWidget::dropEvent(QDropEvent* event)
             // 将brush节点添加到目标实体中
             const auto nodesToMove = std::vector<mdl::Node*>{sourceNode};
             
-            // 创建事务并执行reparentNodes操作
-            auto transaction = Transaction{document, "Move Brush to Entity"};
+            // 清除选择
             document->deselectAll();
             
+            // 创建重父级映射并执行
             std::map<mdl::Node*, std::vector<mdl::Node*>> reparentMap;
             reparentMap[targetEntity] = nodesToMove;
             
             if (!document->reparentNodes(reparentMap)) {
-                transaction.cancel();
                 event->ignore();
                 return;
             }
             
             // 选择被移动的节点
             document->selectNodes(nodesToMove);
-            transaction.commit();
             
             // 确保目标项展开
             targetItem->setExpanded(true);
@@ -782,15 +813,33 @@ void LayerTreeWidget::dropEvent(QDropEvent* event)
         }
         
         // 处理其他类型的节点重父级
-        std::map<mdl::Node*, std::vector<mdl::Node*>> nodesToReparent;
-        nodesToReparent[targetNode].push_back(sourceNode);
-        document->reparentNodes(nodesToReparent);
-        
-        // 确保目标项展开
-        targetItem->setExpanded(true);
-        
-        // 接受拖放事件
-        event->acceptProposedAction();
+        try {
+            // 使用文档的原生reparentNodes方法
+            // MapDocument可能已经在内部创建了Transaction
+            std::map<mdl::Node*, std::vector<mdl::Node*>> nodesToReparent;
+            nodesToReparent[targetNode].push_back(sourceNode);
+            
+            // 先保存当前选择状态
+            auto selectedNode = sourceNode;
+            document->deselectAll();
+            
+            // 执行重新父级操作
+            if (document->reparentNodes(nodesToReparent)) {
+                // 重新选择节点
+                document->selectNodes({selectedNode});
+                
+                // 确保目标项展开
+                targetItem->setExpanded(true);
+                
+                // 接受拖放事件
+                event->acceptProposedAction();
+            } else {
+                event->ignore();
+            }
+        } catch (const std::exception& e) {
+            document->logger().error() << "Error during node reparenting: " << e.what();
+            event->ignore();
+        }
     } catch (const std::exception& e) {
         document->logger().error() << "Error during node reparenting: " << e.what();
         event->ignore();

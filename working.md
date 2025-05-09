@@ -102,3 +102,51 @@
 - ⏱️ 实现其他未完成的功能，如移动摄像机。
 - ⏱️ 继续优化代码和用户界面。
 
+# TrenchBroom 撤销系统和拖拽操作分析
+
+## 基本原则
+- TrenchBroom使用命令模式(Command Pattern)实现撤销/重做功能
+- MapDocument作为核心类管理文档状态和事务
+- Transaction作为事务包装器控制命令的提交和回滚
+
+## 撤销系统关键组件
+
+1. **Transaction类** (Transaction.h/cpp)
+   - 提供RAII风格的事务管理
+   - 自动在构造函数中调用document.startTransaction
+   - 在析构函数中自动取消未完成的事务
+   - 提供commit()和cancel()方法显式控制事务
+
+2. **MapDocument类** (MapDocument.h/cpp)
+   - 实现reparentNodes方法，内部创建Transaction
+   - 管理命令处理和撤销栈
+   - 提供startTransaction/commitTransaction/rollbackTransaction方法
+
+3. **TransactionScope枚举** (TransactionScope.h)
+   - Oneshot: 用户只能看到初始和最终状态
+   - LongRunning: 用户可以看到中间状态
+
+## reparentNodes实现分析
+MapDocument::reparentNodes方法已经在内部创建了自己的Transaction：
+```cpp
+// MapDocument.cpp
+bool MapDocument::reparentNodes(...) {
+  // ...
+  auto transaction = Transaction{*this, "Reparent Objects"};
+  // ...执行操作...
+  return transaction.commit();
+}
+```
+
+## 拖拽问题解决
+1. **问题根源**：LayerListBox.cpp中的dropEvent重复创建了Transaction，导致事务嵌套出现问题
+2. **正确做法**：UI层不应创建Transaction，应完全依赖MapDocument的reparentNodes内部事务管理
+
+## 修复方案
+1. 移除dropEvent中的Transaction创建
+2. 让所有拖拽操作处理方式保持一致
+3. 统一使用MapDocument内部的事务管理机制
+
+## 结论
+TrenchBroom的事务系统设计良好，但需要小心避免在UI层创建重复的Transaction。当调用已经包含Transaction的document方法时，不应再包装额外的Transaction。
+
