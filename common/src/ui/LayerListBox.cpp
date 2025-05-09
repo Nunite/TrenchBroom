@@ -63,11 +63,12 @@ LayerTreeWidget::LayerTreeWidget(std::weak_ptr<MapDocument> document, QWidget* p
     setUniformRowHeights(false);
     setItemsExpandable(true);
     setAllColumnsShowFocus(true);
-    setColumnCount(3); // 名称、对象数量、控制按钮
+    setColumnCount(4); // 名称、对象数量、可见性按钮、锁定按钮
     header()->setStretchLastSection(false);
     header()->setSectionResizeMode(0, QHeaderView::Stretch);  // 名称列自动拉伸
     header()->setSectionResizeMode(1, QHeaderView::Fixed);    // 数量列固定宽度
-    header()->setSectionResizeMode(2, QHeaderView::Fixed);    // 控制按钮列固定宽度
+    header()->setSectionResizeMode(2, QHeaderView::Fixed);    // 可见性按钮列固定宽度
+    header()->setSectionResizeMode(3, QHeaderView::Fixed);    // 锁定按钮列固定宽度
     header()->setDefaultSectionSize(80);  // 增加默认列宽
     
     // 美化样式
@@ -127,10 +128,10 @@ void LayerTreeWidget::loadIcons()
     m_groupIcon = io::loadSVGIcon("Map_folder.svg");  // 分组（线框文件夹）
     m_entityIcon = io::loadSVGIcon("Map_entity.svg");  // 点实体（线框基准）
     m_brushIcon = io::loadSVGIcon("Map_cube.svg");  // 刷子实体（线框立方体）
-    m_visibleIcon = io::loadSVGIcon("Visible.svg");
-    m_hiddenIcon = io::loadSVGIcon("Hidden.svg");
-    m_lockedIcon = io::loadSVGIcon("Locked.svg");
-    m_unlockedIcon = io::loadSVGIcon("Unlocked.svg");
+    m_visibleIcon = io::loadSVGIcon("Hidden_off.svg");
+    m_hiddenIcon = io::loadSVGIcon("Hidden_on.svg");
+    m_lockedIcon = io::loadSVGIcon("Lock_on.svg");
+    m_unlockedIcon = io::loadSVGIcon("Lock_off.svg");
 }
 
 void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
@@ -596,7 +597,8 @@ void LayerListBox::createGui()
     // 设置列宽
     m_treeWidget->setColumnWidth(0, 240); // 名称列加宽
     m_treeWidget->setColumnWidth(1, 100); // 数量列加宽
-    m_treeWidget->setColumnWidth(2, 80);  // 控制按钮列加宽
+    m_treeWidget->setColumnWidth(2, 40);  // 可见性按钮列
+    m_treeWidget->setColumnWidth(3, 40);  // 锁定按钮列
 
     // 创建顶部工具栏布局
     auto* toolbarLayout = new QHBoxLayout();
