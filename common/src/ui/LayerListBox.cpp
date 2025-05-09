@@ -33,6 +33,10 @@
 #include <QDropEvent>
 #include <QKeyEvent>
 #include <QTimer>
+#include <QMimeData>
+#include <QDrag>
+#include <QApplication>
+#include <QDataStream>
 #include <set>
 
 #include "mdl/LayerNode.h"
@@ -362,6 +366,11 @@ void LayerTreeWidget::mouseDoubleClickEvent(QMouseEvent* event)
 
 void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
 {
+    // 记录按下位置，用于判断是否应该启动拖拽
+    if (event->button() == Qt::LeftButton) {
+        m_dragStartPosition = event->pos();
+    }
+    
     // 处理左键点击
     if (event->button() == Qt::LeftButton) {
         auto* item = itemAt(event->pos());
@@ -531,7 +540,9 @@ void LayerTreeWidget::keyPressEvent(QKeyEvent* event)
 // 重写拖拽开始事件，控制哪些项可以被拖拽
 void LayerTreeWidget::dragEnterEvent(QDragEnterEvent* event)
 {
-    if (event->source() == this) {
+    // 只接受来自本控件且带有正确MIME类型的拖拽
+    if (event->source() == this && 
+        event->mimeData()->hasFormat("application/x-trenchronbroom-node")) {
         event->acceptProposedAction();
     } else {
         event->ignore();
@@ -541,138 +552,143 @@ void LayerTreeWidget::dragEnterEvent(QDragEnterEvent* event)
 // 重写拖拽移动事件，根据目标位置判断是否允许放置
 void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
 {
-    QTreeWidgetItem* targetItem = itemAt(event->position().toPoint());
-    QTreeWidgetItem* sourceItem = this->currentItem();
-
-    if (!sourceItem || !targetItem) {
+    // 验证MIME数据
+    if (!event->mimeData()->hasFormat("application/x-trenchronbroom-node")) {
         event->ignore();
-        return;
-    }
-
-    // 获取源节点和目标节点
-    auto* sourceNode = sourceItem->data(0, Qt::UserRole).value<mdl::Node*>();
-    auto* targetNode = targetItem->data(0, Qt::UserRole).value<mdl::Node*>();
-
-    if (!sourceNode || !targetNode) {
-        event->ignore();
-        return;
-    }
-
-    // 不允许拖拽默认图层
-    auto* sourceLayer = dynamic_cast<mdl::LayerNode*>(sourceNode);
-    if (sourceLayer && sourceLayer->name() == "Default Layer") {
-        event->ignore();
-        return;
-    }
-
-    // 只允许相同类型的节点之间拖拽
-    bool isSourceLayer = dynamic_cast<mdl::LayerNode*>(sourceNode) != nullptr;
-    bool isTargetLayer = dynamic_cast<mdl::LayerNode*>(targetNode) != nullptr;
-    bool isSourceEntity = dynamic_cast<mdl::EntityNode*>(sourceNode) != nullptr;
-    bool isSourceBrush = dynamic_cast<mdl::BrushNode*>(sourceNode) != nullptr;
-    bool isTargetEntity = dynamic_cast<mdl::EntityNode*>(targetNode) != nullptr;
-    bool isSourceGroup = dynamic_cast<mdl::GroupNode*>(sourceNode) != nullptr;
-    bool isTargetGroup = dynamic_cast<mdl::GroupNode*>(targetNode) != nullptr;
-
-    // 允许图层之间拖拽
-    if (isSourceLayer && isTargetLayer) {
-        event->acceptProposedAction();
-        return;
-    }
-
-    // 允许实体拖拽到图层或组
-    if (isSourceEntity && (isTargetLayer || isTargetGroup)) {
-        event->acceptProposedAction();
         return;
     }
     
-    // 允许brush拖拽到实体、图层或组
-    if (isSourceBrush && (isTargetEntity || isTargetLayer || isTargetGroup)) {
-        event->acceptProposedAction();
+    // 获取源节点
+    QByteArray itemData = event->mimeData()->data("application/x-trenchronbroom-node");
+    QDataStream dataStream(&itemData, QIODevice::ReadOnly);
+    quintptr nodePtr;
+    dataStream >> nodePtr;
+    mdl::Node* sourceNode = reinterpret_cast<mdl::Node*>(nodePtr);
+    
+    // 获取目标项
+    QTreeWidgetItem* targetItem = itemAt(event->position().toPoint());
+    if (!targetItem) {
+        event->ignore();
         return;
     }
 
-    // 允许组拖拽到图层或其他组
-    if (isSourceGroup && (isTargetLayer || isTargetGroup)) {
-        event->acceptProposedAction();
+    // 获取目标节点
+    auto* targetNode = targetItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    if (!targetNode) {
+        event->ignore();
+        return;
+    }
+    
+    // 不允许拖放到自身
+    if (sourceNode == targetNode) {
+        event->ignore();
+        return;
+    }
+    
+    // 不能拖拽默认图层
+    if (dynamic_cast<mdl::LayerNode*>(sourceNode) && 
+        sourceNode->name() == "Default Layer") {
+        event->ignore();
         return;
     }
 
-    // 其他情况不允许拖拽
-    event->ignore();
+    // 判断目标节点是否可以接收此类源节点
+    bool canAccept = false;
+    
+    // 检查节点类型
+    bool isTargetLayer = dynamic_cast<mdl::LayerNode*>(targetNode) != nullptr;
+    bool isTargetGroup = dynamic_cast<mdl::GroupNode*>(targetNode) != nullptr;
+    bool isTargetEntity = dynamic_cast<mdl::EntityNode*>(targetNode) != nullptr;
+    
+    // 图层可以接收所有类型的节点
+    if (isTargetLayer) {
+        canAccept = true;
+    }
+    // 组可以接收除了图层以外的所有节点
+    else if (isTargetGroup && !dynamic_cast<mdl::LayerNode*>(sourceNode)) {
+        canAccept = true;
+    }
+    // 实体只能接收Brush节点
+    else if (isTargetEntity && dynamic_cast<mdl::BrushNode*>(sourceNode)) {
+        canAccept = true;
+    }
+    
+    if (canAccept) {
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
 }
 
 // 重写放置事件，实现实际的节点移动
 void LayerTreeWidget::dropEvent(QDropEvent* event)
 {
-    // 记录源项和目标项
-    QTreeWidgetItem* sourceItem = this->currentItem();
+    // 验证MIME数据
+    if (!event->mimeData()->hasFormat("application/x-trenchronbroom-node")) {
+        event->ignore();
+        return;
+    }
+    
+    // 解析源节点
+    QByteArray itemData = event->mimeData()->data("application/x-trenchronbroom-node");
+    QDataStream dataStream(&itemData, QIODevice::ReadOnly);
+    quintptr nodePtr;
+    dataStream >> nodePtr;
+    mdl::Node* sourceNode = reinterpret_cast<mdl::Node*>(nodePtr);
+    
+    // 获取目标项
     QTreeWidgetItem* targetItem = itemAt(event->position().toPoint());
-    
-    if (!sourceItem || !targetItem) {
+    if (!targetItem) {
         event->ignore();
         return;
     }
     
-    // 获取源节点和目标节点
-    auto* sourceNode = sourceItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    // 获取目标节点
     auto* targetNode = targetItem->data(0, Qt::UserRole).value<mdl::Node*>();
-    
-    if (!sourceNode || !targetNode) {
+    if (!targetNode) {
         event->ignore();
         return;
     }
     
-    // 如果源节点是实体，目标节点是图层或组，则进行实际的节点移动
-    bool isSourceEntity = dynamic_cast<mdl::EntityNode*>(sourceNode) != nullptr ||
-                         dynamic_cast<mdl::BrushNode*>(sourceNode) != nullptr;
-    bool isSourceGroup = dynamic_cast<mdl::GroupNode*>(sourceNode) != nullptr;
-    bool isTargetLayer = dynamic_cast<mdl::LayerNode*>(targetNode) != nullptr;
-    bool isTargetGroup = dynamic_cast<mdl::GroupNode*>(targetNode) != nullptr;
+    // 不能拖拽到自身
+    if (sourceNode == targetNode) {
+        event->ignore();
+        return;
+    }
+    
+    // 检查节点状态
+    if (sourceNode->locked()) {
+        // 锁定的节点不能移动
+        event->ignore();
+        return;
+    }
+    
+    if (!targetNode->visible() || targetNode->locked()) {
+        // 不能移动到不可见或锁定的目标
+        event->ignore();
+        return;
+    }
     
     auto document = kdl::mem_lock(m_document);
-    
-    if ((isSourceEntity || isSourceGroup) && (isTargetLayer || isTargetGroup)) {
-        // 检查节点状态
-        if (sourceNode->locked()) {
-            // 锁定的节点不能移动
-            event->ignore();
-            return;
-        }
-        
-        if (!targetNode->visible() || targetNode->locked()) {
-            // 不能移动到不可见或锁定的目标
-            event->ignore();
-            return;
-        }
-        
-        // 使用 MapDocument 的 API 进行实际的节点移动
-        if (document) {
-            try {
-                std::map<mdl::Node*, std::vector<mdl::Node*>> nodesToReparent;
-                nodesToReparent[targetNode].push_back(sourceNode);
-                document->reparentNodes(nodesToReparent);
-                
-                // 接受拖放事件
-                event->acceptProposedAction();
-                return;
-            } catch (const std::exception& e) {
-                document->logger().error() << "Error during node reparenting: " << e.what();
-                event->ignore();
-                return;
-            }
-        }
+    if (!document) {
+        event->ignore();
+        return;
     }
     
-    // 对于图层重排序，使用默认处理
-    if (dynamic_cast<mdl::LayerNode*>(sourceNode) && dynamic_cast<mdl::LayerNode*>(targetNode)) {
-        QTreeWidget::dropEvent(event);
+    // 处理节点重父级
+    try {
+        // 使用MapDocument的API移动节点
+        std::map<mdl::Node*, std::vector<mdl::Node*>> nodesToReparent;
+        nodesToReparent[targetNode].push_back(sourceNode);
+        document->reparentNodes(nodesToReparent);
         
         // 确保目标项展开
-        if (targetItem) {
-            targetItem->setExpanded(true);
-        }
-    } else {
+        targetItem->setExpanded(true);
+        
+        // 接受拖放事件
+        event->acceptProposedAction();
+    } catch (const std::exception& e) {
+        document->logger().error() << "Error during node reparenting: " << e.what();
         event->ignore();
     }
 }
@@ -903,9 +919,9 @@ void LayerTreeWidget::onItemSelectionChanged()
             auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
             
             // 检查是否为实体节点
-            if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
-                if (entity->childCount() > 0) {
-                    // 如果是有子节点的实体，折叠其他已展开的实体
+            if (node && dynamic_cast<mdl::EntityNode*>(node)) {
+                if (node->childCount() > 0) {
+                    // 折叠其他已展开的实体
                     for (int i = 0; i < topLevelItemCount(); ++i) {
                         collapseOtherEntities(topLevelItem(i), item);
                     }
@@ -919,20 +935,20 @@ void LayerTreeWidget::onItemSelectionChanged()
 }
 
 // 折叠除当前选中项外的其他实体
-void LayerTreeWidget::collapseOtherEntities(QTreeWidgetItem* item, QTreeWidgetItem* selectedItem)
+void LayerTreeWidget::collapseOtherEntities(QTreeWidgetItem* currentItem, QTreeWidgetItem* selectedItem)
 {
-    if (!item || item == selectedItem) return;
+    if (!currentItem || currentItem == selectedItem) return;
     
     // 检查当前项是否为实体节点
-    auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>();
-    if (dynamic_cast<mdl::EntityNode*>(node) && item->childCount() > 0 && item->isExpanded()) {
+    auto* node = currentItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    if (dynamic_cast<mdl::EntityNode*>(node) && currentItem->childCount() > 0 && currentItem->isExpanded()) {
         // 如果是非选中的实体节点且已展开，则折叠
-        item->setExpanded(false);
+        currentItem->setExpanded(false);
     }
     
     // 递归处理子项
-    for (int i = 0; i < item->childCount(); ++i) {
-        collapseOtherEntities(item->child(i), selectedItem);
+    for (int i = 0; i < currentItem->childCount(); ++i) {
+        collapseOtherEntities(currentItem->child(i), selectedItem);
     }
 }
 
@@ -1376,17 +1392,66 @@ QTreeWidgetItem* LayerTreeWidget::findNodeItem(mdl::Node* targetNode, QTreeWidge
 // 重写鼠标移动事件，阻止拖拽多选
 void LayerTreeWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    // 只有按住Ctrl键时才允许移动选择，否则只处理拖放状态
-    if (!(event->modifiers() & Qt::ControlModifier)) {
-        // 允许拖放操作继续
-        if (state() == QAbstractItemView::DraggingState) {
-            QTreeWidget::mouseMoveEvent(event);
-        }
+    // 如果没有按下左键则不考虑拖拽
+    if (!(event->buttons() & Qt::LeftButton)) {
+        QTreeWidget::mouseMoveEvent(event);
         return;
     }
     
-    // 如果按住Ctrl键，允许正常的鼠标移动处理
-    QTreeWidget::mouseMoveEvent(event);
+    // 判断移动距离是否足够启动拖拽
+    if ((event->pos() - m_dragStartPosition).manhattanLength() < QApplication::startDragDistance()) {
+        // 阻止默认的多选行为
+        event->accept();
+        return;
+    }
+    
+    // 获取当前选中项(只处理单选)
+    QList<QTreeWidgetItem*> selectedItems = this->selectedItems();
+    if (selectedItems.size() != 1) {
+        event->accept();
+        return;
+    }
+    
+    QTreeWidgetItem* currentItem = selectedItems.first();
+    if (!currentItem) {
+        event->accept();
+        return;
+    }
+    
+    // 获取节点信息
+    auto* node = currentItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    if (!node || node->locked()) {
+        event->accept();
+        return;
+    }
+    
+    // 创建拖拽对象
+    QDrag* drag = new QDrag(this);
+    QMimeData* mimeData = new QMimeData;
+    
+    // 存储节点指针用于识别
+    QByteArray itemData;
+    QDataStream dataStream(&itemData, QIODevice::WriteOnly);
+    quintptr nodePtr = reinterpret_cast<quintptr>(node);
+    dataStream << nodePtr;
+    mimeData->setData("application/x-trenchronbroom-node", itemData);
+    
+    drag->setMimeData(mimeData);
+    
+    // 设置拖拽图标
+    QPixmap pixmap(32, 32);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    QIcon icon = currentItem->icon(0);
+    icon.paint(&painter, QRect(0, 0, 32, 32));
+    painter.end();
+    
+    drag->setPixmap(pixmap);
+    drag->setHotSpot(QPoint(16, 16));
+    
+    // 执行拖拽(阻止事件传递给父控件)
+    Qt::DropAction dropAction = drag->exec(Qt::MoveAction);
+    event->accept();
 }
 
 } // namespace tb::ui

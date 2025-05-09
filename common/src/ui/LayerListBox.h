@@ -58,6 +58,7 @@ private:
     QIcon m_unlockedIcon;
     bool m_syncingSelection;
     NotifierConnection m_notifierConnection;
+    QPoint m_dragStartPosition;
 
     void loadIcons();
     void setupTreeItem(QTreeWidgetItem* item, mdl::Node* node);
