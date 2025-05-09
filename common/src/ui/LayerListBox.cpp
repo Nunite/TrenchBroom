@@ -301,6 +301,26 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
             if (auto* node = item->data(0, Qt::UserRole).value<mdl::Node*>()) {
                 QRect itemRect = visualItemRect(item);
                 
+                // 检查是否点击了折叠/展开图标区域
+                int indentation = this->indentation();
+                int itemIndentation = 0;
+                
+                // 计算项的深度级别
+                QTreeWidgetItem* parent = item->parent();
+                while (parent) {
+                    itemIndentation += indentation;
+                    parent = parent->parent();
+                }
+                
+                QRect expandButtonRect(itemRect.left() - itemIndentation, itemRect.top(), 
+                                     itemIndentation, itemRect.height());
+                                     
+                if (expandButtonRect.contains(event->pos())) {
+                    // 点击了折叠/展开区域，让基类处理
+                    QTreeWidget::mousePressEvent(event);
+                    return;
+                }
+                
                 // 计算点击区域
                 int lockColumnX = header()->sectionPosition(2); // 锁定图标列起始位置
                 int visibilityColumnX = header()->sectionPosition(3); // 可见性图标列起始位置
