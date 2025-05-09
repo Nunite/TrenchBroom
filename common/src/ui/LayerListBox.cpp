@@ -300,40 +300,46 @@ void LayerTreeWidget::mousePressEvent(QMouseEvent* event)
             QRect lockRect(lockColumnX, itemRect.top(), lockColumnWidth, itemRect.height());
             
             if (visibilityRect.contains(event->pos())) {
-                // 切换节点可见性状态
+                // 点击了可见性图标
                 auto document = kdl::mem_lock(m_document);
                 document->logger().info() << "Clicked visibility icon for node: " << node->name();
                 
-                // 切换可见性并发射信号
-                std::vector<mdl::Node*> nodes{node};
-                if (node->visible()) {
-                    document->hide(nodes);
+                if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
+                    // 对于图层节点，只发出信号，让LayerEditor处理
+                    emit nodeVisibilityToggled(layerNode);
                 } else {
-                    document->show(nodes);
+                    // 非图层节点仍由本地逻辑处理
+                    std::vector<mdl::Node*> nodes{node};
+                    if (node->visible()) {
+                        document->hide(nodes);
+                    } else {
+                        document->show(nodes);
+                    }
+                    
+                    // 立即更新图标
+                    item->setIcon(2, node->visible() ? m_visibleIcon : m_hiddenIcon);
                 }
-                
-                // 立即更新图标
-                item->setIcon(2, node->visible() ? m_visibleIcon : m_hiddenIcon);
-                
-                emit nodeVisibilityToggled(node);
                 return;
             } else if (lockRect.contains(event->pos())) {
-                // 切换节点锁定状态
+                // 点击了锁定图标
                 auto document = kdl::mem_lock(m_document);
                 document->logger().info() << "Clicked lock icon for node: " << node->name();
                 
-                // 切换锁定状态并发射信号
-                std::vector<mdl::Node*> nodes{node};
-                if (node->locked()) {
-                    document->unlock(nodes);
+                if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
+                    // 对于图层节点，只发出信号，让LayerEditor处理
+                    emit nodeLockToggled(layerNode);
                 } else {
-                    document->lock(nodes);
+                    // 非图层节点仍由本地逻辑处理
+                    std::vector<mdl::Node*> nodes{node};
+                    if (node->locked()) {
+                        document->unlock(nodes);
+                    } else {
+                        document->lock(nodes);
+                    }
+                    
+                    // 立即更新图标
+                    item->setIcon(3, node->locked() ? m_lockedIcon : m_unlockedIcon);
                 }
-                
-                // 立即更新图标
-                item->setIcon(3, node->locked() ? m_lockedIcon : m_unlockedIcon);
-                
-                emit nodeLockToggled(node);
                 return;
             } else if (event->button() == Qt::RightButton) {
                 emit nodeRightClicked(node, event->globalPosition().toPoint());
