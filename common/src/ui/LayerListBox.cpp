@@ -948,6 +948,24 @@ void LayerTreeWidget::syncSelectionFromDocument()
             return;
         }
         
+        // 特殊情况处理：检查是否处于重新父级化或创建brush实体操作中
+        bool isReparentingOrEntityCreation = false;
+        try {
+            // 更改为基于选择内容判断是否是重新父级化操作
+            // 如果选择包含新创建的实体，通常在reparent操作中会存在一个刷子实体和其子节点
+            for (const auto* node : selectedNodes) {
+                if (auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node)) {
+                    if (entityNode->childCount() > 0) {
+                        // 如果是带有子节点的实体，很可能是正在进行reparent或者创建操作
+                        isReparentingOrEntityCreation = true;
+                        break;
+                    }
+                }
+            }
+        } catch (const std::exception&) {
+            // 如果检查失败，忽略该错误
+        }
+        
         // 检查是否所有选中节点都是同一实体的子节点
         const mdl::EntityNode* parentEntity = nullptr;
         bool allAreChildrenOfSameEntity = true;
@@ -994,9 +1012,10 @@ void LayerTreeWidget::syncSelectionFromDocument()
                             foundItem->setExpanded(false);
                             scrollToItem(foundItem);
                             
-                            // 同步到文档
-                            document->deselectAll();
-                            document->selectNodes({const_cast<mdl::EntityNode*>(parentEntity)});
+                            // 同步到文档，但不使用deselectAll，以避免触发循环通知
+                            if (!m_syncingSelection) {
+                                document->selectNodes({const_cast<mdl::EntityNode*>(parentEntity)});
+                            }
                             return;
                         }
                     }
@@ -1009,32 +1028,36 @@ void LayerTreeWidget::syncSelectionFromDocument()
         QList<QTreeWidgetItem*> itemsToSelect;
         
         for (const auto* node : selectedNodes) {
-            // 递归查找节点及其所有父节点
-            std::set<const mdl::Node*> nodesToFind;
-            nodesToFind.insert(node);
-            
-            // 添加所有父节点直到图层节点
-            const mdl::Node* current = node->parent();
-            while (current) {
-                if (!dynamic_cast<const mdl::LayerNode*>(current)) {
-                    nodesToFind.insert(current);
-                    current = current->parent();
-                } else {
+            // 找到对应节点的树项
+            QTreeWidgetItem* foundItem = nullptr;
+            for (int i = 0; i < topLevelItemCount(); ++i) {
+                foundItem = findNodeItemRecursive(node, topLevelItem(i));
+                if (foundItem) {
+                    if (!itemsToSelect.contains(foundItem)) {
+                        itemsToSelect.append(foundItem);
+                    }
                     break;
                 }
             }
             
-            // 查找树中对应的项
-            for (const mdl::Node* targetNode : nodesToFind) {
-                QTreeWidgetItem* foundItem = nullptr;
-                for (int i = 0; i < topLevelItemCount(); ++i) {
-                    foundItem = findNodeItemRecursive(targetNode, topLevelItem(i));
-                    if (foundItem) {
-                        if (!itemsToSelect.contains(foundItem)) {
-                            itemsToSelect.append(foundItem);
+            // 如果没找到对应的树项，或者正在进行重新父级化操作
+            if (!foundItem || isReparentingOrEntityCreation) {
+                // 在重新父级化或创建实体时，添加其父节点到选择项中
+                // 这样可以确保当前操作的可视化状态一致
+                const mdl::Node* parent = node->parent();
+                while (parent && !dynamic_cast<const mdl::LayerNode*>(parent)) {
+                    QTreeWidgetItem* parentItem = nullptr;
+                    for (int i = 0; i < topLevelItemCount(); ++i) {
+                        parentItem = findNodeItemRecursive(parent, topLevelItem(i));
+                        if (parentItem) {
+                            if (isReparentingOrEntityCreation && !itemsToSelect.contains(parentItem)) {
+                                itemsToSelect.append(parentItem); // 也选择父节点
+                            }
+                            parentItem->setExpanded(true);
+                            break;
                         }
-                        break;
                     }
+                    parent = parent->parent();
                 }
             }
         }
@@ -1048,13 +1071,33 @@ void LayerTreeWidget::syncSelectionFromDocument()
                 parent->setExpanded(true);
                 parent = parent->parent();
             }
-            scrollToItem(item);
+        }
+        
+        if (!itemsToSelect.isEmpty()) {
+            scrollToItem(itemsToSelect.first()); // 滚动到第一个选中的项
         }
     } catch (const std::exception& e) {
         auto docLog = kdl::mem_lock(m_document);
         if (docLog) {
             docLog->logger().error() << "Error during selection sync: " << e.what();
         }
+    }
+}
+
+// 处理文档选择变化
+void LayerTreeWidget::onDocumentSelectionChanged(const Selection& /* selection */)
+{
+    if (!m_syncingSelection) {
+        m_syncingSelection = true;
+        try {
+            syncSelectionFromDocument();
+        } catch (const std::exception& e) {
+            auto docLog = kdl::mem_lock(m_document);
+            if (docLog) {
+                docLog->logger().error() << "Error during document selection changed: " << e.what();
+            }
+        }
+        m_syncingSelection = false;
     }
 }
 
@@ -1190,23 +1233,6 @@ void LayerTreeWidget::collapseOtherEntities(QTreeWidgetItem* currentItem, QTreeW
     // 递归处理子项
     for (int i = 0; i < currentItem->childCount(); ++i) {
         collapseOtherEntities(currentItem->child(i), selectedItem);
-    }
-}
-
-// 处理文档选择变化
-void LayerTreeWidget::onDocumentSelectionChanged(const Selection& /* selection */)
-{
-    if (!m_syncingSelection) {
-        m_syncingSelection = true;
-        try {
-            syncSelectionFromDocument();
-        } catch (const std::exception& e) {
-            auto docLog = kdl::mem_lock(m_document);
-            if (docLog) {
-                docLog->logger().error() << "Error during document selection changed: " << e.what();
-            }
-        }
-        m_syncingSelection = false;
     }
 }
 

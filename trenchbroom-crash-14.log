@@ -1,0 +1,2509 @@
+Renderer info: NVIDIA GeForce RTX 4060 Laptop GPU/PCIe/SSE2 version 4.6.0 NVIDIA 566.36 from NVIDIA Corporation
+Depth buffer bits: 24
+Multisampling enabled
+Adding file system path "D:\\Code_Development\\Source_code\\CPP\\TrenchBroom\\build\\app\\Debug\\defaults\\assets"
+Adding file system path "D:\\steam\\steamapps\\common\\Half-Life\\valve"
+Creating new document
+Found 0 shaders
+Unknown property definition type 'color255' for property 'rendercolor' (at FileLocation{line: 549, column: 2})
+Unknown property definition type 'sprite' for property 'spritesmoke' (at FileLocation{line: 602, column: 2})
+Unknown property definition type 'sprite' for property 'spriteflash' (at FileLocation{line: 603, column: 2})
+Unknown property definition type 'sound' for property 'rotatesound' (at FileLocation{line: 605, column: 2})
+Unknown property definition type 'studio' for property 'gibmodel' (at FileLocation{line: 673, column: 2})
+Unknown property definition type 'color255' for property '_light' (at FileLocation{line: 839, column: 2})
+Unknown property definition type 'sound' for property 'message' (at FileLocation{line: 1285, column: 2})
+Legacy model expressions are deprecated, replace with 'undefined' (at FileLocation{line: 1384, column: 85})
+Unknown property definition type 'studio' for property 'model' (at FileLocation{line: 1386, column: 2})
+Unknown property definition type 'sprite' for property 'model' (at FileLocation{line: 1391, column: 2})
+Unknown property definition type 'color255' for property 'rendercolor' (at FileLocation{line: 1423, column: 2})
+Legacy model expressions are deprecated, replace with 'undefined' (at FileLocation{line: 1426, column: 20})
+Unknown property definition type 'studio' for property 'model' (at FileLocation{line: 1428, column: 2})
+Unknown property definition type 'color255' for property 'rendercolor' (at FileLocation{line: 1445, column: 2})
+Unknown property definition type 'sprite' for property 'texture' (at FileLocation{line: 1452, column: 2})
+Found multiple model properties (at FileLocation{line: 1568, column: 91})
+Unknown property definition type 'sprite' for property 'model' (at FileLocation{line: 1570, column: 2})
+Unknown property definition type 'color255' for property 'rendercolor' (at FileLocation{line: 1585, column: 2})
+Unknown property definition type 'color255' for property 'rendercolor' (at FileLocation{line: 1597, column: 2})
+Unknown property definition type 'color255' for property 'rendercolor' (at FileLocation{line: 1609, column: 2})
+Unknown property definition type 'sprite' for property 'texture' (at FileLocation{line: 1612, column: 2})
+Unknown property definition type 'sprite' for property 'EndSprite' (at FileLocation{line: 1613, column: 2})
+Unknown property definition type 'sound' for property 'messagesound' (at FileLocation{line: 1634, column: 2})
+Unknown property definition type 'studio' for property 'shootmodel' (at FileLocation{line: 1676, column: 2})
+Unknown property definition type 'sprite' for property 'model' (at FileLocation{line: 1760, column: 2})
+Unknown property definition type 'color255' for property 'color' (at FileLocation{line: 2210, column: 2})
+Unknown property definition type 'color255' for property 'color2' (at FileLocation{line: 2211, column: 2})
+Legacy model expressions are deprecated, replace with 'undefined' (at FileLocation{line: 2236, column: 20})
+Unknown property definition type 'studio' for property 'model' (at FileLocation{line: 2238, column: 2})
+Legacy model expressions are deprecated, replace with 'undefined' (at FileLocation{line: 2375, column: 50})
+Unknown property definition type 'decal' for property 'texture' (at FileLocation{line: 2396, column: 2})
+Unknown property definition type 'color255' for property '_diffuse_light' (at FileLocation{line: 2424, column: 2})
+Unknown property definition type 'sound' for property 'message' (at FileLocation{line: 3081, column: 2})
+Unknown property definition type 'color255' for property '_light' (at FileLocation{line: 3941, column: 2})
+Unknown property definition type 'color255' for property '_light' (at FileLocation{line: 4005, column: 2})
+Unknown property definition type 'color255' for property '_texcolor' (at FileLocation{line: 4006, column: 2})
+Duplicate class info 'info_texlights' (at FileLocation{line: 3968, column: 13})
+Loaded entity definition file cs16lws.fgd
+Found 0 shaders
+Starting transaction 'Create Brush'
+Starting transaction 'Add Objects'
+Command 'Add Objects' executed
+Command 'Ensure Objects Visible' executed
+Command 'Unlock Objects' executed
+Committing transaction
+Transaction 'Add Objects' executed
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Create Brush' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Select Brush Face'
+Command 'Select 1 Brush Face' executed
+Committing transaction
+Transaction 'Select Brush Face' executed
+Starting transaction 'Select Brush Face'
+Command 'Select None' executed
+Command 'Select 1 Brush Face' executed
+Committing transaction
+Transaction 'Select Brush Face' executed
+Starting transaction 'Select Object'
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Starting transaction 'Select Object'
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Starting transaction 'Select Object'
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Starting transaction 'Select Brush Face'
+Command 'Select None' executed
+Command 'Select 1 Brush Face' executed
+Committing transaction
+Transaction 'Select Brush Face' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Select Object'
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Starting transaction 'Drag Select Objects'
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Drag Select Objects' executed
+Starting transaction 'Create func_detail'
+Command 'Select None' executed
+Starting transaction 'Add Objects'
+Command 'Add Objects' executed
+Command 'Ensure Objects Visible' executed
+Command 'Unlock Objects' executed
+Committing transaction
+Transaction 'Add Objects' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 2 Objects' executed
+Committing transaction
+Transaction 'Create func_detail' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Select Object'
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Create Brush'
+Starting transaction 'Add Objects'
+Command 'Add Objects' executed
+Command 'Ensure Objects Visible' executed
+Command 'Unlock Objects' executed
+Committing transaction
+Transaction 'Add Objects' executed
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Create Brush' executed
+Starting transaction 'Move Objects'
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Committing transaction
+Transaction 'Move Objects' executed
+Starting transaction 'Move Objects'
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Committing transaction
+Transaction 'Move Objects' executed
+Starting transaction 'Move Objects'
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Committing transaction
+Transaction 'Move Objects' executed
+Starting transaction 'Move Objects'
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Committing transaction
+Transaction 'Move Objects' executed
+Starting transaction 'Move Objects'
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Committing transaction
+Transaction 'Move Objects' executed
+Starting transaction 'Move Objects'
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Committing transaction
+Transaction 'Move Objects' executed
+Starting transaction 'Move Objects'
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Starting transaction ''
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Translate Objects' executed
+Committing transaction
+Transaction 'Select None' executed
+Committing transaction
+Transaction 'Move Objects' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Starting transaction 'Create Layer Unnamed'
+Starting transaction 'Add Objects'
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Command 'Add Objects' executed
+Command 'Ensure Objects Visible' executed
+Command 'Unlock Objects' executed
+Committing transaction
+Transaction 'Add Objects' executed
+Starting transaction 'Set Current Layer'
+Command 'Reset Visibility' executed
+Command 'Reset Locking' executed
+Command 'Set Current Layer' executed
+Committing transaction
+Transaction 'Set Current Layer' executed
+Committing transaction
+Transaction 'Create Layer Unnamed' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Reparent Objects' undone
+Command 'Set Link ID' undone
+Command 'Reset Visibility' undone
+Command 'Reset Locking' undone
+Transaction 'Reparent Objects' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Reparent Objects' undone
+Command 'Set Link ID' undone
+Command 'Reset Visibility' undone
+Command 'Reset Locking' undone
+Transaction 'Reparent Objects' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Reparent Objects' undone
+Command 'Set Link ID' undone
+Command 'Reset Visibility' undone
+Command 'Reset Locking' undone
+Transaction 'Reparent Objects' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Set Current Layer' undone
+Command 'Reset Locking' undone
+Command 'Reset Visibility' undone
+Command 'Unlock Objects' undone
+Command 'Ensure Objects Visible' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Add Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Create Layer Unnamed' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Reparent Objects' undone
+Command 'Set Link ID' undone
+Command 'Reset Visibility' undone
+Command 'Reset Locking' undone
+Transaction 'Reparent Objects' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Reparent Objects' undone
+Command 'Set Link ID' undone
+Command 'Reset Visibility' undone
+Command 'Reset Locking' undone
+Transaction 'Reparent Objects' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Translate Objects' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Move Objects' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Starting transaction 'Delete Objects'
+Command 'Select None' executed
+Starting transaction ''
+Command 'Remove Objects' executed
+Command 'Remove Objects' executed
+Committing transaction
+Transaction 'Remove Objects' executed
+Committing transaction
+Transaction 'Delete Objects' executed
+Starting transaction 'Create Brush'
+Starting transaction 'Add Objects'
+Command 'Add Objects' executed
+Command 'Ensure Objects Visible' executed
+Command 'Unlock Objects' executed
+Committing transaction
+Transaction 'Add Objects' executed
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Create Brush' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Create Brush'
+Starting transaction 'Add Objects'
+Command 'Add Objects' executed
+Command 'Ensure Objects Visible' executed
+Command 'Unlock Objects' executed
+Committing transaction
+Transaction 'Add Objects' executed
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Create Brush' executed
+Starting transaction 'Select Object'
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Starting transaction 'Select Object'
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Starting transaction 'Create func_detail'
+Command 'Select None' executed
+Starting transaction 'Add Objects'
+Command 'Add Objects' executed
+Command 'Ensure Objects Visible' executed
+Command 'Unlock Objects' executed
+Committing transaction
+Transaction 'Add Objects' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 2 Objects' executed
+Committing transaction
+Transaction 'Create func_detail' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Select Object'
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Reparent Objects' undone
+Command 'Set Link ID' undone
+Command 'Reset Visibility' undone
+Command 'Reset Locking' undone
+Transaction 'Reparent Objects' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 2 Objects' undone
+Command 'Reparent Objects' undone
+Command 'Set Link ID' undone
+Command 'Reset Visibility' undone
+Command 'Reset Locking' undone
+Command 'Unlock Objects' undone
+Command 'Ensure Objects Visible' undone
+Command 'Add Objects' undone
+Command 'Select None' undone
+Transaction 'Create func_detail' undone
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Create Layer Unnamed'
+Starting transaction 'Add Objects'
+Command 'Add Objects' executed
+Command 'Ensure Objects Visible' executed
+Command 'Unlock Objects' executed
+Committing transaction
+Transaction 'Add Objects' executed
+Starting transaction 'Set Current Layer'
+Command 'Reset Visibility' executed
+Command 'Reset Locking' executed
+Command 'Set Current Layer' executed
+Committing transaction
+Transaction 'Set Current Layer' executed
+Committing transaction
+Transaction 'Create Layer Unnamed' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Starting transaction 'Create func_detail'
+Command 'Select None' executed
+Starting transaction 'Add Objects'
+Command 'Add Objects' executed
+Command 'Ensure Objects Visible' executed
+Command 'Unlock Objects' executed
+Committing transaction
+Transaction 'Add Objects' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Create func_detail' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Starting transaction 'Select Brushes'
+Command 'Select None' executed
+Command 'Select 2 Objects' executed
+Committing transaction
+Transaction 'Select Brushes' executed
+Starting transaction 'Select Object'
+Command 'Select None' executed
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select Object' undone
+Command 'Select 2 Objects' undone
+Command 'Select None' undone
+Transaction 'Select Brushes' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Select None' undone
+Transaction 'Select None' undone
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Starting transaction 'Select Object'
+Command 'Select 1 Object' executed
+Committing transaction
+Transaction 'Select Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Starting transaction 'Reparent Objects'
+Command 'Reset Locking' executed
+Command 'Reset Visibility' executed
+Command 'Set Link ID' executed
+Command 'Reparent Objects' executed
+Committing transaction
+Transaction 'Reparent Objects' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select 1 Object' undone
+Transaction 'Select 1 Object' undone
+Command 'Reparent Objects' undone
+Command 'Set Link ID' undone
+Command 'Reset Visibility' undone
+Command 'Reset Locking' undone
+Transaction 'Reparent Objects' undone
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
+Command 'Select None' executed
+Transaction 'Select None' executed
+Command 'Select 1 Object' executed
+Transaction 'Select 1 Object' executed
