@@ -890,7 +890,7 @@ bool MapViewBase::event(QEvent* event)
 
 void MapViewBase::enterEvent(QEnterEvent* event)
 {
-  // 当鼠标进入视图时，立即设置为箭头光标
+  
   setCursor(Qt::ArrowCursor);
   RenderView::enterEvent(event);
 }

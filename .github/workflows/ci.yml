@@ -5,6 +5,7 @@ on:
       - '**'
     branches:
       - master
+      - Map_Inspector
   pull_request:
 
 name: CI

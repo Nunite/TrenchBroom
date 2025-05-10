@@ -80,7 +80,7 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     
-    // 拖拽相关方法
+    
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragMoveEvent(QDragMoveEvent* event) override;
     void dropEvent(QDropEvent* event) override;
@@ -108,19 +108,19 @@ private:
     QLineEdit* m_searchBox;
     QComboBox* m_sortOptions;
     LayerTreeWidget* m_treeWidget;
-    int m_currentSortMode; // 当前排序模式：0=名称，1=类型，2=自定义
+    int m_currentSortMode; 
 
     void createGui();
     void connectObservers();
     void filterTree(const QString& text);
     void sortTree(int index);
 
-    // 新增辅助方法
+    
     void showAllItems(QTreeWidgetItem* item);
     bool itemMatchesFilter(QTreeWidgetItem* item, const QString& text);
     void sortByType();
 
-    // 通知处理函数
+    
     void documentDidChange(MapDocument*);
     void nodesDidChange(const std::vector<mdl::Node*>&);
 
