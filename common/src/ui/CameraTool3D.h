@@ -62,7 +62,7 @@ private:
 
   std::unique_ptr<GestureTracker> acceptMouseDrag(const InputState& inputState) override;
 
-  bool isRightClickForContextMenu(const InputState& inputState, const QPoint& currentPos) const;
+  bool isRightClickForContextMenu(const QPoint& currentPos) const;
   void showContextMenu();
 
   bool cancel() override;
