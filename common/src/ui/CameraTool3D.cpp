@@ -53,10 +53,20 @@ bool shouldMove(const InputState& inputState)
 
 bool shouldLook(const InputState& inputState)
 {
-  // 确保不拦截Shift+右键组合(用于多选面)
+  // 当按下右键时，先检查是否是Shift+右键多选面组合
+  if (inputState.mouseButtonsPressed(MouseButtons::Right) && 
+      inputState.modifierKeysDown(ModifierKeys::Shift)) {
+    // 只有当开关启用时才跳过拦截
+    if (pref(Preferences::CameraEnableShiftRightClickSelect)) {
+      return false; // 不拦截Shift+右键组合，允许SelectionTool处理多选面
+    }
+    // 如果开关关闭，则像处理普通右键一样处理
+    return true; // 强制拦截Shift+右键组合
+  }
+  
+  // 否则，按照常规逻辑处理右键
   return (
     inputState.mouseButtonsPressed(MouseButtons::Right)
-    && !inputState.modifierKeysDown(ModifierKeys::Shift) // 不拦截Shift修饰键
     && inputState.modifierKeysPressed(ModifierKeys::None)
     && !inputState.anyToolDragging());
 }
@@ -258,7 +268,7 @@ public:
     
     // 每次更新后都重置鼠标位置到中心点
     if (m_widget && inputState.mouseButtonsPressed(MouseButtons::Right)) {
-      QCursor::setPos(m_widget->mapToGlobal(m_center));
+        QCursor::setPos(m_widget->mapToGlobal(m_center));
     }
     
     return true;
@@ -346,11 +356,17 @@ const Tool& CameraTool3D::tool() const
 
 void CameraTool3D::mouseDown(const InputState& inputState)
 {
-  // 记录鼠标按下时的位置和时间（用于检测短点击）
-  // 注意：不处理Shift+右键组合(用于多选面)
+  // 如果是Shift+右键多选面组合且开关启用，直接跳过
   if (inputState.mouseButtonsPressed(MouseButtons::Right) && 
-      !inputState.modifierKeysDown(ModifierKeys::Shift) &&
-      m_widget) {
+      inputState.modifierKeysDown(ModifierKeys::Shift)) {
+    if (pref(Preferences::CameraEnableShiftRightClickSelect)) {
+      return;
+    }
+    // 否则继续处理
+  }
+
+  // 记录鼠标按下时的位置和时间（用于检测短点击）
+  if (inputState.mouseButtonsPressed(MouseButtons::Right) && m_widget) {
     m_rightClickStartTime = QDateTime::currentMSecsSinceEpoch();
     m_rightClickStartPos = m_widget->mapFromGlobal(QCursor::pos());
     
@@ -391,15 +407,25 @@ void CameraTool3D::mouseScroll(const InputState& inputState)
 
 void CameraTool3D::mouseUp(const InputState& inputState)
 {
+  // 由于mouseUp事件在按钮释放后触发，当前的按钮状态已经不包含该按钮
+  // 假设右键被释放，但需要根据其他上下文判断
+  
+  // 检查是否是右键事件
+  const bool isRightMouseEvent = m_rightClickStartTime > 0;
+  
+  // 如果是Shift+右键释放且开关启用，直接跳过
+  if (isRightMouseEvent && inputState.modifierKeysDown(ModifierKeys::Shift)) {
+    if (pref(Preferences::CameraEnableShiftRightClickSelect)) {
+      m_rightClickStartTime = 0; // 重置状态
+      return;
+    }
+    // 开关关闭时，继续处理
+  }
+
   // 检查是否是短时间右键点击（用于显示上下文菜单）
-  // 注意：不处理Shift+右键组合(用于多选面)
-  if (m_widget && 
-      inputState.mouseButtonsPressed(MouseButtons::Right) && 
-      !inputState.modifierKeysDown(ModifierKeys::Shift) &&
-      !m_cursorLocked) {
-    
+  if (m_widget && isRightMouseEvent && !m_cursorLocked) {
     QPoint currentPos = m_widget->mapFromGlobal(QCursor::pos());
-    if (isRightClickForContextMenu(currentPos)) {
+    if (isRightClickForContextMenu(inputState, currentPos)) {
       // 是短点击，显示上下文菜单
       showContextMenu();
     }
@@ -411,7 +437,7 @@ void CameraTool3D::mouseUp(const InputState& inputState)
   }
   
   // 保存偏好设置
-  if (inputState.mouseButtonsPressed(MouseButtons::Right))
+  if (isRightMouseEvent)
   {
     auto& prefs = PreferenceManager::instance();
     if (!prefs.saveInstantly())
@@ -419,9 +445,14 @@ void CameraTool3D::mouseUp(const InputState& inputState)
       prefs.saveChanges();
     }
   }
+  
+  // 重置右键事件状态
+  if (isRightMouseEvent) {
+    m_rightClickStartTime = 0;
+  }
 }
 
-bool CameraTool3D::isRightClickForContextMenu(const QPoint& currentPos) const {
+bool CameraTool3D::isRightClickForContextMenu(const InputState& /* inputState */, const QPoint& currentPos) const {
   // 判断是否为短时间的点击（小于300毫秒）
   const qint64 clickDuration = QDateTime::currentMSecsSinceEpoch() - m_rightClickStartTime;
   if (clickDuration > 300) return false;
@@ -445,10 +476,13 @@ std::unique_ptr<GestureTracker> CameraTool3D::acceptMouseDrag(
 {
   using namespace mdl::HitFilters;
 
-  // 检查是否是Shift+右键组合（多选面），如果是则不接受拖动
+  // 如果是Shift+右键多选面组合且开关启用，直接返回nullptr，交给SelectionTool处理
   if (inputState.mouseButtonsPressed(MouseButtons::Right) && 
       inputState.modifierKeysDown(ModifierKeys::Shift)) {
-    return nullptr;
+    if (pref(Preferences::CameraEnableShiftRightClickSelect)) {
+      return nullptr;
+    }
+    // 开关关闭时，继续处理
   }
 
   if (shouldOrbit(inputState))
@@ -494,10 +528,17 @@ void CameraTool3D::releaseCursorLock() {
 
 void CameraTool3D::mouseMove(const InputState& inputState)
 {
-  // 如果右键被按下，鼠标移动超过阈值，且尚未激活look锁定
-  // 注意：不处理Shift+右键组合(用于多选面)
+  // 如果是Shift+右键多选面组合且开关启用，直接跳过
   if (inputState.mouseButtonsPressed(MouseButtons::Right) && 
-      !inputState.modifierKeysDown(ModifierKeys::Shift) &&
+      inputState.modifierKeysDown(ModifierKeys::Shift)) {
+    if (pref(Preferences::CameraEnableShiftRightClickSelect)) {
+      return;
+    }
+    // 开关关闭时，继续处理
+  }
+
+  // 如果右键被按下，鼠标移动超过阈值，且尚未激活look锁定
+  if (inputState.mouseButtonsPressed(MouseButtons::Right) && 
       m_widget && 
       !m_cursorLocked) {
     

@@ -318,6 +318,8 @@ QString entityLinkModeNone()
 }
 Preference<QString> EntityLinkMode("Map view/Entity link mode", "direct");
 
+Preference<bool> CameraEnableShiftRightClickSelect{"Controls/Camera/EnableShiftRightClickSelect", true};
+
 const std::vector<PreferenceBase*>& staticPreferences()
 {
   static const std::vector<PreferenceBase*> list{
@@ -435,7 +437,8 @@ const std::vector<PreferenceBase*>& staticPreferences()
     &ShowSoftMapBounds,
     &ShowPointEntities,
     &ShowBrushes,
-    &EntityLinkMode};
+    &EntityLinkMode,
+    &CameraEnableShiftRightClickSelect};
 
   return list;
 }

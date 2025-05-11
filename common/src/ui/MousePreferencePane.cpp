@@ -62,6 +62,7 @@ void MousePreferencePane::createGui()
   m_enableAltMoveCheckBox = new QCheckBox{"Alt + middle mouse drag to move camera"};
   m_invertAltMoveAxisCheckBox = new QCheckBox{"Invert Z axis in Alt + middle mouse drag"};
   m_moveInCursorDirCheckBox = new QCheckBox{"Move camera towards cursor"};
+  m_enableShiftRightClickSelectCheckBox = new QCheckBox{"Enable Shift + right-click to select faces"};
 
   m_forwardKeyEditor = new KeySequenceEdit{1};
   m_forwardKeyEditor->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
@@ -125,6 +126,7 @@ void MousePreferencePane::createGui()
   layout->addRow("", m_enableAltMoveCheckBox);
   layout->addRow("", m_invertAltMoveAxisCheckBox);
   layout->addRow("", m_moveInCursorDirCheckBox);
+  layout->addRow("", m_enableShiftRightClickSelectCheckBox);
 
   layout->addSection("Move Keys");
 
@@ -249,6 +251,12 @@ void MousePreferencePane::bindEvents()
     &SliderWithLabel::valueChanged,
     this,
     &MousePreferencePane::flyMoveSpeedChanged);
+
+  connect(
+    m_enableShiftRightClickSelectCheckBox,
+    &QCheckBox::checkStateChanged,
+    this,
+    &MousePreferencePane::enableShiftRightClickSelectChanged);
 }
 
 bool MousePreferencePane::canResetToDefaults()
@@ -281,6 +289,7 @@ void MousePreferencePane::doResetToDefaults()
   prefs.resetToDefault(Preferences::CameraFlyDown());
 
   prefs.resetToDefault(Preferences::CameraFlyMoveSpeed);
+  prefs.resetToDefault(Preferences::CameraEnableShiftRightClickSelect);
 }
 
 void MousePreferencePane::updateControls()
@@ -298,6 +307,7 @@ void MousePreferencePane::updateControls()
   m_enableAltMoveCheckBox->setChecked(pref(Preferences::CameraEnableAltMove));
   m_invertAltMoveAxisCheckBox->setChecked(pref(Preferences::CameraAltMoveInvert));
   m_moveInCursorDirCheckBox->setChecked(pref(Preferences::CameraMoveInCursorDir));
+  m_enableShiftRightClickSelectCheckBox->setChecked(pref(Preferences::CameraEnableShiftRightClickSelect));
 
   m_forwardKeyEditor->setKeySequence(pref(Preferences::CameraFlyForward()));
   m_backwardKeyEditor->setKeySequence(pref(Preferences::CameraFlyBackward()));
@@ -483,6 +493,13 @@ void MousePreferencePane::updateConflicts()
   {
     icon->setVisible(hasConflict(preference));
   }
+}
+
+void MousePreferencePane::enableShiftRightClickSelectChanged(const int state)
+{
+  const auto value = (state == Qt::Checked);
+  auto& prefs = PreferenceManager::instance();
+  prefs.set(Preferences::CameraEnableShiftRightClickSelect, value);
 }
 
 } // namespace tb::ui

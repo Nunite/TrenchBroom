@@ -44,6 +44,7 @@ private:
   QCheckBox* m_enableAltMoveCheckBox = nullptr;
   QCheckBox* m_invertAltMoveAxisCheckBox = nullptr;
   QCheckBox* m_moveInCursorDirCheckBox = nullptr;
+  QCheckBox* m_enableShiftRightClickSelectCheckBox = nullptr;
 
   KeySequenceEdit* m_forwardKeyEditor = nullptr;
   KeySequenceEdit* m_backwardKeyEditor = nullptr;
@@ -86,6 +87,7 @@ private slots:
   void enableAltMoveChanged(int state);
   void invertAltMoveAxisChanged(int state);
   void moveInCursorDirChanged(int state);
+  void enableShiftRightClickSelectChanged(int state);
 
   void forwardKeyChanged();
   void backwardKeyChanged();

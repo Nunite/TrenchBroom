@@ -163,6 +163,7 @@ extern Preference<bool> CameraMouseWheelInvert;
 extern Preference<bool> CameraEnableAltMove;
 extern Preference<bool> CameraAltMoveInvert;
 extern Preference<bool> CameraMoveInCursorDir;
+extern Preference<bool> CameraEnableShiftRightClickSelect;
 
 extern Preference<float> CameraFov;
 
