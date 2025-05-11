@@ -185,11 +185,19 @@ class LookDragTracker : public GestureTracker
 private:
   render::PerspectiveCamera& m_camera;
   bool m_firstUpdate = true;
+  QWidget* m_widget = nullptr;
+  QPoint m_center;
+  QPoint m_lastMousePos;
 
 public:
-  explicit LookDragTracker(render::PerspectiveCamera& camera)
+  explicit LookDragTracker(render::PerspectiveCamera& camera, QWidget* widget = nullptr)
     : m_camera{camera}
+    , m_widget{widget}
   {
+    if (m_widget) {
+      m_center = m_widget->rect().center();
+      m_lastMousePos = m_center;
+    }
   }
 
   void mouseScroll(const InputState& inputState) override
@@ -217,12 +225,33 @@ public:
   {
     if (m_firstUpdate) {
       m_firstUpdate = false;
-      return true; // 跳过首次更新，避免视角突变
+      
+      // 初始化鼠标位置并立即重置
+      if (m_widget && inputState.mouseButtonsPressed(MouseButtons::Right)) {
+        QCursor::setPos(m_widget->mapToGlobal(m_center));
+        const_cast<InputState&>(inputState).mouseMove(float(m_center.x()), float(m_center.y()), 0.0f, 0.0f);
+      }
+      
+      return true;
     }
     
-    const auto hAngle = static_cast<float>(inputState.mouseDX()) * lookSpeedH(m_camera);
-    const auto vAngle = static_cast<float>(inputState.mouseDY()) * lookSpeedV(m_camera);
+    // 获取当前鼠标位置
+    QPoint currentPos = m_widget ? m_widget->mapFromGlobal(QCursor::pos()) : QPoint();
+    
+    // 计算鼠标移动
+    float dx = m_widget ? static_cast<float>(currentPos.x() - m_center.x()) : static_cast<float>(inputState.mouseDX());
+    float dy = m_widget ? static_cast<float>(currentPos.y() - m_center.y()) : static_cast<float>(inputState.mouseDY());
+    
+    // 应用旋转
+    const auto hAngle = dx * lookSpeedH(m_camera);
+    const auto vAngle = dy * lookSpeedV(m_camera);
     m_camera.rotate(hAngle, vAngle);
+    
+    // 每次更新后都重置鼠标位置到中心点
+    if (m_widget && inputState.mouseButtonsPressed(MouseButtons::Right)) {
+      QCursor::setPos(m_widget->mapToGlobal(m_center));
+    }
+    
     return true;
   }
 
@@ -372,7 +401,7 @@ std::unique_ptr<GestureTracker> CameraTool3D::acceptMouseDrag(
 
   if (shouldLook(inputState))
   {
-    return std::make_unique<LookDragTracker>(m_camera);
+    return std::make_unique<LookDragTracker>(m_camera, m_widget);
   }
 
   if (shouldPan(inputState))
