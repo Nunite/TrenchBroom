@@ -35,6 +35,8 @@
 #include "vm/vec.h"
 
 #include <QWindow>
+#include <QDateTime>
+#include <QApplication>
 
 namespace tb::ui
 {
@@ -53,7 +55,8 @@ bool shouldLook(const InputState& inputState)
 {
   return (
     inputState.mouseButtonsPressed(MouseButtons::Right)
-    && inputState.modifierKeysPressed(ModifierKeys::None));
+    && inputState.modifierKeysPressed(ModifierKeys::None)
+    && !inputState.anyToolDragging());
 }
 
 bool shouldPan(const InputState& inputState)
@@ -197,6 +200,10 @@ public:
     if (m_widget) {
       m_center = m_widget->rect().center();
       m_lastMousePos = m_center;
+      
+      // 确保鼠标隐藏
+      QApplication::setOverrideCursor(Qt::BlankCursor);
+      m_widget->setCursor(Qt::BlankCursor);
     }
   }
 
@@ -255,8 +262,21 @@ public:
     return true;
   }
 
-  void end(const InputState&) override {}
-  void cancel() override {}
+  void end(const InputState&) override {
+    // 恢复光标显示
+    if (m_widget) {
+      QApplication::restoreOverrideCursor();
+      m_widget->unsetCursor();
+    }
+  }
+  
+  void cancel() override {
+    // 恢复光标显示
+    if (m_widget) {
+      QApplication::restoreOverrideCursor();
+      m_widget->unsetCursor();
+    }
+  }
 };
 
 class PanDragTracker : public GestureTracker
@@ -307,6 +327,8 @@ CameraTool3D::CameraTool3D(render::PerspectiveCamera& camera, QWidget* widget)
   , Tool{true}
   , m_camera{camera}
   , m_widget(widget)
+  , m_rightClickStartTime(0)
+  , m_rightClickStartPos(0, 0)
 {
 }
 
@@ -322,21 +344,13 @@ const Tool& CameraTool3D::tool() const
 
 void CameraTool3D::mouseDown(const InputState& inputState)
 {
-  // 右键按下直接激活飞行模式
-  if (shouldLook(inputState) && m_widget && !m_cursorLocked) {
-    // 捕获鼠标
-    if (m_widget->windowHandle())
-      m_widget->windowHandle()->setMouseGrabEnabled(true);
-    else
-      m_widget->grabMouse();
-    // 隐藏光标
-    m_widget->setCursor(Qt::BlankCursor);
-    // 记录中心点并重置
-    m_center = m_widget->rect().center();
-    QCursor::setPos(m_widget->mapToGlobal(m_center));
-    m_cursorLocked = true;
-    // 同步InputState的鼠标参考点，消除初始delta跳变
-    const_cast<InputState&>(inputState).mouseMove(float(m_center.x()), float(m_center.y()), 0.0f, 0.0f);
+  // 记录鼠标按下时的位置和时间（用于检测短点击）
+  if (inputState.mouseButtonsPressed(MouseButtons::Right) && m_widget) {
+    m_rightClickStartTime = QDateTime::currentMSecsSinceEpoch();
+    m_rightClickStartPos = m_widget->mapFromGlobal(QCursor::pos());
+    
+    // 暂时不立即激活look，在短暂延迟后或移动超过阈值时再激活
+    // 我们不设置m_cursorLocked，这会在移动鼠标时激活
   }
 }
 
@@ -372,9 +386,24 @@ void CameraTool3D::mouseScroll(const InputState& inputState)
 
 void CameraTool3D::mouseUp(const InputState& inputState)
 {
+  // 检查是否是短时间右键点击（用于显示上下文菜单）
+  if (m_widget && 
+      inputState.mouseButtonsPressed(MouseButtons::Right) && 
+      !m_cursorLocked) {
+    
+    QPoint currentPos = m_widget->mapFromGlobal(QCursor::pos());
+    if (isRightClickForContextMenu(inputState, currentPos)) {
+      // 是短点击，显示上下文菜单
+      showContextMenu();
+    }
+  }
+
+  // 解除光标锁定
   if (m_cursorLocked) {
     releaseCursorLock();
   }
+  
+  // 保存偏好设置
   if (inputState.mouseButtonsPressed(MouseButtons::Right))
   {
     auto& prefs = PreferenceManager::instance();
@@ -382,6 +411,25 @@ void CameraTool3D::mouseUp(const InputState& inputState)
     {
       prefs.saveChanges();
     }
+  }
+}
+
+bool CameraTool3D::isRightClickForContextMenu(const InputState& inputState, const QPoint& currentPos) const {
+  // 判断是否为短时间的点击（小于300毫秒）
+  const qint64 clickDuration = QDateTime::currentMSecsSinceEpoch() - m_rightClickStartTime;
+  if (clickDuration > 300) return false;
+  
+  // 判断是否为小距离的点击（小于5像素）
+  const int moveDistance = (currentPos - m_rightClickStartPos).manhattanLength();
+  if (moveDistance > 5) return false;
+  
+  return true;
+}
+
+void CameraTool3D::showContextMenu() {
+  // 使用工具链中的showPopupMenu
+  if (m_widget) {
+    QMetaObject::invokeMethod(m_widget, "showPopupMenuLater", Qt::QueuedConnection);
   }
 }
 
@@ -423,8 +471,46 @@ void CameraTool3D::releaseCursorLock() {
       m_widget->windowHandle()->setMouseGrabEnabled(false);
     else
       m_widget->releaseMouse();
+      
+    // 恢复光标显示
+    QApplication::restoreOverrideCursor();
     m_widget->unsetCursor();
     m_cursorLocked = false;
+  }
+}
+
+void CameraTool3D::mouseMove(const InputState& inputState)
+{
+  // 如果右键被按下，鼠标移动超过阈值，且尚未激活look锁定
+  if (inputState.mouseButtonsPressed(MouseButtons::Right) && 
+      m_widget && 
+      !m_cursorLocked) {
+    
+    QPoint currentPos = m_widget->mapFromGlobal(QCursor::pos());
+    // 检查鼠标移动距离是否超过阈值(10像素)
+    int moveDistance = (currentPos - m_rightClickStartPos).manhattanLength();
+    
+    if (moveDistance > 10) {
+      // 已经移动超过阈值，这是拖动操作而不是点击，激活look功能
+      
+      // 捕获鼠标
+      if (m_widget->windowHandle()) {
+        m_widget->windowHandle()->setMouseGrabEnabled(true);
+      } else {
+        m_widget->grabMouse();
+      }
+      
+      // 隐藏光标 - 使用更直接的方式
+      QApplication::setOverrideCursor(Qt::BlankCursor);
+      m_widget->setCursor(Qt::BlankCursor);
+      
+      // 记录中心点并重置
+      m_center = m_widget->rect().center();
+      QCursor::setPos(m_widget->mapToGlobal(m_center));
+      m_cursorLocked = true;
+      // 同步InputState的鼠标参考点，消除初始delta跳变
+      const_cast<InputState&>(inputState).mouseMove(float(m_center.x()), float(m_center.y()), 0.0f, 0.0f);
+    }
   }
 }
 

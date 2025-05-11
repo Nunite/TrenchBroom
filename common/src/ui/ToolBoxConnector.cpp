@@ -320,14 +320,23 @@ void ToolBoxConnector::processMouseButtonUp(const MouseEvent& event)
 void ToolBoxConnector::processMouseClick(const MouseEvent& event)
 {
   const auto handled = m_toolBox->mouseClick(*m_toolChain, m_inputState);
-  if (event.button == MouseEvent::Button::Right && !handled)
+  
+  // 现在在CameraTool3D中处理右键菜单，这里不再需要
+  // 保留这里的代码注释，用于记录修改
+  /*
+  // 检查是否是右键点击(而非Alt+右键)
+  if (event.button == MouseEvent::Button::Right 
+      && m_inputState.modifierKeysPressed(ModifierKeys::None)
+      && !handled)
   {
+    // 右键点击时显示菜单(无修饰键)
     // We miss mouse events when a popup menu is already open, so we must make sure that
     // the input state is up to date.
     mouseMoved(event.posX, event.posY);
     updatePickResult();
     showPopupMenu();
   }
+  */
 }
 
 void ToolBoxConnector::processMouseDoubleClick(const MouseEvent& event)

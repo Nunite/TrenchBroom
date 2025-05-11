@@ -42,9 +42,13 @@ private:
   QWidget* m_widget = nullptr;
   bool m_cursorLocked = false;
   QPoint m_center;
+  
+  // 右键点击跟踪
+  qint64 m_rightClickStartTime;
+  QPoint m_rightClickStartPos;
 
 public:
-  explicit CameraTool3D(render::PerspectiveCamera& camera, QWidget* widget);
+  CameraTool3D(render::PerspectiveCamera& camera, QWidget* widget = nullptr);
   void releaseCursorLock();
 
 private:
@@ -54,8 +58,12 @@ private:
   void mouseDown(const InputState& inputState) override;
   void mouseScroll(const InputState& inputState) override;
   void mouseUp(const InputState& inputState) override;
+  void mouseMove(const InputState& inputState) override;
 
   std::unique_ptr<GestureTracker> acceptMouseDrag(const InputState& inputState) override;
+
+  bool isRightClickForContextMenu(const InputState& inputState, const QPoint& currentPos) const;
+  void showContextMenu();
 
   bool cancel() override;
 };
