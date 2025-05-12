@@ -5,6 +5,7 @@ on:
       - '**'
     branches:
       - master
+      - FlyMove
   pull_request:
 
 name: CI
