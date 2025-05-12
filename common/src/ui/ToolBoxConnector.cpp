@@ -317,9 +317,9 @@ void ToolBoxConnector::processMouseButtonUp(const MouseEvent& event)
   m_ignoreNextDrag = false;
 }
 
-void ToolBoxConnector::processMouseClick(const MouseEvent& event)
+void ToolBoxConnector::processMouseClick(const MouseEvent&)
 {
-  const auto handled = m_toolBox->mouseClick(*m_toolChain, m_inputState);
+  m_toolBox->mouseClick(*m_toolChain, m_inputState);
   
   // 现在在CameraTool3D中处理右键菜单，这里不再需要
   // 保留这里的代码注释，用于记录修改
