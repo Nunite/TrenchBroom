@@ -21,5 +21,6 @@ git
 /sledge
 app/resources/documentation/help/index.html
 plugin
-
+oldcode
+bf
 .cursorignore
