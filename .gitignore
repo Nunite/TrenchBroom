@@ -17,8 +17,9 @@ Thumbs.db
 /vs2019
 /.idea
 /coverity
-
+git
 /sledge
 app/resources/documentation/help/index.html
+plugin
 
 .cursorignore
