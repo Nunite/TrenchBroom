@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2023 Kristian Duske
+ Copyright (C) 2023 Lws
 
  This file is part of TrenchBroom.
 
