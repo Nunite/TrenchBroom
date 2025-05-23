@@ -29,50 +29,26 @@ TrenchBroom是一个强大的地图编辑器，主要用于Quake和类似游戏�
 
 设计一个新功能，允许用户：
 1. 选择一个现有的brush实体作为模板
-2. 然后点击其他brush（可以是worldspawn的一部分或其他实体的一部分，但是不能是点实体）
-3. 将每个点击的brush转换为独立的实体，并应用模板实体的所有属性
-
+2. 然后选择其他brush（可以是worldspawn的一部分或其他实体的一部分，但是不能是点实体）
+3. 通过上下文菜单将选中的brush转换为独立的实体，并应用模板实体的所有属性
 
 ### 实现思路
 
-1. **添加新的状态管理**：
+1. **在MapViewBase类中添加模板实体存储**：
    ```cpp
-   class TemplateEntityApplier {
+   // 在MapViewBase.h中添加
    private:
-     mdl::Entity m_templateEntity;
-     bool m_hasTemplate;
-     std::string m_entityClassName;
+     std::optional<mdl::Entity> m_templateEntity;
+     std::string m_templateEntityClassName;
      
    public:
-     void setTemplate(const mdl::EntityNode* templateNode);
-     void clearTemplate();
-     bool hasTemplate() const;
-     mdl::EntityNode* createEntityFromTemplate(mdl::BrushNode* brushNode);
-   };
+     bool hasTemplateEntity() const;
+     void setTemplateEntity(const mdl::EntityNode* entityNode);
+     void clearTemplateEntity();
+     const mdl::Entity* templateEntity() const;
    ```
 
-2. **添加新的工具类**：
-   ```cpp
-   class ApplyEntityTemplateTool : public Tool {
-   private:
-     std::weak_ptr<MapDocument> m_document;
-     TemplateEntityApplier m_applier;
-     
-   public:
-     ApplyEntityTemplateTool(std::weak_ptr<MapDocument> document);
-     
-     bool applies() const;
-     bool activate();
-     void deactivate();
-     
-     bool mouseClick(const InputState& inputState);
-     
-     void setTemplate(const mdl::EntityNode* templateNode);
-     void clearTemplate();
-   };
-   ```
-
-3. **修改MapDocument类**添加新方法：
+2. **在MapDocument类中添加创建单个brush实体的方法**：
    ```cpp
    mdl::EntityNode* MapDocument::createSingleBrushEntity(
      mdl::BrushNode* brushNode, const mdl::Entity& templateEntity) {
@@ -108,58 +84,128 @@ TrenchBroom是一个强大的地图编辑器，主要用于Quake和类似游戏�
    }
    ```
 
-4. **添加用户界面交互**：
-   - 在上下文菜单中添加"Set as Entity Template"选项
-   - 添加"Apply Entity Template"工具按钮
-   - 添加快捷键支持
+3. **在MapViewBase中实现上下文菜单处理**：
+   ```cpp
+   void MapViewBase::showPopupMenuLater() {
+     beforePopupMenu();
 
-5. **实现工作流程**：
-   - 用户右键点击一个实体，选择"Set as Entity Template"
-   - 工具状态变为活跃，并存储模板实体的属性
-   - 用户点击其他brush，每次点击都创建一个新的实体
-   - 完成后，用户可以按Esc键退出工具模式
+     auto document = kdl::mem_lock(m_document);
+     // 现有代码...
+     
+     // 添加实体模板相关菜单项
+     const auto& selectedNodes = document->selectedNodes().nodes();
+     
+     // 检查是否只选择了一个实体
+     bool canSetTemplate = false;
+     mdl::EntityNode* selectedEntityNode = nullptr;
+     
+     if (selectedNodes.size() == 1) {
+       if (auto* entityNode = dynamic_cast<mdl::EntityNode*>(selectedNodes.front())) {
+         canSetTemplate = true;
+         selectedEntityNode = entityNode;
+       }
+     }
+     
+     // 检查是否可以应用模板
+     bool canApplyTemplate = hasTemplateEntity() && document->selectedNodes().hasOnlyBrushes();
+     
+     // 添加菜单项
+     if (canSetTemplate) {
+       menu.addSeparator();
+       menu.addAction(tr("Set as Entity Template"), this, &MapViewBase::setSelectedEntityAsTemplate);
+     }
+     
+     if (canApplyTemplate) {
+       menu.addSeparator();
+       menu.addAction(
+         tr("Apply Entity Template (%1)").arg(QString::fromStdString(m_templateEntityClassName)),
+         this, 
+         &MapViewBase::applyEntityTemplate);
+     }
+     
+     // 现有代码...
+     
+     menu.exec(QCursor::pos());
+     
+     // 现有代码...
+   }
+   ```
+
+4. **实现相关方法**：
+   ```cpp
+   void MapViewBase::setSelectedEntityAsTemplate() {
+     auto document = kdl::mem_lock(m_document);
+     const auto& selectedNodes = document->selectedNodes().nodes();
+     
+     if (selectedNodes.size() == 1) {
+       if (auto* entityNode = dynamic_cast<mdl::EntityNode*>(selectedNodes.front())) {
+         setTemplateEntity(entityNode);
+       }
+     }
+   }
+   
+   void MapViewBase::applyEntityTemplate() {
+     if (!hasTemplateEntity()) {
+       return;
+     }
+     
+     auto document = kdl::mem_lock(m_document);
+     const auto& selectedNodes = document->selectedNodes().nodes();
+     
+     // 过滤出所有的brush节点
+     std::vector<mdl::BrushNode*> brushNodes;
+     for (auto* node : selectedNodes) {
+       if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node)) {
+         brushNodes.push_back(brushNode);
+       }
+     }
+     
+     if (brushNodes.empty()) {
+       return;
+     }
+     
+     // 为每个brush创建一个新实体
+     auto transaction = Transaction{*document, "Apply Entity Template"};
+     
+     for (auto* brushNode : brushNodes) {
+       document->createSingleBrushEntity(brushNode, *templateEntity());
+     }
+     
+     transaction.commit();
+   }
+   ```
 
 ### 修改文件
 
 需要修改以下文件：
-1. `MapDocument.h/cpp` - 添加新方法支持
-2. `MapViewBase.h/cpp` - 添加上下文菜单和工具
-3. 新建 `ApplyEntityTemplateTool.h/cpp` - 实现新工具
-4. `Resources.h` - 添加新的图标和快捷键定义
+1. `MapViewBase.h/cpp` - 添加模板实体存储和上下文菜单处理
+2. `MapDocument.h/cpp` - 添加创建单个brush实体的方法
 
 ### 技术挑战
 
 1. **状态管理**：
    - 需要维护模板实体状态
-   - 需要提供清晰的视觉反馈表明工具是否活跃
+   - 需要在上下文菜单中显示当前模板实体的类名
 
 2. **撤销/重做支持**：
    - 确保所有操作都可以通过事务系统撤销/重做
 
 3. **有效性检查**：
    - 确保模板实体是有效的
-   - 确保点击的是有效的brush
+   - 确保选中的是有效的brush
 
 ## 用户界面设计
 
 1. 当选择一个实体后，右键菜单添加：
    "Set as Entity Template"
 
-2. 在主工具栏添加新按钮：
-   "Apply Entity Template"
-
-3. 当工具激活时，鼠标光标变化以指示模式状态
-
-4. 状态栏显示提示：
-   "Click on a brush to create an entity from template" 
+2. 当有模板实体并且选择了brush时，右键菜单添加：
+   "Apply Entity Template (entity_class_name)"
 
 ## 使用流程
 
 1. 用户创建并设置一个func_door实体，配置好所有参数
-2. 用户右键点击该实体，选择"Set as Entity Template"
-3. 工具进入模板应用模式，鼠标指针变化
-4. 用户点击其他brush，每次点击都会：
-   - 创建一个新的func_door实体
-   - 将点击的brush移动到该实体
-   - 应用模板实体的所有属性
-5. 用户按Esc键或点击其他工具退出该模式
+2. 用户选择该实体，右键点击并选择"Set as Entity Template"
+3. 用户选择一个或多个brush
+4. 用户右键点击并选择"Apply Entity Template (func_door)"
+5. 系统为每个选中的brush创建一个独立的func_door实体，并应用模板实体的所有属性
