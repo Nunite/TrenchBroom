@@ -33,6 +33,7 @@
 #include "mdl/BrushNode.h"
 #include "mdl/ChangeBrushFaceAttributesRequest.h"
 #include "mdl/EditorContext.h"
+#include "mdl/Entity.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionGroup.h"
 #include "mdl/EntityDefinitionManager.h"
@@ -1188,6 +1189,7 @@ void MapViewBase::showPopupMenuLater()
 
   auto document = kdl::mem_lock(m_document);
   const auto& nodes = document->selectedNodes().nodes();
+  
   auto* newBrushParent = findNewParentEntityForBrushes(nodes);
   auto* currentGroup = document->editorContext().currentGroup();
   auto* newGroup = findNewGroupForObjects(nodes);
@@ -1217,6 +1219,59 @@ void MapViewBase::showPopupMenuLater()
   auto* renameAction =
     menu.addAction(tr("Rename Groups"), mapFrame, &MapFrame::renameSelectedGroups);
   renameAction->setEnabled(mapFrame->canRenameSelectedGroups());
+
+  menu.addMenu(makeEntityGroupsMenu(mdl::EntityDefinitionType::PointEntity));
+  menu.addMenu(makeEntityGroupsMenu(mdl::EntityDefinitionType::BrushEntity));
+
+  // 检查是否只选择了一个节点
+  if (nodes.size() == 1) {
+    const auto* node = nodes.front();
+    
+    // 直接检查节点是否为实体节点
+    const auto isEntityNode = node->accept(kdl::overload(
+      [](const mdl::WorldNode*) { return false; },
+      [](const mdl::LayerNode*) { return false; },
+      [](const mdl::GroupNode*) { return false; },
+      [](const mdl::EntityNode*) { return true; },
+      [](const mdl::BrushNode*) { return false; },
+      [](const mdl::PatchNode*) { return false; }));
+    
+    // 如果节点是brushNode，检查其父实体
+    mdl::EntityNode* parentEntity = nullptr;
+    const auto hasBrushWithParentEntity = node->accept(kdl::overload(
+      [](const mdl::WorldNode*) { return false; },
+      [](const mdl::LayerNode*) { return false; },
+      [](const mdl::GroupNode*) { return false; },
+      [](const mdl::EntityNode*) { return false; },
+      [&](const mdl::BrushNode* brushNode) {
+        // 检查brush的父节点是否是实体
+        parentEntity = dynamic_cast<mdl::EntityNode*>(brushNode->parent());
+        // 如果父节点是实体且不是worldspawn，则返回true
+        return parentEntity != nullptr && !parentEntity->entity().classname().empty() && 
+               parentEntity->entity().classname() != "worldspawn";
+      },
+      [](const mdl::PatchNode*) { return false; }));
+
+    if (isEntityNode) {
+      // 如果是实体节点，直接设置它
+      menu.addAction(tr("Set as Entity Template"), this, &MapViewBase::setSelectedEntityAsTemplate);
+    } else if (hasBrushWithParentEntity && parentEntity) {
+      // 如果是brush，设置其父实体
+      menu.addAction(
+        tr("Set %1 as Entity Template").arg(QString::fromStdString(parentEntity->entity().classname())), 
+        this, 
+        [this, parentEntity]() { setTemplateEntity(parentEntity); });
+    }
+  }
+  
+  // 检查是否可以应用模板
+  if (document->selectedNodes().hasOnlyBrushes() && hasTemplateEntity()) {
+    menu.addSeparator();
+    menu.addAction(
+      tr("Apply Entity Template (%1)").arg(QString::fromStdString(m_templateEntityClassName)),
+      this, 
+      &MapViewBase::applyEntityTemplate);
+  }
 
   if (newGroup && canReparentNodes(nodes, newGroup))
   {
@@ -1342,9 +1397,6 @@ void MapViewBase::showPopupMenuLater()
 
     menu.addSeparator();
   }
-
-  menu.addMenu(makeEntityGroupsMenu(mdl::EntityDefinitionType::PointEntity));
-  menu.addMenu(makeEntityGroupsMenu(mdl::EntityDefinitionType::BrushEntity));
 
   menu.exec(QCursor::pos());
 
@@ -1706,6 +1758,85 @@ bool MapViewBase::canMakeStructural() const
     });
   }
   return false;
+}
+
+bool MapViewBase::hasTemplateEntity() const
+{
+  return m_templateEntity != nullptr;
+}
+
+void MapViewBase::setTemplateEntity(const mdl::EntityNode* entityNode)
+{
+  if (entityNode) {
+    m_templateEntity = std::make_unique<mdl::Entity>(entityNode->entity());
+    m_templateEntityClassName = entityNode->entity().classname();
+  } else {
+    clearTemplateEntity();
+  }
+}
+
+void MapViewBase::clearTemplateEntity()
+{
+  m_templateEntity.reset();
+  m_templateEntityClassName.clear();
+}
+
+const mdl::Entity* MapViewBase::templateEntity() const
+{
+  return m_templateEntity.get();
+}
+
+void MapViewBase::setSelectedEntityAsTemplate()
+{
+  auto document = kdl::mem_lock(m_document);
+  const auto& selectedNodes = document->selectedNodes().nodes();
+  
+  if (selectedNodes.size() == 1) {
+    auto* node = selectedNodes.front();
+    bool isEntityNode = node->accept(kdl::overload(
+      [](const mdl::WorldNode*) { return false; },
+      [](const mdl::LayerNode*) { return false; },
+      [](const mdl::GroupNode*) { return false; },
+      [](const mdl::EntityNode*) { return true; },
+      [](const mdl::BrushNode*) { return false; },
+      [](const mdl::PatchNode*) { return false; }));
+      
+    if (isEntityNode) {
+      auto* entityNode = static_cast<mdl::EntityNode*>(node);
+      setTemplateEntity(entityNode);
+    }
+  }
+}
+
+void MapViewBase::applyEntityTemplate()
+{
+  if (!hasTemplateEntity()) {
+    return;
+  }
+  
+  auto document = kdl::mem_lock(m_document);
+  const auto& selectedNodes = document->selectedNodes().nodes();
+  
+  // 过滤出所有的brush节点
+  std::vector<mdl::BrushNode*> brushNodes;
+  for (auto* node : selectedNodes) {
+    if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node)) {
+      brushNodes.push_back(brushNode);
+    }
+  }
+  
+  if (brushNodes.empty()) {
+    return;
+  }
+  
+  // 为每个brush创建一个新实体
+  auto transaction = Transaction{*document, "Apply Entity Template"};
+  
+  for (auto* brushNode : brushNodes) {
+    document->createSingleBrushEntity(brushNode, *templateEntity());
+  }
+  
+  transaction.commit();
 }
 
 } // namespace tb::ui

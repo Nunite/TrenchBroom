@@ -6,6 +6,7 @@ on:
     branches:
       - master
       - dev
+      - entity_presets
   pull_request:
 
 name: CI
