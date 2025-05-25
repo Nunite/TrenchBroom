@@ -5401,4 +5401,37 @@ void MapDocument::transactionUndone(const std::string& name)
   debug() << "Transaction '" << name << "' undone";
 }
 
+mdl::EntityNode* MapDocument::createSingleBrushEntity(
+  mdl::BrushNode* brushNode, const mdl::Entity& templateEntity) {
+  // 复制模板实体属性
+  auto entity = templateEntity;
+  
+  // 创建新实体节点
+  auto* entityNode = new mdl::EntityNode{std::move(entity)};
+  
+  // 事务操作
+  auto transaction = Transaction{*this, "Create Entity from Template"};
+  deselectAll();
+  
+  // 添加实体节点
+  if (addNodes({{parentForNodes(), {entityNode}}}).empty()) {
+    transaction.cancel();
+    return nullptr;
+  }
+  
+  // 将brush重新分配给新实体
+  if (!reparentNodes({{entityNode, {brushNode}}})) {
+    transaction.cancel();
+    return nullptr;
+  }
+  
+  selectNodes({brushNode});
+  
+  if (!transaction.commit()) {
+    return nullptr;
+  }
+  
+  return entityNode;
+}
+
 } // namespace tb::ui

@@ -28,6 +28,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -39,6 +40,8 @@ class QAction;
 namespace tb::mdl
 {
 class BrushEntityDefinition;
+class Entity;
+class EntityNode;
 class EntityDefinition;
 class GroupNode;
 class Node;
@@ -160,6 +163,18 @@ private: // shortcut setup
   void updateActionBindings();
   void updateActionStates();
   void updateActionStatesDelayed();
+
+private: // 实体模板相关
+  std::unique_ptr<mdl::Entity> m_templateEntity;
+  std::string m_templateEntityClassName;
+
+public: // 实体模板相关方法
+  bool hasTemplateEntity() const;
+  void setTemplateEntity(const mdl::EntityNode* entityNode);
+  void clearTemplateEntity();
+  const mdl::Entity* templateEntity() const;
+  void setSelectedEntityAsTemplate();
+  void applyEntityTemplate();
 
 public:
   void triggerAction(const Action& action);
