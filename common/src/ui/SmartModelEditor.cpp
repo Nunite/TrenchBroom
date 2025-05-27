@@ -104,6 +104,13 @@ void SmartModelEditor::browseFile()
       finalModelPath = relativePathStr;
     }
 
+    // Change all backslashes to forward slashes
+    for (size_t i = 0; i < finalModelPath.length(); ++i) {
+      if (finalModelPath[i] == '\\') {
+        finalModelPath[i] = '/';
+      }
+    }
+
     addOrUpdateProperty(finalModelPath);
   }
 }
