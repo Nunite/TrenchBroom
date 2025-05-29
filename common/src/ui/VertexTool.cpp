@@ -49,21 +49,21 @@ std::vector<mdl::BrushNode*> VertexTool::findIncidentBrushes(
   const vm::vec3d& handle) const
 {
   auto document = kdl::mem_lock(m_document);
-  return findIncidentBrushes(document->vertexHandles(), handle);
+  return VertexToolBase::findIncidentBrushes(document->vertexHandles(), handle);
 }
 
 std::vector<mdl::BrushNode*> VertexTool::findIncidentBrushes(
   const vm::segment3d& handle) const
 {
   auto document = kdl::mem_lock(m_document);
-  return findIncidentBrushes(document->edgeHandles(), handle);
+  return VertexToolBase::findIncidentBrushes(document->edgeHandles(), handle);
 }
 
 std::vector<mdl::BrushNode*> VertexTool::findIncidentBrushes(
   const vm::polygon3d& handle) const
 {
   auto document = kdl::mem_lock(m_document);
-  return findIncidentBrushes(document->faceHandles(), handle);
+  return VertexToolBase::findIncidentBrushes(document->faceHandles(), handle);
 }
 
 void VertexTool::pick(

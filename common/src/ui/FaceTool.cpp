@@ -35,7 +35,7 @@ std::vector<mdl::BrushNode*> FaceTool::findIncidentBrushes(
   const vm::polygon3d& handle) const
 {
   auto document = kdl::mem_lock(m_document);
-  return findIncidentBrushes(document->faceHandles(), handle);
+  return VertexToolBase::findIncidentBrushes(document->faceHandles(), handle);
 }
 
 void FaceTool::pick(

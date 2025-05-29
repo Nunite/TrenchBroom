@@ -5433,21 +5433,21 @@ mdl::EntityNode* MapDocument::createSingleBrushEntity(
   
   // 事务操作
   auto transaction = Transaction{*this, "Create Entity from Template"};
-  deselectAll();
+  this->deselectAll();
   
   // 添加实体节点
-  if (addNodes({{parentForNodes(), {entityNode}}}).empty()) {
+  if (this->addNodes({{this->parentForNodes(), {entityNode}}}).empty()) {
     transaction.cancel();
     return nullptr;
   }
   
   // 将brush重新分配给新实体
-  if (!reparentNodes({{entityNode, {brushNode}}})) {
+  if (!this->reparentNodes({{entityNode, {brushNode}}})) {
     transaction.cancel();
     return nullptr;
   }
   
-  selectNodes({brushNode});
+  this->selectNodes({brushNode});
   
   if (!transaction.commit()) {
     return nullptr;

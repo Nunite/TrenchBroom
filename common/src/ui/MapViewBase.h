@@ -39,6 +39,8 @@ class QAction;
 
 namespace tb::mdl
 {
+class Entity;
+class EntityNode;
 struct EntityDefinition;
 class GroupNode;
 class Node;

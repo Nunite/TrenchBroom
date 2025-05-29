@@ -34,7 +34,7 @@ std::vector<mdl::BrushNode*> EdgeTool::findIncidentBrushes(
   const vm::segment3d& handle) const
 {
   auto document = kdl::mem_lock(m_document);
-  return findIncidentBrushes(document->edgeHandles(), handle);
+  return VertexToolBase::findIncidentBrushes(document->edgeHandles(), handle);
 }
 
 void EdgeTool::pick(
