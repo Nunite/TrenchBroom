@@ -36,6 +36,7 @@ jobs:
       FEED_URL: https://nuget.pkg.github.com/TrenchBroom/index.json
       VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/TrenchBroom/index.json,readwrite"
       MONO_GAC_PREFIX: "$HOMEBREW_PREFIX"
+      NUGET_API_KEY: ${{ secrets.GH_PACKAGES_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -75,9 +76,9 @@ jobs:
             -StorePasswordInClearText `
             -Name GitHubPackages `
             -UserName "${{ env.USERNAME }}" `
-            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
+            -Password "${{ env.NUGET_API_KEY }}"
           .$(${{ env.VCPKG_EXE }} fetch nuget) `
-            setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" `
+            setapikey "${{ env.NUGET_API_KEY }}" `
             -Source "${{ env.FEED_URL }}"
 
       - name: Windows - Build
@@ -117,8 +118,8 @@ jobs:
             -StorePasswordInClearText \
             -Name GitHubPackages \
             -UserName "${{ env.USERNAME }}" \
-            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
-          "$NUGET_PATH" setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
+            -Password "${{ env.NUGET_API_KEY }}"
+          "$NUGET_PATH" setapikey "${{ env.NUGET_API_KEY }}" \
             -Source "${{ env.FEED_URL }}"
 
       - name: Linux - Build
@@ -194,8 +195,8 @@ jobs:
             -StorePasswordInClearText \
             -Name GitHubPackages \
             -UserName "${{ env.USERNAME }}" \
-            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
-          mono "$NUGET_EXE" setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
+            -Password "${{ env.NUGET_API_KEY }}"
+          mono "$NUGET_EXE" setapikey "${{ env.NUGET_API_KEY }}" \
             -Source "${{ env.FEED_URL }}"
 
       - name: macOS - Build
