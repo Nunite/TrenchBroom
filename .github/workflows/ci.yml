@@ -111,14 +111,16 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-22.04' }}
         shell: bash
         run: |
-          NUGET_EXE="$(${{ env.VCPKG_EXE }} fetch nuget | tail -n 1)"
-          "$NUGET_EXE" sources add \
+          VCPKG_PATH="${{ env.VCPKG_EXE }}"
+          NUGET_PATH="$("$VCPKG_PATH" fetch nuget | tail -n 1)"
+          chmod +x "$NUGET_PATH"
+          "$NUGET_PATH" sources add \
             -Source "${{ env.FEED_URL }}" \
             -StorePasswordInClearText \
             -Name GitHubPackages \
             -UserName "${{ env.USERNAME }}" \
             -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
-          "$NUGET_EXE" setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
+          "$NUGET_PATH" setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
             -Source "${{ env.FEED_URL }}"
 
       - name: Linux - Build
