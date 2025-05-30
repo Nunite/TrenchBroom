@@ -111,14 +111,14 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-22.04' }}
         shell: bash
         run: |
-          NUGET_EXE=$(mono ${{ env.VCPKG_EXE }} fetch nuget | tail -n 1)
-          mono "$NUGET_EXE" sources add \
+          NUGET_EXE="$(${{ env.VCPKG_EXE }} fetch nuget | tail -n 1)"
+          "$NUGET_EXE" sources add \
             -Source "${{ env.FEED_URL }}" \
             -StorePasswordInClearText \
             -Name GitHubPackages \
             -UserName "${{ env.USERNAME }}" \
             -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
-          mono "$NUGET_EXE" setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
+          "$NUGET_EXE" setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
             -Source "${{ env.FEED_URL }}"
 
       - name: Linux - Build
@@ -149,9 +149,9 @@ jobs:
             else
               echo "TB_ENABLE_ASAN=false" >> $GITHUB_ENV
             fi
-            if [[ "${{ matrix.tb-build-type }}" != "asan" ]] && 
-               [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12 }}" ]] && 
-               [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12_PASSWORD }}" ]] && 
+            if [[ "${{ matrix.tb-build-type }}" != "asan" ]] &&
+               [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12 }}" ]] &&
+               [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12_PASSWORD }}" ]] &&
                [[ -n "${{ secrets.ACTIONS_MAC_SIGN_IDENTITY }}" ]] &&
                [[ -n "${{ secrets.ACTIONS_MAC_NOTARIZATION_EMAIL }}" ]] &&
                [[ -n "${{ secrets.ACTIONS_MAC_NOTARIZATION_TEAM_ID }}" ]] &&
