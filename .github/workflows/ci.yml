@@ -188,7 +188,7 @@ jobs:
         if: ${{ matrix.os == 'macos-13' || matrix.os == 'macos-14' }}
         shell: bash
         run: |
-          NUGET_EXE=$(mono ${{ env.VCPKG_EXE }} fetch nuget | tail -n 1)
+          NUGET_EXE=$(${{ env.VCPKG_EXE }} fetch nuget | tail -n 1)
           mono "$NUGET_EXE" sources add \
             -Source "${{ env.FEED_URL }}" \
             -StorePasswordInClearText \
