@@ -87,6 +87,22 @@
 
 namespace tb::ui
 {
+namespace
+{
+
+auto getCreateableEntityDefinitions(
+  const mdl::EntityDefinitionGroup& group, const mdl::EntityDefinitionType type)
+{
+  const auto definitionsWithType =
+    filterAndSort(group.definitions, type, mdl::EntityDefinitionSortOrder::Name);
+  return definitionsWithType | std::views::filter([](const auto* d) {
+           return !kdl::cs::str_is_equal(
+             d->name, mdl::EntityPropertyValues::WorldspawnClassname);
+         })
+         | kdl::to_vector;
+}
+
+} // namespace
 const int MapViewBase::DefaultCameraAnimationDuration = 250;
 
 MapViewBase::MapViewBase(
@@ -660,8 +676,7 @@ const mdl::EntityDefinition* MapViewBase::findEntityDefinition(
   size_t count = 0;
   for (const auto& group : kdl::mem_lock(m_document)->entityDefinitionManager().groups())
   {
-    const auto definitions =
-      mdl::filterAndSort(group.definitions, type, mdl::EntityDefinitionSortOrder::Name);
+    const auto definitions = getCreateableEntityDefinitions(group, type);
     if (index < count + definitions.size())
     {
       return definitions[index - count];
@@ -1480,13 +1495,7 @@ QMenu* MapViewBase::makeEntityGroupsMenu(const mdl::EntityDefinitionType type)
   auto document = kdl::mem_lock(m_document);
   for (const auto& group : document->entityDefinitionManager().groups())
   {
-    const auto definitionsWithType =
-      filterAndSort(group.definitions, type, mdl::EntityDefinitionSortOrder::Name);
-    auto creatableDefinitions =
-      definitionsWithType | std::views::filter([](const auto* d) {
-        return !kdl::cs::str_is_equal(
-          d->name, mdl::EntityPropertyValues::WorldspawnClassname);
-      });
+    const auto creatableDefinitions = getCreateableEntityDefinitions(group, type);
 
     if (!std::ranges::empty(creatableDefinitions))
     {
