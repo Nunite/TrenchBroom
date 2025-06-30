@@ -281,11 +281,4 @@ private:
 
 std::vector<size_t> findConflicts(const std::vector<const Action*>& actions);
 
-// Copy/paste
-static Action Copy;
-static Action Paste;
-static Action PasteAtOriginalPosition;
-static Action Duplicate;
-static Action CopyAsObj;
-
 } // namespace tb::ui

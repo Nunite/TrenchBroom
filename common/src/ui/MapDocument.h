@@ -471,7 +471,8 @@ public: // entity management
   mdl::EntityNode* createPointEntity(
     const mdl::EntityDefinition& definition, const vm::vec3d& delta) override;
   mdl::EntityNode* createBrushEntity(const mdl::EntityDefinition& definition) override;
-  mdl::EntityNode* createSingleBrushEntity(mdl::BrushNode* brushNode, const mdl::Entity& templateEntity);
+  mdl::EntityNode* createSingleBrushEntity(
+    mdl::BrushNode* brushNode, const mdl::Entity& templateEntity);
 
 public: // group management
   mdl::GroupNode* groupSelection(const std::string& name);
