@@ -3803,6 +3803,7 @@ zhlt_invisible(choices) :"Invisible" : 1 =
 	[
 		"simple": "simple"
 		"legacy": "legacy"
+		"normalized": "normalized"
 	]
 ]
 
@@ -4056,3 +4057,332 @@ zhlt_invisible(choices) :"Invisible" : 1 =
 		2048 : "Not in Deathmatch" : 0
 	]
 ]
+
+@SolidClass = remec_multi_bhop_block : "Static bhop block"
+[
+	targetname(target_source) : "Name" : ""
+	destination(target_destination) : "Where to teleport player" : ""
+	delay(string) : "Delay before trigger" : "0.100000"
+]
+
+@SolidClass = remec_delayed_teleport : "Teleport after a delay"
+[
+	targetname(target_source) : "Name" : ""
+	delay(string) : "Delay before trigger" : "0.000000"
+	target(target_destination) : "Target to teleport to" : ""
+	wait(integer) : "Delay before reset" : 10
+	killtarget(target_destination) : "Kill target" : ""
+	netname(target_destination) : "Target Path" : ""
+	master(target_destination) : "master" : ""
+	sounds(choices) : "Sound style" : 0 =
+	[
+		0 : "No Sound"
+	]
+	message(string) : "Message (set sound too!)" : ""
+	spawnflags(flags) = 
+	[
+		1: "Monsters" : 0
+		2: "No Clients" : 0
+		4: "Pushables" : 0
+	]
+]
+
+@SolidClass = remec_auto_reset_wall : "Triggarable auto-resettable wall"
+[
+	targetname(target_source) : "Name" : ""
+	delay(string) : "Delay before first trigger" : "0.000000"
+	delay2(string) : "Delay before reset trigger" : "1.000000"
+	spawnflags(flags) = 
+	[
+		1: "Starts invisible" : 0
+		2048: "Not in Deathmatch" : 0
+	]
+	globalname(string) : "Global Entity Name" : ""
+	_minlight(string) : "Minimum light level" : ""
+	renderfx(choices) : "Render FX" : 0 =
+	[
+		0 : "Normal"
+		1 : "Slow Pulse"
+		2 : "Fast Pulse"
+		3 : "Slow Wide Pulse"
+		4 : "Fast Wide Pulse"
+		5 : "Slow Fade Away"
+		6 : "Fast Fade Away"
+		7 : "Slow Become Solid"
+		8 : "Fast Become Solid"
+		9 : "Slow Strobe"
+		10 : "Fast Strobe"
+		11 : "Faster Strobe"
+		12 : "Slow Flicker"
+		13 : "Fast Flicker"
+		14 : "Constant Glow"
+		15 : "Distort"
+		16 : "Hologram (Distort + fade)"
+	]
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0 : "Normal"
+		1 : "Color"
+		2 : "Texture"
+		3 : "Glow"
+		4 : "Solid"
+		5 : "Additive"
+	]
+	renderamt(string) : "FX Amount (1 - 255)" : ""
+	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	zhlt_lightflags(choices) : "ZHLT Lightflags" : 0 =
+	[
+		0 : "Default"
+		1 : "Embedded Fix"
+		2 : "Opaque (blocks light)"
+		3 : "Opaque + Embedded fix"
+		6 : "Opaque + Concave Fix"
+	]
+	light_origin(target_destination) : "Light Origin Target" : ""
+]
+
+@PointClass sprite() = remec_lit_model : "cycler_sprite with light and more"
+[
+	targetname(string) : "targetname for entity" : ""
+	origin(string) : "Entity origin" : "0 0 0"
+	angles(string) : "Entity angles (Y Z X)" : "0 0 0"
+	model(string) : "Path to model" : ""
+	texture(string) : "Light emitting texture" : "black_HIDDEN"
+	entity(string) : "Displaying entity" : "cycler_sprite"
+	spawnflags(flags) = 
+	[
+		1: "Lit" : 1
+		2: "Source prop_static" : 0
+		4: "Rotating" : 0
+		8: "Fix Y in (Y Z X)" : 1
+		16: "Use targetname" : 0
+	]
+	avelocity(string) : "Angular velocity if rotating" : "0 0 0"
+]
+
+@SolidClass = remec_n_trigger : "Trigger target only after N triggers"
+[
+	targetname(target_source) : "Name" : ""
+	target(target_destination) : "Target to trigger" : ""
+	count(string) : "After how many triggers to actually trigger the target" : "2"
+	delay(string) : "Delay before actual trigger" : "0.000000"
+]
+
+@PointClass = remec_trigger_sequence : "Trigger targets in a specific sequence"
+[
+	targetname(target_source) : "Name" : ""
+	sequence(string) : "Sequence in which to trigger targets" : ""
+]
+
+@SolidClass = remec_auto_reset_switch : "Switches target on and off after a delay"
+[
+	targetname(target_source) : "Name" : ""
+	delay(string) : "Delay before first trigger" : "0.000000"
+	delay2(string) : "Delay before reset trigger" : "1.000000"
+	target(target_destination) : "Target to trigger" : ""
+	globalname(string) : "Global Entity Name" : ""
+	renderfx(choices) : "Render FX" : 0 =
+	[
+		0 : "Normal"
+		1 : "Slow Pulse"
+		2 : "Fast Pulse"
+		3 : "Slow Wide Pulse"
+		4 : "Fast Wide Pulse"
+		5 : "Slow Fade Away"
+		6 : "Fast Fade Away"
+		7 : "Slow Become Solid"
+		8 : "Fast Become Solid"
+		9 : "Slow Strobe"
+		10 : "Fast Strobe"
+		11 : "Faster Strobe"
+		12 : "Slow Flicker"
+		13 : "Fast Flicker"
+		14 : "Constant Glow"
+		15 : "Distort"
+		16 : "Hologram (Distort + fade)"
+	]
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0 : "Normal"
+		1 : "Color"
+		2 : "Texture"
+		3 : "Glow"
+		4 : "Solid"
+		5 : "Additive"
+	]
+	renderamt(string) : "FX Amount (1 - 255)" : ""
+	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	angles(string) : "Pitch Yaw Roll (Y Z X)" : "0 0 0"
+	zhlt_lightflags(choices) : "ZHLT Lightflags" : 0 =
+	[
+		0 : "Default"
+		1 : "Embedded Fix"
+		2 : "Opaque (blocks light)"
+		3 : "Opaque + Embedded fix"
+		6 : "Opaque + Concave Fix"
+	]
+	light_origin(target_destination) : "Light Origin Target" : ""
+	speed(integer) : "Speed" : 5
+	health(string) : "Health (shootable if > 0)" : ""
+	lip(integer) : "Lip" : 0
+	master(target_destination) : "master" : ""
+	sounds(choices) : "Sounds" : 0 =
+	[
+		0 : "None"
+		1 : "Big zap & Warmup"
+		2 : "Access Denied"
+		3 : "Access Granted"
+		4 : "Quick Combolock"
+		5 : "Power Deadbolt 1"
+		6 : "Power Deadbolt 2"
+		7 : "Plunger"
+		8 : "Small zap"
+		9 : "Keycard Sound"
+		10 : "Buzz"
+		11 : "Buzz Off"
+		14 : "Lightswitch"
+	]
+	wait(integer) : "Delay before reset (-1 stay)" : 3
+	spawnflags(flags) = 
+	[
+		1: "Don't move" : 0
+		32: "Toggle" : 0
+		64: "Sparks" : 0
+		256: "Touch Activates" : 0
+	]
+	locked_sound(choices) : "Locked Sound" : 0 =
+	[
+		0 : "None"
+		2 : "Access Denied"
+		8 : "Small zap"
+		10 : "Buzz"
+		11 : "Buzz Off"
+		12 : "Latch Locked"
+	]
+	unlocked_sound(choices) : "Unlocked Sound" : 0 =
+	[
+		0 : "None"
+		1 : "Big zap & Warmup"
+		3 : "Access Granted"
+		4 : "Quick Combolock"
+		5 : "Power Deadbolt 1"
+		6 : "Power Deadbolt 2"
+		7 : "Plunger"
+		8 : "Small zap"
+		9 : "Keycard Sound"
+		10 : "Buzz"
+		13 : "Latch Unlocked"
+		14 : "Lightswitch"
+	]
+	locked_sentence(choices) : "Locked Sentence" : 0 =
+	[
+		0 : "None"
+		1 : "Gen. Access Denied"
+		2 : "Security Lockout"
+		3 : "Blast Door"
+		4 : "Fire Door"
+		5 : "Chemical Door"
+		6 : "Radiation Door"
+		7 : "Gen. Containment"
+		8 : "Maintenance Door"
+		9 : "Broken Shut Door"
+	]
+	unlocked_sentence(choices) : "Unlocked Sentence" : 0 =
+	[
+		0 : "None"
+		1 : "Gen. Access Granted"
+		2 : "Security Disengaged"
+		3 : "Blast Door"
+		4 : "Fire Door"
+		5 : "Chemical Door"
+		6 : "Radiation Door"
+		7 : "Gen. Containment"
+		8 : "Maintenance area"
+	]
+	_minlight(string) : "Minimum light level" : ""
+]
+
+@SolidClass = remec_hp_booster : "Infinite HP Booster"
+[
+	bottomheight(string) : "Bottom block height" : "16.000000"
+	bottomrendermode(string) : "Bottom block render mode" : "1"
+	bottomrenderamt(string) : "Bottom block FX Amount (1 - 255)" : "60"
+	bottomrendercolor(color255) : "Bottom block FX Color (R G B)" : "0 0 0"
+	topheight(string) : "Top block height" : "16.000000"
+	toprendermode(string) : "Top block render mode" : "1"
+	toprenderamt(string) : "Top block FX Amount (1 - 255)" : "60"
+	toprendercolor(color255) : "Top block FX Color (R G B)" : "0 0 0"
+]
+
+@SolidClass = remec_slip_ramp : "Slippery surf ramp"
+[
+	standingshapename(target_source) : "Name of standing hullshape" : "remec_slip_ramp_sh"
+	crouchingshapename(target_source) : "Name of crouching hullshape" : "remec_slip_ramp_ch"
+	zhlt_detaillevel(integer) : "Detail level" : 1
+	zhlt_chopdown(integer) : "Lower its level to chop others" : 0
+	zhlt_chopup(integer) : "Raise its level to chop others" : 0
+	zhlt_clipnodedetaillevel(integer) : "Detail level of cliphulls" : 1
+	zhlt_noclip(choices) : "Passable" : 0 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+]
+
+@PointClass = remec_trigger_random_target : "Trigger a random target from a list"
+[
+	targetname(target_source) : "Name" : ""
+	origin(string) : "Origin" : ""
+	delay(string) : "Delay between triggers" : "0.100000"
+	starttype(choices) : "Start type" : 1 =
+	[
+		1 : "Start automatically"
+		2 : "Start on trigger"
+	]
+	type(choices) : "Type" : 1 =
+	[
+		1 : "Trigger continuously"
+		2 : "Trigger once"
+	]
+]
+
+@PointClass = remec_multi_manager : "No limit Multi Manager"
+[
+	targetname(target_source) : "Name" : ""
+	spawnflags(flags) = 
+	[
+		1: "multithreaded" : 0
+	]
+]
+
+@SolidClass = remec_multi_target_teleport : "Teleport to multiple switchable targets"
+[
+	targetname(target_source) : "Name" : ""
+	trigger(target_destination) : "Button/trigger that should change the target" : ""
+]
+
+@PointClass = remec_sky_light : "light_environment that takes it's color from the sky"
+[
+	faces(flags) = 
+	[
+		1: "up" : 1
+		2: "back" : 1
+		4: "left" : 1
+		8: "front" : 1
+		16: "right" : 1
+		32: "down" : 1
+	]
+	intensity(integer) : "Light intensity" : 200
+	pitch(integer) : "Light pitch (-90 down, 90 up)" : -90
+	spread(string) : "Shadow spread" : "0.000000"
+	diffuse_light(color255) : "Ambient color" : ""
+	_fade(string) : "ZHLT Fade" : "1.0"
+	_falloff(choices) : "ZHLT Falloff" : 0 =
+	[
+		0 : "Default"
+		1 : "Inverse Linear"
+		2 : "Inverse Square"
+	]
+]
+
+
