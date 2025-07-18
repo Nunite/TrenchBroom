@@ -58,7 +58,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.renameLayer")
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* layerNode = new mdl::LayerNode{mdl::Layer{"test1"}};
   document->addNodes({{document->world(), {layerNode}}});
@@ -75,7 +75,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.duplicateObjectGoesIntoSourceLa
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* layerNode1 = new mdl::LayerNode{mdl::Layer{"test1"}};
   auto* layerNode2 = new mdl::LayerNode{mdl::Layer{"test2"}};
@@ -83,13 +83,13 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.duplicateObjectGoesIntoSourceLa
   document->addNodes({{document->world(), {layerNode2}}});
 
   document->setCurrentLayer(layerNode1);
-  auto* entity = document->createPointEntity(m_pointEntityDef, vm::vec3d{0, 0, 0});
+  auto* entity = document->createPointEntity(*m_pointEntityDef, vm::vec3d{0, 0, 0});
   CHECK(entity->parent() == layerNode1);
   CHECK(layerNode1->childCount() == 1);
 
   document->setCurrentLayer(layerNode2);
   document->selectNodes({entity});
-  document->duplicateObjects(); // the duplicate should stay in layer1
+  document->duplicate(); // the duplicate should stay in layer1
 
   REQUIRE(document->selectedNodes().entityCount() == 1);
   auto* entityClone = document->selectedNodes().entities().at(0);
@@ -102,7 +102,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.newGroupGoesIntoSourceLayer")
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* layerNode1 = new mdl::LayerNode{mdl::Layer{"test1"}};
   auto* layerNode2 = new mdl::LayerNode{mdl::Layer{"test2"}};
@@ -110,7 +110,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.newGroupGoesIntoSourceLayer")
   document->addNodes({{document->world(), {layerNode2}}});
 
   document->setCurrentLayer(layerNode1);
-  auto* entity = document->createPointEntity(m_pointEntityDef, vm::vec3d{0, 0, 0});
+  auto* entity = document->createPointEntity(*m_pointEntityDef, vm::vec3d{0, 0, 0});
   CHECK(entity->parent() == layerNode1);
   CHECK(layerNode1->childCount() == 1);
 
@@ -129,7 +129,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.newObjectsInHiddenLayerAreVisib
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* layerNode1 = new mdl::LayerNode{mdl::Layer{"test1"}};
   auto* layerNode2 = new mdl::LayerNode{mdl::Layer{"test2"}};
@@ -139,7 +139,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.newObjectsInHiddenLayerAreVisib
   document->setCurrentLayer(layerNode1);
 
   // Create an entity in layer1
-  auto* entity1 = document->createPointEntity(m_pointEntityDef, vm::vec3d{0, 0, 0});
+  auto* entity1 = document->createPointEntity(*m_pointEntityDef, vm::vec3d{0, 0, 0});
   CHECK(entity1->parent() == layerNode1);
   CHECK(layerNode1->childCount() == 1u);
 
@@ -155,7 +155,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.newObjectsInHiddenLayerAreVisib
 
   // Create another entity in layer1. It will be visible, while entity1 will still be
   // hidden.
-  auto* entity2 = document->createPointEntity(m_pointEntityDef, vm::vec3d{0, 0, 0});
+  auto* entity2 = document->createPointEntity(*m_pointEntityDef, vm::vec3d{0, 0, 0});
   CHECK(entity2->parent() == layerNode1);
   CHECK(layerNode1->childCount() == 2u);
 
@@ -203,7 +203,7 @@ TEST_CASE_METHOD(
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* layerNode1 = new mdl::LayerNode{mdl::Layer{"test1"}};
   document->addNodes({{document->world(), {layerNode1}}});
@@ -212,7 +212,7 @@ TEST_CASE_METHOD(
   document->hideLayers({layerNode1});
 
   // Create entity1 and brush1 in the hidden layer1
-  auto* entity1 = document->createPointEntity(m_pointEntityDef, vm::vec3d{0, 0, 0});
+  auto* entity1 = document->createPointEntity(*m_pointEntityDef, vm::vec3d{0, 0, 0});
   auto* brush1 = createBrushNode();
   document->addNodes({{document->parentForNodes(), {brush1}}});
 
@@ -228,7 +228,7 @@ TEST_CASE_METHOD(
   document->selectNodes({entity1, brush1});
 
   // Duplicate entity1 and brush1
-  document->duplicateObjects();
+  document->duplicate();
   REQUIRE(document->selectedNodes().entityCount() == 1u);
   REQUIRE(document->selectedNodes().brushCount() == 1u);
   auto* entity2 = document->selectedNodes().entities().front();
@@ -248,7 +248,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.newObjectsInLockedLayerAreUnloc
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* layerNode1 = new mdl::LayerNode{mdl::Layer{"test1"}};
   auto* layerNode2 = new mdl::LayerNode{mdl::Layer{"test2"}};
@@ -258,7 +258,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.newObjectsInLockedLayerAreUnloc
   document->setCurrentLayer(layerNode1);
 
   // Create an entity in layer1
-  auto* entity1 = document->createPointEntity(m_pointEntityDef, vm::vec3d{0, 0, 0});
+  auto* entity1 = document->createPointEntity(*m_pointEntityDef, vm::vec3d{0, 0, 0});
   CHECK(entity1->parent() == layerNode1);
   CHECK(layerNode1->childCount() == 1u);
 
@@ -273,7 +273,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.newObjectsInLockedLayerAreUnloc
 
   // Create another entity in layer1. It will be unlocked, while entity1 will still be
   // locked (inherited).
-  auto* entity2 = document->createPointEntity(m_pointEntityDef, vm::vec3d{0, 0, 0});
+  auto* entity2 = document->createPointEntity(*m_pointEntityDef, vm::vec3d{0, 0, 0});
   CHECK(entity2->parent() == layerNode1);
   CHECK(layerNode1->childCount() == 2u);
 
@@ -319,7 +319,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.moveLayer")
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* layerNode0 = new mdl::LayerNode{mdl::Layer{"layer0"}};
   auto* layerNode1 = new mdl::LayerNode{mdl::Layer{"layer1"}};
@@ -381,7 +381,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.moveSelectionToLayer")
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* customLayer = new mdl::LayerNode{mdl::Layer{"layer"}};
   document->addNodes({{document->world(), {customLayer}}});
@@ -509,7 +509,7 @@ TEST_CASE_METHOD(MapDocumentTest, "LayerNodeTest.setCurrentLayerCollation")
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* defaultLayerNode = document->world()->defaultLayer();
   auto* layerNode1 = new mdl::LayerNode{mdl::Layer{"test1"}};

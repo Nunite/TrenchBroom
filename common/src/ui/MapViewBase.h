@@ -39,14 +39,12 @@ class QAction;
 
 namespace tb::mdl
 {
-class BrushEntityDefinition;
 class Entity;
 class EntityNode;
-class EntityDefinition;
+struct EntityDefinition;
 class GroupNode;
 class Node;
 class NodeCollection;
-class PointEntityDefinition;
 class SmartTag;
 enum class EntityDefinitionType;
 } // namespace tb::mdl
@@ -190,11 +188,11 @@ public: // move, rotate, flip actions
   void duplicateAndMoveObjects(vm::direction direction);
   void duplicateObjects();
 
-  void rotateObjects(vm::rotation_axis axis, bool clockwise);
+  void rotate(vm::rotation_axis axis, bool clockwise);
   vm::vec3d rotationAxis(vm::rotation_axis axis, bool clockwise) const;
 
-  void flipObjects(vm::direction direction);
-  bool canFlipObjects() const;
+  void flip(vm::direction direction);
+  bool canFlip() const;
   virtual size_t flipAxis(vm::direction direction) const = 0;
 
 public: // UV actions
@@ -225,7 +223,7 @@ public: // tool mode actions
 public: // misc actions
   void resetCameraZoom();
   void cancel();
-  void deactivateTool();
+  void deactivateCurrentTool();
 
 public: // reparenting objects
   void addSelectedObjectsToGroup();
@@ -269,10 +267,9 @@ public: // reparenting objects
   void createBrushEntity();
   virtual vm::vec3d computePointEntityPosition(const vm::bbox3d& bounds) const = 0;
 
-  mdl::EntityDefinition* findEntityDefinition(
-    mdl::EntityDefinitionType type, size_t index) const;
-  void createPointEntity(const mdl::PointEntityDefinition* definition);
-  void createBrushEntity(const mdl::BrushEntityDefinition* definition);
+
+  void createPointEntity(const mdl::EntityDefinition& definition);
+  void createBrushEntity(const mdl::EntityDefinition& definition);
   bool canCreateBrushEntity();
 
 public: // tags
@@ -284,8 +281,8 @@ public: // make structural
   void makeStructural();
 
 public: // entity definitions
-  void toggleEntityDefinitionVisible(const mdl::EntityDefinition* definition);
-  void createEntity(const mdl::EntityDefinition* definition);
+  void toggleEntityDefinitionVisible(const mdl::EntityDefinition& definition);
+  void createEntity(const mdl::EntityDefinition& definition);
 
 public: // view filters
   void toggleShowEntityClassnames();

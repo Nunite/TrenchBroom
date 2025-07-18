@@ -169,7 +169,7 @@ TEST_CASE_METHOD(MapDocumentTest, "GroupNodesTest.undoMoveGroupContainingBrushEn
   auto* groupNode = document->groupSelection("test");
   CHECK(groupNode->selected());
 
-  CHECK(document->translateObjects(vm::vec3d{16, 0, 0}));
+  CHECK(document->translate(vm::vec3d{16, 0, 0}));
 
   CHECK_FALSE(hasEmptyName(entityNode->entity().propertyKeys()));
 
@@ -195,8 +195,8 @@ TEST_CASE_METHOD(MapDocumentTest, "GroupNodesTest.rotateGroupContainingBrushEnti
   CHECK(groupNode->selected());
 
   CHECK_FALSE(entityNode->entity().hasProperty("origin"));
-  CHECK(document->rotateObjects(
-    vm::vec3d{0, 0, 0}, vm::vec3d{0, 0, 1}, static_cast<double>(10.0)));
+  CHECK(
+    document->rotate(vm::vec3d{0, 0, 0}, vm::vec3d{0, 0, 1}, static_cast<double>(10.0)));
   CHECK_FALSE(entityNode->entity().hasProperty("origin"));
 
   document->undoCommand();
@@ -239,7 +239,7 @@ TEST_CASE_METHOD(MapDocumentTest, "GroupNodesTest.duplicateCopyPaste")
       REQUIRE(document->paste(document->serializeSelectedNodes()) == PasteType::Node);
       break;
     case Mode::Duplicate:
-      document->duplicateObjects();
+      document->duplicate();
       break;
       switchDefault();
     }
@@ -583,7 +583,7 @@ TEST_CASE_METHOD(MapDocumentTest, "GroupNodesTest.ungroupGroupAndPointEntity")
 TEST_CASE_METHOD(MapDocumentTest, "GroupNodesTest.mergeGroups")
 {
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* entityNode1 = new mdl::EntityNode{mdl::Entity{}};
   document->addNodes({{document->parentForNodes(), {entityNode1}}});
@@ -1102,8 +1102,7 @@ TEST_CASE_METHOD(MapDocumentTest, "GroupNodesTest.operationsOnSeveralGroupsInLin
   {
     document->selectNodes({groupNode, linkedGroupNode});
 
-    CHECK(
-      document->transformObjects("", vm::translation_matrix(vm::vec3d{0.5, 0.5, 0.0})));
+    CHECK(document->transform("", vm::translation_matrix(vm::vec3d{0.5, 0.5, 0.0})));
 
     // This could generate conflicts, because what snaps one group could misalign
     // another group in the link set. So, just reject the change.
@@ -1168,7 +1167,7 @@ TEST_CASE_METHOD(
   document->selectNodes({entityNode});
 
   // move the entity down
-  REQUIRE(document->translateObjects({0, 0, -256}));
+  REQUIRE(document->translate({0, 0, -256}));
   REQUIRE(
     entityNode->physicalBounds() == vm::bbox3d{{-8, -8, -256 - 8}, {8, 8, -256 + 8}});
 
@@ -1179,7 +1178,7 @@ TEST_CASE_METHOD(
   const auto zOffset = document->worldBounds().max.z();
   document->deselectAll();
   document->selectNodes({linkedGroupNode});
-  document->translateObjects({0, 0, document->worldBounds().max.z()});
+  document->translate({0, 0, document->worldBounds().max.z()});
   REQUIRE(
     linkedGroupNode->physicalBounds()
     == vm::bbox3d{{-8, -8, -256 - 8 + zOffset}, {8, 8, -256 + 8 + zOffset}});
@@ -1190,12 +1189,12 @@ TEST_CASE_METHOD(
 
   SECTION("create point entity")
   {
-    REQUIRE(m_pointEntityDef->bounds() == vm::bbox3d{{-16, -16, -16}, {16, 16, 16}});
+    REQUIRE(m_pointEntityDef->pointEntityDefinition->bounds == vm::bbox3d{16.0});
 
     // create a new point entity below the origin -- this entity is temporarily created
     // at the origin and then moved to its eventual position, but the entity at the
     // origin is propagated into the linked group, where it ends up out of  world bounds
-    CHECK(document->createPointEntity(m_pointEntityDef, {0, 0, -32}) != nullptr);
+    CHECK(document->createPointEntity(*m_pointEntityDef, {0, 0, -32}) != nullptr);
   }
 
   SECTION("create brush entity")
@@ -1212,7 +1211,7 @@ TEST_CASE_METHOD(
     // create a brush entity - a temporarily empty entity will be created at the origin
     // and propagated into the linked group, where it ends up out of world bounds and
     // thus failing
-    CHECK(document->createBrushEntity(m_brushEntityDef) != nullptr);
+    CHECK(document->createBrushEntity(*m_brushEntityDef) != nullptr);
   }
 }
 
