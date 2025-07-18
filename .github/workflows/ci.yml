@@ -5,7 +5,7 @@ on:
       - '**'
     branches:
       - master
-      - merge_verticestools
+      - dev
   pull_request:
 
 name: CI
