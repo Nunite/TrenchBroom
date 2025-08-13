@@ -1296,7 +1296,13 @@ void MapFrame::copyToClipboard()
   if (pref(Preferences::PrefixWorldspawnHeaderOnCopy))
   {
     const auto& selected = m_document->selectedNodes();
-    if (selected.hasOnlyBrushes())
+
+    bool shouldPrefix = false;
+    if (selected.hasEntities() || selected.hasGroups())
+    {
+      shouldPrefix = true;
+    }
+    else if (selected.hasOnlyBrushes())
     {
       const auto& brushes = selected.brushes();
       bool allUnderNonWorldEntity = !brushes.empty();
@@ -1309,38 +1315,39 @@ void MapFrame::copyToClipboard()
           break;
         }
       }
+      shouldPrefix = allUnderNonWorldEntity;
+    }
 
-      if (allUnderNonWorldEntity)
-      {
-        const auto& worldEntity = m_document->world()->entity();
-        auto escapeQuotes = [](const std::string& s) {
-          std::string out;
-          out.reserve(s.size());
-          for (const char c : s)
-          {
-            if (c == '"')
-            {
-              out += "\\\"";
-            }
-            else
-            {
-              out += c;
-            }
-          }
-          return out;
-        };
-
-        std::stringstream ss;
-        ss << "{\n";
-        for (const auto& p : worldEntity.properties())
+    if (shouldPrefix)
+    {
+      const auto& worldEntity = m_document->world()->entity();
+      auto escapeQuotes = [](const std::string& s) {
+        std::string out;
+        out.reserve(s.size());
+        for (const char c : s)
         {
-          ss << '"' << escapeQuotes(p.key()) << "\" \"" << escapeQuotes(p.value())
-             << "\"\n";
+          if (c == '"')
+          {
+            out += "\\\"";
+          }
+          else
+          {
+            out += c;
+          }
         }
-        ss << "}\n";
+        return out;
+      };
 
-        finalStr = ss.str() + str;
+      std::stringstream ss;
+      ss << "{\n";
+      for (const auto& p : worldEntity.properties())
+      {
+        ss << '"' << escapeQuotes(p.key()) << "\" \"" << escapeQuotes(p.value())
+           << "\"\n";
       }
+      ss << "}\n";
+
+      finalStr = ss.str() + str;
     }
   }
 
