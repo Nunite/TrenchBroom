@@ -6,7 +6,6 @@ on:
     branches:
       - master
       - dev
-      - prefs-misc-worldspawn-copy-prefix
   pull_request:
 
 name: CI
