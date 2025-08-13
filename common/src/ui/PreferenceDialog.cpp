@@ -30,6 +30,7 @@
 #include "PreferenceManager.h"
 #include "io/ResourceUtils.h"
 #include "ui/UpdatePreferencePane.h"
+#include "ui/MiscPreferencePane.h"
 #if !defined __APPLE__
 #include "ui/BorderLine.h"
 #endif
@@ -57,7 +58,8 @@ enum class PreferenceDialog::PrefPane
   Keyboard = 4,
   Language = 5,
   Update = 6,
-  Last = 6
+  Misc = 7,
+  Last = 8
 } PrefPane;
 
 
@@ -99,6 +101,7 @@ void PreferenceDialog::createGui()
   const auto keyboardImage = io::loadSVGIcon("KeyboardPreferences.svg");
   const auto languageImage = io::loadSVGIcon("LanguagePreferences.svg");
   const auto updateImage = io::loadSVGIcon("UpdatePreferences.svg");
+  const auto miscImage = io::loadSVGIcon("GeneralPreferences.svg");
 
   m_toolBar = new QToolBar{};
   m_toolBar->setFloatable(false);
@@ -112,6 +115,7 @@ void PreferenceDialog::createGui()
     keyboardImage, "Keyboard", [&]() { switchToPane(PrefPane::Keyboard); });
   m_toolBar->addAction(
     languageImage, "Language", [&]() { switchToPane(PrefPane::Language); });
+  m_toolBar->addAction(miscImage, "Misc", [&]() { switchToPane(PrefPane::Misc); });
   m_toolBar->addAction(updateImage, "Update", [&]() { switchToPane(PrefPane::Update); });
 
   // Don't display tooltips for pane switcher buttons...
@@ -134,6 +138,9 @@ void PreferenceDialog::createGui()
   
   m_stackedWidget->addWidget(new UpdatePreferencePane{});
   
+  // Misc (placeholder)
+  m_stackedWidget->addWidget(new MiscPreferencePane{});
+
   // 连接语言变更信号到键盘快捷键模型，以便在语言变更时刷新显示
   connect(languagePane, &LanguagePreferencePane::languageChanged,
           keyboardPane->model(), &KeyboardShortcutModel::refreshAfterLanguageChange);
