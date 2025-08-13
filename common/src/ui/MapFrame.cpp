@@ -1291,8 +1291,68 @@ void MapFrame::copyToClipboard()
                      ? m_document->serializeSelectedBrushFaces()
                      : std::string{};
 
+  std::string finalStr = str;
+
+  if (pref(Preferences::PrefixWorldspawnHeaderOnCopy))
+  {
+    const auto& selected = m_document->selectedNodes();
+
+    bool shouldPrefix = false;
+    if (selected.hasEntities() || selected.hasGroups())
+    {
+      shouldPrefix = true;
+    }
+    else if (selected.hasOnlyBrushes())
+    {
+      const auto& brushes = selected.brushes();
+      bool allUnderNonWorldEntity = !brushes.empty();
+      for (const auto* b : brushes)
+      {
+        const auto* parent = dynamic_cast<const mdl::EntityNode*>(b->parent());
+        if (parent == nullptr || mdl::isWorldspawn(parent->entity().classname()))
+        {
+          allUnderNonWorldEntity = false;
+          break;
+        }
+      }
+      shouldPrefix = allUnderNonWorldEntity;
+    }
+
+    if (shouldPrefix)
+    {
+      const auto& worldEntity = m_document->world()->entity();
+      auto escapeQuotes = [](const std::string& s) {
+        std::string out;
+        out.reserve(s.size());
+        for (const char c : s)
+        {
+          if (c == '"')
+          {
+            out += "\\\"";
+          }
+          else
+          {
+            out += c;
+          }
+        }
+        return out;
+      };
+
+      std::stringstream ss;
+      ss << "{\n";
+      for (const auto& p : worldEntity.properties())
+      {
+        ss << '"' << escapeQuotes(p.key()) << "\" \"" << escapeQuotes(p.value())
+           << "\"\n";
+      }
+      ss << "}\n";
+
+      finalStr = ss.str() + str;
+    }
+  }
+
   auto* clipboard = QApplication::clipboard();
-  clipboard->setText(mapStringToUnicode(m_document->encoding(), str));
+  clipboard->setText(mapStringToUnicode(m_document->encoding(), finalStr));
 }
 
 bool MapFrame::canCutSelection() const

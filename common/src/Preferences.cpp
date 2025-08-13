@@ -195,6 +195,10 @@ Preference<bool> EnableMSAA("render/Enable multisampling", true);
 Preference<bool> AlignmentLock("Editor/Texture lock", true);
 Preference<bool> UVLock("Editor/UV lock", false);
 
+Preference<bool> PrefixWorldspawnHeaderOnCopy(
+  "Editor/Clipboard/Prefix worldspawn header on copy",
+  false);
+
 Preference<std::filesystem::path>& RendererFontPath()
 {
   static Preference<std::filesystem::path> fontPath(
@@ -390,6 +394,7 @@ const std::vector<PreferenceBase*>& staticPreferences()
     &GridColor2D,
     &TextureMinFilter,
     &TextureMagFilter,
+    &EnableMSAA,
     &AlignmentLock,
     &UVLock,
     &RendererFontPath(),
@@ -435,7 +440,8 @@ const std::vector<PreferenceBase*>& staticPreferences()
     &ShowSoftMapBounds,
     &ShowPointEntities,
     &ShowBrushes,
-    &EntityLinkMode};
+    &EntityLinkMode,
+    &PrefixWorldspawnHeaderOnCopy};
 
   return list;
 }
