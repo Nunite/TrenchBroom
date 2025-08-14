@@ -1,0 +1,1 @@
+lrelease translations/trenchbroom_zh_CN.ts -qm translations/trenchbroom_zh_CN.qm

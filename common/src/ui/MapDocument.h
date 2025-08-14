@@ -424,6 +424,7 @@ public: // selection
   void selectBrushFaces(const std::vector<mdl::BrushFaceHandle>& handles) override;
   void convertToFaceSelection() override;
   void selectFacesWithMaterial(const mdl::Material* material);
+  void selectFacesWithMaterialInSelectedBrushes(const mdl::Material* material);
   void selectBrushesWithMaterial(const mdl::Material* material);
   void selectTall(vm::axis::type cameraAxis);
 

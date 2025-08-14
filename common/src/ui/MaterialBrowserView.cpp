@@ -568,6 +568,11 @@ void MaterialBrowserView::doContextMenu(
       doc->selectFacesWithMaterial(material);
     });
 
+    menu.addAction(tr("Select Faces in Selected Brushes"), this, [&, material = &cellData(*cell)]() {
+      auto doc = kdl::mem_lock(m_document);
+      doc->selectFacesWithMaterialInSelectedBrushes(material);
+    });
+
     menu.addAction(tr("Select Brushes"), this, [&, material = &cellData(*cell)]() {
       auto doc = kdl::mem_lock(m_document);
       doc->selectBrushesWithMaterial(material);

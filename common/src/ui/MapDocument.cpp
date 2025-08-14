@@ -1614,6 +1614,20 @@ void MapDocument::selectFacesWithMaterial(const mdl::Material* material)
   transaction.commit();
 }
 
+void MapDocument::selectFacesWithMaterialInSelectedBrushes(const mdl::Material* material)
+{
+  const auto& selectedBrushNodes = selectedNodes().brushes();
+  const auto brushNodePointers = kdl::vec_static_cast<mdl::Node*>(selectedBrushNodes);
+  const auto faces = kdl::vec_filter(
+    mdl::collectSelectableBrushFaces(brushNodePointers, *m_editorContext),
+    [&](const auto& faceHandle) { return faceHandle.face().material() == material; });
+
+  auto transaction = Transaction{*this, "Select Faces with Material in Selected Brushes"};
+  deselectAll();
+  selectBrushFaces(faces);
+  transaction.commit();
+}
+
 void MapDocument::selectBrushesWithMaterial(const mdl::Material* material)
 {
   const auto selectableNodes =
