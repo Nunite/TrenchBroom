@@ -32,43 +32,14 @@
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
 #include "ui/SmartPropertyEditorManager.h"
-#include "ui/SmartFileBrowserEditor.h"
 #include "ui/Splitter.h"
 
 #include "kdl/memory_utils.h"
 
 #include <algorithm>
-#include <unordered_set>
 
 namespace tb::ui
 {
-// 判断属性是否适用于文件浏览器
-static bool isFileBrowserProperty(const std::string& propertyKey) {
-  // 定义一组特定的属性名，这些属性通常对应文件路径
-  static const std::unordered_set<std::string> exactMatchProperties = {
-    "model",       // 模型文件
-    "studio",      // 另一种模型文件
-    "sprite",      // 精灵文件
-    "sound"        // 单个声音文件
-  };
-  
-  // 精确匹配常见的文件属性名
-  if (exactMatchProperties.find(propertyKey) != exactMatchProperties.end()) {
-    return true;
-  }
-  
-  // 检查属性名称是否包含_name并且也包含关键词
-  if (propertyKey.find("_name") != std::string::npos) {
-    if (propertyKey.find("model") != std::string::npos || 
-        propertyKey.find("sprite") != std::string::npos || 
-        propertyKey.find("sound") != std::string::npos) {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
 EntityPropertyEditor::EntityPropertyEditor(
   std::weak_ptr<MapDocument> document, QWidget* parent)
   : QWidget{parent}
@@ -125,7 +96,6 @@ void EntityPropertyEditor::updateDocumentationAndSmartEditor()
   auto document = kdl::mem_lock(m_document);
   const auto& propertyKey = m_propertyGrid->selectedRowName();
 
-  // 无论是否为文件浏览属性，都使用switchEditor方法
   m_smartEditorManager->switchEditor(propertyKey, document->allSelectedEntityNodes());
 
   updateDocumentation(propertyKey);
@@ -140,88 +110,53 @@ void EntityPropertyEditor::updateDocumentationAndSmartEditor()
 QString EntityPropertyEditor::optionDescriptions(
   const mdl::PropertyDefinition& definition)
 {
+  using namespace mdl::PropertyValueTypes;
+
   static const auto bullet = QString{" "} + QChar{0x2022} + QString{" "};
 
-  switch (definition.type())
-  {
-  case mdl::PropertyDefinitionType::ChoiceProperty: {
-    const auto& choiceDef =
-      dynamic_cast<const mdl::ChoicePropertyDefinition&>(definition);
+  return std::visit(
+    kdl::overload(
+      [](const Choice& valueType) {
+        auto result = QString{};
+        auto stream = QTextStream{&result};
+        for (const auto& option : valueType.options)
+        {
+          stream << bullet << option.value.c_str();
+          if (!option.description.empty())
+          {
+            stream << " (" << option.description.c_str() << ")";
+          }
+          stream << "\n";
+        }
+        return result;
+      },
+      [](const Flags& valueType) {
+        // The options are not necessarily sorted by value, so we sort the descriptions
+        // here by inserting into a map sorted by the flag value.
+        auto flagDescriptors = std::map<int, QString>{};
+        for (const auto& flag : valueType.flags)
+        {
+          auto line = QString{};
+          auto stream = QTextStream{&line};
+          stream << bullet << flag.value << " = " << flag.shortDescription.c_str();
+          if (!flag.longDescription.empty())
+          {
+            stream << " (" << flag.longDescription.c_str() << ")";
+          }
+          flagDescriptors[flag.value] = line;
+        }
 
-    auto result = QString{};
-    auto stream = QTextStream{&result};
-    for (const auto& option : choiceDef.options())
-    {
-      stream << bullet << option.value().c_str();
-      if (!option.description().empty())
-      {
-        stream << " (" << option.description().c_str() << ")";
-      }
-      stream << "\n";
-    }
-    return result;
-  }
-  case mdl::PropertyDefinitionType::FlagsProperty: {
-    const auto& flagsDef = dynamic_cast<const mdl::FlagsPropertyDefinition&>(definition);
-
-    // The options are not necessarily sorted by value, so we sort the descriptions here
-    // by inserting into a map sorted by the flag value.
-    auto flagDescriptors = std::map<int, QString>{};
-    for (const auto& option : flagsDef.options())
-    {
-      auto line = QString{};
-      auto stream = QTextStream{&line};
-      stream << bullet << option.value() << " = " << option.shortDescription().c_str();
-      if (!option.longDescription().empty())
-      {
-        stream << " (" << option.longDescription().c_str() << ")";
-      }
-      flagDescriptors[option.value()] = line;
-    }
-
-    // Concatenate the flag descriptions and return.
-    auto result = QString{};
-    auto stream = QTextStream{&result};
-    for (const auto& [value, description] : flagDescriptors)
-    {
-      stream << description << "\n";
-    }
-    return result;
-  }
-  // 为文件类型添加描述，更智能地检测文件类型
-  default: {
-    const std::string& shortDesc = definition.shortDescription();
-    const std::string& key = definition.key();
-    
-    // 根据短描述确定文件类型
-    if (shortDesc.find("<sound>") != std::string::npos || 
-        shortDesc.find("WAV") != std::string::npos || 
-        shortDesc.find(".wav") != std::string::npos) {
-      return "Expected value: Sound file path (*.wav)";
-    } else if (shortDesc.find("<sprite>") != std::string::npos || 
-              shortDesc.find("Sprite Name") != std::string::npos) {
-      return "Expected value: Sprite file path (*.spr)";
-    } else if (shortDesc.find("<model>") != std::string::npos || 
-              (shortDesc.find("Model") != std::string::npos && 
-               shortDesc.find("Sprite") == std::string::npos)) {
-      return "Expected value: Model file path (*.mdl)";
-    } else if (shortDesc.find("Model / Sprite") != std::string::npos) {
-      return "Expected value: Model file path (*.mdl) or Sprite file path (*.spr)";
-    } 
-    // 如果无法从短描述确定，则回退到属性名
-    else if (isFileBrowserProperty(key)) {
-      if (key.find("model") != std::string::npos) {
-        return "Expected value: Model file path (*.mdl)";
-      } else if (key.find("sound") != std::string::npos) {
-        return "Expected value: Sound file path (*.wav)";
-      } else if (key.find("sprite") != std::string::npos) {
-        return "Expected value: Sprite file path (*.spr)";
-      }
-    }
-    
-    return {};
-  }
-  }
+        // Concatenate the flag descriptions and return.
+        auto result = QString{};
+        auto stream = QTextStream{&result};
+        for (const auto& [value, description] : flagDescriptors)
+        {
+          stream << description << "\n";
+        }
+        return result;
+      },
+      [](const auto&) { return QString{}; }),
+    definition.valueType);
 }
 
 void EntityPropertyEditor::updateDocumentation(const std::string& propertyKey)
@@ -239,12 +174,13 @@ void EntityPropertyEditor::updateDocumentation(const std::string& propertyKey)
 
     // add property documentation, if available
     if (
-      const auto* propertyDefinition = entityDefinition->propertyDefinition(propertyKey))
+      const auto* propertyDefinition =
+        getPropertyDefinition(*entityDefinition, propertyKey))
     {
       const auto optionsDescription = optionDescriptions(*propertyDefinition);
 
-      const auto propertyHasDocs = !propertyDefinition->longDescription().empty()
-                                   || !propertyDefinition->shortDescription().empty()
+      const auto propertyHasDocs = !propertyDefinition->longDescription.empty()
+                                   || !propertyDefinition->shortDescription.empty()
                                    || !optionsDescription.isEmpty();
 
       if (propertyHasDocs)
@@ -252,11 +188,11 @@ void EntityPropertyEditor::updateDocumentation(const std::string& propertyKey)
         // e.g. "Property "delay" (Attenuation formula)", in bold
         {
           auto title =
-            tr("Property \"%1\"").arg(QString::fromStdString(propertyDefinition->key()));
-          if (!propertyDefinition->shortDescription().empty())
+            tr("Property \"%1\"").arg(QString::fromStdString(propertyDefinition->key));
+          if (!propertyDefinition->shortDescription.empty())
           {
             title += tr(" (%1)").arg(
-              QString::fromStdString(propertyDefinition->shortDescription()));
+              QString::fromStdString(propertyDefinition->shortDescription));
           }
 
           m_documentationText->setCurrentCharFormat(boldFormat);
@@ -264,10 +200,10 @@ void EntityPropertyEditor::updateDocumentation(const std::string& propertyKey)
           m_documentationText->setCurrentCharFormat(normalFormat);
         }
 
-        if (!propertyDefinition->longDescription().empty())
+        if (!propertyDefinition->longDescription.empty())
         {
           m_documentationText->append("");
-          m_documentationText->append(propertyDefinition->longDescription().c_str());
+          m_documentationText->append(propertyDefinition->longDescription.c_str());
         }
 
         if (!optionsDescription.isEmpty())
@@ -278,62 +214,9 @@ void EntityPropertyEditor::updateDocumentation(const std::string& propertyKey)
         }
       }
     }
-    // 对于文件类型属性，但没有属性定义时添加通用描述
-    else if (isFileBrowserProperty(propertyKey)) {
-      m_documentationText->setCurrentCharFormat(boldFormat);
-      m_documentationText->append(tr("Property \"%1\"").arg(QString::fromStdString(propertyKey)));
-      m_documentationText->setCurrentCharFormat(normalFormat);
-      
-      m_documentationText->append("");
-      
-      // 获取属性定义以检查短描述
-      const auto* propDef = mdl::selectPropertyDefinition(propertyKey, document->allSelectedEntityNodes());
-      
-      if (propDef) {
-        const std::string& desc = propDef->shortDescription();
-        
-        // 根据短描述中的标记确定文件类型
-        if (desc.find("<sound>") != std::string::npos || 
-            desc.find("WAV") != std::string::npos || 
-            desc.find(".wav") != std::string::npos) {
-          m_documentationText->append("Expected value: Sound file path (*.wav)");
-        } else if (desc.find("<sprite>") != std::string::npos || 
-                  desc.find("Sprite Name") != std::string::npos) {
-          m_documentationText->append("Expected value: Sprite file path (*.spr)");
-        } else if (desc.find("<model>") != std::string::npos || 
-                  (desc.find("Model") != std::string::npos && 
-                   desc.find("Sprite") == std::string::npos)) {
-          m_documentationText->append("Expected value: Model file path (*.mdl)");
-        } else if (desc.find("Model / Sprite") != std::string::npos) {
-          m_documentationText->append("Expected value: Model file path (*.mdl) or Sprite file path (*.spr)");
-        } else {
-          // 回退到基于属性名称的检测，仅在无法从描述确定类型时使用
-          if (propertyKey.find("model") != std::string::npos) {
-            m_documentationText->append("Expected value: Model file path (*.mdl)");
-          } else if (propertyKey.find("sound") != std::string::npos) {
-            m_documentationText->append("Expected value: Sound file path (*.wav)");
-          } else if (propertyKey.find("sprite") != std::string::npos) {
-            m_documentationText->append("Expected value: Sprite file path (*.spr)");
-          } else {
-            m_documentationText->append("File path value. Use the browser button to select a file.");
-          }
-        }
-      } else {
-        // 没有属性定义时，回退到基于名称的检测
-        if (propertyKey.find("model") != std::string::npos) {
-          m_documentationText->append("Expected value: Model file path (*.mdl)");
-        } else if (propertyKey.find("sound") != std::string::npos) {
-          m_documentationText->append("Expected value: Sound file path (*.wav)");
-        } else if (propertyKey.find("sprite") != std::string::npos) {
-          m_documentationText->append("Expected value: Sprite file path (*.spr)");
-        } else {
-          m_documentationText->append("File path value. Use the browser button to select a file.");
-        }
-      }
-    }
 
     // add class description, if available
-    if (!entityDefinition->description().empty())
+    if (!entityDefinition->description.empty())
     {
       // add space after property text
       if (!m_documentationText->document()->isEmpty())
@@ -345,12 +228,12 @@ void EntityPropertyEditor::updateDocumentation(const std::string& propertyKey)
       {
         m_documentationText->setCurrentCharFormat(boldFormat);
         m_documentationText->append(
-          tr("Class \"%1\"").arg(QString::fromStdString(entityDefinition->name())));
+          tr("Class \"%1\"").arg(QString::fromStdString(entityDefinition->name)));
         m_documentationText->setCurrentCharFormat(normalFormat);
       }
 
       m_documentationText->append("");
-      m_documentationText->append(entityDefinition->description().c_str());
+      m_documentationText->append(entityDefinition->description.c_str());
       m_documentationText->append("");
     }
   }

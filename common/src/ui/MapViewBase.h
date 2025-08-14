@@ -28,6 +28,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -38,12 +39,12 @@ class QAction;
 
 namespace tb::mdl
 {
-class BrushEntityDefinition;
-class EntityDefinition;
+class Entity;
+class EntityNode;
+struct EntityDefinition;
 class GroupNode;
 class Node;
 class NodeCollection;
-class PointEntityDefinition;
 class SmartTag;
 enum class EntityDefinitionType;
 } // namespace tb::mdl
@@ -161,6 +162,18 @@ private: // shortcut setup
   void updateActionStates();
   void updateActionStatesDelayed();
 
+private: // 实体模板相关
+  std::unique_ptr<mdl::Entity> m_templateEntity;
+  std::string m_templateEntityClassName;
+
+public: // 实体模板相关方法
+  bool hasTemplateEntity() const;
+  void setTemplateEntity(const mdl::EntityNode* entityNode);
+  void clearTemplateEntity();
+  const mdl::Entity* templateEntity() const;
+  void setSelectedEntityAsTemplate();
+  void applyEntityTemplate();
+
 public:
   void triggerAction(const Action& action);
   void triggerAmbiguousAction(const QString& label);
@@ -175,11 +188,11 @@ public: // move, rotate, flip actions
   void duplicateAndMoveObjects(vm::direction direction);
   void duplicateObjects();
 
-  void rotateObjects(vm::rotation_axis axis, bool clockwise);
+  void rotate(vm::rotation_axis axis, bool clockwise);
   vm::vec3d rotationAxis(vm::rotation_axis axis, bool clockwise) const;
 
-  void flipObjects(vm::direction direction);
-  bool canFlipObjects() const;
+  void flip(vm::direction direction);
+  bool canFlip() const;
   virtual size_t flipAxis(vm::direction direction) const = 0;
 
 public: // UV actions
@@ -210,7 +223,7 @@ public: // tool mode actions
 public: // misc actions
   void resetCameraZoom();
   void cancel();
-  void deactivateTool();
+  void deactivateCurrentTool();
 
 public: // reparenting objects
   void addSelectedObjectsToGroup();
@@ -254,10 +267,9 @@ public: // reparenting objects
   void createBrushEntity();
   virtual vm::vec3d computePointEntityPosition(const vm::bbox3d& bounds) const = 0;
 
-  mdl::EntityDefinition* findEntityDefinition(
-    mdl::EntityDefinitionType type, size_t index) const;
-  void createPointEntity(const mdl::PointEntityDefinition* definition);
-  void createBrushEntity(const mdl::BrushEntityDefinition* definition);
+
+  void createPointEntity(const mdl::EntityDefinition& definition);
+  void createBrushEntity(const mdl::EntityDefinition& definition);
   bool canCreateBrushEntity();
 
 public: // tags
@@ -269,8 +281,8 @@ public: // make structural
   void makeStructural();
 
 public: // entity definitions
-  void toggleEntityDefinitionVisible(const mdl::EntityDefinition* definition);
-  void createEntity(const mdl::EntityDefinition* definition);
+  void toggleEntityDefinitionVisible(const mdl::EntityDefinition& definition);
+  void createEntity(const mdl::EntityDefinition& definition);
 
 public: // view filters
   void toggleShowEntityClassnames();

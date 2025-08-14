@@ -251,7 +251,7 @@ TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectTouching_2476")
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   const auto builder =
     mdl::BrushBuilder{document->world()->mapFormat(), document->worldBounds()};
@@ -291,7 +291,7 @@ TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectTouching_2476")
 TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectTouchingWithGroup")
 {
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
   assert(document->selectedNodes().nodeCount() == 0);
 
   auto* layer = new mdl::LayerNode{mdl::Layer{"Layer 1"}};
@@ -323,7 +323,7 @@ TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectTouchingWithGroup")
 TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectInsideWithGroup")
 {
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
   assert(document->selectedNodes().nodeCount() == 0);
 
   auto* layer = new mdl::LayerNode{mdl::Layer{"Layer 1"}};
@@ -402,7 +402,7 @@ TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectInverse")
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   const auto builder =
     mdl::BrushBuilder{document->world()->mapFormat(), document->worldBounds()};
@@ -424,7 +424,7 @@ TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectInverse")
   document->addNodes({{document->parentForNodes(), {patchNode}}});
 
   document->selectNodes({brushNode1, brushNode2});
-  mdl::EntityNode* brushEnt = document->createBrushEntity(m_brushEntityDef);
+  mdl::EntityNode* brushEnt = document->createBrushEntity(*m_brushEntityDef);
 
   document->deselectAll();
 
@@ -458,7 +458,7 @@ TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectTouchingInsideNestedGroup
 {
   // delete default brush
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   auto* brushNode1 = createBrushNode();
   auto* brushNode2 = createBrushNode();
@@ -491,7 +491,7 @@ TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectTouchingInsideNestedGroup
 TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectSiblings")
 {
   document->selectAllNodes();
-  document->deleteObjects();
+  document->remove();
 
   const auto builder =
     mdl::BrushBuilder{document->world()->mapFormat(), document->worldBounds()};
@@ -513,7 +513,7 @@ TEST_CASE_METHOD(MapDocumentTest, "SelectionTest.selectSiblings")
   document->addNodes({{document->parentForNodes(), {patchNode}}});
 
   document->selectNodes({brushNode1, brushNode2});
-  document->createBrushEntity(m_brushEntityDef);
+  document->createBrushEntity(*m_brushEntityDef);
 
   document->deselectAll();
 
@@ -617,7 +617,7 @@ TEST_CASE_METHOD(
     Catch::Equals(std::vector<mdl::BrushNode*>{brushNode}));
 
   // translate the brush
-  document->translateObjects(vm::vec3d{10.0, 0.0, 0.0});
+  document->translate(vm::vec3d{10.0, 0.0, 0.0});
   CHECK(brushNode->logicalBounds().center() == vm::vec3d{10.0, 0.0, 0.0});
 
   // Start undoing changes

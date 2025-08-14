@@ -190,7 +190,7 @@ void LayerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
     } else if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
         
         if (auto* definition = entity->entity().definition()) {
-            if (definition->type() == mdl::EntityDefinitionType::PointEntity) {
+            if (mdl::getType(*definition) == mdl::EntityDefinitionType::Point) {
                 item->setIcon(0, m_entityIcon);  
             } else {
                 item->setIcon(0, m_worldIcon);  
@@ -778,7 +778,7 @@ void LayerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
     else if (targetEntity) {
         
         if (auto* definition = targetEntity->entity().definition()) {
-            if (definition->type() == mdl::EntityDefinitionType::BrushEntity) {
+            if (mdl::getType(*definition) == mdl::EntityDefinitionType::Brush) {
                 
                 if (sourceBrush) {
                     canAccept = true;

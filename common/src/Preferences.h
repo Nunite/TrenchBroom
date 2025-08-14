@@ -139,6 +139,8 @@ extern Preference<bool> EnableMSAA;
 extern Preference<bool> AlignmentLock;
 extern Preference<bool> UVLock;
 
+extern Preference<bool> PrefixWorldspawnHeaderOnCopy;
+
 Preference<std::filesystem::path>& RendererFontPath();
 extern Preference<int> RendererFontSize;
 

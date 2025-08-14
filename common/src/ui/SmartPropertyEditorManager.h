@@ -33,8 +33,6 @@ namespace tb::mdl
 {
 class EntityNodeBase;
 class Node;
-class PropertyDefinition;
-enum class PropertyDefinitionType;
 } // namespace tb::mdl
 
 namespace tb::ui
@@ -42,10 +40,6 @@ namespace tb::ui
 class MapDocument;
 class Selection;
 class SmartPropertyEditor;
-
-// 向前声明SmartFileBrowserEditor和FilePropertyType
-class SmartFileBrowserEditor;
-enum class FilePropertyType;
 
 using SmartPropertyEditorMatcher =
   std::function<bool(const std::string&, const std::vector<mdl::EntityNodeBase*>&)>;
@@ -66,12 +60,7 @@ public:
     std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
 
   void switchEditor(
-    const std::string& propertyKey, const std::vector<mdl::Node*>& nodes);
-    
-  // 新增：同时支持EntityNodeBase类型的切换方法
-  void switchEditor(
     const std::string& propertyKey, const std::vector<mdl::EntityNodeBase*>& nodes);
-    
   bool isDefaultEditorActive() const;
 
 private:
@@ -91,9 +80,6 @@ private:
   void activateEditor(SmartPropertyEditor* editor, const std::string& propertyKey);
   void deactivateEditor();
   void updateEditor();
-  
-  // 新增创建文件浏览器编辑器的方法
-  SmartFileBrowserEditor* createFileBrowserEditor(FilePropertyType type);
 };
 
 } // namespace tb::ui

@@ -17,7 +17,7 @@
 <context>
     <name>QLineEdit</name>
     <message>
-        <location filename="../common/src/ui/QtUtils.cpp" line="501"/>
+        <location filename="../common/src/ui/QtUtils.cpp" line="506"/>
         <source>Search...</source>
         <translation>搜索...</translation>
     </message>
@@ -46,872 +46,872 @@
         <translation>将选定内容转为非%1</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="330"/>
+        <location filename="../common/src/ui/Actions.cpp" line="328"/>
         <source>Create %1</source>
         <translation>创建 %1</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="396"/>
+        <location filename="../common/src/ui/Actions.cpp" line="394"/>
         <source>Create Brush</source>
         <translation type="unfinished">创建Brush</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="407"/>
+        <location filename="../common/src/ui/Actions.cpp" line="405"/>
         <source>Toggle Clip Side</source>
         <translation>切换剪裁面</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="417"/>
+        <location filename="../common/src/ui/Actions.cpp" line="415"/>
         <source>Perform Clip</source>
         <translation>执行裁剪</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="431"/>
+        <location filename="../common/src/ui/Actions.cpp" line="429"/>
         <source>Move Forward</source>
         <translation>前进</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="440"/>
+        <location filename="../common/src/ui/Actions.cpp" line="438"/>
         <source>Move Backward</source>
         <translation>向后移动</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="449"/>
+        <location filename="../common/src/ui/Actions.cpp" line="447"/>
         <source>Move Left</source>
         <translation>向左移动</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="458"/>
+        <location filename="../common/src/ui/Actions.cpp" line="456"/>
         <source>Move Right</source>
         <translation>向右移动</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="467"/>
+        <location filename="../common/src/ui/Actions.cpp" line="465"/>
         <source>Move Up</source>
         <translation>上移</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="476"/>
+        <location filename="../common/src/ui/Actions.cpp" line="474"/>
         <source>Move Down</source>
         <translation>下移</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="490"/>
+        <location filename="../common/src/ui/Actions.cpp" line="488"/>
         <source>Duplicate and Move Forward</source>
         <translation>复制并向前移动</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="502"/>
+        <location filename="../common/src/ui/Actions.cpp" line="500"/>
         <source>Duplicate and Move Backward</source>
         <translation>复制并向后移动</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="512"/>
+        <location filename="../common/src/ui/Actions.cpp" line="510"/>
         <source>Duplicate and Move Left</source>
         <translation>复制并左移</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="520"/>
+        <location filename="../common/src/ui/Actions.cpp" line="518"/>
         <source>Duplicate and Move Right</source>
         <translation>复制并向右移动</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="530"/>
+        <location filename="../common/src/ui/Actions.cpp" line="528"/>
         <source>Duplicate and Move Up</source>
         <translation>复制并上移</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="540"/>
+        <location filename="../common/src/ui/Actions.cpp" line="538"/>
         <source>Duplicate and Move Down</source>
         <translation>复制并下移</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="551"/>
+        <location filename="../common/src/ui/Actions.cpp" line="549"/>
         <source>Roll Clockwise</source>
         <translation>顺时针旋转</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="560"/>
+        <location filename="../common/src/ui/Actions.cpp" line="558"/>
         <source>Roll Counter-clockwise</source>
         <translation>逆时针滚动</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="569"/>
+        <location filename="../common/src/ui/Actions.cpp" line="567"/>
         <source>Yaw Clockwise</source>
         <translation>顺时针偏航</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="578"/>
+        <location filename="../common/src/ui/Actions.cpp" line="576"/>
         <source>Yaw Counter-clockwise</source>
         <translation>偏航 逆时针</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="587"/>
+        <location filename="../common/src/ui/Actions.cpp" line="585"/>
         <source>Pitch Clockwise</source>
         <translation>俯视顺时针</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="596"/>
+        <location filename="../common/src/ui/Actions.cpp" line="594"/>
         <source>Pitch Counter-clockwise</source>
         <translation>俯仰 逆时针</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="607"/>
+        <location filename="../common/src/ui/Actions.cpp" line="605"/>
         <source>Move Textures Up</source>
         <translation>上移纹理</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="617"/>
+        <location filename="../common/src/ui/Actions.cpp" line="615"/>
         <source>Move Textures Up (Coarse)</source>
         <translation>上移纹理（粗调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="627"/>
+        <location filename="../common/src/ui/Actions.cpp" line="625"/>
         <source>Move Textures Up (Fine)</source>
         <translation>上移纹理（微调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="637"/>
+        <location filename="../common/src/ui/Actions.cpp" line="635"/>
         <source>Move Textures Down</source>
         <translation>移动纹理向下</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="647"/>
+        <location filename="../common/src/ui/Actions.cpp" line="645"/>
         <source>Move Textures Down (Coarse)</source>
         <translation>下移纹理（粗调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="657"/>
+        <location filename="../common/src/ui/Actions.cpp" line="655"/>
         <source>Move Textures Down (Fine)</source>
         <translation>下移纹理（微调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="667"/>
+        <location filename="../common/src/ui/Actions.cpp" line="665"/>
         <source>Move Textures Left</source>
         <translation>移动纹理向左</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="677"/>
+        <location filename="../common/src/ui/Actions.cpp" line="675"/>
         <source>Move Textures Left (Coarse)</source>
         <translation>移动纹理向左（大幅）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="687"/>
+        <location filename="../common/src/ui/Actions.cpp" line="685"/>
         <source>Move Textures Left (Fine)</source>
         <translation>左移纹理（微调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="697"/>
+        <location filename="../common/src/ui/Actions.cpp" line="695"/>
         <source>Move Textures Right</source>
         <translation>移动纹理向右</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="707"/>
+        <location filename="../common/src/ui/Actions.cpp" line="705"/>
         <source>Move Textures Right (Coarse)</source>
         <translation>移动贴图向右（粗调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="717"/>
+        <location filename="../common/src/ui/Actions.cpp" line="715"/>
         <source>Move Textures Right (Fine)</source>
         <translation>移动纹理向右（微调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="727"/>
+        <location filename="../common/src/ui/Actions.cpp" line="725"/>
         <source>Rotate Textures Clockwise</source>
         <translation>旋转纹理（顺时针）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="737"/>
+        <location filename="../common/src/ui/Actions.cpp" line="735"/>
         <source>Rotate Textures Clockwise (Coarse)</source>
         <translation>旋转贴图（顺时针，粗调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="747"/>
+        <location filename="../common/src/ui/Actions.cpp" line="745"/>
         <source>Rotate Textures Clockwise (Fine)</source>
         <translation>旋转贴图顺时针（微调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="757"/>
+        <location filename="../common/src/ui/Actions.cpp" line="755"/>
         <source>Rotate Textures Counter-clockwise</source>
         <translation>逆时针旋转纹理</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="767"/>
+        <location filename="../common/src/ui/Actions.cpp" line="765"/>
         <source>Rotate Textures Counter-clockwise (Coarse)</source>
         <translation>旋转纹理逆时针（粗调）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="777"/>
+        <location filename="../common/src/ui/Actions.cpp" line="775"/>
         <source>Rotate Textures Counter-clockwise (Fine)</source>
         <translation>逆时针旋转纹理（精细）</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="787"/>
+        <location filename="../common/src/ui/Actions.cpp" line="785"/>
         <source>Reveal in texture browser</source>
         <translation>在纹理浏览器中显示</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="795"/>
+        <location filename="../common/src/ui/Actions.cpp" line="793"/>
         <source>Flip textures horizontally</source>
         <translation>水平翻转纹理</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="803"/>
+        <location filename="../common/src/ui/Actions.cpp" line="801"/>
         <source>Flip textures vertically</source>
         <translation>垂直翻转纹理</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="811"/>
+        <location filename="../common/src/ui/Actions.cpp" line="809"/>
         <source>Reset texture alignment</source>
         <translation>重置贴图对齐</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="819"/>
+        <location filename="../common/src/ui/Actions.cpp" line="817"/>
         <source>Reset texture alignment to world aligned</source>
         <translation>重置纹理对齐为世界对齐</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="829"/>
+        <location filename="../common/src/ui/Actions.cpp" line="827"/>
         <source>Make Structural</source>
         <translation>创建结构体</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="840"/>
+        <location filename="../common/src/ui/Actions.cpp" line="838"/>
         <source>Toggle Show Entity Classnames</source>
         <translation>切换显示实体类名</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="848"/>
+        <location filename="../common/src/ui/Actions.cpp" line="846"/>
         <source>Toggle Show Group Bounds</source>
         <translation>切换显示组边界</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="857"/>
+        <location filename="../common/src/ui/Actions.cpp" line="855"/>
         <source>Toggle Show Brush Entity Bounds</source>
         <translation type="unfinished">切换显示Brush实体边界</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="866"/>
+        <location filename="../common/src/ui/Actions.cpp" line="864"/>
         <source>Toggle Show Point Entity Bounds</source>
         <translation>切换显示点实体边界</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="874"/>
+        <location filename="../common/src/ui/Actions.cpp" line="872"/>
         <source>Toggle Show Point Entities</source>
         <translation>切换显示点实体</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="883"/>
+        <location filename="../common/src/ui/Actions.cpp" line="881"/>
         <source>Toggle Show Point Entity Models</source>
         <translation>切换显示点实体模型</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="891"/>
+        <location filename="../common/src/ui/Actions.cpp" line="889"/>
         <source>Toggle Show Brushes</source>
         <translation type="unfinished">切换显示Brush</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="899"/>
+        <location filename="../common/src/ui/Actions.cpp" line="897"/>
         <source>Show Textures</source>
         <translation>显示纹理</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="907"/>
+        <location filename="../common/src/ui/Actions.cpp" line="905"/>
         <source>Hide Textures</source>
         <translation>隐藏贴图</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="915"/>
+        <location filename="../common/src/ui/Actions.cpp" line="913"/>
         <source>Hide Faces</source>
         <translation>隐藏面</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="923"/>
+        <location filename="../common/src/ui/Actions.cpp" line="921"/>
         <source>Toggle Shade Faces</source>
         <translation>切换面着色</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="931"/>
+        <location filename="../common/src/ui/Actions.cpp" line="929"/>
         <source>Toggle Show Fog</source>
         <translation>切换显示雾效</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="939"/>
+        <location filename="../common/src/ui/Actions.cpp" line="937"/>
         <source>Toggle Show Edges</source>
         <translation>切换显示边线</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="947"/>
+        <location filename="../common/src/ui/Actions.cpp" line="945"/>
         <source>Show All Entity Links</source>
         <translation>显示所有实体链接</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="956"/>
+        <location filename="../common/src/ui/Actions.cpp" line="954"/>
         <source>Show Transitively Selected Entity Links</source>
         <translation>显示传递选中的实体链接</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="965"/>
+        <location filename="../common/src/ui/Actions.cpp" line="963"/>
         <source>Show Directly Selected Entity Links</source>
         <translation>显示直接选中的实体链接</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="973"/>
+        <location filename="../common/src/ui/Actions.cpp" line="971"/>
         <source>Hide All Entity Links</source>
         <translation>隐藏所有实体链接</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="983"/>
+        <location filename="../common/src/ui/Actions.cpp" line="981"/>
         <source>Cycle View</source>
         <translation>循环视图</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="991"/>
+        <location filename="../common/src/ui/Actions.cpp" line="989"/>
         <source>Reset Camera Zoom</source>
         <translation>重置摄像机缩放</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="999"/>
+        <location filename="../common/src/ui/Actions.cpp" line="997"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1022"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1020"/>
         <source>New Document</source>
         <translation>新建地图</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1034"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1032"/>
         <source>Open Document...</source>
         <translation>打开地图...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1047"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1045"/>
         <source>Save Document</source>
         <translation>保存地图</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1055"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1053"/>
         <source>Save Document as...</source>
         <translation>另存地图为...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1065"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1063"/>
         <source>Wavefront OBJ...</source>
         <translation>Wavefront OBJ...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1073"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1071"/>
         <source>Map...</source>
         <translation>Map...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1079"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1077"/>
         <source>Exports the current map to a .map file. Layers marked Omit From Export will be omitted.</source>
         <translation>将当前地图导出为.map文件。标记为&quot;Omit From Export&quot;的图层将被忽略。</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1087"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1085"/>
         <source>Load Point File...</source>
         <translation>加载点文件...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1095"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1093"/>
         <source>Reload Point File</source>
         <translation>重新加载点文件</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1105"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1103"/>
         <source>Unload Point File</source>
         <translation>卸载点文件</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1116"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1114"/>
         <source>Load Portal File...</source>
         <translation>加载 Portal 文件...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1124"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1122"/>
         <source>Reload Portal File</source>
         <translation>重新加载门户文件</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1134"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1132"/>
         <source>Unload Portal File</source>
         <translation>卸载Portal文件</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1145"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1143"/>
         <source>Reload Texture Collections</source>
         <translation>重新加载纹理集</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1153"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1151"/>
         <source>Reload Entity Definitions</source>
         <translation>重新加载实体定义</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1162"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1160"/>
         <source>Revert Document</source>
         <translation>还原地图</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1168"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1166"/>
         <source>Discards any unsaved changes and reloads the map file.</source>
         <translation>放弃所有未保存的更改并重新加载地图文件。</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1172"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1170"/>
         <source>Close Document</source>
         <translation>关闭地图</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1186"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1184"/>
         <source>Undo</source>
         <translation>撤销</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1198"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1196"/>
         <source>Redo</source>
         <translation>重做</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1210"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1208"/>
         <source>Repeat Last Commands</source>
         <translation>重复上一条命令</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1218"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1216"/>
         <source>Clear Repeatable Commands</source>
         <translation>清除可重复命令</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1230"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1228"/>
         <source>Cut</source>
         <translation>剪切</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1242"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1240"/>
         <source>Copy</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1254"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1252"/>
         <source>Paste</source>
         <translation>粘贴</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1266"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1264"/>
         <source>Paste at Original Position</source>
         <translation>粘贴到原始位置</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1277"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1275"/>
         <source>Duplicate</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1288"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1286"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1305"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1303"/>
         <source>Select All</source>
         <translation>选择全部</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1315"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1313"/>
         <source>Select Siblings</source>
         <translation>选择同级对象</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1325"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1323"/>
         <source>Select Touching</source>
         <translation>选择接触的</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1335"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1333"/>
         <source>Select Inside</source>
         <translation>选择内部</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1345"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1343"/>
         <source>Select Tall</source>
         <translation>选择高</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1355"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1353"/>
         <source>Select by Line Number...</source>
         <translation>按行号选择...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1365"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1363"/>
         <source>Select Inverse</source>
         <translation>选择反选</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1375"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1373"/>
         <source>Select None</source>
         <translation>取消选择全部</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1386"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1384"/>
         <source>Group Selected Objects</source>
         <translation>群组选择对象</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1396"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1394"/>
         <source>Ungroup Selected Objects</source>
         <translation>取消所选对象的分组</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1408"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1406"/>
         <source>Create Linked Duplicate</source>
         <translation>创建链接副本</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1418"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1416"/>
         <source>Select Linked Groups</source>
         <translation>选择链接的组</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1428"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1426"/>
         <source>Separate Selected Groups</source>
         <translation>分离选定组</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1438"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1436"/>
         <source>Clear Protected Properties</source>
         <translation>清除受保护属性</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1450"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1448"/>
         <source>Flip Horizontally</source>
         <translation>水平翻转</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1461"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1459"/>
         <source>Flip Vertically</source>
         <translation>垂直翻转</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1472"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1470"/>
         <source>Move...</source>
         <translation>移动...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1485"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1483"/>
         <source>Brush Tool</source>
         <translation type="unfinished">Brush工具</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1499"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1497"/>
         <source>Clip Tool</source>
         <translation>剪切工具</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1513"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1511"/>
         <source>Rotate Tool</source>
         <translation>旋转工具</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1527"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1525"/>
         <source>Scale Tool</source>
         <translation>缩放工具</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1541"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1539"/>
         <source>Shear Tool</source>
         <translation>剪切工具</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1555"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1553"/>
         <source>Vertex Tool</source>
         <translation>顶点工具</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1569"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1567"/>
         <source>Edge Tool</source>
         <translation>边缘工具</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1583"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1581"/>
         <source>Face Tool</source>
         <translation>面工具</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1597"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1595"/>
         <source>Deactivate Current Tool</source>
         <translation>停用当前工具</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1611"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1609"/>
         <source>Convex Merge</source>
         <translation>凸面合并</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1621"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1619"/>
         <source>Subtract</source>
         <translation>减去</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1631"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1629"/>
         <source>Hollow</source>
         <translation>空心</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1641"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1639"/>
         <source>Intersect</source>
         <translation>相交</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1653"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1651"/>
         <source>Snap Vertices to Integer</source>
         <translation>将顶点对齐到整数坐标</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1663"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1661"/>
         <source>Snap Vertices to Grid</source>
         <translation>将顶点对齐到网格</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1674"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1672"/>
         <source>Texture Lock</source>
         <translation>纹理锁定</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1684"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1682"/>
         <source>UV Lock</source>
         <translation>UV锁定</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1695"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1693"/>
         <source>Replace Texture...</source>
         <translation>替换贴图...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1709"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1707"/>
         <source>Show Grid</source>
         <translation>显示网格</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1720"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1718"/>
         <source>Snap to Grid</source>
         <translation>对齐到网格</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1731"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1729"/>
         <source>Increase Grid Size</source>
         <translation>增大网格尺寸</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1741"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1739"/>
         <source>Decrease Grid Size</source>
         <translation>减小网格尺寸</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1752"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1750"/>
         <source>Set Grid Size 0.125</source>
         <translation>设置网格大小 0.125</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1763"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1761"/>
         <source>Set Grid Size 0.25</source>
         <translation>设置网格大小 0.25</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1774"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1772"/>
         <source>Set Grid Size 0.5</source>
         <translation>设置网格大小 0.5</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1785"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1783"/>
         <source>Set Grid Size 1</source>
         <translation>设置网格大小 1</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1796"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1794"/>
         <source>Set Grid Size 2</source>
         <translation>设置网格大小 2</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1807"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1805"/>
         <source>Set Grid Size 4</source>
         <translation>设置网格大小 4</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1818"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1816"/>
         <source>Set Grid Size 8</source>
         <translation>设置网格大小 8</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1829"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1827"/>
         <source>Set Grid Size 16</source>
         <translation>设置网格大小 16</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1840"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1838"/>
         <source>Set Grid Size 32</source>
         <translation>设置网格大小 32</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1851"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1849"/>
         <source>Set Grid Size 64</source>
         <translation>设置网格大小 64</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1862"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1860"/>
         <source>Set Grid Size 128</source>
         <translation>设置网格大小 128</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1873"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1871"/>
         <source>Set Grid Size 256</source>
         <translation>设置网格大小 256</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1886"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1884"/>
         <source>Move Camera to Next Point</source>
         <translation>移动摄像机到下一个点</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1896"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1894"/>
         <source>Move Camera to Previous Point</source>
         <translation>将摄像机移动到上一个点</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1906"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1904"/>
         <source>Reset 2D Cameras</source>
         <translation>重置2D摄像机</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1916"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1914"/>
         <source>Focus Camera on Selection</source>
         <translation>聚焦摄像机到选定对象</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1926"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1924"/>
         <source>Move Camera to...</source>
         <translation>移动摄像机至...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1936"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1934"/>
         <source>Isolate Selection</source>
         <translation>隔离选择</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1946"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1944"/>
         <source>Hide Selection</source>
         <translation>隐藏选择</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1956"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1954"/>
         <source>Show All</source>
         <translation>显示全部</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1965"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1963"/>
         <source>Show Map Inspector</source>
         <translation>显示地图检查器</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1973"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1971"/>
         <source>Show Entity Inspector</source>
         <translation>显示实体检查器</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1981"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1979"/>
         <source>Show Face Inspector</source>
         <translation>显示面检查器</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="1990"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1988"/>
         <source>Toggle Toolbar</source>
         <translation>切换工具栏</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2001"/>
+        <location filename="../common/src/ui/Actions.cpp" line="1999"/>
         <source>Toggle Info Panel</source>
         <translation>切换信息面板</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2012"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2010"/>
         <source>Toggle Inspector</source>
         <translation>切换检查器</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2023"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2021"/>
         <source>Maximize Current View</source>
         <translation>最大化当前视图</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2040"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2038"/>
         <source>Preferences...</source>
         <translation>首选项...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2056"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2054"/>
         <source>Compile Map...</source>
         <translation>编译地图...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2064"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2062"/>
         <source>Launch Engine...</source>
         <translation>启动引擎...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2078"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2076"/>
         <source>Print Vertices to Console</source>
         <translation>将顶点打印到控制台</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2086"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2084"/>
         <source>Create Brush...</source>
         <translation type="unfinished">创建Brush...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2094"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2092"/>
         <source>Create Cube...</source>
         <translation>创建立方体...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2102"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2100"/>
         <source>Clip Brush...</source>
         <translation>剪切Brush...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2110"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2108"/>
         <source>Crash...</source>
         <translation>崩溃...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2118"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2116"/>
         <source>Throw Exception During Command</source>
         <translation>命令执行期间抛出异常</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2126"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2124"/>
         <source>Show Crash Report Dialog...</source>
         <translation>显示崩溃报告对话框...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2137"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2135"/>
         <source>Set Window Size...</source>
         <translation>设置窗口大小...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2145"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2143"/>
         <source>Show Palette...</source>
         <translation>显示调色板...</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2159"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2157"/>
         <source>TrenchBroom Manual</source>
         <translation>《TrenchBroom 手册》</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/Actions.cpp" line="2170"/>
+        <location filename="../common/src/ui/Actions.cpp" line="2168"/>
         <source>About TrenchBroom</source>
         <translation>关于TrenchBroom</translation>
     </message>
@@ -1721,12 +1721,12 @@ Please create an issue report and upload all three files.</source>
 <context>
     <name>tb::ui::EntityDefinitionCheckBoxList</name>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="195"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="191"/>
         <source>Show all</source>
         <translation>显示全部</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="197"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="193"/>
         <source>Hide all</source>
         <translation>隐藏全部</translation>
     </message>
@@ -1796,18 +1796,17 @@ Please create an issue report and upload all three files.</source>
 <context>
     <name>tb::ui::EntityPropertyEditor</name>
     <message>
-        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="233"/>
-        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="262"/>
+        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="191"/>
         <source>Property &quot;%1&quot;</source>
         <translation>属性 &quot;%1&quot;</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="236"/>
+        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="194"/>
         <source> (%1)</source>
         <translation>(%1)</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="290"/>
+        <location filename="../common/src/ui/EntityPropertyEditor.cpp" line="231"/>
         <source>Class &quot;%1&quot;</source>
         <translation>类 &quot;%1&quot;</translation>
     </message>
@@ -2302,82 +2301,97 @@ Please choose a different file name to export to.</source>
 <context>
     <name>tb::ui::MapViewBase</name>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1211"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1217"/>
         <source>Merge Groups into %1</source>
         <translation>将群组合并至 %1</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1212"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1218"/>
         <source>Merge Groups</source>
         <translation>合并组</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1218"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1224"/>
         <source>Rename Groups</source>
         <translation>重命名组</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1224"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1231"/>
         <source>Add Objects to Group %1</source>
         <translation>将对象添加到组 %1</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1231"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1238"/>
         <source>Remove Objects from Group %1</source>
         <translation>从组 %1 中移除对象</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1249"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1256"/>
         <source>Move to Layer</source>
         <translation>移至图层</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1269"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1276"/>
         <source>Make Layer %1 Active</source>
         <translation>将图层 %1 设为活动状态</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1276"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1283"/>
         <source>Make Layer Active</source>
         <translation>激活图层</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1292"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1299"/>
         <source>Hide Layers</source>
         <translation>隐藏图层</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1295"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1302"/>
         <source>Isolate Layers</source>
         <translation>隔离图层</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1297"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1304"/>
         <source>Select All in Layers</source>
         <translation>选择图层中的所有内容</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1308"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1315"/>
         <source>Make Structural</source>
         <translation>创建结构体</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1322"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1329"/>
         <source>Move Brushes to Entity %1</source>
         <translation>将Brush转为实体 %1</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1338"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1345"/>
         <source>Reveal %1 in Material Browser</source>
         <translation>在材质浏览器中显示 %1</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1414"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1386"/>
+        <source>Set as Entity Template</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1390"/>
+        <source>Set %1 as Entity Template</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1400"/>
+        <source>Apply Entity Template (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1470"/>
         <source>Create Point Entity</source>
         <translation>创建点实体</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MapViewBase.cpp" line="1417"/>
+        <location filename="../common/src/ui/MapViewBase.cpp" line="1473"/>
         <source>Create Brush Entity</source>
         <translation>创建Brush实体</translation>
     </message>
@@ -2385,50 +2399,65 @@ Please choose a different file name to export to.</source>
 <context>
     <name>tb::ui::MaterialBrowser</name>
     <message>
-        <location filename="../common/src/ui/MaterialBrowser.cpp" line="125"/>
+        <location filename="../common/src/ui/MaterialBrowser.cpp" line="127"/>
         <source>Name</source>
         <translation>名称</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MaterialBrowser.cpp" line="126"/>
+        <location filename="../common/src/ui/MaterialBrowser.cpp" line="128"/>
         <source>Usage</source>
         <translation>用法</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MaterialBrowser.cpp" line="128"/>
+        <location filename="../common/src/ui/MaterialBrowser.cpp" line="130"/>
         <source>Select ordering criterion</source>
         <translation>选择排序标准</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MaterialBrowser.cpp" line="136"/>
+        <location filename="../common/src/ui/MaterialBrowser.cpp" line="138"/>
         <source>Group</source>
         <translation>组</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MaterialBrowser.cpp" line="137"/>
+        <location filename="../common/src/ui/MaterialBrowser.cpp" line="139"/>
         <source>Group materials by material collection</source>
         <translation>按材质集合分组材质</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MaterialBrowser.cpp" line="143"/>
+        <location filename="../common/src/ui/MaterialBrowser.cpp" line="145"/>
         <source>Used</source>
         <translation>已使用</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MaterialBrowser.cpp" line="144"/>
+        <location filename="../common/src/ui/MaterialBrowser.cpp" line="146"/>
         <source>Only show materials currently in use</source>
         <translation>仅显示当前使用的材质</translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/MaterialBrowser.cpp" line="158"/>
+        <source>Adjust material preview size</source>
+        <translation>调整材质预览大小</translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/MaterialBrowser.cpp" line="189"/>
+        <source>Size:</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>tb::ui::MaterialBrowserView</name>
     <message>
-        <location filename="../common/src/ui/MaterialBrowserView.cpp" line="456"/>
+        <location filename="../common/src/ui/MaterialBrowserView.cpp" line="560"/>
+        <source>Copy Material Name</source>
+        <translation>复制材质名称</translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/MaterialBrowserView.cpp" line="566"/>
         <source>Select Faces</source>
         <translation>选择面</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/MaterialBrowserView.cpp" line="461"/>
+        <location filename="../common/src/ui/MaterialBrowserView.cpp" line="571"/>
         <source>Select Brushes</source>
         <translation>选择Brush</translation>
     </message>
@@ -2586,42 +2615,77 @@ Please choose a different file name to export to.</source>
 <context>
     <name>tb::ui::RotateObjectsToolPage</name>
     <message>
-        <location filename="../common/src/ui/RotateObjectsToolPage.cpp" line="82"/>
+        <source>Center</source>
+        <translation type="vanished">中心</translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation type="vanished">重置</translation>
+    </message>
+    <message>
+        <source>Reset the position of the rotate handle to the center of the current selection.</source>
+        <translation type="vanished">将旋转手柄的位置重置到当前选择中心。</translation>
+    </message>
+    <message>
+        <source>Rotate objects</source>
+        <translation type="vanished">旋转物体</translation>
+    </message>
+    <message>
+        <source>degs about</source>
+        <translation type="vanished">围绕</translation>
+    </message>
+    <message>
+        <source>axis</source>
+        <translation type="vanished">轴</translation>
+    </message>
+    <message>
+        <source>Apply</source>
+        <translation type="vanished">应用</translation>
+    </message>
+    <message>
+        <source>Update entity properties</source>
+        <translation type="vanished">更新实体属性</translation>
+    </message>
+</context>
+<context>
+    <name>tb::ui::RotateToolPage</name>
+    <message>
+        <location filename="../common/src/ui/RotateToolPage.cpp" line="82"/>
         <source>Center</source>
         <translation>中心</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/RotateObjectsToolPage.cpp" line="87"/>
+        <location filename="../common/src/ui/RotateToolPage.cpp" line="87"/>
         <source>Reset</source>
         <translation>重置</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/RotateObjectsToolPage.cpp" line="88"/>
+        <location filename="../common/src/ui/RotateToolPage.cpp" line="88"/>
         <source>Reset the position of the rotate handle to the center of the current selection.</source>
         <translation>将旋转手柄的位置重置到当前选择中心。</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/RotateObjectsToolPage.cpp" line="91"/>
+        <location filename="../common/src/ui/RotateToolPage.cpp" line="91"/>
         <source>Rotate objects</source>
         <translation>旋转物体</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/RotateObjectsToolPage.cpp" line="92"/>
+        <location filename="../common/src/ui/RotateToolPage.cpp" line="92"/>
         <source>degs about</source>
         <translation>围绕</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/RotateObjectsToolPage.cpp" line="93"/>
+        <location filename="../common/src/ui/RotateToolPage.cpp" line="93"/>
         <source>axis</source>
         <translation>轴</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/RotateObjectsToolPage.cpp" line="104"/>
+        <location filename="../common/src/ui/RotateToolPage.cpp" line="104"/>
         <source>Apply</source>
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/RotateObjectsToolPage.cpp" line="107"/>
+        <location filename="../common/src/ui/RotateToolPage.cpp" line="107"/>
         <source>Update entity properties</source>
         <translation>更新实体属性</translation>
     </message>
@@ -2629,24 +2693,43 @@ Please choose a different file name to export to.</source>
 <context>
     <name>tb::ui::ScaleObjectsToolPage</name>
     <message>
-        <location filename="../common/src/ui/ScaleObjectsToolPage.cpp" line="77"/>
         <source>Scale objects</source>
-        <translation>缩放对象</translation>
+        <translation type="vanished">缩放对象</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ScaleObjectsToolPage.cpp" line="91"/>
         <source>to size</source>
-        <translation>调整大小</translation>
+        <translation type="vanished">调整大小</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ScaleObjectsToolPage.cpp" line="92"/>
         <source>by factors</source>
-        <translation>按比例</translation>
+        <translation type="vanished">按比例</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ScaleObjectsToolPage.cpp" line="101"/>
         <source>Apply</source>
-        <translation>应用</translation>
+        <translation type="vanished">应用</translation>
+    </message>
+</context>
+<context>
+    <name>tb::ui::ScaleToolPage</name>
+    <message>
+        <location filename="../common/src/ui/ScaleToolPage.cpp" line="76"/>
+        <source>Scale objects</source>
+        <translation type="unfinished">缩放对象</translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/ScaleToolPage.cpp" line="88"/>
+        <source>to size</source>
+        <translation type="unfinished">调整大小</translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/ScaleToolPage.cpp" line="89"/>
+        <source>by factors</source>
+        <translation type="unfinished">按比例</translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/ScaleToolPage.cpp" line="98"/>
+        <source>Apply</source>
+        <translation type="unfinished">应用</translation>
     </message>
 </context>
 <context>
@@ -2660,19 +2743,64 @@ Please choose a different file name to export to.</source>
 <context>
     <name>tb::ui::SmartColorEditor</name>
     <message>
-        <location filename="../common/src/ui/SmartColorEditor.cpp" line="120"/>
         <source>Color range</source>
-        <translation>色彩范围</translation>
+        <translation type="vanished">色彩范围</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/SmartColorEditor.cpp" line="123"/>
         <source>Float [0,1]</source>
-        <translation>浮点数 [0,1]</translation>
+        <translation type="vanished">浮点数 [0,1]</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/SmartColorEditor.cpp" line="124"/>
         <source>Byte [0,255]</source>
-        <translation>字节 [0,255]</translation>
+        <translation type="vanished">字节 [0,255]</translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/SmartColorEditor.cpp" line="197"/>
+        <source>Color:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/SmartColorEditor.cpp" line="201"/>
+        <source>Brightness:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/SmartColorEditor.cpp" line="205"/>
+        <source>Hidden Control</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/SmartColorEditor.cpp" line="217"/>
+        <source>200</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/SmartColorEditor.cpp" line="225"/>
+        <source>Double-click to edit brightness value</source>
+        <translation>双击更改亮度值</translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/SmartColorEditor.cpp" line="432"/>
+        <source>Enter Brightness Value</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/SmartColorEditor.cpp" line="433"/>
+        <source>Brightness (0-10000):</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>tb::ui::SmartModelEditor</name>
+    <message>
+        <location filename="../common/src/ui/SmartModelEditor.cpp" line="76"/>
+        <source>Load Model File</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../common/src/ui/SmartModelEditor.cpp" line="78"/>
+        <source>Model files (*.mdl);;All files (*.*)</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -2699,12 +2827,12 @@ Please choose a different file name to export to.</source>
 <context>
     <name>tb::ui::TrenchBroomApp</name>
     <message>
-        <location filename="../common/src/TrenchBroomApp.cpp" line="312"/>
+        <location filename="../common/src/TrenchBroomApp.cpp" line="307"/>
         <source>TrenchBroom can check for updates automatically. Would you like to enable this now?</source>
         <translation>TrenchBroom可以自动检查更新。您希望现在启用此功能吗？</translation>
     </message>
     <message>
-        <location filename="../common/src/TrenchBroomApp.cpp" line="620"/>
+        <location filename="../common/src/TrenchBroomApp.cpp" line="615"/>
         <source>Open Map</source>
         <translation>打开地图</translation>
     </message>
@@ -2762,67 +2890,67 @@ They may contain new features or bug fixes that are not yet part of a stable rel
 <context>
     <name>tb::ui::ViewEditor</name>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="320"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="316"/>
         <source>Show entity classnames</source>
         <translation>显示实体类名</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="321"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="317"/>
         <source>Show group bounds and names</source>
         <translation>显示组边界和名称</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="322"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="318"/>
         <source>Show brush entity bounds</source>
         <translation>显示Brush实体边界</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="323"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="319"/>
         <source>Show point entity bounds</source>
         <translation>显示点实体边界</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="325"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="321"/>
         <source>Show point entities</source>
         <translation>显示点实体</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="326"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="322"/>
         <source>Show point entity models</source>
         <translation>显示点实体模型</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="379"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="375"/>
         <source>Show brushes</source>
         <translation>显示Brush</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="410"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="406"/>
         <source>No tags found</source>
         <translation>未找到标签</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="470"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="466"/>
         <source>Shade faces</source>
         <translation>着色面</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="471"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="467"/>
         <source>Use fog</source>
         <translation>使用雾效</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="472"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="468"/>
         <source>Show edges</source>
         <translation>显示边线</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="492"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="488"/>
         <source>Show soft bounds</source>
         <translation>显示软边界</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="494"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="490"/>
         <source>Restore Defaults</source>
         <translation>恢复默认值</translation>
     </message>
@@ -2830,12 +2958,12 @@ They may contain new features or bug fixes that are not yet part of a stable rel
 <context>
     <name>tb::ui::ViewPopupEditor</name>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="737"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="733"/>
         <source>View Options</source>
         <translation>视图选项</translation>
     </message>
     <message>
-        <location filename="../common/src/ui/ViewEditor.cpp" line="738"/>
+        <location filename="../common/src/ui/ViewEditor.cpp" line="734"/>
         <source>Click to edit view settings</source>
         <translation>点击编辑视图设置</translation>
     </message>

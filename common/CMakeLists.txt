@@ -424,13 +424,13 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/ReparentNodesCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/RepeatStack.cpp
         ${COMMON_SOURCE_DIR}/ui/ReplaceMaterialDialog.cpp
-        ${COMMON_SOURCE_DIR}/ui/RotateObjectsHandle.cpp
-        ${COMMON_SOURCE_DIR}/ui/RotateObjectsTool.cpp
-        ${COMMON_SOURCE_DIR}/ui/RotateObjectsToolController.cpp
-        ${COMMON_SOURCE_DIR}/ui/RotateObjectsToolPage.cpp
-        ${COMMON_SOURCE_DIR}/ui/ScaleObjectsTool.cpp
-        ${COMMON_SOURCE_DIR}/ui/ScaleObjectsToolController.cpp
-        ${COMMON_SOURCE_DIR}/ui/ScaleObjectsToolPage.cpp
+        ${COMMON_SOURCE_DIR}/ui/RotateHandle.cpp
+        ${COMMON_SOURCE_DIR}/ui/RotateTool.cpp
+        ${COMMON_SOURCE_DIR}/ui/RotateToolController.cpp
+        ${COMMON_SOURCE_DIR}/ui/RotateToolPage.cpp
+        ${COMMON_SOURCE_DIR}/ui/ScaleTool.cpp
+        ${COMMON_SOURCE_DIR}/ui/ScaleToolController.cpp
+        ${COMMON_SOURCE_DIR}/ui/ScaleToolPage.cpp
         ${COMMON_SOURCE_DIR}/ui/Selection.cpp
         ${COMMON_SOURCE_DIR}/ui/SelectionCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/SelectionTool.cpp
@@ -439,18 +439,18 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/SetLinkIdsCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/SetLockStateCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/SetVisibilityCommand.cpp
-        ${COMMON_SOURCE_DIR}/ui/ShearObjectsTool.cpp
-        ${COMMON_SOURCE_DIR}/ui/ShearObjectsToolController.cpp
+        ${COMMON_SOURCE_DIR}/ui/ShearTool.cpp
+        ${COMMON_SOURCE_DIR}/ui/ShearToolController.cpp
         ${COMMON_SOURCE_DIR}/ui/SignalDelayer.cpp
         ${COMMON_SOURCE_DIR}/ui/SliderWithLabel.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartChoiceEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartColorEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartDefaultPropertyEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartFlagsEditor.cpp
-        ${COMMON_SOURCE_DIR}/ui/SmartFileBrowserEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditorManager.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartWadEditor.cpp
+        ${COMMON_SOURCE_DIR}/ui/SmartModelEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SpinControl.cpp
         ${COMMON_SOURCE_DIR}/ui/Splitter.cpp
         ${COMMON_SOURCE_DIR}/ui/SwapNodeContentsCommand.cpp
@@ -475,6 +475,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsHelper.cpp
         ${COMMON_SOURCE_DIR}/ui/UpdateConfig.cpp
         ${COMMON_SOURCE_DIR}/ui/UpdatePreferencePane.cpp
+        ${COMMON_SOURCE_DIR}/ui/MiscPreferencePane.cpp
         ${COMMON_SOURCE_DIR}/ui/UpdateVersion.cpp
         ${COMMON_SOURCE_DIR}/ui/UVCameraTool.cpp
         ${COMMON_SOURCE_DIR}/ui/UVEditor.cpp
@@ -624,6 +625,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/EntityDefinitionFileSpec.h
         ${COMMON_SOURCE_DIR}/mdl/EntityDefinitionGroup.h
         ${COMMON_SOURCE_DIR}/mdl/EntityDefinitionManager.h
+        ${COMMON_SOURCE_DIR}/mdl/EntityDefinitionUtils.h
         ${COMMON_SOURCE_DIR}/mdl/EntityModel_Forward.h
         ${COMMON_SOURCE_DIR}/mdl/EntityModel.h
         ${COMMON_SOURCE_DIR}/mdl/EntityModelDataResource.h
@@ -969,13 +971,13 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/ReparentNodesCommand.h
         ${COMMON_SOURCE_DIR}/ui/RepeatStack.h
         ${COMMON_SOURCE_DIR}/ui/ReplaceMaterialDialog.h
-        ${COMMON_SOURCE_DIR}/ui/RotateObjectsHandle.h
-        ${COMMON_SOURCE_DIR}/ui/RotateObjectsTool.h
-        ${COMMON_SOURCE_DIR}/ui/RotateObjectsToolController.h
-        ${COMMON_SOURCE_DIR}/ui/RotateObjectsToolPage.h
-        ${COMMON_SOURCE_DIR}/ui/ScaleObjectsTool.h
-        ${COMMON_SOURCE_DIR}/ui/ScaleObjectsToolController.h
-        ${COMMON_SOURCE_DIR}/ui/ScaleObjectsToolPage.h
+        ${COMMON_SOURCE_DIR}/ui/RotateHandle.h
+        ${COMMON_SOURCE_DIR}/ui/RotateTool.h
+        ${COMMON_SOURCE_DIR}/ui/RotateToolController.h
+        ${COMMON_SOURCE_DIR}/ui/RotateToolPage.h
+        ${COMMON_SOURCE_DIR}/ui/ScaleTool.h
+        ${COMMON_SOURCE_DIR}/ui/ScaleToolController.h
+        ${COMMON_SOURCE_DIR}/ui/ScaleToolPage.h
         ${COMMON_SOURCE_DIR}/ui/Selection.h
         ${COMMON_SOURCE_DIR}/ui/SelectionCommand.h
         ${COMMON_SOURCE_DIR}/ui/SelectionTool.h
@@ -984,18 +986,18 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/SetLinkIdsCommand.h
         ${COMMON_SOURCE_DIR}/ui/SetLockStateCommand.h
         ${COMMON_SOURCE_DIR}/ui/SetVisibilityCommand.h
-        ${COMMON_SOURCE_DIR}/ui/ShearObjectsTool.h
-        ${COMMON_SOURCE_DIR}/ui/ShearObjectsToolController.h
+        ${COMMON_SOURCE_DIR}/ui/ShearTool.h
+        ${COMMON_SOURCE_DIR}/ui/ShearToolController.h
         ${COMMON_SOURCE_DIR}/ui/SignalDelayer.h
         ${COMMON_SOURCE_DIR}/ui/SliderWithLabel.h
         ${COMMON_SOURCE_DIR}/ui/SmartChoiceEditor.h
         ${COMMON_SOURCE_DIR}/ui/SmartColorEditor.h
         ${COMMON_SOURCE_DIR}/ui/SmartDefaultPropertyEditor.h
         ${COMMON_SOURCE_DIR}/ui/SmartFlagsEditor.h
-        ${COMMON_SOURCE_DIR}/ui/SmartFileBrowserEditor.h
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditor.h
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditorManager.h
         ${COMMON_SOURCE_DIR}/ui/SmartWadEditor.h
+        ${COMMON_SOURCE_DIR}/ui/SmartModelEditor.h
         ${COMMON_SOURCE_DIR}/ui/SpinControl.h
         ${COMMON_SOURCE_DIR}/ui/Splitter.h
         ${COMMON_SOURCE_DIR}/ui/SwapNodeContentsCommand.h
@@ -1021,6 +1023,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsHelper.h
         ${COMMON_SOURCE_DIR}/ui/UpdateConfig.h
         ${COMMON_SOURCE_DIR}/ui/UpdatePreferencePane.h
+        ${COMMON_SOURCE_DIR}/ui/MiscPreferencePane.h
         ${COMMON_SOURCE_DIR}/ui/UpdateVersion.h
         ${COMMON_SOURCE_DIR}/ui/UVCameraTool.h
         ${COMMON_SOURCE_DIR}/ui/UVEditor.h
