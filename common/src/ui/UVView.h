@@ -28,6 +28,8 @@
 #include "ui/ToolBoxConnector.h"
 #include "ui/UVViewHelper.h"
 
+#include <QMenu>
+
 #include <filesystem>
 #include <memory>
 #include <vector>
@@ -114,6 +116,8 @@ private:
     render::RenderContext& renderContext, render::RenderBatch& renderBatch);
   void renderToolBox(
     render::RenderContext& renderContext, render::RenderBatch& renderBatch);
+    
+  void doShowPopupMenu() override;
 
 public: // implement InputEventProcessor interface
   void processEvent(const KeyEvent& event) override;

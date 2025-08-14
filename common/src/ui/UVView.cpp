@@ -49,6 +49,12 @@
 
 #include "kdl/memory_utils.h"
 
+#include <QApplication>
+#include <QClipboard>
+#include <QContextMenuEvent>
+#include <QCursor>
+#include <QMenu>
+
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -427,6 +433,48 @@ mdl::PickResult UVView::pick(const vm::ray3d& pickRay) const
     }
   }
   return pickResult;
+}
+
+void UVView::doShowPopupMenu()
+{
+  if (!m_helper.valid())
+  {
+    return;
+  }
+
+  const mdl::Material* material = m_helper.material();
+  if (!material)
+  {
+    return;
+  }
+
+  QMenu menu{this};
+  
+  menu.addAction(tr("Select Faces with Material"), this, [this, material]() {
+    auto document = kdl::mem_lock(m_document);
+    document->selectFacesWithMaterial(material);
+  });
+  
+  menu.addAction(tr("Select Faces with Material in Selected Brushes"), this, [this, material]() {
+    auto document = kdl::mem_lock(m_document);
+    document->selectFacesWithMaterialInSelectedBrushes(material);
+  });
+
+  menu.addAction(tr("Select Brushes with Material"), this, [this, material]() {
+    auto document = kdl::mem_lock(m_document);
+    document->selectBrushesWithMaterial(material);
+  });
+
+  menu.addSeparator();
+  
+  menu.addAction(tr("Copy Material Name"), this, [material]() {
+    QClipboard* clipboard = QApplication::clipboard();
+    clipboard->setText(QString::fromStdString(material->name()));
+  });
+
+  // Show the menu at the current cursor position
+  QPoint pos = QCursor::pos();
+  menu.exec(pos);
 }
 
 } // namespace tb::ui

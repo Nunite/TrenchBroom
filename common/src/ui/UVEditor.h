@@ -22,10 +22,13 @@
 #include <QWidget>
 
 #include "NotifierConnection.h"
+#include "mdl/BrushFace.h"
+#include "mdl/Material.h"
 
 #include <memory>
 
 class QSpinBox;
+class QComboBox;
 class QWidget;
 class QAbstractButton;
 
@@ -45,6 +48,7 @@ private:
   UVView* m_uvView = nullptr;
   QSpinBox* m_xSubDivisionEditor = nullptr;
   QSpinBox* m_ySubDivisionEditor = nullptr;
+  QComboBox* m_materialOperationComboBox = nullptr;
 
   QAbstractButton* m_resetUVButton = nullptr;
   QAbstractButton* m_resetUVToWorldButton = nullptr;
@@ -80,6 +84,7 @@ private:
   void rotateUVCCWClicked();
   void rotateUVCWClicked();
   void subDivisionChanged();
+  void materialOperationChanged(int index);
 };
 
 } // namespace tb::ui

@@ -22,7 +22,10 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QSpinBox>
+#include <QComboBox>
 #include <QToolButton>
+#include <QApplication>
+#include <QClipboard>
 #include <QtGlobal>
 
 #include "mdl/ChangeBrushFaceAttributesRequest.h"
@@ -90,6 +93,15 @@ void UVEditor::createGui(GLContextManager& contextManager)
   connect(
     m_rotateUVCWButton, &QAbstractButton::clicked, this, &UVEditor::rotateUVCWClicked);
 
+  // Create material operation combo box
+  m_materialOperationComboBox = new QComboBox{};
+  m_materialOperationComboBox->addItem(tr("Material Operations"));
+  m_materialOperationComboBox->addItem(tr("Select Faces with Material"));
+  m_materialOperationComboBox->addItem(tr("Select Faces with Material in Selected Brushes"));
+  m_materialOperationComboBox->addItem(tr("Select Brushes with Material"));
+  m_materialOperationComboBox->addItem(tr("Copy Material Name"));
+  connect(m_materialOperationComboBox, QOverload<int>::of(&QComboBox::activated), this, &UVEditor::materialOperationChanged);
+
   auto* gridLabel = new QLabel{"Grid "};
   makeEmphasized(gridLabel);
   m_xSubDivisionEditor = new QSpinBox{};
@@ -121,6 +133,7 @@ void UVEditor::createGui(GLContextManager& contextManager)
   bottomLayout->addWidget(m_flipVAxisButton);
   bottomLayout->addWidget(m_rotateUVCCWButton);
   bottomLayout->addWidget(m_rotateUVCWButton);
+  bottomLayout->addWidget(m_materialOperationComboBox);
   bottomLayout->addStretch();
   bottomLayout->addWidget(gridLabel);
   bottomLayout->addWidget(new QLabel{"X:"});
@@ -211,6 +224,41 @@ void UVEditor::subDivisionChanged()
   const auto x = m_xSubDivisionEditor->value();
   const auto y = m_ySubDivisionEditor->value();
   m_uvView->setSubDivisions(vm::vec2i(x, y));
+}
+
+void UVEditor::materialOperationChanged(int index)
+{
+  // Reset combo box to default selection after operation
+  m_materialOperationComboBox->setCurrentIndex(0);
+  
+  auto document = kdl::mem_lock(m_document);
+  if (!document->allSelectedBrushFaces().empty())
+  {
+    const mdl::BrushFace& face = document->allSelectedBrushFaces().front().face();
+    const mdl::Material* material = face.material();
+    
+    if (material)
+    {
+      switch (index)
+      {
+        case 1: // Select Faces with Material
+          document->selectFacesWithMaterial(material);
+          break;
+        case 2: // Select Faces with Material in Selected Brushes
+          document->selectFacesWithMaterialInSelectedBrushes(material);
+          break;
+        case 3: // Select Brushes with Material
+          document->selectBrushesWithMaterial(material);
+          break;
+        case 4: // Copy Material Name
+          {
+            QClipboard* clipboard = QApplication::clipboard();
+            clipboard->setText(QString::fromStdString(material->name()));
+          }
+          break;
+      }
+    }
+  }
 }
 
 } // namespace tb::ui
