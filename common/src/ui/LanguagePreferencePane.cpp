@@ -1,21 +1,4 @@
-/*
- Copyright (C) 2023 Kristian Duske
-
- This file is part of TrenchBroom.
-
- TrenchBroom is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
-
- TrenchBroom is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License
- along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
- */
+//Added by Lws
 
 #include "LanguagePreferencePane.h"
 
@@ -43,8 +26,8 @@ LanguagePreferencePane::LanguagePreferencePane(QWidget* parent)
 
 void LanguagePreferencePane::createGui()
 {
-  auto* langLabel = new QLabel(tr("界面语言 (UI Language)"));
-  langLabel->setToolTip(tr("选择应用程序界面显示的语言，更改后需要重启应用程序生效"));
+  auto* langLabel = new QLabel(tr("UI Language"));
+  langLabel->setToolTip(tr("Select the display language for the application interface. Changes will take effect after restarting the application"));
 
   m_englishRadioButton = new QRadioButton(Preferences::languageEnglish());
   m_chineseRadioButton = new QRadioButton(Preferences::languageChinese());
@@ -61,11 +44,7 @@ void LanguagePreferencePane::createGui()
     emit languageChanged();
     
     // 显示需要重启的提示
-    QMessageBox::information(
-      this,
-      tr("需要重启"),
-      tr("语言设置将在重启应用程序后生效"),
-      QMessageBox::Ok);
+    showRestartRequiredMessage();
   });
   
   connect(m_chineseRadioButton, &QRadioButton::clicked, this, [this]() {
@@ -76,11 +55,7 @@ void LanguagePreferencePane::createGui()
     emit languageChanged();
     
     // 显示需要重启的提示
-    QMessageBox::information(
-      this,
-      tr("需要重启"),
-      tr("语言设置将在重启应用程序后生效"),
-      QMessageBox::Ok);
+    showRestartRequiredMessage();
   });
 
   auto* languageLayout = new QVBoxLayout();
@@ -89,7 +64,8 @@ void LanguagePreferencePane::createGui()
   languageLayout->addWidget(m_englishRadioButton);
   languageLayout->addWidget(m_chineseRadioButton);
   
-  auto* languageGroupBox = new QGroupBox(tr("语言"));
+  auto* languageGroupBox = new QGroupBox(tr("Language"));
+
   languageGroupBox->setLayout(languageLayout);
   
   auto* layout = new QVBoxLayout();
@@ -129,4 +105,13 @@ bool LanguagePreferencePane::validate()
   return true;
 }
 
-} // namespace tb::ui 
+void LanguagePreferencePane::showRestartRequiredMessage()
+{
+  QMessageBox::information(
+    this,
+    tr("Restart Required"),
+    tr("Language settings will take effect after restarting the application"),
+    QMessageBox::Ok);
+}
+
+} // namespace tb::ui
