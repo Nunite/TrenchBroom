@@ -6,6 +6,7 @@ on:
     branches:
       - master
       - dev
+      - better_extrude
   pull_request:
 
 name: CI
