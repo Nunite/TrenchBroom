@@ -299,7 +299,6 @@ void ToolBox::deactivateAllTools()
   while (!m_modalToolStack.empty())
   {
     deactivateTool(*m_modalToolStack.back());
-\
   }
 }
 

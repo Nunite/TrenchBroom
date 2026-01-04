@@ -651,6 +651,7 @@ void MapViewBase::createPointEntity()
 {
   auto* action = qobject_cast<const QAction*>(sender());
   auto document = kdl::mem_lock(m_document);
+
   const auto classname = action->data().toString().toStdString();
   if (const auto* definition = document->entityDefinitionManager().definition(classname))
   {
@@ -667,6 +668,7 @@ void MapViewBase::createBrushEntity()
 {
   auto* action = qobject_cast<const QAction*>(sender());
   auto document = kdl::mem_lock(m_document);
+
   const auto classname = action->data().toString().toStdString();
   if (const auto* definition = document->entityDefinitionManager().definition(classname))
   {
