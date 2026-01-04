@@ -309,7 +309,7 @@ void SmartColorEditor::updateColorHistory()
 
   // 获取当前选中实体的颜色
   const auto selectedColors =
-    collectColors(document()->allSelectedEntityNodes(), propertyKey());
+    collectColors(document()->selection().allEntities(), propertyKey());
     
   // 更新历史中的选择
   m_colorHistory->setSelection(selectedColors);
@@ -318,9 +318,9 @@ void SmartColorEditor::updateColorHistory()
   m_currentColor = !selectedColors.empty() ? selectedColors.back() : QColor(Qt::black);
   
   // 如果当前选中的属性值包含RGB值，解析并设置
-  if (!document()->allSelectedEntityNodes().empty()) {
-    const auto* node = document()->allSelectedEntityNodes().front();
-    if (const auto* value = node->entity().property(propertyKey())) {
+  if (!document()->selection().allEntities().empty()) {
+    const auto* entity = document()->selection().allEntities().front();
+    if (const auto* value = entity->entity().property(propertyKey())) {
       // 解析RGB值
       auto components = splitString(*value);
       if (components.size() >= 3) {

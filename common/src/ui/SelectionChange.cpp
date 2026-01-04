@@ -17,39 +17,13 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "PushSelection.h"
+#include "SelectionChange.h"
 
-#include "mdl/MapFacade.h"
-#include "mdl/Selection.h"
+#include "kdl/reflection_impl.h"
 
-#include <cassert>
-
-namespace tb::mdl
+namespace tb::ui
 {
 
-PushSelection::PushSelection(MapFacade* facade)
-  : PushSelection{*facade}
-{
-}
+kdl_reflect_impl(SelectionChange);
 
-PushSelection::PushSelection(MapFacade& facade)
-  : m_facade{facade}
-  , m_nodes{m_facade.selection().nodes}
-  , m_faces{m_facade.selection().brushFaces}
-{
-}
-
-PushSelection::~PushSelection()
-{
-  m_facade.deselectAll();
-  if (!m_nodes.empty() && m_facade.selection().nodes != m_nodes)
-  {
-    m_facade.selectNodes(m_nodes);
-  }
-  else if (!m_faces.empty() && m_facade.selection().brushFaces != m_faces)
-  {
-    m_facade.selectBrushFaces(m_faces);
-  }
-}
-
-} // namespace tb::mdl
+} // namespace tb::ui

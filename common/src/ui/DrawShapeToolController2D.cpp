@@ -266,7 +266,7 @@ std::unique_ptr<GestureTracker> DrawShapeToolController2D::acceptMouseDrag(
     }
 
     auto document = kdl::mem_lock(m_document);
-    if (document->hasSelection())
+    if (document->selection().hasAny())
     {
       return nullptr;
     }
@@ -300,6 +300,10 @@ std::unique_ptr<GestureTracker> DrawShapeToolController2D::handleBoxSelection(
   }
   
   auto document = kdl::mem_lock(m_document);
+  if (document->selection().hasAny())
+  {
+    return nullptr;
+  }
   
   // 使用位于BoxSelectionTool.cpp中实现的框选工具
   const auto& bounds = document->referenceBounds();

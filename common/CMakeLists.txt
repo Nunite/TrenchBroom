@@ -161,7 +161,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/ModelSpecification.cpp
         ${COMMON_SOURCE_DIR}/mdl/ModelUtils.cpp
         ${COMMON_SOURCE_DIR}/mdl/Node.cpp
-        ${COMMON_SOURCE_DIR}/mdl/NodeCollection.cpp
         ${COMMON_SOURCE_DIR}/mdl/NodeContents.cpp
         ${COMMON_SOURCE_DIR}/mdl/NodeVisitor.cpp
         ${COMMON_SOURCE_DIR}/mdl/NonIntegerVerticesValidator.cpp
@@ -180,6 +179,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/PropertyValueWithDoubleQuotationMarksValidator.cpp
         ${COMMON_SOURCE_DIR}/mdl/PushSelection.cpp
         ${COMMON_SOURCE_DIR}/mdl/Quake3Shader.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Selection.cpp
         ${COMMON_SOURCE_DIR}/mdl/SoftMapBoundsValidator.cpp
         ${COMMON_SOURCE_DIR}/mdl/Tag.cpp
         ${COMMON_SOURCE_DIR}/mdl/TagAttribute.cpp
@@ -431,7 +431,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/ScaleTool.cpp
         ${COMMON_SOURCE_DIR}/ui/ScaleToolController.cpp
         ${COMMON_SOURCE_DIR}/ui/ScaleToolPage.cpp
-        ${COMMON_SOURCE_DIR}/ui/Selection.cpp
+        ${COMMON_SOURCE_DIR}/ui/SelectionChange.cpp
         ${COMMON_SOURCE_DIR}/ui/SelectionCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/SelectionTool.cpp
         ${COMMON_SOURCE_DIR}/ui/SetBrushFaceAttributesTool.cpp
@@ -676,7 +676,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/ModelSpecification.h
         ${COMMON_SOURCE_DIR}/mdl/ModelUtils.h
         ${COMMON_SOURCE_DIR}/mdl/Node.h
-        ${COMMON_SOURCE_DIR}/mdl/NodeCollection.h
         ${COMMON_SOURCE_DIR}/mdl/NodeContents.h
         ${COMMON_SOURCE_DIR}/mdl/NodeQueries.h
         ${COMMON_SOURCE_DIR}/mdl/NodeVisitor.h
@@ -713,6 +712,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/PushSelection.h
         ${COMMON_SOURCE_DIR}/mdl/Quake3Shader.h
         ${COMMON_SOURCE_DIR}/mdl/Resource.h
+        ${COMMON_SOURCE_DIR}/mdl/Selection.h
         ${COMMON_SOURCE_DIR}/mdl/SoftMapBoundsValidator.h
         ${COMMON_SOURCE_DIR}/mdl/Tag.h
         ${COMMON_SOURCE_DIR}/mdl/TagAttribute.h
@@ -978,7 +978,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/ScaleTool.h
         ${COMMON_SOURCE_DIR}/ui/ScaleToolController.h
         ${COMMON_SOURCE_DIR}/ui/ScaleToolPage.h
-        ${COMMON_SOURCE_DIR}/ui/Selection.h
+        ${COMMON_SOURCE_DIR}/ui/SelectionChange.h
         ${COMMON_SOURCE_DIR}/ui/SelectionCommand.h
         ${COMMON_SOURCE_DIR}/ui/SelectionTool.h
         ${COMMON_SOURCE_DIR}/ui/SetBrushFaceAttributesTool.h

@@ -44,7 +44,7 @@ class EntityNode;
 struct EntityDefinition;
 class GroupNode;
 class Node;
-class NodeCollection;
+struct Selection;
 class SmartTag;
 enum class EntityDefinitionType;
 } // namespace tb::mdl
@@ -67,7 +67,7 @@ class AnimationManager;
 class Command;
 class MapDocument;
 class MapViewToolBox;
-class Selection;
+struct SelectionChange;
 class SignalDelayer;
 class Tool;
 class UndoableCommand;
@@ -145,7 +145,7 @@ private:
   void toolChanged(Tool& tool);
   void commandDone(Command& command);
   void commandUndone(UndoableCommand& command);
-  void selectionDidChange(const Selection& selection);
+  void selectionDidChange(const SelectionChange& selectionChange);
   void materialCollectionsDidChange();
   void entityDefinitionsDidChange();
   void modsDidChange();
@@ -231,8 +231,7 @@ public: // reparenting objects
   mdl::Node* findNewGroupForObjects(const std::vector<mdl::Node*>& nodes) const;
 
   void mergeSelectedGroups();
-  mdl::GroupNode* findGroupToMergeGroupsInto(
-    const mdl::NodeCollection& selectedNodes) const;
+  mdl::GroupNode* findGroupToMergeGroupsInto(const mdl::Selection& selection) const;
 
   /**
    * Checks whether the given node can be reparented under the given new parent.
