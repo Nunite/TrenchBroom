@@ -20,31 +20,31 @@
 #include "CurrentGroupCommand.h"
 
 #include "mdl/EditorContext.h"
-#include "ui/MapDocument.h"
+#include "mdl/Map.h"
 
 namespace tb::mdl
 {
 namespace
 {
 
-void doPushGroup(mdl::GroupNode& groupNode, ui::MapDocument& document)
+void doPushGroup(GroupNode& groupNode, Map& map)
 {
-  document.editorContext().pushGroup(groupNode);
-  document.groupWasOpenedNotifier(groupNode);
+  map.editorContext().pushGroup(groupNode);
+  map.groupWasOpenedNotifier(groupNode);
 }
 
-mdl::GroupNode& doPopGroup(ui::MapDocument& document)
+GroupNode& doPopGroup(Map& map)
 {
-  auto& editorContext = document.editorContext();
+  auto& editorContext = map.editorContext();
   auto& previousGroup = *editorContext.currentGroup();
   editorContext.popGroup();
-  document.groupWasClosedNotifier(previousGroup);
+  map.groupWasClosedNotifier(previousGroup);
   return previousGroup;
 }
 
 } // namespace
 
-std::unique_ptr<CurrentGroupCommand> CurrentGroupCommand::push(mdl::GroupNode* group)
+std::unique_ptr<CurrentGroupCommand> CurrentGroupCommand::push(GroupNode* group)
 {
   return std::make_unique<CurrentGroupCommand>(group);
 }
@@ -54,30 +54,29 @@ std::unique_ptr<CurrentGroupCommand> CurrentGroupCommand::pop()
   return std::make_unique<CurrentGroupCommand>(nullptr);
 }
 
-CurrentGroupCommand::CurrentGroupCommand(mdl::GroupNode* group)
+CurrentGroupCommand::CurrentGroupCommand(GroupNode* group)
   : UndoableCommand{group ? "Push Group" : "Pop Group", false}
   , m_group{group}
 {
 }
 
-std::unique_ptr<CommandResult> CurrentGroupCommand::doPerformDo(ui::MapDocument& document)
+std::unique_ptr<CommandResult> CurrentGroupCommand::doPerformDo(Map& map)
 {
   if (m_group)
   {
-    doPushGroup(*m_group, document);
+    doPushGroup(*m_group, map);
     m_group = nullptr;
   }
   else
   {
-    m_group = &doPopGroup(document);
+    m_group = &doPopGroup(map);
   }
   return std::make_unique<CommandResult>(true);
 }
 
-std::unique_ptr<CommandResult> CurrentGroupCommand::doPerformUndo(
-  ui::MapDocument& document)
+std::unique_ptr<CommandResult> CurrentGroupCommand::doPerformUndo(Map& map)
 {
-  return doPerformDo(document);
+  return doPerformDo(map);
 }
 
 } // namespace tb::mdl

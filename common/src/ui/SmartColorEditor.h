@@ -21,16 +21,12 @@
 
 #include "ui/SmartPropertyEditor.h"
 
-#include <memory>
 #include <vector>
 
 class QColor;
 class QWidget;
 class QPushButton;
 class QRadioButton;
-class QSlider;
-class QCheckBox;
-class QLabel;
 
 namespace tb::ui
 {
@@ -50,47 +46,37 @@ private:
   ColorButton* m_colorPicker = nullptr;
   ColorTable* m_colorHistory = nullptr;
   
-  // 亮度相关控件
+  // Local customization: Brightness control
+  bool m_brightnessEnabled = true;
   QCheckBox* m_alphaCheckBox = nullptr;
   QSlider* m_alphaSlider = nullptr;
   QLabel* m_alphaLabel = nullptr;
-  int m_currentAlpha = 200;
-  bool m_hasAlpha = true;
-  
-  // 是否启用亮度控制
-  bool m_brightnessEnabled = true;
-  
-  // 添加成员变量来跟踪当前颜色
   QColor m_currentColor;
+  int m_currentAlpha = 255;
+  bool m_hasAlpha = false;
 
 public:
-  explicit SmartColorEditor(
-    std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
-    
-  // 设置是否启用亮度控制
+  explicit SmartColorEditor(MapDocument& document, QWidget* parent = nullptr);
+  
   void setBrightnessEnabled(bool enabled);
-
-protected:
-  // 添加事件过滤器以支持双击编辑功能
-  bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
   void createGui();
   void doUpdateVisual(const std::vector<mdl::EntityNodeBase*>& nodes) override;
+  
+  void updateGuiState();
+  void updateAlphaControls(const std::vector<mdl::EntityNodeBase*>& nodes);
+  void alphaSliderChanged(int value);
 
   void updateColorRange(const std::vector<mdl::EntityNodeBase*>& nodes);
   void updateColorHistory();
-  void updateAlphaControls(const std::vector<mdl::EntityNodeBase*>& nodes);
-  void updateGuiState();  // 更新控件的可见性
 
-  void setColor(const QColor& wxColor) const;
+  void setColor(const QColor& color);
 
   void floatRangeRadioButtonClicked();
   void byteRangeRadioButtonClicked();
   void colorPickerChanged(const QColor& color);
   void colorTableSelected(QColor color);
-  void alphaCheckBoxToggled(bool checked);
-  void alphaSliderChanged(int value);
 };
 
 } // namespace tb::ui

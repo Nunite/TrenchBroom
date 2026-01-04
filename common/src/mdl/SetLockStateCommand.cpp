@@ -25,9 +25,9 @@
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/LockState.h"
+#include "mdl/Map.h"
 #include "mdl/Node.h"
 #include "mdl/WorldNode.h"
-#include "ui/MapDocument.h"
 
 #include "kdl/overload.h"
 
@@ -39,18 +39,15 @@ namespace tb::mdl
 namespace
 {
 
-auto setLockState(
-  const std::vector<mdl::Node*>& nodes,
-  const mdl::LockState lockState,
-  ui::MapDocument& document)
+auto setLockState(const std::vector<Node*>& nodes, const LockState lockState, Map& map)
 {
-  auto result = std::vector<std::tuple<mdl::Node*, mdl::LockState>>{};
+  auto result = std::vector<std::tuple<Node*, LockState>>{};
   result.reserve(nodes.size());
 
-  auto changedNodes = std::vector<mdl::Node*>{};
+  auto changedNodes = std::vector<Node*>{};
   changedNodes.reserve(nodes.size());
 
-  for (mdl::Node* node : nodes)
+  for (Node* node : nodes)
   {
     const auto oldState = node->lockState();
     if (node->setLockState(lockState))
@@ -60,16 +57,14 @@ auto setLockState(
     }
   }
 
-  document.nodeLockingDidChangeNotifier(changedNodes);
+  map.nodeLockingDidChangeNotifier(changedNodes);
 
   return result;
 }
 
-void restoreLockState(
-  const std::vector<std::tuple<mdl::Node*, mdl::LockState>>& nodes,
-  ui::MapDocument& document)
+void restoreLockState(const std::vector<std::tuple<Node*, LockState>>& nodes, Map& map)
 {
-  auto changedNodes = std::vector<mdl::Node*>{};
+  auto changedNodes = std::vector<Node*>{};
   changedNodes.reserve(nodes.size());
 
   for (const auto& [node, state] : nodes)
@@ -80,74 +75,70 @@ void restoreLockState(
     }
   }
 
-  document.nodeLockingDidChangeNotifier(changedNodes);
+  map.nodeLockingDidChangeNotifier(changedNodes);
 }
 
 } // namespace
 
-std::unique_ptr<SetLockStateCommand> SetLockStateCommand::lock(
-  std::vector<mdl::Node*> nodes)
+std::unique_ptr<SetLockStateCommand> SetLockStateCommand::lock(std::vector<Node*> nodes)
 {
-  return std::make_unique<SetLockStateCommand>(nodes, mdl::LockState::Locked);
+  return std::make_unique<SetLockStateCommand>(nodes, LockState::Locked);
 }
 
-std::unique_ptr<SetLockStateCommand> SetLockStateCommand::unlock(
-  std::vector<mdl::Node*> nodes)
+std::unique_ptr<SetLockStateCommand> SetLockStateCommand::unlock(std::vector<Node*> nodes)
 {
-  return std::make_unique<SetLockStateCommand>(nodes, mdl::LockState::Unlocked);
+  return std::make_unique<SetLockStateCommand>(nodes, LockState::Unlocked);
 }
 
-std::unique_ptr<SetLockStateCommand> SetLockStateCommand::reset(
-  std::vector<mdl::Node*> nodes)
+std::unique_ptr<SetLockStateCommand> SetLockStateCommand::reset(std::vector<Node*> nodes)
 {
-  return std::make_unique<SetLockStateCommand>(nodes, mdl::LockState::Inherited);
+  return std::make_unique<SetLockStateCommand>(nodes, LockState::Inherited);
 }
 
-static bool shouldUpdateModificationCount(const std::vector<mdl::Node*>& nodes)
+static bool shouldUpdateModificationCount(const std::vector<Node*>& nodes)
 {
   return std::ranges::any_of(nodes, [](const auto* node) {
     return node->accept(kdl::overload(
-      [](const mdl::WorldNode*) { return false; },
-      [](const mdl::LayerNode*) { return true; },
-      [](const mdl::GroupNode*) { return false; },
-      [](const mdl::EntityNode*) { return false; },
-      [](const mdl::BrushNode*) { return false; },
-      [](const mdl::PatchNode*) { return false; }));
+      [](const WorldNode*) { return false; },
+      [](const LayerNode*) { return true; },
+      [](const GroupNode*) { return false; },
+      [](const EntityNode*) { return false; },
+      [](const BrushNode*) { return false; },
+      [](const PatchNode*) { return false; }));
   });
 }
 
 SetLockStateCommand::SetLockStateCommand(
-  std::vector<mdl::Node*> nodes, const mdl::LockState lockState)
+  std::vector<Node*> nodes, const LockState lockState)
   : UndoableCommand(makeName(lockState), shouldUpdateModificationCount(nodes))
   , m_nodes{std::move(nodes)}
   , m_lockState{lockState}
 {
 }
 
-std::string SetLockStateCommand::makeName(const mdl::LockState state)
+std::string SetLockStateCommand::makeName(const LockState state)
 {
   switch (state)
   {
-  case mdl::LockState::Inherited:
+  case LockState::Inherited:
     return "Reset Locking";
-  case mdl::LockState::Locked:
+  case LockState::Locked:
     return "Lock Objects";
-  case mdl::LockState::Unlocked:
+  case LockState::Unlocked:
     return "Unlock Objects";
     switchDefault();
   }
 }
 
-std::unique_ptr<CommandResult> SetLockStateCommand::doPerformDo(ui::MapDocument& document)
+std::unique_ptr<CommandResult> SetLockStateCommand::doPerformDo(Map& map)
 {
-  m_oldLockState = setLockState(m_nodes, m_lockState, document);
+  m_oldLockState = setLockState(m_nodes, m_lockState, map);
   return std::make_unique<CommandResult>(true);
 }
 
-std::unique_ptr<CommandResult> SetLockStateCommand::doPerformUndo(
-  ui::MapDocument& document)
+std::unique_ptr<CommandResult> SetLockStateCommand::doPerformUndo(Map& map)
 {
-  restoreLockState(m_oldLockState, document);
+  restoreLockState(m_oldLockState, map);
   return std::make_unique<CommandResult>(true);
 }
 

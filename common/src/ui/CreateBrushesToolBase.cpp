@@ -22,20 +22,18 @@
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "mdl/BrushNode.h"
+#include "mdl/Map.h"
+#include "mdl/Map_Nodes.h"
 #include "mdl/Transaction.h"
 #include "render/BrushRenderer.h"
 #include "render/SelectionBoundsRenderer.h"
-#include "ui/MapDocument.h"
-
-#include "kdl/memory_utils.h"
 
 namespace tb::ui
 {
 
-CreateBrushesToolBase::CreateBrushesToolBase(
-  const bool initiallyActive, std::weak_ptr<MapDocument> document)
+CreateBrushesToolBase::CreateBrushesToolBase(const bool initiallyActive, mdl::Map& map)
   : Tool{initiallyActive}
-  , m_document{std::move(document)}
+  , m_map{map}
   , m_brushRenderer{std::make_unique<render::BrushRenderer>()}
 {
 }
@@ -44,23 +42,22 @@ CreateBrushesToolBase::~CreateBrushesToolBase() = default;
 
 const mdl::Grid& CreateBrushesToolBase::grid() const
 {
-  return kdl::mem_lock(m_document)->grid();
+  return m_map.grid();
 }
 
 void CreateBrushesToolBase::createBrushes()
 {
   if (!m_brushNodes.empty())
   {
-    auto document = kdl::mem_lock(m_document);
     auto nodesToAdd = kdl::vec_transform(std::move(m_brushNodes), [](auto brushNode) {
       return static_cast<mdl::Node*>(brushNode.release());
     });
     clearBrushes();
 
-    auto transaction = mdl::Transaction{document, "Create Brush"};
-    document->deselectAll();
-    auto addedNodes = document->addNodes({{document->parentForNodes(), nodesToAdd}});
-    document->selectNodes(addedNodes);
+    auto transaction = mdl::Transaction{m_map, "Create Brush"};
+    m_map.deselectAll();
+    auto addedNodes = addNodes(m_map, {{parentForNodes(m_map), nodesToAdd}});
+    m_map.selectNodes(addedNodes);
     transaction.commit();
 
     doBrushesWereCreated();

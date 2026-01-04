@@ -23,7 +23,6 @@
 #include "render/FontDescriptor.h"
 #include "ui/CellView.h"
 
-#include <memory>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -54,7 +53,7 @@ class MaterialBrowserView : public CellView
 {
   Q_OBJECT
 private:
-  std::weak_ptr<MapDocument> m_document;
+  MapDocument& m_document;
   bool m_group = false;
   bool m_hideUnused = false;
   MaterialSortOrder m_sortOrder = MaterialSortOrder::Name;
@@ -67,9 +66,7 @@ private:
 
 public:
   MaterialBrowserView(
-    QScrollBar* scrollBar,
-    GLContextManager& contextManager,
-    std::weak_ptr<MapDocument> document);
+    QScrollBar* scrollBar, GLContextManager& contextManager, MapDocument& document);
   ~MaterialBrowserView() override;
 
   void setSortOrder(MaterialSortOrder sortOrder);

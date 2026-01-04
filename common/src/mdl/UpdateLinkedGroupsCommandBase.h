@@ -39,13 +39,13 @@ protected:
   UpdateLinkedGroupsCommandBase(
     std::string name,
     bool updateModificationCount,
-    std::vector<mdl::GroupNode*> changedLinkedGroups = {});
+    std::vector<GroupNode*> changedLinkedGroups = {});
 
 public:
   ~UpdateLinkedGroupsCommandBase() override;
 
-  std::unique_ptr<CommandResult> performDo(ui::MapDocument& document) override;
-  std::unique_ptr<CommandResult> performUndo(ui::MapDocument& document) override;
+  std::unique_ptr<CommandResult> performDo(Map& map) override;
+  std::unique_ptr<CommandResult> performUndo(Map& map) override;
 
   bool collateWith(UndoableCommand& command) override;
 

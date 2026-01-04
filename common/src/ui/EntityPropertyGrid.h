@@ -23,7 +23,6 @@
 
 #include "NotifierConnection.h"
 
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -36,6 +35,7 @@ class QToolButton;
 namespace tb::mdl
 {
 class EntityNode;
+class Map;
 class Node;
 struct SelectionChange;
 } // namespace tb::mdl
@@ -60,7 +60,7 @@ class EntityPropertyGrid : public QWidget
 {
   Q_OBJECT
 private:
-  std::weak_ptr<MapDocument> m_document;
+  MapDocument& m_document;
 
   EntityPropertyModel* m_model;
   QSortFilterProxyModel* m_proxyModel;
@@ -75,8 +75,7 @@ private:
   NotifierConnection m_notifierConnection;
 
 public:
-  explicit EntityPropertyGrid(
-    std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
+  explicit EntityPropertyGrid(MapDocument& document, QWidget* parent = nullptr);
 
 private:
   void backupSelection();
@@ -90,12 +89,12 @@ private:
   std::vector<int> selectedRowsAndCursorRow() const;
 
 private:
-  void createGui(std::weak_ptr<MapDocument> document);
+  void createGui(MapDocument& document);
 
   void connectObservers();
 
-  void documentWasNewed(MapDocument* document);
-  void documentWasLoaded(MapDocument* document);
+  void mapWasCreated(mdl::Map& map);
+  void mapWasLoaded(mdl::Map& map);
   void nodesDidChange(const std::vector<mdl::Node*>& nodes);
   void selectionWillChange();
   void selectionDidChange(const mdl::SelectionChange& selectionChange);

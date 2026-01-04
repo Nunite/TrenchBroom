@@ -29,7 +29,6 @@
 #include "ui/UVViewHelper.h"
 
 #include <filesystem>
-#include <memory>
 #include <vector>
 
 class QWidget;
@@ -37,7 +36,9 @@ class QWidget;
 namespace tb::mdl
 {
 class BrushFaceHandle;
+class Map;
 class Node;
+
 struct SelectionChange;
 } // namespace tb::mdl
 
@@ -70,7 +71,7 @@ public:
   static const mdl::HitType::Type FaceHitType;
 
 private:
-  std::weak_ptr<MapDocument> m_document;
+  MapDocument& m_document;
 
   render::OrthographicCamera m_camera;
   UVViewHelper m_helper;
@@ -80,7 +81,7 @@ private:
   NotifierConnection m_notifierConnection;
 
 public:
-  UVView(std::weak_ptr<MapDocument> document, GLContextManager& contextManager);
+  UVView(MapDocument& document, GLContextManager& contextManager);
 
   void setSubDivisions(const vm::vec2i& subDivisions);
 
@@ -92,7 +93,7 @@ private:
   void connectObservers();
 
   void selectionDidChange(const mdl::SelectionChange& selectionChange);
-  void documentWasCleared(MapDocument* document);
+  void mapWasCleared(mdl::Map& map);
   void nodesDidChange(const std::vector<mdl::Node*>& nodes);
   void brushFacesDidChange(const std::vector<mdl::BrushFaceHandle>& faces);
   void gridDidChange();

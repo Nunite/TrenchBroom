@@ -29,6 +29,7 @@
 #include "Preferences.h"
 
 #include "kdl/range_to_vector.h"
+#include "kdl/set_adapter.h"
 #include "kdl/vector_utils.h"
 
 #include <ranges>

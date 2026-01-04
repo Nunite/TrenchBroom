@@ -23,6 +23,8 @@
 #include <QWidget>
 
 #include "mdl/EntityNodeBase.h"
+#include "mdl/Game.h"
+#include "mdl/Map.h"
 #include "mdl/PropertyDefinition.h"
 #include "ui/MapDocument.h"
 #include "ui/SmartChoiceEditor.h"
@@ -33,7 +35,6 @@
 #include "ui/SmartWadEditor.h"
 #include "ui/SmartModelEditor.h"
 
-#include "kdl/memory_utils.h"
 #include "kdl/string_compare.h"
 
 namespace tb::ui
@@ -83,9 +84,9 @@ SmartPropertyEditorMatcher makeSmartPropertyEditorKeyMatcher(
 } // namespace
 
 SmartPropertyEditorManager::SmartPropertyEditorManager(
-  std::weak_ptr<MapDocument> document, QWidget* parent)
+  MapDocument& document, QWidget* parent)
   : QWidget{parent}
-  , m_document{std::move(document)}
+  , m_document{document}
   , m_stackedLayout{new QStackedLayout{this}}
 {
   setLayout(m_stackedLayout);
@@ -125,14 +126,14 @@ void SmartPropertyEditorManager::createEditors()
     new SmartChoiceEditor{m_document, this});
   registerEditor(
     makeSmartPropertyEditorKeyMatcher({"model"}),
-    new SmartModelEditor{m_document, this});
+    new SmartModelEditor(m_document, this));
   registerEditor(
     [&](const auto& propertyKey, const auto& nodes) {
+      const auto& map = m_document.map();
       return nodes.size() == 1
              && nodes.front()->entity().classname()
                   == mdl::EntityPropertyValues::WorldspawnClassname
-             && propertyKey
-                  == kdl::mem_lock(m_document)->game()->config().materialConfig.property;
+             && propertyKey == map.game()->config().materialConfig.property;
     },
     new SmartWadEditor{m_document, this});
   registerEditor(
@@ -152,23 +153,23 @@ void SmartPropertyEditorManager::registerEditor(
 
 void SmartPropertyEditorManager::connectObservers()
 {
-  auto document = kdl::mem_lock(m_document);
-  m_notifierConnection += document->selectionDidChangeNotifier.connect(
+  auto& map = m_document.map();
+  m_notifierConnection += map.selectionDidChangeNotifier.connect(
     this, &SmartPropertyEditorManager::selectionDidChange);
-  m_notifierConnection += document->nodesDidChangeNotifier.connect(
-    this, &SmartPropertyEditorManager::nodesDidChange);
+  m_notifierConnection +=
+    map.nodesDidChangeNotifier.connect(this, &SmartPropertyEditorManager::nodesDidChange);
 }
 
 void SmartPropertyEditorManager::selectionDidChange(const mdl::SelectionChange&)
 {
-  auto document = kdl::mem_lock(m_document);
-  switchEditor(m_propertyKey, document->selection().allEntities());
+  const auto& map = m_document.map();
+  switchEditor(m_propertyKey, map.selection().allEntities());
 }
 
 void SmartPropertyEditorManager::nodesDidChange(const std::vector<mdl::Node*>&)
 {
-  auto document = kdl::mem_lock(m_document);
-  switchEditor(m_propertyKey, document->selection().allEntities());
+  const auto& map = m_document.map();
+  switchEditor(m_propertyKey, map.selection().allEntities());
 }
 
 SmartPropertyEditor* SmartPropertyEditorManager::selectEditor(
@@ -221,8 +222,8 @@ void SmartPropertyEditorManager::updateEditor()
 {
   if (activeEditor())
   {
-    auto document = kdl::mem_lock(m_document);
-    activeEditor()->update(document->selection().allEntities());
+    const auto& map = m_document.map();
+    activeEditor()->update(map.selection().allEntities());
   }
 }
 

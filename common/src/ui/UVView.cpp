@@ -24,6 +24,7 @@
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/Grid.h"
+#include "mdl/Map.h"
 #include "mdl/Material.h"
 #include "mdl/Texture.h"
 #include "render/ActiveShader.h"
@@ -46,8 +47,6 @@
 #include "ui/UVRotateTool.h"
 #include "ui/UVScaleTool.h"
 #include "ui/UVShearTool.h"
-
-#include "kdl/memory_utils.h"
 
 #include <cassert>
 #include <memory>
@@ -146,9 +145,9 @@ private:
 
 const mdl::HitType::Type UVView::FaceHitType = mdl::HitType::freeType();
 
-UVView::UVView(std::weak_ptr<MapDocument> document, GLContextManager& contextManager)
+UVView::UVView(MapDocument& document, GLContextManager& contextManager)
   : RenderView{contextManager}
-  , m_document{std::move(document)}
+  , m_document{document}
   , m_helper{m_camera}
 {
   setToolBox(m_toolBox);
@@ -185,17 +184,16 @@ void UVView::createTools()
 
 void UVView::connectObservers()
 {
-  auto document = kdl::mem_lock(m_document);
+  auto& map = m_document.map();
+  m_notifierConnection += map.mapWasClearedNotifier.connect(this, &UVView::mapWasCleared);
   m_notifierConnection +=
-    document->documentWasClearedNotifier.connect(this, &UVView::documentWasCleared);
+    map.nodesDidChangeNotifier.connect(this, &UVView::nodesDidChange);
   m_notifierConnection +=
-    document->nodesDidChangeNotifier.connect(this, &UVView::nodesDidChange);
+    map.brushFacesDidChangeNotifier.connect(this, &UVView::brushFacesDidChange);
   m_notifierConnection +=
-    document->brushFacesDidChangeNotifier.connect(this, &UVView::brushFacesDidChange);
+    map.selectionDidChangeNotifier.connect(this, &UVView::selectionDidChange);
   m_notifierConnection +=
-    document->selectionDidChangeNotifier.connect(this, &UVView::selectionDidChange);
-  m_notifierConnection +=
-    document->grid().gridDidChangeNotifier.connect(this, &UVView::gridDidChange);
+    map.grid().gridDidChangeNotifier.connect(this, &UVView::gridDidChange);
 
   auto& prefs = PreferenceManager::instance();
   m_notifierConnection +=
@@ -207,8 +205,8 @@ void UVView::connectObservers()
 
 void UVView::selectionDidChange(const mdl::SelectionChange&)
 {
-  auto document = kdl::mem_lock(m_document);
-  const auto faces = document->selection().brushFaces;
+  const auto& map = m_document.map();
+  const auto faces = map.selection().brushFaces;
   if (faces.size() != 1)
   {
     m_helper.setFaceHandle(std::nullopt);
@@ -230,7 +228,7 @@ void UVView::selectionDidChange(const mdl::SelectionChange&)
   update();
 }
 
-void UVView::documentWasCleared(MapDocument*)
+void UVView::mapWasCleared(mdl::Map&)
 {
   m_helper.setFaceHandle(std::nullopt);
   m_toolBox.disable();

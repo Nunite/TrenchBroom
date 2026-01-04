@@ -26,15 +26,11 @@
 #include <variant>
 #include <vector>
 
-namespace tb::ui
-{
-class MapDocument;
-}
-
 namespace tb::mdl
 {
 class GroupNode;
 class Node;
+class Map;
 
 /**
  * Checks whether the given vector of linked group can be updated consistently.
@@ -42,7 +38,7 @@ class Node;
  * The given linked groups can be updated consistently if no two of them are in the same
  * linked set.
  */
-bool checkLinkedGroupsToUpdate(const std::vector<mdl::GroupNode*>& changedLinkedGroups);
+bool checkLinkedGroupsToUpdate(const std::vector<GroupNode*>& changedLinkedGroups);
 
 /**
  * A helper class to add support for updating linked groups to commands.
@@ -57,25 +53,25 @@ bool checkLinkedGroupsToUpdate(const std::vector<mdl::GroupNode*>& changedLinked
 class UpdateLinkedGroupsHelper
 {
 private:
-  using ChangedLinkedGroups = std::vector<mdl::GroupNode*>;
+  using ChangedLinkedGroups = std::vector<GroupNode*>;
   using LinkedGroupUpdates =
-    std::vector<std::pair<mdl::Node*, std::vector<std::unique_ptr<mdl::Node>>>>;
+    std::vector<std::pair<Node*, std::vector<std::unique_ptr<Node>>>>;
   std::variant<ChangedLinkedGroups, LinkedGroupUpdates> m_state;
 
 public:
   explicit UpdateLinkedGroupsHelper(ChangedLinkedGroups changedLinkedGroups);
   ~UpdateLinkedGroupsHelper();
 
-  Result<void> applyLinkedGroupUpdates(ui::MapDocument& document);
-  void undoLinkedGroupUpdates(ui::MapDocument& document);
+  Result<void> applyLinkedGroupUpdates(Map& map);
+  void undoLinkedGroupUpdates(Map& map);
   void collateWith(UpdateLinkedGroupsHelper& other);
 
 private:
-  Result<void> computeLinkedGroupUpdates(ui::MapDocument& document);
+  Result<void> computeLinkedGroupUpdates(Map& map);
   static Result<LinkedGroupUpdates> computeLinkedGroupUpdates(
-    const ChangedLinkedGroups& changedLinkedGroups, ui::MapDocument& document);
+    const ChangedLinkedGroups& changedLinkedGroups, Map& map);
 
-  void doApplyOrUndoLinkedGroupUpdates(ui::MapDocument& document);
+  void doApplyOrUndoLinkedGroupUpdates(Map& map);
 };
 
 } // namespace tb::mdl

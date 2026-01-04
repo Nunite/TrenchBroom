@@ -25,15 +25,14 @@
 #include "mdl/DecalDefinition.h"
 #include "mdl/EditorContext.h"
 #include "mdl/EntityNode.h"
+#include "mdl/Map.h"
 #include "mdl/Material.h"
 #include "mdl/MaterialManager.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Texture.h"
 #include "mdl/UVCoordSystem.h"
 #include "mdl/WorldNode.h"
-#include "ui/MapDocument.h"
 
-#include "kdl/memory_utils.h"
 #include "kdl/overload.h"
 
 #include "vm/intersection.h"
@@ -144,8 +143,8 @@ std::vector<Vertex> createDecalBrushFace(
 
 } // namespace
 
-EntityDecalRenderer::EntityDecalRenderer(std::weak_ptr<ui::MapDocument> document)
-  : m_document{std::move(document)}
+EntityDecalRenderer::EntityDecalRenderer(mdl::Map& map)
+  : m_map{map}
 {
   clear();
 }
@@ -191,7 +190,7 @@ void EntityDecalRenderer::removeNode(mdl::Node* node)
 void EntityDecalRenderer::updateEntity(const mdl::EntityNode* entityNode)
 {
   // if the entity isn't visible, don't create decal geometry for it
-  const auto& editorContext = kdl::mem_lock(m_document)->editorContext();
+  const auto& editorContext = m_map.editorContext();
 
   // check if the entity has a decal specification
   const auto spec =
@@ -239,7 +238,7 @@ void EntityDecalRenderer::updateBrush(const mdl::BrushNode* brushNode)
     }
 
     // if the brush is not visible, then it doesn't (currently) intersect
-    const auto& editorContext = kdl::mem_lock(m_document)->editorContext();
+    const auto& editorContext = m_map.editorContext();
     const auto intersects =
       editorContext.visible(*brushNode) && brushNode->intersects(ent);
     const auto tracked = std::find(data.brushes.begin(), data.brushes.end(), brushNode)
@@ -320,9 +319,8 @@ void EntityDecalRenderer::validateDecalData(
   const auto spec = getDecalSpecification(entityNode);
   ensure(spec, "entity has a decal specification");
 
-  const auto& document = kdl::mem_lock(m_document);
-  const auto& editorContext = document->editorContext();
-  const auto* world = document->world();
+  const auto& editorContext = m_map.editorContext();
+  const auto* world = m_map.world();
 
   // collect all the brush nodes that touch the entity's bbox
   const auto entityBounds = entityNode->physicalBounds();
@@ -339,7 +337,7 @@ void EntityDecalRenderer::validateDecalData(
     }
   }
 
-  data.material = document->materialManager().material(spec->materialName);
+  data.material = m_map.materialManager().material(spec->materialName);
   if (!data.material)
   {
     // no decal material was found, don't generate any geometry

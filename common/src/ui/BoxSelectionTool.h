@@ -15,13 +15,13 @@ class RenderBatch;
 
 namespace tb::mdl
 {
+class Map;
 class Node;
 }
 
 namespace tb::ui
 {
 class DrawShapeTool;
-class MapDocument;
 class InputState;
 struct DragState;
 
@@ -46,12 +46,12 @@ class BoxSelectionDragDelegate : public HandleDragTrackerDelegate
 {
 private:
   DrawShapeTool& m_tool;
-  std::weak_ptr<MapDocument> m_document;
+  mdl::Map& m_map;
   vm::bbox3d m_selectionBounds;
   SelectionBoxRenderer m_renderer;
 
 public:
-  BoxSelectionDragDelegate(DrawShapeTool& tool, std::weak_ptr<MapDocument> document);
+  BoxSelectionDragDelegate(DrawShapeTool& tool, mdl::Map& map);
 
   HandlePositionProposer start(
     const InputState& inputState,

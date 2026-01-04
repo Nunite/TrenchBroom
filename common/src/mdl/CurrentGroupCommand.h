@@ -31,17 +31,17 @@ class GroupNode;
 class CurrentGroupCommand : public UndoableCommand
 {
 private:
-  mdl::GroupNode* m_group = nullptr;
+  GroupNode* m_group = nullptr;
 
 public:
-  static std::unique_ptr<CurrentGroupCommand> push(mdl::GroupNode* group);
+  static std::unique_ptr<CurrentGroupCommand> push(GroupNode* group);
   static std::unique_ptr<CurrentGroupCommand> pop();
 
-  explicit CurrentGroupCommand(mdl::GroupNode* group);
+  explicit CurrentGroupCommand(GroupNode* group);
 
 private:
-  std::unique_ptr<CommandResult> doPerformDo(ui::MapDocument& document) override;
-  std::unique_ptr<CommandResult> doPerformUndo(ui::MapDocument& document) override;
+  std::unique_ptr<CommandResult> doPerformDo(Map& map) override;
+  std::unique_ptr<CommandResult> doPerformUndo(Map& map) override;
 
   deleteCopyAndMove(CurrentGroupCommand);
 };

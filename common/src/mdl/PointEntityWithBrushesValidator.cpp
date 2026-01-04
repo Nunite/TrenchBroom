@@ -24,7 +24,8 @@
 #include "mdl/EntityNode.h"
 #include "mdl/Issue.h"
 #include "mdl/IssueQuickFix.h"
-#include "mdl/MapFacade.h"
+#include "mdl/Map.h"
+#include "mdl/Map_Nodes.h"
 
 #include "kdl/vector_utils.h"
 
@@ -39,25 +40,23 @@ const auto Type = freeIssueType();
 
 IssueQuickFix makeMoveBrushesToWorldQuickFix()
 {
-  return {
-    "Move Brushes to World",
-    [](MapFacade& facade, const std::vector<const Issue*>& issues) {
-      auto affectedNodes = std::vector<Node*>{};
-      auto nodesToReparent = std::map<Node*, std::vector<Node*>>{};
+  return {"Move Brushes to World", [](Map& map, const std::vector<const Issue*>& issues) {
+            auto affectedNodes = std::vector<Node*>{};
+            auto nodesToReparent = std::map<Node*, std::vector<Node*>>{};
 
-      for (const auto* issue : issues)
-      {
-        auto& node = issue->node();
-        nodesToReparent[node.parent()] = node.children();
+            for (const auto* issue : issues)
+            {
+              auto& node = issue->node();
+              nodesToReparent[node.parent()] = node.children();
 
-        affectedNodes.push_back(&node);
-        affectedNodes = kdl::vec_concat(std::move(affectedNodes), node.children());
-      }
+              affectedNodes.push_back(&node);
+              affectedNodes = kdl::vec_concat(std::move(affectedNodes), node.children());
+            }
 
-      facade.deselectAll();
-      facade.reparentNodes(nodesToReparent);
-      facade.selectNodes(affectedNodes);
-    }};
+            map.deselectAll();
+            reparentNodes(map, nodesToReparent);
+            map.selectNodes(affectedNodes);
+          }};
 }
 } // namespace
 

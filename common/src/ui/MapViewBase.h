@@ -44,6 +44,7 @@ class EntityNode;
 struct EntityDefinition;
 class Command;
 class GroupNode;
+class Map;
 class Node;
 struct Selection;
 struct SelectionChange;
@@ -82,7 +83,7 @@ public:
   static const int DefaultCameraAnimationDuration;
 
 protected:
-  std::weak_ptr<MapDocument> m_document;
+  MapDocument& m_document;
   MapViewToolBox& m_toolBox;
   render::MapRenderer& m_renderer;
 
@@ -107,7 +108,7 @@ private: // shortcuts
 
 protected:
   MapViewBase(
-    std::weak_ptr<MapDocument> document,
+    MapDocument& document,
     MapViewToolBox& toolBox,
     render::MapRenderer& renderer,
     GLContextManager& contextManager);
@@ -120,7 +121,7 @@ protected:
    * This must be called exactly once, at the end of subclasses's constructors.
    * (Does virtual function calls, so we can't call it in the MapViewBase constructor.)
    *
-   * On normal app startup, these tasks are handled by documentDidChange(),
+   * On normal app startup, these tasks are handled the mapWas* callbacks,
    * but when changing map view layouts (e.g. 1 pane to 2 pane) there are
    * no document notifications to handle these tasks, so it must be done by the
    * constructor.
@@ -154,7 +155,9 @@ private:
   void pointFileDidChange();
   void portalFileDidChange();
   void preferenceDidChange(const std::filesystem::path& path);
-  void documentDidChange(MapDocument* document);
+  void mapWasCreated(mdl::Map& map);
+  void mapWasLoaded(mdl::Map& map);
+  void mapWasCleared(mdl::Map& map);
 
 private: // shortcut setup
   void createActions();
@@ -162,12 +165,10 @@ private: // shortcut setup
   void updateActionStates();
   void updateActionStatesDelayed();
 
-private: // 实体模板相关
-  std::unique_ptr<mdl::Entity> m_templateEntity;
+private:   std::unique_ptr<mdl::Entity> m_templateEntity;
   std::string m_templateEntityClassName;
 
-public: // 实体模板相关方法
-  bool hasTemplateEntity() const;
+public:   bool hasTemplateEntity() const;
   void setTemplateEntity(const mdl::EntityNode* entityNode);
   void clearTemplateEntity();
   const mdl::Entity* templateEntity() const;

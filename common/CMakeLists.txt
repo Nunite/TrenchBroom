@@ -89,6 +89,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/LoggerCache.cpp
         ${COMMON_SOURCE_DIR}/mdl/AddRemoveNodesCommand.cpp
         ${COMMON_SOURCE_DIR}/mdl/AddRemoveNodesUtils.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Autosaver.cpp
         ${COMMON_SOURCE_DIR}/mdl/BezierPatch.cpp
         ${COMMON_SOURCE_DIR}/mdl/Brush.cpp
         ${COMMON_SOURCE_DIR}/mdl/BrushBuilder.cpp
@@ -154,7 +155,26 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/LinkTargetValidator.cpp
         ${COMMON_SOURCE_DIR}/mdl/LongPropertyKeyValidator.cpp
         ${COMMON_SOURCE_DIR}/mdl/LongPropertyValueValidator.cpp
-        ${COMMON_SOURCE_DIR}/mdl/MapFacade.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Assets.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Brushes.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Commands.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_CopyPaste.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Entities.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Geometry.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Groups.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Layers.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_NodeLocking.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Nodes.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_NodeVisibility.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Observers.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Persistence.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Picking.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Resources.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Selection.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Tags.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_Validation.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_World.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map.cpp
         ${COMMON_SOURCE_DIR}/mdl/MapFormat.cpp
         ${COMMON_SOURCE_DIR}/mdl/Material.cpp
         ${COMMON_SOURCE_DIR}/mdl/MaterialCollection.cpp
@@ -186,6 +206,8 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/PushSelection.cpp
         ${COMMON_SOURCE_DIR}/mdl/Quake3Shader.cpp
         ${COMMON_SOURCE_DIR}/mdl/ReparentNodesCommand.cpp
+        ${COMMON_SOURCE_DIR}/mdl/RepeatStack.cpp
+        ${COMMON_SOURCE_DIR}/mdl/ResourceId.cpp
         ${COMMON_SOURCE_DIR}/mdl/Selection.cpp
         ${COMMON_SOURCE_DIR}/mdl/SelectionChange.cpp
         ${COMMON_SOURCE_DIR}/mdl/SelectionCommand.cpp
@@ -211,6 +233,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/UVCoordSystem.cpp
         ${COMMON_SOURCE_DIR}/mdl/Validator.cpp
         ${COMMON_SOURCE_DIR}/mdl/ValidatorRegistry.cpp
+        ${COMMON_SOURCE_DIR}/mdl/VertexHandleManager.cpp
         ${COMMON_SOURCE_DIR}/mdl/WorldBoundsValidator.cpp
         ${COMMON_SOURCE_DIR}/mdl/WorldNode.cpp
         ${COMMON_SOURCE_DIR}/NotifierConnection.cpp
@@ -298,7 +321,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/AppInfoPanel.cpp
         ${COMMON_SOURCE_DIR}/ui/AssembleBrushTool.cpp
         ${COMMON_SOURCE_DIR}/ui/AssembleBrushToolController3D.cpp
-        ${COMMON_SOURCE_DIR}/ui/Autosaver.cpp
         ${COMMON_SOURCE_DIR}/ui/BorderLine.cpp
         ${COMMON_SOURCE_DIR}/ui/BorderPanel.cpp
         ${COMMON_SOURCE_DIR}/ui/CachingLogger.cpp
@@ -432,7 +454,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/RecentDocumentListBox.cpp
         ${COMMON_SOURCE_DIR}/ui/RecentDocuments.cpp
         ${COMMON_SOURCE_DIR}/ui/RenderView.cpp
-        ${COMMON_SOURCE_DIR}/ui/RepeatStack.cpp
         ${COMMON_SOURCE_DIR}/ui/ReplaceMaterialDialog.cpp
         ${COMMON_SOURCE_DIR}/ui/RotateHandle.cpp
         ${COMMON_SOURCE_DIR}/ui/RotateTool.cpp
@@ -485,7 +506,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/UVView.cpp
         ${COMMON_SOURCE_DIR}/ui/UVViewHelper.cpp
         ${COMMON_SOURCE_DIR}/ui/VariableStoreModel.cpp
-        ${COMMON_SOURCE_DIR}/ui/VertexHandleManager.cpp
         ${COMMON_SOURCE_DIR}/ui/VertexTool.cpp
         ${COMMON_SOURCE_DIR}/ui/VertexToolController.cpp
         ${COMMON_SOURCE_DIR}/ui/ViewConstants.cpp
@@ -594,8 +614,10 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/Macros.h
         ${COMMON_SOURCE_DIR}/mdl/AddRemoveNodesCommand.h
         ${COMMON_SOURCE_DIR}/mdl/AddRemoveNodesUtils.h
+        ${COMMON_SOURCE_DIR}/mdl/ApplyAndSwap.h
         ${COMMON_SOURCE_DIR}/mdl/AssetReference.h
         ${COMMON_SOURCE_DIR}/mdl/AssetUtils.h
+        ${COMMON_SOURCE_DIR}/mdl/Autosaver.h
         ${COMMON_SOURCE_DIR}/mdl/BezierPatch.h
         ${COMMON_SOURCE_DIR}/mdl/Brush.h
         ${COMMON_SOURCE_DIR}/mdl/BrushBuilder.h
@@ -668,7 +690,15 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/LockState.h
         ${COMMON_SOURCE_DIR}/mdl/LongPropertyKeyValidator.h
         ${COMMON_SOURCE_DIR}/mdl/LongPropertyValueValidator.h
-        ${COMMON_SOURCE_DIR}/mdl/MapFacade.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_Assets.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_Brushes.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_CopyPaste.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_Entities.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_Geometry.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_Groups.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_Layers.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_Nodes.h
+        ${COMMON_SOURCE_DIR}/mdl/Map.h
         ${COMMON_SOURCE_DIR}/mdl/MapFormat.h
         ${COMMON_SOURCE_DIR}/mdl/Material.h
         ${COMMON_SOURCE_DIR}/mdl/MaterialCollection.h
@@ -689,6 +719,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/Palette.h
         ${COMMON_SOURCE_DIR}/mdl/ParallelUVCoordSystem.h
         ${COMMON_SOURCE_DIR}/mdl/ParaxialUVCoordSystem.h
+        ${COMMON_SOURCE_DIR}/mdl/PasteType.h
         ${COMMON_SOURCE_DIR}/mdl/PatchNode.h
         ${COMMON_SOURCE_DIR}/mdl/PickResult.h
         ${COMMON_SOURCE_DIR}/mdl/PointEntityWithBrushesValidator.h
@@ -717,7 +748,9 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/PushSelection.h
         ${COMMON_SOURCE_DIR}/mdl/Quake3Shader.h
         ${COMMON_SOURCE_DIR}/mdl/ReparentNodesCommand.h
+        ${COMMON_SOURCE_DIR}/mdl/RepeatStack.h
         ${COMMON_SOURCE_DIR}/mdl/Resource.h
+        ${COMMON_SOURCE_DIR}/mdl/ResourceId.h
         ${COMMON_SOURCE_DIR}/mdl/Selection.h
         ${COMMON_SOURCE_DIR}/mdl/SelectionChange.h
         ${COMMON_SOURCE_DIR}/mdl/SelectionCommand.h
@@ -745,6 +778,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/UVCoordSystem.h
         ${COMMON_SOURCE_DIR}/mdl/Validator.h
         ${COMMON_SOURCE_DIR}/mdl/ValidatorRegistry.h
+        ${COMMON_SOURCE_DIR}/mdl/VertexHandleManager.h
         ${COMMON_SOURCE_DIR}/mdl/VisibilityState.cpp
         ${COMMON_SOURCE_DIR}/mdl/VisibilityState.h
         ${COMMON_SOURCE_DIR}/mdl/WorldBoundsValidator.h
@@ -844,7 +878,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/AppInfoPanel.h
         ${COMMON_SOURCE_DIR}/ui/AssembleBrushTool.h
         ${COMMON_SOURCE_DIR}/ui/AssembleBrushToolController3D.h
-        ${COMMON_SOURCE_DIR}/ui/Autosaver.h
         ${COMMON_SOURCE_DIR}/ui/BorderLine.h
         ${COMMON_SOURCE_DIR}/ui/BorderPanel.h
         ${COMMON_SOURCE_DIR}/ui/BoxSelectionTool.h
@@ -971,7 +1004,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/MultiPaneMapView.h
         ${COMMON_SOURCE_DIR}/ui/ObjExportDialog.h
         ${COMMON_SOURCE_DIR}/ui/OnePaneMapView.h
-        ${COMMON_SOURCE_DIR}/ui/PasteType.h
         ${COMMON_SOURCE_DIR}/ui/PickRequest.h
         ${COMMON_SOURCE_DIR}/ui/PopupButton.h
         ${COMMON_SOURCE_DIR}/ui/PopupWindow.h
@@ -981,7 +1013,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/RecentDocumentListBox.h
         ${COMMON_SOURCE_DIR}/ui/RecentDocuments.h
         ${COMMON_SOURCE_DIR}/ui/RenderView.h
-        ${COMMON_SOURCE_DIR}/ui/RepeatStack.h
         ${COMMON_SOURCE_DIR}/ui/ReplaceMaterialDialog.h
         ${COMMON_SOURCE_DIR}/ui/RotateHandle.h
         ${COMMON_SOURCE_DIR}/ui/RotateTool.h
@@ -1034,7 +1065,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/UVView.h
         ${COMMON_SOURCE_DIR}/ui/UVViewHelper.h
         ${COMMON_SOURCE_DIR}/ui/VariableStoreModel.h
-        ${COMMON_SOURCE_DIR}/ui/VertexHandleManager.h
         ${COMMON_SOURCE_DIR}/ui/VertexTool.h
         ${COMMON_SOURCE_DIR}/ui/VertexToolBase.h
         ${COMMON_SOURCE_DIR}/ui/VertexToolController.h

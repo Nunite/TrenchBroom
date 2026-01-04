@@ -17,31 +17,39 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "MapFixture.h"
+#include "TestFactory.h"
 #include "mdl/BrushNode.h" // IWYU pragma: keep
 #include "mdl/CurrentGroupCommand.h"
 #include "mdl/GroupNode.h" // IWYU pragma: keep
+#include "mdl/Map.h"
+#include "mdl/Map_Groups.h"
+#include "mdl/Map_Nodes.h"
 #include "mdl/UpdateLinkedGroupsCommand.h"
-#include "ui/MapDocumentTest.h"
 
 #include "Catch2.h"
 
 namespace tb::mdl
 {
 
-TEST_CASE_METHOD(ui::MapDocumentTest, "UpdateLinkedGroupsCommandTest.collateWith")
+TEST_CASE("UpdateLinkedGroupsCommand")
 {
+  auto fixture = MapFixture{};
+  auto& map = fixture.map();
+  fixture.create();
+
   const auto createLinkedGroup = [&]() {
-    auto* brushNode = createBrushNode();
-    document->addNodes({{document->parentForNodes(), {brushNode}}});
-    document->selectNodes({brushNode});
+    auto brushNode = createBrushNode(map);
+    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    map.selectNodes({brushNode});
 
-    auto* groupNode = document->groupSelection("group");
-    document->selectNodes({groupNode});
+    auto* groupNode = groupSelectedNodes(map, "group");
+    map.selectNodes({groupNode});
 
-    auto* linkedGroupNode = document->createLinkedDuplicate();
-    document->deselectAll();
+    auto* linkedGroupNode = createLinkedDuplicate(map);
+    map.deselectAll();
 
-    return std::make_tuple(groupNode, linkedGroupNode);
+    return std::tuple{groupNode, linkedGroupNode};
   };
 
   auto [groupNode1, linkedGroupNode1] = createLinkedGroup();
@@ -52,8 +60,8 @@ TEST_CASE_METHOD(ui::MapDocumentTest, "UpdateLinkedGroupsCommandTest.collateWith
     auto firstCommand = UpdateLinkedGroupsCommand{{groupNode1}};
     auto secondCommand = UpdateLinkedGroupsCommand{{groupNode1, groupNode2}};
 
-    firstCommand.performDo(*document);
-    secondCommand.performDo(*document);
+    firstCommand.performDo(map);
+    secondCommand.performDo(map);
 
     CHECK(firstCommand.collateWith(secondCommand));
   }
@@ -63,8 +71,8 @@ TEST_CASE_METHOD(ui::MapDocumentTest, "UpdateLinkedGroupsCommandTest.collateWith
     auto firstCommand = UpdateLinkedGroupsCommand{{groupNode1}};
     auto secondCommand = CurrentGroupCommand{groupNode2};
 
-    firstCommand.performDo(*document);
-    secondCommand.performDo(*document);
+    firstCommand.performDo(map);
+    secondCommand.performDo(map);
 
     CHECK_FALSE(firstCommand.collateWith(secondCommand));
   }
