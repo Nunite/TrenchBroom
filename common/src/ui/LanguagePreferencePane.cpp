@@ -40,22 +40,18 @@ void LanguagePreferencePane::createGui()
     auto& prefs = PreferenceManager::instance();
     prefs.set(Preferences::Language, Preferences::languageEnglish());
     
-    // 发出语言变更信号
-    emit languageChanged();
+        emit languageChanged();
     
-    // 显示需要重启的提示
-    showRestartRequiredMessage();
+        showRestartRequiredMessage();
   });
   
   connect(m_chineseRadioButton, &QRadioButton::clicked, this, [this]() {
     auto& prefs = PreferenceManager::instance();
     prefs.set(Preferences::Language, Preferences::languageChinese());
     
-    // 发出语言变更信号
-    emit languageChanged();
+        emit languageChanged();
     
-    // 显示需要重启的提示
-    showRestartRequiredMessage();
+        showRestartRequiredMessage();
   });
 
   auto* languageLayout = new QVBoxLayout();

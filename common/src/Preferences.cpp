@@ -34,7 +34,6 @@ Preference<bool> AskForAutoUpdates{"App/Startup/AskForAutoUpdates", true};
 Preference<bool> AutoCheckForUpdates{"App/Update/CheckForUpdates", true};
 Preference<bool> IncludePreReleaseUpdates{"App/Update/IncludePreReleaseUpdates", false};
 
-// 语言设置
 QString languageEnglish() { return QApplication::tr("English"); }
 QString languageChinese() { return QApplication::tr("中文"); }
 Preference<QString> Language{"App/Ui/Language", languageChinese()};

@@ -25,7 +25,6 @@ class DrawShapeTool;
 class InputState;
 struct DragState;
 
-// 框选渲染器 - 用于显示框选区域
 class SelectionBoxRenderer
 {
 private:
@@ -41,7 +40,6 @@ public:
   void render(render::RenderContext& renderContext, render::RenderBatch& renderBatch) const;
 };
 
-// 框选工具代理
 class BoxSelectionDragDelegate : public HandleDragTrackerDelegate
 {
 private:

@@ -45,8 +45,7 @@ namespace tb::ui
 std::optional<std::tuple<std::string, mdl::MapFormat>> GameDialog::showNewDocumentDialog(
   QWidget* parent)
 {
-  // 检查当前语言设置
-  auto& prefs = PreferenceManager::instance();
+    auto& prefs = PreferenceManager::instance();
   bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
   
   QString title = isEnglish 
@@ -77,8 +76,7 @@ std::optional<std::tuple<std::string, mdl::MapFormat>> GameDialog::showNewDocume
 std::optional<std::tuple<std::string, mdl::MapFormat>> GameDialog::showOpenDocumentDialog(
   QWidget* parent)
 {
-  // 检查当前语言设置
-  auto& prefs = PreferenceManager::instance();
+    auto& prefs = PreferenceManager::instance();
   bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
   
   QString title = isEnglish 
@@ -192,8 +190,7 @@ void GameDialog::createGui(const QString& title, const QString& infoText)
 
 QWidget* GameDialog::createInfoPanel(const QString& title, const QString& infoText)
 {
-  // 检查当前语言设置
-  auto& prefs = PreferenceManager::instance();
+    auto& prefs = PreferenceManager::instance();
   bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
   
   auto* infoPanel = new QWidget{};
@@ -247,8 +244,7 @@ QWidget* GameDialog::createInfoPanel(const QString& title, const QString& infoTe
 
 QWidget* GameDialog::createSelectionPanel()
 {
-  // 检查当前语言设置
-  auto& prefs = PreferenceManager::instance();
+    auto& prefs = PreferenceManager::instance();
   bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
   
   auto* panel = new QWidget{};
@@ -302,8 +298,7 @@ QWidget* GameDialog::createSelectionPanel()
 
 void GameDialog::updateMapFormats(const std::string& gameName)
 {
-  // 检查当前语言设置
-  auto& prefs = PreferenceManager::instance();
+    auto& prefs = PreferenceManager::instance();
   bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
   
   const auto& gameFactory = mdl::GameFactory::instance();

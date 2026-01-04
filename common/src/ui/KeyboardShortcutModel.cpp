@@ -38,7 +38,6 @@
 namespace tb::ui
 {
 
-// 创建路径部分翻译映射表
 const std::unordered_map<std::string, QString> pathTranslations = {
     {"Menu", QObject::tr("菜单")},
     {"File", QObject::tr("文件")},
@@ -77,27 +76,21 @@ const std::unordered_map<std::string, QString> pathTranslations = {
     {"Manual", QObject::tr("手册")}
 };
 
-// 将路径转换为多语言显示
 // static QString translatePath(const std::filesystem::path& path) {
 //     std::string pathStr = path.generic_string();
 //     QString result;
     
-//     // 如果路径为空，返回空字符串
 //     if (pathStr.empty()) {
 //         return QString();
 //     }
     
-//     // 检查当前语言设置
 //     auto& prefs = PreferenceManager::instance();
 //     bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
     
-//     // 如果是英文，直接使用路径原始文本
 //     if (isEnglish) {
 //         return QString::fromUtf8(pathStr.c_str());
 //     }
     
-//     // 中文界面才进行翻译
-//     // 将路径按'/'分割
 //     std::vector<std::string> parts;
 //     size_t start = 0;
 //     size_t end = pathStr.find('/');
@@ -108,22 +101,18 @@ const std::unordered_map<std::string, QString> pathTranslations = {
 //         end = pathStr.find('/', start);
 //     }
     
-//     // 添加最后一部分
 //     if (start < pathStr.size()) {
 //         parts.push_back(pathStr.substr(start));
 //     }
     
-//     // 翻译每个部分
 //     for (size_t i = 0; i < parts.size(); ++i) {
 //         auto it = pathTranslations.find(parts[i]);
 //         if (it != pathTranslations.end()) {
 //             result += it->second;
 //         } else {
-//             // 如果没有找到翻译，使用原始文本
 //             result += QString::fromUtf8(parts[i].c_str());
 //         }
         
-//         // 不是最后一个部分时，添加分隔符
 //         if (i < parts.size() - 1) {
 //             result += " / ";
 //         }
@@ -167,8 +156,7 @@ QVariant KeyboardShortcutModel::headerData(
 {
   if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
   {
-    // 检查当前语言设置
-    auto& prefs = PreferenceManager::instance();
+        auto& prefs = PreferenceManager::instance();
     bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
     
     if (isEnglish) {
@@ -200,8 +188,7 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     if (index.column() == 1)
     {
       const std::string contextName = actionContextName(actionInfo.action.actionContext());
-      // 检查当前语言设置
-      auto& prefs = PreferenceManager::instance();
+            auto& prefs = PreferenceManager::instance();
       bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
       
       if (contextName == "any") {
@@ -211,13 +198,10 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
       }
     }
     
-    // 结合路径主要部分和Action的标签
-    std::string pathStr = actionInfo.displayPath.generic_string();
+        std::string pathStr = actionInfo.displayPath.generic_string();
     QString prefix;
     
-    // 提取路径中的主要类别（如"File", "Edit"等）
-    // 检查当前语言设置
-    auto& prefs = PreferenceManager::instance();
+            auto& prefs = PreferenceManager::instance();
     bool isEnglish = (prefs.get(Preferences::Language) == Preferences::languageEnglish());
     
     if (!pathStr.empty() && !isEnglish) {
@@ -237,8 +221,7 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
       }
     }
     
-    // 返回"类别/标签"的组合
-    return prefix + actionInfo.action.label();
+        return prefix + actionInfo.action.label();
   }
   if (role == Qt::ForegroundRole && hasConflicts(index))
   {
@@ -294,12 +277,10 @@ bool KeyboardShortcutModel::hasConflicts(const QModelIndex& index) const
 
 void KeyboardShortcutModel::refreshAfterLanguageChange()
 {
-  // 通知视图所有数据都需要重新获取
-  if (totalActionCount() > 0)
+    if (totalActionCount() > 0)
   {
     emit dataChanged(createIndex(0, 0), createIndex(totalActionCount() - 1, 2));
-    // 通知表头变化
-    emit headerDataChanged(Qt::Horizontal, 0, 2);
+        emit headerDataChanged(Qt::Horizontal, 0, 2);
   }
 }
 

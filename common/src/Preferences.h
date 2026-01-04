@@ -39,7 +39,6 @@ extern Preference<bool> AskForAutoUpdates;
 extern Preference<bool> AutoCheckForUpdates;
 extern Preference<bool> IncludePreReleaseUpdates;
 
-// 语言设置
 QString languageEnglish();
 QString languageChinese(); 
 extern Preference<QString> Language;

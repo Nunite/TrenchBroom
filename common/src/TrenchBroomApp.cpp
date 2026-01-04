@@ -161,36 +161,28 @@ TrenchBroomApp::TrenchBroomApp(int& argc, char** argv)
 {
   using namespace std::chrono_literals;
   
-  // 设置应用程序语言环境
-  m_translator = new QTranslator(this);
+    m_translator = new QTranslator(this);
   
-  // 根据用户选择设置语言
-  auto& prefs = PreferenceManager::instance();
+    auto& prefs = PreferenceManager::instance();
   QString locale;
   
   if (prefs.get(Preferences::Language) == Preferences::languageEnglish()) {
-    // 英文无需加载翻译文件
-    QLocale::setDefault(QLocale(QLocale::English));
+        QLocale::setDefault(QLocale(QLocale::English));
   } else {
-    // 加载中文翻译
-    QLocale::setDefault(QLocale(QLocale::Chinese, QLocale::China));
+        QLocale::setDefault(QLocale(QLocale::Chinese, QLocale::China));
     locale = "zh_CN";
     
-    // 查找并加载翻译文件，优先从资源文件中加载
-    
-    // 优先从资源文件加载
-    if (m_translator->load(QString(":/translations/trenchbroom_%1").arg(locale)))
+        
+        if (m_translator->load(QString(":/translations/trenchbroom_%1").arg(locale)))
     {
       installTranslator(m_translator);
     }
-    // 然后尝试从应用程序目录加载
-    else if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
+        else if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
                               QCoreApplication::applicationDirPath() + "/translations"))
     {
       installTranslator(m_translator);
     }
-    // 尝试在多个可能的资源路径中查找
-    else
+        else
     {
       const auto resourceDirs = io::SystemPaths::findResourceDirectories("translations");
       for (const auto& dir : resourceDirs)

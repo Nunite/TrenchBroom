@@ -7,7 +7,7 @@ on:
     branches:
       - master
       - dev
-      - better_extrude
+      - merge-upstream-sync
   pull_request:
 
 permissions:
