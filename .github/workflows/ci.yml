@@ -125,14 +125,8 @@ jobs:
             -StorePasswordInClearText \
             -Name GitHubPackages \
             -UserName "${{ env.USERNAME }}" \
-<<<<<<< HEAD
-            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
-          "$NUGET_PATH" setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
-=======
             -Password "${{ secrets.GITHUB_TOKEN }}"
-          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
-            setapikey "${{ secrets.GITHUB_TOKEN }}" \
->>>>>>> 1d9b8806f734f58bcb02288c3014302d6ebb8a89
+          "$NUGET_PATH" setapikey "${{ secrets.GITHUB_TOKEN }}" \
             -Source "${{ env.FEED_URL }}"
 
       - name: Linux - Set compiler version
@@ -214,14 +208,8 @@ jobs:
             -StorePasswordInClearText \
             -Name GitHubPackages \
             -UserName "${{ env.USERNAME }}" \
-<<<<<<< HEAD
-            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
-          mono "$NUGET_EXE" setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
-=======
             -Password "${{ secrets.GITHUB_TOKEN }}"
-          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
-            setapikey "${{ secrets.GITHUB_TOKEN }}" \
->>>>>>> 1d9b8806f734f58bcb02288c3014302d6ebb8a89
+          mono "$NUGET_EXE" setapikey "${{ secrets.GITHUB_TOKEN }}" \
             -Source "${{ env.FEED_URL }}"
 
       - name: macOS - Build
