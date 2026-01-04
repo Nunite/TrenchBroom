@@ -14,4 +14,4 @@ This document tracks the incremental merge of upstream changes into the `merge-u
 |------|---------------|--------|-------|
 | 2026-01-04 | `24e61209f63a41e6c7c438a6adeb1cead0cbd8d6` | **Success** | Merged start point. Conflicts resolved in MapViewBase and ToolBox. |
 | 2026-01-04 | `a20d0dd30bbf72d2f904b860b76c7a4f04f5e203` | **Reverted** | 错误地尝试了一次性合并700+个commit。已回滚并重新开始分批合并。 |
-| 2026-01-04 | `1d9b8806f734f58bcb02288c3014302d6ebb8a89` | **Success** | 合并后续20个commit。解决 MapViewBase.cpp 和 ci.yml 的冲突。 |
+| 2026-01-04 | `1d9b8806f734f58bcb02288c3014302d6ebb8a89` | **Success** | 合并后续20个commit。解决 MapViewBase.cpp 和 ci.yml 的冲突。编译成功，应用基本启动正常。 |
