@@ -19,6 +19,8 @@
 
 #include "SmartColorEditor.h"
 
+#include <QInputDialog>
+#include <QMenu>
 #include <QColor>
 #include <QHBoxLayout>
 #include <QLabel>

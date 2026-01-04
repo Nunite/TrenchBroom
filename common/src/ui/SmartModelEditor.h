@@ -39,7 +39,7 @@ private:
   QAbstractButton* m_browseButton = nullptr;
 
 public:
-  explicit SmartModelEditor(std::weak_ptr<MapDocument> document, QWidget* parent = nullptr);
+  explicit SmartModelEditor(MapDocument& document, QWidget* parent = nullptr);
 
 private slots:
   void browseFile();

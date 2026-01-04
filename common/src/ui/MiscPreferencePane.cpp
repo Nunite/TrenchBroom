@@ -43,8 +43,7 @@ MiscPreferencePane::MiscPreferencePane(QWidget* parent)
 	layout->addStretch();
 	setLayout(layout);
 
-	// 初始化和绑定事件
-	//auto& prefs = PreferenceManager::instance();
+		//auto& prefs = PreferenceManager::instance();
 	prefixWorldspawnOnCopy->setChecked(pref(Preferences::PrefixWorldspawnHeaderOnCopy));
 	QObject::connect(prefixWorldspawnOnCopy, &QCheckBox::toggled, this, [&](bool checked) {
 		setPref(Preferences::PrefixWorldspawnHeaderOnCopy, checked);

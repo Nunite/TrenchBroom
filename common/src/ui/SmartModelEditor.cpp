@@ -30,6 +30,8 @@
 #include "ui/QtUtils.h"
 #include "ui/MapDocument.h"
 #include "mdl/EntityNodeBase.h"
+#include "mdl/Map.h"
+#include "mdl/Game.h"
 
 #include <filesystem>
 
@@ -37,8 +39,8 @@ namespace tb::ui
 {
 
 SmartModelEditor::SmartModelEditor(
-  std::weak_ptr<MapDocument> document, QWidget* parent)
-  : SmartPropertyEditor{std::move(document), parent}
+  MapDocument& document, QWidget* parent)
+  : SmartPropertyEditor{document, parent}
 {
   m_pathLineEdit = new QLineEdit{};
   m_pathLineEdit->setReadOnly(true);
@@ -86,7 +88,7 @@ void SmartModelEditor::browseFile()
     // Assuming the model path should be relative to the game document or game path
     // You might need to adjust this logic based on how model paths are handled in TrenchBroom
     // Calculate path relative to the game path
-    auto relativeModelPathFull = std::filesystem::relative(absModelPath, document()->game()->gamePath());
+    auto relativeModelPathFull = std::filesystem::relative(absModelPath, document().map().game()->gamePath());
 
     // Find the "models/" part in the relative path
     std::string relativePathStr = relativeModelPathFull.string();

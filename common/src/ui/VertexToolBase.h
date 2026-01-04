@@ -117,7 +117,7 @@ public:
 public:
   template <typename M, typename H2>
     requires(!std::ranges::range<H2>)
-  std::vector<mdl::BrushNode*> findIncidentBrushes(
+  std::vector<mdl::BrushNode*> findIncidentBrushesForHandle(
     const M& manager, const H2& handle) const
   {
     return manager.findIncidentBrushes(handle, selectedBrushes());

@@ -311,13 +311,11 @@ void MaterialBrowser::updateSelectedMaterial()
 
 void MaterialBrowser::sizeSliderChanged(int value)
 {
-  // 将值调整为最近的50的倍数
-  int roundedValue = ((value + 25) / 50) * 50;
+    int roundedValue = ((value + 25) / 50) * 50;
   if (roundedValue < 50) roundedValue = 50;
   if (roundedValue > 600) roundedValue = 600;
   
-  // 如果值被调整了，更新滑块但不触发valueChanged信号
-  if (value != roundedValue) {
+    if (value != roundedValue) {
     m_sizeSlider->blockSignals(true);
     m_sizeSlider->setValue(roundedValue);
     m_sizeSlider->blockSignals(false);
@@ -329,8 +327,7 @@ void MaterialBrowser::sizeSliderChanged(int value)
   auto& prefs = PreferenceManager::instance();
   prefs.set(Preferences::MaterialBrowserIconSize, scaleFactor);
   
-  // 直接刷新视图，确保滑块值改变时立即更新材质预览大小
-  reload();
+    reload();
 }
 
 } // namespace tb::ui

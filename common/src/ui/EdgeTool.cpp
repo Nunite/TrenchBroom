@@ -35,7 +35,7 @@ EdgeTool::EdgeTool(mdl::Map& map)
 std::vector<mdl::BrushNode*> EdgeTool::findIncidentBrushes(
   const vm::segment3d& handle) const
 {
-  return findIncidentBrushes(handleManager(), handle);
+  return findIncidentBrushesForHandle(handleManager(), handle);
 }
 
 void EdgeTool::pick(

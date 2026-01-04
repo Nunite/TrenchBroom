@@ -52,6 +52,9 @@ class Game;
 class Map;
 class Node;
 class PickResult;
+class EntityNode;
+class BrushNode;
+class Entity;
 } // namespace tb::mdl
 
 namespace tb::ui
@@ -99,6 +102,10 @@ private:
 public:
   explicit MapDocument(kdl::task_manager& taskManager);
   ~MapDocument() override;
+
+public:
+  mdl::EntityNode* createSingleBrushEntity(
+    mdl::BrushNode* brushNode, const mdl::Entity& templateEntity);
 
 public: // accessors and such
   mdl::Map& map();

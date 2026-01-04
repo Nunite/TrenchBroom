@@ -35,7 +35,7 @@ FaceTool::FaceTool(mdl::Map& map)
 std::vector<mdl::BrushNode*> FaceTool::findIncidentBrushes(
   const vm::polygon3d& handle) const
 {
-  return findIncidentBrushes(m_map.faceHandles(), handle);
+  return findIncidentBrushesForHandle(m_map.faceHandles(), handle);
 }
 
 void FaceTool::pick(

@@ -27,6 +27,9 @@ class QColor;
 class QWidget;
 class QPushButton;
 class QRadioButton;
+class QCheckBox;
+class QSlider;
+class QLabel;
 
 namespace tb::ui
 {
@@ -77,6 +80,8 @@ private:
   void byteRangeRadioButtonClicked();
   void colorPickerChanged(const QColor& color);
   void colorTableSelected(QColor color);
+  void alphaCheckBoxToggled(bool checked);
+  bool eventFilter(QObject* watched, QEvent* event) override;
 };
 
 } // namespace tb::ui

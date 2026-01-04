@@ -16,3 +16,4 @@ This document tracks the incremental merge of upstream changes into the `merge-u
 | 2026-01-04 | `a20d0dd30bbf72d2f904b860b76c7a4f04f5e203` | **Reverted** | 错误地尝试了一次性合并700+个commit。已回滚并重新开始分批合并。 |
 | 2026-01-04 | `1d9b8806f734f58bcb02288c3014302d6ebb8a89` | **Success** | 合并后续20个commit。解决 MapViewBase.cpp 和 ci.yml 的冲突。编译成功，应用基本启动正常。 |
 | 2026-01-04 | `9c12efebb` | **Success** | 合并后续20个commit。解决 MapFrame.cpp, SmartColorEditor.cpp, MapViewBase.cpp 等文件的API冲突（Selection API重构）。编译成功。 |
+| 2026-01-04 | `eaf1e4387` | **Success** | 合并后续20个commit。解决 mdl::Map 重构导致的大量编译错误（SmartModelEditor, MapViewBase, VertexTool 等）。编译成功。 |

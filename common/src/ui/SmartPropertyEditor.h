@@ -55,6 +55,7 @@ public:
   void deactivate();
 
 protected:
+  MapDocument& document() { return m_document; }
   mdl::Map& map();
   const std::string& propertyKey() const;
   const std::vector<mdl::EntityNodeBase*> nodes() const;

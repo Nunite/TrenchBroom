@@ -31,6 +31,7 @@
 #include "mdl/GameFactory.h"
 #include "mdl/LinkedGroupUtils.h"
 #include "mdl/Map.h"
+#include "mdl/Map_Nodes.h"
 #include "mdl/MaterialManager.h"
 #include "mdl/PortalFile.h"
 #include "mdl/PushSelection.h"
@@ -265,26 +266,26 @@ void MapDocument::entityDefinitionsDidChange()
 mdl::EntityNode* MapDocument::createSingleBrushEntity(
   mdl::BrushNode* brushNode, const mdl::Entity& templateEntity)
 {
-    auto entity = templateEntity;
+  auto entity = templateEntity;
 
-    auto* entityNode = new mdl::EntityNode{std::move(entity)};
+  auto* entityNode = new mdl::EntityNode{std::move(entity)};
 
-    auto transaction = mdl::Transaction{map(), "Create Entity from Template"};
-  this->deselectAll();
+  auto transaction = mdl::Transaction{map(), "Create Entity from Template"};
+  map().deselectAll();
 
-    if (this->addNodes({{this->parentForNodes(), {entityNode}}}).empty())
+  if (mdl::addNodes(map(), {{mdl::parentForNodes(map()), {entityNode}}}).empty())
   {
     transaction.cancel();
     return nullptr;
   }
 
-    if (!this->reparentNodes({{entityNode, {brushNode}}}))
+  if (!mdl::reparentNodes(map(), {{entityNode, {brushNode}}}))
   {
     transaction.cancel();
     return nullptr;
   }
 
-  this->selectNodes({brushNode});
+  map().selectNodes({brushNode});
 
   if (!transaction.commit())
   {

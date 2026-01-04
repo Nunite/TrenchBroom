@@ -17,7 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "MapViewBase.h"
+#include "ui/MapViewBase.h"
 
 #include <QDebug>
 #include <QMenu>
@@ -29,9 +29,12 @@
 #include "Logger.h"
 #include "PreferenceManager.h"
 #include "Preferences.h"
+#include "gl/Camera.h"
+#include "gl/ContextManager.h"
+#include "gl/FontDescriptor.h"
+#include "gl/FontManager.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
-#include "mdl/ChangeBrushFaceAttributesRequest.h"
 #include "mdl/EditorContext.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityDefinition.h"
@@ -40,7 +43,8 @@
 #include "mdl/EntityDefinitionUtils.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityProperties.h"
-#include "mdl/Game.h"
+#include "mdl/GameConfig.h"
+#include "mdl/GameInfo.h"
 #include "mdl/Grid.h"
 #include "mdl/GroupNode.h"
 #include "mdl/HitAdapter.h"
@@ -53,38 +57,38 @@
 #include "mdl/Map_Groups.h"
 #include "mdl/Map_Layers.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
+#include "mdl/Map_World.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/PatchNode.h"
 #include "mdl/PointTrace.h"
-#include "mdl/PortalFile.h"
-#include "mdl/Selection.h"
 #include "mdl/Transaction.h"
+#include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/WorldNode.h"
-#include "render/Camera.h"
 #include "render/Compass.h"
-#include "render/FontDescriptor.h"
-#include "render/FontManager.h"
 #include "render/MapRenderer.h"
 #include "render/PrimitiveRenderer.h"
 #include "render/RenderBatch.h"
 #include "render/RenderContext.h"
 #include "render/RenderService.h"
-#include "ui/Actions.h"
+#include "ui/ActionExecutionContext.h"
+#include "ui/ActionManager.h"
 #include "ui/Animation.h"
+#include "ui/AppController.h"
 #include "ui/EnableDisableTagCallback.h"
 #include "ui/FlashSelectionAnimation.h"
-#include "ui/GLContextManager.h"
 #include "ui/MapDocument.h"
 #include "ui/MapFrame.h"
 #include "ui/MapViewActivationTracker.h"
 #include "ui/MapViewToolBox.h"
-#include "ui/QtUtils.h"
 #include "ui/SelectionTool.h"
 #include "ui/SignalDelayer.h"
 
-#include "kdl/string_compare.h"
-#include "kdl/string_format.h"
-#include "kdl/vector_utils.h"
+#include "kd/contracts.h"
+#include "kd/ranges/to.h"
+#include "kd/string_compare.h"
+#include "kd/string_format.h"
+#include "kd/vector_utils.h"
 
 #include "vm/polygon.h"
 #include "vm/util.h"
@@ -114,14 +118,14 @@ auto getCreateableEntityDefinitions(
 const int MapViewBase::DefaultCameraAnimationDuration = 250;
 
 MapViewBase::MapViewBase(
+  AppController& appController,
   MapDocument& document,
   MapViewToolBox& toolBox,
-  render::MapRenderer& renderer,
-  GLContextManager& contextManager)
+  gl::ContextManager& contextManager)
   : RenderView{contextManager}
+  , m_appController{appController}
   , m_document{document}
   , m_toolBox{toolBox}
-  , m_renderer{renderer}
   , m_animationManager{std::make_unique<AnimationManager>(this)}
   , m_updateActionStatesSignalDelayer{new SignalDelayer{this}}
 {
@@ -165,37 +169,19 @@ void MapViewBase::bindEvents()
 
 void MapViewBase::connectObservers()
 {
-  auto& map = m_document.map();
   m_notifierConnection +=
-    map.nodesWereAddedNotifier.connect(this, &MapViewBase::nodesDidChange);
+    m_document.documentWasLoadedNotifier.connect(this, &MapViewBase::documentWasLoaded);
   m_notifierConnection +=
-    map.nodesWereRemovedNotifier.connect(this, &MapViewBase::nodesDidChange);
-  m_notifierConnection +=
-    map.nodesDidChangeNotifier.connect(this, &MapViewBase::nodesDidChange);
-  m_notifierConnection +=
-    map.nodeVisibilityDidChangeNotifier.connect(this, &MapViewBase::nodesDidChange);
-  m_notifierConnection +=
-    map.nodeLockingDidChangeNotifier.connect(this, &MapViewBase::nodesDidChange);
-  m_notifierConnection +=
-    map.commandDoneNotifier.connect(this, &MapViewBase::commandDone);
-  m_notifierConnection +=
-    map.commandUndoneNotifier.connect(this, &MapViewBase::commandUndone);
-  m_notifierConnection +=
-    map.selectionDidChangeNotifier.connect(this, &MapViewBase::selectionDidChange);
-  m_notifierConnection += map.materialCollectionsDidChangeNotifier.connect(
+    m_document.documentDidChangeNotifier.connect(this, &MapViewBase::documentDidChange);
+
+  m_notifierConnection += m_document.materialCollectionsDidChangeNotifier.connect(
     this, &MapViewBase::materialCollectionsDidChange);
-  m_notifierConnection += map.entityDefinitionsDidChangeNotifier.connect(
+  m_notifierConnection += m_document.entityDefinitionsDidChangeNotifier.connect(
     this, &MapViewBase::entityDefinitionsDidChange);
   m_notifierConnection +=
-    map.modsDidChangeNotifier.connect(this, &MapViewBase::modsDidChange);
-  m_notifierConnection += map.editorContextDidChangeNotifier.connect(
+    m_document.modsDidChangeNotifier.connect(this, &MapViewBase::modsDidChange);
+  m_notifierConnection += m_document.editorContextDidChangeNotifier.connect(
     this, &MapViewBase::editorContextDidChange);
-  m_notifierConnection +=
-    map.mapWasCreatedNotifier.connect(this, &MapViewBase::mapWasCreated);
-  m_notifierConnection +=
-    map.mapWasLoadedNotifier.connect(this, &MapViewBase::mapWasLoaded);
-  m_notifierConnection +=
-    map.mapWasClearedNotifier.connect(this, &MapViewBase::mapWasCleared);
   m_notifierConnection +=
     m_document.pointFileWasLoadedNotifier.connect(this, &MapViewBase::pointFileDidChange);
   m_notifierConnection += m_document.pointFileWasUnloadedNotifier.connect(
@@ -205,9 +191,8 @@ void MapViewBase::connectObservers()
   m_notifierConnection += m_document.portalFileWasUnloadedNotifier.connect(
     this, &MapViewBase::portalFileDidChange);
 
-  auto& grid = map.grid();
   m_notifierConnection +=
-    grid.gridDidChangeNotifier.connect(this, &MapViewBase::gridDidChange);
+    m_document.gridDidChangeNotifier.connect(this, &MapViewBase::gridDidChange);
 
   m_notifierConnection +=
     m_toolBox.toolActivatedNotifier.connect(this, &MapViewBase::toolChanged);
@@ -229,9 +214,16 @@ void MapViewBase::createActionsAndUpdatePicking()
   updatePickResult();
 }
 
-void MapViewBase::nodesDidChange(const std::vector<mdl::Node*>&)
+void MapViewBase::documentWasLoaded()
+{
+  createActionsAndUpdatePicking();
+  update();
+}
+
+void MapViewBase::documentDidChange()
 {
   updatePickResult();
+  updateActionStates();
   update();
 }
 
@@ -242,25 +234,6 @@ void MapViewBase::toolChanged(Tool&)
   update();
 }
 
-void MapViewBase::commandDone(mdl::Command&)
-{
-  updateActionStatesDelayed();
-  updatePickResult();
-  update();
-}
-
-void MapViewBase::commandUndone(mdl::UndoableCommand&)
-{
-  updateActionStatesDelayed();
-  updatePickResult();
-  update();
-}
-
-void MapViewBase::selectionDidChange(const mdl::SelectionChange&)
-{
-  updateActionStatesDelayed();
-}
-
 void MapViewBase::materialCollectionsDidChange()
 {
   update();
@@ -269,8 +242,6 @@ void MapViewBase::materialCollectionsDidChange()
 void MapViewBase::entityDefinitionsDidChange()
 {
   createActions();
-  updateActionStates();
-  update();
 }
 
 void MapViewBase::modsDidChange()
@@ -301,30 +272,12 @@ void MapViewBase::portalFileDidChange()
 
 void MapViewBase::preferenceDidChange(const std::filesystem::path& path)
 {
-  if (path == Preferences::RendererFontSize.path())
+  if (path == Preferences::RendererFontSize.path)
   {
     fontManager().clearCache();
   }
 
   updateActionBindings();
-  update();
-}
-
-void MapViewBase::mapWasCreated(mdl::Map&)
-{
-  createActionsAndUpdatePicking();
-  update();
-}
-
-void MapViewBase::mapWasLoaded(mdl::Map&)
-{
-  createActionsAndUpdatePicking();
-  update();
-}
-
-void MapViewBase::mapWasCleared(mdl::Map&)
-{
-  createActionsAndUpdatePicking();
   update();
 }
 
@@ -339,7 +292,7 @@ void MapViewBase::createActions()
   m_shortcuts.clear();
 
   auto visitor = [this](const Action& action) {
-    const auto keySequence = action.keySequence();
+    const auto& keySequence = pref(action.preference());
 
     auto* shortcut = new QShortcut{this};
     shortcut->setContext(Qt::WidgetWithChildrenShortcut);
@@ -352,26 +305,27 @@ void MapViewBase::createActions()
     m_shortcuts.emplace_back(shortcut, &action);
   };
 
-  auto& actionManager = ActionManager::instance();
+  const auto& actionManager = m_appController.actionManager();
   // We don't create a QShortcut for actions whose key binding is handled
   // by the menu or toolbar since they would conflict.
   actionManager.visitMapViewActions(visitor);
 
-  m_document.visitTagActions(visitor);
-  m_document.visitEntityDefinitionActions(visitor);
+  m_document.visitTagActions(actionManager, visitor);
+  m_document.visitEntityDefinitionActions(actionManager, visitor);
 }
 
 void MapViewBase::updateActionBindings()
 {
   for (auto& [shortcut, action] : m_shortcuts)
   {
-    shortcut->setKey(action->keySequence());
+    shortcut->setKey(pref(action->preference()));
   }
 }
 
 void MapViewBase::updateActionStates()
 {
-  auto context = ActionExecutionContext{findMapFrame(this), this};
+  auto* mapFrame = dynamic_cast<MapFrame*>(window());
+  auto context = ActionExecutionContext{m_appController, mapFrame, this};
   for (auto& [shortcut, action] : m_shortcuts)
   {
     shortcut->setEnabled(hasFocus() && action->enabled(context));
@@ -385,7 +339,8 @@ void MapViewBase::updateActionStatesDelayed()
 
 void MapViewBase::triggerAction(const Action& action)
 {
-  auto context = ActionExecutionContext{findMapFrame(this), this};
+  auto* mapFrame = dynamic_cast<MapFrame*>(window());
+  auto context = ActionExecutionContext{m_appController, mapFrame, this};
   action.execute(context);
 }
 
@@ -608,20 +563,16 @@ void MapViewBase::flipUV(const vm::direction direction)
 
 void MapViewBase::resetUV()
 {
-  auto request = mdl::ChangeBrushFaceAttributesRequest{};
-
   auto& map = m_document.map();
-  request.resetAll(map.game()->config().faceAttribsConfig.defaults);
-  setBrushFaceAttributes(map, request);
+  setBrushFaceAttributes(
+    map, mdl::resetAll(map.gameInfo().gameConfig.faceAttribsConfig.defaults));
 }
 
 void MapViewBase::resetUVToWorld()
 {
-  auto request = mdl::ChangeBrushFaceAttributesRequest{};
-
   auto& map = m_document.map();
-  request.resetAllToParaxial(map.game()->config().faceAttribsConfig.defaults);
-  setBrushFaceAttributes(map, request);
+  setBrushFaceAttributes(
+    map, mdl::resetAllToParaxial(map.gameInfo().gameConfig.faceAttribsConfig.defaults));
 }
 
 void MapViewBase::assembleBrush()
@@ -654,7 +605,7 @@ void MapViewBase::cancel()
     auto& map = m_document.map();
     if (map.selection().hasAny())
     {
-      map.deselectAll();
+      deselectAll(map);
     }
     else if (map.editorContext().currentGroup())
     {
@@ -676,7 +627,7 @@ void MapViewBase::createPointEntity()
   const auto classname = action->data().toString().toStdString();
   if (const auto* definition = map.entityDefinitionManager().definition(classname))
   {
-    assert(getType(*definition) == mdl::EntityDefinitionType::Point);
+    contract_assert(getType(*definition) == mdl::EntityDefinitionType::Point);
     createPointEntity(*definition);
   }
   else
@@ -703,7 +654,7 @@ void MapViewBase::createBrushEntity()
 
 void MapViewBase::createPointEntity(const mdl::EntityDefinition& definition)
 {
-  ensure(definition.pointEntityDefinition, "definition is a point entity definition");
+  contract_pre(definition.pointEntityDefinition);
 
   auto& map = m_document.map();
   const auto delta = computePointEntityPosition(definition.pointEntityDefinition->bounds);
@@ -735,9 +686,9 @@ void MapViewBase::toggleTagVisible(const mdl::SmartTag& tag)
 
 void MapViewBase::enableTag(const mdl::SmartTag& tag)
 {
-  assert(tag.canEnable());
-  auto& map = m_document.map();
+  contract_pre(tag.canEnable());
 
+  auto& map = m_document.map();
   auto transaction = mdl::Transaction{map, "Turn Selection into " + tag.name()};
   auto callback = EnableDisableTagCallback{};
   tag.enable(callback, map);
@@ -746,7 +697,8 @@ void MapViewBase::enableTag(const mdl::SmartTag& tag)
 
 void MapViewBase::disableTag(const mdl::SmartTag& tag)
 {
-  assert(tag.canDisable());
+  contract_pre(tag.canDisable());
+
   auto& map = m_document.map();
   auto transaction = mdl::Transaction{map, "Turn Selection into non-" + tag.name()};
   auto callback = EnableDisableTagCallback{};
@@ -764,11 +716,10 @@ void MapViewBase::makeStructural()
 
   auto toReparent = std::vector<mdl::Node*>{};
   const auto& selectedBrushes = map.selection().brushes;
-  std::copy_if(
-    selectedBrushes.begin(),
-    selectedBrushes.end(),
-    std::back_inserter(toReparent),
-    [&](const auto* brushNode) { return brushNode->entity() != map.world(); });
+  std::ranges::copy_if(
+    selectedBrushes, std::back_inserter(toReparent), [&](const auto* brushNode) {
+      return brushNode->entity() != &map.worldNode();
+    });
 
   auto transaction = mdl::Transaction{map, "Make Structural"};
 
@@ -864,17 +815,17 @@ void MapViewBase::toggleShowBrushes()
 
 void MapViewBase::showMaterials()
 {
-  setPref(Preferences::FaceRenderMode, Preferences::faceRenderModeTextured());
+  setPref(Preferences::FaceRenderMode, Preferences::FaceRenderModeTextured);
 }
 
 void MapViewBase::hideMaterials()
 {
-  setPref(Preferences::FaceRenderMode, Preferences::faceRenderModeFlat());
+  setPref(Preferences::FaceRenderMode, Preferences::FaceRenderModeFlat);
 }
 
 void MapViewBase::hideFaces()
 {
-  setPref(Preferences::FaceRenderMode, Preferences::faceRenderModeSkip());
+  setPref(Preferences::FaceRenderMode, Preferences::FaceRenderModeSkip);
 }
 
 void MapViewBase::toggleShadeFaces()
@@ -894,22 +845,22 @@ void MapViewBase::toggleShowEdges()
 
 void MapViewBase::showAllEntityLinks()
 {
-  setPref(Preferences::FaceRenderMode, Preferences::entityLinkModeAll());
+  setPref(Preferences::FaceRenderMode, Preferences::EntityLinkModeAll);
 }
 
 void MapViewBase::showTransitivelySelectedEntityLinks()
 {
-  setPref(Preferences::FaceRenderMode, Preferences::entityLinkModeTransitive());
+  setPref(Preferences::FaceRenderMode, Preferences::EntityLinkModeTransitive);
 }
 
 void MapViewBase::showDirectlySelectedEntityLinks()
 {
-  setPref(Preferences::FaceRenderMode, Preferences::entityLinkModeDirect());
+  setPref(Preferences::FaceRenderMode, Preferences::EntityLinkModeDirect);
 }
 
 void MapViewBase::hideAllEntityLinks()
 {
-  setPref(Preferences::FaceRenderMode, Preferences::entityLinkModeNone());
+  setPref(Preferences::FaceRenderMode, Preferences::EntityLinkModeNone);
 }
 
 bool MapViewBase::event(QEvent* event)
@@ -961,7 +912,8 @@ ActionContext::Type MapViewBase::actionContext() const
 
 void MapViewBase::flashSelection()
 {
-  auto animation = std::make_unique<FlashSelectionAnimation>(m_renderer, this, 180);
+  auto animation =
+    std::make_unique<FlashSelectionAnimation>(m_document.mapRenderer(), this, 180);
   m_animationManager->runAnimation(std::move(animation), true);
 }
 
@@ -995,9 +947,9 @@ void MapViewBase::initializeGL()
   if (doInitializeGL())
   {
     auto& logger = m_document.logger();
-    logger.info() << "Renderer info: " << GLContextManager::GLRenderer << " version "
-                  << GLContextManager::GLVersion << " from "
-                  << GLContextManager::GLVendor;
+    logger.info() << "Renderer info: " << gl::ContextManager::GLRenderer << " version "
+                  << gl::ContextManager::GLVersion << " from "
+                  << gl::ContextManager::GLVendor;
     logger.info() << "Depth buffer bits: " << depthBits();
     logger.info() << "Multisampling "
                   << kdl::str_select(multisample(), "enabled", "disabled");
@@ -1013,9 +965,9 @@ void MapViewBase::renderContents()
 {
   preRender();
 
-  const auto& fontPath = pref(Preferences::RendererFontPath());
+  const auto& fontPath = pref(Preferences::RendererFontPath);
   const auto fontSize = static_cast<size_t>(pref(Preferences::RendererFontSize));
-  const auto fontDescriptor = render::FontDescriptor{fontPath, fontSize};
+  const auto fontDescriptor = gl::FontDescriptor{fontPath, fontSize};
 
   const auto& map = m_document.map();
   const auto& grid = map.grid();
@@ -1025,9 +977,9 @@ void MapViewBase::renderContents()
   renderContext.setFilterMode(
     pref(Preferences::TextureMinFilter), pref(Preferences::TextureMagFilter));
   renderContext.setShowMaterials(
-    pref(Preferences::FaceRenderMode) == Preferences::faceRenderModeTextured());
+    pref(Preferences::FaceRenderMode) == Preferences::FaceRenderModeTextured);
   renderContext.setShowFaces(
-    pref(Preferences::FaceRenderMode) != Preferences::faceRenderModeSkip());
+    pref(Preferences::FaceRenderMode) != Preferences::FaceRenderModeSkip);
   renderContext.setShowEdges(pref(Preferences::ShowEdges));
   renderContext.setShadeFaces(pref(Preferences::ShadeFaces));
   renderContext.setShowPointEntities(pref(Preferences::ShowPointEntities));
@@ -1042,7 +994,7 @@ void MapViewBase::renderContents()
   renderContext.setDpiScale(static_cast<float>(window()->devicePixelRatioF()));
   renderContext.setSoftMapBounds(
     pref(Preferences::ShowSoftMapBounds)
-      ? vm::bbox3f{map.softMapBounds().bounds.value_or(vm::bbox3d{})}
+      ? vm::bbox3f{softMapBounds(map).bounds.value_or(vm::bbox3d{})}
       : vm::bbox3f{});
 
   setupGL(renderContext);
@@ -1051,7 +1003,7 @@ void MapViewBase::renderContents()
   auto renderBatch = render::RenderBatch{vboManager()};
 
   renderGrid(renderContext, renderBatch);
-  renderMap(m_renderer, renderContext, renderBatch);
+  renderMap(m_document.mapRenderer(), renderContext, renderBatch);
   renderTools(m_toolBox, renderContext, renderBatch);
 
   renderCoordinateSystem(renderContext, renderBatch);
@@ -1128,7 +1080,7 @@ void MapViewBase::renderPortalFile(
   if (!m_portalFileRenderer)
   {
     validatePortalFileRenderer(renderContext);
-    assert(m_portalFileRenderer);
+    contract_assert(m_portalFileRenderer);
   }
   renderBatch.add(m_portalFileRenderer.get());
 }
@@ -1140,7 +1092,8 @@ void MapViewBase::invalidatePortalFileRenderer()
 
 void MapViewBase::validatePortalFileRenderer(render::RenderContext&)
 {
-  assert(m_portalFileRenderer == nullptr);
+  contract_pre(m_portalFileRenderer == nullptr);
+
   m_portalFileRenderer = std::make_unique<render::PrimitiveRenderer>();
 
   if (const auto* portals = m_document.portals())
@@ -1217,19 +1170,26 @@ void MapViewBase::showPopupMenuLater()
 {
   beforePopupMenu();
 
+<<<<<<< HEAD:common/src/ui/MapViewBase.cpp
+  auto document = kdl::mem_lock(m_document);
+  const auto& nodes = document->selectedNodes().nodes();
+  
+=======
   auto& map = m_document.map();
   const auto& nodes = map.selection().nodes;
+>>>>>>> a20d0dd30bbf72d2f904b860b76c7a4f04f5e203:lib/TbUiLib/src/MapViewBase.cpp
   auto* newBrushParent = findNewParentEntityForBrushes(nodes);
   auto* currentGroup = map.editorContext().currentGroup();
   auto* newGroup = findNewGroupForObjects(nodes);
   auto* mergeGroup = findGroupToMergeGroupsInto(map.selection());
 
-  auto* mapFrame = findMapFrame(this);
+  auto* mapFrame = dynamic_cast<MapFrame*>(window());
 
   auto menu = QMenu{};
   const auto addMainMenuAction = [&](const auto& path) -> QAction* {
     auto* groupAction = mapFrame->findAction(path);
-    assert(groupAction);
+    contract_assert(groupAction);
+
     menu.addAction(groupAction);
     return groupAction;
   };
@@ -1245,9 +1205,7 @@ void MapViewBase::showPopupMenuLater()
     &MapViewBase::mergeSelectedGroups);
   mergeGroupAction->setEnabled(canMergeGroups());
 
-  auto* renameAction =
-    menu.addAction(tr("Rename Groups"), mapFrame, &MapFrame::renameSelectedGroups);
-  renameAction->setEnabled(mapFrame->canRenameSelectedGroups());
+  addMainMenuAction("Menu/Edit/Rename Groups");
 
 
   if (newGroup && canReparentNodes(nodes, newGroup))
@@ -1279,7 +1237,7 @@ void MapViewBase::showPopupMenuLater()
   const auto selectedObjectLayers = mdl::collectContainingLayersUserSorted(nodes);
 
   auto* moveSelectionTo = menu.addMenu(tr("Move to Layer"));
-  for (auto* layerNode : map.world()->allLayersUserSorted())
+  for (auto* layerNode : map.worldNode().allLayersUserSorted())
   {
     auto* action = moveSelectionTo->addAction(
       QString::fromStdString(layerNode->name()), this, [&map, layerNode] {
@@ -1289,10 +1247,8 @@ void MapViewBase::showPopupMenuLater()
   }
 
   const auto moveSelectionToItems = moveSelectionTo->actions();
-  moveSelectionTo->setEnabled(std::any_of(
-    std::begin(moveSelectionToItems),
-    std::end(moveSelectionToItems),
-    [](QAction* action) { return action->isEnabled(); }));
+  moveSelectionTo->setEnabled(std::ranges::any_of(
+    moveSelectionToItems, [](QAction* action) { return action->isEnabled(); }));
 
   if (selectedObjectLayers.size() == 1u)
   {
@@ -1332,9 +1288,9 @@ void MapViewBase::showPopupMenuLater()
   isolateLayersAction->setEnabled(canIsolateLayers(map, selectedObjectLayers));
   auto* selectAllInLayersAction =
     menu.addAction(tr("Select All in Layers"), this, [&map, selectedObjectLayers]() {
-      map.selectAllInLayers(selectedObjectLayers);
+      selectAllInLayers(map, selectedObjectLayers);
     });
-  selectAllInLayersAction->setEnabled(map.canSelectAllInLayers(selectedObjectLayers));
+  selectAllInLayersAction->setEnabled(canSelectAllInLayers(map, selectedObjectLayers));
 
   menu.addSeparator();
 
@@ -1381,10 +1337,12 @@ void MapViewBase::showPopupMenuLater()
   menu.addMenu(makeEntityGroupsMenu(mdl::EntityDefinitionType::Point));
   menu.addMenu(makeEntityGroupsMenu(mdl::EntityDefinitionType::Brush));
 
-    if (nodes.size() == 1) {
+  
+  if (nodes.size() == 1) {
     const auto* node = nodes.front();
     
-        const auto isEntityNode = node->accept(kdl::overload(
+    
+    const auto isEntityNode = node->accept(kdl::overload(
       [](const mdl::WorldNode*) { return false; },
       [](const mdl::LayerNode*) { return false; },
       [](const mdl::GroupNode*) { return false; },
@@ -1392,30 +1350,36 @@ void MapViewBase::showPopupMenuLater()
       [](const mdl::BrushNode*) { return false; },
       [](const mdl::PatchNode*) { return false; }));
     
-        mdl::EntityNode* parentEntity = nullptr;
+    
+    mdl::EntityNode* parentEntity = nullptr;
     const auto hasBrushWithParentEntity = node->accept(kdl::overload(
       [](const mdl::WorldNode*) { return false; },
       [](const mdl::LayerNode*) { return false; },
       [](const mdl::GroupNode*) { return false; },
       [](const mdl::EntityNode*) { return false; },
       [&](const mdl::BrushNode* brushNode) {
-                parentEntity = dynamic_cast<mdl::EntityNode*>(brushNode->parent());
-                return parentEntity != nullptr && !parentEntity->entity().classname().empty() && 
+        
+        parentEntity = dynamic_cast<mdl::EntityNode*>(brushNode->parent());
+        
+        return parentEntity != nullptr && !parentEntity->entity().classname().empty() && 
                parentEntity->entity().classname() != "worldspawn";
       },
       [](const mdl::PatchNode*) { return false; }));
 
     if (isEntityNode) {
-            menu.addAction(tr("Set as Entity Template"), this, &MapViewBase::setSelectedEntityAsTemplate);
+      
+      menu.addAction(tr("Set as Entity Template"), this, &MapViewBase::setSelectedEntityAsTemplate);
     } else if (hasBrushWithParentEntity && parentEntity) {
-            menu.addAction(
+      
+      menu.addAction(
         tr("Set %1 as Entity Template").arg(QString::fromStdString(parentEntity->entity().classname())), 
         this, 
         [this, parentEntity]() { setTemplateEntity(parentEntity); });
     }
   }
   
-    if (m_document.map().selection().hasOnlyBrushes() && hasTemplateEntity()) {
+  
+  if (document->selectedNodes().hasOnlyBrushes() && hasTemplateEntity()) {
     menu.addSeparator();
     menu.addAction(
       tr("Apply Entity Template (%1)").arg(QString::fromStdString(m_templateEntityClassName)),
@@ -1500,7 +1464,16 @@ QMenu* MapViewBase::makeEntityGroupsMenu(const mdl::EntityDefinitionType type)
   const auto& map = m_document.map();
   for (const auto& group : map.entityDefinitionManager().groups())
   {
+<<<<<<< HEAD:common/src/ui/MapViewBase.cpp
     const auto creatableDefinitions = getCreateableEntityDefinitions(group, type);
+=======
+    auto creatableDefinitions =
+      filterAndSort(group.definitions, type, mdl::EntityDefinitionSortOrder::Name)
+      | std::views::filter([](const auto* d) {
+          return !kdl::cs::str_is_equal(
+            d->name, mdl::EntityPropertyValues::WorldspawnClassname);
+        });
+>>>>>>> a20d0dd30bbf72d2f904b860b76c7a4f04f5e203:lib/TbUiLib/src/MapViewBase.cpp
 
     if (!std::ranges::empty(creatableDefinitions))
     {
@@ -1509,7 +1482,8 @@ QMenu* MapViewBase::makeEntityGroupsMenu(const mdl::EntityDefinitionType type)
 
       for (const auto* definition : creatableDefinitions)
       {
-        const auto label = fromStdStringView(mdl::getShortName(*definition));
+        const auto label =
+          QString::fromStdString(std::string{mdl::getShortName(*definition)});
         QAction* action = nullptr;
 
         switch (type)
@@ -1541,13 +1515,14 @@ void MapViewBase::addSelectedObjectsToGroup()
 {
   auto& map = m_document.map();
   const auto nodes = map.selection().nodes;
+
   auto* newGroup = findNewGroupForObjects(nodes);
-  ensure(newGroup, "newGroup is null");
+  contract_assert(newGroup != nullptr);
 
   auto transaction = mdl::Transaction{map, "Add Objects to Group"};
   reparentNodes(nodes, newGroup, true);
-  map.deselectAll();
-  map.selectNodes({newGroup});
+  deselectAll(map);
+  selectNodes(map, {newGroup});
   transaction.commit();
 }
 
@@ -1558,7 +1533,7 @@ void MapViewBase::removeSelectedObjectsFromGroup()
 
   const auto nodes = map.selection().nodes;
   auto* currentGroup = editorContext.currentGroup();
-  ensure(currentGroup, "currentGroup is null");
+  contract_assert(currentGroup);
 
   auto transaction = mdl::Transaction{map, "Remove Objects from Group"};
   reparentNodes(nodes, editorContext.currentLayer(), true);
@@ -1567,7 +1542,7 @@ void MapViewBase::removeSelectedObjectsFromGroup()
   {
     closeGroup(map);
   }
-  map.selectNodes(nodes);
+  selectNodes(map, nodes);
   transaction.commit();
 }
 
@@ -1591,7 +1566,7 @@ void MapViewBase::mergeSelectedGroups()
 {
   auto& map = m_document.map();
   auto* newGroup = findGroupToMergeGroupsInto(map.selection());
-  ensure(newGroup, "newGroup is null");
+  contract_assert(newGroup != nullptr);
 
   auto transaction = mdl::Transaction{map, "Merge Groups"};
   mergeSelectedGroupsWithGroup(map, newGroup);
@@ -1613,7 +1588,7 @@ mdl::GroupNode* MapViewBase::findGroupToMergeGroupsInto(
   {
     if (auto* mergeTarget = findOutermostClosedGroup(mdl::hitToNode(hits.front())))
     {
-      if (kdl::all_of(selection.nodes, [&](const auto* node) {
+      if (std::ranges::all_of(selection.nodes, [&](const auto* node) {
             return node == mergeTarget || canReparentNode(node, mergeTarget);
           }))
       {
@@ -1635,14 +1610,14 @@ void MapViewBase::moveSelectedBrushesToEntity()
   auto& map = m_document.map();
   const auto nodes = map.selection().nodes;
   auto* newParent = findNewParentEntityForBrushes(nodes);
-  ensure(newParent, "newParent is null");
+  contract_assert(newParent);
 
   auto transaction =
     mdl::Transaction{map, "Move " + kdl::str_plural(nodes.size(), "Brush", "Brushes")};
   reparentNodes(nodes, newParent, false);
 
-  map.deselectAll();
-  map.selectNodes(nodes);
+  deselectAll(map);
+  selectNodes(map, nodes);
   transaction.commit();
 }
 
@@ -1658,7 +1633,7 @@ mdl::Node* MapViewBase::findNewParentEntityForBrushes(
     auto* brush = faceHandle->node();
     auto* newParent = brush->entity();
 
-    if (newParent && newParent != map.world() && canReparentNodes(nodes, newParent))
+    if (newParent && newParent != &map.worldNode() && canReparentNodes(nodes, newParent))
     {
       return newParent;
     }
@@ -1685,9 +1660,8 @@ mdl::Node* MapViewBase::findNewParentEntityForBrushes(
 bool MapViewBase::canReparentNodes(
   const std::vector<mdl::Node*>& nodes, const mdl::Node* newParent) const
 {
-  return std::any_of(nodes.begin(), nodes.end(), [&](const auto* node) {
-    return canReparentNode(node, newParent);
-  });
+  return std::ranges::any_of(
+    nodes, [&](const auto* node) { return canReparentNode(node, newParent); });
 }
 
 /**
@@ -1695,11 +1669,11 @@ bool MapViewBase::canReparentNodes(
  * duplicates removed).
  */
 static std::vector<mdl::Node*> collectEntitiesForNodes(
-  const std::vector<mdl::Node*>& selectedNodes, const mdl::WorldNode* world)
+  const std::vector<mdl::Node*>& selectedNodes, const mdl::WorldNode& worldNode)
 {
   auto result = std::vector<mdl::Node*>{};
   const auto addNode = [&](auto&& thisLambda, auto* node) {
-    if (node->entity() == world)
+    if (node->entity() == &worldNode)
     {
       result.push_back(node);
     }
@@ -1724,37 +1698,38 @@ static std::vector<mdl::Node*> collectEntitiesForNodes(
 void MapViewBase::reparentNodes(
   const std::vector<mdl::Node*>& nodes, mdl::Node* newParent, const bool preserveEntities)
 {
-  ensure(newParent, "newParent is null");
+  contract_pre(newParent != nullptr);
 
   auto& map = m_document.map();
   const auto inputNodes =
-    preserveEntities ? collectEntitiesForNodes(nodes, map.world()) : nodes;
+    preserveEntities ? collectEntitiesForNodes(nodes, map.worldNode()) : nodes;
 
   const auto reparentableNodes = collectReparentableNodes(inputNodes, newParent);
-  assert(!reparentableNodes.empty());
+  contract_assert(!reparentableNodes.empty());
 
   const auto name = "Move "
                     + kdl::str_plural(reparentableNodes.size(), "Object", "Objects")
                     + " to " + newParent->name();
 
   auto transaction = mdl::Transaction{map, name};
-  map.deselectAll();
+  deselectAll(map);
   if (!mdl::reparentNodes(map, {{newParent, reparentableNodes}}))
   {
     transaction.cancel();
     return;
   }
-  map.selectNodes(reparentableNodes);
+  selectNodes(map, reparentableNodes);
   transaction.commit();
 }
 
 std::vector<mdl::Node*> MapViewBase::collectReparentableNodes(
   const std::vector<mdl::Node*>& nodes, const mdl::Node* newParent) const
 {
-  return kdl::vec_filter(nodes, [&](const auto* node) {
-    return newParent != node && newParent != node->parent()
-           && !newParent->isDescendantOf(node);
-  });
+  return nodes | std::views::filter([&](const auto* node) {
+           return newParent != node && newParent != node->parent()
+                  && !newParent->isDescendantOf(node);
+         })
+         | kdl::ranges::to<std::vector>();
 }
 
 bool MapViewBase::canMergeGroups() const
@@ -1770,8 +1745,8 @@ bool MapViewBase::canMakeStructural() const
   if (map.selection().hasOnlyBrushes())
   {
     const auto& brushes = map.selection().brushes;
-    return std::any_of(brushes.begin(), brushes.end(), [&](const auto* brush) {
-      return brush->hasAnyTag() || brush->entity() != map.world()
+    return std::ranges::any_of(brushes, [&](const auto* brush) {
+      return brush->hasAnyTag() || brush->entity() != &map.worldNode()
              || brush->anyFaceHasAnyTag();
     });
   }
@@ -1806,7 +1781,8 @@ const mdl::Entity* MapViewBase::templateEntity() const
 
 void MapViewBase::setSelectedEntityAsTemplate()
 {
-  const auto& selectedNodes = m_document.map().selection().nodes;
+  auto document = kdl::mem_lock(m_document);
+  const auto& selectedNodes = document->selectedNodes().nodes();
   
   if (selectedNodes.size() == 1) {
     auto* node = selectedNodes.front();
@@ -1831,10 +1807,12 @@ void MapViewBase::applyEntityTemplate()
     return;
   }
   
-  const std::vector<mdl::Node*>& selectedNodes = m_document.map().selection().nodes;
+  auto document = kdl::mem_lock(m_document);
+  const auto& selectedNodes = document->selectedNodes().nodes();
   
-    std::vector<mdl::BrushNode*> brushNodes;
-  for (mdl::Node* node : selectedNodes) {
+  
+  std::vector<mdl::BrushNode*> brushNodes;
+  for (auto* node : selectedNodes) {
     if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node)) {
       brushNodes.push_back(brushNode);
     }
@@ -1844,10 +1822,11 @@ void MapViewBase::applyEntityTemplate()
     return;
   }
   
-  auto transaction = mdl::Transaction{m_document.map(), "Apply Entity Template"};
+  
+  auto transaction = Transaction{*document, "Apply Entity Template"};
   
   for (auto* brushNode : brushNodes) {
-    m_document.createSingleBrushEntity(brushNode, *templateEntity());
+    document->createSingleBrushEntity(brushNode, *templateEntity());
   }
   
   transaction.commit();
