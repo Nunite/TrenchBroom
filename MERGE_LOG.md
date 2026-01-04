@@ -6,10 +6,12 @@ This document tracks the incremental merge of upstream changes into the `merge-u
 - Start point: `24e61209f63a41e6c7c438a6adeb1cead0cbd8d6`
 - Batch size: 20 commits
 - Goal: Sync with upstream/master
+- 最高优先级：不要一次性合并到最新的commit。合并的commit消息要用中文。每批次合并了commit后要用户测试是否有问题。如果有问题，要及时修复。
 
 ## Merge History
 
 | Date | Target Commit | Status | Notes |
 |------|---------------|--------|-------|
 | 2026-01-04 | `24e61209f63a41e6c7c438a6adeb1cead0cbd8d6` | **Success** | Merged start point. Conflicts resolved in MapViewBase and ToolBox. |
-| 2026-01-04 | `a20d0dd30bbf72d2f904b860b76c7a4f04f5e203` | **Failed/Aborted** | Attempted merge but encountered significant conflicts due to directory restructure (`common/src/ui` -> `lib/TbUiLib`). Aborted to allow testing of the start point first. |
+| 2026-01-04 | `a20d0dd30bbf72d2f904b860b76c7a4f04f5e203` | **Reverted** | 错误地尝试了一次性合并700+个commit。已回滚并重新开始分批合并。 |
+| 2026-01-04 | `1d9b8806f734f58bcb02288c3014302d6ebb8a89` | **Success** | 合并后续20个commit。解决 MapViewBase.cpp 和 ci.yml 的冲突。 |
