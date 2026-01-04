@@ -22,10 +22,10 @@
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "mdl/BrushNode.h"
+#include "mdl/Transaction.h"
 #include "render/BrushRenderer.h"
 #include "render/SelectionBoundsRenderer.h"
 #include "ui/MapDocument.h"
-#include "ui/Transaction.h"
 
 #include "kdl/memory_utils.h"
 
@@ -42,7 +42,7 @@ CreateBrushesToolBase::CreateBrushesToolBase(
 
 CreateBrushesToolBase::~CreateBrushesToolBase() = default;
 
-const Grid& CreateBrushesToolBase::grid() const
+const mdl::Grid& CreateBrushesToolBase::grid() const
 {
   return kdl::mem_lock(m_document)->grid();
 }
@@ -57,7 +57,7 @@ void CreateBrushesToolBase::createBrushes()
     });
     clearBrushes();
 
-    auto transaction = Transaction{document, "Create Brush"};
+    auto transaction = mdl::Transaction{document, "Create Brush"};
     document->deselectAll();
     auto addedNodes = document->addNodes({{document->parentForNodes(), nodesToAdd}});
     document->selectNodes(addedNodes);

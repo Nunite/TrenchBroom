@@ -4,11 +4,11 @@
 
 #include "render/Camera.h"
 #include "ui/DrawShapeTool.h"
-#include "ui/Grid.h"
+#include "mdl/Grid.h"
 #include "ui/HandleDragTracker.h"
 #include "ui/InputState.h"
 #include "ui/MapDocument.h"
-#include "ui/Transaction.h"
+#include "mdl/Transaction.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/BrushNode.h"
 #include "mdl/WorldNode.h"
@@ -275,7 +275,7 @@ void BoxSelectionDragDelegate::end(
         
       // 如果有可选节点，创建选择事务
       if (!selectableNodes.empty()) {
-        auto transaction = Transaction{*document, "Box Select"};
+        auto transaction = mdl::Transaction{*document, "Box Select"};
         document->deselectAll();
         document->selectNodes(selectableNodes);
         transaction.commit();

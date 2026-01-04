@@ -24,20 +24,20 @@
 #include "Preferences.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushNode.h"
+#include "mdl/BrushVertexCommands.h"
 #include "mdl/Game.h"
 #include "mdl/Hit.h"
 #include "mdl/Polyhedron.h"
 #include "mdl/Polyhedron3.h"
+#include "mdl/SelectionChange.h"
+#include "mdl/Transaction.h"
+#include "mdl/TransactionScope.h"
 #include "mdl/WorldNode.h"
 #include "render/RenderBatch.h"
 #include "render/RenderService.h"
-#include "ui/BrushVertexCommands.h"
 #include "ui/Lasso.h"
 #include "ui/MapDocument.h"
-#include "ui/SelectionChange.h"
 #include "ui/Tool.h"
-#include "ui/Transaction.h"
-#include "ui/TransactionScope.h"
 #include "ui/VertexHandleManager.h"
 
 #include "kdl/memory_utils.h"
@@ -59,8 +59,9 @@
 
 namespace tb::mdl
 {
+class Grid;
 class PickResult;
-}
+} // namespace tb::mdl
 
 namespace tb::render
 {
@@ -69,7 +70,6 @@ class Camera;
 
 namespace tb::ui
 {
-class Grid;
 class Lasso;
 class MapDocument;
 
@@ -107,7 +107,7 @@ public:
   ~VertexToolBase() override = default;
 
 public:
-  const Grid& grid() const { return kdl::mem_lock(m_document)->grid(); }
+  const mdl::Grid& grid() const { return kdl::mem_lock(m_document)->grid(); }
 
   const std::vector<mdl::BrushNode*>& selectedBrushes() const
   {
@@ -255,7 +255,7 @@ public: // performing moves
     refreshViews();
 
     auto document = kdl::mem_lock(m_document);
-    document->startTransaction(actionName(), TransactionScope::LongRunning);
+    document->startTransaction(actionName(), mdl::TransactionScope::LongRunning);
 
     m_dragHandlePosition = getHandlePosition(hits.front());
     m_dragging = true;
@@ -317,7 +317,7 @@ public: // csg convex merge
           }
 
           auto* newParent = document->parentForNodes(document->selection().nodes);
-          auto transaction = Transaction{document, "CSG Convex Merge"};
+          auto transaction = mdl::Transaction{document, "CSG Convex Merge"};
           deselectAll();
           if (document->addNodes({{newParent, {new mdl::BrushNode{std::move(b)}}}})
                 .empty())
@@ -345,7 +345,7 @@ public:
   {
     const auto ignoreChangeNotifications = kdl::inc_temp{m_ignoreChangeNotifications};
 
-    auto transaction = Transaction{m_document, actionName()};
+    auto transaction = mdl::Transaction{m_document, actionName()};
     move(delta);
     transaction.commit();
   }
@@ -506,21 +506,24 @@ private: // Observers and state management
       this, &VertexToolBase::commandUndoFailed);
   }
 
-  void commandDo(Command& command) { commandDoOrUndo(command); }
+  void commandDo(mdl::Command& command) { commandDoOrUndo(command); }
 
-  void commandDone(Command& command) { commandDoneOrUndoFailed(command); }
+  void commandDone(mdl::Command& command) { commandDoneOrUndoFailed(command); }
 
-  void commandDoFailed(Command& command) { commandDoFailedOrUndone(command); }
+  void commandDoFailed(mdl::Command& command) { commandDoFailedOrUndone(command); }
 
-  void commandUndo(UndoableCommand& command) { commandDoOrUndo(command); }
+  void commandUndo(mdl::UndoableCommand& command) { commandDoOrUndo(command); }
 
-  void commandUndone(UndoableCommand& command) { commandDoFailedOrUndone(command); }
+  void commandUndone(mdl::UndoableCommand& command) { commandDoFailedOrUndone(command); }
 
-  void commandUndoFailed(UndoableCommand& command) { commandDoneOrUndoFailed(command); }
-
-  void commandDoOrUndo(Command& command)
+  void commandUndoFailed(mdl::UndoableCommand& command)
   {
-    if (auto* vertexCommand = dynamic_cast<BrushVertexCommandBase*>(&command))
+    commandDoneOrUndoFailed(command);
+  }
+
+  void commandDoOrUndo(mdl::Command& command)
+  {
+    if (auto* vertexCommand = dynamic_cast<mdl::BrushVertexCommandBase*>(&command))
     {
       deselectHandles();
       removeHandles(vertexCommand);
@@ -528,9 +531,9 @@ private: // Observers and state management
     }
   }
 
-  void commandDoneOrUndoFailed(Command& command)
+  void commandDoneOrUndoFailed(mdl::Command& command)
   {
-    if (auto* vertexCommand = dynamic_cast<BrushVertexCommandBase*>(&command))
+    if (auto* vertexCommand = dynamic_cast<mdl::BrushVertexCommandBase*>(&command))
     {
       addHandles(vertexCommand);
       selectNewHandlePositions(vertexCommand);
@@ -538,9 +541,9 @@ private: // Observers and state management
     }
   }
 
-  void commandDoFailedOrUndone(Command& command)
+  void commandDoFailedOrUndone(mdl::Command& command)
   {
-    if (auto* vertexCommand = dynamic_cast<BrushVertexCommandBase*>(&command))
+    if (auto* vertexCommand = dynamic_cast<mdl::BrushVertexCommandBase*>(&command))
     {
       addHandles(vertexCommand);
       selectOldHandlePositions(vertexCommand);
@@ -548,7 +551,7 @@ private: // Observers and state management
     }
   }
 
-  void selectionDidChange(const SelectionChange& selectionChange)
+  void selectionDidChange(const mdl::SelectionChange& selectionChange)
   {
     addHandles(selectionChange.selectedNodes);
     removeHandles(selectionChange.deselectedNodes);
@@ -577,22 +580,22 @@ private: // Observers and state management
 protected:
   virtual void deselectHandles() { handleManager().deselectAll(); }
 
-  virtual void addHandles(BrushVertexCommandBase* command)
+  virtual void addHandles(mdl::BrushVertexCommandBase* command)
   {
     command->addHandles(handleManager());
   }
 
-  virtual void removeHandles(BrushVertexCommandBase* command)
+  virtual void removeHandles(mdl::BrushVertexCommandBase* command)
   {
     command->removeHandles(handleManager());
   }
 
-  virtual void selectNewHandlePositions(BrushVertexCommandBase* command)
+  virtual void selectNewHandlePositions(mdl::BrushVertexCommandBase* command)
   {
     command->selectNewHandlePositions(handleManager());
   }
 
-  virtual void selectOldHandlePositions(BrushVertexCommandBase* command)
+  virtual void selectOldHandlePositions(mdl::BrushVertexCommandBase* command)
   {
     command->selectOldHandlePositions(handleManager());
   }

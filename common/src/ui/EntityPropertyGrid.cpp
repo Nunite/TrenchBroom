@@ -35,13 +35,13 @@
 #include "Macros.h"
 #include "mdl/EntityNodeBase.h" // IWYU pragma: keep
 #include "mdl/Node.h"
+#include "mdl/Transaction.h"
 #include "ui/BorderLine.h"
 #include "ui/EntityPropertyItemDelegate.h"
 #include "ui/EntityPropertyModel.h"
 #include "ui/EntityPropertyTable.h"
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
-#include "ui/Transaction.h"
 #include "ui/ViewConstants.h"
 
 #include "kdl/memory_utils.h"
@@ -153,7 +153,7 @@ void EntityPropertyGrid::removeSelectedProperties()
   const auto numRows = propertyKeys.size();
   auto document = kdl::mem_lock(m_document);
 
-  auto transaction = Transaction{
+  auto transaction = mdl::Transaction{
     document, kdl::str_plural(numRows, "Remove Property", "Remove Properties")};
 
   for (const auto& propertyKey : propertyKeys)
@@ -413,7 +413,7 @@ void EntityPropertyGrid::nodesDidChange(const std::vector<mdl::Node*>&)
 
 void EntityPropertyGrid::selectionWillChange() {}
 
-void EntityPropertyGrid::selectionDidChange(const SelectionChange&)
+void EntityPropertyGrid::selectionDidChange(const mdl::SelectionChange&)
 {
   updateControls();
 }

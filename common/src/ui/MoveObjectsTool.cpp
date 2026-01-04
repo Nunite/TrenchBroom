@@ -19,10 +19,10 @@
 
 #include "MoveObjectsTool.h"
 
-#include "ui/Grid.h"
+#include "mdl/Grid.h"
+#include "mdl/TransactionScope.h"
 #include "ui/InputState.h"
 #include "ui/MapDocument.h"
-#include "ui/TransactionScope.h"
 
 #include "kdl/memory_utils.h"
 
@@ -40,7 +40,7 @@ MoveObjectsTool::MoveObjectsTool(std::weak_ptr<MapDocument> document)
 {
 }
 
-const Grid& MoveObjectsTool::grid() const
+const mdl::Grid& MoveObjectsTool::grid() const
 {
   return kdl::mem_lock(m_document)->grid();
 }
@@ -56,7 +56,7 @@ bool MoveObjectsTool::startMove(const InputState& inputState)
 
   document->startTransaction(
     duplicateObjects(inputState) ? "Duplicate Objects" : "Move Objects",
-    TransactionScope::LongRunning);
+    mdl::TransactionScope::LongRunning);
   m_duplicateObjects = duplicateObjects(inputState);
   return true;
 }

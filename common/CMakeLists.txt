@@ -87,22 +87,27 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/io/ZipFileSystem.cpp
         ${COMMON_SOURCE_DIR}/Logger.cpp
         ${COMMON_SOURCE_DIR}/LoggerCache.cpp
+        ${COMMON_SOURCE_DIR}/mdl/AddRemoveNodesCommand.cpp
+        ${COMMON_SOURCE_DIR}/mdl/AddRemoveNodesUtils.cpp
         ${COMMON_SOURCE_DIR}/mdl/BezierPatch.cpp
         ${COMMON_SOURCE_DIR}/mdl/Brush.cpp
         ${COMMON_SOURCE_DIR}/mdl/BrushBuilder.cpp
         ${COMMON_SOURCE_DIR}/mdl/BrushFace.cpp
         ${COMMON_SOURCE_DIR}/mdl/BrushFaceAttributes.cpp
         ${COMMON_SOURCE_DIR}/mdl/BrushFaceHandle.cpp
-        ${COMMON_SOURCE_DIR}/mdl/BrushFacePredicates.cpp
         ${COMMON_SOURCE_DIR}/mdl/BrushFaceReference.cpp
         ${COMMON_SOURCE_DIR}/mdl/BrushNode.cpp
+        ${COMMON_SOURCE_DIR}/mdl/BrushVertexCommands.cpp
         ${COMMON_SOURCE_DIR}/mdl/ChangeBrushFaceAttributesRequest.cpp
         ${COMMON_SOURCE_DIR}/mdl/CircleShape.cpp
         ${COMMON_SOURCE_DIR}/mdl/ColorRange.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Command.cpp
+        ${COMMON_SOURCE_DIR}/mdl/CommandProcessor.cpp
         ${COMMON_SOURCE_DIR}/mdl/CompareHits.cpp
         ${COMMON_SOURCE_DIR}/mdl/CompilationConfig.cpp
         ${COMMON_SOURCE_DIR}/mdl/CompilationProfile.cpp
         ${COMMON_SOURCE_DIR}/mdl/CompilationTask.cpp
+        ${COMMON_SOURCE_DIR}/mdl/CurrentGroupCommand.cpp
         ${COMMON_SOURCE_DIR}/mdl/DecalDefinition.cpp
         ${COMMON_SOURCE_DIR}/mdl/EditorContext.cpp
         ${COMMON_SOURCE_DIR}/mdl/EmptyBrushEntityValidator.cpp
@@ -131,6 +136,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/GameFactory.cpp
         ${COMMON_SOURCE_DIR}/mdl/GameFileSystem.cpp
         ${COMMON_SOURCE_DIR}/mdl/GameImpl.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Grid.cpp
         ${COMMON_SOURCE_DIR}/mdl/Group.cpp
         ${COMMON_SOURCE_DIR}/mdl/GroupNode.cpp
         ${COMMON_SOURCE_DIR}/mdl/Hit.cpp
@@ -179,8 +185,16 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/PropertyValueWithDoubleQuotationMarksValidator.cpp
         ${COMMON_SOURCE_DIR}/mdl/PushSelection.cpp
         ${COMMON_SOURCE_DIR}/mdl/Quake3Shader.cpp
+        ${COMMON_SOURCE_DIR}/mdl/ReparentNodesCommand.cpp
         ${COMMON_SOURCE_DIR}/mdl/Selection.cpp
+        ${COMMON_SOURCE_DIR}/mdl/SelectionChange.cpp
+        ${COMMON_SOURCE_DIR}/mdl/SelectionCommand.cpp
+        ${COMMON_SOURCE_DIR}/mdl/SetCurrentLayerCommand.cpp
+        ${COMMON_SOURCE_DIR}/mdl/SetLinkIdsCommand.cpp
+        ${COMMON_SOURCE_DIR}/mdl/SetLockStateCommand.cpp
+        ${COMMON_SOURCE_DIR}/mdl/SetVisibilityCommand.cpp
         ${COMMON_SOURCE_DIR}/mdl/SoftMapBoundsValidator.cpp
+        ${COMMON_SOURCE_DIR}/mdl/SwapNodeContentsCommand.cpp
         ${COMMON_SOURCE_DIR}/mdl/Tag.cpp
         ${COMMON_SOURCE_DIR}/mdl/TagAttribute.cpp
         ${COMMON_SOURCE_DIR}/mdl/TagManager.cpp
@@ -189,6 +203,11 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/Texture.cpp
         ${COMMON_SOURCE_DIR}/mdl/TextureBuffer.cpp
         ${COMMON_SOURCE_DIR}/mdl/TextureResource.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Transaction.cpp
+        ${COMMON_SOURCE_DIR}/mdl/UndoableCommand.cpp
+        ${COMMON_SOURCE_DIR}/mdl/UpdateLinkedGroupsCommand.cpp
+        ${COMMON_SOURCE_DIR}/mdl/UpdateLinkedGroupsCommandBase.cpp
+        ${COMMON_SOURCE_DIR}/mdl/UpdateLinkedGroupsHelper.cpp
         ${COMMON_SOURCE_DIR}/mdl/UVCoordSystem.cpp
         ${COMMON_SOURCE_DIR}/mdl/Validator.cpp
         ${COMMON_SOURCE_DIR}/mdl/ValidatorRegistry.cpp
@@ -275,7 +294,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/ActionBuilder.cpp
         ${COMMON_SOURCE_DIR}/ui/ActionContext.cpp
         ${COMMON_SOURCE_DIR}/ui/Actions.cpp
-        ${COMMON_SOURCE_DIR}/ui/AddRemoveNodesCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/Animation.cpp
         ${COMMON_SOURCE_DIR}/ui/AppInfoPanel.cpp
         ${COMMON_SOURCE_DIR}/ui/AssembleBrushTool.cpp
@@ -283,8 +301,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/Autosaver.cpp
         ${COMMON_SOURCE_DIR}/ui/BorderLine.cpp
         ${COMMON_SOURCE_DIR}/ui/BorderPanel.cpp
-        ${COMMON_SOURCE_DIR}/ui/BrushVertexCommands.cpp
-        ${COMMON_SOURCE_DIR}/ui/BoxSelectionTool.cpp
         ${COMMON_SOURCE_DIR}/ui/CachingLogger.cpp
         ${COMMON_SOURCE_DIR}/ui/CameraAnimation.cpp
         ${COMMON_SOURCE_DIR}/ui/CameraLinkHelper.cpp
@@ -302,8 +318,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/ColorModel.cpp
         ${COMMON_SOURCE_DIR}/ui/ColorsPreferencePane.cpp
         ${COMMON_SOURCE_DIR}/ui/ColorTable.cpp
-        ${COMMON_SOURCE_DIR}/ui/Command.cpp
-        ${COMMON_SOURCE_DIR}/ui/CommandProcessor.cpp
         ${COMMON_SOURCE_DIR}/ui/CompilationContext.cpp
         ${COMMON_SOURCE_DIR}/ui/CompilationDialog.cpp
         ${COMMON_SOURCE_DIR}/ui/CompilationProfileEditor.cpp
@@ -322,7 +336,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/CreateEntityTool.cpp
         ${COMMON_SOURCE_DIR}/ui/CreateEntityToolController.cpp
         ${COMMON_SOURCE_DIR}/ui/CurrentGameIndicator.cpp
-        ${COMMON_SOURCE_DIR}/ui/CurrentGroupCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/CyclingMapView.cpp
         ${COMMON_SOURCE_DIR}/ui/DialogHeader.cpp
         ${COMMON_SOURCE_DIR}/ui/DrawShapeTool.cpp
@@ -368,7 +381,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/GestureTracker.cpp
         ${COMMON_SOURCE_DIR}/ui/GetVersion.cpp
         ${COMMON_SOURCE_DIR}/ui/GLContextManager.cpp
-        ${COMMON_SOURCE_DIR}/ui/Grid.cpp
         ${COMMON_SOURCE_DIR}/ui/HandleDragTracker.cpp
         ${COMMON_SOURCE_DIR}/ui/ImageListBox.cpp
         ${COMMON_SOURCE_DIR}/ui/InfoPanel.cpp
@@ -389,7 +401,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/LayerListBox.cpp
         ${COMMON_SOURCE_DIR}/ui/LimitedKeySequenceEdit.cpp
         ${COMMON_SOURCE_DIR}/ui/MapDocument.cpp
-        ${COMMON_SOURCE_DIR}/ui/MapDocumentCommandFacade.cpp
         ${COMMON_SOURCE_DIR}/ui/MapFrame.cpp
         ${COMMON_SOURCE_DIR}/ui/MapInspector.cpp
         ${COMMON_SOURCE_DIR}/ui/MapView.cpp
@@ -421,7 +432,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/RecentDocumentListBox.cpp
         ${COMMON_SOURCE_DIR}/ui/RecentDocuments.cpp
         ${COMMON_SOURCE_DIR}/ui/RenderView.cpp
-        ${COMMON_SOURCE_DIR}/ui/ReparentNodesCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/RepeatStack.cpp
         ${COMMON_SOURCE_DIR}/ui/ReplaceMaterialDialog.cpp
         ${COMMON_SOURCE_DIR}/ui/RotateHandle.cpp
@@ -431,14 +441,8 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/ScaleTool.cpp
         ${COMMON_SOURCE_DIR}/ui/ScaleToolController.cpp
         ${COMMON_SOURCE_DIR}/ui/ScaleToolPage.cpp
-        ${COMMON_SOURCE_DIR}/ui/SelectionChange.cpp
-        ${COMMON_SOURCE_DIR}/ui/SelectionCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/SelectionTool.cpp
         ${COMMON_SOURCE_DIR}/ui/SetBrushFaceAttributesTool.cpp
-        ${COMMON_SOURCE_DIR}/ui/SetCurrentLayerCommand.cpp
-        ${COMMON_SOURCE_DIR}/ui/SetLinkIdsCommand.cpp
-        ${COMMON_SOURCE_DIR}/ui/SetLockStateCommand.cpp
-        ${COMMON_SOURCE_DIR}/ui/SetVisibilityCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/ShearTool.cpp
         ${COMMON_SOURCE_DIR}/ui/ShearToolController.cpp
         ${COMMON_SOURCE_DIR}/ui/SignalDelayer.cpp
@@ -453,7 +457,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/SmartModelEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SpinControl.cpp
         ${COMMON_SOURCE_DIR}/ui/Splitter.cpp
-        ${COMMON_SOURCE_DIR}/ui/SwapNodeContentsCommand.cpp
         ${COMMON_SOURCE_DIR}/ui/SwitchableMapViewContainer.cpp
         ${COMMON_SOURCE_DIR}/ui/SwitchableTitledPanel.cpp
         ${COMMON_SOURCE_DIR}/ui/TabBar.cpp
@@ -467,12 +470,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/ToolBoxConnector.cpp
         ${COMMON_SOURCE_DIR}/ui/ToolChain.cpp
         ${COMMON_SOURCE_DIR}/ui/ToolController.cpp
-        ${COMMON_SOURCE_DIR}/ui/Transaction.cpp
         ${COMMON_SOURCE_DIR}/ui/TwoPaneMapView.cpp
-        ${COMMON_SOURCE_DIR}/ui/UndoableCommand.cpp
-        ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsCommand.cpp
-        ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsCommandBase.cpp
-        ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsHelper.cpp
         ${COMMON_SOURCE_DIR}/ui/UpdateConfig.cpp
         ${COMMON_SOURCE_DIR}/ui/UpdatePreferencePane.cpp
         ${COMMON_SOURCE_DIR}/ui/MiscPreferencePane.cpp
@@ -496,6 +494,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/ViewPreferencePane.cpp
         ${COMMON_SOURCE_DIR}/ui/ViewUtils.cpp
         ${COMMON_SOURCE_DIR}/ui/WelcomeWindow.cpp
+        ${COMMON_SOURCE_DIR}/ui/BoxSelectionTool.cpp
         ${COMMON_SOURCE_DIR}/Uuid.cpp
 )
 
@@ -593,6 +592,8 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/Logger.h
         ${COMMON_SOURCE_DIR}/LoggerCache.h
         ${COMMON_SOURCE_DIR}/Macros.h
+        ${COMMON_SOURCE_DIR}/mdl/AddRemoveNodesCommand.h
+        ${COMMON_SOURCE_DIR}/mdl/AddRemoveNodesUtils.h
         ${COMMON_SOURCE_DIR}/mdl/AssetReference.h
         ${COMMON_SOURCE_DIR}/mdl/AssetUtils.h
         ${COMMON_SOURCE_DIR}/mdl/BezierPatch.h
@@ -601,18 +602,21 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/BrushFace.h
         ${COMMON_SOURCE_DIR}/mdl/BrushFaceAttributes.h
         ${COMMON_SOURCE_DIR}/mdl/BrushFaceHandle.h
-        ${COMMON_SOURCE_DIR}/mdl/BrushFacePredicates.h
         ${COMMON_SOURCE_DIR}/mdl/BrushFaceReference.h
         ${COMMON_SOURCE_DIR}/mdl/BrushGeometry.h
         ${COMMON_SOURCE_DIR}/mdl/BrushNode.h
+        ${COMMON_SOURCE_DIR}/mdl/BrushVertexCommands.h
         ${COMMON_SOURCE_DIR}/mdl/ChangeBrushFaceAttributesRequest.h
         ${COMMON_SOURCE_DIR}/mdl/CircleShape.h
         ${COMMON_SOURCE_DIR}/mdl/ColorRange.h
+        ${COMMON_SOURCE_DIR}/mdl/Command.h
+        ${COMMON_SOURCE_DIR}/mdl/CommandProcessor.h
         ${COMMON_SOURCE_DIR}/mdl/CompareHits.h
         ${COMMON_SOURCE_DIR}/mdl/CompilationConfig.h
         ${COMMON_SOURCE_DIR}/mdl/CompilationProfile.h
         ${COMMON_SOURCE_DIR}/mdl/CompilationTask.h
         ${COMMON_SOURCE_DIR}/mdl/CreateResource.h
+        ${COMMON_SOURCE_DIR}/mdl/CurrentGroupCommand.h
         ${COMMON_SOURCE_DIR}/mdl/DecalDefinition.h
         ${COMMON_SOURCE_DIR}/mdl/EditorContext.h
         ${COMMON_SOURCE_DIR}/mdl/EmptyBrushEntityValidator.h
@@ -643,6 +647,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/GameFactory.h
         ${COMMON_SOURCE_DIR}/mdl/GameFileSystem.h
         ${COMMON_SOURCE_DIR}/mdl/GameImpl.h
+        ${COMMON_SOURCE_DIR}/mdl/Grid.h
         ${COMMON_SOURCE_DIR}/mdl/Group.h
         ${COMMON_SOURCE_DIR}/mdl/GroupNode.h
         ${COMMON_SOURCE_DIR}/mdl/Hit.h
@@ -711,9 +716,17 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/PropertyValueWithDoubleQuotationMarksValidator.h
         ${COMMON_SOURCE_DIR}/mdl/PushSelection.h
         ${COMMON_SOURCE_DIR}/mdl/Quake3Shader.h
+        ${COMMON_SOURCE_DIR}/mdl/ReparentNodesCommand.h
         ${COMMON_SOURCE_DIR}/mdl/Resource.h
         ${COMMON_SOURCE_DIR}/mdl/Selection.h
+        ${COMMON_SOURCE_DIR}/mdl/SelectionChange.h
+        ${COMMON_SOURCE_DIR}/mdl/SelectionCommand.h
+        ${COMMON_SOURCE_DIR}/mdl/SetCurrentLayerCommand.h
+        ${COMMON_SOURCE_DIR}/mdl/SetLinkIdsCommand.h
+        ${COMMON_SOURCE_DIR}/mdl/SetLockStateCommand.h
+        ${COMMON_SOURCE_DIR}/mdl/SetVisibilityCommand.h
         ${COMMON_SOURCE_DIR}/mdl/SoftMapBoundsValidator.h
+        ${COMMON_SOURCE_DIR}/mdl/SwapNodeContentsCommand.h
         ${COMMON_SOURCE_DIR}/mdl/Tag.h
         ${COMMON_SOURCE_DIR}/mdl/TagAttribute.h
         ${COMMON_SOURCE_DIR}/mdl/TagManager.h
@@ -723,6 +736,12 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/Texture.h
         ${COMMON_SOURCE_DIR}/mdl/TextureBuffer.h
         ${COMMON_SOURCE_DIR}/mdl/TextureResource.h
+        ${COMMON_SOURCE_DIR}/mdl/Transaction.h
+        ${COMMON_SOURCE_DIR}/mdl/TransactionScope.h
+        ${COMMON_SOURCE_DIR}/mdl/UndoableCommand.h
+        ${COMMON_SOURCE_DIR}/mdl/UpdateLinkedGroupsCommand.h
+        ${COMMON_SOURCE_DIR}/mdl/UpdateLinkedGroupsCommandBase.h
+        ${COMMON_SOURCE_DIR}/mdl/UpdateLinkedGroupsHelper.h
         ${COMMON_SOURCE_DIR}/mdl/UVCoordSystem.h
         ${COMMON_SOURCE_DIR}/mdl/Validator.h
         ${COMMON_SOURCE_DIR}/mdl/ValidatorRegistry.h
@@ -821,7 +840,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/ActionBuilder.h
         ${COMMON_SOURCE_DIR}/ui/ActionContext.h
         ${COMMON_SOURCE_DIR}/ui/Actions.h
-        ${COMMON_SOURCE_DIR}/ui/AddRemoveNodesCommand.h
         ${COMMON_SOURCE_DIR}/ui/Animation.h
         ${COMMON_SOURCE_DIR}/ui/AppInfoPanel.h
         ${COMMON_SOURCE_DIR}/ui/AssembleBrushTool.h
@@ -829,8 +847,8 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/Autosaver.h
         ${COMMON_SOURCE_DIR}/ui/BorderLine.h
         ${COMMON_SOURCE_DIR}/ui/BorderPanel.h
-        ${COMMON_SOURCE_DIR}/ui/BrushVertexCommands.h
         ${COMMON_SOURCE_DIR}/ui/BoxSelectionTool.h
+
         ${COMMON_SOURCE_DIR}/ui/CachingLogger.h
         ${COMMON_SOURCE_DIR}/ui/CameraAnimation.h
         ${COMMON_SOURCE_DIR}/ui/CameraLinkHelper.h
@@ -848,8 +866,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/ColorModel.h
         ${COMMON_SOURCE_DIR}/ui/ColorsPreferencePane.h
         ${COMMON_SOURCE_DIR}/ui/ColorTable.h
-        ${COMMON_SOURCE_DIR}/ui/Command.h
-        ${COMMON_SOURCE_DIR}/ui/CommandProcessor.h
         ${COMMON_SOURCE_DIR}/ui/CompilationContext.h
         ${COMMON_SOURCE_DIR}/ui/CompilationDialog.h
         ${COMMON_SOURCE_DIR}/ui/CompilationProfileEditor.h
@@ -867,7 +883,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/CreateEntityTool.h
         ${COMMON_SOURCE_DIR}/ui/CreateEntityToolController.h
         ${COMMON_SOURCE_DIR}/ui/CurrentGameIndicator.h
-        ${COMMON_SOURCE_DIR}/ui/CurrentGroupCommand.h
         ${COMMON_SOURCE_DIR}/ui/CyclingMapView.h
         ${COMMON_SOURCE_DIR}/ui/DialogHeader.h
         ${COMMON_SOURCE_DIR}/ui/DrawShapeTool.h
@@ -913,7 +928,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/GestureTracker.h
         ${COMMON_SOURCE_DIR}/ui/GetVersion.h
         ${COMMON_SOURCE_DIR}/ui/GLContextManager.h
-        ${COMMON_SOURCE_DIR}/ui/Grid.h
         ${COMMON_SOURCE_DIR}/ui/HandleDragTracker.h
         ${COMMON_SOURCE_DIR}/ui/ImageListBox.h
         ${COMMON_SOURCE_DIR}/ui/InfoPanel.h
@@ -934,7 +948,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/LayerListBox.h
         ${COMMON_SOURCE_DIR}/ui/LimitedKeySequenceEdit.h
         ${COMMON_SOURCE_DIR}/ui/MapDocument.h
-        ${COMMON_SOURCE_DIR}/ui/MapDocumentCommandFacade.h
         ${COMMON_SOURCE_DIR}/ui/MapFrame.h
         ${COMMON_SOURCE_DIR}/ui/MapInspector.h
         ${COMMON_SOURCE_DIR}/ui/MapView.h
@@ -968,7 +981,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/RecentDocumentListBox.h
         ${COMMON_SOURCE_DIR}/ui/RecentDocuments.h
         ${COMMON_SOURCE_DIR}/ui/RenderView.h
-        ${COMMON_SOURCE_DIR}/ui/ReparentNodesCommand.h
         ${COMMON_SOURCE_DIR}/ui/RepeatStack.h
         ${COMMON_SOURCE_DIR}/ui/ReplaceMaterialDialog.h
         ${COMMON_SOURCE_DIR}/ui/RotateHandle.h
@@ -978,14 +990,8 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/ScaleTool.h
         ${COMMON_SOURCE_DIR}/ui/ScaleToolController.h
         ${COMMON_SOURCE_DIR}/ui/ScaleToolPage.h
-        ${COMMON_SOURCE_DIR}/ui/SelectionChange.h
-        ${COMMON_SOURCE_DIR}/ui/SelectionCommand.h
         ${COMMON_SOURCE_DIR}/ui/SelectionTool.h
         ${COMMON_SOURCE_DIR}/ui/SetBrushFaceAttributesTool.h
-        ${COMMON_SOURCE_DIR}/ui/SetCurrentLayerCommand.h
-        ${COMMON_SOURCE_DIR}/ui/SetLinkIdsCommand.h
-        ${COMMON_SOURCE_DIR}/ui/SetLockStateCommand.h
-        ${COMMON_SOURCE_DIR}/ui/SetVisibilityCommand.h
         ${COMMON_SOURCE_DIR}/ui/ShearTool.h
         ${COMMON_SOURCE_DIR}/ui/ShearToolController.h
         ${COMMON_SOURCE_DIR}/ui/SignalDelayer.h
@@ -1000,7 +1006,6 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/SmartModelEditor.h
         ${COMMON_SOURCE_DIR}/ui/SpinControl.h
         ${COMMON_SOURCE_DIR}/ui/Splitter.h
-        ${COMMON_SOURCE_DIR}/ui/SwapNodeContentsCommand.h
         ${COMMON_SOURCE_DIR}/ui/SwitchableMapViewContainer.h
         ${COMMON_SOURCE_DIR}/ui/SwitchableTitledPanel.h
         ${COMMON_SOURCE_DIR}/ui/TabBar.h
@@ -1014,13 +1019,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/ToolBoxConnector.h
         ${COMMON_SOURCE_DIR}/ui/ToolChain.h
         ${COMMON_SOURCE_DIR}/ui/ToolController.h
-        ${COMMON_SOURCE_DIR}/ui/Transaction.h
-        ${COMMON_SOURCE_DIR}/ui/TransactionScope.h
         ${COMMON_SOURCE_DIR}/ui/TwoPaneMapView.h
-        ${COMMON_SOURCE_DIR}/ui/UndoableCommand.h
-        ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsCommand.h
-        ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsCommandBase.h
-        ${COMMON_SOURCE_DIR}/ui/UpdateLinkedGroupsHelper.h
         ${COMMON_SOURCE_DIR}/ui/UpdateConfig.h
         ${COMMON_SOURCE_DIR}/ui/UpdatePreferencePane.h
         ${COMMON_SOURCE_DIR}/ui/MiscPreferencePane.h

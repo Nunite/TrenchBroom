@@ -61,6 +61,9 @@ class Brush;
 class BrushFace;
 class BrushFaceAttributes;
 class BrushFaceHandle;
+class Command;
+class CommandProcessor;
+class CommandResult;
 class EditorContext;
 class Entity;
 struct EntityDefinition;
@@ -68,6 +71,7 @@ class EntityDefinitionFileSpec;
 class EntityDefinitionManager;
 class EntityModelManager;
 class Game;
+class Grid;
 class Issue;
 class Material;
 class MaterialManager;
@@ -76,27 +80,25 @@ class PointTrace;
 class PortalFile;
 class ResourceId;
 class ResourceManager;
+struct SelectionChange;
 class SmartTag;
 class TagManager;
+enum class TransactionScope;
+class UndoableCommand;
 class UVCoordSystemSnapshot;
 class WorldNode;
 enum class MapFormat;
 enum class WrapStyle;
 struct ProcessContext;
+
 } // namespace tb::mdl
 
 namespace tb::ui
 {
-class Command;
-class CommandResult;
-class Grid;
 enum class PasteType;
 class RepeatStack;
-struct SelectionChange;
-class UndoableCommand;
 class ViewEffectsService;
 enum class MapTextEncoding;
-enum class TransactionScope;
 class AsyncTaskRunner;
 
 struct PointFile
@@ -117,7 +119,7 @@ public:
   static const vm::bbox3d DefaultWorldBounds;
   static const std::string DefaultDocumentName;
 
-protected:
+private:
   kdl::task_manager& m_taskManager;
 
   vm::bbox3d m_worldBounds = DefaultWorldBounds;
@@ -134,11 +136,10 @@ protected:
   std::unique_ptr<mdl::TagManager> m_tagManager;
 
   std::unique_ptr<mdl::EditorContext> m_editorContext;
-  std::unique_ptr<Grid> m_grid;
+  std::unique_ptr<mdl::Grid> m_grid;
 
-  using ActionList = std::vector<Action>;
-  ActionList m_tagActions;
-  ActionList m_entityDefinitionActions;
+  std::vector<Action> m_tagActions;
+  std::vector<Action> m_entityDefinitionActions;
 
   std::filesystem::path m_path = DefaultDocumentName;
   size_t m_lastSaveModificationCount = 0;
@@ -152,7 +153,6 @@ protected:
   EdgeHandleManager m_edgeHandles;
   FaceHandleManager m_faceHandles;
 
-  mdl::LayerNode* m_currentLayer = nullptr;
   std::string m_currentMaterialName = mdl::BrushFaceAttributes::NoMaterialName;
 
   ViewEffectsService* m_viewEffectsService = nullptr;
@@ -166,13 +166,15 @@ protected:
    */
   std::unique_ptr<RepeatStack> m_repeatStack;
 
+  std::unique_ptr<mdl::CommandProcessor> m_commandProcessor;
+
 public: // notification
-  Notifier<Command&> commandDoNotifier;
-  Notifier<Command&> commandDoneNotifier;
-  Notifier<Command&> commandDoFailedNotifier;
-  Notifier<UndoableCommand&> commandUndoNotifier;
-  Notifier<UndoableCommand&> commandUndoneNotifier;
-  Notifier<UndoableCommand&> commandUndoFailedNotifier;
+  Notifier<mdl::Command&> commandDoNotifier;
+  Notifier<mdl::Command&> commandDoneNotifier;
+  Notifier<mdl::Command&> commandDoFailedNotifier;
+  Notifier<mdl::UndoableCommand&> commandUndoNotifier;
+  Notifier<mdl::UndoableCommand&> commandUndoneNotifier;
+  Notifier<mdl::UndoableCommand&> commandUndoFailedNotifier;
   Notifier<const std::string&> transactionDoneNotifier;
   Notifier<const std::string&> transactionUndoneNotifier;
 
@@ -188,7 +190,7 @@ public: // notification
   Notifier<const std::string&> currentMaterialNameDidChangeNotifier;
 
   Notifier<> selectionWillChangeNotifier;
-  Notifier<const SelectionChange&> selectionDidChangeNotifier;
+  Notifier<const mdl::SelectionChange&> selectionDidChangeNotifier;
 
   Notifier<const std::vector<mdl::Node*>&> nodesWereAddedNotifier;
   Notifier<const std::vector<mdl::Node*>&> nodesWillBeRemovedNotifier;
@@ -199,8 +201,8 @@ public: // notification
   Notifier<const std::vector<mdl::Node*>&> nodeVisibilityDidChangeNotifier;
   Notifier<const std::vector<mdl::Node*>&> nodeLockingDidChangeNotifier;
 
-  Notifier<mdl::GroupNode*> groupWasOpenedNotifier;
-  Notifier<mdl::GroupNode*> groupWasClosedNotifier;
+  Notifier<mdl::GroupNode&> groupWasOpenedNotifier;
+  Notifier<mdl::GroupNode&> groupWasClosedNotifier;
 
   Notifier<const std::vector<mdl::BrushFaceHandle>&> brushFacesDidChangeNotifier;
 
@@ -226,10 +228,8 @@ public: // notification
 private:
   NotifierConnection m_notifierConnection;
 
-protected:
-  explicit MapDocument(kdl::task_manager& taskManager);
-
 public:
+  explicit MapDocument(kdl::task_manager& taskManager);
   ~MapDocument() override;
 
 public: // accessors and such
@@ -244,9 +244,6 @@ public: // accessors and such
   bool isGamePathPreference(const std::filesystem::path& path) const;
 
   mdl::LayerNode* currentLayer() const override;
-
-protected:
-  mdl::LayerNode* performSetCurrentLayer(mdl::LayerNode* currentLayer);
 
 public:
   void setCurrentLayer(mdl::LayerNode* currentLayer);
@@ -275,7 +272,7 @@ public:
   mdl::EntityModelManager& entityModelManager() override;
   mdl::MaterialManager& materialManager() override;
 
-  Grid& grid() const;
+  mdl::Grid& grid() const;
 
   mdl::PointTrace* pointFile();
   const mdl::PortalFile* portalFile() const;
@@ -297,7 +294,8 @@ public: // tag and entity definition actions
 
 private: // tag and entity definition actions
   template <typename ActionVisitor>
-  void visitActions(const ActionVisitor& visitor, const ActionList& actions) const
+  void visitActions(
+    const ActionVisitor& visitor, const std::vector<Action>& actions) const
   {
     for (const auto& action : actions)
     {
@@ -616,34 +614,17 @@ public: // command processing
   void clearRepeatableCommands();
 
 public: // transactions
-  void startTransaction(std::string name, TransactionScope scope);
+  void startTransaction(std::string name, mdl::TransactionScope scope);
   void rollbackTransaction();
   bool commitTransaction();
   void cancelTransaction();
 
-  virtual bool isCurrentDocumentStateObservable() const = 0;
+  bool isCurrentDocumentStateObservable() const;
 
 private:
-  std::unique_ptr<CommandResult> execute(std::unique_ptr<Command>&& command);
-  std::unique_ptr<CommandResult> executeAndStore(
-    std::unique_ptr<UndoableCommand>&& command);
-
-private: // subclassing interface for command processing
-  virtual bool doCanUndoCommand() const = 0;
-  virtual bool doCanRedoCommand() const = 0;
-  virtual const std::string& doGetUndoCommandName() const = 0;
-  virtual const std::string& doGetRedoCommandName() const = 0;
-  virtual void doUndoCommand() = 0;
-  virtual void doRedoCommand() = 0;
-
-  virtual void doClearCommandProcessor() = 0;
-  virtual void doStartTransaction(std::string name, TransactionScope scope) = 0;
-  virtual void doCommitTransaction() = 0;
-  virtual void doRollbackTransaction() = 0;
-
-  virtual std::unique_ptr<CommandResult> doExecute(std::unique_ptr<Command> command) = 0;
-  virtual std::unique_ptr<CommandResult> doExecuteAndStore(
-    std::unique_ptr<UndoableCommand> command) = 0;
+  std::unique_ptr<mdl::CommandResult> execute(std::unique_ptr<mdl::Command>&& command);
+  std::unique_ptr<mdl::CommandResult> executeAndStore(
+    std::unique_ptr<mdl::UndoableCommand>&& command);
 
 public: // asset state management
   void processResourcesSync(const mdl::ProcessContext& processContext);
@@ -732,9 +713,6 @@ private: // validator management
 public:
   void setIssueHidden(const mdl::Issue& issue, bool hidden);
 
-private:
-  virtual void doSetIssueHidden(const mdl::Issue& issue, bool hidden) = 0;
-
 public:                     // tag management
   void registerSmartTags(); // public for testing
   const std::vector<mdl::SmartTag>& smartTags() const;
@@ -742,6 +720,10 @@ public:                     // tag management
   const mdl::SmartTag& smartTag(const std::string& name) const;
   bool isRegisteredSmartTag(size_t index) const;
   const mdl::SmartTag& smartTag(size_t index) const;
+
+public: // modification count
+  void incModificationCount(size_t delta = 1);
+  void decModificationCount(size_t delta = 1);
 
 private:
   void initializeAllNodeTags(MapDocument* document);
@@ -773,11 +755,13 @@ private:
 
 private: // observers
   void connectObservers();
+  void documentWasNewed(MapDocument* document);
+  void documentWasLoaded(MapDocument* document);
   void nodesWereAdded(const std::vector<mdl::Node*>& nodes);
   void nodesWereRemoved(const std::vector<mdl::Node*>& nodes);
   void nodesDidChange(const std::vector<mdl::Node*>& nodes);
   void selectionWillChange();
-  void selectionDidChange(const SelectionChange& selectionChange);
+  void selectionDidChange(const mdl::SelectionChange& selectionChange);
   void materialCollectionsWillChange();
   void materialCollectionsDidChange();
   void entityDefinitionsWillChange();
@@ -785,8 +769,8 @@ private: // observers
   void modsWillChange();
   void modsDidChange();
   void preferenceDidChange(const std::filesystem::path& path);
-  void commandDone(Command& command);
-  void commandUndone(UndoableCommand& command);
+  void commandDone(mdl::Command& command);
+  void commandUndone(mdl::UndoableCommand& command);
   void transactionDone(const std::string& name);
   void transactionUndone(const std::string& name);
 };

@@ -22,14 +22,14 @@
 
 #include "PreferenceManager.h"
 #include "Preferences.h"
+#include "mdl/Grid.h"
 #include "mdl/Hit.h"
 #include "mdl/HitFilter.h"
 #include "mdl/PickResult.h"
+#include "mdl/TransactionScope.h"
 #include "render/Camera.h"
-#include "ui/Grid.h"
 #include "ui/MapDocument.h"
 #include "ui/ScaleToolPage.h"
-#include "ui/TransactionScope.h"
 
 #include "kdl/memory_utils.h"
 #include "kdl/range_to_vector.h"
@@ -579,7 +579,7 @@ bool ScaleTool::doActivate()
   return true;
 }
 
-const Grid& ScaleTool::grid() const
+const mdl::Grid& ScaleTool::grid() const
 {
   return kdl::mem_lock(m_document)->grid();
 }
@@ -1025,7 +1025,7 @@ void ScaleTool::startScaleWithHit(const mdl::Hit& hit)
   m_dragCumulativeDelta = vm::vec3d{0, 0, 0};
 
   auto document = kdl::mem_lock(m_document);
-  document->startTransaction("Scale Objects", TransactionScope::LongRunning);
+  document->startTransaction("Scale Objects", mdl::TransactionScope::LongRunning);
   m_resizing = true;
 }
 

@@ -26,14 +26,14 @@
 #include "mdl/Hit.h"
 #include "mdl/HitFilter.h"
 #include "mdl/PickResult.h"
+#include "mdl/SelectionChange.h"
+#include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
 #include "render/BrushRenderer.h"
 #include "render/Camera.h"
 #include "render/RenderService.h"
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
-#include "ui/SelectionChange.h"
-#include "ui/Transaction.h"
 
 #include "kdl/map_utils.h"
 #include "kdl/memory_utils.h"
@@ -496,7 +496,7 @@ ClipTool::~ClipTool()
   kdl::map_clear_and_delete(m_backBrushes);
 }
 
-const Grid& ClipTool::grid() const
+const mdl::Grid& ClipTool::grid() const
 {
   return kdl::mem_lock(m_document)->grid();
 }
@@ -605,7 +605,7 @@ void ClipTool::performClip()
     const auto ignoreNotifications = kdl::set_temp{m_ignoreNotifications};
 
     auto document = kdl::mem_lock(m_document);
-    auto transaction = Transaction{document, "Clip Brushes"};
+    auto transaction = mdl::Transaction{document, "Clip Brushes"};
 
     // need to make a copies here so that we are not affected by the deselection
     const auto toAdd = clipBrushes();
@@ -979,7 +979,7 @@ void ClipTool::connectObservers()
     document->brushFacesDidChangeNotifier.connect(this, &ClipTool::brushFacesDidChange);
 }
 
-void ClipTool::selectionDidChange(const SelectionChange&)
+void ClipTool::selectionDidChange(const mdl::SelectionChange&)
 {
   if (!m_ignoreNotifications)
   {

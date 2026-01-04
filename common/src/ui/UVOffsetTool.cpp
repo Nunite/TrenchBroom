@@ -21,10 +21,10 @@
 
 #include "mdl/BrushFace.h"
 #include "mdl/ChangeBrushFaceAttributesRequest.h"
+#include "mdl/TransactionScope.h"
 #include "ui/GestureTracker.h"
 #include "ui/InputState.h"
 #include "ui/MapDocument.h"
-#include "ui/TransactionScope.h"
 #include "ui/UVView.h"
 
 #include "kdl/memory_utils.h"
@@ -89,7 +89,7 @@ public:
     , m_helper{helper}
     , m_lastPoint{computeHitPoint(m_helper, inputState.pickRay())}
   {
-    m_document.startTransaction("Move UV", TransactionScope::LongRunning);
+    m_document.startTransaction("Move UV", mdl::TransactionScope::LongRunning);
   }
 
   bool update(const InputState& inputState) override

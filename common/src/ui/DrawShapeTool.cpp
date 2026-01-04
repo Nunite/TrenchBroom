@@ -21,10 +21,10 @@
 
 #include "mdl/Brush.h" // IWYU pragma: keep
 #include "mdl/BrushNode.h"
+#include "mdl/Transaction.h"
 #include "ui/DrawShapeToolExtension.h"
 #include "ui/DrawShapeToolPage.h"
 #include "ui/MapDocument.h"
-#include "ui/Transaction.h"
 
 #include "kdl/memory_utils.h"
 #include "kdl/range_to_vector.h"
@@ -83,7 +83,7 @@ QWidget* DrawShapeTool::doCreatePage(QWidget* parent)
                    | kdl::to_vector;
           })
         | kdl::transform([&](auto brushNodes) {
-            auto transaction = Transaction{document, "Update Brushes"};
+            auto transaction = mdl::Transaction{document, "Update Brushes"};
 
             document->remove();
             const auto addedNodes = document->addNodes({

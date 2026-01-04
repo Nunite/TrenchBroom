@@ -40,6 +40,7 @@
 #include "mdl/EntityDefinitionUtils.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityProperties.h"
+#include "mdl/Grid.h"
 #include "mdl/GroupNode.h"
 #include "mdl/HitAdapter.h"
 #include "mdl/HitFilter.h"
@@ -48,6 +49,8 @@
 #include "mdl/PatchNode.h"
 #include "mdl/PointTrace.h"
 #include "mdl/PortalFile.h"
+#include "mdl/Selection.h"
+#include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
 #include "render/Camera.h"
 #include "render/Compass.h"
@@ -63,7 +66,6 @@
 #include "ui/EnableDisableTagCallback.h"
 #include "ui/FlashSelectionAnimation.h"
 #include "ui/GLContextManager.h"
-#include "ui/Grid.h"
 #include "ui/MapDocument.h"
 #include "ui/MapFrame.h"
 #include "ui/MapViewActivationTracker.h"
@@ -71,7 +73,6 @@
 #include "ui/QtUtils.h"
 #include "ui/SelectionTool.h"
 #include "ui/SignalDelayer.h"
-#include "ui/Transaction.h"
 
 #include "kdl/memory_utils.h"
 #include "kdl/string_compare.h"
@@ -234,21 +235,21 @@ void MapViewBase::toolChanged(Tool&)
   update();
 }
 
-void MapViewBase::commandDone(Command&)
+void MapViewBase::commandDone(mdl::Command&)
 {
   updateActionStatesDelayed();
   updatePickResult();
   update();
 }
 
-void MapViewBase::commandUndone(UndoableCommand&)
+void MapViewBase::commandUndone(mdl::UndoableCommand&)
 {
   updateActionStatesDelayed();
   updatePickResult();
   update();
 }
 
-void MapViewBase::selectionDidChange(const SelectionChange&)
+void MapViewBase::selectionDidChange(const mdl::SelectionChange&)
 {
   updateActionStatesDelayed();
 }
@@ -427,7 +428,7 @@ void MapViewBase::duplicateObjects()
 
 void MapViewBase::duplicateAndMoveObjects(const vm::direction direction)
 {
-  auto transaction = Transaction{m_document};
+  auto transaction = mdl::Transaction{m_document};
   duplicateObjects();
   moveObjects(direction);
   transaction.commit();
@@ -481,7 +482,7 @@ void MapViewBase::flip(const vm::direction direction)
     // selections that are an odd number of grid units wide get translated.
     // Instead, snap to 1/2 the grid size.
     // (see: https://github.com/TrenchBroom/TrenchBroom/issues/1495 )
-    auto halfGrid = Grid{document->grid().size()};
+    auto halfGrid = mdl::Grid{document->grid().size()};
     halfGrid.decSize();
 
     const auto center = halfGrid.referencePoint(*document->selectionBounds());
@@ -716,7 +717,7 @@ void MapViewBase::enableTag(const mdl::SmartTag& tag)
   assert(tag.canEnable());
   auto document = kdl::mem_lock(m_document);
 
-  auto transaction = Transaction{document, "Turn Selection into " + tag.name()};
+  auto transaction = mdl::Transaction{document, "Turn Selection into " + tag.name()};
   auto callback = EnableDisableTagCallback{};
   tag.enable(callback, *document);
   transaction.commit();
@@ -726,7 +727,7 @@ void MapViewBase::disableTag(const mdl::SmartTag& tag)
 {
   assert(tag.canDisable());
   auto document = kdl::mem_lock(m_document);
-  auto transaction = Transaction{document, "Turn Selection into non-" + tag.name()};
+  auto transaction = mdl::Transaction{document, "Turn Selection into non-" + tag.name()};
   auto callback = EnableDisableTagCallback{};
   tag.disable(callback, *document);
   transaction.commit();
@@ -748,7 +749,7 @@ void MapViewBase::makeStructural()
     std::back_inserter(toReparent),
     [&](const auto* brushNode) { return brushNode->entity() != document->world(); });
 
-  auto transaction = Transaction{document, "Make Structural"};
+  auto transaction = mdl::Transaction{document, "Make Structural"};
 
   if (!toReparent.empty())
   {
@@ -1531,7 +1532,7 @@ void MapViewBase::addSelectedObjectsToGroup()
   auto* newGroup = findNewGroupForObjects(nodes);
   ensure(newGroup != nullptr, "newGroup is null");
 
-  auto transaction = Transaction{document, "Add Objects to Group"};
+  auto transaction = mdl::Transaction{document, "Add Objects to Group"};
   reparentNodes(nodes, newGroup, true);
   document->deselectAll();
   document->selectNodes({newGroup});
@@ -1545,7 +1546,7 @@ void MapViewBase::removeSelectedObjectsFromGroup()
   auto* currentGroup = document->editorContext().currentGroup();
   ensure(currentGroup != nullptr, "currentGroup is null");
 
-  auto transaction = Transaction{document, "Remove Objects from Group"};
+  auto transaction = mdl::Transaction{document, "Remove Objects from Group"};
   reparentNodes(nodes, document->currentLayer(), true);
 
   while (document->currentGroup() != nullptr)
@@ -1578,7 +1579,7 @@ void MapViewBase::mergeSelectedGroups()
   auto* newGroup = findGroupToMergeGroupsInto(document->selection());
   ensure(newGroup != nullptr, "newGroup is null");
 
-  auto transaction = Transaction{document, "Merge Groups"};
+  auto transaction = mdl::Transaction{document, "Merge Groups"};
   document->mergeSelectedGroupsWithGroup(newGroup);
   transaction.commit();
 }
@@ -1623,8 +1624,8 @@ void MapViewBase::moveSelectedBrushesToEntity()
   auto* newParent = findNewParentEntityForBrushes(nodes);
   ensure(newParent != nullptr, "newParent is null");
 
-  auto transaction =
-    Transaction{document, "Move " + kdl::str_plural(nodes.size(), "Brush", "Brushes")};
+  auto transaction = mdl::Transaction{
+    document, "Move " + kdl::str_plural(nodes.size(), "Brush", "Brushes")};
   reparentNodes(nodes, newParent, false);
 
   document->deselectAll();
@@ -1723,7 +1724,7 @@ void MapViewBase::reparentNodes(
                     + kdl::str_plural(reparentableNodes.size(), "Object", "Objects")
                     + " to " + newParent->name();
 
-  auto transaction = Transaction{document, name};
+  auto transaction = mdl::Transaction{document, name};
   document->deselectAll();
   if (!document->reparentNodes({{newParent, reparentableNodes}}))
   {
@@ -1834,7 +1835,7 @@ void MapViewBase::applyEntityTemplate()
   }
   
   // 为每个brush创建一个新实体
-  auto transaction = Transaction{*document, "Apply Entity Template"};
+  auto transaction = mdl::Transaction{*document, "Apply Entity Template"};
   
   for (auto* brushNode : brushNodes) {
     document->createSingleBrushEntity(brushNode, *templateEntity());

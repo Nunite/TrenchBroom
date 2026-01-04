@@ -19,13 +19,13 @@
 
 #include "DrawShapeToolController2D.h"
 
+#include "mdl/Grid.h"
 #include "render/Camera.h"
 #include "ui/DrawShapeTool.h"
-#include "ui/Grid.h"
 #include "ui/HandleDragTracker.h"
 #include "ui/InputState.h"
 #include "ui/MapDocument.h"
-#include "ui/Transaction.h"
+#include "mdl/Transaction.h"
 #include "ui/BoxSelectionTool.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/BrushBuilder.h"

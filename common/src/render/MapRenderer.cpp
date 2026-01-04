@@ -33,6 +33,7 @@
 #include "mdl/Node.h"
 #include "mdl/PatchNode.h"
 #include "mdl/Resource.h"
+#include "mdl/SelectionChange.h"
 #include "mdl/WorldNode.h"
 #include "render/BrushRenderer.h"
 #include "render/EntityDecalRenderer.h"
@@ -43,7 +44,6 @@
 #include "render/RenderContext.h"
 #include "render/RenderUtils.h"
 #include "ui/MapDocument.h"
-#include "ui/SelectionChange.h"
 
 #include "kdl/memory_utils.h"
 #include "kdl/overload.h"
@@ -762,13 +762,13 @@ void MapRenderer::nodeLockingDidChange(const std::vector<mdl::Node*>& nodes)
   invalidateEntityLinkRenderer();
 }
 
-void MapRenderer::groupWasOpened(mdl::GroupNode*)
+void MapRenderer::groupWasOpened(mdl::GroupNode&)
 {
   invalidateGroupLinkRenderer();
   invalidateEntityLinkRenderer();
 }
 
-void MapRenderer::groupWasClosed(mdl::GroupNode*)
+void MapRenderer::groupWasClosed(mdl::GroupNode&)
 {
   invalidateGroupLinkRenderer();
   invalidateEntityLinkRenderer();
@@ -782,7 +782,7 @@ void MapRenderer::brushFacesDidChange(const std::vector<mdl::BrushFaceHandle>& f
   }
 }
 
-void MapRenderer::selectionDidChange(const ui::SelectionChange& selectionChange)
+void MapRenderer::selectionDidChange(const mdl::SelectionChange& selectionChange)
 {
   for (const auto& face : selectionChange.deselectedBrushFaces)
   {

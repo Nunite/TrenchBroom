@@ -27,8 +27,9 @@
 
 namespace tb::mdl
 {
+class BrushVertexCommandBase;
 class PickResult;
-}
+} // namespace tb::mdl
 
 namespace tb::render
 {
@@ -40,10 +41,7 @@ class RenderService;
 
 namespace tb::ui
 {
-class BrushVertexCommandBase;
-class Grid;
 class Lasso;
-struct SelectionChange;
 
 class VertexTool : public VertexToolBase<vm::vec3d>
 {
@@ -113,8 +111,8 @@ private:
   void addHandles(const std::vector<mdl::Node*>& nodes) override;
   void removeHandles(const std::vector<mdl::Node*>& nodes) override;
 
-  void addHandles(BrushVertexCommandBase* command) override;
-  void removeHandles(BrushVertexCommandBase* command) override;
+  void addHandles(mdl::BrushVertexCommandBase* command) override;
+  void removeHandles(mdl::BrushVertexCommandBase* command) override;
 
 private: // General helper methods
   void resetModeAfterDeselection();

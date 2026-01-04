@@ -21,12 +21,12 @@
 
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
+#include "mdl/Grid.h"
 #include "mdl/Hit.h"
-#include "ui/Grid.h"
+#include "mdl/TransactionScope.h"
 #include "ui/MapDocument.h"
 #include "ui/RotateHandle.h"
 #include "ui/RotateToolPage.h"
-#include "ui/TransactionScope.h"
 
 #include "kdl/memory_utils.h"
 
@@ -45,7 +45,7 @@ bool RotateTool::doActivate()
   return true;
 }
 
-const Grid& RotateTool::grid() const
+const mdl::Grid& RotateTool::grid() const
 {
   return kdl::mem_lock(m_document)->grid();
 }
@@ -106,7 +106,7 @@ double RotateTool::minorHandleRadius(const render::Camera& camera) const
 void RotateTool::beginRotation()
 {
   auto document = kdl::mem_lock(m_document);
-  document->startTransaction("Rotate Objects", TransactionScope::LongRunning);
+  document->startTransaction("Rotate Objects", mdl::TransactionScope::LongRunning);
 }
 
 void RotateTool::commitRotation()

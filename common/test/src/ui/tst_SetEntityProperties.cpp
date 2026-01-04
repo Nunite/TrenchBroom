@@ -26,10 +26,10 @@
 #include "mdl/EntityDefinitionManager.h"
 #include "mdl/EntityNode.h"
 #include "mdl/GroupNode.h"
+#include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentTest.h"
-#include "ui/Transaction.h"
 
 #include "kdl/result.h"
 
@@ -87,7 +87,7 @@ TEST_CASE_METHOD(ValveMapDocumentTest, "SetEntityPropertiesTest.changeClassname"
 
   {
     // we only want to undo the following changes later
-    auto transaction = Transaction{document};
+    auto transaction = mdl::Transaction{document};
     document->setProperty("temp", "large_entity");
     document->renameProperty("temp", "classname");
     transaction.commit();

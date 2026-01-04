@@ -21,14 +21,14 @@
 #include "ShearTool.h"
 
 #include "Ensure.h"
+#include "mdl/Grid.h"
 #include "mdl/Hit.h"
 #include "mdl/HitFilter.h"
 #include "mdl/PickResult.h"
+#include "mdl/TransactionScope.h"
 #include "render/Camera.h"
-#include "ui/Grid.h"
 #include "ui/MapDocument.h"
 #include "ui/ScaleTool.h"
-#include "ui/TransactionScope.h"
 
 #include "kdl/memory_utils.h"
 
@@ -47,7 +47,7 @@ ShearTool::ShearTool(std::weak_ptr<MapDocument> document)
 
 ShearTool::~ShearTool() = default;
 
-const Grid& ShearTool::grid() const
+const mdl::Grid& ShearTool::grid() const
 {
   return kdl::mem_lock(m_document)->grid();
 }
@@ -172,7 +172,7 @@ void ShearTool::startShearWithHit(const mdl::Hit& hit)
   m_dragCumulativeDelta = vm::vec3d{0, 0, 0};
 
   auto document = kdl::mem_lock(m_document);
-  document->startTransaction("Shear Objects", TransactionScope::LongRunning);
+  document->startTransaction("Shear Objects", mdl::TransactionScope::LongRunning);
   m_resizing = true;
 }
 

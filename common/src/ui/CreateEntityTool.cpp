@@ -25,14 +25,14 @@
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionManager.h"
 #include "mdl/EntityNode.h"
+#include "mdl/Grid.h"
 #include "mdl/HitAdapter.h"
 #include "mdl/HitFilter.h"
 #include "mdl/PickResult.h"
+#include "mdl/TransactionScope.h"
 #include "mdl/WorldNode.h"
 #include "render/Camera.h"
-#include "ui/Grid.h"
 #include "ui/MapDocument.h"
-#include "ui/TransactionScope.h"
 
 #include "kdl/k.h"
 #include "kdl/memory_utils.h"
@@ -61,7 +61,7 @@ bool CreateEntityTool::createEntity(const std::string& classname)
   m_referenceBounds = document->referenceBounds();
 
   document->startTransaction(
-    "Create '" + definition->name + "'", TransactionScope::LongRunning);
+    "Create '" + definition->name + "'", mdl::TransactionScope::LongRunning);
   m_entity = document->createPointEntity(*definition, {0, 0, 0});
 
   return m_entity != nullptr;

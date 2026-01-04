@@ -32,10 +32,10 @@
 #include "mdl/IssueQuickFix.h"
 #include "mdl/LayerNode.h"
 #include "mdl/PatchNode.h"
+#include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
-#include "ui/Transaction.h"
 
 #include "kdl/memory_utils.h"
 #include "kdl/overload.h"
@@ -179,7 +179,7 @@ void IssueBrowserView::applyQuickFix(const mdl::IssueQuickFix& quickFix)
   const auto issues = collectIssues(getSelection());
 
   auto transaction =
-    Transaction{document, "Apply Quick Fix (" + quickFix.description() + ")"};
+    mdl::Transaction{document, "Apply Quick Fix (" + quickFix.description() + ")"};
   updateSelection();
   quickFix.apply(*document, issues);
   transaction.commit();

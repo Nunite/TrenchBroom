@@ -23,6 +23,7 @@
 #include "Preferences.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
+#include "mdl/Grid.h"
 #include "mdl/Material.h"
 #include "mdl/Texture.h"
 #include "render/ActiveShader.h"
@@ -38,7 +39,6 @@
 #include "render/Shaders.h"
 #include "render/VboManager.h"
 #include "render/VertexArray.h"
-#include "ui/Grid.h"
 #include "ui/MapDocument.h"
 #include "ui/UVCameraTool.h"
 #include "ui/UVOffsetTool.h"
@@ -205,7 +205,7 @@ void UVView::connectObservers()
     m_camera.cameraDidChangeNotifier.connect(this, &UVView::cameraDidChange);
 }
 
-void UVView::selectionDidChange(const SelectionChange&)
+void UVView::selectionDidChange(const mdl::SelectionChange&)
 {
   auto document = kdl::mem_lock(m_document);
   const auto faces = document->selection().brushFaces;

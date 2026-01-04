@@ -41,9 +41,11 @@ namespace tb
 namespace mdl
 {
 class BrushFace;
+class Grid;
 class Hit;
 class Node;
 class PickResult;
+struct SelectionChange;
 } // namespace mdl
 
 namespace render
@@ -53,9 +55,7 @@ class Camera;
 
 namespace ui
 {
-class Grid;
 class MapDocument;
-struct SelectionChange;
 
 /**
  * Similar to mdl::BrushFaceHandle but caches the Brush state at the beginning of the
@@ -129,7 +129,7 @@ public:
 
   bool applies() const;
 
-  const Grid& grid() const;
+  const mdl::Grid& grid() const;
 
   mdl::Hit pick2D(const vm::ray3d& pickRay, const mdl::PickResult& pickResult) const;
   mdl::Hit pick3D(const vm::ray3d& pickRay, const mdl::PickResult& pickResult) const;
@@ -160,7 +160,7 @@ public:
 private:
   void connectObservers();
   void nodesDidChange(const std::vector<mdl::Node*>& nodes);
-  void selectionDidChange(const SelectionChange& selectionChange);
+  void selectionDidChange(const mdl::SelectionChange& selectionChange);
 };
 } // namespace ui
 } // namespace tb

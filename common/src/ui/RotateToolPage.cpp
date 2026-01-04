@@ -28,9 +28,9 @@
 #include <QtGlobal>
 
 #include "mdl/EntityProperties.h"
+#include "mdl/Grid.h"
 #include "mdl/WorldNode.h"
 #include "ui/BorderLine.h"
-#include "ui/Grid.h"
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
 #include "ui/RotateTool.h"
@@ -178,7 +178,7 @@ void RotateToolPage::updateGui()
   }
 }
 
-void RotateToolPage::selectionDidChange(const SelectionChange&)
+void RotateToolPage::selectionDidChange(const mdl::SelectionChange&)
 {
   updateGui();
 }

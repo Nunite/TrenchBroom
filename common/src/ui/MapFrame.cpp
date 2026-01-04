@@ -53,6 +53,7 @@
 #include "mdl/EntityNodeBase.h"
 #include "mdl/Game.h"
 #include "mdl/GameFactory.h"
+#include "mdl/Grid.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/MapFormat.h"
@@ -73,7 +74,6 @@
 #include "ui/FaceTool.h"
 #include "ui/FrameManager.h"
 #include "ui/GLContextManager.h"
-#include "ui/Grid.h"
 #include "ui/InfoPanel.h"
 #include "ui/Inspector.h"
 #include "ui/LaunchGameEngineDialog.h"
@@ -429,9 +429,9 @@ void MapFrame::createToolBar()
   });
 
   m_gridChoice = new QComboBox{};
-  for (int i = Grid::MinSize; i <= Grid::MaxSize; ++i)
+  for (int i = mdl::Grid::MinSize; i <= mdl::Grid::MaxSize; ++i)
   {
-    const auto gridSize = Grid::actualSize(i);
+    const auto gridSize = mdl::Grid::actualSize(i);
     const auto gridSizeStr = tr("Grid %1").arg(QString::number(gridSize, 'g'));
     m_gridChoice->addItem(gridSizeStr, QVariant(i));
   }
@@ -442,7 +442,7 @@ void MapFrame::createToolBar()
 void MapFrame::updateToolBarWidgets()
 {
   const auto& grid = m_document->grid();
-  const auto sizeIndex = grid.size() - Grid::MinSize;
+  const auto sizeIndex = grid.size() - mdl::Grid::MinSize;
   m_gridChoice->setCurrentIndex(sizeIndex);
 }
 
@@ -610,34 +610,34 @@ QString describeSelection(const MapDocument& document)
 
   const auto& editorContext = document.editorContext();
   document.world()->accept(kdl::overload(
-    [](auto&& thisLambda, const mdl::WorldNode* world) {
-      world->visitChildren(thisLambda);
+    [](auto&& thisLambda, const mdl::WorldNode* worldNode) {
+      worldNode->visitChildren(thisLambda);
     },
-    [](auto&& thisLambda, const mdl::LayerNode* layer) {
-      layer->visitChildren(thisLambda);
+    [](auto&& thisLambda, const mdl::LayerNode* layerNode) {
+      layerNode->visitChildren(thisLambda);
     },
-    [&](auto&& thisLambda, const mdl::GroupNode* group) {
-      if (!editorContext.visible(group))
+    [&](auto&& thisLambda, const mdl::GroupNode* groupNode) {
+      if (!editorContext.visible(*groupNode))
       {
         ++hiddenGroups;
       }
-      group->visitChildren(thisLambda);
+      groupNode->visitChildren(thisLambda);
     },
-    [&](auto&& thisLambda, const mdl::EntityNode* entity) {
-      if (!editorContext.visible(entity))
+    [&](auto&& thisLambda, const mdl::EntityNode* entityNode) {
+      if (!editorContext.visible(*entityNode))
       {
         ++hiddenEntities;
       }
-      entity->visitChildren(thisLambda);
+      entityNode->visitChildren(thisLambda);
     },
-    [&](const mdl::BrushNode* brush) {
-      if (!editorContext.visible(brush))
+    [&](const mdl::BrushNode* brushNode) {
+      if (!editorContext.visible(*brushNode))
       {
         ++hiddenBrushes;
       }
     },
-    [&](const mdl::PatchNode* patch) {
-      if (!editorContext.visible(patch))
+    [&](const mdl::PatchNode* patchNode) {
+      if (!editorContext.visible(*patchNode))
       {
         ++hiddenPatches;
       }
@@ -727,7 +727,7 @@ void MapFrame::connectObservers()
   m_notifierConnection += m_document->portalFileWasUnloadedNotifier.connect(
     this, &MapFrame::portalFileDidChange);
 
-  Grid& grid = m_document->grid();
+  auto& grid = m_document->grid();
   m_notifierConnection +=
     grid.gridDidChangeNotifier.connect(this, &MapFrame::gridDidChange);
 
@@ -814,7 +814,7 @@ void MapFrame::toolHandleSelectionChanged(Tool&)
   updateActionStateDelayed();
 }
 
-void MapFrame::selectionDidChange(const SelectionChange&)
+void MapFrame::selectionDidChange(const mdl::SelectionChange&)
 {
   updateActionStateDelayed();
   updateStatusBarDelayed();
@@ -825,12 +825,12 @@ void MapFrame::currentLayerDidChange(const tb::mdl::LayerNode*)
   updateStatusBarDelayed();
 }
 
-void MapFrame::groupWasOpened(mdl::GroupNode*)
+void MapFrame::groupWasOpened(mdl::GroupNode&)
 {
   updateStatusBarDelayed();
 }
 
-void MapFrame::groupWasClosed(mdl::GroupNode*)
+void MapFrame::groupWasClosed(mdl::GroupNode&)
 {
   updateStatusBarDelayed();
 }
@@ -867,7 +867,7 @@ void MapFrame::bindEvents()
     m_gridChoice,
     QOverload<int>::of(&QComboBox::activated),
     this,
-    [this](const int index) { setGridSize(index + Grid::MinSize); });
+    [this](const int index) { setGridSize(index + mdl::Grid::MinSize); });
   connect(QApplication::clipboard(), &QClipboard::dataChanged, this, [this]() {
     // update the "Paste" menu items
     this->updateActionState();
@@ -1270,7 +1270,7 @@ void MapFrame::cutSelection()
   if (canCutSelection())
   {
     copyToClipboard();
-    auto transaction = Transaction{m_document, "Cut"};
+    auto transaction = mdl::Transaction{m_document, "Cut"};
     m_document->remove();
     transaction.commit();
   }
@@ -1373,7 +1373,7 @@ void MapFrame::pasteAtCursorPosition()
   {
     const auto referenceBounds = m_document->referenceBounds();
 
-    auto transaction = Transaction{m_document, "Paste"};
+    auto transaction = mdl::Transaction{m_document, "Paste"};
     switch (paste())
     {
     case PasteType::Node:
@@ -1989,7 +1989,7 @@ void MapFrame::incGridSize()
 
 bool MapFrame::canIncGridSize() const
 {
-  return m_document->grid().size() < Grid::MaxSize;
+  return m_document->grid().size() < mdl::Grid::MaxSize;
 }
 
 void MapFrame::decGridSize()
@@ -2002,7 +2002,7 @@ void MapFrame::decGridSize()
 
 bool MapFrame::canDecGridSize() const
 {
-  return m_document->grid().size() > Grid::MinSize;
+  return m_document->grid().size() > mdl::Grid::MinSize;
 }
 
 void MapFrame::setGridSize(const int size)
