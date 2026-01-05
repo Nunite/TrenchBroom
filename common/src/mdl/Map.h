@@ -24,7 +24,6 @@
 #include "Result.h"
 #include "io/ExportOptions.h"
 #include "mdl/BrushFaceHandle.h"
-#include "mdl/NodeContents.h"
 #include "mdl/ResourceId.h"
 #include "mdl/Selection.h"
 
@@ -265,59 +264,6 @@ private:
   void setLastSaveModificationCount();
   void clearModificationCount();
 
-public: // selection management
-  const Selection& selection() const;
-
-  void selectAllNodes();
-  void selectNodes(const std::vector<Node*>& nodes);
-
-  void selectSiblingNodes();
-  void selectTouchingNodes(bool del);
-  void selectTouchingNodes(vm::axis::type cameraAxis, bool del);
-  void selectContainedNodes(bool del);
-  void selectNodesWithFilePosition(const std::vector<size_t>& positions);
-  void selectBrushesWithMaterial(const Material* material);
-  void invertNodeSelection();
-
-  void selectAllInLayers(const std::vector<LayerNode*>& layers);
-  bool canSelectAllInLayers(const std::vector<LayerNode*>& layers) const;
-
-  bool canSelectLinkedGroups() const;
-  void selectLinkedGroups();
-
-  void selectBrushFaces(const std::vector<BrushFaceHandle>& handles);
-  void selectBrushFacesWithMaterial(const Material* material);
-  void convertToFaceSelection();
-
-  void deselectAll();
-  void deselectNodes(const std::vector<Node*>& nodes);
-  void deselectBrushFaces(const std::vector<BrushFaceHandle>& handles);
-
-  const vm::bbox3d referenceBounds() const;
-  const std::optional<vm::bbox3d>& lastSelectionBounds() const;
-  const std::optional<vm::bbox3d>& selectionBounds() const;
-
-public: // node management
-  bool updateNodeContents(
-    const std::string& commandName,
-    std::vector<std::pair<Node*, NodeContents>> nodesToSwap,
-    std::vector<GroupNode*> changedLinkedGroups);
-  bool updateNodeContents(
-    const std::string& commandName,
-    std::vector<std::pair<Node*, NodeContents>> nodesToSwap);
-
-public: // world management
-  SoftMapBounds softMapBounds() const;
-  void setSoftMapBounds(const SoftMapBounds& bounds);
-
-  std::vector<std::filesystem::path> externalSearchPaths() const;
-  void updateGameSearchPaths();
-
-  std::vector<std::string> mods() const;
-  void setMods(const std::vector<std::string>& mods);
-  std::string defaultMod() const;
-
-private:
   void setWorld(
     const vm::bbox3d& worldBounds,
     std::unique_ptr<WorldNode> worldNode,
@@ -325,26 +271,12 @@ private:
     const std::filesystem::path& path);
   void clearWorld();
 
-public: // node visibility
-  void isolateSelectedNodes();
-  void hideSelectedNodes();
-  void hideNodes(std::vector<Node*> nodes);
-  void showAllNodes();
-  void showNodes(const std::vector<Node*>& nodes);
-  void ensureNodesVisible(const std::vector<Node*>& nodes);
-  void resetNodeVisibility(const std::vector<Node*>& nodes);
-  void downgradeShownToInherit(const std::vector<Node*>& nodes);
+public: // selection management
+  const Selection& selection() const;
 
-public: // node locking
-  void lockNodes(const std::vector<Node*>& nodes);
-  void unlockNodes(const std::vector<Node*>& nodes);
-  void ensureNodesUnlocked(const std::vector<Node*>& nodes);
-  void resetNodeLockingState(const std::vector<Node*>& nodes);
-  void downgradeUnlockedToInherit(const std::vector<Node*>& nodes);
-
-public: // picking
-  void pick(const vm::ray3d& pickRay, PickResult& pickResult) const;
-  std::vector<Node*> findNodesContaining(const vm::vec3d& point) const;
+  const vm::bbox3d referenceBounds() const;
+  const std::optional<vm::bbox3d>& lastSelectionBounds() const;
+  const std::optional<vm::bbox3d>& selectionBounds() const;
 
 public: // tag management
   void registerSmartTags();
@@ -372,7 +304,7 @@ private: // validation
 public:
   void setIssueHidden(const Issue& issue, bool hidden);
 
-private:
+private: // Asset management
   void loadAssets();
   void clearAssets();
 
@@ -400,6 +332,8 @@ private:
   void setEntityModels(const std::vector<Node*>& nodes);
   void unsetEntityModels();
   void unsetEntityModels(const std::vector<Node*>& nodes);
+
+  void updateGameSearchPaths();
 
 public: // resource processing
   void processResourcesSync(const ProcessContext& processContext);

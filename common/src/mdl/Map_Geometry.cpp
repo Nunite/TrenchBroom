@@ -21,7 +21,6 @@
 
 #include "Ensure.h"
 #include "Logger.h"
-#include "Map.h"
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "mdl/AddRemoveNodesCommand.h"
@@ -36,8 +35,10 @@
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/LinkedGroupUtils.h"
+#include "mdl/Map.h"
 #include "mdl/Map_Groups.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Node.h"
 #include "mdl/PatchNode.h"
@@ -156,7 +157,8 @@ bool transformSelection(
 
   const auto success = map.taskManager().run_tasks_and_wait(tasks) | kdl::fold
                        | kdl::transform([&](auto nodesToUpdate) {
-                           return map.updateNodeContents(
+                           return updateNodeContents(
+                             map,
                              commandName,
                              std::move(nodesToUpdate),
                              collectContainingGroups(map.selection().nodes));
@@ -666,14 +668,14 @@ bool csgConvexMerge(Map& map)
              auto* brushNode = new BrushNode{std::move(b)};
 
              auto transaction = Transaction{map, "CSG Convex Merge"};
-             map.deselectAll();
+             deselectAll(map);
              if (addNodes(map, {{parentNode, {brushNode}}}).empty())
              {
                transaction.cancel();
                return;
              }
              removeNodes(map, toRemove);
-             map.selectNodes({brushNode});
+             selectNodes(map, {brushNode});
              transaction.commit();
            })
          | kdl::if_error(
@@ -691,7 +693,7 @@ bool csgSubtract(Map& map)
 
   auto transaction = Transaction{map, "CSG Subtract"};
   // Select touching, but don't delete the subtrahends yet
-  map.selectTouchingNodes(false);
+  selectTouchingNodes(map, false);
 
   const auto minuendNodes = std::vector<BrushNode*>{map.selection().brushes};
   const auto subtrahends = kdl::vec_transform(
@@ -727,10 +729,10 @@ bool csgSubtract(Map& map)
                     });
          })
          | kdl::fold | kdl::transform([&]() {
-             map.deselectAll();
+             deselectAll(map);
              const auto added = addNodes(map, toAdd);
              removeNodes(map, toRemove);
-             map.selectNodes(added);
+             selectNodes(map, added);
 
              return transaction.commit();
            })
@@ -768,7 +770,7 @@ bool csgIntersect(Map& map)
   const auto toRemove = std::vector<Node*>{std::begin(brushes), std::end(brushes)};
 
   auto transaction = Transaction{map, "CSG Intersect"};
-  map.deselectNodes(toRemove);
+  deselectNodes(map, toRemove);
 
   if (valid)
   {
@@ -779,7 +781,7 @@ bool csgIntersect(Map& map)
       return false;
     }
     removeNodes(map, toRemove);
-    map.selectNodes({intersectionNode});
+    selectNodes(map, {intersectionNode});
   }
   else
   {
@@ -837,7 +839,7 @@ bool csgHollow(Map& map)
   }
 
   auto transaction = Transaction{map, "CSG Hollow"};
-  map.deselectAll();
+  deselectAll(map);
   const auto added = addNodes(map, toAdd);
   if (added.empty())
   {
@@ -845,7 +847,7 @@ bool csgHollow(Map& map)
     return false;
   }
   removeNodes(map, toRemove);
-  map.selectNodes(added);
+  selectNodes(map, added);
 
   return transaction.commit();
 }
@@ -879,7 +881,7 @@ bool clipBrushes(Map& map, const vm::vec3d& p1, const vm::vec3d& p2, const vm::v
              }
 
              auto transaction = Transaction{map, "Clip Brushes"};
-             map.deselectAll();
+             deselectAll(map);
              removeNodes(map, toRemove);
 
              const auto addedNodes = addNodes(map, toAdd);
@@ -888,7 +890,7 @@ bool clipBrushes(Map& map, const vm::vec3d& p1, const vm::vec3d& p2, const vm::v
                transaction.cancel();
                return Error{"Could not replace brushes in document"};
              }
-             map.selectNodes(addedNodes);
+             selectNodes(map, addedNodes);
              if (!transaction.commit())
              {
                return Error{"Could not replace brushes in document"};

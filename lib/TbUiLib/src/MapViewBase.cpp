@@ -102,17 +102,6 @@ namespace tb::ui
 namespace
 {
 
-auto getCreateableEntityDefinitions(
-  const mdl::EntityDefinitionGroup& group, const mdl::EntityDefinitionType type)
-{
-  const auto definitionsWithType =
-    filterAndSort(group.definitions, type, mdl::EntityDefinitionSortOrder::Name);
-  return definitionsWithType | std::views::filter([](const auto* d) {
-           return !kdl::cs::str_is_equal(
-             d->name, mdl::EntityPropertyValues::WorldspawnClassname);
-         })
-         | kdl::to_vector;
-}
 
 } // namespace
 const int MapViewBase::DefaultCameraAnimationDuration = 250;
@@ -1170,14 +1159,8 @@ void MapViewBase::showPopupMenuLater()
 {
   beforePopupMenu();
 
-<<<<<<< HEAD:common/src/ui/MapViewBase.cpp
-  auto document = kdl::mem_lock(m_document);
-  const auto& nodes = document->selectedNodes().nodes();
-  
-=======
   auto& map = m_document.map();
   const auto& nodes = map.selection().nodes;
->>>>>>> a20d0dd30bbf72d2f904b860b76c7a4f04f5e203:lib/TbUiLib/src/MapViewBase.cpp
   auto* newBrushParent = findNewParentEntityForBrushes(nodes);
   auto* currentGroup = map.editorContext().currentGroup();
   auto* newGroup = findNewGroupForObjects(nodes);
@@ -1464,16 +1447,12 @@ QMenu* MapViewBase::makeEntityGroupsMenu(const mdl::EntityDefinitionType type)
   const auto& map = m_document.map();
   for (const auto& group : map.entityDefinitionManager().groups())
   {
-<<<<<<< HEAD:common/src/ui/MapViewBase.cpp
-    const auto creatableDefinitions = getCreateableEntityDefinitions(group, type);
-=======
     auto creatableDefinitions =
       filterAndSort(group.definitions, type, mdl::EntityDefinitionSortOrder::Name)
       | std::views::filter([](const auto* d) {
           return !kdl::cs::str_is_equal(
             d->name, mdl::EntityPropertyValues::WorldspawnClassname);
         });
->>>>>>> a20d0dd30bbf72d2f904b860b76c7a4f04f5e203:lib/TbUiLib/src/MapViewBase.cpp
 
     if (!std::ranges::empty(creatableDefinitions))
     {

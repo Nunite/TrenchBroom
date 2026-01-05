@@ -31,7 +31,10 @@
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Layers.h"
+#include "mdl/Map_NodeLocking.h"
+#include "mdl/Map_NodeVisibility.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
@@ -144,11 +147,11 @@ void LayerEditor::toggleLayerVisible(mdl::LayerNode* layerNode)
   auto& map = m_document.map();
   if (!layerNode->hidden())
   {
-    map.hideNodes(std::vector<mdl::Node*>{layerNode});
+    hideNodes(map, std::vector<mdl::Node*>{layerNode});
   }
   else
   {
-    map.resetNodeVisibility(std::vector<mdl::Node*>{layerNode});
+    resetNodeVisibility(map, std::vector<mdl::Node*>{layerNode});
   }
 }
 
@@ -163,11 +166,11 @@ void LayerEditor::toggleLayerLocked(mdl::LayerNode* layerNode)
   auto& map = m_document.map();
   if (!layerNode->locked())
   {
-    map.lockNodes(std::vector<mdl::Node*>{layerNode});
+    lockNodes(map, std::vector<mdl::Node*>{layerNode});
   }
   else
   {
-    map.resetNodeLockingState(std::vector<mdl::Node*>{layerNode});
+    resetNodeLockingState(map, std::vector<mdl::Node*>{layerNode});
   }
 }
 
@@ -205,16 +208,14 @@ void LayerEditor::onSelectAllInLayer()
   auto* layerNode = m_layerList->selectedLayer();
   ensure(layerNode != nullptr, "layer is null");
 
-  auto& map = m_document.map();
-  map.selectAllInLayers({layerNode});
+  selectAllInLayers(m_document.map(), {layerNode});
 }
 
 bool LayerEditor::canSelectAllInLayer() const
 {
   if (auto* layerNode = m_layerList->selectedLayer())
   {
-    auto& map = m_document.map();
-    return map.canSelectAllInLayers({layerNode});
+    return canSelectAllInLayers(m_document.map(), {layerNode});
   }
   return false;
 }
@@ -261,7 +262,7 @@ void LayerEditor::onRemoveLayer()
   auto* defaultLayerNode = map.world()->defaultLayer();
 
   auto transaction = mdl::Transaction{map, "Remove Layer " + layerNode->name()};
-  map.deselectAll();
+  deselectAll(map);
   if (layerNode->hasChildren())
   {
     if (!reparentNodes(map, {{defaultLayerNode, layerNode->children()}}))
@@ -341,7 +342,7 @@ void LayerEditor::onShowAllLayers()
 {
   auto& map = m_document.map();
   const auto layers = map.world()->allLayers();
-  map.resetNodeVisibility(kdl::vec_static_cast<mdl::Node*>(layers));
+  resetNodeVisibility(map, kdl::vec_static_cast<mdl::Node*>(layers));
 }
 
 bool LayerEditor::canShowAllLayers() const
@@ -356,7 +357,7 @@ void LayerEditor::onHideAllLayers()
 {
   auto& map = m_document.map();
   const auto layers = map.world()->allLayers();
-  map.hideNodes(kdl::vec_static_cast<mdl::Node*>(layers));
+  hideNodes(map, kdl::vec_static_cast<mdl::Node*>(layers));
 }
 
 bool LayerEditor::canHideAllLayers() const
@@ -370,7 +371,7 @@ void LayerEditor::onLockAllLayers()
 {
   auto& map = m_document.map();
   const auto layers = map.world()->allLayers();
-  map.lockNodes(kdl::vec_static_cast<mdl::Node*>(layers));
+  lockNodes(map, kdl::vec_static_cast<mdl::Node*>(layers));
 }
 
 bool LayerEditor::canLockAllLayers() const
@@ -384,7 +385,7 @@ void LayerEditor::onUnlockAllLayers()
 {
   auto& map = m_document.map();
   const auto layers = map.world()->allLayers();
-  map.resetNodeLockingState(kdl::vec_static_cast<mdl::Node*>(layers));
+  resetNodeLockingState(map, kdl::vec_static_cast<mdl::Node*>(layers));
 }
 
 bool LayerEditor::canUnlockAllLayers() const

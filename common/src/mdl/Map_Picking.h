@@ -19,27 +19,17 @@
 
 #pragma once
 
-#include <QByteArray>
-#include <QString>
+#include "vm/ray.h"
 
-#include <catch2/catch.hpp> // IWYU pragma: export
+#include <vector>
 
-namespace Catch
+namespace tb::mdl
 {
+class Map;
+class Node;
+class PickResult;
 
-template <>
-struct StringMaker<QString>
-{
-  static std::string convert(const auto& str) { return str.toStdString(); }
-};
+void pick(const Map& map, const vm::ray3d& pickRay, PickResult& pickResult);
+std::vector<Node*> findNodesContaining(const Map& map, const vm::vec3d& point);
 
-template <>
-struct StringMaker<QByteArray>
-{
-  static std::string convert(const auto& arr)
-  {
-    return QString::fromUtf8(arr).toStdString();
-  }
-};
-
-} // namespace Catch
+} // namespace tb::mdl

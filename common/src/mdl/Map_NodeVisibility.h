@@ -17,30 +17,22 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mdl/Map_Picking.h"
+#pragma once
 
-#include "mdl/Map.h"
-#include "mdl/WorldNode.h"
+#include <vector>
 
 namespace tb::mdl
 {
+class Map;
+class Node;
 
-void pick(const Map& map, const vm::ray3d& pickRay, PickResult& pickResult)
-{
-  if (auto* worldNode = map.world())
-  {
-    worldNode->pick(map.editorContext(), pickRay, pickResult);
-  }
-}
-
-std::vector<Node*> findNodesContaining(const Map& map, const vm::vec3d& point)
-{
-  auto result = std::vector<Node*>{};
-  if (auto* worldNode = map.world())
-  {
-    worldNode->findNodesContaining(point, result);
-  }
-  return result;
-}
+void isolateSelectedNodes(Map& map);
+void hideSelectedNodes(Map& map);
+void hideNodes(Map& map, std::vector<Node*> nodes);
+void showAllNodes(Map& map);
+void showNodes(Map& map, const std::vector<Node*>& nodes);
+void ensureNodesVisible(Map& map, const std::vector<Node*>& nodes);
+void resetNodeVisibility(Map& map, const std::vector<Node*>& nodes);
+void downgradeShownToInherit(Map& map, const std::vector<Node*>& nodes);
 
 } // namespace tb::mdl

@@ -113,11 +113,16 @@ TEST_CASE("WorldNodeTest.nodeTreeUpdates")
     {0, 2, 0}, {1, 2, 1}, {2, 2, 0} }, "material"}};
   // clang-format on
 
+  const auto nodes = std::vector<Node*>{entityNode, brushNode, patchNode};
+  constexpr size_t entityNodeIndex = 0;
+  constexpr size_t brushNodeIndex = 1;
+  constexpr size_t patchNodeIndex = 2;
+
   const auto& nodeTree = worldNode.nodeTree();
 
   SECTION("Adding a single node inserts into node tree")
   {
-    auto* node = GENERATE_COPY(entityNode, brushNode, patchNode);
+    auto* node = nodes[GENERATE_COPY(entityNodeIndex, brushNodeIndex, patchNodeIndex)];
 
     REQUIRE_FALSE(nodeTree.contains(node));
     worldNode.defaultLayer()->addChild(node);
@@ -128,7 +133,7 @@ TEST_CASE("WorldNodeTest.nodeTreeUpdates")
   {
     worldNode.defaultLayer()->addChild(groupNode);
 
-    auto* node = GENERATE_COPY(entityNode, brushNode, patchNode);
+    auto* node = nodes[GENERATE_COPY(entityNodeIndex, brushNodeIndex, patchNodeIndex)];
 
     REQUIRE_FALSE(nodeTree.contains(node));
     groupNode->addChild(node);
@@ -168,7 +173,7 @@ TEST_CASE("WorldNodeTest.nodeTreeUpdates")
 
   SECTION("Removing a single node removes from node tree")
   {
-    auto* node = GENERATE_COPY(entityNode, brushNode, patchNode);
+    auto* node = nodes[GENERATE_COPY(entityNodeIndex, brushNodeIndex, patchNodeIndex)];
 
     worldNode.defaultLayer()->addChild(node);
     REQUIRE(nodeTree.contains(node));
@@ -182,7 +187,7 @@ TEST_CASE("WorldNodeTest.nodeTreeUpdates")
     groupNode->addChildren({entityNode, brushNode, patchNode});
     worldNode.defaultLayer()->addChild(groupNode);
 
-    auto* node = GENERATE_COPY(entityNode, brushNode, patchNode);
+    auto* node = nodes[GENERATE_COPY(entityNodeIndex, brushNodeIndex, patchNodeIndex)];
     REQUIRE(nodeTree.contains(node));
 
     groupNode->removeChild(node);
@@ -214,10 +219,11 @@ TEST_CASE("WorldNodeTest.nodeTreeUpdates")
     REQUIRE(nodeTree.contains(patchNode));
     REQUIRE_THAT(
       nodeTree.find_containers(vm::vec3d{0, 0, 0}),
-      Catch::UnorderedEquals(std::vector<Node*>{entityNode, brushNode, patchNode}));
+      Catch::Matchers::UnorderedEquals(
+        std::vector<Node*>{entityNode, brushNode, patchNode}));
     REQUIRE_THAT(
       nodeTree.find_containers(vm::vec3d{384, 384, 384}),
-      Catch::UnorderedEquals(std::vector<Node*>{}));
+      Catch::Matchers::UnorderedEquals(std::vector<Node*>{}));
 
     transformNode(
       *entityNode, vm::translation_matrix(vm::vec3d(384, 384, 384)), worldBounds);
@@ -231,10 +237,11 @@ TEST_CASE("WorldNodeTest.nodeTreeUpdates")
     CHECK(nodeTree.contains(patchNode));
     CHECK_THAT(
       nodeTree.find_containers(vm::vec3d{0, 0, 0}),
-      Catch::UnorderedEquals(std::vector<Node*>{}));
+      Catch::Matchers::UnorderedEquals(std::vector<Node*>{}));
     CHECK_THAT(
       nodeTree.find_containers(vm::vec3d{384, 384, 384}),
-      Catch::UnorderedEquals(std::vector<Node*>{entityNode, brushNode, patchNode}));
+      Catch::Matchers::UnorderedEquals(
+        std::vector<Node*>{entityNode, brushNode, patchNode}));
   }
 }
 

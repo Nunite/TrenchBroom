@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2025 Kristian Duske
+ Copyright (C) 2010 Kristian Duske
 
  This file is part of TrenchBroom.
 
@@ -19,15 +19,26 @@
 
 #pragma once
 
-// The catch2 header must be included only when all stream insertion
-// operators used in assertions are visible. We add this new wrapper header
-// that includes these operators for the vm types to ensure that they
-// work consistently.
+#include "vm/bbox.h"
 
-#include "StringMakers.h" // IWYU pragma: export
+#include <optional>
 
-// Include this header instead of <catch2/catch.hpp> to ensure that vm
-// stream operators work consistently.
+namespace tb::mdl
+{
 
-#define CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS 1
-#include <catch2/catch.hpp> // IWYU pragma: export
+enum class SoftMapBoundsType
+{
+  Game,
+  Map
+};
+
+struct SoftMapBounds
+{
+  SoftMapBoundsType source;
+  /**
+   * std::nullopt indicates unlimited soft map bounds
+   */
+  std::optional<vm::bbox3d> bounds;
+};
+
+} // namespace tb::mdl

@@ -28,7 +28,9 @@
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Groups.h"
+#include "mdl/Map_NodeLocking.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/PatchNode.h"
 #include "mdl/WorldNode.h"
 
@@ -53,7 +55,7 @@ TEST_CASE("Map_NodeLocking")
 
       REQUIRE_FALSE(layerNode->locked());
 
-      map.lockNodes({layerNode});
+      lockNodes(map, {layerNode});
       CHECK(layerNode->locked());
 
       map.undoCommand();
@@ -71,18 +73,18 @@ TEST_CASE("Map_NodeLocking")
       addNodes(
         map,
         {{parentForNodes(map), {brushNode, entityNode, patchNode, entityNodeInGroup}}});
-      map.deselectAll();
-      map.selectNodes({entityNodeInGroup});
+      deselectAll(map);
+      selectNodes(map, {entityNodeInGroup});
 
       auto* groupNode = groupSelectedNodes(map, "group");
-      map.deselectAll();
+      deselectAll(map);
 
       REQUIRE_FALSE(brushNode->locked());
       REQUIRE_FALSE(entityNode->locked());
       REQUIRE_FALSE(groupNode->locked());
       REQUIRE_FALSE(patchNode->locked());
 
-      map.lockNodes({brushNode, entityNode, groupNode, patchNode});
+      lockNodes(map, {brushNode, entityNode, groupNode, patchNode});
       CHECK(brushNode->locked());
       CHECK(entityNode->locked());
       CHECK(groupNode->locked());
@@ -106,24 +108,24 @@ TEST_CASE("Map_NodeLocking")
       addNodes(
         map,
         {{parentForNodes(map), {brushNode, entityNode, patchNode, entityNodeInGroup}}});
-      map.deselectAll();
-      map.selectNodes({entityNodeInGroup});
+      deselectAll(map);
+      selectNodes(map, {entityNodeInGroup});
 
       auto* groupNode = groupSelectedNodes(map, "group");
-      map.deselectAll();
+      deselectAll(map);
 
       auto* layerNode = new LayerNode{Layer{"layer"}};
       addNodes(map, {{map.world(), {layerNode}}});
 
       const auto originalModificationCount = map.modificationCount();
 
-      map.lockNodes({brushNode, entityNode, groupNode, patchNode});
+      lockNodes(map, {brushNode, entityNode, groupNode, patchNode});
       CHECK(map.modificationCount() == originalModificationCount);
 
       map.undoCommand();
       CHECK(map.modificationCount() == originalModificationCount);
 
-      map.lockNodes({layerNode});
+      lockNodes(map, {layerNode});
       CHECK(map.modificationCount() == originalModificationCount + 1u);
 
       map.undoCommand();
@@ -145,24 +147,24 @@ TEST_CASE("Map_NodeLocking")
 
       SECTION("Node selection")
       {
-        map.selectNodes({selectedBrushNode, unlockedBrushNode});
+        selectNodes(map, {selectedBrushNode, unlockedBrushNode});
 
         REQUIRE_THAT(
           map.selection().nodes,
-          Catch::UnorderedEquals(std::vector<Node*>{
+          Catch::Matchers::UnorderedEquals(std::vector<Node*>{
             selectedBrushNode,
             unlockedBrushNode,
           }));
 
-        map.lockNodes({map.world()->defaultLayer()});
+        lockNodes(map, {map.world()->defaultLayer()});
         CHECK_THAT(
           map.selection().nodes,
-          Catch::UnorderedEquals(std::vector<Node*>{unlockedBrushNode}));
+          Catch::Matchers::UnorderedEquals(std::vector<Node*>{unlockedBrushNode}));
 
         map.undoCommand();
         CHECK_THAT(
           map.selection().nodes,
-          Catch::UnorderedEquals(std::vector<Node*>{
+          Catch::Matchers::UnorderedEquals(std::vector<Node*>{
             selectedBrushNode,
             unlockedBrushNode,
           }));
@@ -170,30 +172,32 @@ TEST_CASE("Map_NodeLocking")
 
       SECTION("Brush face selection")
       {
-        map.selectBrushFaces({
-          {selectedBrushNode, 0},
-          {selectedBrushNode, 1},
-          {unlockedBrushNode, 0},
-        });
+        selectBrushFaces(
+          map,
+          {
+            {selectedBrushNode, 0},
+            {selectedBrushNode, 1},
+            {unlockedBrushNode, 0},
+          });
         REQUIRE_THAT(
           map.selection().brushFaces,
-          Catch::UnorderedEquals(std::vector<BrushFaceHandle>{
+          Catch::Matchers::UnorderedEquals(std::vector<BrushFaceHandle>{
             {selectedBrushNode, 0},
             {selectedBrushNode, 1},
             {unlockedBrushNode, 0},
           }));
 
-        map.lockNodes({map.world()->defaultLayer()});
+        lockNodes(map, {map.world()->defaultLayer()});
         CHECK_THAT(
           map.selection().brushFaces,
-          Catch::UnorderedEquals(std::vector<BrushFaceHandle>{
+          Catch::Matchers::UnorderedEquals(std::vector<BrushFaceHandle>{
             {unlockedBrushNode, 0},
           }));
 
         map.undoCommand();
         CHECK_THAT(
           map.selection().brushFaces,
-          Catch::UnorderedEquals(std::vector<BrushFaceHandle>{
+          Catch::Matchers::UnorderedEquals(std::vector<BrushFaceHandle>{
             {selectedBrushNode, 0},
             {selectedBrushNode, 1},
             {unlockedBrushNode, 0},

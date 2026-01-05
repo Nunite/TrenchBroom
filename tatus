@@ -1,0 +1,20 @@
+[33ma20d0dd30[m[33m ([m[1;31mupstream/master[m[33m, [m[1;31mupstream/HEAD[m[33m)[m Merge pull request #5054 from TrenchBroom/4960-update-manual
+[33m191d422ba[m Merge pull request #5055 from TrenchBroom/apply-shape-parameters
+[33m5453177b7[m Make the apply button update the current shape
+[33m24ac405bb[m Update manual for new task parameters
+[33mfcb3f7398[m Merge pull request #5053 from TrenchBroom/4960-filter-properties-export
+[33m8eca774b6[m Add a checkbox to the export task editor to control stripping TB properties
+[33mef2a4cab6[m Add support for parsing stripTbProperties
+[33mbdcb77305[m Add support for writing stripTbProperties
+[33m776de0bbc[m Always write bools in compilation tasks
+[33m759aece52[m Add stripTbProperties to ExportOptions
+[33m4cec5720f[m Add stripTbProperties to CompilationExportMap task
+[33m7e1b247bc[m Add support for stripping TB specific entity properties when writing a map
+[33maa0e67906[m Extract constant for the common prefix
+[33mf0b332022[m Give all TB property constant names a common prefix
+[33m3ff1b08b5[m Cleanup: Use K macro
+[33m360c9634d[m Replace GameConfigParser with parseGameConfig
+[33m356a53991[m Replace GameEngineConfigParser with parseGameEngineConfig
+[33mb1fdbf8c2[m Replace CompilationConfigParser with parseCompilationConfig
+[33mf71e86bd0[m Cleanup: Introduce function parseExpression
+[33m0934c01e6[m Cleanup: Replace GameEngineConfigWriter with function to convert to el::Value

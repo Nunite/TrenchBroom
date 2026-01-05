@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2010 Kristian Duske
+ Copyright (C) 2025 Kristian Duske
 
  This file is part of TrenchBroom.
 
@@ -17,11 +17,19 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define CATCH_CONFIG_RUNNER
+#pragma once
 
-#include "Catch2.h"
+#include <vector>
 
-int main(int argc, char** argv)
+namespace tb::mdl
 {
-  return Catch::Session().run(argc, argv);
-}
+class Map;
+class Node;
+
+void lockNodes(Map& map, const std::vector<Node*>& nodes);
+void unlockNodes(Map& map, const std::vector<Node*>& nodes);
+void ensureNodesUnlocked(Map& map, const std::vector<Node*>& nodes);
+void resetNodeLockingState(Map& map, const std::vector<Node*>& nodes);
+void downgradeUnlockedToInherit(Map& map, const std::vector<Node*>& nodes);
+
+} // namespace tb::mdl

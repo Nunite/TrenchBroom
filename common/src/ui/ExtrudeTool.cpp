@@ -31,6 +31,7 @@
 #include "mdl/Map.h"
 #include "mdl/Map_Geometry.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/NodeContents.h"
 #include "mdl/PickResult.h"
 #include "mdl/Polyhedron.h"
@@ -442,9 +443,9 @@ bool splitBrushesOutward(
              // Apply the changes calculated above
              map.rollbackTransaction();
 
-             map.deselectAll();
+             deselectAll(map);
              const auto addedNodes = addNodes(map, newNodes);
-             map.selectNodes(addedNodes);
+             selectNodes(map, addedNodes);
              dragState.currentDragFaces = std::move(newDragFaces);
              dragState.totalDelta = delta;
            })
@@ -541,14 +542,14 @@ bool splitBrushesInward(
   map.rollbackTransaction();
 
   // FIXME: deal with linked group update failure (needed for #3647)
-  const bool success = map.updateNodeContents("Resize Brushes", nodesToUpdate);
+  const bool success = updateNodeContents(map, "Resize Brushes", nodesToUpdate);
   unused(success);
 
   // Add the newly split off brushes and select them (keeping the original brushes
   // selected).
   // FIXME: deal with linked group update failure (needed for #3647)
   const auto addedNodes = addNodes(map, newNodes);
-  map.selectNodes(addedNodes);
+  selectNodes(map, addedNodes);
 
   dragState.currentDragFaces = std::move(newDragFaces);
   dragState.totalDelta = delta;

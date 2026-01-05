@@ -26,6 +26,8 @@
 #include "mdl/Issue.h"
 #include "mdl/IssueQuickFix.h"
 #include "mdl/Map.h"
+#include "mdl/Map_Selection.h"
+#include "mdl/Map_World.h"
 #include "mdl/PushSelection.h"
 
 #include "kdl/vector_utils.h"
@@ -80,11 +82,11 @@ IssueQuickFix makeRemoveModsQuickFix()
             const auto pushSelection = PushSelection{map};
 
             // If nothing is selected, property changes will affect only world.
-            map.deselectAll();
+            deselectAll(map);
 
-            const auto oldMods = map.mods();
+            const auto oldMods = mods(map);
             const auto newMods = removeMissingMods(oldMods, issues);
-            map.setMods(newMods);
+            setMods(map, newMods);
           }};
 }
 } // namespace

@@ -32,6 +32,7 @@
 #include "mdl/LinkedGroupUtils.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/MaterialManager.h"
 #include "mdl/PortalFile.h"
 #include "mdl/PushSelection.h"
@@ -271,7 +272,7 @@ mdl::EntityNode* MapDocument::createSingleBrushEntity(
   auto* entityNode = new mdl::EntityNode{std::move(entity)};
 
   auto transaction = mdl::Transaction{map(), "Create Entity from Template"};
-  map().deselectAll();
+  mdl::deselectAll(map());
 
   if (mdl::addNodes(map(), {{mdl::parentForNodes(map()), {entityNode}}}).empty())
   {
@@ -285,7 +286,7 @@ mdl::EntityNode* MapDocument::createSingleBrushEntity(
     return nullptr;
   }
 
-  map().selectNodes({brushNode});
+  mdl::selectNodes(map(), {brushNode});
 
   if (!transaction.commit())
   {

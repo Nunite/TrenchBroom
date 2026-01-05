@@ -31,6 +31,8 @@
 #include "mdl/GroupNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Picking.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/PickResult.h"
 #include "mdl/WorldNode.h"
 #include "render/OrthographicCamera.h"
@@ -81,7 +83,7 @@ TEST_CASE("SelectionTool")
         const auto pickRay = vm::ray3d{camera.pickRay({0, 0, 0})};
 
         auto pickResult = mdl::PickResult{};
-        map.pick(pickRay, pickResult);
+        pick(map, pickRay, pickResult);
         REQUIRE(pickResult.all().size() == 1);
 
         REQUIRE(map.selection().brushFaces.empty());
@@ -149,7 +151,7 @@ TEST_CASE("SelectionTool")
         const auto pickRay = vm::ray3d{camera.pickRay({0, 0, 0})};
 
         auto pickResult = mdl::PickResult{};
-        map.pick(pickRay, pickResult);
+        pick(map, pickRay, pickResult);
         REQUIRE(pickResult.all().size() == 1);
 
         REQUIRE(map.selection().brushFaces.empty());
@@ -273,7 +275,7 @@ TEST_CASE("SelectionTool")
 
         AND_GIVEN("The front face of the brush is selected")
         {
-          map.selectBrushFaces({{brushNode, frontFaceIndex}});
+          selectBrushFaces(map, {{brushNode, frontFaceIndex}});
 
           WHEN("I shift click once")
           {
@@ -338,7 +340,7 @@ TEST_CASE("SelectionTool")
 
         AND_GIVEN("The entity is selected")
         {
-          map.selectNodes({entityNode});
+          selectNodes(map, {entityNode});
 
           WHEN("I shift click once")
           {
@@ -407,8 +409,8 @@ TEST_CASE("SelectionTool")
 
           auto newBrush = brushNode->brush();
           newBrush.face(topFaceIndex).addTag(hiddenTag);
-          map.updateNodeContents(
-            "Set Tag", {{brushNode, mdl::NodeContents{std::move(newBrush)}}});
+          updateNodeContents(
+            map, "Set Tag", {{brushNode, mdl::NodeContents{std::move(newBrush)}}});
 
           REQUIRE(brushNode->brush().face(topFaceIndex).hasTag(hiddenTag));
 
@@ -488,8 +490,8 @@ TEST_CASE("SelectionTool")
       const auto hiddenTag = mdl::Tag{"hidden", {}};
       auto taggedBrush = hiddenBrushNode->brush();
       taggedBrush.face(hiddenTopFaceIndex).addTag(hiddenTag);
-      map.updateNodeContents(
-        "Set Tag", {{hiddenBrushNode, mdl::NodeContents{std::move(taggedBrush)}}});
+      updateNodeContents(
+        map, "Set Tag", {{hiddenBrushNode, mdl::NodeContents{std::move(taggedBrush)}}});
 
       map.editorContext().setHiddenTags(hiddenTag.type());
 
@@ -506,7 +508,7 @@ TEST_CASE("SelectionTool")
         const auto pickRay = vm::ray3d{camera.pickRay({0, 0, 0})};
 
         auto pickResult = mdl::PickResult{};
-        map.pick(pickRay, pickResult);
+        pick(map, pickRay, pickResult);
         CHECK(pickResult.all().size() == 2);
         REQUIRE(map.selection().brushFaces.empty());
 

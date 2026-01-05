@@ -24,7 +24,10 @@
 #include "mdl/EditorContext.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Groups.h"
+#include "mdl/Map_NodeLocking.h"
+#include "mdl/Map_NodeVisibility.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/NodeQueries.h"
 #include "mdl/SetCurrentLayerCommand.h"
 #include "mdl/Transaction.h"
@@ -72,7 +75,8 @@ bool moveLayerByOne(Map& map, LayerNode* layerNode, const MoveDirection directio
   layer.setSortIndex(neighbourSortIndex);
   neighbourLayer.setSortIndex(layerSortIndex);
 
-  map.updateNodeContents(
+  updateNodeContents(
+    map,
     "Swap Layer Positions",
     {{layerNode, NodeContents(std::move(layer))},
      {neighbourNode, NodeContents(std::move(neighbourLayer))}},
@@ -97,8 +101,8 @@ void setCurrentLayer(Map& map, LayerNode* layerNode)
   }
 
   const auto descendants = collectDescendants({currentLayer});
-  map.downgradeShownToInherit(descendants);
-  map.downgradeUnlockedToInherit(descendants);
+  downgradeShownToInherit(map, descendants);
+  downgradeUnlockedToInherit(map, descendants);
 
   map.executeAndStore(SetCurrentLayerCommand::set(layerNode));
   transaction.commit();
@@ -226,7 +230,7 @@ void moveSelectedNodesToLayer(Map& map, LayerNode* layerNode)
   if (!nodesToMove.empty())
   {
     auto transaction = Transaction{map, "Move Nodes to " + layerNode->name()};
-    map.deselectAll();
+    deselectAll(map);
     if (!reparentNodes(map, {{layerNode, nodesToMove}}))
     {
       transaction.cancel();
@@ -234,7 +238,7 @@ void moveSelectedNodesToLayer(Map& map, LayerNode* layerNode)
     }
     if (!layerNode->hidden() && !layerNode->locked())
     {
-      map.selectNodes(nodesToSelect);
+      selectNodes(map, nodesToSelect);
     }
     transaction.commit();
   }
@@ -256,7 +260,7 @@ bool canMoveSelectedNodesToLayer(const Map& map, LayerNode* layerNode)
 void hideLayers(Map& map, const std::vector<LayerNode*>& layers)
 {
   auto transaction = Transaction{map, "Hide Layers"};
-  map.hideNodes(kdl::vec_static_cast<Node*>(layers));
+  hideNodes(map, kdl::vec_static_cast<Node*>(layers));
   transaction.commit();
 }
 
@@ -270,8 +274,8 @@ void isolateLayers(Map& map, const std::vector<LayerNode*>& layers)
   const auto allLayers = map.world()->allLayers();
 
   auto transaction = Transaction{map, "Isolate Layers"};
-  map.hideNodes(kdl::vec_static_cast<Node*>(allLayers));
-  map.showNodes(kdl::vec_static_cast<Node*>(layers));
+  hideNodes(map, kdl::vec_static_cast<Node*>(allLayers));
+  showNodes(map, kdl::vec_static_cast<Node*>(layers));
   transaction.commit();
 }
 
@@ -290,7 +294,7 @@ void setOmitLayerFromExport(Map& map, LayerNode* layerNode, const bool omitFromE
 
   auto layer = layerNode->layer();
   layer.setOmitFromExport(omitFromExport);
-  map.updateNodeContents(commandName, {{layerNode, NodeContents(std::move(layer))}}, {});
+  updateNodeContents(map, commandName, {{layerNode, NodeContents(std::move(layer))}}, {});
 }
 
 } // namespace tb::mdl

@@ -17,3 +17,4 @@ This document tracks the incremental merge of upstream changes into the `merge-u
 | 2026-01-04 | `1d9b8806f734f58bcb02288c3014302d6ebb8a89` | **Success** | 合并后续20个commit。解决 MapViewBase.cpp 和 ci.yml 的冲突。编译成功，应用基本启动正常。 |
 | 2026-01-04 | `9c12efebb` | **Success** | 合并后续20个commit。解决 MapFrame.cpp, SmartColorEditor.cpp, MapViewBase.cpp 等文件的API冲突（Selection API重构）。编译成功。 |
 | 2026-01-04 | `eaf1e4387` | **Success** | 合并后续20个commit。解决 mdl::Map 重构导致的大量编译错误（SmartModelEditor, MapViewBase, VertexTool 等）。编译成功。 |
+| 2026-01-05 | `dac01ab03` | **Success** | 合并后续20个commit。解决 Map_Nodes.h (include冲突) 和 MapViewBase.cpp (selection API) 的冲突。修复 BoxSelectionTool 和 MapDocument 中 deselectAll/selectNodes API 调用错误。主程序编译成功，测试工程(test)存在链接错误但不影响运行。 |

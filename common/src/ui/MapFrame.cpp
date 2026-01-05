@@ -65,7 +65,9 @@
 #include "mdl/Map_Entities.h"
 #include "mdl/Map_Geometry.h"
 #include "mdl/Map_Groups.h"
+#include "mdl/Map_NodeVisibility.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Node.h"
 #include "mdl/PasteType.h"
@@ -1433,10 +1435,10 @@ void MapFrame::pasteAtCursorPosition()
         // (https://github.com/TrenchBroom/TrenchBroom/issues/2755)
         const auto nodes = map.selection().nodes;
 
-        map.hideNodes(nodes);
+        hideNodes(map, nodes);
         const auto delta = m_mapView->pasteObjectsDelta(*bounds, referenceBounds);
-        map.showNodes(nodes);
-        map.selectNodes(nodes); // Hiding deselected the nodes, so reselect them
+        showNodes(map, nodes);
+        selectNodes(map, nodes); // Hiding deselected the nodes, so reselect them
         if (!translateSelection(map, delta))
         {
           transaction.cancel();
@@ -1561,8 +1563,7 @@ void MapFrame::selectAll()
 {
   if (canSelect())
   {
-    auto& map = m_document->map();
-    map.selectAllNodes();
+    selectAllNodes(m_document->map());
   }
 }
 
@@ -1570,8 +1571,7 @@ void MapFrame::selectSiblings()
 {
   if (canSelectSiblings())
   {
-    auto& map = m_document->map();
-    map.selectSiblingNodes();
+    selectSiblingNodes(m_document->map());
   }
 }
 
@@ -1579,8 +1579,7 @@ void MapFrame::selectTouching()
 {
   if (canSelectByBrush())
   {
-    auto& map = m_document->map();
-    map.selectTouchingNodes(true);
+    selectTouchingNodes(m_document->map(), true);
   }
 }
 
@@ -1588,8 +1587,7 @@ void MapFrame::selectInside()
 {
   if (canSelectByBrush())
   {
-    auto& map = m_document->map();
-    map.selectContainedNodes(true);
+    selectContainedNodes(m_document->map(), true);
   }
 }
 
@@ -1622,8 +1620,7 @@ void MapFrame::selectByLineNumber()
         }
       }
 
-      auto& map = m_document->map();
-      map.selectNodesWithFilePosition(positions);
+      selectNodesWithFilePosition(m_document->map(), positions);
     }
   }
 }
@@ -1632,8 +1629,7 @@ void MapFrame::selectInverse()
 {
   if (canSelectInverse())
   {
-    auto& map = m_document->map();
-    map.invertNodeSelection();
+    invertNodeSelection(m_document->map());
   }
 }
 
@@ -1642,7 +1638,7 @@ void MapFrame::selectNone()
   if (canDeselect())
   {
     auto& map = m_document->map();
-    map.deselectAll();
+    deselectAll(map);
   }
 }
 
@@ -2165,8 +2161,7 @@ void MapFrame::isolateSelection()
 {
   if (canIsolateSelection())
   {
-    auto& map = m_document->map();
-    map.isolateSelectedNodes();
+    isolateSelectedNodes(m_document->map());
   }
 }
 
@@ -2180,8 +2175,7 @@ void MapFrame::hideSelection()
 {
   if (canHideSelection())
   {
-    auto& map = m_document->map();
-    map.hideSelectedNodes();
+    hideSelectedNodes(m_document->map());
   }
 }
 
@@ -2193,8 +2187,7 @@ bool MapFrame::canHideSelection() const
 
 void MapFrame::showAll()
 {
-  auto& map = m_document->map();
-  map.showAllNodes();
+  showAllNodes(m_document->map());
 }
 
 void MapFrame::switchToInspectorPage(const InspectorPage page)

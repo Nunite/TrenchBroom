@@ -33,7 +33,9 @@
 #include "mdl/Map_Geometry.h"
 #include "mdl/Map_Groups.h"
 #include "mdl/Map_Layers.h"
+#include "mdl/Map_NodeLocking.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/MaterialManager.h"
 #include "mdl/PatchNode.h"
 #include "mdl/WorldNode.h"
@@ -122,7 +124,7 @@ TEST_CASE("Map_Nodes")
       CHECK(entityNode1->lockState() == LockState::Inherited);
       CHECK(!entityNode1->locked());
 
-      map.lockNodes({layerNode1});
+      lockNodes(map, {layerNode1});
 
       REQUIRE(entityNode1->lockState() == LockState::Inherited);
       REQUIRE(entityNode1->locked());
@@ -147,9 +149,9 @@ TEST_CASE("Map_Nodes")
         groupNode->addChild(brushNode);
         addNodes(map, {{parentForNodes(map), {groupNode}}});
 
-        map.selectNodes({groupNode});
+        selectNodes(map, {groupNode});
         auto* linkedGroupNode = createLinkedDuplicate(map);
-        map.deselectAll();
+        deselectAll(map);
 
         using CreateNode = std::function<Node*(const Map&)>;
         CreateNode createNode = GENERATE_COPY(
@@ -198,13 +200,13 @@ TEST_CASE("Map_Nodes")
         auto* groupNode = new GroupNode{Group{"group"}};
         addNodes(map, {{parentForNodes(map), {groupNode}}});
 
-        map.selectNodes({groupNode});
+        selectNodes(map, {groupNode});
         auto* linkedGroupNode = createLinkedDuplicate(map);
-        map.deselectAll();
+        deselectAll(map);
 
-        map.selectNodes({linkedGroupNode});
+        selectNodes(map, {linkedGroupNode});
         translateSelection(map, vm::vec3d{32, 0, 0});
-        map.deselectAll();
+        deselectAll(map);
 
         auto* brushNode = createBrushNode(map);
         addNodes(map, {{groupNode, {brushNode}}});
@@ -239,15 +241,15 @@ TEST_CASE("Map_Nodes")
         auto* groupNode = new GroupNode{Group{"group"}};
         addNodes(map, {{parentForNodes(map), {groupNode}}});
 
-        map.selectNodes({groupNode});
+        selectNodes(map, {groupNode});
         auto* linkedGroupNode = createLinkedDuplicate(map);
-        map.deselectAll();
+        deselectAll(map);
 
         // adding a brush to the linked group node will fail because it will go out of
         // world bounds
-        map.selectNodes({linkedGroupNode});
+        selectNodes(map, {linkedGroupNode});
         translateSelection(map, map.worldBounds().max);
-        map.deselectAll();
+        deselectAll(map);
 
         auto* brushNode = createBrushNode(map);
         CHECK(addNodes(map, {{groupNode, {brushNode}}}).empty());
@@ -273,7 +275,7 @@ TEST_CASE("Map_Nodes")
       CHECK(layerNode1->childCount() == 1);
 
       setCurrentLayer(map, layerNode2);
-      map.selectNodes({entityNode});
+      selectNodes(map, {entityNode});
       duplicateSelectedNodes(map);
 
       REQUIRE(map.selection().entities.size() == 1);
@@ -306,7 +308,7 @@ TEST_CASE("Map_Nodes")
       REQUIRE(entityNode1->visible());
       REQUIRE(brushNode1->visible());
 
-      map.selectNodes({entityNode1, brushNode1});
+      selectNodes(map, {entityNode1, brushNode1});
 
       // Duplicate entity1 and brush1
       duplicateSelectedNodes(map);
@@ -461,12 +463,12 @@ TEST_CASE("Map_Nodes")
       auto* nestedEntityNode = new EntityNode{Entity{}};
 
       addNodes(map, {{parentForNodes(map), {nestedBrushNode, nestedEntityNode}}});
-      map.selectNodes({nestedBrushNode, nestedEntityNode});
+      selectNodes(map, {nestedBrushNode, nestedEntityNode});
 
       auto* nestedGroupNode = groupSelectedNodes(map, "nested");
 
-      map.deselectAll();
-      map.selectNodes({nestedGroupNode});
+      deselectAll(map);
+      selectNodes(map, {nestedGroupNode});
 
       auto* linkedNestedGroupNode = createLinkedDuplicate(map);
 
@@ -477,16 +479,16 @@ TEST_CASE("Map_Nodes")
 
       addNodes(map, {{parentForNodes(map), {brushNode, entityNode}}});
 
-      map.selectNodes({brushNode, entityNode, nestedGroupNode});
+      selectNodes(map, {brushNode, entityNode, nestedGroupNode});
       auto* groupNode = groupSelectedNodes(map, "group");
 
-      map.deselectAll();
-      map.selectNodes({groupNode});
+      deselectAll(map);
+      selectNodes(map, {groupNode});
 
       auto* linkedGroupNode = createLinkedDuplicate(map);
       auto* linkedGroupNode2 = createLinkedDuplicate(map);
 
-      map.deselectAll();
+      deselectAll(map);
 
       const auto originalNestedBrushLinkId = nestedBrushNode->linkId();
       const auto originalBrushLinkId = brushNode->linkId();
@@ -532,7 +534,7 @@ TEST_CASE("Map_Nodes")
 
       SECTION("Grouping objects within a linked group keeps their link IDs")
       {
-        map.selectNodes({entityNode});
+        selectNodes(map, {entityNode});
         groupSelectedNodes(map, "new group");
         CHECK(entityNode->linkId() == originalEntityLinkId);
         CHECK(entityBrushNode->linkId() == originalEntityBrushLinkId);
@@ -550,13 +552,13 @@ TEST_CASE("Map_Nodes")
       groupNode->addChild(brushNode);
       addNodes(map, {{parentForNodes(map), {groupNode}}});
 
-      map.selectNodes({groupNode});
+      selectNodes(map, {groupNode});
       auto* linkedGroupNode = createLinkedDuplicate(map);
-      map.deselectAll();
+      deselectAll(map);
 
-      map.selectNodes({linkedGroupNode});
+      selectNodes(map, {linkedGroupNode});
       translateSelection(map, vm::vec3d{32, 0, 0});
-      map.deselectAll();
+      deselectAll(map);
 
       SECTION("Move node into group node")
       {
@@ -613,15 +615,15 @@ TEST_CASE("Map_Nodes")
     {
       auto* brushNode = createBrushNode(map);
       addNodes(map, {{parentForNodes(map), {brushNode}}});
-      map.selectNodes({brushNode});
+      selectNodes(map, {brushNode});
 
       auto* groupNode = groupSelectedNodes(map, "test");
       REQUIRE(groupNode != nullptr);
 
-      map.deselectAll();
-      map.selectNodes({groupNode});
+      deselectAll(map);
+      selectNodes(map, {groupNode});
       auto* linkedGroupNode = createLinkedDuplicate(map);
-      map.deselectAll();
+      deselectAll(map);
 
       REQUIRE_THAT(*linkedGroupNode, MatchesNode(*groupNode));
 
@@ -634,12 +636,12 @@ TEST_CASE("Map_Nodes")
         "Adding a group containing a nested linked sibling to a linked group does "
         "nothing")
       {
-        map.selectNodes({linkedGroupNode});
+        selectNodes(map, {linkedGroupNode});
 
         auto* outerGroupNode = groupSelectedNodes(map, "outer");
         REQUIRE(outerGroupNode != nullptr);
 
-        map.deselectAll();
+        deselectAll(map);
         CHECK_FALSE(reparentNodes(map, {{groupNode, {outerGroupNode}}}));
       }
     }
@@ -663,7 +665,7 @@ TEST_CASE("Map_Nodes")
       closeGroup(map);
       closeGroup(map);
 
-      map.selectNodes({outerGroupNode});
+      selectNodes(map, {outerGroupNode});
 
       auto* linkedOuterGroupNode = createLinkedDuplicate(map);
       REQUIRE(
@@ -671,7 +673,7 @@ TEST_CASE("Map_Nodes")
         == std::vector<Node*>{outerEntityNode, innerGroupNode});
       REQUIRE_THAT(*linkedOuterGroupNode, MatchesNode(*outerGroupNode));
 
-      map.deselectAll();
+      deselectAll(map);
 
       reparentNodes(map, {{parentForNodes(map), {innerEntityNode}}});
       CHECK(outerGroupNode->children() == std::vector<Node*>{outerEntityNode});
@@ -693,15 +695,15 @@ TEST_CASE("Map_Nodes")
       auto* groupNode = new GroupNode{Group{"group"}};
       addNodes(map, {{parentForNodes(map), {groupNode}}});
 
-      map.selectNodes({groupNode});
+      selectNodes(map, {groupNode});
       auto* linkedGroupNode = createLinkedDuplicate(map);
-      map.deselectAll();
+      deselectAll(map);
 
       // adding a brush to the linked group node will fail because it will go out of world
       // bounds
-      map.selectNodes({linkedGroupNode});
+      selectNodes(map, {linkedGroupNode});
       translateSelection(map, map.worldBounds().max);
-      map.deselectAll();
+      deselectAll(map);
 
       auto* brushNode = createBrushNode(map);
       addNodes(map, {{parentForNodes(map), {brushNode}}});
@@ -720,9 +722,9 @@ TEST_CASE("Map_Nodes")
 
       addNodes(map, {{parentForNodes(map), {groupNode}}});
 
-      map.selectNodes({groupNode});
+      selectNodes(map, {groupNode});
       auto* linkedGroupNode = createLinkedDuplicate(map);
-      map.deselectAll();
+      deselectAll(map);
 
       CHECK_FALSE(reparentNodes(map, {{linkedGroupNode, {brushNode}}}));
 
@@ -829,9 +831,9 @@ TEST_CASE("Map_Nodes")
       groupNode->addChildren({brushNode, nodeToRemove});
       addNodes(map, {{parentForNodes(map), {groupNode}}});
 
-      map.selectNodes({groupNode});
+      selectNodes(map, {groupNode});
       auto* linkedGroupNode = createLinkedDuplicate(map);
-      map.deselectAll();
+      deselectAll(map);
 
       removeNodes(map, {nodeToRemove});
 
@@ -862,10 +864,10 @@ TEST_CASE("Map_Nodes")
       closeGroup(map);
       closeGroup(map);
 
-      map.selectNodes({outerGroupNode});
+      selectNodes(map, {outerGroupNode});
 
       auto* linkedOuterGroupNode = createLinkedDuplicate(map);
-      map.deselectAll();
+      deselectAll(map);
 
       REQUIRE(
         outerGroupNode->children()
@@ -905,7 +907,7 @@ TEST_CASE("Map_Nodes")
       auto nodesToSwap = std::vector<std::pair<Node*, NodeContents>>{};
       nodesToSwap.emplace_back(brushNode, modifiedBrush);
 
-      map.updateNodeContents("Update Nodes", std::move(nodesToSwap), {});
+      updateNodeContents(map, "Update Nodes", std::move(nodesToSwap), {});
       CHECK(brushNode->brush() == modifiedBrush);
 
       map.undoCommand();
@@ -924,7 +926,7 @@ TEST_CASE("Map_Nodes")
       auto nodesToSwap = std::vector<std::pair<Node*, NodeContents>>{};
       nodesToSwap.emplace_back(patchNode, modifiedPatch);
 
-      map.updateNodeContents("Update Nodes", std::move(nodesToSwap), {});
+      updateNodeContents(map, "Update Nodes", std::move(nodesToSwap), {});
       CHECK(patchNode->patch() == modifiedPatch);
 
       map.undoCommand();
@@ -933,7 +935,7 @@ TEST_CASE("Map_Nodes")
 
     SECTION("Update material usage counts")
     {
-      map.deselectAll();
+      deselectAll(map);
       setEntityProperty(map, EntityPropertyKeys::Wad, "fixture/test/io/Wad/cr8_czg.wad");
 
       constexpr auto MaterialName = "bongs2";
@@ -955,7 +957,7 @@ TEST_CASE("Map_Nodes")
 
       REQUIRE(material->usageCount() == 6u);
 
-      map.updateNodeContents("Update Nodes", std::move(nodesToSwap), {});
+      updateNodeContents(map, "Update Nodes", std::move(nodesToSwap), {});
       CHECK(material->usageCount() == 6u);
 
       map.undoCommand();
@@ -981,7 +983,7 @@ TEST_CASE("Map_Nodes")
 
       REQUIRE(pointEntityDefinition.usageCount() == 1u);
 
-      map.updateNodeContents("Update Nodes", std::move(nodesToSwap), {});
+      updateNodeContents(map, "Update Nodes", std::move(nodesToSwap), {});
       CHECK(pointEntityDefinition.usageCount() == 1u);
 
       map.undoCommand();
@@ -995,17 +997,17 @@ TEST_CASE("Map_Nodes")
       groupNode->addChild(brushNode);
       addNodes(map, {{parentForNodes(map), {groupNode}}});
 
-      map.selectNodes({groupNode});
+      selectNodes(map, {groupNode});
       auto* linkedGroupNode = createLinkedDuplicate(map);
 
-      map.deselectAll();
-      map.selectNodes({linkedGroupNode});
+      deselectAll(map);
+      selectNodes(map, {linkedGroupNode});
       translateSelection(map, vm::vec3d{32, 0, 0});
-      map.deselectAll();
+      deselectAll(map);
 
       const auto originalBrushBounds = brushNode->physicalBounds();
 
-      map.selectNodes({brushNode});
+      selectNodes(map, {brushNode});
       translateSelection(map, vm::vec3d{0, 16, 0});
 
       REQUIRE(
@@ -1040,20 +1042,20 @@ TEST_CASE("Map_Nodes")
       groupNode->addChild(brushNode);
       addNodes(map, {{parentForNodes(map), {groupNode}}});
 
-      map.selectNodes({groupNode});
+      selectNodes(map, {groupNode});
       auto* linkedGroupNode = createLinkedDuplicate(map);
-      map.deselectAll();
+      deselectAll(map);
 
       // moving the brush in linked group node will fail because it will go out of world
       // bounds
-      map.selectNodes({linkedGroupNode});
+      selectNodes(map, {linkedGroupNode});
       REQUIRE(translateSelection(
         map, map.worldBounds().max - linkedGroupNode->physicalBounds().size()));
-      map.deselectAll();
+      deselectAll(map);
 
       const auto originalBrushBounds = brushNode->physicalBounds();
 
-      map.selectNodes({brushNode});
+      selectNodes(map, {brushNode});
       CHECK_FALSE(translateSelection(map, vm::vec3d{0, 16, 0}));
 
       REQUIRE(brushNode->physicalBounds() == originalBrushBounds);

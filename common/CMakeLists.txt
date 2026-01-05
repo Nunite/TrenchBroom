@@ -157,7 +157,6 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/LongPropertyValueValidator.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_Assets.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_Brushes.cpp
-        ${COMMON_SOURCE_DIR}/mdl/Map_Commands.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_CopyPaste.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_Entities.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_Geometry.cpp
@@ -166,13 +165,9 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/mdl/Map_NodeLocking.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_Nodes.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_NodeVisibility.cpp
-        ${COMMON_SOURCE_DIR}/mdl/Map_Observers.cpp
-        ${COMMON_SOURCE_DIR}/mdl/Map_Persistence.cpp
+        ${COMMON_SOURCE_DIR}/mdl/Map_NodeVisibility.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_Picking.cpp
-        ${COMMON_SOURCE_DIR}/mdl/Map_Resources.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_Selection.cpp
-        ${COMMON_SOURCE_DIR}/mdl/Map_Tags.cpp
-        ${COMMON_SOURCE_DIR}/mdl/Map_Validation.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map_World.cpp
         ${COMMON_SOURCE_DIR}/mdl/Map.cpp
         ${COMMON_SOURCE_DIR}/mdl/MapFormat.cpp
@@ -697,7 +692,11 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/Map_Geometry.h
         ${COMMON_SOURCE_DIR}/mdl/Map_Groups.h
         ${COMMON_SOURCE_DIR}/mdl/Map_Layers.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_NodeLocking.h
         ${COMMON_SOURCE_DIR}/mdl/Map_Nodes.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_Picking.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_Selection.h
+        ${COMMON_SOURCE_DIR}/mdl/Map_World.h
         ${COMMON_SOURCE_DIR}/mdl/Map.h
         ${COMMON_SOURCE_DIR}/mdl/MapFormat.h
         ${COMMON_SOURCE_DIR}/mdl/Material.h
@@ -758,6 +757,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/mdl/SetLinkIdsCommand.h
         ${COMMON_SOURCE_DIR}/mdl/SetLockStateCommand.h
         ${COMMON_SOURCE_DIR}/mdl/SetVisibilityCommand.h
+        ${COMMON_SOURCE_DIR}/mdl/SoftMapBounds.h
         ${COMMON_SOURCE_DIR}/mdl/SoftMapBoundsValidator.h
         ${COMMON_SOURCE_DIR}/mdl/SwapNodeContentsCommand.h
         ${COMMON_SOURCE_DIR}/mdl/Tag.h

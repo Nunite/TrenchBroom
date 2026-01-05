@@ -17,30 +17,25 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mdl/Map_Picking.h"
+#pragma once
 
-#include "mdl/Map.h"
-#include "mdl/WorldNode.h"
+#include "mdl/SoftMapBounds.h"
+
+#include <filesystem>
+#include <string>
+#include <vector>
 
 namespace tb::mdl
 {
+class Map;
 
-void pick(const Map& map, const vm::ray3d& pickRay, PickResult& pickResult)
-{
-  if (auto* worldNode = map.world())
-  {
-    worldNode->pick(map.editorContext(), pickRay, pickResult);
-  }
-}
+SoftMapBounds softMapBounds(const Map& map);
+void setSoftMapBounds(Map& map, const SoftMapBounds& bounds);
 
-std::vector<Node*> findNodesContaining(const Map& map, const vm::vec3d& point)
-{
-  auto result = std::vector<Node*>{};
-  if (auto* worldNode = map.world())
-  {
-    worldNode->findNodesContaining(point, result);
-  }
-  return result;
-}
+std::vector<std::filesystem::path> externalSearchPaths(const Map& map);
+
+std::vector<std::string> mods(const Map& map);
+void setMods(Map& map, const std::vector<std::string>& mods);
+std::string defaultMod(const Map& map);
 
 } // namespace tb::mdl

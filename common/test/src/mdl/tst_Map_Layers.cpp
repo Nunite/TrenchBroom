@@ -30,7 +30,9 @@
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Layers.h"
+#include "mdl/Map_NodeLocking.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/PatchNode.h"
 #include "mdl/WorldNode.h"
@@ -147,7 +149,7 @@ TEST_CASE("Map_Layers")
       auto* entityNode1 = new EntityNode{Entity{}};
       addNodes(map, {{parentForNodes(map), {entityNode1}}});
 
-      map.lockNodes({layerNode1});
+      lockNodes(map, {layerNode1});
 
       REQUIRE(entityNode1->lockState() == LockState::Inherited);
       REQUIRE(entityNode1->locked());
@@ -280,7 +282,7 @@ TEST_CASE("Map_Layers")
 
       WHEN("The node is moved to another layer")
       {
-        map.selectNodes({node});
+        selectNodes(map, {node});
         moveSelectedNodesToLayer(map, customLayer);
 
         THEN("The group node is in the target layer")
@@ -333,11 +335,11 @@ TEST_CASE("Map_Layers")
 
         if (selectChild1)
         {
-          map.selectNodes({childNode1});
+          selectNodes(map, {childNode1});
         }
         if (selectChild2)
         {
-          map.selectNodes({childNode2});
+          selectNodes(map, {childNode2});
         }
 
         const auto selectedNodes = map.selection().nodes;

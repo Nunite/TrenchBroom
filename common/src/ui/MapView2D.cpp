@@ -26,6 +26,8 @@
 #include "mdl/Grid.h"
 #include "mdl/HitAdapter.h"
 #include "mdl/HitFilter.h"
+#include "mdl/Map_Picking.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/PickResult.h"
 #include "mdl/PointTrace.h"
@@ -162,7 +164,7 @@ mdl::PickResult MapView2D::pick(const vm::ray3d& pickRay) const
   const auto axis = vm::find_abs_max_component(pickRay.direction);
 
   auto pickResult = mdl::PickResult::bySize(axis);
-  map.pick(pickRay, pickResult);
+  mdl::pick(map, pickRay, pickResult);
 
   return pickResult;
 }
@@ -205,9 +207,8 @@ bool MapView2D::canSelectTall()
 
 void MapView2D::selectTall()
 {
-  auto& map = m_document.map();
-  const vm::axis::type cameraAxis = vm::find_abs_max_component(m_camera->direction());
-  map.selectTouchingNodes(cameraAxis, true);
+  const auto cameraAxis = vm::find_abs_max_component(m_camera->direction());
+  selectTouchingNodes(m_document.map(), cameraAxis, true);
 }
 
 void MapView2D::reset2dCameras(const render::Camera& masterCamera, const bool animate)

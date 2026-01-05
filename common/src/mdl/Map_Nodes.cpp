@@ -21,7 +21,6 @@
 
 #include "Ensure.h"
 #include "Logger.h"
-#include "Map.h"
 #include "Uuid.h"
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/BrushNode.h"
@@ -32,7 +31,11 @@
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/LinkedGroupUtils.h"
+#include "mdl/Map.h"
 #include "mdl/Map_Groups.h"
+#include "mdl/Map_NodeLocking.h"
+#include "mdl/Map_NodeVisibility.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Node.h"
 #include "mdl/NodeQueries.h"
@@ -280,8 +283,8 @@ std::vector<Node*> addNodes(Map& map, const std::map<Node*, std::vector<Node*>>&
   setHasPendingChanges(collectGroupsOrContainers(kdl::map_keys(nodes)), true);
 
   const auto addedNodes = kdl::vec_flatten(kdl::map_values(nodes));
-  map.ensureNodesVisible(addedNodes);
-  map.ensureNodesUnlocked(addedNodes);
+  ensureNodesVisible(map, addedNodes);
+  ensureNodesUnlocked(map, addedNodes);
   if (!transaction.commit())
   {
     return {};
@@ -336,7 +339,7 @@ void duplicateSelectedNodes(Map& map)
 
   {
     auto transaction = Transaction{map, "Duplicate Objects"};
-    map.deselectAll();
+    deselectAll(map);
 
     if (addNodes(map, nodesToAdd).empty())
     {
@@ -344,7 +347,7 @@ void duplicateSelectedNodes(Map& map)
       return;
     }
 
-    map.selectNodes(nodesToSelect);
+    selectNodes(map, nodesToSelect);
     if (!transaction.commit())
     {
       return;
@@ -387,8 +390,8 @@ bool reparentNodes(Map& map, const std::map<Node*, std::vector<Node*>>& nodesToA
       nodes,
       [&](mdl::Object* node) { return node->containingLayer() != newParentLayer; });
 
-    map.downgradeUnlockedToInherit(nodesToDowngrade);
-    map.downgradeShownToInherit(nodesToDowngrade);
+    downgradeUnlockedToInherit(map, nodesToDowngrade);
+    downgradeShownToInherit(map, nodesToDowngrade);
   }
 
   // Reset link IDs of nodes being reparented, but don't recurse into nested groups
@@ -443,12 +446,13 @@ void removeSelectedNodes(Map& map)
   const auto nodes = map.selection().nodes;
 
   auto transaction = Transaction{map, "Delete Objects"};
-  map.deselectAll();
+  deselectAll(map);
   removeNodes(map, nodes);
   assertResult(transaction.commit());
 }
 
-bool Map::updateNodeContents(
+bool updateNodeContents(
+  Map& map,
   const std::string& commandName,
   std::vector<std::pair<Node*, NodeContents>> nodesToSwap,
   std::vector<GroupNode*> changedLinkedGroups)
@@ -459,8 +463,8 @@ bool Map::updateNodeContents(
     return false;
   }
 
-  auto transaction = Transaction{*this};
-  const auto result = executeAndStore(
+  auto transaction = Transaction{map};
+  const auto result = map.executeAndStore(
     std::make_unique<SwapNodeContentsCommand>(commandName, std::move(nodesToSwap)));
 
   if (!result->success())
@@ -473,14 +477,16 @@ bool Map::updateNodeContents(
   return transaction.commit();
 }
 
-bool Map::updateNodeContents(
-  const std::string& commandName, std::vector<std::pair<Node*, NodeContents>> nodesToSwap)
+bool updateNodeContents(
+  Map& map,
+  const std::string& commandName,
+  std::vector<std::pair<Node*, NodeContents>> nodesToSwap)
 {
   auto changedLinkedGroups = collectContainingGroups(
     kdl::vec_transform(nodesToSwap, [](const auto& p) { return p.first; }));
 
   return updateNodeContents(
-    commandName, std::move(nodesToSwap), std::move(changedLinkedGroups));
+    map, commandName, std::move(nodesToSwap), std::move(changedLinkedGroups));
 }
 
 } // namespace tb::mdl

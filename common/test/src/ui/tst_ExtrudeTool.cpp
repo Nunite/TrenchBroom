@@ -31,6 +31,8 @@
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Picking.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/NodeQueries.h"
 #include "mdl/PickResult.h"
@@ -63,7 +65,7 @@ vm::vec3d n(const vm::vec3d& v)
 mdl::PickResult performPick(mdl::Map& map, ExtrudeTool& tool, const vm::ray3d& pickRay)
 {
   auto pickResult = mdl::PickResult::byDistance();
-  map.pick(pickRay, pickResult);
+  pick(map, pickRay, pickResult);
 
   const auto hit = tool.pick3D(pickRay, pickResult);
   CHECK(hit.type() == ExtrudeTool::ExtrudeHitType);
@@ -98,14 +100,14 @@ TEST_CASE("ExtrudeTool")
       new mdl::BrushNode{builder.createCuboid(brushBounds, "material") | kdl::value()};
 
     addNodes(map, {{map.editorContext().currentLayer(), {brushNode1}}});
-    map.selectNodes({brushNode1});
+    selectNodes(map, {brushNode1});
 
     SECTION("Pick ray hits brush directly")
     {
       constexpr auto pickRay = vm::ray3d{{0, 0, 32}, {0, 0, -1}};
 
       auto pickResult = mdl::PickResult{};
-      map.pick(pickRay, pickResult);
+      pick(map, pickRay, pickResult);
 
       REQUIRE(pickResult.all().size() == 1);
 
@@ -155,14 +157,14 @@ TEST_CASE("ExtrudeTool")
       new mdl::BrushNode{builder.createCuboid(brushBounds, "material") | kdl::value()};
 
     addNodes(map, {{map.editorContext().currentLayer(), {brushNode1}}});
-    map.selectNodes({brushNode1});
+    selectNodes(map, {brushNode1});
 
     SECTION("Pick ray hits brush directly")
     {
       const auto pickRay = vm::ray3d{{0, 0, 24}, vm::normalize(vm::vec3d{-1, 0, -1})};
 
       auto pickResult = mdl::PickResult{};
-      map.pick(pickRay, pickResult);
+      pick(map, pickRay, pickResult);
 
       REQUIRE(pickResult.all().size() == 1);
 
@@ -233,7 +235,7 @@ TEST_CASE("ExtrudeTool")
       mapPath,
       {.mapFormat = mdl::MapFormat::Valve, .game = mdl::LoadGameFixture{"Quake"}});
 
-    map.selectAllNodes();
+    selectAllNodes(map);
 
     auto brushes = map.selection().brushes;
     REQUIRE(brushes.size() == 2);
@@ -266,7 +268,7 @@ TEST_CASE("ExtrudeTool")
       kdl::vec_transform(
         tool.proposedDragHandles(),
         [](const auto& h) { return h.faceAtDragStart().attributes().materialName(); }),
-      Catch::UnorderedEquals(expectedDragFaceMaterialNames));
+      Catch::Matchers::UnorderedEquals(expectedDragFaceMaterialNames));
   }
 
   SECTION("splitBrushes")
@@ -279,7 +281,7 @@ TEST_CASE("ExtrudeTool")
       mapPath,
       {.mapFormat = mdl::MapFormat::Valve, .game = mdl::LoadGameFixture{"Quake"}});
 
-    map.selectAllNodes();
+    selectAllNodes(map);
 
     auto brushes = map.selection().brushes;
     REQUIRE(brushes.size() == 2);
@@ -342,7 +344,7 @@ TEST_CASE("ExtrudeTool")
           nodes, [](const auto* node) { return node->logicalBounds(); });
         const auto expectedBounds = std::vector<vm::bbox3d>{
           {{-32, 144, 16}, {-16, 192, 32}}, {{-32, 192, 16}, {-16, 224, 32}}};
-        CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
+        CHECK_THAT(bounds, Catch::Matchers::UnorderedEquals(expectedBounds));
       }
 
       SECTION("check 2 resulting func_detail brushes")
@@ -352,7 +354,7 @@ TEST_CASE("ExtrudeTool")
           nodes, [](const auto* node) { return node->logicalBounds(); });
         const auto expectedBounds = std::vector<vm::bbox3d>{
           {{-16, 176, 16}, {16, 192, 32}}, {{-16, 192, 16}, {16, 224, 32}}};
-        CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
+        CHECK_THAT(bounds, Catch::Matchers::UnorderedEquals(expectedBounds));
       }
 
       CHECK_THAT(
@@ -382,7 +384,7 @@ TEST_CASE("ExtrudeTool")
           nodes, [](const auto* node) { return node->logicalBounds(); });
         const auto expectedBounds = std::vector<vm::bbox3d>{
           {{-32, 144, 16}, {-16, 176, 32}}, {{-32, 176, 16}, {-16, 224, 32}}};
-        CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
+        CHECK_THAT(bounds, Catch::Matchers::UnorderedEquals(expectedBounds));
       }
 
       SECTION("check 1 resulting func_detail brush")
@@ -392,7 +394,7 @@ TEST_CASE("ExtrudeTool")
           nodes, [](const auto* node) { return node->logicalBounds(); });
         const auto expectedBounds =
           std::vector<vm::bbox3d>{{{-16, 176, 16}, {16, 224, 32}}};
-        CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
+        CHECK_THAT(bounds, Catch::Matchers::UnorderedEquals(expectedBounds));
       }
     }
 
@@ -417,7 +419,7 @@ TEST_CASE("ExtrudeTool")
         const auto expectedBounds = std::vector<vm::bbox3d>{
           {{-32, 144, 16}, {-16, 192, 32}},
         };
-        CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
+        CHECK_THAT(bounds, Catch::Matchers::UnorderedEquals(expectedBounds));
       }
 
       SECTION("check 1 resulting func_detail brush")
@@ -427,7 +429,7 @@ TEST_CASE("ExtrudeTool")
           nodes, [](const auto* node) { return node->logicalBounds(); });
         const auto expectedBounds =
           std::vector<vm::bbox3d>{{{-16, 176, 16}, {16, 192, 32}}};
-        CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
+        CHECK_THAT(bounds, Catch::Matchers::UnorderedEquals(expectedBounds));
       }
     }
 
@@ -455,7 +457,7 @@ TEST_CASE("ExtrudeTool")
         const auto expectedBounds = std::vector<vm::bbox3d>{
           {{-32, 224, 16}, {-16, 240, 32}},
         };
-        CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
+        CHECK_THAT(bounds, Catch::Matchers::UnorderedEquals(expectedBounds));
       }
 
       SECTION("check 1 resulting func_detail brush")
@@ -468,7 +470,7 @@ TEST_CASE("ExtrudeTool")
           nodes, [](const auto* node) { return node->logicalBounds(); });
         const auto expectedBounds =
           std::vector<vm::bbox3d>{{{-16, 224, 16}, {16, 240, 32}}};
-        CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
+        CHECK_THAT(bounds, Catch::Matchers::UnorderedEquals(expectedBounds));
       }
 
       CHECK_THAT(

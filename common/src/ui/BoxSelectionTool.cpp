@@ -3,6 +3,7 @@
 #include "BoxSelectionTool.h"
 
 #include "mdl/Map.h"
+#include "mdl/Map_Selection.h"
 #include "render/Camera.h"
 #include "ui/DrawShapeTool.h"
 #include "mdl/Grid.h"
@@ -241,8 +242,8 @@ void BoxSelectionDragDelegate::end(
         
             if (!selectableNodes.empty()) {
         auto transaction = mdl::Transaction{m_map, "Box Select"};
-        m_map.deselectAll();
-        m_map.selectNodes(selectableNodes);
+        mdl::deselectAll(m_map);
+        mdl::selectNodes(m_map, selectableNodes);
         transaction.commit();
       }
       
