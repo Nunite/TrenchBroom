@@ -18,3 +18,5 @@ This document tracks the incremental merge of upstream changes into the `merge-u
 | 2026-01-04 | `9c12efebb` | **Success** | 合并后续20个commit。解决 MapFrame.cpp, SmartColorEditor.cpp, MapViewBase.cpp 等文件的API冲突（Selection API重构）。编译成功。 |
 | 2026-01-04 | `eaf1e4387` | **Success** | 合并后续20个commit。解决 mdl::Map 重构导致的大量编译错误（SmartModelEditor, MapViewBase, VertexTool 等）。编译成功。 |
 | 2026-01-05 | `dac01ab03` | **Success** | 合并后续20个commit。解决 Map_Nodes.h (include冲突) 和 MapViewBase.cpp (selection API) 的冲突。修复 BoxSelectionTool 和 MapDocument 中 deselectAll/selectNodes API 调用错误。主程序编译成功，测试工程(test)存在链接错误但不影响运行。 |
+| 2026-01-05 | `dfcac00e2` | **Success** | 合并后续20个commit (Catch2v3迁移等)。解决 .github/workflows/ci.yml 冲突 (保留GITHUB_TOKEN，接受上游macOS构建脚本更改)。 |
+| 2026-01-06 | `7a7bfc560` | **Success** | 合并后续20个commit。无冲突自动合并。新增 UpdateBrushFaceAttributes，重构 Map 测试。主程序编译成功，测试工程(test)存在链接错误(Catch2相关)但不影响主程序运行。 |
