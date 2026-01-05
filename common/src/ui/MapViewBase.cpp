@@ -21,6 +21,8 @@
 
 #include <QDebug>
 #include <QMenu>
+#include <QAction>
+#include <QVariant>
 #include <QMimeData>
 #include <QShortcut>
 #include <QString>
@@ -105,11 +107,18 @@ auto getCreateableEntityDefinitions(
 {
   const auto definitionsWithType =
     filterAndSort(group.definitions, type, mdl::EntityDefinitionSortOrder::Name);
-  return definitionsWithType | std::views::filter([](const auto* d) {
-           return !kdl::cs::str_is_equal(
-             d->name, mdl::EntityPropertyValues::WorldspawnClassname);
-         })
-         | kdl::to_vector;
+  
+  std::vector<const mdl::EntityDefinition*> result;
+  result.reserve(definitionsWithType.size());
+  for (const auto* d : definitionsWithType)
+  {
+    if (!kdl::cs::str_is_equal(
+          d->name, mdl::EntityPropertyValues::WorldspawnClassname))
+    {
+      result.push_back(d);
+    }
+  }
+  return result;
 }
 
 } // namespace
@@ -1511,7 +1520,7 @@ QMenu* MapViewBase::makeEntityGroupsMenu(const mdl::EntityDefinitionType type)
 
       for (const auto* definition : creatableDefinitions)
       {
-        const auto label = fromStdStringView(mdl::getShortName(*definition));
+        const QString label = fromStdStringView(mdl::getShortName(*definition));
         QAction* action = nullptr;
 
         switch (type)
@@ -1525,11 +1534,10 @@ QMenu* MapViewBase::makeEntityGroupsMenu(const mdl::EntityDefinitionType type)
             label, this, qOverload<>(&MapViewBase::createBrushEntity));
           action->setEnabled(enableMakeBrushEntity);
           break;
-        
         }
 
         // TODO: Would be cleaner to pass this as the string entity name
-        action->setData(QVariant::fromValue(QString::fromStdString(definition->name)));
+        action->setData(QString::fromStdString(definition->name));
       }
 
       menu->addMenu(groupMenu);
