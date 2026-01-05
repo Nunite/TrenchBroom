@@ -30,7 +30,7 @@
 
 #include <ranges>
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace tb::mdl
 {
@@ -43,7 +43,7 @@ TEST_CASE("Map_Assets")
   SECTION("reloadMaterialCollections")
   {
     fixture.load(
-      "fixture/test/ui/MapDocumentTest/reloadMaterialCollectionsQ2.map",
+      "fixture/test/mdl/Map/reloadMaterialCollectionsQ2.map",
       {.mapFormat = MapFormat::Quake2, .game = LoadGameFixture{"Quake2"}});
 
     const auto faces = map.world()->defaultLayer()->children()
@@ -53,7 +53,7 @@ TEST_CASE("Map_Assets")
                            REQUIRE(brushNode);
                            return &brushNode->brush().faces().front();
                          })
-                       | kdl::to_vector;
+                       | kdl::ranges::to<std::vector>();
 
     REQUIRE(faces.size() == 4);
     REQUIRE(

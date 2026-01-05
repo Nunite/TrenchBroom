@@ -45,7 +45,8 @@
 
 #include "catch/Matchers.h"
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace tb::mdl
 {
@@ -899,10 +900,8 @@ TEST_CASE("Map_Nodes")
 
       const auto originalBrush = brushNode->brush();
       auto modifiedBrush = originalBrush;
-      REQUIRE(modifiedBrush
-                .transform(
-                  map.worldBounds(), vm::translation_matrix(vm::vec3d(16, 0, 0)), false)
-                .is_success());
+      REQUIRE(modifiedBrush.transform(
+        map.worldBounds(), vm::translation_matrix(vm::vec3d(16, 0, 0)), false));
 
       auto nodesToSwap = std::vector<std::pair<Node*, NodeContents>>{};
       nodesToSwap.emplace_back(brushNode, modifiedBrush);
@@ -947,10 +946,8 @@ TEST_CASE("Map_Nodes")
 
       const auto& originalBrush = brushNode->brush();
       auto modifiedBrush = originalBrush;
-      REQUIRE(modifiedBrush
-                .transform(
-                  map.worldBounds(), vm::translation_matrix(vm::vec3d(16, 0, 0)), false)
-                .is_success());
+      REQUIRE(modifiedBrush.transform(
+        map.worldBounds(), vm::translation_matrix(vm::vec3d(16, 0, 0)), false));
 
       auto nodesToSwap = std::vector<std::pair<Node*, NodeContents>>{};
       nodesToSwap.emplace_back(brushNode, std::move(modifiedBrush));

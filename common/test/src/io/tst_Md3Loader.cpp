@@ -36,7 +36,7 @@
 #include <filesystem>
 #include <memory>
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace tb::io
 {
@@ -83,7 +83,7 @@ TEST_CASE("Md3Loader")
     auto loader = Md3Loader{"bfg", reader, loadMaterial};
     auto modelData = loader.load(logger);
 
-    CHECK(modelData.is_success());
+    REQUIRE(modelData);
 
     CHECK(modelData.value().frameCount() == 1u);
     CHECK(modelData.value().surfaceCount() == 2u);
@@ -157,7 +157,7 @@ TEST_CASE("Md3Loader (Regression)", "[regression]")
     auto loader = Md3Loader{"armor_red", reader, loadMaterial};
     auto modelData = loader.load(logger);
 
-    CHECK(modelData.is_success());
+    REQUIRE(modelData);
 
     CHECK(modelData.value().frameCount() == 30u);
     CHECK(modelData.value().surfaceCount() == 2u);

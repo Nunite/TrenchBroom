@@ -48,7 +48,7 @@
 
 #include <string>
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace tb
 {
@@ -342,7 +342,7 @@ void transformNode(
     },
     [&](BrushNode* brushNode) {
       auto brush = brushNode->brush();
-      REQUIRE(brush.transform(worldBounds, transformation, false).is_success());
+      REQUIRE(brush.transform(worldBounds, transformation, false));
       brushNode->setBrush(std::move(brush));
     },
     [&](PatchNode* patchNode) {

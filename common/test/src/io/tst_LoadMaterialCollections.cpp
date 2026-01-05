@@ -35,7 +35,8 @@
 #include <memory>
 #include <ranges>
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
 
 namespace tb::io
 {
@@ -145,14 +146,13 @@ TEST_CASE("loadMaterial")
     {},
   };
 
-  CHECK(loadMaterial(fs, materialConfig, "material.jpg", createResource, {}, std::nullopt)
-          .is_success());
+  CHECK(
+    loadMaterial(fs, materialConfig, "material.jpg", createResource, {}, std::nullopt));
 
   SECTION("find alternative file extensions")
   {
     CHECK(
-      loadMaterial(fs, materialConfig, "material.png", createResource, {}, std::nullopt)
-        .is_success());
+      loadMaterial(fs, materialConfig, "material.png", createResource, {}, std::nullopt));
   }
 }
 

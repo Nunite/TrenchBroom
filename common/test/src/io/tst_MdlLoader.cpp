@@ -27,7 +27,7 @@
 
 #include "kdl/result.h"
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace tb::io
 {
@@ -48,7 +48,7 @@ TEST_CASE("MdlLoaderTest.loadValidMdl")
   auto loader = MdlLoader("armor", reader, palette);
   auto modelData = loader.load(logger);
 
-  CHECK(modelData.is_success());
+  REQUIRE(modelData);
   CHECK(modelData.value().surfaceCount() == 1u);
   CHECK(modelData.value().frameCount() == 1u);
 

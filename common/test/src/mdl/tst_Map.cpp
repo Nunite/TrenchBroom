@@ -52,10 +52,12 @@
 #include "kdl/vector_utils.h"
 
 #include "vm/approx.h"
+#include "vm/vec_io.h" // IWYU pragma: keep
 
 #include "catch/Matchers.h"
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace tb::mdl
 {
@@ -97,7 +99,7 @@ TEST_CASE("Map")
       SECTION("Detect Valve Format Map")
       {
         fixture.load(
-          "fixture/test/ui/MapDocumentTest/valveFormatMapWithoutFormatTag.map",
+          "fixture/test/mdl/Map/valveFormatMapWithoutFormatTag.map",
           {.game = MockGameFixture{gameConfig}});
 
         CHECK(map.world()->mapFormat() == mdl::MapFormat::Valve);
@@ -107,7 +109,7 @@ TEST_CASE("Map")
       SECTION("Detect Standard Format Map")
       {
         fixture.load(
-          "fixture/test/ui/MapDocumentTest/standardFormatMapWithoutFormatTag.map",
+          "fixture/test/mdl/Map/standardFormatMapWithoutFormatTag.map",
           {.game = MockGameFixture{gameConfig}});
 
         CHECK(map.world()->mapFormat() == mdl::MapFormat::Standard);
@@ -117,7 +119,7 @@ TEST_CASE("Map")
       SECTION("detectEmptyMap")
       {
         fixture.load(
-          "fixture/test/ui/MapDocumentTest/emptyMapWithoutFormatTag.map",
+          "fixture/test/mdl/Map/emptyMapWithoutFormatTag.map",
           {.game = LoadGameFixture{"Quake"}});
 
         // an empty map detects as Valve because Valve is listed first in the Quake game
@@ -131,8 +133,7 @@ TEST_CASE("Map")
         // map has both Standard and Valve brushes
         CHECK_THROWS_AS(
           fixture.load(
-            "fixture/test/ui/MapDocumentTest/mixedFormats.map",
-            {.game = LoadGameFixture{"Quake"}}),
+            "fixture/test/mdl/Map/mixedFormats.map", {.game = LoadGameFixture{"Quake"}}),
           std::runtime_error);
       }
     }
@@ -143,7 +144,7 @@ TEST_CASE("Map")
     SECTION("Writing map header")
     {
       fixture.load(
-        "fixture/test/ui/MapDocumentTest/valveFormatMapWithoutFormatTag.map",
+        "fixture/test/mdl/Map/valveFormatMapWithoutFormatTag.map",
         {.game = LoadGameFixture{"Quake"}});
       REQUIRE(map.world()->mapFormat() == mdl::MapFormat::Valve);
 
@@ -180,8 +181,7 @@ TEST_CASE("Map")
         auto* layerNode = new mdl::LayerNode{std::move(layer)};
         addNodes(map, {{map.world(), {layerNode}}});
 
-        REQUIRE(
-          map.exportAs(io::MapExportOptions{env.dir() / newDocumentPath}).is_success());
+        REQUIRE(map.exportAs(io::MapExportOptions{env.dir() / newDocumentPath}));
         REQUIRE(env.fileExists(newDocumentPath));
       }
 
@@ -469,7 +469,7 @@ TEST_CASE("Map")
         return paths | std::views::transform([&](const auto& path) {
                  return map.world()->resolvePath(path);
                })
-               | kdl::to_vector;
+               | kdl::ranges::to<std::vector>();
       };
 
       using T = std::vector<NodePath>;

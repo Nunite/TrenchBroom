@@ -44,10 +44,12 @@
 #include "kdl/zip_iterator.h"
 
 #include "vm/approx.h"
+#include "vm/vec_io.h" // IWYU pragma: keep
 
 #include "catch/Matchers.h"
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace tb::mdl
 {
@@ -872,7 +874,7 @@ TEST_CASE("Map_Geometry")
     SECTION("Regression tests")
     {
       fixture.load(
-        "fixture/test/ui/MapDocumentTest/csgSubtractFailure.map",
+        "fixture/test/mdl/Map/csgSubtractFailure.map",
         {.mapFormat = MapFormat::Valve, .game = LoadGameFixture{"Quake"}});
 
       REQUIRE(map.editorContext().currentLayer()->childCount() == 2);
@@ -908,7 +910,7 @@ TEST_CASE("Map_Geometry")
   SECTION("csgHollow")
   {
     fixture.load(
-      "fixture/test/ui/MapDocumentTest/csgHollow.map",
+      "fixture/test/mdl/Map/csgHollow.map",
       {.mapFormat = MapFormat::Valve, .game = LoadGameFixture{"Quake"}});
 
     REQUIRE(map.editorContext().currentLayer()->childCount() == 2);

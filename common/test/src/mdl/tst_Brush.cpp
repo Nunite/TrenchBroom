@@ -27,7 +27,7 @@
 #include "mdl/Material.h"
 #include "mdl/Texture.h"
 
-#include "kdl/range_to_vector.h"
+#include "kdl/ranges/to.h"
 #include "kdl/result.h"
 #include "kdl/result_fold.h"
 #include "kdl/vector_utils.h"
@@ -36,13 +36,15 @@
 #include "vm/polygon.h"
 #include "vm/segment.h"
 #include "vm/vec.h"
+#include "vm/vec_io.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
 
 #include "catch/Matchers.h"
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace tb::mdl
 {
@@ -68,7 +70,7 @@ void assertCanMoveVertices(
 
   CHECK(brush.canTransformVertices(worldBounds, vertexPositions, transform));
 
-  REQUIRE(brush.transformVertices(worldBounds, vertexPositions, transform).is_success());
+  REQUIRE(brush.transformVertices(worldBounds, vertexPositions, transform));
 
   auto movedVertexPositions =
     brush.findClosestVertexPositions(transform * vertexPositions);
@@ -92,7 +94,7 @@ void assertMovingVerticesDeletes(
 
   CHECK(brush.canTransformVertices(worldBounds, vertexPositions, transform));
 
-  REQUIRE(brush.transformVertices(worldBounds, vertexPositions, transform).is_success());
+  REQUIRE(brush.transformVertices(worldBounds, vertexPositions, transform));
   const auto movedVertexPositions =
     brush.findClosestVertexPositions(transform * vertexPositions);
   CHECK(movedVertexPositions.empty());
@@ -132,10 +134,10 @@ void assertCanMoveEdges(
 
   const auto expectedMovedEdges =
     edges | std::views::transform([&](const auto& edge) { return edge.translate(delta); })
-    | kdl::to_vector;
+    | kdl::ranges::to<std::vector>();
 
   CHECK(brush.canTransformEdges(worldBounds, edges, transform));
-  CHECK(brush.transformEdges(worldBounds, edges, transform).is_success());
+  CHECK(brush.transformEdges(worldBounds, edges, transform));
   const auto movedEdges = brush.findClosestEdgePositions(
     kdl::vec_transform(edges, [&](const auto& s) { return s.translate(delta); }));
   CHECK(movedEdges == expectedMovedEdges);
@@ -158,10 +160,10 @@ void assertCanMoveFaces(
   const auto expectedMovedFaces =
     movingFaces
     | std::views::transform([&](const auto& face) { return face.transform(transform); })
-    | kdl::to_vector;
+    | kdl::ranges::to<std::vector>();
 
   CHECK(brush.canTransformFaces(worldBounds, movingFaces, transform));
-  CHECK(brush.transformFaces(worldBounds, movingFaces, transform).is_success());
+  CHECK(brush.transformFaces(worldBounds, movingFaces, transform));
   const auto movedFaces = brush.findClosestFacePositions(expectedMovedFaces);
   CHECK(movedFaces == expectedMovedFaces);
 }
@@ -223,7 +225,7 @@ void assertCannotSnapTo(
 
   const auto nodes =
     io::NodeReader::read(data, MapFormat::Standard, worldBounds, {}, status, taskManager);
-  REQUIRE(nodes.is_success());
+  REQUIRE(nodes);
   CHECK(nodes.value().size() == 1u);
 
   auto brush = static_cast<BrushNode*>(nodes.value().front())->brush();
@@ -246,13 +248,13 @@ void assertSnapTo(
 
   const auto nodes =
     io::NodeReader::read(data, MapFormat::Standard, worldBounds, {}, status, taskManager);
-  REQUIRE(nodes.is_success());
+  REQUIRE(nodes);
   REQUIRE(nodes.value().size() == 1u);
 
   auto brush = static_cast<BrushNode*>(nodes.value().front())->brush();
   CHECK(brush.canSnapVertices(worldBounds, gridSize));
 
-  CHECK(brush.snapVertices(worldBounds, gridSize).is_success());
+  CHECK(brush.snapVertices(worldBounds, gridSize));
   CHECK(brush.fullySpecified());
 
   // Ensure they were actually snapped
@@ -382,7 +384,7 @@ TEST_CASE("Brush")
 
     auto clip =
       createParaxial(vm::vec3d{8, 0, 0}, vm::vec3d{8, 0, 1}, vm::vec3d{8, 1, 0});
-    CHECK(brush.clip(worldBounds, clip).is_success());
+    CHECK(brush.clip(worldBounds, clip));
 
     CHECK(brush.faceCount() == 6u);
     CHECK(brush.findFace(left.boundary()));
@@ -430,8 +432,7 @@ TEST_CASE("Brush")
       CHECK(canMoveBoundary(brush, worldBounds, *topFaceIndex, vm::vec3d{0, 0, +1}));
       CHECK(canMoveBoundary(brush, worldBounds, *topFaceIndex, vm::vec3d{0, 0, -5}));
 
-      CHECK(brush.moveBoundary(worldBounds, *topFaceIndex, vm::vec3d{0, 0, 1}, false)
-              .is_success());
+      CHECK(brush.moveBoundary(worldBounds, *topFaceIndex, vm::vec3d{0, 0, 1}, false));
       CHECK(worldBounds.contains(brush.bounds()));
 
       CHECK(brush.faces().size() == 6u);
@@ -474,7 +475,7 @@ TEST_CASE("Brush")
       auto brush1 =
         builder.createCuboid(vm::bbox3d{{-64, -64, -64}, {64, 64, 64}}, "material")
         | kdl::value();
-      CHECK(brush1.expand(worldBounds, 6, true).is_success());
+      CHECK(brush1.expand(worldBounds, 6, true));
 
       const auto expandedBBox = vm::bbox3d{{-70, -70, -70}, {70, 70, 70}};
       const auto expectedVerticesArray = expandedBBox.vertices();
@@ -494,7 +495,7 @@ TEST_CASE("Brush")
       auto brush1 =
         builder.createCuboid(vm::bbox3d{{-64, -64, -64}, {64, 64, 64}}, "material")
         | kdl::value();
-      CHECK(brush1.expand(worldBounds, -32, true).is_success());
+      CHECK(brush1.expand(worldBounds, -32, true));
 
       const auto expandedBBox = vm::bbox3d{{-32, -32, -32}, {32, 32, 32}};
       const auto expectedVerticesArray = expandedBBox.vertices();
@@ -543,8 +544,7 @@ TEST_CASE("Brush")
       const auto transform = vm::translation_matrix(p9 - p8);
       const auto inverse = vm::translation_matrix(p8 - p9);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -561,8 +561,7 @@ TEST_CASE("Brush")
       assertMaterial("bottom", brush, p1, p3, p7, p5);
 
       oldVertexPositions = std::move(newVertexPositions);
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, inverse).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, inverse));
       newVertexPositions = brush.findClosestVertexPositions(inverse * oldVertexPositions);
 
       CHECK(newVertexPositions.size() == 1u);
@@ -595,8 +594,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>{top};
       const auto transform = vm::translation_matrix(vm::vec3d{0, 0, -32});
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -627,8 +625,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>{p8};
       const auto transform = vm::translation_matrix(p9 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -698,8 +695,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>{p8};
       const auto transform = vm::translation_matrix(p9 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -769,8 +765,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>{p8};
       const auto transform = vm::translation_matrix(p9 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -838,8 +833,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>{p8};
       const auto transform = vm::translation_matrix(p9 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -905,8 +899,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>{p8};
       const auto transform = vm::translation_matrix(p9 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -970,8 +963,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>({p8});
       const auto transform = vm::translation_matrix(p9 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -1034,8 +1026,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>({p8});
       const auto transform = vm::translation_matrix(p9 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -1101,8 +1092,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>({p8});
       const auto transform = vm::translation_matrix(p9 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -1164,8 +1154,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>({p8});
       const auto transform = vm::translation_matrix(p7 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -1228,8 +1217,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>({p7});
       const auto transform = vm::translation_matrix(p8 - p7);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -1293,8 +1281,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>({p6});
       const auto transform = vm::translation_matrix(p9 - p6);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -1358,8 +1345,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>({p8});
       const auto transform = vm::translation_matrix(p9 - p8);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -1424,8 +1410,7 @@ TEST_CASE("Brush")
       const auto oldVertexPositions = std::vector<vm::vec3d>({p9});
       const auto transform = vm::translation_matrix(p10 - p9);
 
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -1475,7 +1460,7 @@ TEST_CASE("Brush")
       const auto allVertexPositions =
         brush.vertices()
         | std::views::transform([](const auto* vertex) { return vertex->position(); })
-        | kdl::to_vector;
+        | kdl::ranges::to<std::vector>();
 
       CHECK(brush.canTransformVertices(
         worldBounds, allVertexPositions, vm::translation_matrix(vm::vec3d{16, 0, 0})));
@@ -1561,8 +1546,7 @@ TEST_CASE("Brush")
 
         const auto oldVertexPositions = std::vector<vm::vec3d>{peakPosition};
         CHECK(brushCopy.canTransformVertices(worldBounds, oldVertexPositions, transform));
-        REQUIRE(brushCopy.transformVertices(worldBounds, oldVertexPositions, transform)
-                  .is_success());
+        REQUIRE(brushCopy.transformVertices(worldBounds, oldVertexPositions, transform));
         const auto newVertexPositions =
           brushCopy.findClosestVertexPositions(transform * oldVertexPositions);
         CHECK(newVertexPositions == transform * oldVertexPositions);
@@ -1609,8 +1593,7 @@ TEST_CASE("Brush")
         vm::rotation_matrix(vm::vec3d{0, 0, 1}, vm::to_radians(angle));
 
       REQUIRE(brush.canTransformVertices(worldBounds, oldVertexPositions, transform));
-      CHECK(
-        brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+      CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
       const auto newVertexPositions =
         brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -1634,7 +1617,7 @@ TEST_CASE("Brush")
       auto builder = BrushBuilder{MapFormat::Standard, worldBounds};
       auto brush = builder.createCube(64.0, "asdf") | kdl::value();
 
-      CHECK(brush.removeVertices(worldBounds, {vm::vec3d{+32, +32, +32}}).is_success());
+      CHECK(brush.removeVertices(worldBounds, {vm::vec3d{+32, +32, +32}}));
 
       CHECK(brush.vertexCount() == 7u);
       CHECK(brush.hasVertex(vm::vec3d{-32, -32, -32}));
@@ -1646,7 +1629,7 @@ TEST_CASE("Brush")
       CHECK(brush.hasVertex(vm::vec3d{+32, +32, -32}));
       CHECK_FALSE(brush.hasVertex(vm::vec3d{+32, +32, +32}));
 
-      CHECK(brush.removeVertices(worldBounds, {vm::vec3d{+32, +32, -32}}).is_success());
+      CHECK(brush.removeVertices(worldBounds, {vm::vec3d{+32, +32, -32}}));
 
       CHECK(brush.vertexCount() == 6u);
       CHECK(brush.hasVertex(vm::vec3d{-32, -32, -32}));
@@ -1658,7 +1641,7 @@ TEST_CASE("Brush")
       CHECK_FALSE(brush.hasVertex(vm::vec3d{+32, +32, -32}));
       CHECK_FALSE(brush.hasVertex(vm::vec3d{+32, +32, +32}));
 
-      CHECK(brush.removeVertices(worldBounds, {vm::vec3d{+32, -32, +32}}).is_success());
+      CHECK(brush.removeVertices(worldBounds, {vm::vec3d{+32, -32, +32}}));
 
       CHECK(brush.vertexCount() == 5u);
       CHECK(brush.hasVertex(vm::vec3d{-32, -32, -32}));
@@ -1670,7 +1653,7 @@ TEST_CASE("Brush")
       CHECK_FALSE(brush.hasVertex(vm::vec3d{+32, +32, -32}));
       CHECK_FALSE(brush.hasVertex(vm::vec3d{+32, +32, +32}));
 
-      CHECK(brush.removeVertices(worldBounds, {vm::vec3d{-32, -32, -32}}).is_success());
+      CHECK(brush.removeVertices(worldBounds, {vm::vec3d{-32, -32, -32}}));
 
       CHECK(brush.vertexCount() == 4u);
       CHECK_FALSE(brush.hasVertex(vm::vec3d{-32, -32, -32}));
@@ -1715,7 +1698,7 @@ TEST_CASE("Brush")
 
             auto brush = builder.createBrush(vertices, "asdf") | kdl::value();
             CHECK(brush.canRemoveVertices(worldBounds, toRemove));
-            CHECK(brush.removeVertices(worldBounds, toRemove).is_success());
+            CHECK(brush.removeVertices(worldBounds, toRemove));
 
             for (size_t l = 0; l < 8; ++l)
             {
@@ -1765,7 +1748,7 @@ TEST_CASE("Brush")
       const auto transform = vm::translation_matrix(p1_2 - p1);
       const auto inverse = vm::translation_matrix(p1 - p1_2);
 
-      CHECK(brush.transformEdges(worldBounds, oldEdgePositions, transform).is_success());
+      CHECK(brush.transformEdges(worldBounds, oldEdgePositions, transform));
       auto newEdgePositions = brush.findClosestEdgePositions(kdl::vec_transform(
         oldEdgePositions, [&](const auto& s) { return s.transform(transform); }));
 
@@ -1783,7 +1766,7 @@ TEST_CASE("Brush")
       CHECK(brush.canTransformEdges(worldBounds, newEdgePositions, inverse));
 
       oldEdgePositions = std::move(newEdgePositions);
-      CHECK(brush.transformEdges(worldBounds, oldEdgePositions, inverse).is_success());
+      CHECK(brush.transformEdges(worldBounds, oldEdgePositions, inverse));
       newEdgePositions = brush.findClosestEdgePositions(kdl::vec_transform(
         oldEdgePositions, [&](const auto& s) { return s.transform(inverse); }));
 
@@ -1807,8 +1790,8 @@ TEST_CASE("Brush")
       auto builder = BrushBuilder{MapFormat::Standard, worldBounds};
       auto brush =
         builder.createCube(128, BrushFaceAttributes::NoMaterialName) | kdl::value();
-      CHECK(brush.addVertex(worldBounds, edge.start()).is_success());
-      CHECK(brush.addVertex(worldBounds, edge.end()).is_success());
+      CHECK(brush.addVertex(worldBounds, edge.start()));
+      CHECK(brush.addVertex(worldBounds, edge.end()));
 
       CHECK(brush.vertexCount() == 10u);
 
@@ -1834,10 +1817,10 @@ TEST_CASE("Brush")
       auto builder = BrushBuilder{MapFormat::Standard, worldBounds};
       auto brush =
         builder.createCube(128, BrushFaceAttributes::NoMaterialName) | kdl::value();
-      CHECK(brush.addVertex(worldBounds, edge1.start()).is_success());
-      CHECK(brush.addVertex(worldBounds, edge1.end()).is_success());
-      CHECK(brush.addVertex(worldBounds, edge2.start()).is_success());
-      CHECK(brush.addVertex(worldBounds, edge2.end()).is_success());
+      CHECK(brush.addVertex(worldBounds, edge1.start()));
+      CHECK(brush.addVertex(worldBounds, edge1.end()));
+      CHECK(brush.addVertex(worldBounds, edge2.start()));
+      CHECK(brush.addVertex(worldBounds, edge2.end()));
 
       CHECK(brush.vertexCount() == 12u);
 
@@ -1872,7 +1855,7 @@ TEST_CASE("Brush")
       CHECK(brush.canTransformFaces(worldBounds, {face}, transform));
 
       auto oldFacePositions = std::vector<vm::polygon3d>{face};
-      CHECK(brush.transformFaces(worldBounds, oldFacePositions, transform).is_success());
+      CHECK(brush.transformFaces(worldBounds, oldFacePositions, transform));
       auto newFacePositions = brush.findClosestFacePositions(kdl::vec_transform(
         oldFacePositions, [&](const auto& f) { return f.transform(transform); }));
 
@@ -1883,7 +1866,7 @@ TEST_CASE("Brush")
       CHECK(newFacePositions[0].hasVertex({+16, -48, +32}));
 
       oldFacePositions = std::move(newFacePositions);
-      CHECK(brush.transformFaces(worldBounds, oldFacePositions, inverse).is_success());
+      CHECK(brush.transformFaces(worldBounds, oldFacePositions, inverse));
       newFacePositions = brush.findClosestFacePositions(kdl::vec_transform(
         oldFacePositions, [&](const auto& f) { return f.transform(inverse); }));
 
@@ -2155,8 +2138,8 @@ TEST_CASE("Brush")
       auto builder = BrushBuilder{MapFormat::Standard, worldBounds};
       auto brush =
         builder.createCube(128, BrushFaceAttributes::NoMaterialName) | kdl::value();
-      CHECK(brush.addVertex(worldBounds, edge.start()).is_success());
-      CHECK(brush.addVertex(worldBounds, edge.end()).is_success());
+      CHECK(brush.addVertex(worldBounds, edge.start()));
+      CHECK(brush.addVertex(worldBounds, edge.end()));
 
       CHECK(brush.vertexCount() == 10u);
 
@@ -2229,11 +2212,9 @@ TEST_CASE("Brush")
       auto changed = brush;
       auto changedWithUVLock = brush;
 
-      REQUIRE(changed.transformFaces(worldBounds, {polygonToMove}, transform, false)
-                .is_success());
+      REQUIRE(changed.transformFaces(worldBounds, {polygonToMove}, transform, false));
       REQUIRE(
-        changedWithUVLock.transformFaces(worldBounds, {polygonToMove}, transform, true)
-          .is_success());
+        changedWithUVLock.transformFaces(worldBounds, {polygonToMove}, transform, true));
 
       // The move should be equivalent to shearing by this matrix
       const auto M = vm::shear_bbox_matrix(brush.bounds(), vm::vec3d{0, 0, 1}, delta);
@@ -2763,7 +2744,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
 
     const auto nodes = io::NodeReader::read(
       data, MapFormat::Standard, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
     CHECK(nodes.value().size() == 1u);
 
     auto brush = static_cast<BrushNode*>(nodes.value().front())->brush();
@@ -2771,8 +2752,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
 
     const auto oldVertexPositions = std::vector{p};
     const auto transform = vm::translation_matrix(4.0 * 16.0 * vm::vec3d{0, -1, 0});
-    CHECK(
-      brush.transformVertices(worldBounds, oldVertexPositions, transform).is_success());
+    CHECK(brush.transformVertices(worldBounds, oldVertexPositions, transform));
     auto newVertexPositions =
       brush.findClosestVertexPositions(transform * oldVertexPositions);
 
@@ -2829,7 +2809,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
 
     auto nodes = io::NodeReader::read(
       data, MapFormat::Standard, vm::bbox3d{4096.0}, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
     CHECK(nodes.value().size() == 1u);
 
     auto brush = static_cast<BrushNode*>(nodes.value().front())->brush();
@@ -2874,7 +2854,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
 
     auto nodes =
       io::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
     CHECK(nodes.value().size() == 1u);
 
     auto brush = static_cast<BrushNode*>(nodes.value().front())->brush();
@@ -2913,7 +2893,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
 
     // delete the vertex
     CHECK(brush.canRemoveVertices(worldBounds, std::vector{p7}));
-    CHECK(brush.removeVertices(worldBounds, std::vector{p7}).is_success());
+    CHECK(brush.removeVertices(worldBounds, std::vector{p7}));
 
     // assert the structure and materials
 
@@ -3228,7 +3208,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
 
     auto nodes = io::NodeReader::read(
       data, MapFormat::Standard, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
     REQUIRE(nodes.value().size() == 1u);
 
     auto brush = static_cast<BrushNode*>(nodes.value().front())->brush();
@@ -3296,7 +3276,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
 
     auto nodes =
       io::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
     REQUIRE(!nodes.value().empty());
 
     auto points = std::vector<vm::vec3d>{};
@@ -3364,7 +3344,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
 
     const auto nodes =
       io::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
     REQUIRE(nodes.value().size() == 28);
 
     auto points = std::vector<vm::vec3d>{};
@@ -3474,8 +3454,8 @@ TEST_CASE("Brush (Regression)", "[regression]")
     const auto subtrahendNodes = io::NodeReader::read(
       subtrahendStr, MapFormat::Valve, worldBounds, {}, status, taskManager);
 
-    REQUIRE(minuendNodes.is_success());
-    REQUIRE(subtrahendNodes.is_success());
+    REQUIRE(minuendNodes);
+    REQUIRE(subtrahendNodes);
 
     const auto& minuend = static_cast<BrushNode*>(minuendNodes.value().front())->brush();
     const auto& subtrahend =
@@ -3513,8 +3493,8 @@ TEST_CASE("Brush (Regression)", "[regression]")
     const auto subtrahendNodes = io::NodeReader::read(
       subtrahendStr, MapFormat::Standard, worldBounds, {}, status, taskManager);
 
-    REQUIRE(minuendNodes.is_success());
-    REQUIRE(subtrahendNodes.is_success());
+    REQUIRE(minuendNodes);
+    REQUIRE(subtrahendNodes);
 
     const auto& minuend = static_cast<BrushNode*>(minuendNodes.value().front())->brush();
     const auto& subtrahend =
@@ -3562,8 +3542,8 @@ TEST_CASE("Brush (Regression)", "[regression]")
     const auto subtrahendNodes = io::NodeReader::read(
       subtrahendStr, MapFormat::Standard, worldBounds, {}, status, taskManager);
 
-    REQUIRE(minuendNodes.is_success());
-    REQUIRE(subtrahendNodes.is_success());
+    REQUIRE(minuendNodes);
+    REQUIRE(subtrahendNodes);
 
     const auto& minuend = static_cast<BrushNode*>(minuendNodes.value().front())->brush();
     const auto& subtrahend =
@@ -3598,7 +3578,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
     auto status = io::TestParserStatus{};
     const auto nodes = io::NodeReader::read(
       brushString, MapFormat::Valve, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
 
     const auto* brushNode = dynamic_cast<BrushNode*>(nodes.value().front());
     REQUIRE(brushNode != nullptr);
@@ -3657,7 +3637,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
     auto status = io::TestParserStatus{};
     const auto nodes = io::NodeReader::read(
       brushString, MapFormat::Standard, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
 
     const auto* brushNode = dynamic_cast<BrushNode*>(nodes.value().front());
     REQUIRE(brushNode != nullptr);
@@ -3798,7 +3778,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
     auto status = io::TestParserStatus{};
     const auto nodes = io::NodeReader::read(
       brushString, MapFormat::Standard, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
 
     const auto* brushNode = dynamic_cast<BrushNode*>(nodes.value().front());
     REQUIRE(brushNode != nullptr);
@@ -3843,7 +3823,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
     auto status = io::TestParserStatus{};
     const auto nodes = io::NodeReader::read(
       brushString, MapFormat::Standard, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
     REQUIRE(nodes.value().size() == 1u);
 
     const auto* brushNode = dynamic_cast<BrushNode*>(nodes.value().front());
@@ -3893,7 +3873,7 @@ TEST_CASE("Brush (Regression)", "[regression]")
     auto status = io::TestParserStatus{};
     const auto nodes = io::NodeReader::read(
       brushString, MapFormat::Quake2, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes.is_success());
+    REQUIRE(nodes);
     CHECK(nodes.value().size() == 1u);
   }
 }

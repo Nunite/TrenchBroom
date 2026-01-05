@@ -44,7 +44,9 @@ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
 #include <filesystem>
 #include <mutex>
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace tb::ui
 {
@@ -497,7 +499,7 @@ TEST_CASE("CompilationRunner")
   auto& map = fixture.map();
 
   fixture.load(
-    "fixture/test/ui/MapDocumentTest/valveFormatMapWithoutFormatTag.map",
+    "fixture/test/mdl/Map/valveFormatMapWithoutFormatTag.map",
     {.game = mdl::LoadGameFixture{"Quake"}});
 
   const auto testWorkDir = std::string{"/some/path"};

@@ -28,7 +28,7 @@
 #include "PreferenceManager.h"
 #include "Preferences.h"
 
-#include "kdl/range_to_vector.h"
+#include "kdl/ranges/to.h"
 #include "kdl/set_adapter.h"
 #include "kdl/vector_utils.h"
 
@@ -344,7 +344,7 @@ void KeyboardShortcutModel::updateConflicts()
   const auto allActions =
     m_actions
     | std::views::transform([](const auto& actionInfo) { return &actionInfo.action; })
-    | kdl::to_vector;
+    | kdl::ranges::to<std::vector>();
 
   m_conflicts = kdl::vec_static_cast<int>(findConflicts(allActions));
   for (const auto& row : m_conflicts)

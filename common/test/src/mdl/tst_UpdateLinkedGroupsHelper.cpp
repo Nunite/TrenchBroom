@@ -34,7 +34,9 @@
 
 #include "kdl/overload.h"
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_vector.hpp>
 
 namespace tb::mdl
 {
@@ -138,7 +140,7 @@ TEST_CASE("UpdateLinkedGroupsHelper")
     {
       {
         auto helper = UpdateLinkedGroupsHelper{{linkedNode}};
-        REQUIRE(helper.applyLinkedGroupUpdates(map).is_success());
+        REQUIRE(helper.applyLinkedGroupUpdates(map));
       }
       CHECK(deleted);
     }
@@ -147,7 +149,7 @@ TEST_CASE("UpdateLinkedGroupsHelper")
     {
       {
         auto helper = UpdateLinkedGroupsHelper{{linkedNode}};
-        REQUIRE(helper.applyLinkedGroupUpdates(map).is_success());
+        REQUIRE(helper.applyLinkedGroupUpdates(map));
         helper.undoLinkedGroupUpdates(map);
       }
       CHECK_FALSE(deleted);
@@ -215,7 +217,7 @@ TEST_CASE("UpdateLinkedGroupsHelper")
 
       // propagate changes
       auto helper = UpdateLinkedGroupsHelper{{groupNode}};
-      REQUIRE(helper.applyLinkedGroupUpdates(map).is_success());
+      REQUIRE(helper.applyLinkedGroupUpdates(map));
 
       /*
       world
@@ -394,7 +396,7 @@ TEST_CASE("UpdateLinkedGroupsHelper")
       SECTION("First propagate changes to innerGroupNode, then outerGroupNode")
       {
         auto helper1 = UpdateLinkedGroupsHelper{{innerGroupNode}};
-        CHECK(helper1.applyLinkedGroupUpdates(map).is_success());
+        CHECK(helper1.applyLinkedGroupUpdates(map));
 
         /*
         world
@@ -431,7 +433,7 @@ TEST_CASE("UpdateLinkedGroupsHelper")
           == originalBrushBounds.translate(vm::vec3d(32.0, 0.0, 8.0)));
 
         auto helper2 = UpdateLinkedGroupsHelper{{outerGroupNode}};
-        CHECK(helper2.applyLinkedGroupUpdates(map).is_success());
+        CHECK(helper2.applyLinkedGroupUpdates(map));
 
         // see end of test for assertions of final state
       }
@@ -439,7 +441,7 @@ TEST_CASE("UpdateLinkedGroupsHelper")
       SECTION("First propagate changes to outerGroupNode, then innerGroupNode")
       {
         auto helper1 = UpdateLinkedGroupsHelper{{outerGroupNode}};
-        REQUIRE(helper1.applyLinkedGroupUpdates(map).is_success());
+        REQUIRE(helper1.applyLinkedGroupUpdates(map));
 
         /*
         world
@@ -475,7 +477,7 @@ TEST_CASE("UpdateLinkedGroupsHelper")
           == originalBrushBounds.translate(vm::vec3d(32.0, 16.0, 8.0)));
 
         auto helper2 = UpdateLinkedGroupsHelper{{innerGroupNode}};
-        REQUIRE(helper2.applyLinkedGroupUpdates(map).is_success());
+        REQUIRE(helper2.applyLinkedGroupUpdates(map));
 
         // see end of test for assertions of final state
       }
@@ -493,7 +495,7 @@ TEST_CASE("UpdateLinkedGroupsHelper")
         }
 
         auto helper = UpdateLinkedGroupsHelper{groupNodes};
-        REQUIRE(helper.applyLinkedGroupUpdates(map).is_success());
+        REQUIRE(helper.applyLinkedGroupUpdates(map));
       }
 
       /*

@@ -31,7 +31,8 @@
 #include <filesystem>
 #include <string>
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace tb::io
 {
@@ -76,7 +77,7 @@ TEST_CASE("readIdMipTexture")
   const auto wadPath =
     std::filesystem::current_path() / "fixture/test/io/Wad/cr8_czg.wad";
   auto wadFS = WadFileSystem{Disk::openFile(wadPath) | kdl::value()};
-  REQUIRE(wadFS.reload().is_success());
+  REQUIRE(wadFS.reload());
 
   const auto file = wadFS.openFile(textureName + ".D") | kdl::value();
   auto reader = file->reader().buffer();
@@ -104,7 +105,7 @@ TEST_CASE("readHlMipTexture")
 
   const auto wadPath = std::filesystem::current_path() / "fixture/test/io/HL/hl.wad";
   auto wadFS = WadFileSystem{Disk::openFile(wadPath) | kdl::value()};
-  REQUIRE(wadFS.reload().is_success());
+  REQUIRE(wadFS.reload());
 
   const auto file = wadFS.openFile(textureName + ".C") | kdl::value();
   auto reader = file->reader().buffer();

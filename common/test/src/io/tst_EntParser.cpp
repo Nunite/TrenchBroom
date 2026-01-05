@@ -28,7 +28,7 @@
 #include <filesystem>
 #include <string>
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace tb::io
 {
@@ -53,7 +53,7 @@ TEST_CASE("EntParser")
       auto parser = EntParser{reader.stringView(), Color{1.0f, 1.0f, 1.0f, 1.0f}};
 
       auto status = TestParserStatus{};
-      CHECK(parser.parseDefinitions(status).is_success());
+      CHECK(parser.parseDefinitions(status));
 
       /* Disabled because our files are full of previously undetected problems
       if (status.countStatus(LogLevel::Warn) > 0u) {

@@ -24,8 +24,10 @@
 #include "mdl/EntityModel.h"
 
 #include "vm/approx.h"
+#include "vm/bbox_io.h" // IWYU pragma: keep
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace tb::io
 {
@@ -43,7 +45,7 @@ TEST_CASE("AssimpLoader")
     {
       auto loader = AssimpLoader{"cube.dae", *fs};
       auto modelData = loader.load(logger);
-      REQUIRE(modelData.is_success());
+      REQUIRE(modelData);
 
       CHECK(modelData.value().frameCount() == 1);
       CHECK(modelData.value().surfaceCount() == 1);
@@ -55,7 +57,7 @@ TEST_CASE("AssimpLoader")
       auto loader = AssimpLoader{"cube.mdl", *fs};
 
       auto modelData = loader.load(logger);
-      REQUIRE(modelData.is_success());
+      REQUIRE(modelData);
 
       CHECK(modelData.value().surfaceCount() == 4);
       CHECK(modelData.value().surface(0).skinCount() == 1);
@@ -85,7 +87,7 @@ TEST_CASE("AssimpLoader")
     auto loader = AssimpLoader{modelPath, *fs};
 
     auto modelData = loader.load(logger);
-    REQUIRE(modelData.is_success());
+    REQUIRE(modelData);
 
     REQUIRE(modelData.value().frameCount() == 1);
     REQUIRE(modelData.value().surfaceCount() == 1);

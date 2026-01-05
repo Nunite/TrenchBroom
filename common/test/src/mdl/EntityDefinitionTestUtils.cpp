@@ -28,7 +28,7 @@
 
 #include <string>
 
-#include "Catch2.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace tb::mdl
 {
@@ -37,7 +37,7 @@ ModelSpecification getModelSpecification(
 {
   auto status = io::TestParserStatus{};
   auto definitions = parser.parseDefinitions(status);
-  REQUIRE(definitions.is_success());
+  REQUIRE(definitions);
   CHECK(definitions.value().size() == 1u);
 
   const auto& definition = definitions.value()[0];
@@ -77,7 +77,7 @@ void assertDecalDefinition(
 {
   auto status = io::TestParserStatus{};
   auto definitions = parser.parseDefinitions(status);
-  REQUIRE(definitions.is_success());
+  REQUIRE(definitions);
   CHECK(definitions.value().size() == 1u);
 
   const auto& definition = definitions.value()[0];
