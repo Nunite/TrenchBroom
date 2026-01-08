@@ -1,7 +1,7 @@
 # 开发日志
 
 ## 任务：合并旧版本功能到当前项目
-
+- 不要用中文注释
 ## 2026-01-08: Interface Localization Implementation
 
 ### Initial Setup
@@ -41,7 +41,29 @@
         -   Created `app/resources/graphics/images/LanguagePreferences.svg` (copied from `GeneralPreferences.svg`).
         -   Updated `common/CMakeLists.txt` to include the new source file.
 
+### 2026-01-08: Box Selection Feature Integration
+1.  **Box Selection Logic**:
+    -   Modified `common/src/ui/BoxSelectionTool.h/cpp` to generalize `BoxSelectionDragDelegate` to work with `Tool&` and `mdl::Map&` instead of specific tool classes.
+    -   Fixed include errors in `BoxSelectionTool.cpp` (`ui/Grid.h` -> `mdl/Grid.h`, `ui/Transaction.h` -> `mdl/Transaction.h`).
+    -   Replaced `MapDocument` usage with `mdl::Map` and `mdl::Map_Selection` functions in `BoxSelectionTool.cpp` to decouple from `MapDocument`.
+
+2.  **Tool Integration**:
+    -   Modified `common/src/ui/SelectionTool.cpp`:
+        -   Added check for Alt+LeftDrag in `acceptMouseDrag`.
+        -   Implemented instantiation of `HandleDragTracker<BoxSelectionDragDelegate>` when Alt is pressed.
+        -   Calculated start point for box selection using ray-plane intersection (plane passing through origin aligned with camera).
+
+### Bug Fixes (Round 2)
+1.  **Compilation Errors**:
+    -   **BoxSelectionTool.cpp**:
+        -   Fixed `Color` initialization error by using `Color(RgbaF(...))` instead of direct `Color(...)`.
+    -   **SelectionTool.cpp**:
+        -   Fixed `use of undefined type 'tb::render::Camera'` by adding `#include "render/Camera.h"`.
+        -   Fixed `ray()` not member of `InputState` by changing to `pickRay()`.
+        -   Fixed malformed include directive.
+        -   Fixed `error C2737: 'point': const object must be initialized` which was caused by the `ray()` method not being found, leading to type deduction failure. Corrected to `pickRay()`.
+
 ### Next Steps
 -   Verify the build succeeds with the applied fixes.
 -   Launch the application to verify Chinese interface is loaded.
--   Continue with merging other features as requested.
+-   Verify Box Selection works (Alt+LeftDrag).

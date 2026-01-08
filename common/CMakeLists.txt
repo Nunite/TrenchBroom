@@ -321,6 +321,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/AssembleBrushToolController3D.cpp
         ${COMMON_SOURCE_DIR}/ui/BorderLine.cpp
         ${COMMON_SOURCE_DIR}/ui/BorderPanel.cpp
+        ${COMMON_SOURCE_DIR}/ui/BoxSelectionTool.cpp
         ${COMMON_SOURCE_DIR}/ui/CachingLogger.cpp
         ${COMMON_SOURCE_DIR}/ui/CameraAnimation.cpp
         ${COMMON_SOURCE_DIR}/ui/CameraLinkHelper.cpp

@@ -36,10 +36,15 @@
 #include "mdl/Node.h"
 #include "mdl/Transaction.h"
 #include "mdl/TransactionScope.h"
+#include "render/Camera.h"
 #include "render/RenderContext.h"
+#include "ui/BoxSelectionTool.h"
 #include "ui/GestureTracker.h"
+#include "ui/HandleDragTracker.h"
 #include "ui/InputState.h"
 #include "ui/MapDocument.h"
+
+#include "vm/intersection.h"
 
 #include <algorithm>
 #include <unordered_set>
@@ -473,6 +478,27 @@ std::unique_ptr<GestureTracker> SelectionTool::acceptMouseDrag(
   using namespace mdl::HitFilters;
 
   const auto& editorContext = m_map.editorContext();
+
+  if (inputState.mouseButtonsPressed(MouseButtons::Left) &&
+      inputState.modifierKeysDown(ModifierKeys::Alt))
+  {
+    const auto& camera = inputState.camera();
+    const auto direction = camera.direction();
+    const auto axis = vm::get_abs_max_component_axis(direction);
+    const auto normal = vm::vec3d{axis};
+    const auto plane = vm::plane3d{vm::vec3d::zero(), normal};
+
+    if (const auto t = vm::intersect_ray_plane(inputState.pickRay(), plane))
+    {
+      const auto point = vm::point_at_distance(inputState.pickRay(), *t);
+      return std::make_unique<HandleDragTracker<BoxSelectionDragDelegate>>(
+        BoxSelectionDragDelegate(tool(), m_map),
+        inputState,
+        point,
+        point);
+    }
+    return nullptr;
+  }
 
   if (!handleClick(inputState, editorContext) || !isMultiClick(inputState))
   {
