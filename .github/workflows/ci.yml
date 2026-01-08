@@ -29,7 +29,7 @@ jobs:
             tb-arch: default-arch
         include:
           - os: macos-15-intel
-            tb-build-type: asan
+            tb-build-type: sanitize
           - os: windows-2022
             tb-arch: x64
     env:
@@ -37,10 +37,11 @@ jobs:
       TB_PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       # Set up environment variables required for caching vcpkg packages using NuGet
       # See https://learn.microsoft.com/en-us/vcpkg/consume/binary-caching-github-packages?pivots=windows-runner
-      USERNAME: TrenchBroom
+      USERNAME: ${{ github.repository_owner }}
+      NUGET_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
       VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
-      FEED_URL: https://nuget.pkg.github.com/TrenchBroom/index.json
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/TrenchBroom/index.json,readwrite"
+      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
       # Set up environment variables required for Mono (on macOS)
       # See https://formulae.brew.sh/formula/mono
       MONO_GAC_PREFIX: "$HOMEBREW_PREFIX"
@@ -88,9 +89,9 @@ jobs:
             -StorePasswordInClearText `
             -Name GitHubPackages `
             -UserName "${{ env.USERNAME }}" `
-            -Password "${{ secrets.GITHUB_TOKEN }}"
+            -Password "${{ env.NUGET_AUTH_TOKEN }}"
           .$(${{ env.VCPKG_EXE }} fetch nuget) `
-            setapikey "${{ secrets.GITHUB_TOKEN }}" `
+            setapikey "${{ env.NUGET_AUTH_TOKEN }}" `
             -Source "${{ env.FEED_URL }}"
 
       - name: Windows - Build
@@ -129,9 +130,9 @@ jobs:
             -StorePasswordInClearText \
             -Name GitHubPackages \
             -UserName "${{ env.USERNAME }}" \
-            -Password "${{ secrets.GITHUB_TOKEN }}"
+            -Password "${{ env.NUGET_AUTH_TOKEN }}"
           mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
-            setapikey "${{ secrets.GITHUB_TOKEN }}" \
+            setapikey "${{ env.NUGET_AUTH_TOKEN }}" \
             -Source "${{ env.FEED_URL }}"
 
       - name: Linux - Set compiler version
@@ -167,12 +168,16 @@ jobs:
       - name: macOS - Set up signing environment
         if: ${{ startsWith(matrix.os, 'macos') }}
         run: |
-            if [[ "${{ matrix.tb-build-type }}" == "asan" ]]; then
-              echo "TB_ENABLE_ASAN=true" >> $GITHUB_ENV
+            if [[ "${{ matrix.tb-build-type }}" == "sanitize" ]]; then
+              echo "TB_ENABLE_ASAN=1" >> $GITHUB_ENV
+              echo "TB_ENABLE_TSAN=0" >> $GITHUB_ENV
+              echo "TB_ENABLE_UBSAN=1" >> $GITHUB_ENV
             else
-              echo "TB_ENABLE_ASAN=false" >> $GITHUB_ENV
+              echo "TB_ENABLE_ASAN=0" >> $GITHUB_ENV
+              echo "TB_ENABLE_TSAN=0" >> $GITHUB_ENV
+              echo "TB_ENABLE_UBSAN=0" >> $GITHUB_ENV
             fi
-            if [[ "${{ matrix.tb-build-type }}" != "asan" ]] && 
+            if [[ "${{ matrix.tb-build-type }}" != "sanitize" ]] && 
                [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12 }}" ]] && 
                [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12_PASSWORD }}" ]] && 
                [[ -n "${{ secrets.ACTIONS_MAC_SIGN_IDENTITY }}" ]] &&
@@ -216,9 +221,9 @@ jobs:
             -StorePasswordInClearText \
             -Name GitHubPackages \
             -UserName "${{ env.USERNAME }}" \
-            -Password "${{ secrets.GITHUB_TOKEN }}"
+            -Password "${{ env.NUGET_AUTH_TOKEN }}"
           mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
-            setapikey "${{ secrets.GITHUB_TOKEN }}" \
+            setapikey "${{ env.NUGET_AUTH_TOKEN }}" \
             -Source "${{ env.FEED_URL }}"
 
       - name: macOS - Build
@@ -227,7 +232,7 @@ jobs:
 
       - name: macOS - Upload artifacts
         uses: actions/upload-artifact@v4
-        if: ${{ startsWith(matrix.os, 'macos') && matrix.tb-build-type != 'asan' }}
+        if: ${{ startsWith(matrix.os, 'macos') && matrix.tb-build-type != 'sanitize' }}
         with:
           name: ${{ matrix.os }}
           path: |
@@ -240,14 +245,12 @@ jobs:
       # based on a glob, so use https://github.com/softprops/action-gh-release
       - name: Release
         uses: softprops/action-gh-release@v1
-        if: ${{ startsWith(github.ref, 'refs/tags/') && matrix.tb-build-type != 'asan' }}
+        if: ${{ startsWith(github.ref, 'refs/tags/') && matrix.tb-build-type != 'sanitize' }}
         with:
           draft: true
           files: |
             cmakebuild/*.zip
             cmakebuild/*.zip.md5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload compiled manual
         uses: peaceiris/actions-gh-pages@v3
