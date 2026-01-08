@@ -3,7 +3,7 @@ Thumbs.db
 *.sublime-workspace
 .vscode
 .cache
-
+/merge
 /cmake-build-*
 /build*
 /cmakebuild*

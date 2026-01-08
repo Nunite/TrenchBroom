@@ -20,6 +20,7 @@
 #include "Preferences.h"
 
 #include <QKeySequence>
+#include <QApplication>
 
 #include "ui/MapViewLayout.h"
 
@@ -36,6 +37,10 @@ Preference<bool> EnableDraftReleaseUpdates(
   "updater/Enable draft releases", false, PreferencePersistencePolicy::Transient);
 Preference<bool> IncludeDraftReleaseUpdates(
   "updater/Include draft releases", false, PreferencePersistencePolicy::Transient);
+
+QString languageEnglish() { return QApplication::tr("English"); }
+QString languageChinese() { return QApplication::tr("中文"); }
+Preference<QString> Language("App/Ui/Language", languageChinese());
 
 Preference<int> MapViewLayout(
   "Views/Map view layout", static_cast<int>(ui::MapViewLayout::OnePane));

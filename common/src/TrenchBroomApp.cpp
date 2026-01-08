@@ -69,6 +69,7 @@
 #include <QStandardPaths>
 #include <QSysInfo>
 #include <QTimer>
+#include <QTranslator>
 #include <QUrl>
 
 #include "kdl/path_utils.h"
@@ -160,6 +161,37 @@ TrenchBroomApp::TrenchBroomApp(int& argc, char** argv)
   , m_taskManager{std::thread::hardware_concurrency()}
 {
   using namespace std::chrono_literals;
+
+  // Set up translator
+  m_translator = new QTranslator(this);
+
+  // Set language based on preference
+  auto& prefs = PreferenceManager::instance();
+  QString locale;
+
+  if (prefs.get(Preferences::Language) == Preferences::languageEnglish()) {
+    QLocale::setDefault(QLocale(QLocale::English));
+  } else {
+    QLocale::setDefault(QLocale(QLocale::Chinese, QLocale::China));
+    locale = "zh_CN";
+
+    if (m_translator->load(QString(":/translations/trenchbroom_%1").arg(locale))) {
+      installTranslator(m_translator);
+    } else if (m_translator->load(QString("trenchbroom_%1").arg(locale), QCoreApplication::applicationDirPath() + "/translations")) {
+      installTranslator(m_translator);
+    } else {
+        const auto resourceDirs = io::SystemPaths::findResourceDirectories("translations");
+        for (const auto& dir : resourceDirs)
+        {
+          if (m_translator->load(QString("trenchbroom_%1").arg(locale), 
+                                io::pathAsQString(dir)))
+          {
+            installTranslator(m_translator);
+            break;
+          }
+        }
+    }
+  }
 
   // When this flag is enabled, font and palette changes propagate as though the user
   // had manually called the corresponding QWidget methods.

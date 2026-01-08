@@ -41,6 +41,10 @@ extern Preference<bool> IncludePreReleaseUpdates;
 extern Preference<bool> EnableDraftReleaseUpdates;
 extern Preference<bool> IncludeDraftReleaseUpdates;
 
+QString languageEnglish();
+QString languageChinese();
+extern Preference<QString> Language;
+
 extern Preference<int> MapViewLayout;
 
 QString systemTheme();

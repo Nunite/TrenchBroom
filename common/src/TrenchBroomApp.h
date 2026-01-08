@@ -57,6 +57,7 @@ private:
   QNetworkAccessManager* m_networkManager = nullptr;
   upd::HttpClient* m_httpClient = nullptr;
   upd::Updater* m_updater = nullptr;
+  QTranslator* m_translator = nullptr;
   kdl::task_manager m_taskManager = kdl::task_manager{256};
   std::unique_ptr<FrameManager> m_frameManager;
   std::unique_ptr<RecentDocuments> m_recentDocuments;
