@@ -46,6 +46,9 @@ enum class MapFormat;
 
 class Game;
 class Map;
+class EntityNode;
+class BrushNode;
+class Entity;
 class Node;
 class PickResult;
 } // namespace tb::mdl
@@ -99,6 +102,9 @@ public:
 public: // accessors and such
   mdl::Map& map();
   const mdl::Map& map() const;
+
+  mdl::EntityNode* createSingleBrushEntity(
+    mdl::BrushNode* brushNode, const mdl::Entity& templateEntity);
 
   Logger& logger();
 

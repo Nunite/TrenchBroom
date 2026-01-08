@@ -27,6 +27,7 @@
 #include "ui/ToolBoxConnector.h"
 
 #include <filesystem>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -40,6 +41,8 @@ namespace tb::mdl
 struct EntityDefinition;
 class GroupNode;
 class Map;
+class Entity;
+class EntityNode;
 class Node;
 class Selection;
 class SmartTag;
@@ -154,6 +157,18 @@ private: // shortcut setup
   void updateActionBindings();
   void updateActionStates();
   void updateActionStatesDelayed();
+
+private: // entity template
+  std::unique_ptr<mdl::Entity> m_templateEntity;
+  std::string m_templateEntityClassName;
+
+public: // entity template
+  bool hasTemplateEntity() const;
+  void setTemplateEntity(const mdl::EntityNode* entityNode);
+  void clearTemplateEntity();
+  const mdl::Entity* templateEntity() const;
+  void setSelectedEntityAsTemplate();
+  void applyEntityTemplate();
 
 public:
   void triggerAction(const Action& action);

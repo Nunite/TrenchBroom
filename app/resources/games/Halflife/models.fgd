@@ -1,0 +1,1368 @@
+
+// FGD that allows displaying models in Trenchbroom Entity Browser 
+// Like an asset browser
+
+//
+// Base Classes
+//
+
+@BaseClass = Targetname 
+[ 
+    targetname(target_source) : "Name"
+]
+
+@BaseClass = Angles
+[
+    angles(string) : "Pitch Yaw Roll (Y Z X)" : "0 0 0"
+]
+
+@BaseClass = FrameRate
+[
+    framerate(integer) : "Frames per second" : 10
+]
+
+@BaseClass = RenderFields
+[
+    renderfx(choices) :"Render FX" : 0 =
+    [
+        0: "Normal"
+        1: "Slow Pulse"
+        2: "Fast Pulse"
+        3: "Slow Wide Pulse"
+        4: "Fast Wide Pulse"
+        9: "Slow Strobe"
+        10: "Fast Strobe"
+        11: "Faster Strobe"
+        12: "Slow Flicker"
+        13: "Fast Flicker"
+        5: "Slow Fade Away"
+        6: "Fast Fade Away"
+        7: "Slow Become Solid"
+        8: "Fast Become Solid"
+        14: "Constant Glow"
+        15: "Distort"
+        16: "Hologram (Distort + fade)"
+    ]
+    rendermode(choices) : "Render Mode" : 0 =
+    [
+        0: "Normal"
+        1: "Color"
+        2: "Texture"
+        3: "Glow"
+        4: "Solid"
+        5: "Additive"
+    ]
+    renderamt(integer) : "FX Amount (1 - 255)"
+    rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+]
+
+@BaseClass = ConvertProp
+[   
+    convert_prop(choices) : "" : 1 =
+    [   
+        0: "no"
+        1: "yes"
+    ]
+]
+
+
+//
+// Models
+//
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set01.mdl" }) = prop_128_fuse_set01 : "Model" 
+[ model(string): "Path" : "models/128_fuse_set01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set02.mdl" }) = prop_128_fuse_set02 : "Model" 
+[ model(string): "Path" : "models/128_fuse_set02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set02_b.mdl" }) = prop_128_fuse_set02_b : "Model" 
+[ model(string): "Path" : "models/128_fuse_set02_b.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set03.mdl" }) = prop_128_fuse_set03 : "Model" 
+[ model(string): "Path" : "models/128_fuse_set03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set04.mdl" }) = prop_128_fuse_set04 : "Model" 
+[ model(string): "Path" : "models/128_fuse_set04.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set05.mdl" }) = prop_128_fuse_set05 : "Model" 
+[ model(string): "Path" : "models/128_fuse_set05.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set05_b.mdl" }) = prop_128_fuse_set05_b : "Model" 
+[ model(string): "Path" : "models/128_fuse_set05_b.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set06.mdl" }) = prop_128_fuse_set06 : "Model" 
+[ model(string): "Path" : "models/128_fuse_set06.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set07.mdl" }) = prop_128_fuse_set07 : "Model" 
+[ model(string): "Path" : "models/128_fuse_set07.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set09.mdl" }) = prop_128_fuse_set09 : "Model" 
+[ model(string): "Path" : "models/128_fuse_set09.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/128_fuse_set10.mdl" }) = prop_128_fuse_set10 : "Model" 
+[ model(string): "Path" : "models/128_fuse_set10.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_Boilers-WaterSoftener_NK_SMesh.mdl" }) = prop_AA_Boilers-WaterSoftener_NK_SMesh : "Model" 
+[ model(string): "Path" : "models/AA_Boilers-WaterSoftener_NK_SMesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_halogen_floor_lampA_JAS_SMesh.mdl" }) = prop_AA_halogen_floor_lampA_JAS_SMesh : "Model" 
+[ model(string): "Path" : "models/AA_halogen_floor_lampA_JAS_SMesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_HospitalDefibrillator_02_TCH_SMesh.mdl" }) = prop_AA_HospitalDefibrillator_02_TCH_SMesh : "Model" 
+[ model(string): "Path" : "models/AA_HospitalDefibrillator_02_TCH_SMesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_HospitalMedicalCart_01_TCH_SMesh.mdl" }) = prop_AA_HospitalMedicalCart_01_TCH_SMesh : "Model" 
+[ model(string): "Path" : "models/AA_HospitalMedicalCart_01_TCH_SMesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_HospitalMountedBioTrash_01_TCH_SMesh.mdl" }) = prop_AA_HospitalMountedBioTrash_01_TCH_SMesh : "Model" 
+[ model(string): "Path" : "models/AA_HospitalMountedBioTrash_01_TCH_SMesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_HospitalMountedEKG_01_TCH_SMesh.mdl" }) = prop_AA_HospitalMountedEKG_01_TCH_SMesh : "Model" 
+[ model(string): "Path" : "models/AA_HospitalMountedEKG_01_TCH_SMesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_IVStand08_BCH_Smesh.mdl" }) = prop_AA_IVStand08_BCH_Smesh : "Model" 
+[ model(string): "Path" : "models/AA_IVStand08_BCH_Smesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_radio.mdl" }) = prop_AA_radio : "Model" 
+[ model(string): "Path" : "models/AA_radio.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_ScrapPile_02_Smesh.mdl" }) = prop_AA_ScrapPile_02_Smesh : "Model" 
+[ model(string): "Path" : "models/AA_ScrapPile_02_Smesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_Slums_TrashPile_01.mdl" }) = prop_AA_Slums_TrashPile_01 : "Model" 
+[ model(string): "Path" : "models/AA_Slums_TrashPile_01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_Tripod01_JG_SMesh.mdl" }) = prop_AA_Tripod01_JG_SMesh : "Model" 
+[ model(string): "Path" : "models/AA_Tripod01_JG_SMesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AA_XRAY_Machine_SM.mdl" }) = prop_AA_XRAY_Machine_SM : "Model" 
+[ model(string): "Path" : "models/AA_XRAY_Machine_SM.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AF_centrifuge.mdl" }) = prop_AF_centrifuge : "Model" 
+[ model(string): "Path" : "models/AF_centrifuge.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AF_environmental_chamber.mdl" }) = prop_AF_environmental_chamber : "Model" 
+[ model(string): "Path" : "models/AF_environmental_chamber.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AF_fan_machine_part1.mdl" }) = prop_AF_fan_machine_part1 : "Model" 
+[ model(string): "Path" : "models/AF_fan_machine_part1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AF_household_metal_cup.mdl" }) = prop_AF_household_metal_cup : "Model" 
+[ model(string): "Path" : "models/AF_household_metal_cup.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AF_lab_microscope.mdl" }) = prop_AF_lab_microscope : "Model" 
+[ model(string): "Path" : "models/AF_lab_microscope.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AF_machine_1.mdl" }) = prop_AF_machine_1 : "Model" 
+[ model(string): "Path" : "models/AF_machine_1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AF_metal_box.mdl" }) = prop_AF_metal_box : "Model" 
+[ model(string): "Path" : "models/AF_metal_box.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AF_metal_chest.mdl" }) = prop_AF_metal_chest : "Model" 
+[ model(string): "Path" : "models/AF_metal_chest.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AF_welding_machine.mdl" }) = prop_AF_welding_machine : "Model" 
+[ model(string): "Path" : "models/AF_welding_machine.mdl"]
+
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/apc.mdl" }) = prop_apc : "Model" 
+[ model(string): "Path" : "models/apc.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/AP_KeyCard.mdl" }) = prop_AP_KeyCard : "Model" 
+[ model(string): "Path" : "models/AP_KeyCard.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/arcticorange.mdl" }) = prop_arcticorange : "Model" 
+[ model(string): "Path" : "models/arcticorange.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/arcticorangeT.mdl" }) = prop_arcticorangeT : "Model" 
+[ model(string): "Path" : "models/arcticorangeT.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/army1.mdl" }) = prop_army1 : "Model" 
+[ model(string): "Path" : "models/army1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/army2.mdl" }) = prop_army2 : "Model" 
+[ model(string): "Path" : "models/army2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bag.mdl" }) = prop_bag : "Model" 
+[ model(string): "Path" : "models/bag.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/barney.mdl" }) = prop_barney : "Model" 
+[ model(string): "Path" : "models/barney.mdl"]
+
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/beakers_heatstand.mdl" }) = prop_beakers_heatstand : "Model" 
+[ model(string): "Path" : "models/beakers_heatstand.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/beyond_tree01.mdl" }) = prop_beyond_tree01 : "Model" 
+[ model(string): "Path" : "models/beyond_tree01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bg_light02.mdl" }) = prop_bg_light02 : "Model" 
+[ model(string): "Path" : "models/bg_light02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bg_siren01.mdl" }) = prop_bg_siren01 : "Model" 
+[ model(string): "Path" : "models/bg_siren01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bigtree.mdl" }) = prop_bigtree : "Model" 
+[ model(string): "Path" : "models/bigtree.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/boid.mdl" }) = prop_boid : "Model" 
+[ model(string): "Path" : "models/boid.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bonesaw.mdl" }) = prop_bonesaw : "Model" 
+[ model(string): "Path" : "models/bonesaw.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bt.mdl" }) = prop_bt : "Model" 
+[ model(string): "Path" : "models/bt.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bullsquid.mdl" }) = prop_bullsquid : "Model" 
+[ model(string): "Path" : "models/bullsquid.mdl"]
+
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bush.mdl" }) = prop_bush : "Model" 
+[ model(string): "Path" : "models/bush.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bush_fern_small.mdl" }) = prop_bush_fern_small : "Model" 
+[ model(string): "Path" : "models/bush_fern_small.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bush_japan_bush01.mdl" }) = prop_bush_japan_bush01 : "Model" 
+[ model(string): "Path" : "models/bush_japan_bush01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bush_japan_fern_01.mdl" }) = prop_bush_japan_fern_01 : "Model" 
+[ model(string): "Path" : "models/bush_japan_fern_01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bush_shrubv03.mdl" }) = prop_bush_shrubv03 : "Model" 
+[ model(string): "Path" : "models/bush_shrubv03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/buttons.mdl" }) = prop_buttons : "Model" 
+[ model(string): "Path" : "models/buttons.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/buzzer_deadkrisa.mdl" }) = prop_buzzer_deadkrisa : "Model" 
+[ model(string): "Path" : "models/buzzer_deadkrisa.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/b_tree.mdl" }) = prop_b_tree : "Model" 
+[ model(string): "Path" : "models/b_tree.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cancooned.mdl" }) = prop_cancooned : "Model" 
+[ model(string): "Path" : "models/cancooned.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cart_utility.mdl" }) = prop_cart_utility : "Model" 
+[ model(string): "Path" : "models/cart_utility.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/car_police02.mdl" }) = prop_car_police02 : "Model" 
+[ model(string): "Path" : "models/car_police02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/car_scrapped.mdl" }) = prop_car_scrapped : "Model" 
+[ model(string): "Path" : "models/car_scrapped.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cc_Barier_02.mdl" }) = prop_cc_Barier_02 : "Model" 
+[ model(string): "Path" : "models/cc_Barier_02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cc_lab_balloon_02.mdl" }) = prop_cc_lab_balloon_02 : "Model" 
+[ model(string): "Path" : "models/cc_lab_balloon_02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/chestburster.mdl" }) = prop_chestburster : "Model" 
+[ model(string): "Path" : "models/chestburster.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/chick.mdl" }) = prop_chick : "Model" 
+[ model(string): "Path" : "models/chick.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/chknovabambus.mdl" }) = prop_chknovabambus : "Model" 
+[ model(string): "Path" : "models/chknovabambus.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/composite_drug-testtubes.mdl" }) = prop_composite_drug-testtubes : "Model" 
+[ model(string): "Path" : "models/composite_drug-testtubes.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/computers.mdl" }) = prop_computers : "Model" 
+[ model(string): "Path" : "models/computers.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/conveyor1.mdl" }) = prop_conveyor1 : "Model" 
+[ model(string): "Path" : "models/conveyor1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/conveyor2.mdl" }) = prop_conveyor2 : "Model" 
+[ model(string): "Path" : "models/conveyor2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/conveyor3.mdl" }) = prop_conveyor3 : "Model" 
+[ model(string): "Path" : "models/conveyor3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/conveyor_turn.mdl" }) = prop_conveyor_turn : "Model" 
+[ model(string): "Path" : "models/conveyor_turn.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/corkboardasi.mdl" }) = prop_corkboardasi : "Model" 
+[ model(string): "Path" : "models/corkboardasi.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/corpse_female1.mdl" }) = prop_corpse_female1 : "Model" 
+[ model(string): "Path" : "models/corpse_female1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/corpse_female2.mdl" }) = prop_corpse_female2 : "Model" 
+[ model(string): "Path" : "models/corpse_female2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/corpse_male1.mdl" }) = prop_corpse_male1 : "Model" 
+[ model(string): "Path" : "models/corpse_male1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/corpse_male2.mdl" }) = prop_corpse_male2 : "Model" 
+[ model(string): "Path" : "models/corpse_male2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/corpse_male3.mdl" }) = prop_corpse_male3 : "Model" 
+[ model(string): "Path" : "models/corpse_male3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/crane.mdl" }) = prop_crane : "Model" 
+[ model(string): "Path" : "models/crane.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/crane01.mdl" }) = prop_crane01 : "Model" 
+[ model(string): "Path" : "models/crane01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/Crane02.mdl" }) = prop_Crane02 : "Model" 
+[ model(string): "Path" : "models/Crane02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/crossbow_bolt.mdl" }) = prop_crossbow_bolt : "Model" 
+[ model(string): "Path" : "models/crossbow_bolt.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/D1_AL.mdl" }) = prop_D1_AL : "Model" 
+[ model(string): "Path" : "models/D1_AL.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/d3_chair1.mdl" }) = prop_d3_chair1 : "Model" 
+[ model(string): "Path" : "models/d3_chair1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/deadguy.mdl" }) = prop_deadguy : "Model" 
+[ model(string): "Path" : "models/deadguy.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/deadman32.mdl" }) = prop_deadman32 : "Model" 
+[ model(string): "Path" : "models/deadman32.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/desert_an01.mdl" }) = prop_desert_an01 : "Model" 
+[ model(string): "Path" : "models/desert_an01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/dk_tree2_small.mdl" }) = prop_dk_tree2_small : "Model" 
+[ model(string): "Path" : "models/dk_tree2_small.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/drone.mdl" }) = prop_drone : "Model" 
+[ model(string): "Path" : "models/drone.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/droneinjured.mdl" }) = prop_droneinjured : "Model" 
+[ model(string): "Path" : "models/droneinjured.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/dynamite_switch.mdl" }) = prop_dynamite_switch : "Model" 
+[ model(string): "Path" : "models/dynamite_switch.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/dynamite_switchT.mdl" }) = prop_dynamite_switchT : "Model" 
+[ model(string): "Path" : "models/dynamite_switchT.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ef_22s2wave.mdl" }) = prop_ef_22s2wave : "Model" 
+[ model(string): "Path" : "models/ef_22s2wave.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/egg.mdl" }) = prop_egg : "Model" 
+[ model(string): "Path" : "models/egg.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/eggsack.mdl" }) = prop_eggsack : "Model" 
+[ model(string): "Path" : "models/eggsack.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/egg_open.mdl" }) = prop_egg_open : "Model" 
+[ model(string): "Path" : "models/egg_open.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/elec_box.mdl" }) = prop_elec_box : "Model" 
+[ model(string): "Path" : "models/elec_box.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/elec_switch.mdl" }) = prop_elec_switch : "Model" 
+[ model(string): "Path" : "models/elec_switch.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/envtrash1.mdl" }) = prop_envtrash1 : "Model" 
+[ model(string): "Path" : "models/envtrash1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/f3_radiotower.mdl" }) = prop_f3_radiotower : "Model" 
+[ model(string): "Path" : "models/f3_radiotower.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/feather.mdl" }) = prop_feather : "Model" 
+[ model(string): "Path" : "models/feather.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fence_metal.mdl" }) = prop_fence_metal : "Model" 
+[ model(string): "Path" : "models/fence_metal.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fence_metal_blue.mdl" }) = prop_fence_metal_blue : "Model" 
+[ model(string): "Path" : "models/fence_metal_blue.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fence_metal_yellow.mdl" }) = prop_fence_metal_yellow : "Model" 
+[ model(string): "Path" : "models/fence_metal_yellow.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fern.mdl" }) = prop_fern : "Model" 
+[ model(string): "Path" : "models/fern.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fernf.mdl" }) = prop_fernf : "Model" 
+[ model(string): "Path" : "models/fernf.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fish01.mdl" }) = prop_fish01 : "Model" 
+[ model(string): "Path" : "models/fish01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fish02.mdl" }) = prop_fish02 : "Model" 
+[ model(string): "Path" : "models/fish02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/flakjacket.mdl" }) = prop_flakjacket : "Model" 
+[ model(string): "Path" : "models/flakjacket.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/flare.mdl" }) = prop_flare : "Model" 
+[ model(string): "Path" : "models/flare.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/flightsuit.mdl" }) = prop_flightsuit : "Model" 
+[ model(string): "Path" : "models/flightsuit.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/flightvest.mdl" }) = prop_flightvest : "Model" 
+[ model(string): "Path" : "models/flightvest.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/flower.mdl" }) = prop_flower : "Model" 
+[ model(string): "Path" : "models/flower.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/flo_grass2.mdl" }) = prop_flo_grass2 : "Model" 
+[ model(string): "Path" : "models/flo_grass2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fnv_ductape.mdl" }) = prop_fnv_ductape : "Model" 
+[ model(string): "Path" : "models/fnv_ductape.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fnv_toolbox.mdl" }) = prop_fnv_toolbox : "Model" 
+[ model(string): "Path" : "models/fnv_toolbox.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fnv_tree03.mdl" }) = prop_fnv_tree03 : "Model" 
+[ model(string): "Path" : "models/fnv_tree03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/forklift.mdl" }) = prop_forklift : "Model" 
+[ model(string): "Path" : "models/forklift.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fridgemesh.mdl" }) = prop_fridgemesh : "Model" 
+[ model(string): "Path" : "models/fridgemesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/fuelsilo01.mdl" }) = prop_fuelsilo01 : "Model" 
+[ model(string): "Path" : "models/fuelsilo01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/garbage2.mdl" }) = prop_garbage2 : "Model" 
+[ model(string): "Path" : "models/garbage2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gaspipe01_512.mdl" }) = prop_gaspipe01_512 : "Model" 
+[ model(string): "Path" : "models/gaspipe01_512.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/geo_scalpel.mdl" }) = prop_geo_scalpel : "Model" 
+[ model(string): "Path" : "models/geo_scalpel.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gibs_bio_leaf_all.mdl" }) = prop_gibs_bio_leaf_all : "Model" 
+[ model(string): "Path" : "models/gibs_bio_leaf_all.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gibs_bio_leaf_o.mdl" }) = prop_gibs_bio_leaf_o : "Model" 
+[ model(string): "Path" : "models/gibs_bio_leaf_o.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gibs_bio_leaf_r.mdl" }) = prop_gibs_bio_leaf_r : "Model" 
+[ model(string): "Path" : "models/gibs_bio_leaf_r.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gibs_cave.mdl" }) = prop_gibs_cave : "Model" 
+[ model(string): "Path" : "models/gibs_cave.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gibs_crate.mdl" }) = prop_gibs_crate : "Model" 
+[ model(string): "Path" : "models/gibs_crate.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gibs_duct_o.mdl" }) = prop_gibs_duct_o : "Model" 
+[ model(string): "Path" : "models/gibs_duct_o.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gibs_woodplank.mdl" }) = prop_gibs_woodplank : "Model" 
+[ model(string): "Path" : "models/gibs_woodplank.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gibs_woodplank_big.mdl" }) = prop_gibs_woodplank_big : "Model" 
+[ model(string): "Path" : "models/gibs_woodplank_big.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gibs_woodplank_medium.mdl" }) = prop_gibs_woodplank_medium : "Model" 
+[ model(string): "Path" : "models/gibs_woodplank_medium.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/grass.mdl" }) = prop_grass : "Model" 
+[ model(string): "Path" : "models/grass.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/grassa.mdl" }) = prop_grassa : "Model" 
+[ model(string): "Path" : "models/grassa.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/gus.mdl" }) = prop_gus : "Model" 
+[ model(string): "Path" : "models/gus.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hatch01.mdl" }) = prop_hatch01 : "Model" 
+[ model(string): "Path" : "models/hatch01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/head.mdl" }) = prop_head : "Model" 
+[ model(string): "Path" : "models/head.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/headcrab.mdl" }) = prop_headcrab : "Model" 
+[ model(string): "Path" : "models/headcrab.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hessi_baum01.mdl" }) = prop_hessi_baum01 : "Model" 
+[ model(string): "Path" : "models/hessi_baum01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hessi_baum02.mdl" }) = prop_hessi_baum02 : "Model" 
+[ model(string): "Path" : "models/hessi_baum02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hessi_baum04.mdl" }) = prop_hessi_baum04 : "Model" 
+[ model(string): "Path" : "models/hessi_baum04.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hgrunt.mdl" }) = prop_hgrunt : "Model" 
+[ model(string): "Path" : "models/hgrunt.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hgrunt01.mdl" }) = prop_hgrunt01 : "Model" 
+[ model(string): "Path" : "models/hgrunt01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hgrunt02.mdl" }) = prop_hgrunt02 : "Model" 
+[ model(string): "Path" : "models/hgrunt02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hgrunt03.mdl" }) = prop_hgrunt03 : "Model" 
+[ model(string): "Path" : "models/hgrunt03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hgruntt.mdl" }) = prop_hgruntt : "Model" 
+[ model(string): "Path" : "models/hgruntt.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/hl2_keypad.mdl" }) = prop_hl2_keypad : "Model" 
+[ model(string): "Path" : "models/hl2_keypad.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/holox32.mdl" }) = prop_holox32 : "Model" 
+[ model(string): "Path" : "models/holox32.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/holox64.mdl" }) = prop_holox64 : "Model" 
+[ model(string): "Path" : "models/holox64.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/labselevatordoormesh.mdl" }) = prop_labselevatordoormesh : "Model" 
+[ model(string): "Path" : "models/labselevatordoormesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/lab_chairs.mdl" }) = prop_lab_chairs : "Model" 
+[ model(string): "Path" : "models/lab_chairs.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/lantern.mdl" }) = prop_lantern : "Model" 
+[ model(string): "Path" : "models/lantern.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/light_flood.mdl" }) = prop_light_flood : "Model" 
+[ model(string): "Path" : "models/light_flood.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/light_sconce.mdl" }) = prop_light_sconce : "Model" 
+[ model(string): "Path" : "models/light_sconce.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/lv_bottle.mdl" }) = prop_lv_bottle : "Model" 
+[ model(string): "Path" : "models/lv_bottle.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/maniak_gmurikvmeshke.mdl" }) = prop_maniak_gmurikvmeshke : "Model" 
+[ model(string): "Path" : "models/maniak_gmurikvmeshke.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/me3_ChairUtility01.mdl" }) = prop_me3_ChairUtility01 : "Model" 
+[ model(string): "Path" : "models/me3_ChairUtility01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/me3_Dumpster01.mdl" }) = prop_me3_Dumpster01 : "Model" 
+[ model(string): "Path" : "models/me3_Dumpster01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/me3_Nor_JokerChair.mdl" }) = prop_me3_Nor_JokerChair : "Model" 
+[ model(string): "Path" : "models/me3_Nor_JokerChair.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/me3_TruckHeavy01.mdl" }) = prop_me3_TruckHeavy01 : "Model" 
+[ model(string): "Path" : "models/me3_TruckHeavy01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/medic1.mdl" }) = prop_medic1 : "Model" 
+[ model(string): "Path" : "models/medic1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/megaburgermachinemesh.mdl" }) = prop_megaburgermachinemesh : "Model" 
+[ model(string): "Path" : "models/megaburgermachinemesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/mex_blood_pump.mdl" }) = prop_mex_blood_pump : "Model" 
+[ model(string): "Path" : "models/mex_blood_pump.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/mex_mask_01.mdl" }) = prop_mex_mask_01 : "Model" 
+[ model(string): "Path" : "models/mex_mask_01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/mill_gears.mdl" }) = prop_mill_gears : "Model" 
+[ model(string): "Path" : "models/mill_gears.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/minebridgeplatformmesh.mdl" }) = prop_minebridgeplatformmesh : "Model" 
+[ model(string): "Path" : "models/minebridgeplatformmesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/nail.mdl" }) = prop_nail : "Model" 
+[ model(string): "Path" : "models/nail.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/navalgun.mdl" }) = prop_navalgun : "Model" 
+[ model(string): "Path" : "models/navalgun.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ncsa.mdl" }) = prop_ncsa : "Model" 
+[ model(string): "Path" : "models/ncsa.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ntdm1_crane20.mdl" }) = prop_ntdm1_crane20 : "Model" 
+[ model(string): "Path" : "models/ntdm1_crane20.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/null.mdl" }) = prop_null : "Model" 
+[ model(string): "Path" : "models/null.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/oar_holo_globe.mdl" }) = prop_oar_holo_globe : "Model" 
+[ model(string): "Path" : "models/oar_holo_globe.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/obj_firepipe_sw01.mdl" }) = prop_obj_firepipe_sw01 : "Model" 
+[ model(string): "Path" : "models/obj_firepipe_sw01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/orange.mdl" }) = prop_orange : "Model" 
+[ model(string): "Path" : "models/orange.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/oranget.mdl" }) = prop_oranget : "Model" 
+[ model(string): "Path" : "models/oranget.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/OutsideMetalGrille.mdl" }) = prop_OutsideMetalGrille : "Model" 
+[ model(string): "Path" : "models/OutsideMetalGrille.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/p2_electrical_boxes.mdl" }) = prop_p2_electrical_boxes : "Model" 
+[ model(string): "Path" : "models/p2_electrical_boxes.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pallet.mdl" }) = prop_pallet : "Model" 
+[ model(string): "Path" : "models/pallet.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pallet_with_bags.mdl" }) = prop_pallet_with_bags : "Model" 
+[ model(string): "Path" : "models/pallet_with_bags.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pallet_with_bags2.mdl" }) = prop_pallet_with_bags2 : "Model" 
+[ model(string): "Path" : "models/pallet_with_bags2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/palmtree.mdl" }) = prop_palmtree : "Model" 
+[ model(string): "Path" : "models/palmtree.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/panel_01.mdl" }) = prop_panel_01 : "Model" 
+[ model(string): "Path" : "models/panel_01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/panel_03.mdl" }) = prop_panel_03 : "Model" 
+[ model(string): "Path" : "models/panel_03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/panel_04.mdl" }) = prop_panel_04 : "Model" 
+[ model(string): "Path" : "models/panel_04.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pc_BigGenBox.mdl" }) = prop_pc_BigGenBox : "Model" 
+[ model(string): "Path" : "models/pc_BigGenBox.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pc_Detail3_Mesh.mdl" }) = prop_pc_Detail3_Mesh : "Model" 
+[ model(string): "Path" : "models/pc_Detail3_Mesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pc_Generator01_Mesh.mdl" }) = prop_pc_Generator01_Mesh : "Model" 
+[ model(string): "Path" : "models/pc_Generator01_Mesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pc_GroundTransformer_Mesh.mdl" }) = prop_pc_GroundTransformer_Mesh : "Model" 
+[ model(string): "Path" : "models/pc_GroundTransformer_Mesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pc_SK_CH_Pyro_Dino_FuelPack.mdl" }) = prop_pc_SK_CH_Pyro_Dino_FuelPack : "Model" 
+[ model(string): "Path" : "models/pc_SK_CH_Pyro_Dino_FuelPack.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pc_UB_MB_AirDuct.mdl" }) = prop_pc_UB_MB_AirDuct : "Model" 
+[ model(string): "Path" : "models/pc_UB_MB_AirDuct.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/PG-150.mdl" }) = prop_PG-150 : "Model" 
+[ model(string): "Path" : "models/PG-150.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pine_tree_snow.mdl" }) = prop_pine_tree_snow : "Model" 
+[ model(string): "Path" : "models/pine_tree_snow.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_bush.mdl" }) = prop_pi_bush : "Model" 
+[ model(string): "Path" : "models/pi_bush.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_fern.mdl" }) = prop_pi_fern : "Model" 
+[ model(string): "Path" : "models/pi_fern.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_outlamp1.mdl" }) = prop_pi_outlamp1 : "Model" 
+[ model(string): "Path" : "models/pi_outlamp1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_shrub.mdl" }) = prop_pi_shrub : "Model" 
+[ model(string): "Path" : "models/pi_shrub.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_stlamp.mdl" }) = prop_pi_stlamp : "Model" 
+[ model(string): "Path" : "models/pi_stlamp.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_tree.mdl" }) = prop_pi_tree : "Model" 
+[ model(string): "Path" : "models/pi_tree.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_tree1.mdl" }) = prop_pi_tree1 : "Model" 
+[ model(string): "Path" : "models/pi_tree1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_tree2.mdl" }) = prop_pi_tree2 : "Model" 
+[ model(string): "Path" : "models/pi_tree2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_tree3.mdl" }) = prop_pi_tree3 : "Model" 
+[ model(string): "Path" : "models/pi_tree3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_treeb.mdl" }) = prop_pi_treeb : "Model" 
+[ model(string): "Path" : "models/pi_treeb.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pi_twig.mdl" }) = prop_pi_twig : "Model" 
+[ model(string): "Path" : "models/pi_twig.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/poruchen_2_old.mdl" }) = prop_poruchen_2_old : "Model" 
+[ model(string): "Path" : "models/poruchen_2_old.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/powerbox.mdl" }) = prop_powerbox : "Model" 
+[ model(string): "Path" : "models/powerbox.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/powerbox2.mdl" }) = prop_powerbox2 : "Model" 
+[ model(string): "Path" : "models/powerbox2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/powerswitch.mdl" }) = prop_powerswitch : "Model" 
+[ model(string): "Path" : "models/powerswitch.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/preatorian.mdl" }) = prop_preatorian : "Model" 
+[ model(string): "Path" : "models/preatorian.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pred_plant.mdl" }) = prop_pred_plant : "Model" 
+[ model(string): "Path" : "models/pred_plant.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/pshell.mdl" }) = prop_pshell : "Model" 
+[ model(string): "Path" : "models/pshell.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/qloader.mdl" }) = prop_qloader : "Model" 
+[ model(string): "Path" : "models/qloader.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/qtruck.mdl" }) = prop_qtruck : "Model" 
+[ model(string): "Path" : "models/qtruck.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/queen.mdl" }) = prop_queen : "Model" 
+[ model(string): "Path" : "models/queen.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/queen_standby.mdl" }) = prop_queen_standby : "Model" 
+[ model(string): "Path" : "models/queen_standby.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ResupplyRationCans.mdl" }) = prop_ResupplyRationCans : "Model" 
+[ model(string): "Path" : "models/ResupplyRationCans.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/robocop.mdl" }) = prop_robocop : "Model" 
+[ model(string): "Path" : "models/robocop.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/robotson01.mdl" }) = prop_robotson01 : "Model" 
+[ model(string): "Path" : "models/robotson01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/robotson02.mdl" }) = prop_robotson02 : "Model" 
+[ model(string): "Path" : "models/robotson02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/rshell.mdl" }) = prop_rshell : "Model" 
+[ model(string): "Path" : "models/rshell.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/rshell_big.mdl" }) = prop_rshell_big : "Model" 
+[ model(string): "Path" : "models/rshell_big.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/runner.mdl" }) = prop_runner : "Model" 
+[ model(string): "Path" : "models/runner.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/sand_elec_box01.mdl" }) = prop_sand_elec_box01 : "Model" 
+[ model(string): "Path" : "models/sand_elec_box01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scale.mdl" }) = prop_scale : "Model" 
+[ model(string): "Path" : "models/scale.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientist.mdl" }) = prop_scientist : "Model" 
+[ model(string): "Path" : "models/scientist.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientist01.mdl" }) = prop_scientist01 : "Model" 
+[ model(string): "Path" : "models/scientist01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientist02.mdl" }) = prop_scientist02 : "Model" 
+[ model(string): "Path" : "models/scientist02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientist03.mdl" }) = prop_scientist03 : "Model" 
+[ model(string): "Path" : "models/scientist03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientist04.mdl" }) = prop_scientist04 : "Model" 
+[ model(string): "Path" : "models/scientist04.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientist05.mdl" }) = prop_scientist05 : "Model" 
+[ model(string): "Path" : "models/scientist05.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientist06.mdl" }) = prop_scientist06 : "Model" 
+[ model(string): "Path" : "models/scientist06.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientist07.mdl" }) = prop_scientist07 : "Model" 
+[ model(string): "Path" : "models/scientist07.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientistf.mdl" }) = prop_scientistf : "Model" 
+[ model(string): "Path" : "models/scientistf.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scientistt.mdl" }) = prop_scientistt : "Model" 
+[ model(string): "Path" : "models/scientistt.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/scr_butts.mdl" }) = prop_scr_butts : "Model" 
+[ model(string): "Path" : "models/scr_butts.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/security.mdl" }) = prop_security : "Model" 
+[ model(string): "Path" : "models/security.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/security01.mdl" }) = prop_security01 : "Model" 
+[ model(string): "Path" : "models/security01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/security02.mdl" }) = prop_security02 : "Model" 
+[ model(string): "Path" : "models/security02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/security03.mdl" }) = prop_security03 : "Model" 
+[ model(string): "Path" : "models/security03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/security04.mdl" }) = prop_security04 : "Model" 
+[ model(string): "Path" : "models/security04.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/sentry.mdl" }) = prop_sentry : "Model" 
+[ model(string): "Path" : "models/sentry.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/sentryT.mdl" }) = prop_sentryT : "Model" 
+[ model(string): "Path" : "models/sentryT.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/server_cabinet01_mat1.mdl" }) = prop_server_cabinet01_mat1 : "Model" 
+[ model(string): "Path" : "models/server_cabinet01_mat1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ship_human.mdl" }) = prop_ship_human : "Model" 
+[ model(string): "Path" : "models/ship_human.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/shotgunshell.mdl" }) = prop_shotgunshell : "Model" 
+[ model(string): "Path" : "models/shotgunshell.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/silo_doorjack.mdl" }) = prop_silo_doorjack : "Model" 
+[ model(string): "Path" : "models/silo_doorjack.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/silo_monitor.mdl" }) = prop_silo_monitor : "Model" 
+[ model(string): "Path" : "models/silo_monitor.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/silo_shockspring.mdl" }) = prop_silo_shockspring : "Model" 
+[ model(string): "Path" : "models/silo_shockspring.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/singlepanelmesh.mdl" }) = prop_singlepanelmesh : "Model" 
+[ model(string): "Path" : "models/singlepanelmesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/sleeping_bag2.mdl" }) = prop_sleeping_bag2 : "Model" 
+[ model(string): "Path" : "models/sleeping_bag2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/snow_tree.mdl" }) = prop_snow_tree : "Model" 
+[ model(string): "Path" : "models/snow_tree.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/space_a_antenna01.mdl" }) = prop_space_a_antenna01 : "Model" 
+[ model(string): "Path" : "models/space_a_antenna01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/space_a_shuttle02.mdl" }) = prop_space_a_shuttle02 : "Model" 
+[ model(string): "Path" : "models/space_a_shuttle02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/static_model.mdl" }) = prop_static_model : "Model" 
+[ model(string): "Path" : "models/static_model.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/stepladder.mdl" }) = prop_stepladder : "Model" 
+[ model(string): "Path" : "models/stepladder.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/sterilizer.mdl" }) = prop_sterilizer : "Model" 
+[ model(string): "Path" : "models/sterilizer.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/support1.mdl" }) = prop_support1 : "Model" 
+[ model(string): "Path" : "models/support1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/support2.mdl" }) = prop_support2 : "Model" 
+[ model(string): "Path" : "models/support2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/support3.mdl" }) = prop_support3 : "Model" 
+[ model(string): "Path" : "models/support3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/surgical_tray.mdl" }) = prop_surgical_tray : "Model" 
+[ model(string): "Path" : "models/surgical_tray.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/surveillance_cam.mdl" }) = prop_surveillance_cam : "Model" 
+[ model(string): "Path" : "models/surveillance_cam.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/synth.mdl" }) = prop_synth : "Model" 
+[ model(string): "Path" : "models/synth.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/synupmachinemesh.mdl" }) = prop_synupmachinemesh : "Model" 
+[ model(string): "Path" : "models/synupmachinemesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/tank04.mdl" }) = prop_tank04 : "Model" 
+[ model(string): "Path" : "models/tank04.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/toadgibs.mdl" }) = prop_toadgibs : "Model" 
+[ model(string): "Path" : "models/toadgibs.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/tracker.mdl" }) = prop_tracker : "Model" 
+[ model(string): "Path" : "models/tracker.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/trapdoormesh.mdl" }) = prop_trapdoormesh : "Model" 
+[ model(string): "Path" : "models/trapdoormesh.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/trash01.mdl" }) = prop_trash01 : "Model" 
+[ model(string): "Path" : "models/trash01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/trash07.mdl" }) = prop_trash07 : "Model" 
+[ model(string): "Path" : "models/trash07.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/trash08.mdl" }) = prop_trash08 : "Model" 
+[ model(string): "Path" : "models/trash08.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/trash1.mdl" }) = prop_trash1 : "Model" 
+[ model(string): "Path" : "models/trash1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/trash2.mdl" }) = prop_trash2 : "Model" 
+[ model(string): "Path" : "models/trash2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/trash3.mdl" }) = prop_trash3 : "Model" 
+[ model(string): "Path" : "models/trash3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/trash4.mdl" }) = prop_trash4 : "Model" 
+[ model(string): "Path" : "models/trash4.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/tree06.mdl" }) = prop_tree06 : "Model" 
+[ model(string): "Path" : "models/tree06.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/tree1.mdl" }) = prop_tree1 : "Model" 
+[ model(string): "Path" : "models/tree1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/tree8a.mdl" }) = prop_tree8a : "Model" 
+[ model(string): "Path" : "models/tree8a.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/tree8aa.mdl" }) = prop_tree8aa : "Model" 
+[ model(string): "Path" : "models/tree8aa.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/tree8abig.mdl" }) = prop_tree8abig : "Model" 
+[ model(string): "Path" : "models/tree8abig.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/tree_1.mdl" }) = prop_tree_1 : "Model" 
+[ model(string): "Path" : "models/tree_1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/truck.mdl" }) = prop_truck : "Model" 
+[ model(string): "Path" : "models/truck.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/truck_large-brown.mdl" }) = prop_truck_large-brown : "Model" 
+[ model(string): "Path" : "models/truck_large-brown.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/turret.mdl" }) = prop_turret : "Model" 
+[ model(string): "Path" : "models/turret.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/uc_pipe03.mdl" }) = prop_uc_pipe03 : "Model" 
+[ model(string): "Path" : "models/uc_pipe03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/valvewheel001.mdl" }) = prop_valvewheel001 : "Model" 
+[ model(string): "Path" : "models/valvewheel001.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/vts_knopki.mdl" }) = prop_vts_knopki : "Model" 
+[ model(string): "Path" : "models/vts_knopki.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/whabun01.mdl" }) = prop_whabun01 : "Model" 
+[ model(string): "Path" : "models/whabun01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/whabun02.mdl" }) = prop_whabun02 : "Model" 
+[ model(string): "Path" : "models/whabun02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/winch_deck.mdl" }) = prop_winch_deck : "Model" 
+[ model(string): "Path" : "models/winch_deck.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/wind.mdl" }) = prop_wind : "Model" 
+[ model(string): "Path" : "models/wind.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/winebottle.mdl" }) = prop_winebottle : "Model" 
+[ model(string): "Path" : "models/winebottle.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/WiringOrange.mdl" }) = prop_WiringOrange : "Model" 
+[ model(string): "Path" : "models/WiringOrange.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/wood.mdl" }) = prop_wood : "Model" 
+[ model(string): "Path" : "models/wood.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/workspace002.mdl" }) = prop_workspace002 : "Model" 
+[ model(string): "Path" : "models/workspace002.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/workspace003.mdl" }) = prop_workspace003 : "Model" 
+[ model(string): "Path" : "models/workspace003.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/xeno_q.mdl" }) = prop_xeno_q : "Model" 
+[ model(string): "Path" : "models/xeno_q.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/xen_smallgrass12.mdl" }) = prop_xen_smallgrass12 : "Model" 
+[ model(string): "Path" : "models/xen_smallgrass12.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ze_machine.mdl" }) = prop_ze_machine : "Model" 
+[ model(string): "Path" : "models/ze_machine.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ze_solar.mdl" }) = prop_ze_solar : "Model" 
+[ model(string): "Path" : "models/ze_solar.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ze_streetlight.mdl" }) = prop_ze_streetlight : "Model" 
+[ model(string): "Path" : "models/ze_streetlight.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ze_streetlight01.mdl" }) = prop_ze_streetlight01 : "Model" 
+[ model(string): "Path" : "models/ze_streetlight01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ze_tank01.mdl" }) = prop_ze_tank01 : "Model" 
+[ model(string): "Path" : "models/ze_tank01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ze_tank01_r.mdl" }) = prop_ze_tank01_r : "Model" 
+[ model(string): "Path" : "models/ze_tank01_r.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ze_tank02.mdl" }) = prop_ze_tank02 : "Model" 
+[ model(string): "Path" : "models/ze_tank02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ze_tank03.mdl" }) = prop_ze_tank03 : "Model" 
+[ model(string): "Path" : "models/ze_tank03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ze_vent03.mdl" }) = prop_ze_vent03 : "Model" 
+[ model(string): "Path" : "models/ze_vent03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/zombie.mdl" }) = prop_zombie : "Model" 
+[ model(string): "Path" : "models/zombie.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/zombie01.mdl" }) = prop_zombie01 : "Model" 
+[ model(string): "Path" : "models/zombie01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/zombie02.mdl" }) = prop_zombie02 : "Model" 
+[ model(string): "Path" : "models/zombie02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/zombie03.mdl" }) = prop_zombie03 : "Model" 
+[ model(string): "Path" : "models/zombie03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/zombiegibs1.mdl" }) = prop_zombiegibs1 : "Model" 
+[ model(string): "Path" : "models/zombiegibs1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/zombiet.mdl" }) = prop_zombiet : "Model" 
+[ model(string): "Path" : "models/zombiet.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/zps_pipes.mdl" }) = prop_zps_pipes : "Model" 
+[ model(string): "Path" : "models/zps_pipes.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/zps_radar.mdl" }) = prop_zps_radar : "Model" 
+[ model(string): "Path" : "models/zps_radar.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/zsh_turret.mdl" }) = prop_zsh_turret : "Model" 
+[ model(string): "Path" : "models/zsh_turret.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/0mystic/Bush1.mdl" }) = prop_Bush1 : "Model" 
+[ model(string): "Path" : "models/0mystic/Bush1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/0mystic/peri_tree1.mdl" }) = prop_peri_tree1 : "Model" 
+[ model(string): "Path" : "models/0mystic/peri_tree1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/0mystic/tree.mdl" }) = prop_tree : "Model" 
+[ model(string): "Path" : "models/0mystic/tree.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/0mystic/tree2.mdl" }) = prop_tree2 : "Model" 
+[ model(string): "Path" : "models/0mystic/tree2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/0mystic/tree_01.mdl" }) = prop_tree_01 : "Model" 
+[ model(string): "Path" : "models/0mystic/tree_01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/2010_Christmas/qizhi.mdl" }) = prop_qizhi : "Model" 
+[ model(string): "Path" : "models/2010_Christmas/qizhi.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/2010_Christmas/tree_cherry.mdl" }) = prop_tree_cherry : "Model" 
+[ model(string): "Path" : "models/2010_Christmas/tree_cherry.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/bats.mdl" }) = prop_bats : "Model" 
+[ model(string): "Path" : "models/abu/bats.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/bush_noleaves.mdl" }) = prop_bush_noleaves : "Model" 
+[ model(string): "Path" : "models/abu/bush_noleaves.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/butterfly.mdl" }) = prop_butterfly : "Model" 
+[ model(string): "Path" : "models/abu/butterfly.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/cat_lick.mdl" }) = prop_cat_lick : "Model" 
+[ model(string): "Path" : "models/abu/cat_lick.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/GardenRock01.mdl" }) = prop_GardenRock01 : "Model" 
+[ model(string): "Path" : "models/abu/GardenRock01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/kamen5.mdl" }) = prop_kamen5 : "Model" 
+[ model(string): "Path" : "models/abu/kamen5.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/kz-rushr.mdl" }) = prop_kz-rushr : "Model" 
+[ model(string): "Path" : "models/abu/kz-rushr.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/logoabubas.mdl" }) = prop_logoabubas : "Model" 
+[ model(string): "Path" : "models/abu/logoabubas.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/p2_branches.mdl" }) = prop_p2_branches : "Model" 
+[ model(string): "Path" : "models/abu/p2_branches.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/p2_vines1.mdl" }) = prop_p2_vines1 : "Model" 
+[ model(string): "Path" : "models/abu/p2_vines1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/s_busherry.mdl" }) = prop_s_busherry : "Model" 
+[ model(string): "Path" : "models/abu/s_busherry.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/xjrotation.mdl" }) = prop_xjrotation : "Model" 
+[ model(string): "Path" : "models/abu/xjrotation.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/1.mdl" }) = prop_1 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/bugor.mdl" }) = prop_bugor : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/bugor.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/bugor2.mdl" }) = prop_bugor2 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/bugor2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/cave1.mdl" }) = prop_cave1 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/cave1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/cave2.mdl" }) = prop_cave2 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/cave2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/cave3.mdl" }) = prop_cave3 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/cave3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/cave4.mdl" }) = prop_cave4 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/cave4.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/cave5.mdl" }) = prop_cave5 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/cave5.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/cavesand.mdl" }) = prop_cavesand : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/cavesand.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/cub.mdl" }) = prop_cub : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/cub.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/cub146.mdl" }) = prop_cub146 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/cub146.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/hball1.mdl" }) = prop_hball1 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/hball1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/hball2.mdl" }) = prop_hball2 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/hball2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/hball3.mdl" }) = prop_hball3 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/hball3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/hball4.mdl" }) = prop_hball4 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/hball4.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/hbhamma.mdl" }) = prop_hbhamma : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/hbhamma.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/kamen.mdl" }) = prop_kamen : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/kamen.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/kamen2.mdl" }) = prop_kamen2 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/kamen2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/lastcave.mdl" }) = prop_lastcave : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/lastcave.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/lastpart.mdl" }) = prop_lastpart : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/lastpart.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/lastroom12.mdl" }) = prop_lastroom12 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/lastroom12.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/lian.mdl" }) = prop_lian : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/lian.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/lian4.mdl" }) = prop_lian4 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/lian4.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/logoabu.mdl" }) = prop_logoabu : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/logoabu.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/piramida.mdl" }) = prop_piramida : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/piramida.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/rock.mdl" }) = prop_rock : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/rock.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/sand.mdl" }) = prop_sand : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/sand.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/slide1.mdl" }) = prop_slide1 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/slide1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/slide2.mdl" }) = prop_slide2 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/slide2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/slide3.mdl" }) = prop_slide3 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/slide3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/slide4.mdl" }) = prop_slide4 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/slide4.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/slide5.mdl" }) = prop_slide5 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/slide5.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/slide6.mdl" }) = prop_slide6 : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/slide6.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/water.mdl" }) = prop_water : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/water.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/abu/hb_hamma/yama.mdl" }) = prop_yama : "Model" 
+[ model(string): "Path" : "models/abu/hb_hamma/yama.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/adv_s/tol_tree.mdl" }) = prop_tol_tree : "Model" 
+[ model(string): "Path" : "models/adv_s/tol_tree.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/ae/palm1A.mdl" }) = prop_palm1A : "Model" 
+[ model(string): "Path" : "models/ae/palm1A.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/aim_ice/jed_fullpine_large.mdl" }) = prop_jed_fullpine_large : "Model" 
+[ model(string): "Path" : "models/aim_ice/jed_fullpine_large.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/butterfly.mdl" }) = prop_butterfly_d2 : "Model" 
+[ model(string): "Path" : "models/alei/butterfly.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_fakel.mdl" }) = prop_cd_fakel : "Model" 
+[ model(string): "Path" : "models/alei/cd_fakel.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_flower.mdl" }) = prop_cd_flower : "Model" 
+[ model(string): "Path" : "models/alei/cd_flower.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_glass6.mdl" }) = prop_cd_glass6 : "Model" 
+[ model(string): "Path" : "models/alei/cd_glass6.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_glass7.mdl" }) = prop_cd_glass7 : "Model" 
+[ model(string): "Path" : "models/alei/cd_glass7.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_grass1.mdl" }) = prop_cd_grass1 : "Model" 
+[ model(string): "Path" : "models/alei/cd_grass1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_grass6.mdl" }) = prop_cd_grass6 : "Model" 
+[ model(string): "Path" : "models/alei/cd_grass6.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_grass7.mdl" }) = prop_cd_grass7 : "Model" 
+[ model(string): "Path" : "models/alei/cd_grass7.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_mt.mdl" }) = prop_cd_mt : "Model" 
+[ model(string): "Path" : "models/alei/cd_mt.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_qiao.mdl" }) = prop_cd_qiao : "Model" 
+[ model(string): "Path" : "models/alei/cd_qiao.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_small.mdl" }) = prop_cd_small : "Model" 
+[ model(string): "Path" : "models/alei/cd_small.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_tree3.mdl" }) = prop_cd_tree3 : "Model" 
+[ model(string): "Path" : "models/alei/cd_tree3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/cd_tree4.mdl" }) = prop_cd_tree4 : "Model" 
+[ model(string): "Path" : "models/alei/cd_tree4.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/dragonfly.mdl" }) = prop_dragonfly : "Model" 
+[ model(string): "Path" : "models/alei/dragonfly.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/palm1.mdl" }) = prop_palm1 : "Model" 
+[ model(string): "Path" : "models/alei/palm1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/palm2.mdl" }) = prop_palm2 : "Model" 
+[ model(string): "Path" : "models/alei/palm2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/palm3.mdl" }) = prop_palm3 : "Model" 
+[ model(string): "Path" : "models/alei/palm3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/alei/plaka_fernofdoom.mdl" }) = prop_plaka_fernofdoom : "Model" 
+[ model(string): "Path" : "models/alei/plaka_fernofdoom.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bhop_mann/arbolito.mdl" }) = prop_arbolito : "Model" 
+[ model(string): "Path" : "models/bhop_mann/arbolito.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bzm_farero/bg_fishingboat01.mdl" }) = prop_bg_fishingboat01 : "Model" 
+[ model(string): "Path" : "models/bzm_farero/bg_fishingboat01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bzm_farero/bg_lighthouse01.mdl" }) = prop_bg_lighthouse01 : "Model" 
+[ model(string): "Path" : "models/bzm_farero/bg_lighthouse01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bzm_farero/bg_lighthouse02.mdl" }) = prop_bg_lighthouse02 : "Model" 
+[ model(string): "Path" : "models/bzm_farero/bg_lighthouse02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bzm_farero/bg_lighthouse03.mdl" }) = prop_bg_lighthouse03 : "Model" 
+[ model(string): "Path" : "models/bzm_farero/bg_lighthouse03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bzm_farero/bg_mulmak01.mdl" }) = prop_bg_mulmak01 : "Model" 
+[ model(string): "Path" : "models/bzm_farero/bg_mulmak01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/bzm_metro/metro_elec_switch.mdl" }) = prop_metro_elec_switch : "Model" 
+[ model(string): "Path" : "models/bzm_metro/metro_elec_switch.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_bridge.mdl" }) = prop_cd_bridge : "Model" 
+[ model(string): "Path" : "models/cd/cd_bridge.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_came.mdl" }) = prop_cd_came : "Model" 
+[ model(string): "Path" : "models/cd/cd_came.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_cao1.mdl" }) = prop_cd_cao1 : "Model" 
+[ model(string): "Path" : "models/cd/cd_cao1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_df.mdl" }) = prop_cd_df : "Model" 
+[ model(string): "Path" : "models/cd/cd_df.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dl.mdl" }) = prop_cd_dl : "Model" 
+[ model(string): "Path" : "models/cd/cd_dl.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dl2.mdl" }) = prop_cd_dl2 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dl2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dl3.mdl" }) = prop_cd_dl3 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dl3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_fired.mdl" }) = prop_cd_fired : "Model" 
+[ model(string): "Path" : "models/cd/cd_fired.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_flower.mdl" }) = prop_cd_flower_d2 : "Model" 
+[ model(string): "Path" : "models/cd/cd_flower.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_grass1.mdl" }) = prop_cd_grass1_d2 : "Model" 
+[ model(string): "Path" : "models/cd/cd_grass1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_mtree01.mdl" }) = prop_cd_mtree01 : "Model" 
+[ model(string): "Path" : "models/cd/cd_mtree01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_mtree03.mdl" }) = prop_cd_mtree03 : "Model" 
+[ model(string): "Path" : "models/cd/cd_mtree03.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_mtree04.mdl" }) = prop_cd_mtree04 : "Model" 
+[ model(string): "Path" : "models/cd/cd_mtree04.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_mtree05.mdl" }) = prop_cd_mtree05 : "Model" 
+[ model(string): "Path" : "models/cd/cd_mtree05.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_mtree06.mdl" }) = prop_cd_mtree06 : "Model" 
+[ model(string): "Path" : "models/cd/cd_mtree06.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_mtree07.mdl" }) = prop_cd_mtree07 : "Model" 
+[ model(string): "Path" : "models/cd/cd_mtree07.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_mtree08.mdl" }) = prop_cd_mtree08 : "Model" 
+[ model(string): "Path" : "models/cd/cd_mtree08.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_mtree09.mdl" }) = prop_cd_mtree09 : "Model" 
+[ model(string): "Path" : "models/cd/cd_mtree09.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_rock02.mdl" }) = prop_cd_rock02 : "Model" 
+[ model(string): "Path" : "models/cd/cd_rock02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_sakura.mdl" }) = prop_cd_sakura : "Model" 
+[ model(string): "Path" : "models/cd/cd_sakura.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_statue01.mdl" }) = prop_cd_statue01 : "Model" 
+[ model(string): "Path" : "models/cd/cd_statue01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/torch.mdl" }) = prop_torch : "Model" 
+[ model(string): "Path" : "models/cd/torch.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cdjzt.mdl" }) = prop_cdjzt : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cdjzt.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cdjzt01.mdl" }) = prop_cdjzt01 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cdjzt01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cdjzt02.mdl" }) = prop_cdjzt02 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cdjzt02.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cd_anubis1.mdl" }) = prop_cd_anubis1 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cd_anubis1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cd_anubis2.mdl" }) = prop_cd_anubis2 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cd_anubis2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cd_farao.mdl" }) = prop_cd_farao : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cd_farao.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cd_palm1.mdl" }) = prop_cd_palm1 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cd_palm1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cd_palm2.mdl" }) = prop_cd_palm2 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cd_palm2.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cd_palm3.mdl" }) = prop_cd_palm3 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cd_palm3.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cd_torch01.mdl" }) = prop_cd_torch01 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cd_torch01.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cd_woods.mdl" }) = prop_cd_woods : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cd_woods.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/cd_zw1.mdl" }) = prop_cd_zw1 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/cd_zw1.mdl"]
+
+@PointClass base(Targetname, Angles, FrameRate, RenderFields, ConvertProp) size(-8 -8 -8, 8 8 8) color(204 0 255) model({ "path": "models/cd/cd_dust/sphinx01.mdl" }) = prop_sphinx01 : "Model" 
+[ model(string): "Path" : "models/cd/cd_dust/sphinx01.mdl"]
+

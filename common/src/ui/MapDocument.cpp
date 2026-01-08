@@ -31,6 +31,8 @@
 #include "mdl/GameFactory.h"
 #include "mdl/LinkedGroupUtils.h"
 #include "mdl/Map.h"
+#include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/MaterialManager.h"
 #include "mdl/PortalFile.h"
 #include "mdl/PushSelection.h"
@@ -88,6 +90,39 @@ mdl::Map& MapDocument::map()
 const mdl::Map& MapDocument::map() const
 {
   return *m_map;
+}
+
+mdl::EntityNode* MapDocument::createSingleBrushEntity(
+  mdl::BrushNode* brushNode, const mdl::Entity& templateEntity)
+{
+  auto& map = *m_map;
+
+  auto entity = templateEntity;
+  auto* entityNode = new mdl::EntityNode{std::move(entity)};
+
+  auto transaction = mdl::Transaction{map, "Create Entity from Template"};
+  mdl::deselectAll(map);
+
+  if (mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}}).empty())
+  {
+    transaction.cancel();
+    return nullptr;
+  }
+
+  if (!mdl::reparentNodes(map, {{entityNode, {brushNode}}}))
+  {
+    transaction.cancel();
+    return nullptr;
+  }
+
+  mdl::selectNodes(map, {brushNode});
+
+  if (!transaction.commit())
+  {
+    return nullptr;
+  }
+
+  return entityNode;
 }
 
 
