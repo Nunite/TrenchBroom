@@ -33,6 +33,14 @@
         -   **Cause**: Incorrect conversion from `std::filesystem::path` to `QString` using `generic_string()` (ANSI on Windows) instead of `generic_wstring()` (UTF-16). `QString::fromStdString` expected UTF-8.
         -   **Fix**: Modified `common/src/ui/KeyboardShortcutModel.cpp` to use `io::pathAsGenericQString`, which handles platform-specific path string conversion correctly.
 
+    ### New Features
+    1.  **Language Selection in Preferences**:
+        -   Added a new "Language" tab to the Preferences dialog.
+        -   Created `common/src/ui/LanguagePreferencePane.h/cpp` based on the implementation in the `merge` directory.
+        -   Updated `common/src/ui/PreferenceDialog.cpp` to include the new pane and icon.
+        -   Created `app/resources/graphics/images/LanguagePreferences.svg` (copied from `GeneralPreferences.svg`).
+        -   Updated `common/CMakeLists.txt` to include the new source file.
+
 ### Next Steps
 -   Verify the build succeeds with the applied fixes.
 -   Launch the application to verify Chinese interface is loaded.

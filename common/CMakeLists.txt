@@ -410,6 +410,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/IssueBrowser.cpp
         ${COMMON_SOURCE_DIR}/ui/IssueBrowserView.cpp
         ${COMMON_SOURCE_DIR}/ui/KeyboardPreferencePane.cpp
+        ${COMMON_SOURCE_DIR}/ui/LanguagePreferencePane.cpp
         ${COMMON_SOURCE_DIR}/ui/KeyboardShortcutItemDelegate.cpp
         ${COMMON_SOURCE_DIR}/ui/KeyboardShortcutModel.cpp
         ${COMMON_SOURCE_DIR}/ui/KeySequenceEdit.cpp
