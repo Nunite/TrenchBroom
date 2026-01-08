@@ -6,6 +6,7 @@ on:
       - '**'
     branches:
       - master
+      - upstream-test
   pull_request:
 
 permissions:
