@@ -88,14 +88,14 @@ auto makeBrushes()
   tempRenderer.validate();
   tempRenderer.clear();
 
-  return std::tuple{std::move(result), std::move(materials)};
+  return std::tuple{std::move(materials), std::move(result)};
 }
 
 } // namespace
 
 TEST_CASE("BrushRendererBenchmark.benchBrushRenderer")
 {
-  auto [brushes, materials] = makeBrushes();
+  [[maybe_unused]] auto [materials, brushes] = makeBrushes();
 
   BrushRenderer r;
 
