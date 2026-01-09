@@ -213,8 +213,8 @@ void BoxSelectionDragDelegate::end(
     auto allNodes = std::vector<mdl::Node*>{};
     if (auto* world = m_map.world()) {
         world->accept(kdl::overload(
-            [&](auto&& thisLambda, mdl::WorldNode* world) { 
-                world->visitChildren(thisLambda);
+            [&](auto&& thisLambda, mdl::WorldNode* worldNode) { 
+                worldNode->visitChildren(thisLambda);
             },
             [&](auto&& thisLambda, mdl::LayerNode* layer) {
                 layer->visitChildren(thisLambda);
