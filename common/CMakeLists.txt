@@ -474,6 +474,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartPropertyEditorManager.cpp
         ${COMMON_SOURCE_DIR}/ui/SmartWadEditor.cpp
+        ${COMMON_SOURCE_DIR}/ui/SmartModelEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/SpinControl.cpp
         ${COMMON_SOURCE_DIR}/ui/Splitter.cpp
         ${COMMON_SOURCE_DIR}/ui/SwitchableMapViewContainer.cpp

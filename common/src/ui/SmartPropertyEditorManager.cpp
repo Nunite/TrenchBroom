@@ -32,6 +32,7 @@
 #include "ui/SmartFlagsEditor.h"
 #include "ui/SmartPropertyEditor.h"
 #include "ui/SmartWadEditor.h"
+#include "ui/SmartModelEditor.h"
 
 #include "kdl/functional.h"
 #include "kdl/string_compare.h"
@@ -137,6 +138,9 @@ void SmartPropertyEditorManager::createEditors()
       makeSmartTypeEditorMatcher<mdl::PropertyValueTypes::Color<RgbB>>(),
       makeSmartTypeEditorMatcher<mdl::PropertyValueTypes::Color<Rgb>>()),
     new SmartColorEditor{m_map, this});
+  registerEditor(
+    makeSmartPropertyEditorKeyMatcher({"model"}),
+    new SmartModelEditor{m_map, this});
   registerEditor(
     [](const auto&, const auto&) { return true; },
     new SmartDefaultPropertyEditor{m_map, this});
