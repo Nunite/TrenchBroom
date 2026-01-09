@@ -201,6 +201,7 @@ extern Preference<bool> ShowSoftMapBounds;
 // Editor context
 extern Preference<bool> ShowPointEntities;
 extern Preference<bool> ShowBrushes;
+extern Preference<bool> PrefixWorldspawnHeaderOnCopy;
 
 QString entityLinkModeAll();
 QString entityLinkModeTransitive();

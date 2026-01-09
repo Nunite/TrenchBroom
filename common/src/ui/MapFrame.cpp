@@ -52,6 +52,7 @@
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
+#include "mdl/EntityProperties.h"
 #include "mdl/Game.h"
 #include "mdl/GameFactory.h"
 #include "mdl/Grid.h"
@@ -1337,8 +1338,68 @@ void MapFrame::copyToClipboard()
                    : selection.hasBrushFaces() ? serializeSelectedBrushFaces(map)
                                                : std::string{};
 
+  auto finalStr = str;
+
+  if (pref(Preferences::PrefixWorldspawnHeaderOnCopy))
+  {
+    const auto& selected = map.selection();
+
+    auto shouldPrefix = false;
+    if (selected.hasEntities() || selected.hasGroups())
+    {
+      shouldPrefix = true;
+    }
+    else if (selected.hasOnlyBrushes())
+    {
+      const auto& brushes = selected.brushes;
+      auto allUnderNonWorldEntity = !brushes.empty();
+      for (const auto* brushNode : brushes)
+      {
+        const auto* parent = dynamic_cast<const mdl::EntityNode*>(brushNode->parent());
+        if (parent == nullptr || mdl::isWorldspawn(parent->entity().classname()))
+        {
+          allUnderNonWorldEntity = false;
+          break;
+        }
+      }
+      shouldPrefix = allUnderNonWorldEntity;
+    }
+
+    if (shouldPrefix)
+    {
+      const auto& worldEntity = map.world()->entity();
+      auto escapeQuotes = [](const std::string& s) {
+        auto out = std::string{};
+        out.reserve(s.size());
+        for (const auto c : s)
+        {
+          if (c == '"')
+          {
+            out += "\\\"";
+          }
+          else
+          {
+            out += c;
+          }
+        }
+        return out;
+      };
+
+      auto ss = std::stringstream{};
+      ss << "{\n";
+      for (const auto& p : worldEntity.properties())
+      {
+        ss << '"' << escapeQuotes(p.key()) << "\" \"" << escapeQuotes(p.value())
+           << "\"\n";
+      }
+      ss << "}\n";
+
+      finalStr = ss.str() + str;
+    }
+  }
+
   auto* clipboard = QApplication::clipboard();
-  clipboard->setText(mapStringToUnicode(map.encoding(), str));
+  clipboard->setText(mapStringToUnicode(map.encoding(), finalStr));
 }
 
 bool MapFrame::canCutSelection() const

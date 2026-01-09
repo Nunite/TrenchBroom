@@ -4,23 +4,25 @@
 
 class QButtonGroup;
 class QRadioButton;
+class QCheckBox;
 
 namespace tb::ui
 {
 
-class LanguagePreferencePane : public PreferencePane
+class MiscPreferencePane : public PreferencePane
 {
   Q_OBJECT
 private:
   QRadioButton* m_englishRadioButton;
   QRadioButton* m_chineseRadioButton;
   QButtonGroup* m_languageButtonGroup;
+  QCheckBox* m_prefixWorldspawnOnCopyCheckBox = nullptr;
 
 signals:
   void languageChanged();
 
 public:
-  explicit LanguagePreferencePane(QWidget* parent = nullptr);
+  explicit MiscPreferencePane(QWidget* parent = nullptr);
 
 private:
   void createGui();

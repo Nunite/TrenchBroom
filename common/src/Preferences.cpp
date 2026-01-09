@@ -309,6 +309,9 @@ Preference<bool> ShowSoftMapBounds("Map view/Show soft map bounds", true);
 Preference<bool> ShowPointEntities("Map view/Show point entities", true);
 Preference<bool> ShowBrushes("Map view/Show brushes", true);
 
+Preference<bool> PrefixWorldspawnHeaderOnCopy(
+  "Editor/Prefix worldspawn header on copy", false);
+
 QString entityLinkModeAll()
 {
   return "all";
@@ -440,6 +443,7 @@ const std::vector<PreferenceBase*>& staticPreferences()
     &ShowSoftMapBounds,
     &ShowPointEntities,
     &ShowBrushes,
+    &PrefixWorldspawnHeaderOnCopy,
     &EntityLinkMode};
 
   return list;

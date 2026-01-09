@@ -1,12 +1,13 @@
-#include "LanguagePreferencePane.h"
+#include "MiscPreferencePane.h"
 
 #include <QApplication>
 #include <QButtonGroup>
+#include <QCheckBox>
+#include <QGroupBox>
 #include <QLabel>
 #include <QMessageBox>
 #include <QRadioButton>
 #include <QVBoxLayout>
-#include <QGroupBox>
 
 #include "PreferenceManager.h"
 #include "Preferences.h"
@@ -15,14 +16,14 @@
 namespace tb::ui
 {
 
-LanguagePreferencePane::LanguagePreferencePane(QWidget* parent)
+MiscPreferencePane::MiscPreferencePane(QWidget* parent)
   : PreferencePane{parent}
 {
   createGui();
   updateControls();
 }
 
-void LanguagePreferencePane::createGui()
+void MiscPreferencePane::createGui()
 {
   auto* langLabel = new QLabel(tr("UI Language"));
   langLabel->setToolTip(tr("Select the display language for the application interface. Changes will take effect after restarting the application"));
@@ -37,22 +38,14 @@ void LanguagePreferencePane::createGui()
   connect(m_englishRadioButton, &QRadioButton::clicked, this, [this]() {
     auto& prefs = PreferenceManager::instance();
     prefs.set(Preferences::Language, Preferences::languageEnglish());
-    
-    // 发出语言变更信号
     emit languageChanged();
-    
-    // 显示需要重启的提示
     showRestartRequiredMessage();
   });
-  
+
   connect(m_chineseRadioButton, &QRadioButton::clicked, this, [this]() {
     auto& prefs = PreferenceManager::instance();
     prefs.set(Preferences::Language, Preferences::languageChinese());
-    
-    // 发出语言变更信号
     emit languageChanged();
-    
-    // 显示需要重启的提示
     showRestartRequiredMessage();
   });
 
@@ -61,49 +54,75 @@ void LanguagePreferencePane::createGui()
   languageLayout->addWidget(langLabel);
   languageLayout->addWidget(m_englishRadioButton);
   languageLayout->addWidget(m_chineseRadioButton);
-  
-  auto* languageGroupBox = new QGroupBox(tr("Language"));
 
+  auto* languageGroupBox = new QGroupBox(tr("Language"));
   languageGroupBox->setLayout(languageLayout);
-  
+
+  m_prefixWorldspawnOnCopyCheckBox =
+    new QCheckBox(tr("Prefix worldspawn header on copy"));
+
+  auto* miscLayout = new QVBoxLayout();
+  miscLayout->setContentsMargins(0, 0, 0, 0);
+  miscLayout->addWidget(m_prefixWorldspawnOnCopyCheckBox);
+
+  auto* miscGroupBox = new QGroupBox(tr("Editor"));
+  miscGroupBox->setLayout(miscLayout);
+
   auto* layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(languageGroupBox);
+  layout->addWidget(miscGroupBox);
   layout->addStretch(1);
   setLayout(layout);
+
+  connect(
+    m_prefixWorldspawnOnCopyCheckBox,
+    &QCheckBox::toggled,
+    this,
+    [](const bool checked) {
+      auto& prefs = PreferenceManager::instance();
+      prefs.set(Preferences::PrefixWorldspawnHeaderOnCopy, checked);
+    });
 }
 
-bool LanguagePreferencePane::canResetToDefaults()
+bool MiscPreferencePane::canResetToDefaults()
 {
   return true;
 }
 
-void LanguagePreferencePane::doResetToDefaults()
+void MiscPreferencePane::doResetToDefaults()
 {
   auto& prefs = PreferenceManager::instance();
   prefs.resetToDefault(Preferences::Language);
+  prefs.resetToDefault(Preferences::PrefixWorldspawnHeaderOnCopy);
 
   updateControls();
 }
 
-void LanguagePreferencePane::updateControls()
+void MiscPreferencePane::updateControls()
 {
   auto& prefs = PreferenceManager::instance();
   const auto& language = prefs.get(Preferences::Language);
 
-  if (language == Preferences::languageEnglish()) {
+  if (language == Preferences::languageEnglish())
+  {
     m_englishRadioButton->setChecked(true);
-  } else {
+  }
+  else
+  {
     m_chineseRadioButton->setChecked(true);
   }
+
+  m_prefixWorldspawnOnCopyCheckBox->setChecked(
+    pref(Preferences::PrefixWorldspawnHeaderOnCopy));
 }
 
-bool LanguagePreferencePane::validate()
+bool MiscPreferencePane::validate()
 {
   return true;
 }
 
-void LanguagePreferencePane::showRestartRequiredMessage()
+void MiscPreferencePane::showRestartRequiredMessage()
 {
   QMessageBox::information(
     this,
