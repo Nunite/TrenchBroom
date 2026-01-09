@@ -45,10 +45,13 @@ namespace
 constexpr size_t NumBrushes = 64'000;
 constexpr size_t NumMaterials = 256;
 
-/**
- * Both returned vectors need to be freed with VecUtils::clearAndDelete
- */
-auto makeBrushes()
+struct BenchmarkData
+{
+  std::vector<mdl::Material> materials;
+  std::vector<std::unique_ptr<mdl::BrushNode>> brushes;
+};
+
+BenchmarkData makeBrushes()
 {
   // make materials
   auto materials = std::vector<mdl::Material>{};
@@ -88,14 +91,15 @@ auto makeBrushes()
   tempRenderer.validate();
   tempRenderer.clear();
 
-  return std::tuple{std::move(materials), std::move(result)};
+  return BenchmarkData{std::move(materials), std::move(result)};
 }
 
 } // namespace
 
 TEST_CASE("BrushRendererBenchmark.benchBrushRenderer")
 {
-  [[maybe_unused]] auto [materials, brushes] = makeBrushes();
+  auto data = makeBrushes();
+  const auto& brushes = data.brushes;
 
   BrushRenderer r;
 
