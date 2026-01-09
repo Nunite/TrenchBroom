@@ -27,6 +27,7 @@
 #include "ui/EntityInspector.h"
 #include "ui/FaceInspector.h"
 #include "ui/MapInspector.h"
+#include "ui/outliner/OutlinerInspector.h"
 #include "ui/MapViewBar.h"
 #include "ui/QtUtils.h"
 #include "ui/TabBar.h"
@@ -43,10 +44,12 @@ Inspector::Inspector(mdl::Map& map, GLContextManager& contextManager, QWidget* p
   m_mapInspector = new MapInspector{map};
   m_entityInspector = new EntityInspector{map, contextManager};
   m_faceInspector = new FaceInspector{map, contextManager};
+  m_outlinerInspector = new OutlinerInspector{map, contextManager};
 
   m_tabBook->addPage(m_mapInspector, "Map");
   m_tabBook->addPage(m_entityInspector, "Entity");
   m_tabBook->addPage(m_faceInspector, "Face");
+  m_tabBook->addPage(m_outlinerInspector, "Outliner");
 
   auto* layout = new QVBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);
