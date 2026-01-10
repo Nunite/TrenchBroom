@@ -169,7 +169,10 @@ void OutlinerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
     item->setData(0, Qt::UserRole, QVariant::fromValue(node));
 
     // Icon and Type logic
-    if (dynamic_cast<mdl::GroupNode*>(node)) {
+    if (auto* layer = dynamic_cast<mdl::LayerNode*>(node)) {
+        item->setIcon(0, m_groupIcon);
+        item->setText(1, QString("%1 objects").arg(layer->childCount()));
+    } else if (dynamic_cast<mdl::GroupNode*>(node)) {
         item->setIcon(0, m_groupIcon);
     } else if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
         if (auto* definition = entity->entity().definition()) {
@@ -187,7 +190,8 @@ void OutlinerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
     }
 
     // Info Column (1)
-    if (auto* container = dynamic_cast<mdl::GroupNode*>(node)) {
+    if (dynamic_cast<mdl::LayerNode*>(node)) {
+    } else if (auto* container = dynamic_cast<mdl::GroupNode*>(node)) {
         item->setText(1, QString("%1 objects").arg(container->childCount()));
     } else if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
         if (entity->childCount() > 0) {
@@ -276,8 +280,11 @@ void OutlinerTreeWidget::updateTree()
     auto* defaultLayer = world->defaultLayer();
     if (defaultLayer) {
         qDebug() << "Default layer children count:" << defaultLayer->children().size();
+        auto* defaultLayerItem = new QTreeWidgetItem(invisibleRootItem());
+        setupTreeItem(defaultLayerItem, defaultLayer);
+        defaultLayerItem->setExpanded(true);
         for (auto* node : defaultLayer->children()) {
-            addNodeToTree(invisibleRootItem(), node);
+            addNodeToTree(defaultLayerItem, node);
         }
     } else {
         qDebug() << "Default layer is null";
@@ -298,12 +305,8 @@ void OutlinerTreeWidget::updateTree()
         // Or maybe just show everything.
         
         auto* layerItem = new QTreeWidgetItem(invisibleRootItem());
-        layerItem->setText(0, QString::fromStdString(layer->name()));
-        layerItem->setData(0, Qt::UserRole, QVariant::fromValue<mdl::Node*>(layer));
-        layerItem->setIcon(0, m_groupIcon); // Use group icon for layer for now
-        layerItem->setText(1, QString("%1 objects").arg(layer->childCount()));
-        layerItem->setIcon(2, layer->locked() ? m_lockedIcon : m_unlockedIcon);
-        layerItem->setIcon(3, layer->visible() ? m_visibleIcon : m_hiddenIcon);
+        setupTreeItem(layerItem, layer);
+        layerItem->setExpanded(true);
         
         for (auto* node : layer->children()) {
             addNodeToTree(layerItem, node);

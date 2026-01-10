@@ -294,44 +294,71 @@ namespace
 
 vm::vec3f computeCameraTargetPosition(const std::vector<mdl::Node*>& nodes)
 {
-  auto center = vm::vec3f{};
-  size_t count = 0u;
-
-  const auto handlePoint = [&](const auto& point) {
-    center = center + vm::vec3f{point};
-    ++count;
+  const auto isFiniteVec3 = [](const auto& v) {
+    for (size_t i = 0u; i < 3u; ++i)
+    {
+      if (vm::is_nan(v[i]) || vm::is_inf(v[i]))
+      {
+        return false;
+      }
+    }
+    return true;
   };
 
+  auto boundsBuilder = vm::bbox3d::builder{};
   mdl::Node::visitAll(
     nodes,
     kdl::overload(
-      [](auto&& thisLambda, mdl::WorldNode* world) { world->visitChildren(thisLambda); },
-      [](auto&& thisLambda, mdl::LayerNode* layer) { layer->visitChildren(thisLambda); },
-      [](auto&& thisLambda, mdl::GroupNode* group) { group->visitChildren(thisLambda); },
-      [&](auto&& thisLambda, mdl::EntityNode* entity) {
-        if (!entity->hasChildren())
+      [&](const mdl::WorldNode* world) {
+        const auto& bounds = world->logicalBounds();
+        if (bounds.is_valid() && isFiniteVec3(bounds.min) && isFiniteVec3(bounds.max))
         {
-          entity->logicalBounds().for_each_vertex(handlePoint);
-        }
-        else
-        {
-          entity->visitChildren(thisLambda);
+          boundsBuilder.add(bounds);
         }
       },
-      [&](mdl::BrushNode* brush) {
-        for (const auto* vertex : brush->brush().vertices())
+      [&](const mdl::LayerNode* layer) {
+        const auto& bounds = layer->logicalBounds();
+        if (bounds.is_valid() && isFiniteVec3(bounds.min) && isFiniteVec3(bounds.max))
         {
-          handlePoint(vertex->position());
+          boundsBuilder.add(bounds);
         }
       },
-      [&](mdl::PatchNode* patchNode) {
-        for (const auto& controlPoint : patchNode->patch().controlPoints())
+      [&](const mdl::GroupNode* group) {
+        const auto& bounds = group->logicalBounds();
+        if (bounds.is_valid() && isFiniteVec3(bounds.min) && isFiniteVec3(bounds.max))
         {
-          handlePoint(controlPoint.xyz());
+          boundsBuilder.add(bounds);
+        }
+      },
+      [&](const mdl::EntityNode* entity) {
+        const auto& bounds = entity->logicalBounds();
+        if (bounds.is_valid() && isFiniteVec3(bounds.min) && isFiniteVec3(bounds.max))
+        {
+          boundsBuilder.add(bounds);
+        }
+      },
+      [&](const mdl::BrushNode* brush) {
+        const auto& bounds = brush->logicalBounds();
+        if (bounds.is_valid() && isFiniteVec3(bounds.min) && isFiniteVec3(bounds.max))
+        {
+          boundsBuilder.add(bounds);
+        }
+      },
+      [&](const mdl::PatchNode* patchNode) {
+        const auto& bounds = patchNode->logicalBounds();
+        if (bounds.is_valid() && isFiniteVec3(bounds.min) && isFiniteVec3(bounds.max))
+        {
+          boundsBuilder.add(bounds);
         }
       }));
 
-  return center / float(count);
+  if (!boundsBuilder.initialized())
+  {
+    return vm::vec3f{};
+  }
+
+  const auto center = boundsBuilder.bounds().center();
+  return vm::vec3f{center};
 }
 
 float computeCameraOffset(
