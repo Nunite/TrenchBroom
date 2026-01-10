@@ -75,6 +75,71 @@ static bool isBrushNode(const mdl::Node* node)
     return dynamic_cast<const mdl::BrushNode*>(node) != nullptr;
 }
 
+template <typename NodeFromItem>
+static std::vector<mdl::Node*> collectNodesToMoveToGroup(
+    mdl::Map& map,
+    const QList<QTreeWidgetItem*>& selectedItems,
+    const NodeFromItem& nodeFromItem,
+    mdl::GroupNode* targetGroup)
+{
+    auto nodes = std::vector<mdl::Node*>{};
+    nodes.reserve(static_cast<size_t>(selectedItems.size()));
+
+    auto* world = map.world();
+
+    for (auto* item : selectedItems) {
+        auto* node = nodeFromItem(item);
+        if (!node) {
+            continue;
+        }
+
+        if (dynamic_cast<mdl::WorldNode*>(node) || dynamic_cast<mdl::LayerNode*>(node)) {
+            continue;
+        }
+
+        if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node)) {
+            auto* entityBase = brushNode->entity();
+            if (entityBase && entityBase != world) {
+                if (auto* entityNode = dynamic_cast<mdl::EntityNode*>(entityBase)) {
+                    nodes.push_back(entityNode);
+                    continue;
+                }
+            }
+
+            nodes.push_back(brushNode);
+            continue;
+        }
+
+        if (auto* entityNode = dynamic_cast<mdl::EntityNode*>(node)) {
+            nodes.push_back(entityNode);
+            continue;
+        }
+    }
+
+    nodes = kdl::vec_sort_and_remove_duplicates(std::move(nodes));
+
+    auto reparentableNodes = std::vector<mdl::Node*>{};
+    reparentableNodes.reserve(nodes.size());
+
+    for (auto* node : nodes) {
+        if (!node) {
+            continue;
+        }
+        if (targetGroup == node || targetGroup == node->parent()) {
+            continue;
+        }
+        if (targetGroup->isDescendantOf(node)) {
+            continue;
+        }
+        if (!targetGroup->canAddChild(node)) {
+            continue;
+        }
+        reparentableNodes.push_back(node);
+    }
+
+    return reparentableNodes;
+}
+
 OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     : QTreeWidget(parent)
     , m_document(document)
@@ -912,7 +977,45 @@ void OutlinerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
     const auto indicator = dropIndicatorPosition();
     if (indicator == QAbstractItemView::OnItem) {
         if (auto* targetItem = itemAt(event->position().toPoint())) {
-            const auto* targetNode = nodeFromItem(targetItem);
+            auto* targetNode = nodeFromItem(targetItem);
+            const auto targetIsGroup = dynamic_cast<const mdl::GroupNode*>(targetNode) != nullptr;
+            const auto targetIsLayer = dynamic_cast<const mdl::LayerNode*>(targetNode) != nullptr;
+            if (targetIsGroup || targetIsLayer) {
+                auto selectionHasGroup = false;
+                auto selectionHasLayer = false;
+                for (auto* selectedItem : selectedItems()) {
+                    const auto* selectedNode = nodeFromItem(selectedItem);
+                    selectionHasGroup = selectionHasGroup || dynamic_cast<const mdl::GroupNode*>(selectedNode) != nullptr;
+                    selectionHasLayer = selectionHasLayer || dynamic_cast<const mdl::LayerNode*>(selectedNode) != nullptr;
+                }
+                if ((targetIsGroup && selectionHasGroup) || (targetIsLayer && selectionHasLayer)) {
+                    event->ignore();
+                    return;
+                }
+            }
+            if (auto* targetGroup = dynamic_cast<mdl::GroupNode*>(targetNode)) {
+                auto& map = m_document.map();
+                const auto nodesToMove = collectNodesToMoveToGroup(
+                    map,
+                    selectedItems(),
+                    [this](QTreeWidgetItem* item) { return nodeFromItem(item); },
+                    targetGroup);
+
+                if (nodesToMove.empty()) {
+                    auto selectionHasRelevantNode = false;
+                    for (auto* selectedItem : selectedItems()) {
+                        const auto* selectedNode = nodeFromItem(selectedItem);
+                        selectionHasRelevantNode = selectionHasRelevantNode
+                                                   || dynamic_cast<const mdl::BrushNode*>(selectedNode)
+                                                   || dynamic_cast<const mdl::EntityNode*>(selectedNode);
+                    }
+
+                    if (selectionHasRelevantNode) {
+                        event->ignore();
+                        return;
+                    }
+                }
+            }
             auto selectionHasPointEntity = false;
             auto selectionHasBrush = false;
             auto selectionAllBrushes = !selectedItems().empty();
@@ -952,6 +1055,66 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
     if (indicator == QAbstractItemView::OnItem) {
         if (auto* targetItem = itemAt(event->position().toPoint())) {
             auto* targetNode = nodeFromItem(targetItem);
+            const auto targetIsGroup = dynamic_cast<const mdl::GroupNode*>(targetNode) != nullptr;
+            const auto targetIsLayer = dynamic_cast<const mdl::LayerNode*>(targetNode) != nullptr;
+            if (targetIsGroup || targetIsLayer) {
+                auto selectionHasGroup = false;
+                auto selectionHasLayer = false;
+                for (auto* selectedItem : selectedItems()) {
+                    const auto* selectedNode = nodeFromItem(selectedItem);
+                    selectionHasGroup = selectionHasGroup || dynamic_cast<const mdl::GroupNode*>(selectedNode) != nullptr;
+                    selectionHasLayer = selectionHasLayer || dynamic_cast<const mdl::LayerNode*>(selectedNode) != nullptr;
+                }
+                if ((targetIsGroup && selectionHasGroup) || (targetIsLayer && selectionHasLayer)) {
+                    event->ignore();
+                    return;
+                }
+            }
+            if (auto* targetGroup = dynamic_cast<mdl::GroupNode*>(targetNode)) {
+                auto& map = m_document.map();
+                auto nodesToMove =
+                    collectNodesToMoveToGroup(
+                        map,
+                        selectedItems(),
+                        [this](QTreeWidgetItem* item) { return nodeFromItem(item); },
+                        targetGroup);
+
+                if (!nodesToMove.empty()) {
+                    auto transaction =
+                        mdl::Transaction{map, "Move Objects to " + targetGroup->name()};
+
+                    mdl::deselectAll(map);
+
+                    auto nodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
+                    nodesToAdd[targetGroup] = nodesToMove;
+                    if (!mdl::reparentNodes(map, nodesToAdd)) {
+                        transaction.cancel();
+                        event->ignore();
+                        return;
+                    }
+
+                    mdl::selectNodes(map, nodesToMove);
+                    transaction.commit();
+
+                    scheduleUpdateTree(targetGroup);
+                    event->acceptProposedAction();
+                    return;
+                }
+
+                auto selectionHasRelevantNode = false;
+                for (auto* selectedItem : selectedItems()) {
+                    const auto* selectedNode = nodeFromItem(selectedItem);
+                    selectionHasRelevantNode = selectionHasRelevantNode
+                                               || dynamic_cast<const mdl::BrushNode*>(selectedNode)
+                                               || dynamic_cast<const mdl::EntityNode*>(selectedNode);
+                }
+
+                if (selectionHasRelevantNode) {
+                    event->ignore();
+                    return;
+                }
+            }
+
             if (auto* targetEntity = dynamic_cast<mdl::EntityNode*>(targetNode)) {
                 if (isBrushEntityNode(targetEntity)) {
                     auto draggedBrushNodes = std::vector<mdl::Node*>{};
