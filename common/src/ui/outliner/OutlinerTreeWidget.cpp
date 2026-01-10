@@ -42,6 +42,20 @@
 namespace tb::ui
 {
 
+static bool isPointEntityNode(const mdl::Node* node)
+{
+    const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node);
+    if (!entityNode) {
+        return false;
+    }
+
+    if (const auto* definition = entityNode->entity().definition()) {
+        return mdl::getType(*definition) == mdl::EntityDefinitionType::Point;
+    }
+
+    return entityNode->childCount() == 0;
+}
+
 OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     : QTreeWidget(parent)
     , m_document(document)
@@ -839,16 +853,43 @@ void OutlinerTreeWidget::dragEnterEvent(QDragEnterEvent* event)
 
 void OutlinerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
 {
+    const auto indicator = dropIndicatorPosition();
+    if (indicator == QAbstractItemView::OnItem) {
+        if (auto* targetItem = itemAt(event->position().toPoint())) {
+            const auto* targetNode = nodeFromItem(targetItem);
+            if (isPointEntityNode(targetNode)) {
+                for (auto* selectedItem : selectedItems()) {
+                    const auto* selectedNode = nodeFromItem(selectedItem);
+                    if (isPointEntityNode(selectedNode)) {
+                        event->ignore();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     event->acceptProposedAction();
 }
 
 void OutlinerTreeWidget::dropEvent(QDropEvent* event)
 {
-    // Implement reparenting logic here
-    // Get source node from mime data
-    // Get target node from itemAt(event->pos())
-    // Call document->reparentNodes(...)
-    
+    const auto indicator = dropIndicatorPosition();
+    if (indicator == QAbstractItemView::OnItem) {
+        if (auto* targetItem = itemAt(event->position().toPoint())) {
+            const auto* targetNode = nodeFromItem(targetItem);
+            if (isPointEntityNode(targetNode)) {
+                for (auto* selectedItem : selectedItems()) {
+                    const auto* selectedNode = nodeFromItem(selectedItem);
+                    if (isPointEntityNode(selectedNode)) {
+                        event->ignore();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     QTreeWidget::dropEvent(event); // Default behavior (visual only) - needs override
 }
 
