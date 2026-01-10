@@ -12,6 +12,8 @@
 #include <QTimer>
 #include <QApplication>
 #include <QScrollBar>
+#include <QMenu>
+#include <QContextMenuEvent>
 
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
@@ -28,6 +30,7 @@
 #include "mdl/Transaction.h"
 
 #include "ui/MapDocument.h"
+#include "ui/MapFrame.h"
 #include "ui/QtUtils.h"
 #include "io/ResourceUtils.h"
 #include "kdl/memory_utils.h"
@@ -555,6 +558,52 @@ void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
     }
     
     QTreeWidget::mousePressEvent(event);
+}
+
+void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
+{
+    auto* item = itemAt(event->pos());
+    if (!item) {
+        return;
+    }
+
+    auto* node = nodeFromItem(item);
+    auto* groupNode = dynamic_cast<mdl::GroupNode*>(node);
+    if (!groupNode) {
+        return;
+    }
+
+    const auto& selection = m_document.map().selection();
+    const auto isGroupInSelection = kdl::vec_contains(selection.groups, groupNode);
+    const auto keepSelection = selection.hasOnlyGroups() && isGroupInSelection;
+
+    if (!keepSelection) {
+        const auto wasSyncing = m_syncingSelection;
+        m_syncingSelection = true;
+        blockSignals(true);
+        clearSelection();
+        item->setSelected(true);
+        setCurrentItem(item);
+        blockSignals(false);
+        m_syncingSelection = wasSyncing;
+
+        mdl::Transaction transaction(m_document.map(), "Select Objects");
+        mdl::deselectAll(m_document.map());
+        mdl::selectNodes(m_document.map(), {groupNode});
+        transaction.commit();
+    }
+
+    QMenu menu(this);
+    if (auto* mapFrame = qobject_cast<MapFrame*>(window())) {
+        if (auto* renameGroupsAction = mapFrame->findAction("Menu/Edit/Rename Groups")) {
+            menu.addAction(renameGroupsAction);
+        }
+    }
+
+    if (!menu.actions().isEmpty()) {
+        menu.exec(event->globalPos());
+        event->accept();
+    }
 }
 
 void OutlinerTreeWidget::mouseDoubleClickEvent(QMouseEvent* event)
