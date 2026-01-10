@@ -15,8 +15,6 @@
 #include <QMenu>
 #include <QContextMenuEvent>
 
-#include <algorithm>
-
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
 #include "mdl/LayerNode.h"
@@ -105,7 +103,7 @@ static void sortNodes(
         return;
     }
 
-    std::stable_sort(nodes.begin(), nodes.end(), [&](const NodeT* a, const NodeT* b) {
+    const auto cmp = [&](const NodeT* a, const NodeT* b) {
         if (a == nullptr || b == nullptr) {
             return a < b;
         }
@@ -122,7 +120,9 @@ static void sortNodes(
         const auto bn = QString::fromStdString(b->name());
         const auto c = QString::compare(an, bn, Qt::CaseInsensitive);
         return c == 0 ? a < b : c < 0;
-    });
+    };
+
+    nodes = kdl::vec_sort(std::move(nodes), cmp);
 }
 
 template <typename NodeFromItem>

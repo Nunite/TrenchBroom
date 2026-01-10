@@ -4,6 +4,7 @@ Thumbs.db
 .vscode
 .cache
 /merge
+/.trae
 /cmake-build-*
 /build*
 /cmakebuild*
