@@ -36,6 +36,7 @@ class MapViewBar;
 class OutlinerInspector;
 class SyncHeightEventFilter;
 class TabBook;
+class MapDocument; // Forward declaration
 
 enum class InspectorPage
 {
@@ -58,7 +59,8 @@ private:
   SyncHeightEventFilter* m_syncTabBarEventFilter = nullptr;
 
 public:
-  Inspector(mdl::Map& map, GLContextManager& contextManager, QWidget* parent = nullptr);
+  // Changed to take MapDocument& instead of mdl::Map& to support Outliner needs
+  Inspector(MapDocument& document, GLContextManager& contextManager, QWidget* parent = nullptr);
   ~Inspector() override;
 
   void connectTopWidgets(MapViewBar* mapViewBar);

@@ -410,6 +410,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/Inspector.cpp
         ${COMMON_SOURCE_DIR}/ui/outliner/OutlinerInspector.cpp
         ${COMMON_SOURCE_DIR}/ui/outliner/OutlinerModel.cpp
+        ${COMMON_SOURCE_DIR}/ui/outliner/OutlinerTreeWidget.cpp
         ${COMMON_SOURCE_DIR}/ui/IssueBrowser.cpp
         ${COMMON_SOURCE_DIR}/ui/IssueBrowserView.cpp
         ${COMMON_SOURCE_DIR}/ui/KeyboardPreferencePane.cpp
