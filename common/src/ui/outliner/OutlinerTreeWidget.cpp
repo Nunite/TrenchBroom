@@ -26,12 +26,15 @@
 #include "mdl/Map_NodeLocking.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Map_Nodes.h" // for reparentNodes helpers if needed
+#include "mdl/Map_Layers.h"
+#include "mdl/EditorContext.h"
 #include "mdl/Selection.h"
 #include "mdl/Transaction.h"
 
 #include "ui/MapDocument.h"
 #include "ui/MapFrame.h"
 #include "ui/QtUtils.h"
+#include "ui/ViewUtils.h"
 #include "io/ResourceUtils.h"
 #include "kdl/memory_utils.h"
 #include "kdl/vector_utils.h"
@@ -568,41 +571,195 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
     }
 
     auto* node = nodeFromItem(item);
-    auto* groupNode = dynamic_cast<mdl::GroupNode*>(node);
-    if (!groupNode) {
+    if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
+        auto& map = m_document.map();
+        auto popupMenu = QMenu{this};
+
+        auto* makeActiveAction = popupMenu.addAction(tr("Make active layer"), this, [&, layerNode]() {
+            mdl::setCurrentLayer(map, layerNode);
+        });
+        auto* moveSelectionToLayerAction =
+            popupMenu.addAction(tr("Move selection to layer"), this, [&, layerNode]() {
+                mdl::moveSelectedNodesToLayer(map, layerNode);
+            });
+        auto* selectAllInLayerAction =
+            popupMenu.addAction(tr("Select all in layer"), this, [&, layerNode]() {
+                mdl::selectAllInLayers(map, {layerNode});
+            });
+
+        popupMenu.addSeparator();
+
+        auto* toggleLayerVisibleAction = popupMenu.addAction(
+            layerNode->hidden() ? tr("Show layer") : tr("Hide layer"), this, [&, layerNode]() {
+                if (!layerNode->hidden()) {
+                    mdl::hideNodes(map, std::vector<mdl::Node*>{layerNode});
+                } else {
+                    mdl::resetNodeVisibility(map, std::vector<mdl::Node*>{layerNode});
+                }
+            });
+        auto* isolateLayerAction = popupMenu.addAction(tr("Isolate layer"), this, [&, layerNode]() {
+            mdl::isolateLayers(map, std::vector<mdl::LayerNode*>{layerNode});
+        });
+        auto* toggleLayerLockedAction = popupMenu.addAction(
+            layerNode->locked() ? tr("Unlock layer") : tr("Lock layer"), this, [&, layerNode]() {
+                if (!layerNode->locked()) {
+                    mdl::lockNodes(map, std::vector<mdl::Node*>{layerNode});
+                } else {
+                    mdl::resetNodeLockingState(map, std::vector<mdl::Node*>{layerNode});
+                }
+            });
+        auto* toggleLayerOmitFromExportAction =
+            popupMenu.addAction(tr("Omit From Export"), this, [&, layerNode]() {
+                mdl::setOmitLayerFromExport(map, layerNode, !layerNode->layer().omitFromExport());
+            });
+
+        popupMenu.addSeparator();
+
+        auto* showAllLayersAction = popupMenu.addAction(tr("Show All Layers"), this, [&]() {
+            const auto layers = map.world()->allLayers();
+            mdl::resetNodeVisibility(map, kdl::vec_static_cast<mdl::Node*>(layers));
+        });
+        auto* hideAllLayersAction = popupMenu.addAction(tr("Hide All Layers"), this, [&]() {
+            const auto layers = map.world()->allLayers();
+            mdl::hideNodes(map, kdl::vec_static_cast<mdl::Node*>(layers));
+        });
+
+        popupMenu.addSeparator();
+
+        auto* unlockAllLayersAction = popupMenu.addAction(tr("Unlock All Layers"), this, [&]() {
+            const auto layers = map.world()->allLayers();
+            mdl::resetNodeLockingState(map, kdl::vec_static_cast<mdl::Node*>(layers));
+        });
+        auto* lockAllLayersAction = popupMenu.addAction(tr("Lock All Layers"), this, [&]() {
+            const auto layers = map.world()->allLayers();
+            mdl::lockNodes(map, kdl::vec_static_cast<mdl::Node*>(layers));
+        });
+
+        popupMenu.addSeparator();
+
+        auto* renameLayerAction = popupMenu.addAction(tr("Rename Layer"), this, [&, layerNode]() {
+            const auto name = queryLayerName(this, layerNode->name());
+            if (!name.empty()) {
+                mdl::renameLayer(map, layerNode, name);
+            }
+        });
+        auto* removeLayerAction = popupMenu.addAction(tr("Remove Layer"), this, [&, layerNode]() {
+            auto* defaultLayerNode = map.world()->defaultLayer();
+
+            auto transaction = mdl::Transaction{map, "Remove Layer " + layerNode->name()};
+            mdl::deselectAll(map);
+            if (layerNode->hasChildren()) {
+                if (!mdl::reparentNodes(map, {{defaultLayerNode, layerNode->children()}})) {
+                    transaction.cancel();
+                    return;
+                }
+            }
+
+            if (map.editorContext().currentLayer() == layerNode) {
+                mdl::setCurrentLayer(map, defaultLayerNode);
+            }
+
+            mdl::removeNodes(map, {layerNode});
+            transaction.commit();
+        });
+
+        const auto canSetCurrentLayer = mdl::canSetCurrentLayer(map, layerNode);
+        const auto canMoveSelectedNodes = mdl::canMoveSelectedNodesToLayer(map, layerNode);
+        const auto canSelectAll = mdl::canSelectAllInLayers(map, {layerNode});
+        const auto canIsolate = mdl::canIsolateLayers(map, {layerNode});
+
+        auto canShowAll = false;
+        auto canHideAll = false;
+        auto canUnlockAll = false;
+        auto canLockAll = false;
+        for (const auto* layer : map.world()->allLayers()) {
+            if (!layer->visible()) {
+                canShowAll = true;
+            }
+            if (layer->visible()) {
+                canHideAll = true;
+            }
+            if (layer->locked()) {
+                canUnlockAll = true;
+            }
+            if (!layer->locked()) {
+                canLockAll = true;
+            }
+        }
+
+        const auto isDefaultLayer = (layerNode == map.world()->defaultLayer());
+        const auto canRename = !isDefaultLayer;
+        const auto canRemove = [&]() {
+            if (isDefaultLayer) {
+                return false;
+            }
+            auto* defaultLayer = map.world()->defaultLayer();
+            if (!defaultLayer->locked() && !defaultLayer->hidden()) {
+                return true;
+            }
+            for (auto* customLayer : map.world()->customLayers()) {
+                if (customLayer != layerNode && !customLayer->locked() && !customLayer->hidden()) {
+                    return true;
+                }
+            }
+            return false;
+        }();
+
+        makeActiveAction->setEnabled(canSetCurrentLayer);
+        moveSelectionToLayerAction->setEnabled(canMoveSelectedNodes);
+        selectAllInLayerAction->setEnabled(canSelectAll);
+        toggleLayerVisibleAction->setEnabled(true);
+        isolateLayerAction->setEnabled(canIsolate);
+
+        toggleLayerOmitFromExportAction->setCheckable(true);
+        toggleLayerOmitFromExportAction->setChecked(layerNode->layer().omitFromExport());
+
+        toggleLayerLockedAction->setEnabled(true);
+        showAllLayersAction->setEnabled(canShowAll);
+        hideAllLayersAction->setEnabled(canHideAll);
+        unlockAllLayersAction->setEnabled(canUnlockAll);
+        lockAllLayersAction->setEnabled(canLockAll);
+        renameLayerAction->setEnabled(canRename);
+        removeLayerAction->setEnabled(canRemove);
+
+        popupMenu.exec(event->globalPos());
+        event->accept();
         return;
     }
 
-    const auto& selection = m_document.map().selection();
-    const auto isGroupInSelection = kdl::vec_contains(selection.groups, groupNode);
-    const auto keepSelection = selection.hasOnlyGroups() && isGroupInSelection;
+    if (auto* groupNode = dynamic_cast<mdl::GroupNode*>(node)) {
+        const auto& selection = m_document.map().selection();
+        const auto isGroupInSelection = kdl::vec_contains(selection.groups, groupNode);
+        const auto keepSelection = selection.hasOnlyGroups() && isGroupInSelection;
 
-    if (!keepSelection) {
-        const auto wasSyncing = m_syncingSelection;
-        m_syncingSelection = true;
-        blockSignals(true);
-        clearSelection();
-        item->setSelected(true);
-        setCurrentItem(item);
-        blockSignals(false);
-        m_syncingSelection = wasSyncing;
+        if (!keepSelection) {
+            const auto wasSyncing = m_syncingSelection;
+            m_syncingSelection = true;
+            blockSignals(true);
+            clearSelection();
+            item->setSelected(true);
+            setCurrentItem(item);
+            blockSignals(false);
+            m_syncingSelection = wasSyncing;
 
-        mdl::Transaction transaction(m_document.map(), "Select Objects");
-        mdl::deselectAll(m_document.map());
-        mdl::selectNodes(m_document.map(), {groupNode});
-        transaction.commit();
-    }
-
-    QMenu menu(this);
-    if (auto* mapFrame = qobject_cast<MapFrame*>(window())) {
-        if (auto* renameGroupsAction = mapFrame->findAction("Menu/Edit/Rename Groups")) {
-            menu.addAction(renameGroupsAction);
+            mdl::Transaction transaction(m_document.map(), "Select Objects");
+            mdl::deselectAll(m_document.map());
+            mdl::selectNodes(m_document.map(), {groupNode});
+            transaction.commit();
         }
-    }
 
-    if (!menu.actions().isEmpty()) {
-        menu.exec(event->globalPos());
-        event->accept();
+        QMenu menu(this);
+        if (auto* mapFrame = qobject_cast<MapFrame*>(window())) {
+            if (auto* renameGroupsAction = mapFrame->findAction("Menu/Edit/Rename Groups")) {
+                menu.addAction(renameGroupsAction);
+            }
+        }
+
+        if (!menu.actions().isEmpty()) {
+            menu.exec(event->globalPos());
+            event->accept();
+        }
+        return;
     }
 }
 
