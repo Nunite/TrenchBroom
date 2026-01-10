@@ -1,6 +1,7 @@
 #include "OutlinerInspector.h"
 #include "OutlinerTreeWidget.h"
 #include "ui/MapDocument.h"
+#include "ui/QtUtils.h"
 
 #include <QVBoxLayout>
 #include <QLineEdit>
@@ -17,9 +18,7 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, GLContextManager& co
     auto layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
-    m_searchField = new QLineEdit(this);
-    m_searchField->setPlaceholderText("Search...");
-    m_searchField->setClearButtonEnabled(true);
+    m_searchField = createSearchBox();
     layout->addWidget(m_searchField);
 
     m_treeWidget = new OutlinerTreeWidget(m_document, this);

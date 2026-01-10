@@ -15,8 +15,6 @@
 #include <QMenu>
 #include <QContextMenuEvent>
 
-#include <functional>
-
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
 #include "mdl/LayerNode.h"
@@ -45,6 +43,7 @@ namespace tb::ui
 {
 
 static constexpr int WorldspawnItemRole = Qt::UserRole + 1;
+static constexpr int WorldspawnLayerRole = Qt::UserRole + 2;
 
 static bool isWorldspawnItem(const QTreeWidgetItem* item)
 {
@@ -56,13 +55,7 @@ static mdl::LayerNode* worldspawnLayerFromItem(const QTreeWidgetItem* worldspawn
     if (!isWorldspawnItem(worldspawnItem)) {
         return nullptr;
     }
-
-    auto* parentItem = worldspawnItem->parent();
-    if (!parentItem) {
-        return nullptr;
-    }
-
-    auto* node = parentItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    auto* node = worldspawnItem->data(0, WorldspawnLayerRole).value<mdl::Node*>();
     return dynamic_cast<mdl::LayerNode*>(node);
 }
 
@@ -539,6 +532,7 @@ void OutlinerTreeWidget::updateTree()
             worldspawnItem->setText(1, QString("%1 brushes").arg(worldspawnBrushes.size()));
             worldspawnItem->setIcon(0, m_brushEntityIcon);
             worldspawnItem->setData(0, WorldspawnItemRole, true);
+            worldspawnItem->setData(0, WorldspawnLayerRole, QVariant::fromValue(static_cast<mdl::Node*>(layer)));
             worldspawnItem->setExpanded(false);
 
             for (auto* brushNode : worldspawnBrushes) {
@@ -606,11 +600,18 @@ void OutlinerTreeWidget::setFilterText(const QString& text)
         m_expandedBeforeFilter.clear();
         m_worldspawnExpandedBeforeFilter.clear();
 
-        std::function<void(QTreeWidgetItem*)> snapshotItem;
-        snapshotItem = [&](QTreeWidgetItem* item) {
-            if (!item) {
-                return;
+        auto stack = std::vector<QTreeWidgetItem*>{};
+        stack.reserve(static_cast<size_t>(topLevelItemCount()));
+
+        for (int i = 0; i < topLevelItemCount(); ++i) {
+            if (auto* item = topLevelItem(i)) {
+                stack.push_back(item);
             }
+        }
+
+        while (!stack.empty()) {
+            auto* item = stack.back();
+            stack.pop_back();
 
             if (auto* node = nodeFromItem(item)) {
                 m_expandedBeforeFilter[node] = item->isExpanded();
@@ -621,23 +622,28 @@ void OutlinerTreeWidget::setFilterText(const QString& text)
             }
 
             for (int i = 0; i < item->childCount(); ++i) {
-                snapshotItem(item->child(i));
+                if (auto* child = item->child(i)) {
+                    stack.push_back(child);
+                }
             }
-        };
-
-        for (int i = 0; i < topLevelItemCount(); ++i) {
-            snapshotItem(topLevelItem(i));
         }
 
         m_filterActive = true;
     } else if (m_filterActive && !nextHasQuery) {
         m_filterText = {};
 
-        std::function<void(QTreeWidgetItem*)> restoreItem;
-        restoreItem = [&](QTreeWidgetItem* item) {
-            if (!item) {
-                return;
+        auto stack = std::vector<QTreeWidgetItem*>{};
+        stack.reserve(static_cast<size_t>(topLevelItemCount()));
+
+        for (int i = 0; i < topLevelItemCount(); ++i) {
+            if (auto* item = topLevelItem(i)) {
+                stack.push_back(item);
             }
+        }
+
+        while (!stack.empty()) {
+            auto* item = stack.back();
+            stack.pop_back();
 
             item->setHidden(false);
 
@@ -656,12 +662,10 @@ void OutlinerTreeWidget::setFilterText(const QString& text)
             }
 
             for (int i = 0; i < item->childCount(); ++i) {
-                restoreItem(item->child(i));
+                if (auto* child = item->child(i)) {
+                    stack.push_back(child);
+                }
             }
-        };
-
-        for (int i = 0; i < topLevelItemCount(); ++i) {
-            restoreItem(topLevelItem(i));
         }
 
         m_expandedBeforeFilter.clear();
@@ -680,51 +684,76 @@ void OutlinerTreeWidget::applyFilter()
     const auto hasQuery = !query.isEmpty();
 
     if (!hasQuery) {
-        std::function<void(QTreeWidgetItem*)> showAll;
-        showAll = [&](QTreeWidgetItem* item) {
-            if (!item) {
-                return;
-            }
-            item->setHidden(false);
-            for (int i = 0; i < item->childCount(); ++i) {
-                showAll(item->child(i));
-            }
-        };
+        auto stack = std::vector<QTreeWidgetItem*>{};
+        stack.reserve(static_cast<size_t>(topLevelItemCount()));
 
         for (int i = 0; i < topLevelItemCount(); ++i) {
-            showAll(topLevelItem(i));
+            if (auto* item = topLevelItem(i)) {
+                stack.push_back(item);
+            }
+        }
+
+        while (!stack.empty()) {
+            auto* item = stack.back();
+            stack.pop_back();
+
+            item->setHidden(false);
+            for (int i = 0; i < item->childCount(); ++i) {
+                if (auto* child = item->child(i)) {
+                    stack.push_back(child);
+                }
+            }
         }
         return;
     }
 
-    const auto matches = [&](const QTreeWidgetItem* item) {
-        return item && item->text(0).contains(query, Qt::CaseInsensitive);
+    struct Frame {
+        QTreeWidgetItem* item;
+        bool visited;
     };
 
-    std::function<bool(QTreeWidgetItem*)> applyToItem;
-    applyToItem = [&](QTreeWidgetItem* item) -> bool {
+    auto stack = std::vector<Frame>{};
+    stack.reserve(static_cast<size_t>(topLevelItemCount()));
+
+    for (int i = 0; i < topLevelItemCount(); ++i) {
+        if (auto* item = topLevelItem(i)) {
+            stack.push_back(Frame{item, false});
+        }
+    }
+
+    while (!stack.empty()) {
+        auto frame = stack.back();
+        stack.pop_back();
+
+        auto* item = frame.item;
         if (!item) {
-            return false;
+            continue;
+        }
+
+        if (!frame.visited) {
+            stack.push_back(Frame{item, true});
+            for (int i = 0; i < item->childCount(); ++i) {
+                if (auto* child = item->child(i)) {
+                    stack.push_back(Frame{child, false});
+                }
+            }
+            continue;
         }
 
         auto anyChildShown = false;
         for (int i = 0; i < item->childCount(); ++i) {
-            anyChildShown = applyToItem(item->child(i)) || anyChildShown;
+            if (auto* child = item->child(i)) {
+                anyChildShown = anyChildShown || !child->isHidden();
+            }
         }
 
-        const auto selfShown = !hasQuery || matches(item);
-        const auto shown = !hasQuery || selfShown || anyChildShown;
+        const auto selfShown = item->text(0).contains(query, Qt::CaseInsensitive);
+        const auto shown = selfShown || anyChildShown;
         item->setHidden(!shown);
 
-        if (hasQuery && shown) {
+        if (shown) {
             item->setExpanded(anyChildShown);
         }
-
-        return shown;
-    };
-
-    for (int i = 0; i < topLevelItemCount(); ++i) {
-        applyToItem(topLevelItem(i));
     }
 }
 
