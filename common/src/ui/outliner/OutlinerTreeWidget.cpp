@@ -862,22 +862,23 @@ void OutlinerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
     if (indicator == QAbstractItemView::OnItem) {
         if (auto* targetItem = itemAt(event->position().toPoint())) {
             const auto* targetNode = nodeFromItem(targetItem);
+            auto selectionHasPointEntity = false;
+            auto selectionHasBrush = false;
+            for (auto* selectedItem : selectedItems()) {
+                const auto* selectedNode = nodeFromItem(selectedItem);
+                selectionHasPointEntity = selectionHasPointEntity || isPointEntityNode(selectedNode);
+                selectionHasBrush = selectionHasBrush || isBrushNode(selectedNode);
+            }
             if (isPointEntityNode(targetNode)) {
-                for (auto* selectedItem : selectedItems()) {
-                    const auto* selectedNode = nodeFromItem(selectedItem);
-                    if (isPointEntityNode(selectedNode)) {
-                        event->ignore();
-                        return;
-                    }
+                if (selectionHasPointEntity || selectionHasBrush) {
+                    event->ignore();
+                    return;
                 }
             }
             if (isBrushNode(targetNode)) {
-                for (auto* selectedItem : selectedItems()) {
-                    const auto* selectedNode = nodeFromItem(selectedItem);
-                    if (isBrushNode(selectedNode)) {
-                        event->ignore();
-                        return;
-                    }
+                if (selectionHasBrush || selectionHasPointEntity) {
+                    event->ignore();
+                    return;
                 }
             }
         }
@@ -892,22 +893,23 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
     if (indicator == QAbstractItemView::OnItem) {
         if (auto* targetItem = itemAt(event->position().toPoint())) {
             const auto* targetNode = nodeFromItem(targetItem);
+            auto selectionHasPointEntity = false;
+            auto selectionHasBrush = false;
+            for (auto* selectedItem : selectedItems()) {
+                const auto* selectedNode = nodeFromItem(selectedItem);
+                selectionHasPointEntity = selectionHasPointEntity || isPointEntityNode(selectedNode);
+                selectionHasBrush = selectionHasBrush || isBrushNode(selectedNode);
+            }
             if (isPointEntityNode(targetNode)) {
-                for (auto* selectedItem : selectedItems()) {
-                    const auto* selectedNode = nodeFromItem(selectedItem);
-                    if (isPointEntityNode(selectedNode)) {
-                        event->ignore();
-                        return;
-                    }
+                if (selectionHasPointEntity || selectionHasBrush) {
+                    event->ignore();
+                    return;
                 }
             }
             if (isBrushNode(targetNode)) {
-                for (auto* selectedItem : selectedItems()) {
-                    const auto* selectedNode = nodeFromItem(selectedItem);
-                    if (isBrushNode(selectedNode)) {
-                        event->ignore();
-                        return;
-                    }
+                if (selectionHasBrush || selectionHasPointEntity) {
+                    event->ignore();
+                    return;
                 }
             }
         }
