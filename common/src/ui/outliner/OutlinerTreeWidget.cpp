@@ -13,9 +13,6 @@
 #include <QApplication>
 #include <QScrollBar>
 
-#include <unordered_map>
-#include <unordered_set>
-
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
 #include "mdl/LayerNode.h"
@@ -34,6 +31,7 @@
 #include "ui/QtUtils.h"
 #include "io/ResourceUtils.h"
 #include "kdl/memory_utils.h"
+#include "kdl/vector_utils.h"
 
 namespace tb::ui
 {
@@ -379,13 +377,7 @@ void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& 
 
     const auto& selection = m_document.map().selection();
 
-    auto selectedSet = std::unordered_set<const mdl::Node*>{};
-    selectedSet.reserve(selection.nodes.size());
-    for (const auto* node : selection.nodes) {
-        selectedSet.insert(node);
-    }
-
-    auto entitiesWithSelectedChildren = std::unordered_map<const mdl::EntityNode*, size_t>{};
+    auto entitiesWithSelectedChildren = std::vector<const mdl::EntityNode*>{};
     for (const auto* node : selection.nodes) {
         if (dynamic_cast<const mdl::LayerNode*>(node) || dynamic_cast<const mdl::WorldNode*>(node)) {
             continue;
@@ -394,24 +386,26 @@ void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& 
         if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(node)) {
             if (const auto* entityBase = brushNode->entity()) {
                 if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(entityBase)) {
-                    entitiesWithSelectedChildren[entityNode] += 1u;
+                    if (!kdl::vec_contains(entitiesWithSelectedChildren, entityNode)) {
+                        entitiesWithSelectedChildren.push_back(entityNode);
+                    }
                 }
             }
         }
     }
 
-    auto suppressedChildren = std::unordered_set<const mdl::Node*>{};
     auto nodesToSelect = std::vector<const mdl::Node*>{};
-    auto added = std::unordered_set<const mdl::Node*>{};
 
     const auto addNode = [&](const mdl::Node* node) {
         if (!node) return;
-        if (added.insert(node).second) {
+        if (!kdl::vec_contains(nodesToSelect, node)) {
             nodesToSelect.push_back(node);
         }
     };
 
-    for (const auto& [entityNode, /*childCount*/ _] : entitiesWithSelectedChildren) {
+    auto suppressedChildren = std::vector<const mdl::Node*>{};
+
+    for (const auto* entityNode : entitiesWithSelectedChildren) {
         if (!entityNode || !entityNode->hasChildren()) {
             continue;
         }
@@ -423,7 +417,7 @@ void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& 
 
         auto allChildrenSelected = true;
         for (const auto* child : children) {
-            if (selectedSet.find(child) == selectedSet.end()) {
+            if (!kdl::vec_contains(selection.nodes, child)) {
                 allChildrenSelected = false;
                 break;
             }
@@ -432,7 +426,9 @@ void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& 
         if (allChildrenSelected) {
             addNode(entityNode);
             for (const auto* child : children) {
-                suppressedChildren.insert(child);
+                if (!kdl::vec_contains(suppressedChildren, child)) {
+                    suppressedChildren.push_back(child);
+                }
             }
         }
     }
@@ -442,7 +438,7 @@ void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& 
             continue;
         }
 
-        if (suppressedChildren.find(node) != suppressedChildren.end()) {
+        if (kdl::vec_contains(suppressedChildren, node)) {
             continue;
         }
 
