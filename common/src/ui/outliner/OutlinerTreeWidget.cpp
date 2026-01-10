@@ -56,6 +56,11 @@ static bool isPointEntityNode(const mdl::Node* node)
     return entityNode->childCount() == 0;
 }
 
+static bool isBrushNode(const mdl::Node* node)
+{
+    return dynamic_cast<const mdl::BrushNode*>(node) != nullptr;
+}
+
 OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     : QTreeWidget(parent)
     , m_document(document)
@@ -866,6 +871,15 @@ void OutlinerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
                     }
                 }
             }
+            if (isBrushNode(targetNode)) {
+                for (auto* selectedItem : selectedItems()) {
+                    const auto* selectedNode = nodeFromItem(selectedItem);
+                    if (isBrushNode(selectedNode)) {
+                        event->ignore();
+                        return;
+                    }
+                }
+            }
         }
     }
 
@@ -882,6 +896,15 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
                 for (auto* selectedItem : selectedItems()) {
                     const auto* selectedNode = nodeFromItem(selectedItem);
                     if (isPointEntityNode(selectedNode)) {
+                        event->ignore();
+                        return;
+                    }
+                }
+            }
+            if (isBrushNode(targetNode)) {
+                for (auto* selectedItem : selectedItems()) {
+                    const auto* selectedNode = nodeFromItem(selectedItem);
+                    if (isBrushNode(selectedNode)) {
                         event->ignore();
                         return;
                     }
