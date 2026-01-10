@@ -13,6 +13,9 @@
 #include <QApplication>
 #include <QScrollBar>
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
 #include "mdl/LayerNode.h"
@@ -370,11 +373,96 @@ void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& 
     m_syncingSelection = true;
     
     // We can use change info to optimize, but full sync is safer for now
+    blockSignals(true);
     clearSelection();
-    
+    blockSignals(false);
+
     const auto& selection = m_document.map().selection();
+
+    auto selectedSet = std::unordered_set<const mdl::Node*>{};
+    selectedSet.reserve(selection.nodes.size());
     for (const auto* node : selection.nodes) {
+        selectedSet.insert(node);
+    }
+
+    auto entitiesWithSelectedChildren = std::unordered_map<const mdl::EntityNode*, size_t>{};
+    for (const auto* node : selection.nodes) {
+        if (dynamic_cast<const mdl::LayerNode*>(node) || dynamic_cast<const mdl::WorldNode*>(node)) {
+            continue;
+        }
+
+        if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(node)) {
+            if (const auto* entityBase = brushNode->entity()) {
+                if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(entityBase)) {
+                    entitiesWithSelectedChildren[entityNode] += 1u;
+                }
+            }
+        }
+    }
+
+    auto suppressedChildren = std::unordered_set<const mdl::Node*>{};
+    auto nodesToSelect = std::vector<const mdl::Node*>{};
+    auto added = std::unordered_set<const mdl::Node*>{};
+
+    const auto addNode = [&](const mdl::Node* node) {
+        if (!node) return;
+        if (added.insert(node).second) {
+            nodesToSelect.push_back(node);
+        }
+    };
+
+    for (const auto& [entityNode, /*childCount*/ _] : entitiesWithSelectedChildren) {
+        if (!entityNode || !entityNode->hasChildren()) {
+            continue;
+        }
+
+        const auto& children = entityNode->children();
+        if (children.empty()) {
+            continue;
+        }
+
+        auto allChildrenSelected = true;
+        for (const auto* child : children) {
+            if (selectedSet.find(child) == selectedSet.end()) {
+                allChildrenSelected = false;
+                break;
+            }
+        }
+
+        if (allChildrenSelected) {
+            addNode(entityNode);
+            for (const auto* child : children) {
+                suppressedChildren.insert(child);
+            }
+        }
+    }
+
+    for (const auto* node : selection.nodes) {
+        if (dynamic_cast<const mdl::LayerNode*>(node) || dynamic_cast<const mdl::WorldNode*>(node)) {
+            continue;
+        }
+
+        if (suppressedChildren.find(node) != suppressedChildren.end()) {
+            continue;
+        }
+
+        addNode(node);
+    }
+
+    for (const auto* node : nodesToSelect) {
         findAndSelectNode(node);
+    }
+
+    for (const auto* node : nodesToSelect) {
+        if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node)) {
+            if (entityNode->hasChildren()) {
+                if (auto* item = findItemForNode(entityNode)) {
+                    item->setExpanded(false);
+                    setCurrentItem(item);
+                    scrollToItem(item);
+                }
+            }
+        }
     }
     
     m_syncingSelection = false;
