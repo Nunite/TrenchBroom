@@ -42,6 +42,13 @@
 namespace tb::ui
 {
 
+static constexpr int WorldspawnItemRole = Qt::UserRole + 1;
+
+static bool isWorldspawnItem(const QTreeWidgetItem* item)
+{
+    return item && item->data(0, WorldspawnItemRole).toBool();
+}
+
 static bool isBrushEntityNode(const mdl::Node* node)
 {
     const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node);
@@ -84,6 +91,54 @@ static std::vector<mdl::Node*> collectBrushNodesToMoveToBrushEntity(
 
     for (auto* node : draggedBrushNodes) {
         if (node && targetEntity != node->parent() && targetEntity->canAddChild(node)) {
+            nodesToMove.push_back(node);
+        }
+    }
+
+    return nodesToMove;
+}
+
+template <typename NodeFromItem>
+static std::vector<mdl::Node*> collectBrushNodesToMoveToWorldspawn(
+    const QList<QTreeWidgetItem*>& selectedItems,
+    const NodeFromItem& nodeFromItem,
+    mdl::LayerNode* targetLayer)
+{
+    if (!targetLayer) {
+        return {};
+    }
+
+    auto draggedBrushNodes = std::vector<mdl::BrushNode*>{};
+    draggedBrushNodes.reserve(static_cast<size_t>(selectedItems.size()));
+
+    auto selectionAllBrushes = !selectedItems.empty();
+    for (auto* selectedItem : selectedItems) {
+        auto* selectedNode = nodeFromItem(selectedItem);
+        if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(selectedNode)) {
+            draggedBrushNodes.push_back(brushNode);
+        } else {
+            selectionAllBrushes = false;
+        }
+    }
+
+    if (!selectionAllBrushes || draggedBrushNodes.empty()) {
+        return {};
+    }
+
+    auto nodesToMove = std::vector<mdl::Node*>{};
+    nodesToMove.reserve(draggedBrushNodes.size());
+
+    for (auto* node : draggedBrushNodes) {
+        if (!node) {
+            continue;
+        }
+
+        auto* parentEntity = dynamic_cast<mdl::EntityNode*>(node->parent());
+        if (!parentEntity || !isBrushEntityNode(parentEntity)) {
+            continue;
+        }
+
+        if (targetLayer != node->parent() && targetLayer->canAddChild(node)) {
             nodesToMove.push_back(node);
         }
     }
@@ -434,6 +489,50 @@ void OutlinerTreeWidget::updateTree()
     // In TrenchBroom, everything is in a layer.
     // If we want to mimic "Outliner", we might want to flatten layers or show them as folders.
     // Let's iterate all layers and their children.
+
+    const auto addLayerContents = [&](QTreeWidgetItem* layerItem, mdl::LayerNode* layer) {
+        auto groupNodes = std::vector<mdl::Node*>{};
+        auto entityNodes = std::vector<mdl::Node*>{};
+        auto otherNodes = std::vector<mdl::Node*>{};
+        auto worldspawnBrushes = std::vector<mdl::BrushNode*>{};
+
+        for (auto* node : layer->children()) {
+            if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node)) {
+                worldspawnBrushes.push_back(brushNode);
+            } else if (dynamic_cast<mdl::GroupNode*>(node)) {
+                groupNodes.push_back(node);
+            } else if (dynamic_cast<mdl::EntityNode*>(node)) {
+                entityNodes.push_back(node);
+            } else {
+                otherNodes.push_back(node);
+            }
+        }
+
+        for (auto* node : groupNodes) {
+            addNodeToTree(layerItem, node);
+        }
+
+        for (auto* node : entityNodes) {
+            addNodeToTree(layerItem, node);
+        }
+
+        if (!worldspawnBrushes.empty()) {
+            auto* worldspawnItem = new QTreeWidgetItem(layerItem);
+            worldspawnItem->setText(0, "worldspawn");
+            worldspawnItem->setText(1, QString("%1 brushes").arg(worldspawnBrushes.size()));
+            worldspawnItem->setIcon(0, m_brushEntityIcon);
+            worldspawnItem->setData(0, WorldspawnItemRole, true);
+            worldspawnItem->setExpanded(false);
+
+            for (auto* brushNode : worldspawnBrushes) {
+                addNodeToTree(worldspawnItem, brushNode);
+            }
+        }
+
+        for (auto* node : otherNodes) {
+            addNodeToTree(layerItem, node);
+        }
+    };
     
     // Default Layer
     auto* defaultLayer = world->defaultLayer();
@@ -442,9 +541,7 @@ void OutlinerTreeWidget::updateTree()
         auto* defaultLayerItem = new QTreeWidgetItem(invisibleRootItem());
         setupTreeItem(defaultLayerItem, defaultLayer);
         defaultLayerItem->setExpanded(false);
-        for (auto* node : defaultLayer->children()) {
-            addNodeToTree(defaultLayerItem, node);
-        }
+        addLayerContents(defaultLayerItem, defaultLayer);
     } else {
         qDebug() << "Default layer is null";
     }
@@ -466,10 +563,8 @@ void OutlinerTreeWidget::updateTree()
         auto* layerItem = new QTreeWidgetItem(invisibleRootItem());
         setupTreeItem(layerItem, layer);
         layerItem->setExpanded(false);
-        
-        for (auto* node : layer->children()) {
-            addNodeToTree(layerItem, node);
-        }
+
+        addLayerContents(layerItem, layer);
     }
     
     // Restore selection
@@ -991,13 +1086,26 @@ void OutlinerTreeWidget::dragEnterEvent(QDragEnterEvent* event)
 void OutlinerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
 {
     const auto indicator = dropIndicatorPosition();
-    if (indicator != QAbstractItemView::OnItem) {
+    if (indicator == QAbstractItemView::OnViewport) {
         event->ignore();
         return;
     }
 
     auto* targetItem = itemAt(event->position().toPoint());
     if (!targetItem) {
+        event->ignore();
+        return;
+    }
+
+    if (auto* worldspawnItem = isWorldspawnItem(targetItem) ? targetItem : targetItem->parent();
+        isWorldspawnItem(worldspawnItem)) {
+        auto* layerNode = dynamic_cast<mdl::LayerNode*>(nodeFromItem(worldspawnItem->parent()));
+        const auto nodesToMove = collectBrushNodesToMoveToWorldspawn(
+            selectedItems(), [this](QTreeWidgetItem* item) { return nodeFromItem(item); }, layerNode);
+        if (!nodesToMove.empty()) {
+            event->acceptProposedAction();
+            return;
+        }
         event->ignore();
         return;
     }
@@ -1042,7 +1150,7 @@ void OutlinerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
 void OutlinerTreeWidget::dropEvent(QDropEvent* event)
 {
     const auto indicator = dropIndicatorPosition();
-    if (indicator != QAbstractItemView::OnItem) {
+    if (indicator == QAbstractItemView::OnViewport) {
         event->ignore();
         return;
     }
@@ -1050,6 +1158,38 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
     auto* targetItem = itemAt(event->position().toPoint());
     if (!targetItem) {
         event->ignore();
+        return;
+    }
+
+    if (auto* worldspawnItem = isWorldspawnItem(targetItem) ? targetItem : targetItem->parent();
+        isWorldspawnItem(worldspawnItem)) {
+        auto& map = m_document.map();
+        auto* layerNode = dynamic_cast<mdl::LayerNode*>(nodeFromItem(worldspawnItem->parent()));
+
+        auto nodesToMove = collectBrushNodesToMoveToWorldspawn(
+            selectedItems(), [this](QTreeWidgetItem* item) { return nodeFromItem(item); }, layerNode);
+
+        if (nodesToMove.empty()) {
+            event->ignore();
+            return;
+        }
+
+        auto transaction = mdl::Transaction{map, "Move Brushes to worldspawn"};
+        mdl::deselectAll(map);
+
+        auto nodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
+        nodesToAdd[layerNode] = nodesToMove;
+        if (!mdl::reparentNodes(map, nodesToAdd)) {
+            transaction.cancel();
+            event->ignore();
+            return;
+        }
+
+        mdl::selectNodes(map, nodesToMove);
+        transaction.commit();
+
+        scheduleUpdateTree(layerNode);
+        event->acceptProposedAction();
         return;
     }
 
