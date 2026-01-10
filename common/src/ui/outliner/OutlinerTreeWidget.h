@@ -24,6 +24,14 @@ class Selection;
 class OutlinerTreeWidget : public QTreeWidget
 {
     Q_OBJECT
+public:
+    enum class SortMode
+    {
+        Default = 0,
+        NameAsc = 1,
+        Type = 2,
+    };
+
 private:
     MapDocument& m_document;
     
@@ -50,6 +58,7 @@ public:
 
     void updateTree();
     void setFilterText(const QString& text);
+    void setSortMode(SortMode mode);
 
 protected:
     void mouseDoubleClickEvent(QMouseEvent* event) override;
@@ -95,6 +104,7 @@ private:
     bool m_filterActive = false;
     std::unordered_map<const mdl::Node*, bool> m_expandedBeforeFilter;
     std::unordered_map<const mdl::LayerNode*, bool> m_worldspawnExpandedBeforeFilter;
+    SortMode m_sortMode = SortMode::Default;
 };
 
 } // namespace tb::ui

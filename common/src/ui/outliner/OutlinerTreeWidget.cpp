@@ -15,6 +15,8 @@
 #include <QMenu>
 #include <QContextMenuEvent>
 
+#include <algorithm>
+
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
 #include "mdl/LayerNode.h"
@@ -71,6 +73,56 @@ static bool isBrushEntityNode(const mdl::Node* node)
     }
 
     return entityNode->childCount() > 0;
+}
+
+static int sortTypeRank(const OutlinerTreeWidget::SortMode mode, const mdl::Node* node)
+{
+    if (mode != OutlinerTreeWidget::SortMode::Type) {
+        return 0;
+    }
+
+    if (dynamic_cast<const mdl::GroupNode*>(node)) {
+        return 0;
+    }
+
+    if (const auto* entity = dynamic_cast<const mdl::EntityNode*>(node)) {
+        return isBrushEntityNode(entity) ? 2 : 1;
+    }
+
+    if (dynamic_cast<const mdl::BrushNode*>(node)) {
+        return 3;
+    }
+
+    return 4;
+}
+
+template <typename NodeT>
+static void sortNodes(
+    const OutlinerTreeWidget::SortMode mode,
+    std::vector<NodeT*>& nodes)
+{
+    if (mode == OutlinerTreeWidget::SortMode::Default) {
+        return;
+    }
+
+    std::stable_sort(nodes.begin(), nodes.end(), [&](const NodeT* a, const NodeT* b) {
+        if (a == nullptr || b == nullptr) {
+            return a < b;
+        }
+
+        if (mode == OutlinerTreeWidget::SortMode::Type) {
+            const auto ar = sortTypeRank(mode, a);
+            const auto br = sortTypeRank(mode, b);
+            if (ar != br) {
+                return ar < br;
+            }
+        }
+
+        const auto an = QString::fromStdString(a->name());
+        const auto bn = QString::fromStdString(b->name());
+        const auto c = QString::compare(an, bn, Qt::CaseInsensitive);
+        return c == 0 ? a < b : c < 0;
+    });
 }
 
 template <typename NodeFromItem>
@@ -329,13 +381,12 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     
     // Connect to map lifecycle events to ensure tree is populated when map is loaded/created
     m_notifierConnection += m_document.map().mapWasLoadedNotifier.connect(
-        [this](auto&) { qDebug() << "Map loaded"; scheduleUpdateTree(); });
+        [this](auto&) { scheduleUpdateTree(); });
     m_notifierConnection += m_document.map().mapWasCreatedNotifier.connect(
-        [this](auto&) { qDebug() << "Map created"; scheduleUpdateTree(); });
+        [this](auto&) { scheduleUpdateTree(); });
     m_notifierConnection += m_document.map().mapWasClearedNotifier.connect(
-        [this](auto&) { qDebug() << "Map cleared"; scheduleUpdateTree(); });
+        [this](auto&) { scheduleUpdateTree(); });
     
-    qDebug() << "OutlinerTreeWidget constructed";
     updateTree();
 }
 
@@ -443,11 +494,15 @@ void OutlinerTreeWidget::addNodeToTree(QTreeWidgetItem* parentItem, mdl::Node* n
     // Recursion
     // If it's a Group or Entity (which can have children), add them
     if (auto* group = dynamic_cast<mdl::GroupNode*>(node)) {
-        for (auto* child : group->children()) {
+        auto children = group->children();
+        sortNodes(m_sortMode, children);
+        for (auto* child : children) {
             addNodeToTree(item, child);
         }
     } else if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
-        for (auto* child : entity->children()) {
+        auto children = entity->children();
+        sortNodes(m_sortMode, children);
+        for (auto* child : children) {
             addNodeToTree(item, child);
         }
     }
@@ -469,8 +524,6 @@ void OutlinerTreeWidget::refreshTreeItemRecursively(QTreeWidgetItem* item)
 
 void OutlinerTreeWidget::updateTree()
 {
-    qDebug() << "OutlinerTreeWidget::updateTree called";
-
     // Prevent selection changes from propagating during rebuild
     const bool wasSyncing = m_syncingSelection;
     m_syncingSelection = true;
@@ -488,7 +541,6 @@ void OutlinerTreeWidget::updateTree()
 
     auto* world = m_document.map().world();
     if (!world) {
-        qDebug() << "World is null";
         m_syncingSelection = wasSyncing;
         blockSignals(false);
         return;
@@ -517,6 +569,10 @@ void OutlinerTreeWidget::updateTree()
                 otherNodes.push_back(node);
             }
         }
+
+        sortNodes(m_sortMode, groupNodes);
+        sortNodes(m_sortMode, entityNodes);
+        sortNodes(m_sortMode, otherNodes);
 
         for (auto* node : groupNodes) {
             addNodeToTree(layerItem, node);
@@ -548,18 +604,14 @@ void OutlinerTreeWidget::updateTree()
     // Default Layer
     auto* defaultLayer = world->defaultLayer();
     if (defaultLayer) {
-        qDebug() << "Default layer children count:" << defaultLayer->children().size();
         auto* defaultLayerItem = new QTreeWidgetItem(invisibleRootItem());
         setupTreeItem(defaultLayerItem, defaultLayer);
         defaultLayerItem->setExpanded(false);
         addLayerContents(defaultLayerItem, defaultLayer);
-    } else {
-        qDebug() << "Default layer is null";
     }
 
     // Custom Layers
     auto customLayers = world->customLayersUserSorted();
-    qDebug() << "Custom layers count:" << customLayers.size();
     for (auto* layer : customLayers) {
         // Option 1: Show Layer as a folder
         // auto* layerItem = new QTreeWidgetItem(invisibleRootItem());
@@ -757,6 +809,15 @@ void OutlinerTreeWidget::applyFilter()
     }
 }
 
+void OutlinerTreeWidget::setSortMode(SortMode mode)
+{
+    if (m_sortMode == mode) {
+        return;
+    }
+    m_sortMode = mode;
+    scheduleUpdateTree();
+}
+
 void OutlinerTreeWidget::findAndSelectNode(const mdl::Node* targetNode)
 {
     if (auto* item = findItemForNode(targetNode)) {
@@ -899,9 +960,7 @@ void OutlinerTreeWidget::onItemSelectionChanged()
 {
     if (m_syncingSelection) return;
 
-    // Debugging selection
     auto items = selectedItems();
-    qDebug() << "Outliner selection changed. Count:" << items.size();
     
     std::vector<mdl::Node*> nodes;
     for (auto* item : items) {
@@ -910,7 +969,6 @@ void OutlinerTreeWidget::onItemSelectionChanged()
                 continue;
             }
             nodes.push_back(node);
-            qDebug() << "  Selected Node:" << QString::fromStdString(node->name());
         }
     }
 

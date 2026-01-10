@@ -18,6 +18,7 @@ class MapDocument;
 }
 
 class QLineEdit;
+class QComboBox;
 
 namespace tb::ui
 {
@@ -29,6 +30,7 @@ private:
   
   OutlinerTreeWidget* m_treeWidget = nullptr;
   QLineEdit* m_searchField = nullptr;
+  QComboBox* m_sortBox = nullptr;
 
 public:
   OutlinerInspector(MapDocument& document, GLContextManager& contextManager, QWidget* parent = nullptr);
