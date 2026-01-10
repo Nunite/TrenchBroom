@@ -15,6 +15,8 @@
 #include <QMenu>
 #include <QContextMenuEvent>
 
+#include <functional>
+
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
 #include "mdl/LayerNode.h"
@@ -47,6 +49,21 @@ static constexpr int WorldspawnItemRole = Qt::UserRole + 1;
 static bool isWorldspawnItem(const QTreeWidgetItem* item)
 {
     return item && item->data(0, WorldspawnItemRole).toBool();
+}
+
+static mdl::LayerNode* worldspawnLayerFromItem(const QTreeWidgetItem* worldspawnItem)
+{
+    if (!isWorldspawnItem(worldspawnItem)) {
+        return nullptr;
+    }
+
+    auto* parentItem = worldspawnItem->parent();
+    if (!parentItem) {
+        return nullptr;
+    }
+
+    auto* node = parentItem->data(0, Qt::UserRole).value<mdl::Node*>();
+    return dynamic_cast<mdl::LayerNode*>(node);
 }
 
 static bool isBrushEntityNode(const mdl::Node* node)
@@ -573,9 +590,142 @@ void OutlinerTreeWidget::updateTree()
             findAndSelectNode(node);
         }
     }
+
+    applyFilter();
     
     m_syncingSelection = wasSyncing;
     blockSignals(false);
+}
+
+void OutlinerTreeWidget::setFilterText(const QString& text)
+{
+    const auto next = text.trimmed();
+    const auto nextHasQuery = !next.isEmpty();
+
+    if (!m_filterActive && nextHasQuery) {
+        m_expandedBeforeFilter.clear();
+        m_worldspawnExpandedBeforeFilter.clear();
+
+        std::function<void(QTreeWidgetItem*)> snapshotItem;
+        snapshotItem = [&](QTreeWidgetItem* item) {
+            if (!item) {
+                return;
+            }
+
+            if (auto* node = nodeFromItem(item)) {
+                m_expandedBeforeFilter[node] = item->isExpanded();
+            } else if (isWorldspawnItem(item)) {
+                if (auto* layer = worldspawnLayerFromItem(item)) {
+                    m_worldspawnExpandedBeforeFilter[layer] = item->isExpanded();
+                }
+            }
+
+            for (int i = 0; i < item->childCount(); ++i) {
+                snapshotItem(item->child(i));
+            }
+        };
+
+        for (int i = 0; i < topLevelItemCount(); ++i) {
+            snapshotItem(topLevelItem(i));
+        }
+
+        m_filterActive = true;
+    } else if (m_filterActive && !nextHasQuery) {
+        m_filterText = {};
+
+        std::function<void(QTreeWidgetItem*)> restoreItem;
+        restoreItem = [&](QTreeWidgetItem* item) {
+            if (!item) {
+                return;
+            }
+
+            item->setHidden(false);
+
+            if (auto* node = nodeFromItem(item)) {
+                const auto it = m_expandedBeforeFilter.find(node);
+                if (it != m_expandedBeforeFilter.end()) {
+                    item->setExpanded(it->second);
+                }
+            } else if (isWorldspawnItem(item)) {
+                if (auto* layer = worldspawnLayerFromItem(item)) {
+                    const auto it = m_worldspawnExpandedBeforeFilter.find(layer);
+                    if (it != m_worldspawnExpandedBeforeFilter.end()) {
+                        item->setExpanded(it->second);
+                    }
+                }
+            }
+
+            for (int i = 0; i < item->childCount(); ++i) {
+                restoreItem(item->child(i));
+            }
+        };
+
+        for (int i = 0; i < topLevelItemCount(); ++i) {
+            restoreItem(topLevelItem(i));
+        }
+
+        m_expandedBeforeFilter.clear();
+        m_worldspawnExpandedBeforeFilter.clear();
+        m_filterActive = false;
+        return;
+    }
+
+    m_filterText = next;
+    applyFilter();
+}
+
+void OutlinerTreeWidget::applyFilter()
+{
+    const auto query = m_filterText;
+    const auto hasQuery = !query.isEmpty();
+
+    if (!hasQuery) {
+        std::function<void(QTreeWidgetItem*)> showAll;
+        showAll = [&](QTreeWidgetItem* item) {
+            if (!item) {
+                return;
+            }
+            item->setHidden(false);
+            for (int i = 0; i < item->childCount(); ++i) {
+                showAll(item->child(i));
+            }
+        };
+
+        for (int i = 0; i < topLevelItemCount(); ++i) {
+            showAll(topLevelItem(i));
+        }
+        return;
+    }
+
+    const auto matches = [&](const QTreeWidgetItem* item) {
+        return item && item->text(0).contains(query, Qt::CaseInsensitive);
+    };
+
+    std::function<bool(QTreeWidgetItem*)> applyToItem;
+    applyToItem = [&](QTreeWidgetItem* item) -> bool {
+        if (!item) {
+            return false;
+        }
+
+        auto anyChildShown = false;
+        for (int i = 0; i < item->childCount(); ++i) {
+            anyChildShown = applyToItem(item->child(i)) || anyChildShown;
+        }
+
+        const auto selfShown = !hasQuery || matches(item);
+        const auto shown = !hasQuery || selfShown || anyChildShown;
+        item->setHidden(!shown);
+
+        if (hasQuery && shown) {
+            item->setExpanded(anyChildShown);
+        }
+
+        return shown;
+    };
+
+    for (int i = 0; i < topLevelItemCount(); ++i) {
+        applyToItem(topLevelItem(i));
+    }
 }
 
 void OutlinerTreeWidget::findAndSelectNode(const mdl::Node* targetNode)

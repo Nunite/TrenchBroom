@@ -2,6 +2,7 @@
 
 #include <QTreeWidget>
 #include <memory>
+#include <unordered_map>
 #include "NotifierConnection.h"
 
 namespace tb::mdl
@@ -48,6 +49,7 @@ public:
     ~OutlinerTreeWidget() override;
 
     void updateTree();
+    void setFilterText(const QString& text);
 
 protected:
     void mouseDoubleClickEvent(QMouseEvent* event) override;
@@ -71,6 +73,7 @@ private:
     void scheduleUpdateTree(mdl::Node* revealNode = nullptr);
     void loadIcons();
     void setupTreeItem(QTreeWidgetItem* item, mdl::Node* node);
+    void applyFilter();
     
     // Recursive helpers
     void addNodeToTree(QTreeWidgetItem* parentItem, mdl::Node* node);
@@ -86,6 +89,12 @@ private:
     
     // Helper to get node from item
     mdl::Node* nodeFromItem(QTreeWidgetItem* item) const;
+
+private:
+    QString m_filterText;
+    bool m_filterActive = false;
+    std::unordered_map<const mdl::Node*, bool> m_expandedBeforeFilter;
+    std::unordered_map<const mdl::LayerNode*, bool> m_worldspawnExpandedBeforeFilter;
 };
 
 } // namespace tb::ui

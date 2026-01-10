@@ -24,6 +24,8 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, GLContextManager& co
 
     m_treeWidget = new OutlinerTreeWidget(m_document, this);
     layout->addWidget(m_treeWidget);
+
+    connect(m_searchField, &QLineEdit::textChanged, m_treeWidget, &OutlinerTreeWidget::setFilterText);
 }
 
 OutlinerInspector::~OutlinerInspector() = default;
