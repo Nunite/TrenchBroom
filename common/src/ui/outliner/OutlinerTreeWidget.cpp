@@ -491,6 +491,14 @@ void OutlinerTreeWidget::mouseDoubleClickEvent(QMouseEvent* event)
 
                             QTimer::singleShot(0, this, [this, entityNode]() {
                                 if (auto* entityItem = findItemForNode(entityNode)) {
+                                    const auto wasSyncing = m_syncingSelection;
+                                    m_syncingSelection = true;
+                                    blockSignals(true);
+                                    clearSelection();
+                                    entityItem->setSelected(true);
+                                    setCurrentItem(entityItem);
+                                    blockSignals(false);
+                                    m_syncingSelection = wasSyncing;
                                     entityItem->setExpanded(false);
                                     scrollToItem(entityItem);
                                 }
@@ -508,6 +516,24 @@ void OutlinerTreeWidget::mouseDoubleClickEvent(QMouseEvent* event)
 
 void OutlinerTreeWidget::keyPressEvent(QKeyEvent* event)
 {
+    if (event->key() == Qt::Key_Escape && event->modifiers() == Qt::NoModifier) {
+        const auto wasSyncing = m_syncingSelection;
+        m_syncingSelection = true;
+
+        blockSignals(true);
+        clearSelection();
+        blockSignals(false);
+
+        {
+            mdl::Transaction transaction(m_document.map(), "Deselect Objects");
+            mdl::deselectAll(m_document.map());
+            transaction.commit();
+        }
+
+        m_syncingSelection = wasSyncing;
+        event->accept();
+        return;
+    }
     QTreeWidget::keyPressEvent(event);
 }
 
