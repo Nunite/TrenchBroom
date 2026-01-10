@@ -56,6 +56,20 @@ static bool isPointEntityNode(const mdl::Node* node)
     return entityNode->childCount() == 0;
 }
 
+static bool isBrushEntityNode(const mdl::Node* node)
+{
+    const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node);
+    if (!entityNode) {
+        return false;
+    }
+
+    if (const auto* definition = entityNode->entity().definition()) {
+        return mdl::getType(*definition) == mdl::EntityDefinitionType::Brush;
+    }
+
+    return entityNode->childCount() > 0;
+}
+
 static bool isBrushNode(const mdl::Node* node)
 {
     return dynamic_cast<const mdl::BrushNode*>(node) != nullptr;
@@ -123,17 +137,29 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     
     // Listen to map changes to update tree
     m_notifierConnection += m_document.map().nodesWereAddedNotifier.connect(
-        [this](const auto&) { updateTree(); }); // Naive full update for now
+        [this](const auto&) { scheduleUpdateTree(); }); // Naive full update for now
     m_notifierConnection += m_document.map().nodesWereRemovedNotifier.connect(
-        [this](const auto&) { updateTree(); });
+        [this](const auto&) { scheduleUpdateTree(); });
         
     // Optimize nodeDidChange: only update item text/icon, do NOT rebuild tree
     m_notifierConnection += m_document.map().nodesDidChangeNotifier.connect(
         [this](const std::vector<mdl::Node*>& nodes) {
+             auto needsRebuild = false;
              for (auto* node : nodes) {
                 if (auto* item = findItemForNode(node)) {
-                    setupTreeItem(item, node);
+                    auto* actualParentNode = nodeFromItem(item->parent());
+                    auto* expectedParentNode = node->parent();
+
+                    if (actualParentNode != expectedParentNode) {
+                        needsRebuild = true;
+                    } else {
+                        setupTreeItem(item, node);
+                    }
                 }
+            }
+
+            if (needsRebuild) {
+                scheduleUpdateTree();
             }
         });
 
@@ -157,17 +183,42 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     
     // Connect to map lifecycle events to ensure tree is populated when map is loaded/created
     m_notifierConnection += m_document.map().mapWasLoadedNotifier.connect(
-        [this](auto&) { qDebug() << "Map loaded"; updateTree(); });
+        [this](auto&) { qDebug() << "Map loaded"; scheduleUpdateTree(); });
     m_notifierConnection += m_document.map().mapWasCreatedNotifier.connect(
-        [this](auto&) { qDebug() << "Map created"; updateTree(); });
+        [this](auto&) { qDebug() << "Map created"; scheduleUpdateTree(); });
     m_notifierConnection += m_document.map().mapWasClearedNotifier.connect(
-        [this](auto&) { qDebug() << "Map cleared"; updateTree(); });
+        [this](auto&) { qDebug() << "Map cleared"; scheduleUpdateTree(); });
     
     qDebug() << "OutlinerTreeWidget constructed";
     updateTree();
 }
 
 OutlinerTreeWidget::~OutlinerTreeWidget() = default;
+
+void OutlinerTreeWidget::scheduleUpdateTree(mdl::Node* revealNode)
+{
+    if (revealNode) {
+        m_revealAfterUpdate = revealNode;
+    }
+
+    if (m_updateTreeQueued) {
+        return;
+    }
+
+    m_updateTreeQueued = true;
+    QTimer::singleShot(0, this, [this]() {
+        m_updateTreeQueued = false;
+        updateTree();
+
+        if (m_revealAfterUpdate) {
+            if (auto* revealItem = findItemForNode(m_revealAfterUpdate)) {
+                revealItem->setExpanded(true);
+                scrollToItem(revealItem);
+            }
+            m_revealAfterUpdate = nullptr;
+        }
+    });
+}
 
 void OutlinerTreeWidget::loadIcons()
 {
@@ -864,10 +915,12 @@ void OutlinerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
             const auto* targetNode = nodeFromItem(targetItem);
             auto selectionHasPointEntity = false;
             auto selectionHasBrush = false;
+            auto selectionAllBrushes = !selectedItems().empty();
             for (auto* selectedItem : selectedItems()) {
                 const auto* selectedNode = nodeFromItem(selectedItem);
                 selectionHasPointEntity = selectionHasPointEntity || isPointEntityNode(selectedNode);
                 selectionHasBrush = selectionHasBrush || isBrushNode(selectedNode);
+                selectionAllBrushes = selectionAllBrushes && isBrushNode(selectedNode);
             }
             if (isPointEntityNode(targetNode)) {
                 if (selectionHasPointEntity || selectionHasBrush) {
@@ -877,6 +930,12 @@ void OutlinerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
             }
             if (isBrushNode(targetNode)) {
                 if (selectionHasBrush || selectionHasPointEntity) {
+                    event->ignore();
+                    return;
+                }
+            }
+            if (isBrushEntityNode(targetNode)) {
+                if (selectionHasPointEntity || !selectionAllBrushes) {
                     event->ignore();
                     return;
                 }
@@ -892,7 +951,57 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
     const auto indicator = dropIndicatorPosition();
     if (indicator == QAbstractItemView::OnItem) {
         if (auto* targetItem = itemAt(event->position().toPoint())) {
-            const auto* targetNode = nodeFromItem(targetItem);
+            auto* targetNode = nodeFromItem(targetItem);
+            if (auto* targetEntity = dynamic_cast<mdl::EntityNode*>(targetNode)) {
+                if (isBrushEntityNode(targetEntity)) {
+                    auto draggedBrushNodes = std::vector<mdl::Node*>{};
+                    auto selectionAllBrushes = !selectedItems().empty();
+                    for (auto* selectedItem : selectedItems()) {
+                        auto* selectedNode = nodeFromItem(selectedItem);
+                        if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(selectedNode)) {
+                            draggedBrushNodes.push_back(brushNode);
+                        } else {
+                            selectionAllBrushes = false;
+                        }
+                    }
+
+                    auto nodesToMove = std::vector<mdl::Node*>{};
+                    if (selectionAllBrushes && !draggedBrushNodes.empty()) {
+                        for (auto* node : draggedBrushNodes) {
+                            if (node && targetEntity != node && targetEntity != node->parent()
+                                && targetEntity->canAddChild(node)) {
+                                nodesToMove.push_back(node);
+                            }
+                        }
+                    }
+
+                    if (!nodesToMove.empty()) {
+                        auto& map = m_document.map();
+                        auto transaction = mdl::Transaction{
+                            map, "Move Brushes to Entity " + targetEntity->name()};
+
+                        mdl::deselectAll(map);
+
+                        auto nodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
+                        nodesToAdd[targetEntity] = nodesToMove;
+                        if (!mdl::reparentNodes(map, nodesToAdd)) {
+                            transaction.cancel();
+                            event->ignore();
+                            return;
+                        }
+
+                        mdl::selectNodes(map, nodesToMove);
+                        transaction.commit();
+
+                        scheduleUpdateTree(targetEntity);
+
+                        event->acceptProposedAction();
+                        return;
+                    }
+                }
+            }
+
+            const auto* targetNodeConst = targetNode;
             auto selectionHasPointEntity = false;
             auto selectionHasBrush = false;
             for (auto* selectedItem : selectedItems()) {
@@ -900,13 +1009,13 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
                 selectionHasPointEntity = selectionHasPointEntity || isPointEntityNode(selectedNode);
                 selectionHasBrush = selectionHasBrush || isBrushNode(selectedNode);
             }
-            if (isPointEntityNode(targetNode)) {
+            if (isPointEntityNode(targetNodeConst)) {
                 if (selectionHasPointEntity || selectionHasBrush) {
                     event->ignore();
                     return;
                 }
             }
-            if (isBrushNode(targetNode)) {
+            if (isBrushNode(targetNodeConst)) {
                 if (selectionHasBrush || selectionHasPointEntity) {
                     event->ignore();
                     return;

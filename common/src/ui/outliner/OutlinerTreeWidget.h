@@ -38,6 +38,8 @@ private:
 
     bool m_syncingSelection = false;
     int m_suppressScrollToSelectionCount = 0;
+    bool m_updateTreeQueued = false;
+    mdl::Node* m_revealAfterUpdate = nullptr;
     NotifierConnection m_notifierConnection;
     QPoint m_dragStartPosition;
 
@@ -66,6 +68,7 @@ signals:
     void nodeRightClicked(mdl::Node* node, const QPoint& pos);
 
 private:
+    void scheduleUpdateTree(mdl::Node* revealNode = nullptr);
     void loadIcons();
     void setupTreeItem(QTreeWidgetItem* item, mdl::Node* node);
     
