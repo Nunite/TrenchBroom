@@ -11,6 +11,7 @@
 #include <QDropEvent>
 #include <QTimer>
 #include <QApplication>
+#include <QScrollBar>
 
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
@@ -282,7 +283,7 @@ void OutlinerTreeWidget::updateTree()
         qDebug() << "Default layer children count:" << defaultLayer->children().size();
         auto* defaultLayerItem = new QTreeWidgetItem(invisibleRootItem());
         setupTreeItem(defaultLayerItem, defaultLayer);
-        defaultLayerItem->setExpanded(true);
+        defaultLayerItem->setExpanded(false);
         for (auto* node : defaultLayer->children()) {
             addNodeToTree(defaultLayerItem, node);
         }
@@ -306,7 +307,7 @@ void OutlinerTreeWidget::updateTree()
         
         auto* layerItem = new QTreeWidgetItem(invisibleRootItem());
         setupTreeItem(layerItem, layer);
-        layerItem->setExpanded(true);
+        layerItem->setExpanded(false);
         
         for (auto* node : layer->children()) {
             addNodeToTree(layerItem, node);
@@ -334,7 +335,9 @@ void OutlinerTreeWidget::findAndSelectNode(const mdl::Node* targetNode)
             p->setExpanded(true);
             p = p->parent();
         }
-        scrollToItem(item);
+        if (m_suppressScrollToSelectionCount == 0) {
+            scrollToItem(item);
+        }
     }
 }
 
@@ -388,9 +391,16 @@ void OutlinerTreeWidget::onItemSelectionChanged()
     std::vector<mdl::Node*> nodes;
     for (auto* item : items) {
         if (auto* node = nodeFromItem(item)) {
+            if (dynamic_cast<mdl::LayerNode*>(node) || dynamic_cast<mdl::WorldNode*>(node)) {
+                continue;
+            }
             nodes.push_back(node);
             qDebug() << "  Selected Node:" << QString::fromStdString(node->name());
         }
+    }
+
+    if (!items.empty() && nodes.empty()) {
+        return;
     }
     
     m_syncingSelection = true;
@@ -423,6 +433,9 @@ void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
         
         if (node) {
             if (column == 2) { // Lock
+                const auto scrollValue = verticalScrollBar()->value();
+                ++m_suppressScrollToSelectionCount;
+
                 bool newLocked = !node->locked();
                 if (newLocked) {
                     mdl::lockNodes(m_document.map(), {node});
@@ -430,8 +443,16 @@ void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
                     mdl::unlockNodes(m_document.map(), {node});
                 }
                 refreshTreeItemRecursively(item);
+
+                QTimer::singleShot(0, this, [this, scrollValue]() {
+                    verticalScrollBar()->setValue(scrollValue);
+                    --m_suppressScrollToSelectionCount;
+                });
                 return;
             } else if (column == 3) { // Vis
+                const auto scrollValue = verticalScrollBar()->value();
+                ++m_suppressScrollToSelectionCount;
+
                 bool newVisible = !node->visible();
                 if (newVisible) {
                     mdl::showNodes(m_document.map(), {node});
@@ -439,6 +460,11 @@ void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
                     mdl::hideNodes(m_document.map(), {node});
                 }
                 refreshTreeItemRecursively(item);
+
+                QTimer::singleShot(0, this, [this, scrollValue]() {
+                    verticalScrollBar()->setValue(scrollValue);
+                    --m_suppressScrollToSelectionCount;
+                });
                 return;
             }
         }
@@ -449,6 +475,34 @@ void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
 
 void OutlinerTreeWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {
+    if (auto* item = itemAt(event->pos())) {
+        if (auto* node = nodeFromItem(item)) {
+            if (dynamic_cast<mdl::BrushNode*>(node)) {
+                for (auto* parentItem = item->parent(); parentItem != nullptr;
+                     parentItem = parentItem->parent()) {
+                    if (auto* parentNode = nodeFromItem(parentItem)) {
+                        if (auto* entityNode = dynamic_cast<mdl::EntityNode*>(parentNode)) {
+                            {
+                                mdl::Transaction transaction(m_document.map(), "Select Objects");
+                                mdl::deselectAll(m_document.map());
+                                mdl::selectNodes(m_document.map(), {entityNode});
+                                transaction.commit();
+                            }
+
+                            QTimer::singleShot(0, this, [this, entityNode]() {
+                                if (auto* entityItem = findItemForNode(entityNode)) {
+                                    entityItem->setExpanded(false);
+                                    scrollToItem(entityItem);
+                                }
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     QTreeWidget::mouseDoubleClickEvent(event);
 }
 

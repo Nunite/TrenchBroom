@@ -37,6 +37,7 @@ private:
     QIcon m_unlockedIcon;    // Lock_off.svg
 
     bool m_syncingSelection = false;
+    int m_suppressScrollToSelectionCount = 0;
     NotifierConnection m_notifierConnection;
     QPoint m_dragStartPosition;
 
