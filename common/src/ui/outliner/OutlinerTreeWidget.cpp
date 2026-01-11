@@ -1054,6 +1054,39 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
     }
 
     auto* node = nodeFromItem(item);
+    const auto setSingleSelectionIfNeeded = [&]() {
+        if (item->isSelected()) {
+            return;
+        }
+
+        const auto wasSyncing = m_syncingSelection;
+        m_syncingSelection = true;
+        blockSignals(true);
+        clearSelection();
+        item->setSelected(true);
+        setCurrentItem(item);
+        blockSignals(false);
+        m_syncingSelection = wasSyncing;
+
+        if (node) {
+            mdl::Transaction transaction(m_document.map(), "Select Objects");
+            mdl::deselectAll(m_document.map());
+            mdl::selectNodes(m_document.map(), {node});
+            transaction.commit();
+        }
+    };
+
+    const auto addFocusAction = [&](QMenu& menu) {
+        if (auto* mapFrame = qobject_cast<MapFrame*>(window())) {
+            if (auto* focusAction = mapFrame->findAction("Menu/View/Camera/Focus on Selection")) {
+                if (!menu.actions().isEmpty()) {
+                    menu.addSeparator();
+                }
+                menu.addAction(focusAction);
+            }
+        }
+    };
+
     if (auto* layerNode = dynamic_cast<mdl::LayerNode*>(node)) {
         auto& map = m_document.map();
         auto popupMenu = QMenu{this};
@@ -1211,6 +1244,8 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
     }
 
     if (auto* groupNode = dynamic_cast<mdl::GroupNode*>(node)) {
+        setSingleSelectionIfNeeded();
+
         const auto& selection = m_document.map().selection();
         const auto isGroupInSelection = kdl::vec_contains(selection.groups, groupNode);
         const auto keepSelection = selection.hasOnlyGroups() && isGroupInSelection;
@@ -1237,7 +1272,20 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
                 menu.addAction(renameGroupsAction);
             }
         }
+        addFocusAction(menu);
 
+        if (!menu.actions().isEmpty()) {
+            menu.exec(event->globalPos());
+            event->accept();
+        }
+        return;
+    }
+
+    if (node) {
+        setSingleSelectionIfNeeded();
+
+        QMenu menu(this);
+        addFocusAction(menu);
         if (!menu.actions().isEmpty()) {
             menu.exec(event->globalPos());
             event->accept();
