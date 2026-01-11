@@ -30,7 +30,6 @@
 #include "ui/ColorButton.h"
 #include "ui/FlagsEditor.h"
 #include "ui/QtUtils.h"
-#include "ui/SmartPropertyEditorManager.h"
 #include "ui/SmartWadEditor.h"
 #include "ui/ViewUtils.h"
 
@@ -366,19 +365,10 @@ OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(mdl::Map& map, QWidge
     propertiesLayout->setSpacing(0);
     propertiesLayout->addWidget(m_scrollArea, 1);
 
-    m_smartEditorPanel = new CollapsibleTitledPanel{tr("Smart Editor"), true, this};
-    m_smartEditorManager = new SmartPropertyEditorManager{m_map, m_smartEditorPanel->getPanel()};
-
-    auto* smartLayout = new QVBoxLayout{m_smartEditorPanel->getPanel()};
-    smartLayout->setContentsMargins(4, 4, 4, 4);
-    smartLayout->setSpacing(0);
-    smartLayout->addWidget(m_smartEditorManager, 1);
-
     auto* layout = new QVBoxLayout{this};
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(m_propertiesPanel, 1);
-    layout->addWidget(m_smartEditorPanel, 0);
 
     connectObservers();
     scheduleUpdate();
@@ -453,7 +443,6 @@ void OutlinerEntityPropertyEditor::updateFromSelection()
 
     const auto entities = m_map.selection().allEntities();
     rebuildPropertyRows(entities);
-    rebuildSmartEditor("");
 }
 
 void OutlinerEntityPropertyEditor::rebuildPropertyRows(
@@ -573,7 +562,6 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 valueCombo->setEditable(true);
                 valueCombo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
                 valueCombo->setProperty("propertyKey", QString::fromStdString(key));
-                valueCombo->setProperty("suppressSmartEditor", true);
 
                 for (const auto& option : choiceType->options)
                 {
@@ -588,7 +576,6 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 if (auto* comboLineEdit = valueCombo->lineEdit())
                 {
                     comboLineEdit->setProperty("propertyKey", QString::fromStdString(key));
-                    comboLineEdit->setProperty("suppressSmartEditor", true);
                 }
 
                 if (propertyDef->readOnly)
@@ -603,12 +590,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             valueEdit = new QLineEdit{row};
             valueEdit->setObjectName("outlinerPropertyValue");
             valueEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-            valueEdit->installEventFilter(this);
             valueEdit->setProperty("propertyKey", QString::fromStdString(key));
-            if (key == "model" || key == mdl::EntityPropertyKeys::Spawnflags)
-            {
-                valueEdit->setProperty("suppressSmartEditor", true);
-            }
 
             if (propertyDef && propertyDef->readOnly)
             {
@@ -862,7 +844,6 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 m_spawnflagsEditorExpanded = checked;
                 spawnflagsToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
                 container->setVisible(checked);
-                rebuildSmartEditor("");
             });
 
             connect(flagsEditor, &FlagsEditor::flagChanged, this, [this, flagsEditor, key](const size_t index, const int, const int, const int) {
@@ -893,7 +874,6 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 m_wadEditorExpanded = checked;
                 wadToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
                 container->setVisible(checked);
-                rebuildSmartEditor("");
             });
         }
 
@@ -1100,53 +1080,6 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     }
 
     m_scrollLayout->addStretch(1);
-}
-
-void OutlinerEntityPropertyEditor::rebuildSmartEditor(const std::string& propertyKey)
-{
-    if (propertyKey.empty())
-    {
-        m_smartEditorManager->switchEditor("", m_map.selection().allEntities());
-    }
-    else
-    {
-        m_smartEditorManager->switchEditor(propertyKey, m_map.selection().allEntities());
-    }
-
-    m_smartEditorPanel->setHidden(m_smartEditorManager->isDefaultEditorActive());
-}
-
-bool OutlinerEntityPropertyEditor::eventFilter(QObject* watched, QEvent* event)
-{
-    if (event->type() == QEvent::FocusIn)
-    {
-        const auto suppress = watched->property("suppressSmartEditor");
-        if (suppress.isValid() && suppress.toBool())
-        {
-            return QWidget::eventFilter(watched, event);
-        }
-
-        const auto keyVariant = watched->property("propertyKey");
-        if (keyVariant.isValid())
-        {
-            const auto key = keyVariant.toString().toStdString();
-            const auto wadKey = m_map.game()->config().materialConfig.property;
-            if (wadKey && key == *wadKey)
-            {
-                rebuildSmartEditor("");
-            }
-            else if (matchesSmartColorKeyPattern(key))
-            {
-                rebuildSmartEditor("");
-            }
-            else
-            {
-                rebuildSmartEditor(key);
-            }
-        }
-    }
-
-    return QWidget::eventFilter(watched, event);
 }
 
 } // namespace tb::ui

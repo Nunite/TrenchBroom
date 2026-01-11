@@ -23,7 +23,6 @@ namespace tb::ui
 {
 class CollapsibleTitledPanel;
 class FlagsEditor;
-class SmartPropertyEditorManager;
 class SmartWadEditor;
 
 class OutlinerEntityPropertyEditor : public QWidget
@@ -34,7 +33,6 @@ private:
     NotifierConnection m_notifierConnection;
 
     CollapsibleTitledPanel* m_propertiesPanel = nullptr;
-    CollapsibleTitledPanel* m_smartEditorPanel = nullptr;
     QScrollArea* m_scrollArea = nullptr;
     QWidget* m_scrollContents = nullptr;
     QVBoxLayout* m_scrollLayout = nullptr;
@@ -42,7 +40,6 @@ private:
     QLineEdit* m_addKey = nullptr;
     QLineEdit* m_addValue = nullptr;
 
-    SmartPropertyEditorManager* m_smartEditorManager = nullptr;
     QWidget* m_embeddedWadEditorContainer = nullptr;
     SmartWadEditor* m_embeddedWadEditor = nullptr;
     bool m_wadEditorExpanded = false;
@@ -67,9 +64,6 @@ private:
     void updateFromSelection();
 
     void rebuildPropertyRows(const std::vector<mdl::EntityNodeBase*>& entityNodes);
-    void rebuildSmartEditor(const std::string& propertyKey);
-
-    bool eventFilter(QObject* watched, QEvent* event) override;
 };
 
 } // namespace tb::ui
