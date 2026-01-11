@@ -358,6 +358,11 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
 
     m_notifierConnection += m_document.map().selectionDidChangeNotifier.connect(
         this, &OutlinerTreeWidget::onDocumentSelectionChanged);
+
+    m_notifierConnection += m_document.map().groupWasOpenedNotifier.connect(
+        [this](mdl::GroupNode&) { updateCurrentGroupHighlight(); });
+    m_notifierConnection += m_document.map().groupWasClosedNotifier.connect(
+        [this](mdl::GroupNode&) { updateCurrentGroupHighlight(); });
     
     // Listen to map changes to update tree
     m_notifierConnection += m_document.map().nodesWereAddedNotifier.connect(
@@ -674,11 +679,44 @@ void OutlinerTreeWidget::updateTree()
     
     restoreExpandedState(expandedNodesBefore, expandedWorldspawnBefore);
     syncSelectionFromDocument();
+    updateCurrentGroupHighlight();
 
     applyFilter();
     
     m_syncingSelection = wasSyncing;
     blockSignals(false);
+}
+
+void OutlinerTreeWidget::updateCurrentGroupHighlight()
+{
+    const auto* currentGroup = m_document.map().editorContext().currentGroup();
+
+    const auto clearGroup = [&](const mdl::GroupNode* groupNode) {
+        if (!groupNode) {
+            return;
+        }
+        if (auto* item = findItemForNode(groupNode)) {
+            for (int c = 0; c < columnCount(); ++c) {
+                item->setBackground(c, QBrush{});
+            }
+        }
+    };
+
+    if (m_highlightedCurrentGroup != currentGroup) {
+        clearGroup(m_highlightedCurrentGroup);
+        m_highlightedCurrentGroup = currentGroup;
+    }
+
+    if (currentGroup) {
+        if (auto* item = findItemForNode(currentGroup)) {
+            const auto highlight = QBrush{QColor{135, 206, 235, 70}}; // 淡蓝色
+            for (int c = 0; c < columnCount(); ++c) {
+                item->setBackground(c, highlight);
+            }
+        }
+    }
+
+    viewport()->update();
 }
 
 void OutlinerTreeWidget::setFilterText(const QString& text)
@@ -1227,29 +1265,37 @@ void OutlinerTreeWidget::onItemSelectionChanged()
 
     auto items = selectedItems();
     
+    const auto& editorContext = m_document.map().editorContext();
+    auto hadUnselectableItem = false;
     std::vector<mdl::Node*> nodes;
     for (auto* item : items) {
         if (auto* node = nodeFromItem(item)) {
             if (dynamic_cast<mdl::LayerNode*>(node) || dynamic_cast<mdl::WorldNode*>(node)) {
                 continue;
             }
-            nodes.push_back(node);
+            if (editorContext.selectable(*node)) {
+                nodes.push_back(node);
+            } else {
+                hadUnselectableItem = true;
+            }
         }
     }
 
     if (!items.empty() && nodes.empty()) {
+        syncSelectionFromDocument();
+        return;
+    }
+
+    if (hadUnselectableItem) {
+        syncSelectionFromDocument();
         return;
     }
     
     m_syncingSelection = true;
     
     {
-        // Use a transaction to ensure atomic update and undo/redo support
         mdl::Transaction transaction(m_document.map(), "Select Objects");
         
-        // Always deselect all first to ensure we match the UI state exactly.
-        // Even if UI adds to selection, 'nodes' contains ALL selected items,
-        // so clearing and re-selecting 'nodes' is correct.
         mdl::deselectAll(m_document.map());
         
         if (!nodes.empty()) {
@@ -1323,6 +1369,13 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
     const auto setSingleSelectionIfNeeded = [&]() {
         if (item->isSelected()) {
             return;
+        }
+
+        if (node) {
+            if (!m_document.map().editorContext().selectable(*node)) {
+                syncSelectionFromDocument();
+                return;
+            }
         }
 
         const auto wasSyncing = m_syncingSelection;

@@ -84,6 +84,7 @@ private:
     void loadIcons();
     void setupTreeItem(QTreeWidgetItem* item, mdl::Node* node);
     void applyFilter();
+    void updateCurrentGroupHighlight();
     
     // Recursive helpers
     void addNodeToTree(QTreeWidgetItem* parentItem, mdl::Node* node);
@@ -112,6 +113,7 @@ private:
     std::unordered_map<const mdl::Node*, bool> m_expandedBeforeFilter;
     std::unordered_map<const mdl::LayerNode*, bool> m_worldspawnExpandedBeforeFilter;
     SortMode m_sortMode = SortMode::Default;
+    const mdl::GroupNode* m_highlightedCurrentGroup = nullptr;
 };
 
 } // namespace tb::ui
