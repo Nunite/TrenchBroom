@@ -1002,19 +1002,122 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
 
     const auto& selection = m_document.map().selection();
 
-    auto entitiesWithSelectedChildren = std::vector<const mdl::EntityNode*>{};
-    for (const auto* node : selection.nodes) {
-        if (dynamic_cast<const mdl::LayerNode*>(node) || dynamic_cast<const mdl::WorldNode*>(node)) {
-            continue;
+    const auto appendDescendants = [](const mdl::Node* root, std::vector<const mdl::Node*>& out) {
+        if (!root) {
+            return;
         }
 
-        if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(node)) {
-            if (const auto* entityBase = brushNode->entity()) {
-                if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(entityBase)) {
-                    if (!kdl::vec_contains(entitiesWithSelectedChildren, entityNode)) {
-                        entitiesWithSelectedChildren.push_back(entityNode);
+        auto stack = std::vector<const mdl::Node*>{};
+        for (const auto* child : root->children()) {
+            if (child) {
+                stack.push_back(child);
+            }
+        }
+
+        while (!stack.empty()) {
+            const auto* node = stack.back();
+            stack.pop_back();
+
+            if (!kdl::vec_contains(out, node)) {
+                out.push_back(node);
+            }
+
+            for (const auto* child : node->children()) {
+                if (child) {
+                    stack.push_back(child);
+                }
+            }
+        }
+    };
+
+    const auto allLeafDescendantsSelected = [&](const mdl::Node* root) {
+        if (!root) {
+            return false;
+        }
+
+        auto stack = std::vector<const mdl::Node*>{root};
+        while (!stack.empty()) {
+            const auto* node = stack.back();
+            stack.pop_back();
+
+            const auto isContainer = [&]() {
+                if (dynamic_cast<const mdl::GroupNode*>(node)) {
+                    return true;
+                }
+                if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node)) {
+                    return entityNode->hasChildren() && isBrushEntityNode(entityNode);
+                }
+                return false;
+            }();
+
+            if (isContainer) {
+                for (const auto* child : node->children()) {
+                    if (child) {
+                        stack.push_back(child);
                     }
                 }
+                continue;
+            }
+
+            if (
+                dynamic_cast<const mdl::WorldNode*>(node) || dynamic_cast<const mdl::LayerNode*>(node)) {
+                continue;
+            }
+
+            if (!node->selected()) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+
+    auto orderedContainers = std::vector<std::pair<size_t, const mdl::Node*>>{};
+    for (const auto* node : selection.nodes) {
+        for (auto* parent = node ? node->parent() : nullptr; parent != nullptr;
+             parent = parent->parent()) {
+            const auto* container = [&]() -> const mdl::Node* {
+                if (dynamic_cast<const mdl::GroupNode*>(parent)) {
+                    return parent;
+                }
+                if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(parent)) {
+                    if (entityNode->hasChildren() && isBrushEntityNode(entityNode)) {
+                        return parent;
+                    }
+                }
+                return nullptr;
+            }();
+
+            if (!container) {
+                continue;
+            }
+
+            auto alreadyAdded = false;
+            for (const auto& entry : orderedContainers) {
+                if (entry.second == container) {
+                    alreadyAdded = true;
+                    break;
+                }
+            }
+            if (alreadyAdded) {
+                continue;
+            }
+
+            auto depth = size_t{0};
+            for (auto* p = parent; p != nullptr; p = p->parent()) {
+                ++depth;
+            }
+
+            auto inserted = false;
+            for (auto it = orderedContainers.begin(); it != orderedContainers.end(); ++it) {
+                if (depth < it->first) {
+                    orderedContainers.insert(it, {depth, container});
+                    inserted = true;
+                    break;
+                }
+            }
+            if (!inserted) {
+                orderedContainers.push_back({depth, container});
             }
         }
     }
@@ -1032,127 +1135,18 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
 
     auto suppressedChildren = std::vector<const mdl::Node*>{};
 
-    for (const auto* entityNode : entitiesWithSelectedChildren) {
-        if (!entityNode || !entityNode->hasChildren()) {
+    for (const auto& entry : orderedContainers) {
+        const auto* containerNode = entry.second;
+        if (!containerNode || !containerNode->hasChildren()) {
+            continue;
+        }
+        if (kdl::vec_contains(suppressedChildren, containerNode)) {
             continue;
         }
 
-        const auto& children = entityNode->children();
-        if (children.empty()) {
-            continue;
-        }
-
-        auto allChildrenSelected = true;
-        for (const auto* child : children) {
-            if (!kdl::vec_contains(selection.nodes, child)) {
-                allChildrenSelected = false;
-                break;
-            }
-        }
-
-        if (allChildrenSelected) {
-            addNode(entityNode);
-            for (const auto* child : children) {
-                if (!kdl::vec_contains(suppressedChildren, child)) {
-                    suppressedChildren.push_back(child);
-                }
-            }
-        }
-    }
-
-    for (const auto* node : selection.nodes) {
-        if (dynamic_cast<const mdl::LayerNode*>(node) || dynamic_cast<const mdl::WorldNode*>(node)) {
-            continue;
-        }
-
-        if (kdl::vec_contains(suppressedChildren, node)) {
-            continue;
-        }
-
-        addNode(node);
-    }
-
-    for (const auto* node : nodesToSelect) {
-        if (auto* item = findItemForNode(node)) {
-            item->setSelected(true);
-            setCurrentItem(item);
-
-            for (auto* p = item->parent(); p != nullptr; p = p->parent()) {
-                p->setExpanded(true);
-            }
-        }
-    }
-
-    --m_suppressScrollToSelectionCount;
-
-    m_syncingSelection = wasSyncing;
-}
-
-void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& /*change*/)
-{
-    if (m_syncingSelection) return;
-    m_syncingSelection = true;
-    
-    // We can use change info to optimize, but full sync is safer for now
-    blockSignals(true);
-    clearSelection();
-    blockSignals(false);
-
-    const auto& selection = m_document.map().selection();
-
-    auto entitiesWithSelectedChildren = std::vector<const mdl::EntityNode*>{};
-    for (const auto* node : selection.nodes) {
-        if (dynamic_cast<const mdl::LayerNode*>(node) || dynamic_cast<const mdl::WorldNode*>(node)) {
-            continue;
-        }
-
-        if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(node)) {
-            if (const auto* entityBase = brushNode->entity()) {
-                if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(entityBase)) {
-                    if (!kdl::vec_contains(entitiesWithSelectedChildren, entityNode)) {
-                        entitiesWithSelectedChildren.push_back(entityNode);
-                    }
-                }
-            }
-        }
-    }
-
-    auto nodesToSelect = std::vector<const mdl::Node*>{};
-
-    const auto addNode = [&](const mdl::Node* node) {
-        if (!node) return;
-        if (!kdl::vec_contains(nodesToSelect, node)) {
-            nodesToSelect.push_back(node);
-        }
-    };
-
-    auto suppressedChildren = std::vector<const mdl::Node*>{};
-
-    for (const auto* entityNode : entitiesWithSelectedChildren) {
-        if (!entityNode || !entityNode->hasChildren()) {
-            continue;
-        }
-
-        const auto& children = entityNode->children();
-        if (children.empty()) {
-            continue;
-        }
-
-        auto allChildrenSelected = true;
-        for (const auto* child : children) {
-            if (!kdl::vec_contains(selection.nodes, child)) {
-                allChildrenSelected = false;
-                break;
-            }
-        }
-
-        if (allChildrenSelected) {
-            addNode(entityNode);
-            for (const auto* child : children) {
-                if (!kdl::vec_contains(suppressedChildren, child)) {
-                    suppressedChildren.push_back(child);
-                }
-            }
+        if (allLeafDescendantsSelected(containerNode)) {
+            addNode(containerNode);
+            appendDescendants(containerNode, suppressedChildren);
         }
     }
 
@@ -1170,30 +1164,43 @@ void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& 
 
     for (const auto* node : nodesToSelect) {
         if (!findItemForNode(node)) {
-            auto* revealNode = const_cast<mdl::Node*>(node);
-            m_syncingSelection = false;
-            scheduleUpdateTree(revealNode);
+            --m_suppressScrollToSelectionCount;
+            m_syncingSelection = wasSyncing;
+            scheduleUpdateTree(const_cast<mdl::Node*>(node));
             return;
         }
     }
 
     for (const auto* node : nodesToSelect) {
-        findAndSelectNode(node);
-    }
+        if (auto* item = findItemForNode(node)) {
+            item->setSelected(true);
+            setCurrentItem(item);
 
-    for (const auto* node : nodesToSelect) {
-        if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node)) {
-            if (entityNode->hasChildren()) {
-                if (auto* item = findItemForNode(entityNode)) {
+            for (auto* p = item->parent(); p != nullptr; p = p->parent()) {
+                p->setExpanded(true);
+            }
+
+            if (dynamic_cast<const mdl::GroupNode*>(node)) {
+                item->setExpanded(false);
+            } else if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node)) {
+                if (isBrushEntityNode(entityNode)) {
                     item->setExpanded(false);
-                    setCurrentItem(item);
-                    scrollToItem(item);
                 }
             }
         }
     }
-    
-    m_syncingSelection = false;
+
+    --m_suppressScrollToSelectionCount;
+
+    m_syncingSelection = wasSyncing;
+}
+
+void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& /*change*/)
+{
+    if (m_syncingSelection) {
+        return;
+    }
+    syncSelectionFromDocument();
 }
 
 void OutlinerTreeWidget::onItemSelectionChanged()
@@ -1234,6 +1241,7 @@ void OutlinerTreeWidget::onItemSelectionChanged()
     }
     
     m_syncingSelection = false;
+    syncSelectionFromDocument();
 }
 
 void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
