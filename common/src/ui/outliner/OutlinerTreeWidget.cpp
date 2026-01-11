@@ -537,6 +537,10 @@ void OutlinerTreeWidget::updateTree()
         }
     }
 
+    auto expandedNodesBefore = std::unordered_map<const mdl::Node*, bool>{};
+    auto expandedWorldspawnBefore = std::unordered_map<const mdl::LayerNode*, bool>{};
+    captureExpandedState(expandedNodesBefore, expandedWorldspawnBefore);
+
     clear();
 
     auto* world = m_document.map().world();
@@ -630,6 +634,8 @@ void OutlinerTreeWidget::updateTree()
         addLayerContents(layerItem, layer);
     }
     
+    restoreExpandedState(expandedNodesBefore, expandedWorldspawnBefore);
+
     // Restore selection
     if (!selectedNodesBefore.empty()) {
         for (auto* node : selectedNodesBefore) {
@@ -652,34 +658,7 @@ void OutlinerTreeWidget::setFilterText(const QString& text)
         m_expandedBeforeFilter.clear();
         m_worldspawnExpandedBeforeFilter.clear();
 
-        auto stack = std::vector<QTreeWidgetItem*>{};
-        stack.reserve(static_cast<size_t>(topLevelItemCount()));
-
-        for (int i = 0; i < topLevelItemCount(); ++i) {
-            if (auto* item = topLevelItem(i)) {
-                stack.push_back(item);
-            }
-        }
-
-        while (!stack.empty()) {
-            auto* item = stack.back();
-            stack.pop_back();
-
-            if (auto* node = nodeFromItem(item)) {
-                m_expandedBeforeFilter[node] = item->isExpanded();
-            } else if (isWorldspawnItem(item)) {
-                if (auto* layer = worldspawnLayerFromItem(item)) {
-                    m_worldspawnExpandedBeforeFilter[layer] = item->isExpanded();
-                }
-            }
-
-            for (int i = 0; i < item->childCount(); ++i) {
-                if (auto* child = item->child(i)) {
-                    stack.push_back(child);
-                }
-            }
-        }
-
+        captureExpandedState(m_expandedBeforeFilter, m_worldspawnExpandedBeforeFilter);
         m_filterActive = true;
     } else if (m_filterActive && !nextHasQuery) {
         m_filterText = {};
@@ -699,20 +678,6 @@ void OutlinerTreeWidget::setFilterText(const QString& text)
 
             item->setHidden(false);
 
-            if (auto* node = nodeFromItem(item)) {
-                const auto it = m_expandedBeforeFilter.find(node);
-                if (it != m_expandedBeforeFilter.end()) {
-                    item->setExpanded(it->second);
-                }
-            } else if (isWorldspawnItem(item)) {
-                if (auto* layer = worldspawnLayerFromItem(item)) {
-                    const auto it = m_worldspawnExpandedBeforeFilter.find(layer);
-                    if (it != m_worldspawnExpandedBeforeFilter.end()) {
-                        item->setExpanded(it->second);
-                    }
-                }
-            }
-
             for (int i = 0; i < item->childCount(); ++i) {
                 if (auto* child = item->child(i)) {
                     stack.push_back(child);
@@ -720,6 +685,7 @@ void OutlinerTreeWidget::setFilterText(const QString& text)
             }
         }
 
+        restoreExpandedState(m_expandedBeforeFilter, m_worldspawnExpandedBeforeFilter);
         m_expandedBeforeFilter.clear();
         m_worldspawnExpandedBeforeFilter.clear();
         m_filterActive = false;
@@ -1595,6 +1561,78 @@ void OutlinerTreeWidget::updateVisibilityIconRecursively(QTreeWidgetItem* item, 
         auto* child = item->child(i);
         auto* childNode = nodeFromItem(child);
         updateVisibilityIconRecursively(child, childNode ? childNode->visible() : isVisible);
+    }
+}
+
+void OutlinerTreeWidget::captureExpandedState(
+    std::unordered_map<const mdl::Node*, bool>& expandedNodes,
+    std::unordered_map<const mdl::LayerNode*, bool>& expandedWorldspawn) const
+{
+    auto stack = std::vector<QTreeWidgetItem*>{};
+    stack.reserve(static_cast<size_t>(topLevelItemCount()));
+
+    for (int i = 0; i < topLevelItemCount(); ++i) {
+        if (auto* item = topLevelItem(i)) {
+            stack.push_back(item);
+        }
+    }
+
+    while (!stack.empty()) {
+        auto* item = stack.back();
+        stack.pop_back();
+
+        if (auto* node = nodeFromItem(item)) {
+            expandedNodes[node] = item->isExpanded();
+        } else if (isWorldspawnItem(item)) {
+            if (auto* layer = worldspawnLayerFromItem(item)) {
+                expandedWorldspawn[layer] = item->isExpanded();
+            }
+        }
+
+        for (int i = 0; i < item->childCount(); ++i) {
+            if (auto* child = item->child(i)) {
+                stack.push_back(child);
+            }
+        }
+    }
+}
+
+void OutlinerTreeWidget::restoreExpandedState(
+    const std::unordered_map<const mdl::Node*, bool>& expandedNodes,
+    const std::unordered_map<const mdl::LayerNode*, bool>& expandedWorldspawn)
+{
+    auto stack = std::vector<QTreeWidgetItem*>{};
+    stack.reserve(static_cast<size_t>(topLevelItemCount()));
+
+    for (int i = 0; i < topLevelItemCount(); ++i) {
+        if (auto* item = topLevelItem(i)) {
+            stack.push_back(item);
+        }
+    }
+
+    while (!stack.empty()) {
+        auto* item = stack.back();
+        stack.pop_back();
+
+        if (auto* node = nodeFromItem(item)) {
+            const auto it = expandedNodes.find(node);
+            if (it != expandedNodes.end()) {
+                item->setExpanded(it->second);
+            }
+        } else if (isWorldspawnItem(item)) {
+            if (auto* layer = worldspawnLayerFromItem(item)) {
+                const auto it = expandedWorldspawn.find(layer);
+                if (it != expandedWorldspawn.end()) {
+                    item->setExpanded(it->second);
+                }
+            }
+        }
+
+        for (int i = 0; i < item->childCount(); ++i) {
+            if (auto* child = item->child(i)) {
+                stack.push_back(child);
+            }
+        }
     }
 }
 

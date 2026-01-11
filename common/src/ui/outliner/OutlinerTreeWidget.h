@@ -95,6 +95,12 @@ private:
     QTreeWidgetItem* findItemForNode(const mdl::Node* targetNode);
     void refreshTreeItemRecursively(QTreeWidgetItem* item);
     void updateVisibilityIconRecursively(QTreeWidgetItem* item, bool isVisible);
+    void captureExpandedState(
+        std::unordered_map<const mdl::Node*, bool>& expandedNodes,
+        std::unordered_map<const mdl::LayerNode*, bool>& expandedWorldspawn) const;
+    void restoreExpandedState(
+        const std::unordered_map<const mdl::Node*, bool>& expandedNodes,
+        const std::unordered_map<const mdl::LayerNode*, bool>& expandedWorldspawn);
     
     // Helper to get node from item
     mdl::Node* nodeFromItem(QTreeWidgetItem* item) const;
