@@ -170,13 +170,13 @@ jobs:
         if: ${{ startsWith(matrix.os, 'macos') }}
         run: |
             if [[ "${{ matrix.tb-build-type }}" == "sanitize" ]]; then
-              echo "TB_ENABLE_ASAN=1" >> $GITHUB_ENV
-              echo "TB_ENABLE_TSAN=0" >> $GITHUB_ENV
-              echo "TB_ENABLE_UBSAN=1" >> $GITHUB_ENV
+              echo "TB_ENABLE_ASAN=true" >> $GITHUB_ENV
+              echo "TB_ENABLE_TSAN=false" >> $GITHUB_ENV
+              echo "TB_ENABLE_UBSAN=true" >> $GITHUB_ENV
             else
-              echo "TB_ENABLE_ASAN=0" >> $GITHUB_ENV
-              echo "TB_ENABLE_TSAN=0" >> $GITHUB_ENV
-              echo "TB_ENABLE_UBSAN=0" >> $GITHUB_ENV
+              echo "TB_ENABLE_ASAN=false" >> $GITHUB_ENV
+              echo "TB_ENABLE_TSAN=false" >> $GITHUB_ENV
+              echo "TB_ENABLE_UBSAN=false" >> $GITHUB_ENV
             fi
             if [[ "${{ matrix.tb-build-type }}" != "sanitize" ]] && 
                [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12 }}" ]] && 
