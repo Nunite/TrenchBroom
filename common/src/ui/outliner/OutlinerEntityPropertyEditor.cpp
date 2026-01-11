@@ -714,7 +714,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 
         QToolButton* spawnflagsToggleButton = nullptr;
         if (
-            key == mdl::EntityPropertyKeys::Spawnflags && propertyDef
+            !inactive && key == mdl::EntityPropertyKeys::Spawnflags && propertyDef
             && std::holds_alternative<mdl::PropertyValueTypes::Flags>(propertyDef->valueType))
         {
             spawnflagsToggleButton = new QToolButton{row};
