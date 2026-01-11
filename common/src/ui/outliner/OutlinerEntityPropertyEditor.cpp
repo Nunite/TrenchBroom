@@ -203,6 +203,42 @@ bool isColorPropertyDefinition(const mdl::PropertyDefinition& propertyDefinition
            || std::holds_alternative<mdl::PropertyValueTypes::Color<Rgb>>(propertyDefinition.valueType);
 }
 
+bool isPropertyReadOnly(const mdl::Entity& entity, const std::string& key)
+{
+    if (const auto* entityDefinition = entity.definition())
+    {
+        if (const auto* propertyDefinition = mdl::getPropertyDefinition(entityDefinition, key))
+        {
+            return propertyDefinition->readOnly;
+        }
+    }
+    return false;
+}
+
+bool isPropertyKeyMutable(const mdl::Entity& entity, const std::string& key)
+{
+    if (isPropertyReadOnly(entity, key))
+    {
+        return false;
+    }
+
+    if (mdl::isWorldspawn(entity.classname()))
+    {
+        return !(
+            key == mdl::EntityPropertyKeys::Classname || key == mdl::EntityPropertyKeys::Mods
+            || key == mdl::EntityPropertyKeys::EntityDefinitions
+            || key == mdl::EntityPropertyKeys::Wad
+            || key == mdl::EntityPropertyKeys::EnabledMaterialCollections
+            || key == mdl::EntityPropertyKeys::SoftMapBounds
+            || key == mdl::EntityPropertyKeys::LayerColor
+            || key == mdl::EntityPropertyKeys::LayerLocked
+            || key == mdl::EntityPropertyKeys::LayerHidden
+            || key == mdl::EntityPropertyKeys::LayerOmitFromExport);
+    }
+
+    return true;
+}
+
 std::optional<QColor> parseEntityColorToQColor(
     const mdl::EntityDefinition* entityDefinition,
     const std::string& propertyKey,
@@ -648,6 +684,18 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         if (propertyDef && propertyDef->readOnly)
         {
             removeButton->setDisabled(true);
+        }
+        if (!inactive)
+        {
+            auto keyMutable = true;
+            for (const auto* node : entityNodes)
+            {
+                keyMutable = keyMutable && isPropertyKeyMutable(node->entity(), key);
+            }
+            if (!keyMutable)
+            {
+                removeButton->setDisabled(true);
+            }
         }
 
         QToolButton* modelBrowseButton = nullptr;
