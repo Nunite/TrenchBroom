@@ -1361,6 +1361,33 @@ void OutlinerTreeWidget::keyPressEvent(QKeyEvent* event)
         event->accept();
         return;
     }
+
+    if (
+        (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace)
+        && event->modifiers() == Qt::NoModifier) {
+        auto nodesToDelete = std::vector<mdl::Node*>{};
+        nodesToDelete.reserve(static_cast<size_t>(selectedItems().size()));
+        for (auto* item : selectedItems()) {
+            auto* node = nodeFromItem(item);
+            if (!node) {
+                continue;
+            }
+            if (dynamic_cast<mdl::LayerNode*>(node) || dynamic_cast<mdl::WorldNode*>(node)) {
+                continue;
+            }
+            nodesToDelete.push_back(node);
+        }
+
+        if (!nodesToDelete.empty()) {
+            auto& map = m_document.map();
+            auto transaction = mdl::Transaction{map, "Delete Objects"};
+            mdl::deselectAll(map);
+            mdl::removeNodes(map, nodesToDelete);
+            transaction.commit();
+            event->accept();
+            return;
+        }
+    }
     QTreeWidget::keyPressEvent(event);
 }
 
