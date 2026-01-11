@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityNodeBase.h"
@@ -33,13 +34,13 @@ class OutlinerChoiceComboBox : public QComboBox
 {
 private:
     bool& m_popupVisible;
-    std::function<void()> m_onHide;
+    OutlinerEntityPropertyEditor* m_editor;
 
 public:
-    OutlinerChoiceComboBox(bool& popupVisible, std::function<void()> onHide, QWidget* parent)
+    OutlinerChoiceComboBox(bool& popupVisible, OutlinerEntityPropertyEditor* editor, QWidget* parent)
         : QComboBox{parent}
         , m_popupVisible{popupVisible}
-        , m_onHide{std::move(onHide)}
+        , m_editor{editor}
     {
     }
 
@@ -54,10 +55,13 @@ protected:
     {
         QComboBox::hidePopup();
         m_popupVisible = false;
-        if (m_onHide)
-        {
-            m_onHide();
-        }
+        m_editor->onChoiceComboPopupHidden();
+    }
+
+    void wheelEvent(QWheelEvent* event) override
+    {
+        setFocus(Qt::MouseFocusReason);
+        QComboBox::wheelEvent(event);
     }
 };
 
@@ -240,6 +244,18 @@ void OutlinerEntityPropertyEditor::scheduleUpdate(const bool force)
     });
 }
 
+void OutlinerEntityPropertyEditor::onChoiceComboPopupHidden()
+{
+    if (!m_updateDeferred)
+    {
+        return;
+    }
+
+    const auto force = m_forceUpdate;
+    m_updateDeferred = false;
+    scheduleUpdate(force);
+}
+
 void OutlinerEntityPropertyEditor::updateFromSelection()
 {
     if (m_comboPopupVisible)
@@ -366,16 +382,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             {
                 valueCombo = new OutlinerChoiceComboBox{
                     m_comboPopupVisible,
-                    [this]() {
-                        if (!m_updateDeferred)
-                        {
-                            return;
-                        }
-
-                        const auto force = m_forceUpdate;
-                        m_updateDeferred = false;
-                        scheduleUpdate(force);
-                    },
+                    this,
                     row};
                 valueCombo->setObjectName("outlinerPropertyValue");
                 valueCombo->setEditable(true);
@@ -527,11 +534,16 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         {
             connect(
                 valueCombo,
-                QOverload<int>::of(&QComboBox::activated),
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this,
                 [this, valueCombo](const int index) {
                     const auto keyVariant = valueCombo->property("propertyKey");
                     if (!keyVariant.isValid())
+                    {
+                        return;
+                    }
+
+                    if (index < 0)
                     {
                         return;
                     }
@@ -541,6 +553,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                     {
                         return;
                     }
+
+                    valueCombo->setFocus(Qt::MouseFocusReason);
 
                     const auto value = valueVariant.toString();
                     {
@@ -553,7 +567,6 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                         keyVariant.toString().toStdString(),
                         mapStringFromUnicode(m_map.encoding(), value),
                         false);
-                    scheduleUpdate(true);
                 });
 
             if (auto* comboLineEdit = valueCombo->lineEdit())

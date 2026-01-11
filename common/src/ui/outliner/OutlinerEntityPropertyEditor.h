@@ -50,6 +50,7 @@ private:
 public:
     explicit OutlinerEntityPropertyEditor(mdl::Map& map, QWidget* parent = nullptr);
     ~OutlinerEntityPropertyEditor() override;
+    void onChoiceComboPopupHidden();
 
 private:
     void connectObservers();
