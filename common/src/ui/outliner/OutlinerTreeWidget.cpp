@@ -1250,6 +1250,12 @@ void OutlinerTreeWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {
     if (auto* item = itemAt(event->pos())) {
         if (auto* node = nodeFromItem(item)) {
+            if (dynamic_cast<mdl::LayerNode*>(node)) {
+                item->setExpanded(!item->isExpanded());
+                event->accept();
+                return;
+            }
+
             if (dynamic_cast<mdl::BrushNode*>(node)) {
                 for (auto* parentItem = item->parent(); parentItem != nullptr;
                      parentItem = parentItem->parent()) {
