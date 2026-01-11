@@ -190,6 +190,11 @@ if(WIN32)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:miniz::miniz>" "$<TARGET_FILE_DIR:TrenchBroom>"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:GLEW::GLEW>" "$<TARGET_FILE_DIR:TrenchBroom>")
 
+    if(Python3_RUNTIME_LIBRARY)
+        add_custom_command(TARGET TrenchBroom POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${Python3_RUNTIME_LIBRARY}" "$<TARGET_FILE_DIR:TrenchBroom>")
+    endif()
+
     # Run windeployqt which copies the Qt dlls into the deployable folder, along with necessary runtime dlls by the compiler
     # Only copy translations on release builds, as deploying them takes significantly longer
     if(NOT TB_SKIP_WINDEPLOYQT)

@@ -395,6 +395,8 @@ public:
 
   void showLaunchEngineDialog();
 
+  void runPythonScript();
+
   bool canRevealMaterial() const;
   void revealMaterial();
 

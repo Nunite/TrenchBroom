@@ -78,6 +78,7 @@
 #include "ui/ActionBuilder.h"
 #include "ui/Actions.h"
 #include "ui/ChoosePathTypeDialog.h"
+#include "ui/PythonScripting.h"
 #include "ui/ClipTool.h"
 #include "ui/ColorButton.h"
 #include "ui/CompilationDialog.h"
@@ -2267,6 +2268,29 @@ void MapFrame::showLaunchEngineDialog()
 {
   auto dialog = LaunchGameEngineDialog{document(), this};
   dialog.exec();
+}
+
+void MapFrame::runPythonScript()
+{
+  const auto pathStr = QFileDialog::getOpenFileName(
+    this,
+    tr("Run Python Script"),
+    fileDialogDefaultDirectory(FileDialogDir::Map),
+    tr("Python Scripts (*.py);;All Files (*)"));
+  if (pathStr.isEmpty())
+  {
+    return;
+  }
+
+  updateFileDialogDefaultDirectoryWithFilename(FileDialogDir::Map, pathStr);
+
+  if (!PythonScripting::instance().runScript(*this, io::pathFromQString(pathStr)))
+  {
+    QMessageBox::warning(
+      this,
+      tr("Python Script Failed"),
+      tr("The Python script failed. See console for details."));
+  }
 }
 
 namespace

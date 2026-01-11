@@ -42,6 +42,9 @@
       "name": "fast-float",
       "version>=": "6.1.4",
       "platform": "osx"
+    },
+    {
+      "name": "python3"
     }
   ],
   "builtin-baseline": "9a5d7860d1e3c0e394495744cecbf0f5cf41306a",

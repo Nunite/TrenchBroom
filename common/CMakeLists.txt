@@ -349,6 +349,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/CompilationTaskListBox.cpp
         ${COMMON_SOURCE_DIR}/ui/CompilationVariables.cpp
         ${COMMON_SOURCE_DIR}/ui/Console.cpp
+        ${COMMON_SOURCE_DIR}/ui/PythonScripting.cpp
         ${COMMON_SOURCE_DIR}/ui/ContainerBar.cpp
         ${COMMON_SOURCE_DIR}/ui/ControlListBox.cpp
         ${COMMON_SOURCE_DIR}/ui/ControlListBox.cpp
@@ -1059,6 +1060,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/ToolChain.h
         ${COMMON_SOURCE_DIR}/ui/ToolController.h
         ${COMMON_SOURCE_DIR}/ui/TwoPaneMapView.h
+        ${COMMON_SOURCE_DIR}/ui/PythonScripting.h
         ${COMMON_SOURCE_DIR}/ui/UpdateConfig.h
         ${COMMON_SOURCE_DIR}/ui/UpdatePreferencePane.h
         ${COMMON_SOURCE_DIR}/ui/UpdateVersion.h
@@ -1090,7 +1092,7 @@ set_target_properties(common PROPERTIES AUTOMOC TRUE)
 target_include_directories(common PUBLIC ${COMMON_SOURCE_DIR})
 target_link_libraries(common 
   PUBLIC kdl vm Qt6::Widgets Qt6::OpenGL Qt6::OpenGLWidgets Qt6::Svg
-  PRIVATE GLEW::GLEW OpenGL::GL upd tinyxml2::tinyxml2 miniz::miniz freeimage::FreeImage freetype assimp::assimp fmt::fmt-header-only)
+  PRIVATE GLEW::GLEW OpenGL::GL upd tinyxml2::tinyxml2 miniz::miniz freeimage::FreeImage freetype assimp::assimp fmt::fmt-header-only Python3::Python)
 
 # use precompiled headers on CMake 3.16 or later
 precompile_std_headers(common)

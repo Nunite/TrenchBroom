@@ -2095,6 +2095,15 @@ void ActionManager::createRunMenu()
     [](auto& context) { context.frame().showLaunchEngineDialog(); },
     [](const auto& context) { return context.hasDocument(); },
   }));
+  runMenu.addSeparator();
+  runMenu.addItem(addAction(Action{
+    "Menu/Run/Run Python Script...",
+    QObject::tr("Run Python Script..."),
+    ActionContext::Any,
+    QKeySequence{},
+    [](auto& context) { context.frame().runPythonScript(); },
+    [](const auto&) { return true; },
+  }));
 }
 
 void ActionManager::createDebugMenu()
