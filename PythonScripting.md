@@ -139,6 +139,14 @@ with tb.transaction("My Batch Edit"):
 
 平移当前选择（可撤销/可重做）。
 
+#### `Selection.rotate(axis_x: float, axis_y: float, axis_z: float, angle_degrees: float, center_x: float | None = None, center_y: float | None = None, center_z: float | None = None) -> bool`
+
+绕给定轴旋转当前选择（可撤销/可重做）。
+
+- `axis_*`：旋转轴向量（例如 Z 轴 `(0, 0, 1)`）
+- `angle_degrees`：角度，单位“度”
+- `center_*`：可选旋转中心点；如果不传，默认使用当前 selection bounds 的中心
+
 ### 类型：`Transaction`
 
 `Transaction` 用于把一段脚本编辑行为合并成一次 undo/redo（推荐用 `with`）。

@@ -26,6 +26,9 @@
 
 #include "Exceptions.h"
 #include "Logger.h"
+#include "kdl/vector_utils.h"
+#include "mdl/BrushFaceHandle.h"
+#include "mdl/BrushNode.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityNode.h"
 #include "mdl/Map.h"
@@ -84,6 +87,41 @@ PyTypeObject* g_transactionType = nullptr;
 PyObject* toPyString(const std::string& str)
 {
   return PyUnicode_FromStringAndSize(str.c_str(), static_cast<Py_ssize_t>(str.size()));
+}
+
+PyObject* toPyVec3dTuple(const vm::vec3d& v)
+{
+  auto* tuple = PyTuple_New(3);
+  if (tuple == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto* x = PyFloat_FromDouble(v.x());
+  if (x == nullptr)
+  {
+    Py_DECREF(tuple);
+    return nullptr;
+  }
+  PyTuple_SET_ITEM(tuple, 0, x);
+
+  auto* y = PyFloat_FromDouble(v.y());
+  if (y == nullptr)
+  {
+    Py_DECREF(tuple);
+    return nullptr;
+  }
+  PyTuple_SET_ITEM(tuple, 1, y);
+
+  auto* z = PyFloat_FromDouble(v.z());
+  if (z == nullptr)
+  {
+    Py_DECREF(tuple);
+    return nullptr;
+  }
+  PyTuple_SET_ITEM(tuple, 2, z);
+
+  return tuple;
 }
 
 tb::ui::MapDocument* activeDocument()
@@ -663,6 +701,67 @@ PyObject* selection_get_all_entities(PyObject* self, void*)
   return selection_all_entities(self, nullptr);
 }
 
+PyObject* selection_brush_vertices(PyObject* self, PyObject*)
+{
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto& map = doc->map();
+  const auto& selection = map.selection();
+
+  auto brushNodes = std::vector<tb::mdl::BrushNode*>{};
+  brushNodes.insert(
+    brushNodes.end(), selection.allBrushes().begin(), selection.allBrushes().end());
+
+  if (selection.hasBrushFaces())
+  {
+    auto nodesFromFaces = tb::mdl::toNodes(selection.brushFaces);
+    brushNodes.insert(brushNodes.end(), nodesFromFaces.begin(), nodesFromFaces.end());
+  }
+
+  brushNodes = kdl::vec_sort_and_remove_duplicates(std::move(brushNodes));
+
+  auto* outer = PyList_New(static_cast<Py_ssize_t>(brushNodes.size()));
+  if (outer == nullptr)
+  {
+    return nullptr;
+  }
+
+  Py_ssize_t brushIndex = 0;
+  for (auto* brushNode : brushNodes)
+  {
+    const auto vertices = brushNode->brush().vertexPositions();
+    auto* inner = PyList_New(static_cast<Py_ssize_t>(vertices.size()));
+    if (inner == nullptr)
+    {
+      Py_DECREF(outer);
+      return nullptr;
+    }
+
+    Py_ssize_t vertexIndex = 0;
+    for (const auto& v : vertices)
+    {
+      auto* tuple = toPyVec3dTuple(v);
+      if (tuple == nullptr)
+      {
+        Py_DECREF(inner);
+        Py_DECREF(outer);
+        return nullptr;
+      }
+      PyList_SET_ITEM(inner, vertexIndex, tuple);
+      ++vertexIndex;
+    }
+
+    PyList_SET_ITEM(outer, brushIndex, inner);
+    ++brushIndex;
+  }
+
+  return outer;
+}
+
 PyObject* selection_clear(PyObject* self, PyObject*)
 {
   auto* doc = getDocumentFromSelectionPy(self);
@@ -785,6 +884,77 @@ PyObject* selection_translate(PyObject* self, PyObject* args)
   try
   {
     const auto ok = tb::mdl::translateSelection(doc->map(), vm::vec3d{x, y, z});
+    if (ok)
+    {
+      Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
+PyObject* selection_rotate(PyObject* self, PyObject* args)
+{
+  double axisX = 0.0;
+  double axisY = 0.0;
+  double axisZ = 0.0;
+  double angleDegrees = 0.0;
+  double centerX = 0.0;
+  double centerY = 0.0;
+  double centerZ = 0.0;
+
+  if (!PyArg_ParseTuple(args, "dddd|ddd", &axisX, &axisY, &axisZ, &angleDegrees, &centerX, &centerY, &centerZ))
+  {
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  try
+  {
+    auto& map = doc->map();
+
+    auto center = vm::vec3d{};
+    const auto argCount = PyTuple_Size(args);
+    if (argCount >= 7)
+    {
+      center = vm::vec3d{centerX, centerY, centerZ};
+    }
+    else
+    {
+      const auto bounds = map.selectionBounds();
+      if (!bounds)
+      {
+        PyErr_SetString(PyExc_RuntimeError, "Selection bounds are not available");
+        return nullptr;
+      }
+
+      center = bounds->min + bounds->size() / 2.0;
+    }
+
+    constexpr double pi = 3.1415926535897932384626433832795;
+    const auto angleRadians = angleDegrees * (pi / 180.0);
+
+    const auto ok =
+      tb::mdl::rotateSelection(map, center, vm::vec3d{axisX, axisY, axisZ}, angleRadians);
     if (ok)
     {
       Py_RETURN_TRUE;
@@ -1061,9 +1231,11 @@ bool registerTypes(PyObject* module)
     static PyMethodDef selectionMethods[] = {
       {"entities", selection_entities, METH_NOARGS, nullptr},
       {"all_entities", selection_all_entities, METH_NOARGS, nullptr},
+      {"brush_vertices", selection_brush_vertices, METH_NOARGS, nullptr},
       {"set_property", selection_set_property, METH_VARARGS, nullptr},
       {"duplicate", selection_duplicate, METH_NOARGS, nullptr},
       {"translate", selection_translate, METH_VARARGS, nullptr},
+      {"rotate", selection_rotate, METH_VARARGS, nullptr},
       {"remove_property", selection_remove_property, METH_VARARGS, nullptr},
       {"rename_property", selection_rename_property, METH_VARARGS, nullptr},
       {"clear", selection_clear, METH_NOARGS, nullptr},

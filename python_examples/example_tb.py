@@ -16,6 +16,7 @@ def main() -> None:
         for _ in range(10):
             sel.duplicate()
             sel.translate(128, 0, 0)
+            sel.rotate(0, 0, 1, 15)
 
     print("done")
 
