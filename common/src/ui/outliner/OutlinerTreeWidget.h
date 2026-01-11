@@ -112,6 +112,8 @@ private:
     bool m_filterActive = false;
     std::unordered_map<const mdl::Node*, bool> m_expandedBeforeFilter;
     std::unordered_map<const mdl::LayerNode*, bool> m_worldspawnExpandedBeforeFilter;
+    std::unordered_map<std::string, size_t> m_linkedGroupSetSizes;
+    std::unordered_map<std::string, int> m_linkedGroupSetIndices;
     SortMode m_sortMode = SortMode::Default;
     const mdl::GroupNode* m_highlightedCurrentGroup = nullptr;
 };

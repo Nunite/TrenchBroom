@@ -29,6 +29,7 @@
 #include "mdl/Map_Selection.h"
 #include "mdl/Map_Nodes.h" // for reparentNodes helpers if needed
 #include "mdl/Map_Layers.h"
+#include "mdl/ModelUtils.h"
 #include "mdl/EditorContext.h"
 #include "mdl/Selection.h"
 #include "mdl/Transaction.h"
@@ -406,6 +407,10 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
             for (auto* node : nodes) {
                 if (auto* item = findItemForNode(node)) {
                     refreshTreeItemRecursively(item);
+                } else if (dynamic_cast<mdl::WorldNode*>(node)) {
+                    for (int i = 0; i < topLevelItemCount(); ++i) {
+                        refreshTreeItemRecursively(topLevelItem(i));
+                    }
                 }
             }
         });
@@ -517,7 +522,28 @@ void OutlinerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
     // Info Column (1)
     if (dynamic_cast<mdl::LayerNode*>(node)) {
     } else if (auto* container = dynamic_cast<mdl::GroupNode*>(node)) {
-        item->setText(1, QString("%1 objects").arg(container->childCount()));
+        auto info = QString("%1 objects").arg(container->childCount());
+
+        if (const auto sizeIt = m_linkedGroupSetSizes.find(container->linkId());
+            sizeIt != m_linkedGroupSetSizes.end() && sizeIt->second > 1u) {
+            const auto indexIt = m_linkedGroupSetIndices.find(container->linkId());
+            const auto index = indexIt != m_linkedGroupSetIndices.end() ? indexIt->second : 0;
+
+            if (index > 0) {
+                info += QString(" · Link %1").arg(index);
+                item->setToolTip(
+                    1,
+                    QString("Linked group set %1 (%2 groups)")
+                        .arg(index)
+                        .arg(static_cast<qulonglong>(sizeIt->second)));
+            } else {
+                info += QString(" · Link");
+                item->setToolTip(
+                    1, QString("Linked group set (%1 groups)").arg(static_cast<qulonglong>(sizeIt->second)));
+            }
+        }
+
+        item->setText(1, info);
     } else if (auto* entity = dynamic_cast<mdl::EntityNode*>(node)) {
         if (entity->childCount() > 0) {
              item->setText(1, QString("%1 brushes").arg(entity->childCount()));
@@ -591,6 +617,34 @@ void OutlinerTreeWidget::updateTree()
         m_syncingSelection = wasSyncing;
         blockSignals(false);
         return;
+    }
+
+    m_linkedGroupSetSizes.clear();
+    m_linkedGroupSetIndices.clear();
+    {
+        const auto groups = mdl::collectGroups({world});
+        for (const auto* groupNode : groups) {
+            if (groupNode) {
+                ++m_linkedGroupSetSizes[groupNode->linkId()];
+            }
+        }
+
+        auto nextIndex = 1;
+        for (const auto* groupNode : groups) {
+            if (!groupNode) {
+                continue;
+            }
+
+            const auto& linkId = groupNode->linkId();
+            const auto sizeIt = m_linkedGroupSetSizes.find(linkId);
+            if (sizeIt == m_linkedGroupSetSizes.end() || sizeIt->second <= 1u) {
+                continue;
+            }
+
+            if (m_linkedGroupSetIndices.find(linkId) == m_linkedGroupSetIndices.end()) {
+                m_linkedGroupSetIndices.emplace(linkId, nextIndex++);
+            }
+        }
     }
 
     // We can iterate layers if we want to show layers, OR we can show entities directly if they are top-level in the layer.
@@ -1318,6 +1372,21 @@ void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
         
         if (node) {
             if (column == 2) { // Lock
+                const auto& editorContext = m_document.map().editorContext();
+                if (const auto* currentGroup = editorContext.currentGroup()) {
+                    const auto inCurrentGroup =
+                        node == currentGroup || node->isDescendantOf(currentGroup);
+                    if (!inCurrentGroup) {
+                        return;
+                    }
+                }
+
+                if (const auto* groupNode = dynamic_cast<const mdl::GroupNode*>(node)) {
+                    if (groupNode->opened()) {
+                        return;
+                    }
+                }
+
                 const auto scrollValue = verticalScrollBar()->value();
                 ++m_suppressScrollToSelectionCount;
 
