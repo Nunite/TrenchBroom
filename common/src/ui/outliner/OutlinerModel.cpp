@@ -14,7 +14,11 @@
 #include <QMimeData>
 #include <QDataStream>
 #include <QIODevice>
-#include <set>
+#include <QSet>
+
+#include <algorithm>
+#include <map>
+#include <vector>
 
 namespace tb::ui
 {
@@ -23,6 +27,14 @@ OutlinerModel::OutlinerModel(mdl::Map& map, QObject* parent) :
     QAbstractItemModel(parent),
     m_map(map)
 {
+    m_groupIcon = io::loadSVGIcon("Folder.svg");
+    m_entityIcon = io::loadSVGIcon("NoTool.svg");
+    m_brushIcon = io::loadSVGIcon("BrushTool.svg");
+    m_visibleIcon = io::loadSVGIcon("Hidden_off.svg");
+    m_hiddenIcon = io::loadSVGIcon("Hidden_on.svg");
+    m_lockedIcon = io::loadSVGIcon("Lock_on.svg");
+    m_unlockedIcon = io::loadSVGIcon("Lock_off.svg");
+
     m_notifierConnection += m_map.nodesWereAddedNotifier.connect([this](const std::vector<mdl::Node*>& nodes) { onNodesWereAdded(nodes); });
     m_notifierConnection += m_map.nodesWillBeRemovedNotifier.connect([this](const std::vector<mdl::Node*>& nodes) { onNodesWillBeRemoved(nodes); });
     m_notifierConnection += m_map.nodesWereRemovedNotifier.connect([this](const std::vector<mdl::Node*>& nodes) { onNodesWereRemoved(nodes); });
@@ -135,15 +147,15 @@ QVariant OutlinerModel::data(const QModelIndex& index, int role) const
         {
             if (dynamic_cast<mdl::GroupNode*>(node))
             {
-                return io::loadSVGIcon("Folder.svg");
+                return m_groupIcon;
             }
             else if (dynamic_cast<mdl::EntityNode*>(node))
             {
-                 return io::loadSVGIcon("NoTool.svg"); 
+                 return m_entityIcon; 
             }
             else if (dynamic_cast<mdl::BrushNode*>(node))
             {
-                return io::loadSVGIcon("BrushTool.svg");
+                return m_brushIcon;
             }
         }
     }
@@ -157,9 +169,9 @@ QVariant OutlinerModel::data(const QModelIndex& index, int role) const
             // Note: We might want to distinguish between Explicitly Hidden and Inherited Hidden?
             // For now simple toggle.
             if (node->visibilityState() == mdl::VisibilityState::Hidden)
-                return io::loadSVGIcon("Hidden_on.svg");
+                return m_hiddenIcon;
             else
-                return io::loadSVGIcon("Hidden_off.svg");
+                return m_visibleIcon;
         }
     }
     else if (index.column() == 2) // Lock
@@ -167,9 +179,9 @@ QVariant OutlinerModel::data(const QModelIndex& index, int role) const
         if (role == Qt::DecorationRole)
         {
             if (node->lockState() == mdl::LockState::Locked)
-                return io::loadSVGIcon("Lock_on.svg");
+                return m_lockedIcon;
             else
-                return io::loadSVGIcon("Lock_off.svg");
+                return m_unlockedIcon;
         }
     }
 
@@ -208,7 +220,7 @@ QMimeData* OutlinerModel::mimeData(const QModelIndexList& indexes) const
     QByteArray encodedData;
     QDataStream stream(&encodedData, QIODevice::WriteOnly);
 
-    std::set<mdl::Node*> uniqueNodes;
+    auto uniqueNodes = QSet<mdl::Node*>{};
     for (const QModelIndex& index : indexes)
     {
         if (index.isValid())

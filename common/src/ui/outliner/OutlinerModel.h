@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAbstractItemModel>
+#include <QIcon>
 
 #include "NotifierConnection.h"
 
@@ -42,6 +43,14 @@ public:
 private:
     mdl::Map& m_map;
     NotifierConnection m_notifierConnection;
+
+    QIcon m_groupIcon;
+    QIcon m_entityIcon;
+    QIcon m_brushIcon;
+    QIcon m_visibleIcon;
+    QIcon m_hiddenIcon;
+    QIcon m_lockedIcon;
+    QIcon m_unlockedIcon;
 
     void onNodesWereAdded(const std::vector<mdl::Node*>& nodes);
     void onNodesWillBeRemoved(const std::vector<mdl::Node*>& nodes);

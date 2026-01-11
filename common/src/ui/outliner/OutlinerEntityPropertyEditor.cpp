@@ -23,7 +23,6 @@
 #include "ui/QtUtils.h"
 #include "ui/SmartPropertyEditorManager.h"
 
-#include <functional>
 #include <unordered_set>
 
 namespace tb::ui
@@ -282,8 +281,7 @@ void OutlinerEntityPropertyEditor::updateFromSelection()
 void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     const std::vector<mdl::EntityNodeBase*>& entityNodes)
 {
-    auto clearLayout = std::function<void(QLayout*)>{};
-    clearLayout = [&](QLayout* l) {
+    const auto clearLayout = [&](auto&& self, QLayout* l) -> void {
         while (auto* item = l->takeAt(0))
         {
             if (auto* w = item->widget())
@@ -292,14 +290,14 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             }
             if (auto* childLayout = item->layout())
             {
-                clearLayout(childLayout);
+                self(self, childLayout);
                 childLayout->deleteLater();
             }
             delete item;
         }
     };
 
-    clearLayout(m_scrollLayout);
+    clearLayout(clearLayout, m_scrollLayout);
 
     auto* addRow = new QWidget{m_scrollContents};
     addRow->setObjectName("outlinerPropertyRow");
