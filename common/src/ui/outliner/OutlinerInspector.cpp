@@ -1,6 +1,6 @@
 #include "OutlinerInspector.h"
 #include "OutlinerTreeWidget.h"
-#include "ui/EntityPropertyEditor.h"
+#include "ui/outliner/OutlinerEntityPropertyEditor.h"
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
 #include "ui/Splitter.h"
@@ -73,9 +73,7 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, GLContextManager& co
     m_treeWidget = new OutlinerTreeWidget(m_document, m_splitter);
     m_splitter->addWidget(m_treeWidget);
 
-    m_propertyEditor = new EntityPropertyEditor{
-        m_document.map(), QStringLiteral("OutlinerEntityPropertyEditor_Splitter"), m_splitter};
-    m_propertyEditor->setDocumentationEnabled(false);
+    m_propertyEditor = new OutlinerEntityPropertyEditor{m_document.map(), m_splitter};
     m_splitter->addWidget(m_propertyEditor);
 
     m_splitter->setStretchFactor(0, 3);
