@@ -74,8 +74,10 @@ protected:
 
     void wheelEvent(QWheelEvent* event) override
     {
-        setFocus(Qt::MouseFocusReason);
-        QComboBox::wheelEvent(event);
+        // enable wheel scrolling
+        // setFocus(Qt::MouseFocusReason);
+        // QComboBox::wheelEvent(event);
+        event->ignore();
     }
 };
 
