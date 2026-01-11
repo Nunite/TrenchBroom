@@ -363,7 +363,12 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     m_notifierConnection += m_document.map().groupWasOpenedNotifier.connect(
         [this](mdl::GroupNode&) { updateCurrentGroupHighlight(); });
     m_notifierConnection += m_document.map().groupWasClosedNotifier.connect(
-        [this](mdl::GroupNode&) { updateCurrentGroupHighlight(); });
+        [this](mdl::GroupNode& groupNode) {
+            if (auto* item = findItemForNode(&groupNode)) {
+                item->setExpanded(false);
+            }
+            updateCurrentGroupHighlight();
+        });
     
     // Listen to map changes to update tree
     m_notifierConnection += m_document.map().nodesWereAddedNotifier.connect(
