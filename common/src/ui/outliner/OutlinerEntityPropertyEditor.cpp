@@ -16,12 +16,15 @@
 
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityNodeBase.h"
+#include "mdl/EntityProperties.h"
+#include "mdl/Game.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/PropertyDefinition.h"
 #include "ui/CollapsibleTitledPanel.h"
 #include "ui/QtUtils.h"
 #include "ui/SmartPropertyEditorManager.h"
+#include "ui/SmartWadEditor.h"
 
 #include <unordered_set>
 
@@ -222,6 +225,12 @@ void OutlinerEntityPropertyEditor::connectObservers()
         [this](const std::vector<mdl::Node*>&) { scheduleUpdate(); });
     m_notifierConnection +=
         m_map.entityDefinitionsDidChangeNotifier.connect([this]() { scheduleUpdate(); });
+    m_notifierConnection += m_map.documentDidChangeNotifier.connect([this]() {
+        if (m_embeddedWadEditor)
+        {
+            m_embeddedWadEditor->update(m_map.selection().allEntities());
+        }
+    });
 }
 
 void OutlinerEntityPropertyEditor::scheduleUpdate(const bool force)
@@ -281,6 +290,9 @@ void OutlinerEntityPropertyEditor::updateFromSelection()
 void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     const std::vector<mdl::EntityNodeBase*>& entityNodes)
 {
+    m_embeddedWadEditorContainer = nullptr;
+    m_embeddedWadEditor = nullptr;
+
     const auto clearLayout = [&](auto&& self, QLayout* l) -> void {
         while (auto* item = l->takeAt(0))
         {
@@ -353,6 +365,10 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 
     const auto* entityDefinition = mdl::selectEntityDefinition(entityNodes);
     const auto keys = buildKeyOrderWithInactiveDefinitions(entityNodes, entityDefinition);
+    const auto wadKey = m_map.game()->config().materialConfig.property;
+    const auto canShowWadEditor = entityNodes.size() == 1
+                                 && entityNodes.front()->entity().classname()
+                                      == mdl::EntityPropertyValues::WorldspawnClassname;
 
     for (const auto& key : keys)
     {
@@ -497,6 +513,20 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             removeButton->setDisabled(true);
         }
 
+        QToolButton* wadToggleButton = nullptr;
+        if (canShowWadEditor && wadKey && key == *wadKey)
+        {
+            wadToggleButton = new QToolButton{row};
+            wadToggleButton->setObjectName("toolButton_withBorder");
+            wadToggleButton->setCheckable(true);
+            wadToggleButton->setFixedSize(QSize{24, 24});
+            wadToggleButton->setToolTip(tr("Show wad file editor"));
+
+            const QSignalBlocker blocker{wadToggleButton};
+            wadToggleButton->setChecked(m_wadEditorExpanded);
+            wadToggleButton->setArrowType(m_wadEditorExpanded ? Qt::DownArrow : Qt::RightArrow);
+        }
+
         rowLayout->addWidget(keyLabel);
         if (valueCombo)
         {
@@ -506,10 +536,39 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         {
             rowLayout->addWidget(valueEdit, 1);
         }
+        if (wadToggleButton)
+        {
+            rowLayout->addWidget(wadToggleButton);
+        }
         rowLayout->addWidget(activateButton);
         rowLayout->addWidget(removeButton);
 
         m_scrollLayout->addWidget(row, 0);
+
+        if (wadToggleButton)
+        {
+            auto* container = new QWidget{m_scrollContents};
+            container->setObjectName("outlinerEmbeddedWadEditor");
+            auto* containerLayout = new QVBoxLayout{container};
+            containerLayout->setContentsMargins(6, 0, 6, 4);
+            containerLayout->setSpacing(0);
+
+            m_embeddedWadEditorContainer = container;
+            m_embeddedWadEditor = new SmartWadEditor{m_map, container, false};
+            m_embeddedWadEditor->activate(*wadKey);
+            m_embeddedWadEditor->update(entityNodes);
+            containerLayout->addWidget(m_embeddedWadEditor, 1);
+
+            container->setVisible(m_wadEditorExpanded);
+            m_scrollLayout->addWidget(container, 0);
+
+            connect(wadToggleButton, &QToolButton::toggled, this, [this, container, wadToggleButton](const bool checked) {
+                m_wadEditorExpanded = checked;
+                wadToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
+                container->setVisible(checked);
+                rebuildSmartEditor("");
+            });
+        }
 
         connect(activateButton, &QAbstractButton::clicked, this, [this, activateButton, propertyDef]() {
             const auto keyVariant = activateButton->property("propertyKey");
@@ -641,7 +700,16 @@ bool OutlinerEntityPropertyEditor::eventFilter(QObject* watched, QEvent* event)
         const auto keyVariant = watched->property("propertyKey");
         if (keyVariant.isValid())
         {
-            rebuildSmartEditor(keyVariant.toString().toStdString());
+            const auto key = keyVariant.toString().toStdString();
+            const auto wadKey = m_map.game()->config().materialConfig.property;
+            if (wadKey && key == *wadKey)
+            {
+                rebuildSmartEditor("");
+            }
+            else
+            {
+                rebuildSmartEditor(key);
+            }
         }
     }
 

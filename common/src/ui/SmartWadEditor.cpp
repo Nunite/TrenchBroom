@@ -75,11 +75,9 @@ std::string getWadPathStr(const std::vector<std::filesystem::path>& wadPaths)
 
 } // namespace
 
-SmartWadEditor::SmartWadEditor(mdl::Map& map, QWidget* parent)
+SmartWadEditor::SmartWadEditor(mdl::Map& map, QWidget* parent, const bool showTitleBar)
   : SmartPropertyEditor{map, parent}
 {
-  auto* header = new TitleBar{"Wad Files"};
-
   m_wadPaths = new QListWidget{};
   m_wadPaths->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
@@ -101,7 +99,10 @@ SmartWadEditor::SmartWadEditor(mdl::Map& map, QWidget* parent)
   auto* layout = new QVBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(0);
-  layout->addWidget(header);
+  if (showTitleBar)
+  {
+    layout->addWidget(new TitleBar{"Wad Files"});
+  }
   layout->addWidget(m_wadPaths, 1);
   layout->addWidget(new BorderLine{}, 0);
   layout->addLayout(toolBar, 0);

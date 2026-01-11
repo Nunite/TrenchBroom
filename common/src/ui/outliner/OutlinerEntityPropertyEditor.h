@@ -23,6 +23,7 @@ namespace tb::ui
 {
 class CollapsibleTitledPanel;
 class SmartPropertyEditorManager;
+class SmartWadEditor;
 
 class OutlinerEntityPropertyEditor : public QWidget
 {
@@ -41,6 +42,9 @@ private:
     QLineEdit* m_addValue = nullptr;
 
     SmartPropertyEditorManager* m_smartEditorManager = nullptr;
+    QWidget* m_embeddedWadEditorContainer = nullptr;
+    SmartWadEditor* m_embeddedWadEditor = nullptr;
+    bool m_wadEditorExpanded = false;
 
     bool m_updateQueued = false;
     bool m_forceUpdate = false;

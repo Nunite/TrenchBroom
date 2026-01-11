@@ -47,7 +47,7 @@ private:
   QAbstractButton* m_reloadWadsButton = nullptr;
 
 public:
-  explicit SmartWadEditor(mdl::Map& map, QWidget* parent = nullptr);
+  explicit SmartWadEditor(mdl::Map& map, QWidget* parent = nullptr, bool showTitleBar = true);
 
   void addWads();
   void removeSelectedWads();
