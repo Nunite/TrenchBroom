@@ -435,7 +435,25 @@ void OutlinerTreeWidget::scheduleUpdateTree(mdl::Node* revealNode)
 
         if (m_revealAfterUpdate) {
             if (auto* revealItem = findItemForNode(m_revealAfterUpdate)) {
-                revealItem->setExpanded(true);
+                for (auto* p = revealItem->parent(); p != nullptr; p = p->parent()) {
+                    p->setExpanded(true);
+                }
+
+                const auto expandRevealItem = [&]() {
+                    if (const auto* node = nodeFromItem(revealItem)) {
+                        if (dynamic_cast<const mdl::GroupNode*>(node)) {
+                            return false;
+                        }
+                        if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node)) {
+                            if (isBrushEntityNode(entityNode)) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                }();
+
+                revealItem->setExpanded(expandRevealItem);
                 scrollToItem(revealItem);
             }
             m_revealAfterUpdate = nullptr;
