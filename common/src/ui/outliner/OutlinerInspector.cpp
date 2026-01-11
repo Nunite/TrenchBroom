@@ -49,8 +49,6 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, GLContextManager& co
     m_sortBox->addItem(tr("Type"), static_cast<int>(OutlinerTreeWidget::SortMode::Type));
     topRow->addWidget(m_sortBox);
 
-    topRow->addStretch(1);
-
     auto* propertiesToggle = createBitmapToggleButton(
         "Map_entity.svg",
         tr("Toggle properties panel"),
