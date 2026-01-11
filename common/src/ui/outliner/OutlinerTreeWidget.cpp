@@ -1320,27 +1320,33 @@ void OutlinerTreeWidget::onItemSelectionChanged()
     auto items = selectedItems();
     
     const auto& editorContext = m_document.map().editorContext();
-    auto hadUnselectableItem = false;
+    const auto outlinerSelectable = [&](const mdl::Node& node) {
+        if (const auto* groupNode = dynamic_cast<const mdl::GroupNode*>(&node)) {
+            if (groupNode->opened()) {
+                return false;
+            }
+        }
+
+        if (const auto* currentGroup = editorContext.currentGroup()) {
+            return &node == currentGroup || node.isDescendantOf(currentGroup);
+        }
+
+        return true;
+    };
+
     std::vector<mdl::Node*> nodes;
     for (auto* item : items) {
         if (auto* node = nodeFromItem(item)) {
             if (dynamic_cast<mdl::LayerNode*>(node) || dynamic_cast<mdl::WorldNode*>(node)) {
                 continue;
             }
-            if (editorContext.selectable(*node)) {
+            if (outlinerSelectable(*node)) {
                 nodes.push_back(node);
-            } else {
-                hadUnselectableItem = true;
             }
         }
     }
 
     if (!items.empty() && nodes.empty()) {
-        syncSelectionFromDocument();
-        return;
-    }
-
-    if (hadUnselectableItem) {
         syncSelectionFromDocument();
         return;
     }
@@ -1435,13 +1441,27 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
     }
 
     auto* node = nodeFromItem(item);
+    const auto& editorContext = m_document.map().editorContext();
+    const auto outlinerSelectable = [&](const mdl::Node& node_) {
+        if (const auto* groupNode = dynamic_cast<const mdl::GroupNode*>(&node_)) {
+            if (groupNode->opened()) {
+                return false;
+            }
+        }
+
+        if (const auto* currentGroup = editorContext.currentGroup()) {
+            return &node_ == currentGroup || node_.isDescendantOf(currentGroup);
+        }
+
+        return true;
+    };
     const auto setSingleSelectionIfNeeded = [&]() {
         if (item->isSelected()) {
             return;
         }
 
         if (node) {
-            if (!m_document.map().editorContext().selectable(*node)) {
+            if (!outlinerSelectable(*node)) {
                 syncSelectionFromDocument();
                 return;
             }
