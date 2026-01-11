@@ -14,6 +14,7 @@
 #include <QScrollBar>
 #include <QMenu>
 #include <QContextMenuEvent>
+#include <QSet>
 
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
@@ -21,6 +22,7 @@
 #include "mdl/GroupNode.h"
 #include "mdl/EntityNode.h"
 #include "mdl/BrushNode.h"
+#include "mdl/PatchNode.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/Map_NodeVisibility.h"
 #include "mdl/Map_NodeLocking.h"
@@ -123,6 +125,30 @@ static void sortNodes(
     };
 
     nodes = kdl::vec_sort(std::move(nodes), cmp);
+}
+
+template <typename NodeFromItem>
+static std::vector<mdl::Node*> collectSelectedNodes(
+    const QList<QTreeWidgetItem*>& selectedItems,
+    const NodeFromItem& nodeFromItem)
+{
+    auto nodes = std::vector<mdl::Node*>{};
+    nodes.reserve(static_cast<size_t>(selectedItems.size()));
+
+    for (auto* item : selectedItems) {
+        auto* node = nodeFromItem(item);
+        if (!node) {
+            continue;
+        }
+
+        if (dynamic_cast<mdl::WorldNode*>(node) || dynamic_cast<mdl::LayerNode*>(node)) {
+            continue;
+        }
+
+        nodes.push_back(node);
+    }
+
+    return kdl::vec_sort_and_remove_duplicates(std::move(nodes));
 }
 
 template <typename NodeFromItem>
@@ -530,14 +556,6 @@ void OutlinerTreeWidget::updateTree()
     m_syncingSelection = true;
     blockSignals(true);
 
-    // Save selection
-    std::vector<mdl::Node*> selectedNodesBefore;
-    for (auto* item : selectedItems()) {
-        if (auto* node = nodeFromItem(item)) {
-            selectedNodesBefore.push_back(node);
-        }
-    }
-
     auto expandedNodesBefore = std::unordered_map<const mdl::Node*, bool>{};
     auto expandedWorldspawnBefore = std::unordered_map<const mdl::LayerNode*, bool>{};
     captureExpandedState(expandedNodesBefore, expandedWorldspawnBefore);
@@ -637,13 +655,7 @@ void OutlinerTreeWidget::updateTree()
     }
     
     restoreExpandedState(expandedNodesBefore, expandedWorldspawnBefore);
-
-    // Restore selection
-    if (!selectedNodesBefore.empty()) {
-        for (auto* node : selectedNodesBefore) {
-            findAndSelectNode(node);
-        }
-    }
+    syncSelectionFromDocument();
 
     applyFilter();
     
@@ -732,6 +744,150 @@ void OutlinerTreeWidget::applyFilter()
         bool visited;
     };
 
+    struct ParsedFilter {
+        QStringList nameTerms;
+        QSet<QString> types;
+        int visible = -1;
+        int locked = -1;
+        bool selectedOnly = false;
+    };
+
+    const auto parsed = [&]() {
+        auto result = ParsedFilter{};
+
+        const auto tokens = query.split(' ', Qt::SkipEmptyParts);
+        for (const auto& tokenRaw : tokens) {
+            const auto token = tokenRaw.trimmed();
+            if (token.isEmpty()) {
+                continue;
+            }
+
+            const auto lower = token.toLower();
+            if (lower.startsWith("type:")) {
+                const auto values = lower.mid(5).split(',', Qt::SkipEmptyParts);
+                for (const auto& v : values) {
+                    const auto t = v.trimmed();
+                    if (!t.isEmpty()) {
+                        result.types.insert(t);
+                    }
+                }
+                continue;
+            }
+
+            if (lower.startsWith("vis:")) {
+                const auto v = lower.mid(4).trimmed();
+                if (v == "visible" || v == "shown" || v == "show") {
+                    result.visible = 1;
+                } else if (v == "hidden" || v == "hide") {
+                    result.visible = 0;
+                }
+                continue;
+            }
+
+            if (lower.startsWith("lock:")) {
+                const auto v = lower.mid(5).trimmed();
+                if (v == "locked" || v == "lock") {
+                    result.locked = 1;
+                } else if (v == "unlocked" || v == "unlock") {
+                    result.locked = 0;
+                }
+                continue;
+            }
+
+            if (lower == "sel" || lower == "selected") {
+                result.selectedOnly = true;
+                continue;
+            }
+
+            result.nameTerms.push_back(token);
+        }
+
+        return result;
+    }();
+
+    const auto matchesItem = [&](QTreeWidgetItem* item) {
+        if (!item) {
+            return false;
+        }
+
+        const auto matchesName = [&]() {
+            if (parsed.nameTerms.empty()) {
+                return true;
+            }
+
+            const auto name = item->text(0);
+            for (const auto& term : parsed.nameTerms) {
+                if (!name.contains(term, Qt::CaseInsensitive)) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        const auto matchesSelected = [&]() {
+            return !parsed.selectedOnly || item->isSelected();
+        };
+
+        if (isWorldspawnItem(item)) {
+            if (!parsed.types.empty() && !parsed.types.contains("worldspawn")) {
+                return false;
+            }
+
+            if (auto* layer = worldspawnLayerFromItem(item)) {
+                if (parsed.visible != -1 && layer->visible() != (parsed.visible == 1)) {
+                    return false;
+                }
+                if (parsed.locked != -1 && layer->locked() != (parsed.locked == 1)) {
+                    return false;
+                }
+            } else {
+                if (parsed.visible != -1 || parsed.locked != -1) {
+                    return false;
+                }
+            }
+
+            return matchesSelected() && matchesName();
+        }
+
+        auto* node = nodeFromItem(item);
+        if (!node) {
+            return false;
+        }
+
+        if (!parsed.types.empty()) {
+            auto typeName = QString{};
+            if (dynamic_cast<const mdl::GroupNode*>(node)) {
+                typeName = "group";
+            } else if (dynamic_cast<const mdl::EntityNode*>(node)) {
+                typeName = "entity";
+            } else if (dynamic_cast<const mdl::BrushNode*>(node)) {
+                typeName = "brush";
+            } else if (dynamic_cast<const mdl::PatchNode*>(node)) {
+                typeName = "patch";
+            } else if (dynamic_cast<const mdl::LayerNode*>(node)) {
+                typeName = "layer";
+            } else if (dynamic_cast<const mdl::WorldNode*>(node)) {
+                typeName = "world";
+            } else {
+                typeName = "other";
+            }
+
+            if (!parsed.types.contains(typeName)) {
+                return false;
+            }
+        }
+
+        if (parsed.visible != -1 && node->visible() != (parsed.visible == 1)) {
+            return false;
+        }
+
+        if (parsed.locked != -1 && node->locked() != (parsed.locked == 1)) {
+            return false;
+        }
+
+        return matchesSelected() && matchesName();
+    };
+
     auto stack = std::vector<Frame>{};
     stack.reserve(static_cast<size_t>(topLevelItemCount()));
 
@@ -767,7 +923,7 @@ void OutlinerTreeWidget::applyFilter()
             }
         }
 
-        const auto selfShown = item->text(0).contains(query, Qt::CaseInsensitive);
+        const auto selfShown = matchesItem(item);
         const auto shown = selfShown || anyChildShown;
         item->setHidden(!shown);
 
@@ -830,6 +986,106 @@ QTreeWidgetItem* OutlinerTreeWidget::findItemForNode(const mdl::Node* targetNode
         }
     }
     return nullptr;
+}
+
+void OutlinerTreeWidget::syncSelectionFromDocument()
+{
+    const auto wasSyncing = m_syncingSelection;
+    m_syncingSelection = true;
+
+    ++m_suppressScrollToSelectionCount;
+
+    const auto wereSignalsBlocked = signalsBlocked();
+    blockSignals(true);
+    clearSelection();
+    blockSignals(wereSignalsBlocked);
+
+    const auto& selection = m_document.map().selection();
+
+    auto entitiesWithSelectedChildren = std::vector<const mdl::EntityNode*>{};
+    for (const auto* node : selection.nodes) {
+        if (dynamic_cast<const mdl::LayerNode*>(node) || dynamic_cast<const mdl::WorldNode*>(node)) {
+            continue;
+        }
+
+        if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(node)) {
+            if (const auto* entityBase = brushNode->entity()) {
+                if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(entityBase)) {
+                    if (!kdl::vec_contains(entitiesWithSelectedChildren, entityNode)) {
+                        entitiesWithSelectedChildren.push_back(entityNode);
+                    }
+                }
+            }
+        }
+    }
+
+    auto nodesToSelect = std::vector<const mdl::Node*>{};
+
+    const auto addNode = [&](const mdl::Node* node) {
+        if (!node) {
+            return;
+        }
+        if (!kdl::vec_contains(nodesToSelect, node)) {
+            nodesToSelect.push_back(node);
+        }
+    };
+
+    auto suppressedChildren = std::vector<const mdl::Node*>{};
+
+    for (const auto* entityNode : entitiesWithSelectedChildren) {
+        if (!entityNode || !entityNode->hasChildren()) {
+            continue;
+        }
+
+        const auto& children = entityNode->children();
+        if (children.empty()) {
+            continue;
+        }
+
+        auto allChildrenSelected = true;
+        for (const auto* child : children) {
+            if (!kdl::vec_contains(selection.nodes, child)) {
+                allChildrenSelected = false;
+                break;
+            }
+        }
+
+        if (allChildrenSelected) {
+            addNode(entityNode);
+            for (const auto* child : children) {
+                if (!kdl::vec_contains(suppressedChildren, child)) {
+                    suppressedChildren.push_back(child);
+                }
+            }
+        }
+    }
+
+    for (const auto* node : selection.nodes) {
+        if (dynamic_cast<const mdl::LayerNode*>(node) || dynamic_cast<const mdl::WorldNode*>(node)) {
+            continue;
+        }
+
+        if (kdl::vec_contains(suppressedChildren, node)) {
+            continue;
+        }
+
+        addNode(node);
+    }
+
+    for (const auto* node : nodesToSelect) {
+        if (auto* item = findItemForNode(node)) {
+            item->setSelected(true);
+            setCurrentItem(item);
+
+            for (auto* p = item->parent(); p != nullptr; p = p->parent()) {
+                p->setExpanded(true);
+            }
+        }
+    }
+
+    --m_suppressScrollToSelectionCount;
+
+    m_syncingSelection = wasSyncing;
 }
 
 void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& /*change*/)
@@ -910,6 +1166,15 @@ void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& 
         }
 
         addNode(node);
+    }
+
+    for (const auto* node : nodesToSelect) {
+        if (!findItemForNode(node)) {
+            auto* revealNode = const_cast<mdl::Node*>(node);
+            m_syncingSelection = false;
+            scheduleUpdateTree(revealNode);
+            return;
+        }
     }
 
     for (const auto* node : nodesToSelect) {
@@ -1250,6 +1515,23 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
         addFocusAction(menu);
 
         if (!menu.actions().isEmpty()) {
+            menu.addSeparator();
+        }
+
+        const auto nodes = collectSelectedNodes(selectedItems(), [this](QTreeWidgetItem* i) { return nodeFromItem(i); });
+        auto* duplicateAction = menu.addAction(tr("Duplicate"), this, [this]() {
+            mdl::duplicateSelectedNodes(m_document.map());
+        });
+        duplicateAction->setEnabled(!nodes.empty());
+
+        auto* deleteAction = menu.addAction(tr("Delete"), this, [this]() {
+            mdl::removeSelectedNodes(m_document.map());
+        });
+        deleteAction->setEnabled(!nodes.empty());
+
+        addFocusAction(menu);
+
+        if (!menu.actions().isEmpty()) {
             menu.exec(event->globalPos());
             event->accept();
         }
@@ -1261,6 +1543,21 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
 
         QMenu menu(this);
         addFocusAction(menu);
+        if (!menu.actions().isEmpty()) {
+            menu.addSeparator();
+        }
+
+        const auto nodes = collectSelectedNodes(selectedItems(), [this](QTreeWidgetItem* i) { return nodeFromItem(i); });
+        auto* duplicateAction = menu.addAction(tr("Duplicate"), this, [this]() {
+            mdl::duplicateSelectedNodes(m_document.map());
+        });
+        duplicateAction->setEnabled(!nodes.empty());
+
+        auto* deleteAction = menu.addAction(tr("Delete"), this, [this]() {
+            mdl::removeSelectedNodes(m_document.map());
+        });
+        deleteAction->setEnabled(!nodes.empty());
+
         if (!menu.actions().isEmpty()) {
             menu.exec(event->globalPos());
             event->accept();
