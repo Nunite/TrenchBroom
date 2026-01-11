@@ -241,6 +241,11 @@ Logger& MapFrame::logger() const
   return *m_console;
 }
 
+Logger& MapFrame::pythonLogger() const
+{
+  return *m_pythonConsole;
+}
+
 QAction* MapFrame::findAction(const std::filesystem::path& path)
 {
   const auto& actionManager = ActionManager::instance();
@@ -388,6 +393,7 @@ void MapFrame::createGui()
   m_infoPanel = new InfoPanel{document()};
   m_infoPanel->setObjectName("MapFrame_InfoPanel");
   m_console = m_infoPanel->console();
+  m_pythonConsole = m_infoPanel->pythonConsole();
 
   m_mapView = new SwitchableMapViewContainer{document(), *m_contextManager};
   m_currentMapView = m_mapView->firstMapViewBase();
@@ -2289,7 +2295,7 @@ void MapFrame::runPythonScript()
     QMessageBox::warning(
       this,
       tr("Python Script Failed"),
-      tr("The Python script failed. See console for details."));
+      tr("The Python script failed. See the Python console for details."));
   }
 }
 

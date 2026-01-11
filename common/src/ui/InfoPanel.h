@@ -39,6 +39,7 @@ class InfoPanel : public QWidget
 private:
   TabBook* m_tabBook = nullptr;
   Console* m_console = nullptr;
+  Console* m_pythonConsole = nullptr;
   IssueBrowser* m_issueBrowser = nullptr;
 
 public:
@@ -46,6 +47,7 @@ public:
   ~InfoPanel() override;
 
   Console* console() const;
+  Console* pythonConsole() const;
 
   QByteArray saveState() const;
   bool restoreState(const QByteArray& state);

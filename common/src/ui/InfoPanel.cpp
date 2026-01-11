@@ -39,9 +39,11 @@ InfoPanel::InfoPanel(MapDocument& document, QWidget* parent)
   m_tabBook->setObjectName("InfoPanel_TabBook");
 
   m_console = new Console{};
+  m_pythonConsole = new Console{};
   m_issueBrowser = new IssueBrowser{document};
 
   m_tabBook->addPage(m_console, tr("Console"));
+  m_tabBook->addPage(m_pythonConsole, tr("Python Console"));
   m_tabBook->addPage(m_issueBrowser, tr("Issues"));
 
   auto* sizer = new QVBoxLayout{};
@@ -60,6 +62,11 @@ InfoPanel::~InfoPanel()
 Console* InfoPanel::console() const
 {
   return m_console;
+}
+
+Console* InfoPanel::pythonConsole() const
+{
+  return m_pythonConsole;
 }
 
 QByteArray InfoPanel::saveState() const

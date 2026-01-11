@@ -106,6 +106,7 @@ private:
   QPointer<MapViewBase> m_currentMapView;
   InfoPanel* m_infoPanel = nullptr;
   Console* m_console = nullptr;
+  Console* m_pythonConsole = nullptr;
   Inspector* m_inspector = nullptr;
 
   QComboBox* m_gridChoice = nullptr;
@@ -140,6 +141,7 @@ public:
 
 public: // getters and such
   Logger& logger() const;
+  Logger& pythonLogger() const;
   QAction* findAction(const std::filesystem::path& path);
 
 private: // title bar contents

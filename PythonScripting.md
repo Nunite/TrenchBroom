@@ -94,6 +94,13 @@ with tb.transaction("My Batch Edit"):
 
 创建一个事务对象（可用于 `with`），作用于此文档的 undo 栈。
 
+#### `Document.vertex_tool_vertices() -> list[tuple[float, float, float]]`
+
+返回当前“顶点工具（Vertex Tool）”里被选中的顶点坐标列表（vertex handles）。
+
+- 返回值：`[(x, y, z), ...]`
+- 如果当前没有选中任何顶点，返回空列表
+
 ### 类型：`Selection`
 
 `Selection` 表示当前选择（Nodes + Face selection 的抽象）。注意 TrenchBroom 的选择语义有两层：
@@ -146,6 +153,13 @@ with tb.transaction("My Batch Edit"):
 - `axis_*`：旋转轴向量（例如 Z 轴 `(0, 0, 1)`）
 - `angle_degrees`：角度，单位“度”
 - `center_*`：可选旋转中心点；如果不传，默认使用当前 selection bounds 的中心
+
+#### `Selection.brush_vertices() -> list[list[tuple[float, float, float]]]`
+
+返回当前选择中所有 brush 的顶点坐标。
+
+- 返回值结构：外层 list 每个元素对应一个 brush；内层是该 brush 的顶点 `(x, y, z)`
+- 选中 brush face 时，会把该 face 所在 brush 也纳入结果（自动去重）
 
 ### 类型：`Transaction`
 
@@ -262,6 +276,32 @@ with tb.transaction("Python: duplicate 10x"):
     for _ in range(10):
         sel.duplicate()
         sel.translate(128, 0, 0)
+```
+
+### 6) 围绕“顶点工具选中的第一个顶点”旋转
+
+```python
+import tb
+
+def main() -> None:
+    doc = tb.Document.current()
+    if doc is None:
+        print("No active document")
+        return
+
+    verts = doc.vertex_tool_vertices()
+    if len(verts) == 0:
+        print("No vertex tool selection")
+        return
+
+    pivot_x, pivot_y, pivot_z = verts[0]
+
+    sel = doc.selection
+    with tb.transaction("Python: rotate around vertex"):
+        sel.rotate(0, 0, 1, 15, pivot_x, pivot_y, pivot_z)
+
+if __name__ == "__main__":
+    main()
 ```
 
 ## 注意事项 / 约束

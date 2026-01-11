@@ -37,6 +37,7 @@
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Transaction.h"
+#include "mdl/VertexHandleManager.h"
 #include "ui/Actions.h"
 #include "ui/MapFrame.h"
 #include "ui/MapDocument.h"
@@ -370,11 +371,11 @@ PyObject* log_writer_write(PyObject* self, PyObject* args)
   {
     if (writer->isError != 0)
     {
-      g_currentFrame->logger().error(message);
+      g_currentFrame->pythonLogger().error(message);
     }
     else
     {
-      g_currentFrame->logger().info(message);
+      g_currentFrame->pythonLogger().info(message);
     }
   }
 
@@ -422,6 +423,56 @@ PyObject* document_transaction(PyObject* self, PyObject* args)
   }
 
   return createTransactionObject(doc, nameObj);
+}
+
+PyObject* document_vertex_tool_vertices(PyObject* self, PyObject*)
+{
+  auto* doc = getDocumentFromPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  try
+  {
+    const auto vertices = doc->map().vertexHandles().selectedHandles();
+
+    auto* list = PyList_New(static_cast<Py_ssize_t>(vertices.size()));
+    if (list == nullptr)
+    {
+      return nullptr;
+    }
+
+    Py_ssize_t index = 0;
+    for (const auto& v : vertices)
+    {
+      auto* tuple = toPyVec3dTuple(v);
+      if (tuple == nullptr)
+      {
+        Py_DECREF(list);
+        return nullptr;
+      }
+      PyList_SET_ITEM(list, index, tuple);
+      ++index;
+    }
+
+    return list;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
 }
 
 PyObject* transaction_enter(PyObject* self, PyObject*)
@@ -1195,6 +1246,7 @@ bool registerTypes(PyObject* module)
        nullptr},
       {"get_selection", document_selection, METH_NOARGS, nullptr},
       {"transaction", document_transaction, METH_VARARGS, nullptr},
+      {"vertex_tool_vertices", document_vertex_tool_vertices, METH_NOARGS, nullptr},
       {nullptr, nullptr, 0, nullptr},
     };
     documentType.tp_methods = documentMethods;
@@ -1552,7 +1604,7 @@ bool PythonScripting::runScript(MapFrame& frame, const std::filesystem::path& pa
 {
   if (!ensureInitialized())
   {
-    frame.logger().error() << "Python initialization failed";
+    frame.pythonLogger().error() << "Python initialization failed";
     return false;
   }
 
@@ -1603,7 +1655,7 @@ bool PythonScripting::runScript(MapFrame& frame, const std::filesystem::path& pa
 
   if (fp == nullptr)
   {
-    frame.logger().error() << "Could not open script: " << filename;
+    frame.pythonLogger().error() << "Could not open script: " << filename;
     if (oldStdout)
     {
       PySys_SetObject("stdout", oldStdout);
@@ -1623,7 +1675,7 @@ bool PythonScripting::runScript(MapFrame& frame, const std::filesystem::path& pa
   if (rc != 0)
   {
     PyErr_Print();
-    frame.logger().error() << "Python script failed: " << filename;
+    frame.pythonLogger().error() << "Python script failed: " << filename;
     if (oldStdout)
     {
       PySys_SetObject("stdout", oldStdout);
