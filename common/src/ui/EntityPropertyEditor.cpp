@@ -41,6 +41,17 @@ namespace tb::ui
 EntityPropertyEditor::EntityPropertyEditor(mdl::Map& map, QWidget* parent)
   : QWidget{parent}
   , m_map{map}
+  , m_splitterObjectName{"EntityAttributeEditor_Splitter"}
+{
+  createGui();
+  connectObservers();
+}
+
+EntityPropertyEditor::EntityPropertyEditor(
+  mdl::Map& map, const QString& splitterObjectName, QWidget* parent)
+  : QWidget{parent}
+  , m_map{map}
+  , m_splitterObjectName{splitterObjectName}
 {
   createGui();
   connectObservers();
@@ -49,6 +60,17 @@ EntityPropertyEditor::EntityPropertyEditor(mdl::Map& map, QWidget* parent)
 EntityPropertyEditor::~EntityPropertyEditor()
 {
   saveWindowState(m_splitter);
+}
+
+void EntityPropertyEditor::setDocumentationEnabled(const bool enabled)
+{
+  if (m_documentationEnabled == enabled)
+  {
+    return;
+  }
+
+  m_documentationEnabled = enabled;
+  updateDocumentationAndSmartEditor();
 }
 
 void EntityPropertyEditor::OnCurrentRowChanged()
@@ -85,10 +107,20 @@ void EntityPropertyEditor::updateDocumentationAndSmartEditor()
 
   m_smartEditorManager->switchEditor(propertyKey, m_map.selection().allEntities());
 
-  updateDocumentation(propertyKey);
+  if (m_documentationEnabled)
+  {
+    updateDocumentation(propertyKey);
+  }
 
   // collapse the splitter if needed
-  m_documentationText->setHidden(m_documentationText->document()->isEmpty());
+  if (m_documentationEnabled)
+  {
+    m_documentationText->setHidden(m_documentationText->document()->isEmpty());
+  }
+  else
+  {
+    m_documentationText->setHidden(true);
+  }
   m_smartEditorManager->setHidden(m_smartEditorManager->isDefaultEditorActive());
 
   updateMinimumSize();
@@ -232,7 +264,7 @@ void EntityPropertyEditor::createGui()
 
   // This class has since been renamed, but we leave the old name so as not to reset the
   // users' view settings.
-  m_splitter->setObjectName("EntityAttributeEditor_Splitter");
+  m_splitter->setObjectName(m_splitterObjectName);
 
   m_propertyGrid = new EntityPropertyGrid{m_map};
   m_smartEditorManager = new SmartPropertyEditorManager{m_map};
@@ -282,11 +314,17 @@ void EntityPropertyEditor::updateMinimumSize()
   size.setWidth(m_propertyGrid->minimumWidth());
   size.setHeight(m_propertyGrid->minimumHeight());
 
-  size.setWidth(std::max(size.width(), m_smartEditorManager->minimumSizeHint().width()));
-  size.setHeight(size.height() + m_smartEditorManager->minimumSizeHint().height());
+  if (!m_smartEditorManager->isHidden())
+  {
+    size.setWidth(std::max(size.width(), m_smartEditorManager->minimumSizeHint().width()));
+    size.setHeight(size.height() + m_smartEditorManager->minimumSizeHint().height());
+  }
 
-  size.setWidth(std::max(size.width(), m_documentationText->minimumSizeHint().width()));
-  size.setHeight(size.height() + m_documentationText->minimumSizeHint().height());
+  if (m_documentationEnabled && !m_documentationText->isHidden())
+  {
+    size.setWidth(std::max(size.width(), m_documentationText->minimumSizeHint().width()));
+    size.setHeight(size.height() + m_documentationText->minimumSizeHint().height());
+  }
 
   setMinimumSize(size);
   updateGeometry();

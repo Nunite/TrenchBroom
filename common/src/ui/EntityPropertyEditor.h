@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <QString>
 #include <QWidget>
 
 #include "NotifierConnection.h"
@@ -52,6 +53,8 @@ class EntityPropertyEditor : public QWidget
   Q_OBJECT
 private:
   mdl::Map& m_map;
+  QString m_splitterObjectName;
+  bool m_documentationEnabled = true;
   QSplitter* m_splitter = nullptr;
   EntityPropertyGrid* m_propertyGrid = nullptr;
   SmartPropertyEditorManager* m_smartEditorManager = nullptr;
@@ -62,7 +65,11 @@ private:
 
 public:
   explicit EntityPropertyEditor(mdl::Map& map, QWidget* parent = nullptr);
+  EntityPropertyEditor(
+    mdl::Map& map, const QString& splitterObjectName, QWidget* parent = nullptr);
   ~EntityPropertyEditor() override;
+
+  void setDocumentationEnabled(bool enabled);
 
 private:
   void OnCurrentRowChanged();
