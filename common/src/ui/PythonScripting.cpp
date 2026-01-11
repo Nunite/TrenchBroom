@@ -30,7 +30,10 @@
 #include "mdl/EntityNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
+#include "mdl/Map_Geometry.h"
+#include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/Transaction.h"
 #include "ui/Actions.h"
 #include "ui/MapFrame.h"
 #include "ui/MapDocument.h"
@@ -65,10 +68,18 @@ struct PyTbLogWriter
   PyObject_HEAD int isError;
 };
 
+struct PyTbTransaction
+{
+  PyObject_HEAD tb::ui::MapDocument* document;
+  PyObject* name;
+  tb::mdl::Transaction* transaction;
+};
+
 PyTypeObject* g_documentType = nullptr;
 PyTypeObject* g_selectionType = nullptr;
 PyTypeObject* g_entityType = nullptr;
 PyTypeObject* g_logWriterType = nullptr;
+PyTypeObject* g_transactionType = nullptr;
 
 PyObject* toPyString(const std::string& str)
 {
@@ -82,6 +93,20 @@ tb::ui::MapDocument* activeDocument()
 
 void freePythonObject(PyObject* self)
 {
+  PyObject_Del(self);
+}
+
+void freeTransactionObject(PyObject* self)
+{
+  auto* obj = reinterpret_cast<PyTbTransaction*>(self);
+  if (obj->transaction != nullptr)
+  {
+    obj->transaction->cancel();
+    delete obj->transaction;
+    obj->transaction = nullptr;
+  }
+  Py_XDECREF(obj->name);
+  obj->name = nullptr;
   PyObject_Del(self);
 }
 
@@ -154,6 +179,41 @@ PyObject* createEntityObject(tb::ui::MapDocument* document, tb::mdl::EntityNodeB
   return reinterpret_cast<PyObject*>(obj);
 }
 
+PyObject* createTransactionObject(tb::ui::MapDocument* document, PyObject* name)
+{
+  if (g_transactionType == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "tb.Transaction type is not initialized");
+    return nullptr;
+  }
+
+  auto* obj = PyObject_New(PyTbTransaction, g_transactionType);
+  if (obj == nullptr)
+  {
+    return nullptr;
+  }
+
+  obj->document = document;
+  obj->transaction = nullptr;
+
+  if (name != nullptr)
+  {
+    Py_INCREF(name);
+    obj->name = name;
+  }
+  else
+  {
+    obj->name = toPyString("Python Script");
+    if (obj->name == nullptr)
+    {
+      PyObject_Del(obj);
+      return nullptr;
+    }
+  }
+
+  return reinterpret_cast<PyObject*>(obj);
+}
+
 tb::ui::MapDocument* getDocumentFromPy(PyObject* self)
 {
   if (g_documentType == nullptr || !PyObject_TypeCheck(self, g_documentType))
@@ -214,6 +274,24 @@ PyTbLogWriter* getLogWriterFromPy(PyObject* self)
   }
 
   return reinterpret_cast<PyTbLogWriter*>(self);
+}
+
+PyTbTransaction* getTransactionFromPy(PyObject* self)
+{
+  if (g_transactionType == nullptr || !PyObject_TypeCheck(self, g_transactionType))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected tb.Transaction");
+    return nullptr;
+  }
+
+  auto* tx = reinterpret_cast<PyTbTransaction*>(self);
+  if (tx->document == nullptr || tx->name == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Transaction is not valid");
+    return nullptr;
+  }
+
+  return tx;
 }
 
 PyObject* log_writer_write(PyObject* self, PyObject* args)
@@ -289,6 +367,224 @@ PyObject* document_selection(PyObject* self, PyObject*)
 PyObject* document_get_selection(PyObject* self, void*)
 {
   return document_selection(self, nullptr);
+}
+
+PyObject* document_transaction(PyObject* self, PyObject* args)
+{
+  PyObject* nameObj = nullptr;
+  if (!PyArg_ParseTuple(args, "|U", &nameObj))
+  {
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  return createTransactionObject(doc, nameObj);
+}
+
+PyObject* transaction_enter(PyObject* self, PyObject*)
+{
+  auto* tx = getTransactionFromPy(self);
+  if (tx == nullptr)
+  {
+    return nullptr;
+  }
+
+  if (tx->transaction != nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Transaction already started");
+    return nullptr;
+  }
+
+  Py_ssize_t size = 0;
+  const auto* nameUtf8 = PyUnicode_AsUTF8AndSize(tx->name, &size);
+  if (nameUtf8 == nullptr)
+  {
+    return nullptr;
+  }
+
+  try
+  {
+    tx->transaction =
+      new tb::mdl::Transaction{tx->document->map(), std::string(nameUtf8, static_cast<size_t>(size))};
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+
+  Py_INCREF(self);
+  return self;
+}
+
+PyObject* transaction_commit(PyObject* self, PyObject*)
+{
+  auto* tx = getTransactionFromPy(self);
+  if (tx == nullptr)
+  {
+    return nullptr;
+  }
+
+  if (tx->transaction == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Transaction not started");
+    return nullptr;
+  }
+
+  try
+  {
+    const auto ok = tx->transaction->commit();
+    delete tx->transaction;
+    tx->transaction = nullptr;
+    if (ok)
+    {
+      Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
+PyObject* transaction_cancel(PyObject* self, PyObject*)
+{
+  auto* tx = getTransactionFromPy(self);
+  if (tx == nullptr)
+  {
+    return nullptr;
+  }
+
+  if (tx->transaction == nullptr)
+  {
+    Py_RETURN_NONE;
+  }
+
+  try
+  {
+    tx->transaction->cancel();
+    delete tx->transaction;
+    tx->transaction = nullptr;
+    Py_RETURN_NONE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
+PyObject* transaction_rollback(PyObject* self, PyObject*)
+{
+  auto* tx = getTransactionFromPy(self);
+  if (tx == nullptr)
+  {
+    return nullptr;
+  }
+
+  if (tx->transaction == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Transaction not started");
+    return nullptr;
+  }
+
+  try
+  {
+    tx->transaction->rollback();
+    Py_RETURN_NONE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
+PyObject* transaction_exit(PyObject* self, PyObject* args)
+{
+  PyObject* excType = nullptr;
+  PyObject* excValue = nullptr;
+  PyObject* excTraceback = nullptr;
+  if (!PyArg_ParseTuple(args, "OOO", &excType, &excValue, &excTraceback))
+  {
+    return nullptr;
+  }
+
+  const auto hasException = excType != Py_None;
+
+  if (hasException)
+  {
+    auto* r = transaction_cancel(self, nullptr);
+    Py_XDECREF(r);
+    Py_RETURN_FALSE;
+  }
+
+  auto* r = transaction_commit(self, nullptr);
+  if (r == nullptr)
+  {
+    return nullptr;
+  }
+  Py_DECREF(r);
+  Py_RETURN_FALSE;
+}
+
+PyObject* selection_call(PyObject* self, PyObject* args, PyObject* kwargs)
+{
+  if ((args != nullptr && PyTuple_Size(args) != 0) || (kwargs != nullptr && PyDict_Size(kwargs) != 0))
+  {
+    PyErr_SetString(PyExc_TypeError, "Selection() takes no arguments");
+    return nullptr;
+  }
+
+  Py_INCREF(self);
+  return self;
 }
 
 PyObject* selection_entities(PyObject* self, PyObject*)
@@ -417,6 +713,78 @@ PyObject* selection_set_property(PyObject* self, PyObject* args)
   {
     const auto ok =
       tb::mdl::setEntityProperty(doc->map(), std::string{key}, std::string{value}, defaultToProtected != 0);
+    if (ok)
+    {
+      Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
+PyObject* selection_duplicate(PyObject* self, PyObject*)
+{
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  try
+  {
+    tb::mdl::duplicateSelectedNodes(doc->map());
+    Py_RETURN_NONE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
+PyObject* selection_translate(PyObject* self, PyObject* args)
+{
+  double x = 0.0;
+  double y = 0.0;
+  double z = 0.0;
+  if (!PyArg_ParseTuple(args, "ddd", &x, &y, &z))
+  {
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  try
+  {
+    const auto ok = tb::mdl::translateSelection(doc->map(), vm::vec3d{x, y, z});
     if (ok)
     {
       Py_RETURN_TRUE;
@@ -616,12 +984,31 @@ PyObject* module_current_document(PyObject*, PyObject*)
   return createDocumentObject(doc);
 }
 
+PyObject* module_transaction(PyObject*, PyObject* args)
+{
+  PyObject* nameObj = nullptr;
+  if (!PyArg_ParseTuple(args, "|U", &nameObj))
+  {
+    return nullptr;
+  }
+
+  auto* doc = activeDocument();
+  if (doc == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "No active MapFrame");
+    return nullptr;
+  }
+
+  return createTransactionObject(doc, nameObj);
+}
+
 bool registerTypes(PyObject* module)
 {
   static auto documentType = PyTypeObject{};
   static auto selectionType = PyTypeObject{};
   static auto entityType = PyTypeObject{};
   static auto logWriterType = PyTypeObject{};
+  static auto transactionType = PyTypeObject{};
 
   if (g_documentType == nullptr)
   {
@@ -636,7 +1023,8 @@ bool registerTypes(PyObject* module)
        [](PyObject*, PyObject*) -> PyObject* { return module_current_document(nullptr, nullptr); },
        METH_CLASS | METH_NOARGS,
        nullptr},
-      {"selection", document_selection, METH_NOARGS, nullptr},
+      {"get_selection", document_selection, METH_NOARGS, nullptr},
+      {"transaction", document_transaction, METH_VARARGS, nullptr},
       {nullptr, nullptr, 0, nullptr},
     };
     documentType.tp_methods = documentMethods;
@@ -668,11 +1056,14 @@ bool registerTypes(PyObject* module)
     selectionType.tp_basicsize = sizeof(PyTbSelection);
     selectionType.tp_flags = Py_TPFLAGS_DEFAULT;
     selectionType.tp_dealloc = freePythonObject;
+    selectionType.tp_call = selection_call;
 
     static PyMethodDef selectionMethods[] = {
       {"entities", selection_entities, METH_NOARGS, nullptr},
       {"all_entities", selection_all_entities, METH_NOARGS, nullptr},
       {"set_property", selection_set_property, METH_VARARGS, nullptr},
+      {"duplicate", selection_duplicate, METH_NOARGS, nullptr},
+      {"translate", selection_translate, METH_VARARGS, nullptr},
       {"remove_property", selection_remove_property, METH_VARARGS, nullptr},
       {"rename_property", selection_rename_property, METH_VARARGS, nullptr},
       {"clear", selection_clear, METH_NOARGS, nullptr},
@@ -769,6 +1160,40 @@ bool registerTypes(PyObject* module)
     }
   }
 
+  if (g_transactionType == nullptr)
+  {
+    transactionType = PyTypeObject{};
+    transactionType.tp_name = "tb.Transaction";
+    transactionType.tp_basicsize = sizeof(PyTbTransaction);
+    transactionType.tp_flags = Py_TPFLAGS_DEFAULT;
+    transactionType.tp_dealloc = freeTransactionObject;
+
+    static PyMethodDef transactionMethods[] = {
+      {"__enter__", transaction_enter, METH_NOARGS, nullptr},
+      {"__exit__", transaction_exit, METH_VARARGS, nullptr},
+      {"commit", transaction_commit, METH_NOARGS, nullptr},
+      {"cancel", transaction_cancel, METH_NOARGS, nullptr},
+      {"rollback", transaction_rollback, METH_NOARGS, nullptr},
+      {nullptr, nullptr, 0, nullptr},
+    };
+    transactionType.tp_methods = transactionMethods;
+
+    if (PyType_Ready(&transactionType) != 0)
+    {
+      return false;
+    }
+    g_transactionType = &transactionType;
+
+    Py_INCREF(g_transactionType);
+    if (
+      PyModule_AddObject(module, "Transaction", reinterpret_cast<PyObject*>(g_transactionType))
+      != 0)
+    {
+      Py_DECREF(g_transactionType);
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -780,11 +1205,12 @@ bool ensureInitialized()
           static PyMethodDef methods[] = {
             {"document", module_document, METH_NOARGS, nullptr},
             {"current_document", module_current_document, METH_NOARGS, nullptr},
+            {"transaction", module_transaction, METH_VARARGS, nullptr},
             {"execute_action",
              [](PyObject*, PyObject* args) -> PyObject* {
                const char* actionPath = nullptr;
                if (!PyArg_ParseTuple(args, "s", &actionPath))
-               {
+                {
                  return nullptr;
                }
 

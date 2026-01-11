@@ -1,23 +1,23 @@
 import tb
 
-
 def main() -> None:
-    doc = tb.document()
-    sel = doc.selection()
+    doc = tb.current_document()
+    if doc is None:
+        print("no current document")
+        return
 
-    entities = sel.entities()
-    print(f"selected explicit entity count: {len(entities)}")
-    for e in entities:
-        print("classname:", e.classname())
-        print("targetname:", e.get("targetname", ""))
+    sel_attr = doc.selection
+    sel = sel_attr() if callable(sel_attr) else sel_attr
+    if len(sel.all_entities()) == 0:
+        print("selection is empty")
+        return
 
-    all_entities = sel.all_entities()
-    print(f"selected entity targets (all_entities): {len(all_entities)}")
-    for e in all_entities:
-        print("classname:", e.classname())
+    with tb.transaction("Python: duplicate 10x"):
+        for _ in range(10):
+            sel.duplicate()
+            sel.translate(128, 0, 0)
 
-    if all_entities:
-        sel.set_property("message", "hello from python")
+    print("done")
 
 
 if __name__ == "__main__":
