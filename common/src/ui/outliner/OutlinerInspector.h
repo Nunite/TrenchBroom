@@ -15,10 +15,12 @@ namespace tb::ui
 class GLContextManager;
 class OutlinerTreeWidget;
 class MapDocument;
+class EntityPropertyEditor;
 }
 
 class QLineEdit;
 class QComboBox;
+class QSplitter;
 
 namespace tb::ui
 {
@@ -28,7 +30,9 @@ class OutlinerInspector : public TabBookPage
 private:
   MapDocument& m_document; 
   
+  QSplitter* m_splitter = nullptr;
   OutlinerTreeWidget* m_treeWidget = nullptr;
+  EntityPropertyEditor* m_propertyEditor = nullptr;
   QLineEdit* m_searchField = nullptr;
   QComboBox* m_sortBox = nullptr;
 

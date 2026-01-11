@@ -1,5 +1,6 @@
 #include "OutlinerInspector.h"
 #include "OutlinerTreeWidget.h"
+#include "ui/EntityPropertyEditor.h"
 #include "ui/MapDocument.h"
 #include "ui/QtUtils.h"
 
@@ -7,6 +8,7 @@
 #include <QHBoxLayout>
 #include <QLineEdit>
 #include <QComboBox>
+#include <QSplitter>
 
 namespace tb::ui
 {
@@ -34,8 +36,18 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, GLContextManager& co
 
     layout->addLayout(topRow);
 
-    m_treeWidget = new OutlinerTreeWidget(m_document, this);
-    layout->addWidget(m_treeWidget);
+    m_splitter = new QSplitter(Qt::Vertical, this);
+
+    m_treeWidget = new OutlinerTreeWidget(m_document, m_splitter);
+    m_splitter->addWidget(m_treeWidget);
+
+    m_propertyEditor = new EntityPropertyEditor{m_document.map(), m_splitter};
+    m_splitter->addWidget(m_propertyEditor);
+
+    m_splitter->setStretchFactor(0, 3);
+    m_splitter->setStretchFactor(1, 2);
+
+    layout->addWidget(m_splitter, 1);
 
     connect(m_searchField, &QLineEdit::textChanged, m_treeWidget, &OutlinerTreeWidget::setFilterText);
     connect(m_sortBox, &QComboBox::currentIndexChanged, this, [this](int index) {
