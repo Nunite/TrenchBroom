@@ -442,6 +442,7 @@ void OutlinerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
 
     item->setText(0, QString::fromStdString(node->name()));
     item->setData(0, Qt::UserRole, QVariant::fromValue(node));
+    m_itemForNode[node] = item;
 
     // Icon and Type logic
     if (auto* layer = dynamic_cast<mdl::LayerNode*>(node)) {
@@ -541,6 +542,7 @@ void OutlinerTreeWidget::updateTree()
     auto expandedWorldspawnBefore = std::unordered_map<const mdl::LayerNode*, bool>{};
     captureExpandedState(expandedNodesBefore, expandedWorldspawnBefore);
 
+    m_itemForNode.clear();
     clear();
 
     auto* world = m_document.map().world();
@@ -802,7 +804,14 @@ void OutlinerTreeWidget::findAndSelectNode(const mdl::Node* targetNode)
 
 QTreeWidgetItem* OutlinerTreeWidget::findItemForNode(const mdl::Node* targetNode)
 {
-    // Breadth-first search or recursive search
+    if (!targetNode) {
+        return nullptr;
+    }
+
+    if (const auto it = m_itemForNode.find(targetNode); it != m_itemForNode.end()) {
+        return it->second;
+    }
+
     QList<QTreeWidgetItem*> queue;
     
     // Add top level items
@@ -1332,8 +1341,9 @@ void OutlinerTreeWidget::keyPressEvent(QKeyEvent* event)
         (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace)
         && event->modifiers() == Qt::NoModifier) {
         auto nodesToDelete = std::vector<mdl::Node*>{};
-        nodesToDelete.reserve(static_cast<size_t>(selectedItems().size()));
-        for (auto* item : selectedItems()) {
+        const auto items = selectedItems();
+        nodesToDelete.reserve(static_cast<size_t>(items.size()));
+        for (auto* item : items) {
             auto* node = nodeFromItem(item);
             if (!node) {
                 continue;

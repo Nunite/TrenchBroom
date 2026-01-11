@@ -49,6 +49,7 @@ private:
     int m_suppressScrollToSelectionCount = 0;
     bool m_updateTreeQueued = false;
     mdl::Node* m_revealAfterUpdate = nullptr;
+    std::unordered_map<const mdl::Node*, QTreeWidgetItem*> m_itemForNode;
     NotifierConnection m_notifierConnection;
     QPoint m_dragStartPosition;
 
