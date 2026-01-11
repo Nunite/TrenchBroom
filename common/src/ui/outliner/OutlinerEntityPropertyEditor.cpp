@@ -1049,7 +1049,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                         keyVariant.toString().toStdString(),
                         mapStringFromUnicode(m_map.encoding(), valueCombo->currentText()),
                         false);
-                    scheduleUpdate(true);
+                    scheduleUpdate();
                 });
             }
         }
@@ -1063,7 +1063,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 }
                 const auto propertyKey = keyVariant.toString().toStdString();
                 mdl::setEntityProperty(m_map, propertyKey, valueEdit->text().toStdString(), false);
-                scheduleUpdate(true);
+                scheduleUpdate();
             });
         }
 
