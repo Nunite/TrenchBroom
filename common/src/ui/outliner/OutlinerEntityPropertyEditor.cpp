@@ -26,11 +26,11 @@
 #include "mdl/Map_Entities.h"
 #include "mdl/PropertyDefinition.h"
 #include "io/PathQt.h"
-#include "ui/CollapsibleTitledPanel.h"
 #include "ui/ColorButton.h"
 #include "ui/FlagsEditor.h"
 #include "ui/QtUtils.h"
 #include "ui/SmartWadEditor.h"
+#include "ui/TitledPanel.h"
 #include "ui/ViewUtils.h"
 
 #include "kdl/string_compare.h"
@@ -344,7 +344,7 @@ OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(mdl::Map& map, QWidge
     : QWidget{parent}
     , m_map{map}
 {
-    m_propertiesPanel = new CollapsibleTitledPanel{tr("Entity"), true, this};
+    m_propertiesPanel = new TitledPanel{tr("Entity"), true, true};
 
     m_scrollArea = new QScrollArea{m_propertiesPanel->getPanel()};
     m_scrollArea->setObjectName("outlinerPropertyScrollArea");

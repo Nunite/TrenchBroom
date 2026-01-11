@@ -21,7 +21,7 @@ class EntityNodeBase;
 
 namespace tb::ui
 {
-class CollapsibleTitledPanel;
+class TitledPanel;
 class FlagsEditor;
 class SmartWadEditor;
 
@@ -32,7 +32,7 @@ private:
     mdl::Map& m_map;
     NotifierConnection m_notifierConnection;
 
-    CollapsibleTitledPanel* m_propertiesPanel = nullptr;
+    TitledPanel* m_propertiesPanel = nullptr;
     QScrollArea* m_scrollArea = nullptr;
     QWidget* m_scrollContents = nullptr;
     QVBoxLayout* m_scrollLayout = nullptr;
