@@ -3,29 +3,41 @@
 #include <QApplication>
 #include <QEvent>
 #include <QFrame>
+#include <QFileDialog>
 #include <QHBoxLayout>
 #include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QScrollArea>
 #include <QSignalBlocker>
+#include <QStringList>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
+#include "Color.h"
 #include "mdl/EntityDefinition.h"
+#include "mdl/EntityColorPropertyValue.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityProperties.h"
 #include "mdl/Game.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/PropertyDefinition.h"
+#include "io/PathQt.h"
 #include "ui/CollapsibleTitledPanel.h"
+#include "ui/ColorButton.h"
+#include "ui/FlagsEditor.h"
 #include "ui/QtUtils.h"
 #include "ui/SmartPropertyEditorManager.h"
 #include "ui/SmartWadEditor.h"
+#include "ui/ViewUtils.h"
 
+#include "kdl/string_compare.h"
+#include "kdl/string_utils.h"
+
+#include <filesystem>
 #include <unordered_set>
 
 namespace tb::ui
@@ -170,6 +182,125 @@ std::vector<std::string> buildKeyOrderWithInactiveDefinitions(
 
     return result;
 }
+
+bool matchesSmartColorKeyPattern(const std::string& propertyKey)
+{
+    static const auto patterns = std::vector<std::string>{
+        "color",
+        "*_color",
+        "*_color2",
+        "*_colour",
+    };
+    return std::ranges::any_of(patterns, [&](const auto& pattern) {
+        return kdl::cs::str_matches_glob(propertyKey, pattern);
+    });
+}
+
+bool isColorPropertyDefinition(const mdl::PropertyDefinition& propertyDefinition)
+{
+    return std::holds_alternative<mdl::PropertyValueTypes::Color<RgbF>>(propertyDefinition.valueType)
+           || std::holds_alternative<mdl::PropertyValueTypes::Color<RgbB>>(propertyDefinition.valueType)
+           || std::holds_alternative<mdl::PropertyValueTypes::Color<Rgb>>(propertyDefinition.valueType);
+}
+
+std::optional<QColor> parseEntityColorToQColor(
+    const mdl::EntityDefinition* entityDefinition,
+    const std::string& propertyKey,
+    const std::string& propertyValue)
+{
+    return mdl::parseEntityColorPropertyValue(entityDefinition, propertyKey, propertyValue)
+           | kdl::transform([](const auto& v) { return toQColor(v.color); })
+           | kdl::value();
+}
+
+constexpr size_t SpawnflagsNumFlags = 24;
+constexpr size_t SpawnflagsNumCols = 3;
+
+void getSpawnflagsLabelsAndTooltips(
+    const std::vector<mdl::EntityNodeBase*>& nodes,
+    const std::string& propertyKey,
+    QStringList& labels,
+    QStringList& tooltips)
+{
+    auto defaultLabels = QStringList{};
+
+    for (size_t i = 0; i < SpawnflagsNumFlags; ++i)
+    {
+        auto defaultLabel = QString::number(1 << i);
+        defaultLabels.push_back(defaultLabel);
+        labels.push_back(defaultLabel);
+        tooltips.push_back("");
+    }
+
+    for (size_t i = 0; i < SpawnflagsNumFlags; ++i)
+    {
+        auto firstPass = true;
+        for (const auto* node : nodes)
+        {
+            const auto indexI = int(i);
+            auto label = defaultLabels[indexI];
+            auto tooltip = QString{""};
+
+            if (const auto* propDef = mdl::getPropertyDefinition(node->entity().definition(), propertyKey))
+            {
+                if (const auto* flagType = std::get_if<mdl::PropertyValueTypes::Flags>(&propDef->valueType))
+                {
+                    const auto flagValue = int(1 << i);
+                    if (const auto* flag = flagType->flag(flagValue))
+                    {
+                        label = QString::fromStdString(flag->shortDescription);
+                        tooltip = QString::fromStdString(flag->longDescription);
+                    }
+                }
+            }
+
+            if (firstPass)
+            {
+                labels[indexI] = label;
+                tooltips[indexI] = tooltip;
+                firstPass = false;
+            }
+            else if (labels[indexI] != label)
+            {
+                labels[indexI] = defaultLabels[indexI];
+                tooltips[indexI].clear();
+            }
+        }
+    }
+}
+
+int getSpawnflagsValue(const mdl::EntityNodeBase* node, const std::string& propertyKey)
+{
+    if (const auto* value = node->entity().property(propertyKey))
+    {
+        return kdl::str_to_int(*value).value_or(0);
+    }
+    return 0;
+}
+
+void getSpawnflagsSetAndMixedValues(
+    const std::vector<mdl::EntityNodeBase*>& nodes,
+    const std::string& propertyKey,
+    int& setFlags,
+    int& mixedFlags)
+{
+    if (nodes.empty())
+    {
+        setFlags = 0;
+        mixedFlags = 0;
+        return;
+    }
+
+    auto it = std::begin(nodes);
+    auto end = std::end(nodes);
+    setFlags = getSpawnflagsValue(*it, propertyKey);
+    mixedFlags = 0;
+
+    while (++it != end)
+    {
+        combineFlags(SpawnflagsNumFlags, getSpawnflagsValue(*it, propertyKey), setFlags, mixedFlags);
+    }
+}
 } // namespace
 
 OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(mdl::Map& map, QWidget* parent)
@@ -292,6 +423,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 {
     m_embeddedWadEditorContainer = nullptr;
     m_embeddedWadEditor = nullptr;
+    m_embeddedSpawnflagsEditorContainer = nullptr;
+    m_embeddedSpawnflagsEditor = nullptr;
 
     const auto clearLayout = [&](auto&& self, QLayout* l) -> void {
         while (auto* item = l->takeAt(0))
@@ -434,6 +567,10 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             valueEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
             valueEdit->installEventFilter(this);
             valueEdit->setProperty("propertyKey", QString::fromStdString(key));
+            if (key == "model" || key == mdl::EntityPropertyKeys::Spawnflags)
+            {
+                valueEdit->setProperty("suppressSmartEditor", true);
+            }
 
             if (propertyDef && propertyDef->readOnly)
             {
@@ -513,6 +650,89 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             removeButton->setDisabled(true);
         }
 
+        QToolButton* modelBrowseButton = nullptr;
+        if (!inactive && key == "model")
+        {
+            modelBrowseButton = createBitmapButton("Folder.svg", tr("Load model file"), row);
+            modelBrowseButton->setObjectName("toolButton_withBorder");
+            modelBrowseButton->setIconSize(QSize{16, 16});
+            modelBrowseButton->setFixedSize(QSize{24, 24});
+            if (propertyDef && propertyDef->readOnly)
+            {
+                modelBrowseButton->setDisabled(true);
+            }
+        }
+
+        ColorButton* colorButton = nullptr;
+        if (!inactive && (matchesSmartColorKeyPattern(key) || (propertyDef && isColorPropertyDefinition(*propertyDef))))
+        {
+            colorButton = new ColorButton{row};
+            colorButton->setObjectName("outlinerPropertyColorButton");
+            colorButton->setFixedHeight(24);
+            colorButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+            auto displayColor = QColor{Qt::black};
+            if (!entityNodes.empty())
+            {
+                if (!consensus.mixed && consensus.anyPresent)
+                {
+                    if (const auto qColor = parseEntityColorToQColor(
+                          entityNodes.front()->entity().definition(), key, consensus.value))
+                    {
+                        displayColor = *qColor;
+                    }
+                }
+                else
+                {
+                    const auto* nodeWithValue = [&]() -> const mdl::EntityNodeBase* {
+                        for (const auto* node : entityNodes)
+                        {
+                            if (node->entity().property(key) != nullptr)
+                            {
+                                return node;
+                            }
+                        }
+                        return entityNodes.front();
+                    }();
+
+                    if (nodeWithValue)
+                    {
+                        if (const auto* propertyValue = nodeWithValue->entity().property(key))
+                        {
+                            if (const auto qColor = parseEntityColorToQColor(
+                                  nodeWithValue->entity().definition(), key, *propertyValue))
+                            {
+                                displayColor = *qColor;
+                            }
+                        }
+                    }
+                }
+            }
+
+            colorButton->setColor(displayColor);
+        }
+
+        QToolButton* spawnflagsToggleButton = nullptr;
+        if (
+            key == mdl::EntityPropertyKeys::Spawnflags && propertyDef
+            && std::holds_alternative<mdl::PropertyValueTypes::Flags>(propertyDef->valueType))
+        {
+            spawnflagsToggleButton = new QToolButton{row};
+            spawnflagsToggleButton->setObjectName("toolButton_withBorder");
+            spawnflagsToggleButton->setCheckable(true);
+            spawnflagsToggleButton->setFixedSize(QSize{24, 24});
+            spawnflagsToggleButton->setToolTip(tr("Show spawnflags editor"));
+
+            if (propertyDef->readOnly)
+            {
+                spawnflagsToggleButton->setDisabled(true);
+            }
+
+            const QSignalBlocker blocker{spawnflagsToggleButton};
+            spawnflagsToggleButton->setChecked(m_spawnflagsEditorExpanded);
+            spawnflagsToggleButton->setArrowType(m_spawnflagsEditorExpanded ? Qt::DownArrow : Qt::RightArrow);
+        }
+
         QToolButton* wadToggleButton = nullptr;
         if (canShowWadEditor && wadKey && key == *wadKey)
         {
@@ -536,14 +756,71 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         {
             rowLayout->addWidget(valueEdit, 1);
         }
+        if (spawnflagsToggleButton)
+        {
+            rowLayout->addWidget(spawnflagsToggleButton);
+        }
         if (wadToggleButton)
         {
             rowLayout->addWidget(wadToggleButton);
+        }
+        if (modelBrowseButton)
+        {
+            rowLayout->addWidget(modelBrowseButton);
+        }
+        if (colorButton)
+        {
+            rowLayout->addWidget(colorButton);
         }
         rowLayout->addWidget(activateButton);
         rowLayout->addWidget(removeButton);
 
         m_scrollLayout->addWidget(row, 0);
+
+        if (spawnflagsToggleButton)
+        {
+            auto* container = new QWidget{m_scrollContents};
+            container->setObjectName("outlinerEmbeddedSpawnflagsEditor");
+            auto* containerLayout = new QVBoxLayout{container};
+            containerLayout->setContentsMargins(6, 0, 6, 4);
+            containerLayout->setSpacing(0);
+
+            m_embeddedSpawnflagsEditorContainer = container;
+            auto* flagsEditor = new FlagsEditor{SpawnflagsNumCols, container};
+            m_embeddedSpawnflagsEditor = flagsEditor;
+
+            auto labels = QStringList{};
+            auto tooltips = QStringList{};
+            getSpawnflagsLabelsAndTooltips(entityNodes, key, labels, tooltips);
+            flagsEditor->setFlags(labels, tooltips);
+
+            int setFlags = 0;
+            int mixedFlags = 0;
+            getSpawnflagsSetAndMixedValues(entityNodes, key, setFlags, mixedFlags);
+            flagsEditor->setFlagValue(setFlags, mixedFlags);
+
+            if (propertyDef && propertyDef->readOnly)
+            {
+                flagsEditor->setDisabled(true);
+            }
+
+            containerLayout->addWidget(flagsEditor, 1);
+            container->setVisible(m_spawnflagsEditorExpanded);
+            m_scrollLayout->addWidget(container, 0);
+
+            connect(spawnflagsToggleButton, &QToolButton::toggled, this, [this, container, spawnflagsToggleButton](const bool checked) {
+                m_spawnflagsEditorExpanded = checked;
+                spawnflagsToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
+                container->setVisible(checked);
+                rebuildSmartEditor("");
+            });
+
+            connect(flagsEditor, &FlagsEditor::flagChanged, this, [this, flagsEditor, key](const size_t index, const int, const int, const int) {
+                const auto set = flagsEditor->isFlagSet(index);
+                mdl::updateEntitySpawnflag(m_map, key, index, set);
+                scheduleUpdate(true);
+            });
+        }
 
         if (wadToggleButton)
         {
@@ -567,6 +844,108 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 wadToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
                 container->setVisible(checked);
                 rebuildSmartEditor("");
+            });
+        }
+
+        if (colorButton)
+        {
+            connect(colorButton, &ColorButton::colorChangedByUser, this, [this, key, propertyDef](const QColor& qColor) {
+                auto requestedColor = Rgb{fromQColor(qColor).to<RgbB>()};
+                if (!m_map.selection().allEntities().empty())
+                {
+                    const auto range = mdl::detectColorRange(key, m_map.selection().allEntities());
+                    if (range == mdl::ColorRange::Float)
+                    {
+                        requestedColor = Rgb{fromQColor(qColor).to<RgbF>()};
+                    }
+                    else if (range == mdl::ColorRange::Byte)
+                    {
+                        requestedColor = Rgb{fromQColor(qColor).to<RgbB>()};
+                    }
+                    else if (propertyDef)
+                    {
+                        if (std::holds_alternative<mdl::PropertyValueTypes::Color<RgbF>>(propertyDef->valueType))
+                        {
+                            requestedColor = Rgb{fromQColor(qColor).to<RgbF>()};
+                        }
+                        else if (std::holds_alternative<mdl::PropertyValueTypes::Color<RgbB>>(propertyDef->valueType))
+                        {
+                            requestedColor = Rgb{fromQColor(qColor).to<RgbB>()};
+                        }
+                    }
+                }
+
+                mdl::setEntityColorProperty(m_map, key, requestedColor);
+                scheduleUpdate(true);
+            });
+        }
+
+        if (modelBrowseButton)
+        {
+            connect(modelBrowseButton, &QAbstractButton::clicked, this, [this, key]() {
+                auto* game = m_map.game();
+                if (!game)
+                {
+                    return;
+                }
+
+                const auto caption = tr("Load Model File");
+                const auto filter = tr("Model files (*.mdl);;All files (*.*)");
+
+                const auto pathQStr = QFileDialog::getOpenFileName(
+                    nullptr,
+                    caption,
+                    fileDialogDefaultDirectory(FileDialogDir::GamePath),
+                    filter);
+                if (pathQStr.isEmpty())
+                {
+                    return;
+                }
+
+                updateFileDialogDefaultDirectoryWithFilename(FileDialogDir::GamePath, pathQStr);
+
+                const auto absModelPath = io::pathFromQString(pathQStr);
+                const auto gamePath = game->gamePath();
+
+                auto ec = std::error_code{};
+                const auto relativeModelPathFull = std::filesystem::relative(absModelPath, gamePath, ec);
+                if (ec)
+                {
+                    return;
+                }
+
+                auto relativePathStr = relativeModelPathFull.string();
+                auto modelsPos = relativePathStr.find("models/");
+                if (modelsPos == std::string::npos)
+                {
+                    modelsPos = relativePathStr.find("models\\");
+                }
+
+                std::string finalModelPath;
+                if (modelsPos != std::string::npos)
+                {
+                    finalModelPath = relativePathStr.substr(modelsPos);
+                }
+                else
+                {
+                    finalModelPath = relativeModelPathFull.generic_string();
+                }
+
+                for (auto& ch : finalModelPath)
+                {
+                    if (ch == '\\')
+                    {
+                        ch = '/';
+                    }
+                }
+
+                if (finalModelPath.empty())
+                {
+                    return;
+                }
+
+                mdl::setEntityProperty(m_map, key, finalModelPath, false);
+                scheduleUpdate(true);
             });
         }
 
@@ -652,8 +1031,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 {
                     return;
                 }
-                const auto key = keyVariant.toString().toStdString();
-                mdl::setEntityProperty(m_map, key, valueEdit->text().toStdString(), false);
+                const auto propertyKey = keyVariant.toString().toStdString();
+                mdl::setEntityProperty(m_map, propertyKey, valueEdit->text().toStdString(), false);
                 scheduleUpdate(true);
             });
         }
@@ -664,8 +1043,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             {
                 return;
             }
-            const auto key = keyVariant.toString().toStdString();
-            mdl::removeEntityProperty(m_map, key);
+            const auto propertyKey = keyVariant.toString().toStdString();
+            mdl::removeEntityProperty(m_map, propertyKey);
             scheduleUpdate(true);
         });
     }
@@ -703,6 +1082,10 @@ bool OutlinerEntityPropertyEditor::eventFilter(QObject* watched, QEvent* event)
             const auto key = keyVariant.toString().toStdString();
             const auto wadKey = m_map.game()->config().materialConfig.property;
             if (wadKey && key == *wadKey)
+            {
+                rebuildSmartEditor("");
+            }
+            else if (matchesSmartColorKeyPattern(key))
             {
                 rebuildSmartEditor("");
             }

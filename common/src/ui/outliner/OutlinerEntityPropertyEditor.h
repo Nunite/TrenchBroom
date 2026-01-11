@@ -22,6 +22,7 @@ class EntityNodeBase;
 namespace tb::ui
 {
 class CollapsibleTitledPanel;
+class FlagsEditor;
 class SmartPropertyEditorManager;
 class SmartWadEditor;
 
@@ -45,6 +46,10 @@ private:
     QWidget* m_embeddedWadEditorContainer = nullptr;
     SmartWadEditor* m_embeddedWadEditor = nullptr;
     bool m_wadEditorExpanded = false;
+
+    QWidget* m_embeddedSpawnflagsEditorContainer = nullptr;
+    FlagsEditor* m_embeddedSpawnflagsEditor = nullptr;
+    bool m_spawnflagsEditorExpanded = false;
 
     bool m_updateQueued = false;
     bool m_forceUpdate = false;

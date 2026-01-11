@@ -190,3 +190,17 @@ common/src/ui/
     *   原因: `onDocumentSelectionChanged` 回调中的参数未使用。
     *   修复: 注释掉参数名称 `/*change*/`。
 
+## 10. SmartEdit 待替代清单
+
+目标：逐步在 Outliner 的 Entity 属性列表中内嵌编辑控件，减少/移除底部 Smart Editor 面板的必要性。
+
+### 已替代（Outliner 内嵌完成）
+- Choice：属性行直接使用可编辑下拉框展示选项，等价覆盖 SmartChoiceEditor 的核心交互。
+- WAD：worldspawn 的 wad key 在属性行内可展开嵌入 SmartWadEditor。
+- Color：属性行直接集成 ColorButton（保留直接编辑文本值的能力）。
+- Model：属性行增加 “Load model file” 按钮，选择文件并写入规范化后的相对路径。
+- Flags：spawnflags 属性行可展开嵌入 FlagsEditor，支持混合态与基于 definition 的 label/tooltip。
+
+### 待替代（SmartEdit 仍有额外价值）
+- Color（附加能力）：Float/Byte 范围转换，以及 Color history（SmartColorEditor）。
+
