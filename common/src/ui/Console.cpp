@@ -21,6 +21,7 @@
 
 #include <QDebug>
 #include <QMutexLocker>
+#include <QMenu>
 #include <QScrollBar>
 #include <QTextEdit>
 #include <QThread>
@@ -67,6 +68,17 @@ Console::Console(QWidget* parent)
   m_textView = new QTextEdit{};
   m_textView->setReadOnly(true);
   m_textView->setWordWrapMode(QTextOption::NoWrap);
+  m_textView->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(m_textView, &QTextEdit::customContextMenuRequested, this, [this](const QPoint& pos) {
+    auto* menu = m_textView->createStandardContextMenu();
+
+    menu->addSeparator();
+    auto* clearAction = menu->addAction(tr("Clear"));
+    connect(clearAction, &QAction::triggered, this, [this]() { clear(); });
+
+    menu->exec(m_textView->mapToGlobal(pos));
+    delete menu;
+  });
 
   auto* sizer = new QVBoxLayout{};
   sizer->setContentsMargins(0, 0, 0, 0);
@@ -75,6 +87,15 @@ Console::Console(QWidget* parent)
 
   connect(m_timer, &QTimer::timeout, this, &Console::logCachedMessages);
   m_timer->start(50);
+}
+
+void Console::clear()
+{
+  {
+    auto lock = QMutexLocker{&m_cacheMutex};
+    m_cache.getCachedMessages([](const auto, const auto&) {});
+  }
+  m_textView->clear();
 }
 
 void Console::doLog(const LogLevel level, const std::string_view message)
@@ -120,6 +141,11 @@ void Console::logCachedMessages()
     logToConsole(level, messageStr);
     FileLogger::instance().log(level, message);
   });
+}
+
+PythonConsole::PythonConsole(QWidget* parent)
+  : Console{parent}
+{
 }
 
 } // namespace tb::ui

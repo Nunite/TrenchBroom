@@ -44,6 +44,7 @@ private:
 
 public:
   explicit Console(QWidget* parent = nullptr);
+  void clear();
 
 private:
   void doLog(LogLevel level, std::string_view message) override;
@@ -51,6 +52,12 @@ private:
   void logToConsole(LogLevel level, const std::string& message);
 
   void logCachedMessages();
+};
+
+class PythonConsole : public Console
+{
+public:
+  explicit PythonConsole(QWidget* parent = nullptr);
 };
 
 } // namespace tb::ui

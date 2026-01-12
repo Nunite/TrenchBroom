@@ -39,7 +39,7 @@ InfoPanel::InfoPanel(MapDocument& document, QWidget* parent)
   m_tabBook->setObjectName("InfoPanel_TabBook");
 
   m_console = new Console{};
-  m_pythonConsole = new Console{};
+  m_pythonConsole = new PythonConsole{};
   m_issueBrowser = new IssueBrowser{document};
 
   m_tabBook->addPage(m_console, tr("Console"));
