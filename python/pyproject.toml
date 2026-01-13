@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trenchbroom-api"
-version = "0.1.4"
+version = "0.1.5"
 description = "Type stubs for TrenchBroom embedded Python module `tb`."
 readme = { text = "This package provides type information for TrenchBroom's embedded Python module (imported as `tb`).\n\nInstall it into your editor's Python environment to get autocomplete and static type checking when authoring TrenchBroom scripts.\n", content-type = "text/markdown" }
 requires-python = ">=3.10"

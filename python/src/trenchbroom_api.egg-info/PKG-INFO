@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: trenchbroom-api
-Version: 0.1.4
+Version: 0.1.5
 Summary: Type stubs for TrenchBroom embedded Python module `tb`.
 Author: XiangXtreme
 License-Expression: GPL-3.0-or-later

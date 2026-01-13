@@ -20,4 +20,5 @@ Thumbs.db
 /coverity
 *.pyc
 app/resources/documentation/help/index.html
-
+*.whl
+*.tar.gz
