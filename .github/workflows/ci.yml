@@ -119,7 +119,7 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt update
-          sudo apt install gcc-13 g++-13 build-essential libxi-dev libxrandr-dev libxxf86vm-dev freeglut3-dev mesa-common-dev libgl1-mesa-dev libglu1-mesa-dev libglm-dev pandoc cmake p7zip-full ninja-build xvfb libglew-dev libfreeimage-dev libfreetype6-dev libtinyxml2-dev libassimp-dev libfuse2
+          sudo apt install gcc-13 g++-13 build-essential libxi-dev libxrandr-dev libxxf86vm-dev freeglut3-dev mesa-common-dev libgl1-mesa-dev libglu1-mesa-dev libglm-dev pandoc cmake p7zip-full ninja-build xvfb libglew-dev libfreeimage-dev libfreetype6-dev libtinyxml2-dev libassimp-dev libfuse2 autoconf autoconf-archive automake libtool libtool-bin
 
       - name: Linux - Add NuGet sources
         if: ${{ matrix.os == 'ubuntu-22.04' }}
@@ -196,7 +196,7 @@ jobs:
 
       - name: macOS - Install dependencies
         if: ${{ startsWith(matrix.os, 'macos') }}
-        run: brew install p7zip pandoc ninja autoconf automake mono
+        run: brew install p7zip pandoc ninja autoconf autoconf-archive automake libtool mono
 
       - name: macOS 15 - Uninstall openexr
         if: ${{ matrix.os == 'macos-15-intel' }}
