@@ -18,6 +18,6 @@ Thumbs.db
 /vs2019
 /.idea
 /coverity
-
+*.pyc
 app/resources/documentation/help/index.html
 

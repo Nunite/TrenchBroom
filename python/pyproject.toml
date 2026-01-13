@@ -4,17 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trenchbroom-api"
-version = "0.1.0"
-description = "Typing and helpers for TrenchBroom embedded Python module."
-readme = { text = "This package provides type definitions and small helpers for TrenchBroom's embedded Python module (imported as `tb`).\n\nIt is intended for authoring TrenchBroom scripts with IDE autocomplete and static type checking.\n", content-type = "text/markdown" }
+version = "0.1.4"
+description = "Type stubs for TrenchBroom embedded Python module `tb`."
+readme = { text = "This package provides type information for TrenchBroom's embedded Python module (imported as `tb`).\n\nInstall it into your editor's Python environment to get autocomplete and static type checking when authoring TrenchBroom scripts.\n", content-type = "text/markdown" }
 requires-python = ">=3.10"
-license = { text = "GPL-3.0-or-later" }
-authors = [{ name = "TrenchBroom community" }]
+license = "GPL-3.0-or-later"
+authors = [{ name = "XiangXtreme" }]
 keywords = ["trenchbroom", "scripting", "typing"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
   "Typing :: Typed",
@@ -27,4 +26,4 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-trenchbroom_api = ["py.typed"]
+tb = ["py.typed"]

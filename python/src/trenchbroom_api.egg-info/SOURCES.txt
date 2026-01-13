@@ -1,0 +1,7 @@
+pyproject.toml
+src/tb/__init__.py
+src/tb/py.typed
+src/trenchbroom_api.egg-info/PKG-INFO
+src/trenchbroom_api.egg-info/SOURCES.txt
+src/trenchbroom_api.egg-info/dependency_links.txt
+src/trenchbroom_api.egg-info/top_level.txt
