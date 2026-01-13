@@ -626,6 +626,243 @@ Result<void> Brush::removeVertices(
   return updateFacesFromGeometry(worldBounds, matcher, newGeometry);
 }
 
+static std::optional<std::vector<vm::vec3d>> chamferVerticesInGeometry(
+  const BrushGeometry& geometry,
+  std::vector<vm::vec3d> vertexPositions,
+  const double distance)
+{
+  if (vertexPositions.empty())
+  {
+    return geometry.vertexPositions();
+  }
+
+  auto points = geometry.vertexPositions();
+  points.erase(
+    std::remove_if(
+      points.begin(),
+      points.end(),
+      [&](const auto& p) { return kdl::vec_contains(vertexPositions, p); }),
+    points.end());
+
+  vertexPositions = kdl::vec_sort_and_remove_duplicates(std::move(vertexPositions));
+
+  constexpr auto eps = vm::constants<double>::almost_zero();
+
+  auto newPoints = std::vector<vm::vec3d>{};
+  constexpr auto closeVertexEpsilon = static_cast<double>(0.01);
+  for (const auto& pos : vertexPositions)
+  {
+    auto* vertex = geometry.findClosestVertex(pos, closeVertexEpsilon);
+    if (vertex == nullptr)
+    {
+      return std::nullopt;
+    }
+
+    auto* firstEdge = vertex->leaving();
+    if (firstEdge == nullptr)
+    {
+      return std::nullopt;
+    }
+
+    auto* currentEdge = firstEdge;
+    do
+    {
+      auto* dst = currentEdge->destination();
+      if (dst == nullptr)
+      {
+        return std::nullopt;
+      }
+
+      const auto dir = dst->position() - pos;
+      const auto len = vm::length(dir);
+      if (!(len > distance + eps))
+      {
+        return std::nullopt;
+      }
+
+      newPoints.push_back(pos + dir * (distance / len));
+      currentEdge = currentEdge->nextIncident();
+    } while (currentEdge != firstEdge);
+  }
+
+  newPoints = kdl::vec_sort_and_remove_duplicates(std::move(newPoints));
+  points = kdl::vec_concat(std::move(points), std::move(newPoints));
+  points = kdl::vec_sort_and_remove_duplicates(std::move(points));
+
+  return points;
+}
+
+static std::optional<BrushGeometry> chamferEdgesInGeometry(
+  const BrushGeometry& geometry,
+  std::vector<vm::segment3d> edgePositions,
+  const double distance)
+{
+  if (edgePositions.empty())
+  {
+    return geometry;
+  }
+
+  constexpr auto eps = vm::constants<double>::almost_zero();
+
+  auto seenEdges = std::set<std::pair<vm::vec3d, vm::vec3d>>{};
+  auto chamferPlanes = std::vector<vm::plane<double, 3>>{};
+  chamferPlanes.reserve(edgePositions.size());
+
+  for (const auto& edgePosition : edgePositions)
+  {
+    constexpr auto closeVertexEpsilon = static_cast<double>(0.01);
+    auto* edge = geometry.findClosestEdge(
+      edgePosition.start(), edgePosition.end(), closeVertexEpsilon);
+    if (edge == nullptr || !edge->fullySpecified())
+    {
+      return std::nullopt;
+    }
+
+    const auto a = edge->firstVertex()->position();
+    const auto b = edge->secondVertex()->position();
+    auto edgeKey = std::make_pair(a, b);
+    if (edgeKey.second < edgeKey.first)
+    {
+      std::swap(edgeKey.first, edgeKey.second);
+    }
+
+    if (!seenEdges.insert(edgeKey).second)
+    {
+      continue;
+    }
+
+    const auto* firstFace = edge->firstFace();
+    const auto* secondFace = edge->secondFace();
+    if (firstFace == nullptr || secondFace == nullptr)
+    {
+      return std::nullopt;
+    }
+
+    const auto n1 = vm::normalize(firstFace->plane().normal);
+    const auto n2 = vm::normalize(secondFace->plane().normal);
+    const auto dot = vm::clamp(vm::dot(n1, n2), -1.0, 1.0);
+
+    const auto sinHalfAngle = vm::sqrt((1.0 - dot) * 0.5);
+    if (!(sinHalfAngle > eps))
+    {
+      return std::nullopt;
+    }
+
+    const auto bisectorNormal = vm::normalize(n1 + n2);
+    if (vm::is_zero(bisectorNormal, eps))
+    {
+      return std::nullopt;
+    }
+
+    const auto offset = distance * sinHalfAngle;
+    const auto pointOnPlane = a - bisectorNormal * offset;
+    chamferPlanes.emplace_back(pointOnPlane, bisectorNormal);
+  }
+
+  auto newGeometry = geometry;
+  for (const auto& plane : chamferPlanes)
+  {
+    const auto result = newGeometry.clip(plane);
+    if (result.empty())
+    {
+      return std::nullopt;
+    }
+  }
+
+  return newGeometry;
+}
+
+bool Brush::canChamferVertices(
+  const vm::bbox3d& worldBounds,
+  const std::vector<vm::vec3d>& vertexPositions,
+  const double distance) const
+{
+  ensure(m_geometry != nullptr, "geometry is null");
+  if (distance <= 0.0)
+  {
+    return false;
+  }
+
+  const auto points = chamferVerticesInGeometry(*m_geometry, vertexPositions, distance);
+  if (!points)
+  {
+    return false;
+  }
+
+  for (const auto& p : *points)
+  {
+    if (!worldBounds.contains(p))
+    {
+      return false;
+    }
+  }
+
+  return BrushGeometry{*points}.polyhedron();
+}
+
+Result<void> Brush::chamferVertices(
+  const vm::bbox3d& worldBounds,
+  const std::vector<vm::vec3d>& vertexPositions,
+  const double distance,
+  const bool uvLock)
+{
+  ensure(m_geometry != nullptr, "geometry is null");
+  ensure(!vertexPositions.empty(), "no vertex positions");
+  assert(canChamferVertices(worldBounds, vertexPositions, distance));
+
+  const auto points = chamferVerticesInGeometry(*m_geometry, vertexPositions, distance);
+  assert(points);
+
+  const BrushGeometry newGeometry{*points};
+  const PolyhedronMatcher<BrushGeometry> matcher(*m_geometry, newGeometry);
+  return updateFacesFromGeometry(worldBounds, matcher, newGeometry, uvLock);
+}
+
+bool Brush::canChamferEdges(
+  const vm::bbox3d& worldBounds,
+  const std::vector<vm::segment3d>& edgePositions,
+  const double distance) const
+{
+  ensure(m_geometry != nullptr, "geometry is null");
+  if (distance <= 0.0)
+  {
+    return false;
+  }
+
+  const auto points = chamferEdgesInGeometry(*m_geometry, edgePositions, distance);
+  if (!points)
+  {
+    return false;
+  }
+
+  for (const auto& p : points->vertexPositions())
+  {
+    if (!worldBounds.contains(p))
+    {
+      return false;
+    }
+  }
+
+  return points->polyhedron();
+}
+
+Result<void> Brush::chamferEdges(
+  const vm::bbox3d& worldBounds,
+  const std::vector<vm::segment3d>& edgePositions,
+  const double distance,
+  const bool uvLock)
+{
+  ensure(m_geometry != nullptr, "geometry is null");
+  ensure(!edgePositions.empty(), "no edge positions");
+  assert(canChamferEdges(worldBounds, edgePositions, distance));
+
+  const auto newGeometry = chamferEdgesInGeometry(*m_geometry, edgePositions, distance);
+  assert(newGeometry);
+
+  const PolyhedronMatcher<BrushGeometry> matcher(*m_geometry, *newGeometry);
+  return updateFacesFromGeometry(worldBounds, matcher, *newGeometry, uvLock);
+}
+
 static BrushGeometry snappedGeometry(const BrushGeometry& geometry, const double snapToF)
 {
   std::vector<vm::vec3d> points;

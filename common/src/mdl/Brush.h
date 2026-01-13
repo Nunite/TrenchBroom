@@ -189,6 +189,16 @@ public:
   Result<void> removeVertices(
     const vm::bbox3d& worldBounds, const std::vector<vm::vec3d>& vertexPositions);
 
+  bool canChamferVertices(
+    const vm::bbox3d& worldBounds,
+    const std::vector<vm::vec3d>& vertexPositions,
+    double distance) const;
+  Result<void> chamferVertices(
+    const vm::bbox3d& worldBounds,
+    const std::vector<vm::vec3d>& vertexPositions,
+    double distance,
+    bool uvLock = false);
+
   bool canSnapVertices(const vm::bbox3d& worldBounds, double snapTo) const;
   Result<void> snapVertices(
     const vm::bbox3d& worldBounds, double snapTo, bool uvLock = false);
@@ -202,6 +212,16 @@ public:
     const vm::bbox3d& worldBounds,
     const std::vector<vm::segment3d>& edgePositions,
     const vm::mat4x4d& transform,
+    bool uvLock = false);
+
+  bool canChamferEdges(
+    const vm::bbox3d& worldBounds,
+    const std::vector<vm::segment3d>& edgePositions,
+    double distance) const;
+  Result<void> chamferEdges(
+    const vm::bbox3d& worldBounds,
+    const std::vector<vm::segment3d>& edgePositions,
+    double distance,
     bool uvLock = false);
 
   // face operations

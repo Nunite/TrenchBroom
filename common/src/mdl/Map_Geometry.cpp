@@ -27,6 +27,7 @@
 #include "mdl/ApplyAndSwap.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
+#include "mdl/BrushGeometry.h"
 #include "mdl/BrushNode.h"
 #include "mdl/BrushVertexCommands.h"
 #include "mdl/EntityNode.h"
@@ -57,6 +58,7 @@
 #include "kdl/string_format.h"
 #include "kdl/task_manager.h"
 
+#include <algorithm>
 #include <ranges>
 
 namespace tb::mdl
@@ -552,6 +554,216 @@ bool removeVertices(
       std::move(*newNodes),
       std::move(vertexPositions),
       std::vector<vm::vec3d>{}));
+
+    if (!result->success())
+    {
+      transaction.cancel();
+      return false;
+    }
+
+    setHasPendingChanges(changedLinkedGroups, true);
+    return transaction.commit();
+  }
+
+  return false;
+}
+
+static std::optional<std::vector<vm::vec3d>> chamferNewVertexPositions(
+  const Brush& brush,
+  std::vector<vm::vec3d> vertexPositions,
+  const double distance)
+{
+  if (vertexPositions.empty())
+  {
+    return std::vector<vm::vec3d>{};
+  }
+
+  vertexPositions = kdl::vec_sort_and_remove_duplicates(std::move(vertexPositions));
+
+  constexpr auto eps = vm::constants<double>::almost_zero();
+
+  auto result = std::vector<vm::vec3d>{};
+  for (const auto& pos : vertexPositions)
+  {
+    const BrushVertex* vertex = nullptr;
+    for (const auto* v : brush.vertices())
+    {
+      if (v != nullptr && v->position() == pos)
+      {
+        vertex = v;
+        break;
+      }
+    }
+
+    if (vertex == nullptr)
+    {
+      return std::nullopt;
+    }
+
+    const auto* firstEdge = vertex->leaving();
+    if (firstEdge == nullptr)
+    {
+      return std::nullopt;
+    }
+
+    const auto* currentEdge = firstEdge;
+    do
+    {
+      const auto* dst = currentEdge->destination();
+      if (dst == nullptr)
+      {
+        return std::nullopt;
+      }
+
+      const auto dir = dst->position() - pos;
+      const auto len = vm::length(dir);
+      if (!(len > distance + eps))
+      {
+        return std::nullopt;
+      }
+
+      result.push_back(pos + dir * (distance / len));
+      currentEdge = currentEdge->nextIncident();
+    } while (currentEdge != firstEdge);
+  }
+
+  return kdl::vec_sort_and_remove_duplicates(std::move(result));
+}
+
+bool chamferVertices(
+  Map& map, const std::string& commandName, std::vector<vm::vec3d> vertexPositions, const double distance)
+{
+  if (distance <= 0.0)
+  {
+    return false;
+  }
+
+  auto newVertexPositions = std::vector<vm::vec3d>{};
+
+  auto newNodes = applyToNodeContents(
+    map.selection().nodes,
+    kdl::overload(
+      [](Layer&) { return true; },
+      [](Group&) { return true; },
+      [](Entity&) { return true; },
+      [&](Brush& brush) {
+        const auto verticesToChamfer = vertexPositions
+                                       | std::views::filter([&](const auto& vertex) {
+                                           return brush.hasVertex(vertex);
+                                         })
+                                       | kdl::ranges::to<std::vector>();
+        if (verticesToChamfer.empty())
+        {
+          return true;
+        }
+
+        if (!brush.canChamferVertices(map.worldBounds(), verticesToChamfer, distance))
+        {
+          return false;
+        }
+
+        const auto chamfered = chamferNewVertexPositions(brush, verticesToChamfer, distance);
+        if (!chamfered)
+        {
+          return false;
+        }
+
+        newVertexPositions = kdl::vec_concat(std::move(newVertexPositions), *chamfered);
+
+        return brush.chamferVertices(map.worldBounds(), verticesToChamfer, distance, pref(Preferences::UVLock))
+               | kdl::if_error([&](auto e) {
+                   map.logger().error() << "Could not chamfer brush vertices: " << e.msg;
+                 })
+               | kdl::is_success();
+      },
+      [](BezierPatch&) { return true; }));
+
+  if (newNodes)
+  {
+    auto transaction = Transaction{map, commandName};
+
+    auto changedLinkedGroups = collectContainingGroups(
+      *newNodes | std::views::keys | kdl::ranges::to<std::vector>());
+
+    newVertexPositions = kdl::vec_sort_and_remove_duplicates(std::move(newVertexPositions));
+
+    const auto result = map.executeAndStore(std::make_unique<BrushVertexCommand>(
+      commandName,
+      std::move(*newNodes),
+      std::move(vertexPositions),
+      std::move(newVertexPositions)));
+
+    if (!result->success())
+    {
+      transaction.cancel();
+      return false;
+    }
+
+    setHasPendingChanges(changedLinkedGroups, true);
+    return transaction.commit();
+  }
+
+  return false;
+}
+
+bool chamferEdges(
+  Map& map, const std::string& commandName, std::vector<vm::segment3d> edgePositions, const double distance)
+{
+  if (distance <= 0.0)
+  {
+    return false;
+  }
+
+  auto newEdgePositions = std::vector<vm::segment3d>{};
+
+  auto newNodes = applyToNodeContents(
+    map.selection().nodes,
+    kdl::overload(
+      [](Layer&) { return true; },
+      [](Group&) { return true; },
+      [](Entity&) { return true; },
+      [&](Brush& brush) {
+        const auto edgesToChamfer =
+          edgePositions
+          | std::views::filter([&](const auto& edge) { return brush.hasEdge(edge); })
+          | kdl::ranges::to<std::vector>();
+        if (edgesToChamfer.empty())
+        {
+          return true;
+        }
+
+        if (!brush.canChamferEdges(map.worldBounds(), edgesToChamfer, distance))
+        {
+          return false;
+        }
+
+        return brush.chamferEdges(map.worldBounds(), edgesToChamfer, distance, pref(Preferences::UVLock))
+               | kdl::transform([&]() {
+                   auto newPositions = brush.findClosestEdgePositions(edgesToChamfer);
+                   newEdgePositions = kdl::vec_concat(
+                     std::move(newEdgePositions), std::move(newPositions));
+                 })
+               | kdl::if_error([&](auto e) {
+                   map.logger().error() << "Could not chamfer brush edges: " << e.msg;
+                 })
+               | kdl::is_success();
+      },
+      [](BezierPatch&) { return true; }));
+
+  if (newNodes)
+  {
+    newEdgePositions = kdl::vec_sort_and_remove_duplicates(std::move(newEdgePositions));
+
+    auto transaction = Transaction{map, commandName};
+
+    const auto changedLinkedGroups = collectContainingGroups(
+      *newNodes | std::views::keys | kdl::ranges::to<std::vector>());
+
+    const auto result = map.executeAndStore(std::make_unique<BrushEdgeCommand>(
+      commandName,
+      std::move(*newNodes),
+      std::move(edgePositions),
+      std::move(newEdgePositions)));
 
     if (!result->success())
     {

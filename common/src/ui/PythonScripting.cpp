@@ -51,6 +51,8 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
+#include "vm/segment.h"
+
 #include <string>
 
 namespace tb::ui
@@ -1441,6 +1443,90 @@ PyObject* selection_rotate(PyObject* self, PyObject* args)
   }
 }
 
+PyObject* selection_chamfer_vertices(PyObject* self, PyObject* args)
+{
+  double distance = 0.0;
+  if (!PyArg_ParseTuple(args, "d", &distance))
+  {
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  try
+  {
+    auto& map = doc->map();
+    const auto ok = tb::mdl::chamferVertices(
+      map, "Chamfer Vertices", map.vertexHandles().selectedHandles(), distance);
+    if (ok)
+    {
+      Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
+PyObject* selection_chamfer_edges(PyObject* self, PyObject* args)
+{
+  double distance = 0.0;
+  if (!PyArg_ParseTuple(args, "d", &distance))
+  {
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  try
+  {
+    auto& map = doc->map();
+    const auto ok = tb::mdl::chamferEdges(
+      map, "Chamfer Edges", map.edgeHandles().selectedHandles(), distance);
+    if (ok)
+    {
+      Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
 PyObject* selection_remove_property(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
@@ -1700,6 +1786,8 @@ bool registerTypes(PyObject* module)
       {"duplicate", selection_duplicate, METH_NOARGS, nullptr},
       {"translate", selection_translate, METH_VARARGS, nullptr},
       {"rotate", selection_rotate, METH_VARARGS, nullptr},
+      {"chamfer_vertices", selection_chamfer_vertices, METH_VARARGS, nullptr},
+      {"chamfer_edges", selection_chamfer_edges, METH_VARARGS, nullptr},
       {"remove_property", selection_remove_property, METH_VARARGS, nullptr},
       {"rename_property", selection_rename_property, METH_VARARGS, nullptr},
       {"clear", selection_clear, METH_NOARGS, nullptr},

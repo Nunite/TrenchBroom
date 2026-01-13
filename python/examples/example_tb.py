@@ -18,6 +18,8 @@ class VertexToolAddon:
         self._panel.add_button_callback("记录中心点", self.op_record_pivot)
         self._panel.add_button_callback("切换中心点模式", self.op_toggle_pivot_mode)
         self._panel.add_button_callback("切换目标实体要求", self.op_toggle_target_mode)
+        self._panel.add_float_field("chamfer_dist", "倒角距离", 8.0, 0.0, 100000.0, 2, 1.0)
+        self._panel.add_button_callback("倒角（顶点工具所选顶点）", self.op_chamfer_vertices)
         self._panel.add_int_field("dup_count", "重复次数", 10, 1, 999)
         self._panel.add_float_field("step_x", "X轴步进", 128.0, -100000.0, 100000.0, 2, 1.0)
         self._panel.add_float_field("step_y", "Y轴步进", 0.0, -100000.0, 100000.0, 2, 1.0)
@@ -118,6 +120,15 @@ class VertexToolAddon:
     def op_toggle_target_mode(self) -> None:
         self._require_explicit_entities = not self._require_explicit_entities
         self._set_message("目标模式已更新")
+
+    def op_chamfer_vertices(self) -> None:
+        doc = self._current_document()
+        if doc is None:
+            return
+        sel = self._current_selection(doc)
+        dist = self._read_float("chamfer_dist")
+        ok = sel.chamfer_vertices(dist)
+        self._set_message("倒角完成" if ok else "倒角失败（请检查是否选中了顶点工具顶点）")
 
     def _read_int(self, key: str) -> int:
         return int(self._panel.get_int_field(key))
