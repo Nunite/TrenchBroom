@@ -34,6 +34,7 @@ class GLContextManager;
 class MapInspector;
 class MapViewBar;
 class OutlinerInspector;
+class PluginInspector;
 class SyncHeightEventFilter;
 class TabBook;
 class MapDocument; // Forward declaration
@@ -43,7 +44,8 @@ enum class InspectorPage
   Map = 0,
   Entity = 1,
   Face = 2,
-  Outliner = 3
+  Outliner = 3,
+  Plugin = 4
 };
 
 class Inspector : public QWidget
@@ -55,6 +57,7 @@ private:
   EntityInspector* m_entityInspector = nullptr;
   FaceInspector* m_faceInspector = nullptr;
   OutlinerInspector* m_outlinerInspector = nullptr;
+  PluginInspector* m_pluginInspector = nullptr;
 
   SyncHeightEventFilter* m_syncTabBarEventFilter = nullptr;
 
@@ -68,6 +71,7 @@ public:
   bool cancelMouseDrag();
 
   FaceInspector* faceInspector();
+  PluginInspector* pluginInspector();
 
   QByteArray saveState() const;
   bool restoreState(const QByteArray& state);

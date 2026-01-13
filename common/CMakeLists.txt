@@ -409,6 +409,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/InputEvent.cpp
         ${COMMON_SOURCE_DIR}/ui/InputState.cpp
         ${COMMON_SOURCE_DIR}/ui/Inspector.cpp
+        ${COMMON_SOURCE_DIR}/ui/PluginInspector.cpp
         ${COMMON_SOURCE_DIR}/ui/outliner/OutlinerEntityPropertyEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/outliner/OutlinerInspector.cpp
         ${COMMON_SOURCE_DIR}/ui/outliner/OutlinerModel.cpp

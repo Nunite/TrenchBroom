@@ -89,6 +89,7 @@
 #include "ui/GLContextManager.h"
 #include "ui/InfoPanel.h"
 #include "ui/Inspector.h"
+#include "ui/PluginInspector.h"
 #include "ui/LaunchGameEngineDialog.h"
 #include "ui/MapDocument.h"
 #include "ui/MapView2D.h"
@@ -445,6 +446,33 @@ void MapFrame::createGui()
   restoreWindowState(m_vSplitter);
   restoreWindowState(m_inspector);
   restoreWindowState(m_infoPanel);
+}
+
+QWidget* MapFrame::addPluginPanel(const QString& title, const QString& content)
+{
+  if (m_inspector == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = m_inspector->pluginInspector()->addPluginPanel(title);
+  if (container == nullptr)
+  {
+    return nullptr;
+  }
+  auto* layout = container->layout();
+  if (layout == nullptr)
+  {
+    auto* v = new QVBoxLayout{};
+    v->setContentsMargins(4, 4, 4, 4);
+    v->setSpacing(4);
+    container->setLayout(v);
+    layout = v;
+  }
+  auto* label = new QLabel{};
+  label->setWordWrap(true);
+  label->setText(content.isEmpty() ? tr("Plugin panel: %1").arg(title) : content);
+  layout->addWidget(label);
+  return container;
 }
 
 void MapFrame::createToolBar()

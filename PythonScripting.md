@@ -20,10 +20,29 @@ TrenchBroom 内嵌 Python（模块名 `tb`），用于：
 
 脚本运行期间，Python 的 `sys.stdout` / `sys.stderr` 会被重定向到 TrenchBroom 的日志系统：
 
-- UI：`View` → `Toggle Info Panel` → `Console` 页签
+- UI：`View` → `Toggle Info Panel` → `Python Console` 页签
 - 同时也会进入 TrenchBroom 的日志文件输出（由现有日志系统处理）
 
-所以 `print(...)` 应该能在 Console 里看到。
+所以 `print(...)` 应该能在 Python Console 里看到。
+
+### Plugin 面板（预览）
+
+Inspector 里新增了一个 `Plugin` 页签（占位）。
+
+它是一个“插件面板容器”，用来存放多个插件各自初始化出来的一块 UI 区域：
+
+- 一个插件对应其中一块区域（可折叠）
+- 容器允许同时显示多个插件区域（可滚动）
+
+现在提供了最小 API 来创建和初始化插件面板：
+`tb.add_plugin_panel(title: str, content: str | None = None) -> None`
+`tb.create_plugin_panel(title: str) -> PluginPanel`
+
+- 会在 `Plugin` 页签里创建一个新的可折叠面板，标题为 `title`
+- 面板内显示一段只读的文本（如果 `content` 为空则显示占位提示）
+- 调用后会自动切换到 `Plugin` 页签，方便查看
+
+注意：当前支持基础文本/HTML展示与按钮触发 Action，后续将扩展为更丰富的插件 UI 能力。
 
 ### sys.path 规则
 
@@ -71,6 +90,101 @@ with tb.transaction("My Batch Edit"):
 #### `tb.list_actions() -> list[str]`
 
 返回所有已注册的 action 路径列表（字符串）。
+
+#### `tb.add_plugin_panel(title: str, content: str | None = None) -> None`
+
+在 Inspector 的 `Plugin` 页签里添加一个新的面板，并显示文本内容。
+
+- 参数：
+  - `title`：面板标题
+  - `content`：面板正文文本；可选
+- 异常：
+  - `RuntimeError`：当前没有活动的 map 窗口
+
+#### `tb.create_plugin_panel(title: str) -> PluginPanel`
+
+创建一个新的插件面板并返回 `PluginPanel` 对象，以便进一步自定义。
+
+- 参数：
+  - `title`：面板标题
+- 返回：`PluginPanel` 对象
+- 异常：
+  - `RuntimeError`：当前没有活动的 map 窗口
+
+### 类型：`PluginPanel`
+
+`PluginPanel` 表示 Inspector 的 `Plugin` 页签里的一块可折叠面板内容区，用于脚本动态创建简单 UI。
+
+当前 UI 能力刻意保持最小：以“标签 + 按钮 + 少量输入控件”为主。面板内控件的生命周期由 TrenchBroom 管理。
+
+#### `PluginPanel.clear() -> None`
+
+清空面板内所有控件。
+
+#### `PluginPanel.add_label(text: str) -> None`
+
+添加一段只读文本（自动换行）。
+
+#### `PluginPanel.set_text(text: str) -> None`
+
+用一段只读文本填充整个面板。
+
+注意：这会先清空面板，因此会移除你之前添加的按钮和输入控件。
+
+#### `PluginPanel.set_html(html: str) -> None`
+
+用一段 HTML 富文本填充整个面板。
+
+注意：这会先清空面板，因此会移除你之前添加的按钮和输入控件。
+
+#### `PluginPanel.add_button(text: str, action_path: str | None = None) -> None`
+
+添加一个按钮。
+
+- `action_path`：可选 action 路径（例如 `"Menu/File/Preferences..."`）。提供后，点击按钮会触发对应 action。
+
+#### `PluginPanel.add_button_callback(text: str, callback: Callable[[], Any]) -> None`
+
+添加一个按钮；点击后调用传入的 Python 回调函数。
+
+#### `PluginPanel.add_label_named(key: str, text: str) -> None`
+
+添加一个“命名标签”。后续可以用 `set_label_text` 只更新该标签文本，而不重建整个面板 UI（不会丢失输入框里的值）。
+
+`key` 在同一个 `PluginPanel` 内应唯一。
+
+#### `PluginPanel.set_label_text(key: str, text: str) -> bool`
+
+更新命名标签文本。
+
+- 返回 `True`：找到并更新成功
+- 返回 `False`：没有找到对应 key 的标签
+
+#### `PluginPanel.add_int_field(key: str, label: str, value: int, min: int = 0, max: int = 999999) -> None`
+
+添加一个整数输入框（SpinBox）。
+
+`key` 在同一个 `PluginPanel` 内应唯一。
+
+#### `PluginPanel.add_float_field(key: str, label: str, value: float, min: float = -1e9, max: float = 1e9, decimals: int = 3, step: float = 1.0) -> None`
+
+添加一个浮点数输入框（DoubleSpinBox）。
+
+`key` 在同一个 `PluginPanel` 内应唯一。
+
+#### `PluginPanel.get_int_field(key: str) -> int`
+
+读取整数输入框当前值。
+
+- 异常：
+  - `KeyError`：找不到对应 key 的输入框
+
+#### `PluginPanel.get_float_field(key: str) -> float`
+
+读取浮点数输入框当前值。
+
+- 异常：
+  - `KeyError`：找不到对应 key 的输入框
 
 ### 类型：`Document`
 
@@ -299,6 +413,20 @@ def main() -> None:
     sel = doc.selection
     with tb.transaction("Python: rotate around vertex"):
         sel.rotate(0, 0, 1, 15, pivot_x, pivot_y, pivot_z)
+
+if __name__ == "__main__":
+    main()
+```
+
+### 7) 添加一个插件面板
+
+```python
+import tb
+
+def main() -> None:
+    panel = tb.create_plugin_panel("My Plugin")
+    panel.set_text("Hello from Python plugin!")
+    panel.add_button("Open Preferences", "Menu/File/Preferences...")
 
 if __name__ == "__main__":
     main()

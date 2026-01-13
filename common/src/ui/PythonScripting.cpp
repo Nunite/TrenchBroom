@@ -41,6 +41,14 @@
 #include "ui/Actions.h"
 #include "ui/MapFrame.h"
 #include "ui/MapDocument.h"
+#include "ui/Inspector.h"
+#include "ui/PluginInspector.h"
+#include <QDoubleSpinBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QSpinBox>
+#include <QPushButton>
+#include <QVBoxLayout>
 
 #include <string>
 
@@ -84,6 +92,12 @@ PyTypeObject* g_selectionType = nullptr;
 PyTypeObject* g_entityType = nullptr;
 PyTypeObject* g_logWriterType = nullptr;
 PyTypeObject* g_transactionType = nullptr;
+PyTypeObject* g_pluginPanelType = nullptr;
+
+struct PyTbPluginPanel
+{
+  PyObject_HEAD QWidget* container;
+};
 
 PyObject* toPyString(const std::string& str)
 {
@@ -253,6 +267,22 @@ PyObject* createTransactionObject(tb::ui::MapDocument* document, PyObject* name)
   return reinterpret_cast<PyObject*>(obj);
 }
 
+PyObject* createPluginPanelObject(QWidget* container)
+{
+  if (g_pluginPanelType == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "tb.PluginPanel type is not initialized");
+    return nullptr;
+  }
+  auto* obj = PyObject_New(PyTbPluginPanel, g_pluginPanelType);
+  if (obj == nullptr)
+  {
+    return nullptr;
+  }
+  obj->container = container;
+  return reinterpret_cast<PyObject*>(obj);
+}
+
 tb::ui::MapDocument* getDocumentFromPy(PyObject* self)
 {
   if (g_documentType == nullptr || !PyObject_TypeCheck(self, g_documentType))
@@ -331,6 +361,379 @@ PyTbTransaction* getTransactionFromPy(PyObject* self)
   }
 
   return tx;
+}
+
+PyTbPluginPanel* getPluginPanelFromPy(PyObject* self)
+{
+  if (g_pluginPanelType == nullptr || !PyObject_TypeCheck(self, g_pluginPanelType))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected tb.PluginPanel");
+    return nullptr;
+  }
+  auto* panel = reinterpret_cast<PyTbPluginPanel*>(self);
+  if (panel->container == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "PluginPanel is not valid");
+    return nullptr;
+  }
+  return panel;
+}
+
+PyObject* plugin_panel_clear(PyObject* self, PyObject*)
+{
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  auto* layout = container->layout();
+  if (layout == nullptr)
+  {
+    Py_RETURN_NONE;
+  }
+  while (auto* item = layout->takeAt(0))
+  {
+    if (auto* w = item->widget())
+    {
+      w->deleteLater();
+    }
+    delete item;
+  }
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_ensure_layout(QWidget* container)
+{
+  auto* layout = container->layout();
+  if (layout == nullptr)
+  {
+    auto* v = new QVBoxLayout{};
+    v->setContentsMargins(4, 4, 4, 4);
+    v->setSpacing(4);
+    container->setLayout(v);
+  }
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_add_label(PyObject* self, PyObject* args)
+{
+  const char* text = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &text))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+  auto* label = new QLabel{};
+  label->setWordWrap(true);
+  label->setText(QString::fromUtf8(text));
+  layout->addWidget(label);
+  Py_RETURN_NONE;
+}
+
+QString plugin_panel_object_name(const QString& prefix, const char* key)
+{
+  return QStringLiteral("tb_py_panel_%1_%2").arg(prefix, QString::fromUtf8(key));
+}
+
+PyObject* plugin_panel_add_label_named(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* text = nullptr;
+  if (!PyArg_ParseTuple(args, "ss", &key, &text))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+  auto* label = new QLabel{};
+  label->setWordWrap(true);
+  label->setObjectName(plugin_panel_object_name(QStringLiteral("label"), key));
+  label->setText(QString::fromUtf8(text));
+  layout->addWidget(label);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_label_text(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* text = nullptr;
+  if (!PyArg_ParseTuple(args, "ss", &key, &text))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  const auto name = plugin_panel_object_name(QStringLiteral("label"), key);
+  auto* label = container->findChild<QLabel*>(name);
+  if (label == nullptr)
+  {
+    Py_RETURN_FALSE;
+  }
+  label->setText(QString::fromUtf8(text));
+  Py_RETURN_TRUE;
+}
+
+PyObject* plugin_panel_add_int_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* labelText = nullptr;
+  int value = 0;
+  int minValue = 0;
+  int maxValue = 999999;
+  if (!PyArg_ParseTuple(args, "ssi|ii", &key, &labelText, &value, &minValue, &maxValue))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* row = new QWidget{container};
+  auto* rowLayout = new QHBoxLayout{};
+  rowLayout->setContentsMargins(0, 0, 0, 0);
+  rowLayout->setSpacing(6);
+  row->setLayout(rowLayout);
+
+  auto* label = new QLabel{};
+  label->setText(QString::fromUtf8(labelText));
+
+  auto* spin = new QSpinBox{};
+  spin->setObjectName(plugin_panel_object_name(QStringLiteral("int"), key));
+  spin->setRange(minValue, maxValue);
+  spin->setValue(value);
+
+  rowLayout->addWidget(label, 1);
+  rowLayout->addWidget(spin, 0);
+  layout->addWidget(row);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_add_float_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* labelText = nullptr;
+  double value = 0.0;
+  double minValue = -1.0e9;
+  double maxValue = 1.0e9;
+  int decimals = 3;
+  double step = 1.0;
+  if (!PyArg_ParseTuple(args, "ssd|ddid", &key, &labelText, &value, &minValue, &maxValue, &decimals, &step))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* row = new QWidget{container};
+  auto* rowLayout = new QHBoxLayout{};
+  rowLayout->setContentsMargins(0, 0, 0, 0);
+  rowLayout->setSpacing(6);
+  row->setLayout(rowLayout);
+
+  auto* label = new QLabel{};
+  label->setText(QString::fromUtf8(labelText));
+
+  auto* spin = new QDoubleSpinBox{};
+  spin->setObjectName(plugin_panel_object_name(QStringLiteral("float"), key));
+  spin->setDecimals(decimals);
+  spin->setRange(minValue, maxValue);
+  spin->setSingleStep(step);
+  spin->setValue(value);
+
+  rowLayout->addWidget(label, 1);
+  rowLayout->addWidget(spin, 0);
+  layout->addWidget(row);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_get_int_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  const auto name = plugin_panel_object_name(QStringLiteral("int"), key);
+  auto* spin = container->findChild<QSpinBox*>(name);
+  if (spin == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such int field");
+    return nullptr;
+  }
+  return PyLong_FromLong(static_cast<long>(spin->value()));
+}
+
+PyObject* plugin_panel_get_float_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  const auto name = plugin_panel_object_name(QStringLiteral("float"), key);
+  auto* spin = container->findChild<QDoubleSpinBox*>(name);
+  if (spin == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such float field");
+    return nullptr;
+  }
+  return PyFloat_FromDouble(spin->value());
+}
+
+PyObject* plugin_panel_set_text(PyObject* self, PyObject* args)
+{
+  const char* text = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &text))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+  while (auto* item = layout->takeAt(0))
+  {
+    if (auto* w = item->widget())
+    {
+      w->deleteLater();
+    }
+    delete item;
+  }
+  auto* label = new QLabel{};
+  label->setWordWrap(true);
+  label->setText(QString::fromUtf8(text));
+  layout->addWidget(label);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_html(PyObject* self, PyObject* args)
+{
+  const char* html = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &html))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+  while (auto* item = layout->takeAt(0))
+  {
+    if (auto* w = item->widget())
+    {
+      w->deleteLater();
+    }
+    delete item;
+  }
+  auto* label = new QLabel{};
+  label->setWordWrap(true);
+  label->setTextFormat(Qt::RichText);
+  label->setText(QString::fromUtf8(html));
+  layout->addWidget(label);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
+{
+  const char* text = nullptr;
+  const char* actionPath = nullptr;
+  if (!PyArg_ParseTuple(args, "s|z", &text, &actionPath))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container;
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+  auto* btn = new QPushButton{};
+  btn->setText(QString::fromUtf8(text));
+  if (actionPath != nullptr)
+  {
+    const auto pathStr = std::string{actionPath};
+    QObject::connect(btn, &QPushButton::clicked, container, [container, pathStr]() {
+      auto* win = container->window();
+      auto* frame = dynamic_cast<tb::ui::MapFrame*>(win);
+      if (frame == nullptr)
+      {
+        return;
+      }
+      try
+      {
+        const auto path = std::filesystem::path{pathStr};
+        const auto& actionsMap = ActionManager::instance().actionsMap();
+        const auto iAction = actionsMap.find(path);
+        if (iAction == std::end(actionsMap))
+        {
+          return;
+        }
+        const auto& action = iAction->second;
+        auto context = ActionExecutionContext{frame, frame->currentMapViewBase()};
+        if (!action.enabled(context))
+        {
+          return;
+        }
+        action.execute(context);
+      }
+      catch (...)
+      {
+      }
+    });
+  }
+  layout->addWidget(btn);
+  Py_RETURN_NONE;
 }
 
 PyObject* log_writer_write(PyObject* self, PyObject* args)
@@ -1418,6 +1821,103 @@ bool registerTypes(PyObject* module)
     }
   }
 
+  if (g_pluginPanelType == nullptr)
+  {
+    static PyTypeObject pluginPanelType = PyTypeObject{};
+    pluginPanelType = PyTypeObject{};
+    pluginPanelType.tp_name = "tb.PluginPanel";
+    pluginPanelType.tp_basicsize = sizeof(PyTbPluginPanel);
+    pluginPanelType.tp_flags = Py_TPFLAGS_DEFAULT;
+    pluginPanelType.tp_dealloc = freePythonObject;
+
+    static PyMethodDef pluginPanelMethods[] = {
+      {"clear", plugin_panel_clear, METH_NOARGS, nullptr},
+      {"add_label", plugin_panel_add_label, METH_VARARGS, nullptr},
+      {"add_label_named", plugin_panel_add_label_named, METH_VARARGS, nullptr},
+      {"set_label_text", plugin_panel_set_label_text, METH_VARARGS, nullptr},
+      {"add_int_field", plugin_panel_add_int_field, METH_VARARGS, nullptr},
+      {"add_float_field", plugin_panel_add_float_field, METH_VARARGS, nullptr},
+      {"get_int_field", plugin_panel_get_int_field, METH_VARARGS, nullptr},
+      {"get_float_field", plugin_panel_get_float_field, METH_VARARGS, nullptr},
+      {"set_text", plugin_panel_set_text, METH_VARARGS, nullptr},
+      {"set_html", plugin_panel_set_html, METH_VARARGS, nullptr},
+      {"add_button", plugin_panel_add_button, METH_VARARGS, nullptr},
+      {"add_button_callback",
+       [](PyObject* self, PyObject* args) -> PyObject* {
+         const char* text = nullptr;
+         PyObject* callback = nullptr;
+         if (!PyArg_ParseTuple(args, "sO", &text, &callback))
+         {
+           return nullptr;
+         }
+         if (!PyCallable_Check(callback))
+         {
+           PyErr_SetString(PyExc_TypeError, "expected a callable");
+           return nullptr;
+         }
+         auto* panel = getPluginPanelFromPy(self);
+         if (panel == nullptr)
+         {
+           return nullptr;
+         }
+         auto* container = panel->container;
+         plugin_panel_ensure_layout(container);
+         auto* layout = container->layout();
+         auto* btn = new QPushButton{};
+         btn->setText(QString::fromUtf8(text));
+         Py_INCREF(callback);
+         QObject::connect(btn, &QPushButton::clicked, container, [callback, container]() {
+           auto gil = PyGILState_Ensure();
+           auto* win = container->window();
+           auto* frame = dynamic_cast<tb::ui::MapFrame*>(win);
+           auto* prev = g_currentFrame;
+           if (frame != nullptr)
+           {
+             g_currentFrame = frame;
+           }
+           auto* result = PyObject_CallObject(callback, nullptr);
+           if (result == nullptr)
+           {
+             PyErr_Print();
+             if (g_currentFrame != nullptr)
+             {
+               g_currentFrame->pythonLogger().error("Error in button callback");
+             }
+           }
+           Py_XDECREF(result);
+           g_currentFrame = prev;
+           PyGILState_Release(gil);
+         });
+         QObject::connect(btn, &QObject::destroyed, container, [callback]() {
+           auto gil = PyGILState_Ensure();
+           Py_DECREF(callback);
+           PyGILState_Release(gil);
+         });
+         layout->addWidget(btn);
+         Py_RETURN_NONE;
+       },
+       METH_VARARGS,
+       nullptr},
+      {nullptr, nullptr, 0, nullptr},
+    };
+    pluginPanelType.tp_methods = pluginPanelMethods;
+
+    if (PyType_Ready(&pluginPanelType) != 0)
+    {
+      return false;
+    }
+    g_pluginPanelType = &pluginPanelType;
+
+    Py_INCREF(g_pluginPanelType);
+    if (
+      PyModule_AddObject(module, "PluginPanel", reinterpret_cast<PyObject*>(g_pluginPanelType))
+      != 0)
+    {
+      Py_DECREF(g_pluginPanelType);
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -1430,6 +1930,83 @@ bool ensureInitialized()
             {"document", module_document, METH_NOARGS, nullptr},
             {"current_document", module_current_document, METH_NOARGS, nullptr},
             {"transaction", module_transaction, METH_VARARGS, nullptr},
+            {"add_plugin_panel",
+             [](PyObject*, PyObject* args) -> PyObject* {
+               const char* title = nullptr;
+               const char* content = nullptr;
+               if (!PyArg_ParseTuple(args, "s|z", &title, &content))
+               {
+                 return nullptr;
+               }
+               if (g_currentFrame == nullptr)
+               {
+                 PyErr_SetString(PyExc_RuntimeError, "No active MapFrame");
+                 return nullptr;
+               }
+               try
+               {
+                 const auto qTitle = QString::fromUtf8(title);
+                 const auto qContent =
+                   content != nullptr ? QString::fromUtf8(content) : QString{};
+                 g_currentFrame->addPluginPanel(qTitle, qContent);
+                 g_currentFrame->switchToInspectorPage(InspectorPage::Plugin);
+                 Py_RETURN_NONE;
+               }
+               catch (const tb::Exception& e)
+               {
+                 PyErr_SetString(PyExc_RuntimeError, e.what());
+                 return nullptr;
+               }
+               catch (const std::exception& e)
+               {
+                 PyErr_SetString(PyExc_RuntimeError, e.what());
+                 return nullptr;
+               }
+               catch (...)
+               {
+                 PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+                 return nullptr;
+               }
+             },
+             METH_VARARGS,
+             nullptr},
+            {"create_plugin_panel",
+             [](PyObject*, PyObject* args) -> PyObject* {
+               const char* title = nullptr;
+               if (!PyArg_ParseTuple(args, "s", &title))
+               {
+                 return nullptr;
+               }
+               if (g_currentFrame == nullptr)
+               {
+                 PyErr_SetString(PyExc_RuntimeError, "No active MapFrame");
+                 return nullptr;
+               }
+               try
+               {
+                 const auto qTitle = QString::fromUtf8(title);
+                 auto* container = g_currentFrame->addPluginPanel(qTitle);
+                 g_currentFrame->switchToInspectorPage(InspectorPage::Plugin);
+                 return createPluginPanelObject(container);
+               }
+               catch (const tb::Exception& e)
+               {
+                 PyErr_SetString(PyExc_RuntimeError, e.what());
+                 return nullptr;
+               }
+               catch (const std::exception& e)
+               {
+                 PyErr_SetString(PyExc_RuntimeError, e.what());
+                 return nullptr;
+               }
+               catch (...)
+               {
+                 PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+                 return nullptr;
+               }
+             },
+             METH_VARARGS,
+             nullptr},
             {"execute_action",
              [](PyObject*, PyObject* args) -> PyObject* {
                const char* actionPath = nullptr;

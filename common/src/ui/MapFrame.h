@@ -399,6 +399,8 @@ public:
 
   void runPythonScript();
 
+  QWidget* addPluginPanel(const QString& title, const QString& content = QString());
+
   bool canRevealMaterial() const;
   void revealMaterial();
 

@@ -27,6 +27,7 @@
 #include "ui/EntityInspector.h"
 #include "ui/FaceInspector.h"
 #include "ui/MapInspector.h"
+#include "ui/PluginInspector.h"
 #include "ui/outliner/OutlinerInspector.h"
 #include "ui/MapViewBar.h"
 #include "ui/QtUtils.h"
@@ -37,6 +38,7 @@
 
 namespace tb::ui
 {
+
 Inspector::Inspector(MapDocument& document, GLContextManager& contextManager, QWidget* parent)
   : QWidget{parent}
 {
@@ -49,11 +51,13 @@ Inspector::Inspector(MapDocument& document, GLContextManager& contextManager, QW
   m_entityInspector = new EntityInspector{map, contextManager};
   m_faceInspector = new FaceInspector{map, contextManager};
   m_outlinerInspector = new OutlinerInspector{document, contextManager};
+  m_pluginInspector = new PluginInspector{};
 
   m_tabBook->addPage(m_mapInspector, "Map");
   m_tabBook->addPage(m_entityInspector, "Entity");
   m_tabBook->addPage(m_faceInspector, "Face");
   m_tabBook->addPage(m_outlinerInspector, "Outliner");
+  m_tabBook->addPage(m_pluginInspector, "Plugin");
 
   auto* layout = new QVBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);
@@ -92,6 +96,11 @@ bool Inspector::cancelMouseDrag()
 FaceInspector* Inspector::faceInspector()
 {
   return m_faceInspector;
+}
+
+PluginInspector* Inspector::pluginInspector()
+{
+  return m_pluginInspector;
 }
 
 QByteArray Inspector::saveState() const
