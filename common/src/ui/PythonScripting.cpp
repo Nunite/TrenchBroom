@@ -46,6 +46,7 @@
 #include <QDoubleSpinBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPointer>
 #include <QSpinBox>
 #include <QPushButton>
 #include <QVBoxLayout>
@@ -96,7 +97,7 @@ PyTypeObject* g_pluginPanelType = nullptr;
 
 struct PyTbPluginPanel
 {
-  PyObject_HEAD QWidget* container;
+  PyObject_HEAD QPointer<QWidget>* container;
 };
 
 PyObject* toPyString(const std::string& str)
@@ -146,6 +147,14 @@ tb::ui::MapDocument* activeDocument()
 
 void freePythonObject(PyObject* self)
 {
+  PyObject_Del(self);
+}
+
+void freePluginPanelObject(PyObject* self)
+{
+  auto* obj = reinterpret_cast<PyTbPluginPanel*>(self);
+  delete obj->container;
+  obj->container = nullptr;
   PyObject_Del(self);
 }
 
@@ -279,7 +288,7 @@ PyObject* createPluginPanelObject(QWidget* container)
   {
     return nullptr;
   }
-  obj->container = container;
+  obj->container = new QPointer<QWidget>{container};
   return reinterpret_cast<PyObject*>(obj);
 }
 
@@ -371,7 +380,7 @@ PyTbPluginPanel* getPluginPanelFromPy(PyObject* self)
     return nullptr;
   }
   auto* panel = reinterpret_cast<PyTbPluginPanel*>(self);
-  if (panel->container == nullptr)
+  if (panel->container == nullptr || panel->container->data() == nullptr)
   {
     PyErr_SetString(PyExc_RuntimeError, "PluginPanel is not valid");
     return nullptr;
@@ -386,7 +395,7 @@ PyObject* plugin_panel_clear(PyObject* self, PyObject*)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   auto* layout = container->layout();
   if (layout == nullptr)
   {
@@ -428,7 +437,7 @@ PyObject* plugin_panel_add_label(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   plugin_panel_ensure_layout(container);
   auto* layout = container->layout();
   auto* label = new QLabel{};
@@ -456,7 +465,7 @@ PyObject* plugin_panel_add_label_named(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   plugin_panel_ensure_layout(container);
   auto* layout = container->layout();
   auto* label = new QLabel{};
@@ -480,7 +489,7 @@ PyObject* plugin_panel_set_label_text(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   const auto name = plugin_panel_object_name(QStringLiteral("label"), key);
   auto* label = container->findChild<QLabel*>(name);
   if (label == nullptr)
@@ -507,7 +516,7 @@ PyObject* plugin_panel_add_int_field(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   plugin_panel_ensure_layout(container);
   auto* layout = container->layout();
 
@@ -549,7 +558,7 @@ PyObject* plugin_panel_add_float_field(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   plugin_panel_ensure_layout(container);
   auto* layout = container->layout();
 
@@ -587,7 +596,7 @@ PyObject* plugin_panel_get_int_field(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   const auto name = plugin_panel_object_name(QStringLiteral("int"), key);
   auto* spin = container->findChild<QSpinBox*>(name);
   if (spin == nullptr)
@@ -610,7 +619,7 @@ PyObject* plugin_panel_get_float_field(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   const auto name = plugin_panel_object_name(QStringLiteral("float"), key);
   auto* spin = container->findChild<QDoubleSpinBox*>(name);
   if (spin == nullptr)
@@ -633,7 +642,7 @@ PyObject* plugin_panel_set_text(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   plugin_panel_ensure_layout(container);
   auto* layout = container->layout();
   while (auto* item = layout->takeAt(0))
@@ -663,7 +672,7 @@ PyObject* plugin_panel_set_html(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   plugin_panel_ensure_layout(container);
   auto* layout = container->layout();
   while (auto* item = layout->takeAt(0))
@@ -695,7 +704,7 @@ PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  auto* container = panel->container;
+  auto* container = panel->container->data();
   plugin_panel_ensure_layout(container);
   auto* layout = container->layout();
   auto* btn = new QPushButton{};
@@ -1828,7 +1837,7 @@ bool registerTypes(PyObject* module)
     pluginPanelType.tp_name = "tb.PluginPanel";
     pluginPanelType.tp_basicsize = sizeof(PyTbPluginPanel);
     pluginPanelType.tp_flags = Py_TPFLAGS_DEFAULT;
-    pluginPanelType.tp_dealloc = freePythonObject;
+    pluginPanelType.tp_dealloc = freePluginPanelObject;
 
     static PyMethodDef pluginPanelMethods[] = {
       {"clear", plugin_panel_clear, METH_NOARGS, nullptr},
@@ -1860,7 +1869,7 @@ bool registerTypes(PyObject* module)
          {
            return nullptr;
          }
-         auto* container = panel->container;
+         auto* container = panel->container->data();
          plugin_panel_ensure_layout(container);
          auto* layout = container->layout();
          auto* btn = new QPushButton{};
