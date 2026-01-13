@@ -4,9 +4,9 @@ _ADDON = None
 
 class VertexToolAddon:
     def __init__(self) -> None:
-        self._panel = tb.create_plugin_panel("Vertex Tool Panel")
+        self._panel = tb.create_plugin_panel("顶点工具面板")
         self._pivot = None  # (x, y, z)
-        self._message = "Ready"
+        self._message = "就绪"
         self._pivot_mode = "first"
         self._require_explicit_entities = False
         self._build_ui()
@@ -15,30 +15,33 @@ class VertexToolAddon:
     def _build_ui(self) -> None:
         self._panel.clear()
         self._panel.add_label_named("status", "")
-        self._panel.add_button_callback("Record Pivot", self.op_record_pivot)
-        self._panel.add_button_callback("Pivot Mode: Toggle", self.op_toggle_pivot_mode)
-        self._panel.add_button_callback("Target: Toggle Entity Requirement", self.op_toggle_target_mode)
-        self._panel.add_int_field("dup_count", "Duplicate Count", 10, 1, 999)
-        self._panel.add_float_field("step_x", "Step X", 128.0, -100000.0, 100000.0, 2, 1.0)
-        self._panel.add_float_field("step_y", "Step Y", 0.0, -100000.0, 100000.0, 2, 1.0)
-        self._panel.add_float_field("step_z", "Step Z", 0.0, -100000.0, 100000.0, 2, 1.0)
-        self._panel.add_float_field("axis_x", "Axis X", 0.0, -1.0, 1.0, 3, 0.1)
-        self._panel.add_float_field("axis_y", "Axis Y", 0.0, -1.0, 1.0, 3, 0.1)
-        self._panel.add_float_field("axis_z", "Axis Z", 1.0, -1.0, 1.0, 3, 0.1)
-        self._panel.add_float_field("rotate_deg", "Rotate Degrees", 15.0, -360.0, 360.0, 2, 1.0)
-        self._panel.add_button_callback("Apply Duplicate+Rotate", self.op_apply_duplicate_rotate)
+        self._panel.add_button_callback("记录中心点", self.op_record_pivot)
+        self._panel.add_button_callback("切换中心点模式", self.op_toggle_pivot_mode)
+        self._panel.add_button_callback("切换目标实体要求", self.op_toggle_target_mode)
+        self._panel.add_int_field("dup_count", "重复次数", 10, 1, 999)
+        self._panel.add_float_field("step_x", "X轴步进", 128.0, -100000.0, 100000.0, 2, 1.0)
+        self._panel.add_float_field("step_y", "Y轴步进", 0.0, -100000.0, 100000.0, 2, 1.0)
+        self._panel.add_float_field("step_z", "Z轴步进", 0.0, -100000.0, 100000.0, 2, 1.0)
+        self._panel.add_float_field("axis_x", "X轴系数", 0.0, -1.0, 1.0, 3, 0.1)
+        self._panel.add_float_field("axis_y", "Y轴系数", 0.0, -1.0, 1.0, 3, 0.1)
+        self._panel.add_float_field("axis_z", "Z轴系数", 1.0, -1.0, 1.0, 3, 0.1)
+        self._panel.add_float_field("rotate_deg", "旋转角度", 15.0, -360.0, 360.0, 2, 1.0)
+        self._panel.add_button_callback("应用 重复+旋转", self.op_apply_duplicate_rotate)
 
     def _status_text(self) -> str:
-        lines = ["Vertex Tool Panel"]
+        lines = ["顶点工具面板"]
         if self._pivot is None:
-            lines.append("- Pivot: <not recorded>")
+            lines.append("- 中心点: <未记录>")
         else:
             x, y, z = self._pivot
-            lines.append(f"- Pivot: ({x:.2f}, {y:.2f}, {z:.2f})")
-        lines.append(f"- Pivot Mode: {self._pivot_mode}")
-        target_mode = "explicit entities only" if self._require_explicit_entities else "any selection"
-        lines.append(f"- Target Mode: {target_mode}")
-        lines.append(f"- Status: {self._message}")
+            lines.append(f"- 中心点: ({x:.2f}, {y:.2f}, {z:.2f})")
+        
+        mode_name = "第一个" if self._pivot_mode == "first" else "平均"
+        lines.append(f"- 中心点模式: {mode_name}")
+        
+        target_mode = "仅限显式实体" if self._require_explicit_entities else "任意选择"
+        lines.append(f"- 目标模式: {target_mode}")
+        lines.append(f"- 状态: {self._message}")
         return "\n".join(lines)
 
     def _refresh_status(self, msg: str | None = None) -> None:
@@ -58,7 +61,7 @@ class VertexToolAddon:
     def _current_document(self):
         doc = tb.Document.current()
         if doc is None:
-            self._set_message("No active document")
+            self._set_message("没有活动的文档")
             return None
         return doc
 
@@ -84,7 +87,7 @@ class VertexToolAddon:
 
     def _record_pivot_from_vertices(self, verts) -> bool:
         if len(verts) == 0:
-            self._set_message("No vertex tool selection")
+            self._set_message("顶点工具未选择任何顶点")
             return False
         if self._pivot_mode == "average":
             sx = 0.0
@@ -98,7 +101,7 @@ class VertexToolAddon:
             self._pivot = (sx / n, sy / n, sz / n)
         else:
             self._pivot = tuple(verts[0])
-        self._set_message("Pivot recorded")
+        self._set_message("中心点已记录")
         return True
 
     def op_record_pivot(self) -> None:
@@ -110,11 +113,11 @@ class VertexToolAddon:
 
     def op_toggle_pivot_mode(self) -> None:
         self._pivot_mode = "average" if self._pivot_mode == "first" else "first"
-        self._set_message("Pivot mode updated")
+        self._set_message("中心点模式已更新")
 
     def op_toggle_target_mode(self) -> None:
         self._require_explicit_entities = not self._require_explicit_entities
-        self._set_message("Target mode updated")
+        self._set_message("目标模式已更新")
 
     def _read_int(self, key: str) -> int:
         return int(self._panel.get_int_field(key))
@@ -124,7 +127,7 @@ class VertexToolAddon:
 
     def op_apply_duplicate_rotate(self) -> None:
         if self._pivot is None:
-            self._set_message("No recorded pivot")
+            self._set_message("未记录中心点")
             return
         doc = self._current_document()
         if doc is None:
@@ -132,9 +135,9 @@ class VertexToolAddon:
         sel = self._current_selection(doc)
         if not self._has_target_selection(sel):
             if self._require_explicit_entities:
-                self._set_message("No explicit entities selected")
+                self._set_message("未选择显式实体")
             else:
-                self._set_message("Selection is empty")
+                self._set_message("选择为空")
             return
 
         px, py, pz = self._pivot
@@ -148,8 +151,8 @@ class VertexToolAddon:
         rotate_deg = self._read_float("rotate_deg")
 
         tx_cm = getattr(doc, "transaction", None)
-        tx = tx_cm("Python: duplicate & rotate around pivot") if callable(tx_cm) else tb.transaction(
-            "Python: duplicate & rotate around pivot"
+        tx = tx_cm("Python: 围绕中心点重复并旋转") if callable(tx_cm) else tb.transaction(
+            "Python: 围绕中心点重复并旋转"
         )
         with tx:
             for _ in range(duplicate_count):
@@ -157,7 +160,7 @@ class VertexToolAddon:
                 sel.translate(step_x, step_y, step_z)
                 sel.rotate(axis_x, axis_y, axis_z, rotate_deg, px, py, pz)
 
-        self._set_message("Applied duplicate+rotate")
+        self._set_message("已应用重复+旋转")
 
 
 def register() -> None:
