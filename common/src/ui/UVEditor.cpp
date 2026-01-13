@@ -36,6 +36,20 @@
 namespace tb::ui
 {
 
+namespace
+{
+
+QToolButton* createTextButton(const QString& text, const QString& tooltip, QWidget* parent)
+{
+  auto* button = new QToolButton{parent};
+  button->setAutoRaise(true);
+  button->setText(text);
+  button->setToolTip(tooltip);
+  return button;
+}
+
+} // namespace
+
 UVEditor::UVEditor(mdl::Map& map, GLContextManager& contextManager, QWidget* parent)
   : QWidget{parent}
   , m_map{map}
@@ -59,6 +73,12 @@ void UVEditor::updateButtons()
   m_flipVAxisButton->setEnabled(enabled);
   m_rotateUVCCWButton->setEnabled(enabled);
   m_rotateUVCWButton->setEnabled(enabled);
+  m_fitUVButton->setEnabled(enabled);
+  m_alignUVLeftButton->setEnabled(enabled);
+  m_alignUVTopButton->setEnabled(enabled);
+  m_alignUVCenterButton->setEnabled(enabled);
+  m_alignUVRightButton->setEnabled(enabled);
+  m_alignUVBottomButton->setEnabled(enabled);
 }
 
 void UVEditor::createGui(GLContextManager& contextManager)
@@ -74,6 +94,12 @@ void UVEditor::createGui(GLContextManager& contextManager)
     createBitmapButton("RotateUVCCW.svg", tr("Rotate UV 90° counter-clockwise"), this);
   m_rotateUVCWButton =
     createBitmapButton("RotateUVCW.svg", tr("Rotate UV 90° clockwise"), this);
+  m_fitUVButton = createTextButton(tr("Fit"), tr("Fit UVs to texture"), this);
+  m_alignUVLeftButton = createTextButton(tr("L"), tr("Align UVs left"), this);
+  m_alignUVTopButton = createTextButton(tr("T"), tr("Align UVs top"), this);
+  m_alignUVCenterButton = createTextButton(tr("C"), tr("Align UVs center"), this);
+  m_alignUVRightButton = createTextButton(tr("R"), tr("Align UVs right"), this);
+  m_alignUVBottomButton = createTextButton(tr("B"), tr("Align UVs bottom"), this);
 
   connect(m_resetUVButton, &QAbstractButton::clicked, this, &UVEditor::resetUVClicked);
   connect(
@@ -87,6 +113,25 @@ void UVEditor::createGui(GLContextManager& contextManager)
     m_rotateUVCCWButton, &QAbstractButton::clicked, this, &UVEditor::rotateUVCCWClicked);
   connect(
     m_rotateUVCWButton, &QAbstractButton::clicked, this, &UVEditor::rotateUVCWClicked);
+  connect(m_fitUVButton, &QAbstractButton::clicked, this, &UVEditor::fitUVClicked);
+  connect(
+    m_alignUVLeftButton, &QAbstractButton::clicked, this, &UVEditor::alignUVLeftClicked);
+  connect(m_alignUVTopButton, &QAbstractButton::clicked, this, &UVEditor::alignUVTopClicked);
+  connect(
+    m_alignUVCenterButton,
+    &QAbstractButton::clicked,
+    this,
+    &UVEditor::alignUVCenterClicked);
+  connect(
+    m_alignUVRightButton,
+    &QAbstractButton::clicked,
+    this,
+    &UVEditor::alignUVRightClicked);
+  connect(
+    m_alignUVBottomButton,
+    &QAbstractButton::clicked,
+    this,
+    &UVEditor::alignUVBottomClicked);
 
   auto* gridLabel = new QLabel{"Grid "};
   makeEmphasized(gridLabel);
@@ -119,6 +164,12 @@ void UVEditor::createGui(GLContextManager& contextManager)
   bottomLayout->addWidget(m_flipVAxisButton);
   bottomLayout->addWidget(m_rotateUVCCWButton);
   bottomLayout->addWidget(m_rotateUVCWButton);
+  bottomLayout->addWidget(m_fitUVButton);
+  bottomLayout->addWidget(m_alignUVLeftButton);
+  bottomLayout->addWidget(m_alignUVTopButton);
+  bottomLayout->addWidget(m_alignUVCenterButton);
+  bottomLayout->addWidget(m_alignUVRightButton);
+  bottomLayout->addWidget(m_alignUVBottomButton);
   bottomLayout->addStretch();
   bottomLayout->addWidget(gridLabel);
   bottomLayout->addWidget(new QLabel{"X:"});
@@ -179,6 +230,36 @@ void UVEditor::rotateUVCCWClicked()
 void UVEditor::rotateUVCWClicked()
 {
   setBrushFaceAttributes(m_map, {.rotation = mdl::AddValue{-90.0f}});
+}
+
+void UVEditor::fitUVClicked()
+{
+  mdl::fitUV(m_map);
+}
+
+void UVEditor::alignUVLeftClicked()
+{
+  mdl::alignUV(m_map, mdl::UVAlign::Left);
+}
+
+void UVEditor::alignUVTopClicked()
+{
+  mdl::alignUV(m_map, mdl::UVAlign::Top);
+}
+
+void UVEditor::alignUVCenterClicked()
+{
+  mdl::alignUV(m_map, mdl::UVAlign::Center);
+}
+
+void UVEditor::alignUVRightClicked()
+{
+  mdl::alignUV(m_map, mdl::UVAlign::Right);
+}
+
+void UVEditor::alignUVBottomClicked()
+{
+  mdl::alignUV(m_map, mdl::UVAlign::Bottom);
 }
 
 void UVEditor::subDivisionChanged()

@@ -32,8 +32,56 @@
 #include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/WorldNode.h"
 
+#include "vm/bbox.h"
+
 namespace tb::mdl
 {
+
+namespace
+{
+
+vm::bbox2f computeBoundsInUVCoords(const BrushFace& face)
+{
+  const auto toUV = face.toUVCoordSystemMatrix(
+    face.attributes().offset(), face.attributes().scale(), true);
+
+  const auto vertices = face.vertices();
+  auto it = std::begin(vertices);
+  auto end = std::end(vertices);
+
+  auto bounds = vm::bbox2f{};
+  const auto firstUV = vm::vec2f{toUV * (*it++)->position()};
+  bounds.min = bounds.max = firstUV;
+
+  while (it != end)
+  {
+    bounds = merge(bounds, vm::vec2f{toUV * (*it++)->position()});
+  }
+
+  return bounds;
+}
+
+vm::bbox2f computeBoundsInRawUVCoords(const BrushFace& face)
+{
+  const auto toRaw = face.toUVCoordSystemMatrix(vm::vec2f{0, 0}, vm::vec2f{1, 1}, true);
+
+  const auto vertices = face.vertices();
+  auto it = std::begin(vertices);
+  auto end = std::end(vertices);
+
+  auto bounds = vm::bbox2f{};
+  const auto firstUV = vm::vec2f{toRaw * (*it++)->position()};
+  bounds.min = bounds.max = firstUV;
+
+  while (it != end)
+  {
+    bounds = merge(bounds, vm::vec2f{toRaw * (*it++)->position()});
+  }
+
+  return bounds;
+}
+
+} // namespace
 
 bool createBrush(Map& map, const std::vector<vm::vec3d>& points)
 {
@@ -88,6 +136,83 @@ bool copyUV(
         coordSystemSnapshot, attribs, sourceFacePlane, wrapStyle);
       return true;
     });
+}
+
+bool alignUV(Map& map, const UVAlign align)
+{
+  return applyAndSwap(
+    map, "Align UV", map.selection().allBrushFaces(), [&](auto& face) {
+      const auto bounds = computeBoundsInUVCoords(face);
+      const auto textureSize = face.textureSize();
+
+      auto offset = face.attributes().offset();
+      switch (align)
+      {
+      case UVAlign::Left:
+        offset[0] += -bounds.min.x();
+        break;
+      case UVAlign::Right:
+        offset[0] += textureSize.x() - bounds.max.x();
+        break;
+      case UVAlign::Bottom:
+        offset[1] += -bounds.min.y();
+        break;
+      case UVAlign::Top:
+        offset[1] += textureSize.y() - bounds.max.y();
+        break;
+      case UVAlign::Center:
+        offset = offset + (textureSize / 2.0f - bounds.center());
+        break;
+      }
+
+      offset = vm::correct(face.attributes().modOffset(offset, textureSize), 4, 0.0f);
+      auto attributes = face.attributes();
+      attributes.setOffset(offset);
+      face.setAttributes(attributes);
+      return true;
+    });
+}
+
+bool fitUV(Map& map)
+{
+  return applyAndSwap(map, "Fit UV", map.selection().allBrushFaces(), [&](auto& face) {
+    const auto rawBounds = computeBoundsInRawUVCoords(face);
+    const auto rawSize = rawBounds.size();
+    const auto textureSize = face.textureSize();
+
+    auto scale = face.attributes().scale();
+
+    if (rawSize.x() != 0.0f)
+    {
+      const auto scaleX = rawSize.x() / textureSize.x();
+      scale[0] = (scale[0] < 0.0f ? -scaleX : scaleX);
+    }
+    if (rawSize.y() != 0.0f)
+    {
+      const auto scaleY = rawSize.y() / textureSize.y();
+      scale[1] = (scale[1] < 0.0f ? -scaleY : scaleY);
+    }
+
+    if (scale.x() == 0.0f || scale.y() == 0.0f)
+    {
+      return true;
+    }
+
+    auto offset = vm::vec2f{};
+    offset[0] = scale.x() >= 0.0f ? -rawBounds.min.x() / scale.x()
+                                  : -rawBounds.max.x() / scale.x();
+    offset[1] = scale.y() >= 0.0f ? -rawBounds.min.y() / scale.y()
+                                  : -rawBounds.max.y() / scale.y();
+
+    offset = vm::correct(face.attributes().modOffset(offset, textureSize), 4, 0.0f);
+    scale = vm::correct(scale, 4, 1.0f);
+
+    auto attributes = face.attributes();
+    attributes.setScale(scale);
+    attributes.setOffset(offset);
+    face.setAttributes(attributes);
+    return true;
+  });
 }
 
 bool translateUV(

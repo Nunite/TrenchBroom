@@ -35,6 +35,15 @@ struct UpdateBrushFaceAttributes;
 
 enum class WrapStyle;
 
+enum class UVAlign
+{
+  Left,
+  Right,
+  Top,
+  Bottom,
+  Center,
+};
+
 bool createBrush(Map& map, const std::vector<vm::vec3d>& points);
 
 bool setBrushFaceAttributes(Map& map, const UpdateBrushFaceAttributes& update);
@@ -45,6 +54,9 @@ bool copyUV(
   const BrushFaceAttributes& attribs,
   const vm::plane3d& sourceFacePlane,
   WrapStyle wrapStyle);
+
+bool alignUV(Map& map, UVAlign align);
+bool fitUV(Map& map);
 
 bool translateUV(
   Map& map,
