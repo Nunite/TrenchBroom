@@ -243,11 +243,12 @@ class Selection(Protocol):
         """
         ...
 
-    def chamfer_edges(self, distance: float) -> bool:
+    def chamfer_edges(self, distance: float, segments: int = 1) -> bool:
         """
         对当前“边工具”选中的边执行倒角（chamfer）。
 
         - distance：沿相邻边向内偏移的距离
+        - segments：倒角段数（>= 1，默认 1）
         - 返回值：是否执行成功
         """
         ...

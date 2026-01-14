@@ -217,11 +217,13 @@ public:
   bool canChamferEdges(
     const vm::bbox3d& worldBounds,
     const std::vector<vm::segment3d>& edgePositions,
-    double distance) const;
+    double distance,
+    int segments = 1) const;
   Result<void> chamferEdges(
     const vm::bbox3d& worldBounds,
     const std::vector<vm::segment3d>& edgePositions,
     double distance,
+    int segments = 1,
     bool uvLock = false);
 
   // face operations

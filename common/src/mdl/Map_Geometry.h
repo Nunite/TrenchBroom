@@ -68,7 +68,11 @@ bool removeVertices(
 bool chamferVertices(
   Map& map, const std::string& commandName, std::vector<vm::vec3d> vertexPositions, double distance);
 bool chamferEdges(
-  Map& map, const std::string& commandName, std::vector<vm::segment3d> edgePositions, double distance);
+  Map& map,
+  const std::string& commandName,
+  std::vector<vm::segment3d> edgePositions,
+  double distance,
+  int segments = 1);
 
 bool snapVertices(Map& map, double snapTo);
 

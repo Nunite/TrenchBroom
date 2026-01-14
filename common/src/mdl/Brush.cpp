@@ -40,6 +40,7 @@
 #include "vm/util.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 #include <ranges>
 #include <set>
@@ -695,18 +696,24 @@ static std::optional<std::vector<vm::vec3d>> chamferVerticesInGeometry(
 static std::optional<BrushGeometry> chamferEdgesInGeometry(
   const BrushGeometry& geometry,
   std::vector<vm::segment3d> edgePositions,
-  const double distance)
+  const double distance,
+  const int segments)
 {
   if (edgePositions.empty())
   {
     return geometry;
   }
 
+  if (segments < 1)
+  {
+    return std::nullopt;
+  }
+
   constexpr auto eps = vm::constants<double>::almost_zero();
 
   auto seenEdges = std::set<std::pair<vm::vec3d, vm::vec3d>>{};
   auto chamferPlanes = std::vector<vm::plane<double, 3>>{};
-  chamferPlanes.reserve(edgePositions.size());
+  chamferPlanes.reserve(edgePositions.size() * static_cast<size_t>(segments));
 
   for (const auto& edgePosition : edgePositions)
   {
@@ -738,8 +745,19 @@ static std::optional<BrushGeometry> chamferEdgesInGeometry(
       return std::nullopt;
     }
 
-    const auto n1 = vm::normalize(firstFace->plane().normal);
-    const auto n2 = vm::normalize(secondFace->plane().normal);
+    const auto edgeDir = vm::normalize(b - a);
+
+    const auto n1raw = vm::normalize(firstFace->plane().normal);
+    const auto n2raw = vm::normalize(secondFace->plane().normal);
+
+    const auto n1 = vm::normalize(n1raw - edgeDir * vm::dot(n1raw, edgeDir));
+    const auto n2 = vm::normalize(n2raw - edgeDir * vm::dot(n2raw, edgeDir));
+
+    if (vm::is_zero(n1, eps) || vm::is_zero(n2, eps))
+    {
+      return std::nullopt;
+    }
+
     const auto dot = vm::clamp(vm::dot(n1, n2), -1.0, 1.0);
 
     const auto sinHalfAngle = vm::sqrt((1.0 - dot) * 0.5);
@@ -755,8 +773,39 @@ static std::optional<BrushGeometry> chamferEdgesInGeometry(
     }
 
     const auto offset = distance * sinHalfAngle;
-    const auto pointOnPlane = a - bisectorNormal * offset;
-    chamferPlanes.emplace_back(pointOnPlane, bisectorNormal);
+    if (!(offset > eps))
+    {
+      return std::nullopt;
+    }
+
+    if (segments == 1)
+    {
+      const auto pointOnPlane = a - bisectorNormal * offset;
+      chamferPlanes.emplace_back(pointOnPlane, bisectorNormal);
+    }
+    else
+    {
+      const auto angle = std::acos(dot);
+      if (!(angle > eps))
+      {
+        return std::nullopt;
+      }
+
+      const auto sign = vm::dot(edgeDir, vm::cross(n1, n2)) >= 0.0 ? 1.0 : -1.0;
+      const auto step = sign * (angle / static_cast<double>(segments + 1));
+
+      for (int i = 1; i <= segments; ++i)
+      {
+        const auto rot = vm::quatd{edgeDir, step * static_cast<double>(i)};
+        const auto normal = vm::normalize(rot * n1);
+        if (vm::is_zero(normal, eps))
+        {
+          return std::nullopt;
+        }
+
+        chamferPlanes.emplace_back(a - normal * offset, normal);
+      }
+    }
   }
 
   auto newGeometry = geometry;
@@ -821,7 +870,8 @@ Result<void> Brush::chamferVertices(
 bool Brush::canChamferEdges(
   const vm::bbox3d& worldBounds,
   const std::vector<vm::segment3d>& edgePositions,
-  const double distance) const
+  const double distance,
+  const int segments) const
 {
   ensure(m_geometry != nullptr, "geometry is null");
   if (distance <= 0.0)
@@ -829,7 +879,7 @@ bool Brush::canChamferEdges(
     return false;
   }
 
-  const auto points = chamferEdgesInGeometry(*m_geometry, edgePositions, distance);
+  const auto points = chamferEdgesInGeometry(*m_geometry, edgePositions, distance, segments);
   if (!points)
   {
     return false;
@@ -850,13 +900,15 @@ Result<void> Brush::chamferEdges(
   const vm::bbox3d& worldBounds,
   const std::vector<vm::segment3d>& edgePositions,
   const double distance,
+  const int segments,
   const bool uvLock)
 {
   ensure(m_geometry != nullptr, "geometry is null");
   ensure(!edgePositions.empty(), "no edge positions");
-  assert(canChamferEdges(worldBounds, edgePositions, distance));
+  assert(canChamferEdges(worldBounds, edgePositions, distance, segments));
 
-  const auto newGeometry = chamferEdgesInGeometry(*m_geometry, edgePositions, distance);
+  const auto newGeometry =
+    chamferEdgesInGeometry(*m_geometry, edgePositions, distance, segments);
   assert(newGeometry);
 
   const PolyhedronMatcher<BrushGeometry> matcher(*m_geometry, *newGeometry);

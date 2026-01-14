@@ -1488,9 +1488,15 @@ PyObject* selection_chamfer_vertices(PyObject* self, PyObject* args)
 PyObject* selection_chamfer_edges(PyObject* self, PyObject* args)
 {
   double distance = 0.0;
-  if (!PyArg_ParseTuple(args, "d", &distance))
+  int segments = 1;
+  if (!PyArg_ParseTuple(args, "d|i", &distance, &segments))
   {
     return nullptr;
+  }
+
+  if (segments < 1)
+  {
+    segments = 1;
   }
 
   auto* doc = getDocumentFromSelectionPy(self);
@@ -1503,7 +1509,7 @@ PyObject* selection_chamfer_edges(PyObject* self, PyObject* args)
   {
     auto& map = doc->map();
     const auto ok = tb::mdl::chamferEdges(
-      map, "Chamfer Edges", map.edgeHandles().selectedHandles(), distance);
+      map, "Chamfer Edges", map.edgeHandles().selectedHandles(), distance, segments);
     if (ok)
     {
       Py_RETURN_TRUE;

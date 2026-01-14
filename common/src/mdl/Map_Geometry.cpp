@@ -707,9 +707,18 @@ bool chamferVertices(
 }
 
 bool chamferEdges(
-  Map& map, const std::string& commandName, std::vector<vm::segment3d> edgePositions, const double distance)
+  Map& map,
+  const std::string& commandName,
+  std::vector<vm::segment3d> edgePositions,
+  const double distance,
+  const int segments)
 {
   if (distance <= 0.0)
+  {
+    return false;
+  }
+
+  if (segments < 1)
   {
     return false;
   }
@@ -732,12 +741,17 @@ bool chamferEdges(
           return true;
         }
 
-        if (!brush.canChamferEdges(map.worldBounds(), edgesToChamfer, distance))
+        if (!brush.canChamferEdges(map.worldBounds(), edgesToChamfer, distance, segments))
         {
           return false;
         }
 
-        return brush.chamferEdges(map.worldBounds(), edgesToChamfer, distance, pref(Preferences::UVLock))
+        return brush.chamferEdges(
+                 map.worldBounds(),
+                 edgesToChamfer,
+                 distance,
+                 segments,
+                 pref(Preferences::UVLock))
                | kdl::transform([&]() {
                    auto newPositions = brush.findClosestEdgePositions(edgesToChamfer);
                    newEdgePositions = kdl::vec_concat(
