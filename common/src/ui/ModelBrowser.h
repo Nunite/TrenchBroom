@@ -85,6 +85,7 @@ private:
   void bindEvents();
   void connectObservers();
 
+  void updateFolderEdit();
   void setFolderPath(std::filesystem::path folderPath);
   void setCurrentFolderPath(std::filesystem::path currentFolderPath);
   void reloadModels();

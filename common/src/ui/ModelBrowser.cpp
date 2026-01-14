@@ -124,7 +124,35 @@ void ModelBrowser::createGui(GLContextManager& contextManager)
 void ModelBrowser::bindEvents()
 {
   connect(m_folderEdit, &QLineEdit::editingFinished, this, [&]() {
-    setFolderPath(std::filesystem::path{m_folderEdit->text().toStdString()});
+    if (!m_folderEdit->isModified())
+    {
+      return;
+    }
+
+    const auto typedPath = std::filesystem::path{m_folderEdit->text().toStdString()}.lexically_normal();
+    if (typedPath.empty() || typedPath == std::filesystem::path{"."})
+    {
+      setCurrentFolderPath(std::filesystem::path{});
+      return;
+    }
+
+    const auto rootPath = m_folderPath.lexically_normal();
+    if (!rootPath.empty())
+    {
+      if (typedPath == rootPath)
+      {
+        setCurrentFolderPath(std::filesystem::path{});
+        return;
+      }
+
+      if (kdl::path_has_prefix(typedPath, rootPath))
+      {
+        setCurrentFolderPath(typedPath.lexically_relative(rootPath));
+        return;
+      }
+    }
+
+    setFolderPath(typedPath);
   });
 
   connect(m_reloadButton, &QPushButton::clicked, this, [&]() { reloadModels(); });
@@ -210,6 +238,29 @@ void ModelBrowser::modsDidChange()
   setWatchedDirectory();
 }
 
+void ModelBrowser::updateFolderEdit()
+{
+  if (!m_folderEdit)
+  {
+    return;
+  }
+
+  auto displayedPath = m_folderPath;
+  if (!m_currentFolderPath.empty())
+  {
+    displayedPath /= m_currentFolderPath;
+  }
+
+  auto displayedText = displayedPath.generic_string();
+  if (displayedText.empty())
+  {
+    displayedText = ".";
+  }
+
+  m_folderEdit->setText(QString::fromStdString(displayedText));
+  m_folderEdit->setModified(false);
+}
+
 void ModelBrowser::setFolderPath(std::filesystem::path folderPath)
 {
   folderPath = folderPath.lexically_normal();
@@ -220,7 +271,7 @@ void ModelBrowser::setFolderPath(std::filesystem::path folderPath)
 
   m_folderPath = std::move(folderPath);
   m_currentFolderPath.clear();
-  m_folderEdit->setText(QString::fromStdString(m_folderPath.generic_string()));
+  updateFolderEdit();
 
   reloadModels();
   setWatchedDirectory();
@@ -255,6 +306,8 @@ void ModelBrowser::setCurrentFolderPath(std::filesystem::path currentFolderPath)
       }
     }
   }
+
+  updateFolderEdit();
 }
 
 void ModelBrowser::reloadModels()
@@ -265,6 +318,7 @@ void ModelBrowser::reloadModels()
     m_modelPaths.clear();
     m_lastWriteTimes.clear();
     m_currentFolderPath.clear();
+    updateFolderEdit();
     rebuildFolderTree();
     m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
     m_view->setCurrentFolderPath(m_currentFolderPath);
@@ -283,6 +337,7 @@ void ModelBrowser::reloadModels()
       m_modelPaths.clear();
       m_lastWriteTimes.clear();
       m_currentFolderPath.clear();
+      updateFolderEdit();
       rebuildFolderTree();
       m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
       m_view->setCurrentFolderPath(m_currentFolderPath);
@@ -322,6 +377,7 @@ void ModelBrowser::reloadModels()
     m_modelPaths.clear();
     m_lastWriteTimes.clear();
     m_currentFolderPath.clear();
+    updateFolderEdit();
     rebuildFolderTree();
     m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
     m_view->setCurrentFolderPath(m_currentFolderPath);
@@ -432,6 +488,7 @@ void ModelBrowser::rebuildFolderTree()
     {
       m_view->setCurrentFolderPath(m_currentFolderPath);
     }
+    updateFolderEdit();
   }
 }
 
@@ -501,6 +558,7 @@ void ModelBrowser::rescanWatchedDirectory()
       m_modelPaths.clear();
       m_lastWriteTimes.clear();
       m_currentFolderPath.clear();
+      updateFolderEdit();
       rebuildFolderTree();
       m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
       m_view->setCurrentFolderPath(m_currentFolderPath);
@@ -567,6 +625,7 @@ void ModelBrowser::rescanWatchedDirectory()
     m_modelPaths.clear();
     m_lastWriteTimes.clear();
     m_currentFolderPath.clear();
+    updateFolderEdit();
     rebuildFolderTree();
     m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
     m_view->setCurrentFolderPath(m_currentFolderPath);
