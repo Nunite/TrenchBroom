@@ -55,6 +55,7 @@ private:
     virtual size_t vertexCount() const = 0;
     virtual size_t sizeInBytes() const = 0;
 
+    virtual bool valid() const = 0;
     virtual void prepare(VboManager& vboManager) = 0;
     virtual void setup() = 0;
     virtual void cleanup() = 0;
@@ -73,13 +74,18 @@ private:
 
     size_t sizeInBytes() const override { return VertexSpec::Size * m_vertexCount; }
 
+    bool valid() const override { return m_vbo != nullptr; }
+
     void prepare(VboManager& vboManager) override
     {
       if (m_vertexCount > 0 && m_vbo == nullptr)
       {
         m_vboManager = &vboManager;
         m_vbo = vboManager.allocateVbo(VboType::ArrayBuffer, sizeInBytes());
-        m_vbo->writeBuffer(0, doGetVertices());
+        if (m_vbo != nullptr)
+        {
+          m_vbo->writeBuffer(0, doGetVertices());
+        }
       }
     }
 
@@ -93,7 +99,10 @@ private:
     void cleanup() override
     {
       VertexSpec::cleanup(m_vboManager->shaderManager().currentProgram());
-      m_vbo->unbind();
+      if (m_vbo != nullptr)
+      {
+        m_vbo->unbind();
+      }
     }
 
   protected:

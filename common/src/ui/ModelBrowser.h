@@ -1,0 +1,90 @@
+/*
+ Copyright (C) 2026
+
+ This file is part of TrenchBroom.
+ 
+ TrenchBroom is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ 
+ TrenchBroom is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include <QWidget>
+
+#include "NotifierConnection.h"
+
+#include "kdl/path_hash.h"
+
+#include <filesystem>
+#include <unordered_map>
+#include <vector>
+
+class QAbstractButton;
+class QFileSystemWatcher;
+class QLineEdit;
+class QPushButton;
+class QScrollBar;
+class QTimer;
+
+namespace tb::mdl
+{
+class Map;
+} // namespace tb::mdl
+
+namespace tb::ui
+{
+class GLContextManager;
+class ModelBrowserView;
+
+class ModelBrowser : public QWidget
+{
+  Q_OBJECT
+private:
+  mdl::Map& m_map;
+
+  QLineEdit* m_folderEdit = nullptr;
+  QPushButton* m_browseButton = nullptr;
+  QPushButton* m_reloadButton = nullptr;
+
+  QScrollBar* m_scrollBar = nullptr;
+  ModelBrowserView* m_view = nullptr;
+
+  QFileSystemWatcher* m_fileSystemWatcher = nullptr;
+  QTimer* m_rescanTimer = nullptr;
+
+  std::filesystem::path m_folderPath;
+  std::vector<std::filesystem::path> m_modelPaths;
+  std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>
+    m_lastWriteTimes;
+
+  NotifierConnection m_notifierConnection;
+
+public:
+  ModelBrowser(
+    mdl::Map& map, GLContextManager& contextManager, QWidget* parent = nullptr);
+  ~ModelBrowser() override;
+
+private:
+  void createGui(GLContextManager& contextManager);
+  void bindEvents();
+
+  void setFolderPath(std::filesystem::path folderPath);
+  void reloadModels();
+
+  void setWatchedDirectory();
+  void scheduleRescan();
+  void rescanWatchedDirectory();
+};
+
+} // namespace tb::ui
+

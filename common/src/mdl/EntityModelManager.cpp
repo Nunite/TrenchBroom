@@ -35,6 +35,9 @@
 #include "kdl/ranges/to.h"
 #include "kdl/result.h"
 
+#include <algorithm>
+#include <ranges>
+
 namespace tb::mdl
 {
 EntityModelManager::EntityModelManager(
@@ -58,6 +61,50 @@ void EntityModelManager::clear()
   m_unpreparedRenderers.clear();
 
   // Remove logging because it might fail when the document is already destroyed.
+}
+
+void EntityModelManager::invalidateModel(const std::filesystem::path& path)
+{
+  if (path.empty())
+  {
+    return;
+  }
+
+  m_models.erase(path);
+
+  for (auto it = m_renderers.begin(); it != m_renderers.end();)
+  {
+    if (it->first.path == path)
+    {
+      it = m_renderers.erase(it);
+    }
+    else
+    {
+      ++it;
+    }
+  }
+
+  for (auto it = m_rendererMismatches.begin(); it != m_rendererMismatches.end();)
+  {
+    if (it->path == path)
+    {
+      it = m_rendererMismatches.erase(it);
+    }
+    else
+    {
+      ++it;
+    }
+  }
+
+  m_unpreparedRenderers.erase(
+    std::remove_if(
+      m_unpreparedRenderers.begin(),
+      m_unpreparedRenderers.end(),
+      [&](auto* renderer) {
+        return !std::ranges::any_of(
+          m_renderers, [&](const auto& entry) { return entry.second.get() == renderer; });
+      }),
+    m_unpreparedRenderers.end());
 }
 
 void EntityModelManager::reloadShaders(kdl::task_manager& taskManager)

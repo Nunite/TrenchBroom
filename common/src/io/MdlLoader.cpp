@@ -20,6 +20,7 @@
 #include "MdlLoader.h"
 
 #include "Color.h"
+#include "io/MaterialUtils.h"
 #include "io/Reader.h"
 #include "io/ReaderException.h"
 #include "mdl/EntityModel.h"
@@ -36,6 +37,7 @@
 
 #include <fmt/format.h>
 
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -279,7 +281,7 @@ auto makeFrameTriangles(
   const size_t skinHeight)
 {
   auto frameTriangles = std::vector<mdl::EntityModelVertex>{};
-  frameTriangles.reserve(triangles.size());
+  frameTriangles.reserve(triangles.size() * 3);
 
   for (size_t i = 0; i < triangles.size(); ++i)
   {
@@ -427,7 +429,21 @@ mdl::Material parseSkin(
   std::string skinName,
   const mdl::Palette& palette)
 {
+  if (width == 0u || height == 0u)
+  {
+    throw ReaderException{"Invalid skin dimensions"};
+  }
+
+  if (width > std::numeric_limits<size_t>::max() / height)
+  {
+    throw ReaderException{"Invalid skin dimensions"};
+  }
+
   const auto size = width * height;
+  if (size > std::numeric_limits<size_t>::max() / 4u)
+  {
+    throw ReaderException{"Invalid skin dimensions"};
+  }
   const auto transparency = (flags & MF_HOLEY)
                               ? mdl::PaletteTransparency::Index255Transparent
                               : mdl::PaletteTransparency::Opaque;
@@ -456,10 +472,25 @@ mdl::Material parseSkin(
   }
 
   const auto pictureCount = reader.readSize<int32_t>();
+  if (pictureCount == 0u)
+  {
+    throw ReaderException{"Invalid skin group picture count"};
+  }
+  if (pictureCount > std::numeric_limits<size_t>::max() / 4u)
+  {
+    throw ReaderException{"Invalid skin group picture count"};
+  }
   reader.seekForward(pictureCount * 4); // skip the picture times
 
   palette.indexedToRgba(reader, size, rgbaImage, transparency, avgColor);
-  reader.seekForward((pictureCount - 1) * size); // skip all remaining pictures
+  if (pictureCount > 1u)
+  {
+    if ((pictureCount - 1u) > std::numeric_limits<size_t>::max() / size)
+    {
+      throw ReaderException{"Invalid skin group picture count"};
+    }
+    reader.seekForward((pictureCount - 1) * size); // skip all remaining pictures
+  }
 
   auto texture = mdl::Texture{
     width,
@@ -550,6 +581,34 @@ Result<mdl::EntityModelData> MdlLoader::load(Logger& /* logger */)
     /* const auto syncType = */ reader.readSize<int32_t>();
     const auto flags = reader.readInt<int32_t>();
 
+    static constexpr auto MaxSkinCount = size_t(2048);
+    static constexpr auto MaxVertexCount = size_t(200000);
+    static constexpr auto MaxTriangleCount = size_t(400000);
+    static constexpr auto MaxFrameCount = size_t(4096);
+
+    if (skinCount > MaxSkinCount)
+    {
+      return Error{fmt::format("MDL has too many skins: {}", skinCount)};
+    }
+    if (vertexCount > MaxVertexCount)
+    {
+      return Error{fmt::format("MDL has too many vertices: {}", vertexCount)};
+    }
+    if (triangleCount > MaxTriangleCount)
+    {
+      return Error{fmt::format("MDL has too many triangles: {}", triangleCount)};
+    }
+    if (frameCount > MaxFrameCount)
+    {
+      return Error{fmt::format("MDL has too many frames: {}", frameCount)};
+    }
+
+    if (!checkTextureDimensions(skinWidth, skinHeight))
+    {
+      return Error{
+        fmt::format("Invalid MDL skin dimensions: {}*{}", skinWidth, skinHeight)};
+    }
+
     auto data =
       mdl::EntityModelData{mdl::PitchType::MdlInverted, mdl::Orientation::Oriented};
     auto& surface = data.addSurface(m_name, frameCount);
@@ -560,6 +619,19 @@ Result<mdl::EntityModelData> MdlLoader::load(Logger& /* logger */)
 
     const auto vertices = parseVertices(reader, vertexCount);
     const auto triangles = parseTriangles(reader, triangleCount);
+
+    const auto verticesSize = vertices.size();
+    for (size_t i = 0; i < triangles.size(); ++i)
+    {
+      const auto& tri = triangles[i];
+      for (size_t j = 0; j < 3; ++j)
+      {
+        if (tri.vertices[j] >= verticesSize)
+        {
+          return Error{fmt::format("MDL triangle index out of bounds: {}", tri.vertices[j])};
+        }
+      }
+    }
 
     for (size_t i = 0; i < frameCount; ++i)
     {

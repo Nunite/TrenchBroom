@@ -69,6 +69,11 @@ bool VertexArray::setup()
   assert(prepared());
   assert(!m_setup);
 
+  if (!m_holder->valid())
+  {
+    return false;
+  }
+
   m_holder->setup();
   m_setup = true;
   return true;
@@ -84,12 +89,20 @@ void VertexArray::cleanup()
 
 void VertexArray::render(const PrimType primType)
 {
+  if (empty())
+  {
+    return;
+  }
   render(primType, 0, static_cast<GLsizei>(vertexCount()));
 }
 
 void VertexArray::render(const PrimType primType, const GLint index, const GLsizei count)
 {
   assert(prepared());
+  if (count <= 0)
+  {
+    return;
+  }
   if (!m_setup)
   {
     if (setup())
@@ -111,6 +124,10 @@ void VertexArray::render(
   const GLint primCount)
 {
   assert(prepared());
+  if (primCount <= 0)
+  {
+    return;
+  }
   if (!m_setup)
   {
     if (setup())
@@ -133,6 +150,10 @@ void VertexArray::render(
   const PrimType primType, const GLIndices& indices, const GLsizei count)
 {
   assert(prepared());
+  if (count <= 0)
+  {
+    return;
+  }
   if (!m_setup)
   {
     if (setup())

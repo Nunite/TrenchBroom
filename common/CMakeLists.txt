@@ -441,6 +441,9 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/MaterialBrowser.cpp
         ${COMMON_SOURCE_DIR}/ui/MaterialBrowserView.cpp
         ${COMMON_SOURCE_DIR}/ui/MaterialCollectionEditor.cpp
+        ${COMMON_SOURCE_DIR}/ui/ModelBrowser.cpp
+        ${COMMON_SOURCE_DIR}/ui/ModelBrowserView.cpp
+        ${COMMON_SOURCE_DIR}/ui/ModelInspector.cpp
         ${COMMON_SOURCE_DIR}/ui/ModEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/MousePreferencePane.cpp
         ${COMMON_SOURCE_DIR}/ui/MoveHandleDragTracker.cpp
@@ -1006,6 +1009,9 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/MaterialBrowser.h
         ${COMMON_SOURCE_DIR}/ui/MaterialBrowserView.h
         ${COMMON_SOURCE_DIR}/ui/MaterialCollectionEditor.h
+        ${COMMON_SOURCE_DIR}/ui/ModelBrowser.h
+        ${COMMON_SOURCE_DIR}/ui/ModelBrowserView.h
+        ${COMMON_SOURCE_DIR}/ui/ModelInspector.h
         ${COMMON_SOURCE_DIR}/ui/ModEditor.h
         ${COMMON_SOURCE_DIR}/ui/MousePreferencePane.h
         ${COMMON_SOURCE_DIR}/ui/MoveHandleDragTracker.h

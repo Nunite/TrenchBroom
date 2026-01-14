@@ -23,7 +23,10 @@
 #include "io/AseLoader.h"
 #include "io/AssimpLoader.h"
 #include "io/BspLoader.h"
+#include "io/DiskFileSystem.h"
+#include "io/DiskIO.h"
 #include "io/DkmLoader.h"
+#include "io/File.h"
 #include "io/FileSystem.h"
 #include "io/ImageSpriteLoader.h"
 #include "io/Md2Loader.h"
@@ -46,6 +49,18 @@ namespace tb::io
 namespace
 {
 
+Result<std::shared_ptr<File>> openModelFile(
+  const FileSystem& fs, const std::filesystem::path& path)
+{
+  if (path.is_absolute())
+  {
+    return Disk::openFile(path) | kdl::transform([](auto cFile) {
+             return std::static_pointer_cast<File>(std::move(cFile));
+           });
+  }
+  return fs.openFile(path);
+}
+
 auto loadPalette(const FileSystem& fs, const mdl::MaterialConfig& materialConfig)
 {
   const auto& path = materialConfig.palette;
@@ -61,7 +76,7 @@ Result<mdl::EntityModelData> loadEntityModelData(
   Logger& logger)
 {
   const auto modelName = path.filename().string();
-  return fs.openFile(path)
+  return openModelFile(fs, path)
          | kdl::and_then([&](auto file) -> Result<mdl::EntityModelData> {
              auto reader = file->reader().buffer();
 
@@ -120,9 +135,15 @@ Result<mdl::EntityModelData> loadEntityModelData(
              }
              if (io::AssimpLoader::canParse(path))
              {
+               if (path.is_absolute())
+               {
+                 auto diskFs = DiskFileSystem{path.parent_path()};
+                 auto loader = io::AssimpLoader{path.filename(), diskFs};
+                 return loader.load(logger);
+               }
                auto loader = io::AssimpLoader{path, fs};
                return loader.load(logger);
-             }
+              }
              return Error{fmt::format("Unknown model format: {}", path)};
            })
          | kdl::or_else([&](const auto& e) {

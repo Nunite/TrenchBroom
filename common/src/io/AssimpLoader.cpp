@@ -53,6 +53,7 @@
 #include <fmt/format.h>
 #include <fmt/std.h>
 
+#include <string>
 #include <optional>
 #include <ranges>
 #include <string_view>
@@ -255,6 +256,32 @@ mdl::Texture loadTexture(
   return loadCompressedEmbeddedTexture(*texture->pcData, texture->mWidth, fs, logger);
 }
 
+std::optional<std::filesystem::path> tryMakeTexturePath(
+  const aiString& path, Logger& logger, const std::filesystem::path& modelPath)
+{
+  const auto raw = std::string_view{path.C_Str()};
+
+  try
+  {
+#ifdef _WIN32
+    auto u8 = std::u8string{};
+    u8.reserve(raw.size());
+    for (const auto c : raw)
+    {
+      u8.push_back(char8_t(static_cast<unsigned char>(c)));
+    }
+    return kdl::parse_path(std::move(u8));
+#else
+    return kdl::parse_path(std::string{raw});
+#endif
+  }
+  catch (const std::exception& e)
+  {
+    logger.error(fmt::format("Failed to parse texture path '{}' for model '{}': {}", raw, modelPath, e.what()));
+    return std::nullopt;
+  }
+}
+
 std::vector<mdl::Texture> loadTexturesForMaterial(
   const aiScene& scene,
   const size_t materialIndex,
@@ -275,9 +302,13 @@ std::vector<mdl::Texture> loadTexturesForMaterial(
       auto path = aiString{};
       scene.mMaterials[materialIndex]->GetTexture(aiTextureType_DIFFUSE, ti, &path);
 
-      const auto texturePath = std::filesystem::path{path.C_Str()};
+      const auto texturePath = tryMakeTexturePath(path, logger, modelPath);
+      if (!texturePath)
+      {
+        continue;
+      }
       const auto* texture = scene.GetEmbeddedTexture(path.C_Str());
-      textures.push_back(loadTexture(texture, texturePath, modelPath, fs, logger));
+      textures.push_back(loadTexture(texture, *texturePath, modelPath, fs, logger));
     }
   }
   else
@@ -287,6 +318,11 @@ std::vector<mdl::Texture> loadTexturesForMaterial(
       materialIndex,
       modelPath));
 
+    textures.push_back(loadFallbackOrDefaultTexture(fs, logger));
+  }
+
+  if (textures.empty())
+  {
     textures.push_back(loadFallbackOrDefaultTexture(fs, logger));
   }
 

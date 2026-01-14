@@ -79,6 +79,7 @@ public:
   ~EntityModelManager();
 
   void clear();
+  void invalidateModel(const std::filesystem::path& path);
   void reloadShaders(kdl::task_manager& taskManager);
 
   void setGame(const Game* game, kdl::task_manager& taskManager);

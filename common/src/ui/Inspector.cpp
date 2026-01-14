@@ -27,6 +27,7 @@
 #include "ui/EntityInspector.h"
 #include "ui/FaceInspector.h"
 #include "ui/MapInspector.h"
+#include "ui/ModelInspector.h"
 #include "ui/PluginInspector.h"
 #include "ui/outliner/OutlinerInspector.h"
 #include "ui/MapViewBar.h"
@@ -52,12 +53,14 @@ Inspector::Inspector(MapDocument& document, GLContextManager& contextManager, QW
   m_faceInspector = new FaceInspector{map, contextManager};
   m_outlinerInspector = new OutlinerInspector{document, contextManager};
   m_pluginInspector = new PluginInspector{};
+  m_modelInspector = new ModelInspector{map, contextManager};
 
   m_tabBook->addPage(m_mapInspector, "Map");
   m_tabBook->addPage(m_entityInspector, "Entity");
   m_tabBook->addPage(m_faceInspector, "Face");
   m_tabBook->addPage(m_outlinerInspector, "Outliner");
   m_tabBook->addPage(m_pluginInspector, "Plugin");
+  m_tabBook->addPage(m_modelInspector, "Model");
 
   auto* layout = new QVBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);
