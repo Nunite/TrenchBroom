@@ -42,6 +42,7 @@
 #include "io/TraversalMode.h"
 #include "mdl/Game.h"
 #include "mdl/Map.h"
+#include "mdl/Map_World.h"
 #include "mdl/EntityModelManager.h"
 #include "ui/ModelBrowserView.h"
 #include "ui/QtUtils.h"
@@ -49,6 +50,7 @@
 #include "kdl/ranges/to.h"
 #include "kdl/path_utils.h"
 
+#include <algorithm>
 #include <ranges>
 
 namespace tb::ui
@@ -217,6 +219,12 @@ void ModelBrowser::mapWasLoaded(mdl::Map&)
 
 void ModelBrowser::modsDidChange()
 {
+  if (m_folderPath != std::filesystem::path{"models"})
+  {
+    setFolderPath(std::filesystem::path{"models"});
+    return;
+  }
+
   reloadModels();
   setWatchedDirectory();
 }
@@ -442,6 +450,24 @@ void ModelBrowser::reloadModels()
   }
 
   const auto& fs = game->gameFileSystem();
+  const auto enabledMods = mdl::enabledMods(m_map);
+  if (enabledMods.empty())
+  {
+    m_modelPaths.clear();
+    m_lastWriteTimes.clear();
+    m_currentFolderPath.clear();
+    updateFolderEdit();
+    rebuildFolderTree();
+    m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
+    m_view->setCurrentFolderPath(m_currentFolderPath);
+    return;
+  }
+
+  const auto modRoots = enabledMods | std::views::transform([&](const auto& mod) {
+                          return (game->gamePath() / std::filesystem::path{mod}).lexically_normal();
+                        })
+                        | kdl::ranges::to<std::vector>();
+
   auto pathsResult =
     fs.find(m_folderPath, io::TraversalMode::Recursive, io::makeExtensionPathMatcher({".mdl"}));
   if (pathsResult.is_error())
@@ -458,6 +484,31 @@ void ModelBrowser::reloadModels()
 
   auto modelPaths = std::move(pathsResult.value());
   std::ranges::sort(modelPaths);
+
+  auto filteredModelPaths = std::vector<std::filesystem::path>{};
+  filteredModelPaths.reserve(modelPaths.size());
+  for (const auto& modelPath : modelPaths)
+  {
+    if (auto absPathResult = fs.makeAbsolute(modelPath); !absPathResult.is_error())
+    {
+      const auto absPath = absPathResult.value().lexically_normal();
+      auto found = false;
+      for (const auto& modRoot : modRoots)
+      {
+        if (kdl::path_has_prefix(absPath, modRoot))
+        {
+          found = true;
+          break;
+        }
+      }
+      if (found)
+      {
+        filteredModelPaths.push_back(modelPath);
+      }
+    }
+  }
+
+  modelPaths = std::move(filteredModelPaths);
 
   auto lastWriteTimes =
     std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>{};
@@ -592,6 +643,10 @@ void ModelBrowser::setWatchedDirectory()
   }
 
   const auto& fs = game->gameFileSystem();
+  if (mdl::enabledMods(m_map).empty())
+  {
+    return;
+  }
   if (auto absPathResult = fs.makeAbsolute(m_folderPath); !absPathResult.is_error())
   {
     const auto& absPath = absPathResult.value();
@@ -689,6 +744,30 @@ void ModelBrowser::rescanWatchedDirectory()
   }
 
   const auto& fs = game->gameFileSystem();
+  const auto enabledMods = mdl::enabledMods(m_map);
+  if (enabledMods.empty())
+  {
+    if (!m_modelPaths.empty() || !m_lastWriteTimes.empty())
+    {
+      for (const auto& p : m_modelPaths)
+      {
+        m_map.entityModelManager().invalidateModel(p);
+      }
+      m_modelPaths.clear();
+      m_lastWriteTimes.clear();
+      m_currentFolderPath.clear();
+      updateFolderEdit();
+      rebuildFolderTree();
+      m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
+      m_view->setCurrentFolderPath(m_currentFolderPath);
+    }
+    return;
+  }
+
+  const auto modRoots = enabledMods | std::views::transform([&](const auto& mod) {
+                          return (game->gamePath() / std::filesystem::path{mod}).lexically_normal();
+                        })
+                        | kdl::ranges::to<std::vector>();
 
   auto pathsResult =
     fs.find(m_folderPath, io::TraversalMode::Recursive, io::makeExtensionPathMatcher({".mdl"}));
@@ -706,6 +785,31 @@ void ModelBrowser::rescanWatchedDirectory()
 
   auto modelPaths = std::move(pathsResult.value());
   std::ranges::sort(modelPaths);
+
+  auto filteredModelPaths = std::vector<std::filesystem::path>{};
+  filteredModelPaths.reserve(modelPaths.size());
+  for (const auto& modelPath : modelPaths)
+  {
+    if (auto absPathResult = fs.makeAbsolute(modelPath); !absPathResult.is_error())
+    {
+      const auto absPath = absPathResult.value().lexically_normal();
+      auto found = false;
+      for (const auto& modRoot : modRoots)
+      {
+        if (kdl::path_has_prefix(absPath, modRoot))
+        {
+          found = true;
+          break;
+        }
+      }
+      if (found)
+      {
+        filteredModelPaths.push_back(modelPath);
+      }
+    }
+  }
+
+  modelPaths = std::move(filteredModelPaths);
 
   auto newLastWriteTimes =
     std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>{};
