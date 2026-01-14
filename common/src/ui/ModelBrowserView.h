@@ -104,6 +104,9 @@ private:
   void doInitLayout(Layout& layout) override;
   void doReloadLayout(Layout& layout) override;
 
+  bool dndEnabled() override;
+  QString dndData(const Cell& cell) override;
+
   void doClear() override;
   void doRender(Layout& layout, float y, float height) override;
   bool shouldRenderFocusIndicator() const override;

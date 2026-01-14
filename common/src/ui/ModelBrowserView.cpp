@@ -724,6 +724,22 @@ vm::mat4x4f ModelBrowserView::itemTransformation(
          * vm::translation_matrix(rotationOffset) * transform;
 }
 
+bool ModelBrowserView::dndEnabled()
+{
+  return true;
+}
+
+QString ModelBrowserView::dndData(const Cell& cell)
+{
+  static const auto prefix = QString{"model:"};
+  const auto& item = cellData(cell);
+  if (item.type != BrowserCellType::Model)
+  {
+    return "";
+  }
+  return prefix + io::pathAsGenericQString(item.path);
+}
+
 QString ModelBrowserView::tooltip(const Cell& cell)
 {
   const auto& item = cellData(cell);

@@ -46,7 +46,12 @@ private:
 public:
   explicit CreateEntityTool(mdl::Map& map);
 
+  mdl::Map& map();
+  const mdl::Map& map() const;
+
   bool createEntity(const std::string& classname);
+  bool createEntity(
+    const std::string& classname, const std::string& propertyKey, const std::string& propertyValue);
   void removeEntity();
   void commitEntity();
 

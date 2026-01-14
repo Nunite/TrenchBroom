@@ -24,16 +24,82 @@
 #include "ui/DropTracker.h"
 #include "ui/InputState.h"
 
-#include "kdl/string_utils.h"
+#include "mdl/EntityDefinition.h"
+#include "mdl/EntityDefinitionManager.h"
+#include "mdl/Game.h"
+#include "mdl/Map.h"
 
+#include <filesystem>
 #include <functional>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace tb::ui
 {
 namespace
 {
+
+std::optional<std::string> droppedModelPathToEntityModelPath(
+  const mdl::Map& map, const std::string_view droppedModelPathStr)
+{
+  const auto* game = map.game();
+  if (!game)
+  {
+    return std::nullopt;
+  }
+
+  if (droppedModelPathStr.empty())
+  {
+    return std::nullopt;
+  }
+
+  const auto gamePath = game->gamePath();
+
+  const auto modelPath = std::filesystem::path{std::string{droppedModelPathStr}};
+  const auto absModelPath = modelPath.is_absolute() ? modelPath : (gamePath / modelPath);
+
+  auto ec = std::error_code{};
+  const auto relativeModelPathFull = std::filesystem::relative(absModelPath, gamePath, ec);
+  if (ec)
+  {
+    return std::nullopt;
+  }
+
+  auto relativePathStr = relativeModelPathFull.string();
+  auto modelsPos = relativePathStr.find("models/");
+  if (modelsPos == std::string::npos)
+  {
+    modelsPos = relativePathStr.find("models\\");
+  }
+
+  std::string finalModelPath;
+  if (modelsPos != std::string::npos)
+  {
+    finalModelPath = relativePathStr.substr(modelsPos);
+  }
+  else
+  {
+    finalModelPath = relativeModelPathFull.generic_string();
+  }
+
+  for (auto& ch : finalModelPath)
+  {
+    if (ch == '\\')
+    {
+      ch = '/';
+    }
+  }
+
+  if (finalModelPath.empty())
+  {
+    return std::nullopt;
+  }
+
+  return finalModelPath;
+}
 
 class CreateEntityDropTracker : public DropTracker
 {
@@ -91,17 +157,72 @@ const Tool& CreateEntityToolController::tool() const
 bool CreateEntityToolController::shouldAcceptDrop(
   const InputState&, const std::string& payload) const
 {
-  const auto parts = kdl::str_split(payload, ":");
-  return parts.size() == 2 && parts[0] == "entity";
+  static constexpr auto entityPrefix = std::string_view{"entity:"};
+  static constexpr auto modelPrefix = std::string_view{"model:"};
+  static const auto cyclerSpriteClassname = std::string{"cycler_sprite"};
+
+  const auto payloadView = std::string_view{payload};
+
+  if (payloadView.starts_with(entityPrefix))
+  {
+    const auto classname = payloadView.substr(entityPrefix.size());
+    return !classname.empty();
+  }
+
+  if (payloadView.starts_with(modelPrefix))
+  {
+    const auto droppedPath = payloadView.substr(modelPrefix.size());
+    if (droppedPath.empty())
+    {
+      return false;
+    }
+
+    const auto* cyclerSpriteDef =
+      m_tool.map().entityDefinitionManager().definition(cyclerSpriteClassname);
+    if (!cyclerSpriteDef || !cyclerSpriteDef->pointEntityDefinition)
+    {
+      return false;
+    }
+
+    return droppedModelPathToEntityModelPath(m_tool.map(), droppedPath).has_value();
+  }
+
+  return false;
 }
 
 std::unique_ptr<DropTracker> CreateEntityToolController::acceptDrop(
   const InputState& inputState, const std::string& payload)
 {
-  const auto parts = kdl::str_split(payload, ":");
-  ensure(parts.size() == 2 && parts[0] == "entity", "dropped item is an entity");
+  static constexpr auto entityPrefix = std::string_view{"entity:"};
+  static constexpr auto modelPrefix = std::string_view{"model:"};
+  static const auto cyclerSpriteClassname = std::string{"cycler_sprite"};
+  static const auto modelKey = std::string{"model"};
 
-  return m_tool.createEntity(parts[1]) ? createDropTracker(inputState) : nullptr;
+  const auto payloadView = std::string_view{payload};
+
+  if (payloadView.starts_with(entityPrefix))
+  {
+    const auto classnameView = payloadView.substr(entityPrefix.size());
+    ensure(!classnameView.empty(), "dropped item is an entity");
+    const auto classname = std::string{classnameView};
+    return m_tool.createEntity(classname) ? createDropTracker(inputState) : nullptr;
+  }
+
+  if (payloadView.starts_with(modelPrefix))
+  {
+    const auto droppedPath = payloadView.substr(modelPrefix.size());
+    const auto finalModelPath = droppedModelPathToEntityModelPath(m_tool.map(), droppedPath);
+    if (!finalModelPath)
+    {
+      return nullptr;
+    }
+
+    return m_tool.createEntity(cyclerSpriteClassname, modelKey, *finalModelPath)
+             ? createDropTracker(inputState)
+             : nullptr;
+  }
+
+  return nullptr;
 }
 
 bool CreateEntityToolController::cancel()

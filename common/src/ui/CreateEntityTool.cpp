@@ -49,6 +49,16 @@ CreateEntityTool::CreateEntityTool(mdl::Map& map)
 {
 }
 
+mdl::Map& CreateEntityTool::map()
+{
+  return m_map;
+}
+
+const mdl::Map& CreateEntityTool::map() const
+{
+  return m_map;
+}
+
 bool CreateEntityTool::createEntity(const std::string& classname)
 {
   const auto& definitionManager = m_map.entityDefinitionManager();
@@ -65,6 +75,30 @@ bool CreateEntityTool::createEntity(const std::string& classname)
   m_entity = createPointEntity(m_map, *definition, {0, 0, 0});
 
   return m_entity != nullptr;
+}
+
+bool CreateEntityTool::createEntity(
+  const std::string& classname,
+  const std::string& propertyKey,
+  const std::string& propertyValue)
+{
+  if (propertyKey.empty() || propertyValue.empty())
+  {
+    return false;
+  }
+
+  if (!createEntity(classname))
+  {
+    return false;
+  }
+
+  if (!mdl::setEntityProperty(m_map, propertyKey, propertyValue, false))
+  {
+    removeEntity();
+    return false;
+  }
+
+  return true;
 }
 
 void CreateEntityTool::removeEntity()
