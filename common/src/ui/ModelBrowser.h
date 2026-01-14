@@ -34,6 +34,8 @@ class QFileSystemWatcher;
 class QLineEdit;
 class QPushButton;
 class QScrollBar;
+class QTreeWidget;
+class QTreeWidgetItem;
 class QTimer;
 
 namespace tb::mdl
@@ -58,14 +60,18 @@ private:
 
   QScrollBar* m_scrollBar = nullptr;
   ModelBrowserView* m_view = nullptr;
+  QTreeWidget* m_folderTree = nullptr;
 
   QFileSystemWatcher* m_fileSystemWatcher = nullptr;
   QTimer* m_rescanTimer = nullptr;
 
   std::filesystem::path m_folderPath;
+  std::filesystem::path m_currentFolderPath;
   std::vector<std::filesystem::path> m_modelPaths;
   std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>
     m_lastWriteTimes;
+  std::unordered_map<std::filesystem::path, QTreeWidgetItem*, kdl::path_hash>
+    m_folderTreeItems;
 
   NotifierConnection m_notifierConnection;
 
@@ -79,7 +85,9 @@ private:
   void bindEvents();
 
   void setFolderPath(std::filesystem::path folderPath);
+  void setCurrentFolderPath(std::filesystem::path currentFolderPath);
   void reloadModels();
+  void rebuildFolderTree();
 
   void setWatchedDirectory();
   void scheduleRescan();
@@ -87,4 +95,3 @@ private:
 };
 
 } // namespace tb::ui
-

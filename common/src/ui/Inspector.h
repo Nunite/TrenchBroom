@@ -33,7 +33,6 @@ class EntityInspector;
 class GLContextManager;
 class MapInspector;
 class MapViewBar;
-class ModelInspector;
 class OutlinerInspector;
 class PluginInspector;
 class SyncHeightEventFilter;
@@ -46,8 +45,7 @@ enum class InspectorPage
   Entity = 1,
   Face = 2,
   Outliner = 3,
-  Plugin = 4,
-  Model = 5
+  Plugin = 4
 };
 
 class Inspector : public QWidget
@@ -60,7 +58,6 @@ private:
   FaceInspector* m_faceInspector = nullptr;
   OutlinerInspector* m_outlinerInspector = nullptr;
   PluginInspector* m_pluginInspector = nullptr;
-  ModelInspector* m_modelInspector = nullptr;
 
   SyncHeightEventFilter* m_syncTabBarEventFilter = nullptr;
 

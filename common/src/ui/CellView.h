@@ -97,6 +97,7 @@ private:
 public: // QWidget overrides
   void mousePressEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
+  void mouseDoubleClickEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
   bool event(QEvent* event) override;
@@ -123,6 +124,8 @@ private:
   virtual void doClear();
   virtual void doRender(Layout& layout, float y, float height) = 0;
   virtual void doLeftClick(Layout& layout, float x, float y);
+  virtual void doDoubleClick(Layout& layout, float x, float y);
+  virtual void doMouseMove(Layout& layout, float x, float y);
   virtual void doContextMenu(Layout& layout, float x, float y, QContextMenuEvent* event);
 
   virtual bool dndEnabled();

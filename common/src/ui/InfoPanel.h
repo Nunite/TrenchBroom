@@ -29,8 +29,10 @@ class Logger;
 namespace tb::ui
 {
 class Console;
+class GLContextManager;
 class IssueBrowser;
 class MapDocument;
+class ModelInspector;
 class TabBook;
 
 class InfoPanel : public QWidget
@@ -41,9 +43,11 @@ private:
   Console* m_console = nullptr;
   Console* m_pythonConsole = nullptr;
   IssueBrowser* m_issueBrowser = nullptr;
+  ModelInspector* m_modelInspector = nullptr;
 
 public:
-  explicit InfoPanel(MapDocument& document, QWidget* parent = nullptr);
+  InfoPanel(
+    MapDocument& document, GLContextManager& contextManager, QWidget* parent = nullptr);
   ~InfoPanel() override;
 
   Console* console() const;

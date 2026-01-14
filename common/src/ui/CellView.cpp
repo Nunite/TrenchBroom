@@ -220,6 +220,18 @@ void CellView::mouseReleaseEvent(QMouseEvent* event)
   }
 }
 
+void CellView::mouseDoubleClickEvent(QMouseEvent* event)
+{
+  validate();
+  if (event->button() == Qt::LeftButton)
+  {
+    const auto top = m_scrollBar ? m_scrollBar->value() : 0;
+    const auto x = float(event->position().x());
+    const auto y = float(event->position().y() + top);
+    doDoubleClick(m_layout, x, y);
+  }
+}
+
 void CellView::mouseMoveEvent(QMouseEvent* event)
 {
   validate();
@@ -234,6 +246,13 @@ void CellView::mouseMoveEvent(QMouseEvent* event)
   else if ((event->buttons() & Qt::RightButton) && (event->modifiers() & Qt::AltModifier))
   {
     scroll(event);
+  }
+
+  {
+    const auto top = m_scrollBar ? m_scrollBar->value() : 0;
+    const auto x = float(event->position().x());
+    const auto y = float(event->position().y() + top);
+    doMouseMove(m_layout, x, y);
   }
 
   m_lastMousePos = event->pos();
@@ -538,6 +557,8 @@ void CellView::renderTitleStrings(float y, float height)
 
 void CellView::doClear() {}
 void CellView::doLeftClick(Layout&, float, float) {}
+void CellView::doDoubleClick(Layout&, float, float) {}
+void CellView::doMouseMove(Layout&, float, float) {}
 void CellView::doContextMenu(Layout&, float, float, QContextMenuEvent*) {}
 
 bool CellView::dndEnabled()

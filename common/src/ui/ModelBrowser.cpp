@@ -24,10 +24,14 @@
 #include <QHBoxLayout>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QScrollBar>
+#include <QSplitter>
 #include <QTimer>
+#include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include "io/ResourceUtils.h"
 #include "io/DiskIO.h"
 #include "io/PathInfo.h"
 #include "io/FileSystem.h"
@@ -80,6 +84,11 @@ void ModelBrowser::createGui(GLContextManager& contextManager)
   auto* controls = new QWidget{};
   controls->setLayout(controlsLayout);
 
+  m_folderTree = new QTreeWidget{};
+  m_folderTree->setHeaderHidden(true);
+  m_folderTree->setUniformRowHeights(true);
+  m_folderTree->setIconSize(QSize{16, 16});
+
   m_scrollBar = new QScrollBar{Qt::Vertical};
   m_view = new ModelBrowserView{m_scrollBar, contextManager, m_map};
 
@@ -92,11 +101,18 @@ void ModelBrowser::createGui(GLContextManager& contextManager)
   auto* browser = new QWidget{};
   browser->setLayout(browserLayout);
 
+  auto* splitter = new QSplitter{Qt::Horizontal};
+  splitter->setChildrenCollapsible(false);
+  splitter->addWidget(m_folderTree);
+  splitter->addWidget(browser);
+  splitter->setStretchFactor(0, 0);
+  splitter->setStretchFactor(1, 1);
+
   auto* layout = new QVBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(0);
   layout->addWidget(controls, 0);
-  layout->addWidget(browser, 1);
+  layout->addWidget(splitter, 1);
   setLayout(layout);
 
   m_fileSystemWatcher = new QFileSystemWatcher{this};
@@ -151,6 +167,19 @@ void ModelBrowser::bindEvents()
     [&]() { scheduleRescan(); });
 
   connect(m_rescanTimer, &QTimer::timeout, this, [&]() { rescanWatchedDirectory(); });
+
+  connect(m_folderTree, &QTreeWidget::currentItemChanged, this, [&](QTreeWidgetItem* current, QTreeWidgetItem*) {
+    if (!current)
+    {
+      return;
+    }
+    const auto rel = current->data(0, Qt::UserRole).toString();
+    setCurrentFolderPath(std::filesystem::path{rel.toStdString()});
+  });
+
+  connect(m_view, &ModelBrowserView::folderActivated, this, [&](const QString& folderPath) {
+    setCurrentFolderPath(std::filesystem::path{folderPath.toStdString()});
+  });
 }
 
 void ModelBrowser::setFolderPath(std::filesystem::path folderPath)
@@ -162,10 +191,42 @@ void ModelBrowser::setFolderPath(std::filesystem::path folderPath)
   }
 
   m_folderPath = std::move(folderPath);
+  m_currentFolderPath.clear();
   m_folderEdit->setText(QString::fromStdString(m_folderPath.generic_string()));
 
   reloadModels();
   setWatchedDirectory();
+}
+
+void ModelBrowser::setCurrentFolderPath(std::filesystem::path currentFolderPath)
+{
+  currentFolderPath = currentFolderPath.lexically_normal();
+  if (currentFolderPath == std::filesystem::path{"."})
+  {
+    currentFolderPath.clear();
+  }
+
+  if (m_currentFolderPath == currentFolderPath)
+  {
+    return;
+  }
+
+  m_currentFolderPath = std::move(currentFolderPath);
+  if (m_view)
+  {
+    m_view->setCurrentFolderPath(m_currentFolderPath);
+  }
+
+  if (m_folderTree)
+  {
+    if (auto it = m_folderTreeItems.find(m_currentFolderPath); it != m_folderTreeItems.end())
+    {
+      if (m_folderTree->currentItem() != it->second)
+      {
+        m_folderTree->setCurrentItem(it->second);
+      }
+    }
+  }
 }
 
 void ModelBrowser::reloadModels()
@@ -175,7 +236,10 @@ void ModelBrowser::reloadModels()
   {
     m_modelPaths.clear();
     m_lastWriteTimes.clear();
-    m_view->setModelPaths({});
+    m_currentFolderPath.clear();
+    rebuildFolderTree();
+    m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
+    m_view->setCurrentFolderPath(m_currentFolderPath);
     return;
   }
 
@@ -190,7 +254,10 @@ void ModelBrowser::reloadModels()
     {
       m_modelPaths.clear();
       m_lastWriteTimes.clear();
-      m_view->setModelPaths({});
+      m_currentFolderPath.clear();
+      rebuildFolderTree();
+      m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
+      m_view->setCurrentFolderPath(m_currentFolderPath);
       return;
     }
 
@@ -213,7 +280,9 @@ void ModelBrowser::reloadModels()
 
     m_modelPaths = std::move(modelPaths);
     m_lastWriteTimes = std::move(lastWriteTimes);
-    m_view->setModelPaths(m_modelPaths);
+    rebuildFolderTree();
+    m_view->setModelPaths(m_folderPath, m_modelPaths);
+    m_view->setCurrentFolderPath(m_currentFolderPath);
     return;
   }
 
@@ -224,7 +293,10 @@ void ModelBrowser::reloadModels()
   {
     m_modelPaths.clear();
     m_lastWriteTimes.clear();
-    m_view->setModelPaths({});
+    m_currentFolderPath.clear();
+    rebuildFolderTree();
+    m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
+    m_view->setCurrentFolderPath(m_currentFolderPath);
     return;
   }
 
@@ -252,7 +324,87 @@ void ModelBrowser::reloadModels()
   m_modelPaths = std::move(modelPaths);
   m_lastWriteTimes = std::move(lastWriteTimes);
 
-  m_view->setModelPaths(m_modelPaths);
+  rebuildFolderTree();
+  m_view->setModelPaths(m_folderPath, m_modelPaths);
+  m_view->setCurrentFolderPath(m_currentFolderPath);
+}
+
+void ModelBrowser::rebuildFolderTree()
+{
+  if (!m_folderTree)
+  {
+    return;
+  }
+
+  auto blocker = QSignalBlocker{m_folderTree};
+
+  m_folderTree->clear();
+  m_folderTreeItems.clear();
+
+  const auto folderIcon = io::loadSVGIcon(std::filesystem::path{"Map_folder.svg"});
+
+  auto rootTitle = m_folderPath.filename().empty() ? m_folderPath : m_folderPath.filename();
+  auto rootTitleText = rootTitle.generic_string();
+  if (rootTitleText.empty())
+  {
+    rootTitleText = ".";
+  }
+
+  auto* rootItem = new QTreeWidgetItem{m_folderTree, QStringList{QString::fromStdString(rootTitleText)}};
+  rootItem->setData(0, Qt::UserRole, QString{});
+  rootItem->setIcon(0, folderIcon);
+  m_folderTreeItems.emplace(std::filesystem::path{}, rootItem);
+
+  for (const auto& modelPath : m_modelPaths)
+  {
+    if (modelPath.empty())
+    {
+      continue;
+    }
+
+    if (!m_folderPath.empty() && !kdl::path_has_prefix(modelPath, m_folderPath))
+    {
+      continue;
+    }
+
+    const auto relModelPath =
+      m_folderPath.empty() ? modelPath : modelPath.lexically_relative(m_folderPath);
+    const auto relFolderPath = relModelPath.parent_path();
+
+    auto* parentItem = rootItem;
+    auto accumulatedPath = std::filesystem::path{};
+    for (const auto& part : relFolderPath)
+    {
+      accumulatedPath /= part;
+      if (m_folderTreeItems.contains(accumulatedPath))
+      {
+        parentItem = m_folderTreeItems[accumulatedPath];
+        continue;
+      }
+
+      auto* item = new QTreeWidgetItem{parentItem, QStringList{QString::fromStdString(part.generic_string())}};
+      item->setData(0, Qt::UserRole, QString::fromStdString(accumulatedPath.generic_string()));
+      item->setIcon(0, folderIcon);
+      parentItem = item;
+      m_folderTreeItems.emplace(accumulatedPath, item);
+    }
+  }
+
+  m_folderTree->expandItem(rootItem);
+
+  if (auto it = m_folderTreeItems.find(m_currentFolderPath); it != m_folderTreeItems.end())
+  {
+    m_folderTree->setCurrentItem(it->second);
+  }
+  else
+  {
+    m_currentFolderPath.clear();
+    m_folderTree->setCurrentItem(rootItem);
+    if (m_view)
+    {
+      m_view->setCurrentFolderPath(m_currentFolderPath);
+    }
+  }
 }
 
 void ModelBrowser::setWatchedDirectory()
@@ -320,7 +472,10 @@ void ModelBrowser::rescanWatchedDirectory()
     {
       m_modelPaths.clear();
       m_lastWriteTimes.clear();
-      m_view->setModelPaths({});
+      m_currentFolderPath.clear();
+      rebuildFolderTree();
+      m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
+      m_view->setCurrentFolderPath(m_currentFolderPath);
       return;
     }
 
@@ -369,7 +524,9 @@ void ModelBrowser::rescanWatchedDirectory()
 
     m_modelPaths = std::move(modelPaths);
     m_lastWriteTimes = std::move(newLastWriteTimes);
-    m_view->setModelPaths(m_modelPaths);
+    rebuildFolderTree();
+    m_view->setModelPaths(m_folderPath, m_modelPaths);
+    m_view->setCurrentFolderPath(m_currentFolderPath);
     return;
   }
 
@@ -381,7 +538,10 @@ void ModelBrowser::rescanWatchedDirectory()
   {
     m_modelPaths.clear();
     m_lastWriteTimes.clear();
-    m_view->setModelPaths({});
+    m_currentFolderPath.clear();
+    rebuildFolderTree();
+    m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
+    m_view->setCurrentFolderPath(m_currentFolderPath);
     return;
   }
 
@@ -434,7 +594,9 @@ void ModelBrowser::rescanWatchedDirectory()
 
   m_modelPaths = std::move(modelPaths);
   m_lastWriteTimes = std::move(newLastWriteTimes);
-  m_view->setModelPaths(m_modelPaths);
+  rebuildFolderTree();
+  m_view->setModelPaths(m_folderPath, m_modelPaths);
+  m_view->setCurrentFolderPath(m_currentFolderPath);
 }
 
 } // namespace tb::ui

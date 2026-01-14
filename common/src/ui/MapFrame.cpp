@@ -391,7 +391,7 @@ void MapFrame::createGui()
   m_vSplitter->setChildrenCollapsible(false);
   m_vSplitter->setObjectName("MapFrame_VerticalSplitterSplitter");
 
-  m_infoPanel = new InfoPanel{document()};
+  m_infoPanel = new InfoPanel{document(), *m_contextManager};
   m_infoPanel->setObjectName("MapFrame_InfoPanel");
   m_console = m_infoPanel->console();
   m_pythonConsole = m_infoPanel->pythonConsole();

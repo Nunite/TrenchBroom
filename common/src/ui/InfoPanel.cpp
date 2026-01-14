@@ -26,25 +26,30 @@
 
 #include "ui/Console.h"
 #include "ui/IssueBrowser.h"
+#include "ui/MapDocument.h"
+#include "ui/ModelInspector.h"
 #include "ui/QtUtils.h"
 #include "ui/TabBook.h"
 
 namespace tb::ui
 {
 
-InfoPanel::InfoPanel(MapDocument& document, QWidget* parent)
+InfoPanel::InfoPanel(MapDocument& document, GLContextManager& contextManager, QWidget* parent)
   : QWidget{parent}
 {
   m_tabBook = new TabBook{};
   m_tabBook->setObjectName("InfoPanel_TabBook");
 
+  auto& map = document.map();
   m_console = new Console{};
   m_pythonConsole = new PythonConsole{};
   m_issueBrowser = new IssueBrowser{document};
+  m_modelInspector = new ModelInspector{map, contextManager};
 
   m_tabBook->addPage(m_console, tr("Console"));
   m_tabBook->addPage(m_pythonConsole, tr("Python Console"));
   m_tabBook->addPage(m_issueBrowser, tr("Issues"));
+  m_tabBook->addPage(m_modelInspector, tr("Model"));
 
   auto* sizer = new QVBoxLayout{};
   sizer->setContentsMargins(0, 0, 0, 0);
