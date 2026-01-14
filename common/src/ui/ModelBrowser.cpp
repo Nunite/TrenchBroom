@@ -22,12 +22,16 @@
 #include <QFileDialog>
 #include <QFileSystemWatcher>
 #include <QHBoxLayout>
+#include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QScrollBar>
+#include <QStackedWidget>
 #include <QSplitter>
 #include <QTimer>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -72,13 +76,27 @@ ModelBrowser::~ModelBrowser()
 
 void ModelBrowser::createGui(GLContextManager& contextManager)
 {
+  m_pathStack = new QStackedWidget{};
+
+  m_breadcrumbBar = new QWidget{};
+  m_breadcrumbLayout = new QHBoxLayout{};
+  m_breadcrumbLayout->setContentsMargins(6, 0, 0, 0);
+  m_breadcrumbLayout->setSpacing(4);
+  m_breadcrumbBar->setLayout(m_breadcrumbLayout);
+  m_breadcrumbBar->installEventFilter(this);
+
   m_folderEdit = new QLineEdit{};
+  m_folderEdit->installEventFilter(this);
   m_browseButton = new QPushButton{tr("Browse")};
   m_reloadButton = new QPushButton{tr("Reload")};
 
+  m_pathStack->addWidget(m_breadcrumbBar);
+  m_pathStack->addWidget(m_folderEdit);
+  m_pathStack->setCurrentWidget(m_breadcrumbBar);
+
   auto* controlsLayout = new QHBoxLayout{};
   controlsLayout->setContentsMargins(0, 0, 0, 0);
-  controlsLayout->addWidget(m_folderEdit, 1);
+  controlsLayout->addWidget(m_pathStack, 1);
   controlsLayout->addWidget(m_browseButton, 0);
   controlsLayout->addWidget(m_reloadButton, 0);
 
@@ -126,6 +144,7 @@ void ModelBrowser::bindEvents()
   connect(m_folderEdit, &QLineEdit::editingFinished, this, [&]() {
     if (!m_folderEdit->isModified())
     {
+      showBreadcrumbBar();
       return;
     }
 
@@ -133,6 +152,7 @@ void ModelBrowser::bindEvents()
     if (typedPath.empty() || typedPath == std::filesystem::path{"."})
     {
       setCurrentFolderPath(std::filesystem::path{});
+      showBreadcrumbBar();
       return;
     }
 
@@ -142,17 +162,20 @@ void ModelBrowser::bindEvents()
       if (typedPath == rootPath)
       {
         setCurrentFolderPath(std::filesystem::path{});
+        showBreadcrumbBar();
         return;
       }
 
       if (kdl::path_has_prefix(typedPath, rootPath))
       {
         setCurrentFolderPath(typedPath.lexically_relative(rootPath));
+        showBreadcrumbBar();
         return;
       }
     }
 
     setFolderPath(typedPath);
+    showBreadcrumbBar();
   });
 
   connect(m_reloadButton, &QPushButton::clicked, this, [&]() { reloadModels(); });
@@ -238,9 +261,75 @@ void ModelBrowser::modsDidChange()
   setWatchedDirectory();
 }
 
-void ModelBrowser::updateFolderEdit()
+bool ModelBrowser::eventFilter(QObject* obj, QEvent* event)
 {
-  if (!m_folderEdit)
+  if (obj == m_breadcrumbBar && event->type() == QEvent::MouseButtonDblClick)
+  {
+    showPathEditor();
+    return true;
+  }
+
+  if (obj == m_folderEdit && event->type() == QEvent::KeyPress)
+  {
+    const auto* keyEvent = static_cast<QKeyEvent*>(event);
+    if (keyEvent->key() == Qt::Key_Escape)
+    {
+      showBreadcrumbBar();
+      return true;
+    }
+  }
+
+  return QWidget::eventFilter(obj, event);
+}
+
+void ModelBrowser::rebuildBreadcrumbBar()
+{
+  if (!m_breadcrumbLayout)
+  {
+    return;
+  }
+
+  while (auto* item = m_breadcrumbLayout->takeAt(0))
+  {
+    if (auto* w = item->widget())
+    {
+      w->deleteLater();
+    }
+    delete item;
+  }
+
+  const auto addSeparator = [&]() {
+    auto* sep = new QLabel{QString::fromUtf8("›")};
+    sep->setEnabled(false);
+    m_breadcrumbLayout->addWidget(sep, 0);
+  };
+
+  const auto addCrumb = [&](const QString& title, const std::filesystem::path& folderPath) {
+    auto* button = new QToolButton{};
+    button->setAutoRaise(true);
+    button->setText(title);
+    connect(button, &QToolButton::clicked, this, [this, folderPath]() {
+      setCurrentFolderPath(folderPath);
+    });
+    m_breadcrumbLayout->addWidget(button, 0);
+  };
+
+  addCrumb(tr("All"), std::filesystem::path{});
+
+  auto accumulated = std::filesystem::path{};
+  for (const auto& part : m_currentFolderPath)
+  {
+    accumulated /= part;
+    addSeparator();
+    addCrumb(QString::fromStdString(part.generic_string()), accumulated);
+  }
+
+  m_breadcrumbLayout->addStretch(1);
+}
+
+void ModelBrowser::showPathEditor()
+{
+  if (!m_pathStack || !m_folderEdit)
   {
     return;
   }
@@ -259,6 +348,29 @@ void ModelBrowser::updateFolderEdit()
 
   m_folderEdit->setText(QString::fromStdString(displayedText));
   m_folderEdit->setModified(false);
+  m_pathStack->setCurrentWidget(m_folderEdit);
+  m_folderEdit->setFocus();
+  m_folderEdit->selectAll();
+}
+
+void ModelBrowser::showBreadcrumbBar()
+{
+  if (!m_pathStack || !m_breadcrumbBar)
+  {
+    return;
+  }
+
+  updateFolderEdit();
+  m_pathStack->setCurrentWidget(m_breadcrumbBar);
+}
+
+void ModelBrowser::updateFolderEdit()
+{
+  rebuildBreadcrumbBar();
+  if (!m_folderEdit || !m_pathStack || m_pathStack->currentWidget() == m_folderEdit)
+  {
+    return;
+  }
 }
 
 void ModelBrowser::setFolderPath(std::filesystem::path folderPath)

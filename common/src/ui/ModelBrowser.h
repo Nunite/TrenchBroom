@@ -30,10 +30,14 @@
 #include <vector>
 
 class QAbstractButton;
+class QEvent;
 class QFileSystemWatcher;
+class QHBoxLayout;
 class QLineEdit;
 class QPushButton;
 class QScrollBar;
+class QStackedWidget;
+class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
 class QTimer;
@@ -54,6 +58,9 @@ class ModelBrowser : public QWidget
 private:
   mdl::Map& m_map;
 
+  QStackedWidget* m_pathStack = nullptr;
+  QWidget* m_breadcrumbBar = nullptr;
+  QHBoxLayout* m_breadcrumbLayout = nullptr;
   QLineEdit* m_folderEdit = nullptr;
   QPushButton* m_browseButton = nullptr;
   QPushButton* m_reloadButton = nullptr;
@@ -80,11 +87,17 @@ public:
     mdl::Map& map, GLContextManager& contextManager, QWidget* parent = nullptr);
   ~ModelBrowser() override;
 
+protected:
+  bool eventFilter(QObject* obj, QEvent* event) override;
+
 private:
   void createGui(GLContextManager& contextManager);
   void bindEvents();
   void connectObservers();
 
+  void rebuildBreadcrumbBar();
+  void showPathEditor();
+  void showBreadcrumbBar();
   void updateFolderEdit();
   void setFolderPath(std::filesystem::path folderPath);
   void setCurrentFolderPath(std::filesystem::path currentFolderPath);
