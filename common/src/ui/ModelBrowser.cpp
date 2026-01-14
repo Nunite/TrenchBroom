@@ -424,7 +424,7 @@ void ModelBrowser::reloadModels()
       return;
     }
 
-    auto modelPaths = std::move(pathsResult.value());
+    auto modelPaths = pathsResult.value();
     std::ranges::sort(modelPaths);
 
     auto lastWriteTimes =
@@ -482,7 +482,7 @@ void ModelBrowser::reloadModels()
     return;
   }
 
-  auto modelPaths = std::move(pathsResult.value());
+  auto modelPaths = pathsResult.value();
   std::ranges::sort(modelPaths);
 
   auto filteredModelPaths = std::vector<std::filesystem::path>{};
@@ -692,7 +692,7 @@ void ModelBrowser::rescanWatchedDirectory()
       return;
     }
 
-    auto modelPaths = std::move(pathsResult.value());
+    auto modelPaths = pathsResult.value();
     std::ranges::sort(modelPaths);
 
     auto newLastWriteTimes =
@@ -783,7 +783,7 @@ void ModelBrowser::rescanWatchedDirectory()
     return;
   }
 
-  auto modelPaths = std::move(pathsResult.value());
+  auto modelPaths = pathsResult.value();
   std::ranges::sort(modelPaths);
 
   auto filteredModelPaths = std::vector<std::filesystem::path>{};

@@ -19,6 +19,10 @@
 
 #include "ModelBrowserView.h"
 
+#include <QEvent>
+#include <QOpenGLContext>
+#include <QScrollBar>
+
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "Exceptions.h"
@@ -43,10 +47,6 @@
 #include "vm/mat_ext.h"
 #include "vm/quat.h"
 #include "vm/vec.h"
-
-#include <QEvent>
-#include <QOpenGLContext>
-#include <QScrollBar>
 
 #include <algorithm>
 #include <ranges>
