@@ -308,6 +308,8 @@ void CellView::startDrag(const QMouseEvent* event)
        int yOffset = event.GetY() - int(cell->itemBounds().top()) + top;
        */
 
+      doLeftClick(m_layout, x, y);
+
       const auto dropData = dndData(*cell);
 
       auto* mimeData = new QMimeData{};
