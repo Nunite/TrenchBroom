@@ -83,11 +83,16 @@ public:
 private:
   void createGui(GLContextManager& contextManager);
   void bindEvents();
+  void connectObservers();
 
   void setFolderPath(std::filesystem::path folderPath);
   void setCurrentFolderPath(std::filesystem::path currentFolderPath);
   void reloadModels();
   void rebuildFolderTree();
+
+  void mapWasCreated(mdl::Map& map);
+  void mapWasLoaded(mdl::Map& map);
+  void modsDidChange();
 
   void setWatchedDirectory();
   void scheduleRescan();

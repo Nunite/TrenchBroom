@@ -58,7 +58,8 @@ ModelBrowser::ModelBrowser(mdl::Map& map, GLContextManager& contextManager, QWid
 {
   createGui(contextManager);
   bindEvents();
-  setFolderPath(std::filesystem::path{"progs"});
+  connectObservers();
+  setFolderPath(std::filesystem::path{"models"});
 }
 
 ModelBrowser::~ModelBrowser()
@@ -180,6 +181,33 @@ void ModelBrowser::bindEvents()
   connect(m_view, &ModelBrowserView::folderActivated, this, [&](const QString& folderPath) {
     setCurrentFolderPath(std::filesystem::path{folderPath.toStdString()});
   });
+}
+
+void ModelBrowser::connectObservers()
+{
+  m_notifierConnection +=
+    m_map.mapWasCreatedNotifier.connect(this, &ModelBrowser::mapWasCreated);
+  m_notifierConnection +=
+    m_map.mapWasLoadedNotifier.connect(this, &ModelBrowser::mapWasLoaded);
+  m_notifierConnection += m_map.modsDidChangeNotifier.connect(this, &ModelBrowser::modsDidChange);
+}
+
+void ModelBrowser::mapWasCreated(mdl::Map&)
+{
+  reloadModels();
+  setWatchedDirectory();
+}
+
+void ModelBrowser::mapWasLoaded(mdl::Map&)
+{
+  reloadModels();
+  setWatchedDirectory();
+}
+
+void ModelBrowser::modsDidChange()
+{
+  reloadModels();
+  setWatchedDirectory();
 }
 
 void ModelBrowser::setFolderPath(std::filesystem::path folderPath)
