@@ -19,13 +19,11 @@
 
 #include "ModelBrowser.h"
 
-#include <QFileDialog>
 #include <QFileSystemWatcher>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPushButton>
 #include <QSignalBlocker>
 #include <QScrollBar>
 #include <QStackedWidget>
@@ -87,8 +85,6 @@ void ModelBrowser::createGui(GLContextManager& contextManager)
 
   m_folderEdit = new QLineEdit{};
   m_folderEdit->installEventFilter(this);
-  m_browseButton = new QPushButton{tr("Browse")};
-  m_reloadButton = new QPushButton{tr("Reload")};
 
   m_pathStack->addWidget(m_breadcrumbBar);
   m_pathStack->addWidget(m_folderEdit);
@@ -97,8 +93,6 @@ void ModelBrowser::createGui(GLContextManager& contextManager)
   auto* controlsLayout = new QHBoxLayout{};
   controlsLayout->setContentsMargins(0, 0, 0, 0);
   controlsLayout->addWidget(m_pathStack, 1);
-  controlsLayout->addWidget(m_browseButton, 0);
-  controlsLayout->addWidget(m_reloadButton, 0);
 
   auto* controls = new QWidget{};
   controls->setLayout(controlsLayout);
@@ -176,40 +170,6 @@ void ModelBrowser::bindEvents()
 
     setFolderPath(typedPath);
     showBreadcrumbBar();
-  });
-
-  connect(m_reloadButton, &QPushButton::clicked, this, [&]() { reloadModels(); });
-
-  connect(m_browseButton, &QPushButton::clicked, this, [&]() {
-    const auto* game = m_map.game();
-    const auto startDir =
-      game ? io::pathAsQString(game->gamePath()) : QString{};
-    const auto folder = QFileDialog::getExistingDirectory(this, tr("Select Model Folder"), startDir);
-    if (folder.isEmpty())
-    {
-      return;
-    }
-
-    if (!game)
-    {
-      setFolderPath(std::filesystem::path{folder.toStdString()});
-      return;
-    }
-
-    const auto gamePath = io::Disk::fixPath(game->gamePath());
-    const auto defaultSearchRoot =
-      io::Disk::fixPath(gamePath / game->config().fileSystemConfig.searchPath);
-    const auto absFolder = io::Disk::fixPath(std::filesystem::path{folder.toStdString()});
-
-    if (kdl::path_has_prefix(absFolder, defaultSearchRoot))
-    {
-      const auto rel = absFolder.lexically_relative(defaultSearchRoot);
-      setFolderPath(rel);
-    }
-    else
-    {
-      setFolderPath(absFolder);
-    }
   });
 
   connect(

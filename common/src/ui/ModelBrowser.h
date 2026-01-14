@@ -34,7 +34,6 @@ class QEvent;
 class QFileSystemWatcher;
 class QHBoxLayout;
 class QLineEdit;
-class QPushButton;
 class QScrollBar;
 class QStackedWidget;
 class QToolButton;
@@ -62,8 +61,6 @@ private:
   QWidget* m_breadcrumbBar = nullptr;
   QHBoxLayout* m_breadcrumbLayout = nullptr;
   QLineEdit* m_folderEdit = nullptr;
-  QPushButton* m_browseButton = nullptr;
-  QPushButton* m_reloadButton = nullptr;
 
   QScrollBar* m_scrollBar = nullptr;
   ModelBrowserView* m_view = nullptr;
