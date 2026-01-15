@@ -225,22 +225,40 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
     const auto relFromCurrent =
       currentFolderAbs.empty() ? folderPath : folderPath.lexically_relative(currentFolderAbs);
 
+    const auto modelNameMatches = matches(io::pathAsGenericQString(modelPath.filename()));
+
     if (relFromCurrent.empty() || relFromCurrent == std::filesystem::path{"."})
     {
-      if (!matches(io::pathAsGenericQString(modelPath.filename())))
+      if (!hasSearch || modelNameMatches)
       {
-        continue;
+        modelChildren.push_back(modelPath);
       }
-      modelChildren.push_back(modelPath);
       continue;
     }
 
     const auto first = *relFromCurrent.begin();
-    if (!matches(io::pathAsGenericQString(first)))
+    const auto firstNameMatches = matches(io::pathAsGenericQString(first));
+    const auto firstRelPath = (m_currentFolderPath / first).lexically_normal();
+
+    if (hasSearch)
     {
+      if (modelNameMatches)
+      {
+        modelChildren.push_back(modelPath);
+        folderChildren.push_back(firstRelPath);
+        continue;
+      }
+
+      if (firstNameMatches)
+      {
+        folderChildren.push_back(firstRelPath);
+        continue;
+      }
+
       continue;
     }
-    folderChildren.push_back((m_currentFolderPath / first).lexically_normal());
+
+    folderChildren.push_back(firstRelPath);
   }
 
   std::ranges::sort(folderChildren, [](const auto& a, const auto& b) {
@@ -250,7 +268,11 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
     std::unique(std::begin(folderChildren), std::end(folderChildren)),
     std::end(folderChildren));
 
-  std::ranges::sort(modelChildren, [](const auto& a, const auto& b) {
+  std::ranges::sort(modelChildren, [&](const auto& a, const auto& b) {
+    if (hasSearch)
+    {
+      return a.generic_string() < b.generic_string();
+    }
     return a.filename().generic_string() < b.filename().generic_string();
   });
 
@@ -285,7 +307,10 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
 
   for (const auto& modelPath : modelChildren)
   {
-    const auto titleUtf8 = io::pathAsGenericQString(modelPath.filename()).toUtf8();
+    const auto titlePath =
+      hasSearch ? (currentFolderAbs.empty() ? modelPath : modelPath.lexically_relative(currentFolderAbs))
+                : modelPath.filename();
+    const auto titleUtf8 = io::pathAsGenericQString(titlePath).toUtf8();
     const auto title = std::string{titleUtf8.constData(), size_t(titleUtf8.size())};
     const auto titleHeight = fontManager().font(font).measure(title).y();
 
