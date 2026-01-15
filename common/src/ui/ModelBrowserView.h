@@ -32,6 +32,7 @@
 #include <vector>
 
 class QEvent;
+class QContextMenuEvent;
 class QScrollBar;
 
 namespace tb::mdl
@@ -116,6 +117,7 @@ private:
   void doMouseMove(Layout& layout, float x, float y) override;
   void doLeftClick(Layout& layout, float x, float y) override;
   void doDoubleClick(Layout& layout, float x, float y) override;
+  void doContextMenu(Layout& layout, float x, float y, QContextMenuEvent* event) override;
 
   void ensureFolderIconTexture();
   void destroyFolderIconTexture();

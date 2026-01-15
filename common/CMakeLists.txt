@@ -48,6 +48,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/io/LoadEntityModel.cpp
         ${COMMON_SOURCE_DIR}/io/LoadMaterialCollections.cpp
         ${COMMON_SOURCE_DIR}/io/LoadShaders.cpp
+        ${COMMON_SOURCE_DIR}/io/GoldSrcMdlScaler.cpp
         ${COMMON_SOURCE_DIR}/io/MapFileSerializer.cpp
         ${COMMON_SOURCE_DIR}/io/MapHeader.cpp
         ${COMMON_SOURCE_DIR}/io/MapParser.cpp
@@ -579,6 +580,7 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/io/LoadEntityModel.h
         ${COMMON_SOURCE_DIR}/io/LoadMaterialCollections.h
         ${COMMON_SOURCE_DIR}/io/LoadShaders.h
+        ${COMMON_SOURCE_DIR}/io/GoldSrcMdlScaler.h
         ${COMMON_SOURCE_DIR}/io/MapFileSerializer.h
         ${COMMON_SOURCE_DIR}/io/MapHeader.h
         ${COMMON_SOURCE_DIR}/io/MapParser.h

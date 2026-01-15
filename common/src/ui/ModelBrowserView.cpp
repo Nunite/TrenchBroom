@@ -19,14 +19,23 @@
 
 #include "ModelBrowserView.h"
 
+#include <QContextMenuEvent>
 #include <QEvent>
+#include <QInputDialog>
+#include <QMenu>
+#include <QMessageBox>
 #include <QScrollBar>
 
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "Exceptions.h"
 #include "mdl/EntityModelManager.h"
+#include "mdl/Game.h"
 #include "mdl/Map.h"
+#include "io/DiskIO.h"
+#include "io/FileSystem.h"
+#include "io/GoldSrcMdlScaler.h"
+#include "io/PathInfo.h"
 #include "io/ResourceUtils.h"
 #include "io/PathQt.h"
 #include "render/ActiveShader.h"
@@ -48,7 +57,11 @@
 #include "vm/vec.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <cstring>
 #include <ranges>
+#include <variant>
+#include <vector>
 
 #include "kdl/path_utils.h"
 
@@ -432,6 +445,77 @@ void ModelBrowserView::doDoubleClick(Layout& layout, const float x, const float 
       emit folderActivated(QString::fromStdString(item.path.generic_string()));
     }
   }
+}
+
+void ModelBrowserView::doContextMenu(
+  Layout& layout, const float x, const float y, QContextMenuEvent* event)
+{
+  const auto* cell = layout.cellAt(x, y);
+  if (!cell)
+  {
+    return;
+  }
+
+  const auto& item = cellData(*cell);
+  if (item.type != BrowserCellType::Model)
+  {
+    return;
+  }
+
+  if (kdl::path_to_lower(item.path.extension()) != ".mdl")
+  {
+    return;
+  }
+
+  auto menu = QMenu{this};
+  menu.addAction(tr("Scale MDL..."), this, [this, modelPath = item.path]() {
+    auto ok = false;
+    const auto scale = QInputDialog::getDouble(
+      this, tr("Scale MDL"), tr("Scale factor"), 1.0, 0.001, 1000.0, 3, &ok);
+    if (!ok)
+    {
+      return;
+    }
+
+    if (scale == 1.0)
+    {
+      return;
+    }
+
+    auto absPath = std::filesystem::path{};
+    if (modelPath.is_absolute())
+    {
+      absPath = modelPath;
+    }
+    else if (const auto* game = m_map.game())
+    {
+      const auto absPathResult = game->gameFileSystem().makeAbsolute(modelPath);
+      if (!absPathResult.is_error())
+      {
+        absPath = absPathResult.value();
+      }
+    }
+
+    if (absPath.empty() || io::Disk::pathInfo(absPath) != io::PathInfo::File)
+    {
+      QMessageBox::warning(this, tr("Error"), tr("Cannot locate a writable MDL file path."));
+      return;
+    }
+
+    const auto result = io::scaleGoldSrcMdlFile(absPath, float(scale));
+    if (result.is_error())
+    {
+      const auto& e = std::get<tb::Error>(result.error());
+      QMessageBox::warning(this, tr("Error"), QString::fromStdString(e.msg));
+      return;
+    }
+
+    m_map.entityModelManager().invalidateModel(modelPath);
+    invalidate();
+    update();
+  });
+
+  menu.exec(event->globalPos());
 }
 
 void ModelBrowserView::renderHoveredCellBounds(
