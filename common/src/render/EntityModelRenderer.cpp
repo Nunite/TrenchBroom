@@ -28,6 +28,8 @@
 #include "mdl/EntityModel.h"
 #include "mdl/EntityModelManager.h"
 #include "mdl/EntityNode.h"
+#include "mdl/Material.h"
+#include "mdl/Texture.h"
 #include "render/ActiveShader.h"
 #include "render/Camera.h"
 #include "render/MaterialIndexRangeRenderer.h"
@@ -43,6 +45,47 @@
 
 namespace tb::render
 {
+namespace
+{
+class RenderFunc : public MaterialRenderFunc
+{
+private:
+  ActiveShader& m_shader;
+  int m_minFilter;
+  int m_magFilter;
+
+public:
+  RenderFunc(ActiveShader& shader, const int minFilter, const int magFilter)
+    : m_shader{shader}
+    , m_minFilter{minFilter}
+    , m_magFilter{magFilter}
+  {
+  }
+
+  void before(const mdl::Material* material) override
+  {
+    if (material)
+    {
+      material->activate(m_minFilter, m_magFilter);
+      const auto* texture = mdl::getTexture(material);
+      const auto enableMasked = texture && texture->mask() == mdl::TextureMask::On;
+      m_shader.set("EnableMasked", enableMasked);
+    }
+    else
+    {
+      m_shader.set("EnableMasked", false);
+    }
+  }
+
+  void after(const mdl::Material* material) override
+  {
+    if (material)
+    {
+      material->deactivate();
+    }
+  }
+};
+} // namespace
 
 EntityModelRenderer::EntityModelRenderer(
   Logger& logger,
@@ -169,6 +212,7 @@ void EntityModelRenderer::doRender(RenderContext& renderContext)
     shader.set("ApplyTinting", m_applyTinting);
     shader.set("TintColor", m_tintColor);
     shader.set("GrayScale", false);
+    shader.set("EnableMasked", false);
     shader.set("Material", 0);
     shader.set("ShowSoftMapBounds", !renderContext.softMapBounds().is_empty());
     shader.set("SoftMapBoundsMin", renderContext.softMapBounds().min);
@@ -209,8 +253,8 @@ void EntityModelRenderer::doRender(RenderContext& renderContext)
 
       shader.set("ModelMatrix", transformation);
 
-      auto renderFunc = DefaultMaterialRenderFunc{
-        renderContext.minFilterMode(), renderContext.magFilterMode()};
+      auto renderFunc = RenderFunc{
+        shader, renderContext.minFilterMode(), renderContext.magFilterMode()};
       renderer->render(renderFunc);
     }
   }

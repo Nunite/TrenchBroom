@@ -214,7 +214,7 @@ mdl::Texture loadUncompressedEmbeddedTexture(
   std::memcpy(buffer.data(), &data, width * height * sizeof(aiTexel));
 
   auto masked = false;
-  const auto* bytes = buffer.data();
+  auto* bytes = buffer.data();
   const auto byteCount = buffer.size();
   for (size_t i = 0; i + 3 < byteCount; i += sizeof(aiTexel))
   {
@@ -222,6 +222,91 @@ mdl::Texture loadUncompressedEmbeddedTexture(
     {
       masked = true;
       break;
+    }
+  }
+
+  if (!masked && width > 0u && height > 0u)
+  {
+    struct Bgr
+    {
+      unsigned char b;
+      unsigned char g;
+      unsigned char r;
+    };
+
+    const auto pixelIndex = [&](const size_t x, const size_t y) {
+      return (y * width + x) * sizeof(aiTexel);
+    };
+
+    const auto readBgr = [&](const size_t x, const size_t y) {
+      const auto i = pixelIndex(x, y);
+      return Bgr{bytes[i + 0], bytes[i + 1], bytes[i + 2]};
+    };
+
+    const auto corners = std::array<Bgr, 4>{
+      readBgr(0u, 0u),
+      readBgr(width - 1u, 0u),
+      readBgr(0u, height - 1u),
+      readBgr(width - 1u, height - 1u),
+    };
+
+    auto cornerCandidates = std::vector<Bgr>{};
+    cornerCandidates.reserve(4);
+    for (const auto& c : corners)
+    {
+      const auto alreadyPresent = std::any_of(
+        cornerCandidates.begin(),
+        cornerCandidates.end(),
+        [&](const Bgr& e) { return e.b == c.b && e.g == c.g && e.r == c.r; });
+      if (!alreadyPresent)
+      {
+        const auto cornerMatches = std::count_if(
+          corners.begin(),
+          corners.end(),
+          [&](const Bgr& e) { return e.b == c.b && e.g == c.g && e.r == c.r; });
+        if (cornerMatches >= 2)
+        {
+          cornerCandidates.push_back(c);
+        }
+      }
+    }
+
+    auto best = std::optional<std::pair<Bgr, size_t>>{};
+    for (const auto& candidate : cornerCandidates)
+    {
+      size_t count = 0u;
+      for (size_t i = 0; i + 3 < byteCount; i += sizeof(aiTexel))
+      {
+        if (
+          bytes[i + 0] == candidate.b && bytes[i + 1] == candidate.g
+          && bytes[i + 2] == candidate.r)
+        {
+          ++count;
+        }
+      }
+
+      if (!best || count > best->second)
+      {
+        best = std::make_pair(candidate, count);
+      }
+    }
+
+    if (best)
+    {
+      const auto totalPixels = width * height;
+      const auto minKeyPixels = totalPixels / 16u;
+      if (best->second >= minKeyPixels)
+      {
+        const auto& key = best->first;
+        for (size_t i = 0; i + 3 < byteCount; i += sizeof(aiTexel))
+        {
+          if (bytes[i + 0] == key.b && bytes[i + 1] == key.g && bytes[i + 2] == key.r)
+          {
+            bytes[i + 3] = 0u;
+          }
+        }
+        masked = true;
+      }
     }
   }
 

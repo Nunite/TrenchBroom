@@ -20,6 +20,7 @@
  */
 
 uniform float Brightness;
+uniform bool EnableMasked;
 uniform sampler2D Material;
 uniform bool ApplyTinting;
 uniform vec4 TintColor;
@@ -32,9 +33,7 @@ vec3 applySoftMapBoundsTint(vec3 inputFragColor, vec3 worldCoords);
 void main() {
     vec4 texel = texture2D(Material, gl_TexCoord[0].st);
 
-    // Assume alpha masked or opaque.
-    // TODO: Make this optional if we gain support for translucent textures
-    if (texel.a < 0.5) {
+    if (EnableMasked && texel.a < 0.5) {
         discard;
     }
 
