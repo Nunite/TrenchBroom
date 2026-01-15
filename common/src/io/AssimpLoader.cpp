@@ -42,6 +42,7 @@
 #include "kdl/ranges/to.h"
 #include "kdl/result.h"
 #include "kdl/result_fold.h"
+#include "kdl/string_format.h"
 #include "kdl/vector_utils.h"
 
 #include <assimp/IOStream.hpp>
@@ -53,11 +54,16 @@
 #include <fmt/format.h>
 #include <fmt/std.h>
 
+#include <cstdint>
+#include <cstring>
+#include <limits>
 #include <string>
 #include <optional>
 #include <ranges>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 
 namespace tb::io
@@ -353,6 +359,306 @@ mdl::Texture loadTexture(
   return loadCompressedEmbeddedTexture(*texture->pcData, texture->mWidth, fs, logger);
 }
 
+struct GoldSrcTextureLibrary
+{
+  std::unordered_map<std::string, std::shared_ptr<mdl::TextureResource>> m_textures;
+};
+
+static constexpr int32_t GoldSrcStudioId_IDST = 0x54534449;
+static constexpr int32_t GoldSrcStudioVersion = 10;
+static constexpr int32_t STUDIO_NF_MASKED = 0x0040;
+
+struct GoldSrcStudioHdr
+{
+  int32_t id{};
+  int32_t version{};
+  char name[64]{};
+  int32_t length{};
+
+  float eyeposition[3]{};
+  float min[3]{};
+  float max[3]{};
+  float bbmin[3]{};
+  float bbmax[3]{};
+
+  int32_t flags{};
+
+  int32_t numbones{};
+  int32_t boneindex{};
+
+  int32_t numbonecontrollers{};
+  int32_t bonecontrollerindex{};
+
+  int32_t numhitboxes{};
+  int32_t hitboxindex{};
+
+  int32_t numseq{};
+  int32_t seqindex{};
+
+  int32_t numseqgroups{};
+  int32_t seqgroupindex{};
+
+  int32_t numtextures{};
+  int32_t textureindex{};
+  int32_t texturedataindex{};
+
+  int32_t numskinref{};
+  int32_t numskinfamilies{};
+  int32_t skinindex{};
+
+  int32_t numbodyparts{};
+  int32_t bodypartindex{};
+
+  int32_t numattachments{};
+  int32_t attachmentindex{};
+
+  int32_t soundtable{};
+  int32_t soundindex{};
+  int32_t soundgroups{};
+  int32_t soundgroupindex{};
+
+  int32_t numtransitions{};
+  int32_t transitionindex{};
+};
+
+struct GoldSrcMStudioTexture
+{
+  char name[64]{};
+  int32_t flags{};
+  int32_t width{};
+  int32_t height{};
+  int32_t index{};
+};
+
+template <typename T>
+const T* ptrAt(const uint8_t* base, const size_t size, const int32_t offset)
+{
+  if (offset < 0)
+  {
+    return nullptr;
+  }
+
+  const auto off = size_t(offset);
+  if (off > size || size - off < sizeof(T))
+  {
+    return nullptr;
+  }
+
+  return reinterpret_cast<const T*>(base + off);
+}
+
+std::filesystem::path addSuffixToFileName(
+  const std::filesystem::path& filePath, const std::string_view suffix)
+{
+  const auto stem = filePath.stem().string();
+  const auto ext = filePath.extension().string();
+  return filePath.parent_path() / (stem + std::string{suffix} + ext);
+}
+
+std::string_view cStringView(const char (&s)[64])
+{
+  const auto* begin = &s[0];
+  const auto* end = static_cast<const char*>(std::memchr(begin, '\0', 64));
+  if (!end)
+  {
+    end = begin + 64;
+  }
+  return std::string_view{begin, size_t(end - begin)};
+}
+
+void insertTextureKey(
+  GoldSrcTextureLibrary& lib,
+  const std::string_view key,
+  const std::shared_ptr<mdl::TextureResource>& textureResource)
+{
+  if (key.empty())
+  {
+    return;
+  }
+
+  lib.m_textures.try_emplace(kdl::str_to_lower(key), textureResource);
+}
+
+std::optional<std::shared_ptr<mdl::TextureResource>> findGoldSrcTexture(
+  const GoldSrcTextureLibrary& lib, const std::string_view raw)
+{
+  const auto rawLower = kdl::str_to_lower(raw);
+  if (const auto it = lib.m_textures.find(rawLower); it != lib.m_textures.end())
+  {
+    return it->second;
+  }
+
+  const auto sep = raw.find_last_of("/\\");
+  const auto basename = (sep == std::string_view::npos) ? raw : raw.substr(sep + 1u);
+
+  const auto basenameLower = kdl::str_to_lower(basename);
+  if (const auto it = lib.m_textures.find(basenameLower); it != lib.m_textures.end())
+  {
+    return it->second;
+  }
+
+  const auto dot = basename.find_last_of('.');
+  if (dot != std::string_view::npos)
+  {
+    const auto stemLower = kdl::str_to_lower(basename.substr(0u, dot));
+    if (const auto it = lib.m_textures.find(stemLower); it != lib.m_textures.end())
+    {
+      return it->second;
+    }
+  }
+
+  return std::nullopt;
+}
+
+Result<GoldSrcTextureLibrary> loadGoldSrcTextureLibraryFromFile(
+  const FileSystem& fs, const std::filesystem::path& mdlPath, Logger& logger)
+{
+  return fs.openFile(mdlPath) | kdl::and_then([&](auto file) -> Result<GoldSrcTextureLibrary> {
+           auto reader = file->reader().buffer();
+           const auto buffered = reader.buffer();
+           const auto* begin = reinterpret_cast<const uint8_t*>(buffered.begin());
+           const auto size = buffered.size();
+
+           const auto* header = ptrAt<GoldSrcStudioHdr>(begin, size, 0);
+           if (!header || header->id != GoldSrcStudioId_IDST || header->version != GoldSrcStudioVersion)
+           {
+             return Error{"Not a GoldSrc Studio MDL"};
+           }
+
+           if (header->numtextures <= 0 || header->textureindex <= 0)
+           {
+             return Error{"GoldSrc Studio MDL has no textures"};
+           }
+
+           const auto textureCount = size_t(header->numtextures);
+           if (textureCount > (std::numeric_limits<size_t>::max() / sizeof(GoldSrcMStudioTexture)))
+           {
+             return Error{"GoldSrc Studio MDL has too many textures"};
+           }
+
+           const auto* textures =
+             ptrAt<GoldSrcMStudioTexture>(begin, size, header->textureindex);
+           if (!textures)
+           {
+             return Error{"GoldSrc Studio MDL texture index is out of bounds"};
+           }
+
+           auto out = GoldSrcTextureLibrary{};
+           for (size_t ti = 0; ti < textureCount; ++ti)
+           {
+             const auto& tex = textures[ti];
+             if (tex.width <= 0 || tex.height <= 0)
+             {
+               continue;
+             }
+
+             const auto width = size_t(tex.width);
+             const auto height = size_t(tex.height);
+
+             if (!checkTextureDimensions(width, height))
+             {
+               continue;
+             }
+
+             if (width > std::numeric_limits<size_t>::max() / height)
+             {
+               continue;
+             }
+
+             const auto pixelCount = width * height;
+             const auto bytesNeeded = pixelCount + 256u * 3u;
+             if (tex.index < 0)
+             {
+               continue;
+             }
+
+             const auto indexOffset = size_t(tex.index);
+             if (indexOffset > size || size - indexOffset < bytesNeeded)
+             {
+               continue;
+             }
+
+             const auto* indices = begin + indexOffset;
+             const auto* palette = indices + pixelCount;
+
+             auto rgba = mdl::TextureBuffer{pixelCount * 4u};
+             auto* outPixels = rgba.data();
+
+             const auto masked = (tex.flags & STUDIO_NF_MASKED) != 0;
+             for (size_t i = 0; i < pixelCount; ++i)
+             {
+               const auto index = size_t(indices[i]);
+               const auto paletteOffset = index * 3u;
+               const auto pixelOffset = i * 4u;
+
+               outPixels[pixelOffset + 0] = palette[paletteOffset + 0];
+               outPixels[pixelOffset + 1] = palette[paletteOffset + 1];
+               outPixels[pixelOffset + 2] = palette[paletteOffset + 2];
+               outPixels[pixelOffset + 3] = 0xFF;
+
+               if (masked && index == 255u)
+               {
+                 outPixels[pixelOffset + 0] = 0u;
+                 outPixels[pixelOffset + 1] = 0u;
+                 outPixels[pixelOffset + 2] = 0u;
+                 outPixels[pixelOffset + 3] = 0u;
+               }
+             }
+
+             const auto averageColor = getAverageColor(rgba, GL_RGBA);
+             auto texture = mdl::Texture{
+               width,
+               height,
+               averageColor,
+               GL_RGBA,
+               masked ? mdl::TextureMask::On : mdl::TextureMask::Off,
+               mdl::NoEmbeddedDefaults{},
+               std::move(rgba)};
+
+             auto textureResource = createTextureResource(std::move(texture));
+             const auto name = cStringView(tex.name);
+             insertTextureKey(out, name, textureResource);
+
+             const auto sep = name.find_last_of("/\\");
+             const auto basename =
+               (sep == std::string_view::npos) ? name : name.substr(sep + 1u);
+             insertTextureKey(out, basename, textureResource);
+
+             const auto dot = basename.find_last_of('.');
+             if (dot != std::string_view::npos)
+             {
+               insertTextureKey(out, basename.substr(0u, dot), textureResource);
+             }
+           }
+
+           if (out.m_textures.empty())
+           {
+             logger.error(fmt::format("GoldSrc Studio MDL '{}' contained no usable textures", mdlPath));
+           }
+
+           return out;
+         });
+}
+
+std::optional<GoldSrcTextureLibrary> tryLoadGoldSrcTextureLibrary(
+  const FileSystem& fs, const std::filesystem::path& modelPath, Logger& logger)
+{
+  const auto primary = loadGoldSrcTextureLibraryFromFile(fs, modelPath, logger);
+  if (primary && !primary.value().m_textures.empty())
+  {
+    return primary.value();
+  }
+
+  const auto textureMdlPath = addSuffixToFileName(modelPath, "T");
+  const auto fallback = loadGoldSrcTextureLibraryFromFile(fs, textureMdlPath, logger);
+  if (fallback && !fallback.value().m_textures.empty())
+  {
+    return fallback.value();
+  }
+
+  return std::nullopt;
+}
+
 std::optional<std::filesystem::path> tryMakeTexturePath(
   const aiString& path, Logger& logger, const std::filesystem::path& modelPath)
 {
@@ -379,14 +685,15 @@ std::optional<std::filesystem::path> tryMakeTexturePath(
   }
 }
 
-std::vector<mdl::Texture> loadTexturesForMaterial(
+std::vector<mdl::Material> loadMaterialsForMaterial(
   const aiScene& scene,
   const size_t materialIndex,
   const std::filesystem::path& modelPath,
   const FileSystem& fs,
-  Logger& logger)
+  Logger& logger,
+  const std::optional<GoldSrcTextureLibrary>& goldSrcTextures)
 {
-  auto textures = std::vector<mdl::Texture>{};
+  auto materials = std::vector<mdl::Material>{};
 
   // Is there even a single diffuse texture? If not, fail and load fallback texture.
   const auto textureCount =
@@ -399,13 +706,24 @@ std::vector<mdl::Texture> loadTexturesForMaterial(
       auto path = aiString{};
       scene.mMaterials[materialIndex]->GetTexture(aiTextureType_DIFFUSE, ti, &path);
 
+      if (goldSrcTextures)
+      {
+        if (const auto texRes = findGoldSrcTexture(*goldSrcTextures, path.C_Str()))
+        {
+          materials.emplace_back("", *texRes);
+          continue;
+        }
+      }
+
       const auto texturePath = tryMakeTexturePath(path, logger, modelPath);
       if (!texturePath)
       {
         continue;
       }
       const auto* texture = scene.GetEmbeddedTexture(path.C_Str());
-      textures.push_back(loadTexture(texture, *texturePath, modelPath, fs, logger));
+      auto loadedTexture = loadTexture(texture, *texturePath, modelPath, fs, logger);
+      auto textureResource = createTextureResource(std::move(loadedTexture));
+      materials.emplace_back("", std::move(textureResource));
     }
   }
   else
@@ -415,15 +733,19 @@ std::vector<mdl::Texture> loadTexturesForMaterial(
       materialIndex,
       modelPath));
 
-    textures.push_back(loadFallbackOrDefaultTexture(fs, logger));
+    auto fallbackTexture = loadFallbackOrDefaultTexture(fs, logger);
+    auto textureResource = createTextureResource(std::move(fallbackTexture));
+    materials.emplace_back("", std::move(textureResource));
   }
 
-  if (textures.empty())
+  if (materials.empty())
   {
-    textures.push_back(loadFallbackOrDefaultTexture(fs, logger));
+    auto fallbackTexture = loadFallbackOrDefaultTexture(fs, logger);
+    auto textureResource = createTextureResource(std::move(fallbackTexture));
+    materials.emplace_back("", std::move(textureResource));
   }
 
-  return textures;
+  return materials;
 }
 
 struct AssimpComputedMeshData
@@ -955,11 +1277,6 @@ bool AssimpLoader::canParse(const std::filesystem::path& path)
 
 Result<mdl::EntityModelData> AssimpLoader::load(tb::Logger& logger)
 {
-  const auto createMaterial = [](auto texture) {
-    auto textureResource = createTextureResource(std::move(texture));
-    return mdl::Material{"", std::move(textureResource)};
-  };
-
   try
   {
     constexpr auto assimpFlags = aiProcess_Triangulate | aiProcess_JoinIdenticalVertices
@@ -986,6 +1303,10 @@ Result<mdl::EntityModelData> AssimpLoader::load(tb::Logger& logger)
     // if we have no animations, always load 1 frame for the reference model
     const auto numSequences = std::max(scene->mNumAnimations, 1u);
 
+    const auto goldSrcTextures = kdl::path_to_lower(m_path.extension()) == ".mdl"
+                                   ? tryLoadGoldSrcTextureLibrary(m_fs, m_path, logger)
+                                   : std::nullopt;
+
     // create a surface for each mesh in the scene and assign the skins/materials to it
     const auto numMeshes = scene->mNumMeshes;
     for (size_t i = 0; i < numMeshes; ++i)
@@ -998,10 +1319,8 @@ Result<mdl::EntityModelData> AssimpLoader::load(tb::Logger& logger)
       // multiple alternatives (this is how assimp handles skins)
 
       // load skins for this surface
-      auto materials =
-        loadTexturesForMaterial(*scene, mesh->mMaterialIndex, m_path, m_fs, logger)
-        | kdl::views::as_rvalue | std::views::transform(createMaterial)
-        | kdl::ranges::to<std::vector>();
+      auto materials = loadMaterialsForMaterial(
+        *scene, mesh->mMaterialIndex, m_path, m_fs, logger, goldSrcTextures);
       surface.setSkins(std::move(materials));
     }
 
