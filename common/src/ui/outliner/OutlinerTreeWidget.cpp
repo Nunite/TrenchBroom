@@ -1,6 +1,7 @@
 #include "OutlinerTreeWidget.h"
 
 #include <QHeaderView>
+#include <QItemSelectionModel>
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QPainter>
@@ -1289,7 +1290,7 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
     for (const auto* node : nodesToSelect) {
         if (auto* item = findItemForNode(node)) {
             item->setSelected(true);
-            setCurrentItem(item);
+            setCurrentItem(item, 0, QItemSelectionModel::NoUpdate);
 
             for (auto* p = item->parent(); p != nullptr; p = p->parent()) {
                 p->setExpanded(true);
