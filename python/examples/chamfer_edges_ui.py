@@ -15,11 +15,12 @@ class ChamferEdgesAddon:
         self._panel.add_label_named("status", "")
         self._panel.add_float_field("distance", "倒角距离", 8.0, 0.0, 100000.0, 2, 1.0)
         self._panel.add_int_field("segments", "倒角段数", 1, 1, 64)
-        self._panel.add_button_callback("执行倒角", self.op_apply)
+        self._panel.add_button_callback("边倒角", self.op_chamfer_edges)
+        self._panel.add_button_callback("点倒角", self.op_chamfer_vertices)
         self._panel.add_button_callback("刷新状态", self.op_refresh)
 
     def _status_text(self) -> str:
-        lines = ["倒角（边工具）"]
+        lines = ["倒角工具箱"]
         lines.append(f"- 状态: {self._message}")
         return "\n".join(lines)
 
@@ -47,7 +48,13 @@ class ChamferEdgesAddon:
     def op_refresh(self) -> None:
         self._refresh_status("就绪")
 
-    def op_apply(self) -> None:
+    def op_chamfer_edges(self) -> None:
+        self._apply_chamfer("edges")
+
+    def op_chamfer_vertices(self) -> None:
+        self._apply_chamfer("vertices")
+
+    def _apply_chamfer(self, mode: str) -> None:
         doc = self._current_document()
         if doc is None:
             self._refresh_status("没有活动的文档")
@@ -57,15 +64,20 @@ class ChamferEdgesAddon:
         distance = self._read_float("distance")
         segments = self._read_int("segments")
 
+        op_name = "边倒角" if mode == "edges" else "点倒角"
         tx_cm = getattr(doc, "transaction", None)
-        tx = tx_cm("Python: Chamfer Edges") if callable(tx_cm) else tb.transaction(
-            "Python: Chamfer Edges"
-        )
+        tx = tx_cm(f"Python: {op_name}") if callable(tx_cm) else tb.transaction(f"Python: {op_name}")
 
         with tx:
-            ok = sel.chamfer_edges(distance, segments)
+            if mode == "edges":
+                # 边倒角支持 segments
+                ok = sel.chamfer_edges(distance, segments)
+            else:
+                # 点倒角目前只支持 distance，暂不支持 segments
+                ok = sel.chamfer_vertices(distance)
 
-        self._refresh_status("倒角完成" if ok else "倒角失败（请检查是否选中了边工具边）")
+        target_tool_name = "边工具" if mode == "edges" else "顶点工具"
+        self._refresh_status(f"{op_name}完成" if ok else f"{op_name}失败（请检查是否选中了{target_tool_name}元素）")
 
 
 def register() -> None:
