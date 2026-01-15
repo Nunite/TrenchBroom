@@ -92,9 +92,13 @@ void ModelBrowser::createGui(GLContextManager& contextManager)
   m_pathStack->addWidget(m_folderEdit);
   m_pathStack->setCurrentWidget(m_breadcrumbBar);
 
-  auto* controlsLayout = new QHBoxLayout{};
+  m_searchBox = createSearchBox();
+
+  auto* controlsLayout = new QVBoxLayout{};
   controlsLayout->setContentsMargins(0, 0, 0, 0);
-  controlsLayout->addWidget(m_pathStack, 1);
+  controlsLayout->setSpacing(0);
+  controlsLayout->addWidget(m_pathStack, 0);
+  controlsLayout->addWidget(m_searchBox, 0);
 
   auto* controls = new QWidget{};
   controls->setLayout(controlsLayout);
@@ -106,6 +110,7 @@ void ModelBrowser::createGui(GLContextManager& contextManager)
 
   m_scrollBar = new QScrollBar{Qt::Vertical};
   m_view = new ModelBrowserView{m_scrollBar, contextManager, m_map};
+  m_view->setSearchText(m_searchBox->text());
 
   auto* browserLayout = new QHBoxLayout{};
   browserLayout->setContentsMargins(0, 0, 0, 0);
@@ -137,6 +142,13 @@ void ModelBrowser::createGui(GLContextManager& contextManager)
 
 void ModelBrowser::bindEvents()
 {
+  connect(m_searchBox, &QLineEdit::textChanged, this, [&](const QString& text) {
+    if (m_view)
+    {
+      m_view->setSearchText(text);
+    }
+  });
+
   connect(m_folderEdit, &QLineEdit::editingFinished, this, [&]() {
     if (!m_folderEdit->isModified())
     {

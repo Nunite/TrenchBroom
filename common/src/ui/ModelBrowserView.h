@@ -76,6 +76,7 @@ private:
   std::filesystem::path m_rootFolderPath;
   std::vector<std::filesystem::path> m_modelPaths;
   std::filesystem::path m_currentFolderPath;
+  QString m_searchText;
 
   NotifierConnection m_notifierConnection;
   QImage m_folderIconImage;
@@ -95,6 +96,7 @@ public:
   void setModelPaths(
     std::filesystem::path rootFolderPath, std::vector<std::filesystem::path> modelPaths);
   void setCurrentFolderPath(std::filesystem::path currentFolderPath);
+  void setSearchText(QString searchText);
 
 private:
   void leaveEvent(QEvent* event) override;

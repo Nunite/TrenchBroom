@@ -159,6 +159,19 @@ void ModelBrowserView::leaveEvent(QEvent* event)
   }
 }
 
+void ModelBrowserView::setSearchText(QString searchText)
+{
+  searchText = searchText.trimmed();
+  if (m_searchText == searchText)
+  {
+    return;
+  }
+
+  m_searchText = std::move(searchText);
+  invalidate();
+  update();
+}
+
 void ModelBrowserView::resourcesWereProcessed(const std::vector<mdl::ResourceId>&)
 {
   invalidate();
@@ -179,6 +192,11 @@ void ModelBrowserView::doInitLayout(Layout& layout)
 
 void ModelBrowserView::doReloadLayout(Layout& layout)
 {
+  const auto hasSearch = !m_searchText.isEmpty();
+  const auto matches = [&](const QString& name) {
+    return !hasSearch || name.contains(m_searchText, Qt::CaseInsensitive);
+  };
+
   const auto& fontPath = pref(Preferences::RendererFontPath());
   const auto fontSize = pref(Preferences::BrowserFontSize);
   const auto font = render::FontDescriptor{fontPath, size_t(fontSize)};
@@ -209,11 +227,19 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
 
     if (relFromCurrent.empty() || relFromCurrent == std::filesystem::path{"."})
     {
+      if (!matches(io::pathAsGenericQString(modelPath.filename())))
+      {
+        continue;
+      }
       modelChildren.push_back(modelPath);
       continue;
     }
 
     const auto first = *relFromCurrent.begin();
+    if (!matches(io::pathAsGenericQString(first)))
+    {
+      continue;
+    }
     folderChildren.push_back((m_currentFolderPath / first).lexically_normal());
   }
 

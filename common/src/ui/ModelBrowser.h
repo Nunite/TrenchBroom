@@ -61,6 +61,7 @@ private:
   QWidget* m_breadcrumbBar = nullptr;
   QHBoxLayout* m_breadcrumbLayout = nullptr;
   QLineEdit* m_folderEdit = nullptr;
+  QLineEdit* m_searchBox = nullptr;
 
   QScrollBar* m_scrollBar = nullptr;
   ModelBrowserView* m_view = nullptr;
