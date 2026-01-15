@@ -33,39 +33,6 @@
 
 #include <fmt/format.h>
 
-/*
- * - glew requires it is included before <OpenGL/gl.h>
- *
- * - Qt requires that glew is included after <qopengl.h> and <QOpenGLFunctions>
- * - QOpenGLWidget includes <qopengl.h>
- * - qopengl.h includes OpenGL/gl.h
- *
- * therefore
- * - glew wants to be included first
- * - and so does QOpenGLWidget
- *
- * Since including glew before QOpenGLWidget only generates a warning and does not seem to
- * incur any ill effects, we silence the warning here.
- *
- * Note that GCC does not let us silence this warning using diagnostic pragmas, so it is
- * disabled in the CXX_FLAGS!
- */
-#if defined(__clang__)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcpp"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcpp"
-#endif
-
-#include <QOpenGLContext>
-
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include <QDateTime>
 #include <QPalette>
 #include <QTimer>
@@ -239,14 +206,12 @@ render::ShaderManager& RenderView::shaderManager()
 
 int RenderView::depthBits() const
 {
-  const auto format = this->context()->format();
-  return format.depthBufferSize();
+  return this->format().depthBufferSize();
 }
 
 bool RenderView::multisample() const
 {
-  const auto format = this->context()->format();
-  return format.samples() != -1;
+  return this->format().samples() != -1;
 }
 
 void RenderView::initializeGL()

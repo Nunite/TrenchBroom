@@ -20,7 +20,6 @@
 #include "ModelBrowserView.h"
 
 #include <QEvent>
-#include <QOpenGLContext>
 #include <QScrollBar>
 
 #include "PreferenceManager.h"
@@ -340,7 +339,7 @@ void ModelBrowserView::destroyFolderIconTexture()
     return;
   }
 
-  if (context() && context()->isValid())
+  if (isValid())
   {
     makeCurrent();
     glAssert(glDeleteTextures(1, &m_folderIconTextureId));
