@@ -213,13 +213,25 @@ mdl::Texture loadUncompressedEmbeddedTexture(
   auto buffer = mdl::TextureBuffer{width * height * sizeof(aiTexel)};
   std::memcpy(buffer.data(), &data, width * height * sizeof(aiTexel));
 
+  auto masked = false;
+  const auto* bytes = buffer.data();
+  const auto byteCount = buffer.size();
+  for (size_t i = 0; i + 3 < byteCount; i += sizeof(aiTexel))
+  {
+    if (bytes[i + 3] != static_cast<unsigned char>(0xFF))
+    {
+      masked = true;
+      break;
+    }
+  }
+
   const auto averageColor = getAverageColor(buffer, GL_BGRA);
   return {
     width,
     height,
     averageColor,
     GL_BGRA,
-    mdl::TextureMask::On,
+    masked ? mdl::TextureMask::On : mdl::TextureMask::Off,
     mdl::NoEmbeddedDefaults{},
     std::move(buffer)};
 }
