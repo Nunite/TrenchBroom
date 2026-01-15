@@ -1335,6 +1335,12 @@ bool Map::needsResourceProcessing() const
   return m_resourceManager->needsProcessing();
 }
 
+void Map::reloadEntityModels(const std::filesystem::path& modelPath)
+{
+  m_entityModelManager->invalidateModel(modelPath);
+  setEntityModels();
+}
+
 bool Map::canUndoCommand() const
 {
   return m_commandProcessor->canUndo();

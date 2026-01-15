@@ -511,7 +511,7 @@ void ModelBrowserView::doContextMenu(
       return;
     }
 
-    m_map.entityModelManager().invalidateModel(modelPath);
+    m_map.reloadEntityModels(modelPath);
     invalidate();
     update();
   });

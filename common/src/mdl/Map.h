@@ -366,6 +366,8 @@ public: // resource processing
   void processResourcesAsync(const ProcessContext& processContext);
   bool needsResourceProcessing() const;
 
+  void reloadEntityModels(const std::filesystem::path& modelPath);
+
 public: // command processing
   bool canUndoCommand() const;
   bool canRedoCommand() const;
