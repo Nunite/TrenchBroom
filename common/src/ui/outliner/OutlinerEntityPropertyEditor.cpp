@@ -523,6 +523,22 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         return;
     }
 
+    {
+        const auto& firstClass = entityNodes.front()->entity().classname();
+        for (size_t i = 1; i < entityNodes.size(); ++i)
+        {
+            if (entityNodes[i]->entity().classname() != firstClass)
+            {
+                auto* mixedLabel = new QLabel{tr("Different entity types selected"), m_scrollContents};
+                mixedLabel->setObjectName("infoLabel");
+                mixedLabel->setContentsMargins(4, 4, 4, 4);
+                m_scrollLayout->addWidget(mixedLabel, 0);
+                m_scrollLayout->addStretch(1);
+                return;
+            }
+        }
+    }
+
     const auto* entityDefinition = mdl::selectEntityDefinition(entityNodes);
     const auto keys = buildKeyOrderWithInactiveDefinitions(entityNodes, entityDefinition);
     const auto wadKey = m_map.game()->config().materialConfig.property;

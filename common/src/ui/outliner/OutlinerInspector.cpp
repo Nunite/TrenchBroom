@@ -45,8 +45,8 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, GLContextManager& co
     m_sortBox = new QComboBox(this);
     m_sortBox->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     m_sortBox->addItem(tr("Default"), static_cast<int>(OutlinerTreeWidget::SortMode::Default));
-    m_sortBox->addItem(tr("Name"), static_cast<int>(OutlinerTreeWidget::SortMode::NameAsc));
     m_sortBox->addItem(tr("Type"), static_cast<int>(OutlinerTreeWidget::SortMode::Type));
+    m_sortBox->addItem(tr("File Order"), static_cast<int>(OutlinerTreeWidget::SortMode::FileOrder));
     topRow->addWidget(m_sortBox);
 
     auto* propertiesToggle = createBitmapToggleButton(

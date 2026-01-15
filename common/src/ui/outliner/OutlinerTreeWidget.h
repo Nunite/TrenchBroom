@@ -27,9 +27,10 @@ class OutlinerTreeWidget : public QTreeWidget
 public:
     enum class SortMode
     {
-        Default = 0,
-        NameAsc = 1,
+        Default = 0, // Now means NameAsc
+        NameAsc = 1, // Same as Default, kept for compatibility/clarity
         Type = 2,
+        FileOrder = 3, // Old Default (no sort)
     };
 
 private:

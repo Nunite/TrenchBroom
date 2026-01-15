@@ -103,7 +103,7 @@ static void sortNodes(
     const OutlinerTreeWidget::SortMode mode,
     std::vector<NodeT*>& nodes)
 {
-    if (mode == OutlinerTreeWidget::SortMode::Default) {
+    if (mode == OutlinerTreeWidget::SortMode::FileOrder) {
         return;
     }
 
