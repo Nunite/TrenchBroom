@@ -505,7 +505,8 @@ void ModelBrowserView::doContextMenu(
     const auto result = io::scaleGoldSrcMdlFile(absPath, float(scale));
     if (result.is_error())
     {
-      const auto& e = std::get<tb::Error>(result.error());
+      const auto err = result.error();
+      const auto& e = std::get<tb::Error>(err);
       QMessageBox::warning(this, tr("Error"), QString::fromStdString(e.msg));
       return;
     }
