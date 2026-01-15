@@ -352,17 +352,8 @@ const std::vector<TextureBuffer>& Texture::buffersIfLoaded() const
 
 void Texture::setFilterMode(const int minFilter, const int magFilter) const
 {
-  if (m_mask == TextureMask::On)
-  {
-    // Force GL_NEAREST filtering for masked textures.
-    glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-    glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-  }
-  else
-  {
-    glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter));
-    glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter));
-  }
+  glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter));
+  glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter));
 }
 
 } // namespace tb::mdl

@@ -62,6 +62,55 @@ Result<mdl::Palette> readHlMipPalette(Reader& reader)
   return mdl::makePalette(data, mdl::PaletteColorFormat::Rgb);
 }
 
+void fixTransparentPixels(mdl::TextureBuffer& buffer, int width, int height)
+{
+  const int bpp = 4;
+  if (buffer.size() != size_t(width * height * bpp))
+    return;
+
+  auto* data = buffer.data();
+
+  for (int y = 0; y < height; ++y)
+  {
+    for (int x = 0; x < width; ++x)
+    {
+      size_t idx = (y * width + x) * bpp;
+      if (data[idx + 3] == 0) // Transparent
+      {
+        int r = 0, g = 0, b = 0, count = 0;
+
+        // Check 4 neighbors
+        const int dx[] = {0, 0, -1, 1};
+        const int dy[] = {-1, 1, 0, 0};
+
+        for (int k = 0; k < 4; ++k)
+        {
+          int nx = x + dx[k];
+          int ny = y + dy[k];
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height)
+          {
+            size_t nidx = (ny * width + nx) * bpp;
+            if (data[nidx + 3] != 0) // Opaque neighbor
+            {
+              r += data[nidx + 0];
+              g += data[nidx + 1];
+              b += data[nidx + 2];
+              count++;
+            }
+          }
+        }
+
+        if (count > 0)
+        {
+          data[idx + 0] = r / count;
+          data[idx + 1] = g / count;
+          data[idx + 2] = b / count;
+        }
+      }
+    }
+  }
+}
+
 Result<mdl::Texture> readMipTexture(
   Reader& reader, const GetMipPalette& getMipPalette, const mdl::TextureMask mask)
 {
@@ -103,6 +152,14 @@ Result<mdl::Texture> readMipTexture(
 
                auto tempColor = Color{RgbaF{}};
                palette.indexedToRgba(reader, size, buffers[i], transparency, tempColor);
+               
+               if (transparency == mdl::PaletteTransparency::Index255Transparent)
+               {
+                 const auto curWidth = std::max<int>(1, width >> i);
+                 const auto curHeight = std::max<int>(1, height >> i);
+                 fixTransparentPixels(buffers[i], curWidth, curHeight);
+               }
+
                if (i == 0)
                {
                  averageColor = tempColor;
