@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2010 Kristian Duske
+ Copyright (C) 2026 Lws
 
  This file is part of TrenchBroom.
 
@@ -27,10 +27,15 @@
 #include "Exceptions.h"
 #include "Logger.h"
 #include "kdl/vector_utils.h"
+#include "kdl/overload.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityNode.h"
+#include "mdl/GroupNode.h"
+#include "mdl/LayerNode.h"
+#include "mdl/PatchNode.h"
+#include "mdl/WorldNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/Map_Geometry.h"
@@ -45,6 +50,7 @@
 #include "ui/PluginInspector.h"
 #include <QDoubleSpinBox>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPointer>
@@ -701,6 +707,154 @@ PyObject* plugin_panel_get_checkbox(PyObject* self, PyObject* args)
   return PyBool_FromLong(checkBox->isChecked());
 }
 
+PyObject* plugin_panel_add_combo_box(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* labelText = nullptr;
+  PyObject* items = nullptr;
+  PyObject* callback = nullptr;
+  if (!PyArg_ParseTuple(args, "ssOO", &key, &labelText, &items, &callback))
+  {
+    PyErr_Clear();
+    if (!PyArg_ParseTuple(args, "ssO", &key, &labelText, &items))
+    {
+      return nullptr;
+    }
+    callback = nullptr;
+  }
+  if (callback != nullptr && !PyCallable_Check(callback))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected a callable");
+    return nullptr;
+  }
+
+  if (!PyList_Check(items))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected list of strings for items");
+    return nullptr;
+  }
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* row = new QWidget{container};
+  auto* rowLayout = new QHBoxLayout{};
+  rowLayout->setContentsMargins(0, 0, 0, 0);
+  rowLayout->setSpacing(6);
+  row->setLayout(rowLayout);
+
+  auto* label = new QLabel{};
+  label->setText(QString::fromUtf8(labelText));
+
+  auto* combo = new QComboBox{};
+  combo->setObjectName(plugin_panel_object_name(QStringLiteral("combo"), key));
+
+  const auto size = PyList_Size(items);
+  for (Py_ssize_t i = 0; i < size; ++i)
+  {
+    auto* item = PyList_GetItem(items, i);
+    const char* itemStr = PyUnicode_AsUTF8(item);
+    if (itemStr == nullptr)
+    {
+      return nullptr;
+    }
+    combo->addItem(QString::fromUtf8(itemStr));
+  }
+
+  if (callback != nullptr)
+  {
+    Py_INCREF(callback);
+    QObject::connect(combo, QOverload<int>::of(&QComboBox::currentIndexChanged), container, [callback, container](int index) {
+      auto gil = PyGILState_Ensure();
+      auto* win = container->window();
+      auto* frame = dynamic_cast<tb::ui::MapFrame*>(win);
+      auto* prev = g_currentFrame;
+      if (frame != nullptr)
+      {
+        g_currentFrame = frame;
+      }
+      
+      PyObject* argList = Py_BuildValue("(i)", index);
+      auto* result = PyObject_CallObject(callback, argList);
+      Py_DECREF(argList);
+      
+      if (result == nullptr)
+      {
+        PyErr_Print();
+        if (g_currentFrame != nullptr)
+        {
+          g_currentFrame->pythonLogger().error("Error in combo box callback");
+        }
+      }
+      Py_XDECREF(result);
+      g_currentFrame = prev;
+      PyGILState_Release(gil);
+    });
+    QObject::connect(combo, &QObject::destroyed, container, [callback]() {
+      auto gil = PyGILState_Ensure();
+      Py_DECREF(callback);
+      PyGILState_Release(gil);
+    });
+  }
+
+  rowLayout->addWidget(label, 1);
+  rowLayout->addWidget(combo, 0);
+  layout->addWidget(row);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_get_combo_box_index(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  const auto name = plugin_panel_object_name(QStringLiteral("combo"), key);
+  auto* combo = container->findChild<QComboBox*>(name);
+  if (combo == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such combo box");
+    return nullptr;
+  }
+  return PyLong_FromLong(combo->currentIndex());
+}
+
+PyObject* plugin_panel_get_combo_box_text(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  const auto name = plugin_panel_object_name(QStringLiteral("combo"), key);
+  auto* combo = container->findChild<QComboBox*>(name);
+  if (combo == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such combo box");
+    return nullptr;
+  }
+  return toPyString(combo->currentText().toStdString());
+}
+
 PyObject* plugin_panel_set_text(PyObject* self, PyObject* args)
 {
   const char* text = nullptr;
@@ -906,6 +1060,56 @@ PyObject* document_transaction(PyObject* self, PyObject* args)
   }
 
   return createTransactionObject(doc, nameObj);
+}
+
+PyObject* document_entities(PyObject* self, void*)
+{
+  auto* doc = getDocumentFromPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto result = std::vector<tb::mdl::EntityNodeBase*>{};
+
+  doc->map().world()->accept(kdl::overload(
+    [&](auto&& thisLambda, tb::mdl::WorldNode* worldNode) {
+      result.push_back(worldNode);
+      worldNode->visitChildren(thisLambda);
+    },
+    [&](auto&& thisLambda, tb::mdl::LayerNode* layerNode) {
+      layerNode->visitChildren(thisLambda);
+    },
+    [&](auto&& thisLambda, tb::mdl::GroupNode* groupNode) {
+      groupNode->visitChildren(thisLambda);
+    },
+    [&](tb::mdl::EntityNode* entityNode) { result.push_back(entityNode); },
+    [&](tb::mdl::BrushNode* brushNode) { result.push_back(brushNode->entity()); },
+    [&](tb::mdl::PatchNode* patchNode) { result.push_back(patchNode->entity()); }));
+
+  std::sort(result.begin(), result.end());
+  result.erase(std::unique(result.begin(), result.end()), result.end());
+
+  auto* list = PyList_New(static_cast<Py_ssize_t>(result.size()));
+  if (list == nullptr)
+  {
+    return nullptr;
+  }
+
+  Py_ssize_t index = 0;
+  for (auto* entityNode : result)
+  {
+    auto* obj = createEntityObject(doc, entityNode);
+    if (obj == nullptr)
+    {
+      Py_DECREF(list);
+      return nullptr;
+    }
+    PyList_SET_ITEM(list, index, obj);
+    ++index;
+  }
+
+  return list;
 }
 
 PyObject* document_vertex_tool_vertices(PyObject* self, PyObject*)
@@ -1294,6 +1498,120 @@ PyObject* selection_brush_vertices(PyObject* self, PyObject*)
   }
 
   return outer;
+}
+
+PyObject* selection_add(PyObject* self, PyObject* args)
+{
+  PyObject* list = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &list))
+  {
+    return nullptr;
+  }
+
+  if (!PyList_Check(list))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected a list of entities");
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto nodes = std::vector<tb::mdl::Node*>{};
+  const auto& currentSelection = doc->map().selection().nodes;
+  nodes.insert(nodes.end(), currentSelection.begin(), currentSelection.end());
+
+  const auto size = PyList_Size(list);
+  for (Py_ssize_t i = 0; i < size; ++i)
+  {
+    auto* item = PyList_GetItem(list, i);
+    auto* entity = getEntityFromPy(item);
+    if (entity == nullptr)
+    {
+      return nullptr;
+    }
+    nodes.push_back(entity->entityNode);
+  }
+
+  try
+  {
+    tb::mdl::selectNodes(doc->map(), nodes);
+    Py_RETURN_NONE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
+PyObject* selection_set(PyObject* self, PyObject* args)
+{
+  PyObject* list = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &list))
+  {
+    return nullptr;
+  }
+
+  if (!PyList_Check(list))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected a list of entities");
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto nodes = std::vector<tb::mdl::Node*>{};
+
+  const auto size = PyList_Size(list);
+  for (Py_ssize_t i = 0; i < size; ++i)
+  {
+    auto* item = PyList_GetItem(list, i);
+    auto* entity = getEntityFromPy(item);
+    if (entity == nullptr)
+    {
+      return nullptr;
+    }
+    nodes.push_back(entity->entityNode);
+  }
+
+  try
+  {
+    tb::mdl::selectNodes(doc->map(), nodes);
+    Py_RETURN_NONE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
 }
 
 PyObject* selection_clear(PyObject* self, PyObject*)
@@ -1824,6 +2142,115 @@ PyObject* entity_get(PyObject* self, PyObject* args)
   return toPyString(*value);
 }
 
+PyObject* entity_getitem(PyObject* self, PyObject* key)
+{
+  auto* entity = getEntityFromPy(self);
+  if (entity == nullptr)
+  {
+    return nullptr;
+  }
+
+  const char* keyStr = PyUnicode_AsUTF8(key);
+  if (keyStr == nullptr)
+  {
+    return nullptr;
+  }
+
+  const auto* value = entity->entityNode->entity().property(std::string{keyStr});
+  if (value == nullptr)
+  {
+    PyErr_SetObject(PyExc_KeyError, key);
+    return nullptr;
+  }
+
+  return toPyString(*value);
+}
+
+PyObject* entity_items(PyObject* self, PyObject*)
+{
+  auto* entity = getEntityFromPy(self);
+  if (entity == nullptr)
+  {
+    return nullptr;
+  }
+
+  const auto keys = entity->entityNode->entity().propertyKeys();
+  auto* list = PyList_New(static_cast<Py_ssize_t>(keys.size()));
+  if (list == nullptr)
+  {
+    return nullptr;
+  }
+
+  Py_ssize_t index = 0;
+  for (const auto& key : keys)
+  {
+    auto* pyKey = toPyString(key);
+    if (pyKey == nullptr)
+    {
+      Py_DECREF(list);
+      return nullptr;
+    }
+
+    const auto* value = entity->entityNode->entity().property(key);
+    auto* pyValue = value ? toPyString(*value) : Py_None;
+    if (pyValue == Py_None)
+    {
+       Py_INCREF(Py_None);
+    }
+    else if (pyValue == nullptr)
+    {
+       Py_DECREF(pyKey);
+       Py_DECREF(list);
+       return nullptr;
+    }
+
+    auto* item = PyTuple_Pack(2, pyKey, pyValue);
+    Py_DECREF(pyKey);
+    Py_DECREF(pyValue);
+
+    if (item == nullptr)
+    {
+      Py_DECREF(list);
+      return nullptr;
+    }
+
+    PyList_SET_ITEM(list, index, item);
+    ++index;
+  }
+
+  return list;
+}
+
+PyObject* entity_richcompare(PyObject* self, PyObject* other, int op)
+{
+  if (!PyObject_TypeCheck(self, g_entityType) || !PyObject_TypeCheck(other, g_entityType))
+  {
+    Py_RETURN_NOTIMPLEMENTED;
+  }
+
+  auto* entity1 = reinterpret_cast<PyTbEntity*>(self);
+  auto* entity2 = reinterpret_cast<PyTbEntity*>(other);
+
+  const bool equal = entity1->entityNode == entity2->entityNode;
+
+  if (op == Py_EQ)
+  {
+    return PyBool_FromLong(equal);
+  }
+  else if (op == Py_NE)
+  {
+    return PyBool_FromLong(!equal);
+  }
+
+  Py_RETURN_NOTIMPLEMENTED;
+}
+
+Py_hash_t entity_hash(PyObject* self)
+{
+  auto* entity = reinterpret_cast<PyTbEntity*>(self);
+  return reinterpret_cast<Py_hash_t>(entity->entityNode);
+}
+
 PyObject* module_document(PyObject*, PyObject*)
 {
   auto* doc = activeDocument();
@@ -1893,6 +2320,7 @@ bool registerTypes(PyObject* module)
 
     static PyGetSetDef documentGetSet[] = {
       {"selection", document_get_selection, nullptr, nullptr, nullptr},
+      {"entities", document_entities, nullptr, nullptr, nullptr},
       {nullptr, nullptr, nullptr, nullptr, nullptr},
     };
     documentType.tp_getset = documentGetSet;
@@ -1923,6 +2351,8 @@ bool registerTypes(PyObject* module)
     static PyMethodDef selectionMethods[] = {
       {"brush_vertices", selection_brush_vertices, METH_NOARGS, nullptr},
       {"set_property", selection_set_property, METH_VARARGS, nullptr},
+      {"add", selection_add, METH_VARARGS, nullptr},
+      {"set", selection_set, METH_VARARGS, nullptr},
       {"duplicate", selection_duplicate, METH_NOARGS, nullptr},
       {"translate", selection_translate, METH_VARARGS, nullptr},
       {"rotate", selection_rotate, METH_VARARGS, nullptr},
@@ -1964,10 +2394,13 @@ bool registerTypes(PyObject* module)
     entityType.tp_basicsize = sizeof(PyTbEntity);
     entityType.tp_flags = Py_TPFLAGS_DEFAULT;
     entityType.tp_dealloc = freePythonObject;
+    entityType.tp_richcompare = entity_richcompare;
+    entityType.tp_hash = entity_hash;
 
     static PyMethodDef entityMethods[] = {
       {"keys", entity_keys, METH_NOARGS, nullptr},
       {"get", entity_get, METH_VARARGS, nullptr},
+      {"items", entity_items, METH_NOARGS, nullptr},
       {nullptr, nullptr, 0, nullptr},
     };
     entityType.tp_methods = entityMethods;
@@ -1977,6 +2410,13 @@ bool registerTypes(PyObject* module)
       {nullptr, nullptr, nullptr, nullptr, nullptr},
     };
     entityType.tp_getset = entityGetSet;
+
+    static PyMappingMethods entityMappingMethods = {
+      nullptr,        /* mp_length */
+      entity_getitem, /* mp_subscript */
+      nullptr,        /* mp_ass_subscript */
+    };
+    entityType.tp_as_mapping = &entityMappingMethods;
 
     if (PyType_Ready(&entityType) != 0)
     {
@@ -2075,9 +2515,12 @@ bool registerTypes(PyObject* module)
       {"add_int_field", plugin_panel_add_int_field, METH_VARARGS, nullptr},
       {"add_float_field", plugin_panel_add_float_field, METH_VARARGS, nullptr},
       {"add_checkbox", plugin_panel_add_checkbox, METH_VARARGS, nullptr},
+      {"add_combo_box", plugin_panel_add_combo_box, METH_VARARGS, nullptr},
       {"get_int_field", plugin_panel_get_int_field, METH_VARARGS, nullptr},
       {"get_float_field", plugin_panel_get_float_field, METH_VARARGS, nullptr},
       {"get_checkbox", plugin_panel_get_checkbox, METH_VARARGS, nullptr},
+      {"get_combo_box_index", plugin_panel_get_combo_box_index, METH_VARARGS, nullptr},
+      {"get_combo_box_text", plugin_panel_get_combo_box_text, METH_VARARGS, nullptr},
       {"set_text", plugin_panel_set_text, METH_VARARGS, nullptr},
       {"set_html", plugin_panel_set_html, METH_VARARGS, nullptr},
       {"add_button", plugin_panel_add_button, METH_VARARGS, nullptr},

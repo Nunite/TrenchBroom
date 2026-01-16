@@ -119,6 +119,18 @@ class PluginPanel(Protocol):
         """读取复选框当前值；key 不存在会抛 KeyError。"""
         ...
 
+    def add_combo_box(self, key: str, label: str, items: list[str]) -> None:
+        """添加一个下拉列表框（QComboBox）。"""
+        ...
+
+    def get_combo_box_index(self, key: str) -> int:
+        """获取下拉列表框当前选中的索引。"""
+        ...
+
+    def get_combo_box_text(self, key: str) -> str:
+        """获取下拉列表框当前选中的文本。"""
+        ...
+
 
 class Transaction(Protocol):
     """用于把一段脚本编辑合并成一次 undo/redo 的事务。"""
@@ -161,11 +173,29 @@ class Entity(Protocol):
         ...
 
     def keys(self) -> list[str]:
-        """返回该实体当前所有 property 的 key 列表。"""
+        """返回实体所有属性的键列表。"""
         ...
 
-    def get(self, key: str, default: Any = None) -> Any:
-        """读取 property；不存在则返回 default。"""
+    def get(self, key: str, default: str | None = None) -> str | None:
+        """
+        获取实体属性值。
+        
+        - key: 属性名
+        - default: 找不到 key 时返回的值（默认为 None）
+        """
+        ...
+
+    def items(self) -> list[tuple[str, str]]:
+        """返回实体所有属性的 (key, value) 对列表。"""
+        ...
+
+    def __getitem__(self, key: str) -> str:
+        """
+        获取实体属性值（dict 风格）。
+        
+        - key: 属性名
+        - 抛出 KeyError 如果 key 不存在
+        """
         ...
 
 
@@ -197,6 +227,14 @@ class Selection(Protocol):
 
         返回是否有实际修改发生。
         """
+        ...
+
+    def add(self, entities: list[Entity]) -> None:
+        """添加实体列表到当前选择。"""
+        ...
+
+    def set(self, entities: list[Entity]) -> None:
+        """设置当前选择为指定的实体列表。"""
         ...
 
     def remove_property(self, key: str) -> bool:
@@ -292,7 +330,12 @@ class Document(Protocol):
 
     @property
     def selection(self) -> Selection:
-        """返回当前选择对象。"""
+        """获取当前的选择对象。"""
+        ...
+
+    @property
+    def entities(self) -> list[Entity]:
+        """获取地图中的所有实体。"""
         ...
 
     def get_selection(self) -> Selection:

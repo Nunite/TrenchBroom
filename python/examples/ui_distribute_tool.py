@@ -161,8 +161,30 @@ class DistributeTool:
         self._panel.clear()
         self._panel.add_label_named("status", self._message)
         
-        self._panel.add_button_callback("1. 从选定顶点/实体记录路径", self.op_record_path)
+        # Chain detection
+        self._detected_chains = self._detect_entity_chains()
         
+        # Build combo box items
+        # Structure: [Placeholder, Manual, Chain 1, Chain 2, ..., Refresh]
+        chain_items = ["--- 选择路径来源 ---", "手动: 从当前选择记录"]
+        if self._detected_chains:
+            chain_items.extend([f"链 {i+1}: {len(c)} 个节点" for i, c in enumerate(self._detected_chains)])
+        else:
+            chain_items.append("(未检测到实体链)")
+        chain_items.append(">> 刷新列表 <<")
+
+        try:
+            # New API with callback support
+            self._panel.add_combo_box("chain_selector", "路径来源", chain_items, self.on_chain_selected)
+        except TypeError:
+            # Fallback for older API without callback
+            self._panel.add_combo_box("chain_selector", "选择实体链", chain_items)
+            self._panel.add_button_callback("应用选择", self.op_apply_selection)
+        except AttributeError:
+             self._panel.add_label("Error: add_combo_box not supported")
+        except Exception as e:
+            self._panel.add_label(f"Error adding combo: {e}")
+
         self._panel.add_int_field("count", "生成数量", 5, 2, 100)
         try:
             self._panel.add_checkbox("align_to_path", "沿路径旋转", True)
@@ -195,7 +217,164 @@ class DistributeTool:
         
         self._panel.add_button_callback("2. 分布选中物体", self.op_distribute)
         
-        self._panel.add_label("说明: 用顶点工具选点，或选中一组 path 实体来记录路径；然后选中要复制的物体。")
+        self._panel.add_label("说明: 下拉选择路径源，然后选中要复制的物体点击分布。")
+
+    def _detect_entity_chains(self):
+        doc = self._current_document()
+        if not doc:
+            return []
+        
+        # Try to use the new entities property if available
+        try:
+            all_entities = doc.entities
+            source = "doc.entities"
+        except AttributeError:
+            # Fallback for older API versions or if entities property is missing
+            sel = doc.selection
+            all_entities = getattr(sel, "entities", [])
+            if callable(all_entities): all_entities = all_entities()
+            source = "sel.entities"
+        
+        if not all_entities:
+            return []
+
+        # Filter path entities
+        path_entities = [e for e in all_entities if e.classname.lower().startswith("path_")]
+        if not path_entities:
+            return []
+
+        # Build lookup maps
+        by_targetname = {}
+        for e in path_entities:
+            tname = e.get("targetname")
+            if tname:
+                by_targetname[tname] = e
+        
+        # Identify parents (entities that target another)
+        # and children (entities that are targeted)
+        next_map = {}
+        has_parent = set()
+        
+        for e in path_entities:
+            target = e.get("target")
+            if target and target in by_targetname:
+                nxt = by_targetname[target]
+                next_map[e] = nxt
+                has_parent.add(nxt)
+        
+        # Find start nodes (not targeted by any other path entity)
+        # Note: In a cycle, there are no start nodes.
+        starts = [e for e in path_entities if e not in has_parent]
+        
+        # If no starts found but we have entities, try to pick one from a cycle
+        if not starts and path_entities:
+             # Just pick the first one as a potential start for a cycle
+             starts = [path_entities[0]]
+
+        chains = []
+        visited_global = set()
+
+        for start_node in starts:
+            if start_node in visited_global: continue
+            
+            chain = []
+            curr = start_node
+            visited_local = set()
+            
+            while curr:
+                chain.append(curr)
+                visited_local.add(curr)
+                visited_global.add(curr)
+                
+                if curr in next_map:
+                    curr = next_map[curr]
+                    if curr in visited_local: # Cycle detected within this chain
+                        break 
+                else:
+                    curr = None
+            
+            if len(chain) >= 2:
+                chains.append(chain)
+
+        # Handle cycles that were not reached (isolated loops)
+        # This is a bit more complex, skip for now unless requested.
+
+        return chains
+
+    def on_chain_selected(self, index):
+        # Index mapping:
+        # 0: Placeholder
+        # 1: Manual
+        # 2..N+1: Chains (if any)
+        # N+2 (or 2 if no chains): (No chains msg) - skip
+        # Last: Refresh
+        
+        if index == 0: return
+
+        chain_start_idx = 2
+        has_chains = len(self._detected_chains) > 0
+        
+        # Calculate max index
+        # If has chains: [0, 1, 2..N+1, N+2(Refresh)] -> len = N+3
+        # If no chains: [0, 1, 2(Msg), 3(Refresh)] -> len = 4
+        
+        total_items = 2 + (len(self._detected_chains) if has_chains else 1) + 1
+        is_refresh = (index == total_items - 1)
+        
+        if is_refresh:
+            self.op_refresh()
+            return
+            
+        if index == 1:
+            self.op_record_path()
+            self._build_ui() # Reset UI to reset combo box
+            return
+            
+        if not has_chains:
+            # Selected the "No chains" placeholder
+            return
+            
+        # It's a chain
+        chain_idx = index - chain_start_idx
+        if 0 <= chain_idx < len(self._detected_chains):
+            self.op_use_chain(chain_idx)
+            self._build_ui() # Reset UI
+
+    def op_apply_selection(self):
+        # Fallback for old API
+        try:
+            idx = self._panel.get_combo_box_index("chain_selector")
+            self.on_chain_selected(idx)
+        except:
+            pass
+
+    def op_refresh(self):
+        self._message = "已刷新实体列表"
+        self._build_ui()
+
+    def op_use_chain(self, idx):
+        # Modified to take index directly
+        if idx < 0 or idx >= len(self._detected_chains):
+            return
+
+        chain = self._detected_chains[idx]
+        points = []
+        for e in chain:
+            origin_str = e.get("origin")
+            if origin_str:
+                try:
+                    pts = [float(x) for x in origin_str.split()]
+                    if len(pts) >= 3: points.append(tuple(pts[:3]))
+                except: pass
+        
+        if len(points) >= 2:
+            self._raw_points = points
+            self._path_points = self._raw_points
+            self._calculate_path_metrics()
+            self._refresh_status(f"已加载链 {idx+1}，共 {len(points)} 个点")
+        else:
+            self._refresh_status("所选链有效点数不足")
+
 
     def _refresh_status(self, msg: str | None = None) -> None:
         if msg:
