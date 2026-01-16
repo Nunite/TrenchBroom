@@ -81,7 +81,9 @@ class DistributeTool:
     def __init__(self) -> None:
         self._panel = tb.create_plugin_panel("沿路径分布")
         self._path_points = []
-        self._message = "请先选择路径点（顶点工具）"
+        self._path_length = 0.0
+        self._segment_lengths = []
+        self._message = "请先选择路径点（顶点或实体）"
         self._build_ui()
         self._refresh_status()
 
@@ -89,7 +91,7 @@ class DistributeTool:
         self._panel.clear()
         self._panel.add_label_named("status", self._message)
         
-        self._panel.add_button_callback("1. 从选定顶点记录路径", self.op_record_path)
+        self._panel.add_button_callback("1. 从选定顶点/实体记录路径", self.op_record_path)
         
         self._panel.add_int_field("count", "生成数量", 5, 2, 100)
         self._panel.add_float_field("offset_start", "起始偏移 (%)", 0.0, 0.0, 100.0, 1, 5.0)
@@ -102,61 +104,143 @@ class DistributeTool:
         
         self._panel.add_button_callback("2. 分布选中物体", self.op_distribute)
         
-        self._panel.add_label("说明: 先用顶点工具选点记录路径，再切回普通工具选中要复制的物体。")
+        self._panel.add_label("说明: 用顶点工具选点，或选中一组 path 实体来记录路径；然后选中要复制的物体。")
 
     def _refresh_status(self, msg: str | None = None) -> None:
         if msg:
             self._message = msg
         
         points_info = f"当前路径点数: {len(self._path_points)}"
+        if self._path_length > 0:
+            points_info += f", 总长: {self._path_length:.1f}"
+            
         full_msg = f"{self._message}\n{points_info}"
         self._panel.set_label_text("status", full_msg)
 
     def _current_document(self):
         return tb.Document.current()
 
+    def _calculate_path_metrics(self):
+        self._path_length = 0.0
+        self._segment_lengths = []
+        if len(self._path_points) < 2:
+            return
+            
+        for i in range(len(self._path_points) - 1):
+            p0 = self._path_points[i]
+            p1 = self._path_points[i+1]
+            dist = vec3_len(vec3_sub(p1, p0))
+            self._segment_lengths.append(dist)
+            self._path_length += dist
+
+    def _sort_path_entities(self, entities):
+        by_targetname = {}
+        for e in entities:
+            tname = e.get("targetname")
+            if tname:
+                by_targetname[tname] = e
+        
+        next_map = {}
+        has_parent = set()
+        for e in entities:
+            target = e.get("target")
+            if target and target in by_targetname:
+                nxt = by_targetname[target]
+                next_map[e] = nxt
+                has_parent.add(nxt)
+        
+        starts = [e for e in entities if e not in has_parent]
+        if not starts and entities: starts = [entities[0]]
+        if not starts: return []
+        
+        result = []
+        curr = starts[0]
+        visited = set()
+        while curr:
+            result.append(curr)
+            visited.add(curr)
+            if curr in next_map:
+                curr = next_map[curr]
+                if curr in visited: break
+            else:
+                curr = None
+        return result
+
     def op_record_path(self) -> None:
         doc = self._current_document()
         if not doc: return
         
+        # 1. 尝试从顶点工具获取
         verts = doc.vertex_tool_vertices()
-        if len(verts) < 2:
-            self._refresh_status("错误: 至少需要选择 2 个顶点来构成路径")
+        if len(verts) >= 2:
+            self._path_points = verts
+            self._calculate_path_metrics()
+            self._refresh_status(f"已从顶点记录路径，共 {len(verts)} 个点")
             return
-            
-        # TB 返回的顶点顺序通常是选择顺序，或者按内存顺序
-        # 假设用户按顺序选择，或者是按空间排序？
-        # 这里暂时直接使用返回的顺序。如果用户框选，顺序可能不确定。
-        # 一个改进是按距离排序链起来，但这里先简单处理。
-        self._path_points = verts
-        self._refresh_status(f"已记录路径，共 {len(verts)} 个点")
 
-    def _get_path_point_at(self, t: float):
-        # t is 0.0 to 1.0
-        # Simple linear interpolation between points
-        if not self._path_points: return None, None
+        # 2. 尝试从实体选择获取 (path_*)
+        sel = doc.selection
+        entities = getattr(sel, "entities", [])
+        if callable(entities): entities = entities()
         
-        total_segments = len(self._path_points) - 1
-        if total_segments < 1: return self._path_points[0], (1,0,0) # Should not happen
+        path_entities = [e for e in entities if e.classname.startswith("path_")]
         
-        segment_t = t * total_segments
-        idx = int(segment_t)
-        if idx >= total_segments:
-            idx = total_segments - 1
-            local_t = 1.0
-        else:
-            local_t = segment_t - idx
+        if len(path_entities) >= 2:
+            sorted_ents = self._sort_path_entities(path_entities)
+            points = []
+            for e in sorted_ents:
+                origin_str = e.get("origin")
+                if origin_str:
+                    try:
+                        pts = [float(x) for x in origin_str.split()]
+                        if len(pts) >= 3: points.append(tuple(pts[:3]))
+                    except: pass
             
-        p0 = self._path_points[idx]
-        p1 = self._path_points[idx+1]
-        
-        # Position
-        pos = vec3_add(p0, vec3_mul(vec3_sub(p1, p0), local_t))
-        
-        # Tangent (Direction)
-        tangent = vec3_normalize(vec3_sub(p1, p0))
-        
-        return pos, tangent
+            if len(points) >= 2:
+                self._path_points = points
+                self._calculate_path_metrics()
+                self._refresh_status(f"已从实体记录路径，共 {len(points)} 个点")
+                return
+
+        self._refresh_status("错误: 请先选择至少 2 个顶点或路径实体")
+
+    def _get_path_point_at_distance(self, dist: float):
+        if not self._path_points or len(self._path_points) < 2:
+            return None, None
+            
+        # Clamp distance
+        if dist <= 0:
+            p0 = self._path_points[0]
+            p1 = self._path_points[1]
+            return p0, vec3_normalize(vec3_sub(p1, p0))
+        if dist >= self._path_length:
+            p0 = self._path_points[-2]
+            p1 = self._path_points[-1]
+            return p1, vec3_normalize(vec3_sub(p1, p0))
+            
+        # Find segment
+        current_dist = dist
+        for i, seg_len in enumerate(self._segment_lengths):
+            if current_dist <= seg_len:
+                # Found segment i
+                p0 = self._path_points[i]
+                p1 = self._path_points[i+1]
+                
+                if seg_len <= 0.0001:
+                    local_t = 0
+                else:
+                    local_t = current_dist / seg_len
+                    
+                pos = vec3_add(p0, vec3_mul(vec3_sub(p1, p0), local_t))
+                tangent = vec3_normalize(vec3_sub(p1, p0))
+                return pos, tangent
+            else:
+                current_dist -= seg_len
+                
+        # Should not reach here if clamped correctly, but just in case return last point
+        p0 = self._path_points[-2]
+        p1 = self._path_points[-1]
+        return p1, vec3_normalize(vec3_sub(p1, p0))
 
     def op_distribute(self) -> None:
         if len(self._path_points) < 2:
@@ -174,26 +258,27 @@ class DistributeTool:
 
         # Parameters
         count = int(self._panel.get_int_field("count"))
-        off_start = self._panel.get_float_field("offset_start") / 100.0
-        off_end = self._panel.get_float_field("offset_end") / 100.0
+        off_start_pct = self._panel.get_float_field("offset_start") / 100.0
+        off_end_pct = self._panel.get_float_field("offset_end") / 100.0
         rand_pos_range = self._panel.get_float_field("rand_pos")
         rand_rot_z_range = self._panel.get_float_field("rand_rot_z")
         rand_scale_pct = self._panel.get_float_field("rand_scale") / 100.0
 
-        # Calculate effective range
-        effective_len = 1.0 - off_start - off_end
-        if effective_len <= 0: effective_len = 0
+        # Calculate effective range based on distance
+        start_dist = self._path_length * off_start_pct
+        end_dist = self._path_length * (1.0 - off_end_pct)
+        
+        # Ensure start <= end
+        if start_dist > end_dist:
+            start_dist = end_dist = (start_dist + end_dist) / 2
+            
+        effective_len = end_dist - start_dist
         
         step = 0.0
         if count > 1:
             step = effective_len / (count - 1)
         
         # Prototype bounds center (approximation)
-        # We need to move the prototype from its current position to the target position
-        # So we need its current center.
-        # But tb API doesn't give bounds easily yet for complex selection.
-        # We assume the user wants the pivot to be the center of selection or 0,0,0?
-        # Better: calculate centroid of selected brushes vertices
         brush_verts_lists = sel.brush_vertices()
         all_verts = [v for sublist in brush_verts_lists for v in sublist]
         
@@ -209,16 +294,25 @@ class DistributeTool:
         num_verts = len(all_verts)
         proto_center = (center_sum[0]/num_verts, center_sum[1]/num_verts, center_sum[2]/num_verts)
 
+        # Track the state of the "current source" for duplication
+        # Initially it is the prototype
+        current_center = proto_center
+        current_yaw = 0.0 # Assuming prototype is at 0 rotation or we treat it as base 0
+
         with doc.transaction("Python: Distribute Along Path"):
             for i in range(count):
-                t = off_start + step * i
-                if count == 1: t = 0.5 # if only 1, put in middle? or start? let's stick to logic
+                if count == 1:
+                    dist = start_dist + effective_len * 0.5
+                else:
+                    dist = start_dist + step * i
                 
-                target_pos, tangent = self._get_path_point_at(t)
+                target_pos, tangent = self._get_path_point_at_distance(dist)
+                
+                if target_pos is None: continue # Should not happen
                 
                 # Create instance
                 sel.duplicate()
-                # Now the new copy is selected
+                # Now the new copy is selected, and it is at 'current_center' with 'current_yaw'
                 
                 # 1. Randomization
                 r_pos_x = random.uniform(-rand_pos_range, rand_pos_range)
@@ -228,42 +322,28 @@ class DistributeTool:
                 r_rot_z = random.uniform(-rand_rot_z_range, rand_rot_z_range)
                 r_scale = 1.0 + random.uniform(-rand_scale_pct, rand_scale_pct)
                 
-                # 2. Rotation to align with path
-                # Default forward is usually X or Y? Let's assume user wants object's X axis to align with path
-                # Or we simply rotate Z based on tangent's yaw
-                # Calculate Yaw from tangent
-                # tangent is (x, y, z)
-                # yaw = atan2(y, x)
+                # 2. Target Transform
                 yaw_rad = math.atan2(tangent[1], tangent[0])
                 yaw_deg = math.degrees(yaw_rad)
-                
-                # Apply Rotation
-                # Rotate around prototype center first?
-                # Actually duplicate() keeps properties.
-                # We want to rotate IT to match tangent.
-                # Assuming original object is facing East (0 degrees).
-                # If original is not facing East, user might need an offset.
-                # For now, we apply yaw_deg.
-                
-                # Apply Random Z Rotation
                 final_yaw = yaw_deg + r_rot_z
                 
-                # Perform Transforms
-                # 1. Move from proto_center to target_pos
-                move_vec = vec3_sub(target_pos, proto_center)
-                move_vec = vec3_add(move_vec, (r_pos_x, r_pos_y, r_pos_z))
+                final_center = vec3_add(target_pos, (r_pos_x, r_pos_y, r_pos_z))
                 
+                # 3. Apply Relative Transforms
+                # Move
+                move_vec = vec3_sub(final_center, current_center)
                 sel.translate(move_vec[0], move_vec[1], move_vec[2])
                 
-                # 2. Rotate at target position
-                # rotate(axis_x, axis_y, axis_z, angle, center_x, center_y, center_z)
-                # We rotate around the NEW center (target_pos)
-                new_center = vec3_add(target_pos, (r_pos_x, r_pos_y, r_pos_z))
-                sel.rotate(0, 0, 1, final_yaw, new_center[0], new_center[1], new_center[2])
+                # Rotate
+                # We rotate around the NEW center (final_center)
+                delta_yaw = final_yaw - current_yaw
+                sel.rotate(0, 0, 1, delta_yaw, final_center[0], final_center[1], final_center[2])
                 
-                # 3. Scale? TB API currently doesn't have scale() for selection :(
-                # Map2Curvex had it, but current Python API selection protocol doesn't list scale.
-                # So we skip scale for now.
+                # Update state for next iteration (since next duplicate will start from here)
+                current_center = final_center
+                current_yaw = final_yaw
+                
+                # 4. Scale (Skip as before)
                 
         self._refresh_status(f"成功生成 {count} 个实例")
 
