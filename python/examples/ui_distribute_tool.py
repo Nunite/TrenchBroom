@@ -167,8 +167,9 @@ class DistributeTool:
         if not doc: return
         
         sel = doc.selection
-        if not sel.entities:
-            self._refresh_status("请先选择要分布的物体（原型）")
+        # 使用 all_entities 以涵盖更广泛的选择情况（如子笔刷选中导致的实体选中）
+        if not sel.all_entities:
+            self._refresh_status("请先选择要分布的物体 (原型)")
             return
 
         # Parameters
