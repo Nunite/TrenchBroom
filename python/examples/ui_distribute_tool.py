@@ -154,6 +154,7 @@ class DistributeTool:
         self._path_length = 0.0
         self._segment_lengths = []
         self._message = "请先选择路径点（顶点或实体）"
+        self._selected_chain_ui_index = 0
         self._build_ui()
         self._refresh_status()
 
@@ -173,13 +174,21 @@ class DistributeTool:
             chain_items.append("(未检测到实体链)")
         chain_items.append(">> 刷新列表 <<")
 
+        # Ensure index is valid
+        if self._selected_chain_ui_index >= len(chain_items):
+             self._selected_chain_ui_index = 0
+
         try:
-            # New API with callback support
-            self._panel.add_combo_box("chain_selector", "路径来源", chain_items, self.on_chain_selected)
+            # New API with callback support and optional index
+            self._panel.add_combo_box("chain_selector", "路径来源", chain_items, self.on_chain_selected, self._selected_chain_ui_index)
         except TypeError:
-            # Fallback for older API without callback
-            self._panel.add_combo_box("chain_selector", "选择实体链", chain_items)
-            self._panel.add_button_callback("应用选择", self.op_apply_selection)
+            try:
+                # API with callback but no index support
+                self._panel.add_combo_box("chain_selector", "路径来源", chain_items, self.on_chain_selected)
+            except TypeError:
+                # Fallback for older API without callback
+                self._panel.add_combo_box("chain_selector", "选择实体链", chain_items)
+                self._panel.add_button_callback("应用选择", self.op_apply_selection)
         except AttributeError:
              self._panel.add_label("Error: add_combo_box not supported")
         except Exception as e:
@@ -309,6 +318,8 @@ class DistributeTool:
         # N+2 (or 2 if no chains): (No chains msg) - skip
         # Last: Refresh
         
+        self._selected_chain_ui_index = index
+
         if index == 0: return
 
         chain_start_idx = 2
@@ -322,12 +333,13 @@ class DistributeTool:
         is_refresh = (index == total_items - 1)
         
         if is_refresh:
+            self._selected_chain_ui_index = 0
             self.op_refresh()
             return
             
         if index == 1:
             self.op_record_path()
-            self._build_ui() # Reset UI to reset combo box
+            self._build_ui() # Reset UI to reset combo box (with persisted index)
             return
             
         if not has_chains:

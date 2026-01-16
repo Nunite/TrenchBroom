@@ -712,20 +712,65 @@ PyObject* plugin_panel_add_combo_box(PyObject* self, PyObject* args)
   const char* key = nullptr;
   const char* labelText = nullptr;
   PyObject* items = nullptr;
-  PyObject* callback = nullptr;
-  if (!PyArg_ParseTuple(args, "ssOO", &key, &labelText, &items, &callback))
+  PyObject* callbackObj = nullptr;
+  int initialIndex = 0;
+
+  if (PyArg_ParseTuple(args, "ssOOi", &key, &labelText, &items, &callbackObj, &initialIndex))
+  {
+    // All arguments provided
+  }
+  else
   {
     PyErr_Clear();
-    if (!PyArg_ParseTuple(args, "ssO", &key, &labelText, &items))
+    if (PyArg_ParseTuple(args, "ssOO", &key, &labelText, &items, &callbackObj))
     {
-      return nullptr;
+      // 4 arguments: Check if the 4th is callback or index
+      if (PyCallable_Check(callbackObj))
+      {
+        // It's a callback
+        initialIndex = 0;
+      }
+      else if (PyLong_Check(callbackObj))
+      {
+        // It's an index
+        initialIndex = (int)PyLong_AsLong(callbackObj);
+        callbackObj = nullptr;
+      }
+      else if (callbackObj == Py_None)
+      {
+        callbackObj = nullptr;
+        initialIndex = 0;
+      }
+      else
+      {
+        // Invalid type for 4th argument, let error handling below catch it if needed, 
+        // or treat as error now. But strict PyCallable_Check below handles it.
+      }
     }
-    callback = nullptr;
+    else
+    {
+      PyErr_Clear();
+      if (PyArg_ParseTuple(args, "ssO", &key, &labelText, &items))
+      {
+        callbackObj = nullptr;
+        initialIndex = 0;
+      }
+      else
+      {
+        return nullptr;
+      }
+    }
   }
-  if (callback != nullptr && !PyCallable_Check(callback))
+
+  PyObject* callback = callbackObj;
+  if (callback != nullptr && callback != Py_None && !PyCallable_Check(callback))
   {
-    PyErr_SetString(PyExc_TypeError, "expected a callable");
+    PyErr_SetString(PyExc_TypeError, "expected a callable, int (index), or None");
     return nullptr;
+  }
+  if (callback == Py_None)
+  {
+    callback = nullptr;
   }
 
   if (!PyList_Check(items))
@@ -765,6 +810,11 @@ PyObject* plugin_panel_add_combo_box(PyObject* self, PyObject* args)
       return nullptr;
     }
     combo->addItem(QString::fromUtf8(itemStr));
+  }
+
+  if (initialIndex >= 0 && initialIndex < combo->count())
+  {
+    combo->setCurrentIndex(initialIndex);
   }
 
   if (callback != nullptr)

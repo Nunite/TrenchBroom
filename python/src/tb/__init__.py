@@ -119,8 +119,20 @@ class PluginPanel(Protocol):
         """读取复选框当前值；key 不存在会抛 KeyError。"""
         ...
 
-    def add_combo_box(self, key: str, label: str, items: list[str]) -> None:
-        """添加一个下拉列表框（QComboBox）。"""
+    def add_combo_box(
+        self,
+        key: str,
+        label: str,
+        items: list[str],
+        callback: Callable[[int], Any] | None = None,
+        index: int = 0,
+    ) -> None:
+        """
+        添加一个下拉列表框（QComboBox）。
+
+        - callback: (可选) 选中项改变时的回调函数，接收参数 (index: int)。
+        - index: (可选) 初始选中的索引，默认为 0。
+        """
         ...
 
     def get_combo_box_index(self, key: str) -> int:

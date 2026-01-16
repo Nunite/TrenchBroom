@@ -101,7 +101,7 @@ bool PathToolController::mouseDoubleClick(const InputState& inputState)
 }
 
 void PathToolController::render(
-    const InputState& inputState,
+    const InputState& /*inputState*/,
     render::RenderContext& renderContext,
     render::RenderBatch& renderBatch)
 {
@@ -117,14 +117,24 @@ bool PathToolController::cancel()
     return false;
 }
 
-bool PathToolController::keyPress(const InputState& inputState, const KeyEvent& event)
+bool PathToolController::keyPress(const InputState& /*inputState*/, const KeyEvent& event)
 {
     if (!m_tool.active())
         return false;
 
     if (event.type == KeyEvent::Type::Down)
     {
-        if (event.key == Qt::Key_Left)
+        if (event.key == Qt::Key_Escape)
+        {
+            m_tool.deactivate();
+            return true;
+        }
+        else if (event.key == Qt::Key_Return || event.key == Qt::Key_Enter)
+        {
+            m_tool.createPathEntities();
+            return true;
+        }
+        else if (event.key == Qt::Key_Left)
         {
             if (m_tool.hasPoints())
             {
