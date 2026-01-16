@@ -147,6 +147,7 @@ class Transaction(Protocol):
 class Entity(Protocol):
     """实体节点（worldspawn 或普通实体）。写入请走 Selection 的 undoable API。"""
 
+    @property
     def classname(self) -> str:
         """返回实体的 classname。"""
         ...
@@ -168,10 +169,12 @@ class Selection(Protocol):
     - all_entities()：命令实际会作用到的实体集合（更常用）
     """
 
+    @property
     def entities(self) -> list[Entity]:
         """返回显式选中的实体节点列表。"""
         ...
 
+    @property
     def all_entities(self) -> list[Entity]:
         """返回“会受操作影响”的实体集合（会包含隐式关联到选择的实体）。"""
         ...

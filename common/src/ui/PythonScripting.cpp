@@ -1785,8 +1785,6 @@ bool registerTypes(PyObject* module)
     selectionType.tp_call = selection_call;
 
     static PyMethodDef selectionMethods[] = {
-      {"entities", selection_entities, METH_NOARGS, nullptr},
-      {"all_entities", selection_all_entities, METH_NOARGS, nullptr},
       {"brush_vertices", selection_brush_vertices, METH_NOARGS, nullptr},
       {"set_property", selection_set_property, METH_VARARGS, nullptr},
       {"duplicate", selection_duplicate, METH_NOARGS, nullptr},
@@ -1831,7 +1829,6 @@ bool registerTypes(PyObject* module)
     entityType.tp_dealloc = freePythonObject;
 
     static PyMethodDef entityMethods[] = {
-      {"classname", entity_classname, METH_NOARGS, nullptr},
       {"keys", entity_keys, METH_NOARGS, nullptr},
       {"get", entity_get, METH_VARARGS, nullptr},
       {nullptr, nullptr, 0, nullptr},
