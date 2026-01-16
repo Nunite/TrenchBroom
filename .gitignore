@@ -23,3 +23,4 @@ app/resources/documentation/help/index.html
 *.whl
 *.tar.gz
 /blender
+/Map2Curvex
