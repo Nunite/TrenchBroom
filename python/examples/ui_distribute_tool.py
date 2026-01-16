@@ -94,6 +94,12 @@ class DistributeTool:
         self._panel.add_button_callback("1. 从选定顶点/实体记录路径", self.op_record_path)
         
         self._panel.add_int_field("count", "生成数量", 5, 2, 100)
+        try:
+            self._panel.add_checkbox("align_to_path", "沿路径旋转", True)
+        except AttributeError:
+             # Fallback for older TB versions if any
+             self._panel.add_int_field("align_to_path", "沿路径旋转 (0=否, 1=是)", 1, 0, 1)
+             
         self._panel.add_float_field("offset_start", "起始偏移 (%)", 0.0, 0.0, 100.0, 1, 5.0)
         self._panel.add_float_field("offset_end", "结束偏移 (%)", 0.0, 0.0, 100.0, 1, 5.0)
         
@@ -258,6 +264,12 @@ class DistributeTool:
 
         # Parameters
         count = int(self._panel.get_int_field("count"))
+        
+        try:
+            align_to_path = self._panel.get_checkbox("align_to_path")
+        except AttributeError:
+             align_to_path = int(self._panel.get_int_field("align_to_path")) == 1
+
         off_start_pct = self._panel.get_float_field("offset_start") / 100.0
         off_end_pct = self._panel.get_float_field("offset_end") / 100.0
         rand_pos_range = self._panel.get_float_field("rand_pos")
@@ -323,8 +335,12 @@ class DistributeTool:
                 r_scale = 1.0 + random.uniform(-rand_scale_pct, rand_scale_pct)
                 
                 # 2. Target Transform
-                yaw_rad = math.atan2(tangent[1], tangent[0])
-                yaw_deg = math.degrees(yaw_rad)
+                if align_to_path:
+                    yaw_rad = math.atan2(tangent[1], tangent[0])
+                    yaw_deg = math.degrees(yaw_rad)
+                else:
+                    yaw_deg = 0.0
+
                 final_yaw = yaw_deg + r_rot_z
                 
                 final_center = vec3_add(target_pos, (r_pos_x, r_pos_y, r_pos_z))
@@ -343,7 +359,12 @@ class DistributeTool:
                 current_center = final_center
                 current_yaw = final_yaw
                 
-                # 4. Scale (Skip as before)
+                # 4. Scale
+                if abs(r_scale - 1.0) > 0.001:
+                    try:
+                        sel.scale(r_scale, r_scale, r_scale, final_center[0], final_center[1], final_center[2])
+                    except AttributeError:
+                        print("Warning: sel.scale not available (update TB to latest)")
                 
         self._refresh_status(f"成功生成 {count} 个实例")
 

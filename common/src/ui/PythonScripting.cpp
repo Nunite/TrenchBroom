@@ -44,6 +44,7 @@
 #include "ui/Inspector.h"
 #include "ui/PluginInspector.h"
 #include <QDoubleSpinBox>
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPointer>
@@ -630,6 +631,74 @@ PyObject* plugin_panel_get_float_field(PyObject* self, PyObject* args)
     return nullptr;
   }
   return PyFloat_FromDouble(spin->value());
+}
+
+PyObject* plugin_panel_add_checkbox(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* labelText = nullptr;
+  int value = 0; // 0 or 1
+  if (!PyArg_ParseTuple(args, "ss|i", &key, &labelText, &value))
+  {
+    return nullptr;
+  }
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto* container = panel->container->data();
+  if (container == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Plugin panel container is gone");
+    return nullptr;
+  }
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* checkBox = new QCheckBox{};
+  checkBox->setObjectName(plugin_panel_object_name(QStringLiteral("checkbox"), key));
+  checkBox->setText(QString::fromUtf8(labelText));
+  checkBox->setChecked(value != 0);
+
+  layout->addWidget(checkBox);
+
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_get_checkbox(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto* container = panel->container->data();
+  if (container == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Plugin panel container is gone");
+    return nullptr;
+  }
+
+  const auto name = plugin_panel_object_name(QStringLiteral("checkbox"), key);
+  auto* checkBox = container->findChild<QCheckBox*>(name);
+
+  if (checkBox == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such checkbox");
+    return nullptr;
+  }
+
+  return PyBool_FromLong(checkBox->isChecked());
 }
 
 PyObject* plugin_panel_set_text(PyObject* self, PyObject* args)
@@ -1443,6 +1512,73 @@ PyObject* selection_rotate(PyObject* self, PyObject* args)
   }
 }
 
+PyObject* selection_scale(PyObject* self, PyObject* args)
+{
+  double scaleX = 0.0;
+  double scaleY = 0.0;
+  double scaleZ = 0.0;
+  double centerX = 0.0;
+  double centerY = 0.0;
+  double centerZ = 0.0;
+
+  if (!PyArg_ParseTuple(args, "ddd|ddd", &scaleX, &scaleY, &scaleZ, &centerX, &centerY, &centerZ))
+  {
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  try
+  {
+    auto& map = doc->map();
+
+    auto center = vm::vec3d{};
+    const auto argCount = PyTuple_Size(args);
+    if (argCount >= 6)
+    {
+      center = vm::vec3d{centerX, centerY, centerZ};
+    }
+    else
+    {
+      const auto bounds = map.selectionBounds();
+      if (!bounds)
+      {
+        PyErr_SetString(PyExc_RuntimeError, "Selection bounds are not available");
+        return nullptr;
+      }
+
+      center = bounds->min + bounds->size() / 2.0;
+    }
+
+    const auto ok =
+      tb::mdl::scaleSelection(map, center, vm::vec3d{scaleX, scaleY, scaleZ});
+    if (ok)
+    {
+      Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+  }
+  catch (const tb::Exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+  catch (...)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Unknown exception");
+    return nullptr;
+  }
+}
+
 PyObject* selection_chamfer_vertices(PyObject* self, PyObject* args)
 {
   double distance = 0.0;
@@ -1790,6 +1926,7 @@ bool registerTypes(PyObject* module)
       {"duplicate", selection_duplicate, METH_NOARGS, nullptr},
       {"translate", selection_translate, METH_VARARGS, nullptr},
       {"rotate", selection_rotate, METH_VARARGS, nullptr},
+      {"scale", selection_scale, METH_VARARGS, nullptr},
       {"chamfer_vertices", selection_chamfer_vertices, METH_VARARGS, nullptr},
       {"chamfer_edges", selection_chamfer_edges, METH_VARARGS, nullptr},
       {"remove_property", selection_remove_property, METH_VARARGS, nullptr},
@@ -1937,8 +2074,10 @@ bool registerTypes(PyObject* module)
       {"set_label_text", plugin_panel_set_label_text, METH_VARARGS, nullptr},
       {"add_int_field", plugin_panel_add_int_field, METH_VARARGS, nullptr},
       {"add_float_field", plugin_panel_add_float_field, METH_VARARGS, nullptr},
+      {"add_checkbox", plugin_panel_add_checkbox, METH_VARARGS, nullptr},
       {"get_int_field", plugin_panel_get_int_field, METH_VARARGS, nullptr},
       {"get_float_field", plugin_panel_get_float_field, METH_VARARGS, nullptr},
+      {"get_checkbox", plugin_panel_get_checkbox, METH_VARARGS, nullptr},
       {"set_text", plugin_panel_set_text, METH_VARARGS, nullptr},
       {"set_html", plugin_panel_set_html, METH_VARARGS, nullptr},
       {"add_button", plugin_panel_add_button, METH_VARARGS, nullptr},

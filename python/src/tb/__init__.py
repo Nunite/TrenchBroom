@@ -111,6 +111,14 @@ class PluginPanel(Protocol):
         """读取浮点字段当前值；key 不存在会抛 KeyError。"""
         ...
 
+    def add_checkbox(self, key: str, label: str, value: bool = False) -> None:
+        """添加一个复选框（QCheckBox），可用 get_checkbox 读取当前值。"""
+        ...
+
+    def get_checkbox(self, key: str) -> bool:
+        """读取复选框当前值；key 不存在会抛 KeyError。"""
+        ...
+
 
 class Transaction(Protocol):
     """用于把一段脚本编辑合并成一次 undo/redo 的事务。"""
@@ -226,6 +234,23 @@ class Selection(Protocol):
 
         - angle_degrees：角度（度）
         - center_*：旋转中心；不提供时使用选择包围盒中心（若不可用会抛 RuntimeError）
+        """
+        ...
+
+    def scale(
+        self,
+        scale_x: float,
+        scale_y: float,
+        scale_z: float,
+        center_x: float | None = None,
+        center_y: float | None = None,
+        center_z: float | None = None,
+    ) -> bool:
+        """
+        缩放当前选择。
+
+        - scale_*：各轴缩放比例（1.0 为不缩放）
+        - center_*：缩放中心；不提供时使用选择包围盒中心
         """
         ...
 

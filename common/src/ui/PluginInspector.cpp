@@ -123,7 +123,9 @@ PluginInspector::PluginInspector(QWidget* parent)
     QWidget#PluginInspector_PythonRunnerPanel QDoubleSpinBox,
     QWidget#PluginInspector_PluginPanel QDoubleSpinBox,
     QWidget#PluginInspector_PythonRunnerPanel QComboBox,
-    QWidget#PluginInspector_PluginPanel QComboBox {
+    QWidget#PluginInspector_PluginPanel QComboBox,
+    QWidget#PluginInspector_PythonRunnerPanel QCheckBox,
+    QWidget#PluginInspector_PluginPanel QCheckBox {
       background-color: rgba(0, 0, 0, 32);
       border: 1 solid rgba(0, 0, 0, 75);
       border-radius: 6;
@@ -144,7 +146,9 @@ PluginInspector::PluginInspector(QWidget* parent)
     QWidget#PluginInspector_PythonRunnerPanel QDoubleSpinBox:focus,
     QWidget#PluginInspector_PluginPanel QDoubleSpinBox:focus,
     QWidget#PluginInspector_PythonRunnerPanel QComboBox:focus,
-    QWidget#PluginInspector_PluginPanel QComboBox:focus {
+    QWidget#PluginInspector_PluginPanel QComboBox:focus,
+    QWidget#PluginInspector_PythonRunnerPanel QCheckBox:focus,
+    QWidget#PluginInspector_PluginPanel QCheckBox:focus {
       border: 1 solid rgba(255, 255, 255, 70);
       background-color: rgba(255, 255, 255, 10);
       color: rgba(255, 255, 255, 255);
