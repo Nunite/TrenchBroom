@@ -1746,7 +1746,7 @@ void ActionManager::createToolsMenu()
     [](const auto& context) {
       return context.hasDocument() && context.frame().pathToolActive();
     },
-    std::filesystem::path{"ClipTool.svg"}, // Reuse ClipTool icon as placeholder
+    std::filesystem::path{"Path.svg"}, // Reuse ClipTool icon as placeholder
     QObject::tr("Left Click: Add Point\nBackspace: Remove Last\nEnter: Create Path")
   }));
   toolsMenu.addItem(addAction(Action{
