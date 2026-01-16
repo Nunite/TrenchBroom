@@ -60,6 +60,7 @@ private:
   QStackedWidget* m_pathStack = nullptr;
   QWidget* m_breadcrumbBar = nullptr;
   QHBoxLayout* m_breadcrumbLayout = nullptr;
+  QToolButton* m_reloadButton = nullptr;
   QLineEdit* m_folderEdit = nullptr;
   QLineEdit* m_searchBox = nullptr;
 

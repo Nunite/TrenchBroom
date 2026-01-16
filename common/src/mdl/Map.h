@@ -367,6 +367,7 @@ public: // resource processing
   bool needsResourceProcessing() const;
 
   void reloadEntityModels(const std::filesystem::path& modelPath);
+  void reloadEntityModels(const std::vector<std::filesystem::path>& modelPaths);
 
 public: // command processing
   bool canUndoCommand() const;

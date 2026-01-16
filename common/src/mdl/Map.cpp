@@ -1341,6 +1341,20 @@ void Map::reloadEntityModels(const std::filesystem::path& modelPath)
   setEntityModels();
 }
 
+void Map::reloadEntityModels(const std::vector<std::filesystem::path>& modelPaths)
+{
+  if (modelPaths.empty())
+  {
+    return;
+  }
+
+  for (const auto& path : modelPaths)
+  {
+    m_entityModelManager->invalidateModel(path);
+  }
+  setEntityModels();
+}
+
 bool Map::canUndoCommand() const
 {
   return m_commandProcessor->canUndo();

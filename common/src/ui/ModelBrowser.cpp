@@ -92,12 +92,23 @@ void ModelBrowser::createGui(GLContextManager& contextManager)
   m_pathStack->addWidget(m_folderEdit);
   m_pathStack->setCurrentWidget(m_breadcrumbBar);
 
+  m_reloadButton = new QToolButton{};
+  m_reloadButton->setIcon(io::loadSVGIcon(std::filesystem::path{"Refresh.svg"}));
+  m_reloadButton->setToolTip(tr("Reload models"));
+  m_reloadButton->setAutoRaise(true);
+
   m_searchBox = createSearchBox();
+
+  auto* pathRowLayout = new QHBoxLayout{};
+  pathRowLayout->setContentsMargins(0, 0, 0, 0);
+  pathRowLayout->setSpacing(0);
+  pathRowLayout->addWidget(m_pathStack, 1);
+  pathRowLayout->addWidget(m_reloadButton, 0);
 
   auto* controlsLayout = new QVBoxLayout{};
   controlsLayout->setContentsMargins(0, 0, 0, 0);
   controlsLayout->setSpacing(0);
-  controlsLayout->addWidget(m_pathStack, 0);
+  controlsLayout->addLayout(pathRowLayout, 0);
   controlsLayout->addWidget(m_searchBox, 0);
 
   auto* controls = new QWidget{};
@@ -205,6 +216,11 @@ void ModelBrowser::bindEvents()
 
   connect(m_view, &ModelBrowserView::folderActivated, this, [&](const QString& folderPath) {
     setCurrentFolderPath(std::filesystem::path{folderPath.toStdString()});
+  });
+
+  connect(m_reloadButton, &QToolButton::clicked, this, [&]() {
+    m_lastWriteTimes.clear();
+    rescanWatchedDirectory();
   });
 }
 
@@ -742,10 +758,7 @@ void ModelBrowser::rescanWatchedDirectory()
       return;
     }
 
-    for (const auto& p : changedPaths)
-    {
-      m_map.entityModelManager().invalidateModel(p);
-    }
+    m_map.reloadEntityModels(changedPaths);
 
     m_modelPaths = std::move(modelPaths);
     m_lastWriteTimes = std::move(newLastWriteTimes);
@@ -862,10 +875,7 @@ void ModelBrowser::rescanWatchedDirectory()
     return;
   }
 
-  for (const auto& p : changedPaths)
-  {
-    m_map.entityModelManager().invalidateModel(p);
-  }
+  m_map.reloadEntityModels(changedPaths);
 
   m_modelPaths = std::move(modelPaths);
   m_lastWriteTimes = std::move(newLastWriteTimes);
