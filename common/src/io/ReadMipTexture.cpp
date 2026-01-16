@@ -74,7 +74,7 @@ void fixTransparentPixels(mdl::TextureBuffer& buffer, int width, int height)
   {
     for (int x = 0; x < width; ++x)
     {
-      size_t idx = (y * width + x) * bpp;
+      size_t idx = static_cast<size_t>(y * width + x) * bpp;
       if (data[idx + 3] == 0) // Transparent
       {
         int r = 0, g = 0, b = 0, count = 0;
@@ -89,7 +89,7 @@ void fixTransparentPixels(mdl::TextureBuffer& buffer, int width, int height)
           int ny = y + dy[k];
           if (nx >= 0 && nx < width && ny >= 0 && ny < height)
           {
-            size_t nidx = (ny * width + nx) * bpp;
+            size_t nidx = static_cast<size_t>(ny * width + nx) * bpp;
             if (data[nidx + 3] != 0) // Opaque neighbor
             {
               r += data[nidx + 0];
@@ -102,9 +102,9 @@ void fixTransparentPixels(mdl::TextureBuffer& buffer, int width, int height)
 
         if (count > 0)
         {
-          data[idx + 0] = r / count;
-          data[idx + 1] = g / count;
-          data[idx + 2] = b / count;
+          data[idx + 0] = static_cast<unsigned char>(r / count);
+          data[idx + 1] = static_cast<unsigned char>(g / count);
+          data[idx + 2] = static_cast<unsigned char>(b / count);
         }
       }
     }
@@ -155,8 +155,8 @@ Result<mdl::Texture> readMipTexture(
                
                if (transparency == mdl::PaletteTransparency::Index255Transparent)
                {
-                 const auto curWidth = std::max<int>(1, width >> i);
-                 const auto curHeight = std::max<int>(1, height >> i);
+                 const auto curWidth = std::max<int>(1, static_cast<int>(width >> i));
+                 const auto curHeight = std::max<int>(1, static_cast<int>(height >> i));
                  fixTransparentPixels(buffers[i], curWidth, curHeight);
                }
 
