@@ -480,7 +480,8 @@ std::unique_ptr<GestureTracker> SelectionTool::acceptMouseDrag(
   const auto& editorContext = m_map.editorContext();
 
   if (inputState.mouseButtonsPressed(MouseButtons::Left) &&
-      inputState.modifierKeysDown(ModifierKeys::Alt))
+      inputState.modifierKeysDown(ModifierKeys::Alt) &&
+      !inputState.camera().perspectiveProjection())
   {
     const auto& camera = inputState.camera();
     const auto direction = camera.direction();

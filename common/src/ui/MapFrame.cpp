@@ -25,6 +25,7 @@
 #include <QComboBox>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMessageBox>
 #include <QMimeData>
@@ -2691,6 +2692,25 @@ static void applyRecursively(QObject* object, const F& f)
 
 bool MapFrame::eventFilter(QObject* target, QEvent* event)
 {
+  if (event->type() == QEvent::ShortcutOverride)
+  {
+    auto* keyEvent = static_cast<QKeyEvent*>(event);
+    if (keyEvent->key() == Qt::Key_Escape && pathToolActive())
+    {
+      event->accept();
+      return true;
+    }
+  }
+  else if (event->type() == QEvent::KeyPress)
+  {
+    auto* keyEvent = static_cast<QKeyEvent*>(event);
+    if (keyEvent->key() == Qt::Key_Escape && pathToolActive())
+    {
+      togglePathTool();
+      return true;
+    }
+  }
+
   if (
     event->type() == QEvent::MouseButtonPress
     || event->type() == QEvent::MouseButtonRelease
