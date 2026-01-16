@@ -423,6 +423,26 @@ void ActionManager::createViewActions()
     },
   });
   addAction(Action{
+    std::filesystem::path{"Controls/Map view/Create Path Entities (Numpad)"},
+    QObject::tr("Create Path Entities"),
+    ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::PathTool,
+    QKeySequence{Qt::Key_Enter},
+    [](auto& context) { context.frame().performPathCreation(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.frame().pathToolActive();
+    },
+  });
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Cancel Path Tool"},
+    QObject::tr("Cancel Path Tool"),
+    ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::PathTool,
+    QKeySequence{Qt::Key_Escape},
+    [](auto& context) { context.frame().togglePathTool(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.frame().pathToolActive();
+    },
+  });
+  addAction(Action{
     std::filesystem::path{"Controls/Map view/Remove Last Path Point"},
     QObject::tr("Remove Last Path Point"),
     ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::PathTool,

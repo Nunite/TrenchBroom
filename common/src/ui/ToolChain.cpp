@@ -76,6 +76,23 @@ void ToolChain::modifierKeyChange(const InputState& inputState)
   }
 }
 
+bool ToolChain::keyPress(const InputState& inputState, const KeyEvent& event)
+{
+  assert(checkInvariant());
+  if (!chainEndsHere())
+  {
+    if (m_tool->toolActive())
+    {
+      if (m_tool->keyPress(inputState, event))
+      {
+        return true;
+      }
+    }
+    return m_suffix->keyPress(inputState, event);
+  }
+  return false;
+}
+
 void ToolChain::mouseDown(const InputState& inputState)
 {
   assert(checkInvariant());

@@ -53,6 +53,8 @@ struct KeyEvent
   };
 
   Type type;
+  int key = 0;
+  Qt::KeyboardModifiers modifiers = Qt::NoModifier;
 
   /**
    * Process this key event with the given event processor.
@@ -61,7 +63,7 @@ struct KeyEvent
    */
   void processWith(InputEventProcessor& processor) const;
 
-  kdl_reflect_decl(KeyEvent, type);
+  kdl_reflect_decl(KeyEvent, type, key, modifiers);
 };
 
 std::ostream& operator<<(std::ostream& lhs, const KeyEvent::Type& rhs);

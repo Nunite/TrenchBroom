@@ -24,6 +24,7 @@ class PathTool : public Tool
 private:
     mdl::Map& m_map;
     std::vector<vm::vec3d> m_points;
+    std::vector<vm::vec3d> m_redoStack;
     NotifierConnection m_notifierConnection;
     
 public:
@@ -36,9 +37,11 @@ public:
     // Point management
     void addPoint(const vm::vec3d& point);
     void removeLastPoint();
+    void redoLastPoint();
     void clearPoints();
     const std::vector<vm::vec3d>& points() const;
     bool hasPoints() const;
+    bool canRedoPoint() const;
 
     // Rendering
     void render(render::RenderContext& renderContext, render::RenderBatch& renderBatch);

@@ -77,10 +77,80 @@ def quaternion_to_euler(q):
     
     return (math.degrees(roll), math.degrees(pitch), math.degrees(yaw))
 
+def catmull_rom_spline(points, steps=10):
+    """
+    Generate a smooth Catmull-Rom spline from a list of 3D points.
+    points: list of (x,y,z) tuples
+    steps: number of interpolated points per segment
+    """
+    if len(points) < 2: return points
+    
+    # Duplicate endpoints to handle open spline
+    # P0, P1, P2, ... Pn
+    # Control points: P0, P0, P1, P2, ... Pn, Pn
+    ctrl = [points[0]] + list(points) + [points[-1]]
+    
+    smoothed = []
+    
+    for i in range(len(points) - 1):
+        # Segment P_i to P_{i+1} corresponds to ctrl[i+1] to ctrl[i+2]
+        p0 = ctrl[i]
+        p1 = ctrl[i+1]
+        p2 = ctrl[i+2]
+        p3 = ctrl[i+3]
+        
+        for t_step in range(steps):
+            t = t_step / float(steps)
+            t2 = t * t
+            t3 = t2 * t
+            
+            # Catmull-Rom formula
+            # 0.5 * ( (2*p1) + (-p0 + p2)*t + (2*p0 - 5*p1 + 4*p2 - p3)*t2 + (-p0 + 3*p1 - 3*p2 + p3)*t3 )
+            
+            x = 0.5 * ((2*p1[0]) + (-p0[0] + p2[0])*t + (2*p0[0] - 5*p1[0] + 4*p2[0] - p3[0])*t2 + (-p0[0] + 3*p1[0] - 3*p2[0] + p3[0])*t3)
+            y = 0.5 * ((2*p1[1]) + (-p0[1] + p2[1])*t + (2*p0[1] - 5*p1[1] + 4*p2[1] - p3[1])*t2 + (-p0[1] + 3*p1[1] - 3*p2[1] + p3[1])*t3)
+            z = 0.5 * ((2*p1[2]) + (-p0[2] + p2[2])*t + (2*p0[2] - 5*p1[2] + 4*p2[2] - p3[2])*t2 + (-p0[2] + 3*p1[2] - 3*p2[2] + p3[2])*t3)
+            
+            smoothed.append((x, y, z))
+            
+    smoothed.append(points[-1])
+    return smoothed
+
+def binomial_coeff(n, k):
+    if k < 0 or k > n: return 0
+    return math.factorial(n) // (math.factorial(k) * math.factorial(n - k))
+
+def bezier_curve(points, steps_per_segment=10):
+    """
+    Generate a smooth Bezier curve from a list of 3D points.
+    Uses all points as control points for a single N-degree Bezier curve.
+    """
+    n = len(points) - 1
+    if n < 1: return points
+    
+    total_steps = n * steps_per_segment
+    result = []
+    
+    for i in range(total_steps + 1):
+        t = i / float(total_steps)
+        # Calculate B(t)
+        x, y, z = 0.0, 0.0, 0.0
+        for k, p in enumerate(points):
+            # b_{k,n}(t) = C(n,k) * (1-t)^(n-k) * t^k
+            # Use math.pow for safety, though ** is fine
+            term = binomial_coeff(n, k) * math.pow(1 - t, n - k) * math.pow(t, k)
+            x += p[0] * term
+            y += p[1] * term
+            z += p[2] * term
+        result.append((x, y, z))
+        
+    return result
+
 class DistributeTool:
     def __init__(self) -> None:
         self._panel = tb.create_plugin_panel("沿路径分布")
-        self._path_points = []
+        self._raw_points = [] # Original user-selected points
+        self._path_points = [] # Points used for distribution (raw or smoothed)
         self._path_length = 0.0
         self._segment_lengths = []
         self._message = "请先选择路径点（顶点或实体）"
@@ -99,9 +169,24 @@ class DistributeTool:
         except AttributeError:
              # Fallback for older TB versions if any
              self._panel.add_int_field("align_to_path", "沿路径旋转 (0=否, 1=是)", 1, 0, 1)
+
+        try:
+            self._panel.add_checkbox("smooth_path", "平滑路径 (样条线)", False)
+        except AttributeError:
+             self._panel.add_int_field("smooth_path", "平滑路径 (0=否, 1=是)", 0, 0, 1)
+             
+        try:
+            self._panel.add_checkbox("use_bezier", "使用贝塞尔曲线 (不经过点)", False)
+        except AttributeError:
+             self._panel.add_int_field("use_bezier", "贝塞尔曲线 (0=否, 1=是)", 0, 0, 1)
              
         self._panel.add_float_field("offset_start", "起始偏移 (%)", 0.0, 0.0, 100.0, 1, 5.0)
         self._panel.add_float_field("offset_end", "结束偏移 (%)", 0.0, 0.0, 100.0, 1, 5.0)
+        
+        self._panel.add_label("基础偏移:")
+        self._panel.add_float_field("base_off_x", "X 偏移", 0.0, -4096.0, 4096.0, 1, 16.0)
+        self._panel.add_float_field("base_off_y", "Y 偏移", 0.0, -4096.0, 4096.0, 1, 16.0)
+        self._panel.add_float_field("base_off_z", "Z 偏移", 0.0, -4096.0, 4096.0, 1, 16.0)
         
         self._panel.add_label("随机化参数:")
         self._panel.add_float_field("rand_pos", "位置抖动", 0.0, 0.0, 128.0, 1, 1.0)
@@ -116,9 +201,9 @@ class DistributeTool:
         if msg:
             self._message = msg
         
-        points_info = f"当前路径点数: {len(self._path_points)}"
+        points_info = f"记录点数: {len(self._raw_points)}"
         if self._path_length > 0:
-            points_info += f", 总长: {self._path_length:.1f}"
+            points_info += f", 当前长度: {self._path_length:.1f}"
             
         full_msg = f"{self._message}\n{points_info}"
         self._panel.set_label_text("status", full_msg)
@@ -179,7 +264,8 @@ class DistributeTool:
         # 1. 尝试从顶点工具获取
         verts = doc.vertex_tool_vertices()
         if len(verts) >= 2:
-            self._path_points = verts
+            self._raw_points = verts
+            self._path_points = self._raw_points
             self._calculate_path_metrics()
             self._refresh_status(f"已从顶点记录路径，共 {len(verts)} 个点")
             return
@@ -203,7 +289,8 @@ class DistributeTool:
                     except: pass
             
             if len(points) >= 2:
-                self._path_points = points
+                self._raw_points = points
+                self._path_points = self._raw_points
                 self._calculate_path_metrics()
                 self._refresh_status(f"已从实体记录路径，共 {len(points)} 个点")
                 return
@@ -249,9 +336,30 @@ class DistributeTool:
         return p1, vec3_normalize(vec3_sub(p1, p0))
 
     def op_distribute(self) -> None:
-        if len(self._path_points) < 2:
+        if len(self._raw_points) < 2:
             self._refresh_status("请先记录路径！")
             return
+
+        # Update path points based on smoothing option
+        try:
+            smooth_path = self._panel.get_checkbox("smooth_path")
+        except AttributeError:
+             smooth_path = int(self._panel.get_int_field("smooth_path")) == 1
+             
+        if smooth_path:
+            try:
+                use_bezier = self._panel.get_checkbox("use_bezier")
+            except AttributeError:
+                 use_bezier = int(self._panel.get_int_field("use_bezier")) == 1
+                 
+            if use_bezier:
+                self._path_points = bezier_curve(self._raw_points, steps_per_segment=10)
+            else:
+                self._path_points = catmull_rom_spline(self._raw_points, steps=10)
+        else:
+            self._path_points = list(self._raw_points)
+            
+        self._calculate_path_metrics()
 
         doc = self._current_document()
         if not doc: return
@@ -272,6 +380,11 @@ class DistributeTool:
 
         off_start_pct = self._panel.get_float_field("offset_start") / 100.0
         off_end_pct = self._panel.get_float_field("offset_end") / 100.0
+        
+        base_off_x = self._panel.get_float_field("base_off_x")
+        base_off_y = self._panel.get_float_field("base_off_y")
+        base_off_z = self._panel.get_float_field("base_off_z")
+
         rand_pos_range = self._panel.get_float_field("rand_pos")
         rand_rot_z_range = self._panel.get_float_field("rand_rot_z")
         rand_scale_pct = self._panel.get_float_field("rand_scale") / 100.0
@@ -344,6 +457,7 @@ class DistributeTool:
                 final_yaw = yaw_deg + r_rot_z
                 
                 final_center = vec3_add(target_pos, (r_pos_x, r_pos_y, r_pos_z))
+                final_center = vec3_add(final_center, (base_off_x, base_off_y, base_off_z))
                 
                 # 3. Apply Relative Transforms
                 # Move

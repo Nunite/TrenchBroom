@@ -214,9 +214,10 @@ void ToolBoxConnector::showPopupMenu()
   updateModifierKeys();
 }
 
-void ToolBoxConnector::processEvent(const KeyEvent&)
+void ToolBoxConnector::processEvent(const KeyEvent& event)
 {
   updateModifierKeys();
+  m_toolBox->keyPress(*m_toolChain, m_inputState, event);
 }
 
 void ToolBoxConnector::processEvent(const MouseEvent& event)

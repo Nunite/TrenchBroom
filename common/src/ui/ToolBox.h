@@ -50,6 +50,7 @@ namespace tb::ui
 class GestureTracker;
 class DropTracker;
 class InputState;
+struct KeyEvent;
 class Tool;
 class ToolController;
 class ToolChain;
@@ -92,6 +93,7 @@ public: // event handling
   bool dragDrop(ToolChain& chain, const InputState& inputState, const std::string& text);
 
   void modifierKeyChange(ToolChain& chain, const InputState& inputState);
+  bool keyPress(ToolChain& chain, const InputState& inputState, const KeyEvent& event) const;
   void mouseDown(ToolChain& chain, const InputState& inputState) const;
   void mouseUp(ToolChain& chain, const InputState& inputState) const;
   bool mouseClick(ToolChain& chain, const InputState& inputState) const;

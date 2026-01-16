@@ -50,6 +50,7 @@ bool PathTool::doDeactivate()
 void PathTool::addPoint(const vm::vec3d& point)
 {
     m_points.push_back(point);
+    m_redoStack.clear();
     refreshViews();
 }
 
@@ -57,7 +58,18 @@ void PathTool::removeLastPoint()
 {
     if (!m_points.empty())
     {
+        m_redoStack.push_back(m_points.back());
         m_points.pop_back();
+        refreshViews();
+    }
+}
+
+void PathTool::redoLastPoint()
+{
+    if (!m_redoStack.empty())
+    {
+        m_points.push_back(m_redoStack.back());
+        m_redoStack.pop_back();
         refreshViews();
     }
 }
@@ -65,6 +77,7 @@ void PathTool::removeLastPoint()
 void PathTool::clearPoints()
 {
     m_points.clear();
+    m_redoStack.clear();
     refreshViews();
 }
 
@@ -76,6 +89,11 @@ const std::vector<vm::vec3d>& PathTool::points() const
 bool PathTool::hasPoints() const
 {
     return !m_points.empty();
+}
+
+bool PathTool::canRedoPoint() const
+{
+    return !m_redoStack.empty();
 }
 
 void PathTool::createPathEntities()

@@ -56,6 +56,7 @@ public:
   virtual void pick(const InputState& inputState, mdl::PickResult& pickResult);
 
   virtual void modifierKeyChange(const InputState& inputState);
+  virtual bool keyPress(const InputState& inputState, const KeyEvent& event);
 
   virtual void mouseDown(const InputState& inputState);
   virtual void mouseUp(const InputState& inputState);

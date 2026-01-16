@@ -36,6 +36,8 @@ public:
     
     // Override cancel to handle Esc
     bool cancel() override;
+
+    bool keyPress(const InputState& inputState, const KeyEvent& event) override;
 };
 
 } // namespace tb::ui

@@ -38,6 +38,11 @@ void ToolController::pick(const InputState&, mdl::PickResult&) {}
 
 void ToolController::modifierKeyChange(const InputState&) {}
 
+bool ToolController::keyPress(const InputState&, const KeyEvent&)
+{
+  return false;
+}
+
 void ToolController::mouseDown(const InputState&) {}
 
 void ToolController::mouseUp(const InputState&) {}

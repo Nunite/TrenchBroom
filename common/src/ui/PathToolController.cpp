@@ -2,6 +2,7 @@
 #include "PathToolController.h"
 
 #include "PathTool.h"
+#include "ui/InputEvent.h"
 #include "ui/InputState.h"
 #include "mdl/Map.h"
 #include "mdl/Grid.h"
@@ -14,6 +15,8 @@
 #include "vm/intersection.h"
 #include "vm/plane.h"
 #include "vm/vec.h"
+
+#include <QKeyEvent>
 
 namespace tb::ui
 {
@@ -110,14 +113,35 @@ void PathToolController::render(
 
 bool PathToolController::cancel()
 {
+    // Return false to allow the tool to be deactivated
+    return false;
+}
+
+bool PathToolController::keyPress(const InputState& inputState, const KeyEvent& event)
+{
     if (!m_tool.active())
         return false;
 
-    if (m_tool.hasPoints())
+    if (event.type == KeyEvent::Type::Down)
     {
-        m_tool.removeLastPoint();
-        return true;
+        if (event.key == Qt::Key_Left)
+        {
+            if (m_tool.hasPoints())
+            {
+                m_tool.removeLastPoint();
+                return true;
+            }
+        }
+        else if (event.key == Qt::Key_Right)
+        {
+            if (m_tool.canRedoPoint())
+            {
+                m_tool.redoLastPoint();
+                return true;
+            }
+        }
     }
+
     return false;
 }
 

@@ -37,6 +37,7 @@ namespace tb::ui
 {
 class GestureTracker;
 class DropTracker;
+struct KeyEvent;
 class InputState;
 class ToolController;
 
@@ -55,6 +56,7 @@ public:
   void pick(const InputState& inputState, mdl::PickResult& pickResult);
 
   void modifierKeyChange(const InputState& inputState);
+  bool keyPress(const InputState& inputState, const KeyEvent& event);
 
   void mouseDown(const InputState& inputState);
   void mouseUp(const InputState& inputState);

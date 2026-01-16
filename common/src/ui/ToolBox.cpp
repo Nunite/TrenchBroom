@@ -119,6 +119,15 @@ void ToolBox::modifierKeyChange(ToolChain& chain, const InputState& inputState)
   }
 }
 
+bool ToolBox::keyPress(ToolChain& chain, const InputState& inputState, const KeyEvent& event) const
+{
+  if (!m_enabled)
+  {
+    return false;
+  }
+  return chain.keyPress(inputState, event);
+}
+
 void ToolBox::mouseDown(ToolChain& chain, const InputState& inputState) const
 {
   if (m_enabled)

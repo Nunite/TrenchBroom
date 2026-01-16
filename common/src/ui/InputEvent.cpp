@@ -274,7 +274,7 @@ void InputEventQueue::processEvents(InputEventProcessor& processor)
 
 void InputEventRecorder::recordEvent(const QKeyEvent& qEvent)
 {
-  m_queue.enqueueEvent(KeyEvent{getEventType(qEvent)});
+  m_queue.enqueueEvent(KeyEvent{getEventType(qEvent), qEvent.key(), qEvent.modifiers()});
 }
 
 void InputEventRecorder::recordEvent(const QMouseEvent& qEvent)
