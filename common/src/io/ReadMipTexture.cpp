@@ -136,14 +136,14 @@ Result<mdl::Texture> readMipTexture(
 
     for (size_t i = 0; i < MipLevels; ++i)
     {
-      offset[i] = reader.readSize<int32_t>();
+      offset[i] = static_cast<size_t>(reader.readSize<int32_t>());
     }
 
     const auto transparency = mask == mdl::TextureMask::On
                                 ? mdl::PaletteTransparency::Index255Transparent
                                 : mdl::PaletteTransparency::Opaque;
 
-    mdl::setMipBufferSize(buffers, MipLevels, width, height, GL_RGBA);
+    mdl::setMipBufferSize(buffers, MipLevels, static_cast<size_t>(width), static_cast<size_t>(height), GL_RGBA);
     return getMipPalette(reader) | kdl::transform([&](const auto& palette) {
              for (size_t i = 0; i < MipLevels; ++i)
              {
