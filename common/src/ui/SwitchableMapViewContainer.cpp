@@ -224,6 +224,34 @@ void SwitchableMapViewContainer::toggleShearTool()
   m_toolBox->toggleShearTool();
 }
 
+bool SwitchableMapViewContainer::pathToolActive() const
+{
+  return m_toolBox->pathToolActive();
+}
+
+bool SwitchableMapViewContainer::canTogglePathTool() const
+{
+  return true;
+}
+
+void SwitchableMapViewContainer::togglePathTool()
+{
+  assert(canTogglePathTool());
+  m_toolBox->togglePathTool();
+}
+
+void SwitchableMapViewContainer::performPathCreation()
+{
+  assert(pathToolActive());
+  m_toolBox->performPathCreation();
+}
+
+void SwitchableMapViewContainer::removeLastPathPoint()
+{
+  assert(pathToolActive());
+  m_toolBox->removeLastPathPoint();
+}
+
 bool SwitchableMapViewContainer::canToggleVertexTools() const
 {
   const auto& map = m_document.map();

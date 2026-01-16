@@ -49,6 +49,7 @@ class ShearTool;
 class VertexTool;
 class EdgeTool;
 class FaceTool;
+class PathTool;
 
 class MapViewToolBox : public ToolBox
 {
@@ -59,6 +60,7 @@ private:
   std::unique_ptr<AssembleBrushTool> m_assembleBrushTool;
   std::unique_ptr<CreateEntityTool> m_createEntityTool;
   std::unique_ptr<DrawShapeTool> m_drawShapeTool;
+  std::unique_ptr<PathTool> m_pathTool;
   std::unique_ptr<MoveObjectsTool> m_moveObjectsTool;
   std::unique_ptr<ExtrudeTool> m_extrudeTool;
   std::unique_ptr<RotateTool> m_rotateTool;
@@ -79,6 +81,7 @@ public: // tools
   AssembleBrushTool& assembleBrushTool();
   CreateEntityTool& createEntityTool();
   DrawShapeTool& drawShapeTool();
+  PathTool& pathTool();
   MoveObjectsTool& moveObjectsTool();
   ExtrudeTool& extrudeTool();
   RotateTool& rotateTool();
@@ -120,6 +123,11 @@ public: // tools
 
   void toggleFaceTool();
   bool faceToolActive() const;
+
+  void togglePathTool();
+  bool pathToolActive() const;
+  void performPathCreation();
+  void removeLastPathPoint();
 
   bool anyModalToolActive() const;
 

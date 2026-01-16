@@ -325,6 +325,12 @@ public:
   bool canToggleFaceTool() const;
   bool faceToolActive() const;
 
+  void togglePathTool();
+  bool canTogglePathTool() const;
+  bool pathToolActive() const;
+  void performPathCreation();
+  void removeLastPathPoint();
+
   void csgConvexMerge();
   bool canDoCsgConvexMerge() const;
 

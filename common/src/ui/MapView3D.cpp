@@ -47,6 +47,7 @@
 #include "ui/ClipToolController.h"
 #include "ui/CreateEntityToolController.h"
 #include "ui/DrawShapeToolController3D.h"
+#include "ui/PathToolController.h"
 #include "ui/EdgeTool.h"
 #include "ui/EdgeToolController.h"
 #include "ui/ExtrudeToolController.h"
@@ -119,6 +120,7 @@ void MapView3D::initializeToolChain(MapViewToolBox& toolBox)
   addToolController(
     std::make_unique<CreateEntityToolController3D>(toolBox.createEntityTool()));
   addToolController(std::make_unique<SetBrushFaceAttributesTool>(map));
+  addToolController(std::make_unique<PathToolController>(toolBox.pathTool()));
   addToolController(std::make_unique<SelectionTool>(map));
   addToolController(
     std::make_unique<DrawShapeToolController3D>(toolBox.drawShapeTool(), map));

@@ -98,6 +98,12 @@ public:
   bool canToggleShearTool() const;
   void toggleShearTool();
 
+  bool pathToolActive() const;
+  bool canTogglePathTool() const;
+  void togglePathTool();
+  void performPathCreation();
+  void removeLastPathPoint();
+
   bool canToggleVertexTools() const;
   bool anyVertexToolActive() const;
   bool vertexToolActive() const;

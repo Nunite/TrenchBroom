@@ -1965,6 +1965,41 @@ bool MapFrame::faceToolActive() const
   return m_mapView->faceToolActive();
 }
 
+void MapFrame::togglePathTool()
+{
+  if (canTogglePathTool())
+  {
+    m_mapView->togglePathTool();
+  }
+}
+
+bool MapFrame::canTogglePathTool() const
+{
+  return true; // Path tool is always toggleable if document exists
+}
+
+bool MapFrame::pathToolActive() const
+{
+  return m_mapView->pathToolActive();
+}
+
+
+void MapFrame::performPathCreation()
+{
+  if (pathToolActive())
+  {
+    m_mapView->performPathCreation();
+  }
+}
+
+void MapFrame::removeLastPathPoint()
+{
+  if (pathToolActive())
+  {
+    m_mapView->removeLastPathPoint();
+  }
+}
+
 void MapFrame::csgConvexMerge()
 {
   if (canDoCsgConvexMerge())

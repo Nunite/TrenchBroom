@@ -897,6 +897,7 @@ ActionContext::Type MapViewBase::actionContext() const
     : m_toolBox.rotateToolActive()      ? ActionContext::RotateTool
     : m_toolBox.scaleToolActive()       ? ActionContext::ScaleTool
     : m_toolBox.shearToolActive()       ? ActionContext::ShearTool
+    : m_toolBox.pathToolActive()        ? ActionContext::PathTool
                                         : ActionContext::NoTool;
   const auto selectionContext = map.selection().hasNodes() ? ActionContext::NodeSelection
                                 : map.selection().hasBrushFaces()
@@ -1815,6 +1816,31 @@ bool MapViewBase::canMakeStructural() const
     });
   }
   return false;
+}
+
+void MapViewBase::togglePathTool()
+{
+  m_toolBox.togglePathTool();
+}
+
+bool MapViewBase::canTogglePathTool() const
+{
+  return true;
+}
+
+bool MapViewBase::pathToolActive() const
+{
+  return m_toolBox.pathToolActive();
+}
+
+void MapViewBase::performPathCreation()
+{
+  m_toolBox.performPathCreation();
+}
+
+void MapViewBase::removeLastPathPoint()
+{
+  m_toolBox.removeLastPathPoint();
 }
 
 } // namespace tb::ui

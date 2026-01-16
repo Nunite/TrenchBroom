@@ -454,6 +454,8 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/MultiPaneMapView.cpp
         ${COMMON_SOURCE_DIR}/ui/ObjExportDialog.cpp
         ${COMMON_SOURCE_DIR}/ui/OnePaneMapView.cpp
+        ${COMMON_SOURCE_DIR}/ui/PathTool.cpp
+        ${COMMON_SOURCE_DIR}/ui/PathToolController.cpp
         ${COMMON_SOURCE_DIR}/ui/PickRequest.cpp
         ${COMMON_SOURCE_DIR}/ui/PopupButton.cpp
         ${COMMON_SOURCE_DIR}/ui/PopupWindow.cpp
@@ -1023,6 +1025,8 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/MultiPaneMapView.h
         ${COMMON_SOURCE_DIR}/ui/ObjExportDialog.h
         ${COMMON_SOURCE_DIR}/ui/OnePaneMapView.h
+        ${COMMON_SOURCE_DIR}/ui/PathTool.h
+        ${COMMON_SOURCE_DIR}/ui/PathToolController.h
         ${COMMON_SOURCE_DIR}/ui/PickRequest.h
         ${COMMON_SOURCE_DIR}/ui/PopupButton.h
         ${COMMON_SOURCE_DIR}/ui/PopupWindow.h

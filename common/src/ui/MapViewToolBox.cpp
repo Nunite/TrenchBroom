@@ -24,6 +24,7 @@
 #include "ui/ClipTool.h"
 #include "ui/CreateEntityTool.h"
 #include "ui/DrawShapeTool.h"
+#include "ui/PathTool.h"
 #include "ui/EdgeTool.h"
 #include "ui/ExtrudeTool.h"
 #include "ui/FaceTool.h"
@@ -63,6 +64,11 @@ CreateEntityTool& MapViewToolBox::createEntityTool()
 DrawShapeTool& MapViewToolBox::drawShapeTool()
 {
   return *m_drawShapeTool;
+}
+
+PathTool& MapViewToolBox::pathTool()
+{
+  return *m_pathTool;
 }
 
 MoveObjectsTool& MapViewToolBox::moveObjectsTool()
@@ -232,6 +238,28 @@ bool MapViewToolBox::faceToolActive() const
   return m_faceTool->active();
 }
 
+void MapViewToolBox::togglePathTool()
+{
+  toggleTool(pathTool());
+}
+
+bool MapViewToolBox::pathToolActive() const
+{
+  return m_pathTool->active();
+}
+
+void MapViewToolBox::performPathCreation()
+{
+  assert(pathToolActive());
+  m_pathTool->createPathEntities();
+}
+
+void MapViewToolBox::removeLastPathPoint()
+{
+  assert(pathToolActive());
+  m_pathTool->removeLastPoint();
+}
+
 bool MapViewToolBox::anyModalToolActive() const
 {
   return rotateToolActive() || scaleToolActive() || shearToolActive()
@@ -261,6 +289,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   m_assembleBrushTool = std::make_unique<AssembleBrushTool>(m_map);
   m_createEntityTool = std::make_unique<CreateEntityTool>(m_map);
   m_drawShapeTool = std::make_unique<DrawShapeTool>(m_map);
+  m_pathTool = std::make_unique<PathTool>(m_map);
   m_moveObjectsTool = std::make_unique<MoveObjectsTool>(m_map);
   m_extrudeTool = std::make_unique<ExtrudeTool>(m_map);
   m_rotateTool = std::make_unique<RotateTool>(m_map);
@@ -283,14 +312,15 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
     assembleBrushTool(), vertexTool(), edgeTool(), faceTool(), clipTool());
 
   suppressWhileActive(
-    assembleBrushTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
-  suppressWhileActive(rotateTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
-  suppressWhileActive(scaleTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
-  suppressWhileActive(shearTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
-  suppressWhileActive(vertexTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
-  suppressWhileActive(edgeTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
-  suppressWhileActive(faceTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
-  suppressWhileActive(clipTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+    assembleBrushTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
+  suppressWhileActive(rotateTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
+  suppressWhileActive(scaleTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
+  suppressWhileActive(shearTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
+  suppressWhileActive(vertexTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
+  suppressWhileActive(edgeTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
+  suppressWhileActive(faceTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
+  suppressWhileActive(clipTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
+  suppressWhileActive(pathTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
 
   registerTool(moveObjectsTool(), bookCtrl);
   registerTool(rotateTool(), bookCtrl);
@@ -304,6 +334,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   registerTool(faceTool(), bookCtrl);
   registerTool(createEntityTool(), bookCtrl);
   registerTool(drawShapeTool(), bookCtrl);
+  registerTool(pathTool(), bookCtrl);
 
   updateToolPage();
 }
@@ -391,6 +422,10 @@ void MapViewToolBox::updateToolPage()
   else if (clipToolActive())
   {
     clipTool().showPage();
+  }
+  else if (pathToolActive())
+  {
+    pathTool().showPage();
   }
   else
   {

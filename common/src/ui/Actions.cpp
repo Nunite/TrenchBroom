@@ -413,6 +413,26 @@ void ActionManager::createViewActions()
     },
   });
   addAction(Action{
+    std::filesystem::path{"Controls/Map view/Create Path Entities"},
+    QObject::tr("Create Path Entities"),
+    ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::PathTool,
+    QKeySequence{Qt::Key_Return},
+    [](auto& context) { context.frame().performPathCreation(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.frame().pathToolActive();
+    },
+  });
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Remove Last Path Point"},
+    QObject::tr("Remove Last Path Point"),
+    ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::PathTool,
+    QKeySequence{Qt::Key_Backspace},
+    [](auto& context) { context.frame().removeLastPathPoint(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.frame().pathToolActive();
+    },
+  });
+  addAction(Action{
     std::filesystem::path{"Controls/Map view/Toggle clip side"},
     QObject::tr("Toggle Clip Side"),
     ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::ClipTool,
@@ -1715,6 +1735,21 @@ void ActionManager::createToolsMenu()
     std::filesystem::path{"FaceTool.svg"},
   }));
   toolsMenu.addItem(addAction(Action{
+    "Menu/Edit/Tools/Path Tool",
+    QObject::tr("Path Tool"),
+    ActionContext::Any,
+    QKeySequence{Qt::Key_P},
+    [](auto& context) { context.frame().togglePathTool(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.frame().canTogglePathTool();
+    },
+    [](const auto& context) {
+      return context.hasDocument() && context.frame().pathToolActive();
+    },
+    std::filesystem::path{"ClipTool.svg"}, // Reuse ClipTool icon as placeholder
+    QObject::tr("Left Click: Add Point\nBackspace: Remove Last\nEnter: Create Path")
+  }));
+  toolsMenu.addItem(addAction(Action{
     "Controls/Map view/Deactivate current tool",
     QObject::tr("Deactivate Current Tool"),
     ActionContext::Any,
@@ -2220,6 +2255,7 @@ void ActionManager::createToolbar()
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Vertex Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Edge Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Face Tool"));
+  m_toolBar.addItem(existingAction("Menu/Edit/Tools/Path Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Rotate Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Scale Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Shear Tool"));

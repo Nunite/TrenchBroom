@@ -216,6 +216,18 @@ public: // tool mode actions
   void toggleClipSide();
   void performClip();
 
+  void toggleFaceTool();
+  bool canToggleFaceTool() const;
+  bool faceToolActive() const;
+
+  void togglePathTool();
+  bool canTogglePathTool() const;
+  bool pathToolActive() const;
+  void performPathCreation();
+  void removeLastPathPoint();
+
+  bool anyModalToolActive() const;
+
 public: // misc actions
   void resetCameraZoom();
   void cancel();
