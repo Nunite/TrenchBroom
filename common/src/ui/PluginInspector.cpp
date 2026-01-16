@@ -187,6 +187,7 @@ PluginInspector::PluginInspector(QWidget* parent)
     v->addLayout(toolbar);
 
     auto* editor = new QPlainTextEdit{};
+    editor->setLineWrapMode(QPlainTextEdit::NoWrap);
     editor->setTabStopDistance(editor->fontMetrics().horizontalAdvance(' ') * 4.0);
     editor->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     v->addWidget(editor, 1);
@@ -206,8 +207,16 @@ PluginInspector::PluginInspector(QWidget* parent)
       {
         return false;
       }
+
+      editor->setUpdatesEnabled(false);
+      const auto wasBlocked = editor->blockSignals(true);
+
       editor->setPlainText(QString::fromUtf8(f.readAll()));
       editor->document()->setModified(false);
+
+      editor->blockSignals(wasBlocked);
+      editor->setUpdatesEnabled(true);
+
       return true;
     };
 
