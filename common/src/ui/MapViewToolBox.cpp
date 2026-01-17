@@ -312,14 +312,14 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
     assembleBrushTool(), vertexTool(), edgeTool(), faceTool(), pathTool(), clipTool());
 
   suppressWhileActive(
-    assembleBrushTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
-  suppressWhileActive(rotateTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
-  suppressWhileActive(scaleTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
-  suppressWhileActive(shearTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
-  suppressWhileActive(vertexTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
-  suppressWhileActive(edgeTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
-  suppressWhileActive(faceTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
-  suppressWhileActive(clipTool(), moveObjectsTool(), extrudeTool(), drawShapeTool(), pathTool());
+    assembleBrushTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+  suppressWhileActive(rotateTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+  suppressWhileActive(scaleTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+  suppressWhileActive(shearTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+  suppressWhileActive(vertexTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+  suppressWhileActive(edgeTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+  suppressWhileActive(faceTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+  suppressWhileActive(clipTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
   suppressWhileActive(pathTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
 
   registerTool(moveObjectsTool(), bookCtrl);
