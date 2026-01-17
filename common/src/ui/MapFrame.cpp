@@ -898,6 +898,7 @@ void MapFrame::toolHandleSelectionChanged(Tool&)
 void MapFrame::selectionDidChange(const mdl::SelectionChange&)
 {
   updateActionStateDelayed();
+  PythonScripting::instance().onSelectionChanged(*this);
   updateStatusBarDelayed();
 }
 

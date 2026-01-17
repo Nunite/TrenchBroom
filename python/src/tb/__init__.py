@@ -561,6 +561,44 @@ class Brush(Protocol):
         ...
 
 
+class Material(Protocol):
+    """材质。"""
+
+    @property
+    def name(self) -> str:
+        """材质名称。"""
+        ...
+
+    @property
+    def width(self) -> int:
+        """宽度。"""
+        ...
+
+    @property
+    def height(self) -> int:
+        """高度。"""
+        ...
+    
+    @property
+    def collection_name(self) -> str:
+        """所属集合名称。"""
+        ...
+
+
+class MaterialCollection(Protocol):
+    """材质集合。"""
+
+    @property
+    def name(self) -> str:
+        """集合名称（路径）。"""
+        ...
+
+    @property
+    def materials(self) -> list[Material]:
+        """包含的材质列表。"""
+        ...
+
+
 class Document(Protocol):
     """当前活动的 map 文档对象。"""
 
@@ -577,6 +615,16 @@ class Document(Protocol):
     @property
     def entities(self) -> list[Entity]:
         """获取地图中的所有实体。"""
+        ...
+
+    @property
+    def materials(self) -> list[Material]:
+        """获取所有可用材质。"""
+        ...
+
+    @property
+    def material_collections(self) -> list[MaterialCollection]:
+        """获取所有材质集合。"""
         ...
 
     def get_selection(self) -> Selection:
@@ -661,6 +709,8 @@ __all__ = [
     "Document",
     "Entity",
     "Face",
+    "Material",
+    "MaterialCollection",
     "Plane",
     "PluginPanel",
     "Selection",
@@ -675,4 +725,31 @@ __all__ = [
     "execute_action",
     "list_actions",
     "transaction",
+    "register_callback",
+    "unregister_callback",
 ]
+
+# Internal callback registry
+_callbacks: dict[str, list[Callable[[], None]]] = {}
+
+def register_callback(event: str, callback: Callable[[], None]) -> None:
+    """
+    注册一个事件回调函数。
+    
+    支持的事件:
+    - "selection_changed": 当选择发生变化时触发。
+    
+    注意：回调函数不应阻塞，且应谨慎执行繁重操作。
+    """
+    if event not in _callbacks:
+        raise ValueError(f"Unknown event type: {event}")
+    
+    if callback not in _callbacks[event]:
+        _callbacks[event].append(callback)
+
+def unregister_callback(event: str, callback: Callable[[], None]) -> None:
+    """
+    注销一个事件回调函数。
+    """
+    if event in _callbacks and callback in _callbacks[event]:
+        _callbacks[event].remove(callback)

@@ -47,6 +47,10 @@
 #include "mdl/Map_Selection.h"
 #include "mdl/Transaction.h"
 #include "mdl/VertexHandleManager.h"
+#include "mdl/MaterialManager.h"
+#include "mdl/MaterialCollection.h"
+#include "mdl/Material.h"
+#include "mdl/Texture.h"
 #include "ui/Actions.h"
 #include "ui/MapFrame.h"
 #include "ui/MapDocument.h"
@@ -126,6 +130,18 @@ struct PyTbTransaction
   tb::mdl::Transaction* transaction;
 };
 
+struct PyTbMaterial
+{
+  PyObject_HEAD
+  const tb::mdl::Material* material;
+};
+
+struct PyTbMaterialCollection
+{
+  PyObject_HEAD
+  const tb::mdl::MaterialCollection* collection;
+};
+
 PyTypeObject* g_vec3Type = nullptr;
 PyTypeObject* g_planeType = nullptr;
 PyTypeObject* g_brushType = nullptr;
@@ -136,6 +152,8 @@ PyTypeObject* g_entityType = nullptr;
 PyTypeObject* g_logWriterType = nullptr;
 PyTypeObject* g_transactionType = nullptr;
 PyTypeObject* g_pluginPanelType = nullptr;
+PyTypeObject* g_materialType = nullptr;
+PyTypeObject* g_materialCollectionType = nullptr;
 
 struct PyTbPluginPanel
 {
@@ -149,6 +167,26 @@ PyObject* createVec3Object(const vm::vec3d& v)
   auto* obj = PyObject_New(PyTbVec3, g_vec3Type);
   if (obj)
     obj->vec = v;
+  return (PyObject*)obj;
+}
+
+PyObject* createMaterialObject(const tb::mdl::Material* material)
+{
+  if (g_materialType == nullptr || material == nullptr)
+    return nullptr;
+  auto* obj = PyObject_New(PyTbMaterial, g_materialType);
+  if (obj)
+    obj->material = material;
+  return (PyObject*)obj;
+}
+
+PyObject* createMaterialCollectionObject(const tb::mdl::MaterialCollection* collection)
+{
+  if (g_materialCollectionType == nullptr || collection == nullptr)
+    return nullptr;
+  auto* obj = PyObject_New(PyTbMaterialCollection, g_materialCollectionType);
+  if (obj)
+    obj->collection = collection;
   return (PyObject*)obj;
 }
 
@@ -3774,6 +3812,103 @@ PyObject* module_create_brush(PyObject*, PyObject* args)
     return createVec3Object(normal);
   }
 
+  // Material methods
+  PyObject* material_get_name(PyObject* self, void*)
+  {
+    auto* obj = (PyTbMaterial*)self;
+    return toPyString(obj->material->name());
+  }
+
+  PyObject* material_get_collection_name(PyObject* self, void*)
+  {
+    auto* obj = (PyTbMaterial*)self;
+    return toPyString(obj->material->collectionName());
+  }
+
+  PyObject* material_get_width(PyObject* self, void*)
+  {
+    auto* obj = (PyTbMaterial*)self;
+    const auto* tex = obj->material->texture();
+    return PyLong_FromSize_t(tex ? tex->width() : 0);
+  }
+
+  PyObject* material_get_height(PyObject* self, void*)
+  {
+    auto* obj = (PyTbMaterial*)self;
+    const auto* tex = obj->material->texture();
+    return PyLong_FromSize_t(tex ? tex->height() : 0);
+  }
+
+  // MaterialCollection methods
+  PyObject* material_collection_get_name(PyObject* self, void*)
+  {
+    auto* obj = (PyTbMaterialCollection*)self;
+    return toPyString(obj->collection->path().generic_string());
+  }
+
+  PyObject* material_collection_get_materials(PyObject* self, void*)
+  {
+    auto* obj = (PyTbMaterialCollection*)self;
+    const auto& materials = obj->collection->materials();
+    auto* list = PyList_New(static_cast<Py_ssize_t>(materials.size()));
+    if (!list) return nullptr;
+    
+    for (size_t i = 0; i < materials.size(); ++i)
+    {
+      auto* matObj = createMaterialObject(&materials[i]);
+      if (!matObj) {
+          Py_DECREF(list);
+          return nullptr;
+      }
+      PyList_SET_ITEM(list, static_cast<Py_ssize_t>(i), matObj);
+    }
+    return list;
+  }
+
+  PyObject* document_get_materials(PyObject* self, void*)
+  {
+    auto* docObj = (PyTbDocument*)self;
+    auto* doc = docObj->document;
+    if (!doc) return nullptr;
+
+    const auto& materials = doc->map().materialManager().materials();
+    auto* list = PyList_New(static_cast<Py_ssize_t>(materials.size()));
+    if (!list) return nullptr;
+
+    for (size_t i = 0; i < materials.size(); ++i)
+    {
+      auto* matObj = createMaterialObject(materials[i]);
+      if (!matObj) {
+          Py_DECREF(list);
+          return nullptr;
+      }
+      PyList_SET_ITEM(list, static_cast<Py_ssize_t>(i), matObj);
+    }
+    return list;
+  }
+
+  PyObject* document_get_material_collections(PyObject* self, void*)
+  {
+    auto* docObj = (PyTbDocument*)self;
+    auto* doc = docObj->document;
+    if (!doc) return nullptr;
+
+    const auto& collections = doc->map().materialManager().collections();
+    auto* list = PyList_New(static_cast<Py_ssize_t>(collections.size()));
+    if (!list) return nullptr;
+
+    for (size_t i = 0; i < collections.size(); ++i)
+    {
+      auto* colObj = createMaterialCollectionObject(&collections[i]);
+      if (!colObj) {
+          Py_DECREF(list);
+          return nullptr;
+      }
+      PyList_SET_ITEM(list, static_cast<Py_ssize_t>(i), colObj);
+    }
+    return list;
+  }
+
   static PyMethodDef brushMethods[] = {
       {"faces", brush_faces, METH_NOARGS, nullptr},
       {"delete", brush_delete, METH_NOARGS, nullptr},
@@ -3806,6 +3941,87 @@ PyObject* module_create_brush(PyObject*, PyObject* args)
 
 
 
+
+PyObject* module_register_callback(PyObject* self, PyObject* args)
+{
+  const char* event = nullptr;
+  PyObject* callback = nullptr;
+  if (!PyArg_ParseTuple(args, "sO", &event, &callback))
+  {
+    return nullptr;
+  }
+
+  if (!PyCallable_Check(callback))
+  {
+    PyErr_SetString(PyExc_TypeError, "Callback must be callable");
+    return nullptr;
+  }
+
+  PyObject* dict = PyModule_GetDict(self);
+  if (dict == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Could not get module dict");
+    return nullptr;
+  }
+
+  PyObject* callbacks = PyDict_GetItemString(dict, "_callbacks");
+  if (callbacks == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "_callbacks not found in module");
+    return nullptr;
+  }
+
+  PyObject* list = PyDict_GetItemString(callbacks, event);
+  if (list == nullptr)
+  {
+    PyErr_Format(PyExc_ValueError, "Unknown event type: %s", event);
+    return nullptr;
+  }
+
+  int contains = PySequence_Contains(list, callback);
+  if (contains == -1) return nullptr;
+  if (contains == 1)
+  {
+    Py_RETURN_NONE;
+  }
+
+  if (PyList_Append(list, callback) != 0)
+  {
+    return nullptr;
+  }
+
+  Py_RETURN_NONE;
+}
+
+PyObject* module_unregister_callback(PyObject* self, PyObject* args)
+{
+  const char* event = nullptr;
+  PyObject* callback = nullptr;
+  if (!PyArg_ParseTuple(args, "sO", &event, &callback))
+  {
+    return nullptr;
+  }
+
+  PyObject* dict = PyModule_GetDict(self);
+  if (dict == nullptr) return nullptr;
+
+  PyObject* callbacks = PyDict_GetItemString(dict, "_callbacks");
+  if (callbacks == nullptr) return nullptr;
+
+  PyObject* list = PyDict_GetItemString(callbacks, event);
+  if (list == nullptr) return nullptr;
+
+  int contains = PySequence_Contains(list, callback);
+  if (contains == -1) return nullptr;
+  if (contains == 1)
+  {
+    PyObject* res = PyObject_CallMethod(list, "remove", "O", callback);
+    if (res == nullptr) return nullptr;
+    Py_DECREF(res);
+  }
+
+  Py_RETURN_NONE;
+}
 
 PyObject* module_current_document(PyObject*, PyObject*)
 {
@@ -4006,6 +4222,8 @@ bool registerTypes(PyObject* module)
     static PyGetSetDef documentGetSet[] = {
       {"selection", document_get_selection, nullptr, nullptr, nullptr},
       {"entities", document_entities, nullptr, nullptr, nullptr},
+      {"materials", document_get_materials, nullptr, nullptr, nullptr},
+      {"material_collections", document_get_material_collections, nullptr, nullptr, nullptr},
       {nullptr, nullptr, nullptr, nullptr, nullptr},
     };
     documentType.tp_getset = documentGetSet;
@@ -4238,6 +4456,68 @@ bool registerTypes(PyObject* module)
     }
   }
 
+  if (g_materialType == nullptr)
+  {
+    static PyGetSetDef materialGetSet[] = {
+      {"name", material_get_name, nullptr, nullptr, nullptr},
+      {"width", material_get_width, nullptr, nullptr, nullptr},
+      {"height", material_get_height, nullptr, nullptr, nullptr},
+      {"collection_name", material_get_collection_name, nullptr, nullptr, nullptr},
+      {nullptr, nullptr, nullptr, nullptr, nullptr}
+    };
+
+    static PyTypeObject materialType = PyTypeObject{};
+    materialType = PyTypeObject{};
+    materialType.tp_name = "tb.Material";
+    materialType.tp_basicsize = sizeof(PyTbMaterial);
+    materialType.tp_flags = Py_TPFLAGS_DEFAULT;
+    materialType.tp_getset = materialGetSet;
+    materialType.tp_dealloc = freePythonObject;
+
+    if (PyType_Ready(&materialType) != 0)
+    {
+      return false;
+    }
+    g_materialType = &materialType;
+
+    Py_INCREF(g_materialType);
+    if (PyModule_AddObject(module, "Material", reinterpret_cast<PyObject*>(g_materialType)) != 0)
+    {
+      Py_DECREF(g_materialType);
+      return false;
+    }
+  }
+
+  if (g_materialCollectionType == nullptr)
+  {
+    static PyGetSetDef materialCollectionGetSet[] = {
+      {"name", material_collection_get_name, nullptr, nullptr, nullptr},
+      {"materials", material_collection_get_materials, nullptr, nullptr, nullptr},
+      {nullptr, nullptr, nullptr, nullptr, nullptr}
+    };
+
+    static PyTypeObject materialCollectionType = PyTypeObject{};
+    materialCollectionType = PyTypeObject{};
+    materialCollectionType.tp_name = "tb.MaterialCollection";
+    materialCollectionType.tp_basicsize = sizeof(PyTbMaterialCollection);
+    materialCollectionType.tp_flags = Py_TPFLAGS_DEFAULT;
+    materialCollectionType.tp_getset = materialCollectionGetSet;
+    materialCollectionType.tp_dealloc = freePythonObject;
+
+    if (PyType_Ready(&materialCollectionType) != 0)
+    {
+      return false;
+    }
+    g_materialCollectionType = &materialCollectionType;
+
+    Py_INCREF(g_materialCollectionType);
+    if (PyModule_AddObject(module, "MaterialCollection", reinterpret_cast<PyObject*>(g_materialCollectionType)) != 0)
+    {
+      Py_DECREF(g_materialCollectionType);
+      return false;
+    }
+  }
+
   if (g_pluginPanelType == nullptr)
   {
     static PyTypeObject pluginPanelType = PyTypeObject{};
@@ -4351,6 +4631,8 @@ bool ensureInitialized()
   {
     if (PyImport_AppendInittab("tb", []() -> PyObject* {
           static PyMethodDef methods[] = {
+            {"register_callback", module_register_callback, METH_VARARGS, nullptr},
+            {"unregister_callback", module_unregister_callback, METH_VARARGS, nullptr},
             {"document", module_document, METH_NOARGS, nullptr},
             {"current_document", module_current_document, METH_NOARGS, nullptr},
             {"transaction", module_transaction, METH_VARARGS, nullptr},
@@ -4535,6 +4817,21 @@ bool ensureInitialized()
             return nullptr;
           }
 
+          // Initialize callbacks registry
+          auto* callbacks = PyDict_New();
+          if (callbacks == nullptr) { Py_DECREF(module); return nullptr; }
+          
+          // Pre-create lists for known events
+          auto* list = PyList_New(0);
+          PyDict_SetItemString(callbacks, "selection_changed", list);
+          Py_DECREF(list);
+          
+          if (PyModule_AddObject(module, "_callbacks", callbacks) != 0) {
+             Py_DECREF(callbacks);
+             Py_DECREF(module);
+             return nullptr;
+          }
+
           if (!registerTypes(module))
           {
             Py_DECREF(module);
@@ -4709,4 +5006,90 @@ bool PythonScripting::runScript(MapFrame& frame, const std::filesystem::path& pa
   return true;
 }
 
+void PythonScripting::onSelectionChanged(MapFrame& frame)
+{
+  if (!g_pythonRegistered || !Py_IsInitialized())
+  {
+    return;
+  }
+
+  auto gil = PyGILState_Ensure();
+
+  auto* prev = g_currentFrame;
+  g_currentFrame = &frame;
+
+  PyObject* oldStdout = PySys_GetObject("stdout");
+  PyObject* oldStderr = PySys_GetObject("stderr");
+  if (oldStdout)
+  {
+    Py_INCREF(oldStdout);
+  }
+  if (oldStderr)
+  {
+    Py_INCREF(oldStderr);
+  }
+
+  auto* newStdout = createLogWriterObject(0);
+  auto* newStderr = createLogWriterObject(1);
+  if (newStdout && newStderr)
+  {
+    PySys_SetObject("stdout", newStdout);
+    PySys_SetObject("stderr", newStderr);
+  }
+  Py_XDECREF(newStdout);
+  Py_XDECREF(newStderr);
+
+  PyObject* tbModule = PyImport_ImportModule("tb");
+  if (tbModule)
+  {
+      PyObject* callbacks = PyObject_GetAttrString(tbModule, "_callbacks");
+      if (callbacks && PyDict_Check(callbacks))
+      {
+          PyObject* list = PyDict_GetItemString(callbacks, "selection_changed");
+          if (list && PyList_Check(list))
+          {
+              Py_ssize_t size = PyList_Size(list);
+              for (Py_ssize_t i = 0; i < size; ++i)
+              {
+                  PyObject* func = PyList_GetItem(list, i);
+                  if (PyCallable_Check(func))
+                  {
+                      PyObject* res = PyObject_CallObject(func, nullptr);
+                      if (res == nullptr)
+                      {
+                          PyErr_Print();
+                          frame.pythonLogger().error("Error in selection_changed callback");
+                      }
+                      else
+                      {
+                          Py_DECREF(res);
+                      }
+                  }
+              }
+          }
+      }
+      Py_XDECREF(callbacks);
+      Py_DECREF(tbModule);
+  }
+  else
+  {
+      PyErr_Clear();
+  }
+
+  if (oldStdout)
+  {
+    PySys_SetObject("stdout", oldStdout);
+    Py_DECREF(oldStdout);
+  }
+  if (oldStderr)
+  {
+    PySys_SetObject("stderr", oldStderr);
+    Py_DECREF(oldStderr);
+  }
+
+  g_currentFrame = prev;
+  PyGILState_Release(gil);
+}
+
 } // namespace tb::ui
+

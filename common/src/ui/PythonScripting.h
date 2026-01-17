@@ -38,6 +38,8 @@ public:
   static PythonScripting& instance();
 
   bool runScript(MapFrame& frame, const std::filesystem::path& path);
+
+  void onSelectionChanged(MapFrame& frame);
 };
 
 } // namespace tb::ui

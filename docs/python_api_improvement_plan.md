@@ -59,7 +59,7 @@
 ### 任务
 
 1.  **暴露 `Vec3` 类** (✅ 已完成)
-    *   **状态**: 已实现 `tb.Vec3`，支持运算符重载。
+    *   **状态**: 已实现 `tb.Vec3`，支持运算符重载及常用数学方法 (`dot`, `cross`, `length`, `normalize`)。
     *   **可行性**: 80% (封装 `math::Vec3` 或使用轻量级结构体)
     *   **必要性**: 高 (High)
     *   **描述**: 具有运算符重载的适当向量类。
@@ -69,12 +69,14 @@
         v2 = v * 2 + tb.Vec3(0, 1, 0)
         ```
 
-2.  **暴露 `Plane` 类**
+2.  **暴露 `Plane` 类** (✅ 已完成)
+    *   **状态**: 已实现 `tb.Plane`。
     *   **可行性**: 80%
     *   **必要性**: 高 (High)
     *   **描述**: 定义笔刷几何体所必需。
 
-3.  **增强的 Selection API**
+3.  **增强的 Selection API** (✅ 已完成)
+    *   **状态**: 已实现 `select`, `deselect`, `add`, `set` 等方法。
     *   **可行性**: 100%
     *   **必要性**: 高 (High)
     *   **描述**: 允许除当前工具之外的程序化选择更改。
@@ -82,6 +84,17 @@
         ```python
         tb.Selection.select(brush)
         tb.Selection.deselect_all()
+        ```
+
+4.  **暴露 `Material` 与 `MaterialCollection`** (✅ 已完成)
+    *   **状态**: 已实现 `tb.Material`, `tb.MaterialCollection` 及 `Document.materials`。
+    *   **可行性**: 100%
+    *   **必要性**: 高 (High)
+    *   **描述**: 允许访问项目中可用的纹理和材质集合。
+    *   **API 目标**:
+        ```python
+        for mat in tb.Document.current().materials:
+            print(mat.name, mat.width, mat.height)
         ```
 
 ---
@@ -92,12 +105,20 @@
 
 ### 任务
 
-1.  **事件系统**
-    *   **可行性**: 60% (需要将 C++ 信号/槽映射到 Python 回调)
+1.  **事件系统** (✅ 已完成)
+    *   **状态**: 已实现 `tb.register_callback` 和 `tb.unregister_callback`，支持 `selection_changed` 事件。
+    *   **可行性**: 100%
     *   **必要性**: 中 (Medium)
-    *   **描述**: 用于 `on_selection_changed`, `on_document_opened` 的钩子。
+    *   **描述**: 用于 `on_selection_changed` 的钩子。
+    *   **API 目标**:
+        ```python
+        def my_callback():
+            print("Selection changed!")
+        tb.register_callback("selection_changed", my_callback)
+        ```
 
 2.  **高级 UI 控件**
+    *   **状态**: 部分完成 (ColorPicker 已实现, 材质列表可通过 API 访问，但缺少专用 UI 控件)。
     *   **可行性**: 70%
     *   **必要性**: 中 (Medium)
     *   **描述**: 向 `PluginPanel` 添加 ColorPickers (颜色选择器), TextureBrowsers (纹理浏览器)。
