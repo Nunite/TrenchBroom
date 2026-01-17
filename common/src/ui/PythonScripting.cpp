@@ -1643,7 +1643,7 @@ PyObject* plugin_panel_add_color_field(PyObject* self, PyObject* args)
       if (PyObject_TypeCheck(initialColorObj, g_vec3Type))
       {
           auto* v = (PyTbVec3*)initialColorObj;
-          color = QColor::fromRgbF(v->vec.x(), v->vec.y(), v->vec.z());
+          color = QColor::fromRgbF(static_cast<float>(v->vec.x()), static_cast<float>(v->vec.y()), static_cast<float>(v->vec.z()));
       }
       else if (PySequence_Check(initialColorObj) && PySequence_Size(initialColorObj) == 3)
       {
@@ -3269,11 +3269,6 @@ PyObject* brush_faces(PyObject* self, PyObject*)
   return list;
 }
 
-PyObject* brush_get_faces(PyObject* self, void*)
-{
-  return brush_faces(self, nullptr);
-}
-
 PyObject* brush_bounds(PyObject* self, void*)
 {
   auto* brushObj = getBrushFromPy(self);
@@ -3358,17 +3353,7 @@ PyObject* brush_bounds(PyObject* self, void*)
    }
  }
  
- PyObject* face_texture_name(PyObject* self, void*)
- {
-  auto* faceObj = getFaceFromPy(self);
-  if (faceObj == nullptr)
-  {
-    return nullptr;
-  }
-  return toPyString(faceObj->brushNode->brush().faces()[faceObj->faceIndex].attributes().materialName());
-}
-
-int face_set_texture_name(PyObject* self, PyObject* value, void*)
+ int face_set_texture_name(PyObject* self, PyObject* value, void*)
 {
   auto* faceObj = getFaceFromPy(self);
   if (faceObj == nullptr)
