@@ -40,6 +40,10 @@
 #include "mdl/Map_Entities.h"
 #include "mdl/Map_Geometry.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Brushes.h"
+#include "mdl/BrushBuilder.h"
+#include "mdl/BrushFace.h"
+#include "mdl/BrushFaceAttributes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Transaction.h"
 #include "mdl/VertexHandleManager.h"
@@ -57,8 +61,10 @@
 #include <QSpinBox>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QColorDialog>
 
 #include "vm/segment.h"
+#include "vm/plane.h"
 
 #include <string>
 
@@ -68,6 +74,29 @@ namespace
 {
 thread_local MapFrame* g_currentFrame = nullptr;
 bool g_pythonRegistered = false;
+
+struct PyTbVec3
+{
+  PyObject_HEAD vm::vec3d vec;
+};
+
+struct PyTbPlane
+{
+  PyObject_HEAD vm::plane3d plane;
+};
+
+struct PyTbBrush
+{
+  PyObject_HEAD tb::ui::MapDocument* document;
+  tb::mdl::BrushNode* brushNode;
+};
+
+struct PyTbFace
+{
+  PyObject_HEAD tb::ui::MapDocument* document;
+  tb::mdl::BrushNode* brushNode;
+  size_t faceIndex;
+};
 
 struct PyTbDocument
 {
@@ -97,6 +126,10 @@ struct PyTbTransaction
   tb::mdl::Transaction* transaction;
 };
 
+PyTypeObject* g_vec3Type = nullptr;
+PyTypeObject* g_planeType = nullptr;
+PyTypeObject* g_brushType = nullptr;
+PyTypeObject* g_faceType = nullptr;
 PyTypeObject* g_documentType = nullptr;
 PyTypeObject* g_selectionType = nullptr;
 PyTypeObject* g_entityType = nullptr;
@@ -108,6 +141,16 @@ struct PyTbPluginPanel
 {
   PyObject_HEAD QPointer<QWidget>* container;
 };
+
+PyObject* createVec3Object(const vm::vec3d& v)
+{
+  if (g_vec3Type == nullptr)
+    return nullptr;
+  auto* obj = PyObject_New(PyTbVec3, g_vec3Type);
+  if (obj)
+    obj->vec = v;
+  return (PyObject*)obj;
+}
 
 PyObject* toPyString(const std::string& str)
 {
@@ -147,6 +190,440 @@ PyObject* toPyVec3dTuple(const vm::vec3d& v)
   PyTuple_SET_ITEM(tuple, 2, z);
 
   return tuple;
+}
+
+PyObject* vec3_new(PyTypeObject* type, PyObject*, PyObject*)
+{
+  auto* self = (PyTbVec3*)type->tp_alloc(type, 0);
+  if (self != nullptr)
+  {
+    new (&self->vec) vm::vec3d{};
+  }
+  return (PyObject*)self;
+}
+
+int vec3_init(PyTbVec3* self, PyObject* args, PyObject*)
+{
+  double x = 0.0, y = 0.0, z = 0.0;
+  if (!PyArg_ParseTuple(args, "|ddd", &x, &y, &z))
+  {
+    return -1;
+  }
+  self->vec = vm::vec3d{x, y, z};
+  return 0;
+}
+
+void vec3_dealloc(PyTbVec3* self)
+{
+  Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+PyObject* vec3_repr(PyTbVec3* self)
+{
+  char buffer[128];
+  snprintf(buffer, sizeof(buffer), "Vec3(%g, %g, %g)", self->vec.x(), self->vec.y(), self->vec.z());
+  return PyUnicode_FromString(buffer);
+}
+
+PyObject* vec3_str(PyTbVec3* self)
+{
+  char buffer[128];
+  snprintf(buffer, sizeof(buffer), "%g %g %g", self->vec.x(), self->vec.y(), self->vec.z());
+  return PyUnicode_FromString(buffer);
+}
+
+PyObject* vec3_get_x(PyObject* self, void*)
+{
+  auto* v = (PyTbVec3*)self;
+  return PyFloat_FromDouble(v->vec.x());
+}
+PyObject* vec3_get_y(PyObject* self, void*)
+{
+  auto* v = (PyTbVec3*)self;
+  return PyFloat_FromDouble(v->vec.y());
+}
+PyObject* vec3_get_z(PyObject* self, void*)
+{
+  auto* v = (PyTbVec3*)self;
+  return PyFloat_FromDouble(v->vec.z());
+}
+
+int vec3_set_x(PyObject* self, PyObject* value, void*)
+{
+  auto* v = (PyTbVec3*)self;
+  if (PyFloat_Check(value))
+    v->vec[0] = PyFloat_AsDouble(value);
+  else if (PyLong_Check(value))
+    v->vec[0] = PyLong_AsDouble(value);
+  else
+  {
+    PyErr_SetString(PyExc_TypeError, "Float required");
+    return -1;
+  }
+  return 0;
+}
+int vec3_set_y(PyObject* self, PyObject* value, void*)
+{
+  auto* v = (PyTbVec3*)self;
+  if (PyFloat_Check(value))
+    v->vec[1] = PyFloat_AsDouble(value);
+  else if (PyLong_Check(value))
+    v->vec[1] = PyLong_AsDouble(value);
+  else
+  {
+    PyErr_SetString(PyExc_TypeError, "Float required");
+    return -1;
+  }
+  return 0;
+}
+int vec3_set_z(PyObject* self, PyObject* value, void*)
+{
+  auto* v = (PyTbVec3*)self;
+  if (PyFloat_Check(value))
+    v->vec[2] = PyFloat_AsDouble(value);
+  else if (PyLong_Check(value))
+    v->vec[2] = PyLong_AsDouble(value);
+  else
+  {
+    PyErr_SetString(PyExc_TypeError, "Float required");
+    return -1;
+  }
+  return 0;
+}
+
+PyObject* vec3_add(PyObject* left, PyObject* right)
+{
+  if (PyObject_TypeCheck(left, g_vec3Type) && PyObject_TypeCheck(right, g_vec3Type))
+  {
+    auto* l = (PyTbVec3*)left;
+    auto* r = (PyTbVec3*)right;
+    auto* res = (PyTbVec3*)g_vec3Type->tp_alloc(g_vec3Type, 0);
+    new (&res->vec) vm::vec3d{l->vec + r->vec};
+    return (PyObject*)res;
+  }
+  Py_RETURN_NOTIMPLEMENTED;
+}
+
+PyObject* vec3_sub(PyObject* left, PyObject* right)
+{
+  if (PyObject_TypeCheck(left, g_vec3Type) && PyObject_TypeCheck(right, g_vec3Type))
+  {
+    auto* l = (PyTbVec3*)left;
+    auto* r = (PyTbVec3*)right;
+    auto* res = (PyTbVec3*)g_vec3Type->tp_alloc(g_vec3Type, 0);
+    new (&res->vec) vm::vec3d{l->vec - r->vec};
+    return (PyObject*)res;
+  }
+  Py_RETURN_NOTIMPLEMENTED;
+}
+
+PyObject* vec3_mul(PyObject* left, PyObject* right)
+{
+  if (PyObject_TypeCheck(left, g_vec3Type))
+  {
+    auto* l = (PyTbVec3*)left;
+    double scalar = 0.0;
+    if (PyFloat_Check(right))
+      scalar = PyFloat_AsDouble(right);
+    else if (PyLong_Check(right))
+      scalar = PyLong_AsDouble(right);
+    else
+      Py_RETURN_NOTIMPLEMENTED;
+
+    auto* res = (PyTbVec3*)g_vec3Type->tp_alloc(g_vec3Type, 0);
+    new (&res->vec) vm::vec3d{l->vec * scalar};
+    return (PyObject*)res;
+  }
+  else if (PyObject_TypeCheck(right, g_vec3Type))
+  {
+    return vec3_mul(right, left);
+  }
+  Py_RETURN_NOTIMPLEMENTED;
+}
+
+PyObject* vec3_truediv(PyObject* left, PyObject* right)
+{
+  if (PyObject_TypeCheck(left, g_vec3Type))
+  {
+    auto* l = (PyTbVec3*)left;
+    double scalar = 0.0;
+    if (PyFloat_Check(right))
+      scalar = PyFloat_AsDouble(right);
+    else if (PyLong_Check(right))
+      scalar = PyLong_AsDouble(right);
+    else
+      Py_RETURN_NOTIMPLEMENTED;
+
+    if (scalar == 0.0)
+    {
+      PyErr_SetString(PyExc_ZeroDivisionError, "float division by zero");
+      return nullptr;
+    }
+
+    auto* res = (PyTbVec3*)g_vec3Type->tp_alloc(g_vec3Type, 0);
+    new (&res->vec) vm::vec3d{l->vec / scalar};
+    return (PyObject*)res;
+  }
+  Py_RETURN_NOTIMPLEMENTED;
+}
+
+PyObject* vec3_neg(PyObject* self)
+{
+  auto* v = (PyTbVec3*)self;
+  auto* res = (PyTbVec3*)g_vec3Type->tp_alloc(g_vec3Type, 0);
+  new (&res->vec) vm::vec3d{-v->vec};
+  return (PyObject*)res;
+}
+
+Py_ssize_t vec3_len(PyObject*)
+{
+  return 3;
+}
+
+PyObject* vec3_getitem(PyObject* self, Py_ssize_t i)
+{
+  auto* v = (PyTbVec3*)self;
+  if (i < 0 || i >= 3)
+  {
+    PyErr_SetString(PyExc_IndexError, "Vec3 index out of range");
+    return nullptr;
+  }
+  return PyFloat_FromDouble(v->vec[static_cast<size_t>(i)]);
+}
+
+PyObject* vec3_richcompare(PyObject* self, PyObject* other, int op)
+{
+  if (!PyObject_TypeCheck(self, g_vec3Type) || !PyObject_TypeCheck(other, g_vec3Type))
+  {
+    Py_RETURN_NOTIMPLEMENTED;
+  }
+
+  auto* v1 = (PyTbVec3*)self;
+  auto* v2 = (PyTbVec3*)other;
+
+  if (op == Py_EQ)
+  {
+    if (v1->vec == v2->vec) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+  }
+  else if (op == Py_NE)
+  {
+    if (v1->vec != v2->vec) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+  }
+
+  Py_RETURN_NOTIMPLEMENTED;
+}
+
+PyObject* vec3_dot(PyObject* self, PyObject* args)
+{
+  PyObject* otherObj = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &otherObj))
+  {
+    return nullptr;
+  }
+
+  if (!PyObject_TypeCheck(otherObj, g_vec3Type))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected tb.Vec3");
+    return nullptr;
+  }
+
+  auto* v1 = (PyTbVec3*)self;
+  auto* v2 = (PyTbVec3*)otherObj;
+
+  return PyFloat_FromDouble(vm::dot(v1->vec, v2->vec));
+}
+
+PyObject* vec3_cross(PyObject* self, PyObject* args)
+{
+  PyObject* otherObj = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &otherObj))
+  {
+    return nullptr;
+  }
+
+  if (!PyObject_TypeCheck(otherObj, g_vec3Type))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected tb.Vec3");
+    return nullptr;
+  }
+
+  auto* v1 = (PyTbVec3*)self;
+  auto* v2 = (PyTbVec3*)otherObj;
+
+  return createVec3Object(vm::cross(v1->vec, v2->vec));
+}
+
+PyObject* vec3_length(PyObject* self, PyObject*)
+{
+  auto* v = (PyTbVec3*)self;
+  return PyFloat_FromDouble(vm::length(v->vec));
+}
+
+PyObject* vec3_normalize(PyObject* self, PyObject*)
+{
+  auto* v = (PyTbVec3*)self;
+  return createVec3Object(vm::normalize(v->vec));
+}
+
+PyObject* plane_new(PyTypeObject* type, PyObject*, PyObject*)
+{
+  auto* self = (PyTbPlane*)type->tp_alloc(type, 0);
+  if (self != nullptr)
+  {
+    new (&self->plane) vm::plane3d{};
+  }
+  return (PyObject*)self;
+}
+
+int plane_init(PyTbPlane* self, PyObject* args, PyObject*)
+{
+  PyObject* normalObj = nullptr;
+  double dist = 0.0;
+  if (!PyArg_ParseTuple(args, "Od", &normalObj, &dist))
+  {
+    return -1;
+  }
+
+  if (!PyObject_TypeCheck(normalObj, g_vec3Type))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected tb.Vec3 for normal");
+    return -1;
+  }
+
+  auto* v = (PyTbVec3*)normalObj;
+  self->plane = vm::plane3d{dist, v->vec};
+  return 0;
+}
+
+void plane_dealloc(PyTbPlane* self)
+{
+  Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+PyObject* plane_repr(PyTbPlane* self)
+{
+  char buffer[256];
+  snprintf(buffer, sizeof(buffer), "Plane(normal=Vec3(%g, %g, %g), dist=%g)",
+           self->plane.normal.x(), self->plane.normal.y(), self->plane.normal.z(), self->plane.distance);
+  return PyUnicode_FromString(buffer);
+}
+
+PyObject* plane_from_points(PyObject*, PyObject* args)
+{
+  PyObject* p1Obj = nullptr;
+  PyObject* p2Obj = nullptr;
+  PyObject* p3Obj = nullptr;
+
+  if (!PyArg_ParseTuple(args, "OOO", &p1Obj, &p2Obj, &p3Obj))
+  {
+    return nullptr;
+  }
+
+  if (!PyObject_TypeCheck(p1Obj, g_vec3Type) ||
+      !PyObject_TypeCheck(p2Obj, g_vec3Type) ||
+      !PyObject_TypeCheck(p3Obj, g_vec3Type))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected 3 tb.Vec3 points");
+    return nullptr;
+  }
+
+  auto* v1 = (PyTbVec3*)p1Obj;
+  auto* v2 = (PyTbVec3*)p2Obj;
+  auto* v3 = (PyTbVec3*)p3Obj;
+
+  try
+  {
+    const auto normal = vm::normalize(vm::cross(v2->vec - v1->vec, v3->vec - v1->vec));
+    const auto dist = vm::dot(v1->vec, normal);
+    auto* obj = (PyTbPlane*)g_planeType->tp_alloc(g_planeType, 0);
+    if (obj)
+    {
+       new (&obj->plane) vm::plane3d{dist, normal};
+    }
+    return (PyObject*)obj;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_ValueError, e.what());
+    return nullptr;
+  }
+}
+
+PyObject* plane_distance(PyObject* self, PyObject* args)
+{
+  PyObject* pointObj = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &pointObj))
+  {
+    return nullptr;
+  }
+
+  if (!PyObject_TypeCheck(pointObj, g_vec3Type))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected tb.Vec3");
+    return nullptr;
+  }
+
+  auto* p = (PyTbPlane*)self;
+  auto* v = (PyTbVec3*)pointObj;
+
+  return PyFloat_FromDouble(p->plane.point_distance(v->vec));
+}
+
+PyObject* plane_project(PyObject* self, PyObject* args)
+{
+  PyObject* pointObj = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &pointObj))
+  {
+    return nullptr;
+  }
+
+  if (!PyObject_TypeCheck(pointObj, g_vec3Type))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected tb.Vec3");
+    return nullptr;
+  }
+
+  auto* p = (PyTbPlane*)self;
+  auto* v = (PyTbVec3*)pointObj;
+
+  auto projected = p->plane.project_point(v->vec);
+  return createVec3Object(projected);
+}
+
+PyObject* plane_get_normal(PyObject* self, void*)
+{
+  auto* p = (PyTbPlane*)self;
+  return createVec3Object(p->plane.normal);
+}
+
+int plane_set_normal(PyObject* self, PyObject* value, void*)
+{
+  if (!PyObject_TypeCheck(value, g_vec3Type))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected tb.Vec3");
+    return -1;
+  }
+  auto* p = (PyTbPlane*)self;
+  auto* v = (PyTbVec3*)value;
+  p->plane = vm::plane3d{p->plane.distance, v->vec};
+  return 0;
+}
+
+PyObject* plane_get_dist(PyObject* self, void*)
+{
+  auto* p = (PyTbPlane*)self;
+  return PyFloat_FromDouble(p->plane.distance);
+}
+
+int plane_set_dist(PyObject* self, PyObject* value, void*)
+{
+  double d = PyFloat_AsDouble(value);
+  if (PyErr_Occurred()) return -1;
+  auto* p = (PyTbPlane*)self;
+  p->plane = vm::plane3d{d, p->plane.normal};
+  return 0;
 }
 
 tb::ui::MapDocument* activeDocument()
@@ -250,6 +727,43 @@ PyObject* createEntityObject(tb::ui::MapDocument* document, tb::mdl::EntityNodeB
   return reinterpret_cast<PyObject*>(obj);
 }
 
+PyObject* createBrushObject(tb::ui::MapDocument* document, tb::mdl::BrushNode* brushNode)
+{
+  if (g_brushType == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "tb.Brush type is not initialized");
+    return nullptr;
+  }
+
+  auto* obj = PyObject_New(PyTbBrush, g_brushType);
+  if (obj == nullptr)
+  {
+    return nullptr;
+  }
+  obj->document = document;
+  obj->brushNode = brushNode;
+  return reinterpret_cast<PyObject*>(obj);
+}
+
+PyObject* createFaceObject(tb::ui::MapDocument* document, tb::mdl::BrushNode* brushNode, size_t faceIndex)
+{
+  if (g_faceType == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "tb.Face type is not initialized");
+    return nullptr;
+  }
+
+  auto* obj = PyObject_New(PyTbFace, g_faceType);
+  if (obj == nullptr)
+  {
+    return nullptr;
+  }
+  obj->document = document;
+  obj->brushNode = brushNode;
+  obj->faceIndex = faceIndex;
+  return reinterpret_cast<PyObject*>(obj);
+}
+
 PyObject* createTransactionObject(tb::ui::MapDocument* document, PyObject* name)
 {
   if (g_transactionType == nullptr)
@@ -316,6 +830,22 @@ tb::ui::MapDocument* getDocumentFromPy(PyObject* self)
     return nullptr;
   }
   return doc;
+}
+
+PyTbSelection* getSelectionFromPy(PyObject* self)
+{
+  if (g_selectionType == nullptr || !PyObject_TypeCheck(self, g_selectionType))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected tb.Selection");
+    return nullptr;
+  }
+  auto* selection = reinterpret_cast<PyTbSelection*>(self);
+  if (selection->document == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Selection is not valid");
+    return nullptr;
+  }
+  return selection;
 }
 
 tb::ui::MapDocument* getDocumentFromSelectionPy(PyObject* self)
@@ -1020,6 +1550,156 @@ PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
+PyObject* plugin_panel_add_color_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* labelText = nullptr;
+  PyObject* initialColorObj = nullptr;
+
+  if (!PyArg_ParseTuple(args, "ss|O", &key, &labelText, &initialColorObj))
+  {
+    return nullptr;
+  }
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* row = new QWidget{container};
+  auto* rowLayout = new QHBoxLayout{};
+  rowLayout->setContentsMargins(0, 0, 0, 0);
+  rowLayout->setSpacing(6);
+  row->setLayout(rowLayout);
+
+  auto* label = new QLabel{};
+  label->setText(QString::fromUtf8(labelText));
+
+  auto* btn = new QPushButton{};
+  btn->setObjectName(plugin_panel_object_name(QStringLiteral("color"), key));
+  btn->setAutoFillBackground(true);
+  btn->setFlat(true);
+
+  auto setBtnColor = [](QPushButton* b, const QColor& c) {
+    b->setStyleSheet(QString("background-color: %1; border: 1px solid gray;").arg(c.name()));
+    b->setProperty("color_val", c);
+    
+    // Update text to show RGB
+    b->setText(QString("%1, %2, %3").arg(c.red()).arg(c.green()).arg(c.blue()));
+    
+    // Set text color to contrasting color
+    if (c.lightness() > 128)
+      b->setStyleSheet(b->styleSheet() + " color: black;");
+    else
+      b->setStyleSheet(b->styleSheet() + " color: white;");
+  };
+
+  QColor color = Qt::white;
+  if (initialColorObj != nullptr)
+  {
+      // Try to parse Vec3 or tuple
+      if (PyObject_TypeCheck(initialColorObj, g_vec3Type))
+      {
+          auto* v = (PyTbVec3*)initialColorObj;
+          color = QColor::fromRgbF(v->vec.x(), v->vec.y(), v->vec.z());
+      }
+      else if (PySequence_Check(initialColorObj) && PySequence_Size(initialColorObj) == 3)
+      {
+           PyObject* px = PySequence_GetItem(initialColorObj, 0);
+           PyObject* py = PySequence_GetItem(initialColorObj, 1);
+           PyObject* pz = PySequence_GetItem(initialColorObj, 2);
+           
+           if (px && py && pz && 
+               (PyFloat_Check(px) || PyLong_Check(px)) && 
+               (PyFloat_Check(py) || PyLong_Check(py)) && 
+               (PyFloat_Check(pz) || PyLong_Check(pz)))
+           {
+               double r = PyFloat_AsDouble(px);
+               double g = PyFloat_AsDouble(py);
+               double b = PyFloat_AsDouble(pz);
+               // Check if normalized (0-1) or byte (0-255).
+               // Usually Vec3 is 0-X. But color fields often imply 0-1 or 0-255.
+               // Let's assume 0-255 if any > 1.0?
+               // But Vec3 colors in TB are usually 0-1?
+               // Wait, texture colors are 0-255?
+               // Let's assume standard QColor behavior:
+               // If we use setRgbF, it expects 0-1.
+               // If we use setRgb, it expects 0-255.
+               
+               // Let's try to be smart or strict.
+               // Let's treat them as 0-255 for tuple, unless they are clearly floats <= 1.0?
+               // No, that's ambiguous.
+               // Let's assume 0-255 for tuple to match typical RGB usage, 
+               // OR 0-1 if passed as Vec3?
+               // In TB, light colors are 0-1 or 0-255? 
+               // Standard Quake lights are 0-255.
+               
+               // Let's stick to 0-255 for tuple input for safety.
+               color = QColor(static_cast<int>(r), static_cast<int>(g), static_cast<int>(b));
+           }
+           Py_XDECREF(px); Py_XDECREF(py); Py_XDECREF(pz);
+      }
+  }
+  setBtnColor(btn, color);
+
+  QObject::connect(btn, &QPushButton::clicked, container, [btn, container, setBtnColor]() {
+    QColor current = btn->property("color_val").value<QColor>();
+    
+    // We need to release GIL before opening modal dialog?
+    // Modal dialog runs its own event loop.
+    // Python might be blocked?
+    // No, we are in C++ callback invoked by Qt.
+    // But we are creating the lambda here.
+    
+    QColor newColor = QColorDialog::getColor(current, container, "Select Color");
+    if (newColor.isValid())
+    {
+      setBtnColor(btn, newColor);
+    }
+  });
+
+  rowLayout->addWidget(label, 1);
+  rowLayout->addWidget(btn, 0);
+  layout->addWidget(row);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_get_color_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  const auto name = plugin_panel_object_name(QStringLiteral("color"), key);
+  auto* btn = container->findChild<QPushButton*>(name);
+  if (btn == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such color field");
+    return nullptr;
+  }
+  
+  QColor c = btn->property("color_val").value<QColor>();
+  // Return as Vec3 (0-1 range? or 0-255?)
+  // Let's return as tuple (r, g, b) in 0-255 range to be safe and compatible with integer colors.
+  
+  auto* tuple = PyTuple_New(3);
+  PyTuple_SET_ITEM(tuple, 0, PyLong_FromLong(c.red()));
+  PyTuple_SET_ITEM(tuple, 1, PyLong_FromLong(c.green()));
+  PyTuple_SET_ITEM(tuple, 2, PyLong_FromLong(c.blue()));
+  return tuple;
+}
+
 PyObject* log_writer_write(PyObject* self, PyObject* args)
 {
   PyObject* value = nullptr;
@@ -1484,70 +2164,128 @@ PyObject* selection_all_entities(PyObject* self, PyObject*)
   return list;
 }
 
+namespace {
+PyObject* selection_get_brushes(PyObject* self, void*)
+{
+  auto* selection = getSelectionFromPy(self);
+  if (selection == nullptr)
+  {
+    return nullptr;
+  }
+
+  const auto& brushes = selection->document->map().selection().brushes;
+  
+  auto* list = PyList_New(static_cast<Py_ssize_t>(brushes.size()));
+  if (list == nullptr)
+  {
+    return nullptr;
+  }
+
+  for (size_t i = 0; i < brushes.size(); ++i)
+  {
+    auto* brushObj = createBrushObject(selection->document, brushes[i]);
+    if (brushObj == nullptr)
+    {
+      Py_DECREF(list);
+      return nullptr;
+    }
+    PyList_SET_ITEM(list, static_cast<Py_ssize_t>(i), brushObj);
+  }
+
+  return list;
+}
+} // namespace
+
 PyObject* selection_get_all_entities(PyObject* self, void*)
 {
   return selection_all_entities(self, nullptr);
 }
 
 PyObject* selection_brush_vertices(PyObject* self, PyObject*)
-{
-  auto* doc = getDocumentFromSelectionPy(self);
-  if (doc == nullptr)
   {
-    return nullptr;
-  }
-
-  auto& map = doc->map();
-  const auto& selection = map.selection();
-
-  auto brushNodes = std::vector<tb::mdl::BrushNode*>{};
-  brushNodes.insert(
-    brushNodes.end(), selection.allBrushes().begin(), selection.allBrushes().end());
-
-  if (selection.hasBrushFaces())
-  {
-    auto nodesFromFaces = tb::mdl::toNodes(selection.brushFaces);
-    brushNodes.insert(brushNodes.end(), nodesFromFaces.begin(), nodesFromFaces.end());
-  }
-
-  brushNodes = kdl::vec_sort_and_remove_duplicates(std::move(brushNodes));
-
-  auto* outer = PyList_New(static_cast<Py_ssize_t>(brushNodes.size()));
-  if (outer == nullptr)
-  {
-    return nullptr;
-  }
-
-  Py_ssize_t brushIndex = 0;
-  for (auto* brushNode : brushNodes)
-  {
-    const auto vertices = brushNode->brush().vertexPositions();
-    auto* inner = PyList_New(static_cast<Py_ssize_t>(vertices.size()));
-    if (inner == nullptr)
+    auto* doc = getDocumentFromSelectionPy(self);
+    if (doc == nullptr)
     {
-      Py_DECREF(outer);
       return nullptr;
     }
 
-    Py_ssize_t vertexIndex = 0;
-    for (const auto& v : vertices)
+    auto& map = doc->map();
+    const auto& selection = map.selection();
+
+    auto brushNodes = std::vector<tb::mdl::BrushNode*>{};
+    brushNodes.insert(
+      brushNodes.end(), selection.allBrushes().begin(), selection.allBrushes().end());
+
+    if (selection.hasBrushFaces())
     {
-      auto* tuple = toPyVec3dTuple(v);
-      if (tuple == nullptr)
+      auto nodesFromFaces = tb::mdl::toNodes(selection.brushFaces);
+      brushNodes.insert(brushNodes.end(), nodesFromFaces.begin(), nodesFromFaces.end());
+    }
+
+    brushNodes = kdl::vec_sort_and_remove_duplicates(std::move(brushNodes));
+
+    auto* outer = PyList_New(static_cast<Py_ssize_t>(brushNodes.size()));
+    if (outer == nullptr)
+    {
+      return nullptr;
+    }
+
+    Py_ssize_t brushIndex = 0;
+    for (auto* brushNode : brushNodes)
+    {
+      const auto vertices = brushNode->brush().vertexPositions();
+      auto* inner = PyList_New(static_cast<Py_ssize_t>(vertices.size()));
+      if (inner == nullptr)
       {
-        Py_DECREF(inner);
         Py_DECREF(outer);
         return nullptr;
       }
-      PyList_SET_ITEM(inner, vertexIndex, tuple);
-      ++vertexIndex;
+
+      Py_ssize_t vertexIndex = 0;
+      for (const auto& v : vertices)
+      {
+        auto* tuple = toPyVec3dTuple(v);
+        if (tuple == nullptr)
+        {
+          Py_DECREF(inner);
+          Py_DECREF(outer);
+          return nullptr;
+        }
+        PyList_SET_ITEM(inner, vertexIndex, tuple);
+        ++vertexIndex;
+      }
+
+      PyList_SET_ITEM(outer, brushIndex, inner);
+      ++brushIndex;
     }
 
-    PyList_SET_ITEM(outer, brushIndex, inner);
-    ++brushIndex;
+    return outer;
   }
 
-  return outer;
+  PyObject* module_document(PyObject*, PyObject*)
+  {
+    auto* doc = activeDocument();
+    if (doc == nullptr)
+    {
+      PyErr_SetString(PyExc_RuntimeError, "No active MapFrame");
+      return nullptr;
+    }
+    return createDocumentObject(doc);
+  }
+
+tb::mdl::Node* getNodeFromPy(PyObject* obj)
+{
+  if (g_entityType && PyObject_TypeCheck(obj, g_entityType))
+  {
+    auto* entity = reinterpret_cast<PyTbEntity*>(obj);
+    return entity->entityNode;
+  }
+  if (g_brushType && PyObject_TypeCheck(obj, g_brushType))
+  {
+    auto* brush = reinterpret_cast<PyTbBrush*>(obj);
+    return brush->brushNode;
+  }
+  return nullptr;
 }
 
 PyObject* selection_add(PyObject* self, PyObject* args)
@@ -1560,7 +2298,7 @@ PyObject* selection_add(PyObject* self, PyObject* args)
 
   if (!PyList_Check(list))
   {
-    PyErr_SetString(PyExc_TypeError, "expected a list of entities");
+    PyErr_SetString(PyExc_TypeError, "expected a list of entities or brushes");
     return nullptr;
   }
 
@@ -1578,12 +2316,13 @@ PyObject* selection_add(PyObject* self, PyObject* args)
   for (Py_ssize_t i = 0; i < size; ++i)
   {
     auto* item = PyList_GetItem(list, i);
-    auto* entity = getEntityFromPy(item);
-    if (entity == nullptr)
+    auto* node = getNodeFromPy(item);
+    if (node == nullptr)
     {
+      PyErr_SetString(PyExc_TypeError, "List items must be Entity or Brush");
       return nullptr;
     }
-    nodes.push_back(entity->entityNode);
+    nodes.push_back(node);
   }
 
   try
@@ -1618,7 +2357,7 @@ PyObject* selection_set(PyObject* self, PyObject* args)
 
   if (!PyList_Check(list))
   {
-    PyErr_SetString(PyExc_TypeError, "expected a list of entities");
+    PyErr_SetString(PyExc_TypeError, "expected a list of entities or brushes");
     return nullptr;
   }
 
@@ -1634,12 +2373,13 @@ PyObject* selection_set(PyObject* self, PyObject* args)
   for (Py_ssize_t i = 0; i < size; ++i)
   {
     auto* item = PyList_GetItem(list, i);
-    auto* entity = getEntityFromPy(item);
-    if (entity == nullptr)
+    auto* node = getNodeFromPy(item);
+    if (node == nullptr)
     {
+      PyErr_SetString(PyExc_TypeError, "List items must be Entity or Brush");
       return nullptr;
     }
-    nodes.push_back(entity->entityNode);
+    nodes.push_back(node);
   }
 
   try
@@ -1663,6 +2403,88 @@ PyObject* selection_set(PyObject* self, PyObject* args)
     return nullptr;
   }
 }
+
+PyObject* selection_select(PyObject* self, PyObject* args)
+{
+  PyObject* obj = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &obj))
+  {
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto* node = getNodeFromPy(obj);
+  if (node == nullptr)
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected Entity or Brush");
+    return nullptr;
+  }
+
+  auto nodes = std::vector<tb::mdl::Node*>{};
+  const auto& currentSelection = doc->map().selection().nodes;
+  nodes.insert(nodes.end(), currentSelection.begin(), currentSelection.end());
+  nodes.push_back(node);
+
+  try
+  {
+    tb::mdl::selectNodes(doc->map(), nodes);
+    Py_RETURN_NONE;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+}
+
+PyObject* selection_deselect(PyObject* self, PyObject* args)
+{
+  PyObject* obj = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &obj))
+  {
+    return nullptr;
+  }
+
+  auto* doc = getDocumentFromSelectionPy(self);
+  if (doc == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto* node = getNodeFromPy(obj);
+  if (node == nullptr)
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected Entity or Brush");
+    return nullptr;
+  }
+
+  auto nodes = std::vector<tb::mdl::Node*>{};
+  const auto& currentSelection = doc->map().selection().nodes;
+  for (auto* n : currentSelection)
+  {
+    if (n != node)
+    {
+      nodes.push_back(n);
+    }
+  }
+
+  try
+  {
+    tb::mdl::selectNodes(doc->map(), nodes);
+    Py_RETURN_NONE;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return nullptr;
+  }
+}
+
 
 PyObject* selection_clear(PyObject* self, PyObject*)
 {
@@ -2136,6 +2958,49 @@ PyObject* entity_get_classname(PyObject* self, void*)
   return entity_classname(self, nullptr);
 }
 
+PyObject* entity_get_brushes(PyObject* self, void*)
+{
+  auto* entity = getEntityFromPy(self);
+  if (entity == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto* node = dynamic_cast<tb::mdl::Node*>(entity->entityNode);
+  if (node == nullptr)
+  {
+    return PyList_New(0);
+  }
+
+  const auto& children = node->children();
+  std::vector<tb::mdl::BrushNode*> brushes;
+  for (auto* child : children)
+  {
+    if (auto* brush = dynamic_cast<tb::mdl::BrushNode*>(child))
+    {
+      brushes.push_back(brush);
+    }
+  }
+
+  auto* list = PyList_New(static_cast<Py_ssize_t>(brushes.size()));
+  if (list == nullptr)
+  {
+    return nullptr;
+  }
+
+  for (size_t i = 0; i < brushes.size(); ++i)
+  {
+    auto* brushObj = createBrushObject(entity->document, brushes[i]);
+    if (brushObj == nullptr)
+    {
+      Py_DECREF(list);
+      return nullptr;
+    }
+    PyList_SET_ITEM(list, static_cast<Py_ssize_t>(i), brushObj);
+  }
+  return list;
+}
+
 PyObject* entity_keys(PyObject* self, PyObject*)
 {
   auto* entity = getEntityFromPy(self);
@@ -2301,16 +3166,646 @@ Py_hash_t entity_hash(PyObject* self)
   return reinterpret_cast<Py_hash_t>(entity->entityNode);
 }
 
-PyObject* module_document(PyObject*, PyObject*)
+PyTbBrush* getBrushFromPy(PyObject* self)
 {
+  if (g_brushType == nullptr || !PyObject_TypeCheck(self, g_brushType))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected tb.Brush");
+    return nullptr;
+  }
+  auto* brush = reinterpret_cast<PyTbBrush*>(self);
+  if (brush->document == nullptr || brush->brushNode == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Brush is not valid");
+    return nullptr;
+  }
+  return brush;
+}
+
+PyTbFace* getFaceFromPy(PyObject* self)
+{
+  if (g_faceType == nullptr || !PyObject_TypeCheck(self, g_faceType))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected tb.Face");
+    return nullptr;
+  }
+  auto* face = reinterpret_cast<PyTbFace*>(self);
+  if (face->document == nullptr || face->brushNode == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Face is not valid");
+    return nullptr;
+  }
+  if (face->faceIndex >= face->brushNode->brush().faces().size())
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Face index out of range");
+    return nullptr;
+  }
+  return face;
+}
+
+PyObject* brush_faces(PyObject* self, PyObject*)
+{
+  auto* brushObj = getBrushFromPy(self);
+  if (brushObj == nullptr)
+  {
+    return nullptr;
+  }
+
+  const auto& faces = brushObj->brushNode->brush().faces();
+  auto* list = PyList_New(static_cast<Py_ssize_t>(faces.size()));
+  if (list == nullptr)
+  {
+    return nullptr;
+  }
+
+  for (size_t i = 0; i < faces.size(); ++i)
+  {
+    auto* faceObj = createFaceObject(brushObj->document, brushObj->brushNode, i);
+    if (faceObj == nullptr)
+    {
+      Py_DECREF(list);
+      return nullptr;
+    }
+    PyList_SET_ITEM(list, static_cast<Py_ssize_t>(i), faceObj);
+  }
+  return list;
+}
+
+PyObject* brush_get_faces(PyObject* self, void*)
+{
+  return brush_faces(self, nullptr);
+}
+
+PyObject* brush_bounds(PyObject* self, void*)
+{
+  auto* brushObj = getBrushFromPy(self);
+  if (brushObj == nullptr)
+  {
+    return nullptr;
+  }
+
+  const auto& bounds = brushObj->brushNode->brush().bounds();
+  auto* minTuple = toPyVec3dTuple(bounds.min);
+  auto* maxTuple = toPyVec3dTuple(bounds.max);
+
+  if (minTuple == nullptr || maxTuple == nullptr)
+  {
+    Py_XDECREF(minTuple);
+    Py_XDECREF(maxTuple);
+    return nullptr;
+  }
+
+  auto* tuple = PyTuple_New(2);
+   PyTuple_SET_ITEM(tuple, 0, minTuple);
+   PyTuple_SET_ITEM(tuple, 1, maxTuple);
+   return tuple;
+ }
+
+ PyObject* brush_delete(PyObject* self, PyObject*)
+ {
+   auto* brushObj = getBrushFromPy(self);
+   if (brushObj == nullptr) return nullptr;
+   
+   auto* doc = brushObj->document;
+   if (doc == nullptr) return nullptr;
+   
+   try
+   {
+     tb::mdl::removeNodes(doc->map(), {brushObj->brushNode});
+     Py_RETURN_NONE;
+   }
+   catch (const std::exception& e)
+   {
+     PyErr_SetString(PyExc_RuntimeError, e.what());
+     return nullptr;
+   }
+ }
+
+ PyObject* brush_copy(PyObject* self, PyObject*)
+ {
+   auto* brushObj = getBrushFromPy(self);
+   if (brushObj == nullptr) return nullptr;
+   
+   auto* doc = brushObj->document;
+   if (doc == nullptr) return nullptr;
+   
+   try
+   {
+     auto& map = doc->map();
+     auto* original = brushObj->brushNode;
+     
+     auto* suggestedParent = tb::mdl::parentForNodes(map, {original}); 
+     auto* clone = original->cloneRecursively(map.worldBounds());
+     
+     auto addedNodes = tb::mdl::addNodes(map, {{suggestedParent, {clone}}});
+     
+     if (addedNodes.empty())
+     {
+        // clone is deleted by addNodes command destructor if failed
+        PyErr_SetString(PyExc_RuntimeError, "Failed to copy brush");
+        return nullptr;
+     }
+     
+     auto* newBrushNode = dynamic_cast<tb::mdl::BrushNode*>(addedNodes[0]);
+     if (newBrushNode)
+     {
+         return createBrushObject(doc, newBrushNode);
+     }
+     Py_RETURN_NONE;
+   }
+   catch (const std::exception& e)
+   {
+     PyErr_SetString(PyExc_RuntimeError, e.what());
+     return nullptr;
+   }
+ }
+ 
+ PyObject* face_texture_name(PyObject* self, void*)
+ {
+  auto* faceObj = getFaceFromPy(self);
+  if (faceObj == nullptr)
+  {
+    return nullptr;
+  }
+  return toPyString(faceObj->brushNode->brush().faces()[faceObj->faceIndex].attributes().materialName());
+}
+
+int face_set_texture_name(PyObject* self, PyObject* value, void*)
+{
+  auto* faceObj = getFaceFromPy(self);
+  if (faceObj == nullptr)
+  {
+    return -1;
+  }
+  if (!PyUnicode_Check(value))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected string");
+    return -1;
+  }
+  const char* str = PyUnicode_AsUTF8(value);
+  if (str == nullptr)
+  {
+    return -1;
+  }
+
+  try
+  {
+    auto brush = faceObj->brushNode->brush();
+    auto& face = brush.faces()[faceObj->faceIndex];
+    auto attribs = face.attributes();
+    attribs.setMaterialName(std::string{str});
+    face.setAttributes(attribs);
+    
+    // We need to update the brush node
+    // This is a bit heavy for a property setter if it triggers full update every time.
+    // But it ensures consistency.
+    
+    // However, doing this without a transaction means no undo.
+    // Maybe we should restrict to read-only for now? 
+    // Or allow it but warn about no undo?
+    // Or maybe we should use `tb::mdl::setBrushFaceAttributes`?
+    
+    // Let's implement setters that modify the brush node directly for now, 
+    // but we should be aware of undo/redo.
+    // Ideally we should use `Transaction`.
+    // But `property` setters in Python usually don't take a transaction object.
+    
+    // For now, let's implement GETTERS only if unsure, OR implement setters that do direct modification (unsafe for undo).
+    // Given the request "create_brush", maybe the user wants to manipulate a brush BEFORE adding it?
+    // But `PyTbBrush` holds a `BrushNode*` which is usually in a map.
+    
+    // If I implement setters, I should probably do:
+    // 1. Create a transaction (maybe implicitly?) -> Bad idea.
+    // 2. Just modify.
+    
+    // Let's look at `selection_set_property`. It calls `tb::mdl::setEntityProperty`.
+    // That function creates a transaction internally? Let's check `Map_Entities.cpp`.
+    // `setEntityProperty` takes `Map&`.
+    
+    // I will stick to GETTERS for now, and maybe setters later if requested or if I find a safe way.
+    // Wait, the user wants "expose ... types". Usually implies read/write.
+    // But without explicit transaction context, write is dangerous for scene integrity.
+    // However, if the user just created the brush via `create_brush`, it might be fine.
+    
+    // Let's implement GETTERS first.
+    // Actually, `BrushFaceAttributes` has setters.
+    // If I allow setting, I should update the node.
+    
+    // I'll implement setters that modify the brush and call `faceObj->brushNode->setBrush(brush)`.
+    // This will trigger `NotifyNodeChange` and update geometry/renderer.
+    // It won't support undo unless wrapped in a transaction in Python.
+    // e.g. `with tb.Transaction(doc): face.texture = "foo"`
+    // But `setBrush` itself doesn't use `Transaction`.
+    
+    // Wait, `BrushNode::setBrush` is a method on the node.
+    // Operations that support undo usually use `Map::perform` or `Transaction` wrapping.
+    // If I modify the node directly, it's a "local" change.
+    // If the user uses `tb.Transaction`, and I modify the node inside it?
+    // `Transaction` captures state diffs.
+    // So if I modify the node inside a transaction, it *should* work?
+    // `Transaction` listens to `NodeChange` events?
+    // `Transaction` captures the state of the map.
+    
+    // Let's check `mdl::Transaction`.
+    // It captures "before" state on creation, and "after" state on commit?
+    // No, it usually records actions.
+    
+    // Actually, `Transaction` in TrenchBroom is `UndoStack` related?
+    // `mdl::Transaction` (line 44 in includes).
+    
+    // If I look at `Map_Brushes.cpp`, `createBrush` uses `Transaction`.
+    // `auto transaction = Transaction{map, "Create Brush"};`
+    // `transaction.commit()`.
+    
+    // So if Python script does:
+    // `with tb.Transaction(doc, "My Action"):`
+    //    `face.texture = "foo"`
+    
+    // The `face.texture = ...` setter should modify the model.
+    // Does `Transaction` automatically capture this?
+    // `Transaction` constructor takes `Map`.
+    // It probably listens to signals.
+    
+    // If so, implementing setters via `brushNode->setBrush(...)` is correct.
+    
+    faceObj->brushNode->setBrush(brush);
+    return 0;
+  }
+  catch (const std::exception& e)
+  {
+    PyErr_SetString(PyExc_RuntimeError, e.what());
+    return -1;
+  }
+}
+
+PyObject* face_get_texture_name(PyObject* self, void*)
+{
+  auto* faceObj = getFaceFromPy(self);
+  if (faceObj == nullptr) return nullptr;
+  return toPyString(faceObj->brushNode->brush().faces()[faceObj->faceIndex].attributes().materialName());
+}
+
+PyObject* module_create_brush(PyObject*, PyObject* args)
+{
+  PyObject* pointsList = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &pointsList))
+  {
+    return nullptr;
+  }
+  
+  if (!PyList_Check(pointsList))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected a list of points (Vec3)");
+    return nullptr;
+  }
+  
+  std::vector<vm::vec3d> points;
+  const auto size = PyList_Size(pointsList);
+  for (Py_ssize_t i = 0; i < size; ++i)
+  {
+    PyObject* item = PyList_GetItem(pointsList, i);
+    // Assuming item is a tb.Vec3 or a tuple/list of 3 floats
+    // Let's use `g_vec3Type` to check or helper
+    // But `PyTbVec3` structure is local.
+    // Use `PyObject_GetAttrString` or simple check.
+    
+    if (PyObject_TypeCheck(item, g_vec3Type))
+    {
+       auto* v = (PyTbVec3*)item;
+       points.push_back(v->vec);
+    }
+    else if (PySequence_Check(item) && PySequence_Size(item) == 3)
+    {
+       PyObject* px = PySequence_GetItem(item, 0);
+       PyObject* py = PySequence_GetItem(item, 1);
+       PyObject* pz = PySequence_GetItem(item, 2);
+       
+       double x = 0, y = 0, z = 0;
+       bool ok = true;
+       
+       if (px && (PyFloat_Check(px) || PyLong_Check(px))) x = PyFloat_AsDouble(px); else ok = false;
+       if (py && (PyFloat_Check(py) || PyLong_Check(py))) y = PyFloat_AsDouble(py); else ok = false;
+       if (pz && (PyFloat_Check(pz) || PyLong_Check(pz))) z = PyFloat_AsDouble(pz); else ok = false;
+       
+       Py_XDECREF(px); Py_XDECREF(py); Py_XDECREF(pz);
+       
+       if (ok)
+       {
+          points.push_back(vm::vec3d{x, y, z});
+       }
+       else
+       {
+           PyErr_SetString(PyExc_TypeError, "Invalid point coordinates (must be numbers)");
+           return nullptr;
+       }
+    }
+    else
+    {
+        PyErr_SetString(PyExc_TypeError, "Expected Vec3 or tuple of 3 floats");
+        return nullptr;
+    }
+  }
+  
+  // Create brush
   auto* doc = activeDocument();
   if (doc == nullptr)
   {
-    PyErr_SetString(PyExc_RuntimeError, "No active MapFrame");
+    PyErr_SetString(PyExc_RuntimeError, "No active document");
     return nullptr;
   }
-  return createDocumentObject(doc);
-}
+  
+  // Use `tb::mdl::createBrush`
+  // But wait, `createBrush` in `Map_Brushes.cpp` creates it in the map and selects it.
+  // Does it return the created brush node?
+  // It returns `bool`.
+  // And it selects the new brush.
+  
+  // So we can check the selection after calling.
+  // But `createBrush` deselects all then selects the new one.
+  // So:
+  
+  try
+  {
+      if (tb::mdl::createBrush(doc->map(), points))
+      {
+          // Get the single selected brush
+          // Wait, `createBrush` creates a `BrushNode`.
+          // `selection.entities` are `EntityNodeBase*`.
+          // But `BrushNode` is an `EntityNodeBase` (via `Node` hierarchy? No, `BrushNode` -> `Node`. `EntityNodeBase`?)
+          // `BrushNode` is not `EntityNodeBase`. `BrushNode` is a child of an entity.
+          // `createBrush` adds it to `parentForNodes(map)`.
+          
+          // `selection` in `Map_Selection.h`:
+          // `std::vector<EntityNodeBase*> entities;`
+          // `std::vector<BrushNode*> brushes;` -> No?
+          
+          // Let's check `Selection` struct in `Map_Selection.h` or `Map.h`.
+          // `Map::selection()` returns `Selection`.
+          
+          // `Map_Selection.h`:
+          // `struct Selection { ... std::set<Node*> nodes; ... }`
+          
+          const auto& selectedNodes = doc->map().selection().nodes;
+          if (selectedNodes.size() == 1)
+          {
+             auto* node = *selectedNodes.begin();
+             auto* brushNode = dynamic_cast<tb::mdl::BrushNode*>(node);
+             if (brushNode)
+             {
+                 return createBrushObject(doc, brushNode);
+             }
+          }
+          Py_RETURN_NONE; 
+      }
+      else
+      {
+          PyErr_SetString(PyExc_RuntimeError, "Failed to create brush");
+          return nullptr;
+      }
+  }
+  catch (const std::exception& e)
+  {
+      PyErr_SetString(PyExc_RuntimeError, e.what());
+      return nullptr;
+  }
+ }
+ 
+ PyObject* face_get_offset(PyObject* self, void*) {
+     auto* faceObj = getFaceFromPy(self);
+     if (!faceObj) return nullptr;
+     const auto& offset = faceObj->brushNode->brush().faces()[faceObj->faceIndex].attributes().offset();
+     auto* tuple = PyTuple_New(2);
+     PyTuple_SET_ITEM(tuple, 0, PyFloat_FromDouble(offset.x()));
+     PyTuple_SET_ITEM(tuple, 1, PyFloat_FromDouble(offset.y()));
+     return tuple;
+ }
+ 
+ int face_set_offset(PyObject* self, PyObject* value, void*) {
+     auto* faceObj = getFaceFromPy(self);
+     if (!faceObj) return -1;
+     double x=0, y=0;
+     if (!PyArg_ParseTuple(value, "dd", &x, &y)) {
+         PyErr_SetString(PyExc_TypeError, "Expected tuple of 2 floats");
+         return -1;
+     }
+     try {
+         auto brush = faceObj->brushNode->brush();
+         auto& face = brush.faces()[faceObj->faceIndex];
+         auto attribs = face.attributes();
+         attribs.setOffset(vm::vec2f{static_cast<float>(x), static_cast<float>(y)});
+         face.setAttributes(attribs);
+         faceObj->brushNode->setBrush(brush);
+         return 0;
+     } catch (...) { return -1; }
+ }
+ 
+ PyObject* face_get_scale(PyObject* self, void*) {
+     auto* faceObj = getFaceFromPy(self);
+     if (!faceObj) return nullptr;
+     const auto& scale = faceObj->brushNode->brush().faces()[faceObj->faceIndex].attributes().scale();
+     auto* tuple = PyTuple_New(2);
+     PyTuple_SET_ITEM(tuple, 0, PyFloat_FromDouble(scale.x()));
+     PyTuple_SET_ITEM(tuple, 1, PyFloat_FromDouble(scale.y()));
+     return tuple;
+ }
+ 
+ int face_set_scale(PyObject* self, PyObject* value, void*) {
+     auto* faceObj = getFaceFromPy(self);
+     if (!faceObj) return -1;
+     double x=0, y=0;
+     if (!PyArg_ParseTuple(value, "dd", &x, &y)) {
+         PyErr_SetString(PyExc_TypeError, "Expected tuple of 2 floats");
+         return -1;
+     }
+     try {
+         auto brush = faceObj->brushNode->brush();
+         auto& face = brush.faces()[faceObj->faceIndex];
+         auto attribs = face.attributes();
+         attribs.setScale(vm::vec2f{static_cast<float>(x), static_cast<float>(y)});
+         face.setAttributes(attribs);
+         faceObj->brushNode->setBrush(brush);
+         return 0;
+     } catch (...) { return -1; }
+ }
+ 
+ PyObject* face_get_rotation(PyObject* self, void*) {
+     auto* faceObj = getFaceFromPy(self);
+     if (!faceObj) return nullptr;
+     return PyFloat_FromDouble(faceObj->brushNode->brush().faces()[faceObj->faceIndex].attributes().rotation());
+ }
+ 
+ int face_set_rotation(PyObject* self, PyObject* value, void*) {
+     auto* faceObj = getFaceFromPy(self);
+     if (!faceObj) return -1;
+     double rot = PyFloat_AsDouble(value);
+     if (PyErr_Occurred()) return -1;
+     try {
+         auto brush = faceObj->brushNode->brush();
+         auto& face = brush.faces()[faceObj->faceIndex];
+         auto attribs = face.attributes();
+         attribs.setRotation(static_cast<float>(rot));
+         face.setAttributes(attribs);
+         faceObj->brushNode->setBrush(brush);
+         return 0;
+     } catch (...) { return -1; }
+ }
+ 
+ PyObject* face_get_surface_contents(PyObject* self, void*)
+ {
+   auto* faceObj = getFaceFromPy(self);
+   if (!faceObj) return nullptr;
+   const auto& val = faceObj->brushNode->brush().faces()[faceObj->faceIndex].attributes().surfaceContents();
+   if (val) return PyLong_FromLong(*val);
+   Py_RETURN_NONE;
+ }
+ 
+ int face_set_surface_contents(PyObject* self, PyObject* value, void*)
+ {
+   auto* faceObj = getFaceFromPy(self);
+   if (!faceObj) return -1;
+   
+   std::optional<int> val;
+   if (value != Py_None)
+   {
+       if (!PyLong_Check(value)) { PyErr_SetString(PyExc_TypeError, "Expected int or None"); return -1; }
+       val = static_cast<int>(PyLong_AsLong(value));
+   }
+ 
+   try {
+       auto brush = faceObj->brushNode->brush();
+       auto& face = brush.faces()[faceObj->faceIndex];
+       auto attribs = face.attributes();
+       attribs.setSurfaceContents(val);
+       face.setAttributes(attribs);
+       faceObj->brushNode->setBrush(brush);
+       return 0;
+   } catch (...) { return -1; }
+ }
+ 
+ PyObject* face_get_surface_flags(PyObject* self, void*)
+ {
+   auto* faceObj = getFaceFromPy(self);
+   if (!faceObj) return nullptr;
+   const auto& val = faceObj->brushNode->brush().faces()[faceObj->faceIndex].attributes().surfaceFlags();
+   if (val) return PyLong_FromLong(*val);
+   Py_RETURN_NONE;
+ }
+ 
+ int face_set_surface_flags(PyObject* self, PyObject* value, void*)
+ {
+   auto* faceObj = getFaceFromPy(self);
+   if (!faceObj) return -1;
+   
+   std::optional<int> val;
+   if (value != Py_None)
+   {
+       if (!PyLong_Check(value)) { PyErr_SetString(PyExc_TypeError, "Expected int or None"); return -1; }
+       val = static_cast<int>(PyLong_AsLong(value));
+   }
+ 
+   try {
+       auto brush = faceObj->brushNode->brush();
+       auto& face = brush.faces()[faceObj->faceIndex];
+       auto attribs = face.attributes();
+       attribs.setSurfaceFlags(val);
+       face.setAttributes(attribs);
+       faceObj->brushNode->setBrush(brush);
+       return 0;
+   } catch (...) { return -1; }
+ }
+ 
+ PyObject* face_get_surface_value(PyObject* self, void*)
+ {
+   auto* faceObj = getFaceFromPy(self);
+   if (!faceObj) return nullptr;
+   const auto& val = faceObj->brushNode->brush().faces()[faceObj->faceIndex].attributes().surfaceValue();
+   if (val) return PyFloat_FromDouble(*val);
+   Py_RETURN_NONE;
+ }
+ 
+ int face_set_surface_value(PyObject* self, PyObject* value, void*)
+  {
+    auto* faceObj = getFaceFromPy(self);
+    if (!faceObj) return -1;
+    
+    std::optional<float> val;
+    if (value != Py_None)
+    {
+        if (!PyFloat_Check(value) && !PyLong_Check(value)) { PyErr_SetString(PyExc_TypeError, "Expected float or None"); return -1; }
+        val = static_cast<float>(PyFloat_AsDouble(value));
+    }
+  
+    try {
+        auto brush = faceObj->brushNode->brush();
+        auto& face = brush.faces()[faceObj->faceIndex];
+        auto attribs = face.attributes();
+        attribs.setSurfaceValue(val);
+        face.setAttributes(attribs);
+        faceObj->brushNode->setBrush(brush);
+        return 0;
+    } catch (...) { return -1; }
+  }
+  
+  PyObject* face_get_vertices(PyObject* self, void*)
+  {
+    auto* faceObj = getFaceFromPy(self);
+    if (!faceObj) return nullptr;
+    
+    const auto vertices = faceObj->brushNode->brush().faces()[faceObj->faceIndex].vertexPositions();
+    
+    auto* list = PyList_New(static_cast<Py_ssize_t>(vertices.size()));
+    if (!list) return nullptr;
+    
+    for (size_t i = 0; i < vertices.size(); ++i)
+    {
+        auto* v = createVec3Object(vertices[i]);
+        if (!v) { Py_DECREF(list); return nullptr; }
+        PyList_SET_ITEM(list, static_cast<Py_ssize_t>(i), v);
+    }
+    return list;
+  }
+
+  PyObject* face_get_normal(PyObject* self, void*)
+  {
+    auto* faceObj = getFaceFromPy(self);
+    if (!faceObj) return nullptr;
+    
+    const auto normal = faceObj->brushNode->brush().faces()[faceObj->faceIndex].boundary().normal;
+    return createVec3Object(normal);
+  }
+
+  static PyMethodDef brushMethods[] = {
+      {"faces", brush_faces, METH_NOARGS, nullptr},
+      {"delete", brush_delete, METH_NOARGS, nullptr},
+      {"copy", brush_copy, METH_NOARGS, nullptr},
+      {nullptr, nullptr, 0, nullptr}
+  };
+ 
+ static PyGetSetDef brushGetSet[] = {
+      {"bounds", brush_bounds, nullptr, nullptr, nullptr},
+      {nullptr, nullptr, nullptr, nullptr, nullptr}
+  };
+ 
+ static PyMethodDef faceMethods[] = {
+     {nullptr, nullptr, 0, nullptr}
+ };
+ 
+ static PyGetSetDef faceGetSet[] = {
+      {"texture_name", face_get_texture_name, face_set_texture_name, nullptr, nullptr},
+      {"offset", face_get_offset, face_set_offset, nullptr, nullptr},
+      {"scale", face_get_scale, face_set_scale, nullptr, nullptr},
+      {"rotation", face_get_rotation, face_set_rotation, nullptr, nullptr},
+      {"surface_contents", face_get_surface_contents, face_set_surface_contents, nullptr, nullptr},
+      {"surface_flags", face_get_surface_flags, face_set_surface_flags, nullptr, nullptr},
+      {"surface_value", face_get_surface_value, face_set_surface_value, nullptr, nullptr},
+      {"vertices", face_get_vertices, nullptr, nullptr, nullptr},
+      {"normal", face_get_normal, nullptr, nullptr, nullptr},
+      {nullptr, nullptr, nullptr, nullptr, nullptr}
+  };
+
+
+
+
 
 PyObject* module_current_document(PyObject*, PyObject*)
 {
@@ -2342,11 +3837,151 @@ PyObject* module_transaction(PyObject*, PyObject* args)
 
 bool registerTypes(PyObject* module)
 {
+  static auto vec3Type = PyTypeObject{};
   static auto documentType = PyTypeObject{};
   static auto selectionType = PyTypeObject{};
   static auto entityType = PyTypeObject{};
   static auto logWriterType = PyTypeObject{};
   static auto transactionType = PyTypeObject{};
+
+  if (g_vec3Type == nullptr)
+  {
+    vec3Type = PyTypeObject{};
+    vec3Type.tp_name = "tb.Vec3";
+    vec3Type.tp_basicsize = sizeof(PyTbVec3);
+    vec3Type.tp_flags = Py_TPFLAGS_DEFAULT;
+    vec3Type.tp_new = vec3_new;
+    vec3Type.tp_init = (initproc)vec3_init;
+    vec3Type.tp_dealloc = (destructor)vec3_dealloc;
+    vec3Type.tp_repr = (reprfunc)vec3_repr;
+    vec3Type.tp_str = (reprfunc)vec3_str;
+    vec3Type.tp_richcompare = vec3_richcompare;
+
+    static PyMethodDef vec3Methods[] = {
+      {"dot", vec3_dot, METH_VARARGS, nullptr},
+      {"cross", vec3_cross, METH_VARARGS, nullptr},
+      {"length", vec3_length, METH_NOARGS, nullptr},
+      {"normalize", vec3_normalize, METH_NOARGS, nullptr},
+      {nullptr, nullptr, 0, nullptr}
+    };
+    vec3Type.tp_methods = vec3Methods;
+
+    static PyGetSetDef vec3GetSet[] = {
+      {"x", vec3_get_x, vec3_set_x, nullptr, nullptr},
+      {"y", vec3_get_y, vec3_set_y, nullptr, nullptr},
+      {"z", vec3_get_z, vec3_set_z, nullptr, nullptr},
+      {nullptr, nullptr, nullptr, nullptr, nullptr},
+    };
+    vec3Type.tp_getset = vec3GetSet;
+
+    static PyNumberMethods vec3NumberMethods = {
+      vec3_add, // nb_add
+      vec3_sub, // nb_subtract
+      vec3_mul, // nb_multiply
+      nullptr, // nb_remainder
+      nullptr, // nb_divmod
+      nullptr, // nb_power
+      vec3_neg, // nb_negative
+      nullptr, // nb_positive
+      nullptr, // nb_absolute
+      nullptr, // nb_bool
+      nullptr, // nb_invert
+      nullptr, // nb_lshift
+      nullptr, // nb_rshift
+      nullptr, // nb_and
+      nullptr, // nb_xor
+      nullptr, // nb_or
+      nullptr, // nb_int
+      nullptr, // nb_reserved
+      nullptr, // nb_float
+      nullptr, // nb_inplace_add
+      nullptr, // nb_inplace_subtract
+      nullptr, // nb_inplace_multiply
+      nullptr, // nb_inplace_remainder
+      nullptr, // nb_inplace_power
+      nullptr, // nb_inplace_lshift
+      nullptr, // nb_inplace_rshift
+      nullptr, // nb_inplace_and
+      nullptr, // nb_inplace_xor
+      nullptr, // nb_inplace_or
+      nullptr, // nb_floor_divide
+      vec3_truediv, // nb_true_divide
+      nullptr, // nb_inplace_floor_divide
+      nullptr, // nb_inplace_true_divide
+      nullptr, // nb_index
+      nullptr, // nb_matrix_multiply
+      nullptr, // nb_inplace_matrix_multiply
+    };
+    vec3Type.tp_as_number = &vec3NumberMethods;
+
+    static PySequenceMethods vec3SequenceMethods = {
+      vec3_len, // sq_length
+      nullptr, // sq_concat
+      nullptr, // sq_repeat
+      vec3_getitem, // sq_item
+      nullptr, // sq_slice
+      nullptr, // sq_ass_item
+      nullptr, // sq_ass_slice
+      nullptr, // sq_contains
+      nullptr, // sq_inplace_concat
+      nullptr, // sq_inplace_repeat
+    };
+    vec3Type.tp_as_sequence = &vec3SequenceMethods;
+
+    if (PyType_Ready(&vec3Type) != 0)
+    {
+      return false;
+    }
+    g_vec3Type = &vec3Type;
+
+    Py_INCREF(g_vec3Type);
+    if (PyModule_AddObject(module, "Vec3", reinterpret_cast<PyObject*>(g_vec3Type)) != 0)
+    {
+      Py_DECREF(g_vec3Type);
+      return false;
+    }
+  }
+
+  if (g_planeType == nullptr)
+  {
+    static PyMethodDef planeMethods[] = {
+      {"from_points", (PyCFunction)plane_from_points, METH_CLASS | METH_VARARGS, nullptr},
+      {"distance", plane_distance, METH_VARARGS, nullptr},
+      {"project", plane_project, METH_VARARGS, nullptr},
+      {nullptr, nullptr, 0, nullptr}
+    };
+
+    static PyGetSetDef planeGetSet[] = {
+      {"normal", plane_get_normal, plane_set_normal, nullptr, nullptr},
+      {"dist", plane_get_dist, plane_set_dist, nullptr, nullptr},
+      {nullptr, nullptr, nullptr, nullptr, nullptr}
+    };
+
+    static auto planeType = PyTypeObject{};
+    planeType = PyTypeObject{};
+    planeType.tp_name = "tb.Plane";
+    planeType.tp_basicsize = sizeof(PyTbPlane);
+    planeType.tp_flags = Py_TPFLAGS_DEFAULT;
+    planeType.tp_new = plane_new;
+    planeType.tp_init = (initproc)plane_init;
+    planeType.tp_dealloc = (destructor)plane_dealloc;
+    planeType.tp_repr = (reprfunc)plane_repr;
+    planeType.tp_methods = planeMethods;
+    planeType.tp_getset = planeGetSet;
+
+    if (PyType_Ready(&planeType) != 0)
+    {
+      return false;
+    }
+    g_planeType = &planeType;
+
+    Py_INCREF(g_planeType);
+    if (PyModule_AddObject(module, "Plane", reinterpret_cast<PyObject*>(g_planeType)) != 0)
+    {
+      Py_DECREF(g_planeType);
+      return false;
+    }
+  }
 
   if (g_documentType == nullptr)
   {
@@ -2403,6 +4038,9 @@ bool registerTypes(PyObject* module)
       {"set_property", selection_set_property, METH_VARARGS, nullptr},
       {"add", selection_add, METH_VARARGS, nullptr},
       {"set", selection_set, METH_VARARGS, nullptr},
+      {"select", selection_select, METH_VARARGS, nullptr},
+      {"deselect", selection_deselect, METH_VARARGS, nullptr},
+      {"deselect_all", selection_clear, METH_NOARGS, nullptr},
       {"duplicate", selection_duplicate, METH_NOARGS, nullptr},
       {"translate", selection_translate, METH_VARARGS, nullptr},
       {"rotate", selection_rotate, METH_VARARGS, nullptr},
@@ -2419,6 +4057,7 @@ bool registerTypes(PyObject* module)
     static PyGetSetDef selectionGetSet[] = {
       {"entities", selection_get_entities, nullptr, nullptr, nullptr},
       {"all_entities", selection_get_all_entities, nullptr, nullptr, nullptr},
+      {"brushes", selection_get_brushes, nullptr, nullptr, nullptr},
       {nullptr, nullptr, nullptr, nullptr, nullptr},
     };
     selectionType.tp_getset = selectionGetSet;
@@ -2457,6 +4096,7 @@ bool registerTypes(PyObject* module)
 
     static PyGetSetDef entityGetSet[] = {
       {"classname", entity_get_classname, nullptr, nullptr, nullptr},
+      {"brushes", entity_get_brushes, nullptr, nullptr, nullptr},
       {nullptr, nullptr, nullptr, nullptr, nullptr},
     };
     entityType.tp_getset = entityGetSet;
@@ -2478,6 +4118,56 @@ bool registerTypes(PyObject* module)
     if (PyModule_AddObject(module, "Entity", reinterpret_cast<PyObject*>(g_entityType)) != 0)
     {
       Py_DECREF(g_entityType);
+      return false;
+    }
+  }
+
+  if (g_brushType == nullptr)
+  {
+    static auto brushType = PyTypeObject{};
+    brushType = PyTypeObject{};
+    brushType.tp_name = "tb.Brush";
+    brushType.tp_basicsize = sizeof(PyTbBrush);
+    brushType.tp_flags = Py_TPFLAGS_DEFAULT;
+    brushType.tp_dealloc = freePythonObject;
+    brushType.tp_methods = brushMethods;
+    brushType.tp_getset = brushGetSet;
+
+    if (PyType_Ready(&brushType) != 0)
+    {
+      return false;
+    }
+    g_brushType = &brushType;
+
+    Py_INCREF(g_brushType);
+    if (PyModule_AddObject(module, "Brush", reinterpret_cast<PyObject*>(g_brushType)) != 0)
+    {
+      Py_DECREF(g_brushType);
+      return false;
+    }
+  }
+
+  if (g_faceType == nullptr)
+  {
+    static auto faceType = PyTypeObject{};
+    faceType = PyTypeObject{};
+    faceType.tp_name = "tb.Face";
+    faceType.tp_basicsize = sizeof(PyTbFace);
+    faceType.tp_flags = Py_TPFLAGS_DEFAULT;
+    faceType.tp_dealloc = freePythonObject;
+    faceType.tp_methods = faceMethods;
+    faceType.tp_getset = faceGetSet;
+
+    if (PyType_Ready(&faceType) != 0)
+    {
+      return false;
+    }
+    g_faceType = &faceType;
+
+    Py_INCREF(g_faceType);
+    if (PyModule_AddObject(module, "Face", reinterpret_cast<PyObject*>(g_faceType)) != 0)
+    {
+      Py_DECREF(g_faceType);
       return false;
     }
   }
@@ -2566,11 +4256,13 @@ bool registerTypes(PyObject* module)
       {"add_float_field", plugin_panel_add_float_field, METH_VARARGS, nullptr},
       {"add_checkbox", plugin_panel_add_checkbox, METH_VARARGS, nullptr},
       {"add_combo_box", plugin_panel_add_combo_box, METH_VARARGS, nullptr},
+      {"add_color_field", plugin_panel_add_color_field, METH_VARARGS, nullptr},
       {"get_int_field", plugin_panel_get_int_field, METH_VARARGS, nullptr},
       {"get_float_field", plugin_panel_get_float_field, METH_VARARGS, nullptr},
       {"get_checkbox", plugin_panel_get_checkbox, METH_VARARGS, nullptr},
       {"get_combo_box_index", plugin_panel_get_combo_box_index, METH_VARARGS, nullptr},
       {"get_combo_box_text", plugin_panel_get_combo_box_text, METH_VARARGS, nullptr},
+      {"get_color_field", plugin_panel_get_color_field, METH_VARARGS, nullptr},
       {"set_text", plugin_panel_set_text, METH_VARARGS, nullptr},
       {"set_html", plugin_panel_set_html, METH_VARARGS, nullptr},
       {"add_button", plugin_panel_add_button, METH_VARARGS, nullptr},
@@ -2662,6 +4354,7 @@ bool ensureInitialized()
             {"document", module_document, METH_NOARGS, nullptr},
             {"current_document", module_current_document, METH_NOARGS, nullptr},
             {"transaction", module_transaction, METH_VARARGS, nullptr},
+            {"create_brush", module_create_brush, METH_VARARGS, nullptr},
             {"add_plugin_panel",
              [](PyObject*, PyObject* args) -> PyObject* {
                const char* title = nullptr;

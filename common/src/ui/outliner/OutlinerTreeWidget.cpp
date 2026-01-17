@@ -60,7 +60,10 @@ static mdl::LayerNode* worldspawnLayerFromItem(const QTreeWidgetItem* worldspawn
         return nullptr;
     }
     auto* node = worldspawnItem->data(0, WorldspawnLayerRole).value<mdl::Node*>();
-    return dynamic_cast<mdl::LayerNode*>(node);
+    // Use static_cast because dynamic_cast accesses the object's vtable, which causes a crash
+    // if the object has been deleted (which can happen during tree updates).
+    // We know the type is correct because we set it ourselves.
+    return static_cast<mdl::LayerNode*>(node);
 }
 
 static bool isBrushEntityNode(const mdl::Node* node)

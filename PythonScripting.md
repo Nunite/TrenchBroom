@@ -111,6 +111,92 @@ with tb.transaction("My Batch Edit"):
 - 异常：
   - `RuntimeError`：当前没有活动的 map 窗口
 
+#### `tb.create_brush(points: list[Vec3 | tuple[float, float, float]]) -> Brush | None`
+
+根据顶点列表创建一个凸包 Brush（笔刷）。
+
+- 参数：
+  - `points`：顶点列表，每个顶点可以是 `Vec3` 对象或 `(x, y, z)` 元组
+- 返回：新创建的 `Brush` 对象；如果创建失败则返回 `None`
+- 异常：
+  - `RuntimeError`：当前没有活动的 map 窗口
+
+### 类型：`Vec3`
+
+三维向量类，支持基础算术运算。
+
+#### `Vec3(x: float = 0.0, y: float = 0.0, z: float = 0.0)`
+
+构造函数。
+
+#### `Vec3.x` / `Vec3.y` / `Vec3.z`
+
+向量分量（读写）。
+
+#### 运算符支持
+
+支持 `+`, `-`, `*` (标量), `/` (标量), `-` (取反), `[]` (索引访问)。
+
+### 类型：`Brush`
+
+表示一个 Brush 节点。
+
+#### `Brush.bounds -> tuple[tuple[float, float, float], tuple[float, float, float]]`
+
+返回包围盒 `(min, max)`，其中 `min` 和 `max` 为 `(x, y, z)` 元组。
+
+#### `Brush.faces() -> list[Face]`
+
+返回该 Brush 的所有面 (`Face` 对象列表)。
+
+#### `Brush.delete() -> None`
+
+删除该 Brush。
+
+#### `Brush.copy() -> Brush | None`
+
+复制该 Brush，返回新创建的 Brush（已添加到地图中）。
+
+### 类型：`Face`
+
+表示 Brush 的一个面。
+
+#### `Face.texture_name -> str`
+
+获取或设置材质名称（字符串）。
+
+#### `Face.offset -> tuple[float, float]`
+
+获取或设置纹理偏移 `(x, y)`。
+
+#### `Face.scale -> tuple[float, float]`
+
+获取或设置纹理缩放 `(x, y)`。
+
+#### `Face.rotation -> float`
+
+获取或设置纹理旋转（度）。
+
+#### `Face.surface_contents -> int | None`
+
+获取或设置 Surface contents flags。
+
+#### `Face.surface_flags -> int | None`
+
+获取或设置 Surface flags。
+
+#### `Face.surface_value -> float | None`
+
+获取或设置 Surface value。
+
+#### `Face.vertices -> list[Vec3]`
+
+获取面的顶点列表（只读）。
+
+#### `Face.normal -> Vec3`
+
+获取面的法线（只读）。
+
 ### 类型：`PluginPanel`
 
 `PluginPanel` 表示 Inspector 的 `Plugin` 页签里的一块可折叠面板内容区，用于脚本动态创建简单 UI。
@@ -427,6 +513,41 @@ def main() -> None:
     panel = tb.create_plugin_panel("My Plugin")
     panel.set_text("Hello from Python plugin!")
     panel.add_button("Open Preferences", "Menu/File/Preferences...")
+
+if __name__ == "__main__":
+    main()
+```
+
+### 8) 创建 Brush 并修改面属性
+
+```python
+import tb
+from tb import Vec3
+
+def main() -> None:
+    doc = tb.Document.current()
+    if doc is None:
+        print("No active document")
+        return
+
+    # 定义一个立方体的顶点
+    size = 64.0
+    half = size / 2.0
+    points = [
+        Vec3(-half, -half, -half), Vec3( half, -half, -half),
+        Vec3( half,  half, -half), Vec3(-half,  half, -half),
+        Vec3(-half, -half,  half), Vec3( half, -half,  half),
+        Vec3( half,  half,  half), Vec3(-half,  half,  half)
+    ]
+    
+    with tb.transaction("Create Python Brush"):
+        brush = tb.create_brush(points)
+        if brush:
+            print(f"Created brush with bounds: {brush.bounds}")
+            # 修改所有面的材质和缩放
+            for face in brush.faces():
+                face.texture_name = "common/caulk"
+                face.scale = (0.5, 0.5)
 
 if __name__ == "__main__":
     main()

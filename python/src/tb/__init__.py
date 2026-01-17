@@ -6,7 +6,8 @@ TrenchBroom 内嵌 Python 模块（实验性）。
 用途：
 - 执行现有菜单/快捷键 Action：execute_action
 - 枚举所有 Action 路径：list_actions
-- 通过最小对象模型读取/修改当前选择：Document / Selection / Entity
+- 通过对象模型读取/修改当前选择：Document / Selection / Entity / Brush / Face
+- 创建新的 Brush：create_brush
 
 使用方式（在 TrenchBroom 内）：
 - 打开一个 map 窗口
@@ -20,6 +21,95 @@ TrenchBroom 内嵌 Python 模块（实验性）。
 from __future__ import annotations
 
 from typing import Any, Callable, Protocol
+
+
+class Vec3:
+    """三维向量类。"""
+
+    x: float
+    y: float
+    z: float
+
+    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> None:
+        """初始化向量。"""
+        ...
+
+    def __add__(self, other: Vec3) -> Vec3:
+        """向量加法。"""
+        ...
+
+    def __sub__(self, other: Vec3) -> Vec3:
+        """向量减法。"""
+        ...
+
+    def __mul__(self, other: float | Vec3) -> Vec3:
+        """标量乘法或点积（暂未实现点积，仅支持标量乘法）。"""
+        ...
+
+    def __truediv__(self, other: float) -> Vec3:
+        """标量除法。"""
+        ...
+
+    def __neg__(self) -> Vec3:
+        """取反。"""
+        ...
+
+    def __getitem__(self, index: int) -> float:
+        """按索引访问分量 (0=x, 1=y, 2=z)。"""
+        ...
+
+    def __len__(self) -> int:
+        """返回分量数量 (3)。"""
+        ...
+
+    def __repr__(self) -> str:
+        """返回字符串表示。"""
+        ...
+
+    def dot(self, other: Vec3) -> float:
+        """计算点积。"""
+        ...
+
+    def cross(self, other: Vec3) -> Vec3:
+        """计算叉积。"""
+        ...
+
+    def length(self) -> float:
+        """计算向量长度。"""
+        ...
+
+    def normalize(self) -> Vec3:
+        """返回归一化向量。"""
+        ...
+
+
+class Plane:
+    """3D 平面类，由法线和距离定义 (dot(normal, point) - dist = 0)。"""
+
+    normal: Vec3
+    dist: float
+
+    def __init__(self, normal: Vec3, dist: float) -> None:
+        """初始化平面。"""
+        ...
+
+    @classmethod
+    def from_points(cls, p1: Vec3, p2: Vec3, p3: Vec3) -> Plane:
+        """根据三个点创建平面。"""
+        ...
+
+    def distance(self, point: Vec3) -> float:
+        """计算点到平面的有符号距离。"""
+        ...
+
+    def project(self, point: Vec3) -> Vec3:
+        """将点投影到平面上。"""
+        ...
+
+    def __repr__(self) -> str:
+        """返回字符串表示。"""
+        ...
+
 
 
 class _LogWriter(Protocol):
@@ -143,6 +233,18 @@ class PluginPanel(Protocol):
         """获取下拉列表框当前选中的文本。"""
         ...
 
+    def add_color_field(self, key: str, label: str, initial_color: Vec3 | tuple[float, float, float] | None = None) -> None:
+        """
+        添加一个颜色选择字段（按钮）。
+        
+        - initial_color: 初始颜色，可以是 Vec3 (0.0-1.0) 或 tuple (r, g, b) (0-255 或 0.0-1.0)。
+        """
+        ...
+
+    def get_color_field(self, key: str) -> tuple[int, int, int]:
+        """获取颜色字段当前值 (r, g, b)，范围 0-255。"""
+        ...
+
 
 class Transaction(Protocol):
     """用于把一段脚本编辑合并成一次 undo/redo 的事务。"""
@@ -182,6 +284,11 @@ class Entity(Protocol):
     @property
     def classname(self) -> str:
         """返回实体的 classname。"""
+        ...
+
+    @property
+    def brushes(self) -> list[Brush]:
+        """返回该实体包含的所有 Brush。"""
         ...
 
     def keys(self) -> list[str]:
@@ -225,6 +332,11 @@ class Selection(Protocol):
         ...
 
     @property
+    def brushes(self) -> list[Brush]:
+        """返回显式选中的 Brush 列表。"""
+        ...
+
+    @property
     def all_entities(self) -> list[Entity]:
         """返回“会受操作影响”的实体集合（会包含隐式关联到选择的实体）。"""
         ...
@@ -241,12 +353,24 @@ class Selection(Protocol):
         """
         ...
 
-    def add(self, entities: list[Entity]) -> None:
-        """添加实体列表到当前选择。"""
+    def add(self, objects: list[Entity | Brush]) -> None:
+        """添加对象列表（Entity 或 Brush）到当前选择。"""
         ...
 
-    def set(self, entities: list[Entity]) -> None:
-        """设置当前选择为指定的实体列表。"""
+    def set(self, objects: list[Entity | Brush]) -> None:
+        """设置当前选择为指定的对象列表（Entity 或 Brush）。"""
+        ...
+
+    def select(self, object: Entity | Brush) -> None:
+        """选中单个对象（Entity 或 Brush）。"""
+        ...
+
+    def deselect(self, object: Entity | Brush) -> None:
+        """取消选中单个对象（Entity 或 Brush）。"""
+        ...
+
+    def deselect_all(self) -> None:
+        """取消选中所有对象。"""
         ...
 
     def remove_property(self, key: str) -> bool:
@@ -329,6 +453,111 @@ class Selection(Protocol):
         - segments：倒角段数（>= 1，默认 1）
         - 返回值：是否执行成功
         """
+        ...
+
+
+class Face(Protocol):
+    """Brush 的一个面。"""
+
+    @property
+    def texture_name(self) -> str:
+        """材质名称。"""
+        ...
+
+    @texture_name.setter
+    def texture_name(self, value: str) -> None:
+        """设置材质名称。"""
+        ...
+
+    @property
+    def offset(self) -> tuple[float, float]:
+        """纹理偏移 (x, y)。"""
+        ...
+
+    @offset.setter
+    def offset(self, value: tuple[float, float]) -> None:
+        """设置纹理偏移。"""
+        ...
+
+    @property
+    def scale(self) -> tuple[float, float]:
+        """纹理缩放 (x, y)。"""
+        ...
+
+    @scale.setter
+    def scale(self, value: tuple[float, float]) -> None:
+        """设置纹理缩放。"""
+        ...
+
+    @property
+    def rotation(self) -> float:
+        """纹理旋转（度）。"""
+        ...
+
+    @rotation.setter
+    def rotation(self, value: float) -> None:
+        """设置纹理旋转。"""
+        ...
+
+    @property
+    def surface_contents(self) -> int | None:
+        """Surface contents flags."""
+        ...
+
+    @surface_contents.setter
+    def surface_contents(self, value: int | None) -> None:
+        """Set surface contents flags."""
+        ...
+
+    @property
+    def surface_flags(self) -> int | None:
+        """Surface flags."""
+        ...
+
+    @surface_flags.setter
+    def surface_flags(self, value: int | None) -> None:
+        """Set surface flags."""
+        ...
+
+    @property
+    def surface_value(self) -> float | None:
+        """Surface value."""
+        ...
+
+    @surface_value.setter
+    def surface_value(self, value: float | None) -> None:
+        """Set surface value."""
+        ...
+
+    @property
+    def vertices(self) -> list[Vec3]:
+        """获取面的顶点列表（只读）。"""
+        ...
+
+    @property
+    def normal(self) -> Vec3:
+        """获取面的法线（只读）。"""
+        ...
+
+
+class Brush(Protocol):
+    """Brush 节点。"""
+
+    @property
+    def bounds(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+        """包围盒 (min, max)。"""
+        ...
+
+    def faces(self) -> list[Face]:
+        """获取所有面。"""
+        ...
+
+    def delete(self) -> None:
+        """删除该 Brush。"""
+        ...
+
+    def copy(self) -> Brush | None:
+        """复制该 Brush，返回新创建的 Brush（已添加到地图中）。"""
         ...
 
 
@@ -417,14 +646,29 @@ def create_plugin_panel(title: str) -> PluginPanel:
     raise RuntimeError('Module "tb" is only available inside TrenchBroom.')
 
 
+def create_brush(points: list[Vec3 | tuple[float, float, float]]) -> Brush | None:
+    """
+    根据顶点列表创建一个凸包 Brush。
+    
+    - points: 顶点列表（Vec3 或 (x, y, z) 元组）。
+    - 返回新创建的 Brush 对象，如果失败则返回 None。
+    """
+    raise RuntimeError('Module "tb" is only available inside TrenchBroom.')
+
+
 __all__ = [
+    "Brush",
     "Document",
     "Entity",
+    "Face",
+    "Plane",
     "PluginPanel",
     "Selection",
     "Transaction",
+    "Vec3",
     "_LogWriter",
     "add_plugin_panel",
+    "create_brush",
     "create_plugin_panel",
     "current_document",
     "document",
