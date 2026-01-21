@@ -66,6 +66,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QColorDialog>
+#include <QLineEdit>
 
 #include "vm/segment.h"
 #include "vm/plane.h"
@@ -1205,6 +1206,69 @@ PyObject* plugin_panel_get_float_field(PyObject* self, PyObject* args)
     return nullptr;
   }
   return PyFloat_FromDouble(spin->value());
+}
+
+PyObject* plugin_panel_add_text_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* labelText = nullptr;
+  const char* value = nullptr;
+  if (!PyArg_ParseTuple(args, "ss|s", &key, &labelText, &value))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* row = new QWidget{container};
+  auto* rowLayout = new QHBoxLayout{};
+  rowLayout->setContentsMargins(0, 0, 0, 0);
+  rowLayout->setSpacing(6);
+  row->setLayout(rowLayout);
+
+  auto* label = new QLabel{};
+  label->setText(QString::fromUtf8(labelText));
+
+  auto* edit = new QLineEdit{};
+  edit->setObjectName(plugin_panel_object_name(QStringLiteral("text"), key));
+  if (value != nullptr)
+  {
+    edit->setText(QString::fromUtf8(value));
+  }
+
+  rowLayout->addWidget(label, 1);
+  rowLayout->addWidget(edit, 0);
+  layout->addWidget(row);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_get_text_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  const auto name = plugin_panel_object_name(QStringLiteral("text"), key);
+  auto* edit = container->findChild<QLineEdit*>(name);
+  if (edit == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such text field");
+    return nullptr;
+  }
+  return toPyString(edit->text().toStdString());
 }
 
 PyObject* plugin_panel_add_checkbox(PyObject* self, PyObject* args)
@@ -3452,6 +3516,11 @@ PyObject* brush_bounds(PyObject* self, void*)
     // If so, implementing setters via `brushNode->setBrush(...)` is correct.
     
     faceObj->brushNode->setBrush(brush);
+
+    // Explicitly notify the map that nodes have changed to update the view
+    std::vector<tb::mdl::Node*> changedNodes = {faceObj->brushNode};
+    faceObj->document->map().nodesDidChangeNotifier(changedNodes);
+
     return 0;
   }
   catch (const std::exception& e)
@@ -4519,11 +4588,13 @@ bool registerTypes(PyObject* module)
       {"set_label_text", plugin_panel_set_label_text, METH_VARARGS, nullptr},
       {"add_int_field", plugin_panel_add_int_field, METH_VARARGS, nullptr},
       {"add_float_field", plugin_panel_add_float_field, METH_VARARGS, nullptr},
+      {"add_text_field", plugin_panel_add_text_field, METH_VARARGS, nullptr},
       {"add_checkbox", plugin_panel_add_checkbox, METH_VARARGS, nullptr},
       {"add_combo_box", plugin_panel_add_combo_box, METH_VARARGS, nullptr},
       {"add_color_field", plugin_panel_add_color_field, METH_VARARGS, nullptr},
       {"get_int_field", plugin_panel_get_int_field, METH_VARARGS, nullptr},
       {"get_float_field", plugin_panel_get_float_field, METH_VARARGS, nullptr},
+      {"get_text_field", plugin_panel_get_text_field, METH_VARARGS, nullptr},
       {"get_checkbox", plugin_panel_get_checkbox, METH_VARARGS, nullptr},
       {"get_combo_box_index", plugin_panel_get_combo_box_index, METH_VARARGS, nullptr},
       {"get_combo_box_text", plugin_panel_get_combo_box_text, METH_VARARGS, nullptr},

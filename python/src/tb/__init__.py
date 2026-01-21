@@ -193,12 +193,20 @@ class PluginPanel(Protocol):
         """添加一个浮点字段（QDoubleSpinBox），可用 get_float_field 读取当前值。"""
         ...
 
+    def add_text_field(self, key: str, label: str, value: str = "") -> None:
+        """添加一个文本输入字段（QLineEdit），可用 get_text_field 读取当前值。"""
+        ...
+
     def get_int_field(self, key: str) -> int:
         """读取整数字段当前值；key 不存在会抛 KeyError。"""
         ...
 
     def get_float_field(self, key: str) -> float:
         """读取浮点字段当前值；key 不存在会抛 KeyError。"""
+        ...
+
+    def get_text_field(self, key: str) -> str:
+        """读取文本字段当前值；key 不存在会抛 KeyError。"""
         ...
 
     def add_checkbox(self, key: str, label: str, value: bool = False) -> None:
