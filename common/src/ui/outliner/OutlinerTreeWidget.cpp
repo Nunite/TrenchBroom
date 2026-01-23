@@ -1329,6 +1329,29 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
 
     --m_suppressScrollToSelectionCount;
 
+    if (!m_filterActive) {
+        for (int i = 0; i < topLevelItemCount(); ++i) {
+            if (auto* layerItem = topLevelItem(i)) {
+                for (int j = 0; j < layerItem->childCount(); ++j) {
+                    if (auto* childItem = layerItem->child(j)) {
+                        if (isWorldspawnItem(childItem)) {
+                            auto hasSelectedChild = false;
+                            for (int k = 0; k < childItem->childCount(); ++k) {
+                                if (childItem->child(k)->isSelected()) {
+                                    hasSelectedChild = true;
+                                    break;
+                                }
+                            }
+                            if (!hasSelectedChild) {
+                                childItem->setExpanded(false);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     m_syncingSelection = wasSyncing;
 }
 
