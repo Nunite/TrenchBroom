@@ -14,8 +14,8 @@ PieMenu::PieMenu(QWidget* parent) : QWidget(parent) {
     setMouseTracking(true);
 }
 
-void PieMenu::addItem(const QString& label, std::function<void()> action) {
-    m_items.push_back({label, action});
+void PieMenu::addItem(const QString& label, std::function<void()> action, bool enabled) {
+    m_items.push_back({label, action, enabled});
 }
 
 void PieMenu::clearItems() {
@@ -65,7 +65,11 @@ void PieMenu::paintEvent(QPaintEvent* /*event*/) {
         QPainterPath sector = path.subtracted(innerPath);
 
         if (static_cast<int>(i) == m_hoveredIndex) {
-            painter.fillPath(sector, QColor(60, 140, 220, 200));
+            if (m_items[i].enabled) {
+                painter.fillPath(sector, QColor(60, 140, 220, 200));
+            } else {
+                painter.fillPath(sector, QColor(80, 80, 80, 200));
+            }
         } else {
             painter.fillPath(sector, QColor(40, 40, 40, 180));
         }
@@ -93,7 +97,11 @@ void PieMenu::paintEvent(QPaintEvent* /*event*/) {
         ty = center.y() - static_cast<int>(textRadius * std::sin(radians));
 
         QRect textRect(tx - 60, ty - 15, 120, 30);
-        painter.setPen(Qt::white);
+        if (m_items[i].enabled) {
+            painter.setPen(Qt::white);
+        } else {
+            painter.setPen(Qt::gray);
+        }
         painter.drawText(textRect, Qt::AlignCenter, m_items[i].label);
     }
 }
@@ -183,6 +191,10 @@ void PieMenu::focusOutEvent(QFocusEvent* /*event*/) {
 
 void PieMenu::executeAndClose(int index) {
     if (index >= 0 && index < static_cast<int>(m_items.size())) {
+        if (!m_items[static_cast<size_t>(index)].enabled) {
+            close();
+            return;
+        }
         auto action = m_items[static_cast<size_t>(index)].action;
         close(); // Close first, then execute
         if (action) action();

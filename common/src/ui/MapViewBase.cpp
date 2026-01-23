@@ -1161,12 +1161,6 @@ void MapViewBase::processEvent(const CancelEvent& event)
 
 void MapViewBase::showPieMenu()
 {
-  // If nothing is selected, do nothing
-  if (!m_document.map().selection().hasAny())
-  {
-    return;
-  }
-
   if (!m_pieMenu)
   {
     m_pieMenu = new PieMenu(this);
@@ -1193,6 +1187,13 @@ void MapViewBase::showPieMenu()
         if (it != actions.end())
         {
           const auto& action = it->second;
+          
+          bool isEnabled = false;
+          if (auto* mapFrame = findMapFrame(this)) {
+              ActionExecutionContext context(mapFrame, this);
+              isEnabled = action.enabled(context);
+          }
+
           m_pieMenu->addItem(action.label(), [this, &action]() {
             if (auto* mapFrame = findMapFrame(this))
             {
@@ -1202,11 +1203,12 @@ void MapViewBase::showPieMenu()
                 action.execute(context);
               }
             }
-          });
+          }, isEnabled);
         }
     }
   }
 
+  // Show at cursor position
   m_pieMenu->showAt(QCursor::pos());
 }
 

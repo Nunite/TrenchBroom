@@ -11,6 +11,7 @@ namespace tb::ui {
 struct PieMenuItem {
     QString label;
     std::function<void()> action;
+    bool enabled = true;
 };
 
 class PieMenu : public QWidget {
@@ -19,7 +20,7 @@ class PieMenu : public QWidget {
 public:
     explicit PieMenu(QWidget* parent = nullptr);
 
-    void addItem(const QString& label, std::function<void()> action);
+    void addItem(const QString& label, std::function<void()> action, bool enabled = true);
     void clearItems();
 
     // Show the menu at the given global position
