@@ -304,6 +304,76 @@ static std::vector<mdl::Node*> collectNodesToMoveToGroup(
     return reparentableNodes;
 }
 
+template <typename NodeFromItem>
+static std::vector<mdl::Node*> collectNodesToMoveToLayer(
+    mdl::Map& map,
+    const QList<QTreeWidgetItem*>& selectedItems,
+    const NodeFromItem& nodeFromItem,
+    mdl::LayerNode* targetLayer)
+{
+    auto nodes = std::vector<mdl::Node*>{};
+    nodes.reserve(static_cast<size_t>(selectedItems.size()));
+
+    auto* world = map.world();
+
+    for (auto* item : selectedItems) {
+        auto* node = nodeFromItem(item);
+        if (!node) {
+            continue;
+        }
+
+        if (dynamic_cast<mdl::WorldNode*>(node) || dynamic_cast<mdl::LayerNode*>(node)) {
+            continue;
+        }
+
+        if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node)) {
+            auto* entityBase = brushNode->entity();
+            if (entityBase && entityBase != world) {
+                if (auto* entityNode = dynamic_cast<mdl::EntityNode*>(entityBase)) {
+                    nodes.push_back(entityNode);
+                    continue;
+                }
+            }
+
+            nodes.push_back(brushNode);
+            continue;
+        }
+
+        if (auto* entityNode = dynamic_cast<mdl::EntityNode*>(node)) {
+            nodes.push_back(entityNode);
+            continue;
+        }
+
+        if (auto* groupNode = dynamic_cast<mdl::GroupNode*>(node)) {
+            nodes.push_back(groupNode);
+            continue;
+        }
+    }
+
+    nodes = kdl::vec_sort_and_remove_duplicates(std::move(nodes));
+
+    auto reparentableNodes = std::vector<mdl::Node*>{};
+    reparentableNodes.reserve(nodes.size());
+
+    for (auto* node : nodes) {
+        if (!node) {
+            continue;
+        }
+        if (targetLayer == node || targetLayer == node->parent()) {
+            continue;
+        }
+        if (targetLayer->isDescendantOf(node)) {
+            continue;
+        }
+        if (!targetLayer->canAddChild(node)) {
+            continue;
+        }
+        reparentableNodes.push_back(node);
+    }
+
+    return reparentableNodes;
+}
+
 OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     : QTreeWidget(parent)
     , m_document(document)
@@ -1925,6 +1995,19 @@ void OutlinerTreeWidget::dragMoveEvent(QDragMoveEvent* event)
         return;
     }
 
+    if (auto* targetLayer = dynamic_cast<mdl::LayerNode*>(targetNode)) {
+        const auto nodesToMove = collectNodesToMoveToLayer(
+            m_document.map(),
+            selectedItems(),
+            [this](QTreeWidgetItem* item) { return nodeFromItem(item); },
+            targetLayer);
+
+        if (!nodesToMove.empty()) {
+            event->acceptProposedAction();
+            return;
+        }
+    }
+
     if (auto* targetGroup = dynamic_cast<mdl::GroupNode*>(targetNode)) {
         auto& map = m_document.map();
         const auto nodesToMove = collectNodesToMoveToGroup(
@@ -2005,6 +2088,38 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
     auto* targetNode = nodeFromItem(targetItem);
     if (!targetNode) {
         event->ignore();
+        return;
+    }
+
+    if (auto* targetLayer = dynamic_cast<mdl::LayerNode*>(targetNode)) {
+        auto& map = m_document.map();
+        auto nodesToMove = collectNodesToMoveToLayer(
+            map,
+            selectedItems(),
+            [this](QTreeWidgetItem* item) { return nodeFromItem(item); },
+            targetLayer);
+
+        if (nodesToMove.empty()) {
+            event->ignore();
+            return;
+        }
+
+        auto transaction = mdl::Transaction{map, "Move Objects to Layer " + targetLayer->name()};
+        mdl::deselectAll(map);
+
+        auto nodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
+        nodesToAdd[targetLayer] = nodesToMove;
+        if (!mdl::reparentNodes(map, nodesToAdd)) {
+            transaction.cancel();
+            event->ignore();
+            return;
+        }
+
+        mdl::selectNodes(map, nodesToMove);
+        transaction.commit();
+
+        scheduleUpdateTree(targetLayer);
+        event->acceptProposedAction();
         return;
     }
 
