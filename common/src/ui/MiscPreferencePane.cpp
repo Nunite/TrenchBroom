@@ -179,7 +179,7 @@ void MiscPreferencePane::createGui()
           listWidget->setMinimumWidth(250); 
           listWidget->setFixedHeight(std::min(totalHeight, maxHeight));
 
-          connect(listWidget, &QListWidget::itemClicked, this, [this, listWidget](QListWidgetItem* item) {
+          connect(listWidget, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
               addPieMenuAction(item->text(), item->data(Qt::UserRole).toString());
               m_pieMenu->close();
           });

@@ -42,7 +42,7 @@ void PieMenu::paintEvent(QPaintEvent* /*event*/) {
 
     if (m_items.empty()) return;
 
-    double angleStep = 360.0 / m_items.size();
+    double angleStep = 360.0 / static_cast<double>(m_items.size());
     // Start from top (90 degrees, but Qt handles angles differently)
     // 0 is 3 o'clock. Top is 90 (counter-clockwise) or 270.
     // We want the first item to be at the TOP.
@@ -56,7 +56,7 @@ void PieMenu::paintEvent(QPaintEvent* /*event*/) {
         QPainterPath path;
         path.moveTo(center);
         path.arcTo(center.x() - m_outerRadius, center.y() - m_outerRadius, 
-                   m_outerRadius * 2, m_outerRadius * 2, startAngle + i * angleStep, angleStep);
+                   m_outerRadius * 2, m_outerRadius * 2, startAngle + static_cast<double>(i) * angleStep, angleStep);
         path.closeSubpath();
 
         // Cut out inner circle
@@ -74,7 +74,7 @@ void PieMenu::paintEvent(QPaintEvent* /*event*/) {
         painter.drawPath(sector);
 
         // Draw Text
-        double midAngle = startAngle + i * angleStep + angleStep / 2.0;
+        double midAngle = startAngle + static_cast<double>(i) * angleStep + angleStep / 2.0;
         double rad = midAngle * M_PI / 180.0;
         // Qt coordinates: Y is down.
         // math coordinates: Y is up.
@@ -121,7 +121,7 @@ void PieMenu::mouseMoveEvent(QMouseEvent* event) {
         if (m_items.empty()) {
             m_hoveredIndex = -1;
         } else {
-            double angleStep = 360.0 / m_items.size();
+            double angleStep = 360.0 / static_cast<double>(m_items.size());
             double startAngle = 90.0 - (angleStep / 2.0);
             
             // Normalize angle relative to startAngle
