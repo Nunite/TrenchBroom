@@ -75,6 +75,7 @@
 #include "ui/FlashSelectionAnimation.h"
 #include "ui/GLContextManager.h"
 #include "ui/MapDocument.h"
+#include "ui/PieMenu.h"
 #include "ui/MapFrame.h"
 #include "ui/MapViewActivationTracker.h"
 #include "ui/MapViewToolBox.h"
@@ -293,7 +294,8 @@ void MapViewBase::createActions()
     const auto keySequence = action.keySequence();
 
     auto* shortcut = new QShortcut{this};
-    shortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    // Use WindowShortcut to ensure it triggers even if focus is slightly off within the window
+    shortcut->setContext(Qt::WindowShortcut);
     shortcut->setKey(keySequence);
     connect(
       shortcut, &QShortcut::activated, this, [this, &action] { triggerAction(action); });
@@ -1130,6 +1132,11 @@ void MapViewBase::renderFPS(
 
 void MapViewBase::processEvent(const KeyEvent& event)
 {
+  if (event.type == KeyEvent::Type::Down && event.key == Qt::Key_QuoteLeft)
+  {
+    showPieMenu();
+    return;
+  }
   ToolBoxConnector::processEvent(event);
 }
 
@@ -1151,6 +1158,36 @@ void MapViewBase::processEvent(const GestureEvent& event)
 void MapViewBase::processEvent(const CancelEvent& event)
 {
   ToolBoxConnector::processEvent(event);
+}
+
+void MapViewBase::showPieMenu()
+{
+  // If nothing is selected, do nothing
+  if (!m_document.map().selection().hasAny())
+  {
+    return;
+  }
+
+  if (!m_pieMenu)
+  {
+    m_pieMenu = new PieMenu(this);
+  }
+
+  // If already visible, do nothing to prevent flickering on key repeat
+  if (m_pieMenu->isVisible()) {
+      return;
+  }
+
+  m_pieMenu->clearItems();
+
+  if (auto* mapFrame = findMapFrame(this))
+  {
+    m_pieMenu->addItem("Focus Selection", [mapFrame]() {
+      mapFrame->focusCameraOnSelection();
+    });
+  }
+
+  m_pieMenu->showAt(QCursor::pos());
 }
 
 void MapViewBase::doShowPopupMenu()

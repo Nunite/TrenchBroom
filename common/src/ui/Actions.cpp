@@ -399,6 +399,16 @@ void ActionManager::initialize()
 
 void ActionManager::createViewActions()
 {
+  /* ========== Pie Menu ========== */
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Show Pie Menu"},
+    QObject::tr("Show Pie Menu"),
+    ActionContext::AnyView,
+    QKeySequence{Qt::Key_QuoteLeft},
+    [](auto& context) { context.view().showPieMenu(); },
+    [](const auto& context) { return context.hasDocument(); },
+  });
+
   /* ========== Editing Actions ========== */
   /* ========== Tool Specific Actions ========== */
   addAction(Action{

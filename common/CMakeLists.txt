@@ -387,6 +387,7 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/FaceInspector.cpp
         ${COMMON_SOURCE_DIR}/ui/FaceTool.cpp
         ${COMMON_SOURCE_DIR}/ui/FaceToolController.cpp
+        ${COMMON_SOURCE_DIR}/ui/PieMenu.cpp
         ${COMMON_SOURCE_DIR}/ui/FlagsEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/FlagsPopupEditor.cpp
         ${COMMON_SOURCE_DIR}/ui/FlashSelectionAnimation.cpp

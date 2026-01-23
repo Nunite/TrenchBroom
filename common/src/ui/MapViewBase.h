@@ -66,6 +66,7 @@ class Action;
 class AnimationManager;
 class MapDocument;
 class MapViewToolBox;
+class PieMenu;
 class SignalDelayer;
 class Tool;
 
@@ -88,6 +89,7 @@ protected:
 private:
   std::unique_ptr<render::Compass> m_compass;
   std::unique_ptr<render::PrimitiveRenderer> m_portalFileRenderer;
+  PieMenu* m_pieMenu = nullptr;
 
   /**
    * Tracks whether this map view has most recently gotten the focus. This is tracked and
@@ -129,6 +131,7 @@ public:
 
 public:
   void setIsCurrent(bool isCurrent);
+  void showPieMenu();
 
   virtual render::Camera& camera() = 0;
 

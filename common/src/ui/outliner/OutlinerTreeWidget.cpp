@@ -37,6 +37,7 @@
 
 #include "ui/MapDocument.h"
 #include "ui/MapFrame.h"
+#include "ui/MapViewBase.h"
 #include "ui/QtUtils.h"
 #include "ui/ViewUtils.h"
 #include "io/ResourceUtils.h"
@@ -1920,6 +1921,16 @@ void OutlinerTreeWidget::keyPressEvent(QKeyEvent* event)
         m_syncingSelection = wasSyncing;
         event->accept();
         return;
+    }
+
+    if (event->key() == Qt::Key_QuoteLeft) {
+        if (auto* frame = dynamic_cast<MapFrame*>(window())) {
+            if (auto* view = frame->currentMapViewBase()) {
+                view->showPieMenu();
+                event->accept();
+                return;
+            }
+        }
     }
 
     if (
