@@ -294,8 +294,7 @@ void MapViewBase::createActions()
     const auto keySequence = action.keySequence();
 
     auto* shortcut = new QShortcut{this};
-    // Use WindowShortcut to ensure it triggers even if focus is slightly off within the window
-    shortcut->setContext(Qt::WindowShortcut);
+    shortcut->setContext(Qt::WidgetWithChildrenShortcut);
     shortcut->setKey(keySequence);
     connect(
       shortcut, &QShortcut::activated, this, [this, &action] { triggerAction(action); });
