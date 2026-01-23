@@ -829,7 +829,7 @@ void Map::setWorld(
   m_game = std::move(game);
 
   entityModelManager().setGame(m_game.get(), taskManager());
-  editorContext().setCurrentLayer(world()->defaultLayer());
+  editorContext().setCurrentLayer(world()->defaultLayer(), false);
 
   updateGameSearchPaths();
   setPath(path);

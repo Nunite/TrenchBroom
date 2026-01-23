@@ -69,7 +69,7 @@ public:
 
 public:
   LayerNode* currentLayer() const;
-  void setCurrentLayer(LayerNode* layerNode);
+  void setCurrentLayer(LayerNode* layerNode, bool notify = true);
 
   GroupNode* currentGroup() const;
   void pushGroup(GroupNode& groupNode);

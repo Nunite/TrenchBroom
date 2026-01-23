@@ -117,6 +117,7 @@ private:
     std::unordered_map<std::string, int> m_linkedGroupSetIndices;
     SortMode m_sortMode = SortMode::Default;
     const mdl::GroupNode* m_highlightedCurrentGroup = nullptr;
+    const mdl::LayerNode* m_highlightedCurrentLayer = nullptr;
 };
 
 } // namespace tb::ui

@@ -366,6 +366,8 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
 
     m_notifierConnection += m_document.map().groupWasOpenedNotifier.connect(
         [this](mdl::GroupNode&) { updateCurrentGroupHighlight(); });
+    m_notifierConnection += m_document.map().editorContext().editorContextDidChangeNotifier.connect(
+        [this]() { updateCurrentGroupHighlight(); });
     m_notifierConnection += m_document.map().groupWasClosedNotifier.connect(
         [this](mdl::GroupNode& groupNode) {
             if (auto* item = findItemForNode(&groupNode)) {
@@ -752,13 +754,15 @@ void OutlinerTreeWidget::updateTree()
 
 void OutlinerTreeWidget::updateCurrentGroupHighlight()
 {
-    const auto* currentGroup = m_document.map().editorContext().currentGroup();
+    const auto& editorContext = m_document.map().editorContext();
+    const auto* currentGroup = editorContext.currentGroup();
+    const auto* currentLayer = editorContext.currentLayer();
 
-    const auto clearGroup = [&](const mdl::GroupNode* groupNode) {
-        if (!groupNode) {
+    const auto clearNode = [&](const mdl::Node* node) {
+        if (!node) {
             return;
         }
-        if (auto* item = findItemForNode(groupNode)) {
+        if (auto* item = findItemForNode(node)) {
             for (int c = 0; c < columnCount(); ++c) {
                 item->setBackground(c, QBrush{});
             }
@@ -766,13 +770,27 @@ void OutlinerTreeWidget::updateCurrentGroupHighlight()
     };
 
     if (m_highlightedCurrentGroup != currentGroup) {
-        clearGroup(m_highlightedCurrentGroup);
+        clearNode(m_highlightedCurrentGroup);
         m_highlightedCurrentGroup = currentGroup;
     }
 
     if (currentGroup) {
         if (auto* item = findItemForNode(currentGroup)) {
             const auto highlight = QBrush{QColor{135, 206, 235, 70}}; // 淡蓝色
+            for (int c = 0; c < columnCount(); ++c) {
+                item->setBackground(c, highlight);
+            }
+        }
+    }
+
+    if (m_highlightedCurrentLayer != currentLayer) {
+        clearNode(m_highlightedCurrentLayer);
+        m_highlightedCurrentLayer = currentLayer;
+    }
+
+    if (currentLayer) {
+        if (auto* item = findItemForNode(currentLayer)) {
+            const auto highlight = QBrush{QColor{255, 215, 0, 70}}; // 金色
             for (int c = 0; c < columnCount(); ++c) {
                 item->setBackground(c, highlight);
             }

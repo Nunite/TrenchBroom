@@ -104,9 +104,16 @@ LayerNode* EditorContext::currentLayer() const
   return m_currentLayer;
 }
 
-void EditorContext::setCurrentLayer(LayerNode* layerNode)
+void EditorContext::setCurrentLayer(LayerNode* layerNode, const bool notify)
 {
-  m_currentLayer = layerNode;
+  if (m_currentLayer != layerNode)
+  {
+    m_currentLayer = layerNode;
+    if (notify)
+    {
+      editorContextDidChangeNotifier();
+    }
+  }
 }
 
 GroupNode* EditorContext::currentGroup() const
