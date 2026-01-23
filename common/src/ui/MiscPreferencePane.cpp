@@ -69,12 +69,38 @@ void MiscPreferencePane::createGui()
   m_prefixWorldspawnOnCopyCheckBox =
     new QCheckBox(tr("Prefix worldspawn header on copy"));
 
-  m_pieMenuActionButton = new QPushButton(tr("Select Action..."));
+  m_pieMenuActionList = new QListWidget();
+  m_pieMenuActionList->setSelectionMode(QAbstractItemView::SingleSelection);
+  m_pieMenuActionList->setDragDropMode(QAbstractItemView::InternalMove);
+  m_pieMenuActionList->setDefaultDropAction(Qt::MoveAction);
+  
+  m_addActionBtn = new QPushButton(tr("Add"));
+  m_removeActionBtn = new QPushButton(tr("Remove"));
+  m_clearActionsBtn = new QPushButton(tr("Clear"));
+
   m_pieMenu = new QMenu(this);
   
-  connect(m_pieMenuActionButton, &QPushButton::clicked, this, [this]() {
-      QPoint pos = m_pieMenuActionButton->mapToGlobal(QPoint(0, m_pieMenuActionButton->height()));
+  connect(m_addActionBtn, &QPushButton::clicked, this, [this]() {
+      QPoint pos = m_addActionBtn->mapToGlobal(QPoint(0, m_addActionBtn->height()));
       m_pieMenu->exec(pos);
+  });
+
+  connect(m_removeActionBtn, &QPushButton::clicked, this, [this]() {
+      QList<QListWidgetItem*> items = m_pieMenuActionList->selectedItems();
+      if (!items.isEmpty()) {
+          delete m_pieMenuActionList->takeItem(m_pieMenuActionList->row(items.first()));
+          savePieMenuActions();
+      }
+  });
+
+  connect(m_clearActionsBtn, &QPushButton::clicked, this, [this]() {
+      m_pieMenuActionList->clear();
+      savePieMenuActions();
+  });
+  
+  // Save on reorder
+  connect(m_pieMenuActionList->model(), &QAbstractItemModel::rowsMoved, this, [this]() {
+      savePieMenuActions();
   });
   
   auto& actionManager = ActionManager::instance();
@@ -130,9 +156,7 @@ void MiscPreferencePane::createGui()
               QAction* qAction = menu->addAction(label);
               qAction->setData(path);
               connect(qAction, &QAction::triggered, this, [this, qAction]() {
-                  auto& prefs = PreferenceManager::instance();
-                  prefs.set(Preferences::PieMenuAction, qAction->data().toString());
-                  m_pieMenuActionButton->setText(qAction->text());
+                  addPieMenuAction(qAction->text(), qAction->data().toString());
               });
           }
       } else {
@@ -156,9 +180,7 @@ void MiscPreferencePane::createGui()
           listWidget->setFixedHeight(std::min(totalHeight, maxHeight));
 
           connect(listWidget, &QListWidget::itemClicked, this, [this, listWidget](QListWidgetItem* item) {
-              auto& prefs = PreferenceManager::instance();
-              prefs.set(Preferences::PieMenuAction, item->data(Qt::UserRole).toString());
-              m_pieMenuActionButton->setText(item->text());
+              addPieMenuAction(item->text(), item->data(Qt::UserRole).toString());
               m_pieMenu->close();
           });
 
@@ -170,15 +192,25 @@ void MiscPreferencePane::createGui()
 
   buildMenu(m_pieMenu, root);
 
-  auto* pieMenuLabel = new QLabel(tr("Pie Menu Action"));
+  auto* pieMenuLabel = new QLabel(tr("Pie Menu Actions"));
+  auto* buttonsLayout = new QVBoxLayout();
+  buttonsLayout->addWidget(m_addActionBtn);
+  buttonsLayout->addWidget(m_removeActionBtn);
+  buttonsLayout->addWidget(m_clearActionsBtn);
+  buttonsLayout->addStretch();
+
   auto* pieMenuLayout = new QHBoxLayout();
-  pieMenuLayout->addWidget(pieMenuLabel);
-  pieMenuLayout->addWidget(m_pieMenuActionButton);
+  pieMenuLayout->addWidget(m_pieMenuActionList);
+  pieMenuLayout->addLayout(buttonsLayout);
+
+  auto* mainPieLayout = new QVBoxLayout();
+  mainPieLayout->addWidget(pieMenuLabel);
+  mainPieLayout->addLayout(pieMenuLayout);
 
   auto* miscLayout = new QVBoxLayout();
   miscLayout->setContentsMargins(0, 0, 0, 0);
   miscLayout->addWidget(m_prefixWorldspawnOnCopyCheckBox);
-  miscLayout->addLayout(pieMenuLayout);
+  miscLayout->addLayout(mainPieLayout);
 
   auto* miscGroupBox = new QGroupBox(tr("Editor"));
   miscGroupBox->setLayout(miscLayout);
@@ -198,6 +230,23 @@ void MiscPreferencePane::createGui()
       auto& prefs = PreferenceManager::instance();
       prefs.set(Preferences::PrefixWorldspawnHeaderOnCopy, checked);
     });
+}
+
+void MiscPreferencePane::addPieMenuAction(const QString& label, const QString& path)
+{
+    auto* item = new QListWidgetItem(label, m_pieMenuActionList);
+    item->setData(Qt::UserRole, path);
+    savePieMenuActions();
+}
+
+void MiscPreferencePane::savePieMenuActions()
+{
+    QStringList paths;
+    for (int i = 0; i < m_pieMenuActionList->count(); ++i) {
+        paths << m_pieMenuActionList->item(i)->data(Qt::UserRole).toString();
+    }
+    auto& prefs = PreferenceManager::instance();
+    prefs.set(Preferences::PieMenuAction, paths.join('|'));
 }
 
 bool MiscPreferencePane::canResetToDefaults()
@@ -233,13 +282,20 @@ void MiscPreferencePane::updateControls()
     pref(Preferences::PrefixWorldspawnHeaderOnCopy));
 
   QString currentPath = pref(Preferences::PieMenuAction);
+  QStringList paths = currentPath.split('|', Qt::SkipEmptyParts);
+  
+  m_pieMenuActionList->clear();
+  
   auto& actionManager = ActionManager::instance();
   const auto& actions = actionManager.actionsMap();
-  auto it = actions.find(std::filesystem::path(currentPath.toStdString()));
-  if (it != actions.end()) {
-      m_pieMenuActionButton->setText(it->second.label());
-  } else {
-      m_pieMenuActionButton->setText(tr("Select Action..."));
+  
+  for (const auto& pathStr : paths) {
+      std::filesystem::path path(pathStr.toStdString());
+      auto it = actions.find(path);
+      QString label = (it != actions.end()) ? it->second.label() : tr("Unknown Action");
+      
+      auto* item = new QListWidgetItem(label, m_pieMenuActionList);
+      item->setData(Qt::UserRole, pathStr);
   }
 }
 

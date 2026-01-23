@@ -1184,21 +1184,26 @@ void MapViewBase::showPieMenu()
   {
     auto& actionManager = ActionManager::instance();
     const auto& actions = actionManager.actionsMap();
-    auto it = actions.find(std::filesystem::path(actionPath.toStdString()));
+    QStringList paths = actionPath.split('|', Qt::SkipEmptyParts);
 
-    if (it != actions.end())
+    for (const auto& pathStr : paths)
     {
-      const auto& action = it->second;
-      m_pieMenu->addItem(action.label(), [this, &action]() {
-        if (auto* mapFrame = findMapFrame(this))
+        auto it = actions.find(std::filesystem::path(pathStr.toStdString()));
+
+        if (it != actions.end())
         {
-          ActionExecutionContext context(mapFrame, this);
-          if (action.enabled(context))
-          {
-            action.execute(context);
-          }
+          const auto& action = it->second;
+          m_pieMenu->addItem(action.label(), [this, &action]() {
+            if (auto* mapFrame = findMapFrame(this))
+            {
+              ActionExecutionContext context(mapFrame, this);
+              if (action.enabled(context))
+              {
+                action.execute(context);
+              }
+            }
+          });
         }
-      });
     }
   }
 
