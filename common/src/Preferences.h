@@ -198,6 +198,8 @@ extern Preference<bool> ShowEdges;
 
 extern Preference<bool> ShowSoftMapBounds;
 
+extern Preference<QString> PieMenuAction;
+
 // Editor context
 extern Preference<bool> ShowPointEntities;
 extern Preference<bool> ShowBrushes;

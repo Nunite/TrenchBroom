@@ -306,6 +306,8 @@ Preference<bool> ShowEdges("Map view/Show edges", true);
 
 Preference<bool> ShowSoftMapBounds("Map view/Show soft map bounds", true);
 
+Preference<QString> PieMenuAction("Controls/Map view/Pie Menu Action", "Menu/View/Camera/Focus on Selection");
+
 Preference<bool> ShowPointEntities("Map view/Show point entities", true);
 Preference<bool> ShowBrushes("Map view/Show brushes", true);
 
@@ -441,6 +443,7 @@ const std::vector<PreferenceBase*>& staticPreferences()
     &ShowFog,
     &ShowEdges,
     &ShowSoftMapBounds,
+    &PieMenuAction,
     &ShowPointEntities,
     &ShowBrushes,
     &PrefixWorldspawnHeaderOnCopy,

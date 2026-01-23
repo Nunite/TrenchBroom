@@ -1179,11 +1179,27 @@ void MapViewBase::showPieMenu()
 
   m_pieMenu->clearItems();
 
-  if (auto* mapFrame = findMapFrame(this))
+  QString actionPath = pref(Preferences::PieMenuAction);
+  if (!actionPath.isEmpty())
   {
-    m_pieMenu->addItem("Focus Selection", [mapFrame]() {
-      mapFrame->focusCameraOnSelection();
-    });
+    auto& actionManager = ActionManager::instance();
+    const auto& actions = actionManager.actionsMap();
+    auto it = actions.find(std::filesystem::path(actionPath.toStdString()));
+
+    if (it != actions.end())
+    {
+      const auto& action = it->second;
+      m_pieMenu->addItem(action.label(), [this, &action]() {
+        if (auto* mapFrame = findMapFrame(this))
+        {
+          ActionExecutionContext context(mapFrame, this);
+          if (action.enabled(context))
+          {
+            action.execute(context);
+          }
+        }
+      });
+    }
   }
 
   m_pieMenu->showAt(QCursor::pos());

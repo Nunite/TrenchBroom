@@ -5,6 +5,8 @@
 class QButtonGroup;
 class QRadioButton;
 class QCheckBox;
+class QPushButton;
+class QMenu;
 
 namespace tb::ui
 {
@@ -17,6 +19,8 @@ private:
   QRadioButton* m_chineseRadioButton;
   QButtonGroup* m_languageButtonGroup;
   QCheckBox* m_prefixWorldspawnOnCopyCheckBox = nullptr;
+  QPushButton* m_pieMenuActionButton = nullptr;
+  QMenu* m_pieMenu = nullptr;
 
 signals:
   void languageChanged();
