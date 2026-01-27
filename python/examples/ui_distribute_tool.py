@@ -85,10 +85,26 @@ def catmull_rom_spline(points, steps=10):
     """
     if len(points) < 2: return points
     
-    # Duplicate endpoints to handle open spline
-    # P0, P1, P2, ... Pn
-    # Control points: P0, P0, P1, P2, ... Pn, Pn
-    ctrl = [points[0]] + list(points) + [points[-1]]
+    # Check if closed loop
+    is_closed = False
+    p_start = points[0]
+    p_end = points[-1]
+    dist_sq = (p_start[0]-p_end[0])**2 + (p_start[1]-p_end[1])**2 + (p_start[2]-p_end[2])**2
+    if dist_sq < 0.001:
+        is_closed = True
+
+    if is_closed:
+        # P0, P1, ..., Pn-1, P0
+        # Need Pn-1 before P0, and P1 after P0
+        # points = [P0, P1, P2, P3, P0]
+        # ctrl should be: [P3, P0, P1, P2, P3, P0, P1]
+        # points[-2] is P3
+        ctrl = [points[-2]] + list(points) + [points[1]]
+    else:
+        # Duplicate endpoints to handle open spline
+        # P0, P1, P2, ... Pn
+        # Control points: P0, P0, P1, P2, ... Pn, Pn
+        ctrl = [points[0]] + list(points) + [points[-1]]
     
     smoothed = []
     
@@ -298,6 +314,8 @@ class DistributeTool:
                 if curr in next_map:
                     curr = next_map[curr]
                     if curr in visited_local: # Cycle detected within this chain
+                        # If cycle closes back to a node in this chain, append it to close the loop physically
+                        chain.append(curr)
                         break 
                 else:
                     curr = None
