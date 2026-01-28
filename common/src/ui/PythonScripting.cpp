@@ -77,6 +77,10 @@
 #include <QMouseEvent>
 #include <QPen>
 #include <QPalette>
+#include <QTextTable>
+#include <QTextTableCell>
+#include <QTextBlock>
+#include <QAbstractTextDocumentLayout>
 
 
 #include "vm/segment.h"
@@ -170,6 +174,108 @@ PyTypeObject* g_materialCollectionType = nullptr;
 struct PyTbPluginPanel
 {
   PyObject_HEAD QPointer<QWidget>* container;
+};
+
+class HtmlViewHoverHighlighter : public QObject
+{
+public:
+  HtmlViewHoverHighlighter(QTextBrowser* browser, const QColor& color)
+    : QObject(browser), m_browser(browser), m_color(color), m_currentRow(-1), m_currentTable(nullptr)
+  {
+    browser->setMouseTracking(true);
+    if (browser->viewport())
+    {
+      browser->viewport()->setMouseTracking(true);
+      browser->viewport()->installEventFilter(this);
+    }
+  }
+
+protected:
+  bool eventFilter(QObject* obj, QEvent* event) override
+  {
+    if (obj == m_browser->viewport())
+    {
+      if (event->type() == QEvent::MouseMove)
+      {
+        auto* mouseEvent = static_cast<QMouseEvent*>(event);
+        highlightRow(mouseEvent->pos());
+      }
+      else if (event->type() == QEvent::Leave)
+      {
+        clearHighlight();
+      }
+    }
+    return QObject::eventFilter(obj, event);
+  }
+
+private:
+  void highlightRow(const QPoint& pos)
+  {
+    // Use anchorAt to check if we are over a link, but we want to highlight the whole row.
+    // The structure is assumed to be a table row.
+    
+    QTextCursor cursor = m_browser->cursorForPosition(pos);
+    QTextTable* table = cursor.currentTable();
+    
+    if (!table)
+    {
+      clearHighlight();
+      return;
+    }
+    
+    QTextTableCell cell = table->cellAt(cursor);
+    if (!cell.isValid())
+    {
+        clearHighlight();
+        return;
+    }
+
+    int row = cell.row();
+    
+    // Optimization: avoid redraw if same row
+    if (row == m_currentRow && table == m_currentTable) return;
+    
+    m_currentRow = row;
+    m_currentTable = table;
+    
+    QList<QTextEdit::ExtraSelection> selections;
+    int cols = table->columns();
+    
+    // Highlight all cells in this row
+    for (int c = 0; c < cols; ++c)
+    {
+      QTextTableCell rowCell = table->cellAt(row, c);
+      if (!rowCell.isValid()) continue;
+
+      QTextCursor cellCursor = rowCell.firstCursorPosition();
+      // Select until the end of the cell
+      cellCursor.setPosition(rowCell.lastCursorPosition().position(), QTextCursor::KeepAnchor);
+      
+      QTextEdit::ExtraSelection sel;
+      sel.cursor = cellCursor;
+      sel.format.setBackground(m_color);
+      // FullWidthSelection helps filling the gaps, but might not be strictly necessary if table cells are tight
+      sel.format.setProperty(QTextFormat::FullWidthSelection, true); 
+      selections.append(sel);
+    }
+    
+    m_browser->setExtraSelections(selections);
+  }
+
+  void clearHighlight()
+  {
+    if (m_currentRow != -1)
+    {
+      m_browser->setExtraSelections({});
+      m_currentRow = -1;
+      m_currentTable = nullptr;
+    }
+  }
+
+  QTextBrowser* m_browser;
+  QColor m_color;
+  int m_currentRow;
+  QTextTable* m_currentTable;
 };
 
 PyObject* createVec3Object(const vm::vec3d& v)
@@ -1906,10 +2012,14 @@ PyObject* plugin_panel_add_html_view(PyObject* self, PyObject* args)
   browser->setOpenExternalLinks(false);
   browser->setFrameShape(QFrame::NoFrame);
   browser->setStyleSheet("background-color: transparent;");
+  browser->setTextInteractionFlags(Qt::LinksAccessibleByMouse);
   
   // Use monospace font for graph alignment
   const auto font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
   browser->setFont(font);
+
+  // Enable hover highlighting with dark grey color
+  new HtmlViewHoverHighlighter(browser, QColor(42, 45, 46));
 
   if (callback != nullptr)
   {
@@ -4286,7 +4396,7 @@ PyObject* module_create_brush(PyObject*, PyObject* args)
     
     auto res = doc->map().save();
     if (res.is_error()) {
-        res.if_error([](const tb::Error& e) {
+        (void)res.if_error([](const tb::Error& e) {
             PyErr_SetString(PyExc_RuntimeError, e.msg.c_str());
         });
         return nullptr;
@@ -4302,7 +4412,7 @@ PyObject* module_create_brush(PyObject*, PyObject* args)
     
     auto res = doc->map().reload();
     if (res.is_error()) {
-        res.if_error([](const tb::Error& e) {
+        (void)res.if_error([](const tb::Error& e) {
             PyErr_SetString(PyExc_RuntimeError, e.msg.c_str());
         });
         return nullptr;

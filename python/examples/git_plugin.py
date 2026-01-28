@@ -4,7 +4,6 @@ import os
 import html
 import re
 import base64
-import copy
 
 class GitManager:
     def __init__(self):
@@ -105,7 +104,7 @@ class GitManager:
         for index, item in enumerate(history_items):
             # Previous output becomes current input
             output_swimlanes_prev = view_models[-1]['outputSwimlanes'] if view_models else []
-            input_swimlanes = [copy.deepcopy(node) for node in output_swimlanes_prev]
+            input_swimlanes = [n.copy() for n in output_swimlanes_prev]
             output_swimlanes = []
 
             first_parent_added = False
@@ -122,13 +121,13 @@ class GitManager:
                             first_parent_added = True
                         continue
                     
-                    output_swimlanes.append(copy.deepcopy(node))
+                    output_swimlanes.append(node.copy())
             else:
                 # No parents (initial commit), pass through others
                 for node in input_swimlanes:
                     if node['id'] == item['id']:
                         continue
-                    output_swimlanes.append(copy.deepcopy(node))
+                    output_swimlanes.append(node.copy())
 
             # Add unprocessed parents to output (forks)
             start_idx = 1 if first_parent_added else 0
@@ -159,12 +158,18 @@ class GitManager:
     def render_graph_svg(self, view_model):
         SWIMLANE_WIDTH = 11
         SWIMLANE_HEIGHT = 22
-        SWIMLANE_CURVE_RADIUS = 5
+        # Use thicker strokes and larger radius to compensate for visual scaling if needed,
+        # but since we are scaling everything up by 2.0 and then down by 2.0 via CSS,
+        # the logical pixel size should remain 1:1.
+        # However, if lines look too thin, we can slightly increase base stroke width.
+        
+        # VS Code uses 1px stroke logically.
         CIRCLE_RADIUS = 4
         CIRCLE_STROKE_WIDTH = 2
+        LINE_STROKE_WIDTH = 1.5 # Slightly thicker than 1px for better visibility
 
-        # Scale 1.0 for 1:1 match with VS Code pixel density
-        SCALE = 1.0
+        # Scale 2.0 for HiDPI, then scale down with CSS
+        SCALE = 2.0
         
         def s(val): return val * SCALE
 
@@ -286,6 +291,8 @@ class GitManager:
     def generate_history_html(self, view_models):
         if not view_models: return ""
         
+        SCALE = 2.0
+        
         table_rows = []
         for vm in view_models:
             item = vm['historyItem']
@@ -307,7 +314,7 @@ class GitManager:
             
             content_html = f'''
             <a href="checkout:{item["id"]}" class="row-link">
-                <img src="data:image/svg+xml;base64,{svg_b64}" width="{svg_w}" height="{svg_h}" class="graph-img" />
+                <img src="data:image/svg+xml;base64,{svg_b64}" width="{svg_w / SCALE}" height="{svg_h / SCALE}" class="graph-img" />
                 <span class="text-content">
                     <span class="hash">{item["id"]}</span>{refs_html}<span class="msg">{html.escape(item["subject"])}</span><span class="meta">{html.escape(item["author"])} &bull; {html.escape(item["date"])}</span>
                 </span>
@@ -325,6 +332,12 @@ class GitManager:
                 font-size: 13px; 
                 margin: 0; 
                 padding: 0; 
+                user-select: none;
+                -webkit-user-select: none;
+                cursor: default;
+            }
+            img {
+                -webkit-user-drag: none;
             }
             table { 
                 border-collapse: collapse; 
@@ -336,7 +349,6 @@ class GitManager:
                 height: 22px;
                 background-color: transparent;
             }
-            tr:hover { background-color: #2a2d2e; }
             
             td.cell { 
                 padding: 0; 
