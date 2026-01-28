@@ -1869,11 +1869,11 @@ PyObject* plugin_panel_set_list_widget_context_menu(PyObject* self, PyObject* ar
       Py_ssize_t size = PyList_Size(actions);
       for(Py_ssize_t i=0; i<size; ++i) {
           PyObject* entry = PyList_GetItem(actions, i);
-          char* name = nullptr;
+          char* actionName = nullptr;
           PyObject* cb = nullptr;
-          if (PyArg_ParseTuple(entry, "sO", &name, &cb)) {
+          if (PyArg_ParseTuple(entry, "sO", &actionName, &cb)) {
               if (PyCallable_Check(cb)) {
-                  menu.addAction(QString::fromUtf8(name));
+                  menu.addAction(QString::fromUtf8(actionName));
               }
           } else {
               PyErr_Clear(); 
@@ -1893,10 +1893,10 @@ PyObject* plugin_panel_set_list_widget_context_menu(PyObject* self, PyObject* ar
 
            for(Py_ssize_t i=0; i<size; ++i) {
                PyObject* entry = PyList_GetItem(actions, i);
-               char* name = nullptr;
+               char* actionName = nullptr;
                PyObject* cb = nullptr;
-               if (PyArg_ParseTuple(entry, "sO", &name, &cb)) {
-                   if (selectedAction->text() == QString::fromUtf8(name)) {
+               if (PyArg_ParseTuple(entry, "sO", &actionName, &cb)) {
+                   if (selectedAction->text() == QString::fromUtf8(actionName)) {
                        PyObject* argList = Py_BuildValue("(i)", index);
                        PyObject* res = PyObject_CallObject(cb, argList);
                        Py_DECREF(argList);
