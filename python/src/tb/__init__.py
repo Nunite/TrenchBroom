@@ -253,6 +253,36 @@ class PluginPanel(Protocol):
         """获取颜色字段当前值 (r, g, b)，范围 0-255。"""
         ...
 
+    def add_list_widget(self, key: str, items: list[str], callback: Callable[[int], Any] | None = None) -> None:
+        """
+        添加一个列表控件（QListWidget）。
+        
+        - key: 唯一标识符。
+        - items: 列表项文本列表。
+        - callback: (可选) 选中项改变时的回调函数，接收参数 (index: int)。
+        """
+        ...
+
+    def set_list_widget_context_menu(self, key: str, actions: list[tuple[str, Callable[[int], Any]]]) -> None:
+        """
+        为指定 key 的列表控件设置右键菜单。
+        
+        - key: 列表控件的标识符。
+        - actions: 菜单项列表，每个项为 (name, callback)。callback 接收参数 (index: int)，即右键点击的项的索引。
+        """
+        ...
+
+    def add_html_view(self, key: str, html: str, height: int = 200, callback: Callable[[str], Any] | None = None) -> None:
+        """
+        添加一个 HTML 视图控件（QTextBrowser）。
+        
+        - key: 唯一标识符。
+        - html: HTML 内容。
+        - height: 控件最小高度（像素），默认 200。
+        - callback: (可选) 点击链接时的回调函数，接收参数 (href: str)。
+        """
+        ...
+
 
 class Transaction(Protocol):
     """用于把一段脚本编辑合并成一次 undo/redo 的事务。"""
@@ -618,6 +648,19 @@ class Document(Protocol):
     @property
     def selection(self) -> Selection:
         """获取当前的选择对象。"""
+        ...
+
+    @property
+    def path(self) -> str:
+        """获取当前文档的绝对路径。"""
+        ...
+
+    def save(self) -> None:
+        """保存当前文档。如果保存失败会抛出 RuntimeError。"""
+        ...
+
+    def reload(self) -> None:
+        """从磁盘重新加载当前文档。如果加载失败会抛出 RuntimeError。"""
         ...
 
     @property

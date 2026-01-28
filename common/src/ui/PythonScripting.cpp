@@ -67,6 +67,17 @@
 #include <QVBoxLayout>
 #include <QColorDialog>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QMenu>
+#include <QCursor>
+#include <QFontDatabase>
+#include <QTextBrowser>
+#include <QPainter>
+#include <QPainterPath>
+#include <QMouseEvent>
+#include <QPen>
+#include <QPalette>
+
 
 #include "vm/segment.h"
 #include "vm/plane.h"
@@ -1598,6 +1609,214 @@ PyObject* plugin_panel_set_html(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
+
+PyObject* plugin_panel_add_list_widget(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  PyObject* items = nullptr;
+  PyObject* callbackObj = nullptr;
+
+  if (!PyArg_ParseTuple(args, "sO|O", &key, &items, &callbackObj))
+  {
+    return nullptr;
+  }
+
+  if (!PyList_Check(items))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected list of strings for items");
+    return nullptr;
+  }
+
+  if (callbackObj != nullptr && callbackObj != Py_None && !PyCallable_Check(callbackObj))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected a callable or None");
+    return nullptr;
+  }
+  if (callbackObj == Py_None) callbackObj = nullptr;
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* listWidget = new QListWidget{};
+  listWidget->setObjectName(plugin_panel_object_name(QStringLiteral("list"), key));
+  const auto font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+  listWidget->setFont(font);
+
+  const auto size = PyList_Size(items);
+  for (Py_ssize_t i = 0; i < size; ++i)
+  {
+    auto* item = PyList_GetItem(items, i);
+    const char* itemStr = PyUnicode_AsUTF8(item);
+    if (itemStr)
+    {
+      listWidget->addItem(QString::fromUtf8(itemStr));
+    }
+  }
+
+  if (callbackObj != nullptr)
+  {
+    Py_INCREF(callbackObj);
+    QObject::connect(listWidget, &QListWidget::currentRowChanged, container, [callbackObj, container](int row) {
+      auto gil = PyGILState_Ensure();
+      auto* win = container->window();
+      auto* frame = dynamic_cast<tb::ui::MapFrame*>(win);
+      auto* prev = g_currentFrame;
+      if (frame != nullptr)
+      {
+        g_currentFrame = frame;
+      }
+      
+      PyObject* argList = Py_BuildValue("(i)", row);
+      auto* result = PyObject_CallObject(callbackObj, argList);
+      Py_DECREF(argList);
+      
+      if (result == nullptr)
+      {
+        PyErr_Print();
+        if (g_currentFrame != nullptr)
+        {
+          g_currentFrame->pythonLogger().error("Error in list widget callback");
+        }
+      }
+      Py_XDECREF(result);
+      g_currentFrame = prev;
+      PyGILState_Release(gil);
+    });
+    QObject::connect(listWidget, &QObject::destroyed, container, [callbackObj]() {
+      auto gil = PyGILState_Ensure();
+      Py_DECREF(callbackObj);
+      PyGILState_Release(gil);
+    });
+  }
+
+  layout->addWidget(listWidget);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_list_widget_context_menu(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  PyObject* actions = nullptr; // List of (name, callback)
+  if (!PyArg_ParseTuple(args, "sO", &key, &actions))
+  {
+    return nullptr;
+  }
+
+  if (!PyList_Check(actions))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected list of (name, callback) tuples");
+    return nullptr;
+  }
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  const auto name = plugin_panel_object_name(QStringLiteral("list"), key);
+  
+  QListWidget* listWidget = nullptr;
+  auto* layout = container->layout();
+  if (layout) {
+      for (int i = 0; i < layout->count(); ++i) {
+          auto* item = layout->itemAt(i);
+          if (auto* w = item->widget()) {
+              if (w->objectName() == name) {
+                  listWidget = qobject_cast<QListWidget*>(w);
+                  if (listWidget) break;
+              }
+          }
+      }
+  }
+
+  if (listWidget == nullptr)
+  {
+    // Fallback to findChild just in case
+    listWidget = container->findChild<QListWidget*>(name);
+  }
+
+  if (listWidget == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such list widget");
+    return nullptr;
+  }
+
+  listWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+  
+  Py_INCREF(actions);
+
+  QObject::connect(listWidget, &QListWidget::customContextMenuRequested, container, [listWidget, actions, container](const QPoint& pos) {
+      auto* item = listWidget->itemAt(pos);
+      int index = -1;
+      if (item) index = listWidget->row(item);
+      
+      QMenu menu;
+      auto gil = PyGILState_Ensure();
+      
+      Py_ssize_t size = PyList_Size(actions);
+      for(Py_ssize_t i=0; i<size; ++i) {
+          PyObject* entry = PyList_GetItem(actions, i);
+          char* name = nullptr;
+          PyObject* cb = nullptr;
+          if (PyArg_ParseTuple(entry, "sO", &name, &cb)) {
+              if (PyCallable_Check(cb)) {
+                  menu.addAction(QString::fromUtf8(name));
+              }
+          } else {
+              PyErr_Clear(); 
+          }
+      }
+      
+      PyGILState_Release(gil); 
+      
+      QAction* selectedAction = menu.exec(QCursor::pos());
+      
+      if (selectedAction) {
+           gil = PyGILState_Ensure();
+           auto* win = container->window();
+           auto* frame = dynamic_cast<tb::ui::MapFrame*>(win);
+           auto* prev = g_currentFrame;
+           if (frame != nullptr) g_currentFrame = frame;
+
+           for(Py_ssize_t i=0; i<size; ++i) {
+               PyObject* entry = PyList_GetItem(actions, i);
+               char* name = nullptr;
+               PyObject* cb = nullptr;
+               if (PyArg_ParseTuple(entry, "sO", &name, &cb)) {
+                   if (selectedAction->text() == QString::fromUtf8(name)) {
+                       PyObject* argList = Py_BuildValue("(i)", index);
+                       PyObject* res = PyObject_CallObject(cb, argList);
+                       Py_DECREF(argList);
+                       Py_XDECREF(res);
+                       if (PyErr_Occurred()) {
+                           PyErr_Print();
+                           if (g_currentFrame) g_currentFrame->pythonLogger().error("Error in context menu callback");
+                       }
+                       break; 
+                   }
+               }
+           }
+           g_currentFrame = prev;
+           PyGILState_Release(gil);
+      }
+  });
+
+  QObject::connect(listWidget, &QObject::destroyed, container, [actions](){
+      auto gil = PyGILState_Ensure();
+      Py_DECREF(actions);
+      PyGILState_Release(gil);
+  });
+
+  Py_RETURN_NONE;
+}
+
 PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
 {
   const char* text = nullptr;
@@ -1649,6 +1868,86 @@ PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
     });
   }
   layout->addWidget(btn);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_add_html_view(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* html = nullptr;
+  int height = 200;
+  PyObject* callback = nullptr;
+
+  if (!PyArg_ParseTuple(args, "ss|iO", &key, &html, &height, &callback))
+  {
+    return nullptr;
+  }
+
+  if (callback != nullptr && callback != Py_None && !PyCallable_Check(callback))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected a callable or None");
+    return nullptr;
+  }
+  if (callback == Py_None) callback = nullptr;
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* browser = new QTextBrowser{};
+  browser->setObjectName(plugin_panel_object_name(QStringLiteral("html_view"), key));
+  browser->setHtml(QString::fromUtf8(html));
+  browser->setMinimumHeight(height);
+  browser->setOpenExternalLinks(false);
+  browser->setFrameShape(QFrame::NoFrame);
+  browser->setStyleSheet("background-color: transparent;");
+  
+  // Use monospace font for graph alignment
+  const auto font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+  browser->setFont(font);
+
+  if (callback != nullptr)
+  {
+    Py_INCREF(callback);
+    QObject::connect(browser, &QTextBrowser::anchorClicked, container, [callback, container](const QUrl& url) {
+      auto gil = PyGILState_Ensure();
+      auto* win = container->window();
+      auto* frame = dynamic_cast<tb::ui::MapFrame*>(win);
+      auto* prev = g_currentFrame;
+      if (frame != nullptr)
+      {
+        g_currentFrame = frame;
+      }
+      
+      PyObject* argList = Py_BuildValue("(s)", url.toString().toUtf8().constData());
+      auto* result = PyObject_CallObject(callback, argList);
+      Py_DECREF(argList);
+      
+      if (result == nullptr)
+      {
+        PyErr_Print();
+        if (g_currentFrame != nullptr)
+        {
+          g_currentFrame->pythonLogger().error("Error in html view callback");
+        }
+      }
+      Py_XDECREF(result);
+      g_currentFrame = prev;
+      PyGILState_Release(gil);
+    });
+    QObject::connect(browser, &QObject::destroyed, container, [callback]() {
+      auto gil = PyGILState_Ensure();
+      Py_DECREF(callback);
+      PyGILState_Release(gil);
+    });
+  }
+
+  layout->addWidget(browser);
   Py_RETURN_NONE;
 }
 
@@ -3963,6 +4262,54 @@ PyObject* module_create_brush(PyObject*, PyObject* args)
     return list;
   }
 
+  PyObject* document_get_path(PyObject* self, void*)
+  {
+    auto* docObj = (PyTbDocument*)self;
+    auto* doc = docObj->document;
+    if (!doc) return nullptr;
+
+    const auto& path = doc->map().path();
+    if (path.empty()) {
+        Py_RETURN_NONE;
+    }
+    
+    const auto dirStr = path.u8string();
+    return PyUnicode_FromStringAndSize(
+      reinterpret_cast<const char*>(dirStr.c_str()), static_cast<Py_ssize_t>(dirStr.size()));
+  }
+
+  PyObject* document_save(PyObject* self, PyObject*)
+  {
+    auto* docObj = (PyTbDocument*)self;
+    auto* doc = docObj->document;
+    if (!doc) return nullptr;
+    
+    auto res = doc->map().save();
+    if (res.is_error()) {
+        res.if_error([](const tb::Error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.msg.c_str());
+        });
+        return nullptr;
+    }
+    Py_RETURN_NONE;
+  }
+
+  PyObject* document_reload(PyObject* self, PyObject*)
+  {
+    auto* docObj = (PyTbDocument*)self;
+    auto* doc = docObj->document;
+    if (!doc) return nullptr;
+    
+    auto res = doc->map().reload();
+    if (res.is_error()) {
+        res.if_error([](const tb::Error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.msg.c_str());
+        });
+        return nullptr;
+    }
+    Py_RETURN_NONE;
+  }
+
   static PyMethodDef brushMethods[] = {
       {"faces", brush_faces, METH_NOARGS, nullptr},
       {"delete", brush_delete, METH_NOARGS, nullptr},
@@ -4269,6 +4616,8 @@ bool registerTypes(PyObject* module)
       {"get_selection", document_selection, METH_NOARGS, nullptr},
       {"transaction", document_transaction, METH_VARARGS, nullptr},
       {"vertex_tool_vertices", document_vertex_tool_vertices, METH_NOARGS, nullptr},
+      {"save", document_save, METH_NOARGS, nullptr},
+      {"reload", document_reload, METH_NOARGS, nullptr},
       {nullptr, nullptr, 0, nullptr},
     };
     documentType.tp_methods = documentMethods;
@@ -4278,6 +4627,7 @@ bool registerTypes(PyObject* module)
       {"entities", document_entities, nullptr, nullptr, nullptr},
       {"materials", document_get_materials, nullptr, nullptr, nullptr},
       {"material_collections", document_get_material_collections, nullptr, nullptr, nullptr},
+      {"path", document_get_path, nullptr, nullptr, nullptr},
       {nullptr, nullptr, nullptr, nullptr, nullptr},
     };
     documentType.tp_getset = documentGetSet;
@@ -4582,6 +4932,8 @@ bool registerTypes(PyObject* module)
     pluginPanelType.tp_dealloc = freePluginPanelObject;
 
     static PyMethodDef pluginPanelMethods[] = {
+      {"add_list_widget", plugin_panel_add_list_widget, METH_VARARGS, nullptr},
+      {"set_list_widget_context_menu", plugin_panel_set_list_widget_context_menu, METH_VARARGS, nullptr},
       {"clear", plugin_panel_clear, METH_NOARGS, nullptr},
       {"add_label", plugin_panel_add_label, METH_VARARGS, nullptr},
       {"add_label_named", plugin_panel_add_label_named, METH_VARARGS, nullptr},
@@ -4602,7 +4954,8 @@ bool registerTypes(PyObject* module)
       {"set_text", plugin_panel_set_text, METH_VARARGS, nullptr},
       {"set_html", plugin_panel_set_html, METH_VARARGS, nullptr},
       {"add_button", plugin_panel_add_button, METH_VARARGS, nullptr},
-      {"add_button_callback",
+      {"add_html_view", plugin_panel_add_html_view, METH_VARARGS, nullptr},
+  {"add_button_callback",
        [](PyObject* self, PyObject* args) -> PyObject* {
          const char* text = nullptr;
          PyObject* callback = nullptr;
