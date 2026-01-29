@@ -214,6 +214,36 @@ class GitManager:
         b64 = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
         return f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" height="{height}" style="vertical-align: middle;" />'
 
+    def create_button_svg(self, text, bg_color):
+        # Specific SVG generator for action buttons (Add, Discard, etc)
+        # Needs to be small and capsule shaped
+        
+        text_width = 0
+        for char in text:
+            text_width += 9 # Increased char width estimation for larger font
+            
+        width = int(text_width + 16) # Increased padding
+        height = 24 # Increased height (was 16)
+        radius = 6 # Increased radius
+        
+        s = 2.0
+        w_s = width * s
+        h_s = height * s
+        r_s = radius * s
+        font_size_s = 14 * s # Increased font size (was 10)
+        
+        text_x = (width/2) * s
+        text_y = (height/2 + 4.5) * s # Adjusted vertical center
+        
+        svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{w_s}" height="{h_s}" viewBox="0 0 {w_s} {h_s}">
+            <rect x="0" y="0" width="{w_s}" height="{h_s}" rx="{r_s}" ry="{r_s}" fill="{bg_color}" />
+            <text x="{text_x}" y="{text_y}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="{font_size_s}" fill="#ffffff" text-anchor="middle" font-weight="600">{text}</text>
+        </svg>'''
+        
+        b64 = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
+        # Wrap in anchor tag logic is handled by caller, this just returns the IMG tag
+        return f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" height="{height}" style="vertical-align: middle;" />'
+
     def render_graph_svg(self, view_model):
         SWIMLANE_WIDTH = 11
         SWIMLANE_HEIGHT = 22
@@ -347,70 +377,8 @@ class GitManager:
         svg_parts.append('</svg>')
         return "".join(svg_parts), width * SCALE, SWIMLANE_HEIGHT * SCALE
 
-    def generate_history_html(self, view_models):
-        if not view_models: return ""
-        
-        SCALE = 2.0
-        
-        table_rows = []
-        for vm in view_models:
-            item = vm['historyItem']
-            svg_xml, svg_w, svg_h = self.render_graph_svg(vm)
-            svg_b64 = base64.b64encode(svg_xml.encode('utf-8')).decode('utf-8')
-            
-            # Refs
-            refs_html = ""
-            for ref in item['refs']:
-                bg_color = "#429542" # 默认绿色（分支）
-                text_color = "#cccccc"
-                icon_char = None
-                
-                if ref == "HEAD":
-                    bg_color = "#007acc" # Blue
-                    text_color = "#ffffff"
-                    # No icon for HEAD usually
-                elif "origin/" in ref:
-                    bg_color = "#652d90" # Purple
-                    text_color = "#ffffff"
-                    icon_char = "&#9729;" # Cloud
-                elif "tag: " in ref:
-                    bg_color = "#ab5a00" # Orange
-                    text_color = "#ffffff"
-                    ref = ref.replace("tag: ", "")
-                    icon_char = "&#127991;" # Tag
-                else:
-                    # Local branch
-                    bg_color = "#429542" # Dark Grey
-                    text_color = "#ffffff"
-                    # Use a simple dot or nothing if font support is issue
-                    # The user liked the "target" icon. Let's try a bullet or circle char
-                    icon_char = "&#9673;" # Fisheye / Bullseye-like circle
-
-                # Generate SVG badge
-                badge_img = self.create_badge_svg(ref, bg_color, text_color, icon_char)
-                refs_html += f'{badge_img}&nbsp;'
-            
-            refs_span = ""
-            if refs_html:
-                # Add extra spacing after the group of badges
-                refs_span = f'<span class="refs-container">{refs_html}</span>&nbsp;&nbsp;'
-
-            # Content (Image + Text in one block)
-            # Use vertical-align middle to align text with graph
-            # Add padding-right to image to separate from text
-            
-            content_html = f'''
-            <a href="checkout:{item["id"]}" class="row-link">
-                <img src="data:image/svg+xml;base64,{svg_b64}" width="{svg_w / SCALE}" height="{svg_h / SCALE}" class="graph-img" />
-                <span class="text-content">
-                    <span class="hash">{item["id"]}</span>{refs_span}<span class="msg">{html.escape(item["subject"])}</span><span class="meta">{html.escape(item["author"])} &bull; {html.escape(item["date"])}</span>
-                </span>
-            </a>
-            '''
-            
-            table_rows.append(f'<tr><td class="cell">{content_html}</td></tr>')
-            
-        style = """
+    def get_css(self):
+        return """
         <style>
             body { 
                 background-color: transparent;
@@ -422,6 +390,8 @@ class GitManager:
                 user-select: none;
                 -webkit-user-select: none;
                 cursor: default;
+                height: 100%;
+                overflow: hidden;
             }
             img {
                 -webkit-user-drag: none;
@@ -497,31 +467,177 @@ class GitManager:
             .ref-tag { background-color: #ab5a00; color: #ffffff; border-color: #ab5a00; }
             .ref-branch { background-color: transparent; color: #cccccc; border-color: #424242; }
             
-            /* Use a generic font that might have these glyphs or fallback */
-            @font-face {
-                font-family: 'codicon';
-                src: url('codicon.ttf') format('truetype');
+            /* Changes List Styles */
+            .view-container {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                overflow: hidden;
             }
-            .icon-branch {
-                font-family: 'Segoe UI Symbol', 'Arial Unicode MS', sans-serif;
-                margin-right: 2px;
-                font-size: 10px;
+            .section-header {
+                font-weight: bold;
+                font-size: 11px;
+                text-transform: uppercase;
+                padding: 6px 8px;
+                background-color: #252526;
+                color: #cccccc;
+                flex-shrink: 0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid #303031;
+            }
+            .scroll-list {
+                flex-grow: 1;
+                overflow-y: auto;
+                padding: 4px 0;
+            }
+            .change-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 4px 8px;
+                font-family: Consolas, monospace;
+                font-size: 13px;
+                color: #cccccc;
+                cursor: default;
+            }
+            .change-row:hover {
+                background-color: #2a2d2e;
+            }
+            .change-info {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                margin-right: 8px;
+                display: flex;
+                align-items: center;
+            }
+            .change-actions a {
+                text-decoration: none;
+                margin-left: 6px;
+                font-size: 11px;
+                color: #ffffff;
+                border: 1px solid #454545;
+                padding: 2px 6px;
+                border-radius: 3px;
+                background-color: #3a3d41;
+                font-weight: 600;
+                display: inline-block;
+                vertical-align: middle;
+            }
+            .change-actions a:hover {
+                background-color: #0090f1;
+                border-color: #0090f1;
+            }
+            
+            /* Scrollbar styling */
+            ::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #424242;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: #4f4f4f;
+            }
+            ::-webkit-scrollbar-corner {
+                background: transparent;
             }
         </style>
         """
-        
+
+    def wrap_html(self, content):
         return f"""
         <html>
-        <head>{style}</head>
+        <head>{self.get_css()}</head>
         <body>
-            <table cellpadding="0" cellspacing="0" border="0">
-                {''.join(table_rows)}
-            </table>
+            {content}
         </body>
         </html>
         """
 
+    def generate_history_html(self, view_models):
+        if not view_models: return ""
+        
+        SCALE = 2.0
+        
+        table_rows = []
+        for vm in view_models:
+            item = vm['historyItem']
+            svg_xml, svg_w, svg_h = self.render_graph_svg(vm)
+            svg_b64 = base64.b64encode(svg_xml.encode('utf-8')).decode('utf-8')
+            
+            # Refs
+            refs_html = ""
+            for ref in item['refs']:
+                bg_color = "#429542" # 默认绿色（分支）
+                text_color = "#cccccc"
+                icon_char = None
+                
+                if ref == "HEAD":
+                    bg_color = "#007acc" # Blue
+                    text_color = "#ffffff"
+                    # No icon for HEAD usually
+                elif "origin/" in ref:
+                    bg_color = "#652d90" # Purple
+                    text_color = "#ffffff"
+                    icon_char = "&#9729;" # Cloud
+                elif "tag: " in ref:
+                    bg_color = "#ab5a00" # Orange
+                    text_color = "#ffffff"
+                    ref = ref.replace("tag: ", "")
+                    icon_char = "&#127991;" # Tag
+                else:
+                    # Local branch
+                    bg_color = "#429542" # Dark Grey
+                    text_color = "#ffffff"
+                    # Use a simple dot or nothing if font support is issue
+                    # The user liked the "target" icon. Let's try a bullet or circle char
+                    icon_char = "&#9673;" # Fisheye / Bullseye-like circle
+
+                # Generate SVG badge
+                badge_img = self.create_badge_svg(ref, bg_color, text_color, icon_char)
+                refs_html += f'{badge_img}&nbsp;'
+            
+            refs_span = ""
+            if refs_html:
+                # Add extra spacing after the group of badges
+                refs_span = f'<span class="refs-container">{refs_html}</span>&nbsp;&nbsp;'
+
+            # Content (Image + Text in one block)
+            # Use vertical-align middle to align text with graph
+            # Add padding-right to image to separate from text
+            
+            # Note: Qt's HTML engine is limited. Flexbox is not supported.
+            # We use &nbsp; to enforce spacing.
+            content_html = f'''
+            <a href="checkout:{item["id"]}" class="row-link">
+                <img src="data:image/svg+xml;base64,{svg_b64}" width="{svg_w / SCALE}" height="{svg_h / SCALE}" class="graph-img" />
+                <span class="text-content">
+                    <span class="hash">{item["id"]}</span>&nbsp;{refs_span}<span class="msg">{html.escape(item["subject"])}</span>&nbsp;&nbsp;&nbsp;<span class="meta">{html.escape(item["author"])} &bull; {html.escape(item["date"])}</span>
+                </span>
+            </a>
+            '''
+            
+            table_rows.append(f'<tr><td class="cell">{content_html}</td></tr>')
+            
+        return self.wrap_html(f"""
+            <div class="view-container">
+                <div class="scroll-list">
+                    <table cellpadding="0" cellspacing="0" border="0">
+                        {''.join(table_rows)}
+                    </table>
+                </div>
+            </div>
+        """)
+
     def refresh(self):
+        # 1. Capture user input first
         try:
             new_msg = self.panel.get_text_field("commit_msg")
             if new_msg:
@@ -529,111 +645,207 @@ class GitManager:
         except:
             pass
         
-        # Save new branch name if typed
         try:
             self.new_branch_name = self.panel.get_text_field("new_branch_name")
         except:
             self.new_branch_name = ""
 
+        # 2. Fetch all data BEFORE clearing UI (prevents flickering)
+        self.repo_dir = self.get_repo_dir()
+        
+        is_git_repo = False
+        current_branch = ""
+        branches = []
+        staged = []
+        changes = []
+        untracked = []
+        history_items = []
+        view_models = []
+        
+        if self.repo_dir and os.path.exists(os.path.join(self.repo_dir, ".git")):
+            is_git_repo = True
+            current_branch = self.get_current_branch()
+            branches = self.get_branches()
+            staged, changes, untracked = self.get_changes_categorized()
+            
+            # Fetch history
+            try:
+                history_items = self.get_history_items()
+                if history_items:
+                    view_models = self.to_view_models(history_items)
+            except Exception as e:
+                print(f"Error fetching history: {e}")
+
+        # 3. Clear and Rebuild UI
         self.panel.clear()
         
-        self.repo_dir = self.get_repo_dir()
         if not self.repo_dir:
             self.panel.add_label("<i>Please save the map to enable Git features.</i>")
             self.panel.add_button_callback("Refresh", self.refresh)
             return
 
-        if not os.path.exists(os.path.join(self.repo_dir, ".git")):
+        if not is_git_repo:
             self.panel.add_label(f"Folder: {self.repo_dir}")
             self.panel.add_label("Not a git repository.")
             self.panel.add_button_callback("Initialize Repo (git init)", self.on_init)
             self.panel.add_button_callback("Refresh", self.refresh)
             return
 
-        # Header / Branch
-        branch = self.get_current_branch()
-        self.panel.add_label(f"<h2>Branch: {html.escape(branch)}</h2>")
+        # --- VS Code Layout Implementation ---
+        
+        # 1. Header (Source Control title + Action icons)
+        # Using HTML for header to put icons on the right
+        # Compact VS Code style layout
+        header_html = f'''
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 4px;">
+            <span style="font-size: 13px; font-weight: bold; color: #cccccc; text-transform: uppercase;">Source Control</span>
+            <span style="display: flex; align-items: center;">
+                <a href="refresh:" title="Refresh" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8635;</a>
+                <a href="pull:" title="Pull" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8659;</a>
+                <a href="push:" title="Push" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8657;</a>
+            </span>
+        </div>
+        '''
+        self.panel.add_html_view("header_view", self.wrap_html(header_html), 34, self.on_header_link_clicked)
         
         if self.dubious_ownership_path:
             self.panel.add_label("<font color='red'><b>Error: Dubious Ownership</b></font>")
             self.panel.add_button_callback(f"Fix Safe Directory", self.on_fix_safe_directory)
-            self.panel.add_button_callback("Refresh", self.refresh)
             return 
-        
-        # Toolbar
-        self.panel.add_button_callback("Refresh Status", self.refresh)
-        self.panel.add_button_callback("Pull (Reload Map)", self.on_pull)
-        self.panel.add_button_callback("Push", self.on_push)
-        
-        # Branch Management
-        self.panel.add_label("<b>Branch Management</b>")
-        self.panel.add_text_field("new_branch_name", "New Branch Name", self.new_branch_name)
-        self.panel.add_button_callback("Create Branch", self.on_create_branch)
-        
-        branches = self.get_branches()
-        branch_items = []
-        current_branch_index = 0
-        for idx, b in enumerate(branches):
-            display = b
-            if b.startswith("* "):
-                display = b[2:] + " (Current)"
-                current_branch_index = idx
-            else:
-                display = b.strip()
-            branch_items.append(display)
-            
-        self.panel.add_list_widget("branch_list", branch_items, None)
-        # Select current branch in list
-        # Note: add_list_widget doesn't support setting selection index in current API, 
-        # but we can provide context menu for operations.
-        
-        self.panel.set_list_widget_context_menu("branch_list", [
-            ("Checkout", self.on_checkout_branch_from_list),
-            ("Delete", self.on_delete_branch_from_list),
-            ("Push (Publish)", self.on_push_branch_from_list)
-        ])
 
-        # Commit Area
-        self.panel.add_label("<b>Commit</b>")
-        self.panel.add_text_field("commit_msg", "Message", self.commit_message)
-        self.panel.add_button_callback("Commit (Save, Add & Commit)", self.on_commit)
+        # 2. Commit Section (Input + Button)
+        # Compact mode: No label for commit message input to save space
+        self.panel.add_text_field("commit_msg", "", self.commit_message, "Message (Ctrl+Enter to commit)")
+        self.panel.add_button_callback("Commit", self.on_commit)
         
-        # Changes List
-        staged, changes, untracked = self.get_changes_categorized()
-        self.current_changes = [] 
+        # 3. Changes Section
+        # Collapsible-like header using label
+        count_staged = len(staged)
+        count_pending = len(changes) + len(untracked)
+        total_count = count_staged + count_pending
+        
+        self.panel.add_label(f"<b>Changes ({total_count})</b>")
+        
+        # Use a HTML view for changes to control height and layout stability
+        # Height 120px (approx 5-6 lines) as requested
+        
+        changes_html = '<div class="changes-container">'
+        has_items = False
+        
+        # Common base style for the anchor wrapper (transparent, no border)
+        # The SVG image itself carries the visual style
+        # Added vertical-align: -3px to shift buttons down relative to larger text
+        anchor_style = "text-decoration: none; margin-left: 6px; display: inline-block; vertical-align: -3px;"
+        
+        # Pre-generate button SVGs for common actions
+        img_add = self.create_button_svg("Add", "#2da44e")
+        img_discard = self.create_button_svg("Discard", "#cf222e")
+        img_ignore = self.create_button_svg("Ignore", "#d29922")
+        img_unstage = self.create_button_svg("Unstage", "#6e7681")
         
         if staged:
-            self.panel.add_label(f"<b>Staged Changes ({len(staged)})</b>")
+            has_items = True
             for status, path in staged:
-                self.panel.add_label(f"<font color='#8de28d'>[Staged] {html.escape(path)}</font>")
-        
-        if changes or untracked:
-            count = len(changes) + len(untracked)
-            self.panel.add_label(f"<b>Pending Changes ({count})</b>")
-            
-            def add_chk(status_code, path, color):
-                key = f"chk_{path}"
-                label = f"[{status_code}] {path}"
-                self.panel.add_checkbox(key, label, 0)
-                self.current_changes.append(path)
-                
-            for status, path in changes:
-                add_chk(status, path, "#e2c08d")
-            for status, path in untracked:
-                add_chk("?", path, "#8ddbe2")
-                
-            self.panel.add_button_callback("Discard Selected Changes", self.on_discard_changes)
-        
-        if not (staged or changes or untracked):
-            self.panel.add_label("<br><i>No pending changes</i><br>")
+                changes_html += f'''
+                <div class="change-row">
+                    <span class="change-info" style="color: #8de28d">[S] {html.escape(path)}</span>
+                    <span class="change-actions">
+                        <a href="unstage:{html.escape(path)}" style="{anchor_style}">{img_unstage}</a>
+                    </span>
+                </div>
+                '''
 
-        # History List
-        self.panel.add_label("<b>History (Graph)</b>")
+        if changes:
+            has_items = True
+            for status, path in changes:
+                changes_html += f'''
+                <div class="change-row">
+                    <span class="change-info" style="color: #e2c08d">[{status}] {html.escape(path)}</span>
+                    <span class="change-actions">
+                        <a href="stage:{html.escape(path)}" style="{anchor_style}">{img_add}</a>
+                        <a href="discard:{html.escape(path)}" style="{anchor_style}">{img_discard}</a>
+                        <a href="ignore:{html.escape(path)}" style="{anchor_style}">{img_ignore}</a>
+                    </span>
+                </div>
+                '''
+                
+        if untracked:
+            has_items = True
+            for status, path in untracked:
+                changes_html += f'''
+                <div class="change-row">
+                    <span class="change-info" style="color: #8ddbe2">[?] {html.escape(path)}</span>
+                    <span class="change-actions">
+                        <a href="stage:{html.escape(path)}" style="{anchor_style}">{img_add}</a>
+                        <a href="discard:{html.escape(path)}" style="{anchor_style}">{img_discard}</a>
+                        <a href="ignore:{html.escape(path)}" style="{anchor_style}">{img_ignore}</a>
+                    </span>
+                </div>
+                '''
+        
+        if not has_items:
+            changes_html += '<div class="change-row" style="color: #858585; font-style: italic;">No pending changes</div>'
+            
+        changes_html += '</div>'
+            
+        self.panel.add_html_view("changes_view", self.wrap_html(changes_html), 130, self.on_changes_link_clicked)
+        
+        # 4. Branches Section (Moved below changes to match VS Code "Commits" or similar view)
+        self.panel.add_label("<b>Branches</b>")
+        # Inline create branch input
+        self.panel.add_text_field("new_branch_name", "Create new branch...", self.new_branch_name)
+        # If user types in box, we could show a button, but simpler to just have button always or rely on enter (if supported)
+        # TB API for text field doesn't support on_enter callback easily, so keep button but make it small
+        self.panel.add_button_callback("Create", self.on_create_branch)
+
+        # Use HTML view for branches for better styling
+        branches_html = '<div class="changes-container" style="height: 100px;">'
+        
+        for b in branches:
+            is_current = b.startswith("* ")
+            branch_name = b[2:].strip() if is_current else b.strip()
+            
+            # Badge style for branch name
+            bg_color = "#007acc" if is_current else "#3a3d41"
+            text_color = "#ffffff"
+            
+            # Generate simple badge using span style instead of SVG for performance in list
+            # Adjusted size: ~0.75x of previous huge size (18px * 0.75 ≈ 13.5px)
+            # Let's go with 14px font, slightly smaller padding
+            badge_style = f"background-color: {bg_color}; color: {text_color}; padding: 4px 10px; border-radius: 12px; font-size: 14px; font-weight: 600; display: inline-block; min-width: 70px; text-align: center;"
+            
+            actions_html = ""
+            if not is_current:
+                 actions_html = f'''
+                 <a href="checkout:{html.escape(branch_name)}" title="Checkout" style="font-size: 16px;">&#10145;</a>
+                 <a href="delete:{html.escape(branch_name)}" title="Delete" style="font-size: 16px;">&#128465;</a>
+                 '''
+            
+            actions_html += f'<a href="push:{html.escape(branch_name)}" title="Push" style="font-size: 16px;">&#8679;</a>'
+
+            branches_html += f'''
+            <div class="change-row" style="padding: 4px 4px;">
+                <span class="change-info" style="display: flex; align-items: center;">
+                    <span style="{badge_style}">{html.escape(branch_name)}</span>
+                    {' <span style="color: #858585; font-size: 12px; margin-left: 8px;">(Current)</span>' if is_current else ''}
+                </span>
+                <span class="change-actions">
+                    {actions_html}
+                </span>
+            </div>
+            '''
+            
+        if not branches:
+             branches_html += '<div class="change-row">No branches found</div>'
+             
+        branches_html += '</div>'
+        self.panel.add_html_view("branches_view", self.wrap_html(branches_html), 110, self.on_branch_link_clicked)
+
+        # 5. History (Graph)
+        self.panel.add_label("<b>History</b>")
         
         try:
-            items = self.get_history_items()
-            if items:
-                view_models = self.to_view_models(items)
+            if view_models:
                 html_content = self.generate_history_html(view_models)
                 self.panel.add_html_view("history_view", html_content, 300, self.on_history_link_clicked)
             else:
@@ -643,6 +855,18 @@ class GitManager:
              import traceback
              traceback.print_exc()
              self.panel.add_label(f"<i>Error loading history: {e}</i>")
+
+    def on_header_link_clicked(self, link):
+        print(f"Header link clicked: {link}")
+        parts = link.split(":", 1)
+        action = parts[0]
+        
+        if action == "refresh":
+            self.refresh()
+        elif action == "pull":
+            self.on_pull()
+        elif action == "push":
+            self.on_push()
 
     def on_history_link_clicked(self, link):
         if link.startswith("checkout:"):
@@ -745,6 +969,71 @@ class GitManager:
         self.dubious_ownership_path = None
         self.refresh()
 
+    def on_branch_link_clicked(self, link):
+        print(f"Branch link clicked: {link}")
+        parts = link.split(":", 1)
+        action = parts[0]
+        branch = parts[1]
+        
+        if action == "checkout":
+            self.run_git(["checkout", branch])
+            self.reload_map()
+            self.refresh()
+        elif action == "delete":
+            self.run_git(["branch", "-D", branch])
+            self.refresh()
+        elif action == "push":
+            self.run_git(["push", "--set-upstream", "origin", branch])
+            self.refresh()
+
+    def on_changes_link_clicked(self, link):
+        print(f"Changes link clicked: {link}")
+        parts = link.split(":", 1)
+        action = parts[0]
+        path = parts[1]
+        
+        if action == "stage":
+            self.run_git(["add", path])
+            self.refresh()
+        elif action == "unstage":
+            self.run_git(["reset", "HEAD", path])
+            self.refresh()
+        elif action == "discard":
+            # Check if untracked to decide between clean and checkout
+            staged, changes, untracked = self.get_changes_categorized()
+            is_untracked = any(p == path for _, p in untracked)
+            
+            if is_untracked:
+                 self.run_git(["clean", "-fd", "--", path])
+            else:
+                 self.run_git(["checkout", "HEAD", "--", path])
+            
+            self.reload_map()
+            self.refresh()
+        elif action == "ignore":
+            gitignore_path = os.path.join(self.repo_dir, ".gitignore")
+            try:
+                needs_newline = False
+                if os.path.exists(gitignore_path):
+                    try:
+                        with open(gitignore_path, "rb") as f:
+                            f.seek(-1, 2)
+                            last_char = f.read(1)
+                            if last_char != b'\n':
+                                needs_newline = True
+                    except:
+                        pass
+                
+                with open(gitignore_path, "a", encoding='utf-8') as f:
+                    if needs_newline:
+                        f.write("\n")
+                    f.write(f"{path}\n")
+                
+                print(f"Added {path} to .gitignore")
+                self.refresh()
+            except Exception as e:
+                print(f"Failed to update .gitignore: {e}")
+
     def on_commit(self):
         doc = tb.Document.current()
         if doc:
@@ -763,12 +1052,43 @@ class GitManager:
             print("Commit message empty")
             return
 
-        path = doc.path if doc else None
-        if path:
-            self.run_git(["add", path])
-            self.run_git(["commit", "-m", msg])
-            self.commit_message = "" 
-            self.refresh()
+        # Check if we have staged changes
+        staged, changes, untracked = self.get_changes_categorized()
+        
+        # If nothing staged, but we have changes, maybe we should auto-stage tracked files?
+        # Standard git behavior is to only commit staged.
+        # But for convenience, if nothing is staged, we could stage the current map file if it's modified?
+        
+        if not staged:
+            # If the map file itself is modified but not staged, stage it?
+            # Or just tell user to stage things.
+            # Let's try to stage the current map file if it's in the modified list
+            path = doc.path if doc else None
+            map_filename = os.path.basename(path) if path else ""
+            
+            # Check if map file is in changes
+            map_modified = False
+            if path:
+                # changes list contains (status, path)
+                # paths from git status are relative to repo root.
+                # We need to match correctly.
+                # Simplest is just:
+                if any(p.endswith(map_filename) for _, p in changes):
+                     map_modified = True
+            
+            if map_modified:
+                print(f"Auto-staging map file: {map_filename}")
+                self.run_git(["add", path])
+                # Re-check staged
+                staged, _, _ = self.get_changes_categorized()
+
+        if not staged:
+            print("Nothing to commit (stage files first)")
+            return
+
+        self.run_git(["commit", "-m", msg])
+        self.commit_message = "" 
+        self.refresh()
 
     def on_pull(self):
         self.run_git(["pull"])
@@ -779,32 +1099,11 @@ class GitManager:
         self.run_git(["push"])
         self.refresh()
 
-    def on_discard_changes(self):
-        to_checkout = []
-        to_clean = []
-        staged, changes, untracked = self.get_changes_categorized()
-        
-        for path in self.current_changes:
-            try:
-                checked = self.panel.get_checkbox(f"chk_{path}")
-                if checked:
-                    is_modified = any(p == path for _, p in changes)
-                    is_untracked = any(p == path for _, p in untracked)
-                    
-                    if is_modified:
-                        to_checkout.append(path)
-                    elif is_untracked:
-                        to_clean.append(path)
-            except:
-                pass
-                
-        if to_checkout:
-            self.run_git(["checkout", "HEAD", "--"] + to_checkout)
-        if to_clean:
-            self.run_git(["clean", "-fd", "--"] + to_clean)
-        if to_checkout or to_clean:
-            self.reload_map()
-            self.refresh()
+    # Dead code from previous checkbox-based UI
+    # def on_discard_changes(self):
+    #     ...
+    # def on_ignore_changes(self):
+    #     ...
 
     def reload_map(self):
         doc = tb.Document.current()

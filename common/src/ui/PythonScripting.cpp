@@ -1330,7 +1330,8 @@ PyObject* plugin_panel_add_text_field(PyObject* self, PyObject* args)
   const char* key = nullptr;
   const char* labelText = nullptr;
   const char* value = nullptr;
-  if (!PyArg_ParseTuple(args, "ss|s", &key, &labelText, &value))
+  const char* placeholder = nullptr;
+  if (!PyArg_ParseTuple(args, "ss|ss", &key, &labelText, &value, &placeholder))
   {
     return nullptr;
   }
@@ -1349,18 +1350,29 @@ PyObject* plugin_panel_add_text_field(PyObject* self, PyObject* args)
   rowLayout->setSpacing(6);
   row->setLayout(rowLayout);
 
-  auto* label = new QLabel{};
-  label->setText(QString::fromUtf8(labelText));
-
   auto* edit = new QLineEdit{};
   edit->setObjectName(plugin_panel_object_name(QStringLiteral("text"), key));
   if (value != nullptr)
   {
     edit->setText(QString::fromUtf8(value));
   }
+  if (placeholder != nullptr)
+  {
+    edit->setPlaceholderText(QString::fromUtf8(placeholder));
+  }
 
-  rowLayout->addWidget(label, 1);
-  rowLayout->addWidget(edit, 0);
+  if (labelText && *labelText)
+  {
+    auto* label = new QLabel{};
+    label->setText(QString::fromUtf8(labelText));
+    rowLayout->addWidget(label, 0);
+    rowLayout->addWidget(edit, 1);
+  }
+  else
+  {
+    rowLayout->addWidget(edit, 1);
+  }
+
   layout->addWidget(row);
   Py_RETURN_NONE;
 }
@@ -2008,7 +2020,18 @@ PyObject* plugin_panel_add_html_view(PyObject* self, PyObject* args)
   auto* browser = new QTextBrowser{};
   browser->setObjectName(plugin_panel_object_name(QStringLiteral("html_view"), key));
   browser->setHtml(QString::fromUtf8(html));
-  browser->setMinimumHeight(height);
+  if (height > 0 && height <= 40)
+  {
+    browser->setFixedHeight(height);
+    browser->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    browser->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    browser->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    browser->document()->setDocumentMargin(0);
+  }
+  else
+  {
+    browser->setMinimumHeight(height);
+  }
   browser->setOpenExternalLinks(false);
   browser->setFrameShape(QFrame::NoFrame);
   browser->setStyleSheet("background-color: transparent;");
