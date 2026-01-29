@@ -350,7 +350,17 @@ set(COMMON_SOURCE
         ${COMMON_SOURCE_DIR}/ui/CompilationTaskListBox.cpp
         ${COMMON_SOURCE_DIR}/ui/CompilationVariables.cpp
         ${COMMON_SOURCE_DIR}/ui/Console.cpp
-        ${COMMON_SOURCE_DIR}/ui/PythonScripting.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonDocument.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonScripting.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonTypes.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonUtils.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonVec3.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonPlane.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonPluginPanel.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonSelection.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonEntity.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonTransaction.cpp
+        ${COMMON_SOURCE_DIR}/ui/python/PythonMaterial.cpp
         ${COMMON_SOURCE_DIR}/ui/ContainerBar.cpp
         ${COMMON_SOURCE_DIR}/ui/ControlListBox.cpp
         ${COMMON_SOURCE_DIR}/ui/ControlListBox.cpp
@@ -1074,7 +1084,11 @@ set(COMMON_HEADER
         ${COMMON_SOURCE_DIR}/ui/ToolChain.h
         ${COMMON_SOURCE_DIR}/ui/ToolController.h
         ${COMMON_SOURCE_DIR}/ui/TwoPaneMapView.h
-        ${COMMON_SOURCE_DIR}/ui/PythonScripting.h
+        ${COMMON_SOURCE_DIR}/ui/python/PythonScripting.h
+        ${COMMON_SOURCE_DIR}/ui/python/PythonTypes.h
+        ${COMMON_SOURCE_DIR}/ui/python/PythonUtils.h
+        ${COMMON_SOURCE_DIR}/ui/python/PythonVec3.h
+        ${COMMON_SOURCE_DIR}/ui/python/PythonPlane.h
         ${COMMON_SOURCE_DIR}/ui/UpdateConfig.h
         ${COMMON_SOURCE_DIR}/ui/UpdatePreferencePane.h
         ${COMMON_SOURCE_DIR}/ui/UpdateVersion.h

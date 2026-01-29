@@ -79,7 +79,7 @@
 #include "ui/ActionBuilder.h"
 #include "ui/Actions.h"
 #include "ui/ChoosePathTypeDialog.h"
-#include "ui/PythonScripting.h"
+#include "ui/python/PythonScripting.h"
 #include "ui/ClipTool.h"
 #include "ui/ColorButton.h"
 #include "ui/CompilationDialog.h"

@@ -34,7 +34,7 @@
 #include "io/PathQt.h"
 #include "ui/ClickableTitleBar.h"
 #include "ui/CollapsibleTitledPanel.h"
-#include "ui/PythonScripting.h"
+#include "ui/python/PythonScripting.h"
 #include "ui/QtUtils.h"
 
 namespace tb::ui
