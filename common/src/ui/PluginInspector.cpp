@@ -47,6 +47,7 @@ PluginInspector::PluginInspector(QWidget* parent)
   m_scrollArea->setWidgetResizable(true);
 
   m_container = new QWidget{};
+  m_container->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::MinimumExpanding);
   m_containerLayout = new QVBoxLayout{};
   m_containerLayout->setContentsMargins(6, 6, 6, 6);
   m_containerLayout->setSpacing(6);

@@ -745,13 +745,13 @@ void FaceAttribsEditor::updateControlsDelayed()
 bool FaceAttribsEditor::hasSurfaceFlags() const
 {
   const auto game = m_map.game();
-  return !game->config().faceAttribsConfig.surfaceFlags.flags.empty();
+  return game && !game->config().faceAttribsConfig.surfaceFlags.flags.empty();
 }
 
 bool FaceAttribsEditor::hasContentFlags() const
 {
   const auto game = m_map.game();
-  return !game->config().faceAttribsConfig.contentFlags.flags.empty();
+  return game && !game->config().faceAttribsConfig.contentFlags.flags.empty();
 }
 
 void FaceAttribsEditor::showSurfaceFlagsEditor()
@@ -784,7 +784,8 @@ void FaceAttribsEditor::hideContentFlagsEditor()
 
 bool FaceAttribsEditor::hasColorAttribs() const
 {
-  return m_map.world()->mapFormat() == mdl::MapFormat::Daikatana;
+  const auto world = m_map.world();
+  return world && world->mapFormat() == mdl::MapFormat::Daikatana;
 }
 
 void FaceAttribsEditor::showColorAttribEditor()

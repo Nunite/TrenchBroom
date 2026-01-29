@@ -31,7 +31,6 @@ class GitManager:
         </div>
         """
         self._ui_built = False
-        self._build_ui()
         self.refresh()
 
     def get_repo_dir(self):
@@ -593,6 +592,8 @@ class GitManager:
         branch_actions.add_button_callback("Checkout", self._checkout_selected_branch)
         branch_actions.add_button_callback("Delete", self._delete_selected_branch)
         branch_actions.add_button_callback("Push", self._push_selected_branch)
+        branch_actions.add_button_callback("Merge", self._merge_selected_branch)
+        branch_actions.add_button_callback("Reset Here", self._reset_selected_branch)
 
         repo_main.add_label_named("history_header", "<b>History</b>")
         repo_main.add_html_view("history_view", self.wrap_html(""), 300, self.on_history_link_clicked)
@@ -604,6 +605,33 @@ class GitManager:
         self.panel.set_widget_visible("repo_main", True)
 
         self._ui_built = True
+
+    def _merge_selected_branch(self):
+        item = self._get_selected_branch()
+        if item is None:
+            return
+        if item["is_current"]:
+            print("Cannot merge current branch into itself")
+            return
+        # Merge the selected branch into current
+        print(f"Merging {item['name']} into current branch")
+        self.run_git(["merge", item["name"]])
+        self.reload_map()
+        self.refresh()
+
+    def _reset_selected_branch(self):
+        item = self._get_selected_branch()
+        if item is None:
+            return
+        # If the branch is current, we can't 'reset here' in the sense of moving another branch.
+        # But checkout -B works even on current branch (it resets it to HEAD).
+        # However, usually this action is used when Detached HEAD to move a branch pointer HERE.
+        
+        print(f"Resetting branch {item['name']} to current HEAD")
+        # checkout -B <branch> will create/reset <branch> to HEAD and switch to it
+        self.run_git(["checkout", "-B", item["name"]])
+        self.reload_map()
+        self.refresh()
 
     def refresh(self):
         self._build_ui()
@@ -698,6 +726,11 @@ class GitManager:
         for b in branches:
             is_current = b.startswith("* ")
             branch_name = b[2:].strip() if is_current else b.strip()
+            
+            # Filter out detached HEAD entry as it is confusing in the branch list
+            if "(HEAD detached" in branch_name:
+                continue
+
             self._branches_entries.append({"name": branch_name, "is_current": is_current})
             branch_rows.append([("* " if is_current else "") + branch_name])
         if not branch_rows:
