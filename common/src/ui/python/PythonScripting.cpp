@@ -334,10 +334,6 @@ PyObject* module_unregister_callback(PyObject* self, PyObject* args)
 
 bool registerTypes(PyObject* module)
 {
-  static auto vec3Type = PyTypeObject{};
-  static auto documentType = PyTypeObject{};
-  static auto selectionType = PyTypeObject{};
-  static auto entityType = PyTypeObject{};
   static auto logWriterType = PyTypeObject{};
   if (!initVec3Type(module))
     return false;

@@ -24,7 +24,7 @@
 
 namespace tb::ui {
 
-PyObject* document_selection(PyObject* self, PyObject*)
+static PyObject* document_selection(PyObject* self, PyObject*)
 {
   auto* doc = getDocumentFromPy(self);
   if (doc == nullptr)
@@ -34,12 +34,12 @@ PyObject* document_selection(PyObject* self, PyObject*)
   return createSelectionObject(doc);
 }
 
-PyObject* document_get_selection(PyObject* self, void*)
+static PyObject* document_get_selection(PyObject* self, void*)
 {
   return document_selection(self, nullptr);
 }
 
-PyObject* document_transaction(PyObject* self, PyObject* args)
+static PyObject* document_transaction(PyObject* self, PyObject* args)
 {
   PyObject* nameObj = nullptr;
   if (!PyArg_ParseTuple(args, "|U", &nameObj))
@@ -56,7 +56,7 @@ PyObject* document_transaction(PyObject* self, PyObject* args)
   return createTransactionObject(doc, nameObj);
 }
 
-PyObject* document_entities(PyObject* self, void*)
+static PyObject* document_entities(PyObject* self, void*)
 {
   auto* doc = getDocumentFromPy(self);
   if (doc == nullptr)
@@ -106,7 +106,7 @@ PyObject* document_entities(PyObject* self, void*)
   return list;
 }
 
-PyObject* document_vertex_tool_vertices(PyObject* self, PyObject*)
+static PyObject* document_vertex_tool_vertices(PyObject* self, PyObject*)
 {
   auto* doc = getDocumentFromPy(self);
   if (doc == nullptr)
@@ -156,7 +156,7 @@ PyObject* document_vertex_tool_vertices(PyObject* self, PyObject*)
   }
 }
 
-PyObject* document_save(PyObject* self, PyObject*)
+static PyObject* document_save(PyObject* self, PyObject*)
 {
   auto* docObj = (PyTbDocument*)self;
   auto* doc = docObj->document;
@@ -172,7 +172,7 @@ PyObject* document_save(PyObject* self, PyObject*)
   Py_RETURN_NONE;
 }
 
-PyObject* document_reload(PyObject* self, PyObject*)
+static PyObject* document_reload(PyObject* self, PyObject*)
 {
   auto* docObj = (PyTbDocument*)self;
   auto* doc = docObj->document;
@@ -188,7 +188,7 @@ PyObject* document_reload(PyObject* self, PyObject*)
   Py_RETURN_NONE;
 }
 
-PyObject* document_get_materials(PyObject* self, void*)
+static PyObject* document_get_materials(PyObject* self, void*)
 {
   auto* docObj = (PyTbDocument*)self;
   auto* doc = docObj->document;
@@ -213,7 +213,7 @@ PyObject* document_get_materials(PyObject* self, void*)
   return list;
 }
 
-PyObject* document_get_material_collections(PyObject* self, void*)
+static PyObject* document_get_material_collections(PyObject* self, void*)
 {
   auto* docObj = (PyTbDocument*)self;
   auto* doc = docObj->document;
@@ -235,7 +235,7 @@ PyObject* document_get_material_collections(PyObject* self, void*)
   return list;
 }
 
-PyObject* document_get_path(PyObject* self, void*)
+static PyObject* document_get_path(PyObject* self, void*)
 {
   auto* docObj = (PyTbDocument*)self;
   auto* doc = docObj->document;
