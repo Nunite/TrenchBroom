@@ -4,7 +4,7 @@
 
 namespace tb::ui {
 
-PyObject* vec3_new(PyTypeObject* type, PyObject*, PyObject*)
+static PyObject* vec3_new(PyTypeObject* type, PyObject*, PyObject*)
 {
   auto* self = (PyTbVec3*)type->tp_alloc(type, 0);
   if (self != nullptr)
@@ -14,7 +14,7 @@ PyObject* vec3_new(PyTypeObject* type, PyObject*, PyObject*)
   return (PyObject*)self;
 }
 
-int vec3_init(PyTbVec3* self, PyObject* args, PyObject*)
+static int vec3_init(PyTbVec3* self, PyObject* args, PyObject*)
 {
   double x = 0.0, y = 0.0, z = 0.0;
   if (!PyArg_ParseTuple(args, "|ddd", &x, &y, &z))
@@ -25,42 +25,42 @@ int vec3_init(PyTbVec3* self, PyObject* args, PyObject*)
   return 0;
 }
 
-void vec3_dealloc(PyTbVec3* self)
+static void vec3_dealloc(PyTbVec3* self)
 {
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-PyObject* vec3_repr(PyTbVec3* self)
+static PyObject* vec3_repr(PyTbVec3* self)
 {
   char buffer[128];
   snprintf(buffer, sizeof(buffer), "Vec3(%g, %g, %g)", self->vec.x(), self->vec.y(), self->vec.z());
   return PyUnicode_FromString(buffer);
 }
 
-PyObject* vec3_str(PyTbVec3* self)
+static PyObject* vec3_str(PyTbVec3* self)
 {
   char buffer[128];
   snprintf(buffer, sizeof(buffer), "%g %g %g", self->vec.x(), self->vec.y(), self->vec.z());
   return PyUnicode_FromString(buffer);
 }
 
-PyObject* vec3_get_x(PyObject* self, void*)
+static PyObject* vec3_get_x(PyObject* self, void*)
 {
   auto* v = (PyTbVec3*)self;
   return PyFloat_FromDouble(v->vec.x());
 }
-PyObject* vec3_get_y(PyObject* self, void*)
+static PyObject* vec3_get_y(PyObject* self, void*)
 {
   auto* v = (PyTbVec3*)self;
   return PyFloat_FromDouble(v->vec.y());
 }
-PyObject* vec3_get_z(PyObject* self, void*)
+static PyObject* vec3_get_z(PyObject* self, void*)
 {
   auto* v = (PyTbVec3*)self;
   return PyFloat_FromDouble(v->vec.z());
 }
 
-int vec3_set_x(PyObject* self, PyObject* value, void*)
+static int vec3_set_x(PyObject* self, PyObject* value, void*)
 {
   auto* v = (PyTbVec3*)self;
   if (PyFloat_Check(value))
@@ -74,7 +74,7 @@ int vec3_set_x(PyObject* self, PyObject* value, void*)
   }
   return 0;
 }
-int vec3_set_y(PyObject* self, PyObject* value, void*)
+static int vec3_set_y(PyObject* self, PyObject* value, void*)
 {
   auto* v = (PyTbVec3*)self;
   if (PyFloat_Check(value))
@@ -88,7 +88,7 @@ int vec3_set_y(PyObject* self, PyObject* value, void*)
   }
   return 0;
 }
-int vec3_set_z(PyObject* self, PyObject* value, void*)
+static int vec3_set_z(PyObject* self, PyObject* value, void*)
 {
   auto* v = (PyTbVec3*)self;
   if (PyFloat_Check(value))
@@ -103,7 +103,7 @@ int vec3_set_z(PyObject* self, PyObject* value, void*)
   return 0;
 }
 
-PyObject* vec3_add(PyObject* left, PyObject* right)
+static PyObject* vec3_add(PyObject* left, PyObject* right)
 {
   if (PyObject_TypeCheck(left, g_vec3Type) && PyObject_TypeCheck(right, g_vec3Type))
   {
@@ -116,7 +116,7 @@ PyObject* vec3_add(PyObject* left, PyObject* right)
   Py_RETURN_NOTIMPLEMENTED;
 }
 
-PyObject* vec3_sub(PyObject* left, PyObject* right)
+static PyObject* vec3_sub(PyObject* left, PyObject* right)
 {
   if (PyObject_TypeCheck(left, g_vec3Type) && PyObject_TypeCheck(right, g_vec3Type))
   {
@@ -129,7 +129,7 @@ PyObject* vec3_sub(PyObject* left, PyObject* right)
   Py_RETURN_NOTIMPLEMENTED;
 }
 
-PyObject* vec3_mul(PyObject* left, PyObject* right)
+static PyObject* vec3_mul(PyObject* left, PyObject* right)
 {
   if (PyObject_TypeCheck(left, g_vec3Type))
   {
@@ -153,7 +153,7 @@ PyObject* vec3_mul(PyObject* left, PyObject* right)
   Py_RETURN_NOTIMPLEMENTED;
 }
 
-PyObject* vec3_truediv(PyObject* left, PyObject* right)
+static PyObject* vec3_truediv(PyObject* left, PyObject* right)
 {
   if (PyObject_TypeCheck(left, g_vec3Type))
   {
@@ -179,7 +179,7 @@ PyObject* vec3_truediv(PyObject* left, PyObject* right)
   Py_RETURN_NOTIMPLEMENTED;
 }
 
-PyObject* vec3_neg(PyObject* self)
+static PyObject* vec3_neg(PyObject* self)
 {
   auto* v = (PyTbVec3*)self;
   auto* res = (PyTbVec3*)g_vec3Type->tp_alloc(g_vec3Type, 0);
@@ -187,12 +187,12 @@ PyObject* vec3_neg(PyObject* self)
   return (PyObject*)res;
 }
 
-Py_ssize_t vec3_len(PyObject*)
+static Py_ssize_t vec3_len(PyObject*)
 {
   return 3;
 }
 
-PyObject* vec3_getitem(PyObject* self, Py_ssize_t i)
+static PyObject* vec3_getitem(PyObject* self, Py_ssize_t i)
 {
   auto* v = (PyTbVec3*)self;
   if (i < 0 || i >= 3)
@@ -203,7 +203,7 @@ PyObject* vec3_getitem(PyObject* self, Py_ssize_t i)
   return PyFloat_FromDouble(v->vec[static_cast<size_t>(i)]);
 }
 
-PyObject* vec3_richcompare(PyObject* self, PyObject* other, int op)
+static PyObject* vec3_richcompare(PyObject* self, PyObject* other, int op)
 {
   if (!PyObject_TypeCheck(self, g_vec3Type) || !PyObject_TypeCheck(other, g_vec3Type))
   {
@@ -227,7 +227,7 @@ PyObject* vec3_richcompare(PyObject* self, PyObject* other, int op)
   Py_RETURN_NOTIMPLEMENTED;
 }
 
-PyObject* vec3_dot(PyObject* self, PyObject* args)
+static PyObject* vec3_dot(PyObject* self, PyObject* args)
 {
   PyObject* otherObj = nullptr;
   if (!PyArg_ParseTuple(args, "O", &otherObj))
@@ -247,7 +247,7 @@ PyObject* vec3_dot(PyObject* self, PyObject* args)
   return PyFloat_FromDouble(vm::dot(v1->vec, v2->vec));
 }
 
-PyObject* vec3_cross(PyObject* self, PyObject* args)
+static PyObject* vec3_cross(PyObject* self, PyObject* args)
 {
   PyObject* otherObj = nullptr;
   if (!PyArg_ParseTuple(args, "O", &otherObj))
@@ -267,13 +267,13 @@ PyObject* vec3_cross(PyObject* self, PyObject* args)
   return createVec3Object(vm::cross(v1->vec, v2->vec));
 }
 
-PyObject* vec3_length(PyObject* self, PyObject*)
+static PyObject* vec3_length(PyObject* self, PyObject*)
 {
   auto* v = (PyTbVec3*)self;
   return PyFloat_FromDouble(vm::length(v->vec));
 }
 
-PyObject* vec3_normalize(PyObject* self, PyObject*)
+static PyObject* vec3_normalize(PyObject* self, PyObject*)
 {
   auto* v = (PyTbVec3*)self;
   return createVec3Object(vm::normalize(v->vec));

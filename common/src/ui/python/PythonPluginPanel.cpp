@@ -160,7 +160,7 @@ PyObject* plugin_panel_ensure_layout(QWidget* container)
 
 } // namespace
 
-PyObject* plugin_panel_clear(PyObject* self, PyObject*)
+static PyObject* plugin_panel_clear(PyObject* self, PyObject*)
 {
   auto* panel = getPluginPanelFromPy(self);
   if (panel == nullptr)
@@ -184,7 +184,7 @@ PyObject* plugin_panel_clear(PyObject* self, PyObject*)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_label(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_label(PyObject* self, PyObject* args)
 {
   const char* text = nullptr;
   if (!PyArg_ParseTuple(args, "s", &text))
@@ -206,7 +206,7 @@ PyObject* plugin_panel_add_label(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_label_named(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_label_named(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* text = nullptr;
@@ -230,7 +230,7 @@ PyObject* plugin_panel_add_label_named(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_label_text(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_label_text(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* text = nullptr;
@@ -254,7 +254,7 @@ PyObject* plugin_panel_set_label_text(PyObject* self, PyObject* args)
   Py_RETURN_TRUE;
 }
 
-PyObject* plugin_panel_add_int_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_int_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
@@ -294,7 +294,7 @@ PyObject* plugin_panel_add_int_field(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_float_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_float_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
@@ -338,7 +338,7 @@ PyObject* plugin_panel_add_float_field(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_get_int_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_get_int_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))
@@ -361,7 +361,7 @@ PyObject* plugin_panel_get_int_field(PyObject* self, PyObject* args)
   return PyLong_FromLong(static_cast<long>(spin->value()));
 }
 
-PyObject* plugin_panel_get_float_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_get_float_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))
@@ -384,7 +384,7 @@ PyObject* plugin_panel_get_float_field(PyObject* self, PyObject* args)
   return PyFloat_FromDouble(spin->value());
 }
 
-PyObject* plugin_panel_add_text_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_text_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
@@ -436,7 +436,7 @@ PyObject* plugin_panel_add_text_field(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_get_text_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_get_text_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))
@@ -459,7 +459,7 @@ PyObject* plugin_panel_get_text_field(PyObject* self, PyObject* args)
   return toPyString(edit->text().toStdString());
 }
 
-PyObject* plugin_panel_set_int_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_int_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   int value = 0;
@@ -483,7 +483,7 @@ PyObject* plugin_panel_set_int_field(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_float_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_float_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   double value = 0.0;
@@ -507,7 +507,7 @@ PyObject* plugin_panel_set_float_field(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_text_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_text_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* value = nullptr;
@@ -531,7 +531,7 @@ PyObject* plugin_panel_set_text_field(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_checkbox(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_checkbox(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   int value = 0;
@@ -555,7 +555,7 @@ PyObject* plugin_panel_set_checkbox(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_combo_box_index(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_combo_box_index(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   int index = 0;
@@ -584,7 +584,7 @@ PyObject* plugin_panel_set_combo_box_index(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_combo_box_items(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_combo_box_items(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   PyObject* items = nullptr;
@@ -632,7 +632,7 @@ PyObject* plugin_panel_set_combo_box_items(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_list_widget_items(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_list_widget_items(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   PyObject* items = nullptr;
@@ -675,7 +675,7 @@ PyObject* plugin_panel_set_list_widget_items(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_html_view(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_html_view(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* html = nullptr;
@@ -699,7 +699,7 @@ PyObject* plugin_panel_set_html_view(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_widget_enabled(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_widget_enabled(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   int enabled = 0;
@@ -750,7 +750,7 @@ PyObject* plugin_panel_set_widget_enabled(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_widget_visible(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_widget_visible(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   int visible = 0;
@@ -801,7 +801,7 @@ PyObject* plugin_panel_set_widget_visible(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_group(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_group(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* title = nullptr;
@@ -829,7 +829,7 @@ PyObject* plugin_panel_add_group(PyObject* self, PyObject* args)
   return createPluginPanelObject(groupBox);
 }
 
-PyObject* plugin_panel_add_row(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_row(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))
@@ -856,7 +856,7 @@ PyObject* plugin_panel_add_row(PyObject* self, PyObject* args)
   return createPluginPanelObject(row);
 }
 
-PyObject* plugin_panel_add_column(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_column(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))
@@ -883,7 +883,7 @@ PyObject* plugin_panel_add_column(PyObject* self, PyObject* args)
   return createPluginPanelObject(col);
 }
 
-PyObject* plugin_panel_add_text_area(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_text_area(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
@@ -938,7 +938,7 @@ PyObject* plugin_panel_add_text_area(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_get_text_area(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_get_text_area(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))
@@ -960,7 +960,7 @@ PyObject* plugin_panel_get_text_area(PyObject* self, PyObject* args)
   return toPyString(edit->toPlainText().toStdString());
 }
 
-PyObject* plugin_panel_set_text_area(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_text_area(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* value = nullptr;
@@ -984,7 +984,7 @@ PyObject* plugin_panel_set_text_area(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_table_widget(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_table_widget(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   PyObject* columns = nullptr;
@@ -1107,7 +1107,7 @@ PyObject* plugin_panel_add_table_widget(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_table_widget_rows(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_table_widget_rows(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   PyObject* rows = nullptr;
@@ -1158,7 +1158,7 @@ PyObject* plugin_panel_set_table_widget_rows(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_tree_widget(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_tree_widget(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   PyObject* headers = nullptr;
@@ -1281,7 +1281,7 @@ PyObject* plugin_panel_add_tree_widget(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_tree_widget_items(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_tree_widget_items(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   PyObject* items = nullptr;
@@ -1332,7 +1332,7 @@ PyObject* plugin_panel_set_tree_widget_items(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_checkbox(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_checkbox(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
@@ -1367,7 +1367,7 @@ PyObject* plugin_panel_add_checkbox(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_get_checkbox(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_get_checkbox(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))
@@ -1400,7 +1400,7 @@ PyObject* plugin_panel_get_checkbox(PyObject* self, PyObject* args)
   return PyBool_FromLong(checkBox->isChecked());
 }
 
-PyObject* plugin_panel_add_combo_box(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_combo_box(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
@@ -1544,7 +1544,7 @@ PyObject* plugin_panel_add_combo_box(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_get_combo_box_index(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_get_combo_box_index(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))
@@ -1567,7 +1567,7 @@ PyObject* plugin_panel_get_combo_box_index(PyObject* self, PyObject* args)
   return PyLong_FromLong(combo->currentIndex());
 }
 
-PyObject* plugin_panel_get_combo_box_text(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_get_combo_box_text(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))
@@ -1590,7 +1590,7 @@ PyObject* plugin_panel_get_combo_box_text(PyObject* self, PyObject* args)
   return toPyString(combo->currentText().toStdString());
 }
 
-PyObject* plugin_panel_set_text(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_text(PyObject* self, PyObject* args)
 {
   const char* text = nullptr;
   if (!PyArg_ParseTuple(args, "s", &text))
@@ -1620,7 +1620,7 @@ PyObject* plugin_panel_set_text(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_html(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_html(PyObject* self, PyObject* args)
 {
   const char* html = nullptr;
   if (!PyArg_ParseTuple(args, "s", &html))
@@ -1651,7 +1651,7 @@ PyObject* plugin_panel_set_html(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_list_widget(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_list_widget(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   PyObject* items = nullptr;
@@ -1740,7 +1740,7 @@ PyObject* plugin_panel_add_list_widget(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_set_list_widget_context_menu(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_set_list_widget_context_menu(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   PyObject* actions = nullptr; // List of (name, callback)
@@ -1857,7 +1857,7 @@ PyObject* plugin_panel_set_list_widget_context_menu(PyObject* self, PyObject* ar
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
 {
   const char* text = nullptr;
   const char* actionPath = nullptr;
@@ -1911,7 +1911,7 @@ PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_html_view(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_html_view(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* html = nullptr;
@@ -2004,7 +2004,7 @@ PyObject* plugin_panel_add_html_view(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_add_color_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_color_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
@@ -2092,7 +2092,7 @@ PyObject* plugin_panel_add_color_field(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-PyObject* plugin_panel_get_color_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_get_color_field(PyObject* self, PyObject* args)
 {
   const char* key = nullptr;
   if (!PyArg_ParseTuple(args, "s", &key))

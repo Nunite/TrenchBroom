@@ -4,7 +4,7 @@
 
 namespace tb::ui {
 
-PyObject* plane_new(PyTypeObject* type, PyObject*, PyObject*)
+static PyObject* plane_new(PyTypeObject* type, PyObject*, PyObject*)
 {
   auto* self = (PyTbPlane*)type->tp_alloc(type, 0);
   if (self != nullptr)
@@ -14,7 +14,7 @@ PyObject* plane_new(PyTypeObject* type, PyObject*, PyObject*)
   return (PyObject*)self;
 }
 
-int plane_init(PyTbPlane* self, PyObject* args, PyObject*)
+static int plane_init(PyTbPlane* self, PyObject* args, PyObject*)
 {
   PyObject* normalObj = nullptr;
   double dist = 0.0;
@@ -34,12 +34,12 @@ int plane_init(PyTbPlane* self, PyObject* args, PyObject*)
   return 0;
 }
 
-void plane_dealloc(PyTbPlane* self)
+static void plane_dealloc(PyTbPlane* self)
 {
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-PyObject* plane_repr(PyTbPlane* self)
+static PyObject* plane_repr(PyTbPlane* self)
 {
   char buffer[256];
   snprintf(buffer, sizeof(buffer), "Plane(normal=Vec3(%g, %g, %g), dist=%g)",
@@ -47,7 +47,7 @@ PyObject* plane_repr(PyTbPlane* self)
   return PyUnicode_FromString(buffer);
 }
 
-PyObject* plane_from_points(PyObject*, PyObject* args)
+static PyObject* plane_from_points(PyObject*, PyObject* args)
 {
   PyObject* p1Obj = nullptr;
   PyObject* p2Obj = nullptr;
@@ -88,7 +88,7 @@ PyObject* plane_from_points(PyObject*, PyObject* args)
   }
 }
 
-PyObject* plane_distance(PyObject* self, PyObject* args)
+static PyObject* plane_distance(PyObject* self, PyObject* args)
 {
   PyObject* pointObj = nullptr;
   if (!PyArg_ParseTuple(args, "O", &pointObj))
@@ -108,7 +108,7 @@ PyObject* plane_distance(PyObject* self, PyObject* args)
   return PyFloat_FromDouble(p->plane.point_distance(v->vec));
 }
 
-PyObject* plane_project(PyObject* self, PyObject* args)
+static PyObject* plane_project(PyObject* self, PyObject* args)
 {
   PyObject* pointObj = nullptr;
   if (!PyArg_ParseTuple(args, "O", &pointObj))
@@ -129,13 +129,13 @@ PyObject* plane_project(PyObject* self, PyObject* args)
   return createVec3Object(projected);
 }
 
-PyObject* plane_get_normal(PyObject* self, void*)
+static PyObject* plane_get_normal(PyObject* self, void*)
 {
   auto* p = (PyTbPlane*)self;
   return createVec3Object(p->plane.normal);
 }
 
-int plane_set_normal(PyObject* self, PyObject* value, void*)
+static int plane_set_normal(PyObject* self, PyObject* value, void*)
 {
   if (!PyObject_TypeCheck(value, g_vec3Type))
   {
@@ -148,13 +148,13 @@ int plane_set_normal(PyObject* self, PyObject* value, void*)
   return 0;
 }
 
-PyObject* plane_get_dist(PyObject* self, void*)
+static PyObject* plane_get_dist(PyObject* self, void*)
 {
   auto* p = (PyTbPlane*)self;
   return PyFloat_FromDouble(p->plane.distance);
 }
 
-int plane_set_dist(PyObject* self, PyObject* value, void*)
+static int plane_set_dist(PyObject* self, PyObject* value, void*)
 {
   double d = PyFloat_AsDouble(value);
   if (PyErr_Occurred()) return -1;
