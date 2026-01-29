@@ -193,8 +193,20 @@ class PluginPanel(Protocol):
         """添加一个浮点字段（QDoubleSpinBox），可用 get_float_field 读取当前值。"""
         ...
 
-    def add_text_field(self, key: str, label: str, value: str = "") -> None:
+    def add_text_field(self, key: str, label: str, value: str = "", placeholder: str = "") -> None:
         """添加一个文本输入字段（QLineEdit），可用 get_text_field 读取当前值。"""
+        ...
+
+    def set_int_field(self, key: str, value: int) -> None:
+        """设置整数字段当前值；key 不存在会抛 KeyError。"""
+        ...
+
+    def set_float_field(self, key: str, value: float) -> None:
+        """设置浮点字段当前值；key 不存在会抛 KeyError。"""
+        ...
+
+    def set_text_field(self, key: str, value: str) -> None:
+        """设置文本字段当前值；key 不存在会抛 KeyError。"""
         ...
 
     def get_int_field(self, key: str) -> int:
@@ -211,6 +223,10 @@ class PluginPanel(Protocol):
 
     def add_checkbox(self, key: str, label: str, value: bool = False) -> None:
         """添加一个复选框（QCheckBox），可用 get_checkbox 读取当前值。"""
+        ...
+
+    def set_checkbox(self, key: str, value: bool) -> None:
+        """设置复选框当前值；key 不存在会抛 KeyError。"""
         ...
 
     def get_checkbox(self, key: str) -> bool:
@@ -241,6 +257,14 @@ class PluginPanel(Protocol):
         """获取下拉列表框当前选中的文本。"""
         ...
 
+    def set_combo_box_index(self, key: str, index: int) -> None:
+        """设置下拉列表框当前选中的索引；key 不存在会抛 KeyError。"""
+        ...
+
+    def set_combo_box_items(self, key: str, items: list[str], index: int = 0) -> None:
+        """替换下拉列表框的全部 items，并设置当前索引。"""
+        ...
+
     def add_color_field(self, key: str, label: str, initial_color: Vec3 | tuple[float, float, float] | None = None) -> None:
         """
         添加一个颜色选择字段（按钮）。
@@ -263,6 +287,10 @@ class PluginPanel(Protocol):
         """
         ...
 
+    def set_list_widget_items(self, key: str, items: list[str]) -> None:
+        """替换列表控件的全部 items。"""
+        ...
+
     def set_list_widget_context_menu(self, key: str, actions: list[tuple[str, Callable[[int], Any]]]) -> None:
         """
         为指定 key 的列表控件设置右键菜单。
@@ -281,6 +309,72 @@ class PluginPanel(Protocol):
         - height: 控件最小高度（像素），默认 200。
         - callback: (可选) 点击链接时的回调函数，接收参数 (href: str)。
         """
+        ...
+
+    def set_html_view(self, key: str, html: str) -> None:
+        """更新 HTML 视图控件内容；key 不存在会抛 KeyError。"""
+        ...
+
+    def set_widget_enabled(self, key: str, enabled: bool) -> None:
+        """设置指定 key 的控件可用性；key 不存在会抛 KeyError。"""
+        ...
+
+    def set_widget_visible(self, key: str, visible: bool) -> None:
+        """设置指定 key 的控件可见性；key 不存在会抛 KeyError。"""
+        ...
+
+    def add_group(self, key: str, title: str) -> PluginPanel:
+        """添加一个分组容器（QGroupBox），并返回其子面板用于继续添加控件。"""
+        ...
+
+    def add_row(self, key: str) -> PluginPanel:
+        """添加一个水平布局容器，并返回其子面板用于继续添加控件。"""
+        ...
+
+    def add_column(self, key: str) -> PluginPanel:
+        """添加一个垂直布局容器，并返回其子面板用于继续添加控件。"""
+        ...
+
+    def add_text_area(self, key: str, label: str, value: str = "", height: int = 120, placeholder: str = "") -> None:
+        """添加一个多行文本输入（QPlainTextEdit）。"""
+        ...
+
+    def get_text_area(self, key: str) -> str:
+        """读取多行文本输入当前值；key 不存在会抛 KeyError。"""
+        ...
+
+    def set_text_area(self, key: str, value: str) -> None:
+        """设置多行文本输入当前值；key 不存在会抛 KeyError。"""
+        ...
+
+    def add_table_widget(
+        self,
+        key: str,
+        columns: list[str],
+        rows: list[list[str]],
+        height: int = 200,
+        callback: Callable[[int, int], Any] | None = None,
+    ) -> None:
+        """添加一个表格控件（QTableWidget），callback 接收 (row, column)。"""
+        ...
+
+    def set_table_widget_rows(self, key: str, rows: list[list[str]]) -> None:
+        """替换表格控件的全部 rows。"""
+        ...
+
+    def add_tree_widget(
+        self,
+        key: str,
+        headers: list[str],
+        items: list[list[str]],
+        height: int = 200,
+        callback: Callable[[int], Any] | None = None,
+    ) -> None:
+        """添加一个树控件（QTreeWidget）的扁平列表视图，callback 接收 (row)。"""
+        ...
+
+    def set_tree_widget_items(self, key: str, items: list[list[str]]) -> None:
+        """替换树控件的全部 items。"""
         ...
 
 

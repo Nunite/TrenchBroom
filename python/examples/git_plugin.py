@@ -2,7 +2,6 @@ import tb
 import subprocess
 import os
 import html
-import re
 import base64
 
 class GitManager:
@@ -12,7 +11,37 @@ class GitManager:
         self.commit_message = ""
         self.new_branch_name = ""
         self.dubious_ownership_path = None
+        self._svg_cache = {}
+        self._badge_cache = {}
+        self._header_html = """
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 4px;">
+            <span style="font-size: 13px; font-weight: bold; color: #cccccc; text-transform: uppercase;">Source Control</span>
+            <span style="display: flex; align-items: center;">
+                <a href="refresh:" title="Refresh" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8635;</a>
+                <a href="pull:" title="Pull" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8659;</a>
+                <a href="push:" title="Push" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8657;</a>
+            </span>
+        </div>
+        """
+        self._ui_built = False
+        self._build_ui()
         self.refresh()
+
+    def _encode_link_payload(self, text: str) -> str:
+        if not text:
+            return ""
+        return base64.urlsafe_b64encode(text.encode("utf-8")).decode("ascii").rstrip("=")
+
+    def _decode_link_payload(self, text: str) -> str:
+        if not text:
+            return ""
+        padding = (-len(text)) % 4
+        if padding:
+            text = text + ("=" * padding)
+        return base64.urlsafe_b64decode(text.encode("ascii")).decode("utf-8", errors="replace")
+
+    def _make_link(self, action: str, payload: str) -> str:
+        return f"{action}:{self._encode_link_payload(payload)}"
 
     def get_repo_dir(self):
         doc = tb.Document.current()
@@ -168,6 +197,11 @@ class GitManager:
         return view_models
 
     def create_badge_svg(self, text, bg_color, text_color, icon_char=None):
+        cache_key = (text, bg_color, text_color, icon_char)
+        cached = self._badge_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         # Heuristic width calculation
         # Base padding: 12px (6px each side)
         # Char width: ~7px avg (Arial 11px)
@@ -212,9 +246,16 @@ class GitManager:
         </svg>'''
         
         b64 = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
-        return f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" height="{height}" style="vertical-align: middle;" />'
+        result = f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" height="{height}" style="vertical-align: middle;" />'
+        self._badge_cache[cache_key] = result
+        return result
 
     def create_button_svg(self, text, bg_color):
+        cache_key = (text, bg_color)
+        cached = self._svg_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         # Specific SVG generator for action buttons (Add, Discard, etc)
         # Needs to be small and capsule shaped
         
@@ -242,7 +283,9 @@ class GitManager:
         
         b64 = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
         # Wrap in anchor tag logic is handled by caller, this just returns the IMG tag
-        return f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" height="{height}" style="vertical-align: middle;" />'
+        result = f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" height="{height}" style="vertical-align: middle;" />'
+        self._svg_cache[cache_key] = result
+        return result
 
     def render_graph_svg(self, view_model):
         SWIMLANE_WIDTH = 11
@@ -636,25 +679,68 @@ class GitManager:
             </div>
         """)
 
+    def _build_ui(self):
+        if self._ui_built:
+            return
+
+        self.panel.clear()
+
+        state_no_doc = self.panel.add_column("state_no_doc")
+        state_no_doc.add_label_named("no_doc_msg", "<i>Please save the map to enable Git features.</i>")
+        state_no_doc.add_button_callback("Refresh", self.refresh)
+
+        state_not_repo = self.panel.add_column("state_not_repo")
+        state_not_repo.add_label_named("not_repo_folder", "")
+        state_not_repo.add_label_named("not_repo_msg", "Not a git repository.")
+        state_not_repo.add_button_callback("Initialize Repo (git init)", self.on_init)
+        state_not_repo.add_button_callback("Refresh", self.refresh)
+
+        state_repo = self.panel.add_column("state_repo")
+        state_repo.add_html_view("header_view", self.wrap_html(self._header_html), 34, self.on_header_link_clicked)
+
+        repo_dubious = state_repo.add_column("repo_dubious")
+        repo_dubious.add_label("<font color='red'><b>Error: Dubious Ownership</b></font>")
+        repo_dubious.add_button_callback("Fix Safe Directory", self.on_fix_safe_directory)
+
+        repo_main = state_repo.add_column("repo_main")
+        repo_main.add_text_field("commit_msg", "", self.commit_message, "Message (Ctrl+Enter to commit)")
+        repo_main.add_button_callback("Commit", self.on_commit)
+
+        repo_main.add_label_named("changes_header", "<b>Changes (0)</b>")
+        repo_main.add_html_view("changes_view", self.wrap_html(""), 130, self.on_changes_link_clicked)
+
+        repo_main.add_label_named("branches_header", "<b>Branches</b>")
+        repo_main.add_text_field("new_branch_name", "Create new branch...", self.new_branch_name)
+        repo_main.add_button_callback("Create", self.on_create_branch)
+        repo_main.add_html_view("branches_view", self.wrap_html(""), 110, self.on_branch_link_clicked)
+
+        repo_main.add_label_named("history_header", "<b>History</b>")
+        repo_main.add_html_view("history_view", self.wrap_html(""), 300, self.on_history_link_clicked)
+
+        self.panel.set_widget_visible("state_no_doc", True)
+        self.panel.set_widget_visible("state_not_repo", False)
+        self.panel.set_widget_visible("state_repo", False)
+        self.panel.set_widget_visible("repo_dubious", False)
+        self.panel.set_widget_visible("repo_main", True)
+
+        self._ui_built = True
+
     def refresh(self):
-        # 1. Capture user input first
+        self._build_ui()
+
         try:
-            new_msg = self.panel.get_text_field("commit_msg")
-            if new_msg:
-                self.commit_message = new_msg
+            self.commit_message = self.panel.get_text_field("commit_msg")
         except:
             pass
-        
+
         try:
             self.new_branch_name = self.panel.get_text_field("new_branch_name")
         except:
             self.new_branch_name = ""
 
-        # 2. Fetch all data BEFORE clearing UI (prevents flickering)
         self.repo_dir = self.get_repo_dir()
         
         is_git_repo = False
-        current_branch = ""
         branches = []
         staged = []
         changes = []
@@ -664,7 +750,6 @@ class GitManager:
         
         if self.repo_dir and os.path.exists(os.path.join(self.repo_dir, ".git")):
             is_git_repo = True
-            current_branch = self.get_current_branch()
             branches = self.get_branches()
             staged, changes, untracked = self.get_changes_categorized()
             
@@ -675,59 +760,42 @@ class GitManager:
                     view_models = self.to_view_models(history_items)
             except Exception as e:
                 print(f"Error fetching history: {e}")
-
-        # 3. Clear and Rebuild UI
-        self.panel.clear()
         
         if not self.repo_dir:
-            self.panel.add_label("<i>Please save the map to enable Git features.</i>")
-            self.panel.add_button_callback("Refresh", self.refresh)
+            self.panel.set_widget_visible("state_no_doc", True)
+            self.panel.set_widget_visible("state_not_repo", False)
+            self.panel.set_widget_visible("state_repo", False)
+            self.panel.set_label_text("no_doc_msg", "<i>Please save the map to enable Git features.</i>")
             return
 
         if not is_git_repo:
-            self.panel.add_label(f"Folder: {self.repo_dir}")
-            self.panel.add_label("Not a git repository.")
-            self.panel.add_button_callback("Initialize Repo (git init)", self.on_init)
-            self.panel.add_button_callback("Refresh", self.refresh)
+            self.panel.set_widget_visible("state_no_doc", False)
+            self.panel.set_widget_visible("state_not_repo", True)
+            self.panel.set_widget_visible("state_repo", False)
+            self.panel.set_label_text("not_repo_folder", f"Folder: {self.repo_dir}")
+            self.panel.set_label_text("not_repo_msg", "Not a git repository.")
             return
 
-        # --- VS Code Layout Implementation ---
-        
-        # 1. Header (Source Control title + Action icons)
-        # Using HTML for header to put icons on the right
-        # Compact VS Code style layout
-        header_html = f'''
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 4px;">
-            <span style="font-size: 13px; font-weight: bold; color: #cccccc; text-transform: uppercase;">Source Control</span>
-            <span style="display: flex; align-items: center;">
-                <a href="refresh:" title="Refresh" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8635;</a>
-                <a href="pull:" title="Pull" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8659;</a>
-                <a href="push:" title="Push" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8657;</a>
-            </span>
-        </div>
-        '''
-        self.panel.add_html_view("header_view", self.wrap_html(header_html), 34, self.on_header_link_clicked)
+        self.panel.set_widget_visible("state_no_doc", False)
+        self.panel.set_widget_visible("state_not_repo", False)
+        self.panel.set_widget_visible("state_repo", True)
+        self.panel.set_html_view("header_view", self.wrap_html(self._header_html))
         
         if self.dubious_ownership_path:
-            self.panel.add_label("<font color='red'><b>Error: Dubious Ownership</b></font>")
-            self.panel.add_button_callback(f"Fix Safe Directory", self.on_fix_safe_directory)
-            return 
+            self.panel.set_widget_visible("repo_dubious", True)
+            self.panel.set_widget_visible("repo_main", False)
+            return
+        else:
+            self.panel.set_widget_visible("repo_dubious", False)
+            self.panel.set_widget_visible("repo_main", True)
 
-        # 2. Commit Section (Input + Button)
-        # Compact mode: No label for commit message input to save space
-        self.panel.add_text_field("commit_msg", "", self.commit_message, "Message (Ctrl+Enter to commit)")
-        self.panel.add_button_callback("Commit", self.on_commit)
+        self.panel.set_text_field("commit_msg", self.commit_message)
         
-        # 3. Changes Section
-        # Collapsible-like header using label
         count_staged = len(staged)
         count_pending = len(changes) + len(untracked)
         total_count = count_staged + count_pending
         
-        self.panel.add_label(f"<b>Changes ({total_count})</b>")
-        
-        # Use a HTML view for changes to control height and layout stability
-        # Height 120px (approx 5-6 lines) as requested
+        self.panel.set_label_text("changes_header", f"<b>Changes ({total_count})</b>")
         
         changes_html = '<div class="changes-container">'
         has_items = False
@@ -750,7 +818,7 @@ class GitManager:
                 <div class="change-row">
                     <span class="change-info" style="color: #8de28d">[S] {html.escape(path)}</span>
                     <span class="change-actions">
-                        <a href="unstage:{html.escape(path)}" style="{anchor_style}">{img_unstage}</a>
+                        <a href="{self._make_link("unstage", path)}" style="{anchor_style}">{img_unstage}</a>
                     </span>
                 </div>
                 '''
@@ -762,9 +830,9 @@ class GitManager:
                 <div class="change-row">
                     <span class="change-info" style="color: #e2c08d">[{status}] {html.escape(path)}</span>
                     <span class="change-actions">
-                        <a href="stage:{html.escape(path)}" style="{anchor_style}">{img_add}</a>
-                        <a href="discard:{html.escape(path)}" style="{anchor_style}">{img_discard}</a>
-                        <a href="ignore:{html.escape(path)}" style="{anchor_style}">{img_ignore}</a>
+                        <a href="{self._make_link("stage", path)}" style="{anchor_style}">{img_add}</a>
+                        <a href="{self._make_link("discard", path)}" style="{anchor_style}">{img_discard}</a>
+                        <a href="{self._make_link("ignore", path)}" style="{anchor_style}">{img_ignore}</a>
                     </span>
                 </div>
                 '''
@@ -776,9 +844,9 @@ class GitManager:
                 <div class="change-row">
                     <span class="change-info" style="color: #8ddbe2">[?] {html.escape(path)}</span>
                     <span class="change-actions">
-                        <a href="stage:{html.escape(path)}" style="{anchor_style}">{img_add}</a>
-                        <a href="discard:{html.escape(path)}" style="{anchor_style}">{img_discard}</a>
-                        <a href="ignore:{html.escape(path)}" style="{anchor_style}">{img_ignore}</a>
+                        <a href="{self._make_link("stage", path)}" style="{anchor_style}">{img_add}</a>
+                        <a href="{self._make_link("discard", path)}" style="{anchor_style}">{img_discard}</a>
+                        <a href="{self._make_link("ignore", path)}" style="{anchor_style}">{img_ignore}</a>
                     </span>
                 </div>
                 '''
@@ -788,15 +856,9 @@ class GitManager:
             
         changes_html += '</div>'
             
-        self.panel.add_html_view("changes_view", self.wrap_html(changes_html), 130, self.on_changes_link_clicked)
+        self.panel.set_html_view("changes_view", self.wrap_html(changes_html))
         
-        # 4. Branches Section (Moved below changes to match VS Code "Commits" or similar view)
-        self.panel.add_label("<b>Branches</b>")
-        # Inline create branch input
-        self.panel.add_text_field("new_branch_name", "Create new branch...", self.new_branch_name)
-        # If user types in box, we could show a button, but simpler to just have button always or rely on enter (if supported)
-        # TB API for text field doesn't support on_enter callback easily, so keep button but make it small
-        self.panel.add_button_callback("Create", self.on_create_branch)
+        self.panel.set_text_field("new_branch_name", self.new_branch_name)
 
         # Use HTML view for branches for better styling
         branches_html = '<div class="changes-container" style="height: 100px;">'
@@ -817,11 +879,11 @@ class GitManager:
             actions_html = ""
             if not is_current:
                  actions_html = f'''
-                 <a href="checkout:{html.escape(branch_name)}" title="Checkout" style="font-size: 16px;">&#10145;</a>
-                 <a href="delete:{html.escape(branch_name)}" title="Delete" style="font-size: 16px;">&#128465;</a>
+                 <a href="{self._make_link("checkout", branch_name)}" title="Checkout" style="font-size: 16px;">&#10145;</a>
+                 <a href="{self._make_link("delete", branch_name)}" title="Delete" style="font-size: 16px;">&#128465;</a>
                  '''
             
-            actions_html += f'<a href="push:{html.escape(branch_name)}" title="Push" style="font-size: 16px;">&#8679;</a>'
+            actions_html += f'<a href="{self._make_link("push", branch_name)}" title="Push" style="font-size: 16px;">&#8679;</a>'
 
             branches_html += f'''
             <div class="change-row" style="padding: 4px 4px;">
@@ -839,22 +901,25 @@ class GitManager:
              branches_html += '<div class="change-row">No branches found</div>'
              
         branches_html += '</div>'
-        self.panel.add_html_view("branches_view", self.wrap_html(branches_html), 110, self.on_branch_link_clicked)
+        self.panel.set_html_view("branches_view", self.wrap_html(branches_html))
 
-        # 5. History (Graph)
-        self.panel.add_label("<b>History</b>")
-        
         try:
             if view_models:
                 html_content = self.generate_history_html(view_models)
-                self.panel.add_html_view("history_view", html_content, 300, self.on_history_link_clicked)
+                self.panel.set_html_view("history_view", html_content)
             else:
-                self.panel.add_label("<i>No history found.</i>")
+                self.panel.set_html_view(
+                    "history_view",
+                    self.wrap_html('<div class="change-row" style="color: #858585; font-style: italic;">No history found</div>'),
+                )
         except Exception as e:
              print(f"Error generating history graph: {e}")
              import traceback
              traceback.print_exc()
-             self.panel.add_label(f"<i>Error loading history: {e}</i>")
+             self.panel.set_html_view(
+                 "history_view",
+                 self.wrap_html(f'<div class="change-row" style="color: #cf222e;">Error loading history: {html.escape(str(e))}</div>'),
+             )
 
     def on_header_link_clicked(self, link):
         print(f"Header link clicked: {link}")
@@ -875,12 +940,6 @@ class GitManager:
             self.run_git(["checkout", hash])
             self.reload_map()
             self.refresh()
-
-    def get_current_branch(self):
-        res = self.run_git(["rev-parse", "--abbrev-ref", "HEAD"])
-        if res and res.returncode == 0:
-            return res.stdout.strip()
-        return "HEAD (Detached?)"
 
     def get_changes_categorized(self):
         res = self.run_git(["status", "--porcelain"])
@@ -926,38 +985,6 @@ class GitManager:
         except Exception as e:
             print(f"Create branch failed: {e}")
 
-    def on_checkout_branch_from_list(self, index):
-        branches = self.get_branches()
-        if 0 <= index < len(branches):
-            raw_name = branches[index]
-            branch_name = raw_name.replace("*", "").strip()
-            print(f"Checkout branch: {branch_name}")
-            self.run_git(["checkout", branch_name])
-            self.reload_map()
-            self.refresh()
-
-    def on_delete_branch_from_list(self, index):
-        branches = self.get_branches()
-        if 0 <= index < len(branches):
-            raw_name = branches[index]
-            if "*" in raw_name:
-                print("Cannot delete current branch")
-                return
-            branch_name = raw_name.strip()
-            print(f"Deleting branch: {branch_name}")
-            self.run_git(["branch", "-D", branch_name])
-            self.refresh()
-
-    def on_push_branch_from_list(self, index):
-        branches = self.get_branches()
-        if 0 <= index < len(branches):
-            raw_name = branches[index]
-            branch_name = raw_name.replace("*", "").strip()
-            print(f"Pushing branch: {branch_name}")
-            # Push with set-upstream
-            self.run_git(["push", "--set-upstream", "origin", branch_name])
-            self.refresh()
-
     def on_init(self):
         self.run_git(["init"])
         self.refresh()
@@ -973,7 +1000,7 @@ class GitManager:
         print(f"Branch link clicked: {link}")
         parts = link.split(":", 1)
         action = parts[0]
-        branch = parts[1]
+        branch = self._decode_link_payload(parts[1]) if len(parts) > 1 else ""
         
         if action == "checkout":
             self.run_git(["checkout", branch])
@@ -990,7 +1017,7 @@ class GitManager:
         print(f"Changes link clicked: {link}")
         parts = link.split(":", 1)
         action = parts[0]
-        path = parts[1]
+        path = self._decode_link_payload(parts[1]) if len(parts) > 1 else ""
         
         if action == "stage":
             self.run_git(["add", path])

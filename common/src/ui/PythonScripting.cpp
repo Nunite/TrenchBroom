@@ -72,6 +72,11 @@
 #include <QCursor>
 #include <QFontDatabase>
 #include <QTextBrowser>
+#include <QPlainTextEdit>
+#include <QGroupBox>
+#include <QTableWidget>
+#include <QHeaderView>
+#include <QTreeWidget>
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
@@ -86,6 +91,8 @@
 #include "vm/segment.h"
 #include "vm/plane.h"
 
+#include <algorithm>
+#include <array>
 #include <string>
 
 namespace tb::ui
@@ -1398,6 +1405,885 @@ PyObject* plugin_panel_get_text_field(PyObject* self, PyObject* args)
     return nullptr;
   }
   return toPyString(edit->text().toStdString());
+}
+
+template <typename T>
+T* plugin_panel_find_widget(QWidget* container, const QString& prefix, const char* key)
+{
+  const auto name = plugin_panel_object_name(prefix, key);
+  return container->findChild<T*>(name);
+}
+
+PyObject* plugin_panel_set_int_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  int value = 0;
+  if (!PyArg_ParseTuple(args, "si", &key, &value))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* spin = plugin_panel_find_widget<QSpinBox>(container, QStringLiteral("int"), key);
+  if (spin == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such int field");
+    return nullptr;
+  }
+  spin->setValue(value);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_float_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  double value = 0.0;
+  if (!PyArg_ParseTuple(args, "sd", &key, &value))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* spin = plugin_panel_find_widget<QDoubleSpinBox>(container, QStringLiteral("float"), key);
+  if (spin == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such float field");
+    return nullptr;
+  }
+  spin->setValue(value);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_text_field(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* value = nullptr;
+  if (!PyArg_ParseTuple(args, "ss", &key, &value))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* edit = plugin_panel_find_widget<QLineEdit>(container, QStringLiteral("text"), key);
+  if (edit == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such text field");
+    return nullptr;
+  }
+  edit->setText(QString::fromUtf8(value));
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_checkbox(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  int value = 0;
+  if (!PyArg_ParseTuple(args, "si", &key, &value))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* checkBox = plugin_panel_find_widget<QCheckBox>(container, QStringLiteral("checkbox"), key);
+  if (checkBox == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such checkbox");
+    return nullptr;
+  }
+  checkBox->setChecked(value != 0);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_combo_box_index(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  int index = 0;
+  if (!PyArg_ParseTuple(args, "si", &key, &index))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* combo = plugin_panel_find_widget<QComboBox>(container, QStringLiteral("combo"), key);
+  if (combo == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such combo box");
+    return nullptr;
+  }
+  if (index < 0 || index >= combo->count())
+  {
+    PyErr_SetString(PyExc_ValueError, "combo box index out of range");
+    return nullptr;
+  }
+  combo->setCurrentIndex(index);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_combo_box_items(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  PyObject* items = nullptr;
+  int index = 0;
+  if (!PyArg_ParseTuple(args, "sO|i", &key, &items, &index))
+  {
+    return nullptr;
+  }
+  if (!PyList_Check(items))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected list of strings for items");
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* combo = plugin_panel_find_widget<QComboBox>(container, QStringLiteral("combo"), key);
+  if (combo == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such combo box");
+    return nullptr;
+  }
+
+  combo->blockSignals(true);
+  combo->clear();
+  const auto size = PyList_Size(items);
+  for (Py_ssize_t i = 0; i < size; ++i)
+  {
+    auto* item = PyList_GetItem(items, i);
+    const char* itemStr = PyUnicode_AsUTF8(item);
+    if (itemStr)
+    {
+      combo->addItem(QString::fromUtf8(itemStr));
+    }
+  }
+  combo->blockSignals(false);
+  if (combo->count() > 0)
+  {
+    const auto boundedIndex = std::clamp(index, 0, combo->count() - 1);
+    combo->setCurrentIndex(boundedIndex);
+  }
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_list_widget_items(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  PyObject* items = nullptr;
+  if (!PyArg_ParseTuple(args, "sO", &key, &items))
+  {
+    return nullptr;
+  }
+  if (!PyList_Check(items))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected list of strings for items");
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* listWidget = plugin_panel_find_widget<QListWidget>(container, QStringLiteral("list"), key);
+  if (listWidget == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such list widget");
+    return nullptr;
+  }
+
+  listWidget->blockSignals(true);
+  listWidget->clear();
+  const auto size = PyList_Size(items);
+  for (Py_ssize_t i = 0; i < size; ++i)
+  {
+    auto* item = PyList_GetItem(items, i);
+    const char* itemStr = PyUnicode_AsUTF8(item);
+    if (itemStr)
+    {
+      listWidget->addItem(QString::fromUtf8(itemStr));
+    }
+  }
+  listWidget->blockSignals(false);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_html_view(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* html = nullptr;
+  if (!PyArg_ParseTuple(args, "ss", &key, &html))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* browser = plugin_panel_find_widget<QTextBrowser>(container, QStringLiteral("html_view"), key);
+  if (browser == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such html view");
+    return nullptr;
+  }
+  browser->setHtml(QString::fromUtf8(html));
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_widget_enabled(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  int enabled = 0;
+  if (!PyArg_ParseTuple(args, "si", &key, &enabled))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+
+  const std::array<QString, 15> prefixes = {
+    QStringLiteral("label"),
+    QStringLiteral("int"),
+    QStringLiteral("float"),
+    QStringLiteral("text"),
+    QStringLiteral("text_area"),
+    QStringLiteral("checkbox"),
+    QStringLiteral("combo"),
+    QStringLiteral("list"),
+    QStringLiteral("html_view"),
+    QStringLiteral("color"),
+    QStringLiteral("group"),
+    QStringLiteral("row"),
+    QStringLiteral("column"),
+    QStringLiteral("table"),
+    QStringLiteral("tree"),
+  };
+
+  QWidget* found = nullptr;
+  for (const auto& prefix : prefixes)
+  {
+    found = container->findChild<QWidget*>(plugin_panel_object_name(prefix, key));
+    if (found != nullptr)
+    {
+      break;
+    }
+  }
+  if (found == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such widget");
+    return nullptr;
+  }
+  found->setEnabled(enabled != 0);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_widget_visible(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  int visible = 0;
+  if (!PyArg_ParseTuple(args, "si", &key, &visible))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+
+  const std::array<QString, 15> prefixes = {
+    QStringLiteral("label"),
+    QStringLiteral("int"),
+    QStringLiteral("float"),
+    QStringLiteral("text"),
+    QStringLiteral("text_area"),
+    QStringLiteral("checkbox"),
+    QStringLiteral("combo"),
+    QStringLiteral("list"),
+    QStringLiteral("html_view"),
+    QStringLiteral("color"),
+    QStringLiteral("group"),
+    QStringLiteral("row"),
+    QStringLiteral("column"),
+    QStringLiteral("table"),
+    QStringLiteral("tree"),
+  };
+
+  QWidget* found = nullptr;
+  for (const auto& prefix : prefixes)
+  {
+    found = container->findChild<QWidget*>(plugin_panel_object_name(prefix, key));
+    if (found != nullptr)
+    {
+      break;
+    }
+  }
+  if (found == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such widget");
+    return nullptr;
+  }
+  found->setVisible(visible != 0);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_add_group(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* title = nullptr;
+  if (!PyArg_ParseTuple(args, "ss", &key, &title))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* groupBox = new QGroupBox{QString::fromUtf8(title), container};
+  groupBox->setObjectName(plugin_panel_object_name(QStringLiteral("group"), key));
+  auto* v = new QVBoxLayout{};
+  v->setContentsMargins(6, 6, 6, 6);
+  v->setSpacing(4);
+  groupBox->setLayout(v);
+  layout->addWidget(groupBox);
+
+  return createPluginPanelObject(groupBox);
+}
+
+PyObject* plugin_panel_add_row(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* row = new QWidget{container};
+  row->setObjectName(plugin_panel_object_name(QStringLiteral("row"), key));
+  auto* h = new QHBoxLayout{};
+  h->setContentsMargins(0, 0, 0, 0);
+  h->setSpacing(6);
+  row->setLayout(h);
+  layout->addWidget(row);
+
+  return createPluginPanelObject(row);
+}
+
+PyObject* plugin_panel_add_column(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* col = new QWidget{container};
+  col->setObjectName(plugin_panel_object_name(QStringLiteral("column"), key));
+  auto* v = new QVBoxLayout{};
+  v->setContentsMargins(0, 0, 0, 0);
+  v->setSpacing(4);
+  col->setLayout(v);
+  layout->addWidget(col);
+
+  return createPluginPanelObject(col);
+}
+
+PyObject* plugin_panel_add_text_area(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* labelText = nullptr;
+  const char* value = nullptr;
+  int height = 120;
+  const char* placeholder = nullptr;
+
+  if (!PyArg_ParseTuple(args, "ss|ziz", &key, &labelText, &value, &height, &placeholder))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* row = new QWidget{container};
+  auto* rowLayout = new QVBoxLayout{};
+  rowLayout->setContentsMargins(0, 0, 0, 0);
+  rowLayout->setSpacing(4);
+  row->setLayout(rowLayout);
+
+  if (labelText && *labelText)
+  {
+    auto* label = new QLabel{};
+    label->setText(QString::fromUtf8(labelText));
+    rowLayout->addWidget(label, 0);
+  }
+
+  auto* edit = new QPlainTextEdit{};
+  edit->setObjectName(plugin_panel_object_name(QStringLiteral("text_area"), key));
+  if (value != nullptr)
+  {
+    edit->setPlainText(QString::fromUtf8(value));
+  }
+  if (placeholder != nullptr)
+  {
+    edit->setPlaceholderText(QString::fromUtf8(placeholder));
+  }
+  if (height > 0)
+  {
+    edit->setMinimumHeight(height);
+  }
+  edit->setTabChangesFocus(true);
+  rowLayout->addWidget(edit, 1);
+
+  layout->addWidget(row);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_get_text_area(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* edit = plugin_panel_find_widget<QPlainTextEdit>(container, QStringLiteral("text_area"), key);
+  if (edit == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such text area");
+    return nullptr;
+  }
+  return toPyString(edit->toPlainText().toStdString());
+}
+
+PyObject* plugin_panel_set_text_area(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  const char* value = nullptr;
+  if (!PyArg_ParseTuple(args, "ss", &key, &value))
+  {
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* edit = plugin_panel_find_widget<QPlainTextEdit>(container, QStringLiteral("text_area"), key);
+  if (edit == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such text area");
+    return nullptr;
+  }
+  edit->setPlainText(QString::fromUtf8(value));
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_add_table_widget(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  PyObject* columns = nullptr;
+  PyObject* rows = nullptr;
+  int height = 200;
+  PyObject* callbackObj = nullptr;
+
+  if (!PyArg_ParseTuple(args, "sOO|iO", &key, &columns, &rows, &height, &callbackObj))
+  {
+    return nullptr;
+  }
+  if (!PyList_Check(columns) || !PyList_Check(rows))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected list for columns and rows");
+    return nullptr;
+  }
+  if (callbackObj != nullptr && callbackObj != Py_None && !PyCallable_Check(callbackObj))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected a callable or None");
+    return nullptr;
+  }
+  if (callbackObj == Py_None) callbackObj = nullptr;
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* table = new QTableWidget{};
+  table->setObjectName(plugin_panel_object_name(QStringLiteral("table"), key));
+  table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  table->setSelectionMode(QAbstractItemView::SingleSelection);
+  table->setSelectionBehavior(QAbstractItemView::SelectRows);
+  table->setShowGrid(false);
+  table->verticalHeader()->setVisible(false);
+  table->horizontalHeader()->setStretchLastSection(true);
+  table->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
+
+  const auto colCount = static_cast<int>(PyList_Size(columns));
+  table->setColumnCount(colCount);
+  QStringList headerLabels;
+  headerLabels.reserve(colCount);
+  for (Py_ssize_t i = 0; i < PyList_Size(columns); ++i)
+  {
+    auto* col = PyList_GetItem(columns, i);
+    const char* colStr = PyUnicode_AsUTF8(col);
+    headerLabels.push_back(colStr ? QString::fromUtf8(colStr) : QString{});
+  }
+  table->setHorizontalHeaderLabels(headerLabels);
+
+  const auto rowCount = static_cast<int>(PyList_Size(rows));
+  table->setRowCount(rowCount);
+  for (int r = 0; r < rowCount; ++r)
+  {
+    auto* rowObj = PyList_GetItem(rows, r);
+    if (!PyList_Check(rowObj))
+    {
+      continue;
+    }
+    const auto cells = static_cast<int>(PyList_Size(rowObj));
+    for (int c = 0; c < std::min(cells, colCount); ++c)
+    {
+      auto* cellObj = PyList_GetItem(rowObj, c);
+      const char* cellStr = PyUnicode_AsUTF8(cellObj);
+      auto* item = new QTableWidgetItem{cellStr ? QString::fromUtf8(cellStr) : QString{}};
+      table->setItem(r, c, item);
+    }
+  }
+
+  if (height > 0)
+  {
+    table->setMinimumHeight(height);
+  }
+
+  if (callbackObj != nullptr)
+  {
+    Py_INCREF(callbackObj);
+    QObject::connect(
+      table,
+      &QTableWidget::currentCellChanged,
+      container,
+      [callbackObj, container](int currentRow, int currentColumn, int, int) {
+        auto gil = PyGILState_Ensure();
+        auto* win = container->window();
+        auto* frame = dynamic_cast<tb::ui::MapFrame*>(win);
+        auto* prev = g_currentFrame;
+        if (frame != nullptr)
+        {
+          g_currentFrame = frame;
+        }
+
+        PyObject* argList = Py_BuildValue("(ii)", currentRow, currentColumn);
+        auto* result = PyObject_CallObject(callbackObj, argList);
+        Py_DECREF(argList);
+
+        if (result == nullptr)
+        {
+          PyErr_Print();
+          if (g_currentFrame != nullptr)
+          {
+            g_currentFrame->pythonLogger().error("Error in table widget callback");
+          }
+        }
+        Py_XDECREF(result);
+        g_currentFrame = prev;
+        PyGILState_Release(gil);
+      });
+    QObject::connect(table, &QObject::destroyed, container, [callbackObj]() {
+      auto gil = PyGILState_Ensure();
+      Py_DECREF(callbackObj);
+      PyGILState_Release(gil);
+    });
+  }
+
+  layout->addWidget(table);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_table_widget_rows(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  PyObject* rows = nullptr;
+  if (!PyArg_ParseTuple(args, "sO", &key, &rows))
+  {
+    return nullptr;
+  }
+  if (!PyList_Check(rows))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected list for rows");
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* table = plugin_panel_find_widget<QTableWidget>(container, QStringLiteral("table"), key);
+  if (table == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such table widget");
+    return nullptr;
+  }
+
+  const auto colCount = table->columnCount();
+  const auto rowCount = static_cast<int>(PyList_Size(rows));
+  table->blockSignals(true);
+  table->clearContents();
+  table->setRowCount(rowCount);
+  for (int r = 0; r < rowCount; ++r)
+  {
+    auto* rowObj = PyList_GetItem(rows, r);
+    if (!PyList_Check(rowObj))
+    {
+      continue;
+    }
+    const auto cells = static_cast<int>(PyList_Size(rowObj));
+    for (int c = 0; c < std::min(cells, colCount); ++c)
+    {
+      auto* cellObj = PyList_GetItem(rowObj, c);
+      const char* cellStr = PyUnicode_AsUTF8(cellObj);
+      auto* item = new QTableWidgetItem{cellStr ? QString::fromUtf8(cellStr) : QString{}};
+      table->setItem(r, c, item);
+    }
+  }
+  table->blockSignals(false);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_add_tree_widget(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  PyObject* headers = nullptr;
+  PyObject* items = nullptr;
+  int height = 200;
+  PyObject* callbackObj = nullptr;
+
+  if (!PyArg_ParseTuple(args, "sOO|iO", &key, &headers, &items, &height, &callbackObj))
+  {
+    return nullptr;
+  }
+  if (!PyList_Check(headers) || !PyList_Check(items))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected list for headers and items");
+    return nullptr;
+  }
+  if (callbackObj != nullptr && callbackObj != Py_None && !PyCallable_Check(callbackObj))
+  {
+    PyErr_SetString(PyExc_TypeError, "expected a callable or None");
+    return nullptr;
+  }
+  if (callbackObj == Py_None) callbackObj = nullptr;
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  plugin_panel_ensure_layout(container);
+  auto* layout = container->layout();
+
+  auto* tree = new QTreeWidget{};
+  tree->setObjectName(plugin_panel_object_name(QStringLiteral("tree"), key));
+  tree->setRootIsDecorated(false);
+  tree->setSelectionMode(QAbstractItemView::SingleSelection);
+  tree->setSelectionBehavior(QAbstractItemView::SelectRows);
+  tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  tree->setHeaderHidden(false);
+  tree->header()->setStretchLastSection(true);
+
+  QStringList headerLabels;
+  const auto headerCount = PyList_Size(headers);
+  headerLabels.reserve(static_cast<int>(headerCount));
+  for (Py_ssize_t i = 0; i < headerCount; ++i)
+  {
+    auto* h = PyList_GetItem(headers, i);
+    const char* hStr = PyUnicode_AsUTF8(h);
+    headerLabels.push_back(hStr ? QString::fromUtf8(hStr) : QString{});
+  }
+  tree->setHeaderLabels(headerLabels);
+
+  const auto itemCount = static_cast<int>(PyList_Size(items));
+  for (int i = 0; i < itemCount; ++i)
+  {
+    auto* rowObj = PyList_GetItem(items, i);
+    if (!PyList_Check(rowObj))
+    {
+      continue;
+    }
+    QStringList cols;
+    const auto colsCount = static_cast<int>(PyList_Size(rowObj));
+    cols.reserve(colsCount);
+    for (int c = 0; c < colsCount; ++c)
+    {
+      auto* cellObj = PyList_GetItem(rowObj, c);
+      const char* cellStr = PyUnicode_AsUTF8(cellObj);
+      cols.push_back(cellStr ? QString::fromUtf8(cellStr) : QString{});
+    }
+    tree->addTopLevelItem(new QTreeWidgetItem{cols});
+  }
+
+  if (height > 0)
+  {
+    tree->setMinimumHeight(height);
+  }
+
+  if (callbackObj != nullptr)
+  {
+    Py_INCREF(callbackObj);
+    QObject::connect(tree, &QTreeWidget::currentItemChanged, container, [callbackObj, container, tree](QTreeWidgetItem* current, QTreeWidgetItem*) {
+      int row = -1;
+      if (current != nullptr)
+      {
+        row = tree->indexOfTopLevelItem(current);
+      }
+      auto gil = PyGILState_Ensure();
+      auto* win = container->window();
+      auto* frame = dynamic_cast<tb::ui::MapFrame*>(win);
+      auto* prev = g_currentFrame;
+      if (frame != nullptr)
+      {
+        g_currentFrame = frame;
+      }
+
+      PyObject* argList = Py_BuildValue("(i)", row);
+      auto* result = PyObject_CallObject(callbackObj, argList);
+      Py_DECREF(argList);
+
+      if (result == nullptr)
+      {
+        PyErr_Print();
+        if (g_currentFrame != nullptr)
+        {
+          g_currentFrame->pythonLogger().error("Error in tree widget callback");
+        }
+      }
+      Py_XDECREF(result);
+      g_currentFrame = prev;
+      PyGILState_Release(gil);
+    });
+    QObject::connect(tree, &QObject::destroyed, container, [callbackObj]() {
+      auto gil = PyGILState_Ensure();
+      Py_DECREF(callbackObj);
+      PyGILState_Release(gil);
+    });
+  }
+
+  layout->addWidget(tree);
+  Py_RETURN_NONE;
+}
+
+PyObject* plugin_panel_set_tree_widget_items(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  PyObject* items = nullptr;
+  if (!PyArg_ParseTuple(args, "sO", &key, &items))
+  {
+    return nullptr;
+  }
+  if (!PyList_Check(items))
+  {
+    PyErr_SetString(PyExc_TypeError, "Expected list for items");
+    return nullptr;
+  }
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  auto* tree = plugin_panel_find_widget<QTreeWidget>(container, QStringLiteral("tree"), key);
+  if (tree == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such tree widget");
+    return nullptr;
+  }
+
+  tree->blockSignals(true);
+  tree->clear();
+  const auto itemCount = static_cast<int>(PyList_Size(items));
+  for (int i = 0; i < itemCount; ++i)
+  {
+    auto* rowObj = PyList_GetItem(items, i);
+    if (!PyList_Check(rowObj))
+    {
+      continue;
+    }
+    QStringList cols;
+    const auto colsCount = static_cast<int>(PyList_Size(rowObj));
+    cols.reserve(colsCount);
+    for (int c = 0; c < colsCount; ++c)
+    {
+      auto* cellObj = PyList_GetItem(rowObj, c);
+      const char* cellStr = PyUnicode_AsUTF8(cellObj);
+      cols.push_back(cellStr ? QString::fromUtf8(cellStr) : QString{});
+    }
+    tree->addTopLevelItem(new QTreeWidgetItem{cols});
+  }
+  tree->blockSignals(false);
+  Py_RETURN_NONE;
 }
 
 PyObject* plugin_panel_add_checkbox(PyObject* self, PyObject* args)
@@ -5067,6 +5953,7 @@ bool registerTypes(PyObject* module)
     static PyMethodDef pluginPanelMethods[] = {
       {"add_list_widget", plugin_panel_add_list_widget, METH_VARARGS, nullptr},
       {"set_list_widget_context_menu", plugin_panel_set_list_widget_context_menu, METH_VARARGS, nullptr},
+      {"set_list_widget_items", plugin_panel_set_list_widget_items, METH_VARARGS, nullptr},
       {"clear", plugin_panel_clear, METH_NOARGS, nullptr},
       {"add_label", plugin_panel_add_label, METH_VARARGS, nullptr},
       {"add_label_named", plugin_panel_add_label_named, METH_VARARGS, nullptr},
@@ -5074,8 +5961,14 @@ bool registerTypes(PyObject* module)
       {"add_int_field", plugin_panel_add_int_field, METH_VARARGS, nullptr},
       {"add_float_field", plugin_panel_add_float_field, METH_VARARGS, nullptr},
       {"add_text_field", plugin_panel_add_text_field, METH_VARARGS, nullptr},
+      {"set_int_field", plugin_panel_set_int_field, METH_VARARGS, nullptr},
+      {"set_float_field", plugin_panel_set_float_field, METH_VARARGS, nullptr},
+      {"set_text_field", plugin_panel_set_text_field, METH_VARARGS, nullptr},
       {"add_checkbox", plugin_panel_add_checkbox, METH_VARARGS, nullptr},
+      {"set_checkbox", plugin_panel_set_checkbox, METH_VARARGS, nullptr},
       {"add_combo_box", plugin_panel_add_combo_box, METH_VARARGS, nullptr},
+      {"set_combo_box_index", plugin_panel_set_combo_box_index, METH_VARARGS, nullptr},
+      {"set_combo_box_items", plugin_panel_set_combo_box_items, METH_VARARGS, nullptr},
       {"add_color_field", plugin_panel_add_color_field, METH_VARARGS, nullptr},
       {"get_int_field", plugin_panel_get_int_field, METH_VARARGS, nullptr},
       {"get_float_field", plugin_panel_get_float_field, METH_VARARGS, nullptr},
@@ -5084,10 +5977,23 @@ bool registerTypes(PyObject* module)
       {"get_combo_box_index", plugin_panel_get_combo_box_index, METH_VARARGS, nullptr},
       {"get_combo_box_text", plugin_panel_get_combo_box_text, METH_VARARGS, nullptr},
       {"get_color_field", plugin_panel_get_color_field, METH_VARARGS, nullptr},
+      {"set_widget_enabled", plugin_panel_set_widget_enabled, METH_VARARGS, nullptr},
+      {"set_widget_visible", plugin_panel_set_widget_visible, METH_VARARGS, nullptr},
       {"set_text", plugin_panel_set_text, METH_VARARGS, nullptr},
       {"set_html", plugin_panel_set_html, METH_VARARGS, nullptr},
       {"add_button", plugin_panel_add_button, METH_VARARGS, nullptr},
       {"add_html_view", plugin_panel_add_html_view, METH_VARARGS, nullptr},
+      {"set_html_view", plugin_panel_set_html_view, METH_VARARGS, nullptr},
+      {"add_group", plugin_panel_add_group, METH_VARARGS, nullptr},
+      {"add_row", plugin_panel_add_row, METH_VARARGS, nullptr},
+      {"add_column", plugin_panel_add_column, METH_VARARGS, nullptr},
+      {"add_text_area", plugin_panel_add_text_area, METH_VARARGS, nullptr},
+      {"get_text_area", plugin_panel_get_text_area, METH_VARARGS, nullptr},
+      {"set_text_area", plugin_panel_set_text_area, METH_VARARGS, nullptr},
+      {"add_table_widget", plugin_panel_add_table_widget, METH_VARARGS, nullptr},
+      {"set_table_widget_rows", plugin_panel_set_table_widget_rows, METH_VARARGS, nullptr},
+      {"add_tree_widget", plugin_panel_add_tree_widget, METH_VARARGS, nullptr},
+      {"set_tree_widget_items", plugin_panel_set_tree_widget_items, METH_VARARGS, nullptr},
   {"add_button_callback",
        [](PyObject* self, PyObject* args) -> PyObject* {
          const char* text = nullptr;
