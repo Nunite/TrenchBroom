@@ -3,6 +3,8 @@ import subprocess
 import os
 import html
 import base64
+import threading
+import queue
 
 class GitManager:
     def __init__(self):
@@ -27,11 +29,85 @@ class GitManager:
                 <a href="refresh:" title="Refresh" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8635;</a>
                 <a href="pull:" title="Pull" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8659;</a>
                 <a href="push:" title="Push" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8657;</a>
+                <a href="settings:" title="Settings" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#9881;</a>
             </span>
         </div>
         """
         self._ui_built = False
+        self._showing_settings = False
+        self._remote_url = ""
+        self._github_visibility = 0 # 0: Public, 1: Private
+        self._error_message = None
+        
+        # Async Task Management
+        self._task_queue = queue.Queue()
+        self._is_running_task = False
+        self._timer_id = tb.set_interval(self._process_tasks, 100) # Check every 100ms
+        
         self.refresh()
+        
+    def _process_tasks(self):
+        try:
+            while True:
+                task_result = self._task_queue.get_nowait()
+                self._handle_task_result(task_result)
+        except queue.Empty:
+            pass
+            
+    def _handle_task_result(self, result):
+        action = result.get("action")
+        status = result.get("status")
+        
+        if status == "started":
+            self.panel.set_label_text("status_msg", f"<i>{result.get('message', 'Working...')}</i>")
+            self._is_running_task = True
+            
+        elif status == "finished":
+            self._is_running_task = False
+            self.panel.set_label_text("status_msg", "")
+            if "output" in result:
+                print(f"[{action}] Output: {result['output']}")
+            
+            if action == "push":
+                if result.get("returncode") == 0:
+                     print("Push successful")
+                     self._error_message = None
+                else:
+                     err = result.get("stderr", "Unknown error")
+                     self._error_message = f"Push failed: {err}"
+                     print(self._error_message)
+                self.refresh()
+            elif action == "pull":
+                self.reload_map()
+                self.refresh()
+            
+        elif status == "error":
+            self._is_running_task = False
+            self.panel.set_label_text("status_msg", "")
+            self._error_message = f"Error: {result.get('error')}"
+            print(self._error_message)
+            self.refresh()
+
+    def _run_async(self, action, func, *args):
+        if self._is_running_task:
+            print("Task already running")
+            return
+
+        def worker():
+            self._task_queue.put({"action": action, "status": "started", "message": f"{action}..."})
+            try:
+                res = func(*args)
+                self._task_queue.put({
+                    "action": action, 
+                    "status": "finished", 
+                    "returncode": res.returncode if res else -1,
+                    "stdout": res.stdout if res else "",
+                    "stderr": res.stderr if res else ""
+                })
+            except Exception as e:
+                self._task_queue.put({"action": action, "status": "error", "error": str(e)})
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def get_repo_dir(self):
         doc = tb.Document.current()
@@ -45,6 +121,13 @@ class GitManager:
         except AttributeError:
             return None
 
+    def get_startupinfo(self):
+        if os.name == 'nt':
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            return si
+        return None
+
     def run_git(self, args):
         if not self.repo_dir:
             self.repo_dir = self.get_repo_dir()
@@ -53,17 +136,12 @@ class GitManager:
             return None
             
         try:
-            startupinfo = None
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                
             result = subprocess.run(
                 ["git"] + args, 
                 cwd=self.repo_dir, 
                 capture_output=True, 
                 text=True,
-                startupinfo=startupinfo,
+                startupinfo=self.get_startupinfo(),
                 encoding='utf-8',
                 errors='replace'
             )
@@ -77,6 +155,12 @@ class GitManager:
         except Exception as e:
             print(f"Git execution error: {str(e)}")
             return None
+
+    def get_git_config(self, key):
+        res = self.run_git(["config", key])
+        if res and res.returncode == 0:
+            return res.stdout.strip()
+        return None
 
     # --- VS Code Port Logic ---
 
@@ -551,9 +635,67 @@ class GitManager:
 
     def _build_ui(self):
         if self._ui_built:
+            if self._error_message:
+                self.panel.set_label_text("status_msg", f"<font color='red'><b>{html.escape(self._error_message)}</b></font>")
+            elif self._is_running_task:
+                 pass # status_msg managed by task handler
+            else:
+                 self.panel.set_label_text("status_msg", "")
             return
 
         self.panel.clear()
+
+        # Settings View
+        if self._showing_settings:
+            settings_col = self.panel.add_column("settings_col")
+            settings_col.add_html_view("header_view", self.wrap_html(self._header_html), 34, self.on_header_link_clicked)
+            
+            settings_col.add_label_named("status_msg", "")
+            if self._error_message:
+                self.panel.set_label_text("status_msg", f"<font color='red'><b>Error:</b> {html.escape(self._error_message)}</font>")
+
+            # --- System Status ---
+            settings_col.add_label("<b>System Status</b>")
+            
+            # Git User
+            git_user = self.get_git_config("user.name") or "<not set>"
+            git_email = self.get_git_config("user.email") or "<not set>"
+            settings_col.add_label(f"Git User: {git_user} &lt;{git_email}&gt;")
+            
+            # GitHub CLI Status
+            gh_status = "Not installed"
+            gh_user = ""
+            try:
+                res = subprocess.run(["gh", "--version"], capture_output=True, startupinfo=self.get_startupinfo())
+                if res.returncode == 0:
+                    gh_status = "Installed"
+                    # Check auth status
+                    auth_res = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, startupinfo=self.get_startupinfo(), encoding='utf-8', errors='replace')
+                    if "Logged in to" in auth_res.stdout or "Logged in to" in auth_res.stderr:
+                        gh_status = "Logged in"
+                        # Try to extract user? output is messy.
+                    else:
+                        gh_status = "Not logged in (Run 'gh auth login' in terminal)"
+            except:
+                pass
+            settings_col.add_label(f"GitHub CLI: {gh_status}")
+            if "Not logged" in gh_status:
+                 settings_col.add_label("<i>VS Code handles auth automatically, but here you must login via system terminal.</i>")
+
+            settings_col.add_label("<b>Remote Configuration</b>")
+            settings_col.add_text_field("remote_url", "Remote URL", self._remote_url, "https://github.com/user/repo.git")
+            settings_col.add_button_callback("Update Remote", self.on_update_remote)
+            
+            if "Installed" in gh_status or "Logged in" in gh_status:
+                settings_col.add_label("<b>GitHub / Forge Integration</b>")
+                settings_col.add_combo_box("github_visibility", "Visibility", ["Public", "Private"], self._on_visibility_changed, self._github_visibility)
+                settings_col.add_button_callback("Create & Push to GitHub", self.on_publish_github)
+            else:
+                settings_col.add_label("<i>Install GitHub CLI (gh) to enable auto-creation.</i>")
+                
+            self.panel.set_widget_visible("settings_col", True)
+            self._ui_built = True
+            return
 
         state_no_doc = self.panel.add_column("state_no_doc")
         state_no_doc.add_label_named("no_doc_msg", "<i>Please save the map to enable Git features.</i>")
@@ -567,13 +709,15 @@ class GitManager:
 
         state_repo = self.panel.add_column("state_repo")
         state_repo.add_html_view("header_view", self.wrap_html(self._header_html), 34, self.on_header_link_clicked)
+        
+        state_repo.add_label_named("status_msg", "")
 
         repo_dubious = state_repo.add_column("repo_dubious")
         repo_dubious.add_label("<font color='red'><b>Error: Dubious Ownership</b></font>")
         repo_dubious.add_button_callback("Fix Safe Directory", self.on_fix_safe_directory)
 
         repo_main = state_repo.add_column("repo_main")
-        repo_main.add_text_field("commit_msg", "", self.commit_message, "Message (Ctrl+Enter to commit)")
+        repo_main.add_text_field("commit_msg", "", self.commit_message, "Message")
         repo_main.add_button_callback("Commit", self.on_commit)
 
         repo_main.add_label_named("changes_header", "<b>Changes (0)</b>")
@@ -634,17 +778,21 @@ class GitManager:
         self.refresh()
 
     def refresh(self):
+        if not self._showing_settings:
+            try:
+                self.commit_message = self.panel.get_text_field("commit_msg")
+            except:
+                pass
+
+            try:
+                self.new_branch_name = self.panel.get_text_field("new_branch_name")
+            except:
+                self.new_branch_name = ""
+
         self._build_ui()
-
-        try:
-            self.commit_message = self.panel.get_text_field("commit_msg")
-        except:
-            pass
-
-        try:
-            self.new_branch_name = self.panel.get_text_field("new_branch_name")
-        except:
-            self.new_branch_name = ""
+        
+        if self._showing_settings:
+            return
 
         self.repo_dir = self.get_repo_dir()
         
@@ -658,6 +806,17 @@ class GitManager:
         
         if self.repo_dir and os.path.exists(os.path.join(self.repo_dir, ".git")):
             is_git_repo = True
+            
+            # Ensure core.quotepath is false to support unicode filenames
+            self.run_git(["config", "core.quotepath", "false"])
+            
+            # Get current remote URL
+            res = self.run_git(["remote", "get-url", "origin"])
+            if res and res.returncode == 0:
+                self._remote_url = res.stdout.strip()
+            else:
+                self._remote_url = ""
+
             branches = self.get_branches()
             staged, changes, untracked = self.get_changes_categorized()
             
@@ -687,6 +846,10 @@ class GitManager:
         self.panel.set_widget_visible("state_repo", True)
         self.panel.set_html_view("header_view", self.wrap_html(self._header_html))
         
+        # Status Message Label (re-add if not present in this view mode, or just ensure it exists)
+        # We need a dedicated place for status messages in the main view too.
+        # Let's insert it at the top or bottom.
+        
         if self.dubious_ownership_path:
             self.panel.set_widget_visible("repo_dubious", True)
             self.panel.set_widget_visible("repo_main", False)
@@ -694,6 +857,12 @@ class GitManager:
         else:
             self.panel.set_widget_visible("repo_dubious", False)
             self.panel.set_widget_visible("repo_main", True)
+
+        self.panel.set_label_text("status_msg", "")
+        if self._error_message:
+             self.panel.set_label_text("status_msg", f"<font color='red'><b>{html.escape(self._error_message)}</b></font>")
+        elif self._is_running_task:
+             self.panel.set_label_text("status_msg", "<i>Working...</i>")
 
         self.panel.set_text_field("commit_msg", self.commit_message)
         
@@ -887,6 +1056,10 @@ class GitManager:
             self.on_pull()
         elif action == "push":
             self.on_push()
+        elif action == "settings":
+            self._showing_settings = not self._showing_settings
+            self._ui_built = False
+            self.refresh()
 
     def on_history_link_clicked(self, link):
         if link.startswith("checkout:"):
@@ -942,6 +1115,7 @@ class GitManager:
 
     def on_init(self):
         self.run_git(["init"])
+        self.run_git(["config", "core.quotepath", "false"])
         self.refresh()
 
     def on_fix_safe_directory(self):
@@ -1008,19 +1182,67 @@ class GitManager:
         self.refresh()
 
     def on_pull(self):
-        self.run_git(["pull"])
-        self.reload_map()
-        self.refresh()
+        self._run_async("pull", self.run_git, ["pull"])
 
     def on_push(self):
-        self.run_git(["push"])
+        self._run_async("push", self.run_git, ["push"])
+            
         self.refresh()
+
+    def _on_visibility_changed(self, index):
+        self._github_visibility = index
+
+    def on_update_remote(self):
+        url = self.panel.get_text_field("remote_url")
+        if not url: return
+        
+        # Check if remote exists
+        res = self.run_git(["remote", "get-url", "origin"])
+        if res and res.returncode == 0:
+            self.run_git(["remote", "set-url", "origin", url])
+        else:
+            self.run_git(["remote", "add", "origin", url])
+        
+        self._remote_url = url
+        print(f"Remote origin set to: {url}")
+        self.refresh()
+
+    def on_publish_github(self):
+        visibility = "--public" if self._github_visibility == 0 else "--private"
+        repo_name = os.path.basename(self.repo_dir)
+        
+        # Create repo on GitHub
+        print(f"Creating GitHub repo: {repo_name} ({visibility})...")
+        res = subprocess.run(
+            ["gh", "repo", "create", repo_name, visibility, "--source=.", "--remote=origin", "--push"], 
+            cwd=self.repo_dir,
+            capture_output=True,
+            text=True,
+            startupinfo=self.get_startupinfo(),
+            encoding='utf-8',
+            errors='replace'
+        )
+        
+        if res.returncode == 0:
+            print("Successfully published to GitHub!")
+            self._showing_settings = False
+            self._ui_built = False
+            self.refresh()
+        else:
+            print(f"Failed to publish: {res.stderr}")
+            self._error_message = f"Publish failed: {res.stderr.strip()}"
+            self._ui_built = False # Rebuild to show error
+            self.refresh()
 
     # Dead code from previous checkbox-based UI
     # def on_discard_changes(self):
     #     ...
     # def on_ignore_changes(self):
     #     ...
+
+    def on_document_saved(self):
+        print("Document saved, refreshing git status...")
+        self.refresh()
 
     def reload_map(self):
         doc = tb.Document.current()
@@ -1031,4 +1253,10 @@ class GitManager:
                 pass
 
 # Start
-GitManager()
+manager = GitManager()
+try:
+    tb.register_callback("document_saved", manager.on_document_saved)
+except ValueError:
+    print("Warning: 'document_saved' event not supported. Please recompile TrenchBroom to enable auto-refresh on save.")
+except AttributeError:
+    pass

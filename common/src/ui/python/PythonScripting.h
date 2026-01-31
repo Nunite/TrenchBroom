@@ -40,6 +40,7 @@ public:
   bool runScript(MapFrame& frame, const std::filesystem::path& path);
 
   void onSelectionChanged(MapFrame& frame);
+  void onDocumentSaved(MapFrame& frame);
 };
 
 } // namespace tb::ui

@@ -868,6 +868,19 @@ def list_actions() -> list[str]:
     raise RuntimeError('Module "tb" is only available inside TrenchBroom.')
 
 
+def set_interval(callback: Callable[[], None], interval: int) -> int:
+    """
+    设置一个定时器，每隔 interval 毫秒执行一次 callback。
+    返回定时器 ID，可用于 clear_interval。
+    """
+    raise RuntimeError('Module "tb" is only available inside TrenchBroom.')
+
+
+def clear_interval(id: int) -> None:
+    """取消由 set_interval 创建的定时器。"""
+    raise RuntimeError('Module "tb" is only available inside TrenchBroom.')
+
+
 def add_plugin_panel(title: str, content: str | None = None) -> None:
     """
     在 Inspector 的 Plugin 页签里添加一个面板，并显示文本内容。
@@ -930,6 +943,7 @@ def register_callback(event: str, callback: Callable[[], None]) -> None:
     
     支持的事件:
     - "selection_changed": 当选择发生变化时触发。
+    - "document_saved": 当文档保存成功时触发。
     
     注意：回调函数不应阻塞，且应谨慎执行繁重操作。
     """

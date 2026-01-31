@@ -1044,6 +1044,7 @@ bool MapFrame::saveDocument()
                                   endTime - startTime)
                                   .count()
                              << "ms";
+             PythonScripting::instance().onDocumentSaved(*this);
            })
            | kdl::transform_error([&](const auto& e) {
                QMessageBox::critical(
@@ -1083,6 +1084,7 @@ bool MapFrame::saveDocumentAs()
                                 endTime - startTime)
                                 .count()
                            << "ms";
+           PythonScripting::instance().onDocumentSaved(*this);
          })
          | kdl::transform_error([&](const auto& e) {
              QMessageBox::critical(

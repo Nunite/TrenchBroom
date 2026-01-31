@@ -106,12 +106,120 @@
 #include <algorithm>
 #include <array>
 #include <string>
+#include <QTimer>
+#include <map>
 
 namespace tb::ui
 {
 namespace
 {
 bool g_pythonRegistered = false;
+
+// --- Timer Support ---
+class PythonTimer : public QObject
+{
+public:
+  PythonTimer(int id, int interval, PyObject* callback) : m_id(id), m_callback(callback)
+  {
+    Py_INCREF(m_callback);
+    m_timer = new QTimer(this);
+    m_timer->setInterval(interval);
+    connect(m_timer, &QTimer::timeout, this, &PythonTimer::onTimeout);
+    m_timer->start();
+  }
+
+  ~PythonTimer()
+  {
+    m_timer->stop();
+    auto gil = PyGILState_Ensure();
+    Py_DECREF(m_callback);
+    PyGILState_Release(gil);
+  }
+
+private:
+  void onTimeout()
+  {
+    auto gil = PyGILState_Ensure();
+    auto* prev = g_currentFrame;
+    // Note: g_currentFrame might be null or stale if the map frame is closed.
+    // However, timers run in the main thread event loop, and we should check if
+    // we have a valid context or if we should just run.
+    // For safety, we can check if the main window still exists, but simple callback execution is usually fine.
+    
+    PyObject* res = PyObject_CallObject(m_callback, nullptr);
+    if (res == nullptr)
+    {
+      PyErr_Print();
+      if (g_currentFrame)
+      {
+         g_currentFrame->pythonLogger().error("Error in timer callback");
+      }
+    }
+    else
+    {
+      Py_DECREF(res);
+    }
+    
+    g_currentFrame = prev;
+    PyGILState_Release(gil);
+  }
+
+  int m_id;
+  PyObject* m_callback;
+  QTimer* m_timer;
+};
+
+static std::map<int, PythonTimer*> g_timers;
+static int g_nextTimerId = 1;
+
+static PyObject* script_set_interval(PyObject* self, PyObject* args)
+{
+  unused(self);
+  PyObject* callback = nullptr;
+  int interval = 0;
+  if (!PyArg_ParseTuple(args, "Oi", &callback, &interval))
+  {
+    return nullptr;
+  }
+  
+  if (!PyCallable_Check(callback))
+  {
+    PyErr_SetString(PyExc_TypeError, "callback must be callable");
+    return nullptr;
+  }
+  
+  // We need a QObject parent for the timer to ensure it lives in the correct thread (main thread)
+  // PythonScripting is a singleton, but not a QObject.
+  // We can parent the timer to nothing (and manage memory manually), 
+  // or use a static QObject if needed. Here we manage manually in g_timers map.
+  
+  int id = g_nextTimerId++;
+  auto* timer = new PythonTimer(id, interval, callback);
+  g_timers[id] = timer;
+  
+  return PyLong_FromLong(id);
+}
+
+static PyObject* script_clear_interval(PyObject* self, PyObject* args)
+{
+  unused(self);
+  int id = 0;
+  if (!PyArg_ParseTuple(args, "i", &id))
+  {
+    return nullptr;
+  }
+  
+  auto it = g_timers.find(id);
+  if (it != g_timers.end())
+  {
+    delete it->second;
+    g_timers.erase(it);
+  }
+  
+  Py_RETURN_NONE;
+}
+
+// --- End Timer Support ---
 
 class StdStreamRedirect
 {
@@ -577,6 +685,8 @@ bool ensureInitialized()
              },
              METH_NOARGS,
              nullptr},
+            {"set_interval", script_set_interval, METH_VARARGS, nullptr},
+            {"clear_interval", script_clear_interval, METH_VARARGS, nullptr},
             {nullptr, nullptr, 0, nullptr},
           };
 
@@ -607,11 +717,15 @@ bool ensureInitialized()
           }
 
           // Pre-create lists for known events
-          auto* list = PyList_New(0);
-          PyDict_SetItemString(callbacks, "selection_changed", list);
-          Py_DECREF(list);
+  auto* list = PyList_New(0);
+  PyDict_SetItemString(callbacks, "selection_changed", list);
+  Py_DECREF(list);
 
-          if (PyModule_AddObject(module, "_callbacks", callbacks) != 0)
+  list = PyList_New(0);
+  PyDict_SetItemString(callbacks, "document_saved", list);
+  Py_DECREF(list);
+
+  if (PyModule_AddObject(module, "_callbacks", callbacks) != 0)
           {
             Py_DECREF(callbacks);
             Py_DECREF(module);
@@ -773,6 +887,61 @@ void PythonScripting::onSelectionChanged(MapFrame& frame)
             {
               PyErr_Print();
               frame.pythonLogger().error("Error in selection_changed callback");
+            }
+            else
+            {
+              Py_DECREF(res);
+            }
+          }
+        }
+      }
+    }
+    Py_XDECREF(callbacks);
+    Py_DECREF(tbModule);
+  }
+  else
+  {
+    PyErr_Clear();
+  }
+
+  g_currentFrame = prev;
+  PyGILState_Release(gil);
+}
+
+void PythonScripting::onDocumentSaved(MapFrame& frame)
+{
+  if (!g_pythonRegistered || !Py_IsInitialized())
+  {
+    return;
+  }
+
+  auto gil = PyGILState_Ensure();
+
+  auto* prev = g_currentFrame;
+  g_currentFrame = &frame;
+
+  StdStreamRedirect streamRedirect;
+
+  PyObject* tbModule = PyImport_ImportModule("tb");
+  if (tbModule)
+  {
+    PyObject* callbacks = PyObject_GetAttrString(tbModule, "_callbacks");
+    if (callbacks && PyDict_Check(callbacks))
+    {
+      PyObject* list = PyDict_GetItemString(callbacks, "document_saved");
+      if (list && PyList_Check(list))
+      {
+        Py_ssize_t size = PyList_Size(list);
+        for (Py_ssize_t i = 0; i < size; ++i)
+        {
+          PyObject* func = PyList_GetItem(list, i);
+          if (PyCallable_Check(func))
+          {
+            PyObject* res = PyObject_CallObject(func, nullptr);
+            if (res == nullptr)
+            {
+              PyErr_Print();
+              frame.pythonLogger().error("Error in document_saved callback");
             }
             else
             {
