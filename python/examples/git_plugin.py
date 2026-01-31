@@ -5,6 +5,362 @@ import html
 import base64
 import threading
 import queue
+import shutil
+
+ICON_DIR = r"d:\Code_Development\Source_code\CPP\TrenchBroom\app\resources\graphics\images"
+
+# Custom SVGs for clearer arrows and reliability
+SVG_PUSH_STR = """<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 2L3.5 6.5H6.5V14H9.5V6.5H12.5L8 2Z" fill="#cccccc"/></svg>"""
+SVG_PULL_STR = """<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 14L12.5 9.5H9.5V2H6.5V9.5H3.5L8 14Z" fill="#cccccc"/></svg>"""
+
+def load_icon(name):
+    path = os.path.join(ICON_DIR, name)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        # Simple color replacement for dark theme adaptation
+        content = content.replace('fill:#3f3f3f', 'fill:#cccccc')
+        content = content.replace('fill="#494949"', 'fill:#cccccc')
+        
+        b64 = base64.b64encode(content.encode('utf-8')).decode('ascii')
+        return f"data:image/svg+xml;base64,{b64}"
+    except Exception as e:
+        print(f"Failed to load icon {name}: {e}")
+        return None
+
+# --- CSS Styles ---
+CSS_STYLES = """
+<style>
+    body { 
+        background-color: transparent;
+        color: #cccccc; 
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        font-size: 13px; 
+        margin: 0; 
+        padding: 0; 
+        user-select: none;
+        -webkit-user-select: none;
+        cursor: default;
+        height: 100%;
+        overflow: hidden;
+    }
+    img { -webkit-user-drag: none; }
+    table { 
+        border-collapse: collapse; 
+        border-spacing: 0;
+        width: 100%;
+        table-layout: fixed;
+    }
+    tr { height: 22px; background-color: transparent; }
+    td.cell { 
+        padding: 0; 
+        vertical-align: top;
+        white-space: nowrap;
+        height: 22px;
+        overflow: hidden;
+    }
+    a.row-link { 
+        text-decoration: none; 
+        color: inherit; 
+        display: block; 
+        height: 100%; 
+        width: 100%;
+        line-height: 22px;
+    }
+    img.graph-img {
+        vertical-align: middle;
+        margin-right: 0px;
+        display: inline-block;
+    }
+    span.text-content {
+        display: inline-flex;
+        align-items: center;
+        vertical-align: middle;
+        height: 100%;
+    }
+    .hash { color: #569cd6; font-family: Consolas, monospace; margin-right: 8px; flex-shrink: 0; }
+    .msg { color: #cccccc; font-weight: 600; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px; }
+    .meta { color: #858585; font-size: 11px; flex-shrink: 0; white-space: nowrap; }
+    .refs-container {
+        display: inline-flex;
+        align-items: center;
+        margin-right: 8px;
+        flex-shrink: 0;
+    }
+    .view-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+    .scroll-list {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 4px 0;
+    }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #424242; }
+    ::-webkit-scrollbar-thumb:hover { background: #4f4f4f; }
+    ::-webkit-scrollbar-corner { background: transparent; }
+</style>
+"""
+
+class BadgeGenerator:
+    def __init__(self):
+        self._cache = {}
+
+    def create_svg(self, text, bg_color, text_color, icon_char=None):
+        cache_key = (text, bg_color, text_color, icon_char)
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        # Heuristic width calculation
+        # Base padding: 12px (6px each side)
+        # Char width: ~7px avg (Arial 11px)
+        # Icon width: 14px if present
+        
+        text_width = 0
+        for char in text:
+            if char.isupper(): text_width += 8
+            else: text_width += 6.5
+            
+        width = int(text_width + 16)
+        start_x = 8
+        
+        if icon_char:
+            width += 14
+            start_x += 14
+            
+        height = 18
+        radius = 9 # Full pill
+        
+        # Scale for high DPI
+        s = 2.0
+        w_s = width * s
+        h_s = height * s
+        r_s = radius * s
+        font_size_s = 11 * s
+        
+        icon_svg = ""
+        if icon_char:
+            # Simple text-based icon for now, positioned left
+            icon_x = 8 * s
+            icon_y = (height/2 + 4) * s
+            icon_svg = f'<text x="{icon_x}" y="{icon_y}" font-family="Segoe UI Symbol, Arial Unicode MS, sans-serif" font-size="{font_size_s}" fill="{text_color}" text-anchor="middle" font-weight="normal">{icon_char}</text>'
+            
+        text_x = (start_x + text_width/2) * s
+        text_y = (height/2 + 3.5) * s # Vertical center adjustment
+        
+        svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{w_s}" height="{h_s}" viewBox="0 0 {w_s} {h_s}">
+            <rect x="0" y="0" width="{w_s}" height="{h_s}" rx="{r_s}" ry="{r_s}" fill="{bg_color}" />
+            {icon_svg}
+            <text x="{text_x}" y="{text_y}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="{font_size_s}" fill="{text_color}" text-anchor="middle" font-weight="600">{text}</text>
+        </svg>'''
+        
+        b64 = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
+        result = f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" height="{height}" style="vertical-align: middle;" />'
+        self._cache[cache_key] = result
+        return result
+
+class GraphRenderer:
+    @staticmethod
+    def build_view_models(history_items):
+        # VS Code colors
+        colors = [
+            '#FFB000', '#DC267F', '#994F00', '#40B0A6', '#B66DFF'
+        ]
+        color_index = -1
+        view_models = []
+
+        for item in history_items:
+            # Previous output becomes current input
+            output_swimlanes_prev = view_models[-1]['outputSwimlanes'] if view_models else []
+            input_swimlanes = [n.copy() for n in output_swimlanes_prev]
+            output_swimlanes = []
+
+            first_parent_added = False
+
+            # Add first parent to output
+            if len(item['parentIds']) > 0:
+                for node in input_swimlanes:
+                    if node['id'] == item['id']:
+                        if not first_parent_added:
+                            output_swimlanes.append({
+                                'id': item['parentIds'][0],
+                                'color': node['color']
+                            })
+                            first_parent_added = True
+                        continue
+                    
+                    output_swimlanes.append(node.copy())
+            else:
+                # No parents (initial commit), pass through others
+                for node in input_swimlanes:
+                    if node['id'] == item['id']:
+                        continue
+                    output_swimlanes.append(node.copy())
+
+            # Add unprocessed parents to output (forks)
+            start_idx = 1 if first_parent_added else 0
+            for i in range(start_idx, len(item['parentIds'])):
+                # Assign new color
+                color_index = (color_index + 1) % len(colors)
+                color_identifier = colors[color_index]
+                
+                output_swimlanes.append({
+                    'id': item['parentIds'][i],
+                    'color': color_identifier
+                })
+            
+            # Determine kind (HEAD logic omitted for simplicity, treating all as nodes)
+            kind = 'node'
+            if any("HEAD" in r for r in item['refs']):
+                kind = 'HEAD'
+
+            view_models.append({
+                'historyItem': item,
+                'kind': kind,
+                'inputSwimlanes': input_swimlanes,
+                'outputSwimlanes': output_swimlanes
+            })
+
+        return view_models
+
+    @staticmethod
+    def render_svg(view_model):
+        SWIMLANE_WIDTH = 11
+        SWIMLANE_HEIGHT = 22
+        # Use thicker strokes and larger radius to compensate for visual scaling if needed,
+        # but since we are scaling everything up by 2.0 and then down by 2.0 via CSS,
+        # the logical pixel size should remain 1:1.
+        # However, if lines look too thin, we can slightly increase base stroke width.
+        
+        # VS Code uses 1px stroke logically.
+        CIRCLE_RADIUS = 4
+
+        # Scale 2.0 for HiDPI, then scale down with CSS
+        SCALE = 2.0
+        
+        def s(val): return val * SCALE
+
+        history_item = view_model['historyItem']
+        input_swimlanes = view_model['inputSwimlanes']
+        output_swimlanes = view_model['outputSwimlanes']
+
+        # Find input index
+        input_index = -1
+        for i, node in enumerate(input_swimlanes):
+            if node['id'] == history_item['id']:
+                input_index = i
+                break
+        
+        # Circle index
+        circle_index = input_index if input_index != -1 else len(input_swimlanes)
+
+        # Circle color
+        circle_color = '#0098FF' # Default
+        if circle_index < len(output_swimlanes):
+            circle_color = output_swimlanes[circle_index]['color']
+        elif circle_index < len(input_swimlanes):
+            circle_color = input_swimlanes[circle_index]['color']
+
+        # SVG Construction
+        # Calculate width based on max lanes
+        width = (max(len(input_swimlanes), len(output_swimlanes), 1) + 1) * SWIMLANE_WIDTH
+        
+        svg_parts = []
+        svg_parts.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{s(width)}" height="{s(SWIMLANE_HEIGHT)}" viewBox="0 0 {s(width)} {s(SWIMLANE_HEIGHT)}">')
+
+        # Helper for path
+        def create_path(d, color, stroke_width=1):
+            return f'<path d="{d}" stroke="{color}" stroke-width="{s(stroke_width)}" fill="none" stroke-linecap="round" />'
+
+        output_swimlane_index = 0
+        for index in range(len(input_swimlanes)):
+            color = input_swimlanes[index]['color']
+            
+            if input_swimlanes[index]['id'] == history_item['id']:
+                # Current commit
+                if index != circle_index:
+                    # Merge curve (Top -> Mid)
+                    x_start = s(SWIMLANE_WIDTH * (index + 1))
+                    y_start = 0
+                    x_end = s(SWIMLANE_WIDTH * (circle_index + 1))
+                    y_end = s(SWIMLANE_HEIGHT / 2) # 11
+                    
+                    d = f"M {x_start} {y_start} C {x_start} {y_end}, {x_end} {y_start}, {x_end} {y_end}"
+                    svg_parts.append(create_path(d, color))
+                else:
+                    output_swimlane_index += 1
+            else:
+                # Pass through
+                if output_swimlane_index < len(output_swimlanes) and \
+                   input_swimlanes[index]['id'] == output_swimlanes[output_swimlane_index]['id']:
+                    
+                    x_in = s(SWIMLANE_WIDTH * (index + 1))
+                    x_out = s(SWIMLANE_WIDTH * (output_swimlane_index + 1))
+                    
+                    if index == output_swimlane_index:
+                        # Straight line
+                        d = f"M {x_in} 0 V {s(SWIMLANE_HEIGHT)}"
+                        svg_parts.append(create_path(d, color))
+                    else:
+                        # Shift
+                        y_bot = s(SWIMLANE_HEIGHT)
+                        d = f"M {x_in} 0 C {x_in} {s(SWIMLANE_HEIGHT/2)}, {x_out} {s(SWIMLANE_HEIGHT/2)}, {x_out} {y_bot}"
+                        svg_parts.append(create_path(d, color))
+                    
+                    output_swimlane_index += 1
+
+        # Add remaining parents (Forking)
+        # From Mid to Bottom
+        for i in range(1, len(history_item['parentIds'])):
+            p_id = history_item['parentIds'][i]
+            # Find in output
+            parent_out_idx = -1
+            for idx, node in enumerate(output_swimlanes):
+                if node['id'] == p_id:
+                    parent_out_idx = idx
+            
+            if parent_out_idx != -1:
+                # Draw connection from Circle(Mid) to Parent(Bottom)
+                x_start = s(SWIMLANE_WIDTH * (circle_index + 1))
+                y_start = s(SWIMLANE_HEIGHT / 2)
+                x_end = s(SWIMLANE_WIDTH * (parent_out_idx + 1))
+                y_end = s(SWIMLANE_HEIGHT)
+                
+                color = output_swimlanes[parent_out_idx]['color']
+                d = f"M {x_start} {y_start} C {x_start} {y_end}, {x_end} {y_start}, {x_end} {y_end}"
+                svg_parts.append(create_path(d, color))
+
+        # Vertical Stub: Top to Mid (if input exists)
+        if input_index != -1:
+            x = s(SWIMLANE_WIDTH * (circle_index + 1))
+            d = f"M {x} 0 V {s(SWIMLANE_HEIGHT / 2)}"
+            svg_parts.append(create_path(d, input_swimlanes[input_index]['color']))
+
+        # Vertical Stub: Mid to Bottom (if parents exist)
+        if len(history_item['parentIds']) > 0:
+            x = s(SWIMLANE_WIDTH * (circle_index + 1))
+            d = f"M {x} {s(SWIMLANE_HEIGHT / 2)} V {s(SWIMLANE_HEIGHT)}"
+            svg_parts.append(create_path(d, circle_color))
+
+        # Draw Circle
+        cx = s(SWIMLANE_WIDTH * (circle_index + 1))
+        cy = s(SWIMLANE_HEIGHT / 2)
+        
+        if view_model['kind'] == 'HEAD':
+             svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="{s(CIRCLE_RADIUS + 2)}" fill="{circle_color}" />')
+             svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="{s(CIRCLE_RADIUS)} " fill="#fff" />')
+        else:
+             svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="{s(CIRCLE_RADIUS)}" fill="{circle_color}" stroke="#1e1e1e" stroke-width="{s(1)}" />')
+
+        svg_parts.append('</svg>')
+        return "".join(svg_parts), width * SCALE, SWIMLANE_HEIGHT * SCALE
 
 class GitManager:
     def __init__(self):
@@ -13,23 +369,44 @@ class GitManager:
         self.commit_message = ""
         self.new_branch_name = ""
         self.dubious_ownership_path = None
-        self._badge_cache = {}
+        self.badge_generator = BadgeGenerator()
         self._changes_entries = []
         self._branches_entries = []
         self._selected_change_index = -1
         self._selected_branch_index = -1
         self._history_cache_key = None
         self._history_cache_html = None
+        
+        # Load Icons
+        self.icon_refresh = load_icon("Refresh.svg")
+        
+        # Use inline SVGs for Pull/Push to ensure they render correctly and are distinct
+        self.icon_pull = f"data:image/svg+xml;base64,{base64.b64encode(SVG_PULL_STR.encode('utf-8')).decode('ascii')}"
+        self.icon_push = f"data:image/svg+xml;base64,{base64.b64encode(SVG_PUSH_STR.encode('utf-8')).decode('ascii')}"
+        
+        self.icon_settings = load_icon("GeneralPreferences.svg")
+        
         self._html_prefix = f"<html><head>{self.get_css()}</head><body>"
         self._html_suffix = "</body></html>"
-        self._header_html = """
+        
+        def icon_html(icon_data, alt_char, title):
+            if icon_data:
+                return f'<img src="{icon_data}" width="16" height="16" />'
+            return f'<span style="font-size: 16px;">{alt_char}</span>'
+
+        refresh_html = icon_html(self.icon_refresh, "&#8635;", "Refresh")
+        pull_html = icon_html(self.icon_pull, "&#8659;", "Pull")
+        push_html = icon_html(self.icon_push, "&#8657;", "Push")
+        settings_html = icon_html(self.icon_settings, "&#9881;", "Settings")
+
+        self._header_html = f"""
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 4px;">
             <span style="font-size: 13px; font-weight: bold; color: #cccccc; text-transform: uppercase;">Source Control</span>
             <span style="display: flex; align-items: center;">
-                <a href="refresh:" title="Refresh" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8635;</a>
-                <a href="pull:" title="Pull" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8659;</a>
-                <a href="push:" title="Push" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#8657;</a>
-                <a href="settings:" title="Settings" style="text-decoration: none; color: #cccccc; font-size: 16px; margin-left: 10px;">&#9881;</a>
+                <a href="refresh:" title="Refresh" style="text-decoration: none; color: #cccccc; margin-left: 10px;">{refresh_html}</a>
+                <a href="pull:" title="Pull" style="text-decoration: none; color: #cccccc; margin-left: 10px;">{pull_html}</a>
+                <a href="push:" title="Push" style="text-decoration: none; color: #cccccc; margin-left: 10px;">{push_html}</a>
+                <a href="settings:" title="Settings" style="text-decoration: none; color: #cccccc; margin-left: 10px;">{settings_html}</a>
             </span>
         </div>
         """
@@ -206,354 +583,12 @@ class GitManager:
             })
         return items
 
-    def to_view_models(self, history_items):
-        # VS Code colors
-        colors = [
-            '#FFB000', '#DC267F', '#994F00', '#40B0A6', '#B66DFF'
-        ]
-        color_index = -1
-        view_models = []
 
-        for item in history_items:
-            # Previous output becomes current input
-            output_swimlanes_prev = view_models[-1]['outputSwimlanes'] if view_models else []
-            input_swimlanes = [n.copy() for n in output_swimlanes_prev]
-            output_swimlanes = []
 
-            first_parent_added = False
 
-            # Add first parent to output
-            if len(item['parentIds']) > 0:
-                for node in input_swimlanes:
-                    if node['id'] == item['id']:
-                        if not first_parent_added:
-                            output_swimlanes.append({
-                                'id': item['parentIds'][0],
-                                'color': node['color']
-                            })
-                            first_parent_added = True
-                        continue
-                    
-                    output_swimlanes.append(node.copy())
-            else:
-                # No parents (initial commit), pass through others
-                for node in input_swimlanes:
-                    if node['id'] == item['id']:
-                        continue
-                    output_swimlanes.append(node.copy())
-
-            # Add unprocessed parents to output (forks)
-            start_idx = 1 if first_parent_added else 0
-            for i in range(start_idx, len(item['parentIds'])):
-                # Assign new color
-                color_index = (color_index + 1) % len(colors)
-                color_identifier = colors[color_index]
-                
-                output_swimlanes.append({
-                    'id': item['parentIds'][i],
-                    'color': color_identifier
-                })
-            
-            # Determine kind (HEAD logic omitted for simplicity, treating all as nodes)
-            kind = 'node'
-            if any("HEAD" in r for r in item['refs']):
-                kind = 'HEAD'
-
-            view_models.append({
-                'historyItem': item,
-                'kind': kind,
-                'inputSwimlanes': input_swimlanes,
-                'outputSwimlanes': output_swimlanes
-            })
-
-        return view_models
-
-    def create_badge_svg(self, text, bg_color, text_color, icon_char=None):
-        cache_key = (text, bg_color, text_color, icon_char)
-        cached = self._badge_cache.get(cache_key)
-        if cached is not None:
-            return cached
-
-        # Heuristic width calculation
-        # Base padding: 12px (6px each side)
-        # Char width: ~7px avg (Arial 11px)
-        # Icon width: 14px if present
-        
-        text_width = 0
-        for char in text:
-            if char.isupper(): text_width += 8
-            else: text_width += 6.5
-            
-        width = int(text_width + 16)
-        start_x = 8
-        
-        if icon_char:
-            width += 14
-            start_x += 14
-            
-        height = 18
-        radius = 9 # Full pill
-        
-        # Scale for high DPI
-        s = 2.0
-        w_s = width * s
-        h_s = height * s
-        r_s = radius * s
-        font_size_s = 11 * s
-        
-        icon_svg = ""
-        if icon_char:
-            # Simple text-based icon for now, positioned left
-            icon_x = 8 * s
-            icon_y = (height/2 + 4) * s
-            icon_svg = f'<text x="{icon_x}" y="{icon_y}" font-family="Segoe UI Symbol, Arial Unicode MS, sans-serif" font-size="{font_size_s}" fill="{text_color}" text-anchor="middle" font-weight="normal">{icon_char}</text>'
-            
-        text_x = (start_x + text_width/2) * s
-        text_y = (height/2 + 3.5) * s # Vertical center adjustment
-        
-        svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{w_s}" height="{h_s}" viewBox="0 0 {w_s} {h_s}">
-            <rect x="0" y="0" width="{w_s}" height="{h_s}" rx="{r_s}" ry="{r_s}" fill="{bg_color}" />
-            {icon_svg}
-            <text x="{text_x}" y="{text_y}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="{font_size_s}" fill="{text_color}" text-anchor="middle" font-weight="600">{text}</text>
-        </svg>'''
-        
-        b64 = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
-        result = f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" height="{height}" style="vertical-align: middle;" />'
-        self._badge_cache[cache_key] = result
-        return result
-
-    def render_graph_svg(self, view_model):
-        SWIMLANE_WIDTH = 11
-        SWIMLANE_HEIGHT = 22
-        # Use thicker strokes and larger radius to compensate for visual scaling if needed,
-        # but since we are scaling everything up by 2.0 and then down by 2.0 via CSS,
-        # the logical pixel size should remain 1:1.
-        # However, if lines look too thin, we can slightly increase base stroke width.
-        
-        # VS Code uses 1px stroke logically.
-        CIRCLE_RADIUS = 4
-
-        # Scale 2.0 for HiDPI, then scale down with CSS
-        SCALE = 2.0
-        
-        def s(val): return val * SCALE
-
-        history_item = view_model['historyItem']
-        input_swimlanes = view_model['inputSwimlanes']
-        output_swimlanes = view_model['outputSwimlanes']
-
-        # Find input index
-        input_index = -1
-        for i, node in enumerate(input_swimlanes):
-            if node['id'] == history_item['id']:
-                input_index = i
-                break
-        
-        # Circle index
-        circle_index = input_index if input_index != -1 else len(input_swimlanes)
-
-        # Circle color
-        circle_color = '#0098FF' # Default
-        if circle_index < len(output_swimlanes):
-            circle_color = output_swimlanes[circle_index]['color']
-        elif circle_index < len(input_swimlanes):
-            circle_color = input_swimlanes[circle_index]['color']
-
-        # SVG Construction
-        # Calculate width based on max lanes
-        width = (max(len(input_swimlanes), len(output_swimlanes), 1) + 1) * SWIMLANE_WIDTH
-        
-        svg_parts = []
-        svg_parts.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{s(width)}" height="{s(SWIMLANE_HEIGHT)}" viewBox="0 0 {s(width)} {s(SWIMLANE_HEIGHT)}">')
-
-        # Helper for path
-        def create_path(d, color, stroke_width=1):
-            return f'<path d="{d}" stroke="{color}" stroke-width="{s(stroke_width)}" fill="none" stroke-linecap="round" />'
-
-        output_swimlane_index = 0
-        for index in range(len(input_swimlanes)):
-            color = input_swimlanes[index]['color']
-            
-            if input_swimlanes[index]['id'] == history_item['id']:
-                # Current commit
-                if index != circle_index:
-                    # Merge curve (Top -> Mid)
-                    x_start = s(SWIMLANE_WIDTH * (index + 1))
-                    y_start = 0
-                    x_end = s(SWIMLANE_WIDTH * (circle_index + 1))
-                    y_end = s(SWIMLANE_HEIGHT / 2) # 11
-                    
-                    d = f"M {x_start} {y_start} C {x_start} {y_end}, {x_end} {y_start}, {x_end} {y_end}"
-                    svg_parts.append(create_path(d, color))
-                else:
-                    output_swimlane_index += 1
-            else:
-                # Pass through
-                if output_swimlane_index < len(output_swimlanes) and \
-                   input_swimlanes[index]['id'] == output_swimlanes[output_swimlane_index]['id']:
-                    
-                    x_in = s(SWIMLANE_WIDTH * (index + 1))
-                    x_out = s(SWIMLANE_WIDTH * (output_swimlane_index + 1))
-                    
-                    if index == output_swimlane_index:
-                        # Straight line
-                        d = f"M {x_in} 0 V {s(SWIMLANE_HEIGHT)}"
-                        svg_parts.append(create_path(d, color))
-                    else:
-                        # Shift
-                        y_bot = s(SWIMLANE_HEIGHT)
-                        d = f"M {x_in} 0 C {x_in} {s(SWIMLANE_HEIGHT/2)}, {x_out} {s(SWIMLANE_HEIGHT/2)}, {x_out} {y_bot}"
-                        svg_parts.append(create_path(d, color))
-                    
-                    output_swimlane_index += 1
-
-        # Add remaining parents (Forking)
-        # From Mid to Bottom
-        for i in range(1, len(history_item['parentIds'])):
-            p_id = history_item['parentIds'][i]
-            # Find in output
-            parent_out_idx = -1
-            for idx, node in enumerate(output_swimlanes):
-                if node['id'] == p_id:
-                    parent_out_idx = idx
-            
-            if parent_out_idx != -1:
-                # Draw connection from Circle(Mid) to Parent(Bottom)
-                x_start = s(SWIMLANE_WIDTH * (circle_index + 1))
-                y_start = s(SWIMLANE_HEIGHT / 2)
-                x_end = s(SWIMLANE_WIDTH * (parent_out_idx + 1))
-                y_end = s(SWIMLANE_HEIGHT)
-                
-                color = output_swimlanes[parent_out_idx]['color']
-                d = f"M {x_start} {y_start} C {x_start} {y_end}, {x_end} {y_start}, {x_end} {y_end}"
-                svg_parts.append(create_path(d, color))
-
-        # Vertical Stub: Top to Mid (if input exists)
-        if input_index != -1:
-            x = s(SWIMLANE_WIDTH * (circle_index + 1))
-            d = f"M {x} 0 V {s(SWIMLANE_HEIGHT / 2)}"
-            svg_parts.append(create_path(d, input_swimlanes[input_index]['color']))
-
-        # Vertical Stub: Mid to Bottom (if parents exist)
-        if len(history_item['parentIds']) > 0:
-            x = s(SWIMLANE_WIDTH * (circle_index + 1))
-            d = f"M {x} {s(SWIMLANE_HEIGHT / 2)} V {s(SWIMLANE_HEIGHT)}"
-            svg_parts.append(create_path(d, circle_color))
-
-        # Draw Circle
-        cx = s(SWIMLANE_WIDTH * (circle_index + 1))
-        cy = s(SWIMLANE_HEIGHT / 2)
-        
-        if view_model['kind'] == 'HEAD':
-             svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="{s(CIRCLE_RADIUS + 2)}" fill="{circle_color}" />')
-             svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="{s(CIRCLE_RADIUS)} " fill="#fff" />')
-        else:
-             svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="{s(CIRCLE_RADIUS)}" fill="{circle_color}" stroke="#1e1e1e" stroke-width="{s(1)}" />')
-
-        svg_parts.append('</svg>')
-        return "".join(svg_parts), width * SCALE, SWIMLANE_HEIGHT * SCALE
 
     def get_css(self):
-        return """
-        <style>
-            body { 
-                background-color: transparent;
-                color: #cccccc; 
-                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-                font-size: 13px; 
-                margin: 0; 
-                padding: 0; 
-                user-select: none;
-                -webkit-user-select: none;
-                cursor: default;
-                height: 100%;
-                overflow: hidden;
-            }
-            img {
-                -webkit-user-drag: none;
-            }
-            table { 
-                border-collapse: collapse; 
-                border-spacing: 0;
-                width: 100%;
-                table-layout: fixed;
-            }
-            tr { 
-                height: 22px;
-                background-color: transparent;
-            }
-            
-            td.cell { 
-                padding: 0; 
-                vertical-align: top;
-                white-space: nowrap;
-                height: 22px;
-                overflow: hidden;
-            }
-            
-            a.row-link { 
-                text-decoration: none; 
-                color: inherit; 
-                display: block; 
-                height: 100%; 
-                width: 100%;
-                line-height: 22px;
-            }
-            
-            img.graph-img {
-                vertical-align: middle;
-                margin-right: 0px;
-                display: inline-block;
-            }
-            
-            span.text-content {
-                display: inline-flex;
-                align-items: center;
-                vertical-align: middle;
-                height: 100%;
-            }
-            
-            .hash { color: #569cd6; font-family: Consolas, monospace; margin-right: 8px; flex-shrink: 0; }
-            .msg { color: #cccccc; font-weight: 600; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px; }
-            .meta { color: #858585; font-size: 11px; flex-shrink: 0; white-space: nowrap; }
-            
-            .refs-container {
-                display: inline-flex;
-                align-items: center;
-                margin-right: 8px;
-                flex-shrink: 0;
-            }
-            .view-container {
-                display: flex;
-                flex-direction: column;
-                height: 100%;
-                overflow: hidden;
-            }
-            .scroll-list {
-                flex-grow: 1;
-                overflow-y: auto;
-                padding: 4px 0;
-            }
-            
-            /* Scrollbar styling */
-            ::-webkit-scrollbar {
-                width: 10px;
-                height: 10px;
-            }
-            ::-webkit-scrollbar-track {
-                background: transparent;
-            }
-            ::-webkit-scrollbar-thumb {
-                background: #424242;
-            }
-            ::-webkit-scrollbar-thumb:hover {
-                background: #4f4f4f;
-            }
-            ::-webkit-scrollbar-corner {
-                background: transparent;
-            }
-        </style>
-        """
+        return CSS_STYLES
 
     def wrap_html(self, content):
         return f"{self._html_prefix}{content}{self._html_suffix}"
@@ -566,7 +601,7 @@ class GitManager:
         table_rows = []
         for vm in view_models:
             item = vm['historyItem']
-            svg_xml, svg_w, svg_h = self.render_graph_svg(vm)
+            svg_xml, svg_w, svg_h = GraphRenderer.render_svg(vm)
             svg_b64 = base64.b64encode(svg_xml.encode('utf-8')).decode('utf-8')
             
             # Refs
@@ -598,7 +633,7 @@ class GitManager:
                     icon_char = "&#9673;" # Fisheye / Bullseye-like circle
 
                 # Generate SVG badge
-                badge_img = self.create_badge_svg(ref, bg_color, text_color, icon_char)
+                badge_img = self.badge_generator.create_svg(ref, bg_color, text_color, icon_char)
                 refs_html += f'{badge_img}&nbsp;'
             
             refs_span = ""
@@ -633,70 +668,109 @@ class GitManager:
             </div>
         """)
 
+    def get_gh_executable(self):
+        # Try to find gh in PATH first
+        path = shutil.which("gh")
+        if path:
+            return path
+        
+        # Fallback for Windows common paths
+        if os.name == 'nt':
+            candidates = [
+                os.path.expandvars(r"%ProgramFiles%\GitHub CLI\gh.exe"),
+                os.path.expandvars(r"%ProgramFiles(x86)%\GitHub CLI\gh.exe"),
+                os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Links\gh.exe"),
+                os.path.expandvars(r"%USERPROFILE%\scoop\shims\gh.exe"),
+                os.path.expandvars(r"%ChocolateyInstall%\bin\gh.exe"),
+            ]
+            for c in candidates:
+                if os.path.exists(c):
+                    return c
+        return "gh"
+
     def _build_ui(self):
         if self._ui_built:
-            if self._error_message:
-                self.panel.set_label_text("status_msg", f"<font color='red'><b>{html.escape(self._error_message)}</b></font>")
-            elif self._is_running_task:
-                 pass # status_msg managed by task handler
-            else:
-                 self.panel.set_label_text("status_msg", "")
+            self._update_status_message()
             return
 
         self.panel.clear()
 
-        # Settings View
         if self._showing_settings:
-            settings_col = self.panel.add_column("settings_col")
-            settings_col.add_html_view("header_view", self.wrap_html(self._header_html), 34, self.on_header_link_clicked)
-            
-            settings_col.add_label_named("status_msg", "")
-            if self._error_message:
-                self.panel.set_label_text("status_msg", f"<font color='red'><b>Error:</b> {html.escape(self._error_message)}</font>")
+            self._build_settings_ui()
+        else:
+            self._build_main_ui()
 
-            # --- System Status ---
-            settings_col.add_label("<b>System Status</b>")
-            
-            # Git User
-            git_user = self.get_git_config("user.name") or "<not set>"
-            git_email = self.get_git_config("user.email") or "<not set>"
-            settings_col.add_label(f"Git User: {git_user} &lt;{git_email}&gt;")
-            
-            # GitHub CLI Status
-            gh_status = "Not installed"
-            gh_user = ""
-            try:
-                res = subprocess.run(["gh", "--version"], capture_output=True, startupinfo=self.get_startupinfo())
-                if res.returncode == 0:
-                    gh_status = "Installed"
-                    # Check auth status
-                    auth_res = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, startupinfo=self.get_startupinfo(), encoding='utf-8', errors='replace')
-                    if "Logged in to" in auth_res.stdout or "Logged in to" in auth_res.stderr:
-                        gh_status = "Logged in"
-                        # Try to extract user? output is messy.
-                    else:
-                        gh_status = "Not logged in (Run 'gh auth login' in terminal)"
-            except:
-                pass
-            settings_col.add_label(f"GitHub CLI: {gh_status}")
-            if "Not logged" in gh_status:
-                 settings_col.add_label("<i>VS Code handles auth automatically, but here you must login via system terminal.</i>")
+        self._ui_built = True
 
-            settings_col.add_label("<b>Remote Configuration</b>")
-            settings_col.add_text_field("remote_url", "Remote URL", self._remote_url, "https://github.com/user/repo.git")
-            settings_col.add_button_callback("Update Remote", self.on_update_remote)
-            
-            if "Installed" in gh_status or "Logged in" in gh_status:
-                settings_col.add_label("<b>GitHub / Forge Integration</b>")
-                settings_col.add_combo_box("github_visibility", "Visibility", ["Public", "Private"], self._on_visibility_changed, self._github_visibility)
-                settings_col.add_button_callback("Create & Push to GitHub", self.on_publish_github)
-            else:
-                settings_col.add_label("<i>Install GitHub CLI (gh) to enable auto-creation.</i>")
-                
-            self.panel.set_widget_visible("settings_col", True)
-            self._ui_built = True
-            return
+    def _update_status_message(self):
+        if self._error_message:
+            self.panel.set_label_text("status_msg", f"<font color='red'><b>{html.escape(self._error_message)}</b></font>")
+        elif self._is_running_task:
+             pass # status_msg managed by task handler
+        else:
+             self.panel.set_label_text("status_msg", "")
 
+    def _build_settings_ui(self):
+        settings_col = self.panel.add_column("settings_col")
+        settings_col.add_html_view("header_view", self.wrap_html(self._header_html), 34, self.on_header_link_clicked)
+        
+        settings_col.add_label_named("status_msg", "")
+        if self._error_message:
+            self.panel.set_label_text("status_msg", f"<font color='red'><b>Error:</b> {html.escape(self._error_message)}</font>")
+
+        # --- System Status ---
+        settings_col.add_label("<b>System Status</b>")
+        
+        # Git User
+        git_user = self.get_git_config("user.name") or "<not set>"
+        git_email = self.get_git_config("user.email") or "<not set>"
+        settings_col.add_label(f"Git User: {git_user} &lt;{git_email}&gt;")
+        
+        # GitHub CLI Status
+        gh_status = "Not installed"
+        gh_user = ""
+        gh_exe = self.get_gh_executable()
+        
+        try:
+            res = subprocess.run([gh_exe, "--version"], capture_output=True, startupinfo=self.get_startupinfo())
+            if res.returncode == 0:
+                gh_status = "Installed"
+                # Check auth status
+                auth_res = subprocess.run([gh_exe, "auth", "status"], capture_output=True, text=True, startupinfo=self.get_startupinfo(), encoding='utf-8', errors='replace')
+                if "Logged in to" in auth_res.stdout or "Logged in to" in auth_res.stderr:
+                    gh_status = "Logged in"
+                else:
+                    gh_status = "Not logged in (Run 'gh auth login' in terminal)"
+        except Exception as e:
+            print(f"Failed to check gh status: {e}")
+            
+        settings_col.add_label(f"GitHub CLI: {gh_status}")
+        if gh_status == "Installed":
+             pass
+        elif gh_status == "Logged in":
+             pass
+        else:
+             settings_col.add_label("<i>(Make sure 'gh' is in PATH or install GitHub CLI)</i>")
+             if gh_exe != "gh":
+                 settings_col.add_label(f"<small>Found at: {gh_exe}</small>")
+        
+        if "Not logged" in gh_status:
+            settings_col.add_label("<i>VS Code handles auth automatically, but here you must login via system terminal.</i>")
+        
+        settings_col.add_label("<b>Remote Configuration</b>")
+        settings_col.add_text_field("remote_url", "Remote URL", self._remote_url, "https://github.com/user/repo.git")
+        settings_col.add_button_callback("Update Remote", self.on_update_remote)
+        
+        if "Installed" in gh_status or "Logged in" in gh_status:
+            settings_col.add_label("<b>GitHub / Forge Integration</b>")
+            settings_col.add_combo_box("github_visibility", "Visibility", ["Public", "Private"], self._on_visibility_changed, self._github_visibility)
+            settings_col.add_button_callback("Create & Push to GitHub", self.on_publish_github)
+        else:
+            settings_col.add_label("<i>Install GitHub CLI (gh) to enable auto-creation.</i>")
+            
+        self.panel.set_widget_visible("settings_col", True)
+
+    def _build_main_ui(self):
         state_no_doc = self.panel.add_column("state_no_doc")
         state_no_doc.add_label_named("no_doc_msg", "<i>Please save the map to enable Git features.</i>")
         state_no_doc.add_button_callback("Refresh", self.refresh)
@@ -747,8 +821,6 @@ class GitManager:
         self.panel.set_widget_visible("state_repo", False)
         self.panel.set_widget_visible("repo_dubious", False)
         self.panel.set_widget_visible("repo_main", True)
-
-        self._ui_built = True
 
     def _merge_selected_branch(self):
         item = self._get_selected_branch()
@@ -927,7 +999,7 @@ class GitManager:
                 if history_key == self._history_cache_key and self._history_cache_html is not None:
                     history_html = self._history_cache_html
                 else:
-                    view_models = self.to_view_models(history_items)
+                    view_models = GraphRenderer.build_view_models(history_items)
                     history_html = self.generate_history_html(view_models)
                     self._history_cache_key = history_key
                     self._history_cache_html = history_html
@@ -1254,9 +1326,9 @@ class GitManager:
 
 # Start
 manager = GitManager()
-try:
-    tb.register_callback("document_saved", manager.on_document_saved)
-except ValueError:
-    print("Warning: 'document_saved' event not supported. Please recompile TrenchBroom to enable auto-refresh on save.")
-except AttributeError:
-    pass
+# try:
+#     tb.register_callback("document_saved", manager.on_document_saved)
+# except ValueError:
+#     print("Warning: 'document_saved' event not supported. Please recompile TrenchBroom to enable auto-refresh on save.")
+# except AttributeError:
+#     pass

@@ -119,7 +119,7 @@ bool g_pythonRegistered = false;
 class PythonTimer : public QObject
 {
 public:
-  PythonTimer(int id, int interval, PyObject* callback) : m_id(id), m_callback(callback)
+  PythonTimer(int interval, PyObject* callback) : m_callback(callback)
   {
     Py_INCREF(m_callback);
     m_timer = new QTimer(this);
@@ -164,7 +164,6 @@ private:
     PyGILState_Release(gil);
   }
 
-  int m_id;
   PyObject* m_callback;
   QTimer* m_timer;
 };
@@ -194,7 +193,7 @@ static PyObject* script_set_interval(PyObject* self, PyObject* args)
   // or use a static QObject if needed. Here we manage manually in g_timers map.
   
   int id = g_nextTimerId++;
-  auto* timer = new PythonTimer(id, interval, callback);
+  auto* timer = new PythonTimer(interval, callback);
   g_timers[id] = timer;
   
   return PyLong_FromLong(id);
