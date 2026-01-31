@@ -13,11 +13,15 @@
 #include <QVBoxLayout>
 #include <QListWidget>
 #include <QWidgetAction>
+#include <QLineEdit>
+#include <QFileDialog>
+#include <QHBoxLayout>
 
 #include <functional>
 
 #include "PreferenceManager.h"
 #include "Preferences.h"
+#include "io/PathQt.h"
 #include "ui/Actions.h"
 #include "ui/QtUtils.h"
 
@@ -65,6 +69,53 @@ void MiscPreferencePane::createGui()
 
   auto* languageGroupBox = new QGroupBox(tr("Language"));
   languageGroupBox->setLayout(languageLayout);
+
+  m_pluginList = new QListWidget();
+  m_pluginList->setSelectionMode(QAbstractItemView::ExtendedSelection);
+  m_pluginList->setMinimumHeight(100);
+
+  m_addPluginBtn = new QPushButton(tr("Add..."));
+  m_removePluginBtn = new QPushButton(tr("Remove"));
+  m_clearPluginsBtn = new QPushButton(tr("Clear"));
+
+  connect(m_addPluginBtn, &QPushButton::clicked, this, [this]() {
+      const auto pathStr = QFileDialog::getOpenFileName(
+          this,
+          tr("Select Default Plugin"),
+          fileDialogDefaultDirectory(FileDialogDir::Map),
+          tr("Python Scripts (*.py);;All Files (*)"));
+          
+      if (!pathStr.isEmpty()) {
+          updateFileDialogDefaultDirectoryWithFilename(FileDialogDir::Map, pathStr);
+          addPluginPath(pathStr);
+      }
+  });
+
+  connect(m_removePluginBtn, &QPushButton::clicked, this, [this]() {
+      auto items = m_pluginList->selectedItems();
+      for (auto* item : items) {
+          delete m_pluginList->takeItem(m_pluginList->row(item));
+      }
+      savePluginPaths();
+  });
+
+  connect(m_clearPluginsBtn, &QPushButton::clicked, this, [this]() {
+      m_pluginList->clear();
+      savePluginPaths();
+  });
+
+  auto* pluginBtnLayout = new QVBoxLayout();
+  pluginBtnLayout->addWidget(m_addPluginBtn);
+  pluginBtnLayout->addWidget(m_removePluginBtn);
+  pluginBtnLayout->addWidget(m_clearPluginsBtn);
+  pluginBtnLayout->addStretch();
+
+  auto* pluginListLayout = new QHBoxLayout();
+  pluginListLayout->addWidget(m_pluginList);
+  pluginListLayout->addLayout(pluginBtnLayout);
+
+  auto* pluginGroupBox = new QGroupBox(tr("Default Plugins"));
+  pluginGroupBox->setLayout(pluginListLayout);
 
   m_prefixWorldspawnOnCopyCheckBox =
     new QCheckBox(tr("Prefix worldspawn header on copy"));
@@ -209,6 +260,7 @@ void MiscPreferencePane::createGui()
 
   auto* miscLayout = new QVBoxLayout();
   miscLayout->setContentsMargins(0, 0, 0, 0);
+  miscLayout->addWidget(pluginGroupBox);
   miscLayout->addWidget(m_prefixWorldspawnOnCopyCheckBox);
   miscLayout->addLayout(mainPieLayout);
 
@@ -249,6 +301,22 @@ void MiscPreferencePane::savePieMenuActions()
     prefs.set(Preferences::PieMenuAction, paths.join('|'));
 }
 
+void MiscPreferencePane::savePluginPaths()
+{
+    QStringList paths;
+    for (int i = 0; i < m_pluginList->count(); ++i) {
+        paths << m_pluginList->item(i)->text();
+    }
+    auto& prefs = PreferenceManager::instance();
+    prefs.set(Preferences::DefaultPluginPaths, paths.join('|'));
+}
+
+void MiscPreferencePane::addPluginPath(const QString& path)
+{
+    new QListWidgetItem(path, m_pluginList);
+    savePluginPaths();
+}
+
 bool MiscPreferencePane::canResetToDefaults()
 {
   return true;
@@ -258,6 +326,7 @@ void MiscPreferencePane::doResetToDefaults()
 {
   auto& prefs = PreferenceManager::instance();
   prefs.resetToDefault(Preferences::Language);
+  prefs.resetToDefault(Preferences::DefaultPluginPaths);
   prefs.resetToDefault(Preferences::PrefixWorldspawnHeaderOnCopy);
   prefs.resetToDefault(Preferences::PieMenuAction);
 
@@ -276,6 +345,13 @@ void MiscPreferencePane::updateControls()
   else
   {
     m_chineseRadioButton->setChecked(true);
+  }
+
+  m_pluginList->clear();
+  QString currentPaths = pref(Preferences::DefaultPluginPaths);
+  QStringList pathsList = currentPaths.split('|', Qt::SkipEmptyParts);
+  for (const auto& path : pathsList) {
+      new QListWidgetItem(path, m_pluginList);
   }
 
   m_prefixWorldspawnOnCopyCheckBox->setChecked(

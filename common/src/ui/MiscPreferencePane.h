@@ -8,6 +8,7 @@ class QCheckBox;
 class QPushButton;
 class QMenu;
 class QListWidget;
+class QLineEdit;
 
 namespace tb::ui
 {
@@ -19,6 +20,10 @@ private:
   QRadioButton* m_englishRadioButton;
   QRadioButton* m_chineseRadioButton;
   QButtonGroup* m_languageButtonGroup;
+  QListWidget* m_pluginList = nullptr;
+  QPushButton* m_addPluginBtn = nullptr;
+  QPushButton* m_removePluginBtn = nullptr;
+  QPushButton* m_clearPluginsBtn = nullptr;
   QCheckBox* m_prefixWorldspawnOnCopyCheckBox = nullptr;
   QListWidget* m_pieMenuActionList = nullptr;
   QPushButton* m_addActionBtn = nullptr;
@@ -41,6 +46,8 @@ private:
   bool validate() override;
   void savePieMenuActions();
   void addPieMenuAction(const QString& label, const QString& path);
+  void savePluginPaths();
+  void addPluginPath(const QString& path);
 };
 
 } // namespace tb::ui

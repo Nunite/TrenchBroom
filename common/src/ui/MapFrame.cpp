@@ -174,6 +174,19 @@ MapFrame::MapFrame(FrameManager& frameManager, std::unique_ptr<MapDocument> docu
   restoreWindowState(this);
 
   setAcceptDrops(true);
+
+  const auto defaultPluginPaths = PreferenceManager::instance().get(Preferences::DefaultPluginPaths);
+  if (!defaultPluginPaths.isEmpty()) {
+      QStringList paths = defaultPluginPaths.split('|', Qt::SkipEmptyParts);
+      QTimer::singleShot(0, this, [this, paths]() {
+          for (const auto& pathStr : paths) {
+              auto path = io::pathFromQString(pathStr);
+              if (std::filesystem::exists(path)) {
+                 PythonScripting::instance().runScript(*this, path);
+              }
+          }
+      });
+  }
 }
 
 MapFrame::~MapFrame()

@@ -198,6 +198,9 @@ Preference<float> GridAlpha("render/Grid/Alpha", 0.5f);
 Preference<Color> GridColor2D("render/Grid/Color2D", RgbaF(0.8f, 0.8f, 0.8f, 0.8f));
 
 Preference<int> TextureMinFilter("render/Texture mode min filter", 0x2700);
+
+Preference<QString> DefaultPluginPaths("App/DefaultPluginPaths", "");
+
 Preference<int> TextureMagFilter("render/Texture mode mag filter", 0x2600);
 Preference<bool> EnableMSAA("render/Enable multisampling", true);
 

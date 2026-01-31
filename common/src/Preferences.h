@@ -198,6 +198,9 @@ extern Preference<bool> ShowEdges;
 
 extern Preference<bool> ShowSoftMapBounds;
 
+extern Preference<QString> DefaultPluginPaths;
+
+
 extern Preference<QString> PieMenuAction;
 
 // Editor context
