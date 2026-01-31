@@ -254,14 +254,16 @@ static PyObject* plugin_panel_set_label_text(PyObject* self, PyObject* args)
   Py_RETURN_TRUE;
 }
 
-static PyObject* plugin_panel_add_int_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_int_field(PyObject* self, PyObject* args, PyObject* kwds)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
   int value = 0;
   int minValue = 0;
   int maxValue = 999999;
-  if (!PyArg_ParseTuple(args, "ssi|ii", &key, &labelText, &value, &minValue, &maxValue))
+  static char* kwlist[] = { (char*)"key", (char*)"label", (char*)"value", (char*)"min_value", (char*)"max_value", nullptr };
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "ssi|ii", kwlist, &key, &labelText, &value, &minValue, &maxValue))
   {
     return nullptr;
   }
@@ -294,7 +296,7 @@ static PyObject* plugin_panel_add_int_field(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-static PyObject* plugin_panel_add_float_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_float_field(PyObject* self, PyObject* args, PyObject* kwds)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
@@ -303,7 +305,9 @@ static PyObject* plugin_panel_add_float_field(PyObject* self, PyObject* args)
   double maxValue = 1.0e9;
   int decimals = 3;
   double step = 1.0;
-  if (!PyArg_ParseTuple(args, "ssd|ddid", &key, &labelText, &value, &minValue, &maxValue, &decimals, &step))
+  static char* kwlist[] = { (char*)"key", (char*)"label", (char*)"value", (char*)"min_value", (char*)"max_value", (char*)"decimals", (char*)"step", nullptr };
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "ssd|ddid", kwlist, &key, &labelText, &value, &minValue, &maxValue, &decimals, &step))
   {
     return nullptr;
   }
@@ -384,13 +388,15 @@ static PyObject* plugin_panel_get_float_field(PyObject* self, PyObject* args)
   return PyFloat_FromDouble(spin->value());
 }
 
-static PyObject* plugin_panel_add_text_field(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_text_field(PyObject* self, PyObject* args, PyObject* kwds)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
   const char* value = nullptr;
   const char* placeholder = nullptr;
-  if (!PyArg_ParseTuple(args, "ss|ss", &key, &labelText, &value, &placeholder))
+  static char* kwlist[] = { (char*)"key", (char*)"label", (char*)"value", (char*)"placeholder", nullptr };
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "ss|ss", kwlist, &key, &labelText, &value, &placeholder))
   {
     return nullptr;
   }
@@ -883,15 +889,17 @@ static PyObject* plugin_panel_add_column(PyObject* self, PyObject* args)
   return createPluginPanelObject(col);
 }
 
-static PyObject* plugin_panel_add_text_area(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_text_area(PyObject* self, PyObject* args, PyObject* kwds)
 {
   const char* key = nullptr;
   const char* labelText = nullptr;
   const char* value = nullptr;
   int height = 120;
   const char* placeholder = nullptr;
+  
+  static char* kwlist[] = { (char*)"key", (char*)"label", (char*)"value", (char*)"height", (char*)"placeholder", nullptr };
 
-  if (!PyArg_ParseTuple(args, "ss|ziz", &key, &labelText, &value, &height, &placeholder))
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "ss|ziz", kwlist, &key, &labelText, &value, &height, &placeholder))
   {
     return nullptr;
   }
@@ -1158,15 +1166,17 @@ static PyObject* plugin_panel_set_table_widget_rows(PyObject* self, PyObject* ar
   Py_RETURN_NONE;
 }
 
-static PyObject* plugin_panel_add_tree_widget(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_tree_widget(PyObject* self, PyObject* args, PyObject* kwds)
 {
   const char* key = nullptr;
   PyObject* headers = nullptr;
   PyObject* items = nullptr;
   int height = 200;
   PyObject* callbackObj = nullptr;
+  
+  static char* kwlist[] = { (char*)"key", (char*)"headers", (char*)"items", (char*)"height", (char*)"callback", nullptr };
 
-  if (!PyArg_ParseTuple(args, "sOO|iO", &key, &headers, &items, &height, &callbackObj))
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "sOO|iO", kwlist, &key, &headers, &items, &height, &callbackObj))
   {
     return nullptr;
   }
@@ -1278,6 +1288,109 @@ static PyObject* plugin_panel_add_tree_widget(PyObject* self, PyObject* args)
   }
 
   layout->addWidget(tree);
+  Py_RETURN_NONE;
+}
+
+static PyObject* plugin_panel_add_tree_node(PyObject* self, PyObject* args, PyObject* kwds)
+{
+  const char* key = nullptr;
+  const char* parent_id = nullptr; // Can be None/Null for root
+  const char* node_id = nullptr;
+  const char* text = nullptr;
+  const char* icon = nullptr;
+  int checkable = 0;
+  int checked = 0;
+  int expanded = 0;
+
+  static char* kwlist[] = { 
+    (char*)"key", (char*)"node_id", (char*)"text", 
+    (char*)"parent_id", (char*)"icon", (char*)"checkable", (char*)"checked", (char*)"expanded",
+    nullptr 
+  };
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "sss|ssiii", kwlist, 
+      &key, &node_id, &text, &parent_id, &icon, &checkable, &checked, &expanded))
+  {
+    return nullptr;
+  }
+
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr) return nullptr;
+  auto* container = panel->container->data();
+  auto* tree = plugin_panel_find_widget<QTreeWidget>(container, QStringLiteral("tree"), key);
+  
+  if (tree == nullptr)
+  {
+    PyErr_SetString(PyExc_KeyError, "No such tree widget");
+    return nullptr;
+  }
+
+  // Find parent item
+  QTreeWidgetItem* parentItem = nullptr;
+  if (parent_id != nullptr && *parent_id != '\0')
+  {
+    auto items = tree->findItems(QString::fromUtf8(parent_id), Qt::MatchRecursive | Qt::MatchExactly, 0); // Assuming col 0 holds ID for internal lookup, or we use data
+    // Actually, storing ID in data(0, Qt::UserRole) is better.
+    // But for simplicity, let's scan.
+    QTreeWidgetItemIterator it(tree);
+    while (*it) {
+        if ((*it)->data(0, Qt::UserRole).toString() == QString::fromUtf8(parent_id)) {
+            parentItem = *it;
+            break;
+        }
+        ++it;
+    }
+    if (!parentItem) {
+        // Parent not found, maybe warn? or add to root?
+        // Let's add to root but log warning?
+    }
+  }
+
+  auto* item = new QTreeWidgetItem(parentItem ? parentItem : tree->invisibleRootItem());
+  item->setText(0, QString::fromUtf8(text));
+  item->setData(0, Qt::UserRole, QString::fromUtf8(node_id)); // Store ID
+  
+  if (icon && *icon) {
+      // Simple icon lookup: standard icons or file paths
+      // For now support standard style icons
+      if (QString::fromUtf8(icon) == "folder") {
+          item->setIcon(0, tree->style()->standardIcon(QStyle::SP_DirIcon));
+      } else if (QString::fromUtf8(icon) == "file") {
+          item->setIcon(0, tree->style()->standardIcon(QStyle::SP_FileIcon));
+      } else if (QString::fromUtf8(icon) == "add") {
+          item->setIcon(0, tree->style()->standardIcon(QStyle::SP_DialogApplyButton)); // Tick/Plus like
+      } else if (QString::fromUtf8(icon) == "delete") {
+          item->setIcon(0, tree->style()->standardIcon(QStyle::SP_DialogCancelButton)); // Cross
+      } else if (QString::fromUtf8(icon) == "modified") {
+           item->setIcon(0, tree->style()->standardIcon(QStyle::SP_DriveNetIcon)); // Placeholder
+      }
+      // TODO: Support loading from file path if needed
+  }
+
+  if (checkable) {
+      item->setCheckState(0, checked ? Qt::Checked : Qt::Unchecked);
+  }
+  
+  if (expanded) {
+      item->setExpanded(true);
+  }
+
+  Py_RETURN_NONE;
+}
+
+static PyObject* plugin_panel_clear_tree_items(PyObject* self, PyObject* args)
+{
+  const char* key = nullptr;
+  if (!PyArg_ParseTuple(args, "s", &key)) return nullptr;
+  
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr) return nullptr;
+  auto* container = panel->container->data();
+  auto* tree = plugin_panel_find_widget<QTreeWidget>(container, QStringLiteral("tree"), key);
+  
+  if (tree) {
+      tree->clear();
+  }
   Py_RETURN_NONE;
 }
 
@@ -1911,14 +2024,15 @@ static PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-static PyObject* plugin_panel_add_html_view(PyObject* self, PyObject* args)
+static PyObject* plugin_panel_add_html_view(PyObject* self, PyObject* args, PyObject* kwds)
 {
   const char* key = nullptr;
   const char* html = nullptr;
   int height = 200;
   PyObject* callback = nullptr;
+  static char* kwlist[] = { (char*)"key", (char*)"html", (char*)"height", (char*)"callback", nullptr };
 
-  if (!PyArg_ParseTuple(args, "ss|iO", &key, &html, &height, &callback))
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "ss|iO", kwlist, &key, &html, &height, &callback))
   {
     return nullptr;
   }
@@ -2121,6 +2235,22 @@ static PyObject* plugin_panel_get_color_field(PyObject* self, PyObject* args)
   return tuple;
 }
 
+static PyObject* plugin_panel_get_widget_handle(PyObject* self, PyObject*)
+{
+  auto* panel = getPluginPanelFromPy(self);
+  if (panel == nullptr)
+  {
+    return nullptr;
+  }
+  auto* container = panel->container->data();
+  if (container == nullptr)
+  {
+    PyErr_SetString(PyExc_RuntimeError, "Plugin panel container is gone");
+    return nullptr;
+  }
+  return PyLong_FromVoidPtr(container);
+}
+
 bool initPluginPanelType(PyObject* module)
 {
   if (g_pluginPanelType == nullptr)
@@ -2133,9 +2263,9 @@ bool initPluginPanelType(PyObject* module)
       {"add_label", plugin_panel_add_label, METH_VARARGS, nullptr},
       {"add_label_named", plugin_panel_add_label_named, METH_VARARGS, nullptr},
       {"set_label_text", plugin_panel_set_label_text, METH_VARARGS, nullptr},
-      {"add_int_field", plugin_panel_add_int_field, METH_VARARGS, nullptr},
-      {"add_float_field", plugin_panel_add_float_field, METH_VARARGS, nullptr},
-      {"add_text_field", plugin_panel_add_text_field, METH_VARARGS, nullptr},
+      {"add_int_field", (PyCFunction)plugin_panel_add_int_field, METH_VARARGS | METH_KEYWORDS, nullptr},
+      {"add_float_field", (PyCFunction)plugin_panel_add_float_field, METH_VARARGS | METH_KEYWORDS, nullptr},
+      {"add_text_field", (PyCFunction)plugin_panel_add_text_field, METH_VARARGS | METH_KEYWORDS, nullptr},
       {"set_int_field", plugin_panel_set_int_field, METH_VARARGS, nullptr},
       {"set_float_field", plugin_panel_set_float_field, METH_VARARGS, nullptr},
       {"set_text_field", plugin_panel_set_text_field, METH_VARARGS, nullptr},
@@ -2157,18 +2287,21 @@ bool initPluginPanelType(PyObject* module)
       {"set_text", plugin_panel_set_text, METH_VARARGS, nullptr},
       {"set_html", plugin_panel_set_html, METH_VARARGS, nullptr},
       {"add_button", plugin_panel_add_button, METH_VARARGS, nullptr},
-      {"add_html_view", plugin_panel_add_html_view, METH_VARARGS, nullptr},
+      {"add_html_view", (PyCFunction)plugin_panel_add_html_view, METH_VARARGS | METH_KEYWORDS, nullptr},
       {"set_html_view", plugin_panel_set_html_view, METH_VARARGS, nullptr},
       {"add_group", plugin_panel_add_group, METH_VARARGS, nullptr},
       {"add_row", plugin_panel_add_row, METH_VARARGS, nullptr},
       {"add_column", plugin_panel_add_column, METH_VARARGS, nullptr},
-      {"add_text_area", plugin_panel_add_text_area, METH_VARARGS, nullptr},
+      {"add_text_area", (PyCFunction)plugin_panel_add_text_area, METH_VARARGS | METH_KEYWORDS, nullptr},
       {"get_text_area", plugin_panel_get_text_area, METH_VARARGS, nullptr},
       {"set_text_area", plugin_panel_set_text_area, METH_VARARGS, nullptr},
       {"add_table_widget", plugin_panel_add_table_widget, METH_VARARGS, nullptr},
       {"set_table_widget_rows", plugin_panel_set_table_widget_rows, METH_VARARGS, nullptr},
-      {"add_tree_widget", plugin_panel_add_tree_widget, METH_VARARGS, nullptr},
+      {"add_tree_widget", (PyCFunction)plugin_panel_add_tree_widget, METH_VARARGS | METH_KEYWORDS, nullptr},
+      {"add_tree_node", (PyCFunction)plugin_panel_add_tree_node, METH_VARARGS | METH_KEYWORDS, nullptr},
+      {"clear_tree_items", plugin_panel_clear_tree_items, METH_VARARGS, nullptr},
       {"set_tree_widget_items", plugin_panel_set_tree_widget_items, METH_VARARGS, nullptr},
+      {"get_widget_handle", plugin_panel_get_widget_handle, METH_NOARGS, nullptr},
       {"add_button_callback",
            [](PyObject* self, PyObject* args) -> PyObject* {
              const char* text = nullptr;

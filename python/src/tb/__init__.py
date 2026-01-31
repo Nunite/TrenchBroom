@@ -176,7 +176,7 @@ class PluginPanel(Protocol):
         """更新由 add_label_named 创建的标签文本；找不到 key 则返回 False。"""
         ...
 
-    def add_int_field(self, key: str, label: str, value: int, min: int = 0, max: int = 999999) -> None:
+    def add_int_field(self, key: str, label: str, value: int, min_value: int = 0, max_value: int = 999999) -> None:
         """添加一个整数字段（QSpinBox），可用 get_int_field 读取当前值。"""
         ...
 
@@ -185,8 +185,8 @@ class PluginPanel(Protocol):
         key: str,
         label: str,
         value: float,
-        min: float = -1e9,
-        max: float = 1e9,
+        min_value: float = -1e9,
+        max_value: float = 1e9,
         decimals: int = 3,
         step: float = 1.0,
     ) -> None:
@@ -373,8 +373,55 @@ class PluginPanel(Protocol):
         """添加一个树控件（QTreeWidget）的扁平列表视图，callback 接收 (row)。"""
         ...
 
+    def add_tree_node(
+        self,
+        key: str,
+        node_id: str,
+        text: str,
+        parent_id: str | None = None,
+        icon: str | None = None,
+        checkable: bool = False,
+        checked: bool = False,
+        expanded: bool = False,
+    ) -> None:
+        """
+        向 TreeWidget 添加一个节点。
+        
+        - key: TreeWidget 的标识符
+        - node_id: 节点的唯一 ID（用于作为 parent_id 引用）
+        - text: 显示文本
+        - parent_id: 父节点 ID，为 None 则添加到根
+        - icon: 图标名称 ("folder", "file", "add", "delete", "modified")
+        - checkable: 是否显示复选框
+        - checked: 是否选中
+        - expanded: 是否展开
+        """
+        ...
+
+    def clear_tree_items(self, key: str) -> None:
+        """清空 TreeWidget 的所有节点。"""
+        ...
+
     def set_tree_widget_items(self, key: str, items: list[list[str]]) -> None:
         """替换树控件的全部 items。"""
+        ...
+
+    def get_widget_handle(self) -> int:
+        """
+        获取面板容器的底层 QWidget 指针地址 (int)。
+        
+        可用于配合 PySide6/shiboken6 将其包装为 QWidget 对象，
+        从而在 Python 端直接使用 PySide6 进行复杂的 UI 构建。
+        
+        示例:
+            import shiboken6
+            from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton
+            
+            handle = panel.get_widget_handle()
+            parent = shiboken6.wrapInstance(handle, QWidget)
+            layout = QVBoxLayout(parent)
+            layout.addWidget(QPushButton("Hello from PySide6"))
+        """
         ...
 
 
