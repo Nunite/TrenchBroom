@@ -268,6 +268,7 @@ public:
   void selectByLineNumber();
   void selectInverse();
   void selectNone();
+  void selectBrushesWithSelectedMaterial();
 
   bool canSelect() const;
   bool canSelectSiblings() const;
@@ -276,6 +277,7 @@ public:
   bool canDeselect() const;
   bool canChangeSelection() const;
   bool canSelectInverse() const;
+  bool canSelectBrushesWithSelectedMaterial() const;
 
   void groupSelectedObjects();
   bool canGroupSelectedObjects() const;

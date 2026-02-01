@@ -1696,6 +1696,17 @@ void MapFrame::selectNone()
   }
 }
 
+void MapFrame::selectBrushesWithSelectedMaterial()
+{
+  if (canSelectBrushesWithSelectedMaterial())
+  {
+    auto& map = m_document->map();
+    const auto materialName =
+      map.selection().brushFaces.front().face().attributes().materialName();
+    mdl::selectBrushesWithMaterial(map, materialName);
+  }
+}
+
 bool MapFrame::canSelect() const
 {
   return canChangeSelection();
@@ -1736,6 +1747,32 @@ bool MapFrame::canSelectInverse() const
 {
   auto& map = m_document->map();
   return map.editorContext().canChangeSelection();
+}
+
+bool MapFrame::canSelectBrushesWithSelectedMaterial() const
+{
+  auto& map = m_document->map();
+  if (!map.editorContext().canChangeSelection())
+  {
+    return false;
+  }
+
+  const auto& selection = map.selection();
+  if (!selection.hasBrushFaces())
+  {
+    return false;
+  }
+
+  const auto& materialName =
+    selection.brushFaces.front().face().attributes().materialName();
+  if (materialName == mdl::BrushFaceAttributes::NoMaterialName)
+  {
+    return false;
+  }
+
+  return std::ranges::all_of(selection.brushFaces, [&](const auto& handle) {
+    return handle.face().attributes().materialName() == materialName;
+  });
 }
 
 void MapFrame::groupSelectedObjects()

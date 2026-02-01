@@ -1561,6 +1561,17 @@ void ActionManager::createSelectionMenu()
     },
   }));
   selectionMenu.addItem(addAction(Action{
+    std::filesystem::path{"Menu/Edit/Select Brushes with Selected Material"},
+    QObject::tr("Select Brushes with Selected Material"),
+    ActionContext::Any,
+    QKeySequence{},
+    [](auto& context) { context.frame().selectBrushesWithSelectedMaterial(); },
+    [](const auto& context) {
+      return context.hasDocument()
+             && context.frame().canSelectBrushesWithSelectedMaterial();
+    },
+  }));
+  selectionMenu.addItem(addAction(Action{
     "Menu/Edit/Select by Line Number",
     QObject::tr("Select by Line Number..."),
     ActionContext::Any,
