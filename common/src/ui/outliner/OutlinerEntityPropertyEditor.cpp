@@ -380,8 +380,6 @@ void OutlinerEntityPropertyEditor::connectObservers()
 {
     m_notifierConnection += m_map.selectionDidChangeNotifier.connect(
         [this](const mdl::SelectionChange&) { scheduleUpdate(); });
-    m_notifierConnection += m_map.nodesDidChangeNotifier.connect(
-        [this](const std::vector<mdl::Node*>&) { scheduleUpdate(); });
     m_notifierConnection +=
         m_map.entityDefinitionsDidChangeNotifier.connect([this]() { scheduleUpdate(); });
     m_notifierConnection += m_map.documentDidChangeNotifier.connect([this]() {

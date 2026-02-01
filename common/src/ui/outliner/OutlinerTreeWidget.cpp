@@ -458,6 +458,19 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
         [this](const std::vector<mdl::Node*>& nodes) {
              auto needsRebuild = false;
              for (auto* node : nodes) {
+                if (!node) {
+                    continue;
+                }
+
+                const auto relevant =
+                    dynamic_cast<mdl::LayerNode*>(node) != nullptr
+                    || dynamic_cast<mdl::GroupNode*>(node) != nullptr
+                    || dynamic_cast<mdl::EntityNode*>(node) != nullptr
+                    || dynamic_cast<mdl::WorldNode*>(node) != nullptr;
+                if (!relevant) {
+                    continue;
+                }
+
                 if (auto* item = findItemForNode(node)) {
                     auto* actualParentNode = nodeFromItem(item->parent());
                     auto* expectedParentNode = node->parent();
