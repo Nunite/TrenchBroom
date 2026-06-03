@@ -33,7 +33,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Using C and CXX because GLEW is C
 project(TrenchBroom C CXX)
 
 # Configure CCache if available and requested
@@ -66,29 +65,9 @@ else()
   message(FATAL_ERROR "Unsupported compiler detected.")
 endif()
 
-# Request 8MB stack on Windows. (NOTE: /STACK should be used on .exe targets only.)
-# Default is 1MB and we need more for our current AABB builder on large maps (https://github.com/TrenchBroom/TrenchBroom/issues/2803)
-if(COMPILER_IS_MSVC)
-  set(TB_STACK_SIZE 8388608)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:${TB_STACK_SIZE}")
-
-  # This might work in CMake 3.13 and avoid a global setting, but we are on 3.12 for now
-  # target_link_options(common INTERFACE "/STACK:${TB_STACK_SIZE}")
-endif()
-
-# Enable ASAN if possible and requested
-if(TB_ENABLE_ASAN)
-  message(STATUS "Enabling ASan")
-
-  if(COMPILER_IS_CLANG OR COMPILER_IS_GNU)
-    add_compile_options(-fsanitize=address)
-    add_link_options(-fsanitize=address)
-  else()
-    message(WARNING "TB isn't set up to enable ASan for compiler ${CMAKE_CXX_COMPILER_ID}")
-  endif()
-endif()
-
 include(cmake/Utils.cmake)
+include(cmake/CompilerConfig.cmake)
+include(cmake/PrecompileHeaders.cmake)
 
 # Find Git
 find_package(Git)
@@ -116,14 +95,15 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 
 find_package(assimp CONFIG REQUIRED)
+find_package(cpptrace CONFIG REQUIRED)
 find_package(freeimage CONFIG REQUIRED)
 find_package(freetype CONFIG REQUIRED)
 find_package(Catch2 CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
-find_package(GLEW REQUIRED)
 find_package(miniz CONFIG REQUIRED)
 find_package(tinyxml2 CONFIG REQUIRED)
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+find_package(stduuid REQUIRED)
 
 # Find Qt and OpenGL
 find_package(OpenGL REQUIRED)
@@ -146,10 +126,7 @@ get_app_version_str(APP_VERSION_YEAR APP_VERSION_NUMBER APP_VERSION_RC APP_VERSI
 set(APP_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
 # Some global variables used in several targets
-set(APP_DIR "${CMAKE_SOURCE_DIR}/app")
-set(APP_RESOURCE_DIR "${APP_DIR}/resources")
+set(TB_RESOURCE_DIR "${CMAKE_SOURCE_DIR}/app/TrenchBroom/resources")
 
 add_subdirectory(lib)
-add_subdirectory(dump-shortcuts)
-add_subdirectory(common)
 add_subdirectory(app)

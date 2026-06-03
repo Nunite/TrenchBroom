@@ -5,6 +5,8 @@ ninja --version
 pandoc --version
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR
 
+
+IF EXIST cmakebuild rmdir /s /q cmakebuild
 mkdir cmakebuild
 cd cmakebuild
 
@@ -13,7 +15,7 @@ REM Don't pass -DCMAKE_CXX_FLAGS="/WX" on the cmake command line; doing so wipes
 set CXXFLAGS="/WX"
 
 call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
-cmake .. -GNinja -DCMAKE_PREFIX_PATH="%QT_ROOT_DIR%" -DCMAKE_BUILD_TYPE=Release -DTB_ENABLE_PCH=0 -DTB_ENABLE_CCACHE=0
+cmake .. -GNinja -DCMAKE_PREFIX_PATH="%QT_ROOT_DIR%" -DCMAKE_BUILD_TYPE=Release -DTB_ENABLE_PCH=0 -DTB_ENABLE_CCACHE=1
 
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR
 
@@ -23,28 +25,68 @@ IF %ERRORLEVEL% NEQ 0 GOTO ERROR
 
 set BUILD_DIR="%cd%"
 
-cd lib\vm\test
-vm-test.exe
+cd lib\KdLib\test
+KdLibTest.exe
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR
 cd "%BUILD_DIR%"
 
-cd lib\kdl\test
-kdl-test.exe
+cd lib\UpdateLib\test
+UpdateLibTest.exe
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR
 cd "%BUILD_DIR%"
 
-cd lib\upd\test
-upd-test.exe
+cd lib\TbBaseLib\test
+TbBaseLibTest.exe
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR
 cd "%BUILD_DIR%"
 
-cd common\test
-common-test.exe
+cd lib\TbBaseLib\test-utils\test
+TbBaseTestUtilsLibTest.exe
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR
 cd "%BUILD_DIR%"
 
-cd common\benchmark
-common-benchmark.exe
+cd lib\TbElLib\test
+TbElLibTest.exe
+IF %ERRORLEVEL% NEQ 0 GOTO ERROR
+cd "%BUILD_DIR%"
+
+cd lib\TbFsLib\test
+TbFsLibTest.exe
+IF %ERRORLEVEL% NEQ 0 GOTO ERROR
+cd "%BUILD_DIR%"
+
+cd lib\TbFsLib\test-utils\test
+TbFsTestUtilsLibTest.exe
+IF %ERRORLEVEL% NEQ 0 GOTO ERROR
+cd "%BUILD_DIR%"
+
+cd lib\TbGlLib\test
+TbGlLibTest.exe
+IF %ERRORLEVEL% NEQ 0 GOTO ERROR
+cd "%BUILD_DIR%"
+
+cd lib\TbMdlLib\test
+TbMdlLibTest.exe
+IF %ERRORLEVEL% NEQ 0 GOTO ERROR
+cd "%BUILD_DIR%"
+
+cd lib\TbMdlLib\test-utils\test
+TbMdlTestUtilsLibTest.exe
+IF %ERRORLEVEL% NEQ 0 GOTO ERROR
+cd "%BUILD_DIR%"
+
+cd lib\TbRenderLib\test
+TbRenderLibTest.exe
+IF %ERRORLEVEL% NEQ 0 GOTO ERROR
+cd "%BUILD_DIR%"
+
+cd lib\TbUiLib\test
+TbUiLibTest.exe
+IF %ERRORLEVEL% NEQ 0 GOTO ERROR
+cd "%BUILD_DIR%"
+
+cd lib\VmLib\test
+VmLibTest.exe
 IF %ERRORLEVEL% NEQ 0 GOTO ERROR
 cd "%BUILD_DIR%"
 

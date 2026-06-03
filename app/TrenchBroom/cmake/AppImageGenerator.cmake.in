@@ -1,0 +1,49 @@
+execute_process(
+  COMMAND @TB_QMAKE_PATH@ -query QT_INSTALL_LIBS
+  OUTPUT_VARIABLE QT_LIBS_DIR
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  COMMAND_ERROR_IS_FATAL ANY
+)
+
+# Build the AppImage: deploy the executable, Qt plugins, and shared libraries,
+# then package everything into an AppImage in one step.
+# LD_LIBRARY_PATH is set so linuxdeploy can resolve Qt shared libraries.
+# EXTRA_PLATFORM_PLUGINS bundles the Wayland platform plugins alongside the
+# default xcb plugin so the app can run on both X11 and Wayland.
+# EXTRA_QT_MODULES=waylandcompositor triggers linuxdeploy-plugin-qt's built-in
+# WaylandcompositorPluginsDeployer, which copies the wayland-shell-integration,
+# wayland-decoration-client and wayland-graphics-integration-client plugin
+# directories needed for Wayland client support.
+# DEPLOY_PLATFORM_THEMES is intentionally not set: linuxdeploy-plugin-qt will
+# still deploy libqxdgdesktopportal.so by default, allowing Qt to follow the
+# system theme via xdg-desktop-portal on modern desktops. Enabling
+# DEPLOY_PLATFORM_THEMES would bundle libqgtk3.so, which crashes on newer
+# distros because the bundled GTK3 (built against Ubuntu 20.04 GSettings
+# schemas) is incompatible with the host's schemas (e.g. the 'antialiasing'
+# key was removed from org.gnome.settings-daemon.plugins.xsettings in
+# GNOME 42+). The xdgdesktopportal theme provides full dark/light mode and
+# accent color support on KDE Plasma and GNOME 47+.
+execute_process(
+  COMMAND
+    @CMAKE_COMMAND@ -E env
+      QMAKE=@TB_QMAKE_PATH@
+      OUTPUT=TrenchBroom.AppImage
+      LD_LIBRARY_PATH=${QT_LIBS_DIR}:$ENV{LD_LIBRARY_PATH}
+      EXTRA_PLATFORM_PLUGINS=libqwayland-egl.so\;libqwayland-generic.so
+      EXTRA_QT_MODULES=waylandcompositor
+    @TB_LINUXDEPLOY_PATH@
+    --appdir=${CPACK_TEMPORARY_DIRECTORY}
+    --desktop-file=@TB_RESOURCE_DIR@/linux/trenchbroom.desktop
+    --icon-file=@TB_RESOURCE_DIR@/graphics/images/AppIcon.png
+    --icon-filename=trenchbroom
+    --plugin qt
+    --output=appimage
+  COMMAND_ERROR_IS_FATAL ANY
+)
+
+# Wrap the AppImage in a zip archive for distribution.
+execute_process(
+  COMMAND
+    @CMAKE_COMMAND@ -E tar cv @CPACK_PACKAGE_FILE_NAME@.@CPACK_PACKAGE_FILE_EXT@ --format=zip TrenchBroom.AppImage
+  COMMAND_ERROR_IS_FATAL ANY
+)

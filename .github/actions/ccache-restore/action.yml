@@ -1,0 +1,24 @@
+name: Restore ccache
+description: Restore compiler cache using shared key structure
+inputs:
+  os:
+    description: OS key segment
+    required: true
+  build-type:
+    description: Build type key segment
+    required: true
+  arch:
+    description: Architecture key segment
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Restore ccache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ${{ env.CCACHE_CACHE_KEY_PREFIX }}-${{ inputs.os }}-${{ inputs.build-type }}-${{ inputs.arch }}-${{ github.run_id }}
+        restore-keys: |
+          ${{ env.CCACHE_CACHE_KEY_PREFIX }}-${{ inputs.os }}-${{ inputs.build-type }}-${{ inputs.arch }}-
+          ${{ env.CCACHE_CACHE_KEY_PREFIX }}-${{ inputs.os }}-${{ inputs.build-type }}-
+          ${{ env.CCACHE_CACHE_KEY_PREFIX }}-${{ inputs.os }}-

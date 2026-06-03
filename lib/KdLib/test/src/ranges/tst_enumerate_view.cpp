@@ -1,0 +1,273 @@
+/*
+ Copyright (C) 2025 Kristian Duske
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ software and associated documentation files (the "Software"), to deal in the Software
+ without restriction, including without limitation the rights to use, copy, modify, merge,
+ publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+ persons to whom the Software is furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all copies or
+ substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+ PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+ FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ DEALINGS IN THE SOFTWARE.
+*/
+
+#include "kd/ranges/enumerate_view.h"
+
+#include <map>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_range_equals.hpp>
+
+namespace kdl
+{
+
+TEST_CASE("enumerate")
+{
+  using Catch::Matchers::RangeEquals;
+
+  SECTION("iterator / sentinel")
+  {
+    SECTION("required types")
+    {
+      SECTION("const range")
+      {
+        const auto v = std::vector<int>{1, 2, 3, 4};
+        auto e = v | views::enumerate;
+
+        using iterator_type = decltype(e.begin());
+        static_assert(
+          std::
+            is_same_v<iterator_type::iterator_concept, std::random_access_iterator_tag>);
+        static_assert(
+          std::is_same_v<iterator_type::iterator_category, std::input_iterator_tag>);
+        static_assert(std::is_same_v<
+                      iterator_type::value_type,
+                      std::tuple<iterator_type::difference_type, int>>);
+
+        using sentinel_type = decltype(e.end());
+        static_assert(
+          std::
+            is_same_v<sentinel_type::iterator_concept, std::random_access_iterator_tag>);
+        static_assert(
+          std::is_same_v<sentinel_type::iterator_category, std::input_iterator_tag>);
+        static_assert(std::is_same_v<
+                      sentinel_type::value_type,
+                      std::tuple<sentinel_type::difference_type, int>>);
+      }
+
+      SECTION("non const range")
+      {
+        auto v = std::vector<int>{1, 2, 3, 4};
+        auto e = v | views::enumerate;
+
+        using iterator_type = decltype(e.begin());
+        static_assert(
+          std::
+            is_same_v<iterator_type::iterator_concept, std::random_access_iterator_tag>);
+        static_assert(
+          std::is_same_v<iterator_type::iterator_category, std::input_iterator_tag>);
+        static_assert(std::is_same_v<
+                      iterator_type::value_type,
+                      std::tuple<iterator_type::difference_type, int>>);
+
+        using sentinel_type = decltype(e.end());
+        static_assert(
+          std::
+            is_same_v<sentinel_type::iterator_concept, std::random_access_iterator_tag>);
+        static_assert(
+          std::is_same_v<sentinel_type::iterator_category, std::input_iterator_tag>);
+        static_assert(std::is_same_v<
+                      sentinel_type::value_type,
+                      std::tuple<sentinel_type::difference_type, int>>);
+      }
+    }
+
+    SECTION("base")
+    {
+      const auto v = std::vector<int>{1, 2, 3, 4};
+      auto e = v | views::enumerate;
+
+      auto i = e.begin();
+      auto s = e.end();
+
+      CHECK(i.base() == v.begin());
+      CHECK(s.base() == v.end());
+    }
+
+    SECTION("arithmetic")
+    {
+      const auto v = std::vector<int>{1, 2, 3, 4};
+      auto e = v | views::enumerate;
+
+      auto it = e.begin();
+      REQUIRE(*it == std::tuple{0, 1});
+
+      CHECK(*it++ == std::tuple{0, 1});
+      CHECK(*it == std::tuple{1, 2});
+
+      CHECK(*++it == std::tuple{2, 3});
+      CHECK(*it == std::tuple{2, 3});
+
+      CHECK(*it-- == std::tuple{2, 3});
+      CHECK(*it == std::tuple{1, 2});
+
+      CHECK(*--it == std::tuple{0, 1});
+      CHECK(*it == std::tuple{0, 1});
+
+      CHECK((it + 1) == std::next(e.begin()));
+      CHECK((1 + it) == std::next(e.begin()));
+      CHECK((it += 1) == std::next(e.begin()));
+      CHECK(it == std::next(e.begin()));
+
+      CHECK((it - 1) == e.begin());
+      CHECK((it -= 1) == e.begin());
+      CHECK(it == e.begin());
+    }
+
+    SECTION("subscript")
+    {
+      const auto v = std::vector<int>{1, 2, 3, 4};
+      auto e = v | views::enumerate;
+
+      auto it = e.begin();
+      CHECK(it[0] == std::tuple{0, 1});
+      CHECK(it[1] == std::tuple{1, 2});
+      CHECK(it[2] == std::tuple{2, 3});
+      CHECK(it[3] == std::tuple{3, 4});
+
+      // Check that the iterator is not invalidated
+      CHECK(*it == std::tuple{0, 1});
+    }
+
+    SECTION("comparison")
+    {
+      const auto v = std::vector<int>{1, 2, 3, 4};
+      auto e = v | views::enumerate;
+
+      auto i = e.begin();
+      auto s = e.end();
+
+      CHECK(i == i);
+      CHECK(s == s);
+      CHECK(i == e.begin());
+      CHECK(std::next(i, 4) == s);
+
+      CHECK(i != s);
+      CHECK_FALSE(i != i);
+
+      CHECK_FALSE(i < i);
+      CHECK(i <= i);
+      CHECK_FALSE(i > i);
+      CHECK(i >= i);
+    }
+  }
+
+  SECTION("input ranges")
+  {
+    auto ints = std::istringstream{"1 2 3 4"};
+
+    SECTION("as lvalue")
+    {
+      auto e = std::ranges::istream_view<int>(ints) | views::enumerate;
+
+      // Note: this is broken due to std::convertible_to (fixed in C++23)
+      // static_assert(std::ranges::input_range<decltype(e)>);
+
+      CHECK_THAT(
+        e,
+        RangeEquals(std::vector<std::tuple<long, int>>{{0, 1}, {1, 2}, {2, 3}, {3, 4}}));
+    }
+  }
+
+  SECTION("bidirectional ranges")
+  {
+    SECTION("as rvalue")
+    {
+      CHECK_THAT(
+        (std::vector<int>{1, 2, 3, 4} | views::enumerate),
+        RangeEquals(std::vector<std::tuple<long, int>>{{0, 1}, {1, 2}, {2, 3}, {3, 4}}));
+
+      CHECK_THAT(
+        (std::vector<int>{} | views::enumerate),
+        RangeEquals(std::vector<std::tuple<long, int>>{}));
+    }
+
+    SECTION("as lvalue")
+    {
+      const auto v = std::vector<int>{1, 2, 3, 4};
+      const auto e = v | views::enumerate;
+      static_assert(std::ranges::bidirectional_range<decltype(e)>);
+
+      CHECK_THAT(
+        e,
+        RangeEquals(std::vector<std::tuple<long, int>>{{0, 1}, {1, 2}, {2, 3}, {3, 4}}));
+    }
+  }
+
+  SECTION("various underlying ranges")
+  {
+    SECTION("array")
+    {
+      const int a[] = {1, 2, 3, 4};
+      auto e = views::enumerate(a);
+      CHECK_THAT(
+        e,
+        RangeEquals(std::vector<std::tuple<long, int>>{{0, 1}, {1, 2}, {2, 3}, {3, 4}}));
+    }
+
+    SECTION("nested types")
+    {
+      const auto v = std::vector<std::map<int, std::string>>{
+        {{1, "a"}, {2, "b"}},
+        {{3, "c"}},
+        {{4, "d"}, {5, "e"}, {6, "f"}},
+      };
+
+      auto e = views::enumerate(v);
+      CHECK(std::ranges::equal(
+        e,
+        std::vector<std::tuple<long, std::map<int, std::string>>>{
+          {0, {{1, "a"}, {2, "b"}}},
+          {1, {{3, "c"}}},
+          {2, {{4, "d"}, {5, "e"}, {6, "f"}}},
+        }));
+    }
+
+    SECTION("initializer list")
+    {
+      const auto l = std::initializer_list<int>{1, 2, 3, 4};
+      auto e = views::enumerate(l);
+      CHECK_THAT(
+        e,
+        RangeEquals(std::vector<std::tuple<long, int>>{{0, 1}, {1, 2}, {2, 3}, {3, 4}}));
+    }
+  }
+
+  SECTION("move-only value types")
+  {
+    auto v = std::vector<std::unique_ptr<int>>{};
+    v.push_back(std::make_unique<int>(1));
+    v.push_back(std::make_unique<int>(2));
+
+    auto e = v | views::enumerate;
+    CHECK_THAT(
+      e,
+      RangeEquals(std::vector<std::tuple<long, std::unique_ptr<int>&>>{
+        {0, v[0]},
+        {1, v[1]},
+      }));
+  }
+}
+
+} // namespace kdl

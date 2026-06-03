@@ -1,0 +1,73 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y software-properties-common && \
+    add-apt-repository ppa:ubuntu-toolchain-r/test && \
+    apt-get update && apt-get install -y \
+      gcc-13 \
+      g++-13 \
+      build-essential \
+      libxi-dev \
+      libxrandr-dev \
+      libxxf86vm-dev \
+      freeglut3-dev \
+      mesa-common-dev \
+      libgl1-mesa-dev \
+      libglu1-mesa-dev \
+      libglm-dev \
+      pandoc \
+      p7zip-full \
+      ninja-build \
+      libglew-dev \
+      libfreeimage-dev \
+      libfreetype6-dev \
+      libtinyxml2-dev \
+      libassimp-dev \
+      libfuse2 \
+      libx11-xcb1 \
+      libxcb-cursor0 \
+      libxcb-icccm4 \
+      libxcb-image0 \
+      libxcb-keysyms1 \
+      libxcb-randr0 \
+      libxcb-render-util0 \
+      libxcb-shape0 \
+      libxcb-shm0 \
+      libxcb-sync1 \
+      libxcb-util1 \
+      libxcb-xfixes0 \
+      libxcb-xinerama0 \
+      libxcb-xkb1 \
+      libwayland-client0 \
+      libwayland-cursor0 \
+      libwayland-egl1 \
+      libxkbcommon-dev \
+      libxkbcommon-x11-0 \
+      ccache \
+      wget \
+      curl \
+      git \
+      ca-certificates \
+      zip \
+      unzip \
+      gnupg \
+      mono-complete \
+      rsync \
+      && mkdir -p /etc/apt/keyrings \
+      && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+        | gpg --dearmor -o /etc/apt/keyrings/kitware.gpg \
+      && echo "deb [signed-by=/etc/apt/keyrings/kitware.gpg] https://apt.kitware.com/ubuntu/ focal main" \
+        > /etc/apt/sources.list.d/kitware.list \
+      && apt-get update \
+      && apt-get install -y cmake \
+      && rm -rf /var/lib/apt/lists/*
+
+ENV CC=gcc-13
+ENV CXX=g++-13
+
+# Create a non-root user matching the GitHub Actions runner uid so tests
+# are not executed as root (which bypasses filesystem permission checks).
+RUN useradd -m -u 1001 -s /bin/bash runner
+RUN mkdir -p /home/runner/.config/NuGet && chown -R runner:runner /home/runner/.config
+USER runner

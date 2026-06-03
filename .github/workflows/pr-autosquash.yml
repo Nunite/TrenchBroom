@@ -1,0 +1,226 @@
+name: PR Bot
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  autosquash:
+    if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '@bot autosquash') }}
+    runs-on: ubuntu-latest
+    env:
+      AUTOSQUASH_PUSH_TOKEN: ${{ secrets.AUTOSQUASH_PUSH_TOKEN }}
+
+    steps:
+      - name: Parse command and validate caller
+        id: command
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.comment.body.trim();
+            const match = body.match(/^@bot\s+autosquash(?:\s+(dry-run))?$/);
+            if (!match) {
+              core.setFailed("Invalid command. Use '@bot autosquash' or '@bot autosquash dry-run'.");
+              return;
+            }
+
+            const allowedAssociations = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+            const association = context.payload.comment.author_association;
+            if (!allowedAssociations.has(association)) {
+              core.setFailed(`User is not allowed to run this command (author_association=${association}).`);
+              return;
+            }
+
+            core.setOutput("dry_run", match[1] === "dry-run" ? "true" : "false");
+
+      - name: Get PR metadata
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.issue.number;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number });
+
+            const baseRef = pr.base.ref;
+            const headRef = pr.head.ref;
+            const headRepo = pr.head.repo.full_name;
+            const baseRepo = `${owner}/${repo}`;
+            const isFork = headRepo !== baseRepo;
+
+            core.setOutput("base_ref", baseRef);
+            core.setOutput("head_ref", headRef);
+            core.setOutput("head_repo", headRepo);
+            core.setOutput("base_repo", baseRepo);
+            core.setOutput("is_fork", isFork ? "true" : "false");
+
+      - name: Validate token for fork PRs
+        if: ${{ steps.pr.outputs.is_fork == 'true' }}
+        run: |
+          if [ -n "${AUTOSQUASH_PUSH_TOKEN:-}" ]; then
+            exit 0
+          fi
+          echo "Fork PR detected (${{ steps.pr.outputs.head_repo }})."
+          echo "Configure AUTOSQUASH_PUSH_TOKEN with push access to the fork branch to enable autosquash on fork PRs."
+          exit 1
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pr.outputs.head_repo }}
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ env.AUTOSQUASH_PUSH_TOKEN != '' && env.AUTOSQUASH_PUSH_TOKEN || github.token }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run autosquash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ steps.pr.outputs.base_ref }}"
+          export GIT_SEQUENCE_EDITOR=:
+          MERGE_BASE=$(git merge-base HEAD "origin/${{ steps.pr.outputs.base_ref }}")
+          git rebase -i --autosquash "$MERGE_BASE"
+
+      - name: Push rewritten history
+        if: ${{ steps.command.outputs.dry_run != 'true' }}
+        run: |
+          set -euo pipefail
+          git push --force-with-lease origin "HEAD:${{ steps.pr.outputs.head_ref }}"
+
+      - name: Comment result
+        if: ${{ always() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const dryRun = `${{ steps.command.outputs.dry_run }}` === "true";
+            const status = `${{ job.status }}`;
+            const mode = dryRun ? "dry-run" : "apply";
+
+            let body;
+            if (status === "success") {
+              body = dryRun
+                ? "Autosquash dry-run succeeded. Rebase with --autosquash completed without conflicts; no push was performed."
+                : "Autosquash succeeded. Fixup/squash commits were autosquashed and the branch was force-pushed.";
+            } else {
+              body = `Autosquash (${mode}) failed. Check the workflow logs for details.`;
+            }
+
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.payload.issue.number,
+              body,
+            });
+
+  rebase-master:
+    if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '@bot rebase') }}
+    runs-on: ubuntu-latest
+    env:
+      AUTOSQUASH_PUSH_TOKEN: ${{ secrets.AUTOSQUASH_PUSH_TOKEN }}
+
+    steps:
+      - name: Parse command and validate caller
+        id: command
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.comment.body.trim();
+            const match = body.match(/^@bot\s+rebase(?:\s+(dry-run))?$/);
+            if (!match) {
+              core.setFailed("Invalid command. Use '@bot rebase' or '@bot rebase dry-run'.");
+              return;
+            }
+
+            const allowedAssociations = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+            const association = context.payload.comment.author_association;
+            if (!allowedAssociations.has(association)) {
+              core.setFailed(`User is not allowed to run this command (author_association=${association}).`);
+              return;
+            }
+
+            core.setOutput("dry_run", match[1] === "dry-run" ? "true" : "false");
+
+      - name: Get PR metadata
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.issue.number;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number });
+
+            const headRef = pr.head.ref;
+            const headRepo = pr.head.repo.full_name;
+            const baseRepo = `${owner}/${repo}`;
+            const isFork = headRepo !== baseRepo;
+
+            core.setOutput("head_ref", headRef);
+            core.setOutput("head_repo", headRepo);
+            core.setOutput("base_repo", baseRepo);
+            core.setOutput("is_fork", isFork ? "true" : "false");
+
+      - name: Validate token for fork PRs
+        if: ${{ steps.pr.outputs.is_fork == 'true' }}
+        run: |
+          if [ -n "${AUTOSQUASH_PUSH_TOKEN:-}" ]; then
+            exit 0
+          fi
+          echo "Fork PR detected (${{ steps.pr.outputs.head_repo }})."
+          echo "Configure AUTOSQUASH_PUSH_TOKEN with push access to the fork branch to enable rebasing fork PRs."
+          exit 1
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pr.outputs.head_repo }}
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ env.AUTOSQUASH_PUSH_TOKEN != '' && env.AUTOSQUASH_PUSH_TOKEN || github.token }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebase onto master
+        run: |
+          set -euo pipefail
+          git fetch origin master
+          git rebase origin/master
+
+      - name: Push rebased history
+        if: ${{ steps.command.outputs.dry_run != 'true' }}
+        run: |
+          set -euo pipefail
+          git push --force-with-lease origin "HEAD:${{ steps.pr.outputs.head_ref }}"
+
+      - name: Comment result
+        if: ${{ always() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const dryRun = `${{ steps.command.outputs.dry_run }}` === "true";
+            const status = `${{ job.status }}`;
+            const mode = dryRun ? "dry-run" : "apply";
+
+            let body;
+            if (status === "success") {
+              body = dryRun
+                ? "Rebase dry-run succeeded. Rebase onto origin/master completed without conflicts; no push was performed."
+                : "Rebase succeeded. The PR branch was rebased onto origin/master and force-pushed.";
+            } else {
+              body = `Rebase (${mode}) failed. Check the workflow logs for details.`;
+            }
+
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.payload.issue.number,
+              body,
+            });

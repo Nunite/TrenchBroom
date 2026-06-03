@@ -23,12 +23,14 @@ export MACOSX_DEPLOYMENT_TARGET=12.0
 # Build TB
 
 TB_BUILD_TYPE="Release"
-if [[ $TB_ENABLE_ASAN == "true" ]] ; then
-    TB_BUILD_TYPE="Debug"
+if [[ $TB_ENABLE_ASAN == "1" || $TB_ENABLE_TSAN == "1" || $TB_ENABLE_UBSAN == "1" ]] ; then
+  TB_BUILD_TYPE="Debug"
 fi
 
 echo "TB_BUILD_TYPE: $TB_BUILD_TYPE"
 echo "TB_ENABLE_ASAN: $TB_ENABLE_ASAN"
+echo "TB_ENABLE_TSAN: $TB_ENABLE_TSAN"
+echo "TB_ENABLE_UBSAN: $TB_ENABLE_UBSAN"
 echo "TB_SIGN_MAC_BUNDLE: $TB_SIGN_MAC_BUNDLE"
 
 # Note: The app bundle and the archive should be signed and notarized, otherwise macOS'
@@ -39,7 +41,7 @@ echo "TB_SIGN_MAC_BUNDLE: $TB_SIGN_MAC_BUNDLE"
 # more details on how to set up the necessary prerequisites for signing and notarizing the
 # app and the archive.
 
-
+rm -rf cmakebuild
 mkdir cmakebuild
 cd cmakebuild
 cmake .. \
@@ -48,9 +50,11 @@ cmake .. \
   -DCMAKE_BUILD_TYPE="$TB_BUILD_TYPE" \
   -DCMAKE_CXX_FLAGS="-Werror" \
   -DCMAKE_EXE_LINKER_FLAGS="-Wl,-fatal_warnings" \
-  -DTB_ENABLE_CCACHE=0 \
+  -DTB_ENABLE_CCACHE=1 \
   -DTB_ENABLE_PCH=0 \
   -DTB_ENABLE_ASAN="$TB_ENABLE_ASAN" \
+  -DTB_ENABLE_TSAN="$TB_ENABLE_TSAN" \
+  -DTB_ENABLE_UBSAN="$TB_ENABLE_UBSAN" \
   -DTB_RUN_MACDEPLOYQT=1 \
   -DTB_SIGN_MAC_BUNDLE=$TB_SIGN_MAC_BUNDLE \
   -DTB_SIGN_IDENTITY="$TB_SIGN_IDENTITY" \
@@ -63,26 +67,46 @@ cmake --build . --config "$TB_BUILD_TYPE" || exit 1
 
 BUILD_DIR=$(pwd)
 
-cd "$BUILD_DIR/lib/vm/test"
-./vm-test || exit 1
+cd "$BUILD_DIR/lib/KdLib/test"
+./KdLibTest || exit 1
 
-cd "$BUILD_DIR/lib/kdl/test"
-./kdl-test || exit 1
+cd "$BUILD_DIR/lib/UpdateLib/test"
+./UpdateLibTest || exit 1
 
-cd "$BUILD_DIR/lib/upd/test"
-./upd-test || exit 1
+cd "$BUILD_DIR/lib/TbBaseLib/test"
+./TbBaseLibTest || exit 1
 
-cd "$BUILD_DIR/common/test"
-./common-test || exit 1
+cd "$BUILD_DIR/lib/TbBaseLib/test-utils/test"
+./TbBaseTestUtilsLibTest || exit 1
 
-if [[ $TB_BUILD_TYPE == "Release" ]] ; then
-    cd "$BUILD_DIR/common/benchmark"
-    ./common-benchmark || exit 1
-else
-    echo "Skipping common-benmchark because this is a debug build"
-fi
+cd "$BUILD_DIR/lib/TbElLib/test"
+./TbElLibTest || exit 1
 
-if [[ $TB_ENABLE_ASAN == "false" ]] ; then
+cd "$BUILD_DIR/lib/TbFsLib/test"
+./TbFsLibTest || exit 1
+
+cd "$BUILD_DIR/lib/TbFsLib/test-utils/test"
+./TbFsTestUtilsLibTest || exit 1
+
+cd "$BUILD_DIR/lib/TbGlLib/test"
+./TbGlLibTest || exit 1
+
+cd "$BUILD_DIR/lib/TbMdlLib/test"
+./TbMdlLibTest || exit 1
+
+cd "$BUILD_DIR/lib/TbMdlLib/test-utils/test"
+./TbMdlTestUtilsLibTest || exit 1
+
+cd "$BUILD_DIR/lib/TbRenderLib/test"
+./TbRenderLibTest || exit 1
+
+cd "$BUILD_DIR/lib/TbUiLib/test"
+./TbUiLibTest || exit 1
+
+cd "$BUILD_DIR/lib/VmLib/test"
+./VmLibTest || exit 1
+
+if [[ $TB_ENABLE_ASAN == "0" && $TB_ENABLE_UBSAN == "0" ]] ; then
   cd "$BUILD_DIR"
 
   # see https://github.com/actions/runner-images/issues/7522
@@ -90,17 +114,17 @@ if [[ $TB_ENABLE_ASAN == "false" ]] ; then
   echo waiting...; while pgrep XProtect; do sleep 3; done;
 
   cpack || exit 1
-  ./app/sign_macos_archive.sh || exit 1
-  ./app/generate_checksum.sh || exit 1
+  ./app/TrenchBroom/sign_macos_archive.sh || exit 1
+  ./app/TrenchBroom/generate_checksum.sh || exit 1
 
   echo "Deployment target (minos):"
-  otool -l ./app/TrenchBroom.app/Contents/MacOS/TrenchBroom | grep minos
+  otool -l ./app/TrenchBroom/TrenchBroom.app/Contents/MacOS/TrenchBroom | grep minos
 
   echo "Shared libraries used:"
-  otool -L ./app/TrenchBroom.app/Contents/MacOS/TrenchBroom
+  otool -L ./app/TrenchBroom/TrenchBroom.app/Contents/MacOS/TrenchBroom
 
   echo "Binary type:"
-  file ./app/TrenchBroom.app/Contents/MacOS/TrenchBroom
+  file ./app/TrenchBroom/TrenchBroom.app/Contents/MacOS/TrenchBroom
 else
     echo "Skipping packaging because this is an ASAN build"
 fi

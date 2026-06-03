@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install build-essential libxi-dev libxrandr-dev libxxf86vm-dev freeglut3-dev mesa-common-dev libgl1-mesa-dev libglu1-mesa-dev libglm-dev pandoc cmake p7zip-full ninja-build xvfb libglew-dev libfreeimage-dev libfreetype6-dev libtinyxml2-dev libassimp-dev libfuse2
+          sudo apt install build-essential libxi-dev libxrandr-dev libxxf86vm-dev freeglut3-dev mesa-common-dev libgl1-mesa-dev libglu1-mesa-dev libglm-dev pandoc cmake p7zip-full ninja-build libglew-dev libfreeimage-dev libfreetype6-dev libtinyxml2-dev libassimp-dev libfuse2
 
       - name: Add NuGet sources
         shell: bash
@@ -74,11 +74,13 @@ jobs:
           version: 18
           style: 'file'  # Use .clang-format config file. 
           tidy-checks: '' # Use .clang-tidy config file.
-          files-changed-only: false
+          extensions: 'c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx,fragsh,vertsh'
+          files-changed-only: true
           database: ${{github.workspace}}/build
-          ignore: 'build|vcpkg-overlay-ports|lib/stackwalker|common/src/ui/GetVersion.cpp'
+          ignore: 'build|vcpkg-overlay-ports|lib/TbUiLib/src/GetVersion.cpp'
+          ignore-tidy: 'app/TrenchBroom/resources/shader'
           step-summary: true
           thread-comments: true
       - name: Fail fast?!
-        if: steps.linter.outputs.clang-tidy-checks-failed > 0
+        if: steps.linter.outputs.checks-failed > 0
         run: exit 1

@@ -1,0 +1,17 @@
+name: Upload CI artifacts
+description: Upload build artifacts for a platform workflow
+inputs:
+  name:
+    description: Artifact name
+    required: true
+  path:
+    description: Artifact path glob(s)
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}

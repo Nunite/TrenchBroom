@@ -11,6 +11,10 @@
       "version>=": "3.10.0"
     },
     {
+      "name": "cpptrace",
+      "version>=": "1.0.4"
+    },
+    {
       "name": "fmt",
       "version>=": "11.2.0"
     },
@@ -25,13 +29,12 @@
       "platform": "!linux"
     },
     {
-      "name": "glew",
-      "version>=": "2.2.0#2",
-      "platform": "!linux"
-    },
-    {
       "name": "miniz",
       "version>=": "2.2.0#1"
+    },
+    {
+      "name": "stduuid",
+      "version>=": "1.2.3"
     },
     {
       "name": "tinyxml2",

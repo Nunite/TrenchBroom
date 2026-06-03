@@ -1,0 +1,218 @@
+/*
+ Copyright (C) 2025 Kristian Duske
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ software and associated documentation files (the "Software"), to deal in the Software
+ without restriction, including without limitation the rights to use, copy, modify, merge,
+ publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+ persons to whom the Software is furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all copies or
+ substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+ PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+ FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ DEALINGS IN THE SOFTWARE.
+*/
+
+#include "kd/ranges/adjacent_transform_view.h"
+
+#include <forward_list>
+#include <memory>
+#include <type_traits>
+#include <vector>
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_range_equals.hpp>
+
+namespace kdl
+{
+
+TEST_CASE("adjacent_transform")
+{
+  using Catch::Matchers::RangeEquals;
+
+  const auto f = [](auto x, auto y, auto z) { return x * y * z; };
+
+  SECTION("properties")
+  {
+    const auto v = std::vector{1, 2, 3, 4};
+    auto a = v | views::adjacent_transform<3>(f);
+    static_assert(std::ranges::view<decltype(a)>);
+  }
+
+  SECTION("iterator / sentinel")
+  {
+    SECTION("required types")
+    {
+      SECTION("random access range")
+      {
+        const auto v = std::vector{1, 2, 3, 4};
+        auto a = v | views::adjacent_transform<3>(f);
+
+        static_assert(std::ranges::random_access_range<decltype(a)>);
+
+        using iterator_type = decltype(a.begin());
+        static_assert(
+          std::
+            is_same_v<iterator_type::iterator_concept, std::random_access_iterator_tag>);
+        static_assert(
+          std::is_same_v<iterator_type::iterator_category, std::input_iterator_tag>);
+        static_assert(std::is_same_v<iterator_type::value_type, int>);
+
+        using sentinel_type = decltype(a.end());
+        static_assert(
+          std::
+            is_same_v<sentinel_type::iterator_concept, std::random_access_iterator_tag>);
+      }
+
+      SECTION("forward range")
+      {
+        const auto l = std::forward_list<int>{1, 2, 3, 4};
+        auto a = l | views::adjacent_transform<3>(f);
+
+        using iterator_type = decltype(a.begin());
+        static_assert(
+          std::is_same_v<iterator_type::iterator_concept, std::forward_iterator_tag>);
+        static_assert(
+          std::is_same_v<iterator_type::iterator_category, std::input_iterator_tag>);
+        static_assert(std::is_same_v<iterator_type::value_type, int>);
+      }
+
+      SECTION("reference-returning transform")
+      {
+        auto v = std::vector{1, 2, 3, 4};
+        const auto take_first = [](auto& a, auto&) -> auto& { return a; };
+        auto a = v | views::adjacent_transform<2>(take_first);
+
+        using iterator_type = decltype(a.begin());
+        static_assert(std::is_lvalue_reference_v<decltype(*a.begin())>);
+        static_assert(
+          std::
+            is_same_v<iterator_type::iterator_category, std::random_access_iterator_tag>);
+      }
+    }
+
+    SECTION("arithmetic")
+    {
+      const auto v = std::vector{1, 2, 3, 4, 5};
+      auto a = v | views::adjacent_transform<3>(f);
+
+      auto it = a.begin();
+      REQUIRE(*it == 6);
+
+      CHECK(*it++ == 6);
+      CHECK(*it == 24);
+
+      CHECK(*++it == 60);
+      CHECK(*it == 60);
+
+      CHECK(*it-- == 60);
+      CHECK(*it == 24);
+
+      CHECK(*--it == 6);
+      CHECK(*it == 6);
+
+      CHECK((it + 1) == std::next(a.begin()));
+      CHECK((1 + it) == std::next(a.begin()));
+      CHECK((it += 1) == std::next(a.begin()));
+      CHECK(it == std::next(a.begin()));
+
+      CHECK((it - 1) == a.begin());
+      CHECK((it -= 1) == a.begin());
+      CHECK(it == a.begin());
+
+      CHECK(*(a.begin() + 2) == 60);
+      CHECK(a.begin() + 3 == a.end());
+    }
+
+    SECTION("subscript")
+    {
+      const auto v = std::vector{1, 2, 3, 4, 5};
+      auto a = v | views::adjacent_transform<3>(f);
+
+      auto it = a.begin();
+      CHECK(it[0] == 6);
+      CHECK(it[1] == 24);
+      CHECK(it[2] == 60);
+
+      // Check that the iterator is not invalidated
+      CHECK(*it == 6);
+    }
+
+    SECTION("comparison")
+    {
+      const auto v = std::vector{1, 2, 3, 4, 5};
+      auto a = v | views::adjacent_transform<3>(f);
+
+      auto i = a.begin();
+      auto s = a.end();
+
+      CHECK(i == i);
+      CHECK(s == s);
+      CHECK(i == a.begin());
+      CHECK(std::next(i, 3) == s);
+
+      CHECK(i != s);
+      CHECK_FALSE(i != i);
+
+      CHECK_FALSE(i < i);
+      CHECK(i <= i);
+      CHECK_FALSE(i > i);
+      CHECK(i >= i);
+    }
+  }
+
+  SECTION("move-only value types")
+  {
+    using move_only = std::unique_ptr<int>;
+
+    auto v = std::vector<move_only>{};
+    v.push_back(std::make_unique<int>(1));
+    v.push_back(std::make_unique<int>(2));
+    v.push_back(std::make_unique<int>(3));
+
+    const auto g = [](const auto& x, const auto& y) { return *x + *y; };
+    auto t = v | views::pairwise_transform(g);
+
+    CHECK_THAT(t, RangeEquals(std::vector<int>{3, 5}));
+  }
+
+  SECTION("pairwise_transform")
+  {
+    const auto g = [](auto x, auto y) { return x * y; };
+
+    const auto v = std::vector{1, 2, 3, 4};
+    auto t = v | views::pairwise_transform(g);
+
+    CHECK_THAT(t, RangeEquals(std::vector<int>{2, 6, 12}));
+  }
+
+  SECTION("examples")
+  {
+    const auto v = std::vector{1, 2, 3, 4};
+    const auto sum = [](auto&&... x) { return (x + ...); };
+
+    CHECK_THAT(
+      v | views::adjacent_transform<1>(sum), RangeEquals(std::vector{1, 2, 3, 4}));
+    CHECK_THAT(v | views::adjacent_transform<2>(sum), RangeEquals(std::vector{3, 5, 7}));
+    CHECK_THAT(v | views::adjacent_transform<3>(sum), RangeEquals(std::vector{6, 9}));
+    CHECK_THAT(v | views::adjacent_transform<4>(sum), RangeEquals(std::vector{10}));
+    CHECK_THAT(v | views::adjacent_transform<5>(sum), RangeEquals(std::vector<int>{}));
+  }
+
+  SECTION("empty base")
+  {
+    const auto sum = [](auto&&... x) { return (x + ...); };
+    const auto v = std::vector<int>{};
+    auto a = v | views::adjacent_transform<3>(sum);
+
+    CHECK(a.size() == 0);
+    CHECK(a.begin() == a.end());
+  }
+}
+
+} // namespace kdl

@@ -1,0 +1,107 @@
+name: CI Windows
+on:
+  workflow_call:
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    env:
+      TB_PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      TB_BUILD_TYPE: release
+      TB_ARCH: x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup common prerequisites
+        uses: ./.github/actions/setup-common
+
+      - name: Setup shared CI environment
+        uses: ./.github/actions/setup-shared-env
+
+      - name: Windows - Bootstrap vcpkg
+        shell: pwsh
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat
+
+      - name: Windows - Install dependencies
+        shell: pwsh
+        run: |
+          choco install ccache pandoc --yes --no-progress
+
+          if (-not $env:ChocolateyInstall) {
+            throw "ChocolateyInstall is not set"
+          }
+          "$env:ChocolateyInstall\\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          Get-Command ccache -ErrorAction Stop | Out-Null
+          Get-Command pandoc -ErrorAction Stop | Out-Null
+
+      - name: Windows - Restore ccache
+        uses: ./.github/actions/ccache-restore
+        with:
+          os: windows-2022
+          build-type: ${{ env.TB_BUILD_TYPE }}
+          arch: ${{ env.TB_ARCH }}
+
+      - name: Windows - Initialize ccache
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "$env:CCACHE_DIR" -Force | Out-Null
+          ccache --set-config=max_size=1G
+          ccache --zero-stats
+
+      - name: Windows - Add NuGet sources
+        shell: pwsh
+        run: |
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            sources add `
+            -Source "${{ env.FEED_URL }}" `
+            -StorePasswordInClearText `
+            -Name GitHubPackages `
+            -UserName "${{ env.USERNAME }}" `
+            -Password "${{ secrets.GITHUB_TOKEN }}"
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            setapikey "${{ secrets.GITHUB_TOKEN }}" `
+            -Source "${{ env.FEED_URL }}"
+
+      - name: Windows - Build
+        run: cmd.exe /c CI-windows.bat
+
+      - name: Windows - ccache stats
+        if: ${{ always() }}
+        shell: pwsh
+        run: ccache --show-stats
+
+      - name: Windows - Save ccache
+        if: ${{ success() && github.ref == 'refs/heads/master' }}
+        uses: ./.github/actions/ccache-save
+        with:
+          os: windows-2022
+          build-type: ${{ env.TB_BUILD_TYPE }}
+          arch: ${{ env.TB_ARCH }}
+
+      - name: Windows - Upload artifacts
+        uses: ./.github/actions/upload-artifacts
+        with:
+          name: windows-2022
+          path: |
+            cmakebuild/*.zip
+            cmakebuild/*.zip.md5
+
+      - name: Release
+        uses: ./.github/actions/create-draft-release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          files: |
+            cmakebuild/*.zip
+            cmakebuild/*.zip.md5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

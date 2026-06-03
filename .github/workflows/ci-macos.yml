@@ -1,0 +1,142 @@
+name: CI macOS
+on:
+  workflow_call:
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  macos:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+        tb-build-type: [release]
+        tb-arch: [default-arch]
+        include:
+          - os: macos-15-intel
+            tb-build-type: sanitize
+            tb-arch: default-arch
+
+    env:
+      TB_PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      MONO_GAC_PREFIX: "$HOMEBREW_PREFIX"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup common prerequisites
+        uses: ./.github/actions/setup-common
+
+      - name: Setup shared CI environment
+        uses: ./.github/actions/setup-shared-env
+
+      - name: macOS - Switch to Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
+
+      - name: macOS - Bootstrap vcpkg
+        shell: bash
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.sh
+
+      - name: macOS - Set up signing environment
+        run: |
+          if [[ "${{ matrix.tb-build-type }}" == "sanitize" ]]; then
+            echo "TB_ENABLE_ASAN=1" >> $GITHUB_ENV
+            echo "TB_ENABLE_TSAN=0" >> $GITHUB_ENV
+            echo "TB_ENABLE_UBSAN=1" >> $GITHUB_ENV
+          else
+            echo "TB_ENABLE_ASAN=0" >> $GITHUB_ENV
+            echo "TB_ENABLE_TSAN=0" >> $GITHUB_ENV
+            echo "TB_ENABLE_UBSAN=0" >> $GITHUB_ENV
+          fi
+          if [[ "${{ matrix.tb-build-type }}" != "sanitize" ]] && \
+             [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12 }}" ]] && \
+             [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12_PASSWORD }}" ]] && \
+             [[ -n "${{ secrets.ACTIONS_MAC_SIGN_IDENTITY }}" ]] && \
+             [[ -n "${{ secrets.ACTIONS_MAC_NOTARIZATION_EMAIL }}" ]] && \
+             [[ -n "${{ secrets.ACTIONS_MAC_NOTARIZATION_TEAM_ID }}" ]] && \
+             [[ -n "${{ secrets.ACTIONS_MAC_NOTARIZATION_PASSWORD }}" ]]; then
+            echo "TB_SIGN_MAC_BUNDLE=true" >> $GITHUB_ENV
+            echo "TB_SIGN_IDENTITY=${{ secrets.ACTIONS_MAC_SIGN_IDENTITY }}" >> $GITHUB_ENV
+            echo "TB_NOTARIZATION_EMAIL=${{ secrets.ACTIONS_MAC_NOTARIZATION_EMAIL }}" >> $GITHUB_ENV
+            echo "TB_NOTARIZATION_TEAM_ID=${{ secrets.ACTIONS_MAC_NOTARIZATION_TEAM_ID }}" >> $GITHUB_ENV
+            echo "TB_NOTARIZATION_PASSWORD=${{ secrets.ACTIONS_MAC_NOTARIZATION_PASSWORD }}" >> $GITHUB_ENV
+          else
+            echo "TB_SIGN_MAC_BUNDLE=false" >> $GITHUB_ENV
+          fi
+
+      - name: macOS - Install dependencies
+        run: brew install p7zip pandoc ninja autoconf automake mono ccache
+
+      - name: macOS - Import signing certificates
+        if: ${{ env.TB_SIGN_MAC_BUNDLE == 'true' }}
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12 }}
+          p12-password: ${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12_PASSWORD }}
+
+      - name: macOS - Restore ccache
+        uses: ./.github/actions/ccache-restore
+        with:
+          os: ${{ matrix.os }}
+          build-type: ${{ matrix.tb-build-type }}
+          arch: ${{ matrix.tb-arch }}
+
+      - name: macOS - Initialize ccache
+        run: |
+          mkdir -p "$CCACHE_DIR"
+          ccache --set-config=max_size=1G
+          ccache --zero-stats
+
+      - name: macOS - Add NuGet sources
+        shell: bash
+        run: |
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            sources add \
+            -Source "${{ env.FEED_URL }}" \
+            -StorePasswordInClearText \
+            -Name GitHubPackages \
+            -UserName "${{ env.USERNAME }}" \
+            -Password "${{ secrets.GITHUB_TOKEN }}"
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            setapikey "${{ secrets.GITHUB_TOKEN }}" \
+            -Source "${{ env.FEED_URL }}"
+
+      - name: macOS - Build
+        run: ./CI-macos.sh
+
+      - name: macOS - ccache stats
+        run: ccache --show-stats
+
+      - name: macOS - Save ccache
+        if: ${{ success() && github.ref == 'refs/heads/master' }}
+        uses: ./.github/actions/ccache-save
+        with:
+          os: ${{ matrix.os }}
+          build-type: ${{ matrix.tb-build-type }}
+          arch: ${{ matrix.tb-arch }}
+
+      - name: macOS - Upload artifacts
+        uses: ./.github/actions/upload-artifacts
+        if: ${{ matrix.tb-build-type != 'sanitize' }}
+        with:
+          name: ${{ matrix.os }}
+          path: |
+            cmakebuild/*.zip
+            cmakebuild/*.md5
+
+      - name: Release
+        uses: ./.github/actions/create-draft-release
+        if: ${{ startsWith(github.ref, 'refs/tags/') && matrix.tb-build-type != 'sanitize' }}
+        with:
+          files: |
+            cmakebuild/*.zip
+            cmakebuild/*.zip.md5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

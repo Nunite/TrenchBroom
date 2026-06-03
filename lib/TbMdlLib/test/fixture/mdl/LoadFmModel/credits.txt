@@ -1,0 +1,2 @@
+models\objects\halberd\tris.fm:
+Taken from OgleQuest Heretic II mod (https://heretic2.amwilliams.com/ogle). Created by Heretic Hides.

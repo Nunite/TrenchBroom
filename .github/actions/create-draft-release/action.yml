@@ -1,0 +1,16 @@
+name: Create draft release
+description: Upload release assets to a draft GitHub release
+inputs:
+  files:
+    description: File glob(s) to include in the draft release
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Create draft release
+      uses: softprops/action-gh-release@v1
+      with:
+        draft: true
+        files: ${{ inputs.files }}
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}

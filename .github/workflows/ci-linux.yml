@@ -1,0 +1,122 @@
+name: CI Linux
+on:
+  workflow_call:
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    env:
+      TB_PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      TB_LINUX_CONTAINER_IMAGE: tb-linux-ci:ubuntu20-gcc13
+      TB_BUILD_TYPE: release
+      TB_ARCH: default-arch
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup common prerequisites
+        uses: ./.github/actions/setup-common
+
+      - name: Setup shared CI environment
+        uses: ./.github/actions/setup-shared-env
+
+      - name: Linux - Restore ccache
+        uses: ./.github/actions/ccache-restore
+        with:
+          os: ubuntu-24.04
+          build-type: ${{ env.TB_BUILD_TYPE }}
+          arch: ${{ env.TB_ARCH }}
+
+      - name: Linux - Build container image
+        run: docker build -f docker/Dockerfile.build-linux -t "${{ env.TB_LINUX_CONTAINER_IMAGE }}" .
+
+      - name: Linux - Initialize ccache
+        run: |
+          docker run --rm \
+            --user runner \
+            -e CCACHE_DIR="${{ github.workspace }}/.ccache" \
+            -v "${{ github.workspace }}:${{ github.workspace }}" \
+            -w "${{ github.workspace }}" \
+            "${{ env.TB_LINUX_CONTAINER_IMAGE }}" \
+            bash -lc 'mkdir -p "${CCACHE_DIR}" && ccache --set-config=max_size=1G && ccache --zero-stats'
+
+      - name: Linux - Build in container
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker run --rm \
+            --user runner \
+            -e QT_ROOT_DIR="${QT_ROOT_DIR}" \
+            -e FEED_URL="${FEED_URL}" \
+            -e USERNAME="${USERNAME}" \
+            -e VCPKG_BINARY_SOURCES="${VCPKG_BINARY_SOURCES}" \
+            -e GITHUB_TOKEN="${GH_TOKEN}" \
+            -e CCACHE_DIR="${{ github.workspace }}/.ccache" \
+            -e CC=gcc-13 \
+            -e CXX=g++-13 \
+            -v "${{ github.workspace }}:${{ github.workspace }}" \
+            -v "${QT_ROOT_DIR}:${QT_ROOT_DIR}:ro" \
+            -w "${{ github.workspace }}" \
+            "${{ env.TB_LINUX_CONTAINER_IMAGE }}" \
+            bash -lc '
+              set -euo pipefail
+              git config --global --add safe.directory "${{ github.workspace }}"
+              ./vcpkg/bootstrap-vcpkg.sh
+              mono `./vcpkg/vcpkg fetch nuget | tail -n 1` sources add -Source "${FEED_URL}" -StorePasswordInClearText -Name GitHubPackages -UserName "${USERNAME}" -Password "${GITHUB_TOKEN}"
+              mono `./vcpkg/vcpkg fetch nuget | tail -n 1` setapikey "${GITHUB_TOKEN}" -Source "${FEED_URL}"
+              ./CI-linux.sh
+            '
+
+      - name: Linux - ccache stats
+        run: |
+          docker run --rm \
+            --user runner \
+            -e CCACHE_DIR="${{ github.workspace }}/.ccache" \
+            -v "${{ github.workspace }}:${{ github.workspace }}" \
+            -w "${{ github.workspace }}" \
+            "${{ env.TB_LINUX_CONTAINER_IMAGE }}" \
+            ccache --show-stats
+
+      - name: Linux - Save ccache
+        if: ${{ success() && github.ref == 'refs/heads/master' }}
+        uses: ./.github/actions/ccache-save
+        with:
+          os: ubuntu-24.04
+          build-type: ${{ env.TB_BUILD_TYPE }}
+          arch: ${{ env.TB_ARCH }}
+
+      - name: Linux - Upload artifacts
+        uses: ./.github/actions/upload-artifacts
+        with:
+          name: ubuntu-24.04
+          path: |
+            cmakebuild/*.zip
+            cmakebuild/*.md5
+
+      - name: Release
+        uses: ./.github/actions/create-draft-release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          files: |
+            cmakebuild/*.zip
+            cmakebuild/*.zip.md5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload compiled manual
+        uses: peaceiris/actions-gh-pages@v3
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+          external_repository: TrenchBroom/manual
+          publish_branch: gh-pages
+          publish_dir: ./cmakebuild/app/TrenchBroom/gen-manual
+          destination_dir: latest

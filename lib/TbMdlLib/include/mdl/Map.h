@@ -1,0 +1,452 @@
+/*
+ Copyright (C) 2025 Kristian Duske
+
+ This file is part of TrenchBroom.
+
+ TrenchBroom is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ TrenchBroom is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include "Notifier.h"
+#include "NotifierConnection.h"
+#include "Result.h"
+#include "gl/ResourceId.h"
+#include "mdl/BrushFaceHandle.h"
+#include "mdl/ExportOptions.h"
+#include "mdl/NodeIndex.h"
+#include "mdl/Selection.h"
+
+#include "vm/bbox.h"
+
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace kdl
+{
+class task_manager;
+} // namespace kdl
+
+namespace tb
+{
+class Logger;
+
+namespace gl
+{
+class MaterialManager;
+class ResourceManager;
+
+struct ProcessContext;
+} // namespace gl
+
+namespace mdl
+{
+enum class MapFormat;
+enum class MapTextEncoding;
+enum class PasteType;
+enum class TransactionScope;
+enum class WrapStyle;
+
+class BrushFaceAttributes;
+class Command;
+class CommandProcessor;
+class EdgeHandleManager;
+class EditorContext;
+class EntityDefinitionManager;
+class EntityLinkManager;
+class EntityModelManager;
+class FaceHandleManager;
+class GameFileSystem;
+class Grid;
+class GroupNode;
+class Issue;
+class LayerNode;
+class Node;
+class NodeIndex;
+class PickResult;
+class PointTrace;
+class RepeatStack;
+class SmartTag;
+class TagManager;
+class UndoableCommand;
+class UVCoordSystemSnapshot;
+class VertexHandleManager;
+class WorldNode;
+
+enum class VisualEffect;
+
+struct EnvironmentConfig;
+struct GameInfo;
+struct SelectionChange;
+struct SoftMapBounds;
+
+class Map
+{
+public:
+  static const std::string DefaultDocumentName;
+
+private:
+  const EnvironmentConfig& m_environmentConfig;
+  const GameInfo& m_gameInfo;
+  std::filesystem::path m_gamePath;
+  std::unique_ptr<GameFileSystem> m_gameFileSystem;
+
+  kdl::task_manager& m_taskManager;
+  gl::ResourceManager& m_resourceManager;
+  Logger& m_logger;
+
+  std::unique_ptr<EntityDefinitionManager> m_entityDefinitionManager;
+  std::unique_ptr<EntityModelManager> m_entityModelManager;
+  std::unique_ptr<gl::MaterialManager> m_materialManager;
+  std::unique_ptr<TagManager> m_tagManager;
+
+  std::unique_ptr<EditorContext> m_editorContext;
+  std::unique_ptr<Grid> m_grid;
+
+  std::unique_ptr<WorldNode> m_worldNode;
+  vm::bbox3d m_worldBounds;
+
+  std::unique_ptr<NodeIndex> m_nodeIndex;
+  std::unique_ptr<EntityLinkManager> m_entityLinkManager;
+
+  std::unique_ptr<VertexHandleManager> m_vertexHandles;
+  std::unique_ptr<EdgeHandleManager> m_edgeHandles;
+  std::unique_ptr<FaceHandleManager> m_faceHandles;
+
+  std::string m_currentMaterialName;
+
+  /*
+   * All actions pushed to this stack can be repeated later. The stack must be
+   * primed to be cleared whenever the selection changes. The effect is that
+   * changing the selection automatically begins a new "macro", but at the same
+   * time the current repeat stack can still be repeated after the selection
+   * was changed.
+   */
+  std::unique_ptr<RepeatStack> m_repeatStack;
+
+  std::unique_ptr<CommandProcessor> m_commandProcessor;
+
+  std::filesystem::path m_path = DefaultDocumentName;
+  size_t m_lastSaveModificationCount = 0;
+  size_t m_modificationCount = 0;
+
+  Selection m_selection;
+  mutable std::optional<vm::bbox3d> m_cachedSelectionBounds;
+  std::optional<vm::bbox3d> m_lastSelectionBounds;
+
+public: // notification
+  Notifier<> mapWasSavedNotifier;
+
+  Notifier<> modificationStateDidChangeNotifier;
+
+  Notifier<> editorContextDidChangeNotifier;
+  Notifier<> currentLayerDidChangeNotifier;
+  Notifier<> currentMaterialNameDidChangeNotifier;
+
+  Notifier<> selectionWillChangeNotifier;
+  Notifier<const SelectionChange&> selectionDidChangeNotifier;
+
+  Notifier<const std::vector<Node*>&> nodesWereAddedNotifier;
+  Notifier<const std::vector<Node*>&> nodesWillBeRemovedNotifier;
+  Notifier<const std::vector<Node*>&> nodesWereRemovedNotifier;
+  Notifier<const std::vector<Node*>&> nodesWillChangeNotifier;
+  Notifier<const std::vector<Node*>&> nodesDidChangeNotifier;
+
+  Notifier<const std::vector<Node*>&> nodeVisibilityDidChangeNotifier;
+  Notifier<const std::vector<Node*>&> nodeLockingDidChangeNotifier;
+
+  Notifier<> groupWasOpenedNotifier;
+  Notifier<> groupWasClosedNotifier;
+
+  Notifier<> materialCollectionsWillChangeNotifier;
+  Notifier<> materialCollectionsDidChangeNotifier;
+
+  Notifier<> materialUsageCountsDidChangeNotifier;
+
+  Notifier<> entityDefinitionsWillChangeNotifier;
+  Notifier<> entityDefinitionsDidChangeNotifier;
+
+  Notifier<> modsWillChangeNotifier;
+  Notifier<> modsDidChangeNotifier;
+
+  Notifier<VisualEffect> triggerVisualEffectNotifier;
+
+private:
+  NotifierConnection m_notifierConnection;
+
+public: // misc
+  Map(
+    const EnvironmentConfig& environmentConfig,
+    const GameInfo& gameInfo,
+    std::filesystem::path gamePath,
+    std::unique_ptr<WorldNode> worldNode,
+    const vm::bbox3d& worldBounds,
+    kdl::task_manager& taskManager,
+    gl::ResourceManager& resourceManager,
+    Logger& logger);
+
+  Map(
+    const EnvironmentConfig& environmentConfig,
+    const GameInfo& gameInfo,
+    std::filesystem::path gamePath,
+    std::unique_ptr<WorldNode> worldNode,
+    const vm::bbox3d& worldBounds,
+    std::filesystem::path path,
+    kdl::task_manager& taskManager,
+    gl::ResourceManager& resourceManager,
+    Logger& logger);
+
+  ~Map();
+
+  static Result<std::unique_ptr<Map>> createMap(
+    const EnvironmentConfig& environmentConfig,
+    const GameInfo& gameInfo,
+    std::filesystem::path gamePath,
+    MapFormat mapFormat,
+    const vm::bbox3d& worldBounds,
+    kdl::task_manager& taskManager,
+    gl::ResourceManager& resourceManager,
+    Logger& logger);
+
+  static Result<std::unique_ptr<Map>> loadMap(
+    const EnvironmentConfig& environmentConfig,
+    const GameInfo& gameInfo,
+    std::filesystem::path gamePath,
+    MapFormat mapFormat,
+    const vm::bbox3d& worldBounds,
+    std::filesystem::path path,
+    kdl::task_manager& taskManager,
+    gl::ResourceManager& resourceManager,
+    Logger& logger);
+
+  Logger& logger();
+
+  kdl::task_manager& taskManager();
+
+  gl::ResourceManager& resourceManager();
+  const gl::ResourceManager& resourceManager() const;
+
+  EntityDefinitionManager& entityDefinitionManager();
+  const EntityDefinitionManager& entityDefinitionManager() const;
+
+  EntityModelManager& entityModelManager();
+  const EntityModelManager& entityModelManager() const;
+
+  gl::MaterialManager& materialManager();
+  const gl::MaterialManager& materialManager() const;
+
+  TagManager& tagManager();
+  const TagManager& tagManager() const;
+
+  EditorContext& editorContext();
+  const EditorContext& editorContext() const;
+
+  Grid& grid();
+  const Grid& grid() const;
+
+  const EnvironmentConfig& environmentConfig() const;
+
+  const GameInfo& gameInfo() const;
+
+  const vm::bbox3d& worldBounds() const;
+
+  const WorldNode& worldNode() const;
+  WorldNode& worldNode();
+
+  MapTextEncoding encoding() const;
+
+  VertexHandleManager& vertexHandles();
+  const VertexHandleManager& vertexHandles() const;
+
+  EdgeHandleManager& edgeHandles();
+  const EdgeHandleManager& edgeHandles() const;
+
+  FaceHandleManager& faceHandles();
+  const FaceHandleManager& faceHandles() const;
+
+  const std::string& currentMaterialName() const;
+  void setCurrentMaterialName(const std::string& currentMaterialName);
+
+  CommandProcessor& commandProcessor();
+  const CommandProcessor& commandProcessor() const;
+
+  template <typename NodeType = Node>
+  std::vector<NodeType*> findNodes(std::string_view pattern) const
+  {
+    return m_nodeIndex ? m_nodeIndex->findNodes<NodeType>(pattern)
+                       : std::vector<NodeType*>{};
+  }
+
+  const EntityLinkManager& entityLinkManager() const;
+
+public: // game path
+  // This is updated whenever the game path is changed via the preferences
+  const std::filesystem::path& gamePath() const;
+  void setGamePath(std::filesystem::path gamePath);
+
+public: // persistence
+  Result<std::unique_ptr<Map>> reload();
+
+  Result<void> save();
+  Result<void> saveAs(const std::filesystem::path& path);
+  Result<void> saveTo(const std::filesystem::path& path) const;
+  Result<void> exportAs(const ExportOptions& options) const;
+
+  bool persistent() const;
+  std::string filename() const;
+  const std::filesystem::path& path() const;
+
+  bool modified() const;
+  size_t modificationCount() const;
+
+  void incModificationCount(size_t delta = 1);
+  void decModificationCount(size_t delta = 1);
+
+private:
+  void setPath(const std::filesystem::path& path);
+  void setLastSaveModificationCount();
+  void clearModificationCount();
+
+public: // selection management
+  const Selection& selection() const;
+
+  const vm::bbox3d referenceBounds() const;
+  const std::optional<vm::bbox3d>& lastSelectionBounds() const;
+  const std::optional<vm::bbox3d>& selectionBounds() const;
+
+public: // tag management
+  void registerSmartTags();
+  const std::vector<SmartTag>& smartTags() const;
+  bool isRegisteredSmartTag(const std::string& name) const;
+  const SmartTag& smartTag(const std::string& name) const;
+  bool isRegisteredSmartTag(size_t index) const;
+  const SmartTag& smartTag(size_t index) const;
+
+private:
+  void initializeAllNodeTags();
+  void initializeNodeTags(const std::vector<Node*>& nodes);
+  void clearNodeTags(const std::vector<Node*>& nodes);
+  void updateNodeTags(const std::vector<Node*>& nodes);
+
+  void updateFaceTags(const std::vector<BrushFaceHandle>& faces);
+  void updateAllFaceTags();
+
+  void updateFaceTagsAfterResourcesWhereProcessed(
+    const std::vector<gl::ResourceId>& resourceIds);
+
+private: // validation
+  void registerValidators();
+
+public:
+  void setIssueHidden(const Issue& issue, bool hidden);
+
+private: // Asset management
+  void loadAssets();
+  void clearAssets();
+
+  void loadEntityDefinitions();
+  void clearEntityDefinitions();
+
+  void reloadMaterials();
+  void loadMaterials();
+  void clearMaterials();
+
+  void setMaterials();
+  void setMaterials(const std::vector<Node*>& nodes);
+  void setMaterials(const std::vector<BrushFaceHandle>& faceHandles);
+  void unsetMaterials();
+  void unsetMaterials(const std::vector<Node*>& nodes);
+
+  void setEntityDefinitions();
+  void setEntityDefinitions(const std::vector<Node*>& nodes);
+  void unsetEntityDefinitions();
+  void unsetEntityDefinitions(const std::vector<Node*>& nodes);
+
+  void clearEntityModels();
+
+  void setEntityModels();
+  void setEntityModels(const std::vector<Node*>& nodes);
+  void unsetEntityModels();
+  void unsetEntityModels(const std::vector<Node*>& nodes);
+
+  void updateGameSearchPaths();
+
+private:
+  void updateGameFileSystem();
+
+private: // index management
+  void initializeNodeIndex();
+  void addToNodeIndex(const std::vector<Node*>& nodes, bool recurse);
+  void removeFromNodeIndex(const std::vector<Node*>& nodes, bool recurse);
+
+private: // entity link management
+  void initializeEntityLinks();
+  void clearEntityLinks();
+  void addEntityLinks(const std::vector<Node*>& nodes, bool recurse);
+  void removeEntityLinks(const std::vector<Node*>& nodes, bool recurse);
+
+public: // command processing
+  bool canUndoCommand() const;
+  bool canRedoCommand() const;
+  const std::string* undoCommandName() const;
+  const std::string* redoCommandName() const;
+  void undoCommand();
+  void redoCommand();
+
+  bool isCommandCollationEnabled() const;
+  void setIsCommandCollationEnabled(bool isCommandCollationEnabled);
+
+  using RepeatableCommand = std::function<void()>;
+  void pushRepeatableCommand(RepeatableCommand command);
+  bool canRepeatCommands() const;
+  void repeatCommands();
+  void clearRepeatableCommands();
+
+  void startTransaction(std::string name, TransactionScope scope);
+  void rollbackTransaction();
+  bool commitTransaction();
+  void cancelTransaction();
+
+  bool isCurrentDocumentStateObservable() const;
+
+  bool throwExceptionDuringCommand();
+
+  bool execute(std::unique_ptr<Command>&& command);
+  bool executeAndStore(std::unique_ptr<UndoableCommand>&& command);
+
+private: // observers
+  void connectObservers();
+  void nodesWereAdded(const std::vector<Node*>& nodes);
+  void nodesWillBeRemoved(const std::vector<Node*>& nodes);
+  void nodesWereRemoved(const std::vector<Node*>& nodes);
+  void nodesWillChange(const std::vector<Node*>& nodes);
+  void nodesDidChange(const std::vector<Node*>& nodes);
+  void brushFacesDidChange(const std::vector<BrushFaceHandle>& brushFaces);
+  void resourcesWereProcessed(const std::vector<gl::ResourceId>&);
+  void selectionWillChange();
+  void selectionDidChange(const SelectionChange& selectionChange);
+  void materialCollectionsWillChange();
+  void materialCollectionsDidChange();
+  void entityDefinitionsWillChange();
+  void entityDefinitionsDidChange();
+  void modsWillChange();
+  void modsDidChange();
+};
+
+} // namespace mdl
+} // namespace tb
