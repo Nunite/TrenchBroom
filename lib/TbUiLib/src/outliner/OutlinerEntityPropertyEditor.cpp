@@ -1,44 +1,5 @@
 #include "ui/outliner/OutlinerEntityPropertyEditor.h"
 
-#include "mdl/Map.h"
-
-#include <QLabel>
-#include <QVBoxLayout>
-
-namespace tb::ui
-{
-
-OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(mdl::Map& map, QWidget* parent)
-  : QWidget{parent}
-  , m_map{map}
-{
-  auto* layout = new QVBoxLayout{this};
-  layout->setContentsMargins(6, 6, 6, 6);
-  auto* label = new QLabel{tr("Entity properties are temporarily unavailable.")};
-  label->setWordWrap(true);
-  layout->addWidget(label);
-  layout->addStretch(1);
-}
-
-OutlinerEntityPropertyEditor::~OutlinerEntityPropertyEditor() = default;
-
-void OutlinerEntityPropertyEditor::onChoiceComboPopupHidden() {}
-
-void OutlinerEntityPropertyEditor::connectObservers() {}
-
-void OutlinerEntityPropertyEditor::scheduleUpdate(bool) {}
-
-void OutlinerEntityPropertyEditor::updateFromSelection() {}
-
-void OutlinerEntityPropertyEditor::rebuildPropertyRows(
-  const std::vector<mdl::EntityNodeBase*>&)
-{
-}
-
-} // namespace tb::ui
-
-#if 0
-
 #include <QApplication>
 #include <QEvent>
 #include <QFrame>
@@ -60,12 +21,18 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 #include "mdl/EntityColorPropertyValue.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityProperties.h"
+#include "mdl/GameInfo.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/PropertyDefinition.h"
-#include "ui/QPathUtils.h"
+#include "ui/BitmapButton.h"
 #include "ui/ColorButton.h"
+#include "ui/FileDialogDefaultDir.h"
 #include "ui/FlagsEditor.h"
+#include "ui/MapDocument.h"
+#include "ui/QColorUtils.h"
+#include "ui/QPathUtils.h"
+#include "ui/QStringUtils.h"
 #include "ui/QWidgetUtils.h"
 #include "ui/SmartWadEditor.h"
 #include "ui/TitledPanel.h"
@@ -264,15 +231,15 @@ bool isPropertyKeyMutable(const mdl::Entity& entity, const std::string& key)
     if (mdl::isWorldspawn(entity.classname()))
     {
         return !(
-            key == mdl::EntityPropertyKeys::Classname || key == mdl::EntityPropertyKeys::Mods
-            || key == mdl::EntityPropertyKeys::EntityDefinitions
+            key == mdl::EntityPropertyKeys::Classname || key == mdl::EntityPropertyKeys::TbMods
+            || key == mdl::EntityPropertyKeys::TbEntityDefinitions
             || key == mdl::EntityPropertyKeys::Wad
-            || key == mdl::EntityPropertyKeys::EnabledMaterialCollections
-            || key == mdl::EntityPropertyKeys::SoftMapBounds
-            || key == mdl::EntityPropertyKeys::LayerColor
-            || key == mdl::EntityPropertyKeys::LayerLocked
-            || key == mdl::EntityPropertyKeys::LayerHidden
-            || key == mdl::EntityPropertyKeys::LayerOmitFromExport);
+            || key == mdl::EntityPropertyKeys::TbEnabledMaterialCollections
+            || key == mdl::EntityPropertyKeys::TbSoftMapBounds
+            || key == mdl::EntityPropertyKeys::TbLayerColor
+            || key == mdl::EntityPropertyKeys::TbLayerLocked
+            || key == mdl::EntityPropertyKeys::TbLayerHidden
+            || key == mdl::EntityPropertyKeys::TbLayerOmitFromExport);
     }
 
     return true;
@@ -378,9 +345,9 @@ void getSpawnflagsSetAndMixedValues(
 }
 } // namespace
 
-OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(mdl::Map& map, QWidget* parent)
+OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(MapDocument& document, QWidget* parent)
     : QWidget{parent}
-    , m_map{map}
+    , m_document{document}
 {
     m_propertiesPanel = new TitledPanel{tr("Entity"), true, true};
 
@@ -416,14 +383,15 @@ OutlinerEntityPropertyEditor::~OutlinerEntityPropertyEditor() = default;
 
 void OutlinerEntityPropertyEditor::connectObservers()
 {
-    m_notifierConnection += m_map.selectionDidChangeNotifier.connect(
+    m_notifierConnection += m_document.selectionDidChangeNotifier.connect(
         [this](const mdl::SelectionChange&) { scheduleUpdate(); });
     m_notifierConnection +=
-        m_map.entityDefinitionsDidChangeNotifier.connect([this]() { scheduleUpdate(); });
-    m_notifierConnection += m_map.documentDidChangeNotifier.connect([this]() {
+        m_document.entityDefinitionsDidChangeNotifier.connect([this]() { scheduleUpdate(); });
+    m_notifierConnection += m_document.documentWasLoadedNotifier.connect([this]() { scheduleUpdate(true); });
+    m_notifierConnection += m_document.nodesDidChangeNotifier.connect([this](const auto&) {
         if (m_embeddedWadEditor)
         {
-            m_embeddedWadEditor->update(m_map.selection().allEntities());
+            m_embeddedWadEditor->update(m_document.map().selection().allEntities());
         }
     });
 }
@@ -469,7 +437,8 @@ void OutlinerEntityPropertyEditor::updateFromSelection()
 
     if (!m_forceUpdate)
     {
-        if (widgetOrChildHasFocus(this))
+        if (auto* focusWidget = QApplication::focusWidget();
+            focusWidget != nullptr && (focusWidget == this || isAncestorOf(focusWidget)))
         {
             return;
         }
@@ -477,7 +446,7 @@ void OutlinerEntityPropertyEditor::updateFromSelection()
     m_forceUpdate = false;
     m_updateDeferred = false;
 
-    const auto entities = m_map.selection().allEntities();
+    const auto entities = m_document.map().selection().allEntities();
     rebuildPropertyRows(entities);
 }
 
@@ -543,7 +512,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             return;
         }
 
-        mdl::setEntityProperty(m_map, key.toStdString(), m_addValue->text().toStdString(), false);
+        mdl::setEntityProperty(
+          m_document.map(), key.toStdString(), m_addValue->text().toStdString(), false);
         m_addKey->clear();
         m_addValue->clear();
         scheduleUpdate(true);
@@ -577,8 +547,9 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 
     const auto* entityDefinition = mdl::selectEntityDefinition(entityNodes);
     const auto keys = buildKeyOrderWithInactiveDefinitions(entityNodes, entityDefinition);
-    const auto wadKey = m_map.game()->config().materialConfig.property;
-    const auto canShowWadEditor = entityNodes.size() == 1
+    const auto& wadKey = m_document.map().gameInfo().gameConfig.materialConfig.property;
+    const auto canShowWadEditor = wadKey.has_value()
+                                 && entityNodes.size() == 1
                                  && entityNodes.front()->entity().classname()
                                       == mdl::EntityPropertyValues::WorldspawnClassname;
 
@@ -618,9 +589,9 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 for (const auto& option : choiceType->options)
                 {
                     const auto value =
-                        mapStringToUnicode(m_map.encoding(), option.value);
+                        mapStringToUnicode(m_document.map().encoding(), option.value);
                     const auto label = mapStringToUnicode(
-                        m_map.encoding(),
+                        m_document.map().encoding(),
                         option.value + " : " + option.description);
                     valueCombo->addItem(label, value);
                 }
@@ -685,7 +656,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 {
                     const QSignalBlocker blocker{valueCombo};
                     valueCombo->setEditText(
-                        mapStringToUnicode(m_map.encoding(), consensus.value));
+                        mapStringToUnicode(m_document.map().encoding(), consensus.value));
                     comboLineEdit->setPlaceholderText(QString{});
                 }
             }
@@ -818,7 +789,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         }
 
         QToolButton* wadToggleButton = nullptr;
-        if (canShowWadEditor && wadKey && key == *wadKey)
+        if (canShowWadEditor && key == *wadKey)
         {
             wadToggleButton = new QToolButton{row};
             wadToggleButton->setObjectName("toolButton_withBorder");
@@ -900,7 +871,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 
             connect(flagsEditor, &FlagsEditor::flagChanged, this, [this, flagsEditor, key](const size_t index, const int, const int, const int) {
                 const auto set = flagsEditor->isFlagSet(index);
-                mdl::updateEntitySpawnflag(m_map, key, index, set);
+                mdl::updateEntitySpawnflag(m_document.map(), key, index, set);
                 scheduleUpdate(true);
             });
         }
@@ -914,7 +885,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             containerLayout->setSpacing(0);
 
             m_embeddedWadEditorContainer = container;
-            m_embeddedWadEditor = new SmartWadEditor{m_map, container, false};
+            m_embeddedWadEditor = new SmartWadEditor{m_document, container};
             m_embeddedWadEditor->activate(*wadKey);
             m_embeddedWadEditor->update(entityNodes);
             containerLayout->addWidget(m_embeddedWadEditor, 1);
@@ -933,9 +904,10 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         {
             connect(colorButton, &ColorButton::colorChangedByUser, this, [this, key, propertyDef](const QColor& qColor) {
                 auto requestedColor = Rgb{fromQColor(qColor).to<RgbB>()};
-                if (!m_map.selection().allEntities().empty())
+                if (!m_document.map().selection().allEntities().empty())
                 {
-                    const auto range = mdl::detectColorRange(key, m_map.selection().allEntities());
+                    const auto range =
+                      mdl::detectColorRange(key, m_document.map().selection().allEntities());
                     if (range == mdl::ColorRange::Float)
                     {
                         requestedColor = Rgb{fromQColor(qColor).to<RgbF>()};
@@ -957,7 +929,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                     }
                 }
 
-                mdl::setEntityColorProperty(m_map, key, requestedColor);
+                mdl::setEntityColorProperty(m_document.map(), key, requestedColor);
                 scheduleUpdate(true);
             });
         }
@@ -965,12 +937,6 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         if (modelBrowseButton)
         {
             connect(modelBrowseButton, &QAbstractButton::clicked, this, [this, key]() {
-                auto* game = m_map.game();
-                if (!game)
-                {
-                    return;
-                }
-
                 const auto caption = tr("Load Model File");
                 const auto filter = tr("Model files (*.mdl);;All files (*.*)");
 
@@ -986,8 +952,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 
                 updateFileDialogDefaultDirectoryWithFilename(FileDialogDir::GamePath, pathQStr);
 
-                const auto absModelPath = io::pathFromQString(pathQStr);
-                const auto gamePath = game->gamePath();
+                const auto absModelPath = pathFromQString(pathQStr);
+                const auto gamePath = m_document.map().gamePath();
 
                 auto ec = std::error_code{};
                 const auto relativeModelPathFull = std::filesystem::relative(absModelPath, gamePath, ec);
@@ -1026,7 +992,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                     return;
                 }
 
-                mdl::setEntityProperty(m_map, key, finalModelPath, false);
+                mdl::setEntityProperty(m_document.map(), key, finalModelPath, false);
                 scheduleUpdate(true);
             });
         }
@@ -1044,7 +1010,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 value = mdl::PropertyDefinition::defaultValue(*propertyDef).value_or("");
             }
 
-            mdl::setEntityProperty(m_map, keyVariant.toString().toStdString(), value, false);
+            mdl::setEntityProperty(
+              m_document.map(), keyVariant.toString().toStdString(), value, false);
             scheduleUpdate(true);
         });
 
@@ -1081,9 +1048,9 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                     }
 
                     mdl::setEntityProperty(
-                        m_map,
+                        m_document.map(),
                         keyVariant.toString().toStdString(),
-                        mapStringFromUnicode(m_map.encoding(), value),
+                        mapStringFromUnicode(m_document.map().encoding(), value),
                         false);
                 });
 
@@ -1097,9 +1064,10 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                     }
 
                     mdl::setEntityProperty(
-                        m_map,
+                        m_document.map(),
                         keyVariant.toString().toStdString(),
-                        mapStringFromUnicode(m_map.encoding(), valueCombo->currentText()),
+                        mapStringFromUnicode(
+                          m_document.map().encoding(), valueCombo->currentText()),
                         false);
                     scheduleUpdate();
                 });
@@ -1114,7 +1082,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                     return;
                 }
                 const auto propertyKey = keyVariant.toString().toStdString();
-                mdl::setEntityProperty(m_map, propertyKey, valueEdit->text().toStdString(), false);
+                mdl::setEntityProperty(
+                  m_document.map(), propertyKey, valueEdit->text().toStdString(), false);
                 scheduleUpdate();
             });
         }
@@ -1126,7 +1095,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 return;
             }
             const auto propertyKey = keyVariant.toString().toStdString();
-            mdl::removeEntityProperty(m_map, propertyKey);
+            mdl::removeEntityProperty(m_document.map(), propertyKey);
             scheduleUpdate(true);
         });
     }
@@ -1135,4 +1104,3 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 }
 
 } // namespace tb::ui
-#endif

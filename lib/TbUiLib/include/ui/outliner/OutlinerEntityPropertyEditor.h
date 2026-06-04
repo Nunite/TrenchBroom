@@ -13,7 +13,6 @@ class QVBoxLayout;
 
 namespace tb::mdl
 {
-class Map;
 struct SelectionChange;
 class Node;
 class EntityNodeBase;
@@ -23,13 +22,14 @@ namespace tb::ui
 {
 class TitledPanel;
 class FlagsEditor;
+class MapDocument;
 class SmartWadEditor;
 
 class OutlinerEntityPropertyEditor : public QWidget
 {
     Q_OBJECT
 private:
-    mdl::Map& m_map;
+    MapDocument& m_document;
     NotifierConnection m_notifierConnection;
 
     TitledPanel* m_propertiesPanel = nullptr;
@@ -54,7 +54,7 @@ private:
     bool m_updateDeferred = false;
 
 public:
-    explicit OutlinerEntityPropertyEditor(mdl::Map& map, QWidget* parent = nullptr);
+    explicit OutlinerEntityPropertyEditor(MapDocument& document, QWidget* parent = nullptr);
     ~OutlinerEntityPropertyEditor() override;
     void onChoiceComboPopupHidden();
 

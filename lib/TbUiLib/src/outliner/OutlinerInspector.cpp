@@ -74,7 +74,7 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
     m_treeWidget = new OutlinerTreeWidget(m_document, m_splitter);
     m_splitter->addWidget(m_treeWidget);
 
-    m_propertyEditor = new OutlinerEntityPropertyEditor{m_document.map(), m_splitter};
+    m_propertyEditor = new OutlinerEntityPropertyEditor{m_document, m_splitter};
     m_splitter->addWidget(m_propertyEditor);
 
     m_splitter->setStretchFactor(0, 3);
