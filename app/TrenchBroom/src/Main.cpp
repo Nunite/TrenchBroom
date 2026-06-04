@@ -29,6 +29,7 @@
 #include <QString>
 #include <QStyleHints>
 #include <QSurfaceFormat>
+#include <QTranslator>
 #include <QtGlobal>
 
 #include "PreferenceManager.h"
@@ -69,6 +70,20 @@ bool loadStyleSheets()
     return true;
   }
   return false;
+}
+
+void loadTranslations(QApplication& app)
+{
+  if (pref(Preferences::Language) != Preferences::languageChinese())
+  {
+    return;
+  }
+
+  static auto trenchBroomTranslator = QTranslator{};
+  if (trenchBroomTranslator.load(":/translations/trenchbroom_zh_CN"))
+  {
+    app.installTranslator(&trenchBroomTranslator);
+  }
 }
 
 QPalette darkPalette()
@@ -322,6 +337,8 @@ int main(int argc, char* argv[])
   // PreferenceManager is destroyed by TrenchBroomApp::~TrenchBroomApp()
   PreferenceManager::createInstance(
     std::make_unique<QPreferenceStore>(pathAsQString(SystemPaths::preferenceFilePath())));
+
+  loadTranslations(app);
 
   // Style sheets must be loaded before creating the app controller, or they won't apply
   // to the welcome window, which the app controller creates
