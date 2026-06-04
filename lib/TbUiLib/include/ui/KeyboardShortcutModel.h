@@ -20,8 +20,8 @@
 #pragma once
 
 #include <QAbstractTableModel>
+#include <QString>
 
-#include <filesystem>
 #include <vector>
 
 class QObject;
@@ -52,13 +52,13 @@ private:
     /**
      * Path displayed to the user, unrelated to the preference path.
      */
-    std::filesystem::path m_displayPath;
+    QString m_displayPath;
     Action* m_action;
 
   public:
-    ActionInfo(ActionInfoType type, std::filesystem::path displayPath, Action& action);
+    ActionInfo(ActionInfoType type, QString displayPath, Action& action);
 
-    const std::filesystem::path& displayPath() const;
+    const QString& displayPath() const;
 
     const Action& action() const;
     Action& action();

@@ -27,7 +27,6 @@
 #include "ui/ActionManager.h"
 #include "ui/ActionMenu.h"
 #include "ui/MapDocument.h"
-#include "ui/QPathUtils.h"
 
 #include "kd/const_overload.h"
 #include "kd/contracts.h"
@@ -40,15 +39,25 @@
 namespace tb::ui
 {
 
+namespace
+{
+
+QString displayPath(const QString& parentPath, const QString& name)
+{
+  return parentPath.isEmpty() ? name : parentPath + "/" + name;
+}
+
+} // namespace
+
 KeyboardShortcutModel::ActionInfo::ActionInfo(
-  const ActionInfoType type, std::filesystem::path displayPath, Action& action)
+  const ActionInfoType type, QString displayPath, Action& action)
   : m_type{type}
   , m_displayPath{std::move(displayPath)}
   , m_action{&action}
 {
 }
 
-const std::filesystem::path& KeyboardShortcutModel::ActionInfo::displayPath() const
+const QString& KeyboardShortcutModel::ActionInfo::displayPath() const
 {
   return m_displayPath;
 }
@@ -117,9 +126,9 @@ QVariant KeyboardShortcutModel::headerData(
 {
   if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
   {
-    return section == 0   ? QString{"Shortcut"}
-           : section == 1 ? QString{"Context"}
-                          : QString{"Description"};
+    return section == 0   ? tr("Shortcut")
+           : section == 1 ? tr("Context")
+                          : tr("Description");
   }
   return QVariant{};
 }
@@ -143,7 +152,7 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
       return QString::fromStdString(
         actionContextName(actionInfo.action().actionContext()));
     }
-    return QString::fromStdString(actionInfo.displayPath().generic_string());
+    return actionInfo.displayPath();
   }
   if (role == Qt::ForegroundRole && hasConflicts(index))
   {
@@ -214,19 +223,20 @@ void KeyboardShortcutModel::initializeActions()
 
 void KeyboardShortcutModel::initializeMenuActions()
 {
-  auto currentPath = std::filesystem::path{};
+  auto currentPath = QString{};
   m_actionManager.visitMainMenu(kdl::overload(
     [](const MenuSeparator&) {},
     [&](const MenuAction& actionItem) {
       m_actions.emplace_back(
         ActionInfoType::Menu,
-        currentPath / pathFromQString(actionItem.action.label()),
+        displayPath(currentPath, actionItem.action.label()),
         actionItem.action);
     },
     [&](const auto& thisLambda, const Menu& menu) {
-      currentPath = currentPath / menu.name;
+      const auto previousPath = currentPath;
+      currentPath = displayPath(currentPath, QString::fromStdString(menu.name));
       menu.visitEntries(thisLambda);
-      currentPath = currentPath.parent_path();
+      currentPath = previousPath;
     }));
 }
 
@@ -234,7 +244,7 @@ void KeyboardShortcutModel::initializeViewActions()
 {
   m_actionManager.visitMapViewActions([&](Action& action) {
     m_actions.emplace_back(
-      ActionInfoType::View, "Map View" / pathFromQString(action.label()), action);
+      ActionInfoType::View, displayPath(tr("Map View"), action.label()), action);
   });
 }
 
@@ -244,7 +254,7 @@ void KeyboardShortcutModel::initializeTagActions()
 
   m_document->visitTagActions(m_actionManager, [&](Action& action) {
     m_actions.emplace_back(
-      ActionInfoType::Tag, "Tags" / pathFromQString(action.label()), action);
+      ActionInfoType::Tag, displayPath(tr("Tags"), action.label()), action);
   });
 }
 
@@ -255,7 +265,7 @@ void KeyboardShortcutModel::initializeEntityDefinitionActions()
   m_document->visitEntityDefinitionActions(m_actionManager, [&](Action& action) {
     m_actions.emplace_back(
       ActionInfoType::EntityDefinition,
-      "Entity Definitions" / pathFromQString(action.label()),
+      displayPath(tr("Entity Definitions"), action.label()),
       action);
   });
 }
