@@ -1789,6 +1789,26 @@ void ActionManager::createViewMenu()
     [](auto& context) { context.mapWindow().switchToInspectorPage(InspectorPage::Face); },
     [](const auto& context) { return context.hasDocument(); },
   }));
+  viewMenu.addItem(addAction(Action{
+    "Menu/View/Switch to Outliner Inspector",
+    QObject::tr("Show Outliner Inspector"),
+    ActionContext::Any,
+    QKeySequence{},
+    [](auto& context) {
+      context.mapWindow().switchToInspectorPage(InspectorPage::Outliner);
+    },
+    [](const auto& context) { return context.hasDocument(); },
+  }));
+  viewMenu.addItem(addAction(Action{
+    "Menu/View/Switch to Plugin Inspector",
+    QObject::tr("Show Plugin Inspector"),
+    ActionContext::Any,
+    QKeySequence{},
+    [](auto& context) {
+      context.mapWindow().switchToInspectorPage(InspectorPage::Plugin);
+    },
+    [](const auto& context) { return context.hasDocument(); },
+  }));
   viewMenu.addSeparator();
   viewMenu.addItem(addAction(Action{
     "Menu/View/Toggle Toolbar",

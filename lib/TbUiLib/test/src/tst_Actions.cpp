@@ -90,6 +90,16 @@ TEST_CASE("Actions")
     const auto conflicts = getActionConflicts(allActions, findConflicts(allActions));
     CHECK(conflicts == std::vector<ActionConflict>{});
   }
+
+  SECTION("Custom inspector pages have view menu actions")
+  {
+    const auto& actions = actionManager.actionsMap();
+    CHECK(actions.contains("Menu/View/Switch to Map Inspector"));
+    CHECK(actions.contains("Menu/View/Switch to Entity Inspector"));
+    CHECK(actions.contains("Menu/View/Switch to Face Inspector"));
+    CHECK(actions.contains("Menu/View/Switch to Outliner Inspector"));
+    CHECK(actions.contains("Menu/View/Switch to Plugin Inspector"));
+  }
 }
 
 } // namespace tb::ui
