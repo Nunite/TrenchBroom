@@ -28,6 +28,7 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_OutlinerModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_OutlinerTreeWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PieMenu.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PreferenceDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PluginInspector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonPluginPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonUtils.cpp

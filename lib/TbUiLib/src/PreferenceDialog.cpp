@@ -40,6 +40,7 @@
 #include "ui/DialogButtonLayout.h"
 #include "ui/GamesPreferencePane.h"
 #include "ui/KeyboardPreferencePane.h"
+#include "ui/MiscPreferencePane.h"
 #include "ui/MousePreferencePane.h"
 #include "ui/PreferencePane.h"
 #include "ui/ViewPreferencePane.h"
@@ -65,8 +66,9 @@ enum class PreferenceDialog::PrefPane
   Colors = 2,
   Mouse = 3,
   Keyboard = 4,
-  Update = 5,
-  Last = 5
+  Misc = 5,
+  Update = 6,
+  Last = 6
 } PrefPane;
 
 
@@ -141,6 +143,7 @@ void PreferenceDialog::createGui()
   const auto colorsImage = loadSVGIcon("ColorPreferences.svg");
   const auto mouseImage = loadSVGIcon("MousePreferences.svg");
   const auto keyboardImage = loadSVGIcon("KeyboardPreferences.svg");
+  const auto miscImage = loadSVGIcon("LanguagePreferences.svg");
   const auto updateImage = loadSVGIcon("UpdatePreferences.svg");
 
   m_toolBar = new QToolBar{};
@@ -153,6 +156,7 @@ void PreferenceDialog::createGui()
   m_toolBar->addAction(mouseImage, "Mouse", [&]() { switchToPane(PrefPane::Mouse); });
   m_toolBar->addAction(
     keyboardImage, "Keyboard", [&]() { switchToPane(PrefPane::Keyboard); });
+  m_toolBar->addAction(miscImage, "Misc", [&]() { switchToPane(PrefPane::Misc); });
   m_toolBar->addAction(updateImage, "Update", [&]() { switchToPane(PrefPane::Update); });
 
   // Don't display tooltips for pane switcher buttons...
@@ -167,6 +171,7 @@ void PreferenceDialog::createGui()
   m_stackedWidget->addWidget(new ColorsPreferencePane{});
   m_stackedWidget->addWidget(new MousePreferencePane{});
   m_stackedWidget->addWidget(new KeyboardPreferencePane{m_appController, m_document});
+  m_stackedWidget->addWidget(new MiscPreferencePane{});
   m_stackedWidget->addWidget(new UpdatePreferencePane{m_appController});
 
   m_buttonBox = new QDialogButtonBox{
