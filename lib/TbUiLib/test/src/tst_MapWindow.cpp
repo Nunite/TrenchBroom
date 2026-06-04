@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDeadlineTimer>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
@@ -547,6 +548,29 @@ panel.add_button("Run")
     window.setGridSize(initialGridSize);
     CHECK(window.document().map().grid().size() == initialGridSize);
     CHECK_FALSE(window.document().map().modified());
+  }
+
+  SECTION("opens the configured pie menu from the current map view shortcut")
+  {
+    setPref(Preferences::PieMenuAction, "Menu/View/Grid/Set Grid Size 8");
+
+    auto* mapView = window.currentMapViewBase();
+    REQUIRE(mapView != nullptr);
+
+    QCursor::setPos({300, 300});
+    auto event = QKeyEvent{QEvent::KeyPress, Qt::Key_QuoteLeft, Qt::NoModifier};
+    QApplication::sendEvent(mapView, &event);
+    QApplication::processEvents();
+
+    REQUIRE(event.isAccepted());
+    auto* menu = findVisiblePieMenu();
+    REQUIRE(menu != nullptr);
+    REQUIRE(QTest::qWaitForWindowExposed(menu));
+
+    menu->close();
+    menu->setParent(nullptr);
+    menu->deleteLater();
+    QApplication::sendPostedEvents(menu, QEvent::DeferredDelete);
   }
 }
 

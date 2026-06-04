@@ -23,6 +23,7 @@
 #include <QClipboard>
 #include <QCursor>
 #include <QDebug>
+#include <QKeyEvent>
 #include <QMenu>
 #include <QMimeData>
 #include <QShortcut>
@@ -902,6 +903,16 @@ bool MapViewBase::event(QEvent* event)
   if (event->type() == QEvent::WindowDeactivate)
   {
     cancelMouseDrag();
+  }
+  else if (event->type() == QEvent::KeyPress)
+  {
+    auto* keyEvent = static_cast<QKeyEvent*>(event);
+    if (!keyEvent->isAutoRepeat() && keyEvent->key() == Qt::Key_QuoteLeft)
+    {
+      showPieMenu();
+      keyEvent->accept();
+      return true;
+    }
   }
 
   return RenderView::event(event);
