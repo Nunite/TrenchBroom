@@ -1497,6 +1497,8 @@ void OutlinerTreeWidget::onItemSelectionChanged()
 
 void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
 {
+    m_rightMousePressedInside = event->button() == Qt::RightButton;
+
     // Handle Lock/Vis clicks
     auto* item = itemAt(event->pos());
     if (item) {
@@ -1562,6 +1564,12 @@ void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
 
 void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
 {
+    if (!m_rightMousePressedInside && event->reason() == QContextMenuEvent::Mouse) {
+        event->ignore();
+        return;
+    }
+    m_rightMousePressedInside = false;
+
     auto* item = itemAt(event->pos());
     if (!item) {
         return;

@@ -53,6 +53,7 @@ private:
     std::unordered_map<const mdl::Node*, QTreeWidgetItem*> m_itemForNode;
     NotifierConnection m_notifierConnection;
     QPoint m_dragStartPosition;
+    bool m_rightMousePressedInside = false;
 
 public:
     explicit OutlinerTreeWidget(MapDocument& document, QWidget* parent = nullptr);
