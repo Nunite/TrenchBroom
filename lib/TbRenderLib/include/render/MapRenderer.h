@@ -54,6 +54,7 @@ class GroupLinkRenderer;
 class ObjectRenderer;
 class RenderBatch;
 class RenderContext;
+class SkyRenderer;
 
 class MapRenderer
 {
@@ -66,6 +67,7 @@ private:
   std::unique_ptr<EntityDecalRenderer> m_entityDecalRenderer;
   std::unique_ptr<EntityLinkRenderer> m_entityLinkRenderer;
   std::unique_ptr<GroupLinkRenderer> m_groupLinkRenderer;
+  std::unique_ptr<SkyRenderer> m_skyRenderer;
 
   enum class Renderer
   {
@@ -94,6 +96,7 @@ public: // rendering
 
 private:
   void setupGL(RenderBatch& renderBatch);
+  void renderSky(RenderContext& renderContext, RenderBatch& renderBatch);
   void renderDefaultOpaque(RenderContext& renderContext, RenderBatch& renderBatch);
   void renderDefaultTransparent(RenderContext& renderContext, RenderBatch& renderBatch);
   void renderSelectionOpaque(RenderContext& renderContext, RenderBatch& renderBatch);

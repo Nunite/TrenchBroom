@@ -206,6 +206,11 @@ void ObjectRenderer::setUseReadable2DBrushOutlines(const bool useReadable2DBrush
   m_brushRenderer.setUseReadable2DBrushOutlines(useReadable2DBrushOutlines);
 }
 
+void ObjectRenderer::setSkipSkyFaces(const bool skipSkyFaces)
+{
+  m_brushRenderer.setSkipSkyFaces(skipSkyFaces);
+}
+
 void ObjectRenderer::setShowHiddenObjects(const bool showHiddenObjects)
 {
   m_entityRenderer.setShowHiddenEntities(showHiddenObjects);

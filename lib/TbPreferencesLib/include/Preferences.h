@@ -96,6 +96,7 @@ inline auto PortalFileBorderColor =
 inline auto PortalFileFillColor =
   Preference<Color>{"render/Colors/Portal file fill", RgbaF{1.0f, 0.4f, 0.4f, 0.2f}};
 inline auto ShowFPS = Preference<bool>{"render/Show FPS", false};
+inline auto ShowSky = Preference<bool>{"render/Show sky", true};
 
 Preference<Color>& axisColor(vm::axis::type axis);
 

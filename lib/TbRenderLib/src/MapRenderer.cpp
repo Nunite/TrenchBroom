@@ -52,6 +52,7 @@
 #include "render/ObjectRenderer.h"
 #include "render/RenderBatch.h"
 #include "render/RenderContext.h"
+#include "render/SkyRenderer.h"
 
 #include "kd/overload.h"
 #include "kd/path_utils.h"
@@ -211,6 +212,7 @@ MapRenderer::MapRenderer(mdl::Map& map)
   , m_entityDecalRenderer{createEntityDecalRenderer(m_map)}
   , m_entityLinkRenderer{std::make_unique<EntityLinkRenderer>(m_map)}
   , m_groupLinkRenderer{std::make_unique<GroupLinkRenderer>(m_map)}
+  , m_skyRenderer{std::make_unique<SkyRenderer>(m_map)}
 {
   connectObservers();
   setupRenderers();
@@ -242,6 +244,7 @@ void MapRenderer::restoreSelectionColors()
 void MapRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
 {
   setupGL(renderBatch);
+  renderSky(renderContext, renderBatch);
   renderEntityDecals(renderContext, renderBatch);
   renderEntityLinks(renderContext, renderBatch);
   renderGroupLinks(renderContext, renderBatch);
@@ -272,6 +275,11 @@ class SetupGL : public Renderable
 void MapRenderer::setupGL(RenderBatch& renderBatch)
 {
   renderBatch.addOneShot(new SetupGL{});
+}
+
+void MapRenderer::renderSky(RenderContext& renderContext, RenderBatch& renderBatch)
+{
+  m_skyRenderer->render(renderContext, renderBatch);
 }
 
 void MapRenderer::renderDefaultOpaque(
@@ -362,6 +370,7 @@ void MapRenderer::setupDefaultRenderer(ObjectRenderer& renderer)
   renderer.setBrushFaceColor(pref(Preferences::FaceColor));
   renderer.setBrushEdgeColor(pref(Preferences::EdgeColor));
   renderer.setUseReadable2DBrushOutlines(pref(Preferences::UseReadable2DBrushOutlines));
+  renderer.setSkipSkyFaces(pref(Preferences::ShowSky));
 }
 
 void MapRenderer::setupSelectionRenderer(ObjectRenderer& renderer)
@@ -389,6 +398,7 @@ void MapRenderer::setupSelectionRenderer(ObjectRenderer& renderer)
   renderer.setBrushFaceColor(pref(Preferences::FaceColor));
   renderer.setBrushEdgeColor(pref(Preferences::SelectedEdgeColor));
   renderer.setUseReadable2DBrushOutlines(false);
+  renderer.setSkipSkyFaces(false);
 }
 
 void MapRenderer::setupLockedRenderer(ObjectRenderer& renderer)
@@ -411,6 +421,7 @@ void MapRenderer::setupLockedRenderer(ObjectRenderer& renderer)
   renderer.setBrushFaceColor(pref(Preferences::FaceColor));
   renderer.setBrushEdgeColor(pref(Preferences::LockedEdgeColor));
   renderer.setUseReadable2DBrushOutlines(false);
+  renderer.setSkipSkyFaces(false);
 }
 
 static bool selected(const mdl::Node& node)
@@ -728,6 +739,7 @@ void MapRenderer::nodesDidChange(const std::vector<mdl::Node*>& nodes)
   }
   invalidateEntityLinkRenderer();
   invalidateGroupLinkRenderer();
+  m_skyRenderer->invalidate();
 }
 
 void MapRenderer::nodeVisibilityDidChange(const std::vector<mdl::Node*>& nodes)
@@ -805,6 +817,7 @@ void MapRenderer::resourcesWereProcessed(const std::vector<gl::ResourceId>& reso
 void MapRenderer::materialCollectionsWillChange()
 {
   invalidateRenderers(Renderer::All);
+  m_skyRenderer->invalidate();
 }
 
 void MapRenderer::entityDefinitionsDidChange()
@@ -831,6 +844,11 @@ void MapRenderer::editorContextDidChange()
 void MapRenderer::preferenceDidChange(const std::filesystem::path& path)
 {
   setupRenderers();
+
+  if (path == Preferences::ShowSky.path)
+  {
+    m_skyRenderer->invalidate();
+  }
 
   if (path == m_map.gameInfo().gamePathPreference.path)
   {

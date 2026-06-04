@@ -486,6 +486,7 @@ QWidget* ViewEditor::createRendererPanel(QWidget* parent)
   m_shadeFacesCheckBox = new QCheckBox{tr("Shade faces")};
   m_showFogCheckBox = new QCheckBox{tr("Use fog")};
   m_showEdgesCheckBox = new QCheckBox{tr("Show edges")};
+  m_showSkyCheckBox = new QCheckBox{tr("Show 3D sky")};
   m_useReadable2DBrushOutlinesCheckBox = new QCheckBox{tr("Readable 2D brush outlines")};
 
 
@@ -522,6 +523,8 @@ QWidget* ViewEditor::createRendererPanel(QWidget* parent)
     m_showFogCheckBox, &QAbstractButton::clicked, this, &ViewEditor::showFogChanged);
   connect(
     m_showEdgesCheckBox, &QAbstractButton::clicked, this, &ViewEditor::showEdgesChanged);
+  connect(
+    m_showSkyCheckBox, &QAbstractButton::clicked, this, &ViewEditor::showSkyChanged);
   connect(
     m_useReadable2DBrushOutlinesCheckBox,
     &QAbstractButton::clicked,
@@ -562,6 +565,7 @@ QWidget* ViewEditor::createRendererPanel(QWidget* parent)
   layout->addWidget(m_shadeFacesCheckBox);
   layout->addWidget(m_showFogCheckBox);
   layout->addWidget(m_showEdgesCheckBox);
+  layout->addWidget(m_showSkyCheckBox);
   layout->addWidget(m_useReadable2DBrushOutlinesCheckBox);
 
   for (auto* button : m_entityLinkRadioGroup->buttons())
@@ -623,6 +627,7 @@ void ViewEditor::refreshRendererPanel()
   m_shadeFacesCheckBox->setChecked(pref(Preferences::ShadeFaces));
   m_showFogCheckBox->setChecked(pref(Preferences::ShowFog));
   m_showEdgesCheckBox->setChecked(pref(Preferences::ShowEdges));
+  m_showSkyCheckBox->setChecked(pref(Preferences::ShowSky));
   m_useReadable2DBrushOutlinesCheckBox->setChecked(
     pref(Preferences::UseReadable2DBrushOutlines));
   checkButtonInGroup(
@@ -718,6 +723,11 @@ void ViewEditor::showEdgesChanged(const bool checked)
   setPref(Preferences::ShowEdges, checked);
 }
 
+void ViewEditor::showSkyChanged(const bool checked)
+{
+  setPref(Preferences::ShowSky, checked);
+}
+
 void ViewEditor::useReadable2DBrushOutlinesChanged(const bool checked)
 {
   setPref(Preferences::UseReadable2DBrushOutlines, checked);
@@ -759,6 +769,7 @@ void ViewEditor::restoreDefaultsClicked()
   prefs.resetToDefault(Preferences::ShadeFaces);
   prefs.resetToDefault(Preferences::ShowFog);
   prefs.resetToDefault(Preferences::ShowEdges);
+  prefs.resetToDefault(Preferences::ShowSky);
   prefs.resetToDefault(Preferences::UseReadable2DBrushOutlines);
   prefs.resetToDefault(Preferences::ShowSoftMapBounds);
   prefs.resetToDefault(Preferences::ShowPointEntities);

@@ -180,6 +180,7 @@ private:
 
   bool m_showHiddenBrushes = false;
   bool m_useReadable2DBrushOutlines = false;
+  bool m_skipSkyFaces = false;
   std::vector<gl::VertexTypes::P3C4::Vertex> m_coloredEdgeVertices;
 
 public:
@@ -236,6 +237,7 @@ public:
    * Specifies whether 2D brush edges should use stable per brush/entity colors.
  */
   void setUseReadable2DBrushOutlines(bool useReadable2DBrushOutlines);
+  void setSkipSkyFaces(bool skipSkyFaces);
 
   /**
    * Specifies whether or not to render faces in grayscale.

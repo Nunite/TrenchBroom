@@ -31,6 +31,7 @@
 #include "render/RenderContext.h"
 
 #include "kd/contracts.h"
+#include "kd/string_compare.h"
 
 #include <cstring>
 #include <vector>
@@ -40,6 +41,10 @@ namespace tb::render
 
 namespace
 {
+bool isSkyFace(const mdl::BrushFace& face)
+{
+  return kdl::ci::str_is_equal(face.attributes().materialName(), "sky");
+}
 
 class FilterWrapper : public BrushRenderer::Filter
 {
@@ -272,6 +277,15 @@ void BrushRenderer::setUseReadable2DBrushOutlines(const bool useReadable2DBrushO
   if (useReadable2DBrushOutlines != m_useReadable2DBrushOutlines)
   {
     m_useReadable2DBrushOutlines = useReadable2DBrushOutlines;
+    invalidate();
+  }
+}
+
+void BrushRenderer::setSkipSkyFaces(const bool skipSkyFaces)
+{
+  if (skipSkyFaces != m_skipSkyFaces)
+  {
+    m_skipSkyFaces = skipSkyFaces;
     invalidate();
   }
 }
@@ -659,7 +673,7 @@ void BrushRenderer::validateBrush(const mdl::BrushNode& brushNode)
     for (size_t j = i; j < nextI; ++j)
     {
       const auto& cache = facesSortedByMaterial[j];
-      if (cache.face->isMarked())
+      if (cache.face->isMarked() && !(m_skipSkyFaces && isSkyFace(*cache.face)))
       {
         contract_assert(cache.material == material);
         if (shouldDrawFaceInTransparentPass(brushNode, *cache.face))
@@ -694,6 +708,7 @@ void BrushRenderer::validateBrush(const mdl::BrushNode& brushNode)
         const auto& cache = facesSortedByMaterial[j];
         if (
           cache.face->isMarked()
+          && !(m_skipSkyFaces && isSkyFace(*cache.face))
           && shouldDrawFaceInTransparentPass(brushNode, *cache.face))
         {
           addTriIndicesForPolygon(
@@ -729,6 +744,7 @@ void BrushRenderer::validateBrush(const mdl::BrushNode& brushNode)
         const auto& cache = facesSortedByMaterial[j];
         if (
           cache.face->isMarked()
+          && !(m_skipSkyFaces && isSkyFace(*cache.face))
           && !shouldDrawFaceInTransparentPass(brushNode, *cache.face))
         {
           addTriIndicesForPolygon(

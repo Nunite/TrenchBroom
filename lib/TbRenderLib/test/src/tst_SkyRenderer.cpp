@@ -1,0 +1,68 @@
+/*
+ Copyright (C) 2026 Kristian Duske
+
+ This file is part of TrenchBroom.
+
+ TrenchBroom is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ TrenchBroom is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "render/SkyRenderer.h"
+
+#include "gl/Material.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <filesystem>
+
+namespace tb::render
+{
+
+TEST_CASE("SkyRenderer.skyMaterialNames")
+{
+  CHECK(
+    skyMaterialNames("desert")
+    == SkyMaterialNames{
+      "desertrt", "desertbk", "desertlf", "desertft", "desertup", "desertdn"});
+}
+
+TEST_CASE("SkyRenderer.looseSkyMaterialPaths")
+{
+  CHECK(
+    looseSkyMaterialPaths("2namekdn")
+    == std::array<std::filesystem::path, 6>{
+      std::filesystem::path{"gfx"} / "env" / "2namekdn.tga",
+      std::filesystem::path{"gfx"} / "env" / "2namekdn.bmp",
+      std::filesystem::path{"gfx"} / "env" / "2namekdn.png",
+      std::filesystem::path{"gfx"} / "env" / "2namekdn.jpg",
+      std::filesystem::path{"gfx"} / "env" / "2namekdn.jpeg",
+      std::filesystem::path{"gfx"} / "env" / "2namekdn.dds"});
+}
+
+TEST_CASE("SkyRenderer.shouldRenderSky")
+{
+  CHECK_FALSE(shouldRenderSky(false, true, "desert"));
+  CHECK_FALSE(shouldRenderSky(true, false, "desert"));
+  CHECK_FALSE(shouldRenderSky(true, true, ""));
+  CHECK(shouldRenderSky(true, true, "desert"));
+}
+
+TEST_CASE("SkyRenderer.skyMaterialsReady")
+{
+  const auto material = reinterpret_cast<const gl::Material*>(0x1);
+  CHECK(skyMaterialsReady({material, material, material, material, material, material}));
+  CHECK_FALSE(skyMaterialsReady({material, material, nullptr, material, material, material}));
+  CHECK_FALSE(skyMaterialsReady({}));
+}
+
+} // namespace tb::render

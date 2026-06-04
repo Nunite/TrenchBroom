@@ -60,6 +60,12 @@ inline const ShaderConfig FaceShader = ShaderConfig{
   {"Grid.fragsh", "MapBounds.fragsh", "Face.fragsh"},
 };
 
+inline const ShaderConfig SkyShader = ShaderConfig{
+  "Sky",
+  {"Sky.vertsh"},
+  {"Sky.fragsh"},
+};
+
 inline const ShaderConfig PatchShader = ShaderConfig{
   "Patch",
   {"Face.vertsh"},

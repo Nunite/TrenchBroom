@@ -54,6 +54,7 @@ void initializeShaders(Gl& gl, ShaderManager& shaderManager)
     MiniMapEdgeShader,
     EntityModelShader,
     FaceShader,
+    SkyShader,
     PatchShader,
     EdgeShader,
     ColoredTextShader,

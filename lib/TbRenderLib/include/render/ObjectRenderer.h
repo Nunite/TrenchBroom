@@ -113,6 +113,7 @@ public: // configuration
   void setBrushFaceColor(const Color& brushFaceColor);
   void setBrushEdgeColor(const Color& brushEdgeColor);
   void setUseReadable2DBrushOutlines(bool useReadable2DBrushOutlines);
+  void setSkipSkyFaces(bool skipSkyFaces);
 
   void setShowHiddenObjects(bool showHiddenObjects);
 

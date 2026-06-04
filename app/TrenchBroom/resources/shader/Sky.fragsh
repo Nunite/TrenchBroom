@@ -1,0 +1,84 @@
+#version 120
+
+/*
+ Copyright (C) 2026 Kristian Duske
+
+ This file is part of TrenchBroom.
+
+ TrenchBroom is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ TrenchBroom is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+uniform sampler2D Material;
+uniform vec3 CameraPosition;
+uniform int SkyFaceIndex;
+
+bool faceMatchesDirection(vec3 dir, int face)
+{
+  vec3 absDir = abs(dir);
+  if (absDir.x >= absDir.y && absDir.x >= absDir.z)
+  {
+    return dir.x >= 0.0 ? face == 0 : face == 2;
+  }
+  if (absDir.y >= absDir.x && absDir.y >= absDir.z)
+  {
+    return dir.y >= 0.0 ? face == 1 : face == 3;
+  }
+  return dir.z >= 0.0 ? face == 4 : face == 5;
+}
+
+vec2 skyUv(vec3 dir, int face)
+{
+  vec3 absDir = abs(dir);
+  vec2 uv;
+
+  if (face == 0)
+  {
+    uv = vec2(-dir.y, dir.z) / absDir.x;
+  }
+  else if (face == 2)
+  {
+    uv = vec2(dir.y, dir.z) / absDir.x;
+  }
+  else if (face == 1)
+  {
+    uv = vec2(dir.x, dir.z) / absDir.y;
+  }
+  else if (face == 3)
+  {
+    uv = vec2(-dir.x, dir.z) / absDir.y;
+  }
+  else if (face == 4)
+  {
+    uv = vec2(dir.x, -dir.y) / absDir.z;
+  }
+  else
+  {
+    uv = vec2(dir.x, dir.y) / absDir.z;
+  }
+
+  uv = uv * 0.5 + 0.5;
+  return vec2(uv.x, 1.0 - uv.y);
+}
+
+void main(void)
+{
+  vec3 worldPosition = gl_TexCoord[1].xyz;
+  vec3 dir = normalize(worldPosition - CameraPosition);
+  if (!faceMatchesDirection(dir, SkyFaceIndex))
+  {
+    discard;
+  }
+
+  gl_FragColor = texture2D(Material, skyUv(dir, SkyFaceIndex));
+}

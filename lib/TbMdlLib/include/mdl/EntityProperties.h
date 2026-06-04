@@ -38,6 +38,7 @@ inline const std::string Killtarget = "killtarget";
 inline const std::string Mangle = "mangle";
 inline const std::string Origin = "origin";
 inline const std::string Spawnflags = "spawnflags";
+inline const std::string Skyname = "skyname";
 inline const std::string Target = "target";
 inline const std::string Targetname = "targetname";
 inline const std::string ValveVersion = "mapversion";
