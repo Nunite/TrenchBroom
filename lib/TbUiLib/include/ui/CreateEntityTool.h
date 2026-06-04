@@ -54,7 +54,11 @@ public:
 
   bool createEntity(const std::string& classname);
   bool createEntity(
-    const std::string& classname, const std::string& propertyKey, const std::string& propertyValue);
+    const std::string& classname,
+    const std::string& propertyKey,
+    const std::string& propertyValue);
+  bool canCreateModelEntity(const std::string& modelPath) const;
+  bool createModelEntity(const std::string& modelPath);
   void removeEntity();
   void commitEntity();
 

@@ -27,8 +27,10 @@
 #include "mdl/Map.h"
 #include "mdl/MapFixture.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/PropertyDefinition.h"
 #include "mdl/WorldNode.h"
 #include "ui/CatchConfig.h"
+#include "ui/CreateEntityTool.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
 #include "ui/MapViewToolBox.h"
@@ -51,6 +53,37 @@ void setPathCornerDefinition(mdl::Map& map)
       Color{},
       "path node",
       {},
+      mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
+    },
+  });
+}
+
+void setModelEntityDefinitions(mdl::Map& map)
+{
+  map.entityDefinitionManager().setDefinitions({
+    {
+      "path_corner",
+      Color{},
+      "path node",
+      {},
+      mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
+    },
+    {
+      "cycler",
+      Color{},
+      "model entity",
+      {
+        {"model", mdl::PropertyValueTypes::String{}, "", "", false},
+      },
+      mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
+    },
+    {
+      "cycler_mdl",
+      Color{},
+      "mdl model entity",
+      {
+        {"mdl", mdl::PropertyValueTypes::String{}, "", "", false},
+      },
       mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
     },
   });
@@ -120,6 +153,21 @@ TEST_CASE("MapViewToolBox")
 
     CHECK(toolBox.pathToolActive());
     CHECK_FALSE(toolBox.rotateToolActive());
+  }
+
+  SECTION("create entity tool creates model entities from browser payloads")
+  {
+    setModelEntityDefinitions(map);
+
+    REQUIRE(toolBox.createEntityTool().canCreateModelEntity("models/player.mdl"));
+    REQUIRE(toolBox.createEntityTool().createModelEntity("models/player.mdl"));
+    toolBox.createEntityTool().commitEntity();
+
+    const auto selectedEntities = selectedEntityNodes(map);
+    REQUIRE(selectedEntities.size() == 1u);
+    CHECK(selectedEntities.front()->entity().classname() == "cycler");
+    REQUIRE(selectedEntities.front()->entity().property("model") != nullptr);
+    CHECK(*selectedEntities.front()->entity().property("model") == "models/player.mdl");
   }
 }
 

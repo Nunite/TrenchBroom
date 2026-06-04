@@ -25,6 +25,7 @@
 #include "mdl/Entity.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionManager.h"
+#include "mdl/EntityDefinitionUtils.h"
 #include "mdl/EntityNode.h"
 #include "mdl/Grid.h"
 #include "mdl/HitAdapter.h"
@@ -40,10 +41,41 @@
 #include "kd/contracts.h"
 #include "kd/k.h"
 
+#include <optional>
 #include <string>
+#include <tuple>
 
 namespace tb::ui
 {
+namespace
+{
+
+std::optional<std::tuple<std::string, std::string>> findModelEntityDefinition(
+  const mdl::Map& map)
+{
+  const auto definitions = map.entityDefinitionManager().definitions(
+    mdl::EntityDefinitionType::Point, mdl::EntityDefinitionSortOrder::Name);
+
+  for (const auto* definition : definitions)
+  {
+    if (mdl::getPropertyDefinition(definition, "model"))
+    {
+      return std::tuple{definition->name, std::string{"model"}};
+    }
+  }
+
+  for (const auto* definition : definitions)
+  {
+    if (mdl::getPropertyDefinition(definition, "mdl"))
+    {
+      return std::tuple{definition->name, std::string{"mdl"}};
+    }
+  }
+
+  return std::nullopt;
+}
+
+} // namespace
 
 CreateEntityTool::CreateEntityTool(MapDocument& document)
   : Tool{K(initiallyActive)}
@@ -103,6 +135,28 @@ bool CreateEntityTool::createEntity(
   }
 
   return true;
+}
+
+bool CreateEntityTool::canCreateModelEntity(const std::string& modelPath) const
+{
+  return !modelPath.empty() && findModelEntityDefinition(map()).has_value();
+}
+
+bool CreateEntityTool::createModelEntity(const std::string& modelPath)
+{
+  if (modelPath.empty())
+  {
+    return false;
+  }
+
+  const auto definitionAndProperty = findModelEntityDefinition(map());
+  if (!definitionAndProperty)
+  {
+    return false;
+  }
+
+  const auto& [classname, propertyKey] = *definitionAndProperty;
+  return createEntity(classname, propertyKey, modelPath);
 }
 
 void CreateEntityTool::removeEntity()

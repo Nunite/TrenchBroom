@@ -24,16 +24,31 @@
 #include "ui/InputState.h"
 
 #include "kd/contracts.h"
-#include "kd/string_utils.h"
 
 #include <functional>
+#include <optional>
 #include <string>
-#include <vector>
 
 namespace tb::ui
 {
 namespace
 {
+
+struct DropPayload
+{
+  std::string type;
+  std::string value;
+};
+
+std::optional<DropPayload> parseDropPayload(const std::string& payload)
+{
+  const auto separatorPos = payload.find(':');
+  if (separatorPos == std::string::npos)
+  {
+    return std::nullopt;
+  }
+  return DropPayload{payload.substr(0, separatorPos), payload.substr(separatorPos + 1)};
+}
 
 class CreateEntityDropTracker : public DropTracker
 {
@@ -91,17 +106,44 @@ const Tool& CreateEntityToolController::tool() const
 bool CreateEntityToolController::shouldAcceptDrop(
   const InputState&, const std::string& payload) const
 {
-  const auto parts = kdl::str_split(payload, ":");
-  return parts.size() == 2 && parts[0] == "entity";
+  const auto parsedPayload = parseDropPayload(payload);
+  if (!parsedPayload)
+  {
+    return false;
+  }
+
+  if (parsedPayload->type == "entity")
+  {
+    return true;
+  }
+
+  if (parsedPayload->type == "model")
+  {
+    return m_tool.canCreateModelEntity(parsedPayload->value);
+  }
+
+  return false;
 }
 
 std::unique_ptr<DropTracker> CreateEntityToolController::acceptDrop(
   const InputState& inputState, const std::string& payload)
 {
-  const auto parts = kdl::str_split(payload, ":");
-  contract_assert(parts.size() == 2 && parts[0] == "entity");
+  const auto parsedPayload = parseDropPayload(payload);
+  contract_assert(parsedPayload.has_value());
 
-  return m_tool.createEntity(parts[1]) ? createDropTracker(inputState) : nullptr;
+  if (parsedPayload->type == "entity")
+  {
+    return m_tool.createEntity(parsedPayload->value) ? createDropTracker(inputState)
+                                                     : nullptr;
+  }
+
+  if (parsedPayload->type == "model")
+  {
+    return m_tool.createModelEntity(parsedPayload->value) ? createDropTracker(inputState)
+                                                          : nullptr;
+  }
+
+  return nullptr;
 }
 
 bool CreateEntityToolController::cancel()
