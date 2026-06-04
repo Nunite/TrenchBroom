@@ -28,6 +28,7 @@
 #include "ui/AppController.h"
 #include "ui/CrashDialog.h"
 #include "ui/GetVersion.h"
+#include "ui/ImageUtils.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
@@ -41,6 +42,7 @@
 #include <fmt/format.h>
 #include <fmt/std.h>
 
+#include <array>
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
@@ -58,6 +60,7 @@ namespace
 AppController* appControllerForCrashReporter = nullptr;
 bool crashReporterGuiEnabled = true;
 bool crashReporterIsReportingCrash = false;
+std::string windowsExceptionDetails;
 
 const MapDocument* topDocument()
 {
@@ -89,6 +92,14 @@ std::string makeCrashReport(const auto& stacktrace, const auto& reason)
   ss << "TrenchBroom Build:\t" << getBuildIdStr().toStdString() << std::endl;
 
   ss << "Reason:\t" << reason << std::endl;
+  if (!windowsExceptionDetails.empty())
+  {
+    ss << windowsExceptionDetails;
+  }
+  if (const auto svgPath = currentSvgRenderPath(); !svgPath.empty())
+  {
+    ss << "Current SVG render path:\t" << svgPath << std::endl;
+  }
 
   stacktrace.print(ss);
 
@@ -191,8 +202,38 @@ std::filesystem::path crashReportBasePath()
 }
 
 #if defined(_WIN32) && defined(_MSC_VER)
+std::string moduleNameForAddress(const void* address)
+{
+  auto module = HMODULE{};
+  if (
+    GetModuleHandleExA(
+      GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+        | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+      static_cast<LPCSTR>(address),
+      &module)
+    == 0)
+  {
+    return {};
+  }
+
+  auto filename = std::array<char, MAX_PATH>{};
+  if (GetModuleFileNameA(module, filename.data(), DWORD(filename.size())) == 0)
+  {
+    return {};
+  }
+  return filename.data();
+}
+
 LONG WINAPI TrenchBroomUnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionPtrs)
 {
+  windowsExceptionDetails = fmt::format(
+    "Exception code:\t0x{:08x}\n"
+    "Exception address:\t{}\n"
+    "Exception module:\t{}\n",
+    pExceptionPtrs->ExceptionRecord->ExceptionCode,
+    pExceptionPtrs->ExceptionRecord->ExceptionAddress,
+    moduleNameForAddress(pExceptionPtrs->ExceptionRecord->ExceptionAddress));
+
   reportCrashAndExit(
     cpptrace::generate_trace(),
     std::to_string(pExceptionPtrs->ExceptionRecord->ExceptionCode));

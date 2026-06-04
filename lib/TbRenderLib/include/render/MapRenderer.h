@@ -96,8 +96,6 @@ private:
   void setupGL(RenderBatch& renderBatch);
   void renderDefaultOpaque(RenderContext& renderContext, RenderBatch& renderBatch);
   void renderDefaultTransparent(RenderContext& renderContext, RenderBatch& renderBatch);
-  void renderReadable2DBrushOutlines(
-    RenderContext& renderContext, RenderBatch& renderBatch);
   void renderSelectionOpaque(RenderContext& renderContext, RenderBatch& renderBatch);
   void renderSelectionTransparent(RenderContext& renderContext, RenderBatch& renderBatch);
   void renderLockedOpaque(RenderContext& renderContext, RenderBatch& renderBatch);

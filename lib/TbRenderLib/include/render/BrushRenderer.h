@@ -21,8 +21,10 @@
 
 #include "Color.h"
 #include "Macros.h"
+#include "gl/VertexType.h"
 #include "mdl/BrushGeometry.h"
 #include "render/AllocationTracker.h"
+#include "render/BrushOutlineColor.h"
 #include "render/EdgeRenderer.h"
 #include "render/FaceRenderer.h"
 
@@ -128,8 +130,10 @@ private:
 
   struct BrushInfo
   {
-    AllocationTracker::Block* vertexHolderKey;
-    AllocationTracker::Block* edgeIndicesKey;
+    AllocationTracker::Block* vertexHolderKey = nullptr;
+    AllocationTracker::Block* edgeIndicesKey = nullptr;
+    size_t coloredEdgeVertexOffset = 0;
+    size_t coloredEdgeVertexCount = 0;
     std::vector<std::pair<const gl::Material*, AllocationTracker::Block*>>
       opaqueFaceIndicesKeys;
     std::vector<std::pair<const gl::Material*, AllocationTracker::Block*>>
@@ -161,6 +165,7 @@ private:
   FaceRenderer m_opaqueFaceRenderer;
   FaceRenderer m_transparentFaceRenderer;
   IndexedEdgeRenderer m_edgeRenderer;
+  DirectEdgeRenderer m_coloredEdgeRenderer;
 
   Color m_faceColor;
   bool m_showEdges = false;
@@ -174,6 +179,8 @@ private:
   float m_transparencyAlpha = 1.0f;
 
   bool m_showHiddenBrushes = false;
+  bool m_useReadable2DBrushOutlines = false;
+  std::vector<gl::VertexTypes::P3C4::Vertex> m_coloredEdgeVertices;
 
 public:
   template <typename FilterT>
@@ -224,6 +231,11 @@ public:
    * The color to render brush edges with.
    */
   void setEdgeColor(const Color& edgeColor);
+
+  /**
+   * Specifies whether 2D brush edges should use stable per brush/entity colors.
+ */
+  void setUseReadable2DBrushOutlines(bool useReadable2DBrushOutlines);
 
   /**
    * Specifies whether or not to render faces in grayscale.
@@ -285,7 +297,7 @@ public: // rendering
 private:
   void renderOpaqueFaces(RenderBatch& renderBatch);
   void renderTransparentFaces(RenderBatch& renderBatch);
-  void renderEdges(RenderBatch& renderBatch);
+  void renderEdges(RenderContext& renderContext, RenderBatch& renderBatch);
 
 public:
   /**

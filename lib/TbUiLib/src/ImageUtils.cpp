@@ -25,6 +25,8 @@
 #include <QImage>
 #include <QPainter>
 #include <QPalette>
+#include <QPen>
+#include <QPolygonF>
 #include <QSvgRenderer>
 #include <QThread>
 
@@ -40,6 +42,8 @@ namespace tb::ui
 {
 namespace
 {
+
+thread_local std::string currentSvgRenderPathValue;
 
 QString imagePathToString(const std::filesystem::path& imagePath)
 {
@@ -70,11 +74,103 @@ QImage createDisabledState(const QImage& image)
   return disabledImage;
 }
 
-QImage renderSvgToImage(
-  QSvgRenderer& svgSource, const bool invert, const qreal devicePixelRatio)
+bool isCircleToolSvg(const QString& imagePathString)
 {
+  return imagePathString.endsWith("CircleEdgeAligned.svg")
+         || imagePathString.endsWith("CircleVertexAligned.svg")
+         || imagePathString.endsWith("CircleScalable.svg");
+}
+
+QImage renderCircleToolImage(const QString& imagePathString, const qreal devicePixelRatio)
+{
+  auto image = QImage{
+    int(24 * devicePixelRatio),
+    int(24 * devicePixelRatio),
+    QImage::Format_ARGB32_Premultiplied};
+  image.setDevicePixelRatio(devicePixelRatio);
+  image.fill(Qt::transparent);
+
+  auto painter = QPainter{&image};
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  painter.scale(devicePixelRatio, devicePixelRatio);
+
+  painter.setPen(QPen{QColor{0xA0, 0x00, 0x00}, 1.0});
+  painter.setBrush(Qt::NoBrush);
+  painter.drawRect(QRectF{3.5, 3.5, 17.0, 17.0});
+
+  const auto orange = QColor{0xFF, 0x7F, 0x01};
+  painter.setPen(QPen{orange, 1.0});
+
+  if (imagePathString.endsWith("CircleScalable.svg"))
+  {
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPolygon(QPolygonF{
+      {14.5, 3.5},
+      {18.5, 5.5},
+      {20.5, 9.5},
+      {20.5, 14.5},
+      {18.5, 18.5},
+      {14.5, 20.5},
+      {9.5, 20.5},
+      {5.5, 18.5},
+      {3.5, 14.5},
+      {3.5, 9.5},
+      {5.5, 5.5},
+      {9.5, 3.5}});
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(orange);
+    painter.drawRect(QRectF{7.0, 7.0, 3.0, 3.0});
+    painter.drawRect(QRectF{14.0, 7.0, 3.0, 3.0});
+    painter.drawRect(QRectF{14.0, 14.0, 3.0, 3.0});
+    painter.drawRect(QRectF{7.0, 14.0, 3.0, 3.0});
+  }
+  else
+  {
+    painter.setBrush(QColor{0x7F, 0x7F, 0x7F, 63});
+    painter.drawPolygon(
+      imagePathString.endsWith("CircleVertexAligned.svg")
+        ? QPolygonF{{18.0, 6.0}, {20.5, 12.0}, {18.0, 18.0}, {12.0, 20.5}, {6.0, 18.0}, {3.5, 12.0}, {6.0, 6.0}, {12.0, 3.5}}
+        : QPolygonF{
+            {15.5, 3.5},
+            {20.5, 8.5},
+            {20.5, 15.5},
+            {15.5, 20.5},
+            {8.5, 20.5},
+            {3.5, 15.5},
+            {3.5, 8.5},
+            {8.5, 3.5}});
+  }
+
+  return image;
+}
+
+QImage renderSvgToImage(
+  QSvgRenderer& svgSource,
+  const QString& imagePathString,
+  const bool invert,
+  const qreal devicePixelRatio)
+{
+  currentSvgRenderPathValue = imagePathString.toStdString();
+  if (isCircleToolSvg(imagePathString))
+  {
+    currentSvgRenderPathValue.clear();
+    return renderCircleToolImage(imagePathString, devicePixelRatio);
+  }
+
   if (!svgSource.isValid())
   {
+    currentSvgRenderPathValue.clear();
+    return QImage{};
+  }
+
+  const auto defaultSize = svgSource.defaultSize();
+  if (
+    !defaultSize.isValid() || defaultSize.isEmpty() || defaultSize.width() > 1024
+    || defaultSize.height() > 1024 || devicePixelRatio <= 0.0)
+  {
+    qWarning() << "Refusing to render SVG with invalid size" << defaultSize;
+    currentSvgRenderPathValue.clear();
     return QImage{};
   }
 
@@ -82,10 +178,18 @@ QImage renderSvgToImage(
     int(svgSource.defaultSize().width() * devicePixelRatio),
     int(svgSource.defaultSize().height() * devicePixelRatio),
     QImage::Format_ARGB32_Premultiplied};
+  if (image.isNull())
+  {
+    qWarning() << "Failed to allocate SVG image" << defaultSize << devicePixelRatio;
+    currentSvgRenderPathValue.clear();
+    return QImage{};
+  }
+
   image.fill(Qt::transparent);
 
   auto paint = QPainter{&image};
   svgSource.render(&paint);
+  currentSvgRenderPathValue.clear();
   image.setDevicePixelRatio(devicePixelRatio);
 
   if (invert && image.isGrayscale())
@@ -98,22 +202,33 @@ QImage renderSvgToImage(
 
 void renderSvgToIcon(
   QSvgRenderer& svgSource,
+  const QString& imagePathString,
   QIcon& icon,
   const QIcon::State state,
   const bool invert,
   const qreal devicePixelRatio)
 {
-  if (!svgSource.isValid())
+  if (!svgSource.isValid() && !isCircleToolSvg(imagePathString))
   {
     return;
   }
 
-  auto image = renderSvgToImage(svgSource, invert, devicePixelRatio);
+  auto image = renderSvgToImage(svgSource, imagePathString, invert, devicePixelRatio);
+  if (image.isNull())
+  {
+    return;
+  }
+
   icon.addPixmap(QPixmap::fromImage(image), QIcon::Normal, state);
   icon.addPixmap(QPixmap::fromImage(createDisabledState(image)), QIcon::Disabled, state);
 }
 
 } // namespace
+
+std::string currentSvgRenderPath()
+{
+  return currentSvgRenderPathValue;
+}
 
 QPixmap loadPixmap(const std::filesystem::path& imagePath)
 {
@@ -144,7 +259,8 @@ QPixmap loadSVGPixmap(const std::filesystem::path& imagePath)
       qWarning() << "Failed to load SVG " << imagePathString;
     }
 
-    auto pixmap = QPixmap::fromImage(renderSvgToImage(renderer, darkTheme, 1.0));
+    auto pixmap =
+      QPixmap::fromImage(renderSvgToImage(renderer, imagePathString, darkTheme, 1.0));
     cache[imagePath] = pixmap;
     return pixmap;
   }
@@ -196,10 +312,10 @@ QIcon loadSVGIcon(const std::filesystem::path& imagePath)
         qWarning() << "Failed to load SVG " << offPath;
       }
 
-      renderSvgToIcon(onRenderer, result, QIcon::On, darkTheme, 1.0);
-      renderSvgToIcon(onRenderer, result, QIcon::On, darkTheme, 2.0);
-      renderSvgToIcon(offRenderer, result, QIcon::Off, darkTheme, 1.0);
-      renderSvgToIcon(offRenderer, result, QIcon::Off, darkTheme, 2.0);
+      renderSvgToIcon(onRenderer, onPath, result, QIcon::On, darkTheme, 1.0);
+      renderSvgToIcon(onRenderer, onPath, result, QIcon::On, darkTheme, 2.0);
+      renderSvgToIcon(offRenderer, offPath, result, QIcon::Off, darkTheme, 1.0);
+      renderSvgToIcon(offRenderer, offPath, result, QIcon::Off, darkTheme, 2.0);
     }
     else if (!imagePathString.isEmpty())
     {
@@ -209,8 +325,8 @@ QIcon loadSVGIcon(const std::filesystem::path& imagePath)
         qWarning() << "Failed to load SVG " << imagePathString;
       }
 
-      renderSvgToIcon(renderer, result, QIcon::Off, darkTheme, 1.0);
-      renderSvgToIcon(renderer, result, QIcon::Off, darkTheme, 2.0);
+      renderSvgToIcon(renderer, imagePathString, result, QIcon::Off, darkTheme, 1.0);
+      renderSvgToIcon(renderer, imagePathString, result, QIcon::Off, darkTheme, 2.0);
     }
     else
     {

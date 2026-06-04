@@ -4,6 +4,7 @@ target_sources(TbRenderLib
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AllocationTracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/BoundsGuideRenderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/BrushOutlineColor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/BrushRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/BrushRendererArrays.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Circle.cpp

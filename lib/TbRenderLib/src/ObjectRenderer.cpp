@@ -201,6 +201,11 @@ void ObjectRenderer::setBrushEdgeColor(const Color& brushEdgeColor)
   m_patchRenderer.setEdgeColor(brushEdgeColor);
 }
 
+void ObjectRenderer::setUseReadable2DBrushOutlines(const bool useReadable2DBrushOutlines)
+{
+  m_brushRenderer.setUseReadable2DBrushOutlines(useReadable2DBrushOutlines);
+}
+
 void ObjectRenderer::setShowHiddenObjects(const bool showHiddenObjects)
 {
   m_entityRenderer.setShowHiddenEntities(showHiddenObjects);

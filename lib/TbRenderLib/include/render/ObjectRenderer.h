@@ -112,6 +112,7 @@ public: // configuration
   void setShowBrushEdges(bool showBrushEdges);
   void setBrushFaceColor(const Color& brushFaceColor);
   void setBrushEdgeColor(const Color& brushEdgeColor);
+  void setUseReadable2DBrushOutlines(bool useReadable2DBrushOutlines);
 
   void setShowHiddenObjects(bool showHiddenObjects);
 

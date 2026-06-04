@@ -23,6 +23,7 @@
 #include <QPixmap>
 
 #include <filesystem>
+#include <string>
 
 namespace tb::ui
 {
@@ -30,5 +31,6 @@ namespace tb::ui
 QPixmap loadPixmap(const std::filesystem::path& imagePath);
 QPixmap loadSVGPixmap(const std::filesystem::path& imagePath);
 QIcon loadSVGIcon(const std::filesystem::path& imagePath);
+std::string currentSvgRenderPath();
 
 } // namespace tb::ui

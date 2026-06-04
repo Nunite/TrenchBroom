@@ -214,6 +214,13 @@ void BrushRenderer::invalidateBrush(const mdl::BrushNode& brushNode)
     contract_assert(m_invalidBrushes.find(&brushNode) == std::end(m_invalidBrushes));
     return;
   }
+
+  if (m_useReadable2DBrushOutlines)
+  {
+    invalidate();
+    return;
+  }
+
   // if it's not in the invalid set, put it in
   if (m_invalidBrushes.insert(&brushNode).second)
   {
@@ -231,6 +238,7 @@ void BrushRenderer::clear()
   m_brushInfo.clear();
   m_allBrushes.clear();
   m_invalidBrushes.clear();
+  m_coloredEdgeVertices.clear();
 
   m_vertexArray = std::make_shared<BrushVertexArray>();
   m_edgeIndices = std::make_shared<BrushIndexArray>();
@@ -241,6 +249,7 @@ void BrushRenderer::clear()
   m_transparentFaceRenderer =
     FaceRenderer{m_vertexArray, m_transparentFaces, m_faceColor};
   m_edgeRenderer = IndexedEdgeRenderer{m_vertexArray, m_edgeIndices};
+  m_coloredEdgeRenderer = DirectEdgeRenderer{};
 }
 
 void BrushRenderer::setFaceColor(const Color& faceColor)
@@ -256,6 +265,15 @@ void BrushRenderer::setShowEdges(const bool showEdges)
 void BrushRenderer::setEdgeColor(const Color& edgeColor)
 {
   m_edgeColor = edgeColor;
+}
+
+void BrushRenderer::setUseReadable2DBrushOutlines(const bool useReadable2DBrushOutlines)
+{
+  if (useReadable2DBrushOutlines != m_useReadable2DBrushOutlines)
+  {
+    m_useReadable2DBrushOutlines = useReadable2DBrushOutlines;
+    invalidate();
+  }
 }
 
 void BrushRenderer::setGrayscale(const bool grayscale)
@@ -330,7 +348,7 @@ void BrushRenderer::renderOpaque(RenderContext& renderContext, RenderBatch& rend
     }
     if (renderContext.showEdges() || m_showEdges)
     {
-      renderEdges(renderBatch);
+      renderEdges(renderContext, renderBatch);
     }
   }
 }
@@ -368,18 +386,28 @@ void BrushRenderer::renderTransparentFaces(RenderBatch& renderBatch)
   m_transparentFaceRenderer.render(renderBatch);
 }
 
-void BrushRenderer::renderEdges(RenderBatch& renderBatch)
+void BrushRenderer::renderEdges(RenderContext& renderContext, RenderBatch& renderBatch)
 {
   if (m_showOccludedEdges)
   {
     m_edgeRenderer.renderOnTop(renderBatch, m_occludedEdgeColor);
   }
-  m_edgeRenderer.render(renderBatch, m_edgeColor);
+
+  if (renderContext.render2D() && m_useReadable2DBrushOutlines)
+  {
+    m_coloredEdgeRenderer.render(renderBatch, false, Color{}, 1.0f, 0.0);
+  }
+  else
+  {
+    m_edgeRenderer.render(renderBatch, m_edgeColor);
+  }
 }
 
 void BrushRenderer::validate()
 {
   contract_pre(!valid());
+
+  m_coloredEdgeVertices.clear();
 
   for (auto* brushNode : m_invalidBrushes)
   {
@@ -393,6 +421,8 @@ void BrushRenderer::validate()
   m_transparentFaceRenderer =
     FaceRenderer{m_vertexArray, m_transparentFaces, m_faceColor};
   m_edgeRenderer = IndexedEdgeRenderer{m_vertexArray, m_edgeIndices};
+  m_coloredEdgeRenderer = DirectEdgeRenderer{
+    gl::VertexArray::move(std::move(m_coloredEdgeVertices)), gl::PrimType::Lines};
 }
 
 static size_t triIndicesCountForPolygon(const size_t vertexCount)
@@ -485,6 +515,33 @@ static void getMarkedEdgeIndices(
   }
 }
 
+static void addMarkedEdgeVertices(
+  const mdl::BrushNode& brushNode,
+  const BrushRenderer::Filter::EdgeRenderPolicy policy,
+  const Color& color,
+  std::vector<gl::VertexTypes::P3C4::Vertex>& vertices)
+{
+  using EdgeRenderPolicy = BrushRenderer::Filter::EdgeRenderPolicy;
+
+  if (policy == EdgeRenderPolicy::RenderNone)
+  {
+    return;
+  }
+
+  const auto& cachedVertices = brushNode.brushRendererBrushCache().cachedVertices();
+  const auto vertexColor = color.to<RgbaF>().toVec();
+  for (const auto& edge : brushNode.brushRendererBrushCache().cachedEdges())
+  {
+    if (shouldRenderEdge(edge, policy))
+    {
+      vertices.emplace_back(
+        vm::vec3f{cachedVertices[edge.vertexIndex1RelativeToBrush].attr}, vertexColor);
+      vertices.emplace_back(
+        vm::vec3f{cachedVertices[edge.vertexIndex2RelativeToBrush].attr}, vertexColor);
+    }
+  }
+}
+
 bool BrushRenderer::shouldDrawFaceInTransparentPass(
   const mdl::BrushNode& brushNode, const mdl::BrushFace& face) const
 {
@@ -563,6 +620,19 @@ void BrushRenderer::validateBrush(const mdl::BrushNode& brushNode)
       // will hit this branch.
       contract_assert(info.edgeIndicesKey == nullptr);
     }
+  }
+
+  if (m_useReadable2DBrushOutlines)
+  {
+    info.coloredEdgeVertexOffset = m_coloredEdgeVertices.size();
+    addMarkedEdgeVertices(
+      brushNode,
+      edgePolicy,
+      brushOutlineColor(
+        brushOutlineColorState(brushNode, true), m_edgeColor, m_edgeColor, m_edgeColor),
+      m_coloredEdgeVertices);
+    info.coloredEdgeVertexCount =
+      m_coloredEdgeVertices.size() - info.coloredEdgeVertexOffset;
   }
 
   // insert face indices
@@ -685,13 +755,27 @@ void BrushRenderer::addBrush(const mdl::BrushNode& brushNode)
     contract_assert(m_brushInfo.find(&brushNode) == std::end(m_brushInfo));
 
     assertResult(m_invalidBrushes.insert(&brushNode).second);
+    if (m_useReadable2DBrushOutlines)
+    {
+      invalidate();
+    }
   }
 }
 
 void BrushRenderer::removeBrush(const mdl::BrushNode& brushNode)
 {
   // update m_brushValid
-  m_allBrushes.erase(&brushNode);
+  if (m_allBrushes.erase(&brushNode) == 0u)
+  {
+    return;
+  }
+
+  if (m_useReadable2DBrushOutlines)
+  {
+    removeBrushFromVbo(brushNode);
+    invalidate();
+    return;
+  }
 
   if (m_invalidBrushes.erase(&brushNode) > 0u)
   {
