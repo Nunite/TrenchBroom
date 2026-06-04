@@ -181,6 +181,7 @@ AppController::AppController(
 
   connectObservers();
 
+  m_recentDocuments->reload();
   m_reloadRecentDocumentsTimer->start(1s);
   m_processResourcesTimer->start(20ms);
 }
