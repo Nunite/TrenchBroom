@@ -21,6 +21,7 @@
 
 #include "Macros.h"
 #include "gl/TextureResource.h"
+#include "gl/VertexArray.h"
 
 #include <array>
 #include <filesystem>
@@ -59,12 +60,16 @@ std::array<std::filesystem::path, 6> looseSkyMaterialPaths(const std::string& na
 bool skyTexturesReady(
   const std::array<std::shared_ptr<gl::TextureResource>, 6>& textures);
 
+size_t skyBrushFaceVertexCount(const mdl::Map& map);
+
 class SkyRenderer
 {
 private:
   mdl::Map& m_map;
   std::optional<std::string> m_cachedSkyname;
   std::array<std::shared_ptr<gl::TextureResource>, 6> m_textures = {};
+  std::optional<gl::VertexArray> m_skyBrushFaceVertexArray;
+  bool m_skyBrushFaceVerticesValid = false;
 
 public:
   explicit SkyRenderer(mdl::Map& map);
@@ -73,10 +78,12 @@ public:
   deleteCopyAndMove(SkyRenderer);
 
   void invalidate();
+  void invalidateBrushFaces();
   void render(RenderContext& renderContext, RenderBatch& renderBatch);
 
 private:
   bool validate();
+  bool validateBrushFaces();
 };
 
 } // namespace render

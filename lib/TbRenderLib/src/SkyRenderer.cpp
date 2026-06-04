@@ -39,8 +39,8 @@
 #include "mdl/BrushNode.h"
 #include "mdl/EditorContext.h"
 #include "mdl/Entity.h"
-#include "mdl/EntityProperties.h"
 #include "mdl/EntityNode.h"
+#include "mdl/EntityProperties.h"
 #include "mdl/GameFileSystem.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
@@ -73,20 +73,26 @@ using Vertex = gl::VertexTypes::P3UV2::Vertex;
 
 std::string worldSkyname(const mdl::Map& map)
 {
-  if (const auto* skyname =
-        map.worldNode().entity().property(mdl::EntityPropertyKeys::Skyname))
+  if (
+    const auto* skyname =
+      map.worldNode().entity().property(mdl::EntityPropertyKeys::Skyname))
   {
     return *skyname;
   }
   return "";
 }
 
-std::shared_ptr<gl::TextureResource> textureResourceForMaterial(const gl::Material* material)
+std::shared_ptr<gl::TextureResource> textureResourceForMaterial(
+  const gl::Material* material)
 {
-  return material ? std::shared_ptr<gl::TextureResource>{
-                      const_cast<gl::TextureResource*>(&material->textureResource()),
-                      [](gl::TextureResource*) {}}
-                  : nullptr;
+  if (!material)
+  {
+    return nullptr;
+  }
+
+  return std::shared_ptr<gl::TextureResource>{
+    const_cast<gl::TextureResource*>(&material->textureResource()),
+    [](gl::TextureResource*) {}};
 }
 
 bool isSkyFace(const mdl::BrushFace& face)
@@ -140,25 +146,12 @@ std::array<std::shared_ptr<gl::TextureResource>, 6> findSkyTextures(
   return textures;
 }
 
-void addQuad(
-  std::vector<Vertex>& vertices,
-  const vm::vec3f& a,
-  const vm::vec3f& b,
-  const vm::vec3f& c,
-  const vm::vec3f& d)
-{
-  vertices.emplace_back(a, vm::vec2f{0.0f, 0.0f});
-  vertices.emplace_back(b, vm::vec2f{1.0f, 0.0f});
-  vertices.emplace_back(c, vm::vec2f{1.0f, 1.0f});
-  vertices.emplace_back(d, vm::vec2f{0.0f, 1.0f});
-}
-
 std::vector<Vertex> makeSkyBrushFaceVertices(const mdl::Map& map)
 {
   auto vertices = std::vector<Vertex>{};
 
   const auto addBrush = [&](const mdl::BrushNode& brushNode) {
-    if (!map.editorContext().visible(brushNode) || !map.editorContext().editable(brushNode))
+    if (!map.editorContext().visible(brushNode))
     {
       return;
     }
@@ -290,9 +283,8 @@ bool shouldRenderSky(const bool render3D, const bool showSky, const std::string&
 
 bool skyMaterialsReady(const std::array<const gl::Material*, 6>& materials)
 {
-  return std::ranges::all_of(materials, [](const auto* material) {
-    return material != nullptr;
-  });
+  return std::ranges::all_of(
+    materials, [](const auto* material) { return material != nullptr; });
 }
 
 bool skyTexturesReady(const std::array<std::shared_ptr<gl::TextureResource>, 6>& textures)
@@ -301,6 +293,11 @@ bool skyTexturesReady(const std::array<std::shared_ptr<gl::TextureResource>, 6>&
     const auto* texture = textureResource ? textureResource->get() : nullptr;
     return texture && texture->isReady();
   });
+}
+
+size_t skyBrushFaceVertexCount(const mdl::Map& map)
+{
+  return makeSkyBrushFaceVertices(map).size();
 }
 
 SkyRenderer::SkyRenderer(mdl::Map& map)
@@ -314,13 +311,19 @@ void SkyRenderer::invalidate()
 {
   m_cachedSkyname = std::nullopt;
   m_textures = {};
+  invalidateBrushFaces();
+}
+
+void SkyRenderer::invalidateBrushFaces()
+{
+  m_skyBrushFaceVertexArray = std::nullopt;
+  m_skyBrushFaceVerticesValid = false;
 }
 
 void SkyRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
 {
   const auto skyname = worldSkyname(m_map);
-  if (!shouldRenderSky(
-        renderContext.render3D(), pref(Preferences::ShowSky), skyname))
+  if (!shouldRenderSky(renderContext.render3D(), pref(Preferences::ShowSky), skyname))
   {
     return;
   }
@@ -330,15 +333,12 @@ void SkyRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
     return;
   }
 
-  auto skyBrushFaceVertices = makeSkyBrushFaceVertices(m_map);
-  if (skyBrushFaceVertices.empty())
+  if (!validateBrushFaces())
   {
     return;
   }
 
-  renderBatch.addOneShot(new SkyRenderable{
-    m_textures,
-    gl::VertexArray::move(std::move(skyBrushFaceVertices))});
+  renderBatch.addOneShot(new SkyRenderable{m_textures, *m_skyBrushFaceVertexArray});
 }
 
 bool SkyRenderer::validate()
@@ -348,12 +348,27 @@ bool SkyRenderer::validate()
   {
     m_cachedSkyname = skyname;
     m_textures = findSkyTextures(
-      m_map.materialManager(),
-      m_map.gameFileSystem(),
-      m_map.resourceManager(),
-      skyname);
+      m_map.materialManager(), m_map.gameFileSystem(), m_map.resourceManager(), skyname);
   }
   return skyTexturesReady(m_textures);
+}
+
+bool SkyRenderer::validateBrushFaces()
+{
+  if (!m_skyBrushFaceVerticesValid)
+  {
+    auto skyBrushFaceVertices = makeSkyBrushFaceVertices(m_map);
+    m_skyBrushFaceVerticesValid = true;
+
+    if (skyBrushFaceVertices.empty())
+    {
+      return false;
+    }
+
+    m_skyBrushFaceVertexArray = gl::VertexArray::move(std::move(skyBrushFaceVertices));
+  }
+
+  return m_skyBrushFaceVertexArray.has_value();
 }
 
 } // namespace tb::render

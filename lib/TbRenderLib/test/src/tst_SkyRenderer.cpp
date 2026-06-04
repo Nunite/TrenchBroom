@@ -17,13 +17,18 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "gl/Material.h"
+#include "mdl/BrushNode.h"
+#include "mdl/MapFixture.h"
+#include "mdl/Map_NodeLocking.h"
+#include "mdl/Map_NodeVisibility.h"
+#include "mdl/Map_Nodes.h"
+#include "mdl/TestFactory.h"
 #include "render/SkyRenderer.h"
 
-#include "gl/Material.h"
+#include <filesystem>
 
 #include <catch2/catch_test_macros.hpp>
-
-#include <filesystem>
 
 namespace tb::render
 {
@@ -61,8 +66,33 @@ TEST_CASE("SkyRenderer.skyMaterialsReady")
 {
   const auto material = reinterpret_cast<const gl::Material*>(0x1);
   CHECK(skyMaterialsReady({material, material, material, material, material, material}));
-  CHECK_FALSE(skyMaterialsReady({material, material, nullptr, material, material, material}));
+  CHECK_FALSE(
+    skyMaterialsReady({material, material, nullptr, material, material, material}));
   CHECK_FALSE(skyMaterialsReady({}));
+}
+
+TEST_CASE("SkyRenderer.skyBrushFaceVertexCount")
+{
+  auto fixture = mdl::MapFixture{};
+  auto& map = fixture.create();
+  auto* skyBrush = mdl::createBrushNode(map, "sky");
+  mdl::addNodes(map, {{mdl::parentForNodes(map), {static_cast<mdl::Node*>(skyBrush)}}});
+
+  CHECK(skyBrushFaceVertexCount(map) > 0);
+
+  SECTION("locked sky brush is still collected")
+  {
+    mdl::lockNodes(map, std::vector<mdl::Node*>{skyBrush});
+
+    CHECK(skyBrushFaceVertexCount(map) > 0);
+  }
+
+  SECTION("invisible sky brush is not collected")
+  {
+    mdl::hideNodes(map, std::vector<mdl::Node*>{skyBrush});
+
+    CHECK(skyBrushFaceVertexCount(map) == 0);
+  }
 }
 
 } // namespace tb::render

@@ -87,6 +87,13 @@ if(APPLE)
     set_source_files_properties(${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/manual/images)
 endif()
 
+if(WIN32 OR ${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
+    file(GLOB_RECURSE APP_SHADER_FILES CONFIGURE_DEPENDS
+            "${TB_RESOURCE_DIR}/shader/*.fragsh"
+            "${TB_RESOURCE_DIR}/shader/*.vertsh")
+    set_source_files_properties(${APP_SHADER_FILES} PROPERTIES HEADER_FILE_ONLY ON)
+endif()
+
 # Set up resource compilation for Windows
 if(WIN32)
     # Create the windows resource file
@@ -110,6 +117,10 @@ get_build_platform(APP_PLATFORM_NAME)
 # Create the executable target and link with libraries
 add_executable(TrenchBroom WIN32 MACOSX_BUNDLE)
 target_sources(TrenchBroom PRIVATE ${APP_SOURCE} ${INDEX_OUTPUT_PATH} ${DOC_MANUAL_TARGET_FILES_ABSOLUTE} ${DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE} ${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE})
+
+if(WIN32 OR ${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
+    target_sources(TrenchBroom PRIVATE ${APP_SHADER_FILES})
+endif()
 
 if(APPLE)
     target_sources(TrenchBroom PRIVATE "$<$<CONFIG:Debug>:${MACOSX_GAME_TESTING_SOURCE_FILES}>")

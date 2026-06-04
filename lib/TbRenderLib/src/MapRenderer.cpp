@@ -398,7 +398,7 @@ void MapRenderer::setupSelectionRenderer(ObjectRenderer& renderer)
   renderer.setBrushFaceColor(pref(Preferences::FaceColor));
   renderer.setBrushEdgeColor(pref(Preferences::SelectedEdgeColor));
   renderer.setUseReadable2DBrushOutlines(false);
-  renderer.setSkipSkyFaces(false);
+  renderer.setSkipSkyFaces(pref(Preferences::ShowSky));
 }
 
 void MapRenderer::setupLockedRenderer(ObjectRenderer& renderer)
@@ -421,7 +421,7 @@ void MapRenderer::setupLockedRenderer(ObjectRenderer& renderer)
   renderer.setBrushFaceColor(pref(Preferences::FaceColor));
   renderer.setBrushEdgeColor(pref(Preferences::LockedEdgeColor));
   renderer.setUseReadable2DBrushOutlines(false);
-  renderer.setSkipSkyFaces(false);
+  renderer.setSkipSkyFaces(pref(Preferences::ShowSky));
 }
 
 static bool selected(const mdl::Node& node)
@@ -739,7 +739,7 @@ void MapRenderer::nodesDidChange(const std::vector<mdl::Node*>& nodes)
   }
   invalidateEntityLinkRenderer();
   invalidateGroupLinkRenderer();
-  m_skyRenderer->invalidate();
+  m_skyRenderer->invalidateBrushFaces();
 }
 
 void MapRenderer::nodeVisibilityDidChange(const std::vector<mdl::Node*>& nodes)
@@ -749,6 +749,7 @@ void MapRenderer::nodeVisibilityDidChange(const std::vector<mdl::Node*>& nodes)
     updateAndInvalidateNodeRecursive(*node);
   }
   invalidateEntityLinkRenderer();
+  m_skyRenderer->invalidateBrushFaces();
 }
 
 void MapRenderer::nodeLockingDidChange(const std::vector<mdl::Node*>& nodes)
@@ -758,6 +759,7 @@ void MapRenderer::nodeLockingDidChange(const std::vector<mdl::Node*>& nodes)
     updateAndInvalidateNodeRecursive(*node);
   }
   invalidateEntityLinkRenderer();
+  m_skyRenderer->invalidateBrushFaces();
 }
 
 void MapRenderer::groupWasOpened()
@@ -847,7 +849,7 @@ void MapRenderer::preferenceDidChange(const std::filesystem::path& path)
 
   if (path == Preferences::ShowSky.path)
   {
-    m_skyRenderer->invalidate();
+    m_skyRenderer->invalidateBrushFaces();
   }
 
   if (path == m_map.gameInfo().gamePathPreference.path)

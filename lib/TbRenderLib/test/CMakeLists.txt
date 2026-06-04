@@ -13,5 +13,6 @@ target_link_libraries(TbRenderLibTest
     CompilerConfig
     PrecompileStdHeaders
     Catch2::Catch2WithMain
+    TbMdlTestUtilsLib
     TbRenderLib
   )
