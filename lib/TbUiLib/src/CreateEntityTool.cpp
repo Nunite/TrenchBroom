@@ -50,25 +50,55 @@ namespace tb::ui
 namespace
 {
 
+std::optional<std::tuple<std::string, std::string>> modelEntityDefinition(
+  const mdl::EntityDefinition* definition)
+{
+  if (!definition || getType(*definition) != mdl::EntityDefinitionType::Point)
+  {
+    return std::nullopt;
+  }
+
+  if (mdl::getPropertyDefinition(definition, "model"))
+  {
+    return std::tuple{definition->name, std::string{"model"}};
+  }
+
+  if (mdl::getPropertyDefinition(definition, "mdl"))
+  {
+    return std::tuple{definition->name, std::string{"mdl"}};
+  }
+
+  return std::nullopt;
+}
+
 std::optional<std::tuple<std::string, std::string>> findModelEntityDefinition(
   const mdl::Map& map)
 {
+  if (
+    const auto preferredDefinition =
+      modelEntityDefinition(map.entityDefinitionManager().definition("cycler_sprite")))
+  {
+    return preferredDefinition;
+  }
+
   const auto definitions = map.entityDefinitionManager().definitions(
     mdl::EntityDefinitionType::Point, mdl::EntityDefinitionSortOrder::Name);
 
   for (const auto* definition : definitions)
   {
-    if (mdl::getPropertyDefinition(definition, "model"))
+    if (const auto modelDefinition = modelEntityDefinition(definition);
+        modelDefinition && std::get<1>(*modelDefinition) == "model")
     {
-      return std::tuple{definition->name, std::string{"model"}};
+      return modelDefinition;
     }
   }
 
   for (const auto* definition : definitions)
   {
-    if (mdl::getPropertyDefinition(definition, "mdl"))
+    if (const auto modelDefinition = modelEntityDefinition(definition);
+        modelDefinition && std::get<1>(*modelDefinition) == "mdl")
     {
-      return std::tuple{definition->name, std::string{"mdl"}};
+      return modelDefinition;
     }
   }
 

@@ -78,6 +78,15 @@ void setModelEntityDefinitions(mdl::Map& map)
       mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
     },
     {
+      "cycler_sprite",
+      Color{},
+      "preferred model entity",
+      {
+        {"model", mdl::PropertyValueTypes::String{}, "", "", false},
+      },
+      mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
+    },
+    {
       "cycler_mdl",
       Color{},
       "mdl model entity",
@@ -165,7 +174,7 @@ TEST_CASE("MapViewToolBox")
 
     const auto selectedEntities = selectedEntityNodes(map);
     REQUIRE(selectedEntities.size() == 1u);
-    CHECK(selectedEntities.front()->entity().classname() == "cycler");
+    CHECK(selectedEntities.front()->entity().classname() == "cycler_sprite");
     REQUIRE(selectedEntities.front()->entity().property("model") != nullptr);
     CHECK(*selectedEntities.front()->entity().property("model") == "models/player.mdl");
   }
