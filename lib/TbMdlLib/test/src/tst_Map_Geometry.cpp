@@ -104,6 +104,11 @@ bool hasEmptyName(const std::vector<std::string>& names)
   return std::ranges::any_of(names, [](const auto& s) { return s.empty(); });
 }
 
+size_t faceCount(const BrushNode& brushNode)
+{
+  return brushNode.brush().faceCount();
+}
+
 } // namespace
 
 TEST_CASE("Map_Geometry")
@@ -1461,6 +1466,68 @@ TEST_CASE("Map_Geometry")
 
       CHECK(brushNode1->physicalBounds() == vm::bbox3d{{-64, -32, -32}, {0, +32, +64}});
       CHECK(brushNode2->physicalBounds() == vm::bbox3d{{0, -32, -32}, {+64, +32, +64}});
+    }
+  }
+
+  SECTION("chamferVertices")
+  {
+    auto& map = fixture.create();
+
+    auto* brushNode = createBrushNode(map);
+    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    selectNodes(map, {brushNode});
+
+    const auto oldFaceCount = faceCount(*brushNode);
+    const auto vertex = vm::vec3d{16, 16, 16};
+
+    REQUIRE(chamferVertices(map, "Chamfer Vertices", {vertex}, 4.0));
+
+    CHECK(faceCount(*brushNode) == oldFaceCount + 1u);
+    CHECK_FALSE(brushNode->brush().hasVertex(vertex));
+    CHECK(map.modified());
+
+    SECTION("Undo and redo")
+    {
+      map.undoCommand();
+
+      CHECK(faceCount(*brushNode) == oldFaceCount);
+      CHECK(brushNode->brush().hasVertex(vertex));
+
+      map.redoCommand();
+
+      CHECK(faceCount(*brushNode) == oldFaceCount + 1u);
+      CHECK_FALSE(brushNode->brush().hasVertex(vertex));
+    }
+  }
+
+  SECTION("chamferEdges")
+  {
+    auto& map = fixture.create();
+
+    auto* brushNode = createBrushNode(map);
+    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    selectNodes(map, {brushNode});
+
+    const auto oldFaceCount = faceCount(*brushNode);
+    const auto edge = vm::segment3d{{-16, -16, 16}, {16, -16, 16}};
+
+    REQUIRE(chamferEdges(map, "Chamfer Edges", {edge}, 4.0, 2));
+
+    CHECK(faceCount(*brushNode) == oldFaceCount + 2u);
+    CHECK_FALSE(brushNode->brush().hasEdge(edge));
+    CHECK(map.modified());
+
+    SECTION("Undo and redo")
+    {
+      map.undoCommand();
+
+      CHECK(faceCount(*brushNode) == oldFaceCount);
+      CHECK(brushNode->brush().hasEdge(edge));
+
+      map.redoCommand();
+
+      CHECK(faceCount(*brushNode) == oldFaceCount + 2u);
+      CHECK_FALSE(brushNode->brush().hasEdge(edge));
     }
   }
 }

@@ -1717,6 +1717,107 @@ TEST_CASE("Brush")
     }
   }
 
+  SECTION("chamferVertices")
+  {
+    const auto worldBounds = vm::bbox3d{4096.0};
+    auto builder = BrushBuilder{MapFormat::Standard, worldBounds};
+
+    SECTION("chamfering a cube corner replaces it with a triangular face")
+    {
+      auto brush =
+        builder.createCube(64.0, "left", "right", "front", "back", "top", "bottom")
+        | kdl::value();
+
+      const auto oldVertex = vm::vec3d{32.0, 32.0, 32.0};
+      const auto newVertices = std::vector<vm::vec3d>{
+        {16.0, 32.0, 32.0},
+        {32.0, 16.0, 32.0},
+        {32.0, 32.0, 16.0},
+      };
+
+      CHECK(brush.canChamferVertices(worldBounds, {oldVertex}, 16.0));
+      REQUIRE(brush.chamferVertices(worldBounds, {oldVertex}, 16.0));
+
+      CHECK_FALSE(brush.hasVertex(oldVertex));
+      for (const auto& vertex : newVertices)
+      {
+        CHECK(brush.hasVertex(vertex));
+      }
+      CHECK(brush.vertexCount() == 10u);
+      CHECK(brush.faceCount() == 7u);
+      CHECK(brush.fullySpecified());
+      CHECK(worldBounds.contains(brush.bounds()));
+
+      CHECK(brush.hasFace({newVertices[0], newVertices[1], newVertices[2]}));
+      CHECK(brush.findFace("right"));
+      CHECK(brush.findFace("back"));
+      CHECK(brush.findFace("top"));
+    }
+
+    SECTION("rejects invalid vertex chamfers")
+    {
+      const auto brush = builder.createCube(64.0, "material") | kdl::value();
+
+      CHECK_FALSE(brush.canChamferVertices(worldBounds, {{32, 32, 32}}, 0.0));
+      CHECK_FALSE(brush.canChamferVertices(worldBounds, {{32, 32, 32}}, -1.0));
+      CHECK_FALSE(brush.canChamferVertices(worldBounds, {{128, 128, 128}}, 16.0));
+      CHECK_FALSE(brush.canChamferVertices(vm::bbox3d{8.0}, {{32, 32, 32}}, 16.0));
+    }
+  }
+
+  SECTION("chamferEdges")
+  {
+    const auto worldBounds = vm::bbox3d{4096.0};
+    auto builder = BrushBuilder{MapFormat::Standard, worldBounds};
+
+    SECTION("chamfering a cube edge inserts one bevel face")
+    {
+      auto brush =
+        builder.createCube(64.0, "left", "right", "front", "back", "top", "bottom")
+        | kdl::value();
+
+      const auto oldEdge = vm::segment3d{{32.0, 32.0, -32.0}, {32.0, 32.0, 32.0}};
+
+      CHECK(brush.canChamferEdges(worldBounds, {oldEdge}, 16.0));
+      REQUIRE(brush.chamferEdges(worldBounds, {oldEdge}, 16.0));
+
+      CHECK_FALSE(brush.hasEdge(oldEdge));
+      CHECK(brush.hasEdge({{16.0, 32.0, -32.0}, {16.0, 32.0, 32.0}}));
+      CHECK(brush.hasEdge({{32.0, 16.0, -32.0}, {32.0, 16.0, 32.0}}));
+      CHECK(brush.vertexCount() == 10u);
+      CHECK(brush.faceCount() == 7u);
+      CHECK(brush.fullySpecified());
+      CHECK(worldBounds.contains(brush.bounds()));
+    }
+
+    SECTION("multiple edge segments add intermediate bevel faces")
+    {
+      auto brush = builder.createCube(64.0, "material") | kdl::value();
+      const auto oldEdge = vm::segment3d{{32.0, 32.0, -32.0}, {32.0, 32.0, 32.0}};
+
+      CHECK(brush.canChamferEdges(worldBounds, {oldEdge}, 16.0, 3));
+      REQUIRE(brush.chamferEdges(worldBounds, {oldEdge}, 16.0, 3));
+
+      CHECK_FALSE(brush.hasEdge(oldEdge));
+      CHECK(brush.vertexCount() == 12u);
+      CHECK(brush.faceCount() == 8u);
+      CHECK(brush.fullySpecified());
+    }
+
+    SECTION("rejects invalid edge chamfers")
+    {
+      const auto brush = builder.createCube(64.0, "material") | kdl::value();
+      const auto edge = vm::segment3d{{32.0, 32.0, -32.0}, {32.0, 32.0, 32.0}};
+
+      CHECK_FALSE(brush.canChamferEdges(worldBounds, {edge}, 0.0));
+      CHECK_FALSE(brush.canChamferEdges(worldBounds, {edge}, -1.0));
+      CHECK_FALSE(brush.canChamferEdges(worldBounds, {edge}, 16.0, 0));
+      CHECK_FALSE(
+        brush.canChamferEdges(worldBounds, {{{128, 128, -32}, {128, 128, 32}}}, 16.0));
+      CHECK_FALSE(brush.canChamferEdges(vm::bbox3d{8.0}, {edge}, 16.0));
+    }
+  }
+
   SECTION("transformEdges")
   {
     SECTION("Move a single edge")

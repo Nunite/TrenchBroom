@@ -307,6 +307,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   m_vertexTool = std::make_unique<VertexTool>(m_document);
   m_edgeTool = std::make_unique<EdgeTool>(m_document);
   m_faceTool = std::make_unique<FaceTool>(m_document);
+  m_pathTool = std::make_unique<PathTool>(m_document.map());
 
   addExclusiveToolGroup(
     assembleBrushTool(),
@@ -315,10 +316,11 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
     shearTool(),
     edgeTool(),
     faceTool(),
-    clipTool());
+    clipTool(),
+    pathTool());
 
   addExclusiveToolGroup(
-    assembleBrushTool(), vertexTool(), edgeTool(), faceTool(), clipTool());
+    assembleBrushTool(), vertexTool(), edgeTool(), faceTool(), clipTool(), pathTool());
 
   suppressWhileActive(
     assembleBrushTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
@@ -329,6 +331,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   suppressWhileActive(edgeTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
   suppressWhileActive(faceTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
   suppressWhileActive(clipTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+  suppressWhileActive(pathTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
 
   registerTool(moveObjectsTool(), bookCtrl);
   registerTool(rotateTool(), bookCtrl);
@@ -342,6 +345,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   registerTool(faceTool(), bookCtrl);
   registerTool(createEntityTool(), bookCtrl);
   registerTool(drawShapeTool(), bookCtrl);
+  registerTool(pathTool(), bookCtrl);
 
   updateToolPage();
 }

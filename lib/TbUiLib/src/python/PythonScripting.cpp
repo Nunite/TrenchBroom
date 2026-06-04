@@ -57,15 +57,16 @@
 #include <QTextBrowser>
 #include <QTextTable>
 #include <QTextTableCell>
+#include <QTimer>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QWidget>
 
 #include "Logger.h"
-#include "ui/python/PythonPlane.h"
-#include "ui/python/PythonTypes.h"
-#include "ui/python/PythonUtils.h"
-#include "ui/python/PythonVec3.h"
+#include "gl/Material.h"
+#include "gl/MaterialCollection.h"
+#include "gl/MaterialManager.h"
+#include "gl/Texture.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceAttributes.h"
@@ -81,11 +82,7 @@
 #include "mdl/Map_Geometry.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
-#include "gl/Material.h"
-#include "gl/MaterialCollection.h"
-#include "gl/MaterialManager.h"
 #include "mdl/PatchNode.h"
-#include "gl/Texture.h"
 #include "mdl/Transaction.h"
 #include "mdl/VertexHandleManager.h"
 #include "mdl/WorldNode.h"
@@ -97,6 +94,10 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/PluginInspector.h"
+#include "ui/python/PythonPlane.h"
+#include "ui/python/PythonTypes.h"
+#include "ui/python/PythonUtils.h"
+#include "ui/python/PythonVec3.h"
 
 #include "kd/overload.h"
 #include "kd/vector_utils.h"
@@ -107,9 +108,8 @@
 #include <Python.h>
 #include <algorithm>
 #include <array>
-#include <string>
-#include <QTimer>
 #include <map>
+#include <string>
 
 namespace tb::ui
 {
@@ -121,7 +121,8 @@ bool g_pythonRegistered = false;
 class PythonTimer : public QObject
 {
 public:
-  PythonTimer(int interval, PyObject* callback) : m_callback(callback)
+  PythonTimer(int interval, PyObject* callback)
+    : m_callback(callback)
   {
     Py_INCREF(m_callback);
     m_timer = new QTimer(this);
@@ -146,22 +147,23 @@ private:
     // Note: g_currentFrame might be null or stale if the map frame is closed.
     // However, timers run in the main thread event loop, and we should check if
     // we have a valid context or if we should just run.
-    // For safety, we can check if the main window still exists, but simple callback execution is usually fine.
-    
+    // For safety, we can check if the main window still exists, but simple callback
+    // execution is usually fine.
+
     PyObject* res = PyObject_CallObject(m_callback, nullptr);
     if (res == nullptr)
     {
       PyErr_Print();
       if (g_currentFrame)
       {
-         g_currentFrame->pythonLogger().error() << "Error in timer callback";
+        g_currentFrame->pythonLogger().error() << "Error in timer callback";
       }
     }
     else
     {
       Py_DECREF(res);
     }
-    
+
     g_currentFrame = prev;
     PyGILState_Release(gil);
   }
@@ -182,22 +184,22 @@ static PyObject* script_set_interval(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  
+
   if (!PyCallable_Check(callback))
   {
     PyErr_SetString(PyExc_TypeError, "callback must be callable");
     return nullptr;
   }
-  
-  // We need a QObject parent for the timer to ensure it lives in the correct thread (main thread)
-  // PythonScripting is a singleton, but not a QObject.
-  // We can parent the timer to nothing (and manage memory manually), 
-  // or use a static QObject if needed. Here we manage manually in g_timers map.
-  
+
+  // We need a QObject parent for the timer to ensure it lives in the correct thread (main
+  // thread) PythonScripting is a singleton, but not a QObject. We can parent the timer to
+  // nothing (and manage memory manually), or use a static QObject if needed. Here we
+  // manage manually in g_timers map.
+
   int id = g_nextTimerId++;
   auto* timer = new PythonTimer(interval, callback);
   g_timers[id] = timer;
-  
+
   return PyLong_FromLong(id);
 }
 
@@ -209,14 +211,14 @@ static PyObject* script_clear_interval(PyObject* self, PyObject* args)
   {
     return nullptr;
   }
-  
+
   auto it = g_timers.find(id);
   if (it != g_timers.end())
   {
     delete it->second;
     g_timers.erase(it);
   }
-  
+
   Py_RETURN_NONE;
 }
 
@@ -331,10 +333,12 @@ PyObject* log_writer_isatty(PyObject*, PyObject*)
 }
 
 
-PyObject* module_transaction(PyObject* self, PyObject* args) {
+PyObject* module_transaction(PyObject* self, PyObject* args)
+{
   unused(self);
   const char* name = "Python Script";
-  if (!PyArg_ParseTuple(args, "|s", &name)) {
+  if (!PyArg_ParseTuple(args, "|s", &name))
+  {
     return nullptr;
   }
   auto* doc = activeDocument();
@@ -344,8 +348,9 @@ PyObject* module_transaction(PyObject* self, PyObject* args) {
     return nullptr;
   }
   PyObject* pyName = PyUnicode_FromString(name);
-  if (!pyName) {
-      return nullptr;
+  if (!pyName)
+  {
+    return nullptr;
   }
   PyObject* result = createTransactionObject(doc, pyName);
   Py_DECREF(pyName);
@@ -705,15 +710,15 @@ bool ensureInitialized()
           }
 
           // Pre-create lists for known events
-  auto* list = PyList_New(0);
-  PyDict_SetItemString(callbacks, "selection_changed", list);
-  Py_DECREF(list);
+          auto* list = PyList_New(0);
+          PyDict_SetItemString(callbacks, "selection_changed", list);
+          Py_DECREF(list);
 
-  list = PyList_New(0);
-  PyDict_SetItemString(callbacks, "document_saved", list);
-  Py_DECREF(list);
+          list = PyList_New(0);
+          PyDict_SetItemString(callbacks, "document_saved", list);
+          Py_DECREF(list);
 
-  if (PyModule_AddObject(module, "_callbacks", callbacks) != 0)
+          if (PyModule_AddObject(module, "_callbacks", callbacks) != 0)
           {
             Py_DECREF(callbacks);
             Py_DECREF(module);
@@ -809,13 +814,14 @@ bool PythonScripting::runScript(MapWindow& frame, const std::filesystem::path& p
 
   StdStreamRedirect streamRedirect;
 
-  const auto filename = path.generic_string();
   const auto pathStr = path.u8string();
+  const auto filename =
+    std::string{reinterpret_cast<const char*>(pathStr.c_str()), pathStr.size()};
   FILE* fp = nullptr;
 #if defined(_WIN32)
   fp = _wfopen(path.c_str(), L"rb");
 #else
-  fp = fopen(reinterpret_cast<const char*>(pathStr.c_str()), "rb");
+  fp = fopen(filename.c_str(), "rb");
 #endif
 
   if (fp == nullptr)

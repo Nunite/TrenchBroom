@@ -149,32 +149,18 @@ void MapViewBase::showPieMenu()
   auto* mapWindow = dynamic_cast<MapWindow*>(window());
   auto* menu = new PieMenu{this};
   auto context = ActionExecutionContext{m_appController, mapWindow, this};
-  auto itemCount = 0u;
 
-  for (const auto& pathStr : kdl::str_split(pref(Preferences::PieMenuAction), "|"))
+  const auto items = buildPieMenuItems(
+    pref(Preferences::PieMenuAction),
+    m_appController.actionManager().actionsMap(),
+    [&](const auto& action) { return action.enabled(context); },
+    [this](const auto& action) { triggerAction(action); });
+  for (const auto& item : items)
   {
-    if (pathStr.empty())
-    {
-      continue;
-    }
-
-    const auto path = std::filesystem::path{pathStr};
-    const auto& actionsMap = m_appController.actionManager().actionsMap();
-    const auto it = actionsMap.find(path);
-    if (it == std::end(actionsMap))
-    {
-      continue;
-    }
-
-    const auto& action = it->second;
-    menu->addItem(
-      action.label(),
-      [this, &action]() { triggerAction(action); },
-      action.enabled(context));
-    ++itemCount;
+    menu->addItem(item.label, item.action, item.enabled);
   }
 
-  if (itemCount == 0u)
+  if (items.empty())
   {
     menu->deleteLater();
     return;

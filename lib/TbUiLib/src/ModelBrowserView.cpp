@@ -2,17 +2,17 @@
  Copyright (C) 2026
 
  This file is part of TrenchBroom.
- 
+
  TrenchBroom is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
  (at your option) any later version.
- 
+
  TrenchBroom is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
- 
+
  You should have received a copy of the GNU General Public License
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
@@ -28,16 +28,9 @@
 
 #include "PreferenceManager.h"
 #include "Preferences.h"
-#include "mdl/EntityModelManager.h"
-#include "mdl/GameFileSystem.h"
-#include "mdl/Map.h"
-#include "ui/AppController.h"
-#include "ui/ImageUtils.h"
 #include "fs/DiskIO.h"
 #include "fs/FileSystem.h"
-#include "mdl/GoldSrcMdlScaler.h"
 #include "fs/PathInfo.h"
-#include "ui/QPathUtils.h"
 #include "gl/ActiveShader.h"
 #include "gl/FontDescriptor.h"
 #include "gl/FontManager.h"
@@ -50,7 +43,16 @@
 #include "gl/TextureFont.h"
 #include "gl/VertexArray.h"
 #include "gl/VertexType.h"
+#include "mdl/EntityModelManager.h"
+#include "mdl/GameFileSystem.h"
+#include "mdl/GoldSrcMdlScaler.h"
+#include "mdl/Map.h"
 #include "render/Transformation.h"
+#include "ui/AppController.h"
+#include "ui/ImageUtils.h"
+#include "ui/QPathUtils.h"
+
+#include "kd/path_utils.h"
 
 #include "vm/mat.h"
 #include "vm/mat_ext.h"
@@ -64,10 +66,129 @@
 #include <variant>
 #include <vector>
 
-#include "kd/path_utils.h"
-
 namespace tb::ui
 {
+
+std::vector<ModelBrowserEntry> modelBrowserEntries(
+  const std::filesystem::path& rootFolderPath,
+  const std::vector<std::filesystem::path>& modelPaths,
+  const std::filesystem::path& currentFolderPath,
+  const QString& searchText)
+{
+  const auto trimmedSearchText = searchText.trimmed();
+  const auto hasSearch = !trimmedSearchText.isEmpty();
+  const auto matches = [&](const std::filesystem::path& path) {
+    return !hasSearch
+           || pathAsGenericQString(path).contains(trimmedSearchText, Qt::CaseInsensitive);
+  };
+
+  auto normalizedCurrentFolderPath = currentFolderPath.lexically_normal();
+  if (normalizedCurrentFolderPath == std::filesystem::path{"."})
+  {
+    normalizedCurrentFolderPath.clear();
+  }
+
+  const auto currentFolderAbs = normalizedCurrentFolderPath.empty()
+                                  ? rootFolderPath
+                                  : (rootFolderPath / normalizedCurrentFolderPath);
+
+  auto folderChildren = std::vector<std::filesystem::path>{};
+  auto modelChildren = std::vector<std::filesystem::path>{};
+
+  for (const auto& modelPath : modelPaths)
+  {
+    if (modelPath.empty())
+    {
+      continue;
+    }
+
+    const auto folderPath = modelPath.parent_path();
+    if (!currentFolderAbs.empty() && !kdl::path_has_prefix(folderPath, currentFolderAbs))
+    {
+      continue;
+    }
+
+    const auto relFromCurrent = currentFolderAbs.empty()
+                                  ? folderPath
+                                  : folderPath.lexically_relative(currentFolderAbs);
+
+    const auto modelNameMatches = matches(modelPath.filename());
+
+    if (relFromCurrent.empty() || relFromCurrent == std::filesystem::path{"."})
+    {
+      if (!hasSearch || modelNameMatches)
+      {
+        modelChildren.push_back(modelPath);
+      }
+      continue;
+    }
+
+    const auto first = *relFromCurrent.begin();
+    const auto firstRelPath = (normalizedCurrentFolderPath / first).lexically_normal();
+
+    if (hasSearch)
+    {
+      if (modelNameMatches)
+      {
+        modelChildren.push_back(modelPath);
+        folderChildren.push_back(firstRelPath);
+        continue;
+      }
+
+      if (matches(first))
+      {
+        folderChildren.push_back(firstRelPath);
+      }
+      continue;
+    }
+
+    folderChildren.push_back(firstRelPath);
+  }
+
+  std::ranges::sort(folderChildren, [](const auto& a, const auto& b) {
+    return a.generic_string() < b.generic_string();
+  });
+  folderChildren.erase(
+    std::unique(std::begin(folderChildren), std::end(folderChildren)),
+    std::end(folderChildren));
+
+  std::ranges::sort(modelChildren, [&](const auto& a, const auto& b) {
+    if (hasSearch)
+    {
+      return a.generic_string() < b.generic_string();
+    }
+    return a.filename().generic_string() < b.filename().generic_string();
+  });
+
+  auto entries = std::vector<ModelBrowserEntry>{};
+  if (!normalizedCurrentFolderPath.empty())
+  {
+    entries.push_back(
+      {BrowserCellData{
+         BrowserCellType::Folder, normalizedCurrentFolderPath.parent_path()},
+       ".."});
+  }
+
+  for (const auto& folderRelPath : folderChildren)
+  {
+    entries.push_back(
+      {BrowserCellData{BrowserCellType::Folder, folderRelPath},
+       folderRelPath.filename().generic_string()});
+  }
+
+  for (const auto& modelPath : modelChildren)
+  {
+    const auto titlePath =
+      hasSearch
+        ? (currentFolderAbs.empty() ? modelPath
+                                    : modelPath.lexically_relative(currentFolderAbs))
+        : modelPath.filename();
+    entries.push_back(
+      {BrowserCellData{BrowserCellType::Model, modelPath}, titlePath.generic_string()});
+  }
+
+  return entries;
+}
 
 ModelBrowserView::ModelBrowserView(
   AppController& appController, QScrollBar* scrollBar, mdl::Map& map)
@@ -83,17 +204,14 @@ ModelBrowserView::ModelBrowserView(
 
   if (scrollBar)
   {
-    connect(scrollBar, &QAbstractSlider::valueChanged, this, [this](const int) {
-      update();
-    });
+    connect(
+      scrollBar, &QAbstractSlider::valueChanged, this, [this](const int) { update(); });
   }
 
-  const auto pixmap =
-    loadSVGPixmap(std::filesystem::path{"Map_folder.svg"});
+  const auto pixmap = loadSVGPixmap(std::filesystem::path{"Map_folder.svg"});
   if (!pixmap.isNull())
   {
-    m_folderIconImage =
-      pixmap.toImage().convertToFormat(QImage::Format_RGBA8888);
+    m_folderIconImage = pixmap.toImage().convertToFormat(QImage::Format_RGBA8888);
   }
 }
 
@@ -203,135 +321,17 @@ void ModelBrowserView::doInitLayout(Layout& layout)
 
 void ModelBrowserView::doReloadLayout(Layout& layout)
 {
-  const auto hasSearch = !m_searchText.isEmpty();
-  const auto matches = [&](const QString& name) {
-    return !hasSearch || name.contains(m_searchText, Qt::CaseInsensitive);
-  };
-
   const auto& fontPath = pref(Preferences::RendererFontPath);
   const auto fontSize = pref(Preferences::BrowserFontSize);
   const auto font = gl::FontDescriptor{fontPath, size_t(fontSize)};
   const auto maxCellWidth = layout.maxCellWidth();
-
-  const auto currentFolderAbs = m_currentFolderPath.empty()
-                                  ? m_rootFolderPath
-                                  : (m_rootFolderPath / m_currentFolderPath);
-
-  auto folderChildren = std::vector<std::filesystem::path>{};
-  auto modelChildren = std::vector<std::filesystem::path>{};
-
-  for (const auto& modelPath : m_modelPaths)
+  for (const auto& entry : modelBrowserEntries(
+         m_rootFolderPath, m_modelPaths, m_currentFolderPath, m_searchText))
   {
-    if (modelPath.empty())
-    {
-      continue;
-    }
-
-    const auto folderPath = modelPath.parent_path();
-    if (!currentFolderAbs.empty() && !kdl::path_has_prefix(folderPath, currentFolderAbs))
-    {
-      continue;
-    }
-
-    const auto relFromCurrent =
-      currentFolderAbs.empty() ? folderPath : folderPath.lexically_relative(currentFolderAbs);
-
-    const auto modelNameMatches = matches(pathAsGenericQString(modelPath.filename()));
-
-    if (relFromCurrent.empty() || relFromCurrent == std::filesystem::path{"."})
-    {
-      if (!hasSearch || modelNameMatches)
-      {
-        modelChildren.push_back(modelPath);
-      }
-      continue;
-    }
-
-    const auto first = *relFromCurrent.begin();
-    const auto firstNameMatches = matches(pathAsGenericQString(first));
-    const auto firstRelPath = (m_currentFolderPath / first).lexically_normal();
-
-    if (hasSearch)
-    {
-      if (modelNameMatches)
-      {
-        modelChildren.push_back(modelPath);
-        folderChildren.push_back(firstRelPath);
-        continue;
-      }
-
-      if (firstNameMatches)
-      {
-        folderChildren.push_back(firstRelPath);
-        continue;
-      }
-
-      continue;
-    }
-
-    folderChildren.push_back(firstRelPath);
-  }
-
-  std::ranges::sort(folderChildren, [](const auto& a, const auto& b) {
-    return a.generic_string() < b.generic_string();
-  });
-  folderChildren.erase(
-    std::unique(std::begin(folderChildren), std::end(folderChildren)),
-    std::end(folderChildren));
-
-  std::ranges::sort(modelChildren, [&](const auto& a, const auto& b) {
-    if (hasSearch)
-    {
-      return a.generic_string() < b.generic_string();
-    }
-    return a.filename().generic_string() < b.filename().generic_string();
-  });
-
-  if (!m_currentFolderPath.empty())
-  {
-    const auto title = std::string{".."};
-    const auto titleHeight = fontManager().font(font).measure(title).y();
-    layout.addItem(
-      BrowserCellData{BrowserCellType::Folder, m_currentFolderPath.parent_path()},
-      title,
-      93.0f,
-      93.0f,
-      maxCellWidth,
-      titleHeight + 4.0f);
-  }
-
-  for (const auto& folderRelPath : folderChildren)
-  {
-    const auto folderName = folderRelPath.filename();
-    const auto titleUtf8 = pathAsGenericQString(folderName).toUtf8();
-    const auto title = std::string{titleUtf8.constData(), size_t(titleUtf8.size())};
-    const auto titleHeight = fontManager().font(font).measure(title).y();
+    const auto titleHeight = fontManager().font(font).measure(entry.title).y();
 
     layout.addItem(
-      BrowserCellData{BrowserCellType::Folder, folderRelPath},
-      title,
-      93.0f,
-      93.0f,
-      maxCellWidth,
-      titleHeight + 4.0f);
-  }
-
-  for (const auto& modelPath : modelChildren)
-  {
-    const auto titlePath =
-      hasSearch ? (currentFolderAbs.empty() ? modelPath : modelPath.lexically_relative(currentFolderAbs))
-                : modelPath.filename();
-    const auto titleUtf8 = pathAsGenericQString(titlePath).toUtf8();
-    const auto title = std::string{titleUtf8.constData(), size_t(titleUtf8.size())};
-    const auto titleHeight = fontManager().font(font).measure(title).y();
-
-    layout.addItem(
-      BrowserCellData{BrowserCellType::Model, modelPath},
-      title,
-      93.0f,
-      93.0f,
-      maxCellWidth,
-      titleHeight + 4.0f);
+      entry.cellData, entry.title, 93.0f, 93.0f, maxCellWidth, titleHeight + 4.0f);
   }
 }
 
@@ -491,7 +491,8 @@ void ModelBrowserView::doContextMenu(
 
     if (absPath.empty() || fs::Disk::pathInfo(absPath) != fs::PathInfo::File)
     {
-      QMessageBox::warning(this, tr("Error"), tr("Cannot locate a writable MDL file path."));
+      QMessageBox::warning(
+        this, tr("Error"), tr("Cannot locate a writable MDL file path."));
       return;
     }
 
@@ -513,7 +514,11 @@ void ModelBrowserView::doContextMenu(
 }
 
 void ModelBrowserView::renderHoveredCellBounds(
-  gl::Gl& gl, Layout& layout, const float y, const float height, const BrowserCellType type)
+  gl::Gl& gl,
+  Layout& layout,
+  const float y,
+  const float height,
+  const BrowserCellType type)
 {
   if (!m_hasHover)
   {
@@ -551,11 +556,14 @@ void ModelBrowserView::renderHoveredCellBounds(
             vertices.emplace_back(
               vm::vec2f{bounds.left() - 2.0f, height - (bounds.top() - 2.0f - y)}, color);
             vertices.emplace_back(
-              vm::vec2f{bounds.left() - 2.0f, height - (bounds.bottom() + 2.0f - y)}, color);
+              vm::vec2f{bounds.left() - 2.0f, height - (bounds.bottom() + 2.0f - y)},
+              color);
             vertices.emplace_back(
-              vm::vec2f{bounds.right() + 2.0f, height - (bounds.bottom() + 2.0f - y)}, color);
+              vm::vec2f{bounds.right() + 2.0f, height - (bounds.bottom() + 2.0f - y)},
+              color);
             vertices.emplace_back(
-              vm::vec2f{bounds.right() + 2.0f, height - (bounds.top() - 2.0f - y)}, color);
+              vm::vec2f{bounds.right() + 2.0f, height - (bounds.top() - 2.0f - y)},
+              color);
           }
         }
       }
@@ -580,7 +588,11 @@ void ModelBrowserView::renderHoveredCellBounds(
 }
 
 void ModelBrowserView::renderSelectedCellBounds(
-  gl::Gl& gl, Layout& layout, const float y, const float height, const BrowserCellType type)
+  gl::Gl& gl,
+  Layout& layout,
+  const float y,
+  const float height,
+  const BrowserCellType type)
 {
   if (!m_hasSelection)
   {
@@ -604,7 +616,9 @@ void ModelBrowserView::renderSelectedCellBounds(
           for (const auto& cell : row.cells())
           {
             const auto& item = cellData(cell);
-            if (item.type != type || item.type != m_selectedType || item.path != m_selectedPath)
+            if (
+              item.type != type || item.type != m_selectedType
+              || item.path != m_selectedPath)
             {
               continue;
             }
@@ -613,11 +627,14 @@ void ModelBrowserView::renderSelectedCellBounds(
             vertices.emplace_back(
               vm::vec2f{bounds.left() - 2.0f, height - (bounds.top() - 2.0f - y)}, color);
             vertices.emplace_back(
-              vm::vec2f{bounds.left() - 2.0f, height - (bounds.bottom() + 2.0f - y)}, color);
+              vm::vec2f{bounds.left() - 2.0f, height - (bounds.bottom() + 2.0f - y)},
+              color);
             vertices.emplace_back(
-              vm::vec2f{bounds.right() + 2.0f, height - (bounds.bottom() + 2.0f - y)}, color);
+              vm::vec2f{bounds.right() + 2.0f, height - (bounds.bottom() + 2.0f - y)},
+              color);
             vertices.emplace_back(
-              vm::vec2f{bounds.right() + 2.0f, height - (bounds.top() - 2.0f - y)}, color);
+              vm::vec2f{bounds.right() + 2.0f, height - (bounds.top() - 2.0f - y)},
+              color);
           }
         }
       }
@@ -665,8 +682,10 @@ void ModelBrowserView::renderFolders(
 
             const auto& bounds = cell.itemBounds();
             vertices.emplace_back(vm::vec2f{bounds.left(), height - (bounds.top() - y)});
-            vertices.emplace_back(vm::vec2f{bounds.left(), height - (bounds.bottom() - y)});
-            vertices.emplace_back(vm::vec2f{bounds.right(), height - (bounds.bottom() - y)});
+            vertices.emplace_back(
+              vm::vec2f{bounds.left(), height - (bounds.bottom() - y)});
+            vertices.emplace_back(
+              vm::vec2f{bounds.right(), height - (bounds.bottom() - y)});
             vertices.emplace_back(vm::vec2f{bounds.right(), height - (bounds.top() - y)});
           }
         }
@@ -682,8 +701,7 @@ void ModelBrowserView::renderFolders(
   auto shader =
     gl::ActiveShader{gl, shaderManager(), gl::Shaders::VaryingPUniformCShader};
   shader.set(
-    "Color",
-    RgbaF{pref(Preferences::BrowserGroupBackgroundColor).to<RgbF>(), 0.35f});
+    "Color", RgbaF{pref(Preferences::BrowserGroupBackgroundColor).to<RgbF>(), 0.35f});
 
   auto vertexArray = gl::VertexArray::move(std::move(vertices));
   vertexArray.prepare(gl, vboManager());
@@ -823,7 +841,8 @@ void ModelBrowserView::renderModels(
             }
 
             const auto center = bounds.center();
-            const auto transform = vm::translation_matrix(center) * vm::rotation_matrix(m_rotation)
+            const auto transform = vm::translation_matrix(center)
+                                   * vm::rotation_matrix(m_rotation)
                                    * vm::translation_matrix(-center);
 
             const auto itemTrans = itemTransformation(cell, y, height, bounds, transform);
@@ -891,7 +910,8 @@ QString ModelBrowserView::tooltip(const Cell& cell)
   const auto& item = cellData(cell);
   if (item.type == BrowserCellType::Folder)
   {
-    const auto folderAbs = item.path.empty() ? m_rootFolderPath : (m_rootFolderPath / item.path);
+    const auto folderAbs =
+      item.path.empty() ? m_rootFolderPath : (m_rootFolderPath / item.path);
     return QString::fromStdString(folderAbs.generic_string());
   }
   return QString::fromStdString(item.path.generic_string());

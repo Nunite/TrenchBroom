@@ -19,17 +19,29 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_InputEvent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LaunchGameEngine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_MapDocument.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_MapViewToolBox.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_MapWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_MiscPreferencePane.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ModelBrowserView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_MoveHandleDragTracker.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_OutlinerEntityPropertyEditor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_OutlinerModel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_OutlinerTreeWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PieMenu.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PluginInspector.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonPluginPanel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPathUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPreferenceStore.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPreferenceStoreUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QVecUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PathTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_RecentDocuments.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_RotateTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ScaleTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SelectionTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ShearTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SmartModelEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SystemPaths.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_TextOutputAdapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UpdateVersion.cpp
@@ -51,6 +63,7 @@ target_link_libraries(TbUiLibTest PRIVATE
   Qt6::Svg
   Qt6::Test
   Qt6::Widgets
+  Python3::Python
   TbBaseTestUtilsLib
   TbElLib
   TbElTestUtilsLib

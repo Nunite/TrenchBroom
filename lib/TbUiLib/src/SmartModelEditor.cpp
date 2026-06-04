@@ -4,17 +4,62 @@
 #include <QHBoxLayout>
 #include <QPushButton>
 
-#include "ui/QPathUtils.h"
-#include "ui/FileDialogDefaultDir.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/Map.h"
+#include "ui/FileDialogDefaultDir.h"
 #include "ui/MapDocument.h"
+#include "ui/QPathUtils.h"
 #include "ui/QWidgetUtils.h"
 
 #include <filesystem>
+#include <optional>
 
 namespace tb::ui
 {
+
+std::optional<std::string> modelPathForSmartModelEditor(
+  const std::filesystem::path& absModelPath, const std::filesystem::path& gamePath)
+{
+  std::error_code ec;
+  const auto relativeModelPathFull =
+    std::filesystem::relative(absModelPath, gamePath, ec);
+  if (ec)
+  {
+    return std::nullopt;
+  }
+
+  auto relativePathStr = relativeModelPathFull.string();
+  auto modelsPos = relativePathStr.find("models/");
+  if (modelsPos == std::string::npos)
+  {
+    modelsPos = relativePathStr.find("models\\");
+  }
+
+  auto finalModelPath = std::string{};
+  if (modelsPos != std::string::npos)
+  {
+    finalModelPath = relativePathStr.substr(modelsPos);
+  }
+  else
+  {
+    finalModelPath = relativeModelPathFull.generic_string();
+  }
+
+  for (auto& ch : finalModelPath)
+  {
+    if (ch == '\\')
+    {
+      ch = '/';
+    }
+  }
+
+  if (finalModelPath.empty())
+  {
+    return std::nullopt;
+  }
+
+  return finalModelPath;
+}
 
 SmartModelEditor::SmartModelEditor(MapDocument& document, QWidget* parent)
   : SmartPropertyEditor{document, parent}
@@ -35,9 +80,7 @@ void SmartModelEditor::createGui()
   connect(m_browseButton, &QPushButton::clicked, this, &SmartModelEditor::browseFile);
 }
 
-void SmartModelEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>&)
-{
-}
+void SmartModelEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>&) {}
 
 void SmartModelEditor::browseFile()
 {
@@ -55,45 +98,13 @@ void SmartModelEditor::browseFile()
 
   const auto absModelPath = pathFromQString(pathQStr);
   const auto gamePath = document().map().gamePath();
-
-  std::error_code ec;
-  const auto relativeModelPathFull = std::filesystem::relative(absModelPath, gamePath, ec);
-  if (ec)
+  const auto finalModelPath = modelPathForSmartModelEditor(absModelPath, gamePath);
+  if (!finalModelPath)
   {
     return;
   }
 
-  auto relativePathStr = relativeModelPathFull.string();
-  auto modelsPos = relativePathStr.find("models/");
-  if (modelsPos == std::string::npos)
-  {
-    modelsPos = relativePathStr.find("models\\");
-  }
-
-  std::string finalModelPath;
-  if (modelsPos != std::string::npos)
-  {
-    finalModelPath = relativePathStr.substr(modelsPos);
-  }
-  else
-  {
-    finalModelPath = relativeModelPathFull.generic_string();
-  }
-
-  for (auto& ch : finalModelPath)
-  {
-    if (ch == '\\')
-    {
-      ch = '/';
-    }
-  }
-
-  if (finalModelPath.empty())
-  {
-    return;
-  }
-
-  addOrUpdateProperty(finalModelPath);
+  addOrUpdateProperty(*finalModelPath);
 }
 
 } // namespace tb::ui

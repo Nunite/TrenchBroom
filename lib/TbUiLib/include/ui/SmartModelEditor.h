@@ -2,6 +2,10 @@
 
 #include "ui/SmartPropertyEditor.h"
 
+#include <filesystem>
+#include <optional>
+#include <string>
+
 class QPushButton;
 class QWidget;
 
@@ -13,6 +17,9 @@ class EntityNodeBase;
 namespace tb::ui
 {
 class MapDocument;
+
+std::optional<std::string> modelPathForSmartModelEditor(
+  const std::filesystem::path& absModelPath, const std::filesystem::path& gamePath);
 
 class SmartModelEditor : public SmartPropertyEditor
 {
