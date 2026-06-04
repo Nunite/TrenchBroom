@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QGroupBox>
 #include <QLabel>
 #include <QToolBar>
 
@@ -54,17 +55,21 @@ TEST_CASE("PreferenceDialog")
     miscAction->trigger();
 
     auto foundLanguageLabel = false;
-    auto foundPieMenuLabel = false;
     for (auto* label : dialog.findChildren<QLabel*>())
     {
       foundLanguageLabel =
         foundLanguageLabel || label->text() == QStringLiteral("UI Language");
-      foundPieMenuLabel =
-        foundPieMenuLabel || label->text() == QStringLiteral("Pie Menu Actions");
+    }
+
+    auto foundPieMenuGroup = false;
+    for (auto* groupBox : dialog.findChildren<QGroupBox*>())
+    {
+      foundPieMenuGroup =
+        foundPieMenuGroup || groupBox->title() == QStringLiteral("Pie Menu Actions");
     }
 
     CHECK(foundLanguageLabel);
-    CHECK(foundPieMenuLabel);
+    CHECK(foundPieMenuGroup);
   }
 }
 

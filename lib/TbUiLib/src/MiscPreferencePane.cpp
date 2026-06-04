@@ -1,14 +1,15 @@
 #include "ui/MiscPreferencePane.h"
 
+#include <QAbstractItemView>
 #include <QAction>
 #include <QApplication>
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QFileDialog>
+#include <QFrame>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
 #include <QMessageBox>
@@ -23,12 +24,58 @@
 #include "ui/ActionManager.h"
 #include "ui/FileDialogDefaultDir.h"
 #include "ui/QPathUtils.h"
-#include "ui/QWidgetUtils.h"
+#include "ui/QStyleUtils.h"
+#include "ui/ViewConstants.h"
 
 #include <functional>
 
 namespace tb::ui
 {
+namespace
+{
+constexpr auto ListMinHeight = 130;
+constexpr auto ButtonColumnWidth = 92;
+
+void configurePreferenceList(QListWidget* list)
+{
+  list->setMinimumHeight(ListMinHeight);
+  list->setAlternatingRowColors(true);
+}
+
+void configureActionButton(QPushButton* button)
+{
+  button->setMinimumWidth(ButtonColumnWidth);
+}
+
+QVBoxLayout* createButtonColumn(std::initializer_list<QPushButton*> buttons)
+{
+  auto* layout = new QVBoxLayout{};
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(LayoutConstants::MediumVMargin);
+
+  for (auto* button : buttons)
+  {
+    configureActionButton(button);
+    layout->addWidget(button);
+  }
+
+  layout->addStretch(1);
+  return layout;
+}
+
+QGroupBox* createGroupBox(const QString& title, QLayout* contentLayout)
+{
+  auto* groupBox = new QGroupBox{title};
+  contentLayout->setContentsMargins(
+    LayoutConstants::WideHMargin,
+    LayoutConstants::WideVMargin,
+    LayoutConstants::WideHMargin,
+    LayoutConstants::WideVMargin);
+  contentLayout->setSpacing(LayoutConstants::WideVMargin);
+  groupBox->setLayout(contentLayout);
+  return groupBox;
+}
+} // namespace
 
 MiscPreferencePane::MiscPreferencePane(QWidget* parent)
   : PreferencePane{parent}
@@ -40,6 +87,7 @@ MiscPreferencePane::MiscPreferencePane(QWidget* parent)
 void MiscPreferencePane::createGui()
 {
   auto* langLabel = new QLabel(tr("UI Language"));
+  setInfoStyle(langLabel);
   langLabel->setToolTip(
     tr("Select the display language for the application interface. Changes will take "
        "effect after restarting the application"));
@@ -67,18 +115,22 @@ void MiscPreferencePane::createGui()
     showRestartRequiredMessage();
   });
 
-  auto* languageLayout = new QVBoxLayout();
-  languageLayout->setContentsMargins(0, 0, 0, 0);
-  languageLayout->addWidget(langLabel);
-  languageLayout->addWidget(m_englishRadioButton);
-  languageLayout->addWidget(m_chineseRadioButton);
+  auto* languageChoicesLayout = new QHBoxLayout();
+  languageChoicesLayout->setContentsMargins(0, 0, 0, 0);
+  languageChoicesLayout->setSpacing(LayoutConstants::WideHMargin);
+  languageChoicesLayout->addWidget(m_englishRadioButton);
+  languageChoicesLayout->addWidget(m_chineseRadioButton);
+  languageChoicesLayout->addStretch(1);
 
-  auto* languageGroupBox = new QGroupBox(tr("Language"));
-  languageGroupBox->setLayout(languageLayout);
+  auto* languageLayout = new QVBoxLayout();
+  languageLayout->addWidget(langLabel);
+  languageLayout->addLayout(languageChoicesLayout);
+
+  auto* languageGroupBox = createGroupBox(tr("Language"), languageLayout);
 
   m_pluginList = new QListWidget();
   m_pluginList->setSelectionMode(QAbstractItemView::ExtendedSelection);
-  m_pluginList->setMinimumHeight(100);
+  configurePreferenceList(m_pluginList);
 
   m_addPluginBtn = new QPushButton(tr("Add..."));
   m_removePluginBtn = new QPushButton(tr("Remove"));
@@ -112,18 +164,19 @@ void MiscPreferencePane::createGui()
     savePluginPaths();
   });
 
-  auto* pluginBtnLayout = new QVBoxLayout();
-  pluginBtnLayout->addWidget(m_addPluginBtn);
-  pluginBtnLayout->addWidget(m_removePluginBtn);
-  pluginBtnLayout->addWidget(m_clearPluginsBtn);
-  pluginBtnLayout->addStretch();
+  auto* pluginBtnLayout =
+    createButtonColumn({m_addPluginBtn, m_removePluginBtn, m_clearPluginsBtn});
 
   auto* pluginListLayout = new QHBoxLayout();
+  pluginListLayout->setContentsMargins(0, 0, 0, 0);
+  pluginListLayout->setSpacing(LayoutConstants::WideHMargin);
   pluginListLayout->addWidget(m_pluginList);
   pluginListLayout->addLayout(pluginBtnLayout);
 
-  auto* pluginGroupBox = new QGroupBox(tr("Default Plugins"));
-  pluginGroupBox->setLayout(pluginListLayout);
+  auto* pluginLayout = new QVBoxLayout();
+  pluginLayout->addLayout(pluginListLayout);
+
+  auto* pluginGroupBox = createGroupBox(tr("Default Plugins"), pluginLayout);
 
   m_prefixWorldspawnOnCopyCheckBox =
     new QCheckBox(tr("Prefix worldspawn header on copy"));
@@ -132,6 +185,7 @@ void MiscPreferencePane::createGui()
   m_pieMenuActionList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_pieMenuActionList->setDragDropMode(QAbstractItemView::InternalMove);
   m_pieMenuActionList->setDefaultDropAction(Qt::MoveAction);
+  configurePreferenceList(m_pieMenuActionList);
 
   m_addActionBtn = new QPushButton(tr("Add"));
   m_removeActionBtn = new QPushButton(tr("Remove"));
@@ -270,34 +324,32 @@ void MiscPreferencePane::createGui()
 
   buildMenu(m_pieMenu, root);
 
-  auto* pieMenuLabel = new QLabel(tr("Pie Menu Actions"));
-  auto* buttonsLayout = new QVBoxLayout();
-  buttonsLayout->addWidget(m_addActionBtn);
-  buttonsLayout->addWidget(m_removeActionBtn);
-  buttonsLayout->addWidget(m_clearActionsBtn);
-  buttonsLayout->addStretch();
+  auto* buttonsLayout =
+    createButtonColumn({m_addActionBtn, m_removeActionBtn, m_clearActionsBtn});
 
   auto* pieMenuLayout = new QHBoxLayout();
+  pieMenuLayout->setContentsMargins(0, 0, 0, 0);
+  pieMenuLayout->setSpacing(LayoutConstants::WideHMargin);
   pieMenuLayout->addWidget(m_pieMenuActionList);
   pieMenuLayout->addLayout(buttonsLayout);
 
-  auto* mainPieLayout = new QVBoxLayout();
-  mainPieLayout->addWidget(pieMenuLabel);
-  mainPieLayout->addLayout(pieMenuLayout);
+  auto* pieMenuGroupBox = createGroupBox(tr("Pie Menu Actions"), pieMenuLayout);
 
-  auto* miscLayout = new QVBoxLayout();
-  miscLayout->setContentsMargins(0, 0, 0, 0);
-  miscLayout->addWidget(pluginGroupBox);
-  miscLayout->addWidget(m_prefixWorldspawnOnCopyCheckBox);
-  miscLayout->addLayout(mainPieLayout);
-
-  auto* miscGroupBox = new QGroupBox(tr("Editor"));
-  miscGroupBox->setLayout(miscLayout);
+  auto* editorLayout = new QVBoxLayout();
+  editorLayout->addWidget(m_prefixWorldspawnOnCopyCheckBox);
+  auto* editorGroupBox = createGroupBox(tr("Editor"), editorLayout);
 
   auto* layout = new QVBoxLayout();
-  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setContentsMargins(
+    LayoutConstants::WideHMargin,
+    LayoutConstants::WideVMargin,
+    LayoutConstants::WideHMargin,
+    LayoutConstants::WideVMargin);
+  layout->setSpacing(LayoutConstants::WideVMargin);
   layout->addWidget(languageGroupBox);
-  layout->addWidget(miscGroupBox);
+  layout->addWidget(pluginGroupBox);
+  layout->addWidget(editorGroupBox);
+  layout->addWidget(pieMenuGroupBox);
   layout->addStretch(1);
   setLayout(layout);
 
