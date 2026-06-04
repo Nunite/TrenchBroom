@@ -44,19 +44,31 @@ auto makeSandboxPath(const std::filesystem::path& dir)
          | kdl::value();
 }
 
+auto testTempPath()
+{
+  auto path = std::filesystem::temp_directory_path() / "TrenchBroomTests";
+  std::filesystem::create_directories(path);
+  return path;
+}
+
 auto addNonAsciiDirs(const std::filesystem::path& rootPath)
 {
   // have a non-ASCII character in the directory name to help catch
   // filename encoding bugs
+#ifdef _WIN32
+  const auto cyrillic = std::filesystem::path{L"Кристиян"};
+  const auto hiraganaLetterSmallA = std::filesystem::path{L"ぁ"};
+#else
   const auto cyrillic = "Кристиян";
   const auto hiraganaLetterSmallA = "ぁ";
+#endif
   return rootPath / cyrillic / hiraganaLetterSmallA;
 }
 
 } // namespace
 
 TestEnvironment::TestEnvironment(const SetupFunction& setup)
-  : m_sandboxPath{makeSandboxPath(std::filesystem::current_path())}
+  : m_sandboxPath{makeSandboxPath(testTempPath())}
   , m_dir{addNonAsciiDirs(m_sandboxPath) / Catch::getResultCapture().getCurrentTestName()}
 {
   createTestEnvironment(setup);
