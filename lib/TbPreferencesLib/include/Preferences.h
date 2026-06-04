@@ -65,7 +65,8 @@ inline const std::string& languageChinese()
   return ChineseLanguage;
 }
 
-inline auto DefaultPluginPaths = Preference<std::string>{"Python/Default plugin paths", ""};
+inline auto DefaultPluginPaths =
+  Preference<std::string>{"Python/Default plugin paths", ""};
 inline auto PieMenuAction = Preference<std::string>{"Controls/Pie menu actions", ""};
 inline auto PrefixWorldspawnHeaderOnCopy =
   Preference<bool>{"Controls/Prefix worldspawn header on copy", false};
@@ -311,6 +312,8 @@ inline auto FaceRenderMode =
 inline auto ShadeFaces = Preference<bool>{"Map view/Shade faces", true};
 inline auto ShowFog = Preference<bool>{"Map view/Show fog", false};
 inline auto ShowEdges = Preference<bool>{"Map view/Show edges", true};
+inline auto UseReadable2DBrushOutlines =
+  Preference<bool>{"Map view/Use readable 2D brush outlines", true};
 
 inline auto ShowSoftMapBounds = Preference<bool>{"Map view/Show soft map bounds", true};
 

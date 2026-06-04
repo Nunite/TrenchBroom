@@ -24,12 +24,17 @@
 #include "gl/MaterialManager.h"
 #include "gl/ResourceId.h"
 #include "gl/ResourceManager.h"
+#include "gl/VertexArray.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
+#include "mdl/BrushRendererBrushCache.h"
 #include "mdl/EditorContext.h"
+#include "mdl/Entity.h"
 #include "mdl/EntityModelManager.h"
 #include "mdl/EntityNode.h"
+#include "mdl/EntityNodeBase.h"
+#include "mdl/EntityProperties.h"
 #include "mdl/GameInfo.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
@@ -40,6 +45,7 @@
 #include "mdl/SelectionChange.h"
 #include "mdl/WorldNode.h"
 #include "render/BrushRenderer.h"
+#include "render/EdgeRenderer.h"
 #include "render/EntityDecalRenderer.h"
 #include "render/EntityLinkRenderer.h"
 #include "render/GroupLinkRenderer.h"
@@ -50,6 +56,9 @@
 #include "kd/overload.h"
 #include "kd/path_utils.h"
 
+#include <cmath>
+#include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace tb::render
@@ -192,6 +201,58 @@ std::unique_ptr<EntityDecalRenderer> createEntityDecalRenderer(mdl::Map& map)
   return std::make_unique<EntityDecalRenderer>(map);
 }
 
+const std::vector<Color>& readable2DBrushOutlinePalette()
+{
+  static const auto palette = std::vector<Color>{
+    RgbaF{0.44f, 0.78f, 0.86f, 0.72f},
+    RgbaF{0.58f, 0.72f, 0.98f, 0.72f},
+    RgbaF{0.56f, 0.82f, 0.56f, 0.72f},
+    RgbaF{0.86f, 0.76f, 0.43f, 0.72f},
+    RgbaF{0.78f, 0.62f, 0.92f, 0.72f},
+    RgbaF{0.90f, 0.58f, 0.55f, 0.72f},
+    RgbaF{0.52f, 0.84f, 0.72f, 0.72f},
+    RgbaF{0.80f, 0.80f, 0.64f, 0.72f},
+  };
+  return palette;
+}
+
+size_t readable2DBrushOutlineColorIndex(const mdl::BrushNode& brushNode)
+{
+  const auto* entityNode = brushNode.entity();
+  const auto useEntityColor =
+    entityNode
+    && entityNode->entity().classname() != mdl::EntityPropertyValues::WorldspawnClassname;
+  const auto bounds =
+    useEntityColor ? entityNode->logicalBounds() : brushNode.brush().bounds();
+  const auto quantize = [](const double value) {
+    return static_cast<int64_t>(std::llround(value * 1000.0));
+  };
+
+  auto hash = uint64_t{1469598103934665603ull};
+  const auto combine = [&](const int64_t value) {
+    hash ^= static_cast<uint64_t>(value);
+    hash *= uint64_t{1099511628211ull};
+  };
+
+  combine(quantize(bounds.min.x()));
+  combine(quantize(bounds.min.y()));
+  combine(quantize(bounds.min.z()));
+  combine(quantize(bounds.max.x()));
+  combine(quantize(bounds.max.y()));
+  combine(quantize(bounds.max.z()));
+  if (useEntityColor)
+  {
+    combine(
+      static_cast<int64_t>(std::hash<std::string>{}(entityNode->entity().classname())));
+  }
+  else
+  {
+    combine(static_cast<int64_t>(brushNode.brush().faces().size()));
+  }
+
+  return static_cast<size_t>(hash % readable2DBrushOutlinePalette().size());
+}
+
 } // namespace
 
 MapRenderer::MapRenderer(mdl::Map& map)
@@ -238,6 +299,7 @@ void MapRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
   renderGroupLinks(renderContext, renderBatch);
 
   renderDefaultOpaque(renderContext, renderBatch);
+  renderReadable2DBrushOutlines(renderContext, renderBatch);
   renderLockedOpaque(renderContext, renderBatch);
   renderSelectionOpaque(renderContext, renderBatch);
 
@@ -277,6 +339,58 @@ void MapRenderer::renderDefaultTransparent(
 {
   m_defaultRenderer->setShowOverlays(renderContext.render3D());
   m_defaultRenderer->renderTransparent(renderContext, renderBatch);
+}
+
+void MapRenderer::renderReadable2DBrushOutlines(
+  RenderContext& renderContext, RenderBatch& renderBatch)
+{
+  if (
+    !renderContext.render2D() || !pref(Preferences::UseReadable2DBrushOutlines)
+    || !renderContext.showEdges())
+  {
+    return;
+  }
+
+  auto vertices = std::vector<gl::VertexTypes::P3C4::Vertex>{};
+  vertices.reserve(m_trackedNodes.size() * 24u);
+
+  const auto& palette = readable2DBrushOutlinePalette();
+  for (const auto& [node, renderers] : m_trackedNodes)
+  {
+    if ((renderers & int(Renderer::Default)) == 0)
+    {
+      continue;
+    }
+
+    auto* brushNode = dynamic_cast<mdl::BrushNode*>(node);
+    if (
+      !brushNode || brushNode->locked() || brushNode->selected()
+      || brushNode->parentSelected() || brushNode->descendantSelected()
+      || brushNode->hasSelectedFaces())
+    {
+      continue;
+    }
+
+    auto& brushCache = brushNode->brushRendererBrushCache();
+    brushCache.validateVertexCache(*brushNode);
+
+    const auto color =
+      palette[readable2DBrushOutlineColorIndex(*brushNode)].to<RgbaF>().toVec();
+    const auto& cachedVertices = brushCache.cachedVertices();
+    for (const auto& edge : brushCache.cachedEdges())
+    {
+      vertices.emplace_back(
+        vm::vec3f{cachedVertices[edge.vertexIndex1RelativeToBrush].attr}, color);
+      vertices.emplace_back(
+        vm::vec3f{cachedVertices[edge.vertexIndex2RelativeToBrush].attr}, color);
+    }
+  }
+
+  if (!vertices.empty())
+  {
+    DirectEdgeRenderer{gl::VertexArray::move(std::move(vertices)), gl::PrimType::Lines}
+      .render(renderBatch, false, Color{}, 1.0f, 0.0);
+  }
 }
 
 void MapRenderer::renderSelectionOpaque(

@@ -486,6 +486,7 @@ QWidget* ViewEditor::createRendererPanel(QWidget* parent)
   m_shadeFacesCheckBox = new QCheckBox{tr("Shade faces")};
   m_showFogCheckBox = new QCheckBox{tr("Use fog")};
   m_showEdgesCheckBox = new QCheckBox{tr("Show edges")};
+  m_useReadable2DBrushOutlinesCheckBox = new QCheckBox{tr("Readable 2D brush outlines")};
 
 
   const auto EntityLinkModes = std::vector<std::tuple<QString, QString>>{
@@ -521,6 +522,11 @@ QWidget* ViewEditor::createRendererPanel(QWidget* parent)
     m_showFogCheckBox, &QAbstractButton::clicked, this, &ViewEditor::showFogChanged);
   connect(
     m_showEdgesCheckBox, &QAbstractButton::clicked, this, &ViewEditor::showEdgesChanged);
+  connect(
+    m_useReadable2DBrushOutlinesCheckBox,
+    &QAbstractButton::clicked,
+    this,
+    &ViewEditor::useReadable2DBrushOutlinesChanged);
 
   connect(
     m_renderModeRadioGroup,
@@ -556,6 +562,7 @@ QWidget* ViewEditor::createRendererPanel(QWidget* parent)
   layout->addWidget(m_shadeFacesCheckBox);
   layout->addWidget(m_showFogCheckBox);
   layout->addWidget(m_showEdgesCheckBox);
+  layout->addWidget(m_useReadable2DBrushOutlinesCheckBox);
 
   for (auto* button : m_entityLinkRadioGroup->buttons())
   {
@@ -616,6 +623,8 @@ void ViewEditor::refreshRendererPanel()
   m_shadeFacesCheckBox->setChecked(pref(Preferences::ShadeFaces));
   m_showFogCheckBox->setChecked(pref(Preferences::ShowFog));
   m_showEdgesCheckBox->setChecked(pref(Preferences::ShowEdges));
+  m_useReadable2DBrushOutlinesCheckBox->setChecked(
+    pref(Preferences::UseReadable2DBrushOutlines));
   checkButtonInGroup(
     m_entityLinkRadioGroup,
     QString::fromStdString(pref(Preferences::EntityLinkMode)),
@@ -709,6 +718,11 @@ void ViewEditor::showEdgesChanged(const bool checked)
   setPref(Preferences::ShowEdges, checked);
 }
 
+void ViewEditor::useReadable2DBrushOutlinesChanged(const bool checked)
+{
+  setPref(Preferences::UseReadable2DBrushOutlines, checked);
+}
+
 void ViewEditor::entityLinkModeChanged(const int id)
 {
   switch (id)
@@ -745,6 +759,7 @@ void ViewEditor::restoreDefaultsClicked()
   prefs.resetToDefault(Preferences::ShadeFaces);
   prefs.resetToDefault(Preferences::ShowFog);
   prefs.resetToDefault(Preferences::ShowEdges);
+  prefs.resetToDefault(Preferences::UseReadable2DBrushOutlines);
   prefs.resetToDefault(Preferences::ShowSoftMapBounds);
   prefs.resetToDefault(Preferences::ShowPointEntities);
   prefs.resetToDefault(Preferences::ShowBrushes);
