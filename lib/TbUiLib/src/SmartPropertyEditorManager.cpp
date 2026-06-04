@@ -32,6 +32,7 @@
 #include "ui/SmartColorEditor.h"
 #include "ui/SmartDefaultPropertyEditor.h"
 #include "ui/SmartFlagsEditor.h"
+#include "ui/SmartModelEditor.h"
 #include "ui/SmartPropertyEditor.h"
 #include "ui/SmartWadEditor.h"
 
@@ -128,11 +129,12 @@ void SmartPropertyEditorManager::createEditors()
     new SmartChoiceEditor{m_document, this});
   registerEditor(
     [&](const auto& propertyKey, const auto& nodes) {
+      const auto& materialProperty =
+        m_document.map().gameInfo().gameConfig.materialConfig.property;
       return nodes.size() == 1
              && nodes.front()->entity().classname()
                   == mdl::EntityPropertyValues::WorldspawnClassname
-             && propertyKey
-                  == m_document.map().gameInfo().gameConfig.materialConfig.property;
+             && materialProperty.has_value() && propertyKey == *materialProperty;
     },
     new SmartWadEditor{m_document, this});
   registerEditor(
@@ -142,6 +144,9 @@ void SmartPropertyEditorManager::createEditors()
       makeSmartTypeEditorMatcher<mdl::PropertyValueTypes::Color<RgbB>>(),
       makeSmartTypeEditorMatcher<mdl::PropertyValueTypes::Color<Rgb>>()),
     new SmartColorEditor{m_document, this});
+  registerEditor(
+    makeSmartPropertyEditorKeyMatcher({"model", "mdl"}),
+    new SmartModelEditor{m_document, this});
   registerEditor(
     [](const auto&, const auto&) { return true; },
     new SmartDefaultPropertyEditor{m_document, this});
