@@ -1,6 +1,6 @@
-#include "PythonSelection.h"
-#include "PythonTypes.h"
-#include "PythonUtils.h"
+#include "ui/python/PythonSelection.h"
+#include "ui/python/PythonTypes.h"
+#include "ui/python/PythonUtils.h"
 
 #include "mdl/Map.h"
 #include "mdl/Map_Selection.h"
@@ -12,8 +12,7 @@
 #include "mdl/EntityNode.h"
 #include "mdl/VertexHandleManager.h"
 #include "ui/MapDocument.h"
-#include "kdl/vector_utils.h"
-#include "Exceptions.h"
+#include "kd/vector_utils.h"
 
 #include <vector>
 
@@ -242,11 +241,6 @@ PyObject* selection_add(PyObject* self, PyObject* args)
     tb::mdl::selectNodes(doc->map(), nodes);
     Py_RETURN_NONE;
   }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
-  }
   catch (const std::exception& e)
   {
     PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -298,11 +292,6 @@ PyObject* selection_set(PyObject* self, PyObject* args)
   {
     tb::mdl::selectNodes(doc->map(), nodes);
     Py_RETURN_NONE;
-  }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
   }
   catch (const std::exception& e)
   {
@@ -410,11 +399,6 @@ PyObject* selection_clear(PyObject* self, PyObject*)
     tb::mdl::deselectAll(doc->map());
     Py_RETURN_NONE;
   }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
-  }
   catch (const std::exception& e)
   {
     PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -453,11 +437,6 @@ PyObject* selection_set_property(PyObject* self, PyObject* args)
     }
     Py_RETURN_FALSE;
   }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
-  }
   catch (const std::exception& e)
   {
     PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -482,11 +461,6 @@ PyObject* selection_duplicate(PyObject* self, PyObject*)
   {
     tb::mdl::duplicateSelectedNodes(doc->map());
     Py_RETURN_NONE;
-  }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
   }
   catch (const std::exception& e)
   {
@@ -524,11 +498,6 @@ PyObject* selection_translate(PyObject* self, PyObject* args)
       Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
-  }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
   }
   catch (const std::exception& e)
   {
@@ -596,11 +565,6 @@ PyObject* selection_rotate(PyObject* self, PyObject* args)
     }
     Py_RETURN_FALSE;
   }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
-  }
   catch (const std::exception& e)
   {
     PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -663,11 +627,6 @@ PyObject* selection_scale(PyObject* self, PyObject* args)
     }
     Py_RETURN_FALSE;
   }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
-  }
   catch (const std::exception& e)
   {
     PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -704,11 +663,6 @@ PyObject* selection_chamfer_vertices(PyObject* self, PyObject* args)
       Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
-  }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
   }
   catch (const std::exception& e)
   {
@@ -753,11 +707,6 @@ PyObject* selection_chamfer_edges(PyObject* self, PyObject* args)
     }
     Py_RETURN_FALSE;
   }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
-  }
   catch (const std::exception& e)
   {
     PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -792,11 +741,6 @@ PyObject* selection_remove_property(PyObject* self, PyObject* args)
       Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
-  }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
   }
   catch (const std::exception& e)
   {
@@ -834,11 +778,6 @@ PyObject* selection_rename_property(PyObject* self, PyObject* args)
       Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
-  }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
   }
   catch (const std::exception& e)
   {

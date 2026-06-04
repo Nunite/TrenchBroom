@@ -1,4 +1,4 @@
-#include "MiscPreferencePane.h"
+#include "ui/MiscPreferencePane.h"
 
 #include <QApplication>
 #include <QButtonGroup>
@@ -21,8 +21,10 @@
 
 #include "PreferenceManager.h"
 #include "Preferences.h"
+#include "ui/Action.h"
+#include "ui/ActionManager.h"
+#include "ui/FileDialogDefaultDir.h"
 #include "ui/QPathUtils.h"
-#include "ui/Actions.h"
 #include "ui/QWidgetUtils.h"
 
 namespace tb::ui
@@ -40,8 +42,10 @@ void MiscPreferencePane::createGui()
   auto* langLabel = new QLabel(tr("UI Language"));
   langLabel->setToolTip(tr("Select the display language for the application interface. Changes will take effect after restarting the application"));
 
-  m_englishRadioButton = new QRadioButton(Preferences::languageEnglish());
-  m_chineseRadioButton = new QRadioButton(Preferences::languageChinese());
+  m_englishRadioButton =
+    new QRadioButton(QString::fromStdString(Preferences::languageEnglish()));
+  m_chineseRadioButton =
+    new QRadioButton(QString::fromStdString(Preferences::languageChinese()));
 
   m_languageButtonGroup = new QButtonGroup(this);
   m_languageButtonGroup->addButton(m_englishRadioButton, 0);
@@ -298,7 +302,7 @@ void MiscPreferencePane::savePieMenuActions()
         paths << m_pieMenuActionList->item(i)->data(Qt::UserRole).toString();
     }
     auto& prefs = PreferenceManager::instance();
-    prefs.set(Preferences::PieMenuAction, paths.join('|'));
+    prefs.set(Preferences::PieMenuAction, paths.join('|').toStdString());
 }
 
 void MiscPreferencePane::savePluginPaths()
@@ -308,7 +312,7 @@ void MiscPreferencePane::savePluginPaths()
         paths << m_pluginList->item(i)->text();
     }
     auto& prefs = PreferenceManager::instance();
-    prefs.set(Preferences::DefaultPluginPaths, paths.join('|'));
+    prefs.set(Preferences::DefaultPluginPaths, paths.join('|').toStdString());
 }
 
 void MiscPreferencePane::addPluginPath(const QString& path)
@@ -348,7 +352,7 @@ void MiscPreferencePane::updateControls()
   }
 
   m_pluginList->clear();
-  QString currentPaths = pref(Preferences::DefaultPluginPaths);
+  auto currentPaths = QString::fromStdString(pref(Preferences::DefaultPluginPaths));
   QStringList pathsList = currentPaths.split('|', Qt::SkipEmptyParts);
   for (const auto& path : pathsList) {
       new QListWidgetItem(path, m_pluginList);
@@ -357,7 +361,7 @@ void MiscPreferencePane::updateControls()
   m_prefixWorldspawnOnCopyCheckBox->setChecked(
     pref(Preferences::PrefixWorldspawnHeaderOnCopy));
 
-  QString currentPath = pref(Preferences::PieMenuAction);
+  auto currentPath = QString::fromStdString(pref(Preferences::PieMenuAction));
   QStringList paths = currentPath.split('|', Qt::SkipEmptyParts);
   
   m_pieMenuActionList->clear();

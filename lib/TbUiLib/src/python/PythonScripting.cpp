@@ -17,14 +17,14 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "PythonScripting.h"
+#include "ui/python/PythonScripting.h"
 
-#include "PythonDocument.h"
-#include "PythonEntity.h"
-#include "PythonMaterial.h"
-#include "PythonPluginPanel.h"
-#include "PythonSelection.h"
-#include "PythonTransaction.h"
+#include "ui/python/PythonDocument.h"
+#include "ui/python/PythonEntity.h"
+#include "ui/python/PythonMaterial.h"
+#include "ui/python/PythonPluginPanel.h"
+#include "ui/python/PythonSelection.h"
+#include "ui/python/PythonTransaction.h"
 
 #if defined(slots)
 #undef slots
@@ -61,12 +61,11 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-#include "Exceptions.h"
 #include "Logger.h"
-#include "PythonPlane.h"
-#include "PythonTypes.h"
-#include "PythonUtils.h"
-#include "PythonVec3.h"
+#include "ui/python/PythonPlane.h"
+#include "ui/python/PythonTypes.h"
+#include "ui/python/PythonUtils.h"
+#include "ui/python/PythonVec3.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceAttributes.h"
@@ -82,22 +81,25 @@
 #include "mdl/Map_Geometry.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
-#include "mdl/Material.h"
-#include "mdl/MaterialCollection.h"
-#include "mdl/MaterialManager.h"
+#include "gl/Material.h"
+#include "gl/MaterialCollection.h"
+#include "gl/MaterialManager.h"
 #include "mdl/PatchNode.h"
-#include "mdl/Texture.h"
+#include "gl/Texture.h"
 #include "mdl/Transaction.h"
 #include "mdl/VertexHandleManager.h"
 #include "mdl/WorldNode.h"
-#include "ui/Actions.h"
+#include "ui/Action.h"
+#include "ui/ActionExecutionContext.h"
+#include "ui/ActionManager.h"
+#include "ui/AppController.h"
 #include "ui/Inspector.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/PluginInspector.h"
 
-#include "kdl/overload.h"
-#include "kdl/vector_utils.h"
+#include "kd/overload.h"
+#include "kd/vector_utils.h"
 
 #include "vm/plane.h"
 #include "vm/segment.h"
@@ -152,7 +154,7 @@ private:
       PyErr_Print();
       if (g_currentFrame)
       {
-         g_currentFrame->pythonLogger().error("Error in timer callback");
+         g_currentFrame->pythonLogger().error() << "Error in timer callback";
       }
     }
     else
@@ -306,11 +308,11 @@ PyObject* log_writer_write(PyObject* self, PyObject* args)
   {
     if (writer->isError != 0)
     {
-      g_currentFrame->pythonLogger().error(message);
+      g_currentFrame->pythonLogger().error() << message;
     }
     else
     {
-      g_currentFrame->pythonLogger().info(message);
+      g_currentFrame->pythonLogger().info() << message;
     }
   }
 
@@ -547,11 +549,6 @@ bool ensureInitialized()
                  g_currentFrame->switchToInspectorPage(InspectorPage::Plugin);
                  Py_RETURN_NONE;
                }
-               catch (const tb::Exception& e)
-               {
-                 PyErr_SetString(PyExc_RuntimeError, e.what());
-                 return nullptr;
-               }
                catch (const std::exception& e)
                {
                  PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -583,11 +580,6 @@ bool ensureInitialized()
                  auto* container = g_currentFrame->addPluginPanel(qTitle);
                  g_currentFrame->switchToInspectorPage(InspectorPage::Plugin);
                  return createPluginPanelObject(container);
-               }
-               catch (const tb::Exception& e)
-               {
-                 PyErr_SetString(PyExc_RuntimeError, e.what());
-                 return nullptr;
                }
                catch (const std::exception& e)
                {
@@ -629,7 +621,9 @@ bool ensureInitialized()
 
                  const auto& action = iAction->second;
                  auto context = ActionExecutionContext{
-                   g_currentFrame, g_currentFrame->currentMapViewBase()};
+                   g_currentFrame->appController(),
+                   g_currentFrame,
+                   g_currentFrame->currentMapViewBase()};
                  if (!action.enabled(context))
                  {
                    PyErr_SetString(PyExc_RuntimeError, "Action is disabled");
@@ -637,11 +631,6 @@ bool ensureInitialized()
                  }
                  action.execute(context);
                  Py_RETURN_NONE;
-               }
-               catch (const tb::Exception& e)
-               {
-                 PyErr_SetString(PyExc_RuntimeError, e.what());
-                 return nullptr;
                }
                catch (const std::exception& e)
                {
@@ -885,7 +874,7 @@ void PythonScripting::onSelectionChanged(MapWindow& frame)
             if (res == nullptr)
             {
               PyErr_Print();
-              frame.pythonLogger().error("Error in selection_changed callback");
+              frame.pythonLogger().error() << "Error in selection_changed callback";
             }
             else
             {
@@ -940,7 +929,7 @@ void PythonScripting::onDocumentSaved(MapWindow& frame)
             if (res == nullptr)
             {
               PyErr_Print();
-              frame.pythonLogger().error("Error in document_saved callback");
+              frame.pythonLogger().error() << "Error in document_saved callback";
             }
             else
             {

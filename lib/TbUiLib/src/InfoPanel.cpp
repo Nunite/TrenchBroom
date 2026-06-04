@@ -26,6 +26,7 @@
 
 #include "ui/Console.h"
 #include "ui/IssueBrowser.h"
+#include "ui/MapDocument.h"
 #include "ui/ModelInspector.h"
 #include "ui/AppController.h"
 #include "ui/TabBook.h"

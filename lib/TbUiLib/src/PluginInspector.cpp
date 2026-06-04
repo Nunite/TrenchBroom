@@ -17,7 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "PluginInspector.h"
+#include "ui/PluginInspector.h"
 
 #include <QLabel>
 #include <QScrollArea>
@@ -27,10 +27,21 @@
 #include "ui/QPathUtils.h"
 #include "ui/ClickableTitleBar.h"
 #include "ui/CollapsibleTitledPanel.h"
+#include "ui/InfoPanel.h"
 #include "ui/QWidgetUtils.h"
 
 namespace tb::ui
 {
+
+namespace
+{
+void makePluginInfo(QLabel* label)
+{
+  label->setWordWrap(true);
+  label->setAlignment(Qt::AlignCenter);
+  label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
+}
+} // namespace
 
 PluginInspector::PluginInspector(QWidget* parent)
   : TabBookPage{parent}
@@ -133,7 +144,7 @@ PluginInspector::PluginInspector(QWidget* parent)
 
   m_emptyLabel = new QLabel{
     tr("No plugin panels loaded.\nThis panel is reserved for plugin-provided UI.")};
-  makeInfo(m_emptyLabel);
+  makePluginInfo(m_emptyLabel);
   m_containerLayout->addWidget(m_emptyLabel, 0);
   m_containerLayout->addStretch(1);
 
@@ -200,7 +211,7 @@ QWidget* PluginInspector::addPluginPanel(const QString& title)
       {
         m_emptyLabel = new QLabel{
           tr("No plugin panels loaded.\nThis panel is reserved for plugin-provided UI.")};
-        makeInfo(m_emptyLabel);
+        makePluginInfo(m_emptyLabel);
         m_containerLayout->insertWidget(1, m_emptyLabel, 0);
       }
     });

@@ -21,6 +21,7 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QCursor>
 #include <QDebug>
 #include <QMenu>
 #include <QMimeData>
@@ -83,6 +84,7 @@
 #include "ui/MapViewActivationTracker.h"
 #include "ui/MapViewToolBox.h"
 #include "ui/MapWindow.h"
+#include "ui/PieMenu.h"
 #include "ui/SelectionTool.h"
 #include "ui/SignalDelayer.h"
 
@@ -90,6 +92,7 @@
 #include "kd/ranges/to.h"
 #include "kd/string_compare.h"
 #include "kd/string_format.h"
+#include "kd/string_utils.h"
 #include "kd/vector_utils.h"
 
 #include "vm/polygon.h"
@@ -139,6 +142,45 @@ MapViewBase::~MapViewBase()
 void MapViewBase::setIsCurrent(const bool isCurrent)
 {
   m_isCurrent = isCurrent;
+}
+
+void MapViewBase::showPieMenu()
+{
+  auto* mapWindow = dynamic_cast<MapWindow*>(window());
+  auto* menu = new PieMenu{this};
+  auto context = ActionExecutionContext{m_appController, mapWindow, this};
+  auto itemCount = 0u;
+
+  for (const auto& pathStr : kdl::str_split(pref(Preferences::PieMenuAction), "|"))
+  {
+    if (pathStr.empty())
+    {
+      continue;
+    }
+
+    const auto path = std::filesystem::path{pathStr};
+    const auto& actionsMap = m_appController.actionManager().actionsMap();
+    const auto it = actionsMap.find(path);
+    if (it == std::end(actionsMap))
+    {
+      continue;
+    }
+
+    const auto& action = it->second;
+    menu->addItem(
+      action.label(),
+      [this, &action]() { triggerAction(action); },
+      action.enabled(context));
+    ++itemCount;
+  }
+
+  if (itemCount == 0u)
+  {
+    menu->deleteLater();
+    return;
+  }
+
+  menu->showAt(QCursor::pos());
 }
 
 void MapViewBase::bindEvents()

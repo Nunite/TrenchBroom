@@ -48,9 +48,19 @@
 namespace tb::ui
 {
 
+ActionManager* ActionManager::m_instance = nullptr;
+
 ActionManager::ActionManager()
 {
+  contract_assert(m_instance == nullptr);
+  m_instance = this;
   initialize();
+}
+
+ActionManager& ActionManager::instance()
+{
+  contract_assert(m_instance != nullptr);
+  return *m_instance;
 }
 
 std::vector<Action> ActionManager::createTagActions(

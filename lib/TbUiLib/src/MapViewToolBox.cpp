@@ -29,6 +29,7 @@
 #include "ui/FaceTool.h"
 #include "ui/MapDocument.h"
 #include "ui/MoveObjectsTool.h"
+#include "ui/PathTool.h"
 #include "ui/RotateTool.h"
 #include "ui/ScaleTool.h"
 #include "ui/ShearTool.h"
@@ -106,6 +107,11 @@ EdgeTool& MapViewToolBox::edgeTool()
 FaceTool& MapViewToolBox::faceTool()
 {
   return *m_faceTool;
+}
+
+PathTool& MapViewToolBox::pathTool()
+{
+  return *m_pathTool;
 }
 
 void MapViewToolBox::toggleAssembleBrushTool()
@@ -239,6 +245,28 @@ void MapViewToolBox::toggleFaceTool()
 bool MapViewToolBox::faceToolActive() const
 {
   return m_faceTool->active();
+}
+
+void MapViewToolBox::togglePathTool()
+{
+  toggleTool(pathTool());
+}
+
+bool MapViewToolBox::pathToolActive() const
+{
+  return m_pathTool->active();
+}
+
+void MapViewToolBox::performPathCreation()
+{
+  contract_pre(pathToolActive());
+  m_pathTool->createPathEntities();
+}
+
+void MapViewToolBox::removeLastPathPoint()
+{
+  contract_pre(pathToolActive());
+  m_pathTool->removeLastPoint();
 }
 
 bool MapViewToolBox::anyModalToolActive() const

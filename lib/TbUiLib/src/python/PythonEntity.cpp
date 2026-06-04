@@ -1,7 +1,7 @@
-#include "PythonEntity.h"
-#include "PythonTypes.h"
-#include "PythonUtils.h"
-#include "PythonDocument.h"
+#include "ui/python/PythonEntity.h"
+#include "ui/python/PythonTypes.h"
+#include "ui/python/PythonUtils.h"
+#include "ui/python/PythonDocument.h"
 
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityNode.h"
@@ -15,7 +15,6 @@
 #include "mdl/BrushFaceAttributes.h"
 #include "mdl/Map_Selection.h"
 #include "ui/MapDocument.h"
-#include "Exceptions.h"
 
 namespace tb::ui {
 

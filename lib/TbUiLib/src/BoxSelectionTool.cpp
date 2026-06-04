@@ -1,6 +1,6 @@
-#include "BoxSelectionTool.h"
+#include "ui/BoxSelectionTool.h"
 
-#include "render/Camera.h"
+#include "gl/Camera.h"
 #include "ui/Tool.h"
 #include "mdl/Grid.h"
 #include "ui/HandleDragTracker.h"
@@ -20,8 +20,8 @@
 #include "render/RenderBatch.h"
 #include "Color.h"
 
-#include "kdl/memory_utils.h"
-#include "kdl/overload.h"
+#include "kd/memory_utils.h"
+#include "kd/overload.h"
 
 #include "vm/intersection.h"
 
@@ -211,29 +211,28 @@ void BoxSelectionDragDelegate::end(
       
     
     auto allNodes = std::vector<mdl::Node*>{};
-    if (auto* world = m_map.world()) {
-        world->accept(kdl::overload(
-            [&](auto&& thisLambda, mdl::WorldNode* worldNode) { 
-                worldNode->visitChildren(thisLambda);
+    auto& world = m_map.worldNode();
+    world.accept(kdl::overload(
+            [&](auto&& thisLambda, mdl::WorldNode& worldNode) {
+                worldNode.visitChildren(thisLambda);
             },
-            [&](auto&& thisLambda, mdl::LayerNode* layer) {
-                layer->visitChildren(thisLambda);
+            [&](auto&& thisLambda, mdl::LayerNode& layer) {
+                layer.visitChildren(thisLambda);
             },
-            [&](auto&& thisLambda, mdl::GroupNode* group) {
-                allNodes.push_back(group);
-                group->visitChildren(thisLambda);
+            [&](auto&& thisLambda, mdl::GroupNode& group) {
+                allNodes.push_back(&group);
+                group.visitChildren(thisLambda);
             },
-            [&](auto&& thisLambda, mdl::EntityNode* entity) {
-                allNodes.push_back(entity);
-                entity->visitChildren(thisLambda);
+            [&](auto&& thisLambda, mdl::EntityNode& entity) {
+                allNodes.push_back(&entity);
+                entity.visitChildren(thisLambda);
             },
-            [&](mdl::BrushNode* brush) {
-                allNodes.push_back(brush);
+            [&](mdl::BrushNode& brush) {
+                allNodes.push_back(&brush);
             },
-            [&](mdl::PatchNode* patch) {
-                allNodes.push_back(patch);
+            [&](mdl::PatchNode& patch) {
+                allNodes.push_back(&patch);
             }));
-    }
       
     
     auto selectedNodes = std::vector<mdl::Node*>{};

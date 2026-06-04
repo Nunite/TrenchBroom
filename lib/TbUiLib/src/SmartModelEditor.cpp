@@ -1,13 +1,14 @@
-#include "SmartModelEditor.h"
+#include "ui/SmartModelEditor.h"
 
 #include <QFileDialog>
 #include <QHBoxLayout>
 #include <QPushButton>
 
 #include "ui/QPathUtils.h"
+#include "ui/FileDialogDefaultDir.h"
 #include "mdl/EntityNodeBase.h"
-#include "mdl/Game.h"
 #include "mdl/Map.h"
+#include "ui/MapDocument.h"
 #include "ui/QWidgetUtils.h"
 
 #include <filesystem>
@@ -15,8 +16,8 @@
 namespace tb::ui
 {
 
-SmartModelEditor::SmartModelEditor(mdl::Map& map, QWidget* parent)
-  : SmartPropertyEditor{map, parent}
+SmartModelEditor::SmartModelEditor(MapDocument& document, QWidget* parent)
+  : SmartPropertyEditor{document, parent}
 {
   createGui();
 }
@@ -40,12 +41,6 @@ void SmartModelEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>&)
 
 void SmartModelEditor::browseFile()
 {
-  auto* game = map().game();
-  if (!game)
-  {
-    return;
-  }
-
   const auto caption = tr("Load Model File");
   const auto filter = tr("Model files (*.mdl);;All files (*.*)");
 
@@ -58,8 +53,8 @@ void SmartModelEditor::browseFile()
 
   updateFileDialogDefaultDirectoryWithFilename(FileDialogDir::GamePath, pathQStr);
 
-  const auto absModelPath = io::pathFromQString(pathQStr);
-  const auto gamePath = game->gamePath();
+  const auto absModelPath = pathFromQString(pathQStr);
+  const auto gamePath = document().map().gamePath();
 
   std::error_code ec;
   const auto relativeModelPathFull = std::filesystem::relative(absModelPath, gamePath, ec);

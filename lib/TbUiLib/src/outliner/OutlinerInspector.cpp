@@ -1,9 +1,12 @@
-#include "OutlinerInspector.h"
-#include "OutlinerTreeWidget.h"
+#include "ui/outliner/OutlinerInspector.h"
+#include "ui/outliner/OutlinerTreeWidget.h"
 #include "ui/outliner/OutlinerEntityPropertyEditor.h"
+#include "ui/BitmapButton.h"
 #include "ui/MapDocument.h"
 #include "ui/QWidgetUtils.h"
+#include "ui/SearchBox.h"
 #include "ui/Splitter.h"
+#include "ui/WidgetState.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -79,11 +82,11 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
 
     layout->addWidget(m_splitter, 1);
 
-    restoreWindowState(m_splitter);
+    restoreWidgetState(m_splitter);
 
     {
         auto settings = QSettings{};
-        const auto visiblePath = windowSettingsPath(this, "PropertiesVisible");
+        const auto visiblePath = widgetSettingsPath(this, "PropertiesVisible");
         const auto propertiesVisible = settings.value(visiblePath, false).toBool();
 
         propertiesToggle->setChecked(propertiesVisible);
@@ -96,13 +99,13 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
 
     connect(propertiesToggle, &QAbstractButton::clicked, this, [this](const bool checked) {
         auto settings = QSettings{};
-        const auto visiblePath = windowSettingsPath(this, "PropertiesVisible");
+        const auto visiblePath = widgetSettingsPath(this, "PropertiesVisible");
         settings.setValue(visiblePath, checked);
 
         if (checked)
         {
             m_propertyEditor->setVisible(true);
-            restoreWindowState(m_splitter);
+            restoreWidgetState(m_splitter);
             const auto sizes = m_splitter->sizes();
             if (sizes.size() >= 2 && sizes.at(1) == 0)
             {
@@ -111,7 +114,7 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
         }
         else
         {
-            saveWindowState(m_splitter);
+            saveWidgetState(m_splitter);
             m_propertyEditor->setVisible(false);
             m_splitter->setSizes({1, 0});
         }
@@ -128,7 +131,7 @@ OutlinerInspector::~OutlinerInspector()
 {
     if (m_propertyEditor && m_propertyEditor->isVisible())
     {
-        saveWindowState(m_splitter);
+        saveWidgetState(m_splitter);
     }
 }
 

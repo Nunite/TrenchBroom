@@ -1,5 +1,5 @@
-#include "PythonTypes.h"
-#include "kdl/vector_utils.h" // For vm::vec3d operations like dot, cross, etc.
+#include "ui/python/PythonTypes.h"
+#include "kd/vector_utils.h" // For vm::vec3d operations like dot, cross, etc.
 #include "vm/plane.h" // Ensure vm::vec3d is fully defined if needed
 
 namespace tb::ui {

@@ -23,7 +23,7 @@
 
 #include "NotifierConnection.h"
 
-#include "kdl/path_hash.h"
+#include "kd/path_hash.h"
 
 #include <filesystem>
 #include <unordered_map>

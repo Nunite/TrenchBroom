@@ -1,7 +1,7 @@
 
-#include "PathToolController.h"
+#include "ui/PathToolController.h"
 
-#include "PathTool.h"
+#include "ui/PathTool.h"
 #include "ui/InputEvent.h"
 #include "ui/InputState.h"
 #include "mdl/Map.h"
@@ -11,7 +11,7 @@
 #include "mdl/HitFilter.h"
 #include "mdl/BrushNode.h"
 #include "render/RenderContext.h"
-#include "render/Camera.h"
+#include "gl/Camera.h"
 #include "vm/intersection.h"
 #include "vm/plane.h"
 #include "vm/vec.h"

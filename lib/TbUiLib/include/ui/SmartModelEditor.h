@@ -7,11 +7,12 @@ class QWidget;
 
 namespace tb::mdl
 {
-class Map;
+class EntityNodeBase;
 }
 
 namespace tb::ui
 {
+class MapDocument;
 
 class SmartModelEditor : public SmartPropertyEditor
 {
@@ -20,7 +21,7 @@ private:
   QPushButton* m_browseButton = nullptr;
 
 public:
-  explicit SmartModelEditor(mdl::Map& map, QWidget* parent = nullptr);
+  explicit SmartModelEditor(MapDocument& document, QWidget* parent = nullptr);
 
 private:
   void createGui();

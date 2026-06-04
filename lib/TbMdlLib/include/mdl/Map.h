@@ -298,6 +298,10 @@ public: // game path
   // This is updated whenever the game path is changed via the preferences
   const std::filesystem::path& gamePath() const;
   void setGamePath(std::filesystem::path gamePath);
+  GameFileSystem& gameFileSystem();
+  const GameFileSystem& gameFileSystem() const;
+  void reloadEntityModels(const std::vector<std::filesystem::path>& paths);
+  void reloadEntityModels(const std::filesystem::path& path);
 
 public: // persistence
   Result<std::unique_ptr<Map>> reload();

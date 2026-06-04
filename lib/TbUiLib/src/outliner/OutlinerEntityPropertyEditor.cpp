@@ -1,4 +1,43 @@
-#include "OutlinerEntityPropertyEditor.h"
+#include "ui/outliner/OutlinerEntityPropertyEditor.h"
+
+#include "mdl/Map.h"
+
+#include <QLabel>
+#include <QVBoxLayout>
+
+namespace tb::ui
+{
+
+OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(mdl::Map& map, QWidget* parent)
+  : QWidget{parent}
+  , m_map{map}
+{
+  auto* layout = new QVBoxLayout{this};
+  layout->setContentsMargins(6, 6, 6, 6);
+  auto* label = new QLabel{tr("Entity properties are temporarily unavailable.")};
+  label->setWordWrap(true);
+  layout->addWidget(label);
+  layout->addStretch(1);
+}
+
+OutlinerEntityPropertyEditor::~OutlinerEntityPropertyEditor() = default;
+
+void OutlinerEntityPropertyEditor::onChoiceComboPopupHidden() {}
+
+void OutlinerEntityPropertyEditor::connectObservers() {}
+
+void OutlinerEntityPropertyEditor::scheduleUpdate(bool) {}
+
+void OutlinerEntityPropertyEditor::updateFromSelection() {}
+
+void OutlinerEntityPropertyEditor::rebuildPropertyRows(
+  const std::vector<mdl::EntityNodeBase*>&)
+{
+}
+
+} // namespace tb::ui
+
+#if 0
 
 #include <QApplication>
 #include <QEvent>
@@ -21,7 +60,6 @@
 #include "mdl/EntityColorPropertyValue.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityProperties.h"
-#include "mdl/Game.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/PropertyDefinition.h"
@@ -33,8 +71,8 @@
 #include "ui/TitledPanel.h"
 #include "ui/ViewUtils.h"
 
-#include "kdl/string_compare.h"
-#include "kdl/string_utils.h"
+#include "kd/string_compare.h"
+#include "kd/string_utils.h"
 
 #include <filesystem>
 #include <unordered_set>
@@ -1097,3 +1135,4 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 }
 
 } // namespace tb::ui
+#endif

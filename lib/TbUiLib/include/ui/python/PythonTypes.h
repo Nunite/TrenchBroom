@@ -5,15 +5,15 @@
 #include <QWidget>
 
 #include "vm/plane.h"
-#include "kdl/vector_utils.h"
+#include "kd/vector_utils.h"
 
 // Forward declarations
 namespace tb::ui { class MapDocument; }
 namespace tb::mdl { class BrushNode; }
 namespace tb::mdl { class EntityNodeBase; }
 namespace tb::mdl { class Transaction; }
-namespace tb::mdl { class Material; }
-namespace tb::mdl { class MaterialCollection; }
+namespace tb::gl { class Material; }
+namespace tb::gl { class MaterialCollection; }
 
 namespace tb::ui {
 
@@ -71,13 +71,13 @@ struct PyTbTransaction
 struct PyTbMaterial
 {
   PyObject_HEAD
-  const tb::mdl::Material* material;
+  const tb::gl::Material* material;
 };
 
 struct PyTbMaterialCollection
 {
   PyObject_HEAD
-  const tb::mdl::MaterialCollection* collection;
+  const tb::gl::MaterialCollection* collection;
 };
 
 struct PyTbPluginPanel
@@ -101,8 +101,8 @@ extern PyTypeObject* g_materialCollectionType;
 
 // Helper functions
 PyObject* createVec3Object(const vm::vec3d& v);
-PyObject* createMaterialObject(const tb::mdl::Material* material);
-PyObject* createMaterialCollectionObject(const tb::mdl::MaterialCollection* collection);
+PyObject* createMaterialObject(const tb::gl::Material* material);
+PyObject* createMaterialCollectionObject(const tb::gl::MaterialCollection* collection);
 PyObject* toPyString(const std::string& str);
 PyObject* toPyVec3dTuple(const vm::vec3d& v);
 PyObject* createLogWriterObject(const int isError);

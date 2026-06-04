@@ -46,6 +46,11 @@ namespace tb::render
 class Transformation;
 } // namespace tb::render
 
+namespace tb::gl
+{
+class Gl;
+} // namespace tb::gl
+
 namespace tb::ui
 {
 
@@ -110,7 +115,7 @@ private:
   QString dndData(const Cell& cell) override;
 
   void doClear() override;
-  void doRender(Layout& layout, float y, float height) override;
+  void doRender(gl::Gl& gl, Layout& layout, float y, float height) override;
   bool shouldRenderFocusIndicator() const override;
   const Color& getBackgroundColor() override;
   void doMouseMove(Layout& layout, float x, float y) override;
@@ -118,14 +123,16 @@ private:
   void doDoubleClick(Layout& layout, float x, float y) override;
   void doContextMenu(Layout& layout, float x, float y, QContextMenuEvent* event) override;
 
-  void ensureFolderIconTexture();
+  void ensureFolderIconTexture(gl::Gl& gl);
   void destroyFolderIconTexture();
 
-  void renderHoveredCellBounds(Layout& layout, float y, float height, BrowserCellType type);
-  void renderSelectedCellBounds(Layout& layout, float y, float height, BrowserCellType type);
-  void renderFolders(Layout& layout, float y, float height);
+  void renderHoveredCellBounds(
+    gl::Gl& gl, Layout& layout, float y, float height, BrowserCellType type);
+  void renderSelectedCellBounds(
+    gl::Gl& gl, Layout& layout, float y, float height, BrowserCellType type);
+  void renderFolders(gl::Gl& gl, Layout& layout, float y, float height);
   void renderModels(
-    Layout& layout, float y, float height, render::Transformation& transformation);
+    gl::Gl& gl, Layout& layout, float y, float height, render::Transformation& transformation);
 
   vm::mat4x4f itemTransformation(
     const Cell& cell,

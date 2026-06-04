@@ -1,5 +1,5 @@
-#include "PythonTypes.h"
-#include "kdl/vector_utils.h"
+#include "ui/python/PythonTypes.h"
+#include "kd/vector_utils.h"
 #include "vm/plane.h"
 
 namespace tb::ui {

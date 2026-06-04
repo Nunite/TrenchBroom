@@ -1,9 +1,12 @@
-#include "PythonPluginPanel.h"
-#include "PythonTypes.h"
-#include "PythonUtils.h"
+#include "ui/python/PythonPluginPanel.h"
+#include "ui/python/PythonTypes.h"
+#include "ui/python/PythonUtils.h"
 #include "Logger.h"
 #include "ui/MapWindow.h"
-#include "ui/Actions.h"
+#include "ui/Action.h"
+#include "ui/ActionExecutionContext.h"
+#include "ui/ActionManager.h"
+#include "ui/AppController.h"
 #include "ui/Inspector.h" // For InspectorPage enum if needed, though mostly used in Scripting initialization
 
 #include <QWidget>
@@ -1097,7 +1100,7 @@ static PyObject* plugin_panel_add_table_widget(PyObject* self, PyObject* args)
           PyErr_Print();
           if (g_currentFrame != nullptr)
           {
-            g_currentFrame->pythonLogger().error("Error in table widget callback");
+            g_currentFrame->pythonLogger().error() << "Error in table widget callback";
           }
         }
         Py_XDECREF(result);
@@ -1273,7 +1276,7 @@ static PyObject* plugin_panel_add_tree_widget(PyObject* self, PyObject* args, Py
         PyErr_Print();
         if (g_currentFrame != nullptr)
         {
-          g_currentFrame->pythonLogger().error("Error in tree widget callback");
+          g_currentFrame->pythonLogger().error() << "Error in tree widget callback";
         }
       }
       Py_XDECREF(result);
@@ -1637,7 +1640,7 @@ static PyObject* plugin_panel_add_combo_box(PyObject* self, PyObject* args)
         PyErr_Print();
         if (g_currentFrame != nullptr)
         {
-          g_currentFrame->pythonLogger().error("Error in combo box callback");
+          g_currentFrame->pythonLogger().error() << "Error in combo box callback";
         }
       }
       Py_XDECREF(result);
@@ -1835,7 +1838,7 @@ static PyObject* plugin_panel_add_list_widget(PyObject* self, PyObject* args)
         PyErr_Print();
         if (g_currentFrame != nullptr)
         {
-          g_currentFrame->pythonLogger().error("Error in list widget callback");
+          g_currentFrame->pythonLogger().error() << "Error in list widget callback";
         }
       }
       Py_XDECREF(result);
@@ -1950,7 +1953,7 @@ static PyObject* plugin_panel_set_list_widget_context_menu(PyObject* self, PyObj
                        Py_XDECREF(res);
                        if (PyErr_Occurred()) {
                            PyErr_Print();
-                           if (g_currentFrame) g_currentFrame->pythonLogger().error("Error in context menu callback");
+                           if (g_currentFrame) g_currentFrame->pythonLogger().error() << "Error in context menu callback";
                        }
                        break; 
                    }
@@ -2008,7 +2011,8 @@ static PyObject* plugin_panel_add_button(PyObject* self, PyObject* args)
           return;
         }
         const auto& action = iAction->second;
-        auto context = ActionExecutionContext{frame, frame->currentMapViewBase()};
+        auto context = ActionExecutionContext{
+          frame->appController(), frame, frame->currentMapViewBase()};
         if (!action.enabled(context))
         {
           return;
@@ -2100,7 +2104,7 @@ static PyObject* plugin_panel_add_html_view(PyObject* self, PyObject* args, PyOb
         PyErr_Print();
         if (g_currentFrame != nullptr)
         {
-          g_currentFrame->pythonLogger().error("Error in html view callback");
+          g_currentFrame->pythonLogger().error() << "Error in html view callback";
         }
       }
       Py_XDECREF(result);
@@ -2341,7 +2345,7 @@ bool initPluginPanelType(PyObject* module)
                  PyErr_Print();
                  if (g_currentFrame != nullptr)
                  {
-                   g_currentFrame->pythonLogger().error("Error in button callback");
+                   g_currentFrame->pythonLogger().error() << "Error in button callback";
                  }
                }
                Py_XDECREF(result);

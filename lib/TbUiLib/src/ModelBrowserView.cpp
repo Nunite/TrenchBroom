@@ -17,7 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ModelBrowserView.h"
+#include "ui/ModelBrowserView.h"
 
 #include <QContextMenuEvent>
 #include <QEvent>
@@ -28,29 +28,29 @@
 
 #include "PreferenceManager.h"
 #include "Preferences.h"
-#include "Exceptions.h"
 #include "mdl/EntityModelManager.h"
-#include "mdl/Game.h"
+#include "mdl/GameFileSystem.h"
 #include "mdl/Map.h"
 #include "ui/AppController.h"
-#include "io/DiskIO.h"
-#include "io/FileSystem.h"
-#include "io/GoldSrcMdlScaler.h"
-#include "io/PathInfo.h"
-#include "io/ResourceUtils.h"
+#include "ui/ImageUtils.h"
+#include "fs/DiskIO.h"
+#include "fs/FileSystem.h"
+#include "mdl/GoldSrcMdlScaler.h"
+#include "fs/PathInfo.h"
 #include "ui/QPathUtils.h"
-#include "render/ActiveShader.h"
-#include "render/FontDescriptor.h"
-#include "render/FontManager.h"
-#include "render/GLVertexType.h"
-#include "render/TextureFont.h"
-#include "render/GL.h"
-#include "render/MaterialIndexRangeRenderer.h"
-#include "render/PrimType.h"
-#include "render/RenderUtils.h"
-#include "render/Shaders.h"
+#include "gl/ActiveShader.h"
+#include "gl/FontDescriptor.h"
+#include "gl/FontManager.h"
+#include "gl/GlInterface.h"
+#include "gl/GlUtils.h"
+#include "gl/MaterialIndexRangeRenderer.h"
+#include "gl/MaterialRenderFunc.h"
+#include "gl/PrimType.h"
+#include "gl/Shaders.h"
+#include "gl/TextureFont.h"
+#include "gl/VertexArray.h"
+#include "gl/VertexType.h"
 #include "render/Transformation.h"
-#include "render/VertexArray.h"
 
 #include "vm/mat.h"
 #include "vm/mat_ext.h"
@@ -64,7 +64,7 @@
 #include <variant>
 #include <vector>
 
-#include "kdl/path_utils.h"
+#include "kd/path_utils.h"
 
 namespace tb::ui
 {
@@ -88,11 +88,8 @@ ModelBrowserView::ModelBrowserView(
     });
   }
 
-  m_notifierConnection += m_map.resourcesWereProcessedNotifier.connect(
-    this, &ModelBrowserView::resourcesWereProcessed);
-
   const auto pixmap =
-    io::loadSVGPixmap(std::filesystem::path{"Map_folder.svg"});
+    loadSVGPixmap(std::filesystem::path{"Map_folder.svg"});
   if (!pixmap.isNull())
   {
     m_folderIconImage =
@@ -211,9 +208,9 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
     return !hasSearch || name.contains(m_searchText, Qt::CaseInsensitive);
   };
 
-  const auto& fontPath = pref(Preferences::RendererFontPath());
+  const auto& fontPath = pref(Preferences::RendererFontPath);
   const auto fontSize = pref(Preferences::BrowserFontSize);
-  const auto font = render::FontDescriptor{fontPath, size_t(fontSize)};
+  const auto font = gl::FontDescriptor{fontPath, size_t(fontSize)};
   const auto maxCellWidth = layout.maxCellWidth();
 
   const auto currentFolderAbs = m_currentFolderPath.empty()
@@ -239,7 +236,7 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
     const auto relFromCurrent =
       currentFolderAbs.empty() ? folderPath : folderPath.lexically_relative(currentFolderAbs);
 
-    const auto modelNameMatches = matches(io::pathAsGenericQString(modelPath.filename()));
+    const auto modelNameMatches = matches(pathAsGenericQString(modelPath.filename()));
 
     if (relFromCurrent.empty() || relFromCurrent == std::filesystem::path{"."})
     {
@@ -251,7 +248,7 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
     }
 
     const auto first = *relFromCurrent.begin();
-    const auto firstNameMatches = matches(io::pathAsGenericQString(first));
+    const auto firstNameMatches = matches(pathAsGenericQString(first));
     const auto firstRelPath = (m_currentFolderPath / first).lexically_normal();
 
     if (hasSearch)
@@ -306,7 +303,7 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
   for (const auto& folderRelPath : folderChildren)
   {
     const auto folderName = folderRelPath.filename();
-    const auto titleUtf8 = io::pathAsGenericQString(folderName).toUtf8();
+    const auto titleUtf8 = pathAsGenericQString(folderName).toUtf8();
     const auto title = std::string{titleUtf8.constData(), size_t(titleUtf8.size())};
     const auto titleHeight = fontManager().font(font).measure(title).y();
 
@@ -324,7 +321,7 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
     const auto titlePath =
       hasSearch ? (currentFolderAbs.empty() ? modelPath : modelPath.lexically_relative(currentFolderAbs))
                 : modelPath.filename();
-    const auto titleUtf8 = io::pathAsGenericQString(titlePath).toUtf8();
+    const auto titleUtf8 = pathAsGenericQString(titlePath).toUtf8();
     const auto title = std::string{titleUtf8.constData(), size_t(titleUtf8.size())};
     const auto titleHeight = fontManager().font(font).measure(title).y();
 
@@ -340,7 +337,8 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
 
 void ModelBrowserView::doClear() {}
 
-void ModelBrowserView::doRender(Layout& layout, const float y, const float height)
+void ModelBrowserView::doRender(
+  gl::Gl& gl, Layout& layout, const float y, const float height)
 {
   const auto viewLeft = float(0);
   const auto viewTop = float(size().height());
@@ -348,22 +346,23 @@ void ModelBrowserView::doRender(Layout& layout, const float y, const float heigh
   const auto viewBottom = float(0);
 
   auto uiTransformation = render::Transformation{
+    gl,
     vm::ortho_matrix(-1.0f, 1.0f, viewLeft, viewTop, viewRight, viewBottom),
     vm::view_matrix(vm::vec3f{0, 0, -1}, vm::vec3f{0, 1, 0})
       * vm::translation_matrix(vm::vec3f{0.0f, 0.0f, 0.1f})};
-  renderHoveredCellBounds(layout, y, height, BrowserCellType::Model);
-  renderSelectedCellBounds(layout, y, height, BrowserCellType::Model);
-  renderFolders(layout, y, height);
+  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Model);
+  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Model);
+  renderFolders(gl, layout, y, height);
 
   const auto projection =
     vm::ortho_matrix(-1024.0f, 1024.0f, viewLeft, viewTop, viewRight, viewBottom);
   const auto view =
     vm::view_matrix(CameraDirection, CameraUp) * vm::translation_matrix(CameraPosition);
-  auto transformation = render::Transformation{projection, view};
-  renderModels(layout, y, height, transformation);
+  auto transformation = render::Transformation{gl, projection, view};
+  renderModels(gl, layout, y, height, transformation);
 }
 
-void ModelBrowserView::ensureFolderIconTexture()
+void ModelBrowserView::ensureFolderIconTexture(gl::Gl& gl)
 {
   if (m_folderIconTextureId != 0)
   {
@@ -375,15 +374,15 @@ void ModelBrowserView::ensureFolderIconTexture()
     return;
   }
 
-  glAssert(glGenTextures(1, &m_folderIconTextureId));
-  glAssert(glBindTexture(GL_TEXTURE_2D, m_folderIconTextureId));
-  glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
-  glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
-  glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-  glAssert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+  gl.genTextures(1, &m_folderIconTextureId);
+  gl.bindTexture(GL_TEXTURE_2D, m_folderIconTextureId);
+  gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-  glAssert(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
-  glAssert(glTexImage2D(
+  gl.pixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(
     GL_TEXTURE_2D,
     0,
     GL_RGBA,
@@ -392,9 +391,9 @@ void ModelBrowserView::ensureFolderIconTexture()
     0,
     GL_RGBA,
     GL_UNSIGNED_BYTE,
-    m_folderIconImage.constBits()));
+    m_folderIconImage.constBits());
 
-  glAssert(glBindTexture(GL_TEXTURE_2D, 0));
+  gl.bindTexture(GL_TEXTURE_2D, 0);
 }
 
 void ModelBrowserView::destroyFolderIconTexture()
@@ -402,13 +401,6 @@ void ModelBrowserView::destroyFolderIconTexture()
   if (m_folderIconTextureId == 0)
   {
     return;
-  }
-
-  if (isValid())
-  {
-    makeCurrent();
-    glAssert(glDeleteTextures(1, &m_folderIconTextureId));
-    doneCurrent();
   }
 
   m_folderIconTextureId = 0;
@@ -488,16 +480,16 @@ void ModelBrowserView::doContextMenu(
     {
       absPath = modelPath;
     }
-    else if (const auto* game = m_map.game())
+    else
     {
-      const auto absPathResult = game->gameFileSystem().makeAbsolute(modelPath);
+      const auto absPathResult = m_map.gameFileSystem().makeAbsolute(modelPath);
       if (!absPathResult.is_error())
       {
         absPath = absPathResult.value();
       }
     }
 
-    if (absPath.empty() || io::Disk::pathInfo(absPath) != io::PathInfo::File)
+    if (absPath.empty() || fs::Disk::pathInfo(absPath) != fs::PathInfo::File)
     {
       QMessageBox::warning(this, tr("Error"), tr("Cannot locate a writable MDL file path."));
       return;
@@ -521,7 +513,7 @@ void ModelBrowserView::doContextMenu(
 }
 
 void ModelBrowserView::renderHoveredCellBounds(
-  Layout& layout, const float y, const float height, const BrowserCellType type)
+  gl::Gl& gl, Layout& layout, const float y, const float height, const BrowserCellType type)
 {
   if (!m_hasHover)
   {
@@ -533,7 +525,7 @@ void ModelBrowserView::renderHoveredCellBounds(
     return;
   }
 
-  using BoundsVertex = render::GLVertexTypes::P2C4::Vertex;
+  using BoundsVertex = gl::VertexTypes::P2C4::Vertex;
   auto vertices = std::vector<BoundsVertex>{};
 
   const auto rgb = pref(Preferences::BrowserTextColor).to<RgbF>();
@@ -575,23 +567,27 @@ void ModelBrowserView::renderHoveredCellBounds(
     return;
   }
 
-  auto vertexArray = render::VertexArray::move(std::move(vertices));
+  auto vertexArray = gl::VertexArray::move(std::move(vertices));
   auto shader =
-    render::ActiveShader{shaderManager(), render::Shaders::MaterialBrowserBorderShader};
+    gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserBorderShader};
 
-  vertexArray.prepare(vboManager());
-  vertexArray.render(render::PrimType::Quads);
+  vertexArray.prepare(gl, vboManager());
+  if (vertexArray.setup(gl, shader.program()))
+  {
+    vertexArray.render(gl, gl::PrimType::Quads);
+    vertexArray.cleanup(gl, shader.program());
+  }
 }
 
 void ModelBrowserView::renderSelectedCellBounds(
-  Layout& layout, const float y, const float height, const BrowserCellType type)
+  gl::Gl& gl, Layout& layout, const float y, const float height, const BrowserCellType type)
 {
   if (!m_hasSelection)
   {
     return;
   }
 
-  using BoundsVertex = render::GLVertexTypes::P2C4::Vertex;
+  using BoundsVertex = gl::VertexTypes::P2C4::Vertex;
   auto vertices = std::vector<BoundsVertex>{};
 
   const auto rgb = pref(Preferences::BrowserTextColor).to<RgbF>();
@@ -633,17 +629,22 @@ void ModelBrowserView::renderSelectedCellBounds(
     return;
   }
 
-  auto vertexArray = render::VertexArray::move(std::move(vertices));
+  auto vertexArray = gl::VertexArray::move(std::move(vertices));
   auto shader =
-    render::ActiveShader{shaderManager(), render::Shaders::MaterialBrowserBorderShader};
+    gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserBorderShader};
 
-  vertexArray.prepare(vboManager());
-  vertexArray.render(render::PrimType::Quads);
+  vertexArray.prepare(gl, vboManager());
+  if (vertexArray.setup(gl, shader.program()))
+  {
+    vertexArray.render(gl, gl::PrimType::Quads);
+    vertexArray.cleanup(gl, shader.program());
+  }
 }
 
-void ModelBrowserView::renderFolders(Layout& layout, const float y, const float height)
+void ModelBrowserView::renderFolders(
+  gl::Gl& gl, Layout& layout, const float y, const float height)
 {
-  using Vertex = render::GLVertexTypes::P2::Vertex;
+  using Vertex = gl::VertexTypes::P2::Vertex;
   auto vertices = std::vector<Vertex>{};
 
   for (const auto& group : layout.groups())
@@ -679,25 +680,29 @@ void ModelBrowserView::renderFolders(Layout& layout, const float y, const float 
   }
 
   auto shader =
-    render::ActiveShader{shaderManager(), render::Shaders::VaryingPUniformCShader};
+    gl::ActiveShader{gl, shaderManager(), gl::Shaders::VaryingPUniformCShader};
   shader.set(
     "Color",
     RgbaF{pref(Preferences::BrowserGroupBackgroundColor).to<RgbF>(), 0.35f});
 
-  auto vertexArray = render::VertexArray::move(std::move(vertices));
-  vertexArray.prepare(vboManager());
-  vertexArray.render(render::PrimType::Quads);
+  auto vertexArray = gl::VertexArray::move(std::move(vertices));
+  vertexArray.prepare(gl, vboManager());
+  if (vertexArray.setup(gl, shader.program()))
+  {
+    vertexArray.render(gl, gl::PrimType::Quads);
+    vertexArray.cleanup(gl, shader.program());
+  }
 
-  renderHoveredCellBounds(layout, y, height, BrowserCellType::Folder);
-  renderSelectedCellBounds(layout, y, height, BrowserCellType::Folder);
+  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Folder);
+  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Folder);
 
-  ensureFolderIconTexture();
+  ensureFolderIconTexture(gl);
   if (m_folderIconTextureId == 0)
   {
     return;
   }
 
-  using IconVertex = render::GLVertexTypes::P2UV2::Vertex;
+  using IconVertex = gl::VertexTypes::P2UV2::Vertex;
   auto iconVertices = std::vector<IconVertex>{};
 
   for (const auto& group : layout.groups())
@@ -743,33 +748,38 @@ void ModelBrowserView::renderFolders(Layout& layout, const float y, const float 
   }
 
   auto iconShader =
-    render::ActiveShader{shaderManager(), render::Shaders::MaterialBrowserShader};
+    gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserShader};
   iconShader.set("ApplyTinting", false);
   iconShader.set("Material", 0);
   iconShader.set("Brightness", 0.8f);
 
-  glAssert(glActiveTexture(GL_TEXTURE0));
-  glAssert(glBindTexture(GL_TEXTURE_2D, m_folderIconTextureId));
+  gl.activeTexture(GL_TEXTURE0);
+  gl.bindTexture(GL_TEXTURE_2D, m_folderIconTextureId);
 
-  auto iconVertexArray = render::VertexArray::move(std::move(iconVertices));
-  iconVertexArray.prepare(vboManager());
-  iconVertexArray.render(render::PrimType::Quads);
+  auto iconVertexArray = gl::VertexArray::move(std::move(iconVertices));
+  iconVertexArray.prepare(gl, vboManager());
+  if (iconVertexArray.setup(gl, iconShader.program()))
+  {
+    iconVertexArray.render(gl, gl::PrimType::Quads);
+    iconVertexArray.cleanup(gl, iconShader.program());
+  }
 
-  glAssert(glBindTexture(GL_TEXTURE_2D, 0));
+  gl.bindTexture(GL_TEXTURE_2D, 0);
 }
 
 void ModelBrowserView::renderModels(
+  gl::Gl& gl,
   Layout& layout,
   const float y,
   const float height,
   render::Transformation& transformation)
 {
-  glAssert(glFrontFace(GL_CW));
+  gl.frontFace(GL_CW);
 
   auto& entityModelManager = m_map.entityModelManager();
-  entityModelManager.prepare(vboManager());
+  entityModelManager.prepare(gl, vboManager());
 
-  auto shader = render::ActiveShader{shaderManager(), render::Shaders::EntityModelShader};
+  auto shader = gl::ActiveShader{gl, shaderManager(), gl::Shaders::EntityModelShader};
   shader.set("ApplyTinting", false);
   shader.set("Brightness", pref(Preferences::Brightness));
   shader.set("GrayScale", false);
@@ -802,7 +812,7 @@ void ModelBrowserView::renderModels(
             {
               continue;
             }
-            modelRenderer->prepare(vboManager());
+            modelRenderer->prepare(gl, vboManager());
 
             shader.set("Orientation", int(mdl::Orientation::Oriented));
 
@@ -822,9 +832,9 @@ void ModelBrowserView::renderModels(
             const auto multMatrix =
               render::MultiplyModelMatrix{transformation, itemTrans};
 
-            auto renderFunc = render::DefaultMaterialRenderFunc{
+            auto renderFunc = gl::DefaultMaterialRenderFunc{
               pref(Preferences::TextureMinFilter), pref(Preferences::TextureMagFilter)};
-            modelRenderer->render(renderFunc);
+            modelRenderer->render(gl, shader.program(), renderFunc);
           }
         }
       }
@@ -873,7 +883,7 @@ QString ModelBrowserView::dndData(const Cell& cell)
   {
     return "";
   }
-  return prefix + io::pathAsGenericQString(item.path);
+  return prefix + pathAsGenericQString(item.path);
 }
 
 QString ModelBrowserView::tooltip(const Cell& cell)

@@ -1,13 +1,13 @@
-#include "PythonDocument.h"
-#include "PythonTypes.h"
-#include "PythonUtils.h"
+#include "ui/python/PythonDocument.h"
+#include "ui/python/PythonTypes.h"
+#include "ui/python/PythonUtils.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Map_World.h"
-#include "mdl/MaterialManager.h"
-#include "mdl/MaterialCollection.h"
+#include "gl/MaterialManager.h"
+#include "gl/MaterialCollection.h"
 #include "mdl/VertexHandleManager.h"
 #include "mdl/WorldNode.h"
 #include "mdl/LayerNode.h"
@@ -16,10 +16,11 @@
 #include "mdl/BrushNode.h"
 #include "mdl/PatchNode.h"
 #include "ui/MapDocument.h"
-#include "kdl/overload.h"
+#include "kd/overload.h"
 #include "Logger.h"
 
 #include <algorithm>
+#include <functional>
 #include <vector>
 
 namespace tb::ui {
@@ -66,20 +67,20 @@ static PyObject* document_entities(PyObject* self, void*)
 
   auto result = std::vector<tb::mdl::EntityNodeBase*>{};
 
-  doc->map().world()->accept(kdl::overload(
-    [&](auto&& thisLambda, tb::mdl::WorldNode* worldNode) {
-      result.push_back(worldNode);
-      worldNode->visitChildren(thisLambda);
-    },
-    [&](auto&& thisLambda, tb::mdl::LayerNode* layerNode) {
-      layerNode->visitChildren(thisLambda);
-    },
-    [&](auto&& thisLambda, tb::mdl::GroupNode* groupNode) {
-      groupNode->visitChildren(thisLambda);
-    },
-    [&](tb::mdl::EntityNode* entityNode) { result.push_back(entityNode); },
-    [&](tb::mdl::BrushNode* brushNode) { result.push_back(brushNode->entity()); },
-    [&](tb::mdl::PatchNode* patchNode) { result.push_back(patchNode->entity()); }));
+  auto visitNode = std::function<void(tb::mdl::Node&)>{};
+  visitNode = [&](tb::mdl::Node& node) {
+    node.accept(kdl::overload(
+      [&](tb::mdl::WorldNode& worldNode) {
+        result.push_back(&worldNode);
+        worldNode.visitChildren(visitNode);
+      },
+      [&](tb::mdl::LayerNode& layerNode) { layerNode.visitChildren(visitNode); },
+      [&](tb::mdl::GroupNode& groupNode) { groupNode.visitChildren(visitNode); },
+      [&](tb::mdl::EntityNode& entityNode) { result.push_back(&entityNode); },
+      [&](tb::mdl::BrushNode& brushNode) { result.push_back(brushNode.entity()); },
+      [&](tb::mdl::PatchNode& patchNode) { result.push_back(patchNode.entity()); }));
+  };
+  visitNode(doc->map().worldNode());
 
   std::sort(result.begin(), result.end());
   result.erase(std::unique(result.begin(), result.end()), result.end());
@@ -138,11 +139,6 @@ static PyObject* document_vertex_tool_vertices(PyObject* self, PyObject*)
     }
 
     return list;
-  }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
   }
   catch (const std::exception& e)
   {

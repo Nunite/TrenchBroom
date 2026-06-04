@@ -1,4 +1,4 @@
-#include "OutlinerTreeWidget.h"
+#include "ui/outliner/OutlinerTreeWidget.h"
 
 #include <QHeaderView>
 #include <QItemSelectionModel>
@@ -40,9 +40,9 @@
 #include "ui/MapViewBase.h"
 #include "ui/QWidgetUtils.h"
 #include "ui/ViewUtils.h"
-#include "io/ResourceUtils.h"
-#include "kdl/memory_utils.h"
-#include "kdl/vector_utils.h"
+#include "ui/ImageUtils.h"
+#include "kd/memory_utils.h"
+#include "kd/vector_utils.h"
 
 namespace tb::ui
 {
@@ -184,7 +184,7 @@ static std::vector<mdl::Node*> collectBrushNodesToMoveToBrushEntity(
     nodesToMove.reserve(draggedBrushNodes.size());
 
     for (auto* node : draggedBrushNodes) {
-        if (node && targetEntity != node->parent() && targetEntity->canAddChild(node)) {
+        if (node && targetEntity != node->parent() && targetEntity->canAddChild(*node)) {
             nodesToMove.push_back(node);
         }
     }
@@ -232,7 +232,7 @@ static std::vector<mdl::Node*> collectBrushNodesToMoveToWorldspawn(
             continue;
         }
 
-        if (targetLayer != node->parent() && targetLayer->canAddChild(node)) {
+        if (targetLayer != node->parent() && targetLayer->canAddChild(*node)) {
             nodesToMove.push_back(node);
         }
     }
@@ -250,7 +250,7 @@ static std::vector<mdl::Node*> collectNodesToMoveToGroup(
     auto nodes = std::vector<mdl::Node*>{};
     nodes.reserve(static_cast<size_t>(selectedItems.size()));
 
-    auto* world = map.world();
+    auto* world = &map.worldNode();
 
     for (auto* item : selectedItems) {
         auto* node = nodeFromItem(item);
@@ -293,10 +293,10 @@ static std::vector<mdl::Node*> collectNodesToMoveToGroup(
         if (targetGroup == node || targetGroup == node->parent()) {
             continue;
         }
-        if (targetGroup->isDescendantOf(node)) {
+        if (targetGroup->isDescendantOf(*node)) {
             continue;
         }
-        if (!targetGroup->canAddChild(node)) {
+        if (!targetGroup->canAddChild(*node)) {
             continue;
         }
         reparentableNodes.push_back(node);
@@ -315,7 +315,7 @@ static std::vector<mdl::Node*> collectNodesToMoveToLayer(
     auto nodes = std::vector<mdl::Node*>{};
     nodes.reserve(static_cast<size_t>(selectedItems.size()));
 
-    auto* world = map.world();
+    auto* world = &map.worldNode();
 
     for (auto* item : selectedItems) {
         auto* node = nodeFromItem(item);
@@ -363,10 +363,10 @@ static std::vector<mdl::Node*> collectNodesToMoveToLayer(
         if (targetLayer == node || targetLayer == node->parent()) {
             continue;
         }
-        if (targetLayer->isDescendantOf(node)) {
+        if (targetLayer->isDescendantOf(*node)) {
             continue;
         }
-        if (!targetLayer->canAddChild(node)) {
+        if (!targetLayer->canAddChild(*node)) {
             continue;
         }
         reparentableNodes.push_back(node);
@@ -432,29 +432,26 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
 
     connect(this, &QTreeWidget::itemSelectionChanged, this, &OutlinerTreeWidget::onItemSelectionChanged);
 
-    m_notifierConnection += m_document.map().selectionDidChangeNotifier.connect(
+    m_notifierConnection += m_document.selectionDidChangeNotifier.connect(
         this, &OutlinerTreeWidget::onDocumentSelectionChanged);
 
-    m_notifierConnection += m_document.map().groupWasOpenedNotifier.connect(
-        [this](mdl::GroupNode&) { updateCurrentGroupHighlight(); });
+    m_notifierConnection += m_document.groupWasOpenedNotifier.connect(
+        [this]() { updateCurrentGroupHighlight(); });
     m_notifierConnection += m_document.map().editorContext().editorContextDidChangeNotifier.connect(
         [this]() { updateCurrentGroupHighlight(); });
-    m_notifierConnection += m_document.map().groupWasClosedNotifier.connect(
-        [this](mdl::GroupNode& groupNode) {
-            if (auto* item = findItemForNode(&groupNode)) {
-                item->setExpanded(false);
-            }
+    m_notifierConnection += m_document.groupWasClosedNotifier.connect(
+        [this]() {
             updateCurrentGroupHighlight();
         });
     
     // Listen to map changes to update tree
-    m_notifierConnection += m_document.map().nodesWereAddedNotifier.connect(
+    m_notifierConnection += m_document.nodesWereAddedNotifier.connect(
         [this](const auto&) { scheduleUpdateTree(); }); // Naive full update for now
-    m_notifierConnection += m_document.map().nodesWereRemovedNotifier.connect(
+    m_notifierConnection += m_document.nodesWereRemovedNotifier.connect(
         [this](const auto&) { scheduleUpdateTree(); });
         
     // Optimize nodeDidChange: only update item text/icon, do NOT rebuild tree
-    m_notifierConnection += m_document.map().nodesDidChangeNotifier.connect(
+    m_notifierConnection += m_document.nodesDidChangeNotifier.connect(
         [this](const std::vector<mdl::Node*>& nodes) {
              auto needsRebuild = false;
              for (auto* node : nodes) {
@@ -488,7 +485,7 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
             }
         });
 
-    m_notifierConnection += m_document.map().nodeVisibilityDidChangeNotifier.connect(
+    m_notifierConnection += m_document.nodeVisibilityDidChangeNotifier.connect(
         [this](const std::vector<mdl::Node*>& nodes) {
             for (auto* node : nodes) {
                 if (auto* item = findItemForNode(node)) {
@@ -497,7 +494,7 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
             }
         });
 
-    m_notifierConnection += m_document.map().nodeLockingDidChangeNotifier.connect(
+    m_notifierConnection += m_document.nodeLockingDidChangeNotifier.connect(
         [this](const std::vector<mdl::Node*>& nodes) {
             for (auto* node : nodes) {
                 if (auto* item = findItemForNode(node)) {
@@ -511,12 +508,8 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
         });
     
     // Connect to map lifecycle events to ensure tree is populated when map is loaded/created
-    m_notifierConnection += m_document.map().mapWasLoadedNotifier.connect(
-        [this](auto&) { scheduleUpdateTree(); });
-    m_notifierConnection += m_document.map().mapWasCreatedNotifier.connect(
-        [this](auto&) { scheduleUpdateTree(); });
-    m_notifierConnection += m_document.map().mapWasClearedNotifier.connect(
-        [this](auto&) { scheduleUpdateTree(); });
+    m_notifierConnection += m_document.documentWasLoadedNotifier.connect(
+        [this]() { scheduleUpdateTree(); });
     
     updateTree();
 }
@@ -568,15 +561,15 @@ void OutlinerTreeWidget::scheduleUpdateTree(mdl::Node* revealNode)
 
 void OutlinerTreeWidget::loadIcons()
 {
-    m_groupIcon = io::loadSVGIcon("Map_folder.svg");
-    m_entityIcon = io::loadSVGIcon("Map_entity.svg");
-    m_brushEntityIcon = io::loadSVGIcon("Map_fullcube.svg");
-    m_brushIcon = io::loadSVGIcon("Map_cube.svg");
+    m_groupIcon = loadSVGIcon("Map_folder.svg");
+    m_entityIcon = loadSVGIcon("Map_entity.svg");
+    m_brushEntityIcon = loadSVGIcon("Map_fullcube.svg");
+    m_brushIcon = loadSVGIcon("Map_cube.svg");
     
-    m_visibleIcon = io::loadSVGIcon("object_show.svg");
-    m_hiddenIcon = io::loadSVGIcon("object_hidden.svg");
-    m_lockedIcon = io::loadSVGIcon("Lock_on.svg");
-    m_unlockedIcon = io::loadSVGIcon("Lock_off.svg");
+    m_visibleIcon = loadSVGIcon("object_show.svg");
+    m_hiddenIcon = loadSVGIcon("object_hidden.svg");
+    m_lockedIcon = loadSVGIcon("Lock_on.svg");
+    m_unlockedIcon = loadSVGIcon("Lock_off.svg");
 }
 
 mdl::Node* OutlinerTreeWidget::nodeFromItem(QTreeWidgetItem* item) const
@@ -707,7 +700,7 @@ void OutlinerTreeWidget::updateTree()
     m_itemForNode.clear();
     clear();
 
-    auto* world = m_document.map().world();
+    auto* world = &m_document.map().worldNode();
     if (!world) {
         m_syncingSelection = wasSyncing;
         blockSignals(false);
@@ -1462,7 +1455,7 @@ void OutlinerTreeWidget::onItemSelectionChanged()
         }
 
         if (const auto* currentGroup = editorContext.currentGroup()) {
-            return &node == currentGroup || node.isDescendantOf(currentGroup);
+            return &node == currentGroup || node.isDescendantOf(*currentGroup);
         }
 
         return true;
@@ -1515,7 +1508,7 @@ void OutlinerTreeWidget::mousePressEvent(QMouseEvent* event)
                 const auto& editorContext = m_document.map().editorContext();
                 if (const auto* currentGroup = editorContext.currentGroup()) {
                     const auto inCurrentGroup =
-                        node == currentGroup || node->isDescendantOf(currentGroup);
+                        node == currentGroup || node->isDescendantOf(*currentGroup);
                     if (!inCurrentGroup) {
                         return;
                     }
@@ -1584,7 +1577,7 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
         }
 
         if (const auto* currentGroup = editorContext.currentGroup()) {
-            return &node_ == currentGroup || node_.isDescendantOf(currentGroup);
+            return &node_ == currentGroup || node_.isDescendantOf(*currentGroup);
         }
 
         return true;
@@ -1674,22 +1667,22 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
         popupMenu.addSeparator();
 
         auto* showAllLayersAction = popupMenu.addAction(tr("Show All Layers"), this, [&]() {
-            const auto layers = map.world()->allLayers();
+            const auto layers = map.worldNode().allLayers();
             mdl::resetNodeVisibility(map, kdl::vec_static_cast<mdl::Node*>(layers));
         });
         auto* hideAllLayersAction = popupMenu.addAction(tr("Hide All Layers"), this, [&]() {
-            const auto layers = map.world()->allLayers();
+            const auto layers = map.worldNode().allLayers();
             mdl::hideNodes(map, kdl::vec_static_cast<mdl::Node*>(layers));
         });
 
         popupMenu.addSeparator();
 
         auto* unlockAllLayersAction = popupMenu.addAction(tr("Unlock All Layers"), this, [&]() {
-            const auto layers = map.world()->allLayers();
+            const auto layers = map.worldNode().allLayers();
             mdl::resetNodeLockingState(map, kdl::vec_static_cast<mdl::Node*>(layers));
         });
         auto* lockAllLayersAction = popupMenu.addAction(tr("Lock All Layers"), this, [&]() {
-            const auto layers = map.world()->allLayers();
+            const auto layers = map.worldNode().allLayers();
             mdl::lockNodes(map, kdl::vec_static_cast<mdl::Node*>(layers));
         });
 
@@ -1702,7 +1695,7 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
             }
         });
         auto* removeLayerAction = popupMenu.addAction(tr("Remove Layer"), this, [&, layerNode]() {
-            auto* defaultLayerNode = map.world()->defaultLayer();
+            auto* defaultLayerNode = map.worldNode().defaultLayer();
 
             auto transaction = mdl::Transaction{map, "Remove Layer " + layerNode->name()};
             mdl::deselectAll(map);
@@ -1730,7 +1723,7 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
         auto canHideAll = false;
         auto canUnlockAll = false;
         auto canLockAll = false;
-        for (const auto* layer : map.world()->allLayers()) {
+        for (const auto* layer : map.worldNode().allLayers()) {
             if (!layer->visible()) {
                 canShowAll = true;
             }
@@ -1745,17 +1738,17 @@ void OutlinerTreeWidget::contextMenuEvent(QContextMenuEvent* event)
             }
         }
 
-        const auto isDefaultLayer = (layerNode == map.world()->defaultLayer());
+        const auto isDefaultLayer = (layerNode == map.worldNode().defaultLayer());
         const auto canRename = !isDefaultLayer;
         const auto canRemove = [&]() {
             if (isDefaultLayer) {
                 return false;
             }
-            auto* defaultLayer = map.world()->defaultLayer();
+            auto* defaultLayer = map.worldNode().defaultLayer();
             if (!defaultLayer->locked() && !defaultLayer->hidden()) {
                 return true;
             }
-            for (auto* customLayer : map.world()->customLayers()) {
+            for (auto* customLayer : map.worldNode().customLayers()) {
                 if (customLayer != layerNode && !customLayer->locked() && !customLayer->hidden()) {
                     return true;
                 }

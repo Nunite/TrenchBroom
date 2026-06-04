@@ -1,8 +1,8 @@
-#include "GoldSrcMdlScaler.h"
+#include "mdl/GoldSrcMdlScaler.h"
 
-#include "io/DiskIO.h"
+#include "fs/DiskIO.h"
 
-#include "kdl/path_utils.h"
+#include "kd/path_utils.h"
 
 #include <cstdint>
 #include <cstring>
@@ -297,7 +297,7 @@ Result<void> scaleGoldSrcMdlBuffer(std::vector<uint8_t>& data, const float s)
 
 Result<void> scaleGoldSrcMdlFile(const std::filesystem::path& absPath, const float s)
 {
-  return Disk::openFile(absPath) | kdl::and_then([&](auto file) -> Result<void> {
+  return fs::Disk::openFile(absPath) | kdl::and_then([&](auto file) -> Result<void> {
            auto reader = file->reader().buffer();
            const auto buffered = reader.buffer();
            if (buffered.size() == 0)
@@ -310,7 +310,7 @@ Result<void> scaleGoldSrcMdlFile(const std::filesystem::path& absPath, const flo
            std::memcpy(data.data(), buffered.begin(), buffered.size());
 
            return scaleGoldSrcMdlBuffer(data, s) | kdl::and_then([&]() -> Result<void> {
-                    return Disk::withOutputStream(
+                    return fs::Disk::withOutputStream(
                       absPath,
                       std::ios::out | std::ios::binary | std::ios::trunc,
                       [&](auto& stream) -> Result<void> {

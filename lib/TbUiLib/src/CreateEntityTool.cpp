@@ -53,12 +53,12 @@ CreateEntityTool::CreateEntityTool(MapDocument& document)
 
 mdl::Map& CreateEntityTool::map()
 {
-  return m_map;
+  return m_document.map();
 }
 
 const mdl::Map& CreateEntityTool::map() const
 {
-  return m_map;
+  return m_document.map();
 }
 
 bool CreateEntityTool::createEntity(const std::string& classname)
@@ -95,7 +95,8 @@ bool CreateEntityTool::createEntity(
     return false;
   }
 
-  if (!mdl::setEntityProperty(m_map, propertyKey, propertyValue, false))
+  auto& map = m_document.map();
+  if (!mdl::setEntityProperty(map, propertyKey, propertyValue, false))
   {
     removeEntity();
     return false;

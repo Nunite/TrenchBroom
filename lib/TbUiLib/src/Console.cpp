@@ -135,4 +135,9 @@ void Console::showContextMenu(const QPoint& pos)
   menu->popup(m_textView->mapToGlobal(pos));
 }
 
+PythonConsole::PythonConsole(QWidget* parent)
+  : Console{parent}
+{
+}
+
 } // namespace tb::ui

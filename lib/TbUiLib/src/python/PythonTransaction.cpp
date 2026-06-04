@@ -1,10 +1,9 @@
-#include "PythonTransaction.h"
-#include "PythonTypes.h"
-#include "PythonUtils.h"
+#include "ui/python/PythonTransaction.h"
+#include "ui/python/PythonTypes.h"
+#include "ui/python/PythonUtils.h"
 #include "mdl/Transaction.h"
 #include "mdl/Map.h"
 #include "ui/MapDocument.h"
-#include "Exceptions.h"
 
 namespace tb::ui {
 
@@ -35,11 +34,6 @@ PyObject* transaction_enter(PyObject* self, PyObject*)
   {
     tx->transaction =
       new tb::mdl::Transaction{tx->document->map(), std::string(nameUtf8, static_cast<size_t>(size))};
-  }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
   }
   catch (const std::exception& e)
   {
@@ -81,11 +75,6 @@ PyObject* transaction_commit(PyObject* self, PyObject*)
     }
     Py_RETURN_FALSE;
   }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
-  }
   catch (const std::exception& e)
   {
     PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -118,11 +107,6 @@ PyObject* transaction_cancel(PyObject* self, PyObject*)
     tx->transaction = nullptr;
     Py_RETURN_NONE;
   }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
-  }
   catch (const std::exception& e)
   {
     PyErr_SetString(PyExc_RuntimeError, e.what());
@@ -153,11 +137,6 @@ PyObject* transaction_rollback(PyObject* self, PyObject*)
   {
     tx->transaction->rollback();
     Py_RETURN_NONE;
-  }
-  catch (const tb::Exception& e)
-  {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return nullptr;
   }
   catch (const std::exception& e)
   {

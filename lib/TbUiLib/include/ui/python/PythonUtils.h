@@ -1,12 +1,15 @@
 #pragma once
 #include <Python.h>
 #include <string>
-#include "PythonTypes.h"
+#include "ui/python/PythonTypes.h"
 #include "vm/vec.h"
 
-namespace tb::mdl {
+namespace tb::gl {
     class Material;
     class MaterialCollection;
+}
+
+namespace tb::mdl {
     class BrushNode;
     class EntityNodeBase;
     class Node;
@@ -27,8 +30,8 @@ extern thread_local MapWindow* g_currentFrame;
 tb::ui::MapDocument* activeDocument();
 
 PyObject* createVec3Object(const vm::vec3d& v);
-PyObject* createMaterialObject(const tb::mdl::Material* material);
-PyObject* createMaterialCollectionObject(const tb::mdl::MaterialCollection* collection);
+PyObject* createMaterialObject(const tb::gl::Material* material);
+PyObject* createMaterialCollectionObject(const tb::gl::MaterialCollection* collection);
 PyObject* toPyString(const std::string& str);
 PyObject* toPyVec3dTuple(const vm::vec3d& v);
 

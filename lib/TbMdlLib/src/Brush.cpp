@@ -840,7 +840,7 @@ bool Brush::canChamferVertices(
   const std::vector<vm::vec3d>& vertexPositions,
   const double distance) const
 {
-  ensure(m_geometry != nullptr, "geometry is null");
+  contract_pre(m_geometry != nullptr);
   if (distance <= 0.0)
   {
     return false;
@@ -869,8 +869,8 @@ Result<void> Brush::chamferVertices(
   const double distance,
   const bool uvLock)
 {
-  ensure(m_geometry != nullptr, "geometry is null");
-  ensure(!vertexPositions.empty(), "no vertex positions");
+  contract_pre(m_geometry != nullptr);
+  contract_pre(!vertexPositions.empty());
   assert(canChamferVertices(worldBounds, vertexPositions, distance));
 
   const auto points = chamferVerticesInGeometry(*m_geometry, vertexPositions, distance);
@@ -887,7 +887,7 @@ bool Brush::canChamferEdges(
   const double distance,
   const int segments) const
 {
-  ensure(m_geometry != nullptr, "geometry is null");
+  contract_pre(m_geometry != nullptr);
   if (distance <= 0.0)
   {
     return false;
@@ -917,8 +917,8 @@ Result<void> Brush::chamferEdges(
   const int segments,
   const bool uvLock)
 {
-  ensure(m_geometry != nullptr, "geometry is null");
-  ensure(!edgePositions.empty(), "no edge positions");
+  contract_pre(m_geometry != nullptr);
+  contract_pre(!edgePositions.empty());
   assert(canChamferEdges(worldBounds, edgePositions, distance, segments));
 
   const auto newGeometry =

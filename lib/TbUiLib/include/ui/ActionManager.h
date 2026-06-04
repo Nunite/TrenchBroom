@@ -41,6 +41,8 @@ namespace tb::ui
 class ActionManager
 {
 private:
+  static ActionManager* m_instance;
+
   /**
    * All actions which are used either in a menu, a tool bar or as a shortcut.
    * Indexed by preference path.
@@ -61,7 +63,16 @@ private:
 
 public:
   ActionManager();
+  ~ActionManager()
+  {
+    if (m_instance == this)
+    {
+      m_instance = nullptr;
+    }
+  }
   deleteCopyAndMove(ActionManager);
+
+  static ActionManager& instance();
 
   /**
    * Note, unlike createAction(), these are not registered / owned by the ActionManager.

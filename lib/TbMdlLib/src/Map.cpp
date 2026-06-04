@@ -832,6 +832,31 @@ void Map::setGamePath(std::filesystem::path gamePath)
   }
 }
 
+GameFileSystem& Map::gameFileSystem()
+{
+  return *m_gameFileSystem;
+}
+
+const GameFileSystem& Map::gameFileSystem() const
+{
+  return *m_gameFileSystem;
+}
+
+void Map::reloadEntityModels(const std::vector<std::filesystem::path>& paths)
+{
+  for (const auto& path : paths)
+  {
+    entityModelManager().invalidateModel(path);
+  }
+  clearEntityModels();
+  setEntityModels();
+}
+
+void Map::reloadEntityModels(const std::filesystem::path& path)
+{
+  reloadEntityModels(std::vector<std::filesystem::path>{path});
+}
+
 Result<std::unique_ptr<Map>> Map::reload()
 {
   if (!persistent())

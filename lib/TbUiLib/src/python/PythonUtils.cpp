@@ -1,6 +1,6 @@
-#include "PythonUtils.h"
-#include "mdl/Material.h"
-#include "mdl/MaterialCollection.h"
+#include "ui/python/PythonUtils.h"
+#include "gl/Material.h"
+#include "gl/MaterialCollection.h"
 #include "mdl/Transaction.h"
 #include "mdl/BrushNode.h"
 #include "mdl/BrushFace.h"
@@ -29,7 +29,7 @@ PyObject* createVec3Object(const vm::vec3d& v)
   return (PyObject*)obj;
 }
 
-PyObject* createMaterialObject(const tb::mdl::Material* material)
+PyObject* createMaterialObject(const tb::gl::Material* material)
 {
   if (g_materialType == nullptr || material == nullptr)
     return nullptr;
@@ -39,7 +39,7 @@ PyObject* createMaterialObject(const tb::mdl::Material* material)
   return (PyObject*)obj;
 }
 
-PyObject* createMaterialCollectionObject(const tb::mdl::MaterialCollection* collection)
+PyObject* createMaterialCollectionObject(const tb::gl::MaterialCollection* collection)
 {
   if (g_materialCollectionType == nullptr || collection == nullptr)
     return nullptr;

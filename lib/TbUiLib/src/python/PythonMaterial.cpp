@@ -1,10 +1,10 @@
-#include "PythonMaterial.h"
-#include "PythonTypes.h"
-#include "PythonUtils.h"
+#include "ui/python/PythonMaterial.h"
+#include "ui/python/PythonTypes.h"
+#include "ui/python/PythonUtils.h"
 
-#include "mdl/Material.h"
-#include "mdl/MaterialCollection.h"
-#include "mdl/Texture.h"
+#include "gl/Material.h"
+#include "gl/MaterialCollection.h"
+#include "gl/Texture.h"
 
 #include <filesystem>
 

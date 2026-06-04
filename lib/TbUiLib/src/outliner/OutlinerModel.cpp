@@ -1,6 +1,6 @@
-#include "OutlinerModel.h"
+#include "ui/outliner/OutlinerModel.h"
 
-#include "io/ResourceUtils.h"
+#include "ui/ImageUtils.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Node.h"
@@ -27,13 +27,13 @@ OutlinerModel::OutlinerModel(mdl::Map& map, QObject* parent) :
     QAbstractItemModel(parent),
     m_map(map)
 {
-    m_groupIcon = io::loadSVGIcon("Folder.svg");
-    m_entityIcon = io::loadSVGIcon("NoTool.svg");
-    m_brushIcon = io::loadSVGIcon("BrushTool.svg");
-    m_visibleIcon = io::loadSVGIcon("Hidden_off.svg");
-    m_hiddenIcon = io::loadSVGIcon("Hidden_on.svg");
-    m_lockedIcon = io::loadSVGIcon("Lock_on.svg");
-    m_unlockedIcon = io::loadSVGIcon("Lock_off.svg");
+    m_groupIcon = loadSVGIcon("Folder.svg");
+    m_entityIcon = loadSVGIcon("NoTool.svg");
+    m_brushIcon = loadSVGIcon("BrushTool.svg");
+    m_visibleIcon = loadSVGIcon("Hidden_off.svg");
+    m_hiddenIcon = loadSVGIcon("Hidden_on.svg");
+    m_lockedIcon = loadSVGIcon("Lock_on.svg");
+    m_unlockedIcon = loadSVGIcon("Lock_off.svg");
 
     m_notifierConnection += m_map.nodesWereAddedNotifier.connect([this](const std::vector<mdl::Node*>& nodes) { onNodesWereAdded(nodes); });
     m_notifierConnection += m_map.nodesWillBeRemovedNotifier.connect([this](const std::vector<mdl::Node*>& nodes) { onNodesWillBeRemoved(nodes); });
@@ -71,7 +71,7 @@ QModelIndex OutlinerModel::parent(const QModelIndex& child) const
     mdl::Node* childNode = static_cast<mdl::Node*>(child.internalPointer());
     mdl::Node* parentNode = childNode->parent();
 
-    if (parentNode == m_map.world())
+    if (parentNode == &m_map.worldNode())
         return {}; // Root parent is invalid index
 
     if (!parentNode)
@@ -263,13 +263,13 @@ bool OutlinerModel::dropMimeData(const QMimeData* data, Qt::DropAction action, i
 
     mdl::Node* parentNode = nodeFromIndex(parent); 
     // If parent is invalid, it means dropping on root (World).
-    if (!parentNode) parentNode = m_map.world();
+    if (!parentNode) parentNode = &m_map.worldNode();
     
     // Validate reparenting
     // We cannot reparent a node to itself or its descendant.
     for (auto* node : nodes) {
         if (node == parentNode) return false;
-        if (parentNode->isDescendantOf(node)) return false;
+        if (parentNode->isDescendantOf(*node)) return false;
     }
 
     std::map<mdl::Node*, std::vector<mdl::Node*>> reparentMap;
@@ -289,12 +289,12 @@ mdl::Node* OutlinerModel::nodeFromIndex(const QModelIndex& index) const
     {
         return static_cast<mdl::Node*>(index.internalPointer());
     }
-    return m_map.world();
+    return &m_map.worldNode();
 }
 
 QModelIndex OutlinerModel::indexFromNode(const mdl::Node* node) const
 {
-    if (!node || node == m_map.world())
+    if (!node || node == &m_map.worldNode())
         return {};
 
     mdl::Node* parentNode = node->parent();

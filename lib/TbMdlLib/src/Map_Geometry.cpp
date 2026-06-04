@@ -665,7 +665,7 @@ bool chamferVertices(
 
         newVertexPositions = kdl::vec_concat(std::move(newVertexPositions), *chamfered);
 
-        return brush.chamferVertices(map.worldBounds(), verticesToChamfer, distance, pref(Preferences::UVLock))
+        return brush.chamferVertices(map.worldBounds(), verticesToChamfer, distance, map.editorContext().uvLock())
                | kdl::if_error([&](auto e) {
                    map.logger().error() << "Could not chamfer brush vertices: " << e.msg;
                  })
@@ -688,7 +688,7 @@ bool chamferVertices(
       std::move(vertexPositions),
       std::move(newVertexPositions)));
 
-    if (!result->success())
+    if (!result)
     {
       transaction.cancel();
       return false;
@@ -746,7 +746,7 @@ bool chamferEdges(
                  edgesToChamfer,
                  distance,
                  segments,
-                 pref(Preferences::UVLock))
+                 map.editorContext().uvLock())
                | kdl::transform([&]() {
                    auto newPositions = brush.findClosestEdgePositions(edgesToChamfer);
                    newEdgePositions = kdl::vec_concat(
@@ -774,7 +774,7 @@ bool chamferEdges(
       std::move(edgePositions),
       std::move(newEdgePositions)));
 
-    if (!result->success())
+    if (!result)
     {
       transaction.cancel();
       return false;

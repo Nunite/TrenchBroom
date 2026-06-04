@@ -419,6 +419,7 @@ public:
 
   void revealMaterial(const gl::Material* material);
 
+  AppController& appController();
   void debugPrintVertices();
   void debugCreateBrush();
   void debugCreateCube();

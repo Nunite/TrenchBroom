@@ -1,4 +1,4 @@
-#include "PathTool.h"
+#include "ui/PathTool.h"
 
 #include "mdl/Map.h"
 #include "mdl/Transaction.h"
@@ -121,7 +121,7 @@ void PathTool::createPathEntities()
     {
         auto entity = mdl::Entity{{{mdl::EntityPropertyKeys::Classname, def->name}}};
         
-        if (m_map.world()->entityPropertyConfig().setDefaultProperties)
+        if (m_map.worldNode().entityPropertyConfig().setDefaultProperties)
         {
             mdl::setDefaultProperties(*def, entity, mdl::SetDefaultPropertyMode::SetAll);
         }

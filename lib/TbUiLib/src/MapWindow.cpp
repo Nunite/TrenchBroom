@@ -205,8 +205,8 @@ MapWindow::MapWindow(AppController& appController, std::unique_ptr<MapDocument> 
 
   setAcceptDrops(true);
 
-  const auto defaultPluginPaths =
-    PreferenceManager::instance().get(Preferences::DefaultPluginPaths);
+  const auto defaultPluginPaths = QString::fromStdString(
+    PreferenceManager::instance().get(Preferences::DefaultPluginPaths));
   if (!defaultPluginPaths.isEmpty())
   {
     const auto paths = defaultPluginPaths.split('|', Qt::SkipEmptyParts);
@@ -2413,6 +2413,11 @@ void MapWindow::revealMaterial(const gl::Material* material)
 {
   m_inspector->switchToPage(InspectorPage::Face);
   m_inspector->faceInspector()->revealMaterial(material);
+}
+
+AppController& MapWindow::appController()
+{
+  return m_appController;
 }
 
 void MapWindow::debugPrintVertices()

@@ -51,22 +51,24 @@ inline auto MapViewLayout = Preference<int>{"Views/Map view layout", 0};
 inline const auto SystemTheme = std::string{"System"};
 inline const auto DarkTheme = std::string{"Dark"};
 inline auto Theme = Preference<std::string>{"Theme", SystemTheme};
-inline const auto EnglishLanguage = QString{"English"};
-inline const auto ChineseLanguage = QString{"Chinese"};
-inline auto Language = Preference<QString>{"Language", EnglishLanguage};
+inline const auto EnglishLanguage = std::string{"English"};
+inline const auto ChineseLanguage = std::string{"Chinese"};
+inline auto Language = Preference<std::string>{"Language", EnglishLanguage};
 
-inline const QString& languageEnglish()
+inline const std::string& languageEnglish()
 {
   return EnglishLanguage;
 }
 
-inline const QString& languageChinese()
+inline const std::string& languageChinese()
 {
   return ChineseLanguage;
 }
 
-inline auto DefaultPluginPaths = Preference<QString>{"Python/Default plugin paths", ""};
-inline auto PieMenuAction = Preference<QString>{"Controls/Pie menu actions", ""};
+inline auto DefaultPluginPaths = Preference<std::string>{"Python/Default plugin paths", ""};
+inline auto PieMenuAction = Preference<std::string>{"Controls/Pie menu actions", ""};
+inline auto PrefixWorldspawnHeaderOnCopy =
+  Preference<bool>{"Controls/Prefix worldspawn header on copy", false};
 
 inline auto ShowAxes = Preference<bool>{"render/Show axes", true};
 inline auto SoftMapBoundsColor =

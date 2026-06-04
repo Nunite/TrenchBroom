@@ -17,7 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ModelBrowser.h"
+#include "ui/ModelBrowser.h"
 
 #include <QFileSystemWatcher>
 #include <QHBoxLayout>
@@ -33,23 +33,24 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
-#include "io/ResourceUtils.h"
-#include "io/DiskIO.h"
-#include "io/PathInfo.h"
-#include "io/FileSystem.h"
-#include "io/PathMatcher.h"
+#include "fs/DiskIO.h"
+#include "fs/PathInfo.h"
+#include "fs/FileSystem.h"
+#include "fs/PathMatcher.h"
 #include "ui/QPathUtils.h"
-#include "io/TraversalMode.h"
-#include "mdl/Game.h"
+#include "fs/TraversalMode.h"
 #include "mdl/Map.h"
+#include "mdl/GameFileSystem.h"
 #include "mdl/Map_World.h"
 #include "mdl/EntityModelManager.h"
 #include "ui/AppController.h"
+#include "ui/ImageUtils.h"
 #include "ui/ModelBrowserView.h"
 #include "ui/QWidgetUtils.h"
+#include "ui/SearchBox.h"
 
-#include "kdl/ranges/to.h"
-#include "kdl/path_utils.h"
+#include "kd/ranges/to.h"
+#include "kd/path_utils.h"
 
 #include <algorithm>
 #include <ranges>
@@ -94,7 +95,7 @@ void ModelBrowser::createGui(AppController& appController)
   m_pathStack->setCurrentWidget(m_breadcrumbBar);
 
   m_reloadButton = new QToolButton{};
-  m_reloadButton->setIcon(io::loadSVGIcon(std::filesystem::path{"Refresh.svg"}));
+  m_reloadButton->setIcon(loadSVGIcon(std::filesystem::path{"Refresh.svg"}));
   m_reloadButton->setToolTip(tr("Reload models"));
   m_reloadButton->setAutoRaise(true);
 
@@ -227,10 +228,6 @@ void ModelBrowser::bindEvents()
 
 void ModelBrowser::connectObservers()
 {
-  m_notifierConnection +=
-    m_map.mapWasCreatedNotifier.connect(this, &ModelBrowser::mapWasCreated);
-  m_notifierConnection +=
-    m_map.mapWasLoadedNotifier.connect(this, &ModelBrowser::mapWasLoaded);
   m_notifierConnection += m_map.modsDidChangeNotifier.connect(this, &ModelBrowser::modsDidChange);
 }
 
@@ -421,26 +418,13 @@ void ModelBrowser::setCurrentFolderPath(std::filesystem::path currentFolderPath)
 
 void ModelBrowser::reloadModels()
 {
-  const auto* game = m_map.game();
-  if (!game)
-  {
-    m_modelPaths.clear();
-    m_lastWriteTimes.clear();
-    m_currentFolderPath.clear();
-    updateFolderEdit();
-    rebuildFolderTree();
-    m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
-    m_view->setCurrentFolderPath(m_currentFolderPath);
-    return;
-  }
-
   if (m_folderPath.is_absolute())
   {
     auto pathsResult =
-      io::Disk::find(
+      fs::Disk::find(
         m_folderPath,
-        io::TraversalMode::Recursive,
-        io::makeExtensionPathMatcher({".mdl"}));
+        fs::TraversalMode::Recursive,
+        fs::makeExtensionPathMatcher({".mdl"}));
     if (pathsResult.is_error())
     {
       m_modelPaths.clear();
@@ -478,7 +462,7 @@ void ModelBrowser::reloadModels()
     return;
   }
 
-  const auto& fs = game->gameFileSystem();
+  const auto& fs = m_map.gameFileSystem();
   const auto enabledMods = mdl::enabledMods(m_map);
   if (enabledMods.empty())
   {
@@ -493,12 +477,12 @@ void ModelBrowser::reloadModels()
   }
 
   const auto modRoots = enabledMods | std::views::transform([&](const auto& mod) {
-                          return (game->gamePath() / std::filesystem::path{mod}).lexically_normal();
+                          return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
                         })
                         | kdl::ranges::to<std::vector>();
 
   auto pathsResult =
-    fs.find(m_folderPath, io::TraversalMode::Recursive, io::makeExtensionPathMatcher({".mdl"}));
+    fs.find(m_folderPath, fs::TraversalMode::Recursive, fs::makeExtensionPathMatcher({".mdl"}));
   if (pathsResult.is_error())
   {
     m_modelPaths.clear();
@@ -577,7 +561,7 @@ void ModelBrowser::rebuildFolderTree()
   m_folderTree->clear();
   m_folderTreeItems.clear();
 
-  const auto folderIcon = io::loadSVGIcon(std::filesystem::path{"Map_folder.svg"});
+  const auto folderIcon = loadSVGIcon(std::filesystem::path{"Map_folder.svg"});
 
   auto rootTitle = m_folderPath.filename().empty() ? m_folderPath : m_folderPath.filename();
   auto rootTitleText = rootTitle.generic_string();
@@ -656,22 +640,16 @@ void ModelBrowser::setWatchedDirectory()
     m_fileSystemWatcher->removePaths(m_fileSystemWatcher->directories());
   }
 
-  const auto* game = m_map.game();
-  if (!game)
-  {
-    return;
-  }
-
   if (m_folderPath.is_absolute())
   {
-    if (io::Disk::pathInfo(m_folderPath) == io::PathInfo::Directory)
+    if (fs::Disk::pathInfo(m_folderPath) == fs::PathInfo::Directory)
     {
-      m_fileSystemWatcher->addPath(io::pathAsQString(m_folderPath));
+      m_fileSystemWatcher->addPath(pathAsQString(m_folderPath));
     }
     return;
   }
 
-  const auto& fs = game->gameFileSystem();
+  const auto& fs = m_map.gameFileSystem();
   if (mdl::enabledMods(m_map).empty())
   {
     return;
@@ -679,9 +657,9 @@ void ModelBrowser::setWatchedDirectory()
   if (auto absPathResult = fs.makeAbsolute(m_folderPath); !absPathResult.is_error())
   {
     const auto& absPath = absPathResult.value();
-    if (io::Disk::pathInfo(absPath) == io::PathInfo::Directory)
+    if (fs::Disk::pathInfo(absPath) == fs::PathInfo::Directory)
     {
-      m_fileSystemWatcher->addPath(io::pathAsQString(absPath));
+      m_fileSystemWatcher->addPath(pathAsQString(absPath));
     }
   }
 }
@@ -696,19 +674,13 @@ void ModelBrowser::scheduleRescan()
 
 void ModelBrowser::rescanWatchedDirectory()
 {
-  const auto* game = m_map.game();
-  if (!game)
-  {
-    return;
-  }
-
   if (m_folderPath.is_absolute())
   {
     auto pathsResult =
-      io::Disk::find(
+      fs::Disk::find(
         m_folderPath,
-        io::TraversalMode::Recursive,
-        io::makeExtensionPathMatcher({".mdl"}));
+        fs::TraversalMode::Recursive,
+        fs::makeExtensionPathMatcher({".mdl"}));
     if (pathsResult.is_error())
     {
       m_modelPaths.clear();
@@ -769,7 +741,7 @@ void ModelBrowser::rescanWatchedDirectory()
     return;
   }
 
-  const auto& fs = game->gameFileSystem();
+  const auto& fs = m_map.gameFileSystem();
   const auto enabledMods = mdl::enabledMods(m_map);
   if (enabledMods.empty())
   {
@@ -791,12 +763,12 @@ void ModelBrowser::rescanWatchedDirectory()
   }
 
   const auto modRoots = enabledMods | std::views::transform([&](const auto& mod) {
-                          return (game->gamePath() / std::filesystem::path{mod}).lexically_normal();
+                          return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
                         })
                         | kdl::ranges::to<std::vector>();
 
   auto pathsResult =
-    fs.find(m_folderPath, io::TraversalMode::Recursive, io::makeExtensionPathMatcher({".mdl"}));
+    fs.find(m_folderPath, fs::TraversalMode::Recursive, fs::makeExtensionPathMatcher({".mdl"}));
   if (pathsResult.is_error())
   {
     m_modelPaths.clear();

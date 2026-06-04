@@ -31,6 +31,7 @@ namespace tb
 namespace mdl
 {
 class EntityNode;
+class Map;
 class PickResult;
 } // namespace mdl
 
