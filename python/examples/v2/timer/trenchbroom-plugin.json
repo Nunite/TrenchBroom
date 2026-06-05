@@ -3,6 +3,7 @@
   "name": "V2 Timer",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "script",
   "entry": "main.py",
   "description": "Shows a session-owned timer.",
   "author": "TrenchBroom"

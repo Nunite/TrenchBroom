@@ -3,6 +3,7 @@
   "name": "Texture Replacer",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "ui",
   "entry": "main.py",
   "description": "Replaces matching face materials on selected brushes.",
   "author": "TrenchBroom"

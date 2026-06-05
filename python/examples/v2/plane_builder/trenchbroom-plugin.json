@@ -3,6 +3,7 @@
   "name": "Plane Builder",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "ui",
   "entry": "main.py",
   "description": "Duplicates selected objects along X and rotates around a selected vertex handle.",
   "author": "TrenchBroom"

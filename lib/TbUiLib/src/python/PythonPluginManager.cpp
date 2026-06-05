@@ -68,6 +68,14 @@ void PythonPluginManager::reload(const std::vector<std::filesystem::path>& direc
       auto result = loadPythonPluginManifest(pluginDirectory);
       if (result.manifest)
       {
+        if (result.manifest->pluginType != PythonPluginType::Ui)
+        {
+          m_errors.push_back(PythonPluginManifestError{
+            pluginDirectory / ManifestFileName,
+            "Script-only Python manifest; use Run Python Script to execute it"});
+          continue;
+        }
+
         auto state = PythonPluginState{};
         state.manifest = std::move(*result.manifest);
         m_plugins.push_back(std::move(state));

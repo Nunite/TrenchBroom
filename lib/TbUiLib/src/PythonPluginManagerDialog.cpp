@@ -99,14 +99,16 @@ PythonPluginManagerDialog::PythonPluginManagerDialog(QWidget* parent)
 
 void PythonPluginManagerDialog::createGui()
 {
-  auto* introLabel = new QLabel{tr("Manage Python v2 manifest plugin directories.")};
+  auto* introLabel = new QLabel{
+    tr("Manage Python v2 UI plugin directories. Script-only plugins should be run with "
+       "Run Python Script.")};
   setInfoStyle(introLabel);
 
   m_pluginPathList = new QListWidget{};
   configureList(m_pluginPathList);
   m_pluginPathList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
-  m_installButton = new QPushButton{tr("Install...")};
+  m_installButton = new QPushButton{tr("Install UI Plugin...")};
   m_removeButton = new QPushButton{tr("Remove")};
   m_clearButton = new QPushButton{tr("Clear")};
   m_refreshButton = new QPushButton{tr("Refresh")};
@@ -119,7 +121,7 @@ void PythonPluginManagerDialog::createGui()
   connect(m_installButton, &QPushButton::clicked, this, [this]() {
     const auto pathStr = QFileDialog::getExistingDirectory(
       this,
-      tr("Install Python Plugin from Directory"),
+      tr("Install Python UI Plugin from Directory"),
       fileDialogDefaultDirectory(FileDialogDir::Map));
 
     if (!pathStr.isEmpty())
@@ -348,8 +350,8 @@ void PythonPluginManagerDialog::reloadPluginStatus()
   {
     m_pluginDetails->setPlainText(
       searchText.isEmpty() && !showIssuesOnly
-        ? tr("No plugin manifests found in the configured directories.")
-        : tr("No plugins match the current filter."));
+        ? tr("No Python UI plugin manifests found in the configured directories.")
+        : tr("No Python UI plugins match the current filter."));
   }
 }
 

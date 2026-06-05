@@ -3,6 +3,7 @@
   "name": "Event Callback",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "script",
   "entry": "main.py",
   "description": "Registers a selection_changed callback and reports selected entities and brushes.",
   "author": "TrenchBroom"

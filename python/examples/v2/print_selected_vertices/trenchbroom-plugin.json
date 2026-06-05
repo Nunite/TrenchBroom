@@ -3,6 +3,7 @@
   "name": "Print Selected Vertices",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "script",
   "entry": "main.py",
   "description": "Prints selected vertex handles and selected brush vertices.",
   "author": "TrenchBroom"

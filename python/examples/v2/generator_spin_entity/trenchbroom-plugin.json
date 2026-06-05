@@ -3,6 +3,7 @@
   "name": "Spin Entity Generator",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "script",
   "entry": "main.py",
   "description": "Duplicates the selected entity around a configurable pivot and axis.",
   "author": "TrenchBroom"

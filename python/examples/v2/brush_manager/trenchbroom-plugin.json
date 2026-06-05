@@ -3,6 +3,7 @@
   "name": "Brush Manager",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "ui",
   "entry": "main.py",
   "description": "Creates cubes, applies materials, and reports selected brush information.",
   "author": "TrenchBroom"

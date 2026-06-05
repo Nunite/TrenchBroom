@@ -3,6 +3,7 @@
   "name": "Entity Brush Modifier",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "script",
   "entry": "main.py",
   "description": "Offsets texture coordinates on brushes owned by selected entities.",
   "author": "TrenchBroom"

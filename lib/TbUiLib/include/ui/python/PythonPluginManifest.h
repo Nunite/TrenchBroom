@@ -8,12 +8,19 @@
 namespace tb::ui
 {
 
+enum class PythonPluginType
+{
+  Script,
+  Ui,
+};
+
 struct PythonPluginManifest
 {
   std::string id;
   std::string name;
   std::string version;
   int apiVersion = 2;
+  PythonPluginType pluginType = PythonPluginType::Script;
   std::filesystem::path entry;
   std::string description;
   std::string author;
@@ -33,6 +40,7 @@ struct PythonPluginManifestResult
 };
 
 PythonPluginManifestResult loadPythonPluginManifest(const std::filesystem::path& path);
+std::string pythonPluginTypeName(PythonPluginType type);
 std::vector<std::filesystem::path> splitPythonPluginDirectories(const std::string& paths);
 std::string joinPythonPluginDirectories(const std::vector<std::filesystem::path>& paths);
 

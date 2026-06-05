@@ -3,6 +3,7 @@
   "name": "Chamfer Tool",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "ui",
   "entry": "main.py",
   "description": "Chamfers selected vertex or edge handles through the Python v2 API.",
   "author": "TrenchBroom"

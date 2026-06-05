@@ -3,6 +3,7 @@
   "name": "Texture Browser",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "ui",
   "entry": "main.py",
   "description": "Lists loaded material collections and their first materials.",
   "author": "TrenchBroom"

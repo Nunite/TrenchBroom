@@ -39,6 +39,35 @@ PythonPluginManifestResult errorResult(
 {
   return {std::nullopt, PythonPluginManifestError{path, std::move(message)}};
 }
+
+PythonPluginManifestResult parsePluginType(
+  const std::filesystem::path& path, const QJsonObject& object, PythonPluginType& type)
+{
+  const auto value = object.value(QStringLiteral("pluginType"));
+  if (value.isUndefined())
+  {
+    type = PythonPluginType::Script;
+    return {};
+  }
+  if (!value.isString())
+  {
+    return errorResult(path, "Invalid manifest field: pluginType");
+  }
+
+  const auto pluginType = value.toString().toLower();
+  if (pluginType == QStringLiteral("ui"))
+  {
+    type = PythonPluginType::Ui;
+    return {};
+  }
+  if (pluginType == QStringLiteral("script"))
+  {
+    type = PythonPluginType::Script;
+    return {};
+  }
+
+  return errorResult(path, "Unsupported Python plugin pluginType");
+}
 } // namespace
 
 PythonPluginManifestResult loadPythonPluginManifest(
@@ -92,11 +121,18 @@ PythonPluginManifestResult loadPythonPluginManifest(
     return errorResult(path, "Unsupported Python plugin apiVersion");
   }
 
+  auto pluginType = PythonPluginType::Script;
+  if (auto result = parsePluginType(path, object, pluginType); result.error)
+  {
+    return result;
+  }
+
   auto manifest = PythonPluginManifest{};
   manifest.id = std::move(*id);
   manifest.name = std::move(*name);
   manifest.version = std::move(*version);
   manifest.apiVersion = apiVersion;
+  manifest.pluginType = pluginType;
   manifest.entry = std::filesystem::path{std::move(*entry)};
   manifest.description = optionalString(object, "description");
   manifest.author = optionalString(object, "author");
@@ -108,6 +144,18 @@ PythonPluginManifestResult loadPythonPluginManifest(
   }
 
   return {std::move(manifest), std::nullopt};
+}
+
+std::string pythonPluginTypeName(const PythonPluginType type)
+{
+  switch (type)
+  {
+  case PythonPluginType::Script:
+    return "script";
+  case PythonPluginType::Ui:
+    return "ui";
+  }
+  return "script";
 }
 
 std::vector<std::filesystem::path> splitPythonPluginDirectories(const std::string& paths)

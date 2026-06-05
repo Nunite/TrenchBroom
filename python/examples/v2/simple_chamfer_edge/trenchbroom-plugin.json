@@ -3,6 +3,7 @@
   "name": "Simple Chamfer Edge",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "script",
   "entry": "main.py",
   "description": "Runs a simple edge chamfer using selected edge handles.",
   "author": "TrenchBroom"

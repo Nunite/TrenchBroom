@@ -22,6 +22,7 @@ TEST_CASE("PythonPluginManifest")
         "name": "Codex Test",
         "version": "1.0.0",
         "apiVersion": 2,
+        "pluginType": "ui",
         "entry": "main.py",
         "description": "Test plugin",
         "author": "Codex"
@@ -31,7 +32,49 @@ TEST_CASE("PythonPluginManifest")
     REQUIRE(result.manifest.has_value());
     CHECK(result.manifest->id == "codex.test");
     CHECK(result.manifest->entry == std::filesystem::path{"main.py"});
+    CHECK(result.manifest->pluginType == PythonPluginType::Ui);
     CHECK_FALSE(result.error.has_value());
+  }
+
+  SECTION("loads script manifests as script-only by default")
+  {
+    env.createDirectory("script");
+    env.createFile("script/main.py", "print('ok')\n");
+    env.createFile(
+      "script/trenchbroom-plugin.json",
+      R"({
+        "id": "codex.script",
+        "name": "Codex Script",
+        "version": "1.0.0",
+        "apiVersion": 2,
+        "entry": "main.py"
+      })");
+
+    auto result = loadPythonPluginManifest(env.dir() / "script");
+    REQUIRE(result.manifest.has_value());
+    CHECK(result.manifest->pluginType == PythonPluginType::Script);
+    CHECK_FALSE(result.error.has_value());
+  }
+
+  SECTION("rejects invalid plugin types")
+  {
+    env.createDirectory("invalid_type");
+    env.createFile("invalid_type/main.py", "print('ok')\n");
+    env.createFile(
+      "invalid_type/trenchbroom-plugin.json",
+      R"({
+        "id": "codex.invalid_type",
+        "name": "Codex Invalid Type",
+        "version": "1.0.0",
+        "apiVersion": 2,
+        "pluginType": "service",
+        "entry": "main.py"
+      })");
+
+    auto result = loadPythonPluginManifest(env.dir() / "invalid_type");
+    CHECK_FALSE(result.manifest.has_value());
+    REQUIRE(result.error.has_value());
+    CHECK(result.error->message.find("pluginType") != std::string::npos);
   }
 
   SECTION("reports missing required fields")
@@ -63,6 +106,7 @@ TEST_CASE("PythonPluginManifest")
         "name": "One",
         "version": "1.0.0",
         "apiVersion": 2,
+        "pluginType": "ui",
         "entry": "main.py"
       })");
 
@@ -75,6 +119,7 @@ TEST_CASE("PythonPluginManifest")
         "name": "Two",
         "version": "1.0.0",
         "apiVersion": 2,
+        "pluginType": "ui",
         "entry": "main.py"
       })");
 
@@ -85,6 +130,29 @@ TEST_CASE("PythonPluginManifest")
     CHECK(manager.plugins()[0].manifest.id == "codex.one");
     CHECK(manager.plugins()[1].manifest.id == "codex.two");
     CHECK(manager.errors().empty());
+  }
+
+  SECTION("manager reports script-only manifests without loading them as UI plugins")
+  {
+    env.createDirectory("script");
+    env.createFile("script/main.py", "print('script')\n");
+    env.createFile(
+      "script/trenchbroom-plugin.json",
+      R"({
+        "id": "codex.script",
+        "name": "Script",
+        "version": "1.0.0",
+        "apiVersion": 2,
+        "pluginType": "script",
+        "entry": "main.py"
+      })");
+
+    auto manager = PythonPluginManager{};
+    manager.reload({env.dir() / "script"});
+
+    CHECK(manager.plugins().empty());
+    REQUIRE(manager.errors().size() == 1u);
+    CHECK(manager.errors()[0].message.find("Run Python Script") != std::string::npos);
   }
 
   SECTION("manager tolerates missing plugin directories")

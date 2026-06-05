@@ -418,6 +418,7 @@ panel.add_button("Run", lambda: print("run"))
         "name": "Codex Reload",
         "version": "1.0.0",
         "apiVersion": 2,
+        "pluginType": "ui",
         "entry": "main.py"
       })");
     env.createFile(

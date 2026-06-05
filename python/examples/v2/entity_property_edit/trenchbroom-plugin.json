@@ -3,6 +3,7 @@
   "name": "V2 Entity Property Edit",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "script",
   "entry": "main.py",
   "description": "Edits a worldspawn property through the transactional v2 API.",
   "author": "TrenchBroom"

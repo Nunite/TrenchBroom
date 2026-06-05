@@ -153,6 +153,7 @@ with open("python-v2-smoke-ok.txt", "w", encoding="utf-8") as f:
         "name": "Codex V2",
         "version": "1.0.0",
         "apiVersion": 2,
+        "pluginType": "ui",
         "entry": "main.py"
       })");
     env.createFile(
@@ -230,6 +231,7 @@ print("hello stderr", file=sys.stderr)
         "name": "Codex V2 Failure",
         "version": "1.0.0",
         "apiVersion": 2,
+        "pluginType": "ui",
         "entry": "main.py"
       })");
     env.createFile(
@@ -339,6 +341,7 @@ tb._cached_entity.classname
         "name": "Codex V2 Timer",
         "version": "1.0.0",
         "apiVersion": 2,
+        "pluginType": "ui",
         "entry": "main.py"
       })");
     env.createFile(
@@ -387,6 +390,7 @@ tb.set_interval(on_timer, 10)
         "name": "Codex V2 Timer Failure",
         "version": "1.0.0",
         "apiVersion": 2,
+        "pluginType": "ui",
         "entry": "main.py"
       })");
     env.createFile(
@@ -440,6 +444,7 @@ tb.set_timeout(on_timer, 10)
         "name": "Codex V2 Controls",
         "version": "1.0.0",
         "apiVersion": 2,
+        "pluginType": "ui",
         "entry": "main.py"
       })");
     env.createFile(
@@ -910,21 +915,17 @@ assert face.surface_value == 3.5
     CHECK(face.attributes().surfaceValue() == std::optional<float>{3.5f});
   }
 
-  SECTION("loads v2 brush builder example plugin")
+  SECTION("runs v2 brush builder example script")
   {
     const auto pluginDir = std::filesystem::path{"python/examples/v2/brush_builder"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
 
-    auto manager = PythonPluginManager{};
-    manager.reload({pluginDir});
-    REQUIRE(manager.errors().empty());
-    REQUIRE(manager.plugins().size() == 1u);
-    REQUIRE(manager.loadPlugins(window));
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(PythonScripting::instance().runScript(window, pluginDir / "main.py"));
 
     const auto& selectedBrushes = window.document().map().selection().brushes;
     REQUIRE(selectedBrushes.size() == 1u);
     CHECK(selectedBrushes.front()->brush().faceCount() == 6u);
-    manager.unloadPlugins(window);
   }
 
   SECTION("loads v2 brush manager example plugin")
@@ -1063,7 +1064,7 @@ assert face.surface_value == 3.5
     manager.unloadPlugins(window);
   }
 
-  SECTION("loads v2 event callback example plugin")
+  SECTION("runs v2 event callback example script")
   {
     auto& map = window.document().map();
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
@@ -1075,16 +1076,11 @@ assert face.surface_value == 3.5
     const auto pluginDir = std::filesystem::path{"python/examples/v2/event_callback"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
 
-    auto manager = PythonPluginManager{};
-    manager.reload({pluginDir});
-    REQUIRE(manager.errors().empty());
-    REQUIRE(manager.plugins().size() == 1u);
     CAPTURE(PythonRuntime::instance().lastError());
-    REQUIRE(manager.loadPlugins(window));
+    REQUIRE(PythonScripting::instance().runScript(window, pluginDir / "main.py"));
 
     PythonRuntime::instance().emitEvent("selection_changed", window);
     CHECK(PythonRuntime::instance().lastError().empty());
-    manager.unloadPlugins(window);
   }
 
   SECTION("loads v2 advanced panel example plugin")
@@ -1307,7 +1303,7 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     manager.unloadPlugins(window);
   }
 
-  SECTION("loads v2 print selected vertices example plugin")
+  SECTION("runs v2 print selected vertices example script")
   {
     auto& map = window.document().map();
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
@@ -1320,12 +1316,8 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
       std::filesystem::path{"python/examples/v2/print_selected_vertices"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
 
-    auto manager = PythonPluginManager{};
-    manager.reload({pluginDir});
-    REQUIRE(manager.errors().empty());
-    REQUIRE(manager.plugins().size() == 1u);
-    REQUIRE(manager.loadPlugins(window));
-    manager.unloadPlugins(window);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(PythonScripting::instance().runScript(window, pluginDir / "main.py"));
   }
 
   SECTION("loads v2 plane builder example plugin")
@@ -1349,7 +1341,7 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     manager.unloadPlugins(window);
   }
 
-  SECTION("loads v2 spin entity generator example plugin")
+  SECTION("runs v2 spin entity generator example script")
   {
     auto& map = window.document().map();
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
@@ -1378,13 +1370,9 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
       std::filesystem::path{"python/examples/v2/generator_spin_entity"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
 
-    auto manager = PythonPluginManager{};
-    manager.reload({pluginDir});
-    REQUIRE(manager.errors().empty());
-    REQUIRE(manager.plugins().size() == 1u);
-    REQUIRE(manager.loadPlugins(window));
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(PythonScripting::instance().runScript(window, pluginDir / "main.py"));
     CHECK(map.selection().nodes.size() == 1u);
-    manager.unloadPlugins(window);
   }
 
   SECTION("loads v2 chamfer example plugins")
@@ -1425,11 +1413,8 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
 
     const auto simpleChamferDir =
       std::filesystem::path{"python/examples/v2/simple_chamfer_edge"};
-    manager.reload({simpleChamferDir});
-    REQUIRE(manager.errors().empty());
-    REQUIRE(manager.plugins().size() == 1u);
-    REQUIRE(manager.loadPlugins(window));
-    manager.unloadPlugins(window);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(PythonScripting::instance().runScript(window, simpleChamferDir / "main.py"));
   }
 
   SECTION("loads v2 transform tool example plugin")
@@ -1535,7 +1520,7 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     manager.unloadPlugins(window);
   }
 
-  SECTION("loads v2 entity brush modifier example plugin")
+  SECTION("runs v2 entity brush modifier example script")
   {
     auto& map = window.document().map();
     auto entity = mdl::Entity{};
@@ -1559,17 +1544,12 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
       std::filesystem::path{"python/examples/v2/entity_brush_modifier"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
 
-    auto manager = PythonPluginManager{};
-    manager.reload({pluginDir});
-    REQUIRE(manager.errors().empty());
-    REQUIRE(manager.plugins().size() == 1u);
     CAPTURE(PythonRuntime::instance().lastError());
-    REQUIRE(manager.loadPlugins(window));
+    REQUIRE(PythonScripting::instance().runScript(window, pluginDir / "main.py"));
 
     const auto newOffset = brushNode->brush().face(0).attributes().offset();
     CHECK(newOffset.x() == oldOffset.x() + 16.0f);
     CHECK(newOffset.y() == oldOffset.y());
-    manager.unloadPlugins(window);
   }
 
   SECTION("runs v2 hello panel through legacy script entry")

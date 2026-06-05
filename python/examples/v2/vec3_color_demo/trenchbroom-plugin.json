@@ -3,6 +3,7 @@
   "name": "Vec3 & Color Demo",
   "version": "1.0.0",
   "apiVersion": 2,
+  "pluginType": "ui",
   "entry": "main.py",
   "description": "Demonstrates Vec3 math, panel fields, and applying _color to selection.",
   "author": "TrenchBroom"
