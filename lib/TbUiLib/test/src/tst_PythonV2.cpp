@@ -1186,6 +1186,30 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     CHECK(env.loadFile("python-v2-html-link-ok.txt") == "tb://history/456");
   }
 
+  SECTION("loads v2 git plugin example")
+  {
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/git_plugin"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+    auto* noDocMessage =
+      panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_no_doc_msg"));
+    REQUIRE(noDocMessage != nullptr);
+    CHECK(noDocMessage->text().contains(QStringLiteral("Please save the map")));
+
+    manager.unloadPlugins(window);
+    QApplication::processEvents();
+  }
+
   SECTION("loads v2 vec3 color demo example plugin")
   {
     auto& map = window.document().map();

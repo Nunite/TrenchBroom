@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.git_plugin",
+  "name": "Git Manager",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Provides local Git status, commit, branch, and history tools in a plugin panel.",
+  "author": "TrenchBroom"
+}

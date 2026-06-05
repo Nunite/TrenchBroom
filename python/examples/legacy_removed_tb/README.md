@@ -23,3 +23,4 @@ Migrated examples:
 - `ui_brush_manager.py` -> `python/examples/v2/brush_manager`
 - `event_system_demo.py` -> `python/examples/v2/event_callback`
 - `ui_advanced_panel_demo.py` -> `python/examples/v2/advanced_panel`
+- `git_plugin.py` -> `python/examples/v2/git_plugin`
