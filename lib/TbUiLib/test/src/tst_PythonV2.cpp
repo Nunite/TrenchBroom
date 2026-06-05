@@ -472,6 +472,52 @@ panel.add_combo_box(["a", "b"], 0, lambda value: open("python-v2-combo-ok.txt", 
     CHECK_FALSE(std::filesystem::exists(env.dir() / "python-v2-button-ok.txt"));
   }
 
+  SECTION("creates named plugin panel fields")
+  {
+    auto env = fs::TestEnvironment{};
+    auto currentPathGuard = CurrentPathGuard{env.dir()};
+    env.createFile(
+      "fields.py",
+      R"(
+import tb2 as tb
+
+panel = tb.create_plugin_panel("Fields")
+panel.add_label_named("status", "Ready")
+panel.set_label_text("status", "Updated")
+panel.add_text_field("name", "Name", "world", "placeholder")
+panel.add_int_field("count", "Count", 7, 1, 16)
+panel.add_float_field("scale", "Scale", 0.5, 0.1, 2.0, 2, 0.1)
+panel.add_combo_box("texture", "Texture", ["a", "b"], current="b")
+panel.add_checkbox("enabled", "Enabled", True)
+assert panel.get_text_field("name") == "world"
+assert panel.get_int_field("count") == 7
+assert panel.get_float_field("scale") == 0.5
+assert panel.get_combo_box_text("texture") == "b"
+assert panel.get_checkbox("enabled") is True
+panel.add_button_callback("Write", lambda: open("fields-ok.txt", "w", encoding="utf-8").write(panel.get_text_field("name")))
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "fields.py";
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+    auto* label = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_status"));
+    REQUIRE(label != nullptr);
+    CHECK(label->text() == QStringLiteral("Updated"));
+    auto* button = panel->findChild<QPushButton*>();
+    REQUIRE(button != nullptr);
+    button->click();
+    CHECK(env.loadFile("fields-ok.txt") == "world");
+  }
+
   SECTION("edits entity properties transactionally")
   {
     auto env = fs::TestEnvironment{};
@@ -665,6 +711,53 @@ assert face.surface_value == 3.5
     const auto& selectedBrushes = window.document().map().selection().brushes;
     REQUIRE(selectedBrushes.size() == 1u);
     CHECK(selectedBrushes.front()->brush().faceCount() == 6u);
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 texture replacer example plugin")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "old") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/texture_replacer"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+    auto* find = panel->findChild<QLineEdit*>(QStringLiteral("tb2_panel_text_find"));
+    auto* replace =
+      panel->findChild<QLineEdit*>(QStringLiteral("tb2_panel_text_replace"));
+    REQUIRE(find != nullptr);
+    REQUIRE(replace != nullptr);
+    find->setText(QStringLiteral("old"));
+    replace->setText(QStringLiteral("new"));
+
+    const auto buttons = panel->findChildren<QPushButton*>();
+    auto* button = static_cast<QPushButton*>(nullptr);
+    for (auto* candidate : buttons)
+    {
+      if (candidate->text() == QStringLiteral("Replace All in Selection"))
+      {
+        button = candidate;
+      }
+    }
+    REQUIRE(button != nullptr);
+    button->click();
+    auto* status = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_status"));
+    REQUIRE(status != nullptr);
+    CAPTURE(status->text().toStdString());
+    CHECK(brushNode->brush().face(0).attributes().materialName() == "new");
     manager.unloadPlugins(window);
   }
 

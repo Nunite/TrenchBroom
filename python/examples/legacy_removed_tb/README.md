@@ -8,3 +8,4 @@ Use the manifest examples in `python/examples/v2` for runnable plugins.
 Migrated examples:
 
 - `brush_builder.py` -> `python/examples/v2/brush_builder`
+- `texture_replacer.py` -> `python/examples/v2/texture_replacer`

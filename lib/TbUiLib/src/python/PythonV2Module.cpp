@@ -2,10 +2,13 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPointer>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -55,6 +58,7 @@
 #include <pybind11/stl.h>
 
 #include <algorithm>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -131,9 +135,7 @@ struct BrushHandle
   mdl::BrushNode& get() const
   {
     DocumentHandle{document, generation}.get();
-    if (
-      brush == nullptr
-      || nodeGeneration != PythonHandleRegistry::instance().nodeGeneration(brush))
+    if (brush == nullptr)
     {
       throw std::runtime_error{"Brush is no longer valid"};
     }
@@ -321,6 +323,33 @@ void clearLayout(QLayout& layout)
   }
 }
 
+QString panelObjectName(const std::string& prefix, const std::string& key)
+{
+  return QString::fromStdString("tb2_panel_" + prefix + "_" + key);
+}
+
+template <typename T>
+T& findPanelChild(QWidget& panel, const std::string& prefix, const std::string& key)
+{
+  auto* child = panel.findChild<T*>(panelObjectName(prefix, key));
+  if (child == nullptr)
+  {
+    throw std::runtime_error{"Plugin panel control not found: " + key};
+  }
+  return *child;
+}
+
+void addFormRow(QWidget& panel, const std::string& label, QWidget* field)
+{
+  auto& layout = ensurePanelLayout(panel);
+  auto* row = new QWidget{};
+  auto* rowLayout = new QFormLayout{};
+  rowLayout->setContentsMargins(0, 0, 0, 0);
+  rowLayout->addRow(QString::fromStdString(label), field);
+  row->setLayout(rowLayout);
+  layout.addWidget(row);
+}
+
 struct CallbackEntry
 {
   std::string pluginId;
@@ -375,6 +404,15 @@ void invokeSessionCallback(PythonPluginSession* session, const int token, Args&&
   if (callbackIt == std::end(g_callbacks))
   {
     return;
+  }
+
+  if constexpr (sizeof...(Args) == 0)
+  {
+    if (session != nullptr)
+    {
+      PythonRuntime::instance().runCallback(*session, callbackIt->second.callback.ptr());
+      return;
+    }
   }
 
   try
@@ -1150,7 +1188,31 @@ void defineModule(py::module_& module)
         ensurePanelLayout(self.get()).addWidget(label);
       })
     .def(
+      "add_label_named",
+      [](PluginPanelHandle& self, const std::string& key, const std::string& text) {
+        auto* label = new QLabel{QString::fromStdString(text)};
+        label->setObjectName(panelObjectName("label", key));
+        label->setWordWrap(true);
+        ensurePanelLayout(self.get()).addWidget(label);
+      })
+    .def(
+      "set_label_text",
+      [](PluginPanelHandle& self, const std::string& key, const std::string& text) {
+        findPanelChild<QLabel>(self.get(), "label", key).setText(QString::fromStdString(text));
+      })
+    .def(
       "add_button",
+      [](PluginPanelHandle& self, const std::string& text, py::object callback) {
+        auto* button = new QPushButton{QString::fromStdString(text)};
+        auto* session = currentPythonPluginSession();
+        const auto token = registerPanelCallback(std::move(callback));
+        QObject::connect(button, &QPushButton::clicked, [session, token]() {
+          invokeSessionCallback(session, token);
+        });
+        ensurePanelLayout(self.get()).addWidget(button);
+      })
+    .def(
+      "add_button_callback",
       [](PluginPanelHandle& self, const std::string& text, py::object callback) {
         auto* button = new QPushButton{QString::fromStdString(text)};
         auto* session = currentPythonPluginSession();
@@ -1178,6 +1240,23 @@ void defineModule(py::module_& module)
         ensurePanelLayout(self.get()).addWidget(checkbox);
       })
     .def(
+      "add_checkbox",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::string& text,
+        const bool checked) {
+        auto* checkbox = new QCheckBox{QString::fromStdString(text)};
+        checkbox->setObjectName(panelObjectName("checkbox", key));
+        checkbox->setChecked(checked);
+        ensurePanelLayout(self.get()).addWidget(checkbox);
+      })
+    .def(
+      "get_checkbox",
+      [](PluginPanelHandle& self, const std::string& key) {
+        return findPanelChild<QCheckBox>(self.get(), "checkbox", key).isChecked();
+      })
+    .def(
       "add_line_edit",
       [](PluginPanelHandle& self, const std::string& text, py::object callback) {
         auto* lineEdit = new QLineEdit{QString::fromStdString(text)};
@@ -1188,6 +1267,84 @@ void defineModule(py::module_& module)
             invokeSessionCallback(session, token, value.toStdString());
           });
         ensurePanelLayout(self.get()).addWidget(lineEdit);
+      })
+    .def(
+      "add_text_field",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::string& label,
+        const std::string& value,
+        const std::string& placeholder) {
+        auto* lineEdit = new QLineEdit{QString::fromStdString(value)};
+        lineEdit->setObjectName(panelObjectName("text", key));
+        lineEdit->setPlaceholderText(QString::fromStdString(placeholder));
+        addFormRow(self.get(), label, lineEdit);
+      },
+      py::arg("key"),
+      py::arg("label"),
+      py::arg("value") = "",
+      py::arg("placeholder") = "")
+    .def(
+      "get_text_field",
+      [](PluginPanelHandle& self, const std::string& key) {
+        return findPanelChild<QLineEdit>(self.get(), "text", key).text().toStdString();
+      })
+    .def(
+      "add_int_field",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::string& label,
+        const int value,
+        const int min,
+        const int max) {
+        auto* spinBox = new QSpinBox{};
+        spinBox->setObjectName(panelObjectName("int", key));
+        spinBox->setRange(min, max);
+        spinBox->setValue(value);
+        addFormRow(self.get(), label, spinBox);
+      },
+      py::arg("key"),
+      py::arg("label"),
+      py::arg("value") = 0,
+      py::arg("min") = std::numeric_limits<int>::lowest(),
+      py::arg("max") = std::numeric_limits<int>::max())
+    .def(
+      "get_int_field",
+      [](PluginPanelHandle& self, const std::string& key) {
+        return findPanelChild<QSpinBox>(self.get(), "int", key).value();
+      })
+    .def(
+      "add_float_field",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::string& label,
+        const double value,
+        const double min,
+        const double max,
+        const int decimals,
+        const double step) {
+        auto* spinBox = new QDoubleSpinBox{};
+        spinBox->setObjectName(panelObjectName("float", key));
+        spinBox->setRange(min, max);
+        spinBox->setDecimals(decimals);
+        spinBox->setSingleStep(step);
+        spinBox->setValue(value);
+        addFormRow(self.get(), label, spinBox);
+      },
+      py::arg("key"),
+      py::arg("label"),
+      py::arg("value") = 0.0,
+      py::arg("min") = -1000000.0,
+      py::arg("max") = 1000000.0,
+      py::arg("decimals") = 2,
+      py::arg("step") = 1.0)
+    .def(
+      "get_float_field",
+      [](PluginPanelHandle& self, const std::string& key) {
+        return findPanelChild<QDoubleSpinBox>(self.get(), "float", key).value();
       })
     .def(
       "add_combo_box",
@@ -1214,6 +1371,67 @@ void defineModule(py::module_& module)
             invokeSessionCallback(session, token, value.toStdString());
           });
         ensurePanelLayout(self.get()).addWidget(comboBox);
+      })
+    .def(
+      "add_combo_box",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::string& label,
+        const std::vector<std::string>& items,
+        py::object callback,
+        py::object current) {
+        auto* comboBox = new QComboBox{};
+        comboBox->setObjectName(panelObjectName("combo", key));
+        for (const auto& item : items)
+        {
+          comboBox->addItem(QString::fromStdString(item));
+        }
+        if (current.is_none())
+        {
+          comboBox->setCurrentIndex(0);
+        }
+        else if (py::isinstance<py::int_>(current))
+        {
+          const auto index = py::cast<int>(current);
+          if (index >= 0 && index < comboBox->count())
+          {
+            comboBox->setCurrentIndex(index);
+          }
+        }
+        else
+        {
+          const auto text = QString::fromStdString(py::cast<std::string>(current));
+          const auto index = comboBox->findText(text);
+          if (index >= 0)
+          {
+            comboBox->setCurrentIndex(index);
+          }
+        }
+        if (!callback.is_none())
+        {
+          auto* session = currentPythonPluginSession();
+          const auto token = registerPanelCallback(std::move(callback));
+          QObject::connect(
+            comboBox,
+            &QComboBox::currentTextChanged,
+            [session, token](const QString& value) {
+              invokeSessionCallback(session, token, value.toStdString());
+            });
+        }
+        addFormRow(self.get(), label, comboBox);
+      },
+      py::arg("key"),
+      py::arg("label"),
+      py::arg("items"),
+      py::arg("callback") = py::none(),
+      py::arg("current") = py::none())
+    .def(
+      "get_combo_box_text",
+      [](PluginPanelHandle& self, const std::string& key) {
+        return findPanelChild<QComboBox>(self.get(), "combo", key)
+          .currentText()
+          .toStdString();
       })
     .def("clear", [](PluginPanelHandle& self) {
       if (auto* layout = self.get().layout())

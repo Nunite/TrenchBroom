@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.texture_replacer",
+  "name": "Texture Replacer",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Replaces matching face materials on selected brushes.",
+  "author": "TrenchBroom"
+}
