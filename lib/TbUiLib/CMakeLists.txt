@@ -209,6 +209,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartModelEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartPropertyEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartPropertyEditorManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartSkyboxEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartWadEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SpinControl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Splitter.cpp
@@ -464,6 +465,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartModelEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartPropertyEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartPropertyEditorManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartSkyboxEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartWadEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SpinControl.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Splitter.h
