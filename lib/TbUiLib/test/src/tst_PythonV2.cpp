@@ -11,7 +11,11 @@
 #include "Result.h"
 #include "fs/TestEnvironment.h"
 #include "gl/GlManager.h"
+#include "gl/Material.h"
+#include "gl/MaterialCollection.h"
+#include "gl/MaterialManager.h"
 #include "gl/ResourceManager.h"
+#include "gl/TextureResource.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
@@ -114,6 +118,7 @@ doc = tb.current_document()
 assert doc is not None
 assert len(doc.entities) >= 1
 assert isinstance(doc.materials, list)
+assert isinstance(doc.material_collections, list)
 with doc.transaction("v2 smoke"):
     pass
 with open("python-v2-smoke-ok.txt", "w", encoding="utf-8") as f:
@@ -961,6 +966,40 @@ assert face.surface_value == 3.5
     REQUIRE(status != nullptr);
     CAPTURE(status->text().toStdString());
     CHECK(brushNode->brush().face(0).attributes().materialName() == "new");
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 texture browser example plugin")
+  {
+    auto material =
+      gl::Material{"example/stone", gl::createTextureResource(gl::Texture{64u, 32u})};
+    auto materials = std::vector<gl::Material>{};
+    materials.push_back(std::move(material));
+    auto collections = std::vector<gl::MaterialCollection>{};
+    collections.emplace_back(
+      std::filesystem::path{"textures/example"}, std::move(materials));
+    window.document().map().materialManager().setMaterialCollections(
+      std::move(collections));
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/texture_browser"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+    auto* status = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_status"));
+    REQUIRE(status != nullptr);
+    const auto text = status->text();
+    CAPTURE(text.toStdString());
+    CHECK(text.contains(QStringLiteral("textures/example")));
+    CHECK(text.contains(QStringLiteral("example/stone (64x32)")));
     manager.unloadPlugins(window);
   }
 

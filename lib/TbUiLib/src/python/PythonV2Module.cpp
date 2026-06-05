@@ -255,6 +255,20 @@ struct MaterialHandle
   }
 };
 
+struct MaterialCollectionHandle
+{
+  const gl::MaterialCollection* collection = nullptr;
+
+  const gl::MaterialCollection& get() const
+  {
+    if (collection == nullptr)
+    {
+      throw std::runtime_error{"Material collection is no longer valid"};
+    }
+    return *collection;
+  }
+};
+
 struct TransactionHandle
 {
   MapDocument* document = nullptr;
@@ -1473,6 +1487,18 @@ void defineModule(py::module_& module)
         }
         return result;
       })
+    .def_property_readonly(
+      "material_collections",
+      [](DocumentHandle& self) {
+        auto result = std::vector<MaterialCollectionHandle>{};
+        const auto& collections = self.get().map().materialManager().collections();
+        result.reserve(collections.size());
+        for (const auto& collection : collections)
+        {
+          result.push_back(MaterialCollectionHandle{&collection});
+        }
+        return result;
+      })
     .def("vertex_tool_vertices", vertexToolVertices)
     .def(
       "transaction",
@@ -1661,6 +1687,8 @@ void defineModule(py::module_& module)
   py::class_<MaterialHandle>(module, "Material")
     .def_property_readonly("name", [](MaterialHandle& self) { return self.get().name(); })
     .def_property_readonly(
+      "collection_name", [](MaterialHandle& self) { return self.get().collectionName(); })
+    .def_property_readonly(
       "width",
       [](MaterialHandle& self) {
         const auto* texture = self.get().texture();
@@ -1669,6 +1697,27 @@ void defineModule(py::module_& module)
     .def_property_readonly("height", [](MaterialHandle& self) {
       const auto* texture = self.get().texture();
       return texture != nullptr ? texture->height() : 0u;
+    });
+
+  py::class_<MaterialCollectionHandle>(module, "MaterialCollection")
+    .def_property_readonly(
+      "name",
+      [](MaterialCollectionHandle& self) { return self.get().path().generic_string(); })
+    .def_property_readonly(
+      "path",
+      [](MaterialCollectionHandle& self) { return self.get().path().generic_string(); })
+    .def_property_readonly(
+      "material_count",
+      [](MaterialCollectionHandle& self) { return self.get().materialCount(); })
+    .def_property_readonly("materials", [](MaterialCollectionHandle& self) {
+      auto result = std::vector<MaterialHandle>{};
+      const auto& materials = self.get().materials();
+      result.reserve(materials.size());
+      for (const auto& material : materials)
+      {
+        result.push_back(MaterialHandle{&material});
+      }
+      return result;
     });
 
   py::class_<TransactionHandle>(module, "Transaction")

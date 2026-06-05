@@ -19,3 +19,4 @@ Migrated examples:
 - `ui_transform_tool.py` -> `python/examples/v2/transform_tool`
 - `ui_distribute_tool.py` -> `python/examples/v2/distribute_tool`
 - `entity_brush_modifier.py` -> `python/examples/v2/entity_brush_modifier`
+- `texture_browser_demo.py` -> `python/examples/v2/texture_browser`

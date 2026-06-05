@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.texture_browser",
+  "name": "Texture Browser",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Lists loaded material collections and their first materials.",
+  "author": "TrenchBroom"
+}
