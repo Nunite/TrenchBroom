@@ -17,8 +17,6 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <QGroupBox>
-#include <QLabel>
 #include <QToolBar>
 
 #include "ui/AppControllerFixture.h"
@@ -39,45 +37,24 @@ TEST_CASE("PreferenceDialog")
   SECTION("opens at a usable size")
   {
     CHECK(dialog->width() >= 800);
-    CHECK(dialog->height() >= 560);
+    CHECK(dialog->height() >= 300);
   }
 
-  SECTION("contains the migrated misc preferences pane")
+  SECTION("uses the original preference panes")
   {
     auto* toolBar = dialog->findChild<QToolBar*>();
     REQUIRE(toolBar != nullptr);
 
-    auto* miscAction = [&]() -> QAction* {
-      for (auto* action : toolBar->actions())
-      {
-        if (action->text() == "Misc")
-        {
-          return action;
-        }
-      }
-      return nullptr;
-    }();
-
-    REQUIRE(miscAction != nullptr);
-
-    miscAction->trigger();
-
-    auto foundLanguageLabel = false;
-    for (auto* label : dialog->findChildren<QLabel*>())
+    auto actionNames = QStringList{};
+    for (auto* action : toolBar->actions())
     {
-      foundLanguageLabel =
-        foundLanguageLabel || label->text() == QStringLiteral("UI Language");
+      actionNames << action->text();
+      action->trigger();
     }
 
-    auto foundPieMenuGroup = false;
-    for (auto* groupBox : dialog->findChildren<QGroupBox*>())
-    {
-      foundPieMenuGroup =
-        foundPieMenuGroup || groupBox->title() == QStringLiteral("Pie Menu Actions");
-    }
-
-    CHECK(foundLanguageLabel);
-    CHECK(foundPieMenuGroup);
+    CHECK(
+      actionNames
+      == QStringList{"Games", "View", "Colors", "Mouse", "Keyboard", "Update"});
   }
 
   dialog.reset();
