@@ -1441,6 +1441,12 @@ void emitEvent(const std::string& eventName)
   }
 }
 
+bool hasEventCallbacks(const std::string& eventName)
+{
+  const auto eventIt = g_eventCallbacks.find(eventName);
+  return eventIt != std::end(g_eventCallbacks) && !eventIt->second.empty();
+}
+
 void cleanupPlugin(const std::string& pluginId)
 {
   auto tokensToRemove = std::vector<int>{};
@@ -2375,6 +2381,7 @@ void defineModule(py::module_& module)
   module.def("clear_interval", clearInterval);
   module.def("set_timeout", setTimeout);
   module.def("_emit_event", emitEvent);
+  module.def("_has_event_callbacks", hasEventCallbacks);
   module.def("_cleanup_plugin", cleanupPlugin);
   module.def("_cleanup_plugin_session", [](py::capsule sessionCapsule) {
     cleanupPluginSession(

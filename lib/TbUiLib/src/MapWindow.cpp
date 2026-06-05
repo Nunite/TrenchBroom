@@ -945,7 +945,7 @@ void MapWindow::selectionDidChange(const mdl::SelectionChange&)
 {
   updateActionStateDelayed();
   updateStatusBarDelayed();
-  PythonRuntime::instance().emitEvent("selection_changed", *this);
+  PythonRuntime::instance().emitEvent("selection_changed", *this, false);
 }
 
 void MapWindow::currentLayerDidChange()

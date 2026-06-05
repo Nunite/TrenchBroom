@@ -410,6 +410,17 @@ bool PythonRuntime::runScript(
 
 void PythonRuntime::emitEvent(const std::string& eventName, MapWindow& mapWindow)
 {
+  emitEvent(eventName, mapWindow, true);
+}
+
+void PythonRuntime::emitEvent(
+  const std::string& eventName, MapWindow& mapWindow, const bool initializeIfNeeded)
+{
+  if (!initializeIfNeeded && !Py_IsInitialized())
+  {
+    return;
+  }
+
   if (!ensureInitialized())
   {
     return;
@@ -427,6 +438,17 @@ void PythonRuntime::emitEvent(const std::string& eventName, MapWindow& mapWindow
   auto* module = PyImport_ImportModule("tb2");
   if (module != nullptr)
   {
+    auto* hasCallbacks =
+      PyObject_CallMethod(module, "_has_event_callbacks", "s", eventName.c_str());
+    const auto shouldEmit = hasCallbacks != nullptr && PyObject_IsTrue(hasCallbacks) == 1;
+    Py_XDECREF(hasCallbacks);
+    if (!shouldEmit)
+    {
+      Py_DECREF(module);
+      PyGILState_Release(gil);
+      return;
+    }
+
     auto* result = PyObject_CallMethod(module, "_emit_event", "s", eventName.c_str());
     if (result == nullptr && context.logger)
     {

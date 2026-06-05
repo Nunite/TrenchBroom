@@ -19,6 +19,7 @@
 #include <cstring>
 #include <map>
 #include <optional>
+#include <unordered_map>
 
 namespace tb::ui
 {
@@ -41,6 +42,18 @@ bool endsWithIgnoreCase(const std::string& str, const char* suffix)
   const auto suffixLength = std::strlen(suffix);
   return str.size() >= suffixLength
          && kdl::ci::str_is_equal(str.substr(str.size() - suffixLength), suffix);
+}
+
+std::unordered_map<std::string, std::vector<SmartSkyboxItem>>& skyboxCache()
+{
+  static auto cache = std::unordered_map<std::string, std::vector<SmartSkyboxItem>>{};
+  return cache;
+}
+
+std::unordered_map<std::string, QIcon>& skyboxIconCache()
+{
+  static auto cache = std::unordered_map<std::string, QIcon>{};
+  return cache;
 }
 
 } // namespace
@@ -140,8 +153,9 @@ void SmartSkyboxEditor::createGui()
   layout->addWidget(m_refreshButton);
   layout->addWidget(m_listWidget);
 
-  connect(
-    m_refreshButton, &QPushButton::clicked, this, &SmartSkyboxEditor::reloadSkyboxes);
+  connect(m_refreshButton, &QPushButton::clicked, this, [this]() {
+    reloadSkyboxes(true);
+  });
   connect(m_listWidget, &QListWidget::itemClicked, this, &SmartSkyboxEditor::applySkybox);
 }
 
@@ -153,10 +167,16 @@ void SmartSkyboxEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>&)
   }
 }
 
-void SmartSkyboxEditor::reloadSkyboxes()
+void SmartSkyboxEditor::reloadSkyboxes(const bool force)
 {
   const auto currentRow = m_listWidget->currentRow();
-  m_skyboxes = findSmartSkyboxes(document().map().gameFileSystem());
+  const auto cacheKey = document().map().gamePath().generic_string();
+  auto& cache = skyboxCache();
+  if (force || !cache.contains(cacheKey))
+  {
+    cache[cacheKey] = findSmartSkyboxes(document().map().gameFileSystem());
+  }
+  m_skyboxes = cache[cacheKey];
 
   m_listWidget->clear();
   for (const auto& skybox : m_skyboxes)
@@ -193,7 +213,13 @@ QIcon SmartSkyboxEditor::iconForSkybox(const SmartSkyboxItem& skybox)
     return {};
   }
 
-  return QIcon{pathAsQPath(absPath.value())};
+  const auto key = absPath.value().generic_string();
+  auto& cache = skyboxIconCache();
+  if (!cache.contains(key))
+  {
+    cache.emplace(key, QIcon{pathAsQPath(absPath.value())});
+  }
+  return cache.at(key);
 }
 
 } // namespace tb::ui

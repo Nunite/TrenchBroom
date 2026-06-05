@@ -25,6 +25,8 @@ public:
   bool runScript(PythonPluginSession& session);
   void runCallback(PythonPluginSession& session, void* callback);
   void emitEvent(const std::string& eventName, MapWindow& mapWindow);
+  void emitEvent(
+    const std::string& eventName, MapWindow& mapWindow, bool initializeIfNeeded);
   void cleanupPlugin(const std::string& pluginId);
   void cleanupPluginSession(PythonPluginSession& session);
   void cleanupDocument(MapWindow& mapWindow);

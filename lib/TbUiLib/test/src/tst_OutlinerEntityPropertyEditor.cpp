@@ -23,12 +23,17 @@
 #include <QLineEdit>
 #include <QtTest/QTest>
 
+#include <map>
+
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
+#include "mdl/BrushNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/Node.h"
+#include "mdl/TestFactory.h"
 #include "mdl/WorldNode.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
@@ -166,12 +171,71 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     REQUIRE(skyboxEditor != nullptr);
 
     mdl::setEntityProperty(map, "skyname", "morning", false);
-    emit skyboxEditor->skyboxApplied();
+    const auto changedNodes = std::vector<mdl::Node*>{&map.worldNode()};
+    map.nodesDidChangeNotifier(changedNodes);
     processOutlinerUpdates();
 
     skynameEdit = propertyValueEdit(editor, "skyname");
     REQUIRE(skynameEdit != nullptr);
     CHECK(skynameEdit->text() == "morning");
+  }
+
+  SECTION("refreshes skyname when the selected worldspawn property changes externally")
+  {
+    mdl::selectNodes(map, std::vector<mdl::Node*>{&map.worldNode()});
+    mdl::setEntityProperty(map, "skyname", "2namek", false);
+    processOutlinerUpdates();
+
+    auto* skynameEdit = propertyValueEdit(editor, "skyname");
+    REQUIRE(skynameEdit != nullptr);
+    CHECK(skynameEdit->text() == "2namek");
+
+    mdl::setEntityProperty(map, "skyname", "morning", false);
+    const auto changedNodes = std::vector<mdl::Node*>{&map.worldNode()};
+    map.nodesDidChangeNotifier(changedNodes);
+    processOutlinerUpdates();
+
+    skynameEdit = propertyValueEdit(editor, "skyname");
+    REQUIRE(skynameEdit != nullptr);
+    CHECK(skynameEdit->text() == "morning");
+  }
+
+  SECTION("keeps expanded skybox editor available when selection still resolves to worldspawn")
+  {
+    mdl::selectNodes(map, std::vector<mdl::Node*>{&map.worldNode()});
+    mdl::setEntityProperty(map, "skyname", "2namek", false);
+    auto* brushNode = mdl::createBrushNode(map);
+    mdl::addNodes(
+      map,
+      std::map<mdl::Node*, std::vector<mdl::Node*>>{
+        {mdl::parentForNodes(map), {static_cast<mdl::Node*>(brushNode)}}});
+    processOutlinerUpdates();
+
+    auto* skyboxButton = static_cast<QAbstractButton*>(nullptr);
+    for (auto* button : propertyRowButtons(editor, "skyname"))
+    {
+      if (button->toolTip() == "Show skybox editor")
+      {
+        skyboxButton = button;
+        break;
+      }
+    }
+    REQUIRE(skyboxButton != nullptr);
+    QTest::mouseClick(skyboxButton, Qt::LeftButton);
+    processOutlinerUpdates();
+
+    auto* skyboxEditor = editor.findChild<SmartSkyboxEditor*>();
+    REQUIRE(skyboxEditor != nullptr);
+
+    mdl::selectNodes(map, std::vector<mdl::Node*>{static_cast<mdl::Node*>(brushNode)});
+    processOutlinerUpdates();
+    auto* selectedBrushSkyboxEditor = editor.findChild<SmartSkyboxEditor*>();
+    REQUIRE(selectedBrushSkyboxEditor != nullptr);
+
+    mdl::deselectAll(map);
+    processOutlinerUpdates();
+    auto* deselectedSkyboxEditor = editor.findChild<SmartSkyboxEditor*>();
+    REQUIRE(deselectedSkyboxEditor != nullptr);
   }
 
   SECTION("updates rows from MapDocument selection notifications")

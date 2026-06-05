@@ -67,6 +67,8 @@ private:
     void connectObservers();
     void scheduleUpdate(bool force = false);
     void updateFromSelection();
+    void refreshVisiblePropertyValues();
+    void refreshEmbeddedEditors();
 
     void rebuildPropertyRows(const std::vector<mdl::EntityNodeBase*>& entityNodes);
 };

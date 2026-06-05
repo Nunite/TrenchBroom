@@ -51,7 +51,7 @@ private:
   void createGui();
   void doUpdateVisual(const std::vector<mdl::EntityNodeBase*>& nodes) override;
 
-  void reloadSkyboxes();
+  void reloadSkyboxes(bool force = false);
   void applySkybox(QListWidgetItem* item);
   QIcon iconForSkybox(const SmartSkyboxItem& skybox);
 };

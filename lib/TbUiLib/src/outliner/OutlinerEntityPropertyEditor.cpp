@@ -390,10 +390,8 @@ void OutlinerEntityPropertyEditor::connectObservers()
         m_document.entityDefinitionsDidChangeNotifier.connect([this]() { scheduleUpdate(); });
     m_notifierConnection += m_document.documentWasLoadedNotifier.connect([this]() { scheduleUpdate(true); });
     m_notifierConnection += m_document.nodesDidChangeNotifier.connect([this](const auto&) {
-        if (m_embeddedWadEditor)
-        {
-            m_embeddedWadEditor->update(m_document.map().selection().allEntities());
-        }
+        refreshVisiblePropertyValues();
+        refreshEmbeddedEditors();
     });
 }
 
@@ -449,6 +447,79 @@ void OutlinerEntityPropertyEditor::updateFromSelection()
 
     const auto entities = m_document.map().selection().allEntities();
     rebuildPropertyRows(entities);
+}
+
+void OutlinerEntityPropertyEditor::refreshVisiblePropertyValues()
+{
+    const auto entityNodes = m_document.map().selection().allEntities();
+    if (entityNodes.empty())
+    {
+        return;
+    }
+
+    for (auto* valueEdit : findChildren<QLineEdit*>("outlinerPropertyValue"))
+    {
+        const auto keyVariant = valueEdit->property("propertyKey");
+        if (!keyVariant.isValid())
+        {
+            continue;
+        }
+
+        const auto key = keyVariant.toString().toStdString();
+        const auto consensus = consensusValue(key, entityNodes);
+        const QSignalBlocker blocker{valueEdit};
+        if (consensus.mixed)
+        {
+            valueEdit->clear();
+            valueEdit->setPlaceholderText(tr("<multiple>"));
+        }
+        else
+        {
+            valueEdit->setText(
+              mapStringToUnicode(m_document.map().encoding(), consensus.value));
+            valueEdit->setPlaceholderText(QString{});
+        }
+    }
+
+    for (auto* valueCombo : findChildren<QComboBox*>("outlinerPropertyValue"))
+    {
+        const auto keyVariant = valueCombo->property("propertyKey");
+        if (!keyVariant.isValid())
+        {
+            continue;
+        }
+
+        const auto key = keyVariant.toString().toStdString();
+        const auto consensus = consensusValue(key, entityNodes);
+        const QSignalBlocker blocker{valueCombo};
+        if (auto* comboLineEdit = valueCombo->lineEdit())
+        {
+            if (consensus.mixed)
+            {
+                valueCombo->setEditText(QString{});
+                comboLineEdit->setPlaceholderText(tr("<multiple>"));
+            }
+            else
+            {
+                valueCombo->setEditText(
+                  mapStringToUnicode(m_document.map().encoding(), consensus.value));
+                comboLineEdit->setPlaceholderText(QString{});
+            }
+        }
+    }
+}
+
+void OutlinerEntityPropertyEditor::refreshEmbeddedEditors()
+{
+    const auto entityNodes = m_document.map().selection().allEntities();
+    if (m_embeddedWadEditor)
+    {
+        m_embeddedWadEditor->update(entityNodes);
+    }
+    if (m_embeddedSkyboxEditor)
+    {
+        m_embeddedSkyboxEditor->update(entityNodes);
+    }
 }
 
 void OutlinerEntityPropertyEditor::rebuildPropertyRows(
@@ -945,7 +1016,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             m_embeddedSkyboxEditor->update(entityNodes);
             containerLayout->addWidget(m_embeddedSkyboxEditor, 1);
             connect(m_embeddedSkyboxEditor, &SmartSkyboxEditor::skyboxApplied, this, [this]() {
-                scheduleUpdate(true);
+                refreshVisiblePropertyValues();
+                refreshEmbeddedEditors();
             });
 
             container->setVisible(m_skyboxEditorExpanded);
