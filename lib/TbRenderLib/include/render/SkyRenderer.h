@@ -21,7 +21,6 @@
 
 #include "Macros.h"
 #include "gl/TextureResource.h"
-#include "gl/VertexArray.h"
 
 #include <array>
 #include <filesystem>
@@ -68,8 +67,6 @@ private:
   mdl::Map& m_map;
   std::optional<std::string> m_cachedSkyname;
   std::array<std::shared_ptr<gl::TextureResource>, 6> m_textures = {};
-  std::optional<gl::VertexArray> m_skyBrushFaceVertexArray;
-  bool m_skyBrushFaceVerticesValid = false;
 
 public:
   explicit SkyRenderer(mdl::Map& map);
@@ -83,7 +80,6 @@ public:
 
 private:
   bool validate();
-  bool validateBrushFaces();
 };
 
 } // namespace render

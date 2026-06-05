@@ -23,52 +23,61 @@ uniform sampler2D Material;
 uniform vec3 CameraPosition;
 uniform int SkyFaceIndex;
 
+const float SkyUvMin = 1.0 / 512.0;
+const float SkyUvMax = 1.0 - SkyUvMin;
+
+float insetSkyUv(float value)
+{
+  return SkyUvMin + (SkyUvMax - SkyUvMin) * value;
+}
+
 bool faceMatchesDirection(vec3 dir, int face)
 {
   vec3 absDir = abs(dir);
-  if (absDir.x >= absDir.y && absDir.x >= absDir.z)
-  {
-    return dir.x >= 0.0 ? face == 0 : face == 2;
-  }
   if (absDir.y >= absDir.x && absDir.y >= absDir.z)
   {
-    return dir.y >= 0.0 ? face == 1 : face == 3;
+    return dir.y < 0.0 ? face == 3 : face == 1;
   }
-  return dir.z >= 0.0 ? face == 4 : face == 5;
+  if (absDir.x >= absDir.y && absDir.x >= absDir.z)
+  {
+    return dir.x > 0.0 ? face == 0 : face == 2;
+  }
+  return dir.z > 0.0 ? face == 4 : face == 5;
 }
 
 vec2 skyUv(vec3 dir, int face)
 {
-  vec3 absDir = abs(dir);
-  vec2 uv;
+  vec2 uv = vec2(0.0, 0.0);
 
   if (face == 0)
   {
-    uv = vec2(-dir.y, dir.z) / absDir.x;
-  }
-  else if (face == 2)
-  {
-    uv = vec2(dir.y, dir.z) / absDir.x;
+    uv = vec2(128.0 - (dir.y / dir.x) * 128.0, 128.0 - (dir.z / dir.x) * 128.0) / 256.0;
   }
   else if (face == 1)
   {
-    uv = vec2(dir.x, dir.z) / absDir.y;
+    uv = vec2((dir.x / dir.y) * 128.0 + 128.0, 128.0 - (dir.z / dir.y) * 128.0) / 256.0;
+  }
+  else if (face == 2)
+  {
+    uv = vec2((dir.y / -dir.x) * 128.0 + 128.0, 128.0 - (dir.z / -dir.x) * 128.0) / 256.0;
   }
   else if (face == 3)
   {
-    uv = vec2(-dir.x, dir.z) / absDir.y;
+    uv = vec2(128.0 - (dir.x / -dir.y) * 128.0, 128.0 - (dir.z / -dir.y) * 128.0) / 256.0;
   }
   else if (face == 4)
   {
-    uv = vec2(dir.x, -dir.y) / absDir.z;
+    uv = vec2(128.0 - (dir.x / dir.z) * 128.0, (dir.y / dir.z) * 128.0 + 128.0) / 256.0;
+    uv.x = 1.0 - uv.x;
+    uv = vec2(1.0 - uv.y, uv.x);
   }
   else
   {
-    uv = vec2(dir.x, dir.y) / absDir.z;
+    uv = vec2(128.0 - (dir.x / -dir.z) * 128.0, (dir.y / -dir.z) * 128.0 + 128.0) / 256.0;
+    uv = vec2(1.0 - uv.y, uv.x);
   }
 
-  uv = uv * 0.5 + 0.5;
-  return vec2(uv.x, 1.0 - uv.y);
+  return vec2(insetSkyUv(uv.x), insetSkyUv(uv.y));
 }
 
 void main(void)

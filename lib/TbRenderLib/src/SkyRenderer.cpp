@@ -26,7 +26,6 @@
 #include "gl/Camera.h"
 #include "gl/GlInterface.h"
 #include "gl/Material.h"
-#include "gl/MaterialManager.h"
 #include "gl/PrimType.h"
 #include "gl/ResourceManager.h"
 #include "gl/Shaders.h"
@@ -70,6 +69,20 @@ namespace tb::render
 namespace
 {
 using Vertex = gl::VertexTypes::P3UV2::Vertex;
+constexpr auto SkyFaceCount = size_t{6};
+struct SkyFaceMapping
+{
+  const char* suffix;
+};
+
+constexpr auto SkyFaceMappings = std::array<SkyFaceMapping, SkyFaceCount>{
+  SkyFaceMapping{"rt"},
+  SkyFaceMapping{"bk"},
+  SkyFaceMapping{"lf"},
+  SkyFaceMapping{"ft"},
+  SkyFaceMapping{"up"},
+  SkyFaceMapping{"dn"},
+};
 
 std::string worldSkyname(const mdl::Map& map)
 {
@@ -80,19 +93,6 @@ std::string worldSkyname(const mdl::Map& map)
     return *skyname;
   }
   return "";
-}
-
-std::shared_ptr<gl::TextureResource> textureResourceForMaterial(
-  const gl::Material* material)
-{
-  if (!material)
-  {
-    return nullptr;
-  }
-
-  return std::shared_ptr<gl::TextureResource>{
-    const_cast<gl::TextureResource*>(&material->textureResource()),
-    [](gl::TextureResource*) {}};
 }
 
 bool isSkyFace(const mdl::BrushFace& face)
@@ -118,7 +118,8 @@ std::shared_ptr<gl::TextureResource> loadLooseSkyTexture(
       continue;
     }
 
-    auto textureResource = gl::createTextureResource(std::move(texture) | kdl::value());
+    auto textureResource =
+      gl::createTextureResource(std::move(texture) | kdl::value());
     resourceManager.addResource(textureResource);
     return textureResource;
   }
@@ -127,20 +128,13 @@ std::shared_ptr<gl::TextureResource> loadLooseSkyTexture(
 }
 
 std::array<std::shared_ptr<gl::TextureResource>, 6> findSkyTextures(
-  const gl::MaterialManager& materialManager,
   mdl::GameFileSystem& gameFileSystem,
   gl::ResourceManager& resourceManager,
   const std::string& skyname)
 {
   auto textures = std::array<std::shared_ptr<gl::TextureResource>, 6>{};
-  const auto names = skyMaterialNames(skyname);
-
-  std::ranges::transform(names, textures.begin(), [&](const auto& name) {
-    if (const auto* material = materialManager.material(name))
-    {
-      return textureResourceForMaterial(material);
-    }
-    return loadLooseSkyTexture(gameFileSystem, resourceManager, name);
+  std::ranges::transform(SkyFaceMappings, textures.begin(), [&](const auto& mapping) {
+    return loadLooseSkyTexture(gameFileSystem, resourceManager, skyname + mapping.suffix);
   });
 
   return textures;
@@ -169,11 +163,11 @@ std::vector<Vertex> makeSkyBrushFaceVertices(const mdl::Map& map)
         continue;
       }
 
-      const auto firstVertex = vm::vec3f{faceVertices.front()};
       for (size_t i = 1; i + 1 < faceVertices.size(); ++i)
       {
-        vertices.emplace_back(firstVertex, vm::vec2f{0.0f, 0.0f});
-        vertices.emplace_back(vm::vec3f{faceVertices[i + 1]}, vm::vec2f{0.0f, 0.0f});
+        vertices.emplace_back(vm::vec3f{faceVertices.front()}, vm::vec2f{0.0f, 0.0f});
+        vertices.emplace_back(
+          vm::vec3f{faceVertices[i + 1]}, vm::vec2f{0.0f, 0.0f});
         vertices.emplace_back(vm::vec3f{faceVertices[i]}, vm::vec2f{0.0f, 0.0f});
       }
     }
@@ -228,7 +222,6 @@ public:
     gl.disable(GL_CULL_FACE);
     gl.enable(GL_TEXTURE_2D);
     gl.depthFunc(GL_LEQUAL);
-    gl.activeTexture(GL_TEXTURE0);
     shader.set("Material", 0);
     shader.set("CameraPosition", renderContext.camera().position());
 
@@ -238,14 +231,23 @@ public:
       {
         const auto* texture = m_textures[i]->get();
 
-        shader.set("SkyFaceIndex", static_cast<int>(i));
+        gl.activeTexture(GL_TEXTURE0);
         texture->activate(
           gl, renderContext.minFilterMode(), renderContext.magFilterMode());
+        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        shader.set("SkyFaceIndex", static_cast<int>(i));
+
         m_vertexArray.render(gl, gl::PrimType::Triangles);
+
+        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         texture->deactivate(gl);
       }
+
       m_vertexArray.cleanup(gl, shader.program());
     }
+    gl.activeTexture(GL_TEXTURE0);
 
     gl.depthFunc(GL_LEQUAL);
     gl.enable(GL_CULL_FACE);
@@ -311,13 +313,10 @@ void SkyRenderer::invalidate()
 {
   m_cachedSkyname = std::nullopt;
   m_textures = {};
-  invalidateBrushFaces();
 }
 
 void SkyRenderer::invalidateBrushFaces()
 {
-  m_skyBrushFaceVertexArray = std::nullopt;
-  m_skyBrushFaceVerticesValid = false;
 }
 
 void SkyRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
@@ -333,12 +332,14 @@ void SkyRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
     return;
   }
 
-  if (!validateBrushFaces())
+  auto skyBrushFaceVertices = makeSkyBrushFaceVertices(m_map);
+  if (skyBrushFaceVertices.empty())
   {
     return;
   }
 
-  renderBatch.addOneShot(new SkyRenderable{m_textures, *m_skyBrushFaceVertexArray});
+  renderBatch.addOneShot(
+    new SkyRenderable{m_textures, gl::VertexArray::move(std::move(skyBrushFaceVertices))});
 }
 
 bool SkyRenderer::validate()
@@ -347,28 +348,10 @@ bool SkyRenderer::validate()
   if (m_cachedSkyname != skyname)
   {
     m_cachedSkyname = skyname;
-    m_textures = findSkyTextures(
-      m_map.materialManager(), m_map.gameFileSystem(), m_map.resourceManager(), skyname);
+    m_textures =
+      findSkyTextures(m_map.gameFileSystem(), m_map.resourceManager(), skyname);
   }
   return skyTexturesReady(m_textures);
-}
-
-bool SkyRenderer::validateBrushFaces()
-{
-  if (!m_skyBrushFaceVerticesValid)
-  {
-    auto skyBrushFaceVertices = makeSkyBrushFaceVertices(m_map);
-    m_skyBrushFaceVerticesValid = true;
-
-    if (skyBrushFaceVertices.empty())
-    {
-      return false;
-    }
-
-    m_skyBrushFaceVertexArray = gl::VertexArray::move(std::move(skyBrushFaceVertices));
-  }
-
-  return m_skyBrushFaceVertexArray.has_value();
 }
 
 } // namespace tb::render
