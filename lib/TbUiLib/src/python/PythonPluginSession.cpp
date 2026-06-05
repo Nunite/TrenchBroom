@@ -1,11 +1,75 @@
 #include "ui/python/PythonPluginSession.h"
 
+#include <QTimer>
 #include <QWidget>
 
+#include "ui/python/PythonRuntime.h"
+
+#if defined(slots)
+#undef slots
+#endif
+
+#include <Python.h>
+#include <algorithm>
 #include <utility>
 
 namespace tb::ui
 {
+
+class PythonSessionTimer : public QObject
+{
+private:
+  PythonPluginSession& m_session;
+  int m_token = 0;
+  PyObject* m_callback = nullptr;
+  QTimer* m_timer = nullptr;
+
+public:
+  PythonSessionTimer(
+    PythonPluginSession& session,
+    const int token,
+    PyObject* callback,
+    const int milliseconds,
+    const bool singleShot)
+    : m_session{session}
+    , m_token{token}
+    , m_callback{callback}
+    , m_timer{new QTimer{this}}
+  {
+    Py_INCREF(m_callback);
+    m_timer->setInterval(milliseconds);
+    m_timer->setSingleShot(singleShot);
+    connect(m_timer, &QTimer::timeout, this, &PythonSessionTimer::run);
+    m_timer->start();
+  }
+
+  ~PythonSessionTimer() override
+  {
+    m_timer->stop();
+    auto gil = PyGILState_Ensure();
+    Py_DECREF(m_callback);
+    PyGILState_Release(gil);
+  }
+
+  int token() const { return m_token; }
+
+private:
+  void run()
+  {
+    PythonRuntime::instance().runCallback(m_session, m_callback);
+    if (m_timer->isSingleShot())
+    {
+      m_session.clearTimer(m_token);
+    }
+  }
+};
+
+namespace
+{
+
+int g_nextTimerToken = 1;
+
+} // namespace
 
 PythonPluginSession::PythonPluginSession(
   PythonPluginManifest manifest, PythonExecutionContext context)
@@ -15,6 +79,12 @@ PythonPluginSession::PythonPluginSession(
   m_context.pluginId = m_manifest.id;
   m_context.pluginDirectory = m_manifest.directory;
   m_context.scriptPath = m_manifest.directory / m_manifest.entry;
+}
+
+PythonPluginSession::~PythonPluginSession()
+{
+  clearTimers();
+  closePluginPanels();
 }
 
 const PythonPluginManifest& PythonPluginSession::manifest() const
@@ -68,6 +138,32 @@ void PythonPluginSession::closePluginPanels()
     }
   }
   m_pluginPanels.clear();
+}
+
+int PythonPluginSession::addIntervalTimer(
+  PyObject* callback, const int milliseconds, const bool singleShot)
+{
+  const auto token = g_nextTimerToken++;
+  m_timers.push_back(std::make_unique<PythonSessionTimer>(
+    *this, token, callback, milliseconds, singleShot));
+  return token;
+}
+
+void PythonPluginSession::clearTimer(const int token)
+{
+  m_timers.erase(
+    std::remove_if(
+      m_timers.begin(),
+      m_timers.end(),
+      [&](const auto& timer) {
+        return static_cast<PythonSessionTimer*>(timer.get())->token() == token;
+      }),
+    m_timers.end());
+}
+
+void PythonPluginSession::clearTimers()
+{
+  m_timers.clear();
 }
 
 const std::string& PythonPluginSession::error() const

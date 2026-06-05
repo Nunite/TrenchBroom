@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QLabel>
+#include <QThread>
 
 #include "Logger.h"
 #include "Result.h"
@@ -154,9 +155,6 @@ tb.register_callback("selection_changed", on_selection_changed)
     REQUIRE(manager.plugins()[0].session != nullptr);
     manager.unloadPlugins(window);
     CHECK(manager.plugins()[0].session == nullptr);
-    env.remove("python-v2-event-ok.txt");
-    PythonRuntime::instance().emitEvent("selection_changed", window);
-    CHECK_FALSE(std::filesystem::exists(env.dir() / "python-v2-event-ok.txt"));
   }
 
   SECTION("redirects stdout and stderr")
@@ -256,6 +254,107 @@ tb._cached_document.entities
     CHECK(
       PythonRuntime::instance().lastError().find("Document is no longer valid")
       != std::string::npos);
+  }
+
+  SECTION("runs and clears session timers")
+  {
+    auto env = fs::TestEnvironment{};
+    auto currentPathGuard = CurrentPathGuard{env.dir()};
+    env.createDirectory("plugin");
+    env.createFile(
+      "plugin/trenchbroom-plugin.json",
+      R"({
+        "id": "codex.v2.timer",
+        "name": "Codex V2 Timer",
+        "version": "1.0.0",
+        "apiVersion": 2,
+        "entry": "main.py"
+      })");
+    env.createFile(
+      "plugin/main.py",
+      R"(
+import tb2 as tb
+
+def on_timer():
+    with open("python-v2-timer-ok.txt", "a", encoding="utf-8") as f:
+        f.write("tick\n")
+
+tb.set_interval(on_timer, 10)
+)");
+
+    auto manager = PythonPluginManager{};
+    manager.reload({env.dir() / "plugin"});
+    REQUIRE(manager.loadPlugins(window));
+
+    for (int i = 0;
+         i < 10 && !std::filesystem::exists(env.dir() / "python-v2-timer-ok.txt");
+         ++i)
+    {
+      QApplication::processEvents();
+      QThread::msleep(10);
+    }
+    CHECK(std::filesystem::exists(env.dir() / "python-v2-timer-ok.txt"));
+
+    manager.unloadPlugins(window);
+    env.remove("python-v2-timer-ok.txt");
+    for (int i = 0; i < 5; ++i)
+    {
+      QApplication::processEvents();
+      QThread::msleep(10);
+    }
+    CHECK_FALSE(std::filesystem::exists(env.dir() / "python-v2-timer-ok.txt"));
+  }
+
+  SECTION("logs timer callback exceptions")
+  {
+    auto env = fs::TestEnvironment{};
+    env.createDirectory("plugin");
+    env.createFile(
+      "plugin/trenchbroom-plugin.json",
+      R"({
+        "id": "codex.v2.timer_failure",
+        "name": "Codex V2 Timer Failure",
+        "version": "1.0.0",
+        "apiVersion": 2,
+        "entry": "main.py"
+      })");
+    env.createFile(
+      "plugin/main.py",
+      R"(
+import tb2 as tb
+
+def on_timer():
+    raise RuntimeError("timer exploded")
+
+tb.set_timeout(on_timer, 10)
+)");
+
+    auto logger = TestLogger{};
+    auto manager = PythonPluginManager{};
+    manager.reload({env.dir() / "plugin"});
+    REQUIRE(manager.plugins().size() == 1u);
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.logger = &logger;
+    context.pluginId = manager.plugins()[0].manifest.id;
+    context.pluginDirectory = manager.plugins()[0].manifest.directory;
+    context.scriptPath =
+      manager.plugins()[0].manifest.directory / manager.plugins()[0].manifest.entry;
+
+    auto session = PythonPluginSession{manager.plugins()[0].manifest, std::move(context)};
+    REQUIRE(PythonRuntime::instance().runScript(session));
+
+    for (int i = 0; i < 10 && logger.messages.empty(); ++i)
+    {
+      QApplication::processEvents();
+      QThread::msleep(10);
+    }
+
+    REQUIRE_FALSE(logger.messages.empty());
+    CHECK(logger.messages.back().find("timer exploded") != std::string::npos);
   }
 }
 

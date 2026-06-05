@@ -23,6 +23,7 @@ public:
   bool runScript(
     const PythonExecutionContext& context, const std::filesystem::path& path);
   bool runScript(PythonPluginSession& session);
+  void runCallback(PythonPluginSession& session, void* callback);
   void emitEvent(const std::string& eventName, MapWindow& mapWindow);
   void cleanupPlugin(const std::string& pluginId);
   void cleanupPluginSession(PythonPluginSession& session);

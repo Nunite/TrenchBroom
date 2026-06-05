@@ -24,7 +24,7 @@ struct PythonPluginState
   PythonPluginManifest manifest;
   PythonPluginStatus status = PythonPluginStatus::NotLoaded;
   std::string error;
-  std::unique_ptr<PythonPluginSession> session;
+  std::shared_ptr<PythonPluginSession> session;
 
   PythonPluginState() = default;
   PythonPluginState(PythonPluginState&&) noexcept = default;

@@ -315,6 +315,29 @@ bool PythonRuntime::runScript(PythonPluginSession& session)
   return runScript(session.context(), session.context().scriptPath, &session);
 }
 
+void PythonRuntime::runCallback(PythonPluginSession& session, void* callback)
+{
+  if (!ensureInitialized())
+  {
+    return;
+  }
+
+  auto gil = PyGILState_Ensure();
+  auto scopedContext = ScopedExecutionContext{session.context(), &session};
+  auto scopedStdStreamRedirect = ScopedStdStreamRedirect{};
+  auto* result = PyObject_CallObject(reinterpret_cast<PyObject*>(callback), nullptr);
+  if (result == nullptr)
+  {
+    m_lastError = formatCurrentException();
+    if (session.context().logger != nullptr)
+    {
+      session.context().logger->error() << m_lastError;
+    }
+  }
+  Py_XDECREF(result);
+  PyGILState_Release(gil);
+}
+
 bool PythonRuntime::runScript(
   const PythonExecutionContext& context,
   const std::filesystem::path& path,

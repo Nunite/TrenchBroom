@@ -82,7 +82,7 @@ bool PythonPluginManager::loadPlugin(MapWindow& mapWindow, PythonPluginState& pl
   context.scriptPath = plugin.manifest.directory / plugin.manifest.entry;
 
   plugin.session =
-    std::make_unique<PythonPluginSession>(plugin.manifest, std::move(context));
+    std::make_shared<PythonPluginSession>(plugin.manifest, std::move(context));
 
   if (PythonRuntime::instance().runScript(*plugin.session))
   {

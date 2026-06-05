@@ -371,13 +371,67 @@ int registerCallback(const std::string& eventName, py::object callback)
   return token;
 }
 
+int setInterval(py::object callback, const int milliseconds)
+{
+  if (!PyCallable_Check(callback.ptr()))
+  {
+    throw py::type_error{"callback must be callable"};
+  }
+  if (milliseconds <= 0)
+  {
+    throw py::value_error{"milliseconds must be greater than zero"};
+  }
+  auto* session = currentPythonPluginSession();
+  if (session == nullptr)
+  {
+    throw std::runtime_error{"Timers require an active Python plugin session"};
+  }
+  return session->addIntervalTimer(callback.ptr(), milliseconds, false);
+}
+
+int setTimeout(py::object callback, const int milliseconds)
+{
+  if (!PyCallable_Check(callback.ptr()))
+  {
+    throw py::type_error{"callback must be callable"};
+  }
+  if (milliseconds <= 0)
+  {
+    throw py::value_error{"milliseconds must be greater than zero"};
+  }
+  auto* session = currentPythonPluginSession();
+  if (session == nullptr)
+  {
+    throw std::runtime_error{"Timers require an active Python plugin session"};
+  }
+  return session->addIntervalTimer(callback.ptr(), milliseconds, true);
+}
+
+void clearInterval(const int token)
+{
+  auto* session = currentPythonPluginSession();
+  if (session == nullptr)
+  {
+    throw std::runtime_error{"Timers require an active Python plugin session"};
+  }
+  session->clearTimer(token);
+}
+
 void unregisterCallback(const int token)
 {
   g_callbacks.erase(token);
-  for (auto& [eventName, tokens] : g_eventCallbacks)
+  for (auto it = g_eventCallbacks.begin(); it != g_eventCallbacks.end();)
   {
-    unused(eventName);
+    auto& tokens = it->second;
     tokens.erase(std::remove(tokens.begin(), tokens.end(), token), tokens.end());
+    if (tokens.empty())
+    {
+      it = g_eventCallbacks.erase(it);
+    }
+    else
+    {
+      ++it;
+    }
   }
 }
 
@@ -422,6 +476,8 @@ void cleanupPluginSession(PythonPluginSession& session)
   {
     unregisterCallback(token);
   }
+  cleanupPlugin(session.pluginId());
+  session.clearTimers();
   session.closePluginPanels();
 }
 
@@ -555,6 +611,9 @@ void defineModule(py::module_& module)
   module.def("create_plugin_panel", createPluginPanel);
   module.def("register_callback", registerCallback);
   module.def("unregister_callback", unregisterCallback);
+  module.def("set_interval", setInterval);
+  module.def("clear_interval", clearInterval);
+  module.def("set_timeout", setTimeout);
   module.def("_emit_event", emitEvent);
   module.def("_cleanup_plugin", cleanupPlugin);
   module.def("_cleanup_plugin_session", [](py::capsule sessionCapsule) {

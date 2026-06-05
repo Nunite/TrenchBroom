@@ -5,13 +5,18 @@
 #include "ui/python/PythonExecutionContext.h"
 #include "ui/python/PythonPluginManifest.h"
 
+#include <memory>
 #include <string>
 #include <vector>
+
+struct _object;
+using PyObject = _object;
 
 class QWidget;
 
 namespace tb::ui
 {
+class PythonSessionTimer;
 
 class PythonPluginSession
 {
@@ -20,11 +25,13 @@ private:
   PythonExecutionContext m_context;
   std::vector<int> m_callbackTokens;
   std::vector<QPointer<QWidget>> m_pluginPanels;
+  std::vector<std::unique_ptr<PythonSessionTimer>> m_timers;
   std::string m_error;
 
 public:
   explicit PythonPluginSession(
     PythonPluginManifest manifest, PythonExecutionContext context);
+  ~PythonPluginSession();
 
   const PythonPluginManifest& manifest() const;
   const std::string& pluginId() const;
@@ -36,6 +43,10 @@ public:
 
   void addPluginPanel(QWidget* panel);
   void closePluginPanels();
+
+  int addIntervalTimer(PyObject* callback, int milliseconds, bool singleShot);
+  void clearTimer(int token);
+  void clearTimers();
 
   const std::string& error() const;
   void setError(std::string error);
