@@ -4,7 +4,10 @@
 
 ## Python v2 当前架构
 
-Python v2 目前以 `tb2` 模块作为正式实验入口；legacy `tb` 模块继续保留，不会在当前阶段被重定向或删除。v2 的目标不是立刻增加大量新能力，而是先把插件生命周期、错误处理、资源清理和可测试性做成可长期维护的基础。
+Python v2 目前以 `tb2` 模块作为唯一正式插件入口；legacy `tb`
+运行入口已经停用。旧脚本仅保留在 `python/examples/legacy_removed_tb`
+作为迁移参考，新的可运行示例都位于 `python/examples/v2` 并使用
+`import tb2 as tb`。
 
 ### Manifest 插件模型
 
@@ -71,6 +74,9 @@ v2 manifest 示例位于 `python/examples/v2`：
 * `event_callback`: 注册 `selection_changed` callback。
 * `timer`: 使用 session-owned interval timer。
 * `entity_property_edit`: 通过事务式 v2 API 修改 entity property。
+* `brush_builder`, `brush_manager`, `texture_replacer`, `texture_browser`: 创建和修改 brush/material。
+* `plane_builder`, `plane_selection_demo`, `transform_tool`, `distribute_tool`, `chamfer_tool`: 几何和选择工具示例。
+* `advanced_panel`, `git_plugin`: 高级 PluginPanel 控件和 HTML view 示例。
 
 ## 优先级定义
 
@@ -88,10 +94,10 @@ v2 manifest 示例位于 `python/examples/v2`：
 ### 任务
 
 1.  **暴露 `Brush` 对象** (✅ 已完成)
-    *   **状态**: 已实现 `tb.Brush` 类型及 `Entity.brushes` 属性。
+    *   **状态**: 已实现 `tb2.Brush` 类型及 `Entity.brushes` 属性。
     *   **可行性**: 100% (封装 `mdl::BrushNode` / `mdl::Brush`)
     *   **必要性**: 关键 (Critical)
-    *   **描述**: 创建 Python 类型 `tb.Brush`。
+    *   **描述**: 创建 Python 类型 `tb2.Brush`。
     *   **API 目标**:
         ```python
         brush = entity.brushes[0]
@@ -99,7 +105,7 @@ v2 manifest 示例位于 `python/examples/v2`：
         ```
 
 2.  **暴露 `Face` 对象** (✅ 已完成)
-    *   **状态**: 已实现 `tb.Face` 类型，支持纹理/UV/法线访问。
+    *   **状态**: 已实现 `tb2.Face` 类型，支持纹理/UV/法线访问。
     *   **可行性**: 100% (封装 `mdl::BrushFace`)
     *   **必要性**: 关键 (Critical)
     *   **描述**: 允许访问面数据（纹理、投影、平面）。
@@ -152,18 +158,19 @@ v2 manifest 示例位于 `python/examples/v2`：
     *   **描述**: 允许除当前工具之外的程序化选择更改。
     *   **API 目标**:
         ```python
-        tb.Selection.select(brush)
-        tb.Selection.deselect_all()
+        doc.select([brush])
+        doc.clear_selection()
         ```
 
 4.  **暴露 `Material` 与 `MaterialCollection`** (✅ 已完成)
-    *   **状态**: 已实现 `tb.Material`, `tb.MaterialCollection` 及 `Document.materials`。
+    *   **状态**: 已实现 `tb2.Material`, `tb2.MaterialCollection` 及 `Document.materials` / `Document.material_collections`。
     *   **可行性**: 100%
     *   **必要性**: 高 (High)
     *   **描述**: 允许访问项目中可用的纹理和材质集合。
     *   **API 目标**:
         ```python
-        for mat in tb.Document.current().materials:
+        doc = tb.current_document()
+        for mat in doc.materials:
             print(mat.name, mat.width, mat.height)
         ```
 
@@ -176,7 +183,7 @@ v2 manifest 示例位于 `python/examples/v2`：
 ### 任务
 
 1.  **事件系统** (✅ 已完成)
-    *   **状态**: 已实现 `tb.register_callback` 和 `tb.unregister_callback`，支持 `selection_changed` 事件。
+    *   **状态**: 已实现 `tb2.register_callback` 和 `tb2.unregister_callback`，支持 `selection_changed` 事件。
     *   **可行性**: 100%
     *   **必要性**: 中 (Medium)
     *   **描述**: 用于 `on_selection_changed` 的钩子。
@@ -218,4 +225,4 @@ v2 manifest 示例位于 `python/examples/v2`：
 ## 参考资料
 
 *   **C++ 源码**: `common/src/mdl/BrushNode.h`, `common/src/mdl/BrushFace.h`
-*   **Python 存根 (Stub)**: `python/src/tb/__init__.py`
+*   **Python 示例**: `python/examples/v2`

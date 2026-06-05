@@ -40,7 +40,7 @@ remain useful.
 ## Python Scripting Test Fixture Coupling
 
 The Python API has small helpers that can be tested directly, but meaningful
-script smoke tests for `import tb`, `tb.current_document()`, transactions,
+script smoke tests for `import tb2 as tb`, `tb.current_document()`, transactions,
 selection, timers, and plugin panels currently depend on `PythonScripting`
 running against a full `MapWindow`. That makes focused tests expensive and
 harder to isolate from UI setup.
@@ -55,7 +55,7 @@ The embedded runtime works for the tested C API conversions, but a full scriptin
 smoke fixture should configure Python home/path exactly like the application.
 
 A `MapWindow` smoke test now exercises the real script entry point with
-`import tb`, `tb.current_document()`, `doc.entities`, `print()`, and a marker file
+`import tb2 as tb`, `tb.current_document()`, `doc.entities`, `print()`, and a marker file
 write. This exposed a Windows-only non-ASCII path bug where
 `PythonScripting::runScript` opened the script via `_wfopen` but passed a narrow
 `path.generic_string()` filename to `PyRun_SimpleFileEx`; the filename is now
@@ -199,7 +199,7 @@ ephemeral child widgets.
 
 ## Automated Coverage Matrix
 
-- Python scripting: `MapWindow` covers `import tb`, `tb.current_document()`,
+- Python scripting: `MapWindow` covers `import tb2 as tb`, `tb.current_document()`,
   document entity access, material/material-collection binding entry points,
   stdout script execution, transactions, `selection_changed` callbacks, timers,
   `tb.list_actions()`, `tb.execute_action()` success/error paths, plugin panel
@@ -309,16 +309,13 @@ tracks plugin status/errors and cleanup. Focused tests cover manifest parsing,
 transaction smoke, plugin panel creation, event callback registration, and
 plugin unload cleanup.
 
-This is intentionally still a v2 foundation rather than a complete replacement.
-The first stable import is `tb2`; `tb.v2` is only attached when an existing
-legacy `tb` module is already present so v2 does not accidentally shadow the
-hand-written legacy API. The handle layer currently validates active document
-presence but does not yet maintain durable node/face generation tokens, and the
-event/callback tables remain process-global while being scoped by plugin id for
-cleanup.
+The stable import is now `tb2`; legacy `tb` scripts are kept only under
+`python/examples/legacy_removed_tb` as migration references. v2 has since grown
+session-owned callback/timer/panel cleanup, traceback/stdout/stderr coverage,
+transactional write APIs, material collection browsing, selection transforms,
+chamfer APIs, advanced PluginPanel controls, HTML views, and migrated manifest
+examples including the Git panel.
 
-Follow-up: introduce a real handle registry with document/node invalidation,
-move callback/timer/panel ownership into a per-plugin runtime session, add
-stdout/stderr redirection and traceback formatting tests, then migrate write
-APIs through explicit document transactions before considering `import tb` ->
-v2 as the default route.
+Follow-up: keep strengthening handle invalidation coverage for map reload,
+deleted nodes, and brush geometry replacement, and decide whether old legacy
+source files should be archived or deleted from `lib/TbUiLib/src/python`.
