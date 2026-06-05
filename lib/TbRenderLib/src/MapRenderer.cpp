@@ -244,6 +244,7 @@ void MapRenderer::restoreSelectionColors()
 void MapRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
 {
   setupGL(renderBatch);
+  updateSkyFaceRendering(renderContext);
   renderSky(renderContext, renderBatch);
   renderEntityDecals(renderContext, renderBatch);
   renderEntityLinks(renderContext, renderBatch);
@@ -356,6 +357,14 @@ void MapRenderer::setupRenderers()
   setupLockedRenderer(*m_lockedRenderer);
 }
 
+void MapRenderer::updateSkyFaceRendering(RenderContext& renderContext)
+{
+  const auto skipSkyFaces = m_skyRenderer->canRender(renderContext);
+  m_defaultRenderer->setSkipSkyFaces(skipSkyFaces);
+  m_selectionRenderer->setSkipSkyFaces(skipSkyFaces);
+  m_lockedRenderer->setSkipSkyFaces(skipSkyFaces);
+}
+
 void MapRenderer::setupDefaultRenderer(ObjectRenderer& renderer)
 {
   renderer.setEntityOverlayTextColor(pref(Preferences::InfoOverlayTextColor));
@@ -370,7 +379,6 @@ void MapRenderer::setupDefaultRenderer(ObjectRenderer& renderer)
   renderer.setBrushFaceColor(pref(Preferences::FaceColor));
   renderer.setBrushEdgeColor(pref(Preferences::EdgeColor));
   renderer.setUseReadable2DBrushOutlines(pref(Preferences::UseReadable2DBrushOutlines));
-  renderer.setSkipSkyFaces(pref(Preferences::ShowSky));
 }
 
 void MapRenderer::setupSelectionRenderer(ObjectRenderer& renderer)
@@ -398,7 +406,6 @@ void MapRenderer::setupSelectionRenderer(ObjectRenderer& renderer)
   renderer.setBrushFaceColor(pref(Preferences::FaceColor));
   renderer.setBrushEdgeColor(pref(Preferences::SelectedEdgeColor));
   renderer.setUseReadable2DBrushOutlines(false);
-  renderer.setSkipSkyFaces(pref(Preferences::ShowSky));
 }
 
 void MapRenderer::setupLockedRenderer(ObjectRenderer& renderer)
@@ -421,7 +428,6 @@ void MapRenderer::setupLockedRenderer(ObjectRenderer& renderer)
   renderer.setBrushFaceColor(pref(Preferences::FaceColor));
   renderer.setBrushEdgeColor(pref(Preferences::LockedEdgeColor));
   renderer.setUseReadable2DBrushOutlines(false);
-  renderer.setSkipSkyFaces(pref(Preferences::ShowSky));
 }
 
 static bool selected(const mdl::Node& node)

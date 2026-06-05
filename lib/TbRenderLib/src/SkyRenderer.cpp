@@ -319,15 +319,25 @@ void SkyRenderer::invalidateBrushFaces()
 {
 }
 
-void SkyRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
+bool SkyRenderer::canRender(RenderContext& renderContext)
 {
   const auto skyname = worldSkyname(m_map);
   if (!shouldRenderSky(renderContext.render3D(), pref(Preferences::ShowSky), skyname))
   {
-    return;
+    return false;
   }
 
   if (!validate())
+  {
+    return false;
+  }
+
+  return skyBrushFaceVertexCount(m_map) > 0;
+}
+
+void SkyRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
+{
+  if (!canRender(renderContext))
   {
     return;
   }

@@ -76,6 +76,7 @@ public:
 
   void invalidate();
   void invalidateBrushFaces();
+  bool canRender(RenderContext& renderContext);
   void render(RenderContext& renderContext, RenderBatch& renderBatch);
 
 private:

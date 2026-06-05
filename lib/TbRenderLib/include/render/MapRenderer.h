@@ -108,6 +108,7 @@ private:
   void renderGroupLinks(RenderContext& renderContext, RenderBatch& renderBatch);
 
   void setupRenderers();
+  void updateSkyFaceRendering(RenderContext& renderContext);
   void setupDefaultRenderer(ObjectRenderer& renderer);
   void setupSelectionRenderer(ObjectRenderer& renderer);
   void setupLockedRenderer(ObjectRenderer& renderer);
