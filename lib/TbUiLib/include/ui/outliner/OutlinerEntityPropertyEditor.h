@@ -23,6 +23,7 @@ namespace tb::ui
 class TitledPanel;
 class FlagsEditor;
 class MapDocument;
+class SmartSkyboxEditor;
 class SmartWadEditor;
 
 class OutlinerEntityPropertyEditor : public QWidget
@@ -43,6 +44,10 @@ private:
     QWidget* m_embeddedWadEditorContainer = nullptr;
     SmartWadEditor* m_embeddedWadEditor = nullptr;
     bool m_wadEditorExpanded = false;
+
+    QWidget* m_embeddedSkyboxEditorContainer = nullptr;
+    SmartSkyboxEditor* m_embeddedSkyboxEditor = nullptr;
+    bool m_skyboxEditorExpanded = false;
 
     QWidget* m_embeddedSpawnflagsEditorContainer = nullptr;
     FlagsEditor* m_embeddedSpawnflagsEditor = nullptr;

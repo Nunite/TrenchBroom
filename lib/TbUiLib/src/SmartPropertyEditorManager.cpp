@@ -34,7 +34,6 @@
 #include "ui/SmartFlagsEditor.h"
 #include "ui/SmartModelEditor.h"
 #include "ui/SmartPropertyEditor.h"
-#include "ui/SmartSkyboxEditor.h"
 #include "ui/SmartWadEditor.h"
 
 #include "kd/contracts.h"
@@ -148,14 +147,6 @@ void SmartPropertyEditorManager::createEditors()
   registerEditor(
     makeSmartPropertyEditorKeyMatcher({"model", "mdl"}),
     new SmartModelEditor{m_document, this});
-  registerEditor(
-    [&](const auto& propertyKey, const auto& nodes) {
-      return nodes.size() == 1
-             && nodes.front()->entity().classname()
-                  == mdl::EntityPropertyValues::WorldspawnClassname
-             && propertyKey == mdl::EntityPropertyKeys::Skyname;
-    },
-    new SmartSkyboxEditor{m_document, this});
   registerEditor(
     [](const auto&, const auto&) { return true; },
     new SmartDefaultPropertyEditor{m_document, this});

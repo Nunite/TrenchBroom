@@ -26,8 +26,10 @@
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
 #include "mdl/Map.h"
+#include "mdl/Map_Entities.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/WorldNode.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
 #include "ui/outliner/OutlinerEntityPropertyEditor.h"
@@ -133,6 +135,32 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     auto* valueEdit = propertyValueEdit(editor, "classname");
     REQUIRE(valueEdit != nullptr);
     CHECK(valueEdit->text() == "worldspawn");
+  }
+
+  SECTION("shows skybox editor control for worldspawn skyname")
+  {
+    mdl::selectNodes(map, std::vector<mdl::Node*>{&map.worldNode()});
+    mdl::setEntityProperty(map, "skyname", "2namek", false);
+    processOutlinerUpdates();
+
+    auto* skynameEdit = propertyValueEdit(editor, "skyname");
+    REQUIRE(skynameEdit != nullptr);
+
+    auto* skyboxButton = static_cast<QAbstractButton*>(nullptr);
+    for (auto* button : propertyRowButtons(editor, "skyname"))
+    {
+      if (button->toolTip() == "Show skybox editor")
+      {
+        skyboxButton = button;
+        break;
+      }
+    }
+
+    REQUIRE(skyboxButton != nullptr);
+    QTest::mouseClick(skyboxButton, Qt::LeftButton);
+    processOutlinerUpdates();
+
+    CHECK(editor.findChild<QWidget*>("outlinerEmbeddedSkyboxEditor") != nullptr);
   }
 
   SECTION("updates rows from MapDocument selection notifications")

@@ -34,6 +34,7 @@
 #include "ui/QPathUtils.h"
 #include "ui/QStringUtils.h"
 #include "ui/QWidgetUtils.h"
+#include "ui/SmartSkyboxEditor.h"
 #include "ui/SmartWadEditor.h"
 #include "ui/TitledPanel.h"
 #include "ui/ViewUtils.h"
@@ -455,6 +456,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 {
     m_embeddedWadEditorContainer = nullptr;
     m_embeddedWadEditor = nullptr;
+    m_embeddedSkyboxEditorContainer = nullptr;
+    m_embeddedSkyboxEditor = nullptr;
     m_embeddedSpawnflagsEditorContainer = nullptr;
     m_embeddedSpawnflagsEditor = nullptr;
 
@@ -552,6 +555,10 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                                  && entityNodes.size() == 1
                                  && entityNodes.front()->entity().classname()
                                       == mdl::EntityPropertyValues::WorldspawnClassname;
+    const auto canShowSkyboxEditor =
+      entityNodes.size() == 1
+      && entityNodes.front()->entity().classname()
+           == mdl::EntityPropertyValues::WorldspawnClassname;
 
     for (const auto& key : keys)
     {
@@ -802,6 +809,26 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             wadToggleButton->setArrowType(m_wadEditorExpanded ? Qt::DownArrow : Qt::RightArrow);
         }
 
+        QToolButton* skyboxToggleButton = nullptr;
+        if (canShowSkyboxEditor && key == mdl::EntityPropertyKeys::Skyname)
+        {
+            skyboxToggleButton = new QToolButton{row};
+            skyboxToggleButton->setObjectName("toolButton_withBorder");
+            skyboxToggleButton->setCheckable(true);
+            skyboxToggleButton->setFixedSize(QSize{24, 24});
+            skyboxToggleButton->setProperty("propertyKey", QString::fromStdString(key));
+            skyboxToggleButton->setToolTip(tr("Show skybox editor"));
+
+            if (propertyDef && propertyDef->readOnly)
+            {
+                skyboxToggleButton->setDisabled(true);
+            }
+
+            const QSignalBlocker blocker{skyboxToggleButton};
+            skyboxToggleButton->setChecked(m_skyboxEditorExpanded);
+            skyboxToggleButton->setArrowType(m_skyboxEditorExpanded ? Qt::DownArrow : Qt::RightArrow);
+        }
+
         rowLayout->addWidget(keyLabel);
         if (valueCombo)
         {
@@ -818,6 +845,10 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         if (wadToggleButton)
         {
             rowLayout->addWidget(wadToggleButton);
+        }
+        if (skyboxToggleButton)
+        {
+            rowLayout->addWidget(skyboxToggleButton);
         }
         if (modelBrowseButton)
         {
@@ -896,6 +927,30 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             connect(wadToggleButton, &QToolButton::toggled, this, [this, container, wadToggleButton](const bool checked) {
                 m_wadEditorExpanded = checked;
                 wadToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
+                container->setVisible(checked);
+            });
+        }
+
+        if (skyboxToggleButton)
+        {
+            auto* container = new QWidget{m_scrollContents};
+            container->setObjectName("outlinerEmbeddedSkyboxEditor");
+            auto* containerLayout = new QVBoxLayout{container};
+            containerLayout->setContentsMargins(6, 0, 6, 4);
+            containerLayout->setSpacing(0);
+
+            m_embeddedSkyboxEditorContainer = container;
+            m_embeddedSkyboxEditor = new SmartSkyboxEditor{m_document, container};
+            m_embeddedSkyboxEditor->activate(mdl::EntityPropertyKeys::Skyname);
+            m_embeddedSkyboxEditor->update(entityNodes);
+            containerLayout->addWidget(m_embeddedSkyboxEditor, 1);
+
+            container->setVisible(m_skyboxEditorExpanded);
+            m_scrollLayout->addWidget(container, 0);
+
+            connect(skyboxToggleButton, &QToolButton::toggled, this, [this, container, skyboxToggleButton](const bool checked) {
+                m_skyboxEditorExpanded = checked;
+                skyboxToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
                 container->setVisible(checked);
             });
         }

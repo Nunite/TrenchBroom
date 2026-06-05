@@ -52,7 +52,7 @@ TEST_CASE("SmartSkyboxEditor")
     CHECK(skyboxBaseAndSuffix("gfx/env/rt.tga") == std::nullopt);
   }
 
-  SECTION("property editor manager selects skybox editor for worldspawn skyname")
+  SECTION("property editor manager leaves worldspawn skyname to default editor")
   {
     auto fixture = MapDocumentFixture{};
     auto& document = fixture.create();
@@ -65,8 +65,8 @@ TEST_CASE("SmartSkyboxEditor")
 
     manager.switchEditor(
       mdl::EntityPropertyKeys::Skyname, std::vector<mdl::EntityNodeBase*>{&worldNode});
-    CHECK(qobject_cast<SmartSkyboxEditor*>(stackedLayout->currentWidget()) != nullptr);
-    CHECK_FALSE(manager.isDefaultEditorActive());
+    CHECK(qobject_cast<SmartSkyboxEditor*>(stackedLayout->currentWidget()) == nullptr);
+    CHECK(manager.isDefaultEditorActive());
 
     manager.switchEditor("targetname", std::vector<mdl::EntityNodeBase*>{&worldNode});
     CHECK(manager.isDefaultEditorActive());
