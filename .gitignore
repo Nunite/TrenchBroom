@@ -25,3 +25,9 @@ app/resources/documentation/help/index.html
 *.tar.gz
 /blender
 /vscode-main
+/JACK_3D_Rendering_CN.md
+/skybox_debug/
+/scripts/build-release-codex/
+/scripts/skybox-mapping-ui.py
+/scripts/skybox-rotate-preview.py
+/scripts/switch-sky-shader-variant.ps1
