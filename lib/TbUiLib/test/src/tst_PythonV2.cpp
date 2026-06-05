@@ -923,6 +923,62 @@ assert face.surface_value == 3.5
     manager.unloadPlugins(window);
   }
 
+  SECTION("loads v2 brush manager example plugin")
+  {
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/brush_manager"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+
+    auto* createButton = static_cast<QPushButton*>(nullptr);
+    auto* applyButton = static_cast<QPushButton*>(nullptr);
+    auto* analyzeButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Create Cube"))
+      {
+        createButton = button;
+      }
+      if (button->text() == QStringLiteral("Apply to Selection"))
+      {
+        applyButton = button;
+      }
+      if (button->text() == QStringLiteral("Analyze Selection"))
+      {
+        analyzeButton = button;
+      }
+    }
+    REQUIRE(createButton != nullptr);
+    REQUIRE(applyButton != nullptr);
+    REQUIRE(analyzeButton != nullptr);
+
+    createButton->click();
+    auto& selection = window.document().map().selection();
+    REQUIRE(selection.brushes.size() == 1u);
+    auto* brushNode = selection.brushes.front();
+    CHECK(brushNode->brush().faceCount() == 6u);
+
+    applyButton->click();
+    CHECK(brushNode->brush().face(0).attributes().materialName() == "common/caulk");
+    CHECK(brushNode->brush().face(0).attributes().scale() == vm::vec2f{1.0f, 1.0f});
+
+    analyzeButton->click();
+    auto* status = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_status"));
+    REQUIRE(status != nullptr);
+    CAPTURE(status->text().toStdString());
+    CHECK(status->text().contains(QStringLiteral("6 faces")));
+    manager.unloadPlugins(window);
+  }
+
   SECTION("loads v2 texture replacer example plugin")
   {
     auto& map = window.document().map();

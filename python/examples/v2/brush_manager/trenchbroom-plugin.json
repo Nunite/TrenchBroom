@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.brush_manager",
+  "name": "Brush Manager",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Creates cubes, applies materials, and reports selected brush information.",
+  "author": "TrenchBroom"
+}

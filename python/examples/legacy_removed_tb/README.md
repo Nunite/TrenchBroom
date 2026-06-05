@@ -20,3 +20,4 @@ Migrated examples:
 - `ui_distribute_tool.py` -> `python/examples/v2/distribute_tool`
 - `entity_brush_modifier.py` -> `python/examples/v2/entity_brush_modifier`
 - `texture_browser_demo.py` -> `python/examples/v2/texture_browser`
+- `ui_brush_manager.py` -> `python/examples/v2/brush_manager`
