@@ -5,11 +5,11 @@
 class QButtonGroup;
 class QRadioButton;
 class QCheckBox;
+class QLineEdit;
 class QPushButton;
 class QMenu;
 class QListWidget;
 class QTextEdit;
-class QLineEdit;
 
 namespace tb::ui
 {
@@ -21,6 +21,8 @@ private:
   QRadioButton* m_englishRadioButton;
   QRadioButton* m_chineseRadioButton;
   QButtonGroup* m_languageButtonGroup;
+  QLineEdit* m_pluginSearchBox = nullptr;
+  QCheckBox* m_pluginShowIssuesOnlyCheckBox = nullptr;
   QListWidget* m_pluginList = nullptr;
   QPushButton* m_addPluginBtn = nullptr;
   QPushButton* m_removePluginBtn = nullptr;

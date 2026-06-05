@@ -10,6 +10,7 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
 #include <QMessageBox>
@@ -165,15 +166,15 @@ void MiscPreferencePane::createGui()
   m_pluginList->setSelectionMode(QAbstractItemView::ExtendedSelection);
   configurePreferenceList(m_pluginList);
 
-  m_addPluginBtn = new QPushButton(tr("Add..."));
+  m_addPluginBtn = new QPushButton(tr("Install..."));
   m_removePluginBtn = new QPushButton(tr("Remove"));
   m_clearPluginsBtn = new QPushButton(tr("Clear"));
-  m_reloadPluginsBtn = new QPushButton(tr("Reload"));
+  m_reloadPluginsBtn = new QPushButton(tr("Refresh"));
 
   connect(m_addPluginBtn, &QPushButton::clicked, this, [this]() {
     const auto pathStr = QFileDialog::getExistingDirectory(
       this,
-      tr("Select Python Plugin Directory"),
+      tr("Install Python Plugin from Directory"),
       fileDialogDefaultDirectory(FileDialogDir::Map));
 
     if (!pathStr.isEmpty())
@@ -211,8 +212,9 @@ void MiscPreferencePane::createGui()
   pluginListLayout->addWidget(m_pluginList, 1);
   pluginListLayout->addLayout(pluginBtnLayout);
 
-  auto* statusLabel = new QLabel{tr("Detected plugins")};
-  setInfoStyle(statusLabel);
+  m_pluginSearchBox = new QLineEdit{};
+  m_pluginSearchBox->setPlaceholderText(tr("Search plugins"));
+  m_pluginShowIssuesOnlyCheckBox = new QCheckBox{tr("Only show issues")};
 
   m_pluginStatusList = new QListWidget();
   m_pluginStatusList->setMinimumHeight(PluginStatusMinHeight);
@@ -226,12 +228,23 @@ void MiscPreferencePane::createGui()
   connect(m_pluginStatusList, &QListWidget::currentItemChanged, this, [this]() {
     updatePluginDetails();
   });
+  connect(
+    m_pluginSearchBox, &QLineEdit::textChanged, this, [this]() { reloadPluginStatus(); });
+  connect(m_pluginShowIssuesOnlyCheckBox, &QCheckBox::toggled, this, [this]() {
+    reloadPluginStatus();
+  });
+
+  auto* pluginToolbarLayout = new QHBoxLayout();
+  pluginToolbarLayout->setContentsMargins(0, 0, 0, 0);
+  pluginToolbarLayout->setSpacing(LayoutConstants::WideHMargin);
+  pluginToolbarLayout->addWidget(m_pluginSearchBox, 1);
+  pluginToolbarLayout->addWidget(m_pluginShowIssuesOnlyCheckBox);
 
   auto* pluginDirectoriesLayout = new QVBoxLayout();
   pluginDirectoriesLayout->addLayout(pluginListLayout);
 
   auto* pluginStatusLayout = new QVBoxLayout();
-  pluginStatusLayout->addWidget(statusLabel);
+  pluginStatusLayout->addLayout(pluginToolbarLayout);
   pluginStatusLayout->addWidget(m_pluginStatusList, 1);
   pluginStatusLayout->addWidget(m_pluginDetails, 1);
 
@@ -239,7 +252,7 @@ void MiscPreferencePane::createGui()
   pluginColumnsLayout->setContentsMargins(0, 0, 0, 0);
   pluginColumnsLayout->setSpacing(LayoutConstants::WideHMargin);
   pluginColumnsLayout->addWidget(
-    createGroupBox(tr("Directories"), pluginDirectoriesLayout), 1);
+    createGroupBox(tr("Search Paths"), pluginDirectoriesLayout), 1);
   pluginColumnsLayout->addWidget(
     createGroupBox(tr("Detected Plugins"), pluginStatusLayout), 1);
 
@@ -490,33 +503,74 @@ void MiscPreferencePane::reloadPluginStatus()
   auto manager = PythonPluginManager{};
   manager.reload(splitPythonPluginDirectories(paths.join('|').toStdString()));
 
+  const auto searchText = m_pluginSearchBox != nullptr
+                            ? m_pluginSearchBox->text().trimmed().toLower()
+                            : QString{};
+  const auto showIssuesOnly = m_pluginShowIssuesOnlyCheckBox != nullptr
+                              && m_pluginShowIssuesOnlyCheckBox->isChecked();
+
   for (const auto& plugin : manager.plugins())
   {
-    const auto title = tr("%1  %2  (%3)")
-                         .arg(QString::fromStdString(plugin.manifest.name))
-                         .arg(QString::fromStdString(plugin.manifest.version))
-                         .arg(pluginStatusText(plugin.status));
+    const auto name = QString::fromStdString(plugin.manifest.name);
+    const auto id = QString::fromStdString(plugin.manifest.id);
+    const auto description = QString::fromStdString(plugin.manifest.description);
+    const auto author = QString::fromStdString(plugin.manifest.author);
+    const auto version = QString::fromStdString(plugin.manifest.version);
+    const auto directory = pathAsQString(plugin.manifest.directory);
+    const auto entry = pathAsQString(plugin.manifest.entry);
+    const auto status = pluginStatusText(plugin.status);
+    const auto error = QString::fromStdString(plugin.error);
+    const auto haystack =
+      QStringList{name, id, description, author, version, directory, entry, status, error}
+        .join(QLatin1Char(' '))
+        .toLower();
+
+    if (!searchText.isEmpty() && !haystack.contains(searchText))
+    {
+      continue;
+    }
+    if (showIssuesOnly && error.isEmpty())
+    {
+      continue;
+    }
+
+    const auto title = description.isEmpty()
+                         ? tr("%1  %2  (%3)").arg(name, version, status)
+                         : tr("%1  %2  (%3)\n%4").arg(name, version, status, description);
     auto* item = new QListWidgetItem{title, m_pluginStatusList};
-    item->setData(Qt::UserRole, QString::fromStdString(plugin.manifest.id));
-    item->setData(Qt::UserRole + 1, QString::fromStdString(plugin.manifest.name));
-    item->setData(Qt::UserRole + 2, QString::fromStdString(plugin.manifest.version));
-    item->setData(Qt::UserRole + 3, pathAsQString(plugin.manifest.directory));
-    item->setData(Qt::UserRole + 4, pathAsQString(plugin.manifest.entry));
-    item->setData(Qt::UserRole + 5, pluginStatusText(plugin.status));
-    item->setData(Qt::UserRole + 6, QString::fromStdString(plugin.error));
+    item->setData(Qt::UserRole, id);
+    item->setData(Qt::UserRole + 1, name);
+    item->setData(Qt::UserRole + 2, version);
+    item->setData(Qt::UserRole + 3, directory);
+    item->setData(Qt::UserRole + 4, entry);
+    item->setData(Qt::UserRole + 5, status);
+    item->setData(Qt::UserRole + 6, error);
+    item->setData(Qt::UserRole + 7, description);
+    item->setData(Qt::UserRole + 8, author);
   }
 
   for (const auto& error : manager.errors())
   {
+    const auto path = pathAsQString(error.path);
+    const auto message = QString::fromStdString(error.message);
+    const auto haystack =
+      QStringList{tr("Manifest error"), path, message}.join(QLatin1Char(' ')).toLower();
+    if (!searchText.isEmpty() && !haystack.contains(searchText))
+    {
+      continue;
+    }
+
     auto* item = new QListWidgetItem{
-      tr("Manifest error  (%1)").arg(tr("Failed")), m_pluginStatusList};
+      tr("Manifest error  (%1)\n%2").arg(tr("Failed"), path), m_pluginStatusList};
     item->setData(Qt::UserRole, QString{});
     item->setData(Qt::UserRole + 1, tr("Manifest error"));
     item->setData(Qt::UserRole + 2, QString{});
-    item->setData(Qt::UserRole + 3, pathAsQString(error.path));
+    item->setData(Qt::UserRole + 3, path);
     item->setData(Qt::UserRole + 4, QString{});
     item->setData(Qt::UserRole + 5, tr("Failed"));
-    item->setData(Qt::UserRole + 6, QString::fromStdString(error.message));
+    item->setData(Qt::UserRole + 6, message);
+    item->setData(Qt::UserRole + 7, QString{});
+    item->setData(Qt::UserRole + 8, QString{});
   }
 
   if (m_pluginStatusList->count() > 0)
@@ -526,7 +580,10 @@ void MiscPreferencePane::reloadPluginStatus()
   else
   {
     m_pluginDetails->setPlainText(
-      tr("No plugin manifests found in the configured directories."));
+      searchText.isEmpty() && !showIssuesOnly
+        ? tr("No plugin manifests found in the configured "
+             "directories.")
+        : tr("No plugins match the current filter."));
   }
 }
 
@@ -551,12 +608,22 @@ void MiscPreferencePane::updatePluginDetails()
   const auto entry = item->data(Qt::UserRole + 4).toString();
   const auto status = item->data(Qt::UserRole + 5).toString();
   const auto error = item->data(Qt::UserRole + 6).toString();
+  const auto description = item->data(Qt::UserRole + 7).toString();
+  const auto author = item->data(Qt::UserRole + 8).toString();
 
   auto details = QString{};
   details += tr("Name: %1\n").arg(name);
   if (!id.isEmpty())
   {
     details += tr("ID: %1\n").arg(id);
+  }
+  if (!description.isEmpty())
+  {
+    details += tr("Description: %1\n").arg(description);
+  }
+  if (!author.isEmpty())
+  {
+    details += tr("Author: %1\n").arg(author);
   }
   if (!version.isEmpty())
   {
