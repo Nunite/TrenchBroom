@@ -299,3 +299,26 @@ those directory components.
 Follow-up: build a reusable `MapWindow` scripting smoke fixture or a smaller
 test double for the scripting context so these can be tested without launching a
 full interactive editor session.
+
+Python v2 now has a first production-architecture checkpoint: `pybind11` is
+available through vcpkg/CMake, `tb2` registers as an embedded module,
+`PythonRuntime` centralizes interpreter setup and script execution context,
+manifest plugins load from `trenchbroom-plugin.json`, and `PythonPluginManager`
+tracks plugin status/errors and cleanup. Focused tests cover manifest parsing,
+`tb2.current_document()`, read-only document/selection/material access,
+transaction smoke, plugin panel creation, event callback registration, and
+plugin unload cleanup.
+
+This is intentionally still a v2 foundation rather than a complete replacement.
+The first stable import is `tb2`; `tb.v2` is only attached when an existing
+legacy `tb` module is already present so v2 does not accidentally shadow the
+hand-written legacy API. The handle layer currently validates active document
+presence but does not yet maintain durable node/face generation tokens, and the
+event/callback tables remain process-global while being scoped by plugin id for
+cleanup.
+
+Follow-up: introduce a real handle registry with document/node invalidation,
+move callback/timer/panel ownership into a per-plugin runtime session, add
+stdout/stderr redirection and traceback formatting tests, then migrate write
+APIs through explicit document transactions before considering `import tb` ->
+v2 as the default route.

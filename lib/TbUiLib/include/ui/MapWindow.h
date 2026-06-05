@@ -25,6 +25,7 @@
 
 #include "NotifierConnection.h"
 #include "mdl/ExportOptions.h"
+#include "ui/python/PythonPluginManager.h"
 
 #include <chrono>
 #include <filesystem>
@@ -118,6 +119,7 @@ private:
   std::optional<std::string> m_lastCompilationProfileName;
 
   NotifierConnection m_notifierConnection;
+  PythonPluginManager m_pythonPluginManager;
 
 private: // shortcuts
   using ActionMap = std::unordered_map<const Action*, QAction*>;

@@ -67,6 +67,8 @@ inline const std::string& languageChinese()
 
 inline auto DefaultPluginPaths =
   Preference<std::string>{"Python/Default plugin paths", ""};
+inline auto PythonPluginDirectories =
+  Preference<std::string>{"Python/Plugin directories", ""};
 inline auto PieMenuAction = Preference<std::string>{"Controls/Pie menu actions", ""};
 inline auto PrefixWorldspawnHeaderOnCopy =
   Preference<bool>{"Controls/Prefix worldspawn header on copy", false};

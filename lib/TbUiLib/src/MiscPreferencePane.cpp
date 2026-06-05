@@ -137,15 +137,14 @@ void MiscPreferencePane::createGui()
   m_clearPluginsBtn = new QPushButton(tr("Clear"));
 
   connect(m_addPluginBtn, &QPushButton::clicked, this, [this]() {
-    const auto pathStr = QFileDialog::getOpenFileName(
+    const auto pathStr = QFileDialog::getExistingDirectory(
       this,
-      tr("Select Default Plugin"),
-      fileDialogDefaultDirectory(FileDialogDir::Map),
-      tr("Python Scripts (*.py);;All Files (*)"));
+      tr("Select Python Plugin Directory"),
+      fileDialogDefaultDirectory(FileDialogDir::Map));
 
     if (!pathStr.isEmpty())
     {
-      updateFileDialogDefaultDirectoryWithFilename(FileDialogDir::Map, pathStr);
+      updateFileDialogDefaultDirectoryWithDirectory(FileDialogDir::Map, pathStr);
       addPluginPath(pathStr);
     }
   });
@@ -176,7 +175,7 @@ void MiscPreferencePane::createGui()
   auto* pluginLayout = new QVBoxLayout();
   pluginLayout->addLayout(pluginListLayout);
 
-  auto* pluginGroupBox = createGroupBox(tr("Default Plugins"), pluginLayout);
+  auto* pluginGroupBox = createGroupBox(tr("Python Plugin Directories"), pluginLayout);
 
   m_prefixWorldspawnOnCopyCheckBox =
     new QCheckBox(tr("Prefix worldspawn header on copy"));
@@ -386,7 +385,7 @@ void MiscPreferencePane::savePluginPaths()
     paths << m_pluginList->item(i)->text();
   }
   auto& prefs = PreferenceManager::instance();
-  prefs.set(Preferences::DefaultPluginPaths, paths.join('|').toStdString());
+  prefs.set(Preferences::PythonPluginDirectories, paths.join('|').toStdString());
 }
 
 void MiscPreferencePane::addPluginPath(const QString& path)
@@ -404,7 +403,7 @@ void MiscPreferencePane::doResetToDefaults()
 {
   auto& prefs = PreferenceManager::instance();
   prefs.resetToDefault(Preferences::Language);
-  prefs.resetToDefault(Preferences::DefaultPluginPaths);
+  prefs.resetToDefault(Preferences::PythonPluginDirectories);
   prefs.resetToDefault(Preferences::PrefixWorldspawnHeaderOnCopy);
   prefs.resetToDefault(Preferences::PieMenuAction);
 
@@ -426,7 +425,7 @@ void MiscPreferencePane::updateControls()
   }
 
   m_pluginList->clear();
-  auto currentPaths = QString::fromStdString(pref(Preferences::DefaultPluginPaths));
+  auto currentPaths = QString::fromStdString(pref(Preferences::PythonPluginDirectories));
   QStringList pathsList = currentPaths.split('|', Qt::SkipEmptyParts);
   for (const auto& path : pathsList)
   {

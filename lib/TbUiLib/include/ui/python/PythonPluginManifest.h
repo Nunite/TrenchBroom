@@ -1,0 +1,39 @@
+#pragma once
+
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace tb::ui
+{
+
+struct PythonPluginManifest
+{
+  std::string id;
+  std::string name;
+  std::string version;
+  int apiVersion = 2;
+  std::filesystem::path entry;
+  std::string description;
+  std::string author;
+  std::filesystem::path directory;
+};
+
+struct PythonPluginManifestError
+{
+  std::filesystem::path path;
+  std::string message;
+};
+
+struct PythonPluginManifestResult
+{
+  std::optional<PythonPluginManifest> manifest;
+  std::optional<PythonPluginManifestError> error;
+};
+
+PythonPluginManifestResult loadPythonPluginManifest(const std::filesystem::path& path);
+std::vector<std::filesystem::path> splitPythonPluginDirectories(const std::string& paths);
+std::string joinPythonPluginDirectories(const std::vector<std::filesystem::path>& paths);
+
+} // namespace tb::ui

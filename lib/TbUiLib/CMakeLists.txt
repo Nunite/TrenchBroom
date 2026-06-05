@@ -170,12 +170,16 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonEntity.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonMaterial.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPlane.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginManifest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginPanel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonRuntime.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonScripting.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonSelection.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonTransaction.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonV2Module.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonVec3.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/QColorUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/QPathUtils.cpp
@@ -425,12 +429,17 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonEntity.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonMaterial.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPlane.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonExecutionContext.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPluginManifest.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPluginManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPluginPanel.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonRuntime.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonScripting.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonSelection.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonTransaction.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonV2Module.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonVec3.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/QColorUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/QPathUtils.h
@@ -521,6 +530,7 @@ target_link_libraries(TbUiLib
     PrecompileQtHeaders
     PrecompileStdHeaders
     cpptrace::cpptrace
+    pybind11::embed
     Python3::Python
     Qt6::Svg
   PUBLIC

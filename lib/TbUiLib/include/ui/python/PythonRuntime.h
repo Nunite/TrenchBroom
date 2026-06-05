@@ -1,0 +1,40 @@
+#pragma once
+
+#include "ui/python/PythonExecutionContext.h"
+
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace tb::ui
+{
+
+class PythonRuntime
+{
+private:
+  PythonRuntime();
+
+public:
+  static PythonRuntime& instance();
+
+  bool ensureInitialized();
+  bool runScript(
+    const PythonExecutionContext& context, const std::filesystem::path& path);
+  void emitEvent(const std::string& eventName, MapWindow& mapWindow);
+  void cleanupPlugin(const std::string& pluginId);
+  void cleanupDocument(MapWindow& mapWindow);
+
+  const std::string& lastError() const;
+  std::string formatCurrentException() const;
+
+private:
+  std::string m_lastError;
+
+  bool installV2Module();
+  bool prependSysPath(const std::filesystem::path& path);
+};
+
+PythonExecutionContext* currentPythonExecutionContext();
+
+} // namespace tb::ui

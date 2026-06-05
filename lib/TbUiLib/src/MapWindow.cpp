@@ -96,7 +96,6 @@
 #include "ui/MapWindowManager.h"
 #include "ui/ObjExportDialog.h"
 #include "ui/PluginInspector.h"
-#include "ui/python/PythonScripting.h"
 #include "ui/QPathUtils.h"
 #include "ui/QStringUtils.h"
 #include "ui/QStyleUtils.h"
@@ -111,6 +110,9 @@
 #include "ui/ViewUtils.h"
 #include "ui/WadUtils.h"
 #include "ui/WidgetState.h"
+#include "ui/python/PythonPluginManifest.h"
+#include "ui/python/PythonRuntime.h"
+#include "ui/python/PythonScripting.h"
 #include "update/Updater.h"
 
 #include "kd/const_overload.h"
@@ -222,12 +224,22 @@ MapWindow::MapWindow(AppController& appController, std::unique_ptr<MapDocument> 
     });
   }
 
+  const auto pluginDirectories =
+    PreferenceManager::instance().get(Preferences::PythonPluginDirectories);
+  if (!pluginDirectories.empty())
+  {
+    m_pythonPluginManager.reload(splitPythonPluginDirectories(pluginDirectories));
+    QTimer::singleShot(0, this, [this]() { m_pythonPluginManager.loadPlugins(*this); });
+  }
+
   // act as if the document was loaded to update the UI
   m_document->documentWasLoadedNotifier();
 }
 
 MapWindow::~MapWindow()
 {
+  m_pythonPluginManager.unloadPlugins(*this);
+
   // Stop the autosave timer
   m_autosaveTimer->stop();
 
@@ -838,6 +850,7 @@ void MapWindow::documentWasLoaded()
   updateToolBarWidgets();
   updateRecentDocumentsMenu();
   loadLastCompilationProfileName();
+  PythonRuntime::instance().emitEvent("document_loaded", *this);
 }
 
 void MapWindow::documentWasSaved()
@@ -847,6 +860,7 @@ void MapWindow::documentWasSaved()
   updateUndoRedoActions();
   updateRecentDocumentsMenu();
   PythonScripting::instance().onDocumentSaved(*this);
+  PythonRuntime::instance().emitEvent("document_saved", *this);
 }
 
 void MapWindow::mapModificationStateDidChange()
@@ -918,6 +932,7 @@ void MapWindow::selectionDidChange(const mdl::SelectionChange&)
   updateActionStateDelayed();
   updateStatusBarDelayed();
   PythonScripting::instance().onSelectionChanged(*this);
+  PythonRuntime::instance().emitEvent("selection_changed", *this);
 }
 
 void MapWindow::currentLayerDidChange()
@@ -2345,10 +2360,7 @@ void MapWindow::showLaunchEngineDialog()
 void MapWindow::runPythonScript()
 {
   const auto pathStr = QFileDialog::getOpenFileName(
-    this,
-    tr("Run Python Script"),
-    QString{},
-    tr("Python Scripts (*.py);;All Files (*)"));
+    this, tr("Run Python Script"), QString{}, tr("Python Scripts (*.py);;All Files (*)"));
 
   if (pathStr.isEmpty())
   {
