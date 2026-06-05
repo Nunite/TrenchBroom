@@ -15,6 +15,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QTextEdit>
 #include <QVBoxLayout>
 #include <QWidgetAction>
 
@@ -26,14 +27,18 @@
 #include "ui/QPathUtils.h"
 #include "ui/QStyleUtils.h"
 #include "ui/ViewConstants.h"
+#include "ui/python/PythonPluginManager.h"
+#include "ui/python/PythonPluginManifest.h"
 
 #include <functional>
+#include <sstream>
 
 namespace tb::ui
 {
 namespace
 {
 constexpr auto ListMinHeight = 130;
+constexpr auto PluginStatusMinHeight = 150;
 constexpr auto ButtonColumnWidth = 92;
 
 void configurePreferenceList(QListWidget* list)
@@ -74,6 +79,20 @@ QGroupBox* createGroupBox(const QString& title, QLayout* contentLayout)
   contentLayout->setSpacing(LayoutConstants::WideVMargin);
   groupBox->setLayout(contentLayout);
   return groupBox;
+}
+
+QString pluginStatusText(const PythonPluginStatus status)
+{
+  switch (status)
+  {
+  case PythonPluginStatus::NotLoaded:
+    return QObject::tr("Ready");
+  case PythonPluginStatus::Loaded:
+    return QObject::tr("Loaded");
+  case PythonPluginStatus::Failed:
+    return QObject::tr("Failed");
+  }
+  return QObject::tr("Unknown");
 }
 } // namespace
 
@@ -135,6 +154,7 @@ void MiscPreferencePane::createGui()
   m_addPluginBtn = new QPushButton(tr("Add..."));
   m_removePluginBtn = new QPushButton(tr("Remove"));
   m_clearPluginsBtn = new QPushButton(tr("Clear"));
+  m_reloadPluginsBtn = new QPushButton(tr("Reload"));
 
   connect(m_addPluginBtn, &QPushButton::clicked, this, [this]() {
     const auto pathStr = QFileDialog::getExistingDirectory(
@@ -163,8 +183,13 @@ void MiscPreferencePane::createGui()
     savePluginPaths();
   });
 
-  auto* pluginBtnLayout =
-    createButtonColumn({m_addPluginBtn, m_removePluginBtn, m_clearPluginsBtn});
+  connect(m_reloadPluginsBtn, &QPushButton::clicked, this, [this]() {
+    savePluginPaths();
+    reloadPluginStatus();
+  });
+
+  auto* pluginBtnLayout = createButtonColumn(
+    {m_addPluginBtn, m_removePluginBtn, m_clearPluginsBtn, m_reloadPluginsBtn});
 
   auto* pluginListLayout = new QHBoxLayout();
   pluginListLayout->setContentsMargins(0, 0, 0, 0);
@@ -172,8 +197,27 @@ void MiscPreferencePane::createGui()
   pluginListLayout->addWidget(m_pluginList);
   pluginListLayout->addLayout(pluginBtnLayout);
 
+  auto* statusLabel = new QLabel{tr("Detected plugins")};
+  setInfoStyle(statusLabel);
+
+  m_pluginStatusList = new QListWidget();
+  m_pluginStatusList->setMinimumHeight(PluginStatusMinHeight);
+  m_pluginStatusList->setAlternatingRowColors(true);
+  m_pluginStatusList->setSelectionMode(QAbstractItemView::SingleSelection);
+
+  m_pluginDetails = new QTextEdit();
+  m_pluginDetails->setReadOnly(true);
+  m_pluginDetails->setMinimumHeight(ListMinHeight);
+
+  connect(m_pluginStatusList, &QListWidget::currentItemChanged, this, [this]() {
+    updatePluginDetails();
+  });
+
   auto* pluginLayout = new QVBoxLayout();
   pluginLayout->addLayout(pluginListLayout);
+  pluginLayout->addWidget(statusLabel);
+  pluginLayout->addWidget(m_pluginStatusList);
+  pluginLayout->addWidget(m_pluginDetails);
 
   auto* pluginGroupBox = createGroupBox(tr("Python Plugin Directories"), pluginLayout);
 
@@ -386,12 +430,118 @@ void MiscPreferencePane::savePluginPaths()
   }
   auto& prefs = PreferenceManager::instance();
   prefs.set(Preferences::PythonPluginDirectories, paths.join('|').toStdString());
+  reloadPluginStatus();
 }
 
 void MiscPreferencePane::addPluginPath(const QString& path)
 {
   new QListWidgetItem(path, m_pluginList);
   savePluginPaths();
+}
+
+void MiscPreferencePane::reloadPluginStatus()
+{
+  if (m_pluginStatusList == nullptr || m_pluginDetails == nullptr)
+  {
+    return;
+  }
+
+  m_pluginStatusList->clear();
+  m_pluginDetails->clear();
+
+  QStringList paths;
+  for (int i = 0; i < m_pluginList->count(); ++i)
+  {
+    paths << m_pluginList->item(i)->text();
+  }
+
+  auto manager = PythonPluginManager{};
+  manager.reload(splitPythonPluginDirectories(paths.join('|').toStdString()));
+
+  for (const auto& plugin : manager.plugins())
+  {
+    const auto title = tr("%1  %2  (%3)")
+                         .arg(QString::fromStdString(plugin.manifest.name))
+                         .arg(QString::fromStdString(plugin.manifest.version))
+                         .arg(pluginStatusText(plugin.status));
+    auto* item = new QListWidgetItem{title, m_pluginStatusList};
+    item->setData(Qt::UserRole, QString::fromStdString(plugin.manifest.id));
+    item->setData(Qt::UserRole + 1, QString::fromStdString(plugin.manifest.name));
+    item->setData(Qt::UserRole + 2, QString::fromStdString(plugin.manifest.version));
+    item->setData(Qt::UserRole + 3, pathAsQString(plugin.manifest.directory));
+    item->setData(Qt::UserRole + 4, pathAsQString(plugin.manifest.entry));
+    item->setData(Qt::UserRole + 5, pluginStatusText(plugin.status));
+    item->setData(Qt::UserRole + 6, QString::fromStdString(plugin.error));
+  }
+
+  for (const auto& error : manager.errors())
+  {
+    auto* item = new QListWidgetItem{
+      tr("Manifest error  (%1)").arg(tr("Failed")), m_pluginStatusList};
+    item->setData(Qt::UserRole, QString{});
+    item->setData(Qt::UserRole + 1, tr("Manifest error"));
+    item->setData(Qt::UserRole + 2, QString{});
+    item->setData(Qt::UserRole + 3, pathAsQString(error.path));
+    item->setData(Qt::UserRole + 4, QString{});
+    item->setData(Qt::UserRole + 5, tr("Failed"));
+    item->setData(Qt::UserRole + 6, QString::fromStdString(error.message));
+  }
+
+  if (m_pluginStatusList->count() > 0)
+  {
+    m_pluginStatusList->setCurrentRow(0);
+  }
+  else
+  {
+    m_pluginDetails->setPlainText(
+      tr("No plugin manifests found in the configured directories."));
+  }
+}
+
+void MiscPreferencePane::updatePluginDetails()
+{
+  if (m_pluginStatusList == nullptr || m_pluginDetails == nullptr)
+  {
+    return;
+  }
+
+  auto* item = m_pluginStatusList->currentItem();
+  if (item == nullptr)
+  {
+    m_pluginDetails->clear();
+    return;
+  }
+
+  const auto id = item->data(Qt::UserRole).toString();
+  const auto name = item->data(Qt::UserRole + 1).toString();
+  const auto version = item->data(Qt::UserRole + 2).toString();
+  const auto directory = item->data(Qt::UserRole + 3).toString();
+  const auto entry = item->data(Qt::UserRole + 4).toString();
+  const auto status = item->data(Qt::UserRole + 5).toString();
+  const auto error = item->data(Qt::UserRole + 6).toString();
+
+  auto details = QString{};
+  details += tr("Name: %1\n").arg(name);
+  if (!id.isEmpty())
+  {
+    details += tr("ID: %1\n").arg(id);
+  }
+  if (!version.isEmpty())
+  {
+    details += tr("Version: %1\n").arg(version);
+  }
+  details += tr("Status: %1\n").arg(status);
+  details += tr("Path: %1\n").arg(directory);
+  if (!entry.isEmpty())
+  {
+    details += tr("Entry: %1\n").arg(entry);
+  }
+  if (!error.isEmpty())
+  {
+    details += tr("\nError:\n%1").arg(error);
+  }
+
+  m_pluginDetails->setPlainText(details);
 }
 
 bool MiscPreferencePane::canResetToDefaults()
@@ -431,6 +581,7 @@ void MiscPreferencePane::updateControls()
   {
     new QListWidgetItem(path, m_pluginList);
   }
+  reloadPluginStatus();
 
   m_prefixWorldspawnOnCopyCheckBox->setChecked(
     pref(Preferences::PrefixWorldspawnHeaderOnCopy));

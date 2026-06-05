@@ -8,6 +8,7 @@ class QCheckBox;
 class QPushButton;
 class QMenu;
 class QListWidget;
+class QTextEdit;
 class QLineEdit;
 
 namespace tb::ui
@@ -24,6 +25,9 @@ private:
   QPushButton* m_addPluginBtn = nullptr;
   QPushButton* m_removePluginBtn = nullptr;
   QPushButton* m_clearPluginsBtn = nullptr;
+  QPushButton* m_reloadPluginsBtn = nullptr;
+  QListWidget* m_pluginStatusList = nullptr;
+  QTextEdit* m_pluginDetails = nullptr;
   QCheckBox* m_prefixWorldspawnOnCopyCheckBox = nullptr;
   QListWidget* m_pieMenuActionList = nullptr;
   QPushButton* m_addActionBtn = nullptr;
@@ -48,6 +52,8 @@ private:
   void addPieMenuAction(const QString& label, const QString& path);
   void savePluginPaths();
   void addPluginPath(const QString& path);
+  void reloadPluginStatus();
+  void updatePluginDetails();
 };
 
 } // namespace tb::ui
