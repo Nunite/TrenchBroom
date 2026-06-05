@@ -6,6 +6,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QFrame>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -13,12 +14,15 @@
 #include <QLineEdit>
 #include <QPointer>
 #include <QPushButton>
+#include <QSizePolicy>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QTextBrowser>
 #include <QTextEdit>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -1529,6 +1533,16 @@ void defineModule(py::module_& module)
 
   py::class_<DocumentHandle>(module, "Document")
     .def_property_readonly(
+      "path",
+      [](DocumentHandle& self) -> py::object {
+        const auto& path = self.get().map().path();
+        if (path.empty())
+        {
+          return py::none();
+        }
+        return py::cast(path.u8string());
+      })
+    .def_property_readonly(
       "entities", [](DocumentHandle& self) { return allEntities(self.get()); })
     .def_property_readonly(
       "selection",
@@ -2271,6 +2285,54 @@ void defineModule(py::module_& module)
         const std::string& key,
         const std::vector<std::vector<std::string>>& rows) {
         setTreeItems(findPanelChild<QTreeWidget>(self.get(), "tree", key), rows);
+      })
+    .def(
+      "add_html_view",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::string& html,
+        const int height,
+        py::object callback) {
+        auto* browser = new QTextBrowser{};
+        browser->setObjectName(panelObjectName("html_view", key));
+        browser->setHtml(QString::fromStdString(html));
+        browser->setOpenExternalLinks(false);
+        browser->setFrameShape(QFrame::NoFrame);
+        browser->setStyleSheet(QStringLiteral("background-color: transparent;"));
+        browser->setTextInteractionFlags(Qt::LinksAccessibleByMouse);
+        if (height > 0 && height <= 40)
+        {
+          browser->setFixedHeight(height);
+          browser->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+          browser->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+          browser->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+          browser->document()->setDocumentMargin(0);
+        }
+        else if (height > 0)
+        {
+          browser->setMinimumHeight(height);
+        }
+        if (!callback.is_none())
+        {
+          auto* session = currentPythonPluginSession();
+          const auto token = registerPanelCallback(std::move(callback));
+          QObject::connect(
+            browser, &QTextBrowser::anchorClicked, [session, token](const QUrl& url) {
+              invokeSessionCallback(session, token, url.toString().toStdString());
+            });
+        }
+        ensurePanelLayout(self.get()).addWidget(browser);
+      },
+      py::arg("key"),
+      py::arg("html"),
+      py::arg("height") = 200,
+      py::arg("callback") = py::none())
+    .def(
+      "set_html_view",
+      [](PluginPanelHandle& self, const std::string& key, const std::string& html) {
+        findPanelChild<QTextBrowser>(self.get(), "html_view", key)
+          .setHtml(QString::fromStdString(html));
       })
     .def("clear", [](PluginPanelHandle& self) {
       if (auto* layout = self.get().layout())

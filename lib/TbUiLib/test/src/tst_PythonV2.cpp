@@ -6,6 +6,7 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QTableWidget>
+#include <QTextBrowser>
 #include <QTextEdit>
 #include <QThread>
 #include <QTreeWidget>
@@ -1139,6 +1140,50 @@ assert face.surface_value == 3.5
     tree->setCurrentItem(tree->topLevelItem(0));
     CHECK(status->text() == QStringLiteral("Tree selection: row=0"));
     manager.unloadPlugins(window);
+  }
+
+  SECTION("creates v2 html views and exposes document path")
+  {
+    auto env = fs::TestEnvironment{};
+    auto currentPathGuard = CurrentPathGuard{env.dir()};
+    env.createFile(
+      "v2_html_view.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+assert doc.path is None or isinstance(doc.path, str)
+
+panel = tb.create_plugin_panel("HTML View")
+
+def on_link(link):
+    with open("python-v2-html-link-ok.txt", "w", encoding="utf-8") as f:
+        f.write(link)
+
+panel.add_html_view("history", '<a href="tb://history/123">History</a>', 120, on_link)
+panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_html_view.py";
+
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* htmlView = panels.back()->findChild<QTextBrowser*>(
+      QStringLiteral("tb2_panel_html_view_history"));
+    REQUIRE(htmlView != nullptr);
+    CHECK(htmlView->toPlainText().contains(QStringLiteral("Updated")));
+
+    emit htmlView->anchorClicked(QUrl{QStringLiteral("tb://history/456")});
+    CHECK(env.loadFile("python-v2-html-link-ok.txt") == "tb://history/456");
   }
 
   SECTION("loads v2 vec3 color demo example plugin")
