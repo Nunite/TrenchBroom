@@ -36,6 +36,12 @@ TEST_CASE("PreferenceDialog")
   auto fixture = AppControllerFixture{};
   auto dialog = std::make_unique<PreferenceDialog>(fixture.appController(), nullptr);
 
+  SECTION("opens at a usable size")
+  {
+    CHECK(dialog->width() >= 800);
+    CHECK(dialog->height() >= 560);
+  }
+
   SECTION("contains the migrated misc preferences pane")
   {
     auto* toolBar = dialog->findChild<QToolBar*>();

@@ -55,6 +55,7 @@ namespace
 
 constexpr int PreferenceDialogMinWidth = 800;
 constexpr int PreferenceDialogMinHeight = 300;
+constexpr int PreferenceDialogPreferredHeight = 560;
 constexpr int PreferencePaneCount = 7;
 
 } // namespace
@@ -266,7 +267,8 @@ QSize PreferenceDialog::initialDialogSize() const
     pane != nullptr ? pane->contentSizeHint().height() : PreferenceDialogMinHeight;
   const auto frameHeight = sizeHint().height() - m_stackedWidget->sizeHint().height();
   const auto initialWidth = std::max(sizeHint().width(), PreferenceDialogMinWidth);
-  const auto initialHeight = frameHeight + maxPaneHeight;
+  const auto initialHeight =
+    std::max(frameHeight + maxPaneHeight, PreferenceDialogPreferredHeight);
   return {initialWidth, initialHeight};
 }
 
