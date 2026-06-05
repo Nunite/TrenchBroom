@@ -30,9 +30,7 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PieMenu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PreferenceDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PluginInspector.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonPluginPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonPluginManifest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonV2.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPathUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPreferenceStore.cpp

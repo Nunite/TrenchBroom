@@ -28,6 +28,7 @@
 #include "ui/python/PythonPluginManager.h"
 #include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonRuntime.h"
+#include "ui/python/PythonScripting.h"
 
 #include "vm/bbox.h"
 
@@ -590,6 +591,62 @@ face.set_material("changed")
     CHECK(brushNode->brush().face(0).attributes().materialName() == "changed");
     REQUIRE(map.selection().brushes.size() == 1u);
     CHECK(map.selection().brushes.front() == brushNode);
+  }
+
+  SECTION("runs v2 hello panel through legacy script entry")
+  {
+    const auto helloPanelScript =
+      std::filesystem::path{"python/examples/v2/hello_panel/main.py"};
+    REQUIRE(std::filesystem::exists(helloPanelScript));
+    REQUIRE(pluginPanels(window).empty());
+    CAPTURE(PythonRuntime::instance().lastError());
+    CHECK(PythonScripting::instance().runScript(window, helloPanelScript));
+    CHECK_FALSE(pluginPanels(window).empty());
+  }
+
+  SECTION("runs generated v2 panels through direct script entry")
+  {
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "direct_v2_import.py",
+      R"(
+import tb2 as tb
+)");
+    env.createFile(
+      "direct_v2_panel.py",
+      R"(
+import tb2 as tb
+
+panel = tb.create_plugin_panel("V2 Hello")
+)");
+    env.createFile(
+      "direct_v2_label.py",
+      R"(
+import tb2 as tb
+
+panel = tb.create_plugin_panel("V2 Hello")
+panel.add_label("Hello from a direct script.")
+)");
+    env.createFile(
+      "direct_v2_button.py",
+      R"(
+import tb2 as tb
+
+panel = tb.create_plugin_panel("V2 Hello")
+panel.add_label("Hello from a direct script.")
+panel.add_button("Print", lambda: print("clicked"))
+)");
+
+    CHECK(
+      PythonScripting::instance().runScript(window, env.dir() / "direct_v2_import.py"));
+    CHECK(
+      PythonScripting::instance().runScript(window, env.dir() / "direct_v2_panel.py"));
+    CHECK(
+      PythonScripting::instance().runScript(window, env.dir() / "direct_v2_label.py"));
+    CAPTURE(PythonRuntime::instance().lastError());
+    CHECK(
+      PythonScripting::instance().runScript(window, env.dir() / "direct_v2_button.py"));
+    CHECK_FALSE(pluginPanels(window).empty());
   }
 }
 

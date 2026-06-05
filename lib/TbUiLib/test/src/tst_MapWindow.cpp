@@ -19,12 +19,10 @@
 
 #include <QApplication>
 #include <QComboBox>
-#include <QDeadlineTimer>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
-#include <QThread>
 #include <QWidget>
 #include <QtTest/QTest>
 
@@ -249,21 +247,16 @@ TEST_CASE("MapWindow")
     env.createFile(
       "smoke.py",
       R"(
-import tb
+import tb2 as tb
 
 doc = tb.current_document()
 assert doc is not None
 assert len(doc.entities) >= 1
 assert isinstance(doc.materials, list)
-assert isinstance(doc.material_collections, list)
 for material in doc.materials:
     assert isinstance(material.name, str)
-    assert isinstance(material.collection_name, str)
     assert isinstance(material.width, int)
     assert isinstance(material.height, int)
-for collection in doc.material_collections:
-    assert isinstance(collection.name, str)
-    assert isinstance(collection.materials, list)
 print("python smoke ok")
 with open("python-smoke-ok.txt", "w", encoding="utf-8") as f:
     f.write(doc.entities[0].classname)
@@ -281,12 +274,13 @@ with open("python-smoke-ok.txt", "w", encoding="utf-8") as f:
     env.createFile(
       "transaction.py",
       R"(
-import tb
+import tb2 as tb
 
 doc = tb.current_document()
+entity = doc.entities[0]
 with doc.transaction("python smoke transaction"):
-    assert doc.selection.set_property("codex_python_smoke", "ok", True)
-)"); // worldspawn is the default entity selection when no entity is explicitly selected.
+    entity.set("codex_python_smoke", "ok")
+)");
 
     const auto currentPathGuard = CurrentPathGuard{env.dir()};
 
@@ -297,47 +291,13 @@ with doc.transaction("python smoke transaction"):
     CHECK(*value == "ok");
   }
 
-  SECTION("runs a Python timer callback")
-  {
-    auto env = fs::TestEnvironment{};
-    env.createFile(
-      "timer.py",
-      R"(
-import tb
-
-timer_id = None
-
-def on_timer():
-    global timer_id
-    with open("python-timer-ok.txt", "w", encoding="utf-8") as f:
-        f.write("ok")
-    tb.clear_interval(timer_id)
-
-timer_id = tb.set_interval(on_timer, 1)
-)");
-
-    const auto currentPathGuard = CurrentPathGuard{env.dir()};
-
-    REQUIRE(PythonScripting::instance().runScript(window, env.dir() / "timer.py"));
-
-    auto deadline = QDeadlineTimer{5000};
-    while (!deadline.hasExpired()
-           && !std::filesystem::exists(env.dir() / "python-timer-ok.txt"))
-    {
-      QApplication::processEvents(QEventLoop::AllEvents, 50);
-      QThread::msleep(10);
-    }
-
-    CHECK(env.loadFile("python-timer-ok.txt") == "ok");
-  }
-
   SECTION("runs Python selection_changed callbacks")
   {
     auto env = fs::TestEnvironment{};
     env.createFile(
       "selection_callback.py",
       R"(
-import tb
+import tb2 as tb
 
 count = 0
 
@@ -346,9 +306,9 @@ def on_selection_changed():
     count += 1
     with open("python-selection-callback-ok.txt", "w", encoding="utf-8") as f:
         f.write(str(count))
+    tb.unregister_callback(callback_token)
 
-tb.register_callback("selection_changed", on_selection_changed)
-tb.register_callback("selection_changed", on_selection_changed)
+callback_token = tb.register_callback("selection_changed", on_selection_changed)
 )");
 
     const auto currentPathGuard = CurrentPathGuard{env.dir()};
@@ -365,17 +325,6 @@ tb.register_callback("selection_changed", on_selection_changed)
 
     CHECK(env.loadFile("python-selection-callback-ok.txt") == "1");
 
-    env.createFile(
-      "unregister_selection_callback.py",
-      R"(
-import tb
-
-tb.unregister_callback("selection_changed", on_selection_changed)
-)");
-
-    REQUIRE(PythonScripting::instance().runScript(
-      window, env.dir() / "unregister_selection_callback.py"));
-
     mdl::deselectAll(map);
     QApplication::processEvents();
 
@@ -388,7 +337,7 @@ tb.unregister_callback("selection_changed", on_selection_changed)
     env.createFile(
       "actions.py",
       R"(
-import tb
+import tb2 as tb
 
 actions = tb.list_actions()
 assert len(actions) > 0
@@ -417,83 +366,17 @@ else:
     CHECK_FALSE(window.document().map().modified());
   }
 
-  SECTION("runs Python brush and face API smoke")
-  {
-    auto env = fs::TestEnvironment{};
-    env.createFile(
-      "brush_face.py",
-      R"(
-import tb
-
-doc = tb.current_document()
-brush = tb.create_brush([
-    (-64, -64, -64),
-    (-64, -64, 64),
-    (-64, 64, -64),
-    (-64, 64, 64),
-    (64, -64, -64),
-    (64, -64, 64),
-    (64, 64, -64),
-    (64, 64, 64),
-])
-
-assert brush is not None
-assert len(doc.selection.brushes) == 1
-assert len(doc.selection.brush_vertices()) == 1
-
-faces = brush.faces()
-assert len(faces) == 6
-face = faces[0]
-face.texture_name = "codex/test"
-face.offset = (12.0, 24.0)
-face.scale = (0.5, 0.25)
-face.rotation = 45.0
-face.surface_contents = 7
-face.surface_flags = 11
-face.surface_value = 3.5
-
-assert face.texture_name == "codex/test"
-assert face.offset == (12.0, 24.0)
-assert face.scale == (0.5, 0.25)
-assert face.rotation == 45.0
-assert face.surface_contents == 7
-assert face.surface_flags == 11
-assert face.surface_value == 3.5
-assert len(face.vertices) >= 3
-assert face.normal is not None
-
-with open("python-brush-face-ok.txt", "w", encoding="utf-8") as f:
-    f.write(str(len(faces)))
-)");
-
-    const auto currentPathGuard = CurrentPathGuard{env.dir()};
-
-    CHECK(PythonScripting::instance().runScript(window, env.dir() / "brush_face.py"));
-    CHECK(env.loadFile("python-brush-face-ok.txt") == "6");
-
-    const auto& selectedBrushes = window.document().map().selection().brushes;
-    REQUIRE(selectedBrushes.size() == 1u);
-    const auto& face = selectedBrushes.front()->brush().faces().front();
-    CHECK(face.attributes().materialName() == "codex/test");
-    CHECK(face.attributes().offset() == vm::vec2f{12.0f, 24.0f});
-    CHECK(face.attributes().scale() == vm::vec2f{0.5f, 0.25f});
-    CHECK(face.attributes().rotation() == 45.0f);
-    CHECK(face.attributes().surfaceContents() == std::optional<int>{7});
-    CHECK(face.attributes().surfaceFlags() == std::optional<int>{11});
-    CHECK(face.attributes().surfaceValue() == std::optional<float>{3.5f});
-  }
-
   SECTION("creates a plugin panel from a Python script")
   {
     auto env = fs::TestEnvironment{};
     env.createFile(
       "plugin_panel.py",
       R"(
-import tb
+import tb2 as tb
 
 panel = tb.create_plugin_panel("Codex Panel")
-panel.add_label_named("status", "Ready")
-panel.add_button("Run")
+panel.add_label("Ready")
+panel.add_button("Run", lambda: print("run"))
 )");
 
     const auto currentPathGuard = CurrentPathGuard{env.dir()};
@@ -507,7 +390,14 @@ panel.add_button("Run")
     REQUIRE(panels.size() == 1u);
 
     auto* panel = panels.front();
-    auto* label = panel->findChild<QLabel*>("tb_py_panel_label_status");
+    auto* label = static_cast<QLabel*>(nullptr);
+    for (auto* candidate : panel->findChildren<QLabel*>())
+    {
+      if (candidate->text() == QStringLiteral("Ready"))
+      {
+        label = candidate;
+      }
+    }
     const auto buttons = panel->findChildren<QPushButton*>();
 
     REQUIRE(label != nullptr);

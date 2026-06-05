@@ -291,14 +291,6 @@ bool PythonRuntime::ensureInitialized()
     return false;
   }
 
-  auto* sysModules = PyImport_GetModuleDict();
-  auto* tbModule = PyDict_GetItemString(sysModules, "tb");
-  if (tbModule != nullptr)
-  {
-    PyObject_SetAttrString(tbModule, "v2", tb2Module);
-    PyDict_SetItemString(sysModules, "tb.v2", tb2Module);
-  }
-
   Py_DECREF(tb2Module);
   PyGILState_Release(gil);
   return true;

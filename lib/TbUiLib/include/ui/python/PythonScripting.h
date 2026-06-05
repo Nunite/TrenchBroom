@@ -38,9 +38,6 @@ public:
   static PythonScripting& instance();
 
   bool runScript(MapWindow& frame, const std::filesystem::path& path);
-
-  void onSelectionChanged(MapWindow& frame);
-  void onDocumentSaved(MapWindow& frame);
 };
 
 } // namespace tb::ui

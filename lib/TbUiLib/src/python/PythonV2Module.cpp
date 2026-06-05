@@ -329,7 +329,7 @@ void logPythonCallbackError(PythonPluginSession& session, const py::error_alread
   }
 }
 
-int registerSessionCallback(py::object callback)
+int registerPanelCallback(py::object callback)
 {
   if (!PyCallable_Check(callback.ptr()))
   {
@@ -337,25 +337,29 @@ int registerSessionCallback(py::object callback)
   }
 
   auto* session = currentPythonPluginSession();
-  if (session == nullptr)
+  auto* context = currentPythonExecutionContext();
+  auto pluginId = std::string{};
+  if (session != nullptr)
   {
-    throw std::runtime_error{"Plugin panel callbacks require an active plugin session"};
+    pluginId = session->pluginId();
+  }
+  else if (context != nullptr)
+  {
+    pluginId = context->pluginId;
   }
 
   const auto token = g_nextCallbackToken++;
-  g_callbacks.emplace(token, CallbackEntry{session->pluginId(), std::move(callback)});
-  session->addCallbackToken(token);
+  g_callbacks.emplace(token, CallbackEntry{std::move(pluginId), std::move(callback)});
+  if (session != nullptr)
+  {
+    session->addCallbackToken(token);
+  }
   return token;
 }
 
 template <typename... Args>
 void invokeSessionCallback(PythonPluginSession* session, const int token, Args&&... args)
 {
-  if (session == nullptr)
-  {
-    return;
-  }
-
   auto gil = py::gil_scoped_acquire{};
   const auto callbackIt = g_callbacks.find(token);
   if (callbackIt == std::end(g_callbacks))
@@ -369,7 +373,14 @@ void invokeSessionCallback(PythonPluginSession* session, const int token, Args&&
   }
   catch (const py::error_already_set& e)
   {
-    logPythonCallbackError(*session, e);
+    if (session != nullptr)
+    {
+      logPythonCallbackError(*session, e);
+    }
+    else
+    {
+      PyErr_Print();
+    }
   }
 }
 
@@ -932,7 +943,7 @@ void defineModule(py::module_& module)
       [](PluginPanelHandle& self, const std::string& text, py::object callback) {
         auto* button = new QPushButton{QString::fromStdString(text)};
         auto* session = currentPythonPluginSession();
-        const auto token = registerSessionCallback(std::move(callback));
+        const auto token = registerPanelCallback(std::move(callback));
         QObject::connect(button, &QPushButton::clicked, [session, token]() {
           invokeSessionCallback(session, token);
         });
@@ -948,7 +959,7 @@ void defineModule(py::module_& module)
         auto* checkbox = new QCheckBox{QString::fromStdString(text)};
         checkbox->setChecked(checked);
         auto* session = currentPythonPluginSession();
-        const auto token = registerSessionCallback(std::move(callback));
+        const auto token = registerPanelCallback(std::move(callback));
         QObject::connect(
           checkbox, &QCheckBox::toggled, [session, token](const bool value) {
             invokeSessionCallback(session, token, value);
@@ -960,7 +971,7 @@ void defineModule(py::module_& module)
       [](PluginPanelHandle& self, const std::string& text, py::object callback) {
         auto* lineEdit = new QLineEdit{QString::fromStdString(text)};
         auto* session = currentPythonPluginSession();
-        const auto token = registerSessionCallback(std::move(callback));
+        const auto token = registerPanelCallback(std::move(callback));
         QObject::connect(
           lineEdit, &QLineEdit::textChanged, [session, token](const QString& value) {
             invokeSessionCallback(session, token, value.toStdString());
@@ -984,7 +995,7 @@ void defineModule(py::module_& module)
           comboBox->setCurrentIndex(currentIndex);
         }
         auto* session = currentPythonPluginSession();
-        const auto token = registerSessionCallback(std::move(callback));
+        const auto token = registerPanelCallback(std::move(callback));
         QObject::connect(
           comboBox,
           &QComboBox::currentTextChanged,

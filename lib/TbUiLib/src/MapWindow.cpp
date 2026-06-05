@@ -862,7 +862,6 @@ void MapWindow::documentWasSaved()
   updateActionState();
   updateUndoRedoActions();
   updateRecentDocumentsMenu();
-  PythonScripting::instance().onDocumentSaved(*this);
   PythonRuntime::instance().emitEvent("document_saved", *this);
 }
 
@@ -934,7 +933,6 @@ void MapWindow::selectionDidChange(const mdl::SelectionChange&)
 {
   updateActionStateDelayed();
   updateStatusBarDelayed();
-  PythonScripting::instance().onSelectionChanged(*this);
   PythonRuntime::instance().emitEvent("selection_changed", *this);
 }
 
