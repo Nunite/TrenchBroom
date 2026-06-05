@@ -16,7 +16,8 @@ constexpr auto ManifestFileName = "trenchbroom-plugin.json";
 
 bool hasPluginManifest(const std::filesystem::path& directory)
 {
-  return std::filesystem::exists(directory / ManifestFileName);
+  auto error = std::error_code{};
+  return std::filesystem::exists(directory / ManifestFileName, error) && !error;
 }
 
 std::vector<std::filesystem::path> discoverPluginDirectories(
@@ -29,17 +30,19 @@ std::vector<std::filesystem::path> discoverPluginDirectories(
     return result;
   }
 
-  if (!std::filesystem::is_directory(directory))
+  auto error = std::error_code{};
+  if (!std::filesystem::is_directory(directory, error) || error)
   {
     return result;
   }
 
-  for (const auto& entry : std::filesystem::directory_iterator{directory})
+  for (const auto& entry : std::filesystem::directory_iterator{directory, error})
   {
-    if (entry.is_directory() && hasPluginManifest(entry.path()))
+    if (entry.is_directory(error) && !error && hasPluginManifest(entry.path()))
     {
       result.push_back(entry.path());
     }
+    error.clear();
   }
 
   std::ranges::sort(result);

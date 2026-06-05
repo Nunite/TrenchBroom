@@ -23,6 +23,8 @@
 
 #include "NotifierConnection.h"
 
+#include <array>
+
 class QDialogButtonBox;
 class QStackedWidget;
 class QToolBar;
@@ -45,6 +47,7 @@ private:
   QToolBar* m_toolBar = nullptr;
   QStackedWidget* m_stackedWidget = nullptr;
   QDialogButtonBox* m_buttonBox = nullptr;
+  std::array<PreferencePane*, 7> m_panes = {};
 
   NotifierConnection m_notifierConnection;
 
@@ -58,6 +61,7 @@ protected: // QWidget overrides
 
 private:
   void createGui();
+  PreferencePane* ensurePane(PrefPane pane);
   QSize initialDialogSize() const;
   void switchToPane(PrefPane pane);
   PreferencePane* currentPane() const;

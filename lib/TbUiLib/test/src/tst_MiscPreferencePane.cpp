@@ -59,7 +59,8 @@ TEST_CASE("MiscPreferencePane")
 {
   auto actionManager = ActionManager{};
   auto& prefs = PreferenceManager::instance();
-  prefs.set(Preferences::DefaultPluginPaths, "C:/tb/plugin_a.py|D:/tools/plugin_b.py");
+  prefs.set(
+    Preferences::PythonPluginDirectories, "C:/tb/plugin_a.py|D:/tools/plugin_b.py");
   prefs.set(Preferences::PieMenuAction, "Menu/Edit/Undo|Menu/Edit/Redo");
 
   auto pane = MiscPreferencePane{};
@@ -82,7 +83,7 @@ TEST_CASE("MiscPreferencePane")
   {
     pane.resetToDefaults();
 
-    CHECK(prefs.get(Preferences::DefaultPluginPaths).empty());
+    CHECK(prefs.get(Preferences::PythonPluginDirectories).empty());
     CHECK(prefs.get(Preferences::PieMenuAction).empty());
     CHECK(listWithItems(pane, {"C:/tb/plugin_a.py", "D:/tools/plugin_b.py"}) == nullptr);
     CHECK(listWithItems(pane, {"Undo", "Redo"}) == nullptr);

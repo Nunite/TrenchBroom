@@ -55,6 +55,7 @@ namespace
 
 constexpr int PreferenceDialogMinWidth = 800;
 constexpr int PreferenceDialogMinHeight = 300;
+constexpr int PreferencePaneCount = 7;
 
 } // namespace
 
@@ -166,13 +167,10 @@ void PreferenceDialog::createGui()
   }
 
   m_stackedWidget = new QStackedWidget{};
-  m_stackedWidget->addWidget(new GamesPreferencePane{m_appController, m_document});
-  m_stackedWidget->addWidget(new ViewPreferencePane{});
-  m_stackedWidget->addWidget(new ColorsPreferencePane{});
-  m_stackedWidget->addWidget(new MousePreferencePane{});
-  m_stackedWidget->addWidget(new KeyboardPreferencePane{m_appController, m_document});
-  m_stackedWidget->addWidget(new MiscPreferencePane{});
-  m_stackedWidget->addWidget(new UpdatePreferencePane{m_appController});
+  for (auto i = 0; i < PreferencePaneCount; ++i)
+  {
+    m_stackedWidget->addWidget(new QWidget{});
+  }
 
   m_buttonBox = new QDialogButtonBox{
     PreferenceManager::instance().saveInstantly()
@@ -218,18 +216,54 @@ void PreferenceDialog::createGui()
   layout->addLayout(wrapDialogButtonBox(m_buttonBox));
 }
 
+PreferencePane* PreferenceDialog::ensurePane(const PrefPane pane)
+{
+  const auto index = int(pane);
+  auto*& result = m_panes[size_t(index)];
+  if (result != nullptr)
+  {
+    return result;
+  }
+
+  switch (pane)
+  {
+  case PrefPane::Games:
+    result = new GamesPreferencePane{m_appController, m_document};
+    break;
+  case PrefPane::View:
+    result = new ViewPreferencePane{};
+    break;
+  case PrefPane::Colors:
+    result = new ColorsPreferencePane{};
+    break;
+  case PrefPane::Mouse:
+    result = new MousePreferencePane{};
+    break;
+  case PrefPane::Keyboard:
+    result = new KeyboardPreferencePane{m_appController, m_document};
+    break;
+  case PrefPane::Misc:
+    result = new MiscPreferencePane{};
+    break;
+  case PrefPane::Update:
+    result = new UpdatePreferencePane{m_appController};
+    break;
+  default:
+    return nullptr;
+  }
+
+  auto* oldWidget = m_stackedWidget->widget(index);
+  m_stackedWidget->removeWidget(oldWidget);
+  delete oldWidget;
+  m_stackedWidget->insertWidget(index, result);
+  return result;
+}
+
 QSize PreferenceDialog::initialDialogSize() const
 {
-  const auto numPanes = m_stackedWidget->count();
-  contract_assert(numPanes > 0);
-
-  const auto paneHeights =
-    std::views::iota(0, numPanes) | std::views::transform([&](const auto i) {
-      const auto* pane = static_cast<PreferencePane*>(m_stackedWidget->widget(i));
-      return pane->contentSizeHint().height();
-    });
-
-  const auto maxPaneHeight = *std::ranges::max_element(paneHeights);
+  const auto* pane = currentPane();
+  const auto maxPaneHeight =
+    pane != nullptr ? pane->contentSizeHint().height() : PreferenceDialogMinHeight;
   const auto frameHeight = sizeHint().height() - m_stackedWidget->sizeHint().height();
   const auto initialWidth = std::max(sizeHint().width(), PreferenceDialogMinWidth);
   const auto initialHeight = frameHeight + maxPaneHeight;
@@ -238,8 +272,10 @@ QSize PreferenceDialog::initialDialogSize() const
 
 void PreferenceDialog::switchToPane(const PrefPane pane)
 {
-  if (currentPane()->validate())
+  if (auto* previousPane = currentPane();
+      previousPane == nullptr || previousPane->validate())
   {
+    ensurePane(pane);
     m_stackedWidget->setCurrentIndex(int(pane));
     currentPane()->updateControls();
 
@@ -250,19 +286,31 @@ void PreferenceDialog::switchToPane(const PrefPane pane)
 
 PreferencePane* PreferenceDialog::currentPane() const
 {
-  return static_cast<PreferencePane*>(m_stackedWidget->currentWidget());
+  const auto index = m_stackedWidget->currentIndex();
+  if (index < 0)
+  {
+    return nullptr;
+  }
+  return m_panes[size_t(index)];
 }
 
 void PreferenceDialog::connectObservers()
 {
   auto& prefs = PreferenceManager::instance();
-  m_notifierConnection += prefs.preferenceDidChangeNotifier.connect(
-    [this](const auto&) { currentPane()->updateControls(); });
+  m_notifierConnection += prefs.preferenceDidChangeNotifier.connect([this](const auto&) {
+    if (auto* pane = currentPane())
+    {
+      pane->updateControls();
+    }
+  });
 }
 
 void PreferenceDialog::resetToDefaults()
 {
-  currentPane()->resetToDefaults();
+  if (auto* pane = currentPane())
+  {
+    pane->resetToDefaults();
+  }
 }
 
 // Don't display tooltips for pane switcher buttons...

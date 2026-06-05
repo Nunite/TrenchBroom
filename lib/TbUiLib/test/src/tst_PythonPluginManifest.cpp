@@ -86,6 +86,16 @@ TEST_CASE("PythonPluginManifest")
     CHECK(manager.plugins()[1].manifest.id == "codex.two");
     CHECK(manager.errors().empty());
   }
+
+  SECTION("manager tolerates missing plugin directories")
+  {
+    auto manager = PythonPluginManager{};
+    CHECK_NOTHROW(manager.reload({env.dir() / "does-not-exist"}));
+
+    CHECK(manager.plugins().empty());
+    REQUIRE(manager.errors().size() == 1u);
+    CHECK(manager.errors()[0].message == "Plugin manifest not found");
+  }
 }
 
 } // namespace tb::ui

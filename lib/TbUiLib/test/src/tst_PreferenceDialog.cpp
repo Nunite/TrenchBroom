@@ -24,6 +24,8 @@
 #include "ui/AppControllerFixture.h"
 #include "ui/PreferenceDialog.h"
 
+#include <memory>
+
 #include <catch2/catch_test_macros.hpp>
 
 namespace tb::ui
@@ -32,11 +34,11 @@ namespace tb::ui
 TEST_CASE("PreferenceDialog")
 {
   auto fixture = AppControllerFixture{};
-  auto dialog = PreferenceDialog{fixture.appController(), nullptr};
+  auto dialog = std::make_unique<PreferenceDialog>(fixture.appController(), nullptr);
 
   SECTION("contains the migrated misc preferences pane")
   {
-    auto* toolBar = dialog.findChild<QToolBar*>();
+    auto* toolBar = dialog->findChild<QToolBar*>();
     REQUIRE(toolBar != nullptr);
 
     auto* miscAction = [&]() -> QAction* {
@@ -55,14 +57,14 @@ TEST_CASE("PreferenceDialog")
     miscAction->trigger();
 
     auto foundLanguageLabel = false;
-    for (auto* label : dialog.findChildren<QLabel*>())
+    for (auto* label : dialog->findChildren<QLabel*>())
     {
       foundLanguageLabel =
         foundLanguageLabel || label->text() == QStringLiteral("UI Language");
     }
 
     auto foundPieMenuGroup = false;
-    for (auto* groupBox : dialog.findChildren<QGroupBox*>())
+    for (auto* groupBox : dialog->findChildren<QGroupBox*>())
     {
       foundPieMenuGroup =
         foundPieMenuGroup || groupBox->title() == QStringLiteral("Pie Menu Actions");
@@ -71,6 +73,8 @@ TEST_CASE("PreferenceDialog")
     CHECK(foundLanguageLabel);
     CHECK(foundPieMenuGroup);
   }
+
+  dialog.reset();
 }
 
 } // namespace tb::ui
