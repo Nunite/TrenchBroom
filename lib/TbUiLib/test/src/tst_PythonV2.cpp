@@ -1237,6 +1237,56 @@ assert face.surface_value == 3.5
     manager.unloadPlugins(window);
   }
 
+  SECTION("loads v2 distribute tool example plugin")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "distribute_tool") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    map.vertexHandles().add(vm::vec3d{0.0, 0.0, 0.0});
+    map.vertexHandles().add(vm::vec3d{128.0, 0.0, 0.0});
+    map.vertexHandles().select(vm::vec3d{0.0, 0.0, 0.0});
+    map.vertexHandles().select(vm::vec3d{128.0, 0.0, 0.0});
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/distribute_tool"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+
+    auto* recordButton = static_cast<QPushButton*>(nullptr);
+    auto* distributeButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Record Path From Selection"))
+      {
+        recordButton = button;
+      }
+      if (button->text() == QStringLiteral("Distribute Selected Objects"))
+      {
+        distributeButton = button;
+      }
+    }
+    REQUIRE(recordButton != nullptr);
+    REQUIRE(distributeButton != nullptr);
+
+    recordButton->click();
+    distributeButton->click();
+    CHECK(map.worldNode().defaultLayer()->childCount() > 1u);
+    manager.unloadPlugins(window);
+  }
+
   SECTION("runs v2 hello panel through legacy script entry")
   {
     const auto helloPanelScript =

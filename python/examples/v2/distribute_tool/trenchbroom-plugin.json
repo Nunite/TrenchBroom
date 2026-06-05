@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.distribute_tool",
+  "name": "Distribute Tool",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Distributes selected objects along recorded vertex or path entity points.",
+  "author": "TrenchBroom"
+}
