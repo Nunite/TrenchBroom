@@ -110,6 +110,7 @@
 #include "ui/ViewUtils.h"
 #include "ui/WadUtils.h"
 #include "ui/WidgetState.h"
+#include "ui/python/PythonHandleRegistry.h"
 #include "ui/python/PythonPluginManifest.h"
 #include "ui/python/PythonRuntime.h"
 #include "ui/python/PythonScripting.h"
@@ -812,6 +813,8 @@ void MapWindow::connectObservers()
     this, &MapWindow::mapModificationStateDidChange);
   m_notifierConnection +=
     m_document->selectionDidChangeNotifier.connect(this, &MapWindow::selectionDidChange);
+  m_notifierConnection += m_document->nodesDidChangeNotifier.connect(
+    [](const auto& nodes) { PythonHandleRegistry::instance().invalidateNodes(nodes); });
   m_notifierConnection += m_document->currentLayerDidChangeNotifier.connect(
     this, &MapWindow::currentLayerDidChange);
   m_notifierConnection +=

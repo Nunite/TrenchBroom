@@ -168,6 +168,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PreferencePane.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonDocument.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonEntity.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonHandleRegistry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonMaterial.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPlane.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginManifest.cpp
@@ -428,6 +429,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PreferencePane.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonDocument.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonEntity.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonHandleRegistry.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonMaterial.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPlane.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonExecutionContext.h

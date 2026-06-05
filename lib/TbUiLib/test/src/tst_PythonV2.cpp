@@ -8,10 +8,13 @@
 #include "gl/GlManager.h"
 #include "gl/ResourceManager.h"
 #include "mdl/GameConfigFixture.h"
+#include "mdl/Map.h"
 #include "mdl/MapFormat.h"
+#include "mdl/WorldNode.h"
 #include "ui/AppControllerFixture.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
+#include "ui/python/PythonHandleRegistry.h"
 #include "ui/python/PythonPluginManager.h"
 #include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonRuntime.h"
@@ -253,6 +256,45 @@ tb._cached_document.entities
       context, env.dir() / "v2_use_cached_document.py"));
     CHECK(
       PythonRuntime::instance().lastError().find("Document is no longer valid")
+      != std::string::npos);
+  }
+
+  SECTION("invalidates entity handles when nodes change")
+  {
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_cache_entity.py",
+      R"(
+import tb2 as tb
+
+tb._cached_entity = tb.current_document().entities[0]
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_cache_entity.py";
+
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+    auto* worldNode = static_cast<mdl::Node*>(&window.document().map().worldNode());
+    auto nodes = std::vector<mdl::Node*>{worldNode};
+    PythonHandleRegistry::instance().invalidateNodes(nodes);
+
+    env.createFile(
+      "v2_use_cached_entity.py",
+      R"(
+import tb2 as tb
+
+tb._cached_entity.classname
+)");
+
+    CHECK_FALSE(PythonRuntime::instance().runScript(
+      context, env.dir() / "v2_use_cached_entity.py"));
+    CHECK(
+      PythonRuntime::instance().lastError().find("Entity is no longer valid")
       != std::string::npos);
   }
 

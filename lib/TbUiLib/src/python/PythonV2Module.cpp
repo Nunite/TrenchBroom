@@ -29,6 +29,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/python/PythonExecutionContext.h"
+#include "ui/python/PythonHandleRegistry.h"
 #include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonRuntime.h"
 
@@ -54,9 +55,6 @@ namespace tb::ui
 {
 namespace
 {
-size_t currentDocumentGeneration(MapDocument* document);
-void invalidateDocumentHandles(MapDocument* document);
-
 struct DocumentHandle
 {
   MapDocument* document = nullptr;
@@ -64,7 +62,9 @@ struct DocumentHandle
 
   MapDocument& get() const
   {
-    if (document == nullptr || generation != currentDocumentGeneration(document))
+    if (
+      document == nullptr
+      || generation != PythonHandleRegistry::instance().documentGeneration(document))
     {
       throw std::runtime_error{"Document is no longer valid"};
     }
@@ -84,11 +84,14 @@ struct EntityHandle
   MapDocument* document = nullptr;
   size_t generation = 0;
   mdl::EntityNodeBase* entity = nullptr;
+  size_t nodeGeneration = 0;
 
   mdl::EntityNodeBase& get() const
   {
     DocumentHandle{document, generation}.get();
-    if (entity == nullptr)
+    if (
+      entity == nullptr
+      || nodeGeneration != PythonHandleRegistry::instance().nodeGeneration(entity))
     {
       throw std::runtime_error{"Entity is no longer valid"};
     }
@@ -101,11 +104,14 @@ struct BrushHandle
   MapDocument* document = nullptr;
   size_t generation = 0;
   mdl::BrushNode* brush = nullptr;
+  size_t nodeGeneration = 0;
 
   mdl::BrushNode& get() const
   {
     DocumentHandle{document, generation}.get();
-    if (brush == nullptr)
+    if (
+      brush == nullptr
+      || nodeGeneration != PythonHandleRegistry::instance().nodeGeneration(brush))
     {
       throw std::runtime_error{"Brush is no longer valid"};
     }
@@ -118,11 +124,12 @@ struct FaceHandle
   MapDocument* document = nullptr;
   size_t generation = 0;
   mdl::BrushNode* brush = nullptr;
+  size_t nodeGeneration = 0;
   size_t faceIndex = 0;
 
   const mdl::BrushFace& get() const
   {
-    auto& brushNode = BrushHandle{document, generation, brush}.get();
+    auto& brushNode = BrushHandle{document, generation, brush, nodeGeneration}.get();
     if (faceIndex >= brushNode.brush().faceCount())
     {
       throw std::runtime_error{"Face is no longer valid"};
@@ -214,25 +221,7 @@ struct CallbackEntry
 
 std::unordered_map<int, CallbackEntry> g_callbacks;
 std::unordered_map<std::string, std::vector<int>> g_eventCallbacks;
-std::unordered_map<MapDocument*, size_t> g_documentGenerations;
 int g_nextCallbackToken = 1;
-
-size_t currentDocumentGeneration(MapDocument* document)
-{
-  if (document == nullptr)
-  {
-    return 0;
-  }
-  return g_documentGenerations[document];
-}
-
-void invalidateDocumentHandles(MapDocument* document)
-{
-  if (document != nullptr)
-  {
-    ++g_documentGenerations[document];
-  }
-}
 
 PythonExecutionContext& requireContext()
 {
@@ -251,7 +240,9 @@ DocumentHandle currentDocument()
   {
     throw std::runtime_error{"No active document"};
   }
-  return DocumentHandle{context.document, currentDocumentGeneration(context.document)};
+  return DocumentHandle{
+    context.document,
+    PythonHandleRegistry::instance().documentGeneration(context.document)};
 }
 
 std::vector<EntityHandle> allEntities(MapDocument& document)
@@ -277,10 +268,14 @@ std::vector<EntityHandle> allEntities(MapDocument& document)
 
   auto handles = std::vector<EntityHandle>{};
   handles.reserve(result.size());
-  const auto generation = currentDocumentGeneration(&document);
+  const auto generation = PythonHandleRegistry::instance().documentGeneration(&document);
   for (auto* entity : result)
   {
-    handles.push_back(EntityHandle{&document, generation, entity});
+    handles.push_back(EntityHandle{
+      &document,
+      generation,
+      entity,
+      PythonHandleRegistry::instance().nodeGeneration(entity)});
   }
   return handles;
 }
@@ -291,7 +286,11 @@ std::vector<BrushHandle> entityBrushes(EntityHandle& entity)
   auto result = std::vector<BrushHandle>{};
   entityNode.visitChildren(kdl::overload(
     [&](mdl::BrushNode& brushNode) {
-      result.push_back(BrushHandle{entity.document, entity.generation, &brushNode});
+      result.push_back(BrushHandle{
+        entity.document,
+        entity.generation,
+        &brushNode,
+        PythonHandleRegistry::instance().nodeGeneration(&brushNode)});
     },
     [](mdl::Node&) {}));
   return result;
@@ -517,7 +516,11 @@ void defineModule(py::module_& module)
       result.reserve(brushes.size());
       for (auto* brush : brushes)
       {
-        result.push_back(BrushHandle{&self.getDocument(), self.generation, brush});
+        result.push_back(BrushHandle{
+          &self.getDocument(),
+          self.generation,
+          brush,
+          PythonHandleRegistry::instance().nodeGeneration(brush)});
       }
       return result;
     });
@@ -551,7 +554,8 @@ void defineModule(py::module_& module)
     result.reserve(brush.faceCount());
     for (size_t i = 0; i < brush.faceCount(); ++i)
     {
-      result.push_back(FaceHandle{self.document, self.generation, self.brush, i});
+      result.push_back(
+        FaceHandle{self.document, self.generation, self.brush, self.nodeGeneration, i});
     }
     return result;
   });
@@ -621,7 +625,7 @@ void defineModule(py::module_& module)
       *reinterpret_cast<PythonPluginSession*>(sessionCapsule.get_pointer()));
   });
   module.def("_invalidate_document", [](py::capsule documentCapsule) {
-    invalidateDocumentHandles(
+    PythonHandleRegistry::instance().invalidateDocument(
       reinterpret_cast<MapDocument*>(documentCapsule.get_pointer()));
   });
 }

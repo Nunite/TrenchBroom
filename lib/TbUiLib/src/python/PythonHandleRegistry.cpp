@@ -1,0 +1,65 @@
+#include "ui/python/PythonHandleRegistry.h"
+
+#include "mdl/Node.h"
+
+#include <unordered_map>
+
+namespace tb::ui
+{
+namespace
+{
+std::unordered_map<MapDocument*, size_t> g_documentGenerations;
+std::unordered_map<mdl::Node*, size_t> g_nodeGenerations;
+} // namespace
+
+PythonHandleRegistry::PythonHandleRegistry() = default;
+
+PythonHandleRegistry& PythonHandleRegistry::instance()
+{
+  static auto instance = PythonHandleRegistry{};
+  return instance;
+}
+
+size_t PythonHandleRegistry::documentGeneration(MapDocument* document)
+{
+  if (document == nullptr)
+  {
+    return 0;
+  }
+  return g_documentGenerations[document];
+}
+
+void PythonHandleRegistry::invalidateDocument(MapDocument* document)
+{
+  if (document != nullptr)
+  {
+    ++g_documentGenerations[document];
+  }
+}
+
+size_t PythonHandleRegistry::nodeGeneration(mdl::Node* node)
+{
+  if (node == nullptr)
+  {
+    return 0;
+  }
+  return g_nodeGenerations[node];
+}
+
+void PythonHandleRegistry::invalidateNode(mdl::Node* node)
+{
+  if (node != nullptr)
+  {
+    ++g_nodeGenerations[node];
+  }
+}
+
+void PythonHandleRegistry::invalidateNodes(const std::vector<mdl::Node*>& nodes)
+{
+  for (auto* node : nodes)
+  {
+    invalidateNode(node);
+  }
+}
+
+} // namespace tb::ui
