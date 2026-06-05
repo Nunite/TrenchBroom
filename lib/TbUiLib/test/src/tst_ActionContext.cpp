@@ -59,6 +59,7 @@ TEST_CASE("actionContextMatches")
     {ActionContext::Any,                                                                ActionContext::View3D | ActionContext::NodeSelection | ActionContext::NoTool,     true},
     {ActionContext::Any,                                                                ActionContext::View3D | ActionContext::NoSelection | ActionContext::RotateTool,   true},
     {ActionContext::Any,                                                                ActionContext::View3D | ActionContext::NodeSelection | ActionContext::RotateTool, true},
+    {ActionContext::Any,                                                                ActionContext::View3D | ActionContext::NoSelection | ActionContext::PathTool,     true},
 
     {ActionContext::View2D | ActionContext::NoSelection | ActionContext::NoTool,        ActionContext::View3D | ActionContext::NoSelection | ActionContext::NoTool,       false},
     {ActionContext::View2D | ActionContext::NoSelection | ActionContext::NoTool,        ActionContext::View3D | ActionContext::NodeSelection | ActionContext::NoTool,     false},
@@ -109,6 +110,7 @@ TEST_CASE("actionContextMatches")
     {ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyTool,    ActionContext::View3D | ActionContext::NodeSelection | ActionContext::NoTool,     false},
     {ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyTool,    ActionContext::View3D | ActionContext::NoSelection | ActionContext::RotateTool,   false},
     {ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyTool,    ActionContext::View3D | ActionContext::NodeSelection | ActionContext::RotateTool, true},
+    {ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyTool,    ActionContext::View3D | ActionContext::NodeSelection | ActionContext::PathTool,   true},
     // clang-format on
   }));
 

@@ -115,6 +115,10 @@ std::string actionContextName(const ActionContext::Type actionContext)
     {
       actionContexts.emplace_back("rotate tool");
     }
+    if (actionContext & ActionContext::PathTool)
+    {
+      actionContexts.emplace_back("path tool");
+    }
     if (actionContext & ActionContext::AnyVertexTool)
     {
       actionContexts.emplace_back("any vertex tool");

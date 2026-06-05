@@ -428,6 +428,10 @@ void MapViewToolBox::updateToolPage()
   {
     clipTool().showPage();
   }
+  else if (pathToolActive())
+  {
+    pathTool().showPage();
+  }
   else
   {
     drawShapeTool().showPage();
