@@ -1897,6 +1897,14 @@ void ActionManager::createRunMenu()
     [](auto& context) { context.mapWindow().runPythonScript(); },
     [](const auto& context) { return context.hasDocument(); },
   }));
+  runMenu.addItem(addAction(Action{
+    "Menu/Run/Python Plugin Manager...",
+    QObject::tr("Python Plugin Manager..."),
+    ActionContext::Any,
+    QKeySequence{},
+    [](auto& context) { context.appController().showPythonPluginManager(); },
+    [](const auto&) { return true; },
+  }));
   runMenu.addSeparator();
   runMenu.addItem(
     addAction(Action{

@@ -135,6 +135,7 @@ public:
 
   void showManual();
   void showPreferences();
+  void showPythonPluginManager();
   void showAboutDialog();
   void debugShowCrashReportDialog();
 
