@@ -11,9 +11,15 @@
 #include "fs/TestEnvironment.h"
 #include "gl/GlManager.h"
 #include "gl/ResourceManager.h"
+#include "mdl/BrushBuilder.h"
+#include "mdl/BrushFace.h"
+#include "mdl/BrushNode.h"
 #include "mdl/GameConfigFixture.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
+#include "mdl/Map_Brushes.h"
+#include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/WorldNode.h"
 #include "ui/AppControllerFixture.h"
 #include "ui/MapDocument.h"
@@ -458,6 +464,127 @@ panel.add_combo_box(["a", "b"], 0, lambda value: open("python-v2-combo-ok.txt", 
     REQUIRE(comboBox != nullptr);
     comboBox->setCurrentIndex(1);
     CHECK(env.loadFile("python-v2-combo-ok.txt") == "b");
+  }
+
+  SECTION("edits entity properties transactionally")
+  {
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_edit_entity.py",
+      R"(
+import tb2 as tb
+
+entity = tb.current_document().entities[0]
+entity.set("message", "hello")
+assert entity.get("message") == "hello"
+entity.remove("message")
+assert entity.get("message") is None
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_edit_entity.py";
+
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+    CHECK(window.document().map().worldNode().entity().property("message") == nullptr);
+  }
+
+  SECTION("rolls back entity edits on script failure")
+  {
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_rollback_entity.py",
+      R"(
+import tb2 as tb
+
+entity = tb.current_document().entities[0]
+with tb.current_document().transaction("rollback entity"):
+    entity.set("message", "temporary")
+    raise RuntimeError("rollback me")
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_rollback_entity.py";
+
+    CHECK_FALSE(PythonRuntime::instance().runScript(context, context.scriptPath));
+    CHECK(window.document().map().worldNode().entity().property("message") == nullptr);
+  }
+
+  SECTION("edits document selection")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "original") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_select.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+brush = doc.entities[0].brushes[0]
+doc.select([brush])
+assert len(doc.selection.brushes) == 1
+doc.clear_selection()
+assert len(doc.selection.brushes) == 0
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_select.py";
+
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+    CHECK_FALSE(map.selection().hasAny());
+  }
+
+  SECTION("sets face material without changing the visible selection")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "original") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_set_face_material.py",
+      R"(
+import tb2 as tb
+
+brush = tb.current_document().entities[0].brushes[0]
+face = brush.faces()[0]
+face.set_material("changed")
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_set_face_material.py";
+
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+    CHECK(brushNode->brush().face(0).attributes().materialName() == "changed");
+    REQUIRE(map.selection().brushes.size() == 1u);
+    CHECK(map.selection().brushes.front() == brushNode);
   }
 }
 
