@@ -14,6 +14,7 @@
 #include "gl/MaterialCollection.h"
 #include "gl/MaterialManager.h"
 #include "mdl/Brush.h"
+#include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
@@ -25,6 +26,7 @@
 #include "mdl/Map.h"
 #include "mdl/Map_Brushes.h"
 #include "mdl/Map_Entities.h"
+#include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/PatchNode.h"
 #include "mdl/Selection.h"
@@ -54,6 +56,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -66,6 +69,13 @@ namespace tb::ui
 namespace
 {
 std::unordered_map<MapDocument*, size_t> g_activePythonTransactions;
+
+struct Vec3
+{
+  double x = 0.0;
+  double y = 0.0;
+  double z = 0.0;
+};
 
 struct DocumentHandle
 {
@@ -406,6 +416,49 @@ DocumentHandle currentDocument()
     PythonHandleRegistry::instance().documentGeneration(context.document)};
 }
 
+Vec3 vec3FromObject(const py::handle& object)
+{
+  if (py::isinstance<Vec3>(object))
+  {
+    return py::cast<Vec3>(object);
+  }
+  auto sequence = py::reinterpret_borrow<py::sequence>(object);
+  if (sequence.size() != 3)
+  {
+    throw py::type_error{"Expected Vec3 or a 3-item sequence"};
+  }
+  return Vec3{
+    py::cast<double>(sequence[0]),
+    py::cast<double>(sequence[1]),
+    py::cast<double>(sequence[2])};
+}
+
+std::vector<vm::vec3d> pointsFromObjects(const py::iterable& objects)
+{
+  auto result = std::vector<vm::vec3d>{};
+  for (const auto object : objects)
+  {
+    const auto point = vec3FromObject(object);
+    result.push_back(vm::vec3d{point.x, point.y, point.z});
+  }
+  return result;
+}
+
+py::tuple vec2ToTuple(const vm::vec2f& value)
+{
+  return py::make_tuple(value.x(), value.y());
+}
+
+vm::vec2f vec2FromObject(const py::handle& object)
+{
+  auto sequence = py::reinterpret_borrow<py::sequence>(object);
+  if (sequence.size() != 2)
+  {
+    throw py::type_error{"Expected a 2-item sequence"};
+  }
+  return vm::vec2f{py::cast<float>(sequence[0]), py::cast<float>(sequence[1])};
+}
+
 std::vector<EntityHandle> allEntities(MapDocument& document)
 {
   auto result = std::vector<mdl::EntityNodeBase*>{};
@@ -589,6 +642,117 @@ void setFaceMaterial(FaceHandle& face, const std::string& materialName)
   });
 
   face.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(face.brush);
+}
+
+void updateFace(FaceHandle& face, mdl::UpdateBrushFaceAttributes update)
+{
+  auto& document = DocumentHandle{face.document, face.generation}.get();
+  auto& brushNode =
+    BrushHandle{face.document, face.generation, face.brush, face.nodeGeneration}.get();
+  if (face.faceIndex >= brushNode.brush().faceCount())
+  {
+    throw std::runtime_error{"Face is no longer valid"};
+  }
+
+  withPreservedSelection(document, "Python v2 Set Face Attributes", [&](auto& map) {
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, {mdl::BrushFaceHandle{&brushNode, face.faceIndex}});
+    return mdl::setBrushFaceAttributes(map, update);
+  });
+
+  face.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(face.brush);
+}
+
+void setFaceOffset(FaceHandle& face, const py::object& offset)
+{
+  const auto value = vec2FromObject(offset);
+  updateFace(
+    face,
+    mdl::UpdateBrushFaceAttributes{
+      .xOffset = mdl::SetValue{value.x()},
+      .yOffset = mdl::SetValue{value.y()}});
+}
+
+void setFaceScale(FaceHandle& face, const py::object& scale)
+{
+  const auto value = vec2FromObject(scale);
+  updateFace(
+    face,
+    mdl::UpdateBrushFaceAttributes{
+      .xScale = mdl::SetValue{value.x()},
+      .yScale = mdl::SetValue{value.y()}});
+}
+
+void setFaceRotation(FaceHandle& face, const float rotation)
+{
+  updateFace(face, mdl::UpdateBrushFaceAttributes{.rotation = mdl::SetValue{rotation}});
+}
+
+void setFaceSurfaceContents(FaceHandle& face, const py::object& value)
+{
+  updateFace(
+    face,
+    mdl::UpdateBrushFaceAttributes{
+      .surfaceContents =
+        mdl::SetFlags{value.is_none() ? std::nullopt
+                                      : std::make_optional(py::cast<int>(value))}});
+}
+
+void setFaceSurfaceFlags(FaceHandle& face, const py::object& value)
+{
+  updateFace(
+    face,
+    mdl::UpdateBrushFaceAttributes{
+      .surfaceFlags =
+        mdl::SetFlags{value.is_none() ? std::nullopt
+                                      : std::make_optional(py::cast<int>(value))}});
+}
+
+void setFaceSurfaceValue(FaceHandle& face, const py::object& value)
+{
+  updateFace(
+    face,
+    mdl::UpdateBrushFaceAttributes{
+      .surfaceValue =
+        mdl::SetValue{value.is_none() ? std::nullopt
+                                      : std::make_optional(py::cast<float>(value))}});
+}
+
+BrushHandle createBrush(const py::iterable& pointObjects, py::object materialName)
+{
+  auto& document = currentDocument().get();
+  auto& map = document.map();
+  const auto points = pointsFromObjects(pointObjects);
+  const auto material =
+    materialName.is_none() ? map.currentMaterialName() : py::cast<std::string>(materialName);
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Create Brush"};
+  auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+  auto brush = builder.createBrush(points, material);
+  if (brush.is_error())
+  {
+    transaction.cancel();
+    throw std::runtime_error{"Could not create brush from points"};
+  }
+
+  auto* brushNode = new mdl::BrushNode{std::move(brush.value())};
+  const auto addedNodes = mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+  if (addedNodes.empty())
+  {
+    transaction.cancel();
+    throw std::runtime_error{"Could not add brush"};
+  }
+  mdl::selectNodes(map, {brushNode});
+  if (!transaction.commit())
+  {
+    throw std::runtime_error{"Could not create brush"};
+  }
+
+  const auto generation = PythonHandleRegistry::instance().documentGeneration(&document);
+  return BrushHandle{
+    &document,
+    generation,
+    brushNode,
+    PythonHandleRegistry::instance().nodeGeneration(brushNode)};
 }
 
 void executeAction(const std::string& actionPath)
@@ -779,6 +943,15 @@ void defineModule(py::module_& module)
 {
   module.doc() = "TrenchBroom Python API v2";
 
+  py::class_<Vec3>(module, "Vec3")
+    .def(py::init<double, double, double>())
+    .def_readwrite("x", &Vec3::x)
+    .def_readwrite("y", &Vec3::y)
+    .def_readwrite("z", &Vec3::z)
+    .def("__iter__", [](const Vec3& self) {
+      return py::iter(py::make_tuple(self.x, self.y, self.z));
+    });
+
   py::class_<DocumentHandle>(module, "Document")
     .def_property_readonly(
       "entities", [](DocumentHandle& self) { return allEntities(self.get()); })
@@ -896,9 +1069,47 @@ void defineModule(py::module_& module)
   });
 
   py::class_<FaceHandle>(module, "Face")
-    .def_property_readonly(
+    .def_property(
       "texture_name",
-      [](FaceHandle& self) { return self.get().attributes().materialName(); })
+      [](FaceHandle& self) { return self.get().attributes().materialName(); },
+      setFaceMaterial)
+    .def_property(
+      "material",
+      [](FaceHandle& self) { return self.get().attributes().materialName(); },
+      setFaceMaterial)
+    .def_property(
+      "offset",
+      [](FaceHandle& self) { return vec2ToTuple(self.get().attributes().offset()); },
+      setFaceOffset)
+    .def_property(
+      "scale",
+      [](FaceHandle& self) { return vec2ToTuple(self.get().attributes().scale()); },
+      setFaceScale)
+    .def_property(
+      "rotation",
+      [](FaceHandle& self) { return self.get().attributes().rotation(); },
+      setFaceRotation)
+    .def_property(
+      "surface_contents",
+      [](FaceHandle& self) {
+        const auto& value = self.get().attributes().surfaceContents();
+        return value ? py::cast(*value) : py::none();
+      },
+      setFaceSurfaceContents)
+    .def_property(
+      "surface_flags",
+      [](FaceHandle& self) {
+        const auto& value = self.get().attributes().surfaceFlags();
+        return value ? py::cast(*value) : py::none();
+      },
+      setFaceSurfaceFlags)
+    .def_property(
+      "surface_value",
+      [](FaceHandle& self) {
+        const auto& value = self.get().attributes().surfaceValue();
+        return value ? py::cast(*value) : py::none();
+      },
+      setFaceSurfaceValue)
     .def("set_material", setFaceMaterial);
 
   py::class_<MaterialHandle>(module, "Material")
@@ -1015,6 +1226,7 @@ void defineModule(py::module_& module)
   module.def("document", currentDocument);
   module.def("execute_action", executeAction);
   module.def("list_actions", listActions);
+  module.def("create_brush", createBrush, py::arg("points"), py::arg("material") = py::none());
   module.def("create_plugin_panel", createPluginPanel);
   module.def("register_callback", registerCallback);
   module.def("unregister_callback", unregisterCallback);

@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.brush_builder",
+  "name": "Brush Builder",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Creates a cube brush and edits its first face with tb2.",
+  "author": "TrenchBroom"
+}

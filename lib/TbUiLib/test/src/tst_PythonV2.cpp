@@ -593,6 +593,81 @@ face.set_material("changed")
     CHECK(map.selection().brushes.front() == brushNode);
   }
 
+  SECTION("creates brushes and edits face attributes")
+  {
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_create_brush.py",
+      R"(
+import tb2 as tb
+
+half = 32
+brush = tb.create_brush([
+    tb.Vec3(-half, -half, -half),
+    tb.Vec3( half, -half, -half),
+    tb.Vec3( half,  half, -half),
+    tb.Vec3(-half,  half, -half),
+    tb.Vec3(-half, -half,  half),
+    tb.Vec3( half, -half,  half),
+    tb.Vec3( half,  half,  half),
+    tb.Vec3(-half,  half,  half),
+], "original")
+face = brush.faces()[0]
+face.texture_name = "changed"
+face.offset = (12.0, 24.0)
+face.scale = (0.5, 0.25)
+face.rotation = 45.0
+face.surface_contents = 7
+face.surface_flags = 11
+face.surface_value = 3.5
+assert face.texture_name == "changed"
+assert face.material == "changed"
+assert face.offset == (12.0, 24.0)
+assert face.scale == (0.5, 0.25)
+assert face.rotation == 45.0
+assert face.surface_contents == 7
+assert face.surface_flags == 11
+assert face.surface_value == 3.5
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_create_brush.py";
+
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+    const auto& selectedBrushes = window.document().map().selection().brushes;
+    REQUIRE(selectedBrushes.size() == 1u);
+    const auto& face = selectedBrushes.front()->brush().faces().front();
+    CHECK(face.attributes().materialName() == "changed");
+    CHECK(face.attributes().offset() == vm::vec2f{12.0f, 24.0f});
+    CHECK(face.attributes().scale() == vm::vec2f{0.5f, 0.25f});
+    CHECK(face.attributes().rotation() == 45.0f);
+    CHECK(face.attributes().surfaceContents() == std::optional<int>{7});
+    CHECK(face.attributes().surfaceFlags() == std::optional<int>{11});
+    CHECK(face.attributes().surfaceValue() == std::optional<float>{3.5f});
+  }
+
+  SECTION("loads v2 brush builder example plugin")
+  {
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/brush_builder"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto& selectedBrushes = window.document().map().selection().brushes;
+    REQUIRE(selectedBrushes.size() == 1u);
+    CHECK(selectedBrushes.front()->brush().faceCount() == 6u);
+    manager.unloadPlugins(window);
+  }
+
   SECTION("runs v2 hello panel through legacy script entry")
   {
     const auto helloPanelScript =
