@@ -1,7 +1,11 @@
 #include "ui/python/PythonV2Module.h"
 
+#include <QCheckBox>
+#include <QComboBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPointer>
+#include <QPushButton>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -213,6 +217,35 @@ struct PluginPanelHandle
   }
 };
 
+QLayout& ensurePanelLayout(QWidget& widget)
+{
+  auto* layout = widget.layout();
+  if (layout == nullptr)
+  {
+    auto* vbox = new QVBoxLayout{};
+    widget.setLayout(vbox);
+    layout = vbox;
+  }
+  return *layout;
+}
+
+void clearLayout(QLayout& layout)
+{
+  while (auto* item = layout.takeAt(0))
+  {
+    if (auto* widget = item->widget())
+    {
+      widget->deleteLater();
+    }
+    if (auto* childLayout = item->layout())
+    {
+      clearLayout(*childLayout);
+      childLayout->deleteLater();
+    }
+    delete item;
+  }
+}
+
 struct CallbackEntry
 {
   std::string pluginId;
@@ -222,6 +255,14 @@ struct CallbackEntry
 std::unordered_map<int, CallbackEntry> g_callbacks;
 std::unordered_map<std::string, std::vector<int>> g_eventCallbacks;
 int g_nextCallbackToken = 1;
+
+void logPythonCallbackError(PythonPluginSession& session, const py::error_already_set& e)
+{
+  if (session.context().logger != nullptr)
+  {
+    session.context().logger->error() << e.what();
+  }
+}
 
 PythonExecutionContext& requireContext()
 {
@@ -595,17 +636,137 @@ void defineModule(py::module_& module)
     .def("cancel", &TransactionHandle::cancel);
 
   py::class_<PluginPanelHandle>(module, "PluginPanel")
-    .def("add_label", [](PluginPanelHandle& self, const std::string& text) {
-      auto* label = new QLabel{QString::fromStdString(text)};
-      label->setWordWrap(true);
-      auto* layout = self.get().layout();
-      if (layout == nullptr)
+    .def(
+      "add_label",
+      [](PluginPanelHandle& self, const std::string& text) {
+        auto* label = new QLabel{QString::fromStdString(text)};
+        label->setWordWrap(true);
+        ensurePanelLayout(self.get()).addWidget(label);
+      })
+    .def(
+      "add_button",
+      [](PluginPanelHandle& self, const std::string& text, py::object callback) {
+        if (!PyCallable_Check(callback.ptr()))
+        {
+          throw py::type_error{"callback must be callable"};
+        }
+        auto* button = new QPushButton{QString::fromStdString(text)};
+        auto* session = currentPythonPluginSession();
+        QObject::connect(
+          button, &QPushButton::clicked, [session, callback = std::move(callback)]() {
+            if (session != nullptr)
+            {
+              PythonRuntime::instance().runCallback(*session, callback.ptr());
+            }
+          });
+        ensurePanelLayout(self.get()).addWidget(button);
+      })
+    .def(
+      "add_checkbox",
+      [](
+        PluginPanelHandle& self,
+        const std::string& text,
+        const bool checked,
+        py::object callback) {
+        if (!PyCallable_Check(callback.ptr()))
+        {
+          throw py::type_error{"callback must be callable"};
+        }
+        auto* checkbox = new QCheckBox{QString::fromStdString(text)};
+        checkbox->setChecked(checked);
+        auto* session = currentPythonPluginSession();
+        QObject::connect(
+          checkbox,
+          &QCheckBox::toggled,
+          [session, callback = std::move(callback)](const bool value) {
+            if (session != nullptr)
+            {
+              auto gil = py::gil_scoped_acquire{};
+              try
+              {
+                callback(value);
+              }
+              catch (const py::error_already_set& e)
+              {
+                logPythonCallbackError(*session, e);
+              }
+            }
+          });
+        ensurePanelLayout(self.get()).addWidget(checkbox);
+      })
+    .def(
+      "add_line_edit",
+      [](PluginPanelHandle& self, const std::string& text, py::object callback) {
+        if (!PyCallable_Check(callback.ptr()))
+        {
+          throw py::type_error{"callback must be callable"};
+        }
+        auto* lineEdit = new QLineEdit{QString::fromStdString(text)};
+        auto* session = currentPythonPluginSession();
+        QObject::connect(
+          lineEdit,
+          &QLineEdit::textChanged,
+          [session, callback = std::move(callback)](const QString& value) {
+            if (session != nullptr)
+            {
+              auto gil = py::gil_scoped_acquire{};
+              try
+              {
+                callback(value.toStdString());
+              }
+              catch (const py::error_already_set& e)
+              {
+                logPythonCallbackError(*session, e);
+              }
+            }
+          });
+        ensurePanelLayout(self.get()).addWidget(lineEdit);
+      })
+    .def(
+      "add_combo_box",
+      [](
+        PluginPanelHandle& self,
+        const std::vector<std::string>& items,
+        const int currentIndex,
+        py::object callback) {
+        if (!PyCallable_Check(callback.ptr()))
+        {
+          throw py::type_error{"callback must be callable"};
+        }
+        auto* comboBox = new QComboBox{};
+        for (const auto& item : items)
+        {
+          comboBox->addItem(QString::fromStdString(item));
+        }
+        if (currentIndex >= 0 && currentIndex < comboBox->count())
+        {
+          comboBox->setCurrentIndex(currentIndex);
+        }
+        auto* session = currentPythonPluginSession();
+        QObject::connect(
+          comboBox,
+          &QComboBox::currentTextChanged,
+          [session, callback = std::move(callback)](const QString& value) {
+            if (session != nullptr)
+            {
+              auto gil = py::gil_scoped_acquire{};
+              try
+              {
+                callback(value.toStdString());
+              }
+              catch (const py::error_already_set& e)
+              {
+                logPythonCallbackError(*session, e);
+              }
+            }
+          });
+        ensurePanelLayout(self.get()).addWidget(comboBox);
+      })
+    .def("clear", [](PluginPanelHandle& self) {
+      if (auto* layout = self.get().layout())
       {
-        auto* vbox = new QVBoxLayout{};
-        self.get().setLayout(vbox);
-        layout = vbox;
+        clearLayout(*layout);
       }
-      layout->addWidget(label);
     });
 
   module.def("current_document", currentDocument);

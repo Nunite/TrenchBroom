@@ -1,5 +1,9 @@
 #include <QApplication>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QThread>
 
 #include "Logger.h"
@@ -397,6 +401,63 @@ tb.set_timeout(on_timer, 10)
 
     REQUIRE_FALSE(logger.messages.empty());
     CHECK(logger.messages.back().find("timer exploded") != std::string::npos);
+  }
+
+  SECTION("creates common plugin panel controls")
+  {
+    auto env = fs::TestEnvironment{};
+    auto currentPathGuard = CurrentPathGuard{env.dir()};
+    env.createDirectory("plugin");
+    env.createFile(
+      "plugin/trenchbroom-plugin.json",
+      R"({
+        "id": "codex.v2.controls",
+        "name": "Codex V2 Controls",
+        "version": "1.0.0",
+        "apiVersion": 2,
+        "entry": "main.py"
+      })");
+    env.createFile(
+      "plugin/main.py",
+      R"(
+import tb2 as tb
+
+panel = tb.create_plugin_panel("Controls")
+panel.add_label("Loaded")
+panel.add_button("Run", lambda: open("python-v2-button-ok.txt", "w", encoding="utf-8").write("button"))
+panel.add_checkbox("Enabled", False, lambda value: open("python-v2-checkbox-ok.txt", "w", encoding="utf-8").write(str(value)))
+panel.add_line_edit("", lambda value: open("python-v2-line-ok.txt", "w", encoding="utf-8").write(value))
+panel.add_combo_box(["a", "b"], 0, lambda value: open("python-v2-combo-ok.txt", "w", encoding="utf-8").write(value))
+)");
+
+    auto manager = PythonPluginManager{};
+    manager.reload({env.dir() / "plugin"});
+    REQUIRE(manager.loadPlugins(window));
+
+    QApplication::processEvents();
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+
+    auto* button = panel->findChild<QPushButton*>();
+    REQUIRE(button != nullptr);
+    button->click();
+    CHECK(env.loadFile("python-v2-button-ok.txt") == "button");
+
+    auto* checkbox = panel->findChild<QCheckBox*>();
+    REQUIRE(checkbox != nullptr);
+    checkbox->setChecked(true);
+    CHECK(env.loadFile("python-v2-checkbox-ok.txt") == "True");
+
+    auto* lineEdit = panel->findChild<QLineEdit*>();
+    REQUIRE(lineEdit != nullptr);
+    lineEdit->setText("hello");
+    CHECK(env.loadFile("python-v2-line-ok.txt") == "hello");
+
+    auto* comboBox = panel->findChild<QComboBox*>();
+    REQUIRE(comboBox != nullptr);
+    comboBox->setCurrentIndex(1);
+    CHECK(env.loadFile("python-v2-combo-ok.txt") == "b");
   }
 }
 
