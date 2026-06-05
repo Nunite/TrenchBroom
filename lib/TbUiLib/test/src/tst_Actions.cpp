@@ -22,6 +22,8 @@
 #include "ui/ActionMenu.h"
 #include "ui/CatchConfig.h"
 
+#include "PreferenceManager.h"
+
 #include "kd/contracts.h"
 #include "kd/vector_utils.h"
 
@@ -105,6 +107,17 @@ TEST_CASE("Actions")
   {
     const auto& actions = actionManager.actionsMap();
     CHECK(actions.contains("Menu/Edit/Tools/Path Tool"));
+    CHECK(pref(actions.at("Menu/Edit/Tools/Path Tool").preference()) == QKeySequence{Qt::Key_P});
+  }
+
+  SECTION("Custom map view actions are configurable")
+  {
+    const auto& actions = actionManager.actionsMap();
+    CHECK(actions.contains("Controls/Map view/Show Pie Menu"));
+    CHECK(actions.contains("Controls/Map view/Create Path Entities"));
+    CHECK(actions.contains("Controls/Map view/Create Path Entities (Numpad)"));
+    CHECK(actions.contains("Controls/Map view/Cancel Path Tool"));
+    CHECK(actions.contains("Controls/Map view/Remove Last Path Point"));
   }
 }
 

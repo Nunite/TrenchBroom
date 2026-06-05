@@ -1956,6 +1956,7 @@ void MapWindow::performPathCreation()
   if (pathToolActive())
   {
     m_mapView->performPathCreation();
+    m_mapView->togglePathTool();
   }
 }
 

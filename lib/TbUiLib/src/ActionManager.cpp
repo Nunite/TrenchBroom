@@ -156,6 +156,16 @@ void ActionManager::initialize()
 
 void ActionManager::createViewActions()
 {
+  /* ========== Pie Menu ========== */
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Show Pie Menu"},
+    QObject::tr("Show Pie Menu"),
+    ActionContext::AnyView,
+    QKeySequence{Qt::Key_QuoteLeft},
+    [](auto& context) { context.mapView().showPieMenu(); },
+    [](const auto& context) { return context.hasDocument(); },
+  });
+
   /* ========== Editing Actions ========== */
   /* ========== Tool Specific Actions ========== */
   addAction(Action{
@@ -167,6 +177,46 @@ void ActionManager::createViewActions()
     [](auto& context) { context.mapView().assembleBrush(); },
     [](const auto& context) {
       return context.hasDocument() && context.mapWindow().assembleBrushToolActive();
+    },
+  });
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Create Path Entities"},
+    QObject::tr("Create Path Entities"),
+    ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::PathTool,
+    QKeySequence{Qt::Key_Return},
+    [](auto& context) { context.mapWindow().performPathCreation(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().pathToolActive();
+    },
+  });
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Create Path Entities (Numpad)"},
+    QObject::tr("Create Path Entities"),
+    ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::PathTool,
+    QKeySequence{Qt::Key_Enter},
+    [](auto& context) { context.mapWindow().performPathCreation(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().pathToolActive();
+    },
+  });
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Cancel Path Tool"},
+    QObject::tr("Cancel Path Tool"),
+    ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::PathTool,
+    QKeySequence{},
+    [](auto& context) { context.mapWindow().togglePathTool(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().pathToolActive();
+    },
+  });
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Remove Last Path Point"},
+    QObject::tr("Remove Last Path Point"),
+    ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::PathTool,
+    QKeySequence{},
+    [](auto& context) { context.mapWindow().removeLastPathPoint(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().pathToolActive();
     },
   });
   addAction(Action{
@@ -1493,7 +1543,7 @@ void ActionManager::createToolsMenu()
     "Menu/Edit/Tools/Path Tool",
     QObject::tr("Path Tool"),
     ActionContext::Any,
-    QKeySequence{},
+    QKeySequence{Qt::Key_P},
     [](auto& context) { context.mapWindow().togglePathTool(); },
     [](const auto& context) {
       return context.hasDocument() && context.mapWindow().canTogglePathTool();
