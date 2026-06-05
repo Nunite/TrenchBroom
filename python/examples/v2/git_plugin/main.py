@@ -1200,7 +1200,10 @@ class GitManager:
     def on_commit(self):
         doc = tb.current_document()
         if doc:
-            print("Python v2 Git Manager does not save the map automatically yet.")
+            try:
+                doc.save()
+            except Exception as e:
+                print(f"Save failed: {e}")
 
         try:
             msg = self.panel.get_text_field("commit_msg")
@@ -1314,9 +1317,12 @@ class GitManager:
         self.refresh()
 
     def reload_map(self):
-        # The v2 API deliberately avoids implicit map reloads for now. Git operations still
-        # refresh the panel state; explicit document reload support can be added later.
-        return
+        doc = tb.current_document()
+        if doc:
+            try:
+                doc.reload()
+            except Exception as e:
+                print(f"Reload failed: {e}")
 
 # Start
 manager = GitManager()

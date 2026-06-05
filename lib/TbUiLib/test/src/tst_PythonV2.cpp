@@ -1153,6 +1153,8 @@ import tb2 as tb
 
 doc = tb.current_document()
 assert doc.path is None or isinstance(doc.path, str)
+assert callable(doc.save)
+assert callable(doc.reload)
 
 panel = tb.create_plugin_panel("HTML View")
 

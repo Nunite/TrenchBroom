@@ -1573,6 +1573,27 @@ void defineModule(py::module_& module)
       })
     .def("vertex_tool_vertices", vertexToolVertices)
     .def(
+      "save",
+      [](DocumentHandle& self) {
+        auto& document = self.get();
+        const auto result = document.map().save();
+        if (result.is_error())
+        {
+          result.if_error([](const auto& e) { throw std::runtime_error{e.msg}; });
+        }
+      })
+    .def(
+      "reload",
+      [](DocumentHandle& self) {
+        auto& document = self.get();
+        const auto result = document.reload();
+        if (result.is_error())
+        {
+          result.if_error([](const auto& e) { throw std::runtime_error{e.msg}; });
+        }
+        PythonHandleRegistry::instance().invalidateDocument(&document);
+      })
+    .def(
       "transaction",
       [](DocumentHandle& self, std::string name) {
         return TransactionHandle{&self.get(), self.generation, std::move(name)};
