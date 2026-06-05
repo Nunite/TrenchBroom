@@ -1287,6 +1287,43 @@ assert face.surface_value == 3.5
     manager.unloadPlugins(window);
   }
 
+  SECTION("loads v2 entity brush modifier example plugin")
+  {
+    auto& map = window.document().map();
+    auto entity = mdl::Entity{};
+    entity.setClassname("func_detail");
+    auto* entityNode = new mdl::EntityNode{std::move(entity)};
+
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "entity_brush") | kdl::value()};
+
+    mdl::addNodes(
+      map,
+      {{static_cast<mdl::Node*>(map.worldNode().defaultLayer()),
+        {static_cast<mdl::Node*>(entityNode)}}});
+    mdl::addNodes(
+      map, {{static_cast<mdl::Node*>(entityNode), {static_cast<mdl::Node*>(brushNode)}}});
+    mdl::selectNodes(map, {entityNode});
+
+    const auto oldOffset = brushNode->brush().face(0).attributes().offset();
+    const auto pluginDir =
+      std::filesystem::path{"python/examples/v2/entity_brush_modifier"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto newOffset = brushNode->brush().face(0).attributes().offset();
+    CHECK(newOffset.x() == oldOffset.x() + 16.0f);
+    CHECK(newOffset.y() == oldOffset.y());
+    manager.unloadPlugins(window);
+  }
+
   SECTION("runs v2 hello panel through legacy script entry")
   {
     const auto helloPanelScript =
