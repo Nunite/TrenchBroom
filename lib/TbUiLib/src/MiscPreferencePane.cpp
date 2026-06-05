@@ -175,8 +175,7 @@ void MiscPreferencePane::createGui()
     const auto pathStr = QFileDialog::getExistingDirectory(
       this,
       tr("Install Python Plugin from Directory"),
-      fileDialogDefaultDirectory(FileDialogDir::Map),
-      QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+      fileDialogDefaultDirectory(FileDialogDir::Map));
 
     if (!pathStr.isEmpty())
     {
