@@ -9,6 +9,7 @@
 
 namespace tb::ui
 {
+class PythonPluginSession;
 
 class PythonRuntime
 {
@@ -21,8 +22,10 @@ public:
   bool ensureInitialized();
   bool runScript(
     const PythonExecutionContext& context, const std::filesystem::path& path);
+  bool runScript(PythonPluginSession& session);
   void emitEvent(const std::string& eventName, MapWindow& mapWindow);
   void cleanupPlugin(const std::string& pluginId);
+  void cleanupPluginSession(PythonPluginSession& session);
   void cleanupDocument(MapWindow& mapWindow);
 
   const std::string& lastError() const;
@@ -31,10 +34,15 @@ public:
 private:
   std::string m_lastError;
 
+  bool runScript(
+    const PythonExecutionContext& context,
+    const std::filesystem::path& path,
+    PythonPluginSession* session);
   bool installV2Module();
   bool prependSysPath(const std::filesystem::path& path);
 };
 
 PythonExecutionContext* currentPythonExecutionContext();
+PythonPluginSession* currentPythonPluginSession();
 
 } // namespace tb::ui

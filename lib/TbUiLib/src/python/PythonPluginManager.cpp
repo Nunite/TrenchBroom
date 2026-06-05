@@ -2,6 +2,7 @@
 
 #include "Preferences.h"
 #include "ui/MapWindow.h"
+#include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonRuntime.h"
 
 #include <algorithm>
@@ -46,7 +47,11 @@ void PythonPluginManager::unloadPlugins(MapWindow& mapWindow)
   {
     if (plugin.status == PythonPluginStatus::Loaded)
     {
-      PythonRuntime::instance().cleanupPlugin(plugin.manifest.id);
+      if (plugin.session)
+      {
+        PythonRuntime::instance().cleanupPluginSession(*plugin.session);
+        plugin.session.reset();
+      }
       plugin.status = PythonPluginStatus::NotLoaded;
       plugin.error.clear();
     }
@@ -76,10 +81,14 @@ bool PythonPluginManager::loadPlugin(MapWindow& mapWindow, PythonPluginState& pl
   context.pluginDirectory = plugin.manifest.directory;
   context.scriptPath = plugin.manifest.directory / plugin.manifest.entry;
 
-  if (PythonRuntime::instance().runScript(context, context.scriptPath))
+  plugin.session =
+    std::make_unique<PythonPluginSession>(plugin.manifest, std::move(context));
+
+  if (PythonRuntime::instance().runScript(*plugin.session))
   {
     plugin.status = PythonPluginStatus::Loaded;
     plugin.error.clear();
+    plugin.session->clearError();
     return true;
   }
 
@@ -89,6 +98,7 @@ bool PythonPluginManager::loadPlugin(MapWindow& mapWindow, PythonPluginState& pl
   {
     plugin.error = "Plugin entry script failed";
   }
+  plugin.session->setError(plugin.error);
   return false;
 }
 

@@ -12,6 +12,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/python/PythonPluginManager.h"
+#include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonRuntime.h"
 
 #include "vm/bbox.h"
@@ -150,7 +151,9 @@ tb.register_callback("selection_changed", on_selection_changed)
     PythonRuntime::instance().emitEvent("selection_changed", window);
     CHECK(env.loadFile("python-v2-event-ok.txt") == "selection");
 
+    REQUIRE(manager.plugins()[0].session != nullptr);
     manager.unloadPlugins(window);
+    CHECK(manager.plugins()[0].session == nullptr);
     env.remove("python-v2-event-ok.txt");
     PythonRuntime::instance().emitEvent("selection_changed", window);
     CHECK_FALSE(std::filesystem::exists(env.dir() / "python-v2-event-ok.txt"));

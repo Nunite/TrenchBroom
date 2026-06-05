@@ -2,6 +2,7 @@
 
 #include "Logger.h"
 #include "ui/MapWindow.h"
+#include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonV2Module.h"
 
 #if defined(slots)
@@ -10,6 +11,7 @@
 
 #include <Python.h>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <string_view>
 
@@ -18,6 +20,7 @@ namespace tb::ui
 namespace
 {
 thread_local PythonExecutionContext* g_currentExecutionContext = nullptr;
+thread_local PythonPluginSession* g_currentPluginSession = nullptr;
 
 struct PyRuntimeLogWriter
 {
@@ -29,18 +32,28 @@ PyTypeObject* g_logWriterType = nullptr;
 class ScopedExecutionContext
 {
 private:
-  PythonExecutionContext m_context;
+  std::optional<PythonExecutionContext> m_ownedContext;
+  PythonExecutionContext* m_contextPtr = nullptr;
   PythonExecutionContext* m_previous = nullptr;
+  PythonPluginSession* m_previousSession = nullptr;
 
 public:
-  explicit ScopedExecutionContext(PythonExecutionContext context)
-    : m_context{std::move(context)}
+  ScopedExecutionContext(
+    const PythonExecutionContext& context, PythonPluginSession* session = nullptr)
+    : m_ownedContext{session == nullptr ? std::make_optional(context) : std::nullopt}
+    , m_contextPtr{session != nullptr ? &session->context() : &*m_ownedContext}
     , m_previous{g_currentExecutionContext}
+    , m_previousSession{g_currentPluginSession}
   {
-    g_currentExecutionContext = &m_context;
+    g_currentExecutionContext = m_contextPtr;
+    g_currentPluginSession = session;
   }
 
-  ~ScopedExecutionContext() { g_currentExecutionContext = m_previous; }
+  ~ScopedExecutionContext()
+  {
+    g_currentExecutionContext = m_previous;
+    g_currentPluginSession = m_previousSession;
+  }
 };
 
 class ScopedSysPath
@@ -294,6 +307,19 @@ bool PythonRuntime::ensureInitialized()
 bool PythonRuntime::runScript(
   const PythonExecutionContext& context, const std::filesystem::path& path)
 {
+  return runScript(context, path, nullptr);
+}
+
+bool PythonRuntime::runScript(PythonPluginSession& session)
+{
+  return runScript(session.context(), session.context().scriptPath, &session);
+}
+
+bool PythonRuntime::runScript(
+  const PythonExecutionContext& context,
+  const std::filesystem::path& path,
+  PythonPluginSession* session)
+{
   if (!ensureInitialized())
   {
     if (context.logger)
@@ -307,7 +333,7 @@ bool PythonRuntime::runScript(
   m_lastError.clear();
 
   auto gil = PyGILState_Ensure();
-  auto scopedContext = ScopedExecutionContext{context};
+  auto scopedContext = ScopedExecutionContext{context, session};
   auto scopedSysPath = ScopedSysPath{path.parent_path()};
   auto scopedStdStreamRedirect = ScopedStdStreamRedirect{};
 
@@ -409,6 +435,33 @@ void PythonRuntime::cleanupPlugin(const std::string& pluginId)
   {
     auto* result = PyObject_CallMethod(module, "_cleanup_plugin", "s", pluginId.c_str());
     Py_XDECREF(result);
+    Py_DECREF(module);
+  }
+  PyGILState_Release(gil);
+}
+
+void PythonRuntime::cleanupPluginSession(PythonPluginSession& session)
+{
+  if (!ensureInitialized())
+  {
+    return;
+  }
+
+  auto gil = PyGILState_Ensure();
+  auto* module = PyImport_ImportModule("tb2");
+  if (module != nullptr)
+  {
+    auto* capsule = PyCapsule_New(&session, nullptr, nullptr);
+    if (capsule != nullptr)
+    {
+      auto* methodName = PyUnicode_FromString("_cleanup_plugin_session");
+      auto* result = methodName != nullptr
+                       ? PyObject_CallMethodObjArgs(module, methodName, capsule, nullptr)
+                       : nullptr;
+      Py_XDECREF(result);
+      Py_XDECREF(methodName);
+      Py_DECREF(capsule);
+    }
     Py_DECREF(module);
   }
   PyGILState_Release(gil);
@@ -528,6 +581,11 @@ bool PythonRuntime::installV2Module()
 PythonExecutionContext* currentPythonExecutionContext()
 {
   return g_currentExecutionContext;
+}
+
+PythonPluginSession* currentPythonPluginSession()
+{
+  return g_currentPluginSession;
 }
 
 } // namespace tb::ui

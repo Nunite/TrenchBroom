@@ -1,8 +1,10 @@
 #pragma once
 
 #include "ui/python/PythonPluginManifest.h"
+#include "ui/python/PythonPluginSession.h"
 
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -22,6 +24,15 @@ struct PythonPluginState
   PythonPluginManifest manifest;
   PythonPluginStatus status = PythonPluginStatus::NotLoaded;
   std::string error;
+  std::unique_ptr<PythonPluginSession> session;
+
+  PythonPluginState() = default;
+  PythonPluginState(PythonPluginState&&) noexcept = default;
+  PythonPluginState& operator=(PythonPluginState&&) noexcept = default;
+  ~PythonPluginState() = default;
+
+  PythonPluginState(const PythonPluginState&) = delete;
+  PythonPluginState& operator=(const PythonPluginState&) = delete;
 };
 
 class PythonPluginManager

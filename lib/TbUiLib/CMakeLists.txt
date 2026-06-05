@@ -172,6 +172,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPlane.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginManifest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginSession.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonRuntime.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonScripting.cpp
@@ -432,6 +433,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonExecutionContext.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPluginManifest.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPluginManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPluginSession.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPluginPanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonRuntime.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonScripting.h

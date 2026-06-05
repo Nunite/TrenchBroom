@@ -29,6 +29,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/python/PythonExecutionContext.h"
+#include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonRuntime.h"
 
 #include "kd/overload.h"
@@ -345,6 +346,10 @@ PluginPanelHandle createPluginPanel(const std::string& title)
 
   auto* container = context.mapWindow->addPluginPanel(QString::fromStdString(title));
   context.mapWindow->switchToInspectorPage(InspectorPage::Plugin);
+  if (auto* session = currentPythonPluginSession())
+  {
+    session->addPluginPanel(container);
+  }
   return PluginPanelHandle{QPointer<QWidget>{container}};
 }
 
@@ -359,6 +364,10 @@ int registerCallback(const std::string& eventName, py::object callback)
   const auto token = g_nextCallbackToken++;
   g_callbacks.emplace(token, CallbackEntry{context.pluginId, std::move(callback)});
   g_eventCallbacks[eventName].push_back(token);
+  if (auto* session = currentPythonPluginSession())
+  {
+    session->addCallbackToken(token);
+  }
   return token;
 }
 
@@ -405,6 +414,15 @@ void cleanupPlugin(const std::string& pluginId)
   {
     unregisterCallback(token);
   }
+}
+
+void cleanupPluginSession(PythonPluginSession& session)
+{
+  for (const auto token : session.takeCallbackTokens())
+  {
+    unregisterCallback(token);
+  }
+  session.closePluginPanels();
 }
 
 void defineModule(py::module_& module)
@@ -539,6 +557,10 @@ void defineModule(py::module_& module)
   module.def("unregister_callback", unregisterCallback);
   module.def("_emit_event", emitEvent);
   module.def("_cleanup_plugin", cleanupPlugin);
+  module.def("_cleanup_plugin_session", [](py::capsule sessionCapsule) {
+    cleanupPluginSession(
+      *reinterpret_cast<PythonPluginSession*>(sessionCapsule.get_pointer()));
+  });
   module.def("_invalidate_document", [](py::capsule documentCapsule) {
     invalidateDocumentHandles(
       reinterpret_cast<MapDocument*>(documentCapsule.get_pointer()));
