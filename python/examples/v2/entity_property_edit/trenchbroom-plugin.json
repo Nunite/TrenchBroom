@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.entity_property_edit",
+  "name": "V2 Entity Property Edit",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Edits a worldspawn property through the transactional v2 API.",
+  "author": "TrenchBroom"
+}

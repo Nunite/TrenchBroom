@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.hello_panel",
+  "name": "V2 Hello Panel",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Creates a simple tb2 plugin panel.",
+  "author": "TrenchBroom"
+}

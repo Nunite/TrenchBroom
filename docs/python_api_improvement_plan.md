@@ -2,6 +2,76 @@
 
 本文档概述了将 TrenchBroom Python API (`tb` 模块) 现代化以符合 Blender 等现代 3D 软件标准的路线图。目标是从基于宏/受限的 API 过渡到完整的数据驱动对象模型。
 
+## Python v2 当前架构
+
+Python v2 目前以 `tb2` 模块作为正式实验入口；legacy `tb` 模块继续保留，不会在当前阶段被重定向或删除。v2 的目标不是立刻增加大量新能力，而是先把插件生命周期、错误处理、资源清理和可测试性做成可长期维护的基础。
+
+### Manifest 插件模型
+
+v2 插件是一个目录，目录中必须包含 `trenchbroom-plugin.json` 和入口脚本。首选项中的 Python 插件目录列表应指向这些插件目录。
+
+```json
+{
+  "id": "example.my_plugin",
+  "name": "My Plugin",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Optional description",
+  "author": "Optional author"
+}
+```
+
+`apiVersion` 当前只支持 `2`。manifest 解析错误、入口脚本缺失和加载错误会显示在 Preferences 的 Python 插件管理区域中。
+
+### Session 与资源清理
+
+每个 manifest 插件加载后都会创建独立的 `PythonPluginSession`。Session 记录插件 id、manifest、执行上下文、事件 callback、timer 和 plugin panel。插件卸载、地图窗口关闭或插件 reload 时，session 会清理它持有的 callback、timer 和 panel，避免回调继续访问已关闭的窗口。
+
+v2 timer 由 session 持有：
+
+```python
+import tb2 as tb
+
+token = tb.set_interval(lambda: print("tick"), 1000)
+tb.clear_interval(token)
+tb.set_timeout(lambda: print("once"), 500)
+```
+
+timer callback 抛异常时会写入 Python logger，不应导致主程序崩溃。
+
+### Transaction 规则
+
+v2 写 API 必须走 TrenchBroom 的 command/transaction 路径。当前已实现的基础写 API 包括：
+
+```python
+import tb2 as tb
+
+doc = tb.current_document()
+entity = doc.entities[0]
+
+entity.set("key", "value")
+entity.remove("key")
+
+brush = entity.brushes[0]
+face = brush.faces()[0]
+face.set_material("wall01")
+
+doc.select([brush])
+doc.clear_selection()
+```
+
+如果脚本已经在 `with doc.transaction("Name"):` 中，写 API 会加入当前 v2 transaction。否则写 API 会创建一个短事务。`with` 块内发生异常时 transaction 会取消，保证 undo/redo 语义可预测。
+
+### 示例插件
+
+v2 manifest 示例位于 `python/examples/v2`：
+
+* `hello_panel`: 创建简单 Plugin Inspector 面板。
+* `event_callback`: 注册 `selection_changed` callback。
+* `timer`: 使用 session-owned interval timer。
+* `entity_property_edit`: 通过事务式 v2 API 修改 entity property。
+
 ## 优先级定义
 
 *   **紧急 (P0)**: 阻碍基本程序化建模任务的关键缺失功能。

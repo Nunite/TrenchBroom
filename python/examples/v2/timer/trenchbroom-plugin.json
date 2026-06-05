@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.timer",
+  "name": "V2 Timer",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Shows a session-owned timer.",
+  "author": "TrenchBroom"
+}
