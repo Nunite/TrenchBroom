@@ -1,15 +1,24 @@
 #include "ui/python/PythonV2Module.h"
 
+#include <QAbstractItemView>
 #include <QCheckBox>
 #include <QColor>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPointer>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QTableWidget>
+#include <QTableWidgetItem>
+#include <QTextEdit>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -441,6 +450,55 @@ void addFormRow(QWidget& panel, const std::string& label, QWidget* field)
   rowLayout->addRow(QString::fromStdString(label), field);
   row->setLayout(rowLayout);
   layout.addWidget(row);
+}
+
+QStringList toQStringList(const std::vector<std::string>& values)
+{
+  auto result = QStringList{};
+  for (const auto& value : values)
+  {
+    result.push_back(QString::fromStdString(value));
+  }
+  return result;
+}
+
+void setTableRows(QTableWidget& table, const std::vector<std::vector<std::string>>& rows)
+{
+  const auto colCount = table.columnCount();
+  table.blockSignals(true);
+  table.clearContents();
+  table.setRowCount(static_cast<int>(rows.size()));
+  for (int row = 0; row < static_cast<int>(rows.size()); ++row)
+  {
+    const auto& values = rows[static_cast<size_t>(row)];
+    for (int col = 0; col < std::min<int>(colCount, static_cast<int>(values.size()));
+         ++col)
+    {
+      table.setItem(
+        row,
+        col,
+        new QTableWidgetItem{QString::fromStdString(values[static_cast<size_t>(col)])});
+    }
+  }
+  table.blockSignals(false);
+}
+
+void setTreeItems(QTreeWidget& tree, const std::vector<std::vector<std::string>>& rows)
+{
+  const auto colCount = tree.columnCount();
+  tree.blockSignals(true);
+  tree.clear();
+  for (const auto& values : rows)
+  {
+    auto* item = new QTreeWidgetItem{};
+    for (int col = 0; col < std::min<int>(colCount, static_cast<int>(values.size()));
+         ++col)
+    {
+      item->setText(col, QString::fromStdString(values[static_cast<size_t>(col)]));
+    }
+    tree.addTopLevelItem(item);
+  }
+  tree.blockSignals(false);
 }
 
 QColor colorFromObject(const py::handle& object)
@@ -1759,6 +1817,57 @@ void defineModule(py::module_& module)
           .setText(QString::fromStdString(text));
       })
     .def(
+      "add_group",
+      [](PluginPanelHandle& self, const std::string& key, const std::string& title) {
+        auto* groupBox = new QGroupBox{QString::fromStdString(title)};
+        groupBox->setObjectName(panelObjectName("group", key));
+        auto* layout = new QVBoxLayout{};
+        layout->setContentsMargins(6, 6, 6, 6);
+        layout->setSpacing(4);
+        groupBox->setLayout(layout);
+        ensurePanelLayout(self.get()).addWidget(groupBox);
+        return PluginPanelHandle{QPointer<QWidget>{groupBox}};
+      })
+    .def(
+      "add_row",
+      [](PluginPanelHandle& self, const std::string& key) {
+        auto* row = new QWidget{};
+        row->setObjectName(panelObjectName("row", key));
+        auto* layout = new QHBoxLayout{};
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(6);
+        row->setLayout(layout);
+        ensurePanelLayout(self.get()).addWidget(row);
+        return PluginPanelHandle{QPointer<QWidget>{row}};
+      })
+    .def(
+      "add_column",
+      [](PluginPanelHandle& self, const std::string& key) {
+        auto* column = new QWidget{};
+        column->setObjectName(panelObjectName("column", key));
+        auto* layout = new QVBoxLayout{};
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(4);
+        column->setLayout(layout);
+        ensurePanelLayout(self.get()).addWidget(column);
+        return PluginPanelHandle{QPointer<QWidget>{column}};
+      })
+    .def(
+      "set_widget_visible",
+      [](PluginPanelHandle& self, const std::string& key, const bool visible) {
+        const auto suffix = QStringLiteral("_") + QString::fromStdString(key);
+        const auto widgets = self.get().findChildren<QWidget*>();
+        for (auto* widget : widgets)
+        {
+          if (widget->objectName().endsWith(suffix))
+          {
+            widget->setVisible(visible);
+            return;
+          }
+        }
+        throw std::runtime_error{"Plugin panel control not found: " + key};
+      })
+    .def(
       "add_button",
       [](PluginPanelHandle& self, const std::string& text, py::object callback) {
         auto* button = new QPushButton{QString::fromStdString(text)};
@@ -1847,6 +1956,51 @@ void defineModule(py::module_& module)
       "get_text_field",
       [](PluginPanelHandle& self, const std::string& key) {
         return findPanelChild<QLineEdit>(self.get(), "text", key).text().toStdString();
+      })
+    .def(
+      "set_text_field",
+      [](PluginPanelHandle& self, const std::string& key, const std::string& value) {
+        findPanelChild<QLineEdit>(self.get(), "text", key)
+          .setText(QString::fromStdString(value));
+      })
+    .def(
+      "add_text_area",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::string& label,
+        const std::string& value,
+        const int height,
+        const std::string& placeholder) {
+        auto* textEdit = new QTextEdit{};
+        textEdit->setObjectName(panelObjectName("text_area", key));
+        textEdit->setPlainText(QString::fromStdString(value));
+        textEdit->setPlaceholderText(QString::fromStdString(placeholder));
+        textEdit->setAcceptRichText(false);
+        textEdit->setTabChangesFocus(true);
+        if (height > 0)
+        {
+          textEdit->setMinimumHeight(height);
+        }
+        addFormRow(self.get(), label, textEdit);
+      },
+      py::arg("key"),
+      py::arg("label"),
+      py::arg("value") = "",
+      py::arg("height") = 120,
+      py::arg("placeholder") = "")
+    .def(
+      "get_text_area",
+      [](PluginPanelHandle& self, const std::string& key) {
+        return findPanelChild<QTextEdit>(self.get(), "text_area", key)
+          .toPlainText()
+          .toStdString();
+      })
+    .def(
+      "set_text_area",
+      [](PluginPanelHandle& self, const std::string& key, const std::string& value) {
+        findPanelChild<QTextEdit>(self.get(), "text_area", key)
+          .setPlainText(QString::fromStdString(value));
       })
     .def(
       "add_int_field",
@@ -2015,6 +2169,108 @@ void defineModule(py::module_& module)
                              .property("tb2_color")
                              .value<QColor>();
         return py::make_tuple(color.red(), color.green(), color.blue());
+      })
+    .def(
+      "add_table_widget",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::vector<std::string>& columns,
+        const std::vector<std::vector<std::string>>& rows,
+        const int height,
+        py::object callback) {
+        auto* table = new QTableWidget{};
+        table->setObjectName(panelObjectName("table", key));
+        table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        table->setSelectionMode(QAbstractItemView::SingleSelection);
+        table->setSelectionBehavior(QAbstractItemView::SelectRows);
+        table->setShowGrid(false);
+        table->verticalHeader()->setVisible(false);
+        table->horizontalHeader()->setStretchLastSection(true);
+        table->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
+        table->setColumnCount(static_cast<int>(columns.size()));
+        table->setHorizontalHeaderLabels(toQStringList(columns));
+        setTableRows(*table, rows);
+        if (height > 0)
+        {
+          table->setMinimumHeight(height);
+        }
+        if (!callback.is_none())
+        {
+          auto* session = currentPythonPluginSession();
+          const auto token = registerPanelCallback(std::move(callback));
+          QObject::connect(
+            table,
+            &QTableWidget::currentCellChanged,
+            [session, token](const int row, const int column, int, int) {
+              invokeSessionCallback(session, token, row, column);
+            });
+        }
+        ensurePanelLayout(self.get()).addWidget(table);
+      },
+      py::arg("key"),
+      py::arg("columns"),
+      py::arg("rows"),
+      py::arg("height") = 200,
+      py::arg("callback") = py::none())
+    .def(
+      "set_table_widget_rows",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::vector<std::vector<std::string>>& rows) {
+        setTableRows(findPanelChild<QTableWidget>(self.get(), "table", key), rows);
+      })
+    .def(
+      "add_tree_widget",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::vector<std::string>& columns,
+        const std::vector<std::vector<std::string>>& rows,
+        const int height,
+        py::object callback) {
+        auto* tree = new QTreeWidget{};
+        tree->setObjectName(panelObjectName("tree", key));
+        tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        tree->setSelectionMode(QAbstractItemView::SingleSelection);
+        tree->setRootIsDecorated(false);
+        tree->setAlternatingRowColors(true);
+        tree->setColumnCount(static_cast<int>(columns.size()));
+        tree->setHeaderLabels(toQStringList(columns));
+        setTreeItems(*tree, rows);
+        if (height > 0)
+        {
+          tree->setMinimumHeight(height);
+        }
+        if (!callback.is_none())
+        {
+          auto* session = currentPythonPluginSession();
+          const auto token = registerPanelCallback(std::move(callback));
+          QObject::connect(
+            tree,
+            &QTreeWidget::currentItemChanged,
+            [session, token, tree](QTreeWidgetItem* current, QTreeWidgetItem*) {
+              invokeSessionCallback(
+                session,
+                token,
+                current != nullptr ? tree->indexOfTopLevelItem(current) : -1);
+            });
+        }
+        ensurePanelLayout(self.get()).addWidget(tree);
+      },
+      py::arg("key"),
+      py::arg("columns"),
+      py::arg("rows"),
+      py::arg("height") = 200,
+      py::arg("callback") = py::none())
+    .def(
+      "set_tree_widget_items",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::vector<std::vector<std::string>>& rows) {
+        setTreeItems(findPanelChild<QTreeWidget>(self.get(), "tree", key), rows);
       })
     .def("clear", [](PluginPanelHandle& self) {
       if (auto* layout = self.get().layout())

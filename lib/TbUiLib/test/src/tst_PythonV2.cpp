@@ -5,7 +5,10 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QTableWidget>
+#include <QTextEdit>
 #include <QThread>
+#include <QTreeWidget>
 
 #include "Logger.h"
 #include "Result.h"
@@ -1080,6 +1083,61 @@ assert face.surface_value == 3.5
 
     PythonRuntime::instance().emitEvent("selection_changed", window);
     CHECK(PythonRuntime::instance().lastError().empty());
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 advanced panel example plugin")
+  {
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/advanced_panel"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+
+    auto* updateButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Update"))
+      {
+        updateButton = button;
+      }
+    }
+    REQUIRE(updateButton != nullptr);
+    updateButton->click();
+
+    auto* name = panel->findChild<QLineEdit*>(QStringLiteral("tb2_panel_text_name"));
+    auto* message =
+      panel->findChild<QTextEdit*>(QStringLiteral("tb2_panel_text_area_message"));
+    auto* table =
+      panel->findChild<QTableWidget*>(QStringLiteral("tb2_panel_table_table"));
+    auto* tree = panel->findChild<QTreeWidget*>(QStringLiteral("tb2_panel_tree_tree"));
+    auto* status = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_status"));
+    REQUIRE(name != nullptr);
+    REQUIRE(message != nullptr);
+    REQUIRE(table != nullptr);
+    REQUIRE(tree != nullptr);
+    REQUIRE(status != nullptr);
+
+    CHECK(name->text() == QStringLiteral("Run 1"));
+    CHECK(message->toPlainText().contains(QStringLiteral("Counter=1")));
+    REQUIRE(table->rowCount() == 5);
+    REQUIRE(table->item(0, 1) != nullptr);
+    CHECK(table->item(0, 1)->text() == QStringLiteral("Item 1 (run 1)"));
+    CHECK(tree->topLevelItemCount() == 5);
+    CHECK(tree->topLevelItem(0)->text(0) == QStringLiteral("Node 1 (run 1)"));
+
+    table->setCurrentCell(0, 1);
+    CHECK(status->text() == QStringLiteral("Table selection: row=0, column=1"));
+    tree->setCurrentItem(tree->topLevelItem(0));
+    CHECK(status->text() == QStringLiteral("Tree selection: row=0"));
     manager.unloadPlugins(window);
   }
 

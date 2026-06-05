@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.advanced_panel",
+  "name": "Advanced Panel",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Demonstrates grouped inputs, text areas, tables, and trees.",
+  "author": "TrenchBroom"
+}
