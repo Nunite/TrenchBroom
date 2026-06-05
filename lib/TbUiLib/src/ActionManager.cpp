@@ -1501,6 +1501,7 @@ void ActionManager::createToolsMenu()
     [](const auto& context) {
       return context.hasDocument() && context.mapWindow().pathToolActive();
     },
+    std::filesystem::path{"Path.svg"},
   }));
   toolsMenu.addItem(addAction(Action{
     "Controls/Map view/Deactivate current tool",
@@ -2029,6 +2030,7 @@ void ActionManager::createToolbar()
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Vertex Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Edge Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Face Tool"));
+  m_toolBar.addItem(existingAction("Menu/Edit/Tools/Path Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Rotate Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Scale Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Shear Tool"));
