@@ -1059,6 +1059,30 @@ assert face.surface_value == 3.5
     manager.unloadPlugins(window);
   }
 
+  SECTION("loads v2 event callback example plugin")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "event_callback") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/event_callback"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    PythonRuntime::instance().emitEvent("selection_changed", window);
+    CHECK(PythonRuntime::instance().lastError().empty());
+    manager.unloadPlugins(window);
+  }
+
   SECTION("loads v2 vec3 color demo example plugin")
   {
     auto& map = window.document().map();
