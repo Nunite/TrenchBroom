@@ -4,6 +4,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QThread>
 
 #include "Logger.h"
@@ -1180,6 +1181,59 @@ assert face.surface_value == 3.5
     REQUIRE(manager.errors().empty());
     REQUIRE(manager.plugins().size() == 1u);
     REQUIRE(manager.loadPlugins(window));
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 transform tool example plugin")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "transform_tool") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+    map.vertexHandles().addHandles(*brushNode);
+    const auto vertexHandles = map.vertexHandles().allHandles();
+    REQUIRE_FALSE(vertexHandles.empty());
+    map.vertexHandles().select(vertexHandles.front());
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/transform_tool"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+
+    auto* recordButton = static_cast<QPushButton*>(nullptr);
+    auto* applyButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Record Pivot From Vertex Handles"))
+      {
+        recordButton = button;
+      }
+      if (button->text() == QStringLiteral("Apply Duplicate + Rotate"))
+      {
+        applyButton = button;
+      }
+    }
+    REQUIRE(recordButton != nullptr);
+    REQUIRE(applyButton != nullptr);
+
+    auto* duplicateCount =
+      panel->findChild<QSpinBox*>(QStringLiteral("tb2_panel_int_dup_count"));
+    REQUIRE(duplicateCount != nullptr);
+    duplicateCount->setValue(1);
+
+    recordButton->click();
+    applyButton->click();
+    CHECK(map.worldNode().defaultLayer()->childCount() == 2u);
     manager.unloadPlugins(window);
   }
 

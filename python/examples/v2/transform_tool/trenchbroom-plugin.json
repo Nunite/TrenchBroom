@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.transform_tool",
+  "name": "Transform Tool",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Records vertex-tool pivots, chamfers vertex handles, and duplicates/rotates selections.",
+  "author": "TrenchBroom"
+}

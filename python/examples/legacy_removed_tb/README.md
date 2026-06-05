@@ -16,3 +16,4 @@ Migrated examples:
 - `generator_spin_entity.py` -> `python/examples/v2/generator_spin_entity`
 - `ui_chamfer_tool.py` -> `python/examples/v2/chamfer_tool`
 - `simple_chamfer_edge.py` -> `python/examples/v2/simple_chamfer_edge`
+- `ui_transform_tool.py` -> `python/examples/v2/transform_tool`
