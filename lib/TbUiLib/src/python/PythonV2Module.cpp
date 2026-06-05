@@ -937,6 +937,58 @@ bool scaleSelection(
   }
 }
 
+bool chamferSelectionVertices(SelectionHandle& selection, const double distance)
+{
+  auto& document = selection.getDocument();
+  auto& map = document.map();
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Chamfer Vertices"};
+  try
+  {
+    const auto ok = mdl::chamferVertices(
+      map, "Python v2 Chamfer Vertices", map.vertexHandles().selectedHandles(), distance);
+    if (!ok || !transaction.commit())
+    {
+      transaction.cancel();
+      return false;
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
+bool chamferSelectionEdges(
+  SelectionHandle& selection, const double distance, const int segments)
+{
+  auto& document = selection.getDocument();
+  auto& map = document.map();
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Chamfer Edges"};
+  try
+  {
+    const auto safeSegments = std::max(segments, 1);
+    const auto ok = mdl::chamferEdges(
+      map,
+      "Python v2 Chamfer Edges",
+      map.edgeHandles().selectedHandles(),
+      distance,
+      safeSegments);
+    if (!ok || !transaction.commit())
+    {
+      transaction.cancel();
+      return false;
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
 void withPreservedSelection(
   MapDocument& document,
   std::string transactionName,
@@ -1517,7 +1569,13 @@ void defineModule(py::module_& module)
       py::arg("scale_z"),
       py::arg("center_x") = std::nullopt,
       py::arg("center_y") = std::nullopt,
-      py::arg("center_z") = std::nullopt);
+      py::arg("center_z") = std::nullopt)
+    .def("chamfer_vertices", chamferSelectionVertices, py::arg("distance"))
+    .def(
+      "chamfer_edges",
+      chamferSelectionEdges,
+      py::arg("distance"),
+      py::arg("segments") = 1);
 
   py::class_<EntityHandle>(module, "Entity")
     .def_property_readonly(

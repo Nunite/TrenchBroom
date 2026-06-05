@@ -745,6 +745,69 @@ assert len(doc.selection.brushes) == 1
     CHECK(map.worldNode().defaultLayer()->childCount() == 3u);
   }
 
+  SECTION("chamfers selected vertex and edge handles")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* vertexBrush =
+      new mdl::BrushNode{builder.createCube(64.0, "chamfer_vertex") | kdl::value()};
+    auto* edgeBrush =
+      new mdl::BrushNode{builder.createCube(64.0, "chamfer_edge") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {vertexBrush, edgeBrush}}});
+
+    map.vertexHandles().addHandles(*vertexBrush);
+    const auto vertexHandles = map.vertexHandles().allHandles();
+    REQUIRE_FALSE(vertexHandles.empty());
+    map.vertexHandles().select(vertexHandles.front());
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_chamfer_vertex.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+doc.selection.set([doc.entities[0].brushes[0]])
+assert doc.selection.chamfer_vertices(4.0)
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_chamfer_vertex.py";
+
+    auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+    CHECK(vertexBrush->brush().vertexCount() > 8u);
+
+    map.vertexHandles().clear();
+    map.edgeHandles().addHandles(*edgeBrush);
+    const auto edgeHandles = map.edgeHandles().allHandles();
+    REQUIRE_FALSE(edgeHandles.empty());
+    map.edgeHandles().select(edgeHandles.front());
+
+    env.createFile(
+      "v2_chamfer_edge.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+doc.selection.set([doc.entities[0].brushes[1]])
+assert doc.selection.chamfer_edges(4.0, 2)
+)");
+    context.scriptPath = env.dir() / "v2_chamfer_edge.py";
+
+    scriptSucceeded = PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+    CHECK(edgeBrush->brush().faceCount() > 6u);
+  }
+
   SECTION("sets face material without changing the visible selection")
   {
     auto& map = window.document().map();
@@ -1072,6 +1135,51 @@ assert face.surface_value == 3.5
     REQUIRE(manager.plugins().size() == 1u);
     REQUIRE(manager.loadPlugins(window));
     CHECK(map.selection().nodes.size() == 1u);
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 chamfer example plugins")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "chamfer_example") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+    map.vertexHandles().addHandles(*brushNode);
+    const auto vertexHandles = map.vertexHandles().allHandles();
+    REQUIRE_FALSE(vertexHandles.empty());
+    map.vertexHandles().select(vertexHandles.front());
+
+    auto manager = PythonPluginManager{};
+    const auto chamferToolDir = std::filesystem::path{"python/examples/v2/chamfer_tool"};
+    manager.reload({chamferToolDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+    auto* vertexButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Chamfer Vertex Handles"))
+      {
+        vertexButton = button;
+      }
+    }
+    REQUIRE(vertexButton != nullptr);
+    vertexButton->click();
+    CHECK(brushNode->brush().vertexCount() > 8u);
+    manager.unloadPlugins(window);
+
+    const auto simpleChamferDir =
+      std::filesystem::path{"python/examples/v2/simple_chamfer_edge"};
+    manager.reload({simpleChamferDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
     manager.unloadPlugins(window);
   }
 

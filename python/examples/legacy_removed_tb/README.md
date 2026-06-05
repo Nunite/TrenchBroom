@@ -14,3 +14,5 @@ Migrated examples:
 - `util_print_brush_verts.py` / `util_print_selected_verts.py` -> `python/examples/v2/print_selected_vertices`
 - `ui_plane_builder.py` -> `python/examples/v2/plane_builder`
 - `generator_spin_entity.py` -> `python/examples/v2/generator_spin_entity`
+- `ui_chamfer_tool.py` -> `python/examples/v2/chamfer_tool`
+- `simple_chamfer_edge.py` -> `python/examples/v2/simple_chamfer_edge`
