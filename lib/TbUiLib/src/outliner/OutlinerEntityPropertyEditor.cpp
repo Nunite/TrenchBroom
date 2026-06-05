@@ -944,6 +944,9 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             m_embeddedSkyboxEditor->activate(mdl::EntityPropertyKeys::Skyname);
             m_embeddedSkyboxEditor->update(entityNodes);
             containerLayout->addWidget(m_embeddedSkyboxEditor, 1);
+            connect(m_embeddedSkyboxEditor, &SmartSkyboxEditor::skyboxApplied, this, [this]() {
+                scheduleUpdate(true);
+            });
 
             container->setVisible(m_skyboxEditorExpanded);
             m_scrollLayout->addWidget(container, 0);

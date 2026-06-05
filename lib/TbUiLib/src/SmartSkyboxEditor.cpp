@@ -127,12 +127,15 @@ SmartSkyboxEditor::SmartSkyboxEditor(MapDocument& document, QWidget* parent)
 
 void SmartSkyboxEditor::createGui()
 {
+  setMinimumHeight(220);
+
   auto* layout = new QVBoxLayout{this};
   layout->setContentsMargins(0, 0, 0, 0);
 
   m_refreshButton = new QPushButton{tr("Refresh skyboxes"), this};
   m_listWidget = new QListWidget{this};
   m_listWidget->setIconSize(QSize{96, 48});
+  m_listWidget->setMinimumHeight(180);
 
   layout->addWidget(m_refreshButton);
   layout->addWidget(m_listWidget);
@@ -179,6 +182,7 @@ void SmartSkyboxEditor::applySkybox(QListWidgetItem* item)
   }
 
   addOrUpdateProperty(m_skyboxes[size_t(row)].name);
+  emit skyboxApplied();
 }
 
 QIcon SmartSkyboxEditor::iconForSkybox(const SmartSkyboxItem& skybox)

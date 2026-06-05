@@ -44,6 +44,9 @@ private:
 public:
   explicit SmartSkyboxEditor(MapDocument& document, QWidget* parent = nullptr);
 
+signals:
+  void skyboxApplied();
+
 private:
   void createGui();
   void doUpdateVisual(const std::vector<mdl::EntityNodeBase*>& nodes) override;

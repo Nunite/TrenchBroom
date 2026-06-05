@@ -32,6 +32,7 @@
 #include "mdl/WorldNode.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
+#include "ui/SmartSkyboxEditor.h"
 #include "ui/outliner/OutlinerEntityPropertyEditor.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -161,6 +162,16 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     processOutlinerUpdates();
 
     CHECK(editor.findChild<QWidget*>("outlinerEmbeddedSkyboxEditor") != nullptr);
+    auto* skyboxEditor = editor.findChild<SmartSkyboxEditor*>();
+    REQUIRE(skyboxEditor != nullptr);
+
+    mdl::setEntityProperty(map, "skyname", "morning", false);
+    emit skyboxEditor->skyboxApplied();
+    processOutlinerUpdates();
+
+    skynameEdit = propertyValueEdit(editor, "skyname");
+    REQUIRE(skynameEdit != nullptr);
+    CHECK(skynameEdit->text() == "morning");
   }
 
   SECTION("updates rows from MapDocument selection notifications")
