@@ -225,13 +225,7 @@ MapWindow::MapWindow(AppController& appController, std::unique_ptr<MapDocument> 
     });
   }
 
-  const auto pluginDirectories =
-    PreferenceManager::instance().get(Preferences::PythonPluginDirectories);
-  if (!pluginDirectories.empty())
-  {
-    m_pythonPluginManager.reload(splitPythonPluginDirectories(pluginDirectories));
-    QTimer::singleShot(0, this, [this]() { m_pythonPluginManager.loadPlugins(*this); });
-  }
+  reloadPythonPlugins();
 
   // act as if the document was loaded to update the UI
   m_document->documentWasLoadedNotifier();
@@ -785,6 +779,20 @@ void MapWindow::updateStatusBarDelayed()
   m_updateStatusBarSignalDelayer->queueSignal();
 }
 
+void MapWindow::reloadPythonPlugins()
+{
+  m_pythonPluginManager.unloadPlugins(*this);
+
+  const auto pluginDirectories =
+    PreferenceManager::instance().get(Preferences::PythonPluginDirectories);
+  m_pythonPluginManager.reload(splitPythonPluginDirectories(pluginDirectories));
+
+  if (!pluginDirectories.empty())
+  {
+    QTimer::singleShot(0, this, [this]() { m_pythonPluginManager.loadPlugins(*this); });
+  }
+}
+
 void MapWindow::connectObservers()
 {
   auto& prefs = PreferenceManager::instance();
@@ -898,6 +906,10 @@ void MapWindow::preferenceDidChange(const std::filesystem::path& path)
   {
     m_mapView->switchToMapView(
       static_cast<MapViewLayout>(pref(Preferences::MapViewLayout)));
+  }
+  else if (path == Preferences::PythonPluginDirectories.path)
+  {
+    reloadPythonPlugins();
   }
 
   updateShortcuts();

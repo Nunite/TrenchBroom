@@ -43,6 +43,7 @@ private:
 public:
   explicit KeyboardPreferencePane(
     AppController& appController, MapDocument* document, QWidget* parent = nullptr);
+  ~KeyboardPreferencePane() override;
 
 private:
   bool canResetToDefaults() override;

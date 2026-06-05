@@ -1,4 +1,5 @@
 #include "fs/TestEnvironment.h"
+#include "ui/python/PythonPluginManager.h"
 #include "ui/python/PythonPluginManifest.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -49,6 +50,41 @@ TEST_CASE("PythonPluginManifest")
     const auto paths = splitPythonPluginDirectories("C:/a|D:/b");
     REQUIRE(paths.size() == 2u);
     CHECK(joinPythonPluginDirectories(paths).find('|') != std::string::npos);
+  }
+
+  SECTION("manager discovers plugin manifests in child directories")
+  {
+    env.createDirectory("plugins/one");
+    env.createFile("plugins/one/main.py", "print('one')\n");
+    env.createFile(
+      "plugins/one/trenchbroom-plugin.json",
+      R"({
+        "id": "codex.one",
+        "name": "One",
+        "version": "1.0.0",
+        "apiVersion": 2,
+        "entry": "main.py"
+      })");
+
+    env.createDirectory("plugins/two");
+    env.createFile("plugins/two/main.py", "print('two')\n");
+    env.createFile(
+      "plugins/two/trenchbroom-plugin.json",
+      R"({
+        "id": "codex.two",
+        "name": "Two",
+        "version": "1.0.0",
+        "apiVersion": 2,
+        "entry": "main.py"
+      })");
+
+    auto manager = PythonPluginManager{};
+    manager.reload({env.dir() / "plugins"});
+
+    REQUIRE(manager.plugins().size() == 2u);
+    CHECK(manager.plugins()[0].manifest.id == "codex.one");
+    CHECK(manager.plugins()[1].manifest.id == "codex.two");
+    CHECK(manager.errors().empty());
   }
 }
 

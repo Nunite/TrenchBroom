@@ -175,6 +175,7 @@ private: // status bar
 
 private: // gui creation
   void createGui();
+  void reloadPythonPlugins();
 
 private: // notification handlers
   void connectObservers();

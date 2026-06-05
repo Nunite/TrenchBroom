@@ -28,7 +28,7 @@ class KeyboardShortcutItemDelegate : public QStyledItemDelegate
 {
   Q_OBJECT
 public:
-  KeyboardShortcutItemDelegate();
+  explicit KeyboardShortcutItemDelegate(QObject* parent = nullptr);
   QWidget* createEditor(
     QWidget* parent,
     const QStyleOptionViewItem& option,

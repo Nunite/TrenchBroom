@@ -45,8 +45,8 @@ KeyboardPreferencePane::KeyboardPreferencePane(
   : PreferencePane{parent}
   , m_appController{appController}
   , m_table{new QTableView{}}
-  , m_model{new KeyboardShortcutModel{m_appController.actionManager(), document}}
-  , m_proxy{new QSortFilterProxyModel{}}
+  , m_model{new KeyboardShortcutModel{m_appController.actionManager(), document, this}}
+  , m_proxy{new QSortFilterProxyModel{this}}
 {
   m_proxy->setSourceModel(m_model);
   m_proxy->setFilterCaseSensitivity(Qt::CaseInsensitive);
@@ -72,7 +72,7 @@ KeyboardPreferencePane::KeyboardPreferencePane(
     QAbstractItemView::EditTrigger::SelectedClicked
     | QAbstractItemView::EditTrigger::DoubleClicked
     | QAbstractItemView::EditTrigger::EditKeyPressed);
-  m_table->setItemDelegate(new KeyboardShortcutItemDelegate());
+  m_table->setItemDelegate(new KeyboardShortcutItemDelegate{m_table});
 
   auto* searchBox = createSearchBox();
   setSmallStyle(searchBox);
@@ -101,6 +101,14 @@ KeyboardPreferencePane::KeyboardPreferencePane(
   connect(searchBox, &QLineEdit::textChanged, this, [&](const QString& newText) {
     m_proxy->setFilterFixedString(newText);
   });
+}
+
+KeyboardPreferencePane::~KeyboardPreferencePane()
+{
+  m_table->closePersistentEditor(m_table->currentIndex());
+  m_table->setItemDelegate(nullptr);
+  m_table->setModel(nullptr);
+  m_proxy->setSourceModel(nullptr);
 }
 
 bool KeyboardPreferencePane::canResetToDefaults()

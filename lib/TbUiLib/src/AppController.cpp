@@ -384,8 +384,9 @@ void AppController::showPreferences()
   auto* topMapWindow = mapWindowManager().topMapWindow();
   auto* topDocument = topMapWindow ? &topMapWindow->document() : nullptr;
 
-  auto dialog = PreferenceDialog{*this, topDocument};
-  dialog.exec();
+  auto* dialog = new PreferenceDialog{*this, topDocument};
+  dialog->exec();
+  dialog->deleteLater();
 }
 
 void AppController::showAboutDialog()

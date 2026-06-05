@@ -407,6 +407,54 @@ panel.add_button("Run", lambda: print("run"))
     }));
   }
 
+  SECTION("reloads manifest plugins when plugin directory preferences change")
+  {
+    auto env = fs::TestEnvironment{};
+    env.createDirectory("plugin");
+    env.createFile(
+      "plugin/trenchbroom-plugin.json",
+      R"({
+        "id": "codex.mapwindow.reload",
+        "name": "Codex Reload",
+        "version": "1.0.0",
+        "apiVersion": 2,
+        "entry": "main.py"
+      })");
+    env.createFile(
+      "plugin/main.py",
+      R"(
+import tb2 as tb
+
+panel = tb.create_plugin_panel("Reloaded Plugin")
+panel.add_label("Loaded from preferences")
+)");
+
+    REQUIRE(pluginPanels(window).empty());
+
+    setPref(Preferences::PythonPluginDirectories, (env.dir() / "plugin").string());
+    QApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QApplication::processEvents();
+
+    const auto panels = pluginPanels(window);
+    REQUIRE(panels.size() == 1u);
+
+    auto* label = static_cast<QLabel*>(nullptr);
+    for (auto* candidate : panels.front()->findChildren<QLabel*>())
+    {
+      if (candidate->text() == QStringLiteral("Loaded from preferences"))
+      {
+        label = candidate;
+      }
+    }
+    CHECK(label != nullptr);
+
+    setPref(Preferences::PythonPluginDirectories, "");
+    QApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QApplication::processEvents();
+
+    CHECK(pluginPanels(window).empty());
+  }
+
   SECTION("executes a configured pie menu action from the current map view")
   {
     setPref(Preferences::PieMenuAction, "Menu/View/Grid/Set Grid Size 8");

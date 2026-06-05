@@ -6,9 +6,46 @@
 #include "ui/python/PythonRuntime.h"
 
 #include <algorithm>
+#include <filesystem>
 
 namespace tb::ui
 {
+namespace
+{
+constexpr auto ManifestFileName = "trenchbroom-plugin.json";
+
+bool hasPluginManifest(const std::filesystem::path& directory)
+{
+  return std::filesystem::exists(directory / ManifestFileName);
+}
+
+std::vector<std::filesystem::path> discoverPluginDirectories(
+  const std::filesystem::path& directory)
+{
+  auto result = std::vector<std::filesystem::path>{};
+  if (hasPluginManifest(directory))
+  {
+    result.push_back(directory);
+    return result;
+  }
+
+  if (!std::filesystem::is_directory(directory))
+  {
+    return result;
+  }
+
+  for (const auto& entry : std::filesystem::directory_iterator{directory})
+  {
+    if (entry.is_directory() && hasPluginManifest(entry.path()))
+    {
+      result.push_back(entry.path());
+    }
+  }
+
+  std::ranges::sort(result);
+  return result;
+}
+} // namespace
 
 void PythonPluginManager::reload(const std::vector<std::filesystem::path>& directories)
 {
@@ -17,16 +54,25 @@ void PythonPluginManager::reload(const std::vector<std::filesystem::path>& direc
 
   for (const auto& directory : directories)
   {
-    auto result = loadPythonPluginManifest(directory);
-    if (result.manifest)
+    auto pluginDirectories = discoverPluginDirectories(directory);
+    if (pluginDirectories.empty())
     {
-      auto state = PythonPluginState{};
-      state.manifest = std::move(*result.manifest);
-      m_plugins.push_back(std::move(state));
+      pluginDirectories.push_back(directory);
     }
-    else if (result.error)
+
+    for (const auto& pluginDirectory : pluginDirectories)
     {
-      m_errors.push_back(std::move(*result.error));
+      auto result = loadPythonPluginManifest(pluginDirectory);
+      if (result.manifest)
+      {
+        auto state = PythonPluginState{};
+        state.manifest = std::move(*result.manifest);
+        m_plugins.push_back(std::move(state));
+      }
+      else if (result.error)
+      {
+        m_errors.push_back(std::move(*result.error));
+      }
     }
   }
 }

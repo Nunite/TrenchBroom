@@ -26,7 +26,8 @@
 namespace tb::ui
 {
 
-KeyboardShortcutItemDelegate::KeyboardShortcutItemDelegate()
+KeyboardShortcutItemDelegate::KeyboardShortcutItemDelegate(QObject* parent)
+  : QStyledItemDelegate{parent}
 {
   auto* itemEditorFactory = new QItemEditorFactory{};
   itemEditorFactory->registerEditor(
