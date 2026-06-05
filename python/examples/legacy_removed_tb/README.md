@@ -12,3 +12,5 @@ Migrated examples:
 - `ui_vec3_color_demo.py` -> `python/examples/v2/vec3_color_demo`
 - `ui_plane_and_selection_demo.py` -> `python/examples/v2/plane_selection_demo`
 - `util_print_brush_verts.py` / `util_print_selected_verts.py` -> `python/examples/v2/print_selected_vertices`
+- `ui_plane_builder.py` -> `python/examples/v2/plane_builder`
+- `generator_spin_entity.py` -> `python/examples/v2/generator_spin_entity`

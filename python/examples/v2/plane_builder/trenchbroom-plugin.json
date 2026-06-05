@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.plane_builder",
+  "name": "Plane Builder",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Duplicates selected objects along X and rotates around a selected vertex handle.",
+  "author": "TrenchBroom"
+}

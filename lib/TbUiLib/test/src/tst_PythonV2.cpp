@@ -693,6 +693,58 @@ assert all(isinstance(v, tb.Vec3) for v in verts_by_brush[0])
     REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
   }
 
+  SECTION("edits selection and transforms selected objects")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNodeA =
+      new mdl::BrushNode{builder.createCube(64.0, "move_a") | kdl::value()};
+    auto* brushNodeB =
+      new mdl::BrushNode{builder.createCube(64.0, "move_b") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNodeA, brushNodeB}}});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_selection_transform.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+world = doc.entities[0]
+brush_a = world.brushes[0]
+brush_b = world.brushes[1]
+
+doc.selection.set([brush_a])
+assert len(doc.selection.brushes) == 1
+doc.selection.add([brush_b])
+assert len(doc.selection.brushes) == 2
+doc.selection.deselect_all()
+assert len(doc.selection.brushes) == 0
+
+doc.selection.set([brush_a])
+assert doc.selection.translate(128, 0, 0)
+assert doc.selection.rotate(0, 0, 1, 90, 0, 0, 0)
+assert doc.selection.scale(1, 1, 1, 0, 0, 0)
+doc.selection.duplicate()
+assert len(doc.selection.brushes) == 1
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_selection_transform.py";
+
+    const auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+    CHECK(map.selection().brushes.size() == 1u);
+    CHECK(map.worldNode().defaultLayer()->childCount() == 3u);
+  }
+
   SECTION("sets face material without changing the visible selection")
   {
     auto& map = window.document().map();
@@ -961,6 +1013,65 @@ assert face.surface_value == 3.5
     REQUIRE(manager.errors().empty());
     REQUIRE(manager.plugins().size() == 1u);
     REQUIRE(manager.loadPlugins(window));
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 plane builder example plugin")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "plane_builder") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/plane_builder"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
+    CHECK(map.worldNode().defaultLayer()->childCount() == 10u);
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 spin entity generator example plugin")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* entityNode = new mdl::EntityNode{mdl::Entity{
+      {{mdl::EntityPropertyKeys::Classname, "func_detail"},
+       {"_angle", "90"},
+       {"_count", "2"},
+       {"_pivot", "0 0 0"},
+       {"_axis", "0 0 1"}}}};
+    auto* brushNode = new mdl::BrushNode{builder.createCube(64.0, "spin") | kdl::value()};
+
+    auto entityNodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
+    entityNodesToAdd.emplace(
+      static_cast<mdl::Node*>(map.worldNode().defaultLayer()),
+      std::vector<mdl::Node*>{static_cast<mdl::Node*>(entityNode)});
+    mdl::addNodes(map, entityNodesToAdd);
+
+    auto brushNodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
+    brushNodesToAdd.emplace(
+      static_cast<mdl::Node*>(entityNode),
+      std::vector<mdl::Node*>{static_cast<mdl::Node*>(brushNode)});
+    mdl::addNodes(map, brushNodesToAdd);
+    mdl::selectNodes(map, {entityNode});
+
+    const auto pluginDir =
+      std::filesystem::path{"python/examples/v2/generator_spin_entity"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
+    CHECK(map.selection().nodes.size() == 1u);
     manager.unloadPlugins(window);
   }
 

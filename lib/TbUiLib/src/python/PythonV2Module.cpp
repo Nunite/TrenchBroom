@@ -30,6 +30,7 @@
 #include "mdl/Map.h"
 #include "mdl/Map_Brushes.h"
 #include "mdl/Map_Entities.h"
+#include "mdl/Map_Geometry.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/PatchNode.h"
@@ -758,6 +759,184 @@ std::vector<mdl::Node*> selectableNodesFromObjects(const py::iterable& objects)
   return result;
 }
 
+vm::vec3d selectionCenter(mdl::Map& map)
+{
+  const auto bounds = map.selectionBounds();
+  if (!bounds)
+  {
+    throw std::runtime_error{"Selection bounds are not available"};
+  }
+  return bounds->min + bounds->size() / 2.0;
+}
+
+bool updateSelection(
+  SelectionHandle& selection,
+  const std::vector<mdl::Node*>& nodes,
+  const std::string& name)
+{
+  auto& document = selection.getDocument();
+  auto transaction = ScopedPythonTransaction{document, name};
+  try
+  {
+    mdl::selectNodes(document.map(), nodes);
+    if (!transaction.commit())
+    {
+      throw std::runtime_error{"Could not update selection"};
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
+bool setSelection(SelectionHandle& selection, const py::iterable& objects)
+{
+  return updateSelection(
+    selection, selectableNodesFromObjects(objects), "Python v2 Set Selection");
+}
+
+bool addSelection(SelectionHandle& selection, const py::iterable& objects)
+{
+  auto& document = selection.getDocument();
+  auto nodes = document.map().selection().nodes;
+  auto nodesToAdd = selectableNodesFromObjects(objects);
+  nodes.insert(nodes.end(), nodesToAdd.begin(), nodesToAdd.end());
+  nodes = kdl::vec_sort_and_remove_duplicates(std::move(nodes));
+  return updateSelection(selection, nodes, "Python v2 Add Selection");
+}
+
+bool deselectAllSelection(SelectionHandle& selection)
+{
+  auto& document = selection.getDocument();
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Clear Selection"};
+  try
+  {
+    mdl::deselectAll(document.map());
+    if (!transaction.commit())
+    {
+      throw std::runtime_error{"Could not clear selection"};
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
+bool duplicateSelection(SelectionHandle& selection)
+{
+  auto& document = selection.getDocument();
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Duplicate Selection"};
+  try
+  {
+    mdl::duplicateSelectedNodes(document.map());
+    if (!transaction.commit())
+    {
+      throw std::runtime_error{"Could not duplicate selection"};
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
+bool translateSelection(
+  SelectionHandle& selection, const double x, const double y, const double z)
+{
+  auto& document = selection.getDocument();
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Translate Selection"};
+  try
+  {
+    const auto ok = mdl::translateSelection(document.map(), vm::vec3d{x, y, z});
+    if (!ok || !transaction.commit())
+    {
+      transaction.cancel();
+      return false;
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
+bool rotateSelection(
+  SelectionHandle& selection,
+  const double axisX,
+  const double axisY,
+  const double axisZ,
+  const double angleDegrees,
+  std::optional<double> centerX,
+  std::optional<double> centerY,
+  std::optional<double> centerZ)
+{
+  auto& document = selection.getDocument();
+  auto& map = document.map();
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Rotate Selection"};
+  try
+  {
+    const auto center = centerX && centerY && centerZ
+                          ? vm::vec3d{*centerX, *centerY, *centerZ}
+                          : selectionCenter(map);
+    constexpr auto pi = 3.1415926535897932384626433832795;
+    const auto ok = mdl::rotateSelection(
+      map, center, vm::vec3d{axisX, axisY, axisZ}, angleDegrees * (pi / 180.0));
+    if (!ok || !transaction.commit())
+    {
+      transaction.cancel();
+      return false;
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
+bool scaleSelection(
+  SelectionHandle& selection,
+  const double scaleX,
+  const double scaleY,
+  const double scaleZ,
+  std::optional<double> centerX,
+  std::optional<double> centerY,
+  std::optional<double> centerZ)
+{
+  auto& document = selection.getDocument();
+  auto& map = document.map();
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Scale Selection"};
+  try
+  {
+    const auto center = centerX && centerY && centerZ
+                          ? vm::vec3d{*centerX, *centerY, *centerZ}
+                          : selectionCenter(map);
+    const auto ok = mdl::scaleSelection(map, center, vm::vec3d{scaleX, scaleY, scaleZ});
+    if (!ok || !transaction.commit())
+    {
+      transaction.cancel();
+      return false;
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
 void withPreservedSelection(
   MapDocument& document,
   std::string transactionName,
@@ -1313,7 +1492,32 @@ void defineModule(py::module_& module)
       py::arg("key"),
       py::arg("value"),
       py::arg("create_if_missing") = true)
-    .def("brush_vertices", selectedBrushVertices);
+    .def("brush_vertices", selectedBrushVertices)
+    .def("set", setSelection)
+    .def("add", addSelection)
+    .def("deselect_all", deselectAllSelection)
+    .def("clear", deselectAllSelection)
+    .def("duplicate", duplicateSelection)
+    .def("translate", translateSelection)
+    .def(
+      "rotate",
+      rotateSelection,
+      py::arg("axis_x"),
+      py::arg("axis_y"),
+      py::arg("axis_z"),
+      py::arg("angle_degrees"),
+      py::arg("center_x") = std::nullopt,
+      py::arg("center_y") = std::nullopt,
+      py::arg("center_z") = std::nullopt)
+    .def(
+      "scale",
+      scaleSelection,
+      py::arg("scale_x"),
+      py::arg("scale_y"),
+      py::arg("scale_z"),
+      py::arg("center_x") = std::nullopt,
+      py::arg("center_y") = std::nullopt,
+      py::arg("center_z") = std::nullopt);
 
   py::class_<EntityHandle>(module, "Entity")
     .def_property_readonly(
