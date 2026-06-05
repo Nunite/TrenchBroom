@@ -24,6 +24,7 @@
 #include "mdl/Map_Brushes.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/VertexHandleManager.h"
 #include "mdl/WorldNode.h"
 #include "ui/AppControllerFixture.h"
 #include "ui/MapDocument.h"
@@ -542,6 +543,12 @@ assert (a + b).length() > 1.4
 assert tuple((a * 2) / 2) == (1.0, 0.0, 0.0)
 assert tuple(a.normalize()) == (1.0, 0.0, 0.0)
 
+plane = tb.Plane.from_points(tb.Vec3(0, 0, 0), tb.Vec3(1, 0, 0), tb.Vec3(0, 1, 0))
+assert tuple(plane.normal) == (0.0, 0.0, 1.0)
+assert plane.dist == 0.0
+assert plane.distance(tb.Vec3(0, 0, 5)) == 5.0
+assert tuple(plane.project(tb.Vec3(1, 2, 5))) == (1.0, 2.0, 0.0)
+
 panel = tb.create_plugin_panel("Vec3 Color")
 panel.add_color_field("color", "Color", (1, 2, 3))
 assert panel.get_color_field("color") == (1, 2, 3)
@@ -554,7 +561,10 @@ assert panel.get_color_field("color") == (1, 2, 3)
     context.currentMapView = window.currentMapViewBase();
     context.logger = &window.pythonLogger();
     context.scriptPath = env.dir() / "vec3_color.py";
-    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+    const auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
   }
 
   SECTION("edits entity properties transactionally")
@@ -642,6 +652,45 @@ assert len(doc.selection.brushes) == 0
 
     REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
     CHECK_FALSE(map.selection().hasAny());
+  }
+
+  SECTION("reads selected brush and vertex tool vertices")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "original") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    map.vertexHandles().add(vm::vec3d{1.0, 2.0, 3.0});
+    map.vertexHandles().select(vm::vec3d{1.0, 2.0, 3.0});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_selection_vertices.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+assert len(doc.vertex_tool_vertices()) == 1
+assert tuple(doc.vertex_tool_vertices()[0]) == (1.0, 2.0, 3.0)
+
+verts_by_brush = doc.selection.brush_vertices()
+assert len(verts_by_brush) == 1
+assert len(verts_by_brush[0]) == 8
+assert all(isinstance(v, tb.Vec3) for v in verts_by_brush[0])
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_selection_vertices.py";
+
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
   }
 
   SECTION("sets face material without changing the visible selection")
@@ -851,6 +900,67 @@ assert face.surface_value == 3.5
     const auto* colorProperty = entityNode->entity().property("_color");
     REQUIRE(colorProperty != nullptr);
     CHECK(*colorProperty == "1.0 0.0 0.0");
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 plane selection example plugin")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "plane") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    const auto pluginDir =
+      std::filesystem::path{"python/examples/v2/plane_selection_demo"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+    auto* label =
+      panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_selection_info"));
+    REQUIRE(label != nullptr);
+
+    auto* inspectButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Inspect Selected Brush Vertices"))
+      {
+        inspectButton = button;
+      }
+    }
+    REQUIRE(inspectButton != nullptr);
+    inspectButton->click();
+    CHECK(label->text().contains(QStringLiteral("Brushes: 1")));
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 print selected vertices example plugin")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "verts") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    const auto pluginDir =
+      std::filesystem::path{"python/examples/v2/print_selected_vertices"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
     manager.unloadPlugins(window);
   }
 

@@ -36,6 +36,7 @@
 #include "mdl/Selection.h"
 #include "mdl/Transaction.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
+#include "mdl/VertexHandleManager.h"
 #include "mdl/WorldNode.h"
 #include "ui/Action.h"
 #include "ui/ActionExecutionContext.h"
@@ -49,6 +50,8 @@
 #include "ui/python/PythonRuntime.h"
 
 #include "kd/overload.h"
+
+#include "vm/plane.h"
 
 #if defined(slots)
 #undef slots
@@ -81,6 +84,12 @@ struct Vec3
   double x = 0.0;
   double y = 0.0;
   double z = 0.0;
+};
+
+struct Plane
+{
+  Vec3 normal;
+  double dist = 0.0;
 };
 
 Vec3 operator+(const Vec3& lhs, const Vec3& rhs)
@@ -123,6 +132,31 @@ Vec3 cross(const Vec3& lhs, const Vec3& rhs)
 double length(const Vec3& value)
 {
   return std::sqrt(dot(value, value));
+}
+
+Vec3 normalize(const Vec3& value)
+{
+  return value / length(value);
+}
+
+vm::vec3d toVmVec3(const Vec3& value)
+{
+  return vm::vec3d{value.x, value.y, value.z};
+}
+
+Vec3 fromVmVec3(const vm::vec3d& value)
+{
+  return Vec3{value.x(), value.y(), value.z()};
+}
+
+vm::plane3d toVmPlane(const Plane& value)
+{
+  return vm::plane3d{value.dist, toVmVec3(value.normal)};
+}
+
+Plane fromVmPlane(const vm::plane3d& value)
+{
+  return Plane{fromVmVec3(value.normal), value.distance};
 }
 
 struct DocumentHandle
@@ -532,7 +566,7 @@ std::vector<vm::vec3d> pointsFromObjects(const py::iterable& objects)
   for (const auto object : objects)
   {
     const auto point = vec3FromObject(object);
-    result.push_back(vm::vec3d{point.x, point.y, point.z});
+    result.push_back(toVmVec3(point));
   }
   return result;
 }
@@ -654,6 +688,48 @@ std::vector<EntityHandle> selectedAllEntities(SelectionHandle& selection)
       generation,
       entity,
       PythonHandleRegistry::instance().nodeGeneration(entity)});
+  }
+  return result;
+}
+
+std::vector<Vec3> vertexToolVertices(DocumentHandle& document)
+{
+  auto result = std::vector<Vec3>{};
+  const auto vertices = document.get().map().vertexHandles().selectedHandles();
+  result.reserve(vertices.size());
+  for (const auto& vertex : vertices)
+  {
+    result.push_back(fromVmVec3(vertex));
+  }
+  return result;
+}
+
+std::vector<std::vector<Vec3>> selectedBrushVertices(SelectionHandle& selection)
+{
+  const auto& mapSelection = selection.getDocument().map().selection();
+
+  auto brushNodes = std::vector<mdl::BrushNode*>{};
+  brushNodes.insert(
+    brushNodes.end(), mapSelection.allBrushes().begin(), mapSelection.allBrushes().end());
+
+  if (mapSelection.hasBrushFaces())
+  {
+    auto nodesFromFaces = mdl::toNodes(mapSelection.brushFaces);
+    brushNodes.insert(brushNodes.end(), nodesFromFaces.begin(), nodesFromFaces.end());
+  }
+
+  brushNodes = kdl::vec_sort_and_remove_duplicates(std::move(brushNodes));
+
+  auto result = std::vector<std::vector<Vec3>>{};
+  result.reserve(brushNodes.size());
+  for (auto* brushNode : brushNodes)
+  {
+    auto vertices = std::vector<Vec3>{};
+    for (const auto& vertex : brushNode->brush().vertexPositions())
+    {
+      vertices.push_back(fromVmVec3(vertex));
+    }
+    result.push_back(std::move(vertices));
   }
   return result;
 }
@@ -1104,8 +1180,8 @@ void defineModule(py::module_& module)
     .def("dot", dot)
     .def("cross", cross)
     .def("length", length)
-    .def("normalize", [](const Vec3& self) { return self / length(self); })
-    .def("normalized", [](const Vec3& self) { return self / length(self); })
+    .def("normalize", normalize)
+    .def("normalized", normalize)
     .def(
       "__repr__",
       [](const Vec3& self) {
@@ -1114,6 +1190,38 @@ void defineModule(py::module_& module)
       })
     .def("__iter__", [](const Vec3& self) {
       return py::iter(py::make_tuple(self.x, self.y, self.z));
+    });
+
+  py::class_<Plane>(module, "Plane")
+    .def(py::init<Vec3, double>())
+    .def_readwrite("normal", &Plane::normal)
+    .def_readwrite("dist", &Plane::dist)
+    .def_static(
+      "from_points",
+      [](const Vec3& p1, const Vec3& p2, const Vec3& p3) {
+        try
+        {
+          const auto normal = normalize(cross(p2 - p1, p3 - p1));
+          return Plane{normal, dot(p1, normal)};
+        }
+        catch (const std::exception& e)
+        {
+          throw py::value_error{e.what()};
+        }
+      })
+    .def(
+      "distance",
+      [](const Plane& self, const Vec3& point) {
+        return toVmPlane(self).point_distance(toVmVec3(point));
+      })
+    .def(
+      "project",
+      [](const Plane& self, const Vec3& point) {
+        return fromVmVec3(toVmPlane(self).project_point(toVmVec3(point)));
+      })
+    .def("__repr__", [](const Plane& self) {
+      return "Plane(normal=" + py::repr(py::cast(self.normal)).cast<std::string>()
+             + ", dist=" + std::to_string(self.dist) + ")";
     });
 
   py::class_<DocumentHandle>(module, "Document")
@@ -1134,6 +1242,7 @@ void defineModule(py::module_& module)
         }
         return result;
       })
+    .def("vertex_tool_vertices", vertexToolVertices)
     .def(
       "transaction",
       [](DocumentHandle& self, std::string name) {
@@ -1203,7 +1312,8 @@ void defineModule(py::module_& module)
       setSelectionProperty,
       py::arg("key"),
       py::arg("value"),
-      py::arg("create_if_missing") = true);
+      py::arg("create_if_missing") = true)
+    .def("brush_vertices", selectedBrushVertices);
 
   py::class_<EntityHandle>(module, "Entity")
     .def_property_readonly(

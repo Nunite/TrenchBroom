@@ -1,0 +1,9 @@
+{
+  "id": "trenchbroom.examples.v2.plane_selection_demo",
+  "name": "Plane & Selection Demo",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "entry": "main.py",
+  "description": "Demonstrates Plane, vertex tool vertices, and selection brush vertices.",
+  "author": "TrenchBroom"
+}
