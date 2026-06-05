@@ -17,76 +17,82 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <QListWidget>
+#include <QCheckBox>
+#include <QPushButton>
+#include <QRadioButton>
 
 #include "PreferenceManager.h"
 #include "Preferences.h"
-#include "ui/ActionManager.h"
+#include "ui/AppController.h"
+#include "ui/AppControllerFixture.h"
 #include "ui/MiscPreferencePane.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 namespace tb::ui
 {
-namespace
-{
-QListWidget* listWithItems(MiscPreferencePane& pane, const QStringList& items)
-{
-  for (auto* list : pane.findChildren<QListWidget*>())
-  {
-    if (list->count() != items.size())
-    {
-      continue;
-    }
-
-    auto matches = true;
-    for (auto i = 0; i < list->count(); ++i)
-    {
-      matches = matches && list->item(i)->text() == items[i];
-    }
-
-    if (matches)
-    {
-      return list;
-    }
-  }
-
-  return nullptr;
-}
-} // namespace
 
 TEST_CASE("MiscPreferencePane")
 {
-  auto actionManager = ActionManager{};
+  auto appControllerFixture = AppControllerFixture{};
   auto& prefs = PreferenceManager::instance();
-  prefs.set(
-    Preferences::PythonPluginDirectories, "C:/tb/plugin_a.py|D:/tools/plugin_b.py");
+  prefs.set(Preferences::Language, Preferences::languageChinese());
+  prefs.set(Preferences::PrefixWorldspawnHeaderOnCopy, true);
+  prefs.set(Preferences::PythonPluginDirectories, "C:/tb/plugin");
   prefs.set(Preferences::PieMenuAction, "Menu/Edit/Undo|Menu/Edit/Redo");
 
-  auto pane = MiscPreferencePane{};
+  auto pane = MiscPreferencePane{appControllerFixture.appController()};
 
-  SECTION("loads default plugin and pie menu preferences")
+  SECTION("loads general misc preferences")
   {
-    auto* pluginList = listWithItems(pane, {"C:/tb/plugin_a.py", "D:/tools/plugin_b.py"});
-    auto* pieMenuList = listWithItems(pane, {"Undo", "Redo"});
+    auto* prefixCheckBox = static_cast<QCheckBox*>(nullptr);
+    for (auto* checkBox : pane.findChildren<QCheckBox*>())
+    {
+      if (checkBox->text() == QStringLiteral("Prefix worldspawn header on copy"))
+      {
+        prefixCheckBox = checkBox;
+      }
+    }
 
-    REQUIRE(pluginList != nullptr);
-    REQUIRE(pieMenuList != nullptr);
+    REQUIRE(prefixCheckBox != nullptr);
+    CHECK(prefixCheckBox->isChecked());
 
-    CHECK(pluginList->item(0)->text() == "C:/tb/plugin_a.py");
-    CHECK(pluginList->item(1)->text() == "D:/tools/plugin_b.py");
-    CHECK(pieMenuList->item(0)->data(Qt::UserRole).toString() == "Menu/Edit/Undo");
-    CHECK(pieMenuList->item(1)->data(Qt::UserRole).toString() == "Menu/Edit/Redo");
+    auto foundChinese = false;
+    for (auto* radioButton : pane.findChildren<QRadioButton*>())
+    {
+      if (radioButton->text() == QString::fromStdString(Preferences::languageChinese()))
+      {
+        foundChinese = radioButton->isChecked();
+      }
+    }
+    CHECK(foundChinese);
   }
 
-  SECTION("reset clears custom plugin and pie menu preferences")
+  SECTION("reset only resets lightweight misc preferences")
   {
     pane.resetToDefaults();
 
-    CHECK(prefs.get(Preferences::PythonPluginDirectories).empty());
-    CHECK(prefs.get(Preferences::PieMenuAction).empty());
-    CHECK(listWithItems(pane, {"C:/tb/plugin_a.py", "D:/tools/plugin_b.py"}) == nullptr);
-    CHECK(listWithItems(pane, {"Undo", "Redo"}) == nullptr);
+    CHECK(prefs.get(Preferences::Language) == Preferences::languageEnglish());
+    CHECK_FALSE(prefs.get(Preferences::PrefixWorldspawnHeaderOnCopy));
+    CHECK(prefs.get(Preferences::PythonPluginDirectories) == "C:/tb/plugin");
+    CHECK(prefs.get(Preferences::PieMenuAction) == "Menu/Edit/Undo|Menu/Edit/Redo");
+  }
+
+  SECTION("links to separate management dialogs")
+  {
+    auto foundPieMenuButton = false;
+    auto foundPluginButton = false;
+
+    for (auto* button : pane.findChildren<QPushButton*>())
+    {
+      foundPieMenuButton =
+        foundPieMenuButton || button->text() == QStringLiteral("Pie Menu Settings...");
+      foundPluginButton =
+        foundPluginButton || button->text() == QStringLiteral("Python Plugin Manager...");
+    }
+
+    CHECK(foundPieMenuButton);
+    CHECK(foundPluginButton);
   }
 }
 

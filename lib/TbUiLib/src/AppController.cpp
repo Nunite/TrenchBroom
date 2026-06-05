@@ -51,6 +51,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/PieMenuSettingsDialog.h"
 #include "ui/PreferenceDialog.h"
 #include "ui/PythonPluginManagerDialog.h"
 #include "ui/QPathUtils.h"
@@ -388,6 +389,13 @@ void AppController::showPreferences()
   auto* dialog = new PreferenceDialog{*this, topDocument};
   dialog->exec();
   dialog->deleteLater();
+}
+
+void AppController::showPieMenuSettings()
+{
+  auto* topMapWindow = mapWindowManager().topMapWindow();
+  auto dialog = PieMenuSettingsDialog{topMapWindow};
+  dialog.exec();
 }
 
 void AppController::showPythonPluginManager()

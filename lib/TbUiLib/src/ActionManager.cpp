@@ -1905,6 +1905,14 @@ void ActionManager::createRunMenu()
     [](auto& context) { context.appController().showPythonPluginManager(); },
     [](const auto&) { return true; },
   }));
+  runMenu.addItem(addAction(Action{
+    "Menu/Run/Pie Menu Settings...",
+    QObject::tr("Pie Menu Settings..."),
+    ActionContext::Any,
+    QKeySequence{},
+    [](auto& context) { context.appController().showPieMenuSettings(); },
+    [](const auto&) { return true; },
+  }));
   runMenu.addSeparator();
   runMenu.addItem(
     addAction(Action{

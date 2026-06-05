@@ -161,6 +161,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PathTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PathToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PieMenu.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PieMenuSettingsDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PluginInspector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PopupButton.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PopupWindow.cpp
@@ -413,6 +414,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PathTool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PathToolController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PieMenu.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PieMenuSettingsDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PluginInspector.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PopupButton.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PopupWindow.h

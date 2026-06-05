@@ -40,7 +40,7 @@ TEST_CASE("PreferenceDialog")
     CHECK(dialog->height() >= 300);
   }
 
-  SECTION("uses the original preference panes")
+  SECTION("uses stable preference panes")
   {
     auto* toolBar = dialog->findChild<QToolBar*>();
     REQUIRE(toolBar != nullptr);
@@ -54,7 +54,7 @@ TEST_CASE("PreferenceDialog")
 
     CHECK(
       actionNames
-      == QStringList{"Games", "View", "Colors", "Mouse", "Keyboard", "Update"});
+      == QStringList{"Games", "View", "Colors", "Mouse", "Keyboard", "Misc", "Update"});
   }
 
   dialog.reset();
