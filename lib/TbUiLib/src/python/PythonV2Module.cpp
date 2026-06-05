@@ -1,6 +1,7 @@
 #include "ui/python/PythonV2Module.h"
 
 #include <QCheckBox>
+#include <QColor>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
@@ -58,6 +59,7 @@
 #include <pybind11/stl.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -80,6 +82,48 @@ struct Vec3
   double y = 0.0;
   double z = 0.0;
 };
+
+Vec3 operator+(const Vec3& lhs, const Vec3& rhs)
+{
+  return Vec3{lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
+}
+
+Vec3 operator-(const Vec3& lhs, const Vec3& rhs)
+{
+  return Vec3{lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};
+}
+
+Vec3 operator*(const Vec3& lhs, const double rhs)
+{
+  return Vec3{lhs.x * rhs, lhs.y * rhs, lhs.z * rhs};
+}
+
+Vec3 operator/(const Vec3& lhs, const double rhs)
+{
+  if (rhs == 0.0)
+  {
+    throw std::runtime_error{"Cannot divide Vec3 by zero"};
+  }
+  return Vec3{lhs.x / rhs, lhs.y / rhs, lhs.z / rhs};
+}
+
+double dot(const Vec3& lhs, const Vec3& rhs)
+{
+  return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
+}
+
+Vec3 cross(const Vec3& lhs, const Vec3& rhs)
+{
+  return Vec3{
+    lhs.y * rhs.z - lhs.z * rhs.y,
+    lhs.z * rhs.x - lhs.x * rhs.z,
+    lhs.x * rhs.y - lhs.y * rhs.x};
+}
+
+double length(const Vec3& value)
+{
+  return std::sqrt(dot(value, value));
+}
 
 struct DocumentHandle
 {
@@ -350,6 +394,17 @@ void addFormRow(QWidget& panel, const std::string& label, QWidget* field)
   layout.addWidget(row);
 }
 
+QColor colorFromObject(const py::handle& object)
+{
+  auto sequence = py::reinterpret_borrow<py::sequence>(object);
+  if (sequence.size() < 3)
+  {
+    throw py::type_error{"Expected a color sequence with at least 3 items"};
+  }
+  return QColor{
+    py::cast<int>(sequence[0]), py::cast<int>(sequence[1]), py::cast<int>(sequence[2])};
+}
+
 struct CallbackEntry
 {
   std::string pluginId;
@@ -571,6 +626,38 @@ std::vector<BrushHandle> entityBrushes(EntityHandle& entity)
   return result;
 }
 
+std::vector<EntityHandle> selectedEntities(SelectionHandle& selection)
+{
+  auto& document = selection.getDocument();
+  auto result = std::vector<EntityHandle>{};
+  const auto generation = PythonHandleRegistry::instance().documentGeneration(&document);
+  for (auto* entity : document.map().selection().entities)
+  {
+    result.push_back(EntityHandle{
+      &document,
+      generation,
+      entity,
+      PythonHandleRegistry::instance().nodeGeneration(entity)});
+  }
+  return result;
+}
+
+std::vector<EntityHandle> selectedAllEntities(SelectionHandle& selection)
+{
+  auto& document = selection.getDocument();
+  auto result = std::vector<EntityHandle>{};
+  const auto generation = PythonHandleRegistry::instance().documentGeneration(&document);
+  for (auto* entity : document.map().selection().allEntities())
+  {
+    result.push_back(EntityHandle{
+      &document,
+      generation,
+      entity,
+      PythonHandleRegistry::instance().nodeGeneration(entity)});
+  }
+  return result;
+}
+
 std::vector<mdl::Node*> selectableNodesFromObjects(const py::iterable& objects)
 {
   auto result = std::vector<mdl::Node*>{};
@@ -663,6 +750,32 @@ void removeEntityProperty(EntityHandle& entity, const std::string& key)
   entity.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(entity.entity);
 }
 
+bool setSelectionProperty(
+  SelectionHandle& selection,
+  const std::string& key,
+  const std::string& value,
+  const bool createIfMissing)
+{
+  auto& document = selection.getDocument();
+  auto transaction =
+    ScopedPythonTransaction{document, "Python v2 Set Selection Property"};
+  try
+  {
+    const auto result =
+      mdl::setEntityProperty(document.map(), key, value, createIfMissing);
+    if (result && !transaction.commit())
+    {
+      throw std::runtime_error{"Could not set selection property"};
+    }
+    return result;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
 void setFaceMaterial(FaceHandle& face, const std::string& materialName)
 {
   auto& document = DocumentHandle{face.document, face.generation}.get();
@@ -707,8 +820,7 @@ void setFaceOffset(FaceHandle& face, const py::object& offset)
   updateFace(
     face,
     mdl::UpdateBrushFaceAttributes{
-      .xOffset = mdl::SetValue{value.x()},
-      .yOffset = mdl::SetValue{value.y()}});
+      .xOffset = mdl::SetValue{value.x()}, .yOffset = mdl::SetValue{value.y()}});
 }
 
 void setFaceScale(FaceHandle& face, const py::object& scale)
@@ -717,8 +829,7 @@ void setFaceScale(FaceHandle& face, const py::object& scale)
   updateFace(
     face,
     mdl::UpdateBrushFaceAttributes{
-      .xScale = mdl::SetValue{value.x()},
-      .yScale = mdl::SetValue{value.y()}});
+      .xScale = mdl::SetValue{value.x()}, .yScale = mdl::SetValue{value.y()}});
 }
 
 void setFaceRotation(FaceHandle& face, const float rotation)
@@ -731,9 +842,8 @@ void setFaceSurfaceContents(FaceHandle& face, const py::object& value)
   updateFace(
     face,
     mdl::UpdateBrushFaceAttributes{
-      .surfaceContents =
-        mdl::SetFlags{value.is_none() ? std::nullopt
-                                      : std::make_optional(py::cast<int>(value))}});
+      .surfaceContents = mdl::SetFlags{
+        value.is_none() ? std::nullopt : std::make_optional(py::cast<int>(value))}});
 }
 
 void setFaceSurfaceFlags(FaceHandle& face, const py::object& value)
@@ -741,9 +851,8 @@ void setFaceSurfaceFlags(FaceHandle& face, const py::object& value)
   updateFace(
     face,
     mdl::UpdateBrushFaceAttributes{
-      .surfaceFlags =
-        mdl::SetFlags{value.is_none() ? std::nullopt
-                                      : std::make_optional(py::cast<int>(value))}});
+      .surfaceFlags = mdl::SetFlags{
+        value.is_none() ? std::nullopt : std::make_optional(py::cast<int>(value))}});
 }
 
 void setFaceSurfaceValue(FaceHandle& face, const py::object& value)
@@ -751,9 +860,8 @@ void setFaceSurfaceValue(FaceHandle& face, const py::object& value)
   updateFace(
     face,
     mdl::UpdateBrushFaceAttributes{
-      .surfaceValue =
-        mdl::SetValue{value.is_none() ? std::nullopt
-                                      : std::make_optional(py::cast<float>(value))}});
+      .surfaceValue = mdl::SetValue{
+        value.is_none() ? std::nullopt : std::make_optional(py::cast<float>(value))}});
 }
 
 BrushHandle createBrush(const py::iterable& pointObjects, py::object materialName)
@@ -761,8 +869,8 @@ BrushHandle createBrush(const py::iterable& pointObjects, py::object materialNam
   auto& document = currentDocument().get();
   auto& map = document.map();
   const auto points = pointsFromObjects(pointObjects);
-  const auto material =
-    materialName.is_none() ? map.currentMaterialName() : py::cast<std::string>(materialName);
+  const auto material = materialName.is_none() ? map.currentMaterialName()
+                                               : py::cast<std::string>(materialName);
   auto transaction = ScopedPythonTransaction{document, "Python v2 Create Brush"};
   auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
   auto brush = builder.createBrush(points, material);
@@ -986,6 +1094,24 @@ void defineModule(py::module_& module)
     .def_readwrite("x", &Vec3::x)
     .def_readwrite("y", &Vec3::y)
     .def_readwrite("z", &Vec3::z)
+    .def("__add__", [](const Vec3& self, const Vec3& other) { return self + other; })
+    .def("__sub__", [](const Vec3& self, const Vec3& other) { return self - other; })
+    .def("__mul__", [](const Vec3& self, const double factor) { return self * factor; })
+    .def("__rmul__", [](const Vec3& self, const double factor) { return self * factor; })
+    .def(
+      "__truediv__",
+      [](const Vec3& self, const double divisor) { return self / divisor; })
+    .def("dot", dot)
+    .def("cross", cross)
+    .def("length", length)
+    .def("normalize", [](const Vec3& self) { return self / length(self); })
+    .def("normalized", [](const Vec3& self) { return self / length(self); })
+    .def(
+      "__repr__",
+      [](const Vec3& self) {
+        return "Vec3(" + std::to_string(self.x) + ", " + std::to_string(self.y) + ", "
+               + std::to_string(self.z) + ")";
+      })
     .def("__iter__", [](const Vec3& self) {
       return py::iter(py::make_tuple(self.x, self.y, self.z));
     });
@@ -1054,20 +1180,30 @@ void defineModule(py::module_& module)
     });
 
   py::class_<SelectionHandle>(module, "Selection")
-    .def_property_readonly("brushes", [](SelectionHandle& self) {
-      auto result = std::vector<BrushHandle>{};
-      const auto& brushes = self.getDocument().map().selection().brushes;
-      result.reserve(brushes.size());
-      for (auto* brush : brushes)
-      {
-        result.push_back(BrushHandle{
-          &self.getDocument(),
-          self.generation,
-          brush,
-          PythonHandleRegistry::instance().nodeGeneration(brush)});
-      }
-      return result;
-    });
+    .def_property_readonly("entities", selectedEntities)
+    .def_property_readonly("all_entities", selectedAllEntities)
+    .def_property_readonly(
+      "brushes",
+      [](SelectionHandle& self) {
+        auto result = std::vector<BrushHandle>{};
+        const auto& brushes = self.getDocument().map().selection().brushes;
+        result.reserve(brushes.size());
+        for (auto* brush : brushes)
+        {
+          result.push_back(BrushHandle{
+            &self.getDocument(),
+            self.generation,
+            brush,
+            PythonHandleRegistry::instance().nodeGeneration(brush)});
+        }
+        return result;
+      })
+    .def(
+      "set_property",
+      setSelectionProperty,
+      py::arg("key"),
+      py::arg("value"),
+      py::arg("create_if_missing") = true);
 
   py::class_<EntityHandle>(module, "Entity")
     .def_property_readonly(
@@ -1198,7 +1334,8 @@ void defineModule(py::module_& module)
     .def(
       "set_label_text",
       [](PluginPanelHandle& self, const std::string& key, const std::string& text) {
-        findPanelChild<QLabel>(self.get(), "label", key).setText(QString::fromStdString(text));
+        findPanelChild<QLabel>(self.get(), "label", key)
+          .setText(QString::fromStdString(text));
       })
     .def(
       "add_button",
@@ -1433,6 +1570,31 @@ void defineModule(py::module_& module)
           .currentText()
           .toStdString();
       })
+    .def(
+      "add_color_field",
+      [](
+        PluginPanelHandle& self,
+        const std::string& key,
+        const std::string& label,
+        py::object colorObject) {
+        const auto color = colorFromObject(colorObject);
+        auto* button = new QPushButton{};
+        button->setObjectName(panelObjectName("color", key));
+        button->setProperty("tb2_color", color);
+        button->setText(QStringLiteral("%1, %2, %3")
+                          .arg(color.red())
+                          .arg(color.green())
+                          .arg(color.blue()));
+        addFormRow(self.get(), label, button);
+      })
+    .def(
+      "get_color_field",
+      [](PluginPanelHandle& self, const std::string& key) {
+        const auto color = findPanelChild<QPushButton>(self.get(), "color", key)
+                             .property("tb2_color")
+                             .value<QColor>();
+        return py::make_tuple(color.red(), color.green(), color.blue());
+      })
     .def("clear", [](PluginPanelHandle& self) {
       if (auto* layout = self.get().layout())
       {
@@ -1444,7 +1606,8 @@ void defineModule(py::module_& module)
   module.def("document", currentDocument);
   module.def("execute_action", executeAction);
   module.def("list_actions", listActions);
-  module.def("create_brush", createBrush, py::arg("points"), py::arg("material") = py::none());
+  module.def(
+    "create_brush", createBrush, py::arg("points"), py::arg("material") = py::none());
   module.def("create_plugin_panel", createPluginPanel);
   module.def("register_callback", registerCallback);
   module.def("unregister_callback", unregisterCallback);

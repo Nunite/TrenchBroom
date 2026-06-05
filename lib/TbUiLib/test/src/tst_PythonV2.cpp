@@ -14,7 +14,11 @@
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
+#include "mdl/Entity.h"
+#include "mdl/EntityNode.h"
+#include "mdl/EntityProperties.h"
 #include "mdl/GameConfigFixture.h"
+#include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
 #include "mdl/Map_Brushes.h"
@@ -31,6 +35,9 @@
 #include "ui/python/PythonScripting.h"
 
 #include "vm/bbox.h"
+
+#include <map>
+#include <vector>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -518,6 +525,38 @@ panel.add_button_callback("Write", lambda: open("fields-ok.txt", "w", encoding="
     CHECK(env.loadFile("fields-ok.txt") == "world");
   }
 
+  SECTION("supports Vec3 math and color fields")
+  {
+    auto env = fs::TestEnvironment{};
+    auto currentPathGuard = CurrentPathGuard{env.dir()};
+    env.createFile(
+      "vec3_color.py",
+      R"(
+import tb2 as tb
+
+a = tb.Vec3(1, 0, 0)
+b = tb.Vec3(0, 1, 0)
+assert a.dot(b) == 0
+assert tuple(a.cross(b)) == (0.0, 0.0, 1.0)
+assert (a + b).length() > 1.4
+assert tuple((a * 2) / 2) == (1.0, 0.0, 0.0)
+assert tuple(a.normalize()) == (1.0, 0.0, 0.0)
+
+panel = tb.create_plugin_panel("Vec3 Color")
+panel.add_color_field("color", "Color", (1, 2, 3))
+assert panel.get_color_field("color") == (1, 2, 3)
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "vec3_color.py";
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+  }
+
   SECTION("edits entity properties transactionally")
   {
     auto env = fs::TestEnvironment{};
@@ -718,8 +757,7 @@ assert face.surface_value == 3.5
   {
     auto& map = window.document().map();
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
-    auto* brushNode =
-      new mdl::BrushNode{builder.createCube(64.0, "old") | kdl::value()};
+    auto* brushNode = new mdl::BrushNode{builder.createCube(64.0, "old") | kdl::value()};
     mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
@@ -758,6 +796,61 @@ assert face.surface_value == 3.5
     REQUIRE(status != nullptr);
     CAPTURE(status->text().toStdString());
     CHECK(brushNode->brush().face(0).attributes().materialName() == "new");
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 vec3 color demo example plugin")
+  {
+    auto& map = window.document().map();
+    auto* entityNode = new mdl::EntityNode{
+      mdl::Entity{{{mdl::EntityPropertyKeys::Classname, "info_player_start"}}}};
+    auto nodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
+    nodesToAdd.emplace(
+      static_cast<mdl::Node*>(map.worldNode().defaultLayer()),
+      std::vector<mdl::Node*>{static_cast<mdl::Node*>(entityNode)});
+    mdl::addNodes(map, nodesToAdd);
+
+    auto nodesToSelect = std::vector<mdl::Node*>{static_cast<mdl::Node*>(entityNode)};
+    mdl::selectNodes(map, nodesToSelect);
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/vec3_color_demo"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+
+    auto* dotButton = static_cast<QPushButton*>(nullptr);
+    auto* colorButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Calculate Dot (A . B)"))
+      {
+        dotButton = button;
+      }
+      if (button->text() == QStringLiteral("Apply Color to Selection (_color)"))
+      {
+        colorButton = button;
+      }
+    }
+    REQUIRE(dotButton != nullptr);
+    REQUIRE(colorButton != nullptr);
+
+    dotButton->click();
+    auto* result = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_result"));
+    REQUIRE(result != nullptr);
+    CHECK(result->text().contains(QStringLiteral("Dot Product")));
+
+    colorButton->click();
+    const auto* colorProperty = entityNode->entity().property("_color");
+    REQUIRE(colorProperty != nullptr);
+    CHECK(*colorProperty == "1.0 0.0 0.0");
     manager.unloadPlugins(window);
   }
 

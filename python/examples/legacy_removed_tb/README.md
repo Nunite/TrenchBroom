@@ -9,3 +9,4 @@ Migrated examples:
 
 - `brush_builder.py` -> `python/examples/v2/brush_builder`
 - `texture_replacer.py` -> `python/examples/v2/texture_replacer`
+- `ui_vec3_color_demo.py` -> `python/examples/v2/vec3_color_demo`
