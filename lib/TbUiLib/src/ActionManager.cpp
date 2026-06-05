@@ -1490,6 +1490,19 @@ void ActionManager::createToolsMenu()
     std::filesystem::path{"FaceTool.svg"},
   }));
   toolsMenu.addItem(addAction(Action{
+    "Menu/Edit/Tools/Path Tool",
+    QObject::tr("Path Tool"),
+    ActionContext::Any,
+    QKeySequence{},
+    [](auto& context) { context.mapWindow().togglePathTool(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().canTogglePathTool();
+    },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().pathToolActive();
+    },
+  }));
+  toolsMenu.addItem(addAction(Action{
     "Controls/Map view/Deactivate current tool",
     QObject::tr("Deactivate Current Tool"),
     ActionContext::Any,

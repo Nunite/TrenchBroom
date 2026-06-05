@@ -1933,6 +1933,40 @@ bool MapWindow::faceToolActive() const
   return m_mapView->faceToolActive();
 }
 
+void MapWindow::togglePathTool()
+{
+  if (canTogglePathTool())
+  {
+    m_mapView->togglePathTool();
+  }
+}
+
+bool MapWindow::canTogglePathTool() const
+{
+  return m_mapView->canTogglePathTool();
+}
+
+bool MapWindow::pathToolActive() const
+{
+  return m_mapView->pathToolActive();
+}
+
+void MapWindow::performPathCreation()
+{
+  if (pathToolActive())
+  {
+    m_mapView->performPathCreation();
+  }
+}
+
+void MapWindow::removeLastPathPoint()
+{
+  if (pathToolActive())
+  {
+    m_mapView->removeLastPathPoint();
+  }
+}
+
 void MapWindow::csgConvexMerge()
 {
   if (canDoCsgConvexMerge())

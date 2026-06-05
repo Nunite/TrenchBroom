@@ -100,6 +100,12 @@ TEST_CASE("Actions")
     CHECK(actions.contains("Menu/View/Switch to Outliner Inspector"));
     CHECK(actions.contains("Menu/View/Switch to Plugin Inspector"));
   }
+
+  SECTION("Custom tools have menu actions")
+  {
+    const auto& actions = actionManager.actionsMap();
+    CHECK(actions.contains("Menu/Edit/Tools/Path Tool"));
+  }
 }
 
 } // namespace tb::ui
