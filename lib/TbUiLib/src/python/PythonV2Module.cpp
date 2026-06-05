@@ -329,6 +329,50 @@ void logPythonCallbackError(PythonPluginSession& session, const py::error_alread
   }
 }
 
+int registerSessionCallback(py::object callback)
+{
+  if (!PyCallable_Check(callback.ptr()))
+  {
+    throw py::type_error{"callback must be callable"};
+  }
+
+  auto* session = currentPythonPluginSession();
+  if (session == nullptr)
+  {
+    throw std::runtime_error{"Plugin panel callbacks require an active plugin session"};
+  }
+
+  const auto token = g_nextCallbackToken++;
+  g_callbacks.emplace(token, CallbackEntry{session->pluginId(), std::move(callback)});
+  session->addCallbackToken(token);
+  return token;
+}
+
+template <typename... Args>
+void invokeSessionCallback(PythonPluginSession* session, const int token, Args&&... args)
+{
+  if (session == nullptr)
+  {
+    return;
+  }
+
+  auto gil = py::gil_scoped_acquire{};
+  const auto callbackIt = g_callbacks.find(token);
+  if (callbackIt == std::end(g_callbacks))
+  {
+    return;
+  }
+
+  try
+  {
+    callbackIt->second.callback(std::forward<Args>(args)...);
+  }
+  catch (const py::error_already_set& e)
+  {
+    logPythonCallbackError(*session, e);
+  }
+}
+
 PythonExecutionContext& requireContext()
 {
   auto* context = currentPythonExecutionContext();
@@ -886,19 +930,12 @@ void defineModule(py::module_& module)
     .def(
       "add_button",
       [](PluginPanelHandle& self, const std::string& text, py::object callback) {
-        if (!PyCallable_Check(callback.ptr()))
-        {
-          throw py::type_error{"callback must be callable"};
-        }
         auto* button = new QPushButton{QString::fromStdString(text)};
         auto* session = currentPythonPluginSession();
-        QObject::connect(
-          button, &QPushButton::clicked, [session, callback = std::move(callback)]() {
-            if (session != nullptr)
-            {
-              PythonRuntime::instance().runCallback(*session, callback.ptr());
-            }
-          });
+        const auto token = registerSessionCallback(std::move(callback));
+        QObject::connect(button, &QPushButton::clicked, [session, token]() {
+          invokeSessionCallback(session, token);
+        });
         ensurePanelLayout(self.get()).addWidget(button);
       })
     .def(
@@ -908,57 +945,25 @@ void defineModule(py::module_& module)
         const std::string& text,
         const bool checked,
         py::object callback) {
-        if (!PyCallable_Check(callback.ptr()))
-        {
-          throw py::type_error{"callback must be callable"};
-        }
         auto* checkbox = new QCheckBox{QString::fromStdString(text)};
         checkbox->setChecked(checked);
         auto* session = currentPythonPluginSession();
+        const auto token = registerSessionCallback(std::move(callback));
         QObject::connect(
-          checkbox,
-          &QCheckBox::toggled,
-          [session, callback = std::move(callback)](const bool value) {
-            if (session != nullptr)
-            {
-              auto gil = py::gil_scoped_acquire{};
-              try
-              {
-                callback(value);
-              }
-              catch (const py::error_already_set& e)
-              {
-                logPythonCallbackError(*session, e);
-              }
-            }
+          checkbox, &QCheckBox::toggled, [session, token](const bool value) {
+            invokeSessionCallback(session, token, value);
           });
         ensurePanelLayout(self.get()).addWidget(checkbox);
       })
     .def(
       "add_line_edit",
       [](PluginPanelHandle& self, const std::string& text, py::object callback) {
-        if (!PyCallable_Check(callback.ptr()))
-        {
-          throw py::type_error{"callback must be callable"};
-        }
         auto* lineEdit = new QLineEdit{QString::fromStdString(text)};
         auto* session = currentPythonPluginSession();
+        const auto token = registerSessionCallback(std::move(callback));
         QObject::connect(
-          lineEdit,
-          &QLineEdit::textChanged,
-          [session, callback = std::move(callback)](const QString& value) {
-            if (session != nullptr)
-            {
-              auto gil = py::gil_scoped_acquire{};
-              try
-              {
-                callback(value.toStdString());
-              }
-              catch (const py::error_already_set& e)
-              {
-                logPythonCallbackError(*session, e);
-              }
-            }
+          lineEdit, &QLineEdit::textChanged, [session, token](const QString& value) {
+            invokeSessionCallback(session, token, value.toStdString());
           });
         ensurePanelLayout(self.get()).addWidget(lineEdit);
       })
@@ -969,10 +974,6 @@ void defineModule(py::module_& module)
         const std::vector<std::string>& items,
         const int currentIndex,
         py::object callback) {
-        if (!PyCallable_Check(callback.ptr()))
-        {
-          throw py::type_error{"callback must be callable"};
-        }
         auto* comboBox = new QComboBox{};
         for (const auto& item : items)
         {
@@ -983,22 +984,12 @@ void defineModule(py::module_& module)
           comboBox->setCurrentIndex(currentIndex);
         }
         auto* session = currentPythonPluginSession();
+        const auto token = registerSessionCallback(std::move(callback));
         QObject::connect(
           comboBox,
           &QComboBox::currentTextChanged,
-          [session, callback = std::move(callback)](const QString& value) {
-            if (session != nullptr)
-            {
-              auto gil = py::gil_scoped_acquire{};
-              try
-              {
-                callback(value.toStdString());
-              }
-              catch (const py::error_already_set& e)
-              {
-                logPythonCallbackError(*session, e);
-              }
-            }
+          [session, token](const QString& value) {
+            invokeSessionCallback(session, token, value.toStdString());
           });
         ensurePanelLayout(self.get()).addWidget(comboBox);
       })

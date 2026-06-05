@@ -464,6 +464,11 @@ panel.add_combo_box(["a", "b"], 0, lambda value: open("python-v2-combo-ok.txt", 
     REQUIRE(comboBox != nullptr);
     comboBox->setCurrentIndex(1);
     CHECK(env.loadFile("python-v2-combo-ok.txt") == "b");
+
+    manager.unloadPlugins(window);
+    env.remove("python-v2-button-ok.txt");
+    button->click();
+    CHECK_FALSE(std::filesystem::exists(env.dir() / "python-v2-button-ok.txt"));
   }
 
   SECTION("edits entity properties transactionally")
