@@ -15,6 +15,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QTabWidget>
 #include <QTextEdit>
 #include <QVBoxLayout>
 #include <QWidgetAction>
@@ -37,9 +38,9 @@ namespace tb::ui
 {
 namespace
 {
-constexpr auto ListMinHeight = 130;
-constexpr auto PluginStatusMinHeight = 150;
-constexpr auto ButtonColumnWidth = 92;
+constexpr auto ListMinHeight = 96;
+constexpr auto PluginStatusMinHeight = 110;
+constexpr auto ButtonColumnWidth = 86;
 
 void configurePreferenceList(QListWidget* list)
 {
@@ -79,6 +80,19 @@ QGroupBox* createGroupBox(const QString& title, QLayout* contentLayout)
   contentLayout->setSpacing(LayoutConstants::WideVMargin);
   groupBox->setLayout(contentLayout);
   return groupBox;
+}
+
+QWidget* createTabPage(QLayout* contentLayout)
+{
+  auto* page = new QWidget{};
+  contentLayout->setContentsMargins(
+    LayoutConstants::WideHMargin,
+    LayoutConstants::WideVMargin,
+    LayoutConstants::WideHMargin,
+    LayoutConstants::WideVMargin);
+  contentLayout->setSpacing(LayoutConstants::WideVMargin);
+  page->setLayout(contentLayout);
+  return page;
 }
 
 QString pluginStatusText(const PythonPluginStatus status)
@@ -194,7 +208,7 @@ void MiscPreferencePane::createGui()
   auto* pluginListLayout = new QHBoxLayout();
   pluginListLayout->setContentsMargins(0, 0, 0, 0);
   pluginListLayout->setSpacing(LayoutConstants::WideHMargin);
-  pluginListLayout->addWidget(m_pluginList);
+  pluginListLayout->addWidget(m_pluginList, 1);
   pluginListLayout->addLayout(pluginBtnLayout);
 
   auto* statusLabel = new QLabel{tr("Detected plugins")};
@@ -207,19 +221,27 @@ void MiscPreferencePane::createGui()
 
   m_pluginDetails = new QTextEdit();
   m_pluginDetails->setReadOnly(true);
-  m_pluginDetails->setMinimumHeight(ListMinHeight);
+  m_pluginDetails->setMinimumHeight(PluginStatusMinHeight);
 
   connect(m_pluginStatusList, &QListWidget::currentItemChanged, this, [this]() {
     updatePluginDetails();
   });
 
-  auto* pluginLayout = new QVBoxLayout();
-  pluginLayout->addLayout(pluginListLayout);
-  pluginLayout->addWidget(statusLabel);
-  pluginLayout->addWidget(m_pluginStatusList);
-  pluginLayout->addWidget(m_pluginDetails);
+  auto* pluginDirectoriesLayout = new QVBoxLayout();
+  pluginDirectoriesLayout->addLayout(pluginListLayout);
 
-  auto* pluginGroupBox = createGroupBox(tr("Python Plugin Directories"), pluginLayout);
+  auto* pluginStatusLayout = new QVBoxLayout();
+  pluginStatusLayout->addWidget(statusLabel);
+  pluginStatusLayout->addWidget(m_pluginStatusList, 1);
+  pluginStatusLayout->addWidget(m_pluginDetails, 1);
+
+  auto* pluginColumnsLayout = new QHBoxLayout();
+  pluginColumnsLayout->setContentsMargins(0, 0, 0, 0);
+  pluginColumnsLayout->setSpacing(LayoutConstants::WideHMargin);
+  pluginColumnsLayout->addWidget(
+    createGroupBox(tr("Directories"), pluginDirectoriesLayout), 1);
+  pluginColumnsLayout->addWidget(
+    createGroupBox(tr("Detected Plugins"), pluginStatusLayout), 1);
 
   m_prefixWorldspawnOnCopyCheckBox =
     new QCheckBox(tr("Prefix worldspawn header on copy"));
@@ -373,14 +395,28 @@ void MiscPreferencePane::createGui()
   auto* pieMenuLayout = new QHBoxLayout();
   pieMenuLayout->setContentsMargins(0, 0, 0, 0);
   pieMenuLayout->setSpacing(LayoutConstants::WideHMargin);
-  pieMenuLayout->addWidget(m_pieMenuActionList);
+  pieMenuLayout->addWidget(m_pieMenuActionList, 1);
   pieMenuLayout->addLayout(buttonsLayout);
-
-  auto* pieMenuGroupBox = createGroupBox(tr("Pie Menu Actions"), pieMenuLayout);
 
   auto* editorLayout = new QVBoxLayout();
   editorLayout->addWidget(m_prefixWorldspawnOnCopyCheckBox);
   auto* editorGroupBox = createGroupBox(tr("Editor"), editorLayout);
+
+  auto* generalLayout = new QVBoxLayout();
+  generalLayout->addWidget(languageGroupBox);
+  generalLayout->addWidget(editorGroupBox);
+  generalLayout->addStretch(1);
+
+  auto* pluginPageLayout = new QVBoxLayout();
+  pluginPageLayout->addLayout(pluginColumnsLayout, 1);
+
+  auto* pieMenuPageLayout = new QVBoxLayout();
+  pieMenuPageLayout->addWidget(createGroupBox(tr("Pie Menu Actions"), pieMenuLayout), 1);
+
+  auto* tabs = new QTabWidget{};
+  tabs->addTab(createTabPage(generalLayout), tr("General"));
+  tabs->addTab(createTabPage(pluginPageLayout), tr("Python Plugins"));
+  tabs->addTab(createTabPage(pieMenuPageLayout), tr("Pie Menu"));
 
   auto* layout = new QVBoxLayout();
   layout->setContentsMargins(
@@ -389,11 +425,7 @@ void MiscPreferencePane::createGui()
     LayoutConstants::WideHMargin,
     LayoutConstants::WideVMargin);
   layout->setSpacing(LayoutConstants::WideVMargin);
-  layout->addWidget(languageGroupBox);
-  layout->addWidget(pluginGroupBox);
-  layout->addWidget(editorGroupBox);
-  layout->addWidget(pieMenuGroupBox);
-  layout->addStretch(1);
+  layout->addWidget(tabs, 1);
   setLayout(layout);
 
   connect(
