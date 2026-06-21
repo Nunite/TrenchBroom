@@ -945,6 +945,7 @@ void MapWindow::preferenceDidChange(const std::filesystem::path& path)
   }
 
   updateShortcuts();
+  updateActionStateDelayed();
 }
 
 void MapWindow::resourcesWereProcessed(const std::vector<gl::ResourceId>&)

@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QAction>
 #include <QApplication>
 #include <QComboBox>
 #include <QKeyEvent>
@@ -492,6 +493,29 @@ panel.add_label("Loaded from preferences")
     window.setGridSize(initialGridSize);
     CHECK(window.document().map().grid().size() == initialGridSize);
     CHECK_FALSE(window.document().map().modified());
+  }
+
+  SECTION("updates checkable action state when preferences change")
+  {
+    auto* textureLockAction = window.findAction("Menu/Edit/Texture Lock");
+    auto* uvLockAction = window.findAction("Menu/Edit/UV Lock");
+    REQUIRE(textureLockAction != nullptr);
+    REQUIRE(uvLockAction != nullptr);
+
+    setPref(Preferences::AlignmentLock, true);
+    setPref(Preferences::UVLock, true);
+    QApplication::processEvents();
+    CHECK(textureLockAction->isChecked());
+    CHECK(uvLockAction->isChecked());
+
+    setPref(Preferences::AlignmentLock, false);
+    setPref(Preferences::UVLock, false);
+    QApplication::processEvents();
+    CHECK_FALSE(textureLockAction->isChecked());
+    CHECK_FALSE(uvLockAction->isChecked());
+
+    setPref(Preferences::AlignmentLock, true);
+    setPref(Preferences::UVLock, false);
   }
 
   SECTION("opens the configured pie menu from the current map view shortcut")
