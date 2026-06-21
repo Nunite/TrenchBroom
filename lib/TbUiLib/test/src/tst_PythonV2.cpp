@@ -3,6 +3,7 @@
 #include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPointer>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QTableWidget>
@@ -12,6 +13,8 @@
 #include <QTreeWidget>
 
 #include "Logger.h"
+#include "PreferenceManager.h"
+#include "Preferences.h"
 #include "Result.h"
 #include "fs/TestEnvironment.h"
 #include "gl/GlManager.h"
@@ -97,6 +100,9 @@ std::vector<QWidget*> pluginPanels(MapWindow& window)
 
 TEST_CASE("PythonV2")
 {
+  setPref(Preferences::DefaultPluginPaths, "");
+  setPref(Preferences::PythonPluginDirectories, "");
+
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
   auto document = MapDocument::createDocument(
@@ -471,6 +477,7 @@ panel.add_combo_box(["a", "b"], 0, lambda value: open("python-v2-combo-ok.txt", 
 
     auto* button = panel->findChild<QPushButton*>();
     REQUIRE(button != nullptr);
+    const auto buttonPointer = QPointer<QPushButton>{button};
     button->click();
     CHECK(env.loadFile("python-v2-button-ok.txt") == "button");
 
@@ -490,8 +497,9 @@ panel.add_combo_box(["a", "b"], 0, lambda value: open("python-v2-combo-ok.txt", 
     CHECK(env.loadFile("python-v2-combo-ok.txt") == "b");
 
     manager.unloadPlugins(window);
+    CHECK(buttonPointer.isNull());
+    CHECK(pluginPanels(window).empty());
     env.remove("python-v2-button-ok.txt");
-    button->click();
     CHECK_FALSE(std::filesystem::exists(env.dir() / "python-v2-button-ok.txt"));
   }
 

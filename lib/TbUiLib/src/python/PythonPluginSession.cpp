@@ -1,5 +1,6 @@
 #include "ui/python/PythonPluginSession.h"
 
+#include <QLayout>
 #include <QString>
 #include <QTimer>
 #include <QWidget>
@@ -141,8 +142,15 @@ void PythonPluginSession::closePluginPanels()
       {
         panelWidget = panel;
       }
-      panelWidget->close();
-      panelWidget->deleteLater();
+      if (auto* parentLayout =
+            panelWidget->parentWidget() != nullptr ? panelWidget->parentWidget()->layout()
+                                                   : nullptr)
+      {
+        parentLayout->removeWidget(panelWidget);
+      }
+      panelWidget->hide();
+      panelWidget->setParent(nullptr);
+      delete panelWidget;
     }
   }
   m_pluginPanels.clear();

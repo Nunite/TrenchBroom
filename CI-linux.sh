@@ -2,6 +2,8 @@
 
 # set -o verbose
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Check versions
 cmake --version
 ninja --version
@@ -16,6 +18,18 @@ cd cmakebuild
 # AppImage tools (linuxdeploy and plugins) may need extract-and-run mode in
 # containers where FUSE mounts are unavailable.
 export APPIMAGE_EXTRACT_AND_RUN=1
+
+# Catch2 test discovery runs test binaries during the build. Ensure a UTF-8
+# locale and headless Qt platform are set for both build-time discovery and
+# ctest execution.
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+export QT_QPA_PLATFORM=offscreen
+
+# Normalize ccache keys across ephemeral CI containers and checkout roots.
+export CCACHE_BASEDIR="${CCACHE_BASEDIR:-$SCRIPT_DIR}"
+export CCACHE_NOHASHDIR=1
+export CCACHE_COMPILERCHECK=content
 
 # install linuxdeploy into the build dir so it gets cleared with it
 wget -nc https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -37,51 +51,12 @@ cmake .. \
 
 cmake --build . --config Release -- -j $(nproc) || exit 1
 
-# Run tests (wxgtk needs an X server running for the app to initialize)
+# Run tests
 
 BUILD_DIR=$(pwd)
-
-cd "$BUILD_DIR/lib/KdLib/test"
-./KdLibTest || exit 1
-
-cd "$BUILD_DIR/lib/UpdateLib/test"
-./UpdateLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbBaseLib/test"
-./TbBaseLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbBaseLib/test-utils/test"
-./TbBaseTestUtilsLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbElLib/test"
-./TbElLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbFsLib/test"
-./TbFsLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbFsLib/test-utils/test"
-./TbFsTestUtilsLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbGlLib/test"
-./TbGlLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbMdlLib/test"
-./TbMdlLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbMdlLib/test-utils/test"
-./TbMdlTestUtilsLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbRenderLib/test"
-./TbRenderLibTest || exit 1
-
-cd "$BUILD_DIR/lib/TbUiLib/test"
-QT_QPA_PLATFORM=offscreen ./TbUiLibTest || exit 1
-
-cd "$BUILD_DIR/lib/VmLib/test"
-./VmLibTest || exit 1
+ctest --test-dir "$BUILD_DIR" --output-on-failure -j || exit 1
 
 cd "$BUILD_DIR"
-
 ldd --verbose ./app/TrenchBroom/trenchbroom
 
 cpack || exit 1

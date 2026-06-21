@@ -437,7 +437,7 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
 
     m_notifierConnection += m_document.groupWasOpenedNotifier.connect(
         [this]() { updateCurrentGroupHighlight(); });
-    m_notifierConnection += m_document.map().editorContext().editorContextDidChangeNotifier.connect(
+    m_notifierConnection += m_document.editorContextDidChangeNotifier.connect(
         [this]() { updateCurrentGroupHighlight(); });
     m_notifierConnection += m_document.groupWasClosedNotifier.connect(
         [this]() {

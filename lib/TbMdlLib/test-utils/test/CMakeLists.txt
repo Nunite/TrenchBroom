@@ -14,3 +14,6 @@ target_link_libraries(TbMdlTestUtilsLibTest
     TbBaseTestUtilsLib
     TbMdlTestUtilsLib
 )
+
+include(Catch)
+catch_discover_tests(TbMdlTestUtilsLibTest)

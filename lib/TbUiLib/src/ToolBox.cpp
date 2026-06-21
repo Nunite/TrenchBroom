@@ -413,7 +413,7 @@ std::vector<Tool*> ToolBox::excludedTools(const Tool& tool) const
   {
     if (kdl::vec_contains(exclusiveToolGroup, &tool))
     {
-      result = kdl::vec_concat(std::move(result), exclusiveToolGroup);
+      kdl::vec_append(result, exclusiveToolGroup);
     }
   }
   return kdl::vec_sort_and_remove_duplicates(std::move(result));
@@ -426,7 +426,7 @@ std::vector<Tool*> ToolBox::currentlySuppressedTools() const
   {
     if (primaryTool->active())
     {
-      result = kdl::vec_concat(std::move(result), suppressedTools);
+      kdl::vec_append(result, suppressedTools);
     }
   }
   return kdl::vec_sort_and_remove_duplicates(std::move(result));

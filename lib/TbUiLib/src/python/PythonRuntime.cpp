@@ -5,6 +5,8 @@
 #include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonV2Module.h"
 
+#include "kd/invoke.h"
+
 #if defined(slots)
 #undef slots
 #endif
@@ -215,6 +217,11 @@ PyObject* logWriterIsatty(PyObject*, PyObject*)
   Py_RETURN_FALSE;
 }
 
+void logWriterDealloc(PyObject* self)
+{
+  Py_TYPE(self)->tp_free(self);
+}
+
 bool ensureLogWriterType()
 {
   if (g_logWriterType != nullptr)
@@ -233,6 +240,7 @@ bool ensureLogWriterType()
   type.tp_basicsize = sizeof(PyRuntimeLogWriter);
   type.tp_flags = Py_TPFLAGS_DEFAULT;
   type.tp_methods = methods;
+  type.tp_dealloc = logWriterDealloc;
   type.tp_new = PyType_GenericNew;
 
   if (PyType_Ready(&type) != 0)
@@ -314,20 +322,22 @@ void PythonRuntime::runCallback(PythonPluginSession& session, void* callback)
     return;
   }
 
-  auto gil = PyGILState_Ensure();
-  auto scopedContext = ScopedExecutionContext{session.context(), &session};
-  auto scopedStdStreamRedirect = ScopedStdStreamRedirect{};
-  auto* result = PyObject_CallObject(reinterpret_cast<PyObject*>(callback), nullptr);
-  if (result == nullptr)
   {
-    m_lastError = formatCurrentException();
-    if (session.context().logger != nullptr)
+    auto gil = PyGILState_Ensure();
+    auto releaseGil = kdl::invoke_later{[&]() { PyGILState_Release(gil); }};
+    auto scopedContext = ScopedExecutionContext{session.context(), &session};
+    auto scopedStdStreamRedirect = ScopedStdStreamRedirect{};
+    auto* result = PyObject_CallObject(reinterpret_cast<PyObject*>(callback), nullptr);
+    if (result == nullptr)
     {
-      session.context().logger->error() << m_lastError;
+      m_lastError = formatCurrentException();
+      if (session.context().logger != nullptr)
+      {
+        session.context().logger->error() << m_lastError;
+      }
     }
+    Py_XDECREF(result);
   }
-  Py_XDECREF(result);
-  PyGILState_Release(gil);
 }
 
 bool PythonRuntime::runScript(
@@ -347,64 +357,63 @@ bool PythonRuntime::runScript(
 
   m_lastError.clear();
 
-  auto gil = PyGILState_Ensure();
-  auto scopedContext = ScopedExecutionContext{context, session};
-  auto scopedSysPath = ScopedSysPath{path.parent_path()};
-  auto scopedStdStreamRedirect = ScopedStdStreamRedirect{};
-
-  auto source = readFile(path);
-  if (source.empty() && std::filesystem::file_size(path) > 0)
   {
-    m_lastError = "Could not read Python script: " + path.generic_string();
-    if (context.logger)
+    auto gil = PyGILState_Ensure();
+    auto releaseGil = kdl::invoke_later{[&]() { PyGILState_Release(gil); }};
+    auto scopedContext = ScopedExecutionContext{context, session};
+    auto scopedSysPath = ScopedSysPath{path.parent_path()};
+    auto scopedStdStreamRedirect = ScopedStdStreamRedirect{};
+
+    auto source = readFile(path);
+    if (source.empty() && std::filesystem::file_size(path) > 0)
     {
-      context.logger->error() << m_lastError;
+      m_lastError = "Could not read Python script: " + path.generic_string();
+      if (context.logger)
+      {
+        context.logger->error() << m_lastError;
+      }
+      return false;
     }
-    PyGILState_Release(gil);
-    return false;
-  }
 
-  auto* globals = PyDict_New();
-  if (globals == nullptr)
-  {
-    m_lastError = "Could not create Python globals";
-    if (context.logger)
+    auto* globals = PyDict_New();
+    if (globals == nullptr)
     {
-      context.logger->error() << m_lastError;
+      m_lastError = "Could not create Python globals";
+      if (context.logger)
+      {
+        context.logger->error() << m_lastError;
+      }
+      return false;
     }
-    PyGILState_Release(gil);
-    return false;
-  }
 
-  auto* builtins = PyEval_GetBuiltins();
-  PyDict_SetItemString(globals, "__builtins__", builtins);
-  const auto filename = path.u8string();
-  auto* filenameObj = PyUnicode_FromStringAndSize(
-    reinterpret_cast<const char*>(filename.c_str()),
-    static_cast<Py_ssize_t>(filename.size()));
-  if (filenameObj != nullptr)
-  {
-    PyDict_SetItemString(globals, "__file__", filenameObj);
-    Py_DECREF(filenameObj);
-  }
-
-  auto* result =
-    PyRun_StringFlags(source.c_str(), Py_file_input, globals, globals, nullptr);
-  Py_DECREF(globals);
-
-  if (result == nullptr)
-  {
-    if (context.logger)
+    auto* builtins = PyEval_GetBuiltins();
+    PyDict_SetItemString(globals, "__builtins__", builtins);
+    const auto filename = path.u8string();
+    auto* filenameObj = PyUnicode_FromStringAndSize(
+      reinterpret_cast<const char*>(filename.c_str()),
+      static_cast<Py_ssize_t>(filename.size()));
+    if (filenameObj != nullptr)
     {
-      m_lastError = formatCurrentException();
-      context.logger->error() << m_lastError;
+      PyDict_SetItemString(globals, "__file__", filenameObj);
+      Py_DECREF(filenameObj);
     }
-    PyGILState_Release(gil);
-    return false;
-  }
 
-  Py_DECREF(result);
-  PyGILState_Release(gil);
+    auto* result =
+      PyRun_StringFlags(source.c_str(), Py_file_input, globals, globals, nullptr);
+    Py_DECREF(globals);
+
+    if (result == nullptr)
+    {
+      if (context.logger)
+      {
+        m_lastError = formatCurrentException();
+        context.logger->error() << m_lastError;
+      }
+      return false;
+    }
+
+    Py_DECREF(result);
+  }
   return true;
 }
 
@@ -462,7 +471,7 @@ void PythonRuntime::emitEvent(
 
 void PythonRuntime::cleanupPlugin(const std::string& pluginId)
 {
-  if (!ensureInitialized())
+  if (!Py_IsInitialized() || !ensureInitialized())
   {
     return;
   }
@@ -479,7 +488,7 @@ void PythonRuntime::cleanupPlugin(const std::string& pluginId)
 
 void PythonRuntime::cleanupPluginSession(PythonPluginSession& session)
 {
-  if (!ensureInitialized())
+  if (!Py_IsInitialized() || !ensureInitialized())
   {
     return;
   }
@@ -506,7 +515,10 @@ void PythonRuntime::cleanupPluginSession(PythonPluginSession& session)
 
 void PythonRuntime::cleanupDocument(MapWindow& mapWindow)
 {
-  emitEvent("document_closed", mapWindow);
+  if (!Py_IsInitialized())
+  {
+    return;
+  }
 
   if (!ensureInitialized())
   {

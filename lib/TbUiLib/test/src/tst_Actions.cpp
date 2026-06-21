@@ -25,7 +25,8 @@
 #include "PreferenceManager.h"
 
 #include "kd/contracts.h"
-#include "kd/vector_utils.h"
+#include "kd/ranges/concat_view.h"
+#include "kd/ranges/to.h"
 
 #include <sstream>
 #include <string>
@@ -58,8 +59,9 @@ auto collectViewActions(const ActionManager& actionManager)
 
 auto collectAllActions(const ActionManager& actionManager)
 {
-  return kdl::vec_concat(
-    collectMenuActions(actionManager), collectViewActions(actionManager));
+  return kdl::views::concat(
+           collectMenuActions(actionManager), collectViewActions(actionManager))
+         | kdl::ranges::to<std::vector>();
 }
 
 using ActionConflict = std::tuple<const Action*, const Action*>;

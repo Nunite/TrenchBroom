@@ -861,7 +861,7 @@ void MapWindow::documentWasLoaded()
   updateToolBarWidgets();
   updateRecentDocumentsMenu();
   loadLastCompilationProfileName();
-  PythonRuntime::instance().emitEvent("document_loaded", *this);
+  PythonRuntime::instance().emitEvent("document_loaded", *this, false);
 }
 
 void MapWindow::documentWasSaved()
@@ -870,7 +870,7 @@ void MapWindow::documentWasSaved()
   updateActionState();
   updateUndoRedoActions();
   updateRecentDocumentsMenu();
-  PythonRuntime::instance().emitEvent("document_saved", *this);
+  PythonRuntime::instance().emitEvent("document_saved", *this, false);
 }
 
 void MapWindow::mapModificationStateDidChange()

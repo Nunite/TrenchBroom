@@ -29,6 +29,7 @@
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "Result.h"
+#include "TestEnvironment.h"
 #include "fs/TestEnvironment.h"
 #include "gl/GlManager.h"
 #include "gl/Resource.h"
@@ -140,6 +141,9 @@ struct TestResource
 
 TEST_CASE("MapWindow")
 {
+  setPref(Preferences::DefaultPluginPaths, "");
+  setPref(Preferences::PythonPluginDirectories, "");
+
   UNSCOPED_INFO("creating AppControllerFixture");
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -165,8 +169,7 @@ TEST_CASE("MapWindow")
 
     const auto changedGridSize = 5;
     const auto changedGridIndex = changedGridSize - mdl::Grid::MinSize;
-    const auto path = pathFromQString(QApplication::applicationDirPath())
-                      / "fixture/test/ui/MapDocument/emptyValveMap.map";
+    const auto path = getFixtureRoot() / "test/ui/MapDocument/emptyValveMap.map";
 
     window.setGridSize(changedGridSize);
     QApplication::processEvents();
@@ -185,10 +188,12 @@ TEST_CASE("MapWindow")
 
     const auto loadedGridSize = window.document().map().grid().size();
     const auto loadedGridIndex = loadedGridSize - mdl::Grid::MinSize;
+    auto* loadedGridChoice = window.findChild<QComboBox*>("MapWindow_GridChoice");
+    REQUIRE(loadedGridChoice != nullptr);
 
     CHECK(loadedGridSize != changedGridSize);
-    CHECK(gridChoice->currentIndex() == loadedGridIndex);
-    CHECK(gridChoice->currentData().toInt() == loadedGridSize);
+    CHECK(loadedGridChoice->currentIndex() == loadedGridIndex);
+    CHECK(loadedGridChoice->currentData().toInt() == loadedGridSize);
   }
 
   SECTION("canReloadMaterialCollections returns false when resources need processing")

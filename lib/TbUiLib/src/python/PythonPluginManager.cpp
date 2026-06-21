@@ -100,6 +100,7 @@ bool PythonPluginManager::loadPlugins(MapWindow& mapWindow)
 
 void PythonPluginManager::unloadPlugins(MapWindow& mapWindow)
 {
+  auto unloadedAnyPlugin = false;
   for (auto& plugin : m_plugins)
   {
     if (plugin.status == PythonPluginStatus::Loaded)
@@ -111,9 +112,13 @@ void PythonPluginManager::unloadPlugins(MapWindow& mapWindow)
       }
       plugin.status = PythonPluginStatus::NotLoaded;
       plugin.error.clear();
+      unloadedAnyPlugin = true;
     }
   }
-  PythonRuntime::instance().cleanupDocument(mapWindow);
+  if (unloadedAnyPlugin)
+  {
+    PythonRuntime::instance().cleanupDocument(mapWindow);
+  }
 }
 
 const std::vector<PythonPluginState>& PythonPluginManager::plugins() const

@@ -537,12 +537,13 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         {
             if (auto* w = item->widget())
             {
-                w->deleteLater();
+                w->setParent(nullptr);
+                delete w;
             }
             if (auto* childLayout = item->layout())
             {
                 self(self, childLayout);
-                childLayout->deleteLater();
+                delete childLayout;
             }
             delete item;
         }

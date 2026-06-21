@@ -16,3 +16,6 @@ target_link_libraries(TbRenderLibTest
     TbMdlTestUtilsLib
     TbRenderLib
   )
+
+include(Catch)
+catch_discover_tests(TbRenderLibTest)
