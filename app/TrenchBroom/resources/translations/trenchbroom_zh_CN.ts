@@ -3700,11 +3700,16 @@ They may contain new features or bug fixes that are not yet part of a stable rel
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/ViewEditor.cpp" line="489"/>
+        <source>Show FPS</source>
+        <translation>显示 FPS</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/ViewEditor.cpp" line="490"/>
         <source>Show 3D sky</source>
         <translation>显示 3D 天空</translation>
     </message>
     <message>
-        <location filename="../../../../lib/TbUiLib/src/ViewEditor.cpp" line="490"/>
+        <location filename="../../../../lib/TbUiLib/src/ViewEditor.cpp" line="491"/>
         <source>Readable 2D brush outlines</source>
         <translation>增强 2D Brush 轮廓可读性</translation>
     </message>

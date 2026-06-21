@@ -75,13 +75,7 @@ RenderView::RenderView(AppController& appController, QWidget* parent)
     m_maxFrameTimeMsecs = 0;
     m_lastFPSCounterUpdate = currentTime;
 
-    m_currentFPS = fmt::format(
-      R"(Avg FPS: {} Max time between frames: {}ms. {} currentVBOS({} peak) totalling {} KiB)",
-      avgFps,
-      maxFrameTime,
-      vboManager().currentVboCount(),
-      vboManager().peakVboCount(),
-      vboManager().currentVboSize() / 1024u);
+    m_currentFPS = fmt::format("FPS: {:.0f}  Frame: {} ms", avgFps, maxFrameTime);
   });
 
   fpsCounter->start(1000);

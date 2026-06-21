@@ -22,6 +22,8 @@
 #include <QPushButton>
 #include <QtTest/QTest>
 
+#include "PreferenceManager.h"
+#include "Preferences.h"
 #include "mdl/EditorContext.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionManager.h"
@@ -68,9 +70,9 @@ QCheckBox* findCheckBox(auto checkBoxes, const QString& text)
   return nullptr;
 }
 
-QPushButton* findButton(EntityDefinitionCheckBoxList& list, const QString& text)
+QPushButton* findButton(QWidget& widget, const QString& text)
 {
-  auto buttons = list.findChildren<QPushButton*>();
+  auto buttons = widget.findChildren<QPushButton*>();
   if (const auto iButton = std::ranges::find_if(
         buttons, [&](const auto* button) { return button->text() == text; });
       iButton != buttons.end())
@@ -190,6 +192,50 @@ TEST_CASE("EntityDefinitionCheckBoxList")
     CHECK(!map.editorContext().entityDefinitionHidden(*funcZetaDefinition));
     CHECK(!map.editorContext().entityDefinitionHidden(*funcAlphaDefinition));
     CHECK(!map.editorContext().entityDefinitionHidden(*triggerOnceDefinition));
+  }
+}
+
+TEST_CASE("ViewEditor")
+{
+  auto fixture = MapDocumentFixture{};
+  auto& document = fixture.create();
+  auto& prefs = PreferenceManager::instance();
+  prefs.set(Preferences::ShowFPS, false);
+
+  auto editor = ViewEditor{document};
+  editor.resize(400, 600);
+  editor.show();
+  QApplication::processEvents();
+
+  SECTION("toggles FPS overlay")
+  {
+    auto* showFPSCheckBox = findCheckBox(editor.findChildren<QCheckBox*>(), "Show FPS");
+    REQUIRE(showFPSCheckBox != nullptr);
+    CHECK_FALSE(showFPSCheckBox->isChecked());
+
+    showFPSCheckBox->click();
+    QApplication::processEvents();
+
+    CHECK(prefs.get(Preferences::ShowFPS));
+  }
+
+  SECTION("restore defaults resets FPS overlay")
+  {
+    auto* showFPSCheckBox = findCheckBox(editor.findChildren<QCheckBox*>(), "Show FPS");
+    REQUIRE(showFPSCheckBox != nullptr);
+    showFPSCheckBox->click();
+    QApplication::processEvents();
+
+    CHECK(showFPSCheckBox->isChecked());
+    CHECK(prefs.get(Preferences::ShowFPS));
+
+    auto* restoreDefaultsButton = findButton(editor, "Restore Defaults");
+    REQUIRE(restoreDefaultsButton != nullptr);
+
+    restoreDefaultsButton->click();
+    QApplication::processEvents();
+
+    CHECK_FALSE(prefs.get(Preferences::ShowFPS));
   }
 }
 
