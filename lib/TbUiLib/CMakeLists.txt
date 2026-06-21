@@ -44,6 +44,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CompilationRunner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CompilationTaskListBox.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CompilationVariables.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/CommandPaletteDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Console.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ContainerBar.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Contracts.cpp
@@ -297,6 +298,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CompilationRunner.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CompilationTaskListBox.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CompilationVariables.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CommandPaletteDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Console.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ContainerBar.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Contracts.h

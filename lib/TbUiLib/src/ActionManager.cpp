@@ -1923,6 +1923,14 @@ void ActionManager::createViewMenu()
       return context.hasDocument() && context.mapWindow().currentViewMaximized();
     },
   }));
+  viewMenu.addItem(addAction(Action{
+    "Menu/View/Command Palette...",
+    QObject::tr("Command Palette..."),
+    ActionContext::Any,
+    QKeySequence{Qt::CTRL | Qt::SHIFT | Qt::Key_P},
+    [](auto& context) { context.mapWindow().showCommandPalette(); },
+    [](const auto&) { return true; },
+  }));
   viewMenu.addSeparator();
   viewMenu.addItem(addAction(Action{
     "Menu/File/Preferences...",

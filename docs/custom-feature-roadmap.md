@@ -9,6 +9,11 @@
 这些能力已经在当前 `feature/latest-upstream-merge` 分支中落地，后续 roadmap
 应以加固、补齐工作流和降低维护成本为主，而不是从零重做。
 
+- 命令面板
+  - 已接入 View 菜单中的 Command Palette，并提供 `Ctrl+Shift+P` 默认快捷键。
+  - 当前定位：第一版可搜索并执行现有 `ActionManager` 动作。
+  - 后续重点：接入 Python 插件命令、最近使用命令和更细的分类/排序。
+
 - Python 插件 v2 / `tb2`
   - 已接入 `PythonRuntime`、`tb2` pybind11 模块、manifest 插件目录、
     `PythonPluginManager`、插件 session、timer、event、panel 和示例插件。
@@ -54,9 +59,10 @@
 
 ## 现代化编辑器待办
 
-- [ ] 命令面板
+- [x] 命令面板
   - 目标：让菜单、工具、视图开关、插件命令更容易被发现，不继续堆工具栏和菜单。
-  - 可能入口：`ActionManager`。
+  - 状态：第一版已完成，可从 `ActionManager` 收集当前上下文可用命令并执行。
+  - 下一步：接入插件命令、最近命令、收藏命令和更好的匹配排序。
 
 - [ ] 统一资产浏览器
   - 目标：保留现有 Model Browser 的工作成果，并扩展成可放置材质、模型、Sprite、声音和实体模板的资产入口。

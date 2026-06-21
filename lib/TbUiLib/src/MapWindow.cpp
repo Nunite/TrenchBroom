@@ -80,6 +80,7 @@
 #include "ui/ChoosePathTypeDialog.h"
 #include "ui/ClipTool.h"
 #include "ui/ColorButton.h"
+#include "ui/CommandPaletteDialog.h"
 #include "ui/CompilationDialog.h"
 #include "ui/Console.h"
 #include "ui/CrashReporter.h"
@@ -862,6 +863,37 @@ void MapWindow::documentWasLoaded()
   updateRecentDocumentsMenu();
   loadLastCompilationProfileName();
   PythonRuntime::instance().emitEvent("document_loaded", *this, false);
+}
+
+void MapWindow::showCommandPalette()
+{
+  auto selectedActionPath = std::optional<std::filesystem::path>{};
+  {
+    auto context = ActionExecutionContext{m_appController, this, currentMapViewBase()};
+    auto dialog = CommandPaletteDialog{
+      m_appController.actionManager(),
+      context,
+      std::filesystem::path{"Menu/View/Command Palette..."},
+      this};
+
+    if (dialog.exec() == QDialog::Accepted)
+    {
+      selectedActionPath = dialog.selectedActionPath();
+    }
+  }
+
+  if (!selectedActionPath)
+  {
+    return;
+  }
+
+  const auto& actionsMap = m_appController.actionManager().actionsMap();
+  if (const auto it = actionsMap.find(*selectedActionPath); it != std::end(actionsMap))
+  {
+    auto executeContext =
+      ActionExecutionContext{m_appController, this, currentMapViewBase()};
+    it->second.execute(executeContext);
+  }
 }
 
 void MapWindow::documentWasSaved()

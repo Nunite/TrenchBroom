@@ -405,6 +405,7 @@ public:
 
   void toggleMaximizeCurrentView();
   bool currentViewMaximized() const;
+  void showCommandPalette();
 
   void showCompileDialog();
   bool closeCompileDialog();

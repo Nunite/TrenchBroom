@@ -895,6 +895,11 @@
         <translation>最大化当前视图</translation>
     </message>
     <message>
+        <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1925"/>
+        <source>Command Palette...</source>
+        <translation>命令面板...</translation>
+    </message>
+    <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1929"/>
         <source>Preferences...</source>
         <translation>首选项...</translation>
@@ -3722,6 +3727,29 @@ They may contain new features or bug fixes that are not yet part of a stable rel
         <location filename="../../../../lib/TbUiLib/src/ViewEditor.cpp" line="514"/>
         <source>Restore Defaults</source>
         <translation>恢复默认值</translation>
+    </message>
+</context>
+<context>
+    <name>tb::ui::CommandPaletteDialog</name>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/CommandPaletteDialog.cpp" line="65"/>
+        <source>Command Palette</source>
+        <translation>命令面板</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/CommandPaletteDialog.cpp" line="94"/>
+        <source>Search commands...</source>
+        <translation>搜索命令...</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/CommandPaletteDialog.cpp" line="102"/>
+        <source>Press Enter to run the selected command.</source>
+        <translation>按 Enter 运行选中的命令。</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/CommandPaletteDialog.cpp" line="183"/>
+        <source>No matching commands</source>
+        <translation>没有匹配的命令</translation>
     </message>
 </context>
 <context>

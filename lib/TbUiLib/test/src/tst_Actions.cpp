@@ -17,12 +17,11 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "PreferenceManager.h"
 #include "ui/Action.h"
 #include "ui/ActionManager.h"
 #include "ui/ActionMenu.h"
 #include "ui/CatchConfig.h"
-
-#include "PreferenceManager.h"
 
 #include "kd/contracts.h"
 #include "kd/ranges/concat_view.h"
@@ -98,6 +97,10 @@ TEST_CASE("Actions")
   SECTION("Custom inspector pages have view menu actions")
   {
     const auto& actions = actionManager.actionsMap();
+    CHECK(actions.contains("Menu/View/Command Palette..."));
+    CHECK(
+      pref(actions.at("Menu/View/Command Palette...").preference())
+      == QKeySequence{Qt::CTRL | Qt::SHIFT | Qt::Key_P});
     CHECK(actions.contains("Menu/View/Switch to Map Inspector"));
     CHECK(actions.contains("Menu/View/Switch to Entity Inspector"));
     CHECK(actions.contains("Menu/View/Switch to Face Inspector"));
@@ -109,7 +112,9 @@ TEST_CASE("Actions")
   {
     const auto& actions = actionManager.actionsMap();
     CHECK(actions.contains("Menu/Edit/Tools/Path Tool"));
-    CHECK(pref(actions.at("Menu/Edit/Tools/Path Tool").preference()) == QKeySequence{Qt::Key_P});
+    CHECK(
+      pref(actions.at("Menu/Edit/Tools/Path Tool").preference())
+      == QKeySequence{Qt::Key_P});
   }
 
   SECTION("Custom map view actions are configurable")
