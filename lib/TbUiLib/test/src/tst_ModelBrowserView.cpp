@@ -62,16 +62,16 @@ std::vector<std::string> entryPaths(const std::vector<ModelBrowserEntry>& entrie
 TEST_CASE("ModelBrowserView")
 {
   const auto root = std::filesystem::path{"models"};
-  const auto models = std::vector<std::filesystem::path>{
-    "models/barrel.mdl",
-    "models/crates/wood.mdl",
-    "models/crates/metal.mdl",
-    "models/monsters/ogre.mdl",
+  const auto assets = std::vector<BrowserAsset>{
+    {BrowserCellType::Model, "models/barrel.mdl"},
+    {BrowserCellType::Model, "models/crates/wood.mdl"},
+    {BrowserCellType::Model, "models/crates/metal.mdl"},
+    {BrowserCellType::Model, "models/monsters/ogre.mdl"},
   };
 
   SECTION("shows top-level folders and models")
   {
-    const auto entries = modelBrowserEntries(root, models, {}, {});
+    const auto entries = modelBrowserEntries(root, assets, {}, {});
 
     CHECK_THAT(
       entryTypes(entries),
@@ -90,7 +90,7 @@ TEST_CASE("ModelBrowserView")
 
   SECTION("shows parent entry and children inside a folder")
   {
-    const auto entries = modelBrowserEntries(root, models, "crates", {});
+    const auto entries = modelBrowserEntries(root, assets, "crates", {});
 
     CHECK_THAT(
       entryTypes(entries),
@@ -110,7 +110,7 @@ TEST_CASE("ModelBrowserView")
 
   SECTION("search includes matching nested models and their containing folders")
   {
-    const auto entries = modelBrowserEntries(root, models, {}, "wood");
+    const auto entries = modelBrowserEntries(root, assets, {}, "wood");
 
     CHECK_THAT(
       entryTypes(entries),
@@ -126,12 +126,59 @@ TEST_CASE("ModelBrowserView")
 
   SECTION("search includes folders with matching names")
   {
-    const auto entries = modelBrowserEntries(root, models, {}, "monster");
+    const auto entries = modelBrowserEntries(root, assets, {}, "monster");
 
     CHECK_THAT(
       entryTypes(entries), Equals(std::vector<BrowserCellType>{BrowserCellType::Folder}));
     CHECK_THAT(entryTitles(entries), Equals(std::vector<std::string>{"monsters"}));
     CHECK_THAT(entryPaths(entries), Equals(std::vector<std::string>{"monsters"}));
+  }
+
+  SECTION("shows unified asset types")
+  {
+    const auto unifiedRoot = std::filesystem::path{};
+    const auto unifiedAssets = std::vector<BrowserAsset>{
+      {BrowserCellType::Model, "models/barrel.mdl"},
+      {BrowserCellType::Sprite, "sprites/glow01.spr"},
+      {BrowserCellType::Sound, "sound/ambience/hum.wav"},
+    };
+
+    const auto entries = modelBrowserEntries(unifiedRoot, unifiedAssets, {}, {});
+
+    CHECK_THAT(
+      entryTypes(entries),
+      Equals(std::vector<BrowserCellType>{
+        BrowserCellType::Folder,
+        BrowserCellType::Folder,
+        BrowserCellType::Folder,
+      }));
+    CHECK_THAT(
+      entryTitles(entries),
+      Equals(std::vector<std::string>{"models", "sound", "sprites"}));
+    CHECK_THAT(
+      entryPaths(entries),
+      Equals(std::vector<std::string>{"models", "sound", "sprites"}));
+  }
+
+  SECTION("shows assets inside unified folders")
+  {
+    const auto unifiedRoot = std::filesystem::path{};
+    const auto unifiedAssets = std::vector<BrowserAsset>{
+      {BrowserCellType::Model, "models/barrel.mdl"},
+      {BrowserCellType::Sprite, "sprites/glow01.spr"},
+      {BrowserCellType::Sound, "sound/ambience/hum.wav"},
+    };
+
+    const auto entries = modelBrowserEntries(unifiedRoot, unifiedAssets, "sprites", {});
+
+    CHECK_THAT(
+      entryTypes(entries),
+      Equals(
+        std::vector<BrowserCellType>{BrowserCellType::Folder, BrowserCellType::Sprite}));
+    CHECK_THAT(
+      entryTitles(entries), Equals(std::vector<std::string>{"..", "glow01.spr"}));
+    CHECK_THAT(
+      entryPaths(entries), Equals(std::vector<std::string>{"", "sprites/glow01.spr"}));
   }
 }
 

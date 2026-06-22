@@ -122,6 +122,16 @@ bool CreateEntityToolController::shouldAcceptDrop(
     return m_tool.canCreateModelEntity(parsedPayload->value);
   }
 
+  if (parsedPayload->type == "sprite")
+  {
+    return m_tool.canCreateSpriteEntity(parsedPayload->value);
+  }
+
+  if (parsedPayload->type == "sound")
+  {
+    return m_tool.canCreateSoundEntity(parsedPayload->value);
+  }
+
   return false;
 }
 
@@ -140,6 +150,18 @@ std::unique_ptr<DropTracker> CreateEntityToolController::acceptDrop(
   if (parsedPayload->type == "model")
   {
     return m_tool.createModelEntity(parsedPayload->value) ? createDropTracker(inputState)
+                                                          : nullptr;
+  }
+
+  if (parsedPayload->type == "sprite")
+  {
+    return m_tool.createSpriteEntity(parsedPayload->value) ? createDropTracker(inputState)
+                                                           : nullptr;
+  }
+
+  if (parsedPayload->type == "sound")
+  {
+    return m_tool.createSoundEntity(parsedPayload->value) ? createDropTracker(inputState)
                                                           : nullptr;
   }
 

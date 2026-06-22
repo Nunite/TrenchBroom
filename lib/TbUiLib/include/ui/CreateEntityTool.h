@@ -59,6 +59,10 @@ public:
     const std::string& propertyValue);
   bool canCreateModelEntity(const std::string& modelPath) const;
   bool createModelEntity(const std::string& modelPath);
+  bool canCreateSpriteEntity(const std::string& spritePath) const;
+  bool createSpriteEntity(const std::string& spritePath);
+  bool canCreateSoundEntity(const std::string& soundPath) const;
+  bool createSoundEntity(const std::string& soundPath);
   void removeEntity();
   void commitEntity();
 

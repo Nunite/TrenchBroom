@@ -58,7 +58,7 @@ void setPathCornerDefinition(mdl::Map& map)
   });
 }
 
-void setModelEntityDefinitions(mdl::Map& map)
+void setAssetEntityDefinitions(mdl::Map& map)
 {
   map.entityDefinitionManager().setDefinitions({
     {
@@ -92,6 +92,26 @@ void setModelEntityDefinitions(mdl::Map& map)
       "mdl model entity",
       {
         {"mdl", mdl::PropertyValueTypes::String{}, "", "", false},
+      },
+      mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
+    },
+    {
+      "env_sprite",
+      Color{},
+      "sprite entity",
+      {
+        {"model", mdl::PropertyValueTypes::String{}, "", "", false},
+      },
+      mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
+    },
+    {
+      "ambient_generic",
+      Color{},
+      "sound entity",
+      {
+        {"message", mdl::PropertyValueTypes::String{}, "", "", false},
+        {"noise", mdl::PropertyValueTypes::String{}, "", "", false},
+        {"sound", mdl::PropertyValueTypes::String{}, "", "", false},
       },
       mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
     },
@@ -166,7 +186,7 @@ TEST_CASE("MapViewToolBox")
 
   SECTION("create entity tool creates model entities from browser payloads")
   {
-    setModelEntityDefinitions(map);
+    setAssetEntityDefinitions(map);
 
     REQUIRE(toolBox.createEntityTool().canCreateModelEntity("models/player.mdl"));
     REQUIRE(toolBox.createEntityTool().createModelEntity("models/player.mdl"));
@@ -177,6 +197,38 @@ TEST_CASE("MapViewToolBox")
     CHECK(selectedEntities.front()->entity().classname() == "cycler_sprite");
     REQUIRE(selectedEntities.front()->entity().property("model") != nullptr);
     CHECK(*selectedEntities.front()->entity().property("model") == "models/player.mdl");
+  }
+
+  SECTION("create entity tool creates sprite entities from browser payloads")
+  {
+    setAssetEntityDefinitions(map);
+
+    REQUIRE(toolBox.createEntityTool().canCreateSpriteEntity("sprites/glow01.spr"));
+    REQUIRE(toolBox.createEntityTool().createSpriteEntity("sprites/glow01.spr"));
+    toolBox.createEntityTool().commitEntity();
+
+    const auto selectedEntities = selectedEntityNodes(map);
+    REQUIRE(selectedEntities.size() == 1u);
+    CHECK(selectedEntities.front()->entity().classname() == "cycler_sprite");
+    REQUIRE(selectedEntities.front()->entity().property("model") != nullptr);
+    CHECK(*selectedEntities.front()->entity().property("model") == "sprites/glow01.spr");
+  }
+
+  SECTION("create entity tool creates sound entities from browser payloads")
+  {
+    setAssetEntityDefinitions(map);
+
+    REQUIRE(toolBox.createEntityTool().canCreateSoundEntity("sound/ambience/hum.wav"));
+    REQUIRE(toolBox.createEntityTool().createSoundEntity("sound/ambience/hum.wav"));
+    toolBox.createEntityTool().commitEntity();
+
+    const auto selectedEntities = selectedEntityNodes(map);
+    REQUIRE(selectedEntities.size() == 1u);
+    CHECK(selectedEntities.front()->entity().classname() == "ambient_generic");
+    REQUIRE(selectedEntities.front()->entity().property("message") != nullptr);
+    CHECK(
+      *selectedEntities.front()->entity().property("message")
+      == "sound/ambience/hum.wav");
   }
 }
 

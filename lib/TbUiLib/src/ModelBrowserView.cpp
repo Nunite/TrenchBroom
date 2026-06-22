@@ -62,16 +62,37 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <ranges>
 #include <variant>
 #include <vector>
 
 namespace tb::ui
 {
+namespace
+{
+
+std::optional<RgbaF> assetPlaceholderColor(const BrowserCellType type)
+{
+  switch (type)
+  {
+  case BrowserCellType::Sprite:
+    return RgbaF{0.25f, 0.62f, 0.95f, 0.35f};
+  case BrowserCellType::Sound:
+    return RgbaF{0.66f, 0.54f, 0.95f, 0.35f};
+  case BrowserCellType::Folder:
+  case BrowserCellType::Model:
+    return std::nullopt;
+  }
+
+  return std::nullopt;
+}
+
+} // namespace
 
 std::vector<ModelBrowserEntry> modelBrowserEntries(
   const std::filesystem::path& rootFolderPath,
-  const std::vector<std::filesystem::path>& modelPaths,
+  const std::vector<BrowserAsset>& assets,
   const std::filesystem::path& currentFolderPath,
   const QString& searchText)
 {
@@ -93,16 +114,17 @@ std::vector<ModelBrowserEntry> modelBrowserEntries(
                                   : (rootFolderPath / normalizedCurrentFolderPath);
 
   auto folderChildren = std::vector<std::filesystem::path>{};
-  auto modelChildren = std::vector<std::filesystem::path>{};
+  auto assetChildren = std::vector<BrowserAsset>{};
 
-  for (const auto& modelPath : modelPaths)
+  for (const auto& asset : assets)
   {
-    if (modelPath.empty())
+    const auto& assetPath = asset.path;
+    if (assetPath.empty())
     {
       continue;
     }
 
-    const auto folderPath = modelPath.parent_path();
+    const auto folderPath = assetPath.parent_path();
     if (!currentFolderAbs.empty() && !kdl::path_has_prefix(folderPath, currentFolderAbs))
     {
       continue;
@@ -112,13 +134,13 @@ std::vector<ModelBrowserEntry> modelBrowserEntries(
                                   ? folderPath
                                   : folderPath.lexically_relative(currentFolderAbs);
 
-    const auto modelNameMatches = matches(modelPath.filename());
+    const auto assetNameMatches = matches(assetPath.filename());
 
     if (relFromCurrent.empty() || relFromCurrent == std::filesystem::path{"."})
     {
-      if (!hasSearch || modelNameMatches)
+      if (!hasSearch || assetNameMatches)
       {
-        modelChildren.push_back(modelPath);
+        assetChildren.push_back(asset);
       }
       continue;
     }
@@ -128,9 +150,9 @@ std::vector<ModelBrowserEntry> modelBrowserEntries(
 
     if (hasSearch)
     {
-      if (modelNameMatches)
+      if (assetNameMatches)
       {
-        modelChildren.push_back(modelPath);
+        assetChildren.push_back(asset);
         folderChildren.push_back(firstRelPath);
         continue;
       }
@@ -152,12 +174,16 @@ std::vector<ModelBrowserEntry> modelBrowserEntries(
     std::unique(std::begin(folderChildren), std::end(folderChildren)),
     std::end(folderChildren));
 
-  std::ranges::sort(modelChildren, [&](const auto& a, const auto& b) {
+  std::ranges::sort(assetChildren, [&](const auto& a, const auto& b) {
     if (hasSearch)
     {
-      return a.generic_string() < b.generic_string();
+      return a.path.generic_string() < b.path.generic_string();
     }
-    return a.filename().generic_string() < b.filename().generic_string();
+    if (a.type != b.type)
+    {
+      return a.type < b.type;
+    }
+    return a.path.filename().generic_string() < b.path.filename().generic_string();
   });
 
   auto entries = std::vector<ModelBrowserEntry>{};
@@ -176,15 +202,16 @@ std::vector<ModelBrowserEntry> modelBrowserEntries(
        folderRelPath.filename().generic_string()});
   }
 
-  for (const auto& modelPath : modelChildren)
+  for (const auto& asset : assetChildren)
   {
+    const auto& assetPath = asset.path;
     const auto titlePath =
       hasSearch
-        ? (currentFolderAbs.empty() ? modelPath
-                                    : modelPath.lexically_relative(currentFolderAbs))
-        : modelPath.filename();
+        ? (currentFolderAbs.empty() ? assetPath
+                                    : assetPath.lexically_relative(currentFolderAbs))
+        : assetPath.filename();
     entries.push_back(
-      {BrowserCellData{BrowserCellType::Model, modelPath}, titlePath.generic_string()});
+      {BrowserCellData{asset.type, assetPath}, titlePath.generic_string()});
   }
 
   return entries;
@@ -221,11 +248,11 @@ ModelBrowserView::~ModelBrowserView()
   clear();
 }
 
-void ModelBrowserView::setModelPaths(
-  std::filesystem::path rootFolderPath, std::vector<std::filesystem::path> modelPaths)
+void ModelBrowserView::setAssets(
+  std::filesystem::path rootFolderPath, std::vector<BrowserAsset> assets)
 {
   m_rootFolderPath = std::move(rootFolderPath);
-  m_modelPaths = std::move(modelPaths);
+  m_assets = std::move(assets);
   m_currentFolderPath.clear();
   m_hasSelection = false;
   m_hasHover = false;
@@ -325,8 +352,8 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
   const auto fontSize = pref(Preferences::BrowserFontSize);
   const auto font = gl::FontDescriptor{fontPath, size_t(fontSize)};
   const auto maxCellWidth = layout.maxCellWidth();
-  for (const auto& entry : modelBrowserEntries(
-         m_rootFolderPath, m_modelPaths, m_currentFolderPath, m_searchText))
+  for (const auto& entry :
+       modelBrowserEntries(m_rootFolderPath, m_assets, m_currentFolderPath, m_searchText))
   {
     const auto titleHeight = fontManager().font(font).measure(entry.title).y();
 
@@ -352,7 +379,12 @@ void ModelBrowserView::doRender(
       * vm::translation_matrix(vm::vec3f{0.0f, 0.0f, 0.1f})};
   renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Model);
   renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Model);
+  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Sprite);
+  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Sprite);
+  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Sound);
+  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Sound);
   renderFolders(gl, layout, y, height);
+  renderAssetPlaceholders(gl, layout, y, height);
 
   const auto projection =
     vm::ortho_matrix(-1024.0f, 1024.0f, viewLeft, viewTop, viewRight, viewBottom);
@@ -511,6 +543,66 @@ void ModelBrowserView::doContextMenu(
   });
 
   menu.exec(event->globalPos());
+}
+
+void ModelBrowserView::renderAssetPlaceholders(
+  gl::Gl& gl, Layout& layout, const float y, const float height)
+{
+  using Vertex = gl::VertexTypes::P2C4::Vertex;
+  auto vertices = std::vector<Vertex>{};
+
+  for (const auto& group : layout.groups())
+  {
+    if (group.intersectsY(y, height))
+    {
+      for (const auto& row : group.rows())
+      {
+        if (row.intersectsY(y, height))
+        {
+          for (const auto& cell : row.cells())
+          {
+            const auto& item = cellData(cell);
+            const auto color = assetPlaceholderColor(item.type);
+            if (!color)
+            {
+              continue;
+            }
+
+            const auto& bounds = cell.itemBounds();
+            const auto colorVec = color->toVec();
+            vertices.emplace_back(
+              vm::vec2f{bounds.left() + 6.0f, height - (bounds.top() + 6.0f - y)},
+              colorVec);
+            vertices.emplace_back(
+              vm::vec2f{bounds.left() + 6.0f, height - (bounds.bottom() - 6.0f - y)},
+              colorVec);
+            vertices.emplace_back(
+              vm::vec2f{bounds.right() - 6.0f, height - (bounds.bottom() - 6.0f - y)},
+              colorVec);
+            vertices.emplace_back(
+              vm::vec2f{bounds.right() - 6.0f, height - (bounds.top() + 6.0f - y)},
+              colorVec);
+          }
+        }
+      }
+    }
+  }
+
+  if (vertices.empty())
+  {
+    return;
+  }
+
+  auto vertexArray = gl::VertexArray::move(std::move(vertices));
+  auto shader =
+    gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserBorderShader};
+
+  vertexArray.prepare(gl, vboManager());
+  if (vertexArray.setup(gl, shader.program()))
+  {
+    vertexArray.render(gl, gl::PrimType::Quads);
+    vertexArray.cleanup(gl, shader.program());
+  }
 }
 
 void ModelBrowserView::renderHoveredCellBounds(
@@ -896,13 +988,20 @@ bool ModelBrowserView::dndEnabled()
 
 QString ModelBrowserView::dndData(const Cell& cell)
 {
-  static const auto prefix = QString{"model:"};
   const auto& item = cellData(cell);
-  if (item.type != BrowserCellType::Model)
+  switch (item.type)
   {
+  case BrowserCellType::Model:
+    return QString{"model:"} + pathAsGenericQString(item.path);
+  case BrowserCellType::Sprite:
+    return QString{"sprite:"} + pathAsGenericQString(item.path);
+  case BrowserCellType::Sound:
+    return QString{"sound:"} + pathAsGenericQString(item.path);
+  case BrowserCellType::Folder:
     return "";
   }
-  return prefix + pathAsGenericQString(item.path);
+
+  return "";
 }
 
 QString ModelBrowserView::tooltip(const Cell& cell)

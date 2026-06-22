@@ -24,11 +24,11 @@
 #include <QIODevice>
 #include <QVBoxLayout>
 
+#include "ui/AppController.h"
 #include "ui/Console.h"
 #include "ui/IssueBrowser.h"
 #include "ui/MapDocument.h"
 #include "ui/ModelInspector.h"
-#include "ui/AppController.h"
 #include "ui/TabBook.h"
 #include "ui/WidgetState.h"
 
@@ -49,7 +49,7 @@ InfoPanel::InfoPanel(AppController& appController, MapDocument& document, QWidge
   m_tabBook->addPage(m_console, tr("Console"));
   m_tabBook->addPage(m_pythonConsole, tr("Python Console"));
   m_tabBook->addPage(m_issueBrowser, tr("Issues"));
-  m_tabBook->addPage(m_modelInspector, tr("Models"));
+  m_tabBook->addPage(m_modelInspector, tr("Assets"));
 
   auto* sizer = new QVBoxLayout{};
   sizer->setContentsMargins(0, 0, 0, 0);

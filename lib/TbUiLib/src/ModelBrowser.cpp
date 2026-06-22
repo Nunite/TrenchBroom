@@ -2,17 +2,17 @@
  Copyright (C) 2026
 
  This file is part of TrenchBroom.
- 
+
  TrenchBroom is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
  (at your option) any later version.
- 
+
  TrenchBroom is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
- 
+
  You should have received a copy of the GNU General Public License
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
@@ -24,39 +24,240 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
-#include <QSignalBlocker>
 #include <QScrollBar>
-#include <QStackedWidget>
+#include <QSignalBlocker>
 #include <QSplitter>
+#include <QStackedWidget>
 #include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
 #include "fs/DiskIO.h"
-#include "fs/PathInfo.h"
 #include "fs/FileSystem.h"
+#include "fs/PathInfo.h"
 #include "fs/PathMatcher.h"
-#include "ui/QPathUtils.h"
 #include "fs/TraversalMode.h"
-#include "mdl/Map.h"
-#include "mdl/GameFileSystem.h"
-#include "mdl/Map_World.h"
 #include "mdl/EntityModelManager.h"
+#include "mdl/GameFileSystem.h"
+#include "mdl/Map.h"
+#include "mdl/Map_World.h"
 #include "ui/AppController.h"
 #include "ui/ImageUtils.h"
 #include "ui/ModelBrowserView.h"
+#include "ui/QPathUtils.h"
 #include "ui/QWidgetUtils.h"
 #include "ui/SearchBox.h"
 
-#include "kd/ranges/to.h"
 #include "kd/path_utils.h"
+#include "kd/ranges/to.h"
 
 #include <algorithm>
+#include <array>
+#include <functional>
+#include <optional>
 #include <ranges>
 
 namespace tb::ui
 {
+namespace
+{
+
+const auto AssetRootPath = std::filesystem::path{};
+
+const auto GoldSrcAssetRoots = std::array{
+  std::pair{BrowserCellType::Model, std::filesystem::path{"models"}},
+  std::pair{BrowserCellType::Sprite, std::filesystem::path{"sprites"}},
+  std::pair{BrowserCellType::Sound, std::filesystem::path{"sound"}},
+};
+
+BrowserCellType assetTypeForExtension(const std::filesystem::path& path)
+{
+  const auto extension = kdl::path_to_lower(path.extension());
+  if (extension == ".mdl")
+  {
+    return BrowserCellType::Model;
+  }
+  if (extension == ".spr")
+  {
+    return BrowserCellType::Sprite;
+  }
+  if (extension == ".wav")
+  {
+    return BrowserCellType::Sound;
+  }
+  return BrowserCellType::Folder;
+}
+
+bool shouldReloadEntityModelForAsset(const BrowserAsset& asset)
+{
+  return asset.type == BrowserCellType::Model || asset.type == BrowserCellType::Sprite;
+}
+
+std::vector<std::filesystem::path> entityModelAssetPaths(
+  const std::vector<BrowserAsset>& assets)
+{
+  auto result = std::vector<std::filesystem::path>{};
+  for (const auto& asset : assets)
+  {
+    if (shouldReloadEntityModelForAsset(asset))
+    {
+      result.push_back(asset.path);
+    }
+  }
+  return result;
+}
+
+template <typename FindAssets, typename MakeAbsolute>
+std::optional<std::vector<BrowserAsset>> collectAssets(
+  const std::filesystem::path& folderPath,
+  const std::vector<std::filesystem::path>& modRoots,
+  FindAssets&& findAssets,
+  MakeAbsolute&& makeAbsolute)
+{
+  auto rootFilters = std::vector<std::pair<BrowserCellType, std::filesystem::path>>{};
+  if (folderPath.empty())
+  {
+    rootFilters.insert(
+      std::end(rootFilters), std::begin(GoldSrcAssetRoots), std::end(GoldSrcAssetRoots));
+  }
+  else
+  {
+    rootFilters.emplace_back(BrowserCellType::Folder, folderPath);
+  }
+
+  auto assets = std::vector<BrowserAsset>{};
+  for (const auto& [rootType, rootPath] : rootFilters)
+  {
+    unused(rootType);
+    auto pathsResult = findAssets(rootPath);
+    if (pathsResult.is_error())
+    {
+      continue;
+    }
+
+    for (const auto& path : pathsResult.value())
+    {
+      const auto assetType = assetTypeForExtension(path);
+      if (assetType == BrowserCellType::Folder)
+      {
+        continue;
+      }
+
+      if (!modRoots.empty())
+      {
+        auto absPathResult = makeAbsolute(path);
+        if (absPathResult.is_error())
+        {
+          continue;
+        }
+
+        const auto absPath = absPathResult.value().lexically_normal();
+        const auto inEnabledMod = std::ranges::any_of(modRoots, [&](const auto& modRoot) {
+          return kdl::path_has_prefix(absPath, modRoot);
+        });
+        if (!inEnabledMod)
+        {
+          continue;
+        }
+      }
+
+      assets.push_back(BrowserAsset{assetType, path});
+    }
+  }
+
+  std::ranges::sort(assets, [](const auto& lhs, const auto& rhs) {
+    return lhs.path.generic_string() < rhs.path.generic_string();
+  });
+  assets.erase(std::unique(std::begin(assets), std::end(assets)), std::end(assets));
+
+  return assets;
+}
+
+template <typename MakeAbsolute>
+std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>
+assetLastWriteTimes(const std::vector<BrowserAsset>& assets, MakeAbsolute&& makeAbsolute)
+{
+  auto lastWriteTimes = std::unordered_map<
+    std::filesystem::path,
+    std::filesystem::file_time_type,
+    kdl::path_hash>{};
+  lastWriteTimes.reserve(assets.size());
+
+  for (const auto& asset : assets)
+  {
+    auto absPath = std::filesystem::path{};
+    if (asset.path.is_absolute())
+    {
+      absPath = asset.path;
+    }
+    else if (auto absPathResult = makeAbsolute(asset.path); !absPathResult.is_error())
+    {
+      absPath = absPathResult.value();
+    }
+
+    if (absPath.empty())
+    {
+      continue;
+    }
+
+    auto error = std::error_code{};
+    const auto t = std::filesystem::last_write_time(absPath, error);
+    if (!error)
+    {
+      lastWriteTimes.emplace(asset.path, t);
+    }
+  }
+
+  return lastWriteTimes;
+}
+
+std::vector<std::filesystem::path> changedAssetPaths(
+  const std::
+    unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>&
+      oldWriteTimes,
+  const std::
+    unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>&
+      newWriteTimes,
+  const std::vector<BrowserAsset>& oldAssets,
+  const std::vector<BrowserAsset>& newAssets)
+{
+  auto changedPaths = std::vector<std::filesystem::path>{};
+  const auto oldEntityModelPaths = entityModelAssetPaths(oldAssets);
+
+  for (const auto& asset : newAssets)
+  {
+    if (!shouldReloadEntityModelForAsset(asset))
+    {
+      continue;
+    }
+
+    if (const auto it = newWriteTimes.find(asset.path); it != std::end(newWriteTimes))
+    {
+      const auto oldIt = oldWriteTimes.find(asset.path);
+      if (oldIt == std::end(oldWriteTimes) || oldIt->second != it->second)
+      {
+        changedPaths.push_back(asset.path);
+      }
+    }
+  }
+
+  for (const auto& oldPath : oldEntityModelPaths)
+  {
+    if (!newWriteTimes.contains(oldPath))
+    {
+      changedPaths.push_back(oldPath);
+    }
+  }
+
+  std::ranges::sort(changedPaths);
+  changedPaths.erase(
+    std::unique(std::begin(changedPaths), std::end(changedPaths)),
+    std::end(changedPaths));
+  return changedPaths;
+}
+
+} // namespace
 
 ModelBrowser::ModelBrowser(AppController& appController, mdl::Map& map, QWidget* parent)
   : QWidget{parent}
@@ -65,7 +266,7 @@ ModelBrowser::ModelBrowser(AppController& appController, mdl::Map& map, QWidget*
   createGui(appController);
   bindEvents();
   connectObservers();
-  setFolderPath(std::filesystem::path{"models"});
+  setFolderPath(AssetRootPath);
 }
 
 ModelBrowser::~ModelBrowser()
@@ -96,7 +297,7 @@ void ModelBrowser::createGui(AppController& appController)
 
   m_reloadButton = new QToolButton{};
   m_reloadButton->setIcon(loadSVGIcon(std::filesystem::path{"Refresh.svg"}));
-  m_reloadButton->setToolTip(tr("Reload models"));
+  m_reloadButton->setToolTip(tr("Reload assets"));
   m_reloadButton->setAutoRaise(true);
 
   m_searchBox = createSearchBox();
@@ -169,7 +370,8 @@ void ModelBrowser::bindEvents()
       return;
     }
 
-    const auto typedPath = std::filesystem::path{m_folderEdit->text().toStdString()}.lexically_normal();
+    const auto typedPath =
+      std::filesystem::path{m_folderEdit->text().toStdString()}.lexically_normal();
     if (typedPath.empty() || typedPath == std::filesystem::path{"."})
     {
       setCurrentFolderPath(std::filesystem::path{});
@@ -199,26 +401,29 @@ void ModelBrowser::bindEvents()
     showBreadcrumbBar();
   });
 
-  connect(
-    m_fileSystemWatcher,
-    &QFileSystemWatcher::directoryChanged,
-    this,
-    [&]() { scheduleRescan(); });
+  connect(m_fileSystemWatcher, &QFileSystemWatcher::directoryChanged, this, [&]() {
+    scheduleRescan();
+  });
 
   connect(m_rescanTimer, &QTimer::timeout, this, [&]() { rescanWatchedDirectory(); });
 
-  connect(m_folderTree, &QTreeWidget::currentItemChanged, this, [&](QTreeWidgetItem* current, QTreeWidgetItem*) {
-    if (!current)
-    {
-      return;
-    }
-    const auto rel = current->data(0, Qt::UserRole).toString();
-    setCurrentFolderPath(std::filesystem::path{rel.toStdString()});
-  });
+  connect(
+    m_folderTree,
+    &QTreeWidget::currentItemChanged,
+    this,
+    [&](QTreeWidgetItem* current, QTreeWidgetItem*) {
+      if (!current)
+      {
+        return;
+      }
+      const auto rel = current->data(0, Qt::UserRole).toString();
+      setCurrentFolderPath(std::filesystem::path{rel.toStdString()});
+    });
 
-  connect(m_view, &ModelBrowserView::folderActivated, this, [&](const QString& folderPath) {
-    setCurrentFolderPath(std::filesystem::path{folderPath.toStdString()});
-  });
+  connect(
+    m_view, &ModelBrowserView::folderActivated, this, [&](const QString& folderPath) {
+      setCurrentFolderPath(std::filesystem::path{folderPath.toStdString()});
+    });
 
   connect(m_reloadButton, &QToolButton::clicked, this, [&]() {
     m_lastWriteTimes.clear();
@@ -228,7 +433,8 @@ void ModelBrowser::bindEvents()
 
 void ModelBrowser::connectObservers()
 {
-  m_notifierConnection += m_map.modsDidChangeNotifier.connect(this, &ModelBrowser::modsDidChange);
+  m_notifierConnection +=
+    m_map.modsDidChangeNotifier.connect(this, &ModelBrowser::modsDidChange);
 }
 
 void ModelBrowser::mapWasCreated(mdl::Map&)
@@ -245,9 +451,9 @@ void ModelBrowser::mapWasLoaded(mdl::Map&)
 
 void ModelBrowser::modsDidChange()
 {
-  if (m_folderPath != std::filesystem::path{"models"})
+  if (m_folderPath != AssetRootPath)
   {
-    setFolderPath(std::filesystem::path{"models"});
+    setFolderPath(AssetRootPath);
     return;
   }
 
@@ -298,7 +504,8 @@ void ModelBrowser::rebuildBreadcrumbBar()
     m_breadcrumbLayout->addWidget(sep, 0);
   };
 
-  const auto addCrumb = [&](const QString& title, const std::filesystem::path& folderPath) {
+  const auto addCrumb = [&](
+                          const QString& title, const std::filesystem::path& folderPath) {
     auto* button = new QToolButton{};
     button->setAutoRaise(true);
     button->setText(title);
@@ -337,7 +544,7 @@ void ModelBrowser::showPathEditor()
   auto displayedText = displayedPath.generic_string();
   if (displayedText.empty())
   {
-    displayedText = ".";
+    displayedText = "assets";
   }
 
   m_folderEdit->setText(QString::fromStdString(displayedText));
@@ -404,7 +611,8 @@ void ModelBrowser::setCurrentFolderPath(std::filesystem::path currentFolderPath)
 
   if (m_folderTree)
   {
-    if (auto it = m_folderTreeItems.find(m_currentFolderPath); it != m_folderTreeItems.end())
+    if (auto it = m_folderTreeItems.find(m_currentFolderPath);
+        it != m_folderTreeItems.end())
     {
       if (m_folderTree->currentItem() != it->second)
       {
@@ -418,134 +626,67 @@ void ModelBrowser::setCurrentFolderPath(std::filesystem::path currentFolderPath)
 
 void ModelBrowser::reloadModels()
 {
+  auto nextAssets = std::optional<std::vector<BrowserAsset>>{};
+  auto makeAbsolute =
+    std::function<Result<std::filesystem::path>(const std::filesystem::path&)>{};
+
   if (m_folderPath.is_absolute())
   {
-    auto pathsResult =
-      fs::Disk::find(
+    makeAbsolute = [](const auto& path) { return Result<std::filesystem::path>{path}; };
+    nextAssets = collectAssets(
+      m_folderPath,
+      {},
+      [&](const auto& rootPath) {
+        return fs::Disk::find(
+          rootPath,
+          fs::TraversalMode::Recursive,
+          fs::makeExtensionPathMatcher({".mdl", ".spr", ".wav"}));
+      },
+      makeAbsolute);
+  }
+  else
+  {
+    const auto& fs = m_map.gameFileSystem();
+    const auto enabledMods = mdl::enabledMods(m_map);
+    if (!enabledMods.empty())
+    {
+      const auto modRoots =
+        enabledMods | std::views::transform([&](const auto& mod) {
+          return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
+        })
+        | kdl::ranges::to<std::vector>();
+
+      makeAbsolute = [&](const auto& path) { return fs.makeAbsolute(path); };
+      nextAssets = collectAssets(
         m_folderPath,
-        fs::TraversalMode::Recursive,
-        fs::makeExtensionPathMatcher({".mdl"}));
-    if (pathsResult.is_error())
-    {
-      m_modelPaths.clear();
-      m_lastWriteTimes.clear();
-      m_currentFolderPath.clear();
-      updateFolderEdit();
-      rebuildFolderTree();
-      m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
-      m_view->setCurrentFolderPath(m_currentFolderPath);
-      return;
+        modRoots,
+        [&](const auto& rootPath) {
+          return fs.find(
+            rootPath,
+            fs::TraversalMode::Recursive,
+            fs::makeExtensionPathMatcher({".mdl", ".spr", ".wav"}));
+        },
+        makeAbsolute);
     }
-
-    auto modelPaths = pathsResult.value();
-    std::ranges::sort(modelPaths);
-
-    auto lastWriteTimes =
-      std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>{};
-    lastWriteTimes.reserve(modelPaths.size());
-
-    for (const auto& modelPath : modelPaths)
-    {
-      auto error = std::error_code{};
-      const auto t = std::filesystem::last_write_time(modelPath, error);
-      if (!error)
-      {
-        lastWriteTimes.emplace(modelPath, t);
-      }
-    }
-
-    m_modelPaths = std::move(modelPaths);
-    m_lastWriteTimes = std::move(lastWriteTimes);
-    rebuildFolderTree();
-    m_view->setModelPaths(m_folderPath, m_modelPaths);
-    m_view->setCurrentFolderPath(m_currentFolderPath);
-    return;
   }
 
-  const auto& fs = m_map.gameFileSystem();
-  const auto enabledMods = mdl::enabledMods(m_map);
-  if (enabledMods.empty())
+  if (!nextAssets)
   {
-    m_modelPaths.clear();
+    m_assets.clear();
     m_lastWriteTimes.clear();
     m_currentFolderPath.clear();
     updateFolderEdit();
     rebuildFolderTree();
-    m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
+    m_view->setAssets(m_folderPath, {});
     m_view->setCurrentFolderPath(m_currentFolderPath);
     return;
   }
 
-  const auto modRoots = enabledMods | std::views::transform([&](const auto& mod) {
-                          return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
-                        })
-                        | kdl::ranges::to<std::vector>();
-
-  auto pathsResult =
-    fs.find(m_folderPath, fs::TraversalMode::Recursive, fs::makeExtensionPathMatcher({".mdl"}));
-  if (pathsResult.is_error())
-  {
-    m_modelPaths.clear();
-    m_lastWriteTimes.clear();
-    m_currentFolderPath.clear();
-    updateFolderEdit();
-    rebuildFolderTree();
-    m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
-    m_view->setCurrentFolderPath(m_currentFolderPath);
-    return;
-  }
-
-  auto modelPaths = pathsResult.value();
-  std::ranges::sort(modelPaths);
-
-  auto filteredModelPaths = std::vector<std::filesystem::path>{};
-  filteredModelPaths.reserve(modelPaths.size());
-  for (const auto& modelPath : modelPaths)
-  {
-    if (auto absPathResult = fs.makeAbsolute(modelPath); !absPathResult.is_error())
-    {
-      const auto absPath = absPathResult.value().lexically_normal();
-      auto found = false;
-      for (const auto& modRoot : modRoots)
-      {
-        if (kdl::path_has_prefix(absPath, modRoot))
-        {
-          found = true;
-          break;
-        }
-      }
-      if (found)
-      {
-        filteredModelPaths.push_back(modelPath);
-      }
-    }
-  }
-
-  modelPaths = std::move(filteredModelPaths);
-
-  auto lastWriteTimes =
-    std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>{};
-  lastWriteTimes.reserve(modelPaths.size());
-
-  for (const auto& modelPath : modelPaths)
-  {
-    if (auto absPathResult = fs.makeAbsolute(modelPath); !absPathResult.is_error())
-    {
-      const auto& absPath = absPathResult.value();
-      auto error = std::error_code{};
-      const auto t = std::filesystem::last_write_time(absPath, error);
-      if (!error)
-      {
-        lastWriteTimes.emplace(modelPath, t);
-      }
-    }
-  }
-
-  m_modelPaths = std::move(modelPaths);
-  m_lastWriteTimes = std::move(lastWriteTimes);
+  m_assets = std::move(*nextAssets);
+  m_lastWriteTimes = assetLastWriteTimes(m_assets, makeAbsolute);
 
   rebuildFolderTree();
-  m_view->setModelPaths(m_folderPath, m_modelPaths);
+  m_view->setAssets(m_folderPath, m_assets);
   m_view->setCurrentFolderPath(m_currentFolderPath);
 }
 
@@ -563,33 +704,36 @@ void ModelBrowser::rebuildFolderTree()
 
   const auto folderIcon = loadSVGIcon(std::filesystem::path{"Map_folder.svg"});
 
-  auto rootTitle = m_folderPath.filename().empty() ? m_folderPath : m_folderPath.filename();
+  auto rootTitle = m_folderPath.filename().empty() ? std::filesystem::path{"assets"}
+                                                   : m_folderPath.filename();
   auto rootTitleText = rootTitle.generic_string();
   if (rootTitleText.empty())
   {
     rootTitleText = ".";
   }
 
-  auto* rootItem = new QTreeWidgetItem{m_folderTree, QStringList{QString::fromStdString(rootTitleText)}};
+  auto* rootItem =
+    new QTreeWidgetItem{m_folderTree, QStringList{QString::fromStdString(rootTitleText)}};
   rootItem->setData(0, Qt::UserRole, QString{});
   rootItem->setIcon(0, folderIcon);
   m_folderTreeItems.emplace(std::filesystem::path{}, rootItem);
 
-  for (const auto& modelPath : m_modelPaths)
+  for (const auto& asset : m_assets)
   {
-    if (modelPath.empty())
+    const auto& assetPath = asset.path;
+    if (assetPath.empty())
     {
       continue;
     }
 
-    if (!m_folderPath.empty() && !kdl::path_has_prefix(modelPath, m_folderPath))
+    if (!m_folderPath.empty() && !kdl::path_has_prefix(assetPath, m_folderPath))
     {
       continue;
     }
 
-    const auto relModelPath =
-      m_folderPath.empty() ? modelPath : modelPath.lexically_relative(m_folderPath);
-    const auto relFolderPath = relModelPath.parent_path();
+    const auto relAssetPath =
+      m_folderPath.empty() ? assetPath : assetPath.lexically_relative(m_folderPath);
+    const auto relFolderPath = relAssetPath.parent_path();
 
     auto* parentItem = rootItem;
     auto accumulatedPath = std::filesystem::path{};
@@ -602,8 +746,10 @@ void ModelBrowser::rebuildFolderTree()
         continue;
       }
 
-      auto* item = new QTreeWidgetItem{parentItem, QStringList{QString::fromStdString(part.generic_string())}};
-      item->setData(0, Qt::UserRole, QString::fromStdString(accumulatedPath.generic_string()));
+      auto* item = new QTreeWidgetItem{
+        parentItem, QStringList{QString::fromStdString(part.generic_string())}};
+      item->setData(
+        0, Qt::UserRole, QString::fromStdString(accumulatedPath.generic_string()));
       item->setIcon(0, folderIcon);
       parentItem = item;
       m_folderTreeItems.emplace(accumulatedPath, item);
@@ -612,7 +758,8 @@ void ModelBrowser::rebuildFolderTree()
 
   m_folderTree->expandItem(rootItem);
 
-  if (auto it = m_folderTreeItems.find(m_currentFolderPath); it != m_folderTreeItems.end())
+  if (auto it = m_folderTreeItems.find(m_currentFolderPath);
+      it != m_folderTreeItems.end())
   {
     m_folderTree->setCurrentItem(it->second);
   }
@@ -654,6 +801,24 @@ void ModelBrowser::setWatchedDirectory()
   {
     return;
   }
+
+  if (m_folderPath.empty())
+  {
+    for (const auto& [type, rootPath] : GoldSrcAssetRoots)
+    {
+      unused(type);
+      if (auto absPathResult = fs.makeAbsolute(rootPath); !absPathResult.is_error())
+      {
+        const auto& absPath = absPathResult.value();
+        if (fs::Disk::pathInfo(absPath) == fs::PathInfo::Directory)
+        {
+          m_fileSystemWatcher->addPath(pathAsQString(absPath));
+        }
+      }
+    }
+    return;
+  }
+
   if (auto absPathResult = fs.makeAbsolute(m_folderPath); !absPathResult.is_error())
   {
     const auto& absPath = absPathResult.value();
@@ -674,186 +839,83 @@ void ModelBrowser::scheduleRescan()
 
 void ModelBrowser::rescanWatchedDirectory()
 {
+  auto nextAssets = std::optional<std::vector<BrowserAsset>>{};
+  auto makeAbsolute =
+    std::function<Result<std::filesystem::path>(const std::filesystem::path&)>{};
+
   if (m_folderPath.is_absolute())
   {
-    auto pathsResult =
-      fs::Disk::find(
-        m_folderPath,
-        fs::TraversalMode::Recursive,
-        fs::makeExtensionPathMatcher({".mdl"}));
-    if (pathsResult.is_error())
-    {
-      m_modelPaths.clear();
-      m_lastWriteTimes.clear();
-      m_currentFolderPath.clear();
-      updateFolderEdit();
-      rebuildFolderTree();
-      m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
-      m_view->setCurrentFolderPath(m_currentFolderPath);
-      return;
-    }
-
-    auto modelPaths = pathsResult.value();
-    std::ranges::sort(modelPaths);
-
-    auto newLastWriteTimes =
-      std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>{};
-    newLastWriteTimes.reserve(modelPaths.size());
-
-    auto changedPaths = std::vector<std::filesystem::path>{};
-
-    for (const auto& modelPath : modelPaths)
-    {
-      auto error = std::error_code{};
-      const auto t = std::filesystem::last_write_time(modelPath, error);
-      if (!error)
-      {
-        newLastWriteTimes.emplace(modelPath, t);
-        if (const auto it = m_lastWriteTimes.find(modelPath);
-            it == m_lastWriteTimes.end() || it->second != t)
-        {
-          changedPaths.push_back(modelPath);
-        }
-      }
-    }
-
-    for (const auto& [oldPath, oldTime] : m_lastWriteTimes)
-    {
-      unused(oldTime);
-      if (!newLastWriteTimes.contains(oldPath))
-      {
-        changedPaths.push_back(oldPath);
-      }
-    }
-
-    if (changedPaths.empty() && modelPaths == m_modelPaths)
-    {
-      return;
-    }
-
-    m_map.reloadEntityModels(changedPaths);
-
-    m_modelPaths = std::move(modelPaths);
-    m_lastWriteTimes = std::move(newLastWriteTimes);
-    rebuildFolderTree();
-    m_view->setModelPaths(m_folderPath, m_modelPaths);
-    m_view->setCurrentFolderPath(m_currentFolderPath);
-    return;
+    makeAbsolute = [](const auto& path) { return Result<std::filesystem::path>{path}; };
+    nextAssets = collectAssets(
+      m_folderPath,
+      {},
+      [&](const auto& rootPath) {
+        return fs::Disk::find(
+          rootPath,
+          fs::TraversalMode::Recursive,
+          fs::makeExtensionPathMatcher({".mdl", ".spr", ".wav"}));
+      },
+      makeAbsolute);
   }
-
-  const auto& fs = m_map.gameFileSystem();
-  const auto enabledMods = mdl::enabledMods(m_map);
-  if (enabledMods.empty())
+  else
   {
-    if (!m_modelPaths.empty() || !m_lastWriteTimes.empty())
+    const auto& fs = m_map.gameFileSystem();
+    const auto enabledMods = mdl::enabledMods(m_map);
+    if (enabledMods.empty())
     {
-      for (const auto& p : m_modelPaths)
+      for (const auto& p : entityModelAssetPaths(m_assets))
       {
         m_map.entityModelManager().invalidateModel(p);
       }
-      m_modelPaths.clear();
+      m_assets.clear();
       m_lastWriteTimes.clear();
       m_currentFolderPath.clear();
       updateFolderEdit();
       rebuildFolderTree();
-      m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
+      m_view->setAssets(m_folderPath, {});
       m_view->setCurrentFolderPath(m_currentFolderPath);
+      return;
     }
+
+    const auto modRoots =
+      enabledMods | std::views::transform([&](const auto& mod) {
+        return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
+      })
+      | kdl::ranges::to<std::vector>();
+
+    makeAbsolute = [&](const auto& path) { return fs.makeAbsolute(path); };
+    nextAssets = collectAssets(
+      m_folderPath,
+      modRoots,
+      [&](const auto& rootPath) {
+        return fs.find(
+          rootPath,
+          fs::TraversalMode::Recursive,
+          fs::makeExtensionPathMatcher({".mdl", ".spr", ".wav"}));
+      },
+      makeAbsolute);
+  }
+
+  if (!nextAssets)
+  {
+    reloadModels();
     return;
   }
 
-  const auto modRoots = enabledMods | std::views::transform([&](const auto& mod) {
-                          return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
-                        })
-                        | kdl::ranges::to<std::vector>();
-
-  auto pathsResult =
-    fs.find(m_folderPath, fs::TraversalMode::Recursive, fs::makeExtensionPathMatcher({".mdl"}));
-  if (pathsResult.is_error())
-  {
-    m_modelPaths.clear();
-    m_lastWriteTimes.clear();
-    m_currentFolderPath.clear();
-    updateFolderEdit();
-    rebuildFolderTree();
-    m_view->setModelPaths(m_folderPath, std::vector<std::filesystem::path>{});
-    m_view->setCurrentFolderPath(m_currentFolderPath);
-    return;
-  }
-
-  auto modelPaths = pathsResult.value();
-  std::ranges::sort(modelPaths);
-
-  auto filteredModelPaths = std::vector<std::filesystem::path>{};
-  filteredModelPaths.reserve(modelPaths.size());
-  for (const auto& modelPath : modelPaths)
-  {
-    if (auto absPathResult = fs.makeAbsolute(modelPath); !absPathResult.is_error())
-    {
-      const auto absPath = absPathResult.value().lexically_normal();
-      auto found = false;
-      for (const auto& modRoot : modRoots)
-      {
-        if (kdl::path_has_prefix(absPath, modRoot))
-        {
-          found = true;
-          break;
-        }
-      }
-      if (found)
-      {
-        filteredModelPaths.push_back(modelPath);
-      }
-    }
-  }
-
-  modelPaths = std::move(filteredModelPaths);
-
-  auto newLastWriteTimes =
-    std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>{};
-  newLastWriteTimes.reserve(modelPaths.size());
-
-  auto changedPaths = std::vector<std::filesystem::path>{};
-
-  for (const auto& modelPath : modelPaths)
-  {
-    if (auto absPathResult = fs.makeAbsolute(modelPath); !absPathResult.is_error())
-    {
-      const auto& absPath = absPathResult.value();
-      auto error = std::error_code{};
-      const auto t = std::filesystem::last_write_time(absPath, error);
-      if (!error)
-      {
-        newLastWriteTimes.emplace(modelPath, t);
-        if (const auto it = m_lastWriteTimes.find(modelPath);
-            it == m_lastWriteTimes.end() || it->second != t)
-        {
-          changedPaths.push_back(modelPath);
-        }
-      }
-    }
-  }
-
-  for (const auto& [oldPath, oldTime] : m_lastWriteTimes)
-  {
-    unused(oldTime);
-    if (!newLastWriteTimes.contains(oldPath))
-    {
-      changedPaths.push_back(oldPath);
-    }
-  }
-
-  if (changedPaths.empty() && modelPaths == m_modelPaths)
+  auto newLastWriteTimes = assetLastWriteTimes(*nextAssets, makeAbsolute);
+  const auto changedPaths =
+    changedAssetPaths(m_lastWriteTimes, newLastWriteTimes, m_assets, *nextAssets);
+  if (changedPaths.empty() && *nextAssets == m_assets)
   {
     return;
   }
 
   m_map.reloadEntityModels(changedPaths);
 
-  m_modelPaths = std::move(modelPaths);
+  m_assets = std::move(*nextAssets);
   m_lastWriteTimes = std::move(newLastWriteTimes);
   rebuildFolderTree();
-  m_view->setModelPaths(m_folderPath, m_modelPaths);
+  m_view->setAssets(m_folderPath, m_assets);
   m_view->setCurrentFolderPath(m_currentFolderPath);
 }
 

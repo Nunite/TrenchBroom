@@ -2,17 +2,17 @@
  Copyright (C) 2026
 
  This file is part of TrenchBroom.
- 
+
  TrenchBroom is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
  (at your option) any later version.
- 
+
  TrenchBroom is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
- 
+
  You should have received a copy of the GNU General Public License
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
@@ -22,6 +22,7 @@
 #include <QWidget>
 
 #include "NotifierConnection.h"
+#include "ui/ModelBrowserView.h"
 
 #include "kd/path_hash.h"
 
@@ -49,7 +50,6 @@ class Map;
 namespace tb::ui
 {
 class AppController;
-class ModelBrowserView;
 
 class ModelBrowser : public QWidget
 {
@@ -73,9 +73,10 @@ private:
 
   std::filesystem::path m_folderPath;
   std::filesystem::path m_currentFolderPath;
-  std::vector<std::filesystem::path> m_modelPaths;
-  std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>
-    m_lastWriteTimes;
+  std::vector<BrowserAsset> m_assets;
+  std::
+    unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>
+      m_lastWriteTimes;
   std::unordered_map<std::filesystem::path, QTreeWidgetItem*, kdl::path_hash>
     m_folderTreeItems;
 

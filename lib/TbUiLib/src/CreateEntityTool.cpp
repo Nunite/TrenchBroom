@@ -41,7 +41,9 @@
 #include "kd/contracts.h"
 #include "kd/k.h"
 
+#include <array>
 #include <optional>
+#include <span>
 #include <string>
 #include <tuple>
 
@@ -50,22 +52,20 @@ namespace tb::ui
 namespace
 {
 
-std::optional<std::tuple<std::string, std::string>> modelEntityDefinition(
-  const mdl::EntityDefinition* definition)
+std::optional<std::tuple<std::string, std::string>> entityDefinitionWithProperty(
+  const mdl::EntityDefinition* definition, std::span<const std::string_view> propertyKeys)
 {
   if (!definition || getType(*definition) != mdl::EntityDefinitionType::Point)
   {
     return std::nullopt;
   }
 
-  if (mdl::getPropertyDefinition(definition, "model"))
+  for (const auto propertyKey : propertyKeys)
   {
-    return std::tuple{definition->name, std::string{"model"}};
-  }
-
-  if (mdl::getPropertyDefinition(definition, "mdl"))
-  {
-    return std::tuple{definition->name, std::string{"mdl"}};
+    if (mdl::getPropertyDefinition(definition, std::string{propertyKey}))
+    {
+      return std::tuple{definition->name, std::string{propertyKey}};
+    }
   }
 
   return std::nullopt;
@@ -74,9 +74,11 @@ std::optional<std::tuple<std::string, std::string>> modelEntityDefinition(
 std::optional<std::tuple<std::string, std::string>> findModelEntityDefinition(
   const mdl::Map& map)
 {
+  static constexpr auto modelProperties = std::array<std::string_view, 2>{"model", "mdl"};
+
   if (
-    const auto preferredDefinition =
-      modelEntityDefinition(map.entityDefinitionManager().definition("cycler_sprite")))
+    const auto preferredDefinition = entityDefinitionWithProperty(
+      map.entityDefinitionManager().definition("cycler_sprite"), modelProperties))
   {
     return preferredDefinition;
   }
@@ -86,7 +88,8 @@ std::optional<std::tuple<std::string, std::string>> findModelEntityDefinition(
 
   for (const auto* definition : definitions)
   {
-    if (const auto modelDefinition = modelEntityDefinition(definition);
+    if (const auto modelDefinition =
+          entityDefinitionWithProperty(definition, modelProperties);
         modelDefinition && std::get<1>(*modelDefinition) == "model")
     {
       return modelDefinition;
@@ -95,10 +98,45 @@ std::optional<std::tuple<std::string, std::string>> findModelEntityDefinition(
 
   for (const auto* definition : definitions)
   {
-    if (const auto modelDefinition = modelEntityDefinition(definition);
+    if (const auto modelDefinition =
+          entityDefinitionWithProperty(definition, modelProperties);
         modelDefinition && std::get<1>(*modelDefinition) == "mdl")
     {
       return modelDefinition;
+    }
+  }
+
+  return std::nullopt;
+}
+
+std::optional<std::tuple<std::string, std::string>> findEntityDefinition(
+  const mdl::Map& map,
+  std::span<const std::string_view> preferredClassnames,
+  std::span<const std::string_view> propertyKeys)
+{
+  for (const auto classname : preferredClassnames)
+  {
+    if (
+      const auto preferredDefinition = entityDefinitionWithProperty(
+        map.entityDefinitionManager().definition(std::string{classname}), propertyKeys))
+    {
+      return preferredDefinition;
+    }
+  }
+
+  const auto definitions = map.entityDefinitionManager().definitions(
+    mdl::EntityDefinitionType::Point, mdl::EntityDefinitionSortOrder::Name);
+
+  for (const auto propertyKey : propertyKeys)
+  {
+    for (const auto* definition : definitions)
+    {
+      if (
+        const auto matchedDefinition =
+          entityDefinitionWithProperty(definition, std::span{&propertyKey, 1}))
+      {
+        return matchedDefinition;
+      }
     }
   }
 
@@ -187,6 +225,68 @@ bool CreateEntityTool::createModelEntity(const std::string& modelPath)
 
   const auto& [classname, propertyKey] = *definitionAndProperty;
   return createEntity(classname, propertyKey, modelPath);
+}
+
+bool CreateEntityTool::canCreateSpriteEntity(const std::string& spritePath) const
+{
+  static constexpr auto classnames =
+    std::array<std::string_view, 2>{"cycler_sprite", "env_sprite"};
+  static constexpr auto properties = std::array<std::string_view, 1>{"model"};
+
+  return !spritePath.empty()
+         && findEntityDefinition(map(), classnames, properties).has_value();
+}
+
+bool CreateEntityTool::createSpriteEntity(const std::string& spritePath)
+{
+  if (spritePath.empty())
+  {
+    return false;
+  }
+
+  static constexpr auto classnames =
+    std::array<std::string_view, 2>{"cycler_sprite", "env_sprite"};
+  static constexpr auto properties = std::array<std::string_view, 1>{"model"};
+
+  const auto definitionAndProperty = findEntityDefinition(map(), classnames, properties);
+  if (!definitionAndProperty)
+  {
+    return false;
+  }
+
+  const auto& [classname, propertyKey] = *definitionAndProperty;
+  return createEntity(classname, propertyKey, spritePath);
+}
+
+bool CreateEntityTool::canCreateSoundEntity(const std::string& soundPath) const
+{
+  static constexpr auto classnames = std::array<std::string_view, 1>{"ambient_generic"};
+  static constexpr auto properties =
+    std::array<std::string_view, 3>{"message", "noise", "sound"};
+
+  return !soundPath.empty()
+         && findEntityDefinition(map(), classnames, properties).has_value();
+}
+
+bool CreateEntityTool::createSoundEntity(const std::string& soundPath)
+{
+  if (soundPath.empty())
+  {
+    return false;
+  }
+
+  static constexpr auto classnames = std::array<std::string_view, 1>{"ambient_generic"};
+  static constexpr auto properties =
+    std::array<std::string_view, 3>{"message", "noise", "sound"};
+
+  const auto definitionAndProperty = findEntityDefinition(map(), classnames, properties);
+  if (!definitionAndProperty)
+  {
+    return false;
+  }
+
+  const auto& [classname, propertyKey] = *definitionAndProperty;
+  return createEntity(classname, propertyKey, soundPath);
 }
 
 void CreateEntityTool::removeEntity()

@@ -61,12 +61,22 @@ enum class BrowserCellType
 {
   Folder,
   Model,
+  Sprite,
+  Sound,
 };
 
 struct BrowserCellData
 {
   BrowserCellType type;
   std::filesystem::path path;
+};
+
+struct BrowserAsset
+{
+  BrowserCellType type;
+  std::filesystem::path path;
+
+  friend bool operator==(const BrowserAsset&, const BrowserAsset&) = default;
 };
 
 struct ModelBrowserEntry
@@ -77,7 +87,7 @@ struct ModelBrowserEntry
 
 std::vector<ModelBrowserEntry> modelBrowserEntries(
   const std::filesystem::path& rootFolderPath,
-  const std::vector<std::filesystem::path>& modelPaths,
+  const std::vector<BrowserAsset>& assets,
   const std::filesystem::path& currentFolderPath,
   const QString& searchText);
 
@@ -94,7 +104,7 @@ private:
   vm::quatf m_rotation;
   QScrollBar* m_scrollBar = nullptr;
   std::filesystem::path m_rootFolderPath;
-  std::vector<std::filesystem::path> m_modelPaths;
+  std::vector<BrowserAsset> m_assets;
   std::filesystem::path m_currentFolderPath;
   QString m_searchText;
 
@@ -112,8 +122,7 @@ public:
   ModelBrowserView(AppController& appController, QScrollBar* scrollBar, mdl::Map& map);
   ~ModelBrowserView() override;
 
-  void setModelPaths(
-    std::filesystem::path rootFolderPath, std::vector<std::filesystem::path> modelPaths);
+  void setAssets(std::filesystem::path rootFolderPath, std::vector<BrowserAsset> assets);
   void setCurrentFolderPath(std::filesystem::path currentFolderPath);
   void setSearchText(QString searchText);
 
@@ -151,6 +160,7 @@ private:
     float y,
     float height,
     render::Transformation& transformation);
+  void renderAssetPlaceholders(gl::Gl& gl, Layout& layout, float y, float height);
 
   vm::mat4x4f itemTransformation(
     const Cell& cell,

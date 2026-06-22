@@ -2141,8 +2141,8 @@ Hold %1 to cycle backwards.</source>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/InfoPanel.cpp" line="52"/>
-        <source>Models</source>
-        <translation>模型</translation>
+        <source>Assets</source>
+        <translation>资产</translation>
     </message>
 </context>
 <context>
@@ -2768,8 +2768,8 @@ Please choose a different file name to export to.</source>
     <name>tb::ui::ModelBrowser</name>
     <message>
         <location filename="../../../../lib/TbUiLib/src/ModelBrowser.cpp" line="99"/>
-        <source>Reload models</source>
-        <translation>重新加载模型</translation>
+        <source>Reload assets</source>
+        <translation>重新加载资产</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/ModelBrowser.cpp" line="311"/>
