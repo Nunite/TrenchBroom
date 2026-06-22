@@ -19,6 +19,55 @@
 - Use --list-tests to discover available tests and Catch2 filters to run a focused subset.
 - Use Build.md for platform-specific setup and dependency details.
 
+### Windows Release build used by this branch
+- The active local Release build tree is usually `build-release-codex`.
+- On this machine, use the Visual Studio developer environment wrapper before CMake builds:
+  ```powershell
+  cmd.exe /c 'call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build build-release-codex --target TrenchBroom --config Release --parallel'
+  ```
+- For UI/library work, build the focused test target first:
+  ```powershell
+  cmd.exe /c 'call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build build-release-codex --target TbUiLibTest --config Release --parallel'
+  ```
+- Run focused Catch2 tests directly from the build tree, for example:
+  ```powershell
+  build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "ModelBrowserView"
+  build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "GoldSrcSpritePreview"
+  build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "PythonV2"
+  ```
+- Before linking `TrenchBroom.exe`, make sure the Release app is not running. If link fails with `LINK : fatal error LNK1104: cannot open file 'app\TrenchBroom\TrenchBroom.exe'`, check for a stale process:
+  ```powershell
+  Get-Process | Where-Object { $_.ProcessName -like '*TrenchBroom*' } | Select-Object Id,ProcessName,Path
+  ```
+  Ask before killing a user process unless the user explicitly told you to close it.
+- The expected Release executable is:
+  ```text
+  build-release-codex\app\TrenchBroom\TrenchBroom.exe
+  ```
+- Useful static checks before commit:
+  ```powershell
+  git diff --check
+  rg -n "^(<<<<<<<|=======|>>>>>>>)" lib app CMakeLists.txt
+  ```
+
+## Current custom branch notes
+- The active feature branch is `feature/latest-upstream-merge`; it contains upstream master plus local custom features. Do not assume upstream TrenchBroom behavior when touching custom areas.
+- Important custom feature areas include:
+  - Python v2 plugin/runtime work (`tb2`) and manifest-style plugins.
+  - Unified GoldSrc asset browser for `.mdl`, `.spr`, and `.wav`.
+  - GoldSrc sprite preview decoding and `ERROR` fallback placeholders.
+  - Model browser drag/drop behavior for model and sprite assets.
+  - 3D sky rendering for GoldSrc `skyname`.
+  - 2D readable brush outlines.
+  - Path Tool and Pie Menu action wiring.
+  - Outliner and property editor customizations.
+- Legacy Python `tb` compatibility was intentionally removed from the active plugin path. Do not reintroduce legacy `tb` module registration unless explicitly requested; new plugin examples should use `tb2` or `import tb2 as tb`.
+- If a change touches the unified asset browser, run at least `TbUiLibTest "ModelBrowserView"` and any specific parser/preview tests such as `GoldSrcSpritePreview`.
+- If a change touches Python plugins, run focused `TbUiLibTest` filters for `PythonV2` and `PythonPluginManifest`, plus any relevant panel/timer tests.
+- If a change touches rendering, be careful with Release-only behavior and OpenGL resource lifetime. Several previous issues only reproduced in Release builds, so build the Release executable before declaring rendering work done.
+- Keep local noise out of commits. In this project, `.codegraph/`, temporary markdown experiments, generated crash logs, and ad hoc asset/debug files should not be committed unless the user explicitly asks.
+- When using web or external research for GoldSrc formats, prefer primary/simple references and record the practical decision in code or docs. Avoid copying large third-party implementations or license-sensitive code.
+
 ### Code coverage
 - **Enable coverage instrumentation**: Pass `-DTB_ENABLE_GCOV=1` for gcov-compatible coverage (works with GCC or Clang) or `-DTB_ENABLE_LCOV=1` for LLVM source-based coverage (Clang only).
 - **Generate coverage data**:
