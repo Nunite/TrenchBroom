@@ -56,10 +56,12 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("history_list"));
     CHECK(names.contains("asset_search"));
     CHECK(names.contains("texture_search"));
+    CHECK(names.contains("blockout_validate"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
     CHECK(!names.contains("asset_place_model"));
     CHECK(!names.contains("texture_apply"));
+    CHECK(!names.contains("blockout_create_room"));
     CHECK(!names.contains("action_execute"));
     CHECK(!names.contains("history_undo_mcp"));
   }
@@ -84,6 +86,14 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("asset_place_sprite"));
     CHECK(names.contains("asset_place_sound"));
     CHECK(names.contains("texture_apply"));
+    CHECK(names.contains("blockout_create_room"));
+    CHECK(names.contains("blockout_create_corridor"));
+    CHECK(names.contains("blockout_create_stairs"));
+    CHECK(names.contains("blockout_create_ramp"));
+    CHECK(names.contains("blockout_create_doorway"));
+    CHECK(names.contains("blockout_create_cover"));
+    CHECK(names.contains("blockout_create_sky_shell"));
+    CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("history_undo_mcp"));
     CHECK(names.contains("history_redo_mcp"));
   }

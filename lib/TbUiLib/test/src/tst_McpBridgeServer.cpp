@@ -95,6 +95,19 @@ TEST_CASE("McpBridgeServer")
         {"transactionName", "MCP: Place model asset"},
       });
     }
+    if (toolName == "blockout_validate")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"valid", true},
+      });
+    }
+    if (toolName == "blockout_create_room")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-3"},
+        {"transactionName", "MCP: Blockout room"},
+      });
+    }
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::ToolNotFound, QString{"Unknown test tool"});
   }};
@@ -276,6 +289,45 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("operationId").toString() == "mcp-op-2");
+  }
+
+  SECTION("read-only mode serves blockout validation")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "blockout_validate",
+      QJsonObject{
+        {"type", "room"},
+        {"min", QJsonArray{0, 0, 0}},
+        {"max", QJsonArray{128, 128, 128}},
+      },
+      mcp::McpMode::ReadOnly});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("valid").toBool());
+  }
+
+  SECTION("edit mode serves blockout creation")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "blockout_create_room",
+      QJsonObject{
+        {"min", QJsonArray{0, 0, 0}},
+        {"max", QJsonArray{128, 128, 128}},
+      },
+      mcp::McpMode::Edit});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("operationId").toString() == "mcp-op-3");
   }
 }
 

@@ -420,8 +420,133 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Create a room from Blockout IR.",
       McpMode::Edit,
       true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Inner room minimum corner.")},
+          {"max", vec3Property("Inner room maximum corner.")},
+          {"thickness", numberProperty("Wall thickness, defaults to 16.")},
+          {"material", stringProperty("Brush material, defaults to current material.")},
+          {"select", boolProperty("Select generated brushes.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "blockout_create_corridor",
+      "Create a rectangular corridor shell from Blockout IR.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Inner corridor minimum corner.")},
+          {"max", vec3Property("Inner corridor maximum corner.")},
+          {"thickness", numberProperty("Wall thickness, defaults to 16.")},
+          {"material", stringProperty("Brush material, defaults to current material.")},
+          {"select", boolProperty("Select generated brushes.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "blockout_create_stairs",
+      "Create box-based stairs from Blockout IR.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Staircase minimum corner.")},
+          {"max", vec3Property("Staircase maximum corner.")},
+          {"steps", integerProperty("Step count, defaults to 8.")},
+          {"axis", stringProperty("Run direction axis: x or y.")},
+          {"material", stringProperty("Brush material, defaults to current material.")},
+          {"select", boolProperty("Select generated brushes.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "blockout_create_ramp",
+      "Create a wedge ramp from Blockout IR.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Ramp minimum corner.")},
+          {"max", vec3Property("Ramp maximum corner.")},
+          {"axis", stringProperty("Run direction axis: x or y.")},
+          {"material", stringProperty("Brush material, defaults to current material.")},
+          {"select", boolProperty("Select generated brush.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "blockout_create_doorway",
+      "Create a wall with a rectangular doorway by splitting it into convex boxes.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Wall minimum corner.")},
+          {"max", vec3Property("Wall maximum corner.")},
+          {"doorMin", vec3Property("Door opening minimum corner.")},
+          {"doorMax", vec3Property("Door opening maximum corner.")},
+          {"material", stringProperty("Brush material, defaults to current material.")},
+          {"select", boolProperty("Select generated brushes.")},
+        },
+        {"min", "max", "doorMin", "doorMax"}),
+    },
+    {
+      "blockout_create_cover",
+      "Create a low cover box from Blockout IR.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Cover minimum corner.")},
+          {"max", vec3Property("Cover maximum corner.")},
+          {"material", stringProperty("Brush material, defaults to current material.")},
+          {"select", boolProperty("Select generated brush.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "blockout_create_sky_shell",
+      "Create a sky shell around a playable volume.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Inner playable minimum corner.")},
+          {"max", vec3Property("Inner playable maximum corner.")},
+          {"thickness", numberProperty("Sky shell thickness, defaults to 16.")},
+          {"material", stringProperty("Sky material, defaults to sky.")},
+          {"select", boolProperty("Select generated brushes.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "blockout_validate",
+      "Validate Blockout IR dimensions without modifying the map.",
+      McpMode::ReadOnly,
       false,
-      objectSchema(),
+      true,
+      objectSchema(
+        {
+          {"type",
+           stringProperty(
+             "IR type: room, corridor, stairs, ramp, doorway, cover, sky_shell.")},
+          {"min", vec3Property("Minimum corner.")},
+          {"max", vec3Property("Maximum corner.")},
+          {"doorMin", vec3Property("Door opening minimum corner for doorway.")},
+          {"doorMax", vec3Property("Door opening maximum corner for doorway.")},
+          {"thickness", numberProperty("Optional wall thickness.")},
+          {"steps", integerProperty("Optional stair step count.")},
+        },
+        {"type", "min", "max"}),
     },
   };
 
