@@ -23,6 +23,7 @@
 
 #include "mcp/McpBridgeConfig.h"
 #include "mcp/McpBridgeMessages.h"
+#include "mcp/McpError.h"
 
 #include <functional>
 #include <memory>
@@ -36,15 +37,27 @@ namespace mcp = tb::mcp;
 
 class AppController;
 
+struct McpBridgeToolResult
+{
+  bool ok = true;
+  QJsonObject result;
+  mcp::McpError error;
+
+  static McpBridgeToolResult success(QJsonObject result = {});
+  static McpBridgeToolResult failure(mcp::McpErrorCode code, QString message);
+};
+
 class McpBridgeServer : public QObject
 {
   Q_OBJECT
 public:
-  using ToolHandler = std::function<QJsonObject(const QString&, const QJsonObject&)>;
+  using ToolHandler =
+    std::function<McpBridgeToolResult(const QString&, const QJsonObject&)>;
 
 private:
   mcp::McpBridgeConfig m_config;
   ToolHandler m_toolHandler;
+  QJsonObject m_overlayState;
   std::unique_ptr<QLocalServer> m_server;
 
 public:

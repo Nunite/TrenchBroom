@@ -122,7 +122,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Set the current editor selection using MCP object ids.",
       McpMode::ReadOnly,
       false,
-      false,
+      true,
       objectSchema(
         {
           {"objectIds", arrayProperty("MCP object ids to select.")},
@@ -140,9 +140,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     {
       "action_execute",
       "Execute a TrenchBroom action by id if it is enabled in the current context.",
-      McpMode::ReadOnly,
-      false,
-      false,
+      McpMode::Edit,
+      true,
+      true,
       objectSchema(
         {
           {"actionId", stringProperty("Action identifier from actions_list.")},
@@ -154,7 +154,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Set MCP overlay labels or highlighted object ids.",
       McpMode::ReadOnly,
       false,
-      false,
+      true,
       objectSchema(),
     },
     {
@@ -162,7 +162,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Clear MCP overlay state.",
       McpMode::ReadOnly,
       false,
-      false,
+      true,
       objectSchema(),
     },
     {

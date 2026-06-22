@@ -27,6 +27,7 @@
 #include "mcp/McpToolCatalog.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushNode.h"
+#include "mdl/EditorContext.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
@@ -36,6 +37,7 @@
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/Node.h"
 #include "mdl/PatchNode.h"
 #include "mdl/Selection.h"
@@ -92,6 +94,43 @@ QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
     parts.push_back(QString::number(index));
   }
   return QString{"node:%1"}.arg(parts.join('/'));
+}
+
+std::optional<mdl::NodePath> parseNodePathId(const QString& id)
+{
+  if (id == "node:world")
+  {
+    return mdl::NodePath{};
+  }
+
+  static const auto Prefix = QString{"node:"};
+  if (!id.startsWith(Prefix))
+  {
+    return std::nullopt;
+  }
+
+  auto path = mdl::NodePath{};
+  for (const auto& part : id.mid(Prefix.size()).split('/', Qt::SkipEmptyParts))
+  {
+    auto ok = false;
+    const auto index = part.toULongLong(&ok);
+    if (!ok)
+    {
+      return std::nullopt;
+    }
+    path.indices.push_back(static_cast<std::size_t>(index));
+  }
+  return path;
+}
+
+mdl::Node* resolveNodeId(mdl::WorldNode& worldNode, const QString& id)
+{
+  const auto path = parseNodePathId(id);
+  if (!path)
+  {
+    return nullptr;
+  }
+  return worldNode.resolvePath(*path);
 }
 
 QString nodeTypeName(const mdl::Node& node)
@@ -349,6 +388,70 @@ QJsonObject selectionJson(AppController& appController)
   };
 }
 
+McpBridgeToolResult selectionSetResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::NoActiveDocument, "No active document");
+  }
+
+  const auto objectIdsValue = params.value("objectIds");
+  if (!objectIdsValue.isArray())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams, "selection_set requires objectIds array");
+  }
+
+  auto& map = mapWindow->document().map();
+  auto& worldNode = map.worldNode();
+  auto nodes = std::vector<mdl::Node*>{};
+
+  for (const auto& objectIdValue : objectIdsValue.toArray())
+  {
+    if (!objectIdValue.isString())
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams, "objectIds must contain only strings");
+    }
+
+    const auto objectId = objectIdValue.toString();
+    auto* node = resolveNodeId(worldNode, objectId);
+    if (!node)
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        QString{"Unknown MCP object id: %1"}.arg(objectId));
+    }
+    if (!map.editorContext().selectable(*node))
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        QString{"MCP object id is not selectable: %1"}.arg(objectId));
+    }
+    nodes.push_back(node);
+  }
+
+  mdl::deselectAll(map);
+  if (!nodes.empty())
+  {
+    mdl::selectNodes(map, nodes);
+  }
+
+  auto selectedIds = QJsonArray{};
+  for (const auto* node : nodes)
+  {
+    selectedIds.push_back(nodePathId(*node, worldNode));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"selectedObjectIds", selectedIds},
+    {"selectedCount", selectedIds.size()},
+  });
+}
+
 QJsonObject actionsListJson(AppController& appController)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -378,6 +481,42 @@ QJsonObject actionsListJson(AppController& appController)
     {"actions", actions},
     {"count", actions.size()},
   };
+}
+
+McpBridgeToolResult actionExecuteResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  const auto actionId = params.value("actionId").toString().trimmed();
+
+  if (actionId.isEmpty())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams, "action_execute requires actionId");
+  }
+
+  const auto actionPath = pathFromQString(actionId);
+  const auto& actionsMap = appController.actionManager().actionsMap();
+  const auto actionIt = actionsMap.find(actionPath);
+  if (actionIt == std::end(actionsMap))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams, QString{"Unknown action id: %1"}.arg(actionId));
+  }
+
+  auto context = ActionExecutionContext{appController, mapWindow, nullptr};
+  const auto& action = actionIt->second;
+  if (!action.enabled(context))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden, QString{"Action is disabled: %1"}.arg(actionId));
+  }
+
+  action.execute(context);
+  return McpBridgeToolResult::success(QJsonObject{
+    {"actionId", actionId},
+    {"executed", true},
+  });
 }
 
 QJsonObject documentsListJson(AppController& appController)
@@ -447,42 +586,81 @@ mcp::McpBridgeResponse makeFailure(
 
 } // namespace
 
+McpBridgeToolResult McpBridgeToolResult::success(QJsonObject result)
+{
+  return McpBridgeToolResult{true, std::move(result), {}};
+}
+
+McpBridgeToolResult McpBridgeToolResult::failure(
+  const mcp::McpErrorCode code, QString message)
+{
+  return McpBridgeToolResult{false, {}, mcp::McpError{code, std::move(message)}};
+}
+
 McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
   : McpBridgeServer{
       [&appController, this](const auto& toolName, const auto& params) {
         if (toolName == "tb_status")
         {
-          return makeStatus(appController, m_config);
+          return McpBridgeToolResult::success(makeStatus(appController, m_config));
         }
         if (toolName == "tb_doctor")
         {
-          return doctorJson(appController, m_config);
+          auto doctor = doctorJson(appController, m_config);
+          doctor.insert("overlay", m_overlayState);
+          return McpBridgeToolResult::success(std::move(doctor));
         }
         if (toolName == "documents_list")
         {
-          return documentsListJson(appController);
+          return McpBridgeToolResult::success(documentsListJson(appController));
         }
         if (toolName == "document_snapshot")
         {
-          return activeDocumentJson(appController);
+          return McpBridgeToolResult::success(activeDocumentJson(appController));
         }
         if (toolName == "map_snapshot")
         {
-          return mapSnapshotJson(appController);
+          return McpBridgeToolResult::success(mapSnapshotJson(appController));
         }
         if (toolName == "map_search")
         {
-          return mapSearchJson(appController, params);
+          return McpBridgeToolResult::success(mapSearchJson(appController, params));
         }
         if (toolName == "selection_get")
         {
-          return selectionJson(appController);
+          return McpBridgeToolResult::success(selectionJson(appController));
+        }
+        if (toolName == "selection_set")
+        {
+          return selectionSetResult(appController, params);
         }
         if (toolName == "actions_list")
         {
-          return actionsListJson(appController);
+          return McpBridgeToolResult::success(actionsListJson(appController));
         }
-        return QJsonObject{};
+        if (toolName == "action_execute")
+        {
+          return actionExecuteResult(appController, params);
+        }
+        if (toolName == "overlay_set")
+        {
+          m_overlayState = params;
+          return McpBridgeToolResult::success(QJsonObject{
+            {"overlay", m_overlayState},
+            {"active", true},
+          });
+        }
+        if (toolName == "overlay_clear")
+        {
+          m_overlayState = QJsonObject{};
+          return McpBridgeToolResult::success(QJsonObject{
+            {"overlay", m_overlayState},
+            {"active", false},
+          });
+        }
+        return McpBridgeToolResult::failure(
+          mcp::McpErrorCode::ToolNotFound,
+          QString{"MCP tool is registered but not wired yet: %1"}.arg(toolName));
       },
       parent}
 {
@@ -585,10 +763,16 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
     request.tool == "tb_status" || request.tool == "tb_doctor"
     || request.tool == "documents_list" || request.tool == "document_snapshot"
     || request.tool == "map_snapshot" || request.tool == "map_search"
-    || request.tool == "selection_get" || request.tool == "actions_list")
+    || request.tool == "selection_get" || request.tool == "selection_set"
+    || request.tool == "actions_list" || request.tool == "action_execute"
+    || request.tool == "overlay_set" || request.tool == "overlay_clear")
   {
-    return mcp::McpBridgeResponse::success(
-      request.id, m_toolHandler(request.tool, request.params));
+    const auto result = m_toolHandler(request.tool, request.params);
+    if (result.ok)
+    {
+      return mcp::McpBridgeResponse::success(request.id, result.result);
+    }
+    return mcp::McpBridgeResponse::failure(request.id, result.error);
   }
 
   return makeFailure(

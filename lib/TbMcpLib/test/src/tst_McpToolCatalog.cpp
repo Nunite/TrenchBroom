@@ -51,11 +51,24 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("map_snapshot"));
     CHECK(names.contains("map_search"));
+    CHECK(names.contains("selection_set"));
+    CHECK(names.contains("overlay_set"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
-    CHECK(!names.contains("selection_set"));
     CHECK(!names.contains("action_execute"));
-    CHECK(!names.contains("overlay_set"));
+  }
+
+  SECTION("edit mode lists implemented edit tools")
+  {
+    const auto tools = toolsListJson(McpMode::Edit);
+    auto names = QStringList{};
+    for (const auto& tool : tools)
+    {
+      names.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("action_execute"));
+    CHECK(!names.contains("entity_create"));
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")

@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QJsonArray>
 #include <QJsonObject>
 
 #include "ui/mcp/McpBridgeServer.h"
@@ -32,25 +33,38 @@ TEST_CASE("McpBridgeServer")
   auto server = McpBridgeServer{[](const QString& toolName, const QJsonObject&) {
     if (toolName == "tb_status")
     {
-      return QJsonObject{
+      return McpBridgeToolResult::success(QJsonObject{
         {"application", "TrenchBroom"},
         {"mode", "ReadOnly"},
-      };
+      });
     }
     if (toolName == "documents_list")
     {
-      return QJsonObject{
+      return McpBridgeToolResult::success(QJsonObject{
         {"count", 0},
-      };
+      });
     }
     if (toolName == "map_search")
     {
-      return QJsonObject{
+      return McpBridgeToolResult::success(QJsonObject{
         {"count", 1},
         {"query", "worldspawn"},
-      };
+      });
     }
-    return QJsonObject{};
+    if (toolName == "selection_set")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"selectedCount", 0},
+      });
+    }
+    if (toolName == "overlay_set")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"active", true},
+      });
+    }
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::ToolNotFound, QString{"Unknown test tool"});
   }};
 
   SECTION("off mode does not listen")
@@ -116,13 +130,45 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("count").toInt() == 1);
   }
 
-  SECTION("rejects unwired tools")
+  SECTION("serves selection_set")
   {
     REQUIRE(
       server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
 
     const auto response = server.dispatchRequest(
       mcp::McpBridgeRequest{"1", "secret", "selection_set", {}, mcp::McpMode::ReadOnly});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("selectedCount").toInt() == 0);
+  }
+
+  SECTION("serves overlay_set")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "overlay_set",
+      QJsonObject{{"highlightObjectIds", QJsonArray{}}},
+      mcp::McpMode::ReadOnly});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("active").toBool());
+  }
+
+  SECTION("read-only mode rejects action_execute")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "action_execute",
+      QJsonObject{{"actionId", "Menu/Edit/Undo"}},
+      mcp::McpMode::Edit});
 
     CHECK(!response.ok);
     REQUIRE(response.error);
