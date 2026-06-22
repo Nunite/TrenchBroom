@@ -41,7 +41,10 @@ optimization order, see `docs/custom-feature-architecture-review.md`.
 - 风险：让 Agent 直接创建任意 brush 顶点很容易生成非法或难排查的 BSP 几何；白盒生成必须优先走语义 Blockout IR 和确定性 brush primitive 编译。
 - 风险：当前 `overlay_set` / `overlay_clear` 只是 bridge 内存状态，还没有真实接入 renderer；后续如果直接塞进某个 renderer，会和 FPS、sky、2D readable outlines 等功能继续分裂。
 - 风险：tool catalog 会快速膨胀；如果每个功能都新增临时 JSON 形状而没有共享 DTO、mode gating 和 focused tests，后续 MCP 会很难维护。
-- 建议修复：MCP 默认关闭，本地 token 必须保留；协议层继续放在 `TbMcpLib`；所有写操作使用命名 transaction 并补 rollback 测试；overlay 必须等视图叠加层管理器后再接真实绘制；Blockout IR 完成前不要开放低层 brush 顶点工具。
+- 风险：第二/三阶段工具已落地后，`McpBridgeServer.cpp` 同时包含 document/action/edit/asset/texture/blockout 逻辑，文件体积和职责都在快速变大。
+- 风险：当前 MCP history 只在 MCP 操作仍位于原生 undo/redo 栈顶时工作；这是安全的第一版，但不等于完整的跨用户编辑操作历史管理。
+- 风险：Blockout IR 第一版已经避免直接拼任意 brush 顶点，但 snap、尺寸约束、房间开口规则和错误报告还比较基础。
+- 建议修复：MCP 默认关闭，本地 token 必须保留；协议层继续放在 `TbMcpLib`；下一步把 bridge tool handler 拆成独立模块；所有写操作继续使用命名 transaction 并补 rollback/真实地图集成测试；overlay 必须等视图叠加层管理器后再接真实绘制；不要开放低层任意 brush 顶点工具，除非先有严格 validation。
 
 ## Medium Priority
 

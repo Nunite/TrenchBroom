@@ -47,14 +47,15 @@ MapDocument transaction / query services
 - 已接入基础查询工具：`tb_status`、`tb_doctor`、`documents_list`、`document_snapshot`、`map_snapshot`、`map_search`、`selection_get`、`actions_list`。
 - 已接入第一批编辑器状态工具：`selection_set`、`overlay_set`、`overlay_clear`。
 - 已接入 `action_execute`，但它要求 `Edit` 模式，因为任意 action 可能间接修改地图。
+- 已接入事务型写入工具：entity 创建/更新/删除、box/wedge/cylinder brush 创建。
+- 已接入 MCP operation history：`history_list`、`history_undo_mcp`、`history_redo_mcp`。当前只在 MCP 操作仍位于 TrenchBroom 原生 undo/redo 栈顶时执行，避免误撤用户手动编辑。
+- 已接入 GoldSrc 资产与材质工具：`.mdl/.spr/.wav` 搜索与放置、material 搜索与应用。
+- 已接入 Blockout IR 第一版：room、corridor、stairs、ramp、doorway、cover、sky shell 和 validate。
 
 仍未完成：
 
-- 事务型 map 写入工具，例如 entity/brush 创建、更新、删除。
-- MCP 专用 operation history 和只撤销 MCP 操作的 undo/redo。
-- 资产搜索与放置工具。
-- Blockout IR 及白盒生成工具。
 - 真实 viewport overlay 渲染与 viewport capture。
+- MCP 工具实现拆分。目前 `McpBridgeServer.cpp` 已承载较多 tool handler，后续应拆成 document/action/edit/asset/blockout/overlay 等模块，避免继续膨胀。
 
 ## 配置与安全模式
 
@@ -99,7 +100,7 @@ MapDocument transaction / query services
 - `action_execute`：执行已注册 action，遵循 action 自身 enabled 状态；由于 action 可能修改地图，当前要求 `Edit` 模式。
 - `overlay_set` / `overlay_clear`：设置或清理 MCP overlay 状态；当前只保存 bridge state，后续再接入视图叠加层管理器进行真实绘制。
 
-第二阶段再开放：
+第二阶段已开放：
 
 - `entity_create`、`entity_update`、`entity_delete`
 - `brush_create_box`、`brush_create_wedge`、`brush_create_cylinder`
@@ -107,7 +108,7 @@ MapDocument transaction / query services
 - `texture_search`、`texture_apply`
 - `history_list`、`history_undo_mcp`、`history_redo_mcp`
 
-第三阶段开放 Blockout IR：
+第三阶段已开放 Blockout IR：
 
 - `blockout_create_room`
 - `blockout_create_corridor`
@@ -174,7 +175,7 @@ Blockout IR 是 Agent 生成白盒的主要入口。它把“房间、走廊、�
 基础规则：
 
 - 坐标默认使用 GoldSrc units。
-- 默认 grid 为 16；输入尺寸先 snap 到 grid。
+- 默认 grid 为 16；第一版工具要求调用方传入已对齐的 GoldSrc units，后续会把 snap 策略显式纳入 `blockout_validate` 和 create 工具。
 - 只生成凸 brush primitive。
 - 门洞、窗口和开口通过拆分墙体生成，不做 CSG 差集。
 - validation 失败时不提交 transaction，并返回错误列表。
@@ -242,9 +243,9 @@ Blockout 测试：
 3. [x] TrenchBroom 内部 `McpBridgeServer`：默认关闭，支持 token、mode 和 `tb_status`。
 4. [x] `trenchbroom-mcp.exe`：stdio MCP server，支持 `initialize`、`tools/list`、`tools/call`。
 5. [x] 只读 map / selection / action tools。
-6. [ ] transaction 编辑 tools 与 MCP history。
-7. [ ] GoldSrc asset placement tools。
-8. [ ] Blockout IR tools。
+6. [x] transaction 编辑 tools 与 MCP history。
+7. [x] GoldSrc asset placement tools。
+8. [x] Blockout IR tools。
 9. [ ] overlay 与 viewport capture。
 10. [ ] 用户文档、示例 prompt 和 smoke workflow。
 
