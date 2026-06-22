@@ -260,6 +260,7 @@ void ModelBrowserView::setAssets(
   m_rootFolderPath = std::move(rootFolderPath);
   m_assets = std::move(assets);
   m_spritePreviewCache.clear();
+  loadSpritePreviews();
   m_currentFolderPath.clear();
   m_hasSelection = false;
   m_hasHover = false;
@@ -338,6 +339,7 @@ void ModelBrowserView::setSearchText(QString searchText)
 void ModelBrowserView::resourcesWereProcessed(const std::vector<mdl::ResourceId>&)
 {
   m_spritePreviewCache.clear();
+  loadSpritePreviews();
   invalidate();
   update();
 }
@@ -448,23 +450,24 @@ void ModelBrowserView::destroyFolderIconTexture()
 }
 
 const std::optional<GoldSrcSpritePreview>& ModelBrowserView::spritePreview(
-  const std::filesystem::path& path)
+  const std::filesystem::path& path) const
 {
-  auto& entry = m_spritePreviewCache[path];
-  if (entry.loaded)
-  {
-    return entry.preview;
-  }
+  static const auto MissingPreview = std::optional<GoldSrcSpritePreview>{};
 
-  entry.loaded = true;
+  const auto it = m_spritePreviewCache.find(path);
+  return it != std::end(m_spritePreviewCache) ? it->second.preview : MissingPreview;
+}
 
+std::optional<GoldSrcSpritePreview> ModelBrowserView::loadSpritePreview(
+  const std::filesystem::path& path) const
+{
   auto file = std::shared_ptr<fs::File>{};
   if (path.is_absolute())
   {
     auto fileResult = fs::Disk::openFile(path);
     if (fileResult.is_error())
     {
-      return entry.preview;
+      return std::nullopt;
     }
     file = fileResult.value();
   }
@@ -473,16 +476,27 @@ const std::optional<GoldSrcSpritePreview>& ModelBrowserView::spritePreview(
     auto fileResult = m_map.gameFileSystem().openFile(path);
     if (fileResult.is_error())
     {
-      return entry.preview;
+      return std::nullopt;
     }
     file = fileResult.value();
   }
 
   auto reader = file->reader().buffer();
   const auto bytes = reader.stringView();
-  entry.preview = loadGoldSrcSpritePreview(
+  return loadGoldSrcSpritePreview(
     std::span{reinterpret_cast<const std::uint8_t*>(bytes.data()), bytes.size()});
-  return entry.preview;
+}
+
+void ModelBrowserView::loadSpritePreviews()
+{
+  for (const auto& asset : m_assets)
+  {
+    if (asset.type == BrowserCellType::Sprite)
+    {
+      m_spritePreviewCache.emplace(
+        asset.path, SpritePreviewCacheEntry{loadSpritePreview(asset.path)});
+    }
+  }
 }
 
 bool ModelBrowserView::shouldRenderFocusIndicator() const
@@ -628,9 +642,11 @@ void ModelBrowserView::renderAssetPlaceholders(
           for (const auto& cell : row.cells())
           {
             const auto& item = cellData(cell);
+            const auto* spritePreviewPtr =
+              item.type == BrowserCellType::Sprite ? &spritePreview(item.path) : nullptr;
             if (
-              item.type == BrowserCellType::Sprite && spritePreview(item.path)
-              && !spritePreview(item.path)->rgba.empty())
+              spritePreviewPtr && spritePreviewPtr->has_value()
+              && !(*spritePreviewPtr)->rgba.empty())
             {
               continue;
             }

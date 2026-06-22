@@ -115,7 +115,6 @@ private:
   GLuint m_folderIconTextureId = 0;
   struct SpritePreviewCacheEntry
   {
-    bool loaded = false;
     std::optional<GoldSrcSpritePreview> preview;
   };
   std::map<std::filesystem::path, SpritePreviewCacheEntry> m_spritePreviewCache;
@@ -157,7 +156,10 @@ private:
   void ensureFolderIconTexture(gl::Gl& gl);
   void destroyFolderIconTexture();
   const std::optional<GoldSrcSpritePreview>& spritePreview(
-    const std::filesystem::path& path);
+    const std::filesystem::path& path) const;
+  std::optional<GoldSrcSpritePreview> loadSpritePreview(
+    const std::filesystem::path& path) const;
+  void loadSpritePreviews();
 
   void renderHoveredCellBounds(
     gl::Gl& gl, Layout& layout, float y, float height, BrowserCellType type);
