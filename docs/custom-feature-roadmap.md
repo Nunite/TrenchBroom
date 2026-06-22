@@ -74,6 +74,12 @@
   - 状态：FPS、sky、2D 可读线条已经分别接入 View Options，但还没有统一 overlay 模型。
   - 重点：避免每个显示功能都散落在不同菜单或临时开关里。
 
+- [ ] MCP / Agent 白盒生成
+  - 目标：让外部 MCP client 通过结构化工具查询地图、执行动作、放置资产，并逐步生成 GoldSrc/CS 1.6 白盒。
+  - 状态：先建立底层协议、bridge、tool catalog 和安全模式，默认关闭；不直接开放任意 Python 脚本。
+  - 重点：TrenchBroom 是唯一真实状态；写操作必须走 `MapDocument` transaction；白盒生成使用 Blockout IR，不让 AI 直接拼 brush 顶点。
+  - 依赖：视图叠加层管理器用于 overlay/截图反馈，统一资产浏览器用于模型/Sprite/声音放置，`tb2` 稳定 API 可作为后续插件扩展基础。
+
 - [ ] Python 插件 v2 生产级收尾
   - 目标：让 `tb2` 优先稳定插件生命周期、卸载清理、错误展示和示例文档，再扩展大 API 面。
   - 状态：runtime、manifest、session、timer、panel 和示例已有基础；主要债务在绑定拆分、handle 生命周期和测试夹具。
@@ -154,4 +160,5 @@
 1. 先做 GoldSrc 资产浏览器第二阶段：Sprite、声音、WAD 纹理和实体属性路径选择。
 2. 同步加固 Python v2：拆分绑定、稳定插件 session、补齐插件管理 UI 的测试。
 3. 做 GoldSrc / VHLT 配置向导和编译日志分析器，因为这两项对 CS 1.6 mapper 的日常收益最高。
-4. 最后整理 View Options / Overlay 管理模型，把 FPS、sky、2D 线条和后续 debug overlay 收到一个清晰入口。
+4. 建立 MCP 底层适配框架，但先只开放只读和结构化工具，避免过早把任意脚本执行暴露给外部 Agent。
+5. 最后整理 View Options / Overlay 管理模型，把 FPS、sky、2D 线条、MCP overlay 和后续 debug overlay 收到一个清晰入口。

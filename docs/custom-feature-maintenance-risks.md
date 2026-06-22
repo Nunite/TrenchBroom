@@ -33,6 +33,15 @@ optimization order, see `docs/custom-feature-architecture-review.md`.
 - Risk: sky brush geometry invalidation is currently coarse-grained; if future changes make it invalidate on selection changes, 3D selection feedback can become visibly slow on large maps.
 - Suggested fix: split sky resource resolution, sky brush geometry caching, and rendering; invalidate geometry only when map visibility, brush geometry, or sky-related materials change.
 
+### MCP / Agent Bridge
+
+- Risk: exposing editor control through MCP can accidentally become a broad remote-control surface if tool modes, token checks, and command boundaries are not enforced from the first implementation.
+- Risk: if edit tools bypass `MapDocument` transactions or directly mutate `.map` files, undo/redo, selection state, and document dirty tracking will diverge from normal editor behavior.
+- Risk: letting Agent code create arbitrary brush vertices is likely to produce invalid or hard-to-debug BSP geometry; whitebox generation needs a semantic Blockout IR and deterministic brush compilation.
+- Risk: tool catalogs can grow quickly and become untestable if every feature adds bespoke request/response shapes without shared DTOs and mode gating.
+- Risk: MCP overlays, screenshots, assets, and Python plugins can become tightly coupled if the bridge calls UI widgets directly instead of small services.
+- Suggested fix: keep MCP disabled by default, require a local token, split protocol code into `TbMcpLib`, route writes through named transactions, start with read-only tools, and add Blockout IR before exposing lower-level brush operations.
+
 ## Medium Priority
 
 ### Model Browser and Resource Access
