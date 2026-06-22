@@ -53,6 +53,10 @@
 #include "ui/QPathUtils.h"
 
 #include "kd/path_utils.h"
+#include "kd/ranges/repeat_view.h"
+#include "kd/ranges/stride_view.h"
+#include "kd/ranges/zip_view.h"
+#include "kd/vector_utils.h"
 
 #include "vm/mat.h"
 #include "vm/mat_ext.h"
@@ -79,7 +83,7 @@ std::optional<RgbaF> assetPlaceholderColor(const BrowserCellType type)
   switch (type)
   {
   case BrowserCellType::Sprite:
-    return RgbaF{0.25f, 0.62f, 0.95f, 0.35f};
+    return RgbaF{0.78f, 0.12f, 0.16f, 0.22f};
   case BrowserCellType::Sound:
     return RgbaF{0.66f, 0.54f, 0.95f, 0.35f};
   case BrowserCellType::Folder:
@@ -592,8 +596,13 @@ void ModelBrowserView::renderAssetPlaceholders(
   gl::Gl& gl, Layout& layout, const float y, const float height)
 {
   using Vertex = gl::VertexTypes::P2C4::Vertex;
+  using TextVertex = gl::VertexTypes::P2UV2C4::Vertex;
   auto backgroundVertices = std::vector<Vertex>{};
   auto iconVertices = std::vector<Vertex>{};
+  auto errorTextVertices = std::vector<TextVertex>{};
+  auto errorFont = gl::FontDescriptor{
+    pref(Preferences::RendererFontPath),
+    size_t(std::max(8, pref(Preferences::BrowserFontSize) - 1))};
 
   const auto addQuad = [&](
                          auto& vertices,
@@ -619,6 +628,13 @@ void ModelBrowserView::renderAssetPlaceholders(
           for (const auto& cell : row.cells())
           {
             const auto& item = cellData(cell);
+            if (
+              item.type == BrowserCellType::Sprite && spritePreview(item.path)
+              && !spritePreview(item.path)->rgba.empty())
+            {
+              continue;
+            }
+
             const auto color = assetPlaceholderColor(item.type);
             if (!color)
             {
@@ -680,6 +696,22 @@ void ModelBrowserView::renderAssetPlaceholders(
                 cy + 6.2f * unit,
                 iconColor);
             }
+            else if (item.type == BrowserCellType::Sprite)
+            {
+              const auto errorText = std::string{"ERROR"};
+              auto& font = fontManager().font(errorFont);
+              const auto textSize = font.measure(errorText);
+              const auto textOffset = vm::vec2f{
+                bounds.left() + std::max((bounds.width - textSize.x()) / 2.0f, 0.0f),
+                height - (bounds.top() - y) - (bounds.height - textSize.y()) / 2.0f};
+              const auto textColor = RgbaF{1.0f, 0.84f, 0.84f, 0.95f}.toVec();
+              const auto textQuads = font.quads(errorText, false, textOffset);
+              const auto textVertices = TextVertex::toList(kdl::views::zip(
+                textQuads | kdl::views::stride(2),
+                textQuads | std::views::drop(1) | kdl::views::stride(2),
+                kdl::views::repeat(textColor)));
+              kdl::vec_append(errorTextVertices, textVertices);
+            }
           }
         }
       }
@@ -708,6 +740,23 @@ void ModelBrowserView::renderAssetPlaceholders(
   {
     iconVertexArray.render(gl, gl::PrimType::Quads);
     iconVertexArray.cleanup(gl, shader.program());
+  }
+
+  if (!errorTextVertices.empty())
+  {
+    auto textVertexArray = gl::VertexArray::ref(errorTextVertices);
+    textVertexArray.prepare(gl, vboManager());
+
+    auto textShader =
+      gl::ActiveShader{gl, shaderManager(), gl::Shaders::ColoredTextShader};
+    textShader.set("Texture", 0);
+    if (textVertexArray.setup(gl, textShader.program()))
+    {
+      fontManager().font(errorFont).activate(gl);
+      textVertexArray.render(gl, gl::PrimType::Quads);
+      textVertexArray.cleanup(gl, textShader.program());
+      fontManager().font(errorFont).deactivate(gl);
+    }
   }
 }
 
