@@ -43,6 +43,7 @@
 #include "mdl/Map.h"
 #include "mdl/Map_World.h"
 #include "ui/AppController.h"
+#include "ui/AssetBrowserModel.h"
 #include "ui/ImageUtils.h"
 #include "ui/ModelBrowserView.h"
 #include "ui/QPathUtils.h"
@@ -53,8 +54,6 @@
 #include "kd/ranges/to.h"
 
 #include <algorithm>
-#include <array>
-#include <functional>
 #include <optional>
 #include <ranges>
 
@@ -64,198 +63,6 @@ namespace
 {
 
 const auto AssetRootPath = std::filesystem::path{};
-
-const auto GoldSrcAssetRoots = std::array{
-  std::pair{BrowserCellType::Model, std::filesystem::path{"models"}},
-  std::pair{BrowserCellType::Sprite, std::filesystem::path{"sprites"}},
-  std::pair{BrowserCellType::Sound, std::filesystem::path{"sound"}},
-};
-
-BrowserCellType assetTypeForExtension(const std::filesystem::path& path)
-{
-  const auto extension = kdl::path_to_lower(path.extension());
-  if (extension == ".mdl")
-  {
-    return BrowserCellType::Model;
-  }
-  if (extension == ".spr")
-  {
-    return BrowserCellType::Sprite;
-  }
-  if (extension == ".wav")
-  {
-    return BrowserCellType::Sound;
-  }
-  return BrowserCellType::Folder;
-}
-
-bool shouldReloadEntityModelForAsset(const BrowserAsset& asset)
-{
-  return asset.type == BrowserCellType::Model || asset.type == BrowserCellType::Sprite;
-}
-
-std::vector<std::filesystem::path> entityModelAssetPaths(
-  const std::vector<BrowserAsset>& assets)
-{
-  auto result = std::vector<std::filesystem::path>{};
-  for (const auto& asset : assets)
-  {
-    if (shouldReloadEntityModelForAsset(asset))
-    {
-      result.push_back(asset.path);
-    }
-  }
-  return result;
-}
-
-template <typename FindAssets, typename MakeAbsolute>
-std::optional<std::vector<BrowserAsset>> collectAssets(
-  const std::filesystem::path& folderPath,
-  const std::vector<std::filesystem::path>& modRoots,
-  FindAssets&& findAssets,
-  MakeAbsolute&& makeAbsolute)
-{
-  auto rootFilters = std::vector<std::pair<BrowserCellType, std::filesystem::path>>{};
-  if (folderPath.empty())
-  {
-    rootFilters.insert(
-      std::end(rootFilters), std::begin(GoldSrcAssetRoots), std::end(GoldSrcAssetRoots));
-  }
-  else
-  {
-    rootFilters.emplace_back(BrowserCellType::Folder, folderPath);
-  }
-
-  auto assets = std::vector<BrowserAsset>{};
-  for (const auto& [rootType, rootPath] : rootFilters)
-  {
-    unused(rootType);
-    auto pathsResult = findAssets(rootPath);
-    if (pathsResult.is_error())
-    {
-      continue;
-    }
-
-    for (const auto& path : pathsResult.value())
-    {
-      const auto assetType = assetTypeForExtension(path);
-      if (assetType == BrowserCellType::Folder)
-      {
-        continue;
-      }
-
-      if (!modRoots.empty())
-      {
-        auto absPathResult = makeAbsolute(path);
-        if (absPathResult.is_error())
-        {
-          continue;
-        }
-
-        const auto absPath = absPathResult.value().lexically_normal();
-        const auto inEnabledMod = std::ranges::any_of(modRoots, [&](const auto& modRoot) {
-          return kdl::path_has_prefix(absPath, modRoot);
-        });
-        if (!inEnabledMod)
-        {
-          continue;
-        }
-      }
-
-      assets.push_back(BrowserAsset{assetType, path});
-    }
-  }
-
-  std::ranges::sort(assets, [](const auto& lhs, const auto& rhs) {
-    return lhs.path.generic_string() < rhs.path.generic_string();
-  });
-  assets.erase(std::unique(std::begin(assets), std::end(assets)), std::end(assets));
-
-  return assets;
-}
-
-template <typename MakeAbsolute>
-std::unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>
-assetLastWriteTimes(const std::vector<BrowserAsset>& assets, MakeAbsolute&& makeAbsolute)
-{
-  auto lastWriteTimes = std::unordered_map<
-    std::filesystem::path,
-    std::filesystem::file_time_type,
-    kdl::path_hash>{};
-  lastWriteTimes.reserve(assets.size());
-
-  for (const auto& asset : assets)
-  {
-    auto absPath = std::filesystem::path{};
-    if (asset.path.is_absolute())
-    {
-      absPath = asset.path;
-    }
-    else if (auto absPathResult = makeAbsolute(asset.path); !absPathResult.is_error())
-    {
-      absPath = absPathResult.value();
-    }
-
-    if (absPath.empty())
-    {
-      continue;
-    }
-
-    auto error = std::error_code{};
-    const auto t = std::filesystem::last_write_time(absPath, error);
-    if (!error)
-    {
-      lastWriteTimes.emplace(asset.path, t);
-    }
-  }
-
-  return lastWriteTimes;
-}
-
-std::vector<std::filesystem::path> changedAssetPaths(
-  const std::
-    unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>&
-      oldWriteTimes,
-  const std::
-    unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>&
-      newWriteTimes,
-  const std::vector<BrowserAsset>& oldAssets,
-  const std::vector<BrowserAsset>& newAssets)
-{
-  auto changedPaths = std::vector<std::filesystem::path>{};
-  const auto oldEntityModelPaths = entityModelAssetPaths(oldAssets);
-
-  for (const auto& asset : newAssets)
-  {
-    if (!shouldReloadEntityModelForAsset(asset))
-    {
-      continue;
-    }
-
-    if (const auto it = newWriteTimes.find(asset.path); it != std::end(newWriteTimes))
-    {
-      const auto oldIt = oldWriteTimes.find(asset.path);
-      if (oldIt == std::end(oldWriteTimes) || oldIt->second != it->second)
-      {
-        changedPaths.push_back(asset.path);
-      }
-    }
-  }
-
-  for (const auto& oldPath : oldEntityModelPaths)
-  {
-    if (!newWriteTimes.contains(oldPath))
-    {
-      changedPaths.push_back(oldPath);
-    }
-  }
-
-  std::ranges::sort(changedPaths);
-  changedPaths.erase(
-    std::unique(std::begin(changedPaths), std::end(changedPaths)),
-    std::end(changedPaths));
-  return changedPaths;
-}
 
 } // namespace
 
@@ -626,51 +433,50 @@ void ModelBrowser::setCurrentFolderPath(std::filesystem::path currentFolderPath)
   updateFolderEdit();
 }
 
-void ModelBrowser::reloadModels()
+std::optional<std::vector<BrowserAsset>> ModelBrowser::scanAssets() const
 {
-  auto nextAssets = std::optional<std::vector<BrowserAsset>>{};
-  auto makeAbsolute =
-    std::function<Result<std::filesystem::path>(const std::filesystem::path&)>{};
-
   if (m_folderPath.is_absolute())
   {
-    makeAbsolute = [](const auto& path) { return Result<std::filesystem::path>{path}; };
-    nextAssets = collectAssets(
+    return collectBrowserAssets(
       m_folderPath,
       {},
       [&](const auto& rootPath) {
         return fs::Disk::find(
           rootPath,
           fs::TraversalMode::Recursive,
-          fs::makeExtensionPathMatcher({".mdl", ".spr", ".wav"}));
+          fs::makeExtensionPathMatcher(goldSrcAssetExtensions()));
       },
-      makeAbsolute);
+      [](const auto& path) { return Result<std::filesystem::path>{path}; });
   }
-  else
-  {
-    const auto& fs = m_map.gameFileSystem();
-    const auto enabledMods = mdl::enabledMods(m_map);
-    if (!enabledMods.empty())
-    {
-      const auto modRoots =
-        enabledMods | std::views::transform([&](const auto& mod) {
-          return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
-        })
-        | kdl::ranges::to<std::vector>();
 
-      makeAbsolute = [&](const auto& path) { return fs.makeAbsolute(path); };
-      nextAssets = collectAssets(
-        m_folderPath,
-        modRoots,
-        [&](const auto& rootPath) {
-          return fs.find(
-            rootPath,
-            fs::TraversalMode::Recursive,
-            fs::makeExtensionPathMatcher({".mdl", ".spr", ".wav"}));
-        },
-        makeAbsolute);
-    }
+  const auto& fs = m_map.gameFileSystem();
+  const auto enabledMods = mdl::enabledMods(m_map);
+  if (enabledMods.empty())
+  {
+    return std::nullopt;
   }
+
+  const auto modRoots =
+    enabledMods | std::views::transform([&](const auto& mod) {
+      return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
+    })
+    | kdl::ranges::to<std::vector>();
+
+  return collectBrowserAssets(
+    m_folderPath,
+    modRoots,
+    [&](const auto& rootPath) {
+      return fs.find(
+        rootPath,
+        fs::TraversalMode::Recursive,
+        fs::makeExtensionPathMatcher(goldSrcAssetExtensions()));
+    },
+    [&](const auto& path) { return fs.makeAbsolute(path); });
+}
+
+void ModelBrowser::reloadModels()
+{
+  auto nextAssets = scanAssets();
 
   if (!nextAssets)
   {
@@ -685,7 +491,7 @@ void ModelBrowser::reloadModels()
   }
 
   m_assets = std::move(*nextAssets);
-  m_lastWriteTimes = assetLastWriteTimes(m_assets, makeAbsolute);
+  m_lastWriteTimes = assetLastWriteTimes(m_assets);
 
   rebuildFolderTree();
   m_view->setAssets(m_folderPath, m_assets);
@@ -806,7 +612,7 @@ void ModelBrowser::setWatchedDirectory()
 
   if (m_folderPath.empty())
   {
-    for (const auto& [type, rootPath] : GoldSrcAssetRoots)
+    for (const auto& [type, rootPath] : goldSrcAssetRoots())
     {
       unused(type);
       if (auto absPathResult = fs.makeAbsolute(rootPath); !absPathResult.is_error())
@@ -841,70 +647,25 @@ void ModelBrowser::scheduleRescan()
 
 void ModelBrowser::rescanWatchedDirectory()
 {
-  auto nextAssets = std::optional<std::vector<BrowserAsset>>{};
-  auto makeAbsolute =
-    std::function<Result<std::filesystem::path>(const std::filesystem::path&)>{};
-
-  if (m_folderPath.is_absolute())
-  {
-    makeAbsolute = [](const auto& path) { return Result<std::filesystem::path>{path}; };
-    nextAssets = collectAssets(
-      m_folderPath,
-      {},
-      [&](const auto& rootPath) {
-        return fs::Disk::find(
-          rootPath,
-          fs::TraversalMode::Recursive,
-          fs::makeExtensionPathMatcher({".mdl", ".spr", ".wav"}));
-      },
-      makeAbsolute);
-  }
-  else
-  {
-    const auto& fs = m_map.gameFileSystem();
-    const auto enabledMods = mdl::enabledMods(m_map);
-    if (enabledMods.empty())
-    {
-      for (const auto& p : entityModelAssetPaths(m_assets))
-      {
-        m_map.entityModelManager().invalidateModel(p);
-      }
-      m_assets.clear();
-      m_lastWriteTimes.clear();
-      m_currentFolderPath.clear();
-      updateFolderEdit();
-      rebuildFolderTree();
-      m_view->setAssets(m_folderPath, {});
-      m_view->setCurrentFolderPath(m_currentFolderPath);
-      return;
-    }
-
-    const auto modRoots =
-      enabledMods | std::views::transform([&](const auto& mod) {
-        return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
-      })
-      | kdl::ranges::to<std::vector>();
-
-    makeAbsolute = [&](const auto& path) { return fs.makeAbsolute(path); };
-    nextAssets = collectAssets(
-      m_folderPath,
-      modRoots,
-      [&](const auto& rootPath) {
-        return fs.find(
-          rootPath,
-          fs::TraversalMode::Recursive,
-          fs::makeExtensionPathMatcher({".mdl", ".spr", ".wav"}));
-      },
-      makeAbsolute);
-  }
+  auto nextAssets = scanAssets();
 
   if (!nextAssets)
   {
-    reloadModels();
+    for (const auto& p : entityModelAssetPaths(m_assets))
+    {
+      m_map.entityModelManager().invalidateModel(p);
+    }
+    m_assets.clear();
+    m_lastWriteTimes.clear();
+    m_currentFolderPath.clear();
+    updateFolderEdit();
+    rebuildFolderTree();
+    m_view->setAssets(m_folderPath, {});
+    m_view->setCurrentFolderPath(m_currentFolderPath);
     return;
   }
 
-  auto newLastWriteTimes = assetLastWriteTimes(*nextAssets, makeAbsolute);
+  auto newLastWriteTimes = assetLastWriteTimes(*nextAssets);
   const auto changedPaths =
     changedAssetPaths(m_lastWriteTimes, newLastWriteTimes, m_assets, *nextAssets);
   if (changedPaths.empty() && *nextAssets == m_assets)

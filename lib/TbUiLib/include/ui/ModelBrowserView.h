@@ -23,6 +23,7 @@
 #include <QString>
 
 #include "NotifierConnection.h"
+#include "ui/AssetBrowserModel.h"
 #include "ui/CellView.h"
 #include "ui/GoldSrcSpritePreview.h"
 
@@ -58,40 +59,6 @@ namespace tb::ui
 {
 
 class AppController;
-
-enum class BrowserCellType
-{
-  Folder,
-  Model,
-  Sprite,
-  Sound,
-};
-
-struct BrowserCellData
-{
-  BrowserCellType type;
-  std::filesystem::path path;
-};
-
-struct BrowserAsset
-{
-  BrowserCellType type;
-  std::filesystem::path path;
-
-  friend bool operator==(const BrowserAsset&, const BrowserAsset&) = default;
-};
-
-struct ModelBrowserEntry
-{
-  BrowserCellData cellData;
-  std::string title;
-};
-
-std::vector<ModelBrowserEntry> modelBrowserEntries(
-  const std::filesystem::path& rootFolderPath,
-  const std::vector<BrowserAsset>& assets,
-  const std::filesystem::path& currentFolderPath,
-  const QString& searchText);
 
 class ModelBrowserView : public CellView
 {

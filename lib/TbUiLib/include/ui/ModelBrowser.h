@@ -22,6 +22,7 @@
 #include <QWidget>
 
 #include "NotifierConnection.h"
+#include "ui/AssetBrowserModel.h"
 #include "ui/ModelBrowserView.h"
 
 #include "kd/path_hash.h"
@@ -74,9 +75,7 @@ private:
   std::filesystem::path m_folderPath;
   std::filesystem::path m_currentFolderPath;
   std::vector<BrowserAsset> m_assets;
-  std::
-    unordered_map<std::filesystem::path, std::filesystem::file_time_type, kdl::path_hash>
-      m_lastWriteTimes;
+  AssetWriteTimes m_lastWriteTimes;
   std::unordered_map<std::filesystem::path, QTreeWidgetItem*, kdl::path_hash>
     m_folderTreeItems;
 
@@ -100,6 +99,7 @@ private:
   void updateFolderEdit();
   void setFolderPath(std::filesystem::path folderPath);
   void setCurrentFolderPath(std::filesystem::path currentFolderPath);
+  std::optional<std::vector<BrowserAsset>> scanAssets() const;
   void reloadModels();
   void rebuildFolderTree();
 
