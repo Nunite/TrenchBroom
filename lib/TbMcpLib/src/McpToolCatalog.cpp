@@ -326,6 +326,96 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(),
     },
     {
+      "asset_search",
+      "Search GoldSrc model, sprite, and sound assets using the unified asset browser "
+      "rules.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"query", stringProperty("Optional text query for asset path or display name.")},
+        {"type", stringProperty("Optional asset type: model, sprite, or sound.")},
+        {"limit", integerProperty("Maximum result count, defaults to 50.")},
+      }),
+    },
+    {
+      "asset_place_model",
+      "Create a point entity for a .mdl asset.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"path", stringProperty("Model path from asset_search.")},
+          {"origin", vec3Property("Entity origin in map units.")},
+          {"classname", stringProperty("Optional classname, defaults to cycler_sprite.")},
+          {"property", stringProperty("Optional model property key, defaults to model.")},
+          {"select", boolProperty("Select the created entity.")},
+        },
+        {"path"}),
+    },
+    {
+      "asset_place_sprite",
+      "Create a point entity for a .spr asset.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"path", stringProperty("Sprite path from asset_search.")},
+          {"origin", vec3Property("Entity origin in map units.")},
+          {"classname", stringProperty("Optional classname, defaults to cycler_sprite.")},
+          {"property",
+           stringProperty("Optional sprite property key, defaults to model.")},
+          {"select", boolProperty("Select the created entity.")},
+        },
+        {"path"}),
+    },
+    {
+      "asset_place_sound",
+      "Create an ambient_generic entity for a .wav asset.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"path", stringProperty("Sound path from asset_search.")},
+          {"origin", vec3Property("Entity origin in map units.")},
+          {"classname",
+           stringProperty("Optional classname, defaults to ambient_generic.")},
+          {"property",
+           stringProperty("Optional sound property key, defaults to message.")},
+          {"select", boolProperty("Select the created entity.")},
+        },
+        {"path"}),
+    },
+    {
+      "texture_search",
+      "Search loaded materials in the active document.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"query", stringProperty("Optional text query for material name or path.")},
+        {"limit", integerProperty("Maximum result count, defaults to 50.")},
+      }),
+    },
+    {
+      "texture_apply",
+      "Apply a material to selected faces, selected brushes, or all faces of one brush.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"material", stringProperty("Material name to apply.")},
+          {"objectId",
+           stringProperty("Optional brush object id. If omitted, uses selection.")},
+          {"faceIndex", integerProperty("Optional face index for objectId brush.")},
+        },
+        {"material"}),
+    },
+    {
       "blockout_create_room",
       "Create a room from Blockout IR.",
       McpMode::Edit,

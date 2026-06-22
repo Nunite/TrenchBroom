@@ -23,6 +23,8 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 
+#include "fs/PathMatcher.h"
+#include "fs/TraversalMode.h"
 #include "gl/Material.h"
 #include "gl/MaterialManager.h"
 #include "mcp/McpError.h"
@@ -30,6 +32,7 @@
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushBuilder.h"
+#include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
 #include "mdl/CircleShape.h"
 #include "mdl/EditorContext.h"
@@ -37,26 +40,31 @@
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityProperties.h"
+#include "mdl/GameFileSystem.h"
 #include "mdl/GameInfo.h"
 #include "mdl/Grid.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
+#include "mdl/Map_Assets.h"
 #include "mdl/Map_Brushes.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/Map_World.h"
 #include "mdl/Node.h"
 #include "mdl/NodeContents.h"
 #include "mdl/PatchNode.h"
 #include "mdl/Selection.h"
 #include "mdl/SwapNodeContentsCommand.h"
 #include "mdl/Transaction.h"
+#include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/WorldNode.h"
 #include "ui/Action.h"
 #include "ui/ActionExecutionContext.h"
 #include "ui/ActionManager.h"
 #include "ui/AppController.h"
+#include "ui/AssetBrowserModel.h"
 #include "ui/GetVersion.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
@@ -98,6 +106,44 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
 QString pathToQString(const std::filesystem::path& path)
 {
   return path.empty() ? QString{} : pathAsQString(path);
+}
+
+QString genericPathToQString(const std::filesystem::path& path)
+{
+  return pathAsGenericQString(path);
+}
+
+QString browserCellTypeName(const BrowserCellType type)
+{
+  switch (type)
+  {
+  case BrowserCellType::Folder:
+    return "folder";
+  case BrowserCellType::Model:
+    return "model";
+  case BrowserCellType::Sprite:
+    return "sprite";
+  case BrowserCellType::Sound:
+    return "sound";
+  }
+  return "unknown";
+}
+
+std::optional<BrowserCellType> browserCellTypeFromString(const QString& type)
+{
+  if (type.compare("model", Qt::CaseInsensitive) == 0)
+  {
+    return BrowserCellType::Model;
+  }
+  if (type.compare("sprite", Qt::CaseInsensitive) == 0)
+  {
+    return BrowserCellType::Sprite;
+  }
+  if (type.compare("sound", Qt::CaseInsensitive) == 0)
+  {
+    return BrowserCellType::Sound;
+  }
+  return std::nullopt;
 }
 
 QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
@@ -1079,6 +1125,348 @@ McpBridgeToolResult historyRedoResult(
   });
 }
 
+std::optional<std::vector<BrowserAsset>> collectMcpAssets(mdl::Map& map)
+{
+  const auto enabledMods = mdl::enabledMods(map);
+  if (enabledMods.empty())
+  {
+    return std::vector<BrowserAsset>{};
+  }
+
+  auto modRoots = std::vector<std::filesystem::path>{};
+  modRoots.reserve(enabledMods.size());
+  for (const auto& mod : enabledMods)
+  {
+    modRoots.push_back((map.gamePath() / std::filesystem::path{mod}).lexically_normal());
+  }
+
+  const auto& fs = map.gameFileSystem();
+  return collectBrowserAssets(
+    {},
+    modRoots,
+    [&](const auto& rootPath) {
+      return fs.find(
+        rootPath,
+        fs::TraversalMode::Recursive,
+        fs::makeExtensionPathMatcher(goldSrcAssetExtensions()));
+    },
+    [&](const auto& path) { return fs.makeAbsolute(path); });
+}
+
+QJsonObject assetJson(const BrowserAsset& asset)
+{
+  return QJsonObject{
+    {"type", browserCellTypeName(asset.type)},
+    {"path", genericPathToQString(asset.path)},
+    {"absolutePath", pathToQString(asset.absolutePath)},
+    {"displayName", QString::fromStdString(asset.displayName)},
+  };
+}
+
+McpBridgeToolResult assetSearchResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto assets = collectMcpAssets(map);
+  if (!assets)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not scan assets");
+  }
+
+  const auto query = params.value("query").toString().trimmed();
+  const auto typeText = params.value("type").toString().trimmed();
+  const auto type = typeText.isEmpty() ? std::optional<BrowserCellType>{}
+                                       : browserCellTypeFromString(typeText);
+  if (!typeText.isEmpty() && !type)
+  {
+    return invalidParamsFailure("type must be model, sprite, or sound");
+  }
+
+  const auto limit = std::max(1, params.value("limit").toInt(50));
+  auto results = QJsonArray{};
+  for (const auto& asset : *assets)
+  {
+    if (type && asset.type != *type)
+    {
+      continue;
+    }
+
+    const auto pathText = genericPathToQString(asset.path);
+    const auto displayName = QString::fromStdString(asset.displayName);
+    if (
+      !query.isEmpty() && !pathText.contains(query, Qt::CaseInsensitive)
+      && !displayName.contains(query, Qt::CaseInsensitive))
+    {
+      continue;
+    }
+
+    results.push_back(assetJson(asset));
+    if (results.size() >= limit)
+    {
+      break;
+    }
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"query", query},
+    {"type", type ? browserCellTypeName(*type) : QString{}},
+    {"results", results},
+    {"count", results.size()},
+  });
+}
+
+McpBridgeToolResult placeAssetResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto path = params.value("path").toString().trimmed();
+  if (path.isEmpty())
+  {
+    return invalidParamsFailure(QString{"%1 requires path"}.arg(toolName));
+  }
+
+  auto assetType = BrowserCellType::Model;
+  auto defaultClassname = std::string{"cycler_sprite"};
+  auto defaultProperty = std::string{"model"};
+  auto transactionLabel = QString{"model"};
+  if (toolName == "asset_place_sprite")
+  {
+    assetType = BrowserCellType::Sprite;
+    defaultClassname = "cycler_sprite";
+    defaultProperty = "model";
+    transactionLabel = "sprite";
+  }
+  else if (toolName == "asset_place_sound")
+  {
+    assetType = BrowserCellType::Sound;
+    defaultClassname = "ambient_generic";
+    defaultProperty = "message";
+    transactionLabel = "sound";
+  }
+
+  const auto actualType =
+    assetTypeForExtension(std::filesystem::path{path.toStdString()});
+  if (actualType != assetType)
+  {
+    return invalidParamsFailure(
+      QString{"path does not match %1 asset type"}.arg(browserCellTypeName(assetType)));
+  }
+
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto error = QString{};
+  auto entity = mdl::Entity{
+    {{mdl::EntityPropertyKeys::Classname,
+      optionalString(params, "classname", defaultClassname)}}};
+  entity.addOrUpdateProperty(
+    optionalString(params, "property", defaultProperty), path.toStdString());
+
+  if (const auto origin = params.value("origin"); !origin.isUndefined())
+  {
+    const auto originVec = vec3FromJson(params, "origin", error);
+    if (!originVec)
+    {
+      return invalidParamsFailure(error);
+    }
+    entity.setOrigin(*originVec);
+  }
+
+  auto& map = mapWindow->document().map();
+  auto* entityNode = new mdl::EntityNode{std::move(entity)};
+  const auto transactionName = QString{"MCP: Place %1 asset"}.arg(transactionLabel);
+  const auto changedObjectIds = addNodesWithTransaction(
+    map, transactionName, {entityNode}, optionalBool(params, "select", true));
+  if (!changedObjectIds)
+  {
+    delete entityNode;
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not place asset entity");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
+  result.insert("assetPath", path);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+QJsonObject materialJson(const gl::Material& material)
+{
+  return QJsonObject{
+    {"name", QString::fromStdString(material.name())},
+    {"collection", QString::fromStdString(material.collectionName())},
+    {"relativePath", genericPathToQString(material.relativePath())},
+    {"absolutePath", pathToQString(material.absolutePath())},
+    {"usageCount", static_cast<int>(material.usageCount())},
+  };
+}
+
+McpBridgeToolResult textureSearchResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto query = params.value("query").toString().trimmed();
+  const auto limit = std::max(1, params.value("limit").toInt(50));
+  auto results = QJsonArray{};
+
+  const auto& materials = mapWindow->document().map().materialManager().materials();
+  for (const auto* material : materials)
+  {
+    if (!material)
+    {
+      continue;
+    }
+    const auto name = QString::fromStdString(material->name());
+    const auto relativePath = genericPathToQString(material->relativePath());
+    if (
+      !query.isEmpty() && !name.contains(query, Qt::CaseInsensitive)
+      && !relativePath.contains(query, Qt::CaseInsensitive))
+    {
+      continue;
+    }
+
+    results.push_back(materialJson(*material));
+    if (results.size() >= limit)
+    {
+      break;
+    }
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"query", query},
+    {"results", results},
+    {"count", results.size()},
+  });
+}
+
+std::vector<mdl::BrushFaceHandle> brushFaceHandlesForTextureApply(
+  mdl::Map& map, const QJsonObject& params, QString& error)
+{
+  auto result = std::vector<mdl::BrushFaceHandle>{};
+  const auto objectId = params.value("objectId").toString().trimmed();
+  if (!objectId.isEmpty())
+  {
+    auto* node = resolveNodeId(map.worldNode(), objectId);
+    auto* brushNode = dynamic_cast<mdl::BrushNode*>(node);
+    if (!brushNode)
+    {
+      error = QString{"objectId is not a brush: %1"}.arg(objectId);
+      return {};
+    }
+
+    const auto faceIndexValue = params.value("faceIndex");
+    if (faceIndexValue.isUndefined())
+    {
+      return mdl::toHandles(brushNode);
+    }
+
+    if (!faceIndexValue.isDouble())
+    {
+      error = "faceIndex must be an integer";
+      return {};
+    }
+    const auto faceIndex = static_cast<size_t>(faceIndexValue.toInt());
+    if (faceIndex >= brushNode->brush().faceCount())
+    {
+      error = "faceIndex is out of range";
+      return {};
+    }
+    result.emplace_back(brushNode, faceIndex);
+    return result;
+  }
+
+  if (!map.selection().brushFaces.empty())
+  {
+    return map.selection().brushFaces;
+  }
+
+  for (auto* brushNode : map.selection().brushes)
+  {
+    const auto handles = mdl::toHandles(brushNode);
+    result.insert(std::end(result), std::begin(handles), std::end(handles));
+  }
+
+  if (result.empty())
+  {
+    error = "texture_apply requires objectId or selected brush faces/brushes";
+  }
+  return result;
+}
+
+McpBridgeToolResult textureApplyResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto material = params.value("material").toString().trimmed();
+  if (material.isEmpty())
+  {
+    return invalidParamsFailure("texture_apply requires material");
+  }
+
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto error = QString{};
+  auto handles = brushFaceHandlesForTextureApply(map, params, error);
+  if (handles.empty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto changedNodes = QJsonArray{};
+  for (const auto* node : mdl::toNodes(handles))
+  {
+    changedNodes.push_back(nodePathId(*node, map.worldNode()));
+  }
+
+  const auto transactionName = QString{"MCP: Apply texture"};
+  auto ok = executeTransaction(map, transactionName, [&]() {
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, handles);
+    return mdl::setBrushFaceAttributes(
+      map, mdl::UpdateBrushFaceAttributes{.materialName = material.toStdString()});
+  });
+  if (!ok)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not apply texture");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, changedNodes, result);
+  result.insert("material", material);
+  result.insert("faceCount", static_cast<int>(handles.size()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
 QJsonObject mapSearchJson(AppController& appController, const QJsonObject& params)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -1438,6 +1826,26 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return historyRedoResult(appController, m_operationHistory);
         }
+        if (toolName == "asset_search")
+        {
+          return assetSearchResult(appController, params);
+        }
+        if (
+          toolName == "asset_place_model" || toolName == "asset_place_sprite"
+          || toolName == "asset_place_sound")
+        {
+          return placeAssetResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "texture_search")
+        {
+          return textureSearchResult(appController, params);
+        }
+        if (toolName == "texture_apply")
+        {
+          return textureApplyResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
         return McpBridgeToolResult::failure(
           mcp::McpErrorCode::ToolNotFound,
           QString{"MCP tool is registered but not wired yet: %1"}.arg(toolName));
@@ -1550,7 +1958,10 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
     || request.tool == "entity_delete" || request.tool == "brush_create_box"
     || request.tool == "brush_create_wedge" || request.tool == "brush_create_cylinder"
     || request.tool == "history_list" || request.tool == "history_undo_mcp"
-    || request.tool == "history_redo_mcp")
+    || request.tool == "history_redo_mcp" || request.tool == "asset_search"
+    || request.tool == "asset_place_model" || request.tool == "asset_place_sprite"
+    || request.tool == "asset_place_sound" || request.tool == "texture_search"
+    || request.tool == "texture_apply")
   {
     const auto result = m_toolHandler(request.tool, request.params);
     if (result.ok)

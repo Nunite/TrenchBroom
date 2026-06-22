@@ -76,6 +76,25 @@ TEST_CASE("McpBridgeServer")
         {"count", 0},
       });
     }
+    if (toolName == "asset_search")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 0},
+      });
+    }
+    if (toolName == "texture_search")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 0},
+      });
+    }
+    if (toolName == "asset_place_model")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-2"},
+        {"transactionName", "MCP: Place model asset"},
+      });
+    }
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::ToolNotFound, QString{"Unknown test tool"});
   }};
@@ -227,6 +246,36 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("count").toInt() == 0);
+  }
+
+  SECTION("read-only mode serves asset and texture search")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto assetResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"1", "secret", "asset_search", {}, mcp::McpMode::ReadOnly});
+    CHECK(assetResponse.ok);
+
+    const auto textureResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"2", "secret", "texture_search", {}, mcp::McpMode::ReadOnly});
+    CHECK(textureResponse.ok);
+  }
+
+  SECTION("edit mode serves asset placement")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "asset_place_model",
+      QJsonObject{{"path", "models/player.mdl"}},
+      mcp::McpMode::Edit});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("operationId").toString() == "mcp-op-2");
   }
 }
 

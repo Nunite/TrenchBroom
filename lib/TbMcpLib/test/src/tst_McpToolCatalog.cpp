@@ -54,8 +54,12 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("selection_set"));
     CHECK(names.contains("overlay_set"));
     CHECK(names.contains("history_list"));
+    CHECK(names.contains("asset_search"));
+    CHECK(names.contains("texture_search"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
+    CHECK(!names.contains("asset_place_model"));
+    CHECK(!names.contains("texture_apply"));
     CHECK(!names.contains("action_execute"));
     CHECK(!names.contains("history_undo_mcp"));
   }
@@ -76,6 +80,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_create_box"));
     CHECK(names.contains("brush_create_wedge"));
     CHECK(names.contains("brush_create_cylinder"));
+    CHECK(names.contains("asset_place_model"));
+    CHECK(names.contains("asset_place_sprite"));
+    CHECK(names.contains("asset_place_sound"));
+    CHECK(names.contains("texture_apply"));
     CHECK(names.contains("history_undo_mcp"));
     CHECK(names.contains("history_redo_mcp"));
   }
