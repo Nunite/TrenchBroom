@@ -21,14 +21,21 @@
 
 ### Windows Release build used by this branch
 - The active local Release build tree is usually `build-release-codex`.
-- On this machine, use the Visual Studio developer environment wrapper before CMake builds:
+- On this machine, prefer the checked-in wrapper script instead of hand-written CMake commands:
   ```powershell
-  cmd.exe /c 'call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build build-release-codex --target TrenchBroom --config Release --parallel'
+  scripts\build_release_codex.cmd
+  ```
+- This is important because the local Windows SDK tools are installed under `D:\Windows Kits\10\...`, not only the default Visual Studio-discovered path. The wrapper script pins `VsDevCmd.bat`, `rc.exe`, and `mt.exe` so Release rebuilds stay reproducible.
+- The wrapper script deletes and recreates the target build directory before configuring. Do not point it at an arbitrary directory unless you intentionally want a full clean rebuild there.
+- If you need the same clean Release flow for another directory, pass it explicitly:
+  ```powershell
+  scripts\build_release_codex.cmd build-release-other
   ```
 - For UI/library work, build the focused test target first:
   ```powershell
   cmd.exe /c 'call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build build-release-codex --target TbUiLibTest --config Release --parallel'
   ```
+- If a plain `cmake --build build-release-codex ...` fails with missing SDK tools, missing `kernel32.lib`, or `type_traits`/STL lookup errors, assume the shell environment is incomplete and go back to `scripts\build_release_codex.cmd` instead of debugging source code first.
 - Run focused Catch2 tests directly from the build tree, for example:
   ```powershell
   build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "ModelBrowserView"
