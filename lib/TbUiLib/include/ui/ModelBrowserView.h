@@ -81,6 +81,14 @@ private:
   QImage m_folderIconImage;
   GLuint m_folderIconTextureId = 0;
   AssetPreviewMap m_assetPreviews;
+  struct SpritePreviewTexture
+  {
+    GLuint textureId = 0;
+    size_t width = 0;
+    size_t height = 0;
+  };
+  std::map<std::filesystem::path, SpritePreviewTexture> m_spritePreviewTextures;
+  std::vector<GLuint> m_pendingDeletedSpriteTextures;
   bool m_hasSelection = false;
   BrowserCellType m_selectedType = BrowserCellType::Folder;
   std::filesystem::path m_selectedPath;
@@ -120,6 +128,10 @@ private:
   void destroyFolderIconTexture();
   const AssetPreviewState* assetPreview(const std::filesystem::path& path) const;
   void loadPreviews();
+  void invalidateSpritePreviewTextures();
+  void deletePendingSpritePreviewTextures(gl::Gl& gl);
+  const SpritePreviewTexture* ensureSpritePreviewTexture(
+    gl::Gl& gl, const std::filesystem::path& path, const GoldSrcSpritePreview& preview);
 
   void renderHoveredCellBounds(
     gl::Gl& gl, Layout& layout, float y, float height, BrowserCellType type);

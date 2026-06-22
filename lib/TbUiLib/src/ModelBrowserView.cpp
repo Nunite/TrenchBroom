@@ -26,6 +26,7 @@
 #include <QMessageBox>
 #include <QScrollBar>
 
+#include "Macros.h"
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "fs/DiskIO.h"
@@ -128,6 +129,7 @@ void ModelBrowserView::setAssets(
   m_rootFolderPath = std::move(rootFolderPath);
   m_assets = std::move(assets);
   m_assetPreviews.clear();
+  invalidateSpritePreviewTextures();
   loadPreviews();
   m_currentFolderPath.clear();
   m_hasSelection = false;
@@ -207,6 +209,7 @@ void ModelBrowserView::setSearchText(QString searchText)
 void ModelBrowserView::resourcesWereProcessed(const std::vector<mdl::ResourceId>&)
 {
   m_assetPreviews.clear();
+  invalidateSpritePreviewTextures();
   loadPreviews();
   invalidate();
   update();
@@ -245,6 +248,8 @@ void ModelBrowserView::doClear() {}
 void ModelBrowserView::doRender(
   gl::Gl& gl, Layout& layout, const float y, const float height)
 {
+  deletePendingSpritePreviewTextures(gl);
+
   const auto viewLeft = float(0);
   const auto viewTop = float(size().height());
   const auto viewRight = float(size().width());
@@ -328,6 +333,82 @@ void ModelBrowserView::loadPreviews()
 {
   m_assetPreviews =
     loadAssetPreviews(AssetPreviewProvider{m_map.gameFileSystem()}, m_assets);
+}
+
+void ModelBrowserView::invalidateSpritePreviewTextures()
+{
+  for (const auto& [path, texture] : m_spritePreviewTextures)
+  {
+    unused(path);
+    if (texture.textureId != 0)
+    {
+      m_pendingDeletedSpriteTextures.push_back(texture.textureId);
+    }
+  }
+  m_spritePreviewTextures.clear();
+}
+
+void ModelBrowserView::deletePendingSpritePreviewTextures(gl::Gl& gl)
+{
+  if (m_pendingDeletedSpriteTextures.empty())
+  {
+    return;
+  }
+
+  gl.deleteTextures(
+    GLsizei(m_pendingDeletedSpriteTextures.size()),
+    m_pendingDeletedSpriteTextures.data());
+  m_pendingDeletedSpriteTextures.clear();
+}
+
+const ModelBrowserView::SpritePreviewTexture* ModelBrowserView::
+  ensureSpritePreviewTexture(
+    gl::Gl& gl, const std::filesystem::path& path, const GoldSrcSpritePreview& preview)
+{
+  if (preview.rgba.empty())
+  {
+    return nullptr;
+  }
+
+  if (auto it = m_spritePreviewTextures.find(path);
+      it != std::end(m_spritePreviewTextures))
+  {
+    if (it->second.width == preview.width && it->second.height == preview.height)
+    {
+      return &it->second;
+    }
+
+    if (it->second.textureId != 0)
+    {
+      gl.deleteTextures(1, &it->second.textureId);
+    }
+    m_spritePreviewTextures.erase(it);
+  }
+
+  auto textureId = GLuint{0};
+  gl.genTextures(1, &textureId);
+  gl.bindTexture(GL_TEXTURE_2D, textureId);
+  gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  gl.pixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(
+    GL_TEXTURE_2D,
+    0,
+    GL_RGBA,
+    GLsizei(preview.width),
+    GLsizei(preview.height),
+    0,
+    GL_RGBA,
+    GL_UNSIGNED_BYTE,
+    preview.rgba.data());
+  gl.bindTexture(GL_TEXTURE_2D, 0);
+
+  const auto [it, inserted] = m_spritePreviewTextures.emplace(
+    path, SpritePreviewTexture{textureId, preview.width, preview.height});
+  unused(inserted);
+  return &it->second;
 }
 
 bool ModelBrowserView::shouldRenderFocusIndicator() const
@@ -666,24 +747,11 @@ void ModelBrowserView::renderSpritePreviews(
         const auto right = left + imageWidth;
         const auto bottom = top + imageHeight;
 
-        auto textureId = GLuint{0};
-        gl.genTextures(1, &textureId);
-        gl.bindTexture(GL_TEXTURE_2D, textureId);
-        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        gl.pixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        gl.texImage2D(
-          GL_TEXTURE_2D,
-          0,
-          GL_RGBA,
-          GLsizei(preview.width),
-          GLsizei(preview.height),
-          0,
-          GL_RGBA,
-          GL_UNSIGNED_BYTE,
-          preview.rgba.data());
+        const auto* texture = ensureSpritePreviewTexture(gl, item.path, preview);
+        if (!texture || texture->textureId == 0)
+        {
+          continue;
+        }
 
         auto vertices = std::vector<Vertex>{
           Vertex{vm::vec2f{left, height - (top - y)}, vm::vec2f{0, 0}},
@@ -692,6 +760,7 @@ void ModelBrowserView::renderSpritePreviews(
           Vertex{vm::vec2f{right, height - (top - y)}, vm::vec2f{1, 0}},
         };
 
+        gl.bindTexture(GL_TEXTURE_2D, texture->textureId);
         auto vertexArray = gl::VertexArray::move(std::move(vertices));
         vertexArray.prepare(gl, vboManager());
         if (vertexArray.setup(gl, shader.program()))
@@ -701,7 +770,6 @@ void ModelBrowserView::renderSpritePreviews(
         }
 
         gl.bindTexture(GL_TEXTURE_2D, 0);
-        gl.deleteTextures(1, &textureId);
       }
     }
   }
