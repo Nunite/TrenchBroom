@@ -40,16 +40,16 @@ class McpBridgeServer : public QObject
 {
   Q_OBJECT
 public:
-  using StatusProvider = std::function<QJsonObject()>;
+  using ToolHandler = std::function<QJsonObject(const QString&, const QJsonObject&)>;
 
 private:
   mcp::McpBridgeConfig m_config;
-  StatusProvider m_statusProvider;
+  ToolHandler m_toolHandler;
   std::unique_ptr<QLocalServer> m_server;
 
 public:
   explicit McpBridgeServer(AppController& appController, QObject* parent = nullptr);
-  explicit McpBridgeServer(StatusProvider statusProvider, QObject* parent = nullptr);
+  explicit McpBridgeServer(ToolHandler toolHandler, QObject* parent = nullptr);
   ~McpBridgeServer() override;
 
   bool start(const mcp::McpBridgeConfig& config, QString* error = nullptr);

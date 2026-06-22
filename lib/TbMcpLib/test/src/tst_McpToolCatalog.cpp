@@ -33,9 +33,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("tb_status"));
     CHECK(findToolDefinition("documents_list"));
     CHECK(findToolDefinition("map_snapshot"));
+    CHECK(findToolDefinition("map_search"));
     CHECK(findToolDefinition("selection_get"));
     CHECK(findToolDefinition("actions_list"));
-    CHECK(findToolDefinition("overlay_clear"));
+    CHECK(findToolDefinition("overlay_set"));
   }
 
   SECTION("read-only mode lists implemented read-only tools only")
@@ -49,8 +50,12 @@ TEST_CASE("McpToolCatalog")
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("map_snapshot"));
+    CHECK(names.contains("map_search"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
+    CHECK(!names.contains("selection_set"));
+    CHECK(!names.contains("action_execute"));
+    CHECK(!names.contains("overlay_set"));
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")

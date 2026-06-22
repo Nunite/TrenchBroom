@@ -29,11 +29,28 @@ namespace mcp = tb::mcp;
 
 TEST_CASE("McpBridgeServer")
 {
-  auto server = McpBridgeServer{[]() {
-    return QJsonObject{
-      {"application", "TrenchBroom"},
-      {"mode", "ReadOnly"},
-    };
+  auto server = McpBridgeServer{[](const QString& toolName, const QJsonObject&) {
+    if (toolName == "tb_status")
+    {
+      return QJsonObject{
+        {"application", "TrenchBroom"},
+        {"mode", "ReadOnly"},
+      };
+    }
+    if (toolName == "documents_list")
+    {
+      return QJsonObject{
+        {"count", 0},
+      };
+    }
+    if (toolName == "map_search")
+    {
+      return QJsonObject{
+        {"count", 1},
+        {"query", "worldspawn"},
+      };
+    }
+    return QJsonObject{};
   }};
 
   SECTION("off mode does not listen")
@@ -68,6 +85,48 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("application").toString() == "TrenchBroom");
+  }
+
+  SECTION("serves wired read-only tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(
+      mcp::McpBridgeRequest{"1", "secret", "documents_list", {}, mcp::McpMode::ReadOnly});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("count").toInt() == 0);
+  }
+
+  SECTION("serves map_search")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "map_search",
+      QJsonObject{{"query", "worldspawn"}},
+      mcp::McpMode::ReadOnly});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("query").toString() == "worldspawn");
+    CHECK(response.result.value("count").toInt() == 1);
+  }
+
+  SECTION("rejects unwired tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(
+      mcp::McpBridgeRequest{"1", "secret", "selection_set", {}, mcp::McpMode::ReadOnly});
+
+    CHECK(!response.ok);
+    REQUIRE(response.error);
+    CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
   }
 
   SECTION("mode gating rejects edit tools")

@@ -25,7 +25,24 @@
 
 #include "mcp/McpError.h"
 #include "mcp/McpToolCatalog.h"
+#include "mdl/Brush.h"
+#include "mdl/BrushNode.h"
+#include "mdl/Entity.h"
+#include "mdl/EntityNode.h"
+#include "mdl/EntityNodeBase.h"
+#include "mdl/GameInfo.h"
+#include "mdl/Grid.h"
+#include "mdl/GroupNode.h"
+#include "mdl/LayerNode.h"
 #include "mdl/Map.h"
+#include "mdl/MapFormat.h"
+#include "mdl/Node.h"
+#include "mdl/PatchNode.h"
+#include "mdl/Selection.h"
+#include "mdl/WorldNode.h"
+#include "ui/Action.h"
+#include "ui/ActionExecutionContext.h"
+#include "ui/ActionManager.h"
 #include "ui/AppController.h"
 #include "ui/GetVersion.h"
 #include "ui/MapDocument.h"
@@ -39,6 +56,345 @@ namespace mcp = tb::mcp;
 
 namespace
 {
+
+QJsonArray vecToJson(const vm::vec3d& value)
+{
+  return QJsonArray{
+    value.x(),
+    value.y(),
+    value.z(),
+  };
+}
+
+QJsonObject boundsToJson(const vm::bbox3d& bounds)
+{
+  return QJsonObject{
+    {"min", vecToJson(bounds.min)},
+    {"max", vecToJson(bounds.max)},
+  };
+}
+
+QString pathToQString(const std::filesystem::path& path)
+{
+  return path.empty() ? QString{} : pathAsQString(path);
+}
+
+QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
+{
+  if (&node == &worldNode)
+  {
+    return "node:world";
+  }
+
+  auto parts = QStringList{};
+  for (const auto index : node.pathFrom(worldNode).indices)
+  {
+    parts.push_back(QString::number(index));
+  }
+  return QString{"node:%1"}.arg(parts.join('/'));
+}
+
+QString nodeTypeName(const mdl::Node& node)
+{
+  if (dynamic_cast<const mdl::WorldNode*>(&node) != nullptr)
+  {
+    return "world";
+  }
+  if (dynamic_cast<const mdl::LayerNode*>(&node) != nullptr)
+  {
+    return "layer";
+  }
+  if (dynamic_cast<const mdl::GroupNode*>(&node) != nullptr)
+  {
+    return "group";
+  }
+  if (dynamic_cast<const mdl::EntityNode*>(&node) != nullptr)
+  {
+    return "entity";
+  }
+  if (dynamic_cast<const mdl::BrushNode*>(&node) != nullptr)
+  {
+    return "brush";
+  }
+  if (dynamic_cast<const mdl::PatchNode*>(&node) != nullptr)
+  {
+    return "patch";
+  }
+  return "node";
+}
+
+QJsonObject nodeSummaryJson(const mdl::Node& node, const mdl::WorldNode& worldNode)
+{
+  auto result = QJsonObject{
+    {"id", nodePathId(node, worldNode)},
+    {"type", nodeTypeName(node)},
+    {"name", QString::fromStdString(node.name())},
+    {"selected", node.selected()},
+    {"childCount", static_cast<int>(node.childCount())},
+    {"descendantCount", static_cast<int>(node.descendantCount())},
+    {"logicalBounds", boundsToJson(node.logicalBounds())},
+  };
+
+  if (const auto* nodeAsWorld = dynamic_cast<const mdl::WorldNode*>(&node))
+  {
+    result.insert("classname", QString::fromStdString(nodeAsWorld->entity().classname()));
+  }
+  else if (const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(&node))
+  {
+    result.insert("classname", QString::fromStdString(entityNode->entity().classname()));
+  }
+  else if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(&node))
+  {
+    result.insert("faceCount", static_cast<int>(brushNode->brush().faceCount()));
+  }
+
+  return result;
+}
+
+void collectMapCounts(const mdl::Node& node, int& entities, int& brushes, int& patches)
+{
+  if (dynamic_cast<const mdl::EntityNode*>(&node) != nullptr)
+  {
+    ++entities;
+  }
+  else if (dynamic_cast<const mdl::BrushNode*>(&node) != nullptr)
+  {
+    ++brushes;
+  }
+  else if (dynamic_cast<const mdl::PatchNode*>(&node) != nullptr)
+  {
+    ++patches;
+  }
+
+  for (const auto* child : node.children())
+  {
+    collectMapCounts(*child, entities, brushes, patches);
+  }
+}
+
+QJsonObject documentJson(const MapWindow& mapWindow, const int index)
+{
+  const auto& map = mapWindow.document().map();
+  return QJsonObject{
+    {"index", index},
+    {"fileName", QString::fromStdString(map.filename())},
+    {"path", pathToQString(map.path())},
+    {"persistent", map.persistent()},
+    {"modified", map.modified()},
+    {"game", QString::fromStdString(map.gameInfo().gameConfig.name)},
+    {"mapFormat", QString::fromStdString(mdl::formatName(map.worldNode().mapFormat()))},
+  };
+}
+
+QJsonObject activeDocumentJson(AppController& appController)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return {};
+  }
+
+  return documentJson(*mapWindow, 0);
+}
+
+QJsonObject mapSnapshotJson(AppController& appController)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return {};
+  }
+
+  const auto& map = mapWindow->document().map();
+  const auto& worldNode = map.worldNode();
+  const auto& grid = map.grid();
+
+  auto entities = 0;
+  auto brushes = 0;
+  auto patches = 0;
+  collectMapCounts(worldNode, entities, brushes, patches);
+
+  auto worldspawn = QJsonObject{};
+  for (const auto& property : worldNode.entity().properties())
+  {
+    worldspawn.insert(
+      QString::fromStdString(property.key()), QString::fromStdString(property.value()));
+  }
+
+  return QJsonObject{
+    {"document", documentJson(*mapWindow, 0)},
+    {"world", nodeSummaryJson(worldNode, worldNode)},
+    {"worldspawn", worldspawn},
+    {"entityCount", entities},
+    {"brushCount", brushes},
+    {"patchCount", patches},
+    {"nodeCount", static_cast<int>(worldNode.descendantCount() + 1)},
+    {"bounds", boundsToJson(worldNode.logicalBounds())},
+    {"grid",
+     QJsonObject{
+       {"size", grid.size()},
+       {"actualSize", grid.actualSize()},
+       {"snap", grid.snap()},
+       {"visible", grid.visible()},
+     }},
+  };
+}
+
+bool textMatches(const QString& text, const QString& query)
+{
+  return text.contains(query, Qt::CaseInsensitive);
+}
+
+bool nodeMatchesQuery(
+  const mdl::Node& node, const mdl::WorldNode& worldNode, const QString& query)
+{
+  if (
+    textMatches(nodePathId(node, worldNode), query)
+    || textMatches(nodeTypeName(node), query)
+    || textMatches(QString::fromStdString(node.name()), query))
+  {
+    return true;
+  }
+
+  if (const auto* entityNode = dynamic_cast<const mdl::EntityNodeBase*>(&node))
+  {
+    if (textMatches(QString::fromStdString(entityNode->entity().classname()), query))
+    {
+      return true;
+    }
+
+    for (const auto& property : entityNode->entity().properties())
+    {
+      if (
+        textMatches(QString::fromStdString(property.key()), query)
+        || textMatches(QString::fromStdString(property.value()), query))
+      {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+void collectSearchResults(
+  const mdl::Node& node,
+  const mdl::WorldNode& worldNode,
+  const QString& query,
+  QJsonArray& results)
+{
+  if (nodeMatchesQuery(node, worldNode, query))
+  {
+    results.push_back(nodeSummaryJson(node, worldNode));
+  }
+
+  for (const auto* child : node.children())
+  {
+    collectSearchResults(*child, worldNode, query, results);
+  }
+}
+
+QJsonObject mapSearchJson(AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  const auto query = params.value("query").toString().trimmed();
+
+  if (!mapWindow || query.isEmpty())
+  {
+    return QJsonObject{
+      {"query", query},
+      {"results", QJsonArray{}},
+      {"count", 0},
+    };
+  }
+
+  const auto& worldNode = mapWindow->document().map().worldNode();
+  auto results = QJsonArray{};
+  collectSearchResults(worldNode, worldNode, query, results);
+
+  return QJsonObject{
+    {"query", query},
+    {"results", results},
+    {"count", results.size()},
+  };
+}
+
+QJsonObject selectionJson(AppController& appController)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return {};
+  }
+
+  const auto& map = mapWindow->document().map();
+  const auto& worldNode = map.worldNode();
+  const auto& selection = map.selection();
+
+  auto nodes = QJsonArray{};
+  for (const auto* node : selection.nodes)
+  {
+    nodes.push_back(nodeSummaryJson(*node, worldNode));
+  }
+
+  return QJsonObject{
+    {"hasSelection", selection.hasAny()},
+    {"nodes", nodes},
+    {"nodeCount", static_cast<int>(selection.nodes.size())},
+    {"groupCount", static_cast<int>(selection.groups.size())},
+    {"entityCount", static_cast<int>(selection.entities.size())},
+    {"brushCount", static_cast<int>(selection.brushes.size())},
+    {"patchCount", static_cast<int>(selection.patches.size())},
+    {"brushFaceCount", static_cast<int>(selection.brushFaces.size())},
+  };
+}
+
+QJsonObject actionsListJson(AppController& appController)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  auto context = ActionExecutionContext{appController, mapWindow, nullptr};
+
+  auto actions = QJsonArray{};
+  for (const auto& [path, action] : appController.actionManager().actionsMap())
+  {
+    const auto enabled = action.enabled(context);
+    auto actionJson = QJsonObject{
+      {"id", pathAsGenericQString(path)},
+      {"label", action.label()},
+      {"enabled", enabled},
+      {"menuAction", action.isMenuAction()},
+      {"checkable", action.checkable()},
+    };
+
+    if (action.checkable())
+    {
+      actionJson.insert("checked", action.checked(context));
+    }
+
+    actions.push_back(actionJson);
+  }
+
+  return QJsonObject{
+    {"actions", actions},
+    {"count", actions.size()},
+  };
+}
+
+QJsonObject documentsListJson(AppController& appController)
+{
+  auto documents = QJsonArray{};
+  auto index = 0;
+  for (const auto* mapWindow : appController.mapWindowManager().mapWindows())
+  {
+    documents.push_back(documentJson(*mapWindow, index));
+    ++index;
+  }
+
+  return QJsonObject{
+    {"documents", documents},
+    {"count", documents.size()},
+  };
+}
 
 QJsonObject makeStatus(AppController& appController, const mcp::McpBridgeConfig& config)
 {
@@ -64,6 +420,23 @@ QJsonObject makeStatus(AppController& appController, const mcp::McpBridgeConfig&
   return result;
 }
 
+QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig& config)
+{
+  const auto implementedTools = mcp::toolsListJson(config.mode);
+  return QJsonObject{
+    {"configPath", mcp::defaultConfigPath()},
+    {"pipeName", config.pipeName},
+    {"mode", mcp::modeName(config.mode)},
+    {"tokenPresent", !config.token.isEmpty()},
+    {"listening", config.mode != mcp::McpMode::Off},
+    {"documentCount",
+     static_cast<int>(appController.mapWindowManager().mapWindows().size())},
+    {"activeDocument", appController.mapWindowManager().topMapWindow() != nullptr},
+    {"implementedToolCount", implementedTools.size()},
+    {"implementedTools", implementedTools},
+  };
+}
+
 mcp::McpBridgeResponse makeFailure(
   const mcp::McpBridgeRequest& request,
   const mcp::McpErrorCode code,
@@ -76,13 +449,48 @@ mcp::McpBridgeResponse makeFailure(
 
 McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
   : McpBridgeServer{
-      [&appController, this]() { return makeStatus(appController, m_config); }, parent}
+      [&appController, this](const auto& toolName, const auto& params) {
+        if (toolName == "tb_status")
+        {
+          return makeStatus(appController, m_config);
+        }
+        if (toolName == "tb_doctor")
+        {
+          return doctorJson(appController, m_config);
+        }
+        if (toolName == "documents_list")
+        {
+          return documentsListJson(appController);
+        }
+        if (toolName == "document_snapshot")
+        {
+          return activeDocumentJson(appController);
+        }
+        if (toolName == "map_snapshot")
+        {
+          return mapSnapshotJson(appController);
+        }
+        if (toolName == "map_search")
+        {
+          return mapSearchJson(appController, params);
+        }
+        if (toolName == "selection_get")
+        {
+          return selectionJson(appController);
+        }
+        if (toolName == "actions_list")
+        {
+          return actionsListJson(appController);
+        }
+        return QJsonObject{};
+      },
+      parent}
 {
 }
 
-McpBridgeServer::McpBridgeServer(StatusProvider statusProvider, QObject* parent)
+McpBridgeServer::McpBridgeServer(ToolHandler toolHandler, QObject* parent)
   : QObject{parent}
-  , m_statusProvider{std::move(statusProvider)}
+  , m_toolHandler{std::move(toolHandler)}
 {
 }
 
@@ -173,9 +581,14 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
       QString{"MCP tool is not available in mode %1"}.arg(mcp::modeName(m_config.mode)));
   }
 
-  if (request.tool == "tb_status")
+  if (
+    request.tool == "tb_status" || request.tool == "tb_doctor"
+    || request.tool == "documents_list" || request.tool == "document_snapshot"
+    || request.tool == "map_snapshot" || request.tool == "map_search"
+    || request.tool == "selection_get" || request.tool == "actions_list")
   {
-    return mcp::McpBridgeResponse::success(request.id, m_statusProvider());
+    return mcp::McpBridgeResponse::success(
+      request.id, m_toolHandler(request.tool, request.params));
   }
 
   return makeFailure(
