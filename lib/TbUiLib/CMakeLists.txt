@@ -106,6 +106,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GetVersion.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GlFunctions.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GlQt.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/GoldSrcSpritePreview.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/HandleDragTracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ImageListBox.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ImageUtils.cpp
@@ -360,6 +361,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/GetVersion.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/GlFunctions.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/GlQt.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/GoldSrcSpritePreview.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/HandleDragTracker.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ImageListBox.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ImageUtils.h

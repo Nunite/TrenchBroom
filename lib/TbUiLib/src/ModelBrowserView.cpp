@@ -62,8 +62,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <variant>
 #include <vector>
 
@@ -253,6 +255,7 @@ void ModelBrowserView::setAssets(
 {
   m_rootFolderPath = std::move(rootFolderPath);
   m_assets = std::move(assets);
+  m_spritePreviewCache.clear();
   m_currentFolderPath.clear();
   m_hasSelection = false;
   m_hasHover = false;
@@ -330,6 +333,7 @@ void ModelBrowserView::setSearchText(QString searchText)
 
 void ModelBrowserView::resourcesWereProcessed(const std::vector<mdl::ResourceId>&)
 {
+  m_spritePreviewCache.clear();
   invalidate();
   update();
 }
@@ -385,6 +389,7 @@ void ModelBrowserView::doRender(
   renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Sound);
   renderFolders(gl, layout, y, height);
   renderAssetPlaceholders(gl, layout, y, height);
+  renderSpritePreviews(gl, layout, y, height);
 
   const auto projection =
     vm::ortho_matrix(-1024.0f, 1024.0f, viewLeft, viewTop, viewRight, viewBottom);
@@ -436,6 +441,44 @@ void ModelBrowserView::destroyFolderIconTexture()
   }
 
   m_folderIconTextureId = 0;
+}
+
+const std::optional<GoldSrcSpritePreview>& ModelBrowserView::spritePreview(
+  const std::filesystem::path& path)
+{
+  auto& entry = m_spritePreviewCache[path];
+  if (entry.loaded)
+  {
+    return entry.preview;
+  }
+
+  entry.loaded = true;
+
+  auto file = std::shared_ptr<fs::File>{};
+  if (path.is_absolute())
+  {
+    auto fileResult = fs::Disk::openFile(path);
+    if (fileResult.is_error())
+    {
+      return entry.preview;
+    }
+    file = fileResult.value();
+  }
+  else
+  {
+    auto fileResult = m_map.gameFileSystem().openFile(path);
+    if (fileResult.is_error())
+    {
+      return entry.preview;
+    }
+    file = fileResult.value();
+  }
+
+  auto reader = file->reader().buffer();
+  const auto bytes = reader.stringView();
+  entry.preview = loadGoldSrcSpritePreview(
+    std::span{reinterpret_cast<const std::uint8_t*>(bytes.data()), bytes.size()});
+  return entry.preview;
 }
 
 bool ModelBrowserView::shouldRenderFocusIndicator() const
@@ -665,6 +708,103 @@ void ModelBrowserView::renderAssetPlaceholders(
   {
     iconVertexArray.render(gl, gl::PrimType::Quads);
     iconVertexArray.cleanup(gl, shader.program());
+  }
+}
+
+void ModelBrowserView::renderSpritePreviews(
+  gl::Gl& gl, Layout& layout, const float y, const float height)
+{
+  using Vertex = gl::VertexTypes::P2UV2::Vertex;
+
+  auto shader = gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserShader};
+  shader.set("ApplyTinting", false);
+  shader.set("Material", 0);
+  shader.set("Brightness", 1.0f);
+
+  for (const auto& group : layout.groups())
+  {
+    if (!group.intersectsY(y, height))
+    {
+      continue;
+    }
+
+    for (const auto& row : group.rows())
+    {
+      if (!row.intersectsY(y, height))
+      {
+        continue;
+      }
+
+      for (const auto& cell : row.cells())
+      {
+        const auto& item = cellData(cell);
+        if (item.type != BrowserCellType::Sprite)
+        {
+          continue;
+        }
+
+        const auto& preview = spritePreview(item.path);
+        if (!preview || preview->rgba.empty())
+        {
+          continue;
+        }
+
+        const auto& bounds = cell.itemBounds();
+        const auto maxWidth = bounds.width - 16.0f;
+        const auto maxHeight = bounds.height - 16.0f;
+        if (maxWidth <= 0.0f || maxHeight <= 0.0f)
+        {
+          continue;
+        }
+
+        const auto previewWidth = float(preview->width);
+        const auto previewHeight = float(preview->height);
+        const auto scale = std::min(maxWidth / previewWidth, maxHeight / previewHeight);
+        const auto imageWidth = previewWidth * scale;
+        const auto imageHeight = previewHeight * scale;
+        const auto left = bounds.left() + (bounds.width - imageWidth) / 2.0f;
+        const auto top = bounds.top() + (bounds.height - imageHeight) / 2.0f;
+        const auto right = left + imageWidth;
+        const auto bottom = top + imageHeight;
+
+        auto textureId = GLuint{0};
+        gl.genTextures(1, &textureId);
+        gl.bindTexture(GL_TEXTURE_2D, textureId);
+        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        gl.pixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        gl.texImage2D(
+          GL_TEXTURE_2D,
+          0,
+          GL_RGBA,
+          GLsizei(preview->width),
+          GLsizei(preview->height),
+          0,
+          GL_RGBA,
+          GL_UNSIGNED_BYTE,
+          preview->rgba.data());
+
+        auto vertices = std::vector<Vertex>{
+          Vertex{vm::vec2f{left, height - (top - y)}, vm::vec2f{0, 0}},
+          Vertex{vm::vec2f{left, height - (bottom - y)}, vm::vec2f{0, 1}},
+          Vertex{vm::vec2f{right, height - (bottom - y)}, vm::vec2f{1, 1}},
+          Vertex{vm::vec2f{right, height - (top - y)}, vm::vec2f{1, 0}},
+        };
+
+        auto vertexArray = gl::VertexArray::move(std::move(vertices));
+        vertexArray.prepare(gl, vboManager());
+        if (vertexArray.setup(gl, shader.program()))
+        {
+          vertexArray.render(gl, gl::PrimType::Quads);
+          vertexArray.cleanup(gl, shader.program());
+        }
+
+        gl.bindTexture(GL_TEXTURE_2D, 0);
+        gl.deleteTextures(1, &textureId);
+      }
+    }
   }
 }
 

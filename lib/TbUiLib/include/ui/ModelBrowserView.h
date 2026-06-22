@@ -24,11 +24,13 @@
 
 #include "NotifierConnection.h"
 #include "ui/CellView.h"
+#include "ui/GoldSrcSpritePreview.h"
 
 #include "vm/bbox.h"
 #include "vm/quat.h" // IWYU pragma: keep
 
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <vector>
 
@@ -111,6 +113,12 @@ private:
   NotifierConnection m_notifierConnection;
   QImage m_folderIconImage;
   GLuint m_folderIconTextureId = 0;
+  struct SpritePreviewCacheEntry
+  {
+    bool loaded = false;
+    std::optional<GoldSrcSpritePreview> preview;
+  };
+  std::map<std::filesystem::path, SpritePreviewCacheEntry> m_spritePreviewCache;
   bool m_hasSelection = false;
   BrowserCellType m_selectedType = BrowserCellType::Folder;
   std::filesystem::path m_selectedPath;
@@ -148,6 +156,8 @@ private:
 
   void ensureFolderIconTexture(gl::Gl& gl);
   void destroyFolderIconTexture();
+  const std::optional<GoldSrcSpritePreview>& spritePreview(
+    const std::filesystem::path& path);
 
   void renderHoveredCellBounds(
     gl::Gl& gl, Layout& layout, float y, float height, BrowserCellType type);
@@ -161,6 +171,7 @@ private:
     float height,
     render::Transformation& transformation);
   void renderAssetPlaceholders(gl::Gl& gl, Layout& layout, float y, float height);
+  void renderSpritePreviews(gl::Gl& gl, Layout& layout, float y, float height);
 
   vm::mat4x4f itemTransformation(
     const Cell& cell,
