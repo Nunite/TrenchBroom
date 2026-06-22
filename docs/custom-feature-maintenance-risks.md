@@ -2,6 +2,9 @@
 
 This document tracks custom features that are useful, but currently more invasive or less maintainable than the upstream TrenchBroom style. Keep this file updated as the issues are fixed.
 
+For a commit-oriented review of the current custom feature stack and suggested
+optimization order, see `docs/custom-feature-architecture-review.md`.
+
 ## High Priority
 
 ### Python v2 Runtime and Plugin API
@@ -51,8 +54,8 @@ This document tracks custom features that are useful, but currently more invasiv
 
 ### Generated Python Package Metadata
 
-- Risk: `python/src/trenchbroom_api.egg-info` is generated package metadata and does not belong in source history.
-- Suggested fix: remove generated package metadata from the repository and add ignore rules if needed.
+- Status: cleaned. `python/src/trenchbroom_api.egg-info` was removed from the repository, and `*.egg-info/` is ignored.
+- Keep this as a guardrail: generated Python packaging metadata should not be committed again.
 
 ### Development Scripts and Debug Artifacts
 

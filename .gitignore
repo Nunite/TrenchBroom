@@ -20,6 +20,7 @@ Thumbs.db
 /.idea
 /coverity
 *.pyc
+*.egg-info/
 app/resources/documentation/help/index.html
 *.whl
 *.tar.gz
