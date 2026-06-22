@@ -63,6 +63,19 @@ TEST_CASE("McpBridgeServer")
         {"active", true},
       });
     }
+    if (toolName == "entity_create")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-1"},
+        {"transactionName", "MCP: Create info_player_start"},
+      });
+    }
+    if (toolName == "history_list")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 0},
+      });
+    }
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::ToolNotFound, QString{"Unknown test tool"});
   }};
@@ -186,6 +199,34 @@ TEST_CASE("McpBridgeServer")
     CHECK(!response.ok);
     REQUIRE(response.error);
     CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
+  }
+
+  SECTION("edit mode serves edit tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "entity_create",
+      QJsonObject{{"classname", "info_player_start"}},
+      mcp::McpMode::Edit});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("operationId").toString() == "mcp-op-1");
+  }
+
+  SECTION("read-only mode serves history_list")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(
+      mcp::McpBridgeRequest{"1", "secret", "history_list", {}, mcp::McpMode::ReadOnly});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("count").toInt() == 0);
   }
 }
 

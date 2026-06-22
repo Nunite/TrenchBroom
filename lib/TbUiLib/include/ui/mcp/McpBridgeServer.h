@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <QJsonArray>
 #include <QObject>
 
 #include "mcp/McpBridgeConfig.h"
@@ -27,6 +28,7 @@
 
 #include <functional>
 #include <memory>
+#include <vector>
 
 class QLocalServer;
 class QLocalSocket;
@@ -47,6 +49,15 @@ struct McpBridgeToolResult
   static McpBridgeToolResult failure(mcp::McpErrorCode code, QString message);
 };
 
+struct McpOperationRecord
+{
+  QString operationId;
+  QString toolName;
+  QString transactionName;
+  QJsonArray changedObjectIds;
+  bool undone = false;
+};
+
 class McpBridgeServer : public QObject
 {
   Q_OBJECT
@@ -58,6 +69,8 @@ private:
   mcp::McpBridgeConfig m_config;
   ToolHandler m_toolHandler;
   QJsonObject m_overlayState;
+  mutable int m_nextOperationIndex = 1;
+  mutable std::vector<McpOperationRecord> m_operationHistory;
   std::unique_ptr<QLocalServer> m_server;
 
 public:

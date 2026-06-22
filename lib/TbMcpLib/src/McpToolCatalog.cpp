@@ -44,11 +44,55 @@ QJsonObject stringProperty(const QString& description)
   };
 }
 
+QJsonObject numberProperty(const QString& description)
+{
+  return QJsonObject{
+    {"type", "number"},
+    {"description", description},
+  };
+}
+
+QJsonObject integerProperty(const QString& description)
+{
+  return QJsonObject{
+    {"type", "integer"},
+    {"description", description},
+  };
+}
+
+QJsonObject boolProperty(const QString& description)
+{
+  return QJsonObject{
+    {"type", "boolean"},
+    {"description", description},
+  };
+}
+
 QJsonObject arrayProperty(const QString& description)
 {
   return QJsonObject{
     {"type", "array"},
     {"description", description},
+  };
+}
+
+QJsonObject vec3Property(const QString& description)
+{
+  return QJsonObject{
+    {"type", "array"},
+    {"description", description},
+    {"items", QJsonObject{{"type", "number"}}},
+    {"minItems", 3},
+    {"maxItems", 3},
+  };
+}
+
+QJsonObject stringObjectProperty(const QString& description)
+{
+  return QJsonObject{
+    {"type", "object"},
+    {"description", description},
+    {"additionalProperties", QJsonObject{{"type", "string"}}},
   };
 }
 
@@ -170,15 +214,115 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Create an entity in the active document.",
       McpMode::Edit,
       true,
-      false,
-      objectSchema(),
+      true,
+      objectSchema(
+        {
+          {"classname", stringProperty("Entity classname.")},
+          {"origin", vec3Property("Entity origin in map units.")},
+          {"properties", stringObjectProperty("Entity key/value properties.")},
+          {"select", boolProperty("Select the created entity.")},
+        },
+        {"classname"}),
+    },
+    {
+      "entity_update",
+      "Update entity key/value properties.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"objectId", stringProperty("MCP object id for a world or entity node.")},
+          {"properties", stringObjectProperty("Properties to add or update.")},
+          {"removeKeys", arrayProperty("Property keys to remove.")},
+        },
+        {"objectId"}),
+    },
+    {
+      "entity_delete",
+      "Delete an entity, brush, patch, group, or layer node.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"objectId", stringProperty("MCP object id to delete.")},
+        },
+        {"objectId"}),
     },
     {
       "brush_create_box",
       "Create a box brush in the active document.",
       McpMode::Edit,
       true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Minimum corner in map units.")},
+          {"max", vec3Property("Maximum corner in map units.")},
+          {"material",
+           stringProperty("Material name, defaults to the current material.")},
+          {"select", boolProperty("Select the created brush.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "brush_create_wedge",
+      "Create a wedge brush in the active document.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Minimum corner in map units.")},
+          {"max", vec3Property("Maximum corner in map units.")},
+          {"axis", stringProperty("Ramp direction axis: x, y, or z.")},
+          {"material",
+           stringProperty("Material name, defaults to the current material.")},
+          {"select", boolProperty("Select the created brush.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "brush_create_cylinder",
+      "Create a cylinder brush in the active document.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Minimum corner in map units.")},
+          {"max", vec3Property("Maximum corner in map units.")},
+          {"sides", integerProperty("Cylinder side count, defaults to 16.")},
+          {"axis", stringProperty("Cylinder axis: x, y, or z.")},
+          {"material",
+           stringProperty("Material name, defaults to the current material.")},
+          {"select", boolProperty("Select the created brush.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "history_list",
+      "List MCP operations recorded for the active bridge session.",
+      McpMode::ReadOnly,
       false,
+      true,
+      objectSchema(),
+    },
+    {
+      "history_undo_mcp",
+      "Undo the latest MCP operation if it is still on top of the native undo stack.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(),
+    },
+    {
+      "history_redo_mcp",
+      "Redo the latest MCP operation undone by history_undo_mcp.",
+      McpMode::Edit,
+      true,
+      true,
       objectSchema(),
     },
     {

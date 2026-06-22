@@ -23,24 +23,35 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 
+#include "gl/Material.h"
+#include "gl/MaterialManager.h"
 #include "mcp/McpError.h"
 #include "mcp/McpToolCatalog.h"
+#include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/Brush.h"
+#include "mdl/BrushBuilder.h"
 #include "mdl/BrushNode.h"
+#include "mdl/CircleShape.h"
 #include "mdl/EditorContext.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
+#include "mdl/EntityProperties.h"
 #include "mdl/GameInfo.h"
 #include "mdl/Grid.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
+#include "mdl/Map_Brushes.h"
+#include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Node.h"
+#include "mdl/NodeContents.h"
 #include "mdl/PatchNode.h"
 #include "mdl/Selection.h"
+#include "mdl/SwapNodeContentsCommand.h"
+#include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
 #include "ui/Action.h"
 #include "ui/ActionExecutionContext.h"
@@ -51,6 +62,14 @@
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
+
+#include "vm/bbox.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <map>
 
 namespace tb::ui
 {
@@ -331,6 +350,733 @@ void collectSearchResults(
   {
     collectSearchResults(*child, worldNode, query, results);
   }
+}
+
+QJsonObject operationRecordJson(const McpOperationRecord& operation)
+{
+  auto result = QJsonObject{};
+  result.insert("operationId", operation.operationId);
+  result.insert("toolName", operation.toolName);
+  result.insert("transactionName", operation.transactionName);
+  result.insert("changedObjectIds", operation.changedObjectIds);
+  result.insert("undone", operation.undone);
+  return result;
+}
+
+QJsonArray operationHistoryJson(const std::vector<McpOperationRecord>& history)
+{
+  auto result = QJsonArray{};
+  for (const auto& operation : history)
+  {
+    result.push_back(operationRecordJson(operation));
+  }
+  return result;
+}
+
+QString makeOperationId(int& nextOperationIndex)
+{
+  return QString{"mcp-op-%1"}.arg(nextOperationIndex++);
+}
+
+QJsonObject mutationResultJson(const McpOperationRecord& operation)
+{
+  auto result = QJsonObject{};
+  result.insert("operationId", operation.operationId);
+  result.insert("transactionName", operation.transactionName);
+  result.insert("changedObjectIds", operation.changedObjectIds);
+  result.insert("changedObjectCount", operation.changedObjectIds.size());
+  return result;
+}
+
+void recordOperation(
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const QString& toolName,
+  const QString& transactionName,
+  const QJsonArray& changedObjectIds,
+  QJsonObject& result)
+{
+  auto operation = McpOperationRecord{};
+  operation.operationId = makeOperationId(nextOperationIndex);
+  operation.toolName = toolName;
+  operation.transactionName = transactionName;
+  operation.changedObjectIds = changedObjectIds;
+  result = mutationResultJson(operation);
+  history.push_back(std::move(operation));
+}
+
+std::optional<vm::vec3d> vec3FromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array of three numbers"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto array = value.toArray();
+  if (array.size() != 3)
+  {
+    error = QString{"%1 must contain exactly three numbers"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto components = std::array<double, 3>{};
+  for (auto i = 0; i < 3; ++i)
+  {
+    if (!array[i].isDouble())
+    {
+      error = QString{"%1[%2] must be a number"}.arg(key).arg(i);
+      return std::nullopt;
+    }
+    components[static_cast<size_t>(i)] = array[i].toDouble();
+  }
+
+  return vm::vec3d{components[0], components[1], components[2]};
+}
+
+std::optional<vm::bbox3d> boundsFromJson(const QJsonObject& params, QString& error)
+{
+  const auto min = vec3FromJson(params, "min", error);
+  if (!min)
+  {
+    return std::nullopt;
+  }
+  const auto max = vec3FromJson(params, "max", error);
+  if (!max)
+  {
+    return std::nullopt;
+  }
+
+  if (
+    min->x() >= max->x() || min->y() >= max->y() || min->z() >= max->z()
+    || !std::isfinite(min->x()) || !std::isfinite(min->y()) || !std::isfinite(min->z())
+    || !std::isfinite(max->x()) || !std::isfinite(max->y()) || !std::isfinite(max->z()))
+  {
+    error = "min must be smaller than max on all axes";
+    return std::nullopt;
+  }
+
+  return vm::bbox3d{*min, *max};
+}
+
+std::string optionalString(
+  const QJsonObject& params, const QString& key, const std::string& defaultValue = {})
+{
+  const auto value = params.value(key);
+  return value.isString() ? value.toString().toStdString() : defaultValue;
+}
+
+bool optionalBool(const QJsonObject& params, const QString& key, const bool defaultValue)
+{
+  const auto value = params.value(key);
+  return value.isBool() ? value.toBool() : defaultValue;
+}
+
+size_t optionalSize(
+  const QJsonObject& params, const QString& key, const size_t defaultValue)
+{
+  const auto value = params.value(key);
+  if (!value.isDouble())
+  {
+    return defaultValue;
+  }
+  return static_cast<size_t>(std::max(0, value.toInt()));
+}
+
+std::optional<std::map<std::string, std::string>> stringMapFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (value.isUndefined())
+  {
+    return std::map<std::string, std::string>{};
+  }
+  if (!value.isObject())
+  {
+    error = QString{"%1 must be an object"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto result = std::map<std::string, std::string>{};
+  const auto object = value.toObject();
+  for (auto it = object.begin(); it != object.end(); ++it)
+  {
+    if (!it.value().isString())
+    {
+      error = QString{"%1.%2 must be a string"}.arg(key, it.key());
+      return std::nullopt;
+    }
+    result.emplace(it.key().toStdString(), it.value().toString().toStdString());
+  }
+  return result;
+}
+
+std::optional<std::vector<std::string>> stringArrayFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (value.isUndefined())
+  {
+    return std::vector<std::string>{};
+  }
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto result = std::vector<std::string>{};
+  for (const auto& item : value.toArray())
+  {
+    if (!item.isString())
+    {
+      error = QString{"%1 must contain only strings"}.arg(key);
+      return std::nullopt;
+    }
+    result.push_back(item.toString().toStdString());
+  }
+  return result;
+}
+
+std::optional<vm::axis::type> axisFromJson(
+  const QJsonObject& params,
+  const QString& key,
+  const vm::axis::type defaultValue,
+  QString& error)
+{
+  const auto value = params.value(key);
+  if (value.isUndefined())
+  {
+    return defaultValue;
+  }
+  if (!value.isString())
+  {
+    error = QString{"%1 must be x, y, or z"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto axis = value.toString().trimmed().toLower();
+  if (axis == "x")
+  {
+    return vm::axis::x;
+  }
+  if (axis == "y")
+  {
+    return vm::axis::y;
+  }
+  if (axis == "z")
+  {
+    return vm::axis::z;
+  }
+
+  error = QString{"%1 must be x, y, or z"}.arg(key);
+  return std::nullopt;
+}
+
+std::string materialNameFromParams(mdl::Map& map, const QJsonObject& params)
+{
+  auto material = optionalString(params, "material");
+  if (material.empty())
+  {
+    material = map.currentMaterialName();
+  }
+  if (material.empty())
+  {
+    material = "__TB_empty";
+  }
+  return material;
+}
+
+McpBridgeToolResult noActiveDocumentFailure()
+{
+  return McpBridgeToolResult::failure(
+    mcp::McpErrorCode::NoActiveDocument, "No active document");
+}
+
+McpBridgeToolResult invalidParamsFailure(const QString& message)
+{
+  return McpBridgeToolResult::failure(mcp::McpErrorCode::InvalidParams, message);
+}
+
+bool executeTransaction(
+  mdl::Map& map, const QString& transactionName, const std::function<bool()>& operation)
+{
+  auto transaction = mdl::Transaction{map, transactionName.toStdString()};
+  if (!operation())
+  {
+    transaction.cancel();
+    return false;
+  }
+  return transaction.commit();
+}
+
+std::optional<QJsonArray> addNodesWithTransaction(
+  mdl::Map& map,
+  const QString& transactionName,
+  const std::vector<mdl::Node*>& nodes,
+  const bool selectCreated)
+{
+  auto addedNodes = std::vector<mdl::Node*>{};
+  auto ok = executeTransaction(map, transactionName, [&]() {
+    if (selectCreated)
+    {
+      mdl::deselectAll(map);
+    }
+
+    auto* parent = mdl::parentForNodes(map);
+    if (!parent || !parent->canAddChildren(std::begin(nodes), std::end(nodes)))
+    {
+      return false;
+    }
+
+    auto nodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
+    nodesToAdd.emplace(parent, nodes);
+    if (!map.executeAndStore(mdl::AddRemoveNodesCommand::add(nodesToAdd)))
+    {
+      return false;
+    }
+
+    addedNodes = nodes;
+    if (selectCreated)
+    {
+      mdl::selectNodes(map, addedNodes);
+    }
+    return true;
+  });
+
+  if (!ok)
+  {
+    return std::nullopt;
+  }
+
+  auto result = QJsonArray{};
+  for (const auto* node : addedNodes)
+  {
+    result.push_back(nodePathId(*node, map.worldNode()));
+  }
+  return result;
+}
+
+std::optional<QJsonArray> updateNodeContentsWithTransaction(
+  mdl::Map& map,
+  const QString& transactionName,
+  std::vector<std::pair<mdl::Node*, mdl::NodeContents>> nodesToSwap)
+{
+  auto changedNodes = QJsonArray{};
+  for (const auto& [node, contents] : nodesToSwap)
+  {
+    unused(contents);
+    changedNodes.push_back(nodePathId(*node, map.worldNode()));
+  }
+
+  const auto ok = executeTransaction(map, transactionName, [&]() {
+    return map.executeAndStore(std::make_unique<mdl::SwapNodeContentsCommand>(
+      transactionName.toStdString(), std::move(nodesToSwap)));
+  });
+
+  return ok ? std::optional{changedNodes} : std::nullopt;
+}
+
+std::optional<QJsonArray> removeNodeWithTransaction(
+  mdl::Map& map, const QString& transactionName, mdl::Node& node)
+{
+  if (&node == &map.worldNode())
+  {
+    return std::nullopt;
+  }
+  auto* parent = node.parent();
+  if (!parent || !parent->canRemoveChild(node))
+  {
+    return std::nullopt;
+  }
+
+  const auto removedId = nodePathId(node, map.worldNode());
+  const auto ok = executeTransaction(map, transactionName, [&]() {
+    mdl::deselectNodes(map, {&node});
+    return map.executeAndStore(mdl::AddRemoveNodesCommand::remove({{parent, {&node}}}));
+  });
+
+  return ok ? std::optional{QJsonArray{removedId}} : std::nullopt;
+}
+
+McpBridgeToolResult createEntityResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto classname = params.value("classname").toString().trimmed();
+  if (classname.isEmpty())
+  {
+    return invalidParamsFailure("entity_create requires classname");
+  }
+
+  auto error = QString{};
+  const auto properties = stringMapFromJson(params, "properties", error);
+  if (!properties)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto entity =
+    mdl::Entity{{{mdl::EntityPropertyKeys::Classname, classname.toStdString()}}};
+  if (const auto origin = params.value("origin"); !origin.isUndefined())
+  {
+    const auto originVec = vec3FromJson(params, "origin", error);
+    if (!originVec)
+    {
+      return invalidParamsFailure(error);
+    }
+    entity.setOrigin(*originVec);
+  }
+
+  for (const auto& [key, value] : *properties)
+  {
+    if (key != mdl::EntityPropertyKeys::Classname)
+    {
+      entity.addOrUpdateProperty(key, value);
+    }
+  }
+
+  auto& map = mapWindow->document().map();
+  auto* entityNode = new mdl::EntityNode{std::move(entity)};
+  const auto transactionName = QString{"MCP: Create %1"}.arg(classname);
+  const auto changedObjectIds = addNodesWithTransaction(
+    map, transactionName, {entityNode}, optionalBool(params, "select", true));
+  if (!changedObjectIds)
+  {
+    delete entityNode;
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not create entity");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult updateEntityResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto objectId = params.value("objectId").toString().trimmed();
+  if (objectId.isEmpty())
+  {
+    return invalidParamsFailure("entity_update requires objectId");
+  }
+
+  auto& map = mapWindow->document().map();
+  auto* node = resolveNodeId(map.worldNode(), objectId);
+  auto* entityNode = dynamic_cast<mdl::EntityNodeBase*>(node);
+  if (!entityNode)
+  {
+    return invalidParamsFailure(QString{"Object is not an entity: %1"}.arg(objectId));
+  }
+
+  auto error = QString{};
+  const auto properties = stringMapFromJson(params, "properties", error);
+  if (!properties)
+  {
+    return invalidParamsFailure(error);
+  }
+  const auto removeKeys = stringArrayFromJson(params, "removeKeys", error);
+  if (!removeKeys)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto entity = entityNode->entity();
+  for (const auto& [key, value] : *properties)
+  {
+    entity.addOrUpdateProperty(key, value);
+  }
+  for (const auto& key : *removeKeys)
+  {
+    if (key != mdl::EntityPropertyKeys::Classname)
+    {
+      entity.removeProperty(key);
+    }
+  }
+
+  const auto transactionName = QString{"MCP: Update entity"};
+  auto nodesToSwap = std::vector<std::pair<mdl::Node*, mdl::NodeContents>>{};
+  nodesToSwap.emplace_back(entityNode, mdl::NodeContents{std::move(entity)});
+  const auto changedObjectIds =
+    updateNodeContentsWithTransaction(map, transactionName, std::move(nodesToSwap));
+  if (!changedObjectIds)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not update entity");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult deleteEntityResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto objectId = params.value("objectId").toString().trimmed();
+  if (objectId.isEmpty())
+  {
+    return invalidParamsFailure("entity_delete requires objectId");
+  }
+
+  auto& map = mapWindow->document().map();
+  auto* node = resolveNodeId(map.worldNode(), objectId);
+  if (!node)
+  {
+    return invalidParamsFailure(QString{"Unknown MCP object id: %1"}.arg(objectId));
+  }
+
+  const auto transactionName = QString{"MCP: Delete object"};
+  const auto changedObjectIds = removeNodeWithTransaction(map, transactionName, *node);
+  if (!changedObjectIds)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden,
+      QString{"Object cannot be deleted: %1"}.arg(objectId));
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+Result<mdl::Brush> createWedgeBrush(
+  const mdl::BrushBuilder& builder,
+  const vm::bbox3d& bounds,
+  const vm::axis::type axis,
+  const std::string& material)
+{
+  const auto& min = bounds.min;
+  const auto& max = bounds.max;
+
+  auto points = std::vector<vm::vec3d>{};
+  switch (axis)
+  {
+  case vm::axis::x:
+    points = {
+      {min.x(), min.y(), min.z()},
+      {min.x(), max.y(), min.z()},
+      {min.x(), min.y(), max.z()},
+      {min.x(), max.y(), max.z()},
+      {max.x(), min.y(), min.z()},
+      {max.x(), max.y(), min.z()},
+    };
+    break;
+  case vm::axis::y:
+    points = {
+      {min.x(), min.y(), min.z()},
+      {max.x(), min.y(), min.z()},
+      {min.x(), min.y(), max.z()},
+      {max.x(), min.y(), max.z()},
+      {min.x(), max.y(), min.z()},
+      {max.x(), max.y(), min.z()},
+    };
+    break;
+  case vm::axis::z:
+    points = {
+      {min.x(), min.y(), min.z()},
+      {max.x(), min.y(), min.z()},
+      {min.x(), max.y(), min.z()},
+      {max.x(), max.y(), min.z()},
+      {min.x(), min.y(), max.z()},
+      {max.x(), min.y(), max.z()},
+    };
+    break;
+  }
+
+  return builder.createBrush(points, material);
+}
+
+McpBridgeToolResult createBrushResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto error = QString{};
+  const auto bounds = boundsFromJson(params, error);
+  if (!bounds)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto material = materialNameFromParams(map, params);
+  const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+
+  auto brush = Result<mdl::Brush>{Error{"Unsupported brush tool"}};
+  auto transactionName = QString{};
+  if (toolName == "brush_create_box")
+  {
+    brush = builder.createCuboid(*bounds, material);
+    transactionName = "MCP: Create box brush";
+  }
+  else if (toolName == "brush_create_wedge")
+  {
+    const auto axis = axisFromJson(params, "axis", vm::axis::x, error);
+    if (!axis)
+    {
+      return invalidParamsFailure(error);
+    }
+    brush = createWedgeBrush(builder, *bounds, *axis, material);
+    transactionName = "MCP: Create wedge brush";
+  }
+  else if (toolName == "brush_create_cylinder")
+  {
+    const auto axis = axisFromJson(params, "axis", vm::axis::z, error);
+    if (!axis)
+    {
+      return invalidParamsFailure(error);
+    }
+    const auto sides = std::max<size_t>(3, optionalSize(params, "sides", 16));
+    brush =
+      builder.createCylinder(*bounds, mdl::EdgeAlignedCircle{sides}, *axis, material);
+    transactionName = "MCP: Create cylinder brush";
+  }
+
+  if (brush.is_error())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams, "Could not create brush from the given bounds");
+  }
+
+  auto* brushNode = new mdl::BrushNode{std::move(brush.value())};
+  const auto changedObjectIds = addNodesWithTransaction(
+    map, transactionName, {brushNode}, optionalBool(params, "select", true));
+  if (!changedObjectIds)
+  {
+    delete brushNode;
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not add brush to the active document");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  result.insert("brush", nodeSummaryJson(*brushNode, map.worldNode()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history)
+{
+  return McpBridgeToolResult::success(QJsonObject{
+    {"operations", operationHistoryJson(history)},
+    {"count", static_cast<int>(history.size())},
+  });
+}
+
+McpBridgeToolResult historyUndoResult(
+  AppController& appController, std::vector<McpOperationRecord>& history)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto it = std::find_if(history.rbegin(), history.rend(), [](const auto& operation) {
+    return !operation.undone;
+  });
+  if (it == history.rend())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden, "No MCP operation is available to undo");
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto* undoName = map.undoCommandName();
+  if (!undoName || QString::fromStdString(*undoName) != it->transactionName)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden,
+      "The latest MCP operation is no longer on top of the undo stack");
+  }
+
+  map.undoCommand();
+  it->undone = true;
+  return McpBridgeToolResult::success(QJsonObject{
+    {"operation", operationRecordJson(*it)},
+    {"undone", true},
+  });
+}
+
+McpBridgeToolResult historyRedoResult(
+  AppController& appController, std::vector<McpOperationRecord>& history)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto it = std::find_if(history.begin(), history.end(), [](const auto& operation) {
+    return operation.undone;
+  });
+  if (it == history.end())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden, "No MCP operation is available to redo");
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto* redoName = map.redoCommandName();
+  if (!redoName || QString::fromStdString(*redoName) != it->transactionName)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden,
+      "The MCP operation is no longer on top of the redo stack");
+  }
+
+  map.redoCommand();
+  it->undone = false;
+  return McpBridgeToolResult::success(QJsonObject{
+    {"operation", operationRecordJson(*it)},
+    {"redone", true},
+  });
 }
 
 QJsonObject mapSearchJson(AppController& appController, const QJsonObject& params)
@@ -658,6 +1404,40 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             {"active", false},
           });
         }
+        if (toolName == "entity_create")
+        {
+          return createEntityResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "entity_update")
+        {
+          return updateEntityResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "entity_delete")
+        {
+          return deleteEntityResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (
+          toolName == "brush_create_box" || toolName == "brush_create_wedge"
+          || toolName == "brush_create_cylinder")
+        {
+          return createBrushResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "history_list")
+        {
+          return historyListResult(m_operationHistory);
+        }
+        if (toolName == "history_undo_mcp")
+        {
+          return historyUndoResult(appController, m_operationHistory);
+        }
+        if (toolName == "history_redo_mcp")
+        {
+          return historyRedoResult(appController, m_operationHistory);
+        }
         return McpBridgeToolResult::failure(
           mcp::McpErrorCode::ToolNotFound,
           QString{"MCP tool is registered but not wired yet: %1"}.arg(toolName));
@@ -765,7 +1545,12 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
     || request.tool == "map_snapshot" || request.tool == "map_search"
     || request.tool == "selection_get" || request.tool == "selection_set"
     || request.tool == "actions_list" || request.tool == "action_execute"
-    || request.tool == "overlay_set" || request.tool == "overlay_clear")
+    || request.tool == "overlay_set" || request.tool == "overlay_clear"
+    || request.tool == "entity_create" || request.tool == "entity_update"
+    || request.tool == "entity_delete" || request.tool == "brush_create_box"
+    || request.tool == "brush_create_wedge" || request.tool == "brush_create_cylinder"
+    || request.tool == "history_list" || request.tool == "history_undo_mcp"
+    || request.tool == "history_redo_mcp")
   {
     const auto result = m_toolHandler(request.tool, request.params);
     if (result.ok)

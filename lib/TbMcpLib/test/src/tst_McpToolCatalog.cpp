@@ -53,9 +53,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("map_search"));
     CHECK(names.contains("selection_set"));
     CHECK(names.contains("overlay_set"));
+    CHECK(names.contains("history_list"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
     CHECK(!names.contains("action_execute"));
+    CHECK(!names.contains("history_undo_mcp"));
   }
 
   SECTION("edit mode lists implemented edit tools")
@@ -68,7 +70,14 @@ TEST_CASE("McpToolCatalog")
     }
 
     CHECK(names.contains("action_execute"));
-    CHECK(!names.contains("entity_create"));
+    CHECK(names.contains("entity_create"));
+    CHECK(names.contains("entity_update"));
+    CHECK(names.contains("entity_delete"));
+    CHECK(names.contains("brush_create_box"));
+    CHECK(names.contains("brush_create_wedge"));
+    CHECK(names.contains("brush_create_cylinder"));
+    CHECK(names.contains("history_undo_mcp"));
+    CHECK(names.contains("history_redo_mcp"));
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")
@@ -77,7 +86,7 @@ TEST_CASE("McpToolCatalog")
 
     REQUIRE(editTool);
     CHECK(!canCallTool(*editTool, McpMode::ReadOnly));
-    CHECK(!canCallTool(*editTool, McpMode::Edit)); // Not implemented yet.
+    CHECK(canCallTool(*editTool, McpMode::Edit));
   }
 
   SECTION("tool json uses MCP inputSchema shape")
