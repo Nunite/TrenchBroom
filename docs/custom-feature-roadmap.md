@@ -76,8 +76,9 @@
 
 - [ ] MCP / Agent 白盒生成
   - 目标：让外部 MCP client 通过结构化工具查询地图、执行动作、放置资产，并逐步生成 GoldSrc/CS 1.6 白盒。
-  - 状态：先建立底层协议、bridge、tool catalog 和安全模式，默认关闭；不直接开放任意 Python 脚本。
+  - 状态：底层协议、`TbMcpLib`、本地 bridge、stdio server、tool catalog、安全模式、基础只读工具、选择设置、action 执行和 bridge overlay 状态已接入；默认关闭，不直接开放任意 Python 脚本。
   - 重点：TrenchBroom 是唯一真实状态；写操作必须走 `MapDocument` transaction；白盒生成使用 Blockout IR，不让 AI 直接拼 brush 顶点。
+  - 下一步：补事务型 entity/brush 工具、MCP operation history、资产放置工具，然后再做 Blockout IR。
   - 依赖：视图叠加层管理器用于 overlay/截图反馈，统一资产浏览器用于模型/Sprite/声音放置，`tb2` 稳定 API 可作为后续插件扩展基础。
 
 - [ ] Python 插件 v2 生产级收尾

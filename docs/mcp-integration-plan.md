@@ -37,6 +37,25 @@ MapDocument transaction / query services
 - `McpBridgeServer`：运行在 TrenchBroom 进程内，接收本地请求，验证 token 和 mode，并在 UI thread 执行工具。
 - `MapDocument` / 现有 UI services：唯一真实状态；MCP 不直接读写 `.map` 文件。
 
+## 当前实现状态
+
+截至当前分支，MCP 底层已经完成以下检查点：
+
+- 已新增 `TbMcpLib`，包含 mode、错误码、bridge config、bridge request/response 和 tool catalog。
+- 已新增 TrenchBroom 内部 `McpBridgeServer`，支持本地 `QLocalServer`、token 校验和 mode gating。
+- 已新增 `trenchbroom-mcp.exe`，作为 stdio MCP server，支持 `initialize`、`tools/list`、`tools/call` 并转发到本地 bridge。
+- 已接入基础查询工具：`tb_status`、`tb_doctor`、`documents_list`、`document_snapshot`、`map_snapshot`、`map_search`、`selection_get`、`actions_list`。
+- 已接入第一批编辑器状态工具：`selection_set`、`overlay_set`、`overlay_clear`。
+- 已接入 `action_execute`，但它要求 `Edit` 模式，因为任意 action 可能间接修改地图。
+
+仍未完成：
+
+- 事务型 map 写入工具，例如 entity/brush 创建、更新、删除。
+- MCP 专用 operation history 和只撤销 MCP 操作的 undo/redo。
+- 资产搜索与放置工具。
+- Blockout IR 及白盒生成工具。
+- 真实 viewport overlay 渲染与 viewport capture。
+
 ## 配置与安全模式
 
 配置路径：
@@ -58,7 +77,7 @@ MapDocument transaction / query services
 模式：
 
 - `Off`：默认值，不启动 bridge。
-- `ReadOnly`：允许读取地图、选择、动作、资产和 overlay 清理等安全操作。
+- `ReadOnly`：允许读取地图、选择、动作列表，以及设置/清理 MCP overlay 等安全 UI 状态操作。
 - `Edit`：允许结构化写操作，所有写入进入 transaction。
 - `Danger`：预留给未来 `run_tb2_script` 或专家级能力；第一版不实现。
 
@@ -75,10 +94,10 @@ MapDocument transaction / query services
 - `map_snapshot`：返回地图摘要，例如 worldspawn 属性、实体数量、brush 数量和 bounds。
 - `map_search`：按 classname、targetname、属性和文本搜索对象。
 - `selection_get`：返回当前选择。
-- `selection_set`：结构化设置选择；在 `ReadOnly` 中可视为 UI 选择操作，具体是否允许由 tool catalog 标记。
+- `selection_set`：结构化设置选择；它只改变编辑器选择状态，不写 map 文件，因此当前允许在 `ReadOnly` 中使用。
 - `actions_list`：列出可执行 actions。
-- `action_execute`：执行已注册 action，遵循 action 自身 enabled 状态。
-- `overlay_set` / `overlay_clear`：设置或清理 MCP overlay，高亮对象和显示 label。
+- `action_execute`：执行已注册 action，遵循 action 自身 enabled 状态；由于 action 可能修改地图，当前要求 `Edit` 模式。
+- `overlay_set` / `overlay_clear`：设置或清理 MCP overlay 状态；当前只保存 bridge state，后续再接入视图叠加层管理器进行真实绘制。
 
 第二阶段再开放：
 
@@ -175,13 +194,13 @@ Blockout IR 是 Agent 生成白盒的主要入口。它把“房间、走廊、�
 
 ## Overlay 与截图
 
-MCP overlay 不应直接散落在 renderer 临时分支中。第一版可以先用轻量 bridge state 表达：
+MCP overlay 不应直接散落在 renderer 临时分支中。当前第一版已使用轻量 bridge state 表达：
 
 - object id 高亮。
 - label。
 - 清理 overlay。
 
-后续应接入 roadmap 中的“视图叠加层管理器”，与 FPS、2D readable outlines、sky、debug overlay 共享统一设置和刷新路径。
+后续必须接入 roadmap 中的“视图叠加层管理器”，与 FPS、2D readable outlines、sky、debug overlay 共享统一设置和刷新路径。接入前不要把 MCP overlay 绘制逻辑直接塞进具体 renderer。
 
 截图工具放到第二轮后半：
 
@@ -218,15 +237,15 @@ Blockout 测试：
 
 ## Roadmap
 
-1. 文档和风险记录。
-2. `TbMcpLib`：配置、DTO、tool catalog、错误码和测试。
-3. TrenchBroom 内部 `McpBridgeServer`：默认关闭，支持 token、mode 和 `tb_status`。
-4. `trenchbroom-mcp.exe`：stdio MCP server，支持 `initialize`、`tools/list`、`tools/call`。
-5. 只读 map / selection / action tools。
-6. transaction 编辑 tools 与 MCP history。
-7. GoldSrc asset placement tools。
-8. Blockout IR tools。
-9. overlay 与 viewport capture。
-10. 用户文档、示例 prompt 和 smoke workflow。
+1. [x] 文档和风险记录。
+2. [x] `TbMcpLib`：配置、DTO、tool catalog、错误码和测试。
+3. [x] TrenchBroom 内部 `McpBridgeServer`：默认关闭，支持 token、mode 和 `tb_status`。
+4. [x] `trenchbroom-mcp.exe`：stdio MCP server，支持 `initialize`、`tools/list`、`tools/call`。
+5. [x] 只读 map / selection / action tools。
+6. [ ] transaction 编辑 tools 与 MCP history。
+7. [ ] GoldSrc asset placement tools。
+8. [ ] Blockout IR tools。
+9. [ ] overlay 与 viewport capture。
+10. [ ] 用户文档、示例 prompt 和 smoke workflow。
 
 每个阶段都应保持可构建，并带 focused tests。涉及写操作的阶段必须先证明 transaction 和 rollback 行为稳定。

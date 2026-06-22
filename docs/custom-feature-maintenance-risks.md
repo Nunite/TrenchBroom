@@ -35,12 +35,13 @@ optimization order, see `docs/custom-feature-architecture-review.md`.
 
 ### MCP / Agent Bridge
 
-- Risk: exposing editor control through MCP can accidentally become a broad remote-control surface if tool modes, token checks, and command boundaries are not enforced from the first implementation.
-- Risk: if edit tools bypass `MapDocument` transactions or directly mutate `.map` files, undo/redo, selection state, and document dirty tracking will diverge from normal editor behavior.
-- Risk: letting Agent code create arbitrary brush vertices is likely to produce invalid or hard-to-debug BSP geometry; whitebox generation needs a semantic Blockout IR and deterministic brush compilation.
-- Risk: tool catalogs can grow quickly and become untestable if every feature adds bespoke request/response shapes without shared DTOs and mode gating.
-- Risk: MCP overlays, screenshots, assets, and Python plugins can become tightly coupled if the bridge calls UI widgets directly instead of small services.
-- Suggested fix: keep MCP disabled by default, require a local token, split protocol code into `TbMcpLib`, route writes through named transactions, start with read-only tools, and add Blockout IR before exposing lower-level brush operations.
+- 风险：MCP 会把编辑器控制能力暴露给外部进程，如果 mode、token 和工具边界没有持续收紧，很容易变成过宽的本地远控入口。
+- 风险：`action_execute` 已经接入，但 action 可能间接修改地图；它必须继续要求 `Edit` 模式，不能放回 `ReadOnly`。
+- 风险：后续 entity/brush 编辑工具如果绕过 `MapDocument` transaction 或直接改 `.map` 文件，undo/redo、selection、dirty 状态都会和普通编辑器行为分裂。
+- 风险：让 Agent 直接创建任意 brush 顶点很容易生成非法或难排查的 BSP 几何；白盒生成必须优先走语义 Blockout IR 和确定性 brush primitive 编译。
+- 风险：当前 `overlay_set` / `overlay_clear` 只是 bridge 内存状态，还没有真实接入 renderer；后续如果直接塞进某个 renderer，会和 FPS、sky、2D readable outlines 等功能继续分裂。
+- 风险：tool catalog 会快速膨胀；如果每个功能都新增临时 JSON 形状而没有共享 DTO、mode gating 和 focused tests，后续 MCP 会很难维护。
+- 建议修复：MCP 默认关闭，本地 token 必须保留；协议层继续放在 `TbMcpLib`；所有写操作使用命名 transaction 并补 rollback 测试；overlay 必须等视图叠加层管理器后再接真实绘制；Blockout IR 完成前不要开放低层 brush 顶点工具。
 
 ## Medium Priority
 
