@@ -135,6 +135,32 @@ Follow-up: keep the extracted entry-building helper as the stable model layer an
 move more browser state transitions, such as filesystem rescans and folder tree
 construction, behind similarly testable helpers.
 
+## Unified Asset Browser Architecture
+
+The GoldSrc asset browser is now split into three explicit layers:
+
+- `AssetBrowserModel` owns asset classification, GoldSrc asset roots
+  (`models`, `sprites`, `sound`), supported extensions, scan result metadata,
+  mod-root filtering, changed-path detection, and browser entry construction.
+- `AssetPreviewProvider` owns file reads and CPU preview decoding. The view asks
+  it for `AssetPreviewState` values, so `.spr` decode failures, missing files,
+  and unsupported assets are represented before rendering begins.
+- `ModelBrowserView` remains a Qt/OpenGL adapter. It receives already-scanned
+  `BrowserAsset` values, renders placeholders/model previews/sprite previews,
+  and caches SPR preview GL textures so `doRender()` does not read files or
+  upload the same preview texture every frame.
+
+This keeps the first unified browser iteration focused on file-backed GoldSrc
+assets (`.mdl`, `.spr`, `.wav`) without committing WAD textures or entity
+templates to the same scanner. Future WAD support should be added as a separate
+asset provider backed by the current map's material collections/WAD list, with
+`AssetBrowserModel` or a small registry merging provider results into a single
+searchable index.
+
+Follow-up: add a small asset-source registry before adding WAD textures, and
+avoid putting WAD/material collection enumeration into the current disk
+scanner.
+
 ## OutlinerModel Notification Granularity
 
 `OutlinerModel` currently handles node insert/remove notifications one node at a
