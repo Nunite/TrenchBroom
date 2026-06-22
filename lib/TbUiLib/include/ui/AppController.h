@@ -61,6 +61,7 @@ namespace ui
 class AboutDialog;
 class ActionManager;
 class MapWindowManager;
+class McpBridgeServer;
 class RecentDocuments;
 class WelcomeWindow;
 
@@ -87,6 +88,7 @@ private:
   MapWindowManager* m_mapWindowManager = nullptr;
   RecentDocuments* m_recentDocuments = nullptr;
   std::unique_ptr<ActionManager> m_actionManager;
+  std::unique_ptr<McpBridgeServer> m_mcpBridgeServer;
   std::unique_ptr<WelcomeWindow> m_welcomeWindow;
   std::unique_ptr<AboutDialog> m_aboutDialog;
 
@@ -142,6 +144,7 @@ public:
 
 private:
   void connectObservers();
+  void startMcpBridge();
 
   void processGlResources();
 };

@@ -45,6 +45,7 @@
 #include "ui/ActionManager.h"
 #include "ui/CrashDialog.h"
 #include "ui/FileDialogDefaultDir.h"
+#include "ui/FileLogger.h"
 #include "ui/GameDialog.h"
 #include "ui/GlFunctions.h"
 #include "ui/GlQt.h"
@@ -59,6 +60,7 @@
 #include "ui/SystemPaths.h"
 #include "ui/UpdateConfig.h"
 #include "ui/WelcomeWindow.h"
+#include "ui/mcp/McpBridgeServer.h"
 #include "update/QtHttpClient.h"
 #include "update/Updater.h"
 
@@ -176,6 +178,7 @@ AppController::AppController(
   , m_mapWindowManager{createMapWindowManager(*this)}
   , m_recentDocuments{createRecentDocuments(this)}
   , m_actionManager{std::make_unique<ActionManager>()}
+  , m_mcpBridgeServer{std::make_unique<McpBridgeServer>(*this)}
   , m_welcomeWindow{std::make_unique<WelcomeWindow>(*this)}
   , m_aboutDialog{std::make_unique<AboutDialog>(*this)}
 {
@@ -186,6 +189,7 @@ AppController::AppController(
   m_recentDocuments->reload();
   m_reloadRecentDocumentsTimer->start(1s);
   m_processResourcesTimer->start(20ms);
+  startMcpBridge();
 }
 
 Result<std::unique_ptr<AppController>> AppController::create()
@@ -435,6 +439,24 @@ void AppController::connectObservers()
     &RecentDocuments::reload);
   connect(
     m_processResourcesTimer, &QTimer::timeout, this, &AppController::processGlResources);
+}
+
+void AppController::startMcpBridge()
+{
+  auto error = QString{};
+  const auto config = mcp::readOrCreateBridgeConfig(mcp::defaultConfigPath(), &error);
+  if (!config)
+  {
+    FileLogger::instance().warn()
+      << "Could not initialize MCP bridge config: " << error.toStdString();
+    return;
+  }
+
+  if (!m_mcpBridgeServer->start(*config, &error) && config->mode != mcp::McpMode::Off)
+  {
+    FileLogger::instance().warn()
+      << "Could not start MCP bridge: " << error.toStdString();
+  }
 }
 
 void AppController::processGlResources()

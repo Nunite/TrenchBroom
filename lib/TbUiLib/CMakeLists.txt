@@ -150,6 +150,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelBrowserView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelInspector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MousePreferencePane.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveHandleDragTracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveObjectsTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveObjectsToolController.cpp
@@ -408,6 +409,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ModelBrowserView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ModelInspector.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MousePreferencePane.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/mcp/McpBridgeServer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveHandleDragTracker.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveObjectsTool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveObjectsToolController.h
@@ -539,6 +541,7 @@ target_link_libraries(TbUiLib
     Qt6::OpenGLWidgets
     Qt6::Widgets
     TbBaseLib
+    TbMcpLib
     TbMdlLib
     TbPreferencesLib
     TbRenderLib
