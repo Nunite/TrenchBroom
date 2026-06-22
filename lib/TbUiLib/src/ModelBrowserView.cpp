@@ -549,7 +549,21 @@ void ModelBrowserView::renderAssetPlaceholders(
   gl::Gl& gl, Layout& layout, const float y, const float height)
 {
   using Vertex = gl::VertexTypes::P2C4::Vertex;
-  auto vertices = std::vector<Vertex>{};
+  auto backgroundVertices = std::vector<Vertex>{};
+  auto iconVertices = std::vector<Vertex>{};
+
+  const auto addQuad = [&](
+                         auto& vertices,
+                         const float left,
+                         const float top,
+                         const float right,
+                         const float bottom,
+                         const vm::vec4f& color) {
+    vertices.emplace_back(vm::vec2f{left, height - (top - y)}, color);
+    vertices.emplace_back(vm::vec2f{left, height - (bottom - y)}, color);
+    vertices.emplace_back(vm::vec2f{right, height - (bottom - y)}, color);
+    vertices.emplace_back(vm::vec2f{right, height - (top - y)}, color);
+  };
 
   for (const auto& group : layout.groups())
   {
@@ -570,38 +584,87 @@ void ModelBrowserView::renderAssetPlaceholders(
 
             const auto& bounds = cell.itemBounds();
             const auto colorVec = color->toVec();
-            vertices.emplace_back(
-              vm::vec2f{bounds.left() + 6.0f, height - (bounds.top() + 6.0f - y)},
+            addQuad(
+              backgroundVertices,
+              bounds.left() + 6.0f,
+              bounds.top() + 6.0f,
+              bounds.right() - 6.0f,
+              bounds.bottom() - 6.0f,
               colorVec);
-            vertices.emplace_back(
-              vm::vec2f{bounds.left() + 6.0f, height - (bounds.bottom() - 6.0f - y)},
-              colorVec);
-            vertices.emplace_back(
-              vm::vec2f{bounds.right() - 6.0f, height - (bounds.bottom() - 6.0f - y)},
-              colorVec);
-            vertices.emplace_back(
-              vm::vec2f{bounds.right() - 6.0f, height - (bounds.top() + 6.0f - y)},
-              colorVec);
+
+            if (item.type == BrowserCellType::Sound)
+            {
+              const auto iconColor = RgbaF{0.90f, 0.86f, 1.0f, 0.92f}.toVec();
+              const auto iconSize = std::min(bounds.width, bounds.height) * 0.48f;
+              const auto left = bounds.left() + (bounds.width - iconSize) / 2.0f;
+              const auto top = bounds.top() + (bounds.height - iconSize) / 2.0f;
+              const auto unit = iconSize / 16.0f;
+              const auto cy = top + iconSize / 2.0f;
+
+              addQuad(
+                iconVertices,
+                left + 1.0f * unit,
+                cy - 3.0f * unit,
+                left + 4.0f * unit,
+                cy + 3.0f * unit,
+                iconColor);
+              addQuad(
+                iconVertices,
+                left + 4.0f * unit,
+                cy - 5.0f * unit,
+                left + 7.0f * unit,
+                cy + 5.0f * unit,
+                iconColor);
+              addQuad(
+                iconVertices,
+                left + 9.0f * unit,
+                cy - 3.0f * unit,
+                left + 10.4f * unit,
+                cy + 3.0f * unit,
+                iconColor);
+              addQuad(
+                iconVertices,
+                left + 11.6f * unit,
+                cy - 4.6f * unit,
+                left + 13.0f * unit,
+                cy + 4.6f * unit,
+                iconColor);
+              addQuad(
+                iconVertices,
+                left + 14.2f * unit,
+                cy - 6.2f * unit,
+                left + 15.6f * unit,
+                cy + 6.2f * unit,
+                iconColor);
+            }
           }
         }
       }
     }
   }
 
-  if (vertices.empty())
+  if (backgroundVertices.empty())
   {
     return;
   }
 
-  auto vertexArray = gl::VertexArray::move(std::move(vertices));
   auto shader =
     gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserBorderShader};
 
+  auto vertexArray = gl::VertexArray::move(std::move(backgroundVertices));
   vertexArray.prepare(gl, vboManager());
   if (vertexArray.setup(gl, shader.program()))
   {
     vertexArray.render(gl, gl::PrimType::Quads);
     vertexArray.cleanup(gl, shader.program());
+  }
+
+  auto iconVertexArray = gl::VertexArray::move(std::move(iconVertices));
+  iconVertexArray.prepare(gl, vboManager());
+  if (iconVertexArray.setup(gl, shader.program()))
+  {
+    iconVertexArray.render(gl, gl::PrimType::Quads);
+    iconVertexArray.cleanup(gl, shader.program());
   }
 }
 
