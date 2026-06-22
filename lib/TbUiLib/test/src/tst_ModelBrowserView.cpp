@@ -180,6 +180,22 @@ TEST_CASE("ModelBrowserView")
     CHECK_THAT(
       entryPaths(entries), Equals(std::vector<std::string>{"", "sprites/glow01.spr"}));
   }
+
+  SECTION("sound preview button bounds stay inside item")
+  {
+    const auto itemBounds = LayoutBounds{10.0f, 20.0f, 93.0f, 93.0f};
+
+    const auto buttonBounds = soundPreviewButtonBounds(itemBounds);
+
+    CHECK(buttonBounds.left() >= itemBounds.left());
+    CHECK(buttonBounds.top() >= itemBounds.top());
+    CHECK(buttonBounds.right() <= itemBounds.right());
+    CHECK(buttonBounds.bottom() <= itemBounds.bottom());
+    CHECK(soundPreviewButtonHitTest(
+      itemBounds, buttonBounds.left() + 1.0f, buttonBounds.top() + 1.0f));
+    CHECK_FALSE(
+      soundPreviewButtonHitTest(itemBounds, itemBounds.left(), itemBounds.top()));
+  }
 }
 
 } // namespace tb::ui

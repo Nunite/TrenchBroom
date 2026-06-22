@@ -42,9 +42,10 @@ AssetPreviewState AssetPreviewProvider::preview(const BrowserAsset& asset) const
   {
   case BrowserCellType::Sprite:
     return spritePreview(asset);
+  case BrowserCellType::Sound:
+    return soundPreview(asset);
   case BrowserCellType::Folder:
   case BrowserCellType::Model:
-  case BrowserCellType::Sound:
     return {AssetPreviewStatus::Unsupported, std::nullopt};
   }
 
@@ -85,6 +86,34 @@ AssetPreviewState AssetPreviewProvider::spritePreview(const BrowserAsset& asset)
   }
 
   return {AssetPreviewStatus::Ready, std::move(preview)};
+}
+
+AssetPreviewState AssetPreviewProvider::soundPreview(const BrowserAsset& asset) const
+{
+  auto soundPath = std::filesystem::path{};
+  if (!asset.absolutePath.empty() && asset.absolutePath.is_absolute())
+  {
+    soundPath = asset.absolutePath;
+  }
+  else if (asset.path.is_absolute())
+  {
+    soundPath = asset.path;
+  }
+  else if (auto absPathResult = m_gameFileSystem.makeAbsolute(asset.path);
+           !absPathResult.is_error())
+  {
+    soundPath = absPathResult.value();
+  }
+
+  if (soundPath.empty())
+  {
+    return {AssetPreviewStatus::Missing, std::nullopt};
+  }
+
+  auto fileResult = fs::Disk::openFile(soundPath);
+  return fileResult.is_error()
+           ? AssetPreviewState{AssetPreviewStatus::Missing, std::nullopt}
+           : AssetPreviewState{AssetPreviewStatus::Ready, std::nullopt, soundPath};
 }
 
 AssetPreviewMap loadAssetPreviews(

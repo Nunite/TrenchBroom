@@ -530,6 +530,7 @@ target_link_libraries(TbUiLib
     cpptrace::cpptrace
     pybind11::embed
     Python3::Python
+    Qt6::Multimedia
     Qt6::Svg
   PUBLIC
     KdLib

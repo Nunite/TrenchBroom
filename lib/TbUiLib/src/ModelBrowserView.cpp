@@ -19,12 +19,15 @@
 
 #include "ui/ModelBrowserView.h"
 
+#include <QAudioOutput>
 #include <QContextMenuEvent>
 #include <QEvent>
 #include <QInputDialog>
+#include <QMediaPlayer>
 #include <QMenu>
 #include <QMessageBox>
 #include <QScrollBar>
+#include <QUrl>
 
 #include "Macros.h"
 #include "PreferenceManager.h"
@@ -74,6 +77,9 @@ namespace tb::ui
 namespace
 {
 
+constexpr auto SoundPreviewButtonSize = 24.0f;
+constexpr auto SoundPreviewButtonMargin = 8.0f;
+
 std::optional<RgbaF> assetPlaceholderColor(const BrowserCellType type)
 {
   switch (type)
@@ -90,7 +96,41 @@ std::optional<RgbaF> assetPlaceholderColor(const BrowserCellType type)
   return std::nullopt;
 }
 
+bool shouldRenderErrorText(const BrowserCellType type, const AssetPreviewState* preview)
+{
+  switch (type)
+  {
+  case BrowserCellType::Sprite:
+  case BrowserCellType::Sound:
+    return preview && preview->status != AssetPreviewStatus::Ready;
+  case BrowserCellType::Folder:
+  case BrowserCellType::Model:
+    return false;
+  }
+
+  return false;
+}
+
 } // namespace
+
+LayoutBounds soundPreviewButtonBounds(const LayoutBounds& itemBounds)
+{
+  const auto size = std::min(
+    SoundPreviewButtonSize,
+    std::max(0.0f, std::min(itemBounds.width, itemBounds.height) - 2.0f));
+  return LayoutBounds{
+    itemBounds.right() - SoundPreviewButtonMargin - size,
+    itemBounds.bottom() - SoundPreviewButtonMargin - size,
+    size,
+    size};
+}
+
+bool soundPreviewButtonHitTest(
+  const LayoutBounds& itemBounds, const float x, const float y)
+{
+  const auto bounds = soundPreviewButtonBounds(itemBounds);
+  return bounds.width > 0.0f && bounds.height > 0.0f && bounds.containsPoint(x, y);
+}
 
 ModelBrowserView::ModelBrowserView(
   AppController& appController, QScrollBar* scrollBar, mdl::Map& map)
@@ -119,6 +159,7 @@ ModelBrowserView::ModelBrowserView(
 
 ModelBrowserView::~ModelBrowserView()
 {
+  stopSoundPreview();
   destroyFolderIconTexture();
   clear();
 }
@@ -134,6 +175,7 @@ void ModelBrowserView::setAssets(
   m_currentFolderPath.clear();
   m_hasSelection = false;
   m_hasHover = false;
+  stopSoundPreview();
   invalidate();
   update();
 }
@@ -151,6 +193,7 @@ void ModelBrowserView::setCurrentFolderPath(std::filesystem::path currentFolderP
     m_currentFolderPath = std::move(currentFolderPath);
     m_hasSelection = false;
     m_hasHover = false;
+    stopSoundPreview();
     invalidate();
     update();
   }
@@ -210,6 +253,7 @@ void ModelBrowserView::resourcesWereProcessed(const std::vector<mdl::ResourceId>
 {
   m_assetPreviews.clear();
   invalidateSpritePreviewTextures();
+  stopSoundPreview();
   loadPreviews();
   invalidate();
   update();
@@ -268,6 +312,7 @@ void ModelBrowserView::doRender(
   renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Sound);
   renderFolders(gl, layout, y, height);
   renderAssetPlaceholders(gl, layout, y, height);
+  renderSoundPreviewButtons(gl, layout, y, height);
   renderSpritePreviews(gl, layout, y, height);
 
   const auto projection =
@@ -425,7 +470,20 @@ void ModelBrowserView::doLeftClick(Layout& layout, const float x, const float y)
 {
   if (const auto* cell = layout.cellAt(x, y))
   {
+    if (soundPreviewButtonHitTest(*cell, x, y))
+    {
+      toggleSoundPreview(cellData(*cell).path);
+      return;
+    }
+
     const auto& item = cellData(*cell);
+    if (
+      m_hasSelection && (m_selectedType != item.type || m_selectedPath != item.path)
+      && m_selectedType == BrowserCellType::Sound)
+    {
+      stopSoundPreview();
+    }
+
     m_selectedType = item.type;
     m_selectedPath = item.path;
     m_hasSelection = true;
@@ -518,6 +576,94 @@ void ModelBrowserView::doContextMenu(
   menu.exec(event->globalPos());
 }
 
+void ModelBrowserView::ensureSoundPlayer()
+{
+  if (m_soundPlayer)
+  {
+    return;
+  }
+
+  m_soundAudioOutput = new QAudioOutput{this};
+  m_soundPlayer = new QMediaPlayer{this};
+  m_soundPlayer->setAudioOutput(m_soundAudioOutput);
+  m_soundAudioOutput->setVolume(1.0f);
+
+  connect(
+    m_soundPlayer, &QMediaPlayer::playbackStateChanged, this, [this](const auto state) {
+      if (state == QMediaPlayer::StoppedState && !m_playingSoundPath.empty())
+      {
+        m_playingSoundPath.clear();
+        update();
+      }
+    });
+
+  connect(
+    m_soundPlayer, &QMediaPlayer::errorOccurred, this, [this](auto, const QString&) {
+      m_playingSoundPath.clear();
+      update();
+    });
+}
+
+void ModelBrowserView::stopSoundPreview()
+{
+  if (m_soundPlayer)
+  {
+    m_soundPlayer->stop();
+  }
+  m_playingSoundPath.clear();
+}
+
+void ModelBrowserView::toggleSoundPreview(const std::filesystem::path& path)
+{
+  const auto* preview = assetPreview(path);
+  if (
+    !preview || preview->status != AssetPreviewStatus::Ready
+    || preview->soundPath.empty())
+  {
+    stopSoundPreview();
+    update();
+    return;
+  }
+
+  if (m_playingSoundPath == path)
+  {
+    stopSoundPreview();
+    update();
+    return;
+  }
+
+  stopSoundPreview();
+  ensureSoundPlayer();
+  m_playingSoundPath = path;
+  m_soundPlayer->setSource(
+    QUrl::fromLocalFile(pathAsQString(preview->soundPath.lexically_normal())));
+  m_soundPlayer->play();
+  update();
+}
+
+bool ModelBrowserView::soundPreviewButtonHitTest(
+  const Cell& cell, const float x, const float y) const
+{
+  const auto& item = cellData(cell);
+  return item.type == BrowserCellType::Sound && m_hasSelection
+         && m_selectedType == BrowserCellType::Sound && m_selectedPath == item.path
+         && canPreviewSound(item.path)
+         && tb::ui::soundPreviewButtonHitTest(cell.itemBounds(), x, y);
+}
+
+bool ModelBrowserView::canPreviewSound(const std::filesystem::path& path) const
+{
+  const auto* preview = assetPreview(path);
+  return preview && preview->status == AssetPreviewStatus::Ready
+         && !preview->soundPath.empty();
+}
+
+bool ModelBrowserView::isPreviewingSound(const std::filesystem::path& path) const
+{
+  return !m_playingSoundPath.empty() && m_playingSoundPath == path && m_soundPlayer
+         && m_soundPlayer->playbackState() == QMediaPlayer::PlayingState;
+}
+
 void ModelBrowserView::renderAssetPlaceholders(
   gl::Gl& gl, Layout& layout, const float y, const float height)
 {
@@ -555,7 +701,9 @@ void ModelBrowserView::renderAssetPlaceholders(
           {
             const auto& item = cellData(cell);
             const auto* preview =
-              item.type == BrowserCellType::Sprite ? assetPreview(item.path) : nullptr;
+              item.type == BrowserCellType::Sprite || item.type == BrowserCellType::Sound
+                ? assetPreview(item.path)
+                : nullptr;
             if (
               preview && preview->status == AssetPreviewStatus::Ready && preview->sprite
               && !preview->sprite->rgba.empty())
@@ -624,7 +772,7 @@ void ModelBrowserView::renderAssetPlaceholders(
                 cy + 6.2f * unit,
                 iconColor);
             }
-            else if (item.type == BrowserCellType::Sprite)
+            if (shouldRenderErrorText(item.type, preview))
             {
               const auto errorText = std::string{"ERROR"};
               auto& font = fontManager().font(errorFont);
@@ -685,6 +833,137 @@ void ModelBrowserView::renderAssetPlaceholders(
       textVertexArray.cleanup(gl, textShader.program());
       fontManager().font(errorFont).deactivate(gl);
     }
+  }
+}
+
+void ModelBrowserView::renderSoundPreviewButtons(
+  gl::Gl& gl, Layout& layout, const float y, const float height)
+{
+  if (
+    !m_hasSelection || m_selectedType != BrowserCellType::Sound
+    || !canPreviewSound(m_selectedPath))
+  {
+    return;
+  }
+
+  using Vertex = gl::VertexTypes::P2C4::Vertex;
+  auto backgroundVertices = std::vector<Vertex>{};
+  auto iconVertices = std::vector<Vertex>{};
+
+  const auto addQuad = [&](
+                         auto& vertices,
+                         const float left,
+                         const float top,
+                         const float right,
+                         const float bottom,
+                         const vm::vec4f& color) {
+    vertices.emplace_back(vm::vec2f{left, height - (top - y)}, color);
+    vertices.emplace_back(vm::vec2f{left, height - (bottom - y)}, color);
+    vertices.emplace_back(vm::vec2f{right, height - (bottom - y)}, color);
+    vertices.emplace_back(vm::vec2f{right, height - (top - y)}, color);
+  };
+  const auto addTriangle = [&](
+                             auto& vertices,
+                             const vm::vec2f& a,
+                             const vm::vec2f& b,
+                             const vm::vec2f& c,
+                             const vm::vec4f& color) {
+    vertices.emplace_back(vm::vec2f{a.x(), height - (a.y() - y)}, color);
+    vertices.emplace_back(vm::vec2f{b.x(), height - (b.y() - y)}, color);
+    vertices.emplace_back(vm::vec2f{c.x(), height - (c.y() - y)}, color);
+  };
+
+  for (const auto& group : layout.groups())
+  {
+    if (!group.intersectsY(y, height))
+    {
+      continue;
+    }
+
+    for (const auto& row : group.rows())
+    {
+      if (!row.intersectsY(y, height))
+      {
+        continue;
+      }
+
+      for (const auto& cell : row.cells())
+      {
+        const auto& item = cellData(cell);
+        if (
+          item.type != BrowserCellType::Sound || item.path != m_selectedPath
+          || !canPreviewSound(item.path))
+        {
+          continue;
+        }
+
+        const auto bounds = soundPreviewButtonBounds(cell.itemBounds());
+        const auto backgroundColor = RgbaF{0.08f, 0.07f, 0.12f, 0.82f}.toVec();
+        const auto iconColor = RgbaF{0.98f, 0.95f, 1.0f, 0.96f}.toVec();
+        addQuad(
+          backgroundVertices,
+          bounds.left(),
+          bounds.top(),
+          bounds.right(),
+          bounds.bottom(),
+          backgroundColor);
+
+        const auto pad = bounds.width * 0.28f;
+        if (isPreviewingSound(item.path))
+        {
+          const auto barWidth = bounds.width * 0.16f;
+          addQuad(
+            iconVertices,
+            bounds.left() + pad,
+            bounds.top() + pad,
+            bounds.left() + pad + barWidth,
+            bounds.bottom() - pad,
+            iconColor);
+          addQuad(
+            iconVertices,
+            bounds.right() - pad - barWidth,
+            bounds.top() + pad,
+            bounds.right() - pad,
+            bounds.bottom() - pad,
+            iconColor);
+        }
+        else
+        {
+          addTriangle(
+            iconVertices,
+            vm::vec2f{bounds.left() + pad, bounds.top() + pad},
+            vm::vec2f{bounds.left() + pad, bounds.bottom() - pad},
+            vm::vec2f{bounds.right() - pad, bounds.top() + bounds.height / 2.0f},
+            iconColor);
+        }
+      }
+    }
+  }
+
+  if (backgroundVertices.empty())
+  {
+    return;
+  }
+
+  auto shader =
+    gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserBorderShader};
+
+  auto backgroundVertexArray = gl::VertexArray::move(std::move(backgroundVertices));
+  backgroundVertexArray.prepare(gl, vboManager());
+  if (backgroundVertexArray.setup(gl, shader.program()))
+  {
+    backgroundVertexArray.render(gl, gl::PrimType::Quads);
+    backgroundVertexArray.cleanup(gl, shader.program());
+  }
+
+  auto iconVertexArray = gl::VertexArray::move(std::move(iconVertices));
+  iconVertexArray.prepare(gl, vboManager());
+  if (iconVertexArray.setup(gl, shader.program()))
+  {
+    iconVertexArray.render(
+      gl,
+      isPreviewingSound(m_selectedPath) ? gl::PrimType::Quads : gl::PrimType::Triangles);
+    iconVertexArray.cleanup(gl, shader.program());
   }
 }
 

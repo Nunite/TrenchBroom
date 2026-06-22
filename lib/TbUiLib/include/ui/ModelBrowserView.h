@@ -37,6 +37,8 @@
 
 class QEvent;
 class QContextMenuEvent;
+class QAudioOutput;
+class QMediaPlayer;
 class QScrollBar;
 
 namespace tb::mdl
@@ -59,6 +61,9 @@ namespace tb::ui
 {
 
 class AppController;
+
+LayoutBounds soundPreviewButtonBounds(const LayoutBounds& itemBounds);
+bool soundPreviewButtonHitTest(const LayoutBounds& itemBounds, float x, float y);
 
 class ModelBrowserView : public CellView
 {
@@ -89,6 +94,9 @@ private:
   };
   std::map<std::filesystem::path, SpritePreviewTexture> m_spritePreviewTextures;
   std::vector<GLuint> m_pendingDeletedSpriteTextures;
+  QMediaPlayer* m_soundPlayer = nullptr;
+  QAudioOutput* m_soundAudioOutput = nullptr;
+  std::filesystem::path m_playingSoundPath;
   bool m_hasSelection = false;
   BrowserCellType m_selectedType = BrowserCellType::Folder;
   std::filesystem::path m_selectedPath;
@@ -124,6 +132,13 @@ private:
   void doDoubleClick(Layout& layout, float x, float y) override;
   void doContextMenu(Layout& layout, float x, float y, QContextMenuEvent* event) override;
 
+  void ensureSoundPlayer();
+  void stopSoundPreview();
+  void toggleSoundPreview(const std::filesystem::path& path);
+  bool soundPreviewButtonHitTest(const Cell& cell, float x, float y) const;
+  bool canPreviewSound(const std::filesystem::path& path) const;
+  bool isPreviewingSound(const std::filesystem::path& path) const;
+
   void ensureFolderIconTexture(gl::Gl& gl);
   void destroyFolderIconTexture();
   const AssetPreviewState* assetPreview(const std::filesystem::path& path) const;
@@ -145,6 +160,7 @@ private:
     float height,
     render::Transformation& transformation);
   void renderAssetPlaceholders(gl::Gl& gl, Layout& layout, float y, float height);
+  void renderSoundPreviewButtons(gl::Gl& gl, Layout& layout, float y, float height);
   void renderSpritePreviews(gl::Gl& gl, Layout& layout, float y, float height);
 
   vm::mat4x4f itemTransformation(

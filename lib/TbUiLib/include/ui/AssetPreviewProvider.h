@@ -47,6 +47,7 @@ struct AssetPreviewState
 {
   AssetPreviewStatus status = AssetPreviewStatus::Unsupported;
   std::optional<GoldSrcSpritePreview> sprite;
+  std::filesystem::path soundPath;
 
   friend bool operator==(const AssetPreviewState&, const AssetPreviewState&) = default;
 };
@@ -63,6 +64,7 @@ public:
 
 private:
   AssetPreviewState spritePreview(const BrowserAsset& asset) const;
+  AssetPreviewState soundPreview(const BrowserAsset& asset) const;
 };
 
 using AssetPreviewMap = std::map<std::filesystem::path, AssetPreviewState>;

@@ -140,23 +140,37 @@ TEST_CASE("AssetPreviewProvider")
     CHECK_FALSE(preview.sprite.has_value());
   }
 
-  SECTION("WAV is unsupported and not cached")
+  SECTION("valid WAV returns ready sound preview")
   {
-    const auto preview =
-      provider.preview(BrowserAsset{BrowserCellType::Sound, "sound/ambience/hum.wav"});
+    const auto path = env.dir() / "hum.wav";
+    writeBytes(path, {'R', 'I', 'F', 'F'});
 
-    CHECK(preview.status == AssetPreviewStatus::Unsupported);
+    const auto preview = provider.preview(
+      BrowserAsset{BrowserCellType::Sound, "sound/ambience/hum.wav", path});
+
+    CHECK(preview.status == AssetPreviewStatus::Ready);
+    CHECK(preview.soundPath == path);
+    CHECK_FALSE(preview.sprite.has_value());
 
     const auto previews = loadAssetPreviews(
       provider,
       {
-        BrowserAsset{BrowserCellType::Sound, "sound/ambience/hum.wav"},
+        BrowserAsset{BrowserCellType::Sound, "sound/ambience/hum.wav", path},
         BrowserAsset{
           BrowserCellType::Sprite, "sprites/missing.spr", env.dir() / "missing.spr"},
       });
 
-    CHECK_FALSE(previews.contains("sound/ambience/hum.wav"));
+    CHECK(previews.contains("sound/ambience/hum.wav"));
     CHECK(previews.contains("sprites/missing.spr"));
+  }
+
+  SECTION("missing WAV returns missing")
+  {
+    const auto preview = provider.preview(BrowserAsset{
+      BrowserCellType::Sound, "sound/ambience/missing.wav", env.dir() / "missing.wav"});
+
+    CHECK(preview.status == AssetPreviewStatus::Missing);
+    CHECK(preview.soundPath.empty());
   }
 }
 

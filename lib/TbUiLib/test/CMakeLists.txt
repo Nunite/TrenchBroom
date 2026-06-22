@@ -63,6 +63,7 @@ target_link_libraries(TbUiLibTest PRIVATE
   PrecompileQtHeaders
   PrecompileStdHeaders
   Catch2::Catch2WithMain
+  Qt6::Multimedia
   Qt6::Network
   Qt6::OpenGL
   Qt6::OpenGLWidgets
