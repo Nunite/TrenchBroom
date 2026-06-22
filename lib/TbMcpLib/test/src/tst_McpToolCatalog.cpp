@@ -1,0 +1,77 @@
+/*
+ Copyright (C) 2026
+
+ This file is part of TrenchBroom.
+
+ TrenchBroom is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ TrenchBroom is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <QJsonArray>
+
+#include "mcp/McpToolCatalog.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+namespace tb::mcp
+{
+
+TEST_CASE("McpToolCatalog")
+{
+  SECTION("contains first-phase tools")
+  {
+    CHECK(findToolDefinition("tb_status"));
+    CHECK(findToolDefinition("documents_list"));
+    CHECK(findToolDefinition("map_snapshot"));
+    CHECK(findToolDefinition("selection_get"));
+    CHECK(findToolDefinition("actions_list"));
+    CHECK(findToolDefinition("overlay_clear"));
+  }
+
+  SECTION("read-only mode lists implemented read-only tools only")
+  {
+    const auto tools = toolsListJson(McpMode::ReadOnly);
+    auto names = QStringList{};
+    for (const auto& tool : tools)
+    {
+      names.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("tb_status"));
+    CHECK(names.contains("map_snapshot"));
+    CHECK(!names.contains("entity_create"));
+    CHECK(!names.contains("brush_create_box"));
+  }
+
+  SECTION("mode gating rejects edit tools in read-only mode")
+  {
+    const auto editTool = findToolDefinition("entity_create");
+
+    REQUIRE(editTool);
+    CHECK(!canCallTool(*editTool, McpMode::ReadOnly));
+    CHECK(!canCallTool(*editTool, McpMode::Edit)); // Not implemented yet.
+  }
+
+  SECTION("tool json uses MCP inputSchema shape")
+  {
+    const auto tool = findToolDefinition("map_search");
+
+    REQUIRE(tool);
+    const auto json = toMcpToolJson(*tool);
+
+    CHECK(json.value("name").toString() == "map_search");
+    CHECK(json.value("inputSchema").toObject().value("type").toString() == "object");
+  }
+}
+
+} // namespace tb::mcp
