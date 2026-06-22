@@ -266,7 +266,9 @@ ModelBrowser::ModelBrowser(AppController& appController, mdl::Map& map, QWidget*
   createGui(appController);
   bindEvents();
   connectObservers();
-  setFolderPath(AssetRootPath);
+  updateFolderEdit();
+  reloadModels();
+  setWatchedDirectory();
 }
 
 ModelBrowser::~ModelBrowser()
