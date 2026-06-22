@@ -29,7 +29,6 @@
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "fs/DiskIO.h"
-#include "fs/FileSystem.h"
 #include "fs/PathInfo.h"
 #include "gl/ActiveShader.h"
 #include "gl/FontDescriptor.h"
@@ -64,12 +63,8 @@
 #include "vm/vec.h"
 
 #include <algorithm>
-#include <cstdint>
-#include <cstring>
 #include <memory>
-#include <optional>
 #include <ranges>
-#include <span>
 #include <variant>
 #include <vector>
 
@@ -132,8 +127,8 @@ void ModelBrowserView::setAssets(
 {
   m_rootFolderPath = std::move(rootFolderPath);
   m_assets = std::move(assets);
-  m_spritePreviewCache.clear();
-  loadSpritePreviews();
+  m_assetPreviews.clear();
+  loadPreviews();
   m_currentFolderPath.clear();
   m_hasSelection = false;
   m_hasHover = false;
@@ -211,8 +206,8 @@ void ModelBrowserView::setSearchText(QString searchText)
 
 void ModelBrowserView::resourcesWereProcessed(const std::vector<mdl::ResourceId>&)
 {
-  m_spritePreviewCache.clear();
-  loadSpritePreviews();
+  m_assetPreviews.clear();
+  loadPreviews();
   invalidate();
   update();
 }
@@ -322,54 +317,17 @@ void ModelBrowserView::destroyFolderIconTexture()
   m_folderIconTextureId = 0;
 }
 
-const std::optional<GoldSrcSpritePreview>& ModelBrowserView::spritePreview(
+const AssetPreviewState* ModelBrowserView::assetPreview(
   const std::filesystem::path& path) const
 {
-  static const auto MissingPreview = std::optional<GoldSrcSpritePreview>{};
-
-  const auto it = m_spritePreviewCache.find(path);
-  return it != std::end(m_spritePreviewCache) ? it->second.preview : MissingPreview;
+  const auto it = m_assetPreviews.find(path);
+  return it != std::end(m_assetPreviews) ? &it->second : nullptr;
 }
 
-std::optional<GoldSrcSpritePreview> ModelBrowserView::loadSpritePreview(
-  const std::filesystem::path& path) const
+void ModelBrowserView::loadPreviews()
 {
-  auto file = std::shared_ptr<fs::File>{};
-  if (path.is_absolute())
-  {
-    auto fileResult = fs::Disk::openFile(path);
-    if (fileResult.is_error())
-    {
-      return std::nullopt;
-    }
-    file = fileResult.value();
-  }
-  else
-  {
-    auto fileResult = m_map.gameFileSystem().openFile(path);
-    if (fileResult.is_error())
-    {
-      return std::nullopt;
-    }
-    file = fileResult.value();
-  }
-
-  auto reader = file->reader().buffer();
-  const auto bytes = reader.stringView();
-  return loadGoldSrcSpritePreview(
-    std::span{reinterpret_cast<const std::uint8_t*>(bytes.data()), bytes.size()});
-}
-
-void ModelBrowserView::loadSpritePreviews()
-{
-  for (const auto& asset : m_assets)
-  {
-    if (asset.type == BrowserCellType::Sprite)
-    {
-      m_spritePreviewCache.emplace(
-        asset.path, SpritePreviewCacheEntry{loadSpritePreview(asset.path)});
-    }
-  }
+  m_assetPreviews =
+    loadAssetPreviews(AssetPreviewProvider{m_map.gameFileSystem()}, m_assets);
 }
 
 bool ModelBrowserView::shouldRenderFocusIndicator() const
@@ -515,11 +473,11 @@ void ModelBrowserView::renderAssetPlaceholders(
           for (const auto& cell : row.cells())
           {
             const auto& item = cellData(cell);
-            const auto* spritePreviewPtr =
-              item.type == BrowserCellType::Sprite ? &spritePreview(item.path) : nullptr;
+            const auto* preview =
+              item.type == BrowserCellType::Sprite ? assetPreview(item.path) : nullptr;
             if (
-              spritePreviewPtr && spritePreviewPtr->has_value()
-              && !(*spritePreviewPtr)->rgba.empty())
+              preview && preview->status == AssetPreviewStatus::Ready && preview->sprite
+              && !preview->sprite->rgba.empty())
             {
               continue;
             }
@@ -681,11 +639,14 @@ void ModelBrowserView::renderSpritePreviews(
           continue;
         }
 
-        const auto& preview = spritePreview(item.path);
-        if (!preview || preview->rgba.empty())
+        const auto* previewState = assetPreview(item.path);
+        if (
+          !previewState || previewState->status != AssetPreviewStatus::Ready
+          || !previewState->sprite || previewState->sprite->rgba.empty())
         {
           continue;
         }
+        const auto& preview = *previewState->sprite;
 
         const auto& bounds = cell.itemBounds();
         const auto maxWidth = bounds.width - 16.0f;
@@ -695,8 +656,8 @@ void ModelBrowserView::renderSpritePreviews(
           continue;
         }
 
-        const auto previewWidth = float(preview->width);
-        const auto previewHeight = float(preview->height);
+        const auto previewWidth = float(preview.width);
+        const auto previewHeight = float(preview.height);
         const auto scale = std::min(maxWidth / previewWidth, maxHeight / previewHeight);
         const auto imageWidth = previewWidth * scale;
         const auto imageHeight = previewHeight * scale;
@@ -717,12 +678,12 @@ void ModelBrowserView::renderSpritePreviews(
           GL_TEXTURE_2D,
           0,
           GL_RGBA,
-          GLsizei(preview->width),
-          GLsizei(preview->height),
+          GLsizei(preview.width),
+          GLsizei(preview.height),
           0,
           GL_RGBA,
           GL_UNSIGNED_BYTE,
-          preview->rgba.data());
+          preview.rgba.data());
 
         auto vertices = std::vector<Vertex>{
           Vertex{vm::vec2f{left, height - (top - y)}, vm::vec2f{0, 0}},
