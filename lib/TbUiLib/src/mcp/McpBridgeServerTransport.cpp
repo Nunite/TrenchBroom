@@ -113,6 +113,14 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
       QString{"Unknown MCP tool: %1"}.arg(request.tool));
   }
 
+  if (!tool->implemented)
+  {
+    return makeFailure(
+      request,
+      mcp::McpErrorCode::ToolNotFound,
+      QString{"MCP tool is registered but not implemented yet: %1"}.arg(request.tool));
+  }
+
   if (!mcp::canCallTool(*tool, m_config.mode))
   {
     return makeFailure(
@@ -121,20 +129,12 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
       QString{"MCP tool is not available in mode %1"}.arg(mcp::modeName(m_config.mode)));
   }
 
-  if (tool->implemented)
+  const auto result = m_toolHandler(request.tool, request.params);
+  if (result.ok)
   {
-    const auto result = m_toolHandler(request.tool, request.params);
-    if (result.ok)
-    {
-      return mcp::McpBridgeResponse::success(request.id, result.result);
-    }
-    return mcp::McpBridgeResponse::failure(request.id, result.error);
+    return mcp::McpBridgeResponse::success(request.id, result.result);
   }
-
-  return makeFailure(
-    request,
-    mcp::McpErrorCode::ToolNotFound,
-    QString{"MCP tool is registered but not wired yet: %1"}.arg(request.tool));
+  return mcp::McpBridgeResponse::failure(request.id, result.error);
 }
 
 void McpBridgeServer::handleNewConnection()

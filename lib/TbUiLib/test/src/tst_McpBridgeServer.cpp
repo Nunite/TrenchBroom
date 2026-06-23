@@ -504,6 +504,20 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
   }
 
+  SECTION("registered unsupported tools report not implemented")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto response = server.dispatchRequest(
+      mcp::McpBridgeRequest{"1", "secret", "brush_create_arch", {}, mcp::McpMode::Edit});
+
+    CHECK(!response.ok);
+    REQUIRE(response.error);
+    CHECK(response.error->code == mcp::McpErrorCode::ToolNotFound);
+    CHECK(response.error->message.contains("not implemented"));
+  }
+
   SECTION("read-only mode rejects document mutation tools")
   {
     REQUIRE(
