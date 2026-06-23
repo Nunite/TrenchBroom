@@ -64,7 +64,7 @@ MapDocument transaction / query services
 - 稳定 arch/torus primitive 生成器；当前 `brush_types_list` 会标记为 unsupported，不出现在默认 `tools/list` 可调用工具中。
 - Prefab provider / prefab_create；当前只在 catalog 中保留 `prefabs_list`、`prefab_create` 未实现占位，不出现在默认 `tools/list`。
 - 更完整的高级 UV 对齐模式；当前 MCP face alignment 先覆盖 reset/paraxial/parallel 这类可稳定映射到现有 API 的模式。
-- MCP 工具实现拆分。目前 `McpBridgeServer.cpp` 已承载较多 tool handler，后续应拆成 document/action/edit/asset/blockout/overlay 等模块，避免继续膨胀。
+- MCP tool handler 已按 document/action/asset/brush/compile/entity/history/object/problem/selection/texture 等文件拆分。后续新增工具应继续保持这个边界，不要把逻辑重新堆回 `McpBridgeServer.cpp`。
 
 ## 配置与安全模式
 
@@ -349,6 +349,6 @@ Blockout 测试：
 8. [x] Blockout IR tools。
 9. [~] overlay 与 viewport capture：当前已有 bridge overlay state、整窗截图和 2D/3D 子视口截图；真实 overlay 绘制待接入。
 9.1. [x] compile profile / leak pointfile tools。
-10. [~] 用户文档、示例 prompt 和 smoke workflow：当前已有本地 smoke 脚本；还缺面向 MCP client 的完整 prompt 示例。
+10. [x] 用户文档、示例 prompt 和 smoke workflow：当前已有本地 smoke 脚本和面向 Agent 的工作流文档。
 
 每个阶段都应保持可构建，并带 focused tests。涉及写操作的阶段必须先证明 transaction 和 rollback 行为稳定。
