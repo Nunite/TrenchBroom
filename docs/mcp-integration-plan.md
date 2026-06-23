@@ -48,7 +48,7 @@ MapDocument transaction / query services
 - 已接入第一批编辑器状态工具：`selection_set`、`overlay_set`、`overlay_clear`。
 - 已接入 `action_execute`，但它要求 `Edit` 模式，因为任意 action 可能间接修改地图。
 - 已接入文档生命周期工具：`documents_open`、`documents_activate`、`documents_save`、`documents_close`、`documents_export`。MCP 保存/导出要求绝对路径，关闭 dirty 文档必须显式传入 `discardChanges=true`，避免阻塞式确认对话框。
-- 已接入选择与视图控制工具：`selection_filter`、`selection_by_bounds`、`selection_grow`、`viewport_focus`、`viewport_clear_marks`、`viewport_capture_current`。当前 `viewport_focus` 复用现有 action；`viewport_capture_current` 截取当前 TrenchBroom 窗口，精确 2D/3D 子视口截图仍在后续阶段。
+- 已接入选择与视图控制工具：`selection_filter`、`selection_by_bounds`、`selection_grow`、`viewport_focus`、`viewport_clear_marks`、`viewport_capture_current`、`viewport_capture_3d`、`viewport_capture_2d`。当前 `viewport_focus` 复用现有 action；截图工具可返回临时 PNG 路径或 base64。
 - 已接入 FGD/schema 与 brush entity 工具：`fgd_entities_list`、`entity_schema`、`entity_create_from_schema`、`entity_tie_brushes`、`entity_untie_brushes`。
 - 已接入事务型写入工具：entity 创建/更新/删除、brush primitive 创建。
 - 已接入 MCP operation history：`history_list`、`history_undo_mcp`、`history_redo_mcp`。当前只在 MCP 操作仍位于 TrenchBroom 原生 undo/redo 栈顶时执行，避免误撤用户手动编辑。
@@ -60,7 +60,7 @@ MapDocument transaction / query services
 
 仍未完成：
 
-- 真实 viewport overlay 渲染与精确 2D/3D viewport capture。
+- 真实 viewport overlay 渲染；当前 `overlay_set` / `overlay_clear` 仍只是 bridge 内存状态，尚未接入统一视图叠加层管理器。
 - 稳定 arch/torus primitive 生成器；当前 `brush_types_list` 会标记为 unsupported，不出现在默认 `tools/list` 可调用工具中。
 - Prefab provider / prefab_create；当前只在 catalog 中保留 `prefabs_list`、`prefab_create` 未实现占位，不出现在默认 `tools/list`。
 - 更完整的高级 UV 对齐模式；当前 MCP face alignment 先覆盖 reset/paraxial/parallel 这类可稳定映射到现有 API 的模式。
@@ -111,6 +111,7 @@ MapDocument transaction / query services
 - `viewport_focus`：聚焦当前选择或传入 object ids；当前通过现有视图 action 执行。
 - `viewport_clear_marks`：清理 MCP overlay 状态，可选清空当前选择。
 - `viewport_capture_current`：截取当前 TrenchBroom 窗口，默认写入临时 PNG，也可返回 base64；这是只读视觉反馈工具，不改变当前视图状态。
+- `viewport_capture_3d` / `viewport_capture_2d`：截取当前可见的 3D / 2D map viewport。优先使用当前聚焦视图；如果当前视图类型不匹配，则从活动 `MapWindow` 中查找第一个可见的对应视图。
 - `fgd_entities_list`：列出当前 game config/entity definition manager 中的 entity class，可按 point/brush 和文本过滤。
 - `entity_schema`：返回指定 entity class 的 FGD 属性、类型、默认值和 point entity bounds。
 - `entity_create_from_schema`：使用 FGD 默认值创建 point entity，并叠加调用方传入的属性。
@@ -236,15 +237,12 @@ MCP overlay 不应直接散落在 renderer 临时分支中。当前第一版已�
 当前已接入：
 
 - `viewport_capture_current`
-
-它截取当前 TrenchBroom 窗口，默认写入 `%TEMP%/TrenchBroomMCP/viewport-<timestamp>.png`，也可以通过 `returnBase64=true` 返回 PNG base64。该工具只读，不改变用户当前视图状态。它的 `scope` 返回值为 `window`，提醒调用方这是整窗截图，不是单个 map viewport。
-
-后续再接入：
-
 - `viewport_capture_3d`
 - `viewport_capture_2d`
 
-这两个工具需要先补 UI 层的当前视口访问/截图边界，避免 MCP 直接绕过 `MapWindow` / `MapViewContainer` 封装。
+它截取当前 TrenchBroom 窗口，默认写入 `%TEMP%/TrenchBroomMCP/viewport-<timestamp>.png`，也可以通过 `returnBase64=true` 返回 PNG base64。该工具只读，不改变用户当前视图状态。它的 `scope` 返回值为 `window`，提醒调用方这是整窗截图，不是单个 map viewport。
+
+`viewport_capture_3d` 与 `viewport_capture_2d` 复用同一输出策略，但只截取对应的 map viewport，`scope` 分别返回 `3d` 和 `2d`。它们仍通过 `MapWindow` / `MapViewBase` 控件抓取，不绕过 UI 状态或直接操作 OpenGL framebuffer。
 
 ## 编译与 Leak 辅助
 
@@ -293,7 +291,7 @@ Blockout 测试：
 6. [x] transaction 编辑 tools 与 MCP history。
 7. [x] GoldSrc asset placement tools。
 8. [x] Blockout IR tools。
-9. [~] overlay 与 viewport capture：当前已有 bridge overlay state 和整窗截图；真实 overlay 绘制、精确 2D/3D 截图待接入。
+9. [~] overlay 与 viewport capture：当前已有 bridge overlay state、整窗截图和 2D/3D 子视口截图；真实 overlay 绘制待接入。
 9.1. [x] compile profile / leak pointfile tools。
 10. [ ] 用户文档、示例 prompt 和 smoke workflow。
 
