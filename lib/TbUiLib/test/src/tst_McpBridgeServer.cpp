@@ -117,14 +117,25 @@ TEST_CASE("McpBridgeServer")
         {"active", false},
       });
     }
-    if (toolName == "viewport_capture_current")
+    if (
+      toolName == "viewport_capture_current" || toolName == "viewport_capture_3d"
+      || toolName == "viewport_capture_2d")
     {
+      auto scope = QString{"window"};
+      if (toolName == "viewport_capture_3d")
+      {
+        scope = "3d";
+      }
+      else if (toolName == "viewport_capture_2d")
+      {
+        scope = "2d";
+      }
       return McpBridgeToolResult::success(QJsonObject{
         {"format", "png"},
         {"path", "C:/tmp/viewport.png"},
         {"width", 640},
         {"height", 480},
-        {"scope", "window"},
+        {"scope", scope},
       });
     }
     if (toolName == "overlay_set")
@@ -398,6 +409,24 @@ TEST_CASE("McpBridgeServer")
     CHECK(captureResponse.ok);
     CHECK(captureResponse.result.value("format").toString() == "png");
     CHECK(captureResponse.result.value("scope").toString() == "window");
+
+    const auto capture3DResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "8",
+      "secret",
+      "viewport_capture_3d",
+      QJsonObject{{"returnBase64", false}},
+      mcp::McpMode::ReadOnly});
+    CHECK(capture3DResponse.ok);
+    CHECK(capture3DResponse.result.value("scope").toString() == "3d");
+
+    const auto capture2DResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "9",
+      "secret",
+      "viewport_capture_2d",
+      QJsonObject{{"returnBase64", false}},
+      mcp::McpMode::ReadOnly});
+    CHECK(capture2DResponse.ok);
+    CHECK(capture2DResponse.result.value("scope").toString() == "2d");
   }
 
   SECTION("serves map_search")

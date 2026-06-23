@@ -47,6 +47,9 @@
 #include "ui/ActionManager.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
+#include "ui/MapView2D.h"
+#include "ui/MapView3D.h"
+#include "ui/MapViewBase.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
@@ -479,6 +482,92 @@ QString makeCaptureFilePath()
   return pathToQString(captureDir / QString{"viewport-%1.png"}.arg(millis).toStdString());
 }
 
+McpBridgeToolResult capturePixmapResult(
+  const QPixmap& pixmap, const QJsonObject& params, const QString& scope)
+{
+  if (pixmap.isNull())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError,
+      QString{"Could not capture %1 viewport"}.arg(scope));
+  }
+
+  if (mcpOptionalBool(params, "returnBase64", false))
+  {
+    auto bytes = QByteArray{};
+    auto buffer = QBuffer{&bytes};
+    buffer.open(QIODevice::WriteOnly);
+    if (!pixmap.save(&buffer, "PNG"))
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InternalError, "Could not encode capture as PNG");
+    }
+    return McpBridgeToolResult::success(QJsonObject{
+      {"format", "png"},
+      {"base64", QString::fromLatin1(bytes.toBase64())},
+      {"width", pixmap.width()},
+      {"height", pixmap.height()},
+      {"scope", scope},
+    });
+  }
+
+  const auto filePath = makeCaptureFilePath();
+  if (filePath.isEmpty())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not create MCP capture directory");
+  }
+  if (!pixmap.save(filePath, "PNG"))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not save capture PNG");
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"format", "png"},
+    {"path", filePath},
+    {"width", pixmap.width()},
+    {"height", pixmap.height()},
+    {"scope", scope},
+  });
+}
+
+template <typename View>
+View* findCaptureView(MapWindow& mapWindow)
+{
+  if (auto* currentView = dynamic_cast<View*>(mapWindow.currentMapViewBase()))
+  {
+    return currentView;
+  }
+
+  return mapWindow.findChild<View*>();
+}
+
+template <typename View>
+McpBridgeToolResult viewportCaptureTypedResult(
+  AppController& appController, const QJsonObject& params, const QString& scope)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  if (!mapWindow->isVisible())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Active map window is not visible");
+  }
+
+  auto* view = findCaptureView<View>(*mapWindow);
+  if (!view || !view->isVisible())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, QString{"No visible %1 viewport"}.arg(scope));
+  }
+
+  return capturePixmapResult(view->grab(), params, scope);
+}
+
 } // namespace
 
 QJsonObject mapSearchJson(AppController& appController, const QJsonObject& params)
@@ -827,51 +916,19 @@ McpBridgeToolResult viewportCaptureCurrentResult(
       mcp::McpErrorCode::InternalError, "Active map window is not visible");
   }
 
-  const auto pixmap = mapWindow->grab();
-  if (pixmap.isNull())
-  {
-    return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError, "Could not capture active map window");
-  }
+  return capturePixmapResult(mapWindow->grab(), params, "window");
+}
 
-  if (mcpOptionalBool(params, "returnBase64", false))
-  {
-    auto bytes = QByteArray{};
-    auto buffer = QBuffer{&bytes};
-    buffer.open(QIODevice::WriteOnly);
-    if (!pixmap.save(&buffer, "PNG"))
-    {
-      return McpBridgeToolResult::failure(
-        mcp::McpErrorCode::InternalError, "Could not encode capture as PNG");
-    }
-    return McpBridgeToolResult::success(QJsonObject{
-      {"format", "png"},
-      {"base64", QString::fromLatin1(bytes.toBase64())},
-      {"width", pixmap.width()},
-      {"height", pixmap.height()},
-      {"scope", "window"},
-    });
-  }
+McpBridgeToolResult viewportCapture3DResult(
+  AppController& appController, const QJsonObject& params)
+{
+  return viewportCaptureTypedResult<MapView3D>(appController, params, "3d");
+}
 
-  const auto filePath = makeCaptureFilePath();
-  if (filePath.isEmpty())
-  {
-    return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError, "Could not create MCP capture directory");
-  }
-  if (!pixmap.save(filePath, "PNG"))
-  {
-    return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError, "Could not save capture PNG");
-  }
-
-  return McpBridgeToolResult::success(QJsonObject{
-    {"format", "png"},
-    {"path", filePath},
-    {"width", pixmap.width()},
-    {"height", pixmap.height()},
-    {"scope", "window"},
-  });
+McpBridgeToolResult viewportCapture2DResult(
+  AppController& appController, const QJsonObject& params)
+{
+  return viewportCaptureTypedResult<MapView2D>(appController, params, "2d");
 }
 
 } // namespace tb::ui

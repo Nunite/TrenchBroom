@@ -382,10 +382,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_3d",
-      "Capture a 3D map viewport. Reserved until view-specific capture is wired.",
+      "Capture a visible 3D map viewport as a PNG for MCP visual feedback.",
       McpMode::ReadOnly,
       false,
-      false,
+      true,
       objectSchema({
         {"returnBase64",
          boolProperty("Return PNG data as base64 instead of a temp file path.")},
@@ -393,10 +393,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_2d",
-      "Capture a 2D map viewport. Reserved until view-specific capture is wired.",
+      "Capture a visible 2D map viewport as a PNG for MCP visual feedback.",
       McpMode::ReadOnly,
       false,
-      false,
+      true,
       objectSchema({
         {"returnBase64",
          boolProperty("Return PNG data as base64 instead of a temp file path.")},

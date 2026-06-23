@@ -135,6 +135,14 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return viewportCaptureCurrentResult(appController, params);
         }
+        if (toolName == "viewport_capture_3d")
+        {
+          return viewportCapture3DResult(appController, params);
+        }
+        if (toolName == "viewport_capture_2d")
+        {
+          return viewportCapture2DResult(appController, params);
+        }
         if (toolName == "actions_list")
         {
           return McpBridgeToolResult::success(actionsListJson(appController));
