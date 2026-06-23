@@ -163,6 +163,23 @@ TEST_CASE("McpBridgeServer")
         {"transactionName", "MCP: Untie brushes"},
       });
     }
+    if (toolName == "brush_types_list")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"types", QJsonArray{}},
+      });
+    }
+    if (
+      toolName == "brush_create" || toolName == "brush_create_cone"
+      || toolName == "brush_create_pipe" || toolName == "brush_create_sphere"
+      || toolName == "brush_create_pyramid" || toolName == "brush_create_tetrahedron"
+      || toolName == "brush_create_from_planes")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-7"},
+        {"transactionName", "MCP: Create brush primitive"},
+      });
+    }
     if (toolName == "history_list")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -417,6 +434,17 @@ TEST_CASE("McpBridgeServer")
     CHECK(schemaResponse.result.value("classname").toString() == "func_wall");
   }
 
+  SECTION("serves brush primitive discovery in read-only mode")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1", "secret", "brush_types_list", {}, mcp::McpMode::ReadOnly});
+    CHECK(response.ok);
+    CHECK(response.result.contains("types"));
+  }
+
   SECTION("edit mode serves FGD entity mutation tools")
   {
     REQUIRE(
@@ -444,6 +472,27 @@ TEST_CASE("McpBridgeServer")
       "3", "secret", "entity_untie_brushes", {}, mcp::McpMode::Edit});
     CHECK(untieResponse.ok);
     CHECK(untieResponse.result.value("operationId").toString() == "mcp-op-6");
+  }
+
+  SECTION("edit mode serves extended brush primitive tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    for (const auto& toolName :
+         {"brush_create",
+          "brush_create_cone",
+          "brush_create_pipe",
+          "brush_create_sphere",
+          "brush_create_pyramid",
+          "brush_create_tetrahedron",
+          "brush_create_from_planes"})
+    {
+      const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+        "1", "secret", toolName, QJsonObject{{"type", "box"}}, mcp::McpMode::Edit});
+      CHECK(response.ok);
+      CHECK(response.result.value("operationId").toString() == "mcp-op-7");
+    }
   }
 
   SECTION("edit mode serves document lifecycle tools")

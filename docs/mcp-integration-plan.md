@@ -50,7 +50,7 @@ MapDocument transaction / query services
 - 已接入文档生命周期工具：`documents_open`、`documents_activate`、`documents_save`、`documents_close`、`documents_export`。MCP 保存/导出要求绝对路径，关闭 dirty 文档必须显式传入 `discardChanges=true`，避免阻塞式确认对话框。
 - 已接入选择与视图控制工具：`selection_filter`、`selection_by_bounds`、`selection_grow`、`viewport_focus`、`viewport_clear_marks`。当前 `viewport_focus` 复用现有 action；真实 overlay 绘制和 viewport capture 仍在后续阶段。
 - 已接入 FGD/schema 与 brush entity 工具：`fgd_entities_list`、`entity_schema`、`entity_create_from_schema`、`entity_tie_brushes`、`entity_untie_brushes`。
-- 已接入事务型写入工具：entity 创建/更新/删除、box/wedge/cylinder brush 创建。
+- 已接入事务型写入工具：entity 创建/更新/删除、brush primitive 创建。
 - 已接入 MCP operation history：`history_list`、`history_undo_mcp`、`history_redo_mcp`。当前只在 MCP 操作仍位于 TrenchBroom 原生 undo/redo 栈顶时执行，避免误撤用户手动编辑。
 - 已接入 GoldSrc 资产与材质工具：`.mdl/.spr/.wav` 搜索与放置、material 搜索与应用。
 - 已接入 Blockout IR 第一版：room、corridor、stairs、ramp、doorway、cover、sky shell 和 validate。
@@ -58,6 +58,7 @@ MapDocument transaction / query services
 仍未完成：
 
 - 真实 viewport overlay 渲染与 viewport capture。
+- 稳定 arch/torus primitive 生成器；当前 `brush_types_list` 会标记为 unsupported，不出现在默认 `tools/list` 可调用工具中。
 - MCP 工具实现拆分。目前 `McpBridgeServer.cpp` 已承载较多 tool handler，后续应拆成 document/action/edit/asset/blockout/overlay 等模块，避免继续膨胀。
 
 ## 配置与安全模式
@@ -117,7 +118,11 @@ MapDocument transaction / query services
 
 - `documents_open`、`documents_activate`、`documents_save`、`documents_close`、`documents_export`
 - `entity_create`、`entity_update`、`entity_delete`
+- `brush_types_list`
+- `brush_create`
 - `brush_create_box`、`brush_create_wedge`、`brush_create_cylinder`
+- `brush_create_cone`、`brush_create_pipe`、`brush_create_sphere`
+- `brush_create_pyramid`、`brush_create_tetrahedron`、`brush_create_from_planes`
 - `asset_search`、`asset_place_model`、`asset_place_sprite`、`asset_place_sound`
 - `texture_search`、`texture_apply`
 - `history_list`、`history_undo_mcp`、`history_redo_mcp`

@@ -50,6 +50,16 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("entity_create_from_schema"));
     CHECK(findToolDefinition("entity_tie_brushes"));
     CHECK(findToolDefinition("entity_untie_brushes"));
+    CHECK(findToolDefinition("brush_types_list"));
+    CHECK(findToolDefinition("brush_create"));
+    CHECK(findToolDefinition("brush_create_cone"));
+    CHECK(findToolDefinition("brush_create_pipe"));
+    CHECK(findToolDefinition("brush_create_sphere"));
+    CHECK(findToolDefinition("brush_create_pyramid"));
+    CHECK(findToolDefinition("brush_create_tetrahedron"));
+    CHECK(findToolDefinition("brush_create_from_planes"));
+    CHECK(findToolDefinition("brush_create_arch"));
+    CHECK(findToolDefinition("brush_create_torus"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
   }
@@ -75,6 +85,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("viewport_clear_marks"));
     CHECK(names.contains("fgd_entities_list"));
     CHECK(names.contains("entity_schema"));
+    CHECK(names.contains("brush_types_list"));
     CHECK(names.contains("overlay_set"));
     CHECK(names.contains("history_list"));
     CHECK(names.contains("asset_search"));
@@ -87,6 +98,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("entity_create_from_schema"));
     CHECK(!names.contains("entity_tie_brushes"));
     CHECK(!names.contains("entity_untie_brushes"));
+    CHECK(!names.contains("brush_create"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
     CHECK(!names.contains("asset_place_model"));
@@ -116,9 +128,19 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("entity_create_from_schema"));
     CHECK(names.contains("entity_tie_brushes"));
     CHECK(names.contains("entity_untie_brushes"));
+    CHECK(names.contains("brush_types_list"));
+    CHECK(names.contains("brush_create"));
     CHECK(names.contains("brush_create_box"));
     CHECK(names.contains("brush_create_wedge"));
     CHECK(names.contains("brush_create_cylinder"));
+    CHECK(names.contains("brush_create_cone"));
+    CHECK(names.contains("brush_create_pipe"));
+    CHECK(names.contains("brush_create_sphere"));
+    CHECK(names.contains("brush_create_pyramid"));
+    CHECK(names.contains("brush_create_tetrahedron"));
+    CHECK(names.contains("brush_create_from_planes"));
+    CHECK(!names.contains("brush_create_arch"));
+    CHECK(!names.contains("brush_create_torus"));
     CHECK(names.contains("asset_place_model"));
     CHECK(names.contains("asset_place_sprite"));
     CHECK(names.contains("asset_place_sound"));

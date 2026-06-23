@@ -1481,6 +1481,176 @@ Result<mdl::Brush> createWedgeBrush(
   return builder.createBrush(points, material);
 }
 
+Result<mdl::Brush> createPyramidBrush(
+  const mdl::BrushBuilder& builder,
+  const vm::bbox3d& bounds,
+  const vm::axis::type axis,
+  const std::string& material)
+{
+  const auto& min = bounds.min;
+  const auto& max = bounds.max;
+  const auto center = bounds.center();
+
+  auto points = std::vector<vm::vec3d>{};
+  switch (axis)
+  {
+  case vm::axis::x:
+    points = {
+      {min.x(), min.y(), min.z()},
+      {min.x(), max.y(), min.z()},
+      {min.x(), min.y(), max.z()},
+      {min.x(), max.y(), max.z()},
+      {max.x(), center.y(), center.z()},
+    };
+    break;
+  case vm::axis::y:
+    points = {
+      {min.x(), min.y(), min.z()},
+      {max.x(), min.y(), min.z()},
+      {min.x(), min.y(), max.z()},
+      {max.x(), min.y(), max.z()},
+      {center.x(), max.y(), center.z()},
+    };
+    break;
+  case vm::axis::z:
+    points = {
+      {min.x(), min.y(), min.z()},
+      {max.x(), min.y(), min.z()},
+      {min.x(), max.y(), min.z()},
+      {max.x(), max.y(), min.z()},
+      {center.x(), center.y(), max.z()},
+    };
+    break;
+  }
+
+  return builder.createBrush(points, material);
+}
+
+Result<mdl::Brush> createTetrahedronBrush(
+  const mdl::BrushBuilder& builder,
+  const vm::bbox3d& bounds,
+  const vm::axis::type axis,
+  const std::string& material)
+{
+  const auto& min = bounds.min;
+  const auto& max = bounds.max;
+
+  auto points = std::vector<vm::vec3d>{};
+  switch (axis)
+  {
+  case vm::axis::x:
+    points = {
+      {min.x(), min.y(), min.z()},
+      {min.x(), max.y(), min.z()},
+      {min.x(), min.y(), max.z()},
+      {max.x(), max.y(), max.z()},
+    };
+    break;
+  case vm::axis::y:
+    points = {
+      {min.x(), min.y(), min.z()},
+      {max.x(), min.y(), min.z()},
+      {min.x(), min.y(), max.z()},
+      {max.x(), max.y(), max.z()},
+    };
+    break;
+  case vm::axis::z:
+    points = {
+      {min.x(), min.y(), min.z()},
+      {max.x(), min.y(), min.z()},
+      {min.x(), max.y(), min.z()},
+      {max.x(), max.y(), max.z()},
+    };
+    break;
+  }
+
+  return builder.createBrush(points, material);
+}
+
+std::optional<mdl::Brush> createBrushFromPlaneTriples(
+  const mdl::Map& map,
+  const QJsonObject& params,
+  const std::string& material,
+  QString& error)
+{
+  const auto planesValue = params.value("planes");
+  if (!planesValue.isArray())
+  {
+    error = "planes must be an array";
+    return std::nullopt;
+  }
+
+  const auto planes = planesValue.toArray();
+  if (planes.size() < 4)
+  {
+    error = "planes must contain at least four plane definitions";
+    return std::nullopt;
+  }
+
+  auto faces = std::vector<mdl::BrushFace>{};
+  faces.reserve(static_cast<size_t>(planes.size()));
+  auto planeIndex = 0;
+  for (const auto& planeValue : planes)
+  {
+    if (!planeValue.isArray())
+    {
+      error = QString{"planes[%1] must be an array of three points"}.arg(planeIndex);
+      return std::nullopt;
+    }
+
+    const auto pointArray = planeValue.toArray();
+    if (pointArray.size() != 3)
+    {
+      error = QString{"planes[%1] must contain exactly three points"}.arg(planeIndex);
+      return std::nullopt;
+    }
+
+    auto points = std::array<vm::vec3d, 3>{};
+    for (auto pointIndex = 0; pointIndex < 3; ++pointIndex)
+    {
+      if (!pointArray[pointIndex].isArray())
+      {
+        error = QString{"planes[%1][%2] must be an array of three numbers"}
+                  .arg(planeIndex)
+                  .arg(pointIndex);
+        return std::nullopt;
+      }
+
+      auto pointParams = QJsonObject{};
+      pointParams.insert("point", pointArray[pointIndex].toArray());
+      const auto point = vec3FromJson(pointParams, "point", error);
+      if (!point)
+      {
+        error = QString{"planes[%1][%2]: %3"}.arg(planeIndex).arg(pointIndex).arg(error);
+        return std::nullopt;
+      }
+      points[static_cast<size_t>(pointIndex)] = *point;
+    }
+
+    auto face = mdl::BrushFace::create(
+      points[0],
+      points[1],
+      points[2],
+      mdl::BrushFaceAttributes{material},
+      map.worldNode().mapFormat());
+    if (face.is_error())
+    {
+      error = QString{"planes[%1] does not define a valid plane"}.arg(planeIndex);
+      return std::nullopt;
+    }
+    faces.push_back(std::move(face.value()));
+    ++planeIndex;
+  }
+
+  auto brush = mdl::Brush::create(map.worldBounds(), std::move(faces));
+  if (brush.is_error())
+  {
+    error = "planes do not form a valid closed convex brush";
+    return std::nullopt;
+  }
+  return std::move(brush.value());
+}
+
 bool validThickness(const double thickness)
 {
   return std::isfinite(thickness) && thickness > 0.0;
@@ -1849,6 +2019,211 @@ McpBridgeToolResult blockoutCreateResult(
   return McpBridgeToolResult::success(std::move(result));
 }
 
+QJsonObject brushTypeJson(
+  const QString& name,
+  const bool supported,
+  const QString& description,
+  const bool createsMultipleBrushes = false)
+{
+  auto result = QJsonObject{
+    {"name", name},
+    {"supported", supported},
+    {"description", description},
+    {"createsMultipleBrushes", createsMultipleBrushes},
+  };
+  if (!supported)
+  {
+    result.insert("reason", "No stable native MCP primitive generator yet");
+  }
+  return result;
+}
+
+McpBridgeToolResult brushTypesListResult()
+{
+  return McpBridgeToolResult::success(QJsonObject{
+    {"types",
+     QJsonArray{
+       brushTypeJson("box", true, "Single convex cuboid brush."),
+       brushTypeJson("wedge", true, "Single convex wedge brush."),
+       brushTypeJson("cylinder", true, "Single convex cylinder brush."),
+       brushTypeJson("cone", true, "Single convex cone brush."),
+       brushTypeJson("pipe", true, "Hollow cylinder made from convex brush segments.", true),
+       brushTypeJson("sphere", true, "Single convex UV or ico sphere brush."),
+       brushTypeJson("pyramid", true, "Single convex square pyramid brush."),
+       brushTypeJson("tetrahedron", true, "Single convex tetrahedron brush."),
+       brushTypeJson("from_planes", true, "Expert brush from plane point triples."),
+       brushTypeJson("arch", false, "Arch primitives need a dedicated stable generator.", true),
+       brushTypeJson(
+         "torus", false, "Torus geometry cannot be represented as one convex BSP brush.", true),
+     }},
+  });
+}
+
+QString brushTypeFromToolName(const QString& toolName, const QJsonObject& params)
+{
+  if (toolName == "brush_create")
+  {
+    return params.value("type").toString().trimmed().toLower();
+  }
+
+  static const auto Prefix = QString{"brush_create_"};
+  return toolName.startsWith(Prefix) ? toolName.mid(Prefix.size()) : QString{};
+}
+
+size_t clampedSizeParam(
+  const QJsonObject& params,
+  const QString& key,
+  const size_t defaultValue,
+  const size_t minValue,
+  const size_t maxValue)
+{
+  return std::clamp(optionalSize(params, key, defaultValue), minValue, maxValue);
+}
+
+std::optional<std::vector<mdl::Brush>> createBrushesForType(
+  const mdl::Map& map,
+  const mdl::BrushBuilder& builder,
+  const QString& type,
+  const QJsonObject& params,
+  const std::string& material,
+  QString& error)
+{
+  if (type.isEmpty())
+  {
+    error = "brush_create requires type";
+    return std::nullopt;
+  }
+
+  if (type == "from_planes")
+  {
+    auto brush = createBrushFromPlaneTriples(map, params, material, error);
+    if (!brush)
+    {
+      return std::nullopt;
+    }
+    return std::vector<mdl::Brush>{std::move(*brush)};
+  }
+
+  const auto bounds = boundsFromJson(params, error);
+  if (!bounds)
+  {
+    return std::nullopt;
+  }
+
+  auto brush = Result<mdl::Brush>{Error{"Unsupported brush type"}};
+  if (type == "box")
+  {
+    brush = builder.createCuboid(*bounds, material);
+  }
+  else if (type == "wedge")
+  {
+    const auto axis = axisFromJson(params, "axis", vm::axis::x, error);
+    if (!axis)
+    {
+      return std::nullopt;
+    }
+    brush = createWedgeBrush(builder, *bounds, *axis, material);
+  }
+  else if (type == "cylinder")
+  {
+    const auto axis = axisFromJson(params, "axis", vm::axis::z, error);
+    if (!axis)
+    {
+      return std::nullopt;
+    }
+    const auto sides = clampedSizeParam(params, "sides", 16, 3, 128);
+    brush = builder.createCylinder(*bounds, mdl::EdgeAlignedCircle{sides}, *axis, material);
+  }
+  else if (type == "cone")
+  {
+    const auto axis = axisFromJson(params, "axis", vm::axis::z, error);
+    if (!axis)
+    {
+      return std::nullopt;
+    }
+    const auto sides = clampedSizeParam(params, "sides", 16, 3, 128);
+    brush = builder.createCone(*bounds, mdl::EdgeAlignedCircle{sides}, *axis, material);
+  }
+  else if (type == "pipe")
+  {
+    const auto axis = axisFromJson(params, "axis", vm::axis::z, error);
+    if (!axis)
+    {
+      return std::nullopt;
+    }
+    const auto sides = clampedSizeParam(params, "sides", 16, 3, 128);
+    const auto thickness = optionalDouble(params, "thickness", 16.0);
+    if (!validThickness(thickness))
+    {
+      error = "thickness must be greater than zero";
+      return std::nullopt;
+    }
+    auto brushes = builder.createHollowCylinder(
+      *bounds, thickness, mdl::EdgeAlignedCircle{sides}, *axis, material);
+    if (brushes.is_error())
+    {
+      error = "Could not create pipe brushes from the given bounds";
+      return std::nullopt;
+    }
+    return std::move(brushes.value());
+  }
+  else if (type == "sphere")
+  {
+    if (params.value("iterations").isDouble())
+    {
+      const auto iterations = clampedSizeParam(params, "iterations", 1, 1, 4);
+      brush = builder.createIcoSphere(*bounds, iterations, material);
+    }
+    else
+    {
+      const auto axis = axisFromJson(params, "axis", vm::axis::z, error);
+      if (!axis)
+      {
+        return std::nullopt;
+      }
+      const auto sides = clampedSizeParam(params, "sides", 12, 3, 64);
+      const auto rings = clampedSizeParam(params, "rings", 6, 1, 64);
+      brush =
+        builder.createUVSphere(*bounds, mdl::EdgeAlignedCircle{sides}, rings, *axis, material);
+    }
+  }
+  else if (type == "pyramid")
+  {
+    const auto axis = axisFromJson(params, "axis", vm::axis::z, error);
+    if (!axis)
+    {
+      return std::nullopt;
+    }
+    brush = createPyramidBrush(builder, *bounds, *axis, material);
+  }
+  else if (type == "tetrahedron")
+  {
+    const auto axis = axisFromJson(params, "axis", vm::axis::z, error);
+    if (!axis)
+    {
+      return std::nullopt;
+    }
+    brush = createTetrahedronBrush(builder, *bounds, *axis, material);
+  }
+  else if (type == "arch" || type == "torus")
+  {
+    error = QString{"Brush primitive type is not supported yet: %1"}.arg(type);
+    return std::nullopt;
+  }
+  else
+  {
+    error = QString{"Unknown brush primitive type: %1"}.arg(type);
+    return std::nullopt;
+  }
+
+  if (brush.is_error())
+  {
+    error = QString{"Could not create %1 brush from the given parameters"}.arg(type);
+    return std::nullopt;
+  }
+  return std::vector<mdl::Brush>{std::move(brush.value())};
+}
+
 McpBridgeToolResult createBrushResult(
   AppController& appController,
   const QString& toolName,
@@ -1863,58 +2238,33 @@ McpBridgeToolResult createBrushResult(
   }
 
   auto error = QString{};
-  const auto bounds = boundsFromJson(params, error);
-  if (!bounds)
-  {
-    return invalidParamsFailure(error);
-  }
-
   auto& map = mapWindow->document().map();
   const auto material = materialNameFromParams(map, params);
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
 
-  auto brush = Result<mdl::Brush>{Error{"Unsupported brush tool"}};
-  auto transactionName = QString{};
-  if (toolName == "brush_create_box")
+  const auto type = brushTypeFromToolName(toolName, params);
+  auto brushes = createBrushesForType(map, builder, type, params, material, error);
+  if (!brushes)
   {
-    brush = builder.createCuboid(*bounds, material);
-    transactionName = "MCP: Create box brush";
-  }
-  else if (toolName == "brush_create_wedge")
-  {
-    const auto axis = axisFromJson(params, "axis", vm::axis::x, error);
-    if (!axis)
-    {
-      return invalidParamsFailure(error);
-    }
-    brush = createWedgeBrush(builder, *bounds, *axis, material);
-    transactionName = "MCP: Create wedge brush";
-  }
-  else if (toolName == "brush_create_cylinder")
-  {
-    const auto axis = axisFromJson(params, "axis", vm::axis::z, error);
-    if (!axis)
-    {
-      return invalidParamsFailure(error);
-    }
-    const auto sides = std::max<size_t>(3, optionalSize(params, "sides", 16));
-    brush =
-      builder.createCylinder(*bounds, mdl::EdgeAlignedCircle{sides}, *axis, material);
-    transactionName = "MCP: Create cylinder brush";
+    return invalidParamsFailure(error);
   }
 
-  if (brush.is_error())
+  auto nodes = std::vector<mdl::Node*>{};
+  nodes.reserve(brushes->size());
+  for (auto& brush : *brushes)
   {
-    return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InvalidParams, "Could not create brush from the given bounds");
+    nodes.push_back(new mdl::BrushNode{std::move(brush)});
   }
 
-  auto* brushNode = new mdl::BrushNode{std::move(brush.value())};
+  const auto transactionName = QString{"MCP: Create %1 brush"}.arg(type);
   const auto changedObjectIds = addNodesWithTransaction(
-    map, transactionName, {brushNode}, optionalBool(params, "select", true));
+    map, transactionName, nodes, optionalBool(params, "select", true));
   if (!changedObjectIds)
   {
-    delete brushNode;
+    for (auto* node : nodes)
+    {
+      delete node;
+    }
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::InternalError, "Could not add brush to the active document");
   }
@@ -1922,7 +2272,18 @@ McpBridgeToolResult createBrushResult(
   auto result = QJsonObject{};
   recordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
-  result.insert("brush", nodeSummaryJson(*brushNode, map.worldNode()));
+  auto brushJson = QJsonArray{};
+  for (const auto* node : nodes)
+  {
+    brushJson.push_back(nodeSummaryJson(*node, map.worldNode()));
+  }
+  result.insert("type", type);
+  result.insert("brushes", brushJson);
+  result.insert("brushCount", brushJson.size());
+  if (nodes.size() == 1)
+  {
+    result.insert("brush", nodeSummaryJson(*nodes.front(), map.worldNode()));
+  }
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -3307,9 +3668,17 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           return untieBrushesResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
+        if (toolName == "brush_types_list")
+        {
+          return brushTypesListResult();
+        }
         if (
-          toolName == "brush_create_box" || toolName == "brush_create_wedge"
-          || toolName == "brush_create_cylinder")
+          toolName == "brush_create" || toolName == "brush_create_box"
+          || toolName == "brush_create_wedge" || toolName == "brush_create_cylinder"
+          || toolName == "brush_create_cone" || toolName == "brush_create_pipe"
+          || toolName == "brush_create_sphere" || toolName == "brush_create_pyramid"
+          || toolName == "brush_create_tetrahedron"
+          || toolName == "brush_create_from_planes")
         {
           return createBrushResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
