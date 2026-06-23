@@ -39,6 +39,9 @@
 #include "mdl/CircleShape.h"
 #include "mdl/EditorContext.h"
 #include "mdl/Entity.h"
+#include "mdl/EntityDefinition.h"
+#include "mdl/EntityDefinitionManager.h"
+#include "mdl/EntityDefinitionUtils.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityProperties.h"
@@ -51,12 +54,14 @@
 #include "mdl/MapFormat.h"
 #include "mdl/Map_Assets.h"
 #include "mdl/Map_Brushes.h"
+#include "mdl/Map_Entities.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Map_World.h"
 #include "mdl/Node.h"
 #include "mdl/NodeContents.h"
 #include "mdl/PatchNode.h"
+#include "mdl/PropertyDefinition.h"
 #include "mdl/Selection.h"
 #include "mdl/SwapNodeContentsCommand.h"
 #include "mdl/Transaction.h"
@@ -82,6 +87,7 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <type_traits>
 
 namespace tb::ui
 {
@@ -964,6 +970,467 @@ McpBridgeToolResult deleteEntityResult(
   auto result = QJsonObject{};
   recordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+QString entityDefinitionTypeName(const mdl::EntityDefinition& definition)
+{
+  return mdl::getType(definition) == mdl::EntityDefinitionType::Point ? "point" : "brush";
+}
+
+QString propertyValueTypeName(const mdl::PropertyValueType& type)
+{
+  return std::visit(
+    [](const auto& valueType) -> QString {
+      using T = std::decay_t<decltype(valueType)>;
+      if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::LinkTarget>)
+      {
+        return "target";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::LinkSource>)
+      {
+        return "target_source";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::String>)
+      {
+        return "string";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::Boolean>)
+      {
+        return "boolean";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::Integer>)
+      {
+        return "integer";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::Float>)
+      {
+        return "float";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::Choice>)
+      {
+        return "choice";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::Flags>)
+      {
+        return "flags";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::Origin>)
+      {
+        return "origin";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::Input>)
+      {
+        return "input";
+      }
+      else if constexpr (std::is_same_v<T, mdl::PropertyValueTypes::Output>)
+      {
+        return "output";
+      }
+      else if constexpr (
+        std::is_same_v<T, mdl::PropertyValueTypes::Color<RgbF>>
+        || std::is_same_v<T, mdl::PropertyValueTypes::Color<RgbB>>
+        || std::is_same_v<T, mdl::PropertyValueTypes::Color<Rgb>>)
+      {
+        return "color";
+      }
+      else
+      {
+        return "unknown";
+      }
+    },
+    type);
+}
+
+QJsonObject propertyDefinitionJson(const mdl::PropertyDefinition& property)
+{
+  auto result = QJsonObject{
+    {"key", QString::fromStdString(property.key)},
+    {"type", propertyValueTypeName(property.valueType)},
+    {"shortDescription", QString::fromStdString(property.shortDescription)},
+    {"longDescription", QString::fromStdString(property.longDescription)},
+    {"readOnly", property.readOnly},
+  };
+
+  if (const auto defaultValue = mdl::PropertyDefinition::defaultValue(property))
+  {
+    result.insert("defaultValue", QString::fromStdString(*defaultValue));
+  }
+
+  return result;
+}
+
+QJsonObject entityDefinitionJson(const mdl::EntityDefinition& definition)
+{
+  auto properties = QJsonArray{};
+  for (const auto& property : definition.propertyDefinitions)
+  {
+    properties.push_back(propertyDefinitionJson(property));
+  }
+
+  auto result = QJsonObject{
+    {"classname", QString::fromStdString(definition.name)},
+    {"type", entityDefinitionTypeName(definition)},
+    {"description", QString::fromStdString(definition.description)},
+    {"propertyCount", properties.size()},
+    {"properties", properties},
+  };
+
+  if (const auto* pointDefinition = mdl::getPointEntityDefinition(&definition))
+  {
+    result.insert("bounds", boundsToJson(pointDefinition->bounds));
+  }
+
+  return result;
+}
+
+McpBridgeToolResult fgdEntitiesListResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto type = params.value("type").toString().trimmed().toLower();
+  const auto query = params.value("query").toString().trimmed();
+  const auto limit = optionalSize(params, "limit", 200);
+
+  auto definitions = QJsonArray{};
+  for (const auto& definition :
+       mapWindow->document().map().entityDefinitionManager().definitions())
+  {
+    if (!type.isEmpty() && entityDefinitionTypeName(definition) != type)
+    {
+      continue;
+    }
+    if (
+      !query.isEmpty()
+      && !textMatches(QString::fromStdString(definition.name), query)
+      && !textMatches(QString::fromStdString(definition.description), query))
+    {
+      continue;
+    }
+
+    definitions.push_back(QJsonObject{
+      {"classname", QString::fromStdString(definition.name)},
+      {"type", entityDefinitionTypeName(definition)},
+      {"description", QString::fromStdString(definition.description)},
+      {"propertyCount", static_cast<int>(definition.propertyDefinitions.size())},
+    });
+
+    if (definitions.size() >= static_cast<int>(limit))
+    {
+      break;
+    }
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"definitions", definitions},
+    {"count", definitions.size()},
+  });
+}
+
+McpBridgeToolResult entitySchemaResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto classname = params.value("classname").toString().trimmed();
+  if (classname.isEmpty())
+  {
+    return invalidParamsFailure("entity_schema requires classname");
+  }
+
+  const auto* definition =
+    mapWindow->document().map().entityDefinitionManager().definition(
+      classname.toStdString());
+  if (!definition)
+  {
+    return invalidParamsFailure(QString{"Unknown entity classname: %1"}.arg(classname));
+  }
+
+  return McpBridgeToolResult::success(entityDefinitionJson(*definition));
+}
+
+McpBridgeToolResult createEntityFromSchemaResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto classname = params.value("classname").toString().trimmed();
+  if (classname.isEmpty())
+  {
+    return invalidParamsFailure("entity_create_from_schema requires classname");
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto* definition = map.entityDefinitionManager().definition(classname.toStdString());
+  if (!definition || mdl::getType(*definition) != mdl::EntityDefinitionType::Point)
+  {
+    return invalidParamsFailure(
+      QString{"Unknown point entity classname: %1"}.arg(classname));
+  }
+
+  auto error = QString{};
+  const auto properties = stringMapFromJson(params, "properties", error);
+  if (!properties)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto origin = vm::vec3d{0, 0, 0};
+  if (const auto originValue = params.value("origin"); !originValue.isUndefined())
+  {
+    const auto parsedOrigin = vec3FromJson(params, "origin", error);
+    if (!parsedOrigin)
+    {
+      return invalidParamsFailure(error);
+    }
+    origin = *parsedOrigin;
+  }
+
+  auto entity =
+    mdl::Entity{{{mdl::EntityPropertyKeys::Classname, classname.toStdString()}}};
+  mdl::setDefaultProperties(*definition, entity, mdl::SetDefaultPropertyMode::SetAll);
+  entity.setOrigin(origin);
+  for (const auto& [key, value] : *properties)
+  {
+    entity.addOrUpdateProperty(key, value);
+  }
+
+  auto* entityNode = new mdl::EntityNode{std::move(entity)};
+  const auto transactionName = QString{"MCP: Create %1"}.arg(classname);
+  const auto changedObjectIds = addNodesWithTransaction(
+    map, transactionName, {entityNode}, optionalBool(params, "select", true));
+  if (!changedObjectIds)
+  {
+    delete entityNode;
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError,
+      QString{"Failed to create entity from schema: %1"}.arg(classname));
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result);
+  result.insert("classname", classname);
+  result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+std::optional<std::vector<mdl::BrushNode*>> brushNodesFromParamsOrSelection(
+  mdl::Map& map, const QJsonObject& params, QString& error)
+{
+  auto brushes = std::vector<mdl::BrushNode*>{};
+  const auto objectIdsValue = params.value("objectIds");
+  if (objectIdsValue.isUndefined())
+  {
+    brushes = map.selection().brushes;
+  }
+  else
+  {
+    if (!objectIdsValue.isArray())
+    {
+      error = "objectIds must be an array";
+      return std::nullopt;
+    }
+    for (const auto& objectIdValue : objectIdsValue.toArray())
+    {
+      if (!objectIdValue.isString())
+      {
+        error = "objectIds must contain only strings";
+        return std::nullopt;
+      }
+      auto* node = resolveNodeId(map.worldNode(), objectIdValue.toString());
+      auto* brushNode = dynamic_cast<mdl::BrushNode*>(node);
+      if (!brushNode)
+      {
+        error = QString{"Object is not a brush: %1"}.arg(objectIdValue.toString());
+        return std::nullopt;
+      }
+      brushes.push_back(brushNode);
+    }
+  }
+
+  brushes = kdl::vec_sort_and_remove_duplicates(std::move(brushes));
+  if (brushes.empty())
+  {
+    error = "No brushes selected or specified";
+    return std::nullopt;
+  }
+  return brushes;
+}
+
+McpBridgeToolResult tieBrushesResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto classname = params.value("classname").toString().trimmed();
+  if (classname.isEmpty())
+  {
+    return invalidParamsFailure("entity_tie_brushes requires classname");
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto* definition = map.entityDefinitionManager().definition(classname.toStdString());
+  if (!definition || mdl::getType(*definition) != mdl::EntityDefinitionType::Brush)
+  {
+    return invalidParamsFailure(
+      QString{"Unknown brush entity classname: %1"}.arg(classname));
+  }
+
+  auto error = QString{};
+  const auto brushes = brushNodesFromParamsOrSelection(map, params, error);
+  if (!brushes)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  mdl::deselectAll(map);
+  mdl::selectNodes(map, kdl::vec_static_cast<mdl::Node*>(*brushes));
+  const auto* entityNode = mdl::createBrushEntity(map, *definition);
+  if (!entityNode)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Failed to tie brushes to entity");
+  }
+
+  auto changedObjectIds = QJsonArray{nodePathId(*entityNode, map.worldNode())};
+  for (const auto* brush : *brushes)
+  {
+    changedObjectIds.push_back(nodePathId(*brush, map.worldNode()));
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history,
+    nextOperationIndex,
+    toolName,
+    QString{"MCP: Tie brushes to %1"}.arg(classname),
+    changedObjectIds,
+    result);
+  result.insert("classname", classname);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult untieBrushesResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto brushes = std::vector<mdl::BrushNode*>{};
+  const auto objectIdsValue = params.value("objectIds");
+  if (objectIdsValue.isUndefined())
+  {
+    brushes = map.selection().brushes;
+  }
+  else if (objectIdsValue.isArray())
+  {
+    for (const auto& objectIdValue : objectIdsValue.toArray())
+    {
+      if (!objectIdValue.isString())
+      {
+        return invalidParamsFailure("objectIds must contain only strings");
+      }
+      auto* node = resolveNodeId(map.worldNode(), objectIdValue.toString());
+      if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node))
+      {
+        brushes.push_back(brushNode);
+      }
+      else if (auto* entityNode = dynamic_cast<mdl::EntityNode*>(node))
+      {
+        for (auto* child : entityNode->children())
+        {
+          if (auto* childBrush = dynamic_cast<mdl::BrushNode*>(child))
+          {
+            brushes.push_back(childBrush);
+          }
+        }
+      }
+      else
+      {
+        return invalidParamsFailure(
+          QString{"Object is not a brush or brush entity: %1"}.arg(
+            objectIdValue.toString()));
+      }
+    }
+  }
+  else
+  {
+    return invalidParamsFailure("objectIds must be an array");
+  }
+
+  brushes.erase(
+    std::remove_if(
+      brushes.begin(),
+      brushes.end(),
+      [&](const auto* brush) { return brush->entity() == &map.worldNode(); }),
+    brushes.end());
+  brushes = kdl::vec_sort_and_remove_duplicates(std::move(brushes));
+  if (brushes.empty())
+  {
+    return invalidParamsFailure("No brush entity brushes selected or specified");
+  }
+
+  auto changedObjectIds = QJsonArray{};
+  for (const auto* brush : brushes)
+  {
+    changedObjectIds.push_back(nodePathId(*brush, map.worldNode()));
+  }
+
+  const auto nodes = kdl::vec_static_cast<mdl::Node*>(brushes);
+  auto* parent = mdl::parentForNodes(map, nodes);
+  if (!parent || !mdl::reparentNodes(map, {{parent, nodes}}))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Failed to untie brushes");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history,
+    nextOperationIndex,
+    toolName,
+    "MCP: Untie brushes",
+    changedObjectIds,
+    result);
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -2815,6 +3282,29 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "entity_delete")
         {
           return deleteEntityResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "fgd_entities_list")
+        {
+          return fgdEntitiesListResult(appController, params);
+        }
+        if (toolName == "entity_schema")
+        {
+          return entitySchemaResult(appController, params);
+        }
+        if (toolName == "entity_create_from_schema")
+        {
+          return createEntityFromSchemaResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "entity_tie_brushes")
+        {
+          return tieBrushesResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "entity_untie_brushes")
+        {
+          return untieBrushesResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
         if (

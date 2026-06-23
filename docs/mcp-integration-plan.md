@@ -49,6 +49,7 @@ MapDocument transaction / query services
 - 已接入 `action_execute`，但它要求 `Edit` 模式，因为任意 action 可能间接修改地图。
 - 已接入文档生命周期工具：`documents_open`、`documents_activate`、`documents_save`、`documents_close`、`documents_export`。MCP 保存/导出要求绝对路径，关闭 dirty 文档必须显式传入 `discardChanges=true`，避免阻塞式确认对话框。
 - 已接入选择与视图控制工具：`selection_filter`、`selection_by_bounds`、`selection_grow`、`viewport_focus`、`viewport_clear_marks`。当前 `viewport_focus` 复用现有 action；真实 overlay 绘制和 viewport capture 仍在后续阶段。
+- 已接入 FGD/schema 与 brush entity 工具：`fgd_entities_list`、`entity_schema`、`entity_create_from_schema`、`entity_tie_brushes`、`entity_untie_brushes`。
 - 已接入事务型写入工具：entity 创建/更新/删除、box/wedge/cylinder brush 创建。
 - 已接入 MCP operation history：`history_list`、`history_undo_mcp`、`history_redo_mcp`。当前只在 MCP 操作仍位于 TrenchBroom 原生 undo/redo 栈顶时执行，避免误撤用户手动编辑。
 - 已接入 GoldSrc 资产与材质工具：`.mdl/.spr/.wav` 搜索与放置、material 搜索与应用。
@@ -103,6 +104,11 @@ MapDocument transaction / query services
 - `selection_grow`：把当前选择扩展到 parents、children 或 siblings。
 - `viewport_focus`：聚焦当前选择或传入 object ids；当前通过现有视图 action 执行。
 - `viewport_clear_marks`：清理 MCP overlay 状态，可选清空当前选择。
+- `fgd_entities_list`：列出当前 game config/entity definition manager 中的 entity class，可按 point/brush 和文本过滤。
+- `entity_schema`：返回指定 entity class 的 FGD 属性、类型、默认值和 point entity bounds。
+- `entity_create_from_schema`：使用 FGD 默认值创建 point entity，并叠加调用方传入的属性。
+- `entity_tie_brushes`：把选中或指定 world brush 绑定成 brush entity。
+- `entity_untie_brushes`：把选中或指定 brush entity 中的 brush 移回当前合适父节点。
 - `actions_list`：列出可执行 actions。
 - `action_execute`：执行已注册 action，遵循 action 自身 enabled 状态；由于 action 可能修改地图，当前要求 `Edit` 模式。
 - `overlay_set` / `overlay_clear`：设置或清理 MCP overlay 状态；当前只保存 bridge state，后续再接入视图叠加层管理器进行真实绘制。

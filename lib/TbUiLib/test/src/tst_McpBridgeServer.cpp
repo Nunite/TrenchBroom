@@ -130,6 +130,39 @@ TEST_CASE("McpBridgeServer")
         {"transactionName", "MCP: Create info_player_start"},
       });
     }
+    if (toolName == "fgd_entities_list")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 1},
+      });
+    }
+    if (toolName == "entity_schema")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"classname", "func_wall"},
+      });
+    }
+    if (toolName == "entity_create_from_schema")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-4"},
+        {"transactionName", "MCP: Create light"},
+      });
+    }
+    if (toolName == "entity_tie_brushes")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-5"},
+        {"transactionName", "MCP: Tie brushes to func_wall"},
+      });
+    }
+    if (toolName == "entity_untie_brushes")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-6"},
+        {"transactionName", "MCP: Untie brushes"},
+      });
+    }
     if (toolName == "history_list")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -362,6 +395,55 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("operationId").toString() == "mcp-op-1");
+  }
+
+  SECTION("serves FGD schema tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto listResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1", "secret", "fgd_entities_list", {}, mcp::McpMode::ReadOnly});
+    CHECK(listResponse.ok);
+    CHECK(listResponse.result.value("count").toInt() == 1);
+
+    const auto schemaResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "entity_schema",
+      QJsonObject{{"classname", "func_wall"}},
+      mcp::McpMode::ReadOnly});
+    CHECK(schemaResponse.ok);
+    CHECK(schemaResponse.result.value("classname").toString() == "func_wall");
+  }
+
+  SECTION("edit mode serves FGD entity mutation tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto createResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "entity_create_from_schema",
+      QJsonObject{{"classname", "light"}},
+      mcp::McpMode::Edit});
+    CHECK(createResponse.ok);
+    CHECK(createResponse.result.value("operationId").toString() == "mcp-op-4");
+
+    const auto tieResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "entity_tie_brushes",
+      QJsonObject{{"classname", "func_wall"}},
+      mcp::McpMode::Edit});
+    CHECK(tieResponse.ok);
+    CHECK(tieResponse.result.value("operationId").toString() == "mcp-op-5");
+
+    const auto untieResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "3", "secret", "entity_untie_brushes", {}, mcp::McpMode::Edit});
+    CHECK(untieResponse.ok);
+    CHECK(untieResponse.result.value("operationId").toString() == "mcp-op-6");
   }
 
   SECTION("edit mode serves document lifecycle tools")

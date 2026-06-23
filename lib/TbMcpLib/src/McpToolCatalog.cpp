@@ -376,6 +376,69 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"objectId"}),
     },
     {
+      "fgd_entities_list",
+      "List entity classes from the active game entity definitions.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"type", stringProperty("Optional entity definition type: point or brush.")},
+        {"query", stringProperty("Optional classname or description query.")},
+        {"limit", integerProperty("Maximum result count, defaults to 200.")},
+      }),
+    },
+    {
+      "entity_schema",
+      "Return FGD schema details for one entity classname.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"classname", stringProperty("Entity classname.")},
+        },
+        {"classname"}),
+    },
+    {
+      "entity_create_from_schema",
+      "Create an entity using FGD defaults plus supplied properties.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"classname", stringProperty("Point entity classname.")},
+          {"origin", vec3Property("Entity origin in map units.")},
+          {"properties", stringObjectProperty("Properties to add or update.")},
+          {"select", boolProperty("Select the created entity.")},
+        },
+        {"classname"}),
+    },
+    {
+      "entity_tie_brushes",
+      "Tie selected or specified brushes to a brush entity.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"classname", stringProperty("Brush entity classname.")},
+          {"objectIds", arrayProperty("Optional brush object ids. Defaults to selection.")},
+        },
+        {"classname"}),
+    },
+    {
+      "entity_untie_brushes",
+      "Move brushes out of brush entities back to the world or current parent.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema({
+        {"objectIds",
+         arrayProperty("Optional brush or brush entity object ids. Defaults to selection.")},
+      }),
+    },
+    {
       "brush_create_box",
       "Create a box brush in the active document.",
       McpMode::Edit,

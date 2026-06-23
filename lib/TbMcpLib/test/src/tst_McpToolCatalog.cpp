@@ -45,6 +45,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("selection_grow"));
     CHECK(findToolDefinition("viewport_focus"));
     CHECK(findToolDefinition("viewport_clear_marks"));
+    CHECK(findToolDefinition("fgd_entities_list"));
+    CHECK(findToolDefinition("entity_schema"));
+    CHECK(findToolDefinition("entity_create_from_schema"));
+    CHECK(findToolDefinition("entity_tie_brushes"));
+    CHECK(findToolDefinition("entity_untie_brushes"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
   }
@@ -68,6 +73,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("selection_grow"));
     CHECK(names.contains("viewport_focus"));
     CHECK(names.contains("viewport_clear_marks"));
+    CHECK(names.contains("fgd_entities_list"));
+    CHECK(names.contains("entity_schema"));
     CHECK(names.contains("overlay_set"));
     CHECK(names.contains("history_list"));
     CHECK(names.contains("asset_search"));
@@ -77,6 +84,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("documents_save"));
     CHECK(!names.contains("documents_close"));
     CHECK(!names.contains("documents_export"));
+    CHECK(!names.contains("entity_create_from_schema"));
+    CHECK(!names.contains("entity_tie_brushes"));
+    CHECK(!names.contains("entity_untie_brushes"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
     CHECK(!names.contains("asset_place_model"));
@@ -103,6 +113,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("entity_create"));
     CHECK(names.contains("entity_update"));
     CHECK(names.contains("entity_delete"));
+    CHECK(names.contains("entity_create_from_schema"));
+    CHECK(names.contains("entity_tie_brushes"));
+    CHECK(names.contains("entity_untie_brushes"));
     CHECK(names.contains("brush_create_box"));
     CHECK(names.contains("brush_create_wedge"));
     CHECK(names.contains("brush_create_cylinder"));
