@@ -45,6 +45,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("selection_grow"));
     CHECK(findToolDefinition("viewport_focus"));
     CHECK(findToolDefinition("viewport_clear_marks"));
+    CHECK(findToolDefinition("viewport_capture_current"));
+    CHECK(findToolDefinition("viewport_capture_3d"));
+    CHECK(findToolDefinition("viewport_capture_2d"));
     CHECK(findToolDefinition("fgd_entities_list"));
     CHECK(findToolDefinition("entity_schema"));
     CHECK(findToolDefinition("entity_create_from_schema"));
@@ -89,6 +92,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("selection_grow"));
     CHECK(names.contains("viewport_focus"));
     CHECK(names.contains("viewport_clear_marks"));
+    CHECK(names.contains("viewport_capture_current"));
+    CHECK(!names.contains("viewport_capture_3d"));
+    CHECK(!names.contains("viewport_capture_2d"));
     CHECK(names.contains("fgd_entities_list"));
     CHECK(names.contains("entity_schema"));
     CHECK(names.contains("brush_types_list"));
@@ -185,6 +191,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("history_undo_mcp"));
     CHECK(names.contains("history_redo_mcp"));
+    CHECK(names.contains("viewport_capture_current"));
+    CHECK(!names.contains("viewport_capture_3d"));
+    CHECK(!names.contains("viewport_capture_2d"));
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")

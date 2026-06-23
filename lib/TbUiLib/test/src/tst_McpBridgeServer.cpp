@@ -117,6 +117,16 @@ TEST_CASE("McpBridgeServer")
         {"active", false},
       });
     }
+    if (toolName == "viewport_capture_current")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"format", "png"},
+        {"path", "C:/tmp/viewport.png"},
+        {"width", 640},
+        {"height", 480},
+        {"scope", "window"},
+      });
+    }
     if (toolName == "overlay_set")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -351,6 +361,16 @@ TEST_CASE("McpBridgeServer")
     const auto clearResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "6", "secret", "viewport_clear_marks", {}, mcp::McpMode::ReadOnly});
     CHECK(clearResponse.ok);
+
+    const auto captureResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "7",
+      "secret",
+      "viewport_capture_current",
+      QJsonObject{{"returnBase64", false}},
+      mcp::McpMode::ReadOnly});
+    CHECK(captureResponse.ok);
+    CHECK(captureResponse.result.value("format").toString() == "png");
+    CHECK(captureResponse.result.value("scope").toString() == "window");
   }
 
   SECTION("serves map_search")

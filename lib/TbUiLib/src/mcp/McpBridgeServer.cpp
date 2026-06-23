@@ -19,9 +19,12 @@
 
 #include "ui/mcp/McpBridgeServer.h"
 
+#include <QBuffer>
+#include <QIODevice>
 #include <QJsonDocument>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QPixmap>
 #include <QWidget>
 
 #include "fs/PathMatcher.h"
@@ -82,6 +85,7 @@
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
+#include "ui/SystemPaths.h"
 
 #include "kd/string_compare.h"
 #include "kd/vector_utils.h"
@@ -90,6 +94,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <functional>
@@ -4448,6 +4453,82 @@ McpBridgeToolResult viewportClearMarksResult(
   });
 }
 
+QString makeCaptureFilePath()
+{
+  const auto captureDir = SystemPaths::tempDirectory() / "TrenchBroomMCP";
+  auto error = std::error_code{};
+  std::filesystem::create_directories(captureDir, error);
+  if (error)
+  {
+    return {};
+  }
+
+  const auto now = std::chrono::system_clock::now().time_since_epoch();
+  const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+  return pathToQString(captureDir / QString{"viewport-%1.png"}.arg(millis).toStdString());
+}
+
+McpBridgeToolResult viewportCaptureCurrentResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  if (!mapWindow->isVisible())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Active map window is not visible");
+  }
+
+  const auto pixmap = mapWindow->grab();
+  if (pixmap.isNull())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not capture active map window");
+  }
+
+  if (optionalBool(params, "returnBase64", false))
+  {
+    auto bytes = QByteArray{};
+    auto buffer = QBuffer{&bytes};
+    buffer.open(QIODevice::WriteOnly);
+    if (!pixmap.save(&buffer, "PNG"))
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InternalError, "Could not encode capture as PNG");
+    }
+    return McpBridgeToolResult::success(QJsonObject{
+      {"format", "png"},
+      {"base64", QString::fromLatin1(bytes.toBase64())},
+      {"width", pixmap.width()},
+      {"height", pixmap.height()},
+      {"scope", "window"},
+    });
+  }
+
+  const auto filePath = makeCaptureFilePath();
+  if (filePath.isEmpty())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not create MCP capture directory");
+  }
+  if (!pixmap.save(filePath, "PNG"))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not save capture PNG");
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"format", "png"},
+    {"path", filePath},
+    {"width", pixmap.width()},
+    {"height", pixmap.height()},
+    {"scope", "window"},
+  });
+}
+
 QJsonObject actionsListJson(AppController& appController)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -4884,6 +4965,10 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "viewport_clear_marks")
         {
           return viewportClearMarksResult(appController, params, m_overlayState);
+        }
+        if (toolName == "viewport_capture_current")
+        {
+          return viewportCaptureCurrentResult(appController, params);
         }
         if (toolName == "actions_list")
         {
