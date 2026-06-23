@@ -151,6 +151,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelInspector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MousePreferencePane.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServerTransport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveHandleDragTracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveObjectsTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveObjectsToolController.cpp
