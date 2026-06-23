@@ -257,6 +257,60 @@ MCP 编译工具不重新实现外部进程运行器，而是复用 TrenchBroom 
 
 这些工具要求本地 `Edit` mode 才能运行外部编译或改变 leak 可视化状态。后续若要做真正的 headless compile session，应从 `CompilationRun` 抽出非 QWidget 输出 sink，而不是让 MCP 直接 fork 编译器。
 
+## Smoke Workflow
+
+本分支提供 `scripts/mcp-smoke.ps1` 用来验证外部 MCP server 到 TrenchBroom 本地 bridge 的完整链路。它默认只执行安全检查：
+
+- `initialize`
+- `tools/list`
+- `tb_status`
+- `tb_doctor`
+
+使用前需要先构建 `trenchbroom-mcp`：
+
+```powershell
+scripts\build-filtered.ps1 -Target trenchbroom-mcp
+```
+
+然后启动 TrenchBroom，并在 Preferences 中把 MCP mode 设置为 `ReadOnly` 或 `Edit`。默认 `Off` 模式下 smoke 脚本会正常连接 `trenchbroom-mcp.exe`，但 `tb_status` / `tb_doctor` 会返回 `Forbidden`，这是预期的安全行为。
+
+基础检查：
+
+```powershell
+scripts\mcp-smoke.ps1
+```
+
+输出完整结构化 JSON：
+
+```powershell
+scripts\mcp-smoke.ps1 -RawJson
+```
+
+验证 overlay marker：
+
+```powershell
+scripts\mcp-smoke.ps1 -Overlay
+```
+
+验证截图工具：
+
+```powershell
+scripts\mcp-smoke.ps1 -Capture 3D
+```
+
+清理 smoke overlay：
+
+```powershell
+scripts\mcp-smoke.ps1 -ClearOverlay
+```
+
+常见失败含义：
+
+- `MCP executable not found`：还没有构建 `trenchbroom-mcp`，或 build dir 不是 `build-release-codex`。
+- `Forbidden / TrenchBroom MCP bridge is disabled`：配置存在，但 TrenchBroom MCP mode 仍是 `Off`。
+- `Could not connect to TrenchBroom MCP bridge`：TrenchBroom 未运行、bridge 未启动，或 pipeName 与当前运行实例不一致。
+- `Unauthorized`：stdio server 读取到的 token 与 TrenchBroom 内部 bridge token 不一致，通常需要重启 TrenchBroom 或检查 `%APPDATA%/TrenchBroom/MCP/config.json`。
+
 ## 测试策略
 
 底层库测试：
@@ -295,6 +349,6 @@ Blockout 测试：
 8. [x] Blockout IR tools。
 9. [~] overlay 与 viewport capture：当前已有 bridge overlay state、整窗截图和 2D/3D 子视口截图；真实 overlay 绘制待接入。
 9.1. [x] compile profile / leak pointfile tools。
-10. [ ] 用户文档、示例 prompt 和 smoke workflow。
+10. [~] 用户文档、示例 prompt 和 smoke workflow：当前已有本地 smoke 脚本；还缺面向 MCP client 的完整 prompt 示例。
 
 每个阶段都应保持可构建，并带 focused tests。涉及写操作的阶段必须先证明 transaction 和 rollback 行为稳定。
