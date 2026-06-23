@@ -98,6 +98,47 @@ McpBridgeToolResult historyUndoResult(
 McpBridgeToolResult historyRedoResult(
   AppController& appController, std::vector<McpOperationRecord>& history);
 
+McpBridgeToolResult createEntityResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult updateEntityResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult deleteEntityResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult fgdEntitiesListResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult entitySchemaResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult createEntityFromSchemaResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult tieBrushesResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult untieBrushesResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+
 McpBridgeToolResult compileProfilesListResult(AppController& appController);
 McpBridgeToolResult compileRunResult(
   AppController& appController, const QJsonObject& params);
