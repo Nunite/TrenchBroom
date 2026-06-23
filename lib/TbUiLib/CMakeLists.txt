@@ -144,6 +144,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialBrowserView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialCollectionEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MiniToolBarLayout.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/McpPreferencePane.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MiscPreferencePane.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelBrowser.cpp
@@ -163,6 +164,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServerTransport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServerTools.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHttpServer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpTextureTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveHandleDragTracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveObjectsTool.cpp
@@ -416,6 +418,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MaterialBrowserView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MaterialCollectionEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MiniToolBarLayout.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/McpPreferencePane.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MiscPreferencePane.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ModEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ModelBrowser.h
@@ -423,6 +426,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ModelInspector.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MousePreferencePane.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/mcp/McpBridgeServer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/mcp/McpHttpServer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveHandleDragTracker.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveObjectsTool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveObjectsToolController.h

@@ -37,11 +37,15 @@ TEST_CASE("McpBridgeConfig")
     CHECK(config.pipeName.startsWith("trenchbroom-mcp-"));
     CHECK(!config.token.isEmpty());
     CHECK(config.mode == McpMode::Off);
+    CHECK(config.httpEnabled);
+    CHECK(config.httpHost == "127.0.0.1");
+    CHECK(config.httpPort == 37666);
   }
 
   SECTION("json roundtrip")
   {
-    const auto config = McpBridgeConfig{"test-pipe", "secret-token", McpMode::ReadOnly};
+    const auto config = McpBridgeConfig{
+      "test-pipe", "secret-token", McpMode::ReadOnly, true, "localhost", 37667};
 
     const auto parsed = bridgeConfigFromJson(toJson(config));
 
@@ -49,6 +53,23 @@ TEST_CASE("McpBridgeConfig")
     CHECK(parsed->pipeName == config.pipeName);
     CHECK(parsed->token == config.token);
     CHECK(parsed->mode == config.mode);
+    CHECK(parsed->httpEnabled == config.httpEnabled);
+    CHECK(parsed->httpHost == config.httpHost);
+    CHECK(parsed->httpPort == config.httpPort);
+  }
+
+  SECTION("legacy json gets default http settings")
+  {
+    const auto parsed = bridgeConfigFromJson(QJsonObject{
+      {"pipeName", "test-pipe"},
+      {"token", "secret-token"},
+      {"mode", "ReadOnly"},
+    });
+
+    REQUIRE(parsed);
+    CHECK(parsed->httpEnabled);
+    CHECK(parsed->httpHost == "127.0.0.1");
+    CHECK(parsed->httpPort == 37666);
   }
 
   SECTION("rejects invalid json")

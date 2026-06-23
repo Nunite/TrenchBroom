@@ -20,39 +20,27 @@
 #pragma once
 
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QString>
 
+#include "mcp/McpBridgeMessages.h"
 #include "mcp/McpMode.h"
 
+#include <functional>
 #include <optional>
 
 namespace tb::mcp
 {
 
-struct McpBridgeConfig
-{
-  QString pipeName;
-  QString token;
-  McpMode mode = McpMode::Off;
-  bool httpEnabled = true;
-  QString httpHost = "127.0.0.1";
-  quint16 httpPort = 37666;
-};
+using McpToolCaller =
+  std::function<McpBridgeResponse(const QString& toolName, const QJsonObject& arguments)>;
 
-QString defaultConfigDirectory();
-QString defaultConfigPath();
-QString generateBridgeToken();
-McpBridgeConfig defaultBridgeConfig();
-
-QJsonObject toJson(const McpBridgeConfig& config);
-std::optional<McpBridgeConfig> bridgeConfigFromJson(
-  const QJsonObject& json, QString* error = nullptr);
-
-std::optional<McpBridgeConfig> readBridgeConfig(
-  const QString& filePath, QString* error = nullptr);
-bool writeBridgeConfig(
-  const McpBridgeConfig& config, const QString& filePath, QString* error = nullptr);
-std::optional<McpBridgeConfig> readOrCreateBridgeConfig(
-  const QString& filePath, QString* error = nullptr);
+QJsonObject jsonRpcResult(const QJsonValue& id, QJsonObject result);
+QJsonObject jsonRpcError(const QJsonValue& id, int code, const QString& message);
+QJsonObject mcpInitializeResult(const QJsonObject& params);
+QJsonObject mcpToolsListResult(McpMode currentMode);
+QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& toolCaller);
+std::optional<QJsonObject> handleMcpJsonRpcRequest(
+  const QJsonObject& request, McpMode currentMode, const McpToolCaller& toolCaller);
 
 } // namespace tb::mcp

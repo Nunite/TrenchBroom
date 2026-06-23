@@ -54,7 +54,8 @@ TEST_CASE("PreferenceDialog")
 
     CHECK(
       actionNames
-      == QStringList{"Games", "View", "Colors", "Mouse", "Keyboard", "Misc", "Update"});
+      == QStringList{
+        "Games", "View", "Colors", "Mouse", "Keyboard", "Misc", "MCP", "Update"});
   }
 
   dialog.reset();

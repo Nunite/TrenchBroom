@@ -99,6 +99,9 @@ McpBridgeConfig defaultBridgeConfig()
     QString{"trenchbroom-mcp-%1"}.arg(currentUserName()),
     generateBridgeToken(),
     McpMode::Off,
+    true,
+    "127.0.0.1",
+    37666,
   };
 }
 
@@ -108,6 +111,9 @@ QJsonObject toJson(const McpBridgeConfig& config)
     {"pipeName", config.pipeName},
     {"token", config.token},
     {"mode", modeName(config.mode)},
+    {"httpEnabled", config.httpEnabled},
+    {"httpHost", config.httpHost},
+    {"httpPort", int(config.httpPort)},
   };
 }
 
@@ -154,10 +160,67 @@ std::optional<McpBridgeConfig> bridgeConfigFromJson(
     return std::nullopt;
   }
 
+  auto httpEnabled = true;
+  const auto httpEnabledValue = json.value("httpEnabled");
+  if (!httpEnabledValue.isUndefined())
+  {
+    if (!httpEnabledValue.isBool())
+    {
+      if (error)
+      {
+        *error = "MCP httpEnabled must be a bool";
+      }
+      return std::nullopt;
+    }
+    httpEnabled = httpEnabledValue.toBool();
+  }
+
+  auto httpHost = QString{"127.0.0.1"};
+  const auto httpHostValue = json.value("httpHost");
+  if (!httpHostValue.isUndefined())
+  {
+    if (!httpHostValue.isString() || httpHostValue.toString().trimmed().isEmpty())
+    {
+      if (error)
+      {
+        *error = "MCP httpHost must not be empty";
+      }
+      return std::nullopt;
+    }
+    httpHost = httpHostValue.toString().trimmed();
+  }
+
+  auto httpPort = quint16{37666};
+  const auto httpPortValue = json.value("httpPort");
+  if (!httpPortValue.isUndefined())
+  {
+    if (!httpPortValue.isDouble())
+    {
+      if (error)
+      {
+        *error = "MCP httpPort must be a number";
+      }
+      return std::nullopt;
+    }
+    const auto port = httpPortValue.toInt();
+    if (port <= 0 || port > 65535)
+    {
+      if (error)
+      {
+        *error = "MCP httpPort must be between 1 and 65535";
+      }
+      return std::nullopt;
+    }
+    httpPort = quint16(port);
+  }
+
   return McpBridgeConfig{
     pipeName.toString(),
     token.toString(),
     *mode,
+    httpEnabled,
+    httpHost,
+    httpPort,
   };
 }
 

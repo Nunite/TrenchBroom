@@ -3,6 +3,7 @@ add_executable(TbMcpLibTest)
 target_sources(TbMcpLibTest PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_McpBridgeConfig.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_McpBridgeMessages.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_McpJsonRpc.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_McpMode.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_McpToolCatalog.cpp
 )

@@ -61,6 +61,7 @@
 #include "ui/UpdateConfig.h"
 #include "ui/WelcomeWindow.h"
 #include "ui/mcp/McpBridgeServer.h"
+#include "ui/mcp/McpHttpServer.h"
 #include "update/QtHttpClient.h"
 #include "update/Updater.h"
 
@@ -179,6 +180,7 @@ AppController::AppController(
   , m_recentDocuments{createRecentDocuments(this)}
   , m_actionManager{std::make_unique<ActionManager>()}
   , m_mcpBridgeServer{std::make_unique<McpBridgeServer>(*this)}
+  , m_mcpHttpServer{std::make_unique<McpHttpServer>(*m_mcpBridgeServer)}
   , m_welcomeWindow{std::make_unique<WelcomeWindow>(*this)}
   , m_aboutDialog{std::make_unique<AboutDialog>(*this)}
 {
@@ -270,6 +272,28 @@ void AppController::refreshMcpOverlayViews()
       mapWindow->refreshMapViews();
     }
   }
+}
+
+void AppController::restartMcpBridge()
+{
+  m_mcpBridgeServer->stop();
+  m_mcpHttpServer->stop();
+  startMcpBridge();
+}
+
+bool AppController::mcpBridgeIsListening() const
+{
+  return m_mcpBridgeServer->isListening();
+}
+
+bool AppController::mcpHttpServerIsListening() const
+{
+  return m_mcpHttpServer->isListening();
+}
+
+QString AppController::mcpHttpServerUrl() const
+{
+  return m_mcpHttpServer->url();
 }
 
 void AppController::askForAutoUpdates()
@@ -472,6 +496,12 @@ void AppController::startMcpBridge()
   {
     FileLogger::instance().warn()
       << "Could not start MCP bridge: " << error.toStdString();
+  }
+
+  if (!m_mcpHttpServer->start(*config, &error) && config->mode != mcp::McpMode::Off)
+  {
+    FileLogger::instance().warn()
+      << "Could not start MCP HTTP server: " << error.toStdString();
   }
 }
 
