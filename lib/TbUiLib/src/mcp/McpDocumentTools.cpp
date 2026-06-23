@@ -516,6 +516,7 @@ QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig&
     {"activeDocument", appController.mapWindowManager().topMapWindow() != nullptr},
     {"implementedToolCount", implementedTools.size()},
     {"implementedTools", implementedTools},
+    {"toolDiagnostics", mcp::toolDiagnosticsJson(config.mode)},
   };
 }
 

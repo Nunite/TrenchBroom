@@ -1229,6 +1229,18 @@ QJsonObject toMcpToolJson(const McpToolDefinition& tool)
   };
 }
 
+QJsonObject toMcpToolDiagnosticJson(
+  const McpToolDefinition& tool, const McpMode currentMode)
+{
+  return QJsonObject{
+    {"name", tool.name},
+    {"requiredMode", modeName(tool.requiredMode)},
+    {"availableInCurrentMode", allowsMode(currentMode, tool.requiredMode)},
+    {"mutatesDocument", tool.mutatesDocument},
+    {"implemented", tool.implemented},
+  };
+}
+
 QJsonArray toolsListJson(const McpMode mode, const bool implementedOnly)
 {
   auto result = QJsonArray{};
@@ -1243,6 +1255,16 @@ QJsonArray toolsListJson(const McpMode mode, const bool implementedOnly)
       continue;
     }
     result.push_back(toMcpToolJson(tool));
+  }
+  return result;
+}
+
+QJsonArray toolDiagnosticsJson(const McpMode currentMode)
+{
+  auto result = QJsonArray{};
+  for (const auto& tool : defaultToolCatalog())
+  {
+    result.push_back(toMcpToolDiagnosticJson(tool, currentMode));
   }
   return result;
 }

@@ -233,6 +233,27 @@ TEST_CASE("McpToolCatalog")
     CHECK(json.value("name").toString() == "map_search");
     CHECK(json.value("inputSchema").toObject().value("type").toString() == "object");
   }
+
+  SECTION("tool diagnostics include unsupported roadmap tools")
+  {
+    const auto diagnostics = toolDiagnosticsJson(McpMode::Edit);
+    auto archDiagnostic = QJsonObject{};
+    for (const auto& entry : diagnostics)
+    {
+      const auto object = entry.toObject();
+      if (object.value("name").toString() == "brush_create_arch")
+      {
+        archDiagnostic = object;
+        break;
+      }
+    }
+
+    REQUIRE(!archDiagnostic.isEmpty());
+    CHECK(archDiagnostic.value("requiredMode").toString() == "Edit");
+    CHECK(archDiagnostic.value("availableInCurrentMode").toBool());
+    CHECK(archDiagnostic.value("mutatesDocument").toBool());
+    CHECK_FALSE(archDiagnostic.value("implemented").toBool());
+  }
 }
 
 } // namespace tb::mcp
