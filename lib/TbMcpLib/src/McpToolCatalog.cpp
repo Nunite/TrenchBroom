@@ -807,6 +807,27 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"path"}),
     },
     {
+      "prefabs_list",
+      "List available prefabs. Reserved until TrenchBroom exposes a prefab provider.",
+      McpMode::ReadOnly,
+      false,
+      false,
+      objectSchema(),
+    },
+    {
+      "prefab_create",
+      "Create a prefab instance. Reserved until TrenchBroom exposes a prefab provider.",
+      McpMode::Edit,
+      true,
+      false,
+      objectSchema(
+        {
+          {"id", stringProperty("Prefab id from prefabs_list.")},
+          {"origin", vec3Property("Prefab origin in map units.")},
+        },
+        {"id"}),
+    },
+    {
       "textures_list",
       "List loaded materials in the active document.",
       McpMode::ReadOnly,

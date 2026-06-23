@@ -3175,12 +3175,24 @@ std::optional<std::vector<BrowserAsset>> collectMcpAssets(mdl::Map& map)
 
 QJsonObject assetJson(const BrowserAsset& asset)
 {
-  return QJsonObject{
+  auto json = QJsonObject{
     {"type", browserCellTypeName(asset.type)},
     {"path", genericPathToQString(asset.path)},
     {"absolutePath", pathToQString(asset.absolutePath)},
     {"displayName", QString::fromStdString(asset.displayName)},
   };
+
+  if (!asset.path.empty())
+  {
+    json.insert("sourceRoot", pathAsGenericQString(*asset.path.begin()));
+  }
+  if (asset.lastModified)
+  {
+    json.insert(
+      "lastModified", QString::number(asset.lastModified->time_since_epoch().count()));
+  }
+
+  return json;
 }
 
 McpBridgeToolResult assetSearchResult(

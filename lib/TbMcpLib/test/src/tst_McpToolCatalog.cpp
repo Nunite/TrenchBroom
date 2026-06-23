@@ -73,6 +73,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("compile_run"));
     CHECK(findToolDefinition("compile_log_tail"));
     CHECK(findToolDefinition("leaks_load_pointfile"));
+    CHECK(findToolDefinition("prefabs_list"));
+    CHECK(findToolDefinition("prefab_create"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
   }
@@ -125,6 +127,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
     CHECK(!names.contains("asset_place_model"));
+    CHECK(!names.contains("prefabs_list"));
+    CHECK(!names.contains("prefab_create"));
     CHECK(!names.contains("texture_apply"));
     CHECK(!names.contains("texture_replace"));
     CHECK(!names.contains("face_texture_set"));
@@ -175,6 +179,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("asset_place_model"));
     CHECK(names.contains("asset_place_sprite"));
     CHECK(names.contains("asset_place_sound"));
+    CHECK(!names.contains("prefabs_list"));
+    CHECK(!names.contains("prefab_create"));
     CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_apply"));
     CHECK(names.contains("texture_replace"));

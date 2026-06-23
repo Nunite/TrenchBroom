@@ -52,7 +52,7 @@ MapDocument transaction / query services
 - 已接入 FGD/schema 与 brush entity 工具：`fgd_entities_list`、`entity_schema`、`entity_create_from_schema`、`entity_tie_brushes`、`entity_untie_brushes`。
 - 已接入事务型写入工具：entity 创建/更新/删除、brush primitive 创建。
 - 已接入 MCP operation history：`history_list`、`history_undo_mcp`、`history_redo_mcp`。当前只在 MCP 操作仍位于 TrenchBroom 原生 undo/redo 栈顶时执行，避免误撤用户手动编辑。
-- 已接入 GoldSrc 资产与材质工具：`.mdl/.spr/.wav` 搜索与放置、material 搜索与应用、face list/select、基础 face texture set、texture replace/copy/align。
+- 已接入 GoldSrc 资产与材质工具：`.mdl/.spr/.wav` 搜索与放置、material 搜索与应用、face list/select、基础 face texture set、texture replace/copy/align。`asset_search` 返回 type、path、sourceRoot、absolutePath、displayName 和 lastModified。
 - 已接入对象删除与变换工具：`objects_delete`、`objects_transform`，当前支持按 object id 删除，以及 translate/rotate/scale 三类确定性变换。
 - 已接入地图验证与安全修复工具：`map_validate`、`problems_check`、`problems_fix`、`map_fix_all_safe`。自动修复只允许明确白名单内的 safe quick fix，不自动删除对象或做大范围结构性调整。
 - 已接入编译与 leak 辅助工具：`compile_profiles_list`、`compile_run`、`compile_log_tail`、`leaks_load_pointfile`。`compile_run` 复用现有 Compile dialog 和 profile runner，不新建独立外部进程框架。
@@ -62,6 +62,7 @@ MapDocument transaction / query services
 
 - 真实 viewport overlay 渲染与精确 2D/3D viewport capture。
 - 稳定 arch/torus primitive 生成器；当前 `brush_types_list` 会标记为 unsupported，不出现在默认 `tools/list` 可调用工具中。
+- Prefab provider / prefab_create；当前只在 catalog 中保留 `prefabs_list`、`prefab_create` 未实现占位，不出现在默认 `tools/list`。
 - 更完整的高级 UV 对齐模式；当前 MCP face alignment 先覆盖 reset/paraxial/parallel 这类可稳定映射到现有 API 的模式。
 - MCP 工具实现拆分。目前 `McpBridgeServer.cpp` 已承载较多 tool handler，后续应拆成 document/action/edit/asset/blockout/overlay 等模块，避免继续膨胀。
 
