@@ -26,10 +26,6 @@ if (-not (Test-Path $configPath)) {
 $config = Get-Content -Path $configPath -Raw | ConvertFrom-Json
 $hostName = if ([string]::IsNullOrWhiteSpace($config.httpHost)) { "127.0.0.1" } else { $config.httpHost }
 $port = if ($null -eq $config.httpPort) { 37666 } else { $config.httpPort }
-$token = $config.token
-if ([string]::IsNullOrWhiteSpace($token)) {
-  throw "MCP token is empty in $configPath"
-}
 
 $url = "http://$hostName`:$port/mcp"
 
@@ -43,9 +39,6 @@ $resolvedOutputDir = (Resolve-Path $OutputDir).Path
 $mcpServer = [ordered] @{
   type = "http"
   url = $url
-  headers = [ordered] @{
-    Authorization = "Bearer $token"
-  }
 }
 
 $mcpServers = [ordered] @{
@@ -58,9 +51,6 @@ $genericConfig = [ordered] @{
   name = $ServerName
   type = "http"
   url = $url
-  headers = [ordered] @{
-    Authorization = "Bearer $token"
-  }
   notes = @(
     "Start TrenchBroom first.",
     "Enable MCP in Preferences > MCP and use ReadOnly or Edit mode.",
@@ -72,9 +62,6 @@ $codexToml = @"
 [mcp_servers.$ServerName]
 type = "http"
 url = "$(Escape-TomlString $url)"
-
-[mcp_servers.$ServerName.headers]
-Authorization = "Bearer $(Escape-TomlString $token)"
 "@
 
 $genericPath = Join-Path $resolvedOutputDir "trenchbroom-mcp.http.json"
@@ -105,7 +92,7 @@ $url
 
 ```powershell
 claude mcp remove $ServerName -s user
-claude mcp add --scope user --transport http $ServerName $url --header "Authorization: Bearer $token"
+claude mcp add --scope user --transport http $ServerName $url
 ```
 
 ## Before Connecting
@@ -140,7 +127,7 @@ if ($Print) {
   Write-Host ""
   Write-Host "Claude Code command:"
   Write-Host "claude mcp remove $ServerName -s user"
-  Write-Host "claude mcp add --scope user --transport http $ServerName $url --header `"Authorization: Bearer $token`""
+  Write-Host "claude mcp add --scope user --transport http $ServerName $url"
   Write-Host ""
   Write-Host "mcpServers JSON:"
   Get-Content -Path $mcpServersPath

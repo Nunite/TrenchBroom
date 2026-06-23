@@ -24,12 +24,10 @@ private:
   QComboBox* m_modeCombo = nullptr;
   QLineEdit* m_httpUrlEdit = nullptr;
   QLineEdit* m_pipeNameEdit = nullptr;
-  QLineEdit* m_tokenEdit = nullptr;
   QLineEdit* m_claudeCommandEdit = nullptr;
   QLineEdit* m_configPathEdit = nullptr;
   QLabel* m_statusLabel = nullptr;
   QLabel* m_errorLabel = nullptr;
-  QPushButton* m_regenerateTokenButton = nullptr;
   QPushButton* m_copyClaudeCommandButton = nullptr;
   QPushButton* m_openConfigFolderButton = nullptr;
 
@@ -48,7 +46,6 @@ private:
   void applyConfigChange();
   void modeChanged(int index);
   void pipeNameChanged(const QString& text);
-  void regenerateToken();
   void copyClaudeCommand();
   void openConfigFolder();
 };

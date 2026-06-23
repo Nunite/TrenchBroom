@@ -1,6 +1,5 @@
 param(
   [string] $Url = "",
-  [string] $Token = "",
   [ValidateSet("None", "Current", "3D", "2D")]
   [string] $Capture = "None",
   [int] $TimeoutSec = 5,
@@ -47,7 +46,6 @@ function Show-JsonSnippet {
 function Invoke-McpRequest {
   param(
     [string] $Url,
-    [string] $Token,
     [string] $Method,
     [object] $Params,
     [int] $TimeoutSec
@@ -65,7 +63,6 @@ function Invoke-McpRequest {
   }
 
   $headers = @{
-    Authorization = "Bearer $Token"
     Accept = "application/json, text/event-stream"
     "MCP-Protocol-Version" = "2025-06-18"
   }
@@ -89,7 +86,6 @@ function Invoke-McpRequest {
 function Invoke-McpTool {
   param(
     [string] $Url,
-    [string] $Token,
     [string] $Name,
     [object] $Arguments,
     [int] $TimeoutSec
@@ -101,7 +97,6 @@ function Invoke-McpTool {
 
   return Invoke-McpRequest `
     -Url $Url `
-    -Token $Token `
     -Method "tools/call" `
     -Params ([ordered] @{ name = $Name; arguments = $Arguments }) `
     -TimeoutSec $TimeoutSec
@@ -150,9 +145,6 @@ if (Test-Path $configPath) {
     $port = if ($null -eq $config.httpPort) { 37666 } else { $config.httpPort }
     $Url = "http://$hostName`:$port/mcp"
   }
-  if ([string]::IsNullOrWhiteSpace($Token)) {
-    $Token = $config.token
-  }
 
   Write-Host "MCP config: $configPath"
   Write-Host "Config mode: $($config.mode)"
@@ -160,8 +152,8 @@ if (Test-Path $configPath) {
   throw "MCP config does not exist: $configPath. Start TrenchBroom once and enable MCP in Preferences > MCP."
 }
 
-if ([string]::IsNullOrWhiteSpace($Url) -or [string]::IsNullOrWhiteSpace($Token)) {
-  throw "MCP Url and Token are required."
+if ([string]::IsNullOrWhiteSpace($Url)) {
+  throw "MCP Url is required."
 }
 
 Write-Host "MCP HTTP URL: $Url"
@@ -171,7 +163,6 @@ $hadToolError = $false
 
 $initialize = Invoke-McpRequest `
   -Url $Url `
-  -Token $Token `
   -Method "initialize" `
   -Params ([ordered] @{
     protocolVersion = "2025-06-18"
@@ -186,7 +177,6 @@ if ($RawJson) {
 
 $toolsList = Invoke-McpRequest `
   -Url $Url `
-  -Token $Token `
   -Method "tools/list" `
   -Params @{} `
   -TimeoutSec $TimeoutSec
@@ -199,13 +189,13 @@ if ($RawJson) {
   Write-Host "  tools: $toolNames"
 }
 
-$status = Invoke-McpTool -Url $Url -Token $Token -Name "tb_status" -Arguments @{} -TimeoutSec $TimeoutSec
+$status = Invoke-McpTool -Url $Url -Name "tb_status" -Arguments @{} -TimeoutSec $TimeoutSec
 $statusOk = Show-ToolResult -Name "tb_status" -Response $status -RawJson:$RawJson
 if (-not $statusOk) {
   $hadToolError = $true
 }
 
-$doctor = Invoke-McpTool -Url $Url -Token $Token -Name "tb_doctor" -Arguments @{} -TimeoutSec $TimeoutSec
+$doctor = Invoke-McpTool -Url $Url -Name "tb_doctor" -Arguments @{} -TimeoutSec $TimeoutSec
 $doctorOk = Show-ToolResult -Name "tb_doctor" -Response $doctor -RawJson:$RawJson
 if (-not $doctorOk) {
   $hadToolError = $true
@@ -234,7 +224,7 @@ if ($Overlay) {
     )
   }
 
-  $overlayResult = Invoke-McpTool -Url $Url -Token $Token -Name "overlay_set" -Arguments $overlayArgs -TimeoutSec $TimeoutSec
+  $overlayResult = Invoke-McpTool -Url $Url -Name "overlay_set" -Arguments $overlayArgs -TimeoutSec $TimeoutSec
   $overlayOk = Show-ToolResult -Name "overlay_set" -Response $overlayResult -RawJson:$RawJson
   if (-not $overlayOk) {
     $hadToolError = $true
@@ -248,7 +238,7 @@ if ($Capture -ne "None") {
     "2D" { "viewport_capture_2d" }
   }
 
-  $captureResult = Invoke-McpTool -Url $Url -Token $Token -Name $captureTool -Arguments ([ordered] @{ returnBase64 = $false }) -TimeoutSec $TimeoutSec
+  $captureResult = Invoke-McpTool -Url $Url -Name $captureTool -Arguments ([ordered] @{ returnBase64 = $false }) -TimeoutSec $TimeoutSec
   $captureOk = Show-ToolResult -Name $captureTool -Response $captureResult -RawJson:$RawJson
   if (-not $captureOk) {
     $hadToolError = $true
@@ -262,7 +252,7 @@ if ($Capture -ne "None") {
 }
 
 if ($ClearOverlay) {
-  $clearResult = Invoke-McpTool -Url $Url -Token $Token -Name "overlay_clear" -Arguments @{} -TimeoutSec $TimeoutSec
+  $clearResult = Invoke-McpTool -Url $Url -Name "overlay_clear" -Arguments @{} -TimeoutSec $TimeoutSec
   $clearOk = Show-ToolResult -Name "overlay_clear" -Response $clearResult -RawJson:$RawJson
   if (-not $clearOk) {
     $hadToolError = $true

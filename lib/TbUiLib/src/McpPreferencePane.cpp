@@ -61,8 +61,8 @@ void McpPreferencePane::createGui()
 
   auto* infoLabel = new QLabel{tr(
     "MCP lets local agent clients inspect and control TrenchBroom through a "
-    "token-protected local HTTP endpoint. Keep it Off unless you are actively using an "
-    "MCP client. Changes on this page apply immediately.")};
+    "localhost HTTP endpoint. Keep it Off unless you are actively using an MCP "
+    "client. Changes on this page apply immediately.")};
   infoLabel->setWordWrap(true);
   setInfoStyle(infoLabel);
 
@@ -88,22 +88,6 @@ void McpPreferencePane::createGui()
   connect(m_pipeNameEdit, &QLineEdit::editingFinished, this, [this]() {
     pipeNameChanged(m_pipeNameEdit->text());
   });
-
-  m_tokenEdit = new QLineEdit{};
-  m_tokenEdit->setReadOnly(true);
-  m_tokenEdit->setEchoMode(QLineEdit::Password);
-
-  m_regenerateTokenButton = new QPushButton{tr("Regenerate Token")};
-  connect(
-    m_regenerateTokenButton,
-    &QPushButton::clicked,
-    this,
-    &McpPreferencePane::regenerateToken);
-
-  auto* tokenLayout = new QHBoxLayout{};
-  tokenLayout->setContentsMargins(0, 0, 0, 0);
-  tokenLayout->addWidget(m_tokenEdit, 1);
-  tokenLayout->addWidget(m_regenerateTokenButton);
 
   m_claudeCommandEdit = new QLineEdit{};
   m_claudeCommandEdit->setReadOnly(true);
@@ -157,7 +141,6 @@ void McpPreferencePane::createGui()
   layout->addRow(tr("Status"), m_statusLabel);
   layout->addSection(tr("HTTP Connection"));
   layout->addRow(tr("URL"), m_httpUrlEdit);
-  layout->addRow(tr("Token"), tokenLayout);
   layout->addRow(tr("Claude Code"), claudeCommandLayout);
   layout->addSection(tr("Compatibility"));
   layout->addRow(tr("Pipe name"), m_pipeNameEdit);
@@ -191,7 +174,6 @@ void McpPreferencePane::updateControls()
 {
   const auto modeBlocker = QSignalBlocker{m_modeCombo};
   const auto pipeBlocker = QSignalBlocker{m_pipeNameEdit};
-  const auto tokenBlocker = QSignalBlocker{m_tokenEdit};
   const auto httpUrlBlocker = QSignalBlocker{m_httpUrlEdit};
   const auto claudeCommandBlocker = QSignalBlocker{m_claudeCommandEdit};
 
@@ -201,11 +183,9 @@ void McpPreferencePane::updateControls()
     QString{"http://%1:%2/mcp"}.arg(m_config.httpHost).arg(m_config.httpPort);
   m_httpUrlEdit->setText(httpUrl);
   m_pipeNameEdit->setText(m_config.pipeName);
-  m_tokenEdit->setText(m_config.token);
   m_claudeCommandEdit->setText(
-    QString{"claude mcp add --scope user --transport http trenchbroom %1 --header "
-            "\"Authorization: Bearer %2\""}
-      .arg(httpUrl, m_config.token));
+    QString{"claude mcp add --scope user --transport http trenchbroom %1"}.arg(
+      httpUrl));
   m_configPathEdit->setText(QDir::toNativeSeparators(m_configPath));
 
   const auto modeText = mcp::modeName(m_config.mode);
@@ -290,12 +270,6 @@ void McpPreferencePane::pipeNameChanged(const QString& text)
   }
 
   m_config.pipeName = pipeName;
-  applyConfigChange();
-}
-
-void McpPreferencePane::regenerateToken()
-{
-  m_config.token = mcp::generateBridgeToken();
   applyConfigChange();
 }
 

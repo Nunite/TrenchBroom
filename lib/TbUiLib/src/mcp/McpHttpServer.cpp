@@ -47,8 +47,6 @@ QByteArray reasonPhrase(const int statusCode)
     return "Accepted";
   case 400:
     return "Bad Request";
-  case 401:
-    return "Unauthorized";
   case 404:
     return "Not Found";
   case 405:
@@ -88,14 +86,6 @@ bool hasAllowedOrigin(const QList<QByteArray>& lines)
   const auto url = QUrl{origin};
   return url.host() == "127.0.0.1"
          || url.host().compare("localhost", Qt::CaseInsensitive) == 0;
-}
-
-bool hasValidBearerToken(const QList<QByteArray>& lines, const QString& token)
-{
-  const auto authorization = headerValue(lines, "Authorization");
-  const auto prefix = QString{"Bearer "};
-  return authorization.startsWith(prefix, Qt::CaseInsensitive)
-         && authorization.mid(prefix.size()) == token;
 }
 
 QString methodFromRequestLine(const QByteArray& requestLine)
@@ -291,14 +281,6 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
   {
     writeHttpResponse(
       socket, 401, reasonPhrase(401), "application/json", jsonBody("Invalid Origin"));
-    socket.disconnectFromHost();
-    return;
-  }
-
-  if (!hasValidBearerToken(lines, m_config.token))
-  {
-    writeHttpResponse(
-      socket, 401, reasonPhrase(401), "application/json", jsonBody("Invalid MCP token"));
     socket.disconnectFromHost();
     return;
   }

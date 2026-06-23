@@ -2,7 +2,7 @@
 
 本文档记录当前分支接入 MCP / Agent 工作流的底层架构。目标不是让
 Agent 直接编辑 `.map` 文件，也不是把 Python 插件系统暴露成一个任意
-执行入口，而是先建立可认证、可测试、可撤销的结构化编辑通道。
+执行入口，而是先建立本机可控、可测试、可撤销的结构化编辑通道。
 
 ## 目标
 
@@ -35,7 +35,7 @@ MCP Client
     v
 trenchbroom-mcp.exe           (兼容 shim，适配只支持 stdio 的客户端)
     |
-    | QLocalSocket + token
+    | QLocalSocket + legacy token
     v
 TrenchBroom McpBridgeServer
     |
@@ -48,13 +48,13 @@ MapDocument transaction / query services
 只保留为很薄的 stdio 兼容层，真正的 MCP tool catalog、mode gating、transaction
 和 UI thread dispatch 都放在 TrenchBroom / `TbMcpLib` 内。这样既兼容 stdio
 客户端，又能让 Claude Code、Cursor、Codex 等支持 HTTP 的客户端直接连接运行中的
-TrenchBroom，减少额外 exe、pipe 配置和 token 不一致带来的维护成本。
+TrenchBroom，减少额外 exe、pipe 配置和鉴权状态不同步带来的维护成本。
 
 职责划分：
 
 - `TbMcpLib`：公共协议、DTO、错误码、tool catalog、配置读写和 JSON 序列化。
 - `trenchbroom-mcp.exe`：外部 stdio MCP server，只做 MCP 协议适配和本地 bridge 转发；后续保留为兼容 shim。
-- `McpBridgeServer`：运行在 TrenchBroom 进程内，接收本地请求，验证 token 和 mode，并在 UI thread 执行工具。
+- `McpBridgeServer`：运行在 TrenchBroom 进程内，接收本地请求，验证 mode，并在 UI thread 执行工具；旧 stdio 兼容路径仍保留 token。
 - `McpHttpServer`：运行在 TrenchBroom 进程内，监听 `127.0.0.1`，提供最小 Streamable HTTP `/mcp` 端点。
 - `MapDocument` / 现有 UI services：唯一真实状态；MCP 不直接读写 `.map` 文件。
 
@@ -63,7 +63,7 @@ TrenchBroom，减少额外 exe、pipe 配置和 token 不一致带来的维护�
 截至当前分支，MCP 底层已经完成以下检查点：
 
 - 已新增 `TbMcpLib`，包含 mode、错误码、bridge config、bridge request/response 和 tool catalog。
-- 已新增 TrenchBroom 内部 `McpBridgeServer`，支持本地 `QLocalServer`、token 校验和 mode gating。
+- 已新增 TrenchBroom 内部 `McpBridgeServer`，支持本地 `QLocalServer` 和 mode gating；旧 stdio 兼容路径仍使用 token 转发。
 - 已新增 TrenchBroom 内置 `McpHttpServer`，默认监听 `127.0.0.1:37666/mcp`，支持 `POST /mcp` JSON-RPC、notification `202 Accepted`、`GET /mcp` 返回 `405 Method Not Allowed`。
 - 已抽出共享 `McpJsonRpc` 处理层，HTTP server 与 stdio shim 共用 `initialize`、`tools/list`、`tools/call` 逻辑；`tools/list` 在 `Off` 模式下仍返回已实现工具列表。
 - 已新增 `trenchbroom-mcp.exe`，作为 stdio MCP server，支持 `initialize`、`tools/list`、`tools/call` 并转发到本地 bridge。
@@ -117,13 +117,15 @@ TrenchBroom，减少额外 exe、pipe 配置和 token 不一致带来的维护�
 - `Edit`：允许结构化写操作，所有写入进入 transaction。
 - `Danger`：预留给未来 `run_tb2_script` 或专家级能力；第一版不实现。
 
-所有 bridge 请求必须携带 token。token 错误返回 `Unauthorized`，不会进入工具分发。
+HTTP 主路径不要求 bearer token；它只绑定 `127.0.0.1`，并由 Preferences 中的
+`Off` / `ReadOnly` / `Edit` mode 控制是否监听和允许哪些工具。旧 stdio shim 到
+`QLocalSocket` bridge 的兼容路径仍携带 config token，避免旧客户端误连其他本地 pipe。
 
 安全约束：
 
 - HTTP server 只能默认绑定 `127.0.0.1`，不绑定 `0.0.0.0`。
 - Streamable HTTP 请求必须校验 `Origin`，避免 DNS rebinding 类攻击。
-- HTTP 请求必须携带 `Authorization: Bearer <token>`；stdio shim 读取同一 config token。
+- HTTP 请求不需要 `Authorization` header；stdio shim 读取 config token 并转发给 legacy bridge。
 - `tools/list` 应返回稳定的已实现工具列表，不因为当前 `Off` / `ReadOnly` / `Edit` mode 返回空列表；实际调用时再由 mode gating 返回 `Forbidden`。这能避免 Claude Code 显示 `connected · no tools`。
 - `Danger` 不通过 UI 暴露，不进入默认 tool list。
 
@@ -138,7 +140,7 @@ MCP 官方 2025-06-18 规范定义两种标准 transport：
 
 - TrenchBroom 本来就是唯一真实状态，直接在进程内暴露 `/mcp` 可减少 `trenchbroom-mcp.exe -> QLocalSocket -> TrenchBroom` 的中转层。
 - Claude Code 支持 `claude mcp add --transport http <name> <url>`，HTTP server 断线后有自动重连；stdio server 是本地子进程，生命周期更依赖客户端。
-- 内置 HTTP 能在 Preferences 中显示真实 URL、状态、token 和 tool 数量，用户体验比维护一个额外 exe 更直接。
+- 内置 HTTP 能在 Preferences 中显示真实 URL、状态和可复制配置命令，用户体验比维护一个额外 exe 更直接。
 - stdio exe 仍有价值：Claude Desktop、部分旧客户端或只支持 stdio 的环境可以继续用它作为兼容 shim。
 
 当前 HTTP server 是最小 Streamable HTTP 实现，暂不提供 SSE streaming：
@@ -153,14 +155,14 @@ MCP 官方 2025-06-18 规范定义两种标准 transport：
 
 - `McpJsonRpc`：处理 `initialize`、`tools/list`、`tools/call`，产出 JSON-RPC response，并封装 tool result 的 `content` / `structuredContent`。
 - `McpStdioServer`：只负责 stdin/stdout 行协议。
-- `McpHttpServer`：只负责 Qt HTTP transport、header/token/origin 校验和 response code。
+- `McpHttpServer`：只负责 Qt HTTP transport、Origin 校验和 response code。
 
 ## 第一批 Tools
 
 第一阶段只实现稳定基础能力：
 
 - `tb_status`：返回 TrenchBroom 版本、bridge mode、当前文档数量和活动文档状态。
-- `tb_doctor`：诊断 bridge 配置、token、mode、活动文档和可用工具。
+- `tb_doctor`：诊断 bridge 配置、mode、活动文档和可用工具。
 - `documents_list`：列出当前打开文档。
 - `document_snapshot`：返回活动文档基本信息。
 - `map_snapshot`：返回地图摘要，例如 worldspawn 属性、实体数量、brush 数量和 bounds。
@@ -212,9 +214,10 @@ MCP 官方 2025-06-18 规范定义两种标准 transport：
 - `blockout_create_sky_shell`
 - `blockout_validate`
 
-## Bridge 协议
+## Legacy Bridge 协议
 
-`trenchbroom-mcp.exe` 和 TrenchBroom 内部 bridge 使用一条本地 JSON 消息协议。请求：
+`trenchbroom-mcp.exe` 和 TrenchBroom 内部 bridge 使用一条本地 JSON 消息协议。这是
+stdio 兼容 shim 的内部协议；推荐的 HTTP `/mcp` 入口不需要用户配置 token。请求：
 
 ```json
 {
@@ -323,7 +326,7 @@ MCP 编译工具不重新实现外部进程运行器，而是复用 TrenchBroom 
 
 本分支提供 `scripts/mcp-smoke.ps1` 用来验证 MCP client 到 TrenchBroom 内置 HTTP
 端点的完整链路。它默认读取 `%APPDATA%/TrenchBroom/MCP/config.json` 中的
-`httpHost`、`httpPort` 和 `token`，并只执行安全检查：
+`httpHost` 和 `httpPort`，并只执行安全检查：
 
 - `initialize`
 - `tools/list`
@@ -368,7 +371,6 @@ scripts\mcp-smoke.ps1 -ClearOverlay
 - `MCP config does not exist`：还没有启动过 TrenchBroom 或没有打开过 `Preferences > MCP`。
 - `Connection refused / 目标计算机积极拒绝`：TrenchBroom 未运行，或 MCP mode 仍是 `Off`。
 - `Forbidden`：当前 mode 不允许调用该工具，例如 `ReadOnly` 中调用写工具。
-- `Unauthorized`：请求头中的 bearer token 与 `%APPDATA%/TrenchBroom/MCP/config.json` 不一致，通常需要重新复制 Preferences 中的 Claude Code 配置命令。
 
 ## MCP Client 配置片段
 
@@ -397,11 +399,11 @@ Claude Code 当前推荐用 HTTP transport，并通过 CLI 管理 MCP server：
 
 ```powershell
 claude mcp remove trenchbroom -s user
-claude mcp add --scope user --transport http trenchbroom http://127.0.0.1:37666/mcp --header "Authorization: Bearer <token>"
+claude mcp add --scope user --transport http trenchbroom http://127.0.0.1:37666/mcp
 claude mcp get trenchbroom
 ```
 
-`Preferences > MCP` 会显示真实 URL、token 和可复制的 Claude Code 命令。旧 stdio
+`Preferences > MCP` 会显示真实 URL 和可复制的 Claude Code 命令。旧 stdio
 shim 仍可用于只支持 stdio 的客户端：
 
 ```powershell
@@ -422,7 +424,7 @@ stdio 命令中的 `--` 用于分隔 Claude Code 自己的参数和 server 子�
 
 底层库测试：
 
-- bridge config 默认值、读取、写入和 token 生成。
+- bridge config 默认值、读取、写入和 legacy token 生成。
 - request/response JSON roundtrip。
 - tool catalog schema、required 参数和 mode gating。
 - `ReadOnly` 禁止 edit tools。
@@ -447,7 +449,7 @@ Blockout 测试：
 
 1. [x] 文档和风险记录。
 2. [x] `TbMcpLib`：配置、DTO、tool catalog、错误码和测试。
-3. [x] TrenchBroom 内部 `McpBridgeServer`：默认关闭，支持 token、mode 和 `tb_status`。
+3. [x] TrenchBroom 内部 `McpBridgeServer`：默认关闭，支持 mode gating 和 `tb_status`；legacy stdio 路径保留 token 转发。
 4. [x] `trenchbroom-mcp.exe`：stdio MCP server，支持 `initialize`、`tools/list`、`tools/call`。
 4.1. [x] 内置 Streamable HTTP `/mcp` server：默认监听 `127.0.0.1`，让支持 HTTP 的 MCP client 直接连接 TrenchBroom。
 4.2. [x] 抽出 `McpJsonRpc`：stdio shim 和 HTTP server 共用同一套 JSON-RPC / tool call 实现。
