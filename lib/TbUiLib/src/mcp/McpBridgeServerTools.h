@@ -88,6 +88,10 @@ McpBridgeToolResult faceTextureSetResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
 
+QJsonObject actionsListJson(AppController& appController);
+McpBridgeToolResult actionExecuteResult(
+  AppController& appController, const QJsonObject& params);
+
 McpBridgeToolResult compileProfilesListResult(AppController& appController);
 McpBridgeToolResult compileRunResult(
   AppController& appController, const QJsonObject& params);
