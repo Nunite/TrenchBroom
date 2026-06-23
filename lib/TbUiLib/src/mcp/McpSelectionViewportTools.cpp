@@ -866,7 +866,8 @@ McpBridgeToolResult viewportFocusResult(
 
   const auto& actionsMap = appController.actionManager().actionsMap();
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  auto context = ActionExecutionContext{appController, mapWindow, nullptr};
+  auto* mapView = mapWindow ? mapWindow->currentMapViewBase() : nullptr;
+  auto context = ActionExecutionContext{appController, mapWindow, mapView};
   const auto actionPath = std::filesystem::path{"Menu/View/Focus on Selection"};
   const auto actionIt = actionsMap.find(actionPath);
   if (actionIt != std::end(actionsMap) && actionIt->second.enabled(context))

@@ -33,6 +33,7 @@
 #include "ui/ActionExecutionContext.h"
 #include "ui/ActionManager.h"
 #include "ui/AppController.h"
+#include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
 
@@ -42,7 +43,8 @@ namespace mcp = tb::mcp;
 QJsonObject actionsListJson(AppController& appController)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  auto context = ActionExecutionContext{appController, mapWindow, nullptr};
+  auto* mapView = mapWindow ? mapWindow->currentMapViewBase() : nullptr;
+  auto context = ActionExecutionContext{appController, mapWindow, mapView};
 
   auto actions = QJsonArray{};
   for (const auto& [path, action] : appController.actionManager().actionsMap())
@@ -91,7 +93,8 @@ McpBridgeToolResult actionExecuteResult(
       mcp::McpErrorCode::InvalidParams, QString{"Unknown action id: %1"}.arg(actionId));
   }
 
-  auto context = ActionExecutionContext{appController, mapWindow, nullptr};
+  auto* mapView = mapWindow ? mapWindow->currentMapViewBase() : nullptr;
+  auto context = ActionExecutionContext{appController, mapWindow, mapView};
   const auto& action = actionIt->second;
   if (!action.enabled(context))
   {
