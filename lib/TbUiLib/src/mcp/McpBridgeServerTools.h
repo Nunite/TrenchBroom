@@ -106,4 +106,21 @@ McpBridgeToolResult compileLogTailResult(
 McpBridgeToolResult leaksLoadPointfileResult(
   AppController& appController, const QJsonObject& params);
 
+McpBridgeToolResult problemsCheckResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult mapValidateResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult problemsFixResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult mapFixAllSafeResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+
 } // namespace tb::ui
