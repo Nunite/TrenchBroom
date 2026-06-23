@@ -60,6 +60,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("brush_create_from_planes"));
     CHECK(findToolDefinition("brush_create_arch"));
     CHECK(findToolDefinition("brush_create_torus"));
+    CHECK(findToolDefinition("objects_delete"));
+    CHECK(findToolDefinition("objects_transform"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
   }
@@ -108,6 +110,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("texture_apply"));
     CHECK(!names.contains("texture_replace"));
     CHECK(!names.contains("face_texture_set"));
+    CHECK(!names.contains("objects_delete"));
+    CHECK(!names.contains("objects_transform"));
     CHECK(!names.contains("blockout_create_room"));
     CHECK(!names.contains("action_execute"));
     CHECK(!names.contains("history_undo_mcp"));
@@ -157,6 +161,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("face_list"));
     CHECK(names.contains("face_select"));
     CHECK(names.contains("face_texture_set"));
+    CHECK(names.contains("objects_delete"));
+    CHECK(names.contains("objects_transform"));
     CHECK(names.contains("blockout_create_room"));
     CHECK(names.contains("blockout_create_corridor"));
     CHECK(names.contains("blockout_create_stairs"));

@@ -87,6 +87,40 @@ QJsonObject vec3Property(const QString& description)
   };
 }
 
+QJsonObject numberOrVec3Property(const QString& description)
+{
+  return QJsonObject{
+    {"description", description},
+    {"oneOf",
+     QJsonArray{
+       QJsonObject{{"type", "number"}},
+       QJsonObject{
+         {"type", "array"},
+         {"items", QJsonObject{{"type", "number"}}},
+         {"minItems", 3},
+         {"maxItems", 3},
+       },
+     }},
+  };
+}
+
+QJsonObject stringOrVec3Property(const QString& description)
+{
+  return QJsonObject{
+    {"description", description},
+    {"oneOf",
+     QJsonArray{
+       QJsonObject{{"type", "string"}},
+       QJsonObject{
+         {"type", "array"},
+         {"items", QJsonObject{{"type", "number"}}},
+         {"minItems", 3},
+         {"maxItems", 3},
+       },
+     }},
+  };
+}
+
 QJsonObject stringObjectProperty(const QString& description)
 {
   return QJsonObject{
@@ -250,7 +284,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"min", vec3Property("Optional bounds minimum corner.")},
         {"max", vec3Property("Optional bounds maximum corner.")},
         {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
-        {"select", boolProperty("Replace current selection with matching selectable nodes.")},
+        {"select",
+         boolProperty("Replace current selection with matching selectable nodes.")},
         {"limit", integerProperty("Maximum result count, defaults to 100.")},
       }),
     },
@@ -423,7 +458,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(
         {
           {"classname", stringProperty("Brush entity classname.")},
-          {"objectIds", arrayProperty("Optional brush object ids. Defaults to selection.")},
+          {"objectIds",
+           arrayProperty("Optional brush object ids. Defaults to selection.")},
         },
         {"classname"}),
     },
@@ -435,7 +471,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       objectSchema({
         {"objectIds",
-         arrayProperty("Optional brush or brush entity object ids. Defaults to selection.")},
+         arrayProperty(
+           "Optional brush or brush entity object ids. Defaults to selection.")},
       }),
     },
     {
@@ -572,7 +609,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"max", vec3Property("Maximum corner in map units.")},
           {"sides", integerProperty("UV sphere side count, defaults to 12.")},
           {"rings", integerProperty("UV sphere ring count, defaults to 6.")},
-          {"iterations", integerProperty("Ico sphere iterations; when present uses ico.")},
+          {"iterations",
+           integerProperty("Ico sphere iterations; when present uses ico.")},
           {"axis", stringProperty("UV sphere axis: x, y, or z.")},
           {"material",
            stringProperty("Material name, defaults to the current material.")},
@@ -802,7 +840,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "texture_copy_from_face",
-      "Copy material and UV attributes from one face to selected or specified target faces.",
+      "Copy material and UV attributes from one face to selected or specified target "
+      "faces.",
       McpMode::Edit,
       true,
       true,
@@ -832,12 +871,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       McpMode::ReadOnly,
       false,
       true,
-      objectSchema(
-        {
-          {"faces", arrayProperty("Array of {objectId, faceIndex} face references.")},
-          {"objectId", stringProperty("Optional single brush object id.")},
-          {"faceIndex", integerProperty("Optional single face index.")},
-        }),
+      objectSchema({
+        {"faces", arrayProperty("Array of {objectId, faceIndex} face references.")},
+        {"objectId", stringProperty("Optional single brush object id.")},
+        {"faceIndex", integerProperty("Optional single face index.")},
+      }),
     },
     {
       "face_texture_set",
@@ -855,6 +893,38 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"objectId", stringProperty("Optional brush object id.")},
         {"faceIndex", integerProperty("Optional face index for objectId brush.")},
       }),
+    },
+    {
+      "objects_delete",
+      "Delete one or more entity, brush, patch, group, or layer nodes.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"objectIds", arrayProperty("MCP object ids to delete.")},
+        },
+        {"objectIds"}),
+    },
+    {
+      "objects_transform",
+      "Transform one or more selectable objects using translate, rotate, or scale.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"objectIds", arrayProperty("MCP object ids to transform.")},
+          {"operation",
+           stringProperty("Transform operation: translate, rotate, or scale.")},
+          {"delta", vec3Property("Translation delta in map units.")},
+          {"axis", stringOrVec3Property("Rotation axis: x, y, z, or a [x,y,z] vector.")},
+          {"angle", numberProperty("Rotation angle in degrees.")},
+          {"scale", numberOrVec3Property("Scale factor number or [x,y,z] factors.")},
+          {"center",
+           vec3Property("Optional transform center. Defaults to object bounds center.")},
+        },
+        {"objectIds", "operation"}),
     },
     {
       "blockout_create_room",

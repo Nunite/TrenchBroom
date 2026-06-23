@@ -220,6 +220,13 @@ TEST_CASE("McpBridgeServer")
         {"transactionName", "MCP: Texture edit"},
       });
     }
+    if (toolName == "objects_delete" || toolName == "objects_transform")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-9"},
+        {"transactionName", "MCP: Object edit"},
+      });
+    }
     if (toolName == "asset_place_model")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -296,7 +303,11 @@ TEST_CASE("McpBridgeServer")
       server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
 
     const auto activateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1", "secret", "documents_activate", QJsonObject{{"index", 0}}, mcp::McpMode::ReadOnly});
+      "1",
+      "secret",
+      "documents_activate",
+      QJsonObject{{"index", 0}},
+      mcp::McpMode::ReadOnly});
     CHECK(activateResponse.ok);
     CHECK(activateResponse.result.value("activated").toBool());
 
@@ -315,12 +326,12 @@ TEST_CASE("McpBridgeServer")
       mcp::McpMode::ReadOnly});
     CHECK(boundsResponse.ok);
 
-    const auto growResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "4", "secret", "selection_grow", {}, mcp::McpMode::ReadOnly});
+    const auto growResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"4", "secret", "selection_grow", {}, mcp::McpMode::ReadOnly});
     CHECK(growResponse.ok);
 
-    const auto focusResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "5", "secret", "viewport_focus", {}, mcp::McpMode::ReadOnly});
+    const auto focusResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"5", "secret", "viewport_focus", {}, mcp::McpMode::ReadOnly});
     CHECK(focusResponse.ok);
 
     const auto clearResponse = server.dispatchRequest(mcp::McpBridgeRequest{
@@ -625,6 +636,28 @@ TEST_CASE("McpBridgeServer")
         "1", "secret", toolName, QJsonObject{{"material", "test"}}, mcp::McpMode::Edit});
       CHECK(response.ok);
       CHECK(response.result.value("operationId").toString() == "mcp-op-8");
+    }
+  }
+
+  SECTION("edit mode serves object mutation tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    for (const auto& toolName : {"objects_delete", "objects_transform"})
+    {
+      const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+        "1",
+        "secret",
+        toolName,
+        QJsonObject{
+          {"objectIds", QJsonArray{"node:1"}},
+          {"operation", "translate"},
+          {"delta", QJsonArray{16, 0, 0}},
+        },
+        mcp::McpMode::Edit});
+      CHECK(response.ok);
+      CHECK(response.result.value("operationId").toString() == "mcp-op-9");
     }
   }
 
