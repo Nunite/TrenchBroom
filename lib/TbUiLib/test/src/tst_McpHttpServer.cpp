@@ -42,6 +42,7 @@ constexpr auto TestToken = "secret-token";
 struct HttpResponse
 {
   int statusCode = 0;
+  QByteArray headers;
   QByteArray body;
 };
 
@@ -116,6 +117,10 @@ HttpResponse sendRequest(const quint16 port, const QByteArray& request)
     {
       bytes += socket.readAll();
     }
+    if (bytes.contains("Content-Type: text/event-stream") && bytes.contains("\r\n\r\n"))
+    {
+      break;
+    }
   }
   bytes += socket.readAll();
 
@@ -129,7 +134,7 @@ HttpResponse sendRequest(const quint16 port, const QByteArray& request)
   const auto statusCode = statusParts[1].toInt(&ok);
   REQUIRE(ok);
 
-  return HttpResponse{statusCode, bytes.mid(headerEnd + 4)};
+  return HttpResponse{statusCode, bytes.left(headerEnd), bytes.mid(headerEnd + 4)};
 }
 
 QJsonObject jsonObject(const HttpResponse& response)
@@ -246,7 +251,7 @@ TEST_CASE("McpHttpServer")
     CHECK(response.body.isEmpty());
   }
 
-  SECTION("get is rejected")
+  SECTION("get opens SSE stream")
   {
     auto bridgeServer = makeBridgeServer();
     auto httpServer = McpHttpServer{bridgeServer};
@@ -256,7 +261,9 @@ TEST_CASE("McpHttpServer")
 
     const auto response = sendRequest(httpServer.port(), makeHttpRequest("GET", "/mcp"));
 
-    CHECK(response.statusCode == 405);
+    CHECK(response.statusCode == 200);
+    CHECK(response.headers.contains("Content-Type: text/event-stream"));
+    CHECK(response.body.contains("TrenchBroom MCP stream ready"));
   }
 
   SECTION("localhost requests do not need authorization header")

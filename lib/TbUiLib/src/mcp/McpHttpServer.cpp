@@ -47,6 +47,8 @@ QByteArray reasonPhrase(const int statusCode)
     return "Accepted";
   case 400:
     return "Bad Request";
+  case 403:
+    return "Forbidden";
   case 404:
     return "Not Found";
   case 405:
@@ -157,6 +159,13 @@ void McpHttpServer::stop()
     m_server->close();
     m_server.reset();
   }
+
+  const auto sockets = findChildren<QTcpSocket*>();
+  for (auto* socket : sockets)
+  {
+    socket->disconnectFromHost();
+    socket->deleteLater();
+  }
 }
 
 bool McpHttpServer::isListening() const
@@ -257,15 +266,17 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
     return;
   }
 
-  if (method == "GET")
+  if (!hasAllowedOrigin(lines))
   {
     writeHttpResponse(
-      socket,
-      405,
-      reasonPhrase(405),
-      "application/json",
-      jsonBody("MCP SSE stream is not implemented"));
+      socket, 403, reasonPhrase(403), "application/json", jsonBody("Invalid Origin"));
     socket.disconnectFromHost();
+    return;
+  }
+
+  if (method == "GET")
+  {
+    writeSseStream(socket);
     return;
   }
 
@@ -273,14 +284,6 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
   {
     writeHttpResponse(
       socket, 405, reasonPhrase(405), "application/json", jsonBody("Method not allowed"));
-    socket.disconnectFromHost();
-    return;
-  }
-
-  if (!hasAllowedOrigin(lines))
-  {
-    writeHttpResponse(
-      socket, 401, reasonPhrase(401), "application/json", jsonBody("Invalid Origin"));
     socket.disconnectFromHost();
     return;
   }
@@ -329,6 +332,20 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
     "application/json",
     QJsonDocument{*response}.toJson(QJsonDocument::Compact));
   socket.disconnectFromHost();
+}
+
+void McpHttpServer::writeSseStream(QTcpSocket& socket) const
+{
+  auto response = QByteArray{};
+  response += "HTTP/1.1 200 " + reasonPhrase(200) + "\r\n";
+  response += "Connection: keep-alive\r\n";
+  response += "Cache-Control: no-cache, no-transform\r\n";
+  response += "Content-Type: text/event-stream\r\n";
+  response += "Access-Control-Allow-Origin: http://127.0.0.1\r\n";
+  response += "\r\n";
+  response += ": TrenchBroom MCP stream ready\r\n\r\n";
+  socket.write(response);
+  socket.flush();
 }
 
 void McpHttpServer::writeHttpResponse(

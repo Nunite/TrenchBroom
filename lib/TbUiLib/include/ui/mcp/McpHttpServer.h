@@ -55,6 +55,7 @@ public:
 private:
   void handleNewConnection();
   void handleSocketReadyRead(QTcpSocket& socket);
+  void writeSseStream(QTcpSocket& socket) const;
   void writeHttpResponse(
     QTcpSocket& socket,
     int statusCode,

@@ -64,7 +64,7 @@ TrenchBroom，减少额外 exe、pipe 配置和鉴权状态不同步带来的维
 
 - 已新增 `TbMcpLib`，包含 mode、错误码、bridge config、bridge request/response 和 tool catalog。
 - 已新增 TrenchBroom 内部 `McpBridgeServer`，支持本地 `QLocalServer` 和 mode gating；旧 stdio 兼容路径仍使用 token 转发。
-- 已新增 TrenchBroom 内置 `McpHttpServer`，默认监听 `127.0.0.1:37666/mcp`，支持 `POST /mcp` JSON-RPC、notification `202 Accepted`、`GET /mcp` 返回 `405 Method Not Allowed`。
+- 已新增 TrenchBroom 内置 `McpHttpServer`，默认监听 `127.0.0.1:37666/mcp`，支持 `POST /mcp` JSON-RPC、notification `202 Accepted`，并为先探测 GET 的客户端提供轻量 SSE stream。
 - 已抽出共享 `McpJsonRpc` 处理层，HTTP server 与 stdio shim 共用 `initialize`、`tools/list`、`tools/call` 逻辑；`tools/list` 在 `Off` 模式下仍返回已实现工具列表。
 - 已新增 `trenchbroom-mcp.exe`，作为 stdio MCP server，支持 `initialize`、`tools/list`、`tools/call` 并转发到本地 bridge。
 - 已接入基础查询工具：`tb_status`、`tb_doctor`、`documents_list`、`document_snapshot`、`map_snapshot`、`map_search`、`selection_get`、`actions_list`。
@@ -143,12 +143,12 @@ MCP 官方 2025-06-18 规范定义两种标准 transport：
 - 内置 HTTP 能在 Preferences 中显示真实 URL、状态和可复制配置命令，用户体验比维护一个额外 exe 更直接。
 - stdio exe 仍有价值：Claude Desktop、部分旧客户端或只支持 stdio 的环境可以继续用它作为兼容 shim。
 
-当前 HTTP server 是最小 Streamable HTTP 实现，暂不提供 SSE streaming：
+当前 HTTP server 是最小 Streamable HTTP 实现，同时提供一个轻量 SSE 兼容 stream：
 
 - `POST /mcp` 接收单个 JSON-RPC request / notification。
 - request 返回 `application/json` 单个 JSON-RPC response。
 - notification 返回 HTTP `202 Accepted`。
-- `GET /mcp` 返回 `405 Method Not Allowed`，表示暂不提供 server-to-client SSE stream。
+- `GET /mcp` 返回 `text/event-stream` 并保持连接。当前只发送 readiness comment，不承载工具调用结果；这主要用于兼容 Claude Code 交互式会话或其他优先打开 SSE 的客户端。
 - 支持 `initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call`，与 stdio shim 共用同一套 request handler。
 
 为避免重复实现，当前已抽出公共协议层：
