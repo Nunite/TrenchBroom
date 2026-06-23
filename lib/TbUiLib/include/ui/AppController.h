@@ -26,6 +26,8 @@
 #include <filesystem>
 #include <memory>
 
+class QJsonObject;
+
 class QMenu;
 class QNetworkAccessManager;
 class QOffscreenSurface;
@@ -125,6 +127,9 @@ public:
   RecentDocuments& recentDocuments();
 
   ActionManager& actionManager();
+
+  const QJsonObject& mcpOverlayState() const;
+  void refreshMcpOverlayViews();
 
   void askForAutoUpdates();
   void triggerAutoUpdateCheck();

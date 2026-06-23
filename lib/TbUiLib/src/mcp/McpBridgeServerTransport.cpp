@@ -95,6 +95,11 @@ mcp::McpMode McpBridgeServer::mode() const
   return m_config.mode;
 }
 
+const QJsonObject& McpBridgeServer::overlayState() const
+{
+  return m_overlayState;
+}
+
 mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   const mcp::McpBridgeRequest& request) const
 {

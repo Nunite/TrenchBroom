@@ -238,6 +238,7 @@ public:
   void reloadEntityDefinitions();
   bool canReloadMaterialCollections() const;
   bool canReloadEntityDefinitions() const;
+  void refreshMapViews();
 
   void closeDocument(bool discardChanges = false);
 

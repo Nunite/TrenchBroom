@@ -154,6 +154,7 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "overlay_set")
         {
           m_overlayState = params;
+          appController.refreshMcpOverlayViews();
           return McpBridgeToolResult::success(QJsonObject{
             {"overlay", m_overlayState},
             {"active", true},
@@ -162,6 +163,7 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "overlay_clear")
         {
           m_overlayState = QJsonObject{};
+          appController.refreshMcpOverlayViews();
           return McpBridgeToolResult::success(QJsonObject{
             {"overlay", m_overlayState},
             {"active", false},

@@ -1357,6 +1357,14 @@ bool MapWindow::canReloadEntityDefinitions() const
   return !m_appController.glManager().resourceManager().needsProcessing();
 }
 
+void MapWindow::refreshMapViews()
+{
+  if (m_mapView)
+  {
+    m_mapView->refreshViews();
+  }
+}
+
 void MapWindow::closeDocument(const bool discardChanges)
 {
   m_discardChangesOnClose = discardChanges;

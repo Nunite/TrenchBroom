@@ -234,6 +234,19 @@ TEST_CASE("McpToolCatalog")
     CHECK(json.value("inputSchema").toObject().value("type").toString() == "object");
   }
 
+  SECTION("overlay_set schema exposes marker inputs")
+  {
+    const auto tool = findToolDefinition("overlay_set");
+
+    REQUIRE(tool);
+    const auto properties = tool->inputSchema.value("properties").toObject();
+
+    CHECK(properties.contains("highlightObjectIds"));
+    CHECK(properties.contains("labels"));
+    CHECK(properties.contains("pointMarkers"));
+    CHECK(properties.contains("boundsMarkers"));
+  }
+
   SECTION("tool diagnostics include unsupported roadmap tools")
   {
     const auto diagnostics = toolDiagnosticsJson(McpMode::Edit);

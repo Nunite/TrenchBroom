@@ -60,7 +60,7 @@ MapDocument transaction / query services
 
 仍未完成：
 
-- 真实 viewport overlay 渲染；当前 `overlay_set` / `overlay_clear` 仍只是 bridge 内存状态，尚未接入统一视图叠加层管理器。
+- 完整视图叠加层管理器；当前 `overlay_set` / `overlay_clear` 已能在 map view 中渲染轻量 bounds、point 和 label marker，但仍是 MCP bridge state 驱动的第一版，不是通用 overlay manager。
 - 稳定 arch/torus primitive 生成器；当前 `brush_types_list` 会标记为 unsupported，不出现在默认 `tools/list` 可调用工具中。
 - Prefab provider / prefab_create；当前只在 catalog 中保留 `prefabs_list`、`prefab_create` 未实现占位，不出现在默认 `tools/list`。
 - 更完整的高级 UV 对齐模式；当前 MCP face alignment 先覆盖 reset/paraxial/parallel 这类可稳定映射到现有 API 的模式。
@@ -119,7 +119,7 @@ MapDocument transaction / query services
 - `entity_untie_brushes`：把选中或指定 brush entity 中的 brush 移回当前合适父节点。
 - `actions_list`：列出可执行 actions。
 - `action_execute`：执行已注册 action，遵循 action 自身 enabled 状态；由于 action 可能修改地图，当前要求 `Edit` 模式。
-- `overlay_set` / `overlay_clear`：设置或清理 MCP overlay 状态；当前只保存 bridge state，后续再接入视图叠加层管理器进行真实绘制。
+- `overlay_set` / `overlay_clear`：设置或清理 MCP overlay 状态；第一版会在 map view 中绘制 object bounds、point marker、bounds marker 和 label，不改变真实选择集或地图数据。
 
 第二阶段已开放：
 
@@ -226,13 +226,15 @@ Blockout IR 是 Agent 生成白盒的主要入口。它把“房间、走廊、�
 
 ## Overlay 与截图
 
-MCP overlay 不应直接散落在 renderer 临时分支中。当前第一版已使用轻量 bridge state 表达：
+MCP overlay 不应直接散落在 renderer 临时分支中。当前第一版使用轻量 bridge state 表达，并由 `MapViewBase` 的统一 render tail 绘制：
 
 - object id 高亮。
 - label。
+- point marker。
+- bounds marker。
 - 清理 overlay。
 
-后续必须接入 roadmap 中的“视图叠加层管理器”，与 FPS、2D readable outlines、sky、debug overlay 共享统一设置和刷新路径。接入前不要把 MCP overlay 绘制逻辑直接塞进具体 renderer。
+后续仍应接入 roadmap 中的“视图叠加层管理器”，与 FPS、2D readable outlines、sky、debug overlay 共享统一设置和刷新路径。当前实现不写 map、不改 selection、不参与 undo，只作为 Agent 视觉反馈层。
 
 当前已接入：
 

@@ -359,7 +359,17 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       McpMode::ReadOnly,
       false,
       true,
-      objectSchema(),
+      objectSchema({
+        {"highlightObjectIds",
+         arrayProperty("Object ids to highlight by logical bounds.")},
+        {"labels",
+         arrayProperty(
+           "Label markers. Each item may contain text plus objectId or position.")},
+        {"pointMarkers",
+         arrayProperty("Point markers with position and optional label.")},
+        {"boundsMarkers",
+         arrayProperty("Bounds markers with min/max and optional label.")},
+      }),
     },
     {
       "overlay_clear",

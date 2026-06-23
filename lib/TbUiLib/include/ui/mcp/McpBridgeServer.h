@@ -84,6 +84,7 @@ public:
   bool isListening() const;
   QString pipeName() const;
   mcp::McpMode mode() const;
+  const QJsonObject& overlayState() const;
 
   mcp::McpBridgeResponse dispatchRequest(const mcp::McpBridgeRequest& request) const;
 
