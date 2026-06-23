@@ -152,6 +152,21 @@ McpBridgeToolResult transformObjectsResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
 
+McpBridgeToolResult brushTypesListResult();
+McpBridgeToolResult createBrushResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult blockoutValidateResult(const QJsonObject& params);
+McpBridgeToolResult blockoutCreateResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+
 McpBridgeToolResult compileProfilesListResult(AppController& appController);
 McpBridgeToolResult compileRunResult(
   AppController& appController, const QJsonObject& params);
