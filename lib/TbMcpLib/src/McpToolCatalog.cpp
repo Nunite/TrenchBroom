@@ -126,6 +126,66 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(),
     },
     {
+      "documents_open",
+      "Open a map document by absolute path.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema(
+        {
+          {"path", stringProperty("Absolute path to the map document.")},
+        },
+        {"path"}),
+    },
+    {
+      "documents_activate",
+      "Activate an open document by document index or path.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"index", integerProperty("Document index from documents_list.")},
+        {"path", stringProperty("Document path from documents_list.")},
+      }),
+    },
+    {
+      "documents_save",
+      "Save an open document. Transient documents require an absolute path.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema({
+        {"index", integerProperty("Optional document index from documents_list.")},
+        {"path", stringProperty("Optional absolute save path.")},
+      }),
+    },
+    {
+      "documents_close",
+      "Close an open document. Dirty documents require discardChanges=true.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema({
+        {"index", integerProperty("Optional document index from documents_list.")},
+        {"discardChanges", boolProperty("Allow closing a modified document.")},
+      }),
+    },
+    {
+      "documents_export",
+      "Export an open document to a map file by absolute path.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema(
+        {
+          {"index", integerProperty("Optional document index from documents_list.")},
+          {"path", stringProperty("Absolute export path.")},
+          {"stripTbProperties",
+           boolProperty("Strip TrenchBroom-specific properties from exported map.")},
+        },
+        {"path"}),
+    },
+    {
       "document_snapshot",
       "Return metadata for the active document.",
       McpMode::ReadOnly,
@@ -172,6 +232,71 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"objectIds", arrayProperty("MCP object ids to select.")},
         },
         {"objectIds"}),
+    },
+    {
+      "selection_filter",
+      "Filter map objects by type, classname, targetname, material, bounds, or text.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"type",
+         stringProperty(
+           "Optional node type: world, layer, group, entity, brush, or patch.")},
+        {"classname", stringProperty("Optional entity classname.")},
+        {"targetname", stringProperty("Optional entity targetname.")},
+        {"material", stringProperty("Optional brush material name.")},
+        {"query", stringProperty("Optional text query.")},
+        {"min", vec3Property("Optional bounds minimum corner.")},
+        {"max", vec3Property("Optional bounds maximum corner.")},
+        {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
+        {"select", boolProperty("Replace current selection with matching selectable nodes.")},
+        {"limit", integerProperty("Maximum result count, defaults to 100.")},
+      }),
+    },
+    {
+      "selection_by_bounds",
+      "Select objects whose logical bounds intersect or fit inside a box.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"min", vec3Property("Bounds minimum corner.")},
+          {"max", vec3Property("Bounds maximum corner.")},
+          {"mode", stringProperty("Bounds mode: intersects or contains.")},
+        },
+        {"min", "max"}),
+    },
+    {
+      "selection_grow",
+      "Grow the current node selection to parents, children, or siblings.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"mode", stringProperty("Growth mode: parents, children, or siblings.")},
+      }),
+    },
+    {
+      "viewport_focus",
+      "Focus the editor viewport on object ids or the current selection.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"objectIds", arrayProperty("Optional MCP object ids to focus.")},
+      }),
+    },
+    {
+      "viewport_clear_marks",
+      "Clear MCP overlay markers, optionally clearing the editor selection.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"clearSelection", boolProperty("Also clear the current editor selection.")},
+      }),
     },
     {
       "actions_list",

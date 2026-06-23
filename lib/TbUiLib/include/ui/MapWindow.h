@@ -135,6 +135,7 @@ private:
   SignalDelayer* m_updateTitleSignalDelayer = nullptr;
   SignalDelayer* m_updateActionStateSignalDelayer = nullptr;
   SignalDelayer* m_updateStatusBarSignalDelayer = nullptr;
+  bool m_discardChangesOnClose = false;
 
 public:
   MapWindow(AppController& appController, std::unique_ptr<MapDocument> document);
@@ -238,7 +239,7 @@ public:
   bool canReloadMaterialCollections() const;
   bool canReloadEntityDefinitions() const;
 
-  void closeDocument();
+  void closeDocument(bool discardChanges = false);
 
   void undo();
   void redo();

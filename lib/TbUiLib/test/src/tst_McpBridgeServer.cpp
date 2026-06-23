@@ -44,6 +44,36 @@ TEST_CASE("McpBridgeServer")
         {"count", 0},
       });
     }
+    if (toolName == "documents_activate")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"activated", true},
+      });
+    }
+    if (toolName == "documents_open")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"opened", true},
+      });
+    }
+    if (toolName == "documents_save")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"saved", true},
+      });
+    }
+    if (toolName == "documents_close")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"closed", true},
+      });
+    }
+    if (toolName == "documents_export")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"exported", true},
+      });
+    }
     if (toolName == "map_search")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -55,6 +85,36 @@ TEST_CASE("McpBridgeServer")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"selectedCount", 0},
+      });
+    }
+    if (toolName == "selection_filter")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 0},
+      });
+    }
+    if (toolName == "selection_by_bounds")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 0},
+      });
+    }
+    if (toolName == "selection_grow")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"selectedCount", 0},
+      });
+    }
+    if (toolName == "viewport_focus")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"focused", true},
+      });
+    }
+    if (toolName == "viewport_clear_marks")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"active", false},
       });
     }
     if (toolName == "overlay_set")
@@ -158,6 +218,44 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("count").toInt() == 0);
   }
 
+  SECTION("serves read-only document and selection parity tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto activateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1", "secret", "documents_activate", QJsonObject{{"index", 0}}, mcp::McpMode::ReadOnly});
+    CHECK(activateResponse.ok);
+    CHECK(activateResponse.result.value("activated").toBool());
+
+    const auto filterResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2", "secret", "selection_filter", {}, mcp::McpMode::ReadOnly});
+    CHECK(filterResponse.ok);
+
+    const auto boundsResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "3",
+      "secret",
+      "selection_by_bounds",
+      QJsonObject{
+        {"min", QJsonArray{0, 0, 0}},
+        {"max", QJsonArray{128, 128, 128}},
+      },
+      mcp::McpMode::ReadOnly});
+    CHECK(boundsResponse.ok);
+
+    const auto growResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "4", "secret", "selection_grow", {}, mcp::McpMode::ReadOnly});
+    CHECK(growResponse.ok);
+
+    const auto focusResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "5", "secret", "viewport_focus", {}, mcp::McpMode::ReadOnly});
+    CHECK(focusResponse.ok);
+
+    const auto clearResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "6", "secret", "viewport_clear_marks", {}, mcp::McpMode::ReadOnly});
+    CHECK(clearResponse.ok);
+  }
+
   SECTION("serves map_search")
   {
     REQUIRE(
@@ -233,6 +331,23 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
   }
 
+  SECTION("read-only mode rejects document mutation tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "documents_save",
+      QJsonObject{{"path", "C:/tmp/test.map"}},
+      mcp::McpMode::Edit});
+
+    CHECK(!response.ok);
+    REQUIRE(response.error);
+    CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
+  }
+
   SECTION("edit mode serves edit tools")
   {
     REQUIRE(
@@ -247,6 +362,44 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("operationId").toString() == "mcp-op-1");
+  }
+
+  SECTION("edit mode serves document lifecycle tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto openResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "documents_open",
+      QJsonObject{{"path", "C:/tmp/test.map"}},
+      mcp::McpMode::Edit});
+    CHECK(openResponse.ok);
+
+    const auto saveResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "documents_save",
+      QJsonObject{{"path", "C:/tmp/test.map"}},
+      mcp::McpMode::Edit});
+    CHECK(saveResponse.ok);
+
+    const auto exportResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "3",
+      "secret",
+      "documents_export",
+      QJsonObject{{"path", "C:/tmp/export.map"}},
+      mcp::McpMode::Edit});
+    CHECK(exportResponse.ok);
+
+    const auto closeResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "4",
+      "secret",
+      "documents_close",
+      QJsonObject{{"discardChanges", true}},
+      mcp::McpMode::Edit});
+    CHECK(closeResponse.ok);
   }
 
   SECTION("read-only mode serves history_list")

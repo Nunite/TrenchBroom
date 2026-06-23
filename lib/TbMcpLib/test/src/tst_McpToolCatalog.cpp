@@ -32,9 +32,19 @@ TEST_CASE("McpToolCatalog")
   {
     CHECK(findToolDefinition("tb_status"));
     CHECK(findToolDefinition("documents_list"));
+    CHECK(findToolDefinition("documents_open"));
+    CHECK(findToolDefinition("documents_activate"));
+    CHECK(findToolDefinition("documents_save"));
+    CHECK(findToolDefinition("documents_close"));
+    CHECK(findToolDefinition("documents_export"));
     CHECK(findToolDefinition("map_snapshot"));
     CHECK(findToolDefinition("map_search"));
     CHECK(findToolDefinition("selection_get"));
+    CHECK(findToolDefinition("selection_filter"));
+    CHECK(findToolDefinition("selection_by_bounds"));
+    CHECK(findToolDefinition("selection_grow"));
+    CHECK(findToolDefinition("viewport_focus"));
+    CHECK(findToolDefinition("viewport_clear_marks"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
   }
@@ -49,14 +59,24 @@ TEST_CASE("McpToolCatalog")
     }
 
     CHECK(names.contains("tb_status"));
+    CHECK(names.contains("documents_activate"));
     CHECK(names.contains("map_snapshot"));
     CHECK(names.contains("map_search"));
     CHECK(names.contains("selection_set"));
+    CHECK(names.contains("selection_filter"));
+    CHECK(names.contains("selection_by_bounds"));
+    CHECK(names.contains("selection_grow"));
+    CHECK(names.contains("viewport_focus"));
+    CHECK(names.contains("viewport_clear_marks"));
     CHECK(names.contains("overlay_set"));
     CHECK(names.contains("history_list"));
     CHECK(names.contains("asset_search"));
     CHECK(names.contains("texture_search"));
     CHECK(names.contains("blockout_validate"));
+    CHECK(!names.contains("documents_open"));
+    CHECK(!names.contains("documents_save"));
+    CHECK(!names.contains("documents_close"));
+    CHECK(!names.contains("documents_export"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
     CHECK(!names.contains("asset_place_model"));
@@ -76,6 +96,10 @@ TEST_CASE("McpToolCatalog")
     }
 
     CHECK(names.contains("action_execute"));
+    CHECK(names.contains("documents_open"));
+    CHECK(names.contains("documents_save"));
+    CHECK(names.contains("documents_close"));
+    CHECK(names.contains("documents_export"));
     CHECK(names.contains("entity_create"));
     CHECK(names.contains("entity_update"));
     CHECK(names.contains("entity_delete"));

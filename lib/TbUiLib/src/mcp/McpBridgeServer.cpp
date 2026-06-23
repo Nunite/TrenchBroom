@@ -22,6 +22,7 @@
 #include <QJsonDocument>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QWidget>
 
 #include "fs/PathMatcher.h"
 #include "fs/TraversalMode.h"
@@ -31,6 +32,7 @@
 #include "mcp/McpToolCatalog.h"
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/Brush.h"
+#include "mdl/BrushFace.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
@@ -76,8 +78,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <functional>
 #include <map>
+#include <set>
 
 namespace tb::ui
 {
@@ -677,6 +681,13 @@ McpBridgeToolResult noActiveDocumentFailure()
 McpBridgeToolResult invalidParamsFailure(const QString& message)
 {
   return McpBridgeToolResult::failure(mcp::McpErrorCode::InvalidParams, message);
+}
+
+template <typename Result>
+QString resultErrorMessage(const Result& result)
+{
+  const auto error = result.error();
+  return QString::fromStdString(std::get<Error>(error).msg);
 }
 
 bool executeTransaction(
@@ -1987,6 +1998,351 @@ McpBridgeToolResult selectionSetResult(
   });
 }
 
+bool boundsMatch(
+  const vm::bbox3d& candidate, const vm::bbox3d& queryBounds, const QString& mode)
+{
+  if (mode.compare("contains", Qt::CaseInsensitive) == 0)
+  {
+    return queryBounds.contains(candidate);
+  }
+  return queryBounds.intersects(candidate);
+}
+
+bool materialMatches(const mdl::Node& node, const QString& material)
+{
+  if (material.isEmpty())
+  {
+    return true;
+  }
+
+  const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(&node);
+  if (!brushNode)
+  {
+    return false;
+  }
+
+  const auto materialName = material.toStdString();
+  for (const auto& face : brushNode->brush().faces())
+  {
+    if (face.attributes().materialName() == materialName)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool entityPropertyMatches(
+  const mdl::Node& node,
+  const QString& classname,
+  const QString& targetname)
+{
+  const auto* entityNode = dynamic_cast<const mdl::EntityNodeBase*>(&node);
+  if (!entityNode)
+  {
+    return classname.isEmpty() && targetname.isEmpty();
+  }
+
+  if (
+    !classname.isEmpty()
+    && !textMatches(QString::fromStdString(entityNode->entity().classname()), classname))
+  {
+    return false;
+  }
+
+  if (!targetname.isEmpty())
+  {
+    const auto targetnameProperty = entityNode->entity().property("targetname");
+    const auto targetnameValue =
+      targetnameProperty ? QString::fromStdString(*targetnameProperty) : QString{};
+    if (!textMatches(targetnameValue, targetname))
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool nodeFilterMatches(
+  const mdl::Node& node,
+  const mdl::WorldNode& worldNode,
+  const QJsonObject& params,
+  const std::optional<vm::bbox3d>& queryBounds)
+{
+  const auto type = params.value("type").toString().trimmed();
+  if (!type.isEmpty() && nodeTypeName(node).compare(type, Qt::CaseInsensitive) != 0)
+  {
+    return false;
+  }
+
+  if (
+    !entityPropertyMatches(
+      node,
+      params.value("classname").toString().trimmed(),
+      params.value("targetname").toString().trimmed()))
+  {
+    return false;
+  }
+
+  if (!materialMatches(node, params.value("material").toString().trimmed()))
+  {
+    return false;
+  }
+
+  if (const auto query = params.value("query").toString().trimmed();
+      !query.isEmpty() && !nodeMatchesQuery(node, worldNode, query))
+  {
+    return false;
+  }
+
+  if (queryBounds)
+  {
+    const auto mode = params.value("boundsMode").toString("intersects");
+    if (!boundsMatch(node.logicalBounds(), *queryBounds, mode))
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void collectFilteredNodes(
+  const mdl::Node& node,
+  const mdl::WorldNode& worldNode,
+  const QJsonObject& params,
+  const std::optional<vm::bbox3d>& queryBounds,
+  const size_t limit,
+  std::vector<mdl::Node*>& matches)
+{
+  if (matches.size() >= limit)
+  {
+    return;
+  }
+
+  if (nodeFilterMatches(node, worldNode, params, queryBounds))
+  {
+    matches.push_back(const_cast<mdl::Node*>(&node));
+  }
+
+  for (const auto* child : node.children())
+  {
+    collectFilteredNodes(*child, worldNode, params, queryBounds, limit, matches);
+    if (matches.size() >= limit)
+    {
+      return;
+    }
+  }
+}
+
+McpBridgeToolResult selectionFilterResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto error = QString{};
+  auto queryBounds = std::optional<vm::bbox3d>{};
+  const auto hasMin = !params.value("min").isUndefined();
+  const auto hasMax = !params.value("max").isUndefined();
+  if (hasMin != hasMax)
+  {
+    return invalidParamsFailure("min and max must be provided together");
+  }
+  if (hasMin && hasMax)
+  {
+    queryBounds = boundsFromJson(params, error);
+    if (!queryBounds)
+    {
+      return invalidParamsFailure(error);
+    }
+  }
+
+  auto& map = mapWindow->document().map();
+  auto& worldNode = map.worldNode();
+  auto matches = std::vector<mdl::Node*>{};
+  collectFilteredNodes(
+    worldNode, worldNode, params, queryBounds, optionalSize(params, "limit", 100), matches);
+
+  if (optionalBool(params, "select", false))
+  {
+    auto selectableNodes = std::vector<mdl::Node*>{};
+    for (auto* node : matches)
+    {
+      if (&worldNode != node && map.editorContext().selectable(*node))
+      {
+        selectableNodes.push_back(node);
+      }
+    }
+    mdl::deselectAll(map);
+    if (!selectableNodes.empty())
+    {
+      mdl::selectNodes(map, selectableNodes);
+    }
+  }
+
+  auto results = QJsonArray{};
+  for (const auto* node : matches)
+  {
+    results.push_back(nodeSummaryJson(*node, worldNode));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"results", results},
+    {"count", results.size()},
+  });
+}
+
+McpBridgeToolResult selectionByBoundsResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto paramsWithSelect = params;
+  paramsWithSelect.insert("select", true);
+  paramsWithSelect.insert("boundsMode", params.value("mode").toString("intersects"));
+  return selectionFilterResult(appController, paramsWithSelect);
+}
+
+McpBridgeToolResult selectionGrowResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto selectedNodes = map.selection().nodes;
+  if (selectedNodes.empty())
+  {
+    return McpBridgeToolResult::success(QJsonObject{
+      {"selectedObjectIds", QJsonArray{}},
+      {"selectedCount", 0},
+    });
+  }
+
+  const auto mode = params.value("mode").toString("parents").trimmed().toLower();
+  auto grown = std::vector<mdl::Node*>{};
+  auto seen = std::set<mdl::Node*>{};
+  const auto addNode = [&](mdl::Node* node) {
+    if (node && node != &map.worldNode() && map.editorContext().selectable(*node))
+    {
+      if (seen.insert(node).second)
+      {
+        grown.push_back(node);
+      }
+    }
+  };
+
+  if (mode == "parents")
+  {
+    for (auto* node : selectedNodes)
+    {
+      addNode(node->parent());
+    }
+  }
+  else if (mode == "children")
+  {
+    for (auto* node : selectedNodes)
+    {
+      for (auto* child : node->children())
+      {
+        addNode(child);
+      }
+    }
+  }
+  else if (mode == "siblings")
+  {
+    for (auto* node : selectedNodes)
+    {
+      if (auto* parent = node->parent())
+      {
+        for (auto* sibling : parent->children())
+        {
+          addNode(sibling);
+        }
+      }
+    }
+  }
+  else
+  {
+    return invalidParamsFailure("selection_grow mode must be parents, children, or siblings");
+  }
+
+  mdl::deselectAll(map);
+  if (!grown.empty())
+  {
+    mdl::selectNodes(map, grown);
+  }
+
+  auto selectedIds = QJsonArray{};
+  for (const auto* node : grown)
+  {
+    selectedIds.push_back(nodePathId(*node, map.worldNode()));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"mode", mode},
+    {"selectedObjectIds", selectedIds},
+    {"selectedCount", selectedIds.size()},
+  });
+}
+
+McpBridgeToolResult viewportFocusResult(
+  AppController& appController, const QJsonObject& params)
+{
+  if (const auto objectIds = params.value("objectIds"); objectIds.isArray())
+  {
+    const auto selectionResult = selectionSetResult(
+      appController, QJsonObject{{"objectIds", objectIds.toArray()}});
+    if (!selectionResult.ok)
+    {
+      return selectionResult;
+    }
+  }
+
+  const auto& actionsMap = appController.actionManager().actionsMap();
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  auto context = ActionExecutionContext{appController, mapWindow, nullptr};
+  const auto actionPath = std::filesystem::path{"Menu/View/Focus on Selection"};
+  const auto actionIt = actionsMap.find(actionPath);
+  if (actionIt != std::end(actionsMap) && actionIt->second.enabled(context))
+  {
+    actionIt->second.execute(context);
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"focused", true},
+    {"selection", selectionJson(appController)},
+  });
+}
+
+McpBridgeToolResult viewportClearMarksResult(
+  AppController& appController, const QJsonObject& params, QJsonObject& overlayState)
+{
+  overlayState = QJsonObject{};
+
+  if (optionalBool(params, "clearSelection", false))
+  {
+    auto* mapWindow = appController.mapWindowManager().topMapWindow();
+    if (!mapWindow)
+    {
+      return noActiveDocumentFailure();
+    }
+    mdl::deselectAll(mapWindow->document().map());
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"overlay", overlayState},
+    {"active", false},
+    {"selectionCleared", optionalBool(params, "clearSelection", false)},
+  });
+}
+
 QJsonObject actionsListJson(AppController& appController)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -2070,6 +2426,219 @@ QJsonObject documentsListJson(AppController& appController)
   };
 }
 
+std::filesystem::path absolutePathFromParams(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto pathString = params.value(key).toString().trimmed();
+  if (pathString.isEmpty())
+  {
+    error = QString{"%1 is required"}.arg(key);
+    return {};
+  }
+
+  auto path = pathFromQString(pathString);
+  if (path.empty() || !path.is_absolute())
+  {
+    error = QString{"%1 must be an absolute path"}.arg(key);
+    return {};
+  }
+
+  return path.lexically_normal();
+}
+
+MapWindow* documentWindowByParams(
+  AppController& appController, const QJsonObject& params, QString& error)
+{
+  const auto windows = appController.mapWindowManager().mapWindows();
+  if (windows.empty())
+  {
+    error = "No active document";
+    return nullptr;
+  }
+
+  const auto indexValue = params.value("index");
+  if (indexValue.isDouble())
+  {
+    const auto index = indexValue.toInt(-1);
+    if (index < 0 || index >= static_cast<int>(windows.size()))
+    {
+      error = QString{"Unknown document index: %1"}.arg(index);
+      return nullptr;
+    }
+    return windows[static_cast<size_t>(index)];
+  }
+
+  const auto pathValue = params.value("path");
+  if (pathValue.isString())
+  {
+    const auto path = pathFromQString(pathValue.toString()).lexically_normal();
+    for (auto* window : windows)
+    {
+      if (window->document().map().path().lexically_normal() == path)
+      {
+        return window;
+      }
+    }
+    error = QString{"No open document for path: %1"}.arg(pathValue.toString());
+    return nullptr;
+  }
+
+  return appController.mapWindowManager().topMapWindow();
+}
+
+McpBridgeToolResult documentOpenResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto error = QString{};
+  const auto path = absolutePathFromParams(params, "path", error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+  if (!std::filesystem::is_regular_file(path))
+  {
+    return invalidParamsFailure(QString{"Document does not exist: %1"}.arg(pathToQString(path)));
+  }
+
+  if (!appController.openDocument(path))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError,
+      QString{"Failed to open document: %1"}.arg(pathToQString(path)));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"opened", true},
+    {"document", activeDocumentJson(appController)},
+  });
+}
+
+McpBridgeToolResult documentActivateResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto error = QString{};
+  auto* mapWindow = documentWindowByParams(appController, params, error);
+  if (!mapWindow)
+  {
+    return error == "No active document" ? noActiveDocumentFailure()
+                                         : invalidParamsFailure(error);
+  }
+
+  mapWindow->show();
+  mapWindow->raise();
+  mapWindow->activateWindow();
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"activated", true},
+    {"document", documentJson(*mapWindow, 0)},
+  });
+}
+
+McpBridgeToolResult documentSaveResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto error = QString{};
+  auto* mapWindow = documentWindowByParams(appController, params, error);
+  if (!mapWindow)
+  {
+    return error == "No active document" ? noActiveDocumentFailure()
+                                         : invalidParamsFailure(error);
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto pathValue = params.value("path");
+  const auto savePath =
+    pathValue.isString() && !pathValue.toString().trimmed().isEmpty()
+      ? absolutePathFromParams(params, "path", error)
+      : std::filesystem::path{};
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  if (savePath.empty() && !map.persistent())
+  {
+    return invalidParamsFailure("Transient documents require absolute path");
+  }
+
+  const auto result = savePath.empty() ? map.save() : map.saveAs(savePath);
+  if (!result)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, resultErrorMessage(result));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"saved", true},
+    {"path", pathToQString(map.path())},
+    {"document", documentJson(*mapWindow, 0)},
+  });
+}
+
+McpBridgeToolResult documentCloseResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto error = QString{};
+  auto* mapWindow = documentWindowByParams(appController, params, error);
+  if (!mapWindow)
+  {
+    return error == "No active document" ? noActiveDocumentFailure()
+                                         : invalidParamsFailure(error);
+  }
+
+  if (mapWindow->document().map().modified() && !optionalBool(params, "discardChanges", false))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden,
+      "Document has unsaved changes; pass discardChanges=true to close it");
+  }
+
+  const auto document = documentJson(*mapWindow, 0);
+  mapWindow->closeDocument(optionalBool(params, "discardChanges", false));
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"closed", true},
+    {"document", document},
+  });
+}
+
+McpBridgeToolResult documentExportResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto error = QString{};
+  auto* mapWindow = documentWindowByParams(appController, params, error);
+  if (!mapWindow)
+  {
+    return error == "No active document" ? noActiveDocumentFailure()
+                                         : invalidParamsFailure(error);
+  }
+
+  const auto exportPath = absolutePathFromParams(params, "path", error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+  if (exportPath == mapWindow->document().map().path())
+  {
+    return invalidParamsFailure("Export path must not overwrite the current document");
+  }
+
+  const auto stripTbProperties = optionalBool(params, "stripTbProperties", true);
+  const auto options = mdl::MapExportOptions{exportPath, stripTbProperties};
+  const auto result = mapWindow->document().map().exportAs(options);
+  if (!result)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, resultErrorMessage(result));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"exported", true},
+    {"path", pathToQString(exportPath)},
+    {"stripTbProperties", stripTbProperties},
+  });
+}
+
 QJsonObject makeStatus(AppController& appController, const mcp::McpBridgeConfig& config)
 {
   auto result = QJsonObject{
@@ -2149,6 +2718,26 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return McpBridgeToolResult::success(documentsListJson(appController));
         }
+        if (toolName == "documents_open")
+        {
+          return documentOpenResult(appController, params);
+        }
+        if (toolName == "documents_activate")
+        {
+          return documentActivateResult(appController, params);
+        }
+        if (toolName == "documents_save")
+        {
+          return documentSaveResult(appController, params);
+        }
+        if (toolName == "documents_close")
+        {
+          return documentCloseResult(appController, params);
+        }
+        if (toolName == "documents_export")
+        {
+          return documentExportResult(appController, params);
+        }
         if (toolName == "document_snapshot")
         {
           return McpBridgeToolResult::success(activeDocumentJson(appController));
@@ -2168,6 +2757,26 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "selection_set")
         {
           return selectionSetResult(appController, params);
+        }
+        if (toolName == "selection_filter")
+        {
+          return selectionFilterResult(appController, params);
+        }
+        if (toolName == "selection_by_bounds")
+        {
+          return selectionByBoundsResult(appController, params);
+        }
+        if (toolName == "selection_grow")
+        {
+          return selectionGrowResult(appController, params);
+        }
+        if (toolName == "viewport_focus")
+        {
+          return viewportFocusResult(appController, params);
+        }
+        if (toolName == "viewport_clear_marks")
+        {
+          return viewportClearMarksResult(appController, params, m_overlayState);
         }
         if (toolName == "actions_list")
         {
@@ -2361,26 +2970,7 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
       QString{"MCP tool is not available in mode %1"}.arg(mcp::modeName(m_config.mode)));
   }
 
-  if (
-    request.tool == "tb_status" || request.tool == "tb_doctor"
-    || request.tool == "documents_list" || request.tool == "document_snapshot"
-    || request.tool == "map_snapshot" || request.tool == "map_search"
-    || request.tool == "selection_get" || request.tool == "selection_set"
-    || request.tool == "actions_list" || request.tool == "action_execute"
-    || request.tool == "overlay_set" || request.tool == "overlay_clear"
-    || request.tool == "entity_create" || request.tool == "entity_update"
-    || request.tool == "entity_delete" || request.tool == "brush_create_box"
-    || request.tool == "brush_create_wedge" || request.tool == "brush_create_cylinder"
-    || request.tool == "history_list" || request.tool == "history_undo_mcp"
-    || request.tool == "history_redo_mcp" || request.tool == "asset_search"
-    || request.tool == "asset_place_model" || request.tool == "asset_place_sprite"
-    || request.tool == "asset_place_sound" || request.tool == "texture_search"
-    || request.tool == "texture_apply" || request.tool == "blockout_create_room"
-    || request.tool == "blockout_create_corridor"
-    || request.tool == "blockout_create_stairs" || request.tool == "blockout_create_ramp"
-    || request.tool == "blockout_create_doorway"
-    || request.tool == "blockout_create_cover"
-    || request.tool == "blockout_create_sky_shell" || request.tool == "blockout_validate")
+  if (tool->implemented)
   {
     const auto result = m_toolHandler(request.tool, request.params);
     if (result.ok)

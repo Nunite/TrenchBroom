@@ -1357,8 +1357,9 @@ bool MapWindow::canReloadEntityDefinitions() const
   return !m_appController.glManager().resourceManager().needsProcessing();
 }
 
-void MapWindow::closeDocument()
+void MapWindow::closeDocument(const bool discardChanges)
 {
+  m_discardChangesOnClose = discardChanges;
   close();
 }
 
@@ -2751,7 +2752,7 @@ void MapWindow::closeEvent(QCloseEvent* event)
   }
   else
   {
-    if (!confirmOrDiscardChanges())
+    if (!m_discardChangesOnClose && !confirmOrDiscardChanges())
     {
       event->ignore();
     }
@@ -2768,6 +2769,7 @@ void MapWindow::closeEvent(QCloseEvent* event)
       event->accept();
     }
   }
+  m_discardChangesOnClose = false;
   // Don't call superclass implementation
 }
 

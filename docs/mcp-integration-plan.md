@@ -47,6 +47,8 @@ MapDocument transaction / query services
 - 已接入基础查询工具：`tb_status`、`tb_doctor`、`documents_list`、`document_snapshot`、`map_snapshot`、`map_search`、`selection_get`、`actions_list`。
 - 已接入第一批编辑器状态工具：`selection_set`、`overlay_set`、`overlay_clear`。
 - 已接入 `action_execute`，但它要求 `Edit` 模式，因为任意 action 可能间接修改地图。
+- 已接入文档生命周期工具：`documents_open`、`documents_activate`、`documents_save`、`documents_close`、`documents_export`。MCP 保存/导出要求绝对路径，关闭 dirty 文档必须显式传入 `discardChanges=true`，避免阻塞式确认对话框。
+- 已接入选择与视图控制工具：`selection_filter`、`selection_by_bounds`、`selection_grow`、`viewport_focus`、`viewport_clear_marks`。当前 `viewport_focus` 复用现有 action；真实 overlay 绘制和 viewport capture 仍在后续阶段。
 - 已接入事务型写入工具：entity 创建/更新/删除、box/wedge/cylinder brush 创建。
 - 已接入 MCP operation history：`history_list`、`history_undo_mcp`、`history_redo_mcp`。当前只在 MCP 操作仍位于 TrenchBroom 原生 undo/redo 栈顶时执行，避免误撤用户手动编辑。
 - 已接入 GoldSrc 资产与材质工具：`.mdl/.spr/.wav` 搜索与放置、material 搜索与应用。
@@ -96,12 +98,18 @@ MapDocument transaction / query services
 - `map_search`：按 classname、targetname、属性和文本搜索对象。
 - `selection_get`：返回当前选择。
 - `selection_set`：结构化设置选择；它只改变编辑器选择状态，不写 map 文件，因此当前允许在 `ReadOnly` 中使用。
+- `selection_filter`：按 type、classname、targetname、material、bounds 或文本过滤对象，可选择是否替换当前选择。
+- `selection_by_bounds`：按 intersects / contains 选择逻辑 bounds 匹配的对象。
+- `selection_grow`：把当前选择扩展到 parents、children 或 siblings。
+- `viewport_focus`：聚焦当前选择或传入 object ids；当前通过现有视图 action 执行。
+- `viewport_clear_marks`：清理 MCP overlay 状态，可选清空当前选择。
 - `actions_list`：列出可执行 actions。
 - `action_execute`：执行已注册 action，遵循 action 自身 enabled 状态；由于 action 可能修改地图，当前要求 `Edit` 模式。
 - `overlay_set` / `overlay_clear`：设置或清理 MCP overlay 状态；当前只保存 bridge state，后续再接入视图叠加层管理器进行真实绘制。
 
 第二阶段已开放：
 
+- `documents_open`、`documents_activate`、`documents_save`、`documents_close`、`documents_export`
 - `entity_create`、`entity_update`、`entity_delete`
 - `brush_create_box`、`brush_create_wedge`、`brush_create_cylinder`
 - `asset_search`、`asset_place_model`、`asset_place_sprite`、`asset_place_sound`
@@ -243,6 +251,7 @@ Blockout 测试：
 3. [x] TrenchBroom 内部 `McpBridgeServer`：默认关闭，支持 token、mode 和 `tb_status`。
 4. [x] `trenchbroom-mcp.exe`：stdio MCP server，支持 `initialize`、`tools/list`、`tools/call`。
 5. [x] 只读 map / selection / action tools。
+5.1. [x] 文档生命周期、选择过滤和视图控制 tools。
 6. [x] transaction 编辑 tools 与 MCP history。
 7. [x] GoldSrc asset placement tools。
 8. [x] Blockout IR tools。
