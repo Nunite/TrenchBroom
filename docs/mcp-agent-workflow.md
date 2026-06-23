@@ -36,6 +36,14 @@
 scripts\mcp-smoke.ps1 -RawJson
 ```
 
+生成 MCP client 配置片段可用：
+
+```powershell
+scripts\mcp-config.ps1 -Print
+```
+
+脚本会输出通用 JSON、`mcpServers` JSON 和 Codex TOML 片段。第一版只生成文件，不直接覆盖用户全局配置。
+
 ## 推荐 Agent 指令
 
 可以把下面这段作为 MCP client 中给 Agent 的项目指令：

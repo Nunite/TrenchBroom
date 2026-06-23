@@ -311,6 +311,29 @@ scripts\mcp-smoke.ps1 -ClearOverlay
 - `Could not connect to TrenchBroom MCP bridge`：TrenchBroom 未运行、bridge 未启动，或 pipeName 与当前运行实例不一致。
 - `Unauthorized`：stdio server 读取到的 token 与 TrenchBroom 内部 bridge token 不一致，通常需要重启 TrenchBroom 或检查 `%APPDATA%/TrenchBroom/MCP/config.json`。
 
+## MCP Client 配置片段
+
+生成可复制到 MCP client 的配置片段：
+
+```powershell
+scripts\mcp-config.ps1 -Print
+```
+
+默认输出目录：
+
+```text
+build-release-codex\mcp-config
+```
+
+生成文件：
+
+- `trenchbroom-mcp.generic.json`：通用 stdio MCP server 记录。
+- `trenchbroom-mcp.mcpServers.json`：适合 Claude Desktop / Cursor 风格 `mcpServers` 配置的 JSON 片段。
+- `trenchbroom-mcp.codex.toml`：适合 Codex 风格 MCP 配置的 TOML 片段。
+- `README.md`：本地配置说明。
+
+第一版脚本只生成配置，不直接改写用户全局配置文件，避免误覆盖现有 MCP server。后续如果要做一键安装，应先做备份、diff 预览和明确确认。
+
 ## 测试策略
 
 底层库测试：
