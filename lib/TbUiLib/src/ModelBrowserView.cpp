@@ -53,6 +53,7 @@
 #include "render/Transformation.h"
 #include "ui/AppController.h"
 #include "ui/ImageUtils.h"
+#include "ui/MapDocument.h"
 #include "ui/QPathUtils.h"
 
 #include "kd/path_utils.h"
@@ -133,9 +134,9 @@ bool soundPreviewButtonHitTest(
 }
 
 ModelBrowserView::ModelBrowserView(
-  AppController& appController, QScrollBar* scrollBar, mdl::Map& map)
+  AppController& appController, QScrollBar* scrollBar, MapDocument& document)
   : CellView{appController, scrollBar}
-  , m_map{map}
+  , m_document{document}
   , m_scrollBar{scrollBar}
 {
   setMouseTracking(true);
@@ -377,7 +378,7 @@ const AssetPreviewState* ModelBrowserView::assetPreview(
 void ModelBrowserView::loadPreviews()
 {
   m_assetPreviews =
-    loadAssetPreviews(AssetPreviewProvider{m_map.gameFileSystem()}, m_assets);
+    loadAssetPreviews(AssetPreviewProvider{m_document.map().gameFileSystem()}, m_assets);
 }
 
 void ModelBrowserView::invalidateSpritePreviewTextures()
@@ -545,7 +546,7 @@ void ModelBrowserView::doContextMenu(
     }
     else
     {
-      const auto absPathResult = m_map.gameFileSystem().makeAbsolute(modelPath);
+      const auto absPathResult = m_document.map().gameFileSystem().makeAbsolute(modelPath);
       if (!absPathResult.is_error())
       {
         absPath = absPathResult.value();
@@ -568,7 +569,7 @@ void ModelBrowserView::doContextMenu(
       return;
     }
 
-    m_map.reloadEntityModels(modelPath);
+    m_document.map().reloadEntityModels(modelPath);
     invalidate();
     update();
   });
@@ -1335,7 +1336,7 @@ void ModelBrowserView::renderModels(
 {
   gl.frontFace(GL_CW);
 
-  auto& entityModelManager = m_map.entityModelManager();
+  auto& entityModelManager = m_document.map().entityModelManager();
   entityModelManager.prepare(gl, vboManager());
 
   auto shader = gl::ActiveShader{gl, shaderManager(), gl::Shaders::EntityModelShader};

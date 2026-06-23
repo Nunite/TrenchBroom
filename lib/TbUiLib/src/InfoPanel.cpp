@@ -44,7 +44,7 @@ InfoPanel::InfoPanel(AppController& appController, MapDocument& document, QWidge
   m_console = new Console{};
   m_pythonConsole = new PythonConsole{};
   m_issueBrowser = new IssueBrowser{document};
-  m_modelInspector = new ModelInspector{appController, document.map()};
+  m_modelInspector = new ModelInspector{appController, document};
 
   m_tabBook->addPage(m_console, tr("Console"));
   m_tabBook->addPage(m_pythonConsole, tr("Python Console"));

@@ -21,25 +21,25 @@
 
 #include <QVBoxLayout>
 
-#include "mdl/Map.h"
 #include "ui/AppController.h"
+#include "ui/MapDocument.h"
 #include "ui/ModelBrowser.h"
 
 namespace tb::ui
 {
 
 ModelInspector::ModelInspector(
-  AppController& appController, mdl::Map& map, QWidget* parent)
+  AppController& appController, MapDocument& document, QWidget* parent)
   : TabBookPage{parent}
 {
-  createGui(appController, map);
+  createGui(appController, document);
 }
 
 ModelInspector::~ModelInspector() = default;
 
-void ModelInspector::createGui(AppController& appController, mdl::Map& map)
+void ModelInspector::createGui(AppController& appController, MapDocument& document)
 {
-  m_modelBrowser = new ModelBrowser{appController, map};
+  m_modelBrowser = new ModelBrowser{appController, document};
 
   auto* layout = new QVBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);

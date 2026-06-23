@@ -43,7 +43,6 @@ class QScrollBar;
 
 namespace tb::mdl
 {
-class Map;
 class ResourceId;
 } // namespace tb::mdl
 
@@ -61,6 +60,7 @@ namespace tb::ui
 {
 
 class AppController;
+class MapDocument;
 
 LayoutBounds soundPreviewButtonBounds(const LayoutBounds& itemBounds);
 bool soundPreviewButtonHitTest(const LayoutBounds& itemBounds, float x, float y);
@@ -74,7 +74,7 @@ private:
   static constexpr auto CameraUp = vm::vec3f{0, 0, 1};
 
 private:
-  mdl::Map& m_map;
+  MapDocument& m_document;
   vm::quatf m_rotation;
   QScrollBar* m_scrollBar = nullptr;
   std::filesystem::path m_rootFolderPath;
@@ -105,7 +105,8 @@ private:
   std::filesystem::path m_hoverPath;
 
 public:
-  ModelBrowserView(AppController& appController, QScrollBar* scrollBar, mdl::Map& map);
+  ModelBrowserView(
+    AppController& appController, QScrollBar* scrollBar, MapDocument& document);
   ~ModelBrowserView() override;
 
   void setAssets(std::filesystem::path rootFolderPath, std::vector<BrowserAsset> assets);

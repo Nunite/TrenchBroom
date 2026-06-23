@@ -45,6 +45,7 @@
 #include "ui/AppController.h"
 #include "ui/AssetBrowserModel.h"
 #include "ui/ImageUtils.h"
+#include "ui/MapDocument.h"
 #include "ui/ModelBrowserView.h"
 #include "ui/QPathUtils.h"
 #include "ui/QWidgetUtils.h"
@@ -66,9 +67,10 @@ const auto AssetRootPath = std::filesystem::path{};
 
 } // namespace
 
-ModelBrowser::ModelBrowser(AppController& appController, mdl::Map& map, QWidget* parent)
+ModelBrowser::ModelBrowser(
+  AppController& appController, MapDocument& document, QWidget* parent)
   : QWidget{parent}
-  , m_map{map}
+  , m_document{document}
 {
   createGui(appController);
   bindEvents();
@@ -132,7 +134,7 @@ void ModelBrowser::createGui(AppController& appController)
   m_folderTree->setIconSize(QSize{16, 16});
 
   m_scrollBar = new QScrollBar{Qt::Vertical};
-  m_view = new ModelBrowserView{appController, m_scrollBar, m_map};
+  m_view = new ModelBrowserView{appController, m_scrollBar, m_document};
   m_view->setSearchText(m_searchBox->text());
 
   auto* browserLayout = new QHBoxLayout{};
@@ -243,17 +245,20 @@ void ModelBrowser::bindEvents()
 void ModelBrowser::connectObservers()
 {
   m_notifierConnection +=
-    m_map.modsDidChangeNotifier.connect(this, &ModelBrowser::modsDidChange);
+    m_document.documentWasLoadedNotifier.connect(this, &ModelBrowser::documentWasLoaded);
+  connectMapObservers();
 }
 
-void ModelBrowser::mapWasCreated(mdl::Map&)
+void ModelBrowser::connectMapObservers()
 {
-  reloadModels();
-  setWatchedDirectory();
+  m_mapNotifierConnection.disconnect();
+  m_mapNotifierConnection += m_document.map().modsDidChangeNotifier.connect(
+    this, &ModelBrowser::modsDidChange);
 }
 
-void ModelBrowser::mapWasLoaded(mdl::Map&)
+void ModelBrowser::documentWasLoaded()
 {
+  connectMapObservers();
   reloadModels();
   setWatchedDirectory();
 }
@@ -449,8 +454,9 @@ std::optional<std::vector<BrowserAsset>> ModelBrowser::scanAssets() const
       [](const auto& path) { return Result<std::filesystem::path>{path}; });
   }
 
-  const auto& fs = m_map.gameFileSystem();
-  const auto enabledMods = mdl::enabledMods(m_map);
+  const auto& map = m_document.map();
+  const auto& fs = map.gameFileSystem();
+  const auto enabledMods = mdl::enabledMods(map);
   if (enabledMods.empty())
   {
     return std::nullopt;
@@ -458,7 +464,7 @@ std::optional<std::vector<BrowserAsset>> ModelBrowser::scanAssets() const
 
   const auto modRoots =
     enabledMods | std::views::transform([&](const auto& mod) {
-      return (m_map.gamePath() / std::filesystem::path{mod}).lexically_normal();
+      return (map.gamePath() / std::filesystem::path{mod}).lexically_normal();
     })
     | kdl::ranges::to<std::vector>();
 
@@ -604,8 +610,9 @@ void ModelBrowser::setWatchedDirectory()
     return;
   }
 
-  const auto& fs = m_map.gameFileSystem();
-  if (mdl::enabledMods(m_map).empty())
+  const auto& map = m_document.map();
+  const auto& fs = map.gameFileSystem();
+  if (mdl::enabledMods(map).empty())
   {
     return;
   }
@@ -653,7 +660,7 @@ void ModelBrowser::rescanWatchedDirectory()
   {
     for (const auto& p : entityModelAssetPaths(m_assets))
     {
-      m_map.entityModelManager().invalidateModel(p);
+      m_document.map().entityModelManager().invalidateModel(p);
     }
     m_assets.clear();
     m_lastWriteTimes.clear();
@@ -673,7 +680,7 @@ void ModelBrowser::rescanWatchedDirectory()
     return;
   }
 
-  m_map.reloadEntityModels(changedPaths);
+  m_document.map().reloadEntityModels(changedPaths);
 
   m_assets = std::move(*nextAssets);
   m_lastWriteTimes = std::move(newLastWriteTimes);

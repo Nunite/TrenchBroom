@@ -21,14 +21,10 @@
 
 #include "ui/TabBook.h"
 
-namespace tb::mdl
-{
-class Map;
-} // namespace tb::mdl
-
 namespace tb::ui
 {
 class AppController;
+class MapDocument;
 class ModelBrowser;
 
 class ModelInspector : public TabBookPage
@@ -38,11 +34,12 @@ private:
   ModelBrowser* m_modelBrowser = nullptr;
 
 public:
-  ModelInspector(AppController& appController, mdl::Map& map, QWidget* parent = nullptr);
+  ModelInspector(
+    AppController& appController, MapDocument& document, QWidget* parent = nullptr);
   ~ModelInspector() override;
 
 private:
-  void createGui(AppController& appController, mdl::Map& map);
+  void createGui(AppController& appController, MapDocument& document);
 };
 
 } // namespace tb::ui

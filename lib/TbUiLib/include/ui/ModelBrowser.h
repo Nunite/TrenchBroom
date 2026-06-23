@@ -43,20 +43,16 @@ class QTreeWidget;
 class QTreeWidgetItem;
 class QTimer;
 
-namespace tb::mdl
-{
-class Map;
-} // namespace tb::mdl
-
 namespace tb::ui
 {
 class AppController;
+class MapDocument;
 
 class ModelBrowser : public QWidget
 {
   Q_OBJECT
 private:
-  mdl::Map& m_map;
+  MapDocument& m_document;
 
   QStackedWidget* m_pathStack = nullptr;
   QWidget* m_breadcrumbBar = nullptr;
@@ -80,9 +76,11 @@ private:
     m_folderTreeItems;
 
   NotifierConnection m_notifierConnection;
+  NotifierConnection m_mapNotifierConnection;
 
 public:
-  ModelBrowser(AppController& appController, mdl::Map& map, QWidget* parent = nullptr);
+  ModelBrowser(
+    AppController& appController, MapDocument& document, QWidget* parent = nullptr);
   ~ModelBrowser() override;
 
 protected:
@@ -92,6 +90,7 @@ private:
   void createGui(AppController& appController);
   void bindEvents();
   void connectObservers();
+  void connectMapObservers();
 
   void rebuildBreadcrumbBar();
   void showPathEditor();
@@ -103,8 +102,7 @@ private:
   void reloadModels();
   void rebuildFolderTree();
 
-  void mapWasCreated(mdl::Map& map);
-  void mapWasLoaded(mdl::Map& map);
+  void documentWasLoaded();
   void modsDidChange();
 
   void setWatchedDirectory();
