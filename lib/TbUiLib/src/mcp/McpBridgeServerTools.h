@@ -51,6 +51,43 @@ McpBridgeToolResult placeAssetResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
 
+McpBridgeToolResult textureSearchResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult textureApplyResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult textureReplaceResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult textureAlignFaceResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult textureCopyFromFaceResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult faceListResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult faceSelectResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult faceTextureSetResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+
 McpBridgeToolResult compileProfilesListResult(AppController& appController);
 McpBridgeToolResult compileRunResult(
   AppController& appController, const QJsonObject& params);
