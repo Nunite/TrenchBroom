@@ -92,6 +92,12 @@ QJsonObject actionsListJson(AppController& appController);
 McpBridgeToolResult actionExecuteResult(
   AppController& appController, const QJsonObject& params);
 
+McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
+McpBridgeToolResult historyUndoResult(
+  AppController& appController, std::vector<McpOperationRecord>& history);
+McpBridgeToolResult historyRedoResult(
+  AppController& appController, std::vector<McpOperationRecord>& history);
+
 McpBridgeToolResult compileProfilesListResult(AppController& appController);
 McpBridgeToolResult compileRunResult(
   AppController& appController, const QJsonObject& params);

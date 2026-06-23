@@ -153,6 +153,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpActionTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpAssetTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpCompileTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHistoryTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServerTransport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServerTools.h
