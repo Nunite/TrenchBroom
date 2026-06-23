@@ -927,6 +927,50 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"objectIds", "operation"}),
     },
     {
+      "map_validate",
+      "Validate the active map and return problem counts.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"includeHidden", boolProperty("Include hidden issues.")},
+      }),
+    },
+    {
+      "problems_check",
+      "Return map validation problems with safe quick fix metadata.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"includeHidden", boolProperty("Include hidden issues.")},
+        {"limit", integerProperty("Maximum result count, defaults to 500.")},
+      }),
+    },
+    {
+      "problems_fix",
+      "Apply one safe quick fix to selected validation problem ids.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"problemIds", arrayProperty("Problem ids from problems_check.")},
+          {"quickFix", stringProperty("Safe quick fix description to apply.")},
+        },
+        {"problemIds", "quickFix"}),
+    },
+    {
+      "map_fix_all_safe",
+      "Apply all currently available safe validation quick fixes.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema({
+        {"includeHidden", boolProperty("Include hidden issues.")},
+      }),
+    },
+    {
       "blockout_create_room",
       "Create a room from Blockout IR.",
       McpMode::Edit,

@@ -49,6 +49,8 @@
 #include "mdl/GameInfo.h"
 #include "mdl/Grid.h"
 #include "mdl/GroupNode.h"
+#include "mdl/Issue.h"
+#include "mdl/IssueQuickFix.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
@@ -68,6 +70,7 @@
 #include "mdl/SwapNodeContentsCommand.h"
 #include "mdl/Transaction.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
+#include "mdl/Validator.h"
 #include "mdl/WorldNode.h"
 #include "ui/Action.h"
 #include "ui/ActionExecutionContext.h"
@@ -1359,6 +1362,383 @@ McpBridgeToolResult transformObjectsResult(
   recordOperation(
     history, nextOperationIndex, toolName, transactionName, changedObjectIds, result);
   result.insert("operation", operation);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+QString problemId(const mdl::Issue& issue, const mdl::WorldNode& worldNode)
+{
+  auto id = QString{"issue:%1:%2:%3"}
+              .arg(QString::number(issue.type()))
+              .arg(nodePathId(issue.node(), worldNode))
+              .arg(QString::number(issue.lineNumber()));
+  if (const auto* faceIssue = dynamic_cast<const mdl::BrushFaceIssue*>(&issue))
+  {
+    id += QString{":face:%1"}.arg(QString::number(faceIssue->faceIndex()));
+  }
+  if (const auto* propertyIssue = dynamic_cast<const mdl::EntityPropertyIssue*>(&issue))
+  {
+    id +=
+      QString{":property:%1"}.arg(QString::fromStdString(propertyIssue->propertyKey()));
+  }
+  return id;
+}
+
+bool isSafeQuickFixDescription(const QString& description)
+{
+  static const auto SafeDescriptions = std::set<QString>{
+    "Delete Property",
+    "Remove Mod",
+    "Replace \" with '",
+    "Reset UV Scale",
+    "Snap Vertices",
+    "Truncate Property Values",
+  };
+  return SafeDescriptions.contains(description);
+}
+
+QJsonArray safeQuickFixDescriptions(
+  const mdl::WorldNode& worldNode, const mdl::Issue& issue)
+{
+  auto result = QJsonArray{};
+  for (const auto* quickFix : worldNode.quickFixes(issue.type()))
+  {
+    const auto description = QString::fromStdString(quickFix->description());
+    if (isSafeQuickFixDescription(description))
+    {
+      result.push_back(description);
+    }
+  }
+  return result;
+}
+
+QJsonObject issueJson(const mdl::Issue& issue, const mdl::WorldNode& worldNode)
+{
+  auto result = QJsonObject{
+    {"id", problemId(issue, worldNode)},
+    {"type", issue.type()},
+    {"severity", "warning"},
+    {"message", QString::fromStdString(issue.description())},
+    {"objectId", nodePathId(issue.node(), worldNode)},
+    {"objectType", nodeTypeName(issue.node())},
+    {"lineNumber", static_cast<int>(issue.lineNumber())},
+    {"hidden", issue.hidden()},
+    {"safeQuickFixes", safeQuickFixDescriptions(worldNode, issue)},
+  };
+
+  if (const auto* faceIssue = dynamic_cast<const mdl::BrushFaceIssue*>(&issue))
+  {
+    result.insert("faceIndex", static_cast<int>(faceIssue->faceIndex()));
+  }
+  if (const auto* propertyIssue = dynamic_cast<const mdl::EntityPropertyIssue*>(&issue))
+  {
+    result.insert("propertyKey", QString::fromStdString(propertyIssue->propertyKey()));
+  }
+  return result;
+}
+
+std::vector<const mdl::Issue*> collectMapIssues(
+  mdl::Map& map, const bool includeHidden, const size_t limit = 0)
+{
+  const auto validators = map.worldNode().registeredValidators();
+  auto issues = std::vector<const mdl::Issue*>{};
+  const auto collectIssues = [&](auto& node) {
+    for (const auto* issue : node.issues(validators))
+    {
+      if ((includeHidden || !issue->hidden()) && (limit == 0 || issues.size() < limit))
+      {
+        issues.push_back(issue);
+      }
+    }
+  };
+
+  map.worldNode().accept(kdl::overload(
+    [&](auto&& thisLambda, mdl::WorldNode& worldNode) {
+      collectIssues(worldNode);
+      worldNode.visitChildren(thisLambda);
+    },
+    [&](auto&& thisLambda, mdl::LayerNode& layerNode) {
+      collectIssues(layerNode);
+      layerNode.visitChildren(thisLambda);
+    },
+    [&](auto&& thisLambda, mdl::GroupNode& groupNode) {
+      collectIssues(groupNode);
+      groupNode.visitChildren(thisLambda);
+    },
+    [&](auto&& thisLambda, mdl::EntityNode& entityNode) {
+      collectIssues(entityNode);
+      entityNode.visitChildren(thisLambda);
+    },
+    [&](mdl::BrushNode& brushNode) { collectIssues(brushNode); },
+    [&](mdl::PatchNode& patchNode) { collectIssues(patchNode); }));
+
+  return issues;
+}
+
+QJsonObject problemsJson(mdl::Map& map, const QJsonObject& params)
+{
+  const auto includeHidden = optionalBool(params, "includeHidden", false);
+  const auto limit = optionalSize(params, "limit", 500);
+  const auto issues = collectMapIssues(map, includeHidden, limit);
+
+  auto results = QJsonArray{};
+  auto safeFixableCount = 0;
+  for (const auto* issue : issues)
+  {
+    const auto json = issueJson(*issue, map.worldNode());
+    if (!json.value("safeQuickFixes").toArray().empty())
+    {
+      ++safeFixableCount;
+    }
+    results.push_back(json);
+  }
+
+  return QJsonObject{
+    {"valid", issues.empty()},
+    {"count", results.size()},
+    {"safeFixableCount", safeFixableCount},
+    {"problems", results},
+  };
+}
+
+McpBridgeToolResult problemsCheckResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return McpBridgeToolResult::success(problemsJson(mapWindow->document().map(), params));
+}
+
+McpBridgeToolResult mapValidateResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto result = problemsJson(mapWindow->document().map(), params);
+  result.remove("problems");
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+std::optional<std::vector<QString>> requiredStringListFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto values = stringListFromJson(params, key, error);
+  if (!values)
+  {
+    return std::nullopt;
+  }
+  if (values->empty())
+  {
+    error = QString{"%1 must not be empty"}.arg(key);
+    return std::nullopt;
+  }
+  return values;
+}
+
+std::vector<const mdl::Issue*> findIssuesByIds(
+  mdl::Map& map,
+  const std::vector<QString>& problemIds,
+  const bool includeHidden,
+  QString& error)
+{
+  const auto wantedIds = std::set<QString>{std::begin(problemIds), std::end(problemIds)};
+  auto foundIds = std::set<QString>{};
+  auto result = std::vector<const mdl::Issue*>{};
+  for (const auto* issue : collectMapIssues(map, includeHidden))
+  {
+    const auto id = problemId(*issue, map.worldNode());
+    if (wantedIds.contains(id))
+    {
+      foundIds.insert(id);
+      result.push_back(issue);
+    }
+  }
+
+  if (foundIds.size() != wantedIds.size())
+  {
+    for (const auto& id : wantedIds)
+    {
+      if (!foundIds.contains(id))
+      {
+        error = QString{"Unknown or stale problem id: %1"}.arg(id);
+        break;
+      }
+    }
+    return {};
+  }
+  return result;
+}
+
+const mdl::IssueQuickFix* findSafeQuickFix(
+  const mdl::WorldNode& worldNode,
+  const std::vector<const mdl::Issue*>& issues,
+  const QString& description)
+{
+  if (!isSafeQuickFixDescription(description))
+  {
+    return nullptr;
+  }
+
+  auto issueTypes = ~static_cast<mdl::IssueType>(0);
+  for (const auto* issue : issues)
+  {
+    issueTypes &= issue->type();
+  }
+
+  for (const auto* quickFix : worldNode.quickFixes(issueTypes))
+  {
+    if (QString::fromStdString(quickFix->description()) == description)
+    {
+      return quickFix;
+    }
+  }
+  return nullptr;
+}
+
+McpBridgeToolResult problemsFixResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto error = QString{};
+  const auto problemIds = requiredStringListFromJson(params, "problemIds", error);
+  if (!problemIds)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto quickFixDescription = params.value("quickFix").toString().trimmed();
+  if (quickFixDescription.isEmpty())
+  {
+    return invalidParamsFailure("problems_fix requires quickFix");
+  }
+
+  const auto issues = findIssuesByIds(
+    map, *problemIds, optionalBool(params, "includeHidden", false), error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto* quickFix = findSafeQuickFix(map.worldNode(), issues, quickFixDescription);
+  if (!quickFix)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden,
+      QString{"Quick fix is not safe or not applicable: %1"}.arg(quickFixDescription));
+  }
+
+  auto changedObjectIds = QJsonArray{};
+  for (const auto* issue : issues)
+  {
+    changedObjectIds.push_back(nodePathId(issue->node(), map.worldNode()));
+  }
+
+  const auto transactionName = QString{"MCP: Fix problems (%1)"}.arg(quickFixDescription);
+  const auto ok = executeTransaction(map, transactionName, [&]() {
+    quickFix->apply(map, issues);
+    return true;
+  });
+  if (!ok)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not apply problem quick fix");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, changedObjectIds, result);
+  result.insert("fixedCount", static_cast<int>(issues.size()));
+  result.insert("quickFix", quickFixDescription);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult mapFixAllSafeResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto includeHidden = optionalBool(params, "includeHidden", false);
+  auto changedObjectIds = QJsonArray{};
+  auto fixedCount = 0;
+  auto appliedFixes = QJsonArray{};
+  const auto transactionName = QString{"MCP: Fix all safe problems"};
+  const auto ok = executeTransaction(map, transactionName, [&]() {
+    auto appliedAny = false;
+    for (auto pass = 0; pass < 8; ++pass)
+    {
+      auto issues = collectMapIssues(map, includeHidden);
+      auto didApply = false;
+      for (const auto* issue : issues)
+      {
+        const auto safeFixes = safeQuickFixDescriptions(map.worldNode(), *issue);
+        if (safeFixes.empty())
+        {
+          continue;
+        }
+
+        const auto quickFixDescription = safeFixes.first().toString();
+        const auto* quickFix =
+          findSafeQuickFix(map.worldNode(), {issue}, quickFixDescription);
+        if (!quickFix)
+        {
+          continue;
+        }
+
+        changedObjectIds.push_back(nodePathId(issue->node(), map.worldNode()));
+        quickFix->apply(map, {issue});
+        appliedFixes.push_back(quickFixDescription);
+        ++fixedCount;
+        didApply = true;
+        appliedAny = true;
+        break;
+      }
+      if (!didApply)
+      {
+        break;
+      }
+    }
+    return appliedAny;
+  });
+  if (!ok)
+  {
+    return McpBridgeToolResult::success(QJsonObject{
+      {"fixedCount", 0},
+      {"appliedFixes", QJsonArray{}},
+      {"message", "No safe problem fixes were available"},
+    });
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, changedObjectIds, result);
+  result.insert("fixedCount", fixedCount);
+  result.insert("appliedFixes", appliedFixes);
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -4650,6 +5030,24 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "objects_transform")
         {
           return transformObjectsResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "map_validate")
+        {
+          return mapValidateResult(appController, params);
+        }
+        if (toolName == "problems_check")
+        {
+          return problemsCheckResult(appController, params);
+        }
+        if (toolName == "problems_fix")
+        {
+          return problemsFixResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "map_fix_all_safe")
+        {
+          return mapFixAllSafeResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
         if (

@@ -227,6 +227,20 @@ TEST_CASE("McpBridgeServer")
         {"transactionName", "MCP: Object edit"},
       });
     }
+    if (toolName == "map_validate" || toolName == "problems_check")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"valid", true},
+        {"count", 0},
+      });
+    }
+    if (toolName == "problems_fix" || toolName == "map_fix_all_safe")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-10"},
+        {"transactionName", "MCP: Fix problems"},
+      });
+    }
     if (toolName == "asset_place_model")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -658,6 +672,43 @@ TEST_CASE("McpBridgeServer")
         mcp::McpMode::Edit});
       CHECK(response.ok);
       CHECK(response.result.value("operationId").toString() == "mcp-op-9");
+    }
+  }
+
+  SECTION("read-only mode serves validation tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto validateResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"1", "secret", "map_validate", {}, mcp::McpMode::ReadOnly});
+    CHECK(validateResponse.ok);
+    CHECK(validateResponse.result.value("valid").toBool());
+
+    const auto problemsResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"2", "secret", "problems_check", {}, mcp::McpMode::ReadOnly});
+    CHECK(problemsResponse.ok);
+    CHECK(problemsResponse.result.value("count").toInt() == 0);
+  }
+
+  SECTION("edit mode serves safe problem fix tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    for (const auto& toolName : {"problems_fix", "map_fix_all_safe"})
+    {
+      const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+        "1",
+        "secret",
+        toolName,
+        QJsonObject{
+          {"problemIds", QJsonArray{"issue:1:node:1:0"}},
+          {"quickFix", "Reset UV Scale"},
+        },
+        mcp::McpMode::Edit});
+      CHECK(response.ok);
+      CHECK(response.result.value("operationId").toString() == "mcp-op-10");
     }
   }
 

@@ -54,6 +54,7 @@ MapDocument transaction / query services
 - 已接入 MCP operation history：`history_list`、`history_undo_mcp`、`history_redo_mcp`。当前只在 MCP 操作仍位于 TrenchBroom 原生 undo/redo 栈顶时执行，避免误撤用户手动编辑。
 - 已接入 GoldSrc 资产与材质工具：`.mdl/.spr/.wav` 搜索与放置、material 搜索与应用、face list/select、基础 face texture set、texture replace/copy/align。
 - 已接入对象删除与变换工具：`objects_delete`、`objects_transform`，当前支持按 object id 删除，以及 translate/rotate/scale 三类确定性变换。
+- 已接入地图验证与安全修复工具：`map_validate`、`problems_check`、`problems_fix`、`map_fix_all_safe`。自动修复只允许明确白名单内的 safe quick fix，不自动删除对象或做大范围结构性调整。
 - 已接入 Blockout IR 第一版：room、corridor、stairs、ramp、doorway、cover、sky shell 和 validate。
 
 仍未完成：
@@ -130,6 +131,7 @@ MapDocument transaction / query services
 - `texture_align_face`、`texture_copy_from_face`
 - `face_list`、`face_select`、`face_texture_set`
 - `objects_delete`、`objects_transform`
+- `map_validate`、`problems_check`、`problems_fix`、`map_fix_all_safe`
 - `history_list`、`history_undo_mcp`、`history_redo_mcp`
 
 第三阶段已开放 Blockout IR：
