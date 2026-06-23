@@ -42,6 +42,22 @@ QString resultErrorMessage(const Result& result)
   return QString::fromStdString(std::get<Error>(error).msg);
 }
 
+QJsonObject makeStatus(AppController& appController, const mcp::McpBridgeConfig& config);
+QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig& config);
+QJsonObject documentsListJson(AppController& appController);
+QJsonObject activeDocumentJson(AppController& appController);
+QJsonObject mapSnapshotJson(AppController& appController);
+McpBridgeToolResult documentOpenResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult documentActivateResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult documentSaveResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult documentCloseResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult documentExportResult(
+  AppController& appController, const QJsonObject& params);
+
 McpBridgeToolResult assetSearchResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult placeAssetResult(

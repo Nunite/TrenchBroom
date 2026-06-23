@@ -154,6 +154,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpAssetTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBrushTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpCompileTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpDocumentTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpEntityTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHistoryTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpObjectTools.cpp
