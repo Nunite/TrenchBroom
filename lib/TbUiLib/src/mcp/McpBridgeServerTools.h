@@ -139,6 +139,19 @@ McpBridgeToolResult untieBrushesResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
 
+McpBridgeToolResult deleteObjectsResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult transformObjectsResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+
 McpBridgeToolResult compileProfilesListResult(AppController& appController);
 McpBridgeToolResult compileRunResult(
   AppController& appController, const QJsonObject& params);

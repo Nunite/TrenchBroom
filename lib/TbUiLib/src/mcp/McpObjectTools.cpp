@@ -1,0 +1,573 @@
+/*
+ Copyright (C) 2026
+
+ This file is part of TrenchBroom.
+
+ TrenchBroom is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ TrenchBroom is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QStringList>
+
+#include "McpBridgeServerTools.h"
+#include "mcp/McpError.h"
+#include "mdl/AddRemoveNodesCommand.h"
+#include "mdl/EditorContext.h"
+#include "mdl/Map.h"
+#include "mdl/Map_Geometry.h"
+#include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
+#include "mdl/Node.h"
+#include "mdl/Transaction.h"
+#include "mdl/WorldNode.h"
+#include "ui/AppController.h"
+#include "ui/MapDocument.h"
+#include "ui/MapWindow.h"
+#include "ui/MapWindowManager.h"
+
+#include "kd/vector_utils.h"
+
+#include "vm/bbox.h"
+#include "vm/mat_ext.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <map>
+#include <optional>
+#include <ranges>
+#include <vector>
+
+namespace tb::ui
+{
+namespace mcp = tb::mcp;
+
+namespace
+{
+
+QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
+{
+  if (&node == &worldNode)
+  {
+    return "node:world";
+  }
+
+  auto parts = QStringList{};
+  for (const auto index : node.pathFrom(worldNode).indices)
+  {
+    parts.push_back(QString::number(index));
+  }
+  return QString{"node:%1"}.arg(parts.join('/'));
+}
+
+std::optional<mdl::NodePath> parseNodePathId(const QString& id)
+{
+  if (id == "node:world")
+  {
+    return mdl::NodePath{};
+  }
+
+  static const auto Prefix = QString{"node:"};
+  if (!id.startsWith(Prefix))
+  {
+    return std::nullopt;
+  }
+
+  auto path = mdl::NodePath{};
+  for (const auto& part : id.mid(Prefix.size()).split('/', Qt::SkipEmptyParts))
+  {
+    auto ok = false;
+    const auto index = part.toULongLong(&ok);
+    if (!ok)
+    {
+      return std::nullopt;
+    }
+    path.indices.push_back(static_cast<std::size_t>(index));
+  }
+  return path;
+}
+
+mdl::Node* resolveNodeId(mdl::WorldNode& worldNode, const QString& id)
+{
+  const auto path = parseNodePathId(id);
+  if (!path)
+  {
+    return nullptr;
+  }
+  return worldNode.resolvePath(*path);
+}
+
+QString makeOperationId(int& nextOperationIndex)
+{
+  return QString{"mcp-op-%1"}.arg(nextOperationIndex++);
+}
+
+QJsonObject mutationResultJson(const McpOperationRecord& operation)
+{
+  auto result = QJsonObject{};
+  result.insert("operationId", operation.operationId);
+  result.insert("transactionName", operation.transactionName);
+  result.insert("changedObjectIds", operation.changedObjectIds);
+  result.insert("changedObjectCount", operation.changedObjectIds.size());
+  return result;
+}
+
+void mcpRecordOperation(
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const QString& toolName,
+  const QString& transactionName,
+  const QJsonArray& changedObjectIds,
+  QJsonObject& result)
+{
+  auto operation = McpOperationRecord{};
+  operation.operationId = makeOperationId(nextOperationIndex);
+  operation.toolName = toolName;
+  operation.transactionName = transactionName;
+  operation.changedObjectIds = changedObjectIds;
+  result = mutationResultJson(operation);
+  history.push_back(std::move(operation));
+}
+
+std::optional<vm::vec3d> mcpVec3FromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array of three numbers"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto array = value.toArray();
+  if (array.size() != 3)
+  {
+    error = QString{"%1 must contain exactly three numbers"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto components = std::array<double, 3>{};
+  for (auto i = 0; i < 3; ++i)
+  {
+    if (!array[i].isDouble())
+    {
+      error = QString{"%1[%2] must be a number"}.arg(key).arg(i);
+      return std::nullopt;
+    }
+    components[static_cast<size_t>(i)] = array[i].toDouble();
+  }
+
+  return vm::vec3d{components[0], components[1], components[2]};
+}
+
+std::optional<double> numberFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (!value.isDouble())
+  {
+    error = QString{"%1 must be a number"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto result = value.toDouble();
+  if (!std::isfinite(result))
+  {
+    error = QString{"%1 must be finite"}.arg(key);
+    return std::nullopt;
+  }
+  return result;
+}
+
+std::optional<std::vector<QString>> stringListFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto result = std::vector<QString>{};
+  for (const auto& item : value.toArray())
+  {
+    if (!item.isString())
+    {
+      error = QString{"%1 must contain only strings"}.arg(key);
+      return std::nullopt;
+    }
+    result.push_back(item.toString());
+  }
+  return result;
+}
+
+bool executeTransaction(
+  mdl::Map& map, const QString& transactionName, const std::function<bool()>& operation)
+{
+  auto transaction = mdl::Transaction{map, transactionName.toStdString()};
+  if (!operation())
+  {
+    transaction.cancel();
+    return false;
+  }
+  return transaction.commit();
+}
+
+std::optional<QJsonArray> removeNodesWithTransaction(
+  mdl::Map& map, const QString& transactionName, std::vector<mdl::Node*> nodes)
+{
+  nodes = kdl::vec_sort_and_remove_duplicates(std::move(nodes));
+  nodes.erase(
+    std::remove_if(
+      std::begin(nodes),
+      std::end(nodes),
+      [&](const auto* node) {
+        return node == &map.worldNode()
+               || std::ranges::any_of(nodes, [&](const auto* other) {
+                    return node != other && node->isDescendantOf(*other);
+                  });
+      }),
+    std::end(nodes));
+
+  if (nodes.empty())
+  {
+    return std::nullopt;
+  }
+
+  auto nodesByParent = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
+  auto removedIds = QJsonArray{};
+  for (auto* node : nodes)
+  {
+    auto* parent = node->parent();
+    if (!parent || !parent->canRemoveChild(*node))
+    {
+      return std::nullopt;
+    }
+    nodesByParent[parent].push_back(node);
+    removedIds.push_back(nodePathId(*node, map.worldNode()));
+  }
+
+  const auto ok = executeTransaction(map, transactionName, [&]() {
+    mdl::deselectNodes(map, nodes);
+    return map.executeAndStore(mdl::AddRemoveNodesCommand::remove(nodesByParent));
+  });
+
+  return ok ? std::optional{removedIds} : std::nullopt;
+}
+
+std::optional<std::vector<mdl::Node*>> nodesFromObjectIds(
+  mdl::Map& map, const QJsonObject& params, QString& error)
+{
+  const auto objectIds = stringListFromJson(params, "objectIds", error);
+  if (!objectIds)
+  {
+    return std::nullopt;
+  }
+  if (objectIds->empty())
+  {
+    error = "objectIds must not be empty";
+    return std::nullopt;
+  }
+
+  auto result = std::vector<mdl::Node*>{};
+  for (const auto& objectId : *objectIds)
+  {
+    auto* node = resolveNodeId(map.worldNode(), objectId);
+    if (!node)
+    {
+      error = QString{"Unknown MCP object id: %1"}.arg(objectId);
+      return std::nullopt;
+    }
+    result.push_back(node);
+  }
+
+  return kdl::vec_sort_and_remove_duplicates(std::move(result));
+}
+
+std::vector<mdl::Node*> removeDescendantNodes(std::vector<mdl::Node*> nodes)
+{
+  nodes = kdl::vec_sort_and_remove_duplicates(std::move(nodes));
+  nodes.erase(
+    std::remove_if(
+      std::begin(nodes),
+      std::end(nodes),
+      [&](const auto* node) {
+        return std::ranges::any_of(nodes, [&](const auto* other) {
+          return node != other && node->isDescendantOf(*other);
+        });
+      }),
+    std::end(nodes));
+  return nodes;
+}
+
+vm::bbox3d boundsForNodes(const std::vector<mdl::Node*>& nodes)
+{
+  auto builder = vm::bbox3d::builder{};
+  for (const auto* node : nodes)
+  {
+    builder.add(node->logicalBounds());
+  }
+  return builder.bounds();
+}
+
+std::optional<vm::vec3d> optionalCenterFromJson(
+  const QJsonObject& params, const std::vector<mdl::Node*>& nodes, QString& error)
+{
+  if (!params.contains("center"))
+  {
+    return boundsForNodes(nodes).center();
+  }
+  return mcpVec3FromJson(params, "center", error);
+}
+
+std::optional<vm::vec3d> transformAxisFromJson(const QJsonObject& params, QString& error)
+{
+  const auto value = params.value("axis");
+  if (value.isUndefined())
+  {
+    return vm::vec3d{0, 0, 1};
+  }
+  if (value.isString())
+  {
+    const auto axis = value.toString().trimmed().toLower();
+    if (axis == "x")
+    {
+      return vm::vec3d{1, 0, 0};
+    }
+    if (axis == "y")
+    {
+      return vm::vec3d{0, 1, 0};
+    }
+    if (axis == "z")
+    {
+      return vm::vec3d{0, 0, 1};
+    }
+    error = "axis must be x, y, z, or an array of three numbers";
+    return std::nullopt;
+  }
+  if (value.isArray())
+  {
+    auto axis = mcpVec3FromJson(params, "axis", error);
+    if (!axis)
+    {
+      return std::nullopt;
+    }
+    if (vm::is_zero(*axis, vm::Cd::almost_zero()))
+    {
+      error = "axis vector must not be zero";
+      return std::nullopt;
+    }
+    return vm::normalize(*axis);
+  }
+
+  error = "axis must be x, y, z, or an array of three numbers";
+  return std::nullopt;
+}
+
+std::optional<vm::vec3d> scaleFactorsFromJson(const QJsonObject& params, QString& error)
+{
+  const auto value = params.value("scale");
+  if (value.isDouble())
+  {
+    const auto factor = value.toDouble();
+    if (!std::isfinite(factor) || factor == 0.0)
+    {
+      error = "scale must be finite and non-zero";
+      return std::nullopt;
+    }
+    return vm::vec3d{factor, factor, factor};
+  }
+  if (value.isArray())
+  {
+    const auto factors = mcpVec3FromJson(params, "scale", error);
+    if (!factors)
+    {
+      return std::nullopt;
+    }
+    if (
+      factors->x() == 0.0 || factors->y() == 0.0 || factors->z() == 0.0
+      || !std::isfinite(factors->x()) || !std::isfinite(factors->y())
+      || !std::isfinite(factors->z()))
+    {
+      error = "scale factors must be finite and non-zero";
+      return std::nullopt;
+    }
+    return factors;
+  }
+
+  error = "scale must be a number or an array of three numbers";
+  return std::nullopt;
+}
+
+} // namespace
+
+McpBridgeToolResult deleteObjectsResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto error = QString{};
+  const auto nodes = nodesFromObjectIds(map, params, error);
+  if (!nodes)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto transactionName = QString{"MCP: Delete objects"};
+  const auto changedObjectIds = removeNodesWithTransaction(map, transactionName, *nodes);
+  if (!changedObjectIds)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden, "One or more objects cannot be deleted");
+  }
+
+  auto result = QJsonObject{};
+  mcpRecordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult transformObjectsResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto error = QString{};
+  const auto nodes = nodesFromObjectIds(map, params, error);
+  if (!nodes)
+  {
+    return invalidParamsFailure(error);
+  }
+  auto transformNodes = removeDescendantNodes(*nodes);
+  if (transformNodes.empty())
+  {
+    return invalidParamsFailure(
+      "objectIds must contain at least one transformable object");
+  }
+  for (const auto* node : transformNodes)
+  {
+    if (node == &map.worldNode() || !map.editorContext().selectable(*node))
+    {
+      return invalidParamsFailure(QString{"Object cannot be transformed: %1"}.arg(
+        nodePathId(*node, map.worldNode())));
+    }
+  }
+
+  const auto operation = params.value("operation").toString().trimmed().toLower();
+  if (operation.isEmpty())
+  {
+    return invalidParamsFailure("objects_transform requires operation");
+  }
+
+  auto transformation = vm::mat4x4d{};
+  auto transactionName = QString{};
+  if (operation == "translate")
+  {
+    const auto delta = mcpVec3FromJson(params, "delta", error);
+    if (!delta)
+    {
+      return invalidParamsFailure(error);
+    }
+    transformation = vm::translation_matrix(*delta);
+    transactionName = "MCP: Translate objects";
+  }
+  else if (operation == "rotate")
+  {
+    const auto center = optionalCenterFromJson(params, transformNodes, error);
+    if (!center)
+    {
+      return invalidParamsFailure(error);
+    }
+    const auto axis = transformAxisFromJson(params, error);
+    if (!axis)
+    {
+      return invalidParamsFailure(error);
+    }
+    const auto angle = numberFromJson(params, "angle", error);
+    if (!angle)
+    {
+      return invalidParamsFailure(error);
+    }
+    transformation = vm::translation_matrix(*center)
+                     * vm::rotation_matrix(*axis, vm::to_radians(*angle))
+                     * vm::translation_matrix(-*center);
+    transactionName = "MCP: Rotate objects";
+  }
+  else if (operation == "scale")
+  {
+    const auto center = optionalCenterFromJson(params, transformNodes, error);
+    if (!center)
+    {
+      return invalidParamsFailure(error);
+    }
+    const auto factors = scaleFactorsFromJson(params, error);
+    if (!factors)
+    {
+      return invalidParamsFailure(error);
+    }
+    transformation = vm::translation_matrix(*center) * vm::scaling_matrix(*factors)
+                     * vm::translation_matrix(-*center);
+    transactionName = "MCP: Scale objects";
+  }
+  else
+  {
+    return invalidParamsFailure("operation must be translate, rotate, or scale");
+  }
+
+  auto changedObjectIds = QJsonArray{};
+  for (const auto* node : transformNodes)
+  {
+    changedObjectIds.push_back(nodePathId(*node, map.worldNode()));
+  }
+
+  mdl::deselectAll(map);
+  mdl::selectNodes(map, transformNodes);
+  const auto ok =
+    mdl::transformSelection(map, transactionName.toStdString(), transformation);
+  if (!ok)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError,
+      QString{"Could not transform objects with operation: %1"}.arg(operation));
+  }
+
+  auto result = QJsonObject{};
+  mcpRecordOperation(
+    history, nextOperationIndex, toolName, transactionName, changedObjectIds, result);
+  result.insert("operation", operation);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+} // namespace tb::ui
