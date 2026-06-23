@@ -192,10 +192,32 @@ TEST_CASE("McpBridgeServer")
         {"count", 0},
       });
     }
-    if (toolName == "texture_search")
+    if (toolName == "textures_list" || toolName == "texture_search")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"count", 0},
+      });
+    }
+    if (toolName == "face_list")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 0},
+      });
+    }
+    if (toolName == "face_select")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"selectedCount", 1},
+      });
+    }
+    if (
+      toolName == "texture_apply" || toolName == "texture_replace"
+      || toolName == "texture_align_face" || toolName == "texture_copy_from_face"
+      || toolName == "face_texture_set")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-8"},
+        {"transactionName", "MCP: Texture edit"},
       });
     }
     if (toolName == "asset_place_model")
@@ -557,6 +579,18 @@ TEST_CASE("McpBridgeServer")
     const auto textureResponse = server.dispatchRequest(
       mcp::McpBridgeRequest{"2", "secret", "texture_search", {}, mcp::McpMode::ReadOnly});
     CHECK(textureResponse.ok);
+
+    const auto texturesListResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"3", "secret", "textures_list", {}, mcp::McpMode::ReadOnly});
+    CHECK(texturesListResponse.ok);
+
+    const auto faceListResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"4", "secret", "face_list", {}, mcp::McpMode::ReadOnly});
+    CHECK(faceListResponse.ok);
+
+    const auto faceSelectResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"5", "secret", "face_select", {}, mcp::McpMode::ReadOnly});
+    CHECK(faceSelectResponse.ok);
   }
 
   SECTION("edit mode serves asset placement")
@@ -573,6 +607,25 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("operationId").toString() == "mcp-op-2");
+  }
+
+  SECTION("edit mode serves texture and face mutation tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    for (const auto& toolName :
+         {"texture_apply",
+          "texture_replace",
+          "texture_align_face",
+          "texture_copy_from_face",
+          "face_texture_set"})
+    {
+      const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+        "1", "secret", toolName, QJsonObject{{"material", "test"}}, mcp::McpMode::Edit});
+      CHECK(response.ok);
+      CHECK(response.result.value("operationId").toString() == "mcp-op-8");
+    }
   }
 
   SECTION("read-only mode serves blockout validation")

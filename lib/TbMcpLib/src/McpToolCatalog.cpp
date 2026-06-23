@@ -736,6 +736,17 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"path"}),
     },
     {
+      "textures_list",
+      "List loaded materials in the active document.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"query", stringProperty("Optional text query for material name or path.")},
+        {"limit", integerProperty("Maximum result count, defaults to 200.")},
+      }),
+    },
+    {
       "texture_search",
       "Search loaded materials in the active document.",
       McpMode::ReadOnly,
@@ -760,6 +771,90 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"faceIndex", integerProperty("Optional face index for objectId brush.")},
         },
         {"material"}),
+    },
+    {
+      "texture_replace",
+      "Replace one material with another on selected faces/brushes or the whole map.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"find", stringProperty("Material name to replace.")},
+          {"replace", stringProperty("Replacement material name.")},
+          {"scope", stringProperty("Replacement scope: selection or map.")},
+        },
+        {"find", "replace"}),
+    },
+    {
+      "texture_align_face",
+      "Apply a basic UV alignment mode to a face or face selection.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"mode", stringProperty("Alignment mode: reset, paraxial, or parallel.")},
+          {"objectId", stringProperty("Optional brush object id.")},
+          {"faceIndex", integerProperty("Optional face index for objectId brush.")},
+        },
+        {"mode"}),
+    },
+    {
+      "texture_copy_from_face",
+      "Copy material and UV attributes from one face to selected or specified target faces.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"sourceObjectId", stringProperty("Source brush object id.")},
+          {"sourceFaceIndex", integerProperty("Source brush face index.")},
+          {"objectId", stringProperty("Optional target brush object id.")},
+          {"faceIndex", integerProperty("Optional target face index.")},
+        },
+        {"sourceObjectId", "sourceFaceIndex"}),
+    },
+    {
+      "face_list",
+      "List faces for one brush, selected brushes, or all selected brush faces.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"objectId", stringProperty("Optional brush object id.")},
+        {"limit", integerProperty("Maximum result count, defaults to 500.")},
+      }),
+    },
+    {
+      "face_select",
+      "Select one or more brush faces.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"faces", arrayProperty("Array of {objectId, faceIndex} face references.")},
+          {"objectId", stringProperty("Optional single brush object id.")},
+          {"faceIndex", integerProperty("Optional single face index.")},
+        }),
+    },
+    {
+      "face_texture_set",
+      "Set face material and basic UV attributes for selected or specified faces.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema({
+        {"material", stringProperty("Optional material name.")},
+        {"xOffset", numberProperty("Optional X texture offset.")},
+        {"yOffset", numberProperty("Optional Y texture offset.")},
+        {"xScale", numberProperty("Optional X texture scale.")},
+        {"yScale", numberProperty("Optional Y texture scale.")},
+        {"rotation", numberProperty("Optional texture rotation.")},
+        {"objectId", stringProperty("Optional brush object id.")},
+        {"faceIndex", integerProperty("Optional face index for objectId brush.")},
+      }),
     },
     {
       "blockout_create_room",

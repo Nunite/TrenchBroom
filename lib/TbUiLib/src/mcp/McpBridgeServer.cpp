@@ -60,6 +60,7 @@
 #include "mdl/Map_World.h"
 #include "mdl/Node.h"
 #include "mdl/NodeContents.h"
+#include "mdl/NodeQueries.h"
 #include "mdl/PatchNode.h"
 #include "mdl/PropertyDefinition.h"
 #include "mdl/Selection.h"
@@ -79,6 +80,8 @@
 #include "ui/QPathUtils.h"
 
 #include "vm/bbox.h"
+
+#include "kd/string_compare.h"
 
 #include <algorithm>
 #include <array>
@@ -2556,6 +2559,48 @@ QJsonObject materialJson(const gl::Material& material)
   };
 }
 
+QJsonObject brushFaceAttributesJson(const mdl::BrushFaceAttributes& attributes)
+{
+  return QJsonObject{
+    {"material", QString::fromStdString(attributes.materialName())},
+    {"xOffset", attributes.xOffset()},
+    {"yOffset", attributes.yOffset()},
+    {"xScale", attributes.xScale()},
+    {"yScale", attributes.yScale()},
+    {"rotation", attributes.rotation()},
+  };
+}
+
+vm::bbox3d brushFaceBounds(const mdl::BrushFace& face)
+{
+  auto vertices = face.vertexPositions();
+  if (vertices.empty())
+  {
+    return vm::bbox3d{};
+  }
+
+  auto bounds = vm::bbox3d{vertices.front(), vertices.front()};
+  for (const auto& vertex : vertices)
+  {
+    bounds = vm::merge(bounds, vertex);
+  }
+  return bounds;
+}
+
+QJsonObject brushFaceJson(
+  const mdl::BrushFaceHandle& handle, const mdl::WorldNode& worldNode)
+{
+  const auto& face = handle.face();
+  return QJsonObject{
+    {"objectId", nodePathId(*handle.node(), worldNode)},
+    {"faceIndex", static_cast<int>(handle.faceIndex())},
+    {"material", QString::fromStdString(face.attributes().materialName())},
+    {"normal", vecToJson(face.normal())},
+    {"bounds", boundsToJson(brushFaceBounds(face))},
+    {"attributes", brushFaceAttributesJson(face.attributes())},
+  };
+}
+
 McpBridgeToolResult textureSearchResult(
   AppController& appController, const QJsonObject& params)
 {
@@ -2599,7 +2644,43 @@ McpBridgeToolResult textureSearchResult(
   });
 }
 
-std::vector<mdl::BrushFaceHandle> brushFaceHandlesForTextureApply(
+std::optional<mdl::BrushFaceHandle> brushFaceHandleFromJson(
+  mdl::Map& map, const QJsonObject& params, const QString& objectIdKey,
+  const QString& faceIndexKey, QString& error)
+{
+  const auto objectId = params.value(objectIdKey).toString().trimmed();
+  if (objectId.isEmpty())
+  {
+    error = QString{"%1 is required"}.arg(objectIdKey);
+    return std::nullopt;
+  }
+
+  auto* node = resolveNodeId(map.worldNode(), objectId);
+  auto* brushNode = dynamic_cast<mdl::BrushNode*>(node);
+  if (!brushNode)
+  {
+    error = QString{"%1 is not a brush: %2"}.arg(objectIdKey, objectId);
+    return std::nullopt;
+  }
+
+  const auto faceIndexValue = params.value(faceIndexKey);
+  if (!faceIndexValue.isDouble())
+  {
+    error = QString{"%1 must be an integer"}.arg(faceIndexKey);
+    return std::nullopt;
+  }
+
+  const auto faceIndex = static_cast<size_t>(faceIndexValue.toInt());
+  if (faceIndex >= brushNode->brush().faceCount())
+  {
+    error = QString{"%1 is out of range"}.arg(faceIndexKey);
+    return std::nullopt;
+  }
+
+  return mdl::BrushFaceHandle{brushNode, faceIndex};
+}
+
+std::vector<mdl::BrushFaceHandle> brushFaceHandlesFromParamsOrSelection(
   mdl::Map& map, const QJsonObject& params, QString& error)
 {
   auto result = std::vector<mdl::BrushFaceHandle>{};
@@ -2648,7 +2729,56 @@ std::vector<mdl::BrushFaceHandle> brushFaceHandlesForTextureApply(
 
   if (result.empty())
   {
-    error = "texture_apply requires objectId or selected brush faces/brushes";
+    error = "tool requires objectId or selected brush faces/brushes";
+  }
+  return result;
+}
+
+std::vector<mdl::BrushFaceHandle> brushFaceHandlesFromFacesArray(
+  mdl::Map& map, const QJsonArray& faces, QString& error)
+{
+  auto result = std::vector<mdl::BrushFaceHandle>{};
+  for (const auto& faceValue : faces)
+  {
+    if (!faceValue.isObject())
+    {
+      error = "faces must contain objects";
+      return {};
+    }
+    const auto faceObject = faceValue.toObject();
+    auto handle =
+      brushFaceHandleFromJson(map, faceObject, "objectId", "faceIndex", error);
+    if (!handle)
+    {
+      return {};
+    }
+    result.push_back(*handle);
+  }
+  return result;
+}
+
+std::vector<mdl::BrushFaceHandle> faceSelectionHandlesFromParams(
+  mdl::Map& map, const QJsonObject& params, QString& error)
+{
+  if (params.value("faces").isArray())
+  {
+    auto handles = brushFaceHandlesFromFacesArray(map, params.value("faces").toArray(), error);
+    if (handles.empty() && error.isEmpty())
+    {
+      error = "faces must not be empty";
+    }
+    return handles;
+  }
+  return brushFaceHandlesFromParamsOrSelection(map, params, error);
+}
+
+QJsonArray changedBrushIds(
+  const std::vector<mdl::BrushFaceHandle>& handles, const mdl::WorldNode& worldNode)
+{
+  auto result = QJsonArray{};
+  for (const auto* node : mdl::toNodes(handles))
+  {
+    result.push_back(nodePathId(*node, worldNode));
   }
   return result;
 }
@@ -2674,17 +2804,13 @@ McpBridgeToolResult textureApplyResult(
 
   auto& map = mapWindow->document().map();
   auto error = QString{};
-  auto handles = brushFaceHandlesForTextureApply(map, params, error);
+  auto handles = brushFaceHandlesFromParamsOrSelection(map, params, error);
   if (handles.empty())
   {
     return invalidParamsFailure(error);
   }
 
-  auto changedNodes = QJsonArray{};
-  for (const auto* node : mdl::toNodes(handles))
-  {
-    changedNodes.push_back(nodePathId(*node, map.worldNode()));
-  }
+  auto changedNodes = changedBrushIds(handles, map.worldNode());
 
   const auto transactionName = QString{"MCP: Apply texture"};
   auto ok = executeTransaction(map, transactionName, [&]() {
@@ -2704,6 +2830,381 @@ McpBridgeToolResult textureApplyResult(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("material", material);
   result.insert("faceCount", static_cast<int>(handles.size()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult faceListResult(AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto handles = std::vector<mdl::BrushFaceHandle>{};
+  const auto objectId = params.value("objectId").toString().trimmed();
+  if (!objectId.isEmpty())
+  {
+    auto* node = resolveNodeId(map.worldNode(), objectId);
+    auto* brushNode = dynamic_cast<mdl::BrushNode*>(node);
+    if (!brushNode)
+    {
+      return invalidParamsFailure(QString{"objectId is not a brush: %1"}.arg(objectId));
+    }
+    handles = mdl::toHandles(brushNode);
+  }
+  else if (!map.selection().brushFaces.empty())
+  {
+    handles = map.selection().brushFaces;
+  }
+  else
+  {
+    for (auto* brushNode : map.selection().brushes)
+    {
+      const auto brushHandles = mdl::toHandles(brushNode);
+      handles.insert(std::end(handles), std::begin(brushHandles), std::end(brushHandles));
+    }
+  }
+
+  const auto limit = optionalSize(params, "limit", 500);
+  auto faces = QJsonArray{};
+  for (const auto& handle : handles)
+  {
+    if (faces.size() >= static_cast<int>(limit))
+    {
+      break;
+    }
+    faces.push_back(brushFaceJson(handle, map.worldNode()));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"faces", faces},
+    {"count", faces.size()},
+  });
+}
+
+McpBridgeToolResult faceSelectResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto error = QString{};
+  auto handles = std::vector<mdl::BrushFaceHandle>{};
+  if (params.value("faces").isArray())
+  {
+    handles = brushFaceHandlesFromFacesArray(map, params.value("faces").toArray(), error);
+  }
+  else
+  {
+    const auto handle =
+      brushFaceHandleFromJson(map, params, "objectId", "faceIndex", error);
+    if (handle)
+    {
+      handles.push_back(*handle);
+    }
+  }
+
+  if (handles.empty())
+  {
+    return invalidParamsFailure(
+      error.isEmpty() ? "face_select requires faces or objectId/faceIndex" : error);
+  }
+
+  mdl::deselectAll(map);
+  mdl::selectBrushFaces(map, handles);
+
+  auto faces = QJsonArray{};
+  for (const auto& handle : handles)
+  {
+    faces.push_back(brushFaceJson(handle, map.worldNode()));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"faces", faces},
+    {"selectedCount", faces.size()},
+  });
+}
+
+std::optional<mdl::UpdateBrushFaceAttributes> updateBrushFaceAttributesFromParams(
+  const QJsonObject& params, QString& error)
+{
+  auto update = mdl::UpdateBrushFaceAttributes{};
+  auto hasUpdate = false;
+
+  const auto material = params.value("material").toString().trimmed();
+  if (!material.isEmpty())
+  {
+    update.materialName = material.toStdString();
+    hasUpdate = true;
+  }
+
+  const auto setFloat = [&](const QString& key, auto& target) {
+    const auto value = params.value(key);
+    if (!value.isUndefined())
+    {
+      if (!value.isDouble())
+      {
+        error = QString{"%1 must be a number"}.arg(key);
+        return false;
+      }
+      target = mdl::SetValue{static_cast<float>(value.toDouble())};
+      hasUpdate = true;
+    }
+    return true;
+  };
+
+  if (
+    !setFloat("xOffset", update.xOffset) || !setFloat("yOffset", update.yOffset)
+    || !setFloat("xScale", update.xScale) || !setFloat("yScale", update.yScale)
+    || !setFloat("rotation", update.rotation))
+  {
+    return std::nullopt;
+  }
+
+  if (!hasUpdate)
+  {
+    error = "No face texture attributes were provided";
+    return std::nullopt;
+  }
+  return update;
+}
+
+McpBridgeToolResult faceTextureSetResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto error = QString{};
+  const auto update = updateBrushFaceAttributesFromParams(params, error);
+  if (!update)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto handles = faceSelectionHandlesFromParams(map, params, error);
+  if (handles.empty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto changedNodes = changedBrushIds(handles, map.worldNode());
+  const auto transactionName = QString{"MCP: Set face texture"};
+  const auto ok = executeTransaction(map, transactionName, [&]() {
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, handles);
+    return mdl::setBrushFaceAttributes(map, *update);
+  });
+  if (!ok)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not set face texture attributes");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, changedNodes, result);
+  result.insert("faceCount", static_cast<int>(handles.size()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult textureReplaceResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto find = params.value("find").toString().trimmed();
+  const auto replace = params.value("replace").toString().trimmed();
+  if (find.isEmpty() || replace.isEmpty())
+  {
+    return invalidParamsFailure("texture_replace requires find and replace");
+  }
+
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto scope = params.value("scope").toString("selection").trimmed().toLower();
+  auto handles = scope == "map" ? mdl::collectBrushFaces({&map.worldNode()})
+                                : map.selection().allBrushFaces();
+  if (scope != "map" && scope != "selection")
+  {
+    return invalidParamsFailure("scope must be selection or map");
+  }
+  if (handles.empty())
+  {
+    return invalidParamsFailure("texture_replace found no candidate faces");
+  }
+
+  const auto findMaterial = find.toStdString();
+  handles.erase(
+    std::remove_if(
+      handles.begin(),
+      handles.end(),
+      [&](const auto& handle) {
+        return !kdl::ci::str_is_equal(
+          handle.face().attributes().materialName(), findMaterial);
+      }),
+    handles.end());
+  if (handles.empty())
+  {
+    return invalidParamsFailure("No faces use the requested material");
+  }
+
+  const auto changedNodes = changedBrushIds(handles, map.worldNode());
+  const auto transactionName = QString{"MCP: Replace texture"};
+  const auto ok = executeTransaction(map, transactionName, [&]() {
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, handles);
+    return mdl::setBrushFaceAttributes(
+      map, mdl::UpdateBrushFaceAttributes{.materialName = replace.toStdString()});
+  });
+  if (!ok)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not replace texture");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, changedNodes, result);
+  result.insert("find", find);
+  result.insert("replace", replace);
+  result.insert("faceCount", static_cast<int>(handles.size()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult textureAlignFaceResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto mode = params.value("mode").toString().trimmed().toLower();
+  auto update = mdl::UpdateBrushFaceAttributes{};
+  if (mode == "reset")
+  {
+    update.axis = mdl::ResetAxis{};
+  }
+  else if (mode == "paraxial" || mode == "world")
+  {
+    update.axis = mdl::ToParaxial{};
+  }
+  else if (mode == "parallel" || mode == "face")
+  {
+    update.axis = mdl::ToParallel{};
+  }
+  else
+  {
+    return invalidParamsFailure(
+      "texture_align_face mode must be reset, paraxial, world, parallel, or face");
+  }
+
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto error = QString{};
+  auto handles = brushFaceHandlesFromParamsOrSelection(map, params, error);
+  if (handles.empty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto changedNodes = changedBrushIds(handles, map.worldNode());
+  const auto transactionName = QString{"MCP: Align face texture"};
+  const auto ok = executeTransaction(map, transactionName, [&]() {
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, handles);
+    return mdl::setBrushFaceAttributes(map, update);
+  });
+  if (!ok)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not align face texture");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, changedNodes, result);
+  result.insert("mode", mode);
+  result.insert("faceCount", static_cast<int>(handles.size()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult textureCopyFromFaceResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto error = QString{};
+  const auto source =
+    brushFaceHandleFromJson(map, params, "sourceObjectId", "sourceFaceIndex", error);
+  if (!source)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto targetParams = params;
+  targetParams.remove("sourceObjectId");
+  targetParams.remove("sourceFaceIndex");
+  auto handles = brushFaceHandlesFromParamsOrSelection(map, targetParams, error);
+  if (handles.empty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto sourceAttributes = source->face().attributes();
+  const auto changedNodes = changedBrushIds(handles, map.worldNode());
+  const auto transactionName = QString{"MCP: Copy face texture"};
+  const auto ok = executeTransaction(map, transactionName, [&]() {
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, handles);
+    return mdl::setBrushFaceAttributes(map, mdl::copyAll(sourceAttributes));
+  });
+  if (!ok)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not copy face texture");
+  }
+
+  auto result = QJsonObject{};
+  recordOperation(
+    history, nextOperationIndex, toolName, transactionName, changedNodes, result);
+  result.insert("faceCount", static_cast<int>(handles.size()));
+  result.insert("source", brushFaceJson(*source, map.worldNode()));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -3706,13 +4207,41 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           return placeAssetResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
-        if (toolName == "texture_search")
+        if (toolName == "textures_list" || toolName == "texture_search")
         {
           return textureSearchResult(appController, params);
         }
         if (toolName == "texture_apply")
         {
           return textureApplyResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "texture_replace")
+        {
+          return textureReplaceResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "texture_align_face")
+        {
+          return textureAlignFaceResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "texture_copy_from_face")
+        {
+          return textureCopyFromFaceResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "face_list")
+        {
+          return faceListResult(appController, params);
+        }
+        if (toolName == "face_select")
+        {
+          return faceSelectResult(appController, params);
+        }
+        if (toolName == "face_texture_set")
+        {
+          return faceTextureSetResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
         if (

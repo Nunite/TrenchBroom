@@ -89,7 +89,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("overlay_set"));
     CHECK(names.contains("history_list"));
     CHECK(names.contains("asset_search"));
+    CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_search"));
+    CHECK(names.contains("face_list"));
+    CHECK(names.contains("face_select"));
     CHECK(names.contains("blockout_validate"));
     CHECK(!names.contains("documents_open"));
     CHECK(!names.contains("documents_save"));
@@ -103,6 +106,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("brush_create_box"));
     CHECK(!names.contains("asset_place_model"));
     CHECK(!names.contains("texture_apply"));
+    CHECK(!names.contains("texture_replace"));
+    CHECK(!names.contains("face_texture_set"));
     CHECK(!names.contains("blockout_create_room"));
     CHECK(!names.contains("action_execute"));
     CHECK(!names.contains("history_undo_mcp"));
@@ -144,7 +149,14 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("asset_place_model"));
     CHECK(names.contains("asset_place_sprite"));
     CHECK(names.contains("asset_place_sound"));
+    CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_apply"));
+    CHECK(names.contains("texture_replace"));
+    CHECK(names.contains("texture_align_face"));
+    CHECK(names.contains("texture_copy_from_face"));
+    CHECK(names.contains("face_list"));
+    CHECK(names.contains("face_select"));
+    CHECK(names.contains("face_texture_set"));
     CHECK(names.contains("blockout_create_room"));
     CHECK(names.contains("blockout_create_corridor"));
     CHECK(names.contains("blockout_create_stairs"));
