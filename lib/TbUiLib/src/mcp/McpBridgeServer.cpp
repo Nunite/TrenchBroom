@@ -26,8 +26,6 @@
 #include <QWidget>
 
 #include "McpBridgeServerTools.h"
-#include "fs/PathMatcher.h"
-#include "fs/TraversalMode.h"
 #include "gl/Material.h"
 #include "gl/MaterialManager.h"
 #include "mcp/McpError.h"
@@ -47,7 +45,6 @@
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityProperties.h"
-#include "mdl/GameFileSystem.h"
 #include "mdl/GameInfo.h"
 #include "mdl/Grid.h"
 #include "mdl/GroupNode.h"
@@ -56,7 +53,6 @@
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
-#include "mdl/Map_Assets.h"
 #include "mdl/Map_Brushes.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/Map_Geometry.h"
@@ -78,7 +74,6 @@
 #include "ui/ActionExecutionContext.h"
 #include "ui/ActionManager.h"
 #include "ui/AppController.h"
-#include "ui/AssetBrowserModel.h"
 #include "ui/GetVersion.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
@@ -134,39 +129,6 @@ QString pathToQString(const std::filesystem::path& path)
 QString genericPathToQString(const std::filesystem::path& path)
 {
   return pathAsGenericQString(path);
-}
-
-QString browserCellTypeName(const BrowserCellType type)
-{
-  switch (type)
-  {
-  case BrowserCellType::Folder:
-    return "folder";
-  case BrowserCellType::Model:
-    return "model";
-  case BrowserCellType::Sprite:
-    return "sprite";
-  case BrowserCellType::Sound:
-    return "sound";
-  }
-  return "unknown";
-}
-
-std::optional<BrowserCellType> browserCellTypeFromString(const QString& type)
-{
-  if (type.compare("model", Qt::CaseInsensitive) == 0)
-  {
-    return BrowserCellType::Model;
-  }
-  if (type.compare("sprite", Qt::CaseInsensitive) == 0)
-  {
-    return BrowserCellType::Sprite;
-  }
-  if (type.compare("sound", Qt::CaseInsensitive) == 0)
-  {
-    return BrowserCellType::Sound;
-  }
-  return std::nullopt;
 }
 
 QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
@@ -250,7 +212,7 @@ QString nodeTypeName(const mdl::Node& node)
   return "node";
 }
 
-QJsonObject nodeSummaryJson(const mdl::Node& node, const mdl::WorldNode& worldNode)
+QJsonObject mcpNodeSummaryJson(const mdl::Node& node, const mdl::WorldNode& worldNode)
 {
   auto result = QJsonObject{
     {"id", nodePathId(node, worldNode)},
@@ -350,7 +312,7 @@ QJsonObject mapSnapshotJson(AppController& appController)
 
   return QJsonObject{
     {"document", documentJson(*mapWindow, 0)},
-    {"world", nodeSummaryJson(worldNode, worldNode)},
+    {"world", mcpNodeSummaryJson(worldNode, worldNode)},
     {"worldspawn", worldspawn},
     {"entityCount", entities},
     {"brushCount", brushes},
@@ -412,7 +374,7 @@ void collectSearchResults(
 {
   if (nodeMatchesQuery(node, worldNode, query))
   {
-    results.push_back(nodeSummaryJson(node, worldNode));
+    results.push_back(mcpNodeSummaryJson(node, worldNode));
   }
 
   for (const auto* child : node.children())
@@ -457,7 +419,7 @@ QJsonObject mutationResultJson(const McpOperationRecord& operation)
   return result;
 }
 
-void recordOperation(
+void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   const QString& toolName,
@@ -474,7 +436,7 @@ void recordOperation(
   history.push_back(std::move(operation));
 }
 
-std::optional<vm::vec3d> vec3FromJson(
+std::optional<vm::vec3d> mcpVec3FromJson(
   const QJsonObject& params, const QString& key, QString& error)
 {
   const auto value = params.value(key);
@@ -507,12 +469,12 @@ std::optional<vm::vec3d> vec3FromJson(
 
 std::optional<vm::bbox3d> boundsFromJson(const QJsonObject& params, QString& error)
 {
-  const auto min = vec3FromJson(params, "min", error);
+  const auto min = mcpVec3FromJson(params, "min", error);
   if (!min)
   {
     return std::nullopt;
   }
-  const auto max = vec3FromJson(params, "max", error);
+  const auto max = mcpVec3FromJson(params, "max", error);
   if (!max)
   {
     return std::nullopt;
@@ -533,12 +495,12 @@ std::optional<vm::bbox3d> boundsFromJson(const QJsonObject& params, QString& err
 std::optional<vm::bbox3d> boundsFromJson(
   const QJsonObject& params, const QString& minKey, const QString& maxKey, QString& error)
 {
-  const auto min = vec3FromJson(params, minKey, error);
+  const auto min = mcpVec3FromJson(params, minKey, error);
   if (!min)
   {
     return std::nullopt;
   }
-  const auto max = vec3FromJson(params, maxKey, error);
+  const auto max = mcpVec3FromJson(params, maxKey, error);
   if (!max)
   {
     return std::nullopt;
@@ -556,14 +518,15 @@ std::optional<vm::bbox3d> boundsFromJson(
   return vm::bbox3d{*min, *max};
 }
 
-std::string optionalString(
+std::string mcpOptionalString(
   const QJsonObject& params, const QString& key, const std::string& defaultValue = {})
 {
   const auto value = params.value(key);
   return value.isString() ? value.toString().toStdString() : defaultValue;
 }
 
-bool optionalBool(const QJsonObject& params, const QString& key, const bool defaultValue)
+bool mcpOptionalBool(
+  const QJsonObject& params, const QString& key, const bool defaultValue)
 {
   const auto value = params.value(key);
   return value.isBool() ? value.toBool() : defaultValue;
@@ -721,7 +684,7 @@ std::optional<vm::axis::type> axisFromJson(
 
 std::string materialNameFromParams(mdl::Map& map, const QJsonObject& params)
 {
-  auto material = optionalString(params, "material");
+  auto material = mcpOptionalString(params, "material");
   if (material.empty())
   {
     material = map.currentMaterialName();
@@ -745,7 +708,7 @@ bool executeTransaction(
   return transaction.commit();
 }
 
-std::optional<QJsonArray> addNodesWithTransaction(
+std::optional<QJsonArray> mcpAddNodesWithTransaction(
   mdl::Map& map,
   const QString& transactionName,
   const std::vector<mdl::Node*>& nodes,
@@ -906,7 +869,7 @@ McpBridgeToolResult createEntityResult(
     mdl::Entity{{{mdl::EntityPropertyKeys::Classname, classname.toStdString()}}};
   if (const auto origin = params.value("origin"); !origin.isUndefined())
   {
-    const auto originVec = vec3FromJson(params, "origin", error);
+    const auto originVec = mcpVec3FromJson(params, "origin", error);
     if (!originVec)
     {
       return invalidParamsFailure(error);
@@ -925,8 +888,8 @@ McpBridgeToolResult createEntityResult(
   auto& map = mapWindow->document().map();
   auto* entityNode = new mdl::EntityNode{std::move(entity)};
   const auto transactionName = QString{"MCP: Create %1"}.arg(classname);
-  const auto changedObjectIds = addNodesWithTransaction(
-    map, transactionName, {entityNode}, optionalBool(params, "select", true));
+  const auto changedObjectIds = mcpAddNodesWithTransaction(
+    map, transactionName, {entityNode}, mcpOptionalBool(params, "select", true));
   if (!changedObjectIds)
   {
     delete entityNode;
@@ -935,9 +898,9 @@ McpBridgeToolResult createEntityResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
-  result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
+  result.insert("entity", mcpNodeSummaryJson(*entityNode, map.worldNode()));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -1005,9 +968,9 @@ McpBridgeToolResult updateEntityResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
-  result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
+  result.insert("entity", mcpNodeSummaryJson(*entityNode, map.worldNode()));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -1047,7 +1010,7 @@ McpBridgeToolResult deleteEntityResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
   return McpBridgeToolResult::success(std::move(result));
 }
@@ -1127,7 +1090,7 @@ McpBridgeToolResult deleteObjectsResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
   return McpBridgeToolResult::success(std::move(result));
 }
@@ -1149,7 +1112,7 @@ std::optional<vm::vec3d> optionalCenterFromJson(
   {
     return boundsForNodes(nodes).center();
   }
-  return vec3FromJson(params, "center", error);
+  return mcpVec3FromJson(params, "center", error);
 }
 
 std::optional<vm::vec3d> transformAxisFromJson(const QJsonObject& params, QString& error)
@@ -1179,7 +1142,7 @@ std::optional<vm::vec3d> transformAxisFromJson(const QJsonObject& params, QStrin
   }
   if (value.isArray())
   {
-    auto axis = vec3FromJson(params, "axis", error);
+    auto axis = mcpVec3FromJson(params, "axis", error);
     if (!axis)
     {
       return std::nullopt;
@@ -1211,7 +1174,7 @@ std::optional<vm::vec3d> scaleFactorsFromJson(const QJsonObject& params, QString
   }
   if (value.isArray())
   {
-    const auto factors = vec3FromJson(params, "scale", error);
+    const auto factors = mcpVec3FromJson(params, "scale", error);
     if (!factors)
     {
       return std::nullopt;
@@ -1276,7 +1239,7 @@ McpBridgeToolResult transformObjectsResult(
   auto transactionName = QString{};
   if (operation == "translate")
   {
-    const auto delta = vec3FromJson(params, "delta", error);
+    const auto delta = mcpVec3FromJson(params, "delta", error);
     if (!delta)
     {
       return invalidParamsFailure(error);
@@ -1345,7 +1308,7 @@ McpBridgeToolResult transformObjectsResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedObjectIds, result);
   result.insert("operation", operation);
   return McpBridgeToolResult::success(std::move(result));
@@ -1462,7 +1425,7 @@ std::vector<const mdl::Issue*> collectMapIssues(
 
 QJsonObject problemsJson(mdl::Map& map, const QJsonObject& params)
 {
-  const auto includeHidden = optionalBool(params, "includeHidden", false);
+  const auto includeHidden = mcpOptionalBool(params, "includeHidden", false);
   const auto limit = optionalSize(params, "limit", 500);
   const auto issues = collectMapIssues(map, includeHidden, limit);
 
@@ -1616,7 +1579,7 @@ McpBridgeToolResult problemsFixResult(
   }
 
   const auto issues = findIssuesByIds(
-    map, *problemIds, optionalBool(params, "includeHidden", false), error);
+    map, *problemIds, mcpOptionalBool(params, "includeHidden", false), error);
   if (!error.isEmpty())
   {
     return invalidParamsFailure(error);
@@ -1648,7 +1611,7 @@ McpBridgeToolResult problemsFixResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedObjectIds, result);
   result.insert("fixedCount", static_cast<int>(issues.size()));
   result.insert("quickFix", quickFixDescription);
@@ -1669,7 +1632,7 @@ McpBridgeToolResult mapFixAllSafeResult(
   }
 
   auto& map = mapWindow->document().map();
-  const auto includeHidden = optionalBool(params, "includeHidden", false);
+  const auto includeHidden = mcpOptionalBool(params, "includeHidden", false);
   auto changedObjectIds = QJsonArray{};
   auto fixedCount = 0;
   auto appliedFixes = QJsonArray{};
@@ -1721,7 +1684,7 @@ McpBridgeToolResult mapFixAllSafeResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedObjectIds, result);
   result.insert("fixedCount", fixedCount);
   result.insert("appliedFixes", appliedFixes);
@@ -1950,7 +1913,7 @@ McpBridgeToolResult createEntityFromSchemaResult(
   auto origin = vm::vec3d{0, 0, 0};
   if (const auto originValue = params.value("origin"); !originValue.isUndefined())
   {
-    const auto parsedOrigin = vec3FromJson(params, "origin", error);
+    const auto parsedOrigin = mcpVec3FromJson(params, "origin", error);
     if (!parsedOrigin)
     {
       return invalidParamsFailure(error);
@@ -1969,8 +1932,8 @@ McpBridgeToolResult createEntityFromSchemaResult(
 
   auto* entityNode = new mdl::EntityNode{std::move(entity)};
   const auto transactionName = QString{"MCP: Create %1"}.arg(classname);
-  const auto changedObjectIds = addNodesWithTransaction(
-    map, transactionName, {entityNode}, optionalBool(params, "select", true));
+  const auto changedObjectIds = mcpAddNodesWithTransaction(
+    map, transactionName, {entityNode}, mcpOptionalBool(params, "select", true));
   if (!changedObjectIds)
   {
     delete entityNode;
@@ -1980,10 +1943,10 @@ McpBridgeToolResult createEntityFromSchemaResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
   result.insert("classname", classname);
-  result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
+  result.insert("entity", mcpNodeSummaryJson(*entityNode, map.worldNode()));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -2081,7 +2044,7 @@ McpBridgeToolResult tieBrushesResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history,
     nextOperationIndex,
     toolName,
@@ -2175,7 +2138,7 @@ McpBridgeToolResult untieBrushesResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history,
     nextOperationIndex,
     toolName,
@@ -2369,7 +2332,7 @@ std::optional<mdl::Brush> createBrushFromPlaneTriples(
 
       auto pointParams = QJsonObject{};
       pointParams.insert("point", pointArray[pointIndex].toArray());
-      const auto point = vec3FromJson(pointParams, "point", error);
+      const auto point = mcpVec3FromJson(pointParams, "point", error);
       if (!point)
       {
         error = QString{"planes[%1][%2]: %3"}.arg(planeIndex).arg(pointIndex).arg(error);
@@ -2733,7 +2696,7 @@ McpBridgeToolResult blockoutCreateResult(
   }
   else if (toolName == "blockout_create_sky_shell")
   {
-    material = optionalString(params, "material", "sky");
+    material = mcpOptionalString(params, "material", "sky");
     const auto shellBounds =
       skyShellBounds(*bounds, optionalDouble(params, "thickness", 16.0));
     if (shellBounds.empty())
@@ -2750,8 +2713,8 @@ McpBridgeToolResult blockoutCreateResult(
       error.isEmpty() ? "No blockout brushes were generated" : error);
   }
 
-  const auto changedObjectIds = addNodesWithTransaction(
-    map, transactionName, nodes, optionalBool(params, "select", true));
+  const auto changedObjectIds = mcpAddNodesWithTransaction(
+    map, transactionName, nodes, mcpOptionalBool(params, "select", true));
   if (!changedObjectIds)
   {
     for (auto* node : nodes)
@@ -2763,7 +2726,7 @@ McpBridgeToolResult blockoutCreateResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
   result.insert("brushCount", static_cast<int>(nodes.size()));
   result.insert("material", QString::fromStdString(material));
@@ -3014,8 +2977,8 @@ McpBridgeToolResult createBrushResult(
   }
 
   const auto transactionName = QString{"MCP: Create %1 brush"}.arg(type);
-  const auto changedObjectIds = addNodesWithTransaction(
-    map, transactionName, nodes, optionalBool(params, "select", true));
+  const auto changedObjectIds = mcpAddNodesWithTransaction(
+    map, transactionName, nodes, mcpOptionalBool(params, "select", true));
   if (!changedObjectIds)
   {
     for (auto* node : nodes)
@@ -3027,19 +2990,19 @@ McpBridgeToolResult createBrushResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
   auto brushJson = QJsonArray{};
   for (const auto* node : nodes)
   {
-    brushJson.push_back(nodeSummaryJson(*node, map.worldNode()));
+    brushJson.push_back(mcpNodeSummaryJson(*node, map.worldNode()));
   }
   result.insert("type", type);
   result.insert("brushes", brushJson);
   result.insert("brushCount", brushJson.size());
   if (nodes.size() == 1)
   {
-    result.insert("brush", nodeSummaryJson(*nodes.front(), map.worldNode()));
+    result.insert("brush", mcpNodeSummaryJson(*nodes.front(), map.worldNode()));
   }
   return McpBridgeToolResult::success(std::move(result));
 }
@@ -3120,198 +3083,6 @@ McpBridgeToolResult historyRedoResult(
     {"operation", operationRecordJson(*it)},
     {"redone", true},
   });
-}
-
-std::optional<std::vector<BrowserAsset>> collectMcpAssets(mdl::Map& map)
-{
-  const auto enabledMods = mdl::enabledMods(map);
-  if (enabledMods.empty())
-  {
-    return std::vector<BrowserAsset>{};
-  }
-
-  auto modRoots = std::vector<std::filesystem::path>{};
-  modRoots.reserve(enabledMods.size());
-  for (const auto& mod : enabledMods)
-  {
-    modRoots.push_back((map.gamePath() / std::filesystem::path{mod}).lexically_normal());
-  }
-
-  const auto& fs = map.gameFileSystem();
-  return collectBrowserAssets(
-    {},
-    modRoots,
-    [&](const auto& rootPath) {
-      return fs.find(
-        rootPath,
-        fs::TraversalMode::Recursive,
-        fs::makeExtensionPathMatcher(goldSrcAssetExtensions()));
-    },
-    [&](const auto& path) { return fs.makeAbsolute(path); });
-}
-
-QJsonObject assetJson(const BrowserAsset& asset)
-{
-  auto json = QJsonObject{
-    {"type", browserCellTypeName(asset.type)},
-    {"path", genericPathToQString(asset.path)},
-    {"absolutePath", pathToQString(asset.absolutePath)},
-    {"displayName", QString::fromStdString(asset.displayName)},
-  };
-
-  if (!asset.path.empty())
-  {
-    json.insert("sourceRoot", pathAsGenericQString(*asset.path.begin()));
-  }
-  if (asset.lastModified)
-  {
-    json.insert(
-      "lastModified", QString::number(asset.lastModified->time_since_epoch().count()));
-  }
-
-  return json;
-}
-
-McpBridgeToolResult assetSearchResult(
-  AppController& appController, const QJsonObject& params)
-{
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
-  {
-    return noActiveDocumentFailure();
-  }
-
-  auto& map = mapWindow->document().map();
-  const auto assets = collectMcpAssets(map);
-  if (!assets)
-  {
-    return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError, "Could not scan assets");
-  }
-
-  const auto query = params.value("query").toString().trimmed();
-  const auto typeText = params.value("type").toString().trimmed();
-  const auto type = typeText.isEmpty() ? std::optional<BrowserCellType>{}
-                                       : browserCellTypeFromString(typeText);
-  if (!typeText.isEmpty() && !type)
-  {
-    return invalidParamsFailure("type must be model, sprite, or sound");
-  }
-
-  const auto limit = std::max(1, params.value("limit").toInt(50));
-  auto results = QJsonArray{};
-  for (const auto& asset : *assets)
-  {
-    if (type && asset.type != *type)
-    {
-      continue;
-    }
-
-    const auto pathText = genericPathToQString(asset.path);
-    const auto displayName = QString::fromStdString(asset.displayName);
-    if (
-      !query.isEmpty() && !pathText.contains(query, Qt::CaseInsensitive)
-      && !displayName.contains(query, Qt::CaseInsensitive))
-    {
-      continue;
-    }
-
-    results.push_back(assetJson(asset));
-    if (results.size() >= limit)
-    {
-      break;
-    }
-  }
-
-  return McpBridgeToolResult::success(QJsonObject{
-    {"query", query},
-    {"type", type ? browserCellTypeName(*type) : QString{}},
-    {"results", results},
-    {"count", results.size()},
-  });
-}
-
-McpBridgeToolResult placeAssetResult(
-  AppController& appController,
-  const QString& toolName,
-  const QJsonObject& params,
-  std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
-{
-  const auto path = params.value("path").toString().trimmed();
-  if (path.isEmpty())
-  {
-    return invalidParamsFailure(QString{"%1 requires path"}.arg(toolName));
-  }
-
-  auto assetType = BrowserCellType::Model;
-  auto defaultClassname = std::string{"cycler_sprite"};
-  auto defaultProperty = std::string{"model"};
-  auto transactionLabel = QString{"model"};
-  if (toolName == "asset_place_sprite")
-  {
-    assetType = BrowserCellType::Sprite;
-    defaultClassname = "cycler_sprite";
-    defaultProperty = "model";
-    transactionLabel = "sprite";
-  }
-  else if (toolName == "asset_place_sound")
-  {
-    assetType = BrowserCellType::Sound;
-    defaultClassname = "ambient_generic";
-    defaultProperty = "message";
-    transactionLabel = "sound";
-  }
-
-  const auto actualType =
-    assetTypeForExtension(std::filesystem::path{path.toStdString()});
-  if (actualType != assetType)
-  {
-    return invalidParamsFailure(
-      QString{"path does not match %1 asset type"}.arg(browserCellTypeName(assetType)));
-  }
-
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
-  {
-    return noActiveDocumentFailure();
-  }
-
-  auto error = QString{};
-  auto entity = mdl::Entity{
-    {{mdl::EntityPropertyKeys::Classname,
-      optionalString(params, "classname", defaultClassname)}}};
-  entity.addOrUpdateProperty(
-    optionalString(params, "property", defaultProperty), path.toStdString());
-
-  if (const auto origin = params.value("origin"); !origin.isUndefined())
-  {
-    const auto originVec = vec3FromJson(params, "origin", error);
-    if (!originVec)
-    {
-      return invalidParamsFailure(error);
-    }
-    entity.setOrigin(*originVec);
-  }
-
-  auto& map = mapWindow->document().map();
-  auto* entityNode = new mdl::EntityNode{std::move(entity)};
-  const auto transactionName = QString{"MCP: Place %1 asset"}.arg(transactionLabel);
-  const auto changedObjectIds = addNodesWithTransaction(
-    map, transactionName, {entityNode}, optionalBool(params, "select", true));
-  if (!changedObjectIds)
-  {
-    delete entityNode;
-    return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError, "Could not place asset entity");
-  }
-
-  auto result = QJsonObject{};
-  recordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
-  result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
-  result.insert("assetPath", path);
-  return McpBridgeToolResult::success(std::move(result));
 }
 
 QJsonObject materialJson(const gl::Material& material)
@@ -3596,7 +3367,7 @@ McpBridgeToolResult textureApplyResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("material", material);
   result.insert("faceCount", static_cast<int>(handles.size()));
@@ -3787,7 +3558,7 @@ McpBridgeToolResult faceTextureSetResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("faceCount", static_cast<int>(handles.size()));
   return McpBridgeToolResult::success(std::move(result));
@@ -3856,7 +3627,7 @@ McpBridgeToolResult textureReplaceResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("find", find);
   result.insert("replace", replace);
@@ -3919,7 +3690,7 @@ McpBridgeToolResult textureAlignFaceResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("mode", mode);
   result.insert("faceCount", static_cast<int>(handles.size()));
@@ -3972,7 +3743,7 @@ McpBridgeToolResult textureCopyFromFaceResult(
   }
 
   auto result = QJsonObject{};
-  recordOperation(
+  mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("faceCount", static_cast<int>(handles.size()));
   result.insert("source", brushFaceJson(*source, map.worldNode()));
@@ -4019,7 +3790,7 @@ QJsonObject selectionJson(AppController& appController)
   auto nodes = QJsonArray{};
   for (const auto* node : selection.nodes)
   {
-    nodes.push_back(nodeSummaryJson(*node, worldNode));
+    nodes.push_back(mcpNodeSummaryJson(*node, worldNode));
   }
 
   return QJsonObject{
@@ -4270,7 +4041,7 @@ McpBridgeToolResult selectionFilterResult(
     optionalSize(params, "limit", 100),
     matches);
 
-  if (optionalBool(params, "select", false))
+  if (mcpOptionalBool(params, "select", false))
   {
     auto selectableNodes = std::vector<mdl::Node*>{};
     for (auto* node : matches)
@@ -4290,7 +4061,7 @@ McpBridgeToolResult selectionFilterResult(
   auto results = QJsonArray{};
   for (const auto* node : matches)
   {
-    results.push_back(nodeSummaryJson(*node, worldNode));
+    results.push_back(mcpNodeSummaryJson(*node, worldNode));
   }
 
   return McpBridgeToolResult::success(QJsonObject{
@@ -4429,7 +4200,7 @@ McpBridgeToolResult viewportClearMarksResult(
 {
   overlayState = QJsonObject{};
 
-  if (optionalBool(params, "clearSelection", false))
+  if (mcpOptionalBool(params, "clearSelection", false))
   {
     auto* mapWindow = appController.mapWindowManager().topMapWindow();
     if (!mapWindow)
@@ -4442,7 +4213,7 @@ McpBridgeToolResult viewportClearMarksResult(
   return McpBridgeToolResult::success(QJsonObject{
     {"overlay", overlayState},
     {"active", false},
-    {"selectionCleared", optionalBool(params, "clearSelection", false)},
+    {"selectionCleared", mcpOptionalBool(params, "clearSelection", false)},
   });
 }
 
@@ -4482,7 +4253,7 @@ McpBridgeToolResult viewportCaptureCurrentResult(
       mcp::McpErrorCode::InternalError, "Could not capture active map window");
   }
 
-  if (optionalBool(params, "returnBase64", false))
+  if (mcpOptionalBool(params, "returnBase64", false))
   {
     auto bytes = QByteArray{};
     auto buffer = QBuffer{&bytes};
@@ -4767,7 +4538,7 @@ McpBridgeToolResult documentCloseResult(
 
   if (
     mapWindow->document().map().modified()
-    && !optionalBool(params, "discardChanges", false))
+    && !mcpOptionalBool(params, "discardChanges", false))
   {
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::Forbidden,
@@ -4775,7 +4546,7 @@ McpBridgeToolResult documentCloseResult(
   }
 
   const auto document = documentJson(*mapWindow, 0);
-  mapWindow->closeDocument(optionalBool(params, "discardChanges", false));
+  mapWindow->closeDocument(mcpOptionalBool(params, "discardChanges", false));
 
   return McpBridgeToolResult::success(QJsonObject{
     {"closed", true},
@@ -4804,7 +4575,7 @@ McpBridgeToolResult documentExportResult(
     return invalidParamsFailure("Export path must not overwrite the current document");
   }
 
-  const auto stripTbProperties = optionalBool(params, "stripTbProperties", true);
+  const auto stripTbProperties = mcpOptionalBool(params, "stripTbProperties", true);
   const auto options = mdl::MapExportOptions{exportPath, stripTbProperties};
   const auto result = mapWindow->document().map().exportAs(options);
   if (!result)

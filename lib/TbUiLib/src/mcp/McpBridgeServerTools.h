@@ -19,8 +19,13 @@
 
 #pragma once
 
+#include <QJsonObject>
+#include <QString>
+
 #include "Result.h"
 #include "ui/mcp/McpBridgeServer.h"
+
+#include <vector>
 
 namespace tb::ui
 {
@@ -36,6 +41,15 @@ QString resultErrorMessage(const Result& result)
   const auto error = result.error();
   return QString::fromStdString(std::get<Error>(error).msg);
 }
+
+McpBridgeToolResult assetSearchResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult placeAssetResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 
 McpBridgeToolResult compileProfilesListResult(AppController& appController);
 McpBridgeToolResult compileRunResult(
