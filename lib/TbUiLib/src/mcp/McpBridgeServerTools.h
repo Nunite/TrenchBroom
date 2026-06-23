@@ -92,6 +92,23 @@ QJsonObject actionsListJson(AppController& appController);
 McpBridgeToolResult actionExecuteResult(
   AppController& appController, const QJsonObject& params);
 
+QJsonObject mapSearchJson(AppController& appController, const QJsonObject& params);
+QJsonObject selectionJson(AppController& appController);
+McpBridgeToolResult selectionSetResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult selectionFilterResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult selectionByBoundsResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult selectionGrowResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult viewportFocusResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult viewportClearMarksResult(
+  AppController& appController, const QJsonObject& params, QJsonObject& overlayState);
+McpBridgeToolResult viewportCaptureCurrentResult(
+  AppController& appController, const QJsonObject& params);
+
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyUndoResult(
   AppController& appController, std::vector<McpOperationRecord>& history);
