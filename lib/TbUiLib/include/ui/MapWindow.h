@@ -411,6 +411,9 @@ public:
   void showCompileDialog();
   bool closeCompileDialog();
   void rerunLastCompilation();
+  bool runCompilationProfile(const std::string& profileName);
+  bool compilationRunning() const;
+  QString compilationOutputText() const;
   bool hasLastCompilationProfile() const;
 
   void showLaunchEngineDialog();

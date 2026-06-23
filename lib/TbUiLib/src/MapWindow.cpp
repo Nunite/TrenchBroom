@@ -2350,6 +2350,26 @@ void MapWindow::rerunLastCompilation()
   }
 }
 
+bool MapWindow::runCompilationProfile(const std::string& profileName)
+{
+  showCompileDialog();
+  if (!m_compilationDialog)
+  {
+    return false;
+  }
+  return m_compilationDialog->runProfileByName(profileName);
+}
+
+bool MapWindow::compilationRunning() const
+{
+  return m_compilationDialog && m_compilationDialog->isRunning();
+}
+
+QString MapWindow::compilationOutputText() const
+{
+  return m_compilationDialog ? m_compilationDialog->outputText() : QString{};
+}
+
 bool MapWindow::hasLastCompilationProfile() const
 {
   return lastCompilationProfile() != nullptr;

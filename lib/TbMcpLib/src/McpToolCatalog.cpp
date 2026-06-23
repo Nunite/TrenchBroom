@@ -1004,6 +1004,47 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "compile_profiles_list",
+      "List compilation profiles for the active document.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(),
+    },
+    {
+      "compile_run",
+      "Run a compilation profile through TrenchBroom's existing compile dialog.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema({
+        {"profile",
+         stringProperty("Compilation profile name. Defaults to the first profile.")},
+      }),
+    },
+    {
+      "compile_log_tail",
+      "Return recent text from the current compile dialog output.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"maxLines", integerProperty("Maximum lines to return, defaults to 80.")},
+      }),
+    },
+    {
+      "leaks_load_pointfile",
+      "Load a compiler pointfile (.pts/.lin) into the active document.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema(
+        {
+          {"path", stringProperty("Absolute path to the pointfile.")},
+        },
+        {"path"}),
+    },
+    {
       "blockout_create_room",
       "Create a room from Blockout IR.",
       McpMode::Edit,

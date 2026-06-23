@@ -82,6 +82,31 @@ void CompilationDialog::runSelectedProfile()
   }
 }
 
+bool CompilationDialog::runProfileByName(const std::string& profileName)
+{
+  const auto& profiles = m_profileManager->config().profiles;
+  const auto it = std::ranges::find_if(
+    profiles, [&](const auto& profile) { return profile.name == profileName; });
+  if (it == std::end(profiles) || it->tasks.empty())
+  {
+    return false;
+  }
+
+  selectProfile(*it);
+  startCompilation(false);
+  return true;
+}
+
+bool CompilationDialog::isRunning() const
+{
+  return m_run.running();
+}
+
+QString CompilationDialog::outputText() const
+{
+  return m_output->toPlainText();
+}
+
 void CompilationDialog::createGui()
 {
   setWindowIconTB(this);

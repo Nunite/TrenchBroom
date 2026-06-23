@@ -65,6 +65,9 @@ public:
   void selectFirstProfile();
 
   void runSelectedProfile();
+  bool runProfileByName(const std::string& profileName);
+  bool isRunning() const;
+  QString outputText() const;
 
 signals:
   void compilationProfileStarted(const std::string& profileName);

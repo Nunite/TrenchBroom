@@ -69,6 +69,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("problems_check"));
     CHECK(findToolDefinition("problems_fix"));
     CHECK(findToolDefinition("map_fix_all_safe"));
+    CHECK(findToolDefinition("compile_profiles_list"));
+    CHECK(findToolDefinition("compile_run"));
+    CHECK(findToolDefinition("compile_log_tail"));
+    CHECK(findToolDefinition("leaks_load_pointfile"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
   }
@@ -107,6 +111,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("face_select"));
     CHECK(names.contains("map_validate"));
     CHECK(names.contains("problems_check"));
+    CHECK(names.contains("compile_profiles_list"));
+    CHECK(names.contains("compile_log_tail"));
     CHECK(names.contains("blockout_validate"));
     CHECK(!names.contains("documents_open"));
     CHECK(!names.contains("documents_save"));
@@ -126,6 +132,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("objects_transform"));
     CHECK(!names.contains("problems_fix"));
     CHECK(!names.contains("map_fix_all_safe"));
+    CHECK(!names.contains("compile_run"));
+    CHECK(!names.contains("leaks_load_pointfile"));
     CHECK(!names.contains("blockout_create_room"));
     CHECK(!names.contains("action_execute"));
     CHECK(!names.contains("history_undo_mcp"));
@@ -181,6 +189,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("problems_check"));
     CHECK(names.contains("problems_fix"));
     CHECK(names.contains("map_fix_all_safe"));
+    CHECK(names.contains("compile_profiles_list"));
+    CHECK(names.contains("compile_run"));
+    CHECK(names.contains("compile_log_tail"));
+    CHECK(names.contains("leaks_load_pointfile"));
     CHECK(names.contains("blockout_create_room"));
     CHECK(names.contains("blockout_create_corridor"));
     CHECK(names.contains("blockout_create_stairs"));

@@ -40,6 +40,8 @@
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
 #include "mdl/CircleShape.h"
+#include "mdl/CompilationProfile.h"
+#include "mdl/CompilationTask.h"
 #include "mdl/EditorContext.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityDefinition.h"
@@ -68,6 +70,7 @@
 #include "mdl/NodeContents.h"
 #include "mdl/NodeQueries.h"
 #include "mdl/PatchNode.h"
+#include "mdl/PointTrace.h"
 #include "mdl/PropertyDefinition.h"
 #include "mdl/Selection.h"
 #include "mdl/SwapNodeContentsCommand.h"
@@ -97,6 +100,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <ranges>
@@ -4596,6 +4600,231 @@ McpBridgeToolResult actionExecuteResult(
   });
 }
 
+QString compilationTaskTypeName(const mdl::CompilationTask& task)
+{
+  return std::visit(
+    kdl::overload(
+      [](const mdl::CompilationExportMap&) { return QString{"export_map"}; },
+      [](const mdl::CompilationCopyFiles&) { return QString{"copy_files"}; },
+      [](const mdl::CompilationRenameFile&) { return QString{"rename_file"}; },
+      [](const mdl::CompilationDeleteFiles&) { return QString{"delete_files"}; },
+      [](const mdl::CompilationRunTool&) { return QString{"run_tool"}; }),
+    task);
+}
+
+bool compilationTaskEnabled(const mdl::CompilationTask& task)
+{
+  return std::visit([](const auto& value) { return value.enabled; }, task);
+}
+
+QJsonObject compilationTaskJson(const mdl::CompilationTask& task, const int index)
+{
+  auto result = QJsonObject{
+    {"index", index},
+    {"type", compilationTaskTypeName(task)},
+    {"enabled", compilationTaskEnabled(task)},
+  };
+
+  std::visit(
+    kdl::overload(
+      [&](const mdl::CompilationExportMap& value) {
+        result.insert("target", QString::fromStdString(value.targetSpec));
+        result.insert("stripTbProperties", value.stripTbProperties);
+      },
+      [&](const mdl::CompilationCopyFiles& value) {
+        result.insert("source", QString::fromStdString(value.sourceSpec));
+        result.insert("target", QString::fromStdString(value.targetSpec));
+      },
+      [&](const mdl::CompilationRenameFile& value) {
+        result.insert("source", QString::fromStdString(value.sourceSpec));
+        result.insert("target", QString::fromStdString(value.targetSpec));
+      },
+      [&](const mdl::CompilationDeleteFiles& value) {
+        result.insert("target", QString::fromStdString(value.targetSpec));
+      },
+      [&](const mdl::CompilationRunTool& value) {
+        result.insert("tool", QString::fromStdString(value.toolSpec));
+        result.insert("parameters", QString::fromStdString(value.parameterSpec));
+        result.insert(
+          "treatNonZeroResultCodeAsError", value.treatNonZeroResultCodeAsError);
+      }),
+    task);
+
+  return result;
+}
+
+QJsonObject compilationProfileJson(
+  const mdl::CompilationProfile& profile, const int index)
+{
+  auto tasks = QJsonArray{};
+  for (size_t i = 0; i < profile.tasks.size(); ++i)
+  {
+    tasks.push_back(compilationTaskJson(profile.tasks[i], static_cast<int>(i)));
+  }
+
+  return QJsonObject{
+    {"index", index},
+    {"name", QString::fromStdString(profile.name)},
+    {"workDir", QString::fromStdString(profile.workDirSpec)},
+    {"taskCount", static_cast<int>(profile.tasks.size())},
+    {"tasks", tasks},
+  };
+}
+
+McpBridgeToolResult compileProfilesListResult(AppController& appController)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto& profiles =
+    mapWindow->document().map().gameInfo().compilationConfig.profiles;
+  auto profilesJson = QJsonArray{};
+  for (size_t i = 0; i < profiles.size(); ++i)
+  {
+    profilesJson.push_back(compilationProfileJson(profiles[i], static_cast<int>(i)));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"profiles", profilesJson},
+    {"count", profilesJson.size()},
+  });
+}
+
+McpBridgeToolResult compileRunResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto& profiles =
+    mapWindow->document().map().gameInfo().compilationConfig.profiles;
+  if (profiles.empty())
+  {
+    return invalidParamsFailure("Active document has no compilation profiles");
+  }
+
+  auto profileName = optionalString(params, "profile");
+  if (profileName.empty())
+  {
+    profileName = profiles.front().name;
+  }
+
+  const auto profileIt = std::ranges::find_if(
+    profiles, [&](const auto& profile) { return profile.name == profileName; });
+  if (profileIt == std::end(profiles))
+  {
+    return invalidParamsFailure(QString{"Unknown compilation profile: %1"}.arg(
+      QString::fromStdString(profileName)));
+  }
+  if (profileIt->tasks.empty())
+  {
+    return invalidParamsFailure(QString{"Compilation profile has no tasks: %1"}.arg(
+      QString::fromStdString(profileName)));
+  }
+
+  if (!mapWindow->runCompilationProfile(profileName))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError,
+      QString{"Could not start compilation profile: %1"}.arg(
+        QString::fromStdString(profileName)));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"profile", QString::fromStdString(profileName)},
+    {"started", true},
+    {"running", mapWindow->compilationRunning()},
+  });
+}
+
+McpBridgeToolResult compileLogTailResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto maxLines = optionalSize(params, "maxLines", 80);
+  if (maxLines == 0)
+  {
+    maxLines = 80;
+  }
+
+  const auto lines = mapWindow->compilationOutputText().split('\n');
+  const auto start =
+    std::max<qsizetype>(0, lines.size() - static_cast<qsizetype>(maxLines));
+
+  auto tail = QJsonArray{};
+  for (auto i = start; i < lines.size(); ++i)
+  {
+    tail.push_back(lines[i]);
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"lines", tail},
+    {"lineCount", tail.size()},
+    {"running", mapWindow->compilationRunning()},
+  });
+}
+
+McpBridgeToolResult leaksLoadPointfileResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto pathString = params.value("path").toString().trimmed();
+  if (pathString.isEmpty())
+  {
+    return invalidParamsFailure("path is required");
+  }
+
+  const auto path = pathFromQString(pathString).lexically_normal();
+  if (path.empty() || !path.is_absolute())
+  {
+    return invalidParamsFailure("path must be an absolute path");
+  }
+  if (!std::filesystem::is_regular_file(path))
+  {
+    return invalidParamsFailure(
+      QString{"Pointfile does not exist: %1"}.arg(pathToQString(path)));
+  }
+
+  auto stream = std::ifstream{path};
+  if (!stream)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError,
+      QString{"Could not open pointfile: %1"}.arg(pathToQString(path)));
+  }
+
+  auto trace = mdl::loadPointFile(stream);
+  if (trace.is_error())
+  {
+    return invalidParamsFailure(resultErrorMessage(trace));
+  }
+  const auto pointCount = static_cast<int>(trace.value().points().size());
+
+  mapWindow->document().loadPointFile(path);
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"loaded", mapWindow->document().isPointFileLoaded()},
+    {"path", pathToQString(path)},
+    {"pointCount", pointCount},
+  });
+}
+
 QJsonObject documentsListJson(AppController& appController)
 {
   auto documents = QJsonArray{};
@@ -5134,6 +5363,22 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return mapFixAllSafeResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "compile_profiles_list")
+        {
+          return compileProfilesListResult(appController);
+        }
+        if (toolName == "compile_run")
+        {
+          return compileRunResult(appController, params);
+        }
+        if (toolName == "compile_log_tail")
+        {
+          return compileLogTailResult(appController, params);
+        }
+        if (toolName == "leaks_load_pointfile")
+        {
+          return leaksLoadPointfileResult(appController, params);
         }
         if (
           toolName == "blockout_create_room" || toolName == "blockout_create_corridor"

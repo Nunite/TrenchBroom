@@ -55,6 +55,7 @@ MapDocument transaction / query services
 - 已接入 GoldSrc 资产与材质工具：`.mdl/.spr/.wav` 搜索与放置、material 搜索与应用、face list/select、基础 face texture set、texture replace/copy/align。
 - 已接入对象删除与变换工具：`objects_delete`、`objects_transform`，当前支持按 object id 删除，以及 translate/rotate/scale 三类确定性变换。
 - 已接入地图验证与安全修复工具：`map_validate`、`problems_check`、`problems_fix`、`map_fix_all_safe`。自动修复只允许明确白名单内的 safe quick fix，不自动删除对象或做大范围结构性调整。
+- 已接入编译与 leak 辅助工具：`compile_profiles_list`、`compile_run`、`compile_log_tail`、`leaks_load_pointfile`。`compile_run` 复用现有 Compile dialog 和 profile runner，不新建独立外部进程框架。
 - 已接入 Blockout IR 第一版：room、corridor、stairs、ramp、doorway、cover、sky shell 和 validate。
 
 仍未完成：
@@ -133,6 +134,7 @@ MapDocument transaction / query services
 - `face_list`、`face_select`、`face_texture_set`
 - `objects_delete`、`objects_transform`
 - `map_validate`、`problems_check`、`problems_fix`、`map_fix_all_safe`
+- `compile_profiles_list`、`compile_run`、`compile_log_tail`、`leaks_load_pointfile`
 - `history_list`、`history_undo_mcp`、`history_redo_mcp`
 
 第三阶段已开放 Blockout IR：
@@ -243,6 +245,17 @@ MCP overlay 不应直接散落在 renderer 临时分支中。当前第一版已�
 
 这两个工具需要先补 UI 层的当前视口访问/截图边界，避免 MCP 直接绕过 `MapWindow` / `MapViewContainer` 封装。
 
+## 编译与 Leak 辅助
+
+MCP 编译工具不重新实现外部进程运行器，而是复用 TrenchBroom 当前 Compile dialog 与 compilation profile：
+
+- `compile_profiles_list` 返回活动文档当前 game config 中的 profiles、workdir spec 和 task 摘要。
+- `compile_run` 选择指定 profile 并通过现有 Compile dialog 启动运行；它返回 `started=true`，不阻塞等待编译完成。
+- `compile_log_tail` 返回当前 Compile dialog 输出框的尾部文本，用于 Agent 轮询编译结果。
+- `leaks_load_pointfile` 先解析指定 `.pts/.lin`，成功后调用 `MapDocument::loadPointFile`，让现有视图渲染 leak path。
+
+这些工具要求本地 `Edit` mode 才能运行外部编译或改变 leak 可视化状态。后续若要做真正的 headless compile session，应从 `CompilationRun` 抽出非 QWidget 输出 sink，而不是让 MCP 直接 fork 编译器。
+
 ## 测试策略
 
 底层库测试：
@@ -280,6 +293,7 @@ Blockout 测试：
 7. [x] GoldSrc asset placement tools。
 8. [x] Blockout IR tools。
 9. [~] overlay 与 viewport capture：当前已有 bridge overlay state 和整窗截图；真实 overlay 绘制、精确 2D/3D 截图待接入。
+9.1. [x] compile profile / leak pointfile tools。
 10. [ ] 用户文档、示例 prompt 和 smoke workflow。
 
 每个阶段都应保持可构建，并带 focused tests。涉及写操作的阶段必须先证明 transaction 和 rollback 行为稳定。

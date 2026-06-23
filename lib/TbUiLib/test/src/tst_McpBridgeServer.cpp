@@ -251,6 +251,33 @@ TEST_CASE("McpBridgeServer")
         {"transactionName", "MCP: Fix problems"},
       });
     }
+    if (toolName == "compile_profiles_list")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 1},
+      });
+    }
+    if (toolName == "compile_log_tail")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"lineCount", 0},
+        {"running", false},
+      });
+    }
+    if (toolName == "compile_run")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"profile", "default"},
+        {"started", true},
+      });
+    }
+    if (toolName == "leaks_load_pointfile")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"loaded", true},
+        {"pointCount", 2},
+      });
+    }
     if (toolName == "asset_place_model")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -711,6 +738,48 @@ TEST_CASE("McpBridgeServer")
     CHECK(problemsResponse.result.value("count").toInt() == 0);
   }
 
+  SECTION("read-only mode serves compile profile and log tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto profilesResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1", "secret", "compile_profiles_list", {}, mcp::McpMode::ReadOnly});
+    CHECK(profilesResponse.ok);
+    CHECK(profilesResponse.result.value("count").toInt() == 1);
+
+    const auto logResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2", "secret", "compile_log_tail", {}, mcp::McpMode::ReadOnly});
+    CHECK(logResponse.ok);
+    CHECK(logResponse.result.value("lineCount").toInt() == 0);
+  }
+
+  SECTION("read-only mode rejects compile run and pointfile loading")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto compileResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "compile_run",
+      QJsonObject{{"profile", "default"}},
+      mcp::McpMode::Edit});
+    CHECK(!compileResponse.ok);
+    REQUIRE(compileResponse.error);
+    CHECK(compileResponse.error->code == mcp::McpErrorCode::Forbidden);
+
+    const auto pointfileResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "leaks_load_pointfile",
+      QJsonObject{{"path", "C:/tmp/test.pts"}},
+      mcp::McpMode::Edit});
+    CHECK(!pointfileResponse.ok);
+    REQUIRE(pointfileResponse.error);
+    CHECK(pointfileResponse.error->code == mcp::McpErrorCode::Forbidden);
+  }
+
   SECTION("edit mode serves safe problem fix tools")
   {
     REQUIRE(
@@ -730,6 +799,30 @@ TEST_CASE("McpBridgeServer")
       CHECK(response.ok);
       CHECK(response.result.value("operationId").toString() == "mcp-op-10");
     }
+  }
+
+  SECTION("edit mode serves compile run and pointfile loading")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto compileResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "compile_run",
+      QJsonObject{{"profile", "default"}},
+      mcp::McpMode::Edit});
+    CHECK(compileResponse.ok);
+    CHECK(compileResponse.result.value("started").toBool());
+
+    const auto pointfileResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "leaks_load_pointfile",
+      QJsonObject{{"path", "C:/tmp/test.pts"}},
+      mcp::McpMode::Edit});
+    CHECK(pointfileResponse.ok);
+    CHECK(pointfileResponse.result.value("loaded").toBool());
   }
 
   SECTION("read-only mode serves blockout validation")
