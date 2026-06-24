@@ -37,6 +37,7 @@ class QFileSystemWatcher;
 class QHBoxLayout;
 class QLineEdit;
 class QScrollBar;
+class QShowEvent;
 class QStackedWidget;
 class QToolButton;
 class QTreeWidget;
@@ -77,6 +78,8 @@ private:
 
   NotifierConnection m_notifierConnection;
   NotifierConnection m_mapNotifierConnection;
+  bool m_assetRefreshPending = true;
+  bool m_assetRefreshQueued = false;
 
 public:
   ModelBrowser(
@@ -87,6 +90,8 @@ protected:
   bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
+  void showEvent(QShowEvent* event) override;
+
   void createGui(AppController& appController);
   void bindEvents();
   void connectObservers();
@@ -98,6 +103,9 @@ private:
   void updateFolderEdit();
   void setFolderPath(std::filesystem::path folderPath);
   void setCurrentFolderPath(std::filesystem::path currentFolderPath);
+  void markAssetsDirty();
+  void ensureAssetsLoaded();
+  void scheduleAssetRefresh();
   std::optional<std::vector<BrowserAsset>> scanAssets() const;
   void reloadModels();
   void rebuildFolderTree();

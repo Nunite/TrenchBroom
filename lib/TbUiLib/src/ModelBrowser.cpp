@@ -25,6 +25,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QScrollBar>
+#include <QShowEvent>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -76,8 +77,6 @@ ModelBrowser::ModelBrowser(
   bindEvents();
   connectObservers();
   updateFolderEdit();
-  reloadModels();
-  setWatchedDirectory();
 }
 
 ModelBrowser::~ModelBrowser()
@@ -238,6 +237,7 @@ void ModelBrowser::bindEvents()
 
   connect(m_reloadButton, &QToolButton::clicked, this, [&]() {
     m_lastWriteTimes.clear();
+    m_assetRefreshPending = false;
     rescanWatchedDirectory();
   });
 }
@@ -252,15 +252,14 @@ void ModelBrowser::connectObservers()
 void ModelBrowser::connectMapObservers()
 {
   m_mapNotifierConnection.disconnect();
-  m_mapNotifierConnection += m_document.map().modsDidChangeNotifier.connect(
-    this, &ModelBrowser::modsDidChange);
+  m_mapNotifierConnection +=
+    m_document.map().modsDidChangeNotifier.connect(this, &ModelBrowser::modsDidChange);
 }
 
 void ModelBrowser::documentWasLoaded()
 {
   connectMapObservers();
-  reloadModels();
-  setWatchedDirectory();
+  markAssetsDirty();
 }
 
 void ModelBrowser::modsDidChange()
@@ -271,8 +270,13 @@ void ModelBrowser::modsDidChange()
     return;
   }
 
-  reloadModels();
-  setWatchedDirectory();
+  markAssetsDirty();
+}
+
+void ModelBrowser::showEvent(QShowEvent* event)
+{
+  QWidget::showEvent(event);
+  scheduleAssetRefresh();
 }
 
 bool ModelBrowser::eventFilter(QObject* obj, QEvent* event)
@@ -400,8 +404,7 @@ void ModelBrowser::setFolderPath(std::filesystem::path folderPath)
   m_currentFolderPath.clear();
   updateFolderEdit();
 
-  reloadModels();
-  setWatchedDirectory();
+  markAssetsDirty();
 }
 
 void ModelBrowser::setCurrentFolderPath(std::filesystem::path currentFolderPath)
@@ -436,6 +439,36 @@ void ModelBrowser::setCurrentFolderPath(std::filesystem::path currentFolderPath)
   }
 
   updateFolderEdit();
+}
+
+void ModelBrowser::markAssetsDirty()
+{
+  m_assetRefreshPending = true;
+  scheduleAssetRefresh();
+}
+
+void ModelBrowser::ensureAssetsLoaded()
+{
+  m_assetRefreshQueued = false;
+  if (!m_assetRefreshPending)
+  {
+    return;
+  }
+
+  m_assetRefreshPending = false;
+  reloadModels();
+  setWatchedDirectory();
+}
+
+void ModelBrowser::scheduleAssetRefresh()
+{
+  if (!isVisible() || m_assetRefreshQueued)
+  {
+    return;
+  }
+
+  m_assetRefreshQueued = true;
+  QTimer::singleShot(0, this, [this]() { ensureAssetsLoaded(); });
 }
 
 std::optional<std::vector<BrowserAsset>> ModelBrowser::scanAssets() const
