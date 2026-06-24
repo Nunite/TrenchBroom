@@ -20,7 +20,15 @@
 #include <QToolBar>
 
 #include "ui/AppControllerFixture.h"
+#include "ui/ColorsPreferencePane.h"
+#include "ui/GamesPreferencePane.h"
+#include "ui/KeyboardPreferencePane.h"
+#include "ui/McpPreferencePane.h"
+#include "ui/MiscPreferencePane.h"
+#include "ui/MousePreferencePane.h"
 #include "ui/PreferenceDialog.h"
+#include "ui/UpdatePreferencePane.h"
+#include "ui/ViewPreferencePane.h"
 
 #include <memory>
 
@@ -59,6 +67,60 @@ TEST_CASE("PreferenceDialog")
   }
 
   dialog.reset();
+}
+
+TEST_CASE("PreferenceDialog.preferencePanes")
+{
+  auto fixture = AppControllerFixture{};
+
+  SECTION("Games")
+  {
+    auto pane = std::make_unique<GamesPreferencePane>(fixture.appController(), nullptr);
+    pane.reset();
+  }
+
+  SECTION("View")
+  {
+    auto pane = std::make_unique<ViewPreferencePane>();
+    pane.reset();
+  }
+
+  SECTION("Colors")
+  {
+    auto pane = std::make_unique<ColorsPreferencePane>();
+    pane.reset();
+  }
+
+  SECTION("Mouse")
+  {
+    auto pane = std::make_unique<MousePreferencePane>();
+    pane.reset();
+  }
+
+  SECTION("Keyboard")
+  {
+    auto pane =
+      std::make_unique<KeyboardPreferencePane>(fixture.appController(), nullptr);
+    pane.reset();
+  }
+
+  SECTION("Misc")
+  {
+    auto pane = std::make_unique<MiscPreferencePane>(fixture.appController());
+    pane.reset();
+  }
+
+  SECTION("MCP")
+  {
+    auto pane = std::make_unique<McpPreferencePane>(fixture.appController());
+    pane.reset();
+  }
+
+  SECTION("Update")
+  {
+    auto pane = std::make_unique<UpdatePreferencePane>(fixture.appController());
+    pane.reset();
+  }
 }
 
 } // namespace tb::ui

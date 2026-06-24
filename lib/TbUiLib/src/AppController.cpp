@@ -430,9 +430,8 @@ void AppController::showPreferences()
   auto* topMapWindow = mapWindowManager().topMapWindow();
   auto* topDocument = topMapWindow ? &topMapWindow->document() : nullptr;
 
-  auto* dialog = new PreferenceDialog{*this, topDocument};
-  dialog->exec();
-  dialog->deleteLater();
+  auto dialog = PreferenceDialog{*this, topDocument};
+  dialog.exec();
 }
 
 void AppController::showPieMenuSettings()
