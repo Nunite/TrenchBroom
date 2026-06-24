@@ -217,7 +217,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           || toolName == "brush_create_cone" || toolName == "brush_create_pipe"
           || toolName == "brush_create_sphere" || toolName == "brush_create_pyramid"
           || toolName == "brush_create_tetrahedron"
-          || toolName == "brush_create_from_planes")
+          || toolName == "brush_create_from_planes" || toolName == "brush_create_prism"
+          || toolName == "brush_create_cylinder_sector")
         {
           return createBrushResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
@@ -330,7 +331,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           toolName == "blockout_create_room" || toolName == "blockout_create_corridor"
           || toolName == "blockout_create_stairs" || toolName == "blockout_create_ramp"
           || toolName == "blockout_create_doorway" || toolName == "blockout_create_cover"
-          || toolName == "blockout_create_sky_shell")
+          || toolName == "blockout_create_sky_shell"
+          || toolName == "blockout_create_spiral_stairs")
         {
           return blockoutCreateResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
@@ -338,6 +340,15 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "blockout_validate")
         {
           return blockoutValidateResult(params);
+        }
+        if (toolName == "geometry_analyze_selection")
+        {
+          return geometryAnalyzeSelectionResult(appController, params);
+        }
+        if (toolName == "blockout_validate_spiral_stairs")
+        {
+          return blockoutValidateSpiralStairsResult(
+            appController, params, m_operationHistory);
         }
         return McpBridgeToolResult::failure(
           mcp::McpErrorCode::ToolNotFound,

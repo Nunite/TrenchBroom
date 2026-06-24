@@ -61,6 +61,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("brush_create_pyramid"));
     CHECK(findToolDefinition("brush_create_tetrahedron"));
     CHECK(findToolDefinition("brush_create_from_planes"));
+    CHECK(findToolDefinition("brush_create_prism"));
+    CHECK(findToolDefinition("brush_create_cylinder_sector"));
     CHECK(findToolDefinition("brush_create_arch"));
     CHECK(findToolDefinition("brush_create_torus"));
     CHECK(findToolDefinition("objects_delete"));
@@ -75,6 +77,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("leaks_load_pointfile"));
     CHECK(findToolDefinition("prefabs_list"));
     CHECK(findToolDefinition("prefab_create"));
+    CHECK(findToolDefinition("geometry_analyze_selection"));
+    CHECK(findToolDefinition("blockout_create_spiral_stairs"));
+    CHECK(findToolDefinition("blockout_validate_spiral_stairs"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
   }
@@ -116,6 +121,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("compile_profiles_list"));
     CHECK(names.contains("compile_log_tail"));
     CHECK(names.contains("blockout_validate"));
+    CHECK(names.contains("geometry_analyze_selection"));
+    CHECK(names.contains("blockout_validate_spiral_stairs"));
     CHECK(!names.contains("documents_open"));
     CHECK(!names.contains("documents_save"));
     CHECK(!names.contains("documents_close"));
@@ -126,6 +133,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("brush_create"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create_box"));
+    CHECK(!names.contains("brush_create_prism"));
+    CHECK(!names.contains("brush_create_cylinder_sector"));
+    CHECK(!names.contains("blockout_create_spiral_stairs"));
     CHECK(!names.contains("asset_place_model"));
     CHECK(!names.contains("prefabs_list"));
     CHECK(!names.contains("prefab_create"));
@@ -174,6 +184,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_create_pyramid"));
     CHECK(names.contains("brush_create_tetrahedron"));
     CHECK(names.contains("brush_create_from_planes"));
+    CHECK(names.contains("brush_create_prism"));
+    CHECK(names.contains("brush_create_cylinder_sector"));
     CHECK(!names.contains("brush_create_arch"));
     CHECK(!names.contains("brush_create_torus"));
     CHECK(names.contains("asset_place_model"));
@@ -206,7 +218,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_create_doorway"));
     CHECK(names.contains("blockout_create_cover"));
     CHECK(names.contains("blockout_create_sky_shell"));
+    CHECK(names.contains("blockout_create_spiral_stairs"));
     CHECK(names.contains("blockout_validate"));
+    CHECK(names.contains("geometry_analyze_selection"));
+    CHECK(names.contains("blockout_validate_spiral_stairs"));
     CHECK(names.contains("history_undo_mcp"));
     CHECK(names.contains("history_redo_mcp"));
     CHECK(names.contains("viewport_capture_current"));

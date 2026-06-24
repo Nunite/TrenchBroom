@@ -27,6 +27,11 @@
 
 #include <vector>
 
+namespace tb::mdl
+{
+class Map;
+}
+
 namespace tb::ui
 {
 
@@ -203,6 +208,23 @@ McpBridgeToolResult blockoutCreateResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult geometryAnalyzeSelectionResult(
+  mdl::Map& map, const QJsonObject& params);
+McpBridgeToolResult geometryAnalyzeSelectionResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult blockoutValidateSpiralStairsResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history);
+McpBridgeToolResult blockoutValidateSpiralStairsResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history);
 
 McpBridgeToolResult compileProfilesListResult(AppController& appController);
 McpBridgeToolResult compileRunResult(

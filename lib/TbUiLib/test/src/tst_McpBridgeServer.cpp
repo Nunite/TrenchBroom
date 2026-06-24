@@ -20,6 +20,16 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+#include "../../src/mcp/McpBridgeServerTools.h"
+#include "Result.h"
+#include "gl/GlManager.h"
+#include "mdl/GameConfigFixture.h"
+#include "mdl/Map.h"
+#include "mdl/MapFormat.h"
+#include "mdl/Map_Selection.h"
+#include "mdl/WorldNode.h"
+#include "ui/AppControllerFixture.h"
+#include "ui/MapDocument.h"
 #include "ui/mcp/McpBridgeServer.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -194,7 +204,8 @@ TEST_CASE("McpBridgeServer")
       toolName == "brush_create" || toolName == "brush_create_cone"
       || toolName == "brush_create_pipe" || toolName == "brush_create_sphere"
       || toolName == "brush_create_pyramid" || toolName == "brush_create_tetrahedron"
-      || toolName == "brush_create_from_planes")
+      || toolName == "brush_create_from_planes" || toolName == "brush_create_prism"
+      || toolName == "brush_create_cylinder_sector")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"operationId", "mcp-op-7"},
@@ -302,11 +313,27 @@ TEST_CASE("McpBridgeServer")
         {"valid", true},
       });
     }
-    if (toolName == "blockout_create_room")
+    if (toolName == "geometry_analyze_selection")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"brushCount", 0},
+        {"invalidBrushCount", 0},
+      });
+    }
+    if (toolName == "blockout_validate_spiral_stairs")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"valid", true},
+        {"gapCount", 0},
+      });
+    }
+    if (toolName == "blockout_create_room" || toolName == "blockout_create_spiral_stairs")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"operationId", "mcp-op-3"},
-        {"transactionName", "MCP: Blockout room"},
+        {"transactionName",
+         toolName == "blockout_create_room" ? "MCP: Blockout room"
+                                            : "MCP: Blockout spiral stairs"},
       });
     }
     return McpBridgeToolResult::failure(
@@ -623,7 +650,9 @@ TEST_CASE("McpBridgeServer")
           "brush_create_sphere",
           "brush_create_pyramid",
           "brush_create_tetrahedron",
-          "brush_create_from_planes"})
+          "brush_create_from_planes",
+          "brush_create_prism",
+          "brush_create_cylinder_sector"})
     {
       const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
         "1", "secret", toolName, QJsonObject{{"type", "box"}}, mcp::McpMode::Edit});
@@ -888,6 +917,26 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("valid").toBool());
   }
 
+  SECTION("read-only mode serves geometry analysis and spiral validation")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto analysisResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1", "secret", "geometry_analyze_selection", {}, mcp::McpMode::ReadOnly});
+    CHECK(analysisResponse.ok);
+    CHECK(analysisResponse.result.value("invalidBrushCount").toInt() == 0);
+
+    const auto validateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "blockout_validate_spiral_stairs",
+      QJsonObject{},
+      mcp::McpMode::ReadOnly});
+    CHECK(validateResponse.ok);
+    CHECK(validateResponse.result.value("valid").toBool());
+  }
+
   SECTION("edit mode serves blockout creation")
   {
     REQUIRE(
@@ -905,7 +954,102 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("operationId").toString() == "mcp-op-3");
+
+    const auto spiralResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "blockout_create_spiral_stairs",
+      QJsonObject{{"steps", 24}},
+      mcp::McpMode::Edit});
+
+    CHECK(spiralResponse.ok);
+    CHECK(
+      spiralResponse.result.value("transactionName").toString()
+      == "MCP: Blockout spiral stairs");
   }
+}
+
+TEST_CASE("McpBridgeServer spiral stair geometry tools")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  const auto createResponse = blockoutCreateSpiralStairsForMapResult(
+    map,
+    QJsonObject{
+      {"center", QJsonArray{0, 0, 0}},
+      {"innerRadius", 32},
+      {"outerRadius", 128},
+      {"steps", 24},
+      {"stepHeight", 8},
+      {"turnDegrees", 360},
+      {"select", true},
+    },
+    history,
+    nextOperationIndex);
+
+  const auto createError =
+    createResponse.ok ? std::string{} : createResponse.error.message.toStdString();
+  INFO(createError);
+  REQUIRE(createResponse.ok);
+  CHECK(
+    createResponse.result.value("transactionName").toString()
+    == "MCP: Blockout spiral stairs");
+  CHECK(createResponse.result.value("operationId").toString() == "mcp-op-1");
+  CHECK(createResponse.result.value("brushCount").toInt() == 26);
+  CHECK(map.selection().nodes.size() == 26u);
+
+  const auto validation = createResponse.result.value("validation").toObject();
+  CHECK(validation.value("valid").toBool());
+  CHECK(validation.value("gapCount").toInt() == 0);
+  CHECK(!validation.value("radiusMismatch").toBool());
+  CHECK(validation.value("columnFits").toBool());
+  CHECK(validation.value("landingConnected").toBool());
+  CHECK(validation.value("invalidBrushCount").toInt() == 0);
+
+  const auto analyzeResponse = geometryAnalyzeSelectionResult(
+    map, QJsonObject{{"grid", 1}, {"includeVertices", false}});
+  REQUIRE(analyzeResponse.ok);
+  CHECK(analyzeResponse.result.value("brushCount").toInt() == 26);
+  CHECK(analyzeResponse.result.value("invalidBrushCount").toInt() == 0);
+  CHECK(analyzeResponse.result.value("nonGridAlignedCount").toInt() == 0);
+
+  const auto validateResponse = blockoutValidateSpiralStairsResult(
+    map,
+    QJsonObject{
+      {"operationId", createResponse.result.value("operationId").toString()},
+      {"center", QJsonArray{0, 0, 0}},
+      {"innerRadius", 32},
+      {"outerRadius", 128},
+      {"steps", 24},
+      {"stepHeight", 8},
+      {"turnDegrees", 360},
+      {"grid", 1},
+    },
+    history);
+  REQUIRE(validateResponse.ok);
+  CHECK(validateResponse.result.value("valid").toBool());
+  CHECK(validateResponse.result.value("source").toString() == "operationId");
+  CHECK(validateResponse.result.value("brushCountMatches").toBool());
+  CHECK(validateResponse.result.value("gapCount").toInt() == 0);
+  CHECK(validateResponse.result.value("columnFits").toBool());
+  CHECK(validateResponse.result.value("landingConnected").toBool());
+
+  REQUIRE(map.undoCommandName() != nullptr);
+  CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: Blockout spiral stairs");
+  map.undoCommand();
+  CHECK(map.worldNode().childCount() == 1u);
 }
 
 } // namespace tb::ui

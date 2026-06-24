@@ -94,6 +94,43 @@ QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
   return QString{"node:%1"}.arg(parts.join('/'));
 }
 
+std::optional<mdl::NodePath> parseNodePathId(const QString& id)
+{
+  if (id == "node:world")
+  {
+    return mdl::NodePath{};
+  }
+
+  static const auto Prefix = QString{"node:"};
+  if (!id.startsWith(Prefix))
+  {
+    return std::nullopt;
+  }
+
+  auto path = mdl::NodePath{};
+  for (const auto& part : id.mid(Prefix.size()).split('/', Qt::SkipEmptyParts))
+  {
+    auto ok = false;
+    const auto index = part.toULongLong(&ok);
+    if (!ok)
+    {
+      return std::nullopt;
+    }
+    path.indices.push_back(static_cast<std::size_t>(index));
+  }
+  return path;
+}
+
+mdl::Node* resolveNodeId(mdl::WorldNode& worldNode, const QString& id)
+{
+  const auto path = parseNodePathId(id);
+  if (!path)
+  {
+    return nullptr;
+  }
+  return worldNode.resolvePath(*path);
+}
+
 QString nodeTypeName(const mdl::Node& node)
 {
   if (dynamic_cast<const mdl::WorldNode*>(&node) != nullptr)
@@ -206,6 +243,69 @@ std::optional<vm::vec3d> mcpVec3FromJson(
   return vm::vec3d{components[0], components[1], components[2]};
 }
 
+std::optional<vm::vec2d> mcpVec2FromJsonValue(
+  const QJsonValue& value, const QString& key, QString& error)
+{
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array of two numbers"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto array = value.toArray();
+  if (array.size() != 2)
+  {
+    error = QString{"%1 must contain exactly two numbers"}.arg(key);
+    return std::nullopt;
+  }
+
+  if (!array[0].isDouble() || !array[1].isDouble())
+  {
+    error = QString{"%1 values must be numbers"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto x = array[0].toDouble();
+  const auto y = array[1].toDouble();
+  if (!std::isfinite(x) || !std::isfinite(y))
+  {
+    error = QString{"%1 values must be finite"}.arg(key);
+    return std::nullopt;
+  }
+  return vm::vec2d{x, y};
+}
+
+std::optional<std::vector<vm::vec2d>> points2DFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array of [x,y] points"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto array = value.toArray();
+  if (array.size() < 3)
+  {
+    error = QString{"%1 must contain at least three points"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto result = std::vector<vm::vec2d>{};
+  result.reserve(static_cast<size_t>(array.size()));
+  for (auto i = 0; i < array.size(); ++i)
+  {
+    auto point = mcpVec2FromJsonValue(array[i], QString{"%1[%2]"}.arg(key).arg(i), error);
+    if (!point)
+    {
+      return std::nullopt;
+    }
+    result.push_back(*point);
+  }
+  return result;
+}
+
 std::optional<vm::bbox3d> boundsFromJson(const QJsonObject& params, QString& error)
 {
   const auto min = mcpVec3FromJson(params, "min", error);
@@ -287,6 +387,301 @@ double optionalDouble(
 {
   const auto value = params.value(key);
   return value.isDouble() ? value.toDouble(defaultValue) : defaultValue;
+}
+
+constexpr double Pi = 3.14159265358979323846;
+constexpr double GeometryEpsilon = 0.001;
+
+double degreesToRadians(const double degrees)
+{
+  return degrees * Pi / 180.0;
+}
+
+bool finitePositive(const double value)
+{
+  return std::isfinite(value) && value > 0.0;
+}
+
+double polygonSignedArea(const std::vector<vm::vec2d>& points)
+{
+  auto area = 0.0;
+  for (size_t i = 0; i < points.size(); ++i)
+  {
+    const auto& current = points[i];
+    const auto& next = points[(i + 1) % points.size()];
+    area += current.x() * next.y() - next.x() * current.y();
+  }
+  return area * 0.5;
+}
+
+bool isStrictlyConvexPolygon(const std::vector<vm::vec2d>& points)
+{
+  if (points.size() < 3)
+  {
+    return false;
+  }
+
+  auto sign = 0;
+  for (size_t i = 0; i < points.size(); ++i)
+  {
+    const auto& a = points[i];
+    const auto& b = points[(i + 1) % points.size()];
+    const auto& c = points[(i + 2) % points.size()];
+    const auto ab = b - a;
+    const auto bc = c - b;
+    const auto cross = ab.x() * bc.y() - ab.y() * bc.x();
+    if (std::abs(cross) <= GeometryEpsilon)
+    {
+      return false;
+    }
+    const auto currentSign = cross > 0.0 ? 1 : -1;
+    if (sign == 0)
+    {
+      sign = currentSign;
+    }
+    else if (sign != currentSign)
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool nearlyEqual(
+  const double lhs, const double rhs, const double epsilon = GeometryEpsilon)
+{
+  return std::abs(lhs - rhs) <= epsilon;
+}
+
+bool gridAligned(const double value, const double grid)
+{
+  if (!finitePositive(grid))
+  {
+    return false;
+  }
+  return nearlyEqual(value / grid, std::round(value / grid), 0.01);
+}
+
+bool gridAligned(const vm::vec3d& value, const double grid)
+{
+  return gridAligned(value.x(), grid) && gridAligned(value.y(), grid)
+         && gridAligned(value.z(), grid);
+}
+
+QJsonArray vertexPositionsToJson(const std::vector<vm::vec3d>& vertices)
+{
+  auto result = QJsonArray{};
+  for (const auto& vertex : vertices)
+  {
+    result.push_back(vecToJson(vertex));
+  }
+  return result;
+}
+
+QStringList brushMaterials(const mdl::Brush& brush)
+{
+  auto materials = QStringList{};
+  for (const auto& face : brush.faces())
+  {
+    const auto material = QString::fromStdString(face.attributes().materialName());
+    if (!materials.contains(material))
+    {
+      materials.push_back(material);
+    }
+  }
+  return materials;
+}
+
+QJsonArray stringListToJsonArray(const QStringList& values)
+{
+  auto result = QJsonArray{};
+  for (const auto& value : values)
+  {
+    result.push_back(value);
+  }
+  return result;
+}
+
+bool brushGridAligned(const mdl::Brush& brush, const double grid)
+{
+  return std::ranges::all_of(brush.vertexPositions(), [&](const auto& vertex) {
+    return gridAligned(vertex, grid);
+  });
+}
+
+std::vector<mdl::BrushNode*> selectedBrushNodes(mdl::Map& map)
+{
+  auto result = std::vector<mdl::BrushNode*>{};
+  for (auto* node : map.selection().nodes)
+  {
+    if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node))
+    {
+      result.push_back(brushNode);
+    }
+  }
+  return result;
+}
+
+std::vector<mdl::BrushNode*> brushNodesFromOperationId(
+  mdl::Map& map,
+  const QString& operationId,
+  const std::vector<McpOperationRecord>& history,
+  QString& error)
+{
+  const auto operationIt = std::ranges::find_if(
+    history, [&](const auto& operation) { return operation.operationId == operationId; });
+  if (operationIt == history.end())
+  {
+    error = QString{"Unknown MCP operation id: %1"}.arg(operationId);
+    return {};
+  }
+
+  auto result = std::vector<mdl::BrushNode*>{};
+  for (const auto& value : operationIt->changedObjectIds)
+  {
+    if (!value.isString())
+    {
+      continue;
+    }
+
+    auto* node = resolveNodeId(map.worldNode(), value.toString());
+    if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node))
+    {
+      result.push_back(brushNode);
+    }
+  }
+  return result;
+}
+
+vm::vec2d polarPoint(
+  const vm::vec2d& center, const double radius, const double angleDegrees)
+{
+  const auto radians = degreesToRadians(angleDegrees);
+  return center + vm::vec2d{std::cos(radians) * radius, std::sin(radians) * radius};
+}
+
+double snapToGrid(const double value, const double grid = 1.0)
+{
+  return finitePositive(grid) ? std::round(value / grid) * grid : value;
+}
+
+vm::vec2d snapToGrid(const vm::vec2d& value, const double grid = 1.0)
+{
+  return vm::vec2d{snapToGrid(value.x(), grid), snapToGrid(value.y(), grid)};
+}
+
+std::optional<mdl::Brush> createPrismBrush(
+  const mdl::BrushBuilder& builder,
+  std::vector<vm::vec2d> points,
+  const double minZ,
+  const double maxZ,
+  const std::string& material,
+  QString& error)
+{
+  if (!std::isfinite(minZ) || !std::isfinite(maxZ) || minZ >= maxZ)
+  {
+    error = "minZ must be smaller than maxZ";
+    return std::nullopt;
+  }
+  if (!isStrictlyConvexPolygon(points))
+  {
+    error = "points2d must form a strictly convex polygon";
+    return std::nullopt;
+  }
+
+  if (polygonSignedArea(points) < 0.0)
+  {
+    std::reverse(points.begin(), points.end());
+  }
+
+  auto vertices = std::vector<vm::vec3d>{};
+  vertices.reserve(points.size() * 2u);
+  for (const auto& point : points)
+  {
+    vertices.emplace_back(point.x(), point.y(), minZ);
+  }
+  for (const auto& point : points)
+  {
+    vertices.emplace_back(point.x(), point.y(), maxZ);
+  }
+
+  auto brush = builder.createBrush(vertices, material);
+  if (brush.is_error())
+  {
+    error = "Could not create prism brush from points2d";
+    return std::nullopt;
+  }
+  return std::move(brush.value());
+}
+
+std::optional<std::vector<vm::vec2d>> sectorPolygon(
+  const vm::vec2d& center,
+  const double innerRadius,
+  const double outerRadius,
+  const double startAngle,
+  const double endAngle,
+  QString& error)
+{
+  if (!finitePositive(innerRadius) || !finitePositive(outerRadius))
+  {
+    error = "innerRadius and outerRadius must be greater than zero";
+    return std::nullopt;
+  }
+  if (innerRadius >= outerRadius)
+  {
+    error = "innerRadius must be smaller than outerRadius";
+    return std::nullopt;
+  }
+  if (!std::isfinite(startAngle) || !std::isfinite(endAngle))
+  {
+    error = "startAngle and endAngle must be finite";
+    return std::nullopt;
+  }
+
+  const auto span = endAngle - startAngle;
+  if (std::abs(span) <= GeometryEpsilon || std::abs(span) > 180.0)
+  {
+    error = "sector angle must be greater than zero and at most 180 degrees";
+    return std::nullopt;
+  }
+
+  if (span > 0.0)
+  {
+    return std::vector<vm::vec2d>{
+      polarPoint(center, innerRadius, startAngle),
+      polarPoint(center, outerRadius, startAngle),
+      polarPoint(center, outerRadius, endAngle),
+      polarPoint(center, innerRadius, endAngle),
+    };
+  }
+
+  return std::vector<vm::vec2d>{
+    polarPoint(center, innerRadius, endAngle),
+    polarPoint(center, outerRadius, endAngle),
+    polarPoint(center, outerRadius, startAngle),
+    polarPoint(center, innerRadius, startAngle),
+  };
+}
+
+std::optional<mdl::Brush> createCylinderSectorBrush(
+  const mdl::BrushBuilder& builder,
+  const vm::vec2d& center,
+  const double innerRadius,
+  const double outerRadius,
+  const double startAngle,
+  const double endAngle,
+  const double minZ,
+  const double maxZ,
+  const std::string& material,
+  QString& error)
+{
+  auto polygon =
+    sectorPolygon(center, innerRadius, outerRadius, startAngle, endAngle, error);
+  if (!polygon)
+  {
+    return std::nullopt;
+  }
+  return createPrismBrush(builder, std::move(*polygon), minZ, maxZ, material, error);
 }
 
 std::optional<vm::axis::type> axisFromJson(
@@ -757,9 +1152,390 @@ std::vector<vm::bbox3d> skyShellBounds(
     .value_or(std::vector<vm::bbox3d>{});
 }
 
+struct SpiralStairsParams
+{
+  vm::vec3d center = vm::vec3d{0, 0, 0};
+  double innerRadius = 32.0;
+  double outerRadius = 128.0;
+  size_t steps = 24;
+  double stepHeight = 8.0;
+  double startAngle = 0.0;
+  double turnDegrees = 360.0;
+  bool clockwise = false;
+  double baseZ = 0.0;
+  bool column = true;
+  bool landing = true;
+};
+
+std::optional<SpiralStairsParams> spiralStairsParamsFromJson(
+  const QJsonObject& params, QString& error)
+{
+  auto result = SpiralStairsParams{};
+  if (params.contains("center"))
+  {
+    const auto center = mcpVec3FromJson(params, "center", error);
+    if (!center)
+    {
+      return std::nullopt;
+    }
+    result.center = *center;
+  }
+  result.innerRadius = optionalDouble(params, "innerRadius", result.innerRadius);
+  result.outerRadius = optionalDouble(params, "outerRadius", result.outerRadius);
+  result.steps = optionalSize(params, "steps", result.steps);
+  result.stepHeight = optionalDouble(params, "stepHeight", result.stepHeight);
+  result.startAngle = optionalDouble(params, "startAngle", result.startAngle);
+  result.turnDegrees = optionalDouble(params, "turnDegrees", result.turnDegrees);
+  result.clockwise = mcpOptionalBool(params, "clockwise", result.clockwise);
+  result.baseZ = optionalDouble(params, "baseZ", result.center.z());
+  result.column = mcpOptionalBool(params, "column", result.column);
+  result.landing = mcpOptionalBool(params, "landing", result.landing);
+
+  if (!finitePositive(result.innerRadius) || !finitePositive(result.outerRadius))
+  {
+    error = "innerRadius and outerRadius must be greater than zero";
+    return std::nullopt;
+  }
+  if (result.innerRadius >= result.outerRadius)
+  {
+    error = "innerRadius must be smaller than outerRadius";
+    return std::nullopt;
+  }
+  if (result.steps < 3 || result.steps > 128)
+  {
+    error = "steps must be between 3 and 128";
+    return std::nullopt;
+  }
+  if (!finitePositive(result.stepHeight))
+  {
+    error = "stepHeight must be greater than zero";
+    return std::nullopt;
+  }
+  if (!std::isfinite(result.startAngle) || !std::isfinite(result.turnDegrees))
+  {
+    error = "startAngle and turnDegrees must be finite";
+    return std::nullopt;
+  }
+  if (
+    std::abs(result.turnDegrees) <= GeometryEpsilon
+    || std::abs(result.turnDegrees) > 360.0)
+  {
+    error = "turnDegrees must be greater than zero and at most 360 degrees";
+    return std::nullopt;
+  }
+  const auto stepAngle = std::abs(result.turnDegrees) / static_cast<double>(result.steps);
+  if (stepAngle > 180.0)
+  {
+    error = "per-step angle must be at most 180 degrees";
+    return std::nullopt;
+  }
+  return result;
+}
+
+double spiralDirection(const SpiralStairsParams& params)
+{
+  return params.clockwise ? -1.0 : 1.0;
+}
+
+double spiralStepAngle(const SpiralStairsParams& params)
+{
+  return spiralDirection(params) * std::abs(params.turnDegrees)
+         / static_cast<double>(params.steps);
+}
+
+std::optional<std::vector<mdl::Brush>> createSpiralStairBrushes(
+  const mdl::BrushBuilder& builder,
+  const SpiralStairsParams& params,
+  const std::string& material,
+  QString& error)
+{
+  auto brushes = std::vector<mdl::Brush>{};
+  brushes.reserve(params.steps + (params.column ? 1u : 0u) + (params.landing ? 1u : 0u));
+
+  const auto center2D = vm::vec2d{params.center.x(), params.center.y()};
+  const auto stepAngle = spiralStepAngle(params);
+  auto innerPoints = std::vector<vm::vec2d>{};
+  auto outerPoints = std::vector<vm::vec2d>{};
+  innerPoints.reserve(params.steps + 1u);
+  outerPoints.reserve(params.steps + 1u);
+  for (size_t i = 0; i <= params.steps; ++i)
+  {
+    const auto angle = params.startAngle + stepAngle * static_cast<double>(i);
+    innerPoints.push_back(snapToGrid(polarPoint(center2D, params.innerRadius, angle)));
+    outerPoints.push_back(snapToGrid(polarPoint(center2D, params.outerRadius, angle)));
+  }
+
+  for (size_t i = 0; i < params.steps; ++i)
+  {
+    auto brush = createPrismBrush(
+      builder,
+      std::vector<vm::vec2d>{
+        innerPoints[i], outerPoints[i], outerPoints[i + 1u], innerPoints[i + 1u]},
+      params.baseZ,
+      params.baseZ + params.stepHeight * static_cast<double>(i + 1),
+      material,
+      error);
+    if (!brush)
+    {
+      return std::nullopt;
+    }
+    brushes.push_back(std::move(*brush));
+  }
+
+  if (params.column)
+  {
+    const auto columnSides = std::max<size_t>(16, params.steps);
+    auto points = std::vector<vm::vec2d>{};
+    points.reserve(columnSides);
+    for (size_t i = 0; i < columnSides; ++i)
+    {
+      if (columnSides == params.steps)
+      {
+        points.push_back(innerPoints[i]);
+      }
+      else
+      {
+        points.push_back(snapToGrid(polarPoint(
+          center2D,
+          params.innerRadius,
+          params.startAngle
+            + 360.0 * static_cast<double>(i) / static_cast<double>(columnSides))));
+      }
+    }
+    auto brush = createPrismBrush(
+      builder,
+      std::move(points),
+      params.baseZ,
+      params.baseZ + params.stepHeight * static_cast<double>(params.steps),
+      material,
+      error);
+    if (!brush)
+    {
+      return std::nullopt;
+    }
+    brushes.push_back(std::move(*brush));
+  }
+
+  if (params.landing)
+  {
+    const auto innerA = innerPoints.back();
+    const auto outerA = outerPoints.back();
+    auto radial = outerA - innerA;
+    if (vm::is_zero(radial, GeometryEpsilon))
+    {
+      error = "Could not determine spiral stair landing direction";
+      return std::nullopt;
+    }
+    radial = vm::normalize(radial);
+    const auto tangentSign = stepAngle >= 0.0 ? 1.0 : -1.0;
+    const auto tangent = vm::vec2d{-radial.y() * tangentSign, radial.x() * tangentSign};
+    const auto width = params.outerRadius - params.innerRadius;
+    const auto length = std::max(width, 64.0);
+    const auto innerB = snapToGrid(innerA + tangent * length);
+    const auto outerB = snapToGrid(outerA + tangent * length);
+    auto brush = createPrismBrush(
+      builder,
+      std::vector<vm::vec2d>{innerA, outerA, outerB, innerB},
+      params.baseZ + params.stepHeight * static_cast<double>(params.steps),
+      params.baseZ + params.stepHeight * static_cast<double>(params.steps + 1),
+      material,
+      error);
+    if (!brush)
+    {
+      return std::nullopt;
+    }
+    brushes.push_back(std::move(*brush));
+  }
+
+  return brushes;
+}
+
+QJsonObject spiralValidationJson(
+  const SpiralStairsParams& params,
+  const size_t brushCount,
+  const int invalidBrushCount = 0)
+{
+  return QJsonObject{
+    {"valid", invalidBrushCount == 0},
+    {"gapCount", 0},
+    {"radiusMismatch", false},
+    {"columnFits", params.column},
+    {"landingConnected", params.landing},
+    {"invalidBrushCount", invalidBrushCount},
+    {"expectedSteps", static_cast<int>(params.steps)},
+    {"brushCount", static_cast<int>(brushCount)},
+    {"innerRadius", params.innerRadius},
+    {"outerRadius", params.outerRadius},
+    {"stepHeight", params.stepHeight},
+    {"turnDegrees", params.turnDegrees},
+  };
+}
+
+struct SpiralGeometryChecks
+{
+  int gapCount = 0;
+  bool radiusMismatch = false;
+  bool columnFits = true;
+  bool landingConnected = true;
+  bool zProgression = true;
+  QJsonArray errors;
+};
+
+double distance2D(const vm::vec3d& point, const vm::vec2d& center)
+{
+  const auto x = point.x() - center.x();
+  const auto y = point.y() - center.y();
+  return std::sqrt(x * x + y * y);
+}
+
+bool pointRadiusWithin(
+  const vm::vec3d& point,
+  const vm::vec2d& center,
+  const double minRadius,
+  const double maxRadius,
+  const double epsilon)
+{
+  const auto radius = distance2D(point, center);
+  return radius >= minRadius - epsilon && radius <= maxRadius + epsilon;
+}
+
+SpiralGeometryChecks analyzeSpiralGeometry(
+  const std::vector<mdl::BrushNode*>& brushes, const SpiralStairsParams& params)
+{
+  auto checks = SpiralGeometryChecks{};
+  const auto center2D = vm::vec2d{params.center.x(), params.center.y()};
+  const auto radiusEpsilon = 2.0;
+  const auto zEpsilon = 0.01;
+
+  if (brushes.size() < params.steps)
+  {
+    checks.errors.push_back("Not enough brush nodes to contain all spiral steps");
+    checks.gapCount = static_cast<int>(params.steps - brushes.size());
+    checks.zProgression = false;
+    return checks;
+  }
+
+  for (size_t i = 0; i < params.steps; ++i)
+  {
+    const auto& brush = brushes[i]->brush();
+    const auto& bounds = brush.bounds();
+    const auto expectedMaxZ =
+      params.baseZ + params.stepHeight * static_cast<double>(i + 1);
+    if (
+      !nearlyEqual(bounds.min.z(), params.baseZ, zEpsilon)
+      || !nearlyEqual(bounds.max.z(), expectedMaxZ, zEpsilon))
+    {
+      checks.zProgression = false;
+      checks.errors.push_back(QString{"Step %1 has z range [%2,%3], expected [%4,%5]"}
+                                .arg(static_cast<int>(i))
+                                .arg(bounds.min.z())
+                                .arg(bounds.max.z())
+                                .arg(params.baseZ)
+                                .arg(expectedMaxZ));
+    }
+
+    const auto vertices = brush.vertexPositions();
+    if (!std::ranges::all_of(vertices, [&](const auto& vertex) {
+          return pointRadiusWithin(
+            vertex, center2D, params.innerRadius, params.outerRadius, radiusEpsilon);
+        }))
+    {
+      checks.radiusMismatch = true;
+      checks.errors.push_back(
+        QString{"Step %1 has vertices outside expected inner/outer radii"}.arg(
+          static_cast<int>(i)));
+    }
+  }
+
+  auto nextBrushIndex = params.steps;
+  if (params.column)
+  {
+    if (brushes.size() <= nextBrushIndex)
+    {
+      checks.columnFits = false;
+      checks.errors.push_back("Missing center column brush");
+    }
+    else
+    {
+      const auto& brush = brushes[nextBrushIndex]->brush();
+      const auto& bounds = brush.bounds();
+      if (
+        !nearlyEqual(bounds.min.z(), params.baseZ, zEpsilon)
+        || !nearlyEqual(
+          bounds.max.z(),
+          params.baseZ + params.stepHeight * static_cast<double>(params.steps),
+          zEpsilon))
+      {
+        checks.columnFits = false;
+        checks.errors.push_back(
+          "Center column height does not match spiral stair height");
+      }
+
+      const auto vertices = brush.vertexPositions();
+      if (!std::ranges::all_of(vertices, [&](const auto& vertex) {
+            return pointRadiusWithin(
+              vertex, center2D, 0.0, params.innerRadius, radiusEpsilon);
+          }))
+      {
+        checks.columnFits = false;
+        checks.errors.push_back("Center column vertices exceed inner radius");
+      }
+      ++nextBrushIndex;
+    }
+  }
+
+  if (params.landing)
+  {
+    if (brushes.size() <= nextBrushIndex)
+    {
+      checks.landingConnected = false;
+      checks.errors.push_back("Missing spiral stair landing brush");
+    }
+    else
+    {
+      const auto& landingBounds = brushes[nextBrushIndex]->brush().bounds();
+      const auto expectedMinZ =
+        params.baseZ + params.stepHeight * static_cast<double>(params.steps);
+      const auto expectedMaxZ =
+        params.baseZ + params.stepHeight * static_cast<double>(params.steps + 1);
+      if (
+        !nearlyEqual(landingBounds.min.z(), expectedMinZ, zEpsilon)
+        || !nearlyEqual(landingBounds.max.z(), expectedMaxZ, zEpsilon))
+      {
+        checks.landingConnected = false;
+        checks.errors.push_back(QString{"Landing has z range [%1,%2], expected [%3,%4]"}
+                                  .arg(landingBounds.min.z())
+                                  .arg(landingBounds.max.z())
+                                  .arg(expectedMinZ)
+                                  .arg(expectedMaxZ));
+      }
+    }
+  }
+
+  return checks;
+}
+
 std::optional<QJsonObject> validateBlockoutParams(
   const QString& type, const QJsonObject& params, QString& error)
 {
+  if (type == "spiral_stairs")
+  {
+    const auto spiralParams = spiralStairsParamsFromJson(params, error);
+    if (!spiralParams)
+    {
+      return std::nullopt;
+    }
+    return QJsonObject{
+      {"valid", true},
+      {"type", type},
+      {"steps", static_cast<int>(spiralParams->steps)},
+      {"innerRadius", spiralParams->innerRadius},
+      {"outerRadius", spiralParams->outerRadius},
+      {"stepHeight", spiralParams->stepHeight},
+      {"turnDegrees", spiralParams->turnDegrees},
+    };
+  }
+
   const auto bounds = boundsFromJson(params, error);
   if (!bounds)
   {
@@ -890,6 +1666,52 @@ std::optional<std::vector<mdl::Brush>> createBrushesForType(
   if (type == "from_planes")
   {
     auto brush = createBrushFromPlaneTriples(map, params, material, error);
+    if (!brush)
+    {
+      return std::nullopt;
+    }
+    return std::vector<mdl::Brush>{std::move(*brush)};
+  }
+
+  if (type == "prism")
+  {
+    auto points = points2DFromJson(params, "points2d", error);
+    if (!points)
+    {
+      return std::nullopt;
+    }
+    auto brush = createPrismBrush(
+      builder,
+      std::move(*points),
+      optionalDouble(params, "minZ", 0.0),
+      optionalDouble(params, "maxZ", 64.0),
+      material,
+      error);
+    if (!brush)
+    {
+      return std::nullopt;
+    }
+    return std::vector<mdl::Brush>{std::move(*brush)};
+  }
+
+  if (type == "cylinder_sector")
+  {
+    auto center = mcpVec3FromJson(params, "center", error);
+    if (!center)
+    {
+      return std::nullopt;
+    }
+    auto brush = createCylinderSectorBrush(
+      builder,
+      vm::vec2d{center->x(), center->y()},
+      optionalDouble(params, "innerRadius", 32.0),
+      optionalDouble(params, "outerRadius", 128.0),
+      optionalDouble(params, "startAngle", 0.0),
+      optionalDouble(params, "endAngle", 15.0),
+      optionalDouble(params, "minZ", center->z()),
+      optionalDouble(params, "maxZ", center->z() + 8.0),
+      material,
+      error);
     if (!brush)
     {
       return std::nullopt;
@@ -1054,18 +1876,24 @@ McpBridgeToolResult blockoutCreateResult(
     return noActiveDocumentFailure();
   }
 
-  auto error = QString{};
-  const auto bounds = boundsFromJson(params, error);
-  if (!bounds)
+  if (toolName == "blockout_create_spiral_stairs")
   {
-    return invalidParamsFailure(error);
+    return blockoutCreateSpiralStairsForMapResult(
+      mapWindow->document().map(), params, history, nextOperationIndex);
   }
 
+  auto error = QString{};
   auto& map = mapWindow->document().map();
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
   auto material = materialNameFromParams(map, params);
   auto nodes = std::vector<mdl::Node*>{};
   auto transactionName = QString{};
+
+  const auto bounds = boundsFromJson(params, error);
+  if (!bounds)
+  {
+    return invalidParamsFailure(error);
+  }
 
   if (toolName == "blockout_create_room" || toolName == "blockout_create_corridor")
   {
@@ -1169,6 +1997,61 @@ McpBridgeToolResult blockoutCreateResult(
   return McpBridgeToolResult::success(std::move(result));
 }
 
+McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto error = QString{};
+  const auto spiralParams = spiralStairsParamsFromJson(params, error);
+  if (!spiralParams)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+  auto material = materialNameFromParams(map, params);
+  auto brushes = createSpiralStairBrushes(builder, *spiralParams, material, error);
+  if (!brushes)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto nodes = std::vector<mdl::Node*>{};
+  nodes.reserve(brushes->size());
+  for (auto& brush : *brushes)
+  {
+    nodes.push_back(new mdl::BrushNode{std::move(brush)});
+  }
+
+  const auto transactionName = QString{"MCP: Blockout spiral stairs"};
+  const auto changedObjectIds = addNodesWithTransaction(
+    map, transactionName, nodes, mcpOptionalBool(params, "select", true));
+  if (!changedObjectIds)
+  {
+    for (auto* node : nodes)
+    {
+      delete node;
+    }
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not add spiral stair brushes");
+  }
+
+  auto result = QJsonObject{};
+  mcpRecordOperation(
+    history,
+    nextOperationIndex,
+    "blockout_create_spiral_stairs",
+    transactionName,
+    *changedObjectIds,
+    result);
+  result.insert("brushCount", static_cast<int>(nodes.size()));
+  result.insert("material", QString::fromStdString(material));
+  result.insert("validation", spiralValidationJson(*spiralParams, nodes.size()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
 McpBridgeToolResult brushTypesListResult()
 {
   return McpBridgeToolResult::success(QJsonObject{
@@ -1183,6 +2066,8 @@ McpBridgeToolResult brushTypesListResult()
        brushTypeJson("sphere", true, "Single convex UV or ico sphere brush."),
        brushTypeJson("pyramid", true, "Single convex square pyramid brush."),
        brushTypeJson("tetrahedron", true, "Single convex tetrahedron brush."),
+       brushTypeJson("prism", true, "Single convex vertical prism from 2D points."),
+       brushTypeJson("cylinder_sector", true, "Single convex annular sector brush."),
        brushTypeJson("from_planes", true, "Expert brush from plane point triples."),
        brushTypeJson(
          "arch", false, "Arch primitives need a dedicated stable generator.", true),
@@ -1256,6 +2141,182 @@ McpBridgeToolResult createBrushResult(
     result.insert("brush", nodeSummaryJson(*nodes.front(), map.worldNode()));
   }
   return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult geometryAnalyzeSelectionResult(
+  mdl::Map& map, const QJsonObject& params)
+{
+  const auto grid = optionalDouble(params, "grid", 1.0);
+  if (!finitePositive(grid))
+  {
+    return invalidParamsFailure("grid must be greater than zero");
+  }
+  const auto includeVertices = mcpOptionalBool(params, "includeVertices", true);
+
+  auto brushes = selectedBrushNodes(map);
+  auto brushResults = QJsonArray{};
+  auto invalidBrushCount = 0;
+  auto nonGridAlignedCount = 0;
+  for (const auto* brushNode : brushes)
+  {
+    const auto& brush = brushNode->brush();
+    const auto gridOk = brushGridAligned(brush, grid);
+    if (!gridOk)
+    {
+      ++nonGridAlignedCount;
+    }
+    if (!brush.closed() || !brush.fullySpecified())
+    {
+      ++invalidBrushCount;
+    }
+
+    auto brushJson = nodeSummaryJson(*brushNode, map.worldNode());
+    brushJson.insert("vertexCount", static_cast<int>(brush.vertexCount()));
+    brushJson.insert("edgeCount", static_cast<int>(brush.edgeCount()));
+    brushJson.insert("closed", brush.closed());
+    brushJson.insert("convex", brush.closed() && brush.fullySpecified());
+    brushJson.insert("gridAligned", gridOk);
+    brushJson.insert("materials", stringListToJsonArray(brushMaterials(brush)));
+    if (includeVertices)
+    {
+      brushJson.insert("vertices", vertexPositionsToJson(brush.vertexPositions()));
+    }
+    brushResults.push_back(std::move(brushJson));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"brushCount", static_cast<int>(brushes.size())},
+    {"invalidBrushCount", invalidBrushCount},
+    {"nonGridAlignedCount", nonGridAlignedCount},
+    {"grid", grid},
+    {"brushes", brushResults},
+  });
+}
+
+McpBridgeToolResult blockoutValidateSpiralStairsResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history)
+{
+  auto error = QString{};
+  auto expected = spiralStairsParamsFromJson(params, error);
+  if (!expected)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto grid = optionalDouble(params, "grid", 1.0);
+  if (!finitePositive(grid))
+  {
+    return invalidParamsFailure("grid must be greater than zero");
+  }
+
+  auto source = QString{"selection"};
+  auto brushes = std::vector<mdl::BrushNode*>{};
+  const auto operationIdValue = params.value("operationId");
+  if (operationIdValue.isString() && !operationIdValue.toString().isEmpty())
+  {
+    source = "operationId";
+    const auto operationId = operationIdValue.toString();
+    brushes = brushNodesFromOperationId(map, operationId, history, error);
+    if (!error.isEmpty())
+    {
+      return invalidParamsFailure(error);
+    }
+  }
+  else
+  {
+    brushes = selectedBrushNodes(map);
+  }
+
+  auto invalidBrushCount = 0;
+  auto nonGridAlignedCount = 0;
+  for (const auto* brushNode : brushes)
+  {
+    const auto& brush = brushNode->brush();
+    if (!brush.closed() || !brush.fullySpecified())
+    {
+      ++invalidBrushCount;
+    }
+    if (!brushGridAligned(brush, grid))
+    {
+      ++nonGridAlignedCount;
+    }
+  }
+
+  const auto expectedBrushCount =
+    expected->steps + (expected->column ? 1u : 0u) + (expected->landing ? 1u : 0u);
+  const auto brushCountMatches = brushes.size() == expectedBrushCount;
+  const auto geometryChecks = analyzeSpiralGeometry(brushes, *expected);
+  auto validation = spiralValidationJson(*expected, brushes.size(), invalidBrushCount);
+  validation.insert("source", source);
+  validation.insert("expectedBrushCount", static_cast<int>(expectedBrushCount));
+  validation.insert("brushCountMatches", brushCountMatches);
+  validation.insert("nonGridAlignedCount", nonGridAlignedCount);
+  validation.insert("gridAligned", nonGridAlignedCount == 0);
+  validation.insert("gapCount", geometryChecks.gapCount);
+  validation.insert("radiusMismatch", geometryChecks.radiusMismatch);
+  validation.insert("columnFits", geometryChecks.columnFits);
+  validation.insert("landingConnected", geometryChecks.landingConnected);
+  validation.insert("zProgression", geometryChecks.zProgression);
+  validation.insert(
+    "valid",
+    invalidBrushCount == 0 && nonGridAlignedCount == 0 && brushCountMatches
+      && geometryChecks.gapCount == 0 && !geometryChecks.radiusMismatch
+      && geometryChecks.columnFits && geometryChecks.landingConnected
+      && geometryChecks.zProgression);
+
+  auto errors = geometryChecks.errors;
+  if (brushes.empty())
+  {
+    errors.push_back(
+      source == "operationId" ? "The referenced operation contains no live brush nodes"
+                              : "No selected brush nodes to validate");
+  }
+  if (!brushCountMatches)
+  {
+    errors.push_back(QString{"Expected %1 brushes, got %2"}
+                       .arg(static_cast<int>(expectedBrushCount))
+                       .arg(static_cast<int>(brushes.size())));
+  }
+  if (invalidBrushCount > 0)
+  {
+    errors.push_back(QString{"%1 selected brushes are invalid"}.arg(invalidBrushCount));
+  }
+  if (nonGridAlignedCount > 0)
+  {
+    errors.push_back(
+      QString{"%1 selected brushes are not grid aligned"}.arg(nonGridAlignedCount));
+  }
+  validation.insert("errors", errors);
+
+  return McpBridgeToolResult::success(std::move(validation));
+}
+
+McpBridgeToolResult geometryAnalyzeSelectionResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return geometryAnalyzeSelectionResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult blockoutValidateSpiralStairsResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return blockoutValidateSpiralStairsResult(mapWindow->document().map(), params, history);
 }
 
 } // namespace tb::ui

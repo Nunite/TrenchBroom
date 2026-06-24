@@ -867,6 +867,11 @@ McpBridgeToolResult viewportFocusResult(
   const auto& actionsMap = appController.actionManager().actionsMap();
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   auto* mapView = mapWindow ? mapWindow->currentMapViewBase() : nullptr;
+  if (mapWindow && !mapView)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden, "No active map view");
+  }
   auto context = ActionExecutionContext{appController, mapWindow, mapView};
   const auto actionPath = std::filesystem::path{"Menu/View/Focus on Selection"};
   const auto actionIt = actionsMap.find(actionPath);

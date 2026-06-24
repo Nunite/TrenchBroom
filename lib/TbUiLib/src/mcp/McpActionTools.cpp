@@ -40,11 +40,30 @@
 namespace tb::ui
 {
 namespace mcp = tb::mcp;
-QJsonObject actionsListJson(AppController& appController)
+namespace
+{
+struct ActiveActionContext
+{
+  MapWindow* mapWindow = nullptr;
+  MapViewBase* mapView = nullptr;
+};
+
+ActiveActionContext activeActionContext(AppController& appController)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   auto* mapView = mapWindow ? mapWindow->currentMapViewBase() : nullptr;
-  auto context = ActionExecutionContext{appController, mapWindow, mapView};
+  return {mapWindow, mapView};
+}
+} // namespace
+
+QJsonObject actionsListJson(AppController& appController)
+{
+  const auto activeContext = activeActionContext(appController);
+  const auto hasActiveView = activeContext.mapWindow && activeContext.mapView;
+  auto context = ActionExecutionContext{
+    appController,
+    hasActiveView ? activeContext.mapWindow : nullptr,
+    hasActiveView ? activeContext.mapView : nullptr};
 
   auto actions = QJsonArray{};
   for (const auto& [path, action] : appController.actionManager().actionsMap())
@@ -60,7 +79,7 @@ QJsonObject actionsListJson(AppController& appController)
 
     if (action.checkable())
     {
-      actionJson.insert("checked", action.checked(context));
+      actionJson.insert("checked", enabled ? action.checked(context) : false);
     }
 
     actions.push_back(actionJson);
@@ -75,7 +94,6 @@ QJsonObject actionsListJson(AppController& appController)
 McpBridgeToolResult actionExecuteResult(
   AppController& appController, const QJsonObject& params)
 {
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
   const auto actionId = params.value("actionId").toString().trimmed();
 
   if (actionId.isEmpty())
@@ -93,8 +111,15 @@ McpBridgeToolResult actionExecuteResult(
       mcp::McpErrorCode::InvalidParams, QString{"Unknown action id: %1"}.arg(actionId));
   }
 
-  auto* mapView = mapWindow ? mapWindow->currentMapViewBase() : nullptr;
-  auto context = ActionExecutionContext{appController, mapWindow, mapView};
+  const auto activeContext = activeActionContext(appController);
+  if (activeContext.mapWindow && !activeContext.mapView)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden, "No active map view");
+  }
+
+  auto context =
+    ActionExecutionContext{appController, activeContext.mapWindow, activeContext.mapView};
   const auto& action = actionIt->second;
   if (!action.enabled(context))
   {
