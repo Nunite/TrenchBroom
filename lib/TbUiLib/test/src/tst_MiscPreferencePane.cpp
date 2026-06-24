@@ -38,6 +38,7 @@ TEST_CASE("MiscPreferencePane")
   auto& prefs = PreferenceManager::instance();
   prefs.set(Preferences::Language, Preferences::languageChinese());
   prefs.set(Preferences::PrefixWorldspawnHeaderOnCopy, true);
+  prefs.set(Preferences::Enable2DBoxSelection, true);
   prefs.set(Preferences::PythonPluginDirectories, "C:/tb/plugin");
   prefs.set(Preferences::PieMenuAction, "Menu/Edit/Undo|Menu/Edit/Redo");
 
@@ -46,16 +47,23 @@ TEST_CASE("MiscPreferencePane")
   SECTION("loads general misc preferences")
   {
     auto* prefixCheckBox = static_cast<QCheckBox*>(nullptr);
+    auto* boxSelectionCheckBox = static_cast<QCheckBox*>(nullptr);
     for (auto* checkBox : pane.findChildren<QCheckBox*>())
     {
       if (checkBox->text() == QStringLiteral("Prefix worldspawn header on copy"))
       {
         prefixCheckBox = checkBox;
       }
+      if (checkBox->text() == QStringLiteral("Enable 2D box selection with Ctrl+drag"))
+      {
+        boxSelectionCheckBox = checkBox;
+      }
     }
 
     REQUIRE(prefixCheckBox != nullptr);
     CHECK(prefixCheckBox->isChecked());
+    REQUIRE(boxSelectionCheckBox != nullptr);
+    CHECK(boxSelectionCheckBox->isChecked());
 
     auto foundChinese = false;
     for (auto* radioButton : pane.findChildren<QRadioButton*>())
@@ -74,6 +82,7 @@ TEST_CASE("MiscPreferencePane")
 
     CHECK(prefs.get(Preferences::Language) == Preferences::languageEnglish());
     CHECK_FALSE(prefs.get(Preferences::PrefixWorldspawnHeaderOnCopy));
+    CHECK_FALSE(prefs.get(Preferences::Enable2DBoxSelection));
     CHECK(prefs.get(Preferences::PythonPluginDirectories) == "C:/tb/plugin");
     CHECK(prefs.get(Preferences::PieMenuAction) == "Menu/Edit/Undo|Menu/Edit/Redo");
   }

@@ -91,8 +91,17 @@ void MiscPreferencePane::createGui()
       prefs.set(Preferences::PrefixWorldspawnHeaderOnCopy, checked);
     });
 
+  m_enable2DBoxSelectionCheckBox =
+    new QCheckBox{tr("Enable 2D box selection with Ctrl+drag")};
+  connect(
+    m_enable2DBoxSelectionCheckBox, &QCheckBox::toggled, this, [](const bool checked) {
+      auto& prefs = PreferenceManager::instance();
+      prefs.set(Preferences::Enable2DBoxSelection, checked);
+    });
+
   auto* editorLayout = new QVBoxLayout{};
   editorLayout->addWidget(m_prefixWorldspawnOnCopyCheckBox);
+  editorLayout->addWidget(m_enable2DBoxSelectionCheckBox);
 
   m_pieMenuSettingsButton = new QPushButton{tr("Pie Menu Settings...")};
   m_pythonPluginManagerButton = new QPushButton{tr("Python Plugin Manager...")};
@@ -134,6 +143,7 @@ void MiscPreferencePane::doResetToDefaults()
   auto& prefs = PreferenceManager::instance();
   prefs.resetToDefault(Preferences::Language);
   prefs.resetToDefault(Preferences::PrefixWorldspawnHeaderOnCopy);
+  prefs.resetToDefault(Preferences::Enable2DBoxSelection);
   updateControls();
 }
 
@@ -142,12 +152,14 @@ void MiscPreferencePane::updateControls()
   const auto englishBlocker = QSignalBlocker{m_englishRadioButton};
   const auto chineseBlocker = QSignalBlocker{m_chineseRadioButton};
   const auto prefixBlocker = QSignalBlocker{m_prefixWorldspawnOnCopyCheckBox};
+  const auto boxSelectionBlocker = QSignalBlocker{m_enable2DBoxSelectionCheckBox};
 
   const auto& language = pref(Preferences::Language);
   m_englishRadioButton->setChecked(language == Preferences::languageEnglish());
   m_chineseRadioButton->setChecked(language == Preferences::languageChinese());
   m_prefixWorldspawnOnCopyCheckBox->setChecked(
     pref(Preferences::PrefixWorldspawnHeaderOnCopy));
+  m_enable2DBoxSelectionCheckBox->setChecked(pref(Preferences::Enable2DBoxSelection));
 }
 
 bool MiscPreferencePane::validate()

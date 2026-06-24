@@ -37,6 +37,7 @@
 #include "mdl/Transaction.h"
 #include "mdl/TransactionScope.h"
 #include "render/RenderContext.h"
+#include "ui/BoxSelectionTool.h"
 #include "ui/GestureTracker.h"
 #include "ui/InputState.h"
 #include "ui/MapDocument.h"
@@ -517,6 +518,29 @@ std::unique_ptr<GestureTracker> SelectionTool::acceptMouseDrag(
       firstHit(inputState, type(mdl::nodeHitType()) && isNodeSelectable(editorContext));
     if (!hit.isMatch())
     {
+      if (
+        inputState.camera().orthographicProjection()
+        && inputState.mouseButtonsPressed(MouseButtons::Left)
+        && inputState.checkModifierKeys(
+          ModifierKeyPressed::Yes, ModifierKeyPressed::No, ModifierKeyPressed::No)
+        && pref(Preferences::Enable2DBoxSelection))
+      {
+        const auto bounds = map.referenceBounds();
+        const auto plane = vm::plane3d{
+          bounds.min,
+          vm::vec3d{vm::get_abs_max_component_axis(inputState.camera().direction())}};
+
+        if (const auto distance = vm::intersect_ray_plane(inputState.pickRay(), plane))
+        {
+          const auto initialHandlePosition =
+            vm::point_at_distance(inputState.pickRay(), *distance);
+          return createHandleDragTracker(
+            BoxSelectionDragDelegate{*this, map},
+            inputState,
+            initialHandlePosition,
+            initialHandlePosition);
+        }
+      }
       return nullptr;
     }
 

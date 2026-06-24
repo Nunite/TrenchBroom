@@ -21,6 +21,7 @@ private:
   QRadioButton* m_chineseRadioButton = nullptr;
   QButtonGroup* m_languageButtonGroup = nullptr;
   QCheckBox* m_prefixWorldspawnOnCopyCheckBox = nullptr;
+  QCheckBox* m_enable2DBoxSelectionCheckBox = nullptr;
   QPushButton* m_pieMenuSettingsButton = nullptr;
   QPushButton* m_pythonPluginManagerButton = nullptr;
 

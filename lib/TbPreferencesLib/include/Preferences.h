@@ -72,6 +72,8 @@ inline auto PythonPluginDirectories =
 inline auto PieMenuAction = Preference<std::string>{"Controls/Pie menu actions", ""};
 inline auto PrefixWorldspawnHeaderOnCopy =
   Preference<bool>{"Controls/Prefix worldspawn header on copy", false};
+inline auto Enable2DBoxSelection =
+  Preference<bool>{"Controls/Enable 2D box selection", false};
 
 inline auto ShowAxes = Preference<bool>{"render/Show axes", true};
 inline auto SoftMapBoundsColor =

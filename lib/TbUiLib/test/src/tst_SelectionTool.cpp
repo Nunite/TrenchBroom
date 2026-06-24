@@ -17,6 +17,8 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "PreferenceManager.h"
+#include "Preferences.h"
 #include "gl/OrthographicCamera.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushBuilder.h"
@@ -36,6 +38,7 @@
 #include "mdl/TestUtils.h"
 #include "mdl/WorldNode.h"
 #include "ui/CatchConfig.h"
+#include "ui/GestureTracker.h"
 #include "ui/InputState.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
@@ -450,6 +453,97 @@ TEST_CASE("SelectionTool")
           }
         }
       }
+    }
+  }
+
+  SECTION("2D box selection")
+  {
+    auto& prefs = PreferenceManager::instance();
+    prefs.set(Preferences::Enable2DBoxSelection, false);
+
+    const auto& worldNode = map.worldNode();
+    auto builder = mdl::BrushBuilder{
+      worldNode.mapFormat(),
+      map.worldBounds(),
+      map.gameInfo().gameConfig.faceAttribsConfig.defaults};
+
+    auto* insideBrushNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{-16, -16, -16}, {16, 16, 16}}, "inside")
+      | kdl::value()};
+    auto* outsideBrushNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{96, 96, -16}, {128, 128, 16}}, "outside")
+      | kdl::value()};
+    addNodes(map, {{parentForNodes(map), {insideBrushNode, outsideBrushNode}}});
+
+    auto camera = gl::OrthographicCamera{};
+    camera.moveTo({0, 0, 128});
+    camera.setDirection({0, 0, -1}, {0, 1, 0});
+
+    const auto makeInputState = [&](const vm::vec3d& point) {
+      auto inputState = InputState{};
+      inputState.setModifierKeys(ModifierKeys::CtrlCmd);
+      inputState.mouseDown(MouseButtons::Left);
+      inputState.setPickRequest({vm::ray3d{point, {0, 0, -1}}, camera});
+      inputState.setPickResult(mdl::PickResult{});
+      return inputState;
+    };
+
+    auto tool = SelectionTool{document};
+
+    SECTION("disabled")
+    {
+      auto inputState = makeInputState({-48, -48, 128});
+      CHECK(tool.acceptMouseDrag(inputState) == nullptr);
+    }
+
+    SECTION("enabled")
+    {
+      prefs.set(Preferences::Enable2DBoxSelection, true);
+
+      auto startInputState = makeInputState({-48, -48, 128});
+      auto tracker = tool.acceptMouseDrag(startInputState);
+      REQUIRE(tracker != nullptr);
+
+      auto endInputState = makeInputState({48, 48, 128});
+      REQUIRE(tracker->update(endInputState));
+      endInputState.mouseUp(MouseButtons::Left);
+      tracker->end(endInputState);
+
+      CHECK(map.selection() == mdl::makeSelection(map, {insideBrushNode}));
+    }
+
+    SECTION("enabled with selectable containers")
+    {
+      prefs.set(Preferences::Enable2DBoxSelection, true);
+
+      auto* groupBrushNode = new mdl::BrushNode{
+        builder.createCuboid(vm::bbox3d{{-64, -64, -16}, {-48, -48, 16}}, "group")
+        | kdl::value()};
+      auto* groupNode = new mdl::GroupNode{mdl::Group{"group"}};
+      addNodes(map, {{parentForNodes(map), {groupNode}}});
+      addNodes(map, {{groupNode, {groupBrushNode}}});
+
+      auto* entityBrushNode = new mdl::BrushNode{
+        builder.createCuboid(vm::bbox3d{{48, 48, -16}, {64, 64, 16}}, "brush_entity")
+        | kdl::value()};
+      auto* brushEntityNode =
+        new mdl::EntityNode{mdl::Entity{{{"classname", "func_wall"}}}};
+      addNodes(map, {{parentForNodes(map), {brushEntityNode}}});
+      addNodes(map, {{brushEntityNode, {entityBrushNode}}});
+
+      auto startInputState = makeInputState({-80, -80, 128});
+      auto tracker = tool.acceptMouseDrag(startInputState);
+      REQUIRE(tracker != nullptr);
+
+      auto endInputState = makeInputState({80, 80, 128});
+      REQUIRE(tracker->update(endInputState));
+      endInputState.mouseUp(MouseButtons::Left);
+      tracker->end(endInputState);
+
+      CHECK_THAT(
+        map.selection().nodes,
+        UnorderedEquals(
+          std::vector<mdl::Node*>{insideBrushNode, groupNode, entityBrushNode}));
     }
   }
 
