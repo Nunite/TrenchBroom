@@ -1617,48 +1617,22 @@ int profileRank(const McpToolProfile profile)
   return 1;
 }
 
-bool isModelingTool(const QString& name)
+bool visibleInModelingProfile(const McpToolDefinition& tool)
 {
-  static constexpr auto ModelingToolNames = std::array{
-    "tb_status",
-    "tb_doctor",
-    "tb_tools_search",
-    "selection_get",
-    "selection_set",
-    "selection_filter",
-    "selection_by_bounds",
-    "fgd_entities_list",
-    "entity_schema",
-    "entity_create",
-    "entity_create_from_schema",
-    "operation_inspect",
-    "operation_select",
-    "operation_validate",
-    "history_undo_mcp",
-    "history_redo_mcp",
-    "brush_types_list",
-    "brush_create",
-    "brush_create_box",
-    "brush_create_prism",
-    "brush_create_cylinder_sector",
-    "brush_create_from_planes",
-    "blockout_create_batch",
-    "python_generate_blockout",
-    "heightmap_import_grayscale",
-    "geometry_analyze_selection",
-    "blockout_validate",
-    "objects_delete",
-    "objects_transform",
-    "textures_list",
-    "texture_search",
-    "face_list",
-    "face_select",
-    "face_texture_set",
-    "texture_apply",
+  static constexpr auto HiddenToolNames = std::array{
+    "actions_list",
+    "action_execute",
+    "overlay_set",
+    "overlay_clear",
+    "viewport_focus",
+    "viewport_clear_marks",
+    "viewport_capture_current",
+    "viewport_capture_3d",
+    "viewport_capture_2d",
   };
 
-  return std::ranges::any_of(
-    ModelingToolNames, [&](const auto* toolName) { return name == toolName; });
+  return !std::ranges::any_of(
+    HiddenToolNames, [&](const auto* toolName) { return tool.name == toolName; });
 }
 
 bool visibleInProfile(const McpToolDefinition& tool, const McpToolProfile profile)
@@ -1678,7 +1652,7 @@ bool visibleInProfile(const McpToolDefinition& tool, const McpToolProfile profil
   }
   if (profile == McpToolProfile::Modeling)
   {
-    return isModelingTool(tool.name);
+    return visibleInModelingProfile(tool);
   }
   return !tool.expert && profileRank(profile) >= profileRank(tool.minimumProfile);
 }
