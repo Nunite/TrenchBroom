@@ -276,6 +276,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("selection_set"));
     CHECK(names.contains("selection_filter"));
     CHECK(names.contains("selection_by_bounds"));
+    CHECK(names.contains("fgd_entities_list"));
+    CHECK(names.contains("entity_schema"));
+    CHECK(names.contains("entity_create"));
+    CHECK(names.contains("entity_create_from_schema"));
     CHECK(names.contains("operation_inspect"));
     CHECK(names.contains("operation_select"));
     CHECK(names.contains("operation_validate"));
@@ -310,10 +314,27 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("compile_run"));
     CHECK(!names.contains("leaks_load_pointfile"));
     CHECK(!names.contains("asset_place_model"));
-    CHECK(!names.contains("fgd_entities_list"));
-    CHECK(!names.contains("entity_schema"));
+    CHECK(!names.contains("entity_update"));
+    CHECK(!names.contains("entity_delete"));
+    CHECK(!names.contains("entity_tie_brushes"));
+    CHECK(!names.contains("entity_untie_brushes"));
     CHECK(!names.contains("blockout_create_spiral_stairs"));
     CHECK(!names.contains("blockout_create_curved_corridor"));
+  }
+
+  SECTION("modeling read-only profile exposes entity schema but not entity creation")
+  {
+    const auto tools = toolsListJson(McpMode::ReadOnly, true, McpToolProfile::Modeling);
+    auto names = QStringList{};
+    for (const auto& tool : tools)
+    {
+      names.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("fgd_entities_list"));
+    CHECK(names.contains("entity_schema"));
+    CHECK(!names.contains("entity_create"));
+    CHECK(!names.contains("entity_create_from_schema"));
   }
 
   SECTION("heightmap import tool requires image path and is modeling visible")
