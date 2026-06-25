@@ -17,7 +17,9 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QLocalServer>
 #include <QLocalSocket>
 
@@ -38,6 +40,51 @@ mcp::McpBridgeResponse makeFailure(
 }
 
 } // namespace
+
+void McpOperationRecord::setChangedObjectIds(const QJsonArray& ids)
+{
+  changedObjectIds.clear();
+  changedObjectIds.reserve(ids.size());
+  for (const auto& value : ids)
+  {
+    if (value.isString())
+    {
+      changedObjectIds.push_back(value.toString());
+    }
+  }
+}
+
+QJsonArray McpOperationRecord::changedObjectIdsJson() const
+{
+  auto result = QJsonArray{};
+  for (const auto& id : changedObjectIds)
+  {
+    result.push_back(id);
+  }
+  return result;
+}
+
+void McpOperationRecord::setSummary(const QJsonObject& value)
+{
+  summaryJson = QJsonDocument{value}.toJson(QJsonDocument::Compact);
+}
+
+QJsonObject McpOperationRecord::summary() const
+{
+  const auto document = QJsonDocument::fromJson(summaryJson);
+  return document.isObject() ? document.object() : QJsonObject{};
+}
+
+void McpOperationRecord::setDetail(const QJsonObject& value)
+{
+  detailJson = QJsonDocument{value}.toJson(QJsonDocument::Compact);
+}
+
+QJsonObject McpOperationRecord::detail() const
+{
+  const auto document = QJsonDocument::fromJson(detailJson);
+  return document.isObject() ? document.object() : QJsonObject{};
+}
 
 bool McpBridgeServer::start(const mcp::McpBridgeConfig& config, QString* error)
 {
@@ -78,6 +125,8 @@ void McpBridgeServer::stop()
     QLocalServer::removeServer(m_config.pipeName);
     m_server.reset();
   }
+  m_overlayState = QJsonObject{};
+  m_operationHistory.clear();
 }
 
 bool McpBridgeServer::isListening() const
@@ -121,11 +170,11 @@ std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) con
     {"operationId", it->operationId},
     {"toolName", it->toolName},
     {"transactionName", it->transactionName},
-    {"changedObjectIds", it->changedObjectIds},
+    {"changedObjectIds", it->changedObjectIdsJson()},
     {"changedObjectCount", it->changedObjectIds.size()},
     {"undone", it->undone},
-    {"summary", it->summary},
-    {"detail", it->detail},
+    {"summary", it->summary()},
+    {"detail", it->detail()},
   };
 }
 

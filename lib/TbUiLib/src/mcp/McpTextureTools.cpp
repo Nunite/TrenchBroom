@@ -156,7 +156,7 @@ QJsonObject mutationResultJson(const McpOperationRecord& operation)
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
-  result.insert("changedObjectIds", operation.changedObjectIds);
+  result.insert("changedObjectIds", operation.changedObjectIdsJson());
   result.insert("changedObjectCount", operation.changedObjectIds.size());
   return result;
 }
@@ -173,7 +173,7 @@ void mcpRecordOperation(
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
-  operation.changedObjectIds = changedObjectIds;
+  operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation);
   history.push_back(std::move(operation));
 }

@@ -19,8 +19,11 @@
 
 #pragma once
 
+#include <QByteArray>
 #include <QJsonArray>
+#include <QJsonObject>
 #include <QObject>
+#include <QStringList>
 
 #include "mcp/McpBridgeConfig.h"
 #include "mcp/McpBridgeMessages.h"
@@ -54,10 +57,17 @@ struct McpOperationRecord
   QString operationId;
   QString toolName;
   QString transactionName;
-  QJsonArray changedObjectIds;
-  QJsonObject summary;
-  QJsonObject detail;
+  QStringList changedObjectIds;
+  QByteArray summaryJson;
+  QByteArray detailJson;
   bool undone = false;
+
+  void setChangedObjectIds(const QJsonArray& ids);
+  QJsonArray changedObjectIdsJson() const;
+  void setSummary(const QJsonObject& value);
+  QJsonObject summary() const;
+  void setDetail(const QJsonObject& value);
+  QJsonObject detail() const;
 };
 
 class McpBridgeServer : public QObject

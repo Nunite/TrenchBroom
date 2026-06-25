@@ -210,6 +210,8 @@ Result<std::unique_ptr<AppController>> AppController::create()
 
 AppController::~AppController()
 {
+  m_mcpHttpServer->stop();
+  m_mcpBridgeServer->stop();
   processGlResources();
 }
 

@@ -62,12 +62,12 @@ QJsonObject operationRecordDetailJson(
   result.insert("detail", detail);
   if (detail == "ids" || detail == "full")
   {
-    result.insert("changedObjectIds", operation.changedObjectIds);
+    result.insert("changedObjectIds", operation.changedObjectIdsJson());
   }
   if (detail == "full")
   {
-    result.insert("summary", operation.summary);
-    result.insert("operationDetail", operation.detail);
+    result.insert("summary", operation.summary());
+    result.insert("operationDetail", operation.detail());
   }
   return result;
 }
@@ -191,11 +191,7 @@ McpBridgeToolResult operationSelectResult(
   auto nodes = std::vector<mdl::Node*>{};
   for (const auto& value : operation->changedObjectIds)
   {
-    if (!value.isString())
-    {
-      continue;
-    }
-    const auto path = parseNodePathId(value.toString());
+    const auto path = parseNodePathId(value);
     if (!path)
     {
       continue;
@@ -249,12 +245,7 @@ McpBridgeToolResult operationValidateResult(
   auto& map = mapWindow->document().map();
   for (const auto& value : operation->changedObjectIds)
   {
-    if (!value.isString())
-    {
-      ++staleObjectCount;
-      continue;
-    }
-    const auto path = parseNodePathId(value.toString());
+    const auto path = parseNodePathId(value);
     if (!path || map.worldNode().resolvePath(*path) == nullptr)
     {
       ++staleObjectCount;

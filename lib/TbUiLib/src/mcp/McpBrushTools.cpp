@@ -209,10 +209,10 @@ void mcpRecordOperation(
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
-  operation.changedObjectIds = changedObjectIds;
+  operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation);
-  operation.summary = result;
-  operation.detail = detail;
+  operation.setSummary(result);
+  operation.setDetail(detail);
   history.push_back(std::move(operation));
 }
 
@@ -625,14 +625,9 @@ std::vector<mdl::BrushNode*> brushNodesFromOperationId(
   }
 
   auto result = std::vector<mdl::BrushNode*>{};
-  for (const auto& value : operationIt->changedObjectIds)
+  for (const auto& id : operationIt->changedObjectIds)
   {
-    if (!value.isString())
-    {
-      continue;
-    }
-
-    auto* node = resolveNodeId(map.worldNode(), value.toString());
+    auto* node = resolveNodeId(map.worldNode(), id);
     if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node))
     {
       result.push_back(brushNode);
@@ -2705,7 +2700,7 @@ McpBridgeToolResult blockoutCreateBatchResult(
     !history.empty()
     && history.back().operationId == result.value("operationId").toString())
   {
-    history.back().summary = result;
+    history.back().setSummary(result);
   }
   return McpBridgeToolResult::success(std::move(result));
 }
