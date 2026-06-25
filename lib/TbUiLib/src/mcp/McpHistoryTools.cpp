@@ -42,6 +42,14 @@ namespace mcp = tb::mcp;
 namespace
 {
 
+bool isSelectionCommandName(const QString& commandName)
+{
+  return commandName == "Select None" || commandName == "Select All Objects"
+         || commandName == "Select All Brush Faces"
+         || commandName == "Convert to Brush Face Selection"
+         || commandName.startsWith("Select ") || commandName.startsWith("Deselect ");
+}
+
 QJsonObject operationRecordJson(const McpOperationRecord& operation)
 {
   auto result = QJsonObject{};
@@ -273,6 +281,12 @@ McpBridgeToolResult historyUndoResult(
     return noActiveDocumentFailure();
   }
 
+  return historyUndoForMapResult(mapWindow->document().map(), history);
+}
+
+McpBridgeToolResult historyUndoForMapResult(
+  mdl::Map& map, std::vector<McpOperationRecord>& history)
+{
   auto it = std::find_if(history.rbegin(), history.rend(), [](const auto& operation) {
     return !operation.undone;
   });
@@ -282,7 +296,23 @@ McpBridgeToolResult historyUndoResult(
       mcp::McpErrorCode::Forbidden, "No MCP operation is available to undo");
   }
 
-  auto& map = mapWindow->document().map();
+  auto skippedSelectionCommands = 0;
+  while (const auto* undoName = map.undoCommandName())
+  {
+    const auto commandName = QString::fromStdString(*undoName);
+    if (commandName == it->transactionName)
+    {
+      break;
+    }
+    if (!isSelectionCommandName(commandName))
+    {
+      break;
+    }
+
+    map.undoCommand();
+    ++skippedSelectionCommands;
+  }
+
   const auto* undoName = map.undoCommandName();
   if (!undoName || QString::fromStdString(*undoName) != it->transactionName)
   {
@@ -295,6 +325,7 @@ McpBridgeToolResult historyUndoResult(
   it->undone = true;
   return McpBridgeToolResult::success(QJsonObject{
     {"operation", operationRecordJson(*it)},
+    {"skippedSelectionCommands", skippedSelectionCommands},
     {"undone", true},
   });
 }

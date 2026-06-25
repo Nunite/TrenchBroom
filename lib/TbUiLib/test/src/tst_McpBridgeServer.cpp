@@ -1747,6 +1747,78 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
     CHECK(segment.value("effectiveDistanceBadLanding").toDouble() > 96.0);
     CHECK(segment.value("usedMetadataDirection").toBool());
   }
+
+  SECTION("undo skips metadata selection commands before reverting the MCP operation")
+  {
+    const auto descendantCountBefore = map.worldNode().descendantCount();
+    const auto response = brushCreatePolygonBatchForMapResult(
+      map,
+      "brush_create_polygon_batch",
+      QJsonObject{
+        {"transactionName", "MCP: KZ polygon platforms"},
+        {"detail", "ids"},
+        {"select", false},
+        {"brushes",
+         QJsonArray{
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{0, 0},
+                QJsonArray{64, 0},
+                QJsonArray{64, 64},
+                QJsonArray{0, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "undo_chain"},
+                {"movementType", "bhop"},
+              }},
+           },
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{160, 0},
+                QJsonArray{224, 0},
+                QJsonArray{224, 64},
+                QJsonArray{160, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "undo_chain"},
+                {"movementType", "bhop"},
+              }},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    CHECK(map.worldNode().descendantCount() == descendantCountBefore + 2u);
+
+    const auto selectResponse = selectionByMetadataForMapResult(
+      map,
+      QJsonObject{
+        {"routeId", "undo_chain"},
+        {"select", true},
+      },
+      metadataStore);
+    REQUIRE(selectResponse.ok);
+    CHECK(map.selection().nodes.size() == 2u);
+    REQUIRE(map.undoCommandName() != nullptr);
+    CHECK(QString::fromStdString(*map.undoCommandName()) == "Select 2 Objects");
+
+    const auto undoResponse = historyUndoForMapResult(map, history);
+    REQUIRE(undoResponse.ok);
+    CHECK(undoResponse.result.value("undone").toBool());
+    CHECK(undoResponse.result.value("skippedSelectionCommands").toInt() == 1);
+    CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+  }
 }
 
 TEST_CASE("McpBridgeServer Python blockout tools")
