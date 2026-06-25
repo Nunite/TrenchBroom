@@ -210,10 +210,14 @@ QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& to
 
   const auto error = bridgeResponse.error.value_or(
     McpError{McpErrorCode::InternalError, "Unknown MCP bridge error"});
-  const auto structuredError = QJsonObject{
+  auto structuredError = QJsonObject{
     {"code", errorCodeName(error.code)},
     {"message", error.message},
   };
+  if (!error.details.isEmpty())
+  {
+    structuredError.insert("details", error.details);
+  }
   return textToolResult(compactJsonText(structuredError), true, structuredError);
 }
 

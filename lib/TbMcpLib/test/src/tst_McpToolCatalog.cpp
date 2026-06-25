@@ -85,6 +85,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("operation_validate"));
     CHECK(findToolDefinition("blockout_create_batch"));
     CHECK(findToolDefinition("blockout_create_curved_corridor"));
+    CHECK(findToolDefinition("python_generate_blockout"));
     CHECK(findToolDefinition("tb_tools_search"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
@@ -155,6 +156,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("compile_run"));
     CHECK(!names.contains("leaks_load_pointfile"));
     CHECK(!names.contains("blockout_create_room"));
+    CHECK(!names.contains("python_generate_blockout"));
     CHECK(!names.contains("action_execute"));
     CHECK(!names.contains("history_undo_mcp"));
   }
@@ -227,6 +229,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_create_spiral_stairs"));
     CHECK(names.contains("blockout_create_batch"));
     CHECK(names.contains("blockout_create_curved_corridor"));
+    CHECK(names.contains("python_generate_blockout"));
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("blockout_validate_spiral_stairs"));
@@ -256,6 +259,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("viewport_capture_current"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("blockout_validate"));
+    CHECK(!names.contains("python_generate_blockout"));
     CHECK(!names.contains("documents_open"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("brush_create"));
@@ -285,6 +289,37 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_create_cylinder_sector"));
     CHECK(!names.contains("brush_create_arch"));
     CHECK(!names.contains("brush_create_torus"));
+  }
+
+  SECTION("python blockout tool requires script and is discoverable from core profile")
+  {
+    const auto tool = findToolDefinition("python_generate_blockout");
+
+    REQUIRE(tool);
+    CHECK(tool->category == "python");
+    CHECK(tool->requiredMode == McpMode::Edit);
+    CHECK(tool->mutatesDocument);
+
+    const auto required = tool->inputSchema.value("required").toArray();
+    CHECK(required.contains("script"));
+
+    const auto tools =
+      toolsSearchJson("python", "", "schema", McpMode::Edit, McpToolProfile::Core);
+    auto found = QJsonObject{};
+    for (const auto& entry : tools)
+    {
+      const auto object = entry.toObject();
+      if (object.value("name").toString() == "python_generate_blockout")
+      {
+        found = object;
+        break;
+      }
+    }
+
+    REQUIRE(!found.isEmpty());
+    CHECK(found.value("category").toString() == "python");
+    CHECK(!found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("inputSchema").isObject());
   }
 
   SECTION("tool search can discover hidden expert tools")

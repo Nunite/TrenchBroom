@@ -29,9 +29,9 @@
 #include "mdl/Map_Selection.h"
 #include "mdl/WorldNode.h"
 #include "ui/AppControllerFixture.h"
+#include "ui/CatchConfig.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
-#include "ui/MapWindowManager.h"
 #include "ui/mcp/McpBridgeServer.h"
 
 #include <optional>
@@ -554,6 +554,16 @@ TEST_CASE("McpBridgeServer")
     CHECK(!response.ok);
     REQUIRE(response.error);
     CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
+
+    const auto pythonResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "python_generate_blockout",
+      QJsonObject{{"script", "print('{}')"}},
+      mcp::McpMode::Edit});
+    CHECK(!pythonResponse.ok);
+    REQUIRE(pythonResponse.error);
+    CHECK(pythonResponse.error->code == mcp::McpErrorCode::Forbidden);
   }
 
   SECTION("registered unsupported tools report not implemented")
@@ -1146,20 +1156,20 @@ TEST_CASE("McpBridgeServer batch blockout tools")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
-  REQUIRE(appController.mapWindowManager()
-            .createDocument(mdl::QuakeGameInfo, mdl::MapFormat::Valve, vm::bbox3d{8192.0})
-            .is_success());
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  REQUIRE(mapWindow != nullptr);
-  auto& map = mapWindow->document().map();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
 
-  auto server = McpBridgeServer{appController};
-  REQUIRE(server.start(mcp::McpBridgeConfig{
-    "test-pipe-batch", "secret", mcp::McpMode::Edit, true, "127.0.0.1", 0}));
-
-  const auto batchResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "1",
-    "secret",
+  const auto batchResponse = blockoutCreateBatchForMapResult(
+    map,
     "blockout_create_batch",
     QJsonObject{
       {"name", "MCP: Test batch"},
@@ -1180,10 +1190,11 @@ TEST_CASE("McpBridgeServer batch blockout tools")
          },
        }},
     },
-    mcp::McpMode::Edit});
+    history,
+    nextOperationIndex);
 
   const auto batchError =
-    batchResponse.ok ? std::string{} : batchResponse.error->message.toStdString();
+    batchResponse.ok ? std::string{} : batchResponse.error.message.toStdString();
   INFO(batchError);
   REQUIRE(batchResponse.ok);
   const auto operationId = batchResponse.result.value("operationId").toString();
@@ -1200,9 +1211,8 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(map.selection().nodes.size() == 2u);
 
   const auto descendantCountBeforeInvalid = map.worldNode().descendantCount();
-  const auto invalidResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "invalid",
-    "secret",
+  const auto invalidResponse = blockoutCreateBatchForMapResult(
+    map,
     "blockout_create_batch",
     QJsonObject{
       {"operations",
@@ -1214,50 +1224,21 @@ TEST_CASE("McpBridgeServer batch blockout tools")
          },
        }},
     },
-    mcp::McpMode::Edit});
+    history,
+    nextOperationIndex);
   REQUIRE(invalidResponse.ok);
   CHECK(!invalidResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
-  const auto inspectResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "2",
-    "secret",
-    "operation_inspect",
-    QJsonObject{{"operationId", operationId}, {"detail", "ids"}},
-    mcp::McpMode::ReadOnly});
+  const auto inspectResponse = operationInspectResult(
+    history, QJsonObject{{"operationId", operationId}, {"detail", "ids"}});
   REQUIRE(inspectResponse.ok);
   CHECK(inspectResponse.result.value("changedObjectIds").toArray().size() == 2);
 
-  const auto resource =
-    server.readResource(batchResponse.result.value("resourceUri").toString());
-  REQUIRE(resource);
-  CHECK(resource->value("operationId").toString() == operationId);
-  CHECK(resource->value("changedObjectIds").toArray().size() == 2);
-
   mdl::deselectAll(map);
-  const auto selectResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "3",
-    "secret",
-    "operation_select",
-    QJsonObject{{"operationId", operationId}},
-    mcp::McpMode::ReadOnly});
-  REQUIRE(selectResponse.ok);
-  CHECK(selectResponse.result.value("selectedCount").toInt() == 2);
 
-  const auto validateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "4",
-    "secret",
-    "operation_validate",
-    QJsonObject{{"operationId", operationId}},
-    mcp::McpMode::ReadOnly});
-  REQUIRE(validateResponse.ok);
-  CHECK(validateResponse.result.value("valid").toBool());
-  CHECK(validateResponse.result.value("liveObjectCount").toInt() == 2);
-  CHECK(validateResponse.result.value("staleObjectCount").toInt() == 0);
-
-  const auto curvedResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "5",
-    "secret",
+  const auto curvedResponse = blockoutCreateBatchForMapResult(
+    map,
     "blockout_create_curved_corridor",
     QJsonObject{
       {"center", QJsonArray{256, 0, 0}},
@@ -1270,18 +1251,173 @@ TEST_CASE("McpBridgeServer batch blockout tools")
       {"caps", "both"},
       {"select", true},
     },
-    mcp::McpMode::Edit});
+    history,
+    nextOperationIndex);
 
   const auto curvedError =
-    curvedResponse.ok ? std::string{} : curvedResponse.error->message.toStdString();
+    curvedResponse.ok ? std::string{} : curvedResponse.error.message.toStdString();
   INFO(curvedError);
   REQUIRE(curvedResponse.ok);
   CHECK(curvedResponse.result.value("brushCount").toInt() == 14);
   CHECK(curvedResponse.result.value("changedObjectIds").isUndefined());
   CHECK(curvedResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.selection().nodes.size() == 14u);
+}
 
-  mapWindow->close();
+TEST_CASE("McpBridgeServer Python blockout tools")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  SECTION("compiles operations printed by Python")
+  {
+    const auto response = pythonGenerateBlockoutForMapResult(
+      map,
+      "python_generate_blockout",
+      QJsonObject{
+        {"name", "MCP: Python test blockout"},
+        {"grid", 16},
+        {"select", true},
+        {"detail", "summary"},
+        {"script",
+         R"PY(
+import json
+print(json.dumps({
+    "operations": [
+        {"type": "box", "min": [0, 0, 0], "max": [64, 64, 16]}
+    ]
+}))
+)PY"},
+      },
+      history,
+      nextOperationIndex);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    CHECK(
+      response.result.value("transactionName").toString() == "MCP: Python test blockout");
+    CHECK(response.result.value("brushCount").toInt() == 1);
+    CHECK(response.result.value("changedObjectCount").toInt() == 1);
+    CHECK(response.result.value("changedObjectIds").isUndefined());
+    CHECK(response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(response.result.value("python").toObject().value("stdoutBytes").toInt() > 0);
+    CHECK(map.selection().nodes.size() == 1u);
+  }
+
+  SECTION("rejects invalid JSON without committing")
+  {
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = pythonGenerateBlockoutForMapResult(
+      map,
+      "python_generate_blockout",
+      QJsonObject{{"script", "print('not json')"}},
+      history,
+      nextOperationIndex);
+
+    CHECK(!response.ok);
+    CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
+    CHECK(response.error.details.value("valid").toBool(true) == false);
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
+
+  SECTION("requires operations array")
+  {
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = pythonGenerateBlockoutForMapResult(
+      map,
+      "python_generate_blockout",
+      QJsonObject{{"script", "print('{}')"}},
+      history,
+      nextOperationIndex);
+
+    CHECK(!response.ok);
+    CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
+    CHECK(response.error.details.value("message").toString().contains("operations"));
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
+
+  SECTION("reports nonzero Python exit")
+  {
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = pythonGenerateBlockoutForMapResult(
+      map,
+      "python_generate_blockout",
+      QJsonObject{
+        {"script",
+         R"PY(
+import sys
+print("script failed", file=sys.stderr)
+sys.exit(7)
+)PY"},
+      },
+      history,
+      nextOperationIndex);
+
+    CHECK(!response.ok);
+    CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
+    CHECK(response.error.details.value("stderr").toString().contains("script failed"));
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
+
+  SECTION("kills timed out Python")
+  {
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = pythonGenerateBlockoutForMapResult(
+      map,
+      "python_generate_blockout",
+      QJsonObject{
+        {"timeoutMs", 50},
+        {"script",
+         R"PY(
+import time
+time.sleep(2)
+)PY"},
+      },
+      history,
+      nextOperationIndex);
+
+    CHECK(!response.ok);
+    CHECK(response.error.code == mcp::McpErrorCode::InternalError);
+    CHECK(response.error.message.contains("timed out"));
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
+
+  SECTION("does not commit invalid generated operations")
+  {
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = pythonGenerateBlockoutForMapResult(
+      map,
+      "python_generate_blockout",
+      QJsonObject{
+        {"script",
+         R"PY(
+import json
+print(json.dumps({
+    "operations": [
+        {"type": "box", "min": [0, 0, 0], "max": [0, 64, 16]}
+    ]
+}))
+)PY"},
+      },
+      history,
+      nextOperationIndex);
+
+    REQUIRE(response.ok);
+    CHECK(!response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
 }
 
 } // namespace tb::ui

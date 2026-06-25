@@ -83,10 +83,15 @@ std::optional<McpErrorCode> parseErrorCode(const QString& value)
 
 QJsonObject toJson(const McpError& error)
 {
-  return QJsonObject{
+  auto json = QJsonObject{
     {"code", errorCodeName(error.code)},
     {"message", error.message},
   };
+  if (!error.details.isEmpty())
+  {
+    json.insert("details", error.details);
+  }
+  return json;
 }
 
 std::optional<McpError> errorFromJson(const QJsonObject& json, QString* error)
@@ -121,7 +126,14 @@ std::optional<McpError> errorFromJson(const QJsonObject& json, QString* error)
     return std::nullopt;
   }
 
-  return McpError{*code, messageValue.toString()};
+  auto details = QJsonObject{};
+  const auto detailsValue = json.value("details");
+  if (detailsValue.isObject())
+  {
+    details = detailsValue.toObject();
+  }
+
+  return McpError{*code, messageValue.toString(), details};
 }
 
 } // namespace tb::mcp

@@ -352,6 +352,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return leaksLoadPointfileResult(appController, params);
         }
+        if (toolName == "python_generate_blockout")
+        {
+          return pythonGenerateBlockoutResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
         if (
           toolName == "blockout_create_batch"
           || toolName == "blockout_create_curved_corridor")

@@ -1303,6 +1303,30 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"operations"}),
     },
     {
+      "python_generate_blockout",
+      "Run a local Python script in a subprocess to generate Blockout IR, then compile "
+      "the returned operations through blockout_create_batch.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"script",
+           stringProperty(
+             "Python source. It must print a JSON object with an operations array to "
+             "stdout.")},
+          {"name",
+           stringProperty("Transaction label, defaults to MCP: Python blockout.")},
+          {"timeoutMs",
+           integerProperty("Subprocess timeout in milliseconds. Defaults to 5000.")},
+          {"grid", numberProperty("Grid size for snapping generated geometry.")},
+          {"select", boolProperty("Select generated brushes.")},
+          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"material", stringProperty("Default material passed to blockout batch.")},
+        },
+        {"script"}),
+    },
+    {
       "blockout_create_curved_corridor",
       "Create a curved corridor as one transaction using floor, ceiling, inner wall, "
       "outer wall, and optional caps.",
@@ -1452,6 +1476,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       else if (tool.name.startsWith("entity_") || tool.name.startsWith("fgd_"))
       {
         tool.category = "entity";
+      }
+      else if (tool.name.startsWith("python_"))
+      {
+        tool.category = "python";
       }
       else if (
         tool.name == "tb_status" || tool.name == "tb_doctor"

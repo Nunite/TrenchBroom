@@ -160,6 +160,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHistoryTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpObjectTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpProblemTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpPythonTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectionViewportTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServerTransport.cpp
@@ -564,6 +565,11 @@ target_link_libraries(TbUiLib
     TbRenderLib
     UpdateLib
     VmLib
+)
+
+target_compile_definitions(TbUiLib
+  PRIVATE
+    TB_PYTHON3_EXECUTABLE="${Python3_EXECUTABLE}"
 )
 
 set_target_properties(TbUiLib PROPERTIES AUTOMOC TRUE)

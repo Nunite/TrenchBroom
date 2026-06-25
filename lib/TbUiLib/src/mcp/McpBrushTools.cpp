@@ -2583,6 +2583,17 @@ McpBridgeToolResult blockoutCreateBatchResult(
     return noActiveDocumentFailure();
   }
 
+  return blockoutCreateBatchForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult blockoutCreateBatchForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   auto batchParams = params;
   if (toolName == "blockout_create_curved_corridor")
   {
@@ -2607,7 +2618,6 @@ McpBridgeToolResult blockoutCreateBatchResult(
     return invalidParamsFailure("operations must not be empty");
   }
 
-  auto& map = mapWindow->document().map();
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
   const auto defaultMaterial = materialNameFromParams(map, batchParams);
   const auto grid = optionalDouble(batchParams, "grid", 1.0);

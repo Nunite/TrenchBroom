@@ -79,8 +79,13 @@ TEST_CASE("McpBridgeMessages")
 
   SECTION("failure response json roundtrip")
   {
-    const auto response =
-      McpBridgeResponse::failure("1", McpError{McpErrorCode::Unauthorized, "bad token"});
+    const auto response = McpBridgeResponse::failure(
+      "1",
+      McpError{
+        McpErrorCode::Unauthorized,
+        "bad token",
+        QJsonObject{{"stderrBytes", 12}},
+      });
 
     const auto parsed = bridgeResponseFromJson(toJson(response));
 
@@ -90,6 +95,7 @@ TEST_CASE("McpBridgeMessages")
     REQUIRE(parsed->error);
     CHECK(parsed->error->code == McpErrorCode::Unauthorized);
     CHECK(parsed->error->message == "bad token");
+    CHECK(parsed->error->details.value("stderrBytes").toInt() == 12);
   }
 }
 

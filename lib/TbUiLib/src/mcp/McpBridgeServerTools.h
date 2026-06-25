@@ -224,6 +224,24 @@ McpBridgeToolResult blockoutCreateBatchResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult blockoutCreateBatchForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult pythonGenerateBlockoutResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult pythonGenerateBlockoutForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
