@@ -1660,6 +1660,60 @@ TEST_CASE("McpBridgeServer grayscale heightmap import tool")
     CHECK(map.worldNode().descendantCount() == descendantCount);
   }
 
+  SECTION("imports adaptive surface brushes from a grayscale image")
+  {
+    auto image = QImage{3, 3, QImage::Format_RGB32};
+    image.setPixelColor(0, 0, QColor{0, 0, 0});
+    image.setPixelColor(1, 0, QColor{96, 96, 96});
+    image.setPixelColor(2, 0, QColor{32, 32, 32});
+    image.setPixelColor(0, 1, QColor{128, 128, 128});
+    image.setPixelColor(1, 1, QColor{255, 255, 255});
+    image.setPixelColor(2, 1, QColor{96, 96, 96});
+    image.setPixelColor(0, 2, QColor{32, 32, 32});
+    image.setPixelColor(1, 2, QColor{96, 96, 96});
+    image.setPixelColor(2, 2, QColor{0, 0, 0});
+    const auto imagePath = saveImage("adaptive.png", image);
+
+    const auto response = heightmapImportGrayscaleForMapResult(
+      map,
+      "heightmap_import_grayscale",
+      QJsonObject{
+        {"imagePath", imagePath},
+        {"mode", "adaptive_surface"},
+        {"origin", QJsonArray{0, 0, 0}},
+        {"cellSize", 32},
+        {"heightScale", 64},
+        {"maxSize", 2},
+        {"minCellSize", 32},
+        {"maxCellSize", 64},
+        {"errorTolerance", 0},
+        {"maxBrushes", 16},
+        {"select", true},
+        {"detail", "summary"},
+      },
+      history,
+      nextOperationIndex);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    CHECK(response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(response.result.value("brushCount").toInt() > 0);
+    CHECK(response.result.value("changedObjectIds").isUndefined());
+
+    const auto heightmap = response.result.value("heightmap").toObject();
+    CHECK(heightmap.value("mode").toString() == "adaptive_surface");
+    CHECK(heightmap.value("surfaceCellCount").toInt() > 0);
+    CHECK(
+      heightmap.value("triangleBrushCount").toInt()
+      == response.result.value("brushCount").toInt());
+    CHECK(heightmap.value("minCellSize").toDouble() == 32.0);
+    CHECK(heightmap.value("maxCellSize").toDouble() == 64.0);
+    CHECK(
+      map.selection().nodes.size()
+      == static_cast<size_t>(response.result.value("brushCount").toInt()));
+  }
+
   SECTION("rejects excessive brush count without committing")
   {
     auto image = QImage{4, 4, QImage::Format_RGB32};
@@ -1690,6 +1744,45 @@ TEST_CASE("McpBridgeServer grayscale heightmap import tool")
     CHECK(!response.result.value("validation").toObject().value("valid").toBool());
     CHECK(
       response.result.value("heightmap").toObject().value("mergedBrushCount").toInt()
+      > 4);
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
+
+  SECTION("rejects excessive adaptive surface brush count without committing")
+  {
+    auto image = QImage{4, 4, QImage::Format_RGB32};
+    for (auto y = 0; y < image.height(); ++y)
+    {
+      for (auto x = 0; x < image.width(); ++x)
+      {
+        const auto value = ((x + y) % 2 == 0) ? 64 : 192;
+        image.setPixelColor(x, y, QColor{value, value, value});
+      }
+    }
+    const auto imagePath = saveImage("adaptive_checker.png", image);
+
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = heightmapImportGrayscaleForMapResult(
+      map,
+      "heightmap_import_grayscale",
+      QJsonObject{
+        {"imagePath", imagePath},
+        {"mode", "adaptive_surface"},
+        {"cellSize", 32},
+        {"heightScale", 64},
+        {"maxSize", 4},
+        {"minCellSize", 32},
+        {"maxCellSize", 32},
+        {"errorTolerance", 0},
+        {"maxBrushes", 4},
+      },
+      history,
+      nextOperationIndex);
+
+    REQUIRE(response.ok);
+    CHECK(!response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(
+      response.result.value("heightmap").toObject().value("triangleBrushCount").toInt()
       > 4);
     CHECK(map.worldNode().descendantCount() == descendantCount);
   }

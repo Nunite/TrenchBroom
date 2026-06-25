@@ -328,6 +328,12 @@ TEST_CASE("McpToolCatalog")
     const auto required = tool->inputSchema.value("required").toArray();
     CHECK(required.contains("imagePath"));
 
+    const auto properties = tool->inputSchema.value("properties").toObject();
+    CHECK(properties.contains("mode"));
+    CHECK(properties.contains("minCellSize"));
+    CHECK(properties.contains("maxCellSize"));
+    CHECK(properties.contains("errorTolerance"));
+
     const auto readOnlyTools =
       toolsListJson(McpMode::ReadOnly, true, McpToolProfile::Modeling);
     auto readOnlyNames = QStringList{};

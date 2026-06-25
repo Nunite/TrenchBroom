@@ -394,6 +394,45 @@ std::optional<std::vector<vm::vec2d>> points2DFromJson(
   return result;
 }
 
+std::optional<vm::vec3d> mcpVec3FromJsonValue(
+  const QJsonValue& value, const QString& key, QString& error)
+{
+  auto object = QJsonObject{};
+  object.insert(key, value);
+  return mcpVec3FromJson(object, key, error);
+}
+
+std::optional<std::vector<vm::vec3d>> points3DFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array of [x,y,z] points"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto array = value.toArray();
+  if (array.size() < 4)
+  {
+    error = QString{"%1 must contain at least four points"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto result = std::vector<vm::vec3d>{};
+  result.reserve(static_cast<size_t>(array.size()));
+  for (auto i = 0; i < array.size(); ++i)
+  {
+    auto point = mcpVec3FromJsonValue(array[i], QString{"%1[%2]"}.arg(key).arg(i), error);
+    if (!point)
+    {
+      return std::nullopt;
+    }
+    result.push_back(*point);
+  }
+  return result;
+}
+
 std::optional<vm::bbox3d> boundsFromJson(const QJsonObject& params, QString& error)
 {
   const auto min = mcpVec3FromJson(params, "min", error);
@@ -672,6 +711,18 @@ std::vector<vm::vec2d> snapPointsToGrid(
   const std::vector<vm::vec2d>& points, const double grid)
 {
   auto result = std::vector<vm::vec2d>{};
+  result.reserve(points.size());
+  for (const auto& point : points)
+  {
+    result.push_back(snapToGrid(point, grid));
+  }
+  return result;
+}
+
+std::vector<vm::vec3d> snapPointsToGrid(
+  const std::vector<vm::vec3d>& points, const double grid)
+{
+  auto result = std::vector<vm::vec3d>{};
   result.reserve(points.size());
   for (const auto& point : points)
   {
@@ -2197,6 +2248,22 @@ std::vector<mdl::Node*> compileBatchOperation(
       return {};
     }
     return {new mdl::BrushNode{std::move(*brush)}};
+  }
+
+  if (type == "polyhedron")
+  {
+    auto points = points3DFromJson(operation, "points", error);
+    if (!points)
+    {
+      return {};
+    }
+    auto brush = builder.createBrush(snapPointsToGrid(*points, grid), material);
+    if (brush.is_error())
+    {
+      error = "Could not create convex polyhedron brush from points";
+      return {};
+    }
+    return {new mdl::BrushNode{std::move(brush.value())}};
   }
 
   if (type == "cylinder_sector")

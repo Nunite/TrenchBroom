@@ -30,6 +30,7 @@
 #include "ui/MapWindowManager.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <optional>
 #include <vector>
@@ -44,8 +45,10 @@ constexpr auto DefaultHeightScale = 128.0;
 constexpr auto DefaultHeightSteps = 8;
 constexpr auto DefaultMaxSize = 64;
 constexpr auto DefaultMaxBrushes = 512;
+constexpr auto DefaultAdaptiveMaxCellSpan = 4;
 constexpr auto HardMaxSize = 256;
 constexpr auto HardMaxBrushes = 4096;
+constexpr auto SurfaceEpsilon = 0.01;
 
 struct HeightmapOrigin
 {
@@ -61,6 +64,24 @@ struct HeightmapRect
   int width = 0;
   int height = 0;
   int level = 0;
+};
+
+struct HeightmapSurfaceCell
+{
+  int x = 0;
+  int y = 0;
+  int width = 0;
+  int height = 0;
+};
+
+struct HeightmapSurfaceStats
+{
+  int surfaceCellCount = 0;
+  int skippedZeroTriangles = 0;
+  int triangleBrushCount = 0;
+  int minCellSpan = 1;
+  int maxCellSpan = DefaultAdaptiveMaxCellSpan;
+  double errorTolerance = 0.0;
 };
 
 double optionalDouble(
@@ -169,6 +190,42 @@ std::vector<int> sampleLevels(
   return result;
 }
 
+double grayHeight(
+  const QImage& image,
+  const int x,
+  const int y,
+  const int sampledWidth,
+  const int sampledHeight,
+  const double heightScale)
+{
+  const auto sourceX = sampleCoordinate(x, image.width(), sampledWidth);
+  const auto sourceY = sampleCoordinate(y, image.height(), sampledHeight);
+  const auto color = image.pixelColor(sourceX, sourceY);
+  const auto gray = 0.299 * static_cast<double>(color.red())
+                    + 0.587 * static_cast<double>(color.green())
+                    + 0.114 * static_cast<double>(color.blue());
+  return gray / 255.0 * heightScale;
+}
+
+std::vector<double> sampleHeights(
+  const QImage& image,
+  const int sampledWidth,
+  const int sampledHeight,
+  const double heightScale)
+{
+  auto result =
+    std::vector<double>(static_cast<size_t>(sampledWidth * sampledHeight), 0.0);
+  for (auto y = 0; y < sampledHeight; ++y)
+  {
+    for (auto x = 0; x < sampledWidth; ++x)
+    {
+      result[static_cast<size_t>(y * sampledWidth + x)] =
+        grayHeight(image, x, y, sampledWidth, sampledHeight, heightScale);
+    }
+  }
+  return result;
+}
+
 std::vector<HeightmapRect> mergeSameHeightRects(
   const std::vector<int>& levels, const int width, const int height)
 {
@@ -240,6 +297,19 @@ QJsonArray vec3Json(const double x, const double y, const double z)
   return QJsonArray{x, y, z};
 }
 
+QJsonArray vec3Json(
+  const HeightmapOrigin& origin,
+  const int x,
+  const int y,
+  const double z,
+  const double cellSize)
+{
+  return vec3Json(
+    origin.x + static_cast<double>(x) * cellSize,
+    origin.y + static_cast<double>(y) * cellSize,
+    origin.z + z);
+}
+
 QJsonArray operationsFromRects(
   const std::vector<HeightmapRect>& rects,
   const HeightmapOrigin& origin,
@@ -269,6 +339,266 @@ QJsonArray operationsFromRects(
     }
     result.push_back(std::move(operation));
   }
+  return result;
+}
+
+double heightAt(
+  const std::vector<double>& heights, const int width, const int x, const int y)
+{
+  return heights[static_cast<size_t>(y * width + x)];
+}
+
+double bilinearHeight(
+  const double h00,
+  const double h10,
+  const double h11,
+  const double h01,
+  const double tx,
+  const double ty)
+{
+  const auto a = h00 * (1.0 - tx) + h10 * tx;
+  const auto b = h01 * (1.0 - tx) + h11 * tx;
+  return a * (1.0 - ty) + b * ty;
+}
+
+bool shouldSplitSurfaceCell(
+  const std::vector<double>& heights,
+  const int heightWidth,
+  const HeightmapSurfaceCell& cell,
+  const int minCellSpan,
+  const int maxCellSpan,
+  const double errorTolerance)
+{
+  if (cell.width > maxCellSpan || cell.height > maxCellSpan)
+  {
+    return true;
+  }
+  if (cell.width <= minCellSpan && cell.height <= minCellSpan)
+  {
+    return false;
+  }
+
+  const auto h00 = heightAt(heights, heightWidth, cell.x, cell.y);
+  const auto h10 = heightAt(heights, heightWidth, cell.x + cell.width, cell.y);
+  const auto h11 =
+    heightAt(heights, heightWidth, cell.x + cell.width, cell.y + cell.height);
+  const auto h01 = heightAt(heights, heightWidth, cell.x, cell.y + cell.height);
+
+  auto maxError = 0.0;
+  for (auto y = cell.y; y <= cell.y + cell.height; ++y)
+  {
+    const auto ty = static_cast<double>(y - cell.y) / static_cast<double>(cell.height);
+    for (auto x = cell.x; x <= cell.x + cell.width; ++x)
+    {
+      const auto tx = static_cast<double>(x - cell.x) / static_cast<double>(cell.width);
+      const auto expected = bilinearHeight(h00, h10, h11, h01, tx, ty);
+      maxError =
+        std::max(maxError, std::abs(heightAt(heights, heightWidth, x, y) - expected));
+    }
+  }
+  return maxError > errorTolerance;
+}
+
+void addAdaptiveSurfaceCells(
+  const std::vector<double>& heights,
+  const int heightWidth,
+  const HeightmapSurfaceCell& cell,
+  const int minCellSpan,
+  const int maxCellSpan,
+  const double errorTolerance,
+  std::vector<HeightmapSurfaceCell>& result)
+{
+  if (
+    shouldSplitSurfaceCell(
+      heights, heightWidth, cell, minCellSpan, maxCellSpan, errorTolerance)
+    && (cell.width > minCellSpan || cell.height > minCellSpan))
+  {
+    if (cell.width >= cell.height && cell.width > minCellSpan)
+    {
+      const auto leftWidth = cell.width / 2;
+      addAdaptiveSurfaceCells(
+        heights,
+        heightWidth,
+        HeightmapSurfaceCell{cell.x, cell.y, leftWidth, cell.height},
+        minCellSpan,
+        maxCellSpan,
+        errorTolerance,
+        result);
+      addAdaptiveSurfaceCells(
+        heights,
+        heightWidth,
+        HeightmapSurfaceCell{
+          cell.x + leftWidth, cell.y, cell.width - leftWidth, cell.height},
+        minCellSpan,
+        maxCellSpan,
+        errorTolerance,
+        result);
+      return;
+    }
+
+    if (cell.height > minCellSpan)
+    {
+      const auto topHeight = cell.height / 2;
+      addAdaptiveSurfaceCells(
+        heights,
+        heightWidth,
+        HeightmapSurfaceCell{cell.x, cell.y, cell.width, topHeight},
+        minCellSpan,
+        maxCellSpan,
+        errorTolerance,
+        result);
+      addAdaptiveSurfaceCells(
+        heights,
+        heightWidth,
+        HeightmapSurfaceCell{
+          cell.x, cell.y + topHeight, cell.width, cell.height - topHeight},
+        minCellSpan,
+        maxCellSpan,
+        errorTolerance,
+        result);
+      return;
+    }
+  }
+
+  result.push_back(cell);
+}
+
+std::vector<HeightmapSurfaceCell> adaptiveSurfaceCells(
+  const std::vector<double>& heights,
+  const int heightWidth,
+  const int cellWidth,
+  const int cellHeight,
+  const int minCellSpan,
+  const int maxCellSpan,
+  const double errorTolerance)
+{
+  auto result = std::vector<HeightmapSurfaceCell>{};
+  addAdaptiveSurfaceCells(
+    heights,
+    heightWidth,
+    HeightmapSurfaceCell{0, 0, cellWidth, cellHeight},
+    minCellSpan,
+    maxCellSpan,
+    errorTolerance,
+    result);
+  return result;
+}
+
+void pushUniquePoint(QJsonArray& points, const QJsonArray& point)
+{
+  for (const auto& value : points)
+  {
+    if (value.toArray() == point)
+    {
+      return;
+    }
+  }
+  points.push_back(point);
+}
+
+std::optional<QJsonObject> trianglePolyhedronOperation(
+  const HeightmapOrigin& origin,
+  const double cellSize,
+  const QString& material,
+  const std::array<int, 3>& xs,
+  const std::array<int, 3>& ys,
+  const std::array<double, 3>& heights)
+{
+  auto maxHeight = 0.0;
+  for (const auto height : heights)
+  {
+    maxHeight = std::max(maxHeight, height);
+  }
+  if (maxHeight <= SurfaceEpsilon)
+  {
+    return std::nullopt;
+  }
+
+  auto points = QJsonArray{};
+  for (auto i = 0u; i < xs.size(); ++i)
+  {
+    pushUniquePoint(points, vec3Json(origin, xs[i], ys[i], 0.0, cellSize));
+  }
+  for (auto i = 0u; i < xs.size(); ++i)
+  {
+    if (heights[i] > SurfaceEpsilon)
+    {
+      pushUniquePoint(points, vec3Json(origin, xs[i], ys[i], heights[i], cellSize));
+    }
+  }
+  if (points.size() < 4)
+  {
+    return std::nullopt;
+  }
+
+  auto operation = QJsonObject{
+    {"type", "polyhedron"},
+    {"points", points},
+  };
+  if (!material.isEmpty())
+  {
+    operation.insert("material", material);
+  }
+  return operation;
+}
+
+QJsonArray operationsFromAdaptiveSurface(
+  const std::vector<HeightmapSurfaceCell>& cells,
+  const std::vector<double>& heights,
+  const int heightWidth,
+  const HeightmapOrigin& origin,
+  const double cellSize,
+  const QString& material,
+  HeightmapSurfaceStats& stats)
+{
+  auto result = QJsonArray{};
+  for (const auto& cell : cells)
+  {
+    const auto x0 = cell.x;
+    const auto y0 = cell.y;
+    const auto x1 = cell.x + cell.width;
+    const auto y1 = cell.y + cell.height;
+
+    const auto h00 = heightAt(heights, heightWidth, x0, y0);
+    const auto h10 = heightAt(heights, heightWidth, x1, y0);
+    const auto h11 = heightAt(heights, heightWidth, x1, y1);
+    const auto h01 = heightAt(heights, heightWidth, x0, y1);
+
+    const auto firstTriangle = trianglePolyhedronOperation(
+      origin,
+      cellSize,
+      material,
+      std::array<int, 3>{x0, x1, x1},
+      std::array<int, 3>{y0, y0, y1},
+      std::array<double, 3>{h00, h10, h11});
+    if (firstTriangle)
+    {
+      result.push_back(*firstTriangle);
+    }
+    else
+    {
+      ++stats.skippedZeroTriangles;
+    }
+
+    const auto secondTriangle = trianglePolyhedronOperation(
+      origin,
+      cellSize,
+      material,
+      std::array<int, 3>{x0, x1, x0},
+      std::array<int, 3>{y0, y1, y1},
+      std::array<double, 3>{h00, h11, h01});
+    if (secondTriangle)
+    {
+      result.push_back(*secondTriangle);
+    }
+    else
+    {
+      ++stats.skippedZeroTriangles;
+    }
+  }
+
+  stats.surfaceCellCount = static_cast<int>(cells.size());
+  stats.triangleBrushCount = result.size();
   return result;
 }
 
@@ -334,10 +664,13 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
   }
 
   const auto mode = params.value("mode").toString("terraced_brushes").trimmed();
-  if (mode != "terraced_brushes")
+  const auto normalizedMode = mode.toLower();
+  const auto adaptiveSurface =
+    normalizedMode == "adaptive_surface" || normalizedMode == "adaptive_sloped";
+  if (normalizedMode != "terraced_brushes" && !adaptiveSurface)
   {
     return invalidParamsFailure(
-      "heightmap_import_grayscale currently supports mode=terraced_brushes only");
+      "mode must be terraced_brushes, adaptive_surface, or adaptive_sloped");
   }
 
   auto error = QString{};
@@ -390,10 +723,103 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
   const auto sampledHeight =
     std::max(1, static_cast<int>(std::ceil(static_cast<double>(image.height()) / scale)));
 
-  const auto levels = sampleLevels(image, sampledWidth, sampledHeight, heightSteps);
-  const auto skippedCells = static_cast<int>(std::ranges::count(levels, 0));
-  const auto rects = mergeSameHeightRects(levels, sampledWidth, sampledHeight);
-  if (rects.empty())
+  const auto material = params.value("material").toString();
+  auto operations = QJsonArray{};
+  auto skippedCells = 0;
+  auto brushCount = 0;
+  auto heightmapInfoExtras = QJsonObject{};
+
+  if (adaptiveSurface)
+  {
+    const auto surfaceWidth = std::max(1, sampledWidth);
+    const auto surfaceHeight = std::max(1, sampledHeight);
+    const auto vertexWidth = surfaceWidth + 1;
+    const auto vertexHeight = surfaceHeight + 1;
+    const auto heights = sampleHeights(image, vertexWidth, vertexHeight, heightScale);
+
+    const auto requestedMinCellSize = optionalDouble(params, "minCellSize", cellSize);
+    const auto requestedMaxCellSize =
+      optionalDouble(params, "maxCellSize", cellSize * DefaultAdaptiveMaxCellSpan);
+    if (!std::isfinite(requestedMinCellSize) || requestedMinCellSize <= 0.0)
+    {
+      return invalidParamsFailure("minCellSize must be greater than zero");
+    }
+    if (!std::isfinite(requestedMaxCellSize) || requestedMaxCellSize <= 0.0)
+    {
+      return invalidParamsFailure("maxCellSize must be greater than zero");
+    }
+    if (requestedMinCellSize > requestedMaxCellSize)
+    {
+      return invalidParamsFailure(
+        "minCellSize must be less than or equal to maxCellSize");
+    }
+
+    const auto minCellSpan = std::clamp(
+      static_cast<int>(std::round(requestedMinCellSize / cellSize)),
+      1,
+      std::max(surfaceWidth, surfaceHeight));
+    const auto maxCellSpan = std::clamp(
+      static_cast<int>(std::round(requestedMaxCellSize / cellSize)),
+      minCellSpan,
+      std::max(surfaceWidth, surfaceHeight));
+    const auto errorTolerance =
+      optionalDouble(params, "errorTolerance", std::max(1.0, heightScale / 16.0));
+    if (!std::isfinite(errorTolerance) || errorTolerance < 0.0)
+    {
+      return invalidParamsFailure("errorTolerance must be zero or greater");
+    }
+
+    auto stats = HeightmapSurfaceStats{};
+    stats.minCellSpan = minCellSpan;
+    stats.maxCellSpan = maxCellSpan;
+    stats.errorTolerance = errorTolerance;
+    const auto cells = adaptiveSurfaceCells(
+      heights,
+      vertexWidth,
+      surfaceWidth,
+      surfaceHeight,
+      minCellSpan,
+      maxCellSpan,
+      errorTolerance);
+    operations = operationsFromAdaptiveSurface(
+      cells, heights, vertexWidth, *origin, cellSize, material, stats);
+    skippedCells = stats.skippedZeroTriangles;
+    brushCount = stats.triangleBrushCount;
+    heightmapInfoExtras = QJsonObject{
+      {"surfaceCellCount", stats.surfaceCellCount},
+      {"skippedZeroTriangles", stats.skippedZeroTriangles},
+      {"triangleBrushCount", stats.triangleBrushCount},
+      {"minCellSize", static_cast<double>(minCellSpan) * cellSize},
+      {"maxCellSize", static_cast<double>(maxCellSpan) * cellSize},
+      {"errorTolerance", errorTolerance},
+    };
+  }
+  else
+  {
+    const auto levels = sampleLevels(image, sampledWidth, sampledHeight, heightSteps);
+    skippedCells = static_cast<int>(std::ranges::count(levels, 0));
+    const auto rects = mergeSameHeightRects(levels, sampledWidth, sampledHeight);
+    operations =
+      operationsFromRects(rects, *origin, cellSize, heightScale, heightSteps, material);
+    brushCount = static_cast<int>(rects.size());
+  }
+
+  auto heightmapInfo = heightmapInfoJson(
+    image,
+    sampledWidth,
+    sampledHeight,
+    heightSteps,
+    cellSize,
+    heightScale,
+    skippedCells,
+    brushCount,
+    adaptiveSurface ? "adaptive_surface" : "terraced_brushes");
+  for (auto it = heightmapInfoExtras.begin(); it != heightmapInfoExtras.end(); ++it)
+  {
+    heightmapInfo.insert(it.key(), it.value());
+  }
+
+  if (operations.isEmpty())
   {
     return McpBridgeToolResult::success(QJsonObject{
       {"valid", false},
@@ -404,20 +830,10 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
          {"operationCount", 0},
          {"brushCount", 0},
        }},
-      {"heightmap",
-       heightmapInfoJson(
-         image,
-         sampledWidth,
-         sampledHeight,
-         heightSteps,
-         cellSize,
-         heightScale,
-         skippedCells,
-         0,
-         mode)},
+      {"heightmap", heightmapInfo},
     });
   }
-  if (static_cast<int>(rects.size()) > maxBrushes)
+  if (brushCount > maxBrushes)
   {
     return McpBridgeToolResult::success(QJsonObject{
       {"valid", false},
@@ -427,32 +843,20 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
          {"errors",
           QJsonArray{QString{"heightmap would create %1 brushes; increase maxBrushes "
                              "or lower maxSize/heightSteps"}
-                       .arg(rects.size())}},
-         {"operationCount", static_cast<int>(rects.size())},
-         {"brushCount", static_cast<int>(rects.size())},
+                       .arg(brushCount)}},
+         {"operationCount", brushCount},
+         {"brushCount", brushCount},
        }},
-      {"heightmap",
-       heightmapInfoJson(
-         image,
-         sampledWidth,
-         sampledHeight,
-         heightSteps,
-         cellSize,
-         heightScale,
-         skippedCells,
-         static_cast<int>(rects.size()),
-         mode)},
+      {"heightmap", heightmapInfo},
     });
   }
 
-  const auto material = params.value("material").toString();
   auto batchParams = QJsonObject{
     {"name", params.value("name").toString("MCP: Import grayscale heightmap")},
     {"grid", params.value("grid").toDouble(1.0)},
     {"select", optionalBool(params, "select", true)},
     {"detail", params.value("detail").toString("summary")},
-    {"operations",
-     operationsFromRects(rects, *origin, cellSize, heightScale, heightSteps, material)},
+    {"operations", operations},
   };
   if (!material.isEmpty())
   {
@@ -463,16 +867,6 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
     map, "blockout_create_batch", batchParams, history, nextOperationIndex);
   if (result.ok)
   {
-    const auto heightmapInfo = heightmapInfoJson(
-      image,
-      sampledWidth,
-      sampledHeight,
-      heightSteps,
-      cellSize,
-      heightScale,
-      skippedCells,
-      static_cast<int>(rects.size()),
-      mode);
     result.result.insert("heightmap", heightmapInfo);
     result.result.insert("toolName", "heightmap_import_grayscale");
     if (

@@ -1306,8 +1306,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"operations",
            arrayProperty(
              "Array of blockout operations. Supported types include box, prism, "
-             "cylinder_sector, room, corridor, curved_corridor, stairs, ramp, "
-             "doorway, cover, and sky_shell.")},
+             "polyhedron, cylinder_sector, room, corridor, curved_corridor, stairs, "
+             "ramp, doorway, cover, and sky_shell.")},
         },
         {"operations"}),
     },
@@ -1337,9 +1337,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "heightmap_import_grayscale",
-      "Import a local grayscale image as terraced brush terrain. The image is sampled, "
-      "quantized, merged into same-height rectangles, then committed as one batch "
-      "transaction.",
+      "Import a local grayscale image as brush terrain. Defaults to terraced_brushes; "
+      "adaptive_surface approximates a smoother heightfield with finer brush cells in "
+      "more complex areas.",
       McpMode::Edit,
       true,
       true,
@@ -1356,7 +1356,20 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"maxBrushes",
            integerProperty("Maximum merged brushes to create, defaults to 512.")},
           {"mode",
-           stringProperty("Import mode. First version supports terraced_brushes only.")},
+           stringProperty(
+             "Import mode: terraced_brushes or adaptive_surface. Defaults to "
+             "terraced_brushes.")},
+          {"minCellSize",
+           numberProperty(
+             "adaptive_surface minimum cell size in map units. Defaults to cellSize.")},
+          {"maxCellSize",
+           numberProperty(
+             "adaptive_surface maximum cell size in map units. Defaults to 4 * "
+             "cellSize.")},
+          {"errorTolerance",
+           numberProperty(
+             "adaptive_surface height error tolerance in map units before a cell "
+             "subdivides. Lower values create more brushes.")},
           {"material", stringProperty("Brush material, defaults to current material.")},
           {"select", boolProperty("Select generated terrain brushes.")},
           {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
