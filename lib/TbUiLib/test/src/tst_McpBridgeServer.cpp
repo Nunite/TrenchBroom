@@ -34,6 +34,8 @@
 #include "ui/MapWindowManager.h"
 #include "ui/mcp/McpBridgeServer.h"
 
+#include <optional>
+
 #include <catch2/catch_test_macros.hpp>
 
 namespace tb::ui
@@ -1026,6 +1028,34 @@ TEST_CASE("McpBridgeServer")
       mcp::McpMode::Edit});
     CHECK(curvedResponse.ok);
     CHECK(curvedResponse.result.value("operationId").toString() == "mcp-op-11");
+  }
+
+  SECTION("rejects nested dispatch")
+  {
+    auto* nestedServer = static_cast<McpBridgeServer*>(nullptr);
+    auto nestedResponse = std::optional<mcp::McpBridgeResponse>{};
+    auto guardedServer = McpBridgeServer{[&](
+                                           const QString& toolName, const QJsonObject&) {
+      if (toolName == "tb_status")
+      {
+        nestedResponse = nestedServer->dispatchRequest(mcp::McpBridgeRequest{
+          "nested", "secret", "tb_doctor", {}, mcp::McpMode::ReadOnly});
+        return McpBridgeToolResult::success(QJsonObject{{"application", "TrenchBroom"}});
+      }
+      return McpBridgeToolResult::success(QJsonObject{{"ok", true}});
+    }};
+    nestedServer = &guardedServer;
+    REQUIRE(guardedServer.start(
+      mcp::McpBridgeConfig{"test-pipe-nested", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = guardedServer.dispatchRequest(
+      mcp::McpBridgeRequest{"outer", "secret", "tb_status", {}, mcp::McpMode::ReadOnly});
+
+    REQUIRE(response.ok);
+    REQUIRE(nestedResponse);
+    CHECK(!nestedResponse->ok);
+    REQUIRE(nestedResponse->error);
+    CHECK(nestedResponse->error->code == mcp::McpErrorCode::Forbidden);
   }
 }
 

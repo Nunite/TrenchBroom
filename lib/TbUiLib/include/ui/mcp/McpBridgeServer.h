@@ -73,6 +73,7 @@ private:
   QJsonObject m_overlayState;
   mutable int m_nextOperationIndex = 1;
   mutable std::vector<McpOperationRecord> m_operationHistory;
+  mutable bool m_dispatchInProgress = false;
   std::unique_ptr<QLocalServer> m_server;
 
 public:

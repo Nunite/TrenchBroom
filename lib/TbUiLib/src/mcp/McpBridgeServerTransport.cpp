@@ -132,6 +132,14 @@ std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) con
 mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   const mcp::McpBridgeRequest& request) const
 {
+  if (m_dispatchInProgress)
+  {
+    return makeFailure(
+      request,
+      mcp::McpErrorCode::Forbidden,
+      "MCP bridge is already handling another request; retry after it finishes");
+  }
+
   if (request.token != m_config.token)
   {
     return makeFailure(
@@ -163,6 +171,20 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
       QString{"MCP tool is not available in mode %1"}.arg(mcp::modeName(m_config.mode)));
   }
 
+  struct DispatchGuard
+  {
+    bool& dispatchInProgress;
+
+    explicit DispatchGuard(bool& i_dispatchInProgress)
+      : dispatchInProgress{i_dispatchInProgress}
+    {
+      dispatchInProgress = true;
+    }
+
+    ~DispatchGuard() { dispatchInProgress = false; }
+  };
+
+  const auto dispatchGuard = DispatchGuard{m_dispatchInProgress};
   const auto result = m_toolHandler(request.tool, request.params);
   if (result.ok)
   {
