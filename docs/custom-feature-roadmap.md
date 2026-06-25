@@ -76,9 +76,9 @@
 
 - [ ] MCP / Agent 白盒生成
   - 目标：让外部 MCP client 通过结构化工具查询地图、执行动作、放置资产，并逐步生成 GoldSrc/CS 1.6 白盒。
-  - 状态：底层协议、`TbMcpLib`、本地 bridge、stdio server、tool catalog、安全模式、只读工具、选择设置、action 执行、事务型 entity/brush 编辑、MCP history、GoldSrc 资产/材质工具、overlay/capture、compile/leak 辅助、Blockout IR、smoke 脚本和 Agent 工作流文档已接入；默认关闭，不直接开放任意 Python 脚本。
-  - 重点：TrenchBroom 是唯一真实状态；写操作必须走 `MapDocument` transaction；白盒生成使用 Blockout IR，不让 AI 直接拼 brush 顶点。
-  - 下一步：把 MCP overlay 收束进统一视图叠加层管理器，补 prefab provider、高级 UV 对齐、更细的 Blockout validation/snap 规则，以及真实 MCP client 端到端回归。
+  - 状态：底层协议、`TbMcpLib`、内置 HTTP `/mcp`、stdio 兼容 shim、tool catalog、安全模式、只读工具、选择设置、action 执行、事务型 entity/brush 编辑、MCP history、GoldSrc 资产/材质工具、overlay/capture、compile/leak 辅助、Blockout IR、批量 `blockout_create_batch`、`operation_*` 详情工具、`resources/read` 和 tool profile 已接入；默认关闭，不直接开放任意 Python 脚本。
+  - 重点：TrenchBroom 是唯一真实状态；写操作必须走 `MapDocument` transaction；白盒生成优先使用高层 outcome tools 和 Batch Blockout IR，不让 AI 默认直接拼 brush 顶点。
+  - 下一步：把 MCP overlay 收束进统一视图叠加层管理器，补 prefab provider、高级 UV 对齐、更细的 Blockout validation/snap 规则、更多 GoldSrc 常用结构模板，以及真实 MCP client 端到端回归。
   - 依赖：视图叠加层管理器用于 overlay/截图反馈，统一资产浏览器用于模型/Sprite/声音放置，`tb2` 稳定 API 可作为后续插件扩展基础。
 
 - [ ] Python 插件 v2 生产级收尾

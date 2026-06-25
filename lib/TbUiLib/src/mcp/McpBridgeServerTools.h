@@ -135,6 +135,16 @@ McpBridgeToolResult viewportCapture2DResult(
   AppController& appController, const QJsonObject& params);
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
+McpBridgeToolResult operationInspectResult(
+  const std::vector<McpOperationRecord>& history, const QJsonObject& params);
+McpBridgeToolResult operationSelectResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params);
+McpBridgeToolResult operationValidateResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params);
 McpBridgeToolResult historyUndoResult(
   AppController& appController, std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyRedoResult(
@@ -203,6 +213,12 @@ McpBridgeToolResult createBrushResult(
   int& nextOperationIndex);
 McpBridgeToolResult blockoutValidateResult(const QJsonObject& params);
 McpBridgeToolResult blockoutCreateResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult blockoutCreateBatchResult(
   AppController& appController,
   const QString& toolName,
   const QJsonObject& params,

@@ -40,12 +40,19 @@ TEST_CASE("McpBridgeConfig")
     CHECK(config.httpEnabled);
     CHECK(config.httpHost == "127.0.0.1");
     CHECK(config.httpPort == 37666);
+    CHECK(config.toolProfile == McpToolProfile::Balanced);
   }
 
   SECTION("json roundtrip")
   {
     const auto config = McpBridgeConfig{
-      "test-pipe", "secret-token", McpMode::ReadOnly, true, "localhost", 37667};
+      "test-pipe",
+      "secret-token",
+      McpMode::ReadOnly,
+      true,
+      "localhost",
+      37667,
+      McpToolProfile::Full};
 
     const auto parsed = bridgeConfigFromJson(toJson(config));
 
@@ -56,6 +63,7 @@ TEST_CASE("McpBridgeConfig")
     CHECK(parsed->httpEnabled == config.httpEnabled);
     CHECK(parsed->httpHost == config.httpHost);
     CHECK(parsed->httpPort == config.httpPort);
+    CHECK(parsed->toolProfile == config.toolProfile);
   }
 
   SECTION("legacy json gets default http settings")
@@ -70,6 +78,20 @@ TEST_CASE("McpBridgeConfig")
     CHECK(parsed->httpEnabled);
     CHECK(parsed->httpHost == "127.0.0.1");
     CHECK(parsed->httpPort == 37666);
+    CHECK(parsed->toolProfile == McpToolProfile::Balanced);
+  }
+
+  SECTION("reads tool profile")
+  {
+    const auto parsed = bridgeConfigFromJson(QJsonObject{
+      {"pipeName", "test-pipe"},
+      {"token", "secret-token"},
+      {"mode", "ReadOnly"},
+      {"toolProfile", "Core"},
+    });
+
+    REQUIRE(parsed);
+    CHECK(parsed->toolProfile == McpToolProfile::Core);
   }
 
   SECTION("rejects invalid json")
@@ -78,6 +100,16 @@ TEST_CASE("McpBridgeConfig")
 
     CHECK(!bridgeConfigFromJson(QJsonObject{}, &error));
     CHECK(error.contains("pipeName"));
+
+    CHECK(!bridgeConfigFromJson(
+      QJsonObject{
+        {"pipeName", "test-pipe"},
+        {"token", "secret-token"},
+        {"mode", "ReadOnly"},
+        {"toolProfile", "Tiny"},
+      },
+      &error));
+    CHECK(error.contains("toolProfile"));
   }
 
   SECTION("read or create config")

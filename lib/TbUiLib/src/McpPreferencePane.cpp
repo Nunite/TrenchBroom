@@ -42,6 +42,23 @@ int findModeIndex(const QComboBox& combo, const mcp::McpMode mode)
   return combo.findData(mcp::modeName(mode), ModeRole);
 }
 
+void addToolProfile(
+  QComboBox& combo, const QString& label, const mcp::McpToolProfile profile)
+{
+  combo.addItem(label, mcp::toolProfileName(profile));
+}
+
+mcp::McpToolProfile toolProfileFromCombo(const QComboBox& combo)
+{
+  const auto value = combo.currentData(ModeRole).toString();
+  return mcp::parseToolProfile(value).value_or(mcp::McpToolProfile::Balanced);
+}
+
+int findToolProfileIndex(const QComboBox& combo, const mcp::McpToolProfile profile)
+{
+  return combo.findData(mcp::toolProfileName(profile), ModeRole);
+}
+
 } // namespace
 
 McpPreferencePane::McpPreferencePane(AppController& appController, QWidget* parent)
@@ -59,10 +76,10 @@ void McpPreferencePane::createGui()
 {
   auto* mcpPreferences = new QWidget{};
 
-  auto* infoLabel = new QLabel{tr(
-    "MCP lets local agent clients inspect and control TrenchBroom through a "
-    "localhost HTTP endpoint. Keep it Off unless you are actively using an MCP "
-    "client. Changes on this page apply immediately.")};
+  auto* infoLabel = new QLabel{
+    tr("MCP lets local agent clients inspect and control TrenchBroom through a "
+       "localhost HTTP endpoint. Keep it Off unless you are actively using an MCP "
+       "client. Changes on this page apply immediately.")};
   infoLabel->setWordWrap(true);
   setInfoStyle(infoLabel);
 
@@ -79,6 +96,19 @@ void McpPreferencePane::createGui()
     QOverload<int>::of(&QComboBox::currentIndexChanged),
     this,
     &McpPreferencePane::modeChanged);
+
+  m_toolProfileCombo = new QComboBox{};
+  addToolProfile(*m_toolProfileCombo, tr("Core"), mcp::McpToolProfile::Core);
+  addToolProfile(*m_toolProfileCombo, tr("Balanced"), mcp::McpToolProfile::Balanced);
+  addToolProfile(*m_toolProfileCombo, tr("Full"), mcp::McpToolProfile::Full);
+  m_toolProfileCombo->setToolTip(
+    tr("Core exposes only compact high-level tools. Balanced is recommended. Full "
+       "also exposes expert atomic brush tools."));
+  connect(
+    m_toolProfileCombo,
+    QOverload<int>::of(&QComboBox::currentIndexChanged),
+    this,
+    &McpPreferencePane::toolProfileChanged);
 
   m_httpUrlEdit = new QLineEdit{};
   m_httpUrlEdit->setReadOnly(true);
@@ -138,6 +168,7 @@ void McpPreferencePane::createGui()
   layout->addSection(tr("MCP Bridge"));
   layout->addRow(infoLabel);
   layout->addRow(tr("Mode"), m_modeCombo);
+  layout->addRow(tr("Tool Profile"), m_toolProfileCombo);
   layout->addRow(tr("Status"), m_statusLabel);
   layout->addSection(tr("HTTP Connection"));
   layout->addRow(tr("URL"), m_httpUrlEdit);
@@ -173,19 +204,22 @@ void McpPreferencePane::doResetToDefaults()
 void McpPreferencePane::updateControls()
 {
   const auto modeBlocker = QSignalBlocker{m_modeCombo};
+  const auto toolProfileBlocker = QSignalBlocker{m_toolProfileCombo};
   const auto pipeBlocker = QSignalBlocker{m_pipeNameEdit};
   const auto httpUrlBlocker = QSignalBlocker{m_httpUrlEdit};
   const auto claudeCommandBlocker = QSignalBlocker{m_claudeCommandEdit};
 
   const auto modeIndex = findModeIndex(*m_modeCombo, m_config.mode);
   m_modeCombo->setCurrentIndex(modeIndex >= 0 ? modeIndex : 0);
+  const auto toolProfileIndex =
+    findToolProfileIndex(*m_toolProfileCombo, m_config.toolProfile);
+  m_toolProfileCombo->setCurrentIndex(toolProfileIndex >= 0 ? toolProfileIndex : 1);
   const auto httpUrl =
     QString{"http://%1:%2/mcp"}.arg(m_config.httpHost).arg(m_config.httpPort);
   m_httpUrlEdit->setText(httpUrl);
   m_pipeNameEdit->setText(m_config.pipeName);
   m_claudeCommandEdit->setText(
-    QString{"claude mcp add --scope user --transport http trenchbroom %1"}.arg(
-      httpUrl));
+    QString{"claude mcp add --scope user --transport http trenchbroom %1"}.arg(httpUrl));
   m_configPathEdit->setText(QDir::toNativeSeparators(m_configPath));
 
   const auto modeText = mcp::modeName(m_config.mode);
@@ -258,6 +292,12 @@ void McpPreferencePane::applyConfigChange()
 void McpPreferencePane::modeChanged(const int /* index */)
 {
   m_config.mode = modeFromCombo(*m_modeCombo);
+  applyConfigChange();
+}
+
+void McpPreferencePane::toolProfileChanged(const int /* index */)
+{
+  m_config.toolProfile = toolProfileFromCombo(*m_toolProfileCombo);
   applyConfigChange();
 }
 

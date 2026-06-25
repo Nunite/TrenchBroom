@@ -21,6 +21,7 @@
 
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QStringList>
 
 #include "mcp/McpError.h"
 #include "mcp/McpToolCatalog.h"
@@ -37,14 +38,26 @@ constexpr auto ServerVersion = "0.1.0";
 QJsonObject textToolResult(
   const QString& text, const bool isError, QJsonObject structuredContent = {})
 {
+  auto content = QJsonArray{
+    QJsonObject{
+      {"type", "text"},
+      {"text", text},
+    },
+  };
+  const auto resourceUri = structuredContent.value("resourceUri").toString();
+  if (!resourceUri.isEmpty())
+  {
+    content.push_back(QJsonObject{
+      {"type", "resource_link"},
+      {"uri", resourceUri},
+      {"name", structuredContent.value("operationId").toString("MCP operation")},
+      {"description", "MCP operation details"},
+      {"mimeType", "application/json"},
+    });
+  }
+
   auto result = QJsonObject{
-    {"content",
-     QJsonArray{
-       QJsonObject{
-         {"type", "text"},
-         {"text", text},
-       },
-     }},
+    {"content", content},
     {"isError", isError},
   };
 
@@ -59,6 +72,50 @@ QJsonObject textToolResult(
 QString compactJsonText(const QJsonObject& json)
 {
   return QString::fromUtf8(QJsonDocument{json}.toJson(QJsonDocument::Compact));
+}
+
+QString toolResultText(const QJsonObject& json)
+{
+  const auto summary = json.value("summary").toString();
+  if (!summary.isEmpty())
+  {
+    return summary;
+  }
+
+  const auto operationId = json.value("operationId").toString();
+  if (!operationId.isEmpty())
+  {
+    const auto transactionName = json.value("transactionName").toString();
+    const auto changedCount = json.value("changedObjectCount").toInt(-1);
+    const auto brushCount = json.value("brushCount").toInt(-1);
+
+    auto parts = QStringList{QString{"operationId=%1"}.arg(operationId)};
+    if (!transactionName.isEmpty())
+    {
+      parts.push_back(QString{"transaction=%1"}.arg(transactionName));
+    }
+    if (brushCount >= 0)
+    {
+      parts.push_back(QString{"brushCount=%1"}.arg(brushCount));
+    }
+    else if (changedCount >= 0)
+    {
+      parts.push_back(QString{"changedObjectCount=%1"}.arg(changedCount));
+    }
+    if (const auto resourceUri = json.value("resourceUri").toString();
+        !resourceUri.isEmpty())
+    {
+      parts.push_back(QString{"resource=%1"}.arg(resourceUri));
+    }
+    return parts.join("; ");
+  }
+
+  if (json.contains("count"))
+  {
+    return QString{"count=%1"}.arg(json.value("count").toInt());
+  }
+
+  return compactJsonText(json);
 }
 
 } // namespace
@@ -95,6 +152,7 @@ QJsonObject mcpInitializeResult(const QJsonObject& params)
     {"protocolVersion", protocolVersion},
     {"capabilities",
      QJsonObject{
+       {"resources", QJsonObject{}},
        {"tools", QJsonObject{{"listChanged", false}}},
      }},
     {"serverInfo",
@@ -110,12 +168,18 @@ QJsonObject mcpInitializeResult(const QJsonObject& params)
   };
 }
 
-QJsonObject mcpToolsListResult(const McpMode currentMode)
+QJsonObject mcpToolsListResult(const McpMode currentMode, const McpToolProfile profile)
 {
   return QJsonObject{
-    {"tools", toolsListJson(McpMode::Edit)},
+    {"tools", toolsListJson(McpMode::Edit, true, profile)},
     {"trenchBroomMode", modeName(currentMode)},
+    {"toolProfile", toolProfileName(profile)},
   };
+}
+
+QJsonObject mcpToolsListResult(const McpMode currentMode)
+{
+  return mcpToolsListResult(currentMode, McpToolProfile::Balanced);
 }
 
 QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& toolCaller)
@@ -141,7 +205,7 @@ QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& to
   if (bridgeResponse.ok)
   {
     return textToolResult(
-      compactJsonText(bridgeResponse.result), false, bridgeResponse.result);
+      toolResultText(bridgeResponse.result), false, bridgeResponse.result);
   }
 
   const auto error = bridgeResponse.error.value_or(
@@ -154,7 +218,11 @@ QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& to
 }
 
 std::optional<QJsonObject> handleMcpJsonRpcRequest(
-  const QJsonObject& request, const McpMode currentMode, const McpToolCaller& toolCaller)
+  const QJsonObject& request,
+  const McpMode currentMode,
+  const McpToolCaller& toolCaller,
+  const McpToolProfile profile,
+  const McpResourceReader& resourceReader)
 {
   const auto id = request.value("id");
   const auto method = request.value("method").toString();
@@ -184,7 +252,7 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
 
   if (method == "tools/list")
   {
-    return jsonRpcResult(id, mcpToolsListResult(currentMode));
+    return jsonRpcResult(id, mcpToolsListResult(currentMode, profile));
   }
 
   if (method == "tools/call")
@@ -192,7 +260,41 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
     return jsonRpcResult(id, mcpToolCallResult(params, toolCaller));
   }
 
+  if (method == "resources/read")
+  {
+    const auto uri = params.value("uri").toString();
+    if (uri.isEmpty())
+    {
+      return jsonRpcError(id, -32602, "resources/read requires uri");
+    }
+    if (!resourceReader)
+    {
+      return jsonRpcError(id, -32601, "resources/read is not available");
+    }
+    const auto resource = resourceReader(uri);
+    if (!resource)
+    {
+      return jsonRpcError(id, -32002, QString{"Resource not found: %1"}.arg(uri));
+    }
+    return jsonRpcResult(
+      id,
+      QJsonObject{
+        {"contents",
+         QJsonArray{QJsonObject{
+           {"uri", uri},
+           {"mimeType", "application/json"},
+           {"text", compactJsonText(*resource)},
+         }}}});
+  }
+
   return jsonRpcError(id, -32601, QString{"Method not found: %1"}.arg(method));
+}
+
+std::optional<QJsonObject> handleMcpJsonRpcRequest(
+  const QJsonObject& request, const McpMode currentMode, const McpToolCaller& toolCaller)
+{
+  return handleMcpJsonRpcRequest(
+    request, currentMode, toolCaller, McpToolProfile::Balanced, {});
 }
 
 } // namespace tb::mcp

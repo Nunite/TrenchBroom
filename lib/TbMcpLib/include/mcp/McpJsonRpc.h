@@ -25,6 +25,7 @@
 
 #include "mcp/McpBridgeMessages.h"
 #include "mcp/McpMode.h"
+#include "mcp/McpToolCatalog.h"
 
 #include <functional>
 #include <optional>
@@ -34,12 +35,20 @@ namespace tb::mcp
 
 using McpToolCaller =
   std::function<McpBridgeResponse(const QString& toolName, const QJsonObject& arguments)>;
+using McpResourceReader = std::function<std::optional<QJsonObject>(const QString& uri)>;
 
 QJsonObject jsonRpcResult(const QJsonValue& id, QJsonObject result);
 QJsonObject jsonRpcError(const QJsonValue& id, int code, const QString& message);
 QJsonObject mcpInitializeResult(const QJsonObject& params);
+QJsonObject mcpToolsListResult(McpMode currentMode, McpToolProfile profile);
 QJsonObject mcpToolsListResult(McpMode currentMode);
 QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& toolCaller);
+std::optional<QJsonObject> handleMcpJsonRpcRequest(
+  const QJsonObject& request,
+  McpMode currentMode,
+  const McpToolCaller& toolCaller,
+  McpToolProfile profile,
+  const McpResourceReader& resourceReader);
 std::optional<QJsonObject> handleMcpJsonRpcRequest(
   const QJsonObject& request, McpMode currentMode, const McpToolCaller& toolCaller);
 

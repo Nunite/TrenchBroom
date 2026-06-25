@@ -100,6 +100,35 @@ const QJsonObject& McpBridgeServer::overlayState() const
   return m_overlayState;
 }
 
+std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) const
+{
+  static const auto Prefix = QString{"tbmcp://operation/"};
+  if (!uri.startsWith(Prefix))
+  {
+    return std::nullopt;
+  }
+
+  const auto operationId = uri.mid(Prefix.size());
+  const auto it = std::ranges::find_if(m_operationHistory, [&](const auto& operation) {
+    return operation.operationId == operationId;
+  });
+  if (it == m_operationHistory.end())
+  {
+    return std::nullopt;
+  }
+
+  return QJsonObject{
+    {"operationId", it->operationId},
+    {"toolName", it->toolName},
+    {"transactionName", it->transactionName},
+    {"changedObjectIds", it->changedObjectIds},
+    {"changedObjectCount", it->changedObjectIds.size()},
+    {"undone", it->undone},
+    {"summary", it->summary},
+    {"detail", it->detail},
+  };
+}
+
 mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   const mcp::McpBridgeRequest& request) const
 {

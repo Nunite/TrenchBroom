@@ -55,6 +55,8 @@ struct McpOperationRecord
   QString toolName;
   QString transactionName;
   QJsonArray changedObjectIds;
+  QJsonObject summary;
+  QJsonObject detail;
   bool undone = false;
 };
 
@@ -87,6 +89,7 @@ public:
   const QJsonObject& overlayState() const;
 
   mcp::McpBridgeResponse dispatchRequest(const mcp::McpBridgeRequest& request) const;
+  std::optional<QJsonObject> readResource(const QString& uri) const;
 
 private:
   void handleNewConnection();

@@ -504,11 +504,12 @@ QJsonObject makeStatus(AppController& appController, const mcp::McpBridgeConfig&
 
 QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig& config)
 {
-  const auto implementedTools = mcp::toolsListJson(config.mode);
+  const auto implementedTools = mcp::toolsListJson(config.mode, true, config.toolProfile);
   return QJsonObject{
     {"configPath", mcp::defaultConfigPath()},
     {"pipeName", config.pipeName},
     {"mode", mcp::modeName(config.mode)},
+    {"toolProfile", mcp::toolProfileName(config.toolProfile)},
     {"tokenPresent", !config.token.isEmpty()},
     {"listening", config.mode != mcp::McpMode::Off},
     {"documentCount",

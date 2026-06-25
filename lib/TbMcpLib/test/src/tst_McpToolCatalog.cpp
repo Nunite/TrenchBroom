@@ -80,6 +80,12 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("geometry_analyze_selection"));
     CHECK(findToolDefinition("blockout_create_spiral_stairs"));
     CHECK(findToolDefinition("blockout_validate_spiral_stairs"));
+    CHECK(findToolDefinition("operation_inspect"));
+    CHECK(findToolDefinition("operation_select"));
+    CHECK(findToolDefinition("operation_validate"));
+    CHECK(findToolDefinition("blockout_create_batch"));
+    CHECK(findToolDefinition("blockout_create_curved_corridor"));
+    CHECK(findToolDefinition("tb_tools_search"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
   }
@@ -153,7 +159,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("history_undo_mcp"));
   }
 
-  SECTION("edit mode lists implemented edit tools")
+  SECTION("balanced edit mode lists common tools and hides expert brush tools")
   {
     const auto tools = toolsListJson(McpMode::Edit);
     auto names = QStringList{};
@@ -174,18 +180,18 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("entity_tie_brushes"));
     CHECK(names.contains("entity_untie_brushes"));
     CHECK(names.contains("brush_types_list"));
-    CHECK(names.contains("brush_create"));
-    CHECK(names.contains("brush_create_box"));
-    CHECK(names.contains("brush_create_wedge"));
-    CHECK(names.contains("brush_create_cylinder"));
-    CHECK(names.contains("brush_create_cone"));
-    CHECK(names.contains("brush_create_pipe"));
-    CHECK(names.contains("brush_create_sphere"));
-    CHECK(names.contains("brush_create_pyramid"));
-    CHECK(names.contains("brush_create_tetrahedron"));
-    CHECK(names.contains("brush_create_from_planes"));
-    CHECK(names.contains("brush_create_prism"));
-    CHECK(names.contains("brush_create_cylinder_sector"));
+    CHECK(!names.contains("brush_create"));
+    CHECK(!names.contains("brush_create_box"));
+    CHECK(!names.contains("brush_create_wedge"));
+    CHECK(!names.contains("brush_create_cylinder"));
+    CHECK(!names.contains("brush_create_cone"));
+    CHECK(!names.contains("brush_create_pipe"));
+    CHECK(!names.contains("brush_create_sphere"));
+    CHECK(!names.contains("brush_create_pyramid"));
+    CHECK(!names.contains("brush_create_tetrahedron"));
+    CHECK(!names.contains("brush_create_from_planes"));
+    CHECK(!names.contains("brush_create_prism"));
+    CHECK(!names.contains("brush_create_cylinder_sector"));
     CHECK(!names.contains("brush_create_arch"));
     CHECK(!names.contains("brush_create_torus"));
     CHECK(names.contains("asset_place_model"));
@@ -219,6 +225,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_create_cover"));
     CHECK(names.contains("blockout_create_sky_shell"));
     CHECK(names.contains("blockout_create_spiral_stairs"));
+    CHECK(names.contains("blockout_create_batch"));
+    CHECK(names.contains("blockout_create_curved_corridor"));
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("blockout_validate_spiral_stairs"));
@@ -227,6 +235,78 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("viewport_capture_current"));
     CHECK(names.contains("viewport_capture_3d"));
     CHECK(names.contains("viewport_capture_2d"));
+  }
+
+  SECTION("core profile keeps only compact discovery and batch-oriented tools")
+  {
+    const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Core);
+    auto names = QStringList{};
+    for (const auto& tool : tools)
+    {
+      names.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("tb_status"));
+    CHECK(names.contains("tb_doctor"));
+    CHECK(names.contains("tb_tools_search"));
+    CHECK(names.contains("blockout_create_batch"));
+    CHECK(names.contains("operation_inspect"));
+    CHECK(names.contains("operation_select"));
+    CHECK(names.contains("operation_validate"));
+    CHECK(names.contains("viewport_capture_current"));
+    CHECK(names.contains("geometry_analyze_selection"));
+    CHECK(names.contains("blockout_validate"));
+    CHECK(!names.contains("documents_open"));
+    CHECK(!names.contains("entity_create"));
+    CHECK(!names.contains("brush_create"));
+    CHECK(!names.contains("blockout_create_room"));
+  }
+
+  SECTION("full profile exposes implemented expert brush tools")
+  {
+    const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Full);
+    auto names = QStringList{};
+    for (const auto& tool : tools)
+    {
+      names.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("brush_create"));
+    CHECK(names.contains("brush_create_box"));
+    CHECK(names.contains("brush_create_wedge"));
+    CHECK(names.contains("brush_create_cylinder"));
+    CHECK(names.contains("brush_create_cone"));
+    CHECK(names.contains("brush_create_pipe"));
+    CHECK(names.contains("brush_create_sphere"));
+    CHECK(names.contains("brush_create_pyramid"));
+    CHECK(names.contains("brush_create_tetrahedron"));
+    CHECK(names.contains("brush_create_from_planes"));
+    CHECK(names.contains("brush_create_prism"));
+    CHECK(names.contains("brush_create_cylinder_sector"));
+    CHECK(!names.contains("brush_create_arch"));
+    CHECK(!names.contains("brush_create_torus"));
+  }
+
+  SECTION("tool search can discover hidden expert tools")
+  {
+    const auto tools = toolsSearchJson(
+      "from_planes", "brush", "schema", McpMode::Edit, McpToolProfile::Balanced);
+    auto found = QJsonObject{};
+    for (const auto& tool : tools)
+    {
+      const auto object = tool.toObject();
+      if (object.value("name").toString() == "brush_create_from_planes")
+      {
+        found = object;
+        break;
+      }
+    }
+
+    REQUIRE(!found.isEmpty());
+    CHECK(found.value("category").toString() == "brush");
+    CHECK(found.value("expert").toBool());
+    CHECK(!found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("inputSchema").isObject());
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")

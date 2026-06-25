@@ -23,6 +23,7 @@
 #include <QString>
 
 #include "mcp/McpMode.h"
+#include "mcp/McpToolCatalog.h"
 
 #include <optional>
 
@@ -37,6 +38,7 @@ struct McpBridgeConfig
   bool httpEnabled = true;
   QString httpHost = "127.0.0.1";
   quint16 httpPort = 37666;
+  McpToolProfile toolProfile = McpToolProfile::Balanced;
 };
 
 QString defaultConfigDirectory();

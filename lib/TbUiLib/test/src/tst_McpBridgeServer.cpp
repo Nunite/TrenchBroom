@@ -30,6 +30,8 @@
 #include "mdl/WorldNode.h"
 #include "ui/AppControllerFixture.h"
 #include "ui/MapDocument.h"
+#include "ui/MapWindow.h"
+#include "ui/MapWindowManager.h"
 #include "ui/mcp/McpBridgeServer.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -325,6 +327,27 @@ TEST_CASE("McpBridgeServer")
       return McpBridgeToolResult::success(QJsonObject{
         {"valid", true},
         {"gapCount", 0},
+      });
+    }
+    if (
+      toolName == "operation_inspect" || toolName == "operation_select"
+      || toolName == "operation_validate")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-3"},
+      });
+    }
+    if (
+      toolName == "blockout_create_batch"
+      || toolName == "blockout_create_curved_corridor")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-11"},
+        {"transactionName",
+         toolName == "blockout_create_batch" ? "MCP: Blockout batch"
+                                             : "MCP: Blockout curved corridor"},
+        {"brushCount", 4},
+        {"resourceUri", "tbmcp://operation/mcp-op-11"},
       });
     }
     if (toolName == "blockout_create_room" || toolName == "blockout_create_spiral_stairs")
@@ -937,6 +960,25 @@ TEST_CASE("McpBridgeServer")
     CHECK(validateResponse.result.value("valid").toBool());
   }
 
+  SECTION("read-only mode serves operation detail tools")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    for (const auto& toolName :
+         {"operation_inspect", "operation_select", "operation_validate"})
+    {
+      const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+        "1",
+        "secret",
+        toolName,
+        QJsonObject{{"operationId", "mcp-op-3"}},
+        mcp::McpMode::ReadOnly});
+      CHECK(response.ok);
+      CHECK(response.result.value("operationId").toString() == "mcp-op-3");
+    }
+  }
+
   SECTION("edit mode serves blockout creation")
   {
     REQUIRE(
@@ -966,6 +1008,24 @@ TEST_CASE("McpBridgeServer")
     CHECK(
       spiralResponse.result.value("transactionName").toString()
       == "MCP: Blockout spiral stairs");
+
+    const auto batchResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "3",
+      "secret",
+      "blockout_create_batch",
+      QJsonObject{{"operations", QJsonArray{QJsonObject{{"type", "box"}}}}},
+      mcp::McpMode::Edit});
+    CHECK(batchResponse.ok);
+    CHECK(batchResponse.result.value("operationId").toString() == "mcp-op-11");
+
+    const auto curvedResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "4",
+      "secret",
+      "blockout_create_curved_corridor",
+      QJsonObject{{"center", QJsonArray{0, 0, 0}}},
+      mcp::McpMode::Edit});
+    CHECK(curvedResponse.ok);
+    CHECK(curvedResponse.result.value("operationId").toString() == "mcp-op-11");
   }
 }
 
@@ -1050,6 +1110,148 @@ TEST_CASE("McpBridgeServer spiral stair geometry tools")
   CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: Blockout spiral stairs");
   map.undoCommand();
   CHECK(map.worldNode().childCount() == 1u);
+}
+
+TEST_CASE("McpBridgeServer batch blockout tools")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  REQUIRE(appController.mapWindowManager()
+            .createDocument(mdl::QuakeGameInfo, mdl::MapFormat::Valve, vm::bbox3d{8192.0})
+            .is_success());
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  REQUIRE(mapWindow != nullptr);
+  auto& map = mapWindow->document().map();
+
+  auto server = McpBridgeServer{appController};
+  REQUIRE(server.start(mcp::McpBridgeConfig{
+    "test-pipe-batch", "secret", mcp::McpMode::Edit, true, "127.0.0.1", 0}));
+
+  const auto batchResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "1",
+    "secret",
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Test batch"},
+      {"grid", 16},
+      {"select", true},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         },
+         QJsonObject{
+           {"type", "ramp"},
+           {"min", QJsonArray{80, 0, 0}},
+           {"max", QJsonArray{144, 64, 32}},
+           {"axis", "x"},
+         },
+       }},
+    },
+    mcp::McpMode::Edit});
+
+  const auto batchError =
+    batchResponse.ok ? std::string{} : batchResponse.error->message.toStdString();
+  INFO(batchError);
+  REQUIRE(batchResponse.ok);
+  const auto operationId = batchResponse.result.value("operationId").toString();
+  CHECK(!operationId.isEmpty());
+  CHECK(batchResponse.result.value("transactionName").toString() == "MCP: Test batch");
+  CHECK(batchResponse.result.value("brushCount").toInt() == 2);
+  CHECK(batchResponse.result.value("changedObjectCount").toInt() == 2);
+  CHECK(batchResponse.result.value("grid").toDouble() == 16.0);
+  CHECK(batchResponse.result.value("changedObjectIds").isUndefined());
+  CHECK(batchResponse.result.value("resourceUri")
+          .toString()
+          .startsWith("tbmcp://operation/"));
+  CHECK(batchResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.selection().nodes.size() == 2u);
+
+  const auto descendantCountBeforeInvalid = map.worldNode().descendantCount();
+  const auto invalidResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "invalid",
+    "secret",
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{0, 64, 16}},
+         },
+       }},
+    },
+    mcp::McpMode::Edit});
+  REQUIRE(invalidResponse.ok);
+  CHECK(!invalidResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+
+  const auto inspectResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "2",
+    "secret",
+    "operation_inspect",
+    QJsonObject{{"operationId", operationId}, {"detail", "ids"}},
+    mcp::McpMode::ReadOnly});
+  REQUIRE(inspectResponse.ok);
+  CHECK(inspectResponse.result.value("changedObjectIds").toArray().size() == 2);
+
+  const auto resource =
+    server.readResource(batchResponse.result.value("resourceUri").toString());
+  REQUIRE(resource);
+  CHECK(resource->value("operationId").toString() == operationId);
+  CHECK(resource->value("changedObjectIds").toArray().size() == 2);
+
+  mdl::deselectAll(map);
+  const auto selectResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "3",
+    "secret",
+    "operation_select",
+    QJsonObject{{"operationId", operationId}},
+    mcp::McpMode::ReadOnly});
+  REQUIRE(selectResponse.ok);
+  CHECK(selectResponse.result.value("selectedCount").toInt() == 2);
+
+  const auto validateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "4",
+    "secret",
+    "operation_validate",
+    QJsonObject{{"operationId", operationId}},
+    mcp::McpMode::ReadOnly});
+  REQUIRE(validateResponse.ok);
+  CHECK(validateResponse.result.value("valid").toBool());
+  CHECK(validateResponse.result.value("liveObjectCount").toInt() == 2);
+  CHECK(validateResponse.result.value("staleObjectCount").toInt() == 0);
+
+  const auto curvedResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "5",
+    "secret",
+    "blockout_create_curved_corridor",
+    QJsonObject{
+      {"center", QJsonArray{256, 0, 0}},
+      {"innerRadius", 64},
+      {"outerRadius", 128},
+      {"startAngle", 0},
+      {"turnDegrees", 90},
+      {"height", 96},
+      {"segments", 3},
+      {"caps", "both"},
+      {"select", true},
+    },
+    mcp::McpMode::Edit});
+
+  const auto curvedError =
+    curvedResponse.ok ? std::string{} : curvedResponse.error->message.toStdString();
+  INFO(curvedError);
+  REQUIRE(curvedResponse.ok);
+  CHECK(curvedResponse.result.value("brushCount").toInt() == 14);
+  CHECK(curvedResponse.result.value("changedObjectIds").isUndefined());
+  CHECK(curvedResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.selection().nodes.size() == 14u);
+
+  mapWindow->close();
 }
 
 } // namespace tb::ui

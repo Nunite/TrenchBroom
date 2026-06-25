@@ -22,7 +22,11 @@
 
 #include "McpBridgeServerTools.h"
 #include "mcp/McpError.h"
+#include "mdl/EditorContext.h"
 #include "mdl/Map.h"
+#include "mdl/Map_Selection.h"
+#include "mdl/Node.h"
+#include "mdl/WorldNode.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
@@ -44,8 +48,27 @@ QJsonObject operationRecordJson(const McpOperationRecord& operation)
   result.insert("operationId", operation.operationId);
   result.insert("toolName", operation.toolName);
   result.insert("transactionName", operation.transactionName);
-  result.insert("changedObjectIds", operation.changedObjectIds);
+  result.insert("changedObjectCount", operation.changedObjectIds.size());
+  result.insert(
+    "resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId));
   result.insert("undone", operation.undone);
+  return result;
+}
+
+QJsonObject operationRecordDetailJson(
+  const McpOperationRecord& operation, const QString& detail)
+{
+  auto result = operationRecordJson(operation);
+  result.insert("detail", detail);
+  if (detail == "ids" || detail == "full")
+  {
+    result.insert("changedObjectIds", operation.changedObjectIds);
+  }
+  if (detail == "full")
+  {
+    result.insert("summary", operation.summary);
+    result.insert("operationDetail", operation.detail);
+  }
   return result;
 }
 
@@ -66,6 +89,172 @@ McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& his
   return McpBridgeToolResult::success(QJsonObject{
     {"operations", operationHistoryJson(history)},
     {"count", static_cast<int>(history.size())},
+  });
+}
+
+const McpOperationRecord* findOperation(
+  const std::vector<McpOperationRecord>& history, const QString& operationId)
+{
+  const auto it = std::ranges::find_if(
+    history, [&](const auto& operation) { return operation.operationId == operationId; });
+  return it == history.end() ? nullptr : &*it;
+}
+
+std::optional<mdl::NodePath> parseNodePathId(const QString& id)
+{
+  static const auto Prefix = QString{"node:"};
+  if (id == "node:world")
+  {
+    return mdl::NodePath{};
+  }
+  if (!id.startsWith(Prefix))
+  {
+    return std::nullopt;
+  }
+
+  auto path = mdl::NodePath{};
+  for (const auto& part : id.mid(Prefix.size()).split('/', Qt::SkipEmptyParts))
+  {
+    auto ok = false;
+    const auto index = part.toULongLong(&ok);
+    if (!ok)
+    {
+      return std::nullopt;
+    }
+    path.indices.push_back(static_cast<std::size_t>(index));
+  }
+  return path;
+}
+
+McpBridgeToolResult operationInspectResult(
+  const std::vector<McpOperationRecord>& history, const QJsonObject& params)
+{
+  const auto operationId = params.value("operationId").toString();
+  if (operationId.isEmpty())
+  {
+    return invalidParamsFailure("operation_inspect requires operationId");
+  }
+
+  const auto* operation = findOperation(history, operationId);
+  if (!operation)
+  {
+    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+  }
+
+  const auto detail = params.value("detail").toString("summary").toLower();
+  return McpBridgeToolResult::success(operationRecordDetailJson(
+    *operation,
+    detail == "full"  ? "full"
+    : detail == "ids" ? "ids"
+                      : "summary"));
+}
+
+McpBridgeToolResult operationSelectResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto operationId = params.value("operationId").toString();
+  if (operationId.isEmpty())
+  {
+    return invalidParamsFailure("operation_select requires operationId");
+  }
+
+  const auto* operation = findOperation(history, operationId);
+  if (!operation)
+  {
+    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+  }
+
+  auto& map = mapWindow->document().map();
+  auto nodes = std::vector<mdl::Node*>{};
+  for (const auto& value : operation->changedObjectIds)
+  {
+    if (!value.isString())
+    {
+      continue;
+    }
+    const auto path = parseNodePathId(value.toString());
+    if (!path)
+    {
+      continue;
+    }
+    if (auto* node = map.worldNode().resolvePath(*path))
+    {
+      if (map.editorContext().selectable(*node))
+      {
+        nodes.push_back(node);
+      }
+    }
+  }
+
+  mdl::deselectAll(map);
+  if (!nodes.empty())
+  {
+    mdl::selectNodes(map, nodes);
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"operationId", operationId},
+    {"selectedCount", static_cast<int>(nodes.size())},
+  });
+}
+
+McpBridgeToolResult operationValidateResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto operationId = params.value("operationId").toString();
+  if (operationId.isEmpty())
+  {
+    return invalidParamsFailure("operation_validate requires operationId");
+  }
+
+  const auto* operation = findOperation(history, operationId);
+  if (!operation)
+  {
+    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+  }
+
+  auto liveObjectCount = 0;
+  auto staleObjectCount = 0;
+  auto& map = mapWindow->document().map();
+  for (const auto& value : operation->changedObjectIds)
+  {
+    if (!value.isString())
+    {
+      ++staleObjectCount;
+      continue;
+    }
+    const auto path = parseNodePathId(value.toString());
+    if (!path || map.worldNode().resolvePath(*path) == nullptr)
+    {
+      ++staleObjectCount;
+      continue;
+    }
+    ++liveObjectCount;
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"operationId", operationId},
+    {"valid", !operation->undone && staleObjectCount == 0},
+    {"undone", operation->undone},
+    {"changedObjectCount", operation->changedObjectIds.size()},
+    {"liveObjectCount", liveObjectCount},
+    {"staleObjectCount", staleObjectCount},
   });
 }
 

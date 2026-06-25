@@ -22,6 +22,7 @@ private:
   QString m_configPath;
   QString m_error;
   QComboBox* m_modeCombo = nullptr;
+  QComboBox* m_toolProfileCombo = nullptr;
   QLineEdit* m_httpUrlEdit = nullptr;
   QLineEdit* m_pipeNameEdit = nullptr;
   QLineEdit* m_claudeCommandEdit = nullptr;
@@ -45,6 +46,7 @@ private:
   bool saveConfig();
   void applyConfigChange();
   void modeChanged(int index);
+  void toolProfileChanged(int index);
   void pipeNameChanged(const QString& text);
   void copyClaudeCommand();
   void openConfigFolder();

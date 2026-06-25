@@ -625,6 +625,26 @@ QJsonObject selectionJson(AppController& appController)
   };
 }
 
+QJsonObject selectionSummaryJson(AppController& appController)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return {};
+  }
+
+  const auto& selection = mapWindow->document().map().selection();
+  return QJsonObject{
+    {"hasSelection", selection.hasAny()},
+    {"nodeCount", static_cast<int>(selection.nodes.size())},
+    {"groupCount", static_cast<int>(selection.groups.size())},
+    {"entityCount", static_cast<int>(selection.entities.size())},
+    {"brushCount", static_cast<int>(selection.brushes.size())},
+    {"patchCount", static_cast<int>(selection.patches.size())},
+    {"brushFaceCount", static_cast<int>(selection.brushFaces.size())},
+  };
+}
+
 McpBridgeToolResult selectionSetResult(
   AppController& appController, const QJsonObject& params)
 {
@@ -744,15 +764,28 @@ McpBridgeToolResult selectionFilterResult(
   }
 
   auto results = QJsonArray{};
+  auto objectIds = QJsonArray{};
+  const auto detail = params.value("detail").toString("summary").toLower();
   for (const auto* node : matches)
   {
-    results.push_back(mcpNodeSummaryJson(*node, worldNode));
+    const auto objectId = nodePathId(*node, worldNode);
+    objectIds.push_back(objectId);
+    if (detail == "full")
+    {
+      results.push_back(mcpNodeSummaryJson(*node, worldNode));
+    }
   }
 
-  return McpBridgeToolResult::success(QJsonObject{
-    {"results", results},
-    {"count", results.size()},
-  });
+  auto result = QJsonObject{
+    {"objectIds", objectIds},
+    {"count", objectIds.size()},
+    {"detail", detail == "full" ? "full" : "summary"},
+  };
+  if (detail == "full")
+  {
+    result.insert("results", results);
+  }
+  return McpBridgeToolResult::success(std::move(result));
 }
 
 McpBridgeToolResult selectionByBoundsResult(
@@ -882,7 +915,7 @@ McpBridgeToolResult viewportFocusResult(
 
   return McpBridgeToolResult::success(QJsonObject{
     {"focused", true},
-    {"selection", selectionJson(appController)},
+    {"selection", selectionSummaryJson(appController)},
   });
 }
 

@@ -102,6 +102,7 @@ McpBridgeConfig defaultBridgeConfig()
     true,
     "127.0.0.1",
     37666,
+    McpToolProfile::Balanced,
   };
 }
 
@@ -114,6 +115,7 @@ QJsonObject toJson(const McpBridgeConfig& config)
     {"httpEnabled", config.httpEnabled},
     {"httpHost", config.httpHost},
     {"httpPort", int(config.httpPort)},
+    {"toolProfile", toolProfileName(config.toolProfile)},
   };
 }
 
@@ -214,6 +216,30 @@ std::optional<McpBridgeConfig> bridgeConfigFromJson(
     httpPort = quint16(port);
   }
 
+  auto toolProfile = McpToolProfile::Balanced;
+  const auto toolProfileValue = json.value("toolProfile");
+  if (!toolProfileValue.isUndefined())
+  {
+    if (!toolProfileValue.isString())
+    {
+      if (error)
+      {
+        *error = "MCP toolProfile must be a string";
+      }
+      return std::nullopt;
+    }
+    const auto parsedProfile = parseToolProfile(toolProfileValue.toString());
+    if (!parsedProfile)
+    {
+      if (error)
+      {
+        *error = "MCP toolProfile is unknown";
+      }
+      return std::nullopt;
+    }
+    toolProfile = *parsedProfile;
+  }
+
   return McpBridgeConfig{
     pipeName.toString(),
     token.toString(),
@@ -221,6 +247,7 @@ std::optional<McpBridgeConfig> bridgeConfigFromJson(
     httpEnabled,
     httpHost,
     httpPort,
+    toolProfile,
   };
 }
 

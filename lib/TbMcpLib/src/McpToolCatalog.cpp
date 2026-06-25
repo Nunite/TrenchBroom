@@ -789,6 +789,47 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(),
     },
     {
+      "operation_inspect",
+      "Inspect an MCP operation by operationId. Use detail=summary by default and "
+      "detail=ids/full only when object ids or debug data are needed.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"operationId",
+           stringProperty("Operation id returned by a mutating MCP tool.")},
+          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+        },
+        {"operationId"}),
+    },
+    {
+      "operation_select",
+      "Select live map objects created or changed by an MCP operation.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"operationId",
+           stringProperty("Operation id returned by a mutating MCP tool.")},
+        },
+        {"operationId"}),
+    },
+    {
+      "operation_validate",
+      "Return generic validation status for an MCP operation.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"operationId",
+           stringProperty("Operation id returned by a mutating MCP tool.")},
+        },
+        {"operationId"}),
+    },
+    {
       "history_undo_mcp",
       "Undo the latest MCP operation if it is still on top of the native undo stack.",
       McpMode::Edit,
@@ -1241,6 +1282,51 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"min", "max"}),
     },
     {
+      "blockout_create_batch",
+      "Create multiple blockout operations in one transaction. Prefer this over many "
+      "atomic brush_create calls for architectural generation.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"name", stringProperty("Transaction label, defaults to MCP: Blockout batch.")},
+          {"grid", numberProperty("Grid size for snapping generated geometry.")},
+          {"select", boolProperty("Select generated brushes.")},
+          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"operations",
+           arrayProperty(
+             "Array of blockout operations. Supported types include box, prism, "
+             "cylinder_sector, room, corridor, curved_corridor, stairs, ramp, "
+             "doorway, cover, and sky_shell.")},
+        },
+        {"operations"}),
+    },
+    {
+      "blockout_create_curved_corridor",
+      "Create a curved corridor as one transaction using floor, ceiling, inner wall, "
+      "outer wall, and optional caps.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema({
+        {"center", vec3Property("Corridor center; X/Y define arc origin.")},
+        {"innerRadius", numberProperty("Playable inner radius.")},
+        {"outerRadius", numberProperty("Playable outer radius.")},
+        {"startAngle", numberProperty("Start angle in degrees.")},
+        {"turnDegrees", numberProperty("Arc length in degrees.")},
+        {"height", numberProperty("Playable height, defaults to 128.")},
+        {"segments", integerProperty("Segment count, defaults to 12.")},
+        {"wallThickness", numberProperty("Wall thickness, defaults to 16.")},
+        {"floorThickness", numberProperty("Floor thickness, defaults to 16.")},
+        {"ceilingThickness", numberProperty("Ceiling thickness, defaults to 16.")},
+        {"caps", stringProperty("none, start, end, or both. Defaults to none.")},
+        {"material", stringProperty("Brush material, defaults to current material.")},
+        {"select", boolProperty("Select generated brushes.")},
+        {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+      }),
+    },
+    {
       "blockout_validate",
       "Validate Blockout IR dimensions without modifying the map.",
       McpMode::ReadOnly,
@@ -1316,9 +1402,133 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"grid", numberProperty("Grid size for alignment checks, defaults to 1.")},
       }),
     },
+    {
+      "tb_tools_search",
+      "Search available TrenchBroom MCP tools by name, category, or description. Use "
+      "detail=schema when exact parameters are needed.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"query", stringProperty("Optional text query.")},
+        {"category", stringProperty("Optional category such as blockout or brush.")},
+        {"detail", stringProperty("summary or schema. Defaults to summary.")},
+      }),
+    },
   };
 
-  return Catalog;
+  static const auto CatalogWithMetadata = [&] {
+    auto tools = Catalog;
+    for (auto& tool : tools)
+    {
+      if (tool.name.startsWith("brush_create"))
+      {
+        tool.category = "brush";
+        tool.expert = true;
+        tool.minimumProfile = McpToolProfile::Full;
+      }
+      else if (tool.name.startsWith("blockout_"))
+      {
+        tool.category = "blockout";
+        tool.minimumProfile = McpToolProfile::Core;
+      }
+      else if (tool.name.startsWith("operation_") || tool.name.startsWith("history_"))
+      {
+        tool.category = "operation";
+        tool.minimumProfile = McpToolProfile::Core;
+      }
+      else if (tool.name.startsWith("selection_") || tool.name.startsWith("viewport_"))
+      {
+        tool.category = "selection";
+      }
+      else if (tool.name.startsWith("asset_"))
+      {
+        tool.category = "asset";
+      }
+      else if (tool.name.startsWith("texture_") || tool.name.startsWith("face_"))
+      {
+        tool.category = "texture";
+      }
+      else if (tool.name.startsWith("entity_") || tool.name.startsWith("fgd_"))
+      {
+        tool.category = "entity";
+      }
+      else if (
+        tool.name == "tb_status" || tool.name == "tb_doctor"
+        || tool.name == "tb_tools_search")
+      {
+        tool.category = "core";
+        tool.minimumProfile = McpToolProfile::Core;
+      }
+    }
+    return tools;
+  }();
+
+  return CatalogWithMetadata;
+}
+
+QString toolProfileName(const McpToolProfile profile)
+{
+  switch (profile)
+  {
+  case McpToolProfile::Core:
+    return "Core";
+  case McpToolProfile::Balanced:
+    return "Balanced";
+  case McpToolProfile::Full:
+    return "Full";
+  }
+  return "Balanced";
+}
+
+std::optional<McpToolProfile> parseToolProfile(const QString& profile)
+{
+  const auto normalized = profile.trimmed().toLower();
+  if (normalized == "core")
+  {
+    return McpToolProfile::Core;
+  }
+  if (normalized == "balanced")
+  {
+    return McpToolProfile::Balanced;
+  }
+  if (normalized == "full")
+  {
+    return McpToolProfile::Full;
+  }
+  return std::nullopt;
+}
+
+int profileRank(const McpToolProfile profile)
+{
+  switch (profile)
+  {
+  case McpToolProfile::Core:
+    return 0;
+  case McpToolProfile::Balanced:
+    return 1;
+  case McpToolProfile::Full:
+    return 2;
+  }
+  return 1;
+}
+
+bool visibleInProfile(const McpToolDefinition& tool, const McpToolProfile profile)
+{
+  if (profile == McpToolProfile::Full)
+  {
+    return true;
+  }
+  if (profile == McpToolProfile::Core)
+  {
+    return tool.name == "tb_status" || tool.name == "tb_doctor"
+           || tool.name == "tb_tools_search" || tool.name == "blockout_create_batch"
+           || tool.name.startsWith("operation_")
+           || tool.name.startsWith("viewport_capture")
+           || tool.name == "geometry_analyze_selection"
+           || tool.name == "blockout_validate";
+  }
+  return !tool.expert && profileRank(profile) >= profileRank(tool.minimumProfile);
 }
 
 std::optional<McpToolDefinition> findToolDefinition(const QString& name)
@@ -1359,7 +1569,8 @@ QJsonObject toMcpToolDiagnosticJson(
   };
 }
 
-QJsonArray toolsListJson(const McpMode mode, const bool implementedOnly)
+QJsonArray toolsListJson(
+  const McpMode mode, const bool implementedOnly, const McpToolProfile profile)
 {
   auto result = QJsonArray{};
   for (const auto& tool : defaultToolCatalog())
@@ -1372,7 +1583,75 @@ QJsonArray toolsListJson(const McpMode mode, const bool implementedOnly)
     {
       continue;
     }
+    if (!visibleInProfile(tool, profile))
+    {
+      continue;
+    }
     result.push_back(toMcpToolJson(tool));
+  }
+  return result;
+}
+
+QJsonArray toolsListJson(const McpMode mode, const bool implementedOnly)
+{
+  return toolsListJson(mode, implementedOnly, McpToolProfile::Balanced);
+}
+
+QJsonArray toolsListJson(const McpMode mode)
+{
+  return toolsListJson(mode, true, McpToolProfile::Balanced);
+}
+
+QJsonArray toolsSearchJson(
+  const QString& query,
+  const QString& category,
+  const QString& detail,
+  const McpMode mode,
+  const McpToolProfile profile)
+{
+  const auto normalizedQuery = query.trimmed().toLower();
+  const auto normalizedCategory = category.trimmed().toLower();
+  const auto includeSchema =
+    detail.trimmed().toLower() == "schema" || detail.trimmed().toLower() == "full";
+
+  auto result = QJsonArray{};
+  for (const auto& tool : defaultToolCatalog())
+  {
+    if (!tool.implemented || !allowsMode(mode, tool.requiredMode))
+    {
+      continue;
+    }
+    if (!visibleInProfile(tool, profile) && normalizedQuery.isEmpty())
+    {
+      continue;
+    }
+    if (
+      !normalizedCategory.isEmpty()
+      && tool.category.compare(normalizedCategory, Qt::CaseInsensitive) != 0)
+    {
+      continue;
+    }
+    if (
+      !normalizedQuery.isEmpty() && !tool.name.toLower().contains(normalizedQuery)
+      && !tool.description.toLower().contains(normalizedQuery)
+      && !tool.category.toLower().contains(normalizedQuery))
+    {
+      continue;
+    }
+
+    auto object = QJsonObject{
+      {"name", tool.name},
+      {"description", tool.description},
+      {"category", tool.category},
+      {"expert", tool.expert},
+      {"requiredMode", modeName(tool.requiredMode)},
+      {"visibleInCurrentProfile", visibleInProfile(tool, profile)},
+    };
+    if (includeSchema)
+    {
+      object.insert("inputSchema", tool.inputSchema);
+    }
+    result.push_back(std::move(object));
   }
   return result;
 }

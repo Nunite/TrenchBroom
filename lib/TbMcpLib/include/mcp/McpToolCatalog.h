@@ -31,6 +31,13 @@
 namespace tb::mcp
 {
 
+enum class McpToolProfile
+{
+  Core,
+  Balanced,
+  Full,
+};
+
 struct McpToolDefinition
 {
   QString name;
@@ -39,16 +46,30 @@ struct McpToolDefinition
   bool mutatesDocument = false;
   bool implemented = true;
   QJsonObject inputSchema;
+  QString category = "general";
+  bool expert = false;
+  McpToolProfile minimumProfile = McpToolProfile::Balanced;
 };
 
 const std::vector<McpToolDefinition>& defaultToolCatalog();
+
+QString toolProfileName(McpToolProfile profile);
+std::optional<McpToolProfile> parseToolProfile(const QString& profile);
 
 std::optional<McpToolDefinition> findToolDefinition(const QString& name);
 bool canCallTool(const McpToolDefinition& tool, McpMode mode);
 
 QJsonObject toMcpToolJson(const McpToolDefinition& tool);
 QJsonObject toMcpToolDiagnosticJson(const McpToolDefinition& tool, McpMode currentMode);
-QJsonArray toolsListJson(McpMode mode, bool implementedOnly = true);
+QJsonArray toolsListJson(McpMode mode, bool implementedOnly, McpToolProfile profile);
+QJsonArray toolsListJson(McpMode mode, bool implementedOnly);
+QJsonArray toolsListJson(McpMode mode);
+QJsonArray toolsSearchJson(
+  const QString& query,
+  const QString& category,
+  const QString& detail,
+  McpMode mode,
+  McpToolProfile profile);
 QJsonArray toolDiagnosticsJson(McpMode currentMode);
 
 } // namespace tb::mcp

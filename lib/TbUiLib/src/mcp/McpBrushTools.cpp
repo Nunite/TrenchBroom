@@ -190,8 +190,9 @@ QJsonObject mutationResultJson(const McpOperationRecord& operation)
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
-  result.insert("changedObjectIds", operation.changedObjectIds);
   result.insert("changedObjectCount", operation.changedObjectIds.size());
+  result.insert(
+    "resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId));
   return result;
 }
 
@@ -201,7 +202,8 @@ void mcpRecordOperation(
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& changedObjectIds,
-  QJsonObject& result)
+  QJsonObject& result,
+  const QJsonObject& detail = {})
 {
   auto operation = McpOperationRecord{};
   operation.operationId = makeOperationId(nextOperationIndex);
@@ -209,7 +211,54 @@ void mcpRecordOperation(
   operation.transactionName = transactionName;
   operation.changedObjectIds = changedObjectIds;
   result = mutationResultJson(operation);
+  operation.summary = result;
+  operation.detail = detail;
   history.push_back(std::move(operation));
+}
+
+void applyDetailLevel(
+  QJsonObject& result,
+  const QJsonArray& changedObjectIds,
+  const QString& detail,
+  const QJsonArray& fullResults = {})
+{
+  const auto normalized = detail.trimmed().toLower();
+  if (normalized == "ids")
+  {
+    result.insert("changedObjectIds", changedObjectIds);
+  }
+  else if (normalized == "full")
+  {
+    result.insert("changedObjectIds", changedObjectIds);
+    if (!fullResults.isEmpty())
+    {
+      result.insert("results", fullResults);
+    }
+  }
+  result.insert(
+    "detail",
+    normalized == "full"  ? "full"
+    : normalized == "ids" ? "ids"
+                          : "summary");
+}
+
+vm::bbox3d boundsForNodes(const std::vector<mdl::Node*>& nodes)
+{
+  auto result = vm::bbox3d{};
+  auto first = true;
+  for (const auto* node : nodes)
+  {
+    if (first)
+    {
+      result = node->logicalBounds();
+      first = false;
+    }
+    else
+    {
+      result = vm::merge(result, node->logicalBounds());
+    }
+  }
+  return result;
 }
 
 std::optional<vm::vec3d> mcpVec3FromJson(
@@ -570,6 +619,40 @@ vm::vec2d snapToGrid(const vm::vec2d& value, const double grid = 1.0)
   return vm::vec2d{snapToGrid(value.x(), grid), snapToGrid(value.y(), grid)};
 }
 
+vm::vec3d snapToGrid(const vm::vec3d& value, const double grid = 1.0)
+{
+  return vm::vec3d{
+    snapToGrid(value.x(), grid),
+    snapToGrid(value.y(), grid),
+    snapToGrid(value.z(), grid)};
+}
+
+std::vector<vm::vec2d> snapPointsToGrid(
+  const std::vector<vm::vec2d>& points, const double grid)
+{
+  auto result = std::vector<vm::vec2d>{};
+  result.reserve(points.size());
+  for (const auto& point : points)
+  {
+    result.push_back(snapToGrid(point, grid));
+  }
+  return result;
+}
+
+std::optional<vm::bbox3d> snapBoundsToGrid(
+  const vm::bbox3d& bounds, const double grid, QString& error)
+{
+  const auto min = snapToGrid(bounds.min, grid);
+  const auto max = snapToGrid(bounds.max, grid);
+  if (min.x() >= max.x() || min.y() >= max.y() || min.z() >= max.z())
+  {
+    error =
+      "bounds collapse after grid snapping; use larger dimensions or a smaller grid";
+    return std::nullopt;
+  }
+  return vm::bbox3d{min, max};
+}
+
 std::optional<mdl::Brush> createPrismBrush(
   const mdl::BrushBuilder& builder,
   std::vector<vm::vec2d> points,
@@ -673,7 +756,8 @@ std::optional<mdl::Brush> createCylinderSectorBrush(
   const double minZ,
   const double maxZ,
   const std::string& material,
-  QString& error)
+  QString& error,
+  const double grid = 1.0)
 {
   auto polygon =
     sectorPolygon(center, innerRadius, outerRadius, startAngle, endAngle, error);
@@ -681,7 +765,13 @@ std::optional<mdl::Brush> createCylinderSectorBrush(
   {
     return std::nullopt;
   }
-  return createPrismBrush(builder, std::move(*polygon), minZ, maxZ, material, error);
+  return createPrismBrush(
+    builder,
+    snapPointsToGrid(*polygon, grid),
+    snapToGrid(minZ, grid),
+    snapToGrid(maxZ, grid),
+    material,
+    error);
 }
 
 std::optional<vm::axis::type> axisFromJson(
@@ -1609,6 +1699,392 @@ std::vector<mdl::Node*> brushNodesFromBounds(
   return result;
 }
 
+void deleteNodes(std::vector<mdl::Node*>& nodes)
+{
+  for (auto* node : nodes)
+  {
+    delete node;
+  }
+  nodes.clear();
+}
+
+QJsonObject batchValidationJson(
+  const bool valid,
+  const QJsonArray& errors,
+  const int operationCount,
+  const int brushCount)
+{
+  return QJsonObject{
+    {"valid", valid},
+    {"errors", errors},
+    {"operationCount", operationCount},
+    {"brushCount", brushCount},
+  };
+}
+
+std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& params)
+{
+  const auto center = params.value("center").toArray();
+  const auto innerRadius = optionalDouble(params, "innerRadius", 128.0);
+  const auto outerRadius = optionalDouble(params, "outerRadius", 224.0);
+  const auto startAngle = optionalDouble(params, "startAngle", -90.0);
+  const auto turnDegrees = optionalDouble(params, "turnDegrees", 180.0);
+  const auto height = optionalDouble(params, "height", 128.0);
+  const auto segments = std::max<size_t>(1, optionalSize(params, "segments", 12));
+  const auto wallThickness = optionalDouble(params, "wallThickness", 16.0);
+  const auto floorThickness = optionalDouble(params, "floorThickness", 16.0);
+  const auto ceilingThickness = optionalDouble(params, "ceilingThickness", 16.0);
+  const auto caps = params.value("caps").toString("none").toLower();
+  const auto material = params.value("material").toString();
+
+  auto operations = std::vector<QJsonObject>{};
+  operations.reserve(segments * 4 + 2);
+
+  const auto step = turnDegrees / static_cast<double>(segments);
+  for (size_t i = 0; i < segments; ++i)
+  {
+    const auto a0 = startAngle + step * static_cast<double>(i);
+    const auto a1 = a0 + step;
+    const auto addSector =
+      [&](const double inner, const double outer, const double minZ, const double maxZ) {
+        auto op = QJsonObject{
+          {"type", "cylinder_sector"},
+          {"center", center},
+          {"innerRadius", inner},
+          {"outerRadius", outer},
+          {"startAngle", a0},
+          {"endAngle", a1},
+          {"minZ", minZ},
+          {"maxZ", maxZ},
+        };
+        if (!material.isEmpty())
+        {
+          op.insert("material", material);
+        }
+        operations.push_back(std::move(op));
+      };
+
+    addSector(innerRadius, outerRadius, 0.0, floorThickness);
+    addSector(innerRadius, outerRadius, height, height + ceilingThickness);
+    addSector(innerRadius - wallThickness, innerRadius, floorThickness, height);
+    addSector(outerRadius, outerRadius + wallThickness, floorThickness, height);
+  }
+
+  const auto addCap = [&](const double angle) {
+    const auto half = std::abs(step) / 2.0;
+    auto op = QJsonObject{
+      {"type", "cylinder_sector"},
+      {"center", center},
+      {"innerRadius", innerRadius - wallThickness},
+      {"outerRadius", outerRadius + wallThickness},
+      {"startAngle", angle - half},
+      {"endAngle", angle + half},
+      {"minZ", 0.0},
+      {"maxZ", height + ceilingThickness},
+    };
+    if (!material.isEmpty())
+    {
+      op.insert("material", material);
+    }
+    operations.push_back(std::move(op));
+  };
+
+  if (caps == "start" || caps == "both")
+  {
+    addCap(startAngle);
+  }
+  if (caps == "end" || caps == "both")
+  {
+    addCap(startAngle + turnDegrees);
+  }
+  return operations;
+}
+
+bool validateCurvedCorridorParams(const QJsonObject& params, QString& error)
+{
+  const auto innerRadius = optionalDouble(params, "innerRadius", 128.0);
+  const auto outerRadius = optionalDouble(params, "outerRadius", 224.0);
+  const auto turnDegrees = optionalDouble(params, "turnDegrees", 180.0);
+  const auto segments = optionalSize(params, "segments", 12);
+  const auto height = optionalDouble(params, "height", 128.0);
+  const auto wallThickness = optionalDouble(params, "wallThickness", 16.0);
+  const auto floorThickness = optionalDouble(params, "floorThickness", 16.0);
+  const auto ceilingThickness = optionalDouble(params, "ceilingThickness", 16.0);
+  const auto caps = params.value("caps").toString("none").toLower();
+
+  if (!params.value("center").isArray())
+  {
+    error = "center must be provided for curved corridor";
+    return false;
+  }
+  if (
+    !finitePositive(innerRadius) || !finitePositive(outerRadius)
+    || innerRadius >= outerRadius)
+  {
+    error = "innerRadius must be greater than zero and smaller than outerRadius";
+    return false;
+  }
+  if (
+    !finitePositive(height) || !finitePositive(wallThickness)
+    || !finitePositive(floorThickness) || !finitePositive(ceilingThickness))
+  {
+    error = "height and thickness values must be greater than zero";
+    return false;
+  }
+  if (innerRadius <= wallThickness)
+  {
+    error = "innerRadius must be larger than wallThickness";
+    return false;
+  }
+  if (segments < 1 || segments > 128)
+  {
+    error = "segments must be between 1 and 128";
+    return false;
+  }
+  if (
+    !std::isfinite(turnDegrees) || std::abs(turnDegrees) <= GeometryEpsilon
+    || std::abs(turnDegrees) > 360.0)
+  {
+    error = "turnDegrees must be greater than zero and at most 360 degrees";
+    return false;
+  }
+  if (std::abs(turnDegrees) / static_cast<double>(segments) > 180.0)
+  {
+    error = "segments too low; use enough segments so each sector is <= 180 degrees";
+    return false;
+  }
+  if (caps != "none" && caps != "start" && caps != "end" && caps != "both")
+  {
+    error = "caps must be none, start, end, or both";
+    return false;
+  }
+  return true;
+}
+
+std::vector<mdl::Node*> compileBatchOperation(
+  const mdl::Map& map,
+  const mdl::BrushBuilder& builder,
+  const QJsonObject& operation,
+  const std::string& defaultMaterial,
+  const double grid,
+  QString& error)
+{
+  const auto type = operation.value("type").toString().trimmed().toLower();
+  const auto material = mcpOptionalString(operation, "material", defaultMaterial);
+
+  if (type == "curved_corridor")
+  {
+    if (!validateCurvedCorridorParams(operation, error))
+    {
+      return {};
+    }
+    auto result = std::vector<mdl::Node*>{};
+    for (const auto& childOperation : curvedCorridorOperationsFromParams(operation))
+    {
+      auto childNodes =
+        compileBatchOperation(map, builder, childOperation, material, grid, error);
+      if (!error.isEmpty())
+      {
+        deleteNodes(result);
+        deleteNodes(childNodes);
+        return {};
+      }
+      result.insert(result.end(), childNodes.begin(), childNodes.end());
+    }
+    return result;
+  }
+
+  if (type == "box" || type == "cover")
+  {
+    const auto bounds = boundsFromJson(operation, error);
+    if (!bounds)
+    {
+      return {};
+    }
+    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
+    if (!snappedBounds)
+    {
+      return {};
+    }
+    return brushNodesFromBounds(builder, {*snappedBounds}, material, error);
+  }
+
+  if (type == "room" || type == "corridor")
+  {
+    const auto bounds = boundsFromJson(operation, error);
+    if (!bounds)
+    {
+      return {};
+    }
+    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
+    if (!snappedBounds)
+    {
+      return {};
+    }
+    const auto shellBounds = roomShellBounds(
+      *snappedBounds,
+      snapToGrid(optionalDouble(operation, "thickness", 16.0), grid),
+      error);
+    if (!shellBounds)
+    {
+      return {};
+    }
+    return brushNodesFromBounds(builder, *shellBounds, material, error);
+  }
+
+  if (type == "sky_shell")
+  {
+    const auto bounds = boundsFromJson(operation, error);
+    if (!bounds)
+    {
+      return {};
+    }
+    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
+    if (!snappedBounds)
+    {
+      return {};
+    }
+    return brushNodesFromBounds(
+      builder,
+      skyShellBounds(
+        *snappedBounds, snapToGrid(optionalDouble(operation, "thickness", 16.0), grid)),
+      mcpOptionalString(operation, "material", "sky"),
+      error);
+  }
+
+  if (type == "stairs")
+  {
+    const auto bounds = boundsFromJson(operation, error);
+    if (!bounds)
+    {
+      return {};
+    }
+    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
+    if (!snappedBounds)
+    {
+      return {};
+    }
+    const auto axis = axisFromJson(operation, "axis", vm::axis::x, error);
+    if (!axis)
+    {
+      return {};
+    }
+    const auto stairBoxes =
+      stairsBounds(*snappedBounds, optionalSize(operation, "steps", 8), *axis, error);
+    if (!stairBoxes)
+    {
+      return {};
+    }
+    return brushNodesFromBounds(builder, *stairBoxes, material, error);
+  }
+
+  if (type == "ramp")
+  {
+    const auto bounds = boundsFromJson(operation, error);
+    if (!bounds)
+    {
+      return {};
+    }
+    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
+    if (!snappedBounds)
+    {
+      return {};
+    }
+    const auto axis = axisFromJson(operation, "axis", vm::axis::x, error);
+    if (!axis)
+    {
+      return {};
+    }
+    auto brush = createWedgeBrush(builder, *snappedBounds, *axis, material);
+    if (brush.is_error())
+    {
+      error = "Could not create ramp brush";
+      return {};
+    }
+    return {new mdl::BrushNode{std::move(brush.value())}};
+  }
+
+  if (type == "doorway")
+  {
+    const auto bounds = boundsFromJson(operation, error);
+    if (!bounds)
+    {
+      return {};
+    }
+    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
+    if (!snappedBounds)
+    {
+      return {};
+    }
+    const auto door = boundsFromJson(operation, "doorMin", "doorMax", error);
+    if (!door)
+    {
+      return {};
+    }
+    const auto snappedDoor = snapBoundsToGrid(*door, grid, error);
+    if (!snappedDoor)
+    {
+      return {};
+    }
+    const auto segments = doorwayBounds(*snappedBounds, *snappedDoor, error);
+    if (!segments)
+    {
+      return {};
+    }
+    return brushNodesFromBounds(builder, *segments, material, error);
+  }
+
+  if (type == "prism")
+  {
+    auto points = points2DFromJson(operation, "points2d", error);
+    if (!points)
+    {
+      return {};
+    }
+    auto brush = createPrismBrush(
+      builder,
+      snapPointsToGrid(*points, grid),
+      snapToGrid(optionalDouble(operation, "minZ", 0.0), grid),
+      snapToGrid(optionalDouble(operation, "maxZ", 128.0), grid),
+      material,
+      error);
+    if (!brush)
+    {
+      return {};
+    }
+    return {new mdl::BrushNode{std::move(*brush)}};
+  }
+
+  if (type == "cylinder_sector")
+  {
+    const auto center = mcpVec3FromJson(operation, "center", error);
+    if (!center)
+    {
+      return {};
+    }
+    auto brush = createCylinderSectorBrush(
+      builder,
+      vm::vec2d{center->x(), center->y()},
+      optionalDouble(operation, "innerRadius", 128.0),
+      optionalDouble(operation, "outerRadius", 224.0),
+      optionalDouble(operation, "startAngle", 0.0),
+      optionalDouble(operation, "endAngle", 15.0),
+      optionalDouble(operation, "minZ", 0.0),
+      optionalDouble(operation, "maxZ", 128.0),
+      material,
+      error,
+      grid);
+    if (!brush)
+    {
+      return {};
+    }
+    return {new mdl::BrushNode{std::move(*brush)}};
+  }
+
+  error = QString{"Unsupported batch operation type: %1"}.arg(type);
+  return {};
+}
+
 QJsonObject brushTypeJson(
   const QString& name,
   const bool supported,
@@ -1994,6 +2470,8 @@ McpBridgeToolResult blockoutCreateResult(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
   result.insert("brushCount", static_cast<int>(nodes.size()));
   result.insert("material", QString::fromStdString(material));
+  result.insert("bounds", boundsToJson(boundsForNodes(nodes)));
+  applyDetailLevel(result, *changedObjectIds, params.value("detail").toString("summary"));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -2049,6 +2527,147 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   result.insert("brushCount", static_cast<int>(nodes.size()));
   result.insert("material", QString::fromStdString(material));
   result.insert("validation", spiralValidationJson(*spiralParams, nodes.size()));
+  result.insert("bounds", boundsToJson(boundsForNodes(nodes)));
+  applyDetailLevel(result, *changedObjectIds, params.value("detail").toString("summary"));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult blockoutCreateBatchResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto batchParams = params;
+  if (toolName == "blockout_create_curved_corridor")
+  {
+    auto operation = params;
+    operation.insert("type", "curved_corridor");
+    batchParams = QJsonObject{
+      {"name", "MCP: Blockout curved corridor"},
+      {"operations", QJsonArray{operation}},
+      {"select", params.value("select").toBool(true)},
+      {"detail", params.value("detail").toString("summary")},
+    };
+  }
+
+  const auto operationsValue = batchParams.value("operations");
+  if (!operationsValue.isArray())
+  {
+    return invalidParamsFailure("blockout_create_batch requires operations array");
+  }
+  const auto operations = operationsValue.toArray();
+  if (operations.isEmpty())
+  {
+    return invalidParamsFailure("operations must not be empty");
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+  const auto defaultMaterial = materialNameFromParams(map, batchParams);
+  const auto grid = optionalDouble(batchParams, "grid", 1.0);
+  if (!finitePositive(grid))
+  {
+    return invalidParamsFailure("grid must be greater than zero");
+  }
+
+  auto nodes = std::vector<mdl::Node*>{};
+  auto errors = QJsonArray{};
+  for (auto i = 0; i < operations.size(); ++i)
+  {
+    if (!operations[i].isObject())
+    {
+      errors.push_back(QString{"operations[%1] must be an object"}.arg(i));
+      break;
+    }
+
+    auto error = QString{};
+    auto operationNodes = compileBatchOperation(
+      map, builder, operations[i].toObject(), defaultMaterial, grid, error);
+    if (!error.isEmpty() || operationNodes.empty())
+    {
+      errors.push_back(
+        error.isEmpty() ? QString{"operations[%1] generated no brushes"}.arg(i)
+                        : QString{"operations[%1]: %2"}.arg(i).arg(error));
+      deleteNodes(operationNodes);
+      break;
+    }
+
+    nodes.insert(nodes.end(), operationNodes.begin(), operationNodes.end());
+  }
+
+  if (!errors.isEmpty())
+  {
+    deleteNodes(nodes);
+    return McpBridgeToolResult::success(QJsonObject{
+      {"valid", false},
+      {"validation",
+       batchValidationJson(
+         false, errors, operations.size(), static_cast<int>(nodes.size()))},
+    });
+  }
+
+  const auto transactionName =
+    batchParams.value("name").toString("MCP: Blockout batch").trimmed();
+  const auto changedObjectIds = addNodesWithTransaction(
+    map,
+    transactionName.isEmpty() ? QString{"MCP: Blockout batch"} : transactionName,
+    nodes,
+    batchParams.value("select").toBool(true));
+  if (!changedObjectIds)
+  {
+    deleteNodes(nodes);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not add blockout batch brushes");
+  }
+
+  auto fullResults = QJsonArray{};
+  for (const auto* node : nodes)
+  {
+    fullResults.push_back(nodeSummaryJson(*node, map.worldNode()));
+  }
+
+  auto result = QJsonObject{};
+  auto detailObject = QJsonObject{
+    {"input", batchParams},
+    {"grid", grid},
+    {"validation",
+     batchValidationJson(true, {}, operations.size(), static_cast<int>(nodes.size()))},
+    {"results", fullResults},
+  };
+  mcpRecordOperation(
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName.isEmpty() ? QString{"MCP: Blockout batch"} : transactionName,
+    *changedObjectIds,
+    result,
+    detailObject);
+  result.insert("brushCount", static_cast<int>(nodes.size()));
+  result.insert("bounds", boundsToJson(boundsForNodes(nodes)));
+  result.insert(
+    "validation",
+    batchValidationJson(true, {}, operations.size(), static_cast<int>(nodes.size())));
+  result.insert("material", QString::fromStdString(defaultMaterial));
+  result.insert("grid", grid);
+  applyDetailLevel(
+    result,
+    *changedObjectIds,
+    batchParams.value("detail").toString("summary"),
+    fullResults);
+  if (
+    !history.empty()
+    && history.back().operationId == result.value("operationId").toString())
+  {
+    history.back().summary = result;
+  }
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -2134,12 +2753,10 @@ McpBridgeToolResult createBrushResult(
     brushJson.push_back(nodeSummaryJson(*node, map.worldNode()));
   }
   result.insert("type", type);
-  result.insert("brushes", brushJson);
   result.insert("brushCount", brushJson.size());
-  if (nodes.size() == 1)
-  {
-    result.insert("brush", nodeSummaryJson(*nodes.front(), map.worldNode()));
-  }
+  result.insert("bounds", boundsToJson(boundsForNodes(nodes)));
+  applyDetailLevel(
+    result, *changedObjectIds, params.value("detail").toString("summary"), brushJson);
   return McpBridgeToolResult::success(std::move(result));
 }
 

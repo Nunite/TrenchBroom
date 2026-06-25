@@ -32,7 +32,9 @@ TEST_CASE("McpJsonRpc")
   SECTION("initialize declares tools capability")
   {
     const auto result = mcpInitializeResult({});
-    CHECK(result.value("capabilities").toObject().contains("tools"));
+    const auto capabilities = result.value("capabilities").toObject();
+    CHECK(capabilities.contains("tools"));
+    CHECK(capabilities.contains("resources"));
   }
 
   SECTION("tools list remains visible when TrenchBroom mode is off")
@@ -65,6 +67,33 @@ TEST_CASE("McpJsonRpc")
     CHECK(result.value("structuredContent").toObject().value("ok").toBool());
   }
 
+  SECTION("tools call includes operation resource link")
+  {
+    const auto result = mcpToolCallResult(
+      QJsonObject{
+        {"name", "blockout_create_batch"},
+        {"arguments", QJsonObject{}},
+      },
+      [](const QString&, const QJsonObject&) {
+        return McpBridgeResponse::success(
+          "request",
+          QJsonObject{
+            {"operationId", "mcp-op-1"},
+            {"transactionName", "MCP: Test"},
+            {"brushCount", 2},
+            {"resourceUri", "tbmcp://operation/mcp-op-1"},
+          });
+      });
+
+    CHECK(!result.value("isError").toBool());
+    const auto content = result.value("content").toArray();
+    REQUIRE(content.size() == 2);
+    CHECK(content[0].toObject().value("type").toString() == "text");
+    CHECK(content[0].toObject().value("text").toString().contains("brushCount=2"));
+    CHECK(content[1].toObject().value("type").toString() == "resource_link");
+    CHECK(content[1].toObject().value("uri").toString() == "tbmcp://operation/mcp-op-1");
+  }
+
   SECTION("notification does not produce a response")
   {
     const auto response = handleMcpJsonRpcRequest(
@@ -78,6 +107,37 @@ TEST_CASE("McpJsonRpc")
       });
 
     CHECK(!response);
+  }
+
+  SECTION("resources read returns JSON resource contents")
+  {
+    const auto response = handleMcpJsonRpcRequest(
+      QJsonObject{
+        {"jsonrpc", "2.0"},
+        {"id", 5},
+        {"method", "resources/read"},
+        {"params", QJsonObject{{"uri", "tbmcp://operation/mcp-op-1"}}},
+      },
+      McpMode::ReadOnly,
+      [](const QString&, const QJsonObject&) {
+        return McpBridgeResponse::success("request", {});
+      },
+      McpToolProfile::Balanced,
+      [](const QString& uri) -> std::optional<QJsonObject> {
+        if (uri == "tbmcp://operation/mcp-op-1")
+        {
+          return QJsonObject{{"operationId", "mcp-op-1"}};
+        }
+        return std::nullopt;
+      });
+
+    REQUIRE(response);
+    const auto result = response->value("result").toObject();
+    const auto contents = result.value("contents").toArray();
+    REQUIRE(contents.size() == 1);
+    CHECK(contents[0].toObject().value("uri").toString() == "tbmcp://operation/mcp-op-1");
+    CHECK(contents[0].toObject().value("mimeType").toString() == "application/json");
+    CHECK(contents[0].toObject().value("text").toString().contains("mcp-op-1"));
   }
 }
 

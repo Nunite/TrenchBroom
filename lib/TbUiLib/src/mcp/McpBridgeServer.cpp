@@ -67,6 +67,19 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           doctor.insert("overlay", m_overlayState);
           return McpBridgeToolResult::success(std::move(doctor));
         }
+        if (toolName == "tb_tools_search")
+        {
+          return McpBridgeToolResult::success(QJsonObject{
+            {"tools",
+             mcp::toolsSearchJson(
+               params.value("query").toString(),
+               params.value("category").toString(),
+               params.value("detail").toString("summary"),
+               m_config.mode,
+               m_config.toolProfile)},
+            {"toolProfile", mcp::toolProfileName(m_config.toolProfile)},
+          });
+        }
         if (toolName == "documents_list")
         {
           return McpBridgeToolResult::success(documentsListJson(appController));
@@ -227,6 +240,18 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return historyListResult(m_operationHistory);
         }
+        if (toolName == "operation_inspect")
+        {
+          return operationInspectResult(m_operationHistory, params);
+        }
+        if (toolName == "operation_select")
+        {
+          return operationSelectResult(appController, m_operationHistory, params);
+        }
+        if (toolName == "operation_validate")
+        {
+          return operationValidateResult(appController, m_operationHistory, params);
+        }
         if (toolName == "history_undo_mcp")
         {
           return historyUndoResult(appController, m_operationHistory);
@@ -326,6 +351,13 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "leaks_load_pointfile")
         {
           return leaksLoadPointfileResult(appController, params);
+        }
+        if (
+          toolName == "blockout_create_batch"
+          || toolName == "blockout_create_curved_corridor")
+        {
+          return blockoutCreateBatchResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
         if (
           toolName == "blockout_create_room" || toolName == "blockout_create_corridor"

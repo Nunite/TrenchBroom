@@ -316,7 +316,9 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
         m_config.mode,
       };
       return m_bridgeServer.dispatchRequest(request);
-    });
+    },
+    m_config.toolProfile,
+    [this](const QString& uri) { return m_bridgeServer.readResource(uri); });
 
   if (!response)
   {
