@@ -100,6 +100,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("blockout_create_batch"));
     CHECK(findToolDefinition("blockout_create_curved_corridor"));
     CHECK(findToolDefinition("python_generate_blockout"));
+    CHECK(findToolDefinition("heightmap_import_grayscale"));
     CHECK(findToolDefinition("tb_tools_search"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
@@ -244,6 +245,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_create_batch"));
     CHECK(names.contains("blockout_create_curved_corridor"));
     CHECK(names.contains("python_generate_blockout"));
+    CHECK(names.contains("heightmap_import_grayscale"));
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("blockout_validate_spiral_stairs"));
@@ -287,6 +289,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_create_from_planes"));
     CHECK(names.contains("blockout_create_batch"));
     CHECK(names.contains("python_generate_blockout"));
+    CHECK(names.contains("heightmap_import_grayscale"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("objects_delete"));
@@ -311,6 +314,36 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("entity_schema"));
     CHECK(!names.contains("blockout_create_spiral_stairs"));
     CHECK(!names.contains("blockout_create_curved_corridor"));
+  }
+
+  SECTION("heightmap import tool requires image path and is modeling visible")
+  {
+    const auto tool = findToolDefinition("heightmap_import_grayscale");
+    REQUIRE(tool);
+
+    CHECK(tool->category == "heightmap");
+    CHECK(tool->requiredMode == McpMode::Edit);
+    CHECK(tool->mutatesDocument);
+
+    const auto required = tool->inputSchema.value("required").toArray();
+    CHECK(required.contains("imagePath"));
+
+    const auto readOnlyTools =
+      toolsListJson(McpMode::ReadOnly, true, McpToolProfile::Modeling);
+    auto readOnlyNames = QStringList{};
+    for (const auto& entry : readOnlyTools)
+    {
+      readOnlyNames.push_back(entry.toObject().value("name").toString());
+    }
+    CHECK(!readOnlyNames.contains("heightmap_import_grayscale"));
+
+    const auto editTools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    auto editNames = QStringList{};
+    for (const auto& entry : editTools)
+    {
+      editNames.push_back(entry.toObject().value("name").toString());
+    }
+    CHECK(editNames.contains("heightmap_import_grayscale"));
   }
 
   SECTION("core profile keeps only compact discovery and batch-oriented tools")

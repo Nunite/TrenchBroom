@@ -158,6 +158,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpDocumentTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpEntityTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHistoryTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHeightmapTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpObjectTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpProblemTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpPythonTools.cpp

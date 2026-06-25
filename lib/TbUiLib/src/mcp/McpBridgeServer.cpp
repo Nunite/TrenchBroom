@@ -357,6 +357,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           return pythonGenerateBlockoutResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
+        if (toolName == "heightmap_import_grayscale")
+        {
+          return heightmapImportGrayscaleResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
         if (
           toolName == "blockout_create_batch"
           || toolName == "blockout_create_curved_corridor")

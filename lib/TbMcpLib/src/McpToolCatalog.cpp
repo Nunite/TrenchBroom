@@ -1336,6 +1336,34 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"script"}),
     },
     {
+      "heightmap_import_grayscale",
+      "Import a local grayscale image as terraced brush terrain. The image is sampled, "
+      "quantized, merged into same-height rectangles, then committed as one batch "
+      "transaction.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"imagePath", stringProperty("Local image path to read as a heightmap.")},
+          {"origin", vec3Property("Terrain minimum origin, defaults to [0,0,0].")},
+          {"cellSize", numberProperty("Map units per sampled pixel, defaults to 64.")},
+          {"heightScale", numberProperty("Maximum generated height, defaults to 128.")},
+          {"heightSteps", integerProperty("Quantization steps, defaults to 8.")},
+          {"maxSize",
+           integerProperty(
+             "Maximum sampled image dimension before downsampling, defaults to 64.")},
+          {"maxBrushes",
+           integerProperty("Maximum merged brushes to create, defaults to 512.")},
+          {"mode",
+           stringProperty("Import mode. First version supports terraced_brushes only.")},
+          {"material", stringProperty("Brush material, defaults to current material.")},
+          {"select", boolProperty("Select generated terrain brushes.")},
+          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+        },
+        {"imagePath"}),
+    },
+    {
       "blockout_create_curved_corridor",
       "Create a curved corridor as one transaction using floor, ceiling, inner wall, "
       "outer wall, and optional caps.",
@@ -1495,6 +1523,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       {
         tool.category = "python";
       }
+      else if (tool.name.startsWith("heightmap_"))
+      {
+        tool.category = "heightmap";
+        tool.minimumProfile = McpToolProfile::Modeling;
+      }
       else if (
         tool.name == "tb_status" || tool.name == "tb_doctor"
         || tool.name == "tb_tools_search")
@@ -1586,6 +1619,7 @@ bool isModelingTool(const QString& name)
     "brush_create_from_planes",
     "blockout_create_batch",
     "python_generate_blockout",
+    "heightmap_import_grayscale",
     "geometry_analyze_selection",
     "blockout_validate",
     "objects_delete",

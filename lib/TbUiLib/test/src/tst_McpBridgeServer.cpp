@@ -17,8 +17,11 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QColor>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QTemporaryDir>
 
 #include "../../src/mcp/McpBridgeServerTools.h"
 #include "Result.h"
@@ -352,6 +355,15 @@ TEST_CASE("McpBridgeServer")
         {"resourceUri", "tbmcp://operation/mcp-op-11"},
       });
     }
+    if (toolName == "heightmap_import_grayscale")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"operationId", "mcp-op-12"},
+        {"transactionName", "MCP: Import grayscale heightmap"},
+        {"brushCount", 4},
+        {"resourceUri", "tbmcp://operation/mcp-op-12"},
+      });
+    }
     if (toolName == "blockout_create_room" || toolName == "blockout_create_spiral_stairs")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -564,6 +576,16 @@ TEST_CASE("McpBridgeServer")
     CHECK(!pythonResponse.ok);
     REQUIRE(pythonResponse.error);
     CHECK(pythonResponse.error->code == mcp::McpErrorCode::Forbidden);
+
+    const auto heightmapResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "3",
+      "secret",
+      "heightmap_import_grayscale",
+      QJsonObject{{"imagePath", "C:/tmp/heightmap.png"}},
+      mcp::McpMode::Edit});
+    CHECK(!heightmapResponse.ok);
+    REQUIRE(heightmapResponse.error);
+    CHECK(heightmapResponse.error->code == mcp::McpErrorCode::Forbidden);
   }
 
   SECTION("registered unsupported tools report not implemented")
@@ -1038,6 +1060,15 @@ TEST_CASE("McpBridgeServer")
       mcp::McpMode::Edit});
     CHECK(curvedResponse.ok);
     CHECK(curvedResponse.result.value("operationId").toString() == "mcp-op-11");
+
+    const auto heightmapResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "5",
+      "secret",
+      "heightmap_import_grayscale",
+      QJsonObject{{"imagePath", "C:/tmp/heightmap.png"}},
+      mcp::McpMode::Edit});
+    CHECK(heightmapResponse.ok);
+    CHECK(heightmapResponse.result.value("operationId").toString() == "mcp-op-12");
   }
 
   SECTION("rejects nested dispatch")
@@ -1482,6 +1513,158 @@ print(json.dumps({
 
     REQUIRE(response.ok);
     CHECK(!response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
+}
+
+TEST_CASE("McpBridgeServer grayscale heightmap import tool")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  auto tempDir = QTemporaryDir{};
+  REQUIRE(tempDir.isValid());
+
+  const auto saveImage = [&](const QString& fileName, const QImage& image) {
+    const auto path = tempDir.filePath(fileName);
+    REQUIRE(image.save(path));
+    return path;
+  };
+
+  SECTION("imports terraced merged brushes from a grayscale image")
+  {
+    auto image = QImage{2, 2, QImage::Format_RGB32};
+    image.setPixelColor(0, 0, QColor{0, 0, 0});
+    image.setPixelColor(1, 0, QColor{128, 128, 128});
+    image.setPixelColor(0, 1, QColor{128, 128, 128});
+    image.setPixelColor(1, 1, QColor{255, 255, 255});
+    const auto imagePath = saveImage("heightmap.png", image);
+
+    const auto response = heightmapImportGrayscaleForMapResult(
+      map,
+      "heightmap_import_grayscale",
+      QJsonObject{
+        {"imagePath", imagePath},
+        {"origin", QJsonArray{0, 0, 0}},
+        {"cellSize", 32},
+        {"heightScale", 64},
+        {"heightSteps", 4},
+        {"maxSize", 4},
+        {"maxBrushes", 16},
+        {"select", true},
+        {"detail", "summary"},
+      },
+      history,
+      nextOperationIndex);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    CHECK(
+      response.result.value("transactionName").toString()
+      == "MCP: Import grayscale heightmap");
+    CHECK(response.result.value("operationId").toString() == "mcp-op-1");
+    CHECK(response.result.value("brushCount").toInt() == 3);
+    CHECK(response.result.value("changedObjectCount").toInt() == 3);
+    CHECK(response.result.value("changedObjectIds").isUndefined());
+    CHECK(response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(
+      response.result.value("heightmap").toObject().value("sourceWidth").toInt() == 2);
+    CHECK(
+      response.result.value("heightmap").toObject().value("sampledHeight").toInt() == 2);
+    CHECK(
+      response.result.value("heightmap")
+        .toObject()
+        .value("skippedZeroHeightCells")
+        .toInt()
+      == 1);
+    CHECK(map.selection().nodes.size() == 3u);
+
+    REQUIRE(map.undoCommandName() != nullptr);
+    CHECK(
+      QString::fromStdString(*map.undoCommandName())
+      == "MCP: Import grayscale heightmap");
+  }
+
+  SECTION("rejects missing image path without committing")
+  {
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = heightmapImportGrayscaleForMapResult(
+      map,
+      "heightmap_import_grayscale",
+      QJsonObject{{"imagePath", tempDir.filePath("missing.png")}},
+      history,
+      nextOperationIndex);
+
+    CHECK(!response.ok);
+    CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
+
+  SECTION("reports empty all-black heightmap without committing")
+  {
+    auto image = QImage{4, 4, QImage::Format_RGB32};
+    image.fill(QColor{0, 0, 0});
+    const auto imagePath = saveImage("black.png", image);
+
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = heightmapImportGrayscaleForMapResult(
+      map,
+      "heightmap_import_grayscale",
+      QJsonObject{{"imagePath", imagePath}},
+      history,
+      nextOperationIndex);
+
+    REQUIRE(response.ok);
+    CHECK(!response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(
+      response.result.value("heightmap").toObject().value("mergedBrushCount").toInt()
+      == 0);
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
+
+  SECTION("rejects excessive brush count without committing")
+  {
+    auto image = QImage{4, 4, QImage::Format_RGB32};
+    for (auto y = 0; y < image.height(); ++y)
+    {
+      for (auto x = 0; x < image.width(); ++x)
+      {
+        const auto value = ((x + y) % 2 == 0) ? 64 : 192;
+        image.setPixelColor(x, y, QColor{value, value, value});
+      }
+    }
+    const auto imagePath = saveImage("checker.png", image);
+
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = heightmapImportGrayscaleForMapResult(
+      map,
+      "heightmap_import_grayscale",
+      QJsonObject{
+        {"imagePath", imagePath},
+        {"heightSteps", 8},
+        {"maxSize", 4},
+        {"maxBrushes", 4},
+      },
+      history,
+      nextOperationIndex);
+
+    REQUIRE(response.ok);
+    CHECK(!response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(
+      response.result.value("heightmap").toObject().value("mergedBrushCount").toInt()
+      > 4);
     CHECK(map.worldNode().descendantCount() == descendantCount);
   }
 }

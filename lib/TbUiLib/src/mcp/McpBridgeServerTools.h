@@ -242,6 +242,18 @@ McpBridgeToolResult pythonGenerateBlockoutForMapResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult heightmapImportGrayscaleResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult heightmapImportGrayscaleForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
