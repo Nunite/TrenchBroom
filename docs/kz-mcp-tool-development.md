@@ -159,6 +159,19 @@ build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "McpBridgeServer"
 build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "McpBridgeServer KZ MCP tools"
 ```
 
+Runtime smoke:
+
+```powershell
+scripts\mcp-kz-smoke.ps1 -Launch -RawJson
+```
+
+The runtime smoke starts the Release TrenchBroom executable with
+`build-release-codex\app\TrenchBroom\map_test\unnamed.map`, connects to the local
+HTTP MCP endpoint, creates a two-platform KZ polygon chain with metadata, reads
+the metadata back, selects by `routeId`, runs `kz_distance_analyze_chain`, and
+then uses `history_undo_mcp` to remove the smoke brushes. It verifies that the
+map dirty state returns to its pre-smoke value.
+
 Build targets:
 
 ```powershell
