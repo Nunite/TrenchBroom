@@ -272,6 +272,34 @@ QJsonArray nodeSummariesJson(
   return result;
 }
 
+QJsonObject pendingNodeSummaryJson(const mdl::Node& node)
+{
+  auto result = QJsonObject{
+    {"type", nodeTypeName(node)},
+    {"name", QString::fromStdString(node.name())},
+    {"childCount", static_cast<int>(node.childCount())},
+    {"descendantCount", static_cast<int>(node.descendantCount())},
+    {"logicalBounds", boundsToJson(node.logicalBounds())},
+  };
+
+  if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(&node))
+  {
+    result.insert("faceCount", static_cast<int>(brushNode->brush().faceCount()));
+  }
+
+  return result;
+}
+
+QJsonArray pendingNodeSummariesJson(const std::vector<mdl::Node*>& nodes)
+{
+  auto result = QJsonArray{};
+  for (const auto* node : nodes)
+  {
+    result.push_back(pendingNodeSummaryJson(*node));
+  }
+  return result;
+}
+
 std::optional<vm::vec3d> mcpVec3FromJson(
   const QJsonObject& params, const QString& key, QString& error)
 {
@@ -2633,7 +2661,7 @@ McpBridgeToolResult blockoutCreateBatchResult(
     batchParams.value("name").toString("MCP: Blockout batch").trimmed();
   const auto brushCount = static_cast<int>(nodes.size());
   const auto bounds = boundsForNodes(nodes);
-  const auto fullResults = nodeSummariesJson(nodes, map.worldNode());
+  const auto fullResults = pendingNodeSummariesJson(nodes);
   const auto validation =
     batchValidationJson(true, {}, operations.size(), static_cast<int>(nodes.size()));
   const auto changedObjectIds = addNodesWithTransaction(
@@ -2743,7 +2771,7 @@ McpBridgeToolResult createBrushResult(
   }
 
   const auto bounds = boundsForNodes(nodes);
-  auto brushJson = nodeSummariesJson(nodes, map.worldNode());
+  auto brushJson = pendingNodeSummariesJson(nodes);
   const auto transactionName = QString{"MCP: Create %1 brush"}.arg(type);
   const auto changedObjectIds = addNodesWithTransaction(
     map, transactionName, nodes, mcpOptionalBool(params, "select", true));
