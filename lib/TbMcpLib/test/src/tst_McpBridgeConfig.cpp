@@ -40,7 +40,7 @@ TEST_CASE("McpBridgeConfig")
     CHECK(config.httpEnabled);
     CHECK(config.httpHost == "127.0.0.1");
     CHECK(config.httpPort == 37666);
-    CHECK(config.toolProfile == McpToolProfile::Balanced);
+    CHECK(config.toolProfile == McpToolProfile::Modeling);
   }
 
   SECTION("json roundtrip")
@@ -78,7 +78,7 @@ TEST_CASE("McpBridgeConfig")
     CHECK(parsed->httpEnabled);
     CHECK(parsed->httpHost == "127.0.0.1");
     CHECK(parsed->httpPort == 37666);
-    CHECK(parsed->toolProfile == McpToolProfile::Balanced);
+    CHECK(parsed->toolProfile == McpToolProfile::Modeling);
   }
 
   SECTION("reads tool profile")
@@ -92,6 +92,24 @@ TEST_CASE("McpBridgeConfig")
 
     REQUIRE(parsed);
     CHECK(parsed->toolProfile == McpToolProfile::Core);
+
+    const auto modeling = bridgeConfigFromJson(QJsonObject{
+      {"pipeName", "test-pipe"},
+      {"token", "secret-token"},
+      {"mode", "ReadOnly"},
+      {"toolProfile", "Modeling"},
+    });
+    REQUIRE(modeling);
+    CHECK(modeling->toolProfile == McpToolProfile::Modeling);
+
+    const auto balanced = bridgeConfigFromJson(QJsonObject{
+      {"pipeName", "test-pipe"},
+      {"token", "secret-token"},
+      {"mode", "ReadOnly"},
+      {"toolProfile", "Balanced"},
+    });
+    REQUIRE(balanced);
+    CHECK(balanced->toolProfile == McpToolProfile::Balanced);
   }
 
   SECTION("rejects invalid json")

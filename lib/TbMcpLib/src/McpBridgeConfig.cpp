@@ -102,7 +102,7 @@ McpBridgeConfig defaultBridgeConfig()
     true,
     "127.0.0.1",
     37666,
-    McpToolProfile::Balanced,
+    McpToolProfile::Modeling,
   };
 }
 
@@ -216,7 +216,7 @@ std::optional<McpBridgeConfig> bridgeConfigFromJson(
     httpPort = quint16(port);
   }
 
-  auto toolProfile = McpToolProfile::Balanced;
+  auto toolProfile = McpToolProfile::Modeling;
   const auto toolProfileValue = json.value("toolProfile");
   if (!toolProfileValue.isUndefined())
   {

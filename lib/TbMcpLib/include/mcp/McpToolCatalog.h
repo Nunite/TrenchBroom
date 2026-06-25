@@ -34,6 +34,7 @@ namespace tb::mcp
 enum class McpToolProfile
 {
   Core,
+  Modeling,
   Balanced,
   Full,
 };

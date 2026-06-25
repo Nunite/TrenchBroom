@@ -107,7 +107,7 @@ TrenchBroom，减少额外 exe、pipe 配置和鉴权状态不同步带来的维
   "httpEnabled": true,
   "httpHost": "127.0.0.1",
   "httpPort": 37666,
-  "toolProfile": "Balanced"
+  "toolProfile": "Modeling"
 }
 ```
 
@@ -128,7 +128,7 @@ HTTP 主路径不要求 bearer token；它只绑定 `127.0.0.1`，并由 Prefere
 - Streamable HTTP 请求必须校验 `Origin`，避免 DNS rebinding 类攻击。
 - HTTP 请求不需要 `Authorization` header；stdio shim 读取 config token 并转发给 legacy bridge。
 - `tools/list` 应返回稳定的已实现工具列表，不因为当前 `Off` / `ReadOnly` / `Edit` mode 返回空列表；实际调用时再由 mode gating 返回 `Forbidden`。这能避免 Claude Code 显示 `connected · no tools`。
-- `toolProfile` 控制 `tools/list` 默认暴露范围：`Core` 只暴露状态、搜索、batch blockout、operation 和截图/验证工具；`Balanced` 为推荐默认；`Full` 才暴露低层 atomic brush 工具。
+- `toolProfile` 控制 `tools/list` 默认暴露范围：`Core` 只暴露状态、搜索和 batch/operation 工具；`Modeling` 为推荐默认，暴露原子建模、batch IR、Python IR、几何验证和基础 face/texture 工具；`Balanced` 保留通用编辑器工具；`Full` 暴露全部专家和调试工具。
 - `Danger` 不通过 UI 暴露，不进入默认 tool list。
 
 ## MCP Transport 设计细节
@@ -228,7 +228,7 @@ MCP 官方 2025-06-18 规范定义两种标准 transport：
 
 - 高层 outcome tools：用于确定性生成常见结构，例如 `blockout_create_spiral_stairs` 和 `blockout_create_curved_corridor`。当用户要“做一个旋转楼梯/弧形走廊”时，应优先调用这类工具，而不是让 Agent 逐个创建 brush。
 - 中层 Batch Blockout IR：`blockout_create_batch` 是默认主力入口。Agent 一次提交 `operations[]`，TrenchBroom 在内部完成 grid snap、validation、brush 编译和一次 transaction。失败时不提交任何 brush。
-- 低层 atomic tools：`brush_create_*` 保留给专家调试或单个特殊 primitive。默认 `Balanced` profile 会隐藏这些工具；需要时可以切换 `Full`，或用 `tb_tools_search` 按需发现。
+- 低层 atomic tools：`brush_create_*` 保留给建模精修或单个特殊 primitive。默认 `Modeling` profile 只直接暴露常用原子工具（box、prism、cylinder sector、from_planes 等）；其他 UI、编译、资产和高层 prefab 式工具通过 `tb_tools_search` 按需发现，或切换 `Balanced` / `Full`。
 
 批量/创建工具的默认返回遵循 compact result 约定：
 

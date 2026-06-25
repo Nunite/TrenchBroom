@@ -28,6 +28,20 @@ namespace tb::mcp
 
 TEST_CASE("McpToolCatalog")
 {
+  SECTION("parses and names tool profiles")
+  {
+    CHECK(toolProfileName(McpToolProfile::Core) == "Core");
+    CHECK(toolProfileName(McpToolProfile::Modeling) == "Modeling");
+    CHECK(toolProfileName(McpToolProfile::Balanced) == "Balanced");
+    CHECK(toolProfileName(McpToolProfile::Full) == "Full");
+
+    CHECK(parseToolProfile("Core") == McpToolProfile::Core);
+    CHECK(parseToolProfile("Modeling") == McpToolProfile::Modeling);
+    CHECK(parseToolProfile("modeling") == McpToolProfile::Modeling);
+    CHECK(parseToolProfile("Balanced") == McpToolProfile::Balanced);
+    CHECK(parseToolProfile("Full") == McpToolProfile::Full);
+  }
+
   SECTION("contains first-phase tools")
   {
     CHECK(findToolDefinition("tb_status"));
@@ -93,7 +107,7 @@ TEST_CASE("McpToolCatalog")
 
   SECTION("read-only mode lists implemented read-only tools only")
   {
-    const auto tools = toolsListJson(McpMode::ReadOnly);
+    const auto tools = toolsListJson(McpMode::ReadOnly, true, McpToolProfile::Balanced);
     auto names = QStringList{};
     for (const auto& tool : tools)
     {
@@ -163,7 +177,7 @@ TEST_CASE("McpToolCatalog")
 
   SECTION("balanced edit mode lists common tools and hides expert brush tools")
   {
-    const auto tools = toolsListJson(McpMode::Edit);
+    const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Balanced);
     auto names = QStringList{};
     for (const auto& tool : tools)
     {
@@ -238,6 +252,65 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("viewport_capture_current"));
     CHECK(names.contains("viewport_capture_3d"));
     CHECK(names.contains("viewport_capture_2d"));
+  }
+
+  SECTION("modeling profile is the default and keeps modeling tools visible")
+  {
+    const auto tools = toolsListJson(McpMode::Edit);
+    const auto explicitTools =
+      toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    CHECK(tools == explicitTools);
+
+    auto names = QStringList{};
+    for (const auto& tool : tools)
+    {
+      names.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("tb_status"));
+    CHECK(names.contains("tb_doctor"));
+    CHECK(names.contains("tb_tools_search"));
+    CHECK(names.contains("selection_get"));
+    CHECK(names.contains("selection_set"));
+    CHECK(names.contains("selection_filter"));
+    CHECK(names.contains("selection_by_bounds"));
+    CHECK(names.contains("operation_inspect"));
+    CHECK(names.contains("operation_select"));
+    CHECK(names.contains("operation_validate"));
+    CHECK(names.contains("history_undo_mcp"));
+    CHECK(names.contains("history_redo_mcp"));
+    CHECK(names.contains("brush_types_list"));
+    CHECK(names.contains("brush_create"));
+    CHECK(names.contains("brush_create_box"));
+    CHECK(names.contains("brush_create_prism"));
+    CHECK(names.contains("brush_create_cylinder_sector"));
+    CHECK(names.contains("brush_create_from_planes"));
+    CHECK(names.contains("blockout_create_batch"));
+    CHECK(names.contains("python_generate_blockout"));
+    CHECK(names.contains("geometry_analyze_selection"));
+    CHECK(names.contains("blockout_validate"));
+    CHECK(names.contains("objects_delete"));
+    CHECK(names.contains("objects_transform"));
+    CHECK(names.contains("textures_list"));
+    CHECK(names.contains("texture_search"));
+    CHECK(names.contains("face_list"));
+    CHECK(names.contains("face_select"));
+    CHECK(names.contains("face_texture_set"));
+    CHECK(names.contains("texture_apply"));
+
+    CHECK(!names.contains("documents_open"));
+    CHECK(!names.contains("documents_save"));
+    CHECK(!names.contains("documents_close"));
+    CHECK(!names.contains("documents_export"));
+    CHECK(!names.contains("viewport_capture_3d"));
+    CHECK(!names.contains("overlay_set"));
+    CHECK(!names.contains("compile_run"));
+    CHECK(!names.contains("leaks_load_pointfile"));
+    CHECK(!names.contains("asset_place_model"));
+    CHECK(!names.contains("fgd_entities_list"));
+    CHECK(!names.contains("entity_schema"));
+    CHECK(!names.contains("blockout_create_spiral_stairs"));
+    CHECK(!names.contains("blockout_create_curved_corridor"));
   }
 
   SECTION("core profile keeps only compact discovery and batch-oriented tools")
@@ -318,6 +391,26 @@ TEST_CASE("McpToolCatalog")
 
     REQUIRE(!found.isEmpty());
     CHECK(found.value("category").toString() == "python");
+    CHECK(!found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("inputSchema").isObject());
+  }
+
+  SECTION("tool search can discover hidden tools from modeling profile")
+  {
+    const auto tools = toolsSearchJson(
+      "viewport_capture_3d", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    auto found = QJsonObject{};
+    for (const auto& tool : tools)
+    {
+      const auto object = tool.toObject();
+      if (object.value("name").toString() == "viewport_capture_3d")
+      {
+        found = object;
+        break;
+      }
+    }
+
+    REQUIRE(!found.isEmpty());
     CHECK(!found.value("visibleInCurrentProfile").toBool());
     CHECK(found.value("inputSchema").isObject());
   }

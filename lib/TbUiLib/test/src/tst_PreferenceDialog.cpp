@@ -27,6 +27,7 @@
 #include "ui/MiscPreferencePane.h"
 #include "ui/MousePreferencePane.h"
 #include "ui/PreferenceDialog.h"
+#include "ui/PreferencePane.h"
 #include "ui/UpdatePreferencePane.h"
 #include "ui/ViewPreferencePane.h"
 
@@ -113,6 +114,9 @@ TEST_CASE("PreferenceDialog.preferencePanes")
   SECTION("MCP")
   {
     auto pane = std::make_unique<McpPreferencePane>(fixture.appController());
+    auto& preferencePane = static_cast<PreferencePane&>(*pane);
+    CHECK(preferencePane.canResetToDefaults());
+    preferencePane.resetToDefaults();
     pane.reset();
   }
 

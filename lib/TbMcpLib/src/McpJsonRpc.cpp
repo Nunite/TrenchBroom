@@ -179,7 +179,7 @@ QJsonObject mcpToolsListResult(const McpMode currentMode, const McpToolProfile p
 
 QJsonObject mcpToolsListResult(const McpMode currentMode)
 {
-  return mcpToolsListResult(currentMode, McpToolProfile::Balanced);
+  return mcpToolsListResult(currentMode, McpToolProfile::Modeling);
 }
 
 QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& toolCaller)
@@ -298,7 +298,7 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
   const QJsonObject& request, const McpMode currentMode, const McpToolCaller& toolCaller)
 {
   return handleMcpJsonRpcRequest(
-    request, currentMode, toolCaller, McpToolProfile::Balanced, {});
+    request, currentMode, toolCaller, McpToolProfile::Modeling, {});
 }
 
 } // namespace tb::mcp

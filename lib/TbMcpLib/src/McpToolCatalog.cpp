@@ -20,6 +20,7 @@
 #include "mcp/McpToolCatalog.h"
 
 #include <algorithm>
+#include <array>
 
 namespace tb::mcp
 {
@@ -1501,12 +1502,14 @@ QString toolProfileName(const McpToolProfile profile)
   {
   case McpToolProfile::Core:
     return "Core";
+  case McpToolProfile::Modeling:
+    return "Modeling";
   case McpToolProfile::Balanced:
     return "Balanced";
   case McpToolProfile::Full:
     return "Full";
   }
-  return "Balanced";
+  return "Modeling";
 }
 
 std::optional<McpToolProfile> parseToolProfile(const QString& profile)
@@ -1515,6 +1518,10 @@ std::optional<McpToolProfile> parseToolProfile(const QString& profile)
   if (normalized == "core")
   {
     return McpToolProfile::Core;
+  }
+  if (normalized == "modeling")
+  {
+    return McpToolProfile::Modeling;
   }
   if (normalized == "balanced")
   {
@@ -1533,12 +1540,53 @@ int profileRank(const McpToolProfile profile)
   {
   case McpToolProfile::Core:
     return 0;
-  case McpToolProfile::Balanced:
+  case McpToolProfile::Modeling:
     return 1;
-  case McpToolProfile::Full:
+  case McpToolProfile::Balanced:
     return 2;
+  case McpToolProfile::Full:
+    return 3;
   }
   return 1;
+}
+
+bool isModelingTool(const QString& name)
+{
+  static constexpr auto ModelingToolNames = std::array{
+    "tb_status",
+    "tb_doctor",
+    "tb_tools_search",
+    "selection_get",
+    "selection_set",
+    "selection_filter",
+    "selection_by_bounds",
+    "operation_inspect",
+    "operation_select",
+    "operation_validate",
+    "history_undo_mcp",
+    "history_redo_mcp",
+    "brush_types_list",
+    "brush_create",
+    "brush_create_box",
+    "brush_create_prism",
+    "brush_create_cylinder_sector",
+    "brush_create_from_planes",
+    "blockout_create_batch",
+    "python_generate_blockout",
+    "geometry_analyze_selection",
+    "blockout_validate",
+    "objects_delete",
+    "objects_transform",
+    "textures_list",
+    "texture_search",
+    "face_list",
+    "face_select",
+    "face_texture_set",
+    "texture_apply",
+  };
+
+  return std::ranges::any_of(
+    ModelingToolNames, [&](const auto* toolName) { return name == toolName; });
 }
 
 bool visibleInProfile(const McpToolDefinition& tool, const McpToolProfile profile)
@@ -1555,6 +1603,10 @@ bool visibleInProfile(const McpToolDefinition& tool, const McpToolProfile profil
            || tool.name.startsWith("viewport_capture")
            || tool.name == "geometry_analyze_selection"
            || tool.name == "blockout_validate";
+  }
+  if (profile == McpToolProfile::Modeling)
+  {
+    return isModelingTool(tool.name);
   }
   return !tool.expert && profileRank(profile) >= profileRank(tool.minimumProfile);
 }
@@ -1622,12 +1674,12 @@ QJsonArray toolsListJson(
 
 QJsonArray toolsListJson(const McpMode mode, const bool implementedOnly)
 {
-  return toolsListJson(mode, implementedOnly, McpToolProfile::Balanced);
+  return toolsListJson(mode, implementedOnly, McpToolProfile::Modeling);
 }
 
 QJsonArray toolsListJson(const McpMode mode)
 {
-  return toolsListJson(mode, true, McpToolProfile::Balanced);
+  return toolsListJson(mode, true, McpToolProfile::Modeling);
 }
 
 QJsonArray toolsSearchJson(

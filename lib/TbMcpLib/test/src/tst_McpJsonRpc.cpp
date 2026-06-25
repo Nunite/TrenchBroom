@@ -43,6 +43,7 @@ TEST_CASE("McpJsonRpc")
     const auto tools = result.value("tools").toArray();
 
     CHECK(result.value("trenchBroomMode").toString() == "Off");
+    CHECK(result.value("toolProfile").toString() == "Modeling");
     CHECK(!tools.isEmpty());
     CHECK(tools.first().toObject().value("name").toString() == "tb_status");
   }

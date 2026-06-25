@@ -51,7 +51,7 @@ void addToolProfile(
 mcp::McpToolProfile toolProfileFromCombo(const QComboBox& combo)
 {
   const auto value = combo.currentData(ModeRole).toString();
-  return mcp::parseToolProfile(value).value_or(mcp::McpToolProfile::Balanced);
+  return mcp::parseToolProfile(value).value_or(mcp::McpToolProfile::Modeling);
 }
 
 int findToolProfileIndex(const QComboBox& combo, const mcp::McpToolProfile profile)
@@ -99,11 +99,13 @@ void McpPreferencePane::createGui()
 
   m_toolProfileCombo = new QComboBox{};
   addToolProfile(*m_toolProfileCombo, tr("Core"), mcp::McpToolProfile::Core);
+  addToolProfile(*m_toolProfileCombo, tr("Modeling"), mcp::McpToolProfile::Modeling);
   addToolProfile(*m_toolProfileCombo, tr("Balanced"), mcp::McpToolProfile::Balanced);
   addToolProfile(*m_toolProfileCombo, tr("Full"), mcp::McpToolProfile::Full);
   m_toolProfileCombo->setToolTip(
-    tr("Core exposes only compact high-level tools. Balanced is recommended. Full "
-       "also exposes expert atomic brush tools."));
+    tr("Core exposes only compact discovery tools. Modeling is the recommended "
+       "default for brush, face, transform, batch, and Python IR tools. Balanced "
+       "exposes general editor tools. Full also exposes expert and debug tools."));
   connect(
     m_toolProfileCombo,
     QOverload<int>::of(&QComboBox::currentIndexChanged),

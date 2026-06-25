@@ -46,7 +46,7 @@ optimization order, see `docs/custom-feature-architecture-review.md`.
 - 风险：Blockout IR 第一版已经避免直接拼任意 brush 顶点，但 snap、尺寸约束、房间开口规则和错误报告还比较基础。
 - 风险：如果 Agent 默认使用大量 atomic brush tools，tool definitions 和中间结果会快速挤占上下文，并且更容易生成局部正确但整体不连贯的几何。
 - 风险：`operation_*` resource store 当前是会话级内存状态；文档 reload/close 后旧 object id 可能失效，后续必须持续返回明确 stale/live 诊断，不能静默选择错误对象。
-- 建议修复：MCP 默认关闭，本地 token 必须保留；协议层继续放在 `TbMcpLib`；新增 bridge tool handler 继续按领域拆分；所有写操作继续使用命名 transaction 并补 rollback/真实地图集成测试；overlay 下一步应并入统一视图叠加层管理器；默认 profile 继续隐藏低层 atomic brush tools，复杂结构优先走高层 outcome tools 或 `blockout_create_batch`；不要开放低层任意 brush 顶点工具，除非先有严格 validation。
+- 建议修复：MCP 默认关闭，HTTP 只绑定 localhost，旧 stdio/pipe token 仅作兼容路径；协议层继续放在 `TbMcpLib`；新增 bridge tool handler 继续按领域拆分；所有写操作继续使用命名 transaction 并补 rollback/真实地图集成测试；overlay 下一步应并入统一视图叠加层管理器；默认 `Modeling` profile 只暴露建模核心工具，复杂结构优先走 `blockout_create_batch` 或 `python_generate_blockout`；不要开放任意内部脚本执行，除非先有严格 validation 和显式危险模式。
 
 ## Medium Priority
 
