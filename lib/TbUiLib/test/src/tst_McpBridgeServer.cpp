@@ -1262,6 +1262,72 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(curvedResponse.result.value("changedObjectIds").isUndefined());
   CHECK(curvedResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.selection().nodes.size() == 14u);
+
+  const auto radialCurvedResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_curved_corridor",
+    QJsonObject{
+      {"center", QJsonArray{512, 0, 0}},
+      {"innerRadius", 64},
+      {"outerRadius", 128},
+      {"startAngle", 0},
+      {"turnDegrees", 90},
+      {"height", 96},
+      {"segments", 3},
+      {"caps", "none"},
+      {"snapMode", "radial"},
+      {"grid", 16},
+      {"select", true},
+      {"detail", "full"},
+    },
+    history,
+    nextOperationIndex);
+
+  const auto radialCurvedError = radialCurvedResponse.ok
+                                   ? std::string{}
+                                   : radialCurvedResponse.error.message.toStdString();
+  INFO(radialCurvedError);
+  REQUIRE(radialCurvedResponse.ok);
+  CHECK(radialCurvedResponse.result.value("brushCount").toInt() == 12);
+  CHECK(
+    radialCurvedResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(radialCurvedResponse.result.value("grid").toDouble() == 16.0);
+  CHECK(map.selection().nodes.size() == 12u);
+
+  const auto radialInspectResponse = operationInspectResult(
+    history,
+    QJsonObject{
+      {"operationId", radialCurvedResponse.result.value("operationId").toString()},
+      {"detail", "full"},
+    });
+  REQUIRE(radialInspectResponse.ok);
+  const auto radialInput = radialInspectResponse.result.value("operationDetail")
+                             .toObject()
+                             .value("input")
+                             .toObject();
+  const auto radialOperation =
+    radialInput.value("operations").toArray().first().toObject();
+  CHECK(radialOperation.value("snapMode").toString() == "radial");
+  CHECK(radialInput.value("grid").toDouble() == 16.0);
+
+  const auto invalidSnapResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_curved_corridor",
+    QJsonObject{
+      {"center", QJsonArray{768, 0, 0}},
+      {"innerRadius", 64},
+      {"outerRadius", 128},
+      {"turnDegrees", 90},
+      {"snapMode", "wobbly"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(invalidSnapResponse.ok);
+  const auto invalidSnapValidation =
+    invalidSnapResponse.result.value("validation").toObject();
+  CHECK(!invalidSnapValidation.value("valid").toBool());
+  CHECK(invalidSnapValidation.value("errors").toArray().first().toString().contains(
+    "snapMode"));
 }
 
 TEST_CASE("McpBridgeServer Python blockout tools")

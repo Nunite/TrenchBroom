@@ -395,6 +395,28 @@ TEST_CASE("McpToolCatalog")
     CHECK(found.value("inputSchema").isObject());
   }
 
+  SECTION("curved corridor exposes snap mode schema")
+  {
+    const auto tool = findToolDefinition("blockout_create_curved_corridor");
+    REQUIRE(tool);
+
+    const auto properties = tool->inputSchema.value("properties").toObject();
+    CHECK(properties.value("snapMode").isObject());
+    CHECK(properties.value("snapMode")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("radial"));
+    CHECK(properties.value("grid").isObject());
+
+    const auto sectorTool = findToolDefinition("brush_create_cylinder_sector");
+    REQUIRE(sectorTool);
+    CHECK(sectorTool->inputSchema.value("properties")
+            .toObject()
+            .value("snapMode")
+            .isObject());
+  }
+
   SECTION("tool search can discover hidden tools from modeling profile")
   {
     const auto tools = toolsSearchJson(

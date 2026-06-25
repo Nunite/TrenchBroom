@@ -555,6 +555,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"outerRadius", numberProperty("Outer radius for cylinder sector.")},
           {"startAngle", numberProperty("Start angle in degrees.")},
           {"endAngle", numberProperty("End angle in degrees.")},
+          {"snapMode",
+           stringProperty(
+             "XY vertex snap mode for cylinder_sector: grid, radial, or none.")},
+          {"grid", numberProperty("Grid size for cylinder_sector snapping.")},
           {"material",
            stringProperty("Material name, defaults to the current material.")},
           {"select", boolProperty("Select the created brush or brushes.")},
@@ -751,6 +755,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"endAngle", numberProperty("End angle in degrees.")},
           {"minZ", numberProperty("Minimum Z in map units.")},
           {"maxZ", numberProperty("Maximum Z in map units.")},
+          {"snapMode",
+           stringProperty(
+             "XY vertex snap mode: grid, radial, or none. Defaults to grid.")},
+          {"grid", numberProperty("Grid size for snapping generated geometry.")},
           {"material",
            stringProperty("Material name, defaults to the current material.")},
           {"select", boolProperty("Select the created brush.")},
@@ -1346,6 +1354,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"floorThickness", numberProperty("Floor thickness, defaults to 16.")},
         {"ceilingThickness", numberProperty("Ceiling thickness, defaults to 16.")},
         {"caps", stringProperty("none, start, end, or both. Defaults to none.")},
+        {"snapMode",
+         stringProperty(
+           "XY vertex snap mode: radial, grid, or none. Defaults to radial to keep "
+           "arc boundaries visually continuous.")},
+        {"grid", numberProperty("Grid size for Z/thickness snapping and grid mode.")},
         {"material", stringProperty("Brush material, defaults to current material.")},
         {"select", boolProperty("Select generated brushes.")},
         {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},

@@ -480,6 +480,13 @@ double optionalDouble(
 constexpr double Pi = 3.14159265358979323846;
 constexpr double GeometryEpsilon = 0.001;
 
+enum class SectorSnapMode
+{
+  Grid,
+  Radial,
+  None,
+};
+
 double degreesToRadians(const double degrees)
 {
   return degrees * Pi / 180.0;
@@ -673,6 +680,41 @@ std::vector<vm::vec2d> snapPointsToGrid(
   return result;
 }
 
+std::optional<SectorSnapMode> sectorSnapModeFromJson(
+  const QJsonObject& params,
+  const QString& key,
+  const SectorSnapMode defaultValue,
+  QString& error)
+{
+  const auto value = params.value(key);
+  if (value.isUndefined())
+  {
+    return defaultValue;
+  }
+  if (!value.isString())
+  {
+    error = QString{"%1 must be grid, radial, or none"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto mode = value.toString().trimmed().toLower();
+  if (mode == "grid")
+  {
+    return SectorSnapMode::Grid;
+  }
+  if (mode == "radial")
+  {
+    return SectorSnapMode::Radial;
+  }
+  if (mode == "none")
+  {
+    return SectorSnapMode::None;
+  }
+
+  error = QString{"%1 must be grid, radial, or none"}.arg(key);
+  return std::nullopt;
+}
+
 std::optional<vm::bbox3d> snapBoundsToGrid(
   const vm::bbox3d& bounds, const double grid, QString& error)
 {
@@ -780,6 +822,64 @@ std::optional<std::vector<vm::vec2d>> sectorPolygon(
   };
 }
 
+vm::vec2d snapSectorPoint(
+  const vm::vec2d& center,
+  const double radius,
+  const double angleDegrees,
+  const SectorSnapMode snapMode,
+  const double grid)
+{
+  const auto point = polarPoint(center, radius, angleDegrees);
+  if (snapMode == SectorSnapMode::Radial || snapMode == SectorSnapMode::None)
+  {
+    return point;
+  }
+
+  const auto snapped = snapToGrid(point, grid);
+  return snapped;
+}
+
+std::optional<std::vector<vm::vec2d>> sectorPolygon(
+  const vm::vec2d& center,
+  const double innerRadius,
+  const double outerRadius,
+  const double startAngle,
+  const double endAngle,
+  const SectorSnapMode snapMode,
+  const double grid,
+  QString& error)
+{
+  auto polygon =
+    sectorPolygon(center, innerRadius, outerRadius, startAngle, endAngle, error);
+  if (!polygon || snapMode == SectorSnapMode::None)
+  {
+    return polygon;
+  }
+
+  if (snapMode == SectorSnapMode::Grid)
+  {
+    return snapPointsToGrid(*polygon, grid);
+  }
+
+  const auto span = endAngle - startAngle;
+  if (span > 0.0)
+  {
+    return std::vector<vm::vec2d>{
+      snapSectorPoint(center, innerRadius, startAngle, snapMode, grid),
+      snapSectorPoint(center, outerRadius, startAngle, snapMode, grid),
+      snapSectorPoint(center, outerRadius, endAngle, snapMode, grid),
+      snapSectorPoint(center, innerRadius, endAngle, snapMode, grid),
+    };
+  }
+
+  return std::vector<vm::vec2d>{
+    snapSectorPoint(center, innerRadius, endAngle, snapMode, grid),
+    snapSectorPoint(center, outerRadius, endAngle, snapMode, grid),
+    snapSectorPoint(center, outerRadius, startAngle, snapMode, grid),
+    snapSectorPoint(center, innerRadius, startAngle, snapMode, grid),
+  };
+}
+
 std::optional<mdl::Brush> createCylinderSectorBrush(
   const mdl::BrushBuilder& builder,
   const vm::vec2d& center,
@@ -791,17 +891,18 @@ std::optional<mdl::Brush> createCylinderSectorBrush(
   const double maxZ,
   const std::string& material,
   QString& error,
-  const double grid = 1.0)
+  const double grid = 1.0,
+  const SectorSnapMode snapMode = SectorSnapMode::Grid)
 {
-  auto polygon =
-    sectorPolygon(center, innerRadius, outerRadius, startAngle, endAngle, error);
+  auto polygon = sectorPolygon(
+    center, innerRadius, outerRadius, startAngle, endAngle, snapMode, grid, error);
   if (!polygon)
   {
     return std::nullopt;
   }
   return createPrismBrush(
     builder,
-    snapPointsToGrid(*polygon, grid),
+    std::move(*polygon),
     snapToGrid(minZ, grid),
     snapToGrid(maxZ, grid),
     material,
@@ -1770,6 +1871,7 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& p
   const auto ceilingThickness = optionalDouble(params, "ceilingThickness", 16.0);
   const auto caps = params.value("caps").toString("none").toLower();
   const auto material = params.value("material").toString();
+  const auto snapMode = params.value("snapMode").toString("radial").toLower();
 
   auto operations = std::vector<QJsonObject>{};
   operations.reserve(segments * 4 + 2);
@@ -1790,6 +1892,7 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& p
           {"endAngle", a1},
           {"minZ", minZ},
           {"maxZ", maxZ},
+          {"snapMode", snapMode},
         };
         if (!material.isEmpty())
         {
@@ -1815,6 +1918,7 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& p
       {"endAngle", angle + half},
       {"minZ", 0.0},
       {"maxZ", height + ceilingThickness},
+      {"snapMode", snapMode},
     };
     if (!material.isEmpty())
     {
@@ -1845,6 +1949,7 @@ bool validateCurvedCorridorParams(const QJsonObject& params, QString& error)
   const auto floorThickness = optionalDouble(params, "floorThickness", 16.0);
   const auto ceilingThickness = optionalDouble(params, "ceilingThickness", 16.0);
   const auto caps = params.value("caps").toString("none").toLower();
+  const auto snapMode = params.value("snapMode").toString("radial").toLower();
 
   if (!params.value("center").isArray())
   {
@@ -1890,6 +1995,11 @@ bool validateCurvedCorridorParams(const QJsonObject& params, QString& error)
   if (caps != "none" && caps != "start" && caps != "end" && caps != "both")
   {
     error = "caps must be none, start, end, or both";
+    return false;
+  }
+  if (snapMode != "grid" && snapMode != "radial" && snapMode != "none")
+  {
+    error = "snapMode must be grid, radial, or none";
     return false;
   }
   return true;
@@ -2096,6 +2206,12 @@ std::vector<mdl::Node*> compileBatchOperation(
     {
       return {};
     }
+    const auto snapMode =
+      sectorSnapModeFromJson(operation, "snapMode", SectorSnapMode::Grid, error);
+    if (!snapMode)
+    {
+      return {};
+    }
     auto brush = createCylinderSectorBrush(
       builder,
       vm::vec2d{center->x(), center->y()},
@@ -2107,7 +2223,8 @@ std::vector<mdl::Node*> compileBatchOperation(
       optionalDouble(operation, "maxZ", 128.0),
       material,
       error,
-      grid);
+      grid,
+      *snapMode);
     if (!brush)
     {
       return {};
@@ -2211,6 +2328,12 @@ std::optional<std::vector<mdl::Brush>> createBrushesForType(
     {
       return std::nullopt;
     }
+    const auto snapMode =
+      sectorSnapModeFromJson(params, "snapMode", SectorSnapMode::Grid, error);
+    if (!snapMode)
+    {
+      return std::nullopt;
+    }
     auto brush = createCylinderSectorBrush(
       builder,
       vm::vec2d{center->x(), center->y()},
@@ -2221,7 +2344,9 @@ std::optional<std::vector<mdl::Brush>> createBrushesForType(
       optionalDouble(params, "minZ", center->z()),
       optionalDouble(params, "maxZ", center->z() + 8.0),
       material,
-      error);
+      error,
+      optionalDouble(params, "grid", 1.0),
+      *snapMode);
     if (!brush)
     {
       return std::nullopt;
@@ -2604,6 +2729,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
       {"operations", QJsonArray{operation}},
       {"select", params.value("select").toBool(true)},
       {"detail", params.value("detail").toString("summary")},
+      {"grid", params.value("grid").toDouble(1.0)},
     };
   }
 
