@@ -92,12 +92,27 @@ McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& his
   });
 }
 
-const McpOperationRecord* findOperation(
+std::optional<std::size_t> findOperationIndex(
   const std::vector<McpOperationRecord>& history, const QString& operationId)
 {
   const auto it = std::ranges::find_if(
     history, [&](const auto& operation) { return operation.operationId == operationId; });
-  return it == history.end() ? nullptr : &*it;
+  if (it == history.end())
+  {
+    return std::nullopt;
+  }
+  return static_cast<std::size_t>(std::distance(history.begin(), it));
+}
+
+std::optional<McpOperationRecord> findOperationCopy(
+  const std::vector<McpOperationRecord>& history, const QString& operationId)
+{
+  const auto index = findOperationIndex(history, operationId);
+  if (!index)
+  {
+    return std::nullopt;
+  }
+  return history[*index];
 }
 
 std::optional<mdl::NodePath> parseNodePathId(const QString& id)
@@ -135,7 +150,7 @@ McpBridgeToolResult operationInspectResult(
     return invalidParamsFailure("operation_inspect requires operationId");
   }
 
-  const auto* operation = findOperation(history, operationId);
+  const auto operation = findOperationCopy(history, operationId);
   if (!operation)
   {
     return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
@@ -166,7 +181,7 @@ McpBridgeToolResult operationSelectResult(
     return invalidParamsFailure("operation_select requires operationId");
   }
 
-  const auto* operation = findOperation(history, operationId);
+  const auto operation = findOperationCopy(history, operationId);
   if (!operation)
   {
     return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
@@ -223,7 +238,7 @@ McpBridgeToolResult operationValidateResult(
     return invalidParamsFailure("operation_validate requires operationId");
   }
 
-  const auto* operation = findOperation(history, operationId);
+  const auto operation = findOperationCopy(history, operationId);
   if (!operation)
   {
     return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));

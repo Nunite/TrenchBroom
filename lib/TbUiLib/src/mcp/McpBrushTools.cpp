@@ -261,6 +261,17 @@ vm::bbox3d boundsForNodes(const std::vector<mdl::Node*>& nodes)
   return result;
 }
 
+QJsonArray nodeSummariesJson(
+  const std::vector<mdl::Node*>& nodes, const mdl::WorldNode& worldNode)
+{
+  auto result = QJsonArray{};
+  for (const auto* node : nodes)
+  {
+    result.push_back(nodeSummaryJson(*node, worldNode));
+  }
+  return result;
+}
+
 std::optional<vm::vec3d> mcpVec3FromJson(
   const QJsonObject& params, const QString& key, QString& error)
 {
@@ -2453,6 +2464,8 @@ McpBridgeToolResult blockoutCreateResult(
       error.isEmpty() ? "No blockout brushes were generated" : error);
   }
 
+  const auto brushCount = static_cast<int>(nodes.size());
+  const auto generatedBounds = boundsForNodes(nodes);
   const auto changedObjectIds = addNodesWithTransaction(
     map, transactionName, nodes, mcpOptionalBool(params, "select", true));
   if (!changedObjectIds)
@@ -2468,9 +2481,9 @@ McpBridgeToolResult blockoutCreateResult(
   auto result = QJsonObject{};
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
-  result.insert("brushCount", static_cast<int>(nodes.size()));
+  result.insert("brushCount", brushCount);
   result.insert("material", QString::fromStdString(material));
-  result.insert("bounds", boundsToJson(boundsForNodes(nodes)));
+  result.insert("bounds", boundsToJson(generatedBounds));
   applyDetailLevel(result, *changedObjectIds, params.value("detail").toString("summary"));
   return McpBridgeToolResult::success(std::move(result));
 }
@@ -2503,6 +2516,8 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
     nodes.push_back(new mdl::BrushNode{std::move(brush)});
   }
 
+  const auto brushCount = static_cast<int>(nodes.size());
+  const auto bounds = boundsForNodes(nodes);
   const auto transactionName = QString{"MCP: Blockout spiral stairs"};
   const auto changedObjectIds = addNodesWithTransaction(
     map, transactionName, nodes, mcpOptionalBool(params, "select", true));
@@ -2524,10 +2539,10 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
     transactionName,
     *changedObjectIds,
     result);
-  result.insert("brushCount", static_cast<int>(nodes.size()));
+  result.insert("brushCount", brushCount);
   result.insert("material", QString::fromStdString(material));
-  result.insert("validation", spiralValidationJson(*spiralParams, nodes.size()));
-  result.insert("bounds", boundsToJson(boundsForNodes(nodes)));
+  result.insert("validation", spiralValidationJson(*spiralParams, brushCount));
+  result.insert("bounds", boundsToJson(bounds));
   applyDetailLevel(result, *changedObjectIds, params.value("detail").toString("summary"));
   return McpBridgeToolResult::success(std::move(result));
 }
@@ -2616,6 +2631,11 @@ McpBridgeToolResult blockoutCreateBatchResult(
 
   const auto transactionName =
     batchParams.value("name").toString("MCP: Blockout batch").trimmed();
+  const auto brushCount = static_cast<int>(nodes.size());
+  const auto bounds = boundsForNodes(nodes);
+  const auto fullResults = nodeSummariesJson(nodes, map.worldNode());
+  const auto validation =
+    batchValidationJson(true, {}, operations.size(), static_cast<int>(nodes.size()));
   const auto changedObjectIds = addNodesWithTransaction(
     map,
     transactionName.isEmpty() ? QString{"MCP: Blockout batch"} : transactionName,
@@ -2628,18 +2648,11 @@ McpBridgeToolResult blockoutCreateBatchResult(
       mcp::McpErrorCode::InternalError, "Could not add blockout batch brushes");
   }
 
-  auto fullResults = QJsonArray{};
-  for (const auto* node : nodes)
-  {
-    fullResults.push_back(nodeSummaryJson(*node, map.worldNode()));
-  }
-
   auto result = QJsonObject{};
   auto detailObject = QJsonObject{
     {"input", batchParams},
     {"grid", grid},
-    {"validation",
-     batchValidationJson(true, {}, operations.size(), static_cast<int>(nodes.size()))},
+    {"validation", validation},
     {"results", fullResults},
   };
   mcpRecordOperation(
@@ -2650,11 +2663,9 @@ McpBridgeToolResult blockoutCreateBatchResult(
     *changedObjectIds,
     result,
     detailObject);
-  result.insert("brushCount", static_cast<int>(nodes.size()));
-  result.insert("bounds", boundsToJson(boundsForNodes(nodes)));
-  result.insert(
-    "validation",
-    batchValidationJson(true, {}, operations.size(), static_cast<int>(nodes.size())));
+  result.insert("brushCount", brushCount);
+  result.insert("bounds", boundsToJson(bounds));
+  result.insert("validation", validation);
   result.insert("material", QString::fromStdString(defaultMaterial));
   result.insert("grid", grid);
   applyDetailLevel(
@@ -2731,6 +2742,8 @@ McpBridgeToolResult createBrushResult(
     nodes.push_back(new mdl::BrushNode{std::move(brush)});
   }
 
+  const auto bounds = boundsForNodes(nodes);
+  auto brushJson = nodeSummariesJson(nodes, map.worldNode());
   const auto transactionName = QString{"MCP: Create %1 brush"}.arg(type);
   const auto changedObjectIds = addNodesWithTransaction(
     map, transactionName, nodes, mcpOptionalBool(params, "select", true));
@@ -2747,14 +2760,9 @@ McpBridgeToolResult createBrushResult(
   auto result = QJsonObject{};
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
-  auto brushJson = QJsonArray{};
-  for (const auto* node : nodes)
-  {
-    brushJson.push_back(nodeSummaryJson(*node, map.worldNode()));
-  }
   result.insert("type", type);
   result.insert("brushCount", brushJson.size());
-  result.insert("bounds", boundsToJson(boundsForNodes(nodes)));
+  result.insert("bounds", boundsToJson(bounds));
   applyDetailLevel(
     result, *changedObjectIds, params.value("detail").toString("summary"), brushJson);
   return McpBridgeToolResult::success(std::move(result));
