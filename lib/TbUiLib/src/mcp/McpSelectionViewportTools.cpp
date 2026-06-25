@@ -25,6 +25,7 @@
 #include <QStringList>
 
 #include "McpBridgeServerTools.h"
+#include "McpSelectionQuery.h"
 #include "mcp/McpError.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushFace.h"
@@ -718,33 +719,21 @@ McpBridgeToolResult selectionFilterResult(
     return noActiveDocumentFailure();
   }
 
-  auto error = QString{};
-  auto queryBounds = std::optional<vm::bbox3d>{};
-  const auto hasMin = !params.value("min").isUndefined();
-  const auto hasMax = !params.value("max").isUndefined();
-  if (hasMin != hasMax)
-  {
-    return invalidParamsFailure("min and max must be provided together");
-  }
-  if (hasMin && hasMax)
-  {
-    queryBounds = boundsFromJson(params, error);
-    if (!queryBounds)
-    {
-      return invalidParamsFailure(error);
-    }
-  }
-
   auto& map = mapWindow->document().map();
   auto& worldNode = map.worldNode();
-  auto matches = std::vector<mdl::Node*>{};
-  collectFilteredNodes(
-    worldNode,
-    worldNode,
-    params,
-    queryBounds,
-    optionalSize(params, "limit", 100),
-    matches);
+  auto error = QString{};
+  auto options = McpSelectionQueryOptions{};
+  options.excludeWorld = mcpOptionalBool(params, "excludeWorld", true);
+  options.selectableOnly = mcpOptionalBool(params, "selectableOnly", false);
+  options.leafOnly = mcpOptionalBool(params, "leafOnly", false);
+  options.exactTypeOnly = mcpOptionalBool(params, "exactTypeOnly", true);
+  options.removeDescendantMatches =
+    mcpOptionalBool(params, "removeDescendantMatches", false);
+  auto matches = mcpFilteredNodes(map, params, options, error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
 
   if (mcpOptionalBool(params, "select", false))
   {

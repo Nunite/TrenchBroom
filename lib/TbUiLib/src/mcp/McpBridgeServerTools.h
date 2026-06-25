@@ -83,6 +83,12 @@ McpBridgeToolResult textureApplyResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult textureApplyByFilterResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult textureReplaceResult(
   AppController& appController,
   const QString& toolName,
@@ -181,6 +187,12 @@ McpBridgeToolResult createEntityFromSchemaResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult createEntityCheckedResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult tieBrushesResult(
   AppController& appController,
   const QString& toolName,
@@ -200,6 +212,12 @@ McpBridgeToolResult deleteObjectsResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult deleteObjectsByFilterResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult transformObjectsResult(
   AppController& appController,
   const QString& toolName,
@@ -209,6 +227,12 @@ McpBridgeToolResult transformObjectsResult(
 
 McpBridgeToolResult brushTypesListResult();
 McpBridgeToolResult createBrushResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult createBoxesBatchResult(
   AppController& appController,
   const QString& toolName,
   const QJsonObject& params,

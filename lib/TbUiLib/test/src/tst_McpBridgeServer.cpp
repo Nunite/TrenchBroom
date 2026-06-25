@@ -180,7 +180,7 @@ TEST_CASE("McpBridgeServer")
         {"classname", "func_wall"},
       });
     }
-    if (toolName == "entity_create_from_schema")
+    if (toolName == "entity_create_from_schema" || toolName == "entity_create_checked")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"operationId", "mcp-op-4"},
@@ -212,7 +212,8 @@ TEST_CASE("McpBridgeServer")
       || toolName == "brush_create_pipe" || toolName == "brush_create_sphere"
       || toolName == "brush_create_pyramid" || toolName == "brush_create_tetrahedron"
       || toolName == "brush_create_from_planes" || toolName == "brush_create_prism"
-      || toolName == "brush_create_cylinder_sector")
+      || toolName == "brush_create_cylinder_sector"
+      || toolName == "brush_create_boxes_batch")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"operationId", "mcp-op-7"},
@@ -265,7 +266,8 @@ TEST_CASE("McpBridgeServer")
       });
     }
     if (
-      toolName == "texture_apply" || toolName == "texture_replace"
+      toolName == "texture_apply" || toolName == "texture_apply_by_filter"
+      || toolName == "texture_replace"
       || toolName == "texture_align_face" || toolName == "texture_copy_from_face"
       || toolName == "face_texture_set")
     {
@@ -274,7 +276,9 @@ TEST_CASE("McpBridgeServer")
         {"transactionName", "MCP: Texture edit"},
       });
     }
-    if (toolName == "objects_delete" || toolName == "objects_transform")
+    if (
+      toolName == "objects_delete" || toolName == "objects_delete_by_filter"
+      || toolName == "objects_transform")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"operationId", "mcp-op-9"},

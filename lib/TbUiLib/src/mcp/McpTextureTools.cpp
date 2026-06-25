@@ -29,6 +29,7 @@
 #include <QStringList>
 
 #include "McpBridgeServerTools.h"
+#include "McpSelectionQuery.h"
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "gl/Material.h"
@@ -555,6 +556,83 @@ McpBridgeToolResult textureApplyResult(
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("material", material);
+  result.insert("faceCount", static_cast<int>(handles.size()));
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult textureApplyByFilterResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto material = params.value("material").toString().trimmed();
+  if (material.isEmpty())
+  {
+    return invalidParamsFailure("texture_apply_by_filter requires material");
+  }
+
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  auto filterParams = params;
+  if (filterParams.value("type").toString().trimmed().isEmpty())
+  {
+    filterParams.insert("type", "brush");
+  }
+
+  auto error = QString{};
+  auto options = McpSelectionQueryOptions{};
+  options.excludeWorld = true;
+  options.selectableOnly = true;
+  options.leafOnly = true;
+  options.exactTypeOnly = true;
+  auto matches = mcpFilteredNodes(map, filterParams, options, error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto handles = std::vector<mdl::BrushFaceHandle>{};
+  for (auto* node : matches)
+  {
+    auto* brushNode = dynamic_cast<mdl::BrushNode*>(node);
+    if (!brushNode)
+    {
+      continue;
+    }
+    const auto brushHandles = mdl::toHandles(brushNode);
+    handles.insert(std::end(handles), std::begin(brushHandles), std::end(brushHandles));
+  }
+  if (handles.empty())
+  {
+    return invalidParamsFailure("texture_apply_by_filter matched no brush faces");
+  }
+
+  auto changedNodes = changedBrushIds(handles, map.worldNode());
+  const auto transactionName = QString{"MCP: Apply texture by filter"};
+  auto ok = executeTransaction(map, transactionName, [&]() {
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, handles);
+    return mdl::setBrushFaceAttributes(
+      map, mdl::UpdateBrushFaceAttributes{.materialName = material.toStdString()});
+  });
+  if (!ok)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not apply texture by filter");
+  }
+
+  auto result = QJsonObject{};
+  mcpRecordOperation(
+    history, nextOperationIndex, toolName, transactionName, changedNodes, result);
+  result.insert("material", material);
+  result.insert("brushCount", static_cast<int>(matches.size()));
   result.insert("faceCount", static_cast<int>(handles.size()));
   return McpBridgeToolResult::success(std::move(result));
 }

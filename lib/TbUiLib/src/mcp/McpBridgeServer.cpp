@@ -210,6 +210,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           return createEntityFromSchemaResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
+        if (toolName == "entity_create_checked")
+        {
+          return createEntityCheckedResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
         if (toolName == "entity_tie_brushes")
         {
           return tieBrushesResult(
@@ -234,6 +239,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           || toolName == "brush_create_cylinder_sector")
         {
           return createBrushResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "brush_create_boxes_batch")
+        {
+          return createBoxesBatchResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
         if (toolName == "history_list")
@@ -288,6 +298,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           return textureApplyResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
+        if (toolName == "texture_apply_by_filter")
+        {
+          return textureApplyByFilterResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
         if (toolName == "texture_replace")
         {
           return textureReplaceResult(
@@ -319,6 +334,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "objects_delete")
         {
           return deleteObjectsResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "objects_delete_by_filter")
+        {
+          return deleteObjectsByFilterResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
         if (toolName == "objects_transform")

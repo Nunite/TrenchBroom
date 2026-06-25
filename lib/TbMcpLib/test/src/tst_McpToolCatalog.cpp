@@ -65,6 +65,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("fgd_entities_list"));
     CHECK(findToolDefinition("entity_schema"));
     CHECK(findToolDefinition("entity_create_from_schema"));
+    CHECK(findToolDefinition("entity_create_checked"));
     CHECK(findToolDefinition("entity_tie_brushes"));
     CHECK(findToolDefinition("entity_untie_brushes"));
     CHECK(findToolDefinition("brush_types_list"));
@@ -77,9 +78,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("brush_create_from_planes"));
     CHECK(findToolDefinition("brush_create_prism"));
     CHECK(findToolDefinition("brush_create_cylinder_sector"));
+    CHECK(findToolDefinition("brush_create_boxes_batch"));
     CHECK(findToolDefinition("brush_create_arch"));
     CHECK(findToolDefinition("brush_create_torus"));
     CHECK(findToolDefinition("objects_delete"));
+    CHECK(findToolDefinition("objects_delete_by_filter"));
     CHECK(findToolDefinition("objects_transform"));
     CHECK(findToolDefinition("map_validate"));
     CHECK(findToolDefinition("problems_check"));
@@ -93,6 +96,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("prefab_create"));
     CHECK(findToolDefinition("texture_lock_get"));
     CHECK(findToolDefinition("texture_lock_set"));
+    CHECK(findToolDefinition("texture_apply_by_filter"));
     CHECK(findToolDefinition("geometry_analyze_selection"));
     CHECK(findToolDefinition("blockout_create_spiral_stairs"));
     CHECK(findToolDefinition("blockout_validate_spiral_stairs"));
@@ -198,6 +202,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("entity_update"));
     CHECK(names.contains("entity_delete"));
     CHECK(names.contains("entity_create_from_schema"));
+    CHECK(names.contains("entity_create_checked"));
     CHECK(names.contains("entity_tie_brushes"));
     CHECK(names.contains("entity_untie_brushes"));
     CHECK(names.contains("brush_types_list"));
@@ -306,6 +311,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_create_tetrahedron"));
     CHECK(names.contains("brush_create_prism"));
     CHECK(names.contains("brush_create_cylinder_sector"));
+    CHECK(names.contains("brush_create_boxes_batch"));
     CHECK(names.contains("brush_create_from_planes"));
     CHECK(names.contains("asset_search"));
     CHECK(names.contains("asset_place_model"));
@@ -327,12 +333,14 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("blockout_validate_spiral_stairs"));
     CHECK(names.contains("objects_delete"));
+    CHECK(names.contains("objects_delete_by_filter"));
     CHECK(names.contains("objects_transform"));
     CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_search"));
     CHECK(names.contains("texture_lock_get"));
     CHECK(names.contains("texture_lock_set"));
     CHECK(names.contains("texture_apply"));
+    CHECK(names.contains("texture_apply_by_filter"));
     CHECK(names.contains("texture_replace"));
     CHECK(names.contains("texture_align_face"));
     CHECK(names.contains("texture_copy_from_face"));
@@ -581,6 +589,50 @@ TEST_CASE("McpToolCatalog")
     CHECK(found.value("category").toString() == "blockout");
     CHECK(found.value("visibleInCurrentProfile").toBool());
     CHECK(found.value("inputSchema").isObject());
+
+    const auto schema = found.value("inputSchema").toObject();
+    const auto operations =
+      schema.value("properties").toObject().value("operations").toObject();
+    CHECK(operations.value("items").isObject());
+    const auto itemDescription =
+      operations.value("items").toObject().value("description").toString();
+    CHECK(itemDescription.contains(R"("type":"box")"));
+    CHECK(itemDescription.contains(R"("type":"curved_corridor")"));
+    CHECK(operations.value("items").toObject().value("required").toArray().contains("type"));
+  }
+
+  SECTION("safe batch modeling helpers have structured schemas")
+  {
+    const auto boxesTool = findToolDefinition("brush_create_boxes_batch");
+    REQUIRE(boxesTool);
+    CHECK(boxesTool->requiredMode == McpMode::Edit);
+    CHECK(boxesTool->mutatesDocument);
+    CHECK(boxesTool->category == "brush");
+    const auto boxesSchema = boxesTool->inputSchema.value("properties").toObject();
+    CHECK(boxesSchema.value("boxes").toObject().value("items").isObject());
+    CHECK(
+      boxesSchema.value("boxes")
+        .toObject()
+        .value("items")
+        .toObject()
+        .value("required")
+        .toArray()
+        .contains("min"));
+
+    const auto deleteTool = findToolDefinition("objects_delete_by_filter");
+    REQUIRE(deleteTool);
+    CHECK(deleteTool->category == "object");
+    CHECK(deleteTool->requiredMode == McpMode::Edit);
+
+    const auto textureTool = findToolDefinition("texture_apply_by_filter");
+    REQUIRE(textureTool);
+    CHECK(textureTool->category == "texture");
+    CHECK(textureTool->inputSchema.value("required").toArray().contains("material"));
+
+    const auto entityTool = findToolDefinition("entity_create_checked");
+    REQUIRE(entityTool);
+    CHECK(entityTool->category == "entity");
+    CHECK(entityTool->inputSchema.value("required").toArray().contains("classname"));
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")

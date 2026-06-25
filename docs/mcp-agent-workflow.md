@@ -84,11 +84,13 @@ scripts\mcp-config.ps1 -Print
 2. 给出 rough bounds，例如房间 `[0,0,0]` 到 `[512,384,192]`。
 3. 确认全部尺寸按 16 units 对齐。
 4. 对每个结构调用 `blockout_validate`。
-5. validate 通过后调用对应创建工具：房间用 `blockout_create_room`，走廊用 `blockout_create_corridor`，楼梯用 `blockout_create_stairs`，斜坡用 `blockout_create_ramp`，门洞用 `blockout_create_doorway`，掩体用 `blockout_create_cover`，天空壳用 `blockout_create_sky_shell`。
-6. 收集每次返回的 `changedObjectIds`。
-7. 用 `overlay_set` 标注新结构，并调用 `viewport_capture_3d` / `viewport_capture_2d`。
-8. 根据截图调整尺寸或位置，必要时使用 `objects_transform` 平移/旋转/缩放。
-9. 调用 `map_validate` / `problems_check`。
+5. 优先用 `blockout_create_batch` 一次提交 typed object `operations[]`，例如 `{"type":"box","min":[0,0,0],"max":[128,128,16]}`、`{"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}`、`{"type":"curved_corridor","center":[0,0,0],"innerRadius":128,"outerRadius":256,"startAngle":0,"turnDegrees":90,"height":128,"segments":8,"caps":"both"}`。
+6. 只需要批量创建平台/跳块时用 `brush_create_boxes_batch`，传 `boxes: [{min,max,material?}]`，避免多次 `brush_create_box` 产生大量 undo/history。
+7. validate 通过后调用对应创建工具：房间用 `blockout_create_room`，走廊用 `blockout_create_corridor`，楼梯用 `blockout_create_stairs`，斜坡用 `blockout_create_ramp`，门洞用 `blockout_create_doorway`，掩体用 `blockout_create_cover`，天空壳用 `blockout_create_sky_shell`。
+8. 默认只保留返回的 `operationId` / `resourceUri`，需要 ids 时再用 `operation_inspect(detail=ids)`。
+9. 用 `overlay_set` 标注新结构，并调用 `viewport_capture_3d` / `viewport_capture_2d`。
+10. 根据截图调整尺寸或位置，必要时使用 `objects_transform` 平移/旋转/缩放。
+11. 调用 `map_validate` / `problems_check`。
 
 不要让 Agent 直接使用 `brush_create_from_planes` 做普通白盒。它是专家工具，只适合已有明确 plane 数据且需要严格校验的场景。
 
@@ -104,9 +106,9 @@ GoldSrc / CS1.6 资产优先走统一资产工具：
 
 实体优先走 FGD schema：
 
-1. `fgd_entities_list` 查找 classname。
-2. `entity_schema` 读取默认属性、类型和说明。
-3. `entity_create_from_schema` 创建 point entity。
+1. 已知 classname 时优先用 `entity_create_checked`，它会确认当前 FGD 支持该 point entity，再按 schema/defaults 创建。
+2. 不确定 classname 时用 `fgd_entities_list` 查找，再用 `entity_schema` 读取默认属性、类型和说明。
+3. 需要完全显式控制 schema 流程时再用 `entity_create_from_schema` 创建 point entity。
 4. `entity_update` 只修改明确给出的属性，不清空未知字段。
 
 Brush entity 工作流：
@@ -121,11 +123,14 @@ Brush entity 工作流：
 
 1. `textures_list` / `texture_search` 找材质。
 2. `texture_lock_get` 查看 Texture Lock / UV Lock；需要固定后续几何变换的贴图行为时用 `texture_lock_set`。
-3. `face_list` 查看目标 brush 的 face index、法线和材质。
-4. 单面修改用 `face_select` + `face_texture_set`，或 `texture_apply` 带 `objectId` / `faceIndex`。
-5. 批量替换用 `texture_replace`，默认优先 `scope=selection`，谨慎使用全图替换。
-6. 对齐用 `texture_align_face`，当前稳定模式为 `reset`、`paraxial`、`parallel`。
-7. 复制贴图属性用 `texture_copy_from_face`。
+3. 批量给一组 brush 贴材质时优先用 `texture_apply_by_filter`，它内部只编辑 brush faces，不需要先拼 object ids。
+4. `face_list` 查看目标 brush 的 face index、法线和材质。
+5. 单面修改用 `face_select` + `face_texture_set`，或 `texture_apply` 带 `objectId` / `faceIndex`。
+6. 批量替换用 `texture_replace`，默认优先 `scope=selection`，谨慎使用全图替换。
+7. 对齐用 `texture_align_face`，当前稳定模式为 `reset`、`paraxial`、`parallel`。
+8. 复制贴图属性用 `texture_copy_from_face`。
+
+删除或变换前，如果需要按条件找对象，优先用 `selection_filter` 的 `excludeWorld=true`、`selectableOnly=true`、`leafOnly=true` 参数。真正要按条件删除时用 `objects_delete_by_filter`，不要把 `selection_filter` 返回的父节点和子节点混在一起手动传给 `objects_delete`。
 
 贴图工具返回错误时不要尝试直接改 UV 原始数据；先缩小到单个 face，再确认 face index 是否仍有效。
 

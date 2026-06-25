@@ -22,6 +22,7 @@
 #include <QStringList>
 
 #include "McpBridgeServerTools.h"
+#include "McpSelectionQuery.h"
 #include "mcp/McpError.h"
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/EditorContext.h"
@@ -447,6 +448,73 @@ McpBridgeToolResult deleteObjectsResult(
   auto result = QJsonObject{};
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult deleteObjectsByFilterResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto& map = mapWindow->document().map();
+  const auto hasFilter =
+    !params.value("type").toString().trimmed().isEmpty()
+    || !params.value("classname").toString().trimmed().isEmpty()
+    || !params.value("targetname").toString().trimmed().isEmpty()
+    || !params.value("material").toString().trimmed().isEmpty()
+    || !params.value("query").toString().trimmed().isEmpty()
+    || (!params.value("min").isUndefined() && !params.value("max").isUndefined());
+  if (!hasFilter)
+  {
+    return invalidParamsFailure(
+      "objects_delete_by_filter requires at least one filter: type, classname, "
+      "targetname, material, query, or bounds");
+  }
+  if (params.value("type").toString().trimmed().compare("world", Qt::CaseInsensitive)
+      == 0)
+  {
+    return invalidParamsFailure("objects_delete_by_filter cannot delete world");
+  }
+
+  auto error = QString{};
+  auto options = McpSelectionQueryOptions{};
+  options.excludeWorld = true;
+  options.selectableOnly = true;
+  options.leafOnly = params.value("leafOnly").isUndefined()
+                       ? false
+                       : params.value("leafOnly").toBool(false);
+  options.exactTypeOnly = true;
+  options.removeDescendantMatches = true;
+  auto nodes = mcpFilteredNodes(map, params, options, error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+  if (nodes.empty())
+  {
+    return invalidParamsFailure("objects_delete_by_filter matched no deletable objects");
+  }
+
+  const auto transactionName = QString{"MCP: Delete objects by filter"};
+  const auto changedObjectIds = removeNodesWithTransaction(map, transactionName, nodes);
+  if (!changedObjectIds)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden, "Matched objects cannot be deleted");
+  }
+
+  auto result = QJsonObject{};
+  mcpRecordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  result.insert("matchedCount", changedObjectIds->size());
   return McpBridgeToolResult::success(std::move(result));
 }
 

@@ -2779,6 +2779,56 @@ McpBridgeToolResult blockoutCreateBatchResult(
     mapWindow->document().map(), toolName, params, history, nextOperationIndex);
 }
 
+McpBridgeToolResult createBoxesBatchResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto boxesValue = params.value("boxes");
+  if (!boxesValue.isArray())
+  {
+    return invalidParamsFailure("brush_create_boxes_batch requires boxes array");
+  }
+
+  const auto boxes = boxesValue.toArray();
+  if (boxes.isEmpty())
+  {
+    return invalidParamsFailure("boxes must not be empty");
+  }
+
+  auto operations = QJsonArray{};
+  for (auto i = 0; i < boxes.size(); ++i)
+  {
+    if (!boxes[i].isObject())
+    {
+      return invalidParamsFailure(QString{"boxes[%1] must be an object"}.arg(i));
+    }
+    auto operation = boxes[i].toObject();
+    operation.insert("type", "box");
+    operations.push_back(operation);
+  }
+
+  auto batchParams = QJsonObject{
+    {"name", params.value("name").toString("MCP: Create box brush batch")},
+    {"operations", operations},
+    {"select", params.value("select").toBool(true)},
+    {"detail", params.value("detail").toString("summary")},
+  };
+  if (params.contains("grid"))
+  {
+    batchParams.insert("grid", params.value("grid"));
+  }
+  if (params.contains("material"))
+  {
+    batchParams.insert("material", params.value("material"));
+  }
+
+  return blockoutCreateBatchResult(
+    appController, toolName, batchParams, history, nextOperationIndex);
+}
+
 McpBridgeToolResult blockoutCreateBatchForMapResult(
   mdl::Map& map,
   const QString& toolName,

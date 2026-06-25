@@ -80,6 +80,15 @@ QJsonObject arrayProperty(const QString& description)
   };
 }
 
+QJsonObject arrayProperty(const QString& description, const QJsonObject& items)
+{
+  return QJsonObject{
+    {"type", "array"},
+    {"description", description},
+    {"items", items},
+  };
+}
+
 QJsonObject vec3Property(const QString& description)
 {
   return QJsonObject{
@@ -132,6 +141,75 @@ QJsonObject stringObjectProperty(const QString& description)
     {"description", description},
     {"additionalProperties", QJsonObject{{"type", "string"}}},
   };
+}
+
+QJsonObject blockoutBatchOperationSchema()
+{
+  return QJsonObject{
+    {"type", "object"},
+    {"description",
+     "Typed Blockout IR operation object. Examples: "
+     R"({"type":"box","min":[0,0,0],"max":[128,128,16],"material":"clip"}; )"
+     R"({"type":"prism","points2d":[[0,0],[128,0],[64,64]],"minZ":0,"maxZ":64}; )"
+     R"({"type":"cylinder_sector","center":[0,0,0],"innerRadius":64,)"
+     R"("outerRadius":128,"startAngle":0,"endAngle":90,"minZ":0,"maxZ":16}; )"
+     R"({"type":"room","min":[0,0,0],"max":[512,512,128],"thickness":16}; )"
+     R"({"type":"corridor","min":[0,0,0],"max":[512,128,128],"thickness":16}; )"
+     R"({"type":"curved_corridor","center":[0,0,0],"innerRadius":128,)"
+     R"("outerRadius":256,"startAngle":0,"turnDegrees":90,"height":128,)"
+     R"("segments":8,"wallThickness":16,"caps":"both"}; )"
+     R"({"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}; )"
+     R"({"type":"ramp","min":[0,0,0],"max":[256,128,64],"axis":"x"}; )"
+     R"({"type":"doorway","min":[0,0,0],"max":[256,16,128],)"
+     R"("doorMin":[96,0,0],"doorMax":[160,16,96]}; )"
+     R"({"type":"cover","min":[0,0,0],"max":[64,32,48]}; )"
+     R"({"type":"sky_shell","min":[-512,-512,0],"max":[512,512,256],"thickness":16}.)"},
+    {"properties",
+     QJsonObject{
+       {"type",
+        stringProperty(
+          "Operation type: box, prism, polyhedron, cylinder_sector, room, corridor, "
+          "curved_corridor, stairs, ramp, doorway, cover, or sky_shell.")},
+       {"min", vec3Property("Minimum corner for box-like operations.")},
+       {"max", vec3Property("Maximum corner for box-like operations.")},
+       {"material", stringProperty("Per-operation material override.")},
+       {"points2d", arrayProperty("Convex prism footprint points as [x,y].")},
+       {"points", arrayProperty("Convex polyhedron points as [x,y,z].")},
+       {"minZ", numberProperty("Minimum Z for prism or cylinder_sector.")},
+       {"maxZ", numberProperty("Maximum Z for prism or cylinder_sector.")},
+       {"center", vec3Property("Center for circular operations.")},
+       {"innerRadius", numberProperty("Inner radius for cylinder_sector/curved_corridor.")},
+       {"outerRadius", numberProperty("Outer radius for cylinder_sector/curved_corridor.")},
+       {"startAngle", numberProperty("Start angle in degrees.")},
+       {"endAngle", numberProperty("End angle in degrees for cylinder_sector.")},
+       {"turnDegrees", numberProperty("Arc sweep in degrees for curved_corridor.")},
+       {"height", numberProperty("Height for curved_corridor.")},
+       {"segments", integerProperty("Segment count for curved_corridor.")},
+       {"wallThickness", numberProperty("Wall thickness for curved_corridor.")},
+       {"floorThickness", numberProperty("Floor thickness for curved_corridor.")},
+       {"ceilingThickness", numberProperty("Ceiling thickness for curved_corridor.")},
+       {"caps", stringProperty("curved_corridor caps: none, start, end, or both.")},
+       {"steps", integerProperty("Stair step count.")},
+       {"axis", stringProperty("Axis for stairs/ramp: x, y, or z.")},
+       {"thickness", numberProperty("Shell thickness for room/corridor/sky_shell.")},
+       {"doorMin", vec3Property("Door opening minimum corner for doorway.")},
+       {"doorMax", vec3Property("Door opening maximum corner for doorway.")},
+       {"snapMode", stringProperty("Circular vertex snap mode: grid, radial, or none.")},
+     }},
+    {"required", QJsonArray{"type"}},
+    {"additionalProperties", true},
+  };
+}
+
+QJsonObject boxBatchItemSchema()
+{
+  return objectSchema(
+    {
+      {"min", vec3Property("Box minimum corner in map units.")},
+      {"max", vec3Property("Box maximum corner in map units.")},
+      {"material", stringProperty("Optional per-box material override.")},
+    },
+    {"min", "max"});
 }
 
 } // namespace
@@ -290,6 +368,17 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
         {"select",
          boolProperty("Replace current selection with matching selectable nodes.")},
+        {"excludeWorld",
+         boolProperty("Exclude node:world from returned objectIds. Defaults to true.")},
+        {"selectableOnly",
+         boolProperty(
+           "Return only objects that can be selected directly. Defaults to false.")},
+        {"leafOnly",
+         boolProperty(
+           "Return only leaf nodes with no children, useful before delete/transform.")},
+        {"exactTypeOnly",
+         boolProperty(
+           "Require exact node type matching when type is provided. Defaults to true.")},
         {"limit", integerProperty("Maximum result count, defaults to 100.")},
       }),
     },
@@ -497,6 +586,23 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"classname"}),
     },
     {
+      "entity_create_checked",
+      "Create a point entity after checking the active FGD schema supports the "
+      "classname. This is the preferred one-step helper over manually calling "
+      "fgd_entities_list, entity_schema, and entity_create_from_schema.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"classname", stringProperty("Point entity classname to validate.")},
+          {"origin", vec3Property("Entity origin in map units.")},
+          {"properties", stringObjectProperty("Properties to add or update.")},
+          {"select", boolProperty("Select the created entity.")},
+        },
+        {"classname"}),
+    },
+    {
       "entity_tie_brushes",
       "Tie selected or specified brushes to a brush entity.",
       McpMode::Edit,
@@ -583,6 +689,31 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"select", boolProperty("Select the created brush.")},
         },
         {"min", "max"}),
+    },
+    {
+      "brush_create_boxes_batch",
+      "Create many box brushes in one transaction. Prefer this for platform chains, "
+      "jump blocks, and other repeated cuboids instead of many brush_create_box calls.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"boxes",
+           arrayProperty(
+             "Array of box objects: {\"min\":[x,y,z],\"max\":[x,y,z],"
+             "\"material\":\"optional\"}.",
+             boxBatchItemSchema())},
+          {"name",
+           stringProperty(
+             "Transaction label, defaults to MCP: Create box brush batch.")},
+          {"material",
+           stringProperty("Default material for boxes without a material field.")},
+          {"grid", numberProperty("Grid size for snapping generated geometry.")},
+          {"select", boolProperty("Select generated boxes.")},
+          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+        },
+        {"boxes"}),
     },
     {
       "brush_create_wedge",
@@ -1000,6 +1131,29 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"material"}),
     },
     {
+      "texture_apply_by_filter",
+      "Apply a material to brushes matched by a safe selection_filter-style query. "
+      "The tool only edits brush faces and ignores world/group/layer parents.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"material", stringProperty("Material name to apply.")},
+          {"type",
+           stringProperty(
+             "Optional node type filter. Defaults to brush for safe texture edits.")},
+          {"classname", stringProperty("Optional entity classname filter.")},
+          {"targetname", stringProperty("Optional entity targetname filter.")},
+          {"query", stringProperty("Optional text query.")},
+          {"min", vec3Property("Optional bounds minimum corner.")},
+          {"max", vec3Property("Optional bounds maximum corner.")},
+          {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
+          {"limit", integerProperty("Maximum matched brush count, defaults to 100.")},
+        },
+        {"material"}),
+    },
+    {
       "texture_replace",
       "Replace one material with another on selected faces/brushes or the whole map.",
       McpMode::Edit,
@@ -1094,6 +1248,30 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"objectIds", arrayProperty("MCP object ids to delete.")},
         },
         {"objectIds"}),
+    },
+    {
+      "objects_delete_by_filter",
+      "Delete selectable objects matched by a safe selection_filter-style query. "
+      "Defaults exclude node:world, require selectable matches, and remove redundant "
+      "descendants before deleting.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema({
+        {"type",
+         stringProperty(
+           "Optional node type: layer, group, entity, brush, or patch. Strongly "
+           "recommended for destructive calls.")},
+        {"classname", stringProperty("Optional entity classname.")},
+        {"targetname", stringProperty("Optional entity targetname.")},
+        {"material", stringProperty("Optional brush material name.")},
+        {"query", stringProperty("Optional text query.")},
+        {"min", vec3Property("Optional bounds minimum corner.")},
+        {"max", vec3Property("Optional bounds maximum corner.")},
+        {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
+        {"leafOnly", boolProperty("Return only leaf matches before deletion.")},
+        {"limit", integerProperty("Maximum matched object count, defaults to 100.")},
+      }),
     },
     {
       "objects_transform",
@@ -1330,7 +1508,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            arrayProperty(
              "Array of blockout operations. Supported types include box, prism, "
              "polyhedron, cylinder_sector, room, corridor, curved_corridor, stairs, "
-             "ramp, doorway, cover, and sky_shell.")},
+             "ramp, doorway, cover, and sky_shell. Each item must be an object with "
+             "a type field; use tb_tools_search(detail=schema, query="
+             "\"blockout_create_batch operations\") for examples.",
+             blockoutBatchOperationSchema())},
         },
         {"operations"}),
     },
@@ -1551,6 +1732,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       else if (tool.name.startsWith("asset_"))
       {
         tool.category = "asset";
+      }
+      else if (tool.name.startsWith("objects_"))
+      {
+        tool.category = "object";
       }
       else if (tool.name.startsWith("texture_") || tool.name.startsWith("face_"))
       {

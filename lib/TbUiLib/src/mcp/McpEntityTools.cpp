@@ -912,6 +912,51 @@ McpBridgeToolResult createEntityFromSchemaResult(
   return McpBridgeToolResult::success(std::move(result));
 }
 
+McpBridgeToolResult createEntityCheckedResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto classname = params.value("classname").toString().trimmed();
+  if (classname.isEmpty())
+  {
+    return invalidParamsFailure("entity_create_checked requires classname");
+  }
+
+  const auto* definition =
+    mapWindow->document().map().entityDefinitionManager().definition(
+      classname.toStdString());
+  if (!definition)
+  {
+    return invalidParamsFailure(
+      QString{"FGD does not define entity classname: %1"}.arg(classname));
+  }
+  if (mdl::getType(*definition) != mdl::EntityDefinitionType::Point)
+  {
+    return invalidParamsFailure(
+      QString{"entity_create_checked only creates point entities; %1 is %2"}
+        .arg(classname)
+        .arg(entityDefinitionTypeName(*definition)));
+  }
+
+  auto result = createEntityFromSchemaResult(
+    appController, toolName, params, history, nextOperationIndex);
+  if (result.ok)
+  {
+    result.result.insert("checked", true);
+    result.result.insert("schemaClassname", classname);
+  }
+  return result;
+}
+
 McpBridgeToolResult tieBrushesResult(
   AppController& appController,
   const QString& toolName,

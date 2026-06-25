@@ -181,6 +181,7 @@ MCP 官方 2025-06-18 规范定义两种标准 transport：
 - `fgd_entities_list`：列出当前 game config/entity definition manager 中的 entity class，可按 point/brush 和文本过滤。
 - `entity_schema`：返回指定 entity class 的 FGD 属性、类型、默认值和 point entity bounds。
 - `entity_create_from_schema`：使用 FGD 默认值创建 point entity，并叠加调用方传入的属性。
+- `entity_create_checked`：已知 classname 时的一步式安全创建入口，会先确认当前 FGD 支持该 point entity。
 - `entity_tie_brushes`：把选中或指定 world brush 绑定成 brush entity。
 - `entity_untie_brushes`：把选中或指定 brush entity 中的 brush 移回当前合适父节点。
 - `actions_list`：列出可执行 actions。
@@ -196,12 +197,13 @@ MCP 官方 2025-06-18 规范定义两种标准 transport：
 - `brush_create_box`、`brush_create_wedge`、`brush_create_cylinder`
 - `brush_create_cone`、`brush_create_pipe`、`brush_create_sphere`
 - `brush_create_pyramid`、`brush_create_tetrahedron`、`brush_create_from_planes`
+- `brush_create_boxes_batch`
 - `asset_search`、`asset_place_model`、`asset_place_sprite`、`asset_place_sound`
 - `textures_list`、`texture_search`、`texture_lock_get`、`texture_lock_set`
-- `texture_apply`、`texture_replace`
+- `texture_apply`、`texture_apply_by_filter`、`texture_replace`
 - `texture_align_face`、`texture_copy_from_face`
 - `face_list`、`face_select`、`face_texture_set`
-- `objects_delete`、`objects_transform`
+- `objects_delete`、`objects_delete_by_filter`、`objects_transform`
 - `map_validate`、`problems_check`、`problems_fix`、`map_fix_all_safe`
 - `compile_profiles_list`、`compile_run`、`compile_log_tail`、`leaks_load_pointfile`
 - `history_list`、`history_undo_mcp`、`history_redo_mcp`
@@ -229,6 +231,7 @@ MCP 官方 2025-06-18 规范定义两种标准 transport：
 
 - 高层 outcome tools：用于确定性生成常见结构，例如 `blockout_create_spiral_stairs` 和 `blockout_create_curved_corridor`。当用户要“做一个旋转楼梯/弧形走廊”时，应优先调用这类工具，而不是让 Agent 逐个创建 brush。
 - 中层 Batch Blockout IR：`blockout_create_batch` 是默认主力入口。Agent 一次提交 `operations[]`，TrenchBroom 在内部完成 grid snap、validation、brush 编译和一次 transaction。失败时不提交任何 brush。
+- 高频批量 cuboid：`brush_create_boxes_batch` 是平台、跳块、简单柱块链的快捷入口，输入 `boxes: [{min,max,material?}]`，内部仍复用 Batch IR 和一次 transaction。
 - 低层 atomic tools：`brush_create_*` 保留给建模精修或单个特殊 primitive。默认 `Modeling` profile 直接暴露建模工作流需要的实体、brush、资产、prefab、材质、验证、编译、保存和批量生成工具；它只默认隐藏 action、overlay、viewport focus/capture 等 UI 或可视反馈入口。需要视觉复核时可通过 `tb_tools_search` 按需发现截图/overlay 工具，或切换 `Balanced` / `Full`。
 
 批量/创建工具的默认返回遵循 compact result 约定：
