@@ -29,6 +29,8 @@
 #include <QStringList>
 
 #include "McpBridgeServerTools.h"
+#include "PreferenceManager.h"
+#include "Preferences.h"
 #include "gl/Material.h"
 #include "gl/MaterialManager.h"
 #include "mcp/McpError.h"
@@ -36,6 +38,7 @@
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
+#include "mdl/EditorContext.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Brushes.h"
 #include "mdl/Map_Selection.h"
@@ -297,6 +300,70 @@ McpBridgeToolResult textureSearchResult(
     {"results", results},
     {"count", results.size()},
   });
+}
+
+QJsonObject textureLockJson(mdl::Map& map)
+{
+  const auto& editorContext = map.editorContext();
+  return QJsonObject{
+    {"textureLock", editorContext.alignmentLock()},
+    {"uvLock", editorContext.uvLock()},
+  };
+}
+
+McpBridgeToolResult textureLockGetResult(AppController& appController)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return McpBridgeToolResult::success(textureLockJson(mapWindow->document().map()));
+}
+
+McpBridgeToolResult textureLockSetResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto textureLockValue = params.value("textureLock");
+  const auto uvLockValue = params.value("uvLock");
+  if (textureLockValue.isUndefined() && uvLockValue.isUndefined())
+  {
+    return invalidParamsFailure("texture_lock_set requires textureLock or uvLock");
+  }
+  if (!textureLockValue.isUndefined() && !textureLockValue.isBool())
+  {
+    return invalidParamsFailure("textureLock must be a boolean");
+  }
+  if (!uvLockValue.isUndefined() && !uvLockValue.isBool())
+  {
+    return invalidParamsFailure("uvLock must be a boolean");
+  }
+
+  auto& map = mapWindow->document().map();
+  auto& editorContext = map.editorContext();
+  if (textureLockValue.isBool())
+  {
+    const auto textureLock = textureLockValue.toBool();
+    setPref(Preferences::AlignmentLock, textureLock);
+    editorContext.setAlignmentLock(textureLock);
+  }
+  if (uvLockValue.isBool())
+  {
+    const auto uvLock = uvLockValue.toBool();
+    setPref(Preferences::UVLock, uvLock);
+    editorContext.setUVLock(uvLock);
+  }
+
+  auto result = textureLockJson(map);
+  result.insert("changed", true);
+  return McpBridgeToolResult::success(std::move(result));
 }
 
 std::optional<mdl::BrushFaceHandle> brushFaceHandleFromJson(

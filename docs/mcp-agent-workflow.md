@@ -120,11 +120,12 @@ Brush entity 工作流：
 推荐顺序：
 
 1. `textures_list` / `texture_search` 找材质。
-2. `face_list` 查看目标 brush 的 face index、法线和材质。
-3. 单面修改用 `face_select` + `face_texture_set`，或 `texture_apply` 带 `objectId` / `faceIndex`。
-4. 批量替换用 `texture_replace`，默认优先 `scope=selection`，谨慎使用全图替换。
-5. 对齐用 `texture_align_face`，当前稳定模式为 `reset`、`paraxial`、`parallel`。
-6. 复制贴图属性用 `texture_copy_from_face`。
+2. `texture_lock_get` 查看 Texture Lock / UV Lock；需要固定后续几何变换的贴图行为时用 `texture_lock_set`。
+3. `face_list` 查看目标 brush 的 face index、法线和材质。
+4. 单面修改用 `face_select` + `face_texture_set`，或 `texture_apply` 带 `objectId` / `faceIndex`。
+5. 批量替换用 `texture_replace`，默认优先 `scope=selection`，谨慎使用全图替换。
+6. 对齐用 `texture_align_face`，当前稳定模式为 `reset`、`paraxial`、`parallel`。
+7. 复制贴图属性用 `texture_copy_from_face`。
 
 贴图工具返回错误时不要尝试直接改 UV 原始数据；先缩小到单个 face，再确认 face index 是否仍有效。
 

@@ -91,6 +91,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("leaks_load_pointfile"));
     CHECK(findToolDefinition("prefabs_list"));
     CHECK(findToolDefinition("prefab_create"));
+    CHECK(findToolDefinition("texture_lock_get"));
+    CHECK(findToolDefinition("texture_lock_set"));
     CHECK(findToolDefinition("geometry_analyze_selection"));
     CHECK(findToolDefinition("blockout_create_spiral_stairs"));
     CHECK(findToolDefinition("blockout_validate_spiral_stairs"));
@@ -136,6 +138,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("asset_search"));
     CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_search"));
+    CHECK(names.contains("texture_lock_get"));
     CHECK(names.contains("face_list"));
     CHECK(names.contains("face_select"));
     CHECK(names.contains("map_validate"));
@@ -162,6 +165,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("prefabs_list"));
     CHECK(!names.contains("prefab_create"));
     CHECK(!names.contains("texture_apply"));
+    CHECK(!names.contains("texture_lock_set"));
     CHECK(!names.contains("texture_replace"));
     CHECK(!names.contains("face_texture_set"));
     CHECK(!names.contains("objects_delete"));
@@ -326,6 +330,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("objects_transform"));
     CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_search"));
+    CHECK(names.contains("texture_lock_get"));
+    CHECK(names.contains("texture_lock_set"));
     CHECK(names.contains("texture_apply"));
     CHECK(names.contains("texture_replace"));
     CHECK(names.contains("texture_align_face"));

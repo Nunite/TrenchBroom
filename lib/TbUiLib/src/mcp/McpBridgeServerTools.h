@@ -74,6 +74,9 @@ McpBridgeToolResult placeAssetResult(
 
 McpBridgeToolResult textureSearchResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult textureLockGetResult(AppController& appController);
+McpBridgeToolResult textureLockSetResult(
+  AppController& appController, const QJsonObject& params);
 McpBridgeToolResult textureApplyResult(
   AppController& appController,
   const QString& toolName,

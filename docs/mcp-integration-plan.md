@@ -197,7 +197,8 @@ MCP 官方 2025-06-18 规范定义两种标准 transport：
 - `brush_create_cone`、`brush_create_pipe`、`brush_create_sphere`
 - `brush_create_pyramid`、`brush_create_tetrahedron`、`brush_create_from_planes`
 - `asset_search`、`asset_place_model`、`asset_place_sprite`、`asset_place_sound`
-- `textures_list`、`texture_search`、`texture_apply`、`texture_replace`
+- `textures_list`、`texture_search`、`texture_lock_get`、`texture_lock_set`
+- `texture_apply`、`texture_replace`
 - `texture_align_face`、`texture_copy_from_face`
 - `face_list`、`face_select`、`face_texture_set`
 - `objects_delete`、`objects_transform`

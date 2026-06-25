@@ -965,6 +965,26 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "texture_lock_get",
+      "Return current texture lock and UV lock state for modeling operations.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(),
+    },
+    {
+      "texture_lock_set",
+      "Set texture lock and/or UV lock for subsequent modeling operations.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema({
+        {"textureLock",
+         boolProperty("Texture alignment lock, matching Menu/Edit/Texture Lock.")},
+        {"uvLock", boolProperty("UV lock, matching Menu/Edit/UV Lock.")},
+      }),
+    },
+    {
       "texture_apply",
       "Apply a material to selected faces, selected brushes, or all faces of one brush.",
       McpMode::Edit,

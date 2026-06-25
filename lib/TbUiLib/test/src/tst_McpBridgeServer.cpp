@@ -237,6 +237,21 @@ TEST_CASE("McpBridgeServer")
         {"count", 0},
       });
     }
+    if (toolName == "texture_lock_get")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"textureLock", true},
+        {"uvLock", false},
+      });
+    }
+    if (toolName == "texture_lock_set")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"textureLock", true},
+        {"uvLock", true},
+        {"changed", true},
+      });
+    }
     if (toolName == "face_list")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -785,12 +800,28 @@ TEST_CASE("McpBridgeServer")
       mcp::McpBridgeRequest{"3", "secret", "textures_list", {}, mcp::McpMode::ReadOnly});
     CHECK(texturesListResponse.ok);
 
+    const auto textureLockResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "4", "secret", "texture_lock_get", {}, mcp::McpMode::ReadOnly});
+    CHECK(textureLockResponse.ok);
+    CHECK(textureLockResponse.result.value("textureLock").toBool());
+    CHECK_FALSE(textureLockResponse.result.value("uvLock").toBool());
+
+    const auto textureLockSetResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "5",
+      "secret",
+      "texture_lock_set",
+      QJsonObject{{"textureLock", false}},
+      mcp::McpMode::ReadOnly});
+    CHECK(!textureLockSetResponse.ok);
+    REQUIRE(textureLockSetResponse.error);
+    CHECK(textureLockSetResponse.error->code == mcp::McpErrorCode::Forbidden);
+
     const auto faceListResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"4", "secret", "face_list", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"6", "secret", "face_list", {}, mcp::McpMode::ReadOnly});
     CHECK(faceListResponse.ok);
 
     const auto faceSelectResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"5", "secret", "face_select", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"7", "secret", "face_select", {}, mcp::McpMode::ReadOnly});
     CHECK(faceSelectResponse.ok);
   }
 
@@ -817,15 +848,27 @@ TEST_CASE("McpBridgeServer")
 
     for (const auto& toolName :
          {"texture_apply",
+          "texture_lock_set",
           "texture_replace",
           "texture_align_face",
           "texture_copy_from_face",
           "face_texture_set"})
     {
-      const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-        "1", "secret", toolName, QJsonObject{{"material", "test"}}, mcp::McpMode::Edit});
+      const auto params = toolName == QString{"texture_lock_set"}
+                            ? QJsonObject{{"textureLock", true}, {"uvLock", true}}
+                            : QJsonObject{{"material", "test"}};
+      const auto response = server.dispatchRequest(
+        mcp::McpBridgeRequest{"1", "secret", toolName, params, mcp::McpMode::Edit});
       CHECK(response.ok);
-      CHECK(response.result.value("operationId").toString() == "mcp-op-8");
+      if (toolName == QString{"texture_lock_set"})
+      {
+        CHECK(response.result.value("textureLock").toBool());
+        CHECK(response.result.value("uvLock").toBool());
+      }
+      else
+      {
+        CHECK(response.result.value("operationId").toString() == "mcp-op-8");
+      }
     }
   }
 

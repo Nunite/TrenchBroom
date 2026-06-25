@@ -275,6 +275,14 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return textureSearchResult(appController, params);
         }
+        if (toolName == "texture_lock_get")
+        {
+          return textureLockGetResult(appController);
+        }
+        if (toolName == "texture_lock_set")
+        {
+          return textureLockSetResult(appController, params);
+        }
         if (toolName == "texture_apply")
         {
           return textureApplyResult(
