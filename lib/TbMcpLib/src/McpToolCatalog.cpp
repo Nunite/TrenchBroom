@@ -19,6 +19,9 @@
 
 #include "mcp/McpToolCatalog.h"
 
+#include <QJsonDocument>
+#include <QStringList>
+
 #include <algorithm>
 #include <array>
 
@@ -1747,6 +1750,103 @@ QJsonArray toolsListJson(const McpMode mode)
   return toolsListJson(mode, true, McpToolProfile::Modeling);
 }
 
+namespace
+{
+
+bool isWeakToolSearchToken(const QString& token)
+{
+  static constexpr auto WeakTokens = std::array{
+    "argument",
+    "arguments",
+    "format",
+    "input",
+    "inputs",
+    "json",
+    "mcp",
+    "output",
+    "outputs",
+    "parameter",
+    "parameters",
+    "schema",
+    "tool",
+    "tools",
+  };
+
+  return std::ranges::any_of(
+    WeakTokens, [&](const auto* weakToken) { return token == weakToken; });
+}
+
+QStringList toolSearchTokens(const QString& query)
+{
+  auto tokens = QStringList{};
+  auto token = QString{};
+
+  const auto flushToken = [&] {
+    if (token.size() >= 2 && !isWeakToolSearchToken(token))
+    {
+      tokens.push_back(token);
+    }
+    token.clear();
+  };
+
+  for (const auto ch : query.trimmed().toLower())
+  {
+    if (ch.isLetterOrNumber())
+    {
+      token.push_back(ch);
+    }
+    else
+    {
+      flushToken();
+    }
+  }
+  flushToken();
+
+  tokens.removeDuplicates();
+  return tokens;
+}
+
+QString searchableToolText(const McpToolDefinition& tool, const bool includeSchema)
+{
+  auto expandedName = tool.name;
+  expandedName.replace("_", " ");
+
+  auto text =
+    QStringList{
+      tool.name,
+      expandedName,
+      tool.description,
+      tool.category,
+    }
+      .join("\n")
+      .toLower();
+
+  if (includeSchema)
+  {
+    text += "\n";
+    text +=
+      QString::fromUtf8(QJsonDocument{tool.inputSchema}.toJson(QJsonDocument::Compact))
+        .toLower();
+  }
+
+  return text;
+}
+
+bool toolMatchesSearch(
+  const McpToolDefinition& tool, const QStringList& tokens, const bool includeSchema)
+{
+  if (tokens.isEmpty())
+  {
+    return true;
+  }
+
+  const auto text = searchableToolText(tool, includeSchema);
+  return std::ranges::all_of(
+    tokens, [&](const auto& token) { return text.contains(token); });
+}
+
+} // namespace
+
 QJsonArray toolsSearchJson(
   const QString& query,
   const QString& category,
@@ -1758,6 +1858,7 @@ QJsonArray toolsSearchJson(
   const auto normalizedCategory = category.trimmed().toLower();
   const auto includeSchema =
     detail.trimmed().toLower() == "schema" || detail.trimmed().toLower() == "full";
+  const auto tokens = toolSearchTokens(normalizedQuery);
 
   auto result = QJsonArray{};
   for (const auto& tool : defaultToolCatalog())
@@ -1776,10 +1877,7 @@ QJsonArray toolsSearchJson(
     {
       continue;
     }
-    if (
-      !normalizedQuery.isEmpty() && !tool.name.toLower().contains(normalizedQuery)
-      && !tool.description.toLower().contains(normalizedQuery)
-      && !tool.category.toLower().contains(normalizedQuery))
+    if (!normalizedQuery.isEmpty() && !toolMatchesSearch(tool, tokens, includeSchema))
     {
       continue;
     }

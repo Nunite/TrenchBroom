@@ -498,6 +498,31 @@ TEST_CASE("McpToolCatalog")
     CHECK(found.value("inputSchema").isObject());
   }
 
+  SECTION("tool search matches tokenized schema queries")
+  {
+    const auto tools = toolsSearchJson(
+      "blockout_create_batch operations box format",
+      "blockout",
+      "schema",
+      McpMode::Edit,
+      McpToolProfile::Modeling);
+    auto found = QJsonObject{};
+    for (const auto& tool : tools)
+    {
+      const auto object = tool.toObject();
+      if (object.value("name").toString() == "blockout_create_batch")
+      {
+        found = object;
+        break;
+      }
+    }
+
+    REQUIRE(!found.isEmpty());
+    CHECK(found.value("category").toString() == "blockout");
+    CHECK(found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("inputSchema").isObject());
+  }
+
   SECTION("mode gating rejects edit tools in read-only mode")
   {
     const auto editTool = findToolDefinition("entity_create");
