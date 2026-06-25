@@ -2935,12 +2935,25 @@ McpBridgeToolResult geometryAnalyzeSelectionResult(
   {
     return invalidParamsFailure("grid must be greater than zero");
   }
-  const auto includeVertices = mcpOptionalBool(params, "includeVertices", true);
+  const auto detail = params.value("detail").toString("summary").trimmed().toLower();
+  const auto detailLevel = detail == "full"  ? QString{"full"}
+                           : detail == "ids" ? QString{"ids"}
+                                             : QString{"summary"};
+  const auto maxBrushes =
+    std::clamp(optionalSize(params, "maxBrushes", 100), size_t{0}, size_t{1000});
+  const auto includeVertices =
+    detailLevel == "full" && mcpOptionalBool(params, "includeVertices", false);
+  const auto includeBrushEntries = detailLevel == "ids" || detailLevel == "full";
 
   auto brushes = selectedBrushNodes(map);
   auto brushResults = QJsonArray{};
+  auto objectIds = QJsonArray{};
+  auto materials = QStringList{};
   auto invalidBrushCount = 0;
   auto nonGridAlignedCount = 0;
+  auto bounds = vm::bbox3d{};
+  auto hasBounds = false;
+  auto truncated = false;
   for (const auto* brushNode : brushes)
   {
     const auto& brush = brushNode->brush();
@@ -2954,27 +2967,75 @@ McpBridgeToolResult geometryAnalyzeSelectionResult(
       ++invalidBrushCount;
     }
 
-    auto brushJson = nodeSummaryJson(*brushNode, map.worldNode());
-    brushJson.insert("vertexCount", static_cast<int>(brush.vertexCount()));
-    brushJson.insert("edgeCount", static_cast<int>(brush.edgeCount()));
-    brushJson.insert("closed", brush.closed());
-    brushJson.insert("convex", brush.closed() && brush.fullySpecified());
-    brushJson.insert("gridAligned", gridOk);
-    brushJson.insert("materials", stringListToJsonArray(brushMaterials(brush)));
-    if (includeVertices)
+    bounds = hasBounds ? vm::merge(bounds, brushNode->logicalBounds())
+                       : brushNode->logicalBounds();
+    hasBounds = true;
+
+    for (const auto& material : brushMaterials(brush))
     {
-      brushJson.insert("vertices", vertexPositionsToJson(brush.vertexPositions()));
+      if (!materials.contains(material))
+      {
+        materials.push_back(material);
+      }
     }
-    brushResults.push_back(std::move(brushJson));
+
+    if (!includeBrushEntries)
+    {
+      continue;
+    }
+
+    const auto returnedEntryCount = detailLevel == "ids"
+                                      ? static_cast<size_t>(objectIds.size())
+                                      : static_cast<size_t>(brushResults.size());
+    if (returnedEntryCount >= maxBrushes)
+    {
+      truncated = true;
+      continue;
+    }
+
+    objectIds.push_back(nodePathId(*brushNode, map.worldNode()));
+    if (detailLevel == "full")
+    {
+      auto brushJson = nodeSummaryJson(*brushNode, map.worldNode());
+      brushJson.insert("vertexCount", static_cast<int>(brush.vertexCount()));
+      brushJson.insert("edgeCount", static_cast<int>(brush.edgeCount()));
+      brushJson.insert("closed", brush.closed());
+      brushJson.insert("convex", brush.closed() && brush.fullySpecified());
+      brushJson.insert("gridAligned", gridOk);
+      brushJson.insert("materials", stringListToJsonArray(brushMaterials(brush)));
+      if (includeVertices)
+      {
+        brushJson.insert("vertices", vertexPositionsToJson(brush.vertexPositions()));
+      }
+      brushResults.push_back(std::move(brushJson));
+    }
   }
 
-  return McpBridgeToolResult::success(QJsonObject{
+  auto result = QJsonObject{
     {"brushCount", static_cast<int>(brushes.size())},
     {"invalidBrushCount", invalidBrushCount},
     {"nonGridAlignedCount", nonGridAlignedCount},
     {"grid", grid},
-    {"brushes", brushResults},
-  });
+    {"detail", detailLevel},
+    {"truncated", truncated},
+    {"returnedBrushCount", includeBrushEntries ? brushResults.size() : 0},
+    {"materials", stringListToJsonArray(materials)},
+  };
+  if (hasBounds)
+  {
+    result.insert("bounds", boundsToJson(bounds));
+  }
+  if (detailLevel == "ids")
+  {
+    result.insert("objectIds", objectIds);
+    result.insert("returnedBrushCount", objectIds.size());
+  }
+  else if (detailLevel == "full")
+  {
+    result.insert("brushes", brushResults);
+  }
+
+  return McpBridgeToolResult::success(std::move(result));
 }
 
 McpBridgeToolResult blockoutValidateSpiralStairsResult(

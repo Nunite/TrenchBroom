@@ -1448,7 +1448,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       objectSchema({
         {"grid", numberProperty("Grid size for alignment checks, defaults to 1.")},
-        {"includeVertices", boolProperty("Include vertex arrays, defaults to true.")},
+        {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+        {"maxBrushes",
+         integerProperty(
+           "Maximum per-brush entries returned for ids/full detail, defaults to 100.")},
+        {"includeVertices",
+         boolProperty("Include vertex arrays for detail=full, defaults to false.")},
       }),
     },
     {

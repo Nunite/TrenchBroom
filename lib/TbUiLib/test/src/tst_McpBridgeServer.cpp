@@ -1155,6 +1155,32 @@ TEST_CASE("McpBridgeServer spiral stair geometry tools")
   CHECK(analyzeResponse.result.value("brushCount").toInt() == 26);
   CHECK(analyzeResponse.result.value("invalidBrushCount").toInt() == 0);
   CHECK(analyzeResponse.result.value("nonGridAlignedCount").toInt() == 0);
+  CHECK(analyzeResponse.result.value("detail").toString() == "summary");
+  CHECK(analyzeResponse.result.value("brushes").isUndefined());
+  CHECK(analyzeResponse.result.value("objectIds").isUndefined());
+
+  const auto fullAnalyzeResponse = geometryAnalyzeSelectionResult(
+    map,
+    QJsonObject{
+      {"grid", 1},
+      {"detail", "full"},
+      {"maxBrushes", 2},
+      {"includeVertices", false},
+    });
+  REQUIRE(fullAnalyzeResponse.ok);
+  CHECK(fullAnalyzeResponse.result.value("brushCount").toInt() == 26);
+  CHECK(fullAnalyzeResponse.result.value("returnedBrushCount").toInt() == 2);
+  CHECK(fullAnalyzeResponse.result.value("truncated").toBool());
+  CHECK(fullAnalyzeResponse.result.value("brushes").toArray().size() == 2);
+
+  const auto idsAnalyzeResponse = geometryAnalyzeSelectionResult(
+    map, QJsonObject{{"grid", 1}, {"detail", "ids"}, {"maxBrushes", 3}});
+  REQUIRE(idsAnalyzeResponse.ok);
+  CHECK(idsAnalyzeResponse.result.value("brushCount").toInt() == 26);
+  CHECK(idsAnalyzeResponse.result.value("returnedBrushCount").toInt() == 3);
+  CHECK(idsAnalyzeResponse.result.value("truncated").toBool());
+  CHECK(idsAnalyzeResponse.result.value("objectIds").toArray().size() == 3);
+  CHECK(idsAnalyzeResponse.result.value("brushes").isUndefined());
 
   const auto validateResponse = blockoutValidateSpiralStairsResult(
     map,
