@@ -143,6 +143,43 @@ QJsonObject stringObjectProperty(const QString& description)
   };
 }
 
+QJsonObject kzMetadataSchema()
+{
+  return QJsonObject{
+    {"type", "object"},
+    {"description",
+     "Session-level KZ route metadata. Supported keys include routeId, intent, "
+     "difficulty, movementType, takeoffEdge, landingWindow, incomingDirection, and "
+     "outgoingDirection."},
+    {"additionalProperties", true},
+    {"properties",
+     QJsonObject{
+       {"routeId", stringProperty("Route or chain id, e.g. kz_intro_bhop.")},
+       {"intent",
+        stringProperty("Mapper intent, e.g. redirect_right or precision_land.")},
+       {"difficulty", stringProperty("Difficulty label such as easy, average, hard.")},
+       {"movementType", stringProperty("KZ movement type such as bhop, LJ, BJ, SBJ.")},
+       {"takeoffEdge", stringProperty("Semantic takeoff edge id or label.")},
+       {"landingWindow", stringProperty("Semantic landing window id or label.")},
+       {"incomingDirection", vec3Property("Incoming route direction vector.")},
+       {"outgoingDirection", vec3Property("Outgoing route direction vector.")},
+     }},
+  };
+}
+
+QJsonObject polygonBatchItemSchema()
+{
+  return objectSchema(
+    {
+      {"points2d", arrayProperty("Convex 2D footprint points as [x,y].")},
+      {"minZ", numberProperty("Minimum platform Z in map units.")},
+      {"maxZ", numberProperty("Maximum platform Z in map units.")},
+      {"material", stringProperty("Optional per-platform material override.")},
+      {"metadata", kzMetadataSchema()},
+    },
+    {"points2d", "minZ", "maxZ"});
+}
+
 QJsonObject blockoutBatchOperationSchema()
 {
   return QJsonObject{
@@ -178,8 +215,10 @@ QJsonObject blockoutBatchOperationSchema()
        {"minZ", numberProperty("Minimum Z for prism or cylinder_sector.")},
        {"maxZ", numberProperty("Maximum Z for prism or cylinder_sector.")},
        {"center", vec3Property("Center for circular operations.")},
-       {"innerRadius", numberProperty("Inner radius for cylinder_sector/curved_corridor.")},
-       {"outerRadius", numberProperty("Outer radius for cylinder_sector/curved_corridor.")},
+       {"innerRadius",
+        numberProperty("Inner radius for cylinder_sector/curved_corridor.")},
+       {"outerRadius",
+        numberProperty("Outer radius for cylinder_sector/curved_corridor.")},
        {"startAngle", numberProperty("Start angle in degrees.")},
        {"endAngle", numberProperty("End angle in degrees for cylinder_sector.")},
        {"turnDegrees", numberProperty("Arc sweep in degrees for curved_corridor.")},
@@ -637,6 +676,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(),
     },
     {
+      "shape_library_list",
+      "List KZ platform footprint grammars for route-aware polygon platforms.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(),
+    },
+    {
       "brush_create",
       "Create a brush primitive using a type parameter.",
       McpMode::Edit,
@@ -705,8 +752,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
              "\"material\":\"optional\"}.",
              boxBatchItemSchema())},
           {"name",
-           stringProperty(
-             "Transaction label, defaults to MCP: Create box brush batch.")},
+           stringProperty("Transaction label, defaults to MCP: Create box brush batch.")},
           {"material",
            stringProperty("Default material for boxes without a material field.")},
           {"grid", numberProperty("Grid size for snapping generated geometry.")},
@@ -714,6 +760,32 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
         },
         {"boxes"}),
+    },
+    {
+      "brush_create_polygon_batch",
+      "Create many convex prism platforms from 2D polygons in one transaction. "
+      "Prefer this for KZ diamond, trapezoid, chamfered, and route-guiding platforms "
+      "instead of box-only chains.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"brushes",
+           arrayProperty(
+             "Array of platform objects: {points2d:[[x,y],...], minZ, maxZ, "
+             "material?, metadata?}.",
+             polygonBatchItemSchema())},
+          {"grid", numberProperty("Grid size for snapping generated geometry.")},
+          {"select", boolProperty("Select generated platforms.")},
+          {"transactionName",
+           stringProperty(
+             "Transaction label, defaults to MCP: Create polygon platform batch.")},
+          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"material",
+           stringProperty("Default material for brushes without a material field.")},
+        },
+        {"brushes"}),
     },
     {
       "brush_create_wedge",
@@ -1674,6 +1746,64 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "brush_metadata_set",
+      "Attach session-level KZ route metadata to live brush object ids.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema(
+        {
+          {"objectIds", arrayProperty("Brush object ids to annotate.")},
+          {"metadata", kzMetadataSchema()},
+        },
+        {"objectIds", "metadata"}),
+    },
+    {
+      "brush_metadata_get",
+      "Read session-level KZ route metadata for brush object ids.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"objectIds", arrayProperty("Brush object ids to inspect.")},
+        },
+        {"objectIds"}),
+    },
+    {
+      "selection_by_metadata",
+      "Find or select brushes by session-level KZ route metadata.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"routeId", stringProperty("Optional route id to match exactly.")},
+        {"intent", stringProperty("Optional intent to match exactly.")},
+        {"difficulty", stringProperty("Optional difficulty to match exactly.")},
+        {"movementType", stringProperty("Optional movement type to match exactly.")},
+        {"select", boolProperty("Replace selection with matched live brush nodes.")},
+        {"limit", integerProperty("Maximum result count, defaults to 100.")},
+      }),
+    },
+    {
+      "kz_distance_analyze_chain",
+      "Analyze KZ platform-chain geometry metrics such as edge gap, effective distance, "
+      "height delta, lateral offset, and landing window area. This is a mapper "
+      "heuristic, not an in-game pass/fail guarantee.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"objectIds", arrayProperty("Optional ordered brush object ids to analyze.")},
+        {"routeId",
+         stringProperty("Optional metadata routeId. Used when objectIds is omitted.")},
+        {"movementType", stringProperty("Optional movement type such as bhop or LJ.")},
+        {"playerHull",
+         vec3Property(
+           "Optional player hull size [width, depth, height], defaults to [32,32,72].")},
+      }),
+    },
+    {
       "blockout_validate_spiral_stairs",
       "Validate selected spiral-stair brushes generated through MCP.",
       McpMode::ReadOnly,
@@ -1714,6 +1844,13 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         tool.category = "brush";
         tool.expert = true;
         tool.minimumProfile = McpToolProfile::Full;
+        if (
+          tool.name == "brush_create_boxes_batch"
+          || tool.name == "brush_create_polygon_batch")
+        {
+          tool.expert = false;
+          tool.minimumProfile = McpToolProfile::Modeling;
+        }
       }
       else if (tool.name.startsWith("blockout_"))
       {
@@ -1752,6 +1889,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       else if (tool.name.startsWith("heightmap_"))
       {
         tool.category = "heightmap";
+        tool.minimumProfile = McpToolProfile::Modeling;
+      }
+      else if (
+        tool.name == "shape_library_list" || tool.name.startsWith("brush_metadata_")
+        || tool.name == "selection_by_metadata"
+        || tool.name == "kz_distance_analyze_chain")
+      {
+        tool.category = "kz";
         tool.minimumProfile = McpToolProfile::Modeling;
       }
       else if (

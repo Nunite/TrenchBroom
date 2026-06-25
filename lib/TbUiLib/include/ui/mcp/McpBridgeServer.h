@@ -30,6 +30,7 @@
 #include "mcp/McpError.h"
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -70,6 +71,13 @@ struct McpOperationRecord
   QJsonObject detail() const;
 };
 
+struct McpKzBrushMetadataRecord
+{
+  QString objectId;
+  QJsonObject metadata;
+  bool stale = false;
+};
+
 class McpBridgeServer : public QObject
 {
   Q_OBJECT
@@ -83,6 +91,7 @@ private:
   QJsonObject m_overlayState;
   mutable int m_nextOperationIndex = 1;
   mutable std::vector<McpOperationRecord> m_operationHistory;
+  mutable std::map<QString, McpKzBrushMetadataRecord> m_kzBrushMetadata;
   mutable bool m_dispatchInProgress = false;
   std::unique_ptr<QLocalServer> m_server;
 

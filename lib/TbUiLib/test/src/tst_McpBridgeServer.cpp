@@ -207,17 +207,48 @@ TEST_CASE("McpBridgeServer")
         {"types", QJsonArray{}},
       });
     }
+    if (toolName == "shape_library_list")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"shapes", QJsonArray{QJsonObject{{"name", "diamond"}}}},
+      });
+    }
     if (
       toolName == "brush_create" || toolName == "brush_create_cone"
       || toolName == "brush_create_pipe" || toolName == "brush_create_sphere"
       || toolName == "brush_create_pyramid" || toolName == "brush_create_tetrahedron"
       || toolName == "brush_create_from_planes" || toolName == "brush_create_prism"
       || toolName == "brush_create_cylinder_sector"
-      || toolName == "brush_create_boxes_batch")
+      || toolName == "brush_create_boxes_batch"
+      || toolName == "brush_create_polygon_batch")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"operationId", "mcp-op-7"},
         {"transactionName", "MCP: Create brush primitive"},
+      });
+    }
+    if (toolName == "brush_metadata_set")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 1},
+      });
+    }
+    if (toolName == "brush_metadata_get")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 1},
+      });
+    }
+    if (toolName == "selection_by_metadata")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"count", 1},
+      });
+    }
+    if (toolName == "kz_distance_analyze_chain")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"segmentCount", 1},
       });
     }
     if (toolName == "history_list")
@@ -267,9 +298,8 @@ TEST_CASE("McpBridgeServer")
     }
     if (
       toolName == "texture_apply" || toolName == "texture_apply_by_filter"
-      || toolName == "texture_replace"
-      || toolName == "texture_align_face" || toolName == "texture_copy_from_face"
-      || toolName == "face_texture_set")
+      || toolName == "texture_replace" || toolName == "texture_align_face"
+      || toolName == "texture_copy_from_face" || toolName == "face_texture_set")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"operationId", "mcp-op-8"},
@@ -1432,6 +1462,291 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(!invalidSnapValidation.value("valid").toBool());
   CHECK(invalidSnapValidation.value("errors").toArray().first().toString().contains(
     "snapMode"));
+}
+
+TEST_CASE("McpBridgeServer KZ MCP tools")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpKzBrushMetadataRecord>{};
+
+  SECTION("lists supported KZ platform shapes")
+  {
+    const auto response = shapeLibraryListResult();
+
+    REQUIRE(response.ok);
+    const auto shapes = response.result.value("shapes").toArray();
+    auto names = QStringList{};
+    for (const auto& shape : shapes)
+    {
+      names.push_back(shape.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("diamond"));
+    CHECK(names.contains("trapezoid"));
+    CHECK(names.contains("chamfered_rect"));
+    CHECK(names.contains("half_hex"));
+    CHECK(names.contains("arrowhead"));
+    CHECK(names.contains("slanted_plank"));
+  }
+
+  SECTION("creates convex polygon platforms in one transaction and stores metadata")
+  {
+    const auto descendantCountBefore = map.worldNode().descendantCount();
+    const auto response = brushCreatePolygonBatchForMapResult(
+      map,
+      "brush_create_polygon_batch",
+      QJsonObject{
+        {"transactionName", "MCP: KZ polygon platforms"},
+        {"grid", 16},
+        {"select", true},
+        {"detail", "summary"},
+        {"brushes",
+         QJsonArray{
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{0, 32},
+                QJsonArray{32, 0},
+                QJsonArray{64, 32},
+                QJsonArray{32, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "intro"},
+                {"movementType", "bhop"},
+                {"outgoingDirection", QJsonArray{1, 0, 0}},
+              }},
+           },
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{160, 0},
+                QJsonArray{240, 0},
+                QJsonArray{224, 64},
+                QJsonArray{176, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "intro"},
+                {"intent", "landing_bias"},
+                {"movementType", "bhop"},
+              }},
+           },
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{320, 0},
+                QJsonArray{384, 0},
+                QJsonArray{400, 16},
+                QJsonArray{400, 48},
+                QJsonArray{384, 64},
+                QJsonArray{320, 64},
+                QJsonArray{304, 48},
+                QJsonArray{304, 16}}},
+             {"minZ", 16},
+             {"maxZ", 32},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "intro"},
+                {"difficulty", "easy"},
+                {"movementType", "bhop"},
+              }},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    CHECK(
+      response.result.value("transactionName").toString() == "MCP: KZ polygon platforms");
+    CHECK(response.result.value("brushCount").toInt() == 3);
+    CHECK(response.result.value("changedObjectCount").toInt() == 3);
+    CHECK(response.result.value("changedObjectIds").isUndefined());
+    CHECK(response.result.value("metadataCount").toInt() == 3);
+    CHECK(response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(map.selection().nodes.size() == 3u);
+    REQUIRE(map.undoCommandName() != nullptr);
+    CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: KZ polygon platforms");
+
+    const auto inspect = operationInspectResult(
+      history,
+      QJsonObject{
+        {"operationId", response.result.value("operationId").toString()},
+        {"detail", "ids"},
+      });
+    REQUIRE(inspect.ok);
+    CHECK(inspect.result.value("changedObjectIds").toArray().size() == 3);
+    CHECK(metadataStore.size() == 3u);
+
+    map.undoCommand();
+    CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+  }
+
+  SECTION("rejects invalid polygon batch without committing")
+  {
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = brushCreatePolygonBatchForMapResult(
+      map,
+      "brush_create_polygon_batch",
+      QJsonObject{
+        {"brushes",
+         QJsonArray{
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{0, 0},
+                QJsonArray{64, 0},
+                QJsonArray{16, 16},
+                QJsonArray{0, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore);
+
+    REQUIRE(response.ok);
+    CHECK(!response.result.value("validation").toObject().value("valid").toBool());
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+    CHECK(metadataStore.empty());
+  }
+
+  SECTION("sets, gets, selects, and analyzes route metadata")
+  {
+    const auto response = brushCreatePolygonBatchForMapResult(
+      map,
+      "brush_create_polygon_batch",
+      QJsonObject{
+        {"detail", "ids"},
+        {"select", false},
+        {"brushes",
+         QJsonArray{
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{0, 0},
+                QJsonArray{64, 0},
+                QJsonArray{64, 64},
+                QJsonArray{0, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "chain_a"},
+                {"movementType", "bhop"},
+                {"outgoingDirection", QJsonArray{1, 0, 0}},
+              }},
+           },
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{160, 0},
+                QJsonArray{224, 0},
+                QJsonArray{224, 64},
+                QJsonArray{160, 64}}},
+             {"minZ", 16},
+             {"maxZ", 32},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "chain_a"},
+                {"movementType", "bhop"},
+                {"incomingDirection", QJsonArray{1, 0, 0}},
+              }},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    const auto objectIds = response.result.value("changedObjectIds").toArray();
+    REQUIRE(objectIds.size() == 2);
+
+    const auto firstObjectId = objectIds[0].toString();
+    const auto setResponse = brushMetadataSetForMapResult(
+      map,
+      QJsonObject{
+        {"objectIds", QJsonArray{firstObjectId}},
+        {"metadata",
+         QJsonObject{
+           {"routeId", "chain_a"},
+           {"intent", "takeoff"},
+           {"difficulty", "easy"},
+           {"movementType", "bhop"},
+           {"outgoingDirection", QJsonArray{1, 0, 0}},
+         }},
+      },
+      metadataStore);
+    REQUIRE(setResponse.ok);
+    CHECK(setResponse.result.value("count").toInt() == 1);
+
+    const auto getResponse = brushMetadataGetForMapResult(
+      map, QJsonObject{{"objectIds", objectIds}}, metadataStore);
+    REQUIRE(getResponse.ok);
+    CHECK(getResponse.result.value("count").toInt() == 2);
+    CHECK(
+      getResponse.result.value("objects")
+        .toArray()
+        .first()
+        .toObject()
+        .value("metadata")
+        .toObject()
+        .value("intent")
+        .toString()
+      == "takeoff");
+
+    const auto selectResponse = selectionByMetadataForMapResult(
+      map,
+      QJsonObject{
+        {"routeId", "chain_a"},
+        {"movementType", "bhop"},
+        {"select", true},
+      },
+      metadataStore);
+    REQUIRE(selectResponse.ok);
+    CHECK(selectResponse.result.value("count").toInt() == 2);
+    CHECK(map.selection().nodes.size() == 2u);
+
+    const auto analyzeResponse = kzDistanceAnalyzeChainForMapResult(
+      map,
+      QJsonObject{
+        {"objectIds", objectIds},
+        {"movementType", "bhop"},
+        {"playerHull", QJsonArray{32, 32, 72}},
+      },
+      metadataStore);
+    REQUIRE(analyzeResponse.ok);
+    CHECK(analyzeResponse.result.value("segmentCount").toInt() == 1);
+    const auto segment =
+      analyzeResponse.result.value("segments").toArray().first().toObject();
+    CHECK(segment.value("edgeGap").toDouble() == 96.0);
+    CHECK(segment.value("heightDelta").toDouble() == 0.0);
+    CHECK(segment.value("effectiveDistanceBadLanding").toDouble() > 96.0);
+    CHECK(segment.value("usedMetadataDirection").toBool());
+  }
 }
 
 TEST_CASE("McpBridgeServer Python blockout tools")

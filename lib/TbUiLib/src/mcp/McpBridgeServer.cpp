@@ -229,6 +229,10 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return brushTypesListResult();
         }
+        if (toolName == "shape_library_list")
+        {
+          return shapeLibraryListResult();
+        }
         if (
           toolName == "brush_create" || toolName == "brush_create_box"
           || toolName == "brush_create_wedge" || toolName == "brush_create_cylinder"
@@ -245,6 +249,32 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return createBoxesBatchResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "brush_create_polygon_batch")
+        {
+          return brushCreatePolygonBatchResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_kzBrushMetadata);
+        }
+        if (toolName == "brush_metadata_set")
+        {
+          return brushMetadataSetResult(appController, params, m_kzBrushMetadata);
+        }
+        if (toolName == "brush_metadata_get")
+        {
+          return brushMetadataGetResult(appController, params, m_kzBrushMetadata);
+        }
+        if (toolName == "selection_by_metadata")
+        {
+          return selectionByMetadataResult(appController, params, m_kzBrushMetadata);
+        }
+        if (toolName == "kz_distance_analyze_chain")
+        {
+          return kzDistanceAnalyzeChainResult(appController, params, m_kzBrushMetadata);
         }
         if (toolName == "history_list")
         {

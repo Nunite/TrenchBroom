@@ -79,6 +79,12 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("brush_create_prism"));
     CHECK(findToolDefinition("brush_create_cylinder_sector"));
     CHECK(findToolDefinition("brush_create_boxes_batch"));
+    CHECK(findToolDefinition("brush_create_polygon_batch"));
+    CHECK(findToolDefinition("shape_library_list"));
+    CHECK(findToolDefinition("brush_metadata_set"));
+    CHECK(findToolDefinition("brush_metadata_get"));
+    CHECK(findToolDefinition("selection_by_metadata"));
+    CHECK(findToolDefinition("kz_distance_analyze_chain"));
     CHECK(findToolDefinition("brush_create_arch"));
     CHECK(findToolDefinition("brush_create_torus"));
     CHECK(findToolDefinition("objects_delete"));
@@ -137,6 +143,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("fgd_entities_list"));
     CHECK(names.contains("entity_schema"));
     CHECK(names.contains("brush_types_list"));
+    CHECK(names.contains("shape_library_list"));
+    CHECK(names.contains("brush_metadata_get"));
+    CHECK(names.contains("selection_by_metadata"));
+    CHECK(names.contains("kz_distance_analyze_chain"));
     CHECK(names.contains("overlay_set"));
     CHECK(names.contains("history_list"));
     CHECK(names.contains("asset_search"));
@@ -164,6 +174,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("brush_create_box"));
     CHECK(!names.contains("brush_create_prism"));
     CHECK(!names.contains("brush_create_cylinder_sector"));
+    CHECK(!names.contains("brush_create_polygon_batch"));
+    CHECK(!names.contains("brush_metadata_set"));
     CHECK(!names.contains("blockout_create_spiral_stairs"));
     CHECK(!names.contains("asset_place_model"));
     CHECK(!names.contains("prefabs_list"));
@@ -312,7 +324,13 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_create_prism"));
     CHECK(names.contains("brush_create_cylinder_sector"));
     CHECK(names.contains("brush_create_boxes_batch"));
+    CHECK(names.contains("brush_create_polygon_batch"));
     CHECK(names.contains("brush_create_from_planes"));
+    CHECK(names.contains("shape_library_list"));
+    CHECK(names.contains("brush_metadata_set"));
+    CHECK(names.contains("brush_metadata_get"));
+    CHECK(names.contains("selection_by_metadata"));
+    CHECK(names.contains("kz_distance_analyze_chain"));
     CHECK(names.contains("asset_search"));
     CHECK(names.contains("asset_place_model"));
     CHECK(names.contains("asset_place_sprite"));
@@ -467,6 +485,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_create_from_planes"));
     CHECK(names.contains("brush_create_prism"));
     CHECK(names.contains("brush_create_cylinder_sector"));
+    CHECK(names.contains("brush_create_polygon_batch"));
     CHECK(!names.contains("brush_create_arch"));
     CHECK(!names.contains("brush_create_torus"));
   }
@@ -598,7 +617,8 @@ TEST_CASE("McpToolCatalog")
       operations.value("items").toObject().value("description").toString();
     CHECK(itemDescription.contains(R"("type":"box")"));
     CHECK(itemDescription.contains(R"("type":"curved_corridor")"));
-    CHECK(operations.value("items").toObject().value("required").toArray().contains("type"));
+    CHECK(
+      operations.value("items").toObject().value("required").toArray().contains("type"));
   }
 
   SECTION("safe batch modeling helpers have structured schemas")
@@ -610,14 +630,26 @@ TEST_CASE("McpToolCatalog")
     CHECK(boxesTool->category == "brush");
     const auto boxesSchema = boxesTool->inputSchema.value("properties").toObject();
     CHECK(boxesSchema.value("boxes").toObject().value("items").isObject());
-    CHECK(
-      boxesSchema.value("boxes")
-        .toObject()
-        .value("items")
-        .toObject()
-        .value("required")
-        .toArray()
-        .contains("min"));
+    CHECK(boxesSchema.value("boxes")
+            .toObject()
+            .value("items")
+            .toObject()
+            .value("required")
+            .toArray()
+            .contains("min"));
+
+    const auto polygonTool = findToolDefinition("brush_create_polygon_batch");
+    REQUIRE(polygonTool);
+    CHECK(polygonTool->requiredMode == McpMode::Edit);
+    CHECK(polygonTool->mutatesDocument);
+    CHECK(polygonTool->category == "brush");
+    const auto polygonSchema = polygonTool->inputSchema.value("properties").toObject();
+    const auto polygonItem =
+      polygonSchema.value("brushes").toObject().value("items").toObject();
+    CHECK(polygonItem.value("required").toArray().contains("points2d"));
+    CHECK(polygonItem.value("required").toArray().contains("minZ"));
+    CHECK(polygonItem.value("required").toArray().contains("maxZ"));
+    CHECK(polygonItem.value("properties").toObject().contains("metadata"));
 
     const auto deleteTool = findToolDefinition("objects_delete_by_filter");
     REQUIRE(deleteTool);
@@ -638,10 +670,61 @@ TEST_CASE("McpToolCatalog")
   SECTION("mode gating rejects edit tools in read-only mode")
   {
     const auto editTool = findToolDefinition("entity_create");
+    const auto polygonBatchTool = findToolDefinition("brush_create_polygon_batch");
+    const auto metadataSetTool = findToolDefinition("brush_metadata_set");
+    const auto metadataGetTool = findToolDefinition("brush_metadata_get");
+    const auto kzDistanceTool = findToolDefinition("kz_distance_analyze_chain");
 
     REQUIRE(editTool);
+    REQUIRE(polygonBatchTool);
+    REQUIRE(metadataSetTool);
+    REQUIRE(metadataGetTool);
+    REQUIRE(kzDistanceTool);
     CHECK(!canCallTool(*editTool, McpMode::ReadOnly));
     CHECK(canCallTool(*editTool, McpMode::Edit));
+    CHECK(!canCallTool(*polygonBatchTool, McpMode::ReadOnly));
+    CHECK(canCallTool(*polygonBatchTool, McpMode::Edit));
+    CHECK(!canCallTool(*metadataSetTool, McpMode::ReadOnly));
+    CHECK(canCallTool(*metadataSetTool, McpMode::Edit));
+    CHECK(canCallTool(*metadataGetTool, McpMode::ReadOnly));
+    CHECK(canCallTool(*kzDistanceTool, McpMode::ReadOnly));
+  }
+
+  SECTION("KZ tools are visible in modeling profile and searchable with schemas")
+  {
+    const auto editTools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    auto editNames = QStringList{};
+    for (const auto& tool : editTools)
+    {
+      editNames.push_back(tool.toObject().value("name").toString());
+    }
+    CHECK(editNames.contains("shape_library_list"));
+    CHECK(editNames.contains("brush_create_polygon_batch"));
+    CHECK(editNames.contains("brush_metadata_set"));
+    CHECK(editNames.contains("brush_metadata_get"));
+    CHECK(editNames.contains("selection_by_metadata"));
+    CHECK(editNames.contains("kz_distance_analyze_chain"));
+
+    const auto searchResults = toolsSearchJson(
+      "kz distance", "kz", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    auto found = QJsonObject{};
+    for (const auto& tool : searchResults)
+    {
+      const auto object = tool.toObject();
+      if (object.value("name").toString() == "kz_distance_analyze_chain")
+      {
+        found = object;
+        break;
+      }
+    }
+
+    REQUIRE(!found.isEmpty());
+    CHECK(found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("inputSchema")
+            .toObject()
+            .value("properties")
+            .toObject()
+            .contains("routeId"));
   }
 
   SECTION("tool json uses MCP inputSchema shape")

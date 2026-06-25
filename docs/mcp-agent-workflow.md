@@ -94,6 +94,53 @@ scripts\mcp-config.ps1 -Print
 
 不要让 Agent 直接使用 `brush_create_from_planes` 做普通白盒。它是专家工具，只适合已有明确 plane 数据且需要严格校验的场景。
 
+## KZ 平台链工作流
+
+CS1.6 KZ route 设计不要默认生成一串大 box。平台形状应表达玩家意图：起跳边、落点窗口、下一跳方向和容错。当前推荐流程：
+
+1. `shape_library_list`：读取支持的 footprint vocabulary，例如 `diamond`、`trapezoid`、`chamfered_rect`、`half_hex`、`arrowhead`。
+2. `brush_create_polygon_batch`：一次提交多个凸多边形平台。每个平台传 `points2d`、`minZ`、`maxZ`、可选 `material` 和 `metadata`。
+3. 在 metadata 中写入 `routeId`、`movementType`、`intent`、`difficulty`、`incomingDirection`、`outgoingDirection` 等信息。metadata 第一版只在 MCP session 内有效，不写入 `.map`。
+4. `selection_by_metadata(routeId=..., select=true)`：需要继续编辑某段 route 时按 metadata 找回对象，不要在上下文中长期携带大 object id 列表。
+5. `kz_distance_analyze_chain`：用 ordered `objectIds` 或 `routeId` 计算 `edgeGap`、`effectiveDistanceIdeal`、`effectiveDistanceBadLanding`、`heightDelta`、`lateralOffset` 和 `landingWindowArea`。
+6. 结果只能作为 mapper 几何指标，不能承诺 CS1.6 实机可通关。`sv_airaccelerate`、server plugin、玩家速度、落地状态和高度差都会影响实际难度。
+
+示例 polygon batch：
+
+```json
+{
+  "transactionName": "MCP: KZ intro platforms",
+  "grid": 16,
+  "detail": "ids",
+  "brushes": [
+    {
+      "points2d": [[0, 32], [32, 0], [64, 32], [32, 64]],
+      "minZ": 0,
+      "maxZ": 16,
+      "metadata": {
+        "routeId": "intro",
+        "movementType": "bhop",
+        "intent": "takeoff",
+        "outgoingDirection": [1, 0, 0]
+      }
+    },
+    {
+      "points2d": [[160, 0], [224, 0], [224, 64], [160, 64]],
+      "minZ": 0,
+      "maxZ": 16,
+      "metadata": {
+        "routeId": "intro",
+        "movementType": "bhop",
+        "intent": "landing",
+        "incomingDirection": [1, 0, 0]
+      }
+    }
+  ]
+}
+```
+
+如果需要凹形平台，先把 footprint 拆成多个凸 polygon，再用同一个 `brush_create_polygon_batch` transaction 提交。不要用 `brush_create_from_planes` 作为常规 KZ 平台生成路径。
+
 ## 资产与实体放置
 
 GoldSrc / CS1.6 资产优先走统一资产工具：

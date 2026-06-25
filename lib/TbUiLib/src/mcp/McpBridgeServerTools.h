@@ -25,6 +25,7 @@
 #include "Result.h"
 #include "ui/mcp/McpBridgeServer.h"
 
+#include <map>
 #include <vector>
 
 namespace tb::mdl
@@ -281,6 +282,54 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+
+McpBridgeToolResult shapeLibraryListResult();
+McpBridgeToolResult brushCreatePolygonBatchResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult brushCreatePolygonBatchForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult brushMetadataSetForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult brushMetadataGetForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult selectionByMetadataForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult kzDistanceAnalyzeChainForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult brushMetadataSetResult(
+  AppController& appController,
+  const QJsonObject& params,
+  std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult brushMetadataGetResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult selectionByMetadataResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult kzDistanceAnalyzeChainResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
