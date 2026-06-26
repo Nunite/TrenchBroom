@@ -118,8 +118,8 @@ CS1.6 KZ route 设计不要默认生成一串大 box。平台形状应表达玩�
 2. `brush_create_polygon_batch`：一次提交多个凸多边形平台。每个平台传 `points2d`、`minZ`、`maxZ`、可选 `material` 和 `metadata`。
 3. 在 metadata 中写入 `routeId`、`movementType`、`intent`、`difficulty`、`incomingDirection`、`outgoingDirection` 等信息。metadata 第一版只在 MCP session 内有效，不写入 `.map`。
 4. `selection_by_metadata(routeId=..., select=true)`：需要继续编辑某段 route 时按 metadata 找回对象，不要在上下文中长期携带大 object id 列表。
-5. `kz_distance_analyze_chain`：用 ordered `objectIds` 或 `routeId` 计算 `edgeGap`、`effectiveDistanceIdeal`、`effectiveDistanceBadLanding`、`heightDelta`、`lateralOffset` 和 `landingWindowArea`。
-6. 结果只能作为 mapper 几何指标，不能承诺 CS1.6 实机可通关。`sv_airaccelerate`、server plugin、玩家速度、落地状态和高度差都会影响实际难度。
+5. `route_geometry_analyze_chain`：用 ordered `objectIds` 或 `routeId` 计算 `edgeGap`、`effectiveDistanceIdeal`、`effectiveDistanceBadLanding`、`heightDelta`、`lateralOffset` 和 `landingWindowArea`。
+6. 结果只能作为静态几何事实，不能承诺 CS1.6 实机可通关，也不负责 hard/god 等难度裁判。难度语感应由 Agent 的 KZ/CS1.6 skill 结合路线意图、movement 类型和实测反馈判断；`sv_airaccelerate`、server plugin、玩家速度、落地状态和高度差都会影响实际难度。
 
 示例 polygon batch：
 

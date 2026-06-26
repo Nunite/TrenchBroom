@@ -84,6 +84,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("brush_metadata_set"));
     CHECK(findToolDefinition("brush_metadata_get"));
     CHECK(findToolDefinition("selection_by_metadata"));
+    CHECK(findToolDefinition("route_geometry_analyze_chain"));
     CHECK(findToolDefinition("kz_distance_analyze_chain"));
     CHECK(findToolDefinition("brush_create_arch"));
     CHECK(findToolDefinition("brush_create_torus"));
@@ -146,7 +147,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("shape_library_list"));
     CHECK(names.contains("brush_metadata_get"));
     CHECK(names.contains("selection_by_metadata"));
-    CHECK(names.contains("kz_distance_analyze_chain"));
+    CHECK(names.contains("route_geometry_analyze_chain"));
+    CHECK(!names.contains("kz_distance_analyze_chain"));
     CHECK(names.contains("overlay_set"));
     CHECK(names.contains("history_list"));
     CHECK(names.contains("asset_search"));
@@ -330,7 +332,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_metadata_set"));
     CHECK(names.contains("brush_metadata_get"));
     CHECK(names.contains("selection_by_metadata"));
-    CHECK(names.contains("kz_distance_analyze_chain"));
+    CHECK(names.contains("route_geometry_analyze_chain"));
+    CHECK(!names.contains("kz_distance_analyze_chain"));
     CHECK(names.contains("asset_search"));
     CHECK(names.contains("asset_place_model"));
     CHECK(names.contains("asset_place_sprite"));
@@ -723,12 +726,14 @@ TEST_CASE("McpToolCatalog")
     const auto polygonBatchTool = findToolDefinition("brush_create_polygon_batch");
     const auto metadataSetTool = findToolDefinition("brush_metadata_set");
     const auto metadataGetTool = findToolDefinition("brush_metadata_get");
+    const auto routeGeometryTool = findToolDefinition("route_geometry_analyze_chain");
     const auto kzDistanceTool = findToolDefinition("kz_distance_analyze_chain");
 
     REQUIRE(editTool);
     REQUIRE(polygonBatchTool);
     REQUIRE(metadataSetTool);
     REQUIRE(metadataGetTool);
+    REQUIRE(routeGeometryTool);
     REQUIRE(kzDistanceTool);
     CHECK(!canCallTool(*editTool, McpMode::ReadOnly));
     CHECK(canCallTool(*editTool, McpMode::Edit));
@@ -737,10 +742,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(!canCallTool(*metadataSetTool, McpMode::ReadOnly));
     CHECK(canCallTool(*metadataSetTool, McpMode::Edit));
     CHECK(canCallTool(*metadataGetTool, McpMode::ReadOnly));
+    CHECK(canCallTool(*routeGeometryTool, McpMode::ReadOnly));
     CHECK(canCallTool(*kzDistanceTool, McpMode::ReadOnly));
   }
 
-  SECTION("KZ tools are visible in modeling profile and searchable with schemas")
+  SECTION("route metadata tools are modeling-visible and KZ alias is searchable")
   {
     const auto editTools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
     auto editNames = QStringList{};
@@ -753,15 +759,16 @@ TEST_CASE("McpToolCatalog")
     CHECK(editNames.contains("brush_metadata_set"));
     CHECK(editNames.contains("brush_metadata_get"));
     CHECK(editNames.contains("selection_by_metadata"));
-    CHECK(editNames.contains("kz_distance_analyze_chain"));
+    CHECK(editNames.contains("route_geometry_analyze_chain"));
+    CHECK(!editNames.contains("kz_distance_analyze_chain"));
 
     const auto searchResults = toolsSearchJson(
-      "kz distance", "kz", "schema", McpMode::Edit, McpToolProfile::Modeling);
+      "route geometry", "route", "schema", McpMode::Edit, McpToolProfile::Modeling);
     auto found = QJsonObject{};
     for (const auto& tool : searchResults)
     {
       const auto object = tool.toObject();
-      if (object.value("name").toString() == "kz_distance_analyze_chain")
+      if (object.value("name").toString() == "route_geometry_analyze_chain")
       {
         found = object;
         break;
@@ -775,6 +782,22 @@ TEST_CASE("McpToolCatalog")
             .value("properties")
             .toObject()
             .contains("routeId"));
+
+    const auto aliasResults = toolsSearchJson(
+      "kz_distance_analyze_chain", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    auto alias = QJsonObject{};
+    for (const auto& tool : aliasResults)
+    {
+      const auto object = tool.toObject();
+      if (object.value("name").toString() == "kz_distance_analyze_chain")
+      {
+        alias = object;
+        break;
+      }
+    }
+
+    REQUIRE(!alias.isEmpty());
+    CHECK(!alias.value("visibleInCurrentProfile").toBool());
   }
 
   SECTION("tool json uses MCP inputSchema shape")

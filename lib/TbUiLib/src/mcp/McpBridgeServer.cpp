@@ -272,7 +272,9 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return selectionByMetadataResult(appController, params, m_kzBrushMetadata);
         }
-        if (toolName == "kz_distance_analyze_chain")
+        if (
+          toolName == "route_geometry_analyze_chain"
+          || toolName == "kz_distance_analyze_chain")
         {
           return kzDistanceAnalyzeChainResult(appController, params, m_kzBrushMetadata);
         }

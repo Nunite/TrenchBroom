@@ -626,6 +626,28 @@ QStringList brushMaterials(const mdl::Brush& brush)
   return materials;
 }
 
+QStringList brushMaterialsForObjectIds(mdl::Map& map, const QJsonArray& objectIds)
+{
+  auto materials = QStringList{};
+  for (const auto& value : objectIds)
+  {
+    auto* node = resolveNodeId(map.worldNode(), value.toString());
+    const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(node);
+    if (brushNode == nullptr)
+    {
+      continue;
+    }
+    for (const auto& material : brushMaterials(brushNode->brush()))
+    {
+      if (!materials.contains(material))
+      {
+        materials.push_back(material);
+      }
+    }
+  }
+  return materials;
+}
+
 QJsonArray stringListToJsonArray(const QStringList& values)
 {
   auto result = QJsonArray{};
@@ -2698,6 +2720,9 @@ McpBridgeToolResult blockoutCreateResult(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
   result.insert("brushCount", brushCount);
   result.insert("material", QString::fromStdString(material));
+  result.insert(
+    "materials",
+    stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
   result.insert("bounds", boundsToJson(generatedBounds));
   applyDetailLevel(result, *changedObjectIds, params.value("detail").toString("summary"));
   return McpBridgeToolResult::success(std::move(result));
@@ -2756,6 +2781,9 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
     result);
   result.insert("brushCount", brushCount);
   result.insert("material", QString::fromStdString(material));
+  result.insert(
+    "materials",
+    stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
   result.insert("validation", spiralValidationJson(*spiralParams, brushCount));
   result.insert("bounds", boundsToJson(bounds));
   applyDetailLevel(result, *changedObjectIds, params.value("detail").toString("summary"));
@@ -2943,6 +2971,9 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   result.insert("bounds", boundsToJson(bounds));
   result.insert("validation", validation);
   result.insert("material", QString::fromStdString(defaultMaterial));
+  result.insert(
+    "materials",
+    stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
   result.insert("grid", grid);
   applyDetailLevel(
     result,

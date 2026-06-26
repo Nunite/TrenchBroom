@@ -149,6 +149,54 @@ std::optional<mdl::NodePath> parseNodePathId(const QString& id)
   return path;
 }
 
+QJsonObject operationStaleDiagnosticJson(
+  const McpOperationRecord& operation,
+  const int liveObjectCount,
+  const int staleObjectCount)
+{
+  auto result = QJsonObject{
+    {"liveObjectCount", liveObjectCount},
+    {"staleObjectCount", staleObjectCount},
+  };
+  if (operation.undone)
+  {
+    result.insert("staleReason", "operation was undone");
+    result.insert(
+      "suggestedAction",
+      "Redo the MCP operation if available, or recreate/re-identify the objects in the "
+      "current map.");
+  }
+  else if (staleObjectCount > 0)
+  {
+    result.insert(
+      "staleReason",
+      "one or more operation object ids no longer resolve in the active document");
+    result.insert(
+      "suggestedAction",
+      "The objects may have been deleted, the map may have been reloaded, or node ids "
+      "may have changed. Use selection_filter/selection_by_bounds or operation details "
+      "to re-identify current objects.");
+  }
+  return result;
+}
+
+QJsonObject operationLiveStateJson(mdl::Map& map, const McpOperationRecord& operation)
+{
+  auto liveObjectCount = 0;
+  auto staleObjectCount = 0;
+  for (const auto& value : operation.changedObjectIds)
+  {
+    const auto path = parseNodePathId(value);
+    if (!path || map.worldNode().resolvePath(*path) == nullptr)
+    {
+      ++staleObjectCount;
+      continue;
+    }
+    ++liveObjectCount;
+  }
+  return operationStaleDiagnosticJson(operation, liveObjectCount, staleObjectCount);
+}
+
 McpBridgeToolResult operationInspectResult(
   const std::vector<McpOperationRecord>& history, const QJsonObject& params)
 {
@@ -196,6 +244,7 @@ McpBridgeToolResult operationSelectResult(
   }
 
   auto& map = mapWindow->document().map();
+  auto diagnostic = operationLiveStateJson(map, *operation);
   auto nodes = std::vector<mdl::Node*>{};
   for (const auto& value : operation->changedObjectIds)
   {
@@ -219,10 +268,28 @@ McpBridgeToolResult operationSelectResult(
     mdl::selectNodes(map, nodes);
   }
 
-  return McpBridgeToolResult::success(QJsonObject{
+  auto result = QJsonObject{
     {"operationId", operationId},
     {"selectedCount", static_cast<int>(nodes.size())},
-  });
+  };
+  for (auto it = diagnostic.begin(); it != diagnostic.end(); ++it)
+  {
+    result.insert(it.key(), it.value());
+  }
+  if (nodes.empty() && !operation->changedObjectIds.empty())
+  {
+    result.insert(
+      "diagnostic",
+      "No live selectable objects were found for this operation in the active document.");
+    if (!result.contains("suggestedAction"))
+    {
+      result.insert(
+        "suggestedAction",
+        "Use selection_filter/selection_by_bounds or operation_inspect(detail=full) to "
+        "re-identify current objects.");
+    }
+  }
+  return McpBridgeToolResult::success(result);
 }
 
 McpBridgeToolResult operationValidateResult(
@@ -248,28 +315,23 @@ McpBridgeToolResult operationValidateResult(
     return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
   }
 
-  auto liveObjectCount = 0;
-  auto staleObjectCount = 0;
-  auto& map = mapWindow->document().map();
-  for (const auto& value : operation->changedObjectIds)
-  {
-    const auto path = parseNodePathId(value);
-    if (!path || map.worldNode().resolvePath(*path) == nullptr)
-    {
-      ++staleObjectCount;
-      continue;
-    }
-    ++liveObjectCount;
-  }
+  const auto liveState = operationLiveStateJson(mapWindow->document().map(), *operation);
+  const auto liveObjectCount = liveState.value("liveObjectCount").toInt();
+  const auto staleObjectCount = liveState.value("staleObjectCount").toInt();
 
-  return McpBridgeToolResult::success(QJsonObject{
+  auto result = QJsonObject{
     {"operationId", operationId},
     {"valid", !operation->undone && staleObjectCount == 0},
     {"undone", operation->undone},
     {"changedObjectCount", operation->changedObjectIds.size()},
     {"liveObjectCount", liveObjectCount},
     {"staleObjectCount", staleObjectCount},
-  });
+  };
+  for (auto it = liveState.begin(); it != liveState.end(); ++it)
+  {
+    result.insert(it.key(), it.value());
+  }
+  return McpBridgeToolResult::success(result);
 }
 
 McpBridgeToolResult historyUndoResult(

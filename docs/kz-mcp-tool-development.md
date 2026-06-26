@@ -1,13 +1,14 @@
 # KZ MCP Tool Development
 
-This document records the KZ MCP tool work in small, testable stages. The goal is to keep the toolset focused on mapper control: shape, intent, metadata, and metrics. It should not drift into a pile of fixed bhop prefabs.
+This document records the KZ-adjacent MCP tool work in small, testable stages. The goal is to keep the toolset focused on mapper control: shape, intent, metadata, and geometry facts. It should not drift into a pile of fixed bhop prefabs or a static KZ difficulty module inside the map editor.
 
 ## Principles
 
 - TrenchBroom remains the source of truth. MCP tools do not write `.map` files directly.
 - KZ tools should expose local mapper intent, not whole-map generation.
 - Prefer shape vocabulary and batch polygon creation over repeated box spam.
-- Prefer geometry metrics and warnings over claims that a route is playable in CS1.6.
+- Prefer geometry facts and warnings over claims that a route is playable in CS1.6.
+- Difficulty labels such as hard/god belong in Agent skills and user feedback loops, not in TrenchBroom MCP static validators.
 - Keep writes transactional and undoable.
 - Keep metadata session-local until there is a clear persistence design.
 
@@ -20,7 +21,8 @@ Stage 1 implements the lowest-risk tools from `KZ_MCP_TOOL_REQUIREMENTS.md`:
 - `brush_metadata_set`
 - `brush_metadata_get`
 - `selection_by_metadata`
-- `kz_distance_analyze_chain`
+- `route_geometry_analyze_chain`
+- `kz_distance_analyze_chain` compatibility alias
 
 Deferred from Stage 1:
 
@@ -126,7 +128,7 @@ It also supports exact matching on custom metadata with:
 }
 ```
 
-### `kz_distance_analyze_chain`
+### `route_geometry_analyze_chain`
 
 Read-only. Accepts ordered `objectIds` or a `routeId`. It computes mapper geometry metrics for each adjacent pair:
 
@@ -143,7 +145,9 @@ report `0` even if both have thickness. `verticalGap` reports actual vertical
 separation between the brush bodies and is `0` when the two platform volumes
 overlap or touch vertically.
 
-The tool uses `outgoingDirection` or `incomingDirection` metadata when present. Without direction metadata it uses platform centers and emits a warning. The result is a mapper heuristic, not an in-game pass/fail guarantee.
+The tool uses `outgoingDirection` or `incomingDirection` metadata when present. Without direction metadata it uses platform centers and emits a warning. The result is static route geometry only, not a difficulty verdict and not an in-game pass/fail guarantee.
+
+`kz_distance_analyze_chain` remains as a compatibility alias for existing clients, but the recommended tool name is `route_geometry_analyze_chain`.
 
 ## Recommended Agent Flow
 
@@ -151,7 +155,7 @@ The tool uses `outgoingDirection` or `incomingDirection` metadata when present. 
 2. Call `brush_create_polygon_batch(detail=ids)` to create the platforms in one transaction.
 3. Use metadata in the batch call, or call `brush_metadata_set` afterward.
 4. Use `selection_by_metadata(routeId=..., select=true)` for route edits.
-5. Call `kz_distance_analyze_chain` with ordered ids before judging difficulty.
+5. Call `route_geometry_analyze_chain` with ordered ids when the Agent needs static route facts. Use KZ/CS1.6 skill context and user feedback to judge difficulty.
 6. Use `history_undo_mcp` for rollback if the batch does not match the intended route.
 
 ## Validation Notes
@@ -164,7 +168,7 @@ Stage 1 validates:
 - one transaction for a multi-platform batch
 - undo removes the whole batch
 - metadata set/get/select
-- basic KZ distance metrics for a two-platform chain
+- basic route geometry metrics for a two-platform chain
 
 Stage 1 deliberately does not validate actual CS1.6 movement viability. Server settings, plugin rules, player speed, landing state, and in-game physics still need manual testing.
 
@@ -187,7 +191,7 @@ scripts\mcp-kz-smoke.ps1 -Launch -RawJson
 The runtime smoke starts the Release TrenchBroom executable with
 `build-release-codex\app\TrenchBroom\map_test\unnamed.map`, connects to the local
 HTTP MCP endpoint, creates a two-platform KZ polygon chain with metadata, reads
-the metadata back, selects by `routeId`, runs `kz_distance_analyze_chain`, and
+the metadata back, selects by `routeId`, runs `route_geometry_analyze_chain`, and
 then uses `history_undo_mcp` to remove the smoke brushes. It verifies that the
 map dirty state returns to its pre-smoke value.
 

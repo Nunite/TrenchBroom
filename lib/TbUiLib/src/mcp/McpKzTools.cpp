@@ -730,26 +730,47 @@ McpBridgeToolResult brushMetadataGetForMapResult(
     const auto it = metadataStore.find(objectId);
     auto* node = resolveNodeId(map.worldNode(), objectId);
     const auto live = dynamic_cast<mdl::BrushNode*>(node) != nullptr;
-    const auto stale = !live || (it != metadataStore.end() && it->second.stale);
+    const auto explicitlyStale = it != metadataStore.end() && it->second.stale;
+    const auto stale = !live || explicitlyStale;
     if (stale)
     {
       ++staleCount;
     }
 
-    results.push_back(QJsonObject{
+    auto object = QJsonObject{
       {"objectId", objectId},
       {"live", live},
       {"stale", stale},
       {"hasMetadata", it != metadataStore.end() && !it->second.metadata.isEmpty()},
       {"metadata", it != metadataStore.end() ? it->second.metadata : QJsonObject{}},
-    });
+    };
+    if (stale)
+    {
+      object.insert(
+        "staleReason",
+        !live ? "objectId does not resolve to a live brush"
+              : "metadata record was marked stale");
+    }
+    results.push_back(object);
   }
 
-  return McpBridgeToolResult::success(QJsonObject{
+  auto result = QJsonObject{
     {"count", results.size()},
     {"staleCount", staleCount},
     {"objects", results},
-  });
+  };
+  if (staleCount > 0)
+  {
+    result.insert(
+      "diagnostic",
+      "Some metadata records no longer point at live brush objects. This can happen "
+      "after undo, delete, map reload, or object id reassignment.");
+    result.insert(
+      "suggestedAction",
+      "Re-identify objects with selection_filter/selection_by_bounds or recreate "
+      "metadata for the current document session.");
+  }
+  return McpBridgeToolResult::success(result);
 }
 
 McpBridgeToolResult selectionByMetadataResult(
@@ -798,13 +819,25 @@ McpBridgeToolResult selectionByMetadataForMapResult(
     mdl::selectNodes(map, nodes);
   }
 
-  return McpBridgeToolResult::success(QJsonObject{
+  auto result = QJsonObject{
     {"count", objectIds.size()},
     {"objectIds", objectIds},
     {"selected", params.value("select").toBool(false)},
     {"staleCount", staleCount},
     {"truncated", matchingIds.size() >= limit},
-  });
+  };
+  if (staleCount > 0)
+  {
+    result.insert(
+      "diagnostic",
+      "Some matching metadata records were skipped because their object ids no longer "
+      "resolve to live brushes.");
+    result.insert(
+      "suggestedAction",
+      "Use selection_filter/selection_by_bounds to re-identify the current brush set, "
+      "then refresh session metadata if needed.");
+  }
+  return McpBridgeToolResult::success(result);
 }
 
 McpBridgeToolResult kzDistanceAnalyzeChainResult(
@@ -845,7 +878,7 @@ McpBridgeToolResult kzDistanceAnalyzeChainForMapResult(
     if (routeId.isEmpty())
     {
       return invalidParamsFailure(
-        "kz_distance_analyze_chain requires objectIds or routeId");
+        "route geometry analysis requires objectIds or routeId");
     }
     objectIds = matchingMetadataObjectIds(
       QJsonObject{{"routeId", routeId}},
@@ -929,8 +962,9 @@ McpBridgeToolResult kzDistanceAnalyzeChainForMapResult(
     {"maxAbsHeightDelta", maxHeightDelta},
     {"warnings", warnings},
     {"note",
-     "KZ distance analysis is a mapper heuristic and not an in-game pass/fail "
-     "guarantee."},
+     "Route geometry analysis reports static brush metrics only. Gameplay difficulty "
+     "and pass/fail viability should be judged by the Agent with domain context and "
+     "in-game testing."},
   });
 }
 

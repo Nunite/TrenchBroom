@@ -29,6 +29,7 @@
 #include "mcp/McpError.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushFace.h"
+#include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
 #include "mdl/EditorContext.h"
 #include "mdl/Entity.h"
@@ -63,6 +64,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <set>
 #include <vector>
@@ -623,6 +625,30 @@ QJsonObject selectionJsonForMap(const mdl::Map& map)
     }
   }
 
+  auto faceOwnerBrushIds = QJsonArray{};
+  auto faceOwnerBrushes = QJsonArray{};
+  auto faceCountsByBrush = std::map<const mdl::BrushNode*, int>{};
+  for (const auto& handle : selection.brushFaces)
+  {
+    ++faceCountsByBrush[handle.node()];
+  }
+  for (const auto& [brushNode, faceCount] : faceCountsByBrush)
+  {
+    if (brushNode == nullptr)
+    {
+      continue;
+    }
+    const auto objectId = nodePathId(*brushNode, worldNode);
+    faceOwnerBrushIds.push_back(objectId);
+    faceOwnerBrushes.push_back(QJsonObject{
+      {"id", objectId},
+      {"type", "brush"},
+      {"selectedFaceCount", faceCount},
+      {"faceCount", static_cast<int>(brushNode->brush().faceCount())},
+      {"logicalBounds", boundsToJson(brushNode->logicalBounds())},
+    });
+  }
+
   return QJsonObject{
     {"hasSelection", selection.hasAny()},
     {"nodes", nodes},
@@ -632,6 +658,9 @@ QJsonObject selectionJsonForMap(const mdl::Map& map)
     {"brushCount", static_cast<int>(selection.brushes.size())},
     {"patchCount", static_cast<int>(selection.patches.size())},
     {"brushFaceCount", static_cast<int>(selection.brushFaces.size())},
+    {"faceOwnerBrushCount", faceOwnerBrushIds.size()},
+    {"faceOwnerBrushIds", faceOwnerBrushIds},
+    {"faceOwnerBrushes", faceOwnerBrushes},
     {"selectedBrushTotalFaceCount", selectedBrushTotalFaceCount},
   };
 }
@@ -651,6 +680,23 @@ QJsonObject selectionSummaryJson(AppController& appController)
     selectedBrushTotalFaceCount += static_cast<int>(brushNode->brush().faceCount());
   }
 
+  auto faceOwnerBrushIds = QJsonArray{};
+  auto faceCountsByBrush = std::map<const mdl::BrushNode*, int>{};
+  const auto& worldNode = mapWindow->document().map().worldNode();
+  for (const auto& handle : selection.brushFaces)
+  {
+    ++faceCountsByBrush[handle.node()];
+  }
+  for (const auto& entry : faceCountsByBrush)
+  {
+    const auto* brushNode = entry.first;
+    if (brushNode == nullptr)
+    {
+      continue;
+    }
+    faceOwnerBrushIds.push_back(nodePathId(*brushNode, worldNode));
+  }
+
   return QJsonObject{
     {"hasSelection", selection.hasAny()},
     {"nodeCount", static_cast<int>(selection.nodes.size())},
@@ -659,6 +705,8 @@ QJsonObject selectionSummaryJson(AppController& appController)
     {"brushCount", static_cast<int>(selection.brushes.size())},
     {"patchCount", static_cast<int>(selection.patches.size())},
     {"brushFaceCount", static_cast<int>(selection.brushFaces.size())},
+    {"faceOwnerBrushCount", faceOwnerBrushIds.size()},
+    {"faceOwnerBrushIds", faceOwnerBrushIds},
     {"selectedBrushTotalFaceCount", selectedBrushTotalFaceCount},
   };
 }

@@ -26,6 +26,8 @@
 #include "../../src/mcp/McpBridgeServerTools.h"
 #include "Result.h"
 #include "gl/GlManager.h"
+#include "mdl/BrushFaceHandle.h"
+#include "mdl/BrushNode.h"
 #include "mdl/GameConfigFixture.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
@@ -245,7 +247,9 @@ TEST_CASE("McpBridgeServer")
         {"count", 1},
       });
     }
-    if (toolName == "kz_distance_analyze_chain")
+    if (
+      toolName == "route_geometry_analyze_chain"
+      || toolName == "kz_distance_analyze_chain")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"segmentCount", 1},
@@ -1350,6 +1354,28 @@ TEST_CASE("McpBridgeServer MCP read semantics")
   CHECK(selection.value("brushFaceCount").toInt() == 0);
   CHECK(selection.value("selectedBrushTotalFaceCount").toInt() == 12);
 
+  const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(objectIds.size() == 2);
+  const auto firstBrushPath = mdl::NodePath{{0}};
+  auto* firstBrushNode =
+    dynamic_cast<mdl::BrushNode*>(map.worldNode().resolvePath(firstBrushPath));
+  REQUIRE(firstBrushNode != nullptr);
+  mdl::selectBrushFaces(
+    map,
+    {mdl::BrushFaceHandle{firstBrushNode, 0}, mdl::BrushFaceHandle{firstBrushNode, 1}});
+
+  const auto faceSelection = selectionJsonForMap(map);
+  CHECK(faceSelection.value("brushCount").toInt() == 0);
+  CHECK(faceSelection.value("brushFaceCount").toInt() == 2);
+  CHECK(faceSelection.value("faceOwnerBrushCount").toInt() == 1);
+  CHECK(
+    faceSelection.value("faceOwnerBrushIds").toArray().first().toString()
+    == objectIds[0].toString());
+  const auto faceOwner =
+    faceSelection.value("faceOwnerBrushes").toArray().first().toObject();
+  CHECK(faceOwner.value("id").toString() == objectIds[0].toString());
+  CHECK(faceOwner.value("selectedFaceCount").toInt() == 2);
+
   const auto boundsResponse = selectionByBoundsForMapResult(
     map,
     QJsonObject{
@@ -1614,6 +1640,7 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
                 QJsonArray{32, 64}}},
              {"minZ", 0},
              {"maxZ", 16},
+             {"material", "mcp_floor_a"},
              {"metadata",
               QJsonObject{
                 {"routeId", "intro"},
@@ -1630,6 +1657,7 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
                 QJsonArray{176, 64}}},
              {"minZ", 0},
              {"maxZ", 16},
+             {"material", "mcp_floor_b"},
              {"metadata",
               QJsonObject{
                 {"routeId", "intro"},
@@ -1650,6 +1678,7 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
                 QJsonArray{304, 16}}},
              {"minZ", 16},
              {"maxZ", 32},
+             {"material", "mcp_floor_a"},
              {"metadata",
               QJsonObject{
                 {"routeId", "intro"},
@@ -1673,6 +1702,15 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
     CHECK(response.result.value("changedObjectIds").isUndefined());
     CHECK(response.result.value("metadataCount").toInt() == 3);
     CHECK(response.result.value("validation").toObject().value("valid").toBool());
+    const auto materials = response.result.value("materials").toArray();
+    auto materialNames = QStringList{};
+    for (const auto& material : materials)
+    {
+      materialNames.push_back(material.toString());
+    }
+    CHECK(materialNames.contains("mcp_floor_a"));
+    CHECK(materialNames.contains("mcp_floor_b"));
+    CHECK(!materialNames.contains("__TB_empty"));
     CHECK(map.selection().nodes.size() == 3u);
     REQUIRE(map.undoCommandName() != nullptr);
     CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: KZ polygon platforms");
@@ -1689,6 +1727,89 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
 
     map.undoCommand();
     CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+  }
+
+  SECTION("reports operation and metadata stale diagnostics")
+  {
+    const auto response = brushCreatePolygonBatchForMapResult(
+      map,
+      "brush_create_polygon_batch",
+      QJsonObject{
+        {"detail", "ids"},
+        {"select", false},
+        {"brushes",
+         QJsonArray{
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{0, 0},
+                QJsonArray{64, 0},
+                QJsonArray{64, 64},
+                QJsonArray{0, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "stale_probe"},
+                {"movementType", "bhop"},
+              }},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    const auto operationId = response.result.value("operationId").toString();
+    const auto objectIds = response.result.value("changedObjectIds").toArray();
+    REQUIRE(objectIds.size() == 1);
+
+    map.undoCommand();
+
+    const auto validateResponse = operationValidateResult(
+      appController, history, QJsonObject{{"operationId", operationId}});
+    REQUIRE(validateResponse.ok);
+    CHECK(!validateResponse.result.value("valid").toBool());
+    CHECK(validateResponse.result.value("staleObjectCount").toInt() == 1);
+    CHECK(!validateResponse.result.value("staleReason").toString().isEmpty());
+    CHECK(validateResponse.result.value("suggestedAction")
+            .toString()
+            .contains("re-identify"));
+
+    const auto selectResponse = operationSelectResult(
+      appController, history, QJsonObject{{"operationId", operationId}});
+    REQUIRE(selectResponse.ok);
+    CHECK(selectResponse.result.value("selectedCount").toInt() == 0);
+    CHECK(selectResponse.result.value("staleObjectCount").toInt() == 1);
+    CHECK(selectResponse.result.value("diagnostic")
+            .toString()
+            .contains("No live selectable"));
+
+    const auto getResponse = brushMetadataGetForMapResult(
+      map, QJsonObject{{"objectIds", objectIds}}, metadataStore);
+    REQUIRE(getResponse.ok);
+    CHECK(getResponse.result.value("staleCount").toInt() == 1);
+    CHECK(getResponse.result.value("diagnostic").toString().contains("metadata records"));
+    const auto object = getResponse.result.value("objects").toArray().first().toObject();
+    CHECK(object.value("stale").toBool());
+    CHECK(!object.value("staleReason").toString().isEmpty());
+
+    const auto byMetadataResponse = selectionByMetadataForMapResult(
+      map,
+      QJsonObject{
+        {"routeId", "stale_probe"},
+        {"select", true},
+      },
+      metadataStore);
+    REQUIRE(byMetadataResponse.ok);
+    CHECK(byMetadataResponse.result.value("count").toInt() == 0);
+    CHECK(byMetadataResponse.result.value("staleCount").toInt() == 1);
+    CHECK(byMetadataResponse.result.value("suggestedAction")
+            .toString()
+            .contains("re-identify"));
   }
 
   SECTION("rejects invalid polygon batch without committing")

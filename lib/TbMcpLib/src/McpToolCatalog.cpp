@@ -1802,9 +1802,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "kz_distance_analyze_chain",
-      "Analyze KZ platform-chain geometry metrics such as edge gap, effective distance, "
-      "height delta, lateral offset, and landing window area. This is a mapper "
-      "heuristic, not an in-game pass/fail guarantee.",
+      "Compatibility alias for route_geometry_analyze_chain. Returns geometric route "
+      "facts only; difficulty should be judged by the Agent using project/domain "
+      "context.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1813,6 +1813,25 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"routeId",
          stringProperty("Optional metadata routeId. Used when objectIds is omitted.")},
         {"movementType", stringProperty("Optional movement type such as bhop or LJ.")},
+        {"playerHull",
+         vec3Property(
+           "Optional player hull size [width, depth, height], defaults to [32,32,72].")},
+      }),
+    },
+    {
+      "route_geometry_analyze_chain",
+      "Analyze ordered brush-platform geometry facts such as edge gap, effective "
+      "distance, height delta, lateral offset, and landing window area. This tool "
+      "does not classify gameplay difficulty or pass/fail viability.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"objectIds", arrayProperty("Optional ordered brush object ids to analyze.")},
+        {"routeId",
+         stringProperty("Optional metadata routeId. Used when objectIds is omitted.")},
+        {"movementType",
+         stringProperty("Optional movement label used only for result context.")},
         {"playerHull",
          vec3Property(
            "Optional player hull size [width, depth, height], defaults to [32,32,72].")},
@@ -1909,10 +1928,16 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       else if (
         tool.name == "shape_library_list" || tool.name.startsWith("brush_metadata_")
         || tool.name == "selection_by_metadata"
-        || tool.name == "kz_distance_analyze_chain")
+        || tool.name == "route_geometry_analyze_chain")
       {
-        tool.category = "kz";
+        tool.category = "route";
         tool.minimumProfile = McpToolProfile::Modeling;
+      }
+      else if (tool.name == "kz_distance_analyze_chain")
+      {
+        tool.category = "route";
+        tool.expert = true;
+        tool.minimumProfile = McpToolProfile::Full;
       }
       else if (
         tool.name == "tb_status" || tool.name == "tb_doctor"
@@ -1994,6 +2019,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "viewport_capture_current",
     "viewport_capture_3d",
     "viewport_capture_2d",
+    "kz_distance_analyze_chain",
   };
 
   return !std::ranges::any_of(
@@ -2250,12 +2276,12 @@ QJsonArray toolsSearchJson(
     {
       continue;
     }
+    const auto exactNameMatch = !normalizedQuery.isEmpty()
+                                && queryContainsExactToolName(normalizedQuery, tool.name);
     if (!visibleInProfile(tool, profile) && normalizedQuery.isEmpty())
     {
       continue;
     }
-    const auto exactNameMatch = !normalizedQuery.isEmpty()
-                                && queryContainsExactToolName(normalizedQuery, tool.name);
     if (
       !exactNameMatch && !normalizedCategory.isEmpty()
       && tool.category.compare(normalizedCategory, Qt::CaseInsensitive) != 0)
