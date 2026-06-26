@@ -33,6 +33,7 @@
 #include "mdl/Node.h"
 #include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
+#include "ui/mcp/McpObjectRegistry.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
@@ -299,6 +300,62 @@ std::optional<std::vector<mdl::Node*>> nodesFromObjectIds(
   return kdl::vec_sort_and_remove_duplicates(std::move(result));
 }
 
+std::optional<const McpOperationRecord*> findOperation(
+  const std::vector<McpOperationRecord>& history, const QString& operationId)
+{
+  const auto it = std::ranges::find_if(
+    history, [&](const auto& operation) { return operation.operationId == operationId; });
+  if (it == history.end())
+  {
+    return std::nullopt;
+  }
+  return &*it;
+}
+
+std::optional<std::vector<mdl::Node*>> nodesFromOperation(
+  mdl::Map& map,
+  const McpOperationRecord& operation,
+  const McpObjectRegistry& objectRegistry,
+  QString& error)
+{
+  if (operation.undone)
+  {
+    error = QString{"MCP operation is already undone: %1"}.arg(operation.operationId);
+    return std::nullopt;
+  }
+
+  auto result = std::vector<mdl::Node*>{};
+  for (const auto& objectId : operation.changedObjectIds)
+  {
+    const auto resolved = objectRegistry.resolveExternalId(map, objectId);
+    if (!resolved.ok)
+    {
+      error = resolved.error;
+      return std::nullopt;
+    }
+    auto* node = resolveNodeId(map.worldNode(), resolved.legacyPathId);
+    if (!node)
+    {
+      error = QString{"Operation object no longer resolves: %1"}.arg(objectId);
+      return std::nullopt;
+    }
+    if (node == &map.worldNode() || !map.editorContext().selectable(*node))
+    {
+      error = QString{"Operation object cannot be deleted: %1"}.arg(objectId);
+      return std::nullopt;
+    }
+    result.push_back(node);
+  }
+
+  if (result.empty())
+  {
+    error = QString{"MCP operation has no changed objects: %1"}.arg(operation.operationId);
+    return std::nullopt;
+  }
+
+  return kdl::vec_sort_and_remove_duplicates(std::move(result));
+}
+
 std::vector<mdl::Node*> removeDescendantNodes(std::vector<mdl::Node*> nodes)
 {
   nodes = kdl::vec_sort_and_remove_duplicates(std::move(nodes));
@@ -515,6 +572,72 @@ McpBridgeToolResult deleteObjectsByFilterResult(
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
   result.insert("matchedCount", changedObjectIds->size());
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult deleteObjectsByOperationResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return deleteObjectsByOperationForMapResult(
+    mapWindow->document().map(),
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    objectRegistry);
+}
+
+McpBridgeToolResult deleteObjectsByOperationForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
+  const auto operationId = params.value("operationId").toString().trimmed();
+  if (operationId.isEmpty())
+  {
+    return invalidParamsFailure("objects_delete_by_operation requires operationId");
+  }
+  const auto operation = findOperation(history, operationId);
+  if (!operation)
+  {
+    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+  }
+
+  auto error = QString{};
+  const auto nodes = nodesFromOperation(map, **operation, objectRegistry, error);
+  if (!nodes)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto transactionName =
+    QString{"MCP: Delete operation %1 objects"}.arg(operationId);
+  const auto changedObjectIds = removeNodesWithTransaction(map, transactionName, *nodes);
+  if (!changedObjectIds)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden, "Operation objects cannot be deleted");
+  }
+
+  auto result = QJsonObject{};
+  mcpRecordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  result.insert("sourceOperationId", operationId);
+  result.insert("deletedCount", changedObjectIds->size());
   return McpBridgeToolResult::success(std::move(result));
 }
 

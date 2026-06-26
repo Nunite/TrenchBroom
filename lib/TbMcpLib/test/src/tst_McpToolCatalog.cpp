@@ -90,6 +90,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("brush_create_torus"));
     CHECK(findToolDefinition("objects_delete"));
     CHECK(findToolDefinition("objects_delete_by_filter"));
+    CHECK(findToolDefinition("objects_delete_by_operation"));
     CHECK(findToolDefinition("objects_transform"));
     CHECK(findToolDefinition("map_validate"));
     CHECK(findToolDefinition("problems_check"));
@@ -248,6 +249,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("face_select"));
     CHECK(names.contains("face_texture_set"));
     CHECK(names.contains("objects_delete"));
+    CHECK(names.contains("objects_delete_by_operation"));
     CHECK(names.contains("objects_transform"));
     CHECK(names.contains("map_validate"));
     CHECK(names.contains("problems_check"));
@@ -345,6 +347,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("objects_delete"));
     CHECK(names.contains("objects_delete_by_filter"));
+    CHECK(names.contains("objects_delete_by_operation"));
     CHECK(names.contains("objects_transform"));
     CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_search"));
@@ -707,11 +710,17 @@ TEST_CASE("McpToolCatalog")
       polygonItem.value("properties").toObject().value("metadata").toObject();
     CHECK(metadataSchema.value("additionalProperties").toBool());
     CHECK(metadataSchema.value("description").toString().contains("Custom"));
+    CHECK(metadataSchema.value("properties").toObject().contains("order"));
 
     const auto deleteTool = findToolDefinition("objects_delete_by_filter");
     REQUIRE(deleteTool);
     CHECK(deleteTool->category == "object");
     CHECK(deleteTool->requiredMode == McpMode::Edit);
+
+    const auto deleteOperationTool = findToolDefinition("objects_delete_by_operation");
+    REQUIRE(deleteOperationTool);
+    CHECK(
+      deleteOperationTool->inputSchema.value("required").toArray().contains("operationId"));
 
     const auto textureTool = findToolDefinition("texture_apply_by_filter");
     REQUIRE(textureTool);

@@ -250,6 +250,20 @@ McpBridgeToolResult deleteObjectsByFilterResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult deleteObjectsByOperationResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult deleteObjectsByOperationForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult transformObjectsResult(
   AppController& appController,
   const QString& toolName,

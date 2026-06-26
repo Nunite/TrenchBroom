@@ -242,6 +242,21 @@ bool metadataMatches(
   return metadata.value(key).toString().compare(expected, Qt::CaseInsensitive) == 0;
 }
 
+bool metadataNumberMatches(
+  const QJsonObject& metadata, const QString& key, const QJsonObject& params)
+{
+  const auto expected = params.value(key);
+  if (expected.isUndefined())
+  {
+    return true;
+  }
+  if (!expected.isDouble() || !metadata.value(key).isDouble())
+  {
+    return false;
+  }
+  return metadata.value(key).toDouble() == expected.toDouble();
+}
+
 bool metadataObjectMatches(const QJsonObject& metadata, const QJsonObject& expected)
 {
   for (const auto& key : expected.keys())
@@ -260,10 +275,11 @@ bool allMetadataFiltersMatch(const QJsonObject& metadata, const QJsonObject& par
          && metadataMatches(metadata, "intent", params)
          && metadataMatches(metadata, "difficulty", params)
          && metadataMatches(metadata, "movementType", params)
+         && metadataNumberMatches(metadata, "order", params)
          && metadataObjectMatches(
            metadata,
            params.value("metadata").isObject() ? params.value("metadata").toObject()
-                                               : QJsonObject{});
+                                                : QJsonObject{});
 }
 
 size_t optionalSize(
@@ -316,6 +332,30 @@ std::vector<QString> matchingMetadataObjectIds(
     }
   }
   return result;
+}
+
+void sortMetadataObjectIdsByOrder(
+  std::vector<QString>& objectIds,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  QJsonArray& warnings)
+{
+  const auto allHaveOrder = std::ranges::all_of(objectIds, [&](const auto& objectId) {
+    const auto it = metadataStore.find(objectId);
+    return it != metadataStore.end() && it->second.metadata.value("order").isDouble();
+  });
+  if (!allHaveOrder)
+  {
+    warnings.push_back(
+      "Route order was inferred from MCP object ids because one or more metadata records "
+      "do not define numeric order. Pass ordered objectIds or set metadata.order for exact "
+      "chain order.");
+    return;
+  }
+
+  std::ranges::stable_sort(objectIds, [&](const auto& lhs, const auto& rhs) {
+    return metadataStore.at(lhs).metadata.value("order").toDouble()
+           < metadataStore.at(rhs).metadata.value("order").toDouble();
+  });
 }
 
 std::vector<mdl::BrushNode*> liveBrushNodesFromObjectIds(
@@ -884,9 +924,18 @@ McpBridgeToolResult routeGeometryAnalyzeChainForMapResult(
       QJsonObject{{"routeId", routeId}},
       metadataStore,
       std::numeric_limits<size_t>::max());
-    warnings.push_back(
-      "Route order was inferred from MCP object ids; pass ordered objectIds for exact "
-      "chain order.");
+    const auto orderBy =
+      params.value("orderBy").toString("metadataOrder").trimmed().toLower();
+    if (orderBy == "metadataorder" || orderBy == "metadata" || orderBy == "order")
+    {
+      sortMetadataObjectIdsByOrder(objectIds, metadataStore, warnings);
+    }
+    else
+    {
+      warnings.push_back(
+        "Route order was inferred from MCP object ids; pass ordered objectIds or use "
+        "orderBy=metadataOrder with metadata.order for exact chain order.");
+    }
   }
 
   if (objectIds.size() < 2)

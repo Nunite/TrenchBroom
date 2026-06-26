@@ -499,7 +499,10 @@ McpObjectRegistry::ResolveResult McpObjectRegistry::resolveExternalId(
 }
 
 QJsonObject McpObjectRegistry::liveStateJson(
-  mdl::Map& map, const QStringList& objectIds, const bool undone) const
+  mdl::Map& map,
+  const QStringList& objectIds,
+  const bool undone,
+  const bool includeDiagnostics) const
 {
   auto liveObjectCount = 0;
   auto staleObjectCount = 0;
@@ -527,7 +530,7 @@ QJsonObject McpObjectRegistry::liveStateJson(
     {
       ++staleObjectCount;
     }
-    if (!resolved.ok)
+    if (includeDiagnostics)
     {
       diagnostics.push_back(diagnostic);
     }

@@ -149,8 +149,8 @@ QJsonObject routeMetadataSchema()
     {"type", "object"},
     {"description",
      "Session-level route/object metadata. Known keys include routeId, intent, "
-     "difficulty, movementType, takeoffEdge, landingWindow, incomingDirection, and "
-     "outgoingDirection. Custom session-only keys are allowed for agent probes."},
+     "difficulty, movementType, order, takeoffEdge, landingWindow, incomingDirection, "
+     "and outgoingDirection. Custom session-only keys are allowed for agent probes."},
     {"additionalProperties", true},
     {"properties",
      QJsonObject{
@@ -159,6 +159,7 @@ QJsonObject routeMetadataSchema()
         stringProperty("Mapper intent, e.g. redirect_right or precision_land.")},
        {"difficulty", stringProperty("Difficulty label such as easy, average, hard.")},
        {"movementType", stringProperty("Movement or route label such as bhop or ramp.")},
+       {"order", numberProperty("Optional numeric order within a route chain.")},
        {"takeoffEdge", stringProperty("Semantic takeoff edge id or label.")},
        {"landingWindow", stringProperty("Semantic landing window id or label.")},
        {"incomingDirection", vec3Property("Incoming route direction vector.")},
@@ -1047,7 +1048,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "operation_validate",
-      "Return generic validation status for an MCP operation.",
+      "Return generic validation status for an MCP operation. Defaults to compact "
+      "summary diagnostics; use detail=full to include per-object diagnostics.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1055,6 +1057,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {
           {"operationId",
            stringProperty("Operation id returned by a mutating MCP tool.")},
+          {"detail", stringProperty("summary or full. Defaults to summary.")},
         },
         {"operationId"}),
     },
@@ -1360,6 +1363,20 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"leafOnly", boolProperty("Return only leaf matches before deletion.")},
         {"limit", integerProperty("Maximum matched object count, defaults to 100.")},
       }),
+    },
+    {
+      "objects_delete_by_operation",
+      "Delete the live selectable objects changed by a previous MCP operation. Prefer "
+      "this over passing long objectIds arrays when removing generated modules.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"operationId",
+           stringProperty("Operation id returned by a mutating MCP tool.")},
+        },
+        {"operationId"}),
     },
     {
       "objects_transform",
@@ -1797,6 +1814,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"intent", stringProperty("Optional intent to match exactly.")},
         {"difficulty", stringProperty("Optional difficulty to match exactly.")},
         {"movementType", stringProperty("Optional movement type to match exactly.")},
+        {"order", numberProperty("Optional exact route order to match.")},
         {"metadata", routeMetadataSchema()},
         {"select", boolProperty("Replace selection with matched live brush nodes.")},
         {"limit", integerProperty("Maximum result count, defaults to 100.")},
@@ -1814,6 +1832,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"objectIds", arrayProperty("Optional ordered brush object ids to analyze.")},
         {"routeId",
          stringProperty("Optional metadata routeId. Used when objectIds is omitted.")},
+        {"orderBy",
+         stringProperty(
+           "When using routeId, use metadataOrder to sort by metadata order. Defaults "
+           "to metadataOrder.")},
         {"movementType", stringProperty("Optional movement type such as bhop or LJ.")},
         {"playerHull",
          vec3Property(
@@ -1832,6 +1854,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"objectIds", arrayProperty("Optional ordered brush object ids to analyze.")},
         {"routeId",
          stringProperty("Optional metadata routeId. Used when objectIds is omitted.")},
+        {"orderBy",
+         stringProperty(
+           "When using routeId, use metadataOrder to sort by metadata order. Defaults "
+           "to metadataOrder.")},
         {"movementType",
          stringProperty("Optional movement label used only for result context.")},
         {"playerHull",
@@ -2055,6 +2081,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "blockout_validate",
     "objects_delete",
     "objects_delete_by_filter",
+    "objects_delete_by_operation",
     "objects_transform",
     "fgd_entities_list",
     "entity_schema",

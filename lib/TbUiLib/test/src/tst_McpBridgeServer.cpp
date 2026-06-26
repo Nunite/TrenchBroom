@@ -1340,6 +1340,8 @@ TEST_CASE("McpBridgeServer MCP read semantics")
   CHECK(snapshot.value("bounds").toObject().value("min").toArray()[0].toDouble() == 1024);
   CHECK(snapshot.value("bounds").toObject().value("max").toArray()[0].toDouble() == 1280);
   CHECK(snapshot.value("world").toObject().value("logicalBounds").isObject());
+  CHECK_FALSE(snapshot.value("world").toObject().value("selectable").toBool(true));
+  CHECK_FALSE(snapshot.value("world").toObject().value("operationSafe").toBool(true));
   CHECK(
     snapshot.value("world")
       .toObject()
@@ -1503,6 +1505,86 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
     registry.liveStateJson(map, QStringList{directStableId}, false);
   CHECK(!staleState.value("valid").toBool());
   CHECK(staleState.value("staleObjectCount").toInt() == 1);
+}
+
+TEST_CASE("McpBridgeServer deletes operations without long object id lists")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto registry = McpObjectRegistry{};
+
+  const auto createResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{128, 0, 0}},
+           {"max", QJsonArray{192, 64, 16}},
+         },
+       }},
+      {"detail", "ids"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(createResponse.ok);
+  REQUIRE(history.size() == 1u);
+  for (const auto& id : history.front().changedObjectIds)
+  {
+    CHECK(registry.externalIdForLegacy(map, id).startsWith("mcp:"));
+  }
+  CHECK(map.worldNode().descendantCount() == 3u);
+
+  const auto liveCompactState =
+    registry.liveStateJson(map, history.front().changedObjectIds, false);
+  CHECK_FALSE(liveCompactState.contains("objectDiagnostics"));
+  CHECK(liveCompactState.value("valid").toBool());
+
+  const auto liveFullState =
+    registry.liveStateJson(map, history.front().changedObjectIds, false, true);
+  CHECK(liveFullState.value("valid").toBool());
+  CHECK(liveFullState.value("objectDiagnostics").toArray().size() == 2);
+
+  const auto deleteResponse = deleteObjectsByOperationForMapResult(
+    map,
+    "objects_delete_by_operation",
+    QJsonObject{{"operationId", history.front().operationId}},
+    history,
+    nextOperationIndex,
+    registry);
+  REQUIRE(deleteResponse.ok);
+  CHECK(deleteResponse.result.value("sourceOperationId").toString() == "mcp-op-1");
+  CHECK(deleteResponse.result.value("changedObjectCount").toInt() == 2);
+  CHECK(deleteResponse.result.value("deletedCount").toInt() == 2);
+  CHECK(map.worldNode().descendantCount() == 1u);
+
+  const auto compactState =
+    registry.liveStateJson(map, history.front().changedObjectIds, false);
+  CHECK_FALSE(compactState.contains("objectDiagnostics"));
+  CHECK_FALSE(compactState.value("valid").toBool());
+  CHECK(compactState.value("staleObjectCount").toInt() >= 1);
+
+  const auto fullState =
+    registry.liveStateJson(map, history.front().changedObjectIds, false, true);
+  CHECK(fullState.contains("objectDiagnostics"));
 }
 
 TEST_CASE("McpBridgeServer batch blockout tools")
@@ -2152,6 +2234,78 @@ TEST_CASE("McpBridgeServer route metadata tools")
     CHECK(segment.value("heightDelta").toDouble() == 24.0);
     CHECK(segment.value("verticalGap").toDouble() == 8.0);
     CHECK(analyzeResponse.result.value("maxAbsHeightDelta").toDouble() == 24.0);
+  }
+
+  SECTION("routeId analysis uses metadata order when available")
+  {
+    const auto response = brushCreatePolygonBatchForMapResult(
+      map,
+      "brush_create_polygon_batch",
+      QJsonObject{
+        {"detail", "ids"},
+        {"select", false},
+        {"brushes",
+         QJsonArray{
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{160, 0},
+                QJsonArray{224, 0},
+                QJsonArray{224, 64},
+                QJsonArray{160, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "ordered_chain"},
+                {"order", 2},
+                {"movementType", "bhop"},
+                {"incomingDirection", QJsonArray{1, 0, 0}},
+              }},
+           },
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{0, 0},
+                QJsonArray{64, 0},
+                QJsonArray{64, 64},
+                QJsonArray{0, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "ordered_chain"},
+                {"order", 1},
+                {"movementType", "bhop"},
+                {"outgoingDirection", QJsonArray{1, 0, 0}},
+              }},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore);
+    REQUIRE(response.ok);
+    const auto objectIds = response.result.value("changedObjectIds").toArray();
+    REQUIRE(objectIds.size() == 2);
+
+    const auto analyzeResponse = routeGeometryAnalyzeChainForMapResult(
+      map,
+      QJsonObject{
+        {"routeId", "ordered_chain"},
+        {"orderBy", "metadata"},
+        {"movementType", "bhop"},
+      },
+      metadataStore);
+    REQUIRE(analyzeResponse.ok);
+    const auto orderedIds = analyzeResponse.result.value("objectIds").toArray();
+    REQUIRE(orderedIds.size() == 2);
+    CHECK(orderedIds[0].toString() == objectIds[1].toString());
+    CHECK(orderedIds[1].toString() == objectIds[0].toString());
+    CHECK(analyzeResponse.result.value("warnings").toArray().isEmpty());
+    const auto segment =
+      analyzeResponse.result.value("segments").toArray().first().toObject();
+    CHECK(segment.value("edgeGap").toDouble() == 96.0);
   }
 
   SECTION("undo skips metadata selection commands before reverting the MCP operation")

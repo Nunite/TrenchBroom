@@ -80,7 +80,10 @@ public:
 
   ResolveResult resolveExternalId(mdl::Map& map, const QString& objectId) const;
   QJsonObject liveStateJson(
-    mdl::Map& map, const QStringList& objectIds, bool undone) const;
+    mdl::Map& map,
+    const QStringList& objectIds,
+    bool undone,
+    bool includeDiagnostics = false) const;
 
   std::optional<QJsonObject> internalizeParams(
     mdl::Map& map, const QJsonObject& params, QString& error) const;

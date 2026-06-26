@@ -351,7 +351,10 @@ McpBridgeToolResult operationInspectResult(
   {
     const auto liveState =
       objectRegistry.liveStateJson(
-        mapWindow->document().map(), operation->changedObjectIds, operation->undone);
+        mapWindow->document().map(),
+        operation->changedObjectIds,
+        operation->undone,
+        detail == "full");
     for (auto it = liveState.begin(); it != liveState.end(); ++it)
     {
       result.insert(it.key(), it.value());
@@ -569,8 +572,12 @@ McpBridgeToolResult operationValidateResult(
     return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
   }
 
+  const auto detail = params.value("detail").toString("summary").toLower();
   const auto liveState = objectRegistry.liveStateJson(
-    mapWindow->document().map(), operation->changedObjectIds, operation->undone);
+    mapWindow->document().map(),
+    operation->changedObjectIds,
+    operation->undone,
+    detail == "full");
   const auto liveObjectCount = liveState.value("liveObjectCount").toInt();
   const auto staleObjectCount = liveState.value("staleObjectCount").toInt();
   const auto mismatchCount = liveState.value("mismatchCount").toInt();

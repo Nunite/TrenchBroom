@@ -309,6 +309,16 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return historyRedoResult(appController, m_operationHistory);
         }
+        if (toolName == "objects_delete_by_operation")
+        {
+          return deleteObjectsByOperationResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
+        }
         if (toolName == "asset_search")
         {
           return assetSearchResult(appController, params);

@@ -315,6 +315,8 @@ QJsonObject mapSnapshotJsonForMap(const mdl::Map& map, const QJsonObject& docume
   }
 
   auto world = mcpNodeSummaryJson(worldNode, worldNode);
+  world.insert("selectable", false);
+  world.insert("operationSafe", false);
   world.insert("nodeLogicalBounds", world.value("logicalBounds"));
   world.insert("logicalBounds", boundsToJson(mapContentBounds));
   world.insert("contentBounds", boundsToJson(mapContentBounds));
