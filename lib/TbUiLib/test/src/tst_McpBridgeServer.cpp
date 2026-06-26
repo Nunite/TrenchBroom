@@ -1461,6 +1461,7 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   auto& map = document->map();
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
+  auto registry = McpObjectRegistry{};
 
   auto server = McpBridgeServer{
     [&](const QString& toolName, const QJsonObject& params) {
@@ -1526,8 +1527,11 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   CHECK(selectResponse.result.value("selectedCount").toInt() == 1);
   CHECK(selectResponse.result.value("receivedLegacyPath").toString().startsWith("node:"));
 
-  auto registry = McpObjectRegistry{};
-  const auto legacyId = history.back().changedObjectIds.front();
+  REQUIRE(history.size() == 1u);
+  CHECK(history.back().changedObjectIds.front().startsWith("node:"));
+  const auto legacyId = selectResponse.result.value("receivedLegacyPath").toString();
+  CHECK(history.back().changedObjectIds.front() == legacyId);
+
   const auto directStableId = registry.externalIdForLegacy(map, legacyId);
   CHECK(directStableId.startsWith("mcp:"));
   const auto liveState = registry.liveStateJson(map, QStringList{directStableId}, false);
@@ -1543,8 +1547,40 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   CHECK(!staleState.value("valid").toBool());
   CHECK(staleState.value("staleObjectCount").toInt() == 1);
 
+  const auto replacementResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         },
+       }},
+      {"detail", "ids"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(replacementResponse.ok);
+  const auto replacementObjectIds =
+    replacementResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(replacementObjectIds.size() == 1);
+  const auto replacementLegacyId = replacementObjectIds.first().toString();
+  CHECK(replacementLegacyId == legacyId);
+
+  const auto replacementStableId = registry.externalIdForLegacy(map, replacementLegacyId);
+  CHECK(replacementStableId.startsWith("mcp:"));
+  CHECK(replacementStableId != directStableId);
+  const auto replacementState =
+    registry.liveStateJson(map, QStringList{replacementStableId}, false);
+  CHECK(replacementState.value("valid").toBool());
+  CHECK(replacementState.value("liveObjectCount").toInt() == 1);
+  CHECK(replacementState.value("mismatchCount").toInt() == 0);
+
   const auto offGridCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "3",
+    "4",
     "secret",
     "blockout_create_batch",
     QJsonObject{
@@ -1569,7 +1605,7 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   REQUIRE(offGridCreateResponse.ok);
 
   const auto analyzeResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "4",
+    "5",
     "secret",
     "geometry_analyze_selection",
     QJsonObject{{"grid", 1}, {"detail", "summary"}},
@@ -1607,7 +1643,8 @@ TEST_CASE("McpBridgeServer object transform summaries")
       }
       if (toolName == "objects_transform")
       {
-        return transformObjectsForMapResult(map, toolName, params, history, nextOperationIndex);
+        return transformObjectsForMapResult(
+          map, toolName, params, history, nextOperationIndex);
       }
       return McpBridgeToolResult::failure(
         mcp::McpErrorCode::ToolNotFound, QString{"Unexpected tool: %1"}.arg(toolName));
@@ -1646,8 +1683,9 @@ TEST_CASE("McpBridgeServer object transform summaries")
       {"delta", QJsonArray{16, 0, 0}},
     },
     mcp::McpMode::Edit});
-  const auto transformError =
-    transformResponse.ok || !transformResponse.error ? QString{} : transformResponse.error->message;
+  const auto transformError = transformResponse.ok || !transformResponse.error
+                                ? QString{}
+                                : transformResponse.error->message;
   INFO(transformError.toStdString());
   REQUIRE(transformResponse.ok);
   CHECK(transformResponse.result.value("changedObjectCount").toInt() == 1);
@@ -1873,9 +1911,41 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(batchResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.selection().nodes.size() == 2u);
 
+  const auto ribbonResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Path ribbon"},
+      {"grid", 16},
+      {"select", true},
+      {"detail", "ids"},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "path_ribbon"},
+           {"points2d",
+            QJsonArray{QJsonArray{256, 0}, QJsonArray{512, 0}, QJsonArray{512, 256}}},
+           {"width", 128},
+           {"minZ", 0},
+           {"maxZ", 16},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  const auto ribbonError =
+    ribbonResponse.ok ? std::string{} : ribbonResponse.error.message.toStdString();
+  INFO(ribbonError);
+  REQUIRE(ribbonResponse.ok);
+  CHECK(ribbonResponse.result.value("brushCount").toInt() == 2);
+  CHECK(ribbonResponse.result.value("changedObjectCount").toInt() == 2);
+  CHECK(ribbonResponse.result.value("changedObjectIds").toArray().size() == 2);
+  CHECK(ribbonResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.selection().nodes.size() == 2u);
+
   const auto historyResponse = historyListResult(history);
   REQUIRE(historyResponse.ok);
-  CHECK(historyResponse.result.value("count").toInt() == 1);
+  CHECK(historyResponse.result.value("count").toInt() == 2);
   const auto historyOperation =
     historyResponse.result.value("operations").toArray().first().toObject();
   CHECK(historyOperation.value("operationId").toString() == operationId);
@@ -1901,6 +1971,28 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     nextOperationIndex);
   REQUIRE(invalidResponse.ok);
   CHECK(!invalidResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+
+  const auto invalidRibbonResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "path_ribbon"},
+           {"points2d", QJsonArray{QJsonArray{0, 0}, QJsonArray{0, 0}}},
+           {"width", 128},
+           {"minZ", 0},
+           {"maxZ", 16},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(invalidRibbonResponse.ok);
+  CHECK(
+    !invalidRibbonResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
   const auto inspectResponse = operationInspectResult(

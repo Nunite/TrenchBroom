@@ -627,6 +627,7 @@ TEST_CASE("McpToolCatalog")
       operations.value("items").toObject().value("description").toString();
     CHECK(itemDescription.contains(R"("type":"box")"));
     CHECK(itemDescription.contains(R"("type":"curved_corridor")"));
+    CHECK(itemDescription.contains(R"("type":"path_ribbon")"));
     CHECK(
       operations.value("items").toObject().value("required").toArray().contains("type"));
   }

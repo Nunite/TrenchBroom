@@ -28,6 +28,8 @@
 #include "mdl/Map.h"
 #include "ui/mcp/McpBridgeServer.h"
 
+#include <algorithm>
+
 namespace tb::ui
 {
 namespace
@@ -39,6 +41,34 @@ mcp::McpBridgeResponse makeFailure(
   const QString& message)
 {
   return mcp::McpBridgeResponse::failure(request.id, mcp::McpError{code, message});
+}
+
+void syncOperationHistoryWithExternalResult(
+  std::vector<McpOperationRecord>& history,
+  mdl::Map& map,
+  const McpObjectRegistry& objectRegistry,
+  const QJsonObject& result)
+{
+  const auto operationId = result.value("operationId").toString();
+  if (operationId.isEmpty())
+  {
+    return;
+  }
+
+  const auto it = std::ranges::find_if(
+    history, [&](const auto& operation) { return operation.operationId == operationId; });
+  if (it == history.end())
+  {
+    return;
+  }
+
+  auto stableObjectIds = QJsonArray{};
+  for (const auto& objectId : it->changedObjectIds)
+  {
+    stableObjectIds.push_back(objectRegistry.externalIdForLegacy(map, objectId));
+  }
+  it->setChangedObjectIds(stableObjectIds);
+  it->setSummary(result);
 }
 
 } // namespace
@@ -296,8 +326,10 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   {
     if (map != nullptr)
     {
-      return mcp::McpBridgeResponse::success(
-        request.id, m_objectRegistry.externalizeResult(*map, result.result));
+      auto externalResult = m_objectRegistry.externalizeResult(*map, result.result);
+      syncOperationHistoryWithExternalResult(
+        m_operationHistory, *map, m_objectRegistry, externalResult);
+      return mcp::McpBridgeResponse::success(request.id, std::move(externalResult));
     }
     return mcp::McpBridgeResponse::success(request.id, result.result);
   }

@@ -364,7 +364,10 @@ std::optional<vm::vec2d> mcpVec2FromJsonValue(
 }
 
 std::optional<std::vector<vm::vec2d>> points2DFromJson(
-  const QJsonObject& params, const QString& key, QString& error)
+  const QJsonObject& params,
+  const QString& key,
+  const size_t minPointCount,
+  QString& error)
 {
   const auto value = params.value(key);
   if (!value.isArray())
@@ -374,9 +377,9 @@ std::optional<std::vector<vm::vec2d>> points2DFromJson(
   }
 
   const auto array = value.toArray();
-  if (array.size() < 3)
+  if (static_cast<size_t>(array.size()) < minPointCount)
   {
-    error = QString{"%1 must contain at least three points"}.arg(key);
+    error = QString{"%1 must contain at least %2 points"}.arg(key).arg(minPointCount);
     return std::nullopt;
   }
 
@@ -392,6 +395,12 @@ std::optional<std::vector<vm::vec2d>> points2DFromJson(
     result.push_back(*point);
   }
   return result;
+}
+
+std::optional<std::vector<vm::vec2d>> points2DFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  return points2DFromJson(params, key, 3u, error);
 }
 
 std::optional<vm::vec3d> mcpVec3FromJsonValue(
@@ -2011,6 +2020,167 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& p
   return operations;
 }
 
+std::optional<std::vector<std::vector<vm::vec2d>>> pathRibbonPolygonsFromParams(
+  const QJsonObject& params, const double grid, QString& error)
+{
+  const auto points = points2DFromJson(params, "points2d", 2u, error);
+  if (!points)
+  {
+    return std::nullopt;
+  }
+
+  if (points->size() < 2)
+  {
+    error = "points2d must contain at least two centerline points";
+    return std::nullopt;
+  }
+
+  const auto width = optionalDouble(params, "width", 128.0);
+  if (!finitePositive(width))
+  {
+    error = "width must be greater than zero";
+    return std::nullopt;
+  }
+
+  auto snappedPoints = snapPointsToGrid(*points, grid);
+  auto normals = std::vector<vm::vec2d>{};
+  normals.reserve(snappedPoints.size() - 1);
+  for (size_t i = 0; i + 1 < snappedPoints.size(); ++i)
+  {
+    const auto direction = snappedPoints[i + 1] - snappedPoints[i];
+    if (vm::is_zero(direction, GeometryEpsilon))
+    {
+      error = QString{"points2d[%1] and points2d[%2] collapse after snapping"}.arg(i).arg(
+        i + 1);
+      return std::nullopt;
+    }
+
+    const auto tangent = vm::normalize(direction);
+    normals.push_back(vm::vec2d{-tangent.y(), tangent.x()});
+  }
+
+  auto polygons = std::vector<std::vector<vm::vec2d>>{};
+  polygons.reserve(snappedPoints.size() - 1);
+  const auto halfWidth = snapToGrid(width * 0.5, grid);
+  const auto miterLimit = optionalDouble(params, "miterLimit", 4.0);
+  if (!finitePositive(halfWidth))
+  {
+    error = "width snaps to zero";
+    return std::nullopt;
+  }
+  if (!finitePositive(miterLimit))
+  {
+    error = "miterLimit must be greater than zero";
+    return std::nullopt;
+  }
+
+  auto leftOffsets = std::vector<vm::vec2d>{};
+  auto rightOffsets = std::vector<vm::vec2d>{};
+  leftOffsets.reserve(snappedPoints.size());
+  rightOffsets.reserve(snappedPoints.size());
+  for (size_t i = 0; i < snappedPoints.size(); ++i)
+  {
+    auto offset = vm::vec2d{};
+    if (i == 0)
+    {
+      offset = normals.front() * halfWidth;
+    }
+    else if (i + 1 == snappedPoints.size())
+    {
+      offset = normals.back() * halfWidth;
+    }
+    else
+    {
+      const auto previousNormal = normals[i - 1];
+      const auto nextNormal = normals[i];
+      auto miter = previousNormal + nextNormal;
+      if (vm::is_zero(miter, GeometryEpsilon))
+      {
+        error = QString{"path_ribbon turn at points2d[%1] is too sharp"}.arg(i);
+        return std::nullopt;
+      }
+      miter = vm::normalize(miter);
+      const auto denominator =
+        miter.x() * previousNormal.x() + miter.y() * previousNormal.y();
+      if (std::abs(denominator) <= GeometryEpsilon)
+      {
+        error = QString{"path_ribbon turn at points2d[%1] is too sharp"}.arg(i);
+        return std::nullopt;
+      }
+      const auto miterLength = halfWidth / denominator;
+      if (std::abs(miterLength) > halfWidth * miterLimit)
+      {
+        error = QString{"path_ribbon turn at points2d[%1] exceeds miterLimit"}.arg(i);
+        return std::nullopt;
+      }
+      offset = miter * miterLength;
+    }
+    leftOffsets.push_back(snapToGrid(snappedPoints[i] + offset, grid));
+    rightOffsets.push_back(snapToGrid(snappedPoints[i] - offset, grid));
+  }
+
+  for (size_t i = 0; i + 1 < snappedPoints.size(); ++i)
+  {
+    auto polygon = std::vector<vm::vec2d>{
+      leftOffsets[i],
+      leftOffsets[i + 1],
+      rightOffsets[i + 1],
+      rightOffsets[i],
+    };
+
+    polygon = snapPointsToGrid(std::move(polygon), grid);
+    if (!isStrictlyConvexPolygon(polygon))
+    {
+      error = QString{"path_ribbon segment %1 is not a convex brush footprint"}.arg(i);
+      return std::nullopt;
+    }
+    polygons.push_back(std::move(polygon));
+  }
+
+  if (polygons.empty())
+  {
+    error = "path_ribbon generated no segments";
+    return std::nullopt;
+  }
+  return polygons;
+}
+
+std::vector<mdl::Node*> createPathRibbonNodes(
+  const mdl::BrushBuilder& builder,
+  const QJsonObject& operation,
+  const double grid,
+  const std::string& material,
+  QString& error)
+{
+  const auto polygons = pathRibbonPolygonsFromParams(operation, grid, error);
+  if (!polygons)
+  {
+    return {};
+  }
+
+  const auto minZ = snapToGrid(optionalDouble(operation, "minZ", 0.0), grid);
+  const auto maxZ = snapToGrid(optionalDouble(operation, "maxZ", 16.0), grid);
+  if (!(std::isfinite(minZ) && std::isfinite(maxZ)) || minZ >= maxZ)
+  {
+    error = "minZ must be smaller than maxZ";
+    return {};
+  }
+
+  auto result = std::vector<mdl::Node*>{};
+  result.reserve(polygons->size());
+  for (const auto& polygon : *polygons)
+  {
+    auto brush = createPrismBrush(builder, polygon, minZ, maxZ, material, error);
+    if (!brush)
+    {
+      deleteNodes(result);
+      return {};
+    }
+    result.push_back(new mdl::BrushNode{std::move(*brush)});
+  }
+  return result;
+}
+
 bool validateCurvedCorridorParams(const QJsonObject& params, QString& error)
 {
   const auto innerRadius = optionalDouble(params, "innerRadius", 128.0);
@@ -2109,6 +2279,11 @@ std::vector<mdl::Node*> compileBatchOperation(
       result.insert(result.end(), childNodes.begin(), childNodes.end());
     }
     return result;
+  }
+
+  if (type == "path_ribbon")
+  {
+    return createPathRibbonNodes(builder, operation, grid, material, error);
   }
 
   if (type == "box" || type == "cover")

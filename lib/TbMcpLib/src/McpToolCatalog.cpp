@@ -197,6 +197,8 @@ QJsonObject blockoutBatchOperationSchema()
      R"({"type":"curved_corridor","center":[0,0,0],"innerRadius":128,)"
      R"("outerRadius":256,"startAngle":0,"turnDegrees":90,"height":128,)"
      R"("segments":8,"wallThickness":16,"caps":"both"}; )"
+     R"({"type":"path_ribbon","points2d":[[0,0],[512,0],[768,256]],)"
+     R"("width":160,"minZ":0,"maxZ":16}; )"
      R"({"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}; )"
      R"({"type":"ramp","min":[0,0,0],"max":[256,128,64],"axis":"x"}; )"
      R"({"type":"doorway","min":[0,0,0],"max":[256,16,128],)"
@@ -208,7 +210,8 @@ QJsonObject blockoutBatchOperationSchema()
        {"type",
         stringProperty(
           "Operation type: box, prism, polyhedron, cylinder_sector, room, corridor, "
-          "curved_corridor, stairs, ramp, doorway, cover, or sky_shell.")},
+          "curved_corridor, path_ribbon, stairs, ramp, doorway, cover, or "
+          "sky_shell.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"material", stringProperty("Per-operation material override.")},
@@ -216,6 +219,10 @@ QJsonObject blockoutBatchOperationSchema()
        {"points", arrayProperty("Convex polyhedron points as [x,y,z].")},
        {"minZ", numberProperty("Minimum Z for prism or cylinder_sector.")},
        {"maxZ", numberProperty("Maximum Z for prism or cylinder_sector.")},
+       {"width", numberProperty("Path ribbon width in map units.")},
+       {"miterLimit",
+        numberProperty(
+          "Maximum path_ribbon corner miter length as a half-width multiple.")},
        {"center", vec3Property("Center for circular operations.")},
        {"innerRadius",
         numberProperty("Inner radius for cylinder_sector/curved_corridor.")},
@@ -1614,9 +1621,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"operations",
            arrayProperty(
              "Array of blockout operations. Supported types include box, prism, "
-             "polyhedron, cylinder_sector, room, corridor, curved_corridor, stairs, "
-             "ramp, doorway, cover, and sky_shell. Each item must be an object with "
-             "a type field; use tb_tools_search(detail=schema, query="
+             "polyhedron, cylinder_sector, room, corridor, curved_corridor, "
+             "path_ribbon, stairs, ramp, doorway, cover, and sky_shell. Each item "
+             "must be an object with a type field; use tb_tools_search(detail=schema, "
+             "query="
              "\"blockout_create_batch operations\") for examples.",
              blockoutBatchOperationSchema())},
         },
