@@ -92,6 +92,12 @@ McpBridgeToolResult textureApplyByFilterResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult textureApplyByFilterForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult textureReplaceResult(
   AppController& appController,
   const QString& toolName,

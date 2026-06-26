@@ -25,6 +25,7 @@
 
 #include "../../src/mcp/McpBridgeServerTools.h"
 #include "Result.h"
+#include "mdl/BrushFace.h"
 #include "gl/GlManager.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
@@ -1505,6 +1506,83 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
     registry.liveStateJson(map, QStringList{directStableId}, false);
   CHECK(!staleState.value("valid").toBool());
   CHECK(staleState.value("staleObjectCount").toInt() == 1);
+}
+
+TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  const auto createResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+           {"material", "source_mat"},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{128, 0, 0}},
+           {"max", QJsonArray{192, 64, 16}},
+           {"material", "source_mat"},
+         },
+       }},
+      {"detail", "ids"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(createResponse.ok);
+
+  const auto response = textureApplyByFilterForMapResult(
+    map,
+    "texture_apply_by_filter",
+    QJsonObject{
+      {"material", "target_mat"},
+      {"type", "brush"},
+      {"min", QJsonArray{-16, -16, -16}},
+      {"max", QJsonArray{80, 80, 32}},
+      {"boundsMode", "intersects"},
+    },
+    history,
+    nextOperationIndex);
+
+  const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+  INFO(error);
+  REQUIRE(response.ok);
+  CHECK(response.result.value("material").toString() == "target_mat");
+  CHECK(response.result.value("brushCount").toInt() == 1);
+  CHECK(response.result.value("faceCount").toInt() == 6);
+  CHECK(response.result.value("changedObjectCount").toInt() == 1);
+  CHECK(response.result.value("changedObjectIds").toArray().size() == 1);
+
+  const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(objectIds.size() == 2);
+  const auto firstBrushPath =
+    McpObjectRegistry::parseLegacyObjectId(objectIds[0].toString());
+  REQUIRE(firstBrushPath);
+  auto* firstBrushNode =
+    dynamic_cast<mdl::BrushNode*>(map.worldNode().resolvePath(*firstBrushPath));
+  REQUIRE(firstBrushNode != nullptr);
+  for (const auto& face : firstBrushNode->brush().faces())
+  {
+    CHECK(face.attributes().materialName() == "target_mat");
+  }
 }
 
 TEST_CASE("McpBridgeServer deletes operations without long object id lists")

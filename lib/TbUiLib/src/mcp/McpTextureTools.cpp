@@ -523,8 +523,14 @@ QJsonArray changedBrushIds(
   const std::vector<mdl::BrushFaceHandle>& handles, const mdl::WorldNode& worldNode)
 {
   auto result = QJsonArray{};
+  auto nodes = std::vector<const mdl::Node*>{};
   for (const auto* node : mdl::toNodes(handles))
   {
+    if (std::find(std::begin(nodes), std::end(nodes), node) != std::end(nodes))
+    {
+      continue;
+    }
+    nodes.push_back(node);
     result.push_back(nodePathId(*node, worldNode));
   }
   return result;
@@ -587,20 +593,31 @@ McpBridgeToolResult textureApplyByFilterResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex)
 {
-  const auto material = params.value("material").toString().trimmed();
-  if (material.isEmpty())
-  {
-    return invalidParamsFailure("texture_apply_by_filter requires material");
-  }
-
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
   {
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return textureApplyByFilterForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult textureApplyByFilterForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto material = params.value("material").toString().trimmed();
+  if (material.isEmpty())
+  {
+    return invalidParamsFailure("texture_apply_by_filter requires material");
+  }
+
   auto filterParams = params;
+  filterParams.remove("material");
   if (filterParams.value("type").toString().trimmed().isEmpty())
   {
     filterParams.insert("type", "brush");
