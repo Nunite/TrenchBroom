@@ -27,6 +27,7 @@
 #include "mdl/Map_Selection.h"
 #include "mdl/Node.h"
 #include "mdl/WorldNode.h"
+#include "ui/mcp/McpObjectRegistry.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
@@ -126,6 +127,8 @@ QJsonObject operationStaleDiagnosticJson(
   auto result = QJsonObject{
     {"liveObjectCount", liveObjectCount},
     {"staleObjectCount", staleObjectCount},
+    {"mismatchCount", 0},
+    {"valid", !operation.undone && staleObjectCount == 0},
   };
   if (operation.undone)
   {
@@ -167,7 +170,9 @@ QJsonObject operationLiveStateJson(mdl::Map& map, const McpOperationRecord& oper
 }
 
 QJsonObject operationRecordJson(
-  mdl::Map& map, const McpOperationRecord& operation, const bool includeLiveState)
+  mdl::Map& map,
+  const McpOperationRecord& operation,
+  const bool includeLiveState)
 {
   auto result = operationRecordJson(operation);
   if (includeLiveState)
@@ -177,8 +182,25 @@ QJsonObject operationRecordJson(
     {
       result.insert(it.key(), it.value());
     }
-    result.insert(
-      "valid", !operation.undone && liveState.value("staleObjectCount").toInt() == 0);
+  }
+  return result;
+}
+
+QJsonObject operationRecordJson(
+  mdl::Map& map,
+  const McpOperationRecord& operation,
+  const McpObjectRegistry& objectRegistry,
+  const bool includeLiveState)
+{
+  auto result = operationRecordJson(operation);
+  if (includeLiveState)
+  {
+    const auto liveState =
+      objectRegistry.liveStateJson(map, operation.changedObjectIds, operation.undone);
+    for (auto it = liveState.begin(); it != liveState.end(); ++it)
+    {
+      result.insert(it.key(), it.value());
+    }
   }
   return result;
 }
@@ -196,6 +218,20 @@ QJsonArray operationHistoryJson(
   return result;
 }
 
+QJsonArray operationHistoryJson(
+  mdl::Map& map,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry,
+  const bool includeLiveState)
+{
+  auto result = QJsonArray{};
+  for (const auto& operation : history)
+  {
+    result.push_back(operationRecordJson(map, operation, objectRegistry, includeLiveState));
+  }
+  return result;
+}
+
 } // namespace
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history)
@@ -203,6 +239,25 @@ McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& his
   return McpBridgeToolResult::success(QJsonObject{
     {"operations", operationHistoryJson(history)},
     {"count", static_cast<int>(history.size())},
+  });
+}
+
+McpBridgeToolResult historyListResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return historyListResult(history);
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"operations",
+     operationHistoryJson(mapWindow->document().map(), history, objectRegistry, true)},
+    {"count", static_cast<int>(history.size())},
+    {"liveStateIncluded", true},
   });
 }
 
@@ -271,6 +326,43 @@ McpBridgeToolResult operationInspectResult(
 McpBridgeToolResult operationInspectResult(
   AppController& appController,
   const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry)
+{
+  const auto operationId = params.value("operationId").toString();
+  if (operationId.isEmpty())
+  {
+    return invalidParamsFailure("operation_inspect requires operationId");
+  }
+
+  const auto operation = findOperationCopy(history, operationId);
+  if (!operation)
+  {
+    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+  }
+
+  const auto detail = params.value("detail").toString("summary").toLower();
+  auto result = operationRecordDetailJson(
+    *operation,
+    detail == "full"  ? "full"
+    : detail == "ids" ? "ids"
+                      : "summary");
+  if (auto* mapWindow = appController.mapWindowManager().topMapWindow())
+  {
+    const auto liveState =
+      objectRegistry.liveStateJson(
+        mapWindow->document().map(), operation->changedObjectIds, operation->undone);
+    for (auto it = liveState.begin(); it != liveState.end(); ++it)
+    {
+      result.insert(it.key(), it.value());
+    }
+  }
+  return McpBridgeToolResult::success(result);
+}
+
+McpBridgeToolResult operationInspectResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
   const QJsonObject& params)
 {
   const auto operationId = params.value("operationId").toString();
@@ -299,8 +391,84 @@ McpBridgeToolResult operationInspectResult(
     {
       result.insert(it.key(), it.value());
     }
+  }
+  return McpBridgeToolResult::success(result);
+}
+
+McpBridgeToolResult operationSelectResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto operationId = params.value("operationId").toString();
+  if (operationId.isEmpty())
+  {
+    return invalidParamsFailure("operation_select requires operationId");
+  }
+
+  const auto operation = findOperationCopy(history, operationId);
+  if (!operation)
+  {
+    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+  }
+
+  auto& map = mapWindow->document().map();
+  auto diagnostic =
+    objectRegistry.liveStateJson(map, operation->changedObjectIds, operation->undone);
+  auto nodes = std::vector<mdl::Node*>{};
+  for (const auto& value : operation->changedObjectIds)
+  {
+    const auto resolved = objectRegistry.resolveExternalId(map, value);
+    if (!resolved.ok)
+    {
+      continue;
+    }
+    const auto path = parseNodePathId(resolved.legacyPathId);
+    if (path)
+    {
+      if (auto* node = map.worldNode().resolvePath(*path))
+      {
+        if (map.editorContext().selectable(*node))
+        {
+          nodes.push_back(node);
+        }
+      }
+    }
+  }
+
+  mdl::deselectAll(map);
+  if (!nodes.empty())
+  {
+    mdl::selectNodes(map, nodes);
+  }
+
+  auto result = QJsonObject{
+    {"operationId", operationId},
+    {"selectedCount", static_cast<int>(nodes.size())},
+  };
+  for (auto it = diagnostic.begin(); it != diagnostic.end(); ++it)
+  {
+    result.insert(it.key(), it.value());
+  }
+  if (nodes.empty() && !operation->changedObjectIds.empty())
+  {
     result.insert(
-      "valid", !operation->undone && liveState.value("staleObjectCount").toInt() == 0);
+      "diagnostic",
+      "No live selectable objects were found for this operation in the active document.");
+    if (!result.contains("suggestedAction"))
+    {
+      result.insert(
+        "suggestedAction",
+        "Use selection_filter/selection_by_bounds or operation_inspect(detail=full) to "
+        "re-identify current objects.");
+    }
   }
   return McpBridgeToolResult::success(result);
 }
@@ -380,6 +548,52 @@ McpBridgeToolResult operationSelectResult(
 McpBridgeToolResult operationValidateResult(
   AppController& appController,
   const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto operationId = params.value("operationId").toString();
+  if (operationId.isEmpty())
+  {
+    return invalidParamsFailure("operation_validate requires operationId");
+  }
+
+  const auto operation = findOperationCopy(history, operationId);
+  if (!operation)
+  {
+    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+  }
+
+  const auto liveState = objectRegistry.liveStateJson(
+    mapWindow->document().map(), operation->changedObjectIds, operation->undone);
+  const auto liveObjectCount = liveState.value("liveObjectCount").toInt();
+  const auto staleObjectCount = liveState.value("staleObjectCount").toInt();
+  const auto mismatchCount = liveState.value("mismatchCount").toInt();
+
+  auto result = QJsonObject{
+    {"operationId", operationId},
+    {"valid", liveState.value("valid").toBool(false)},
+    {"undone", operation->undone},
+    {"changedObjectCount", operation->changedObjectIds.size()},
+    {"liveObjectCount", liveObjectCount},
+    {"staleObjectCount", staleObjectCount},
+    {"mismatchCount", mismatchCount},
+  };
+  for (auto it = liveState.begin(); it != liveState.end(); ++it)
+  {
+    result.insert(it.key(), it.value());
+  }
+  return McpBridgeToolResult::success(result);
+}
+
+McpBridgeToolResult operationValidateResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
   const QJsonObject& params)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -406,11 +620,12 @@ McpBridgeToolResult operationValidateResult(
 
   auto result = QJsonObject{
     {"operationId", operationId},
-    {"valid", !operation->undone && staleObjectCount == 0},
+    {"valid", liveState.value("valid").toBool(false)},
     {"undone", operation->undone},
     {"changedObjectCount", operation->changedObjectIds.size()},
     {"liveObjectCount", liveObjectCount},
     {"staleObjectCount", staleObjectCount},
+    {"mismatchCount", 0},
   };
   for (auto it = liveState.begin(); it != liveState.end(); ++it)
   {

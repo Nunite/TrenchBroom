@@ -112,7 +112,7 @@ scripts\mcp-config.ps1 -Print
 
 ## KZ 平台链工作流
 
-CS1.6 KZ route 设计不要默认生成一串大 box。平台形状应表达玩家意图：起跳边、落点窗口、下一跳方向和容错。当前推荐流程：
+这里使用的是通用 route/metadata/shape MCP 工具；KZ 只是 Agent skill 和用户语境，不是 TrenchBroom MCP 内部模块。CS1.6 KZ route 设计不要默认生成一串大 box。平台形状应表达玩家意图：起跳边、落点窗口、下一跳方向和容错。当前推荐流程：
 
 1. `shape_library_list`：读取支持的 footprint vocabulary，例如 `diamond`、`trapezoid`、`chamfered_rect`、`half_hex`、`arrowhead`。
 2. `brush_create_polygon_batch`：一次提交多个凸多边形平台。每个平台传 `points2d`、`minZ`、`maxZ`、可选 `material` 和 `metadata`。
@@ -125,7 +125,7 @@ CS1.6 KZ route 设计不要默认生成一串大 box。平台形状应表达玩�
 
 ```json
 {
-  "transactionName": "MCP: KZ intro platforms",
+  "transactionName": "MCP: Route intro platforms",
   "grid": 16,
   "detail": "ids",
   "brushes": [

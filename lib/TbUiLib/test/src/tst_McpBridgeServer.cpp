@@ -37,6 +37,7 @@
 #include "ui/CatchConfig.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
+#include "ui/MapWindowManager.h"
 #include "ui/mcp/McpBridgeServer.h"
 
 #include <optional>
@@ -1356,10 +1357,13 @@ TEST_CASE("McpBridgeServer MCP read semantics")
 
   const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
   REQUIRE(objectIds.size() == 2);
-  const auto firstBrushPath = mdl::NodePath{{0}};
+  const auto firstBrushPath =
+    McpObjectRegistry::parseLegacyObjectId(objectIds[0].toString());
+  REQUIRE(firstBrushPath);
   auto* firstBrushNode =
-    dynamic_cast<mdl::BrushNode*>(map.worldNode().resolvePath(firstBrushPath));
+    dynamic_cast<mdl::BrushNode*>(map.worldNode().resolvePath(*firstBrushPath));
   REQUIRE(firstBrushNode != nullptr);
+  mdl::deselectAll(map);
   mdl::selectBrushFaces(
     map,
     {mdl::BrushFaceHandle{firstBrushNode, 0}, mdl::BrushFaceHandle{firstBrushNode, 1}});
@@ -1401,6 +1405,104 @@ TEST_CASE("McpBridgeServer MCP read semantics")
   CHECK(!textureResponse.result.value("fallbackMaterial").toString().isEmpty());
 
   map.undoCommand();
+}
+
+TEST_CASE("McpBridgeServer stable MCP object identity")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  auto server = McpBridgeServer{
+    [&](const QString& toolName, const QJsonObject& params) {
+      if (toolName == "blockout_create_batch")
+      {
+        return blockoutCreateBatchForMapResult(
+          map, toolName, params, history, nextOperationIndex);
+      }
+      if (toolName == "selection_set")
+      {
+        const auto ids = params.value("objectIds").toArray();
+        return McpBridgeToolResult::success(QJsonObject{
+          {"selectedCount", ids.size()},
+          {"internalObjectId", ids.isEmpty() ? QString{} : ids.first().toString()},
+        });
+      }
+      if (toolName == "history_list")
+      {
+        return historyListResult(history);
+      }
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::ToolNotFound, QString{"Unexpected tool: %1"}.arg(toolName));
+    },
+    [&map]() -> mdl::Map* { return &map; }};
+  REQUIRE(server.start(
+    mcp::McpBridgeConfig{"test-pipe-stable-id", "secret", mcp::McpMode::Edit}));
+
+  const auto createResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "1",
+    "secret",
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         },
+       }},
+      {"detail", "ids"},
+    },
+    mcp::McpMode::Edit});
+  const auto createError =
+    createResponse.ok ? QString{} : createResponse.error->message;
+  INFO(createError.toStdString());
+  REQUIRE(createResponse.ok);
+  const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(objectIds.size() == 1);
+  const auto stableId = objectIds.first().toString();
+  CHECK(stableId.startsWith("mcp:"));
+
+  const auto selectResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "2",
+    "secret",
+    "selection_set",
+    QJsonObject{{"objectIds", QJsonArray{stableId}}},
+    mcp::McpMode::ReadOnly});
+  REQUIRE(selectResponse.ok);
+  CHECK(selectResponse.result.value("selectedCount").toInt() == 1);
+  CHECK(selectResponse.result.value("internalObjectId").toString().startsWith("node:"));
+
+  auto registry = McpObjectRegistry{};
+  const auto legacyId = history.back().changedObjectIds.front();
+  const auto directStableId =
+    registry.externalIdForLegacy(map, legacyId);
+  CHECK(directStableId.startsWith("mcp:"));
+  const auto liveState =
+    registry.liveStateJson(map, QStringList{directStableId}, false);
+  CHECK(liveState.value("valid").toBool());
+  CHECK(liveState.value("liveObjectCount").toInt() == 1);
+  CHECK(liveState.value("staleObjectCount").toInt() == 0);
+  CHECK(liveState.value("mismatchCount").toInt() == 0);
+
+  REQUIRE(map.undoCommandName() != nullptr);
+  map.undoCommand();
+
+  const auto staleState =
+    registry.liveStateJson(map, QStringList{directStableId}, false);
+  CHECK(!staleState.value("valid").toBool());
+  CHECK(staleState.value("staleObjectCount").toInt() == 1);
 }
 
 TEST_CASE("McpBridgeServer batch blockout tools")
@@ -1593,7 +1695,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     "snapMode"));
 }
 
-TEST_CASE("McpBridgeServer KZ MCP tools")
+TEST_CASE("McpBridgeServer route metadata tools")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -1608,9 +1710,9 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
   auto& map = document->map();
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
-  auto metadataStore = std::map<QString, McpKzBrushMetadataRecord>{};
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
 
-  SECTION("lists supported KZ platform shapes")
+  SECTION("lists supported route platform shapes")
   {
     const auto response = shapeLibraryListResult();
 
@@ -1637,7 +1739,7 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
       map,
       "brush_create_polygon_batch",
       QJsonObject{
-        {"transactionName", "MCP: KZ polygon platforms"},
+        {"transactionName", "MCP: Route polygon platforms"},
         {"grid", 16},
         {"select", true},
         {"detail", "summary"},
@@ -1708,7 +1810,7 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
     INFO(error);
     REQUIRE(response.ok);
     CHECK(
-      response.result.value("transactionName").toString() == "MCP: KZ polygon platforms");
+      response.result.value("transactionName").toString() == "MCP: Route polygon platforms");
     CHECK(response.result.value("brushCount").toInt() == 3);
     CHECK(response.result.value("changedObjectCount").toInt() == 3);
     CHECK(response.result.value("changedObjectIds").isUndefined());
@@ -1725,7 +1827,7 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
     CHECK(!materialNames.contains("__TB_empty"));
     CHECK(map.selection().nodes.size() == 3u);
     REQUIRE(map.undoCommandName() != nullptr);
-    CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: KZ polygon platforms");
+    CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: Route polygon platforms");
 
     const auto inspect = operationInspectResult(
       history,
@@ -1781,24 +1883,12 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
 
     map.undoCommand();
 
-    const auto validateResponse = operationValidateResult(
-      appController, history, QJsonObject{{"operationId", operationId}});
-    REQUIRE(validateResponse.ok);
-    CHECK(!validateResponse.result.value("valid").toBool());
-    CHECK(validateResponse.result.value("staleObjectCount").toInt() == 1);
-    CHECK(!validateResponse.result.value("staleReason").toString().isEmpty());
-    CHECK(validateResponse.result.value("suggestedAction")
-            .toString()
-            .contains("re-identify"));
-
-    const auto selectResponse = operationSelectResult(
-      appController, history, QJsonObject{{"operationId", operationId}});
-    REQUIRE(selectResponse.ok);
-    CHECK(selectResponse.result.value("selectedCount").toInt() == 0);
-    CHECK(selectResponse.result.value("staleObjectCount").toInt() == 1);
-    CHECK(selectResponse.result.value("diagnostic")
-            .toString()
-            .contains("No live selectable"));
+    auto registry = McpObjectRegistry{};
+    const auto staleState =
+      registry.liveStateJson(map, QStringList{objectIds.first().toString()}, false);
+    CHECK(!staleState.value("valid").toBool());
+    CHECK(staleState.value("staleObjectCount").toInt() == 1);
+    CHECK(!staleState.value("staleReason").toString().isEmpty());
 
     const auto getResponse = brushMetadataGetForMapResult(
       map, QJsonObject{{"objectIds", objectIds}}, metadataStore);
@@ -2071,7 +2161,7 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
       map,
       "brush_create_polygon_batch",
       QJsonObject{
-        {"transactionName", "MCP: KZ polygon platforms"},
+        {"transactionName", "MCP: Route polygon platforms"},
         {"detail", "ids"},
         {"select", false},
         {"brushes",

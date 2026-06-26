@@ -1,11 +1,11 @@
-# KZ MCP Tool Development
+# Route Metadata MCP Tool Development
 
-This document records the KZ-adjacent MCP tool work in small, testable stages. The goal is to keep the toolset focused on mapper control: shape, intent, metadata, and geometry facts. It should not drift into a pile of fixed bhop prefabs or a static KZ difficulty module inside the map editor.
+This document records the route/metadata MCP tool work in small, testable stages. The goal is to keep the toolset focused on mapper control: shape, intent, metadata, and geometry facts. KZ and other game-specific difficulty semantics belong in Agent skills and user feedback loops, not in a static TrenchBroom MCP module.
 
 ## Principles
 
 - TrenchBroom remains the source of truth. MCP tools do not write `.map` files directly.
-- KZ tools should expose local mapper intent, not whole-map generation.
+- Route tools should expose local mapper intent, not whole-map generation.
 - Prefer shape vocabulary and batch polygon creation over repeated box spam.
 - Prefer geometry facts and warnings over claims that a route is playable in CS1.6.
 - Difficulty labels such as hard/god belong in Agent skills and user feedback loops, not in TrenchBroom MCP static validators.
@@ -14,7 +14,7 @@ This document records the KZ-adjacent MCP tool work in small, testable stages. T
 
 ## Stage 1 Scope
 
-Stage 1 implements the lowest-risk tools from `KZ_MCP_TOOL_REQUIREMENTS.md`:
+Stage 1 implements the lowest-risk route/metadata tools from `KZ_MCP_TOOL_REQUIREMENTS.md`:
 
 - `shape_library_list`
 - `brush_create_polygon_batch`
@@ -35,7 +35,7 @@ Deferred from Stage 1:
 
 ### `shape_library_list`
 
-Read-only. Returns the first KZ footprint vocabulary:
+Read-only. Returns the first generic footprint vocabulary:
 
 - `box`
 - `diamond`
@@ -68,7 +68,7 @@ Edit mode only. Input:
   ],
   "grid": 16,
   "select": true,
-  "transactionName": "MCP: KZ polygon platforms",
+  "transactionName": "MCP: Route polygon platforms",
   "detail": "summary"
 }
 ```
@@ -155,7 +155,7 @@ The tool uses `outgoingDirection` or `incomingDirection` metadata when present. 
 2. Call `brush_create_polygon_batch(detail=ids)` to create the platforms in one transaction.
 3. Use metadata in the batch call, or call `brush_metadata_set` afterward.
 4. Use `selection_by_metadata(routeId=..., select=true)` for route edits.
-5. Call `route_geometry_analyze_chain` with ordered ids when the Agent needs static route facts. Use KZ/CS1.6 skill context and user feedback to judge difficulty.
+5. Call `route_geometry_analyze_chain` with ordered ids when the Agent needs static route facts. Use game-specific skills, such as KZ/CS1.6, and user feedback to judge difficulty.
 6. Use `history_undo_mcp` for rollback if the batch does not match the intended route.
 
 ## Validation Notes
@@ -179,7 +179,7 @@ Focused tests:
 ```powershell
 build-release-codex\lib\TbMcpLib\test\TbMcpLibTest.exe "McpToolCatalog"
 build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "McpBridgeServer"
-build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "McpBridgeServer KZ MCP tools"
+build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "McpBridgeServer route metadata tools"
 ```
 
 Runtime smoke:
@@ -190,7 +190,7 @@ scripts\mcp-kz-smoke.ps1 -Launch -RawJson
 
 The runtime smoke starts the Release TrenchBroom executable with
 `build-release-codex\app\TrenchBroom\map_test\unnamed.map`, connects to the local
-HTTP MCP endpoint, creates a two-platform KZ polygon chain with metadata, reads
+HTTP MCP endpoint, creates a two-platform polygon chain with metadata, reads
 the metadata back, selects by `routeId`, runs `route_geometry_analyze_chain`, and
 then uses `history_undo_mcp` to remove the smoke brushes. It verifies that the
 map dirty state returns to its pre-smoke value.

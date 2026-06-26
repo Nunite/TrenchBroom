@@ -143,22 +143,22 @@ QJsonObject stringObjectProperty(const QString& description)
   };
 }
 
-QJsonObject kzMetadataSchema()
+QJsonObject routeMetadataSchema()
 {
   return QJsonObject{
     {"type", "object"},
     {"description",
-     "Session-level KZ route metadata. Known keys include routeId, intent, "
+     "Session-level route/object metadata. Known keys include routeId, intent, "
      "difficulty, movementType, takeoffEdge, landingWindow, incomingDirection, and "
      "outgoingDirection. Custom session-only keys are allowed for agent probes."},
     {"additionalProperties", true},
     {"properties",
      QJsonObject{
-       {"routeId", stringProperty("Route or chain id, e.g. kz_intro_bhop.")},
+       {"routeId", stringProperty("Route or chain id, e.g. intro_route_a.")},
        {"intent",
         stringProperty("Mapper intent, e.g. redirect_right or precision_land.")},
        {"difficulty", stringProperty("Difficulty label such as easy, average, hard.")},
-       {"movementType", stringProperty("KZ movement type such as bhop, LJ, BJ, SBJ.")},
+       {"movementType", stringProperty("Movement or route label such as bhop or ramp.")},
        {"takeoffEdge", stringProperty("Semantic takeoff edge id or label.")},
        {"landingWindow", stringProperty("Semantic landing window id or label.")},
        {"incomingDirection", vec3Property("Incoming route direction vector.")},
@@ -175,7 +175,7 @@ QJsonObject polygonBatchItemSchema()
       {"minZ", numberProperty("Minimum platform Z in map units.")},
       {"maxZ", numberProperty("Maximum platform Z in map units.")},
       {"material", stringProperty("Optional per-platform material override.")},
-      {"metadata", kzMetadataSchema()},
+      {"metadata", routeMetadataSchema()},
     },
     {"points2d", "minZ", "maxZ"});
 }
@@ -689,7 +689,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "shape_library_list",
-      "List KZ platform footprint grammars for route-aware polygon platforms.",
+      "List generic convex footprint grammars for route-aware polygon platforms.",
       McpMode::ReadOnly,
       false,
       true,
@@ -776,7 +776,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     {
       "brush_create_polygon_batch",
       "Create many convex prism platforms from 2D polygons in one transaction. "
-      "Prefer this for KZ diamond, trapezoid, chamfered, and route-guiding platforms "
+      "Prefer this for diamond, trapezoid, chamfered, and route-guiding platforms "
       "instead of box-only chains.",
       McpMode::Edit,
       true,
@@ -1763,20 +1763,20 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "brush_metadata_set",
-      "Attach session-level KZ route metadata to live brush object ids.",
+      "Attach session-level route/object metadata to live brush object ids.",
       McpMode::Edit,
       false,
       true,
       objectSchema(
         {
           {"objectIds", arrayProperty("Brush object ids to annotate.")},
-          {"metadata", kzMetadataSchema()},
+          {"metadata", routeMetadataSchema()},
         },
         {"objectIds", "metadata"}),
     },
     {
       "brush_metadata_get",
-      "Read session-level KZ route metadata for brush object ids.",
+      "Read session-level route/object metadata for brush object ids.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1788,7 +1788,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "selection_by_metadata",
-      "Find or select brushes by session-level KZ route metadata.",
+      "Find or select brushes by session-level route/object metadata.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1797,7 +1797,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"intent", stringProperty("Optional intent to match exactly.")},
         {"difficulty", stringProperty("Optional difficulty to match exactly.")},
         {"movementType", stringProperty("Optional movement type to match exactly.")},
-        {"metadata", kzMetadataSchema()},
+        {"metadata", routeMetadataSchema()},
         {"select", boolProperty("Replace selection with matched live brush nodes.")},
         {"limit", integerProperty("Maximum result count, defaults to 100.")},
       }),
@@ -2011,21 +2011,75 @@ int profileRank(const McpToolProfile profile)
 
 bool visibleInModelingProfile(const McpToolDefinition& tool)
 {
-  static constexpr auto HiddenToolNames = std::array{
-    "actions_list",
-    "action_execute",
-    "overlay_set",
-    "overlay_clear",
-    "viewport_focus",
-    "viewport_clear_marks",
-    "viewport_capture_current",
-    "viewport_capture_3d",
-    "viewport_capture_2d",
-    "kz_distance_analyze_chain",
+  static constexpr auto ToolNames = std::array{
+    "tb_status",
+    "tb_doctor",
+    "tb_tools_search",
+    "map_snapshot",
+    "map_search",
+    "selection_get",
+    "selection_set",
+    "selection_filter",
+    "selection_by_bounds",
+    "selection_grow",
+    "operation_inspect",
+    "operation_select",
+    "operation_validate",
+    "history_list",
+    "history_undo_mcp",
+    "history_redo_mcp",
+    "brush_types_list",
+    "brush_create",
+    "brush_create_box",
+    "brush_create_wedge",
+    "brush_create_cylinder",
+    "brush_create_cone",
+    "brush_create_pipe",
+    "brush_create_sphere",
+    "brush_create_pyramid",
+    "brush_create_tetrahedron",
+    "brush_create_prism",
+    "brush_create_cylinder_sector",
+    "brush_create_from_planes",
+    "brush_create_boxes_batch",
+    "brush_create_polygon_batch",
+    "blockout_create_batch",
+    "python_generate_blockout",
+    "heightmap_import_grayscale",
+    "shape_library_list",
+    "brush_metadata_set",
+    "brush_metadata_get",
+    "selection_by_metadata",
+    "route_geometry_analyze_chain",
+    "geometry_analyze_selection",
+    "blockout_validate",
+    "objects_delete",
+    "objects_delete_by_filter",
+    "objects_transform",
+    "fgd_entities_list",
+    "entity_schema",
+    "entity_create_checked",
+    "entity_create_from_schema",
+    "entity_tie_brushes",
+    "entity_untie_brushes",
+    "textures_list",
+    "texture_search",
+    "texture_lock_get",
+    "texture_lock_set",
+    "texture_apply",
+    "texture_apply_by_filter",
+    "texture_replace",
+    "texture_align_face",
+    "texture_copy_from_face",
+    "face_list",
+    "face_select",
+    "face_texture_set",
+    "map_validate",
+    "problems_check",
   };
 
-  return !std::ranges::any_of(
-    HiddenToolNames, [&](const auto* toolName) { return tool.name == toolName; });
+  return std::ranges::any_of(
+    ToolNames, [&](const auto* toolName) { return tool.name == toolName; });
 }
 
 bool visibleInProfile(const McpToolDefinition& tool, const McpToolProfile profile)

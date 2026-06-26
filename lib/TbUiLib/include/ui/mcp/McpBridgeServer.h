@@ -28,6 +28,7 @@
 #include "mcp/McpBridgeConfig.h"
 #include "mcp/McpBridgeMessages.h"
 #include "mcp/McpError.h"
+#include "ui/mcp/McpObjectRegistry.h"
 
 #include <functional>
 #include <map>
@@ -36,6 +37,11 @@
 
 class QLocalServer;
 class QLocalSocket;
+
+namespace tb::mdl
+{
+class Map;
+}
 
 namespace tb::ui
 {
@@ -74,7 +80,7 @@ struct McpOperationRecord
   QJsonObject detail() const;
 };
 
-struct McpKzBrushMetadataRecord
+struct McpBrushMetadataRecord
 {
   QString objectId;
   QJsonObject metadata;
@@ -87,20 +93,25 @@ class McpBridgeServer : public QObject
 public:
   using ToolHandler =
     std::function<McpBridgeToolResult(const QString&, const QJsonObject&)>;
+  using ActiveMapProvider = std::function<mdl::Map*()>;
 
 private:
   mcp::McpBridgeConfig m_config;
   ToolHandler m_toolHandler;
+  ActiveMapProvider m_activeMapProvider;
   QJsonObject m_overlayState;
   mutable int m_nextOperationIndex = 1;
   mutable std::vector<McpOperationRecord> m_operationHistory;
-  mutable std::map<QString, McpKzBrushMetadataRecord> m_kzBrushMetadata;
+  mutable std::map<QString, McpBrushMetadataRecord> m_brushMetadata;
+  mutable McpObjectRegistry m_objectRegistry;
   mutable bool m_dispatchInProgress = false;
   std::unique_ptr<QLocalServer> m_server;
 
 public:
   explicit McpBridgeServer(AppController& appController, QObject* parent = nullptr);
   explicit McpBridgeServer(ToolHandler toolHandler, QObject* parent = nullptr);
+  McpBridgeServer(
+    ToolHandler toolHandler, ActiveMapProvider activeMapProvider, QObject* parent = nullptr);
   ~McpBridgeServer() override;
 
   bool start(const mcp::McpBridgeConfig& config, QString* error = nullptr);

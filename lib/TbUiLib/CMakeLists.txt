@@ -159,8 +159,9 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpEntityTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHistoryTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHeightmapTools.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpKzTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpRouteTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpObjectTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpObjectRegistry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpProblemTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpPythonTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectionQuery.cpp
@@ -432,6 +433,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MousePreferencePane.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/mcp/McpBridgeServer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/mcp/McpHttpServer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/mcp/McpObjectRegistry.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveHandleDragTracker.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveObjectsTool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveObjectsToolController.h

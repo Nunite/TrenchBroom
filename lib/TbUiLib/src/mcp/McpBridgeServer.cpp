@@ -25,6 +25,9 @@
 #include "McpBridgeServerTools.h"
 #include "mcp/McpError.h"
 #include "ui/AppController.h"
+#include "ui/MapDocument.h"
+#include "ui/MapWindow.h"
+#include "ui/MapWindowManager.h"
 
 #include <utility>
 
@@ -258,41 +261,45 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             params,
             m_operationHistory,
             m_nextOperationIndex,
-            m_kzBrushMetadata);
+            m_brushMetadata);
         }
         if (toolName == "brush_metadata_set")
         {
-          return brushMetadataSetResult(appController, params, m_kzBrushMetadata);
+          return brushMetadataSetResult(appController, params, m_brushMetadata);
         }
         if (toolName == "brush_metadata_get")
         {
-          return brushMetadataGetResult(appController, params, m_kzBrushMetadata);
+          return brushMetadataGetResult(appController, params, m_brushMetadata);
         }
         if (toolName == "selection_by_metadata")
         {
-          return selectionByMetadataResult(appController, params, m_kzBrushMetadata);
+          return selectionByMetadataResult(appController, params, m_brushMetadata);
         }
         if (
           toolName == "route_geometry_analyze_chain"
           || toolName == "kz_distance_analyze_chain")
         {
-          return kzDistanceAnalyzeChainResult(appController, params, m_kzBrushMetadata);
+          return routeGeometryAnalyzeChainResult(
+            appController, params, m_brushMetadata);
         }
         if (toolName == "history_list")
         {
-          return historyListResult(appController, m_operationHistory);
+          return historyListResult(appController, m_operationHistory, m_objectRegistry);
         }
         if (toolName == "operation_inspect")
         {
-          return operationInspectResult(appController, m_operationHistory, params);
+          return operationInspectResult(
+            appController, m_operationHistory, params, m_objectRegistry);
         }
         if (toolName == "operation_select")
         {
-          return operationSelectResult(appController, m_operationHistory, params);
+          return operationSelectResult(
+            appController, m_operationHistory, params, m_objectRegistry);
         }
         if (toolName == "operation_validate")
         {
-          return operationValidateResult(appController, m_operationHistory, params);
+          return operationValidateResult(
+            appController, m_operationHistory, params, m_objectRegistry);
         }
         if (toolName == "history_undo_mcp")
         {
@@ -458,11 +465,23 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
       },
       parent}
 {
+  m_activeMapProvider = [&appController]() -> mdl::Map* {
+    auto* mapWindow = appController.mapWindowManager().topMapWindow();
+    return mapWindow != nullptr ? &mapWindow->document().map() : nullptr;
+  };
 }
 
 McpBridgeServer::McpBridgeServer(ToolHandler toolHandler, QObject* parent)
   : QObject{parent}
   , m_toolHandler{std::move(toolHandler)}
+{
+}
+
+McpBridgeServer::McpBridgeServer(
+  ToolHandler toolHandler, ActiveMapProvider activeMapProvider, QObject* parent)
+  : QObject{parent}
+  , m_toolHandler{std::move(toolHandler)}
+  , m_activeMapProvider{std::move(activeMapProvider)}
 {
 }
 

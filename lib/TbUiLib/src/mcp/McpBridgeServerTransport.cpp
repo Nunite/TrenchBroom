@@ -25,6 +25,7 @@
 #include <QLocalSocket>
 
 #include "mcp/McpToolCatalog.h"
+#include "mdl/Map.h"
 #include "ui/mcp/McpBridgeServer.h"
 
 namespace tb::ui
@@ -135,6 +136,8 @@ void McpBridgeServer::stop()
   }
   m_overlayState = QJsonObject{};
   m_operationHistory.clear();
+  m_brushMetadata.clear();
+  m_objectRegistry.clear();
 }
 
 bool McpBridgeServer::isListening() const
@@ -157,6 +160,36 @@ const QJsonObject& McpBridgeServer::overlayState() const
   return m_overlayState;
 }
 
+namespace
+{
+
+QJsonObject resourceObject(
+  const McpOperationRecord& operation, const std::optional<QJsonObject>& liveState)
+{
+  auto result = QJsonObject{
+    {"operationId", operation.operationId},
+    {"toolName", operation.toolName},
+    {"transactionName", operation.transactionName},
+    {"createdAt", operation.createdAt},
+    {"createdAtMs", operation.createdAtMs},
+    {"changedObjectIds", operation.changedObjectIdsJson()},
+    {"changedObjectCount", operation.changedObjectIds.size()},
+    {"undone", operation.undone},
+    {"summary", operation.summary()},
+    {"detail", operation.detail()},
+  };
+  if (liveState)
+  {
+    for (auto it = liveState->begin(); it != liveState->end(); ++it)
+    {
+      result.insert(it.key(), it.value());
+    }
+  }
+  return result;
+}
+
+} // namespace
+
 std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) const
 {
   static const auto Prefix = QString{"tbmcp://operation/"};
@@ -174,18 +207,18 @@ std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) con
     return std::nullopt;
   }
 
-  return QJsonObject{
-    {"operationId", it->operationId},
-    {"toolName", it->toolName},
-    {"transactionName", it->transactionName},
-    {"createdAt", it->createdAt},
-    {"createdAtMs", it->createdAtMs},
-    {"changedObjectIds", it->changedObjectIdsJson()},
-    {"changedObjectCount", it->changedObjectIds.size()},
-    {"undone", it->undone},
-    {"summary", it->summary()},
-    {"detail", it->detail()},
-  };
+  if (m_activeMapProvider)
+  {
+    if (auto* map = m_activeMapProvider())
+    {
+      return m_objectRegistry.externalizeResult(
+        *map,
+        resourceObject(
+          *it, m_objectRegistry.liveStateJson(*map, it->changedObjectIds, it->undone)));
+    }
+  }
+
+  return resourceObject(*it, std::nullopt);
 }
 
 mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
@@ -244,9 +277,28 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   };
 
   const auto dispatchGuard = DispatchGuard{m_dispatchInProgress};
-  const auto result = m_toolHandler(request.tool, request.params);
+
+  auto params = request.params;
+  auto* map = m_activeMapProvider ? m_activeMapProvider() : nullptr;
+  if (map != nullptr)
+  {
+    auto error = QString{};
+    const auto internalParams = m_objectRegistry.internalizeParams(*map, params, error);
+    if (!internalParams)
+    {
+      return makeFailure(request, mcp::McpErrorCode::InvalidParams, error);
+    }
+    params = *internalParams;
+  }
+
+  const auto result = m_toolHandler(request.tool, params);
   if (result.ok)
   {
+    if (map != nullptr)
+    {
+      return mcp::McpBridgeResponse::success(
+        request.id, m_objectRegistry.externalizeResult(*map, result.result));
+    }
     return mcp::McpBridgeResponse::success(request.id, result.result);
   }
   return mcp::McpBridgeResponse::failure(request.id, result.error);

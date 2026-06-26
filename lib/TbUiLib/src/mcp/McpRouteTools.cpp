@@ -221,7 +221,7 @@ QJsonObject shapeJson(
 
 QJsonObject metadataForObject(
   const QString& objectId,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   const auto it = metadataStore.find(objectId);
   if (it == metadataStore.end())
@@ -295,7 +295,7 @@ QJsonArray stringVectorToJson(const std::vector<QString>& values)
 
 std::vector<QString> matchingMetadataObjectIds(
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
   const size_t limit)
 {
   auto result = std::vector<QString>{};
@@ -511,7 +511,7 @@ McpBridgeToolResult brushCreatePolygonBatchResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
-  std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -534,7 +534,7 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
-  std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   const auto brushesValue = params.value("brushes");
   if (!brushesValue.isArray())
@@ -608,7 +608,7 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
     {
       continue;
     }
-    metadataStore[objectId] = McpKzBrushMetadataRecord{
+    metadataStore[objectId] = McpBrushMetadataRecord{
       objectId,
       brushMetadata,
       false,
@@ -634,7 +634,7 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
 McpBridgeToolResult brushMetadataSetResult(
   AppController& appController,
   const QJsonObject& params,
-  std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -648,7 +648,7 @@ McpBridgeToolResult brushMetadataSetResult(
 McpBridgeToolResult brushMetadataSetForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
-  std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   auto error = QString{};
   auto objectIds = stringListFromJson(params, "objectIds", error);
@@ -683,7 +683,7 @@ McpBridgeToolResult brushMetadataSetForMapResult(
 
   for (const auto& objectId : *objectIds)
   {
-    metadataStore[objectId] = McpKzBrushMetadataRecord{
+    metadataStore[objectId] = McpBrushMetadataRecord{
       objectId,
       *metadata,
       false,
@@ -700,7 +700,7 @@ McpBridgeToolResult brushMetadataSetForMapResult(
 McpBridgeToolResult brushMetadataGetResult(
   AppController& appController,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -714,7 +714,7 @@ McpBridgeToolResult brushMetadataGetResult(
 McpBridgeToolResult brushMetadataGetForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   auto error = QString{};
   auto objectIds = stringListFromJson(params, "objectIds", error);
@@ -776,7 +776,7 @@ McpBridgeToolResult brushMetadataGetForMapResult(
 McpBridgeToolResult selectionByMetadataResult(
   AppController& appController,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -791,7 +791,7 @@ McpBridgeToolResult selectionByMetadataResult(
 McpBridgeToolResult selectionByMetadataForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   const auto limit =
     std::clamp(optionalSize(params, "limit", 100), size_t{1}, size_t{1000});
@@ -840,10 +840,10 @@ McpBridgeToolResult selectionByMetadataForMapResult(
   return McpBridgeToolResult::success(result);
 }
 
-McpBridgeToolResult kzDistanceAnalyzeChainResult(
+McpBridgeToolResult routeGeometryAnalyzeChainResult(
   AppController& appController,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -851,14 +851,14 @@ McpBridgeToolResult kzDistanceAnalyzeChainResult(
     return noActiveDocumentFailure();
   }
 
-  return kzDistanceAnalyzeChainForMapResult(
+  return routeGeometryAnalyzeChainForMapResult(
     mapWindow->document().map(), params, metadataStore);
 }
 
-McpBridgeToolResult kzDistanceAnalyzeChainForMapResult(
+McpBridgeToolResult routeGeometryAnalyzeChainForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore)
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   auto error = QString{};
   auto objectIds = std::vector<QString>{};
@@ -911,8 +911,8 @@ McpBridgeToolResult kzDistanceAnalyzeChainForMapResult(
   if (params.value("movementType").toString().trimmed().isEmpty())
   {
     warnings.push_back(
-      "movementType was omitted; distances are geometry metrics, not a KZ difficulty "
-      "verdict.");
+      "movementType was omitted; distances are geometry metrics, not a gameplay "
+      "difficulty verdict.");
   }
 
   auto segments = QJsonArray{};
@@ -966,6 +966,22 @@ McpBridgeToolResult kzDistanceAnalyzeChainForMapResult(
      "and pass/fail viability should be judged by the Agent with domain context and "
      "in-game testing."},
   });
+}
+
+McpBridgeToolResult kzDistanceAnalyzeChainResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
+{
+  return routeGeometryAnalyzeChainResult(appController, params, metadataStore);
+}
+
+McpBridgeToolResult kzDistanceAnalyzeChainForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
+{
+  return routeGeometryAnalyzeChainForMapResult(map, params, metadataStore);
 }
 
 } // namespace tb::ui

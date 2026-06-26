@@ -152,9 +152,16 @@ McpBridgeToolResult viewportCapture2DResult(
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyListResult(
-  AppController& appController, const std::vector<McpOperationRecord>& history);
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult operationInspectResult(
   const std::vector<McpOperationRecord>& history, const QJsonObject& params);
+McpBridgeToolResult operationInspectResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult operationInspectResult(
   AppController& appController,
   const std::vector<McpOperationRecord>& history,
@@ -162,7 +169,17 @@ McpBridgeToolResult operationInspectResult(
 McpBridgeToolResult operationSelectResult(
   AppController& appController,
   const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult operationSelectResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
   const QJsonObject& params);
+McpBridgeToolResult operationValidateResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult operationValidateResult(
   AppController& appController,
   const std::vector<McpOperationRecord>& history,
@@ -304,46 +321,54 @@ McpBridgeToolResult brushCreatePolygonBatchResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
-  std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult brushCreatePolygonBatchForMapResult(
   mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
-  std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult brushMetadataSetForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
-  std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult brushMetadataGetForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult selectionByMetadataForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult routeGeometryAnalyzeChainForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult kzDistanceAnalyzeChainForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult brushMetadataSetResult(
   AppController& appController,
   const QJsonObject& params,
-  std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult brushMetadataGetResult(
   AppController& appController,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult selectionByMetadataResult(
   AppController& appController,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore);
+McpBridgeToolResult routeGeometryAnalyzeChainResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult kzDistanceAnalyzeChainResult(
   AppController& appController,
   const QJsonObject& params,
-  const std::map<QString, McpKzBrushMetadataRecord>& metadataStore);
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
