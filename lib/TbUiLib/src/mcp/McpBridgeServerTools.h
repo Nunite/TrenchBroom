@@ -314,13 +314,15 @@ McpBridgeToolResult pythonGenerateBlockoutResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult pythonGenerateBlockoutForMapResult(
   mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult heightmapImportGrayscaleResult(
   AppController& appController,
   const QString& toolName,
@@ -348,6 +350,10 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore);
+int storeBatchOperationMetadata(
+  const QJsonArray& operations,
+  const QStringList& changedObjectIds,
   std::map<QString, McpBrushMetadataRecord>& metadataStore);
 McpBridgeToolResult brushMetadataSetForMapResult(
   mdl::Map& map,

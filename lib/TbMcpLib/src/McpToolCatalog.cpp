@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <array>
+#include <functional>
 
 namespace tb::mcp
 {
@@ -2352,6 +2353,29 @@ QJsonArray toolsSearchJson(
     }
     result.push_back(std::move(object));
   };
+
+  auto exactMatches = std::vector<std::reference_wrapper<const McpToolDefinition>>{};
+  if (!normalizedQuery.isEmpty())
+  {
+    for (const auto& tool : defaultToolCatalog())
+    {
+      if (
+        tool.implemented && allowsMode(mode, tool.requiredMode)
+        && queryContainsExactToolName(normalizedQuery, tool.name)
+        && (normalizedCategory.isEmpty() || tool.category.compare(normalizedCategory, Qt::CaseInsensitive) == 0))
+      {
+        exactMatches.push_back(std::cref(tool));
+      }
+    }
+  }
+  if (!exactMatches.empty())
+  {
+    for (const auto& tool : exactMatches)
+    {
+      appendTool(tool.get());
+    }
+    return result;
+  }
 
   for (const auto& tool : defaultToolCatalog())
   {

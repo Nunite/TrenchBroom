@@ -3096,6 +3096,8 @@ McpBridgeToolResult geometryAnalyzeSelectionResult(
   auto brushes = selectedBrushNodes(map);
   auto brushResults = QJsonArray{};
   auto objectIds = QJsonArray{};
+  auto invalidObjectIds = QJsonArray{};
+  auto nonGridAlignedObjectIds = QJsonArray{};
   auto materials = QStringList{};
   auto invalidBrushCount = 0;
   auto nonGridAlignedCount = 0;
@@ -3106,13 +3108,22 @@ McpBridgeToolResult geometryAnalyzeSelectionResult(
   {
     const auto& brush = brushNode->brush();
     const auto gridOk = brushGridAligned(brush, grid);
+    const auto objectId = nodePathId(*brushNode, map.worldNode());
     if (!gridOk)
     {
       ++nonGridAlignedCount;
+      if (nonGridAlignedObjectIds.size() < 10)
+      {
+        nonGridAlignedObjectIds.push_back(objectId);
+      }
     }
     if (!brush.closed() || !brush.fullySpecified())
     {
       ++invalidBrushCount;
+      if (invalidObjectIds.size() < 10)
+      {
+        invalidObjectIds.push_back(objectId);
+      }
     }
 
     bounds = hasBounds ? vm::merge(bounds, brushNode->logicalBounds())
@@ -3141,7 +3152,7 @@ McpBridgeToolResult geometryAnalyzeSelectionResult(
       continue;
     }
 
-    objectIds.push_back(nodePathId(*brushNode, map.worldNode()));
+    objectIds.push_back(objectId);
     if (detailLevel == "full")
     {
       auto brushJson = nodeSummaryJson(*brushNode, map.worldNode());
@@ -3172,6 +3183,14 @@ McpBridgeToolResult geometryAnalyzeSelectionResult(
   if (hasBounds)
   {
     result.insert("bounds", boundsToJson(bounds));
+  }
+  if (!invalidObjectIds.isEmpty())
+  {
+    result.insert("invalidObjectIds", invalidObjectIds);
+  }
+  if (!nonGridAlignedObjectIds.isEmpty())
+  {
+    result.insert("nonGridAlignedObjectIds", nonGridAlignedObjectIds);
   }
   if (detailLevel == "ids")
   {

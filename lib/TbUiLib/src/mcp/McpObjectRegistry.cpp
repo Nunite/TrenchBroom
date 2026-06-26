@@ -21,8 +21,8 @@
 
 #include <QJsonArray>
 
-#include "mdl/BrushNode.h"
 #include "mdl/BrushFace.h"
+#include "mdl/BrushNode.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/GroupNode.h"
@@ -103,7 +103,8 @@ QStringList brushMaterials(const mdl::BrushNode& brushNode)
   const auto& brush = brushNode.brush();
   for (size_t i = 0; i < brush.faceCount(); ++i)
   {
-    const auto material = QString::fromStdString(brush.face(i).attributes().materialName());
+    const auto material =
+      QString::fromStdString(brush.face(i).attributes().materialName());
     if (!materials.contains(material))
     {
       materials.push_back(material);
@@ -202,16 +203,16 @@ mdl::Node* resolveLegacyObjectId(mdl::Map& map, const QString& objectId)
 
 bool isObjectIdKey(const QString& key)
 {
+  if (key.endsWith("ObjectId") || key.endsWith("ObjectIds"))
+  {
+    return true;
+  }
+
   static const auto Keys = QStringList{
     "id",
     "objectId",
-    "fromObjectId",
-    "toObjectId",
     "objectIds",
-    "changedObjectIds",
-    "selectedObjectIds",
     "faceOwnerBrushIds",
-    "highlightObjectIds",
   };
   return Keys.contains(key);
 }
@@ -552,7 +553,8 @@ QJsonObject McpObjectRegistry::liveStateJson(
   }
   else if (mismatchCount > 0)
   {
-    result.insert("staleReason", "one or more stable ids now resolve to different objects");
+    result.insert(
+      "staleReason", "one or more stable ids now resolve to different objects");
   }
   else if (staleObjectCount > 0)
   {

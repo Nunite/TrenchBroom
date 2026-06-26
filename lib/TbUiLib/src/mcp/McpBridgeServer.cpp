@@ -279,8 +279,7 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           toolName == "route_geometry_analyze_chain"
           || toolName == "kz_distance_analyze_chain")
         {
-          return routeGeometryAnalyzeChainResult(
-            appController, params, m_brushMetadata);
+          return routeGeometryAnalyzeChainResult(appController, params, m_brushMetadata);
         }
         if (toolName == "history_list")
         {
@@ -432,7 +431,12 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "python_generate_blockout")
         {
           return pythonGenerateBlockoutResult(
-            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_brushMetadata);
         }
         if (toolName == "heightmap_import_grayscale")
         {

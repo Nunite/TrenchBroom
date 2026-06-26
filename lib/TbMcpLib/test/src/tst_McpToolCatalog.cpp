@@ -667,6 +667,14 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_create_batch"));
   }
 
+  SECTION("tool search exact tool name returns only exact matches")
+  {
+    const auto tools = toolsSearchJson(
+      "blockout_create_batch", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    REQUIRE(tools.size() == 1);
+    CHECK(tools.first().toObject().value("name").toString() == "blockout_create_batch");
+  }
+
   SECTION("tool search exact names can find hidden profile tools")
   {
     const auto tools = toolsSearchJson(
@@ -719,8 +727,9 @@ TEST_CASE("McpToolCatalog")
 
     const auto deleteOperationTool = findToolDefinition("objects_delete_by_operation");
     REQUIRE(deleteOperationTool);
-    CHECK(
-      deleteOperationTool->inputSchema.value("required").toArray().contains("operationId"));
+    CHECK(deleteOperationTool->inputSchema.value("required")
+            .toArray()
+            .contains("operationId"));
 
     const auto textureTool = findToolDefinition("texture_apply_by_filter");
     REQUIRE(textureTool);

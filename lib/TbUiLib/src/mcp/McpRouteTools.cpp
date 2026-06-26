@@ -220,8 +220,7 @@ QJsonObject shapeJson(
 }
 
 QJsonObject metadataForObject(
-  const QString& objectId,
-  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
+  const QString& objectId, const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   const auto it = metadataStore.find(objectId);
   if (it == metadataStore.end())
@@ -279,7 +278,7 @@ bool allMetadataFiltersMatch(const QJsonObject& metadata, const QJsonObject& par
          && metadataObjectMatches(
            metadata,
            params.value("metadata").isObject() ? params.value("metadata").toObject()
-                                                : QJsonObject{});
+                                               : QJsonObject{});
 }
 
 size_t optionalSize(
@@ -347,7 +346,8 @@ void sortMetadataObjectIdsByOrder(
   {
     warnings.push_back(
       "Route order was inferred from MCP object ids because one or more metadata records "
-      "do not define numeric order. Pass ordered objectIds or set metadata.order for exact "
+      "do not define numeric order. Pass ordered objectIds or set metadata.order for "
+      "exact "
       "chain order.");
     return;
   }
@@ -507,6 +507,88 @@ QJsonObject segmentMetricsJson(
 }
 
 } // namespace
+
+int storeBatchOperationMetadata(
+  const QJsonArray& operations,
+  const QStringList& changedObjectIds,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore)
+{
+  if (changedObjectIds.isEmpty())
+  {
+    return 0;
+  }
+
+  auto metadataByObject = std::vector<QJsonObject>{};
+  for (const auto& operationValue : operations)
+  {
+    if (!operationValue.isObject())
+    {
+      continue;
+    }
+    const auto operation = operationValue.toObject();
+    auto error = QString{};
+    const auto metadata =
+      metadataFromJsonValue(operation.value("metadata"), "operations[].metadata", error);
+    if (!metadata || metadata->isEmpty())
+    {
+      continue;
+    }
+
+    const auto operationType = operation.value("type").toString().trimmed();
+    auto generatedBrushCount = 1;
+    if (operationType == "curved_corridor")
+    {
+      const auto segments = std::max(1, operation.value("segments").toInt(12));
+      const auto caps = operation.value("caps").toString("none").trimmed().toLower();
+      generatedBrushCount = segments * 4;
+      if (caps == "start" || caps == "end")
+      {
+        generatedBrushCount += 1;
+      }
+      else if (caps == "both")
+      {
+        generatedBrushCount += 2;
+      }
+    }
+    else if (operationType == "room" || operationType == "corridor")
+    {
+      generatedBrushCount = 6;
+    }
+    else if (operationType == "sky_shell")
+    {
+      generatedBrushCount = 6;
+    }
+    else if (operationType == "doorway")
+    {
+      generatedBrushCount = 4;
+    }
+    else if (operationType == "stairs")
+    {
+      generatedBrushCount = std::max(1, operation.value("steps").toInt(8));
+    }
+
+    for (auto i = 0; i < generatedBrushCount; ++i)
+    {
+      metadataByObject.push_back(*metadata);
+    }
+  }
+
+  auto metadataCount = 0;
+  for (auto i = 0;
+       i < changedObjectIds.size() && i < static_cast<int>(metadataByObject.size());
+       ++i)
+  {
+    const auto objectId = changedObjectIds[i];
+    const auto metadata = metadataByObject[static_cast<size_t>(i)];
+    if (objectId.isEmpty() || metadata.isEmpty())
+    {
+      continue;
+    }
+    metadataStore[objectId] = McpBrushMetadataRecord{objectId, metadata, false};
+    ++metadataCount;
+  }
+  return metadataCount;
+}
 
 McpBridgeToolResult shapeLibraryListResult()
 {

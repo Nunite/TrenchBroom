@@ -107,7 +107,8 @@ McpBridgeToolResult pythonGenerateBlockoutResult(
   const QString&,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -120,7 +121,8 @@ McpBridgeToolResult pythonGenerateBlockoutResult(
     "python_generate_blockout",
     params,
     history,
-    nextOperationIndex);
+    nextOperationIndex,
+    metadataStore);
 }
 
 McpBridgeToolResult pythonGenerateBlockoutForMapResult(
@@ -128,7 +130,8 @@ McpBridgeToolResult pythonGenerateBlockoutForMapResult(
   const QString&,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
   const auto script = params.value("script").toString();
   if (script.trimmed().isEmpty())
@@ -243,6 +246,23 @@ McpBridgeToolResult pythonGenerateBlockoutForMapResult(
     map, "blockout_create_batch", batchParams, history, nextOperationIndex);
   if (result.ok)
   {
+    const auto changedObjectIds =
+      !history.empty()
+          && history.back().operationId == result.result.value("operationId").toString()
+        ? history.back().changedObjectIds
+        : QStringList{};
+    const auto metadataCount = storeBatchOperationMetadata(
+      operationsValue.toArray(), changedObjectIds, metadataStore);
+    if (metadataCount > 0)
+    {
+      result.result.insert("metadataCount", metadataCount);
+      if (
+        !history.empty()
+        && history.back().operationId == result.result.value("operationId").toString())
+      {
+        history.back().setSummary(result.result);
+      }
+    }
     result.result.insert(
       "python",
       QJsonObject{

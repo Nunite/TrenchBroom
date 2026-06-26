@@ -25,8 +25,8 @@
 
 #include "../../src/mcp/McpBridgeServerTools.h"
 #include "Result.h"
-#include "mdl/BrushFace.h"
 #include "gl/GlManager.h"
+#include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
 #include "mdl/GameConfigFixture.h"
@@ -1198,7 +1198,6 @@ TEST_CASE("McpBridgeServer spiral stair geometry tools")
   auto& map = document->map();
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
-
   const auto createResponse = blockoutCreateSpiralStairsForMapResult(
     map,
     QJsonObject{
@@ -1264,6 +1263,37 @@ TEST_CASE("McpBridgeServer spiral stair geometry tools")
   CHECK(idsAnalyzeResponse.result.value("truncated").toBool());
   CHECK(idsAnalyzeResponse.result.value("objectIds").toArray().size() == 3);
   CHECK(idsAnalyzeResponse.result.value("brushes").isUndefined());
+
+  const auto offGridResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "cylinder_sector"},
+           {"center", QJsonArray{512, 0, 0}},
+           {"innerRadius", 96},
+           {"outerRadius", 224},
+           {"startAngle", 15},
+           {"endAngle", 105},
+           {"minZ", 0},
+           {"maxZ", 16},
+           {"snapMode", "radial"},
+         },
+       }},
+      {"select", true},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(offGridResponse.ok);
+  const auto offGridAnalyzeResponse =
+    geometryAnalyzeSelectionResult(map, QJsonObject{{"grid", 1}});
+  REQUIRE(offGridAnalyzeResponse.ok);
+  CHECK(offGridAnalyzeResponse.result.value("nonGridAlignedCount").toInt() == 1);
+  CHECK(
+    offGridAnalyzeResponse.result.value("nonGridAlignedObjectIds").toArray().size() == 1);
+  map.undoCommand();
 
   const auto validateResponse = blockoutValidateSpiralStairsResult(
     map,
@@ -1438,12 +1468,16 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
         const auto ids = params.value("objectIds").toArray();
         return McpBridgeToolResult::success(QJsonObject{
           {"selectedCount", ids.size()},
-          {"internalObjectId", ids.isEmpty() ? QString{} : ids.first().toString()},
+          {"receivedLegacyPath", ids.isEmpty() ? QString{} : ids.first().toString()},
         });
       }
       if (toolName == "history_list")
       {
         return historyListResult(history);
+      }
+      if (toolName == "geometry_analyze_selection")
+      {
+        return geometryAnalyzeSelectionResult(map, params);
       }
       return McpBridgeToolResult::failure(
         mcp::McpErrorCode::ToolNotFound, QString{"Unexpected tool: %1"}.arg(toolName));
@@ -1468,8 +1502,7 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
       {"detail", "ids"},
     },
     mcp::McpMode::Edit});
-  const auto createError =
-    createResponse.ok ? QString{} : createResponse.error->message;
+  const auto createError = createResponse.ok ? QString{} : createResponse.error->message;
   INFO(createError.toStdString());
   REQUIRE(createResponse.ok);
   const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
@@ -1485,15 +1518,13 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
     mcp::McpMode::ReadOnly});
   REQUIRE(selectResponse.ok);
   CHECK(selectResponse.result.value("selectedCount").toInt() == 1);
-  CHECK(selectResponse.result.value("internalObjectId").toString().startsWith("node:"));
+  CHECK(selectResponse.result.value("receivedLegacyPath").toString().startsWith("node:"));
 
   auto registry = McpObjectRegistry{};
   const auto legacyId = history.back().changedObjectIds.front();
-  const auto directStableId =
-    registry.externalIdForLegacy(map, legacyId);
+  const auto directStableId = registry.externalIdForLegacy(map, legacyId);
   CHECK(directStableId.startsWith("mcp:"));
-  const auto liveState =
-    registry.liveStateJson(map, QStringList{directStableId}, false);
+  const auto liveState = registry.liveStateJson(map, QStringList{directStableId}, false);
   CHECK(liveState.value("valid").toBool());
   CHECK(liveState.value("liveObjectCount").toInt() == 1);
   CHECK(liveState.value("staleObjectCount").toInt() == 0);
@@ -1502,10 +1533,47 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   REQUIRE(map.undoCommandName() != nullptr);
   map.undoCommand();
 
-  const auto staleState =
-    registry.liveStateJson(map, QStringList{directStableId}, false);
+  const auto staleState = registry.liveStateJson(map, QStringList{directStableId}, false);
   CHECK(!staleState.value("valid").toBool());
   CHECK(staleState.value("staleObjectCount").toInt() == 1);
+
+  const auto offGridCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "3",
+    "secret",
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "cylinder_sector"},
+           {"center", QJsonArray{512, 0, 0}},
+           {"innerRadius", 96},
+           {"outerRadius", 224},
+           {"startAngle", 15},
+           {"endAngle", 105},
+           {"minZ", 0},
+           {"maxZ", 16},
+           {"snapMode", "radial"},
+         },
+       }},
+      {"select", true},
+      {"detail", "ids"},
+    },
+    mcp::McpMode::Edit});
+  REQUIRE(offGridCreateResponse.ok);
+
+  const auto analyzeResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "4",
+    "secret",
+    "geometry_analyze_selection",
+    QJsonObject{{"grid", 1}, {"detail", "summary"}},
+    mcp::McpMode::ReadOnly});
+  REQUIRE(analyzeResponse.ok);
+  CHECK(analyzeResponse.result.value("nonGridAlignedCount").toInt() == 1);
+  const auto nonGridAlignedObjectIds =
+    analyzeResponse.result.value("nonGridAlignedObjectIds").toArray();
+  REQUIRE(nonGridAlignedObjectIds.size() == 1);
+  CHECK(nonGridAlignedObjectIds.first().toString().startsWith("mcp:"));
 }
 
 TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
@@ -1970,7 +2038,8 @@ TEST_CASE("McpBridgeServer route metadata tools")
     INFO(error);
     REQUIRE(response.ok);
     CHECK(
-      response.result.value("transactionName").toString() == "MCP: Route polygon platforms");
+      response.result.value("transactionName").toString()
+      == "MCP: Route polygon platforms");
     CHECK(response.result.value("brushCount").toInt() == 3);
     CHECK(response.result.value("changedObjectCount").toInt() == 3);
     CHECK(response.result.value("changedObjectIds").isUndefined());
@@ -1987,7 +2056,8 @@ TEST_CASE("McpBridgeServer route metadata tools")
     CHECK(!materialNames.contains("__TB_empty"));
     CHECK(map.selection().nodes.size() == 3u);
     REQUIRE(map.undoCommandName() != nullptr);
-    CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: Route polygon platforms");
+    CHECK(
+      QString::fromStdString(*map.undoCommandName()) == "MCP: Route polygon platforms");
 
     const auto inspect = operationInspectResult(
       history,
@@ -2474,6 +2544,7 @@ TEST_CASE("McpBridgeServer Python blockout tools")
   auto& map = document->map();
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
 
   SECTION("compiles operations printed by Python")
   {
@@ -2496,7 +2567,8 @@ print(json.dumps({
 )PY"},
       },
       history,
-      nextOperationIndex);
+      nextOperationIndex,
+      metadataStore);
 
     const auto error = response.ok ? std::string{} : response.error.message.toStdString();
     INFO(error);
@@ -2511,6 +2583,53 @@ print(json.dumps({
     CHECK(map.selection().nodes.size() == 1u);
   }
 
+  SECTION("stores operation metadata printed by Python")
+  {
+    const auto response = pythonGenerateBlockoutForMapResult(
+      map,
+      "python_generate_blockout",
+      QJsonObject{
+        {"name", "MCP: Python metadata route"},
+        {"detail", "summary"},
+        {"script",
+         R"PY(
+import json
+print(json.dumps({
+    "operations": [
+        {
+            "type": "prism",
+            "points2d": [[0, 0], [64, 0], [64, 64], [0, 64]],
+            "minZ": 0,
+            "maxZ": 16,
+            "metadata": {"routeId": "python_route", "order": 1}
+        },
+        {
+            "type": "prism",
+            "points2d": [[128, 0], [192, 0], [192, 64], [128, 64]],
+            "minZ": 0,
+            "maxZ": 16,
+            "metadata": {"routeId": "python_route", "order": 2}
+        }
+    ]
+}))
+)PY"},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    CHECK(response.result.value("metadataCount").toInt() == 2);
+    CHECK(response.result.value("changedObjectIds").isUndefined());
+
+    const auto selectResponse = selectionByMetadataForMapResult(
+      map, QJsonObject{{"routeId", "python_route"}, {"select", false}}, metadataStore);
+    REQUIRE(selectResponse.ok);
+    CHECK(selectResponse.result.value("count").toInt() == 2);
+  }
+
   SECTION("rejects invalid JSON without committing")
   {
     const auto descendantCount = map.worldNode().descendantCount();
@@ -2519,7 +2638,8 @@ print(json.dumps({
       "python_generate_blockout",
       QJsonObject{{"script", "print('not json')"}},
       history,
-      nextOperationIndex);
+      nextOperationIndex,
+      metadataStore);
 
     CHECK(!response.ok);
     CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
@@ -2535,7 +2655,8 @@ print(json.dumps({
       "python_generate_blockout",
       QJsonObject{{"script", "print('{}')"}},
       history,
-      nextOperationIndex);
+      nextOperationIndex,
+      metadataStore);
 
     CHECK(!response.ok);
     CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
@@ -2558,7 +2679,8 @@ sys.exit(7)
 )PY"},
       },
       history,
-      nextOperationIndex);
+      nextOperationIndex,
+      metadataStore);
 
     CHECK(!response.ok);
     CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
@@ -2581,7 +2703,8 @@ time.sleep(2)
 )PY"},
       },
       history,
-      nextOperationIndex);
+      nextOperationIndex,
+      metadataStore);
 
     CHECK(!response.ok);
     CHECK(response.error.code == mcp::McpErrorCode::InternalError);
@@ -2607,7 +2730,8 @@ print(json.dumps({
 )PY"},
       },
       history,
-      nextOperationIndex);
+      nextOperationIndex,
+      metadataStore);
 
     REQUIRE(response.ok);
     CHECK(!response.result.value("validation").toObject().value("valid").toBool());
