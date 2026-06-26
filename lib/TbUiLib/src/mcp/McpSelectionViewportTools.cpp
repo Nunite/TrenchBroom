@@ -45,9 +45,6 @@
 #include "mdl/PatchNode.h"
 #include "mdl/Selection.h"
 #include "mdl/WorldNode.h"
-#include "ui/Action.h"
-#include "ui/ActionExecutionContext.h"
-#include "ui/ActionManager.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
 #include "ui/MapView2D.h"
@@ -404,14 +401,12 @@ std::optional<MapViewLayout> parseMapViewLayout(const QString& value)
 
 QJsonObject viewportLayoutJson(MapWindow& mapWindow)
 {
-  const auto hasVisible2D =
-    std::ranges::any_of(mapWindow.findChildren<MapView2D*>(), [](const auto* view) {
-      return view != nullptr && view->isVisible();
-    });
-  const auto hasVisible3D =
-    std::ranges::any_of(mapWindow.findChildren<MapView3D*>(), [](const auto* view) {
-      return view != nullptr && view->isVisible();
-    });
+  const auto hasVisible2D = std::ranges::any_of(
+    mapWindow.findChildren<MapView2D*>(),
+    [](const auto* view) { return view != nullptr && view->isVisible(); });
+  const auto hasVisible3D = std::ranges::any_of(
+    mapWindow.findChildren<MapView3D*>(),
+    [](const auto* view) { return view != nullptr && view->isVisible(); });
 
   return QJsonObject{
     {"layout", mapViewLayoutName(mapWindow.currentMapViewLayout())},
@@ -1108,25 +1103,34 @@ McpBridgeToolResult viewportFocusResult(
     }
   }
 
-  const auto& actionsMap = appController.actionManager().actionsMap();
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  auto* mapView = mapWindow ? mapWindow->currentMapViewBase() : nullptr;
-  if (mapWindow && !mapView)
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  auto* mapView = mapWindow->currentMapViewBase();
+  if (!mapView)
   {
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::Forbidden, "No active map view");
   }
-  auto context = ActionExecutionContext{appController, mapWindow, mapView};
-  const auto actionPath = std::filesystem::path{"Menu/View/Focus on Selection"};
-  const auto actionIt = actionsMap.find(actionPath);
-  if (actionIt != std::end(actionsMap) && actionIt->second.enabled(context))
+
+  const auto selection = selectionSummaryJson(appController);
+  const auto selectedNodeCount = selection.value("nodeCount").toInt();
+  const auto canFocus = selectedNodeCount > 0;
+  if (canFocus)
   {
-    actionIt->second.execute(context);
+    mapWindow->focusCameraOnSelection(false);
+    QCoreApplication::processEvents();
+    mapWindow->refreshMapViews();
+    QCoreApplication::processEvents();
   }
 
   return McpBridgeToolResult::success(QJsonObject{
-    {"focused", true},
-    {"selection", selectionSummaryJson(appController)},
+    {"focused", canFocus},
+    {"cameraControlled", canFocus},
+    {"focusedObjectCount", selectedNodeCount},
+    {"selection", selection},
   });
 }
 
@@ -1236,6 +1240,8 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
   }
 
   const auto objectIdsValue = params.value("objectIds");
+  auto cameraControlled = false;
+  auto focusedObjectCount = 0;
   if (objectIdsValue.isArray())
   {
     const auto focusResult =
@@ -1244,6 +1250,8 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     {
       return focusResult;
     }
+    cameraControlled = focusResult.result.value("cameraControlled").toBool(false);
+    focusedObjectCount = focusResult.result.value("focusedObjectCount").toInt(0);
 
     overlayState.insert("highlightObjectIds", objectIdsValue.toArray());
     if (const auto sceneName = params.value("sceneName").toString().trimmed();
@@ -1318,10 +1326,14 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     {"warnings", warnings},
     {"layout", layout.value("layout")},
     {"viewportLayout", layout},
-    {"cameraControlled", false},
+    {"cameraControlled", cameraControlled},
+    {"focusedObjectCount", focusedObjectCount},
     {"note",
-     "This review package uses the current visible TrenchBroom viewport state. Add "
-     "viewport camera controls for deterministic multi-angle screenshots."},
+     cameraControlled
+       ? "This review package focused the current selection before capturing visible "
+         "viewports. Explicit free camera placement is still not implemented."
+       : "This review package uses the current visible TrenchBroom viewport state. "
+         "Pass objectIds to focus the selection before capture."},
   });
 }
 

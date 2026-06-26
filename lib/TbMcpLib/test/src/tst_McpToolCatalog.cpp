@@ -585,6 +585,20 @@ TEST_CASE("McpToolCatalog")
     CHECK(found.value("inputSchema").isObject());
   }
 
+  SECTION("scene review capture documents focused object screenshots")
+  {
+    const auto tool = findToolDefinition("viewport_capture_scene_review");
+    REQUIRE(tool);
+
+    CHECK(tool->description.contains("focusing optional object ids"));
+    CHECK(tool->description.contains("deterministic target-focused review"));
+
+    const auto properties = tool->inputSchema.value("properties").toObject();
+    CHECK(properties.value("objectIds").isObject());
+    CHECK(properties.value("layout").isObject());
+    CHECK(properties.value("views").isObject());
+  }
+
   SECTION("tool search can discover hidden expert tools")
   {
     const auto tools = toolsSearchJson(

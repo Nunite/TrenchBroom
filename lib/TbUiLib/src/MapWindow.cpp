@@ -2221,9 +2221,14 @@ void MapWindow::reset2dCameras()
 
 void MapWindow::focusCameraOnSelection()
 {
+  focusCameraOnSelection(true);
+}
+
+void MapWindow::focusCameraOnSelection(const bool animate)
+{
   if (canFocusCamera())
   {
-    m_mapView->focusCameraOnSelection(true);
+    m_mapView->focusCameraOnSelection(animate);
   }
 }
 

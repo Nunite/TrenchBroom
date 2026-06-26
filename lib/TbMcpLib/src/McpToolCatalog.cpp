@@ -479,7 +479,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_focus",
-      "Focus the editor viewport on object ids or the current selection.",
+      "Focus visible editor viewports on object ids or the current selection for "
+      "screenshot review.",
       McpMode::ReadOnly,
       false,
       true,
@@ -604,8 +605,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "viewport_capture_scene_review",
       "Create a compact whitebox scene review package by focusing optional object ids, "
       "highlighting them, and capturing requested current/3d/2d viewport screenshots. "
-      "This is a review helper, not a camera-control tool; it uses the current UI "
-      "view state until explicit MCP camera controls are implemented.",
+      "Use objectIds for deterministic target-focused review; explicit free camera "
+      "placement is still not implemented.",
       McpMode::ReadOnly,
       false,
       true,

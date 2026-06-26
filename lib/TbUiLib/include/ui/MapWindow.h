@@ -385,6 +385,7 @@ public:
   void reset2dCameras();
 
   void focusCameraOnSelection();
+  void focusCameraOnSelection(bool animate);
   bool canFocusCamera() const;
 
   void moveCameraToPosition();

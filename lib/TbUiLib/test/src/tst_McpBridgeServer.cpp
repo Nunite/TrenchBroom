@@ -53,7 +53,7 @@ namespace mcp = tb::mcp;
 
 TEST_CASE("McpBridgeServer")
 {
-  auto server = McpBridgeServer{[](const QString& toolName, const QJsonObject&) {
+  auto server = McpBridgeServer{[](const QString& toolName, const QJsonObject& params) {
     if (toolName == "tb_status")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -132,6 +132,8 @@ TEST_CASE("McpBridgeServer")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"focused", true},
+        {"cameraControlled", true},
+        {"focusedObjectCount", 1},
       });
     }
     if (toolName == "viewport_clear_marks")
@@ -181,6 +183,7 @@ TEST_CASE("McpBridgeServer")
     }
     if (toolName == "viewport_capture_scene_review")
     {
+      const auto cameraControlled = params.value("objectIds").isArray();
       return McpBridgeToolResult::success(QJsonObject{
         {"sceneName", "whitebox review smoke"},
         {"captureCount", 3},
@@ -191,7 +194,8 @@ TEST_CASE("McpBridgeServer")
            QJsonObject{{"view", "2d"}, {"path", "C:/tmp/2d.png"}},
          }},
         {"checklist", QJsonArray{"silhouette", "connectivity"}},
-        {"cameraControlled", false},
+        {"cameraControlled", cameraControlled},
+        {"focusedObjectCount", cameraControlled ? 1 : 0},
       });
     }
     if (toolName == "overlay_set")
@@ -613,6 +617,21 @@ TEST_CASE("McpBridgeServer")
     CHECK(reviewResponse.ok);
     CHECK(reviewResponse.result.value("captureCount").toInt() == 3);
     CHECK_FALSE(reviewResponse.result.value("cameraControlled").toBool());
+    CHECK(reviewResponse.result.value("focusedObjectCount").toInt() == 0);
+
+    const auto focusedReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "10b",
+      "secret",
+      "viewport_capture_scene_review",
+      QJsonObject{
+        {"sceneName", "focused whitebox review smoke"},
+        {"objectIds", QJsonArray{"node:0/0"}},
+        {"views", QJsonArray{"3d"}},
+      },
+      mcp::McpMode::ReadOnly});
+    CHECK(focusedReviewResponse.ok);
+    CHECK(focusedReviewResponse.result.value("cameraControlled").toBool());
+    CHECK(focusedReviewResponse.result.value("focusedObjectCount").toInt() == 1);
   }
 
   SECTION("serves map_search")
