@@ -268,17 +268,38 @@ bool metadataObjectMatches(const QJsonObject& metadata, const QJsonObject& expec
   return true;
 }
 
+bool isMetadataControlParam(const QString& key)
+{
+  static const auto Keys = QStringList{
+    "detail",
+    "limit",
+    "metadata",
+    "metadataOrder",
+    "objectIds",
+    "playerHull",
+    "select",
+  };
+  return Keys.contains(key);
+}
+
+QJsonObject expectedMetadataFromParams(const QJsonObject& params)
+{
+  auto result =
+    params.value("metadata").isObject() ? params.value("metadata").toObject()
+                                        : QJsonObject{};
+  for (auto it = params.begin(); it != params.end(); ++it)
+  {
+    if (!isMetadataControlParam(it.key()))
+    {
+      result.insert(it.key(), it.value());
+    }
+  }
+  return result;
+}
+
 bool allMetadataFiltersMatch(const QJsonObject& metadata, const QJsonObject& params)
 {
-  return metadataMatches(metadata, "routeId", params)
-         && metadataMatches(metadata, "intent", params)
-         && metadataMatches(metadata, "difficulty", params)
-         && metadataMatches(metadata, "movementType", params)
-         && metadataNumberMatches(metadata, "order", params)
-         && metadataObjectMatches(
-           metadata,
-           params.value("metadata").isObject() ? params.value("metadata").toObject()
-                                               : QJsonObject{});
+  return metadataObjectMatches(metadata, expectedMetadataFromParams(params));
 }
 
 size_t optionalSize(

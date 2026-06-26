@@ -2314,6 +2314,16 @@ TEST_CASE("McpBridgeServer route metadata tools")
       metadataStore);
     REQUIRE(customSelectResponse.ok);
     CHECK(customSelectResponse.result.value("count").toInt() == 1);
+
+    const auto topLevelCustomSelectResponse = selectionByMetadataForMapResult(
+      map,
+      QJsonObject{
+        {"probeTag", "agent_probe"},
+        {"select", false},
+      },
+      metadataStore);
+    REQUIRE(topLevelCustomSelectResponse.ok);
+    CHECK(topLevelCustomSelectResponse.result.value("count").toInt() == 1);
   }
 
   SECTION("distance analysis uses top-to-top height delta")
