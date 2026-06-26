@@ -326,6 +326,10 @@ QString McpObjectRegistry::externalIdForLegacy(
   {
     return legacyPathId;
   }
+  if (const auto it = m_legacyToStable.find(legacyPathId); it != m_legacyToStable.end())
+  {
+    return it->second;
+  }
   auto* node = resolveLegacyObjectId(map, legacyPathId);
   if (node == nullptr)
   {
@@ -344,9 +348,11 @@ McpObjectRegistry::ResolveResult McpObjectRegistry::resolveExternalId(
     {
       auto stableResult = resolveExternalId(map, stableIt->second);
       stableResult.legacyPathId = objectId;
-      stableResult.diagnostic.insert("objectId", objectId);
+      stableResult.diagnostic.insert("objectId", stableIt->second);
+      stableResult.diagnostic.insert("legacyInputId", objectId);
       stableResult.diagnostic.insert("stableObjectId", stableIt->second);
-      stableResult.diagnostic.insert("legacy", true);
+      stableResult.diagnostic.insert("legacy", false);
+      stableResult.diagnostic.insert("legacyInput", true);
       return stableResult;
     }
     if (auto* node = resolveLegacyObjectId(map, objectId))
@@ -531,9 +537,12 @@ QJsonObject McpObjectRegistry::liveStateJson(
     {"liveObjectCount", liveObjectCount},
     {"staleObjectCount", staleObjectCount},
     {"mismatchCount", mismatchCount},
-    {"legacyObjectCount", legacyObjectCount},
     {"valid", !undone && staleObjectCount == 0 && mismatchCount == 0},
   };
+  if (legacyObjectCount > 0 && liveObjectCount == 0 && staleObjectCount == 0)
+  {
+    result.insert("legacyObjectCount", legacyObjectCount);
+  }
   if (undone)
   {
     result.insert("staleReason", "operation was undone");
