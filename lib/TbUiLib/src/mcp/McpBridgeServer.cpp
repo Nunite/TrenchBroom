@@ -155,6 +155,14 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return viewportLayoutSetResult(appController, params);
         }
+        if (toolName == "viewport_camera_frame_bounds")
+        {
+          return viewportCameraFrameBoundsResult(appController, params);
+        }
+        if (toolName == "viewport_camera_set")
+        {
+          return viewportCameraSetResult(appController, params);
+        }
         if (toolName == "viewport_capture_current")
         {
           return viewportCaptureCurrentResult(appController, params);

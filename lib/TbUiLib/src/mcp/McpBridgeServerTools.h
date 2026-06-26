@@ -152,6 +152,10 @@ McpBridgeToolResult viewportClearMarksResult(
 McpBridgeToolResult viewportLayoutGetResult(AppController& appController);
 McpBridgeToolResult viewportLayoutSetResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult viewportCameraFrameBoundsResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult viewportCameraSetResult(
+  AppController& appController, const QJsonObject& params);
 McpBridgeToolResult viewportCaptureCurrentResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult viewportCapture3DResult(

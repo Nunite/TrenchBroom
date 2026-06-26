@@ -523,6 +523,56 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"layout"}),
     },
     {
+      "viewport_camera_frame_bounds",
+      "Frame a visible 3D viewport around object ids or explicit bounds from a "
+      "deterministic orbit angle for automated screenshot review. This only changes "
+      "the editor camera, not the map.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"objectIds", arrayProperty("Optional object ids whose combined bounds to frame.")},
+        {"bounds",
+         objectSchema(
+           {
+             {"min", vec3Property("Bounds minimum corner.")},
+             {"max", vec3Property("Bounds maximum corner.")},
+           },
+           {"min", "max"})},
+        {"min", vec3Property("Alternative bounds minimum corner.")},
+        {"max", vec3Property("Alternative bounds maximum corner.")},
+        {"azimuth",
+         numberProperty(
+           "Horizontal orbit angle in degrees around +Z. Defaults to -45.")},
+        {"elevation",
+         numberProperty(
+           "Vertical orbit angle in degrees, clamped to [-85,85]. Defaults to 32.")},
+        {"distanceScale",
+         numberProperty("Camera distance as a bounds diagonal multiplier. Defaults to 1.35.")},
+        {"minDistance",
+         numberProperty("Minimum camera distance in map units. Defaults to 256.")},
+        {"targetOffset",
+         vec3Property("Optional offset added to the computed bounds center target.")},
+      }),
+    },
+    {
+      "viewport_camera_set",
+      "Place a visible 3D viewport camera at an explicit position looking at a target. "
+      "Use this for interior, canyon, cave, or close-up screenshots where orbiting "
+      "bounds would be occluded.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"position", vec3Property("Camera position in map units.")},
+          {"target", vec3Property("Point the camera should look at in map units.")},
+          {"up", vec3Property("Optional camera up vector. Defaults to [0,0,1].")},
+          {"zoom", numberProperty("Optional camera zoom. Defaults to 1.")},
+        },
+        {"position", "target"}),
+    },
+    {
       "actions_list",
       "List executable TrenchBroom actions for the current context.",
       McpMode::ReadOnly,
@@ -605,8 +655,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "viewport_capture_scene_review",
       "Create a compact whitebox scene review package by focusing optional object ids, "
       "highlighting them, and capturing requested current/3d/2d viewport screenshots. "
-      "Use objectIds for deterministic target-focused review; explicit free camera "
-      "placement is still not implemented.",
+      "Use objectIds, camera bounds, or explicit camera position/target for "
+      "deterministic review.",
       McpMode::ReadOnly,
       false,
       true,
@@ -621,6 +671,27 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          stringProperty(
            "Optional layout to switch to before capture: twoPanes, threePanes, or "
            "fourPanes are useful when 2D and 3D screenshots are both required.")},
+        {"camera",
+         objectSchema({
+           {"bounds",
+            objectSchema(
+              {
+                {"min", vec3Property("Bounds minimum corner.")},
+                {"max", vec3Property("Bounds maximum corner.")},
+              },
+              {"min", "max"})},
+           {"min", vec3Property("Alternative bounds minimum corner.")},
+           {"max", vec3Property("Alternative bounds maximum corner.")},
+           {"azimuth", numberProperty("3D orbit azimuth in degrees.")},
+           {"elevation", numberProperty("3D orbit elevation in degrees.")},
+           {"distanceScale", numberProperty("3D camera distance scale.")},
+           {"minDistance", numberProperty("3D minimum camera distance.")},
+           {"targetOffset", vec3Property("Optional 3D target offset.")},
+           {"position", vec3Property("Explicit 3D camera position.")},
+           {"target", vec3Property("Explicit 3D camera look-at target.")},
+           {"up", vec3Property("Optional explicit 3D camera up vector.")},
+           {"zoom", numberProperty("Optional explicit 3D camera zoom.")},
+         })},
         {"checklist",
          arrayProperty(
            "Optional review checklist strings. Defaults to whitebox scene checks.")},
@@ -2158,6 +2229,8 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "selection_grow",
     "viewport_layout_get",
     "viewport_layout_set",
+    "viewport_camera_frame_bounds",
+    "viewport_camera_set",
     "viewport_capture_scene_review",
     "operation_inspect",
     "operation_select",

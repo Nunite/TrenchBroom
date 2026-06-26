@@ -61,6 +61,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("viewport_clear_marks"));
     CHECK(findToolDefinition("viewport_layout_get"));
     CHECK(findToolDefinition("viewport_layout_set"));
+    CHECK(findToolDefinition("viewport_camera_frame_bounds"));
+    CHECK(findToolDefinition("viewport_camera_set"));
     CHECK(findToolDefinition("viewport_capture_current"));
     CHECK(findToolDefinition("viewport_capture_3d"));
     CHECK(findToolDefinition("viewport_capture_2d"));
@@ -145,6 +147,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("viewport_clear_marks"));
     CHECK(names.contains("viewport_layout_get"));
     CHECK(names.contains("viewport_layout_set"));
+    CHECK(names.contains("viewport_camera_frame_bounds"));
+    CHECK(names.contains("viewport_camera_set"));
     CHECK(names.contains("viewport_capture_current"));
     CHECK(names.contains("viewport_capture_3d"));
     CHECK(names.contains("viewport_capture_2d"));
@@ -402,6 +406,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("viewport_clear_marks"));
     CHECK(names.contains("viewport_layout_get"));
     CHECK(names.contains("viewport_layout_set"));
+    CHECK(names.contains("viewport_camera_frame_bounds"));
+    CHECK(names.contains("viewport_camera_set"));
     CHECK(!names.contains("viewport_capture_3d"));
     CHECK(names.contains("viewport_capture_scene_review"));
     CHECK(!names.contains("overlay_set"));
@@ -591,14 +597,50 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(tool);
 
     CHECK(tool->description.contains("focusing optional object ids"));
-    CHECK(tool->description.contains("deterministic target-focused review"));
+    CHECK(tool->description.contains("explicit camera position/target"));
 
     const auto properties = tool->inputSchema.value("properties").toObject();
     CHECK(properties.value("objectIds").isObject());
     CHECK(properties.value("layout").isObject());
     CHECK(properties.value("views").isObject());
+    CHECK(properties.value("camera").isObject());
     CHECK(properties.value("highlight").isObject());
     CHECK(properties.value("clearSelectionBeforeCapture").isObject());
+  }
+
+  SECTION("viewport camera set schema supports explicit look-at review")
+  {
+    const auto tool = findToolDefinition("viewport_camera_set");
+    REQUIRE(tool);
+
+    CHECK(tool->description.contains("explicit position"));
+
+    const auto properties = tool->inputSchema.value("properties").toObject();
+    CHECK(properties.value("position").isObject());
+    CHECK(properties.value("target").isObject());
+    CHECK(properties.value("up").isObject());
+    CHECK(properties.value("zoom").isObject());
+    const auto required = tool->inputSchema.value("required").toArray();
+    CHECK(required.contains("position"));
+    CHECK(required.contains("target"));
+  }
+
+  SECTION("viewport camera frame bounds schema supports orbit review")
+  {
+    const auto tool = findToolDefinition("viewport_camera_frame_bounds");
+    REQUIRE(tool);
+
+    CHECK(tool->description.contains("deterministic orbit angle"));
+
+    const auto properties = tool->inputSchema.value("properties").toObject();
+    CHECK(properties.value("objectIds").isObject());
+    CHECK(properties.value("bounds").isObject());
+    CHECK(properties.value("min").isObject());
+    CHECK(properties.value("max").isObject());
+    CHECK(properties.value("azimuth").isObject());
+    CHECK(properties.value("elevation").isObject());
+    CHECK(properties.value("distanceScale").isObject());
+    CHECK(properties.value("targetOffset").isObject());
   }
 
   SECTION("tool search can discover hidden expert tools")

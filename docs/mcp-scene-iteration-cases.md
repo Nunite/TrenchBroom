@@ -342,3 +342,42 @@ Proposed MCP changes:
 
 Commit:
 - `Improve MCP scene review capture options`
+
+### 2026-06-27 - Scene 1 Follow-up: Camera-Controlled Review
+
+Build phases:
+- No new map geometry. This run improved screenshot automation after the first Scene 1 review proved that focus-only 3D captures could be occluded by large exterior brush massing.
+
+MCP tools used:
+- `viewport_camera_frame_bounds` to orbit the visible 3D camera around explicit bounds or selected object bounds.
+- `viewport_camera_set` to place the 3D camera at an explicit `position` looking at a `target`.
+- `viewport_capture_scene_review` with the new `camera` object, `highlight=false`, and `clearSelectionBeforeCapture=true`.
+- `tb_tools_search(detail=schema)` to verify both camera tools are visible in the `Modeling` profile.
+
+Screenshots:
+- Orbit bounds 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782501975992.png`
+- Narrow route orbit 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782502002279.png`
+- Interior look-at 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782502304964.png`
+- Interior look-at 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782502305024.png`
+
+What worked:
+- `viewport_camera_frame_bounds` gives repeatable orbit camera placement and returns the actual camera position, direction, target, and distance.
+- `viewport_camera_set` solves the interior/canyon/cave case where an orbit camera sees only the exterior shell.
+- The interior look-at screenshot made the boardwalk, support posts, rail band, and canyon wall spacing visible enough for AI review.
+
+What failed:
+- Orbiting combined object bounds can still frame unrelated or oversized massing if selection/bounds are too broad.
+- Scene 1 geometry still reads more like a boxed trench or industrial corridor than a natural mountain canyon because the cliff walls are tall prisms and the top/exterior mass dominates.
+- Explicit camera placement currently relies on the agent choosing good positions; there is no automatic multi-view plan or occlusion scoring yet.
+
+Tool/context bottlenecks:
+- Automated review needs a small multi-camera preset or caller convention: exterior orbit, route/interior look-at, and top/2D plan.
+- Scene selection should be scoped by operation/metadata where possible, not broad world bounds.
+- Natural terrain still needs lower-level profile/terrain primitives, not a canyon prefab.
+
+Proposed MCP changes:
+- Implemented this run: `viewport_camera_frame_bounds`, `viewport_camera_set`, and `viewport_capture_scene_review.camera`.
+- Next useful primitives remain `terrain_profile_wall_batch`, `repeat_along_path`, `support_posts_under_path`, and scoped `problems_check` / baseline warning diff.
+
+Commit:
+- `Add MCP camera controls for scene review`

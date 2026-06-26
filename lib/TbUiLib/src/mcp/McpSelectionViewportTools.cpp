@@ -25,6 +25,7 @@
 #include <QPixmap>
 #include <QStringList>
 
+#include "gl/Camera.h"
 #include "McpBridgeServerTools.h"
 #include "McpSelectionQuery.h"
 #include "mcp/McpError.h"
@@ -63,6 +64,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -89,6 +91,17 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
   return QJsonObject{
     {"min", vecToJson(bounds.min)},
     {"max", vecToJson(bounds.max)},
+  };
+}
+
+QJsonObject cameraToJson(const gl::Camera& camera)
+{
+  return QJsonObject{
+    {"position", vecToJson(vm::vec3d{camera.position()})},
+    {"direction", vecToJson(vm::vec3d{camera.direction()})},
+    {"up", vecToJson(vm::vec3d{camera.up()})},
+    {"right", vecToJson(vm::vec3d{camera.right()})},
+    {"zoom", camera.zoom()},
   };
 }
 
@@ -316,6 +329,18 @@ std::optional<vm::bbox3d> boundsFromJson(const QJsonObject& params, QString& err
   return vm::bbox3d{*min, *max};
 }
 
+std::optional<vm::bbox3d> boundsFromParamObject(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (!value.isObject())
+  {
+    error = QString{"%1 must be an object with min/max arrays"}.arg(key);
+    return std::nullopt;
+  }
+  return boundsFromJson(value.toObject(), error);
+}
+
 QJsonArray defaultSceneReviewChecklist()
 {
   return QJsonArray{
@@ -413,6 +438,17 @@ QJsonObject viewportLayoutJson(MapWindow& mapWindow)
     {"hasVisible2D", hasVisible2D},
     {"hasVisible3D", hasVisible3D},
   };
+}
+
+double optionalFiniteNumber(
+  const QJsonObject& params, const QString& key, const double defaultValue)
+{
+  const auto value = params.value(key);
+  if (!value.isDouble() || !std::isfinite(value.toDouble()))
+  {
+    return defaultValue;
+  }
+  return value.toDouble();
 }
 
 bool mcpOptionalBool(
@@ -658,6 +694,184 @@ View* findCaptureView(MapWindow& mapWindow)
   }
 
   return mapWindow.findChild<View*>();
+}
+
+std::vector<mdl::Node*> nodesFromObjectIds(
+  mdl::Map& map, const QJsonArray& objectIds, QString& error)
+{
+  auto& worldNode = map.worldNode();
+  auto nodes = std::vector<mdl::Node*>{};
+
+  for (const auto& objectIdValue : objectIds)
+  {
+    if (!objectIdValue.isString())
+    {
+      error = "objectIds must contain only strings";
+      return {};
+    }
+
+    const auto objectId = objectIdValue.toString();
+    auto* node = resolveNodeId(worldNode, objectId);
+    if (!node)
+    {
+      error = QString{"Unknown MCP object id: %1"}.arg(objectId);
+      return {};
+    }
+    nodes.push_back(node);
+  }
+
+  return nodes;
+}
+
+vm::bbox3d boundsForNodes(const std::vector<mdl::Node*>& nodes)
+{
+  auto builder = vm::bbox3d::builder{};
+  for (const auto* node : nodes)
+  {
+    if (node)
+    {
+      builder.add(node->logicalBounds());
+    }
+  }
+  return builder.bounds();
+}
+
+std::optional<vm::bbox3d> cameraFrameBoundsFromParams(
+  mdl::Map& map, const QJsonObject& params, QString& error)
+{
+  if (const auto boundsValue = params.value("bounds"); boundsValue.isObject())
+  {
+    return boundsFromParamObject(params, "bounds", error);
+  }
+  if (params.contains("min") || params.contains("max"))
+  {
+    return boundsFromJson(params, error);
+  }
+  if (const auto objectIds = params.value("objectIds"); objectIds.isArray())
+  {
+    const auto nodes = nodesFromObjectIds(map, objectIds.toArray(), error);
+    if (!error.isEmpty())
+    {
+      return std::nullopt;
+    }
+    if (nodes.empty())
+    {
+      error = "objectIds must contain at least one object";
+      return std::nullopt;
+    }
+    return boundsForNodes(nodes);
+  }
+
+  error = "viewport_camera_frame_bounds requires objectIds, bounds, or min/max";
+  return std::nullopt;
+}
+
+QJsonObject frame3dCameraOnBounds(MapView3D& view, const vm::bbox3d& bounds, const QJsonObject& params)
+{
+  const auto azimuthDegrees = optionalFiniteNumber(params, "azimuth", -45.0);
+  const auto elevationDegrees = std::clamp(
+    optionalFiniteNumber(params, "elevation", 32.0), -85.0, 85.0);
+  const auto distanceScale =
+    std::max(0.25, optionalFiniteNumber(params, "distanceScale", 1.35));
+  const auto minDistance =
+    std::max(1.0, optionalFiniteNumber(params, "minDistance", 256.0));
+  const auto targetOffset = [&]() {
+    auto error = QString{};
+    if (const auto offset = mcpVec3FromJson(params, "targetOffset", error))
+    {
+      return *offset;
+    }
+    return vm::vec3d{};
+  }();
+
+  const auto target = bounds.center() + targetOffset;
+  const auto size = bounds.size();
+  const auto diagonal = std::max(1.0, vm::length(size));
+  const auto distance = std::max(minDistance, diagonal * distanceScale);
+  const auto azimuth = azimuthDegrees * vm::constants<double>::pi() / 180.0;
+  const auto elevation = elevationDegrees * vm::constants<double>::pi() / 180.0;
+  const auto horizontal = std::cos(elevation);
+  const auto offsetDirection = vm::normalize(vm::vec3d{
+    std::cos(azimuth) * horizontal,
+    std::sin(azimuth) * horizontal,
+    std::sin(elevation),
+  });
+  const auto position = target + offsetDirection * distance;
+
+  auto& camera = static_cast<MapViewBase&>(view).camera();
+  camera.moveTo(vm::vec3f{position});
+  camera.lookAt(vm::vec3f{target}, vm::vec3f{0, 0, 1});
+  camera.setZoom(1.0f);
+  view.update();
+  QCoreApplication::processEvents();
+
+  return QJsonObject{
+    {"cameraControlled", true},
+    {"mode", "orbitBounds"},
+    {"bounds", boundsToJson(bounds)},
+    {"target", vecToJson(target)},
+    {"position", vecToJson(position)},
+    {"azimuth", azimuthDegrees},
+    {"elevation", elevationDegrees},
+    {"distance", distance},
+    {"distanceScale", distanceScale},
+    {"minDistance", minDistance},
+    {"camera", cameraToJson(camera)},
+  };
+}
+
+McpBridgeToolResult set3dCameraLookAtResult(
+  MapView3D& view, const QJsonObject& params)
+{
+  auto error = QString{};
+  const auto position = mcpVec3FromJson(params, "position", error);
+  if (!position)
+  {
+    return invalidParamsFailure(error);
+  }
+  const auto target = mcpVec3FromJson(params, "target", error);
+  if (!target)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto up = vm::vec3d{0, 0, 1};
+  if (params.contains("up"))
+  {
+    const auto parsedUp = mcpVec3FromJson(params, "up", error);
+    if (!parsedUp)
+    {
+      return invalidParamsFailure(error);
+    }
+    up = *parsedUp;
+  }
+
+  const auto direction = *target - *position;
+  if (
+    vm::is_zero(vm::squared_length(direction), vm::Cd::almost_zero())
+    || vm::is_zero(vm::squared_length(up), vm::Cd::almost_zero()))
+  {
+    return invalidParamsFailure(
+      "position and target must differ, and up must be non-zero");
+  }
+
+  const auto zoom = std::max(0.01, optionalFiniteNumber(params, "zoom", 1.0));
+  auto& camera = static_cast<MapViewBase&>(view).camera();
+  camera.moveTo(vm::vec3f{*position});
+  camera.lookAt(vm::vec3f{*target}, vm::vec3f{up});
+  camera.setZoom(static_cast<float>(zoom));
+  view.update();
+  QCoreApplication::processEvents();
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"cameraControlled", true},
+    {"mode", "lookAt"},
+    {"position", vecToJson(*position)},
+    {"target", vecToJson(*target)},
+    {"up", vecToJson(up)},
+    {"zoom", zoom},
+    {"camera", cameraToJson(camera)},
+  });
 }
 
 template <typename View>
@@ -1197,6 +1411,52 @@ McpBridgeToolResult viewportLayoutSetResult(
   return McpBridgeToolResult::success(std::move(after));
 }
 
+McpBridgeToolResult viewportCameraFrameBoundsResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto* view = findCaptureView<MapView3D>(*mapWindow);
+  if (!view)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "No 3D viewport is available");
+  }
+
+  auto error = QString{};
+  const auto bounds =
+    cameraFrameBoundsFromParams(mapWindow->document().map(), params, error);
+  if (!bounds)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  return McpBridgeToolResult::success(frame3dCameraOnBounds(*view, *bounds, params));
+}
+
+McpBridgeToolResult viewportCameraSetResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  auto* view = findCaptureView<MapView3D>(*mapWindow);
+  if (!view)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "No 3D viewport is available");
+  }
+
+  return set3dCameraLookAtResult(*view, params);
+}
+
 McpBridgeToolResult viewportCaptureCurrentResult(
   AppController& appController, const QJsonObject& params)
 {
@@ -1242,6 +1502,7 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
   const auto objectIdsValue = params.value("objectIds");
   auto cameraControlled = false;
   auto focusedObjectCount = 0;
+  auto cameraFrame = QJsonObject{};
   if (objectIdsValue.isArray())
   {
     const auto focusResult =
@@ -1274,6 +1535,32 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
       overlayState = QJsonObject{};
     }
     appController.refreshMcpOverlayViews();
+  }
+
+  if (const auto cameraValue = params.value("camera"); cameraValue.isObject())
+  {
+    auto cameraParams = cameraValue.toObject();
+    auto cameraResult =
+      cameraParams.contains("position") && cameraParams.contains("target")
+        ? viewportCameraSetResult(appController, cameraParams)
+        : McpBridgeToolResult::failure(
+          mcp::McpErrorCode::InvalidParams, "camera requires position/target or bounds");
+    if (
+      !cameraParams.contains("position") && !cameraParams.contains("target")
+      && !cameraParams.contains("objectIds") && objectIdsValue.isArray())
+    {
+      cameraParams.insert("objectIds", objectIdsValue);
+    }
+    if (!(cameraParams.contains("position") && cameraParams.contains("target")))
+    {
+      cameraResult = viewportCameraFrameBoundsResult(appController, cameraParams);
+    }
+    if (!cameraResult.ok)
+    {
+      return cameraResult;
+    }
+    cameraFrame = cameraResult.result;
+    cameraControlled = true;
   }
 
   if (mcpOptionalBool(params, "clearSelectionBeforeCapture", false))
@@ -1345,11 +1632,11 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     {"layout", layout.value("layout")},
     {"viewportLayout", layout},
     {"cameraControlled", cameraControlled},
+    {"cameraFrame", cameraFrame},
     {"focusedObjectCount", focusedObjectCount},
     {"note",
      cameraControlled
-       ? "This review package focused the current selection before capturing visible "
-         "viewports. Explicit free camera placement is still not implemented."
+       ? "This review package controlled the visible viewport target before capture."
        : "This review package uses the current visible TrenchBroom viewport state. "
          "Pass objectIds to focus the selection before capture."},
   });

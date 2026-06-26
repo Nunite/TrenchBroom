@@ -160,6 +160,22 @@ TEST_CASE("McpBridgeServer")
         {"hasVisible3D", true},
       });
     }
+    if (toolName == "viewport_camera_frame_bounds")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"cameraControlled", true},
+        {"mode", "orbitBounds"},
+        {"azimuth", params.value("azimuth").toDouble(-45.0)},
+        {"elevation", params.value("elevation").toDouble(32.0)},
+      });
+    }
+    if (toolName == "viewport_camera_set")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"cameraControlled", true},
+        {"mode", "lookAt"},
+      });
+    }
     if (
       toolName == "viewport_capture_current" || toolName == "viewport_capture_3d"
       || toolName == "viewport_capture_2d")
@@ -576,6 +592,33 @@ TEST_CASE("McpBridgeServer")
     CHECK(layoutSetResponse.ok);
     CHECK(layoutSetResponse.result.value("hasVisible2D").toBool());
 
+    const auto cameraFrameResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "6c",
+      "secret",
+      "viewport_camera_frame_bounds",
+      QJsonObject{
+        {"min", QJsonArray{0, 0, 0}},
+        {"max", QJsonArray{128, 128, 128}},
+        {"azimuth", -35.0},
+        {"elevation", 25.0},
+      },
+      mcp::McpMode::ReadOnly});
+    CHECK(cameraFrameResponse.ok);
+    CHECK(cameraFrameResponse.result.value("cameraControlled").toBool());
+    CHECK(cameraFrameResponse.result.value("mode").toString() == "orbitBounds");
+
+    const auto cameraSetResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "6d",
+      "secret",
+      "viewport_camera_set",
+      QJsonObject{
+        {"position", QJsonArray{256, -256, 128}},
+        {"target", QJsonArray{0, 0, 32}},
+      },
+      mcp::McpMode::ReadOnly});
+    CHECK(cameraSetResponse.ok);
+    CHECK(cameraSetResponse.result.value("mode").toString() == "lookAt");
+
     const auto captureResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "7",
       "secret",
@@ -628,6 +671,11 @@ TEST_CASE("McpBridgeServer")
         {"objectIds", QJsonArray{"node:0/0"}},
         {"highlight", false},
         {"clearSelectionBeforeCapture", true},
+        {"camera",
+         QJsonObject{
+           {"position", QJsonArray{256, -256, 128}},
+           {"target", QJsonArray{0, 0, 32}},
+         }},
         {"views", QJsonArray{"3d"}},
       },
       mcp::McpMode::ReadOnly});
