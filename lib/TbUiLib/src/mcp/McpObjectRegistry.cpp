@@ -334,6 +334,10 @@ QString McpObjectRegistry::externalIdForLegacy(
     {
       return it->second;
     }
+    if (resolveLegacyObjectId(map, legacyPathId) == nullptr)
+    {
+      return it->second;
+    }
     m_legacyToStable.erase(it);
   }
   auto* node = resolveLegacyObjectId(map, legacyPathId);

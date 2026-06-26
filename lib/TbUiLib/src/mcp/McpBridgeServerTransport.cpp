@@ -68,6 +68,12 @@ void syncOperationHistoryWithExternalResult(
     stableObjectIds.push_back(objectRegistry.externalIdForLegacy(map, objectId));
   }
   it->setChangedObjectIds(stableObjectIds);
+  auto stableDeletedObjectIds = QJsonArray{};
+  for (const auto& objectId : it->deletedObjectIds)
+  {
+    stableDeletedObjectIds.push_back(objectRegistry.externalIdForLegacy(map, objectId));
+  }
+  it->setDeletedObjectIds(stableDeletedObjectIds);
   it->setSummary(result);
 }
 
@@ -78,6 +84,7 @@ McpOperationRecord::McpOperationRecord()
   const auto now = QDateTime::currentDateTimeUtc();
   createdAt = now.toString(Qt::ISODateWithMs);
   createdAtMs = now.toMSecsSinceEpoch();
+  operationKind = "mutation";
 }
 
 void McpOperationRecord::setChangedObjectIds(const QJsonArray& ids)
@@ -93,10 +100,33 @@ void McpOperationRecord::setChangedObjectIds(const QJsonArray& ids)
   }
 }
 
+void McpOperationRecord::setDeletedObjectIds(const QJsonArray& ids)
+{
+  deletedObjectIds.clear();
+  deletedObjectIds.reserve(ids.size());
+  for (const auto& value : ids)
+  {
+    if (value.isString())
+    {
+      deletedObjectIds.push_back(value.toString());
+    }
+  }
+}
+
 QJsonArray McpOperationRecord::changedObjectIdsJson() const
 {
   auto result = QJsonArray{};
   for (const auto& id : changedObjectIds)
+  {
+    result.push_back(id);
+  }
+  return result;
+}
+
+QJsonArray McpOperationRecord::deletedObjectIdsJson() const
+{
+  auto result = QJsonArray{};
+  for (const auto& id : deletedObjectIds)
   {
     result.push_back(id);
   }
@@ -200,10 +230,13 @@ QJsonObject resourceObject(
     {"operationId", operation.operationId},
     {"toolName", operation.toolName},
     {"transactionName", operation.transactionName},
+    {"operationKind", operation.operationKind},
     {"createdAt", operation.createdAt},
     {"createdAtMs", operation.createdAtMs},
     {"changedObjectIds", operation.changedObjectIdsJson()},
     {"changedObjectCount", operation.changedObjectIds.size()},
+    {"deletedObjectIds", operation.deletedObjectIdsJson()},
+    {"deletedObjectCount", operation.deletedObjectIds.size()},
     {"undone", operation.undone},
     {"summary", operation.summary()},
     {"detail", operation.detail()},

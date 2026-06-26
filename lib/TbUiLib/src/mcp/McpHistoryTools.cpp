@@ -27,11 +27,11 @@
 #include "mdl/Map_Selection.h"
 #include "mdl/Node.h"
 #include "mdl/WorldNode.h"
-#include "ui/mcp/McpObjectRegistry.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/mcp/McpObjectRegistry.h"
 
 #include <algorithm>
 #include <vector>
@@ -57,9 +57,13 @@ QJsonObject operationRecordJson(const McpOperationRecord& operation)
   result.insert("operationId", operation.operationId);
   result.insert("toolName", operation.toolName);
   result.insert("transactionName", operation.transactionName);
+  result.insert(
+    "operationKind",
+    operation.operationKind.isEmpty() ? "mutation" : operation.operationKind);
   result.insert("createdAt", operation.createdAt);
   result.insert("createdAtMs", operation.createdAtMs);
   result.insert("changedObjectCount", operation.changedObjectIds.size());
+  result.insert("deletedObjectCount", operation.deletedObjectIds.size());
   result.insert(
     "resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId));
   result.insert("undone", operation.undone);
@@ -74,6 +78,7 @@ QJsonObject operationRecordDetailJson(
   if (detail == "ids" || detail == "full")
   {
     result.insert("changedObjectIds", operation.changedObjectIdsJson());
+    result.insert("deletedObjectIds", operation.deletedObjectIdsJson());
   }
   if (detail == "full")
   {
@@ -170,9 +175,7 @@ QJsonObject operationLiveStateJson(mdl::Map& map, const McpOperationRecord& oper
 }
 
 QJsonObject operationRecordJson(
-  mdl::Map& map,
-  const McpOperationRecord& operation,
-  const bool includeLiveState)
+  mdl::Map& map, const McpOperationRecord& operation, const bool includeLiveState)
 {
   auto result = operationRecordJson(operation);
   if (includeLiveState)
@@ -195,8 +198,20 @@ QJsonObject operationRecordJson(
   auto result = operationRecordJson(operation);
   if (includeLiveState)
   {
-    const auto liveState =
+    auto liveState =
       objectRegistry.liveStateJson(map, operation.changedObjectIds, operation.undone);
+    if (operation.operationKind == "delete")
+    {
+      liveState.insert("valid", !operation.undone);
+      liveState.insert("targetsLive", false);
+      liveState.insert(
+        "staleReason",
+        "delete operation records objects that were removed by the transaction");
+      liveState.insert(
+        "suggestedAction",
+        "Use deletedObjectIds for audit only; redo/undo the delete operation to change "
+        "map state.");
+    }
     for (auto it = liveState.begin(); it != liveState.end(); ++it)
     {
       result.insert(it.key(), it.value());
@@ -227,7 +242,8 @@ QJsonArray operationHistoryJson(
   auto result = QJsonArray{};
   for (const auto& operation : history)
   {
-    result.push_back(operationRecordJson(map, operation, objectRegistry, includeLiveState));
+    result.push_back(
+      operationRecordJson(map, operation, objectRegistry, includeLiveState));
   }
   return result;
 }
@@ -349,12 +365,23 @@ McpBridgeToolResult operationInspectResult(
                       : "summary");
   if (auto* mapWindow = appController.mapWindowManager().topMapWindow())
   {
-    const auto liveState =
-      objectRegistry.liveStateJson(
-        mapWindow->document().map(),
-        operation->changedObjectIds,
-        operation->undone,
-        detail == "full");
+    auto liveState = objectRegistry.liveStateJson(
+      mapWindow->document().map(),
+      operation->changedObjectIds,
+      operation->undone,
+      detail == "full");
+    if (operation->operationKind == "delete")
+    {
+      liveState.insert("valid", !operation->undone);
+      liveState.insert("targetsLive", false);
+      liveState.insert(
+        "staleReason",
+        "delete operation records objects that were removed by the transaction");
+      liveState.insert(
+        "suggestedAction",
+        "Use deletedObjectIds for audit only; redo/undo the delete operation to change "
+        "map state.");
+    }
     for (auto it = liveState.begin(); it != liveState.end(); ++it)
     {
       result.insert(it.key(), it.value());
@@ -560,6 +587,16 @@ McpBridgeToolResult operationValidateResult(
     return noActiveDocumentFailure();
   }
 
+  return operationValidateForMapResult(
+    mapWindow->document().map(), history, params, objectRegistry);
+}
+
+McpBridgeToolResult operationValidateForMapResult(
+  mdl::Map& map,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry)
+{
   const auto operationId = params.value("operationId").toString();
   if (operationId.isEmpty())
   {
@@ -573,11 +610,20 @@ McpBridgeToolResult operationValidateResult(
   }
 
   const auto detail = params.value("detail").toString("summary").toLower();
-  const auto liveState = objectRegistry.liveStateJson(
-    mapWindow->document().map(),
-    operation->changedObjectIds,
-    operation->undone,
-    detail == "full");
+  auto liveState = objectRegistry.liveStateJson(
+    map, operation->changedObjectIds, operation->undone, detail == "full");
+  if (operation->operationKind == "delete")
+  {
+    liveState.insert("valid", !operation->undone);
+    liveState.insert("targetsLive", false);
+    liveState.insert(
+      "staleReason",
+      "delete operation records objects that were removed by the transaction");
+    liveState.insert(
+      "suggestedAction",
+      "Use deletedObjectIds for audit only; redo/undo the delete operation to change "
+      "map state.");
+  }
   const auto liveObjectCount = liveState.value("liveObjectCount").toInt();
   const auto staleObjectCount = liveState.value("staleObjectCount").toInt();
   const auto mismatchCount = liveState.value("mismatchCount").toInt();
@@ -586,11 +632,19 @@ McpBridgeToolResult operationValidateResult(
     {"operationId", operationId},
     {"valid", liveState.value("valid").toBool(false)},
     {"undone", operation->undone},
+    {"operationKind",
+     operation->operationKind.isEmpty() ? "mutation" : operation->operationKind},
     {"changedObjectCount", operation->changedObjectIds.size()},
+    {"deletedObjectCount", operation->deletedObjectIds.size()},
     {"liveObjectCount", liveObjectCount},
     {"staleObjectCount", staleObjectCount},
     {"mismatchCount", mismatchCount},
   };
+  if (detail == "ids" || detail == "full")
+  {
+    result.insert("changedObjectIds", operation->changedObjectIdsJson());
+    result.insert("deletedObjectIds", operation->deletedObjectIdsJson());
+  }
   for (auto it = liveState.begin(); it != liveState.end(); ++it)
   {
     result.insert(it.key(), it.value());

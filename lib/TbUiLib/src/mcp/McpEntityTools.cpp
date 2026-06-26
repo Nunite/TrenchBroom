@@ -957,6 +957,163 @@ McpBridgeToolResult createEntityCheckedResult(
   return result;
 }
 
+McpBridgeToolResult createEntityCheckedBatchResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return createEntityCheckedBatchForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult createEntityCheckedBatchForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto entitiesValue = params.value("entities");
+  if (!entitiesValue.isArray())
+  {
+    return invalidParamsFailure("entity_create_checked_batch requires entities array");
+  }
+
+  const auto entitiesArray = entitiesValue.toArray();
+  if (entitiesArray.isEmpty())
+  {
+    return invalidParamsFailure("entities must not be empty");
+  }
+
+  auto nodes = std::vector<mdl::Node*>{};
+  auto createdClassnames = QJsonArray{};
+
+  const auto cleanupNodes = [&] {
+    for (auto* node : nodes)
+    {
+      delete node;
+    }
+    nodes.clear();
+  };
+
+  for (auto i = 0; i < entitiesArray.size(); ++i)
+  {
+    const auto entityValue = entitiesArray[i];
+    if (!entityValue.isObject())
+    {
+      cleanupNodes();
+      return invalidParamsFailure(QString{"entities[%1] must be an object"}.arg(i));
+    }
+
+    const auto entityParams = entityValue.toObject();
+    const auto classname = entityParams.value("classname").toString().trimmed();
+    if (classname.isEmpty())
+    {
+      cleanupNodes();
+      return invalidParamsFailure(QString{"entities[%1] requires classname"}.arg(i));
+    }
+
+    const auto* definition =
+      map.entityDefinitionManager().definition(classname.toStdString());
+    if (!definition)
+    {
+      cleanupNodes();
+      return invalidParamsFailure(
+        QString{"FGD does not define entity classname: %1"}.arg(classname));
+    }
+    if (mdl::getType(*definition) != mdl::EntityDefinitionType::Point)
+    {
+      cleanupNodes();
+      return invalidParamsFailure(
+        QString{"entity_create_checked_batch only creates point entities; %1 is %2"}
+          .arg(classname)
+          .arg(entityDefinitionTypeName(*definition)));
+    }
+
+    auto error = QString{};
+    const auto properties = stringMapFromJson(entityParams, "properties", error);
+    if (!properties)
+    {
+      cleanupNodes();
+      return invalidParamsFailure(QString{"entities[%1].%2"}.arg(i).arg(error));
+    }
+
+    auto origin = vm::vec3d{0, 0, 0};
+    if (const auto originValue = entityParams.value("origin"); !originValue.isUndefined())
+    {
+      const auto parsedOrigin = mcpVec3FromJson(entityParams, "origin", error);
+      if (!parsedOrigin)
+      {
+        cleanupNodes();
+        return invalidParamsFailure(QString{"entities[%1].%2"}.arg(i).arg(error));
+      }
+      origin = *parsedOrigin;
+    }
+
+    auto entity =
+      mdl::Entity{{{mdl::EntityPropertyKeys::Classname, classname.toStdString()}}};
+    mdl::setDefaultProperties(*definition, entity, mdl::SetDefaultPropertyMode::SetAll);
+    entity.setOrigin(origin);
+    for (const auto& [key, value] : *properties)
+    {
+      entity.addOrUpdateProperty(key, value);
+    }
+
+    nodes.push_back(new mdl::EntityNode{std::move(entity)});
+    createdClassnames.push_back(classname);
+  }
+
+  const auto transactionName =
+    params.value("transactionName").toString("MCP: Create checked entities").trimmed();
+  const auto finalTransactionName =
+    transactionName.isEmpty() ? QString{"MCP: Create checked entities"} : transactionName;
+  const auto changedObjectIds = addNodesWithTransaction(
+    map, finalTransactionName, nodes, mcpOptionalBool(params, "select", true));
+  if (!changedObjectIds)
+  {
+    cleanupNodes();
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not create checked entity batch");
+  }
+
+  auto result = QJsonObject{};
+  mcpRecordOperation(
+    history,
+    nextOperationIndex,
+    toolName,
+    finalTransactionName,
+    *changedObjectIds,
+    result);
+  result.insert("checked", true);
+  result.insert("entityCount", static_cast<int>(nodes.size()));
+  result.insert("classNames", createdClassnames);
+
+  const auto detail = params.value("detail").toString("summary").toLower();
+  if (detail == "ids" || detail == "full")
+  {
+    result.insert("changedObjectIds", *changedObjectIds);
+  }
+  if (detail == "full")
+  {
+    auto entitySummaries = QJsonArray{};
+    for (const auto* node : nodes)
+    {
+      entitySummaries.push_back(nodeSummaryJson(*node, map.worldNode()));
+    }
+    result.insert("entities", entitySummaries);
+  }
+
+  return McpBridgeToolResult::success(std::move(result));
+}
+
 McpBridgeToolResult tieBrushesResult(
   AppController& appController,
   const QString& toolName,

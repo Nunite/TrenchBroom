@@ -186,6 +186,11 @@ McpBridgeToolResult operationValidateResult(
   const std::vector<McpOperationRecord>& history,
   const QJsonObject& params,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult operationValidateForMapResult(
+  mdl::Map& map,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult operationValidateResult(
   AppController& appController,
   const std::vector<McpOperationRecord>& history,
@@ -231,6 +236,18 @@ McpBridgeToolResult createEntityCheckedResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult createEntityCheckedBatchResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult createEntityCheckedBatchForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult tieBrushesResult(
   AppController& appController,
   const QString& toolName,
@@ -246,6 +263,12 @@ McpBridgeToolResult untieBrushesResult(
 
 McpBridgeToolResult deleteObjectsResult(
   AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult deleteObjectsForMapResult(
+  mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,

@@ -260,6 +260,17 @@ QJsonObject boxBatchItemSchema()
     {"min", "max"});
 }
 
+QJsonObject checkedEntityBatchItemSchema()
+{
+  return objectSchema(
+    {
+      {"classname", stringProperty("Point entity classname to validate.")},
+      {"origin", vec3Property("Entity origin in map units.")},
+      {"properties", stringObjectProperty("Properties to add or update.")},
+    },
+    {"classname"});
+}
+
 } // namespace
 
 const std::vector<McpToolDefinition>& defaultToolCatalog()
@@ -661,6 +672,28 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"select", boolProperty("Select the created entity.")},
         },
         {"classname"}),
+    },
+    {
+      "entity_create_checked_batch",
+      "Create multiple point entities after validating each classname against the "
+      "active FGD schema. Use this for lights, spawns, and route markers that should "
+      "land in one undoable transaction.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"entities",
+           arrayProperty(
+             "Entities to create: {classname, origin?, properties?}.",
+             checkedEntityBatchItemSchema())},
+          {"transactionName",
+           stringProperty(
+             "Transaction label, defaults to MCP: Create checked entities.")},
+          {"select", boolProperty("Select created entities.")},
+          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+        },
+        {"entities"}),
     },
     {
       "entity_tie_brushes",
@@ -2096,6 +2129,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "fgd_entities_list",
     "entity_schema",
     "entity_create_checked",
+    "entity_create_checked_batch",
     "entity_create_from_schema",
     "entity_tie_brushes",
     "entity_untie_brushes",
@@ -2331,6 +2365,17 @@ bool queryContainsExactToolName(const QString& normalizedQuery, const QString& t
   return false;
 }
 
+bool queryHasAnyExactToolName(const QString& normalizedQuery)
+{
+  if (normalizedQuery.isEmpty())
+  {
+    return false;
+  }
+  return std::ranges::any_of(defaultToolCatalog(), [&](const auto& tool) {
+    return queryContainsExactToolName(normalizedQuery, tool.name);
+  });
+}
+
 } // namespace
 
 QJsonArray toolsSearchJson(
@@ -2374,6 +2419,18 @@ QJsonArray toolsSearchJson(
         && (normalizedCategory.isEmpty() || tool.category.compare(normalizedCategory, Qt::CaseInsensitive) == 0))
       {
         exactMatches.push_back(std::cref(tool));
+      }
+    }
+    if (exactMatches.empty() && queryHasAnyExactToolName(normalizedQuery))
+    {
+      for (const auto& tool : defaultToolCatalog())
+      {
+        if (
+          tool.implemented && allowsMode(mode, tool.requiredMode)
+          && queryContainsExactToolName(normalizedQuery, tool.name))
+        {
+          exactMatches.push_back(std::cref(tool));
+        }
       }
     }
   }

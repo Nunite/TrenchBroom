@@ -29,6 +29,8 @@
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
+#include "mdl/EntityDefinition.h"
+#include "mdl/EntityDefinitionManager.h"
 #include "mdl/GameConfigFixture.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
@@ -184,7 +186,9 @@ TEST_CASE("McpBridgeServer")
         {"classname", "func_wall"},
       });
     }
-    if (toolName == "entity_create_from_schema" || toolName == "entity_create_checked")
+    if (
+      toolName == "entity_create_from_schema" || toolName == "entity_create_checked"
+      || toolName == "entity_create_checked_batch")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"operationId", "mcp-op-4"},
@@ -1391,6 +1395,7 @@ TEST_CASE("McpBridgeServer MCP read semantics")
   CHECK(selection.value("brushCount").toInt() == 2);
   CHECK(selection.value("brushFaceCount").toInt() == 0);
   CHECK(selection.value("selectedBrushTotalFaceCount").toInt() == 12);
+  CHECK(selection.value("selectedBrushFaceCount").toInt() == 12);
 
   const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
   REQUIRE(objectIds.size() == 2);
@@ -1408,6 +1413,7 @@ TEST_CASE("McpBridgeServer MCP read semantics")
   const auto faceSelection = selectionJsonForMap(map);
   CHECK(faceSelection.value("brushCount").toInt() == 0);
   CHECK(faceSelection.value("brushFaceCount").toInt() == 2);
+  CHECK(faceSelection.value("selectedBrushFaceCount").toInt() == 0);
   CHECK(faceSelection.value("faceOwnerBrushCount").toInt() == 1);
   CHECK(
     faceSelection.value("faceOwnerBrushIds").toArray().first().toString()
@@ -1478,9 +1484,18 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
           {"receivedLegacyPath", ids.isEmpty() ? QString{} : ids.first().toString()},
         });
       }
+      if (toolName == "objects_delete")
+      {
+        return deleteObjectsForMapResult(
+          map, toolName, params, history, nextOperationIndex);
+      }
       if (toolName == "history_list")
       {
         return historyListResult(history);
+      }
+      if (toolName == "operation_inspect")
+      {
+        return operationInspectResult(history, params);
       }
       if (toolName == "geometry_analyze_selection")
       {
@@ -1616,6 +1631,61 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
     analyzeResponse.result.value("nonGridAlignedObjectIds").toArray();
   REQUIRE(nonGridAlignedObjectIds.size() == 1);
   CHECK(nonGridAlignedObjectIds.first().toString().startsWith("mcp:"));
+
+  const auto deleteCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "6",
+    "secret",
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{1024, 0, 0}},
+           {"max", QJsonArray{1088, 64, 16}},
+         },
+       }},
+      {"detail", "ids"},
+    },
+    mcp::McpMode::Edit});
+  REQUIRE(deleteCreateResponse.ok);
+  const auto deleteCreateIds =
+    deleteCreateResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(deleteCreateIds.size() == 1);
+  const auto stableDeleteTarget = deleteCreateIds.first().toString();
+  REQUIRE(stableDeleteTarget.startsWith("mcp:"));
+
+  const auto deleteResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "7",
+    "secret",
+    "objects_delete",
+    QJsonObject{{"objectIds", QJsonArray{stableDeleteTarget}}},
+    mcp::McpMode::Edit});
+  REQUIRE(deleteResponse.ok);
+  CHECK(deleteResponse.result.value("operationKind").toString() == "delete");
+  CHECK(deleteResponse.result.value("changedObjectCount").toInt() == 0);
+  const auto deletedObjectIds = deleteResponse.result.value("deletedObjectIds").toArray();
+  REQUIRE(deletedObjectIds.size() == 1);
+  CHECK(deletedObjectIds.first().toString() == stableDeleteTarget);
+  REQUIRE(history.size() >= 4u);
+  CHECK(history.back().operationKind == "delete");
+  REQUIRE(history.back().deletedObjectIds.size() == 1);
+  CHECK(history.back().deletedObjectIds.front().startsWith("node:"));
+
+  const auto inspectDeleteResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "8",
+    "secret",
+    "operation_inspect",
+    QJsonObject{
+      {"operationId", deleteResponse.result.value("operationId").toString()},
+      {"detail", "ids"},
+    },
+    mcp::McpMode::ReadOnly});
+  REQUIRE(inspectDeleteResponse.ok);
+  const auto inspectedDeletedObjectIds =
+    inspectDeleteResponse.result.value("deletedObjectIds").toArray();
+  REQUIRE(inspectedDeletedObjectIds.size() == 1);
+  CHECK(inspectedDeletedObjectIds.first().toString() == stableDeleteTarget);
 }
 
 TEST_CASE("McpBridgeServer object transform summaries")
@@ -1838,9 +1908,22 @@ TEST_CASE("McpBridgeServer deletes operations without long object id lists")
     registry);
   REQUIRE(deleteResponse.ok);
   CHECK(deleteResponse.result.value("sourceOperationId").toString() == "mcp-op-1");
-  CHECK(deleteResponse.result.value("changedObjectCount").toInt() == 2);
+  CHECK(deleteResponse.result.value("operationKind").toString() == "delete");
+  CHECK(deleteResponse.result.value("changedObjectCount").toInt() == 0);
   CHECK(deleteResponse.result.value("deletedCount").toInt() == 2);
+  CHECK(deleteResponse.result.value("deletedObjectIds").toArray().size() == 2);
   CHECK(map.worldNode().descendantCount() == 1u);
+  REQUIRE(history.size() == 2u);
+  CHECK(history.back().operationKind == "delete");
+  CHECK(history.back().changedObjectIds.empty());
+  CHECK(history.back().deletedObjectIds.size() == 2);
+
+  const auto validateDelete = operationValidateForMapResult(
+    map, history, QJsonObject{{"operationId", history.back().operationId}}, registry);
+  REQUIRE(validateDelete.ok);
+  CHECK(validateDelete.result.value("valid").toBool());
+  CHECK_FALSE(validateDelete.result.value("targetsLive").toBool());
+  CHECK(validateDelete.result.value("deletedObjectCount").toInt() == 2);
 
   const auto compactState =
     registry.liveStateJson(map, history.front().changedObjectIds, false);
@@ -2710,6 +2793,103 @@ TEST_CASE("McpBridgeServer route metadata tools")
     CHECK(undoResponse.result.value("undone").toBool());
     CHECK(undoResponse.result.value("skippedSelectionCommands").toInt() == 1);
     CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+  }
+}
+
+TEST_CASE("McpBridgeServer checked entity batch")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  map.entityDefinitionManager().setDefinitions({
+    {"test_spawn", {}, "", {}, mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}}},
+    {"test_light", {}, "", {}, mdl::PointEntityDefinition{vm::bbox3d{8.0}, {}, {}}},
+  });
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  SECTION("creates multiple checked point entities in one transaction")
+  {
+    const auto descendantCountBefore = map.worldNode().descendantCount();
+    const auto response = createEntityCheckedBatchForMapResult(
+      map,
+      "entity_create_checked_batch",
+      QJsonObject{
+        {"transactionName", "MCP: Test checked entity batch"},
+        {"detail", "ids"},
+        {"select", true},
+        {"entities",
+         QJsonArray{
+           QJsonObject{
+             {"classname", "test_spawn"},
+             {"origin", QJsonArray{0, 0, 8}},
+             {"properties", QJsonObject{{"angles", "0 90 0"}}},
+           },
+           QJsonObject{
+             {"classname", "test_light"},
+             {"origin", QJsonArray{128, 0, 128}},
+             {"properties", QJsonObject{{"_light", "255 240 220 160"}}},
+           },
+           QJsonObject{
+             {"classname", "test_light"},
+             {"origin", QJsonArray{256, 0, 128}},
+             {"properties", QJsonObject{{"_light", "220 240 255 120"}}},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    CHECK(
+      response.result.value("transactionName").toString()
+      == "MCP: Test checked entity batch");
+    CHECK(response.result.value("checked").toBool());
+    CHECK(response.result.value("entityCount").toInt() == 3);
+    CHECK(response.result.value("changedObjectCount").toInt() == 3);
+    CHECK(response.result.value("changedObjectIds").toArray().size() == 3);
+    CHECK(history.size() == 1u);
+    CHECK(history.front().toolName == "entity_create_checked_batch");
+    CHECK(map.selection().nodes.size() == 3u);
+    CHECK(map.worldNode().descendantCount() == descendantCountBefore + 3u);
+    REQUIRE(map.undoCommandName() != nullptr);
+    CHECK(
+      QString::fromStdString(*map.undoCommandName()) == "MCP: Test checked entity batch");
+
+    map.undoCommand();
+    CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+  }
+
+  SECTION("rejects unknown class without committing")
+  {
+    const auto descendantCountBefore = map.worldNode().descendantCount();
+    const auto response = createEntityCheckedBatchForMapResult(
+      map,
+      "entity_create_checked_batch",
+      QJsonObject{
+        {"entities",
+         QJsonArray{
+           QJsonObject{{"classname", "test_light"}, {"origin", QJsonArray{0, 0, 128}}},
+           QJsonObject{{"classname", "not_a_real_entity"}},
+         }},
+      },
+      history,
+      nextOperationIndex);
+
+    CHECK(!response.ok);
+    CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
+    CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+    CHECK(history.empty());
   }
 }
 

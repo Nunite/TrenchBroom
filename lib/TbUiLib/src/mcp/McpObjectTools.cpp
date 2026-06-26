@@ -33,11 +33,11 @@
 #include "mdl/Node.h"
 #include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
-#include "ui/mcp/McpObjectRegistry.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/mcp/McpObjectRegistry.h"
 
 #include "kd/vector_utils.h"
 
@@ -155,6 +155,25 @@ void mcpRecordOperation(
   operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation);
   history.push_back(std::move(operation));
+}
+
+void markDeleteOperation(
+  std::vector<McpOperationRecord>& history,
+  QJsonObject& result,
+  const QJsonArray& deletedObjectIds)
+{
+  if (!history.empty())
+  {
+    auto& operation = history.back();
+    operation.operationKind = "delete";
+    operation.setChangedObjectIds(QJsonArray{});
+    operation.setDeletedObjectIds(deletedObjectIds);
+  }
+  result.insert("operationKind", "delete");
+  result.insert("changedObjectIds", QJsonArray{});
+  result.insert("changedObjectCount", 0);
+  result.insert("deletedObjectIds", deletedObjectIds);
+  result.insert("deletedObjectCount", deletedObjectIds.size());
 }
 
 std::optional<vm::vec3d> mcpVec3FromJson(
@@ -362,7 +381,8 @@ std::optional<std::vector<mdl::Node*>> nodesFromOperation(
 
   if (result.empty())
   {
-    error = QString{"MCP operation has no changed objects: %1"}.arg(operation.operationId);
+    error =
+      QString{"MCP operation has no changed objects: %1"}.arg(operation.operationId);
     return std::nullopt;
   }
 
@@ -499,7 +519,17 @@ McpBridgeToolResult deleteObjectsResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return deleteObjectsForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult deleteObjectsForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   auto error = QString{};
   const auto nodes = nodesFromObjectIds(map, params, error);
   if (!nodes)
@@ -518,6 +548,7 @@ McpBridgeToolResult deleteObjectsResult(
   auto result = QJsonObject{};
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  markDeleteOperation(history, result, *changedObjectIds);
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -548,8 +579,8 @@ McpBridgeToolResult deleteObjectsByFilterResult(
       "objects_delete_by_filter requires at least one filter: type, classname, "
       "targetname, material, query, or bounds");
   }
-  if (params.value("type").toString().trimmed().compare("world", Qt::CaseInsensitive)
-      == 0)
+  if (
+    params.value("type").toString().trimmed().compare("world", Qt::CaseInsensitive) == 0)
   {
     return invalidParamsFailure("objects_delete_by_filter cannot delete world");
   }
@@ -584,6 +615,7 @@ McpBridgeToolResult deleteObjectsByFilterResult(
   auto result = QJsonObject{};
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  markDeleteOperation(history, result, *changedObjectIds);
   result.insert("matchedCount", changedObjectIds->size());
   return McpBridgeToolResult::success(std::move(result));
 }
@@ -639,6 +671,11 @@ McpBridgeToolResult deleteObjectsByOperationForMapResult(
 
   const auto transactionName =
     QString{"MCP: Delete operation %1 objects"}.arg(operationId);
+  auto deletedObjectIds = QJsonArray{};
+  for (const auto& objectId : (**operation).changedObjectIds)
+  {
+    deletedObjectIds.push_back(objectId);
+  }
   const auto changedObjectIds = removeNodesWithTransaction(map, transactionName, *nodes);
   if (!changedObjectIds)
   {
@@ -649,8 +686,9 @@ McpBridgeToolResult deleteObjectsByOperationForMapResult(
   auto result = QJsonObject{};
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  markDeleteOperation(history, result, deletedObjectIds);
   result.insert("sourceOperationId", operationId);
-  result.insert("deletedCount", changedObjectIds->size());
+  result.insert("deletedCount", deletedObjectIds.size());
   return McpBridgeToolResult::success(std::move(result));
 }
 

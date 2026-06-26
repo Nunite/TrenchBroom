@@ -64,7 +64,9 @@ struct McpOperationRecord
   QString operationId;
   QString toolName;
   QString transactionName;
+  QString operationKind;
   QStringList changedObjectIds;
+  QStringList deletedObjectIds;
   QString createdAt;
   qint64 createdAtMs = 0;
   QByteArray summaryJson;
@@ -73,7 +75,9 @@ struct McpOperationRecord
 
   McpOperationRecord();
   void setChangedObjectIds(const QJsonArray& ids);
+  void setDeletedObjectIds(const QJsonArray& ids);
   QJsonArray changedObjectIdsJson() const;
+  QJsonArray deletedObjectIdsJson() const;
   void setSummary(const QJsonObject& value);
   QJsonObject summary() const;
   void setDetail(const QJsonObject& value);
@@ -111,7 +115,9 @@ public:
   explicit McpBridgeServer(AppController& appController, QObject* parent = nullptr);
   explicit McpBridgeServer(ToolHandler toolHandler, QObject* parent = nullptr);
   McpBridgeServer(
-    ToolHandler toolHandler, ActiveMapProvider activeMapProvider, QObject* parent = nullptr);
+    ToolHandler toolHandler,
+    ActiveMapProvider activeMapProvider,
+    QObject* parent = nullptr);
   ~McpBridgeServer() override;
 
   bool start(const mcp::McpBridgeConfig& config, QString* error = nullptr);

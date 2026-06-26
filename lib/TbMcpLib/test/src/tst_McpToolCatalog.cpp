@@ -66,6 +66,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("entity_schema"));
     CHECK(findToolDefinition("entity_create_from_schema"));
     CHECK(findToolDefinition("entity_create_checked"));
+    CHECK(findToolDefinition("entity_create_checked_batch"));
     CHECK(findToolDefinition("entity_tie_brushes"));
     CHECK(findToolDefinition("entity_untie_brushes"));
     CHECK(findToolDefinition("brush_types_list"));
@@ -307,6 +308,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("fgd_entities_list"));
     CHECK(names.contains("entity_schema"));
     CHECK(names.contains("entity_create_checked"));
+    CHECK(names.contains("entity_create_checked_batch"));
     CHECK(names.contains("entity_create_from_schema"));
     CHECK(names.contains("entity_tie_brushes"));
     CHECK(names.contains("entity_untie_brushes"));
@@ -410,6 +412,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("entity_schema"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("entity_create_from_schema"));
+    CHECK(!names.contains("entity_create_checked_batch"));
   }
 
   SECTION("heightmap import tool requires image path and is modeling visible")
@@ -668,6 +671,23 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_create_batch"));
   }
 
+  SECTION("tool search exact names survive misleading category hints")
+  {
+    const auto tools = toolsSearchJson(
+      "entity_create_checked_batch",
+      "blockout",
+      "schema",
+      McpMode::Edit,
+      McpToolProfile::Modeling);
+    auto names = QStringList{};
+    for (const auto& tool : tools)
+    {
+      names.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("entity_create_checked_batch"));
+  }
+
   SECTION("tool search exact tool name returns only exact matches")
   {
     const auto tools = toolsSearchJson(
@@ -741,6 +761,14 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(entityTool);
     CHECK(entityTool->category == "entity");
     CHECK(entityTool->inputSchema.value("required").toArray().contains("classname"));
+
+    const auto entityBatchTool = findToolDefinition("entity_create_checked_batch");
+    REQUIRE(entityBatchTool);
+    CHECK(entityBatchTool->category == "entity");
+    CHECK(entityBatchTool->inputSchema.value("required").toArray().contains("entities"));
+    const auto entityBatchProperties =
+      entityBatchTool->inputSchema.value("properties").toObject();
+    CHECK(entityBatchProperties.value("entities").toObject().value("items").isObject());
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")

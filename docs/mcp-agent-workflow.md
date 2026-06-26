@@ -170,9 +170,10 @@ GoldSrc / CS1.6 资产优先走统一资产工具：
 实体优先走 FGD schema：
 
 1. 已知 classname 时优先用 `entity_create_checked`，它会确认当前 FGD 支持该 point entity，再按 schema/defaults 创建。
-2. 不确定 classname 时用 `fgd_entities_list` 查找，再用 `entity_schema` 读取默认属性、类型和说明。
-3. 需要完全显式控制 schema 流程时再用 `entity_create_from_schema` 创建 point entity。
-4. `entity_update` 只修改明确给出的属性，不清空未知字段。
+2. 同时创建多盏 `light`、多个 spawn、route marker 或其他 point entity 时用 `entity_create_checked_batch`，一次验证 FGD、一次 transaction、一次 undo，不要连续调用很多次 `entity_create_checked`。
+3. 不确定 classname 时用 `fgd_entities_list` 查找，再用 `entity_schema` 读取默认属性、类型和说明。
+4. 需要完全显式控制 schema 流程时再用 `entity_create_from_schema` 创建 point entity。
+5. `entity_update` 只修改明确给出的属性，不清空未知字段。
 
 Brush entity 工作流：
 
@@ -221,6 +222,8 @@ MCP 写操作会返回：
 
 - 一次布局阶段完成后调用 `history_list`，查看最近 MCP 操作时间线。每条记录包含 `createdAt`、`createdAtMs`、`toolName`、`transactionName`、`changedObjectCount`；有活动文档时还包含 `liveObjectCount`、`staleObjectCount` 和 `valid`。
 - 需要查看某次操作创建/修改的对象时调用 `operation_inspect(detail=ids)`；需要检查对象是否仍然有效时调用 `operation_validate`。
+- 删除类 operation 会标记 `operationKind=delete`，并把被删除对象放在 `deletedObjectIds` / `deletedObjectCount` 中。不要把 delete operation 的 `liveObjectCount` 当作“被删对象还活着”；删除记录主要用于审计和 undo/redo。
+- `selection_get` 中 `brushFaceCount` 表示当前选择的 brush face 数量；整 brush 选择的总 face 数使用 `selectedBrushFaceCount` / `selectedBrushTotalFaceCount`。
 - 发现最近一次 MCP 操作错误时调用 `history_undo_mcp`。
 - 不要用 `objects_delete` 代替 undo，除非用户明确要删除对象。
 - 保存前调用 `map_validate` 和 `problems_check`。

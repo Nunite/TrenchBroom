@@ -218,6 +218,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           return createEntityCheckedResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
         }
+        if (toolName == "entity_create_checked_batch")
+        {
+          return createEntityCheckedBatchResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
         if (toolName == "entity_tie_brushes")
         {
           return tieBrushesResult(
