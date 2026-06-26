@@ -218,6 +218,19 @@ QJsonObject materialJson(const gl::Material& material)
   };
 }
 
+QString currentMaterialName(mdl::Map& map)
+{
+  return QString::fromStdString(map.currentMaterialName());
+}
+
+QString fallbackMaterialName(mdl::Map& map)
+{
+  const auto current = currentMaterialName(map);
+  return current.isEmpty()
+           ? QString::fromStdString(mdl::BrushFaceAttributes::NoMaterialName)
+           : current;
+}
+
 QJsonObject brushFaceAttributesJson(const mdl::BrushFaceAttributes& attributes)
 {
   return QJsonObject{
@@ -269,11 +282,16 @@ McpBridgeToolResult textureSearchResult(
     return noActiveDocumentFailure();
   }
 
+  return textureSearchForMapResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult textureSearchForMapResult(mdl::Map& map, const QJsonObject& params)
+{
   const auto query = params.value("query").toString().trimmed();
   const auto limit = std::max(1, params.value("limit").toInt(50));
   auto results = QJsonArray{};
 
-  const auto& materials = mapWindow->document().map().materialManager().materials();
+  const auto& materials = map.materialManager().materials();
   for (const auto* material : materials)
   {
     if (!material)
@@ -300,6 +318,8 @@ McpBridgeToolResult textureSearchResult(
     {"query", query},
     {"results", results},
     {"count", results.size()},
+    {"currentMaterial", currentMaterialName(map)},
+    {"fallbackMaterial", fallbackMaterialName(map)},
   });
 }
 

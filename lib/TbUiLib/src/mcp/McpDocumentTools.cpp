@@ -170,6 +170,27 @@ void collectMapCounts(const mdl::Node& node, int& entities, int& brushes, int& p
   }
 }
 
+vm::bbox3d contentBounds(const mdl::WorldNode& worldNode)
+{
+  auto result = vm::bbox3d{};
+  auto hasBounds = false;
+
+  worldNode.visitChildren([&](auto&& thisLambda, const mdl::Node& node) {
+    if (
+      dynamic_cast<const mdl::EntityNode*>(&node) != nullptr
+      || dynamic_cast<const mdl::BrushNode*>(&node) != nullptr
+      || dynamic_cast<const mdl::PatchNode*>(&node) != nullptr)
+    {
+      result = hasBounds ? vm::merge(result, node.logicalBounds()) : node.logicalBounds();
+      hasBounds = true;
+    }
+
+    node.visitChildren(thisLambda);
+  });
+
+  return hasBounds ? result : vm::bbox3d{};
+}
+
 QJsonObject documentJson(const MapWindow& mapWindow, const int index)
 {
   const auto& map = mapWindow.document().map();
@@ -272,7 +293,11 @@ QJsonObject mapSnapshotJson(AppController& appController)
     return {};
   }
 
-  const auto& map = mapWindow->document().map();
+  return mapSnapshotJsonForMap(mapWindow->document().map(), documentJson(*mapWindow, 0));
+}
+
+QJsonObject mapSnapshotJsonForMap(const mdl::Map& map, const QJsonObject& document)
+{
   const auto& worldNode = map.worldNode();
   const auto& grid = map.grid();
 
@@ -280,6 +305,7 @@ QJsonObject mapSnapshotJson(AppController& appController)
   auto brushes = 0;
   auto patches = 0;
   collectMapCounts(worldNode, entities, brushes, patches);
+  const auto mapContentBounds = contentBounds(worldNode);
 
   auto worldspawn = QJsonObject{};
   for (const auto& property : worldNode.entity().properties())
@@ -288,15 +314,21 @@ QJsonObject mapSnapshotJson(AppController& appController)
       QString::fromStdString(property.key()), QString::fromStdString(property.value()));
   }
 
+  auto world = mcpNodeSummaryJson(worldNode, worldNode);
+  world.insert("nodeLogicalBounds", world.value("logicalBounds"));
+  world.insert("logicalBounds", boundsToJson(mapContentBounds));
+  world.insert("contentBounds", boundsToJson(mapContentBounds));
+
   return QJsonObject{
-    {"document", documentJson(*mapWindow, 0)},
-    {"world", mcpNodeSummaryJson(worldNode, worldNode)},
+    {"document", document},
+    {"world", world},
     {"worldspawn", worldspawn},
     {"entityCount", entities},
     {"brushCount", brushes},
     {"patchCount", patches},
     {"nodeCount", static_cast<int>(worldNode.descendantCount() + 1)},
-    {"bounds", boundsToJson(worldNode.logicalBounds())},
+    {"bounds", boundsToJson(mapContentBounds)},
+    {"contentBounds", boundsToJson(mapContentBounds)},
     {"grid",
      QJsonObject{
        {"size", grid.size()},

@@ -1286,6 +1286,97 @@ TEST_CASE("McpBridgeServer spiral stair geometry tools")
   CHECK(map.worldNode().childCount() == 1u);
 }
 
+TEST_CASE("McpBridgeServer MCP read semantics")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  const auto createResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Snapshot read semantics"},
+      {"detail", "ids"},
+      {"select", true},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{1024, 0, 0}},
+           {"max", QJsonArray{1088, 64, 16}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{1216, 0, 0}},
+           {"max", QJsonArray{1280, 64, 16}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  const auto createError =
+    createResponse.ok ? std::string{} : createResponse.error.message.toStdString();
+  INFO(createError);
+  REQUIRE(createResponse.ok);
+
+  const auto snapshot = mapSnapshotJsonForMap(map, QJsonObject{});
+  CHECK(snapshot.value("brushCount").toInt() == 2);
+  CHECK(snapshot.value("bounds").toObject().value("min").toArray()[0].toDouble() == 1024);
+  CHECK(snapshot.value("bounds").toObject().value("max").toArray()[0].toDouble() == 1280);
+  CHECK(snapshot.value("world").toObject().value("logicalBounds").isObject());
+  CHECK(
+    snapshot.value("world")
+      .toObject()
+      .value("contentBounds")
+      .toObject()
+      .value("max")
+      .toArray()[0]
+      .toDouble()
+    == 1280);
+
+  const auto selection = selectionJsonForMap(map);
+  CHECK(selection.value("brushCount").toInt() == 2);
+  CHECK(selection.value("brushFaceCount").toInt() == 0);
+  CHECK(selection.value("selectedBrushTotalFaceCount").toInt() == 12);
+
+  const auto boundsResponse = selectionByBoundsForMapResult(
+    map,
+    QJsonObject{
+      {"min", QJsonArray{1000, -16, -16}},
+      {"max", QJsonArray{1300, 80, 32}},
+      {"detail", "full"},
+    });
+  REQUIRE(boundsResponse.ok);
+  CHECK(boundsResponse.result.value("count").toInt() == 2);
+  CHECK(
+    boundsResponse.result.value("filters").toObject().value("selectableOnly").toBool());
+  CHECK(boundsResponse.result.value("filters").toObject().value("leafOnly").toBool());
+  for (const auto& value : boundsResponse.result.value("results").toArray())
+  {
+    const auto object = value.toObject();
+    CHECK(object.value("type").toString() == "brush");
+  }
+
+  const auto textureResponse = textureSearchForMapResult(
+    map, QJsonObject{{"query", "unlikely_missing_material_name"}});
+  REQUIRE(textureResponse.ok);
+  CHECK(textureResponse.result.value("count").toInt() == 0);
+  CHECK(!textureResponse.result.value("fallbackMaterial").toString().isEmpty());
+
+  map.undoCommand();
+}
+
 TEST_CASE("McpBridgeServer batch blockout tools")
 {
   auto appControllerFixture = AppControllerFixture{};
@@ -1664,8 +1755,8 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
                 QJsonArray{224, 0},
                 QJsonArray{224, 64},
                 QJsonArray{160, 64}}},
-             {"minZ", 16},
-             {"maxZ", 32},
+             {"minZ", 0},
+             {"maxZ", 16},
              {"metadata",
               QJsonObject{
                 {"routeId", "chain_a"},
@@ -1744,8 +1835,100 @@ TEST_CASE("McpBridgeServer KZ MCP tools")
       analyzeResponse.result.value("segments").toArray().first().toObject();
     CHECK(segment.value("edgeGap").toDouble() == 96.0);
     CHECK(segment.value("heightDelta").toDouble() == 0.0);
+    CHECK(segment.value("verticalGap").toDouble() == 0.0);
     CHECK(segment.value("effectiveDistanceBadLanding").toDouble() > 96.0);
     CHECK(segment.value("usedMetadataDirection").toBool());
+
+    const auto customSetResponse = brushMetadataSetForMapResult(
+      map,
+      QJsonObject{
+        {"objectIds", QJsonArray{firstObjectId}},
+        {"metadata",
+         QJsonObject{
+           {"routeId", "chain_a"},
+           {"probeTag", "agent_probe"},
+         }},
+      },
+      metadataStore);
+    REQUIRE(customSetResponse.ok);
+
+    const auto customSelectResponse = selectionByMetadataForMapResult(
+      map,
+      QJsonObject{
+        {"metadata", QJsonObject{{"probeTag", "agent_probe"}}},
+        {"select", false},
+      },
+      metadataStore);
+    REQUIRE(customSelectResponse.ok);
+    CHECK(customSelectResponse.result.value("count").toInt() == 1);
+  }
+
+  SECTION("distance analysis uses top-to-top height delta")
+  {
+    const auto response = brushCreatePolygonBatchForMapResult(
+      map,
+      "brush_create_polygon_batch",
+      QJsonObject{
+        {"detail", "ids"},
+        {"select", false},
+        {"brushes",
+         QJsonArray{
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{0, 0},
+                QJsonArray{64, 0},
+                QJsonArray{64, 64},
+                QJsonArray{0, 64}}},
+             {"minZ", 0},
+             {"maxZ", 16},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "height_chain"},
+                {"movementType", "bhop"},
+                {"outgoingDirection", QJsonArray{1, 0, 0}},
+              }},
+           },
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{160, 0},
+                QJsonArray{224, 0},
+                QJsonArray{224, 64},
+                QJsonArray{160, 64}}},
+             {"minZ", 24},
+             {"maxZ", 40},
+             {"metadata",
+              QJsonObject{
+                {"routeId", "height_chain"},
+                {"movementType", "bhop"},
+                {"incomingDirection", QJsonArray{1, 0, 0}},
+              }},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore);
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    const auto objectIds = response.result.value("changedObjectIds").toArray();
+
+    const auto analyzeResponse = kzDistanceAnalyzeChainForMapResult(
+      map,
+      QJsonObject{
+        {"objectIds", objectIds},
+        {"movementType", "bhop"},
+      },
+      metadataStore);
+    REQUIRE(analyzeResponse.ok);
+    const auto segment =
+      analyzeResponse.result.value("segments").toArray().first().toObject();
+    CHECK(segment.value("heightDelta").toDouble() == 24.0);
+    CHECK(segment.value("verticalGap").toDouble() == 8.0);
+    CHECK(analyzeResponse.result.value("maxAbsHeightDelta").toDouble() == 24.0);
   }
 
   SECTION("undo skips metadata selection commands before reverting the MCP operation")

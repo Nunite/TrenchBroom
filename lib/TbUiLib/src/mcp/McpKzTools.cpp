@@ -242,12 +242,28 @@ bool metadataMatches(
   return metadata.value(key).toString().compare(expected, Qt::CaseInsensitive) == 0;
 }
 
+bool metadataObjectMatches(const QJsonObject& metadata, const QJsonObject& expected)
+{
+  for (const auto& key : expected.keys())
+  {
+    if (metadata.value(key) != expected.value(key))
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
 bool allMetadataFiltersMatch(const QJsonObject& metadata, const QJsonObject& params)
 {
   return metadataMatches(metadata, "routeId", params)
          && metadataMatches(metadata, "intent", params)
          && metadataMatches(metadata, "difficulty", params)
-         && metadataMatches(metadata, "movementType", params);
+         && metadataMatches(metadata, "movementType", params)
+         && metadataObjectMatches(
+           metadata,
+           params.value("metadata").isObject() ? params.value("metadata").toObject()
+                                               : QJsonObject{});
 }
 
 size_t optionalSize(
@@ -334,14 +350,6 @@ QJsonArray metadataKeysJson()
   };
 }
 
-bool isSupportedMetadataKey(const QString& key)
-{
-  const auto keys = metadataKeysJson();
-  return std::any_of(keys.begin(), keys.end(), [&](const auto& value) {
-    return value.toString().compare(key, Qt::CaseInsensitive) == 0;
-  });
-}
-
 std::optional<QJsonObject> metadataFromJsonValue(
   const QJsonValue& value, const QString& key, QString& error)
 {
@@ -355,16 +363,7 @@ std::optional<QJsonObject> metadataFromJsonValue(
     return std::nullopt;
   }
 
-  const auto metadata = value.toObject();
-  for (const auto& metadataKey : metadata.keys())
-  {
-    if (!isSupportedMetadataKey(metadataKey))
-    {
-      error = QString{"Unsupported metadata key '%1'"}.arg(metadataKey);
-      return std::nullopt;
-    }
-  }
-  return metadata;
+  return value.toObject();
 }
 
 std::optional<std::vector<QJsonObject>> metadataArrayFromBrushes(
@@ -440,7 +439,11 @@ QJsonObject segmentMetricsJson(
   const auto toHalfAlong = std::abs(direction.x()) * toBounds.size().x() / 2.0
                            + std::abs(direction.y()) * toBounds.size().y() / 2.0;
   const auto edgeGap = std::max(0.0, centerDistance - fromHalfAlong - toHalfAlong);
-  const auto heightDelta = toBounds.min.z() - fromBounds.max.z();
+  const auto heightDelta = toBounds.max.z() - fromBounds.max.z();
+  const auto verticalGap =
+    toBounds.min.z() > fromBounds.max.z()   ? toBounds.min.z() - fromBounds.max.z()
+    : fromBounds.min.z() > toBounds.max.z() ? toBounds.max.z() - fromBounds.min.z()
+                                            : 0.0;
   const auto lateralOffset =
     std::abs((-direction.y()) * delta.x() + direction.x() * delta.y());
   const auto landingWindowArea = platformArea2D(to);
@@ -455,6 +458,7 @@ QJsonObject segmentMetricsJson(
     {"effectiveDistanceIdeal", edgeGap},
     {"effectiveDistanceBadLanding", edgeGap + badLandingPenalty},
     {"heightDelta", heightDelta},
+    {"verticalGap", verticalGap},
     {"lateralOffset", lateralOffset},
     {"landingWindowArea", landingWindowArea},
     {"direction", QJsonArray{direction.x(), direction.y()}},

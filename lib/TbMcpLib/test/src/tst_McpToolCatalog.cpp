@@ -621,6 +621,52 @@ TEST_CASE("McpToolCatalog")
       operations.value("items").toObject().value("required").toArray().contains("type"));
   }
 
+  SECTION("tool search returns exact tool names from multi-tool queries")
+  {
+    const auto tools = toolsSearchJson(
+      "brush_create_polygon_batch kz_distance_analyze_chain selection_by_metadata",
+      "",
+      "summary",
+      McpMode::Edit,
+      McpToolProfile::Modeling);
+    auto names = QStringList{};
+    for (const auto& tool : tools)
+    {
+      names.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("brush_create_polygon_batch"));
+    CHECK(names.contains("kz_distance_analyze_chain"));
+    CHECK(names.contains("selection_by_metadata"));
+  }
+
+  SECTION("tool search exact names survive category hints")
+  {
+    const auto tools = toolsSearchJson(
+      "blockout_create_batch operations box format",
+      "blockout",
+      "schema",
+      McpMode::Edit,
+      McpToolProfile::Modeling);
+    auto names = QStringList{};
+    for (const auto& tool : tools)
+    {
+      names.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(names.contains("blockout_create_batch"));
+  }
+
+  SECTION("tool search exact names can find hidden profile tools")
+  {
+    const auto tools = toolsSearchJson(
+      "viewport_capture_3d", "", "summary", McpMode::Edit, McpToolProfile::Modeling);
+    REQUIRE(tools.size() == 1);
+    const auto tool = tools.first().toObject();
+    CHECK(tool.value("name").toString() == "viewport_capture_3d");
+    CHECK(!tool.value("visibleInCurrentProfile").toBool());
+  }
+
   SECTION("safe batch modeling helpers have structured schemas")
   {
     const auto boxesTool = findToolDefinition("brush_create_boxes_batch");
@@ -650,6 +696,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(polygonItem.value("required").toArray().contains("minZ"));
     CHECK(polygonItem.value("required").toArray().contains("maxZ"));
     CHECK(polygonItem.value("properties").toObject().contains("metadata"));
+    const auto metadataSchema =
+      polygonItem.value("properties").toObject().value("metadata").toObject();
+    CHECK(metadataSchema.value("additionalProperties").toBool());
+    CHECK(metadataSchema.value("description").toString().contains("Custom"));
 
     const auto deleteTool = findToolDefinition("objects_delete_by_filter");
     REQUIRE(deleteTool);

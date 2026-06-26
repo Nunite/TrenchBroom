@@ -89,7 +89,7 @@ Use `detail=ids` when a caller needs object ids for follow-up metadata or analys
 
 Metadata is stored in the MCP bridge session. It is not written into the map file.
 
-Supported metadata keys:
+Known metadata keys:
 
 - `routeId`
 - `intent`
@@ -99,6 +99,10 @@ Supported metadata keys:
 - `landingWindow`
 - `incomingDirection`
 - `outgoingDirection`
+
+Custom session-only keys are allowed for temporary Agent probes, for example
+`probeTag`. They can be matched with `selection_by_metadata` using the
+`metadata` object parameter.
 
 If the map is reloaded or an object id stops resolving to a live brush, reads report the record as stale.
 
@@ -112,6 +116,15 @@ Read-only. Finds live brushes by session metadata and optionally selects them. I
 - `movementType`
 
 This lets an Agent select a route segment without manually carrying long object-id lists through the conversation.
+It also supports exact matching on custom metadata with:
+
+```json
+{
+  "metadata": {
+    "probeTag": "agent_probe"
+  }
+}
+```
 
 ### `kz_distance_analyze_chain`
 
@@ -121,8 +134,14 @@ Read-only. Accepts ordered `objectIds` or a `routeId`. It computes mapper geomet
 - `effectiveDistanceIdeal`
 - `effectiveDistanceBadLanding`
 - `heightDelta`
+- `verticalGap`
 - `lateralOffset`
 - `landingWindowArea`
+
+`heightDelta` is top-to-top (`to.maxZ - from.maxZ`), so same-height platforms
+report `0` even if both have thickness. `verticalGap` reports actual vertical
+separation between the brush bodies and is `0` when the two platform volumes
+overlap or touch vertically.
 
 The tool uses `outgoingDirection` or `incomingDirection` metadata when present. Without direction metadata it uses platform centers and emits a warning. The result is a mapper heuristic, not an in-game pass/fail guarantee.
 

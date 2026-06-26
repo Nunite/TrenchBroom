@@ -148,9 +148,9 @@ QJsonObject kzMetadataSchema()
   return QJsonObject{
     {"type", "object"},
     {"description",
-     "Session-level KZ route metadata. Supported keys include routeId, intent, "
+     "Session-level KZ route metadata. Known keys include routeId, intent, "
      "difficulty, movementType, takeoffEdge, landingWindow, incomingDirection, and "
-     "outgoingDirection."},
+     "outgoingDirection. Custom session-only keys are allowed for agent probes."},
     {"additionalProperties", true},
     {"properties",
      QJsonObject{
@@ -423,7 +423,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "selection_by_bounds",
-      "Select objects whose logical bounds intersect or fit inside a box.",
+      "Select leaf selectable objects whose logical bounds intersect or fit inside a "
+      "box. Defaults exclude world/container matches.",
       McpMode::ReadOnly,
       false,
       true,
@@ -432,6 +433,17 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"min", vec3Property("Bounds minimum corner.")},
           {"max", vec3Property("Bounds maximum corner.")},
           {"mode", stringProperty("Bounds mode: intersects or contains.")},
+          {"excludeWorld",
+           boolProperty("Exclude node:world. Defaults to true for bounds queries.")},
+          {"selectableOnly",
+           boolProperty(
+             "Return only directly selectable nodes. Defaults to true for bounds "
+             "queries.")},
+          {"leafOnly",
+           boolProperty("Return only leaf nodes. Defaults to true for bounds queries.")},
+          {"exactTypeOnly",
+           boolProperty("Require exact type matches when type is supplied.")},
+          {"detail", stringProperty("summary or full. Defaults to summary.")},
         },
         {"min", "max"}),
     },
@@ -1147,7 +1159,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "textures_list",
-      "List loaded materials in the active document.",
+      "List loaded materials in the active document. With an empty query, returns the "
+      "first N materials plus currentMaterial and fallbackMaterial.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1158,7 +1171,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "texture_search",
-      "Search loaded materials in the active document.",
+      "Search loaded materials in the active document. If no material matches, use "
+      "fallbackMaterial from the result for safe blockout geometry.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1781,6 +1795,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"intent", stringProperty("Optional intent to match exactly.")},
         {"difficulty", stringProperty("Optional difficulty to match exactly.")},
         {"movementType", stringProperty("Optional movement type to match exactly.")},
+        {"metadata", kzMetadataSchema()},
         {"select", boolProperty("Replace selection with matched live brush nodes.")},
         {"limit", integerProperty("Maximum result count, defaults to 100.")},
       }),
@@ -2173,6 +2188,30 @@ bool toolMatchesSearch(
     tokens, [&](const auto& token) { return text.contains(token); });
 }
 
+bool queryContainsExactToolName(const QString& normalizedQuery, const QString& toolName)
+{
+  const auto normalizedName = toolName.toLower();
+  auto start = qsizetype{0};
+  while ((start = normalizedQuery.indexOf(normalizedName, start)) >= 0)
+  {
+    const auto before =
+      start == 0 ? QChar{} : normalizedQuery.at(static_cast<qsizetype>(start - 1));
+    const auto afterIndex = start + normalizedName.size();
+    const auto after =
+      afterIndex >= normalizedQuery.size() ? QChar{} : normalizedQuery.at(afterIndex);
+    const auto beforeBoundary =
+      before.isNull() || (!before.isLetterOrNumber() && before != '_');
+    const auto afterBoundary =
+      after.isNull() || (!after.isLetterOrNumber() && after != '_');
+    if (beforeBoundary && afterBoundary)
+    {
+      return true;
+    }
+    ++start;
+  }
+  return false;
+}
+
 } // namespace
 
 QJsonArray toolsSearchJson(
@@ -2189,27 +2228,7 @@ QJsonArray toolsSearchJson(
   const auto tokens = toolSearchTokens(normalizedQuery);
 
   auto result = QJsonArray{};
-  for (const auto& tool : defaultToolCatalog())
-  {
-    if (!tool.implemented || !allowsMode(mode, tool.requiredMode))
-    {
-      continue;
-    }
-    if (!visibleInProfile(tool, profile) && normalizedQuery.isEmpty())
-    {
-      continue;
-    }
-    if (
-      !normalizedCategory.isEmpty()
-      && tool.category.compare(normalizedCategory, Qt::CaseInsensitive) != 0)
-    {
-      continue;
-    }
-    if (!normalizedQuery.isEmpty() && !toolMatchesSearch(tool, tokens, includeSchema))
-    {
-      continue;
-    }
-
+  const auto appendTool = [&](const auto& tool) {
     auto object = QJsonObject{
       {"name", tool.name},
       {"description", tool.description},
@@ -2223,6 +2242,34 @@ QJsonArray toolsSearchJson(
       object.insert("inputSchema", tool.inputSchema);
     }
     result.push_back(std::move(object));
+  };
+
+  for (const auto& tool : defaultToolCatalog())
+  {
+    if (!tool.implemented || !allowsMode(mode, tool.requiredMode))
+    {
+      continue;
+    }
+    if (!visibleInProfile(tool, profile) && normalizedQuery.isEmpty())
+    {
+      continue;
+    }
+    const auto exactNameMatch = !normalizedQuery.isEmpty()
+                                && queryContainsExactToolName(normalizedQuery, tool.name);
+    if (
+      !exactNameMatch && !normalizedCategory.isEmpty()
+      && tool.category.compare(normalizedCategory, Qt::CaseInsensitive) != 0)
+    {
+      continue;
+    }
+    if (
+      !exactNameMatch && !normalizedQuery.isEmpty()
+      && !toolMatchesSearch(tool, tokens, includeSchema))
+    {
+      continue;
+    }
+
+    appendTool(tool);
   }
   return result;
 }

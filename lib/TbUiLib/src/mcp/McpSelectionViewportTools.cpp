@@ -604,14 +604,23 @@ QJsonObject selectionJson(AppController& appController)
     return {};
   }
 
-  const auto& map = mapWindow->document().map();
+  return selectionJsonForMap(mapWindow->document().map());
+}
+
+QJsonObject selectionJsonForMap(const mdl::Map& map)
+{
   const auto& worldNode = map.worldNode();
   const auto& selection = map.selection();
 
   auto nodes = QJsonArray{};
+  auto selectedBrushTotalFaceCount = 0;
   for (const auto* node : selection.nodes)
   {
     nodes.push_back(mcpNodeSummaryJson(*node, worldNode));
+    if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(node))
+    {
+      selectedBrushTotalFaceCount += static_cast<int>(brushNode->brush().faceCount());
+    }
   }
 
   return QJsonObject{
@@ -623,6 +632,7 @@ QJsonObject selectionJson(AppController& appController)
     {"brushCount", static_cast<int>(selection.brushes.size())},
     {"patchCount", static_cast<int>(selection.patches.size())},
     {"brushFaceCount", static_cast<int>(selection.brushFaces.size())},
+    {"selectedBrushTotalFaceCount", selectedBrushTotalFaceCount},
   };
 }
 
@@ -635,6 +645,12 @@ QJsonObject selectionSummaryJson(AppController& appController)
   }
 
   const auto& selection = mapWindow->document().map().selection();
+  auto selectedBrushTotalFaceCount = 0;
+  for (const auto* brushNode : selection.brushes)
+  {
+    selectedBrushTotalFaceCount += static_cast<int>(brushNode->brush().faceCount());
+  }
+
   return QJsonObject{
     {"hasSelection", selection.hasAny()},
     {"nodeCount", static_cast<int>(selection.nodes.size())},
@@ -643,6 +659,7 @@ QJsonObject selectionSummaryJson(AppController& appController)
     {"brushCount", static_cast<int>(selection.brushes.size())},
     {"patchCount", static_cast<int>(selection.patches.size())},
     {"brushFaceCount", static_cast<int>(selection.brushFaces.size())},
+    {"selectedBrushTotalFaceCount", selectedBrushTotalFaceCount},
   };
 }
 
@@ -719,7 +736,11 @@ McpBridgeToolResult selectionFilterResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return selectionFilterForMapResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult selectionFilterForMapResult(mdl::Map& map, const QJsonObject& params)
+{
   auto& worldNode = map.worldNode();
   auto error = QString{};
   auto options = McpSelectionQueryOptions{};
@@ -769,6 +790,14 @@ McpBridgeToolResult selectionFilterResult(
     {"objectIds", objectIds},
     {"count", objectIds.size()},
     {"detail", detail == "full" ? "full" : "summary"},
+    {"filters",
+     QJsonObject{
+       {"excludeWorld", options.excludeWorld},
+       {"selectableOnly", options.selectableOnly},
+       {"leafOnly", options.leafOnly},
+       {"exactTypeOnly", options.exactTypeOnly},
+       {"removeDescendantMatches", options.removeDescendantMatches},
+     }},
   };
   if (detail == "full")
   {
@@ -780,10 +809,34 @@ McpBridgeToolResult selectionFilterResult(
 McpBridgeToolResult selectionByBoundsResult(
   AppController& appController, const QJsonObject& params)
 {
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return selectionByBoundsForMapResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult selectionByBoundsForMapResult(
+  mdl::Map& map, const QJsonObject& params)
+{
   auto paramsWithSelect = params;
   paramsWithSelect.insert("select", true);
   paramsWithSelect.insert("boundsMode", params.value("mode").toString("intersects"));
-  return selectionFilterResult(appController, paramsWithSelect);
+  if (!paramsWithSelect.contains("excludeWorld"))
+  {
+    paramsWithSelect.insert("excludeWorld", true);
+  }
+  if (!paramsWithSelect.contains("selectableOnly"))
+  {
+    paramsWithSelect.insert("selectableOnly", true);
+  }
+  if (!paramsWithSelect.contains("leafOnly"))
+  {
+    paramsWithSelect.insert("leafOnly", true);
+  }
+  return selectionFilterForMapResult(map, paramsWithSelect);
 }
 
 McpBridgeToolResult selectionGrowResult(

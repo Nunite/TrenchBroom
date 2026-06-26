@@ -53,6 +53,7 @@ QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig&
 QJsonObject documentsListJson(AppController& appController);
 QJsonObject activeDocumentJson(AppController& appController);
 QJsonObject mapSnapshotJson(AppController& appController);
+QJsonObject mapSnapshotJsonForMap(const mdl::Map& map, const QJsonObject& document);
 McpBridgeToolResult documentOpenResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult documentActivateResult(
@@ -75,6 +76,7 @@ McpBridgeToolResult placeAssetResult(
 
 McpBridgeToolResult textureSearchResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult textureSearchForMapResult(mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult textureLockGetResult(AppController& appController);
 McpBridgeToolResult textureLockSetResult(
   AppController& appController, const QJsonObject& params);
@@ -125,12 +127,16 @@ McpBridgeToolResult actionExecuteResult(
 
 QJsonObject mapSearchJson(AppController& appController, const QJsonObject& params);
 QJsonObject selectionJson(AppController& appController);
+QJsonObject selectionJsonForMap(const mdl::Map& map);
 McpBridgeToolResult selectionSetResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult selectionFilterResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult selectionFilterForMapResult(mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult selectionByBoundsResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult selectionByBoundsForMapResult(
+  mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult selectionGrowResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult viewportFocusResult(
