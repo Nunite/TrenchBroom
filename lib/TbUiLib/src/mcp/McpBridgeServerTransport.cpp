@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -40,6 +41,13 @@ mcp::McpBridgeResponse makeFailure(
 }
 
 } // namespace
+
+McpOperationRecord::McpOperationRecord()
+{
+  const auto now = QDateTime::currentDateTimeUtc();
+  createdAt = now.toString(Qt::ISODateWithMs);
+  createdAtMs = now.toMSecsSinceEpoch();
+}
 
 void McpOperationRecord::setChangedObjectIds(const QJsonArray& ids)
 {
@@ -170,6 +178,8 @@ std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) con
     {"operationId", it->operationId},
     {"toolName", it->toolName},
     {"transactionName", it->transactionName},
+    {"createdAt", it->createdAt},
+    {"createdAtMs", it->createdAtMs},
     {"changedObjectIds", it->changedObjectIdsJson()},
     {"changedObjectCount", it->changedObjectIds.size()},
     {"undone", it->undone},

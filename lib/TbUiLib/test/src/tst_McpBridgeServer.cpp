@@ -1461,6 +1461,16 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(batchResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.selection().nodes.size() == 2u);
 
+  const auto historyResponse = historyListResult(history);
+  REQUIRE(historyResponse.ok);
+  CHECK(historyResponse.result.value("count").toInt() == 1);
+  const auto historyOperation =
+    historyResponse.result.value("operations").toArray().first().toObject();
+  CHECK(historyOperation.value("operationId").toString() == operationId);
+  CHECK(!historyOperation.value("createdAt").toString().isEmpty());
+  CHECK(historyOperation.value("createdAtMs").toDouble() > 0.0);
+  CHECK(historyOperation.value("changedObjectCount").toInt() == 2);
+
   const auto descendantCountBeforeInvalid = map.worldNode().descendantCount();
   const auto invalidResponse = blockoutCreateBatchForMapResult(
     map,
@@ -1485,6 +1495,8 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     history, QJsonObject{{"operationId", operationId}, {"detail", "ids"}});
   REQUIRE(inspectResponse.ok);
   CHECK(inspectResponse.result.value("changedObjectIds").toArray().size() == 2);
+  CHECK(!inspectResponse.result.value("createdAt").toString().isEmpty());
+  CHECK(inspectResponse.result.value("createdAtMs").toDouble() > 0.0);
 
   mdl::deselectAll(map);
 

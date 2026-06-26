@@ -56,6 +56,8 @@ QJsonObject operationRecordJson(const McpOperationRecord& operation)
   result.insert("operationId", operation.operationId);
   result.insert("toolName", operation.toolName);
   result.insert("transactionName", operation.transactionName);
+  result.insert("createdAt", operation.createdAt);
+  result.insert("createdAtMs", operation.createdAtMs);
   result.insert("changedObjectCount", operation.changedObjectIds.size());
   result.insert(
     "resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId));
@@ -88,39 +90,6 @@ QJsonArray operationHistoryJson(const std::vector<McpOperationRecord>& history)
     result.push_back(operationRecordJson(operation));
   }
   return result;
-}
-
-} // namespace
-
-McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history)
-{
-  return McpBridgeToolResult::success(QJsonObject{
-    {"operations", operationHistoryJson(history)},
-    {"count", static_cast<int>(history.size())},
-  });
-}
-
-std::optional<std::size_t> findOperationIndex(
-  const std::vector<McpOperationRecord>& history, const QString& operationId)
-{
-  const auto it = std::ranges::find_if(
-    history, [&](const auto& operation) { return operation.operationId == operationId; });
-  if (it == history.end())
-  {
-    return std::nullopt;
-  }
-  return static_cast<std::size_t>(std::distance(history.begin(), it));
-}
-
-std::optional<McpOperationRecord> findOperationCopy(
-  const std::vector<McpOperationRecord>& history, const QString& operationId)
-{
-  const auto index = findOperationIndex(history, operationId);
-  if (!index)
-  {
-    return std::nullopt;
-  }
-  return history[*index];
 }
 
 std::optional<mdl::NodePath> parseNodePathId(const QString& id)
@@ -197,6 +166,85 @@ QJsonObject operationLiveStateJson(mdl::Map& map, const McpOperationRecord& oper
   return operationStaleDiagnosticJson(operation, liveObjectCount, staleObjectCount);
 }
 
+QJsonObject operationRecordJson(
+  mdl::Map& map, const McpOperationRecord& operation, const bool includeLiveState)
+{
+  auto result = operationRecordJson(operation);
+  if (includeLiveState)
+  {
+    const auto liveState = operationLiveStateJson(map, operation);
+    for (auto it = liveState.begin(); it != liveState.end(); ++it)
+    {
+      result.insert(it.key(), it.value());
+    }
+    result.insert(
+      "valid", !operation.undone && liveState.value("staleObjectCount").toInt() == 0);
+  }
+  return result;
+}
+
+QJsonArray operationHistoryJson(
+  mdl::Map& map,
+  const std::vector<McpOperationRecord>& history,
+  const bool includeLiveState)
+{
+  auto result = QJsonArray{};
+  for (const auto& operation : history)
+  {
+    result.push_back(operationRecordJson(map, operation, includeLiveState));
+  }
+  return result;
+}
+
+} // namespace
+
+McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history)
+{
+  return McpBridgeToolResult::success(QJsonObject{
+    {"operations", operationHistoryJson(history)},
+    {"count", static_cast<int>(history.size())},
+  });
+}
+
+McpBridgeToolResult historyListResult(
+  AppController& appController, const std::vector<McpOperationRecord>& history)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return historyListResult(history);
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"operations", operationHistoryJson(mapWindow->document().map(), history, true)},
+    {"count", static_cast<int>(history.size())},
+    {"liveStateIncluded", true},
+  });
+}
+
+std::optional<std::size_t> findOperationIndex(
+  const std::vector<McpOperationRecord>& history, const QString& operationId)
+{
+  const auto it = std::ranges::find_if(
+    history, [&](const auto& operation) { return operation.operationId == operationId; });
+  if (it == history.end())
+  {
+    return std::nullopt;
+  }
+  return static_cast<std::size_t>(std::distance(history.begin(), it));
+}
+
+std::optional<McpOperationRecord> findOperationCopy(
+  const std::vector<McpOperationRecord>& history, const QString& operationId)
+{
+  const auto index = findOperationIndex(history, operationId);
+  if (!index)
+  {
+    return std::nullopt;
+  }
+  return history[*index];
+}
+
 McpBridgeToolResult operationInspectResult(
   const std::vector<McpOperationRecord>& history, const QJsonObject& params)
 {
@@ -218,6 +266,43 @@ McpBridgeToolResult operationInspectResult(
     detail == "full"  ? "full"
     : detail == "ids" ? "ids"
                       : "summary"));
+}
+
+McpBridgeToolResult operationInspectResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params)
+{
+  const auto operationId = params.value("operationId").toString();
+  if (operationId.isEmpty())
+  {
+    return invalidParamsFailure("operation_inspect requires operationId");
+  }
+
+  const auto operation = findOperationCopy(history, operationId);
+  if (!operation)
+  {
+    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+  }
+
+  const auto detail = params.value("detail").toString("summary").toLower();
+  auto result = operationRecordDetailJson(
+    *operation,
+    detail == "full"  ? "full"
+    : detail == "ids" ? "ids"
+                      : "summary");
+  if (auto* mapWindow = appController.mapWindowManager().topMapWindow())
+  {
+    const auto liveState =
+      operationLiveStateJson(mapWindow->document().map(), *operation);
+    for (auto it = liveState.begin(); it != liveState.end(); ++it)
+    {
+      result.insert(it.key(), it.value());
+    }
+    result.insert(
+      "valid", !operation->undone && liveState.value("staleObjectCount").toInt() == 0);
+  }
+  return McpBridgeToolResult::success(result);
 }
 
 McpBridgeToolResult operationSelectResult(

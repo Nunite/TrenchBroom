@@ -1009,7 +1009,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "history_list",
-      "List MCP operations recorded for the active bridge session.",
+      "List the MCP operation timeline for the active bridge session, including "
+      "creation time and live/stale object counts when a document is active.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1018,7 +1019,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     {
       "operation_inspect",
       "Inspect an MCP operation by operationId. Use detail=summary by default and "
-      "detail=ids/full only when object ids or debug data are needed.",
+      "detail=ids/full only when object ids or debug data are needed. Includes "
+      "live/stale status when a document is active.",
       McpMode::ReadOnly,
       false,
       true,

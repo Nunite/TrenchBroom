@@ -151,8 +151,14 @@ McpBridgeToolResult viewportCapture2DResult(
   AppController& appController, const QJsonObject& params);
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
+McpBridgeToolResult historyListResult(
+  AppController& appController, const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult operationInspectResult(
   const std::vector<McpOperationRecord>& history, const QJsonObject& params);
+McpBridgeToolResult operationInspectResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params);
 McpBridgeToolResult operationSelectResult(
   AppController& appController,
   const std::vector<McpOperationRecord>& history,

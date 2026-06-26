@@ -280,11 +280,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         }
         if (toolName == "history_list")
         {
-          return historyListResult(m_operationHistory);
+          return historyListResult(appController, m_operationHistory);
         }
         if (toolName == "operation_inspect")
         {
-          return operationInspectResult(m_operationHistory, params);
+          return operationInspectResult(appController, m_operationHistory, params);
         }
         if (toolName == "operation_select")
         {

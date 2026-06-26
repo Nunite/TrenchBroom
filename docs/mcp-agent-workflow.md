@@ -219,7 +219,8 @@ MCP 写操作会返回：
 
 推荐规则：
 
-- 一次布局阶段完成后调用 `history_list`，记录最近 MCP 操作。
+- 一次布局阶段完成后调用 `history_list`，查看最近 MCP 操作时间线。每条记录包含 `createdAt`、`createdAtMs`、`toolName`、`transactionName`、`changedObjectCount`；有活动文档时还包含 `liveObjectCount`、`staleObjectCount` 和 `valid`。
+- 需要查看某次操作创建/修改的对象时调用 `operation_inspect(detail=ids)`；需要检查对象是否仍然有效时调用 `operation_validate`。
 - 发现最近一次 MCP 操作错误时调用 `history_undo_mcp`。
 - 不要用 `objects_delete` 代替 undo，除非用户明确要删除对象。
 - 保存前调用 `map_validate` 和 `problems_check`。

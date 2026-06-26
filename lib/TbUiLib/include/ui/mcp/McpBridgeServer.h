@@ -59,10 +59,13 @@ struct McpOperationRecord
   QString toolName;
   QString transactionName;
   QStringList changedObjectIds;
+  QString createdAt;
+  qint64 createdAtMs = 0;
   QByteArray summaryJson;
   QByteArray detailJson;
   bool undone = false;
 
+  McpOperationRecord();
   void setChangedObjectIds(const QJsonArray& ids);
   QJsonArray changedObjectIdsJson() const;
   void setSummary(const QJsonObject& value);
