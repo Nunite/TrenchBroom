@@ -89,6 +89,7 @@ scripts\mcp-config.ps1 -Print
 4. `selection_get`：读取用户当前选择。
 5. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
 6. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
+7. 场景验收优先用 `viewport_capture_scene_review`：它会按可选对象 id 聚焦/高亮，批量截取当前、3D、2D 视图，并返回白盒检查项。当前版本依赖 TrenchBroom 正在显示的 UI 视图；如果某类 viewport 不可见，工具会在 `warnings` 中说明。
 
 对象操作必须使用 MCP 返回的 `objectId`，不要根据实体顺序或 UI 文本猜测内部指针。
 
@@ -104,7 +105,7 @@ scripts\mcp-config.ps1 -Print
 6. 只需要批量创建平台/跳块时用 `brush_create_boxes_batch`，传 `boxes: [{min,max,material?}]`，避免多次 `brush_create_box` 产生大量 undo/history。
 7. validate 通过后调用对应创建工具：房间用 `blockout_create_room`，走廊用 `blockout_create_corridor`，楼梯用 `blockout_create_stairs`，斜坡用 `blockout_create_ramp`，门洞用 `blockout_create_doorway`，掩体用 `blockout_create_cover`，天空壳用 `blockout_create_sky_shell`。
 8. 默认只保留返回的 `operationId` / `resourceUri`，需要 ids 时再用 `operation_inspect(detail=ids)`。
-9. 用 `overlay_set` 标注新结构，并调用 `viewport_capture_3d` / `viewport_capture_2d`。
+9. 用 `overlay_set` 标注新结构，并调用 `viewport_capture_scene_review` 收集截图验收包。只需要单张反馈时再用 `viewport_capture_3d` / `viewport_capture_2d`。
 10. 根据截图调整尺寸或位置，必要时使用 `objects_transform` 平移/旋转/缩放。
 11. 调用 `map_validate` / `problems_check`。
 

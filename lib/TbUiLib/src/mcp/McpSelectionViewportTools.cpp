@@ -317,6 +317,51 @@ std::optional<vm::bbox3d> boundsFromJson(const QJsonObject& params, QString& err
   return vm::bbox3d{*min, *max};
 }
 
+QJsonArray defaultSceneReviewChecklist()
+{
+  return QJsonArray{
+    "silhouette reads as the requested scene type",
+    "major spaces and route connections are coherent",
+    "scale is plausible for the target game/editor context",
+    "brushes do not visibly float, overlap incorrectly, or leave unintended gaps",
+    "whitebox material differences are enough to distinguish functional parts",
+    "MCP tool friction or missing primitives are recorded for follow-up",
+  };
+}
+
+QJsonArray stringArrayFromValueOrDefault(
+  const QJsonValue& value, const QJsonArray& defaultValue)
+{
+  if (!value.isArray())
+  {
+    return defaultValue;
+  }
+
+  auto result = QJsonArray{};
+  for (const auto& entry : value.toArray())
+  {
+    if (entry.isString() && !entry.toString().trimmed().isEmpty())
+    {
+      result.push_back(entry.toString().trimmed());
+    }
+  }
+  return result.isEmpty() ? defaultValue : result;
+}
+
+QString normalizedReviewViewName(const QString& view)
+{
+  const auto normalized = view.trimmed().toLower();
+  if (normalized == "window")
+  {
+    return "current";
+  }
+  if (normalized == "current" || normalized == "3d" || normalized == "2d")
+  {
+    return normalized;
+  }
+  return {};
+}
+
 bool mcpOptionalBool(
   const QJsonObject& params, const QString& key, const bool defaultValue)
 {
@@ -1060,6 +1105,94 @@ McpBridgeToolResult viewportCapture2DResult(
   AppController& appController, const QJsonObject& params)
 {
   return viewportCaptureTypedResult<MapView2D>(appController, params, "2d");
+}
+
+McpBridgeToolResult viewportCaptureSceneReviewResult(
+  AppController& appController, const QJsonObject& params, QJsonObject& overlayState)
+{
+  const auto objectIdsValue = params.value("objectIds");
+  if (objectIdsValue.isArray())
+  {
+    const auto focusResult =
+      viewportFocusResult(appController, QJsonObject{{"objectIds", objectIdsValue}});
+    if (!focusResult.ok)
+    {
+      return focusResult;
+    }
+
+    overlayState.insert("highlightObjectIds", objectIdsValue.toArray());
+    if (const auto sceneName = params.value("sceneName").toString().trimmed();
+        !sceneName.isEmpty())
+    {
+      auto labels = QJsonArray{};
+      labels.push_back(QJsonObject{
+        {"text", sceneName},
+        {"objectId",
+         objectIdsValue.toArray().isEmpty() ? QJsonValue{}
+                                            : objectIdsValue.toArray().first()},
+      });
+      overlayState.insert("labels", labels);
+    }
+    appController.refreshMcpOverlayViews();
+  }
+
+  const auto views = stringArrayFromValueOrDefault(
+    params.value("views"), QJsonArray{"current", "3d", "2d"});
+  const auto captureParams =
+    QJsonObject{{"returnBase64", mcpOptionalBool(params, "returnBase64", false)}};
+  auto captures = QJsonArray{};
+  auto warnings = QJsonArray{};
+
+  for (const auto& viewValue : views)
+  {
+    const auto view = normalizedReviewViewName(viewValue.toString());
+    if (view.isEmpty())
+    {
+      warnings.push_back(
+        QString{"Unknown review view '%1'; expected current, 3d, or 2d."}.arg(
+          viewValue.toString()));
+      continue;
+    }
+
+    auto captureResult =
+      view == "current" ? viewportCaptureCurrentResult(appController, captureParams)
+      : view == "3d"    ? viewportCapture3DResult(appController, captureParams)
+                        : viewportCapture2DResult(appController, captureParams);
+    if (!captureResult.ok)
+    {
+      warnings.push_back(
+        QString{"Could not capture %1 view: %2"}.arg(view, captureResult.error.message));
+      continue;
+    }
+    auto capture = captureResult.result;
+    capture.insert("view", view);
+    captures.push_back(capture);
+  }
+
+  if (mcpOptionalBool(params, "clearSelectionAfter", false))
+  {
+    const auto clearResult = viewportClearMarksResult(
+      appController, QJsonObject{{"clearSelection", true}}, overlayState);
+    if (!clearResult.ok)
+    {
+      warnings.push_back(
+        QString{"Could not clear review selection: %1"}.arg(clearResult.error.message));
+    }
+  }
+
+  const auto checklist = stringArrayFromValueOrDefault(
+    params.value("checklist"), defaultSceneReviewChecklist());
+  return McpBridgeToolResult::success(QJsonObject{
+    {"sceneName", params.value("sceneName").toString()},
+    {"captureCount", captures.size()},
+    {"captures", captures},
+    {"checklist", checklist},
+    {"warnings", warnings},
+    {"cameraControlled", false},
+    {"note",
+     "This review package uses the current visible TrenchBroom viewport state. Add "
+     "viewport camera controls for deterministic multi-angle screenshots."},
+  });
 }
 
 } // namespace tb::ui

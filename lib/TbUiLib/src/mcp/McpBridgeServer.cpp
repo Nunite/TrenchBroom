@@ -159,6 +159,10 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return viewportCapture2DResult(appController, params);
         }
+        if (toolName == "viewport_capture_scene_review")
+        {
+          return viewportCaptureSceneReviewResult(appController, params, m_overlayState);
+        }
         if (toolName == "actions_list")
         {
           return McpBridgeToolResult::success(actionsListJson(appController));

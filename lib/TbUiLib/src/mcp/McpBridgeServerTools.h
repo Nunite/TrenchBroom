@@ -155,6 +155,8 @@ McpBridgeToolResult viewportCapture3DResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult viewportCapture2DResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult viewportCaptureSceneReviewResult(
+  AppController& appController, const QJsonObject& params, QJsonObject& overlayState);
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyListResult(

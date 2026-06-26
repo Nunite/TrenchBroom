@@ -577,6 +577,31 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "viewport_capture_scene_review",
+      "Create a compact whitebox scene review package by focusing optional object ids, "
+      "highlighting them, and capturing requested current/3d/2d viewport screenshots. "
+      "This is a review helper, not a camera-control tool; it uses the current UI "
+      "view state until explicit MCP camera controls are implemented.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"sceneName", stringProperty("Optional scene or checkpoint label.")},
+        {"objectIds",
+         arrayProperty("Optional object ids to select, focus, and highlight.")},
+        {"views",
+         arrayProperty(
+           "Views to capture: current/window, 3d, 2d. Defaults to current, 3d, 2d.")},
+        {"checklist",
+         arrayProperty(
+           "Optional review checklist strings. Defaults to whitebox scene checks.")},
+        {"returnBase64",
+         boolProperty("Return PNG data as base64. Defaults to false to save context.")},
+        {"clearSelectionAfter",
+         boolProperty("Clear selection and overlay after capture. Defaults to false.")},
+      }),
+    },
+    {
       "entity_create",
       "Create an entity in the active document.",
       McpMode::Edit,
@@ -1967,9 +1992,13 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         tool.category = "operation";
         tool.minimumProfile = McpToolProfile::Core;
       }
-      else if (tool.name.startsWith("selection_") || tool.name.startsWith("viewport_"))
+      else if (tool.name.startsWith("selection_"))
       {
         tool.category = "selection";
+      }
+      else if (tool.name.startsWith("viewport_"))
+      {
+        tool.category = "viewport";
       }
       else if (tool.name.startsWith("asset_"))
       {
@@ -2091,6 +2120,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "selection_filter",
     "selection_by_bounds",
     "selection_grow",
+    "viewport_capture_scene_review",
     "operation_inspect",
     "operation_select",
     "operation_validate",

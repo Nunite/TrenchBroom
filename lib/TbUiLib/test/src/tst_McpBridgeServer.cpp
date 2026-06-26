@@ -161,6 +161,21 @@ TEST_CASE("McpBridgeServer")
         {"scope", scope},
       });
     }
+    if (toolName == "viewport_capture_scene_review")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"sceneName", "whitebox review smoke"},
+        {"captureCount", 3},
+        {"captures",
+         QJsonArray{
+           QJsonObject{{"view", "current"}, {"path", "C:/tmp/current.png"}},
+           QJsonObject{{"view", "3d"}, {"path", "C:/tmp/3d.png"}},
+           QJsonObject{{"view", "2d"}, {"path", "C:/tmp/2d.png"}},
+         }},
+        {"checklist", QJsonArray{"silhouette", "connectivity"}},
+        {"cameraControlled", false},
+      });
+    }
     if (toolName == "overlay_set")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -552,6 +567,19 @@ TEST_CASE("McpBridgeServer")
       mcp::McpMode::ReadOnly});
     CHECK(capture2DResponse.ok);
     CHECK(capture2DResponse.result.value("scope").toString() == "2d");
+
+    const auto reviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "10",
+      "secret",
+      "viewport_capture_scene_review",
+      QJsonObject{
+        {"sceneName", "whitebox review smoke"},
+        {"views", QJsonArray{"current", "3d", "2d"}},
+      },
+      mcp::McpMode::ReadOnly});
+    CHECK(reviewResponse.ok);
+    CHECK(reviewResponse.result.value("captureCount").toInt() == 3);
+    CHECK_FALSE(reviewResponse.result.value("cameraControlled").toBool());
   }
 
   SECTION("serves map_search")
