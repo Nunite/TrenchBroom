@@ -36,6 +36,22 @@
 scripts\mcp-smoke.ps1 -RawJson
 ```
 
+如果 Codex / Claude 的 MCP 会话状态失效，但 TrenchBroom 本地 HTTP MCP 端口仍在，可以绕过客户端注册状态直接请求：
+
+```powershell
+scripts\mcp-call.ps1 -Tool tb_status
+scripts\mcp-call.ps1 -ListTools
+scripts\mcp-call.ps1 -Tool map_snapshot -RawStructured
+scripts\mcp-call.ps1 -Tool selection_by_bounds -ArgumentsJson '{"min":[0,0,0],"max":[256,256,128],"detail":"full"}'
+scripts\mcp-call.ps1 -ResourceUri tbmcp://operation/mcp-op-1
+```
+
+需要从命令行启动最新 Release TrenchBroom 并请求一次工具时：
+
+```powershell
+scripts\mcp-call.ps1 -Launch -KeepOpen -Tool tb_status
+```
+
 生成 MCP client 配置片段可用：
 
 ```powershell
