@@ -117,6 +117,19 @@ QString makeOperationId(int& nextOperationIndex)
   return QString{"mcp-op-%1"}.arg(nextOperationIndex++);
 }
 
+QJsonArray vecToJson(const vm::vec3d& value)
+{
+  return QJsonArray{value.x(), value.y(), value.z()};
+}
+
+QJsonObject boundsToJson(const vm::bbox3d& bounds)
+{
+  return QJsonObject{
+    {"min", vecToJson(bounds.min)},
+    {"max", vecToJson(bounds.max)},
+  };
+}
+
 QJsonObject mutationResultJson(const McpOperationRecord& operation)
 {
   auto result = QJsonObject{};
@@ -654,7 +667,17 @@ McpBridgeToolResult transformObjectsResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return transformObjectsForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult transformObjectsForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   auto error = QString{};
   const auto nodes = nodesFromObjectIds(map, params, error);
   if (!nodes)
@@ -758,6 +781,14 @@ McpBridgeToolResult transformObjectsResult(
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedObjectIds, result);
   result.insert("operation", operation);
+  result.insert("bounds", boundsToJson(boundsForNodes(transformNodes)));
+  result.insert("selectedCount", static_cast<int>(transformNodes.size()));
+  result.insert(
+    "validation",
+    QJsonObject{
+      {"valid", true},
+      {"errors", QJsonArray{}},
+    });
   return McpBridgeToolResult::success(std::move(result));
 }
 

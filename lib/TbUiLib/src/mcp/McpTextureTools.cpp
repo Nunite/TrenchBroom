@@ -290,6 +290,7 @@ McpBridgeToolResult textureSearchForMapResult(mdl::Map& map, const QJsonObject& 
   const auto query = params.value("query").toString().trimmed();
   const auto limit = std::max(1, params.value("limit").toInt(50));
   auto results = QJsonArray{};
+  auto materialNames = QJsonArray{};
 
   const auto& materials = map.materialManager().materials();
   for (const auto* material : materials)
@@ -307,7 +308,9 @@ McpBridgeToolResult textureSearchForMapResult(mdl::Map& map, const QJsonObject& 
       continue;
     }
 
-    results.push_back(materialJson(*material));
+    const auto json = materialJson(*material);
+    results.push_back(json);
+    materialNames.push_back(json.value("name").toString());
     if (results.size() >= limit)
     {
       break;
@@ -317,6 +320,8 @@ McpBridgeToolResult textureSearchForMapResult(mdl::Map& map, const QJsonObject& 
   return McpBridgeToolResult::success(QJsonObject{
     {"query", query},
     {"results", results},
+    {"materials", results},
+    {"materialNames", materialNames},
     {"count", results.size()},
     {"currentMaterial", currentMaterialName(map)},
     {"fallbackMaterial", fallbackMaterialName(map)},

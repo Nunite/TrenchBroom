@@ -1178,7 +1178,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     {
       "texture_search",
       "Search loaded materials in the active document. If no material matches, use "
-      "fallbackMaterial from the result for safe blockout geometry.",
+      "fallbackMaterial from the result for safe blockout geometry. Returns detailed "
+      "results plus materials/materialNames aliases for simple agent consumption.",
       McpMode::ReadOnly,
       false,
       true,

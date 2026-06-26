@@ -273,6 +273,8 @@ TEST_CASE("McpBridgeServer")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"count", 0},
+        {"materials", QJsonArray{}},
+        {"materialNames", QJsonArray{}},
       });
     }
     if (toolName == "texture_lock_get")
@@ -835,6 +837,8 @@ TEST_CASE("McpBridgeServer")
     const auto textureResponse = server.dispatchRequest(
       mcp::McpBridgeRequest{"2", "secret", "texture_search", {}, mcp::McpMode::ReadOnly});
     CHECK(textureResponse.ok);
+    CHECK(textureResponse.result.contains("materials"));
+    CHECK(textureResponse.result.contains("materialNames"));
 
     const auto texturesListResponse = server.dispatchRequest(
       mcp::McpBridgeRequest{"3", "secret", "textures_list", {}, mcp::McpMode::ReadOnly});
@@ -1435,6 +1439,8 @@ TEST_CASE("McpBridgeServer MCP read semantics")
     map, QJsonObject{{"query", "unlikely_missing_material_name"}});
   REQUIRE(textureResponse.ok);
   CHECK(textureResponse.result.value("count").toInt() == 0);
+  CHECK(textureResponse.result.value("materials").toArray().isEmpty());
+  CHECK(textureResponse.result.value("materialNames").toArray().isEmpty());
   CHECK(!textureResponse.result.value("fallbackMaterial").toString().isEmpty());
 
   map.undoCommand();
@@ -1574,6 +1580,82 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
     analyzeResponse.result.value("nonGridAlignedObjectIds").toArray();
   REQUIRE(nonGridAlignedObjectIds.size() == 1);
   CHECK(nonGridAlignedObjectIds.first().toString().startsWith("mcp:"));
+}
+
+TEST_CASE("McpBridgeServer object transform summaries")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  auto server = McpBridgeServer{
+    [&](const QString& toolName, const QJsonObject& params) {
+      if (toolName == "blockout_create_batch")
+      {
+        return blockoutCreateBatchForMapResult(
+          map, toolName, params, history, nextOperationIndex);
+      }
+      if (toolName == "objects_transform")
+      {
+        return transformObjectsForMapResult(map, toolName, params, history, nextOperationIndex);
+      }
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::ToolNotFound, QString{"Unexpected tool: %1"}.arg(toolName));
+    },
+    [&map]() -> mdl::Map* { return &map; }};
+  REQUIRE(server.start(
+    mcp::McpBridgeConfig{"test-pipe-transform-summary", "secret", mcp::McpMode::Edit}));
+
+  const auto createResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "1",
+    "secret",
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         },
+       }},
+      {"detail", "ids"},
+    },
+    mcp::McpMode::Edit});
+  REQUIRE(createResponse.ok);
+  const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(objectIds.size() == 1);
+
+  const auto transformResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "2",
+    "secret",
+    "objects_transform",
+    QJsonObject{
+      {"objectIds", objectIds},
+      {"operation", "translate"},
+      {"delta", QJsonArray{16, 0, 0}},
+    },
+    mcp::McpMode::Edit});
+  const auto transformError =
+    transformResponse.ok || !transformResponse.error ? QString{} : transformResponse.error->message;
+  INFO(transformError.toStdString());
+  REQUIRE(transformResponse.ok);
+  CHECK(transformResponse.result.value("changedObjectCount").toInt() == 1);
+  CHECK(transformResponse.result.value("selectedCount").toInt() == 1);
+  CHECK(transformResponse.result.value("validation").toObject().value("valid").toBool());
+  const auto bounds = transformResponse.result.value("bounds").toObject();
+  CHECK(bounds.value("min").toArray().at(0).toDouble() == 16.0);
+  CHECK(bounds.value("max").toArray().at(0).toDouble() == 80.0);
 }
 
 TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")

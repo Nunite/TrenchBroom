@@ -276,6 +276,12 @@ McpBridgeToolResult transformObjectsResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult transformObjectsForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 
 McpBridgeToolResult brushTypesListResult();
 McpBridgeToolResult createBrushResult(
