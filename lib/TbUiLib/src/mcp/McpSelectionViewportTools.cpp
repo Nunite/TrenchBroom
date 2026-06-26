@@ -1253,20 +1253,38 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     cameraControlled = focusResult.result.value("cameraControlled").toBool(false);
     focusedObjectCount = focusResult.result.value("focusedObjectCount").toInt(0);
 
-    overlayState.insert("highlightObjectIds", objectIdsValue.toArray());
-    if (const auto sceneName = params.value("sceneName").toString().trimmed();
-        !sceneName.isEmpty())
+    if (mcpOptionalBool(params, "highlight", true))
     {
-      auto labels = QJsonArray{};
-      labels.push_back(QJsonObject{
-        {"text", sceneName},
-        {"objectId",
-         objectIdsValue.toArray().isEmpty() ? QJsonValue{}
-                                            : objectIdsValue.toArray().first()},
-      });
-      overlayState.insert("labels", labels);
+      overlayState.insert("highlightObjectIds", objectIdsValue.toArray());
+      if (const auto sceneName = params.value("sceneName").toString().trimmed();
+          !sceneName.isEmpty())
+      {
+        auto labels = QJsonArray{};
+        labels.push_back(QJsonObject{
+          {"text", sceneName},
+          {"objectId",
+           objectIdsValue.toArray().isEmpty() ? QJsonValue{}
+                                              : objectIdsValue.toArray().first()},
+        });
+        overlayState.insert("labels", labels);
+      }
+    }
+    else
+    {
+      overlayState = QJsonObject{};
     }
     appController.refreshMcpOverlayViews();
+  }
+
+  if (mcpOptionalBool(params, "clearSelectionBeforeCapture", false))
+  {
+    auto* mapWindow = appController.mapWindowManager().topMapWindow();
+    if (!mapWindow)
+    {
+      return noActiveDocumentFailure();
+    }
+    mdl::deselectAll(mapWindow->document().map());
+    QCoreApplication::processEvents();
   }
 
   const auto views = stringArrayFromValueOrDefault(

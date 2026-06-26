@@ -300,3 +300,45 @@ Tool/context bottlenecks:
 Proposed MCP changes:
 Commit:
 ```
+
+### 2026-06-27 - Scene 1: Mountain Valley Boardwalk
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 1: canyon terrain massing`: canyon walls, river ribbon, and cave mouth massing. Result: `valid=true`, 20 brushes.
+- `mcp-op-2` / `MCP Scene 1: boardwalk and bridge route`: curved boardwalk ribbon, bridge deck, and plank markers. Result: `valid=true`, 18 brushes.
+- `mcp-op-3` / `MCP Scene 1: railings and supports`: side rails, support posts, bridge supports, and rail caps. Result: `valid=true`, 34 brushes.
+
+MCP tools used:
+- `blockout_create_batch` with `path_ribbon`, `prism`, and `box` operations.
+- `selection_filter` scoped to the Scene 1 bounds.
+- `viewport_capture_scene_review` with `objectIds`, `highlight=false`, and `clearSelectionBeforeCapture=true`.
+- `map_validate` and `problems_check`.
+- `documents_save` on the ignored local iteration map `build-release-codex/app/TrenchBroom/map_test/mcp_scene_iterations.map`.
+
+Screenshots:
+- Current/window: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782500834093.png`
+- 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782500834182.png`
+- 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782500834231.png`
+
+What worked:
+- The batch IR path was compact enough: 52 operations produced 72 new scene brushes across three transactions without direct plane editing.
+- The 2D review clearly shows a continuous boardwalk/bridge route running between two irregular canyon edges.
+- The new scene review flags reduced screenshot clutter by allowing focus without persistent selection/highlight overlays.
+
+What failed:
+- The 3D clean screenshot reads as a long solid rectangular/cliff block more than an open canyon; the boardwalk is hidden by the high rock mass from the automatic angle.
+- The selected/highlighted screenshot showed the route, but 73 highlighted objects made the image too noisy for reliable visual review.
+- `map_validate` returned four pre-existing empty-property warnings on `worldspawn` / `light_environment`; they are not Scene 1 brush geometry failures, but they still pollute automated pass/fail summaries.
+
+Tool/context bottlenecks:
+- `viewport_capture_scene_review` can focus bounds, but still lacks explicit orbit/elevation/free-camera framing, so a scene can be technically focused but visually occluded.
+- Organic canyon walls are currently made from tall prisms, which produces boxy silhouettes and hides interior detail. The agent needs lower-level terrain/profile primitives, not a canyon prefab.
+- Repeated posts/rails are still verbose in IR. A generic `repeat_along_path` or `support_posts_under_path` would reduce script complexity while staying atomic.
+- Validation output needs a way to distinguish baseline/pre-existing map warnings from warnings introduced by the latest operation or selected scene bounds.
+
+Proposed MCP changes:
+- Implemented this run: `viewport_capture_scene_review.highlight` and `clearSelectionBeforeCapture` so review can focus objects without selection/overlay clutter.
+- Next useful primitives: `viewport_camera_frame_bounds` or `viewport_orbit_capture`, `terrain_profile_wall_batch`, `repeat_along_path`, `support_posts_under_path`, and scoped `problems_check` / baseline warning diff.
+
+Commit:
+- `Improve MCP scene review capture options`

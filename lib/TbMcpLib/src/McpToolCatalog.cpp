@@ -626,6 +626,13 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Optional review checklist strings. Defaults to whitebox scene checks.")},
         {"returnBase64",
          boolProperty("Return PNG data as base64. Defaults to false to save context.")},
+        {"highlight",
+         boolProperty(
+           "Highlight focused object ids and add a scene label. Defaults to true.")},
+        {"clearSelectionBeforeCapture",
+         boolProperty(
+           "After focusing objectIds, clear the editor selection before capturing to "
+           "reduce wireframe clutter. Defaults to false.")},
         {"clearSelectionAfter",
          boolProperty("Clear selection and overlay after capture. Defaults to false.")},
       }),

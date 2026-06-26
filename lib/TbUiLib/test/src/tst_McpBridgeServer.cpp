@@ -626,6 +626,8 @@ TEST_CASE("McpBridgeServer")
       QJsonObject{
         {"sceneName", "focused whitebox review smoke"},
         {"objectIds", QJsonArray{"node:0/0"}},
+        {"highlight", false},
+        {"clearSelectionBeforeCapture", true},
         {"views", QJsonArray{"3d"}},
       },
       mcp::McpMode::ReadOnly});

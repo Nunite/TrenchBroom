@@ -597,6 +597,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(properties.value("objectIds").isObject());
     CHECK(properties.value("layout").isObject());
     CHECK(properties.value("views").isObject());
+    CHECK(properties.value("highlight").isObject());
+    CHECK(properties.value("clearSelectionBeforeCapture").isObject());
   }
 
   SECTION("tool search can discover hidden expert tools")
