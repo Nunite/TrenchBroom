@@ -140,6 +140,24 @@ TEST_CASE("McpBridgeServer")
         {"active", false},
       });
     }
+    if (toolName == "viewport_layout_get")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"layout", "onePane"},
+        {"hasVisible2D", false},
+        {"hasVisible3D", true},
+      });
+    }
+    if (toolName == "viewport_layout_set")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"layout", "twoPanes"},
+        {"previousLayout", "onePane"},
+        {"changed", true},
+        {"hasVisible2D", true},
+        {"hasVisible3D", true},
+      });
+    }
     if (
       toolName == "viewport_capture_current" || toolName == "viewport_capture_3d"
       || toolName == "viewport_capture_2d")
@@ -540,6 +558,20 @@ TEST_CASE("McpBridgeServer")
       "6", "secret", "viewport_clear_marks", {}, mcp::McpMode::ReadOnly});
     CHECK(clearResponse.ok);
 
+    const auto layoutGetResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "6a", "secret", "viewport_layout_get", {}, mcp::McpMode::ReadOnly});
+    CHECK(layoutGetResponse.ok);
+    CHECK(layoutGetResponse.result.value("layout").toString() == "onePane");
+
+    const auto layoutSetResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "6b",
+      "secret",
+      "viewport_layout_set",
+      QJsonObject{{"layout", "twoPanes"}},
+      mcp::McpMode::ReadOnly});
+    CHECK(layoutSetResponse.ok);
+    CHECK(layoutSetResponse.result.value("hasVisible2D").toBool());
+
     const auto captureResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "7",
       "secret",
@@ -574,6 +606,7 @@ TEST_CASE("McpBridgeServer")
       "viewport_capture_scene_review",
       QJsonObject{
         {"sceneName", "whitebox review smoke"},
+        {"layout", "twoPanes"},
         {"views", QJsonArray{"current", "3d", "2d"}},
       },
       mcp::McpMode::ReadOnly});

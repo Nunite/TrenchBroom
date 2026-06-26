@@ -93,6 +93,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapView2D.h"
 #include "ui/MapViewBase.h"
+#include "ui/MapViewLayout.h"
 #include "ui/MapViewToolBox.h"
 #include "ui/MapWindowManager.h"
 #include "ui/ObjExportDialog.h"
@@ -1363,6 +1364,18 @@ void MapWindow::refreshMapViews()
   {
     m_mapView->refreshViews();
   }
+}
+
+MapViewLayout MapWindow::currentMapViewLayout() const
+{
+  return m_mapView->currentMapViewLayout();
+}
+
+void MapWindow::switchMapViewLayout(const MapViewLayout layout)
+{
+  m_mapView->switchToMapView(layout);
+  m_currentMapView = m_mapView->firstMapViewBase();
+  refreshMapViews();
 }
 
 void MapWindow::closeDocument(const bool discardChanges)

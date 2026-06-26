@@ -147,6 +147,14 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return viewportClearMarksResult(appController, params, m_overlayState);
         }
+        if (toolName == "viewport_layout_get")
+        {
+          return viewportLayoutGetResult(appController);
+        }
+        if (toolName == "viewport_layout_set")
+        {
+          return viewportLayoutSetResult(appController, params);
+        }
         if (toolName == "viewport_capture_current")
         {
           return viewportCaptureCurrentResult(appController, params);

@@ -78,6 +78,11 @@ bool SwitchableMapViewContainer::active() const
   return m_activationTracker->active();
 }
 
+MapViewLayout SwitchableMapViewContainer::currentMapViewLayout() const
+{
+  return m_currentMapViewLayout;
+}
+
 void SwitchableMapViewContainer::switchToMapView(const MapViewLayout viewId)
 {
   m_activationTracker->clear();
@@ -115,6 +120,7 @@ void SwitchableMapViewContainer::switchToMapView(const MapViewLayout viewId)
   layout->addWidget(m_mapView, 1);
   setLayout(layout);
 
+  m_currentMapViewLayout = viewId;
   m_mapView->setFocus();
 }
 

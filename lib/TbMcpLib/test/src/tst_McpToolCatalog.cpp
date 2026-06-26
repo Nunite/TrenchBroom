@@ -59,6 +59,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("selection_grow"));
     CHECK(findToolDefinition("viewport_focus"));
     CHECK(findToolDefinition("viewport_clear_marks"));
+    CHECK(findToolDefinition("viewport_layout_get"));
+    CHECK(findToolDefinition("viewport_layout_set"));
     CHECK(findToolDefinition("viewport_capture_current"));
     CHECK(findToolDefinition("viewport_capture_3d"));
     CHECK(findToolDefinition("viewport_capture_2d"));
@@ -141,6 +143,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("selection_grow"));
     CHECK(names.contains("viewport_focus"));
     CHECK(names.contains("viewport_clear_marks"));
+    CHECK(names.contains("viewport_layout_get"));
+    CHECK(names.contains("viewport_layout_set"));
     CHECK(names.contains("viewport_capture_current"));
     CHECK(names.contains("viewport_capture_3d"));
     CHECK(names.contains("viewport_capture_2d"));
@@ -396,6 +400,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("map_fix_all_safe"));
     CHECK(!names.contains("viewport_focus"));
     CHECK(!names.contains("viewport_clear_marks"));
+    CHECK(names.contains("viewport_layout_get"));
+    CHECK(names.contains("viewport_layout_set"));
     CHECK(!names.contains("viewport_capture_3d"));
     CHECK(names.contains("viewport_capture_scene_review"));
     CHECK(!names.contains("overlay_set"));

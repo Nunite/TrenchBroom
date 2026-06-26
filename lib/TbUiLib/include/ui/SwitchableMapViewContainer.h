@@ -24,6 +24,7 @@
 #include "Macros.h"
 #include "NotifierConnection.h"
 #include "ui/MapView.h"
+#include "ui/MapViewLayout.h"
 
 namespace tb::ui
 {
@@ -34,7 +35,6 @@ class FaceTool;
 class Inspector;
 class MapDocument;
 class MapViewBar;
-enum class MapViewLayout;
 class MapViewToolBox;
 class MultiPaneMapView;
 class Tool;
@@ -54,6 +54,7 @@ private:
   std::unique_ptr<MapViewActivationTracker> m_activationTracker;
 
   NotifierConnection m_notifierConnection;
+  MapViewLayout m_currentMapViewLayout;
 
 public:
   SwitchableMapViewContainer(
@@ -65,6 +66,7 @@ public:
   void windowActivationStateChanged(bool active);
 
   bool active() const;
+  MapViewLayout currentMapViewLayout() const;
   void switchToMapView(MapViewLayout viewId);
 
   bool anyModalToolActive() const;

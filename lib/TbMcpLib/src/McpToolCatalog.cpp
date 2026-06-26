@@ -498,6 +498,30 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "viewport_layout_get",
+      "Return the active map view layout and whether visible 2D/3D viewports are "
+      "available for screenshot automation.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(),
+    },
+    {
+      "viewport_layout_set",
+      "Switch the active map window layout for deterministic screenshot automation. "
+      "This changes the current UI layout only and does not mutate the map.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"layout",
+           stringProperty(
+             "Target layout: onePane, twoPanes, threePanes, fourPanes, or 1/2/3/4.")},
+        },
+        {"layout"}),
+    },
+    {
       "actions_list",
       "List executable TrenchBroom actions for the current context.",
       McpMode::ReadOnly,
@@ -592,6 +616,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"views",
          arrayProperty(
            "Views to capture: current/window, 3d, 2d. Defaults to current, 3d, 2d.")},
+        {"layout",
+         stringProperty(
+           "Optional layout to switch to before capture: twoPanes, threePanes, or "
+           "fourPanes are useful when 2D and 3D screenshots are both required.")},
         {"checklist",
          arrayProperty(
            "Optional review checklist strings. Defaults to whitebox scene checks.")},
@@ -2120,6 +2148,8 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "selection_filter",
     "selection_by_bounds",
     "selection_grow",
+    "viewport_layout_get",
+    "viewport_layout_set",
     "viewport_capture_scene_review",
     "operation_inspect",
     "operation_select",

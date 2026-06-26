@@ -149,6 +149,9 @@ McpBridgeToolResult viewportFocusResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult viewportClearMarksResult(
   AppController& appController, const QJsonObject& params, QJsonObject& overlayState);
+McpBridgeToolResult viewportLayoutGetResult(AppController& appController);
+McpBridgeToolResult viewportLayoutSetResult(
+  AppController& appController, const QJsonObject& params);
 McpBridgeToolResult viewportCaptureCurrentResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult viewportCapture3DResult(

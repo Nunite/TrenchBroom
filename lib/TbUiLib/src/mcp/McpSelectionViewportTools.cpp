@@ -18,6 +18,7 @@
  */
 
 #include <QBuffer>
+#include <QCoreApplication>
 #include <QIODevice>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -52,6 +53,7 @@
 #include "ui/MapView2D.h"
 #include "ui/MapView3D.h"
 #include "ui/MapViewBase.h"
+#include "ui/MapViewLayout.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
@@ -362,6 +364,62 @@ QString normalizedReviewViewName(const QString& view)
   return {};
 }
 
+QString mapViewLayoutName(const MapViewLayout layout)
+{
+  switch (layout)
+  {
+  case MapViewLayout::OnePane:
+    return "onePane";
+  case MapViewLayout::TwoPanes:
+    return "twoPanes";
+  case MapViewLayout::ThreePanes:
+    return "threePanes";
+  case MapViewLayout::FourPanes:
+    return "fourPanes";
+  }
+  return "unknown";
+}
+
+std::optional<MapViewLayout> parseMapViewLayout(const QString& value)
+{
+  const auto normalized = value.trimmed().toLower();
+  if (normalized == "1" || normalized == "one" || normalized == "onepane")
+  {
+    return MapViewLayout::OnePane;
+  }
+  if (normalized == "2" || normalized == "two" || normalized == "twopanes")
+  {
+    return MapViewLayout::TwoPanes;
+  }
+  if (normalized == "3" || normalized == "three" || normalized == "threepanes")
+  {
+    return MapViewLayout::ThreePanes;
+  }
+  if (normalized == "4" || normalized == "four" || normalized == "fourpanes")
+  {
+    return MapViewLayout::FourPanes;
+  }
+  return std::nullopt;
+}
+
+QJsonObject viewportLayoutJson(MapWindow& mapWindow)
+{
+  const auto hasVisible2D =
+    std::ranges::any_of(mapWindow.findChildren<MapView2D*>(), [](const auto* view) {
+      return view != nullptr && view->isVisible();
+    });
+  const auto hasVisible3D =
+    std::ranges::any_of(mapWindow.findChildren<MapView3D*>(), [](const auto* view) {
+      return view != nullptr && view->isVisible();
+    });
+
+  return QJsonObject{
+    {"layout", mapViewLayoutName(mapWindow.currentMapViewLayout())},
+    {"hasVisible2D", hasVisible2D},
+    {"hasVisible3D", hasVisible3D},
+  };
+}
+
 bool mcpOptionalBool(
   const QJsonObject& params, const QString& key, const bool defaultValue)
 {
@@ -583,6 +641,22 @@ McpBridgeToolResult capturePixmapResult(
 template <typename View>
 View* findCaptureView(MapWindow& mapWindow)
 {
+  if (auto* currentView = dynamic_cast<View*>(mapWindow.currentMapViewBase()))
+  {
+    if (currentView->isVisible())
+    {
+      return currentView;
+    }
+  }
+
+  for (auto* view : mapWindow.findChildren<View*>())
+  {
+    if (view && view->isVisible())
+    {
+      return view;
+    }
+  }
+
   if (auto* currentView = dynamic_cast<View*>(mapWindow.currentMapViewBase()))
   {
     return currentView;
@@ -1078,6 +1152,47 @@ McpBridgeToolResult viewportClearMarksResult(
   });
 }
 
+McpBridgeToolResult viewportLayoutGetResult(AppController& appController)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return McpBridgeToolResult::success(viewportLayoutJson(*mapWindow));
+}
+
+McpBridgeToolResult viewportLayoutSetResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  const auto layoutText = params.value("layout").toString();
+  const auto layout = parseMapViewLayout(layoutText);
+  if (!layout)
+  {
+    return invalidParamsFailure(
+      "layout must be onePane, twoPanes, threePanes, fourPanes, or 1/2/3/4");
+  }
+
+  const auto before = viewportLayoutJson(*mapWindow);
+  if (mapWindow->currentMapViewLayout() != *layout)
+  {
+    mapWindow->switchMapViewLayout(*layout);
+    QCoreApplication::processEvents();
+  }
+
+  auto after = viewportLayoutJson(*mapWindow);
+  after.insert("previousLayout", before.value("layout"));
+  after.insert("changed", before.value("layout") != after.value("layout"));
+  return McpBridgeToolResult::success(std::move(after));
+}
+
 McpBridgeToolResult viewportCaptureCurrentResult(
   AppController& appController, const QJsonObject& params)
 {
@@ -1110,6 +1225,16 @@ McpBridgeToolResult viewportCapture2DResult(
 McpBridgeToolResult viewportCaptureSceneReviewResult(
   AppController& appController, const QJsonObject& params, QJsonObject& overlayState)
 {
+  if (params.contains("layout"))
+  {
+    const auto layoutResult = viewportLayoutSetResult(
+      appController, QJsonObject{{"layout", params.value("layout")}});
+    if (!layoutResult.ok)
+    {
+      return layoutResult;
+    }
+  }
+
   const auto objectIdsValue = params.value("objectIds");
   if (objectIdsValue.isArray())
   {
@@ -1180,6 +1305,9 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     }
   }
 
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  const auto layout =
+    mapWindow != nullptr ? viewportLayoutJson(*mapWindow) : QJsonObject{};
   const auto checklist = stringArrayFromValueOrDefault(
     params.value("checklist"), defaultSceneReviewChecklist());
   return McpBridgeToolResult::success(QJsonObject{
@@ -1188,6 +1316,8 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     {"captures", captures},
     {"checklist", checklist},
     {"warnings", warnings},
+    {"layout", layout.value("layout")},
+    {"viewportLayout", layout},
     {"cameraControlled", false},
     {"note",
      "This review package uses the current visible TrenchBroom viewport state. Add "

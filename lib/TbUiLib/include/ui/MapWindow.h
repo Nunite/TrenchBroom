@@ -79,6 +79,7 @@ class Inspector;
 enum class InspectorPage;
 class MapDocument;
 class MapViewBase;
+enum class MapViewLayout;
 class ObjExportDialog;
 class SignalDelayer;
 class SwitchableMapViewContainer;
@@ -239,6 +240,8 @@ public:
   bool canReloadMaterialCollections() const;
   bool canReloadEntityDefinitions() const;
   void refreshMapViews();
+  MapViewLayout currentMapViewLayout() const;
+  void switchMapViewLayout(MapViewLayout layout);
 
   void closeDocument(bool discardChanges = false);
 
