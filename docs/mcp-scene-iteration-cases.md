@@ -826,4 +826,65 @@ Proposed MCP changes:
 - Improve scene review cameras with automatic street/interior presets that avoid nearby occluders.
 
 Commit:
-- Pending follow-up: `Add repeat grid batch operation`.
+- `6d461b739 Add repeat grid batch operation`.
+
+### 2026-06-27 - Scene 10: Cave Ruin Hybrid
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_10_cave_ruin_hybrid.map`
+- Created from the minimal Valve map fixture and launched directly with `scripts/mcp-call.ps1 -Launch -KeepOpen -MapPath ...`.
+- Initial verification: `brushCount=0`, empty MCP history.
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 10: cave shell river and main route`: cave base slab, angular cave walls, underground river ribbon, entry/exit markers, and main stepping route. Result: `valid=true`, 24 brushes from 16 operations.
+- First `mcp-op-2` attempt: rejected before commit because a one-axis `repeat_grid` payload was serialized with mismatched `counts` / `offsets`. Result: `valid=false`, `compiledOperationCount=15`, `compiledBrushCount=35`, no map commit.
+- `mcp-op-2` / `MCP Scene 10: ruin bridge altar broken platforms and markers`: stone bridge, bridge supports, stepped altar, column grid, broken platforms, marker blocks, and side route pillars. Result: `valid=true`, 43 brushes.
+- First `mcp-op-3` attempt: rejected before commit for the same one-axis `repeat_grid` shorthand issue. Result: `valid=false`, no map commit.
+- `mcp-op-3` / `MCP Scene 10: stalactites stalagmites rubble and route markers`: prism stalactites/stalagmites, rubble clusters, raised shrine details, route markers, and torch-like posts. Result: `valid=true`, 54 brushes.
+
+MCP tools used:
+- `blockout_create_batch` with `box`, `prism`, `path_ribbon`, `repeat_grid`, `stepped_mass`, and `support_posts_between`.
+- `map_snapshot`, `map_validate`, `problems_check`, `history_list`, and `documents_save`.
+- `viewport_capture_scene_review` with overview, bridge/river, and altar cameras.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782551672670.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782551672721.png`
+- Bridge and river detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782551689636.png`
+- Altar and ruin detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782551701630.png`
+
+Validation:
+- Final `map_snapshot`: `brushCount=121`, bounds `[-2048,-1408,-64]` to `[2048,1408,544]`, saved with `modified=false`.
+- Final `map_validate`: `valid=true`, `count=0`, `safeFixableCount=0`.
+- Final `problems_check`: no problems.
+- `history_list`: three live operations, all `valid=true`, `mismatchCount=0`, `staleObjectCount=0`.
+
+What worked:
+- The bridge/river detail view reads as an underground route with water/void, bridge, rock walls, markers, and broken blocks.
+- The altar detail view clearly shows a man-made ruin structure inside the cave: stepped altar, columns, route platforms, and surrounding cave clutter.
+- Splitting the scene into cave shell, ruin structure, and natural/detail phases kept invalid batch attempts from damaging committed geometry.
+- Batch validation diagnostics were useful: the failed repeat-grid attempts identified the operation index/type and reported compiled counts before rollback.
+- Final validation stayed fully clean despite the mix of prisms, repeated objects, supports, and stepped massing.
+
+What failed or constrained the agent:
+- The cave shell still reads as an angular rectangular enclosure from overview. Natural/organic cave walls remain the weakest part of the atomic toolset.
+- One-axis `repeat_grid` was awkward from PowerShell and JSON generation: `counts=@(6)` serialized like a scalar in practice, forcing an artificial `counts=[6,1]` workaround.
+- Stalactites and stalagmites are coarse triangular prisms; they communicate cave intent but not organic curvature.
+- Interior camera framing can still place a large cave wall too close to the viewport, partially occluding the scene.
+- The 2D overview is useful for broad footprint checks, but not enough to judge cave/ruin readability alone.
+
+Implemented MCP follow-up:
+- Improved `repeat_grid` to support one-axis shorthand: `counts` may be a single integer and `offsets` may be a single `[x,y,z]` vector.
+- Kept existing multi-axis `counts[]` / `offsets[]` behavior and validation.
+- Updated schema examples and descriptions to document the shorthand.
+- Added focused tests for shorthand repeat-grid creation.
+- Real MCP smoke verified `counts=6` plus `offsets=[128,0,0]` creates six brushes in one operation, `map_validate valid=true`, and undo returns the smoke map to `brushCount=0`.
+
+Proposed MCP changes:
+- Add a generic organic/profile terrain primitive for cave walls, such as `organic_wall_from_profile`, `terrain_patch_from_grid`, or `cave_shell_from_rings`; avoid a cave prefab.
+- Add camera review presets for enclosed scenes that place the camera inside the playable volume and avoid near-wall occlusion.
+- Add small route/semantic markers as generic metadata or label brushes so natural/ruin routes are easier to review in whitebox.
+- Consider richer prism/mesh helpers for tapered spikes or rock clusters without hand-writing many triangular prisms.
+
+Commit:
+- Pending follow-up: `Allow repeat grid one-axis shorthand`.

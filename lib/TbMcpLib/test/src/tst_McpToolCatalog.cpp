@@ -701,6 +701,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemDescription.contains(R"("type":"path_ribbon")"));
     CHECK(itemDescription.contains(R"("type":"repeat_translate")"));
     CHECK(itemDescription.contains(R"("type":"repeat_grid")"));
+    CHECK(itemDescription.contains(R"("counts":6)"));
     CHECK(itemDescription.contains(R"("type":"stepped_mass")"));
     CHECK(itemDescription.contains(R"("type":"support_posts_between")"));
     CHECK(

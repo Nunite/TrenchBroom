@@ -2238,6 +2238,47 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(repeatGridResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.selection().nodes.size() == 12u);
 
+  const auto repeatGridShorthandResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Repeat grid shorthand"},
+      {"grid", 16},
+      {"select", true},
+      {"detail", "ids"},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "repeat_grid"},
+           {"counts", 6},
+           {"offsets", QJsonArray{96, 0, 0}},
+           {"operation",
+            QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{1024, 512, 0}},
+              {"max", QJsonArray{1088, 544, 32}},
+            }},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  const auto repeatGridShorthandError =
+    repeatGridShorthandResponse.ok
+      ? std::string{}
+      : repeatGridShorthandResponse.error.message.toStdString();
+  INFO(repeatGridShorthandError);
+  REQUIRE(repeatGridShorthandResponse.ok);
+  CHECK(repeatGridShorthandResponse.result.value("brushCount").toInt() == 6);
+  CHECK(repeatGridShorthandResponse.result.value("changedObjectCount").toInt() == 6);
+  CHECK(
+    repeatGridShorthandResponse.result.value("changedObjectIds").toArray().size() == 6);
+  CHECK(repeatGridShorthandResponse.result.value("validation")
+          .toObject()
+          .value("valid")
+          .toBool());
+  CHECK(map.selection().nodes.size() == 6u);
+
   const auto steppedMassResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",
@@ -2308,7 +2349,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
 
   const auto historyResponse = historyListResult(history);
   REQUIRE(historyResponse.ok);
-  CHECK(historyResponse.result.value("count").toInt() == 6);
+  CHECK(historyResponse.result.value("count").toInt() == 7);
   const auto historyOperation =
     historyResponse.result.value("operations").toArray().first().toObject();
   CHECK(historyOperation.value("operationId").toString() == operationId);

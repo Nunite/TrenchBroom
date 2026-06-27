@@ -2187,9 +2187,19 @@ std::optional<std::vector<size_t>> repeatGridCountsFromJson(
   const QJsonObject& operation, QString& error)
 {
   const auto value = operation.value("counts");
+  if (value.isDouble())
+  {
+    const auto count = static_cast<size_t>(value.toInteger(0));
+    if (count == 0 || count > 256)
+    {
+      error = "repeat_grid counts must be between 1 and 256";
+      return std::nullopt;
+    }
+    return std::vector<size_t>{count};
+  }
   if (!value.isArray())
   {
-    error = "repeat_grid requires counts array";
+    error = "repeat_grid requires counts integer or array";
     return std::nullopt;
   }
 
@@ -2219,6 +2229,15 @@ std::optional<std::vector<vm::vec3d>> repeatGridOffsetsFromJson(
   const QJsonObject& operation, const size_t expectedCount, QString& error)
 {
   const auto value = operation.value("offsets");
+  if (expectedCount == 1)
+  {
+    const auto offset = mcpVec3FromJsonValue(value, "offsets", error);
+    if (offset)
+    {
+      return std::vector<vm::vec3d>{*offset};
+    }
+    error.clear();
+  }
   if (!value.isArray())
   {
     error = "repeat_grid requires offsets array";

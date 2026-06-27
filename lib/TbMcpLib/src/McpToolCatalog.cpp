@@ -205,6 +205,8 @@ QJsonObject blockoutBatchOperationSchema()
      R"("operation":{"type":"box","min":[0,0,0],"max":[64,64,16]}}; )"
      R"({"type":"repeat_grid","counts":[4,3],"offsets":[[128,0,0],[0,0,96]],)"
      R"("operation":{"type":"box","min":[0,0,0],"max":[64,16,48]}}; )"
+     R"({"type":"repeat_grid","counts":6,"offsets":[128,0,0],)"
+     R"("operation":{"type":"box","min":[0,0,0],"max":[64,16,48]}}; )"
      R"({"type":"stepped_mass","min":[-512,-512,0],"max":[512,512,64],)"
      R"("levels":5,"inset":96,"stepHeight":64}; )"
      R"({"type":"support_posts_between","points2d":[[-256,-256],[256,-256]],)"
@@ -265,14 +267,16 @@ QJsonObject blockoutBatchOperationSchema()
        {"count", integerProperty("repeat_translate repetition count, 1..256.")},
        {"counts",
         arrayProperty(
-          "repeat_grid repetition counts per axis, one to three integers; total "
-          "instances must be <= 4096.")},
+          "repeat_grid repetition counts: either one integer or one to three integers; "
+          "total instances must be <= 4096.")},
        {"offset",
         vec3Property(
           "repeat_translate offset added for each repetition; must be non-zero when "
           "count is greater than one.")},
        {"offsets",
-        arrayProperty("repeat_grid offset vectors per axis; length must match counts.")},
+        arrayProperty(
+          "repeat_grid offset vector for one-axis shorthand, or offset vectors per axis; "
+          "length must match counts.")},
        {"operation",
         QJsonObject{
           {"type", "object"},
