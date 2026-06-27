@@ -311,6 +311,96 @@ QJsonArray vec3Json(const double x, const double y, const double z)
   return QJsonArray{x, y, z};
 }
 
+struct JsonBounds
+{
+  bool valid = false;
+  double minX = 0.0;
+  double minY = 0.0;
+  double minZ = 0.0;
+  double maxX = 0.0;
+  double maxY = 0.0;
+  double maxZ = 0.0;
+};
+
+std::optional<std::array<double, 3>> pointFromJson(const QJsonValue& value)
+{
+  if (!value.isArray())
+  {
+    return std::nullopt;
+  }
+  const auto array = value.toArray();
+  if (
+    array.size() != 3 || !array[0].isDouble() || !array[1].isDouble()
+    || !array[2].isDouble())
+  {
+    return std::nullopt;
+  }
+  return std::array<double, 3>{
+    array[0].toDouble(), array[1].toDouble(), array[2].toDouble()};
+}
+
+void includePoint(JsonBounds& bounds, const std::array<double, 3>& point)
+{
+  if (!bounds.valid)
+  {
+    bounds.valid = true;
+    bounds.minX = bounds.maxX = point[0];
+    bounds.minY = bounds.maxY = point[1];
+    bounds.minZ = bounds.maxZ = point[2];
+    return;
+  }
+
+  bounds.minX = std::min(bounds.minX, point[0]);
+  bounds.minY = std::min(bounds.minY, point[1]);
+  bounds.minZ = std::min(bounds.minZ, point[2]);
+  bounds.maxX = std::max(bounds.maxX, point[0]);
+  bounds.maxY = std::max(bounds.maxY, point[1]);
+  bounds.maxZ = std::max(bounds.maxZ, point[2]);
+}
+
+std::optional<JsonBounds> boundsFromOperations(const QJsonArray& operations)
+{
+  auto bounds = JsonBounds{};
+  for (const auto& value : operations)
+  {
+    if (!value.isObject())
+    {
+      continue;
+    }
+    const auto operation = value.toObject();
+    const auto type = operation.value("type").toString();
+    if (type == "box")
+    {
+      const auto min = pointFromJson(operation.value("min"));
+      const auto max = pointFromJson(operation.value("max"));
+      if (min && max)
+      {
+        includePoint(bounds, *min);
+        includePoint(bounds, *max);
+      }
+    }
+    else if (type == "polyhedron")
+    {
+      for (const auto& pointValue : operation.value("points").toArray())
+      {
+        if (const auto point = pointFromJson(pointValue))
+        {
+          includePoint(bounds, *point);
+        }
+      }
+    }
+  }
+  return bounds.valid ? std::optional<JsonBounds>{bounds} : std::nullopt;
+}
+
+QJsonObject boundsToJson(const JsonBounds& bounds)
+{
+  return QJsonObject{
+    {"min", vec3Json(bounds.minX, bounds.minY, bounds.minZ)},
+    {"max", vec3Json(bounds.maxX, bounds.maxY, bounds.maxZ)},
+  };
+}
+
 QJsonArray vec3Json(
   const HeightmapOrigin& origin,
   const int x,
@@ -850,21 +940,27 @@ HeightmapPreview buildHeightmapPreview(const QJsonObject& params)
     heightmapInfo.insert(it.key(), it.value());
   }
 
-  const auto outputBounds = QJsonObject{
-    {"min", QJsonArray{origin->x, origin->y, origin->z}},
-    {"max",
-     QJsonArray{
-       origin->x + static_cast<double>(sampledWidth) * cellSize,
-       origin->y + static_cast<double>(sampledHeight) * cellSize,
-       origin->z + heightScale}},
-  };
+  const auto operationBounds = boundsFromOperations(operations);
+  const auto outputBounds =
+    operationBounds ? boundsToJson(*operationBounds)
+                    : QJsonObject{
+                        {"min", QJsonArray{origin->x, origin->y, origin->z}},
+                        {"max",
+                         QJsonArray{
+                           origin->x + static_cast<double>(sampledWidth) * cellSize,
+                           origin->y + static_cast<double>(sampledHeight) * cellSize,
+                           origin->z + heightScale}},
+                      };
+  const auto heightRange =
+    operationBounds
+      ? QJsonObject{{"min", operationBounds->minZ}, {"max", operationBounds->maxZ}}
+      : QJsonObject{{"min", origin->z}, {"max", origin->z + heightScale}};
   heightmapInfo.insert(
     "sourceImageSize", QJsonObject{{"width", image.width()}, {"height", image.height()}});
   heightmapInfo.insert(
     "sampleGrid", QJsonObject{{"width", sampledWidth}, {"height", sampledHeight}});
   heightmapInfo.insert("outputBounds", outputBounds);
-  heightmapInfo.insert(
-    "heightRange", QJsonObject{{"min", origin->z}, {"max", origin->z + heightScale}});
+  heightmapInfo.insert("heightRange", heightRange);
 
   preview.operations = operations;
   preview.brushCount = brushCount;

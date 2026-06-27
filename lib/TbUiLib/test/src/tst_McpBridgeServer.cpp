@@ -3863,6 +3863,15 @@ TEST_CASE("McpBridgeServer grayscale heightmap import tool")
         .value("skippedZeroHeightCells")
         .toInt()
       == 1);
+    CHECK(
+      response.result.value("heightmap")
+        .toObject()
+        .value("outputBounds")
+        .toObject()
+        .value("max")
+        .toArray()[2]
+        .toDouble()
+      == response.result.value("bounds").toObject().value("max").toArray()[2].toDouble());
     CHECK(map.selection().nodes.size() == 3u);
 
     REQUIRE(map.undoCommandName() != nullptr);
@@ -3901,8 +3910,10 @@ TEST_CASE("McpBridgeServer grayscale heightmap import tool")
     CHECK(response.result.value("sampleGrid").toObject().value("width").toInt() == 2);
     CHECK(
       response.result.value("sourceImageSize").toObject().value("height").toInt() == 2);
-    CHECK(response.result.value("outputBounds").isObject());
-    CHECK(response.result.value("heightRange").isObject());
+    const auto outputBounds = response.result.value("outputBounds").toObject();
+    CHECK(outputBounds.value("max").toArray()[2].toDouble() == 64.0);
+    const auto heightRange = response.result.value("heightRange").toObject();
+    CHECK(heightRange.value("max").toDouble() == 64.0);
     CHECK(response.result.value("warnings").isArray());
     CHECK(response.result.value("suggestedParams").isObject());
     CHECK(map.worldNode().descendantCount() == descendantCount);
