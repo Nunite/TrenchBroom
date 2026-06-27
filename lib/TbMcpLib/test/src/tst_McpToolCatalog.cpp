@@ -345,7 +345,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_create_cylinder_sector"));
     CHECK(names.contains("brush_create_boxes_batch"));
     CHECK(names.contains("brush_create_polygon_batch"));
-    CHECK(names.contains("brush_create_from_planes"));
+    CHECK(!names.contains("brush_create_from_planes"));
     CHECK(names.contains("shape_library_list"));
     CHECK(names.contains("brush_metadata_set"));
     CHECK(names.contains("brush_metadata_get"));
@@ -353,7 +353,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("route_geometry_analyze_chain"));
     CHECK(!names.contains("kz_distance_analyze_chain"));
     CHECK(names.contains("blockout_create_batch"));
-    CHECK(names.contains("python_generate_blockout"));
+    CHECK(!names.contains("python_generate_blockout"));
     CHECK(names.contains("heightmap_import_grayscale"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("blockout_validate"));

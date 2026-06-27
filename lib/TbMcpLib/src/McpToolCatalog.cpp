@@ -187,18 +187,16 @@ QJsonObject blockoutBatchOperationSchema()
   return QJsonObject{
     {"type", "object"},
     {"description",
-     "Typed Blockout IR operation object. Examples: "
+     "Typed Blockout IR operation object. Primitive modeling operations should be "
+     "preferred for ordinary Agent-generated geometry. Convenience structural "
+     "operations are supported for compatibility and quick prototypes, but they are "
+     "not the default path for precise modeling. Primitive examples: "
      R"({"type":"box","min":[0,0,0],"max":[128,128,16],"material":"clip"}; )"
      R"({"type":"cylinder","min":[-64,-64,0],"max":[64,64,128],)"
      R"("sides":16,"axis":"z"}; )"
      R"({"type":"prism","points2d":[[0,0],[128,0],[64,64]],"minZ":0,"maxZ":64}; )"
      R"({"type":"cylinder_sector","center":[0,0,0],"innerRadius":64,)"
      R"("outerRadius":128,"startAngle":0,"endAngle":90,"minZ":0,"maxZ":16}; )"
-     R"({"type":"room","min":[0,0,0],"max":[512,512,128],"thickness":16}; )"
-     R"({"type":"corridor","min":[0,0,0],"max":[512,128,128],"thickness":16}; )"
-     R"({"type":"curved_corridor","center":[0,0,0],"innerRadius":128,)"
-     R"("outerRadius":256,"startAngle":0,"turnDegrees":90,"height":128,)"
-     R"("segments":8,"wallThickness":16,"caps":"both"}; )"
      R"({"type":"path_ribbon","points2d":[[0,0],[512,0],[768,256]],)"
      R"("width":160,"minZ":0,"maxZ":16}; )"
      R"({"type":"repeat_translate","count":4,"offset":[128,0,0],)"
@@ -211,6 +209,12 @@ QJsonObject blockoutBatchOperationSchema()
      R"("levels":5,"inset":96,"stepHeight":64}; )"
      R"({"type":"support_posts_between","points2d":[[-256,-256],[256,-256]],)"
      R"("bottomZ":0,"topZ":192,"postSize":32}; )"
+     "Convenience examples: "
+     R"({"type":"room","min":[0,0,0],"max":[512,512,128],"thickness":16}; )"
+     R"({"type":"corridor","min":[0,0,0],"max":[512,128,128],"thickness":16}; )"
+     R"({"type":"curved_corridor","center":[0,0,0],"innerRadius":128,)"
+     R"("outerRadius":256,"startAngle":0,"turnDegrees":90,"height":128,)"
+     R"("segments":8,"wallThickness":16,"caps":"both"}; )"
      R"({"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}; )"
      R"({"type":"ramp","min":[0,0,0],"max":[256,128,64],"axis":"x"}; )"
      R"({"type":"doorway","min":[0,0,0],"max":[256,16,128],)"
@@ -221,11 +225,11 @@ QJsonObject blockoutBatchOperationSchema()
      QJsonObject{
        {"type",
         stringProperty(
-          "Operation type: box, cylinder, prism, polyhedron, "
-          "cylinder_sector, room, corridor, "
-          "curved_corridor, path_ribbon, repeat_translate, repeat_grid, "
-          "stepped_mass, support_posts_between, stairs, ramp, doorway, cover, "
-          "or sky_shell.")},
+          "Operation type. Primitive modeling types: box, cylinder, prism, "
+          "polyhedron, cylinder_sector, path_ribbon, repeat_translate, "
+          "repeat_grid, stepped_mass, support_posts_between. Convenience "
+          "structural types: room, corridor, curved_corridor, stairs, ramp, "
+          "doorway, cover, sky_shell.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"material", stringProperty("Per-operation material override.")},
@@ -2297,11 +2301,9 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "brush_create_tetrahedron",
     "brush_create_prism",
     "brush_create_cylinder_sector",
-    "brush_create_from_planes",
     "brush_create_boxes_batch",
     "brush_create_polygon_batch",
     "blockout_create_batch",
-    "python_generate_blockout",
     "heightmap_import_grayscale",
     "shape_library_list",
     "brush_metadata_set",

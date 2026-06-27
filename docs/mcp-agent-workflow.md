@@ -71,9 +71,9 @@ scripts\mcp-config.ps1 -Print
 1. 先调用 tb_status、tb_doctor、documents_list，确认 MCP 已启用且有活动文档。
 2. 查询地图时使用 document_snapshot、map_snapshot、map_search、selection_get、fgd_entities_list、textures_list、asset_search。
 3. 修改地图时只使用结构化 MCP 工具，不直接写 .map 文件，也不运行任意 Python 脚本。
-4. 白盒生成必须优先使用 blockout_validate 和 blockout_create_* 工具；不要直接生成任意 brush 顶点。
+4. 白盒生成必须优先使用 `blockout_validate` 和 `blockout_create_batch` 的 primitive operations；不要直接生成任意 brush 顶点。
 5. 所有坐标和尺寸使用 GoldSrc units，并尽量按 16 units 网格对齐。
-6. 每次写操作后读取 operationId 和 changedObjectIds，用 overlay_set 标记结果，再用 viewport_capture_3d 或 viewport_capture_2d 检查。
+6. 每次写操作后读取 operationId，需要时再用 `operation_inspect(detail=ids)` 取对象 id；用截图工具检查，不要长期携带大 object id 列表。
 7. 发现结果错误时优先使用 history_undo_mcp 回滚最近一次 MCP 操作，而不是用删除工具硬删一片对象。
 8. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认。
 9. 如果工具返回 unsupported、Forbidden 或 Unauthorized，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
@@ -100,16 +100,16 @@ scripts\mcp-config.ps1 -Print
 1. 先让 Agent 提炼布局，包括主房间、走廊、楼梯、门洞、掩体、出生点和目标点。
 2. 给出 rough bounds，例如房间 `[0,0,0]` 到 `[512,384,192]`。
 3. 确认全部尺寸按 16 units 对齐。
-4. 对每个结构调用 `blockout_validate`。
-5. 优先用 `blockout_create_batch` 一次提交 typed object `operations[]`，例如 `{"type":"box","min":[0,0,0],"max":[128,128,16]}`、`{"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}`、`{"type":"curved_corridor","center":[0,0,0],"innerRadius":128,"outerRadius":256,"startAngle":0,"turnDegrees":90,"height":128,"segments":8,"caps":"both"}`。
-6. 只需要批量创建平台/跳块时用 `brush_create_boxes_batch`，传 `boxes: [{min,max,material?}]`，避免多次 `brush_create_box` 产生大量 undo/history。
-7. validate 通过后调用对应创建工具：房间用 `blockout_create_room`，走廊用 `blockout_create_corridor`，楼梯用 `blockout_create_stairs`，斜坡用 `blockout_create_ramp`，门洞用 `blockout_create_doorway`，掩体用 `blockout_create_cover`，天空壳用 `blockout_create_sky_shell`。
+4. 对每个结构调用 `blockout_validate`，先检查尺寸、厚度、grid 和非凸风险。
+5. 优先用 `blockout_create_batch` 一次提交 typed object `operations[]`，默认选择 primitive operations：`box`、`prism`、`cylinder`、`cylinder_sector`、`polyhedron`、`path_ribbon`、`repeat_translate`、`repeat_grid`、`stepped_mass`、`support_posts_between`。例如 `{"type":"box","min":[0,0,0],"max":[128,128,16]}`、`{"type":"path_ribbon","points2d":[[0,0],[512,0],[768,256]],"width":160,"minZ":0,"maxZ":16}`。
+6. 只需要批量创建平台/跳块时用 `brush_create_boxes_batch`，传 `boxes: [{min,max,material?}]`；需要棱形、切角或引导形状时用 `brush_create_polygon_batch`，避免多次单 brush 调用产生大量 undo/history。
+7. `blockout_create_room`、`blockout_create_corridor`、`blockout_create_stairs`、`blockout_create_ramp`、`blockout_create_doorway`、`blockout_create_cover`、`blockout_create_sky_shell` 属于 convenience helpers，只用于快速草图、旧 workflow 兼容或用户明确要求，不作为 Modeling 默认路径。
 8. 默认只保留返回的 `operationId` / `resourceUri`，需要 ids 时再用 `operation_inspect(detail=ids)`。
 9. 用 `overlay_set` 标注新结构，并调用 `viewport_capture_scene_review` 收集截图验收包。只需要单张反馈时再用 `viewport_capture_3d` / `viewport_capture_2d`。
 10. 根据截图调整尺寸或位置，必要时使用 `objects_transform` 平移/旋转/缩放。
 11. 调用 `map_validate` / `problems_check`。
 
-不要让 Agent 直接使用 `brush_create_from_planes` 做普通白盒。它是专家工具，只适合已有明确 plane 数据且需要严格校验的场景。
+不要让 Agent 直接使用 `brush_create_from_planes` 做普通白盒。它是 `Full` / 搜索可发现的专家工具，只适合已有明确 plane 数据且需要严格校验的场景。复杂批量结构也不要默认走 `python_generate_blockout`；除非用户明确要求脚本生成，优先用 typed batch primitive operations 分阶段落地。
 
 ## KZ 平台链工作流
 
@@ -236,18 +236,15 @@ MCP 写操作会返回：
 推荐工具序列：
 
 1. `tb_status`
-2. `documents_list`
-3. `map_snapshot`
-4. `blockout_validate`，参数：`type=room`、`min=[0,0,0]`、`max=[512,384,192]`、`thickness=16`
-5. `blockout_create_room`，同 bounds，`material=DEV/DEV_MEASUREWALL01` 或当前可用开发材质
-6. `blockout_create_corridor`，连接到主房间一侧
-7. `blockout_create_stairs` 或 `blockout_create_ramp`
-8. `blockout_create_cover` 放置掩体
-9. `blockout_create_sky_shell` 包住 playable volume
-10. `overlay_set` 给房间、走廊、掩体加 label
-11. `viewport_capture_3d`
-12. `map_validate`
-13. 用户确认后 `documents_save`
+2. `map_snapshot`
+3. `textures_list` 或 `texture_search`
+4. `blockout_validate` 检查主体 bounds、走廊宽度、楼梯/斜坡尺寸和 sky shell 厚度
+5. `blockout_create_batch` 用 primitive operations 一次或分阶段提交主体几何，例如房间墙/地/顶用多个 `box`，弧形或折线路线用 `path_ribbon`，重复支撑用 `repeat_translate` / `repeat_grid`
+6. `brush_create_polygon_batch` 创建需要玩家引导的非矩形平台、切角平台或箭头形落点
+7. `entity_create_checked_batch` 放置 spawn、基础 light 或目标点；创建前先确认 FGD/schema
+8. `viewport_capture_scene_review` 做视觉验收
+9. `map_validate` / `problems_check`
+10. 用户确认后 `documents_save`
 
 如果材质名不确定，先用 `texture_search` 查找 `dev`、`clip`、`sky` 等关键词；不要硬编码不存在的材质。
 
