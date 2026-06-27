@@ -81,6 +81,32 @@ function Read-JsonValue {
   return $Json | ConvertFrom-Json
 }
 
+function Get-McpUrlPort {
+  param([string] $Url)
+
+  try {
+    $uri = [Uri] $Url
+    return $uri.Port
+  } catch {
+    return $null
+  }
+}
+
+function Get-McpPortOwners {
+  param([int] $Port)
+
+  if ($Port -le 0) {
+    return @()
+  }
+
+  try {
+    return @(Get-NetTCPConnection -LocalPort $Port -ErrorAction Stop |
+      Select-Object -ExpandProperty OwningProcess -Unique)
+  } catch {
+    return @()
+  }
+}
+
 function Invoke-McpRequest {
   param(
     [string] $Url,
@@ -156,6 +182,11 @@ try {
   }
 
   Write-Status "MCP HTTP URL: $Url" Cyan
+  $mcpPort = Get-McpUrlPort -Url $Url
+  $mcpPortOwners = Get-McpPortOwners -Port $mcpPort
+  if ($mcpPortOwners.Count -gt 0) {
+    Write-Status "MCP port $mcpPort owner PID(s): $($mcpPortOwners -join ', ')" Cyan
+  }
   $script:NextRequestId = 0
 
   if ($Initialize) {
@@ -221,6 +252,14 @@ try {
   }
 
   $structuredContent = Get-PropertyValue $result "structuredContent"
+  if ($null -ne $structuredContent -and -not $RawStructured) {
+    $statusProcessId = Get-PropertyValue $structuredContent "processId"
+    if ($null -ne $statusProcessId -and $mcpPortOwners.Count -gt 0) {
+      $matchesOwner = $mcpPortOwners -contains ([int] $statusProcessId)
+      $color = if ($matchesOwner) { [ConsoleColor]::Green } else { [ConsoleColor]::Yellow }
+      Write-Status "tb_status.processId=$statusProcessId; portOwnerMatch=$matchesOwner" $color
+    }
+  }
   if ($RawStructured -and $null -ne $structuredContent) {
     ConvertTo-PrettyJson $structuredContent
     return

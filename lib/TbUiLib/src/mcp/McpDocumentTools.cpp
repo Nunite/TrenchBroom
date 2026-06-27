@@ -17,6 +17,9 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QCoreApplication>
+#include <QDeadlineTimer>
+#include <QEventLoop>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QStringList>
@@ -47,6 +50,7 @@
 #include "vm/bbox.h"
 
 #include <filesystem>
+#include <functional>
 
 namespace tb::ui
 {
@@ -75,6 +79,28 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
 QString pathToQString(const std::filesystem::path& path)
 {
   return path.empty() ? QString{} : pathAsQString(path);
+}
+
+QString documentPathString(const mdl::Map& map)
+{
+  return pathToQString(map.path());
+}
+
+QString documentFingerprint(const mdl::Map& map)
+{
+  auto hash = qHash(QString::fromStdString(map.filename()));
+  hash ^= qHash(documentPathString(map)) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+  hash ^= qHash(QString::fromStdString(map.gameInfo().gameConfig.name)) + 0x9e3779b9u
+          + (hash << 6) + (hash >> 2);
+  hash ^= qHash(QString::number(reinterpret_cast<quintptr>(&map), 16)) + 0x9e3779b9u
+          + (hash << 6) + (hash >> 2);
+  return QString{"doc:%1"}.arg(static_cast<quint64>(hash), 16, 16, QLatin1Char{'0'});
+}
+
+int documentEpoch(const mdl::Map& map)
+{
+  return static_cast<int>(
+    qHash(QString::number(reinterpret_cast<quintptr>(&map), 16)) & 0x7fffffff);
 }
 
 QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
@@ -197,11 +223,14 @@ QJsonObject documentJson(const MapWindow& mapWindow, const int index)
   return QJsonObject{
     {"index", index},
     {"fileName", QString::fromStdString(map.filename())},
-    {"path", pathToQString(map.path())},
+    {"path", documentPathString(map)},
     {"persistent", map.persistent()},
     {"modified", map.modified()},
     {"game", QString::fromStdString(map.gameInfo().gameConfig.name)},
     {"mapFormat", QString::fromStdString(mdl::formatName(map.worldNode().mapFormat()))},
+    {"windowTitle", mapWindow.windowTitle()},
+    {"documentEpoch", documentEpoch(map)},
+    {"documentFingerprint", documentFingerprint(map)},
   };
 }
 
@@ -274,26 +303,66 @@ bool mcpOptionalBool(
 
 } // namespace
 
-QJsonObject activeDocumentJson(AppController& appController)
+QJsonObject bridgeIdentityJson(
+  const QString& bridgeInstanceId, const QString& bridgeStartedAt, const quint16 httpPort)
 {
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
-  {
-    return {};
-  }
-
-  return documentJson(*mapWindow, 0);
+  return QJsonObject{
+    {"processId", static_cast<int>(QCoreApplication::applicationPid())},
+    {"bridgeInstanceId", bridgeInstanceId},
+    {"bridgeStartedAt", bridgeStartedAt},
+    {"httpPort", static_cast<int>(httpPort)},
+  };
 }
 
-QJsonObject mapSnapshotJson(AppController& appController)
+QJsonObject activeDocumentJson(
+  AppController& appController,
+  const QString& bridgeInstanceId,
+  const QString& bridgeStartedAt,
+  const quint16 httpPort)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
   {
-    return {};
+    auto result = bridgeIdentityJson(bridgeInstanceId, bridgeStartedAt, httpPort);
+    result.insert("activeDocument", false);
+    return result;
   }
 
-  return mapSnapshotJsonForMap(mapWindow->document().map(), documentJson(*mapWindow, 0));
+  auto result = documentJson(*mapWindow, 0);
+  result.insert("activeDocument", true);
+  auto identity = bridgeIdentityJson(bridgeInstanceId, bridgeStartedAt, httpPort);
+  for (auto it = identity.begin(); it != identity.end(); ++it)
+  {
+    result.insert(it.key(), it.value());
+  }
+  return result;
+}
+
+QJsonObject mapSnapshotJson(
+  AppController& appController,
+  const QString& bridgeInstanceId,
+  const QString& bridgeStartedAt,
+  const quint16 httpPort)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    auto result = bridgeIdentityJson(bridgeInstanceId, bridgeStartedAt, httpPort);
+    result.insert("activeDocument", false);
+    return result;
+  }
+
+  auto snapshot =
+    mapSnapshotJsonForMap(mapWindow->document().map(), documentJson(*mapWindow, 0));
+  auto identity = bridgeIdentityJson(bridgeInstanceId, bridgeStartedAt, httpPort);
+  for (auto it = identity.begin(); it != identity.end(); ++it)
+  {
+    snapshot.insert(it.key(), it.value());
+  }
+  snapshot.insert("documentEpoch", documentEpoch(mapWindow->document().map()));
+  snapshot.insert(
+    "documentFingerprint", documentFingerprint(mapWindow->document().map()));
+  return snapshot;
 }
 
 QJsonObject mapSnapshotJsonForMap(const mdl::Map& map, const QJsonObject& document)
@@ -383,6 +452,140 @@ McpBridgeToolResult documentOpenResult(
     {"opened", true},
     {"document", activeDocumentJson(appController)},
   });
+}
+
+McpBridgeToolResult documentOpenVerifiedResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const QString& bridgeInstanceId,
+  const QString& bridgeStartedAt,
+  const quint16 httpPort)
+{
+  auto error = QString{};
+  const auto path = absolutePathFromParams(params, "path", error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+  if (!std::filesystem::is_regular_file(path))
+  {
+    return invalidParamsFailure(
+      QString{"Document does not exist: %1"}.arg(pathToQString(path)));
+  }
+
+  const auto pathString = pathToQString(path);
+  if (!appController.openDocument(path))
+  {
+    return McpBridgeToolResult::success(QJsonObject{
+      {"opened", false},
+      {"verified", false},
+      {"stage", "openFailed"},
+      {"path", pathString},
+      {"message", QString{"Failed to open document: %1"}.arg(pathString)},
+    });
+  }
+
+  const auto waitMs = std::clamp(params.value("waitMs").toInt(5000), 0, 30000);
+  const auto activate = mcpOptionalBool(params, "activate", true);
+  const auto deadline = QDeadlineTimer{waitMs};
+  auto* verifiedWindow = static_cast<MapWindow*>(nullptr);
+  while (!deadline.hasExpired())
+  {
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    auto localError = QString{};
+    verifiedWindow = documentWindowByParams(
+      appController, QJsonObject{{"path", pathString}}, localError);
+    if (verifiedWindow != nullptr)
+    {
+      break;
+    }
+  }
+  if (verifiedWindow == nullptr)
+  {
+    return McpBridgeToolResult::success(QJsonObject{
+      {"opened", true},
+      {"verified", false},
+      {"stage", "verificationFailed"},
+      {"path", pathString},
+      {"message",
+       "Document was opened but could not be found in the open document list."},
+      {"documents", documentsListJson(appController).value("documents")},
+    });
+  }
+
+  if (activate)
+  {
+    verifiedWindow->show();
+    verifiedWindow->raise();
+    verifiedWindow->activateWindow();
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+  }
+
+  const auto activePath = activeDocumentPath(appController);
+  if (activate && activePath != pathString)
+  {
+    return McpBridgeToolResult::success(QJsonObject{
+      {"opened", true},
+      {"verified", false},
+      {"stage", "activationFailed"},
+      {"path", pathString},
+      {"activeDocumentPath", activePath},
+      {"document", documentJson(*verifiedWindow, 0)},
+    });
+  }
+
+  auto snapshot =
+    mapSnapshotJson(appController, bridgeInstanceId, bridgeStartedAt, httpPort);
+  if (snapshot.isEmpty() || !snapshot.value("document").isObject())
+  {
+    return McpBridgeToolResult::success(QJsonObject{
+      {"opened", true},
+      {"verified", false},
+      {"stage", "bridgeUnavailableAfterOpen"},
+      {"path", pathString},
+      {"document", documentJson(*verifiedWindow, 0)},
+    });
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"opened", true},
+    {"verified", true},
+    {"stage", "verified"},
+    {"path", pathString},
+    {"document", documentJson(*verifiedWindow, 0)},
+    {"activeDocumentPath", activeDocumentPath(appController)},
+    {"documentFingerprint", documentFingerprint(verifiedWindow->document().map())},
+    {"documentEpoch", documentEpoch(verifiedWindow->document().map())},
+    {"snapshot", snapshot},
+  });
+}
+
+QString activeDocumentPath(AppController& appController)
+{
+  if (auto* mapWindow = appController.mapWindowManager().topMapWindow())
+  {
+    return documentPathString(mapWindow->document().map());
+  }
+  return {};
+}
+
+McpBridgeToolResult expectedDocumentPathFailure(
+  AppController& appController,
+  const QString& expectedPath,
+  const QString& bridgeInstanceId,
+  const QString& bridgeStartedAt,
+  const quint16 httpPort)
+{
+  auto config = mcp::McpBridgeConfig{};
+  config.httpPort = httpPort;
+  auto status = makeStatus(appController, config, bridgeInstanceId, bridgeStartedAt);
+  status.insert("expectedDocumentPath", expectedPath);
+  status.insert("actualDocumentPath", activeDocumentPath(appController));
+  return McpBridgeToolResult::failure(
+    mcp::McpErrorCode::Forbidden,
+    QString{
+      "Active document does not match expectedDocumentPath. Expected '%1', actual '%2'."}
+      .arg(expectedPath, activeDocumentPath(appController)));
 }
 
 McpBridgeToolResult documentActivateResult(
@@ -512,15 +715,26 @@ McpBridgeToolResult documentExportResult(
   });
 }
 
-QJsonObject makeStatus(AppController& appController, const mcp::McpBridgeConfig& config)
+QJsonObject makeStatus(
+  AppController& appController,
+  const mcp::McpBridgeConfig& config,
+  const QString& bridgeInstanceId,
+  const QString& bridgeStartedAt)
 {
   auto result = QJsonObject{
     {"application", "TrenchBroom"},
     {"version", getBuildVersion()},
     {"mode", mcp::modeName(config.mode)},
     {"pipeName", config.pipeName},
+    {"processId", static_cast<int>(QCoreApplication::applicationPid())},
+    {"bridgeInstanceId", bridgeInstanceId},
+    {"bridgeStartedAt", bridgeStartedAt},
+    {"httpPort", static_cast<int>(config.httpPort)},
     {"documentCount",
      static_cast<int>(appController.mapWindowManager().mapWindows().size())},
+    {"openDocumentCount",
+     static_cast<int>(appController.mapWindowManager().mapWindows().size())},
+    {"openDocumentsSummary", documentsListJson(appController).value("documents")},
     {"activeDocument", false},
   };
 
@@ -529,8 +743,14 @@ QJsonObject makeStatus(AppController& appController, const mcp::McpBridgeConfig&
     const auto& map = mapWindow->document().map();
     result.insert("activeDocument", true);
     result.insert("activeDocumentFileName", QString::fromStdString(map.filename()));
-    result.insert("activeDocumentPath", pathAsQString(map.path()));
+    result.insert("activeDocumentPath", documentPathString(map));
+    result.insert("activeDocumentIndex", 0);
     result.insert("activeDocumentModified", map.modified());
+    result.insert("activeDocumentDirty", map.modified());
+    result.insert("activeWindowTitle", mapWindow->windowTitle());
+    result.insert("activeDocumentWindowTitle", mapWindow->windowTitle());
+    result.insert("documentEpoch", documentEpoch(map));
+    result.insert("documentFingerprint", documentFingerprint(map));
   }
 
   return result;

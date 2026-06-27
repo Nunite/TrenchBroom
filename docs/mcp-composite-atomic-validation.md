@@ -14,14 +14,17 @@
 
 每次验收场景都应该记录：
 
+- `tb_status` 绑定信息：`processId`、`bridgeInstanceId`、`activeDocumentPath`、`documentFingerprint`。
 - 场景名称和日期。
 - 使用的 MCP 工具。
 - operation ids。
+- `history_status`：是否能 undo 最新 MCP operation，若不能，记录 `reasonIfUnavailable`。
 - brush 数量和大致 bounds。
 - 是按类型分阶段创建，还是一次 batch 提交。
 - undo / redo 是否正常。
 - `map_validate` 和 `problems_check` 是否通过。
 - `operation_validate` 是否报告对象仍然 live。
+- terrain/heightmap 场景必须先记录 `heightmap_preview_grayscale` 的 `estimatedBrushCount`、`outputBounds`、`warnings` 和 `suggestedParams`。
 - 截图路径或 `viewport_capture_scene_review` 输出。
 - 本次使用中发现的工具摩擦。
 - 后续需要的工具调整。
@@ -249,8 +252,11 @@
 - 日期：
 - 场景：
 - 地图：
+- 绑定状态：
+- History 状态：
 - 使用工具：
 - Operation ids：
+- Heightmap preview：
 - 结果：
 - 截图验收：
 - 发现问题：

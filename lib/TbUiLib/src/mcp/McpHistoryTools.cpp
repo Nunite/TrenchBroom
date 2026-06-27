@@ -31,6 +31,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/QPathUtils.h"
 #include "ui/mcp/McpObjectRegistry.h"
 
 #include <algorithm>
@@ -274,7 +275,79 @@ McpBridgeToolResult historyListResult(
      operationHistoryJson(mapWindow->document().map(), history, objectRegistry, true)},
     {"count", static_cast<int>(history.size())},
     {"liveStateIncluded", true},
+    {"status",
+     history.empty()
+       ? QJsonObject{
+           {"available", false},
+           {"reasonIfUnavailable", "noMcpMutationYet"},
+         }
+       : QJsonObject{
+           {"available", true},
+           {"reasonIfUnavailable", QJsonValue{}},
+         }},
   });
+}
+
+McpBridgeToolResult historyStatusResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry,
+  const QString& bridgeInstanceId,
+  const QString& bridgeStartedAt)
+{
+  auto result = QJsonObject{
+    {"bridgeInstanceId", bridgeInstanceId},
+    {"bridgeStartedAt", bridgeStartedAt},
+    {"historyCount", static_cast<int>(history.size())},
+    {"lastOperationId", history.empty() ? QString{} : history.back().operationId},
+    {"canUndoLatestMcpOperation", false},
+    {"reasonIfUnavailable", "noMcpMutationYet"},
+  };
+
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    result.insert("activeDocument", false);
+    result.insert("reasonIfUnavailable", "noActiveDocument");
+    return McpBridgeToolResult::success(result);
+  }
+
+  auto& map = mapWindow->document().map();
+  result.insert("activeDocument", true);
+  result.insert("activeDocumentPath", pathAsQString(map.path()));
+  result.insert("activeDocumentFingerprint", objectRegistry.documentFingerprint(map));
+  result.insert("documentEpoch", objectRegistry.documentEpoch(map));
+
+  if (history.empty())
+  {
+    return McpBridgeToolResult::success(result);
+  }
+
+  const auto latestIt = std::find_if(
+    history.rbegin(), history.rend(), [](const auto& op) { return !op.undone; });
+  if (latestIt == history.rend())
+  {
+    result.insert("reasonIfUnavailable", "allMcpOperationsUndone");
+    return McpBridgeToolResult::success(result);
+  }
+
+  result.insert("latestUndoCandidateId", latestIt->operationId);
+  result.insert("latestUndoCandidateTransactionName", latestIt->transactionName);
+  const auto* undoName = map.undoCommandName();
+  result.insert(
+    "nativeUndoCommandName",
+    undoName != nullptr ? QString::fromStdString(*undoName) : QString{});
+  if (
+    undoName != nullptr && QString::fromStdString(*undoName) == latestIt->transactionName)
+  {
+    result.insert("canUndoLatestMcpOperation", true);
+    result.insert("reasonIfUnavailable", QJsonValue{});
+  }
+  else
+  {
+    result.insert("reasonIfUnavailable", "nativeUndoStackTopDoesNotMatchMcp");
+  }
+  return McpBridgeToolResult::success(result);
 }
 
 McpBridgeToolResult historyListResult(

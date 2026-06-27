@@ -84,6 +84,20 @@ struct HeightmapSurfaceStats
   double errorTolerance = 0.0;
 };
 
+struct HeightmapPreview
+{
+  bool ok = false;
+  bool willCommit = false;
+  QString error;
+  QJsonArray operations;
+  QJsonObject heightmap;
+  QJsonObject validation;
+  QJsonArray warnings;
+  QJsonObject suggestedParams;
+  int brushCount = 0;
+  int maxBrushes = DefaultMaxBrushes;
+};
+
 double optionalDouble(
   const QJsonObject& params, const QString& key, const double defaultValue)
 {
@@ -627,40 +641,47 @@ QJsonObject heightmapInfoJson(
   };
 }
 
-} // namespace
-
-McpBridgeToolResult heightmapImportGrayscaleResult(
-  AppController& appController,
-  const QString&,
-  const QJsonObject& params,
-  std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+QJsonArray heightmapWarnings(
+  const QImage& image,
+  const int sampledWidth,
+  const int sampledHeight,
+  const double heightScale,
+  const int brushCount,
+  const int maxBrushes,
+  const QString& mode)
 {
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
+  auto warnings = QJsonArray{};
+  if (brushCount > maxBrushes)
   {
-    return noActiveDocumentFailure();
+    warnings.push_back("tooManyBrushes");
   }
-
-  return heightmapImportGrayscaleForMapResult(
-    mapWindow->document().map(),
-    "heightmap_import_grayscale",
-    params,
-    history,
-    nextOperationIndex);
+  if (sampledWidth <= 4 || sampledHeight <= 4)
+  {
+    warnings.push_back("terrainTooCoarse");
+  }
+  if (heightScale < 16.0)
+  {
+    warnings.push_back("heightRangeTooFlat");
+  }
+  if (heightScale > 1024.0)
+  {
+    warnings.push_back("heightRangeTooSteep");
+  }
+  if (mode == "terraced_brushes" && image.width() * image.height() > 4096)
+  {
+    warnings.push_back("adaptiveWouldHelp");
+  }
+  return warnings;
 }
 
-McpBridgeToolResult heightmapImportGrayscaleForMapResult(
-  mdl::Map& map,
-  const QString&,
-  const QJsonObject& params,
-  std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+HeightmapPreview buildHeightmapPreview(const QJsonObject& params)
 {
+  auto preview = HeightmapPreview{};
   const auto imagePath = params.value("imagePath").toString().trimmed();
   if (imagePath.isEmpty())
   {
-    return invalidParamsFailure("heightmap_import_grayscale requires imagePath");
+    preview.error = "heightmap_preview_grayscale requires imagePath";
+    return preview;
   }
 
   const auto mode = params.value("mode").toString("terraced_brushes").trimmed();
@@ -669,15 +690,16 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
     normalizedMode == "adaptive_surface" || normalizedMode == "adaptive_sloped";
   if (normalizedMode != "terraced_brushes" && !adaptiveSurface)
   {
-    return invalidParamsFailure(
-      "mode must be terraced_brushes, adaptive_surface, or adaptive_sloped");
+    preview.error = "mode must be terraced_brushes, adaptive_surface, or adaptive_sloped";
+    return preview;
   }
 
   auto error = QString{};
   const auto origin = originFromParams(params, error);
   if (!origin)
   {
-    return invalidParamsFailure(error);
+    preview.error = error;
+    return preview;
   }
 
   const auto cellSize = optionalDouble(params, "cellSize", DefaultCellSize);
@@ -687,30 +709,36 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
     std::clamp(optionalInt(params, "maxSize", DefaultMaxSize), 1, HardMaxSize);
   const auto maxBrushes =
     std::clamp(optionalInt(params, "maxBrushes", DefaultMaxBrushes), 1, HardMaxBrushes);
+  preview.maxBrushes = maxBrushes;
 
   if (!std::isfinite(cellSize) || cellSize <= 0.0)
   {
-    return invalidParamsFailure("cellSize must be greater than zero");
+    preview.error = "cellSize must be greater than zero";
+    return preview;
   }
   if (!std::isfinite(heightScale) || heightScale <= 0.0)
   {
-    return invalidParamsFailure("heightScale must be greater than zero");
+    preview.error = "heightScale must be greater than zero";
+    return preview;
   }
   if (heightSteps <= 0 || heightSteps > 256)
   {
-    return invalidParamsFailure("heightSteps must be between 1 and 256");
+    preview.error = "heightSteps must be between 1 and 256";
+    return preview;
   }
 
   const auto fileInfo = QFileInfo{imagePath};
   if (!fileInfo.exists() || !fileInfo.isFile())
   {
-    return invalidParamsFailure(QString{"Image file does not exist: %1"}.arg(imagePath));
+    preview.error = QString{"Image file does not exist: %1"}.arg(imagePath);
+    return preview;
   }
 
   auto image = QImage{imagePath};
   if (image.isNull() || image.width() <= 0 || image.height() <= 0)
   {
-    return invalidParamsFailure(QString{"Could not read image file: %1"}.arg(imagePath));
+    preview.error = QString{"Could not read image file: %1"}.arg(imagePath);
+    return preview;
   }
 
   const auto scale = std::max(
@@ -742,16 +770,18 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
       optionalDouble(params, "maxCellSize", cellSize * DefaultAdaptiveMaxCellSpan);
     if (!std::isfinite(requestedMinCellSize) || requestedMinCellSize <= 0.0)
     {
-      return invalidParamsFailure("minCellSize must be greater than zero");
+      preview.error = "minCellSize must be greater than zero";
+      return preview;
     }
     if (!std::isfinite(requestedMaxCellSize) || requestedMaxCellSize <= 0.0)
     {
-      return invalidParamsFailure("maxCellSize must be greater than zero");
+      preview.error = "maxCellSize must be greater than zero";
+      return preview;
     }
     if (requestedMinCellSize > requestedMaxCellSize)
     {
-      return invalidParamsFailure(
-        "minCellSize must be less than or equal to maxCellSize");
+      preview.error = "minCellSize must be less than or equal to maxCellSize";
+      return preview;
     }
 
     const auto minCellSpan = std::clamp(
@@ -766,7 +796,8 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
       optionalDouble(params, "errorTolerance", std::max(1.0, heightScale / 16.0));
     if (!std::isfinite(errorTolerance) || errorTolerance < 0.0)
     {
-      return invalidParamsFailure("errorTolerance must be zero or greater");
+      preview.error = "errorTolerance must be zero or greater";
+      return preview;
     }
 
     auto stats = HeightmapSurfaceStats{};
@@ -819,35 +850,150 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
     heightmapInfo.insert(it.key(), it.value());
   }
 
-  if (operations.isEmpty())
+  const auto outputBounds = QJsonObject{
+    {"min", QJsonArray{origin->x, origin->y, origin->z}},
+    {"max",
+     QJsonArray{
+       origin->x + static_cast<double>(sampledWidth) * cellSize,
+       origin->y + static_cast<double>(sampledHeight) * cellSize,
+       origin->z + heightScale}},
+  };
+  heightmapInfo.insert(
+    "sourceImageSize", QJsonObject{{"width", image.width()}, {"height", image.height()}});
+  heightmapInfo.insert(
+    "sampleGrid", QJsonObject{{"width", sampledWidth}, {"height", sampledHeight}});
+  heightmapInfo.insert("outputBounds", outputBounds);
+  heightmapInfo.insert(
+    "heightRange", QJsonObject{{"min", origin->z}, {"max", origin->z + heightScale}});
+
+  preview.operations = operations;
+  preview.brushCount = brushCount;
+  preview.heightmap = heightmapInfo;
+  preview.warnings = heightmapWarnings(
+    image,
+    sampledWidth,
+    sampledHeight,
+    heightScale,
+    brushCount,
+    maxBrushes,
+    adaptiveSurface ? "adaptive_surface" : "terraced_brushes");
+  preview.suggestedParams = QJsonObject{
+    {"maxSize", brushCount > maxBrushes ? std::max(1, maxSize / 2) : maxSize},
+    {"maxBrushes", std::min(HardMaxBrushes, std::max(maxBrushes, brushCount))},
+    {"mode",
+     brushCount > maxBrushes ? "adaptive_surface"
+     : adaptiveSurface       ? "adaptive_surface"
+                             : "terraced_brushes"},
+  };
+  preview.willCommit = !operations.isEmpty() && brushCount <= maxBrushes;
+  preview.validation = QJsonObject{
+    {"valid", preview.willCommit},
+    {"errors",
+     operations.isEmpty() ? QJsonArray{"heightmap produced no non-zero terrain cells"}
+     : brushCount > maxBrushes
+       ? QJsonArray{QString{"heightmap would create %1 brushes; increase maxBrushes "
+                            "or lower maxSize/heightSteps"}
+                      .arg(brushCount)}
+       : QJsonArray{}},
+    {"operationCount", brushCount},
+    {"brushCount", brushCount},
+  };
+  preview.ok = true;
+  return preview;
+}
+
+} // namespace
+
+McpBridgeToolResult heightmapImportGrayscaleResult(
+  AppController& appController,
+  const QString&,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return heightmapImportGrayscaleForMapResult(
+    mapWindow->document().map(),
+    "heightmap_import_grayscale",
+    params,
+    history,
+    nextOperationIndex);
+}
+
+McpBridgeToolResult heightmapPreviewGrayscaleResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return heightmapPreviewGrayscaleForMapResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult heightmapPreviewGrayscaleForMapResult(
+  mdl::Map&, const QJsonObject& params)
+{
+  const auto preview = buildHeightmapPreview(params);
+  if (!preview.ok)
+  {
+    return invalidParamsFailure(preview.error);
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"valid", preview.willCommit},
+    {"willCommit", preview.willCommit},
+    {"estimatedBrushCount", preview.brushCount},
+    {"maxBrushes", preview.maxBrushes},
+    {"sourceImageSize", preview.heightmap.value("sourceImageSize")},
+    {"sampleGrid", preview.heightmap.value("sampleGrid")},
+    {"outputBounds", preview.heightmap.value("outputBounds")},
+    {"heightRange", preview.heightmap.value("heightRange")},
+    {"warnings", preview.warnings},
+    {"suggestedParams", preview.suggestedParams},
+    {"validation", preview.validation},
+    {"heightmap", preview.heightmap},
+  });
+}
+
+McpBridgeToolResult heightmapImportGrayscaleForMapResult(
+  mdl::Map& map,
+  const QString&,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto preview = buildHeightmapPreview(params);
+  if (!preview.ok)
+  {
+    return invalidParamsFailure(preview.error);
+  }
+  if (preview.operations.isEmpty())
   {
     return McpBridgeToolResult::success(QJsonObject{
       {"valid", false},
-      {"validation",
-       QJsonObject{
-         {"valid", false},
-         {"errors", QJsonArray{"heightmap produced no non-zero terrain cells"}},
-         {"operationCount", 0},
-         {"brushCount", 0},
-       }},
-      {"heightmap", heightmapInfo},
+      {"willCommit", false},
+      {"validation", preview.validation},
+      {"heightmap", preview.heightmap},
+      {"warnings", preview.warnings},
+      {"suggestedParams", preview.suggestedParams},
     });
   }
-  if (brushCount > maxBrushes)
+  if (preview.brushCount > preview.maxBrushes)
   {
     return McpBridgeToolResult::success(QJsonObject{
       {"valid", false},
-      {"validation",
-       QJsonObject{
-         {"valid", false},
-         {"errors",
-          QJsonArray{QString{"heightmap would create %1 brushes; increase maxBrushes "
-                             "or lower maxSize/heightSteps"}
-                       .arg(brushCount)}},
-         {"operationCount", brushCount},
-         {"brushCount", brushCount},
-       }},
-      {"heightmap", heightmapInfo},
+      {"willCommit", false},
+      {"validation", preview.validation},
+      {"heightmap", preview.heightmap},
+      {"warnings", preview.warnings},
+      {"suggestedParams", preview.suggestedParams},
     });
   }
 
@@ -856,8 +1002,9 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
     {"grid", params.value("grid").toDouble(1.0)},
     {"select", optionalBool(params, "select", true)},
     {"detail", params.value("detail").toString("summary")},
-    {"operations", operations},
+    {"operations", preview.operations},
   };
+  const auto material = params.value("material").toString();
   if (!material.isEmpty())
   {
     batchParams.insert("material", material);
@@ -867,7 +1014,14 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
     map, "blockout_create_batch", batchParams, history, nextOperationIndex);
   if (result.ok)
   {
-    result.result.insert("heightmap", heightmapInfo);
+    result.result.insert("heightmap", preview.heightmap);
+    result.result.insert(
+      "preview",
+      QJsonObject{
+        {"estimatedBrushCount", preview.brushCount},
+        {"warnings", preview.warnings},
+        {"suggestedParams", preview.suggestedParams},
+      });
     result.result.insert("toolName", "heightmap_import_grayscale");
     if (
       !history.empty()
@@ -875,7 +1029,7 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
     {
       history.back().toolName = "heightmap_import_grayscale";
       auto detail = history.back().detail();
-      detail.insert("heightmap", heightmapInfo);
+      detail.insert("heightmap", preview.heightmap);
       detail.insert("heightmapInput", params);
       history.back().setDetail(detail);
       history.back().setSummary(result.result);

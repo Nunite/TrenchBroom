@@ -47,6 +47,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("tb_status"));
     CHECK(findToolDefinition("documents_list"));
     CHECK(findToolDefinition("documents_open"));
+    CHECK(findToolDefinition("documents_open_verified"));
     CHECK(findToolDefinition("documents_activate"));
     CHECK(findToolDefinition("documents_save"));
     CHECK(findToolDefinition("documents_close"));
@@ -117,10 +118,12 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("operation_inspect"));
     CHECK(findToolDefinition("operation_select"));
     CHECK(findToolDefinition("operation_validate"));
+    CHECK(findToolDefinition("history_status"));
     CHECK(findToolDefinition("blockout_create_batch"));
     CHECK(findToolDefinition("blockout_create_curved_corridor"));
     CHECK(findToolDefinition("python_generate_blockout"));
     CHECK(findToolDefinition("heightmap_import_grayscale"));
+    CHECK(findToolDefinition("heightmap_preview_grayscale"));
     CHECK(findToolDefinition("tb_tools_search"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
@@ -163,6 +166,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("kz_distance_analyze_chain"));
     CHECK(names.contains("overlay_set"));
     CHECK(names.contains("history_list"));
+    CHECK(names.contains("history_status"));
     CHECK(names.contains("asset_search"));
     CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_search"));
@@ -282,6 +286,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_create_curved_corridor"));
     CHECK(names.contains("python_generate_blockout"));
     CHECK(names.contains("heightmap_import_grayscale"));
+    CHECK(names.contains("heightmap_preview_grayscale"));
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("blockout_validate_spiral_stairs"));
@@ -393,6 +398,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("blockout_create_curved_corridor"));
     CHECK(!names.contains("blockout_validate_spiral_stairs"));
     CHECK(!names.contains("documents_open"));
+    CHECK(!names.contains("documents_open_verified"));
     CHECK(!names.contains("documents_save"));
     CHECK(!names.contains("documents_close"));
     CHECK(!names.contains("documents_export"));
@@ -464,6 +470,49 @@ TEST_CASE("McpToolCatalog")
       editNames.push_back(entry.toObject().value("name").toString());
     }
     CHECK(editNames.contains("heightmap_import_grayscale"));
+  }
+
+  SECTION("state trust tools expose compact schemas and modeling visibility")
+  {
+    const auto verifiedOpen = findToolDefinition("documents_open_verified");
+    REQUIRE(verifiedOpen);
+    CHECK(verifiedOpen->requiredMode == McpMode::Edit);
+    CHECK(verifiedOpen->mutatesDocument);
+    CHECK(verifiedOpen->inputSchema.value("required").toArray().contains("path"));
+    CHECK(verifiedOpen->inputSchema.value("properties")
+            .toObject()
+            .contains("expectedDocumentPath"));
+
+    const auto historyStatus = findToolDefinition("history_status");
+    REQUIRE(historyStatus);
+    CHECK(historyStatus->requiredMode == McpMode::ReadOnly);
+    CHECK(!historyStatus->mutatesDocument);
+
+    const auto heightmapPreview = findToolDefinition("heightmap_preview_grayscale");
+    REQUIRE(heightmapPreview);
+    CHECK(heightmapPreview->category == "heightmap");
+    CHECK(heightmapPreview->requiredMode == McpMode::ReadOnly);
+    CHECK(!heightmapPreview->mutatesDocument);
+    CHECK(
+      heightmapPreview->inputSchema.value("required").toArray().contains("imagePath"));
+
+    const auto editTools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    auto editNames = QStringList{};
+    for (const auto& entry : editTools)
+    {
+      editNames.push_back(entry.toObject().value("name").toString());
+    }
+    CHECK(editNames.contains("history_status"));
+    CHECK(editNames.contains("heightmap_preview_grayscale"));
+    CHECK(!editNames.contains("documents_open_verified"));
+
+    const auto searchResults = toolsSearchJson(
+      "documents_open_verified", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    REQUIRE(searchResults.size() == 1);
+    const auto found = searchResults.first().toObject();
+    CHECK(found.value("name").toString() == "documents_open_verified");
+    CHECK(!found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("inputSchema").isObject());
   }
 
   SECTION("core profile keeps only compact discovery and batch-oriented tools")
@@ -601,6 +650,9 @@ TEST_CASE("McpToolCatalog")
 
     const auto properties = tool->inputSchema.value("properties").toObject();
     CHECK(properties.value("objectIds").isObject());
+    CHECK(properties.value("operationIds").isObject());
+    CHECK(properties.value("framing").isObject());
+    CHECK(properties.value("bounds").isObject());
     CHECK(properties.value("layout").isObject());
     CHECK(properties.value("views").isObject());
     CHECK(properties.value("camera").isObject());

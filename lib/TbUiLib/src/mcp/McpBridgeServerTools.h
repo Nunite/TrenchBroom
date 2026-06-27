@@ -48,14 +48,43 @@ QString resultErrorMessage(const Result& result)
   return QString::fromStdString(std::get<Error>(error).msg);
 }
 
-QJsonObject makeStatus(AppController& appController, const mcp::McpBridgeConfig& config);
+QJsonObject makeStatus(
+  AppController& appController,
+  const mcp::McpBridgeConfig& config,
+  const QString& bridgeInstanceId = {},
+  const QString& bridgeStartedAt = {});
 QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig& config);
+QJsonObject bridgeIdentityJson(
+  const QString& bridgeInstanceId,
+  const QString& bridgeStartedAt,
+  quint16 httpPort = 37666);
 QJsonObject documentsListJson(AppController& appController);
-QJsonObject activeDocumentJson(AppController& appController);
-QJsonObject mapSnapshotJson(AppController& appController);
+QJsonObject activeDocumentJson(
+  AppController& appController,
+  const QString& bridgeInstanceId = {},
+  const QString& bridgeStartedAt = {},
+  quint16 httpPort = 37666);
+QJsonObject mapSnapshotJson(
+  AppController& appController,
+  const QString& bridgeInstanceId = {},
+  const QString& bridgeStartedAt = {},
+  quint16 httpPort = 37666);
 QJsonObject mapSnapshotJsonForMap(const mdl::Map& map, const QJsonObject& document);
+QString activeDocumentPath(AppController& appController);
+McpBridgeToolResult expectedDocumentPathFailure(
+  AppController& appController,
+  const QString& expectedPath,
+  const QString& bridgeInstanceId,
+  const QString& bridgeStartedAt,
+  quint16 httpPort = 37666);
 McpBridgeToolResult documentOpenResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult documentOpenVerifiedResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const QString& bridgeInstanceId = {},
+  const QString& bridgeStartedAt = {},
+  quint16 httpPort = 37666);
 McpBridgeToolResult documentActivateResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult documentSaveResult(
@@ -163,13 +192,23 @@ McpBridgeToolResult viewportCapture3DResult(
 McpBridgeToolResult viewportCapture2DResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult viewportCaptureSceneReviewResult(
-  AppController& appController, const QJsonObject& params, QJsonObject& overlayState);
+  AppController& appController,
+  const QJsonObject& params,
+  QJsonObject& overlayState,
+  const std::vector<McpOperationRecord>& history = {},
+  const McpObjectRegistry* objectRegistry = nullptr);
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyListResult(
   AppController& appController,
   const std::vector<McpOperationRecord>& history,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult historyStatusResult(
+  AppController& appController,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry,
+  const QString& bridgeInstanceId = {},
+  const QString& bridgeStartedAt = {});
 McpBridgeToolResult operationInspectResult(
   const std::vector<McpOperationRecord>& history, const QJsonObject& params);
 McpBridgeToolResult operationInspectResult(
@@ -367,6 +406,10 @@ McpBridgeToolResult heightmapImportGrayscaleResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult heightmapPreviewGrayscaleResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult heightmapPreviewGrayscaleForMapResult(
+  mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult heightmapImportGrayscaleForMapResult(
   mdl::Map& map,
   const QString& toolName,

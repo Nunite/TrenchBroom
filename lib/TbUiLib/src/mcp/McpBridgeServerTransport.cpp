@@ -23,9 +23,12 @@
 #include <QJsonObject>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QUuid>
 
+#include "McpBridgeServerTools.h"
 #include "mcp/McpToolCatalog.h"
 #include "mdl/Map.h"
+#include "ui/QPathUtils.h"
 #include "ui/mcp/McpBridgeServer.h"
 
 #include <algorithm>
@@ -159,6 +162,8 @@ bool McpBridgeServer::start(const mcp::McpBridgeConfig& config, QString* error)
 {
   stop();
   m_config = config;
+  m_bridgeInstanceId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+  m_bridgeStartedAtUtc = QDateTime::currentDateTimeUtc();
 
   if (m_config.mode == mcp::McpMode::Off)
   {
@@ -343,6 +348,25 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
 
   auto params = request.params;
   auto* map = m_activeMapProvider ? m_activeMapProvider() : nullptr;
+  if (tool->mutatesDocument)
+  {
+    const auto expectedDocumentPath =
+      params.value("expectedDocumentPath").toString().trimmed();
+    if (!expectedDocumentPath.isEmpty())
+    {
+      const auto actualDocumentPath =
+        map != nullptr && !map->path().empty() ? pathAsQString(map->path()) : QString{};
+      if (actualDocumentPath != expectedDocumentPath)
+      {
+        return makeFailure(
+          request,
+          mcp::McpErrorCode::Forbidden,
+          QString{"Active document does not match expectedDocumentPath. Expected '%1', "
+                  "actual '%2'."}
+            .arg(expectedDocumentPath, actualDocumentPath));
+      }
+    }
+  }
   if (map != nullptr)
   {
     auto error = QString{};

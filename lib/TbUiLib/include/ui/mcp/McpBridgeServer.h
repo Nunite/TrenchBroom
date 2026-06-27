@@ -20,6 +20,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QObject>
@@ -109,6 +110,8 @@ private:
   mutable std::map<QString, McpBrushMetadataRecord> m_brushMetadata;
   mutable McpObjectRegistry m_objectRegistry;
   mutable bool m_dispatchInProgress = false;
+  QString m_bridgeInstanceId;
+  QDateTime m_bridgeStartedAtUtc;
   std::unique_ptr<QLocalServer> m_server;
 
 public:

@@ -25,9 +25,9 @@
 #include <QPixmap>
 #include <QStringList>
 
-#include "gl/Camera.h"
 #include "McpBridgeServerTools.h"
 #include "McpSelectionQuery.h"
+#include "gl/Camera.h"
 #include "mcp/McpError.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushFace.h"
@@ -56,6 +56,7 @@
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
 #include "ui/SystemPaths.h"
+#include "ui/mcp/McpObjectRegistry.h"
 
 #include "vm/bbox.h"
 
@@ -370,6 +371,35 @@ QJsonArray stringArrayFromValueOrDefault(
     }
   }
   return result.isEmpty() ? defaultValue : result;
+}
+
+void applyFramingPreset(QJsonObject& cameraParams, const QString& framing)
+{
+  const auto normalized = framing.trimmed().toLower();
+  if (normalized == "overview_orbit")
+  {
+    cameraParams.insert("azimuth", -45.0);
+    cameraParams.insert("elevation", 38.0);
+    cameraParams.insert("distanceScale", 1.55);
+  }
+  else if (normalized == "top_fit")
+  {
+    cameraParams.insert("azimuth", -90.0);
+    cameraParams.insert("elevation", 82.0);
+    cameraParams.insert("distanceScale", 1.35);
+  }
+  else if (normalized == "side_profile")
+  {
+    cameraParams.insert("azimuth", -90.0);
+    cameraParams.insert("elevation", 8.0);
+    cameraParams.insert("distanceScale", 1.65);
+  }
+  else if (normalized == "route_follow")
+  {
+    cameraParams.insert("azimuth", -35.0);
+    cameraParams.insert("elevation", 18.0);
+    cameraParams.insert("distanceScale", 1.45);
+  }
 }
 
 QString normalizedReviewViewName(const QString& view)
@@ -766,11 +796,12 @@ std::optional<vm::bbox3d> cameraFrameBoundsFromParams(
   return std::nullopt;
 }
 
-QJsonObject frame3dCameraOnBounds(MapView3D& view, const vm::bbox3d& bounds, const QJsonObject& params)
+QJsonObject frame3dCameraOnBounds(
+  MapView3D& view, const vm::bbox3d& bounds, const QJsonObject& params)
 {
   const auto azimuthDegrees = optionalFiniteNumber(params, "azimuth", -45.0);
-  const auto elevationDegrees = std::clamp(
-    optionalFiniteNumber(params, "elevation", 32.0), -85.0, 85.0);
+  const auto elevationDegrees =
+    std::clamp(optionalFiniteNumber(params, "elevation", 32.0), -85.0, 85.0);
   const auto distanceScale =
     std::max(0.25, optionalFiniteNumber(params, "distanceScale", 1.35));
   const auto minDistance =
@@ -820,8 +851,7 @@ QJsonObject frame3dCameraOnBounds(MapView3D& view, const vm::bbox3d& bounds, con
   };
 }
 
-McpBridgeToolResult set3dCameraLookAtResult(
-  MapView3D& view, const QJsonObject& params)
+McpBridgeToolResult set3dCameraLookAtResult(MapView3D& view, const QJsonObject& params)
 {
   auto error = QString{};
   const auto position = mcpVec3FromJson(params, "position", error);
@@ -1355,12 +1385,12 @@ McpBridgeToolResult viewportClearMarksResult(
 
   if (mcpOptionalBool(params, "clearSelection", false))
   {
-    auto* mapWindow = appController.mapWindowManager().topMapWindow();
-    if (!mapWindow)
+    auto* activeMapWindow = appController.mapWindowManager().topMapWindow();
+    if (!activeMapWindow)
     {
       return noActiveDocumentFailure();
     }
-    mdl::deselectAll(mapWindow->document().map());
+    mdl::deselectAll(activeMapWindow->document().map());
   }
 
   return McpBridgeToolResult::success(QJsonObject{
@@ -1487,7 +1517,11 @@ McpBridgeToolResult viewportCapture2DResult(
 }
 
 McpBridgeToolResult viewportCaptureSceneReviewResult(
-  AppController& appController, const QJsonObject& params, QJsonObject& overlayState)
+  AppController& appController,
+  const QJsonObject& params,
+  QJsonObject& overlayState,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
 {
   if (params.contains("layout"))
   {
@@ -1499,14 +1533,57 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     }
   }
 
-  const auto objectIdsValue = params.value("objectIds");
+  auto objectIds = QJsonArray{};
+  if (const auto objectIdsValue = params.value("objectIds"); objectIdsValue.isArray())
+  {
+    objectIds = objectIdsValue.toArray();
+  }
+
+  auto* reviewMapWindow = appController.mapWindowManager().topMapWindow();
+  auto* map = reviewMapWindow != nullptr ? &reviewMapWindow->document().map() : nullptr;
+  const auto appendResolvableObjectId = [&](const QString& objectId) {
+    if (objectId.isEmpty())
+    {
+      return;
+    }
+    if (objectRegistry != nullptr && map != nullptr)
+    {
+      const auto resolved = objectRegistry->resolveExternalId(*map, objectId);
+      if (resolved.ok && !resolved.legacyPathId.isEmpty())
+      {
+        objectIds.push_back(resolved.legacyPathId);
+      }
+      return;
+    }
+    objectIds.push_back(objectId);
+  };
+
+  if (const auto operationIdsValue = params.value("operationIds");
+      operationIdsValue.isArray())
+  {
+    for (const auto& operationIdValue : operationIdsValue.toArray())
+    {
+      const auto operationId = operationIdValue.toString();
+      const auto it = std::ranges::find_if(history, [&](const auto& operation) {
+        return operation.operationId == operationId;
+      });
+      if (it != history.end())
+      {
+        for (const auto& objectId : it->changedObjectIds)
+        {
+          appendResolvableObjectId(objectId);
+        }
+      }
+    }
+  }
+
   auto cameraControlled = false;
   auto focusedObjectCount = 0;
   auto cameraFrame = QJsonObject{};
-  if (objectIdsValue.isArray())
+  if (!objectIds.isEmpty())
   {
     const auto focusResult =
-      viewportFocusResult(appController, QJsonObject{{"objectIds", objectIdsValue}});
+      viewportFocusResult(appController, QJsonObject{{"objectIds", objectIds}});
     if (!focusResult.ok)
     {
       return focusResult;
@@ -1516,16 +1593,14 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
 
     if (mcpOptionalBool(params, "highlight", true))
     {
-      overlayState.insert("highlightObjectIds", objectIdsValue.toArray());
+      overlayState.insert("highlightObjectIds", objectIds);
       if (const auto sceneName = params.value("sceneName").toString().trimmed();
           !sceneName.isEmpty())
       {
         auto labels = QJsonArray{};
         labels.push_back(QJsonObject{
           {"text", sceneName},
-          {"objectId",
-           objectIdsValue.toArray().isEmpty() ? QJsonValue{}
-                                              : objectIdsValue.toArray().first()},
+          {"objectId", objectIds.isEmpty() ? QJsonValue{} : objectIds.first()},
         });
         overlayState.insert("labels", labels);
       }
@@ -1544,12 +1619,13 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
       cameraParams.contains("position") && cameraParams.contains("target")
         ? viewportCameraSetResult(appController, cameraParams)
         : McpBridgeToolResult::failure(
-          mcp::McpErrorCode::InvalidParams, "camera requires position/target or bounds");
+            mcp::McpErrorCode::InvalidParams,
+            "camera requires position/target or bounds");
     if (
       !cameraParams.contains("position") && !cameraParams.contains("target")
-      && !cameraParams.contains("objectIds") && objectIdsValue.isArray())
+      && !cameraParams.contains("objectIds") && !objectIds.isEmpty())
     {
-      cameraParams.insert("objectIds", objectIdsValue);
+      cameraParams.insert("objectIds", objectIds);
     }
     if (!(cameraParams.contains("position") && cameraParams.contains("target")))
     {
@@ -1560,6 +1636,29 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
       return cameraResult;
     }
     cameraFrame = cameraResult.result;
+    cameraControlled = true;
+  }
+  else if (const auto framing = params.value("framing").toString("current");
+           framing != "current" && !framing.trimmed().isEmpty())
+  {
+    auto cameraParams = QJsonObject{};
+    if (!objectIds.isEmpty())
+    {
+      cameraParams.insert("objectIds", objectIds);
+    }
+    if (const auto bounds = params.value("bounds"); bounds.isObject())
+    {
+      cameraParams.insert("bounds", bounds);
+    }
+    applyFramingPreset(cameraParams, framing);
+    const auto cameraResult =
+      viewportCameraFrameBoundsResult(appController, cameraParams);
+    if (!cameraResult.ok)
+    {
+      return cameraResult;
+    }
+    cameraFrame = cameraResult.result;
+    cameraFrame.insert("framing", framing);
     cameraControlled = true;
   }
 

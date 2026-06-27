@@ -27,8 +27,10 @@
 
 - `tools/list` 为空且 `tb_status` 返回 `Forbidden`：TrenchBroom MCP mode 仍是 `Off`。
 - `tb_status` 连接失败：TrenchBroom 未运行、bridge 未启动，或配置 token/pipeName 不匹配。
-- `documents_list` 为空：需要先让用户打开地图，或在 `Edit` mode 下使用 `documents_open` 打开绝对路径。
+- `tb_status.processId`、`bridgeInstanceId`、`activeDocumentPath`、`documentFingerprint` 是本轮请求链路的身份锚点。写入前必须确认它们指向预期 TrenchBroom 进程和预期地图。
+- `documents_list` 为空：需要先让用户打开地图，或在 `Edit` mode 下使用 `documents_open_verified` 打开绝对路径。
 - `tb_doctor` 报告活动文档不存在：不要执行 map / selection / edit 工具，先激活或打开文档。
+- 多个 TrenchBroom 进程同时存在时，MCP HTTP 端口只控制该端口 owner 所属进程；不要假设它就是屏幕上最前面的 TB。`scripts/mcp-call.ps1` 会显示端口 owner PID，并可与 `tb_status.processId` 对照。
 
 本地快速 smoke 可用：
 
@@ -52,6 +54,12 @@ scripts\mcp-call.ps1 -ResourceUri tbmcp://operation/mcp-op-1
 scripts\mcp-call.ps1 -Launch -KeepOpen -Tool tb_status
 ```
 
+切换地图建议使用 verified open：
+
+```powershell
+scripts\mcp-call.ps1 -Tool documents_open_verified -ArgumentsJson '{"path":"D:/absolute/path/to/map.map","waitMs":5000,"activate":true}'
+```
+
 生成 MCP client 配置片段可用：
 
 ```powershell
@@ -68,15 +76,16 @@ scripts\mcp-config.ps1 -Print
 你正在通过 TrenchBroom MCP 控制一个正在运行的 TrenchBroom 实例。
 
 工作规则：
-1. 先调用 tb_status、tb_doctor、documents_list，确认 MCP 已启用且有活动文档。
+1. 先调用 tb_status、tb_doctor、documents_list，确认 MCP 已启用且有活动文档，并记录 processId、activeDocumentPath、documentFingerprint。
 2. 查询地图时使用 document_snapshot、map_snapshot、map_search、selection_get、fgd_entities_list、textures_list、asset_search。
 3. 修改地图时只使用结构化 MCP 工具，不直接写 .map 文件，也不运行任意 Python 脚本。
 4. 白盒生成必须优先使用 `blockout_validate` 和 `blockout_create_batch` 的 primitive operations；不要直接生成任意 brush 顶点。
 5. 所有坐标和尺寸使用 GoldSrc units，并尽量按 16 units 网格对齐。
 6. 每次写操作后读取 operationId，需要时再用 `operation_inspect(detail=ids)` 取对象 id；用截图工具检查，不要长期携带大 object id 列表。
 7. 发现结果错误时优先使用 history_undo_mcp 回滚最近一次 MCP 操作，而不是用删除工具硬删一片对象。
-8. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认。
-9. 如果工具返回 unsupported、Forbidden 或 Unauthorized，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
+8. 大型或破坏性写入应传 expectedDocumentPath，防止写到错误地图。
+9. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认。
+10. 如果工具返回 unsupported、Forbidden 或 Unauthorized，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
 ```
 
 ## 读取地图
@@ -90,6 +99,7 @@ scripts\mcp-config.ps1 -Print
 5. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
 6. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
 7. 场景验收优先用 `viewport_capture_scene_review`：它会按可选对象 id 聚焦/高亮，批量截取当前、3D、2D 视图，并返回白盒检查项。当前版本依赖 TrenchBroom 正在显示的 UI 视图；如果某类 viewport 不可见，工具会在 `warnings` 中说明。
+8. 自动化截图时优先传 `operationIds` 和 `framing`：`overview_orbit` 看整体，`top_fit` 看占地/路线，`side_profile` 看高度剖面，`route_follow` 看行进方向。显式 `camera` 优先级最高。
 
 对象操作必须使用 MCP 返回的 `objectId`，不要根据实体顺序或 UI 文本猜测内部指针。
 
@@ -105,9 +115,10 @@ scripts\mcp-config.ps1 -Print
 6. 只需要批量创建平台/跳块时用 `brush_create_boxes_batch`，传 `boxes: [{min,max,material?}]`；需要棱形、切角或引导形状时用 `brush_create_polygon_batch`，避免多次单 brush 调用产生大量 undo/history。
 7. `blockout_create_room`、`blockout_create_corridor`、`blockout_create_stairs`、`blockout_create_ramp`、`blockout_create_doorway`、`blockout_create_cover`、`blockout_create_sky_shell` 属于 convenience helpers，只用于快速草图、旧 workflow 兼容或用户明确要求，不作为 Modeling 默认路径。
 8. 默认只保留返回的 `operationId` / `resourceUri`，需要 ids 时再用 `operation_inspect(detail=ids)`。
-9. 用 `overlay_set` 标注新结构，并调用 `viewport_capture_scene_review` 收集截图验收包。只需要单张反馈时再用 `viewport_capture_3d` / `viewport_capture_2d`。
-10. 根据截图调整尺寸或位置，必要时使用 `objects_transform` 平移/旋转/缩放。
-11. 调用 `map_validate` / `problems_check`。
+9. 写入工具支持 `expectedDocumentPath`。当 Agent 已经从 `tb_status` 记录了目标地图路径时，大型批量创建、删除、贴图替换、heightmap import、实体创建和保存都应传这个 guard。
+10. 用 `overlay_set` 标注新结构，并调用 `viewport_capture_scene_review` 收集截图验收包。只需要单张反馈时再用 `viewport_capture_3d` / `viewport_capture_2d`。
+11. 根据截图调整尺寸或位置，必要时使用 `objects_transform` 平移/旋转/缩放。
+12. 调用 `history_status` 确认最近 MCP operation 是否还在 undo 栈顶；再调用 `map_validate` / `problems_check`。
 
 不要让 Agent 直接使用 `brush_create_from_planes` 做普通白盒。它是 `Full` / 搜索可发现的专家工具，只适合已有明确 plane 数据且需要严格校验的场景。复杂批量结构也不要默认走 `python_generate_blockout`；除非用户明确要求脚本生成，优先用 typed batch primitive operations 分阶段落地。
 

@@ -169,6 +169,22 @@ QJsonObject routeMetadataSchema()
   };
 }
 
+void addExpectedDocumentPathGuardSchema(McpToolDefinition& tool)
+{
+  if (!tool.mutatesDocument)
+  {
+    return;
+  }
+
+  auto properties = tool.inputSchema.value("properties").toObject();
+  properties.insert(
+    "expectedDocumentPath",
+    stringProperty(
+      "Optional active document path guard. If set, the tool refuses to mutate when "
+      "the current active document path differs."));
+  tool.inputSchema.insert("properties", properties);
+}
+
 QJsonObject polygonBatchItemSchema()
 {
   return objectSchema(
@@ -224,12 +240,11 @@ QJsonObject blockoutBatchOperationSchema()
     {"properties",
      QJsonObject{
        {"type",
-        stringProperty(
-          "Operation type. Primitive modeling types: box, cylinder, prism, "
-          "polyhedron, cylinder_sector, path_ribbon, repeat_translate, "
-          "repeat_grid, stepped_mass, support_posts_between. Convenience "
-          "structural types: room, corridor, curved_corridor, stairs, ramp, "
-          "doorway, cover, sky_shell.")},
+        stringProperty("Operation type. Primitive modeling types: box, cylinder, prism, "
+                       "polyhedron, cylinder_sector, path_ribbon, repeat_translate, "
+                       "repeat_grid, stepped_mass, support_posts_between. Convenience "
+                       "structural types: room, corridor, curved_corridor, stairs, ramp, "
+                       "doorway, cover, sky_shell.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"material", stringProperty("Per-operation material override.")},
@@ -357,6 +372,24 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(
         {
           {"path", stringProperty("Absolute path to the map document.")},
+        },
+        {"path"}),
+    },
+    {
+      "documents_open_verified",
+      "Open, activate, and verify a map document before returning success.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"path", stringProperty("Absolute path to the map document.")},
+          {"waitMs",
+           integerProperty(
+             "Maximum verification wait in milliseconds. Defaults to 5000.")},
+          {"activate",
+           boolProperty(
+             "Activate the opened document before verification. Defaults to true.")},
         },
         {"path"}),
     },
@@ -704,8 +737,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "viewport_capture_scene_review",
       "Create a compact whitebox scene review package by focusing optional object ids, "
       "highlighting them, and capturing requested current/3d/2d viewport screenshots. "
-      "Use objectIds, camera bounds, or explicit camera position/target for "
-      "deterministic review.",
+      "Use objectIds, operationIds, framing presets, camera bounds, or explicit "
+      "camera position/target for deterministic review.",
       McpMode::ReadOnly,
       false,
       true,
@@ -713,6 +746,22 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"sceneName", stringProperty("Optional scene or checkpoint label.")},
         {"objectIds",
          arrayProperty("Optional object ids to select, focus, and highlight.")},
+        {"operationIds",
+         arrayProperty(
+           "Optional MCP operation ids. Live operation objects are used for focus, "
+           "highlight, and framing bounds.")},
+        {"framing",
+         stringProperty(
+           "Camera framing preset when no explicit camera is supplied: current, "
+           "overview_orbit, top_fit, side_profile, or route_follow. Defaults to "
+           "current.")},
+        {"bounds",
+         objectSchema(
+           {
+             {"min", vec3Property("Framing bounds minimum corner.")},
+             {"max", vec3Property("Framing bounds maximum corner.")},
+           },
+           {"min", "max"})},
         {"views",
          arrayProperty(
            "Views to capture: current/window, 3d, 2d. Defaults to current, 3d, 2d.")},
@@ -1234,6 +1283,15 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "history_list",
       "List the MCP operation timeline for the active bridge session, including "
       "creation time and live/stale object counts when a document is active.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(),
+    },
+    {
+      "history_status",
+      "Return compact MCP operation history availability diagnostics for the active "
+      "bridge session and document.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1912,6 +1970,38 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"imagePath"}),
     },
     {
+      "heightmap_preview_grayscale",
+      "Preview a local grayscale heightmap import without committing brushes.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"imagePath", stringProperty("Local image path to read as a heightmap.")},
+          {"origin", vec3Property("Terrain minimum origin, defaults to [0,0,0].")},
+          {"cellSize", numberProperty("Map units per sampled pixel, defaults to 64.")},
+          {"heightScale", numberProperty("Maximum generated height, defaults to 128.")},
+          {"heightSteps", integerProperty("Quantization steps, defaults to 8.")},
+          {"maxSize",
+           integerProperty(
+             "Maximum sampled image dimension before downsampling, defaults to 64.")},
+          {"maxBrushes",
+           integerProperty("Maximum merged brushes to allow, defaults to 512.")},
+          {"mode",
+           stringProperty(
+             "Preview mode: terraced_brushes or adaptive_surface. Defaults to "
+             "terraced_brushes.")},
+          {"minCellSize",
+           numberProperty("adaptive_surface minimum cell size in map units.")},
+          {"maxCellSize",
+           numberProperty("adaptive_surface maximum cell size in map units.")},
+          {"errorTolerance",
+           numberProperty("adaptive_surface height error tolerance in map units.")},
+          {"material", stringProperty("Brush material for previewed operations.")},
+        },
+        {"imagePath"}),
+    },
+    {
       "blockout_create_curved_corridor",
       "Create a curved corridor as one transaction using floor, ceiling, inner wall, "
       "outer wall, and optional caps.",
@@ -2204,6 +2294,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         tool.category = "core";
         tool.minimumProfile = McpToolProfile::Core;
       }
+      addExpectedDocumentPathGuardSchema(tool);
     }
     return tools;
   }();
@@ -2287,6 +2378,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "operation_select",
     "operation_validate",
     "history_list",
+    "history_status",
     "history_undo_mcp",
     "history_redo_mcp",
     "brush_types_list",
@@ -2305,6 +2397,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "brush_create_polygon_batch",
     "blockout_create_batch",
     "heightmap_import_grayscale",
+    "heightmap_preview_grayscale",
     "shape_library_list",
     "brush_metadata_set",
     "brush_metadata_get",

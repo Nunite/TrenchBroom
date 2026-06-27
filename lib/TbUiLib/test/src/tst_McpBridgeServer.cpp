@@ -320,6 +320,14 @@ TEST_CASE("McpBridgeServer")
         {"count", 0},
       });
     }
+    if (toolName == "history_status")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"historyCount", 0},
+        {"canUndoLatestMcpOperation", false},
+        {"reasonIfUnavailable", "noMcpMutationYet"},
+      });
+    }
     if (toolName == "asset_search")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -478,6 +486,14 @@ TEST_CASE("McpBridgeServer")
         {"resourceUri", "tbmcp://operation/mcp-op-12"},
       });
     }
+    if (toolName == "heightmap_preview_grayscale")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"willCommit", true},
+        {"estimatedBrushCount", 4},
+        {"warnings", QJsonArray{}},
+      });
+    }
     if (toolName == "blockout_create_room" || toolName == "blockout_create_spiral_stairs")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -523,6 +539,25 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("application").toString() == "TrenchBroom");
+  }
+
+  SECTION("status includes bridge and process identity")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto config = mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit};
+    config.httpPort = 45678;
+
+    const auto status =
+      makeStatus(appController, config, "bridge-test-id", "2026-06-28T00:00:00Z");
+
+    CHECK(status.value("application").toString() == "TrenchBroom");
+    CHECK(status.value("processId").toInt() > 0);
+    CHECK(status.value("bridgeInstanceId").toString() == "bridge-test-id");
+    CHECK(status.value("bridgeStartedAt").toString() == "2026-06-28T00:00:00Z");
+    CHECK(status.value("httpPort").toInt() == 45678);
+    CHECK(status.contains("openDocumentCount"));
+    CHECK(status.contains("openDocumentsSummary"));
   }
 
   SECTION("serves wired read-only tools")
@@ -957,6 +992,14 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("count").toInt() == 0);
+
+    const auto statusResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"2", "secret", "history_status", {}, mcp::McpMode::ReadOnly});
+    CHECK(statusResponse.ok);
+    CHECK(statusResponse.result.value("historyCount").toInt() == 0);
+    CHECK(
+      statusResponse.result.value("reasonIfUnavailable").toString()
+      == "noMcpMutationYet");
   }
 
   SECTION("read-only mode serves asset and texture search")
@@ -1290,6 +1333,15 @@ TEST_CASE("McpBridgeServer")
       mcp::McpMode::Edit});
     CHECK(heightmapResponse.ok);
     CHECK(heightmapResponse.result.value("operationId").toString() == "mcp-op-12");
+
+    const auto heightmapPreviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "6",
+      "secret",
+      "heightmap_preview_grayscale",
+      QJsonObject{{"imagePath", "C:/tmp/heightmap.png"}},
+      mcp::McpMode::ReadOnly});
+    CHECK(heightmapPreviewResponse.ok);
+    CHECK(heightmapPreviewResponse.result.value("estimatedBrushCount").toInt() == 4);
   }
 
   SECTION("rejects nested dispatch")
@@ -1318,6 +1370,46 @@ TEST_CASE("McpBridgeServer")
     CHECK(!nestedResponse->ok);
     REQUIRE(nestedResponse->error);
     CHECK(nestedResponse->error->code == mcp::McpErrorCode::Forbidden);
+  }
+
+  SECTION("mutating tools reject mismatched expectedDocumentPath before dispatch")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto handlerCalled = false;
+    auto guardedServer = McpBridgeServer{
+      [&](const QString&, const QJsonObject&) {
+        handlerCalled = true;
+        return McpBridgeToolResult::success(QJsonObject{{"unexpected", true}});
+      },
+      [&map]() -> mdl::Map* { return &map; }};
+    REQUIRE(guardedServer.start(
+      mcp::McpBridgeConfig{"test-pipe-expected-doc", "secret", mcp::McpMode::Edit}));
+
+    const auto response = guardedServer.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "blockout_create_batch",
+      QJsonObject{
+        {"expectedDocumentPath", "D:/does/not/match.map"},
+        {"operations", QJsonArray{QJsonObject{{"type", "box"}}}},
+      },
+      mcp::McpMode::Edit});
+
+    CHECK(!response.ok);
+    REQUIRE(response.error);
+    CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
+    CHECK(response.error->message.contains("expectedDocumentPath"));
+    CHECK(!handlerCalled);
   }
 }
 
@@ -3748,6 +3840,44 @@ TEST_CASE("McpBridgeServer grayscale heightmap import tool")
     CHECK(
       QString::fromStdString(*map.undoCommandName())
       == "MCP: Import grayscale heightmap");
+  }
+
+  SECTION("previews grayscale heightmap without committing")
+  {
+    auto image = QImage{2, 2, QImage::Format_RGB32};
+    image.setPixelColor(0, 0, QColor{0, 0, 0});
+    image.setPixelColor(1, 0, QColor{128, 128, 128});
+    image.setPixelColor(0, 1, QColor{128, 128, 128});
+    image.setPixelColor(1, 1, QColor{255, 255, 255});
+    const auto imagePath = saveImage("heightmap_preview.png", image);
+
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = heightmapPreviewGrayscaleForMapResult(
+      map,
+      QJsonObject{
+        {"imagePath", imagePath},
+        {"origin", QJsonArray{0, 0, 0}},
+        {"cellSize", 32},
+        {"heightScale", 64},
+        {"heightSteps", 4},
+        {"maxSize", 4},
+        {"maxBrushes", 16},
+      });
+
+    const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+    INFO(error);
+    REQUIRE(response.ok);
+    CHECK(response.result.value("willCommit").toBool());
+    CHECK(response.result.value("estimatedBrushCount").toInt() == 3);
+    CHECK(response.result.value("sampleGrid").toObject().value("width").toInt() == 2);
+    CHECK(
+      response.result.value("sourceImageSize").toObject().value("height").toInt() == 2);
+    CHECK(response.result.value("outputBounds").isObject());
+    CHECK(response.result.value("heightRange").isObject());
+    CHECK(response.result.value("warnings").isArray());
+    CHECK(response.result.value("suggestedParams").isObject());
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+    CHECK(map.undoCommandName() == nullptr);
   }
 
   SECTION("rejects missing image path without committing")

@@ -19,8 +19,10 @@
 
 #include "ui/mcp/McpBridgeServer.h"
 
+#include <QDateTime>
 #include <QJsonObject>
 #include <QLocalServer>
+#include <QUuid>
 
 #include "McpBridgeServerTools.h"
 #include "mcp/McpError.h"
@@ -62,7 +64,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
       [&appController, this](const auto& toolName, const auto& params) {
         if (toolName == "tb_status")
         {
-          return McpBridgeToolResult::success(makeStatus(appController, m_config));
+          return McpBridgeToolResult::success(makeStatus(
+            appController,
+            m_config,
+            m_bridgeInstanceId,
+            m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs)));
         }
         if (toolName == "tb_doctor")
         {
@@ -91,6 +97,15 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return documentOpenResult(appController, params);
         }
+        if (toolName == "documents_open_verified")
+        {
+          return documentOpenVerifiedResult(
+            appController,
+            params,
+            m_bridgeInstanceId,
+            m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs),
+            m_config.httpPort);
+        }
         if (toolName == "documents_activate")
         {
           return documentActivateResult(appController, params);
@@ -109,11 +124,19 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         }
         if (toolName == "document_snapshot")
         {
-          return McpBridgeToolResult::success(activeDocumentJson(appController));
+          return McpBridgeToolResult::success(activeDocumentJson(
+            appController,
+            m_bridgeInstanceId,
+            m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs),
+            m_config.httpPort));
         }
         if (toolName == "map_snapshot")
         {
-          return McpBridgeToolResult::success(mapSnapshotJson(appController));
+          return McpBridgeToolResult::success(mapSnapshotJson(
+            appController,
+            m_bridgeInstanceId,
+            m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs),
+            m_config.httpPort));
         }
         if (toolName == "map_search")
         {
@@ -177,7 +200,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         }
         if (toolName == "viewport_capture_scene_review")
         {
-          return viewportCaptureSceneReviewResult(appController, params, m_overlayState);
+          return viewportCaptureSceneReviewResult(
+            appController, params, m_overlayState, m_operationHistory, &m_objectRegistry);
         }
         if (toolName == "actions_list")
         {
@@ -309,6 +333,15 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "history_list")
         {
           return historyListResult(appController, m_operationHistory, m_objectRegistry);
+        }
+        if (toolName == "history_status")
+        {
+          return historyStatusResult(
+            appController,
+            m_operationHistory,
+            m_objectRegistry,
+            m_bridgeInstanceId,
+            m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs));
         }
         if (toolName == "operation_inspect")
         {
@@ -467,6 +500,10 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return heightmapImportGrayscaleResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "heightmap_preview_grayscale")
+        {
+          return heightmapPreviewGrayscaleResult(appController, params);
         }
         if (
           toolName == "blockout_create_batch"
