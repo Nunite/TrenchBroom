@@ -203,6 +203,8 @@ QJsonObject blockoutBatchOperationSchema()
      R"("width":160,"minZ":0,"maxZ":16}; )"
      R"({"type":"repeat_translate","count":4,"offset":[128,0,0],)"
      R"("operation":{"type":"box","min":[0,0,0],"max":[64,64,16]}}; )"
+     R"({"type":"repeat_grid","counts":[4,3],"offsets":[[128,0,0],[0,0,96]],)"
+     R"("operation":{"type":"box","min":[0,0,0],"max":[64,16,48]}}; )"
      R"({"type":"stepped_mass","min":[-512,-512,0],"max":[512,512,64],)"
      R"("levels":5,"inset":96,"stepHeight":64}; )"
      R"({"type":"support_posts_between","points2d":[[-256,-256],[256,-256]],)"
@@ -216,11 +218,12 @@ QJsonObject blockoutBatchOperationSchema()
     {"properties",
      QJsonObject{
        {"type",
-        stringProperty("Operation type: box, cylinder, prism, polyhedron, "
-                       "cylinder_sector, room, corridor, "
-                       "curved_corridor, path_ribbon, repeat_translate, "
-                       "stepped_mass, support_posts_between, stairs, ramp, doorway, "
-                       "cover, or sky_shell.")},
+        stringProperty(
+          "Operation type: box, cylinder, prism, polyhedron, "
+          "cylinder_sector, room, corridor, "
+          "curved_corridor, path_ribbon, repeat_translate, repeat_grid, "
+          "stepped_mass, support_posts_between, stairs, ramp, doorway, cover, "
+          "or sky_shell.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"material", stringProperty("Per-operation material override.")},
@@ -260,14 +263,20 @@ QJsonObject blockoutBatchOperationSchema()
        {"doorMax", vec3Property("Door opening maximum corner for doorway.")},
        {"snapMode", stringProperty("Circular vertex snap mode: grid, radial, or none.")},
        {"count", integerProperty("repeat_translate repetition count, 1..256.")},
+       {"counts",
+        arrayProperty(
+          "repeat_grid repetition counts per axis, one to three integers; total "
+          "instances must be <= 4096.")},
        {"offset",
         vec3Property(
           "repeat_translate offset added for each repetition; must be non-zero when "
           "count is greater than one.")},
+       {"offsets",
+        arrayProperty("repeat_grid offset vectors per axis; length must match counts.")},
        {"operation",
         QJsonObject{
           {"type", "object"},
-          {"description", "repeat_translate child operation object."},
+          {"description", "repeat_translate or repeat_grid child operation object."},
           {"additionalProperties", true},
         }},
      }},
@@ -1815,9 +1824,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            arrayProperty(
              "Array of blockout operations. Supported types include box, cylinder, "
              "prism, polyhedron, cylinder_sector, room, corridor, curved_corridor, "
-             "path_ribbon, repeat_translate, stepped_mass, support_posts_between, "
-             "stairs, ramp, doorway, cover, and sky_shell. Each item must be an object "
-             "with a type field; use "
+             "path_ribbon, repeat_translate, repeat_grid, stepped_mass, "
+             "support_posts_between, stairs, ramp, doorway, cover, and sky_shell. Each "
+             "item must be an object with a type field; use "
              "tb_tools_search(detail=schema, "
              "query="
              "\"blockout_create_batch operations\") for examples.",

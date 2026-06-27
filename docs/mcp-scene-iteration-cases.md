@@ -766,4 +766,64 @@ Proposed MCP changes:
 - Consider an overlap/duplicate-bounds validator for batch results, because duplicated brushes are easy for agents to create and hard to spot in screenshots.
 
 Commit:
-- Pending follow-up: `Reject zero-offset repeat translate operations`.
+- `5000ea9bd Reject zero-offset repeat translate operations`.
+
+### 2026-06-27 - Scene 9: Cyberpunk Street Corner
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_09_cyberpunk_street_corner.map`
+- Created from the minimal Valve map fixture.
+- First attempted to switch from the prior smoke map with `documents_open`; it returned success, but the next MCP calls timed out and the TB process exited. The stable path was to relaunch TrenchBroom directly with this clean map.
+- Initial verification after direct launch: `brushCount=0`, empty MCP history.
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 9: street corner roads buildings and skybridge massing`: L-shaped street slabs, four building masses, corner storefront bands, and initial skybridge massing. Result: `valid=true`, 21 brushes.
+- `mcp-op-2` / `MCP Scene 9: facade windows signs and service boxes`: repeated facade window panels, sign boxes, store signs, and service/vent boxes. Result: `valid=true`, 95 brushes from 22 operations.
+- `mcp-op-3` / `MCP Scene 9: skybridge light strips street props and anchors`: skybridge details, street median/props, vertical light-strip cues, arrow markers, and bridge support posts. Result: `valid=true`, 62 brushes.
+
+MCP tools used:
+- `blockout_create_batch` with `box`, `prism`, `repeat_translate`, and `support_posts_between`.
+- `map_snapshot`, `map_validate`, `problems_check`, `history_list`, and `documents_save`.
+- `viewport_capture_scene_review` with overview and two explicit detail cameras.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782550453174.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782550453227.png`
+- Street corner detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782550453708.png`
+- Skybridge/facade detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782550467180.png`
+
+Validation:
+- Final `map_snapshot`: `brushCount=178`, bounds `[-1600,-1600,-32]` to `[1600,1600,896]`, saved with `modified=false`.
+- Final `map_validate`: `valid=true`, `count=0`, `safeFixableCount=0`.
+- Final `problems_check`: no problems.
+- `history_list`: three live operations, all `valid=true`, `mismatchCount=0`, `staleObjectCount=0`.
+
+What worked:
+- The close street view reads as a dense urban street corner: tall facades, storefront bands, signs, vents, street props, and a skybridge are recognizable in whitebox.
+- Validation stayed fully clean by avoiding circular primitives in this scene.
+- Dense facade detail was possible with existing repeat operations, and the operation history stayed phase-readable.
+- The skybridge and support posts created enough vertical layering to distinguish the scene from a plain intersection.
+
+What failed or constrained the agent:
+- Window grids and facade panels were awkward: a 2D grid of windows required many separate `repeat_translate` strips instead of one compact grid operation.
+- Cyberpunk identity in whitebox depends heavily on signs, text, light strips, and facade density. Without text/label/sign primitives, the scene reads more like a dense sci-fi street than specifically cyberpunk.
+- Running multiple MCP screenshot calls in parallel hit the bridge's single-request guard: one capture returned `Forbidden: MCP bridge is already handling another request`. Scene automation should serialize MCP calls or gain a queue.
+- `documents_open` again proved less stable than launching a clean map directly, so per-scene command-line launch remains the preferred automation flow.
+- Some camera angles were partly occluded by nearby tall building massing. The camera tools work, but automated scene review still needs better view presets or occlusion-aware framing.
+
+Implemented MCP follow-up:
+- Added generic `repeat_grid` to `blockout_create_batch`.
+- `repeat_grid` repeats any non-repeat child operation over one to three axes using `counts` and `offsets`, with a total instance cap of 4096 and zero-offset rejection for axes with count greater than one.
+- Updated schema examples/properties so `tb_tools_search(detail=schema)` shows the payload format.
+- Added focused tests for valid 4x3 grid creation and invalid zero-offset grid axes.
+- Real MCP smoke verified a 4x3 `repeat_grid` creates 12 brushes in one operation, `map_validate valid=true`, and undo returns the smoke map to `brushCount=0`.
+
+Proposed MCP changes:
+- Add a generic sign/text primitive such as `text_to_polygon_brushes` or a lower-level glyph/label brush generator.
+- Add facade-oriented helpers that remain atomic, for example `panel_grid_on_plane` or `box_grid_on_plane`, for windows and light panels on vertical faces.
+- Add client-side or server-side request queueing for screenshot-heavy automation, or document that MCP callers must serialize requests.
+- Add safer scene switching or a `mcp_open_clean_map`/launch helper so `documents_open` instability does not interrupt automated iteration.
+- Improve scene review cameras with automatic street/interior presets that avoid nearby occluders.
+
+Commit:
+- Pending follow-up: `Add repeat grid batch operation`.

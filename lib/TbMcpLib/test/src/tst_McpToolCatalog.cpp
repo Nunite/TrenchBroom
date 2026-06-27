@@ -700,6 +700,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemDescription.contains(R"("type":"curved_corridor")"));
     CHECK(itemDescription.contains(R"("type":"path_ribbon")"));
     CHECK(itemDescription.contains(R"("type":"repeat_translate")"));
+    CHECK(itemDescription.contains(R"("type":"repeat_grid")"));
     CHECK(itemDescription.contains(R"("type":"stepped_mass")"));
     CHECK(itemDescription.contains(R"("type":"support_posts_between")"));
     CHECK(
@@ -714,7 +715,9 @@ TEST_CASE("McpToolCatalog")
             .toString()
             .contains("cylinder"));
     CHECK(itemProperties.value("count").isObject());
+    CHECK(itemProperties.value("counts").isObject());
     CHECK(itemProperties.value("offset").isObject());
+    CHECK(itemProperties.value("offsets").isObject());
     CHECK(itemProperties.value("levels").isObject());
     CHECK(itemProperties.value("inset").isObject());
     CHECK(itemProperties.value("stepHeight").isObject());

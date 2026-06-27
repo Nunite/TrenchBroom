@@ -2198,6 +2198,46 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(repeatResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.selection().nodes.size() == 4u);
 
+  const auto repeatGridResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Repeat grid"},
+      {"grid", 16},
+      {"select", true},
+      {"detail", "ids"},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "repeat_grid"},
+           {"counts", QJsonArray{4, 3}},
+           {"offsets",
+            QJsonArray{
+              QJsonArray{128, 0, 0},
+              QJsonArray{0, 0, 64},
+            }},
+           {"operation",
+            QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{1024, 0, 0}},
+              {"max", QJsonArray{1088, 32, 32}},
+            }},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  const auto repeatGridError = repeatGridResponse.ok
+                                 ? std::string{}
+                                 : repeatGridResponse.error.message.toStdString();
+  INFO(repeatGridError);
+  REQUIRE(repeatGridResponse.ok);
+  CHECK(repeatGridResponse.result.value("brushCount").toInt() == 12);
+  CHECK(repeatGridResponse.result.value("changedObjectCount").toInt() == 12);
+  CHECK(repeatGridResponse.result.value("changedObjectIds").toArray().size() == 12);
+  CHECK(repeatGridResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.selection().nodes.size() == 12u);
+
   const auto steppedMassResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",
@@ -2268,7 +2308,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
 
   const auto historyResponse = historyListResult(history);
   REQUIRE(historyResponse.ok);
-  CHECK(historyResponse.result.value("count").toInt() == 5);
+  CHECK(historyResponse.result.value("count").toInt() == 6);
   const auto historyOperation =
     historyResponse.result.value("operations").toArray().first().toObject();
   CHECK(historyOperation.value("operationId").toString() == operationId);
@@ -2450,12 +2490,51 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(
     invalidRepeatZeroOffsetValidation.value("failedOperationType").toString()
     == "repeat_translate");
+  CHECK(invalidRepeatZeroOffsetValidation.value("errors")
+          .toArray()
+          .first()
+          .toString()
+          .contains("offset"));
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+
+  const auto invalidRepeatGridZeroOffsetResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "repeat_grid"},
+           {"counts", QJsonArray{2, 3}},
+           {"offsets",
+            QJsonArray{
+              QJsonArray{0, 0, 0},
+              QJsonArray{0, 0, 64},
+            }},
+           {"operation",
+            QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{0, 0, 0}},
+              {"max", QJsonArray{64, 64, 16}},
+            }},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(invalidRepeatGridZeroOffsetResponse.ok);
+  const auto invalidRepeatGridZeroOffsetValidation =
+    invalidRepeatGridZeroOffsetResponse.result.value("validation").toObject();
+  CHECK(!invalidRepeatGridZeroOffsetValidation.value("valid").toBool());
+  CHECK(invalidRepeatGridZeroOffsetValidation.value("failedOperationIndex").toInt() == 0);
   CHECK(
-    invalidRepeatZeroOffsetValidation.value("errors")
-      .toArray()
-      .first()
-      .toString()
-      .contains("offset"));
+    invalidRepeatGridZeroOffsetValidation.value("failedOperationType").toString()
+    == "repeat_grid");
+  CHECK(invalidRepeatGridZeroOffsetValidation.value("errors")
+          .toArray()
+          .first()
+          .toString()
+          .contains("offsets[0]"));
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
   const auto invalidStairsResponse = blockoutCreateBatchForMapResult(

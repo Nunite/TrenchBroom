@@ -2183,6 +2183,80 @@ std::optional<QJsonObject> translatedBatchOperation(
   return result;
 }
 
+std::optional<std::vector<size_t>> repeatGridCountsFromJson(
+  const QJsonObject& operation, QString& error)
+{
+  const auto value = operation.value("counts");
+  if (!value.isArray())
+  {
+    error = "repeat_grid requires counts array";
+    return std::nullopt;
+  }
+
+  const auto array = value.toArray();
+  if (array.isEmpty() || array.size() > 3)
+  {
+    error = "repeat_grid counts must contain between one and three integers";
+    return std::nullopt;
+  }
+
+  auto result = std::vector<size_t>{};
+  result.reserve(static_cast<size_t>(array.size()));
+  for (auto i = 0; i < array.size(); ++i)
+  {
+    const auto count = static_cast<size_t>(array[i].toInteger(0));
+    if (count == 0 || count > 256)
+    {
+      error = QString{"repeat_grid counts[%1] must be between 1 and 256"}.arg(i);
+      return std::nullopt;
+    }
+    result.push_back(count);
+  }
+  return result;
+}
+
+std::optional<std::vector<vm::vec3d>> repeatGridOffsetsFromJson(
+  const QJsonObject& operation, const size_t expectedCount, QString& error)
+{
+  const auto value = operation.value("offsets");
+  if (!value.isArray())
+  {
+    error = "repeat_grid requires offsets array";
+    return std::nullopt;
+  }
+
+  const auto array = value.toArray();
+  if (static_cast<size_t>(array.size()) != expectedCount)
+  {
+    error = "repeat_grid offsets length must match counts length";
+    return std::nullopt;
+  }
+
+  auto result = std::vector<vm::vec3d>{};
+  result.reserve(expectedCount);
+  for (auto i = 0; i < array.size(); ++i)
+  {
+    const auto offset =
+      mcpVec3FromJsonValue(array[i], QString{"offsets[%1]"}.arg(i), error);
+    if (!offset)
+    {
+      return std::nullopt;
+    }
+    result.push_back(*offset);
+  }
+  return result;
+}
+
+size_t repeatGridInstanceCount(const std::vector<size_t>& counts)
+{
+  auto result = size_t{1};
+  for (const auto count : counts)
+  {
+    result *= count;
+  }
+  return result;
+}
+
 std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& params)
 {
   const auto center = params.value("center").toArray();
@@ -2538,6 +2612,83 @@ std::vector<mdl::Node*> compileBatchOperation(
     {
       const auto translatedOperation =
         translatedBatchOperation(childOperation, *offset * static_cast<double>(i), error);
+      if (!translatedOperation)
+      {
+        deleteNodes(result);
+        return {};
+      }
+
+      auto childNodes =
+        compileBatchOperation(map, builder, *translatedOperation, material, grid, error);
+      if (!error.isEmpty())
+      {
+        deleteNodes(result);
+        deleteNodes(childNodes);
+        return {};
+      }
+      result.insert(result.end(), childNodes.begin(), childNodes.end());
+    }
+    return result;
+  }
+
+  if (type == "repeat_grid")
+  {
+    if (!operation.value("operation").isObject())
+    {
+      error = "repeat_grid requires child operation object";
+      return {};
+    }
+    const auto counts = repeatGridCountsFromJson(operation, error);
+    if (!counts)
+    {
+      return {};
+    }
+    const auto offsets = repeatGridOffsetsFromJson(operation, counts->size(), error);
+    if (!offsets)
+    {
+      return {};
+    }
+    const auto instanceCount = repeatGridInstanceCount(*counts);
+    if (instanceCount == 0 || instanceCount > 4096)
+    {
+      error = "repeat_grid total instance count must be between 1 and 4096";
+      return {};
+    }
+    for (size_t i = 0; i < counts->size(); ++i)
+    {
+      if ((*counts)[i] > 1 && vm::is_zero((*offsets)[i], GeometryEpsilon))
+      {
+        error =
+          QString{
+            "repeat_grid offsets[%1] must be non-zero when count is greater "
+            "than one"}
+            .arg(i);
+        return {};
+      }
+    }
+
+    auto childOperation = operation.value("operation").toObject();
+    const auto childType = childOperation.value("type").toString().trimmed().toLower();
+    if (childType == "repeat_translate" || childType == "repeat_grid")
+    {
+      error = "repeat_grid child operation cannot be another repeat operation";
+      return {};
+    }
+
+    auto result = std::vector<mdl::Node*>{};
+    for (size_t instance = 0; instance < instanceCount; ++instance)
+    {
+      auto remainder = instance;
+      auto delta = vm::vec3d{};
+      for (size_t axisIndex = 0; axisIndex < counts->size(); ++axisIndex)
+      {
+        const auto axisStep = remainder % (*counts)[axisIndex];
+        remainder /= (*counts)[axisIndex];
+        delta = delta + (*offsets)[axisIndex] * static_cast<double>(axisStep);
+      }
+
+      const auto translatedOperation =
+        translatedBatchOperation(childOperation, delta, error);
       if (!translatedOperation)
       {
         deleteNodes(result);
