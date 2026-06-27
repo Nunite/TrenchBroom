@@ -342,7 +342,7 @@ Proposed MCP changes:
 - Next useful primitives: `viewport_camera_frame_bounds` or `viewport_orbit_capture`, `terrain_profile_wall_batch`, `repeat_along_path`, `support_posts_under_path`, and scoped `problems_check` / baseline warning diff.
 
 Commit:
-- `Improve MCP scene review capture options`
+- `2a8606866 Improve MCP scene review capture options`
 
 ### 2026-06-27 - Scene 1 Follow-up: Camera-Controlled Review
 
@@ -381,7 +381,7 @@ Proposed MCP changes:
 - Next useful primitives remain `terrain_profile_wall_batch`, `repeat_along_path`, `support_posts_under_path`, and scoped `problems_check` / baseline warning diff.
 
 Commit:
-- `Add MCP camera controls for scene review`
+- `ce9e1deff Add MCP camera controls for scene review`
 
 ### 2026-06-27 - Scene 2: Coastal Lighthouse And Breakwater
 
