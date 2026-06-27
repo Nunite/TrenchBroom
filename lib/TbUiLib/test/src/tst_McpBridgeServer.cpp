@@ -2190,7 +2190,51 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     history,
     nextOperationIndex);
   REQUIRE(invalidResponse.ok);
-  CHECK(!invalidResponse.result.value("validation").toObject().value("valid").toBool());
+  const auto invalidValidation = invalidResponse.result.value("validation").toObject();
+  CHECK(!invalidValidation.value("valid").toBool());
+  CHECK(invalidValidation.value("failedOperationIndex").toInt() == 0);
+  CHECK(invalidValidation.value("failedOperationType").toString() == "box");
+  CHECK(invalidValidation.value("compiledOperationCount").toInt() == 0);
+  CHECK(invalidValidation.value("compiledBrushCount").toInt() == 0);
+  CHECK(
+    invalidValidation.value("failedOperationPreview").toObject().value("type").toString()
+    == "box");
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+
+  const auto partiallyInvalidResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{2048, 0, 0}},
+           {"max", QJsonArray{2112, 64, 16}},
+         },
+         QJsonObject{
+           {"type", "cylinder"},
+           {"min", QJsonArray{2200, 0, 0}},
+           {"max", QJsonArray{2200, 64, 128}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(partiallyInvalidResponse.ok);
+  const auto partiallyInvalidValidation =
+    partiallyInvalidResponse.result.value("validation").toObject();
+  CHECK(!partiallyInvalidValidation.value("valid").toBool());
+  CHECK(partiallyInvalidValidation.value("failedOperationIndex").toInt() == 1);
+  CHECK(partiallyInvalidValidation.value("failedOperationType").toString() == "cylinder");
+  CHECK(partiallyInvalidValidation.value("compiledOperationCount").toInt() == 1);
+  CHECK(partiallyInvalidValidation.value("compiledBrushCount").toInt() == 1);
+  CHECK(
+    partiallyInvalidValidation.value("failedOperationPreview")
+      .toObject()
+      .value("type")
+      .toString()
+    == "cylinder");
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
   const auto invalidRibbonResponse = blockoutCreateBatchForMapResult(

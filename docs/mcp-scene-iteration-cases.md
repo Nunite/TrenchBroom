@@ -8,6 +8,7 @@ The scenes below are intentionally not prefab requests. Each one should be built
 
 - Use whitebox materials only. The screenshot review should judge silhouette, scale, spatial logic, connectivity, and recognizable scene intent.
 - Build in phases: playable/main massing, boundaries and supports, then markers/details. Each phase should have its own operation record.
+- Start each scene from a clean standalone `.map` file. Do not accumulate multiple scene cases in one map, because cross-scene bounds, selection, and screenshot review become ambiguous.
 - Prefer atomic and reusable tools over scene-specific prefab helpers.
 - Record which MCP limitation blocked the agent, caused excessive context, or forced awkward geometry.
 - Capture at least top, three-quarter, and detail/interior views once viewport camera control exists. Until then, use `viewport_focus` plus available captures.
@@ -431,3 +432,58 @@ Proposed MCP changes:
 
 Commit:
 - Pending follow-up: `Add batch cylinder blockout operation`.
+
+### 2026-06-27 - Scene 3: Chinese Courtyard
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_03_chinese_courtyard.map`
+- Created by copying the minimal Valve map fixture, then launching TrenchBroom directly with this map. Initial verification: `brushCount=0`, empty MCP history.
+- `documents_open` from the previous scene map to this empty map made TrenchBroom exit / MCP return `502`; the stable workflow is command-line launch per scene.
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 3: courtyard walls moon gate and pool`: foundation, courtyard walls, stepped moon-gate approximation, pool border, water depression, and main paving. Result: `valid=true`, 26 brushes.
+- `mcp-op-2` / `MCP Scene 3: pavilion columns and roof`: pavilion plinth, four batched cylinder columns, beams, stepped roof, ridge, and trim. Result: `valid=true`, 19 brushes.
+- Failed attempt before `mcp-op-3`: one oversized batch mixed walkway columns, rock garden, and details. A PowerShell IR expression produced malformed cylinder max values, and batch validation rejected the whole operation without committing brushes.
+- `mcp-op-3` / `MCP Scene 3: covered walkway columns`: north/east covered walkway strips, repeated batched cylinder columns, beams, and ridge lines. Result: `valid=true`, 18 brushes.
+- `mcp-op-4` / `MCP Scene 3: rock garden plaques and benches`: convex prism rocks, stepping stones, entrance plaques, and pool benches. Result: `valid=true`, 12 brushes.
+
+MCP tools used:
+- `blockout_create_batch` with `box`, `prism`, and the newly added `cylinder` operation.
+- `map_snapshot`, `history_list`, `map_validate`, `problems_check`, and `documents_save`.
+- `viewport_capture_scene_review` with orbit bounds and explicit look-at cameras.
+- `viewport_layout_set(onePane)` for clean detail screenshots, then restored to `twoPanes`.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782544557520.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782544557569.png`
+- Pavilion/detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782544570688.png`
+- Moon gate front 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782544622833.png`
+
+What worked:
+- The clean-map workflow made validation and bounds unambiguous: final `brushCount=75`, `entityCount=0`, bounds `[-1456,-896,-16]` to `[1456,848,368]`.
+- The scene reads as a bounded courtyard with central paving, pool, pavilion, covered walkway, rock garden, entrance plaques, and benches.
+- `blockout_create_batch` with `cylinder` significantly reduced column spam: pavilion and walkway columns were created inside two transactions instead of many atomic cylinder calls.
+- Splitting the final details into two smaller batches let the stable walkway geometry commit even after the mixed batch revealed a malformed operation.
+
+What failed:
+- The moon gate reads as a stepped arch, not a true round opening. This is the expected limitation from lacking a generic arch/opening primitive.
+- The roof is a stepped block approximation rather than sloped roof brushwork; it is readable from a distance but crude in close-up.
+- `map_validate` / `problems_check` returned 16 warnings for non-integer vertices, all from cylinder columns. The batch cylinder support inherited the same circular-grid issue seen in Scene 2.
+- 2D scene review still captured only a partial plan instead of framing the full scene bounds.
+- The failed mixed batch returned only `operations[2]: max must contain exactly three numbers`; it did not report how many previous operations had compiled successfully before rollback or include a compact operation preview.
+
+Tool/context bottlenecks:
+- Need a generic arch/opening primitive, such as an arch wall segment or cylinder-sector-based arch frame, not a Chinese courtyard prefab.
+- Need circular primitive snap controls for `cylinder` similar in spirit to `cylinder_sector.snapMode`, or a way to request grid-safe/octagonal columns.
+- Need better batch failure diagnostics so generated IR can be debugged without manually opening temp JSON.
+- Need framed 2D capture by bounds or operation id for plan-view scene review.
+- Need a stable per-scene launch/create-clean-map helper. `documents_open` as a document switch is not robust enough for this workflow.
+
+Proposed MCP changes:
+- Implemented follow-up: improve `blockout_create_batch` validation diagnostics with failed operation index/type, successfully compiled operation count before rollback, and a compact operation preview.
+- Later: add `arch_opening_from_wall` or a lower-level `brush_create_arch_frame` primitive.
+- Later: add `viewport_capture_scene_review` support for operation ids and bounds-framed 2D capture.
+- Later: add circular primitive snap/grid controls for `cylinder`.
+
+Commit:
+- Pending follow-up: `Improve batch blockout failure diagnostics`.

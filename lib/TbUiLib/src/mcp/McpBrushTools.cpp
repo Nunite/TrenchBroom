@@ -1939,6 +1939,37 @@ QJsonObject batchValidationJson(
   };
 }
 
+QJsonObject batchOperationPreviewJson(const QJsonObject& operation)
+{
+  auto result = QJsonObject{};
+  result.insert("type", operation.value("type").toString());
+
+  for (const auto& key :
+       {"min",
+        "max",
+        "points2d",
+        "points",
+        "center",
+        "minZ",
+        "maxZ",
+        "axis",
+        "sides",
+        "width",
+        "height",
+        "segments",
+        "startAngle",
+        "endAngle",
+        "turnDegrees"})
+  {
+    if (operation.contains(key))
+    {
+      result.insert(key, operation.value(key));
+    }
+  }
+
+  return result;
+}
+
 std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& params)
 {
   const auto center = params.value("center").toArray();
@@ -3103,22 +3134,30 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
 
   auto nodes = std::vector<mdl::Node*>{};
   auto errors = QJsonArray{};
+  auto failedOperationIndex = -1;
+  auto failedOperationType = QString{};
+  auto failedOperationPreview = QJsonObject{};
   for (auto i = 0; i < operations.size(); ++i)
   {
     if (!operations[i].isObject())
     {
       errors.push_back(QString{"operations[%1] must be an object"}.arg(i));
+      failedOperationIndex = i;
       break;
     }
 
     auto error = QString{};
-    auto operationNodes = compileBatchOperation(
-      map, builder, operations[i].toObject(), defaultMaterial, grid, error);
+    const auto operation = operations[i].toObject();
+    auto operationNodes =
+      compileBatchOperation(map, builder, operation, defaultMaterial, grid, error);
     if (!error.isEmpty() || operationNodes.empty())
     {
       errors.push_back(
         error.isEmpty() ? QString{"operations[%1] generated no brushes"}.arg(i)
                         : QString{"operations[%1]: %2"}.arg(i).arg(error));
+      failedOperationIndex = i;
+      failedOperationType = operation.value("type").toString().trimmed().toLower();
+      failedOperationPreview = batchOperationPreviewJson(operation);
       deleteNodes(operationNodes);
       break;
     }
@@ -3128,12 +3167,28 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
 
   if (!errors.isEmpty())
   {
+    auto validation = batchValidationJson(
+      false, errors, operations.size(), static_cast<int>(nodes.size()));
+    validation.insert(
+      "compiledOperationCount", failedOperationIndex < 0 ? 0 : failedOperationIndex);
+    validation.insert("compiledBrushCount", static_cast<int>(nodes.size()));
+    if (failedOperationIndex >= 0)
+    {
+      validation.insert("failedOperationIndex", failedOperationIndex);
+    }
+    if (!failedOperationType.isEmpty())
+    {
+      validation.insert("failedOperationType", failedOperationType);
+    }
+    if (!failedOperationPreview.isEmpty())
+    {
+      validation.insert("failedOperationPreview", failedOperationPreview);
+    }
+
     deleteNodes(nodes);
     return McpBridgeToolResult::success(QJsonObject{
       {"valid", false},
-      {"validation",
-       batchValidationJson(
-         false, errors, operations.size(), static_cast<int>(nodes.size()))},
+      {"validation", validation},
     });
   }
 
