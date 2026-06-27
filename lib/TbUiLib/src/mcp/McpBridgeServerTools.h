@@ -219,6 +219,13 @@ McpBridgeToolResult historyStatusResult(
   const McpObjectRegistry& objectRegistry,
   const QString& bridgeInstanceId = {},
   const QString& bridgeStartedAt = {});
+McpBridgeToolResult historyStatusForMapResult(
+  mdl::Map& map,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry,
+  const QString& bridgeInstanceId = {},
+  const QString& bridgeStartedAt = {},
+  const QString& activeDocumentPath = {});
 McpBridgeToolResult operationInspectResult(
   const std::vector<McpOperationRecord>& history, const QJsonObject& params);
 McpBridgeToolResult operationInspectResult(

@@ -1440,6 +1440,55 @@ TEST_CASE("McpBridgeServer")
       registry.documentEpoch(document->map())
       == documentEpochForMap(document->map(), &registry));
   }
+
+  SECTION(
+    "history_status treats selection-only commands above latest MCP operation as "
+    "skippable")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+    const auto createResponse = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Test operation"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 64}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(createResponse.ok);
+    REQUIRE(map.undoCommandName() != nullptr);
+    CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: Test operation");
+
+    mdl::deselectAll(map);
+    REQUIRE(map.undoCommandName() != nullptr);
+    CHECK(QString::fromStdString(*map.undoCommandName()) == "Select None");
+
+    auto registry = McpObjectRegistry{};
+    const auto response = historyStatusForMapResult(
+      map, history, registry, "bridge-test-id", "2026-06-28T00:00:00Z", {});
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("canUndoLatestMcpOperation").toBool());
+    CHECK(response.result.value("selectionCommandsAboveLatestMcpOperation").toInt() == 1);
+    CHECK(response.result.value("reasonIfUnavailable").isNull());
+  }
 }
 
 TEST_CASE("McpBridgeServer spiral stair geometry tools")

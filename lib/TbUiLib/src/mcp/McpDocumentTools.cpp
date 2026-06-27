@@ -233,6 +233,9 @@ QJsonObject documentJson(
   const McpObjectRegistry* objectRegistry = nullptr)
 {
   const auto& map = mapWindow.document().map();
+  const auto epoch = documentEpoch(map, objectRegistry);
+  const auto epochKey =
+    objectRegistry != nullptr ? QString{"documentEpoch"} : QString{"documentPathEpoch"};
   return QJsonObject{
     {"index", index},
     {"fileName", QString::fromStdString(map.filename())},
@@ -242,7 +245,7 @@ QJsonObject documentJson(
     {"game", QString::fromStdString(map.gameInfo().gameConfig.name)},
     {"mapFormat", QString::fromStdString(mdl::formatName(map.worldNode().mapFormat()))},
     {"windowTitle", mapWindow.windowTitle()},
-    {"documentEpoch", documentEpoch(map, objectRegistry)},
+    {epochKey, epoch},
     {"documentFingerprint", documentFingerprint(map, objectRegistry)},
   };
 }

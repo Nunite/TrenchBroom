@@ -295,6 +295,40 @@ McpBridgeToolResult historyStatusResult(
   const QString& bridgeInstanceId,
   const QString& bridgeStartedAt)
 {
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    auto result = QJsonObject{
+      {"bridgeInstanceId", bridgeInstanceId},
+      {"bridgeStartedAt", bridgeStartedAt},
+      {"historyCount", static_cast<int>(history.size())},
+      {"lastOperationId", history.empty() ? QString{} : history.back().operationId},
+      {"canUndoLatestMcpOperation", false},
+      {"reasonIfUnavailable", "noMcpMutationYet"},
+    };
+    result.insert("activeDocument", false);
+    result.insert("reasonIfUnavailable", "noActiveDocument");
+    return McpBridgeToolResult::success(result);
+  }
+
+  auto& map = mapWindow->document().map();
+  return historyStatusForMapResult(
+    map,
+    history,
+    objectRegistry,
+    bridgeInstanceId,
+    bridgeStartedAt,
+    pathAsQString(map.path()));
+}
+
+McpBridgeToolResult historyStatusForMapResult(
+  mdl::Map& map,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry,
+  const QString& bridgeInstanceId,
+  const QString& bridgeStartedAt,
+  const QString& activeDocumentPath)
+{
   auto result = QJsonObject{
     {"bridgeInstanceId", bridgeInstanceId},
     {"bridgeStartedAt", bridgeStartedAt},
@@ -304,17 +338,8 @@ McpBridgeToolResult historyStatusResult(
     {"reasonIfUnavailable", "noMcpMutationYet"},
   };
 
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
-  {
-    result.insert("activeDocument", false);
-    result.insert("reasonIfUnavailable", "noActiveDocument");
-    return McpBridgeToolResult::success(result);
-  }
-
-  auto& map = mapWindow->document().map();
   result.insert("activeDocument", true);
-  result.insert("activeDocumentPath", pathAsQString(map.path()));
+  result.insert("activeDocumentPath", activeDocumentPath);
   result.insert("activeDocumentFingerprint", objectRegistry.documentFingerprint(map));
   result.insert("documentEpoch", objectRegistry.documentEpoch(map));
 
@@ -341,7 +366,19 @@ McpBridgeToolResult historyStatusResult(
     undoName != nullptr && QString::fromStdString(*undoName) == latestIt->transactionName)
   {
     result.insert("canUndoLatestMcpOperation", true);
+    result.insert("selectionCommandsAboveLatestMcpOperation", 0);
     result.insert("reasonIfUnavailable", QJsonValue{});
+  }
+  else if (
+    undoName != nullptr && isSelectionCommandName(QString::fromStdString(*undoName)))
+  {
+    result.insert("canUndoLatestMcpOperation", true);
+    result.insert("selectionCommandsAboveLatestMcpOperation", 1);
+    result.insert("reasonIfUnavailable", QJsonValue{});
+    result.insert(
+      "note",
+      "A selection-only command is above the latest MCP operation; history_undo_mcp "
+      "will skip it before undoing the MCP transaction.");
   }
   else
   {
