@@ -18,6 +18,7 @@
  */
 
 #include <QColor>
+#include <QFileInfo>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -253,10 +254,25 @@ TEST_CASE("McpBridgeServer")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"tool", "render_review_operation"},
+        {"renderer", "geometry_cpu"},
         {"reviewId", "review-test"},
-        {"isolate", true},
         {"targetObjectCount", 1},
         {"captureCount", 3},
+        {"captures", QJsonArray{}},
+        {"quality", QJsonArray{}},
+        {"qualityValid", true},
+        {"outputDir", params.value("outputDir").toString()},
+      });
+    }
+    if (toolName == "render_review_targets")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"tool", "render_review_targets"},
+        {"renderer", "geometry_cpu"},
+        {"reviewId", "review-targets-test"},
+        {"targetObjectCount", 1},
+        {"targetBrushCount", 1},
+        {"captureCount", 5},
         {"captures", QJsonArray{}},
         {"quality", QJsonArray{}},
         {"qualityValid", true},
@@ -809,8 +825,23 @@ TEST_CASE("McpBridgeServer")
     CHECK(
       bundleReviewResponse.result.value("tool").toString() == "render_review_operation");
     CHECK(bundleReviewResponse.result.value("reviewId").toString().startsWith("review-"));
-    CHECK(bundleReviewResponse.result.value("isolate").toBool());
+    CHECK(bundleReviewResponse.result.value("renderer").toString() == "geometry_cpu");
     CHECK(bundleReviewResponse.result.value("captureCount").toInt() == 3);
+
+    const auto geometryReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "10e",
+      "secret",
+      "render_review_targets",
+      QJsonObject{
+        {"objectIds", QJsonArray{"node:0/0"}},
+        {"views", QJsonArray{"iso_overview_ne", "top_plan"}},
+      },
+      mcp::McpMode::ReadOnly});
+    CHECK(geometryReviewResponse.ok);
+    CHECK(
+      geometryReviewResponse.result.value("tool").toString() == "render_review_targets");
+    CHECK(geometryReviewResponse.result.value("renderer").toString() == "geometry_cpu");
+    CHECK(geometryReviewResponse.result.value("captureCount").toInt() == 5);
   }
 
   SECTION("serves map_search")
@@ -1582,6 +1613,88 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("canUndoLatestMcpOperation").toBool());
     CHECK(response.result.value("selectionCommandsAboveLatestMcpOperation").toInt() == 1);
     CHECK(response.result.value("reasonIfUnavailable").isNull());
+  }
+
+  SECTION("geometry review renderer writes isolated nonblank review bundle")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+    const auto createResponse = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Review target"},
+        {"operations",
+         QJsonArray{
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{0, 0, 0}},
+             {"max", QJsonArray{128, 64, 48}},
+           },
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{160, 0, 32}},
+             {"max", QJsonArray{224, 64, 96}},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(createResponse.ok);
+    REQUIRE(history.size() == 1u);
+
+    const auto wasModified = map.modified();
+    auto tempDir = QTemporaryDir{};
+    REQUIRE(tempDir.isValid());
+    auto registry = McpObjectRegistry{};
+    const auto response = renderReviewTargetsForMapResult(
+      map,
+      QJsonObject{
+        {"operationIds", QJsonArray{history.front().operationId}},
+        {"views", QJsonArray{"iso_overview_ne", "top_plan"}},
+        {"imageSize", QJsonArray{900, 650}},
+        {"outputDir", tempDir.path()},
+      },
+      history,
+      &registry);
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("tool").toString() == "render_review_targets");
+    CHECK(response.result.value("renderer").toString() == "geometry_cpu");
+    CHECK(response.result.value("targetObjectCount").toInt() == 2);
+    CHECK(response.result.value("targetBrushCount").toInt() == 2);
+    CHECK(response.result.value("captureCount").toInt() == 2);
+    CHECK(response.result.value("qualityValid").toBool());
+    CHECK(map.modified() == wasModified);
+
+    const auto captures = response.result.value("captures").toArray();
+    REQUIRE(captures.size() == 2);
+    for (const auto& captureValue : captures)
+    {
+      const auto capture = captureValue.toObject();
+      const auto path = capture.value("path").toString();
+      CHECK(QFileInfo::exists(path));
+      const auto image = QImage{path};
+      CHECK(!image.isNull());
+      CHECK(image.width() >= 900);
+      CHECK(image.height() >= 650);
+      CHECK(capture.value("targetCoverage").toDouble() > 0.0);
+      CHECK(capture.value("edgeDensity").toDouble() > 0.0);
+      CHECK(capture.value("valid").toBool());
+    }
+
+    CHECK(QFileInfo::exists(response.result.value("manifestPath").toString()));
   }
 }
 

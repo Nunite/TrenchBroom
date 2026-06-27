@@ -207,10 +207,19 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
   QJsonObject& overlayState,
   const std::vector<McpOperationRecord>& history = {},
   const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult renderReviewTargetsResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history = {},
+  const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult renderReviewTargetsForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history = {},
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult renderReviewOperationResult(
   AppController& appController,
   const QJsonObject& params,
-  QJsonObject& overlayState,
   const std::vector<McpOperationRecord>& history = {},
   const McpObjectRegistry* objectRegistry = nullptr);
 

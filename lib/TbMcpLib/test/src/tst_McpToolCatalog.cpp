@@ -68,6 +68,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("viewport_capture_3d"));
     CHECK(findToolDefinition("viewport_capture_2d"));
     CHECK(findToolDefinition("viewport_capture_scene_review"));
+    CHECK(findToolDefinition("render_review_targets"));
+    CHECK(findToolDefinition("render_review_operation"));
     CHECK(findToolDefinition("fgd_entities_list"));
     CHECK(findToolDefinition("entity_schema"));
     CHECK(findToolDefinition("entity_create_from_schema"));
@@ -156,6 +158,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("viewport_capture_3d"));
     CHECK(names.contains("viewport_capture_2d"));
     CHECK(names.contains("viewport_capture_scene_review"));
+    CHECK(names.contains("render_review_targets"));
+    CHECK(names.contains("render_review_operation"));
     CHECK(names.contains("fgd_entities_list"));
     CHECK(names.contains("entity_schema"));
     CHECK(names.contains("brush_types_list"));
@@ -665,10 +669,24 @@ TEST_CASE("McpToolCatalog")
 
   SECTION("render review operation is visible for modeling self-verification")
   {
+    const auto targetTool = findToolDefinition("render_review_targets");
+    REQUIRE(targetTool);
+
+    CHECK(targetTool->description.contains("geometry review bundle"));
+    CHECK(targetTool->description.contains("does not touch TrenchBroom viewport"));
+
+    const auto targetProperties = targetTool->inputSchema.value("properties").toObject();
+    CHECK(targetProperties.value("operationIds").isObject());
+    CHECK(targetProperties.value("objectIds").isObject());
+    CHECK(targetProperties.value("views").isObject());
+    CHECK(targetProperties.value("style").isObject());
+    CHECK(targetProperties.value("imageSize").isObject());
+    CHECK(targetProperties.value("maxDetailedFaces").isObject());
+
     const auto tool = findToolDefinition("render_review_operation");
     REQUIRE(tool);
 
-    CHECK(tool->description.contains("isolated Agent-readable review bundle"));
+    CHECK(tool->description.contains("isolated Agent-readable geometry review bundle"));
 
     const auto properties = tool->inputSchema.value("properties").toObject();
     CHECK(properties.value("operationIds").isObject());
@@ -676,7 +694,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(properties.value("views").isObject());
     CHECK(properties.value("isolateMode").isObject());
     CHECK(properties.value("framingPreset").isObject());
-    CHECK(properties.value("min2dHeight").isObject());
+    CHECK(properties.value("imageSize").isObject());
 
     const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
     auto names = QStringList{};
@@ -684,6 +702,7 @@ TEST_CASE("McpToolCatalog")
     {
       names.push_back(listedTool.toObject().value("name").toString());
     }
+    CHECK(names.contains("render_review_targets"));
     CHECK(names.contains("render_review_operation"));
   }
 

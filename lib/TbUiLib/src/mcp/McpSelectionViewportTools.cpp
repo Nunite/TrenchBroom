@@ -686,8 +686,8 @@ QString makeCaptureFilePath(const QJsonObject& params)
   else if (const auto reviewId = params.value("reviewId").toString().trimmed();
            !reviewId.isEmpty())
   {
-    captureDir = captureDir / "reviews"
-                 / sanitizeFileComponent(reviewId, "review").toStdString();
+    captureDir =
+      captureDir / "reviews" / sanitizeFileComponent(reviewId, "review").toStdString();
   }
 
   auto error = std::error_code{};
@@ -2030,8 +2030,8 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
 
   const auto views = stringArrayFromValueOrDefault(
     params.value("views"), QJsonArray{"current", "3d", "2d"});
-  auto captureParams = QJsonObject{
-    {"returnBase64", mcpOptionalBool(params, "returnBase64", false)}};
+  auto captureParams =
+    QJsonObject{{"returnBase64", mcpOptionalBool(params, "returnBase64", false)}};
   if (const auto outputDir = params.value("outputDir").toString().trimmed();
       !outputDir.isEmpty())
   {
@@ -2232,72 +2232,35 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
 McpBridgeToolResult renderReviewOperationResult(
   AppController& appController,
   const QJsonObject& params,
-  QJsonObject& overlayState,
   const std::vector<McpOperationRecord>& history,
   const McpObjectRegistry* objectRegistry)
 {
   auto reviewParams = params;
-  const auto reviewId =
-    QString{"review-%1"}.arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
-  reviewParams.insert("reviewId", reviewId);
-  if (const auto outputDir = params.value("outputDir").toString().trimmed();
-      !outputDir.isEmpty())
+  if (!reviewParams.contains("style"))
   {
-    const auto bundleDir =
-      std::filesystem::path{outputDir.toStdString()}
-      / sanitizeFileComponent(reviewId, "review").toStdString();
-    reviewParams.insert("outputDir", pathToQString(bundleDir));
-  }
-  if (!reviewParams.contains("sceneName"))
-  {
-    reviewParams.insert("sceneName", "MCP isolated scene review");
-  }
-  if (!reviewParams.contains("isolate"))
-  {
-    reviewParams.insert("isolate", true);
-  }
-  if (!reviewParams.contains("isolateMode"))
-  {
-    reviewParams.insert("isolateMode", "hide_others");
+    reviewParams.insert("style", "whitebox_edges");
   }
   if (!reviewParams.contains("views"))
   {
     reviewParams.insert(
-      "views", QJsonArray{"overview_3d", "top_2d_fit", "side_2d_fit", "detail_3d"});
-  }
-  if (!reviewParams.contains("layout"))
-  {
-    reviewParams.insert("layout", "twoPanes");
-  }
-  if (!reviewParams.contains("framing"))
-  {
-    reviewParams.insert(
-      "framing", params.value("framingPreset").toString("overview_orbit"));
-  }
-  if (!reviewParams.contains("min2dHeight"))
-  {
-    reviewParams.insert("min2dHeight", 360);
-  }
-  if (!reviewParams.contains("highlight"))
-  {
-    reviewParams.insert("highlight", true);
-  }
-  if (!reviewParams.contains("returnBase64"))
-  {
-    reviewParams.insert("returnBase64", false);
+      "views",
+      QJsonArray{
+        "iso_overview_ne",
+        "iso_overview_sw",
+        "top_plan",
+        "side_elevation_long",
+        "front_elevation_cross",
+      });
   }
 
-  auto review = viewportCaptureSceneReviewResult(
-    appController, reviewParams, overlayState, history, objectRegistry);
+  auto review =
+    renderReviewTargetsResult(appController, reviewParams, history, objectRegistry);
   if (!review.ok)
   {
     return review;
   }
 
-  review.result.insert("reviewId", reviewId);
-  review.result.insert("resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId));
   review.result.insert("tool", "render_review_operation");
-  review.result.insert("outputDir", reviewParams.value("outputDir").toString());
   return review;
 }
 

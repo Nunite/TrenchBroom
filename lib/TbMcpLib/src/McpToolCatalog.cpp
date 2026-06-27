@@ -821,10 +821,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
-      "render_review_operation",
-      "Create an isolated Agent-readable review bundle for generated scene objects. "
-      "Pass operationIds or objectIds; the tool frames the target, captures "
-      "overview/detail 3D and readable 2D views, and returns quality diagnostics.",
+      "render_review_targets",
+      "Render an isolated Agent-readable geometry review bundle using only target "
+      "object geometry. This CPU/QImage renderer does not touch TrenchBroom viewport "
+      "layout, selection, map visibility, undo, or OpenGL state.",
       McpMode::ReadOnly,
       false,
       true,
@@ -841,25 +841,84 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            },
            {"min", "max"})},
         {"views",
-         arrayProperty("Review views. Defaults to overview_3d, top_2d_fit, side_2d_fit, "
-                       "detail_3d.")},
+         arrayProperty(
+           "Geometry review views. Defaults to iso_overview_ne, iso_overview_sw, "
+           "top_plan, side_elevation_long, and front_elevation_cross. Legacy "
+           "overview_3d/detail_3d/top_2d_fit/side_2d_fit names are accepted.")},
+        {"style",
+         stringProperty(
+           "Rendering style. First production style is whitebox_edges: shaded gray "
+           "faces with strong outlines for textureless whitebox maps.")},
+        {"imageSize",
+         arrayProperty(
+           "Optional [width,height] in pixels. Values are clamped to production review "
+           "limits; default is 1400x1000.")},
+        {"imageWidth", integerProperty("Optional image width override.")},
+        {"imageHeight", integerProperty("Optional image height override.")},
+        {"outputDir",
+         stringProperty(
+           "Optional root directory for review bundles. Captures are written under "
+           "<outputDir>/<reviewId>.")},
+        {"includeAxes", boolProperty("Draw a small orientation axis marker.")},
+        {"includeBoundsBox",
+         boolProperty("Draw the target bounding box as a translucent dashed outline.")},
+        {"maxDetailedFaces",
+         integerProperty(
+           "Maximum brush faces rendered as real polygons before falling back to bounds "
+           "geometry. Defaults to 20000.")},
+        {"detail",
+         stringProperty(
+           "Return detail level. Summary is default; full may include more diagnostics "
+           "in later versions.")},
+      }),
+    },
+    {
+      "render_review_operation",
+      "Create an isolated Agent-readable geometry review bundle for generated scene "
+      "objects. Pass operationIds or objectIds; the CPU renderer draws only target "
+      "geometry with whitebox faces and strong outlines, avoiding live viewport "
+      "layout/visibility changes.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"operationIds",
+         arrayProperty(
+           "MCP operation ids whose live changed objects are the review target.")},
+        {"objectIds", arrayProperty("Explicit MCP object ids to review.")},
+        {"bounds",
+         objectSchema(
+           {
+             {"min", vec3Property("Fallback target bounds minimum corner.")},
+             {"max", vec3Property("Fallback target bounds maximum corner.")},
+           },
+           {"min", "max"})},
+        {"views",
+         arrayProperty(
+           "Review views. Defaults to iso_overview_ne, iso_overview_sw, top_plan, "
+           "side_elevation_long, and front_elevation_cross. Legacy viewport review "
+           "view names are accepted.")},
         {"isolateMode",
          stringProperty(
            "Requested isolation mode: hide_others, fade_others, or highlight_only. "
-           "Defaults to hide_others for Agent-readable isolated captures.")},
+           "Accepted for compatibility; geometry review always renders only targets.")},
         {"framingPreset",
-         stringProperty("Base framing preset for 3D views: overview_orbit, top_fit, "
-                        "side_profile, or route_follow. Defaults to overview_orbit.")},
+         stringProperty(
+           "Compatibility parameter from viewport review. Geometry review ignores "
+           "camera presets and fits each orthographic view to the target.")},
         {"outputDir",
          stringProperty(
            "Optional root directory for review bundles. Captures are written under "
            "<outputDir>/<reviewId>; otherwise the MCP temp review directory is used.")},
-        {"min2dHeight",
-         integerProperty(
-           "Minimum acceptable 2D capture height in pixels. Defaults to 360.")},
+        {"imageSize", arrayProperty("Optional [width,height] in pixels.")},
+        {"includeAxes", boolProperty("Draw a small orientation axis marker.")},
+        {"includeBoundsBox",
+         boolProperty("Draw the target bounding box as a translucent dashed outline.")},
         {"sceneName", stringProperty("Optional scene/review label.")},
         {"returnBase64",
-         boolProperty("Return PNG data as base64. Defaults to false to save context.")},
+         boolProperty(
+           "Compatibility parameter. Geometry review writes files and returns paths to "
+           "save context.")},
       }),
     },
     {
@@ -2430,6 +2489,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "viewport_camera_frame_bounds",
     "viewport_camera_set",
     "viewport_capture_scene_review",
+    "render_review_targets",
     "render_review_operation",
     "operation_inspect",
     "operation_select",

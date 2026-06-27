@@ -133,8 +133,11 @@ function Assert-ReviewQuality {
       $warnings = @($quality.warnings) -join ", "
       throw "$Name capture '$($quality.view)' failed quality: $warnings"
     }
-    if (($quality.view -like "*2d*") -and ([int] $quality.height -lt 360)) {
-      throw "$Name capture '$($quality.view)' is too short: $($quality.height)"
+    if ([int] $quality.width -lt 900 -or [int] $quality.height -lt 650) {
+      throw "$Name capture '$($quality.view)' is too small: $($quality.width)x$($quality.height)"
+    }
+    if ([double] $quality.edgeDensity -le 0) {
+      throw "$Name capture '$($quality.view)' has no visible edge density"
     }
   }
 }
@@ -143,7 +146,13 @@ function Invoke-ReviewBundle {
   param(
     [string] $Name,
     [string] $OperationId,
-    [string[]] $Views = @("overview_3d", "detail_3d"),
+    [string[]] $Views = @(
+      "iso_overview_ne",
+      "iso_overview_sw",
+      "top_plan",
+      "side_elevation_long",
+      "front_elevation_cross"
+    ),
     [string] $OutputRoot
   )
 
@@ -156,9 +165,10 @@ function Invoke-ReviewBundle {
     sceneName = $Name
     operationIds = @($OperationId)
     views = $Views
-    layout = "twoPanes"
     isolateMode = "hide_others"
-    min2dHeight = 360
+    imageSize = @(1400, 1000)
+    includeAxes = $true
+    includeBoundsBox = $true
     returnBase64 = $false
   }
   if ($sceneOutputRoot) {
@@ -167,18 +177,16 @@ function Invoke-ReviewBundle {
   $review = Invoke-McpTool -Tool "render_review_operation" -Arguments $reviewArgs -TimeoutSec 45
   $actualViews = @($review.captures | ForEach-Object { [string] $_.view })
   foreach ($view in $Views) {
-    $normalized = if ($view -eq "overview_3d" -or $view -eq "detail_3d") { "3d" } else { $view }
+    $normalized = switch ($view) {
+      "overview_3d" { "iso_overview_ne" }
+      "detail_3d" { "iso_overview_sw" }
+      "top_2d_fit" { "top_plan" }
+      "side_2d_fit" { "side_elevation_long" }
+      default { $view }
+    }
     if (-not $actualViews.Contains($normalized)) {
       throw "$Name did not capture requested review view '$view'"
     }
-  }
-  $topCapture = @($review.captures | Where-Object { $_.view -eq "top_2d_fit" } | Select-Object -First 1)
-  if ($topCapture.Count -gt 0 -and [string] $topCapture[0].viewPlane -ne "xy") {
-    throw "$Name top_2d_fit used viewPlane '$($topCapture[0].viewPlane)', expected 'xy'"
-  }
-  $sideCapture = @($review.captures | Where-Object { $_.view -eq "side_2d_fit" } | Select-Object -First 1)
-  if ($sideCapture.Count -gt 0 -and [string] $sideCapture[0].viewPlane -ne "xz") {
-    throw "$Name side_2d_fit used viewPlane '$($sideCapture[0].viewPlane)', expected 'xz'"
   }
   Assert-ReviewQuality -Review $review -Name $Name
   return [ordered] @{
@@ -291,6 +299,87 @@ try {
       )
     })
     $reviewSceneResults += Invoke-ReviewBundle -Name "review-block-group" -OperationId $blockGroup.operationId -OutputRoot $reviewOutputRoot.FullName
+
+    $curvedTurn = Invoke-McpTool -Tool "blockout_create_batch" -Arguments ([ordered] @{
+      expectedDocumentPath = $testMap
+      name = "review_curved_turn"
+      detail = "ids"
+      select = $true
+      operations = @(
+        [ordered] @{ type = "box"; min = @(512, -96, 0); max = @(896, 96, 32); material = "__TB_empty" },
+        [ordered] @{
+          type = "curved_corridor"
+          center = @(896, 96, 0)
+          innerRadius = 96
+          outerRadius = 288
+          startAngle = -90
+          endAngle = 0
+          minZ = 0
+          maxZ = 32
+          segments = 12
+          material = "__TB_empty"
+        },
+        [ordered] @{ type = "box"; min = @(1088, 96, 0); max = @(1280, 480, 32); material = "__TB_empty" }
+      )
+    }) -TimeoutSec 30
+    $reviewSceneResults += Invoke-ReviewBundle -Name "review-curved-turn" -OperationId $curvedTurn.operationId -OutputRoot $reviewOutputRoot.FullName
+
+    $route = Invoke-McpTool -Tool "brush_create_polygon_batch" -Arguments ([ordered] @{
+      expectedDocumentPath = $testMap
+      transactionName = "review_height_route"
+      detail = "ids"
+      select = $true
+      brushes = @(
+        [ordered] @{ points2d = @(@(-640, 256), @(-512, 256), @(-512, 384), @(-640, 384)); minZ = 0; maxZ = 24; material = "__TB_empty" },
+        [ordered] @{ points2d = @(@(-448, 304), @(-320, 336), @(-352, 464), @(-480, 432)); minZ = 40; maxZ = 64; material = "__TB_empty" },
+        [ordered] @{ points2d = @(@(-256, 384), @(-128, 448), @(-192, 576), @(-320, 512)); minZ = 88; maxZ = 112; material = "__TB_empty" },
+        [ordered] @{ points2d = @(@(-64, 512), @(96, 512), @(96, 640), @(-64, 640)); minZ = 144; maxZ = 168; material = "__TB_empty" }
+      )
+    })
+    $reviewSceneResults += Invoke-ReviewBundle -Name "review-height-route" -OperationId $route.operationId -OutputRoot $reviewOutputRoot.FullName
+
+    $terrainArgs = [ordered] @{
+      imagePath = $heightmapPath
+      expectedDocumentPath = $testMap
+      origin = @(-1024, 768, 0)
+      cellSize = 48
+      heightScale = 160
+      heightSteps = 16
+      maxSize = 16
+      maxBrushes = 400
+      material = "__TB_empty"
+      mode = "terraced_brushes"
+      select = $true
+      detail = "summary"
+    }
+    $terrain = Invoke-McpTool -Tool "heightmap_import_grayscale" -Arguments $terrainArgs -TimeoutSec 30
+    $reviewSceneResults += Invoke-ReviewBundle -Name "review-heightmap-terrain" -OperationId $terrain.operationId -OutputRoot $reviewOutputRoot.FullName
+
+    $trackOps = @()
+    for ($i = 0; $i -lt 14; ++$i) {
+      $angle0 = -20 + $i * 7
+      $angle1 = $angle0 + 6
+      $trackOps += [ordered] @{
+        type = "cylinder_sector"
+        center = @(960, 960, 0)
+        innerRadius = 360
+        outerRadius = 560
+        startAngle = $angle0
+        endAngle = $angle1
+        minZ = [Math]::Round($i * 6)
+        maxZ = [Math]::Round($i * 6 + 28)
+        material = "__TB_empty"
+        sides = 8
+      }
+    }
+    $track = Invoke-McpTool -Tool "blockout_create_batch" -Arguments ([ordered] @{
+      expectedDocumentPath = $testMap
+      name = "review_smooth_track_turn"
+      detail = "ids"
+      select = $true
+      operations = $trackOps
+    }) -TimeoutSec 30
+    $reviewSceneResults += Invoke-ReviewBundle -Name "review-smooth-track-turn" -OperationId $track.operationId -OutputRoot $reviewOutputRoot.FullName
   }
 
   [ordered] @{
