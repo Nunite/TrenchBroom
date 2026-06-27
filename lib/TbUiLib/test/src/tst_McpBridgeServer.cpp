@@ -2131,6 +2131,12 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(batchResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.selection().nodes.size() == 3u);
 
+  const auto cylinderAnalyzeResponse =
+    geometryAnalyzeSelectionResult(map, QJsonObject{{"grid", 1}});
+  REQUIRE(cylinderAnalyzeResponse.ok);
+  CHECK(
+    cylinderAnalyzeResponse.result.value("nonGridAlignedObjectIds").toArray().isEmpty());
+
   const auto ribbonResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",

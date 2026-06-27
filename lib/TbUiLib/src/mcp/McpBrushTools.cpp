@@ -991,6 +991,138 @@ std::optional<mdl::Brush> createCylinderSectorBrush(
     error);
 }
 
+std::vector<vm::vec2d> cylinderPolygon(
+  const vm::bbox3d& bounds,
+  const size_t sides,
+  const SectorSnapMode snapMode,
+  const double grid)
+{
+  const auto center = bounds.xy().center();
+  const auto radius = vm::min(bounds.size().x(), bounds.size().y()) * 0.5;
+
+  auto result = std::vector<vm::vec2d>{};
+  result.reserve(sides);
+  const auto halfAngle = vm::Cd::pi() / static_cast<double>(sides);
+  const auto scale = 1.0 / std::cos(halfAngle);
+  for (size_t i = 0; i < sides; ++i)
+  {
+    const auto angle =
+      -vm::Cd::half_pi()
+      + (static_cast<double>(i) + 0.5) * vm::Cd::two_pi() / static_cast<double>(sides);
+    auto point =
+      center
+      + vm::vec2d{std::cos(angle) * radius * scale, std::sin(angle) * radius * scale};
+    if (snapMode == SectorSnapMode::Grid)
+    {
+      point = snapToGrid(point, grid);
+    }
+    result.push_back(point);
+  }
+  return result;
+}
+
+std::optional<mdl::Brush> createCylinderBrushFromPolygon(
+  const mdl::BrushBuilder& builder,
+  const vm::bbox3d& bounds,
+  const size_t sides,
+  const vm::axis::type axis,
+  const std::string& material,
+  const SectorSnapMode snapMode,
+  const double grid,
+  QString& error)
+{
+  if (snapMode == SectorSnapMode::None)
+  {
+    auto brush =
+      builder.createCylinder(bounds, mdl::EdgeAlignedCircle{sides}, axis, material);
+    if (brush.is_error())
+    {
+      error = "Could not create cylinder brush from the given bounds";
+      return std::nullopt;
+    }
+    return std::move(brush.value());
+  }
+
+  auto planeBounds = vm::bbox3d{};
+  auto minAxis = 0.0;
+  auto maxAxis = 0.0;
+  if (axis == vm::axis::x)
+  {
+    planeBounds = vm::bbox3d{
+      {bounds.min.y(), bounds.min.z(), bounds.min.x()},
+      {bounds.max.y(), bounds.max.z(), bounds.max.x()}};
+    minAxis = planeBounds.min.z();
+    maxAxis = planeBounds.max.z();
+  }
+  else if (axis == vm::axis::y)
+  {
+    planeBounds = vm::bbox3d{
+      {bounds.min.x(), bounds.min.z(), bounds.min.y()},
+      {bounds.max.x(), bounds.max.z(), bounds.max.y()}};
+    minAxis = planeBounds.min.z();
+    maxAxis = planeBounds.max.z();
+  }
+  else
+  {
+    planeBounds = bounds;
+    minAxis = bounds.min.z();
+    maxAxis = bounds.max.z();
+  }
+
+  auto polygon = cylinderPolygon(planeBounds, sides, snapMode, grid);
+  minAxis = snapMode == SectorSnapMode::Grid ? snapToGrid(minAxis, grid) : minAxis;
+  maxAxis = snapMode == SectorSnapMode::Grid ? snapToGrid(maxAxis, grid) : maxAxis;
+  if (!std::isfinite(minAxis) || !std::isfinite(maxAxis) || minAxis >= maxAxis)
+  {
+    error = "cylinder bounds collapse after grid snapping";
+    return std::nullopt;
+  }
+  if (!isStrictlyConvexPolygon(polygon))
+  {
+    error = "cylinder footprint collapses after grid snapping";
+    return std::nullopt;
+  }
+
+  if (polygonSignedArea(polygon) < 0.0)
+  {
+    std::reverse(polygon.begin(), polygon.end());
+  }
+
+  auto vertices = std::vector<vm::vec3d>{};
+  vertices.reserve(polygon.size() * 2u);
+  const auto addVertex = [&](const vm::vec2d& point, const double axisValue) {
+    if (axis == vm::axis::x)
+    {
+      vertices.emplace_back(axisValue, point.x(), point.y());
+    }
+    else if (axis == vm::axis::y)
+    {
+      vertices.emplace_back(point.x(), axisValue, point.y());
+    }
+    else
+    {
+      vertices.emplace_back(point.x(), point.y(), axisValue);
+    }
+  };
+
+  for (const auto& point : polygon)
+  {
+    addVertex(point, minAxis);
+  }
+  for (const auto& point : polygon)
+  {
+    addVertex(point, maxAxis);
+  }
+
+  auto brush = builder.createBrush(vertices, material);
+  if (brush.is_error())
+  {
+    error = "Could not create cylinder brush from snapped points";
+    return std::nullopt;
+  }
+  return std::move(brush.value());
+}
+
 std::optional<vm::axis::type> axisFromJson(
   const QJsonObject& params,
   const QString& key,
@@ -2788,14 +2920,19 @@ std::vector<mdl::Node*> compileBatchOperation(
     }
     const auto sides =
       std::clamp(optionalSize(operation, "sides", 16), size_t{3}, size_t{128});
-    auto brush = builder.createCylinder(
-      *snappedBounds, mdl::EdgeAlignedCircle{sides}, *axis, material);
-    if (brush.is_error())
+    const auto snapMode =
+      sectorSnapModeFromJson(operation, "snapMode", SectorSnapMode::Grid, error);
+    if (!snapMode)
     {
-      error = "Could not create cylinder brush from the given bounds";
       return {};
     }
-    return {new mdl::BrushNode{std::move(brush.value())}};
+    auto brush = createCylinderBrushFromPolygon(
+      builder, *snappedBounds, sides, *axis, material, *snapMode, grid, error);
+    if (!brush)
+    {
+      return {};
+    }
+    return {new mdl::BrushNode{std::move(*brush)}};
   }
 
   if (type == "room" || type == "corridor")
@@ -3188,8 +3325,26 @@ std::optional<std::vector<mdl::Brush>> createBrushesForType(
       return std::nullopt;
     }
     const auto sides = clampedSizeParam(params, "sides", 16, 3, 128);
-    brush =
-      builder.createCylinder(*bounds, mdl::EdgeAlignedCircle{sides}, *axis, material);
+    const auto snapMode =
+      sectorSnapModeFromJson(params, "snapMode", SectorSnapMode::Grid, error);
+    if (!snapMode)
+    {
+      return std::nullopt;
+    }
+    auto gridSafeBrush = createCylinderBrushFromPolygon(
+      builder,
+      *bounds,
+      sides,
+      *axis,
+      material,
+      *snapMode,
+      optionalDouble(params, "grid", 1.0),
+      error);
+    if (!gridSafeBrush)
+    {
+      return std::nullopt;
+    }
+    brush = std::move(*gridSafeBrush);
   }
   else if (type == "cone")
   {

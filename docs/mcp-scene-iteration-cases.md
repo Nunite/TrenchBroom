@@ -383,6 +383,50 @@ Proposed MCP changes:
 Commit:
 - `ce9e1deff Add MCP camera controls for scene review`
 
+### 2026-06-27 - Scene 1 Clean-Map Rerun: Mountain Valley Boardwalk
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_01_mountain_valley_boardwalk.map`
+- Created from the minimal Valve map fixture and launched directly with `scripts/mcp-call.ps1 -Launch -KeepOpen -MapPath ...`.
+- Initial verification: `brushCount=0`; a first generated batch with a concave canyon-wall footprint was rejected before commit and the map stayed at `brushCount=0`.
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 1 clean: mountain valley boardwalk`: canyon floor, river ribbon, convex wall segments, ledges, boardwalk, bridge deck, planks, support posts, rail ribbons, cave mouth, and route markers. Result: `valid=true`, 81 brushes from 49 operations.
+
+MCP tools used:
+- `python_generate_blockout` to generate typed `blockout_create_batch` IR, then internal batch compile.
+- Batch operations: `box`, `prism`, `path_ribbon`, and `support_posts_between`.
+- `map_snapshot`, `map_validate`, `problems_check`, `documents_save`.
+- `viewport_capture_scene_review` with overview and explicit route-detail camera.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782553269535.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782553269582.png`
+- Route/detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782553277322.png`
+
+Validation:
+- Final `map_snapshot`: `brushCount=81`, bounds `[-1536,-560,-32]` to `[1536,568,320]`, saved with `modified=false`.
+- Final `map_validate`: `valid=true`, `count=0`, `safeFixableCount=0`.
+- Final `problems_check`: no problems.
+
+What worked:
+- The clean standalone map now satisfies the per-scene isolation requirement instead of relying on the earlier shared iteration map.
+- Batch validation correctly rejected the first concave canyon wall before committing partial geometry.
+- The overview reads as a canyon/boardwalk route with side walls, river/floor ribbon, bridge, supports, and rail bands.
+
+What failed or constrained the agent:
+- The route-detail camera was partly occluded by the tall canyon wall; choosing a useful camera inside long narrow spaces still takes manual iteration.
+- Canyon walls are still blocky convex strips. The scene communicates route structure but remains weak as natural terrain.
+- Authoring the canyon required splitting one intended organic wall into many convex pieces, which is correct for brush validity but verbose for the agent.
+
+Proposed MCP changes:
+- Add a generic terrain/profile wall primitive that compiles to convex strips, not a canyon prefab.
+- Add camera presets or an occlusion-aware route camera for long interior/canyon spaces.
+- Add operation-id based scene review so the camera can frame only the active generated module.
+
+Commit:
+- Documentation/verification only; no new MCP code for this rerun.
+
 ### 2026-06-27 - Scene 2: Coastal Lighthouse And Breakwater
 
 Build phases:
@@ -432,6 +476,51 @@ Proposed MCP changes:
 
 Commit:
 - `27d89f75a Add batch cylinder blockout operation`
+
+### 2026-06-27 - Scene 2 Clean-Map Rerun: Coastal Lighthouse And Breakwater
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_02_coastal_lighthouse_breakwater.map`
+- Recreated from the minimal Valve map fixture and launched directly with `scripts/mcp-call.ps1 -Launch -KeepOpen -MapPath ...`.
+- Initial verification: clean empty map before generation.
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 2 clean: coastal lighthouse breakwater`: island and water slabs, stacked lighthouse cylinders, lantern room and cap, service deck, dock, rail bands, support posts, curved breakwater ribbon, rock markers, door, and windows. Result: `valid=true`, 43 brushes from 32 operations.
+
+MCP tools used:
+- `python_generate_blockout` to generate typed `blockout_create_batch` IR.
+- Batch operations: `box`, `cylinder`, `prism`, `path_ribbon`, and `support_posts_between`.
+- `map_snapshot`, `map_validate`, `problems_check`, `documents_save`.
+- `viewport_capture_scene_review` with overview and lighthouse/dock detail cameras.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782554096124.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782554096194.png`
+- Lighthouse/dock detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782554106295.png`
+
+Validation:
+- Final `map_snapshot`: `brushCount=43`, bounds `[-1536,-1536,-64]` to `[1536,1536,832]`, saved with `modified=false`.
+- Final `map_validate`: `valid=true`, `count=0`, `safeFixableCount=0`.
+- Final `problems_check`: no problems.
+
+What worked:
+- The detail screenshot clearly reads as a lighthouse with stacked tower body, lantern room, cap, dock, posts, and nearby breakwater/rocks.
+- Rebuilding the same scene after the cylinder snap fix removed all non-integer-vertex warnings.
+- The whole scene now lands as one compact operation instead of six separate cylinder calls plus later batches.
+
+What failed or constrained the agent:
+- The overview camera includes a large water slab, making the lighthouse and breakwater visually small. Automated review still needs better scene-specific framing heuristics.
+- Lighthouse cap and roof pieces are coarse prism approximations; a generic frustum/cone grid-safe primitive would improve towers without becoming a lighthouse prefab.
+- Circular primitives now favor grid-safe whitebox vertices by default, but users may still need `snapMode=radial` when visual roundness matters more than integer-grid cleanup.
+
+Implemented MCP follow-up:
+- Batch `cylinder` now honors `snapMode` and defaults to `grid`, creating grid-safe polygonal cylinder brush geometry.
+- `snapMode=radial` / `none` remain available when exact circular placement is preferred.
+- Updated tool schema text so `blockout_create_batch.operations` documents cylinder snap behavior.
+- Added focused test coverage that the default batch cylinder is grid-aligned under `geometry_analyze_selection(grid=1)`.
+
+Commit:
+- Pending follow-up: `Make batch cylinders grid-safe by default`.
 
 ### 2026-06-27 - Scene 3: Chinese Courtyard
 

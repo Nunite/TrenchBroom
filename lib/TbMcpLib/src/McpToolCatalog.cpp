@@ -263,7 +263,11 @@ QJsonObject blockoutBatchOperationSchema()
        {"thickness", numberProperty("Shell thickness for room/corridor/sky_shell.")},
        {"doorMin", vec3Property("Door opening minimum corner for doorway.")},
        {"doorMax", vec3Property("Door opening maximum corner for doorway.")},
-       {"snapMode", stringProperty("Circular vertex snap mode: grid, radial, or none.")},
+       {"snapMode",
+        stringProperty(
+          "Circular vertex snap mode for cylinder/cylinder_sector/curved_corridor: "
+          "grid, radial, or none. Batch cylinder defaults to grid so generated "
+          "whitebox vertices stay integer/grid-safe.")},
        {"count", integerProperty("repeat_translate repetition count, 1..256.")},
        {"counts",
         arrayProperty(
