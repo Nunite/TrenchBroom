@@ -520,7 +520,7 @@ Implemented MCP follow-up:
 - Added focused test coverage that the default batch cylinder is grid-aligned under `geometry_analyze_selection(grid=1)`.
 
 Commit:
-- Pending follow-up: `Make batch cylinders grid-safe by default`.
+- `b9abed592 Make batch cylinders grid-safe by default`
 
 ### 2026-06-27 - Scene 3: Chinese Courtyard
 
