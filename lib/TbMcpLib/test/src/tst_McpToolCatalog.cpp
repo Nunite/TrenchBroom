@@ -700,6 +700,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemDescription.contains(R"("type":"curved_corridor")"));
     CHECK(itemDescription.contains(R"("type":"path_ribbon")"));
     CHECK(itemDescription.contains(R"("type":"repeat_translate")"));
+    CHECK(itemDescription.contains(R"("type":"stepped_mass")"));
     CHECK(
       operations.value("items").toObject().value("required").toArray().contains("type"));
 
@@ -713,6 +714,9 @@ TEST_CASE("McpToolCatalog")
             .contains("cylinder"));
     CHECK(itemProperties.value("count").isObject());
     CHECK(itemProperties.value("offset").isObject());
+    CHECK(itemProperties.value("levels").isObject());
+    CHECK(itemProperties.value("inset").isObject());
+    CHECK(itemProperties.value("stepHeight").isObject());
     const auto childOperation = itemProperties.value("operation").toObject();
     CHECK(childOperation.value("type").toString() == "object");
     CHECK(childOperation.value("additionalProperties").toBool());

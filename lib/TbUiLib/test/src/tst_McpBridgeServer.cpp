@@ -2198,9 +2198,43 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(repeatResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.selection().nodes.size() == 4u);
 
+  const auto steppedMassResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Stepped mass"},
+      {"grid", 16},
+      {"select", true},
+      {"detail", "ids"},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "stepped_mass"},
+           {"min", QJsonArray{-512, -512, 0}},
+           {"max", QJsonArray{512, 512, 64}},
+           {"levels", 5},
+           {"inset", 96},
+           {"stepHeight", 64},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  const auto steppedMassError = steppedMassResponse.ok
+                                  ? std::string{}
+                                  : steppedMassResponse.error.message.toStdString();
+  INFO(steppedMassError);
+  REQUIRE(steppedMassResponse.ok);
+  CHECK(steppedMassResponse.result.value("brushCount").toInt() == 5);
+  CHECK(steppedMassResponse.result.value("changedObjectCount").toInt() == 5);
+  CHECK(steppedMassResponse.result.value("changedObjectIds").toArray().size() == 5);
+  CHECK(
+    steppedMassResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.selection().nodes.size() == 5u);
+
   const auto historyResponse = historyListResult(history);
   REQUIRE(historyResponse.ok);
-  CHECK(historyResponse.result.value("count").toInt() == 3);
+  CHECK(historyResponse.result.value("count").toInt() == 4);
   const auto historyOperation =
     historyResponse.result.value("operations").toArray().first().toObject();
   CHECK(historyOperation.value("operationId").toString() == operationId);
@@ -2292,6 +2326,37 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   REQUIRE(invalidRibbonResponse.ok);
   CHECK(
     !invalidRibbonResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+
+  const auto invalidSteppedMassResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "stepped_mass"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{128, 128, 16}},
+           {"levels", 4},
+           {"inset", 64},
+           {"stepHeight", 16},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(invalidSteppedMassResponse.ok);
+  const auto invalidSteppedMassValidation =
+    invalidSteppedMassResponse.result.value("validation").toObject();
+  CHECK(!invalidSteppedMassValidation.value("valid").toBool());
+  CHECK(invalidSteppedMassValidation.value("failedOperationIndex").toInt() == 0);
+  CHECK(
+    invalidSteppedMassValidation.value("failedOperationType").toString()
+    == "stepped_mass");
+  CHECK(
+    invalidSteppedMassValidation.value("errors").toArray().first().toString().contains(
+      "collapsed"));
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
   const auto invalidStairsResponse = blockoutCreateBatchForMapResult(

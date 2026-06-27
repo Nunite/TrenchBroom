@@ -595,3 +595,59 @@ Proposed MCP changes:
 
 Commit:
 - Pending follow-up: `Reject fractional stair batch geometry`.
+
+### 2026-06-27 - Scene 6: Desert Ruin Temple
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_06_desert_ruin_temple.map`
+- Created from the minimal Valve map fixture and launched directly with `scripts/mcp-call.ps1 -Launch -KeepOpen -MapPath ...`.
+- Initial verification: `brushCount=0`.
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 6: desert base stepped temple and entrance route`: large sand base, coarse dune prisms, five-layer temple massing, front stair route, and rear underground entrance volume. Result: `valid=true`, 29 brushes.
+- `mcp-op-2` / `MCP Scene 6: columns broken doors and fallen stones`: repeated column rows, broken lintels, doorway pieces, and fallen stone blocks. Result: `valid=true`, 36 brushes.
+- `mcp-op-3` / `MCP Scene 6: dunes transition markers and route readable edges`: additional dune transition prisms, side ramps, route edge markers, and rear entrance framing. Result: `valid=true`, 34 brushes.
+
+MCP tools used:
+- `blockout_create_batch` with `box`, `prism`, `ramp`, `stairs`, and `repeat_translate`.
+- `map_snapshot`, `map_validate`, `history_list`, `documents_save`.
+- `viewport_capture_scene_review` with overview, front entrance, and rear entrance cameras.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782547419017.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782547419072.png`
+- Front entrance 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782547419125.png`
+- Rear underground entrance 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782547419297.png`
+
+Validation:
+- Final `map_snapshot`: `brushCount=99`, bounds `[-2048,-1536,-32]` to `[2048,1536,320]`, saved with `modified=false`.
+- Final `map_validate`: `valid=true`, `count=0`, `safeFixableCount=0`.
+- `history_list`: three live operations, all `valid=true`, `mismatchCount=0`, `staleObjectCount=0`.
+
+What worked:
+- The front entrance screenshot reads as a stepped ruin temple: central stair, columns, broken doorway pieces, fallen blocks, and layered massing are visible.
+- Validation stayed clean with no non-integer vertices or safe-fixable problems.
+- `repeat_translate` again reduced repeated columns and small route markers.
+- Explicit detail cameras are more useful than a single overview for judging route hierarchy and broken doorway intent.
+
+What failed or constrained the agent:
+- The five-layer temple mass had to be manually described as five boxes. This is not a prefab issue; it is a missing generic stepped massing primitive useful for many scenes.
+- Sand dunes made from a few prism/ramp brushes read as coarse raised slabs. Terrain remains too blocky for natural scenes.
+- Broken stones are still hand-placed boxes/prisms. There is no controlled chip/chamfer primitive for damaged stone edges.
+- The 2D overview was not a useful top-down scene review; it mostly showed large rectangle outlines and missed much of the readable detail.
+- In a real MCP smoke after undoing a `stepped_mass` operation, `map_snapshot` correctly returned to `brushCount=0`, but `operation_validate` still reported the undone operation as live. That suggests operation validity can lag or mismatch after undo in this path.
+
+Implemented MCP follow-up:
+- Added generic `stepped_mass` to `blockout_create_batch`: creates `levels` stacked rectangular massing brushes with an xy `inset` per level and `stepHeight` per level. It is useful for temples, plinths, arenas, terraces, stepped terrain, and other layered forms without becoming a scene prefab.
+- Added schema examples/properties for `stepped_mass`.
+- Added tests for valid creation and collapsed-level rejection.
+- Real MCP smoke verified schema discovery, creation of a 5-layer stepped mass, `map_validate valid=true`, and undo returning the map to `brushCount=0`.
+
+Proposed MCP changes:
+- Add generic controlled damage tools such as `edge_chip_batch` or `brush_chamfer_batch` for ruin/broken-stone work.
+- Improve 2D scene review by forcing a true top view with fitted content and useful layer/depth behavior.
+- Investigate `operation_validate` after undo so operation live/stale state matches the actual document state immediately.
+- Add terrain-specific primitives or adaptive heightfield tools for natural dunes, still as generic terrain/mesh tools rather than desert-specific helpers.
+
+Commit:
+- Pending follow-up: `Add stepped mass batch operation`.

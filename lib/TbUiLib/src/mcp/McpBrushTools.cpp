@@ -1462,6 +1462,54 @@ std::optional<std::vector<vm::bbox3d>> stairsBounds(
   return result;
 }
 
+std::optional<std::vector<vm::bbox3d>> steppedMassBounds(
+  const vm::bbox3d& baseBounds,
+  const size_t levels,
+  const double inset,
+  const double stepHeight,
+  QString& error)
+{
+  if (levels == 0 || levels > 256)
+  {
+    error = "levels must be between 1 and 256";
+    return std::nullopt;
+  }
+  if (!std::isfinite(inset) || inset < 0.0)
+  {
+    error = "inset must be finite and non-negative";
+    return std::nullopt;
+  }
+  if (!finitePositive(stepHeight))
+  {
+    error = "stepHeight must be greater than zero";
+    return std::nullopt;
+  }
+
+  const auto& min = baseBounds.min;
+  const auto& max = baseBounds.max;
+  auto result = std::vector<vm::bbox3d>{};
+  result.reserve(levels);
+  for (size_t i = 0; i < levels; ++i)
+  {
+    const auto offset = inset * static_cast<double>(i);
+    const auto levelMin = vm::vec3d{
+      min.x() + offset, min.y() + offset, min.z() + stepHeight * static_cast<double>(i)};
+    const auto levelMax = vm::vec3d{
+      max.x() - offset,
+      max.y() - offset,
+      min.z() + stepHeight * static_cast<double>(i + 1)};
+    if (
+      levelMin.x() >= levelMax.x() || levelMin.y() >= levelMax.y()
+      || levelMin.z() >= levelMax.z())
+    {
+      error = QString{"stepped_mass level %1 collapsed; reduce levels or inset"}.arg(i);
+      return std::nullopt;
+    }
+    result.emplace_back(levelMin, levelMax);
+  }
+  return result;
+}
+
 std::vector<vm::bbox3d> skyShellBounds(
   const vm::bbox3d& innerBounds, const double thickness)
 {
@@ -2607,6 +2655,31 @@ std::vector<mdl::Node*> compileBatchOperation(
       return {};
     }
     return brushNodesFromBounds(builder, *stairBoxes, material, error);
+  }
+
+  if (type == "stepped_mass")
+  {
+    const auto bounds = boundsFromJson(operation, error);
+    if (!bounds)
+    {
+      return {};
+    }
+    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
+    if (!snappedBounds)
+    {
+      return {};
+    }
+    const auto massBounds = steppedMassBounds(
+      *snappedBounds,
+      optionalSize(operation, "levels", 1),
+      snapToGrid(optionalDouble(operation, "inset", 16.0), grid),
+      snapToGrid(optionalDouble(operation, "stepHeight", 16.0), grid),
+      error);
+    if (!massBounds)
+    {
+      return {};
+    }
+    return brushNodesFromBounds(builder, *massBounds, material, error);
   }
 
   if (type == "ramp")

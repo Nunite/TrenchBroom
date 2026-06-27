@@ -203,6 +203,8 @@ QJsonObject blockoutBatchOperationSchema()
      R"("width":160,"minZ":0,"maxZ":16}; )"
      R"({"type":"repeat_translate","count":4,"offset":[128,0,0],)"
      R"("operation":{"type":"box","min":[0,0,0],"max":[64,64,16]}}; )"
+     R"({"type":"stepped_mass","min":[-512,-512,0],"max":[512,512,64],)"
+     R"("levels":5,"inset":96,"stepHeight":64}; )"
      R"({"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}; )"
      R"({"type":"ramp","min":[0,0,0],"max":[256,128,64],"axis":"x"}; )"
      R"({"type":"doorway","min":[0,0,0],"max":[256,16,128],)"
@@ -214,8 +216,8 @@ QJsonObject blockoutBatchOperationSchema()
        {"type",
         stringProperty("Operation type: box, cylinder, prism, polyhedron, "
                        "cylinder_sector, room, corridor, "
-                       "curved_corridor, path_ribbon, repeat_translate, stairs, ramp, "
-                       "doorway, cover, or sky_shell.")},
+                       "curved_corridor, path_ribbon, repeat_translate, "
+                       "stepped_mass, stairs, ramp, doorway, cover, or sky_shell.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"material", stringProperty("Per-operation material override.")},
@@ -241,6 +243,9 @@ QJsonObject blockoutBatchOperationSchema()
        {"floorThickness", numberProperty("Floor thickness for curved_corridor.")},
        {"ceilingThickness", numberProperty("Ceiling thickness for curved_corridor.")},
        {"caps", stringProperty("curved_corridor caps: none, start, end, or both.")},
+       {"levels", integerProperty("stepped_mass level count, 1..256.")},
+       {"inset", numberProperty("stepped_mass xy inset per level.")},
+       {"stepHeight", numberProperty("stepped_mass height per level.")},
        {"steps", integerProperty("Stair step count.")},
        {"axis", stringProperty("Axis for cylinder/stairs/ramp: x, y, or z.")},
        {"sides", integerProperty("Cylinder side count, clamped to 3..128.")},
@@ -1801,8 +1806,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            arrayProperty(
              "Array of blockout operations. Supported types include box, cylinder, "
              "prism, polyhedron, cylinder_sector, room, corridor, curved_corridor, "
-             "path_ribbon, repeat_translate, stairs, ramp, doorway, cover, and "
-             "sky_shell. Each item must be an object with a type field; use "
+             "path_ribbon, repeat_translate, stepped_mass, stairs, ramp, doorway, "
+             "cover, and sky_shell. Each item must be an object with a type field; use "
              "tb_tools_search(detail=schema, "
              "query="
              "\"blockout_create_batch operations\") for examples.",
