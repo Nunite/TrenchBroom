@@ -1,273 +1,259 @@
-# MCP Composite Atomic Validation
+# MCP 组合原子工具验收
 
-This document tracks validation scenes for TrenchBroom MCP composite atomic
-tools. The goal is to grow reusable modeling atoms, not scene-specific prefab
-generators.
+本文档用于跟踪 TrenchBroom MCP 组合原子工具的验收场景。目标是沉淀可复用的建模原子，而不是把工具做成一组场景专属 prefab。
 
-## Principles
+## 原则
 
-- Validate one reusable capability across multiple scene types before treating it
-  as a stable MCP primitive.
-- Prefer `blockout_create_batch`, `brush_create_polygon_batch`, transform,
-  metadata, operation history, and screenshot review over scene-specific helpers.
-- Keep generated geometry inspectable, selectable, undoable, saveable, and
-  composed of valid convex brushes.
-- Use scene screenshots as human review evidence, but judge tool quality by
-  whether the same atom transfers to different layouts.
-- Keep KZ, racing, castle, industrial, and natural scenes as test contexts only.
-  Do not turn them into hardcoded prefab families.
+- 一个能力至少要跨多个场景类型验证，再视为稳定 MCP primitive。
+- 优先使用 `blockout_create_batch`、`brush_create_polygon_batch`、transform、metadata、operation history 和截图验收，而不是场景专属 helper。
+- 生成的几何必须可检查、可选择、可 undo、可保存，并且由合法凸 brush 组成。
+- 截图用于人工视觉验收，但真正判断工具质量时，要看同一个原子能力能否迁移到不同布局。
+- KZ、赛道、城堡、工业和自然场景都只是测试语境，不应该变成硬编码 prefab 家族。
 
-## Common Acceptance Criteria
+## 通用验收标准
 
-Every validation scene should record:
+每次验收场景都应该记录：
 
-- Scenario name and date.
-- MCP tools used.
-- Operation ids.
-- Brush count and rough bounds.
-- Whether creation was staged by type or submitted as one batch.
-- Whether undo/redo works.
-- Whether `map_validate` and `problems_check` pass.
-- Whether `operation_validate` reports live objects.
-- Screenshot paths or `viewport_capture_scene_review` output.
-- Tool friction found during the run.
-- Follow-up tool changes, if any.
+- 场景名称和日期。
+- 使用的 MCP 工具。
+- operation ids。
+- brush 数量和大致 bounds。
+- 是按类型分阶段创建，还是一次 batch 提交。
+- undo / redo 是否正常。
+- `map_validate` 和 `problems_check` 是否通过。
+- `operation_validate` 是否报告对象仍然 live。
+- 截图路径或 `viewport_capture_scene_review` 输出。
+- 本次使用中发现的工具摩擦。
+- 后续需要的工具调整。
 
-The scene passes only if:
+场景通过必须满足：
 
-- The main structure is recognizable from screenshot review.
-- Turns, joins, endpoints, and repeated elements are coherent.
-- No obvious unwanted rods, gaps, orphan brushes, or floating supports appear.
-- Object identity remains usable through `history_list`, `operation_inspect`,
-  and `operation_validate`.
-- The same tool pattern would plausibly work in at least one other scene type.
+- 主体结构能从截图里识别出来。
+- 转角、连接、端点和重复元素是连贯的。
+- 没有明显多余棍状物、缝隙、孤立 brush 或悬空支撑。
+- 对象身份仍能通过 `history_list`、`operation_inspect` 和 `operation_validate` 追踪。
+- 同一套工具模式至少看起来能迁移到另一类场景。
 
-## Validation Scenes
+## 验收场景
 
-### 1. Mountain Road Track
+### 1. 山路赛道
 
-Primary capabilities:
+主要能力：
 
-- Path floor generation.
-- Curved and segmented turns.
-- Edge barriers or guard rails.
-- Supports that follow terrain or height changes.
-- Width and elevation variation along a route.
+- 路径地面生成。
+- 曲线和分段转弯。
+- 边缘护栏或防撞墙。
+- 跟随地形或高度变化的支撑。
+- 路线宽度和高度变化。
 
-Useful tools:
+可用工具：
 
-- `blockout_create_batch` with `path_ribbon`, `box`, `prism`,
-  `repeat_translate`, and `support_posts_between`.
-- `brush_create_polygon_batch` for custom road shoulders or markers.
-- `viewport_capture_scene_review`.
+- `blockout_create_batch`，配合 `path_ribbon`、`box`、`prism`、`repeat_translate` 和 `support_posts_between`。
+- `brush_create_polygon_batch`，用于自定义路肩或标记。
+- `viewport_capture_scene_review`。
 
-Acceptance focus:
+验收重点：
 
-- The road surface is continuous through turns.
-- Barriers follow both sides without drifting.
-- Supports are placed under elevated sections, not protruding through the road.
-- The same atoms can be reused for bridges, canyon paths, or KZ routes.
+- 路面在转弯处连续。
+- 两侧护栏贴边，不漂移。
+- 支撑位于高架段下方，而不是从路面穿出来。
+- 同一套原子能力可以复用于桥梁、峡谷路径或 KZ route。
 
-Status: Not run.
+状态：未运行。
 
-### 2. Castle Wall Walk
+### 2. 城堡城墙巡逻道
 
-Primary capabilities:
+主要能力：
 
-- Wall strips along a multi-segment path.
-- Walkable top surface.
-- Corner joins.
-- Repeated merlons, crenels, and tower connection points.
+- 沿多段路径生成墙体条带。
+- 可行走的墙顶。
+- 转角连接。
+- 重复垛口、缺口和塔楼连接点。
 
-Useful tools:
+可用工具：
 
-- `path_ribbon` for wall walk floors.
-- `repeat_translate` / `repeat_grid` for merlons.
-- `brush_create_polygon_batch` for tower footprints and angled corners.
+- `path_ribbon`，用于墙顶巡逻道。
+- `repeat_translate` / `repeat_grid`，用于垛口。
+- `brush_create_polygon_batch`，用于塔楼 footprint 和斜角转角。
 
-Acceptance focus:
+验收重点：
 
-- Wall top is walkable and grid-aligned.
-- Corner joins close cleanly.
-- Merlon spacing is stable and does not overlap corners.
-- Tower connection points are explicit and selectable.
+- 墙顶可行走且贴 grid。
+- 转角连接干净闭合。
+- 垛口间距稳定，并且不和转角重叠。
+- 塔楼连接点清晰且可选择。
 
-Status: Not run.
+状态：未运行。
 
-### 3. Canyon Wooden Walkway
+### 3. 峡谷木栈道
 
-Primary capabilities:
+主要能力：
 
-- Segmented path platforms.
-- Railings.
-- Posts and braces under irregular path sections.
-- Directional readability.
+- 分段路径平台。
+- 栏杆。
+- 不规则路径下方的柱子和斜撑。
+- 路线方向可读性。
 
-Useful tools:
+可用工具：
 
-- `path_ribbon` or polygon batch for deck sections.
-- `support_posts_between` for posts.
-- `repeat_translate` for planks or railing segments.
+- `path_ribbon` 或 polygon batch，用于栈道平台。
+- `support_posts_between`，用于支撑柱。
+- `repeat_translate`，用于木板或栏杆段。
 
-Acceptance focus:
+验收重点：
 
-- Deck turns are readable and not just box spam.
-- Railings stay attached to edges.
-- Supports reach the intended base height.
-- The path can be split into stages so one invalid decorative piece does not
-  block the main walkway.
+- 栈道转弯有清晰方向，而不是 box spam。
+- 栏杆贴住边缘。
+- 支撑延伸到预期底部高度。
+- 路径可以分阶段提交，避免一个非法装饰件阻止主栈道落地。
 
-Status: Not run.
+状态：未运行。
 
-### 4. Underground Pipe Or Sewer
+### 4. 地下管道或下水道
 
-Primary capabilities:
+主要能力：
 
-- Cylindrical or half-cylindrical corridor approximations.
-- Curved pipe turns.
-- Side exits.
-- Segment continuity.
+- 圆形或半圆形通道近似。
+- 弯曲管道转角。
+- 侧向出口。
+- 分段连续性。
 
-Useful tools:
+可用工具：
 
-- `brush_create_cylinder_sector`.
-- `blockout_create_batch` with `cylinder_sector`, `cylinder`, `path_ribbon`,
-  `box`, and `prism`.
+- `brush_create_cylinder_sector`。
+- `blockout_create_batch`，配合 `cylinder_sector`、`cylinder`、`path_ribbon`、`box` 和 `prism`。
 
-Acceptance focus:
+验收重点：
 
-- Inner passage remains coherent across segments.
-- Side exit connects to the pipe wall cleanly.
-- Circular approximation stays grid-safe enough for GoldSrc blockout work.
-- No invalid or concave brushes are produced.
+- 内部通道跨分段后仍然连贯。
+- 侧向出口能干净接到管壁。
+- 圆形近似对 GoldSrc 白盒来说足够 grid-safe。
+- 不生成非法或凹 brush。
 
-Status: Not run.
+状态：未运行。
 
-### 5. Factory Conveyor And Maintenance Platforms
+### 5. 工厂传送带与维修平台
 
-Primary capabilities:
+主要能力：
 
-- Repeating mechanical modules.
-- Platform chains.
-- Railings, support frames, ramps, and stairs as reusable atoms.
-- Texture and face operations on repeated elements.
+- 重复机械模块。
+- 平台链。
+- 栏杆、支撑框架、斜坡和楼梯作为可复用原子。
+- 对重复元素进行贴图和 face 操作。
 
-Useful tools:
+可用工具：
 
-- `repeat_translate`, `repeat_grid`, `box`, `prism`.
-- `brush_create_boxes_batch`.
-- Texture and face tools.
+- `repeat_translate`、`repeat_grid`、`box`、`prism`。
+- `brush_create_boxes_batch`。
+- 贴图和 face 工具。
 
-Acceptance focus:
+验收重点：
 
-- Repetition is compact in MCP calls and operation history.
-- Supports and rails line up with the conveyor/platform edges.
-- Face/texture edits can target repeated elements without long object id lists.
-- One operation can be inspected and selected after creation.
+- 重复结构在 MCP 调用和 operation history 中保持紧凑。
+- 支撑和栏杆对齐传送带或平台边缘。
+- face / texture 编辑不需要长期传递大 object id 列表。
+- 创建后能 inspect 和 select 对应 operation。
 
-Status: Not run.
+状态：未运行。
 
-### 6. KZ Curved Bhop Route
+### 6. KZ 曲线 Bhop 路线
 
-Primary capabilities:
+主要能力：
 
-- Route metadata.
-- Non-box platform footprints.
-- Curved uphill path composition.
-- Player intention expressed through platform shape and orientation.
+- route metadata。
+- 非 box 平台 footprint。
+- 曲线上升路径组合。
+- 通过平台形状和朝向表达玩家意图。
 
-Useful tools:
+可用工具：
 
-- `shape_library_list`.
-- `brush_create_polygon_batch`.
-- `brush_metadata_set`, `selection_by_metadata`.
-- `route_geometry_analyze_chain` for geometric facts only.
+- `shape_library_list`。
+- `brush_create_polygon_batch`。
+- `brush_metadata_set`、`selection_by_metadata`。
+- `route_geometry_analyze_chain`，只用于返回几何事实。
 
-Acceptance focus:
+验收重点：
 
-- The route communicates takeoff edges and landing windows.
-- Platforms are not just a uniform box chain unless explicitly requested.
-- Difficulty judgement stays in the Agent skill and human review, not in a
-  static MCP verdict.
-- Metadata can recover the route without carrying a large object id list.
+- 路线能表达起跳边和落点窗口。
+- 平台不只是统一 box chain，除非用户明确要求。
+- 难度判断保留给 Agent skill 和人工 review，不交给 MCP 静态结论。
+- metadata 能找回 route，不需要在上下文里携带很长 object id 列表。
 
-Status: Not run.
+状态：未运行。
 
-### 7. Temple Steps And Terraces
+### 7. 寺庙台阶与阶地
 
-Primary capabilities:
+主要能力：
 
-- Layered stepped masses.
-- Symmetric repetition.
-- Column rows.
-- Axis-aligned and polygonal platform composition.
+- 分层阶地。
+- 对称重复。
+- 柱列。
+- 轴向对齐和多边形平台组合。
 
-Useful tools:
+可用工具：
 
-- `stepped_mass`.
-- `repeat_grid`.
-- `brush_create_cylinder`.
-- `brush_create_polygon_batch`.
+- `stepped_mass`。
+- `repeat_grid`。
+- `brush_create_cylinder`。
+- `brush_create_polygon_batch`。
 
-Acceptance focus:
+验收重点：
 
-- Terraces read as intentional levels, not random stacked blocks.
-- Columns align with route and entrance axes.
-- Stairs or ramps connect levels.
-- The same atoms can support plazas, fortifications, or arena seating.
+- 阶地看起来是有意图的层级，而不是随机堆块。
+- 柱列与路线和入口轴线对齐。
+- 楼梯或斜坡能连接不同层级。
+- 同一套原子能力可以复用于广场、防御工事或竞技场看台。
 
-Status: Not run.
+状态：未运行。
 
-### 8. Natural Cave Blockout
+### 8. 自然洞穴白盒
 
-Primary capabilities:
+主要能力：
 
-- Terrain or heightfield surfaces.
-- Irregular but convex platform chunks.
-- Rock columns and cave openings.
-- Adaptive detail in visually complex areas.
+- 地形或高度图表面。
+- 不规则但仍凸的岩石平台块。
+- 岩柱和洞口。
+- 视觉复杂区域的自适应细分。
 
-Useful tools:
+可用工具：
 
-- `heightmap_import_grayscale`.
-- `brush_create_polygon_batch`.
-- `brush_create_cylinder` / `brush_create_cone`.
-- `blockout_create_batch` staged by terrain, openings, and supports.
+- `heightmap_import_grayscale`。
+- `brush_create_polygon_batch`。
+- `brush_create_cylinder` / `brush_create_cone`。
+- `blockout_create_batch`，按地形、洞口和支撑分阶段提交。
 
-Acceptance focus:
+验收重点：
 
-- The cave silhouette is not purely rectangular.
-- Complex regions can use finer cells or smaller polygons.
-- Generated brushes remain selectable and saveable.
-- Screenshot review can distinguish the route, openings, and major masses.
+- 洞穴轮廓不是纯矩形。
+- 复杂区域能使用更细的 cell 或更小 polygon。
+- 生成的 brush 仍然可选择、可保存。
+- 截图验收能区分路线、洞口和主要体块。
 
-Status: Not run.
+状态：未运行。
 
-## Priority Queue
+## 优先队列
 
-1. Mountain Road Track: validates path, barrier, support, and height variation.
-2. Castle Wall Walk: validates corner joins, repetition, and walkable thickness.
-3. KZ Curved Bhop Route: validates route metadata and player-intent footprints.
-4. Underground Pipe Or Sewer: validates curved/circular brush composition.
+1. 山路赛道：验证路径、护栏、支撑和高度变化。
+2. 城堡城墙巡逻道：验证转角连接、重复结构和可行走厚度。
+3. KZ 曲线 Bhop 路线：验证 route metadata 和玩家意图 footprint。
+4. 地下管道或下水道：验证曲线和圆形 brush 组合。
 
-These four should run first because together they stress path composition,
-repetition, curved geometry, object identity, metadata, and screenshot review
-without requiring final art materials.
+这四个场景应该优先运行，因为它们能在不依赖最终美术材质的情况下，同时压测路径组合、重复结构、曲线几何、对象身份、metadata 和截图验收。
 
-## Findings Log
+## Findings 记录
 
-Add new findings below after each real MCP run.
+每次真实 MCP 跑图后，在下面追加记录。
 
-### Template
+### 模板
 
-- Date:
-- Scenario:
-- Map:
-- Tools used:
-- Operation ids:
-- Result:
-- Screenshot review:
-- Problems found:
-- Tool changes proposed:
-- Tool changes implemented:
-- Commit:
+- 日期：
+- 场景：
+- 地图：
+- 使用工具：
+- Operation ids：
+- 结果：
+- 截图验收：
+- 发现问题：
+- 建议工具调整：
+- 已实现工具调整：
+- Commit：
