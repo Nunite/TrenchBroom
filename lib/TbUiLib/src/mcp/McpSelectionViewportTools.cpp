@@ -19,11 +19,14 @@
 
 #include <QBuffer>
 #include <QCoreApplication>
+#include <QFileInfo>
 #include <QIODevice>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QPixmap>
 #include <QStringList>
+#include <QUuid>
 
 #include "McpBridgeServerTools.h"
 #include "McpSelectionQuery.h"
@@ -413,7 +416,26 @@ QString normalizedReviewViewName(const QString& view)
   {
     return normalized;
   }
+  if (normalized == "overview_3d" || normalized == "detail_3d")
+  {
+    return "3d";
+  }
+  if (normalized == "top_2d_fit" || normalized == "side_2d_fit")
+  {
+    return normalized;
+  }
   return {};
+}
+
+QString normalizedIsolateMode(const QJsonObject& params)
+{
+  const auto mode =
+    params.value("isolateMode").toString("highlight_only").trimmed().toLower();
+  if (mode == "hide_others" || mode == "fade_others" || mode == "highlight_only")
+  {
+    return mode;
+  }
+  return "highlight_only";
 }
 
 QString mapViewLayoutName(const MapViewLayout layout)
@@ -699,6 +721,117 @@ McpBridgeToolResult capturePixmapResult(
   });
 }
 
+QJsonObject captureQualityJson(
+  const QJsonObject& capture,
+  const QString& view,
+  const int min2dHeight,
+  const bool requireCameraFrame)
+{
+  auto warnings = QJsonArray{};
+  const auto path = capture.value("path").toString();
+  const auto width = capture.value("width").toInt(0);
+  const auto height = capture.value("height").toInt(0);
+  auto fileSize = int64_t{0};
+  auto exists = false;
+
+  if (!path.isEmpty())
+  {
+    const auto info = QFileInfo{path};
+    exists = info.exists() && info.isFile();
+    fileSize = exists ? info.size() : int64_t{0};
+  }
+  else if (capture.contains("base64"))
+  {
+    exists = true;
+    fileSize = capture.value("base64").toString().size();
+  }
+
+  if (!exists)
+  {
+    warnings.push_back("missingCaptureFile");
+  }
+  if (width <= 0 || height <= 0)
+  {
+    warnings.push_back("invalidCaptureDimensions");
+  }
+  if (fileSize <= 0)
+  {
+    warnings.push_back("emptyCaptureFile");
+  }
+  if (view.contains("2d") && height < min2dHeight)
+  {
+    warnings.push_back("tooSmall2dCapture");
+  }
+  if (requireCameraFrame)
+  {
+    warnings.push_back("missingCameraFramingMetadata");
+  }
+
+  if (!path.isEmpty() && exists)
+  {
+    const auto image = QImage{path};
+    if (image.isNull())
+    {
+      warnings.push_back("unreadableCaptureImage");
+    }
+    else
+    {
+      auto minLuma = 255;
+      auto maxLuma = 0;
+      auto sampled = 0;
+      const auto stepX = std::max(1, image.width() / 24);
+      const auto stepY = std::max(1, image.height() / 24);
+      for (auto y = 0; y < image.height(); y += stepY)
+      {
+        for (auto x = 0; x < image.width(); x += stepX)
+        {
+          const auto color = image.pixelColor(x, y);
+          const auto luma = qGray(color.rgb());
+          minLuma = std::min(minLuma, luma);
+          maxLuma = std::max(maxLuma, luma);
+          ++sampled;
+        }
+      }
+      if (sampled > 0 && maxLuma - minLuma < 4)
+      {
+        warnings.push_back("nearBlankCapture");
+      }
+      if (sampled > 0 && maxLuma < 8)
+      {
+        warnings.push_back("nearBlackCapture");
+      }
+      if (sampled > 0 && minLuma > 247)
+      {
+        warnings.push_back("nearWhiteCapture");
+      }
+    }
+  }
+
+  return QJsonObject{
+    {"view", view},
+    {"valid", warnings.isEmpty()},
+    {"warnings", warnings},
+    {"path", path},
+    {"exists", exists},
+    {"fileSize", static_cast<double>(fileSize)},
+    {"width", width},
+    {"height", height},
+  };
+}
+
+bool captureQualityValid(const QJsonObject& quality)
+{
+  return quality.value("valid").toBool(false);
+}
+
+void appendWarnings(QJsonArray& target, const QJsonArray& warnings)
+{
+  for (const auto& warning : warnings)
+  {
+    target.push_back(warning);
+  }
+}
+
 template <typename View>
 View* findCaptureView(MapWindow& mapWindow)
 {
@@ -927,6 +1060,89 @@ McpBridgeToolResult viewportCaptureTypedResult(
   }
 
   return capturePixmapResult(view->grab(), params, scope);
+}
+
+MapView2D* findReview2DView(MapWindow& mapWindow, const QString& reviewView)
+{
+  const auto desiredObjectName =
+    reviewView == "side_2d_fit" ? QString{"XZ View"} : QString{"XY View"};
+  for (auto* view : mapWindow.findChildren<MapView2D*>())
+  {
+    if (view != nullptr && view->isVisible() && view->objectName() == desiredObjectName)
+    {
+      return view;
+    }
+  }
+  return findCaptureView<MapView2D>(mapWindow);
+}
+
+MapView2D* ensureReview2DPlane(MapWindow& mapWindow, const QString& reviewView)
+{
+  const auto desiredObjectName =
+    reviewView == "side_2d_fit" ? QString{"XZ View"} : QString{"XY View"};
+  for (auto attempt = 0; attempt < 3; ++attempt)
+  {
+    auto* view = findReview2DView(mapWindow, reviewView);
+    if (view == nullptr || view->objectName() == desiredObjectName)
+    {
+      return view;
+    }
+    view->cycleMapView();
+    QCoreApplication::processEvents();
+  }
+  return findReview2DView(mapWindow, reviewView);
+}
+
+QString viewPlaneName(const MapView2D* view)
+{
+  if (view == nullptr)
+  {
+    return {};
+  }
+  if (view->objectName() == "XY View")
+  {
+    return "xy";
+  }
+  if (view->objectName() == "XZ View")
+  {
+    return "xz";
+  }
+  if (view->objectName() == "YZ View")
+  {
+    return "yz";
+  }
+  return view->objectName();
+}
+
+McpBridgeToolResult viewportCaptureReview2DResult(
+  AppController& appController, const QJsonObject& params, const QString& reviewView)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  if (!mapWindow->isVisible())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Active map window is not visible");
+  }
+
+  auto* view = ensureReview2DPlane(*mapWindow, reviewView);
+  if (!view || !view->isVisible())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError,
+      QString{"No visible %1 viewport"}.arg(reviewView));
+  }
+
+  auto result = capturePixmapResult(view->grab(), params, "2d");
+  if (result.ok)
+  {
+    result.result.insert("viewPlane", viewPlaneName(view));
+    result.result.insert("viewObjectName", view->objectName());
+  }
+  return result;
 }
 
 } // namespace
@@ -1523,6 +1739,11 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
   const std::vector<McpOperationRecord>& history,
   const McpObjectRegistry* objectRegistry)
 {
+  const auto requestedLayoutValue = params.value("layout");
+  auto* initialMapWindow = appController.mapWindowManager().topMapWindow();
+  const auto originalLayout = initialMapWindow != nullptr
+                                ? initialMapWindow->currentMapViewLayout()
+                                : MapViewLayout::OnePane;
   if (params.contains("layout"))
   {
     const auto layoutResult = viewportLayoutSetResult(
@@ -1536,11 +1757,18 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
   auto objectIds = QJsonArray{};
   if (const auto objectIdsValue = params.value("objectIds"); objectIdsValue.isArray())
   {
-    objectIds = objectIdsValue.toArray();
+    for (const auto& objectIdValue : objectIdsValue.toArray())
+    {
+      if (objectIdValue.isString())
+      {
+        objectIds.push_back(objectIdValue.toString());
+      }
+    }
   }
 
   auto* reviewMapWindow = appController.mapWindowManager().topMapWindow();
   auto* map = reviewMapWindow != nullptr ? &reviewMapWindow->document().map() : nullptr;
+  auto targetWarnings = QJsonArray{};
   const auto appendResolvableObjectId = [&](const QString& objectId) {
     if (objectId.isEmpty())
     {
@@ -1553,10 +1781,39 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
       {
         objectIds.push_back(resolved.legacyPathId);
       }
+      else
+      {
+        targetWarnings.push_back(
+          QString{"Could not resolve MCP object id '%1' for review."}.arg(objectId));
+      }
       return;
     }
     objectIds.push_back(objectId);
   };
+
+  if (objectRegistry != nullptr && map != nullptr)
+  {
+    auto resolvedObjectIds = QJsonArray{};
+    for (const auto& objectIdValue : objectIds)
+    {
+      if (!objectIdValue.isString())
+      {
+        continue;
+      }
+      const auto objectId = objectIdValue.toString();
+      const auto resolved = objectRegistry->resolveExternalId(*map, objectId);
+      if (resolved.ok && !resolved.legacyPathId.isEmpty())
+      {
+        resolvedObjectIds.push_back(resolved.legacyPathId);
+      }
+      else
+      {
+        targetWarnings.push_back(
+          QString{"Could not resolve MCP object id '%1' for review."}.arg(objectId));
+      }
+    }
+    objectIds = resolvedObjectIds;
+  }
 
   if (const auto operationIdsValue = params.value("operationIds");
       operationIdsValue.isArray())
@@ -1574,25 +1831,74 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
           appendResolvableObjectId(objectId);
         }
       }
+      else if (!operationId.isEmpty())
+      {
+        targetWarnings.push_back(
+          QString{"Unknown MCP operation id '%1' for scene review."}.arg(operationId));
+      }
     }
   }
+
+  auto dedupedObjectIds = QJsonArray{};
+  auto seenObjectIds = std::set<QString>{};
+  for (const auto& objectIdValue : objectIds)
+  {
+    if (!objectIdValue.isString())
+    {
+      continue;
+    }
+    const auto objectId = objectIdValue.toString();
+    if (seenObjectIds.insert(objectId).second)
+    {
+      dedupedObjectIds.push_back(objectId);
+    }
+  }
+  objectIds = dedupedObjectIds;
+
+  auto targetBounds = QJsonObject{};
+  if (map != nullptr && !objectIds.isEmpty())
+  {
+    auto error = QString{};
+    const auto nodes = nodesFromObjectIds(*map, objectIds, error);
+    if (error.isEmpty() && !nodes.empty())
+    {
+      targetBounds = boundsToJson(boundsForNodes(nodes));
+    }
+    else if (!error.isEmpty())
+    {
+      targetWarnings.push_back(error);
+    }
+  }
+  else if (const auto boundsValue = params.value("bounds"); boundsValue.isObject())
+  {
+    targetBounds = boundsValue.toObject();
+  }
+
+  const auto requestedIsolate = mcpOptionalBool(params, "isolate", false);
+  const auto isolateMode = normalizedIsolateMode(params);
+  auto appliedIsolateMode = QString{};
 
   auto cameraControlled = false;
   auto focusedObjectCount = 0;
   auto cameraFrame = QJsonObject{};
   if (!objectIds.isEmpty())
   {
-    const auto focusResult =
-      viewportFocusResult(appController, QJsonObject{{"objectIds", objectIds}});
-    if (!focusResult.ok)
+    focusedObjectCount = objectIds.size();
+    if (!requestedIsolate)
     {
-      return focusResult;
+      const auto focusResult =
+        viewportFocusResult(appController, QJsonObject{{"objectIds", objectIds}});
+      if (!focusResult.ok)
+      {
+        return focusResult;
+      }
+      cameraControlled = focusResult.result.value("cameraControlled").toBool(false);
+      focusedObjectCount = focusResult.result.value("focusedObjectCount").toInt(0);
     }
-    cameraControlled = focusResult.result.value("cameraControlled").toBool(false);
-    focusedObjectCount = focusResult.result.value("focusedObjectCount").toInt(0);
 
-    if (mcpOptionalBool(params, "highlight", true))
+    if (mcpOptionalBool(params, "highlight", true) || requestedIsolate)
     {
+      appliedIsolateMode = "highlight_only";
       overlayState.insert("highlightObjectIds", objectIds);
       if (const auto sceneName = params.value("sceneName").toString().trimmed();
           !sceneName.isEmpty())
@@ -1610,6 +1916,14 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
       overlayState = QJsonObject{};
     }
     appController.refreshMcpOverlayViews();
+  }
+  if (requestedIsolate && isolateMode != "highlight_only")
+  {
+    targetWarnings.push_back(
+      QString{"isolationModeFallback: %1 requested, but this build only supports "
+              "non-persistent highlight_only review isolation without changing map "
+              "visibility or undo state."}
+        .arg(isolateMode));
   }
 
   if (const auto cameraValue = params.value("camera"); cameraValue.isObject())
@@ -1677,8 +1991,11 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     params.value("views"), QJsonArray{"current", "3d", "2d"});
   const auto captureParams =
     QJsonObject{{"returnBase64", mcpOptionalBool(params, "returnBase64", false)}};
+  const auto min2dHeight = std::max(1, params.value("min2dHeight").toInt(360));
   auto captures = QJsonArray{};
+  auto quality = QJsonArray{};
   auto warnings = QJsonArray{};
+  appendWarnings(warnings, targetWarnings);
 
   for (const auto& viewValue : views)
   {
@@ -1686,15 +2003,44 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     if (view.isEmpty())
     {
       warnings.push_back(
-        QString{"Unknown review view '%1'; expected current, 3d, or 2d."}.arg(
-          viewValue.toString()));
+        QString{"Unknown review view '%1'; expected current, 3d, 2d, "
+                "overview_3d, detail_3d, top_2d_fit, or side_2d_fit."}
+          .arg(viewValue.toString()));
       continue;
+    }
+
+    auto* captureMapWindow = appController.mapWindowManager().topMapWindow();
+    const auto captureLayoutBefore = captureMapWindow != nullptr
+                                       ? captureMapWindow->currentMapViewLayout()
+                                       : originalLayout;
+    if ((view == "top_2d_fit" || view == "side_2d_fit") && captureMapWindow != nullptr)
+    {
+      if (captureMapWindow->currentMapViewLayout() != MapViewLayout::TwoPanes)
+      {
+        captureMapWindow->switchMapViewLayout(MapViewLayout::TwoPanes);
+        QCoreApplication::processEvents();
+      }
+      if (!objectIds.isEmpty())
+      {
+        if (!requestedIsolate)
+        {
+          const auto focusResult =
+            viewportFocusResult(appController, QJsonObject{{"objectIds", objectIds}});
+          if (!focusResult.ok)
+          {
+            warnings.push_back(QString{"Could not focus 2D review target: %1"}.arg(
+              focusResult.error.message));
+          }
+        }
+      }
     }
 
     auto captureResult =
       view == "current" ? viewportCaptureCurrentResult(appController, captureParams)
       : view == "3d"    ? viewportCapture3DResult(appController, captureParams)
-                        : viewportCapture2DResult(appController, captureParams);
+      : (view == "top_2d_fit" || view == "side_2d_fit")
+        ? viewportCaptureReview2DResult(appController, captureParams, view)
+        : viewportCapture2DResult(appController, captureParams);
     if (!captureResult.ok)
     {
       warnings.push_back(
@@ -1703,7 +2049,54 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     }
     auto capture = captureResult.result;
     capture.insert("view", view);
+    capture.insert("requestedView", viewValue.toString());
+    capture.insert("isolate", requestedIsolate);
+    capture.insert("isolateMode", appliedIsolateMode);
+    capture.insert("framing", params.value("framing").toString("current"));
+    capture.insert("cameraFrame", cameraFrame);
+    capture.insert("layoutBeforeCapture", mapViewLayoutName(captureLayoutBefore));
+
+    auto captureQuality = captureQualityJson(
+      capture, view, min2dHeight, cameraControlled && cameraFrame.isEmpty());
+    if (
+      (view == "top_2d_fit" || view == "side_2d_fit")
+      && !captureQualityValid(captureQuality))
+    {
+      appendWarnings(warnings, captureQuality.value("warnings").toArray());
+      if (captureMapWindow != nullptr)
+      {
+        captureMapWindow->switchMapViewLayout(MapViewLayout::TwoPanes);
+        QCoreApplication::processEvents();
+        auto retryResult =
+          viewportCaptureReview2DResult(appController, captureParams, view);
+        if (retryResult.ok)
+        {
+          auto retryCapture = retryResult.result;
+          retryCapture.insert("view", view);
+          retryCapture.insert("requestedView", viewValue.toString());
+          retryCapture.insert("retry", true);
+          retryCapture.insert("isolate", requestedIsolate);
+          retryCapture.insert("isolateMode", appliedIsolateMode);
+          retryCapture.insert("framing", params.value("framing").toString("current"));
+          retryCapture.insert("cameraFrame", cameraFrame);
+          retryCapture.insert(
+            "layoutBeforeCapture", mapViewLayoutName(MapViewLayout::TwoPanes));
+          const auto retryQuality = captureQualityJson(
+            retryCapture, view, min2dHeight, cameraControlled && cameraFrame.isEmpty());
+          if (captureQualityValid(retryQuality) || !captureQualityValid(captureQuality))
+          {
+            capture = retryCapture;
+            captureQuality = retryQuality;
+          }
+        }
+      }
+    }
+    if (!captureQualityValid(captureQuality))
+    {
+      appendWarnings(warnings, captureQuality.value("warnings").toArray());
+    }
     captures.push_back(capture);
+    quality.push_back(captureQuality);
   }
 
   if (mcpOptionalBool(params, "clearSelectionAfter", false))
@@ -1718,14 +2111,25 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
   }
 
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (
+    mapWindow != nullptr && !params.contains("layout")
+    && mapWindow->currentMapViewLayout() != originalLayout)
+  {
+    mapWindow->switchMapViewLayout(originalLayout);
+    QCoreApplication::processEvents();
+  }
   const auto layout =
     mapWindow != nullptr ? viewportLayoutJson(*mapWindow) : QJsonObject{};
   const auto checklist = stringArrayFromValueOrDefault(
     params.value("checklist"), defaultSceneReviewChecklist());
+  const auto qualityValid = std::ranges::all_of(
+    quality, [](const auto& entry) { return entry.toObject().value("valid").toBool(); });
   return McpBridgeToolResult::success(QJsonObject{
     {"sceneName", params.value("sceneName").toString()},
     {"captureCount", captures.size()},
     {"captures", captures},
+    {"quality", quality},
+    {"qualityValid", qualityValid && captures.size() > 0 && focusedObjectCount > 0},
     {"checklist", checklist},
     {"warnings", warnings},
     {"layout", layout.value("layout")},
@@ -1733,12 +2137,79 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     {"cameraControlled", cameraControlled},
     {"cameraFrame", cameraFrame},
     {"focusedObjectCount", focusedObjectCount},
+    {"targetObjectIds", objectIds},
+    {"targetObjectCount", objectIds.size()},
+    {"targetBounds", targetBounds},
+    {"isolate", requestedIsolate},
+    {"requestedIsolateMode", isolateMode},
+    {"appliedIsolateMode", appliedIsolateMode},
+    {"originalLayout", mapViewLayoutName(originalLayout)},
+    {"requestedLayout",
+     requestedLayoutValue.isString() ? requestedLayoutValue.toString() : QString{}},
     {"note",
      cameraControlled
        ? "This review package controlled the visible viewport target before capture."
        : "This review package uses the current visible TrenchBroom viewport state. "
          "Pass objectIds to focus the selection before capture."},
   });
+}
+
+McpBridgeToolResult renderReviewOperationResult(
+  AppController& appController,
+  const QJsonObject& params,
+  QJsonObject& overlayState,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
+{
+  auto reviewParams = params;
+  if (!reviewParams.contains("sceneName"))
+  {
+    reviewParams.insert("sceneName", "MCP isolated scene review");
+  }
+  if (!reviewParams.contains("isolate"))
+  {
+    reviewParams.insert("isolate", true);
+  }
+  if (!reviewParams.contains("isolateMode"))
+  {
+    reviewParams.insert("isolateMode", "hide_others");
+  }
+  if (!reviewParams.contains("views"))
+  {
+    reviewParams.insert(
+      "views", QJsonArray{"overview_3d", "top_2d_fit", "side_2d_fit", "detail_3d"});
+  }
+  if (!reviewParams.contains("framing"))
+  {
+    reviewParams.insert(
+      "framing", params.value("framingPreset").toString("overview_orbit"));
+  }
+  if (!reviewParams.contains("min2dHeight"))
+  {
+    reviewParams.insert("min2dHeight", 360);
+  }
+  if (!reviewParams.contains("highlight"))
+  {
+    reviewParams.insert("highlight", true);
+  }
+  if (!reviewParams.contains("returnBase64"))
+  {
+    reviewParams.insert("returnBase64", false);
+  }
+
+  auto review = viewportCaptureSceneReviewResult(
+    appController, reviewParams, overlayState, history, objectRegistry);
+  if (!review.ok)
+  {
+    return review;
+  }
+
+  const auto reviewId =
+    QString{"review-%1"}.arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  review.result.insert("reviewId", reviewId);
+  review.result.insert("resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId));
+  review.result.insert("tool", "render_review_operation");
+  return review;
 }
 
 } // namespace tb::ui

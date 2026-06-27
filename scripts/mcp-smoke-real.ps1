@@ -2,7 +2,8 @@ param(
   [string] $TrenchBroomExe = "build-release-codex\app\TrenchBroom\TrenchBroom.exe",
   [string] $SourceMap = "build-release-codex\app\TrenchBroom\map_test\unnamed.map",
   [string] $WorkDir = "build-release-codex\codex-mcp-real-tests",
-  [switch] $KeepOpen
+  [switch] $KeepOpen,
+  [switch] $ReviewScenes
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,11 +67,88 @@ function Get-CaptureSummary {
       bytes = if ($file) { $file.Length } else { 0 }
       width = if ($image) { $image.Width } else { 0 }
       height = if ($image) { $image.Height } else { 0 }
+      viewPlane = $Capture.viewPlane
+      viewObjectName = $Capture.viewObjectName
     }
   } finally {
     if ($image) {
       $image.Dispose()
     }
+  }
+}
+
+function Assert-ReviewQuality {
+  param(
+    [object] $Review,
+    [string] $Name
+  )
+
+  if (-not $Review.reviewId) {
+    throw "$Name did not return reviewId"
+  }
+  if ([int] $Review.targetObjectCount -le 0) {
+    throw "$Name did not resolve any target objects"
+  }
+  if ([int] $Review.captureCount -le 0) {
+    throw "$Name did not produce captures"
+  }
+  $qualityViews = @($Review.quality | ForEach-Object { [string] $_.view })
+  foreach ($capture in @($Review.captures)) {
+    if (-not $qualityViews.Contains([string] $capture.view)) {
+      throw "$Name capture '$($capture.view)' is missing quality metadata"
+    }
+  }
+  foreach ($quality in @($Review.quality)) {
+    if (-not [bool] $quality.valid) {
+      $warnings = @($quality.warnings) -join ", "
+      throw "$Name capture '$($quality.view)' failed quality: $warnings"
+    }
+    if (($quality.view -like "*2d*") -and ([int] $quality.height -lt 360)) {
+      throw "$Name capture '$($quality.view)' is too short: $($quality.height)"
+    }
+  }
+}
+
+function Invoke-ReviewBundle {
+  param(
+    [string] $Name,
+    [string] $OperationId,
+    [string[]] $Views = @("overview_3d", "top_2d_fit", "side_2d_fit", "detail_3d")
+  )
+
+  $review = Invoke-McpTool -Tool "render_review_operation" -Arguments ([ordered] @{
+    sceneName = $Name
+    operationIds = @($OperationId)
+    views = $Views
+    isolateMode = "hide_others"
+    min2dHeight = 360
+    returnBase64 = $false
+  })
+  $actualViews = @($review.captures | ForEach-Object { [string] $_.view })
+  foreach ($view in $Views) {
+    $normalized = if ($view -eq "overview_3d" -or $view -eq "detail_3d") { "3d" } else { $view }
+    if (-not $actualViews.Contains($normalized)) {
+      throw "$Name did not capture requested review view '$view'"
+    }
+  }
+  $topCapture = @($review.captures | Where-Object { $_.view -eq "top_2d_fit" } | Select-Object -First 1)
+  if ($topCapture.Count -gt 0 -and [string] $topCapture[0].viewPlane -ne "xy") {
+    throw "$Name top_2d_fit used viewPlane '$($topCapture[0].viewPlane)', expected 'xy'"
+  }
+  $sideCapture = @($review.captures | Where-Object { $_.view -eq "side_2d_fit" } | Select-Object -First 1)
+  if ($sideCapture.Count -gt 0 -and [string] $sideCapture[0].viewPlane -ne "xz") {
+    throw "$Name side_2d_fit used viewPlane '$($sideCapture[0].viewPlane)', expected 'xz'"
+  }
+  Assert-ReviewQuality -Review $review -Name $Name
+  return [ordered] @{
+    name = $Name
+    reviewId = $review.reviewId
+    targetObjectCount = $review.targetObjectCount
+    targetBounds = $review.targetBounds
+    qualityValid = $review.qualityValid
+    warnings = $review.warnings
+    captures = @($review.captures | ForEach-Object { Get-CaptureSummary $_ })
+    quality = $review.quality
   }
 }
 
@@ -154,6 +232,68 @@ try {
   $undo = Invoke-McpTool -Tool "history_undo_mcp"
   $history = Invoke-McpTool -Tool "history_status"
 
+  $reviewSceneResults = @()
+  if ($ReviewScenes) {
+    $blockGroup = Invoke-McpTool -Tool "blockout_create_batch" -Arguments ([ordered] @{
+      expectedDocumentPath = $testMap
+      name = "review_block_group"
+      detail = "ids"
+      select = $true
+      operations = @(
+        [ordered] @{ type = "box"; min = @(-256, -256, 0); max = @(-96, -96, 96); material = "__TB_empty" },
+        [ordered] @{ type = "box"; min = @(-64, -256, 0); max = @(96, -96, 160); material = "__TB_empty" },
+        [ordered] @{ type = "box"; min = @(128, -256, 0); max = @(288, -96, 64); material = "__TB_empty" },
+        [ordered] @{ type = "box"; min = @(-256, -64, 96); max = @(288, 32, 128); material = "__TB_empty" }
+      )
+    })
+    $reviewSceneResults += Invoke-ReviewBundle -Name "review-block-group" -OperationId $blockGroup.operationId
+
+    $curved = Invoke-McpTool -Tool "blockout_create_batch" -Arguments ([ordered] @{
+      expectedDocumentPath = $testMap
+      name = "review_curved_corridor"
+      detail = "ids"
+      select = $true
+      operations = @(
+        [ordered] @{ type = "box"; min = @(640, -320, 0); max = @(1024, -192, 24); material = "__TB_empty" },
+        [ordered] @{ type = "curved_corridor"; center = @(1024, -192, 0); innerRadius = 128; outerRadius = 256; startAngle = -90; turnDegrees = 90; height = 128; segments = 12; wallThickness = 16; floorThickness = 24; ceilingThickness = 16; caps = "none"; material = "__TB_empty" },
+        [ordered] @{ type = "box"; min = @(1152, -64, 0); max = @(1280, 320, 24); material = "__TB_empty" }
+      )
+    })
+    $reviewSceneResults += Invoke-ReviewBundle -Name "review-curved-corridor" -OperationId $curved.operationId
+
+    $route = Invoke-McpTool -Tool "brush_create_polygon_batch" -Arguments ([ordered] @{
+      expectedDocumentPath = $testMap
+      transactionName = "review route fragment"
+      detail = "ids"
+      select = $true
+      material = "__TB_empty"
+      brushes = @(
+        [ordered] @{ points2d = @(@(0, 768), @(160, 768), @(160, 896), @(0, 896)); minZ = 0; maxZ = 16; metadata = @{ routeId = "review_route"; order = 1 } },
+        [ordered] @{ points2d = @(@(256, 832), @(416, 864), @(384, 992), @(224, 960)); minZ = 32; maxZ = 48; metadata = @{ routeId = "review_route"; order = 2 } },
+        [ordered] @{ points2d = @(@(512, 960), @(704, 960), @(736, 1088), @(544, 1088)); minZ = 72; maxZ = 88; metadata = @{ routeId = "review_route"; order = 3 } },
+        [ordered] @{ points2d = @(@(832, 1120), @(992, 1184), @(928, 1312), @(768, 1248)); minZ = 112; maxZ = 128; metadata = @{ routeId = "review_route"; order = 4 } }
+      )
+    })
+    $reviewSceneResults += Invoke-ReviewBundle -Name "review-route-fragment" -OperationId $route.operationId
+
+    $terrainArgs = [ordered] @{
+      imagePath = $heightmapPath
+      expectedDocumentPath = $testMap
+      origin = @(1600, 768, 0)
+      cellSize = 32
+      heightScale = 96
+      heightSteps = 12
+      maxSize = 16
+      maxBrushes = 400
+      material = "__TB_empty"
+      mode = "terraced_brushes"
+      select = $true
+      detail = "ids"
+    }
+    $terrain = Invoke-McpTool -Tool "heightmap_import_grayscale" -Arguments $terrainArgs
+    $reviewSceneResults += Invoke-ReviewBundle -Name "review-heightmap-terrain" -OperationId $terrain.operationId
+  }
+
   [ordered] @{
     status = [ordered] @{
       processId = $status.processId
@@ -176,6 +316,7 @@ try {
       validation = $validation
       undo = $undo
     }
+    reviewScenes = $reviewSceneResults
     historyAfterSmoke = $history
   } | ConvertTo-Json -Depth 100
 } finally {

@@ -795,6 +795,20 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Optional review checklist strings. Defaults to whitebox scene checks.")},
         {"returnBase64",
          boolProperty("Return PNG data as base64. Defaults to false to save context.")},
+        {"isolate",
+         boolProperty(
+           "Temporarily isolate the review target for capture. First version uses "
+           "non-persistent highlight-only isolation when renderer hide/fade is not "
+           "available. Defaults to false.")},
+        {"isolateMode",
+         stringProperty(
+           "Requested isolation mode: hide_others, fade_others, or highlight_only. "
+           "hide_others/fade_others may fall back to highlight_only without changing "
+           "map visibility.")},
+        {"min2dHeight",
+         integerProperty(
+           "Minimum acceptable 2D capture height in pixels before warning/retry. "
+           "Defaults to 360.")},
         {"highlight",
          boolProperty(
            "Highlight focused object ids and add a scene label. Defaults to true.")},
@@ -804,6 +818,48 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "reduce wireframe clutter. Defaults to false.")},
         {"clearSelectionAfter",
          boolProperty("Clear selection and overlay after capture. Defaults to false.")},
+      }),
+    },
+    {
+      "render_review_operation",
+      "Create an isolated Agent-readable review bundle for generated scene objects. "
+      "Pass operationIds or objectIds; the tool frames the target, captures "
+      "overview/detail 3D and readable 2D views, and returns quality diagnostics.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"operationIds",
+         arrayProperty(
+           "MCP operation ids whose live changed objects are the review target.")},
+        {"objectIds", arrayProperty("Explicit MCP object ids to review.")},
+        {"bounds",
+         objectSchema(
+           {
+             {"min", vec3Property("Fallback target bounds minimum corner.")},
+             {"max", vec3Property("Fallback target bounds maximum corner.")},
+           },
+           {"min", "max"})},
+        {"views",
+         arrayProperty("Review views. Defaults to overview_3d, top_2d_fit, side_2d_fit, "
+                       "detail_3d.")},
+        {"isolateMode",
+         stringProperty(
+           "Requested isolation mode: hide_others, fade_others, or highlight_only. "
+           "Defaults to hide_others with safe highlight_only fallback.")},
+        {"framingPreset",
+         stringProperty("Base framing preset for 3D views: overview_orbit, top_fit, "
+                        "side_profile, or route_follow. Defaults to overview_orbit.")},
+        {"outputDir",
+         stringProperty(
+           "Reserved for future capture bundle output directory. Current version uses "
+           "the MCP temp capture directory.")},
+        {"min2dHeight",
+         integerProperty(
+           "Minimum acceptable 2D capture height in pixels. Defaults to 360.")},
+        {"sceneName", stringProperty("Optional scene/review label.")},
+        {"returnBase64",
+         boolProperty("Return PNG data as base64. Defaults to false to save context.")},
       }),
     },
     {
@@ -2374,6 +2430,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "viewport_camera_frame_bounds",
     "viewport_camera_set",
     "viewport_capture_scene_review",
+    "render_review_operation",
     "operation_inspect",
     "operation_select",
     "operation_validate",

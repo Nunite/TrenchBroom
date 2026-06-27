@@ -207,6 +207,12 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
   QJsonObject& overlayState,
   const std::vector<McpOperationRecord>& history = {},
   const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult renderReviewOperationResult(
+  AppController& appController,
+  const QJsonObject& params,
+  QJsonObject& overlayState,
+  const std::vector<McpOperationRecord>& history = {},
+  const McpObjectRegistry* objectRegistry = nullptr);
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyListResult(

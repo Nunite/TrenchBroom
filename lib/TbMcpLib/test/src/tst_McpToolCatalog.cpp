@@ -656,8 +656,35 @@ TEST_CASE("McpToolCatalog")
     CHECK(properties.value("layout").isObject());
     CHECK(properties.value("views").isObject());
     CHECK(properties.value("camera").isObject());
+    CHECK(properties.value("isolate").isObject());
+    CHECK(properties.value("isolateMode").isObject());
+    CHECK(properties.value("min2dHeight").isObject());
     CHECK(properties.value("highlight").isObject());
     CHECK(properties.value("clearSelectionBeforeCapture").isObject());
+  }
+
+  SECTION("render review operation is visible for modeling self-verification")
+  {
+    const auto tool = findToolDefinition("render_review_operation");
+    REQUIRE(tool);
+
+    CHECK(tool->description.contains("isolated Agent-readable review bundle"));
+
+    const auto properties = tool->inputSchema.value("properties").toObject();
+    CHECK(properties.value("operationIds").isObject());
+    CHECK(properties.value("objectIds").isObject());
+    CHECK(properties.value("views").isObject());
+    CHECK(properties.value("isolateMode").isObject());
+    CHECK(properties.value("framingPreset").isObject());
+    CHECK(properties.value("min2dHeight").isObject());
+
+    const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    auto names = QStringList{};
+    for (const auto& listedTool : tools)
+    {
+      names.push_back(listedTool.toObject().value("name").toString());
+    }
+    CHECK(names.contains("render_review_operation"));
   }
 
   SECTION("viewport camera set schema supports explicit look-at review")

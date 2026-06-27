@@ -200,18 +200,62 @@ TEST_CASE("McpBridgeServer")
     if (toolName == "viewport_capture_scene_review")
     {
       const auto cameraControlled = params.value("objectIds").isArray();
+      const auto views = params.value("views").isArray()
+                           ? params.value("views").toArray()
+                           : QJsonArray{"current", "3d", "2d"};
+      auto captures = QJsonArray{};
+      auto quality = QJsonArray{};
+      for (const auto& viewValue : views)
+      {
+        const auto view = viewValue.toString();
+        captures.push_back(QJsonObject{
+          {"view", view},
+          {"path", QString{"C:/tmp/%1.png"}.arg(view)},
+          {"width", 640},
+          {"height", 480},
+        });
+        quality.push_back(QJsonObject{
+          {"view", view},
+          {"valid", true},
+          {"warnings", QJsonArray{}},
+          {"width", 640},
+          {"height", 480},
+          {"fileSize", 4096},
+        });
+      }
+      const auto hasTarget = params.value("objectIds").isArray();
       return McpBridgeToolResult::success(QJsonObject{
         {"sceneName", "whitebox review smoke"},
-        {"captureCount", 3},
-        {"captures",
-         QJsonArray{
-           QJsonObject{{"view", "current"}, {"path", "C:/tmp/current.png"}},
-           QJsonObject{{"view", "3d"}, {"path", "C:/tmp/3d.png"}},
-           QJsonObject{{"view", "2d"}, {"path", "C:/tmp/2d.png"}},
-         }},
+        {"captureCount", captures.size()},
+        {"captures", captures},
+        {"quality", quality},
+        {"qualityValid", true},
         {"checklist", QJsonArray{"silhouette", "connectivity"}},
+        {"warnings",
+         params.value("isolateMode").toString() == "hide_others"
+           ? QJsonArray{"isolationModeFallback: hide_others requested, but this build "
+                        "only "
+                        "supports non-persistent highlight_only review isolation without "
+                        "changing map visibility or undo state."}
+           : QJsonArray{}},
         {"cameraControlled", cameraControlled},
         {"focusedObjectCount", cameraControlled ? 1 : 0},
+        {"targetObjectCount", hasTarget ? 1 : 0},
+        {"appliedIsolateMode",
+         params.value("isolate").toBool(false) ? "highlight_only" : ""},
+      });
+    }
+    if (toolName == "render_review_operation")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"tool", "render_review_operation"},
+        {"reviewId", "review-test"},
+        {"isolate", true},
+        {"targetObjectCount", 1},
+        {"captureCount", 3},
+        {"captures", QJsonArray{}},
+        {"quality", QJsonArray{}},
+        {"qualityValid", true},
       });
     }
     if (toolName == "overlay_set")
@@ -696,6 +740,8 @@ TEST_CASE("McpBridgeServer")
     CHECK(reviewResponse.result.value("captureCount").toInt() == 3);
     CHECK_FALSE(reviewResponse.result.value("cameraControlled").toBool());
     CHECK(reviewResponse.result.value("focusedObjectCount").toInt() == 0);
+    CHECK(reviewResponse.result.value("quality").toArray().size() == 3);
+    CHECK(reviewResponse.result.value("targetObjectCount").toInt() == 0);
 
     const auto focusedReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "10b",
@@ -717,6 +763,50 @@ TEST_CASE("McpBridgeServer")
     CHECK(focusedReviewResponse.ok);
     CHECK(focusedReviewResponse.result.value("cameraControlled").toBool());
     CHECK(focusedReviewResponse.result.value("focusedObjectCount").toInt() == 1);
+    CHECK(focusedReviewResponse.result.value("targetObjectCount").toInt() == 1);
+
+    const auto isolatedReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "10c",
+      "secret",
+      "viewport_capture_scene_review",
+      QJsonObject{
+        {"sceneName", "isolated whitebox review smoke"},
+        {"objectIds", QJsonArray{"node:0/0"}},
+        {"isolate", true},
+        {"isolateMode", "hide_others"},
+        {"views", QJsonArray{"top_2d_fit", "side_2d_fit"}},
+      },
+      mcp::McpMode::ReadOnly});
+    CHECK(isolatedReviewResponse.ok);
+    CHECK(
+      isolatedReviewResponse.result.value("appliedIsolateMode").toString()
+      == "highlight_only");
+    CHECK(isolatedReviewResponse.result.value("captureCount").toInt() == 2);
+    CHECK(isolatedReviewResponse.result.value("quality").toArray().size() == 2);
+    CHECK(
+      isolatedReviewResponse.result.value("warnings")
+        .toArray()
+        .contains(
+          "isolationModeFallback: hide_others requested, but this build only supports "
+          "non-persistent highlight_only review isolation without changing map "
+          "visibility "
+          "or undo state."));
+
+    const auto bundleReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+      "10d",
+      "secret",
+      "render_review_operation",
+      QJsonObject{
+        {"objectIds", QJsonArray{"node:0/0"}},
+        {"views", QJsonArray{"overview_3d", "top_2d_fit", "detail_3d"}},
+      },
+      mcp::McpMode::ReadOnly});
+    CHECK(bundleReviewResponse.ok);
+    CHECK(
+      bundleReviewResponse.result.value("tool").toString() == "render_review_operation");
+    CHECK(bundleReviewResponse.result.value("reviewId").toString().startsWith("review-"));
+    CHECK(bundleReviewResponse.result.value("isolate").toBool());
+    CHECK(bundleReviewResponse.result.value("captureCount").toInt() == 3);
   }
 
   SECTION("serves map_search")
