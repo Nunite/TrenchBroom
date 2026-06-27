@@ -201,6 +201,8 @@ QJsonObject blockoutBatchOperationSchema()
      R"("segments":8,"wallThickness":16,"caps":"both"}; )"
      R"({"type":"path_ribbon","points2d":[[0,0],[512,0],[768,256]],)"
      R"("width":160,"minZ":0,"maxZ":16}; )"
+     R"({"type":"repeat_translate","count":4,"offset":[128,0,0],)"
+     R"("operation":{"type":"box","min":[0,0,0],"max":[64,64,16]}}; )"
      R"({"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}; )"
      R"({"type":"ramp","min":[0,0,0],"max":[256,128,64],"axis":"x"}; )"
      R"({"type":"doorway","min":[0,0,0],"max":[256,16,128],)"
@@ -212,8 +214,8 @@ QJsonObject blockoutBatchOperationSchema()
        {"type",
         stringProperty("Operation type: box, cylinder, prism, polyhedron, "
                        "cylinder_sector, room, corridor, "
-                       "curved_corridor, path_ribbon, stairs, ramp, doorway, cover, or "
-                       "sky_shell.")},
+                       "curved_corridor, path_ribbon, repeat_translate, stairs, ramp, "
+                       "doorway, cover, or sky_shell.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"material", stringProperty("Per-operation material override.")},
@@ -246,6 +248,14 @@ QJsonObject blockoutBatchOperationSchema()
        {"doorMin", vec3Property("Door opening minimum corner for doorway.")},
        {"doorMax", vec3Property("Door opening maximum corner for doorway.")},
        {"snapMode", stringProperty("Circular vertex snap mode: grid, radial, or none.")},
+       {"count", integerProperty("repeat_translate repetition count, 1..256.")},
+       {"offset", vec3Property("repeat_translate offset added for each repetition.")},
+       {"operation",
+        QJsonObject{
+          {"type", "object"},
+          {"description", "repeat_translate child operation object."},
+          {"additionalProperties", true},
+        }},
      }},
     {"required", QJsonArray{"type"}},
     {"additionalProperties", true},
@@ -1791,8 +1801,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            arrayProperty(
              "Array of blockout operations. Supported types include box, cylinder, "
              "prism, polyhedron, cylinder_sector, room, corridor, curved_corridor, "
-             "path_ribbon, stairs, ramp, doorway, cover, and sky_shell. Each item "
-             "must be an object with a type field; use tb_tools_search(detail=schema, "
+             "path_ribbon, repeat_translate, stairs, ramp, doorway, cover, and "
+             "sky_shell. Each item must be an object with a type field; use "
+             "tb_tools_search(detail=schema, "
              "query="
              "\"blockout_create_batch operations\") for examples.",
              blockoutBatchOperationSchema())},

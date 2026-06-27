@@ -2163,9 +2163,44 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(ribbonResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.selection().nodes.size() == 2u);
 
+  const auto repeatResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Repeat boxes"},
+      {"grid", 16},
+      {"select", true},
+      {"detail", "ids"},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "repeat_translate"},
+           {"count", 4},
+           {"offset", QJsonArray{128, 0, 0}},
+           {"operation",
+            QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{640, 0, 0}},
+              {"max", QJsonArray{704, 64, 16}},
+            }},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  const auto repeatError =
+    repeatResponse.ok ? std::string{} : repeatResponse.error.message.toStdString();
+  INFO(repeatError);
+  REQUIRE(repeatResponse.ok);
+  CHECK(repeatResponse.result.value("brushCount").toInt() == 4);
+  CHECK(repeatResponse.result.value("changedObjectCount").toInt() == 4);
+  CHECK(repeatResponse.result.value("changedObjectIds").toArray().size() == 4);
+  CHECK(repeatResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.selection().nodes.size() == 4u);
+
   const auto historyResponse = historyListResult(history);
   REQUIRE(historyResponse.ok);
-  CHECK(historyResponse.result.value("count").toInt() == 2);
+  CHECK(historyResponse.result.value("count").toInt() == 3);
   const auto historyOperation =
     historyResponse.result.value("operations").toArray().first().toObject();
   CHECK(historyOperation.value("operationId").toString() == operationId);
@@ -2257,6 +2292,39 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   REQUIRE(invalidRibbonResponse.ok);
   CHECK(
     !invalidRibbonResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+
+  const auto invalidRepeatResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "repeat_translate"},
+           {"count", 0},
+           {"offset", QJsonArray{128, 0, 0}},
+           {"operation",
+            QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{3000, 0, 0}},
+              {"max", QJsonArray{3064, 64, 16}},
+            }},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(invalidRepeatResponse.ok);
+  const auto invalidRepeatValidation =
+    invalidRepeatResponse.result.value("validation").toObject();
+  CHECK(!invalidRepeatValidation.value("valid").toBool());
+  CHECK(invalidRepeatValidation.value("failedOperationIndex").toInt() == 0);
+  CHECK(
+    invalidRepeatValidation.value("failedOperationType").toString()
+    == "repeat_translate");
+  CHECK(invalidRepeatValidation.value("errors").toArray().first().toString().contains(
+    "count"));
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
   const auto inspectResponse = operationInspectResult(

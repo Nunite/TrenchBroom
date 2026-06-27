@@ -1970,6 +1970,125 @@ QJsonObject batchOperationPreviewJson(const QJsonObject& operation)
   return result;
 }
 
+QJsonArray translatedVec3Array(
+  const QJsonValue& value, const vm::vec3d& delta, const QString& key, QString& error)
+{
+  const auto point = mcpVec3FromJsonValue(value, key, error);
+  if (!point)
+  {
+    return {};
+  }
+  return vecToJson(*point + delta);
+}
+
+QJsonArray translatedVec2Array(
+  const QJsonValue& value, const vm::vec2d& delta, const QString& key, QString& error)
+{
+  const auto point = mcpVec2FromJsonValue(value, key, error);
+  if (!point)
+  {
+    return {};
+  }
+  return QJsonArray{point->x() + delta.x(), point->y() + delta.y()};
+}
+
+QJsonArray translatedVec2PointsArray(
+  const QJsonValue& value, const vm::vec2d& delta, const QString& key, QString& error)
+{
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array of [x,y] points"}.arg(key);
+    return {};
+  }
+
+  auto result = QJsonArray{};
+  const auto points = value.toArray();
+  for (auto i = 0; i < points.size(); ++i)
+  {
+    if (!error.isEmpty())
+    {
+      return {};
+    }
+    result.push_back(
+      translatedVec2Array(points[i], delta, QString{"%1[%2]"}.arg(key).arg(i), error));
+  }
+  return result;
+}
+
+QJsonArray translatedVec3PointsArray(
+  const QJsonValue& value, const vm::vec3d& delta, const QString& key, QString& error)
+{
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array of [x,y,z] points"}.arg(key);
+    return {};
+  }
+
+  auto result = QJsonArray{};
+  const auto points = value.toArray();
+  for (auto i = 0; i < points.size(); ++i)
+  {
+    if (!error.isEmpty())
+    {
+      return {};
+    }
+    result.push_back(
+      translatedVec3Array(points[i], delta, QString{"%1[%2]"}.arg(key).arg(i), error));
+  }
+  return result;
+}
+
+std::optional<QJsonObject> translatedBatchOperation(
+  const QJsonObject& operation, const vm::vec3d& delta, QString& error)
+{
+  auto result = operation;
+  const auto delta2D = vm::vec2d{delta.x(), delta.y()};
+
+  for (const auto& key : {"min", "max", "center", "doorMin", "doorMax"})
+  {
+    if (result.contains(key))
+    {
+      result.insert(key, translatedVec3Array(result.value(key), delta, key, error));
+      if (!error.isEmpty())
+      {
+        return std::nullopt;
+      }
+    }
+  }
+
+  if (result.contains("points2d"))
+  {
+    result.insert(
+      "points2d",
+      translatedVec2PointsArray(result.value("points2d"), delta2D, "points2d", error));
+    if (!error.isEmpty())
+    {
+      return std::nullopt;
+    }
+  }
+
+  if (result.contains("points"))
+  {
+    result.insert(
+      "points",
+      translatedVec3PointsArray(result.value("points"), delta, "points", error));
+    if (!error.isEmpty())
+    {
+      return std::nullopt;
+    }
+  }
+
+  for (const auto& key : {"minZ", "maxZ"})
+  {
+    if (result.value(key).isDouble())
+    {
+      result.insert(key, result.value(key).toDouble() + delta.z());
+    }
+  }
+
+  return result;
+}
+
 std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& params)
 {
   const auto center = params.value("center").toArray();
@@ -2289,6 +2408,55 @@ std::vector<mdl::Node*> compileBatchOperation(
 {
   const auto type = operation.value("type").toString().trimmed().toLower();
   const auto material = mcpOptionalString(operation, "material", defaultMaterial);
+
+  if (type == "repeat_translate")
+  {
+    if (!operation.value("operation").isObject())
+    {
+      error = "repeat_translate requires child operation object";
+      return {};
+    }
+    const auto offset = mcpVec3FromJson(operation, "offset", error);
+    if (!offset)
+    {
+      return {};
+    }
+    const auto count = optionalSize(operation, "count", 0);
+    if (count == 0 || count > 256)
+    {
+      error = "repeat_translate count must be between 1 and 256";
+      return {};
+    }
+
+    auto result = std::vector<mdl::Node*>{};
+    auto childOperation = operation.value("operation").toObject();
+    if (childOperation.value("type").toString().trimmed().toLower() == "repeat_translate")
+    {
+      error = "repeat_translate child operation cannot be another repeat_translate";
+      return {};
+    }
+    for (size_t i = 0; i < count; ++i)
+    {
+      const auto translatedOperation =
+        translatedBatchOperation(childOperation, *offset * static_cast<double>(i), error);
+      if (!translatedOperation)
+      {
+        deleteNodes(result);
+        return {};
+      }
+
+      auto childNodes =
+        compileBatchOperation(map, builder, *translatedOperation, material, grid, error);
+      if (!error.isEmpty())
+      {
+        deleteNodes(result);
+        deleteNodes(childNodes);
+        return {};
+      }
+      result.insert(result.end(), childNodes.begin(), childNodes.end());
+    }
+    return result;
+  }
 
   if (type == "curved_corridor")
   {

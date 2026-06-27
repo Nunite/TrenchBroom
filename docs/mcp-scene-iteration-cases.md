@@ -487,3 +487,59 @@ Proposed MCP changes:
 
 Commit:
 - Pending follow-up: `Improve batch blockout failure diagnostics`.
+
+### 2026-06-27 - Scene 4: Abandoned Factory
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_04_abandoned_factory.map`
+- Created from the minimal Valve map fixture and launched directly with `scripts/mcp-call.ps1 -Launch -KeepOpen -MapPath ...`.
+- Initial verification: `brushCount=0`, empty MCP history.
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 4: factory shell and damaged walls`: floor slab, segmented long walls, loading door gaps, damaged openings, and debris prisms. Result: `valid=true`, 23 brushes.
+- `mcp-op-2` / `MCP Scene 4: roof trusses and partial roof`: repeated roof trusses, side roof strips, and a central ridge. Result: `valid=true`, 24 brushes.
+- `mcp-op-3` / `MCP Scene 4: platforms stairs crane rails`: side mezzanines, stairs, ramp, crane rails, trolley block, guard rails. Result: `valid=true`, 35 brushes from 21 operations.
+- `mcp-op-4` / `MCP Scene 4: pipes tanks machinery and lights`: tanks, horizontal pipe runs, elbows, vents, machinery blocks, cable tray, and hanging light blocks. Result: `valid=true`, 20 brushes.
+
+MCP tools used:
+- `blockout_create_batch` with `box`, `prism`, `stairs`, `ramp`, and `cylinder` operations.
+- `map_snapshot`, `map_validate`, `problems_check`, `history_list`, and `documents_save`.
+- `viewport_capture_scene_review` with an overview orbit camera and an interior look-at camera.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782545252226.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782545252276.png`
+- Interior 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782545263995.png`
+
+What worked:
+- The factory reads as an abandoned industrial hall: long shell, punched wall openings, roof trusses, side platforms, stairs, crane rails, and machinery blocks are all visible.
+- Stairs/ramp/platforms stayed coherent and were created in one transaction for the main platform phase.
+- The direct clean-map launch flow was stable for this scene.
+- Batch failure diagnostics from the previous improvement were useful when checking malformed generated IR: invalid batches can now report the failing operation without committing partial geometry.
+
+What failed:
+- Repeating trusses, posts, guard rails, and light blocks required host-side loops; PowerShell array-expression pitfalls repeatedly dropped intended brush operations. The map remained valid, but authoring friction was high.
+- Damaged walls are still built by composing many rectangular wall segments around holes; there is no generic cut/opening primitive for true wall damage.
+- Pipes/tanks created with `cylinder` still produced four non-integer-vertex warnings.
+- Interior screenshot shows platforms and openings clearly, but pipe/machinery detail is partly hidden behind the exterior shell; automated review still needs better interior multi-view presets.
+- 2D capture remains partially framed rather than full-scene framed.
+
+Tool/context bottlenecks:
+- Need a generic repeat/array operation inside Batch IR so the agent can repeat any low-level operation without external script loops or huge JSON.
+- Need cut/opening primitives for windows, loading doors, and damaged wall holes.
+- Need pipe-from-path or repeat-along-path primitives for industrial pipe runs, but as generic path geometry, not a factory prefab.
+- Need circular primitive snap/grid controls for cylinder.
+
+Proposed MCP changes:
+- Implemented follow-up: added generic `repeat_translate` to `blockout_create_batch` so one child operation can be repeated by count and offset inside the same transaction and validation path.
+- Later: add generic `brush_cut_opening` / `opening_from_wall_segments` support.
+- Later: add path-based pipe/beam helpers, e.g. `path_tube_segments` or `repeat_along_path`.
+- Later: add bounds-framed 2D scene capture.
+
+Follow-up validation:
+- Unit/focused tests: `TbMcpLibTest "McpToolCatalog"` and `TbUiLibTest "McpBridgeServer batch blockout tools"`.
+- Release app build: `cmake --build build-release-codex --target TrenchBroom --config Release --parallel`.
+- Real MCP smoke: launched `mcp_repeat_translate_smoke.map`, confirmed `tb_tools_search` exposes the `repeat_translate` schema, created four repeated boxes in one `blockout_create_batch` operation, then used `history_undo_mcp` and verified the map returned to `brushCount=0`.
+
+Commit:
+- Pending follow-up: `Add repeat translate batch operation`.

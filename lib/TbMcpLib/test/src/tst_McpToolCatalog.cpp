@@ -699,6 +699,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemDescription.contains(R"("type":"cylinder")"));
     CHECK(itemDescription.contains(R"("type":"curved_corridor")"));
     CHECK(itemDescription.contains(R"("type":"path_ribbon")"));
+    CHECK(itemDescription.contains(R"("type":"repeat_translate")"));
     CHECK(
       operations.value("items").toObject().value("required").toArray().contains("type"));
 
@@ -710,6 +711,11 @@ TEST_CASE("McpToolCatalog")
             .value("description")
             .toString()
             .contains("cylinder"));
+    CHECK(itemProperties.value("count").isObject());
+    CHECK(itemProperties.value("offset").isObject());
+    const auto childOperation = itemProperties.value("operation").toObject();
+    CHECK(childOperation.value("type").toString() == "object");
+    CHECK(childOperation.value("additionalProperties").toBool());
   }
 
   SECTION("tool search returns exact tool names from multi-tool queries")
