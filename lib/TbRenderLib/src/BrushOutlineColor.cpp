@@ -28,27 +28,19 @@
 
 #include <cmath>
 #include <functional>
+#include <limits>
 
 namespace tb::render
 {
 
-const std::vector<Color>& readable2DBrushOutlinePalette()
-{
-  static const auto palette = std::vector<Color>{
-    RgbaF{0.44f, 0.78f, 0.86f, 0.72f},
-    RgbaF{0.58f, 0.72f, 0.98f, 0.72f},
-    RgbaF{0.56f, 0.82f, 0.56f, 0.72f},
-    RgbaF{0.86f, 0.76f, 0.43f, 0.72f},
-    RgbaF{0.78f, 0.62f, 0.92f, 0.72f},
-    RgbaF{0.90f, 0.58f, 0.55f, 0.72f},
-    RgbaF{0.52f, 0.84f, 0.72f, 0.72f},
-    RgbaF{0.80f, 0.80f, 0.64f, 0.72f},
-  };
-  return palette;
-}
-
 namespace
 {
+
+constexpr auto JackBrushDefaultColor = RgbaF{1.0f, 1.0f, 1.0f, 1.0f};
+constexpr auto JackBrushRandomColorMin = RgbaF{0.0f, 100.0f / 255.0f, 100.0f / 255.0f, 1.0f};
+constexpr auto JackBrushRandomColorMax = RgbaF{0.0f, 1.0f, 1.0f, 1.0f};
+constexpr auto JackBrushTintMin = 0.25f;
+constexpr auto JackBrushTintMax = 0.65f;
 
 int64_t quantize(const double value)
 {
@@ -71,9 +63,21 @@ void combineBounds(uint64_t& hash, const vm::bbox3d& bounds)
   combineHash(hash, quantize(bounds.max.z()));
 }
 
+float normalizedHashComponent(const uint64_t hash, const uint64_t salt)
+{
+  const auto mixed = hash ^ salt ^ (hash >> 17u) ^ (hash << 13u);
+  const auto bucket = static_cast<float>(mixed & 0xFFu);
+  return bucket / 255.0f;
+}
+
+float interpolate(const float minValue, const float maxValue, const float mix)
+{
+  return minValue + (maxValue - minValue) * mix;
+}
+
 } // namespace
 
-size_t readable2DBrushOutlineColorIndex(const BrushOutlineColorState& state)
+Color readable2DBrushOutlinePaletteColor(const BrushOutlineColorState& state)
 {
   auto hash = uint64_t{1469598103934665603ull};
 
@@ -90,8 +94,73 @@ size_t readable2DBrushOutlineColorIndex(const BrushOutlineColorState& state)
     combineHash(hash, static_cast<int64_t>(state.brushFaceCount));
   }
 
-  const auto mixedHash = hash ^ (hash >> 32u);
-  return static_cast<size_t>(mixedHash % readable2DBrushOutlinePalette().size());
+  const auto greenMix = normalizedHashComponent(hash, 0x4a41434b47524545ull);
+  const auto blueMix = normalizedHashComponent(hash, 0x4a41434b424c5545ull);
+  const auto tintMix = normalizedHashComponent(hash, 0x4a41434b54494e54ull);
+
+  const auto randomGreen = interpolate(
+    JackBrushRandomColorMin.get<ColorChannel::g>(),
+    JackBrushRandomColorMax.get<ColorChannel::g>(),
+    greenMix);
+  const auto randomBlue = interpolate(
+    JackBrushRandomColorMin.get<ColorChannel::b>(),
+    JackBrushRandomColorMax.get<ColorChannel::b>(),
+    blueMix);
+  const auto tint = interpolate(JackBrushTintMin, JackBrushTintMax, tintMix);
+
+  return RgbaF{
+    interpolate(JackBrushDefaultColor.get<ColorChannel::r>(), 0.0f, tint),
+    interpolate(JackBrushDefaultColor.get<ColorChannel::g>(), randomGreen, tint),
+    interpolate(JackBrushDefaultColor.get<ColorChannel::b>(), randomBlue, tint),
+    JackBrushDefaultColor.get<ColorChannel::a>()};
+}
+
+const std::vector<Color>& readable2DBrushOutlinePalette()
+{
+  static const auto palette = std::vector<Color>{
+    readable2DBrushOutlinePaletteColor(BrushOutlineColorState{
+      .readable2DOutlines = true,
+      .brushBounds = vm::bbox3d{{0.0, 0.0, 0.0}, {64.0, 64.0, 64.0}},
+      .brushFaceCount = 6u}),
+    readable2DBrushOutlinePaletteColor(BrushOutlineColorState{
+      .readable2DOutlines = true,
+      .brushBounds = vm::bbox3d{{128.0, 0.0, 0.0}, {192.0, 64.0, 64.0}},
+      .brushFaceCount = 6u}),
+    readable2DBrushOutlinePaletteColor(BrushOutlineColorState{
+      .readable2DOutlines = true,
+      .brushBounds = vm::bbox3d{{256.0, 0.0, 0.0}, {320.0, 64.0, 64.0}},
+      .brushFaceCount = 6u}),
+    readable2DBrushOutlinePaletteColor(BrushOutlineColorState{
+      .readable2DOutlines = true,
+      .brushBounds = vm::bbox3d{{384.0, 0.0, 0.0}, {448.0, 64.0, 64.0}},
+      .brushFaceCount = 6u}),
+  };
+  return palette;
+}
+
+size_t readable2DBrushOutlineColorIndex(const BrushOutlineColorState& state)
+{
+  const auto color = readable2DBrushOutlinePaletteColor(state).to<RgbaF>();
+
+  size_t bestIndex = 0u;
+  auto bestDistance = std::numeric_limits<float>::max();
+
+  const auto& palette = readable2DBrushOutlinePalette();
+  for (size_t i = 0u; i < palette.size(); ++i)
+  {
+    const auto candidate = palette[i].to<RgbaF>();
+    const auto dr = candidate.get<ColorChannel::r>() - color.get<ColorChannel::r>();
+    const auto dg = candidate.get<ColorChannel::g>() - color.get<ColorChannel::g>();
+    const auto db = candidate.get<ColorChannel::b>() - color.get<ColorChannel::b>();
+    const auto distance = dr * dr + dg * dg + db * db;
+    if (distance < bestDistance)
+    {
+      bestDistance = distance;
+      bestIndex = i;
+    }
+  }
+
+  return bestIndex;
 }
 
 Color brushOutlineColor(
@@ -115,7 +184,7 @@ Color brushOutlineColor(
     return selectedEdgeColor;
   }
 
-  return readable2DBrushOutlinePalette()[readable2DBrushOutlineColorIndex(state)];
+  return readable2DBrushOutlinePaletteColor(state);
 }
 
 BrushOutlineColorState brushOutlineColorState(

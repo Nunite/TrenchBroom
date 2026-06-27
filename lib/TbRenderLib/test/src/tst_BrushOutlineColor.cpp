@@ -19,6 +19,8 @@
 
 #include "render/BrushOutlineColor.h"
 
+#include "ColorChannel.h"
+
 #include <set>
 
 #include <catch2/catch_test_macros.hpp>
@@ -31,6 +33,7 @@ namespace
 const auto DefaultEdgeColor = Color{RgbF{0.9f, 0.9f, 0.9f}};
 const auto SelectedEdgeColor = Color{RgbF{1.0f, 0.0f, 0.0f}};
 const auto LockedEdgeColor = Color{RgbF{0.0f, 0.0f, 1.0f}};
+constexpr auto Epsilon = 0.0001f;
 
 BrushOutlineColorState makeState(const vm::bbox3d& bounds)
 {
@@ -44,6 +47,11 @@ BrushOutlineColorState makeState(const vm::bbox3d& bounds)
 bool sameColor(const Color& lhs, const Color& rhs)
 {
   return lhs.to<RgbaF>() == rhs.to<RgbaF>();
+}
+
+bool withinEpsilon(const float lhs, const float rhs)
+{
+  return std::abs(lhs - rhs) <= Epsilon;
 }
 
 } // namespace
@@ -97,6 +105,41 @@ TEST_CASE("BrushOutlineColor.worldBrushesCanReceiveDifferentColors")
   }
 
   CHECK(usedColors.size() > 1u);
+}
+
+TEST_CASE("BrushOutlineColor.readableWorldBrushColorsStayInJackBrushTintRange")
+{
+  for (size_t i = 0; i < 16; ++i)
+  {
+    const auto x = static_cast<double>(i * 128);
+    const auto brush = makeState(vm::bbox3d{{x, 0, 0}, {x + 64, 64, 64}});
+    const auto color =
+      brushOutlineColor(brush, DefaultEdgeColor, SelectedEdgeColor, LockedEdgeColor)
+        .to<RgbaF>();
+
+    CHECK(color.get<ColorChannel::r>() >= (0.35f - Epsilon));
+    CHECK(color.get<ColorChannel::r>() <= (0.75f + Epsilon));
+    CHECK(color.get<ColorChannel::g>() >= (0.60f - Epsilon));
+    CHECK(color.get<ColorChannel::g>() <= (1.0f + Epsilon));
+    CHECK(color.get<ColorChannel::b>() >= (0.60f - Epsilon));
+    CHECK(color.get<ColorChannel::b>() <= (1.0f + Epsilon));
+    CHECK(withinEpsilon(color.get<ColorChannel::a>(), 1.0f));
+  }
+}
+
+TEST_CASE("BrushOutlineColor.readableWorldBrushColorsRemainBlueGreenBiased")
+{
+  for (size_t i = 0; i < 16; ++i)
+  {
+    const auto x = static_cast<double>(i * 128);
+    const auto brush = makeState(vm::bbox3d{{x, 0, 0}, {x + 64, 64, 64}});
+    const auto color =
+      brushOutlineColor(brush, DefaultEdgeColor, SelectedEdgeColor, LockedEdgeColor)
+        .to<RgbaF>();
+
+    CHECK(color.get<ColorChannel::g>() >= color.get<ColorChannel::r>());
+    CHECK(color.get<ColorChannel::b>() >= color.get<ColorChannel::r>());
+  }
 }
 
 TEST_CASE("BrushOutlineColor.selectedPriority")
