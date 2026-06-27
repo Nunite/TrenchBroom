@@ -543,3 +543,55 @@ Follow-up validation:
 
 Commit:
 - Pending follow-up: `Add repeat translate batch operation`.
+
+### 2026-06-27 - Scene 5: Underground Metro Station
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_05_metro_station.map`
+- Recreated from the minimal Valve map fixture after the first trial exposed invalid stair divisions.
+- Initial verification: `brushCount=0`.
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 5: station platforms tracks and shell`: floor slab, twin side platforms, central track trench, rails, exterior shell, end tunnel mouths, concourse blocks, and stairs. Final result: `valid=true`, 33 brushes.
+- `mcp-op-2` / `MCP Scene 5: repeated columns lights signs and sleepers`: repeated platform columns, ceiling light bars, track sleepers, sign boards, small route markers, and end portal blocks. Result: `valid=true`, 83 brushes from 13 operations.
+- `mcp-op-3` / `MCP Scene 5: tunnel arch cues gates and route markers`: stepped tunnel arch cues, ticket gates, concourse sign blocks, platform direction markers. Result: `valid=true`, 35 brushes.
+
+MCP tools used:
+- `blockout_create_batch` with `box`, `stairs`, `prism`, and `repeat_translate`.
+- `map_snapshot`, `map_validate`, `problems_check`, `history_list`, `documents_save`.
+- `viewport_capture_scene_review` with `twoPanes` overview and explicit interior camera.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782547070957.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782547071009.png`
+- Exterior/detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782547071091.png`
+- Interior 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782547114768.png`
+
+Validation:
+- Final `map_snapshot`: `brushCount=151`, bounds `[-1792,-672,-32]` to `[1792,672,256]`, saved with `modified=false`.
+- Final `map_validate`: `valid=true`, `count=0`, `safeFixableCount=0`.
+- `history_list`: three live operations, all `valid=true`, `mismatchCount=0`, `staleObjectCount=0`.
+
+What worked:
+- `repeat_translate` was immediately useful: 13 operations created 83 repeated columns, lights, sleepers, and signs without host-side loops or giant object-id lists.
+- `twoPanes` scene review produced usable 2D and 3D screenshots at full height; the previous four-pane 2D capture issue did not reproduce.
+- The 2D overview clearly reads as an underground station: two platforms, central track pair, sleepers, end tunnel mouths, stairs, ticket hall, and repeated columns.
+- Explicit inside-the-room camera control can verify enclosed spaces when exterior orbit shots are occluded by the shell.
+
+What failed or constrained the agent:
+- First trial used 6 steps across a 256-unit run, which produced `runStep=42.6667` and 12 `Brush has non-integer vertices` warnings. MCP allowed it at creation time, so the issue was only discovered by `map_validate`.
+- Initial attempt to fix this by requiring stairs to align to the active grid was too strict: `riseStep=24` is a valid integer unit height even if the grid is 16. The correct generic rule is integer-unit vertices, not grid-only stair increments.
+- Tunnel arches are still only hinted by stepped boxes and small prisms; there is no generic arched tunnel section primitive.
+- Exterior orbit screenshots of enclosed scenes are poor for review. They show the shell, but not station usability.
+
+Implemented MCP follow-up:
+- Added `stairs` validation in the batch compiler: stair run/rise per step must be integer map units. Invalid stair divisions now fail before commit and return `failedOperationIndex`, `failedOperationType`, and a concrete run/rise diagnostic.
+- Real MCP smoke verified the failing Scene 5 stair case returns `valid=false` with no committed brushes, then the final Scene 5 rebuild passed `map_validate` with zero warnings.
+
+Proposed MCP changes:
+- Add generic `tunnel_section_batch` / `arch_section_from_span` for arched ceilings and tunnel portals.
+- Add an interior review helper or camera preset that can frame inside enclosed shell geometry without manual camera coordinates.
+- Add optional `ensureIntegerVertices=true` validation mode for other batch operations that can produce fractional vertices.
+
+Commit:
+- Pending follow-up: `Reject fractional stair batch geometry`.

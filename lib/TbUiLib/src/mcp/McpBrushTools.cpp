@@ -1427,6 +1427,17 @@ std::optional<std::vector<vm::bbox3d>> stairsBounds(
   const auto runMax = axis == vm::axis::x ? max.x() : max.y();
   const auto runStep = (runMax - runMin) / static_cast<double>(steps);
   const auto riseStep = (max.z() - min.z()) / static_cast<double>(steps);
+  if (!gridAligned(runStep, 1.0) || !gridAligned(riseStep, 1.0))
+  {
+    error =
+      QString{
+        "stairs run/rise step size must be integer units; got runStep=%1 and "
+        "riseStep=%2 for %3 steps"}
+        .arg(runStep)
+        .arg(riseStep)
+        .arg(steps);
+    return std::nullopt;
+  }
 
   auto result = std::vector<vm::bbox3d>{};
   result.reserve(steps);
@@ -3021,7 +3032,6 @@ McpBridgeToolResult blockoutCreateResult(
   {
     return invalidParamsFailure(error);
   }
-
   if (toolName == "blockout_create_room" || toolName == "blockout_create_corridor")
   {
     const auto shellBounds =

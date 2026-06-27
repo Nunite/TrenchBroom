@@ -2294,6 +2294,34 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     !invalidRibbonResponse.result.value("validation").toObject().value("valid").toBool());
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
+  const auto invalidStairsResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"grid", 16},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "stairs"},
+           {"min", QJsonArray{512, 320, 32}},
+           {"max", QJsonArray{768, 608, 128}},
+           {"steps", 6},
+           {"axis", "x"},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(invalidStairsResponse.ok);
+  const auto invalidStairsValidation =
+    invalidStairsResponse.result.value("validation").toObject();
+  CHECK(!invalidStairsValidation.value("valid").toBool());
+  CHECK(invalidStairsValidation.value("failedOperationIndex").toInt() == 0);
+  CHECK(invalidStairsValidation.value("failedOperationType").toString() == "stairs");
+  CHECK(invalidStairsValidation.value("errors").toArray().first().toString().contains(
+    "integer units"));
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+
   const auto invalidRepeatResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",
