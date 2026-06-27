@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -44,6 +45,16 @@ mcp::McpBridgeResponse makeFailure(
   const QString& message)
 {
   return mcp::McpBridgeResponse::failure(request.id, mcp::McpError{code, message});
+}
+
+mcp::McpBridgeResponse makeFailure(
+  const mcp::McpBridgeRequest& request,
+  const mcp::McpErrorCode code,
+  const QString& message,
+  QJsonObject details)
+{
+  return mcp::McpBridgeResponse::failure(
+    request.id, mcp::McpError{code, message, std::move(details)});
 }
 
 void syncOperationHistoryWithExternalResult(
@@ -363,7 +374,15 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
           mcp::McpErrorCode::Forbidden,
           QString{"Active document does not match expectedDocumentPath. Expected '%1', "
                   "actual '%2'."}
-            .arg(expectedDocumentPath, actualDocumentPath));
+            .arg(expectedDocumentPath, actualDocumentPath),
+          QJsonObject{
+            {"expectedDocumentPath", expectedDocumentPath},
+            {"actualDocumentPath", actualDocumentPath},
+            {"processId", static_cast<int>(QCoreApplication::applicationPid())},
+            {"bridgeInstanceId", m_bridgeInstanceId},
+            {"bridgeStartedAt", m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs)},
+            {"httpPort", static_cast<int>(m_config.httpPort)},
+          });
       }
     }
   }

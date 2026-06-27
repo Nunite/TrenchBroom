@@ -31,7 +31,14 @@
   ```powershell
   scripts\build_release_codex.cmd build-release-other
   ```
-- For UI/library work, build the focused test target first:
+- Once `build-release-codex` exists, prefer the filtered wrapper for routine incremental Release builds and focused tests. It keeps the full log under `build-release-codex\codex-logs` while hiding repetitive dependency/deploy noise from the terminal:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TrenchBroom
+  powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbUiLibTest -TestFilter "McpBridgeServer"
+  powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbMcpLibTest -TestExe build-release-codex\lib\TbMcpLib\test\TbMcpLibTest.exe -TestFilter "McpToolCatalog"
+  ```
+- If the filtered output hides something relevant, rerun with `-NoFilter` or inspect the matching log in `build-release-codex\codex-logs`.
+- For UI/library work, build the focused test target first. If the filtered wrapper is unavailable, use the explicit Visual Studio environment form:
   ```powershell
   cmd.exe /c 'call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build build-release-codex --target TbUiLibTest --config Release --parallel'
   ```

@@ -1409,7 +1409,36 @@ TEST_CASE("McpBridgeServer")
     REQUIRE(response.error);
     CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
     CHECK(response.error->message.contains("expectedDocumentPath"));
+    CHECK(
+      response.error->details.value("expectedDocumentPath").toString()
+      == "D:/does/not/match.map");
+    CHECK(response.error->details.contains("actualDocumentPath"));
+    CHECK(response.error->details.contains("processId"));
+    CHECK(response.error->details.contains("bridgeInstanceId"));
+    CHECK(response.error->details.contains("httpPort"));
     CHECK(!handlerCalled);
+  }
+
+  SECTION("status and history report the same active document fingerprint")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto registry = McpObjectRegistry{};
+
+    const auto bridgeFingerprint = documentFingerprintForMap(document->map(), &registry);
+    CHECK(bridgeFingerprint.startsWith("doc:"));
+    CHECK(registry.documentFingerprint(document->map()) == bridgeFingerprint);
+    CHECK(
+      registry.documentEpoch(document->map())
+      == documentEpochForMap(document->map(), &registry));
   }
 }
 

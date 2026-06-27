@@ -3,6 +3,8 @@ param(
   [string] $Target = "TrenchBroom",
   [string] $Config = "Release",
   [string] $TestFilter = "",
+  [string] $TestTarget = "",
+  [string] $TestExe = "",
   [string] $VsDevCmd = "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat",
   [switch] $NoVsDevCmd,
   [switch] $NoFilter
@@ -20,6 +22,66 @@ function Join-CommandArgs {
         $_
       }
     }) -join " "
+}
+
+function Get-SafeFileNamePart {
+  param([string] $Value)
+
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    return "all"
+  }
+
+  $safe = $Value
+  foreach ($character in [System.IO.Path]::GetInvalidFileNameChars()) {
+    $safe = $safe.Replace($character, "_")
+  }
+  $safe = $safe -replace '\s+', '_'
+  $safe = $safe -replace '[^A-Za-z0-9_.-]', '_'
+  $safe = $safe.Trim("._-")
+  if ([string]::IsNullOrWhiteSpace($safe)) {
+    return "filter"
+  }
+  if ($safe.Length -gt 80) {
+    return $safe.Substring(0, 80)
+  }
+  return $safe
+}
+
+function Get-TestExePath {
+  param(
+    [System.Management.Automation.PathInfo] $ResolvedBuildDir,
+    [string] $Target,
+    [string] $TestTarget,
+    [string] $TestExe
+  )
+
+  if (-not [string]::IsNullOrWhiteSpace($TestExe)) {
+    return $TestExe
+  }
+
+  $effectiveTarget = if ([string]::IsNullOrWhiteSpace($TestTarget)) { $Target } else { $TestTarget }
+  if ($effectiveTarget -notmatch 'Test$') {
+    throw "TestFilter was provided, but '$effectiveTarget' is not a test target. Pass -TestTarget or -TestExe."
+  }
+
+  $candidateRoots = @(
+    (Join-Path $ResolvedBuildDir "lib"),
+    (Join-Path $ResolvedBuildDir "app")
+  )
+  foreach ($root in $candidateRoots) {
+    if (-not (Test-Path $root)) {
+      continue
+    }
+    $matches = @(Get-ChildItem -Path $root -Recurse -Filter "$effectiveTarget.exe" -File -ErrorAction SilentlyContinue)
+    if ($matches.Count -eq 1) {
+      return $matches[0].FullName
+    }
+    if ($matches.Count -gt 1) {
+      throw "Multiple test executables found for '$effectiveTarget'. Pass -TestExe explicitly: $($matches.FullName -join ', ')"
+    }
+  }
+
+  throw "Test executable not found for target '$effectiveTarget'. Pass -TestExe explicitly."
 }
 
 function Should-ShowLine {
@@ -56,6 +118,7 @@ function Should-ShowLine {
     '^d3dcompiler_47\.dll is up to date\.$',
     '^dxcompiler\.dll is up to date\.$',
     '^dxil\.dll is up to date\.$',
+    '^[A-Za-z0-9_.-]+\.dll is up to date\.$',
     '^q.*\.dll is up to date\.$',
     '^Creating qt_.*\.qm\.*$'
   )
@@ -125,7 +188,7 @@ function Invoke-FilteredCommand {
     foreach ($line in $tail) {
       Write-Host $line
     }
-    exit $process.ExitCode
+    throw "$Title failed with exit code $($process.ExitCode). Full log: $LogPath"
   }
 }
 
@@ -159,14 +222,20 @@ Invoke-FilteredCommand `
   -LogPath (Join-Path $logDir "$stamp-build-$Target.log")
 
 if ($TestFilter) {
-  $testExe = Join-Path $resolvedBuildDir "lib\TbUiLib\test\TbUiLibTest.exe"
+  $testExe = Get-TestExePath `
+    -ResolvedBuildDir $resolvedBuildDir `
+    -Target $Target `
+    -TestTarget $TestTarget `
+    -TestExe $TestExe
   if (-not (Test-Path $testExe)) {
     throw "Test executable not found: $testExe"
   }
 
+  $testName = if ([string]::IsNullOrWhiteSpace($TestTarget)) { [System.IO.Path]::GetFileNameWithoutExtension($testExe) } else { $TestTarget }
+  $safeFilter = Get-SafeFileNamePart $TestFilter
   $testCommand = Join-CommandArgs @($testExe, $TestFilter)
   Invoke-FilteredCommand `
-    -Title "Run TbUiLibTest $TestFilter" `
+    -Title "Run $testName $TestFilter" `
     -Command $testCommand `
-    -LogPath (Join-Path $logDir "$stamp-test-$TestFilter.log")
+    -LogPath (Join-Path $logDir "$stamp-test-$testName-$safeFilter.log")
 }

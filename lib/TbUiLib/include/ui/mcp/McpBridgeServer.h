@@ -58,6 +58,8 @@ struct McpBridgeToolResult
 
   static McpBridgeToolResult success(QJsonObject result = {});
   static McpBridgeToolResult failure(mcp::McpErrorCode code, QString message);
+  static McpBridgeToolResult failure(
+    mcp::McpErrorCode code, QString message, QJsonObject details);
 };
 
 struct McpOperationRecord

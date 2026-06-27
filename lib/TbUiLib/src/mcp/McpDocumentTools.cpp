@@ -86,7 +86,18 @@ QString documentPathString(const mdl::Map& map)
   return pathToQString(map.path());
 }
 
-QString documentFingerprint(const mdl::Map& map)
+int legacyDocumentEpoch(const mdl::Map& map)
+{
+  return static_cast<int>(
+    qHash(QString::number(reinterpret_cast<quintptr>(&map), 16)) & 0x7fffffff);
+}
+
+int documentEpoch(const mdl::Map& map, const McpObjectRegistry* objectRegistry)
+{
+  return documentEpochForMap(map, objectRegistry);
+}
+
+QString legacyDocumentFingerprint(const mdl::Map& map)
 {
   auto hash = qHash(QString::fromStdString(map.filename()));
   hash ^= qHash(documentPathString(map)) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
@@ -97,10 +108,9 @@ QString documentFingerprint(const mdl::Map& map)
   return QString{"doc:%1"}.arg(static_cast<quint64>(hash), 16, 16, QLatin1Char{'0'});
 }
 
-int documentEpoch(const mdl::Map& map)
+QString documentFingerprint(const mdl::Map& map, const McpObjectRegistry* objectRegistry)
 {
-  return static_cast<int>(
-    qHash(QString::number(reinterpret_cast<quintptr>(&map), 16)) & 0x7fffffff);
+  return documentFingerprintForMap(map, objectRegistry);
 }
 
 QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
@@ -217,7 +227,10 @@ vm::bbox3d contentBounds(const mdl::WorldNode& worldNode)
   return hasBounds ? result : vm::bbox3d{};
 }
 
-QJsonObject documentJson(const MapWindow& mapWindow, const int index)
+QJsonObject documentJson(
+  const MapWindow& mapWindow,
+  const int index,
+  const McpObjectRegistry* objectRegistry = nullptr)
 {
   const auto& map = mapWindow.document().map();
   return QJsonObject{
@@ -229,8 +242,8 @@ QJsonObject documentJson(const MapWindow& mapWindow, const int index)
     {"game", QString::fromStdString(map.gameInfo().gameConfig.name)},
     {"mapFormat", QString::fromStdString(mdl::formatName(map.worldNode().mapFormat()))},
     {"windowTitle", mapWindow.windowTitle()},
-    {"documentEpoch", documentEpoch(map)},
-    {"documentFingerprint", documentFingerprint(map)},
+    {"documentEpoch", documentEpoch(map, objectRegistry)},
+    {"documentFingerprint", documentFingerprint(map, objectRegistry)},
   };
 }
 
@@ -318,7 +331,8 @@ QJsonObject activeDocumentJson(
   AppController& appController,
   const QString& bridgeInstanceId,
   const QString& bridgeStartedAt,
-  const quint16 httpPort)
+  const quint16 httpPort,
+  const McpObjectRegistry* objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -328,7 +342,7 @@ QJsonObject activeDocumentJson(
     return result;
   }
 
-  auto result = documentJson(*mapWindow, 0);
+  auto result = documentJson(*mapWindow, 0, objectRegistry);
   result.insert("activeDocument", true);
   auto identity = bridgeIdentityJson(bridgeInstanceId, bridgeStartedAt, httpPort);
   for (auto it = identity.begin(); it != identity.end(); ++it)
@@ -342,7 +356,8 @@ QJsonObject mapSnapshotJson(
   AppController& appController,
   const QString& bridgeInstanceId,
   const QString& bridgeStartedAt,
-  const quint16 httpPort)
+  const quint16 httpPort,
+  const McpObjectRegistry* objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -352,16 +367,18 @@ QJsonObject mapSnapshotJson(
     return result;
   }
 
-  auto snapshot =
-    mapSnapshotJsonForMap(mapWindow->document().map(), documentJson(*mapWindow, 0));
+  auto snapshot = mapSnapshotJsonForMap(
+    mapWindow->document().map(), documentJson(*mapWindow, 0, objectRegistry));
   auto identity = bridgeIdentityJson(bridgeInstanceId, bridgeStartedAt, httpPort);
   for (auto it = identity.begin(); it != identity.end(); ++it)
   {
     snapshot.insert(it.key(), it.value());
   }
-  snapshot.insert("documentEpoch", documentEpoch(mapWindow->document().map()));
   snapshot.insert(
-    "documentFingerprint", documentFingerprint(mapWindow->document().map()));
+    "documentEpoch", documentEpoch(mapWindow->document().map(), objectRegistry));
+  snapshot.insert(
+    "documentFingerprint",
+    documentFingerprint(mapWindow->document().map(), objectRegistry));
   return snapshot;
 }
 
@@ -410,13 +427,29 @@ QJsonObject mapSnapshotJsonForMap(const mdl::Map& map, const QJsonObject& docume
   };
 }
 
-QJsonObject documentsListJson(AppController& appController)
+QString documentFingerprintForMap(
+  const mdl::Map& map, const McpObjectRegistry* objectRegistry)
+{
+  return objectRegistry != nullptr
+           ? objectRegistry->documentFingerprint(const_cast<mdl::Map&>(map))
+           : legacyDocumentFingerprint(map);
+}
+
+int documentEpochForMap(const mdl::Map& map, const McpObjectRegistry* objectRegistry)
+{
+  return objectRegistry != nullptr
+           ? objectRegistry->documentEpoch(const_cast<mdl::Map&>(map))
+           : legacyDocumentEpoch(map);
+}
+
+QJsonObject documentsListJson(
+  AppController& appController, const McpObjectRegistry* objectRegistry)
 {
   auto documents = QJsonArray{};
   auto index = 0;
   for (const auto* mapWindow : appController.mapWindowManager().mapWindows())
   {
-    documents.push_back(documentJson(*mapWindow, index));
+    documents.push_back(documentJson(*mapWindow, index, objectRegistry));
     ++index;
   }
 
@@ -459,7 +492,8 @@ McpBridgeToolResult documentOpenVerifiedResult(
   const QJsonObject& params,
   const QString& bridgeInstanceId,
   const QString& bridgeStartedAt,
-  const quint16 httpPort)
+  const quint16 httpPort,
+  const McpObjectRegistry* objectRegistry)
 {
   auto error = QString{};
   const auto path = absolutePathFromParams(params, "path", error);
@@ -534,8 +568,8 @@ McpBridgeToolResult documentOpenVerifiedResult(
     });
   }
 
-  auto snapshot =
-    mapSnapshotJson(appController, bridgeInstanceId, bridgeStartedAt, httpPort);
+  auto snapshot = mapSnapshotJson(
+    appController, bridgeInstanceId, bridgeStartedAt, httpPort, objectRegistry);
   if (snapshot.isEmpty() || !snapshot.value("document").isObject())
   {
     return McpBridgeToolResult::success(QJsonObject{
@@ -543,7 +577,7 @@ McpBridgeToolResult documentOpenVerifiedResult(
       {"verified", false},
       {"stage", "bridgeUnavailableAfterOpen"},
       {"path", pathString},
-      {"document", documentJson(*verifiedWindow, 0)},
+      {"document", documentJson(*verifiedWindow, 0, objectRegistry)},
     });
   }
 
@@ -552,10 +586,11 @@ McpBridgeToolResult documentOpenVerifiedResult(
     {"verified", true},
     {"stage", "verified"},
     {"path", pathString},
-    {"document", documentJson(*verifiedWindow, 0)},
+    {"document", documentJson(*verifiedWindow, 0, objectRegistry)},
     {"activeDocumentPath", activeDocumentPath(appController)},
-    {"documentFingerprint", documentFingerprint(verifiedWindow->document().map())},
-    {"documentEpoch", documentEpoch(verifiedWindow->document().map())},
+    {"documentFingerprint",
+     documentFingerprint(verifiedWindow->document().map(), objectRegistry)},
+    {"documentEpoch", documentEpoch(verifiedWindow->document().map(), objectRegistry)},
     {"snapshot", snapshot},
   });
 }
@@ -585,7 +620,8 @@ McpBridgeToolResult expectedDocumentPathFailure(
     mcp::McpErrorCode::Forbidden,
     QString{
       "Active document does not match expectedDocumentPath. Expected '%1', actual '%2'."}
-      .arg(expectedPath, activeDocumentPath(appController)));
+      .arg(expectedPath, activeDocumentPath(appController)),
+    status);
 }
 
 McpBridgeToolResult documentActivateResult(
@@ -719,7 +755,8 @@ QJsonObject makeStatus(
   AppController& appController,
   const mcp::McpBridgeConfig& config,
   const QString& bridgeInstanceId,
-  const QString& bridgeStartedAt)
+  const QString& bridgeStartedAt,
+  const McpObjectRegistry* objectRegistry)
 {
   auto result = QJsonObject{
     {"application", "TrenchBroom"},
@@ -749,8 +786,8 @@ QJsonObject makeStatus(
     result.insert("activeDocumentDirty", map.modified());
     result.insert("activeWindowTitle", mapWindow->windowTitle());
     result.insert("activeDocumentWindowTitle", mapWindow->windowTitle());
-    result.insert("documentEpoch", documentEpoch(map));
-    result.insert("documentFingerprint", documentFingerprint(map));
+    result.insert("documentEpoch", documentEpoch(map, objectRegistry));
+    result.insert("documentFingerprint", documentFingerprint(map, objectRegistry));
   }
 
   return result;

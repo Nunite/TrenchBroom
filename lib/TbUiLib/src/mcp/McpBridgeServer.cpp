@@ -59,6 +59,13 @@ McpBridgeToolResult McpBridgeToolResult::failure(
   return McpBridgeToolResult{false, {}, mcp::McpError{code, std::move(message)}};
 }
 
+McpBridgeToolResult McpBridgeToolResult::failure(
+  const mcp::McpErrorCode code, QString message, QJsonObject details)
+{
+  return McpBridgeToolResult{
+    false, {}, mcp::McpError{code, std::move(message), std::move(details)}};
+}
+
 McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
   : McpBridgeServer{
       [&appController, this](const auto& toolName, const auto& params) {
@@ -68,7 +75,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             appController,
             m_config,
             m_bridgeInstanceId,
-            m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs)));
+            m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs),
+            &m_objectRegistry));
         }
         if (toolName == "tb_doctor")
         {
@@ -104,7 +112,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             params,
             m_bridgeInstanceId,
             m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs),
-            m_config.httpPort);
+            m_config.httpPort,
+            &m_objectRegistry);
         }
         if (toolName == "documents_activate")
         {
@@ -128,7 +137,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             appController,
             m_bridgeInstanceId,
             m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs),
-            m_config.httpPort));
+            m_config.httpPort,
+            &m_objectRegistry));
         }
         if (toolName == "map_snapshot")
         {
@@ -136,7 +146,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             appController,
             m_bridgeInstanceId,
             m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs),
-            m_config.httpPort));
+            m_config.httpPort,
+            &m_objectRegistry));
         }
         if (toolName == "map_search")
         {

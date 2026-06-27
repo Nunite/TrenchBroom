@@ -107,6 +107,29 @@ function Get-McpPortOwners {
   }
 }
 
+function Format-McpPortOwners {
+  param([int[]] $Owners)
+
+  $realOwners = @($Owners | Where-Object { $_ -ne 0 })
+  $labels = @()
+  if ($realOwners.Count -gt 0) {
+    $labels += ($realOwners -join ', ')
+  }
+  if ($Owners -contains 0) {
+    $labels += "0 (system reservation)"
+  }
+  return $labels -join ', '
+}
+
+function Test-McpPortOwnerMatch {
+  param(
+    [int[]] $Owners,
+    [int] $ProcessId
+  )
+
+  return @($Owners | Where-Object { $_ -ne 0 }) -contains $ProcessId
+}
+
 function Invoke-McpRequest {
   param(
     [string] $Url,
@@ -185,7 +208,7 @@ try {
   $mcpPort = Get-McpUrlPort -Url $Url
   $mcpPortOwners = Get-McpPortOwners -Port $mcpPort
   if ($mcpPortOwners.Count -gt 0) {
-    Write-Status "MCP port $mcpPort owner PID(s): $($mcpPortOwners -join ', ')" Cyan
+    Write-Status "MCP port $mcpPort owner PID(s): $(Format-McpPortOwners $mcpPortOwners)" Cyan
   }
   $script:NextRequestId = 0
 
@@ -255,7 +278,7 @@ try {
   if ($null -ne $structuredContent -and -not $RawStructured) {
     $statusProcessId = Get-PropertyValue $structuredContent "processId"
     if ($null -ne $statusProcessId -and $mcpPortOwners.Count -gt 0) {
-      $matchesOwner = $mcpPortOwners -contains ([int] $statusProcessId)
+      $matchesOwner = Test-McpPortOwnerMatch -Owners $mcpPortOwners -ProcessId ([int] $statusProcessId)
       $color = if ($matchesOwner) { [ConsoleColor]::Green } else { [ConsoleColor]::Yellow }
       Write-Status "tb_status.processId=$statusProcessId; portOwnerMatch=$matchesOwner" $color
     }

@@ -25,12 +25,14 @@
 #include "mdl/BrushNode.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
+#include "mdl/GameInfo.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/Node.h"
 #include "mdl/PatchNode.h"
 #include "mdl/WorldNode.h"
+#include "ui/QPathUtils.h"
 
 #include <algorithm>
 #include <functional>
@@ -282,10 +284,14 @@ int McpObjectRegistry::documentEpoch(mdl::Map& map) const
 
 QString McpObjectRegistry::documentFingerprint(mdl::Map& map) const
 {
-  return QString{"epoch:%1;map:%2;world:%3"}
-    .arg(documentEpoch(map))
-    .arg(reinterpret_cast<quintptr>(&map))
-    .arg(reinterpret_cast<quintptr>(&map.worldNode()));
+  auto hash = qHash(QString::fromStdString(map.filename()));
+  const auto documentPath = map.path().empty() ? QString{} : pathAsQString(map.path());
+  hash ^= qHash(documentPath) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+  hash ^= qHash(QString::fromStdString(map.gameInfo().gameConfig.name)) + 0x9e3779b9u
+          + (hash << 6) + (hash >> 2);
+  hash ^= qHash(QString::number(reinterpret_cast<quintptr>(&map), 16)) + 0x9e3779b9u
+          + (hash << 6) + (hash >> 2);
+  return QString{"doc:%1"}.arg(static_cast<quint64>(hash), 16, 16, QLatin1Char{'0'});
 }
 
 QString McpObjectRegistry::registerNode(mdl::Map& map, mdl::Node& node) const

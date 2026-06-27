@@ -37,6 +37,7 @@ namespace tb::ui
 {
 
 class AppController;
+class McpObjectRegistry;
 
 McpBridgeToolResult noActiveDocumentFailure();
 McpBridgeToolResult invalidParamsFailure(const QString& message);
@@ -52,24 +53,32 @@ QJsonObject makeStatus(
   AppController& appController,
   const mcp::McpBridgeConfig& config,
   const QString& bridgeInstanceId = {},
-  const QString& bridgeStartedAt = {});
+  const QString& bridgeStartedAt = {},
+  const McpObjectRegistry* objectRegistry = nullptr);
 QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig& config);
 QJsonObject bridgeIdentityJson(
   const QString& bridgeInstanceId,
   const QString& bridgeStartedAt,
   quint16 httpPort = 37666);
-QJsonObject documentsListJson(AppController& appController);
+QJsonObject documentsListJson(
+  AppController& appController, const McpObjectRegistry* objectRegistry = nullptr);
 QJsonObject activeDocumentJson(
   AppController& appController,
   const QString& bridgeInstanceId = {},
   const QString& bridgeStartedAt = {},
-  quint16 httpPort = 37666);
+  quint16 httpPort = 37666,
+  const McpObjectRegistry* objectRegistry = nullptr);
 QJsonObject mapSnapshotJson(
   AppController& appController,
   const QString& bridgeInstanceId = {},
   const QString& bridgeStartedAt = {},
-  quint16 httpPort = 37666);
+  quint16 httpPort = 37666,
+  const McpObjectRegistry* objectRegistry = nullptr);
 QJsonObject mapSnapshotJsonForMap(const mdl::Map& map, const QJsonObject& document);
+QString documentFingerprintForMap(
+  const mdl::Map& map, const McpObjectRegistry* objectRegistry = nullptr);
+int documentEpochForMap(
+  const mdl::Map& map, const McpObjectRegistry* objectRegistry = nullptr);
 QString activeDocumentPath(AppController& appController);
 McpBridgeToolResult expectedDocumentPathFailure(
   AppController& appController,
@@ -84,7 +93,8 @@ McpBridgeToolResult documentOpenVerifiedResult(
   const QJsonObject& params,
   const QString& bridgeInstanceId = {},
   const QString& bridgeStartedAt = {},
-  quint16 httpPort = 37666);
+  quint16 httpPort = 37666,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult documentActivateResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult documentSaveResult(
