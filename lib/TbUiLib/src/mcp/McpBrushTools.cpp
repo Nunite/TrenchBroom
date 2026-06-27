@@ -1510,6 +1510,41 @@ std::optional<std::vector<vm::bbox3d>> steppedMassBounds(
   return result;
 }
 
+std::optional<std::vector<vm::bbox3d>> supportPostBounds(
+  const std::vector<vm::vec2d>& points,
+  const double bottomZ,
+  const double topZ,
+  const double postSize,
+  QString& error)
+{
+  if (points.empty())
+  {
+    error = "points2d must contain at least one support position";
+    return std::nullopt;
+  }
+  if (!std::isfinite(bottomZ) || !std::isfinite(topZ) || bottomZ >= topZ)
+  {
+    error = "bottomZ must be smaller than topZ";
+    return std::nullopt;
+  }
+  if (!finitePositive(postSize))
+  {
+    error = "postSize must be greater than zero";
+    return std::nullopt;
+  }
+
+  const auto halfSize = postSize * 0.5;
+  auto result = std::vector<vm::bbox3d>{};
+  result.reserve(points.size());
+  for (const auto& point : points)
+  {
+    result.emplace_back(
+      vm::vec3d{point.x() - halfSize, point.y() - halfSize, bottomZ},
+      vm::vec3d{point.x() + halfSize, point.y() + halfSize, topZ});
+  }
+  return result;
+}
+
 std::vector<vm::bbox3d> skyShellBounds(
   const vm::bbox3d& innerBounds, const double thickness)
 {
@@ -2680,6 +2715,26 @@ std::vector<mdl::Node*> compileBatchOperation(
       return {};
     }
     return brushNodesFromBounds(builder, *massBounds, material, error);
+  }
+
+  if (type == "support_posts_between")
+  {
+    auto points = points2DFromJson(operation, "points2d", error);
+    if (!points)
+    {
+      return {};
+    }
+    const auto postBounds = supportPostBounds(
+      snapPointsToGrid(*points, grid),
+      snapToGrid(optionalDouble(operation, "bottomZ", 0.0), grid),
+      snapToGrid(optionalDouble(operation, "topZ", 128.0), grid),
+      snapToGrid(optionalDouble(operation, "postSize", 16.0), grid),
+      error);
+    if (!postBounds)
+    {
+      return {};
+    }
+    return brushNodesFromBounds(builder, *postBounds, material, error);
   }
 
   if (type == "ramp")

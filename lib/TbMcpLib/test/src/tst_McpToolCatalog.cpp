@@ -701,6 +701,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemDescription.contains(R"("type":"path_ribbon")"));
     CHECK(itemDescription.contains(R"("type":"repeat_translate")"));
     CHECK(itemDescription.contains(R"("type":"stepped_mass")"));
+    CHECK(itemDescription.contains(R"("type":"support_posts_between")"));
     CHECK(
       operations.value("items").toObject().value("required").toArray().contains("type"));
 
@@ -717,6 +718,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemProperties.value("levels").isObject());
     CHECK(itemProperties.value("inset").isObject());
     CHECK(itemProperties.value("stepHeight").isObject());
+    CHECK(itemProperties.value("bottomZ").isObject());
+    CHECK(itemProperties.value("topZ").isObject());
+    CHECK(itemProperties.value("postSize").isObject());
     const auto childOperation = itemProperties.value("operation").toObject();
     CHECK(childOperation.value("type").toString() == "object");
     CHECK(childOperation.value("additionalProperties").toBool());

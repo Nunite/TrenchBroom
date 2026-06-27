@@ -542,7 +542,7 @@ Follow-up validation:
 - Real MCP smoke: launched `mcp_repeat_translate_smoke.map`, confirmed `tb_tools_search` exposes the `repeat_translate` schema, created four repeated boxes in one `blockout_create_batch` operation, then used `history_undo_mcp` and verified the map returned to `brushCount=0`.
 
 Commit:
-- Pending follow-up: `Add repeat translate batch operation`.
+- `a1e0c4514 Add repeat translate batch operation`.
 
 ### 2026-06-27 - Scene 5: Underground Metro Station
 
@@ -594,7 +594,7 @@ Proposed MCP changes:
 - Add optional `ensureIntegerVertices=true` validation mode for other batch operations that can produce fractional vertices.
 
 Commit:
-- Pending follow-up: `Reject fractional stair batch geometry`.
+- `f35427ed0 Reject fractional stair batch geometry`.
 
 ### 2026-06-27 - Scene 6: Desert Ruin Temple
 
@@ -650,4 +650,60 @@ Proposed MCP changes:
 - Add terrain-specific primitives or adaptive heightfield tools for natural dunes, still as generic terrain/mesh tools rather than desert-specific helpers.
 
 Commit:
-- Pending follow-up: `Add stepped mass batch operation`.
+- `9adbfa91f Add stepped mass batch operation`.
+
+### 2026-06-27 - Scene 7: Snow Mountain Research Station
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_07_snow_research_station.map`
+- Created from the minimal Valve map fixture and launched directly with `scripts/mcp-call.ps1 -Launch -KeepOpen -MapPath ...`.
+- Initial verification: `brushCount=0`.
+
+Build phases:
+- `mcp-op-1` / `MCP Scene 7: snow slope terrain and station modules`: stepped snow terrain, raised module foundations, main station blocks, bridge corridor massing, and landing pads. Result: `valid=true`, 20 brushes.
+- `mcp-op-2` / `MCP Scene 7: supports antennas bridge details and ice cave`: bridge supports, antenna silhouettes, rail bands, equipment blocks, and a first-pass ice cave opening. Result: `valid=true`, 35 brushes.
+- `mcp-op-3` / `MCP Scene 7: rails equipment snow banks and route markers`: additional rails, snow banks, equipment crates, route markers, and edge details. Result: `valid=true`, 63 brushes.
+
+MCP tools used:
+- `blockout_create_batch` with `box`, `prism`, `ramp`, `repeat_translate`, and related batch operations.
+- `map_snapshot`, `map_validate`, `history_list`, and `documents_save`.
+- `viewport_capture_scene_review` with overview and detail cameras.
+- Local screenshot inspection of the generated PNGs with visual review.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782548392346.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782548392409.png`
+- Modules and bridge detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782548392482.png`
+- Ice cave and supports 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782548392736.png`
+
+Validation:
+- Final `map_snapshot`: `brushCount=118`, bounds `[-2048,-1536,-64]` to `[2048,1536,912]`, saved with `modified=false`.
+- Final `map_validate`: `valid=true`, `count=0`, `safeFixableCount=0`.
+- `history_list`: three live operations, all `valid=true`, `mismatchCount=0`, `staleObjectCount=0`.
+
+What worked:
+- The overview reads as a modular station placed on a large stepped snow slope.
+- The detail camera shows a believable hard-surface research base: bridge corridor, module blocks, rail bands, support posts, antennas, and equipment are all legible in whitebox.
+- Validation stayed clean after saving the map.
+- Splitting terrain/modules, supports/details, and rails/equipment into separate operations kept operation history readable and reduced the risk of one malformed detail blocking the main massing.
+
+What failed or constrained the agent:
+- Bridge and platform supports still required manual coordinate estimates. The agent had to calculate support centers and heights rather than asking MCP to connect a deck to a known bottom/top surface.
+- The ice cave reads only moderately; it looks closer to a rectangular portal and stepped cut than an organic ice opening.
+- Snow terrain remains blocky. The existing batch primitives can express slopes and terraces, but not adaptive smoothness or natural contact.
+- The 2D screenshot still did not produce a reliable full-scene top review. It captured useful local outlines, but not a consistently fitted plan view.
+
+Implemented MCP follow-up:
+- Added generic `support_posts_between` to `blockout_create_batch`. It creates square post brushes from `points2d`, `bottomZ`, `topZ`, and `postSize` in one transaction. This is useful for bridges, boardwalks, raised modules, platforms, catwalks, docks, and industrial structures without becoming a snow-station prefab.
+- Added schema examples/properties for `support_posts_between`.
+- Added tests for valid multi-post creation and invalid Z ranges.
+- Real MCP smoke verified schema discovery, creation of three support posts, `map_validate valid=true`, and undo returning the smoke map to `brushCount=0`.
+
+Proposed MCP changes:
+- Add `support_posts_under_path` or a contact-aware support helper that can derive per-post bottom Z from terrain or selected surfaces.
+- Add `geometry_contact_analyze` so the agent can check whether supports touch both terrain and deck without relying on screenshots.
+- Improve natural terrain and cave tools with adaptive mesh/profile primitives, while keeping them generic.
+- Improve 2D scene review with true top-view fitted capture by bounds or operation id.
+
+Commit:
+- Pending follow-up: `Add support posts batch operation`.
