@@ -656,9 +656,40 @@ void collectFilteredNodes(
   }
 }
 
-QString makeCaptureFilePath()
+QString sanitizeFileComponent(QString value, const QString& fallback)
 {
-  const auto captureDir = SystemPaths::tempDirectory() / "TrenchBroomMCP";
+  value = value.trimmed();
+  if (value.isEmpty())
+  {
+    value = fallback;
+  }
+
+  for (auto i = 0; i < value.size(); ++i)
+  {
+    auto ch = value.at(i);
+    if (!ch.isLetterOrNumber() && ch != '-' && ch != '_' && ch != '.')
+    {
+      value[i] = '_';
+    }
+  }
+  return value.isEmpty() ? fallback : value;
+}
+
+QString makeCaptureFilePath(const QJsonObject& params)
+{
+  auto captureDir = SystemPaths::tempDirectory() / "TrenchBroomMCP";
+  if (const auto outputDir = params.value("outputDir").toString().trimmed();
+      !outputDir.isEmpty())
+  {
+    captureDir = std::filesystem::path{outputDir.toStdString()};
+  }
+  else if (const auto reviewId = params.value("reviewId").toString().trimmed();
+           !reviewId.isEmpty())
+  {
+    captureDir = captureDir / "reviews"
+                 / sanitizeFileComponent(reviewId, "review").toStdString();
+  }
+
   auto error = std::error_code{};
   std::filesystem::create_directories(captureDir, error);
   if (error)
@@ -668,7 +699,14 @@ QString makeCaptureFilePath()
 
   const auto now = std::chrono::system_clock::now().time_since_epoch();
   const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-  return pathToQString(captureDir / QString{"viewport-%1.png"}.arg(millis).toStdString());
+  const auto captureName = sanitizeFileComponent(
+    params.value("captureName").toString(), QString{"viewport-%1"}.arg(millis));
+  return pathToQString(captureDir / QString{"%1.png"}.arg(captureName).toStdString());
+}
+
+QString makeCaptureFilePath()
+{
+  return makeCaptureFilePath(QJsonObject{});
 }
 
 McpBridgeToolResult capturePixmapResult(
@@ -700,7 +738,7 @@ McpBridgeToolResult capturePixmapResult(
     });
   }
 
-  const auto filePath = makeCaptureFilePath();
+  const auto filePath = makeCaptureFilePath(params);
   if (filePath.isEmpty())
   {
     return McpBridgeToolResult::failure(
@@ -1856,12 +1894,14 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
   objectIds = dedupedObjectIds;
 
   auto targetBounds = QJsonObject{};
+  auto targetNodes = std::vector<mdl::Node*>{};
   if (map != nullptr && !objectIds.isEmpty())
   {
     auto error = QString{};
     const auto nodes = nodesFromObjectIds(*map, objectIds, error);
     if (error.isEmpty() && !nodes.empty())
     {
+      targetNodes = nodes;
       targetBounds = boundsToJson(boundsForNodes(nodes));
     }
     else if (!error.isEmpty())
@@ -1917,13 +1957,25 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     }
     appController.refreshMcpOverlayViews();
   }
-  if (requestedIsolate && isolateMode != "highlight_only")
+  if (requestedIsolate && isolateMode == "fade_others")
   {
     targetWarnings.push_back(
-      QString{"isolationModeFallback: %1 requested, but this build only supports "
-              "non-persistent highlight_only review isolation without changing map "
-              "visibility or undo state."}
+      QString{"isolationModeFallback: %1 requested; this build captures with "
+              "highlight_only because renderer-level fade isolation is not implemented "
+              "yet."}
         .arg(isolateMode));
+  }
+  if (requestedIsolate && isolateMode == "hide_others")
+  {
+    targetWarnings.push_back(
+      "isolationModeFallback: hide_others requested; this build writes a focused "
+      "highlight_only review bundle. True hidden-others isolation needs a dedicated "
+      "renderer target filter.");
+  }
+  if (requestedIsolate && targetNodes.empty())
+  {
+    targetWarnings.push_back(
+      "isolationSkipped: review isolation requires live operationIds or objectIds.");
   }
 
   if (const auto cameraValue = params.value("camera"); cameraValue.isObject())
@@ -1976,6 +2028,26 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     cameraControlled = true;
   }
 
+  const auto views = stringArrayFromValueOrDefault(
+    params.value("views"), QJsonArray{"current", "3d", "2d"});
+  auto captureParams = QJsonObject{
+    {"returnBase64", mcpOptionalBool(params, "returnBase64", false)}};
+  if (const auto outputDir = params.value("outputDir").toString().trimmed();
+      !outputDir.isEmpty())
+  {
+    captureParams.insert("outputDir", outputDir);
+  }
+  if (const auto reviewId = params.value("reviewId").toString().trimmed();
+      !reviewId.isEmpty())
+  {
+    captureParams.insert("reviewId", reviewId);
+  }
+  const auto min2dHeight = std::max(1, params.value("min2dHeight").toInt(360));
+  auto captures = QJsonArray{};
+  auto quality = QJsonArray{};
+  auto warnings = QJsonArray{};
+  appendWarnings(warnings, targetWarnings);
+
   if (mcpOptionalBool(params, "clearSelectionBeforeCapture", false))
   {
     auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -1987,16 +2059,7 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
     QCoreApplication::processEvents();
   }
 
-  const auto views = stringArrayFromValueOrDefault(
-    params.value("views"), QJsonArray{"current", "3d", "2d"});
-  const auto captureParams =
-    QJsonObject{{"returnBase64", mcpOptionalBool(params, "returnBase64", false)}};
-  const auto min2dHeight = std::max(1, params.value("min2dHeight").toInt(360));
-  auto captures = QJsonArray{};
-  auto quality = QJsonArray{};
-  auto warnings = QJsonArray{};
-  appendWarnings(warnings, targetWarnings);
-
+  auto captureIndex = 0;
   for (const auto& viewValue : views)
   {
     const auto view = normalizedReviewViewName(viewValue.toString());
@@ -2035,12 +2098,18 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
       }
     }
 
+    auto viewCaptureParams = captureParams;
+    viewCaptureParams.insert(
+      "captureName",
+      sanitizeFileComponent(
+        QString{"%1-%2"}.arg(captureIndex++).arg(viewValue.toString()), "capture"));
+
     auto captureResult =
-      view == "current" ? viewportCaptureCurrentResult(appController, captureParams)
-      : view == "3d"    ? viewportCapture3DResult(appController, captureParams)
+      view == "current" ? viewportCaptureCurrentResult(appController, viewCaptureParams)
+      : view == "3d"    ? viewportCapture3DResult(appController, viewCaptureParams)
       : (view == "top_2d_fit" || view == "side_2d_fit")
-        ? viewportCaptureReview2DResult(appController, captureParams, view)
-        : viewportCapture2DResult(appController, captureParams);
+        ? viewportCaptureReview2DResult(appController, viewCaptureParams, view)
+        : viewportCapture2DResult(appController, viewCaptureParams);
     if (!captureResult.ok)
     {
       warnings.push_back(
@@ -2067,8 +2136,14 @@ McpBridgeToolResult viewportCaptureSceneReviewResult(
       {
         captureMapWindow->switchMapViewLayout(MapViewLayout::TwoPanes);
         QCoreApplication::processEvents();
+        auto retryParams = viewCaptureParams;
+        retryParams.insert(
+          "captureName",
+          sanitizeFileComponent(
+            QString{"%1-%2-retry"}.arg(captureIndex++).arg(viewValue.toString()),
+            "capture-retry"));
         auto retryResult =
-          viewportCaptureReview2DResult(appController, captureParams, view);
+          viewportCaptureReview2DResult(appController, retryParams, view);
         if (retryResult.ok)
         {
           auto retryCapture = retryResult.result;
@@ -2162,6 +2237,17 @@ McpBridgeToolResult renderReviewOperationResult(
   const McpObjectRegistry* objectRegistry)
 {
   auto reviewParams = params;
+  const auto reviewId =
+    QString{"review-%1"}.arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  reviewParams.insert("reviewId", reviewId);
+  if (const auto outputDir = params.value("outputDir").toString().trimmed();
+      !outputDir.isEmpty())
+  {
+    const auto bundleDir =
+      std::filesystem::path{outputDir.toStdString()}
+      / sanitizeFileComponent(reviewId, "review").toStdString();
+    reviewParams.insert("outputDir", pathToQString(bundleDir));
+  }
   if (!reviewParams.contains("sceneName"))
   {
     reviewParams.insert("sceneName", "MCP isolated scene review");
@@ -2178,6 +2264,10 @@ McpBridgeToolResult renderReviewOperationResult(
   {
     reviewParams.insert(
       "views", QJsonArray{"overview_3d", "top_2d_fit", "side_2d_fit", "detail_3d"});
+  }
+  if (!reviewParams.contains("layout"))
+  {
+    reviewParams.insert("layout", "twoPanes");
   }
   if (!reviewParams.contains("framing"))
   {
@@ -2204,11 +2294,10 @@ McpBridgeToolResult renderReviewOperationResult(
     return review;
   }
 
-  const auto reviewId =
-    QString{"review-%1"}.arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
   review.result.insert("reviewId", reviewId);
   review.result.insert("resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId));
   review.result.insert("tool", "render_review_operation");
+  review.result.insert("outputDir", reviewParams.value("outputDir").toString());
   return review;
 }
 

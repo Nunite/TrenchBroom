@@ -224,6 +224,16 @@ TEST_CASE("McpBridgeServer")
         });
       }
       const auto hasTarget = params.value("objectIds").isArray();
+      auto warnings = QJsonArray{};
+      if (
+        params.value("isolate").toBool(false)
+        && params.value("isolateMode").toString() == "hide_others")
+      {
+        warnings.push_back(
+          "isolationModeFallback: hide_others requested; this build writes a focused "
+          "highlight_only review bundle. True hidden-others isolation needs a dedicated "
+          "renderer target filter.");
+      }
       return McpBridgeToolResult::success(QJsonObject{
         {"sceneName", "whitebox review smoke"},
         {"captureCount", captures.size()},
@@ -231,13 +241,7 @@ TEST_CASE("McpBridgeServer")
         {"quality", quality},
         {"qualityValid", true},
         {"checklist", QJsonArray{"silhouette", "connectivity"}},
-        {"warnings",
-         params.value("isolateMode").toString() == "hide_others"
-           ? QJsonArray{"isolationModeFallback: hide_others requested, but this build "
-                        "only "
-                        "supports non-persistent highlight_only review isolation without "
-                        "changing map visibility or undo state."}
-           : QJsonArray{}},
+        {"warnings", warnings},
         {"cameraControlled", cameraControlled},
         {"focusedObjectCount", cameraControlled ? 1 : 0},
         {"targetObjectCount", hasTarget ? 1 : 0},
@@ -256,6 +260,7 @@ TEST_CASE("McpBridgeServer")
         {"captures", QJsonArray{}},
         {"quality", QJsonArray{}},
         {"qualityValid", true},
+        {"outputDir", params.value("outputDir").toString()},
       });
     }
     if (toolName == "overlay_set")
@@ -787,10 +792,9 @@ TEST_CASE("McpBridgeServer")
       isolatedReviewResponse.result.value("warnings")
         .toArray()
         .contains(
-          "isolationModeFallback: hide_others requested, but this build only supports "
-          "non-persistent highlight_only review isolation without changing map "
-          "visibility "
-          "or undo state."));
+          "isolationModeFallback: hide_others requested; this build writes a focused "
+          "highlight_only review bundle. True hidden-others isolation needs a dedicated "
+          "renderer target filter."));
 
     const auto bundleReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "10d",

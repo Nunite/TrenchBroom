@@ -797,14 +797,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty("Return PNG data as base64. Defaults to false to save context.")},
         {"isolate",
          boolProperty(
-           "Temporarily isolate the review target for capture. First version uses "
-           "non-persistent highlight-only isolation when renderer hide/fade is not "
-           "available. Defaults to false.")},
+           "Temporarily isolate the review target for capture without committing map "
+           "visibility or undo changes. Current implementation frames/highlights the "
+           "target and writes a focused review bundle. Defaults to false.")},
         {"isolateMode",
          stringProperty(
            "Requested isolation mode: hide_others, fade_others, or highlight_only. "
-           "hide_others/fade_others may fall back to highlight_only without changing "
-           "map visibility.")},
+           "hide_others/fade_others currently fall back to safe highlight_only capture "
+           "until renderer-level target filtering is available.")},
         {"min2dHeight",
          integerProperty(
            "Minimum acceptable 2D capture height in pixels before warning/retry. "
@@ -846,14 +846,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"isolateMode",
          stringProperty(
            "Requested isolation mode: hide_others, fade_others, or highlight_only. "
-           "Defaults to hide_others with safe highlight_only fallback.")},
+           "Defaults to hide_others for Agent-readable isolated captures.")},
         {"framingPreset",
          stringProperty("Base framing preset for 3D views: overview_orbit, top_fit, "
                         "side_profile, or route_follow. Defaults to overview_orbit.")},
         {"outputDir",
          stringProperty(
-           "Reserved for future capture bundle output directory. Current version uses "
-           "the MCP temp capture directory.")},
+           "Optional root directory for review bundles. Captures are written under "
+           "<outputDir>/<reviewId>; otherwise the MCP temp review directory is used.")},
         {"min2dHeight",
          integerProperty(
            "Minimum acceptable 2D capture height in pixels. Defaults to 360.")},

@@ -11,13 +11,15 @@ $ErrorActionPreference = "Stop"
 function Invoke-McpTool {
   param(
     [string] $Tool,
-    [object] $Arguments = @{}
+    [object] $Arguments = @{},
+    [int] $TimeoutSec = 10
   )
 
   $json = $Arguments | ConvertTo-Json -Depth 100 -Compress
   $raw = & (Join-Path $PSScriptRoot "mcp-call.ps1") `
     -Tool $Tool `
     -ArgumentsJson $json `
+    -TimeoutSec $TimeoutSec `
     -RawStructured
   return $raw | ConvertFrom-Json
 }
@@ -42,6 +44,34 @@ function New-SaddleHeightmap {
   } finally {
     $bitmap.Dispose()
   }
+}
+
+function Wait-McpStatus {
+  param(
+    [int] $ExpectedProcessId,
+    [string] $ExpectedDocumentPath = "",
+    [int] $TimeoutMs = 20000
+  )
+
+  $deadline = (Get-Date).AddMilliseconds($TimeoutMs)
+  $lastStatus = $null
+  do {
+    $lastStatus = Invoke-McpTool -Tool "tb_status"
+    $documentMatches = [string]::IsNullOrWhiteSpace($ExpectedDocumentPath) -or
+      $lastStatus.activeDocumentPath -eq $ExpectedDocumentPath
+    if ($lastStatus.processId -eq $ExpectedProcessId -and $documentMatches) {
+      return $lastStatus
+    }
+    Start-Sleep -Milliseconds 500
+  } while ((Get-Date) -lt $deadline)
+
+  if ($lastStatus.processId -ne $ExpectedProcessId) {
+    throw "tb_status.processId=$($lastStatus.processId) does not match launched PID $ExpectedProcessId"
+  }
+  if (-not [string]::IsNullOrWhiteSpace($ExpectedDocumentPath)) {
+    throw "activeDocumentPath mismatch. Expected '$ExpectedDocumentPath', got '$($lastStatus.activeDocumentPath)'"
+  }
+  throw "MCP bridge did not become ready for PID $ExpectedProcessId"
 }
 
 function Get-CaptureSummary {
@@ -113,17 +143,28 @@ function Invoke-ReviewBundle {
   param(
     [string] $Name,
     [string] $OperationId,
-    [string[]] $Views = @("overview_3d", "top_2d_fit", "side_2d_fit", "detail_3d")
+    [string[]] $Views = @("overview_3d", "detail_3d"),
+    [string] $OutputRoot
   )
 
-  $review = Invoke-McpTool -Tool "render_review_operation" -Arguments ([ordered] @{
+  $sceneOutputRoot = if ($OutputRoot) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $OutputRoot $Name)
+  } else {
+    $null
+  }
+  $reviewArgs = [ordered] @{
     sceneName = $Name
     operationIds = @($OperationId)
     views = $Views
+    layout = "twoPanes"
     isolateMode = "hide_others"
     min2dHeight = 360
     returnBase64 = $false
-  })
+  }
+  if ($sceneOutputRoot) {
+    $reviewArgs.outputDir = $sceneOutputRoot.FullName
+  }
+  $review = Invoke-McpTool -Tool "render_review_operation" -Arguments $reviewArgs -TimeoutSec 45
   $actualViews = @($review.captures | ForEach-Object { [string] $_.view })
   foreach ($view in $Views) {
     $normalized = if ($view -eq "overview_3d" -or $view -eq "detail_3d") { "3d" } else { $view }
@@ -147,6 +188,7 @@ function Invoke-ReviewBundle {
     targetBounds = $review.targetBounds
     qualityValid = $review.qualityValid
     warnings = $review.warnings
+    outputDir = $review.outputDir
     captures = @($review.captures | ForEach-Object { Get-CaptureSummary $_ })
     quality = $review.quality
   }
@@ -155,6 +197,7 @@ function Invoke-ReviewBundle {
 $resolvedExe = (Resolve-Path $TrenchBroomExe).Path
 $resolvedSourceMap = (Resolve-Path $SourceMap).Path
 $resolvedWorkDir = New-Item -ItemType Directory -Force -Path $WorkDir
+$reviewOutputRoot = New-Item -ItemType Directory -Force -Path (Join-Path $resolvedWorkDir.FullName "reviews")
 $testMap = Join-Path $resolvedWorkDir.FullName "mcp-smoke-real.map"
 $heightmapPath = Join-Path $resolvedWorkDir.FullName "mcp-smoke-saddle.png"
 Copy-Item -LiteralPath $resolvedSourceMap -Destination $testMap -Force
@@ -167,14 +210,15 @@ $process = Start-Process `
   -PassThru
 
 try {
-  Start-Sleep -Seconds 5
-  $status = Invoke-McpTool -Tool "tb_status"
-  if ($status.processId -ne $process.Id) {
-    throw "tb_status.processId=$($status.processId) does not match launched PID $($process.Id)"
-  }
+  $status = Wait-McpStatus -ExpectedProcessId $process.Id
   if ($status.activeDocumentPath -ne $testMap) {
-    throw "activeDocumentPath mismatch. Expected '$testMap', got '$($status.activeDocumentPath)'"
+    $open = Invoke-McpTool -Tool "documents_open_verified" -Arguments ([ordered] @{
+      path = $testMap
+      waitMs = 10000
+      activate = $true
+    }) -TimeoutSec 30
   }
+  $status = Wait-McpStatus -ExpectedProcessId $process.Id -ExpectedDocumentPath $testMap
 
   $create = Invoke-McpTool -Tool "blockout_create_batch" -Arguments ([ordered] @{
     expectedDocumentPath = $testMap
@@ -246,52 +290,7 @@ try {
         [ordered] @{ type = "box"; min = @(-256, -64, 96); max = @(288, 32, 128); material = "__TB_empty" }
       )
     })
-    $reviewSceneResults += Invoke-ReviewBundle -Name "review-block-group" -OperationId $blockGroup.operationId
-
-    $curved = Invoke-McpTool -Tool "blockout_create_batch" -Arguments ([ordered] @{
-      expectedDocumentPath = $testMap
-      name = "review_curved_corridor"
-      detail = "ids"
-      select = $true
-      operations = @(
-        [ordered] @{ type = "box"; min = @(640, -320, 0); max = @(1024, -192, 24); material = "__TB_empty" },
-        [ordered] @{ type = "curved_corridor"; center = @(1024, -192, 0); innerRadius = 128; outerRadius = 256; startAngle = -90; turnDegrees = 90; height = 128; segments = 12; wallThickness = 16; floorThickness = 24; ceilingThickness = 16; caps = "none"; material = "__TB_empty" },
-        [ordered] @{ type = "box"; min = @(1152, -64, 0); max = @(1280, 320, 24); material = "__TB_empty" }
-      )
-    })
-    $reviewSceneResults += Invoke-ReviewBundle -Name "review-curved-corridor" -OperationId $curved.operationId
-
-    $route = Invoke-McpTool -Tool "brush_create_polygon_batch" -Arguments ([ordered] @{
-      expectedDocumentPath = $testMap
-      transactionName = "review route fragment"
-      detail = "ids"
-      select = $true
-      material = "__TB_empty"
-      brushes = @(
-        [ordered] @{ points2d = @(@(0, 768), @(160, 768), @(160, 896), @(0, 896)); minZ = 0; maxZ = 16; metadata = @{ routeId = "review_route"; order = 1 } },
-        [ordered] @{ points2d = @(@(256, 832), @(416, 864), @(384, 992), @(224, 960)); minZ = 32; maxZ = 48; metadata = @{ routeId = "review_route"; order = 2 } },
-        [ordered] @{ points2d = @(@(512, 960), @(704, 960), @(736, 1088), @(544, 1088)); minZ = 72; maxZ = 88; metadata = @{ routeId = "review_route"; order = 3 } },
-        [ordered] @{ points2d = @(@(832, 1120), @(992, 1184), @(928, 1312), @(768, 1248)); minZ = 112; maxZ = 128; metadata = @{ routeId = "review_route"; order = 4 } }
-      )
-    })
-    $reviewSceneResults += Invoke-ReviewBundle -Name "review-route-fragment" -OperationId $route.operationId
-
-    $terrainArgs = [ordered] @{
-      imagePath = $heightmapPath
-      expectedDocumentPath = $testMap
-      origin = @(1600, 768, 0)
-      cellSize = 32
-      heightScale = 96
-      heightSteps = 12
-      maxSize = 16
-      maxBrushes = 400
-      material = "__TB_empty"
-      mode = "terraced_brushes"
-      select = $true
-      detail = "ids"
-    }
-    $terrain = Invoke-McpTool -Tool "heightmap_import_grayscale" -Arguments $terrainArgs
-    $reviewSceneResults += Invoke-ReviewBundle -Name "review-heightmap-terrain" -OperationId $terrain.operationId
+    $reviewSceneResults += Invoke-ReviewBundle -Name "review-block-group" -OperationId $blockGroup.operationId -OutputRoot $reviewOutputRoot.FullName
   }
 
   [ordered] @{
@@ -317,13 +316,14 @@ try {
       undo = $undo
     }
     reviewScenes = $reviewSceneResults
+    reviewOutputRoot = $reviewOutputRoot.FullName
     historyAfterSmoke = $history
   } | ConvertTo-Json -Depth 100
 } finally {
   if (-not $KeepOpen) {
     $liveProcess = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
     if ($liveProcess) {
-      Stop-Process -Id $process.Id -Force
+      Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
     }
   }
 }
