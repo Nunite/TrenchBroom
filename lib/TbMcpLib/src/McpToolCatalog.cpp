@@ -189,6 +189,8 @@ QJsonObject blockoutBatchOperationSchema()
     {"description",
      "Typed Blockout IR operation object. Examples: "
      R"({"type":"box","min":[0,0,0],"max":[128,128,16],"material":"clip"}; )"
+     R"({"type":"cylinder","min":[-64,-64,0],"max":[64,64,128],)"
+     R"("sides":16,"axis":"z"}; )"
      R"({"type":"prism","points2d":[[0,0],[128,0],[64,64]],"minZ":0,"maxZ":64}; )"
      R"({"type":"cylinder_sector","center":[0,0,0],"innerRadius":64,)"
      R"("outerRadius":128,"startAngle":0,"endAngle":90,"minZ":0,"maxZ":16}; )"
@@ -208,10 +210,10 @@ QJsonObject blockoutBatchOperationSchema()
     {"properties",
      QJsonObject{
        {"type",
-        stringProperty(
-          "Operation type: box, prism, polyhedron, cylinder_sector, room, corridor, "
-          "curved_corridor, path_ribbon, stairs, ramp, doorway, cover, or "
-          "sky_shell.")},
+        stringProperty("Operation type: box, cylinder, prism, polyhedron, "
+                       "cylinder_sector, room, corridor, "
+                       "curved_corridor, path_ribbon, stairs, ramp, doorway, cover, or "
+                       "sky_shell.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"material", stringProperty("Per-operation material override.")},
@@ -238,7 +240,8 @@ QJsonObject blockoutBatchOperationSchema()
        {"ceilingThickness", numberProperty("Ceiling thickness for curved_corridor.")},
        {"caps", stringProperty("curved_corridor caps: none, start, end, or both.")},
        {"steps", integerProperty("Stair step count.")},
-       {"axis", stringProperty("Axis for stairs/ramp: x, y, or z.")},
+       {"axis", stringProperty("Axis for cylinder/stairs/ramp: x, y, or z.")},
+       {"sides", integerProperty("Cylinder side count, clamped to 3..128.")},
        {"thickness", numberProperty("Shell thickness for room/corridor/sky_shell.")},
        {"doorMin", vec3Property("Door opening minimum corner for doorway.")},
        {"doorMax", vec3Property("Door opening maximum corner for doorway.")},
@@ -531,7 +534,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       false,
       true,
       objectSchema({
-        {"objectIds", arrayProperty("Optional object ids whose combined bounds to frame.")},
+        {"objectIds",
+         arrayProperty("Optional object ids whose combined bounds to frame.")},
         {"bounds",
          objectSchema(
            {
@@ -542,13 +546,13 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"min", vec3Property("Alternative bounds minimum corner.")},
         {"max", vec3Property("Alternative bounds maximum corner.")},
         {"azimuth",
-         numberProperty(
-           "Horizontal orbit angle in degrees around +Z. Defaults to -45.")},
+         numberProperty("Horizontal orbit angle in degrees around +Z. Defaults to -45.")},
         {"elevation",
          numberProperty(
            "Vertical orbit angle in degrees, clamped to [-85,85]. Defaults to 32.")},
         {"distanceScale",
-         numberProperty("Camera distance as a bounds diagonal multiplier. Defaults to 1.35.")},
+         numberProperty(
+           "Camera distance as a bounds diagonal multiplier. Defaults to 1.35.")},
         {"minDistance",
          numberProperty("Minimum camera distance in map units. Defaults to 256.")},
         {"targetOffset",
@@ -1785,8 +1789,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
           {"operations",
            arrayProperty(
-             "Array of blockout operations. Supported types include box, prism, "
-             "polyhedron, cylinder_sector, room, corridor, curved_corridor, "
+             "Array of blockout operations. Supported types include box, cylinder, "
+             "prism, polyhedron, cylinder_sector, room, corridor, curved_corridor, "
              "path_ribbon, stairs, ramp, doorway, cover, and sky_shell. Each item "
              "must be an object with a type field; use tb_tools_search(detail=schema, "
              "query="

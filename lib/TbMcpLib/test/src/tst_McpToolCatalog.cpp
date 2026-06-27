@@ -696,10 +696,20 @@ TEST_CASE("McpToolCatalog")
     const auto itemDescription =
       operations.value("items").toObject().value("description").toString();
     CHECK(itemDescription.contains(R"("type":"box")"));
+    CHECK(itemDescription.contains(R"("type":"cylinder")"));
     CHECK(itemDescription.contains(R"("type":"curved_corridor")"));
     CHECK(itemDescription.contains(R"("type":"path_ribbon")"));
     CHECK(
       operations.value("items").toObject().value("required").toArray().contains("type"));
+
+    const auto itemProperties =
+      operations.value("items").toObject().value("properties").toObject();
+    CHECK(itemProperties.value("sides").isObject());
+    CHECK(itemProperties.value("axis")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("cylinder"));
   }
 
   SECTION("tool search returns exact tool names from multi-tool queries")

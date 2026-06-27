@@ -2102,6 +2102,13 @@ TEST_CASE("McpBridgeServer batch blockout tools")
            {"max", QJsonArray{144, 64, 32}},
            {"axis", "x"},
          },
+         QJsonObject{
+           {"type", "cylinder"},
+           {"min", QJsonArray{160, 0, 0}},
+           {"max", QJsonArray{224, 64, 96}},
+           {"sides", 8},
+           {"axis", "z"},
+         },
        }},
     },
     history,
@@ -2114,15 +2121,15 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   const auto operationId = batchResponse.result.value("operationId").toString();
   CHECK(!operationId.isEmpty());
   CHECK(batchResponse.result.value("transactionName").toString() == "MCP: Test batch");
-  CHECK(batchResponse.result.value("brushCount").toInt() == 2);
-  CHECK(batchResponse.result.value("changedObjectCount").toInt() == 2);
+  CHECK(batchResponse.result.value("brushCount").toInt() == 3);
+  CHECK(batchResponse.result.value("changedObjectCount").toInt() == 3);
   CHECK(batchResponse.result.value("grid").toDouble() == 16.0);
   CHECK(batchResponse.result.value("changedObjectIds").isUndefined());
   CHECK(batchResponse.result.value("resourceUri")
           .toString()
           .startsWith("tbmcp://operation/"));
   CHECK(batchResponse.result.value("validation").toObject().value("valid").toBool());
-  CHECK(map.selection().nodes.size() == 2u);
+  CHECK(map.selection().nodes.size() == 3u);
 
   const auto ribbonResponse = blockoutCreateBatchForMapResult(
     map,
@@ -2164,7 +2171,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(historyOperation.value("operationId").toString() == operationId);
   CHECK(!historyOperation.value("createdAt").toString().isEmpty());
   CHECK(historyOperation.value("createdAtMs").toDouble() > 0.0);
-  CHECK(historyOperation.value("changedObjectCount").toInt() == 2);
+  CHECK(historyOperation.value("changedObjectCount").toInt() == 3);
 
   const auto descendantCountBeforeInvalid = map.worldNode().descendantCount();
   const auto invalidResponse = blockoutCreateBatchForMapResult(
@@ -2211,7 +2218,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   const auto inspectResponse = operationInspectResult(
     history, QJsonObject{{"operationId", operationId}, {"detail", "ids"}});
   REQUIRE(inspectResponse.ok);
-  CHECK(inspectResponse.result.value("changedObjectIds").toArray().size() == 2);
+  CHECK(inspectResponse.result.value("changedObjectIds").toArray().size() == 3);
   CHECK(!inspectResponse.result.value("createdAt").toString().isEmpty());
   CHECK(inspectResponse.result.value("createdAtMs").toDouble() > 0.0);
 

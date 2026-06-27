@@ -2301,6 +2301,35 @@ std::vector<mdl::Node*> compileBatchOperation(
     return brushNodesFromBounds(builder, {*snappedBounds}, material, error);
   }
 
+  if (type == "cylinder")
+  {
+    const auto bounds = boundsFromJson(operation, error);
+    if (!bounds)
+    {
+      return {};
+    }
+    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
+    if (!snappedBounds)
+    {
+      return {};
+    }
+    const auto axis = axisFromJson(operation, "axis", vm::axis::z, error);
+    if (!axis)
+    {
+      return {};
+    }
+    const auto sides =
+      std::clamp(optionalSize(operation, "sides", 16), size_t{3}, size_t{128});
+    auto brush = builder.createCylinder(
+      *snappedBounds, mdl::EdgeAlignedCircle{sides}, *axis, material);
+    if (brush.is_error())
+    {
+      error = "Could not create cylinder brush from the given bounds";
+      return {};
+    }
+    return {new mdl::BrushNode{std::move(brush.value())}};
+  }
+
   if (type == "room" || type == "corridor")
   {
     const auto bounds = boundsFromJson(operation, error);

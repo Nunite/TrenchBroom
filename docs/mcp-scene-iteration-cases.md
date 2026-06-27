@@ -381,3 +381,53 @@ Proposed MCP changes:
 
 Commit:
 - `Add MCP camera controls for scene review`
+
+### 2026-06-27 - Scene 2: Coastal Lighthouse And Breakwater
+
+Build phases:
+- `mcp-op-1..6`: lighthouse island base, stacked tower cylinders, lantern room, and cap. Result: 6 cylinder brushes from atomic `brush_create_cylinder`.
+- `mcp-op-7` / `MCP Scene 2: service deck rails and straight dock`: service deck cross beams, rail blocks, dock deck, posts, and small end platform. Result: `valid=true`, 14 brushes.
+- `mcp-op-8` / `MCP Scene 2: breakwater rocks and markers`: curved breakwater ribbon, rock blocks, dock end rails, beacon markers, and lantern details. Result: `valid=true`, 25 brushes from 18 operations.
+- `mcp-op-9`: translated all Scene 2 operation objects back inside GoldSrc soft map bounds after the initial placement at `x=7000+` produced out-of-bounds warnings.
+
+MCP tools used:
+- `brush_create_cylinder` for lighthouse round tower parts.
+- `blockout_create_batch` with `box` and `path_ribbon` operations for dock, rocks, rail bands, and breakwater.
+- `operation_inspect(detail=ids)` plus `objects_transform` to move the generated module as one scene.
+- `map_validate`, `problems_check`, `documents_save`.
+- `viewport_capture_scene_review` with explicit `camera.position` / `camera.target` for visual review.
+
+Screenshots:
+- 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782502762644.png`
+- 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782502762715.png`
+- Focused 3D after `viewport_layout_set(onePane)`: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782503155480.png`
+
+What worked:
+- The lighthouse silhouette is immediately readable: stacked cylindrical tower, wider lantern deck, cap, cross service platform, and dock connection.
+- `path_ribbon` produced a curved breakwater without many individual box calls.
+- `viewport_camera_set` made it easy to choose a useful 3D review angle instead of fighting the current editor camera.
+- Operation history was usable enough to collect generated object ids and move a complete scene module after validation found a placement issue.
+- I could open the captured PNGs locally and visually verify the scene without reading the `.map` file: the lighthouse tower, dock, and breakwater were recognizable in the 3D screenshot.
+
+What failed:
+- `brush_create_cylinder` has no batch mode, so the tower required six separate atomic MCP calls and six undo steps.
+- Cylinder brushes generated non-integer vertex warnings in `problems_check`; this is probably from circular vertex math and needs a snap/grid strategy.
+- Initial scene placement outside the soft map bounds produced many warnings before translation; scene iteration needs a documented safe placement envelope or a map occupancy helper.
+- Bounds selection by broad region overlapped Scene 1 after translation, proving that spatial selection alone is unsafe for multi-scene iteration. Operation ids or metadata should be preferred.
+- 2D screenshot showed only a partial plan view; scene review still needs a multi-camera or framed 2D bounds mode.
+- The first two-pane 3D capture included the adjacent 2D grid pane in the image. Switching to `onePane` produced a cleaner 3D capture, but a large neighboring brush mass still entered frame, so screenshot review needs stronger operation-scoped isolation or camera obstacle awareness.
+
+Tool/context bottlenecks:
+- Missing generic `brush_create_cylinders_batch` or support for solid-cylinder operations in `blockout_create_batch`.
+- Need `snapMode` / `grid` handling for circular primitives so generated vertices can avoid non-integer warnings when desired.
+- Need a safe-space query such as `map_find_empty_bounds` or at least a documented soft-bounds-aware placement helper.
+- Need operation-scoped selection/review flows to avoid long id arrays and accidental cross-scene bounds overlap.
+
+Proposed MCP changes:
+- Implemented follow-up: add generic `cylinder` support to `blockout_create_batch`, not a lighthouse-specific helper.
+- Add or expose circular primitive snap controls that can prefer integer/grid vertices over perfect radius.
+- Improve scene review with operation ids directly, for example `viewport_capture_scene_review.operationIds`.
+- Add scoped/baseline problem filtering so Scene 2 warnings can be distinguished from pre-existing worldspawn/light_environment warnings.
+
+Commit:
+- Pending follow-up: `Add batch cylinder blockout operation`.
