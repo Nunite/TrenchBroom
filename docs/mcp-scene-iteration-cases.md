@@ -431,7 +431,7 @@ Proposed MCP changes:
 - Add scoped/baseline problem filtering so Scene 2 warnings can be distinguished from pre-existing worldspawn/light_environment warnings.
 
 Commit:
-- Pending follow-up: `Add batch cylinder blockout operation`.
+- `27d89f75a Add batch cylinder blockout operation`
 
 ### 2026-06-27 - Scene 3: Chinese Courtyard
 
@@ -486,7 +486,7 @@ Proposed MCP changes:
 - Later: add circular primitive snap/grid controls for `cylinder`.
 
 Commit:
-- Pending follow-up: `Improve batch blockout failure diagnostics`.
+- `d07e828ca Improve batch blockout failure diagnostics`
 
 ### 2026-06-27 - Scene 4: Abandoned Factory
 
@@ -887,4 +887,4 @@ Proposed MCP changes:
 - Consider richer prism/mesh helpers for tapered spikes or rock clusters without hand-writing many triangular prisms.
 
 Commit:
-- Pending follow-up: `Allow repeat grid one-axis shorthand`.
+- `cf54e1302 Allow repeat grid one-axis shorthand`
