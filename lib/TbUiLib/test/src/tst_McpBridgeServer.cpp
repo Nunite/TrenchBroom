@@ -2421,6 +2421,43 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(!invalidSupportPostsValidation.value("errors").toArray().isEmpty());
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
+  const auto invalidRepeatZeroOffsetResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "repeat_translate"},
+           {"count", 2},
+           {"offset", QJsonArray{0, 0, 0}},
+           {"operation",
+            QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{0, 0, 0}},
+              {"max", QJsonArray{64, 64, 16}},
+            }},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(invalidRepeatZeroOffsetResponse.ok);
+  const auto invalidRepeatZeroOffsetValidation =
+    invalidRepeatZeroOffsetResponse.result.value("validation").toObject();
+  CHECK(!invalidRepeatZeroOffsetValidation.value("valid").toBool());
+  CHECK(invalidRepeatZeroOffsetValidation.value("failedOperationIndex").toInt() == 0);
+  CHECK(
+    invalidRepeatZeroOffsetValidation.value("failedOperationType").toString()
+    == "repeat_translate");
+  CHECK(
+    invalidRepeatZeroOffsetValidation.value("errors")
+      .toArray()
+      .first()
+      .toString()
+      .contains("offset"));
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+
   const auto invalidStairsResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",

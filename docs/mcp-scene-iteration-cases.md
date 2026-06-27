@@ -706,4 +706,64 @@ Proposed MCP changes:
 - Improve 2D scene review with true top-view fitted capture by bounds or operation id.
 
 Commit:
-- Pending follow-up: `Add support posts batch operation`.
+- `13ddcdce4 Add support posts batch operation`.
+
+### 2026-06-27 - Scene 8: European Castle Wall
+
+Clean map:
+- `build-release-codex/app/TrenchBroom/map_test/mcp_scene_08_european_castle_wall.map`
+- Created from the minimal Valve map fixture, then opened through MCP `documents_open`.
+- Initial verification: `brushCount=0`. The MCP history still contained stale/undone records from the prior smoke map, so this run used the active document snapshot and Scene 8 transaction names as the authoritative evidence.
+
+Build phases:
+- `mcp-op-2` / `MCP Scene 8: castle ground curtain walls towers and gatehouse`: ground slab, curtain wall ribbons, four corner towers, central gatehouse, and inner courtyard base. Result: `valid=true`, 18 brushes.
+- `mcp-op-3` / `MCP Scene 8: battlements wall walks and tower crowns`: first attempt at wall walks and crenellations. Result: created 100 brushes, then immediately undone because one `repeat_translate` operation accidentally used `offset=[0,0,0]`, producing overlapping duplicate tower crown brushes.
+- `mcp-op-4` / `MCP Scene 8: battlements wall walks and tower crowns`: corrected battlements, wall walks, tower top slabs, and gatehouse crenellations. Result: `valid=true`, 86 brushes.
+- `mcp-op-5` / `MCP Scene 8: gate opening stairs courtyard and markers`: gate void markers, stairs to wall walks, interior keep marker, courtyard blocks, and route/flag markers. Result: `valid=true`, 35 brushes.
+
+MCP tools used:
+- `blockout_create_batch` with `path_ribbon`, `box`, `cylinder`, `stairs`, `ramp`, `prism`, and `repeat_translate`.
+- Hidden but searchable `documents_open` / `documents_save` to switch from the smoke map to a clean scene map and save the result.
+- `map_snapshot`, `map_validate`, `problems_check`, and `history_list`.
+- `viewport_capture_scene_review` with an orbit overview plus explicit gatehouse and wall-walk cameras.
+
+Screenshots:
+- Overview 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782549677880.png`
+- Overview 2D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782549677941.png`
+- Gatehouse detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782549678337.png`
+- Battlement wall-walk detail 3D: `C:\Users\Trh\AppData\Local\Temp\TrenchBroomMCP\viewport-1782549678515.png`
+
+Validation:
+- Final `map_snapshot`: `brushCount=139`, bounds `[-1808,-1200,-32]` to `[1808,1200,464]`, saved with `modified=false`.
+- Final `map_validate`: `valid=false`, `count=5`, `safeFixableCount=5`.
+- `problems_check`: five `Brush has non-integer vertices` warnings, all on the 12-sided cylinder tower brushes (`mcp:3:8` through `mcp:3:12`). These are known circular primitive grid warnings, not random Scene 8 placement failures.
+- Scene 8 live operations after correction: `mcp-op-2`, `mcp-op-4`, and `mcp-op-5` all reported `valid=true`; the bad `mcp-op-3` is retained in history as `undone=true`.
+
+What worked:
+- The gatehouse screenshot reads clearly as a castle wall: central doorway, heavy curtain wall, crenellations, corner towers, and flanking walls are visible.
+- The wall-walk detail shot shows usable parapet rhythm and a readable top route along the wall.
+- `repeat_translate` kept crenellations and repeated wall markers compact enough to author and review.
+- The corrected three-phase build made undo and history audit practical: the bad battlement attempt was isolated and removed without touching the main wall massing.
+
+What failed or constrained the agent:
+- A zero-offset `repeat_translate` accidentally generated duplicate overlapping tower crown brushes. The batch compiler accepted it because the individual boxes were valid. This is dangerous because visual screenshots may not reveal exact duplicate overlap.
+- Castle gates still had to be represented by manually splitting wall/gatehouse solids and leaving an opening. There is no generic arch/opening/cut primitive yet.
+- Walls along a rectangular path required separate `path_ribbon` operations per side plus hand-placed tower intersections. A generic wall-from-polyline helper would be useful if it stays low-level and path-based.
+- Round towers using `cylinder` still created non-integer vertex warnings even with grid snapping. For grid-clean castle towers, an explicit polygonal tower footprint or stronger cylinder snap behavior is needed.
+- `documents_open` worked this time, but operation history persisted stale entries from the previous document. Scene tests should not equate non-empty history with a dirty scene.
+
+Implemented MCP follow-up:
+- Added validation for `repeat_translate`: when `count > 1`, `offset` must be non-zero. This prevents accidental exact duplicate brush generation inside batch IR.
+- Updated schema text for `repeat_translate.offset` to document the rule.
+- Added focused `TbUiLibTest` coverage for zero-offset rejection.
+- Real MCP smoke verified a zero-offset repeat returns `valid=false` with `failedOperationType=repeat_translate` and leaves the clean smoke map at `brushCount=0`.
+
+Proposed MCP changes:
+- Add a generic `wall_from_polyline` or `path_wall_segment_batch` that creates straight wall runs from a centerline with height/thickness, but still returns ordinary brush geometry rather than a castle prefab.
+- Add a generic `crenellation_repeat` or `repeat_along_polyline` for repeated objects along straight and turning paths.
+- Add `arch_opening_from_wall` / `opening_from_wall_segments` for gates, tunnels, and windows.
+- Fix or replace grid-safe circular primitives so polygonal towers can avoid non-integer vertex warnings without manual prism footprints.
+- Consider an overlap/duplicate-bounds validator for batch results, because duplicated brushes are easy for agents to create and hard to spot in screenshots.
+
+Commit:
+- Pending follow-up: `Reject zero-offset repeat translate operations`.

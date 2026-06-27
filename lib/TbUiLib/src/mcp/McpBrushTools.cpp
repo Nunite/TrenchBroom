@@ -2521,6 +2521,11 @@ std::vector<mdl::Node*> compileBatchOperation(
       error = "repeat_translate count must be between 1 and 256";
       return {};
     }
+    if (count > 1 && vm::is_zero(*offset, GeometryEpsilon))
+    {
+      error = "repeat_translate offset must be non-zero when count is greater than one";
+      return {};
+    }
 
     auto result = std::vector<mdl::Node*>{};
     auto childOperation = operation.value("operation").toObject();

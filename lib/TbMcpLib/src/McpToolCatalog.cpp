@@ -260,7 +260,10 @@ QJsonObject blockoutBatchOperationSchema()
        {"doorMax", vec3Property("Door opening maximum corner for doorway.")},
        {"snapMode", stringProperty("Circular vertex snap mode: grid, radial, or none.")},
        {"count", integerProperty("repeat_translate repetition count, 1..256.")},
-       {"offset", vec3Property("repeat_translate offset added for each repetition.")},
+       {"offset",
+        vec3Property(
+          "repeat_translate offset added for each repetition; must be non-zero when "
+          "count is greater than one.")},
        {"operation",
         QJsonObject{
           {"type", "object"},
