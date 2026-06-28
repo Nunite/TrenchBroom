@@ -1304,6 +1304,249 @@ bool writeManifest(const std::filesystem::path& path, const QJsonObject& manifes
   return true;
 }
 
+QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolName)
+{
+  auto compact = QJsonObject{
+    {"tool", toolName},
+    {"renderer", result.value("renderer")},
+    {"style", result.value("style")},
+    {"edgeMode", result.value("edgeMode")},
+    {"reviewId", result.value("reviewId")},
+    {"resourceUri", result.value("resourceUri")},
+    {"preferredCapturePath", result.value("preferredCapturePath")},
+    {"outputDir", result.value("outputDir")},
+    {"manifestPath", result.value("manifestPath")},
+    {"targetObjectCount", result.value("targetObjectCount")},
+    {"targetBrushCount", result.value("targetBrushCount")},
+    {"unsupportedObjectCount", result.value("unsupportedObjectCount")},
+    {"targetBounds", result.value("targetBounds")},
+    {"captureCount", result.value("captureCount")},
+    {"qualityValid", result.value("qualityValid")},
+    {"warnings", result.value("warnings")},
+    {"faceCount", result.value("faceCount")},
+    {"edgeCount", result.value("edgeCount")},
+    {"simplified", result.value("simplified")},
+  };
+
+  const auto contactSheet = result.value("contactSheet").toObject();
+  if (!contactSheet.isEmpty())
+  {
+    compact.insert(
+      "contactSheet",
+      QJsonObject{
+        {"path", contactSheet.value("path")},
+        {"width", contactSheet.value("width")},
+        {"height", contactSheet.value("height")},
+        {"fileSize", contactSheet.value("fileSize")},
+        {"valid", contactSheet.value("valid")},
+      });
+  }
+  return compact;
+}
+
+McpBridgeToolResult renderReviewNodesForMapResult(
+  const QString& toolName,
+  const std::vector<mdl::Node*>& nodes,
+  const QJsonObject& params)
+{
+  auto warnings = QJsonArray{};
+  if (nodes.empty())
+  {
+    return McpBridgeToolResult::success(QJsonObject{
+      {"tool", toolName},
+      {"renderer", "geometry_cpu"},
+      {"reviewId", QString{}},
+      {"targetObjectCount", 0},
+      {"targetBrushCount", 0},
+      {"unsupportedObjectCount", 0},
+      {"captureCount", 0},
+      {"qualityValid", false},
+      {"warnings", QJsonArray{"noReviewTargets"}},
+      {"note", "No live map objects were available for review."},
+    });
+  }
+
+  auto targetBounds = boundsForNodes(nodes);
+  const auto maxFaces =
+    optionalIntClamped(params, "maxDetailedFaces", MaxDetailedFaceCount, 100, 100000);
+  const auto style = reviewStyleFromParams(params, warnings);
+  const auto edgeMode = reviewEdgeModeFromParams(params, warnings);
+  auto geometry = buildRenderGeometry(nodes, warnings, maxFaces);
+  if (geometry.faces.empty() && geometry.edges.empty())
+  {
+    addBboxToGeometry(geometry, targetBounds);
+    appendWarning(warnings, "emptyGeometryFallback: target rendered as bounds only.");
+  }
+  if (!geometry.faces.empty() || !geometry.edges.empty())
+  {
+    targetBounds = boundsForGeometry(geometry);
+  }
+
+  const auto requestedWidth =
+    optionalIntClamped(params, "imageWidth", DefaultWidth, MinWidth, 4096);
+  const auto requestedHeight =
+    optionalIntClamped(params, "imageHeight", DefaultHeight, MinHeight, 4096);
+  auto imageSize = QSize{requestedWidth, requestedHeight};
+  if (const auto imageSizeValue = params.value("imageSize"); imageSizeValue.isArray())
+  {
+    const auto array = imageSizeValue.toArray();
+    if (array.size() == 2 && array[0].isDouble() && array[1].isDouble())
+    {
+      imageSize = QSize{
+        std::clamp(array[0].toInt(DefaultWidth), MinWidth, 4096),
+        std::clamp(array[1].toInt(DefaultHeight), MinHeight, 4096),
+      };
+    }
+  }
+
+  const auto reviewId =
+    params.value("reviewId").toString().trimmed().isEmpty()
+      ? QString{"review-%1"}.arg(QUuid::createUuid().toString(QUuid::WithoutBraces))
+      : sanitizeFileComponent(params.value("reviewId").toString(), "review");
+  const auto outputDir = reviewOutputDir(params, reviewId);
+  auto error = std::error_code{};
+  std::filesystem::create_directories(outputDir, error);
+  if (error)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError,
+      QString{"Could not create review output directory: %1"}.arg(
+        pathToQString(outputDir)));
+  }
+
+  const auto includeAxes = optionalBool(params, "includeAxes", true);
+  const auto includeBoundsBox = optionalBool(params, "includeBoundsBox", false);
+  const auto combineViews = optionalBool(params, "combineViews", true);
+  const auto views = viewsFromParams(params);
+  auto captures = QJsonArray{};
+  auto quality = QJsonArray{};
+  for (const auto& viewValue : views)
+  {
+    if (!viewValue.isString())
+    {
+      appendWarning(warnings, "views must contain only strings");
+      continue;
+    }
+    const auto view = reviewViewForName(viewValue.toString());
+    const auto captureName =
+      sanitizeFileComponent(view.name, "review-view") + QString{".png"};
+    const auto outputPath = pathToQString(outputDir / captureName.toStdString());
+    auto capture = renderCapture(
+      geometry,
+      targetBounds,
+      view,
+      style,
+      edgeMode,
+      imageSize,
+      outputPath,
+      includeAxes,
+      includeBoundsBox);
+    captures.push_back(capture);
+    quality.push_back(capture.value("quality").toObject());
+  }
+
+  auto contactSheet = QJsonObject{};
+  auto contactSheetPath = QString{};
+  if (combineViews && !captures.isEmpty())
+  {
+    auto contactSheetSize = QSize{
+      std::clamp(imageSize.width() * 2, MinWidth, 4096),
+      std::clamp(static_cast<int>(std::round(imageSize.height() * 1.55)), MinHeight, 4096),
+    };
+    if (const auto contactSizeValue = params.value("contactSheetSize");
+        contactSizeValue.isArray())
+    {
+      const auto array = contactSizeValue.toArray();
+      if (array.size() == 2 && array[0].isDouble() && array[1].isDouble())
+      {
+        contactSheetSize = QSize{
+          std::clamp(array[0].toInt(contactSheetSize.width()), MinWidth, 4096),
+          std::clamp(array[1].toInt(contactSheetSize.height()), MinHeight, 4096),
+        };
+      }
+    }
+
+    contactSheetPath = pathToQString(outputDir / "contact_sheet.png");
+    contactSheet = writeContactSheet(
+      captures,
+      contactSheetPath,
+      QString{"%1  |  %2  |  edges:%3  |  %4 brushes"}
+        .arg(reviewId)
+        .arg(reviewStyleName(style))
+        .arg(
+          edgeMode == ReviewEdgeMode::All       ? "all"
+          : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
+          : edgeMode == ReviewEdgeMode::None    ? "none"
+                                                : "auto")
+        .arg(geometry.targetBrushCount),
+      contactSheetSize);
+    if (!contactSheet.value("valid").toBool(false))
+    {
+      warnings.push_back("contactSheetInvalid");
+    }
+  }
+
+  auto materialNames = QJsonArray{};
+  for (const auto& materialName : geometry.materialNames)
+  {
+    materialNames.push_back(materialName);
+  }
+
+  const auto qualityValid =
+    !captures.isEmpty()
+    && std::ranges::all_of(
+      quality,
+      [](const auto& entry) { return entry.toObject().value("valid").toBool(false); });
+
+  auto result = QJsonObject{
+    {"tool", toolName},
+    {"renderer", "geometry_cpu"},
+    {"style", reviewStyleName(style)},
+    {"edgeMode",
+     edgeMode == ReviewEdgeMode::All       ? "all"
+     : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
+     : edgeMode == ReviewEdgeMode::None    ? "none"
+                                           : "auto"},
+    {"reviewId", reviewId},
+    {"resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId)},
+    {"outputDir", pathToQString(outputDir)},
+    {"manifestPath", pathToQString(outputDir / "manifest.json")},
+    {"preferredCapturePath", contactSheetPath.isEmpty()
+                               ? (captures.isEmpty() ? QString{}
+                                                     : captures.first().toObject().value("path").toString())
+                               : contactSheetPath},
+    {"contactSheet", contactSheet},
+    {"targetObjectCount", geometry.targetObjectCount},
+    {"targetBrushCount", geometry.targetBrushCount},
+    {"unsupportedObjectCount", static_cast<int>(geometry.unsupportedNodes.size())},
+    {"targetBounds", boundsToJson(targetBounds)},
+    {"captureCount", captures.size()},
+    {"captures", captures},
+    {"quality", quality},
+    {"qualityValid", qualityValid},
+    {"warnings", warnings},
+    {"materials", materialNames},
+    {"maxDetailedFaces", maxFaces},
+    {"simplified", geometry.simplified},
+    {"faceCount", static_cast<int>(geometry.faces.size())},
+    {"edgeCount", static_cast<int>(geometry.edges.size())},
+  };
+
+  if (!writeManifest(outputDir / "manifest.json", result))
+  {
+    auto updatedWarnings = result.value("warnings").toArray();
+    updatedWarnings.push_back("manifestWriteFailed");
+    result.insert("warnings", updatedWarnings);
+    result.insert("qualityValid", false);
+  }
+
+  if (params.value("detail").toString("summary").trimmed().toLower() != "full")
+  {
+    result = compactReviewResult(result, toolName);
+  }
+  return McpBridgeToolResult::success(result);
+}
+
 } // namespace
 
 McpBridgeToolResult renderReviewTargetsForMapResult(
@@ -1541,6 +1784,101 @@ McpBridgeToolResult renderReviewTargetsResult(
   }
   return renderReviewTargetsForMapResult(
     mapWindow->document().map(), params, history, objectRegistry);
+}
+
+McpBridgeToolResult renderReviewCurrentSceneForMapResult(
+  mdl::Map& map, const QJsonObject& params)
+{
+  auto brushNodes = std::vector<mdl::BrushNode*>{};
+  collectBrushNodes(map.worldNode(), brushNodes);
+  brushNodes = dedupeNodes(std::move(brushNodes));
+
+  auto nodes = std::vector<mdl::Node*>{};
+  nodes.reserve(brushNodes.size());
+  for (auto* brushNode : brushNodes)
+  {
+    nodes.push_back(brushNode);
+  }
+
+  auto reviewParams = params;
+  const auto targetBounds = nodes.empty() ? std::optional<vm::bbox3d>{}
+                                          : std::optional<vm::bbox3d>{boundsForNodes(nodes)};
+  const auto preset = reviewParams.value("preset").toString("auto").trimmed().toLower();
+  const auto boundsSize = targetBounds ? targetBounds->max - targetBounds->min : vm::vec3d{};
+  const auto terrainLike =
+    targetBounds
+    && (brushNodes.size() >= 120
+        || (boundsSize.z() > 0.0
+            && boundsSize.z() < std::max(boundsSize.x(), boundsSize.y()) * 0.18));
+
+  if (!reviewParams.contains("style"))
+  {
+    reviewParams.insert(
+      "style",
+      preset == "whitebox"       ? "whitebox_edges"
+      : preset == "material"     ? "material_tint_edges"
+      : preset == "building"     ? "material_tint_edges"
+      : preset == "terrain"      ? "height_heatmap_edges"
+      : preset == "terrain_route" ? "height_heatmap_edges"
+      : terrainLike              ? "height_heatmap_edges"
+                                  : "material_tint_edges");
+  }
+  if (!reviewParams.contains("edgeMode"))
+  {
+    reviewParams.insert(
+      "edgeMode",
+      reviewParams.value("style").toString().trimmed().toLower() == "height_heatmap_edges"
+        ? "none"
+        : "minimal");
+  }
+  if (!reviewParams.contains("views"))
+  {
+    reviewParams.insert(
+      "views",
+      QJsonArray{
+        "iso_overview_ne",
+        "top_plan",
+        "side_elevation_long",
+        "front_elevation_cross",
+      });
+  }
+  if (!reviewParams.contains("imageSize"))
+  {
+    reviewParams.insert("imageSize", QJsonArray{1200, 850});
+  }
+  if (!reviewParams.contains("contactSheetSize"))
+  {
+    reviewParams.insert("contactSheetSize", QJsonArray{1800, 1400});
+  }
+  if (!reviewParams.contains("combineViews"))
+  {
+    reviewParams.insert("combineViews", true);
+  }
+  if (!reviewParams.contains("detail"))
+  {
+    reviewParams.insert("detail", "summary");
+  }
+
+  auto result = renderReviewNodesForMapResult(
+    "render_review_current_scene", nodes, reviewParams);
+  if (result.ok)
+  {
+    result.result.insert("preset", preset);
+    result.result.insert("autoPreset", terrainLike ? "terrain_route" : "building");
+  }
+  return result;
+}
+
+McpBridgeToolResult renderReviewCurrentSceneResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (mapWindow == nullptr)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return renderReviewCurrentSceneForMapResult(mapWindow->document().map(), params);
 }
 
 } // namespace tb::ui

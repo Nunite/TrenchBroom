@@ -217,6 +217,10 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history = {},
   const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult renderReviewCurrentSceneForMapResult(
+  mdl::Map& map, const QJsonObject& params);
+McpBridgeToolResult renderReviewCurrentSceneResult(
+  AppController& appController, const QJsonObject& params);
 McpBridgeToolResult renderReviewOperationResult(
   AppController& appController,
   const QJsonObject& params,

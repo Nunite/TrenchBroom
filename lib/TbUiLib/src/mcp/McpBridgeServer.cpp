@@ -219,6 +219,10 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           return renderReviewTargetsResult(
             appController, params, m_operationHistory, &m_objectRegistry);
         }
+        if (toolName == "render_review_current_scene")
+        {
+          return renderReviewCurrentSceneResult(appController, params);
+        }
         if (toolName == "render_review_operation")
         {
           return renderReviewOperationResult(

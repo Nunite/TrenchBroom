@@ -69,6 +69,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("viewport_capture_2d"));
     CHECK(findToolDefinition("viewport_capture_scene_review"));
     CHECK(findToolDefinition("render_review_targets"));
+    CHECK(findToolDefinition("render_review_current_scene"));
     CHECK(findToolDefinition("render_review_operation"));
     CHECK(findToolDefinition("fgd_entities_list"));
     CHECK(findToolDefinition("entity_schema"));
@@ -159,6 +160,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("viewport_capture_2d"));
     CHECK(names.contains("viewport_capture_scene_review"));
     CHECK(names.contains("render_review_targets"));
+    CHECK(names.contains("render_review_current_scene"));
     CHECK(names.contains("render_review_operation"));
     CHECK(names.contains("fgd_entities_list"));
     CHECK(names.contains("entity_schema"));
@@ -686,6 +688,19 @@ TEST_CASE("McpToolCatalog")
     CHECK(targetProperties.value("imageSize").isObject());
     CHECK(targetProperties.value("maxDetailedFaces").isObject());
 
+    const auto currentSceneTool = findToolDefinition("render_review_current_scene");
+    REQUIRE(currentSceneTool);
+    CHECK(currentSceneTool->description.contains("active document"));
+    CHECK(currentSceneTool->description.contains("preferredCapturePath"));
+
+    const auto currentSceneProperties =
+      currentSceneTool->inputSchema.value("properties").toObject();
+    CHECK(currentSceneProperties.value("preset").isObject());
+    CHECK(currentSceneProperties.value("style").isObject());
+    CHECK(currentSceneProperties.value("edgeMode").isObject());
+    CHECK(currentSceneProperties.value("combineViews").isObject());
+    CHECK(currentSceneProperties.value("detail").isObject());
+
     const auto tool = findToolDefinition("render_review_operation");
     REQUIRE(tool);
 
@@ -710,6 +725,7 @@ TEST_CASE("McpToolCatalog")
       names.push_back(listedTool.toObject().value("name").toString());
     }
     CHECK(names.contains("render_review_targets"));
+    CHECK(names.contains("render_review_current_scene"));
     CHECK(names.contains("render_review_operation"));
   }
 

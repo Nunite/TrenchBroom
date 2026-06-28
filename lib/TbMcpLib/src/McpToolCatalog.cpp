@@ -886,6 +886,57 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "render_review_current_scene",
+      "Create a compact Agent-readable geometry review for the active document in one "
+      "call. The tool automatically reviews current brush geometry, chooses terrain-"
+      "friendly defaults when appropriate, writes a contact_sheet.png, and returns a "
+      "small summary with preferredCapturePath. Use detail=full for captures, quality "
+      "arrays, and other manifest details.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"preset",
+         stringProperty(
+           "Optional preset: auto, terrain, terrain_route, building, material, or "
+           "whitebox. Defaults to auto.")},
+        {"style",
+         stringProperty(
+           "Optional rendering style override: whitebox_edges, material_tint_edges, or "
+           "height_heatmap_edges.")},
+        {"edgeMode",
+         stringProperty(
+           "Optional edge drawing override: auto, all, minimal, or none. Dense terrain "
+           "defaults to none for a clean first-pass image.")},
+        {"views",
+         arrayProperty(
+           "Optional views. Defaults to iso_overview_ne, top_plan, side_elevation_long, "
+           "and front_elevation_cross.")},
+        {"combineViews",
+         boolProperty(
+           "Write a combined contact_sheet.png and return it as preferredCapturePath. "
+           "Defaults to true.")},
+        {"contactSheetSize",
+         arrayProperty("Optional [width,height] for the combined contact sheet.")},
+        {"imageSize", arrayProperty("Optional [width,height] for source views.")},
+        {"outputDir",
+         stringProperty(
+           "Optional root directory for review bundles. Captures are written under "
+           "<outputDir>/<reviewId>.")},
+        {"includeAxes", boolProperty("Draw a small orientation axis marker.")},
+        {"includeBoundsBox",
+         boolProperty("Draw the target bounding box as a translucent dashed outline.")},
+        {"maxDetailedFaces",
+         integerProperty(
+           "Maximum brush faces rendered as real polygons before falling back to bounds "
+           "geometry. Defaults to 20000.")},
+        {"detail",
+         stringProperty(
+           "summary or full. Summary is default and suppresses large arrays from the "
+           "MCP response; full details are still written to manifest.json.")},
+      }),
+    },
+    {
       "render_review_operation",
       "Create an isolated Agent-readable geometry review bundle for generated scene "
       "objects. Pass operationIds or objectIds; the CPU renderer draws only target "
@@ -2517,6 +2568,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "viewport_camera_set",
     "viewport_capture_scene_review",
     "render_review_targets",
+    "render_review_current_scene",
     "render_review_operation",
     "operation_inspect",
     "operation_select",

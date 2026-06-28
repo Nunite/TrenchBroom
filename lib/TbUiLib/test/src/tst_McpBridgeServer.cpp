@@ -1707,6 +1707,65 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(QFileInfo::exists(response.result.value("manifestPath").toString()));
   }
+
+  SECTION("current scene review auto-collects brushes and returns compact summary")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+    const auto createResponse = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Current scene review"},
+        {"operations",
+         QJsonArray{
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{0, 0, 0}},
+             {"max", QJsonArray{128, 64, 32}},
+           },
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{160, 16, 16}},
+             {"max", QJsonArray{240, 80, 64}},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(createResponse.ok);
+
+    auto tempDir = QTemporaryDir{};
+    REQUIRE(tempDir.isValid());
+    const auto response = renderReviewCurrentSceneForMapResult(
+      map,
+      QJsonObject{
+        {"preset", "auto"},
+        {"outputDir", tempDir.path()},
+        {"imageSize", QJsonArray{900, 650}},
+      });
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("tool").toString() == "render_review_current_scene");
+    CHECK(response.result.value("renderer").toString() == "geometry_cpu");
+    CHECK(response.result.value("targetBrushCount").toInt() == 2);
+    CHECK(response.result.value("qualityValid").toBool());
+    CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
+    CHECK(response.result.value("captures").isUndefined());
+    CHECK(response.result.value("targetObjectIds").isUndefined());
+  }
 }
 
 TEST_CASE("McpBridgeServer spiral stair geometry tools")
