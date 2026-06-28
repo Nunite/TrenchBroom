@@ -1664,6 +1664,7 @@ TEST_CASE("McpBridgeServer")
         {"operationIds", QJsonArray{history.front().operationId}},
         {"views", QJsonArray{"iso_overview_ne", "top_plan"}},
         {"style", "material_tint_edges"},
+        {"edgeMode", "minimal"},
         {"imageSize", QJsonArray{900, 650}},
         {"contactSheetSize", QJsonArray{1200, 900}},
         {"outputDir", tempDir.path()},
@@ -1675,6 +1676,7 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("tool").toString() == "render_review_targets");
     CHECK(response.result.value("renderer").toString() == "geometry_cpu");
     CHECK(response.result.value("style").toString() == "material_tint_edges");
+    CHECK(response.result.value("edgeMode").toString() == "minimal");
     CHECK(response.result.value("targetObjectCount").toInt() == 2);
     CHECK(response.result.value("targetBrushCount").toInt() == 2);
     CHECK(response.result.value("captureCount").toInt() == 2);

@@ -128,6 +128,14 @@ enum class ReviewStyle
   HeightHeatmapEdges,
 };
 
+enum class ReviewEdgeMode
+{
+  Auto,
+  All,
+  Minimal,
+  None,
+};
+
 QString reviewStyleName(const ReviewStyle style)
 {
   switch (style)
@@ -165,6 +173,31 @@ ReviewStyle reviewStyleFromParams(const QJsonObject& params, QJsonArray& warning
     warnings,
     QString{"unknownReviewStyle: '%1' falls back to whitebox_edges."}.arg(styleName));
   return ReviewStyle::WhiteboxEdges;
+}
+
+ReviewEdgeMode reviewEdgeModeFromParams(const QJsonObject& params, QJsonArray& warnings)
+{
+  const auto edgeMode = params.value("edgeMode").toString("auto").trimmed().toLower();
+  if (edgeMode.isEmpty() || edgeMode == "auto")
+  {
+    return ReviewEdgeMode::Auto;
+  }
+  if (edgeMode == "all")
+  {
+    return ReviewEdgeMode::All;
+  }
+  if (edgeMode == "minimal" || edgeMode == "sparse")
+  {
+    return ReviewEdgeMode::Minimal;
+  }
+  if (edgeMode == "none" || edgeMode == "off")
+  {
+    return ReviewEdgeMode::None;
+  }
+  appendWarning(
+    warnings,
+    QString{"unknownReviewEdgeMode: '%1' falls back to auto."}.arg(edgeMode));
+  return ReviewEdgeMode::Auto;
 }
 
 QString pathToQString(const std::filesystem::path& path)
@@ -902,7 +935,8 @@ QJsonObject qualityForCapture(
   const double targetWidthRatio,
   const double targetHeightRatio,
   const double edgeDensity,
-  const bool isoView)
+  const bool isoView,
+  const bool requireEdges)
 {
   auto warnings = QJsonArray{};
   if (path.isEmpty() || fileSize <= 0)
@@ -924,7 +958,7 @@ QJsonObject qualityForCapture(
   {
     warnings.push_back("targetCoverageTooHigh");
   }
-  if (edgeDensity < 0.002)
+  if (requireEdges && edgeDensity < 0.002)
   {
     warnings.push_back("edgeDensityTooLow");
   }
@@ -947,6 +981,7 @@ QJsonObject renderCapture(
   const vm::bbox3d& targetBounds,
   const ReviewView& view,
   const ReviewStyle style,
+  const ReviewEdgeMode requestedEdgeMode,
   const QSize& imageSize,
   const QString& outputPath,
   const bool includeAxes,
@@ -1032,15 +1067,29 @@ QJsonObject renderCapture(
   }
 
   auto edgeLength = 0.0;
+  const auto effectiveEdgeMode =
+    requestedEdgeMode == ReviewEdgeMode::Auto
+      ? (style == ReviewStyle::HeightHeatmapEdges ? ReviewEdgeMode::Minimal
+                                                  : ReviewEdgeMode::All)
+      : requestedEdgeMode;
   for (const auto& edge : geometry.edges)
   {
+    if (effectiveEdgeMode == ReviewEdgeMode::None)
+    {
+      continue;
+    }
+
     if (style == ReviewStyle::HeightHeatmapEdges)
     {
       const auto zDelta = std::abs(edge.a.z() - edge.b.z());
       const auto strongHeightEdge = zDelta > 1.0;
+      if (effectiveEdgeMode == ReviewEdgeMode::Minimal && !strongHeightEdge)
+      {
+        continue;
+      }
       painter.setPen(QPen{
-        strongHeightEdge ? QColor{28, 28, 26, 145} : QColor{36, 36, 34, 42},
-        strongHeightEdge ? 0.9 : 0.45});
+        strongHeightEdge ? QColor{28, 28, 26, 135} : QColor{36, 36, 34, 38},
+        strongHeightEdge ? 0.85 : 0.4});
     }
     else
     {
@@ -1095,7 +1144,8 @@ QJsonObject renderCapture(
     widthRatio,
     heightRatio,
     edgeDensity,
-    view.iso);
+    view.iso,
+    effectiveEdgeMode != ReviewEdgeMode::None);
   return QJsonObject{
     {"view", view.name},
     {"path", outputPath},
@@ -1105,6 +1155,11 @@ QJsonObject renderCapture(
     {"format", "png"},
     {"projection", view.projection},
     {"style", reviewStyleName(style)},
+    {"edgeMode",
+     effectiveEdgeMode == ReviewEdgeMode::All       ? "all"
+     : effectiveEdgeMode == ReviewEdgeMode::Minimal ? "minimal"
+     : effectiveEdgeMode == ReviewEdgeMode::None    ? "none"
+                                                    : "auto"},
     {"targetCoverage", coverage},
     {"targetWidthRatio", widthRatio},
     {"targetHeightRatio", heightRatio},
@@ -1297,6 +1352,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
   const auto maxFaces =
     optionalIntClamped(params, "maxDetailedFaces", MaxDetailedFaceCount, 100, 100000);
   const auto style = reviewStyleFromParams(params, warnings);
+  const auto edgeMode = reviewEdgeModeFromParams(params, warnings);
   auto geometry = buildRenderGeometry(nodes, warnings, maxFaces);
   if (geometry.faces.empty() && geometry.edges.empty())
   {
@@ -1363,6 +1419,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
       *targetBounds,
       view,
       style,
+      edgeMode,
       imageSize,
       outputPath,
       includeAxes,
@@ -1396,9 +1453,14 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     contactSheet = writeContactSheet(
       captures,
       contactSheetPath,
-      QString{"%1  |  %2  |  %3 brushes"}
+      QString{"%1  |  %2  |  edges:%3  |  %4 brushes"}
         .arg(reviewId)
         .arg(reviewStyleName(style))
+        .arg(
+          edgeMode == ReviewEdgeMode::All       ? "all"
+          : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
+          : edgeMode == ReviewEdgeMode::None    ? "none"
+                                                : "auto")
         .arg(geometry.targetBrushCount),
       contactSheetSize);
     if (!contactSheet.value("valid").toBool(false))
@@ -1424,6 +1486,11 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"tool", "render_review_targets"},
     {"renderer", "geometry_cpu"},
     {"style", reviewStyleName(style)},
+    {"edgeMode",
+     edgeMode == ReviewEdgeMode::All       ? "all"
+     : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
+     : edgeMode == ReviewEdgeMode::None    ? "none"
+                                           : "auto"},
     {"reviewId", reviewId},
     {"resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId)},
     {"outputDir", pathToQString(outputDir)},

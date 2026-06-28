@@ -680,6 +680,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(targetProperties.value("objectIds").isObject());
     CHECK(targetProperties.value("views").isObject());
     CHECK(targetProperties.value("style").isObject());
+    CHECK(targetProperties.value("edgeMode").isObject());
     CHECK(targetProperties.value("combineViews").isObject());
     CHECK(targetProperties.value("contactSheetSize").isObject());
     CHECK(targetProperties.value("imageSize").isObject());
@@ -695,6 +696,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(properties.value("objectIds").isObject());
     CHECK(properties.value("views").isObject());
     CHECK(properties.value("style").isObject());
+    CHECK(properties.value("edgeMode").isObject());
     CHECK(properties.value("combineViews").isObject());
     CHECK(properties.value("contactSheetSize").isObject());
     CHECK(properties.value("isolateMode").isObject());

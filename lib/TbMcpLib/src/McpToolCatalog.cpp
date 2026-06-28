@@ -851,6 +851,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "height_heatmap_edges. material_tint_edges assigns stable semantic colors "
            "from face material names; height_heatmap_edges colors by Z height and "
            "softens dense terrain edges.")},
+        {"edgeMode",
+         stringProperty(
+           "Edge drawing mode: auto, all, minimal, or none. For terrain review, "
+           "height_heatmap_edges defaults to minimal so same-height grid lines do not "
+           "overwhelm the image; use none for clean color-only height maps.")},
         {"combineViews",
          boolProperty(
            "Write a combined contact_sheet.png for context-efficient Agent vision. "
@@ -910,6 +915,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          stringProperty(
            "Rendering style: whitebox_edges, material_tint_edges, or "
            "height_heatmap_edges.")},
+        {"edgeMode",
+         stringProperty(
+           "Edge drawing mode: auto, all, minimal, or none. Use none/minimal for dense "
+           "terrain or heightmap captures.")},
         {"combineViews",
          boolProperty(
            "Write a combined contact_sheet.png and return it as preferredCapturePath. "
