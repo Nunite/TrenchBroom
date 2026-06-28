@@ -418,7 +418,15 @@ McpBridgeToolResult mapValidateResult(
   }
 
   auto result = problemsJson(mapWindow->document().map(), params);
-  result.remove("problems");
+  if (!mcpOptionalBool(params, "includeProblems", false))
+  {
+    result.remove("problems");
+  }
+  else
+  {
+    result.insert("detail", "summaryWithProblems");
+    result.insert("limit", static_cast<int>(optionalSize(params, "limit", 500)));
+  }
   return McpBridgeToolResult::success(std::move(result));
 }
 

@@ -30,11 +30,14 @@
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
+#include "mdl/Entity.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionManager.h"
+#include "mdl/EntityNode.h"
 #include "mdl/GameConfigFixture.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
+#include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/WorldNode.h"
 #include "ui/AppControllerFixture.h"
@@ -1753,18 +1756,83 @@ TEST_CASE("McpBridgeServer")
       map,
       QJsonObject{
         {"preset", "auto"},
+        {"scope", "mcp_history"},
         {"outputDir", tempDir.path()},
         {"imageSize", QJsonArray{900, 650}},
-      });
+      },
+      history);
 
     REQUIRE(response.ok);
     CHECK(response.result.value("tool").toString() == "render_review_current_scene");
+    CHECK(response.result.value("scope").toString() == "mcp_history");
     CHECK(response.result.value("renderer").toString() == "geometry_cpu");
     CHECK(response.result.value("targetBrushCount").toInt() == 2);
     CHECK(response.result.value("qualityValid").toBool());
     CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
     CHECK(response.result.value("captures").isUndefined());
     CHECK(response.result.value("targetObjectIds").isUndefined());
+
+    const auto routeResponse = renderReviewCurrentSceneForMapResult(
+      map,
+      QJsonObject{
+        {"preset", "route_platform"},
+        {"scope", "mcp_history"},
+        {"outputDir", tempDir.path()},
+        {"imageSize", QJsonArray{900, 650}},
+      },
+      history);
+    REQUIRE(routeResponse.ok);
+    CHECK(routeResponse.result.value("preset").toString() == "route_platform");
+    CHECK(routeResponse.result.value("style").toString() == "whitebox_edges");
+    CHECK(routeResponse.result.value("edgeMode").toString() == "all");
+    CHECK(routeResponse.result.value("verticalExaggeration").toDouble() == 1.6);
+    CHECK(routeResponse.result.value("labelCount").toInt() == 2);
+    CHECK(routeResponse.result.value("qualityValid").toBool());
+  }
+
+  SECTION("geometry review renderer draws point entity glyph labels")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+
+    auto entity = mdl::Entity{{{"classname", "info_player_start"}}};
+    entity.setOrigin(vm::vec3d{64.0, 96.0, 32.0});
+    auto* entityNode = new mdl::EntityNode{std::move(entity)};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}});
+
+    auto tempDir = QTemporaryDir{};
+    REQUIRE(tempDir.isValid());
+    auto registry = McpObjectRegistry{};
+    const auto entityId = registry.registerNode(map, *entityNode);
+    const auto response = renderReviewTargetsForMapResult(
+      map,
+      QJsonObject{
+        {"objectIds", QJsonArray{entityId}},
+        {"views", QJsonArray{"top_plan"}},
+        {"includeEntityLabels", true},
+        {"imageSize", QJsonArray{900, 650}},
+        {"outputDir", tempDir.path()},
+      },
+      {},
+      &registry);
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("targetObjectCount").toInt() == 1);
+    CHECK(response.result.value("targetBrushCount").toInt() == 0);
+    CHECK(response.result.value("unsupportedObjectCount").toInt() == 1);
+    CHECK(response.result.value("labelCount").toInt() == 1);
+    CHECK(response.result.value("edgeCount").toInt() == 3);
+    CHECK(response.result.value("qualityValid").toBool());
+    CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
   }
 }
 
@@ -1783,6 +1851,7 @@ TEST_CASE("McpBridgeServer spiral stair geometry tools")
   auto& map = document->map();
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
   const auto createResponse = blockoutCreateSpiralStairsForMapResult(
     map,
     QJsonObject{
@@ -2280,6 +2349,7 @@ TEST_CASE("McpBridgeServer object transform summaries")
   auto& map = document->map();
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
 
   auto server = McpBridgeServer{
     [&](const QString& toolName, const QJsonObject& params) {
@@ -2291,7 +2361,7 @@ TEST_CASE("McpBridgeServer object transform summaries")
       if (toolName == "objects_transform")
       {
         return transformObjectsForMapResult(
-          map, toolName, params, history, nextOperationIndex);
+          map, toolName, params, history, nextOperationIndex, objectRegistry);
       }
       return McpBridgeToolResult::failure(
         mcp::McpErrorCode::ToolNotFound, QString{"Unexpected tool: %1"}.arg(toolName));
@@ -2341,6 +2411,25 @@ TEST_CASE("McpBridgeServer object transform summaries")
   const auto bounds = transformResponse.result.value("bounds").toObject();
   CHECK(bounds.value("min").toArray().at(0).toDouble() == 16.0);
   CHECK(bounds.value("max").toArray().at(0).toDouble() == 80.0);
+
+  const auto transformByOperationResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "3",
+    "secret",
+    "objects_transform",
+    QJsonObject{
+      {"operationId", createResponse.result.value("operationId").toString()},
+      {"operation", "translate"},
+      {"delta", QJsonArray{0, 16, 0}},
+    },
+    mcp::McpMode::Edit});
+  const auto transformByOperationError =
+    transformByOperationResponse.ok || !transformByOperationResponse.error
+      ? QString{}
+      : transformByOperationResponse.error->message;
+  INFO(transformByOperationError.toStdString());
+  REQUIRE(transformByOperationResponse.ok);
+  CHECK(transformByOperationResponse.result.value("changedObjectCount").toInt() == 1);
+  CHECK(transformByOperationResponse.result.value("sourceOperationCount").toInt() == 1);
 }
 
 TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
@@ -2418,6 +2507,87 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
   {
     CHECK(face.attributes().materialName() == "target_mat");
   }
+}
+
+TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  const auto createResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+         {"material", "source_mat"},
+       }}},
+      {"detail", "ids"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(createResponse.ok);
+  REQUIRE(history.size() == 1u);
+
+  const auto response = textureApplyByFilterForMapResult(
+    map,
+    "texture_apply_by_filter",
+    QJsonObject{
+      {"material", "top_mat"},
+      {"operationId", history.front().operationId},
+      {"faceSemantic", "top"},
+    },
+    history,
+    nextOperationIndex);
+
+  const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+  INFO(error);
+  REQUIRE(response.ok);
+  CHECK(response.result.value("faceCount").toInt() == 1);
+  CHECK(response.result.value("brushCount").toInt() == 1);
+  CHECK(response.result.value("faceSemantic").toString() == "top");
+
+  const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(objectIds.size() == 1);
+  const auto brushPath = McpObjectRegistry::parseLegacyObjectId(objectIds[0].toString());
+  REQUIRE(brushPath);
+  auto* brushNode =
+    dynamic_cast<mdl::BrushNode*>(map.worldNode().resolvePath(*brushPath));
+  REQUIRE(brushNode != nullptr);
+
+  auto topFaceCount = 0;
+  auto topFaceMaterialCount = 0;
+  for (const auto& face : brushNode->brush().faces())
+  {
+    if (face.normal().z() > 0.75)
+    {
+      ++topFaceCount;
+      if (face.attributes().materialName() == "top_mat")
+      {
+        ++topFaceMaterialCount;
+      }
+    }
+    else
+    {
+      CHECK(face.attributes().materialName() == "source_mat");
+    }
+  }
+  CHECK(topFaceCount == 1);
+  CHECK(topFaceMaterialCount == 1);
 }
 
 TEST_CASE("McpBridgeServer deletes operations without long object id lists")

@@ -511,6 +511,74 @@ McpBridgeToolResult documentOpenVerifiedResult(
   }
 
   const auto pathString = pathToQString(path);
+  const auto waitMs = std::clamp(params.value("waitMs").toInt(5000), 0, 30000);
+  const auto activate = mcpOptionalBool(params, "activate", true);
+  if (auto* activeWindow = appController.mapWindowManager().topMapWindow())
+  {
+    if (activeWindow->document().map().path().lexically_normal() == path)
+    {
+      if (activate)
+      {
+        activeWindow->show();
+        activeWindow->raise();
+        activeWindow->activateWindow();
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+      }
+
+      auto snapshot = mapSnapshotJson(
+        appController, bridgeInstanceId, bridgeStartedAt, httpPort, objectRegistry);
+      return McpBridgeToolResult::success(QJsonObject{
+        {"opened", false},
+        {"alreadyActive", true},
+        {"verified", snapshot.value("document").isObject()},
+        {"stage",
+         snapshot.value("document").isObject() ? "alreadyActiveVerified"
+                                               : "bridgeUnavailableAfterOpen"},
+        {"path", pathString},
+        {"activeDocumentPath", activeDocumentPath(appController)},
+        {"document", documentJson(*activeWindow, 0, objectRegistry)},
+        {"documentFingerprint",
+         documentFingerprint(activeWindow->document().map(), objectRegistry)},
+        {"documentEpoch", documentEpoch(activeWindow->document().map(), objectRegistry)},
+        {"snapshot", snapshot},
+      });
+    }
+  }
+
+  auto localError = QString{};
+  auto* alreadyOpenWindow =
+    documentWindowByParams(appController, QJsonObject{{"path", pathString}}, localError);
+  if (alreadyOpenWindow != nullptr)
+  {
+    if (activate)
+    {
+      alreadyOpenWindow->show();
+      alreadyOpenWindow->raise();
+      alreadyOpenWindow->activateWindow();
+      QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    }
+
+    auto snapshot = mapSnapshotJson(
+      appController, bridgeInstanceId, bridgeStartedAt, httpPort, objectRegistry);
+    const auto activePath = activeDocumentPath(appController);
+    return McpBridgeToolResult::success(QJsonObject{
+      {"opened", false},
+      {"alreadyOpen", true},
+      {"verified", !activate || activePath == pathString},
+      {"stage",
+       !activate || activePath == pathString ? "alreadyOpenVerified"
+                                             : "activationFailed"},
+      {"path", pathString},
+      {"activeDocumentPath", activePath},
+      {"document", documentJson(*alreadyOpenWindow, 0, objectRegistry)},
+      {"documentFingerprint",
+       documentFingerprint(alreadyOpenWindow->document().map(), objectRegistry)},
+      {"documentEpoch",
+       documentEpoch(alreadyOpenWindow->document().map(), objectRegistry)},
+      {"snapshot", snapshot},
+    });
+  }
+
   if (!appController.openDocument(path))
   {
     return McpBridgeToolResult::success(QJsonObject{
@@ -518,20 +586,21 @@ McpBridgeToolResult documentOpenVerifiedResult(
       {"verified", false},
       {"stage", "openFailed"},
       {"path", pathString},
+      {"toolName", "documents_open_verified"},
+      {"activeDocumentPath", activeDocumentPath(appController)},
+      {"bridgeInstanceId", bridgeInstanceId},
       {"message", QString{"Failed to open document: %1"}.arg(pathString)},
     });
   }
 
-  const auto waitMs = std::clamp(params.value("waitMs").toInt(5000), 0, 30000);
-  const auto activate = mcpOptionalBool(params, "activate", true);
   const auto deadline = QDeadlineTimer{waitMs};
   auto* verifiedWindow = static_cast<MapWindow*>(nullptr);
   while (!deadline.hasExpired())
   {
     QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
-    auto localError = QString{};
+    auto lookupError = QString{};
     verifiedWindow = documentWindowByParams(
-      appController, QJsonObject{{"path", pathString}}, localError);
+      appController, QJsonObject{{"path", pathString}}, lookupError);
     if (verifiedWindow != nullptr)
     {
       break;
@@ -544,6 +613,9 @@ McpBridgeToolResult documentOpenVerifiedResult(
       {"verified", false},
       {"stage", "verificationFailed"},
       {"path", pathString},
+      {"toolName", "documents_open_verified"},
+      {"activeDocumentPath", activeDocumentPath(appController)},
+      {"bridgeInstanceId", bridgeInstanceId},
       {"message",
        "Document was opened but could not be found in the open document list."},
       {"documents", documentsListJson(appController).value("documents")},
@@ -566,7 +638,9 @@ McpBridgeToolResult documentOpenVerifiedResult(
       {"verified", false},
       {"stage", "activationFailed"},
       {"path", pathString},
+      {"toolName", "documents_open_verified"},
       {"activeDocumentPath", activePath},
+      {"bridgeInstanceId", bridgeInstanceId},
       {"document", documentJson(*verifiedWindow, 0)},
     });
   }
@@ -580,6 +654,9 @@ McpBridgeToolResult documentOpenVerifiedResult(
       {"verified", false},
       {"stage", "bridgeUnavailableAfterOpen"},
       {"path", pathString},
+      {"toolName", "documents_open_verified"},
+      {"activeDocumentPath", activeDocumentPath(appController)},
+      {"bridgeInstanceId", bridgeInstanceId},
       {"document", documentJson(*verifiedWindow, 0, objectRegistry)},
     });
   }

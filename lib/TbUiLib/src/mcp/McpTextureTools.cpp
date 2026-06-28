@@ -54,10 +54,12 @@
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
+#include "ui/mcp/McpObjectRegistry.h"
 
 #include "kd/string_compare.h"
 
 #include "vm/bbox.h"
+#include "vm/vec.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -148,6 +150,311 @@ mdl::Node* resolveNodeId(mdl::WorldNode& worldNode, const QString& id)
     return nullptr;
   }
   return worldNode.resolvePath(*path);
+}
+
+std::optional<QStringList> stringListFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (value.isUndefined())
+  {
+    return QStringList{};
+  }
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto result = QStringList{};
+  for (const auto& entry : value.toArray())
+  {
+    if (!entry.isString())
+    {
+      error = QString{"%1 must contain only strings"}.arg(key);
+      return std::nullopt;
+    }
+    const auto id = entry.toString().trimmed();
+    if (!id.isEmpty())
+    {
+      result.push_back(id);
+    }
+  }
+  result.removeDuplicates();
+  return result;
+}
+
+std::optional<QStringList> operationIdsFromParams(
+  const QJsonObject& params, QString& error)
+{
+  auto result = QStringList{};
+  const auto operationId = params.value("operationId").toString().trimmed();
+  if (!operationId.isEmpty())
+  {
+    result.push_back(operationId);
+  }
+
+  const auto operationIds = stringListFromJson(params, "operationIds", error);
+  if (!operationIds)
+  {
+    return std::nullopt;
+  }
+  result.append(*operationIds);
+  result.removeDuplicates();
+  return result;
+}
+
+const McpOperationRecord* findOperation(
+  const std::vector<McpOperationRecord>& history, const QString& operationId)
+{
+  const auto it = std::ranges::find_if(
+    history, [&](const auto& operation) { return operation.operationId == operationId; });
+  return it == history.end() ? nullptr : &*it;
+}
+
+mdl::Node* resolveExternalNodeId(
+  mdl::Map& map,
+  const QString& objectId,
+  const McpObjectRegistry* objectRegistry,
+  QString& error)
+{
+  auto legacyPathId = objectId;
+  if (objectRegistry != nullptr)
+  {
+    const auto resolved = objectRegistry->resolveExternalId(map, objectId);
+    if (!resolved.ok)
+    {
+      error = resolved.error;
+      return nullptr;
+    }
+    legacyPathId = resolved.legacyPathId;
+  }
+
+  auto* node = resolveNodeId(map.worldNode(), legacyPathId);
+  if (node == nullptr)
+  {
+    error = QString{"Unknown MCP object id: %1"}.arg(objectId);
+  }
+  return node;
+}
+
+std::optional<std::vector<mdl::Node*>> nodesFromObjectIdsAndOperations(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry,
+  QString& error)
+{
+  auto result = std::vector<mdl::Node*>{};
+
+  const auto objectIds = stringListFromJson(params, "objectIds", error);
+  if (!objectIds)
+  {
+    return std::nullopt;
+  }
+  for (const auto& objectId : *objectIds)
+  {
+    auto* node = resolveExternalNodeId(map, objectId, objectRegistry, error);
+    if (node == nullptr)
+    {
+      return std::nullopt;
+    }
+    result.push_back(node);
+  }
+
+  const auto operationIds = operationIdsFromParams(params, error);
+  if (!operationIds)
+  {
+    return std::nullopt;
+  }
+  for (const auto& operationId : *operationIds)
+  {
+    const auto* operation = findOperation(history, operationId);
+    if (operation == nullptr)
+    {
+      error = QString{"Unknown MCP operation id: %1"}.arg(operationId);
+      return std::nullopt;
+    }
+    if (operation->undone)
+    {
+      error = QString{"MCP operation is already undone: %1"}.arg(operationId);
+      return std::nullopt;
+    }
+    for (const auto& objectId : operation->changedObjectIds)
+    {
+      auto* node = resolveExternalNodeId(map, objectId, objectRegistry, error);
+      if (node == nullptr)
+      {
+        return std::nullopt;
+      }
+      result.push_back(node);
+    }
+  }
+
+  std::ranges::sort(result);
+  result.erase(std::unique(result.begin(), result.end()), result.end());
+  return result;
+}
+
+void collectBrushNodes(mdl::Node& node, std::vector<mdl::BrushNode*>& brushes)
+{
+  if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(&node))
+  {
+    brushes.push_back(brushNode);
+    return;
+  }
+
+  for (auto* child : node.children())
+  {
+    if (child != nullptr)
+    {
+      collectBrushNodes(*child, brushes);
+    }
+  }
+}
+
+std::vector<mdl::BrushFaceHandle> brushFaceHandlesFromNodes(
+  const std::vector<mdl::Node*>& nodes)
+{
+  auto brushes = std::vector<mdl::BrushNode*>{};
+  for (auto* node : nodes)
+  {
+    if (node != nullptr)
+    {
+      collectBrushNodes(*node, brushes);
+    }
+  }
+  std::ranges::sort(brushes);
+  brushes.erase(std::unique(brushes.begin(), brushes.end()), brushes.end());
+
+  auto result = std::vector<mdl::BrushFaceHandle>{};
+  for (auto* brushNode : brushes)
+  {
+    const auto handles = mdl::toHandles(brushNode);
+    result.insert(std::end(result), std::begin(handles), std::end(handles));
+  }
+  return result;
+}
+
+std::optional<vm::vec3d> vec3FromJson(const QJsonValue& value, QString& error)
+{
+  if (!value.isArray())
+  {
+    return std::nullopt;
+  }
+  const auto array = value.toArray();
+  if (array.size() != 3)
+  {
+    error = "normal must be a [x,y,z] array";
+    return std::nullopt;
+  }
+  for (const auto& entry : array)
+  {
+    if (!entry.isDouble())
+    {
+      error = "normal must contain only numbers";
+      return std::nullopt;
+    }
+  }
+  const auto normal =
+    vm::vec3d{array[0].toDouble(), array[1].toDouble(), array[2].toDouble()};
+  if (vm::is_zero(vm::squared_length(normal), vm::Cd::almost_zero()))
+  {
+    error = "normal must not be zero";
+    return std::nullopt;
+  }
+  return vm::normalize(normal);
+}
+
+bool matchesFaceSemantic(
+  const mdl::BrushFaceHandle& handle,
+  const QString& faceSemantic,
+  const std::optional<vm::vec3d>& requestedNormal,
+  const double normalTolerance)
+{
+  const auto normal = handle.face().normal();
+  if (requestedNormal)
+  {
+    return vm::dot(normal, *requestedNormal) >= normalTolerance;
+  }
+
+  if (faceSemantic.isEmpty() || faceSemantic == "all")
+  {
+    return true;
+  }
+  if (faceSemantic == "top")
+  {
+    return normal.z() >= normalTolerance;
+  }
+  if (faceSemantic == "bottom")
+  {
+    return normal.z() <= -normalTolerance;
+  }
+  if (faceSemantic == "side" || faceSemantic == "sides")
+  {
+    return std::abs(normal.z()) <= 1.0 - normalTolerance;
+  }
+  return false;
+}
+
+std::vector<mdl::BrushFaceHandle> filterFaceHandlesBySemantic(
+  std::vector<mdl::BrushFaceHandle> handles, const QJsonObject& params, QString& error)
+{
+  const auto faceSemantic =
+    params.value("faceSemantic").toString("all").trimmed().toLower();
+  const auto hasNormal = params.contains("normal");
+  auto requestedNormal = std::optional<vm::vec3d>{};
+  if (hasNormal)
+  {
+    requestedNormal = vec3FromJson(params.value("normal"), error);
+    if (!requestedNormal)
+    {
+      return {};
+    }
+  }
+
+  const auto toleranceValue = params.value("normalTolerance");
+  auto normalTolerance = 0.75;
+  if (!toleranceValue.isUndefined())
+  {
+    if (!toleranceValue.isDouble())
+    {
+      error = "normalTolerance must be a number";
+      return {};
+    }
+    normalTolerance = std::clamp(toleranceValue.toDouble(), 0.0, 1.0);
+  }
+
+  if (
+    !requestedNormal && !faceSemantic.isEmpty() && faceSemantic != "all"
+    && faceSemantic != "top" && faceSemantic != "bottom" && faceSemantic != "side"
+    && faceSemantic != "sides")
+  {
+    error = "faceSemantic must be all, top, bottom, or side";
+    return {};
+  }
+
+  if (!requestedNormal && (faceSemantic.isEmpty() || faceSemantic == "all"))
+  {
+    return handles;
+  }
+
+  handles.erase(
+    std::remove_if(
+      handles.begin(),
+      handles.end(),
+      [&](const auto& handle) {
+        return !matchesFaceSemantic(
+          handle, faceSemantic, requestedNormal, normalTolerance);
+      }),
+    handles.end());
+  if (handles.empty())
+  {
+    error = requestedNormal
+              ? "normal matched no brush faces"
+              : QString{"faceSemantic '%1' matched no brush faces"}.arg(faceSemantic);
+  }
+  return handles;
 }
 
 QString makeOperationId(int& nextOperationIndex)
@@ -291,6 +598,7 @@ McpBridgeToolResult textureSearchForMapResult(mdl::Map& map, const QJsonObject& 
   const auto limit = std::max(1, params.value("limit").toInt(50));
   auto results = QJsonArray{};
   auto materialNames = QJsonArray{};
+  auto sampleMaterials = QJsonArray{};
 
   const auto& materials = map.materialManager().materials();
   for (const auto* material : materials)
@@ -298,6 +606,10 @@ McpBridgeToolResult textureSearchForMapResult(mdl::Map& map, const QJsonObject& 
     if (!material)
     {
       continue;
+    }
+    if (sampleMaterials.size() < std::min(limit, 12))
+    {
+      sampleMaterials.push_back(QString::fromStdString(material->name()));
     }
     const auto name = QString::fromStdString(material->name());
     const auto relativePath = genericPathToQString(material->relativePath());
@@ -325,6 +637,8 @@ McpBridgeToolResult textureSearchForMapResult(mdl::Map& map, const QJsonObject& 
     {"count", results.size()},
     {"currentMaterial", currentMaterialName(map)},
     {"fallbackMaterial", fallbackMaterialName(map)},
+    {"suggestedFallbackMaterial", fallbackMaterialName(map)},
+    {"sampleMaterialNames", sampleMaterials},
   });
 }
 
@@ -485,6 +799,40 @@ std::vector<mdl::BrushFaceHandle> brushFaceHandlesFromParamsOrSelection(
   return result;
 }
 
+std::vector<mdl::BrushFaceHandle> brushFaceHandlesFromTargetsOrSelection(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry,
+  QString& error)
+{
+  if (
+    params.value("objectIds").isArray() || params.contains("operationId")
+    || params.value("operationIds").isArray())
+  {
+    auto nodes =
+      nodesFromObjectIdsAndOperations(map, params, history, objectRegistry, error);
+    if (!nodes)
+    {
+      return {};
+    }
+    auto handles = brushFaceHandlesFromNodes(*nodes);
+    if (handles.empty())
+    {
+      error = "target objects contain no brush faces";
+      return {};
+    }
+    return filterFaceHandlesBySemantic(std::move(handles), params, error);
+  }
+
+  auto handles = brushFaceHandlesFromParamsOrSelection(map, params, error);
+  if (handles.empty())
+  {
+    return handles;
+  }
+  return filterFaceHandlesBySemantic(std::move(handles), params, error);
+}
+
 std::vector<mdl::BrushFaceHandle> brushFaceHandlesFromFacesArray(
   mdl::Map& map, const QJsonArray& faces, QString& error)
 {
@@ -509,7 +857,11 @@ std::vector<mdl::BrushFaceHandle> brushFaceHandlesFromFacesArray(
 }
 
 std::vector<mdl::BrushFaceHandle> faceSelectionHandlesFromParams(
-  mdl::Map& map, const QJsonObject& params, QString& error)
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry,
+  QString& error)
 {
   if (params.value("faces").isArray())
   {
@@ -519,9 +871,12 @@ std::vector<mdl::BrushFaceHandle> faceSelectionHandlesFromParams(
     {
       error = "faces must not be empty";
     }
-    return handles;
+    return handles.empty()
+             ? handles
+             : filterFaceHandlesBySemantic(std::move(handles), params, error);
   }
-  return brushFaceHandlesFromParamsOrSelection(map, params, error);
+  return brushFaceHandlesFromTargetsOrSelection(
+    map, params, history, objectRegistry, error);
 }
 
 QJsonArray changedBrushIds(
@@ -546,7 +901,8 @@ McpBridgeToolResult textureApplyResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
 {
   const auto material = params.value("material").toString().trimmed();
   if (material.isEmpty())
@@ -562,7 +918,8 @@ McpBridgeToolResult textureApplyResult(
 
   auto& map = mapWindow->document().map();
   auto error = QString{};
-  auto handles = brushFaceHandlesFromParamsOrSelection(map, params, error);
+  auto handles =
+    brushFaceHandlesFromTargetsOrSelection(map, params, history, &objectRegistry, error);
   if (handles.empty())
   {
     return invalidParamsFailure(error);
@@ -588,6 +945,7 @@ McpBridgeToolResult textureApplyResult(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("material", material);
   result.insert("faceCount", static_cast<int>(handles.size()));
+  result.insert("faceSemantic", params.value("faceSemantic").toString("all"));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -596,7 +954,8 @@ McpBridgeToolResult textureApplyByFilterResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -605,7 +964,12 @@ McpBridgeToolResult textureApplyByFilterResult(
   }
 
   return textureApplyByFilterForMapResult(
-    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+    mapWindow->document().map(),
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    &objectRegistry);
 }
 
 McpBridgeToolResult textureApplyByFilterForMapResult(
@@ -613,7 +977,8 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  const McpObjectRegistry* objectRegistry)
 {
   const auto material = params.value("material").toString().trimmed();
   if (material.isEmpty())
@@ -621,39 +986,62 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
     return invalidParamsFailure("texture_apply_by_filter requires material");
   }
 
-  auto filterParams = params;
-  filterParams.remove("material");
-  if (filterParams.value("type").toString().trimmed().isEmpty())
-  {
-    filterParams.insert("type", "brush");
-  }
-
   auto error = QString{};
-  auto options = McpSelectionQueryOptions{};
-  options.excludeWorld = true;
-  options.selectableOnly = true;
-  options.leafOnly = true;
-  options.exactTypeOnly = true;
-  auto matches = mcpFilteredNodes(map, filterParams, options, error);
-  if (!error.isEmpty())
+  auto matches = std::vector<mdl::Node*>{};
+  auto handles = std::vector<mdl::BrushFaceHandle>{};
+  if (
+    params.value("objectIds").isArray() || params.contains("operationId")
+    || params.value("operationIds").isArray())
   {
-    return invalidParamsFailure(error);
+    auto nodes =
+      nodesFromObjectIdsAndOperations(map, params, history, objectRegistry, error);
+    if (!nodes)
+    {
+      return invalidParamsFailure(error);
+    }
+    matches = *nodes;
+    handles = brushFaceHandlesFromNodes(matches);
+  }
+  else
+  {
+    auto filterParams = params;
+    filterParams.remove("material");
+    filterParams.remove("faceSemantic");
+    filterParams.remove("normal");
+    filterParams.remove("normalTolerance");
+    if (filterParams.value("type").toString().trimmed().isEmpty())
+    {
+      filterParams.insert("type", "brush");
+    }
+
+    auto options = McpSelectionQueryOptions{};
+    options.excludeWorld = true;
+    options.selectableOnly = true;
+    options.leafOnly = true;
+    options.exactTypeOnly = true;
+    matches = mcpFilteredNodes(map, filterParams, options, error);
+    if (!error.isEmpty())
+    {
+      return invalidParamsFailure(error);
+    }
+
+    for (auto* node : matches)
+    {
+      auto* brushNode = dynamic_cast<mdl::BrushNode*>(node);
+      if (!brushNode)
+      {
+        continue;
+      }
+      const auto brushHandles = mdl::toHandles(brushNode);
+      handles.insert(std::end(handles), std::begin(brushHandles), std::end(brushHandles));
+    }
   }
 
-  auto handles = std::vector<mdl::BrushFaceHandle>{};
-  for (auto* node : matches)
-  {
-    auto* brushNode = dynamic_cast<mdl::BrushNode*>(node);
-    if (!brushNode)
-    {
-      continue;
-    }
-    const auto brushHandles = mdl::toHandles(brushNode);
-    handles.insert(std::end(handles), std::begin(brushHandles), std::end(brushHandles));
-  }
+  handles = filterFaceHandlesBySemantic(std::move(handles), params, error);
   if (handles.empty())
   {
-    return invalidParamsFailure("texture_apply_by_filter matched no brush faces");
+    return invalidParamsFailure(
+      error.isEmpty() ? "texture_apply_by_filter matched no brush faces" : error);
   }
 
   auto changedNodes = changedBrushIds(handles, map.worldNode());
@@ -676,11 +1064,15 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
   result.insert("material", material);
   result.insert("brushCount", static_cast<int>(matches.size()));
   result.insert("faceCount", static_cast<int>(handles.size()));
+  result.insert("faceSemantic", params.value("faceSemantic").toString("all"));
   return McpBridgeToolResult::success(std::move(result));
 }
 
 McpBridgeToolResult faceListResult(
-  AppController& appController, const QJsonObject& params)
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -689,29 +1081,12 @@ McpBridgeToolResult faceListResult(
   }
 
   auto& map = mapWindow->document().map();
-  auto handles = std::vector<mdl::BrushFaceHandle>{};
-  const auto objectId = params.value("objectId").toString().trimmed();
-  if (!objectId.isEmpty())
+  auto error = QString{};
+  auto handles =
+    brushFaceHandlesFromTargetsOrSelection(map, params, history, &objectRegistry, error);
+  if (handles.empty() && !error.isEmpty())
   {
-    auto* node = resolveNodeId(map.worldNode(), objectId);
-    auto* brushNode = dynamic_cast<mdl::BrushNode*>(node);
-    if (!brushNode)
-    {
-      return invalidParamsFailure(QString{"objectId is not a brush: %1"}.arg(objectId));
-    }
-    handles = mdl::toHandles(brushNode);
-  }
-  else if (!map.selection().brushFaces.empty())
-  {
-    handles = map.selection().brushFaces;
-  }
-  else
-  {
-    for (auto* brushNode : map.selection().brushes)
-    {
-      const auto brushHandles = mdl::toHandles(brushNode);
-      handles.insert(std::end(handles), std::begin(brushHandles), std::end(brushHandles));
-    }
+    return invalidParamsFailure(error);
   }
 
   const auto limit = optionalSize(params, "limit", 500);
@@ -732,7 +1107,10 @@ McpBridgeToolResult faceListResult(
 }
 
 McpBridgeToolResult faceSelectResult(
-  AppController& appController, const QJsonObject& params)
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -746,15 +1124,15 @@ McpBridgeToolResult faceSelectResult(
   if (params.value("faces").isArray())
   {
     handles = brushFaceHandlesFromFacesArray(map, params.value("faces").toArray(), error);
+    if (!handles.empty())
+    {
+      handles = filterFaceHandlesBySemantic(std::move(handles), params, error);
+    }
   }
   else
   {
-    const auto handle =
-      brushFaceHandleFromJson(map, params, "objectId", "faceIndex", error);
-    if (handle)
-    {
-      handles.push_back(*handle);
-    }
+    handles = brushFaceHandlesFromTargetsOrSelection(
+      map, params, history, &objectRegistry, error);
   }
 
   if (handles.empty())
@@ -827,7 +1205,8 @@ McpBridgeToolResult faceTextureSetResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -843,7 +1222,8 @@ McpBridgeToolResult faceTextureSetResult(
     return invalidParamsFailure(error);
   }
 
-  auto handles = faceSelectionHandlesFromParams(map, params, error);
+  auto handles =
+    faceSelectionHandlesFromParams(map, params, history, &objectRegistry, error);
   if (handles.empty())
   {
     return invalidParamsFailure(error);
@@ -866,6 +1246,7 @@ McpBridgeToolResult faceTextureSetResult(
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("faceCount", static_cast<int>(handles.size()));
+  result.insert("faceSemantic", params.value("faceSemantic").toString("all"));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -945,7 +1326,8 @@ McpBridgeToolResult textureAlignFaceResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
 {
   const auto mode = params.value("mode").toString().trimmed().toLower();
   auto update = mdl::UpdateBrushFaceAttributes{};
@@ -975,7 +1357,8 @@ McpBridgeToolResult textureAlignFaceResult(
 
   auto& map = mapWindow->document().map();
   auto error = QString{};
-  auto handles = brushFaceHandlesFromParamsOrSelection(map, params, error);
+  auto handles =
+    brushFaceHandlesFromTargetsOrSelection(map, params, history, &objectRegistry, error);
   if (handles.empty())
   {
     return invalidParamsFailure(error);
@@ -999,6 +1382,7 @@ McpBridgeToolResult textureAlignFaceResult(
     history, nextOperationIndex, toolName, transactionName, changedNodes, result);
   result.insert("mode", mode);
   result.insert("faceCount", static_cast<int>(handles.size()));
+  result.insert("faceSemantic", params.value("faceSemantic").toString("all"));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -1007,7 +1391,8 @@ McpBridgeToolResult textureCopyFromFaceResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -1027,7 +1412,8 @@ McpBridgeToolResult textureCopyFromFaceResult(
   auto targetParams = params;
   targetParams.remove("sourceObjectId");
   targetParams.remove("sourceFaceIndex");
-  auto handles = brushFaceHandlesFromParamsOrSelection(map, targetParams, error);
+  auto handles = brushFaceHandlesFromTargetsOrSelection(
+    map, targetParams, history, &objectRegistry, error);
   if (handles.empty())
   {
     return invalidParamsFailure(error);

@@ -332,6 +332,43 @@ std::optional<std::vector<mdl::Node*>> nodesFromObjectIds(
   return kdl::vec_sort_and_remove_duplicates(std::move(result));
 }
 
+std::optional<QStringList> operationIdsFromParams(
+  const QJsonObject& params, QString& error)
+{
+  auto result = QStringList{};
+  const auto operationId = params.value("operationId").toString().trimmed();
+  if (!operationId.isEmpty())
+  {
+    result.push_back(operationId);
+  }
+
+  const auto operationIdsValue = params.value("operationIds");
+  if (!operationIdsValue.isUndefined())
+  {
+    if (!operationIdsValue.isArray())
+    {
+      error = "operationIds must be an array";
+      return std::nullopt;
+    }
+    for (const auto& value : operationIdsValue.toArray())
+    {
+      if (!value.isString())
+      {
+        error = "operationIds must contain only strings";
+        return std::nullopt;
+      }
+      const auto id = value.toString().trimmed();
+      if (!id.isEmpty())
+      {
+        result.push_back(id);
+      }
+    }
+  }
+
+  result.removeDuplicates();
+  return result;
+}
+
 std::optional<const McpOperationRecord*> findOperation(
   const std::vector<McpOperationRecord>& history, const QString& operationId)
 {
@@ -373,7 +410,7 @@ std::optional<std::vector<mdl::Node*>> nodesFromOperation(
     }
     if (node == &map.worldNode() || !map.editorContext().selectable(*node))
     {
-      error = QString{"Operation object cannot be deleted: %1"}.arg(objectId);
+      error = QString{"Operation object cannot be edited: %1"}.arg(objectId);
       return std::nullopt;
     }
     result.push_back(node);
@@ -387,6 +424,55 @@ std::optional<std::vector<mdl::Node*>> nodesFromOperation(
   }
 
   return kdl::vec_sort_and_remove_duplicates(std::move(result));
+}
+
+std::optional<std::vector<mdl::Node*>> nodesFromObjectIdsOrOperations(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry,
+  QString& error)
+{
+  auto result = std::vector<mdl::Node*>{};
+  if (params.value("objectIds").isArray())
+  {
+    auto objectNodes = nodesFromObjectIds(map, params, error);
+    if (!objectNodes)
+    {
+      return std::nullopt;
+    }
+    result.insert(std::end(result), std::begin(*objectNodes), std::end(*objectNodes));
+  }
+
+  auto operationIds = operationIdsFromParams(params, error);
+  if (!operationIds)
+  {
+    return std::nullopt;
+  }
+  for (const auto& operationId : *operationIds)
+  {
+    const auto operation = findOperation(history, operationId);
+    if (!operation)
+    {
+      error = QString{"Unknown MCP operation id: %1"}.arg(operationId);
+      return std::nullopt;
+    }
+    auto operationNodes = nodesFromOperation(map, **operation, objectRegistry, error);
+    if (!operationNodes)
+    {
+      return std::nullopt;
+    }
+    result.insert(
+      std::end(result), std::begin(*operationNodes), std::end(*operationNodes));
+  }
+
+  result = kdl::vec_sort_and_remove_duplicates(std::move(result));
+  if (result.empty())
+  {
+    error = "objects_transform requires objectIds, operationId, or operationIds";
+    return std::nullopt;
+  }
+  return result;
 }
 
 std::vector<mdl::Node*> removeDescendantNodes(std::vector<mdl::Node*> nodes)
@@ -697,7 +783,8 @@ McpBridgeToolResult transformObjectsResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -706,7 +793,12 @@ McpBridgeToolResult transformObjectsResult(
   }
 
   return transformObjectsForMapResult(
-    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+    mapWindow->document().map(),
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    objectRegistry);
 }
 
 McpBridgeToolResult transformObjectsForMapResult(
@@ -714,10 +806,12 @@ McpBridgeToolResult transformObjectsForMapResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex)
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
 {
   auto error = QString{};
-  const auto nodes = nodesFromObjectIds(map, params, error);
+  const auto nodes =
+    nodesFromObjectIdsOrOperations(map, params, history, objectRegistry, error);
   if (!nodes)
   {
     return invalidParamsFailure(error);
@@ -821,6 +915,12 @@ McpBridgeToolResult transformObjectsForMapResult(
   result.insert("operation", operation);
   result.insert("bounds", boundsToJson(boundsForNodes(transformNodes)));
   result.insert("selectedCount", static_cast<int>(transformNodes.size()));
+  if (auto operationIds = operationIdsFromParams(params, error);
+      operationIds && !operationIds->isEmpty())
+  {
+    result.insert("sourceOperationIds", QJsonArray::fromStringList(*operationIds));
+    result.insert("sourceOperationCount", operationIds->size());
+  }
   result.insert(
     "validation",
     QJsonObject{

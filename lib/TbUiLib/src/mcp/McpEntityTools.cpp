@@ -190,6 +190,25 @@ QJsonObject nodeSummaryJson(const mdl::Node& node, const mdl::WorldNode& worldNo
   return result;
 }
 
+int removeEmptyEntityProperties(mdl::Entity& entity)
+{
+  auto keysToRemove = std::vector<std::string>{};
+  for (const auto& property : entity.properties())
+  {
+    if (
+      property.value().empty() && property.key() != mdl::EntityPropertyKeys::Classname
+      && property.key() != mdl::EntityPropertyKeys::Origin)
+    {
+      keysToRemove.push_back(property.key());
+    }
+  }
+  for (const auto& key : keysToRemove)
+  {
+    entity.removeProperty(key);
+  }
+  return static_cast<int>(keysToRemove.size());
+}
+
 bool textMatches(const QString& text, const QString& query)
 {
   return text.contains(query, Qt::CaseInsensitive);
@@ -995,6 +1014,7 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
 
   auto nodes = std::vector<mdl::Node*>{};
   auto createdClassnames = QJsonArray{};
+  auto removedEmptyPropertyCount = 0;
 
   const auto cleanupNodes = [&] {
     for (auto* node : nodes)
@@ -1064,8 +1084,12 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
     entity.setOrigin(origin);
     for (const auto& [key, value] : *properties)
     {
-      entity.addOrUpdateProperty(key, value);
+      if (!value.empty())
+      {
+        entity.addOrUpdateProperty(key, value);
+      }
     }
+    removedEmptyPropertyCount += removeEmptyEntityProperties(entity);
 
     nodes.push_back(new mdl::EntityNode{std::move(entity)});
     createdClassnames.push_back(classname);
@@ -1095,6 +1119,7 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
   result.insert("checked", true);
   result.insert("entityCount", static_cast<int>(nodes.size()));
   result.insert("classNames", createdClassnames);
+  result.insert("removedEmptyPropertyCount", removedEmptyPropertyCount);
 
   const auto detail = params.value("detail").toString("summary").toLower();
   if (detail == "ids" || detail == "full")

@@ -52,6 +52,7 @@
 #include "vm/vec.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <limits>
@@ -101,10 +102,19 @@ struct RenderEdge
   vm::vec3d b;
 };
 
+struct RenderLabel
+{
+  vm::vec3d position;
+  QString text;
+  QString kind;
+  std::optional<vm::vec3d> direction;
+};
+
 struct RenderGeometry
 {
   std::vector<RenderFace> faces;
   std::vector<RenderEdge> edges;
+  std::vector<RenderLabel> labels;
   std::vector<mdl::Node*> unsupportedNodes;
   int targetBrushCount = 0;
   int targetObjectCount = 0;
@@ -152,7 +162,8 @@ QString reviewStyleName(const ReviewStyle style)
 
 ReviewStyle reviewStyleFromParams(const QJsonObject& params, QJsonArray& warnings)
 {
-  const auto styleName = params.value("style").toString("whitebox_edges").trimmed().toLower();
+  const auto styleName =
+    params.value("style").toString("whitebox_edges").trimmed().toLower();
   if (styleName.isEmpty() || styleName == "whitebox_edges" || styleName == "whitebox")
   {
     return ReviewStyle::WhiteboxEdges;
@@ -195,8 +206,7 @@ ReviewEdgeMode reviewEdgeModeFromParams(const QJsonObject& params, QJsonArray& w
     return ReviewEdgeMode::None;
   }
   appendWarning(
-    warnings,
-    QString{"unknownReviewEdgeMode: '%1' falls back to auto."}.arg(edgeMode));
+    warnings, QString{"unknownReviewEdgeMode: '%1' falls back to auto."}.arg(edgeMode));
   return ReviewEdgeMode::Auto;
 }
 
@@ -421,6 +431,46 @@ std::vector<mdl::Node*> resolveReviewTargetNodes(
   return dedupeNodes(std::move(nodes));
 }
 
+std::vector<mdl::Node*> nodesFromMcpHistory(
+  mdl::Map& map,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry,
+  QJsonArray& warnings)
+{
+  auto nodes = std::vector<mdl::Node*>{};
+  auto seenObjectIds = std::set<QString>{};
+  for (const auto& operation : history)
+  {
+    if (operation.undone)
+    {
+      continue;
+    }
+    for (const auto& objectId : operation.changedObjectIds)
+    {
+      if (!seenObjectIds.insert(objectId).second)
+      {
+        continue;
+      }
+      auto legacyPathId = objectId;
+      if (objectRegistry != nullptr)
+      {
+        const auto resolved = objectRegistry->resolveExternalId(map, objectId);
+        if (!resolved.ok)
+        {
+          appendWarning(warnings, resolved.error);
+          continue;
+        }
+        legacyPathId = resolved.legacyPathId;
+      }
+      if (auto* node = resolveLegacyNodeId(map, legacyPathId))
+      {
+        nodes.push_back(node);
+      }
+    }
+  }
+  return dedupeNodes(std::move(nodes));
+}
+
 void collectBrushNodes(mdl::Node& node, std::vector<mdl::BrushNode*>& brushes)
 {
   if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(&node))
@@ -466,6 +516,14 @@ vm::bbox3d boundsForGeometry(const RenderGeometry& geometry)
     builder.add(edge.a);
     builder.add(edge.b);
   }
+  for (const auto& label : geometry.labels)
+  {
+    builder.add(label.position);
+    if (label.direction)
+    {
+      builder.add(label.position + *label.direction);
+    }
+  }
   return builder.bounds();
 }
 
@@ -505,6 +563,113 @@ void addBboxToGeometry(RenderGeometry& geometry, const vm::bbox3d& bounds)
   geometry.edges.insert(geometry.edges.end(), edges.begin(), edges.end());
 }
 
+void addCrossToGeometry(
+  RenderGeometry& geometry, const vm::vec3d& center, const double radius)
+{
+  const auto r = std::max(8.0, radius);
+  geometry.edges.push_back({center - vm::vec3d{r, 0, 0}, center + vm::vec3d{r, 0, 0}});
+  geometry.edges.push_back({center - vm::vec3d{0, r, 0}, center + vm::vec3d{0, r, 0}});
+  geometry.edges.push_back({center - vm::vec3d{0, 0, r}, center + vm::vec3d{0, 0, r}});
+}
+
+std::optional<vm::vec3d> faceNormal(const std::vector<vm::vec3d>& vertices);
+
+double verticalExaggerationFromParams(const QJsonObject& params, QJsonArray& warnings)
+{
+  const auto value = params.value("verticalExaggeration");
+  if (value.isUndefined())
+  {
+    return 1.0;
+  }
+  if (!value.isDouble())
+  {
+    appendWarning(warnings, "verticalExaggeration must be a number; using 1.0.");
+    return 1.0;
+  }
+  const auto requested = value.toDouble();
+  const auto clamped = std::clamp(requested, 0.1, 10.0);
+  if (std::abs(requested - clamped) > 0.001)
+  {
+    appendWarning(
+      warnings,
+      QString{"verticalExaggeration clamped from %1 to %2."}.arg(requested).arg(clamped));
+  }
+  return clamped;
+}
+
+vm::vec3d scaleZAround(const vm::vec3d& point, const double originZ, const double factor)
+{
+  return vm::vec3d{point.x(), point.y(), originZ + (point.z() - originZ) * factor};
+}
+
+vm::bbox3d scaleBoundsZ(
+  const vm::bbox3d& bounds, const double originZ, const double factor)
+{
+  auto builder = vm::bbox3d::builder{};
+  const auto min = bounds.min;
+  const auto max = bounds.max;
+  for (const auto& point : std::array{
+         vm::vec3d{min.x(), min.y(), min.z()},
+         vm::vec3d{max.x(), min.y(), min.z()},
+         vm::vec3d{max.x(), max.y(), min.z()},
+         vm::vec3d{min.x(), max.y(), min.z()},
+         vm::vec3d{min.x(), min.y(), max.z()},
+         vm::vec3d{max.x(), min.y(), max.z()},
+         vm::vec3d{max.x(), max.y(), max.z()},
+         vm::vec3d{min.x(), max.y(), max.z()},
+       })
+  {
+    builder.add(scaleZAround(point, originZ, factor));
+  }
+  return builder.bounds();
+}
+
+void applyVerticalExaggerationToGeometry(
+  RenderGeometry& geometry, vm::bbox3d& targetBounds, const double factor)
+{
+  if (std::abs(factor - 1.0) < 0.001)
+  {
+    return;
+  }
+
+  const auto originZ = targetBounds.min.z();
+  for (auto& face : geometry.faces)
+  {
+    for (auto& vertex : face.vertices)
+    {
+      vertex = scaleZAround(vertex, originZ, factor);
+    }
+    auto normal = faceNormal(face.vertices);
+    if (normal)
+    {
+      face.normal = *normal;
+    }
+    face.centerZ = 0.0;
+    for (const auto& vertex : face.vertices)
+    {
+      face.centerZ += vertex.z();
+    }
+    face.centerZ /= static_cast<double>(std::max<size_t>(1, face.vertices.size()));
+  }
+  for (auto& edge : geometry.edges)
+  {
+    edge.a = scaleZAround(edge.a, originZ, factor);
+    edge.b = scaleZAround(edge.b, originZ, factor);
+  }
+  for (auto& label : geometry.labels)
+  {
+    const auto originalPosition = label.position;
+    label.position = scaleZAround(label.position, originZ, factor);
+    if (label.direction)
+    {
+      const auto endpoint =
+        scaleZAround(originalPosition + *label.direction, originZ, factor);
+      label.direction = endpoint - label.position;
+    }
+  }
+  targetBounds = scaleBoundsZ(targetBounds, originZ, factor);
+}
+
 std::optional<vm::vec3d> faceNormal(const std::vector<vm::vec3d>& vertices)
 {
   if (vertices.size() < 3)
@@ -520,7 +685,12 @@ std::optional<vm::vec3d> faceNormal(const std::vector<vm::vec3d>& vertices)
 }
 
 RenderGeometry buildRenderGeometry(
-  const std::vector<mdl::Node*>& nodes, QJsonArray& warnings, const int maxFaces)
+  const std::vector<mdl::Node*>& nodes,
+  QJsonArray& warnings,
+  const int maxFaces,
+  const bool includeEntityLabels,
+  const bool includeOrderLabels,
+  const bool includeDirectionLabels)
 {
   auto geometry = RenderGeometry{};
   geometry.targetObjectCount = static_cast<int>(nodes.size());
@@ -609,7 +779,24 @@ RenderGeometry buildRenderGeometry(
     if (childBrushes.empty())
     {
       geometry.unsupportedNodes.push_back(node);
-      addBboxToGeometry(geometry, node->logicalBounds());
+      if (const auto* entityNode = dynamic_cast<const mdl::EntityNodeBase*>(node))
+      {
+        const auto origin = entityNode->entity().origin();
+        addCrossToGeometry(geometry, origin, 16.0);
+        if (includeEntityLabels)
+        {
+          geometry.labels.push_back(RenderLabel{
+            origin + vm::vec3d{0, 0, 18},
+            QString::fromStdString(entityNode->entity().classname()),
+            "entity",
+            std::nullopt,
+          });
+        }
+      }
+      else
+      {
+        addBboxToGeometry(geometry, node->logicalBounds());
+      }
     }
   }
 
@@ -620,6 +807,42 @@ RenderGeometry buildRenderGeometry(
       QString{"unsupportedObjectPlaceholder: %1 non-brush targets rendered as bounds "
               "markers."}
         .arg(geometry.unsupportedNodes.size()));
+  }
+
+  if (includeOrderLabels)
+  {
+    auto order = 1;
+    for (const auto* node : nodes)
+    {
+      if (node == nullptr)
+      {
+        continue;
+      }
+      const auto center = node->logicalBounds().center();
+      auto direction = std::optional<vm::vec3d>{};
+      if (includeDirectionLabels && order < static_cast<int>(nodes.size()))
+      {
+        const auto* nextNode = nodes[static_cast<size_t>(order)];
+        if (nextNode != nullptr)
+        {
+          const auto delta = nextNode->logicalBounds().center() - center;
+          if (!vm::is_zero(vm::squared_length(delta), vm::Cd::almost_zero()))
+          {
+            const auto boundsSize = node->logicalBounds().size();
+            const auto arrowLength = std::max(
+              32.0, std::max({boundsSize.x(), boundsSize.y(), boundsSize.z()}) * 0.7);
+            direction = vm::normalize(delta) * arrowLength;
+          }
+        }
+      }
+      geometry.labels.push_back(RenderLabel{
+        center + vm::vec3d{0, 0, std::max(12.0, node->logicalBounds().size().z() * 0.15)},
+        QString::number(order),
+        "order",
+        direction,
+      });
+      ++order;
+    }
   }
 
   return geometry;
@@ -763,6 +986,14 @@ std::vector<vm::vec3d> referencePoints(
     points.push_back(edge.a);
     points.push_back(edge.b);
   }
+  for (const auto& label : geometry.labels)
+  {
+    points.push_back(label.position);
+    if (label.direction)
+    {
+      points.push_back(label.position + *label.direction);
+    }
+  }
   if (points.empty())
   {
     const auto min = targetBounds.min;
@@ -812,7 +1043,8 @@ QColor shadeColor(const QColor& color, const double factor)
   const auto channel = [&](const int value) {
     return std::clamp(static_cast<int>(std::round(value * scale)), 0, 255);
   };
-  return QColor{channel(color.red()), channel(color.green()), channel(color.blue()), color.alpha()};
+  return QColor{
+    channel(color.red()), channel(color.green()), channel(color.blue()), color.alpha()};
 }
 
 QColor colorForMaterialName(const QString& materialName)
@@ -826,8 +1058,9 @@ QColor colorForMaterialName(const QString& materialName)
   {
     return QColor{118, 138, 154};
   }
-  if (key.contains("terrain") || key.contains("grass") || key.contains("dirt")
-      || key.contains("rock") || key.contains("stone"))
+  if (
+    key.contains("terrain") || key.contains("grass") || key.contains("dirt")
+    || key.contains("rock") || key.contains("stone"))
   {
     return QColor{143, 152, 118};
   }
@@ -876,16 +1109,17 @@ QColor faceColorForStyle(
   const auto light = vm::normalize(vm::vec3d{0.35, -0.45, 0.82});
   const auto normalLight = std::abs(vm::dot(face.normal, light));
   const auto viewLight = std::max(0.0, vm::dot(face.normal, -view.view));
-  const auto shadeFactor = std::clamp(0.74 + normalLight * 0.22 + viewLight * 0.12, 0.62, 1.12);
+  const auto shadeFactor =
+    std::clamp(0.74 + normalLight * 0.22 + viewLight * 0.12, 0.62, 1.12);
 
   switch (style)
   {
   case ReviewStyle::MaterialTintEdges:
     return shadeColor(colorForMaterialName(face.materialName), shadeFactor);
   case ReviewStyle::HeightHeatmapEdges:
-    return shadeColor(heightHeatmapColor(normalizedHeight(face.centerZ, targetBounds)), shadeFactor);
-  case ReviewStyle::WhiteboxEdges:
-  {
+    return shadeColor(
+      heightHeatmapColor(normalizedHeight(face.centerZ, targetBounds)), shadeFactor);
+  case ReviewStyle::WhiteboxEdges: {
     const auto shade =
       std::clamp(164.0 + normalLight * 52.0 + viewLight * 22.0, 120.0, 238.0);
     const auto tint = (face.brushIndex % 7) * 5;
@@ -925,6 +1159,94 @@ void drawAxes(
   painter.drawText(origin + QPointF{-6, -60}, upLabel);
 }
 
+void drawReviewLabels(
+  QPainter& painter,
+  QRectF& targetPixelBounds,
+  double& edgeLength,
+  const std::vector<RenderLabel>& labels,
+  const ReviewView& view,
+  const double minU,
+  const double maxU,
+  const double minV,
+  const double maxV,
+  const QSize& imageSize,
+  const double padding)
+{
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  for (const auto& label : labels)
+  {
+    const auto projected =
+      projectPoint(label.position, view, minU, maxU, minV, maxV, imageSize, padding);
+    const auto point = projected.point;
+    const auto isOrder = label.kind == "order";
+    const auto radius = isOrder ? 11.0 : 8.0;
+    const auto text = label.text.left(32);
+    auto textRect = QRectF{};
+
+    if (isOrder)
+    {
+      const auto bubble = QRectF{
+        point.x() - radius,
+        point.y() - radius,
+        radius * 2.0,
+        radius * 2.0,
+      };
+      painter.setPen(QPen{QColor{20, 20, 20}, 1.4});
+      painter.setBrush(QColor{255, 245, 180, 235});
+      painter.drawEllipse(bubble);
+      painter.setPen(QPen{QColor{20, 20, 20}, 1.0});
+      painter.drawText(bubble, Qt::AlignCenter, text);
+      textRect = bubble;
+    }
+    else
+    {
+      const auto metrics = painter.fontMetrics();
+      textRect = QRectF{
+        point.x() + 8.0,
+        point.y() - 10.0,
+        static_cast<double>(std::max(46, metrics.horizontalAdvance(text) + 12)),
+        22.0,
+      };
+      painter.setPen(QPen{QColor{35, 35, 35}, 1.0});
+      painter.setBrush(QColor{226, 238, 255, 230});
+      painter.drawRoundedRect(textRect, 4.0, 4.0);
+      painter.drawText(textRect, Qt::AlignCenter, text);
+      painter.setPen(QPen{QColor{42, 82, 150}, 2.2});
+      painter.drawLine(point + QPointF{-radius, 0}, point + QPointF{radius, 0});
+      painter.drawLine(point + QPointF{0, -radius}, point + QPointF{0, radius});
+    }
+
+    targetPixelBounds = targetPixelBounds.united(textRect);
+    if (label.direction)
+    {
+      const auto endpoint = projectPoint(
+        label.position + *label.direction,
+        view,
+        minU,
+        maxU,
+        minV,
+        maxV,
+        imageSize,
+        padding);
+      painter.setPen(QPen{QColor{40, 60, 170, 210}, 2.2});
+      painter.drawLine(point, endpoint.point);
+      const auto vector = endpoint.point - point;
+      const auto length = std::hypot(vector.x(), vector.y());
+      if (length > 1.0)
+      {
+        const auto unit = QPointF{vector.x() / length, vector.y() / length};
+        const auto side = QPointF{-unit.y(), unit.x()};
+        const auto arrowA = endpoint.point - unit * 10.0 + side * 5.0;
+        const auto arrowB = endpoint.point - unit * 10.0 - side * 5.0;
+        painter.drawLine(endpoint.point, arrowA);
+        painter.drawLine(endpoint.point, arrowB);
+        edgeLength += length;
+      }
+      targetPixelBounds = targetPixelBounds.united(QRectF{endpoint.point, QSizeF{1, 1}});
+    }
+  }
+}
+
 QJsonObject qualityForCapture(
   const QString& viewName,
   const QString& path,
@@ -936,7 +1258,8 @@ QJsonObject qualityForCapture(
   const double targetHeightRatio,
   const double edgeDensity,
   const bool isoView,
-  const bool requireEdges)
+  const bool requireEdges,
+  const bool sparseGlyphTarget)
 {
   auto warnings = QJsonArray{};
   if (path.isEmpty() || fileSize <= 0)
@@ -950,7 +1273,8 @@ QJsonObject qualityForCapture(
   const auto minCoverage = isoView ? 0.35 : 0.45;
   const auto maxCoverage = isoView ? 0.90 : 0.92;
   const auto majorAxisFill = std::max(targetWidthRatio, targetHeightRatio);
-  if (targetCoverage < minCoverage && majorAxisFill < 0.60)
+  const auto minMajorAxisFill = sparseGlyphTarget ? 0.10 : 0.60;
+  if (targetCoverage < minCoverage && majorAxisFill < minMajorAxisFill)
   {
     warnings.push_back("targetCoverageTooLow");
   }
@@ -958,7 +1282,8 @@ QJsonObject qualityForCapture(
   {
     warnings.push_back("targetCoverageTooHigh");
   }
-  if (requireEdges && edgeDensity < 0.002)
+  const auto minEdgeDensity = sparseGlyphTarget ? 0.0008 : 0.002;
+  if (requireEdges && edgeDensity < minEdgeDensity)
   {
     warnings.push_back("edgeDensityTooLow");
   }
@@ -973,6 +1298,7 @@ QJsonObject qualityForCapture(
     {"targetWidthRatio", targetWidthRatio},
     {"targetHeightRatio", targetHeightRatio},
     {"edgeDensity", edgeDensity},
+    {"sparseGlyphTarget", sparseGlyphTarget},
   };
 }
 
@@ -1103,6 +1429,19 @@ QJsonObject renderCapture(
     targetPixelBounds = targetPixelBounds.united(QRectF{b.point, QSizeF{1, 1}});
   }
 
+  drawReviewLabels(
+    painter,
+    targetPixelBounds,
+    edgeLength,
+    geometry.labels,
+    view,
+    minU,
+    maxU,
+    minV,
+    maxV,
+    imageSize,
+    padding);
+
   painter.setPen(QPen{QColor{70, 70, 66}, 1});
   painter.drawText(QPointF{18.0, 28.0}, view.name);
   if (includeAxes)
@@ -1133,6 +1472,8 @@ QJsonObject renderCapture(
           targetPixelBounds.height() / static_cast<double>(imageSize.height()), 0.0, 1.0)
       : 0.0;
   const auto edgeDensity = std::clamp(edgeLength / imageArea, 0.0, 1.0);
+  const auto sparseGlyphTarget =
+    geometry.faces.empty() && !geometry.labels.empty() && !geometry.edges.empty();
 
   const auto quality = qualityForCapture(
     view.name,
@@ -1145,7 +1486,8 @@ QJsonObject renderCapture(
     heightRatio,
     edgeDensity,
     view.iso,
-    effectiveEdgeMode != ReviewEdgeMode::None);
+    effectiveEdgeMode != ReviewEdgeMode::None,
+    sparseGlyphTarget);
   return QJsonObject{
     {"view", view.name},
     {"path", outputPath},
@@ -1241,11 +1583,12 @@ QJsonObject writeContactSheet(
 
     const auto labelHeight = 22;
     painter.setPen(QPen{QColor{56, 56, 52}, 1});
-    painter.drawText(cell.adjusted(8, 2, -8, 0), Qt::AlignLeft | Qt::AlignTop, loaded[i].first);
+    painter.drawText(
+      cell.adjusted(8, 2, -8, 0), Qt::AlignLeft | Qt::AlignTop, loaded[i].first);
 
     const auto imageRect = cell.adjusted(8, labelHeight, -8, -8);
-    const auto scaled =
-      loaded[i].second.scaled(imageRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    const auto scaled = loaded[i].second.scaled(
+      imageRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
     const auto target = QRect{
       imageRect.x() + (imageRect.width() - scaled.width()) / 2,
       imageRect.y() + (imageRect.height() - scaled.height()) / 2,
@@ -1317,6 +1660,9 @@ QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolNa
     {"outputDir", result.value("outputDir")},
     {"manifestPath", result.value("manifestPath")},
     {"targetObjectCount", result.value("targetObjectCount")},
+    {"targetObjectIdsCount", result.value("targetObjectIdsCount")},
+    {"targetObjectIdsSample", result.value("targetObjectIdsSample")},
+    {"idsMode", result.value("idsMode")},
     {"targetBrushCount", result.value("targetBrushCount")},
     {"unsupportedObjectCount", result.value("unsupportedObjectCount")},
     {"targetBounds", result.value("targetBounds")},
@@ -1325,7 +1671,9 @@ QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolNa
     {"warnings", result.value("warnings")},
     {"faceCount", result.value("faceCount")},
     {"edgeCount", result.value("edgeCount")},
+    {"labelCount", result.value("labelCount")},
     {"simplified", result.value("simplified")},
+    {"verticalExaggeration", result.value("verticalExaggeration")},
   };
 
   const auto contactSheet = result.value("contactSheet").toObject();
@@ -1344,11 +1692,96 @@ QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolNa
   return compact;
 }
 
+QString idsModeFromParams(const QJsonObject& params)
+{
+  const auto mode = params.value("idsMode")
+                      .toString(params.value("detail").toString("summary"))
+                      .trimmed()
+                      .toLower();
+  if (mode == "full" || mode == "ids")
+  {
+    return "full";
+  }
+  if (mode == "sample")
+  {
+    return "sample";
+  }
+  if (mode == "none")
+  {
+    return "none";
+  }
+  return "count";
+}
+
+QJsonObject normalizedReviewParams(QJsonObject params)
+{
+  const auto preset = params.value("preset").toString().trimmed().toLower();
+  if (preset == "route_platform")
+  {
+    if (!params.contains("style"))
+    {
+      params.insert("style", "whitebox_edges");
+    }
+    if (!params.contains("edgeMode"))
+    {
+      params.insert("edgeMode", "all");
+    }
+    if (!params.contains("verticalExaggeration"))
+    {
+      params.insert("verticalExaggeration", 1.6);
+    }
+    if (!params.contains("views"))
+    {
+      params.insert(
+        "views",
+        QJsonArray{
+          "iso_overview_ne",
+          "iso_overview_sw",
+          "top_plan",
+          "side_elevation_long",
+        });
+    }
+    if (!params.contains("includeOrderLabels"))
+    {
+      params.insert("includeOrderLabels", true);
+    }
+    if (!params.contains("includeDirectionLabels"))
+    {
+      params.insert("includeDirectionLabels", true);
+    }
+  }
+  return params;
+}
+
+void applyIdsMode(
+  QJsonObject& result,
+  const QString& fieldName,
+  const QStringList& ids,
+  const QString& idsMode)
+{
+  result.insert(fieldName + "Count", ids.size());
+  result.insert("idsMode", idsMode);
+  if (idsMode == "full")
+  {
+    result.insert(fieldName, QJsonArray::fromStringList(ids));
+    return;
+  }
+  result.remove(fieldName);
+  if (idsMode == "sample")
+  {
+    constexpr auto SampleLimit = qsizetype{12};
+    result.insert(
+      fieldName + "Sample",
+      QJsonArray::fromStringList(ids.mid(0, std::min(ids.size(), SampleLimit))));
+  }
+}
+
 McpBridgeToolResult renderReviewNodesForMapResult(
   const QString& toolName,
   const std::vector<mdl::Node*>& nodes,
-  const QJsonObject& params)
+  const QJsonObject& rawParams)
 {
+  const auto params = normalizedReviewParams(rawParams);
   auto warnings = QJsonArray{};
   if (nodes.empty())
   {
@@ -1371,12 +1804,24 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     optionalIntClamped(params, "maxDetailedFaces", MaxDetailedFaceCount, 100, 100000);
   const auto style = reviewStyleFromParams(params, warnings);
   const auto edgeMode = reviewEdgeModeFromParams(params, warnings);
-  auto geometry = buildRenderGeometry(nodes, warnings, maxFaces);
+  const auto verticalExaggeration = verticalExaggerationFromParams(params, warnings);
+  const auto includeEntityLabels = optionalBool(params, "includeEntityLabels", true);
+  const auto includeOrderLabels = optionalBool(params, "includeOrderLabels", false);
+  const auto includeDirectionLabels =
+    optionalBool(params, "includeDirectionLabels", false);
+  auto geometry = buildRenderGeometry(
+    nodes,
+    warnings,
+    maxFaces,
+    includeEntityLabels,
+    includeOrderLabels,
+    includeDirectionLabels);
   if (geometry.faces.empty() && geometry.edges.empty())
   {
     addBboxToGeometry(geometry, targetBounds);
     appendWarning(warnings, "emptyGeometryFallback: target rendered as bounds only.");
   }
+  applyVerticalExaggerationToGeometry(geometry, targetBounds, verticalExaggeration);
   if (!geometry.faces.empty() || !geometry.edges.empty())
   {
     targetBounds = boundsForGeometry(geometry);
@@ -1451,7 +1896,8 @@ McpBridgeToolResult renderReviewNodesForMapResult(
   {
     auto contactSheetSize = QSize{
       std::clamp(imageSize.width() * 2, MinWidth, 4096),
-      std::clamp(static_cast<int>(std::round(imageSize.height() * 1.55)), MinHeight, 4096),
+      std::clamp(
+        static_cast<int>(std::round(imageSize.height() * 1.55)), MinHeight, 4096),
     };
     if (const auto contactSizeValue = params.value("contactSheetSize");
         contactSizeValue.isArray())
@@ -1470,9 +1916,10 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     contactSheet = writeContactSheet(
       captures,
       contactSheetPath,
-      QString{"%1  |  %2  |  edges:%3  |  %4 brushes"}
+      QString{"%1  |  %2  |  z:%3x  |  edges:%4  |  %5 brushes"}
         .arg(reviewId)
         .arg(reviewStyleName(style))
+        .arg(verticalExaggeration)
         .arg(
           edgeMode == ReviewEdgeMode::All       ? "all"
           : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
@@ -1493,15 +1940,15 @@ McpBridgeToolResult renderReviewNodesForMapResult(
   }
 
   const auto qualityValid =
-    !captures.isEmpty()
-    && std::ranges::all_of(
-      quality,
-      [](const auto& entry) { return entry.toObject().value("valid").toBool(false); });
+    !captures.isEmpty() && std::ranges::all_of(quality, [](const auto& entry) {
+      return entry.toObject().value("valid").toBool(false);
+    });
 
   auto result = QJsonObject{
     {"tool", toolName},
     {"renderer", "geometry_cpu"},
     {"style", reviewStyleName(style)},
+    {"verticalExaggeration", verticalExaggeration},
     {"edgeMode",
      edgeMode == ReviewEdgeMode::All       ? "all"
      : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
@@ -1511,10 +1958,11 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     {"resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId)},
     {"outputDir", pathToQString(outputDir)},
     {"manifestPath", pathToQString(outputDir / "manifest.json")},
-    {"preferredCapturePath", contactSheetPath.isEmpty()
-                               ? (captures.isEmpty() ? QString{}
-                                                     : captures.first().toObject().value("path").toString())
-                               : contactSheetPath},
+    {"preferredCapturePath",
+     contactSheetPath.isEmpty()
+       ? (captures.isEmpty() ? QString{}
+                             : captures.first().toObject().value("path").toString())
+       : contactSheetPath},
     {"contactSheet", contactSheet},
     {"targetObjectCount", geometry.targetObjectCount},
     {"targetBrushCount", geometry.targetBrushCount},
@@ -1530,8 +1978,8 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     {"simplified", geometry.simplified},
     {"faceCount", static_cast<int>(geometry.faces.size())},
     {"edgeCount", static_cast<int>(geometry.edges.size())},
+    {"labelCount", static_cast<int>(geometry.labels.size())},
   };
-
   if (!writeManifest(outputDir / "manifest.json", result))
   {
     auto updatedWarnings = result.value("warnings").toArray();
@@ -1551,10 +1999,11 @@ McpBridgeToolResult renderReviewNodesForMapResult(
 
 McpBridgeToolResult renderReviewTargetsForMapResult(
   mdl::Map& map,
-  const QJsonObject& params,
+  const QJsonObject& rawParams,
   const std::vector<McpOperationRecord>& history,
   const McpObjectRegistry* objectRegistry)
 {
+  const auto params = normalizedReviewParams(rawParams);
   auto warnings = QJsonArray{};
   auto resolvedObjectIds = QStringList{};
   auto nodes = resolveReviewTargetNodes(
@@ -1596,12 +2045,24 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     optionalIntClamped(params, "maxDetailedFaces", MaxDetailedFaceCount, 100, 100000);
   const auto style = reviewStyleFromParams(params, warnings);
   const auto edgeMode = reviewEdgeModeFromParams(params, warnings);
-  auto geometry = buildRenderGeometry(nodes, warnings, maxFaces);
+  const auto verticalExaggeration = verticalExaggerationFromParams(params, warnings);
+  const auto includeEntityLabels = optionalBool(params, "includeEntityLabels", true);
+  const auto includeOrderLabels = optionalBool(params, "includeOrderLabels", false);
+  const auto includeDirectionLabels =
+    optionalBool(params, "includeDirectionLabels", false);
+  auto geometry = buildRenderGeometry(
+    nodes,
+    warnings,
+    maxFaces,
+    includeEntityLabels,
+    includeOrderLabels,
+    includeDirectionLabels);
   if (geometry.faces.empty() && geometry.edges.empty())
   {
     addBboxToGeometry(geometry, *targetBounds);
     appendWarning(warnings, "emptyGeometryFallback: target rendered as bounds only.");
   }
+  applyVerticalExaggerationToGeometry(geometry, *targetBounds, verticalExaggeration);
   const auto geometryBounds = boundsForGeometry(geometry);
   if (!geometry.faces.empty() || !geometry.edges.empty())
   {
@@ -1677,7 +2138,8 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
   {
     auto contactSheetSize = QSize{
       std::clamp(imageSize.width() * 2, MinWidth, 4096),
-      std::clamp(static_cast<int>(std::round(imageSize.height() * 1.55)), MinHeight, 4096),
+      std::clamp(
+        static_cast<int>(std::round(imageSize.height() * 1.55)), MinHeight, 4096),
     };
     if (const auto contactSizeValue = params.value("contactSheetSize");
         contactSizeValue.isArray())
@@ -1696,9 +2158,10 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     contactSheet = writeContactSheet(
       captures,
       contactSheetPath,
-      QString{"%1  |  %2  |  edges:%3  |  %4 brushes"}
+      QString{"%1  |  %2  |  z:%3x  |  edges:%4  |  %5 brushes"}
         .arg(reviewId)
         .arg(reviewStyleName(style))
+        .arg(verticalExaggeration)
         .arg(
           edgeMode == ReviewEdgeMode::All       ? "all"
           : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
@@ -1729,6 +2192,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"tool", "render_review_targets"},
     {"renderer", "geometry_cpu"},
     {"style", reviewStyleName(style)},
+    {"verticalExaggeration", verticalExaggeration},
     {"edgeMode",
      edgeMode == ReviewEdgeMode::All       ? "all"
      : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
@@ -1738,10 +2202,11 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId)},
     {"outputDir", pathToQString(outputDir)},
     {"manifestPath", pathToQString(outputDir / "manifest.json")},
-    {"preferredCapturePath", contactSheetPath.isEmpty()
-                               ? (captures.isEmpty() ? QString{}
-                                                     : captures.first().toObject().value("path").toString())
-                               : contactSheetPath},
+    {"preferredCapturePath",
+     contactSheetPath.isEmpty()
+       ? (captures.isEmpty() ? QString{}
+                             : captures.first().toObject().value("path").toString())
+       : contactSheetPath},
     {"contactSheet", contactSheet},
     {"targetObjectIds", QJsonArray::fromStringList(resolvedObjectIds)},
     {"targetObjectCount", geometry.targetObjectCount},
@@ -1758,6 +2223,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"simplified", geometry.simplified},
     {"faceCount", static_cast<int>(geometry.faces.size())},
     {"edgeCount", static_cast<int>(geometry.edges.size())},
+    {"labelCount", static_cast<int>(geometry.labels.size())},
   };
 
   if (!writeManifest(outputDir / "manifest.json", result))
@@ -1768,6 +2234,11 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     result.insert("qualityValid", false);
   }
 
+  applyIdsMode(result, "targetObjectIds", resolvedObjectIds, idsModeFromParams(params));
+  if (params.value("detail").toString().trimmed().toLower() == "summary")
+  {
+    result = compactReviewResult(result, "render_review_targets");
+  }
   return McpBridgeToolResult::success(result);
 }
 
@@ -1787,27 +2258,61 @@ McpBridgeToolResult renderReviewTargetsResult(
 }
 
 McpBridgeToolResult renderReviewCurrentSceneForMapResult(
-  mdl::Map& map, const QJsonObject& params)
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
 {
-  auto brushNodes = std::vector<mdl::BrushNode*>{};
-  collectBrushNodes(map.worldNode(), brushNodes);
-  brushNodes = dedupeNodes(std::move(brushNodes));
-
+  auto warnings = QJsonArray{};
+  const auto scope = params.value("scope").toString("all").trimmed().toLower();
   auto nodes = std::vector<mdl::Node*>{};
-  nodes.reserve(brushNodes.size());
-  for (auto* brushNode : brushNodes)
+  if (scope == "mcp_history")
   {
-    nodes.push_back(brushNode);
+    nodes = nodesFromMcpHistory(map, history, objectRegistry, warnings);
+  }
+  else if (scope == "selection")
+  {
+    nodes.reserve(map.selection().nodes.size());
+    for (auto* node : map.selection().nodes)
+    {
+      if (node != nullptr)
+      {
+        nodes.push_back(node);
+      }
+    }
+    nodes = dedupeNodes(std::move(nodes));
+  }
+  else if (scope == "all" || scope.isEmpty())
+  {
+    auto brushNodes = std::vector<mdl::BrushNode*>{};
+    collectBrushNodes(map.worldNode(), brushNodes);
+    brushNodes = dedupeNodes(std::move(brushNodes));
+    nodes.reserve(brushNodes.size());
+    for (auto* brushNode : brushNodes)
+    {
+      nodes.push_back(brushNode);
+    }
+  }
+  else
+  {
+    return invalidParamsFailure(
+      "render_review_current_scene scope must be all, mcp_history, or selection");
   }
 
   auto reviewParams = params;
-  const auto targetBounds = nodes.empty() ? std::optional<vm::bbox3d>{}
-                                          : std::optional<vm::bbox3d>{boundsForNodes(nodes)};
+  reviewParams.remove("scope");
+  const auto targetBounds = nodes.empty()
+                              ? std::optional<vm::bbox3d>{}
+                              : std::optional<vm::bbox3d>{boundsForNodes(nodes)};
   const auto preset = reviewParams.value("preset").toString("auto").trimmed().toLower();
-  const auto boundsSize = targetBounds ? targetBounds->max - targetBounds->min : vm::vec3d{};
+  const auto boundsSize =
+    targetBounds ? targetBounds->max - targetBounds->min : vm::vec3d{};
+  const auto brushCount = std::ranges::count_if(nodes, [](const auto* node) {
+    return dynamic_cast<const mdl::BrushNode*>(node) != nullptr;
+  });
   const auto terrainLike =
     targetBounds
-    && (brushNodes.size() >= 120
+    && (brushCount >= 120
         || (boundsSize.z() > 0.0
             && boundsSize.z() < std::max(boundsSize.x(), boundsSize.y()) * 0.18));
 
@@ -1815,19 +2320,22 @@ McpBridgeToolResult renderReviewCurrentSceneForMapResult(
   {
     reviewParams.insert(
       "style",
-      preset == "whitebox"       ? "whitebox_edges"
-      : preset == "material"     ? "material_tint_edges"
-      : preset == "building"     ? "material_tint_edges"
-      : preset == "terrain"      ? "height_heatmap_edges"
-      : preset == "terrain_route" ? "height_heatmap_edges"
-      : terrainLike              ? "height_heatmap_edges"
-                                  : "material_tint_edges");
+      preset == "whitebox"         ? "whitebox_edges"
+      : preset == "route_platform" ? "whitebox_edges"
+      : preset == "material"       ? "material_tint_edges"
+      : preset == "building"       ? "material_tint_edges"
+      : preset == "terrain"        ? "height_heatmap_edges"
+      : preset == "terrain_route"  ? "height_heatmap_edges"
+      : terrainLike                ? "height_heatmap_edges"
+                                   : "material_tint_edges");
   }
   if (!reviewParams.contains("edgeMode"))
   {
     reviewParams.insert(
       "edgeMode",
-      reviewParams.value("style").toString().trimmed().toLower() == "height_heatmap_edges"
+      preset == "route_platform" ? "all"
+      : reviewParams.value("style").toString().trimmed().toLower()
+          == "height_heatmap_edges"
         ? "none"
         : "minimal");
   }
@@ -1835,12 +2343,23 @@ McpBridgeToolResult renderReviewCurrentSceneForMapResult(
   {
     reviewParams.insert(
       "views",
-      QJsonArray{
-        "iso_overview_ne",
-        "top_plan",
-        "side_elevation_long",
-        "front_elevation_cross",
-      });
+      preset == "route_platform"
+        ? QJsonArray{
+            "iso_overview_ne",
+            "iso_overview_sw",
+            "top_plan",
+            "side_elevation_long",
+          }
+        : QJsonArray{
+            "iso_overview_ne",
+            "top_plan",
+            "side_elevation_long",
+            "front_elevation_cross",
+          });
+  }
+  if (!reviewParams.contains("verticalExaggeration") && preset == "route_platform")
+  {
+    reviewParams.insert("verticalExaggeration", 1.6);
   }
   if (!reviewParams.contains("imageSize"))
   {
@@ -1859,18 +2378,31 @@ McpBridgeToolResult renderReviewCurrentSceneForMapResult(
     reviewParams.insert("detail", "summary");
   }
 
-  auto result = renderReviewNodesForMapResult(
-    "render_review_current_scene", nodes, reviewParams);
+  auto result =
+    renderReviewNodesForMapResult("render_review_current_scene", nodes, reviewParams);
   if (result.ok)
   {
     result.result.insert("preset", preset);
     result.result.insert("autoPreset", terrainLike ? "terrain_route" : "building");
+    result.result.insert("scope", scope.isEmpty() ? "all" : scope);
+    if (!warnings.isEmpty())
+    {
+      auto combinedWarnings = result.result.value("warnings").toArray();
+      for (const auto& warning : warnings)
+      {
+        combinedWarnings.push_back(warning);
+      }
+      result.result.insert("warnings", combinedWarnings);
+    }
   }
   return result;
 }
 
 McpBridgeToolResult renderReviewCurrentSceneResult(
-  AppController& appController, const QJsonObject& params)
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (mapWindow == nullptr)
@@ -1878,7 +2410,8 @@ McpBridgeToolResult renderReviewCurrentSceneResult(
     return noActiveDocumentFailure();
   }
 
-  return renderReviewCurrentSceneForMapResult(mapWindow->document().map(), params);
+  return renderReviewCurrentSceneForMapResult(
+    mapWindow->document().map(), params, history, objectRegistry);
 }
 
 } // namespace tb::ui

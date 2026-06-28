@@ -82,6 +82,16 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           auto doctor = doctorJson(appController, m_config);
           doctor.insert("overlay", m_overlayState);
+          if (params.value("detail").toString("summary").trimmed().toLower() != "full")
+          {
+            doctor.remove("implementedTools");
+            doctor.remove("toolDiagnostics");
+            doctor.insert("detail", "summary");
+          }
+          else
+          {
+            doctor.insert("detail", "full");
+          }
           return McpBridgeToolResult::success(std::move(doctor));
         }
         if (toolName == "tb_tools_search")
@@ -221,7 +231,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         }
         if (toolName == "render_review_current_scene")
         {
-          return renderReviewCurrentSceneResult(appController, params);
+          return renderReviewCurrentSceneResult(
+            appController, params, m_operationHistory, &m_objectRegistry);
         }
         if (toolName == "render_review_operation")
         {
@@ -427,12 +438,22 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "texture_apply")
         {
           return textureApplyResult(
-            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
         }
         if (toolName == "texture_apply_by_filter")
         {
           return textureApplyByFilterResult(
-            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
         }
         if (toolName == "texture_replace")
         {
@@ -442,25 +463,42 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "texture_align_face")
         {
           return textureAlignFaceResult(
-            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
         }
         if (toolName == "texture_copy_from_face")
         {
           return textureCopyFromFaceResult(
-            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
         }
         if (toolName == "face_list")
         {
-          return faceListResult(appController, params);
+          return faceListResult(
+            appController, params, m_operationHistory, m_objectRegistry);
         }
         if (toolName == "face_select")
         {
-          return faceSelectResult(appController, params);
+          return faceSelectResult(
+            appController, params, m_operationHistory, m_objectRegistry);
         }
         if (toolName == "face_texture_set")
         {
           return faceTextureSetResult(
-            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
         }
         if (toolName == "objects_delete")
         {
@@ -475,7 +513,12 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "objects_transform")
         {
           return transformObjectsResult(
-            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
         }
         if (toolName == "map_validate")
         {

@@ -62,6 +62,13 @@ namespace mcp = tb::mcp;
 namespace
 {
 
+struct PathRibbonSegment
+{
+  std::vector<vm::vec2d> polygon;
+  double minZ = 0.0;
+  double maxZ = 16.0;
+};
+
 QJsonArray vecToJson(const vm::vec3d& value)
 {
   return QJsonArray{
@@ -425,6 +432,37 @@ std::optional<std::vector<vm::vec3d>> points3DFromJson(
   if (array.size() < 4)
   {
     error = QString{"%1 must contain at least four points"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto result = std::vector<vm::vec3d>{};
+  result.reserve(static_cast<size_t>(array.size()));
+  for (auto i = 0; i < array.size(); ++i)
+  {
+    auto point = mcpVec3FromJsonValue(array[i], QString{"%1[%2]"}.arg(key).arg(i), error);
+    if (!point)
+    {
+      return std::nullopt;
+    }
+    result.push_back(*point);
+  }
+  return result;
+}
+
+std::optional<std::vector<vm::vec3d>> centerlinePoints3DFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array of [x,y,z] points"}.arg(key);
+    return std::nullopt;
+  }
+
+  const auto array = value.toArray();
+  if (array.size() < 2)
+  {
+    error = QString{"%1 must contain at least two points"}.arg(key);
     return std::nullopt;
   }
 
@@ -2423,6 +2461,8 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& p
   const auto caps = params.value("caps").toString("none").toLower();
   const auto material = params.value("material").toString();
   const auto snapMode = params.value("snapMode").toString("radial").toLower();
+  const auto slopeStartZ = optionalDouble(params, "slopeStartZ", 0.0);
+  const auto slopeEndZ = optionalDouble(params, "slopeEndZ", slopeStartZ);
 
   auto operations = std::vector<QJsonObject>{};
   operations.reserve(segments * 4 + 2);
@@ -2432,6 +2472,10 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& p
   {
     const auto a0 = startAngle + step * static_cast<double>(i);
     const auto a1 = a0 + step;
+    const auto t0 = static_cast<double>(i) / static_cast<double>(segments);
+    const auto t1 = static_cast<double>(i + 1) / static_cast<double>(segments);
+    const auto segmentT = (t0 + t1) * 0.5;
+    const auto segmentBaseZ = slopeStartZ + (slopeEndZ - slopeStartZ) * segmentT;
     const auto addSector =
       [&](const double inner, const double outer, const double minZ, const double maxZ) {
         auto op = QJsonObject{
@@ -2441,8 +2485,8 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& p
           {"outerRadius", outer},
           {"startAngle", a0},
           {"endAngle", a1},
-          {"minZ", minZ},
-          {"maxZ", maxZ},
+          {"minZ", minZ + segmentBaseZ},
+          {"maxZ", maxZ + segmentBaseZ},
           {"snapMode", snapMode},
         };
         if (!material.isEmpty())
@@ -2467,8 +2511,9 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& p
       {"outerRadius", outerRadius + wallThickness},
       {"startAngle", angle - half},
       {"endAngle", angle + half},
-      {"minZ", 0.0},
-      {"maxZ", height + ceilingThickness},
+      {"minZ", angle == startAngle ? slopeStartZ : slopeEndZ},
+      {"maxZ",
+       (angle == startAngle ? slopeStartZ : slopeEndZ) + height + ceilingThickness},
       {"snapMode", snapMode},
     };
     if (!material.isEmpty())
@@ -2489,18 +2534,41 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& p
   return operations;
 }
 
-std::optional<std::vector<std::vector<vm::vec2d>>> pathRibbonPolygonsFromParams(
+std::optional<std::vector<PathRibbonSegment>> pathRibbonSegmentsFromParams(
   const QJsonObject& params, const double grid, QString& error)
 {
-  const auto points = points2DFromJson(params, "points2d", 2u, error);
-  if (!points)
+  auto zValues = std::vector<double>{};
+  auto points2d = std::vector<vm::vec2d>{};
+  if (params.value("points3d").isArray())
   {
-    return std::nullopt;
+    const auto points3d = centerlinePoints3DFromJson(params, "points3d", error);
+    if (!points3d)
+    {
+      return std::nullopt;
+    }
+    points2d.reserve(points3d->size());
+    zValues.reserve(points3d->size());
+    for (const auto& point : *points3d)
+    {
+      points2d.emplace_back(point.x(), point.y());
+      zValues.push_back(snapToGrid(point.z(), grid));
+    }
+  }
+  else
+  {
+    const auto points = points2DFromJson(params, "points2d", 2u, error);
+    if (!points)
+    {
+      return std::nullopt;
+    }
+    points2d = *points;
   }
 
-  if (points->size() < 2)
+  if (points2d.size() < 2)
   {
-    error = "points2d must contain at least two centerline points";
+    error = params.value("points3d").isArray()
+              ? "points3d must contain at least two centerline points"
+              : "points2d must contain at least two centerline points";
     return std::nullopt;
   }
 
@@ -2511,7 +2579,7 @@ std::optional<std::vector<std::vector<vm::vec2d>>> pathRibbonPolygonsFromParams(
     return std::nullopt;
   }
 
-  auto snappedPoints = snapPointsToGrid(*points, grid);
+  auto snappedPoints = snapPointsToGrid(points2d, grid);
   auto normals = std::vector<vm::vec2d>{};
   normals.reserve(snappedPoints.size() - 1);
   for (size_t i = 0; i + 1 < snappedPoints.size(); ++i)
@@ -2519,8 +2587,10 @@ std::optional<std::vector<std::vector<vm::vec2d>>> pathRibbonPolygonsFromParams(
     const auto direction = snappedPoints[i + 1] - snappedPoints[i];
     if (vm::is_zero(direction, GeometryEpsilon))
     {
-      error = QString{"points2d[%1] and points2d[%2] collapse after snapping"}.arg(i).arg(
-        i + 1);
+      error = QString{"%1[%2] and %1[%3] collapse after snapping"}
+                .arg(params.value("points3d").isArray() ? "points3d" : "points2d")
+                .arg(i)
+                .arg(i + 1);
       return std::nullopt;
     }
 
@@ -2528,8 +2598,8 @@ std::optional<std::vector<std::vector<vm::vec2d>>> pathRibbonPolygonsFromParams(
     normals.push_back(vm::vec2d{-tangent.y(), tangent.x()});
   }
 
-  auto polygons = std::vector<std::vector<vm::vec2d>>{};
-  polygons.reserve(snappedPoints.size() - 1);
+  auto segments = std::vector<PathRibbonSegment>{};
+  segments.reserve(snappedPoints.size() - 1);
   const auto halfWidth = snapToGrid(width * 0.5, grid);
   const auto miterLimit = optionalDouble(params, "miterLimit", 4.0);
   if (!finitePositive(halfWidth))
@@ -2603,15 +2673,25 @@ std::optional<std::vector<std::vector<vm::vec2d>>> pathRibbonPolygonsFromParams(
       error = QString{"path_ribbon segment %1 is not a convex brush footprint"}.arg(i);
       return std::nullopt;
     }
-    polygons.push_back(std::move(polygon));
+    auto segment = PathRibbonSegment{};
+    segment.polygon = std::move(polygon);
+    if (!zValues.empty())
+    {
+      const auto baseZ = std::min(zValues[i], zValues[i + 1]);
+      segment.minZ = snapToGrid(baseZ + optionalDouble(params, "zOffset", 0.0), grid);
+      const auto segmentThickness =
+        optionalDouble(params, "thickness", optionalDouble(params, "height", 16.0));
+      segment.maxZ = snapToGrid(segment.minZ + segmentThickness, grid);
+    }
+    segments.push_back(std::move(segment));
   }
 
-  if (polygons.empty())
+  if (segments.empty())
   {
     error = "path_ribbon generated no segments";
     return std::nullopt;
   }
-  return polygons;
+  return segments;
 }
 
 std::vector<mdl::Node*> createPathRibbonNodes(
@@ -2621,25 +2701,44 @@ std::vector<mdl::Node*> createPathRibbonNodes(
   const std::string& material,
   QString& error)
 {
-  const auto polygons = pathRibbonPolygonsFromParams(operation, grid, error);
-  if (!polygons)
+  auto segments = pathRibbonSegmentsFromParams(operation, grid, error);
+  if (!segments)
   {
     return {};
   }
 
   const auto minZ = snapToGrid(optionalDouble(operation, "minZ", 0.0), grid);
   const auto maxZ = snapToGrid(optionalDouble(operation, "maxZ", 16.0), grid);
-  if (!(std::isfinite(minZ) && std::isfinite(maxZ)) || minZ >= maxZ)
+  if (operation.value("points3d").isArray())
+  {
+    for (auto& segment : *segments)
+    {
+      if (
+        !(std::isfinite(segment.minZ) && std::isfinite(segment.maxZ))
+        || segment.minZ >= segment.maxZ)
+      {
+        error = "points3d path_ribbon thickness/height must keep segment minZ below maxZ";
+        return {};
+      }
+    }
+  }
+  else if (!(std::isfinite(minZ) && std::isfinite(maxZ)) || minZ >= maxZ)
   {
     error = "minZ must be smaller than maxZ";
     return {};
   }
 
   auto result = std::vector<mdl::Node*>{};
-  result.reserve(polygons->size());
-  for (const auto& polygon : *polygons)
+  result.reserve(segments->size());
+  for (auto segment : *segments)
   {
-    auto brush = createPrismBrush(builder, polygon, minZ, maxZ, material, error);
+    if (!operation.value("points3d").isArray())
+    {
+      segment.minZ = minZ;
+      segment.maxZ = maxZ;
+    }
+    auto brush = createPrismBrush(
+      builder, segment.polygon, segment.minZ, segment.maxZ, material, error);
     if (!brush)
     {
       deleteNodes(result);
@@ -2662,6 +2761,8 @@ bool validateCurvedCorridorParams(const QJsonObject& params, QString& error)
   const auto ceilingThickness = optionalDouble(params, "ceilingThickness", 16.0);
   const auto caps = params.value("caps").toString("none").toLower();
   const auto snapMode = params.value("snapMode").toString("radial").toLower();
+  const auto slopeStartZ = optionalDouble(params, "slopeStartZ", 0.0);
+  const auto slopeEndZ = optionalDouble(params, "slopeEndZ", slopeStartZ);
 
   if (!params.value("center").isArray())
   {
@@ -2680,6 +2781,11 @@ bool validateCurvedCorridorParams(const QJsonObject& params, QString& error)
     || !finitePositive(floorThickness) || !finitePositive(ceilingThickness))
   {
     error = "height and thickness values must be greater than zero";
+    return false;
+  }
+  if (!std::isfinite(slopeStartZ) || !std::isfinite(slopeEndZ))
+  {
+    error = "slopeStartZ and slopeEndZ must be finite";
     return false;
   }
   if (innerRadius <= wallThickness)

@@ -211,7 +211,6 @@ bool isObjectIdKey(const QString& key)
   }
 
   static const auto Keys = QStringList{
-    "id",
     "objectId",
     "objectIds",
     "faceOwnerBrushIds",
@@ -614,14 +613,37 @@ std::optional<QJsonObject> McpObjectRegistry::internalizeParams(
 QJsonObject McpObjectRegistry::externalizeResult(
   mdl::Map& map, const QJsonObject& result) const
 {
+  auto diagnostics = QJsonArray{};
   const auto translate = [&](const QString& value) -> QJsonValue {
     if (!isLegacyObjectId(value))
     {
       return value;
     }
+    if (resolveLegacyObjectId(map, value) == nullptr)
+    {
+      diagnostics.push_back(QJsonObject{
+        {"objectId", value},
+        {"legacy", true},
+        {"live", false},
+        {"stale", true},
+        {"mismatch", false},
+        {"staleReason", "legacy object id no longer resolves in active document"},
+      });
+      return value;
+    }
     return externalIdForLegacy(map, value);
   };
-  return walkObjectIds(result, {}, translate).toObject();
+  auto converted = walkObjectIds(result, {}, translate).toObject();
+  if (!diagnostics.isEmpty())
+  {
+    auto existing = converted.value("objectIdDiagnostics").toArray();
+    for (const auto& diagnostic : diagnostics)
+    {
+      existing.push_back(diagnostic);
+    }
+    converted.insert("objectIdDiagnostics", existing);
+  }
+  return converted;
 }
 
 bool McpObjectRegistry::isStableObjectId(const QString& id)

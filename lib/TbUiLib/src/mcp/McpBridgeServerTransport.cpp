@@ -400,11 +400,12 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   const auto result = m_toolHandler(request.tool, params);
   if (result.ok)
   {
-    if (map != nullptr)
+    auto* resultMap = m_activeMapProvider ? m_activeMapProvider() : nullptr;
+    if (resultMap != nullptr)
     {
-      auto externalResult = m_objectRegistry.externalizeResult(*map, result.result);
+      auto externalResult = m_objectRegistry.externalizeResult(*resultMap, result.result);
       syncOperationHistoryWithExternalResult(
-        m_operationHistory, *map, m_objectRegistry, externalResult);
+        m_operationHistory, *resultMap, m_objectRegistry, externalResult);
       return mcp::McpBridgeResponse::success(request.id, std::move(externalResult));
     }
     return mcp::McpBridgeResponse::success(request.id, result.result);

@@ -124,19 +124,22 @@ McpBridgeToolResult textureApplyResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult textureApplyByFilterResult(
   AppController& appController,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult textureApplyByFilterForMapResult(
   mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult textureReplaceResult(
   AppController& appController,
   const QString& toolName,
@@ -148,23 +151,32 @@ McpBridgeToolResult textureAlignFaceResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult textureCopyFromFaceResult(
   AppController& appController,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult faceListResult(
-  AppController& appController, const QJsonObject& params);
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult faceSelectResult(
-  AppController& appController, const QJsonObject& params);
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult faceTextureSetResult(
   AppController& appController,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 
 QJsonObject actionsListJson(AppController& appController);
 McpBridgeToolResult actionExecuteResult(
@@ -218,9 +230,15 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
   const std::vector<McpOperationRecord>& history = {},
   const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult renderReviewCurrentSceneForMapResult(
-  mdl::Map& map, const QJsonObject& params);
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history = {},
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult renderReviewCurrentSceneResult(
-  AppController& appController, const QJsonObject& params);
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history = {},
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult renderReviewOperationResult(
   AppController& appController,
   const QJsonObject& params,
@@ -382,13 +400,15 @@ McpBridgeToolResult transformObjectsResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult transformObjectsForMapResult(
   mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 
 McpBridgeToolResult brushTypesListResult();
 McpBridgeToolResult createBrushResult(

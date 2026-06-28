@@ -416,12 +416,15 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("map_fix_all_safe"));
     CHECK(!names.contains("viewport_focus"));
     CHECK(!names.contains("viewport_clear_marks"));
-    CHECK(names.contains("viewport_layout_get"));
-    CHECK(names.contains("viewport_layout_set"));
-    CHECK(names.contains("viewport_camera_frame_bounds"));
-    CHECK(names.contains("viewport_camera_set"));
+    CHECK(!names.contains("viewport_layout_get"));
+    CHECK(!names.contains("viewport_layout_set"));
+    CHECK(!names.contains("viewport_camera_frame_bounds"));
+    CHECK(!names.contains("viewport_camera_set"));
     CHECK(!names.contains("viewport_capture_3d"));
-    CHECK(names.contains("viewport_capture_scene_review"));
+    CHECK(!names.contains("viewport_capture_scene_review"));
+    CHECK(names.contains("render_review_targets"));
+    CHECK(names.contains("render_review_current_scene"));
+    CHECK(names.contains("render_review_operation"));
     CHECK(!names.contains("overlay_set"));
     CHECK(!names.contains("overlay_clear"));
   }
@@ -695,10 +698,12 @@ TEST_CASE("McpToolCatalog")
 
     const auto currentSceneProperties =
       currentSceneTool->inputSchema.value("properties").toObject();
+    CHECK(currentSceneProperties.value("scope").isObject());
     CHECK(currentSceneProperties.value("preset").isObject());
     CHECK(currentSceneProperties.value("style").isObject());
     CHECK(currentSceneProperties.value("edgeMode").isObject());
     CHECK(currentSceneProperties.value("combineViews").isObject());
+    CHECK(currentSceneProperties.value("idsMode").isObject());
     CHECK(currentSceneProperties.value("detail").isObject());
 
     const auto tool = findToolDefinition("render_review_operation");
@@ -717,6 +722,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(properties.value("isolateMode").isObject());
     CHECK(properties.value("framingPreset").isObject());
     CHECK(properties.value("imageSize").isObject());
+    CHECK(properties.value("idsMode").isObject());
 
     const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
     auto names = QStringList{};
@@ -968,10 +974,49 @@ TEST_CASE("McpToolCatalog")
             .toArray()
             .contains("operationId"));
 
+    const auto transformTool = findToolDefinition("objects_transform");
+    REQUIRE(transformTool);
+    const auto transformProperties =
+      transformTool->inputSchema.value("properties").toObject();
+    CHECK(transformProperties.value("operationId").isObject());
+    CHECK(transformProperties.value("operationIds").isObject());
+    CHECK(transformTool->inputSchema.value("required").toArray().contains("operation"));
+    CHECK(!transformTool->inputSchema.value("required").toArray().contains("objectIds"));
+
     const auto textureTool = findToolDefinition("texture_apply_by_filter");
     REQUIRE(textureTool);
     CHECK(textureTool->category == "texture");
     CHECK(textureTool->inputSchema.value("required").toArray().contains("material"));
+    const auto textureProperties =
+      textureTool->inputSchema.value("properties").toObject();
+    CHECK(textureProperties.value("operationId").isObject());
+    CHECK(textureProperties.value("operationIds").isObject());
+    CHECK(textureProperties.value("faceSemantic").isObject());
+    CHECK(textureProperties.value("normal").isObject());
+
+    const auto faceTextureTool = findToolDefinition("face_texture_set");
+    REQUIRE(faceTextureTool);
+    const auto faceTextureProperties =
+      faceTextureTool->inputSchema.value("properties").toObject();
+    CHECK(faceTextureProperties.value("operationIds").isObject());
+    CHECK(faceTextureProperties.value("faceSemantic").isObject());
+
+    const auto reviewTargetsTool = findToolDefinition("render_review_targets");
+    REQUIRE(reviewTargetsTool);
+    const auto reviewTargetProperties =
+      reviewTargetsTool->inputSchema.value("properties").toObject();
+    CHECK(reviewTargetProperties.value("preset").isObject());
+    CHECK(reviewTargetProperties.value("verticalExaggeration").isObject());
+    CHECK(reviewTargetProperties.value("includeEntityLabels").isObject());
+    CHECK(reviewTargetProperties.value("includeOrderLabels").isObject());
+    CHECK(reviewTargetProperties.value("includeDirectionLabels").isObject());
+
+    const auto validateTool = findToolDefinition("map_validate");
+    REQUIRE(validateTool);
+    const auto validateProperties =
+      validateTool->inputSchema.value("properties").toObject();
+    CHECK(validateProperties.value("includeProblems").isObject());
+    CHECK(validateProperties.value("limit").isObject());
 
     const auto entityTool = findToolDefinition("entity_create_checked");
     REQUIRE(entityTool);

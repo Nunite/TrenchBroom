@@ -169,6 +169,54 @@ QJsonObject routeMetadataSchema()
   };
 }
 
+QJsonObject faceTargetSchemaProperties()
+{
+  return QJsonObject{
+    {"objectId",
+     stringProperty("Optional single brush object id. If omitted, uses selection.")},
+    {"objectIds",
+     arrayProperty(
+       "Optional brush, brush entity, group, or operation target object ids. All child "
+       "brush faces are candidates.")},
+    {"operationId",
+     stringProperty(
+       "Optional MCP operation id. Live changed brush objects from the operation are "
+       "used as candidates.")},
+    {"operationIds",
+     arrayProperty(
+       "Optional MCP operation ids. Live changed brush objects from all operations are "
+       "used as candidates.")},
+    {"faceIndex",
+     integerProperty("Optional face index when objectId names a single brush.")},
+  };
+}
+
+QJsonObject semanticFaceSchemaProperties()
+{
+  return QJsonObject{
+    {"faceSemantic",
+     stringProperty(
+       "Optional semantic face filter after resolving candidates: all, top, bottom, or "
+       "side.")},
+    {"normal",
+     vec3Property(
+       "Optional normal vector filter after resolving candidates. Faces whose normal "
+       "dot this vector is at least normalTolerance are selected.")},
+    {"normalTolerance",
+     numberProperty(
+       "Dot-product threshold for normal/semantic face matching, defaults to 0.75.")},
+  };
+}
+
+QJsonObject mergeProperties(QJsonObject base, const QJsonObject& extra)
+{
+  for (auto it = extra.begin(); it != extra.end(); ++it)
+  {
+    base.insert(it.key(), it.value());
+  }
+  return base;
+}
+
 void addExpectedDocumentPathGuardSchema(McpToolDefinition& tool)
 {
   if (!tool.mutatesDocument)
@@ -249,10 +297,15 @@ QJsonObject blockoutBatchOperationSchema()
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"material", stringProperty("Per-operation material override.")},
        {"points2d", arrayProperty("Convex prism footprint points as [x,y].")},
+       {"points3d",
+        arrayProperty(
+          "Optional path_ribbon centerline points as [x,y,z]. When present, each "
+          "ribbon segment follows the lower endpoint Z plus zOffset.")},
        {"points", arrayProperty("Convex polyhedron points as [x,y,z].")},
        {"minZ", numberProperty("Minimum Z for prism or cylinder_sector.")},
        {"maxZ", numberProperty("Maximum Z for prism or cylinder_sector.")},
        {"width", numberProperty("Path ribbon width in map units.")},
+       {"zOffset", numberProperty("Vertical offset for points3d path_ribbon.")},
        {"miterLimit",
         numberProperty(
           "Maximum path_ribbon corner miter length as a half-width multiple.")},
@@ -265,6 +318,8 @@ QJsonObject blockoutBatchOperationSchema()
        {"endAngle", numberProperty("End angle in degrees for cylinder_sector.")},
        {"turnDegrees", numberProperty("Arc sweep in degrees for curved_corridor.")},
        {"height", numberProperty("Height for curved_corridor.")},
+       {"slopeStartZ", numberProperty("Starting Z offset for sloped curved_corridor.")},
+       {"slopeEndZ", numberProperty("Ending Z offset for sloped curved_corridor.")},
        {"segments", integerProperty("Segment count for curved_corridor.")},
        {"wallThickness", numberProperty("Wall thickness for curved_corridor.")},
        {"floorThickness", numberProperty("Floor thickness for curved_corridor.")},
@@ -353,7 +408,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       McpMode::ReadOnly,
       false,
       true,
-      objectSchema(),
+      objectSchema({
+        {"detail",
+         stringProperty(
+           "summary or full. Summary omits full tool lists/diagnostics to keep status "
+           "checks compact.")},
+      }),
     },
     {
       "documents_list",
@@ -851,6 +911,15 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "height_heatmap_edges. material_tint_edges assigns stable semantic colors "
            "from face material names; height_heatmap_edges colors by Z height and "
            "softens dense terrain edges.")},
+        {"preset",
+         stringProperty(
+           "Optional default bundle preset. route_platform favors strong whitebox "
+           "edges, dual iso views, top plan, side elevation, and modest vertical "
+           "exaggeration for sparse platform chains.")},
+        {"verticalExaggeration",
+         numberProperty(
+           "Scale Z distances around the target minimum Z before rendering. Defaults "
+           "to 1.0; route_platform defaults to 1.6.")},
         {"edgeMode",
          stringProperty(
            "Edge drawing mode: auto, all, minimal, or none. For terrain review, "
@@ -875,6 +944,16 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"includeAxes", boolProperty("Draw a small orientation axis marker.")},
         {"includeBoundsBox",
          boolProperty("Draw the target bounding box as a translucent dashed outline.")},
+        {"includeEntityLabels",
+         boolProperty(
+           "Draw classname labels for point/entity placeholders. Defaults to true.")},
+        {"includeOrderLabels",
+         boolProperty(
+           "Draw ordered target labels. route_platform enables this by default.")},
+        {"includeDirectionLabels",
+         boolProperty(
+           "Draw arrows between ordered targets. route_platform enables this by "
+           "default.")},
         {"maxDetailedFaces",
          integerProperty(
            "Maximum brush faces rendered as real polygons before falling back to bounds "
@@ -896,14 +975,24 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       false,
       true,
       objectSchema({
+        {"scope",
+         stringProperty(
+           "Review scope: all, mcp_history, or selection. Defaults to all for "
+           "compatibility; mcp_history is recommended for isolated generated-scene "
+           "review.")},
         {"preset",
          stringProperty(
-           "Optional preset: auto, terrain, terrain_route, building, material, or "
-           "whitebox. Defaults to auto.")},
+           "Optional preset: auto, terrain, terrain_route, route_platform, building, "
+           "material, or whitebox. route_platform uses strong whitebox edges and "
+           "modest vertical exaggeration for platform/route chains. Defaults to auto.")},
         {"style",
          stringProperty(
            "Optional rendering style override: whitebox_edges, material_tint_edges, or "
            "height_heatmap_edges.")},
+        {"verticalExaggeration",
+         numberProperty(
+           "Scale Z distances around the target minimum Z before rendering. Defaults "
+           "to 1.0; route_platform defaults to 1.6.")},
         {"edgeMode",
          stringProperty(
            "Optional edge drawing override: auto, all, minimal, or none. Dense terrain "
@@ -926,10 +1015,24 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"includeAxes", boolProperty("Draw a small orientation axis marker.")},
         {"includeBoundsBox",
          boolProperty("Draw the target bounding box as a translucent dashed outline.")},
+        {"includeEntityLabels",
+         boolProperty(
+           "Draw classname labels for point/entity placeholders. Defaults to true.")},
+        {"includeOrderLabels",
+         boolProperty(
+           "Draw ordered target labels. route_platform enables this by default.")},
+        {"includeDirectionLabels",
+         boolProperty(
+           "Draw arrows between ordered targets. route_platform enables this by "
+           "default.")},
         {"maxDetailedFaces",
          integerProperty(
            "Maximum brush faces rendered as real polygons before falling back to bounds "
            "geometry. Defaults to 20000.")},
+        {"idsMode",
+         stringProperty(
+           "Object id verbosity for tools that resolve targets: none, count, sample, or "
+           "full. Current-scene review mainly reports counts.")},
         {"detail",
          stringProperty(
            "summary or full. Summary is default and suppresses large arrays from the "
@@ -963,9 +1066,17 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "side_elevation_long, and front_elevation_cross. Legacy viewport review "
            "view names are accepted.")},
         {"style",
+         stringProperty("Rendering style: whitebox_edges, material_tint_edges, or "
+                        "height_heatmap_edges.")},
+        {"preset",
          stringProperty(
-           "Rendering style: whitebox_edges, material_tint_edges, or "
-           "height_heatmap_edges.")},
+           "Optional default bundle preset. route_platform favors strong whitebox "
+           "edges, dual iso views, top plan, side elevation, and modest vertical "
+           "exaggeration for sparse platform chains.")},
+        {"verticalExaggeration",
+         numberProperty(
+           "Scale Z distances around the target minimum Z before rendering. Defaults "
+           "to 1.0; route_platform defaults to 1.6.")},
         {"edgeMode",
          stringProperty(
            "Edge drawing mode: auto, all, minimal, or none. Use none/minimal for dense "
@@ -992,11 +1103,25 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"includeAxes", boolProperty("Draw a small orientation axis marker.")},
         {"includeBoundsBox",
          boolProperty("Draw the target bounding box as a translucent dashed outline.")},
+        {"includeEntityLabels",
+         boolProperty(
+           "Draw classname labels for point/entity placeholders. Defaults to true.")},
+        {"includeOrderLabels",
+         boolProperty(
+           "Draw ordered target labels. route_platform enables this by default.")},
+        {"includeDirectionLabels",
+         boolProperty(
+           "Draw arrows between ordered targets. route_platform enables this by "
+           "default.")},
         {"sceneName", stringProperty("Optional scene/review label.")},
         {"returnBase64",
          boolProperty(
            "Compatibility parameter. Geometry review writes files and returns paths to "
            "save context.")},
+        {"idsMode",
+         stringProperty(
+           "Target id verbosity: none, count, sample, or full. Defaults to count unless "
+           "detail=full/ids is requested.")},
       }),
     },
     {
@@ -1682,40 +1807,42 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "texture_apply",
-      "Apply a material to selected faces, selected brushes, or all faces of one brush.",
+      "Apply a material to selected faces, target objects, operation targets, or a "
+      "semantic subset such as top/bottom/side faces.",
       McpMode::Edit,
       true,
       true,
       objectSchema(
-        {
-          {"material", stringProperty("Material name to apply.")},
-          {"objectId",
-           stringProperty("Optional brush object id. If omitted, uses selection.")},
-          {"faceIndex", integerProperty("Optional face index for objectId brush.")},
-        },
+        mergeProperties(
+          QJsonObject{{"material", stringProperty("Material name to apply.")}},
+          mergeProperties(faceTargetSchemaProperties(), semanticFaceSchemaProperties())),
         {"material"}),
     },
     {
       "texture_apply_by_filter",
       "Apply a material to brushes matched by a safe selection_filter-style query. "
-      "The tool only edits brush faces and ignores world/group/layer parents.",
+      "The tool only edits brush faces and ignores world/group/layer parents. It also "
+      "accepts objectIds or operationIds as direct targets, then can narrow by "
+      "faceSemantic or normal.",
       McpMode::Edit,
       true,
       true,
       objectSchema(
-        {
-          {"material", stringProperty("Material name to apply.")},
-          {"type",
-           stringProperty(
-             "Optional node type filter. Defaults to brush for safe texture edits.")},
-          {"classname", stringProperty("Optional entity classname filter.")},
-          {"targetname", stringProperty("Optional entity targetname filter.")},
-          {"query", stringProperty("Optional text query.")},
-          {"min", vec3Property("Optional bounds minimum corner.")},
-          {"max", vec3Property("Optional bounds maximum corner.")},
-          {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
-          {"limit", integerProperty("Maximum matched brush count, defaults to 100.")},
-        },
+        mergeProperties(
+          QJsonObject{
+            {"material", stringProperty("Material name to apply.")},
+            {"type",
+             stringProperty(
+               "Optional node type filter. Defaults to brush for safe texture edits.")},
+            {"classname", stringProperty("Optional entity classname filter.")},
+            {"targetname", stringProperty("Optional entity targetname filter.")},
+            {"query", stringProperty("Optional text query.")},
+            {"min", vec3Property("Optional bounds minimum corner.")},
+            {"max", vec3Property("Optional bounds maximum corner.")},
+            {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
+            {"limit", integerProperty("Maximum matched brush count, defaults to 100.")},
+          },
+          mergeProperties(faceTargetSchemaProperties(), semanticFaceSchemaProperties())),
         {"material"}),
     },
     {
@@ -1739,11 +1866,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       true,
       objectSchema(
-        {
-          {"mode", stringProperty("Alignment mode: reset, paraxial, or parallel.")},
-          {"objectId", stringProperty("Optional brush object id.")},
-          {"faceIndex", integerProperty("Optional face index for objectId brush.")},
-        },
+        mergeProperties(
+          QJsonObject{
+            {"mode", stringProperty("Alignment mode: reset, paraxial, or parallel.")},
+          },
+          mergeProperties(faceTargetSchemaProperties(), semanticFaceSchemaProperties())),
         {"mode"}),
     },
     {
@@ -1754,12 +1881,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       true,
       objectSchema(
-        {
-          {"sourceObjectId", stringProperty("Source brush object id.")},
-          {"sourceFaceIndex", integerProperty("Source brush face index.")},
-          {"objectId", stringProperty("Optional target brush object id.")},
-          {"faceIndex", integerProperty("Optional target face index.")},
-        },
+        mergeProperties(
+          QJsonObject{
+            {"sourceObjectId", stringProperty("Source brush object id.")},
+            {"sourceFaceIndex", integerProperty("Source brush face index.")},
+          },
+          mergeProperties(faceTargetSchemaProperties(), semanticFaceSchemaProperties())),
         {"sourceObjectId", "sourceFaceIndex"}),
     },
     {
@@ -1769,7 +1896,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       false,
       true,
       objectSchema({
-        {"objectId", stringProperty("Optional brush object id.")},
+        {"objectId", stringProperty("Optional single brush object id.")},
+        {"objectIds",
+         arrayProperty("Optional object ids whose child brush faces should be listed.")},
+        {"operationId", stringProperty("Optional MCP operation id target.")},
+        {"operationIds", arrayProperty("Optional MCP operation id targets.")},
+        {"faceSemantic", stringProperty("Optional semantic face filter.")},
+        {"normal", vec3Property("Optional normal vector face filter.")},
+        {"normalTolerance", numberProperty("Normal matching tolerance.")},
         {"limit", integerProperty("Maximum result count, defaults to 500.")},
       }),
     },
@@ -1782,7 +1916,15 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema({
         {"faces", arrayProperty("Array of {objectId, faceIndex} face references.")},
         {"objectId", stringProperty("Optional single brush object id.")},
+        {"objectIds",
+         arrayProperty(
+           "Optional object ids whose child brush faces should be selected.")},
+        {"operationId", stringProperty("Optional MCP operation id target.")},
+        {"operationIds", arrayProperty("Optional MCP operation id targets.")},
         {"faceIndex", integerProperty("Optional single face index.")},
+        {"faceSemantic", stringProperty("Optional semantic face filter.")},
+        {"normal", vec3Property("Optional normal vector face filter.")},
+        {"normalTolerance", numberProperty("Normal matching tolerance.")},
       }),
     },
     {
@@ -1791,16 +1933,16 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       McpMode::Edit,
       true,
       true,
-      objectSchema({
-        {"material", stringProperty("Optional material name.")},
-        {"xOffset", numberProperty("Optional X texture offset.")},
-        {"yOffset", numberProperty("Optional Y texture offset.")},
-        {"xScale", numberProperty("Optional X texture scale.")},
-        {"yScale", numberProperty("Optional Y texture scale.")},
-        {"rotation", numberProperty("Optional texture rotation.")},
-        {"objectId", stringProperty("Optional brush object id.")},
-        {"faceIndex", integerProperty("Optional face index for objectId brush.")},
-      }),
+      objectSchema(mergeProperties(
+        QJsonObject{
+          {"material", stringProperty("Optional material name.")},
+          {"xOffset", numberProperty("Optional X texture offset.")},
+          {"yOffset", numberProperty("Optional Y texture offset.")},
+          {"xScale", numberProperty("Optional X texture scale.")},
+          {"yScale", numberProperty("Optional Y texture scale.")},
+          {"rotation", numberProperty("Optional texture rotation.")},
+        },
+        mergeProperties(faceTargetSchemaProperties(), semanticFaceSchemaProperties()))),
     },
     {
       "objects_delete",
@@ -1861,6 +2003,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(
         {
           {"objectIds", arrayProperty("MCP object ids to transform.")},
+          {"operationId",
+           stringProperty(
+             "Optional MCP operation id whose live changed objects are transformed.")},
+          {"operationIds",
+           arrayProperty(
+             "Optional MCP operation ids whose live changed objects are transformed.")},
           {"operation",
            stringProperty("Transform operation: translate, rotate, or scale.")},
           {"delta", vec3Property("Translation delta in map units.")},
@@ -1870,16 +2018,21 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"center",
            vec3Property("Optional transform center. Defaults to object bounds center.")},
         },
-        {"objectIds", "operation"}),
+        {"operation"}),
     },
     {
       "map_validate",
-      "Validate the active map and return problem counts.",
+      "Validate the active map and return compact problem counts by default.",
       McpMode::ReadOnly,
       false,
       true,
       objectSchema({
         {"includeHidden", boolProperty("Include hidden issues.")},
+        {"includeProblems",
+         boolProperty(
+           "Include a limited problems array. Defaults to false to keep validation "
+           "responses compact.")},
+        {"limit", integerProperty("Maximum problem entries when includeProblems=true.")},
       }),
     },
     {
@@ -2158,6 +2311,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
              "subdivides. Lower values create more brushes.")},
           {"material", stringProperty("Brush material, defaults to current material.")},
           {"select", boolProperty("Select generated terrain brushes.")},
+          {"idsMode",
+           stringProperty(
+             "Object id verbosity: none, count, sample, or full. Maps to summary/ids "
+             "detail internally.")},
           {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
         },
         {"imagePath"}),
@@ -2208,6 +2365,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"startAngle", numberProperty("Start angle in degrees.")},
         {"turnDegrees", numberProperty("Arc length in degrees.")},
         {"height", numberProperty("Playable height, defaults to 128.")},
+        {"slopeStartZ", numberProperty("Starting Z offset for an uphill/downhill arc.")},
+        {"slopeEndZ", numberProperty("Ending Z offset for an uphill/downhill arc.")},
         {"segments", integerProperty("Segment count, defaults to 12.")},
         {"wallThickness", numberProperty("Wall thickness, defaults to 16.")},
         {"floorThickness", numberProperty("Floor thickness, defaults to 16.")},
@@ -2562,11 +2721,6 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "selection_filter",
     "selection_by_bounds",
     "selection_grow",
-    "viewport_layout_get",
-    "viewport_layout_set",
-    "viewport_camera_frame_bounds",
-    "viewport_camera_set",
-    "viewport_capture_scene_review",
     "render_review_targets",
     "render_review_current_scene",
     "render_review_operation",

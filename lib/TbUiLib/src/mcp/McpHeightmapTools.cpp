@@ -1100,6 +1100,13 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
     {"detail", params.value("detail").toString("summary")},
     {"operations", preview.operations},
   };
+  const auto idsMode = params.value("idsMode").toString().trimmed().toLower();
+  if (!idsMode.isEmpty())
+  {
+    batchParams.insert(
+      "detail",
+      idsMode == "full" || idsMode == "ids" || idsMode == "sample" ? "ids" : "summary");
+  }
   const auto material = params.value("material").toString();
   if (!material.isEmpty())
   {

@@ -209,14 +209,110 @@ QJsonObject shapeJson(
   const QString& name,
   const QString& purpose,
   const QString& parameters,
-  const bool polygonBatch)
+  const bool polygonBatch,
+  const QJsonArray& points2dExample)
 {
   return QJsonObject{
     {"name", name},
     {"purpose", purpose},
     {"parameters", parameters},
     {"polygonBatch", polygonBatch},
+    {"points2dExample", points2dExample},
   };
+}
+
+QJsonArray points2dJson(std::initializer_list<std::initializer_list<double>> points)
+{
+  auto result = QJsonArray{};
+  for (const auto& point : points)
+  {
+    auto pointArray = QJsonArray{};
+    for (const auto value : point)
+    {
+      pointArray.push_back(value);
+    }
+    result.push_back(pointArray);
+  }
+  return result;
+}
+
+bool nearlyEqual(const double lhs, const double rhs, const double epsilon = 0.001)
+{
+  return std::abs(lhs - rhs) <= epsilon;
+}
+
+double snapToGrid(const double value, const double grid)
+{
+  return grid > 0.0 && std::isfinite(grid) ? std::round(value / grid) * grid : value;
+}
+
+std::optional<QJsonArray> cleanedPoints2dArray(
+  const QJsonValue& value, const double grid, QString& error)
+{
+  if (!value.isArray())
+  {
+    error = "points2d must be an array";
+    return std::nullopt;
+  }
+
+  auto points = std::vector<vm::vec2d>{};
+  for (const auto& pointValue : value.toArray())
+  {
+    if (!pointValue.isArray())
+    {
+      error = "points2d must contain [x,y] arrays";
+      return std::nullopt;
+    }
+    const auto pointArray = pointValue.toArray();
+    if (pointArray.size() < 2 || !pointArray[0].isDouble() || !pointArray[1].isDouble())
+    {
+      error = "points2d points must contain x and y numbers";
+      return std::nullopt;
+    }
+    const auto point = vm::vec2d{
+      snapToGrid(pointArray[0].toDouble(), grid),
+      snapToGrid(pointArray[1].toDouble(), grid)};
+    if (
+      points.empty() || !nearlyEqual(points.back().x(), point.x())
+      || !nearlyEqual(points.back().y(), point.y()))
+    {
+      points.push_back(point);
+    }
+  }
+  if (
+    points.size() > 1 && nearlyEqual(points.front().x(), points.back().x())
+    && nearlyEqual(points.front().y(), points.back().y()))
+  {
+    points.pop_back();
+  }
+
+  auto changed = true;
+  while (changed && points.size() >= 3)
+  {
+    changed = false;
+    for (auto i = size_t{0}; i < points.size(); ++i)
+    {
+      const auto& previous = points[(i + points.size() - 1) % points.size()];
+      const auto& current = points[i];
+      const auto& next = points[(i + 1) % points.size()];
+      const auto ab = current - previous;
+      const auto bc = next - current;
+      const auto cross = ab.x() * bc.y() - ab.y() * bc.x();
+      if (std::abs(cross) <= 0.001)
+      {
+        points.erase(points.begin() + static_cast<std::ptrdiff_t>(i));
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  auto result = QJsonArray{};
+  for (const auto& point : points)
+  {
+    result.push_back(QJsonArray{point.x(), point.y()});
+  }
+  return result;
 }
 
 QJsonObject metadataForObject(
@@ -284,9 +380,8 @@ bool isMetadataControlParam(const QString& key)
 
 QJsonObject expectedMetadataFromParams(const QJsonObject& params)
 {
-  auto result =
-    params.value("metadata").isObject() ? params.value("metadata").toObject()
-                                        : QJsonObject{};
+  auto result = params.value("metadata").isObject() ? params.value("metadata").toObject()
+                                                    : QJsonObject{};
   for (auto it = params.begin(); it != params.end(); ++it)
   {
     if (!isMetadataControlParam(it.key()))
@@ -616,34 +711,56 @@ McpBridgeToolResult shapeLibraryListResult()
   return McpBridgeToolResult::success(QJsonObject{
     {"shapes",
      QJsonArray{
-       shapeJson("box", "Fast blockout/test block.", "center, size", true),
        shapeJson(
-         "diamond", "Directional landing/takeoff cue.", "center, width, depth", true),
+         "box",
+         "Fast blockout/test block.",
+         "center, size",
+         true,
+         points2dJson({{-64, -64}, {64, -64}, {64, 64}, {-64, 64}})),
+       shapeJson(
+         "diamond",
+         "Directional landing/takeoff cue.",
+         "center, width, depth",
+         true,
+         points2dJson({{0, -72}, {96, 0}, {0, 72}, {-96, 0}})),
        shapeJson(
          "trapezoid",
          "Bias landing window toward an outgoing edge.",
          "center, topWidth, bottomWidth, depth",
-         true),
+         true,
+         points2dJson({{-96, -64}, {96, -64}, {56, 64}, {-56, 64}})),
        shapeJson(
          "chamfered_rect",
          "Trim meaningless corners from box-like platforms.",
          "center, width, depth, chamfer",
-         true),
+         true,
+         points2dJson(
+           {{-80, -64},
+            {80, -64},
+            {96, -48},
+            {96, 48},
+            {80, 64},
+            {-80, 64},
+            {-96, 48},
+            {-96, -48}})),
        shapeJson(
          "half_hex",
          "Broad route turn with fewer false corners.",
          "center, radius",
-         true),
+         true,
+         points2dJson({{-96, -56}, {0, -96}, {96, -56}, {96, 56}, {0, 96}, {-96, 56}})),
        shapeJson(
          "arrowhead",
          "Strong direction cue for next jump.",
          "center, width, depth",
-         true),
+         true,
+         points2dJson({{-96, -64}, {32, -64}, {112, 0}, {32, 64}, {-96, 64}})),
        shapeJson(
          "slanted_plank",
          "Long narrow route-guiding ledge.",
          "center, length, width, angle",
-         true),
+         true,
+         points2dJson({{-128, -32}, {128, -32}, {128, 32}, {-128, 32}})),
      }},
   });
 }
@@ -699,9 +816,22 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
   }
 
   auto operations = QJsonArray{};
+  auto normalizedPointCount = 0;
+  const auto grid =
+    params.value("grid").isDouble() ? params.value("grid").toDouble() : 0.0;
   for (auto i = 0; i < brushes.size(); ++i)
   {
     auto operation = brushes[i].toObject();
+    const auto originalPointsCount = operation.value("points2d").toArray().size();
+    const auto cleanedPoints =
+      cleanedPoints2dArray(operation.value("points2d"), grid, error);
+    if (!cleanedPoints)
+    {
+      return invalidParamsFailure(QString{"brushes[%1].%2"}.arg(i).arg(error));
+    }
+    operation.insert("points2d", *cleanedPoints);
+    normalizedPointCount +=
+      std::max(0, static_cast<int>(originalPointsCount - cleanedPoints->size()));
     operation.remove("metadata");
     operation.insert("type", "prism");
     operations.push_back(operation);
@@ -760,6 +890,7 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
   }
 
   result.result.insert("metadataCount", metadataCount);
+  result.result.insert("normalizedPointCount", normalizedPointCount);
   if (requestedDetail == "summary")
   {
     result.result.remove("changedObjectIds");
