@@ -73,6 +73,7 @@ constexpr auto DefaultHeight = 1000;
 constexpr auto MinWidth = 900;
 constexpr auto MinHeight = 650;
 constexpr auto MaxDetailedFaceCount = 20000;
+constexpr auto DefaultContactSheetMaxCaptures = 2;
 
 struct ReviewView
 {
@@ -1620,6 +1621,37 @@ QJsonObject writeContactSheet(
   };
 }
 
+QJsonArray capturesForContactSheet(const QJsonArray& captures, const int maxCaptures)
+{
+  if (maxCaptures <= 0 || captures.size() <= maxCaptures)
+  {
+    return captures;
+  }
+
+  auto result = QJsonArray{};
+  for (auto i = 0; i < maxCaptures; ++i)
+  {
+    result.push_back(captures[i]);
+  }
+  return result;
+}
+
+void annotateContactSheet(
+  QJsonObject& contactSheet, const int totalCaptureCount, const int maxCaptures)
+{
+  if (contactSheet.isEmpty())
+  {
+    return;
+  }
+
+  const auto includedCaptureCount =
+    std::min(totalCaptureCount, maxCaptures <= 0 ? totalCaptureCount : maxCaptures);
+  contactSheet.insert("sourceCaptureCount", totalCaptureCount);
+  contactSheet.insert("includedCaptureCount", includedCaptureCount);
+  contactSheet.insert("omittedCaptureCount", totalCaptureCount - includedCaptureCount);
+  contactSheet.insert("maxCaptures", maxCaptures);
+}
+
 std::filesystem::path reviewOutputDir(const QJsonObject& params, const QString& reviewId)
 {
   if (const auto outputDir = params.value("outputDir").toString().trimmed();
@@ -1862,6 +1894,8 @@ McpBridgeToolResult renderReviewNodesForMapResult(
   const auto includeAxes = optionalBool(params, "includeAxes", true);
   const auto includeBoundsBox = optionalBool(params, "includeBoundsBox", false);
   const auto combineViews = optionalBool(params, "combineViews", true);
+  const auto contactSheetMaxCaptures = optionalIntClamped(
+    params, "contactSheetMaxCaptures", DefaultContactSheetMaxCaptures, 1, 16);
   const auto views = viewsFromParams(params);
   auto captures = QJsonArray{};
   auto quality = QJsonArray{};
@@ -1913,8 +1947,10 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     }
 
     contactSheetPath = pathToQString(outputDir / "contact_sheet.png");
+    const auto contactSheetCaptures =
+      capturesForContactSheet(captures, contactSheetMaxCaptures);
     contactSheet = writeContactSheet(
-      captures,
+      contactSheetCaptures,
       contactSheetPath,
       QString{"%1  |  %2  |  z:%3x  |  edges:%4  |  %5 brushes"}
         .arg(reviewId)
@@ -1927,6 +1963,7 @@ McpBridgeToolResult renderReviewNodesForMapResult(
                                                 : "auto")
         .arg(geometry.targetBrushCount),
       contactSheetSize);
+    annotateContactSheet(contactSheet, captures.size(), contactSheetMaxCaptures);
     if (!contactSheet.value("valid").toBool(false))
     {
       warnings.push_back("contactSheetInvalid");
@@ -2104,6 +2141,8 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
   const auto includeAxes = optionalBool(params, "includeAxes", true);
   const auto includeBoundsBox = optionalBool(params, "includeBoundsBox", false);
   const auto combineViews = optionalBool(params, "combineViews", true);
+  const auto contactSheetMaxCaptures = optionalIntClamped(
+    params, "contactSheetMaxCaptures", DefaultContactSheetMaxCaptures, 1, 16);
   const auto views = viewsFromParams(params);
   auto captures = QJsonArray{};
   auto quality = QJsonArray{};
@@ -2155,8 +2194,10 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     }
 
     contactSheetPath = pathToQString(outputDir / "contact_sheet.png");
+    const auto contactSheetCaptures =
+      capturesForContactSheet(captures, contactSheetMaxCaptures);
     contactSheet = writeContactSheet(
-      captures,
+      contactSheetCaptures,
       contactSheetPath,
       QString{"%1  |  %2  |  z:%3x  |  edges:%4  |  %5 brushes"}
         .arg(reviewId)
@@ -2169,6 +2210,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
                                                 : "auto")
         .arg(geometry.targetBrushCount),
       contactSheetSize);
+    annotateContactSheet(contactSheet, captures.size(), contactSheetMaxCaptures);
     if (!contactSheet.value("valid").toBool(false))
     {
       warnings.push_back("contactSheetInvalid");

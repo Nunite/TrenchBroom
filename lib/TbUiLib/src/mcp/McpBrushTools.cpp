@@ -44,6 +44,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/mcp/McpObjectRegistry.h"
 
 #include "vm/bbox.h"
 
@@ -51,6 +52,7 @@
 #include <array>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <map>
 #include <optional>
 #include <vector>
@@ -583,6 +585,20 @@ bool finitePositive(const double value)
   return std::isfinite(value) && value > 0.0;
 }
 
+QString axisName(const vm::axis::type axis)
+{
+  switch (axis)
+  {
+  case vm::axis::x:
+    return "x";
+  case vm::axis::y:
+    return "y";
+  case vm::axis::z:
+    return "z";
+  }
+  return "unknown";
+}
+
 double polygonSignedArea(const std::vector<vm::vec2d>& points)
 {
   auto area = 0.0;
@@ -721,6 +737,324 @@ std::vector<mdl::BrushNode*> selectedBrushNodes(mdl::Map& map)
     {
       result.push_back(brushNode);
     }
+  }
+  return result;
+}
+
+std::optional<QStringList> stringListFromJson(
+  const QJsonObject& params, const QString& key, QString& error)
+{
+  const auto value = params.value(key);
+  if (value.isUndefined())
+  {
+    return QStringList{};
+  }
+  if (!value.isArray())
+  {
+    error = QString{"%1 must be an array"}.arg(key);
+    return std::nullopt;
+  }
+
+  auto result = QStringList{};
+  for (const auto& entry : value.toArray())
+  {
+    if (!entry.isString())
+    {
+      error = QString{"%1 must contain only strings"}.arg(key);
+      return std::nullopt;
+    }
+    const auto id = entry.toString().trimmed();
+    if (!id.isEmpty())
+    {
+      result.push_back(id);
+    }
+  }
+  result.removeDuplicates();
+  return result;
+}
+
+std::optional<QStringList> operationIdsFromParams(
+  const QJsonObject& params, QString& error)
+{
+  auto result = QStringList{};
+  const auto operationId = params.value("operationId").toString().trimmed();
+  if (!operationId.isEmpty())
+  {
+    result.push_back(operationId);
+  }
+
+  const auto operationIds = stringListFromJson(params, "operationIds", error);
+  if (!operationIds)
+  {
+    return std::nullopt;
+  }
+  result.append(*operationIds);
+  result.removeDuplicates();
+  return result;
+}
+
+mdl::Node* resolveExternalNodeId(
+  mdl::Map& map,
+  const QString& objectId,
+  const McpObjectRegistry* objectRegistry,
+  QString& error)
+{
+  auto legacyPathId = objectId;
+  if (objectRegistry != nullptr)
+  {
+    const auto resolved = objectRegistry->resolveExternalId(map, objectId);
+    if (!resolved.ok)
+    {
+      error = resolved.error;
+      return nullptr;
+    }
+    legacyPathId = resolved.legacyPathId;
+  }
+
+  auto* node = resolveNodeId(map.worldNode(), legacyPathId);
+  if (node == nullptr)
+  {
+    error = QString{"Unknown MCP object id: %1"}.arg(objectId);
+  }
+  return node;
+}
+
+void collectBrushNodes(mdl::Node& node, std::vector<mdl::BrushNode*>& brushes)
+{
+  if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(&node))
+  {
+    brushes.push_back(brushNode);
+    return;
+  }
+
+  for (auto* child : node.children())
+  {
+    if (child != nullptr)
+    {
+      collectBrushNodes(*child, brushes);
+    }
+  }
+}
+
+std::optional<std::vector<mdl::BrushNode*>> brushNodesFromObjectIdsAndOperations(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry,
+  QString& error)
+{
+  auto nodes = std::vector<mdl::Node*>{};
+  const auto objectIds = stringListFromJson(params, "objectIds", error);
+  if (!objectIds)
+  {
+    return std::nullopt;
+  }
+  for (const auto& objectId : *objectIds)
+  {
+    auto* node = resolveExternalNodeId(map, objectId, objectRegistry, error);
+    if (node == nullptr)
+    {
+      return std::nullopt;
+    }
+    nodes.push_back(node);
+  }
+
+  const auto operationIds = operationIdsFromParams(params, error);
+  if (!operationIds)
+  {
+    return std::nullopt;
+  }
+  for (const auto& operationId : *operationIds)
+  {
+    const auto operationIt = std::ranges::find_if(history, [&](const auto& operation) {
+      return operation.operationId == operationId;
+    });
+    if (operationIt == history.end())
+    {
+      error = QString{"Unknown MCP operation id: %1"}.arg(operationId);
+      return std::nullopt;
+    }
+    if (operationIt->undone)
+    {
+      error = QString{"MCP operation is already undone: %1"}.arg(operationId);
+      return std::nullopt;
+    }
+    for (const auto& objectId : operationIt->changedObjectIds)
+    {
+      auto* node = resolveExternalNodeId(map, objectId, objectRegistry, error);
+      if (node == nullptr)
+      {
+        return std::nullopt;
+      }
+      nodes.push_back(node);
+    }
+  }
+
+  auto brushes = std::vector<mdl::BrushNode*>{};
+  for (auto* node : nodes)
+  {
+    if (node != nullptr)
+    {
+      collectBrushNodes(*node, brushes);
+    }
+  }
+
+  std::ranges::sort(brushes);
+  brushes.erase(std::unique(brushes.begin(), brushes.end()), brushes.end());
+  return brushes;
+}
+
+std::optional<vm::vec3d> optionalRouteDirectionFromParams(
+  const QJsonObject& params, QString& error)
+{
+  if (params.value("routeDirection").isArray())
+  {
+    const auto routeDirection = mcpVec3FromJson(params, "routeDirection", error);
+    if (!routeDirection)
+    {
+      return std::nullopt;
+    }
+    if (vm::is_zero(vm::vec2d{routeDirection->x(), routeDirection->y()}, GeometryEpsilon))
+    {
+      error = "routeDirection must have non-zero X/Y components";
+      return std::nullopt;
+    }
+    return vm::normalize(vm::vec3d{routeDirection->x(), routeDirection->y(), 0.0});
+  }
+
+  if (params.value("start").isArray() || params.value("end").isArray())
+  {
+    const auto start = mcpVec3FromJson(params, "start", error);
+    if (!start)
+    {
+      return std::nullopt;
+    }
+    const auto end = mcpVec3FromJson(params, "end", error);
+    if (!end)
+    {
+      return std::nullopt;
+    }
+    const auto direction = *end - *start;
+    if (vm::is_zero(vm::vec2d{direction.x(), direction.y()}, GeometryEpsilon))
+    {
+      error = "start/end route direction must have non-zero X/Y delta";
+      return std::nullopt;
+    }
+    return vm::normalize(vm::vec3d{direction.x(), direction.y(), 0.0});
+  }
+
+  return std::nullopt;
+}
+
+double optionalClampedDouble(
+  const QJsonObject& params,
+  const QString& key,
+  const double defaultValue,
+  const double minValue,
+  const double maxValue)
+{
+  const auto value = params.value(key);
+  if (!value.isDouble())
+  {
+    return defaultValue;
+  }
+  return std::clamp(value.toDouble(defaultValue), minValue, maxValue);
+}
+
+vm::bbox3d faceBounds(const mdl::BrushFace& face)
+{
+  const auto vertices = face.vertexPositions();
+  if (vertices.empty())
+  {
+    return vm::bbox3d{};
+  }
+
+  auto bounds = vm::bbox3d{vertices.front(), vertices.front()};
+  for (const auto& vertex : vertices)
+  {
+    bounds = vm::merge(bounds, vertex);
+  }
+  return bounds;
+}
+
+double faceProjectedSpan(const mdl::BrushFace& face, const vm::vec3d& direction)
+{
+  auto minProjection = std::numeric_limits<double>::max();
+  auto maxProjection = std::numeric_limits<double>::lowest();
+  for (const auto& vertex : face.vertexPositions())
+  {
+    const auto projection = vm::dot(vertex, direction);
+    minProjection = std::min(minProjection, projection);
+    maxProjection = std::max(maxProjection, projection);
+  }
+  if (minProjection == std::numeric_limits<double>::max())
+  {
+    return 0.0;
+  }
+  return std::max(0.0, maxProjection - minProjection);
+}
+
+QJsonObject slopeFaceJson(
+  const mdl::BrushNode& brushNode,
+  const mdl::BrushFace& face,
+  const size_t faceIndex,
+  const std::optional<vm::vec3d>& routeDirection,
+  const mdl::WorldNode& worldNode)
+{
+  const auto normal = face.normal();
+  const auto slopeDegrees = std::acos(std::clamp(normal.z(), -1.0, 1.0)) * 180.0 / Pi;
+  auto riseDirection = vm::vec3d{};
+  auto riseDirectionConfidence = "none";
+  if (normal.z() > GeometryEpsilon)
+  {
+    const auto uphill = vm::vec2d{-normal.x(), -normal.y()};
+    if (!vm::is_zero(uphill, GeometryEpsilon))
+    {
+      const auto normalized = vm::normalize(uphill);
+      riseDirection = vm::vec3d{normalized.x(), normalized.y(), 0.0};
+      riseDirectionConfidence = "high";
+    }
+  }
+
+  auto classification = QString{"unknown_direction"};
+  auto confidence = QString{"low"};
+  auto heightDeltaAlongRoute = 0.0;
+  if (routeDirection && !vm::is_zero(riseDirection, GeometryEpsilon))
+  {
+    const auto alignment = vm::dot(riseDirection, *routeDirection);
+    const auto span = faceProjectedSpan(face, *routeDirection);
+    heightDeltaAlongRoute = std::tan(slopeDegrees * Pi / 180.0) * alignment * span;
+    if (alignment > 0.15)
+    {
+      classification = "ascending";
+    }
+    else if (alignment < -0.15)
+    {
+      classification = "descending";
+    }
+    else
+    {
+      classification = "cross_slope";
+    }
+    confidence = "high";
+  }
+
+  auto result = QJsonObject{
+    {"objectId", nodePathId(brushNode, worldNode)},
+    {"faceIndex", static_cast<int>(faceIndex)},
+    {"normal", vecToJson(normal)},
+    {"bounds", boundsToJson(faceBounds(face))},
+    {"slopeDegrees", slopeDegrees},
+    {"riseDirection", vecToJson(riseDirection)},
+    {"riseDirectionConfidence", riseDirectionConfidence},
+    {"heightDeltaAlongRoute", heightDeltaAlongRoute},
+    {"classification", classification},
+    {"confidence", confidence},
+    {"material", QString::fromStdString(face.attributes().materialName())},
+  };
+  if (routeDirection)
+  {
+    result.insert("routeDirection", vecToJson(*routeDirection));
   }
   return result;
 }
@@ -1314,6 +1648,146 @@ Result<mdl::Brush> createWedgeBrush(
   }
 
   return builder.createBrush(points, material);
+}
+
+Result<mdl::Brush> createRampBetweenBrush(
+  const mdl::BrushBuilder& builder,
+  const vm::vec3d& start,
+  const vm::vec3d& end,
+  const double width,
+  const double thickness,
+  const std::string& material,
+  QString& error)
+{
+  const auto delta = vm::vec2d{end.x() - start.x(), end.y() - start.y()};
+  if (vm::is_zero(delta, GeometryEpsilon))
+  {
+    error = "ramp_between start/end must differ in X/Y after snapping";
+    return Error{"ramp_between start/end must differ in X/Y after snapping"};
+  }
+
+  if (!finitePositive(width))
+  {
+    error = "ramp_between width must be greater than zero";
+    return Error{"ramp_between width must be greater than zero"};
+  }
+  if (!finitePositive(thickness))
+  {
+    error = "ramp_between thickness must be greater than zero";
+    return Error{"ramp_between thickness must be greater than zero"};
+  }
+
+  const auto direction = vm::normalize(delta);
+  const auto right = vm::vec2d{direction.y(), -direction.x()} * (width * 0.5);
+  const auto startLeft =
+    vm::vec3d{start.x() - right.x(), start.y() - right.y(), start.z()};
+  const auto startRight =
+    vm::vec3d{start.x() + right.x(), start.y() + right.y(), start.z()};
+  const auto endLeft = vm::vec3d{end.x() - right.x(), end.y() - right.y(), end.z()};
+  const auto endRight = vm::vec3d{end.x() + right.x(), end.y() + right.y(), end.z()};
+
+  const auto points = std::vector<vm::vec3d>{
+    startLeft,
+    startRight,
+    endLeft,
+    endRight,
+    startLeft - vm::vec3d{0, 0, thickness},
+    startRight - vm::vec3d{0, 0, thickness},
+    endLeft - vm::vec3d{0, 0, thickness},
+    endRight - vm::vec3d{0, 0, thickness},
+  };
+  return builder.createBrush(points, material);
+}
+
+std::optional<QJsonObject> rampBetweenIntentSummary(
+  const QJsonObject& operation, const double grid, QString& error)
+{
+  const auto start = mcpVec3FromJson(operation, "start", error);
+  if (!start)
+  {
+    return std::nullopt;
+  }
+  const auto end = mcpVec3FromJson(operation, "end", error);
+  if (!end)
+  {
+    return std::nullopt;
+  }
+
+  const auto snappedStart = snapToGrid(*start, grid);
+  const auto snappedEnd = snapToGrid(*end, grid);
+  const auto travel = snappedEnd - snappedStart;
+  const auto horizontal = vm::vec2d{travel.x(), travel.y()};
+  if (vm::is_zero(horizontal, GeometryEpsilon))
+  {
+    error = "ramp_between start/end must differ in X/Y after snapping";
+    return std::nullopt;
+  }
+
+  return QJsonObject{
+    {"type", "ramp_between"},
+    {"start", vecToJson(snappedStart)},
+    {"end", vecToJson(snappedEnd)},
+    {"heightDelta", snappedEnd.z() - snappedStart.z()},
+    {"travelDirection", vecToJson(vm::normalize(travel))},
+    {"width", snapToGrid(optionalDouble(operation, "width", 128.0), grid)},
+    {"thickness", snapToGrid(optionalDouble(operation, "thickness", 16.0), grid)},
+  };
+}
+
+std::optional<QJsonObject> rampLikeIntentSummary(
+  const QJsonObject& operation, const double grid, QString& error)
+{
+  const auto type = operation.value("type").toString().trimmed().toLower();
+  if (type == "ramp_between")
+  {
+    return rampBetweenIntentSummary(operation, grid, error);
+  }
+  if (type != "ramp" && type != "wedge")
+  {
+    return std::nullopt;
+  }
+
+  const auto bounds = boundsFromJson(operation, error);
+  if (!bounds)
+  {
+    return std::nullopt;
+  }
+  const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
+  if (!snappedBounds)
+  {
+    return std::nullopt;
+  }
+  const auto axis = axisFromJson(operation, "axis", vm::axis::x, error);
+  if (!axis)
+  {
+    return std::nullopt;
+  }
+
+  auto travel = vm::vec3d{};
+  switch (*axis)
+  {
+  case vm::axis::x:
+    travel = vm::vec3d{snappedBounds->size().x(), 0, snappedBounds->size().z()};
+    break;
+  case vm::axis::y:
+    travel = vm::vec3d{0, snappedBounds->size().y(), snappedBounds->size().z()};
+    break;
+  case vm::axis::z:
+    travel = vm::vec3d{0, 0, snappedBounds->size().z()};
+    break;
+  }
+
+  return QJsonObject{
+    {"type", type},
+    {"note",
+     "Legacy min/max/axis slope primitive. Prefer ramp_between for route intent."},
+    {"bounds", boundsToJson(*snappedBounds)},
+    {"axis", axisName(*axis)},
+    {"heightDelta", snappedBounds->size().z()},
+    {"travelDirection",
+     vm::is_zero(travel, GeometryEpsilon) ? vecToJson(travel)
+                                          : vecToJson(vm::normalize(travel))},
+  };
 }
 
 Result<mdl::Brush> createPyramidBrush(
@@ -3155,7 +3629,37 @@ std::vector<mdl::Node*> compileBatchOperation(
     return brushNodesFromBounds(builder, *postBounds, material, error);
   }
 
-  if (type == "ramp")
+  if (type == "ramp_between")
+  {
+    const auto start = mcpVec3FromJson(operation, "start", error);
+    if (!start)
+    {
+      return {};
+    }
+    const auto end = mcpVec3FromJson(operation, "end", error);
+    if (!end)
+    {
+      return {};
+    }
+    const auto width = snapToGrid(optionalDouble(operation, "width", 128.0), grid);
+    const auto thickness = snapToGrid(optionalDouble(operation, "thickness", 16.0), grid);
+    auto brush = createRampBetweenBrush(
+      builder,
+      snapToGrid(*start, grid),
+      snapToGrid(*end, grid),
+      width,
+      thickness,
+      material,
+      error);
+    if (brush.is_error())
+    {
+      error = error.isEmpty() ? "Could not create ramp_between brush" : error;
+      return {};
+    }
+    return {new mdl::BrushNode{std::move(brush.value())}};
+  }
+
+  if (type == "ramp" || type == "wedge")
   {
     const auto bounds = boundsFromJson(operation, error);
     if (!bounds)
@@ -3175,7 +3679,7 @@ std::vector<mdl::Node*> compileBatchOperation(
     auto brush = createWedgeBrush(builder, *snappedBounds, *axis, material);
     if (brush.is_error())
     {
-      error = "Could not create ramp brush";
+      error = QString{"Could not create %1 brush"}.arg(type);
       return {};
     }
     return {new mdl::BrushNode{std::move(brush.value())}};
@@ -3767,6 +4271,103 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   return McpBridgeToolResult::success(std::move(result));
 }
 
+McpBridgeToolResult geometryAnalyzeSlopesForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
+{
+  auto error = QString{};
+  const auto brushes =
+    brushNodesFromObjectIdsAndOperations(map, params, history, objectRegistry, error);
+  if (!brushes)
+  {
+    return invalidParamsFailure(error);
+  }
+  if (brushes->empty())
+  {
+    return invalidParamsFailure(
+      "geometry_analyze_slopes requires operationIds or objectIds that resolve to "
+      "brushes");
+  }
+
+  const auto routeDirection = optionalRouteDirectionFromParams(params, error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto minSlopeDegrees =
+    optionalClampedDouble(params, "minSlopeDegrees", 0.5, 0.0, 89.0);
+  const auto maxSlopeDegrees =
+    optionalClampedDouble(params, "maxSlopeDegrees", 89.0, minSlopeDegrees, 89.9);
+  auto slopes = QJsonArray{};
+  for (const auto* brush : *brushes)
+  {
+    const auto& faces = brush->brush().faces();
+    for (size_t i = 0; i < faces.size(); ++i)
+    {
+      const auto& face = faces[i];
+      const auto normal = face.normal();
+      if (normal.z() <= GeometryEpsilon || normal.z() >= 1.0 - GeometryEpsilon)
+      {
+        continue;
+      }
+
+      const auto slopeDegrees = std::acos(std::clamp(normal.z(), -1.0, 1.0)) * 180.0 / Pi;
+      if (slopeDegrees < minSlopeDegrees || slopeDegrees > maxSlopeDegrees)
+      {
+        continue;
+      }
+      slopes.push_back(slopeFaceJson(*brush, face, i, routeDirection, map.worldNode()));
+    }
+  }
+
+  auto warnings = QJsonArray{};
+  if (!routeDirection)
+  {
+    warnings.push_back(
+      "lowConfidence: provide routeDirection or start/end to classify each slope as "
+      "ascending, descending, or cross_slope.");
+  }
+  if (slopes.isEmpty())
+  {
+    warnings.push_back("noSlopedFaces: no upward non-flat slope faces matched filters.");
+  }
+
+  auto result = QJsonObject{
+    {"tool", "geometry_analyze_slopes"},
+    {"targetBrushCount", static_cast<int>(brushes->size())},
+    {"slopeCount", slopes.size()},
+    {"slopes", slopes},
+    {"warnings", warnings},
+    {"minSlopeDegrees", minSlopeDegrees},
+    {"maxSlopeDegrees", maxSlopeDegrees},
+    {"routeDirectionProvided", routeDirection.has_value()},
+  };
+  if (routeDirection)
+  {
+    result.insert("routeDirection", vecToJson(*routeDirection));
+  }
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult geometryAnalyzeSlopesResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return geometryAnalyzeSlopesForMapResult(
+    mapWindow->document().map(), params, history, objectRegistry);
+}
+
 McpBridgeToolResult blockoutCreateBatchResult(
   AppController& appController,
   const QString& toolName,
@@ -3876,6 +4477,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
 
   auto nodes = std::vector<mdl::Node*>{};
   auto errors = QJsonArray{};
+  auto intentSummaries = QJsonArray{};
   auto failedOperationIndex = -1;
   auto failedOperationType = QString{};
   auto failedOperationPreview = QJsonObject{};
@@ -3902,6 +4504,25 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
       failedOperationPreview = batchOperationPreviewJson(operation);
       deleteNodes(operationNodes);
       break;
+    }
+
+    const auto type = operation.value("type").toString().trimmed().toLower();
+    if (type == "ramp" || type == "wedge" || type == "ramp_between")
+    {
+      auto intentError = QString{};
+      auto intent = rampLikeIntentSummary(operation, grid, intentError);
+      if (!intent || !intentError.isEmpty())
+      {
+        errors.push_back(QString{"operations[%1]: %2"}.arg(i).arg(
+          intentError.isEmpty() ? "Could not summarize ramp intent" : intentError));
+        failedOperationIndex = i;
+        failedOperationType = type;
+        failedOperationPreview = batchOperationPreviewJson(operation);
+        deleteNodes(operationNodes);
+        break;
+      }
+      intent->insert("operationIndex", i);
+      intentSummaries.push_back(*intent);
     }
 
     nodes.insert(nodes.end(), operationNodes.begin(), operationNodes.end());
@@ -3960,6 +4581,10 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
     {"validation", validation},
     {"results", fullResults},
   };
+  if (!intentSummaries.isEmpty())
+  {
+    detailObject.insert("intentSummaries", intentSummaries);
+  }
   mcpRecordOperation(
     history,
     nextOperationIndex,
@@ -3976,6 +4601,10 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
     "materials",
     stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
   result.insert("grid", grid);
+  if (!intentSummaries.isEmpty())
+  {
+    result.insert("intentSummaries", intentSummaries);
+  }
   applyDetailLevel(
     result,
     *changedObjectIds,

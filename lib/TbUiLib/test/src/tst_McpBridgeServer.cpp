@@ -517,6 +517,14 @@ TEST_CASE("McpBridgeServer")
         {"invalidBrushCount", 0},
       });
     }
+    if (toolName == "geometry_analyze_slopes")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"targetBrushCount", 0},
+        {"slopeCount", 0},
+        {"slopes", QJsonArray{}},
+      });
+    }
     if (toolName == "blockout_validate_spiral_stairs")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -1665,7 +1673,14 @@ TEST_CASE("McpBridgeServer")
       map,
       QJsonObject{
         {"operationIds", QJsonArray{history.front().operationId}},
-        {"views", QJsonArray{"iso_overview_ne", "top_plan"}},
+        {"views",
+         QJsonArray{
+           "iso_overview_ne",
+           "iso_overview_sw",
+           "top_plan",
+           "side_elevation_long",
+           "front_elevation_cross",
+         }},
         {"style", "material_tint_edges"},
         {"edgeMode", "minimal"},
         {"imageSize", QJsonArray{900, 650}},
@@ -1682,7 +1697,7 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("edgeMode").toString() == "minimal");
     CHECK(response.result.value("targetObjectCount").toInt() == 2);
     CHECK(response.result.value("targetBrushCount").toInt() == 2);
-    CHECK(response.result.value("captureCount").toInt() == 2);
+    CHECK(response.result.value("captureCount").toInt() == 5);
     CHECK(response.result.value("qualityValid").toBool());
     CHECK(map.modified() == wasModified);
     CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
@@ -1690,10 +1705,13 @@ TEST_CASE("McpBridgeServer")
     const auto contactSheet = response.result.value("contactSheet").toObject();
     CHECK(contactSheet.value("valid").toBool());
     CHECK(QFileInfo::exists(contactSheet.value("path").toString()));
-    CHECK(contactSheet.value("sourceCaptureCount").toInt() == 2);
+    CHECK(contactSheet.value("sourceCaptureCount").toInt() == 5);
+    CHECK(contactSheet.value("includedCaptureCount").toInt() == 2);
+    CHECK(contactSheet.value("omittedCaptureCount").toInt() == 3);
+    CHECK(contactSheet.value("maxCaptures").toInt() == 2);
 
     const auto captures = response.result.value("captures").toArray();
-    REQUIRE(captures.size() == 2);
+    REQUIRE(captures.size() == 5);
     for (const auto& captureValue : captures)
     {
       const auto capture = captureValue.toObject();
@@ -2720,9 +2738,22 @@ TEST_CASE("McpBridgeServer batch blockout tools")
            {"axis", "x"},
          },
          QJsonObject{
-           {"type", "cylinder"},
+           {"type", "wedge"},
            {"min", QJsonArray{160, 0, 0}},
-           {"max", QJsonArray{224, 64, 96}},
+           {"max", QJsonArray{224, 64, 32}},
+           {"axis", "x"},
+         },
+         QJsonObject{
+           {"type", "ramp_between"},
+           {"start", QJsonArray{240, 32, 0}},
+           {"end", QJsonArray{368, 32, 64}},
+           {"width", 64},
+           {"thickness", 16},
+         },
+         QJsonObject{
+           {"type", "cylinder"},
+           {"min", QJsonArray{384, 0, 0}},
+           {"max", QJsonArray{448, 64, 96}},
            {"sides", 8},
            {"axis", "z"},
          },
@@ -2738,21 +2769,69 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   const auto operationId = batchResponse.result.value("operationId").toString();
   CHECK(!operationId.isEmpty());
   CHECK(batchResponse.result.value("transactionName").toString() == "MCP: Test batch");
-  CHECK(batchResponse.result.value("brushCount").toInt() == 3);
-  CHECK(batchResponse.result.value("changedObjectCount").toInt() == 3);
+  CHECK(batchResponse.result.value("brushCount").toInt() == 5);
+  CHECK(batchResponse.result.value("changedObjectCount").toInt() == 5);
   CHECK(batchResponse.result.value("grid").toDouble() == 16.0);
   CHECK(batchResponse.result.value("changedObjectIds").isUndefined());
   CHECK(batchResponse.result.value("resourceUri")
           .toString()
           .startsWith("tbmcp://operation/"));
   CHECK(batchResponse.result.value("validation").toObject().value("valid").toBool());
-  CHECK(map.selection().nodes.size() == 3u);
+  CHECK(map.selection().nodes.size() == 5u);
+  CHECK(batchResponse.result.value("intentSummaries").toArray().size() == 3);
 
   const auto cylinderAnalyzeResponse =
     geometryAnalyzeSelectionResult(map, QJsonObject{{"grid", 1}});
   REQUIRE(cylinderAnalyzeResponse.ok);
   CHECK(
     cylinderAnalyzeResponse.result.value("nonGridAlignedObjectIds").toArray().isEmpty());
+
+  const auto slopeResponse = geometryAnalyzeSlopesForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", operationId},
+      {"start", QJsonArray{240, 32, 0}},
+      {"end", QJsonArray{368, 32, 64}},
+    },
+    history);
+  REQUIRE(slopeResponse.ok);
+  CHECK(slopeResponse.result.value("routeDirectionProvided").toBool());
+  const auto slopes = slopeResponse.result.value("slopes").toArray();
+  REQUIRE(!slopes.isEmpty());
+  auto foundAscendingRampBetween = false;
+  for (const auto& slopeValue : slopes)
+  {
+    const auto slope = slopeValue.toObject();
+    if (
+      slope.value("classification").toString() == "ascending"
+      && slope.value("heightDeltaAlongRoute").toDouble() > 0.0)
+    {
+      foundAscendingRampBetween = true;
+    }
+  }
+  CHECK(foundAscendingRampBetween);
+
+  const auto reverseSlopeResponse = geometryAnalyzeSlopesForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", operationId},
+      {"routeDirection", QJsonArray{-1, 0, 0}},
+    },
+    history);
+  REQUIRE(reverseSlopeResponse.ok);
+  const auto reverseSlopes = reverseSlopeResponse.result.value("slopes").toArray();
+  auto foundDescendingRampBetween = false;
+  for (const auto& slopeValue : reverseSlopes)
+  {
+    const auto slope = slopeValue.toObject();
+    if (
+      slope.value("classification").toString() == "descending"
+      && slope.value("heightDeltaAlongRoute").toDouble() < 0.0)
+    {
+      foundDescendingRampBetween = true;
+    }
+  }
+  CHECK(foundDescendingRampBetween);
 
   const auto ribbonResponse = blockoutCreateBatchForMapResult(
     map,

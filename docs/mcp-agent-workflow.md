@@ -98,8 +98,8 @@ scripts\mcp-config.ps1 -Print
 4. `selection_get`：读取用户当前选择。
 5. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
 6. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
-7. 场景验收优先用 `viewport_capture_scene_review`：它会按可选对象 id 聚焦/高亮，批量截取当前、3D、2D 视图，并返回白盒检查项。当前版本依赖 TrenchBroom 正在显示的 UI 视图；如果某类 viewport 不可见，工具会在 `warnings` 中说明。
-8. 自动化截图时优先传 `operationIds` 和 `framing`：`overview_orbit` 看整体，`top_fit` 看占地/路线，`side_profile` 看高度剖面，`route_follow` 看行进方向。显式 `camera` 优先级最高。
+7. 场景自验收优先用 `render_review_operation` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。
+8. `viewport_capture_scene_review` 只作为真实 TrenchBroom 视口辅助调试使用。需要确认 UI 视角或用户当前视图时再调用；自动化验收不要依赖它来隔离对象。
 
 对象操作必须使用 MCP 返回的 `objectId`，不要根据实体顺序或 UI 文本猜测内部指针。
 
@@ -116,11 +116,24 @@ scripts\mcp-config.ps1 -Print
 7. `blockout_create_room`、`blockout_create_corridor`、`blockout_create_stairs`、`blockout_create_ramp`、`blockout_create_doorway`、`blockout_create_cover`、`blockout_create_sky_shell` 属于 convenience helpers，只用于快速草图、旧 workflow 兼容或用户明确要求，不作为 Modeling 默认路径。
 8. 默认只保留返回的 `operationId` / `resourceUri`，需要 ids 时再用 `operation_inspect(detail=ids)`。
 9. 写入工具支持 `expectedDocumentPath`。当 Agent 已经从 `tb_status` 记录了目标地图路径时，大型批量创建、删除、贴图替换、heightmap import、实体创建和保存都应传这个 guard。
-10. 用 `overlay_set` 标注新结构，并调用 `viewport_capture_scene_review` 收集截图验收包。只需要单张反馈时再用 `viewport_capture_3d` / `viewport_capture_2d`。
+10. 用 `render_review_operation` 收集几何 review 包；复杂场景默认看 `preferredCapturePath` 的 2 图 contact sheet，必要时再打开 manifest 里的单独视图 PNG。
 11. 根据截图调整尺寸或位置，必要时使用 `objects_transform` 平移/旋转/缩放。
 12. 调用 `history_status` 确认最近 MCP operation 是否还在 undo 栈顶；再调用 `map_validate` / `problems_check`。
 
 不要让 Agent 直接使用 `brush_create_from_planes` 做普通白盒。它是 `Full` / 搜索可发现的专家工具，只适合已有明确 plane 数据且需要严格校验的场景。复杂批量结构也不要默认走 `python_generate_blockout`；除非用户明确要求脚本生成，优先用 typed batch primitive operations 分阶段落地。
+
+## 斜面 / Surf / Slide 验收
+
+涉及 `ramp`、`wedge`、`ramp_between`、surf、slide 或任何可跑斜面时，不能只看 `operation_validate` 和 review 截图。`operation_validate` 只能证明对象仍 live，review 图只能证明大体结构可读；它们不能证明坡面沿路线方向上升还是下降。
+
+推荐流程：
+
+1. 小样优先：先用一段 `ramp_between` 验证工具语义，再批量生成路线主体。
+2. 新路线优先用 `{"type":"ramp_between","start":[...],"end":[...],"width":...,"thickness":...}`，表达“沿 start -> end 行进”；旧 `ramp(min,max,axis)` 只用于兼容或快速草图。
+3. 批量创建后立即调用 `geometry_analyze_slopes(operationId=..., start=..., end=...)` 或传 `routeDirection`。
+4. 检查每个候选坡面返回的 `normal`、`slopeDegrees`、`riseDirection`、`heightDeltaAlongRoute`、`classification`。预期上坡应看到 `classification=ascending` 且 `heightDeltaAlongRoute > 0`；反向复测应暴露 `descending`。
+5. 再看 `render_review_operation` 的 contact sheet。默认最多 2 张并列；如果需要更多视角，打开单独 PNG，不要把过多视图挤进一张图。
+6. 复杂路线按主体、护边、标记分阶段创建，保留少量关键 `operationId`，降低 history 追踪和回滚成本。
 
 ## KZ 平台链工作流
 

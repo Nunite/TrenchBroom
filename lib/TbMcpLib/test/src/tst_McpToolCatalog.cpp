@@ -116,6 +116,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("texture_lock_set"));
     CHECK(findToolDefinition("texture_apply_by_filter"));
     CHECK(findToolDefinition("geometry_analyze_selection"));
+    CHECK(findToolDefinition("geometry_analyze_slopes"));
     CHECK(findToolDefinition("blockout_create_spiral_stairs"));
     CHECK(findToolDefinition("blockout_validate_spiral_stairs"));
     CHECK(findToolDefinition("operation_inspect"));
@@ -185,6 +186,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("compile_log_tail"));
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("geometry_analyze_selection"));
+    CHECK(names.contains("geometry_analyze_slopes"));
     CHECK(names.contains("blockout_validate_spiral_stairs"));
     CHECK(!names.contains("documents_open"));
     CHECK(!names.contains("documents_save"));
@@ -688,6 +690,12 @@ TEST_CASE("McpToolCatalog")
     CHECK(targetProperties.value("edgeMode").isObject());
     CHECK(targetProperties.value("combineViews").isObject());
     CHECK(targetProperties.value("contactSheetSize").isObject());
+    CHECK(targetProperties.value("contactSheetMaxCaptures").isObject());
+    CHECK(targetProperties.value("contactSheetMaxCaptures")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("Defaults to 2"));
     CHECK(targetProperties.value("imageSize").isObject());
     CHECK(targetProperties.value("maxDetailedFaces").isObject());
 
@@ -703,6 +711,12 @@ TEST_CASE("McpToolCatalog")
     CHECK(currentSceneProperties.value("style").isObject());
     CHECK(currentSceneProperties.value("edgeMode").isObject());
     CHECK(currentSceneProperties.value("combineViews").isObject());
+    CHECK(currentSceneProperties.value("contactSheetMaxCaptures").isObject());
+    CHECK(currentSceneProperties.value("contactSheetMaxCaptures")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("Defaults to 2"));
     CHECK(currentSceneProperties.value("idsMode").isObject());
     CHECK(currentSceneProperties.value("detail").isObject());
 
@@ -719,6 +733,12 @@ TEST_CASE("McpToolCatalog")
     CHECK(properties.value("edgeMode").isObject());
     CHECK(properties.value("combineViews").isObject());
     CHECK(properties.value("contactSheetSize").isObject());
+    CHECK(properties.value("contactSheetMaxCaptures").isObject());
+    CHECK(properties.value("contactSheetMaxCaptures")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("Defaults to 2"));
     CHECK(properties.value("isolateMode").isObject());
     CHECK(properties.value("framingPreset").isObject());
     CHECK(properties.value("imageSize").isObject());
@@ -826,6 +846,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemDescription.contains(R"("type":"cylinder")"));
     CHECK(itemDescription.contains(R"("type":"curved_corridor")"));
     CHECK(itemDescription.contains(R"("type":"path_ribbon")"));
+    CHECK(itemDescription.contains(R"("type":"ramp_between")"));
+    CHECK(itemDescription.contains(R"("type":"wedge")"));
     CHECK(itemDescription.contains(R"("type":"repeat_translate")"));
     CHECK(itemDescription.contains(R"("type":"repeat_grid")"));
     CHECK(itemDescription.contains(R"("counts":6)"));
@@ -1010,6 +1032,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(reviewTargetProperties.value("includeEntityLabels").isObject());
     CHECK(reviewTargetProperties.value("includeOrderLabels").isObject());
     CHECK(reviewTargetProperties.value("includeDirectionLabels").isObject());
+    CHECK(reviewTargetProperties.value("contactSheetMaxCaptures").isObject());
 
     const auto validateTool = findToolDefinition("map_validate");
     REQUIRE(validateTool);

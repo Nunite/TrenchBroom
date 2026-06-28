@@ -280,6 +280,9 @@ QJsonObject blockoutBatchOperationSchema()
      R"("outerRadius":256,"startAngle":0,"turnDegrees":90,"height":128,)"
      R"("segments":8,"wallThickness":16,"caps":"both"}; )"
      R"({"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}; )"
+     R"({"type":"ramp_between","start":[0,0,0],"end":[256,0,64],)"
+     R"("width":128,"thickness":16}; )"
+     R"({"type":"wedge","min":[0,0,0],"max":[256,128,64],"axis":"x"}; )"
      R"({"type":"ramp","min":[0,0,0],"max":[256,128,64],"axis":"x"}; )"
      R"({"type":"doorway","min":[0,0,0],"max":[256,16,128],)"
      R"("doorMin":[96,0,0],"doorMax":[160,16,96]}; )"
@@ -291,10 +294,17 @@ QJsonObject blockoutBatchOperationSchema()
         stringProperty("Operation type. Primitive modeling types: box, cylinder, prism, "
                        "polyhedron, cylinder_sector, path_ribbon, repeat_translate, "
                        "repeat_grid, stepped_mass, support_posts_between. Convenience "
-                       "structural types: room, corridor, curved_corridor, stairs, ramp, "
-                       "doorway, cover, sky_shell.")},
+                       "structural types: room, corridor, curved_corridor, stairs, "
+                       "ramp_between, wedge, ramp, doorway, cover, sky_shell. Prefer "
+                       "ramp_between over legacy ramp for route/surf/slide semantics.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
+       {"start",
+        vec3Property("Route start point for ramp_between. The ramp rises or falls along "
+                     "start -> end.")},
+       {"end",
+        vec3Property(
+          "Route end point for ramp_between. Use end.z > start.z for an uphill ramp.")},
        {"material", stringProperty("Per-operation material override.")},
        {"points2d", arrayProperty("Convex prism footprint points as [x,y].")},
        {"points3d",
@@ -304,7 +314,8 @@ QJsonObject blockoutBatchOperationSchema()
        {"points", arrayProperty("Convex polyhedron points as [x,y,z].")},
        {"minZ", numberProperty("Minimum Z for prism or cylinder_sector.")},
        {"maxZ", numberProperty("Maximum Z for prism or cylinder_sector.")},
-       {"width", numberProperty("Path ribbon width in map units.")},
+       {"width",
+        numberProperty("Path ribbon width, or ramp_between width, in map units.")},
        {"zOffset", numberProperty("Vertical offset for points3d path_ribbon.")},
        {"miterLimit",
         numberProperty(
@@ -332,7 +343,10 @@ QJsonObject blockoutBatchOperationSchema()
        {"topZ", numberProperty("support_posts_between top Z.")},
        {"postSize", numberProperty("support_posts_between square post width/depth.")},
        {"steps", integerProperty("Stair step count.")},
-       {"axis", stringProperty("Axis for cylinder/stairs/ramp: x, y, or z.")},
+       {"axis",
+        stringProperty(
+          "Axis for cylinder/stairs/wedge/legacy ramp: x, y, or z. Legacy ramp "
+          "has weak route semantics; prefer ramp_between start/end.")},
        {"sides", integerProperty("Cylinder side count, clamped to 3..128.")},
        {"thickness", numberProperty("Shell thickness for room/corridor/sky_shell.")},
        {"doorMin", vec3Property("Door opening minimum corner for doorway.")},
@@ -931,6 +945,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Defaults to true.")},
         {"contactSheetSize",
          arrayProperty("Optional [width,height] for the combined contact sheet.")},
+        {"contactSheetMaxCaptures",
+         integerProperty(
+           "Maximum number of source views included in contact_sheet.png. Defaults to "
+           "2 so each panel stays readable for Agent vision; all individual view PNGs "
+           "are still "
+           "written.")},
         {"imageSize",
          arrayProperty(
            "Optional [width,height] in pixels. Values are clamped to production review "
@@ -1007,6 +1027,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Defaults to true.")},
         {"contactSheetSize",
          arrayProperty("Optional [width,height] for the combined contact sheet.")},
+        {"contactSheetMaxCaptures",
+         integerProperty(
+           "Maximum number of source views included in contact_sheet.png. Defaults to "
+           "2 so each panel stays readable for Agent vision; all individual view PNGs "
+           "are still "
+           "written.")},
         {"imageSize", arrayProperty("Optional [width,height] for source views.")},
         {"outputDir",
          stringProperty(
@@ -1087,6 +1113,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Defaults to true.")},
         {"contactSheetSize",
          arrayProperty("Optional [width,height] for the combined contact sheet.")},
+        {"contactSheetMaxCaptures",
+         integerProperty(
+           "Maximum number of source views included in contact_sheet.png. Defaults to "
+           "2 so each panel stays readable for Agent vision; all individual view PNGs "
+           "are still "
+           "written.")},
         {"isolateMode",
          stringProperty(
            "Requested isolation mode: hide_others, fade_others, or highlight_only. "
@@ -2447,6 +2479,40 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "geometry_analyze_slopes",
+      "Analyze live brush slope faces for ramp/wedge/surf/slide validation. Reports "
+      "face normals, slope angle, rise direction, and whether each slope ascends or "
+      "descends along routeDirection or start -> end. This is geometry/mapper "
+      "semantics only, not gameplay difficulty analysis.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"operationId", stringProperty("Single MCP operation id to analyze.")},
+        {"operationIds",
+         arrayProperty(
+           "MCP operation ids whose live changed brush objects should be analyzed.")},
+        {"objectIds", arrayProperty("Explicit MCP object ids to analyze.")},
+        {"routeDirection",
+         vec3Property(
+           "Optional travel direction vector. X/Y determine whether slopes are "
+           "ascending, descending, or cross_slope.")},
+        {"start",
+         vec3Property(
+           "Optional route start. When start and end are provided, start -> end is "
+           "used as routeDirection.")},
+        {"end",
+         vec3Property(
+           "Optional route end. When start and end are provided, start -> end is "
+           "used as routeDirection.")},
+        {"minSlopeDegrees",
+         numberProperty(
+           "Minimum non-flat slope angle to report. Defaults to 0.5 degrees.")},
+        {"maxSlopeDegrees",
+         numberProperty("Maximum slope angle to report. Defaults to 89 degrees.")},
+      }),
+    },
+    {
       "brush_metadata_set",
       "Attach session-level route/object metadata to live brush object ids.",
       McpMode::Edit,
@@ -2754,6 +2820,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "selection_by_metadata",
     "route_geometry_analyze_chain",
     "geometry_analyze_selection",
+    "geometry_analyze_slopes",
     "blockout_validate",
     "objects_delete",
     "objects_delete_by_filter",
