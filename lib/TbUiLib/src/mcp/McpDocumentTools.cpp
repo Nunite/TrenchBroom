@@ -27,16 +27,19 @@
 #include "McpBridgeServerTools.h"
 #include "mcp/McpError.h"
 #include "mcp/McpToolCatalog.h"
+#include "fs/DiskIO.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushNode.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
 #include "mdl/GameInfo.h"
+#include "mdl/GameManager.h"
 #include "mdl/Grid.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
+#include "mdl/MapHeader.h"
 #include "mdl/Node.h"
 #include "mdl/PatchNode.h"
 #include "mdl/WorldNode.h"
@@ -84,6 +87,111 @@ QString pathToQString(const std::filesystem::path& path)
 QString documentPathString(const mdl::Map& map)
 {
   return pathToQString(map.path());
+}
+
+QJsonObject documentOpenDiagnostic(
+  AppController& appController,
+  const std::filesystem::path& path,
+  const QString& stage,
+  const QString& message,
+  const QString& bridgeInstanceId = {})
+{
+  return QJsonObject{
+    {"opened", false},
+    {"verified", false},
+    {"stage", stage},
+    {"path", pathToQString(path)},
+    {"toolName", "documents_open_verified"},
+    {"activeDocumentPath", tb::ui::activeDocumentPath(appController)},
+    {"bridgeInstanceId", bridgeInstanceId},
+    {"message", message},
+  };
+}
+
+std::optional<std::tuple<std::string, mdl::MapFormat>> detectGameAndFormatForMcp(
+  AppController& appController, const std::filesystem::path& path, QString& error)
+{
+  const auto detected =
+    fs::Disk::withInputStream(path, mdl::readMapHeader)
+    | kdl::transform_error([&](const auto& e) {
+        error = QString::fromStdString(e.msg);
+        return std::pair<std::optional<std::string>, mdl::MapFormat>{
+          std::nullopt, mdl::MapFormat::Unknown};
+      })
+    | kdl::value();
+
+  auto [gameName, mapFormat] = detected;
+  if (!gameName)
+  {
+    error =
+      "Could not autodetect map game. Add a TrenchBroom map header or open the map "
+      "interactively once before using documents_open_verified from MCP.";
+    return std::nullopt;
+  }
+  if (mapFormat == mdl::MapFormat::Unknown)
+  {
+    error =
+      "Could not autodetect map format. Add a TrenchBroom map header or open the map "
+      "interactively once before using documents_open_verified from MCP.";
+    return std::nullopt;
+  }
+
+  const auto* gameInfo = appController.gameManager().gameInfo(*gameName);
+  if (gameInfo == nullptr)
+  {
+    error = QString{"Autodetected game '%1' is not available in this TrenchBroom "
+                    "configuration."}
+              .arg(QString::fromStdString(*gameName));
+    return std::nullopt;
+  }
+
+  return std::tuple{std::move(*gameName), mapFormat};
+}
+
+McpBridgeToolResult openDocumentForMcp(
+  AppController& appController,
+  const std::filesystem::path& path,
+  const QString& stage,
+  const QString& bridgeInstanceId = {})
+{
+  auto error = QString{};
+  const auto gameNameAndMapFormat = detectGameAndFormatForMcp(appController, path, error);
+  if (!gameNameAndMapFormat)
+  {
+    return McpBridgeToolResult::success(documentOpenDiagnostic(
+      appController,
+      path,
+      "openFailed",
+      QString{"%1 %2"}.arg(stage, error).trimmed(),
+      bridgeInstanceId));
+  }
+
+  const auto& [gameName, mapFormat] = *gameNameAndMapFormat;
+  const auto* gameInfo = appController.gameManager().gameInfo(gameName);
+  if (gameInfo == nullptr)
+  {
+    return McpBridgeToolResult::success(documentOpenDiagnostic(
+      appController,
+      path,
+      "openFailed",
+      QString{"Game is no longer available after autodetect: %1"}
+        .arg(QString::fromStdString(gameName)),
+      bridgeInstanceId));
+  }
+
+  const auto result = appController.mapWindowManager().loadDocument(
+    *gameInfo, mapFormat, MapDocument::DefaultWorldBounds, path);
+  if (!result)
+  {
+    return McpBridgeToolResult::success(documentOpenDiagnostic(
+      appController,
+      path,
+      "openFailed",
+      QString{"%1 %2"}.arg(stage, resultErrorMessage(result)).trimmed(),
+      bridgeInstanceId));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{{"opened", true}});
 }
 
 int legacyDocumentEpoch(const mdl::Map& map)
@@ -477,11 +585,21 @@ McpBridgeToolResult documentOpenResult(
       QString{"Document does not exist: %1"}.arg(pathToQString(path)));
   }
 
-  if (!appController.openDocument(path))
+  const auto openResult = openDocumentForMcp(
+    appController,
+    path,
+    QString{"Failed to open document without interactive game/format prompt."});
+  if (!openResult.ok || !openResult.result.value("opened").toBool(false))
   {
-    return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError,
-      QString{"Failed to open document: %1"}.arg(pathToQString(path)));
+    if (openResult.ok)
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        openResult.result.value("message")
+          .toString(QString{"Failed to open document: %1"}.arg(pathToQString(path))),
+        openResult.result);
+    }
+    return openResult;
   }
 
   return McpBridgeToolResult::success(QJsonObject{
@@ -579,18 +697,20 @@ McpBridgeToolResult documentOpenVerifiedResult(
     });
   }
 
-  if (!appController.openDocument(path))
+  const auto openResult = openDocumentForMcp(
+    appController,
+    path,
+    QString{"Failed to open document without interactive game/format prompt."},
+    bridgeInstanceId);
+  if (!openResult.ok || !openResult.result.value("opened").toBool(false))
   {
-    return McpBridgeToolResult::success(QJsonObject{
-      {"opened", false},
-      {"verified", false},
-      {"stage", "openFailed"},
-      {"path", pathString},
-      {"toolName", "documents_open_verified"},
-      {"activeDocumentPath", activeDocumentPath(appController)},
-      {"bridgeInstanceId", bridgeInstanceId},
-      {"message", QString{"Failed to open document: %1"}.arg(pathString)},
-    });
+    return openResult.ok ? openResult
+                         : McpBridgeToolResult::success(documentOpenDiagnostic(
+                             appController,
+                             path,
+                             "openFailed",
+                             openResult.error.message,
+                             bridgeInstanceId));
   }
 
   const auto deadline = QDeadlineTimer{waitMs};

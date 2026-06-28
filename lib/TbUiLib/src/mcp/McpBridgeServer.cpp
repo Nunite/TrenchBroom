@@ -239,6 +239,83 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           return renderReviewOperationResult(
             appController, params, m_operationHistory, &m_objectRegistry);
         }
+        if (toolName == "selector_preview")
+        {
+          return selectorPreviewResult(
+            appController,
+            params,
+            m_operationHistory,
+            m_brushMetadata,
+            m_modules,
+            m_objectRegistry);
+        }
+        if (toolName == "objects_select_by_selector")
+        {
+          return objectsSelectBySelectorResult(
+            appController,
+            params,
+            m_operationHistory,
+            m_brushMetadata,
+            m_modules,
+            m_objectRegistry);
+        }
+        if (toolName == "objects_delete_by_selector")
+        {
+          return objectsDeleteBySelectorResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_brushMetadata,
+            m_modules,
+            m_objectRegistry);
+        }
+        if (toolName == "render_review_selector")
+        {
+          return renderReviewSelectorResult(
+            appController,
+            params,
+            m_operationHistory,
+            m_brushMetadata,
+            m_modules,
+            m_objectRegistry);
+        }
+        if (toolName == "module_list")
+        {
+          return moduleListResult(
+            appController, params, m_brushMetadata, m_modules, m_objectRegistry);
+        }
+        if (toolName == "module_inspect")
+        {
+          return moduleInspectResult(
+            appController, params, m_brushMetadata, m_modules, m_objectRegistry);
+        }
+        if (toolName == "module_select")
+        {
+          return moduleSelectResult(
+            appController, params, m_brushMetadata, m_modules, m_objectRegistry);
+        }
+        if (toolName == "module_render_review")
+        {
+          return moduleRenderReviewResult(
+            appController,
+            params,
+            m_operationHistory,
+            m_brushMetadata,
+            m_modules,
+            m_objectRegistry);
+        }
+        if (toolName == "module_validate")
+        {
+          return moduleValidateResult(
+            appController,
+            params,
+            m_operationHistory,
+            m_brushMetadata,
+            m_modules,
+            m_objectRegistry);
+        }
         if (toolName == "actions_list")
         {
           return McpBridgeToolResult::success(actionsListJson(appController));
@@ -573,12 +650,37 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return heightmapPreviewGrayscaleResult(appController, params);
         }
+        if (toolName == "ir_validate")
+        {
+          return irValidateResult(appController, params);
+        }
+        if (toolName == "ir_compile_preview")
+        {
+          return irCompilePreviewResult(appController, params);
+        }
+        if (toolName == "ir_apply")
+        {
+          return irApplyResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_brushMetadata,
+            m_modules);
+        }
         if (
           toolName == "blockout_create_batch"
           || toolName == "blockout_create_curved_corridor")
         {
           return blockoutCreateBatchResult(
-            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            &m_brushMetadata,
+            &m_modules);
         }
         if (
           toolName == "blockout_create_room" || toolName == "blockout_create_corridor"
@@ -601,12 +703,22 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "geometry_analyze_slopes")
         {
           return geometryAnalyzeSlopesResult(
-            appController, params, m_operationHistory, &m_objectRegistry);
+            appController,
+            params,
+            m_operationHistory,
+            &m_objectRegistry,
+            &m_brushMetadata,
+            &m_modules);
         }
         if (toolName == "geometry_analyze_route_continuity")
         {
           return geometryAnalyzeRouteContinuityResult(
-            appController, params, m_operationHistory, &m_objectRegistry);
+            appController,
+            params,
+            m_operationHistory,
+            &m_objectRegistry,
+            &m_brushMetadata,
+            &m_modules);
         }
         if (toolName == "blockout_validate_spiral_stairs")
         {

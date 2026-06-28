@@ -246,6 +246,58 @@ QJsonObject polygonBatchItemSchema()
     {"points2d", "minZ", "maxZ"});
 }
 
+QJsonObject genericMetadataSchema()
+{
+  return QJsonObject{
+    {"type", "object"},
+    {"description",
+     "Session-level Agent metadata. Common keys: moduleId, part, role, order, "
+     "routeId, temporary, generatedBy. Stored by MCP for selector/module lookup; "
+     "not written to the .map."},
+    {"additionalProperties", true},
+  };
+}
+
+QJsonObject selectorSchema()
+{
+  return QJsonObject{
+    {"type", "object"},
+    {"description",
+     "Structured selector v1. Matches live objects by metadata, type, bounds, "
+     "material, classname/targetname, operationId/operationIds, or moduleId. This is "
+     "intentionally JSON, not a free-text DSL."},
+    {"properties",
+     QJsonObject{
+       {"metadata", genericMetadataSchema()},
+       {"moduleId", stringProperty("Session metadata moduleId.")},
+       {"part", stringProperty("Session metadata part.")},
+       {"role", stringProperty("Session metadata role.")},
+       {"order", numberProperty("Session metadata order.")},
+       {"routeId", stringProperty("Session metadata routeId.")},
+       {"temporary", boolProperty("Session metadata temporary flag.")},
+       {"generatedBy", stringProperty("Session metadata generatedBy value.")},
+       {"operationId", stringProperty("Single MCP operation id target.")},
+       {"operationIds", arrayProperty("MCP operation id targets.")},
+       {"type", stringProperty("Node type filter, e.g. brush, entity, group.")},
+       {"classname", stringProperty("Entity classname filter.")},
+       {"targetname", stringProperty("Entity targetname filter.")},
+       {"material", stringProperty("Brush material filter.")},
+       {"query", stringProperty("Text query over id/type/name/entity properties.")},
+       {"min", vec3Property("Optional bounds minimum.")},
+       {"max", vec3Property("Optional bounds maximum.")},
+       {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
+       {"limit", integerProperty("Maximum matched objects, defaults to 100.")},
+     }},
+    {"additionalProperties", false},
+  };
+}
+
+QJsonObject withDescription(QJsonObject schema, const QString& description)
+{
+  schema.insert("description", description);
+  return schema;
+}
+
 QJsonObject blockoutBatchOperationSchema()
 {
   return QJsonObject{
@@ -306,6 +358,24 @@ QJsonObject blockoutBatchOperationSchema()
         vec3Property(
           "Route end point for ramp_between. Use end.z > start.z for an uphill ramp.")},
        {"material", stringProperty("Per-operation material override.")},
+       {"metadata", genericMetadataSchema()},
+       {"parts",
+        arrayProperty(
+          "Optional part names to generate for part-aware operations. curved_corridor "
+          "supports floor, ceiling, inner_wall, outer_wall, start_cap, end_cap; "
+          "path_ribbon supports surface/floor/ribbon; stairs supports steps.")},
+       {"partMaterials",
+        QJsonObject{
+          {"type", "object"},
+          {"description", "Optional per-part material map, e.g. {floor:'clip'}."},
+          {"additionalProperties", QJsonObject{{"type", "string"}}},
+        }},
+       {"partMetadata",
+        QJsonObject{
+          {"type", "object"},
+          {"description", "Optional per-part metadata map keyed by part name."},
+          {"additionalProperties", genericMetadataSchema()},
+        }},
        {"points2d", arrayProperty("Convex prism footprint points as [x,y].")},
        {"points3d",
         arrayProperty(
@@ -1155,6 +1225,168 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Target id verbosity: none, count, sample, or full. Defaults to count unless "
            "detail=full/ids is requested.")},
       }),
+    },
+    {
+      "selector_preview",
+      "Preview a structured JSON selector against the active map. Selectors can combine "
+      "session metadata, moduleId, operation ids, type, bounds, material, classname, "
+      "targetname, and text query. Defaults to count/sample output to avoid long id "
+      "lists.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"selector", selectorSchema()},
+        {"idsMode", stringProperty("none, count, sample, or full. Defaults to sample.")},
+        {"sampleLimit", integerProperty("Maximum sample summaries, defaults to 12.")},
+      }),
+    },
+    {
+      "objects_select_by_selector",
+      "Replace the current selection with objects matched by a structured JSON "
+      "selector. Use this to recover generated modules without carrying long object id "
+      "lists.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema({
+        {"selector", selectorSchema()},
+        {"idsMode", stringProperty("none, count, sample, or full. Defaults to sample.")},
+        {"sampleLimit", integerProperty("Maximum sample summaries, defaults to 12.")},
+      }),
+    },
+    {
+      "objects_delete_by_selector",
+      "Delete live objects matched by a structured JSON selector in one transaction. "
+      "This is safer than pasting a long objectIds array when the target was tagged "
+      "with moduleId/part/role metadata.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema({
+        {"selector", selectorSchema()},
+        {"transactionName", stringProperty("Optional delete transaction label.")},
+      }),
+    },
+    {
+      "render_review_selector",
+      "Render an isolated geometry review for objects matched by a structured JSON "
+      "selector. This composes selector_preview with render_review_targets and keeps "
+      "the MCP response compact.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"selector", selectorSchema()},
+        {"views", arrayProperty("Optional review view names.")},
+        {"preset", stringProperty("Optional review preset such as route_platform.")},
+        {"style",
+         stringProperty("whitebox_edges, material_tint_edges, or height_heatmap_edges.")},
+        {"combineViews", boolProperty("Write contact_sheet.png. Defaults to true.")},
+        {"contactSheetMaxCaptures",
+         integerProperty("Maximum contact sheet panels. Defaults to 2.")},
+        {"outputDir", stringProperty("Optional review output root.")},
+        {"detail", stringProperty("summary or full. Defaults to summary.")},
+      }),
+    },
+    {
+      "module_list",
+      "List session-level modules discovered from metadata.moduleId and IR/module "
+      "registry records. Modules are MCP-session only and are not written to the map. "
+      "Defaults to live modules only so stale modules from previous documents do not "
+      "pollute Agent target recovery.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"limit", integerProperty("Maximum modules returned, defaults to 100.")},
+        {"includeStale",
+         boolProperty("Include modules whose tracked objects are all stale in the active "
+                      "document.")},
+        {"includeEmpty",
+         boolProperty(
+           "Include modules with no tracked objects. Defaults to includeStale.")},
+      }),
+    },
+    {
+      "module_inspect",
+      "Inspect one session-level module by moduleId, including live/stale object "
+      "counts, operation ids, metadata, and bounds.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"moduleId", stringProperty("Session metadata module id.")},
+          {"idsMode", stringProperty("sample or full. Defaults to sample.")},
+        },
+        {"moduleId"}),
+    },
+    {
+      "module_select",
+      "Select all live objects in a session-level module.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema(
+        {
+          {"moduleId", stringProperty("Session metadata module id.")},
+          {"idsMode",
+           stringProperty("none, count, sample, or full. Defaults to sample.")},
+        },
+        {"moduleId"}),
+    },
+    {
+      "module_render_review",
+      "Render an isolated review bundle for a session-level module.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"moduleId", stringProperty("Session metadata module id.")},
+          {"views", arrayProperty("Optional review view names.")},
+          {"preset", stringProperty("Optional review preset.")},
+          {"style", stringProperty("Optional review style.")},
+          {"outputDir", stringProperty("Optional review output root.")},
+          {"detail", stringProperty("summary or full. Defaults to summary.")},
+        },
+        {"moduleId"}),
+    },
+    {
+      "module_validate",
+      "Validate a session-level module's live objects and optional route continuity. "
+      "This reports geometry facts only; skill/domain logic decides gameplay or "
+      "aesthetic quality.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"moduleId", stringProperty("Session metadata module id.")},
+          {"checkRouteContinuity",
+           boolProperty(
+             "Also run geometry_analyze_route_continuity. Defaults to walkable/road/"
+             "ramp/platform metadata targets; pass continuitySelector for a custom "
+             "subset.")},
+          {"continuitySelector", selectorSchema()},
+          {"start", vec3Property("Optional route start for continuity.")},
+          {"end", vec3Property("Optional route end for continuity.")},
+          {"routeDirection", vec3Property("Optional route direction for continuity.")},
+          {"continuityMode",
+           stringProperty(
+             "Passed through to geometry_analyze_route_continuity: continuous, "
+             "stepped, or jump_gaps.")},
+          {"maxStepHeight",
+           numberProperty(
+             "Used with continuityMode=stepped. Maximum step height treated as "
+             "semantically continuous.")},
+          {"maxJumpGap",
+           numberProperty(
+             "Used with continuityMode=jump_gaps. Maximum jump gap treated as "
+             "semantically continuous.")},
+        },
+        {"moduleId"}),
     },
     {
       "entity_create",
@@ -2268,6 +2500,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"grid", numberProperty("Grid size for snapping generated geometry.")},
           {"select", boolProperty("Select generated brushes.")},
           {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"defaultMetadata", genericMetadataSchema()},
           {"operations",
            arrayProperty(
              "Array of blockout operations. Supported types include box, cylinder, "
@@ -2275,9 +2508,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
              "path_ribbon, repeat_translate, repeat_grid, stepped_mass, "
              "support_posts_between, stairs, ramp, doorway, cover, and sky_shell. Each "
              "item must be an object with a type field; use "
-             "tb_tools_search(detail=schema, "
-             "query="
-             "\"blockout_create_batch operations\") for examples.",
+             "tb_tools_search(detail=schema, query=\"blockout_create_batch operations\") "
+             "for examples. Diagonal ramp_between can be valid but may return "
+             "offAxisRampMayProduceNonGridVertices when side vertices are not "
+             "grid-aligned.",
              blockoutBatchOperationSchema())},
         },
         {"operations"}),
@@ -2384,6 +2618,92 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"imagePath"}),
     },
     {
+      "ir_validate",
+      "Validate minimal TrenchBroom MCP scene IR without mutating the map. IR is a "
+      "small JSON wrapper around existing atomic operations: operations for "
+      "blockout_create_batch and entities for entity_create_checked_batch.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"ir",
+         QJsonObject{
+           {"type", "object"},
+           {"description",
+            "Optional IR object. It must contain operations and/or entities arrays; "
+            "operations entries require type and entity entries require classname."},
+           {"additionalProperties", true},
+         }},
+        {"operations",
+         arrayProperty(
+           "Optional blockout_create_batch operations array. Every item must be an "
+           "object with a type.")},
+        {"entities",
+         arrayProperty(
+           "Optional entity_create_checked_batch entities array. Every item must be "
+           "an object with classname.")},
+      }),
+    },
+    {
+      "ir_compile_preview",
+      "Preview minimal scene IR compile counts, parts, moduleId, and warnings without "
+      "committing a transaction.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"ir",
+         QJsonObject{
+           {"type", "object"},
+           {"description",
+            "Optional IR object. It must contain operations and/or entities arrays; "
+            "operations entries require type and entity entries require classname."},
+           {"additionalProperties", true},
+         }},
+        {"operations",
+         arrayProperty(
+           "Optional blockout_create_batch operations array. Every item must be an "
+           "object with a type.")},
+        {"entities",
+         arrayProperty(
+           "Optional entity_create_checked_batch entities array. Every item must be "
+           "an object with classname.")},
+      }),
+    },
+    {
+      "ir_apply",
+      "Apply minimal scene IR by dispatching to existing atomic MCP operations in "
+      "transactions. This is an orchestration convenience for skill-generated IR, not "
+      "a scene prefab.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema({
+        {"ir",
+         QJsonObject{
+           {"type", "object"},
+           {"description",
+            "Optional IR object. It must contain operations and/or entities arrays; "
+            "operations entries require type and entity entries require classname."},
+           {"additionalProperties", true},
+         }},
+        {"operations",
+         arrayProperty(
+           "Optional blockout_create_batch operations array. Every item must be an "
+           "object with a type.")},
+        {"entities",
+         arrayProperty(
+           "Optional entity_create_checked_batch entities array. Every item must be "
+           "an object with classname.")},
+        {"moduleId", stringProperty("Optional module id copied into defaultMetadata.")},
+        {"defaultMetadata", genericMetadataSchema()},
+        {"name", stringProperty("Optional blockout transaction name.")},
+        {"grid", numberProperty("Optional grid snap size.")},
+        {"material", stringProperty("Optional default material.")},
+        {"select", boolProperty("Select generated blockout geometry.")},
+      }),
+    },
+    {
       "blockout_create_curved_corridor",
       "Create a curved corridor as one transaction using floor, ceiling, inner wall, "
       "outer wall, and optional caps.",
@@ -2410,6 +2730,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "arc boundaries visually continuous.")},
         {"grid", numberProperty("Grid size for Z/thickness snapping and grid mode.")},
         {"material", stringProperty("Brush material, defaults to current material.")},
+        {"defaultMetadata", genericMetadataSchema()},
+        {"metadata", genericMetadataSchema()},
+        {"parts",
+         arrayProperty(
+           "Optional parts to generate: floor, ceiling, inner_wall, outer_wall, "
+           "start_cap, end_cap.")},
+        {"partMaterials", genericMetadataSchema()},
+        {"partMetadata", genericMetadataSchema()},
         {"select", boolProperty("Select generated brushes.")},
         {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
       }),
@@ -2493,6 +2821,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          arrayProperty(
            "MCP operation ids whose live changed brush objects should be analyzed.")},
         {"objectIds", arrayProperty("Explicit MCP object ids to analyze.")},
+        {"selector",
+         withDescription(
+           selectorSchema(),
+           "Structured selector for live route/ramp targets. Prefer this over "
+           "fetching full objectIds when filtering by moduleId/part/role/routeId.")},
         {"routeDirection",
          vec3Property(
            "Optional travel direction vector. X/Y determine whether slopes are "
@@ -2517,7 +2850,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Analyze ordered route brush surfaces for playable continuity. Reports each "
       "target's upward playable face and each adjacent seam's verticalStep, "
       "horizontalGap, and classification so ramp-to-platform ledges are caught even "
-      "when the ramp slope itself is valid.",
+      "when the ramp slope itself is valid. Same-height overlaps are reported as "
+      "overlap_continuous_height and remain continuous.",
       McpMode::ReadOnly,
       false,
       true,
@@ -2530,6 +2864,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          arrayProperty(
            "Explicit MCP object ids to analyze. The analyzer sorts them along the "
            "route direction before comparing adjacent surfaces.")},
+        {"selector",
+         withDescription(
+           selectorSchema(),
+           "Structured selector for live route targets. Prefer this over operationIds "
+           "when an operation also contains rails/supports/markers.")},
         {"routeDirection",
          vec3Property(
            "Optional travel direction vector. X/Y determine route ordering and seam "
@@ -2550,6 +2889,20 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          numberProperty(
            "Maximum positive route-direction gap treated as continuous. Defaults to "
            "1 map unit.")},
+        {"continuityMode",
+         stringProperty(
+           "continuous (strict default), stepped (step_up/step_down within "
+           "maxStepHeight are semantically continuous), or jump_gaps (horizontal_gap "
+           "within maxJumpGap is treated as an intentional jump gap). Raw seam "
+           "continuous/classification fields remain unchanged.")},
+        {"maxStepHeight",
+         numberProperty(
+           "Used with continuityMode=stepped. Maximum absolute step height treated as "
+           "semantically continuous. Defaults to 24.")},
+        {"maxJumpGap",
+         numberProperty(
+           "Used with continuityMode=jump_gaps. Maximum horizontal gap treated as an "
+           "intentional jump gap. Defaults to 128.")},
         {"minUpNormal",
          numberProperty(
            "Minimum face normal.z for playable surfaces. Defaults to 0.2 so ramps and "
@@ -2824,6 +3177,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "tb_status",
     "tb_doctor",
     "tb_tools_search",
+    "documents_open_verified",
     "map_snapshot",
     "map_search",
     "selection_get",
@@ -2834,6 +3188,15 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "render_review_targets",
     "render_review_current_scene",
     "render_review_operation",
+    "selector_preview",
+    "objects_select_by_selector",
+    "objects_delete_by_selector",
+    "render_review_selector",
+    "module_list",
+    "module_inspect",
+    "module_select",
+    "module_render_review",
+    "module_validate",
     "operation_inspect",
     "operation_select",
     "operation_validate",
@@ -2858,6 +3221,9 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "blockout_create_batch",
     "heightmap_import_grayscale",
     "heightmap_preview_grayscale",
+    "ir_validate",
+    "ir_compile_preview",
+    "ir_apply",
     "shape_library_list",
     "brush_metadata_set",
     "brush_metadata_get",

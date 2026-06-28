@@ -165,6 +165,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpProblemTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpPythonTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpReviewRenderTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectorTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectionQuery.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectionQuery.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectionViewportTools.cpp

@@ -90,8 +90,18 @@ struct McpOperationRecord
 struct McpBrushMetadataRecord
 {
   QString objectId;
+  QString documentFingerprint;
   QJsonObject metadata;
   bool stale = false;
+};
+
+struct McpModuleRecord
+{
+  QString moduleId;
+  QString documentFingerprint;
+  QStringList objectIds;
+  QStringList operationIds;
+  QJsonObject metadata;
 };
 
 class McpBridgeServer : public QObject
@@ -110,6 +120,7 @@ private:
   mutable int m_nextOperationIndex = 1;
   mutable std::vector<McpOperationRecord> m_operationHistory;
   mutable std::map<QString, McpBrushMetadataRecord> m_brushMetadata;
+  mutable std::map<QString, McpModuleRecord> m_modules;
   mutable McpObjectRegistry m_objectRegistry;
   mutable bool m_dispatchInProgress = false;
   QString m_bridgeInstanceId;

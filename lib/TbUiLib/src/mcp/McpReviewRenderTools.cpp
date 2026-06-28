@@ -440,6 +440,8 @@ std::vector<mdl::Node*> nodesFromMcpHistory(
 {
   auto nodes = std::vector<mdl::Node*>{};
   auto seenObjectIds = std::set<QString>{};
+  auto unresolvedCount = 0;
+  auto unresolvedSamples = QStringList{};
   for (const auto& operation : history)
   {
     if (operation.undone)
@@ -458,7 +460,11 @@ std::vector<mdl::Node*> nodesFromMcpHistory(
         const auto resolved = objectRegistry->resolveExternalId(map, objectId);
         if (!resolved.ok)
         {
-          appendWarning(warnings, resolved.error);
+          ++unresolvedCount;
+          if (unresolvedSamples.size() < 5)
+          {
+            unresolvedSamples.push_back(objectId);
+          }
           continue;
         }
         legacyPathId = resolved.legacyPathId;
@@ -468,6 +474,19 @@ std::vector<mdl::Node*> nodesFromMcpHistory(
         nodes.push_back(node);
       }
     }
+  }
+  if (unresolvedCount > 0)
+  {
+    appendWarning(
+      warnings,
+      QString{
+        "mcpHistoryUnresolvedObjects: %1 stale or document-switched history objects "
+        "were omitted%2."}
+        .arg(unresolvedCount)
+        .arg(
+          unresolvedSamples.isEmpty()
+            ? QString{}
+            : QString{"; sample=%1"}.arg(unresolvedSamples.join(','))));
   }
   return dedupeNodes(std::move(nodes));
 }
@@ -852,21 +871,27 @@ RenderGeometry buildRenderGeometry(
 ReviewView reviewViewForName(QString name)
 {
   name = name.trimmed().toLower();
-  if (name == "overview_3d")
+  if (name == "overview_3d" || name == "iso" || name == "isometric" || name == "3d")
   {
     name = "iso_overview_ne";
   }
-  else if (name == "detail_3d")
+  else if (name == "detail_3d" || name == "iso_sw" || name == "isometric_sw")
   {
     name = "iso_overview_sw";
   }
-  else if (name == "top_2d_fit")
+  else if (name == "top_2d_fit" || name == "top" || name == "plan")
   {
     name = "top_plan";
   }
-  else if (name == "side_2d_fit")
+  else if (
+    name == "side_2d_fit" || name == "side" || name == "side_profile"
+    || name == "elevation")
   {
     name = "side_elevation_long";
+  }
+  else if (name == "front" || name == "front_profile" || name == "cross")
+  {
+    name = "front_elevation_cross";
   }
 
   auto makeIso = [&](const QString& viewName, const vm::vec3d& cameraDirection) {

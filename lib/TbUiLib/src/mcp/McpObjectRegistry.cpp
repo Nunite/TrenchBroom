@@ -203,6 +203,26 @@ mdl::Node* resolveLegacyObjectId(mdl::Map& map, const QString& objectId)
   return map.worldNode().resolvePath(*path);
 }
 
+mdl::Node* findNodeByAddress(mdl::Node& root, const quintptr nodeAddress)
+{
+  if (reinterpret_cast<quintptr>(&root) == nodeAddress)
+  {
+    return &root;
+  }
+  for (auto* child : root.children())
+  {
+    if (child == nullptr)
+    {
+      continue;
+    }
+    if (auto* result = findNodeByAddress(*child, nodeAddress))
+    {
+      return result;
+    }
+  }
+  return nullptr;
+}
+
 bool isObjectIdKey(const QString& key)
 {
   if (key.endsWith("ObjectId") || key.endsWith("ObjectIds"))
@@ -458,6 +478,39 @@ McpObjectRegistry::ResolveResult McpObjectRegistry::resolveExternalId(
     };
   }
 
+  if (auto* sameNode = findNodeByAddress(map.worldNode(), record.nodeAddress))
+  {
+    const auto currentLegacyPathId = nodePathId(*sameNode, map.worldNode());
+    const auto previousLegacyPathId = record.legacyPathId;
+    const auto currentFingerprint = nodeFingerprint(*sameNode, currentLegacyPathId);
+    const auto pathChanged = currentLegacyPathId != previousLegacyPathId;
+    if (pathChanged)
+    {
+      m_legacyToStable.erase(previousLegacyPathId);
+      recordIt->second.legacyPathId = currentLegacyPathId;
+      recordIt->second.summary = nodeSummaryJson(*sameNode, currentLegacyPathId);
+      m_legacyToStable[currentLegacyPathId] = objectId;
+    }
+    return ResolveResult{
+      true,
+      objectId,
+      currentLegacyPathId,
+      {},
+      QJsonObject{
+        {"objectId", objectId},
+        {"legacyPathId", currentLegacyPathId},
+        {"previousLegacyPathId", pathChanged ? previousLegacyPathId : QString{}},
+        {"type", record.type},
+        {"live", true},
+        {"stale", false},
+        {"mismatch", false},
+        {"pathChanged", pathChanged},
+        {"documentEpoch", record.documentEpoch},
+        {"changedSinceRegistered", currentFingerprint != record.creationFingerprint},
+      },
+    };
+  }
+
   auto* node = resolveLegacyObjectId(map, record.legacyPathId);
   if (node == nullptr)
   {
@@ -486,15 +539,16 @@ McpObjectRegistry::ResolveResult McpObjectRegistry::resolveExternalId(
       {"objectId", objectId},
       {"legacyPathId", record.legacyPathId},
       {"live", false},
-      {"stale", false},
-      {"mismatch", true},
-      {"staleReason", "object path resolves to a different node instance"},
+      {"stale", true},
+      {"mismatch", false},
+      {"pathReused", true},
+      {"staleReason", "original object is no longer live and its path is reused"},
     };
     return ResolveResult{
       false,
       objectId,
       record.legacyPathId,
-      QString{"MCP object id path was reused by a different object: %1"}.arg(objectId),
+      QString{"MCP object id is stale; its path is now reused: %1"}.arg(objectId),
       diagnostic,
     };
   }

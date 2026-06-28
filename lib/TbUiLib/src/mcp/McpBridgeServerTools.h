@@ -244,6 +244,92 @@ McpBridgeToolResult renderReviewOperationResult(
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history = {},
   const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult selectorPreviewResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult selectorPreviewForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult objectsSelectBySelectorResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult objectsDeleteBySelectorResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult renderReviewSelectorResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult moduleListResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult moduleListForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult moduleInspectResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult moduleSelectResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult moduleRenderReviewResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult moduleValidateResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult irValidateResult(AppController& appController, const QJsonObject& params);
+McpBridgeToolResult irCompilePreviewResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult irApplyResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore);
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyListResult(
@@ -435,13 +521,25 @@ McpBridgeToolResult blockoutCreateBatchResult(
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex);
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult blockoutCreateBatchForMapResult(
   mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult blockoutCreateBatchForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore);
+McpBridgeToolResult blockoutCompilePreviewForMapResult(
+  mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult pythonGenerateBlockoutResult(
   AppController& appController,
   const QString& toolName,
@@ -492,6 +590,21 @@ int storeBatchOperationMetadata(
   const QJsonArray& operations,
   const QStringList& changedObjectIds,
   std::map<QString, McpBrushMetadataRecord>& metadataStore);
+int storeBatchOperationMetadata(
+  const QJsonArray& operations,
+  const QStringList& changedObjectIds,
+  const QJsonObject& defaultMetadata,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore,
+  const QString& operationId);
+int storeBatchOperationMetadata(
+  const QJsonArray& operations,
+  const QStringList& changedObjectIds,
+  const QString& documentFingerprint,
+  const QJsonObject& defaultMetadata,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore,
+  const QString& operationId);
 McpBridgeToolResult brushMetadataSetForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
@@ -545,22 +658,30 @@ McpBridgeToolResult geometryAnalyzeSlopesForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  const std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult geometryAnalyzeSlopesResult(
   AppController& appController,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  const std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  const std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult geometryAnalyzeRouteContinuityResult(
   AppController& appController,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  const std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult blockoutValidateSpiralStairsResult(
   mdl::Map& map,
   const QJsonObject& params,

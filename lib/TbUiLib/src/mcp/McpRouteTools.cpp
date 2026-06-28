@@ -32,6 +32,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/mcp/McpObjectRegistry.h"
 
 #include "vm/bbox.h"
 #include "vm/vec.h"
@@ -39,6 +40,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <map>
 #include <optional>
@@ -205,6 +207,33 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
   };
 }
 
+bool isModuleLevelMetadataKey(const QString& key)
+{
+  static const auto Keys = QStringList{
+    "moduleId",
+    "routeId",
+    "temporary",
+    "generatedBy",
+    "intent",
+    "name",
+    "description",
+  };
+  return Keys.contains(key);
+}
+
+QJsonObject moduleLevelMetadata(const QJsonObject& metadata)
+{
+  auto result = QJsonObject{};
+  for (auto it = metadata.begin(); it != metadata.end(); ++it)
+  {
+    if (isModuleLevelMetadataKey(it.key()))
+    {
+      result.insert(it.key(), it.value());
+    }
+  }
+  return result;
+}
+
 QJsonObject shapeJson(
   const QString& name,
   const QString& purpose,
@@ -316,14 +345,40 @@ std::optional<QJsonArray> cleanedPoints2dArray(
 }
 
 QJsonObject metadataForObject(
-  const QString& objectId, const std::map<QString, McpBrushMetadataRecord>& metadataStore)
+  const QString& objectId,
+  const QString& documentFingerprint,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
-  const auto it = metadataStore.find(objectId);
+  const auto scopedKey = documentFingerprint.isEmpty()
+                           ? objectId
+                           : QString{"%1|%2"}.arg(documentFingerprint, objectId);
+  auto it = metadataStore.find(scopedKey);
   if (it == metadataStore.end())
+  {
+    it = metadataStore.find(objectId);
+  }
+  if (
+    it == metadataStore.end() || it->second.stale
+    || (!it->second.documentFingerprint.isEmpty()
+        && it->second.documentFingerprint != documentFingerprint))
   {
     return {};
   }
   return it->second.metadata;
+}
+
+bool recordMatchesDocument(
+  const McpBrushMetadataRecord& record, const QString& documentFingerprint)
+{
+  return record.documentFingerprint.isEmpty()
+         || record.documentFingerprint == documentFingerprint;
+}
+
+QString metadataStoreKey(const QString& documentFingerprint, const QString& objectId)
+{
+  return documentFingerprint.isEmpty()
+           ? objectId
+           : QString{"%1|%2"}.arg(documentFingerprint, objectId);
 }
 
 bool metadataMatches(
@@ -426,13 +481,17 @@ QJsonArray stringVectorToJson(const std::vector<QString>& values)
 
 std::vector<QString> matchingMetadataObjectIds(
   const QJsonObject& params,
+  const QString& documentFingerprint,
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
   const size_t limit)
 {
   auto result = std::vector<QString>{};
   for (const auto& [objectId, record] : metadataStore)
   {
-    if (record.stale || record.metadata.isEmpty())
+    Q_UNUSED(objectId);
+    if (
+      record.stale || record.metadata.isEmpty()
+      || !recordMatchesDocument(record, documentFingerprint))
     {
       continue;
     }
@@ -440,7 +499,7 @@ std::vector<QString> matchingMetadataObjectIds(
     {
       continue;
     }
-    result.push_back(objectId);
+    result.push_back(record.objectId);
     if (result.size() >= limit)
     {
       break;
@@ -451,12 +510,17 @@ std::vector<QString> matchingMetadataObjectIds(
 
 void sortMetadataObjectIdsByOrder(
   std::vector<QString>& objectIds,
+  const QString& documentFingerprint,
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
   QJsonArray& warnings)
 {
   const auto allHaveOrder = std::ranges::all_of(objectIds, [&](const auto& objectId) {
-    const auto it = metadataStore.find(objectId);
-    return it != metadataStore.end() && it->second.metadata.value("order").isDouble();
+    const auto it = std::ranges::find_if(metadataStore, [&](const auto& entry) {
+      return entry.second.objectId == objectId && !entry.second.stale
+             && recordMatchesDocument(entry.second, documentFingerprint);
+    });
+    return it != metadataStore.end()
+           && it->second.metadata.value("order").isDouble();
   });
   if (!allHaveOrder)
   {
@@ -469,8 +533,16 @@ void sortMetadataObjectIdsByOrder(
   }
 
   std::ranges::stable_sort(objectIds, [&](const auto& lhs, const auto& rhs) {
-    return metadataStore.at(lhs).metadata.value("order").toDouble()
-           < metadataStore.at(rhs).metadata.value("order").toDouble();
+    const auto lhsIt = std::ranges::find_if(metadataStore, [&](const auto& entry) {
+      return entry.second.objectId == lhs && !entry.second.stale
+             && recordMatchesDocument(entry.second, documentFingerprint);
+    });
+    const auto rhsIt = std::ranges::find_if(metadataStore, [&](const auto& entry) {
+      return entry.second.objectId == rhs && !entry.second.stale
+             && recordMatchesDocument(entry.second, documentFingerprint);
+    });
+    return lhsIt->second.metadata.value("order").toDouble()
+           < rhsIt->second.metadata.value("order").toDouble();
   });
 }
 
@@ -629,12 +701,211 @@ int storeBatchOperationMetadata(
   const QStringList& changedObjectIds,
   std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
+  return storeBatchOperationMetadata(
+    operations, changedObjectIds, {}, QJsonObject{}, metadataStore, nullptr, {});
+}
+
+int storeBatchOperationMetadata(
+  const QJsonArray& operations,
+  const QStringList& changedObjectIds,
+  const QJsonObject& defaultMetadata,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore,
+  const QString& operationId)
+{
+  return storeBatchOperationMetadata(
+    operations,
+    changedObjectIds,
+    {},
+    defaultMetadata,
+    metadataStore,
+    moduleStore,
+    operationId);
+}
+
+int storeBatchOperationMetadata(
+  const QJsonArray& operations,
+  const QStringList& changedObjectIds,
+  const QString& documentFingerprint,
+  const QJsonObject& defaultMetadata,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore,
+  const QString& operationId)
+{
   if (changedObjectIds.isEmpty())
   {
     return 0;
   }
 
+  const auto mergeMetadata = [](QJsonObject base, const QJsonObject& overlay) {
+    for (auto it = overlay.begin(); it != overlay.end(); ++it)
+    {
+      base.insert(it.key(), it.value());
+    }
+    return base;
+  };
+
+  const auto partMetadata = [&](const QJsonObject& operation,
+                                const QString& partName,
+                                const QJsonObject& base) {
+    auto result = base;
+    if (!partName.isEmpty())
+    {
+      result.insert("part", partName);
+    }
+    if (operation.value("partMetadata").isObject())
+    {
+      const auto partMetadataObject = operation.value("partMetadata").toObject();
+      if (partMetadataObject.value(partName).isObject())
+      {
+        result = mergeMetadata(result, partMetadataObject.value(partName).toObject());
+      }
+    }
+    return result;
+  };
+
+  const auto partRequested = [](const QJsonObject& operation, const QString& partName) {
+    if (!operation.value("parts").isArray())
+    {
+      return true;
+    }
+    const auto parts = operation.value("parts").toArray();
+    if (parts.isEmpty())
+    {
+      return false;
+    }
+    for (const auto& part : parts)
+    {
+      if (part.toString().compare(partName, Qt::CaseInsensitive) == 0)
+      {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  std::function<void(const QJsonObject&, const QJsonObject&)> appendOperationMetadata;
   auto metadataByObject = std::vector<QJsonObject>{};
+  appendOperationMetadata = [&](const QJsonObject& operation, const QJsonObject& parent) {
+    auto metadata = mergeMetadata(parent, operation.value("metadata").toObject());
+    if (metadata.isEmpty())
+    {
+      metadata = parent;
+    }
+    const auto operationType = operation.value("type").toString().trimmed();
+
+    const auto appendRepeated = [&](const int count, const QString& part = {}) {
+      for (auto i = 0; i < count; ++i)
+      {
+        metadataByObject.push_back(partMetadata(operation, part, metadata));
+      }
+    };
+
+    if (operationType == "repeat_translate")
+    {
+      const auto count = std::clamp(operation.value("count").toInt(1), 1, 256);
+      const auto child = operation.value("operation").toObject();
+      for (auto i = 0; i < count; ++i)
+      {
+        appendOperationMetadata(child, metadata);
+      }
+      return;
+    }
+    if (operationType == "repeat_grid")
+    {
+      auto instanceCount = 1;
+      const auto counts = operation.value("counts");
+      if (counts.isDouble())
+      {
+        instanceCount = std::max(1, counts.toInt(1));
+      }
+      else if (counts.isArray())
+      {
+        for (const auto& value : counts.toArray())
+        {
+          instanceCount *= std::max(1, value.toInt(1));
+        }
+      }
+      const auto child = operation.value("operation").toObject();
+      for (auto i = 0; i < instanceCount; ++i)
+      {
+        appendOperationMetadata(child, metadata);
+      }
+      return;
+    }
+    if (operationType == "curved_corridor")
+    {
+      const auto segments = std::max(1, operation.value("segments").toInt(12));
+      for (auto i = 0; i < segments; ++i)
+      {
+        if (partRequested(operation, "floor"))
+        {
+          metadataByObject.push_back(partMetadata(operation, "floor", metadata));
+        }
+        if (partRequested(operation, "ceiling"))
+        {
+          metadataByObject.push_back(partMetadata(operation, "ceiling", metadata));
+        }
+        if (partRequested(operation, "inner_wall"))
+        {
+          metadataByObject.push_back(partMetadata(operation, "inner_wall", metadata));
+        }
+        if (partRequested(operation, "outer_wall"))
+        {
+          metadataByObject.push_back(partMetadata(operation, "outer_wall", metadata));
+        }
+      }
+      const auto caps = operation.value("caps").toString("none").trimmed().toLower();
+      if ((caps == "start" || caps == "both") && partRequested(operation, "start_cap"))
+      {
+        metadataByObject.push_back(partMetadata(operation, "start_cap", metadata));
+      }
+      if ((caps == "end" || caps == "both") && partRequested(operation, "end_cap"))
+      {
+        metadataByObject.push_back(partMetadata(operation, "end_cap", metadata));
+      }
+      return;
+    }
+    if (operationType == "room" || operationType == "corridor")
+    {
+      appendRepeated(6, "shell");
+      return;
+    }
+    if (operationType == "sky_shell")
+    {
+      appendRepeated(6, "sky_shell");
+      return;
+    }
+    if (operationType == "doorway")
+    {
+      appendRepeated(4, "wall_segment");
+      return;
+    }
+    if (operationType == "stairs")
+    {
+      if (partRequested(operation, "steps"))
+      {
+        appendRepeated(std::max(1, operation.value("steps").toInt(8)), "steps");
+      }
+      return;
+    }
+    if (operationType == "path_ribbon")
+    {
+      if (
+        partRequested(operation, "surface") || partRequested(operation, "floor")
+        || partRequested(operation, "ribbon"))
+      {
+        const auto points = operation.value("points3d").isArray()
+                              ? operation.value("points3d").toArray()
+                              : operation.value("points2d").toArray();
+        appendRepeated(std::max(1, static_cast<int>(points.size()) - 1), "surface");
+      }
+      return;
+    }
+
+    metadataByObject.push_back(metadata);
+  };
+
   for (const auto& operationValue : operations)
   {
     if (!operationValue.isObject())
@@ -642,51 +913,7 @@ int storeBatchOperationMetadata(
       continue;
     }
     const auto operation = operationValue.toObject();
-    auto error = QString{};
-    const auto metadata =
-      metadataFromJsonValue(operation.value("metadata"), "operations[].metadata", error);
-    if (!metadata || metadata->isEmpty())
-    {
-      continue;
-    }
-
-    const auto operationType = operation.value("type").toString().trimmed();
-    auto generatedBrushCount = 1;
-    if (operationType == "curved_corridor")
-    {
-      const auto segments = std::max(1, operation.value("segments").toInt(12));
-      const auto caps = operation.value("caps").toString("none").trimmed().toLower();
-      generatedBrushCount = segments * 4;
-      if (caps == "start" || caps == "end")
-      {
-        generatedBrushCount += 1;
-      }
-      else if (caps == "both")
-      {
-        generatedBrushCount += 2;
-      }
-    }
-    else if (operationType == "room" || operationType == "corridor")
-    {
-      generatedBrushCount = 6;
-    }
-    else if (operationType == "sky_shell")
-    {
-      generatedBrushCount = 6;
-    }
-    else if (operationType == "doorway")
-    {
-      generatedBrushCount = 4;
-    }
-    else if (operationType == "stairs")
-    {
-      generatedBrushCount = std::max(1, operation.value("steps").toInt(8));
-    }
-
-    for (auto i = 0; i < generatedBrushCount; ++i)
-    {
-      metadataByObject.push_back(*metadata);
-    }
+    appendOperationMetadata(operation, defaultMetadata);
   }
 
   auto metadataCount = 0;
@@ -700,7 +927,27 @@ int storeBatchOperationMetadata(
     {
       continue;
     }
-    metadataStore[objectId] = McpBrushMetadataRecord{objectId, metadata, false};
+    metadataStore[metadataStoreKey(documentFingerprint, objectId)] =
+      McpBrushMetadataRecord{objectId, documentFingerprint, metadata, false};
+    const auto moduleId = metadata.value("moduleId").toString().trimmed();
+    if (moduleStore != nullptr && !moduleId.isEmpty())
+    {
+      const auto moduleKey = documentFingerprint.isEmpty()
+                               ? moduleId
+                               : QString{"%1|%2"}.arg(documentFingerprint, moduleId);
+      auto& module = (*moduleStore)[moduleKey];
+      module.moduleId = moduleId;
+      module.documentFingerprint = documentFingerprint;
+      module.metadata = mergeMetadata(module.metadata, moduleLevelMetadata(defaultMetadata));
+      module.metadata = mergeMetadata(module.metadata, moduleLevelMetadata(metadata));
+      module.objectIds.push_back(objectId);
+      module.objectIds.removeDuplicates();
+      if (!operationId.isEmpty())
+      {
+        module.operationIds.push_back(operationId);
+        module.operationIds.removeDuplicates();
+      }
+    }
     ++metadataCount;
   }
   return metadataCount;
@@ -872,6 +1119,7 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
 
   const auto changedObjectIds = result.result.value("changedObjectIds").toArray();
   auto metadataCount = 0;
+  const auto documentFingerprint = documentFingerprintForMap(map);
   for (auto i = 0; i < changedObjectIds.size() && i < static_cast<int>(metadata->size());
        ++i)
   {
@@ -881,8 +1129,10 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
     {
       continue;
     }
-    metadataStore[objectId] = McpBrushMetadataRecord{
+    metadataStore[metadataStoreKey(documentFingerprint, objectId)] =
+      McpBrushMetadataRecord{
       objectId,
+      documentFingerprint,
       brushMetadata,
       false,
     };
@@ -955,10 +1205,13 @@ McpBridgeToolResult brushMetadataSetForMapResult(
     }
   }
 
+  const auto documentFingerprint = documentFingerprintForMap(map);
   for (const auto& objectId : *objectIds)
   {
-    metadataStore[objectId] = McpBrushMetadataRecord{
+    metadataStore[metadataStoreKey(documentFingerprint, objectId)] =
+      McpBrushMetadataRecord{
       objectId,
+      documentFingerprint,
       *metadata,
       false,
     };
@@ -999,13 +1252,20 @@ McpBridgeToolResult brushMetadataGetForMapResult(
 
   auto results = QJsonArray{};
   auto staleCount = 0;
+  const auto documentFingerprint = documentFingerprintForMap(map);
   for (const auto& objectId : *objectIds)
   {
-    const auto it = metadataStore.find(objectId);
+    auto it = metadataStore.find(metadataStoreKey(documentFingerprint, objectId));
+    if (it == metadataStore.end())
+    {
+      it = metadataStore.find(objectId);
+    }
     auto* node = resolveNodeId(map.worldNode(), objectId);
     const auto live = dynamic_cast<mdl::BrushNode*>(node) != nullptr;
     const auto explicitlyStale = it != metadataStore.end() && it->second.stale;
-    const auto stale = !live || explicitlyStale;
+    const auto wrongDocument =
+      it != metadataStore.end() && !recordMatchesDocument(it->second, documentFingerprint);
+    const auto stale = !live || explicitlyStale || wrongDocument;
     if (stale)
     {
       ++staleCount;
@@ -1015,15 +1275,18 @@ McpBridgeToolResult brushMetadataGetForMapResult(
       {"objectId", objectId},
       {"live", live},
       {"stale", stale},
-      {"hasMetadata", it != metadataStore.end() && !it->second.metadata.isEmpty()},
-      {"metadata", it != metadataStore.end() ? it->second.metadata : QJsonObject{}},
+      {"hasMetadata",
+       it != metadataStore.end() && !wrongDocument && !it->second.metadata.isEmpty()},
+      {"metadata",
+       it != metadataStore.end() && !wrongDocument ? it->second.metadata : QJsonObject{}},
     };
     if (stale)
     {
       object.insert(
         "staleReason",
-        !live ? "objectId does not resolve to a live brush"
-              : "metadata record was marked stale");
+        !live             ? "objectId does not resolve to a live brush"
+        : wrongDocument   ? "metadata belongs to a different document"
+                           : "metadata record was marked stale");
     }
     results.push_back(object);
   }
@@ -1069,7 +1332,8 @@ McpBridgeToolResult selectionByMetadataForMapResult(
 {
   const auto limit =
     std::clamp(optionalSize(params, "limit", 100), size_t{1}, size_t{1000});
-  const auto matchingIds = matchingMetadataObjectIds(params, metadataStore, limit);
+  const auto matchingIds = matchingMetadataObjectIds(
+    params, documentFingerprintForMap(map), metadataStore, limit);
 
   auto nodes = std::vector<mdl::Node*>{};
   auto objectIds = QJsonArray{};
@@ -1156,13 +1420,15 @@ McpBridgeToolResult routeGeometryAnalyzeChainForMapResult(
     }
     objectIds = matchingMetadataObjectIds(
       QJsonObject{{"routeId", routeId}},
+      documentFingerprintForMap(map),
       metadataStore,
       std::numeric_limits<size_t>::max());
     const auto orderBy =
       params.value("orderBy").toString("metadataOrder").trimmed().toLower();
     if (orderBy == "metadataorder" || orderBy == "metadata" || orderBy == "order")
     {
-      sortMetadataObjectIdsByOrder(objectIds, metadataStore, warnings);
+      sortMetadataObjectIdsByOrder(
+        objectIds, documentFingerprintForMap(map), metadataStore, warnings);
     }
     else
     {
@@ -1206,8 +1472,11 @@ McpBridgeToolResult routeGeometryAnalyzeChainForMapResult(
   {
     const auto fromObjectId = nodePathId(*brushes[i], map.worldNode());
     const auto toObjectId = nodePathId(*brushes[i + 1u], map.worldNode());
-    const auto fromMetadata = metadataForObject(fromObjectId, metadataStore);
-    const auto toMetadata = metadataForObject(toObjectId, metadataStore);
+    const auto documentFingerprint = documentFingerprintForMap(map);
+    const auto fromMetadata =
+      metadataForObject(fromObjectId, documentFingerprint, metadataStore);
+    const auto toMetadata =
+      metadataForObject(toObjectId, documentFingerprint, metadataStore);
     if (
       !fromMetadata.contains("outgoingDirection")
       && !toMetadata.contains("incomingDirection"))

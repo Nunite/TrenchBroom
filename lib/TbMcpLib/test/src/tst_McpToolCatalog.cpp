@@ -71,6 +71,15 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("render_review_targets"));
     CHECK(findToolDefinition("render_review_current_scene"));
     CHECK(findToolDefinition("render_review_operation"));
+    CHECK(findToolDefinition("selector_preview"));
+    CHECK(findToolDefinition("objects_select_by_selector"));
+    CHECK(findToolDefinition("objects_delete_by_selector"));
+    CHECK(findToolDefinition("render_review_selector"));
+    CHECK(findToolDefinition("module_list"));
+    CHECK(findToolDefinition("module_inspect"));
+    CHECK(findToolDefinition("module_select"));
+    CHECK(findToolDefinition("module_render_review"));
+    CHECK(findToolDefinition("module_validate"));
     CHECK(findToolDefinition("fgd_entities_list"));
     CHECK(findToolDefinition("entity_schema"));
     CHECK(findToolDefinition("entity_create_from_schema"));
@@ -129,6 +138,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("python_generate_blockout"));
     CHECK(findToolDefinition("heightmap_import_grayscale"));
     CHECK(findToolDefinition("heightmap_preview_grayscale"));
+    CHECK(findToolDefinition("ir_validate"));
+    CHECK(findToolDefinition("ir_compile_preview"));
+    CHECK(findToolDefinition("ir_apply"));
     CHECK(findToolDefinition("tb_tools_search"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
@@ -346,6 +358,15 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("history_list"));
     CHECK(names.contains("history_undo_mcp"));
     CHECK(names.contains("history_redo_mcp"));
+    CHECK(names.contains("selector_preview"));
+    CHECK(names.contains("objects_select_by_selector"));
+    CHECK(names.contains("objects_delete_by_selector"));
+    CHECK(names.contains("render_review_selector"));
+    CHECK(names.contains("module_list"));
+    CHECK(names.contains("module_inspect"));
+    CHECK(names.contains("module_select"));
+    CHECK(names.contains("module_render_review"));
+    CHECK(names.contains("module_validate"));
     CHECK(names.contains("brush_types_list"));
     CHECK(names.contains("brush_create"));
     CHECK(names.contains("brush_create_box"));
@@ -370,6 +391,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_create_batch"));
     CHECK(!names.contains("python_generate_blockout"));
     CHECK(names.contains("heightmap_import_grayscale"));
+    CHECK(names.contains("heightmap_preview_grayscale"));
+    CHECK(names.contains("ir_validate"));
+    CHECK(names.contains("ir_compile_preview"));
+    CHECK(names.contains("ir_apply"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("objects_delete"));
@@ -408,7 +433,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("blockout_create_curved_corridor"));
     CHECK(!names.contains("blockout_validate_spiral_stairs"));
     CHECK(!names.contains("documents_open"));
-    CHECK(!names.contains("documents_open_verified"));
+    CHECK(names.contains("documents_open_verified"));
     CHECK(!names.contains("documents_save"));
     CHECK(!names.contains("documents_close"));
     CHECK(!names.contains("documents_export"));
@@ -517,14 +542,15 @@ TEST_CASE("McpToolCatalog")
     }
     CHECK(editNames.contains("history_status"));
     CHECK(editNames.contains("heightmap_preview_grayscale"));
-    CHECK(!editNames.contains("documents_open_verified"));
+    CHECK(editNames.contains("documents_open_verified"));
+    CHECK(!editNames.contains("documents_open"));
 
     const auto searchResults = toolsSearchJson(
       "documents_open_verified", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
     REQUIRE(searchResults.size() == 1);
     const auto found = searchResults.first().toObject();
     CHECK(found.value("name").toString() == "documents_open_verified");
-    CHECK(!found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("visibleInCurrentProfile").toBool());
     CHECK(found.value("inputSchema").isObject());
   }
 
@@ -624,6 +650,11 @@ TEST_CASE("McpToolCatalog")
             .toString()
             .contains("radial"));
     CHECK(properties.value("grid").isObject());
+    CHECK(properties.value("defaultMetadata").isObject());
+    CHECK(properties.value("metadata").isObject());
+    CHECK(properties.value("parts").isObject());
+    CHECK(properties.value("partMaterials").isObject());
+    CHECK(properties.value("partMetadata").isObject());
 
     const auto sectorTool = findToolDefinition("brush_create_cylinder_sector");
     REQUIRE(sectorTool);
@@ -651,6 +682,101 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(!found.isEmpty());
     CHECK(!found.value("visibleInCurrentProfile").toBool());
     CHECK(found.value("inputSchema").isObject());
+  }
+
+  SECTION("selector module and IR tools expose compact atomic workflow schemas")
+  {
+    const auto selectorTool = findToolDefinition("selector_preview");
+    REQUIRE(selectorTool);
+    CHECK(selectorTool->requiredMode == McpMode::ReadOnly);
+    CHECK(!selectorTool->mutatesDocument);
+
+    const auto selectorProperties =
+      selectorTool->inputSchema.value("properties").toObject();
+    CHECK(selectorProperties.value("selector").isObject());
+    CHECK(selectorProperties.value("idsMode").isObject());
+
+    const auto selectorSchema =
+      selectorProperties.value("selector").toObject().value("properties").toObject();
+    CHECK(selectorSchema.value("metadata").isObject());
+    CHECK(selectorSchema.value("moduleId").isObject());
+    CHECK(selectorSchema.value("operationIds").isObject());
+    CHECK(selectorSchema.value("boundsMode").isObject());
+
+    const auto renderSelectorTool = findToolDefinition("render_review_selector");
+    REQUIRE(renderSelectorTool);
+    CHECK(renderSelectorTool->requiredMode == McpMode::ReadOnly);
+    CHECK(renderSelectorTool->inputSchema.value("properties")
+            .toObject()
+            .value("contactSheetMaxCaptures")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("Defaults to 2"));
+
+    const auto moduleValidate = findToolDefinition("module_validate");
+    REQUIRE(moduleValidate);
+    CHECK(moduleValidate->requiredMode == McpMode::ReadOnly);
+    CHECK(moduleValidate->inputSchema.value("required").toArray().contains("moduleId"));
+    CHECK(moduleValidate->inputSchema.value("properties")
+            .toObject()
+            .value("checkRouteContinuity")
+            .isObject());
+
+    const auto irApply = findToolDefinition("ir_apply");
+    REQUIRE(irApply);
+    CHECK(irApply->requiredMode == McpMode::Edit);
+    CHECK(irApply->mutatesDocument);
+    const auto irProperties = irApply->inputSchema.value("properties").toObject();
+    CHECK(irProperties.value("ir").isObject());
+    CHECK(irProperties.value("operations").isObject());
+    CHECK(irProperties.value("entities").isObject());
+    CHECK(irProperties.value("moduleId").isObject());
+    CHECK(irProperties.value("defaultMetadata").isObject());
+
+    const auto blockoutBatch = findToolDefinition("blockout_create_batch");
+    REQUIRE(blockoutBatch);
+    const auto batchProperties =
+      blockoutBatch->inputSchema.value("properties").toObject();
+    CHECK(batchProperties.value("defaultMetadata").isObject());
+
+    const auto operationItems = batchProperties.value("operations")
+                                  .toObject()
+                                  .value("items")
+                                  .toObject()
+                                  .value("properties")
+                                  .toObject();
+    CHECK(operationItems.value("metadata").isObject());
+    CHECK(operationItems.value("parts").isObject());
+    CHECK(operationItems.value("partMaterials").isObject());
+    CHECK(operationItems.value("partMetadata").isObject());
+
+    const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    auto names = QStringList{};
+    for (const auto& listedTool : tools)
+    {
+      names.push_back(listedTool.toObject().value("name").toString());
+    }
+    CHECK(names.contains("selector_preview"));
+    CHECK(names.contains("objects_select_by_selector"));
+    CHECK(names.contains("objects_delete_by_selector"));
+    CHECK(names.contains("render_review_selector"));
+    CHECK(names.contains("module_list"));
+    CHECK(names.contains("module_inspect"));
+    CHECK(names.contains("module_select"));
+    CHECK(names.contains("module_render_review"));
+    CHECK(names.contains("module_validate"));
+    CHECK(names.contains("ir_validate"));
+    CHECK(names.contains("ir_compile_preview"));
+    CHECK(names.contains("ir_apply"));
+
+    const auto moduleList = findToolDefinition("module_list");
+    REQUIRE(moduleList);
+    CHECK(moduleList->description.contains("live modules only"));
+    const auto moduleListProperties =
+      moduleList->inputSchema.value("properties").toObject();
+    CHECK(moduleListProperties.value("includeStale").isObject());
+    CHECK(moduleListProperties.value("includeEmpty").isObject());
   }
 
   SECTION("scene review capture documents focused object screenshots")
@@ -841,6 +967,9 @@ TEST_CASE("McpToolCatalog")
     const auto schema = found.value("inputSchema").toObject();
     const auto operations =
       schema.value("properties").toObject().value("operations").toObject();
+    CHECK(operations.value("description")
+            .toString()
+            .contains("offAxisRampMayProduceNonGridVertices"));
     CHECK(operations.value("items").isObject());
     const auto itemDescription =
       operations.value("items").toObject().value("description").toString();
@@ -1023,16 +1152,26 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(routeContinuityTool);
     CHECK(routeContinuityTool->description.contains("verticalStep"));
     CHECK(routeContinuityTool->description.contains("horizontalGap"));
+    CHECK(routeContinuityTool->description.contains("overlap_continuous_height"));
     const auto routeContinuityProperties =
       routeContinuityTool->inputSchema.value("properties").toObject();
     CHECK(routeContinuityProperties.value("operationId").isObject());
     CHECK(routeContinuityProperties.value("operationIds").isObject());
     CHECK(routeContinuityProperties.value("objectIds").isObject());
+    CHECK(routeContinuityProperties.value("selector").isObject());
     CHECK(routeContinuityProperties.value("routeDirection").isObject());
     CHECK(routeContinuityProperties.value("start").isObject());
     CHECK(routeContinuityProperties.value("end").isObject());
     CHECK(routeContinuityProperties.value("verticalTolerance").isObject());
     CHECK(routeContinuityProperties.value("horizontalTolerance").isObject());
+    CHECK(routeContinuityProperties.value("continuityMode").isObject());
+    CHECK(routeContinuityProperties.value("maxStepHeight").isObject());
+    CHECK(routeContinuityProperties.value("maxJumpGap").isObject());
+
+    const auto slopeTool = findToolDefinition("geometry_analyze_slopes");
+    REQUIRE(slopeTool);
+    const auto slopeProperties = slopeTool->inputSchema.value("properties").toObject();
+    CHECK(slopeProperties.value("selector").isObject());
 
     const auto faceTextureTool = findToolDefinition("face_texture_set");
     REQUIRE(faceTextureTool);

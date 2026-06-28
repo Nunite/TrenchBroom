@@ -213,6 +213,7 @@ void McpBridgeServer::stop()
   m_overlayState = QJsonObject{};
   m_operationHistory.clear();
   m_brushMetadata.clear();
+  m_modules.clear();
   m_objectRegistry.clear();
 }
 

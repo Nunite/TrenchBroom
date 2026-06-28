@@ -2267,8 +2267,68 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   CHECK(replacementState.value("liveObjectCount").toInt() == 1);
   CHECK(replacementState.value("mismatchCount").toInt() == 0);
 
-  const auto offGridCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+  const auto pathShiftResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "3",
+    "secret",
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{256, 0, 0}},
+           {"max", QJsonArray{320, 64, 16}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{336, 0, 0}},
+           {"max", QJsonArray{400, 64, 16}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{416, 0, 0}},
+           {"max", QJsonArray{480, 64, 16}},
+         },
+       }},
+      {"detail", "ids"},
+    },
+    mcp::McpMode::Edit});
+  REQUIRE(pathShiftResponse.ok);
+  const auto pathShiftObjectIds =
+    pathShiftResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(pathShiftObjectIds.size() == 3);
+  const auto deletedStableId = pathShiftObjectIds[1].toString();
+  const auto shiftedStableId = pathShiftObjectIds[2].toString();
+
+  const auto deleteShiftedSiblingResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "4",
+    "secret",
+    "objects_delete",
+    QJsonObject{{"objectIds", QJsonArray{deletedStableId}}},
+    mcp::McpMode::Edit});
+  REQUIRE(deleteShiftedSiblingResponse.ok);
+
+  const auto shiftedState =
+    registry.liveStateJson(map, QStringList{shiftedStableId}, false, true);
+  CHECK(shiftedState.value("valid").toBool());
+  CHECK(shiftedState.value("liveObjectCount").toInt() == 1);
+  CHECK(shiftedState.value("mismatchCount").toInt() == 0);
+  CHECK(shiftedState.value("staleObjectCount").toInt() == 0);
+  const auto shiftedDiagnostics =
+    shiftedState.value("objectDiagnostics").toArray().first().toObject();
+  CHECK(shiftedDiagnostics.value("pathChanged").toBool());
+
+  const auto deletedStableState =
+    registry.liveStateJson(map, QStringList{deletedStableId}, false, true);
+  CHECK(!deletedStableState.value("valid").toBool());
+  CHECK(deletedStableState.value("staleObjectCount").toInt() == 1);
+  CHECK(deletedStableState.value("mismatchCount").toInt() == 0);
+  const auto deletedDiagnostics =
+    deletedStableState.value("objectDiagnostics").toArray().first().toObject();
+  CHECK(deletedDiagnostics.value("pathReused").toBool());
+
+  const auto offGridCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "5",
     "secret",
     "blockout_create_batch",
     QJsonObject{
@@ -2293,7 +2353,7 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   REQUIRE(offGridCreateResponse.ok);
 
   const auto analyzeResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "5",
+    "6",
     "secret",
     "geometry_analyze_selection",
     QJsonObject{{"grid", 1}, {"detail", "summary"}},
@@ -2306,7 +2366,7 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   CHECK(nonGridAlignedObjectIds.first().toString().startsWith("mcp:"));
 
   const auto deleteCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "6",
+    "7",
     "secret",
     "blockout_create_batch",
     QJsonObject{
@@ -2329,7 +2389,7 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   REQUIRE(stableDeleteTarget.startsWith("mcp:"));
 
   const auto deleteResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "7",
+    "8",
     "secret",
     "objects_delete",
     QJsonObject{{"objectIds", QJsonArray{stableDeleteTarget}}},
@@ -2346,7 +2406,7 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   CHECK(history.back().deletedObjectIds.front().startsWith("node:"));
 
   const auto inspectDeleteResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "8",
+    "9",
     "secret",
     "operation_inspect",
     QJsonObject{
@@ -2359,6 +2419,106 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
     inspectDeleteResponse.result.value("deletedObjectIds").toArray();
   REQUIRE(inspectedDeletedObjectIds.size() == 1);
   CHECK(inspectedDeletedObjectIds.first().toString() == stableDeleteTarget);
+}
+
+TEST_CASE("McpBridgeServer scopes selector metadata and modules to active document")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto firstDocument = MapDocument::createDocument(
+                         appController.environmentConfig(),
+                         mdl::QuakeGameInfo,
+                         mdl::MapFormat::Valve,
+                         vm::bbox3d{8192.0},
+                         appController.taskManager(),
+                         appController.glManager().resourceManager())
+                       | kdl::value();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  auto& map = firstDocument->map();
+  auto firstCreate = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"detail", "ids"},
+      {"select", false},
+      {"defaultMetadata",
+       QJsonObject{
+         {"moduleId", "doc-a-module"},
+         {"role", "walkable"},
+         {"generatedBy", "test"},
+       }},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+           {"metadata",
+            QJsonObject{{"routeId", "shared-route"}, {"part", "road"}, {"order", 1}}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore);
+  const auto firstCreateError =
+    firstCreate.ok ? std::string{} : firstCreate.error.message.toStdString();
+  INFO(firstCreateError);
+  REQUIRE(firstCreate.ok);
+  CHECK(firstCreate.result.value("changedObjectCount").toInt() == 1);
+
+  const auto currentFingerprint = documentFingerprintForMap(map);
+  const auto otherFingerprint = QString{"doc:other-map"};
+  moduleStore[QString{"%1|doc-b-module"}.arg(otherFingerprint)] = McpModuleRecord{
+    "doc-b-module",
+    otherFingerprint,
+    QStringList{"node:0"},
+    QStringList{"mcp-op-other"},
+    QJsonObject{{"moduleId", "doc-b-module"}, {"role", "walkable"}},
+  };
+  metadataStore[QString{"%1|node:0"}.arg(otherFingerprint)] = McpBrushMetadataRecord{
+    "node:0",
+    otherFingerprint,
+    QJsonObject{{"moduleId", "doc-b-module"}, {"routeId", "shared-route"}},
+    false,
+  };
+
+  const auto selector = selectorPreviewForMapResult(
+    map,
+    QJsonObject{{"selector", QJsonObject{{"routeId", "shared-route"}}}},
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(selector.ok);
+  CHECK(selector.result.value("matchedCount").toInt() == 1);
+
+  const auto modules =
+    moduleListForMapResult(map, QJsonObject{}, metadataStore, moduleStore, objectRegistry);
+  REQUIRE(modules.ok);
+  CHECK(modules.result.value("moduleCount").toInt() == 1);
+  const auto moduleArray = modules.result.value("modules").toArray();
+  REQUIRE(moduleArray.size() == 1);
+  const auto moduleSummary = moduleArray.first().toObject();
+  CHECK(moduleSummary.value("moduleId").toString() == "doc-a-module");
+  const auto moduleMetadata = moduleSummary.value("metadata").toObject();
+  CHECK(moduleMetadata.value("moduleId").toString() == "doc-a-module");
+  CHECK(moduleMetadata.value("routeId").toString() == "shared-route");
+  CHECK(moduleMetadata.value("generatedBy").toString() == "test");
+  CHECK(!moduleMetadata.contains("part"));
+  CHECK(!moduleMetadata.contains("order"));
+  CHECK(!moduleMetadata.contains("role"));
+  const auto parts = moduleSummary.value("parts").toArray();
+  REQUIRE(parts.size() == 1);
+  CHECK(parts.first().toObject().value("part").toString() == "road");
+  CHECK(parts.first().toObject().value("count").toInt() == 1);
+  CHECK(currentFingerprint != otherFingerprint);
 }
 
 TEST_CASE("McpBridgeServer object transform summaries")
@@ -2786,8 +2946,57 @@ TEST_CASE("McpBridgeServer batch blockout tools")
           .toString()
           .startsWith("tbmcp://operation/"));
   CHECK(batchResponse.result.value("validation").toObject().value("valid").toBool());
+  CHECK(batchResponse.result.value("warnings").toArray().isEmpty());
   CHECK(map.selection().nodes.size() == 5u);
   CHECK(batchResponse.result.value("intentSummaries").toArray().size() == 3);
+
+  const auto diagonalRampPreviewResponse = blockoutCompilePreviewForMapResult(
+    map,
+    QJsonObject{
+      {"grid", 16},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "ramp_between"},
+           {"start", QJsonArray{0, 256, 0}},
+           {"end", QJsonArray{128, 384, 64}},
+           {"width", 96},
+           {"thickness", 16},
+         },
+       }},
+    });
+  REQUIRE(diagonalRampPreviewResponse.ok);
+  const auto diagonalPreviewWarnings =
+    diagonalRampPreviewResponse.result.value("warnings").toArray();
+  REQUIRE(diagonalPreviewWarnings.size() == 1);
+  CHECK(diagonalPreviewWarnings.first().toString().contains(
+    "offAxisRampMayProduceNonGridVertices"));
+
+  const auto diagonalRampResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Diagonal ramp warning sample"},
+      {"grid", 16},
+      {"select", false},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "ramp_between"},
+           {"start", QJsonArray{0, 384, 0}},
+           {"end", QJsonArray{128, 512, 64}},
+           {"width", 96},
+           {"thickness", 16},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(diagonalRampResponse.ok);
+  const auto diagonalWarnings = diagonalRampResponse.result.value("warnings").toArray();
+  REQUIRE(diagonalWarnings.size() == 1);
+  CHECK(
+    diagonalWarnings.first().toString().contains("offAxisRampMayProduceNonGridVertices"));
 
   const auto cylinderAnalyzeResponse =
     geometryAnalyzeSelectionResult(map, QJsonObject{{"grid", 1}});
@@ -2940,6 +3149,46 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     CHECK(seam.value("classification").toString() == "continuous");
     CHECK(seam.value("verticalStep").toDouble() == 0.0);
   }
+
+  const auto overlapRampResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Overlap continuity sample"},
+      {"grid", 16},
+      {"select", true},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{1920, 0, 0}},
+           {"max", QJsonArray{2048, 96, 16}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{2032, 0, 0}},
+           {"max", QJsonArray{2160, 96, 16}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(overlapRampResponse.ok);
+  const auto overlapContinuityResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", overlapRampResponse.result.value("operationId").toString()},
+      {"start", QJsonArray{1920, 48, 16}},
+      {"end", QJsonArray{2160, 48, 16}},
+    },
+    history);
+  REQUIRE(overlapContinuityResponse.ok);
+  CHECK(overlapContinuityResponse.result.value("continuous").toBool());
+  const auto overlapSeams = overlapContinuityResponse.result.value("seams").toArray();
+  REQUIRE(overlapSeams.size() == 1);
+  const auto overlapSeam = overlapSeams.first().toObject();
+  CHECK(overlapSeam.value("classification").toString() == "overlap_continuous_height");
+  CHECK(overlapSeam.value("continuous").toBool());
 
   const auto ribbonResponse = blockoutCreateBatchForMapResult(
     map,
@@ -3159,13 +3408,15 @@ TEST_CASE("McpBridgeServer batch blockout tools")
 
   const auto historyResponse = historyListResult(history);
   REQUIRE(historyResponse.ok);
-  CHECK(historyResponse.result.value("count").toInt() == 7);
+  CHECK(historyResponse.result.value("count").toInt() == static_cast<int>(history.size()));
   const auto historyOperation =
     historyResponse.result.value("operations").toArray().first().toObject();
   CHECK(historyOperation.value("operationId").toString() == operationId);
   CHECK(!historyOperation.value("createdAt").toString().isEmpty());
   CHECK(historyOperation.value("createdAtMs").toDouble() > 0.0);
-  CHECK(historyOperation.value("changedObjectCount").toInt() == 3);
+  CHECK(
+    historyOperation.value("changedObjectCount").toInt()
+    == batchResponse.result.value("changedObjectCount").toInt());
 
   const auto descendantCountBeforeInvalid = map.worldNode().descendantCount();
   const auto invalidResponse = blockoutCreateBatchForMapResult(
@@ -3452,7 +3703,9 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   const auto inspectResponse = operationInspectResult(
     history, QJsonObject{{"operationId", operationId}, {"detail", "ids"}});
   REQUIRE(inspectResponse.ok);
-  CHECK(inspectResponse.result.value("changedObjectIds").toArray().size() == 3);
+  CHECK(
+    inspectResponse.result.value("changedObjectIds").toArray().size()
+    == batchResponse.result.value("changedObjectCount").toInt());
   CHECK(!inspectResponse.result.value("createdAt").toString().isEmpty());
   CHECK(inspectResponse.result.value("createdAtMs").toDouble() > 0.0);
 
@@ -3549,6 +3802,158 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(!invalidSnapValidation.value("valid").toBool());
   CHECK(invalidSnapValidation.value("errors").toArray().first().toString().contains(
     "snapMode"));
+}
+
+TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic modes")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto routeResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Selector route"},
+      {"grid", 16},
+      {"select", false},
+      {"detail", "ids"},
+      {"defaultMetadata",
+       QJsonObject{
+         {"moduleId", "selector-route"},
+         {"generatedBy", "test"},
+         {"role", "walkable"},
+         {"routeId", "selector-route-a"},
+       }},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{128, 96, 16}},
+           {"metadata", QJsonObject{{"part", "platform"}, {"order", 1}}},
+         },
+         QJsonObject{
+           {"type", "ramp_between"},
+           {"start", QJsonArray{128, 48, 16}},
+           {"end", QJsonArray{384, 48, 64}},
+           {"width", 96},
+           {"thickness", 16},
+           {"metadata", QJsonObject{{"part", "ramp"}, {"order", 2}}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{384, 0, 48}},
+           {"max", QJsonArray{512, 96, 64}},
+           {"metadata", QJsonObject{{"part", "platform"}, {"order", 3}}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(routeResponse.ok);
+
+  const auto selectorContinuity = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "selector-route"}, {"role", "walkable"}}},
+      {"start", QJsonArray{0, 48, 16}},
+      {"end", QJsonArray{512, 48, 64}},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(selectorContinuity.ok);
+  CHECK(selectorContinuity.result.value("selectorMatchedCount").toInt() == 3);
+  CHECK(selectorContinuity.result.value("continuous").toBool());
+
+  const auto selectorSlopes = geometryAnalyzeSlopesForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "selector-route"}, {"part", "ramp"}}},
+      {"routeDirection", QJsonArray{1, 0, 0}},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(selectorSlopes.ok);
+  CHECK(selectorSlopes.result.value("selectorMatchedCount").toInt() == 1);
+  CHECK(selectorSlopes.result.value("slopeCount").toInt() >= 1);
+
+  const auto objectIds = routeResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(objectIds.size() == 3);
+  const auto steppedResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"objectIds", QJsonArray{objectIds[0], objectIds[2]}},
+      {"start", QJsonArray{0, 48, 16}},
+      {"end", QJsonArray{512, 48, 64}},
+      {"continuityMode", "stepped"},
+      {"maxStepHeight", 48},
+      {"horizontalTolerance", 512},
+    },
+    history,
+    &objectRegistry);
+  REQUIRE(steppedResponse.ok);
+  CHECK_FALSE(steppedResponse.result.value("continuous").toBool());
+  CHECK(steppedResponse.result.value("semanticContinuous").toBool());
+
+  const auto jumpRouteResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Jump gap route"},
+      {"grid", 16},
+      {"select", false},
+      {"detail", "ids"},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{1024, 0, 0}},
+           {"max", QJsonArray{1152, 96, 16}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{1280, 0, 0}},
+           {"max", QJsonArray{1408, 96, 16}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(jumpRouteResponse.ok);
+  const auto jumpGapResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", jumpRouteResponse.result.value("operationId").toString()},
+      {"start", QJsonArray{1024, 48, 16}},
+      {"end", QJsonArray{1408, 48, 16}},
+      {"continuityMode", "jump_gaps"},
+      {"maxJumpGap", 128},
+    },
+    history,
+    &objectRegistry);
+  REQUIRE(jumpGapResponse.ok);
+  CHECK_FALSE(jumpGapResponse.result.value("continuous").toBool());
+  CHECK(jumpGapResponse.result.value("semanticContinuous").toBool());
 }
 
 TEST_CASE("McpBridgeServer route metadata tools")
