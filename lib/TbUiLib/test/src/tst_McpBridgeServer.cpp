@@ -525,6 +525,15 @@ TEST_CASE("McpBridgeServer")
         {"slopes", QJsonArray{}},
       });
     }
+    if (toolName == "geometry_analyze_route_continuity")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"targetBrushCount", 0},
+        {"surfaceCount", 0},
+        {"seamCount", 0},
+        {"continuous", true},
+      });
+    }
     if (toolName == "blockout_validate_spiral_stairs")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -2832,6 +2841,105 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     }
   }
   CHECK(foundDescendingRampBetween);
+
+  const auto brokenRampResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Broken ramp continuity sample"},
+      {"grid", 16},
+      {"select", true},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{640, 0, 0}},
+           {"max", QJsonArray{768, 96, 16}},
+         },
+         QJsonObject{
+           {"type", "ramp_between"},
+           {"start", QJsonArray{768, 48, 16}},
+           {"end", QJsonArray{1024, 48, 96}},
+           {"width", 96},
+           {"thickness", 16},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{1024, 0, 96}},
+           {"max", QJsonArray{1152, 96, 112}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(brokenRampResponse.ok);
+
+  const auto brokenContinuityResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", brokenRampResponse.result.value("operationId").toString()},
+      {"start", QJsonArray{640, 48, 16}},
+      {"end", QJsonArray{1152, 48, 112}},
+    },
+    history);
+  REQUIRE(brokenContinuityResponse.ok);
+  CHECK_FALSE(brokenContinuityResponse.result.value("continuous").toBool());
+  const auto brokenSeams = brokenContinuityResponse.result.value("seams").toArray();
+  REQUIRE(brokenSeams.size() == 2);
+  const auto brokenTopSeam = brokenSeams[1].toObject();
+  CHECK(brokenTopSeam.value("classification").toString() == "step_up");
+  CHECK(brokenTopSeam.value("verticalStep").toDouble() == 16.0);
+
+  const auto continuousRampResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Continuous ramp sample"},
+      {"grid", 16},
+      {"select", true},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{1280, 0, 0}},
+           {"max", QJsonArray{1408, 96, 16}},
+         },
+         QJsonObject{
+           {"type", "ramp_between"},
+           {"start", QJsonArray{1408, 48, 16}},
+           {"end", QJsonArray{1664, 48, 96}},
+           {"width", 96},
+           {"thickness", 16},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{1664, 0, 80}},
+           {"max", QJsonArray{1792, 96, 96}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(continuousRampResponse.ok);
+
+  const auto continuousResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", continuousRampResponse.result.value("operationId").toString()},
+      {"start", QJsonArray{1280, 48, 16}},
+      {"end", QJsonArray{1792, 48, 96}},
+    },
+    history);
+  REQUIRE(continuousResponse.ok);
+  CHECK(continuousResponse.result.value("continuous").toBool());
+  const auto continuousSeams = continuousResponse.result.value("seams").toArray();
+  REQUIRE(continuousSeams.size() == 2);
+  for (const auto& seamValue : continuousSeams)
+  {
+    const auto seam = seamValue.toObject();
+    CHECK(seam.value("classification").toString() == "continuous");
+    CHECK(seam.value("verticalStep").toDouble() == 0.0);
+  }
 
   const auto ribbonResponse = blockoutCreateBatchForMapResult(
     map,

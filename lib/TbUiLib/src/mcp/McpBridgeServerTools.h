@@ -551,6 +551,16 @@ McpBridgeToolResult geometryAnalyzeSlopesResult(
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
   const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult geometryAnalyzeRouteContinuityResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult blockoutValidateSpiralStairsResult(
   mdl::Map& map,
   const QJsonObject& params,

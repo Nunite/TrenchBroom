@@ -603,6 +603,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           return geometryAnalyzeSlopesResult(
             appController, params, m_operationHistory, &m_objectRegistry);
         }
+        if (toolName == "geometry_analyze_route_continuity")
+        {
+          return geometryAnalyzeRouteContinuityResult(
+            appController, params, m_operationHistory, &m_objectRegistry);
+        }
         if (toolName == "blockout_validate_spiral_stairs")
         {
           return blockoutValidateSpiralStairsResult(

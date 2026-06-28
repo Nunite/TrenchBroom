@@ -117,6 +117,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("texture_apply_by_filter"));
     CHECK(findToolDefinition("geometry_analyze_selection"));
     CHECK(findToolDefinition("geometry_analyze_slopes"));
+    CHECK(findToolDefinition("geometry_analyze_route_continuity"));
     CHECK(findToolDefinition("blockout_create_spiral_stairs"));
     CHECK(findToolDefinition("blockout_validate_spiral_stairs"));
     CHECK(findToolDefinition("operation_inspect"));
@@ -187,6 +188,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("blockout_validate"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("geometry_analyze_slopes"));
+    CHECK(names.contains("geometry_analyze_route_continuity"));
     CHECK(names.contains("blockout_validate_spiral_stairs"));
     CHECK(!names.contains("documents_open"));
     CHECK(!names.contains("documents_save"));
@@ -1015,6 +1017,22 @@ TEST_CASE("McpToolCatalog")
     CHECK(textureProperties.value("operationIds").isObject());
     CHECK(textureProperties.value("faceSemantic").isObject());
     CHECK(textureProperties.value("normal").isObject());
+
+    const auto routeContinuityTool =
+      findToolDefinition("geometry_analyze_route_continuity");
+    REQUIRE(routeContinuityTool);
+    CHECK(routeContinuityTool->description.contains("verticalStep"));
+    CHECK(routeContinuityTool->description.contains("horizontalGap"));
+    const auto routeContinuityProperties =
+      routeContinuityTool->inputSchema.value("properties").toObject();
+    CHECK(routeContinuityProperties.value("operationId").isObject());
+    CHECK(routeContinuityProperties.value("operationIds").isObject());
+    CHECK(routeContinuityProperties.value("objectIds").isObject());
+    CHECK(routeContinuityProperties.value("routeDirection").isObject());
+    CHECK(routeContinuityProperties.value("start").isObject());
+    CHECK(routeContinuityProperties.value("end").isObject());
+    CHECK(routeContinuityProperties.value("verticalTolerance").isObject());
+    CHECK(routeContinuityProperties.value("horizontalTolerance").isObject());
 
     const auto faceTextureTool = findToolDefinition("face_texture_set");
     REQUIRE(faceTextureTool);

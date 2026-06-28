@@ -2513,6 +2513,50 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "geometry_analyze_route_continuity",
+      "Analyze ordered route brush surfaces for playable continuity. Reports each "
+      "target's upward playable face and each adjacent seam's verticalStep, "
+      "horizontalGap, and classification so ramp-to-platform ledges are caught even "
+      "when the ramp slope itself is valid.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"operationId", stringProperty("Single MCP operation id to analyze.")},
+        {"operationIds",
+         arrayProperty(
+           "MCP operation ids whose live changed brush objects should be analyzed.")},
+        {"objectIds",
+         arrayProperty(
+           "Explicit MCP object ids to analyze. The analyzer sorts them along the "
+           "route direction before comparing adjacent surfaces.")},
+        {"routeDirection",
+         vec3Property(
+           "Optional travel direction vector. X/Y determine route ordering and seam "
+           "entry/exit heights.")},
+        {"start",
+         vec3Property(
+           "Optional route start. When start and end are provided, start -> end is "
+           "used as routeDirection.")},
+        {"end",
+         vec3Property(
+           "Optional route end. When start and end are provided, start -> end is "
+           "used as routeDirection.")},
+        {"verticalTolerance",
+         numberProperty(
+           "Maximum absolute seam height difference treated as continuous. Defaults "
+           "to 0.5 map units.")},
+        {"horizontalTolerance",
+         numberProperty(
+           "Maximum positive route-direction gap treated as continuous. Defaults to "
+           "1 map unit.")},
+        {"minUpNormal",
+         numberProperty(
+           "Minimum face normal.z for playable surfaces. Defaults to 0.2 so ramps and "
+           "flat tops are included while walls are ignored.")},
+      }),
+    },
+    {
       "brush_metadata_set",
       "Attach session-level route/object metadata to live brush object ids.",
       McpMode::Edit,
@@ -2821,6 +2865,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "route_geometry_analyze_chain",
     "geometry_analyze_selection",
     "geometry_analyze_slopes",
+    "geometry_analyze_route_continuity",
     "blockout_validate",
     "objects_delete",
     "objects_delete_by_filter",

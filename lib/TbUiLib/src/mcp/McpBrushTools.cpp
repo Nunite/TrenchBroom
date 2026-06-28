@@ -1059,6 +1059,209 @@ QJsonObject slopeFaceJson(
   return result;
 }
 
+struct PlayableSurface
+{
+  mdl::BrushNode* brush = nullptr;
+  QString objectId;
+  size_t faceIndex = 0u;
+  vm::vec3d normal = vm::vec3d{};
+  vm::bbox3d bounds = vm::bbox3d{};
+  double slopeDegrees = 0.0;
+  double minProjection = 0.0;
+  double maxProjection = 0.0;
+  double entryZ = 0.0;
+  double exitZ = 0.0;
+  double averageZ = 0.0;
+};
+
+double averageZAtProjection(
+  const std::vector<vm::vec3d>& vertices,
+  const vm::vec3d& routeDirection,
+  const double targetProjection,
+  const double tolerance)
+{
+  auto sum = 0.0;
+  auto count = 0;
+  auto bestDistance = std::numeric_limits<double>::max();
+  auto bestZ = 0.0;
+  for (const auto& vertex : vertices)
+  {
+    const auto distance = std::abs(vm::dot(vertex, routeDirection) - targetProjection);
+    if (distance < bestDistance)
+    {
+      bestDistance = distance;
+      bestZ = vertex.z();
+    }
+    if (distance <= tolerance)
+    {
+      sum += vertex.z();
+      ++count;
+    }
+  }
+  return count > 0 ? sum / static_cast<double>(count) : bestZ;
+}
+
+std::optional<PlayableSurface> playableSurfaceForBrush(
+  mdl::BrushNode& brushNode,
+  const vm::vec3d& routeDirection,
+  const mdl::WorldNode& worldNode,
+  const double minUpNormal)
+{
+  auto bestSurface = std::optional<PlayableSurface>{};
+  const auto& faces = brushNode.brush().faces();
+  for (size_t faceIndex = 0; faceIndex < faces.size(); ++faceIndex)
+  {
+    const auto& face = faces[faceIndex];
+    const auto normal = face.normal();
+    if (normal.z() < minUpNormal)
+    {
+      continue;
+    }
+
+    const auto vertices = face.vertexPositions();
+    if (vertices.empty())
+    {
+      continue;
+    }
+
+    auto minProjection = std::numeric_limits<double>::max();
+    auto maxProjection = std::numeric_limits<double>::lowest();
+    auto averageZ = 0.0;
+    for (const auto& vertex : vertices)
+    {
+      const auto projection = vm::dot(vertex, routeDirection);
+      minProjection = std::min(minProjection, projection);
+      maxProjection = std::max(maxProjection, projection);
+      averageZ += vertex.z();
+    }
+    averageZ /= static_cast<double>(vertices.size());
+
+    const auto span = std::max(0.0, maxProjection - minProjection);
+    const auto projectionTolerance = std::max(0.01, span * 0.01);
+    auto candidate = PlayableSurface{};
+    candidate.brush = &brushNode;
+    candidate.objectId = nodePathId(brushNode, worldNode);
+    candidate.faceIndex = faceIndex;
+    candidate.normal = normal;
+    candidate.bounds = faceBounds(face);
+    candidate.slopeDegrees = std::acos(std::clamp(normal.z(), -1.0, 1.0)) * 180.0 / Pi;
+    candidate.minProjection = minProjection;
+    candidate.maxProjection = maxProjection;
+    candidate.entryZ =
+      averageZAtProjection(vertices, routeDirection, minProjection, projectionTolerance);
+    candidate.exitZ =
+      averageZAtProjection(vertices, routeDirection, maxProjection, projectionTolerance);
+    candidate.averageZ = averageZ;
+
+    if (!bestSurface)
+    {
+      bestSurface = candidate;
+      continue;
+    }
+
+    const auto bestSpan = bestSurface->maxProjection - bestSurface->minProjection;
+    if (
+      span > bestSpan + GeometryEpsilon
+      || (nearlyEqual(span, bestSpan) && averageZ > bestSurface->averageZ))
+    {
+      bestSurface = candidate;
+    }
+  }
+
+  return bestSurface;
+}
+
+QJsonObject playableSurfaceJson(const PlayableSurface& surface)
+{
+  return QJsonObject{
+    {"objectId", surface.objectId},
+    {"faceIndex", static_cast<int>(surface.faceIndex)},
+    {"normal", vecToJson(surface.normal)},
+    {"bounds", boundsToJson(surface.bounds)},
+    {"slopeDegrees", surface.slopeDegrees},
+    {"entryZ", surface.entryZ},
+    {"exitZ", surface.exitZ},
+    {"minProjection", surface.minProjection},
+    {"maxProjection", surface.maxProjection},
+  };
+}
+
+QString seamClassification(
+  const double horizontalGap,
+  const double verticalStep,
+  const double horizontalTolerance,
+  const double verticalTolerance)
+{
+  if (horizontalGap > horizontalTolerance)
+  {
+    return "horizontal_gap";
+  }
+  if (verticalStep > verticalTolerance)
+  {
+    return "step_up";
+  }
+  if (verticalStep < -verticalTolerance)
+  {
+    return "step_down";
+  }
+  if (horizontalGap < -horizontalTolerance)
+  {
+    return "overlap_continuous_height";
+  }
+  return "continuous";
+}
+
+QJsonObject seamJson(
+  const PlayableSurface& from,
+  const PlayableSurface& to,
+  const size_t seamIndex,
+  const double horizontalTolerance,
+  const double verticalTolerance)
+{
+  const auto horizontalGap = to.minProjection - from.maxProjection;
+  const auto verticalStep = to.entryZ - from.exitZ;
+  const auto classification = seamClassification(
+    horizontalGap, verticalStep, horizontalTolerance, verticalTolerance);
+  return QJsonObject{
+    {"seamIndex", static_cast<int>(seamIndex)},
+    {"fromObjectId", from.objectId},
+    {"toObjectId", to.objectId},
+    {"fromFaceIndex", static_cast<int>(from.faceIndex)},
+    {"toFaceIndex", static_cast<int>(to.faceIndex)},
+    {"fromExitZ", from.exitZ},
+    {"toEntryZ", to.entryZ},
+    {"verticalStep", verticalStep},
+    {"horizontalGap", horizontalGap},
+    {"classification", classification},
+    {"continuous", classification == "continuous"},
+  };
+}
+
+vm::vec3d routeDirectionFromBrushCenters(
+  const std::vector<mdl::BrushNode*>& brushes, QString& warning)
+{
+  if (brushes.size() < 2u)
+  {
+    return vm::vec3d{};
+  }
+
+  const auto start = brushes.front()->logicalBounds().center();
+  const auto end = brushes.back()->logicalBounds().center();
+  const auto delta = end - start;
+  if (vm::is_zero(vm::vec2d{delta.x(), delta.y()}, GeometryEpsilon))
+  {
+    warning =
+      "routeDirectionUnavailable: provide routeDirection or start/end for continuity "
+      "analysis.";
+    return vm::vec3d{};
+  }
+
+  warning =
+    "lowConfidence: routeDirection was inferred from first/last target centers; pass "
+    "routeDirection or start/end for route-critical validation.";
+  return vm::normalize(vm::vec3d{delta.x(), delta.y(), 0.0});
+}
+
 std::vector<mdl::BrushNode*> brushNodesFromOperationId(
   mdl::Map& map,
   const QString& operationId,
@@ -4365,6 +4568,138 @@ McpBridgeToolResult geometryAnalyzeSlopesResult(
   }
 
   return geometryAnalyzeSlopesForMapResult(
+    mapWindow->document().map(), params, history, objectRegistry);
+}
+
+McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
+{
+  auto error = QString{};
+  const auto brushes =
+    brushNodesFromObjectIdsAndOperations(map, params, history, objectRegistry, error);
+  if (!brushes)
+  {
+    return invalidParamsFailure(error);
+  }
+  if (brushes->size() < 2u)
+  {
+    return invalidParamsFailure(
+      "geometry_analyze_route_continuity requires at least two target brushes");
+  }
+
+  auto routeDirection = optionalRouteDirectionFromParams(params, error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto warnings = QJsonArray{};
+  if (!routeDirection)
+  {
+    auto warning = QString{};
+    const auto inferred = routeDirectionFromBrushCenters(*brushes, warning);
+    if (vm::is_zero(inferred, GeometryEpsilon))
+    {
+      return invalidParamsFailure(warning);
+    }
+    routeDirection = inferred;
+    warnings.push_back(warning);
+  }
+
+  const auto minUpNormal = optionalClampedDouble(params, "minUpNormal", 0.2, 0.0, 1.0);
+  const auto horizontalTolerance =
+    optionalClampedDouble(params, "horizontalTolerance", 1.0, 0.0, 1024.0);
+  const auto verticalTolerance =
+    optionalClampedDouble(params, "verticalTolerance", 0.5, 0.0, 1024.0);
+
+  auto surfaces = std::vector<PlayableSurface>{};
+  auto unsupportedObjectIds = QJsonArray{};
+  surfaces.reserve(brushes->size());
+  for (auto* brush : *brushes)
+  {
+    auto surface =
+      playableSurfaceForBrush(*brush, *routeDirection, map.worldNode(), minUpNormal);
+    if (!surface)
+    {
+      unsupportedObjectIds.push_back(nodePathId(*brush, map.worldNode()));
+      continue;
+    }
+    surfaces.push_back(*surface);
+  }
+
+  std::ranges::sort(surfaces, [](const auto& lhs, const auto& rhs) {
+    return lhs.minProjection < rhs.minProjection;
+  });
+
+  auto surfaceJson = QJsonArray{};
+  for (const auto& surface : surfaces)
+  {
+    surfaceJson.push_back(playableSurfaceJson(surface));
+  }
+
+  auto seams = QJsonArray{};
+  auto maxAbsVerticalStep = 0.0;
+  auto maxHorizontalGap = 0.0;
+  auto continuous = surfaces.size() >= 2u;
+  for (size_t i = 0; i + 1u < surfaces.size(); ++i)
+  {
+    const auto seam =
+      seamJson(surfaces[i], surfaces[i + 1u], i, horizontalTolerance, verticalTolerance);
+    const auto verticalStep = seam.value("verticalStep").toDouble();
+    const auto horizontalGap = seam.value("horizontalGap").toDouble();
+    maxAbsVerticalStep = std::max(maxAbsVerticalStep, std::abs(verticalStep));
+    maxHorizontalGap = std::max(maxHorizontalGap, horizontalGap);
+    continuous = continuous && seam.value("continuous").toBool(false);
+    seams.push_back(seam);
+  }
+
+  if (!unsupportedObjectIds.isEmpty())
+  {
+    warnings.push_back(
+      "unsupportedTargets: some brushes had no upward playable face matching "
+      "minUpNormal.");
+  }
+  if (!continuous)
+  {
+    warnings.push_back(
+      "routeNotContinuous: at least one adjacent playable surface has a vertical "
+      "step, horizontal gap, or overlap outside tolerance.");
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"tool", "geometry_analyze_route_continuity"},
+    {"targetBrushCount", static_cast<int>(brushes->size())},
+    {"surfaceCount", static_cast<int>(surfaces.size())},
+    {"seamCount", seams.size()},
+    {"continuous", continuous},
+    {"routeDirection", vecToJson(*routeDirection)},
+    {"horizontalTolerance", horizontalTolerance},
+    {"verticalTolerance", verticalTolerance},
+    {"maxAbsVerticalStep", maxAbsVerticalStep},
+    {"maxHorizontalGap", maxHorizontalGap},
+    {"surfaces", surfaceJson},
+    {"seams", seams},
+    {"unsupportedObjectIds", unsupportedObjectIds},
+    {"warnings", warnings},
+  });
+}
+
+McpBridgeToolResult geometryAnalyzeRouteContinuityResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return geometryAnalyzeRouteContinuityForMapResult(
     mapWindow->document().map(), params, history, objectRegistry);
 }
 

@@ -132,8 +132,9 @@ scripts\mcp-config.ps1 -Print
 2. 新路线优先用 `{"type":"ramp_between","start":[...],"end":[...],"width":...,"thickness":...}`，表达“沿 start -> end 行进”；旧 `ramp(min,max,axis)` 只用于兼容或快速草图。
 3. 批量创建后立即调用 `geometry_analyze_slopes(operationId=..., start=..., end=...)` 或传 `routeDirection`。
 4. 检查每个候选坡面返回的 `normal`、`slopeDegrees`、`riseDirection`、`heightDeltaAlongRoute`、`classification`。预期上坡应看到 `classification=ascending` 且 `heightDeltaAlongRoute > 0`；反向复测应暴露 `descending`。
-5. 再看 `render_review_operation` 的 contact sheet。默认最多 2 张并列；如果需要更多视角，打开单独 PNG，不要把过多视图挤进一张图。
-6. 复杂路线按主体、护边、标记分阶段创建，保留少量关键 `operationId`，降低 history 追踪和回滚成本。
+5. 再调用 `geometry_analyze_route_continuity(operationId=..., start=..., end=...)` 检查相邻可跑面。重点看 `continuous`、每个 seam 的 `verticalStep`、`horizontalGap` 和 `classification`；例如 ramp 顶面接到平台底面时会报 `step_up` 和约等于平台厚度的 `verticalStep`。
+6. 最后看 `render_review_operation` 的 contact sheet。默认最多 2 张并列；如果需要更多视角，打开单独 PNG，不要把过多视图挤进一张图。
+7. 复杂路线按主体、护边、标记分阶段创建，保留少量关键 `operationId`，降低 history 追踪和回滚成本。
 
 ## KZ 平台链工作流
 
