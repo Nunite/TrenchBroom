@@ -1663,7 +1663,9 @@ TEST_CASE("McpBridgeServer")
       QJsonObject{
         {"operationIds", QJsonArray{history.front().operationId}},
         {"views", QJsonArray{"iso_overview_ne", "top_plan"}},
+        {"style", "material_tint_edges"},
         {"imageSize", QJsonArray{900, 650}},
+        {"contactSheetSize", QJsonArray{1200, 900}},
         {"outputDir", tempDir.path()},
       },
       history,
@@ -1672,11 +1674,18 @@ TEST_CASE("McpBridgeServer")
     REQUIRE(response.ok);
     CHECK(response.result.value("tool").toString() == "render_review_targets");
     CHECK(response.result.value("renderer").toString() == "geometry_cpu");
+    CHECK(response.result.value("style").toString() == "material_tint_edges");
     CHECK(response.result.value("targetObjectCount").toInt() == 2);
     CHECK(response.result.value("targetBrushCount").toInt() == 2);
     CHECK(response.result.value("captureCount").toInt() == 2);
     CHECK(response.result.value("qualityValid").toBool());
     CHECK(map.modified() == wasModified);
+    CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
+
+    const auto contactSheet = response.result.value("contactSheet").toObject();
+    CHECK(contactSheet.value("valid").toBool());
+    CHECK(QFileInfo::exists(contactSheet.value("path").toString()));
+    CHECK(contactSheet.value("sourceCaptureCount").toInt() == 2);
 
     const auto captures = response.result.value("captures").toArray();
     REQUIRE(captures.size() == 2);

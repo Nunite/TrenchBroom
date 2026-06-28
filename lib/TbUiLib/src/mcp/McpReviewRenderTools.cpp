@@ -20,6 +20,7 @@
 #include <QBuffer>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -54,6 +55,7 @@
 #include <cmath>
 #include <filesystem>
 #include <limits>
+#include <map>
 #include <optional>
 #include <set>
 #include <vector>
@@ -87,7 +89,9 @@ struct RenderFace
 {
   std::vector<vm::vec3d> vertices;
   vm::vec3d normal;
+  QString materialName;
   double depth = 0.0;
+  double centerZ = 0.0;
   int brushIndex = 0;
 };
 
@@ -105,6 +109,7 @@ struct RenderGeometry
   int targetBrushCount = 0;
   int targetObjectCount = 0;
   bool simplified = false;
+  std::set<QString> materialNames;
 };
 
 struct ProjectedPoint
@@ -113,6 +118,54 @@ struct ProjectedPoint
   double u = 0.0;
   double v = 0.0;
 };
+
+void appendWarning(QJsonArray& warnings, const QString& warning);
+
+enum class ReviewStyle
+{
+  WhiteboxEdges,
+  MaterialTintEdges,
+  HeightHeatmapEdges,
+};
+
+QString reviewStyleName(const ReviewStyle style)
+{
+  switch (style)
+  {
+  case ReviewStyle::MaterialTintEdges:
+    return "material_tint_edges";
+  case ReviewStyle::HeightHeatmapEdges:
+    return "height_heatmap_edges";
+  case ReviewStyle::WhiteboxEdges:
+    return "whitebox_edges";
+  }
+  return "whitebox_edges";
+}
+
+ReviewStyle reviewStyleFromParams(const QJsonObject& params, QJsonArray& warnings)
+{
+  const auto styleName = params.value("style").toString("whitebox_edges").trimmed().toLower();
+  if (styleName.isEmpty() || styleName == "whitebox_edges" || styleName == "whitebox")
+  {
+    return ReviewStyle::WhiteboxEdges;
+  }
+  if (
+    styleName == "material_tint_edges" || styleName == "material_tint"
+    || styleName == "material")
+  {
+    return ReviewStyle::MaterialTintEdges;
+  }
+  if (
+    styleName == "height_heatmap_edges" || styleName == "height_heatmap"
+    || styleName == "terrain_heightmap")
+  {
+    return ReviewStyle::HeightHeatmapEdges;
+  }
+  appendWarning(
+    warnings,
+    QString{"unknownReviewStyle: '%1' falls back to whitebox_edges."}.arg(styleName));
+  return ReviewStyle::WhiteboxEdges;
+}
 
 QString pathToQString(const std::filesystem::path& path)
 {
@@ -493,7 +546,15 @@ RenderGeometry buildRenderGeometry(
       auto renderFace = RenderFace{};
       renderFace.vertices = vertices;
       renderFace.normal = *normal;
+      renderFace.materialName = QString::fromStdString(face.attributes().materialName());
+      renderFace.centerZ = 0.0;
+      for (const auto& vertex : vertices)
+      {
+        renderFace.centerZ += vertex.z();
+      }
+      renderFace.centerZ /= static_cast<double>(vertices.size());
       renderFace.brushIndex = brushIndex;
+      geometry.materialNames.insert(renderFace.materialName);
       geometry.faces.push_back(std::move(renderFace));
 
       for (auto i = size_t{0}; i < vertices.size(); ++i)
@@ -687,21 +748,123 @@ std::vector<vm::vec3d> referencePoints(
   return points;
 }
 
-QColor faceColorForNormal(
-  const vm::vec3d& normal, const ReviewView& view, const int brushIndex)
+double normalizedHeight(const double z, const vm::bbox3d& targetBounds)
+{
+  const auto minZ = targetBounds.min.z();
+  const auto maxZ = targetBounds.max.z();
+  if (std::abs(maxZ - minZ) < 0.001)
+  {
+    return 0.5;
+  }
+  return std::clamp((z - minZ) / (maxZ - minZ), 0.0, 1.0);
+}
+
+QColor mixColor(const QColor& a, const QColor& b, const double t)
+{
+  const auto clamped = std::clamp(t, 0.0, 1.0);
+  const auto mix = [&](const int lhs, const int rhs) {
+    return static_cast<int>(std::round(lhs + (rhs - lhs) * clamped));
+  };
+  return QColor{
+    mix(a.red(), b.red()),
+    mix(a.green(), b.green()),
+    mix(a.blue(), b.blue()),
+    mix(a.alpha(), b.alpha()),
+  };
+}
+
+QColor shadeColor(const QColor& color, const double factor)
+{
+  const auto scale = std::clamp(factor, 0.35, 1.45);
+  const auto channel = [&](const int value) {
+    return std::clamp(static_cast<int>(std::round(value * scale)), 0, 255);
+  };
+  return QColor{channel(color.red()), channel(color.green()), channel(color.blue()), color.alpha()};
+}
+
+QColor colorForMaterialName(const QString& materialName)
+{
+  const auto key = materialName.trimmed().toLower();
+  if (key.isEmpty() || key == "__tb_empty")
+  {
+    return QColor{200, 200, 194};
+  }
+  if (key.contains("floor") || key.contains("road") || key.contains("track"))
+  {
+    return QColor{118, 138, 154};
+  }
+  if (key.contains("terrain") || key.contains("grass") || key.contains("dirt")
+      || key.contains("rock") || key.contains("stone"))
+  {
+    return QColor{143, 152, 118};
+  }
+  if (key.contains("wall") || key.contains("concrete") || key.contains("brick"))
+  {
+    return QColor{178, 169, 158};
+  }
+  if (key.contains("water"))
+  {
+    return QColor{91, 150, 190};
+  }
+  if (key.contains("sky"))
+  {
+    return QColor{156, 188, 226};
+  }
+  if (key.contains("clip") || key.contains("trigger") || key.contains("hint"))
+  {
+    return QColor{214, 120, 168};
+  }
+
+  const auto hash = qHash(key);
+  const auto hue = static_cast<int>(hash % 360u);
+  auto color = QColor{};
+  color.setHsv(hue, 72, 204);
+  return color;
+}
+
+QColor heightHeatmapColor(const double t)
+{
+  const auto low = QColor{110, 150, 184};
+  const auto mid = QColor{190, 194, 184};
+  const auto high = QColor{215, 154, 105};
+  if (t < 0.5)
+  {
+    return mixColor(low, mid, t * 2.0);
+  }
+  return mixColor(mid, high, (t - 0.5) * 2.0);
+}
+
+QColor faceColorForStyle(
+  const RenderFace& face,
+  const ReviewView& view,
+  const vm::bbox3d& targetBounds,
+  const ReviewStyle style)
 {
   const auto light = vm::normalize(vm::vec3d{0.35, -0.45, 0.82});
-  const auto normalLight = std::abs(vm::dot(normal, light));
-  const auto viewLight = std::max(0.0, vm::dot(normal, -view.view));
-  const auto shade =
-    std::clamp(164.0 + normalLight * 52.0 + viewLight * 22.0, 120.0, 238.0);
-  const auto tint = (brushIndex % 7) * 5;
-  return QColor{
-    std::clamp(static_cast<int>(shade + tint), 0, 255),
-    std::clamp(static_cast<int>(shade + 2), 0, 255),
-    std::clamp(static_cast<int>(shade - tint / 2), 0, 255),
-    255,
-  };
+  const auto normalLight = std::abs(vm::dot(face.normal, light));
+  const auto viewLight = std::max(0.0, vm::dot(face.normal, -view.view));
+  const auto shadeFactor = std::clamp(0.74 + normalLight * 0.22 + viewLight * 0.12, 0.62, 1.12);
+
+  switch (style)
+  {
+  case ReviewStyle::MaterialTintEdges:
+    return shadeColor(colorForMaterialName(face.materialName), shadeFactor);
+  case ReviewStyle::HeightHeatmapEdges:
+    return shadeColor(heightHeatmapColor(normalizedHeight(face.centerZ, targetBounds)), shadeFactor);
+  case ReviewStyle::WhiteboxEdges:
+  {
+    const auto shade =
+      std::clamp(164.0 + normalLight * 52.0 + viewLight * 22.0, 120.0, 238.0);
+    const auto tint = (face.brushIndex % 7) * 5;
+    return QColor{
+      std::clamp(static_cast<int>(shade + tint), 0, 255),
+      std::clamp(static_cast<int>(shade + 2), 0, 255),
+      std::clamp(static_cast<int>(shade - tint / 2), 0, 255),
+      255,
+    };
+  }
+  }
+  return QColor{200, 200, 196};
 }
 
 double polygonArea(const QPolygonF& polygon)
@@ -783,6 +946,7 @@ QJsonObject renderCapture(
   const RenderGeometry& geometry,
   const vm::bbox3d& targetBounds,
   const ReviewView& view,
+  const ReviewStyle style,
   const QSize& imageSize,
   const QString& outputPath,
   const bool includeAxes,
@@ -826,7 +990,14 @@ QJsonObject renderCapture(
 
   auto targetPixelBounds = QRectF{};
   auto totalFaceArea = 0.0;
-  painter.setPen(QPen{QColor{95, 95, 92}, 1.25});
+  if (style == ReviewStyle::HeightHeatmapEdges)
+  {
+    painter.setPen(Qt::NoPen);
+  }
+  else
+  {
+    painter.setPen(QPen{QColor{95, 95, 92}, 1.25});
+  }
   for (const auto& face : faces)
   {
     auto polygon = QPolygonF{};
@@ -840,7 +1011,7 @@ QJsonObject renderCapture(
     if (polygon.size() >= 3)
     {
       totalFaceArea += polygonArea(polygon);
-      painter.setBrush(faceColorForNormal(face.normal, view, face.brushIndex));
+      painter.setBrush(faceColorForStyle(face, view, targetBounds, style));
       painter.drawPolygon(polygon);
     }
   }
@@ -861,9 +1032,20 @@ QJsonObject renderCapture(
   }
 
   auto edgeLength = 0.0;
-  painter.setPen(QPen{QColor{26, 26, 24}, 2.0});
   for (const auto& edge : geometry.edges)
   {
+    if (style == ReviewStyle::HeightHeatmapEdges)
+    {
+      const auto zDelta = std::abs(edge.a.z() - edge.b.z());
+      const auto strongHeightEdge = zDelta > 1.0;
+      painter.setPen(QPen{
+        strongHeightEdge ? QColor{28, 28, 26, 145} : QColor{36, 36, 34, 42},
+        strongHeightEdge ? 0.9 : 0.45});
+    }
+    else
+    {
+      painter.setPen(QPen{QColor{26, 26, 24}, 2.0});
+    }
     const auto a = projectPoint(edge.a, view, minU, maxU, minV, maxV, imageSize, padding);
     const auto b = projectPoint(edge.b, view, minU, maxU, minV, maxV, imageSize, padding);
     painter.drawLine(a.point, b.point);
@@ -922,6 +1104,7 @@ QJsonObject renderCapture(
     {"fileSize", static_cast<double>(fileSize)},
     {"format", "png"},
     {"projection", view.projection},
+    {"style", reviewStyleName(style)},
     {"targetCoverage", coverage},
     {"targetWidthRatio", widthRatio},
     {"targetHeightRatio", heightRatio},
@@ -929,6 +1112,113 @@ QJsonObject renderCapture(
     {"facePixelArea", totalFaceArea},
     {"valid", quality.value("valid").toBool()},
     {"quality", quality},
+  };
+}
+
+QJsonObject writeContactSheet(
+  const QJsonArray& captures,
+  const QString& outputPath,
+  const QString& title,
+  const QSize& requestedSize)
+{
+  auto loaded = std::vector<std::pair<QString, QImage>>{};
+  for (const auto& captureValue : captures)
+  {
+    const auto capture = captureValue.toObject();
+    const auto path = capture.value("path").toString();
+    auto image = QImage{path};
+    if (!image.isNull())
+    {
+      loaded.emplace_back(capture.value("view").toString(), std::move(image));
+    }
+  }
+
+  auto warnings = QJsonArray{};
+  if (loaded.empty())
+  {
+    warnings.push_back("contactSheetNoSourceImages");
+    return QJsonObject{
+      {"path", outputPath},
+      {"width", 0},
+      {"height", 0},
+      {"fileSize", 0},
+      {"valid", false},
+      {"warnings", warnings},
+    };
+  }
+
+  const auto width = std::clamp(requestedSize.width(), MinWidth, 4096);
+  const auto height = std::clamp(requestedSize.height(), MinHeight, 4096);
+  auto image = QImage{QSize{width, height}, QImage::Format_ARGB32_Premultiplied};
+  image.fill(QColor{246, 246, 244});
+
+  auto painter = QPainter{&image};
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  painter.fillRect(image.rect(), QColor{246, 246, 244});
+  painter.setPen(QPen{QColor{38, 38, 36}, 1.0});
+  painter.drawText(QPointF{20.0, 28.0}, title);
+
+  const auto count = static_cast<int>(loaded.size());
+  const auto columns = count <= 2 ? count : 2;
+  const auto rows = static_cast<int>(std::ceil(count / static_cast<double>(columns)));
+  const auto margin = 18;
+  const auto titleHeight = 42;
+  const auto gutter = 14;
+  const auto cellWidth =
+    (width - margin * 2 - gutter * std::max(0, columns - 1)) / std::max(1, columns);
+  const auto cellHeight =
+    (height - titleHeight - margin * 2 - gutter * std::max(0, rows - 1))
+    / std::max(1, rows);
+
+  for (auto i = 0; i < count; ++i)
+  {
+    const auto column = i % columns;
+    const auto row = i / columns;
+    const auto cell = QRect{
+      margin + column * (cellWidth + gutter),
+      titleHeight + margin + row * (cellHeight + gutter),
+      cellWidth,
+      cellHeight,
+    };
+    painter.setPen(QPen{QColor{198, 198, 192}, 1});
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRect(cell.adjusted(0, 0, -1, -1));
+
+    const auto labelHeight = 22;
+    painter.setPen(QPen{QColor{56, 56, 52}, 1});
+    painter.drawText(cell.adjusted(8, 2, -8, 0), Qt::AlignLeft | Qt::AlignTop, loaded[i].first);
+
+    const auto imageRect = cell.adjusted(8, labelHeight, -8, -8);
+    const auto scaled =
+      loaded[i].second.scaled(imageRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    const auto target = QRect{
+      imageRect.x() + (imageRect.width() - scaled.width()) / 2,
+      imageRect.y() + (imageRect.height() - scaled.height()) / 2,
+      scaled.width(),
+      scaled.height(),
+    };
+    painter.drawImage(target, scaled);
+  }
+  painter.end();
+
+  auto dir = QDir{};
+  dir.mkpath(QFileInfo{outputPath}.absolutePath());
+  const auto saved = image.save(outputPath, "PNG");
+  const auto fileInfo = QFileInfo{outputPath};
+  if (!saved || !fileInfo.exists() || fileInfo.size() <= 0)
+  {
+    warnings.push_back("contactSheetWriteFailed");
+  }
+
+  return QJsonObject{
+    {"path", outputPath},
+    {"width", width},
+    {"height", height},
+    {"fileSize", static_cast<double>(fileInfo.exists() ? fileInfo.size() : 0)},
+    {"format", "png"},
+    {"sourceCaptureCount", count},
+    {"valid", warnings.isEmpty()},
+    {"warnings", warnings},
   };
 }
 
@@ -1006,6 +1296,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
 
   const auto maxFaces =
     optionalIntClamped(params, "maxDetailedFaces", MaxDetailedFaceCount, 100, 100000);
+  const auto style = reviewStyleFromParams(params, warnings);
   auto geometry = buildRenderGeometry(nodes, warnings, maxFaces);
   if (geometry.faces.empty() && geometry.edges.empty())
   {
@@ -1052,6 +1343,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
 
   const auto includeAxes = optionalBool(params, "includeAxes", true);
   const auto includeBoundsBox = optionalBool(params, "includeBoundsBox", false);
+  const auto combineViews = optionalBool(params, "combineViews", true);
   const auto views = viewsFromParams(params);
   auto captures = QJsonArray{};
   auto quality = QJsonArray{};
@@ -1070,12 +1362,55 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
       geometry,
       *targetBounds,
       view,
+      style,
       imageSize,
       outputPath,
       includeAxes,
       includeBoundsBox);
     captures.push_back(capture);
     quality.push_back(capture.value("quality").toObject());
+  }
+
+  auto contactSheet = QJsonObject{};
+  auto contactSheetPath = QString{};
+  if (combineViews && !captures.isEmpty())
+  {
+    auto contactSheetSize = QSize{
+      std::clamp(imageSize.width() * 2, MinWidth, 4096),
+      std::clamp(static_cast<int>(std::round(imageSize.height() * 1.55)), MinHeight, 4096),
+    };
+    if (const auto contactSizeValue = params.value("contactSheetSize");
+        contactSizeValue.isArray())
+    {
+      const auto array = contactSizeValue.toArray();
+      if (array.size() == 2 && array[0].isDouble() && array[1].isDouble())
+      {
+        contactSheetSize = QSize{
+          std::clamp(array[0].toInt(contactSheetSize.width()), MinWidth, 4096),
+          std::clamp(array[1].toInt(contactSheetSize.height()), MinHeight, 4096),
+        };
+      }
+    }
+
+    contactSheetPath = pathToQString(outputDir / "contact_sheet.png");
+    contactSheet = writeContactSheet(
+      captures,
+      contactSheetPath,
+      QString{"%1  |  %2  |  %3 brushes"}
+        .arg(reviewId)
+        .arg(reviewStyleName(style))
+        .arg(geometry.targetBrushCount),
+      contactSheetSize);
+    if (!contactSheet.value("valid").toBool(false))
+    {
+      warnings.push_back("contactSheetInvalid");
+    }
+  }
+
+  auto materialNames = QJsonArray{};
+  for (const auto& materialName : geometry.materialNames)
+  {
+    materialNames.push_back(materialName);
   }
 
   const auto qualityValid =
@@ -1088,11 +1423,16 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
   auto result = QJsonObject{
     {"tool", "render_review_targets"},
     {"renderer", "geometry_cpu"},
-    {"style", params.value("style").toString("whitebox_edges")},
+    {"style", reviewStyleName(style)},
     {"reviewId", reviewId},
     {"resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId)},
     {"outputDir", pathToQString(outputDir)},
     {"manifestPath", pathToQString(outputDir / "manifest.json")},
+    {"preferredCapturePath", contactSheetPath.isEmpty()
+                               ? (captures.isEmpty() ? QString{}
+                                                     : captures.first().toObject().value("path").toString())
+                               : contactSheetPath},
+    {"contactSheet", contactSheet},
     {"targetObjectIds", QJsonArray::fromStringList(resolvedObjectIds)},
     {"targetObjectCount", geometry.targetObjectCount},
     {"targetBrushCount", geometry.targetBrushCount},
@@ -1103,6 +1443,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"quality", quality},
     {"qualityValid", qualityValid},
     {"warnings", warnings},
+    {"materials", materialNames},
     {"maxDetailedFaces", maxFaces},
     {"simplified", geometry.simplified},
     {"faceCount", static_cast<int>(geometry.faces.size())},

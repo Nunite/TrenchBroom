@@ -847,8 +847,16 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "overview_3d/detail_3d/top_2d_fit/side_2d_fit names are accepted.")},
         {"style",
          stringProperty(
-           "Rendering style. First production style is whitebox_edges: shaded gray "
-           "faces with strong outlines for textureless whitebox maps.")},
+           "Rendering style: whitebox_edges, material_tint_edges, or "
+           "height_heatmap_edges. material_tint_edges assigns stable semantic colors "
+           "from face material names; height_heatmap_edges colors by Z height and "
+           "softens dense terrain edges.")},
+        {"combineViews",
+         boolProperty(
+           "Write a combined contact_sheet.png for context-efficient Agent vision. "
+           "Defaults to true.")},
+        {"contactSheetSize",
+         arrayProperty("Optional [width,height] for the combined contact sheet.")},
         {"imageSize",
          arrayProperty(
            "Optional [width,height] in pixels. Values are clamped to production review "
@@ -898,6 +906,16 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Review views. Defaults to iso_overview_ne, iso_overview_sw, top_plan, "
            "side_elevation_long, and front_elevation_cross. Legacy viewport review "
            "view names are accepted.")},
+        {"style",
+         stringProperty(
+           "Rendering style: whitebox_edges, material_tint_edges, or "
+           "height_heatmap_edges.")},
+        {"combineViews",
+         boolProperty(
+           "Write a combined contact_sheet.png and return it as preferredCapturePath. "
+           "Defaults to true.")},
+        {"contactSheetSize",
+         arrayProperty("Optional [width,height] for the combined contact sheet.")},
         {"isolateMode",
          stringProperty(
            "Requested isolation mode: hide_others, fade_others, or highlight_only. "
