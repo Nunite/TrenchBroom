@@ -96,6 +96,20 @@ QString summaryOrFullDetail(const QJsonObject& params)
   return detail == "full" || detail == "ids" ? QString{"full"} : QString{"summary"};
 }
 
+QString idDetailFromParams(const QJsonObject& params)
+{
+  const auto idsMode = params.value("idsMode").toString().trimmed().toLower();
+  if (idsMode == "full")
+  {
+    return "ids";
+  }
+  if (idsMode == "none" || idsMode == "count" || idsMode == "sample")
+  {
+    return "summary";
+  }
+  return params.value("detail").toString("summary");
+}
+
 QJsonArray jsonSample(
   const QJsonArray& values, const int limit = DefaultGeometrySampleLimit)
 {
@@ -5366,7 +5380,7 @@ McpBridgeToolResult blockoutCreateResult(
     "materials",
     stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
   result.insert("bounds", boundsToJson(generatedBounds));
-  applyDetailLevel(result, *changedObjectIds, params.value("detail").toString("summary"));
+  applyDetailLevel(result, *changedObjectIds, idDetailFromParams(params));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -5428,7 +5442,7 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
     stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
   result.insert("validation", spiralValidationJson(*spiralParams, brushCount));
   result.insert("bounds", boundsToJson(bounds));
-  applyDetailLevel(result, *changedObjectIds, params.value("detail").toString("summary"));
+  applyDetailLevel(result, *changedObjectIds, idDetailFromParams(params));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -6229,7 +6243,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   applyDetailLevel(
     result,
     *changedObjectIds,
-    batchParams.value("detail").toString("summary"),
+    idDetailFromParams(batchParams),
     fullResults);
   if (metadataStore != nullptr)
   {
@@ -6455,7 +6469,7 @@ McpBridgeToolResult createBrushResult(
   result.insert("brushCount", brushJson.size());
   result.insert("bounds", boundsToJson(bounds));
   applyDetailLevel(
-    result, *changedObjectIds, params.value("detail").toString("summary"), brushJson);
+    result, *changedObjectIds, idDetailFromParams(params), brushJson);
   return McpBridgeToolResult::success(std::move(result));
 }
 

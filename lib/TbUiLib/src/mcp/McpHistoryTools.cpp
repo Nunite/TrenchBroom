@@ -44,6 +44,24 @@ namespace mcp = tb::mcp;
 namespace
 {
 
+QString detailFromParams(const QJsonObject& params)
+{
+  const auto idsMode = params.value("idsMode").toString().trimmed().toLower();
+  if (idsMode == "full")
+  {
+    return "ids";
+  }
+  if (idsMode == "none" || idsMode == "count" || idsMode == "sample")
+  {
+    return "summary";
+  }
+
+  const auto detail = params.value("detail").toString("summary").toLower();
+  return detail == "full"  ? "full"
+         : detail == "ids" ? "ids"
+                            : "summary";
+}
+
 bool isSelectionCommandName(const QString& commandName)
 {
   return commandName == "Select None" || commandName == "Select All Objects"
@@ -441,12 +459,8 @@ McpBridgeToolResult operationInspectResult(
     return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
   }
 
-  const auto detail = params.value("detail").toString("summary").toLower();
-  return McpBridgeToolResult::success(operationRecordDetailJson(
-    *operation,
-    detail == "full"  ? "full"
-    : detail == "ids" ? "ids"
-                      : "summary"));
+  return McpBridgeToolResult::success(
+    operationRecordDetailJson(*operation, detailFromParams(params)));
 }
 
 McpBridgeToolResult operationInspectResult(
@@ -467,12 +481,8 @@ McpBridgeToolResult operationInspectResult(
     return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
   }
 
-  const auto detail = params.value("detail").toString("summary").toLower();
-  auto result = operationRecordDetailJson(
-    *operation,
-    detail == "full"  ? "full"
-    : detail == "ids" ? "ids"
-                      : "summary");
+  const auto detail = detailFromParams(params);
+  auto result = operationRecordDetailJson(*operation, detail);
   if (auto* mapWindow = appController.mapWindowManager().topMapWindow())
   {
     auto liveState = objectRegistry.liveStateJson(
@@ -517,12 +527,7 @@ McpBridgeToolResult operationInspectResult(
     return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
   }
 
-  const auto detail = params.value("detail").toString("summary").toLower();
-  auto result = operationRecordDetailJson(
-    *operation,
-    detail == "full"  ? "full"
-    : detail == "ids" ? "ids"
-                      : "summary");
+  auto result = operationRecordDetailJson(*operation, detailFromParams(params));
   if (auto* mapWindow = appController.mapWindowManager().topMapWindow())
   {
     const auto liveState =
@@ -719,7 +724,7 @@ McpBridgeToolResult operationValidateForMapResult(
     return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
   }
 
-  const auto detail = params.value("detail").toString("summary").toLower();
+  const auto detail = detailFromParams(params);
   auto liveState = objectRegistry.liveStateJson(
     map, operation->changedObjectIds, operation->undone, detail == "full");
   if (operation->operationKind == "delete")

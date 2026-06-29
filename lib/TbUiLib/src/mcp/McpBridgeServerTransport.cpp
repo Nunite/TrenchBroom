@@ -235,14 +235,16 @@ QJsonObject resourceObject(
     {"operationKind", operation.operationKind},
     {"createdAt", operation.createdAt},
     {"createdAtMs", operation.createdAtMs},
-    {"changedObjectIds", operation.changedObjectIdsJson()},
     {"changedObjectCount", operation.changedObjectIds.size()},
-    {"deletedObjectIds", operation.deletedObjectIdsJson()},
     {"deletedObjectCount", operation.deletedObjectIds.size()},
     {"undone", operation.undone},
     {"summary", operation.summary()},
     {"detail", operation.detail()},
   };
+  result.insert(
+    "idsDetail",
+    "compact; use operation_inspect(detail=ids) or operation_inspect(detail=full) "
+    "for changedObjectIds/deletedObjectIds");
   if (liveState)
   {
     for (auto it = liveState->begin(); it != liveState->end(); ++it)

@@ -2215,6 +2215,26 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   const auto stableId = objectIds.first().toString();
   CHECK(stableId.startsWith("mcp:"));
 
+  const auto resource = server.readResource(
+    createResponse.result.value("resourceUri").toString());
+  REQUIRE(resource);
+  CHECK(resource->value("changedObjectCount").toInt() == 1);
+  CHECK(resource->value("changedObjectIds").isUndefined());
+  CHECK(resource->value("deletedObjectIds").isUndefined());
+  CHECK(resource->value("idsDetail").toString().contains("operation_inspect"));
+
+  const auto inspectIdsResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "1b",
+    "secret",
+    "operation_inspect",
+    QJsonObject{
+      {"operationId", createResponse.result.value("operationId").toString()},
+      {"idsMode", "full"},
+    },
+    mcp::McpMode::ReadOnly});
+  REQUIRE(inspectIdsResponse.ok);
+  CHECK(inspectIdsResponse.result.value("changedObjectIds").toArray().size() == 1);
+
   const auto selectResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "2",
     "secret",
@@ -3187,6 +3207,23 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(batchResponse.result.value("warnings").toArray().isEmpty());
   CHECK(map.selection().nodes.size() == 5u);
   CHECK(batchResponse.result.value("intentSummaries").toArray().size() == 3);
+
+  const auto idsModeResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"idsMode", "full"},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{512, 0, 0}},
+         {"max", QJsonArray{576, 64, 32}},
+       }}},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(idsModeResponse.ok);
+  CHECK(idsModeResponse.result.value("changedObjectIds").toArray().size() == 1);
 
   const auto diagonalRampPreviewResponse = blockoutCompilePreviewForMapResult(
     map,

@@ -1197,6 +1197,26 @@ TEST_CASE("McpToolCatalog")
     CHECK(
       deleteOperationTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
 
+    const auto boxesBatchTool = findToolDefinition("brush_create_boxes_batch");
+    REQUIRE(boxesBatchTool);
+    CHECK(
+      boxesBatchTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+
+    const auto blockoutBatchTool = findToolDefinition("blockout_create_batch");
+    REQUIRE(blockoutBatchTool);
+    CHECK(
+      blockoutBatchTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+
+    const auto operationInspectTool = findToolDefinition("operation_inspect");
+    REQUIRE(operationInspectTool);
+    CHECK(
+      operationInspectTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+
+    const auto operationValidateTool = findToolDefinition("operation_validate");
+    REQUIRE(operationValidateTool);
+    CHECK(
+      operationValidateTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+
     const auto transformTool = findToolDefinition("objects_transform");
     REQUIRE(transformTool);
     const auto transformProperties =
