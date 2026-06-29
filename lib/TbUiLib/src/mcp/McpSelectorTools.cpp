@@ -65,6 +65,9 @@ struct SelectorDiagnosticsInternal
   int matchedBeforeLimit = 0;
   bool limitApplied = false;
   int staleExcluded = 0;
+  int moduleObjectIdCount = 0;
+  int operationObjectIdCount = 0;
+  int metadataRecordCount = 0;
 };
 
 QJsonArray stringsToJson(const QStringList& values)
@@ -275,9 +278,12 @@ mdl::Node* resolveObjectId(
   QJsonArray& warnings)
 {
   const auto resolved = objectRegistry.resolveExternalId(map, objectId);
-  if (!resolved.ok)
+  if (!resolved.ok || !resolved.diagnostic.value("live").toBool(true))
   {
-    warnings.push_back(resolved.diagnostic);
+    warnings.push_back(
+      resolved.diagnostic.isEmpty()
+        ? QJsonValue{QString{"Object id does not resolve: %1"}.arg(objectId)}
+        : QJsonValue{resolved.diagnostic});
     return nullptr;
   }
   const auto path = McpObjectRegistry::parseLegacyObjectId(resolved.legacyPathId);
@@ -293,6 +299,18 @@ mdl::Node* resolveObjectId(
     warnings.push_back(QString{"Object id does not resolve: %1"}.arg(objectId));
   }
   return node;
+}
+
+bool objectIdResolvesLive(
+  mdl::Map& map, const QString& objectId, const McpObjectRegistry& objectRegistry)
+{
+  const auto resolved = objectRegistry.resolveExternalId(map, objectId);
+  if (!resolved.ok || !resolved.diagnostic.value("live").toBool(true))
+  {
+    return false;
+  }
+  const auto path = McpObjectRegistry::parseLegacyObjectId(resolved.legacyPathId);
+  return path && map.worldNode().resolvePath(*path) != nullptr;
 }
 
 QString externalObjectIdForNode(
@@ -437,6 +455,32 @@ QString moduleStoreKey(const QString& documentFingerprint, const QString& module
            : QString{"%1|%2"}.arg(documentFingerprint, moduleId);
 }
 
+QStringList liveModuleObjectIdsFromMetadata(
+  mdl::Map& map,
+  const QString& moduleId,
+  const QString& documentFingerprint,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto result = QStringList{};
+  for (const auto& [objectId, record] : metadataStore)
+  {
+    Q_UNUSED(objectId);
+    if (
+      record.stale || !recordMatchesDocument(record, documentFingerprint)
+      || record.metadata.value("moduleId").toString() != moduleId)
+    {
+      continue;
+    }
+    if (objectIdResolvesLive(map, record.objectId, objectRegistry))
+    {
+      result.push_back(record.objectId);
+    }
+  }
+  result.removeDuplicates();
+  return result;
+}
+
 bool metadataSelectorNeedsObjectFilter(
   const QJsonObject& selector, const QJsonObject& metadata, const bool seededByModuleId)
 {
@@ -494,6 +538,9 @@ std::vector<mdl::Node*> resolveSelectorNodesInternal(
   auto seededByModuleId = false;
   const auto documentFingerprint = documentFingerprintForMap(map);
   auto staleExcluded = 0;
+  auto moduleObjectIdCount = 0;
+  auto operationObjectIdCount = 0;
+  auto metadataRecordCount = 0;
 
   const auto moduleId = selector.value("moduleId").toString().trimmed();
   if (!moduleId.isEmpty())
@@ -502,6 +549,7 @@ std::vector<mdl::Node*> resolveSelectorNodesInternal(
     {
       for (const auto& objectId : module->objectIds)
       {
+        ++moduleObjectIdCount;
         if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
         {
           candidates.push_back(node);
@@ -511,6 +559,24 @@ std::vector<mdl::Node*> resolveSelectorNodesInternal(
           ++staleExcluded;
         }
       }
+      seeded = true;
+      seededByModuleId = true;
+    }
+    for (const auto& objectId : liveModuleObjectIdsFromMetadata(
+           map, moduleId, documentFingerprint, metadataStore, objectRegistry))
+    {
+      ++moduleObjectIdCount;
+      if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
+      {
+        candidates.push_back(node);
+      }
+      else
+      {
+        ++staleExcluded;
+      }
+    }
+    if (moduleObjectIdCount > 0)
+    {
       seeded = true;
       seededByModuleId = true;
     }
@@ -534,6 +600,7 @@ std::vector<mdl::Node*> resolveSelectorNodesInternal(
     }
     for (const auto& objectId : operation->changedObjectIds)
     {
+      ++operationObjectIdCount;
       if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
       {
         candidates.push_back(node);
@@ -573,6 +640,7 @@ std::vector<mdl::Node*> resolveSelectorNodesInternal(
         {
           continue;
         }
+        ++metadataRecordCount;
         if (auto* node = resolveObjectId(map, record.objectId, objectRegistry, warnings))
         {
           candidates.push_back(node);
@@ -658,6 +726,9 @@ std::vector<mdl::Node*> resolveSelectorNodesInternal(
     diagnostics->matchedBeforeLimit = matchedBeforeLimit;
     diagnostics->limitApplied = limitApplied;
     diagnostics->staleExcluded = staleExcluded;
+    diagnostics->moduleObjectIdCount = moduleObjectIdCount;
+    diagnostics->operationObjectIdCount = operationObjectIdCount;
+    diagnostics->metadataRecordCount = metadataRecordCount;
   }
   return candidates;
 }
@@ -921,6 +992,8 @@ void recordDeleteOperation(
 
 void markDeletedMetadata(
   const QJsonArray& deletedObjectIds,
+  mdl::Map& map,
+  const McpObjectRegistry& objectRegistry,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore)
 {
@@ -932,9 +1005,31 @@ void markDeletedMetadata(
       deleted.insert(value.toString());
     }
   }
+  auto deletedLegacyIds = std::set<QString>{};
+  for (const auto& objectId : deleted)
+  {
+    const auto resolved = objectRegistry.resolveExternalId(map, objectId);
+    if (!resolved.legacyPathId.isEmpty())
+    {
+      deletedLegacyIds.insert(resolved.legacyPathId);
+    }
+    if (McpObjectRegistry::isLegacyObjectId(objectId))
+    {
+      deletedLegacyIds.insert(objectId);
+    }
+  }
+  const auto matchesDeleted = [&](const QString& objectId) {
+    if (deleted.contains(objectId) || deletedLegacyIds.contains(objectId))
+    {
+      return true;
+    }
+    const auto resolved = objectRegistry.resolveExternalId(map, objectId);
+    return !resolved.legacyPathId.isEmpty()
+           && deletedLegacyIds.contains(resolved.legacyPathId);
+  };
   for (auto& [objectId, record] : metadataStore)
   {
-    if (deleted.contains(objectId) || deleted.contains(record.objectId))
+    if (matchesDeleted(objectId) || matchesDeleted(record.objectId))
     {
       record.stale = true;
     }
@@ -945,7 +1040,7 @@ void markDeletedMetadata(
       std::remove_if(
         module.objectIds.begin(),
         module.objectIds.end(),
-        [&](const auto& objectId) { return deleted.contains(objectId); }),
+        [&](const auto& objectId) { return matchesDeleted(objectId); }),
       module.objectIds.end());
   }
 }
@@ -977,9 +1072,11 @@ QJsonObject moduleMetadataFromObjects(
 }
 
 QJsonArray modulePartSummary(
+  mdl::Map& map,
   const QString& moduleId,
   const QString& documentFingerprint,
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const McpObjectRegistry& objectRegistry,
   const bool staleOnly = false)
 {
   auto counts = std::map<QString, int>{};
@@ -987,8 +1084,14 @@ QJsonArray modulePartSummary(
   {
     Q_UNUSED(objectId);
     if (
-      record.stale != staleOnly || !recordMatchesDocument(record, documentFingerprint)
+      !recordMatchesDocument(record, documentFingerprint)
       || record.metadata.value("moduleId").toString() != moduleId)
+    {
+      continue;
+    }
+    const auto live =
+      !record.stale && objectIdResolvesLive(map, record.objectId, objectRegistry);
+    if (live == staleOnly)
     {
       continue;
     }
@@ -1064,10 +1167,16 @@ QJsonObject moduleSummary(
   auto staleCount = 0;
   auto warnings = QJsonArray{};
   auto nodes = std::vector<mdl::Node*>{};
-  for (const auto& objectId : module.objectIds)
+  auto objectIds = module.objectIds;
+  objectIds.removeDuplicates();
+  for (const auto& objectId : objectIds)
   {
     if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
     {
+      if (nodeInVector(nodes, *node))
+      {
+        continue;
+      }
       ++liveCount;
       nodes.push_back(node);
     }
@@ -1085,11 +1194,19 @@ QJsonObject moduleSummary(
     {"operationCount", module.operationIds.size()},
     {"metadata", module.metadata},
     {"parts",
-     modulePartSummary(module.moduleId, module.documentFingerprint, metadataStore)},
+     modulePartSummary(
+       map, module.moduleId, module.documentFingerprint, metadataStore, objectRegistry)},
     {"liveParts",
-     modulePartSummary(module.moduleId, module.documentFingerprint, metadataStore)},
+     modulePartSummary(
+       map, module.moduleId, module.documentFingerprint, metadataStore, objectRegistry)},
     {"staleParts",
-     modulePartSummary(module.moduleId, module.documentFingerprint, metadataStore, true)},
+     modulePartSummary(
+       map,
+       module.moduleId,
+       module.documentFingerprint,
+       metadataStore,
+       objectRegistry,
+       true)},
     {"bounds", nodes.empty() ? QJsonObject{} : boundsToJson(boundsForNodes(nodes))},
   };
 }
@@ -1636,6 +1753,9 @@ std::vector<mdl::Node*> resolveSelectorNodes(
     diagnostics->matchedBeforeLimit = internalDiagnostics.matchedBeforeLimit;
     diagnostics->limitApplied = internalDiagnostics.limitApplied;
     diagnostics->staleExcluded = internalDiagnostics.staleExcluded;
+    diagnostics->moduleObjectIdCount = internalDiagnostics.moduleObjectIdCount;
+    diagnostics->operationObjectIdCount = internalDiagnostics.operationObjectIdCount;
+    diagnostics->metadataRecordCount = internalDiagnostics.metadataRecordCount;
   }
   return nodes;
 }
@@ -1702,6 +1822,9 @@ McpBridgeToolResult selectorPreviewForMapResult(
   result.insert("matchedBeforeLimit", diagnostics.matchedBeforeLimit);
   result.insert("limitApplied", diagnostics.limitApplied);
   result.insert("staleExcluded", diagnostics.staleExcluded);
+  result.insert("moduleObjectIdCount", diagnostics.moduleObjectIdCount);
+  result.insert("operationObjectIdCount", diagnostics.operationObjectIdCount);
+  result.insert("metadataRecordCount", diagnostics.metadataRecordCount);
   return McpBridgeToolResult::success(result);
 }
 
@@ -1773,7 +1896,27 @@ McpBridgeToolResult objectsDeleteBySelectorResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return objectsDeleteBySelectorForMapResult(
+    mapWindow->document().map(),
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+}
+
+McpBridgeToolResult objectsDeleteBySelectorForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
   auto warnings = QJsonArray{};
   auto error = QString{};
   const auto selector = selectorFromParams(params);
@@ -1797,7 +1940,15 @@ McpBridgeToolResult objectsDeleteBySelectorResult(
 
   const auto transactionName =
     params.value("transactionName").toString("MCP: Delete objects by selector");
-  const auto deletedIds = nodeIdsJson(map, nodes, objectRegistry);
+  auto deletedIds = nodeIdsJson(map, nodes, objectRegistry);
+  auto deletedIdentityIds = deletedIds;
+  for (const auto* node : nodes)
+  {
+    if (node != nullptr)
+    {
+      deletedIdentityIds.push_back(mcpNodePathId(*node, map.worldNode()));
+    }
+  }
   const auto changedObjectIds = removeNodesWithTransaction(
     map,
     transactionName.isEmpty() ? QString{"MCP: Delete objects by selector"}
@@ -1809,7 +1960,8 @@ McpBridgeToolResult objectsDeleteBySelectorResult(
       mcp::McpErrorCode::Forbidden, "Matched selector objects cannot be deleted");
   }
 
-  markDeletedMetadata(deletedIds, metadataStore, moduleStore);
+  markDeletedMetadata(
+    deletedIdentityIds, map, objectRegistry, metadataStore, moduleStore);
   auto result = QJsonObject{};
   recordDeleteOperation(
     history,
@@ -2020,6 +2172,10 @@ McpBridgeToolResult moduleRenderReviewResult(
   auto selectorParams = params;
   auto selector = selectorFromParams(params);
   selector.insert("moduleId", params.value("moduleId"));
+  if (!selector.contains("limit"))
+  {
+    selector.insert("limit", params.value("limit").toInt(10000));
+  }
   selectorParams.insert("selector", selector);
   return renderReviewSelectorResult(
     appController, selectorParams, history, metadataStore, moduleStore, objectRegistry);
@@ -2194,7 +2350,8 @@ McpBridgeToolResult moduleCompactResult(
     const auto& record = it->second;
     if (
       recordMatchesDocument(record, documentFingerprint)
-      && record.metadata.value("moduleId").toString() == moduleId && record.stale)
+      && record.metadata.value("moduleId").toString() == moduleId
+      && (record.stale || !objectIdResolvesLive(map, record.objectId, objectRegistry)))
     {
       it = metadataStore.erase(it);
       ++removedMetadataCount;
@@ -2323,7 +2480,8 @@ McpBridgeToolResult irApplyResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore)
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry* objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (mapWindow == nullptr)
@@ -2345,7 +2503,8 @@ McpBridgeToolResult irApplyResult(
     history,
     nextOperationIndex,
     metadataStore,
-    moduleStore);
+    moduleStore,
+    objectRegistry);
 }
 
 McpBridgeToolResult irApplyForMapResult(
@@ -2355,7 +2514,8 @@ McpBridgeToolResult irApplyForMapResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore)
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry* objectRegistry)
 {
   auto error = QString{};
   const auto ir = irFromParams(params, error);
@@ -2410,7 +2570,8 @@ McpBridgeToolResult irApplyForMapResult(
       history,
       nextOperationIndex,
       &metadataStore,
-      &moduleStore);
+      &moduleStore,
+      objectRegistry);
     ok =
       ok && blockoutResult.ok
       && blockoutResult.result.value("validation").toObject().value("valid").toBool(true);
@@ -2516,7 +2677,8 @@ McpBridgeToolResult irApplyFromFileResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore)
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry* objectRegistry)
 {
   auto error = QString{};
   const auto ir = irFromFileParams(params, error);
@@ -2533,7 +2695,8 @@ McpBridgeToolResult irApplyFromFileResult(
     history,
     nextOperationIndex,
     metadataStore,
-    moduleStore);
+    moduleStore,
+    objectRegistry);
   if (result.ok)
   {
     result.result.insert("sourcePath", params.value("path").toString());
@@ -2548,7 +2711,8 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore)
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry* objectRegistry)
 {
   auto error = QString{};
   const auto ir = irFromFileParams(params, error);
@@ -2559,7 +2723,14 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   auto applyParams = params;
   applyParams.insert("ir", *ir);
   auto result = irApplyForMapResult(
-    map, toolName, applyParams, history, nextOperationIndex, metadataStore, moduleStore);
+    map,
+    toolName,
+    applyParams,
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
   if (result.ok)
   {
     result.result.insert("sourcePath", params.value("path").toString());

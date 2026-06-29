@@ -44,6 +44,9 @@ struct McpSelectorDiagnostics
   int matchedBeforeLimit = 0;
   bool limitApplied = false;
   int staleExcluded = 0;
+  int moduleObjectIdCount = 0;
+  int operationObjectIdCount = 0;
+  int metadataRecordCount = 0;
 };
 
 McpBridgeToolResult noActiveDocumentFailure();
@@ -297,6 +300,15 @@ McpBridgeToolResult objectsDeleteBySelectorResult(
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult objectsDeleteBySelectorForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult renderReviewSelectorResult(
   AppController& appController,
   const QJsonObject& params,
@@ -363,7 +375,8 @@ McpBridgeToolResult irApplyResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore);
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult irApplyForMapResult(
   mdl::Map& map,
   const QString& toolName,
@@ -371,7 +384,8 @@ McpBridgeToolResult irApplyForMapResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore);
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult irApplyFromFileResult(
   AppController& appController,
   const QString& toolName,
@@ -379,7 +393,8 @@ McpBridgeToolResult irApplyFromFileResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore);
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult irApplyFromFileForMapResult(
   mdl::Map& map,
   const QString& toolName,
@@ -387,7 +402,8 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore);
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry* objectRegistry = nullptr);
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyListResult(
@@ -695,8 +711,8 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>* metadataStore,
-  std::map<QString, McpModuleRecord>* moduleStore,
-  const McpObjectRegistry* objectRegistry);
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult blockoutCompilePreviewForMapResult(
   mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult pythonGenerateBlockoutResult(

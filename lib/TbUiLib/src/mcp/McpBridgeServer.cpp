@@ -752,7 +752,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             m_operationHistory,
             m_nextOperationIndex,
             m_brushMetadata,
-            m_modules);
+            m_modules,
+            &m_objectRegistry);
         }
         if (toolName == "ir_apply_from_file")
         {
@@ -763,7 +764,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             m_operationHistory,
             m_nextOperationIndex,
             m_brushMetadata,
-            m_modules);
+            m_modules,
+            &m_objectRegistry);
         }
         if (
           toolName == "blockout_create_batch"

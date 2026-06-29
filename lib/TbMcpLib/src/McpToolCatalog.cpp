@@ -1441,13 +1441,18 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "module_render_review",
-      "Render an isolated review bundle for a session-level module.",
+      "Render an isolated review bundle for a session-level module. By default the "
+      "selector limit is raised to cover the full live module; pass limit only when "
+      "you intentionally want a partial review.",
       McpMode::ReadOnly,
       false,
       true,
       objectSchema(
         {
           {"moduleId", stringProperty("Session metadata module id.")},
+          {"limit",
+           integerProperty(
+             "Optional maximum matched objects; omitted means full live module.")},
           {"views", arrayProperty("Optional review view names.")},
           {"preset", stringProperty("Optional review preset.")},
           {"style", stringProperty("Optional review style.")},

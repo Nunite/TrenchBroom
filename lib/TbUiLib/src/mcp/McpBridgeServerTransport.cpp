@@ -70,9 +70,28 @@ void syncOperationHistoryWithExternalResult(
     history, [&](const auto& operation) { return operation.operationId == operationId; });
   if (it == history.end())
   {
+    auto operation = McpOperationRecord{};
+    operation.operationId = operationId;
+    operation.toolName = result.value("toolName").toString();
+    operation.transactionName = result.value("transactionName").toString();
+    operation.operationKind = result.value("operationKind").toString("mutation");
+    operation.setChangedObjectIds(result.value("changedObjectIds").toArray());
+    operation.setDeletedObjectIds(result.value("deletedObjectIds").toArray());
+    operation.setSummary(result);
+    history.push_back(std::move(operation));
     return;
   }
 
+  const auto changedObjectIds = result.value("changedObjectIds").toArray();
+  if (!changedObjectIds.isEmpty())
+  {
+    it->setChangedObjectIds(changedObjectIds);
+  }
+  const auto deletedObjectIds = result.value("deletedObjectIds").toArray();
+  if (!deletedObjectIds.isEmpty())
+  {
+    it->setDeletedObjectIds(deletedObjectIds);
+  }
   it->setSummary(result);
 }
 

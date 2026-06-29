@@ -2809,6 +2809,148 @@ TEST_CASE("McpBridgeServer scopes selector metadata and modules to active docume
   CHECK(currentFingerprint != otherFingerprint);
 }
 
+TEST_CASE("McpBridgeServer selector metadata round trips through IR and operations")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto applyResponse = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"idsMode", "full"},
+      {"ir",
+       QJsonObject{
+         {"moduleId", "roundtrip-cottage"},
+         {"defaultMetadata",
+          QJsonObject{{"moduleId", "roundtrip-cottage"}, {"generatedBy", "test"}}},
+         {"operations",
+          QJsonArray{
+            QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{0, 0, 0}},
+              {"max", QJsonArray{64, 16, 96}},
+              {"metadata", QJsonObject{{"part", "front_door"}, {"role", "detail"}}},
+            },
+            QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{80, 0, 32}},
+              {"max", QJsonArray{128, 16, 80}},
+              {"metadata", QJsonObject{{"part", "front_window"}, {"role", "detail"}}},
+            },
+            QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{0, 48, 0}},
+              {"max", QJsonArray{160, 96, 16}},
+              {"metadata", QJsonObject{{"part", "front_walkway"}, {"role", "walkable"}}},
+            },
+          }},
+       }},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  const auto applyError =
+    applyResponse.ok ? std::string{} : applyResponse.error.message.toStdString();
+  INFO(applyError);
+  REQUIRE(applyResponse.ok);
+  const auto operationIds = applyResponse.result.value("operationIds").toArray();
+  REQUIRE(operationIds.size() == 1);
+  const auto operationId = operationIds.first().toString();
+  CHECK(applyResponse.result.value("changedObjectCount").toInt() == 3);
+
+  const auto partPreview = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector",
+       QJsonObject{{"moduleId", "roundtrip-cottage"}, {"part", "front_door"}}},
+      {"idsMode", "count"},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(partPreview.ok);
+  CHECK(partPreview.result.value("matchedCount").toInt() == 1);
+  CHECK(partPreview.result.value("moduleObjectIdCount").toInt() >= 3);
+
+  const auto operationPreview = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"operationId", operationId}}},
+      {"idsMode", "count"},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(operationPreview.ok);
+  CHECK(operationPreview.result.value("matchedCount").toInt() == 3);
+  CHECK(operationPreview.result.value("operationObjectIdCount").toInt() == 3);
+
+  const auto moduleSummary = moduleListForMapResult(
+    map, QJsonObject{}, metadataStore, moduleStore, objectRegistry);
+  REQUIRE(moduleSummary.ok);
+  const auto moduleArray = moduleSummary.result.value("modules").toArray();
+  REQUIRE(moduleArray.size() == 1);
+  CHECK(moduleArray.first().toObject().value("liveObjectCount").toInt() == 3);
+  CHECK(moduleArray.first().toObject().value("staleObjectCount").toInt() == 0);
+
+  const auto deleteResponse = objectsDeleteBySelectorForMapResult(
+    map,
+    "objects_delete_by_selector",
+    QJsonObject{
+      {"selector",
+       QJsonObject{{"moduleId", "roundtrip-cottage"}, {"part", "front_walkway"}}},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(deleteResponse.ok);
+  CHECK(deleteResponse.result.value("matchedCount").toInt() == 1);
+
+  const auto deletedPartPreview = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector",
+       QJsonObject{{"moduleId", "roundtrip-cottage"}, {"part", "front_walkway"}}},
+      {"idsMode", "count"},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(deletedPartPreview.ok);
+  CHECK(deletedPartPreview.result.value("matchedCount").toInt() == 0);
+
+  const auto afterDeleteSummary = moduleListForMapResult(
+    map, QJsonObject{{"includeStale", true}}, metadataStore, moduleStore, objectRegistry);
+  REQUIRE(afterDeleteSummary.ok);
+  const auto afterDeleteModules = afterDeleteSummary.result.value("modules").toArray();
+  REQUIRE(afterDeleteModules.size() == 1);
+  const auto afterDeleteModule = afterDeleteModules.first().toObject();
+  CHECK(afterDeleteModule.value("liveObjectCount").toInt() == 2);
+  CHECK(afterDeleteModule.value("staleParts").toArray().size() == 1);
+}
+
 TEST_CASE("McpBridgeServer object transform summaries")
 {
   auto appControllerFixture = AppControllerFixture{};
@@ -2982,7 +3124,8 @@ TEST_CASE("McpBridgeServer transforms selector targets without long id lists")
     history,
     nextOperationIndex,
     &metadataStore,
-    &moduleStore);
+    &moduleStore,
+    &objectRegistry);
   const auto createError =
     createResponse.ok ? std::string{} : createResponse.error.message.toStdString();
   INFO(createError);
@@ -3345,7 +3488,8 @@ TEST_CASE("McpBridgeServer keeps selector metadata live after grouping")
     history,
     nextOperationIndex,
     &metadataStore,
-    &moduleStore);
+    &moduleStore,
+    &objectRegistry);
   REQUIRE(createBrushes.ok);
 
   const auto previewRoad = selectorPreviewForMapResult(
