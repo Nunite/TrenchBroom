@@ -427,7 +427,7 @@ Use this table as the rolling implementation checklist.
 
 | Priority | Item | Owner Layer | Status |
 | --- | --- | --- | --- |
-| P1 | Normalize `idsMode` across high-volume tools | C++ MCP | Partial: IR apply, selector preview, transform, and review have compact defaults; remaining create/entity/texture/history paths need another sweep. |
+| P1 | Normalize `idsMode` across high-volume tools | C++ MCP | Partial: IR apply, selector preview, transform, review, entity mutations, and texture mutations have compact defaults; remaining create/history/object/resource paths need another sweep. |
 | P1 | Return absolute review paths | C++ MCP | Done for review renderer outputs and compact review summaries. |
 | P1 | Add summary/default modes to slope and continuity analysis | C++ MCP | Done: default summary returns counts/samples; `detail:"full"` returns full slope/seam evidence. |
 | P1 | Document absolute review output path in skill workflow | Skill | Done in `trenchbroom-mcp-scene-workflow`; keep in sync when review defaults change. |

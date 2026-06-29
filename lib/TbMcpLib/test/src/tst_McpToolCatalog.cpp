@@ -1217,6 +1217,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(textureProperties.value("operationIds").isObject());
     CHECK(textureProperties.value("faceSemantic").isObject());
     CHECK(textureProperties.value("normal").isObject());
+    CHECK(textureProperties.value("idsMode").isObject());
 
     const auto routeContinuityTool =
       findToolDefinition("geometry_analyze_route_continuity");
@@ -1254,6 +1255,7 @@ TEST_CASE("McpToolCatalog")
       faceTextureTool->inputSchema.value("properties").toObject();
     CHECK(faceTextureProperties.value("operationIds").isObject());
     CHECK(faceTextureProperties.value("faceSemantic").isObject());
+    CHECK(faceTextureProperties.value("idsMode").isObject());
 
     const auto reviewTargetsTool = findToolDefinition("render_review_targets");
     REQUIRE(reviewTargetsTool);
@@ -1289,10 +1291,14 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(updatePropsTool);
     CHECK(
       updatePropsTool->inputSchema.value("required").toArray().contains("properties"));
+    CHECK(
+      updatePropsTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
 
     const auto deletePropsTool = findToolDefinition("entity_properties_delete");
     REQUIRE(deletePropsTool);
     CHECK(deletePropsTool->inputSchema.value("required").toArray().contains("keys"));
+    CHECK(
+      deletePropsTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
 
     const auto entityTool = findToolDefinition("entity_create_checked");
     REQUIRE(entityTool);
@@ -1306,6 +1312,7 @@ TEST_CASE("McpToolCatalog")
     const auto entityBatchProperties =
       entityBatchTool->inputSchema.value("properties").toObject();
     CHECK(entityBatchProperties.value("entities").toObject().value("items").isObject());
+    CHECK(entityBatchProperties.value("idsMode").isObject());
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")

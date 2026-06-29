@@ -72,6 +72,8 @@ namespace mcp = tb::mcp;
 
 namespace
 {
+constexpr auto DefaultIdSampleLimit = 12;
+
 
 QJsonArray vecToJson(const vm::vec3d& value)
 {
@@ -220,13 +222,74 @@ QString makeOperationId(int& nextOperationIndex)
   return QString{"mcp-op-%1"}.arg(nextOperationIndex++);
 }
 
-QJsonObject mutationResultJson(const McpOperationRecord& operation)
+QString idsModeFromParams(const QJsonObject& params)
+{
+  const auto idsMode = params.value("idsMode").toString().trimmed().toLower();
+  if (!idsMode.isEmpty())
+  {
+    return idsMode;
+  }
+
+  const auto detail = params.value("detail").toString("summary").trimmed().toLower();
+  if (detail == "ids" || detail == "full")
+  {
+    return "full";
+  }
+  if (detail == "sample" || detail == "none" || detail == "count")
+  {
+    return detail;
+  }
+  return "count";
+}
+
+QJsonArray sampleArray(const QJsonArray& values, const int limit)
+{
+  auto result = QJsonArray{};
+  const auto count = std::min(values.size(), static_cast<qsizetype>(limit));
+  for (auto i = qsizetype{0}; i < count; ++i)
+  {
+    result.push_back(values[i]);
+  }
+  return result;
+}
+
+void applyChangedObjectIdsMode(
+  QJsonObject& result, const QJsonArray& changedObjectIds, const QString& idsMode)
+{
+  const auto mode = idsMode.trimmed().toLower();
+  result.remove("changedObjectIds");
+  result.remove("changedObjectIdSample");
+  result.insert("changedObjectCount", changedObjectIds.size());
+
+  if (mode == "full")
+  {
+    result.insert("changedObjectIds", changedObjectIds);
+  }
+  else if (mode == "sample")
+  {
+    result.insert(
+      "changedObjectIdSample", sampleArray(changedObjectIds, DefaultIdSampleLimit));
+  }
+  else if (mode == "none" || mode == "count" || mode.isEmpty())
+  {
+    return;
+  }
+  else
+  {
+    auto warnings = result.value("warnings").toArray();
+    warnings.push_back(
+      QString{"unknownIdsMode: %1; returned changedObjectCount only"}.arg(idsMode));
+    result.insert("warnings", warnings);
+  }
+}
+
+QJsonObject mutationResultJson(
+  const McpOperationRecord& operation, const QString& idsMode)
 {
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
-  result.insert("changedObjectIds", operation.changedObjectIdsJson());
-  result.insert("changedObjectCount", operation.changedObjectIds.size());
+  applyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
 }
 
@@ -236,14 +299,15 @@ void mcpRecordOperation(
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& changedObjectIds,
-  QJsonObject& result)
+  QJsonObject& result,
+  const QString& idsMode = "count")
 {
   auto operation = McpOperationRecord{};
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
   operation.setChangedObjectIds(changedObjectIds);
-  result = mutationResultJson(operation);
+  result = mutationResultJson(operation, idsMode);
   history.push_back(std::move(operation));
 }
 
@@ -798,7 +862,13 @@ McpBridgeToolResult createEntityResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result,
+    idsModeFromParams(params));
   result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
   return McpBridgeToolResult::success(std::move(result));
 }
@@ -868,7 +938,13 @@ McpBridgeToolResult updateEntityResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result,
+    idsModeFromParams(params));
   result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
   return McpBridgeToolResult::success(std::move(result));
 }
@@ -910,7 +986,13 @@ McpBridgeToolResult deleteEntityResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result,
+    idsModeFromParams(params));
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -994,9 +1076,20 @@ McpBridgeToolResult entityPropertiesUpdateForMapResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result,
+    idsModeFromParams(params));
   result.insert("entityCount", static_cast<int>(entityNodes.size()));
-  result.insert("warnings", warnings);
+  auto resultWarnings = result.value("warnings").toArray();
+  for (const auto& warning : warnings)
+  {
+    resultWarnings.push_back(warning);
+  }
+  result.insert("warnings", resultWarnings);
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -1085,9 +1178,20 @@ McpBridgeToolResult entityPropertiesDeleteForMapResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result,
+    idsModeFromParams(params));
   result.insert("entityCount", static_cast<int>(entityNodes.size()));
-  result.insert("warnings", warnings);
+  auto resultWarnings = result.value("warnings").toArray();
+  for (const auto& warning : warnings)
+  {
+    resultWarnings.push_back(warning);
+  }
+  result.insert("warnings", resultWarnings);
   return McpBridgeToolResult::success(std::move(result));
 }
 
@@ -1233,7 +1337,13 @@ McpBridgeToolResult createEntityFromSchemaResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result,
+    idsModeFromParams(params));
   result.insert("classname", classname);
   result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
   return McpBridgeToolResult::success(std::move(result));
@@ -1423,17 +1533,14 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
     toolName,
     finalTransactionName,
     *changedObjectIds,
-    result);
+    result,
+    idsModeFromParams(params));
   result.insert("checked", true);
   result.insert("entityCount", static_cast<int>(nodes.size()));
   result.insert("classNames", createdClassnames);
   result.insert("removedEmptyPropertyCount", removedEmptyPropertyCount);
 
   const auto detail = params.value("detail").toString("summary").toLower();
-  if (detail == "ids" || detail == "full")
-  {
-    result.insert("changedObjectIds", *changedObjectIds);
-  }
   if (detail == "full")
   {
     auto entitySummaries = QJsonArray{};
@@ -1504,7 +1611,8 @@ McpBridgeToolResult tieBrushesResult(
     toolName,
     QString{"MCP: Tie brushes to %1"}.arg(classname),
     changedObjectIds,
-    result);
+    result,
+    idsModeFromParams(params));
   result.insert("classname", classname);
   return McpBridgeToolResult::success(std::move(result));
 }
@@ -1598,7 +1706,8 @@ McpBridgeToolResult untieBrushesResult(
     toolName,
     "MCP: Untie brushes",
     changedObjectIds,
-    result);
+    result,
+    idsModeFromParams(params));
   return McpBridgeToolResult::success(std::move(result));
 }
 

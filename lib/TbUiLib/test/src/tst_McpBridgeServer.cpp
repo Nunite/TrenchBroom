@@ -2855,7 +2855,8 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
   CHECK(response.result.value("brushCount").toInt() == 1);
   CHECK(response.result.value("faceCount").toInt() == 6);
   CHECK(response.result.value("changedObjectCount").toInt() == 1);
-  CHECK(response.result.value("changedObjectIds").toArray().size() == 1);
+  CHECK(response.result.value("changedObjectIds").isUndefined());
+  CHECK(response.result.value("changedObjectIdSample").isUndefined());
 
   const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
   REQUIRE(objectIds.size() == 2);
@@ -2869,6 +2870,39 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
   {
     CHECK(face.attributes().materialName() == "target_mat");
   }
+
+  const auto sampleResponse = textureApplyByFilterForMapResult(
+    map,
+    "texture_apply_by_filter",
+    QJsonObject{
+      {"material", "sample_mat"},
+      {"type", "brush"},
+      {"min", QJsonArray{-16, -16, -16}},
+      {"max", QJsonArray{80, 80, 32}},
+      {"boundsMode", "intersects"},
+      {"idsMode", "sample"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(sampleResponse.ok);
+  CHECK(sampleResponse.result.value("changedObjectIds").isUndefined());
+  CHECK(sampleResponse.result.value("changedObjectIdSample").toArray().size() == 1);
+
+  const auto fullResponse = textureApplyByFilterForMapResult(
+    map,
+    "texture_apply_by_filter",
+    QJsonObject{
+      {"material", "full_mat"},
+      {"type", "brush"},
+      {"min", QJsonArray{-16, -16, -16}},
+      {"max", QJsonArray{80, 80, 32}},
+      {"boundsMode", "intersects"},
+      {"idsMode", "full"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(fullResponse.ok);
+  CHECK(fullResponse.result.value("changedObjectIds").toArray().size() == 1);
 }
 
 TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
@@ -5155,6 +5189,9 @@ TEST_CASE("McpBridgeServer checked entity batch")
       objectRegistry);
     REQUIRE(updateResponse.ok);
     CHECK(updateResponse.result.value("entityCount").toInt() == 1);
+    CHECK(updateResponse.result.value("changedObjectCount").toInt() == 1);
+    CHECK(updateResponse.result.value("changedObjectIds").isUndefined());
+    CHECK(updateResponse.result.value("changedObjectIdSample").isUndefined());
 
     const auto deleteResponse = entityPropertiesDeleteForMapResult(
       map,
@@ -5162,6 +5199,7 @@ TEST_CASE("McpBridgeServer checked entity batch")
       QJsonObject{
         {"operationIds", QJsonArray{createResponse.result.value("operationId")}},
         {"keys", QJsonArray{"targetname"}},
+        {"idsMode", "sample"},
       },
       history,
       history,
@@ -5169,6 +5207,24 @@ TEST_CASE("McpBridgeServer checked entity batch")
       objectRegistry);
     REQUIRE(deleteResponse.ok);
     CHECK(deleteResponse.result.value("entityCount").toInt() == 1);
+    CHECK(deleteResponse.result.value("changedObjectCount").toInt() == 1);
+    CHECK(deleteResponse.result.value("changedObjectIds").isUndefined());
+    CHECK(deleteResponse.result.value("changedObjectIdSample").toArray().size() == 1);
+
+    const auto fullUpdateResponse = entityPropertiesUpdateForMapResult(
+      map,
+      "entity_properties_update",
+      QJsonObject{
+        {"operationIds", QJsonArray{createResponse.result.value("operationId")}},
+        {"properties", QJsonObject{{"_light", "128 128 128 100"}}},
+        {"idsMode", "full"},
+      },
+      history,
+      history,
+      nextOperationIndex,
+      objectRegistry);
+    REQUIRE(fullUpdateResponse.ok);
+    CHECK(fullUpdateResponse.result.value("changedObjectIds").toArray().size() == 1);
   }
 }
 

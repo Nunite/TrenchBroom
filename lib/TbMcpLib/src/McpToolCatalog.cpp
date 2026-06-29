@@ -188,6 +188,10 @@ QJsonObject faceTargetSchemaProperties()
        "used as candidates.")},
     {"faceIndex",
      integerProperty("Optional face index when objectId names a single brush.")},
+    {"idsMode",
+     stringProperty(
+       "none, count, sample, or full for changed object ids. Defaults to count; use "
+       "full only when the caller must carry ids forward.")},
   };
 }
 
@@ -1516,6 +1520,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"origin", vec3Property("Entity origin in map units.")},
           {"properties", stringObjectProperty("Entity key/value properties.")},
           {"select", boolProperty("Select the created entity.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"classname"}),
     },
@@ -1530,6 +1537,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"objectId", stringProperty("MCP object id for a world or entity node.")},
           {"properties", stringObjectProperty("Properties to add or update.")},
           {"removeKeys", arrayProperty("Property keys to remove.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"objectId"}),
     },
@@ -1546,6 +1556,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"operationIds",
            arrayProperty("MCP operation ids whose live entity objects are updated.")},
           {"properties", stringObjectProperty("Properties to add or update.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"properties"}),
     },
@@ -1561,6 +1574,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"operationIds",
            arrayProperty("MCP operation ids whose live entity objects are updated.")},
           {"keys", arrayProperty("Entity property keys to remove.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"keys"}),
     },
@@ -1612,6 +1628,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"origin", vec3Property("Entity origin in map units.")},
           {"properties", stringObjectProperty("Properties to add or update.")},
           {"select", boolProperty("Select the created entity.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"classname"}),
     },
@@ -1629,6 +1648,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"origin", vec3Property("Entity origin in map units.")},
           {"properties", stringObjectProperty("Properties to add or update.")},
           {"select", boolProperty("Select the created entity.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"classname"}),
     },
@@ -1651,6 +1673,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
              "Transaction label, defaults to MCP: Create checked entities.")},
           {"select", boolProperty("Select created entities.")},
           {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count; "
+             "detail=ids/full remains accepted as legacy shorthand for full ids.")},
         },
         {"entities"}),
     },
@@ -1665,6 +1691,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"classname", stringProperty("Brush entity classname.")},
           {"objectIds",
            arrayProperty("Optional brush object ids. Defaults to selection.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"classname"}),
     },
@@ -1678,6 +1707,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"objectIds",
          arrayProperty(
            "Optional brush or brush entity object ids. Defaults to selection.")},
+        {"idsMode",
+         stringProperty(
+           "none, count, sample, or full for changed object ids. Defaults to count.")},
       }),
     },
     {
@@ -2267,6 +2299,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"find", stringProperty("Material name to replace.")},
           {"replace", stringProperty("Replacement material name.")},
           {"scope", stringProperty("Replacement scope: selection or map.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"find", "replace"}),
     },
