@@ -2502,7 +2502,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "objects_transform",
       "Transform one or more selectable objects using translate, rotate, or scale. "
       "Prefer selector targets for module/route/part iteration so generated scene "
-      "pieces can be stretched, moved, or rotated without deleting and rebuilding them.",
+      "pieces can be stretched, moved, or rotated without deleting and rebuilding them. "
+      "If objectIds, operationIds, and selector are omitted, transforms the current "
+      "user selection.",
       McpMode::Edit,
       true,
       true,
@@ -3129,7 +3131,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Analyze live brush slope faces for ramp/wedge/surf/slide validation. Reports "
       "face normals, slope angle, rise direction, and whether each slope ascends or "
       "descends along routeDirection or start -> end. This is geometry/mapper "
-      "semantics only, not gameplay difficulty analysis.",
+      "semantics only, not gameplay difficulty analysis. If operationIds, objectIds, "
+      "and selector are omitted, analyzes the current user-selected brushes.",
       McpMode::ReadOnly,
       false,
       true,
@@ -3174,7 +3177,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "horizontalGap, fullWidthContinuous, edgeGapMax, innerEdgeGap, outerEdgeGap, "
       "and classification so ramp-to-platform ledges or arc segment side gaps are "
       "caught even when the route centerline looks valid. Same-height overlaps are "
-      "reported as overlap_continuous_height and remain continuous.",
+      "reported as overlap_continuous_height and remain continuous. If operationIds, "
+      "objectIds, and selector are omitted, analyzes the current user-selected "
+      "brushes.",
       McpMode::ReadOnly,
       false,
       true,
@@ -3557,6 +3562,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "ir_compile_preview_from_file",
     "ir_apply",
     "ir_apply_from_file",
+    "geometry_analyze_selection",
     "geometry_analyze_slopes",
     "geometry_analyze_route_continuity",
     "objects_transform",

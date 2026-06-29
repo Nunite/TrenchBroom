@@ -371,6 +371,18 @@ std::optional<QStringList> operationIdsFromParams(
   return result;
 }
 
+bool hasExplicitTransformTargetParams(const QJsonObject& params)
+{
+  if (
+    params.contains("selector") || params.contains("objectIds")
+    || params.contains("operationIds"))
+  {
+    return true;
+  }
+  const auto operationId = params.value("operationId").toString().trimmed();
+  return !operationId.isEmpty() || params.value("operationIds").isArray();
+}
+
 std::optional<const McpOperationRecord*> findOperation(
   const std::vector<McpOperationRecord>& history, const QString& operationId)
 {
@@ -441,6 +453,7 @@ std::optional<std::vector<mdl::Node*>> nodesFromObjectIdsOrOperations(
   auto result = std::vector<mdl::Node*>{};
   auto source = QString{};
   auto selectorWarnings = QJsonArray{};
+  const auto explicitTargetsProvided = hasExplicitTransformTargetParams(params);
   const auto objectIdsProvided = params.value("objectIds").isArray();
   if (objectIdsProvided)
   {
@@ -516,6 +529,21 @@ std::optional<std::vector<mdl::Node*>> nodesFromObjectIdsOrOperations(
     }
   }
 
+  if (!explicitTargetsProvided && result.empty())
+  {
+    for (auto* node : map.selection().nodes)
+    {
+      if (
+        node == nullptr || node == &map.worldNode()
+        || !map.editorContext().selectable(*node))
+      {
+        continue;
+      }
+      result.push_back(node);
+    }
+    source = "selection";
+  }
+
   result = kdl::vec_sort_and_remove_duplicates(std::move(result));
   if (diagnostics != nullptr)
   {
@@ -545,8 +573,8 @@ std::optional<std::vector<mdl::Node*>> nodesFromObjectIdsOrOperations(
     else
     {
       error =
-        "objects_transform requires objectIds, operationId, operationIds, or selector "
-        "that resolves to live objects";
+        "objects_transform requires objectIds, operationId, operationIds, selector "
+        "targets, or selected live objects";
     }
     return std::nullopt;
   }

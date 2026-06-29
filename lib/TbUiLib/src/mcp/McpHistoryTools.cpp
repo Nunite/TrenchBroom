@@ -57,9 +57,7 @@ QString detailFromParams(const QJsonObject& params)
   }
 
   const auto detail = params.value("detail").toString("summary").toLower();
-  return detail == "full"  ? "full"
-         : detail == "ids" ? "ids"
-                            : "summary";
+  return detail == "full" ? "full" : detail == "ids" ? "ids" : "summary";
 }
 
 bool isSelectionCommandName(const QString& commandName)
@@ -67,7 +65,8 @@ bool isSelectionCommandName(const QString& commandName)
   return commandName == "Select None" || commandName == "Select All Objects"
          || commandName == "Select All Brush Faces"
          || commandName == "Convert to Brush Face Selection"
-         || commandName.startsWith("Select ") || commandName.startsWith("Deselect ");
+         || commandName == "Drag Select Objects" || commandName.startsWith("Select ")
+         || commandName.startsWith("Deselect ");
 }
 
 QJsonObject operationRecordJson(const McpOperationRecord& operation)

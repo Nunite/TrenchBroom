@@ -2804,6 +2804,29 @@ TEST_CASE("McpBridgeServer object transform summaries")
   REQUIRE(transformByOperationResponse.ok);
   CHECK(transformByOperationResponse.result.value("changedObjectCount").toInt() == 1);
   CHECK(transformByOperationResponse.result.value("sourceOperationCount").toInt() == 1);
+
+  const auto transformSelectionResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "4",
+    "secret",
+    "objects_transform",
+    QJsonObject{
+      {"operation", "translate"},
+      {"delta", QJsonArray{0, 0, 16}},
+    },
+    mcp::McpMode::Edit});
+  const auto transformSelectionError =
+    transformSelectionResponse.ok || !transformSelectionResponse.error
+      ? QString{}
+      : transformSelectionResponse.error->message;
+  INFO(transformSelectionError.toStdString());
+  REQUIRE(transformSelectionResponse.ok);
+  CHECK(
+    transformSelectionResponse.result.value("targetSource").toString() == "selection");
+  CHECK(transformSelectionResponse.result.value("changedObjectCount").toInt() == 1);
+  CHECK(transformSelectionResponse.result.value("selectedCount").toInt() == 1);
+  const auto selectionBounds =
+    transformSelectionResponse.result.value("bounds").toObject();
+  CHECK(selectionBounds.value("min").toArray().at(2).toDouble() == 16.0);
 }
 
 TEST_CASE("McpBridgeServer transforms selector targets without long id lists")
@@ -3451,6 +3474,39 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   }
   CHECK(foundDescendingRampBetween);
 
+  const auto selectedRampResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Selection slope sample"},
+      {"select", true},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "ramp_between"},
+           {"start", QJsonArray{480, 32, 0}},
+           {"end", QJsonArray{608, 32, 64}},
+           {"width", 64},
+           {"thickness", 16},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(selectedRampResponse.ok);
+
+  const auto selectionSlopeResponse = geometryAnalyzeSlopesForMapResult(
+    map,
+    QJsonObject{{"routeDirection", QJsonArray{1, 0, 0}}, {"detail", "full"}},
+    history);
+  REQUIRE(selectionSlopeResponse.ok);
+  CHECK(selectionSlopeResponse.result.value("source").toString() == "selection");
+  CHECK(selectionSlopeResponse.result.value("targetSource").toString() == "selection");
+  CHECK(
+    selectionSlopeResponse.result.value("targetBrushCount").toInt()
+    == static_cast<int>(map.selection().nodes.size()));
+  CHECK(selectionSlopeResponse.result.value("slopeCount").toInt() >= 1);
+
   const auto brokenRampResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",
@@ -3551,6 +3607,21 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     CHECK(seam.value("classification").toString() == "continuous");
     CHECK(seam.value("verticalStep").toDouble() == 0.0);
   }
+
+  const auto selectionContinuityResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"start", QJsonArray{1280, 48, 16}},
+      {"end", QJsonArray{1792, 48, 96}},
+      {"detail", "full"},
+    },
+    history);
+  REQUIRE(selectionContinuityResponse.ok);
+  CHECK(selectionContinuityResponse.result.value("source").toString() == "selection");
+  CHECK(
+    selectionContinuityResponse.result.value("targetSource").toString() == "selection");
+  CHECK(selectionContinuityResponse.result.value("targetBrushCount").toInt() == 3);
+  CHECK(selectionContinuityResponse.result.value("continuous").toBool());
 
   const auto overlapRampResponse = blockoutCreateBatchForMapResult(
     map,

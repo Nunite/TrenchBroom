@@ -341,7 +341,7 @@ TEST_CASE("McpToolCatalog")
     names.sort();
 
     INFO("Modeling profile tools: " << names.join(", ").toStdString());
-    CHECK(names.size() <= 47);
+    CHECK(names.size() <= 48);
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
@@ -406,7 +406,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("ir_validate"));
     CHECK(names.contains("ir_compile_preview"));
     CHECK(names.contains("ir_apply"));
-    CHECK(!names.contains("geometry_analyze_selection"));
+    CHECK(names.contains("geometry_analyze_selection"));
     CHECK(!names.contains("blockout_validate"));
     CHECK(!names.contains("objects_delete"));
     CHECK(!names.contains("objects_delete_by_filter"));
@@ -689,7 +689,6 @@ TEST_CASE("McpToolCatalog")
          {"viewport_capture_3d",
           "render_review_targets",
           "selection_by_metadata",
-          "geometry_analyze_selection",
           "face_list"})
     {
       CAPTURE(hiddenToolName);
@@ -1252,6 +1251,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(transformProperties.value("selector").isObject());
     CHECK(transformProperties.value("idsMode").isObject());
     CHECK(transformProperties.value("sampleLimit").isObject());
+    CHECK(transformTool->description.contains("current user selection"));
     CHECK(transformTool->description.contains("selector"));
     CHECK(transformTool->description.contains("stretched"));
     CHECK(transformTool->inputSchema.value("required").toArray().contains("operation"));
@@ -1275,6 +1275,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(routeContinuityTool->description.contains("verticalStep"));
     CHECK(routeContinuityTool->description.contains("horizontalGap"));
     CHECK(routeContinuityTool->description.contains("overlap_continuous_height"));
+    CHECK(routeContinuityTool->description.contains("current user-selected brushes"));
     const auto routeContinuityProperties =
       routeContinuityTool->inputSchema.value("properties").toObject();
     CHECK(routeContinuityProperties.value("operationId").isObject());
@@ -1295,6 +1296,7 @@ TEST_CASE("McpToolCatalog")
 
     const auto slopeTool = findToolDefinition("geometry_analyze_slopes");
     REQUIRE(slopeTool);
+    CHECK(slopeTool->description.contains("current user-selected brushes"));
     const auto slopeProperties = slopeTool->inputSchema.value("properties").toObject();
     CHECK(slopeProperties.value("selector").isObject());
     CHECK(slopeProperties.value("detail").isObject());

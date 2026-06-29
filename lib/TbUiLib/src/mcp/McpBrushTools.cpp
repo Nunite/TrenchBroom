@@ -771,16 +771,20 @@ bool brushGridAligned(const mdl::Brush& brush, const double grid)
   });
 }
 
+void collectBrushNodes(mdl::Node& node, std::vector<mdl::BrushNode*>& brushes);
+
 std::vector<mdl::BrushNode*> selectedBrushNodes(mdl::Map& map)
 {
   auto result = std::vector<mdl::BrushNode*>{};
   for (auto* node : map.selection().nodes)
   {
-    if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node))
+    if (node != nullptr)
     {
-      result.push_back(brushNode);
+      collectBrushNodes(*node, result);
     }
   }
+  std::ranges::sort(result);
+  result.erase(std::unique(result.begin(), result.end()), result.end());
   return result;
 }
 
@@ -1010,6 +1014,29 @@ QJsonObject paramsWithSelectorObjectIds(
     warnings.push_back(warning);
   }
   return result;
+}
+
+bool hasExplicitBrushTargetParams(const QJsonObject& params)
+{
+  if (
+    params.contains("selector") || params.contains("objectIds")
+    || params.contains("operationIds"))
+  {
+    return true;
+  }
+  const auto operationId = params.value("operationId").toString().trimmed();
+  if (!operationId.isEmpty() || params.value("operationIds").isArray())
+  {
+    return true;
+  }
+  for (const auto& key : {"moduleId", "part", "role", "routeId", "order"})
+  {
+    if (!params.value(key).isUndefined())
+    {
+      return true;
+    }
+  }
+  return false;
 }
 
 QString scopedMetadataKey(const QString& documentFingerprint, const QString& objectId)
@@ -5462,17 +5489,26 @@ McpBridgeToolResult geometryAnalyzeSlopesForMapResult(
   {
     return invalidParamsFailure(error);
   }
-  const auto brushes = brushNodesFromObjectIdsAndOperations(
-    map, resolvedParams, history, objectRegistry, error);
-  if (!brushes)
+  const auto useSelectionTargets = !hasExplicitBrushTargetParams(params);
+  auto brushes = std::optional<std::vector<mdl::BrushNode*>>{};
+  if (useSelectionTargets)
   {
-    return invalidParamsFailure(error);
+    brushes = selectedBrushNodes(map);
+  }
+  else
+  {
+    brushes = brushNodesFromObjectIdsAndOperations(
+      map, resolvedParams, history, objectRegistry, error);
+    if (!brushes)
+    {
+      return invalidParamsFailure(error);
+    }
   }
   if (brushes->empty())
   {
     return invalidParamsFailure(
-      "geometry_analyze_slopes requires operationIds or objectIds that resolve to "
-      "brushes");
+      "geometry_analyze_slopes requires operationIds, objectIds, selector targets, "
+      "or selected brush nodes");
   }
 
   const auto routeDirection = optionalRouteDirectionFromParams(resolvedParams, error);
@@ -5553,6 +5589,8 @@ McpBridgeToolResult geometryAnalyzeSlopesForMapResult(
   auto result = QJsonObject{
     {"tool", "geometry_analyze_slopes"},
     {"detail", detail},
+    {"source", useSelectionTargets ? "selection" : "targets"},
+    {"targetSource", useSelectionTargets ? "selection" : "targets"},
     {"targetBrushCount", static_cast<int>(brushes->size())},
     {"slopeCount", slopes.size()},
     {"ascendingCount", ascendingCount},
@@ -5622,16 +5660,26 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   {
     return invalidParamsFailure(error);
   }
-  const auto brushes = brushNodesFromObjectIdsAndOperations(
-    map, resolvedParams, history, objectRegistry, error);
-  if (!brushes)
+  const auto useSelectionTargets = !hasExplicitBrushTargetParams(params);
+  auto brushes = std::optional<std::vector<mdl::BrushNode*>>{};
+  if (useSelectionTargets)
   {
-    return invalidParamsFailure(error);
+    brushes = selectedBrushNodes(map);
+  }
+  else
+  {
+    brushes = brushNodesFromObjectIdsAndOperations(
+      map, resolvedParams, history, objectRegistry, error);
+    if (!brushes)
+    {
+      return invalidParamsFailure(error);
+    }
   }
   if (brushes->size() < 2u)
   {
     return invalidParamsFailure(
-      "geometry_analyze_route_continuity requires at least two target brushes");
+      "geometry_analyze_route_continuity requires at least two operation/object/"
+      "selector target brushes or at least two selected brush nodes");
   }
 
   const auto orderBy =
@@ -5917,6 +5965,8 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   auto result = QJsonObject{
     {"tool", "geometry_analyze_route_continuity"},
     {"detail", detail},
+    {"source", useSelectionTargets ? "selection" : "targets"},
+    {"targetSource", useSelectionTargets ? "selection" : "targets"},
     {"targetBrushCount", static_cast<int>(brushes->size())},
     {"surfaceCount", static_cast<int>(surfaces.size())},
     {"seamCount", seams.size()},
@@ -6241,10 +6291,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
     result.insert("intentSummaries", intentSummaries);
   }
   applyDetailLevel(
-    result,
-    *changedObjectIds,
-    idDetailFromParams(batchParams),
-    fullResults);
+    result, *changedObjectIds, idDetailFromParams(batchParams), fullResults);
   if (metadataStore != nullptr)
   {
     const auto changedIds =
@@ -6468,8 +6515,7 @@ McpBridgeToolResult createBrushResult(
   result.insert("type", type);
   result.insert("brushCount", brushJson.size());
   result.insert("bounds", boundsToJson(bounds));
-  applyDetailLevel(
-    result, *changedObjectIds, idDetailFromParams(params), brushJson);
+  applyDetailLevel(result, *changedObjectIds, idDetailFromParams(params), brushJson);
   return McpBridgeToolResult::success(std::move(result));
 }
 
