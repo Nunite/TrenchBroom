@@ -139,7 +139,7 @@ private:
   mutable bool m_dispatchInProgress = false;
   QString m_bridgeInstanceId;
   QDateTime m_bridgeStartedAtUtc;
-  std::unique_ptr<QLocalServer> m_server;
+  std::unique_ptr<QLocalServer> m_server = nullptr;
 
 public:
   explicit McpBridgeServer(AppController& appController, QObject* parent = nullptr);
@@ -162,6 +162,7 @@ public:
   std::optional<QJsonObject> readResource(const QString& uri) const;
 
 private:
+  void clearSessionState();
   void handleNewConnection();
   void handleSocketReadyRead(QLocalSocket& socket);
   void writeResponse(QLocalSocket& socket, const mcp::McpBridgeResponse& response) const;

@@ -206,6 +206,17 @@ bool McpBridgeServer::start(const mcp::McpBridgeConfig& config, QString* error)
   return true;
 }
 
+void McpBridgeServer::clearSessionState()
+{
+  m_overlayState = QJsonObject{};
+  m_operationHistory.clear();
+  m_brushMetadata.clear();
+  m_modules.clear();
+  m_objectRegistry.clear();
+  m_irPreviewCache.clear();
+  m_nextIrPreviewIndex = 1;
+}
+
 void McpBridgeServer::stop()
 {
   if (m_server)
@@ -214,11 +225,7 @@ void McpBridgeServer::stop()
     QLocalServer::removeServer(m_config.pipeName);
     m_server.reset();
   }
-  m_overlayState = QJsonObject{};
-  m_operationHistory.clear();
-  m_brushMetadata.clear();
-  m_modules.clear();
-  m_objectRegistry.clear();
+  clearSessionState();
 }
 
 bool McpBridgeServer::isListening() const
