@@ -1853,8 +1853,8 @@ McpBridgeToolResult renderReviewSelectorResult(
   auto reviewParams = params;
   reviewParams.insert("objectIds", objectIds);
   reviewParams.insert("detail", params.value("detail").toString("summary"));
-  auto result =
-    renderReviewTargetsForMapResult(map, reviewParams, history, &objectRegistry);
+  auto result = renderReviewTargetsForMapResult(
+    map, reviewParams, history, &objectRegistry, &metadataStore);
   if (result.ok)
   {
     result.result.insert("selector", selector);

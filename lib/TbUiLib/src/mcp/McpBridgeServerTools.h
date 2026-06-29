@@ -230,27 +230,32 @@ McpBridgeToolResult renderReviewTargetsResult(
   AppController& appController,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history = {},
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr);
 McpBridgeToolResult renderReviewTargetsForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history = {},
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr);
 McpBridgeToolResult renderReviewCurrentSceneForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history = {},
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr);
 McpBridgeToolResult renderReviewCurrentSceneResult(
   AppController& appController,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history = {},
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr);
 McpBridgeToolResult renderReviewOperationResult(
   AppController& appController,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history = {},
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr);
 McpBridgeToolResult selectorPreviewResult(
   AppController& appController,
   const QJsonObject& params,

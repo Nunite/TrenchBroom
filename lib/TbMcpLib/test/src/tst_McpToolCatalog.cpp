@@ -905,6 +905,7 @@ TEST_CASE("McpToolCatalog")
             .contains("Defaults to 2"));
     CHECK(currentSceneProperties.value("idsMode").isObject());
     CHECK(currentSceneProperties.value("detail").isObject());
+    CHECK(currentSceneProperties.value("labelParts").isObject());
 
     const auto tool = findToolDefinition("render_review_operation");
     REQUIRE(tool);
@@ -929,6 +930,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(properties.value("framingPreset").isObject());
     CHECK(properties.value("imageSize").isObject());
     CHECK(properties.value("idsMode").isObject());
+    CHECK(properties.value("labelParts").isObject());
 
     const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
     auto names = QStringList{};
@@ -947,6 +949,20 @@ TEST_CASE("McpToolCatalog")
     CHECK(found.value("name").toString() == "render_review_targets");
     CHECK(!found.value("visibleInCurrentProfile").toBool());
     CHECK(found.value("inputSchema").isObject());
+
+    const auto selectorTool = findToolDefinition("render_review_selector");
+    REQUIRE(selectorTool);
+    CHECK(selectorTool->inputSchema.value("properties")
+            .toObject()
+            .value("labelParts")
+            .isObject());
+
+    const auto moduleReviewTool = findToolDefinition("module_render_review");
+    REQUIRE(moduleReviewTool);
+    CHECK(moduleReviewTool->inputSchema.value("properties")
+            .toObject()
+            .value("labelParts")
+            .isObject());
   }
 
   SECTION("viewport camera set schema supports explicit look-at review")
@@ -1194,28 +1210,38 @@ TEST_CASE("McpToolCatalog")
     CHECK(deleteOperationTool->inputSchema.value("required")
             .toArray()
             .contains("operationId"));
-    CHECK(
-      deleteOperationTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+    CHECK(deleteOperationTool->inputSchema.value("properties")
+            .toObject()
+            .value("idsMode")
+            .isObject());
 
     const auto boxesBatchTool = findToolDefinition("brush_create_boxes_batch");
     REQUIRE(boxesBatchTool);
-    CHECK(
-      boxesBatchTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+    CHECK(boxesBatchTool->inputSchema.value("properties")
+            .toObject()
+            .value("idsMode")
+            .isObject());
 
     const auto blockoutBatchTool = findToolDefinition("blockout_create_batch");
     REQUIRE(blockoutBatchTool);
-    CHECK(
-      blockoutBatchTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+    CHECK(blockoutBatchTool->inputSchema.value("properties")
+            .toObject()
+            .value("idsMode")
+            .isObject());
 
     const auto operationInspectTool = findToolDefinition("operation_inspect");
     REQUIRE(operationInspectTool);
-    CHECK(
-      operationInspectTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+    CHECK(operationInspectTool->inputSchema.value("properties")
+            .toObject()
+            .value("idsMode")
+            .isObject());
 
     const auto operationValidateTool = findToolDefinition("operation_validate");
     REQUIRE(operationValidateTool);
-    CHECK(
-      operationValidateTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+    CHECK(operationValidateTool->inputSchema.value("properties")
+            .toObject()
+            .value("idsMode")
+            .isObject());
 
     const auto transformTool = findToolDefinition("objects_transform");
     REQUIRE(transformTool);
@@ -1283,8 +1309,10 @@ TEST_CASE("McpToolCatalog")
 
     const auto assetPlaceTool = findToolDefinition("asset_place_model");
     REQUIRE(assetPlaceTool);
-    CHECK(
-      assetPlaceTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+    CHECK(assetPlaceTool->inputSchema.value("properties")
+            .toObject()
+            .value("idsMode")
+            .isObject());
 
     const auto reviewTargetsTool = findToolDefinition("render_review_targets");
     REQUIRE(reviewTargetsTool);
@@ -1293,10 +1321,21 @@ TEST_CASE("McpToolCatalog")
     CHECK(reviewTargetProperties.value("preset").isObject());
     CHECK(reviewTargetProperties.value("verticalExaggeration").isObject());
     CHECK(reviewTargetProperties.value("includeEntityLabels").isObject());
+    CHECK(reviewTargetProperties.value("includeEntityLabels")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("auto-hide"));
     CHECK(reviewTargetProperties.value("includeOrderLabels").isObject());
     CHECK(reviewTargetProperties.value("includeDirectionLabels").isObject());
     CHECK(reviewTargetProperties.value("labelStride").isObject());
+    CHECK(reviewTargetProperties.value("labelParts").isObject());
     CHECK(reviewTargetProperties.value("autoHideLabelsThreshold").isObject());
+    CHECK(reviewTargetProperties.value("autoHideLabelsThreshold")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("entity"));
     CHECK(reviewTargetProperties.value("contactSheetMaxCaptures").isObject());
 
     const auto validateTool = findToolDefinition("map_validate");
@@ -1320,14 +1359,18 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(updatePropsTool);
     CHECK(
       updatePropsTool->inputSchema.value("required").toArray().contains("properties"));
-    CHECK(
-      updatePropsTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+    CHECK(updatePropsTool->inputSchema.value("properties")
+            .toObject()
+            .value("idsMode")
+            .isObject());
 
     const auto deletePropsTool = findToolDefinition("entity_properties_delete");
     REQUIRE(deletePropsTool);
     CHECK(deletePropsTool->inputSchema.value("required").toArray().contains("keys"));
-    CHECK(
-      deletePropsTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+    CHECK(deletePropsTool->inputSchema.value("properties")
+            .toObject()
+            .value("idsMode")
+            .isObject());
 
     const auto entityTool = findToolDefinition("entity_create_checked");
     REQUIRE(entityTool);
@@ -1345,8 +1388,10 @@ TEST_CASE("McpToolCatalog")
 
     const auto problemsFixTool = findToolDefinition("problems_fix");
     REQUIRE(problemsFixTool);
-    CHECK(
-      problemsFixTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+    CHECK(problemsFixTool->inputSchema.value("properties")
+            .toObject()
+            .value("idsMode")
+            .isObject());
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")
@@ -1406,6 +1451,9 @@ TEST_CASE("McpToolCatalog")
 
     REQUIRE(!found.isEmpty());
     CHECK(!found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("description")
+            .toString()
+            .contains("geometry_analyze_route_continuity"));
     CHECK(found.value("inputSchema")
             .toObject()
             .value("properties")
@@ -1435,6 +1483,17 @@ TEST_CASE("McpToolCatalog")
 
     REQUIRE(!alias.isEmpty());
     CHECK(!alias.value("visibleInCurrentProfile").toBool());
+    CHECK(alias.value("description")
+            .toString()
+            .contains("geometry_analyze_route_continuity"));
+
+    const auto metadataSetResults = toolsSearchJson(
+      "brush_metadata_set", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    REQUIRE(metadataSetResults.size() == 1);
+    const auto metadataSetTool = metadataSetResults.first().toObject();
+    CHECK(!metadataSetTool.value("visibleInCurrentProfile").toBool());
+    CHECK(metadataSetTool.value("description").toString().contains("Legacy"));
+    CHECK(metadataSetTool.value("description").toString().contains("defaultMetadata"));
   }
 
   SECTION("tool json uses MCP inputSchema shape")

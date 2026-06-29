@@ -2233,7 +2233,8 @@ McpBridgeToolResult renderReviewOperationResult(
   AppController& appController,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry)
+  const McpObjectRegistry* objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore)
 {
   auto reviewParams = params;
   if (!reviewParams.contains("style"))
@@ -2253,8 +2254,8 @@ McpBridgeToolResult renderReviewOperationResult(
       });
   }
 
-  auto review =
-    renderReviewTargetsResult(appController, reviewParams, history, objectRegistry);
+  auto review = renderReviewTargetsResult(
+    appController, reviewParams, history, objectRegistry, metadataStore);
   if (!review.ok)
   {
     return review;

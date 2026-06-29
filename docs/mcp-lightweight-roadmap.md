@@ -391,16 +391,16 @@ Artifacts:
 
 ## Immediate Backlog
 
-1. Fix `ir_apply_from_file(idsMode:"count")` returning long `changedObjectIds`.
-2. Fix `selector_preview(idsMode:"count")` returning object samples.
-3. Return absolute review paths, even when `outputDir` is relative.
+1. Fix `ir_apply_from_file(idsMode:"count")` returning long `changedObjectIds`. Done.
+2. Fix `selector_preview(idsMode:"count")` returning object samples. Done.
+3. Return absolute review paths, even when `outputDir` is relative. Done.
 4. Add summary/default and `detail:"full"` modes to slope and continuity analysis. Done: default responses return counts and samples; `detail:"full"` returns all slopes/surfaces/seams.
 5. Add explicit route validation modes: `continuous`, `stepped`, `jump_chain`, `spiral`, and `closed_loop`. Done; legacy `continuityMode:"jump_gaps"` remains accepted and normalizes to `jump_chain`.
-6. Update skill workflow to recommend absolute review output dirs.
-7. Add tests for output compaction across IR apply, selector, module, and review.
-8. Add recipe catalog command or script-level listing.
-9. Add Codex CLI regression prompts for the three core recipe scenarios.
-10. Review Modeling profile size after each MCP feature batch.
+6. Update skill workflow to recommend absolute review output dirs. Done.
+7. Add tests for output compaction across IR apply, selector, module, and review. Done.
+8. Add recipe catalog command or script-level listing. Done.
+9. Add Codex CLI regression prompts for the three core recipe scenarios. Done.
+10. Review Modeling profile size after each MCP feature batch. Done.
 
 ## Decision Checklist For New Requests
 
@@ -434,9 +434,9 @@ Use this table as the rolling implementation checklist.
 | P1 | Add route validation modes | C++ MCP + Skill | Done for MCP route continuity: `continuous`, `stepped`, `jump_chain`, `spiral`, `closed_loop`, plus recipe profile aliases. |
 | P2 | Add recipe catalog/listing | Skill | Done in `trenchbroom-mcp-scene-workflow/scripts/list_recipes.py`; lists manifests, examples, and recommended validation without generating IR. |
 | P2 | Add profile-size regression test | MCP catalog tests | Done: `McpToolCatalog` now guards Modeling profile size and hidden-tool search behavior. |
-| P2 | Improve entity glyph and label policy in review | C++ MCP | Pending |
-| P2 | Add Codex CLI regression prompts | Skill/testing | Pending |
-| P3 | Evaluate legacy/convenience tools for deprecation text | MCP catalog docs | Pending |
+| P2 | Improve entity glyph and label policy in review | C++ MCP | Done: entity glyphs remain visible while dense classname labels auto-hide; `labelParts` labels important metadata parts with stride/threshold controls, and review summaries report entity/order/part label counts. |
+| P2 | Add Codex CLI regression prompts | Skill/testing | Done in `C:\Users\Trh\.codex\skills\trenchbroom-mcp-scene-workflow\references\codex-cli-regression-prompts.md` for ascending spiral, temple courtyard, and KZ bhop/slide disposable flows. |
+| P3 | Evaluate legacy/convenience tools for deprecation text | MCP catalog docs | Done: hidden viewport, low-level review, legacy metadata, and legacy route analysis entries stay searchable and describe recommended selector/module/review/continuity replacements. |
 
 ## Non-Goals
 

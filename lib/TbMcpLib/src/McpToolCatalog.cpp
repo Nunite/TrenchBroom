@@ -1092,7 +1092,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty("Draw the target bounding box as a translucent dashed outline.")},
         {"includeEntityLabels",
          boolProperty(
-           "Draw classname labels for point/entity placeholders. Defaults to true.")},
+           "Draw classname labels for point/entity placeholders. Defaults to true; "
+           "dense targets auto-hide text labels while keeping entity glyph markers.")},
         {"includeOrderLabels",
          boolProperty(
            "Draw ordered target labels. route_platform enables this by default.")},
@@ -1104,10 +1105,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          integerProperty(
            "Draw only every Nth order label when includeOrderLabels is true. Defaults "
            "to 1.")},
+        {"labelParts",
+         arrayProperty(
+           "Optional metadata part names to label, such as road, rail, support, or "
+           "spawn. Labels are auto-hidden on dense targets.")},
         {"autoHideLabelsThreshold",
          integerProperty(
-           "Automatically hide dense order labels when targetObjectCount exceeds this "
-           "threshold. Defaults to 120; use 0 to disable.")},
+           "Automatically hide dense order/entity/part labels when targetObjectCount "
+           "exceeds this threshold. Defaults to 120; use 0 to disable.")},
         {"maxDetailedFaces",
          integerProperty(
            "Maximum brush faces rendered as real polygons before falling back to bounds "
@@ -1177,7 +1182,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty("Draw the target bounding box as a translucent dashed outline.")},
         {"includeEntityLabels",
          boolProperty(
-           "Draw classname labels for point/entity placeholders. Defaults to true.")},
+           "Draw classname labels for point/entity placeholders. Defaults to true; "
+           "dense targets auto-hide text labels while keeping entity glyph markers.")},
         {"includeOrderLabels",
          boolProperty(
            "Draw ordered target labels. route_platform enables this by default.")},
@@ -1189,10 +1195,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          integerProperty(
            "Draw only every Nth order label when includeOrderLabels is true. Defaults "
            "to 1.")},
+        {"labelParts",
+         arrayProperty(
+           "Optional metadata part names to label, such as road, rail, support, or "
+           "spawn. Labels are auto-hidden on dense targets.")},
         {"autoHideLabelsThreshold",
          integerProperty(
-           "Automatically hide dense order labels when targetObjectCount exceeds this "
-           "threshold. Defaults to 120; use 0 to disable.")},
+           "Automatically hide dense order/entity/part labels when targetObjectCount "
+           "exceeds this threshold. Defaults to 120; use 0 to disable.")},
         {"maxDetailedFaces",
          integerProperty(
            "Maximum brush faces rendered as real polygons before falling back to bounds "
@@ -1279,7 +1289,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty("Draw the target bounding box as a translucent dashed outline.")},
         {"includeEntityLabels",
          boolProperty(
-           "Draw classname labels for point/entity placeholders. Defaults to true.")},
+           "Draw classname labels for point/entity placeholders. Defaults to true; "
+           "dense targets auto-hide text labels while keeping entity glyph markers.")},
         {"includeOrderLabels",
          boolProperty(
            "Draw ordered target labels. route_platform enables this by default.")},
@@ -1291,10 +1302,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          integerProperty(
            "Draw only every Nth order label when includeOrderLabels is true. Defaults "
            "to 1.")},
+        {"labelParts",
+         arrayProperty(
+           "Optional metadata part names to label, such as road, rail, support, or "
+           "spawn. Labels are auto-hidden on dense targets.")},
         {"autoHideLabelsThreshold",
          integerProperty(
-           "Automatically hide dense order labels when targetObjectCount exceeds this "
-           "threshold. Defaults to 120; use 0 to disable.")},
+           "Automatically hide dense order/entity/part labels when targetObjectCount "
+           "exceeds this threshold. Defaults to 120; use 0 to disable.")},
         {"sceneName", stringProperty("Optional scene/review label.")},
         {"returnBase64",
          boolProperty(
@@ -1367,8 +1382,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          integerProperty("Maximum contact sheet panels. Defaults to 2.")},
         {"labelStride",
          integerProperty("Draw only every Nth order label when labels are enabled.")},
+        {"labelParts",
+         arrayProperty(
+           "Optional metadata part names to label; dense targets auto-hide these "
+           "labels.")},
         {"autoHideLabelsThreshold",
-         integerProperty("Hide dense order labels above this target count.")},
+         integerProperty("Hide dense order/entity/part labels above this target count.")},
         {"outputDir", stringProperty("Optional review output root.")},
         {"detail", stringProperty("summary or full. Defaults to summary.")},
       }),
@@ -1434,8 +1453,13 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"style", stringProperty("Optional review style.")},
           {"labelStride",
            integerProperty("Draw only every Nth order label when labels are enabled.")},
+          {"labelParts",
+           arrayProperty(
+             "Optional metadata part names to label; dense targets auto-hide these "
+             "labels.")},
           {"autoHideLabelsThreshold",
-           integerProperty("Hide dense order labels above this target count.")},
+           integerProperty(
+             "Hide dense order/entity/part labels above this target count.")},
           {"outputDir", stringProperty("Optional review output root.")},
           {"detail", stringProperty("summary or full. Defaults to summary.")},
         },
@@ -3230,7 +3254,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "brush_metadata_set",
-      "Attach session-level route/object metadata to live brush object ids.",
+      "Legacy object-id metadata setter. Prefer passing defaultMetadata/metadata to "
+      "creation tools or using structured selectors/modules for recovery.",
       McpMode::Edit,
       false,
       true,
@@ -3243,7 +3268,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "brush_metadata_get",
-      "Read session-level route/object metadata for brush object ids.",
+      "Legacy object-id metadata reader. Prefer selector_preview or module_inspect for "
+      "structured metadata recovery.",
       McpMode::ReadOnly,
       false,
       true,
@@ -3275,8 +3301,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     {
       "kz_distance_analyze_chain",
       "Compatibility alias for route_geometry_analyze_chain. Returns geometric route "
-      "facts only; difficulty should be judged by the Agent using project/domain "
-      "context.",
+      "facts only. Prefer geometry_analyze_route_continuity for route validation; "
+      "difficulty should be judged by the Agent using project/domain context.",
       McpMode::ReadOnly,
       false,
       true,
@@ -3298,7 +3324,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "route_geometry_analyze_chain",
       "Analyze ordered brush-platform geometry facts such as edge gap, effective "
       "distance, height delta, lateral offset, and landing window area. This tool "
-      "does not classify gameplay difficulty or pass/fail viability.",
+      "does not classify gameplay difficulty or pass/fail viability. Prefer "
+      "geometry_analyze_route_continuity for current route validation workflows.",
       McpMode::ReadOnly,
       false,
       true,

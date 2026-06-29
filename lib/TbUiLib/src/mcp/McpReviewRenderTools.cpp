@@ -119,6 +119,9 @@ struct RenderGeometry
   std::vector<mdl::Node*> unsupportedNodes;
   int targetBrushCount = 0;
   int targetObjectCount = 0;
+  int entityLabelCount = 0;
+  int orderLabelCount = 0;
+  int partLabelCount = 0;
   bool simplified = false;
   std::set<QString> materialNames;
 };
@@ -329,6 +332,129 @@ void appendWarning(QJsonArray& warnings, const QString& warning)
   {
     warnings.push_back(warning);
   }
+}
+
+QString scopedMetadataKey(const QString& documentFingerprint, const QString& objectId)
+{
+  return documentFingerprint.isEmpty()
+           ? objectId
+           : QString{"%1|%2"}.arg(documentFingerprint, objectId);
+}
+
+std::optional<QJsonObject> metadataForNode(
+  mdl::Map& map,
+  const mdl::Node& node,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const McpObjectRegistry* objectRegistry)
+{
+  if (metadataStore == nullptr)
+  {
+    return std::nullopt;
+  }
+
+  const auto documentFingerprint = documentFingerprintForMap(map, objectRegistry);
+  const auto legacyId = nodePathId(node, map.worldNode());
+  auto candidates = QStringList{legacyId};
+  if (objectRegistry != nullptr)
+  {
+    candidates.push_front(objectRegistry->externalIdForLegacy(map, legacyId));
+  }
+
+  for (const auto& objectId : candidates)
+  {
+    for (const auto& key :
+         QStringList{scopedMetadataKey(documentFingerprint, objectId), objectId})
+    {
+      const auto it = metadataStore->find(key);
+      if (
+        it != metadataStore->end() && !it->second.stale
+        && (it->second.documentFingerprint.isEmpty() || it->second.documentFingerprint == documentFingerprint))
+      {
+        return it->second.metadata;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+QStringList labelPartsFromParams(const QJsonObject& params)
+{
+  auto result = QStringList{};
+  const auto value = params.value("labelParts");
+  if (value.isString())
+  {
+    const auto text = value.toString().trimmed();
+    if (!text.isEmpty())
+    {
+      result.push_back(text);
+    }
+  }
+  else if (value.isArray())
+  {
+    for (const auto& entry : value.toArray())
+    {
+      const auto text = entry.toString().trimmed();
+      if (!text.isEmpty())
+      {
+        result.push_back(text);
+      }
+    }
+  }
+  result.removeDuplicates();
+  return result;
+}
+
+struct ReviewLabelOptions
+{
+  bool includeEntityLabels = true;
+  bool includeOrderLabels = false;
+  bool includeDirectionLabels = false;
+  QStringList labelParts;
+  int labelStride = 1;
+};
+
+ReviewLabelOptions labelOptionsFromParams(
+  const QJsonObject& params, const int targetObjectCount, QJsonArray& warnings)
+{
+  auto options = ReviewLabelOptions{};
+  const auto autoHideLabelsThreshold =
+    optionalIntClamped(params, "autoHideLabelsThreshold", 120, 0, 10000);
+  options.includeEntityLabels = optionalBool(params, "includeEntityLabels", true);
+  options.includeOrderLabels = optionalBool(params, "includeOrderLabels", false);
+  options.includeDirectionLabels = optionalBool(params, "includeDirectionLabels", false);
+  options.labelParts = labelPartsFromParams(params);
+  options.labelStride = optionalIntClamped(params, "labelStride", 1, 1, 1000);
+
+  if (autoHideLabelsThreshold > 0 && targetObjectCount > autoHideLabelsThreshold)
+  {
+    if (options.includeOrderLabels)
+    {
+      options.includeOrderLabels = false;
+      warnings.push_back(
+        QString{"orderLabelsAutoHidden: targetObjectCount=%1 exceeds threshold=%2"}
+          .arg(targetObjectCount)
+          .arg(autoHideLabelsThreshold));
+    }
+    if (options.includeEntityLabels)
+    {
+      options.includeEntityLabels = false;
+      warnings.push_back(
+        QString{"entityLabelsAutoHidden: targetObjectCount=%1 exceeds threshold=%2; "
+                "entity glyph markers are still rendered."}
+          .arg(targetObjectCount)
+          .arg(autoHideLabelsThreshold));
+    }
+    if (!options.labelParts.isEmpty())
+    {
+      options.labelParts.clear();
+      warnings.push_back(
+        QString{"partLabelsAutoHidden: targetObjectCount=%1 exceeds threshold=%2"}
+          .arg(targetObjectCount)
+          .arg(autoHideLabelsThreshold));
+    }
+  }
+
+  return options;
 }
 
 template <typename NodeT>
@@ -705,13 +831,13 @@ std::optional<vm::vec3d> faceNormal(const std::vector<vm::vec3d>& vertices)
 }
 
 RenderGeometry buildRenderGeometry(
+  mdl::Map& map,
   const std::vector<mdl::Node*>& nodes,
   QJsonArray& warnings,
   const int maxFaces,
-  const bool includeEntityLabels,
-  const bool includeOrderLabels,
-  const bool includeDirectionLabels,
-  const int labelStride)
+  const ReviewLabelOptions& labelOptions,
+  const McpObjectRegistry* objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore)
 {
   auto geometry = RenderGeometry{};
   geometry.targetObjectCount = static_cast<int>(nodes.size());
@@ -804,7 +930,7 @@ RenderGeometry buildRenderGeometry(
       {
         const auto origin = entityNode->entity().origin();
         addCrossToGeometry(geometry, origin, 16.0);
-        if (includeEntityLabels)
+        if (labelOptions.includeEntityLabels)
         {
           geometry.labels.push_back(RenderLabel{
             origin + vm::vec3d{0, 0, 18},
@@ -812,6 +938,7 @@ RenderGeometry buildRenderGeometry(
             "entity",
             std::nullopt,
           });
+          ++geometry.entityLabelCount;
         }
       }
       else
@@ -830,7 +957,51 @@ RenderGeometry buildRenderGeometry(
         .arg(geometry.unsupportedNodes.size()));
   }
 
-  if (includeOrderLabels)
+  if (!labelOptions.labelParts.isEmpty())
+  {
+    const auto labelPartsLower = [&]() {
+      auto result = QStringList{};
+      for (const auto& part : labelOptions.labelParts)
+      {
+        result.push_back(part.trimmed().toLower());
+      }
+      return result;
+    }();
+    auto partIndex = 0;
+    for (const auto* node : nodes)
+    {
+      if (node == nullptr)
+      {
+        continue;
+      }
+      ++partIndex;
+      if (
+        labelOptions.labelStride > 1 && ((partIndex - 1) % labelOptions.labelStride) != 0)
+      {
+        continue;
+      }
+      const auto metadata = metadataForNode(map, *node, metadataStore, objectRegistry);
+      if (!metadata)
+      {
+        continue;
+      }
+      const auto part = metadata->value("part").toString().trimmed();
+      if (part.isEmpty() || !labelPartsLower.contains(part.toLower()))
+      {
+        continue;
+      }
+      const auto bounds = node->logicalBounds();
+      geometry.labels.push_back(RenderLabel{
+        bounds.center() + vm::vec3d{0, 0, std::max(12.0, bounds.size().z() * 0.2)},
+        part,
+        "part",
+        std::nullopt,
+      });
+      ++geometry.partLabelCount;
+    }
+  }
+
+  if (labelOptions.includeOrderLabels)
   {
     auto order = 1;
     for (const auto* node : nodes)
@@ -839,14 +1010,14 @@ RenderGeometry buildRenderGeometry(
       {
         continue;
       }
-      if (labelStride > 1 && ((order - 1) % labelStride) != 0)
+      if (labelOptions.labelStride > 1 && ((order - 1) % labelOptions.labelStride) != 0)
       {
         ++order;
         continue;
       }
       const auto center = node->logicalBounds().center();
       auto direction = std::optional<vm::vec3d>{};
-      if (includeDirectionLabels && order < static_cast<int>(nodes.size()))
+      if (labelOptions.includeDirectionLabels && order < static_cast<int>(nodes.size()))
       {
         const auto* nextNode = nodes[static_cast<size_t>(order)];
         if (nextNode != nullptr)
@@ -867,6 +1038,7 @@ RenderGeometry buildRenderGeometry(
         "order",
         direction,
       });
+      ++geometry.orderLabelCount;
       ++order;
     }
   }
@@ -1794,6 +1966,9 @@ QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolNa
     {"faceCount", result.value("faceCount")},
     {"edgeCount", result.value("edgeCount")},
     {"labelCount", result.value("labelCount")},
+    {"entityLabelCount", result.value("entityLabelCount")},
+    {"orderLabelCount", result.value("orderLabelCount")},
+    {"partLabelCount", result.value("partLabelCount")},
     {"simplified", result.value("simplified")},
     {"verticalExaggeration", result.value("verticalExaggeration")},
   };
@@ -1901,8 +2076,11 @@ void applyIdsMode(
 
 McpBridgeToolResult renderReviewNodesForMapResult(
   const QString& toolName,
+  mdl::Map& map,
   const std::vector<mdl::Node*>& nodes,
-  const QJsonObject& rawParams)
+  const QJsonObject& rawParams,
+  const McpObjectRegistry* objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore)
 {
   const auto params = normalizedReviewParams(rawParams);
   auto warnings = QJsonArray{};
@@ -1928,31 +2106,10 @@ McpBridgeToolResult renderReviewNodesForMapResult(
   const auto style = reviewStyleFromParams(params, warnings);
   const auto edgeMode = reviewEdgeModeFromParams(params, warnings);
   const auto verticalExaggeration = verticalExaggerationFromParams(params, warnings);
-  const auto includeEntityLabels = optionalBool(params, "includeEntityLabels", true);
-  const auto autoHideLabelsThreshold =
-    optionalIntClamped(params, "autoHideLabelsThreshold", 120, 0, 10000);
-  auto includeOrderLabels = optionalBool(params, "includeOrderLabels", false);
-  if (
-    includeOrderLabels && autoHideLabelsThreshold > 0
-    && static_cast<int>(nodes.size()) > autoHideLabelsThreshold)
-  {
-    includeOrderLabels = false;
-    warnings.push_back(
-      QString{"orderLabelsAutoHidden: targetObjectCount=%1 exceeds threshold=%2"}
-        .arg(nodes.size())
-        .arg(autoHideLabelsThreshold));
-  }
-  const auto includeDirectionLabels =
-    optionalBool(params, "includeDirectionLabels", false);
-  const auto labelStride = optionalIntClamped(params, "labelStride", 1, 1, 1000);
+  const auto labelOptions =
+    labelOptionsFromParams(params, static_cast<int>(nodes.size()), warnings);
   auto geometry = buildRenderGeometry(
-    nodes,
-    warnings,
-    maxFaces,
-    includeEntityLabels,
-    includeOrderLabels,
-    includeDirectionLabels,
-    labelStride);
+    map, nodes, warnings, maxFaces, labelOptions, objectRegistry, metadataStore);
   if (geometry.faces.empty() && geometry.edges.empty())
   {
     addBboxToGeometry(geometry, targetBounds);
@@ -2121,6 +2278,9 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     {"faceCount", static_cast<int>(geometry.faces.size())},
     {"edgeCount", static_cast<int>(geometry.edges.size())},
     {"labelCount", static_cast<int>(geometry.labels.size())},
+    {"entityLabelCount", geometry.entityLabelCount},
+    {"orderLabelCount", geometry.orderLabelCount},
+    {"partLabelCount", geometry.partLabelCount},
   };
   addAbsoluteReviewPaths(result);
   if (!writeManifest(outputDir / "manifest.json", result))
@@ -2144,7 +2304,8 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
   mdl::Map& map,
   const QJsonObject& rawParams,
   const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry)
+  const McpObjectRegistry* objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore)
 {
   const auto params = normalizedReviewParams(rawParams);
   auto warnings = QJsonArray{};
@@ -2189,31 +2350,10 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
   const auto style = reviewStyleFromParams(params, warnings);
   const auto edgeMode = reviewEdgeModeFromParams(params, warnings);
   const auto verticalExaggeration = verticalExaggerationFromParams(params, warnings);
-  const auto includeEntityLabels = optionalBool(params, "includeEntityLabels", true);
-  const auto autoHideLabelsThreshold =
-    optionalIntClamped(params, "autoHideLabelsThreshold", 120, 0, 10000);
-  auto includeOrderLabels = optionalBool(params, "includeOrderLabels", false);
-  if (
-    includeOrderLabels && autoHideLabelsThreshold > 0
-    && static_cast<int>(nodes.size()) > autoHideLabelsThreshold)
-  {
-    includeOrderLabels = false;
-    warnings.push_back(
-      QString{"orderLabelsAutoHidden: targetObjectCount=%1 exceeds threshold=%2"}
-        .arg(nodes.size())
-        .arg(autoHideLabelsThreshold));
-  }
-  const auto includeDirectionLabels =
-    optionalBool(params, "includeDirectionLabels", false);
-  const auto labelStride = optionalIntClamped(params, "labelStride", 1, 1, 1000);
+  const auto labelOptions =
+    labelOptionsFromParams(params, static_cast<int>(nodes.size()), warnings);
   auto geometry = buildRenderGeometry(
-    nodes,
-    warnings,
-    maxFaces,
-    includeEntityLabels,
-    includeOrderLabels,
-    includeDirectionLabels,
-    labelStride);
+    map, nodes, warnings, maxFaces, labelOptions, objectRegistry, metadataStore);
   if (geometry.faces.empty() && geometry.edges.empty())
   {
     addBboxToGeometry(geometry, *targetBounds);
@@ -2386,6 +2526,9 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"faceCount", static_cast<int>(geometry.faces.size())},
     {"edgeCount", static_cast<int>(geometry.edges.size())},
     {"labelCount", static_cast<int>(geometry.labels.size())},
+    {"entityLabelCount", geometry.entityLabelCount},
+    {"orderLabelCount", geometry.orderLabelCount},
+    {"partLabelCount", geometry.partLabelCount},
   };
   addAbsoluteReviewPaths(result);
 
@@ -2409,7 +2552,8 @@ McpBridgeToolResult renderReviewTargetsResult(
   AppController& appController,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry)
+  const McpObjectRegistry* objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (mapWindow == nullptr)
@@ -2417,14 +2561,15 @@ McpBridgeToolResult renderReviewTargetsResult(
     return noActiveDocumentFailure();
   }
   return renderReviewTargetsForMapResult(
-    mapWindow->document().map(), params, history, objectRegistry);
+    mapWindow->document().map(), params, history, objectRegistry, metadataStore);
 }
 
 McpBridgeToolResult renderReviewCurrentSceneForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry)
+  const McpObjectRegistry* objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore)
 {
   auto warnings = QJsonArray{};
   const auto scope = params.value("scope").toString("all").trimmed().toLower();
@@ -2541,8 +2686,13 @@ McpBridgeToolResult renderReviewCurrentSceneForMapResult(
     reviewParams.insert("detail", "summary");
   }
 
-  auto result =
-    renderReviewNodesForMapResult("render_review_current_scene", nodes, reviewParams);
+  auto result = renderReviewNodesForMapResult(
+    "render_review_current_scene",
+    map,
+    nodes,
+    reviewParams,
+    objectRegistry,
+    metadataStore);
   if (result.ok)
   {
     result.result.insert("preset", preset);
@@ -2565,7 +2715,8 @@ McpBridgeToolResult renderReviewCurrentSceneResult(
   AppController& appController,
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry)
+  const McpObjectRegistry* objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (mapWindow == nullptr)
@@ -2574,7 +2725,7 @@ McpBridgeToolResult renderReviewCurrentSceneResult(
   }
 
   return renderReviewCurrentSceneForMapResult(
-    mapWindow->document().map(), params, history, objectRegistry);
+    mapWindow->document().map(), params, history, objectRegistry, metadataStore);
 }
 
 } // namespace tb::ui

@@ -229,17 +229,29 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         if (toolName == "render_review_targets")
         {
           return renderReviewTargetsResult(
-            appController, params, m_operationHistory, &m_objectRegistry);
+            appController,
+            params,
+            m_operationHistory,
+            &m_objectRegistry,
+            &m_brushMetadata);
         }
         if (toolName == "render_review_current_scene")
         {
           return renderReviewCurrentSceneResult(
-            appController, params, m_operationHistory, &m_objectRegistry);
+            appController,
+            params,
+            m_operationHistory,
+            &m_objectRegistry,
+            &m_brushMetadata);
         }
         if (toolName == "render_review_operation")
         {
           return renderReviewOperationResult(
-            appController, params, m_operationHistory, &m_objectRegistry);
+            appController,
+            params,
+            m_operationHistory,
+            &m_objectRegistry,
+            &m_brushMetadata);
         }
         if (toolName == "selector_preview")
         {

@@ -1871,6 +1871,127 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("qualityValid").toBool());
     CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
   }
+
+  SECTION("geometry review renderer auto-hides dense entity labels but keeps glyphs")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+
+    auto registry = McpObjectRegistry{};
+    auto objectIds = QJsonArray{};
+    for (auto i = 0; i < 4; ++i)
+    {
+      auto entity = mdl::Entity{{{"classname", i == 0 ? "info_player_start" : "light"}}};
+      entity.setOrigin(vm::vec3d{i * 32.0, 0.0, 32.0});
+      auto* entityNode = new mdl::EntityNode{std::move(entity)};
+      mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}});
+      objectIds.push_back(registry.registerNode(map, *entityNode));
+    }
+
+    auto tempDir = QTemporaryDir{};
+    REQUIRE(tempDir.isValid());
+    const auto response = renderReviewTargetsForMapResult(
+      map,
+      QJsonObject{
+        {"objectIds", objectIds},
+        {"views", QJsonArray{"top_plan"}},
+        {"includeEntityLabels", true},
+        {"autoHideLabelsThreshold", 3},
+        {"imageSize", QJsonArray{900, 650}},
+        {"outputDir", tempDir.path()},
+      },
+      {},
+      &registry);
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("targetObjectCount").toInt() == 4);
+    CHECK(response.result.value("unsupportedObjectCount").toInt() == 4);
+    CHECK(response.result.value("entityLabelCount").toInt() == 0);
+    CHECK(response.result.value("labelCount").toInt() == 0);
+    CHECK(response.result.value("edgeCount").toInt() == 12);
+    CHECK(response.result.value("qualityValid").toBool());
+    const auto warnings = response.result.value("warnings").toArray();
+    CHECK(std::ranges::any_of(warnings, [](const auto& warning) {
+      return warning.toString().startsWith("entityLabelsAutoHidden");
+    }));
+  }
+
+  SECTION("geometry review renderer labels requested metadata parts")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+    auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+    auto moduleStore = std::map<QString, McpModuleRecord>{};
+    const auto createResponse = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Review part labels"},
+        {"defaultMetadata", QJsonObject{{"moduleId", "review-label-module"}}},
+        {"operations",
+         QJsonArray{
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{0, 0, 0}},
+             {"max", QJsonArray{128, 64, 16}},
+             {"metadata", QJsonObject{{"part", "road"}}},
+           },
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{0, -24, 16}},
+             {"max", QJsonArray{128, -8, 40}},
+             {"metadata", QJsonObject{{"part", "rail"}}},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex,
+      &metadataStore,
+      &moduleStore);
+    REQUIRE(createResponse.ok);
+
+    auto tempDir = QTemporaryDir{};
+    REQUIRE(tempDir.isValid());
+    const auto response = renderReviewTargetsForMapResult(
+      map,
+      QJsonObject{
+        {"operationIds", QJsonArray{createResponse.result.value("operationId")}},
+        {"views", QJsonArray{"top_plan"}},
+        {"labelParts", QJsonArray{"rail"}},
+        {"imageSize", QJsonArray{900, 650}},
+        {"outputDir", tempDir.path()},
+      },
+      history,
+      nullptr,
+      &metadataStore);
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("targetObjectCount").toInt() == 2);
+    CHECK(response.result.value("partLabelCount").toInt() == 1);
+    CHECK(response.result.value("labelCount").toInt() == 1);
+    CHECK(response.result.value("qualityValid").toBool());
+  }
 }
 
 TEST_CASE("McpBridgeServer spiral stair geometry tools")
@@ -2215,8 +2336,8 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   const auto stableId = objectIds.first().toString();
   CHECK(stableId.startsWith("mcp:"));
 
-  const auto resource = server.readResource(
-    createResponse.result.value("resourceUri").toString());
+  const auto resource =
+    server.readResource(createResponse.result.value("resourceUri").toString());
   REQUIRE(resource);
   CHECK(resource->value("changedObjectCount").toInt() == 1);
   CHECK(resource->value("changedObjectIds").isUndefined());
@@ -2470,8 +2591,10 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
     },
     mcp::McpMode::Edit});
   REQUIRE(fullDeleteCreateResponse.ok);
-  const auto fullDeleteTarget =
-    fullDeleteCreateResponse.result.value("changedObjectIds").toArray().first().toString();
+  const auto fullDeleteTarget = fullDeleteCreateResponse.result.value("changedObjectIds")
+                                  .toArray()
+                                  .first()
+                                  .toString();
   const auto fullDeleteResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "11",
     "secret",
