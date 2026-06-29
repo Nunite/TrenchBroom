@@ -338,6 +338,10 @@ TEST_CASE("McpToolCatalog")
     {
       names.push_back(tool.toObject().value("name").toString());
     }
+    names.sort();
+
+    INFO("Modeling profile tools: " << names.join(", ").toStdString());
+    CHECK(names.size() <= 47);
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
@@ -681,22 +685,31 @@ TEST_CASE("McpToolCatalog")
 
   SECTION("tool search can discover hidden tools from modeling profile")
   {
-    const auto tools = toolsSearchJson(
-      "viewport_capture_3d", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
-    auto found = QJsonObject{};
-    for (const auto& tool : tools)
+    for (const auto* hiddenToolName :
+         {"viewport_capture_3d",
+          "render_review_targets",
+          "selection_by_metadata",
+          "geometry_analyze_selection",
+          "face_list"})
     {
-      const auto object = tool.toObject();
-      if (object.value("name").toString() == "viewport_capture_3d")
+      CAPTURE(hiddenToolName);
+      const auto tools = toolsSearchJson(
+        hiddenToolName, "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+      auto found = QJsonObject{};
+      for (const auto& tool : tools)
       {
-        found = object;
-        break;
+        const auto object = tool.toObject();
+        if (object.value("name").toString() == hiddenToolName)
+        {
+          found = object;
+          break;
+        }
       }
-    }
 
-    REQUIRE(!found.isEmpty());
-    CHECK(!found.value("visibleInCurrentProfile").toBool());
-    CHECK(found.value("inputSchema").isObject());
+      REQUIRE(!found.isEmpty());
+      CHECK(!found.value("visibleInCurrentProfile").toBool());
+      CHECK(found.value("inputSchema").isObject());
+    }
   }
 
   SECTION("selector module and IR tools expose compact atomic workflow schemas")
