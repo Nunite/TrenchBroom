@@ -275,6 +275,28 @@ Harden the C++ layer around:
 This phase protects the Agent from wrong-map writes, stale selections, and misleading
 visual review.
 
+Current Phase 3 status:
+
+- Mutating tools reject mismatched `expectedDocumentPath` before dispatch and return
+  active path, process, bridge, and port diagnostics.
+- `McpObjectRegistry` resolves external object ids against the active map and reports
+  stale diagnostics instead of treating stale ids as live targets.
+- Selector/module state is scoped by document fingerprint so metadata from another map
+  is not reused in the active document.
+- File-based IR apply is covered as an execution-kernel path: `ir_apply_from_file`
+  writes through normal transactions/history, registers module metadata, and the
+  resulting module can be recovered with `module_list` and `selector_preview` without
+  carrying long object id arrays.
+- Review tools return `preferredCapturePath` and contact-sheet metadata, and default
+  contact sheets include at most two source captures while keeping individual PNGs in
+  the manifest.
+- Compact `idsMode` responses are covered for create, transform, delete, entity, IR,
+  selector, review, and operation flows.
+- Real TB validation during Phase 2 exercised the execution kernel with three
+  disposable recipe maps through file IR preview/apply, module recovery, selector
+  preview, slope/continuity validation, map validation, and review rendering with no
+  new crash logs.
+
 ### Phase 4: Slim The Default Profile
 
 The Modeling profile should show only the normal path:

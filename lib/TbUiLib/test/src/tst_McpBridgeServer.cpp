@@ -6118,6 +6118,34 @@ TEST_CASE("McpBridgeServer file based IR tools")
   REQUIRE(applied.size() == 1);
   CHECK(applied.at(0).toObject().value("changedObjectIds").isUndefined());
 
+  const auto moduleResponse = moduleListForMapResult(
+    map, QJsonObject{}, metadataStore, moduleStore, McpObjectRegistry{});
+  REQUIRE(moduleResponse.ok);
+  const auto modules = moduleResponse.result.value("modules").toArray();
+  REQUIRE(modules.size() == 1);
+  const auto module = modules.first().toObject();
+  CHECK(module.value("moduleId").toString() == "file-ir-module");
+  CHECK(module.value("liveObjectCount").toInt() == 1);
+  CHECK(module.value("staleObjectCount").toInt() == 0);
+  const auto parts = module.value("parts").toArray();
+  REQUIRE(parts.size() == 1);
+  CHECK(parts.first().toObject().value("part").toString() == "floor");
+  CHECK(parts.first().toObject().value("count").toInt() == 1);
+
+  const auto selectorResponse = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "file-ir-module"}, {"part", "floor"}}},
+      {"idsMode", "count"},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    McpObjectRegistry{});
+  REQUIRE(selectorResponse.ok);
+  CHECK(selectorResponse.result.value("matchedCount").toInt() == 1);
+  CHECK(selectorResponse.result.value("staleExcluded").toInt() == 0);
+
   const auto fullApplyResponse = irApplyFromFileForMapResult(
     map,
     "ir_apply_from_file",
