@@ -21,6 +21,8 @@
 
 #include "mcp/McpToolCatalog.h"
 
+#include <map>
+
 #include <catch2/catch_test_macros.hpp>
 
 namespace tb::mcp
@@ -116,6 +118,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("objects_delete_by_filter"));
     CHECK(findToolDefinition("objects_delete_by_operation"));
     CHECK(findToolDefinition("objects_transform"));
+    CHECK(findToolDefinition("group_create_from_selection"));
+    CHECK(findToolDefinition("group_inspect"));
+    CHECK(findToolDefinition("group_rename_selected"));
+    CHECK(findToolDefinition("group_ungroup_selected"));
     CHECK(findToolDefinition("map_validate"));
     CHECK(findToolDefinition("problems_check"));
     CHECK(findToolDefinition("problems_fix"));
@@ -341,7 +347,7 @@ TEST_CASE("McpToolCatalog")
     names.sort();
 
     INFO("Modeling profile tools: " << names.join(", ").toStdString());
-    CHECK(names.size() <= 48);
+    CHECK(names.size() <= 50);
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
@@ -412,6 +418,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("objects_delete_by_filter"));
     CHECK(!names.contains("objects_delete_by_operation"));
     CHECK(names.contains("objects_transform"));
+    CHECK(names.contains("group_create_from_selection"));
+    CHECK(names.contains("group_inspect"));
+    CHECK(!names.contains("group_rename_selected"));
+    CHECK(!names.contains("group_ungroup_selected"));
     CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_search"));
     CHECK(!names.contains("texture_lock_get"));
@@ -467,6 +477,60 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("render_review_operation"));
     CHECK(!names.contains("overlay_set"));
     CHECK(!names.contains("overlay_clear"));
+  }
+
+  SECTION("group tools expose native grouping path without profile noise")
+  {
+    const auto createTool = findToolDefinition("group_create_from_selection");
+    const auto inspectTool = findToolDefinition("group_inspect");
+    const auto renameTool = findToolDefinition("group_rename_selected");
+    const auto ungroupTool = findToolDefinition("group_ungroup_selected");
+    REQUIRE(createTool);
+    REQUIRE(inspectTool);
+    REQUIRE(renameTool);
+    REQUIRE(ungroupTool);
+
+    CHECK(createTool->category == "group");
+    CHECK(inspectTool->category == "group");
+    CHECK(renameTool->category == "group");
+    CHECK(ungroupTool->category == "group");
+    CHECK(createTool->mutatesDocument);
+    CHECK_FALSE(inspectTool->mutatesDocument);
+    CHECK(renameTool->mutatesDocument);
+    CHECK(ungroupTool->mutatesDocument);
+
+    const auto modelingTools =
+      toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    auto modelingNames = QStringList{};
+    for (const auto& entry : modelingTools)
+    {
+      modelingNames.push_back(entry.toObject().value("name").toString());
+    }
+    CHECK(modelingNames.contains("group_create_from_selection"));
+    CHECK(modelingNames.contains("group_inspect"));
+    CHECK_FALSE(modelingNames.contains("group_rename_selected"));
+    CHECK_FALSE(modelingNames.contains("group_ungroup_selected"));
+
+    const auto searchResults =
+      toolsSearchJson("group", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    auto searchNames = QStringList{};
+    auto visibility = std::map<QString, bool>{};
+    for (const auto& entry : searchResults)
+    {
+      const auto object = entry.toObject();
+      const auto name = object.value("name").toString();
+      searchNames.push_back(name);
+      visibility[name] = object.value("visibleInCurrentProfile").toBool();
+      CHECK(object.value("inputSchema").isObject());
+    }
+    CHECK(searchNames.contains("group_create_from_selection"));
+    CHECK(searchNames.contains("group_inspect"));
+    CHECK(searchNames.contains("group_rename_selected"));
+    CHECK(searchNames.contains("group_ungroup_selected"));
+    CHECK(visibility["group_create_from_selection"]);
+    CHECK(visibility["group_inspect"]);
+    CHECK_FALSE(visibility["group_rename_selected"]);
+    CHECK_FALSE(visibility["group_ungroup_selected"]);
   }
 
   SECTION("modeling read-only profile hides entity schema helpers by default")

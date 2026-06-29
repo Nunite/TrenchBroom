@@ -530,6 +530,44 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             m_nextOperationIndex,
             m_objectRegistry);
         }
+        if (toolName == "group_create_from_selection")
+        {
+          return groupCreateFromSelectionResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry,
+            &m_brushMetadata,
+            &m_modules);
+        }
+        if (toolName == "group_inspect")
+        {
+          return groupInspectResult(appController, params, m_objectRegistry);
+        }
+        if (toolName == "group_rename_selected")
+        {
+          return groupRenameSelectedResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
+        }
+        if (toolName == "group_ungroup_selected")
+        {
+          return groupUngroupSelectedResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry,
+            &m_brushMetadata,
+            &m_modules);
+        }
         if (toolName == "asset_search")
         {
           return assetSearchResult(appController, params);
@@ -738,7 +776,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             m_operationHistory,
             m_nextOperationIndex,
             &m_brushMetadata,
-            &m_modules);
+            &m_modules,
+            &m_objectRegistry);
         }
         if (
           toolName == "blockout_create_room" || toolName == "blockout_create_corridor"

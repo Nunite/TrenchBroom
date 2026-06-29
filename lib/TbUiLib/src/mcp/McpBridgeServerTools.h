@@ -571,6 +571,62 @@ McpBridgeToolResult deleteObjectsByOperationForMapResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult groupCreateFromSelectionResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr);
+McpBridgeToolResult groupCreateFromSelectionForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr);
+McpBridgeToolResult groupInspectResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult groupInspectForMapResult(
+  mdl::Map& map, const QJsonObject& params, const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult groupRenameSelectedResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult groupRenameSelectedForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult groupUngroupSelectedResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr);
+McpBridgeToolResult groupUngroupSelectedForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult transformObjectsResult(
   AppController& appController,
   const QString& toolName,
@@ -624,7 +680,8 @@ McpBridgeToolResult blockoutCreateBatchResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
-  std::map<QString, McpModuleRecord>* moduleStore = nullptr);
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult blockoutCreateBatchForMapResult(
   mdl::Map& map,
   const QString& toolName,
@@ -638,7 +695,8 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>* metadataStore,
-  std::map<QString, McpModuleRecord>* moduleStore);
+  std::map<QString, McpModuleRecord>* moduleStore,
+  const McpObjectRegistry* objectRegistry);
 McpBridgeToolResult blockoutCompilePreviewForMapResult(
   mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult pythonGenerateBlockoutResult(

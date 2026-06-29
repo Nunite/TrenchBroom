@@ -37,8 +37,10 @@
 #include "mdl/EntityDefinitionManager.h"
 #include "mdl/EntityNode.h"
 #include "mdl/GameConfigFixture.h"
+#include "mdl/GroupNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
+#include "mdl/Map_Groups.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/WorldNode.h"
@@ -2608,6 +2610,104 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   CHECK(fullDeletedObjectIds.first().toString() == fullDeleteTarget);
 }
 
+TEST_CASE("McpBridgeServer externalizes native group object ids")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto registry = McpObjectRegistry{};
+
+  auto server = McpBridgeServer{
+    [&](const QString& toolName, const QJsonObject& params) {
+      if (toolName == "blockout_create_batch")
+      {
+        return blockoutCreateBatchForMapResult(
+          map, toolName, params, history, nextOperationIndex);
+      }
+      if (toolName == "group_create_from_selection")
+      {
+        return groupCreateFromSelectionForMapResult(
+          map, toolName, params, history, nextOperationIndex, registry);
+      }
+      if (toolName == "group_inspect")
+      {
+        return McpBridgeToolResult::success(QJsonObject{
+          {"receivedLegacyPath", params.value("objectId").toString()},
+        });
+      }
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::ToolNotFound, QString{"Unexpected tool: %1"}.arg(toolName));
+    },
+    [&map]() -> mdl::Map* { return &map; }};
+  REQUIRE(server.start(
+    mcp::McpBridgeConfig{"test-pipe-group-stable-id", "secret", mcp::McpMode::Edit}));
+
+  const auto createResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "1",
+    "secret",
+    "blockout_create_batch",
+    QJsonObject{
+      {"select", true},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{80, 0, 0}},
+           {"max", QJsonArray{144, 64, 16}},
+         },
+       }},
+    },
+    mcp::McpMode::Edit});
+  REQUIRE(createResponse.ok);
+  REQUIRE(map.selection().nodes.size() == 2);
+
+  const auto groupResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "2",
+    "secret",
+    "group_create_from_selection",
+    QJsonObject{{"name", "stable-group"}, {"idsMode", "count"}},
+    mcp::McpMode::Edit});
+  const auto groupError = groupResponse.ok ? QString{} : groupResponse.error->message;
+  INFO(groupError.toStdString());
+  REQUIRE(groupResponse.ok);
+  const auto groupId = groupResponse.result.value("groupId").toString();
+  CHECK(groupId.startsWith("mcp:"));
+  CHECK(
+    groupId
+    != createResponse.result.value("changedObjectIds").toArray().first().toString());
+  CHECK(
+    groupResponse.result.value("group").toObject().value("groupId").toString()
+    == groupId);
+  CHECK(groupResponse.result.value("changedObjectCount").toInt() == 1);
+  CHECK(
+    groupResponse.result.value("childCounts").toObject().value("brushes").toInt() == 2);
+
+  const auto inspectResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "3",
+    "secret",
+    "group_inspect",
+    QJsonObject{{"objectId", groupId}},
+    mcp::McpMode::ReadOnly});
+  REQUIRE(inspectResponse.ok);
+  CHECK(
+    inspectResponse.result.value("receivedLegacyPath").toString().startsWith("node:"));
+}
+
 TEST_CASE("McpBridgeServer scopes selector metadata and modules to active document")
 {
   auto appControllerFixture = AppControllerFixture{};
@@ -2653,7 +2753,8 @@ TEST_CASE("McpBridgeServer scopes selector metadata and modules to active docume
     history,
     nextOperationIndex,
     &metadataStore,
-    &moduleStore);
+    &moduleStore,
+    &objectRegistry);
   const auto firstCreateError =
     firstCreate.ok ? std::string{} : firstCreate.error.message.toStdString();
   INFO(firstCreateError);
@@ -2987,6 +3088,325 @@ TEST_CASE("McpBridgeServer transforms selector targets without long id lists")
     == "missing-transform-route");
   CHECK(missResponse.error.details.value("selectorMatchedCount").toInt() == 0);
   CHECK(history.back().toolName == "objects_transform");
+}
+
+TEST_CASE("McpBridgeServer native group tools")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+
+  const auto createBrushes = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"detail", "ids"},
+      {"select", true},
+      {"defaultMetadata",
+       QJsonObject{
+         {"moduleId", "group-route"},
+         {"part", "road"},
+         {"role", "walkable"},
+       }},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+           {"metadata", QJsonObject{{"order", 1}}},
+         },
+         QJsonObject{
+           {"type", "ramp_between"},
+           {"start", QJsonArray{64, 32, 16}},
+           {"end", QJsonArray{192, 32, 64}},
+           {"width", 64},
+           {"thickness", 16},
+           {"metadata", QJsonObject{{"order", 2}}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{192, 0, 64}},
+           {"max", QJsonArray{256, 64, 80}},
+           {"metadata", QJsonObject{{"order", 3}}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    nullptr);
+  const auto createError =
+    createBrushes.ok ? std::string{} : createBrushes.error.message.toStdString();
+  INFO(createError);
+  REQUIRE(createBrushes.ok);
+  REQUIRE(map.selection().nodes.size() == 3);
+
+  const auto groupResponse = groupCreateFromSelectionForMapResult(
+    map,
+    "group_create_from_selection",
+    QJsonObject{{"name", "road-group-initial"}},
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    &metadataStore);
+  const auto groupError =
+    groupResponse.ok ? std::string{} : groupResponse.error.message.toStdString();
+  INFO(groupError);
+  REQUIRE(groupResponse.ok);
+  REQUIRE(map.selection().hasOnlyGroups());
+  auto* groupNode = map.selection().groups.front();
+  REQUIRE(groupNode != nullptr);
+  CHECK(groupNode->group().name() == "road-group-initial");
+
+  const auto groupId = groupResponse.result.value("groupId").toString();
+  CHECK_FALSE(groupId.isEmpty());
+  CHECK(groupResponse.result.value("changedObjectCount").toInt() == 1);
+  CHECK(groupResponse.result.value("sourceSelectionCount").toInt() == 3);
+  CHECK(
+    groupResponse.result.value("childCounts").toObject().value("brushes").toInt() == 3);
+  CHECK(history.back().toolName == "group_create_from_selection");
+
+  const auto inspectResponse = groupInspectForMapResult(
+    map,
+    QJsonObject{
+      {"objectId", groupId},
+      {"includeChildren", true},
+      {"idsMode", "sample"},
+    },
+    objectRegistry);
+  const auto inspectError =
+    inspectResponse.ok ? std::string{} : inspectResponse.error.message.toStdString();
+  INFO(inspectError);
+  REQUIRE(inspectResponse.ok);
+  CHECK(inspectResponse.result.value("groupName").toString() == "road-group-initial");
+  CHECK(inspectResponse.result.value("childCount").toInt() == 3);
+  CHECK(inspectResponse.result.value("childIdCount").toInt() == 3);
+  CHECK(inspectResponse.result.value("childIdSample").toArray().size() == 3);
+
+  const auto transformGroup = transformObjectsForMapResult(
+    map,
+    "objects_transform",
+    QJsonObject{
+      {"operation", "translate"},
+      {"delta", QJsonArray{16, 0, 0}},
+    },
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  const auto transformError =
+    transformGroup.ok ? std::string{} : transformGroup.error.message.toStdString();
+  INFO(transformError);
+  REQUIRE(transformGroup.ok);
+  CHECK(transformGroup.result.value("targetSource").toString() == "selection");
+  CHECK(transformGroup.result.value("targetCount").toInt() == 1);
+  CHECK(map.selection().hasOnlyGroups());
+
+  const auto selectionAnalysis = geometryAnalyzeSelectionResult(map, QJsonObject{});
+  REQUIRE(selectionAnalysis.ok);
+  CHECK(selectionAnalysis.result.value("brushCount").toInt() == 3);
+
+  const auto renameResponse = groupRenameSelectedForMapResult(
+    map,
+    "group_rename_selected",
+    QJsonObject{{"name", "road-group"}},
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  const auto renameError =
+    renameResponse.ok ? std::string{} : renameResponse.error.message.toStdString();
+  INFO(renameError);
+  REQUIRE(renameResponse.ok);
+  CHECK(groupNode->group().name() == "road-group");
+  CHECK(history.back().toolName == "group_rename_selected");
+
+  REQUIRE(map.undoCommandName() != nullptr);
+  CHECK(QString::fromStdString(*map.undoCommandName()) == "Rename Group");
+  const auto undoRename = historyUndoForMapResult(map, history);
+  const auto undoRenameError =
+    undoRename.ok ? std::string{} : undoRename.error.message.toStdString();
+  INFO(undoRenameError);
+  REQUIRE(undoRename.ok);
+  CHECK(groupNode->group().name() == "road-group-initial");
+
+  REQUIRE(map.redoCommandName() != nullptr);
+  CHECK(QString::fromStdString(*map.redoCommandName()) == "Rename Group");
+  map.redoCommand();
+  CHECK(groupNode->group().name() == "road-group");
+
+  mdl::deselectAll(map);
+  mdl::selectNodes(map, {groupNode});
+  const auto ungroupResponse = groupUngroupSelectedForMapResult(
+    map,
+    "group_ungroup_selected",
+    QJsonObject{{"idsMode", "sample"}},
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  const auto ungroupError =
+    ungroupResponse.ok ? std::string{} : ungroupResponse.error.message.toStdString();
+  INFO(ungroupError);
+  REQUIRE(ungroupResponse.ok);
+  CHECK_FALSE(map.selection().hasOnlyGroups());
+  CHECK(map.selection().nodes.size() == 3);
+  CHECK(ungroupResponse.result.value("ungroupedGroupCount").toInt() == 1);
+  CHECK(ungroupResponse.result.value("selectedObjectIdCount").toInt() == 3);
+  CHECK(ungroupResponse.result.value("selectedObjectIdSample").toArray().size() == 3);
+  CHECK(
+    ungroupResponse.result.value("selectedCounts").toObject().value("brushes").toInt()
+    == 3);
+
+  const auto selectedChildren = map.selection().nodes;
+  REQUIRE(!selectedChildren.empty());
+  const auto selectedChildIds =
+    ungroupResponse.result.value("selectedObjectIdSample").toArray();
+  REQUIRE(!selectedChildIds.isEmpty());
+  const auto inspectNonGroup = groupInspectForMapResult(
+    map, QJsonObject{{"objectId", selectedChildIds.first()}}, objectRegistry);
+  CHECK_FALSE(inspectNonGroup.ok);
+  CHECK(inspectNonGroup.error.message.contains("not a group"));
+
+  mdl::deselectAll(map);
+  mdl::selectNodes(map, {selectedChildren.front()});
+  const auto renameNonGroup = groupRenameSelectedForMapResult(
+    map,
+    "group_rename_selected",
+    QJsonObject{{"name", "bad"}},
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  CHECK_FALSE(renameNonGroup.ok);
+  CHECK(renameNonGroup.error.message.contains("only groups"));
+}
+
+TEST_CASE("McpBridgeServer keeps selector metadata live after grouping")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+
+  const auto createBrushes = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"select", false},
+      {"defaultMetadata",
+       QJsonObject{
+         {"moduleId", "group-refresh-route"},
+         {"routeId", "group-refresh-route"},
+       }},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+           {"metadata", QJsonObject{{"part", "road"}, {"role", "walkable"}}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{80, 0, 0}},
+           {"max", QJsonArray{144, 64, 16}},
+           {"metadata", QJsonObject{{"part", "rails"}, {"role", "boundary"}}},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{160, 0, 0}},
+           {"max", QJsonArray{224, 64, 16}},
+           {"metadata", QJsonObject{{"part", "supports"}, {"role", "support"}}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(createBrushes.ok);
+
+  const auto previewRoad = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "group-refresh-route"}, {"part", "road"}}},
+      {"idsMode", "sample"},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(previewRoad.ok);
+  CHECK(previewRoad.result.value("matchedCount").toInt() == 1);
+  const auto roadId =
+    previewRoad.result.value("objectIdSample").toArray().first().toString();
+  REQUIRE(!roadId.isEmpty());
+  const auto resolvedRoad = objectRegistry.resolveExternalId(map, roadId);
+  REQUIRE(resolvedRoad.ok);
+  const auto roadPath = McpObjectRegistry::parseLegacyObjectId(resolvedRoad.legacyPathId);
+  REQUIRE(roadPath);
+  auto* roadNode = map.worldNode().resolvePath(*roadPath);
+  REQUIRE(roadNode != nullptr);
+  mdl::deselectAll(map);
+  mdl::selectNodes(map, {roadNode});
+
+  const auto groupRoad = groupCreateFromSelectionForMapResult(
+    map,
+    "group_create_from_selection",
+    QJsonObject{{"name", "group-refresh-road"}},
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(groupRoad.ok);
+
+  const auto previewSupports = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector",
+       QJsonObject{{"moduleId", "group-refresh-route"}, {"part", "supports"}}},
+      {"idsMode", "sample"},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(previewSupports.ok);
+  CHECK(previewSupports.result.value("matchedCount").toInt() == 1);
+  CHECK(previewSupports.result.value("warnings").toArray().isEmpty());
+  const auto sample = previewSupports.result.value("sample").toArray();
+  REQUIRE(sample.size() == 1);
+  CHECK(
+    sample.first().toObject().value("metadata").toObject().value("part") == "supports");
+
+  const auto moduleList = moduleListForMapResult(
+    map, QJsonObject{}, metadataStore, moduleStore, objectRegistry);
+  REQUIRE(moduleList.ok);
+  CHECK(moduleList.result.value("liveModuleCount").toInt() == 1);
+  CHECK(moduleList.result.value("staleModuleCount").toInt() == 0);
 }
 
 TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")

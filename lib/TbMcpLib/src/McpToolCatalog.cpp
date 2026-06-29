@@ -2539,6 +2539,80 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"operation"}),
     },
     {
+      "group_create_from_selection",
+      "Create a native TrenchBroom group from the current user selection. Groups are "
+      "for visible Outliner organization and user selection convenience; keep semantic "
+      "tracking in module/metadata/selector records.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"name", stringProperty("Native TrenchBroom group name.")},
+          {"selectGroup",
+           boolProperty("Select the new group after creation. Defaults to true.")},
+          {"idsMode",
+           stringProperty(
+             "Returned group id detail: count (default), sample, full, or none.")},
+          {"sampleLimit",
+           integerProperty("Maximum sampled ids when idsMode=sample. Defaults to 12.")},
+        },
+        {"name"}),
+    },
+    {
+      "group_inspect",
+      "Inspect native TrenchBroom group structure by objectId/objectIds or by current "
+      "selected group. Returns group name, bounds, child counts, edit state, and linked "
+      "group summary. This does not read or write semantic metadata.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"objectId", stringProperty("Optional MCP group object id to inspect.")},
+        {"objectIds", arrayProperty("Optional MCP group object ids to inspect.")},
+        {"includeChildren",
+         boolProperty(
+           "Include direct child ids according to idsMode. Defaults to false.")},
+        {"idsMode",
+         stringProperty(
+           "Returned child id detail when includeChildren=true: sample (default), "
+           "count, full, or none.")},
+        {"sampleLimit",
+         integerProperty("Maximum sampled ids when idsMode=sample. Defaults to 12.")},
+      }),
+    },
+    {
+      "group_rename_selected",
+      "Rename the currently selected native TrenchBroom group or groups. The current "
+      "selection must contain only groups.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"name", stringProperty("New native TrenchBroom group name.")},
+          {"idsMode",
+           stringProperty(
+             "Returned group id detail: count (default), sample, full, or none.")},
+        },
+        {"name"}),
+    },
+    {
+      "group_ungroup_selected",
+      "Ungroup the currently selected native TrenchBroom groups and leave their former "
+      "children selected. Use for organization cleanup, not semantic metadata changes.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema({
+        {"idsMode",
+         stringProperty(
+           "Returned selected child id detail: count (default), sample, full, or none.")},
+        {"sampleLimit",
+         integerProperty("Maximum sampled ids when idsMode=sample. Defaults to 12.")},
+      }),
+    },
+    {
       "map_validate",
       "Validate the active map and return compact problem counts by default.",
       McpMode::ReadOnly,
@@ -3424,6 +3498,16 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       {
         tool.category = "object";
       }
+      else if (tool.name.startsWith("group_"))
+      {
+        tool.category = "group";
+        tool.minimumProfile = McpToolProfile::Modeling;
+        if (tool.name == "group_rename_selected" || tool.name == "group_ungroup_selected")
+        {
+          tool.expert = true;
+          tool.minimumProfile = McpToolProfile::Full;
+        }
+      }
       else if (tool.name.startsWith("texture_") || tool.name.startsWith("face_"))
       {
         tool.category = "texture";
@@ -3566,6 +3650,8 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "geometry_analyze_slopes",
     "geometry_analyze_route_continuity",
     "objects_transform",
+    "group_create_from_selection",
+    "group_inspect",
     "entity_create_checked",
     "entity_create_checked_batch",
     "entity_properties_update",

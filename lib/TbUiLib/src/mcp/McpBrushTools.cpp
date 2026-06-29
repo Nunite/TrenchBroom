@@ -6038,7 +6038,8 @@ McpBridgeToolResult blockoutCreateBatchResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>* metadataStore,
-  std::map<QString, McpModuleRecord>* moduleStore)
+  std::map<QString, McpModuleRecord>* moduleStore,
+  const McpObjectRegistry* objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -6053,7 +6054,8 @@ McpBridgeToolResult blockoutCreateBatchResult(
     history,
     nextOperationIndex,
     metadataStore,
-    moduleStore);
+    moduleStore,
+    objectRegistry);
 }
 
 McpBridgeToolResult createBoxesBatchResult(
@@ -6114,6 +6116,27 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>* metadataStore,
   std::map<QString, McpModuleRecord>* moduleStore)
+{
+  return blockoutCreateBatchForMapResult(
+    map,
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    nullptr);
+}
+
+McpBridgeToolResult blockoutCreateBatchForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore,
+  const McpObjectRegistry* objectRegistry)
 {
   auto batchParams = params;
   if (toolName == "blockout_create_curved_corridor")
@@ -6299,6 +6322,14 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
           && history.back().operationId == result.value("operationId").toString()
         ? history.back().changedObjectIds
         : QStringList{};
+    auto metadataObjectIds = changedIds;
+    if (objectRegistry != nullptr)
+    {
+      for (auto& objectId : metadataObjectIds)
+      {
+        objectId = objectRegistry->externalIdForLegacy(map, objectId);
+      }
+    }
     const auto metadataCount = storeBatchOperationMetadata(
       [&]() {
         auto expanded = QJsonArray{};
@@ -6308,7 +6339,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
         }
         return expanded;
       }(),
-      changedIds,
+      metadataObjectIds,
       documentFingerprintForMap(map),
       defaultMetadata,
       *metadataStore,
@@ -6431,7 +6462,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   int& nextOperationIndex)
 {
   return blockoutCreateBatchForMapResult(
-    map, toolName, params, history, nextOperationIndex, nullptr, nullptr);
+    map, toolName, params, history, nextOperationIndex, nullptr, nullptr, nullptr);
 }
 
 McpBridgeToolResult brushTypesListResult()

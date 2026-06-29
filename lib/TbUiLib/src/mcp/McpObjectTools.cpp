@@ -26,12 +26,18 @@
 #include "McpSelectionQuery.h"
 #include "mcp/McpError.h"
 #include "mdl/AddRemoveNodesCommand.h"
+#include "mdl/BrushNode.h"
 #include "mdl/EditorContext.h"
+#include "mdl/EntityNodeBase.h"
+#include "mdl/GroupNode.h"
+#include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Geometry.h"
+#include "mdl/Map_Groups.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Node.h"
+#include "mdl/PatchNode.h"
 #include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
 #include "ui/AppController.h"
@@ -52,6 +58,7 @@
 #include <map>
 #include <optional>
 #include <ranges>
+#include <string>
 #include <vector>
 
 namespace tb::ui
@@ -139,6 +146,346 @@ QJsonObject mutationResultJson(
   result.insert("transactionName", operation.transactionName);
   mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
+}
+
+struct NodeTypeCounts
+{
+  int groups = 0;
+  int entities = 0;
+  int brushes = 0;
+  int patches = 0;
+  int layers = 0;
+  int other = 0;
+};
+
+void addNodeType(NodeTypeCounts& counts, const mdl::Node& node)
+{
+  if (dynamic_cast<const mdl::GroupNode*>(&node) != nullptr)
+  {
+    ++counts.groups;
+  }
+  else if (dynamic_cast<const mdl::LayerNode*>(&node) != nullptr)
+  {
+    ++counts.layers;
+  }
+  else if (dynamic_cast<const mdl::EntityNodeBase*>(&node) != nullptr)
+  {
+    ++counts.entities;
+  }
+  else if (dynamic_cast<const mdl::BrushNode*>(&node) != nullptr)
+  {
+    ++counts.brushes;
+  }
+  else if (dynamic_cast<const mdl::PatchNode*>(&node) != nullptr)
+  {
+    ++counts.patches;
+  }
+  else
+  {
+    ++counts.other;
+  }
+}
+
+QJsonObject nodeTypeCountsJson(const NodeTypeCounts& counts)
+{
+  return QJsonObject{
+    {"groups", counts.groups},
+    {"entities", counts.entities},
+    {"brushes", counts.brushes},
+    {"patches", counts.patches},
+    {"layers", counts.layers},
+    {"other", counts.other},
+  };
+}
+
+NodeTypeCounts directChildCounts(const mdl::Node& node)
+{
+  auto counts = NodeTypeCounts{};
+  for (const auto* child : node.children())
+  {
+    if (child != nullptr)
+    {
+      addNodeType(counts, *child);
+    }
+  }
+  return counts;
+}
+
+NodeTypeCounts descendantCounts(const mdl::Node& node)
+{
+  auto counts = NodeTypeCounts{};
+  const auto collect = [&](auto&& thisLambda, const mdl::Node& current) -> void {
+    for (const auto* child : current.children())
+    {
+      if (child == nullptr)
+      {
+        continue;
+      }
+      addNodeType(counts, *child);
+      thisLambda(thisLambda, *child);
+    }
+  };
+  collect(collect, node);
+  return counts;
+}
+
+NodeTypeCounts countsForNodes(const std::vector<mdl::Node*>& nodes)
+{
+  auto counts = NodeTypeCounts{};
+  for (const auto* node : nodes)
+  {
+    if (node != nullptr)
+    {
+      addNodeType(counts, *node);
+    }
+  }
+  return counts;
+}
+
+QJsonArray nodeIdsJson(
+  mdl::Map& map,
+  const std::vector<mdl::Node*>& nodes,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto result = QJsonArray{};
+  for (const auto* node : nodes)
+  {
+    if (node != nullptr)
+    {
+      result.push_back(
+        objectRegistry.externalIdForLegacy(map, nodePathId(*node, map.worldNode())));
+    }
+  }
+  return result;
+}
+
+void applyNodeIdsMode(
+  QJsonObject& result,
+  const QString& pluralKey,
+  const QString& sampleKey,
+  const QString& countKey,
+  mdl::Map& map,
+  const std::vector<mdl::Node*>& nodes,
+  const McpObjectRegistry& objectRegistry,
+  const QString& idsMode,
+  const int sampleLimit)
+{
+  result.remove(pluralKey);
+  result.remove(sampleKey);
+  result.insert(countKey, static_cast<int>(nodes.size()));
+
+  const auto normalized = idsMode.trimmed().toLower();
+  if (normalized == "full")
+  {
+    result.insert(pluralKey, nodeIdsJson(map, nodes, objectRegistry));
+  }
+  else if (normalized == "sample")
+  {
+    auto sampleNodes = nodes;
+    const auto limit = std::clamp(sampleLimit, 0, 100);
+    if (static_cast<int>(sampleNodes.size()) > limit)
+    {
+      sampleNodes.resize(static_cast<size_t>(limit));
+    }
+    result.insert(sampleKey, nodeIdsJson(map, sampleNodes, objectRegistry));
+  }
+  else if (normalized != "none" && normalized != "count" && !normalized.isEmpty())
+  {
+    auto warnings = result.value("warnings").toArray();
+    warnings.push_back(
+      QString{"unknownIdsMode: %1; returned %2 only"}.arg(idsMode, countKey));
+    result.insert("warnings", warnings);
+  }
+}
+
+QJsonObject groupSummaryJson(
+  mdl::Map& map,
+  mdl::GroupNode& groupNode,
+  const McpObjectRegistry& objectRegistry,
+  const bool includeChildren,
+  const QString& idsMode,
+  const int sampleLimit)
+{
+  auto result = QJsonObject{
+    {"groupId", nodePathId(groupNode, map.worldNode())},
+    {"groupName", QString::fromStdString(groupNode.group().name())},
+    {"bounds", boundsToJson(groupNode.logicalBounds())},
+    {"childCount", static_cast<int>(groupNode.childCount())},
+    {"childCounts", nodeTypeCountsJson(directChildCounts(groupNode))},
+    {"descendantCounts", nodeTypeCountsJson(descendantCounts(groupNode))},
+    {"opened", groupNode.opened()},
+    {"closed", groupNode.closed()},
+    {"hasOpenedDescendant", groupNode.hasOpenedDescendant()},
+    {"hasPendingChanges", groupNode.hasPendingChanges()},
+    {"linkId", QString::fromStdString(groupNode.linkId())},
+  };
+  if (groupNode.persistentId())
+  {
+    result.insert(
+      "persistentId",
+      QString::number(static_cast<qulonglong>(*groupNode.persistentId())));
+  }
+  if (includeChildren)
+  {
+    applyNodeIdsMode(
+      result,
+      "childIds",
+      "childIdSample",
+      "childIdCount",
+      map,
+      groupNode.children(),
+      objectRegistry,
+      idsMode,
+      sampleLimit);
+  }
+  return result;
+}
+
+mdl::Node* resolveNodeIdWithRegistry(
+  mdl::Map& map,
+  const QString& objectId,
+  const McpObjectRegistry& objectRegistry,
+  QString& error)
+{
+  const auto resolved = objectRegistry.resolveExternalId(map, objectId);
+  if (!resolved.ok)
+  {
+    error = resolved.error;
+    return nullptr;
+  }
+  auto* node = resolveNodeId(map.worldNode(), resolved.legacyPathId);
+  if (node == nullptr)
+  {
+    error = QString{"MCP object id no longer resolves: %1"}.arg(objectId);
+  }
+  return node;
+}
+
+void refreshMetadataObjectPaths(
+  mdl::Map& map,
+  const McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
+{
+  if (metadataStore == nullptr)
+  {
+    return;
+  }
+
+  const auto documentFingerprint = documentFingerprintForMap(map, &objectRegistry);
+  auto idUpdates = std::map<QString, QString>{};
+  auto refreshedMetadata = std::map<QString, McpBrushMetadataRecord>{};
+
+  for (const auto& [storedKey, record] : *metadataStore)
+  {
+    auto refreshed = record;
+    auto newKey = storedKey;
+    if (
+      !record.stale
+      && (record.documentFingerprint.isEmpty() || record.documentFingerprint == documentFingerprint))
+    {
+      const auto resolved = objectRegistry.resolveExternalId(map, record.objectId);
+      if (resolved.ok && !resolved.legacyPathId.isEmpty())
+      {
+        const auto oldObjectId = record.objectId;
+        refreshed.objectId = resolved.legacyPathId;
+        refreshed.documentFingerprint = documentFingerprint;
+        newKey = QString{"%1|%2"}.arg(documentFingerprint, refreshed.objectId);
+        if (oldObjectId != refreshed.objectId)
+        {
+          idUpdates[oldObjectId] = refreshed.objectId;
+        }
+      }
+    }
+    refreshedMetadata[newKey] = std::move(refreshed);
+  }
+
+  *metadataStore = std::move(refreshedMetadata);
+
+  if (moduleStore == nullptr || idUpdates.empty())
+  {
+    return;
+  }
+  for (auto& [moduleKey, module] : *moduleStore)
+  {
+    Q_UNUSED(moduleKey);
+    for (auto& objectId : module.objectIds)
+    {
+      if (const auto it = idUpdates.find(objectId); it != idUpdates.end())
+      {
+        objectId = it->second;
+      }
+    }
+    module.objectIds.removeDuplicates();
+  }
+}
+
+std::optional<std::vector<mdl::GroupNode*>> groupTargetsFromParamsOrSelection(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry,
+  QString& error)
+{
+  auto groups = std::vector<mdl::GroupNode*>{};
+  const auto objectId = params.value("objectId").toString().trimmed();
+  if (!objectId.isEmpty())
+  {
+    auto* node = resolveNodeIdWithRegistry(map, objectId, objectRegistry, error);
+    if (node == nullptr)
+    {
+      return std::nullopt;
+    }
+    auto* groupNode = dynamic_cast<mdl::GroupNode*>(node);
+    if (groupNode == nullptr)
+    {
+      error = QString{"objectId is not a group: %1"}.arg(objectId);
+      return std::nullopt;
+    }
+    groups.push_back(groupNode);
+  }
+  else if (params.value("objectIds").isArray())
+  {
+    for (const auto& value : params.value("objectIds").toArray())
+    {
+      if (!value.isString())
+      {
+        error = "objectIds must contain only strings";
+        return std::nullopt;
+      }
+      auto* node =
+        resolveNodeIdWithRegistry(map, value.toString(), objectRegistry, error);
+      if (node == nullptr)
+      {
+        return std::nullopt;
+      }
+      auto* groupNode = dynamic_cast<mdl::GroupNode*>(node);
+      if (groupNode == nullptr)
+      {
+        error =
+          QString{"objectIds contains a non-group object: %1"}.arg(value.toString());
+        return std::nullopt;
+      }
+      groups.push_back(groupNode);
+    }
+  }
+  else
+  {
+    for (auto* groupNode : map.selection().groups)
+    {
+      if (groupNode != nullptr)
+      {
+        groups.push_back(groupNode);
+      }
+    }
+  }
+
+  groups = kdl::vec_sort_and_remove_duplicates(std::move(groups));
+  if (groups.empty())
+  {
+    error = "No selected or addressed groups";
+    return std::nullopt;
+  }
+  return groups;
 }
 
 void mcpRecordOperation(
@@ -949,6 +1296,336 @@ McpBridgeToolResult deleteObjectsByOperationForMapResult(
   markDeleteOperation(history, result, deletedObjectIds, mcpIdsModeFromParams(params));
   result.insert("sourceOperationId", operationId);
   result.insert("deletedCount", deletedObjectIds.size());
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult groupCreateFromSelectionResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  return groupCreateFromSelectionForMapResult(
+    mapWindow->document().map(),
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    metadataStore,
+    moduleStore);
+}
+
+McpBridgeToolResult groupCreateFromSelectionForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
+{
+  const auto name = params.value("name").toString().trimmed();
+  if (name.isEmpty())
+  {
+    return invalidParamsFailure("group_create_from_selection requires name");
+  }
+  if (!map.selection().hasNodes())
+  {
+    return invalidParamsFailure("group_create_from_selection requires selected objects");
+  }
+
+  const auto selectedBefore = map.selection().nodes;
+  auto* groupNode = mdl::groupSelectedNodes(map, name.toStdString());
+  if (groupNode == nullptr)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden, "Selected objects cannot be grouped");
+  }
+
+  const auto selectGroup = params.value("selectGroup").toBool(true);
+  if (!selectGroup)
+  {
+    mdl::deselectAll(map);
+  }
+  refreshMetadataObjectPaths(map, objectRegistry, metadataStore, moduleStore);
+
+  auto result = QJsonObject{};
+  const auto groupLegacyId = nodePathId(*groupNode, map.worldNode());
+  auto changedObjectIds = QJsonArray{groupLegacyId};
+  const auto transactionName = QString{"Group Selected Objects"};
+  mcpRecordOperation(
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    changedObjectIds,
+    result,
+    mcpIdsModeFromParams(params));
+
+  result.insert("tool", toolName);
+  result.insert("groupId", groupLegacyId);
+  result.insert("groupName", name);
+  result.insert("selectedGroup", selectGroup);
+  result.insert("sourceSelectionCount", static_cast<int>(selectedBefore.size()));
+  result.insert(
+    "group",
+    groupSummaryJson(
+      map,
+      *groupNode,
+      objectRegistry,
+      false,
+      params.value("idsMode").toString("count"),
+      params.value("sampleLimit").toInt(McpDefaultIdSampleLimit)));
+  result.insert("childCounts", result.value("group").toObject().value("childCounts"));
+  result.insert("bounds", result.value("group").toObject().value("bounds"));
+  result.insert(
+    "validation",
+    QJsonObject{
+      {"valid", true},
+      {"errors", QJsonArray{}},
+    });
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult groupInspectResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  return groupInspectForMapResult(mapWindow->document().map(), params, objectRegistry);
+}
+
+McpBridgeToolResult groupInspectForMapResult(
+  mdl::Map& map, const QJsonObject& params, const McpObjectRegistry& objectRegistry)
+{
+  auto error = QString{};
+  auto groups = groupTargetsFromParamsOrSelection(map, params, objectRegistry, error);
+  if (!groups)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto includeChildren = params.value("includeChildren").toBool(false);
+  const auto idsMode = params.value("idsMode").toString("sample");
+  const auto sampleLimit = params.value("sampleLimit").toInt(McpDefaultIdSampleLimit);
+  auto summaries = QJsonArray{};
+  for (auto* groupNode : *groups)
+  {
+    summaries.push_back(groupSummaryJson(
+      map, *groupNode, objectRegistry, includeChildren, idsMode, sampleLimit));
+  }
+
+  auto result = QJsonObject{
+    {"tool", "group_inspect"},
+    {"groupCount", static_cast<int>(groups->size())},
+    {"groups", summaries},
+  };
+  if (groups->size() == 1u)
+  {
+    const auto first = summaries.first().toObject();
+    for (auto it = first.begin(); it != first.end(); ++it)
+    {
+      result.insert(it.key(), it.value());
+    }
+  }
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult groupRenameSelectedResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  return groupRenameSelectedForMapResult(
+    mapWindow->document().map(),
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    objectRegistry);
+}
+
+McpBridgeToolResult groupRenameSelectedForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
+  const auto name = params.value("name").toString().trimmed();
+  if (name.isEmpty())
+  {
+    return invalidParamsFailure("group_rename_selected requires name");
+  }
+  if (!map.selection().hasOnlyGroups())
+  {
+    return invalidParamsFailure(
+      "group_rename_selected requires the current selection to contain only groups");
+  }
+
+  const auto groups = map.selection().groups;
+  auto groupIds = QJsonArray{};
+  for (const auto* groupNode : groups)
+  {
+    groupIds.push_back(nodePathId(*groupNode, map.worldNode()));
+  }
+
+  mdl::renameSelectedGroups(map, name.toStdString());
+
+  auto result = QJsonObject{};
+  const auto transactionName =
+    QString{"Rename %1"}.arg(groups.size() == 1u ? "Group" : "Groups");
+  mcpRecordOperation(
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    groupIds,
+    result,
+    mcpIdsModeFromParams(params));
+
+  auto inspectedGroups = QJsonArray{};
+  for (auto* groupNode : groups)
+  {
+    inspectedGroups.push_back(groupSummaryJson(
+      map,
+      *groupNode,
+      objectRegistry,
+      false,
+      params.value("idsMode").toString("count"),
+      params.value("sampleLimit").toInt(McpDefaultIdSampleLimit)));
+  }
+  result.insert("tool", toolName);
+  result.insert("groupName", name);
+  result.insert("groupCount", static_cast<int>(groups.size()));
+  result.insert("groups", inspectedGroups);
+  result.insert(
+    "validation",
+    QJsonObject{
+      {"valid", true},
+      {"errors", QJsonArray{}},
+    });
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult groupUngroupSelectedResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  return groupUngroupSelectedForMapResult(
+    mapWindow->document().map(),
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    metadataStore,
+    moduleStore);
+}
+
+McpBridgeToolResult groupUngroupSelectedForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
+{
+  if (!map.selection().hasNodes())
+  {
+    return invalidParamsFailure("group_ungroup_selected requires selected groups");
+  }
+  auto selectedGroups = map.selection().groups;
+  if (selectedGroups.empty())
+  {
+    return invalidParamsFailure("group_ungroup_selected requires selected groups");
+  }
+
+  auto groupIds = QJsonArray{};
+  for (const auto* groupNode : selectedGroups)
+  {
+    groupIds.push_back(nodePathId(*groupNode, map.worldNode()));
+  }
+
+  mdl::ungroupSelectedNodes(map);
+  refreshMetadataObjectPaths(map, objectRegistry, metadataStore, moduleStore);
+
+  const auto selectedAfter = map.selection().nodes;
+  auto changedObjectIds = QJsonArray{};
+  for (const auto* node : selectedAfter)
+  {
+    changedObjectIds.push_back(nodePathId(*node, map.worldNode()));
+  }
+
+  auto result = QJsonObject{};
+  const auto transactionName = QString{"Ungroup"};
+  mcpRecordOperation(
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    changedObjectIds,
+    result,
+    mcpIdsModeFromParams(params));
+  result.insert("tool", toolName);
+  result.insert("ungroupedGroupCount", static_cast<int>(selectedGroups.size()));
+  result.insert("ungroupedGroupIds", groupIds);
+  result.insert("selectedObjectCount", static_cast<int>(selectedAfter.size()));
+  result.insert("selectedCounts", nodeTypeCountsJson(countsForNodes(selectedAfter)));
+  applyNodeIdsMode(
+    result,
+    "selectedObjectIds",
+    "selectedObjectIdSample",
+    "selectedObjectIdCount",
+    map,
+    selectedAfter,
+    objectRegistry,
+    params.value("idsMode").toString("count"),
+    params.value("sampleLimit").toInt(McpDefaultIdSampleLimit));
+  result.insert(
+    "validation",
+    QJsonObject{
+      {"valid", true},
+      {"errors", QJsonArray{}},
+    });
   return McpBridgeToolResult::success(std::move(result));
 }
 

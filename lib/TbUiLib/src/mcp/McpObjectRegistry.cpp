@@ -236,11 +236,18 @@ bool isObjectIdKey(const QString& key)
     "objectId",
     "objectIds",
     "changedObjectIds",
+    "childIdSample",
+    "childIds",
     "deletedObjectIds",
     "faceOwnerBrushIds",
+    "groupId",
+    "groupIds",
     "nonGridAlignedObjectIds",
     "objectIdSample",
+    "selectedObjectIdSample",
+    "selectedObjectIds",
     "targetObjectIds",
+    "ungroupedGroupIds",
   };
   return Keys.contains(key);
 }
@@ -361,16 +368,17 @@ QString McpObjectRegistry::externalIdForLegacy(
   }
   if (const auto it = m_legacyToStable.find(legacyPathId); it != m_legacyToStable.end())
   {
-    const auto resolved = resolveExternalId(map, it->second);
-    if (resolved.ok)
+    const auto stableId = it->second;
+    const auto resolved = resolveExternalId(map, stableId);
+    if (resolved.ok && resolved.legacyPathId == legacyPathId)
     {
-      return it->second;
+      return stableId;
     }
     if (resolveLegacyObjectId(map, legacyPathId) == nullptr)
     {
-      return it->second;
+      return stableId;
     }
-    m_legacyToStable.erase(it);
+    m_legacyToStable.erase(legacyPathId);
   }
   auto* node = resolveLegacyObjectId(map, legacyPathId);
   if (node == nullptr)
@@ -391,7 +399,6 @@ McpObjectRegistry::ResolveResult McpObjectRegistry::resolveExternalId(
       auto stableResult = resolveExternalId(map, stableIt->second);
       if (stableResult.ok)
       {
-        stableResult.legacyPathId = objectId;
         stableResult.diagnostic.insert("objectId", stableIt->second);
         stableResult.diagnostic.insert("legacyInputId", objectId);
         stableResult.diagnostic.insert("stableObjectId", stableIt->second);
