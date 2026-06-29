@@ -365,9 +365,15 @@ McpBridgeToolResult irValidateResult(
 McpBridgeToolResult irCompilePreviewResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult irCompilePreviewFromFileResult(
-  AppController& appController, const QJsonObject& params);
+  AppController& appController,
+  const QJsonObject& params,
+  std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr,
+  int* nextPreviewIndex = nullptr);
 McpBridgeToolResult irCompilePreviewFromFileForMapResult(
-  mdl::Map& map, const QJsonObject& params);
+  mdl::Map& map,
+  const QJsonObject& params,
+  std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr,
+  int* nextPreviewIndex = nullptr);
 McpBridgeToolResult irApplyResult(
   AppController& appController,
   const QString& toolName,
@@ -394,7 +400,8 @@ McpBridgeToolResult irApplyFromFileResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr);
 McpBridgeToolResult irApplyFromFileForMapResult(
   mdl::Map& map,
   const QString& toolName,
@@ -403,7 +410,8 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry = nullptr);
+  const McpObjectRegistry* objectRegistry = nullptr,
+  std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr);
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyListResult(

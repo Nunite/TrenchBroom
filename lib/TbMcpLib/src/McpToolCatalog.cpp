@@ -3053,7 +3053,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "ir_compile_preview_from_file",
       "Read a local JSON IR file and preview the same minimal scene IR without "
       "mutating the map. Use this when generated IR would be too large for the "
-      "conversation context.",
+      "conversation context. Successful valid previews return a session previewId "
+      "that ir_apply_from_file can reuse without resending the path.",
       McpMode::ReadOnly,
       false,
       true,
@@ -3103,21 +3104,25 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     {
       "ir_apply_from_file",
       "Read a local JSON IR file and apply it through existing atomic MCP operations. "
-      "The file is transport only; it does not add scene prefab semantics.",
+      "The file is transport only; it does not add scene prefab semantics. Pass either "
+      "path or a previewId returned by ir_compile_preview_from_file.",
       McpMode::Edit,
       true,
       true,
-      objectSchema(
-        {
-          {"path", stringProperty("Absolute local path to a JSON IR file.")},
-          {"expectedDocumentPath",
-           stringProperty("Optional active document guard before mutating.")},
-          {"idsMode",
-           stringProperty(
-             "Changed object id verbosity: none, count, sample, or full. Defaults to "
-             "count.")},
-        },
-        {"path"}),
+      objectSchema({
+        {"path", stringProperty("Absolute local path to a JSON IR file.")},
+        {"previewId",
+         stringProperty(
+           "Optional cached preview id from ir_compile_preview_from_file. When "
+           "provided, path is read from the cache and the file hash/document "
+           "fingerprint must still match.")},
+        {"expectedDocumentPath",
+         stringProperty("Optional active document guard before mutating.")},
+        {"idsMode",
+         stringProperty(
+           "Changed object id verbosity: none, count, sample, or full. Defaults to "
+           "count.")},
+      }),
     },
     {
       "blockout_create_curved_corridor",

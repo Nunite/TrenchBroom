@@ -6070,6 +6070,8 @@ TEST_CASE("McpBridgeServer file based IR tools")
   auto nextOperationIndex = 1;
   auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
   auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto previewCache = std::map<QString, McpIrPreviewCacheRecord>{};
+  auto nextPreviewIndex = 1;
   auto tempDir = QTemporaryDir{};
   REQUIRE(tempDir.isValid());
   const auto path = tempDir.filePath("scene-ir.json");
@@ -6091,14 +6093,113 @@ TEST_CASE("McpBridgeServer file based IR tools")
     }}.toJson());
   file.close();
 
-  const auto previewResponse =
-    irCompilePreviewFromFileForMapResult(map, QJsonObject{{"path", path}});
+  const auto previewResponse = irCompilePreviewFromFileForMapResult(
+    map, QJsonObject{{"path", path}}, &previewCache, &nextPreviewIndex);
   REQUIRE(previewResponse.ok);
   CHECK(
     previewResponse.result.value("tool").toString() == "ir_compile_preview_from_file");
   CHECK(!previewResponse.result.value("willCommit").toBool());
-  CHECK(previewResponse.result.value("sourcePath").toString() == path);
+  CHECK(
+    previewResponse.result.value("sourcePath").toString()
+    == QFileInfo{path}.canonicalFilePath());
   CHECK(previewResponse.result.value("estimatedBrushCount").toInt() == 1);
+  CHECK(previewResponse.result.value("cacheable").toBool());
+  CHECK(previewResponse.result.value("previewId").toString() == "ir-preview-1");
+  CHECK(previewResponse.result.value("irHash").toString().startsWith("sha256:"));
+  CHECK(
+    previewResponse.result.value("documentFingerprint").toString()
+    == documentFingerprintForMap(map));
+  CHECK(
+    previewResponse.result.value("activeDocumentPath").toString()
+    == QString::fromStdString(map.path().string()));
+  CHECK(previewResponse.result.value("expiresAfterSeconds").toInt() == 600);
+  CHECK(previewCache.size() == 1u);
+
+  const auto expiredPreviewId = previewResponse.result.value("previewId").toString();
+  auto expiredPreviewCache = previewCache;
+  expiredPreviewCache[expiredPreviewId].expiresAtMs = 1;
+  const auto expiredPreviewResponse = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{{"previewId", expiredPreviewId}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    nullptr,
+    &expiredPreviewCache);
+  CHECK(!expiredPreviewResponse.ok);
+  CHECK(expiredPreviewResponse.error.message.contains("Unknown or expired"));
+
+  auto otherDocument = MapDocument::createDocument(
+                         appController.environmentConfig(),
+                         mdl::QuakeGameInfo,
+                         mdl::MapFormat::Valve,
+                         vm::bbox3d{8192.0},
+                         appController.taskManager(),
+                         appController.glManager().resourceManager())
+                       | kdl::value();
+  const auto wrongDocumentResponse = irApplyFromFileForMapResult(
+    otherDocument->map(),
+    "ir_apply_from_file",
+    QJsonObject{{"previewId", expiredPreviewId}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    nullptr,
+    &previewCache);
+  CHECK(!wrongDocumentResponse.ok);
+  CHECK(wrongDocumentResponse.error.message.contains("different active document"));
+  CHECK(
+    wrongDocumentResponse.error.details.value("mutatedDocument").toBool(true) == false);
+
+  const auto invalidPreviewPath = tempDir.filePath("invalid-preview-ir.json");
+  auto invalidPreviewFile = QFile{invalidPreviewPath};
+  REQUIRE(invalidPreviewFile.open(QIODevice::WriteOnly));
+  invalidPreviewFile.write(QJsonDocument{
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{0, 64, 16}},
+         },
+       }},
+    }}.toJson());
+  invalidPreviewFile.close();
+  const auto invalidPreviewResponse = irCompilePreviewFromFileForMapResult(
+    map, QJsonObject{{"path", invalidPreviewPath}}, &previewCache, &nextPreviewIndex);
+  REQUIRE(invalidPreviewResponse.ok);
+  CHECK(!invalidPreviewResponse.result.value("valid").toBool(true));
+  CHECK(!invalidPreviewResponse.result.value("cacheable").toBool(true));
+  CHECK(invalidPreviewResponse.result.value("previewId").isUndefined());
+  CHECK(previewCache.size() == 1u);
+
+  const auto cachedApplyResponse = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{
+      {"previewId", previewResponse.result.value("previewId").toString()},
+      {"idsMode", "count"},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    nullptr,
+    &previewCache);
+  REQUIRE(cachedApplyResponse.ok);
+  CHECK(cachedApplyResponse.result.value("usedPreviewCache").toBool());
+  CHECK(
+    cachedApplyResponse.result.value("previewId").toString()
+    == previewResponse.result.value("previewId").toString());
+  CHECK(
+    cachedApplyResponse.result.value("irHash").toString()
+    == previewResponse.result.value("irHash").toString());
+  CHECK(cachedApplyResponse.result.value("operationCount").toInt() == 1);
+  CHECK(cachedApplyResponse.result.value("changedObjectCount").toInt() == 1);
 
   const auto applyResponse = irApplyFromFileForMapResult(
     map,
@@ -6110,7 +6211,9 @@ TEST_CASE("McpBridgeServer file based IR tools")
     moduleStore);
   REQUIRE(applyResponse.ok);
   CHECK(applyResponse.result.value("tool").toString() == "ir_apply_from_file");
-  CHECK(applyResponse.result.value("sourcePath").toString() == path);
+  CHECK(
+    applyResponse.result.value("sourcePath").toString()
+    == QFileInfo{path}.canonicalFilePath());
   CHECK(applyResponse.result.value("operationCount").toInt() == 1);
   CHECK(applyResponse.result.value("changedObjectCount").toInt() == 1);
   CHECK(applyResponse.result.value("changedObjectIds").isUndefined());
@@ -6143,8 +6246,72 @@ TEST_CASE("McpBridgeServer file based IR tools")
     moduleStore,
     McpObjectRegistry{});
   REQUIRE(selectorResponse.ok);
-  CHECK(selectorResponse.result.value("matchedCount").toInt() == 1);
+  CHECK(selectorResponse.result.value("matchedCount").toInt() == 2);
   CHECK(selectorResponse.result.value("staleExcluded").toInt() == 0);
+
+  auto changedFile = QFile{path};
+  REQUIRE(changedFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
+  changedFile.write(QJsonDocument{
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{0, 64, 16}},
+         },
+       }},
+    }}.toJson());
+  changedFile.close();
+
+  const auto descendantCountBeforeRejectedApply = map.worldNode().descendantCount();
+  const auto changedFileApplyResponse = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{{"previewId", "ir-preview-1"}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    nullptr,
+    &previewCache);
+  CHECK(!changedFileApplyResponse.ok);
+  CHECK(changedFileApplyResponse.error.code == mcp::McpErrorCode::InvalidParams);
+  CHECK(changedFileApplyResponse.error.message.contains("changed after preview"));
+  CHECK(
+    changedFileApplyResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeRejectedApply);
+
+  const auto unknownPreviewResponse = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{{"previewId", "ir-preview-missing"}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    nullptr,
+    &previewCache);
+  CHECK(!unknownPreviewResponse.ok);
+  CHECK(unknownPreviewResponse.error.message.contains("Unknown or expired"));
+
+  REQUIRE(changedFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
+  changedFile.write(QJsonDocument{
+    QJsonObject{
+      {"moduleId", "file-ir-module"},
+      {"defaultMetadata", QJsonObject{{"moduleId", "file-ir-module"}}},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+           {"metadata", QJsonObject{{"part", "floor"}}},
+         },
+       }},
+    }}.toJson());
+  changedFile.close();
 
   const auto fullApplyResponse = irApplyFromFileForMapResult(
     map,

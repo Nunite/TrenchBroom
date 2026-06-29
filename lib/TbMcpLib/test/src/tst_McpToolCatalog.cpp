@@ -845,13 +845,18 @@ TEST_CASE("McpToolCatalog")
     const auto irPreviewFile = findToolDefinition("ir_compile_preview_from_file");
     REQUIRE(irPreviewFile);
     CHECK(irPreviewFile->requiredMode == McpMode::ReadOnly);
+    CHECK(irPreviewFile->description.contains("previewId"));
     CHECK(irPreviewFile->inputSchema.value("required").toArray().contains("path"));
 
     const auto irApplyFile = findToolDefinition("ir_apply_from_file");
     REQUIRE(irApplyFile);
     CHECK(irApplyFile->requiredMode == McpMode::Edit);
     CHECK(irApplyFile->mutatesDocument);
-    CHECK(irApplyFile->inputSchema.value("required").toArray().contains("path"));
+    CHECK(irApplyFile->description.contains("previewId"));
+    const auto irApplyFileProperties =
+      irApplyFile->inputSchema.value("properties").toObject();
+    CHECK(irApplyFileProperties.value("path").isObject());
+    CHECK(irApplyFileProperties.value("previewId").isObject());
 
     const auto blockoutBatch = findToolDefinition("blockout_create_batch");
     REQUIRE(blockoutBatch);
@@ -1273,7 +1278,8 @@ TEST_CASE("McpToolCatalog")
       CHECK(!tool.name.contains("racetrack", Qt::CaseInsensitive));
     }
 
-    const auto modelingTools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    const auto modelingTools =
+      toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
     auto modelingNames = QStringList{};
     for (const auto& tool : modelingTools)
     {
@@ -1323,7 +1329,8 @@ TEST_CASE("McpToolCatalog")
       {"brush_metadata_get", {"Legacy", "selector_preview"}},
       {"selection_by_metadata", {"Legacy", "structured selectors"}},
       {"route_geometry_analyze_chain", {"Prefer", "geometry_analyze_route_continuity"}},
-      {"kz_distance_analyze_chain", {"Compatibility alias", "geometry_analyze_route_continuity"}},
+      {"kz_distance_analyze_chain",
+       {"Compatibility alias", "geometry_analyze_route_continuity"}},
     };
 
     for (const auto& [toolName, fragments] : expectedDescriptionFragments)

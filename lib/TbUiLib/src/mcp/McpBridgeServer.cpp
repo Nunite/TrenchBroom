@@ -741,7 +741,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         }
         if (toolName == "ir_compile_preview_from_file")
         {
-          return irCompilePreviewFromFileResult(appController, params);
+          return irCompilePreviewFromFileResult(
+            appController, params, &m_irPreviewCache, &m_nextIrPreviewIndex);
         }
         if (toolName == "ir_apply")
         {
@@ -765,7 +766,8 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             m_nextOperationIndex,
             m_brushMetadata,
             m_modules,
-            &m_objectRegistry);
+            &m_objectRegistry,
+            &m_irPreviewCache);
         }
         if (
           toolName == "blockout_create_batch"

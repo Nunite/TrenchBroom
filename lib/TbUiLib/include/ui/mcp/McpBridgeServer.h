@@ -104,6 +104,18 @@ struct McpModuleRecord
   QJsonObject metadata;
 };
 
+struct McpIrPreviewCacheRecord
+{
+  QString previewId;
+  QString sourcePath;
+  QString irHash;
+  QString documentFingerprint;
+  QString activeDocumentPath;
+  qint64 createdAtMs = 0;
+  qint64 expiresAtMs = 0;
+  QJsonObject preview;
+};
+
 class McpBridgeServer : public QObject
 {
   Q_OBJECT
@@ -121,6 +133,8 @@ private:
   mutable std::vector<McpOperationRecord> m_operationHistory;
   mutable std::map<QString, McpBrushMetadataRecord> m_brushMetadata;
   mutable std::map<QString, McpModuleRecord> m_modules;
+  mutable std::map<QString, McpIrPreviewCacheRecord> m_irPreviewCache;
+  mutable int m_nextIrPreviewIndex = 1;
   mutable McpObjectRegistry m_objectRegistry;
   mutable bool m_dispatchInProgress = false;
   QString m_bridgeInstanceId;

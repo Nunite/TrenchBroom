@@ -17,6 +17,8 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QCryptographicHash>
+#include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -59,6 +61,7 @@ namespace
 {
 
 constexpr auto DefaultSampleLimit = 12;
+constexpr auto IrPreviewCacheTtlMs = qint64{10 * 60 * 1000};
 
 struct SelectorDiagnosticsInternal
 {
@@ -1462,6 +1465,187 @@ std::optional<QJsonObject> irFromFileParams(const QJsonObject& params, QString& 
   return ir;
 }
 
+std::optional<QByteArray> irFileBytesFromPath(const QString& path, QString& error)
+{
+  const auto info = QFileInfo{path};
+  if (!info.isAbsolute())
+  {
+    error = "file-based IR path must be absolute";
+    return std::nullopt;
+  }
+  if (!info.isFile() || !info.isReadable())
+  {
+    error = QString{"IR file is not readable: %1"}.arg(path);
+    return std::nullopt;
+  }
+  if (info.size() > 10 * 1024 * 1024)
+  {
+    error = "IR file is too large; maximum size is 10 MiB";
+    return std::nullopt;
+  }
+
+  auto file = QFile{path};
+  if (!file.open(QIODevice::ReadOnly))
+  {
+    error = QString{"Could not open IR file: %1"}.arg(path);
+    return std::nullopt;
+  }
+  return file.readAll();
+}
+
+QString hashIrFileBytes(const QByteArray& bytes)
+{
+  return QString{"sha256:%1"}.arg(QString::fromLatin1(
+    QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex()));
+}
+
+QString canonicalIrFilePath(const QString& path)
+{
+  const auto info = QFileInfo{path};
+  return info.exists() ? info.canonicalFilePath() : info.absoluteFilePath();
+}
+
+void pruneExpiredIrPreviewCache(
+  std::map<QString, McpIrPreviewCacheRecord>& previewCache, const qint64 nowMs)
+{
+  for (auto it = previewCache.begin(); it != previewCache.end();)
+  {
+    if (it->second.expiresAtMs <= nowMs)
+    {
+      it = previewCache.erase(it);
+    }
+    else
+    {
+      ++it;
+    }
+  }
+}
+
+void attachIrPreviewCacheRecord(
+  QJsonObject& preview,
+  mdl::Map& map,
+  const QString& path,
+  std::map<QString, McpIrPreviewCacheRecord>* previewCache,
+  int* nextPreviewIndex)
+{
+  if (
+    !preview.value("valid").toBool(false) || previewCache == nullptr
+    || nextPreviewIndex == nullptr)
+  {
+    preview.insert("cacheable", false);
+    return;
+  }
+
+  auto error = QString{};
+  const auto bytes = irFileBytesFromPath(path, error);
+  if (!bytes)
+  {
+    preview.insert("cacheable", false);
+    auto warnings = preview.value("warnings").toArray();
+    warnings.push_back(QString{"irPreviewCacheSkipped: %1"}.arg(error));
+    preview.insert("warnings", warnings);
+    return;
+  }
+
+  const auto nowMs = QDateTime::currentMSecsSinceEpoch();
+  pruneExpiredIrPreviewCache(*previewCache, nowMs);
+
+  const auto previewId = QString{"ir-preview-%1"}.arg((*nextPreviewIndex)++);
+  auto record = McpIrPreviewCacheRecord{};
+  record.previewId = previewId;
+  record.sourcePath = canonicalIrFilePath(path);
+  record.irHash = hashIrFileBytes(*bytes);
+  record.documentFingerprint = documentFingerprintForMap(map);
+  record.activeDocumentPath = QString::fromStdString(map.path().string());
+  record.createdAtMs = nowMs;
+  record.expiresAtMs = nowMs + IrPreviewCacheTtlMs;
+
+  preview.insert("cacheable", true);
+  preview.insert("previewId", previewId);
+  preview.insert("irHash", record.irHash);
+  preview.insert("documentFingerprint", record.documentFingerprint);
+  preview.insert("activeDocumentPath", record.activeDocumentPath);
+  preview.insert("createdAtMs", QString::number(record.createdAtMs));
+  preview.insert("expiresAtMs", QString::number(record.expiresAtMs));
+  preview.insert("expiresAfterSeconds", static_cast<int>(IrPreviewCacheTtlMs / 1000));
+  record.preview = preview;
+  previewCache->insert_or_assign(previewId, record);
+}
+
+McpBridgeToolResult cachedIrApplyParams(
+  mdl::Map& map,
+  const QJsonObject& params,
+  std::map<QString, McpIrPreviewCacheRecord>& previewCache)
+{
+  const auto previewId = params.value("previewId").toString().trimmed();
+  if (previewId.isEmpty())
+  {
+    return invalidParamsFailure("ir_apply_from_file requires path or previewId");
+  }
+
+  const auto nowMs = QDateTime::currentMSecsSinceEpoch();
+  pruneExpiredIrPreviewCache(previewCache, nowMs);
+  const auto it = previewCache.find(previewId);
+  if (it == previewCache.end())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Unknown or expired IR previewId: %1"}.arg(previewId),
+      QJsonObject{{"previewId", previewId}, {"mutatedDocument", false}});
+  }
+
+  const auto& record = it->second;
+  const auto currentFingerprint = documentFingerprintForMap(map);
+  if (record.documentFingerprint != currentFingerprint)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "IR preview belongs to a different active document",
+      QJsonObject{
+        {"previewId", previewId},
+        {"cachedDocumentFingerprint", record.documentFingerprint},
+        {"currentDocumentFingerprint", currentFingerprint},
+        {"cachedActiveDocumentPath", record.activeDocumentPath},
+        {"mutatedDocument", false},
+      });
+  }
+
+  auto error = QString{};
+  const auto bytes = irFileBytesFromPath(record.sourcePath, error);
+  if (!bytes)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Cached IR file is no longer readable: %1"}.arg(error),
+      QJsonObject{
+        {"previewId", previewId},
+        {"sourcePath", record.sourcePath},
+        {"mutatedDocument", false},
+      });
+  }
+
+  const auto currentHash = hashIrFileBytes(*bytes);
+  if (currentHash != record.irHash)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "Cached IR file changed after preview",
+      QJsonObject{
+        {"previewId", previewId},
+        {"sourcePath", record.sourcePath},
+        {"cachedIrHash", record.irHash},
+        {"currentIrHash", currentHash},
+        {"mutatedDocument", false},
+      });
+  }
+
+  auto applyParams = params;
+  applyParams.insert("path", record.sourcePath);
+  applyParams.insert("previewId", previewId);
+  applyParams.insert("irHash", record.irHash);
+  return McpBridgeToolResult::success(applyParams);
+}
+
 QJsonObject mergeObjects(QJsonObject base, const QJsonObject& overlay)
 {
   for (auto it = overlay.begin(); it != overlay.end(); ++it)
@@ -2439,7 +2623,10 @@ McpBridgeToolResult irCompilePreviewResult(
 }
 
 McpBridgeToolResult irCompilePreviewFromFileResult(
-  AppController& appController, const QJsonObject& params)
+  AppController& appController,
+  const QJsonObject& params,
+  std::map<QString, McpIrPreviewCacheRecord>* previewCache,
+  int* nextPreviewIndex)
 {
   auto error = QString{};
   const auto ir = irFromFileParams(params, error);
@@ -2453,12 +2640,28 @@ McpBridgeToolResult irCompilePreviewFromFileResult(
                    : irPreviewJson(*ir);
   preview.insert("tool", "ir_compile_preview_from_file");
   preview.insert("willCommit", false);
-  preview.insert("sourcePath", params.value("path").toString());
+  preview.insert("sourcePath", canonicalIrFilePath(params.value("path").toString()));
+  if (mapWindow != nullptr)
+  {
+    attachIrPreviewCacheRecord(
+      preview,
+      mapWindow->document().map(),
+      params.value("path").toString(),
+      previewCache,
+      nextPreviewIndex);
+  }
+  else
+  {
+    preview.insert("cacheable", false);
+  }
   return McpBridgeToolResult::success(preview);
 }
 
 McpBridgeToolResult irCompilePreviewFromFileForMapResult(
-  mdl::Map& map, const QJsonObject& params)
+  mdl::Map& map,
+  const QJsonObject& params,
+  std::map<QString, McpIrPreviewCacheRecord>* previewCache,
+  int* nextPreviewIndex)
 {
   auto error = QString{};
   const auto ir = irFromFileParams(params, error);
@@ -2469,7 +2672,9 @@ McpBridgeToolResult irCompilePreviewFromFileForMapResult(
   auto preview = irPreviewJsonForMap(map, *ir);
   preview.insert("tool", "ir_compile_preview_from_file");
   preview.insert("willCommit", false);
-  preview.insert("sourcePath", params.value("path").toString());
+  preview.insert("sourcePath", canonicalIrFilePath(params.value("path").toString()));
+  attachIrPreviewCacheRecord(
+    preview, map, params.value("path").toString(), previewCache, nextPreviewIndex);
   return McpBridgeToolResult::success(preview);
 }
 
@@ -2496,10 +2701,12 @@ McpBridgeToolResult irApplyResult(
     return invalidParamsFailure(error);
   }
 
+  auto applyParams = params;
+  applyParams.insert("ir", *ir);
   return irApplyForMapResult(
     map,
     toolName,
-    QJsonObject{{"ir", *ir}},
+    applyParams,
     history,
     nextOperationIndex,
     metadataStore,
@@ -2678,15 +2885,37 @@ McpBridgeToolResult irApplyFromFileResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry)
+  const McpObjectRegistry* objectRegistry,
+  std::map<QString, McpIrPreviewCacheRecord>* previewCache)
 {
+  auto paramsWithPath = params;
+  if (!paramsWithPath.value("previewId").toString().trimmed().isEmpty())
+  {
+    auto* mapWindow = appController.mapWindowManager().topMapWindow();
+    if (mapWindow == nullptr)
+    {
+      return noActiveDocumentFailure();
+    }
+    if (previewCache == nullptr)
+    {
+      return invalidParamsFailure("ir_apply_from_file previewId cache is unavailable");
+    }
+    const auto cached =
+      cachedIrApplyParams(mapWindow->document().map(), paramsWithPath, *previewCache);
+    if (!cached.ok)
+    {
+      return cached;
+    }
+    paramsWithPath = cached.result;
+  }
+
   auto error = QString{};
-  const auto ir = irFromFileParams(params, error);
+  const auto ir = irFromFileParams(paramsWithPath, error);
   if (!ir)
   {
     return invalidParamsFailure(error);
   }
-  auto applyParams = params;
+  auto applyParams = paramsWithPath;
   applyParams.insert("ir", *ir);
   auto result = irApplyResult(
     appController,
@@ -2699,7 +2928,14 @@ McpBridgeToolResult irApplyFromFileResult(
     objectRegistry);
   if (result.ok)
   {
-    result.result.insert("sourcePath", params.value("path").toString());
+    result.result.insert(
+      "sourcePath", canonicalIrFilePath(paramsWithPath.value("path").toString()));
+    if (!paramsWithPath.value("previewId").toString().trimmed().isEmpty())
+    {
+      result.result.insert("previewId", paramsWithPath.value("previewId").toString());
+      result.result.insert("irHash", paramsWithPath.value("irHash").toString());
+      result.result.insert("usedPreviewCache", true);
+    }
   }
   return result;
 }
@@ -2712,15 +2948,31 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry)
+  const McpObjectRegistry* objectRegistry,
+  std::map<QString, McpIrPreviewCacheRecord>* previewCache)
 {
+  auto paramsWithPath = params;
+  if (!paramsWithPath.value("previewId").toString().trimmed().isEmpty())
+  {
+    if (previewCache == nullptr)
+    {
+      return invalidParamsFailure("ir_apply_from_file previewId cache is unavailable");
+    }
+    const auto cached = cachedIrApplyParams(map, paramsWithPath, *previewCache);
+    if (!cached.ok)
+    {
+      return cached;
+    }
+    paramsWithPath = cached.result;
+  }
+
   auto error = QString{};
-  const auto ir = irFromFileParams(params, error);
+  const auto ir = irFromFileParams(paramsWithPath, error);
   if (!ir)
   {
     return invalidParamsFailure(error);
   }
-  auto applyParams = params;
+  auto applyParams = paramsWithPath;
   applyParams.insert("ir", *ir);
   auto result = irApplyForMapResult(
     map,
@@ -2733,7 +2985,14 @@ McpBridgeToolResult irApplyFromFileForMapResult(
     objectRegistry);
   if (result.ok)
   {
-    result.result.insert("sourcePath", params.value("path").toString());
+    result.result.insert(
+      "sourcePath", canonicalIrFilePath(paramsWithPath.value("path").toString()));
+    if (!paramsWithPath.value("previewId").toString().trimmed().isEmpty())
+    {
+      result.result.insert("previewId", paramsWithPath.value("previewId").toString());
+      result.result.insert("irHash", paramsWithPath.value("irHash").toString());
+      result.result.insert("usedPreviewCache", true);
+    }
   }
   return result;
 }
