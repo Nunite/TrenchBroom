@@ -57,6 +57,10 @@ right layer:
 
 ## Layer Boundaries
 
+Future MCP development is governed by `docs/mcp-development-governance.md`.
+Treat that document as the normative rule set for deciding whether a capability
+belongs in C++ MCP, IR, or a skill recipe.
+
 ### C++ MCP Owns
 
 C++ MCP should keep capabilities that require TrenchBroom internals:

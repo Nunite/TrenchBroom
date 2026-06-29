@@ -14,6 +14,10 @@ This roadmap keeps MCP atomic and moves complex composition into skill recipes. 
 
 ## Design Rules
 
+The normative rule set for future implementation is
+`docs/mcp-development-governance.md`. The bullets below summarize that contract;
+if there is a conflict, follow the governance document and update this roadmap.
+
 - Do not add scene prefab tools to C++ MCP. Avoid tools like `create_temple`, `create_kz_route`, `create_courtyard`, or `create_racetrack`.
 - Add C++ MCP capability only when it needs TrenchBroom internals, document guards, undo transactions, selection/object identity, validation geometry, or review rendering.
 - Prefer selector/module targets over long object id lists.

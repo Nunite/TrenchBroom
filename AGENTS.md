@@ -82,6 +82,15 @@
 - Keep local noise out of commits. In this project, `.codegraph/`, temporary markdown experiments, generated crash logs, and ad hoc asset/debug files should not be committed unless the user explicitly asks.
 - When using web or external research for GoldSrc formats, prefer primary/simple references and record the practical decision in code or docs. Avoid copying large third-party implementations or license-sensitive code.
 
+## MCP development governance
+- Before adding or changing TrenchBroom MCP tools, read and follow `docs/mcp-development-governance.md`.
+- C++ MCP is the guarded editor execution kernel. Do not add scene prefab tools such as `create_temple`, `create_courtyard`, `create_kz_route`, `create_racetrack`, `create_house`, or similar layout-specific generators.
+- Put prefab-like composition, gameplay/domain judgement, and reusable scene families into skill recipes that emit IR files. MCP should preview/apply the IR, recover targets, validate geometry, and render reviews.
+- Add a C++ MCP capability only when it needs TrenchBroom internals such as document guards, undo transactions, selection/object identity, live map geometry, validation, or review rendering.
+- New high-volume MCP outputs must be compact by default (`idsMode:"count"` or `"sample"`, `detail:"summary"` style behavior) with full ids/details opt-in.
+- Modeling profile growth requires justification. Prefer hidden/searchable expert tools over visible duplicate convenience aliases.
+- For dense old maps or ambiguous brush ownership, prefer user selection plus selection-aware MCP tools instead of complex automatic brush matching.
+
 ### Code coverage
 - **Enable coverage instrumentation**: Pass `-DTB_ENABLE_GCOV=1` for gcov-compatible coverage (works with GCC or Clang) or `-DTB_ENABLE_LCOV=1` for LLVM source-based coverage (Clang only).
 - **Generate coverage data**:
