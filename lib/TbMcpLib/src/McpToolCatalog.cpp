@@ -1306,8 +1306,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "selector_preview",
       "Preview a structured JSON selector against the active map. Selectors can combine "
       "session metadata, moduleId, operation ids, type, bounds, material, classname, "
-      "targetname, and text query. Defaults to count/sample output to avoid long id "
-      "lists.",
+      "targetname, and text query. idsMode=count returns counts only; idsMode=sample "
+      "adds small object summaries.",
       McpMode::ReadOnly,
       false,
       true,
@@ -2867,6 +2867,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"grid", numberProperty("Optional grid snap size.")},
         {"material", stringProperty("Optional default material.")},
         {"select", boolProperty("Select generated blockout geometry.")},
+        {"idsMode",
+         stringProperty(
+           "Changed object id verbosity: none, count, sample, or full. Defaults to "
+           "count.")},
       }),
     },
     {
@@ -2881,6 +2885,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"path", stringProperty("Absolute local path to a JSON IR file.")},
           {"expectedDocumentPath",
            stringProperty("Optional active document guard before mutating.")},
+          {"idsMode",
+           stringProperty(
+             "Changed object id verbosity: none, count, sample, or full. Defaults to "
+             "count.")},
         },
         {"path"}),
     },

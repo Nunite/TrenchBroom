@@ -690,8 +690,10 @@ QJsonObject compactTargetResult(
 {
   auto objectIds = QStringList{};
   auto samples = QJsonArray{};
+  const auto mode = idsMode.trimmed().toLower();
   const auto sampleLimit =
     std::clamp(selector.value("sampleLimit").toInt(DefaultSampleLimit), 0, 100);
+  const auto includeSamples = mode.isEmpty() || mode == "sample" || mode == "full";
   for (auto i = 0; i < static_cast<int>(nodes.size()); ++i)
   {
     const auto* node = nodes[static_cast<size_t>(i)];
@@ -700,7 +702,7 @@ QJsonObject compactTargetResult(
       continue;
     }
     objectIds.push_back(externalObjectIdForNode(map, *node, objectRegistry));
-    if (i < sampleLimit)
+    if (includeSamples && i < sampleLimit)
     {
       samples.push_back(nodeSummary(map, *node, metadataStore, objectRegistry));
     }
@@ -709,16 +711,18 @@ QJsonObject compactTargetResult(
   auto result = QJsonObject{
     {"selector", selector},
     {"matchedCount", static_cast<int>(nodes.size())},
-    {"sampleCount", samples.size()},
-    {"sample", samples},
     {"warnings", warnings},
   };
+  if (includeSamples)
+  {
+    result.insert("sampleCount", samples.size());
+    result.insert("sample", samples);
+  }
   if (!nodes.empty())
   {
     result.insert("bounds", boundsToJson(boundsForNodes(nodes)));
   }
 
-  const auto mode = idsMode.trimmed().toLower();
   if (mode == "full")
   {
     result.insert("objectIds", stringsToJson(objectIds));
@@ -746,6 +750,68 @@ QJsonObject compactTargetResult(
     result.insert("warnings", updatedWarnings);
   }
   return result;
+}
+
+void applyChangedObjectIdsMode(
+  QJsonObject& result, const QStringList& objectIds, const QString& idsMode)
+{
+  const auto mode = idsMode.trimmed().toLower();
+  result.remove("changedObjectIds");
+  result.remove("changedObjectIdSample");
+  result.insert("changedObjectCount", objectIds.size());
+  if (mode == "full")
+  {
+    result.insert("changedObjectIds", stringsToJson(objectIds));
+  }
+  else if (mode == "sample")
+  {
+    result.insert(
+      "changedObjectIdSample",
+      stringsToJson(objectIds.mid(
+        0, std::min(DefaultSampleLimit, static_cast<int>(objectIds.size())))));
+  }
+  else if (mode == "none" || mode == "count" || mode.isEmpty())
+  {
+    return;
+  }
+  else
+  {
+    auto warnings = result.value("warnings").toArray();
+    warnings.push_back(
+      QString{"unknownIdsMode: %1; returned changedObjectCount only"}.arg(idsMode));
+    result.insert("warnings", warnings);
+  }
+}
+
+void compactAppliedOperationResults(QJsonObject& result, const QString& idsMode)
+{
+  const auto mode = idsMode.trimmed().toLower();
+  if (mode == "full")
+  {
+    return;
+  }
+
+  auto applied = QJsonArray{};
+  for (const auto& value : result.value("applied").toArray())
+  {
+    auto operation = value.toObject();
+    const auto changedObjectIds = operation.value("changedObjectIds").toArray();
+    operation.insert("changedObjectCount", changedObjectIds.size());
+    operation.remove("changedObjectIds");
+    if (mode == "sample")
+    {
+      auto sample = QJsonArray{};
+      for (auto i = 0;
+           i < std::min(DefaultSampleLimit, static_cast<int>(changedObjectIds.size()));
+           ++i)
+      {
+        sample.push_back(changedObjectIds[i]);
+      }
+      operation.insert("changedObjectIdSample", sample);
+    }
+    applied.push_back(operation);
+  }
+  result.insert("applied", applied);
 }
 
 QJsonArray nodeIdsJson(
@@ -2312,6 +2378,7 @@ McpBridgeToolResult irApplyForMapResult(
   auto objectIds = QStringList{};
   auto warnings = QJsonArray{};
   auto ok = true;
+  const auto idsMode = params.value("idsMode").toString("count");
 
   if (const auto operations = ir->value("operations"); operations.isArray())
   {
@@ -2355,11 +2422,12 @@ McpBridgeToolResult irApplyForMapResult(
         {"operationIds", QJsonArray{}},
         {"operationCount", 0},
         {"changedObjectCount", 0},
-        {"changedObjectIds", QJsonArray{}},
         {"applied", appliedOperations},
         {"preview", irPreviewJsonForMap(map, *ir)},
         {"warnings", warnings},
       };
+      applyChangedObjectIdsMode(resultObject, {}, idsMode);
+      compactAppliedOperationResults(resultObject, idsMode);
       if (!moduleId.isEmpty())
       {
         resultObject.insert("resourceUri", QString{"tbmcp://module/%1"}.arg(moduleId));
@@ -2425,11 +2493,12 @@ McpBridgeToolResult irApplyForMapResult(
     {"operationIds", stringsToJson(operationIds)},
     {"operationCount", operationIds.size()},
     {"changedObjectCount", objectIds.size()},
-    {"changedObjectIds", stringsToJson(objectIds)},
     {"applied", appliedOperations},
     {"preview", irPreviewJsonForMap(map, *ir)},
     {"warnings", warnings},
   };
+  applyChangedObjectIdsMode(result, objectIds, idsMode);
+  compactAppliedOperationResults(result, idsMode);
   if (!moduleId.isEmpty())
   {
     result.insert("resourceUri", QString{"tbmcp://module/%1"}.arg(moduleId));

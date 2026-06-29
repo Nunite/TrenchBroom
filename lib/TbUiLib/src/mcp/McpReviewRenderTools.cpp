@@ -1685,18 +1685,74 @@ void annotateContactSheet(
 
 std::filesystem::path reviewOutputDir(const QJsonObject& params, const QString& reviewId)
 {
+  auto outputRoot = std::filesystem::path{};
   if (const auto outputDir = params.value("outputDir").toString().trimmed();
       !outputDir.isEmpty())
   {
-    const auto path = std::filesystem::path{outputDir.toStdString()};
-    if (path.filename().string() == reviewId.toStdString())
-    {
-      return path;
-    }
-    return path / reviewId.toStdString();
+    outputRoot = std::filesystem::path{outputDir.toStdString()};
   }
-  return SystemPaths::tempDirectory() / "TrenchBroomMCP" / "reviews"
-         / reviewId.toStdString();
+  else
+  {
+    outputRoot = SystemPaths::tempDirectory() / "TrenchBroomMCP" / "reviews";
+  }
+
+  auto error = std::error_code{};
+  auto absoluteRoot =
+    outputRoot.is_absolute() ? outputRoot : std::filesystem::absolute(outputRoot, error);
+  if (error)
+  {
+    absoluteRoot = outputRoot;
+  }
+  absoluteRoot = absoluteRoot.lexically_normal();
+  if (absoluteRoot.filename().string() == reviewId.toStdString())
+  {
+    return absoluteRoot;
+  }
+  return absoluteRoot / reviewId.toStdString();
+}
+
+void addAbsoluteReviewPaths(QJsonObject& result)
+{
+  const auto addAbsolutePath = [&](const QString& sourceKey, const QString& targetKey) {
+    const auto path = result.value(sourceKey).toString();
+    if (path.isEmpty())
+    {
+      return;
+    }
+    result.insert(targetKey, QFileInfo{path}.absoluteFilePath());
+  };
+
+  addAbsolutePath("outputDir", "absoluteOutputDir");
+  addAbsolutePath("manifestPath", "absoluteManifestPath");
+  addAbsolutePath("preferredCapturePath", "absolutePreferredCapturePath");
+
+  auto contactSheet = result.value("contactSheet").toObject();
+  if (!contactSheet.isEmpty())
+  {
+    const auto path = contactSheet.value("path").toString();
+    if (!path.isEmpty())
+    {
+      contactSheet.insert("absolutePath", QFileInfo{path}.absoluteFilePath());
+      result.insert("contactSheet", contactSheet);
+    }
+  }
+
+  auto captures = result.value("captures").toArray();
+  if (!captures.isEmpty())
+  {
+    auto updatedCaptures = QJsonArray{};
+    for (const auto& value : captures)
+    {
+      auto capture = value.toObject();
+      const auto path = capture.value("path").toString();
+      if (!path.isEmpty())
+      {
+        capture.insert("absolutePath", QFileInfo{path}.absoluteFilePath());
+      }
+      updatedCaptures.push_back(capture);
+    }
+    result.insert("captures", updatedCaptures);
+  }
 }
 
 bool writeManifest(const std::filesystem::path& path, const QJsonObject& manifest)
@@ -1720,8 +1776,11 @@ QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolNa
     {"reviewId", result.value("reviewId")},
     {"resourceUri", result.value("resourceUri")},
     {"preferredCapturePath", result.value("preferredCapturePath")},
+    {"absolutePreferredCapturePath", result.value("absolutePreferredCapturePath")},
     {"outputDir", result.value("outputDir")},
+    {"absoluteOutputDir", result.value("absoluteOutputDir")},
     {"manifestPath", result.value("manifestPath")},
+    {"absoluteManifestPath", result.value("absoluteManifestPath")},
     {"targetObjectCount", result.value("targetObjectCount")},
     {"targetObjectIdsCount", result.value("targetObjectIdsCount")},
     {"targetObjectIdsSample", result.value("targetObjectIdsSample")},
@@ -1746,6 +1805,7 @@ QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolNa
       "contactSheet",
       QJsonObject{
         {"path", contactSheet.value("path")},
+        {"absolutePath", contactSheet.value("absolutePath")},
         {"width", contactSheet.value("width")},
         {"height", contactSheet.value("height")},
         {"fileSize", contactSheet.value("fileSize")},
@@ -2062,6 +2122,7 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     {"edgeCount", static_cast<int>(geometry.edges.size())},
     {"labelCount", static_cast<int>(geometry.labels.size())},
   };
+  addAbsoluteReviewPaths(result);
   if (!writeManifest(outputDir / "manifest.json", result))
   {
     auto updatedWarnings = result.value("warnings").toArray();
@@ -2326,6 +2387,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"edgeCount", static_cast<int>(geometry.edges.size())},
     {"labelCount", static_cast<int>(geometry.labels.size())},
   };
+  addAbsoluteReviewPaths(result);
 
   if (!writeManifest(outputDir / "manifest.json", result))
   {

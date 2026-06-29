@@ -1679,6 +1679,8 @@ TEST_CASE("McpBridgeServer")
     const auto wasModified = map.modified();
     auto tempDir = QTemporaryDir{};
     REQUIRE(tempDir.isValid());
+    const auto relativeOutputDir =
+      QDir::current().relativeFilePath(tempDir.filePath("relative-review-output"));
     auto registry = McpObjectRegistry{};
     const auto response = renderReviewTargetsForMapResult(
       map,
@@ -1696,7 +1698,7 @@ TEST_CASE("McpBridgeServer")
         {"edgeMode", "minimal"},
         {"imageSize", QJsonArray{900, 650}},
         {"contactSheetSize", QJsonArray{1200, 900}},
-        {"outputDir", tempDir.path()},
+        {"outputDir", relativeOutputDir},
       },
       history,
       &registry);
@@ -1712,10 +1714,16 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("qualityValid").toBool());
     CHECK(map.modified() == wasModified);
     CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
+    CHECK(QFileInfo{response.result.value("outputDir").toString()}.isAbsolute());
+    CHECK(QFileInfo{response.result.value("absoluteOutputDir").toString()}.isAbsolute());
+    CHECK(QFileInfo{response.result.value("absolutePreferredCapturePath").toString()}
+            .exists());
 
     const auto contactSheet = response.result.value("contactSheet").toObject();
     CHECK(contactSheet.value("valid").toBool());
     CHECK(QFileInfo::exists(contactSheet.value("path").toString()));
+    CHECK(QFileInfo{contactSheet.value("path").toString()}.isAbsolute());
+    CHECK(QFileInfo{contactSheet.value("absolutePath").toString()}.exists());
     CHECK(contactSheet.value("sourceCaptureCount").toInt() == 5);
     CHECK(contactSheet.value("includedCaptureCount").toInt() == 2);
     CHECK(contactSheet.value("omittedCaptureCount").toInt() == 3);
@@ -2700,6 +2708,8 @@ TEST_CASE("McpBridgeServer transforms selector targets without long id lists")
   CHECK(previewResponse.result.value("matchedCount").toInt() == 32);
   CHECK(previewResponse.result.value("objectIdCount").toInt() == 32);
   CHECK(previewResponse.result.value("objectIds").isUndefined());
+  CHECK(previewResponse.result.value("objectIdSample").isUndefined());
+  CHECK(previewResponse.result.value("sample").isUndefined());
 
   const auto transformResponse = transformObjectsForMapResult(
     map,
@@ -5166,7 +5176,7 @@ TEST_CASE("McpBridgeServer file based IR tools")
   const auto applyResponse = irApplyFromFileForMapResult(
     map,
     "ir_apply_from_file",
-    QJsonObject{{"path", path}},
+    QJsonObject{{"path", path}, {"idsMode", "count"}},
     history,
     nextOperationIndex,
     metadataStore,
@@ -5176,6 +5186,31 @@ TEST_CASE("McpBridgeServer file based IR tools")
   CHECK(applyResponse.result.value("sourcePath").toString() == path);
   CHECK(applyResponse.result.value("operationCount").toInt() == 1);
   CHECK(applyResponse.result.value("changedObjectCount").toInt() == 1);
+  CHECK(applyResponse.result.value("changedObjectIds").isUndefined());
+  const auto applied = applyResponse.result.value("applied").toArray();
+  REQUIRE(applied.size() == 1);
+  CHECK(applied.at(0).toObject().value("changedObjectIds").isUndefined());
+
+  const auto fullApplyResponse = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{{"path", path}, {"idsMode", "full"}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore);
+  REQUIRE(fullApplyResponse.ok);
+  CHECK(fullApplyResponse.result.value("changedObjectCount").toInt() == 1);
+  CHECK(fullApplyResponse.result.value("changedObjectIds").toArray().size() == 1);
+  CHECK(
+    fullApplyResponse.result.value("applied")
+      .toArray()
+      .at(0)
+      .toObject()
+      .value("changedObjectIds")
+      .toArray()
+      .size()
+    == 1);
 }
 
 TEST_CASE("McpBridgeServer Python blockout tools")
