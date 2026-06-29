@@ -200,6 +200,65 @@ Every non-trivial MCP change must include:
 
 Documentation-only governance changes need static checks, not a Release rebuild.
 
+### Rule 11: IR Compatibility Must Be Intentional
+
+IR is a public boundary between recipes and C++ MCP. Changes to IR shape must be
+version-aware:
+
+- keep old accepted fields working when practical
+- add new fields as optional first
+- return warnings for deprecated fields before removing them
+- reject unknown or unsupported schema versions with a structured error
+- document any breaking IR change in the governance/roadmap docs and recipe
+  validation path
+
+Recipes should include a schema/version marker once the IR shape changes beyond
+small additive fields.
+
+### Rule 12: Tool Lifecycle Must Be Explicit
+
+Every MCP tool should fit one lifecycle state:
+
+- `stable`: default for commonly used tools
+- `experimental`: hidden/searchable until real workflows prove it
+- `legacy`: kept for compatibility, with replacement guidance
+- `deprecated`: replacement exists; no new workflow should use it
+
+Do not remove a tool immediately unless it is unsafe. Hide or deprecate first,
+keep exact-name search working, and add replacement text in the schema. Changing
+default profile visibility counts as a compatibility change and needs catalog
+test coverage.
+
+### Rule 13: Performance Budgets Must Be Clear
+
+MCP tools should have predictable cost. New high-volume tools must define:
+
+- expected input size and target count
+- default timeout or practical runtime expectation
+- maximum returned id/detail volume in default mode
+- behavior when work is too large: summarize, paginate, write a resource, warn,
+  or reject before mutation
+
+Review and validation tools should prefer bounded summaries, small samples, and
+resource paths over huge inline payloads.
+
+### Rule 14: Failure Recovery Must Be Structured
+
+Mutating tools must either commit one clear transaction or fail before mutation.
+Partial mutation is allowed only when explicitly documented and reported.
+
+Failures should return structured diagnostics that tell the Agent:
+
+- whether the document was mutated
+- whether retrying is safe
+- whether the active document/path/fingerprint mismatched
+- whether ids were stale or selectors matched nothing
+- whether validation failed before commit or rollback happened
+- which recovery path to use: retry, refresh status, inspect detail, undo, or
+  rebuild
+
+Crash, wrong-map write, data loss, and unclear mutation state are P0 issues.
+
 ## New Capability Decision Checklist
 
 Use this checklist before implementing a request:
@@ -235,6 +294,9 @@ Layer decision:
 - Required TrenchBroom internals:
 - Default output mode:
 - Modeling profile visibility:
+- Compatibility/lifecycle:
+- Performance budget:
+- Failure recovery behavior:
 - Validation path:
 - Real TB acceptance plan:
 ```
@@ -267,6 +329,8 @@ Before merging or committing MCP work, verify:
 - route/slope semantics are validated by geometry tools
 - review images remain readable
 - docs and skill routing are updated when workflow changes
+- IR compatibility and tool lifecycle are intentional
+- performance and failure behavior are documented for high-volume tools
 - focused tests and real TB acceptance match the change risk
 
 This is the guardrail that keeps MCP useful without letting it become a pile of
