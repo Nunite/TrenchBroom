@@ -1459,8 +1459,15 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"routeDirection", vec3Property("Optional route direction for continuity.")},
           {"continuityMode",
            stringProperty(
+             "Legacy pass-through to geometry_analyze_route_continuity. Prefer "
+             "routeMode for new workflows.")},
+          {"routeMode",
+           stringProperty(
              "Passed through to geometry_analyze_route_continuity: continuous, "
-             "stepped, or jump_gaps.")},
+             "stepped, jump_chain, spiral, or closed_loop.")},
+          {"validationMode",
+           stringProperty(
+             "Alias for routeMode used by recipe/skill validation profiles.")},
           {"maxStepHeight",
            numberProperty(
              "Used with continuityMode=stepped. Maximum step height treated as "
@@ -1477,6 +1484,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            boolProperty(
              "Passed through to geometry_analyze_route_continuity. When true, the "
              "last ordered route surface is checked against the first.")},
+          {"detail",
+           stringProperty(
+             "Passed through to geometry_analyze_route_continuity. Summary is the "
+             "default; full includes per-surface and per-seam evidence.")},
         },
         {"moduleId"}),
     },
@@ -3038,6 +3049,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Minimum non-flat slope angle to report. Defaults to 0.5 degrees.")},
         {"maxSlopeDegrees",
          numberProperty("Maximum slope angle to report. Defaults to 89 degrees.")},
+        {"detail",
+         stringProperty(
+           "summary or full. Defaults to summary. Summary returns counts and a small "
+           "slopeSample; full also returns every slope face.")},
       }),
     },
     {
@@ -3087,10 +3102,17 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "1 map unit.")},
         {"continuityMode",
          stringProperty(
-           "continuous (strict default), stepped (step_up/step_down within "
-           "maxStepHeight are semantically continuous), or jump_gaps (horizontal_gap "
-           "within maxJumpGap is treated as an intentional jump gap). Raw seam "
-           "continuous/classification fields remain unchanged.")},
+           "Legacy route validation mode: continuous (strict default), stepped, "
+           "jump_gaps. Prefer routeMode for new workflows.")},
+        {"routeMode",
+         stringProperty(
+           "continuous, stepped, jump_chain, spiral, or closed_loop. Also accepts "
+           "validation profile aliases walkable_continuous, spiral_ascending, "
+           "jump_chain, stairs_or_steps, and slide_or_surf.")},
+        {"validationMode",
+         stringProperty(
+           "Alias for routeMode used by recipes/skills. continuityMode remains "
+           "accepted for compatibility.")},
         {"maxStepHeight",
          numberProperty(
            "Used with continuityMode=stepped. Maximum absolute step height treated as "
@@ -3111,6 +3133,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty(
            "When true, also checks the final ordered surface back to the first and "
            "marks that seam with loopClosure.")},
+        {"detail",
+         stringProperty(
+           "summary or full. Defaults to summary. Summary returns continuity totals "
+           "and small seam/surface samples; full also returns every surface, seam, and "
+           "unsupported object id.")},
       }),
     },
     {

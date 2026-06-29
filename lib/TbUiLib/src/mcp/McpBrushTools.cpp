@@ -64,6 +64,8 @@ namespace mcp = tb::mcp;
 namespace
 {
 
+constexpr auto DefaultGeometrySampleLimit = 6;
+
 struct PathRibbonSegment
 {
   std::vector<vm::vec2d> polygon;
@@ -86,6 +88,24 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
     {"min", vecToJson(bounds.min)},
     {"max", vecToJson(bounds.max)},
   };
+}
+
+QString summaryOrFullDetail(const QJsonObject& params)
+{
+  const auto detail = params.value("detail").toString("summary").trimmed().toLower();
+  return detail == "full" || detail == "ids" ? QString{"full"} : QString{"summary"};
+}
+
+QJsonArray jsonSample(
+  const QJsonArray& values, const int limit = DefaultGeometrySampleLimit)
+{
+  auto result = QJsonArray{};
+  const auto count = std::min(std::max(0, limit), static_cast<int>(values.size()));
+  for (auto i = 0; i < count; ++i)
+  {
+    result.push_back(values.at(i));
+  }
+  return result;
 }
 
 QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
@@ -1307,8 +1327,7 @@ std::optional<PlayableSurface> playableSurfaceForBrush(
   surface.routeDirection = routeDirection;
   surface.bounds = *topBounds;
   surface.vertices = std::move(topVertices);
-  surface.slopeDegrees =
-    std::acos(std::clamp(bestNormal.z(), -1.0, 1.0)) * 180.0 / Pi;
+  surface.slopeDegrees = std::acos(std::clamp(bestNormal.z(), -1.0, 1.0)) * 180.0 / Pi;
   surface.minProjection = minProjection;
   surface.maxProjection = maxProjection;
   surface.entryZ = averageZAtProjection(
@@ -1445,9 +1464,8 @@ QJsonObject seamEdgeJson(
   const auto edgeVerticalStepMax =
     std::max(std::abs(minSideVerticalStep), std::abs(maxSideVerticalStep));
   const auto overlapAccepted = classification == "overlap_continuous_height";
-  const auto fullWidthContinuous =
-    (overlapAccepted || edgeGapMax <= horizontalTolerance)
-    && edgeVerticalStepMax <= verticalTolerance;
+  const auto fullWidthContinuous = (overlapAccepted || edgeGapMax <= horizontalTolerance)
+                                   && edgeVerticalStepMax <= verticalTolerance;
 
   return QJsonObject{
     {"available", true},
@@ -1535,6 +1553,52 @@ QJsonObject seamJson(
   };
 }
 
+QJsonObject seamSummaryJson(const QJsonObject& seam)
+{
+  auto result = QJsonObject{
+    {"seamIndex", seam.value("seamIndex")},
+    {"fromObjectId", seam.value("fromObjectId")},
+    {"toObjectId", seam.value("toObjectId")},
+    {"classification", seam.value("classification")},
+    {"continuous", seam.value("continuous")},
+    {"semanticContinuous", seam.value("semanticContinuous")},
+    {"centerlineContinuous", seam.value("centerlineContinuous")},
+    {"fullWidthContinuous", seam.value("fullWidthContinuous")},
+    {"verticalStep", seam.value("verticalStep")},
+    {"horizontalGap", seam.value("horizontalGap")},
+    {"edgeGapMax", seam.value("edgeGapMax")},
+    {"edgeVerticalStepMax", seam.value("edgeVerticalStepMax")},
+  };
+  if (seam.value("loopClosure").toBool(false))
+  {
+    result.insert("loopClosure", true);
+  }
+  return result;
+}
+
+QJsonArray seamSummarySample(
+  const QJsonArray& seams,
+  const bool onlySemanticFailures,
+  const int limit = DefaultGeometrySampleLimit)
+{
+  auto result = QJsonArray{};
+  const auto maxCount = std::max(0, limit);
+  for (const auto& seamValue : seams)
+  {
+    const auto seam = seamValue.toObject();
+    if (onlySemanticFailures && seam.value("semanticContinuous").toBool(false))
+    {
+      continue;
+    }
+    result.push_back(seamSummaryJson(seam));
+    if (result.size() >= maxCount)
+    {
+      break;
+    }
+  }
+  return result;
+}
+
 bool seamSemanticallyContinuous(
   const QJsonObject& seam,
   const QString& continuityMode,
@@ -1557,6 +1621,12 @@ bool seamSemanticallyContinuous(
   }
   if (
     continuityMode == "jump_gaps" && classification == "horizontal_gap"
+    && horizontalGap <= maxJumpGap)
+  {
+    return true;
+  }
+  if (
+    continuityMode == "jump_chain" && classification == "horizontal_gap"
     && horizontalGap <= maxJumpGap)
   {
     return true;
@@ -5401,7 +5471,15 @@ McpBridgeToolResult geometryAnalyzeSlopesForMapResult(
     optionalClampedDouble(resolvedParams, "minSlopeDegrees", 0.5, 0.0, 89.0);
   const auto maxSlopeDegrees =
     optionalClampedDouble(resolvedParams, "maxSlopeDegrees", 89.0, minSlopeDegrees, 89.9);
+  const auto detail = summaryOrFullDetail(resolvedParams);
   auto slopes = QJsonArray{};
+  auto ascendingCount = 0;
+  auto descendingCount = 0;
+  auto crossSlopeCount = 0;
+  auto unknownDirectionCount = 0;
+  auto minReportedSlope = std::numeric_limits<double>::max();
+  auto maxReportedSlope = 0.0;
+  auto maxAbsHeightDeltaAlongRoute = 0.0;
   for (const auto* brush : *brushes)
   {
     const auto& faces = brush->brush().faces();
@@ -5419,7 +5497,30 @@ McpBridgeToolResult geometryAnalyzeSlopesForMapResult(
       {
         continue;
       }
-      slopes.push_back(slopeFaceJson(*brush, face, i, routeDirection, map.worldNode()));
+      auto slope = slopeFaceJson(*brush, face, i, routeDirection, map.worldNode());
+      const auto classification = slope.value("classification").toString();
+      if (classification == "ascending")
+      {
+        ++ascendingCount;
+      }
+      else if (classification == "descending")
+      {
+        ++descendingCount;
+      }
+      else if (classification == "cross_slope")
+      {
+        ++crossSlopeCount;
+      }
+      else
+      {
+        ++unknownDirectionCount;
+      }
+      minReportedSlope = std::min(minReportedSlope, slopeDegrees);
+      maxReportedSlope = std::max(maxReportedSlope, slopeDegrees);
+      maxAbsHeightDeltaAlongRoute = std::max(
+        maxAbsHeightDeltaAlongRoute,
+        std::abs(slope.value("heightDeltaAlongRoute").toDouble()));
+      slopes.push_back(std::move(slope));
     }
   }
 
@@ -5432,18 +5533,31 @@ McpBridgeToolResult geometryAnalyzeSlopesForMapResult(
   if (slopes.isEmpty())
   {
     warnings.push_back("noSlopedFaces: no upward non-flat slope faces matched filters.");
+    minReportedSlope = 0.0;
   }
 
   auto result = QJsonObject{
     {"tool", "geometry_analyze_slopes"},
+    {"detail", detail},
     {"targetBrushCount", static_cast<int>(brushes->size())},
     {"slopeCount", slopes.size()},
-    {"slopes", slopes},
+    {"ascendingCount", ascendingCount},
+    {"descendingCount", descendingCount},
+    {"crossSlopeCount", crossSlopeCount},
+    {"unknownDirectionCount", unknownDirectionCount},
+    {"minReportedSlopeDegrees", minReportedSlope},
+    {"maxReportedSlopeDegrees", maxReportedSlope},
+    {"maxAbsHeightDeltaAlongRoute", maxAbsHeightDeltaAlongRoute},
+    {"slopeSample", jsonSample(slopes)},
     {"warnings", warnings},
     {"minSlopeDegrees", minSlopeDegrees},
     {"maxSlopeDegrees", maxSlopeDegrees},
     {"routeDirectionProvided", routeDirection.has_value()},
   };
+  if (detail == "full")
+  {
+    result.insert("slopes", slopes);
+  }
   if (resolvedParams.contains("selectorMatchedCount"))
   {
     result.insert("selectorMatchedCount", resolvedParams.value("selectorMatchedCount"));
@@ -5514,8 +5628,6 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   {
     return invalidParamsFailure("orderBy must be projection or metadataOrder");
   }
-  const auto closedLoop = resolvedParams.value("closedLoop").toBool(false);
-
   auto orderedBrushes = *brushes;
   if (useMetadataOrder)
   {
@@ -5559,19 +5671,51 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     optionalClampedDouble(resolvedParams, "horizontalTolerance", 1.0, 0.0, 1024.0);
   const auto verticalTolerance =
     optionalClampedDouble(resolvedParams, "verticalTolerance", 0.5, 0.0, 1024.0);
-  const auto continuityMode =
-    resolvedParams.value("continuityMode").toString("continuous").trimmed().toLower();
-  if (
-    continuityMode != "continuous" && continuityMode != "stepped"
-    && continuityMode != "jump_gaps")
+  const auto detail = summaryOrFullDetail(resolvedParams);
+  auto routeMode =
+    resolvedParams.value("routeMode")
+      .toString(
+        resolvedParams.value("validationMode")
+          .toString(resolvedParams.value("continuityMode").toString("continuous")))
+      .trimmed()
+      .toLower();
+  if (routeMode == "walkable_continuous")
+  {
+    routeMode = "continuous";
+  }
+  else if (routeMode == "stairs_or_steps")
+  {
+    routeMode = "stepped";
+  }
+  else if (routeMode == "slide_or_surf")
+  {
+    routeMode = "continuous";
+  }
+  else if (routeMode == "spiral_ascending")
+  {
+    routeMode = "spiral";
+  }
+  else if (routeMode == "jump_gaps")
+  {
+    routeMode = "jump_chain";
+  }
+  const auto validRouteMode = routeMode == "continuous" || routeMode == "stepped"
+                              || routeMode == "jump_chain" || routeMode == "spiral"
+                              || routeMode == "closed_loop";
+  if (!validRouteMode)
   {
     return invalidParamsFailure(
-      "continuityMode must be continuous, stepped, or jump_gaps");
+      "routeMode/continuityMode must be continuous, stepped, jump_chain, spiral, or "
+      "closed_loop");
   }
+  const auto continuityMode =
+    routeMode == "closed_loop" ? QString{"continuous"} : routeMode;
   const auto maxStepHeight =
     optionalClampedDouble(resolvedParams, "maxStepHeight", 24.0, 0.0, 256.0);
   const auto maxJumpGap =
     optionalClampedDouble(resolvedParams, "maxJumpGap", 128.0, 0.0, 4096.0);
+  const auto checkClosedLoop =
+    routeMode == "closed_loop" || resolvedParams.value("closedLoop").toBool(false);
 
   auto surfaces = std::vector<PlayableSurface>{};
   auto unsupportedObjectIds = QJsonArray{};
@@ -5675,13 +5819,15 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   auto centerlineContinuous = surfaces.size() >= 2u;
   auto fullWidthContinuous = surfaces.size() >= 2u;
   auto semanticContinuous = surfaces.size() >= 2u;
+  auto failingSeamCount = 0;
+  auto semanticFailingSeamCount = 0;
   const auto seamPairCount =
-    surfaces.size() >= 2u ? surfaces.size() - 1u + (closedLoop ? 1u : 0u) : 0u;
+    surfaces.size() >= 2u ? surfaces.size() - 1u + (checkClosedLoop ? 1u : 0u) : 0u;
   for (size_t i = 0; i < seamPairCount; ++i)
   {
     const auto fromIndex = i;
     const auto toIndex = (i + 1u) % surfaces.size();
-    auto maybeSeam = seamForPair(fromIndex, toIndex, i, closedLoop && toIndex == 0u);
+    auto maybeSeam = seamForPair(fromIndex, toIndex, i, checkClosedLoop && toIndex == 0u);
     if (!maybeSeam)
     {
       continue;
@@ -5703,6 +5849,14 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     const auto seamSemanticContinuous =
       seamSemanticallyContinuous(seam, continuityMode, maxStepHeight, maxJumpGap);
     seam.insert("semanticContinuous", seamSemanticContinuous);
+    if (!seam.value("continuous").toBool(false))
+    {
+      ++failingSeamCount;
+    }
+    if (!seamSemanticContinuous)
+    {
+      ++semanticFailingSeamCount;
+    }
     semanticContinuous = semanticContinuous && seamSemanticContinuous;
     seams.push_back(seam);
   }
@@ -5732,26 +5886,36 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
       "semantically continuous; inspect raw continuous/classification fields for "
       "strict geometry.");
   }
-  else if (continuityMode == "jump_gaps")
+  else if (continuityMode == "jump_chain")
   {
     warnings.push_back(
-      "continuityMode=jump_gaps treats horizontal_gap seams within maxJumpGap as "
-      "intentional jump gaps; inspect raw continuous/classification fields for strict "
+      "routeMode=jump_chain treats horizontal_gap seams within maxJumpGap as "
+      "intentional jumps; inspect raw continuous/classification fields for strict "
       "geometry.");
+  }
+  else if (continuityMode == "spiral")
+  {
+    warnings.push_back(
+      "routeMode=spiral checks ordered adjacent segment continuity but does not check "
+      "the final surface back to the first unless closedLoop is also true.");
   }
 
   auto result = QJsonObject{
     {"tool", "geometry_analyze_route_continuity"},
+    {"detail", detail},
     {"targetBrushCount", static_cast<int>(brushes->size())},
     {"surfaceCount", static_cast<int>(surfaces.size())},
     {"seamCount", seams.size()},
+    {"failingSeamCount", failingSeamCount},
+    {"semanticFailingSeamCount", semanticFailingSeamCount},
     {"continuous", continuous},
     {"centerlineContinuous", centerlineContinuous},
     {"fullWidthContinuous", fullWidthContinuous},
     {"semanticContinuous", semanticContinuous},
     {"continuityMode", continuityMode},
+    {"routeMode", routeMode},
     {"orderBy", useMetadataOrder ? "metadataOrder" : "projection"},
-    {"closedLoop", closedLoop},
+    {"closedLoop", checkClosedLoop},
     {"routeDirection", vecToJson(*routeDirection)},
     {"horizontalTolerance", horizontalTolerance},
     {"verticalTolerance", verticalTolerance},
@@ -5761,11 +5925,18 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     {"maxHorizontalGap", maxHorizontalGap},
     {"maxEdgeGap", maxEdgeGap},
     {"maxEdgeVerticalStep", maxEdgeVerticalStep},
-    {"surfaces", surfaceJson},
-    {"seams", seams},
-    {"unsupportedObjectIds", unsupportedObjectIds},
+    {"surfaceSample", jsonSample(surfaceJson)},
+    {"failingSeamSample", seamSummarySample(seams, true)},
+    {"seamSample", seamSummarySample(seams, false)},
+    {"unsupportedObjectCount", unsupportedObjectIds.size()},
     {"warnings", warnings},
   };
+  if (detail == "full")
+  {
+    result.insert("surfaces", surfaceJson);
+    result.insert("seams", seams);
+    result.insert("unsupportedObjectIds", unsupportedObjectIds);
+  }
   if (resolvedParams.contains("selectorMatchedCount"))
   {
     result.insert("selectorMatchedCount", resolvedParams.value("selectorMatchedCount"));

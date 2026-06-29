@@ -394,8 +394,8 @@ Artifacts:
 1. Fix `ir_apply_from_file(idsMode:"count")` returning long `changedObjectIds`.
 2. Fix `selector_preview(idsMode:"count")` returning object samples.
 3. Return absolute review paths, even when `outputDir` is relative.
-4. Add summary/default and `detail:"full"` modes to slope and continuity analysis.
-5. Add explicit route validation modes: `continuous`, `stepped`, `jump_chain`, `spiral`, and `closed_loop`.
+4. Add summary/default and `detail:"full"` modes to slope and continuity analysis. Done: default responses return counts and samples; `detail:"full"` returns all slopes/surfaces/seams.
+5. Add explicit route validation modes: `continuous`, `stepped`, `jump_chain`, `spiral`, and `closed_loop`. Done; legacy `continuityMode:"jump_gaps"` remains accepted and normalizes to `jump_chain`.
 6. Update skill workflow to recommend absolute review output dirs.
 7. Add tests for output compaction across IR apply, selector, module, and review.
 8. Add recipe catalog command or script-level listing.
@@ -427,11 +427,11 @@ Use this table as the rolling implementation checklist.
 
 | Priority | Item | Owner Layer | Status |
 | --- | --- | --- | --- |
-| P1 | Normalize `idsMode` across high-volume tools | C++ MCP | Pending |
-| P1 | Return absolute review paths | C++ MCP | Pending |
-| P1 | Add summary/default modes to slope and continuity analysis | C++ MCP | Pending |
-| P1 | Document absolute review output path in skill workflow | Skill | Pending |
-| P1 | Add route validation modes | C++ MCP + Skill | Pending |
+| P1 | Normalize `idsMode` across high-volume tools | C++ MCP | Partial: IR apply, selector preview, transform, and review have compact defaults; remaining create/entity/texture/history paths need another sweep. |
+| P1 | Return absolute review paths | C++ MCP | Done for review renderer outputs and compact review summaries. |
+| P1 | Add summary/default modes to slope and continuity analysis | C++ MCP | Done: default summary returns counts/samples; `detail:"full"` returns full slope/seam evidence. |
+| P1 | Document absolute review output path in skill workflow | Skill | Done in `trenchbroom-mcp-scene-workflow`; keep in sync when review defaults change. |
+| P1 | Add route validation modes | C++ MCP + Skill | Done for MCP route continuity: `continuous`, `stepped`, `jump_chain`, `spiral`, `closed_loop`, plus recipe profile aliases. |
 | P2 | Add recipe catalog/listing | Skill | Pending |
 | P2 | Add profile-size regression test | MCP catalog tests | Pending |
 | P2 | Improve entity glyph and label policy in review | C++ MCP | Pending |

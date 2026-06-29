@@ -1223,13 +1223,17 @@ TEST_CASE("McpToolCatalog")
     CHECK(routeContinuityProperties.value("verticalTolerance").isObject());
     CHECK(routeContinuityProperties.value("horizontalTolerance").isObject());
     CHECK(routeContinuityProperties.value("continuityMode").isObject());
+    CHECK(routeContinuityProperties.value("routeMode").isObject());
+    CHECK(routeContinuityProperties.value("validationMode").isObject());
     CHECK(routeContinuityProperties.value("maxStepHeight").isObject());
     CHECK(routeContinuityProperties.value("maxJumpGap").isObject());
+    CHECK(routeContinuityProperties.value("detail").isObject());
 
     const auto slopeTool = findToolDefinition("geometry_analyze_slopes");
     REQUIRE(slopeTool);
     const auto slopeProperties = slopeTool->inputSchema.value("properties").toObject();
     CHECK(slopeProperties.value("selector").isObject());
+    CHECK(slopeProperties.value("detail").isObject());
 
     const auto faceTextureTool = findToolDefinition("face_texture_set");
     REQUIRE(faceTextureTool);
@@ -1266,6 +1270,7 @@ TEST_CASE("McpToolCatalog")
       routeContinuityToolForOrder->inputSchema.value("properties").toObject();
     CHECK(routeContinuityOrderProperties.value("orderBy").isObject());
     CHECK(routeContinuityOrderProperties.value("closedLoop").isObject());
+    CHECK(routeContinuityOrderProperties.value("routeMode").isObject());
 
     const auto updatePropsTool = findToolDefinition("entity_properties_update");
     REQUIRE(updatePropsTool);

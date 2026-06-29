@@ -2140,11 +2140,14 @@ McpBridgeToolResult moduleValidateResult(
          {"continuityMode",
           "maxStepHeight",
           "maxJumpGap",
+          "routeMode",
+          "validationMode",
           "verticalTolerance",
           "horizontalTolerance",
           "minUpNormal",
           "orderBy",
-          "closedLoop"})
+          "closedLoop",
+          "detail"})
     {
       if (params.contains(key))
       {

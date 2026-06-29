@@ -3185,6 +3185,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
       {"operationId", operationId},
       {"start", QJsonArray{240, 32, 0}},
       {"end", QJsonArray{368, 32, 64}},
+      {"detail", "full"},
     },
     history);
   REQUIRE(slopeResponse.ok);
@@ -3209,6 +3210,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     QJsonObject{
       {"operationId", operationId},
       {"routeDirection", QJsonArray{-1, 0, 0}},
+      {"detail", "full"},
     },
     history);
   REQUIRE(reverseSlopeResponse.ok);
@@ -3264,6 +3266,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
       {"operationId", brokenRampResponse.result.value("operationId").toString()},
       {"start", QJsonArray{640, 48, 16}},
       {"end", QJsonArray{1152, 48, 112}},
+      {"detail", "full"},
     },
     history);
   REQUIRE(brokenContinuityResponse.ok);
@@ -3312,6 +3315,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
       {"operationId", continuousRampResponse.result.value("operationId").toString()},
       {"start", QJsonArray{1280, 48, 16}},
       {"end", QJsonArray{1792, 48, 96}},
+      {"detail", "full"},
     },
     history);
   REQUIRE(continuousResponse.ok);
@@ -3355,6 +3359,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
       {"operationId", overlapRampResponse.result.value("operationId").toString()},
       {"start", QJsonArray{1920, 48, 16}},
       {"end", QJsonArray{2160, 48, 16}},
+      {"detail", "full"},
     },
     history);
   REQUIRE(overlapContinuityResponse.ok);
@@ -4103,6 +4108,15 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
   REQUIRE(selectorContinuity.ok);
   CHECK(selectorContinuity.result.value("selectorMatchedCount").toInt() == 3);
   CHECK(selectorContinuity.result.value("continuous").toBool());
+  CHECK(selectorContinuity.result.value("detail").toString() == "summary");
+  CHECK(selectorContinuity.result.value("seams").isUndefined());
+  CHECK(selectorContinuity.result.value("surfaceSample").toArray().size() == 3);
+  CHECK(selectorContinuity.result.value("seamSample").toArray().size() == 2);
+  CHECK_FALSE(selectorContinuity.result.value("seamSample")
+                .toArray()
+                .first()
+                .toObject()
+                .contains("edge"));
 
   const auto selectorSlopes = geometryAnalyzeSlopesForMapResult(
     map,
@@ -4117,6 +4131,10 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
   REQUIRE(selectorSlopes.ok);
   CHECK(selectorSlopes.result.value("selectorMatchedCount").toInt() == 1);
   CHECK(selectorSlopes.result.value("slopeCount").toInt() >= 1);
+  CHECK(selectorSlopes.result.value("detail").toString() == "summary");
+  CHECK(selectorSlopes.result.value("slopes").isUndefined());
+  CHECK(selectorSlopes.result.value("slopeSample").toArray().size() >= 1);
+  CHECK(selectorSlopes.result.value("ascendingCount").toInt() >= 1);
 
   const auto objectIds = routeResponse.result.value("changedObjectIds").toArray();
   REQUIRE(objectIds.size() == 3);
@@ -4175,6 +4193,23 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
   REQUIRE(jumpGapResponse.ok);
   CHECK_FALSE(jumpGapResponse.result.value("continuous").toBool());
   CHECK(jumpGapResponse.result.value("semanticContinuous").toBool());
+  CHECK(jumpGapResponse.result.value("routeMode").toString() == "jump_chain");
+
+  const auto jumpChainResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", jumpRouteResponse.result.value("operationId").toString()},
+      {"start", QJsonArray{1024, 48, 16}},
+      {"end", QJsonArray{1408, 48, 16}},
+      {"routeMode", "jump_chain"},
+      {"maxJumpGap", 128},
+    },
+    history,
+    &objectRegistry);
+  REQUIRE(jumpChainResponse.ok);
+  CHECK_FALSE(jumpChainResponse.result.value("continuous").toBool());
+  CHECK(jumpChainResponse.result.value("semanticContinuous").toBool());
+  CHECK(jumpChainResponse.result.value("routeMode").toString() == "jump_chain");
 
   const auto arcRampResponse = blockoutCreateBatchForMapResult(
     map,
@@ -4234,6 +4269,7 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
       {"continuityMode", "stepped"},
       {"maxStepHeight", 256},
       {"horizontalTolerance", 1024},
+      {"detail", "full"},
     },
     history,
     &objectRegistry,
@@ -4265,16 +4301,18 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
     QJsonObject{
       {"routeId", "arc-loop"},
       {"orderBy", "metadataOrder"},
-      {"closedLoop", true},
-      {"continuityMode", "stepped"},
+      {"routeMode", "closed_loop"},
       {"maxStepHeight", 256},
       {"horizontalTolerance", 1024},
+      {"detail", "full"},
     },
     history,
     &objectRegistry,
     &metadataStore,
     &moduleStore);
   REQUIRE(arcClosedLoopResponse.ok);
+  CHECK(arcClosedLoopResponse.result.value("routeMode").toString() == "closed_loop");
+  CHECK(arcClosedLoopResponse.result.value("closedLoop").toBool());
   const auto arcClosedLoopSeams = arcClosedLoopResponse.result.value("seams").toArray();
   REQUIRE(!arcClosedLoopSeams.isEmpty());
   CHECK(arcClosedLoopSeams.last().toObject().value("loopClosure").toBool());
@@ -4332,6 +4370,14 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
   CHECK_FALSE(mismatchedContinuity.result.value("continuous").toBool());
   CHECK(mismatchedContinuity.result.value("centerlineContinuous").toBool());
   CHECK_FALSE(mismatchedContinuity.result.value("fullWidthContinuous").toBool());
+  CHECK(mismatchedContinuity.result.value("failingSeamCount").toInt() == 1);
+  CHECK(mismatchedContinuity.result.value("semanticFailingSeamCount").toInt() == 1);
+  CHECK(mismatchedContinuity.result.value("failingSeamSample").toArray().size() == 1);
+  CHECK_FALSE(mismatchedContinuity.result.value("failingSeamSample")
+                .toArray()
+                .first()
+                .toObject()
+                .contains("edge"));
   CHECK(mismatchedContinuity.result.value("maxEdgeGap").toDouble() > 1.0);
   CHECK(mismatchedContinuity.result.value("warnings")
           .toArray()
@@ -4349,6 +4395,7 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
       {"continuityMode", "stepped"},
       {"maxStepHeight", 128},
       {"horizontalTolerance", 1024},
+      {"detail", "full"},
     },
     history,
     &objectRegistry,
