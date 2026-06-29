@@ -905,12 +905,13 @@ TEST_CASE("McpToolCatalog")
     CHECK(moduleListProperties.value("includeEmpty").isObject());
   }
 
-  SECTION("scene review capture documents focused object screenshots")
+  SECTION("legacy viewport review helper documents retirement path")
   {
     const auto tool = findToolDefinition("viewport_capture_scene_review");
     REQUIRE(tool);
 
-    CHECK(tool->description.contains("Legacy viewport review helper"));
+    CHECK(tool->description.contains("Retired lightweight-runtime viewport helper"));
+    CHECK(tool->description.contains("Searchable for migration only"));
     CHECK(tool->description.contains("render_review_selector"));
 
     const auto properties = tool->inputSchema.value("properties").toObject();
@@ -1033,12 +1034,13 @@ TEST_CASE("McpToolCatalog")
             .isObject());
   }
 
-  SECTION("viewport camera set schema supports explicit look-at review")
+  SECTION("viewport camera set schema remains searchable for migration")
   {
     const auto tool = findToolDefinition("viewport_camera_set");
     REQUIRE(tool);
 
-    CHECK(tool->description.contains("explicit position"));
+    CHECK(tool->description.contains("Retired lightweight-runtime viewport helper"));
+    CHECK(tool->description.contains("render_review_selector"));
 
     const auto properties = tool->inputSchema.value("properties").toObject();
     CHECK(properties.value("position").isObject());
@@ -1050,12 +1052,13 @@ TEST_CASE("McpToolCatalog")
     CHECK(required.contains("target"));
   }
 
-  SECTION("viewport camera frame bounds schema supports orbit review")
+  SECTION("viewport camera frame bounds schema remains searchable for migration")
   {
     const auto tool = findToolDefinition("viewport_camera_frame_bounds");
     REQUIRE(tool);
 
-    CHECK(tool->description.contains("deterministic orbit angle"));
+    CHECK(tool->description.contains("Retired lightweight-runtime viewport helper"));
+    CHECK(tool->description.contains("module_render_review"));
 
     const auto properties = tool->inputSchema.value("properties").toObject();
     CHECK(properties.value("objectIds").isObject());

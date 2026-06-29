@@ -755,8 +755,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_focus",
-      "Focus visible editor viewports on object ids or the current selection for "
-      "screenshot review.",
+      "Retired lightweight-runtime viewport helper. For normal Agent review, use "
+      "render_review_current_scene(scope:\"selection\"), render_review_selector, or "
+      "module_render_review instead.",
       McpMode::ReadOnly,
       false,
       true,
@@ -776,8 +777,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_layout_get",
-      "Return the active map view layout and whether visible 2D/3D viewports are "
-      "available for screenshot automation.",
+      "Retired lightweight-runtime viewport helper. Searchable for migration only; "
+      "use geometry review tools instead of live UI layout inspection.",
       McpMode::ReadOnly,
       false,
       true,
@@ -785,8 +786,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_layout_set",
-      "Switch the active map window layout for deterministic screenshot automation. "
-      "This changes the current UI layout only and does not mutate the map.",
+      "Retired lightweight-runtime viewport helper. Searchable for migration only; "
+      "geometry review tools now provide deterministic saved review bundles without "
+      "changing the live UI layout.",
       McpMode::ReadOnly,
       false,
       true,
@@ -800,9 +802,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_camera_frame_bounds",
-      "Frame a visible 3D viewport around object ids or explicit bounds from a "
-      "deterministic orbit angle for automated screenshot review. This only changes "
-      "the editor camera, not the map.",
+      "Retired lightweight-runtime viewport helper. Searchable for migration only; "
+      "use render_review_selector or module_render_review view presets instead of "
+      "controlling the live editor camera.",
       McpMode::ReadOnly,
       false,
       true,
@@ -834,9 +836,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_camera_set",
-      "Place a visible 3D viewport camera at an explicit position looking at a target. "
-      "Use this for interior, canyon, cave, or close-up screenshots where orbiting "
-      "bounds would be occluded.",
+      "Retired lightweight-runtime viewport helper. Searchable for migration only; "
+      "use render_review_selector or module_render_review view presets instead of "
+      "controlling the live editor camera.",
       McpMode::ReadOnly,
       false,
       true,
@@ -897,9 +899,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_current",
-      "Debug helper: capture the current TrenchBroom window as a PNG. For Agent "
-      "scene review, prefer render_review_current_scene, render_review_selector, or "
-      "render_review_operation.",
+      "Retired lightweight-runtime viewport helper. Searchable for migration only; "
+      "use render_review_current_scene, render_review_selector, or "
+      "render_review_operation for Agent scene review.",
       McpMode::ReadOnly,
       false,
       true,
@@ -910,8 +912,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_3d",
-      "Debug helper: capture a visible 3D map viewport as a PNG. For isolated Agent "
-      "scene review, prefer render_review_selector or render_review_operation.",
+      "Retired lightweight-runtime viewport helper. Searchable for migration only; "
+      "use render_review_selector, render_review_operation, or module_render_review.",
       McpMode::ReadOnly,
       false,
       true,
@@ -922,8 +924,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_2d",
-      "Debug helper: capture a visible 2D map viewport as a PNG. For isolated Agent "
-      "scene review, prefer render_review_selector or render_review_operation.",
+      "Retired lightweight-runtime viewport helper. Searchable for migration only; "
+      "use render_review_selector, render_review_operation, or module_render_review.",
       McpMode::ReadOnly,
       false,
       true,
@@ -934,10 +936,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_scene_review",
-      "Legacy viewport review helper. It captures live UI viewports and is mainly "
-      "useful for debugging camera/layout issues. For normal Agent self-review, "
-      "prefer geometry review tools such as render_review_selector, "
-      "render_review_operation, or render_review_current_scene.",
+      "Retired lightweight-runtime viewport helper. Searchable for migration only. "
+      "For normal Agent self-review, use geometry review tools such as "
+      "render_review_selector, render_review_operation, render_review_current_scene, "
+      "or module_render_review.",
       McpMode::ReadOnly,
       false,
       true,
