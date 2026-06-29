@@ -1180,7 +1180,9 @@ struct PlayableSurface
   QString objectId;
   size_t faceIndex = 0u;
   vm::vec3d normal = vm::vec3d{};
+  vm::vec3d routeDirection = vm::vec3d{};
   vm::bbox3d bounds = vm::bbox3d{};
+  std::vector<vm::vec3d> vertices;
   double slopeDegrees = 0.0;
   double minProjection = 0.0;
   double maxProjection = 0.0;
@@ -1223,7 +1225,12 @@ std::optional<PlayableSurface> playableSurfaceForBrush(
   const mdl::WorldNode& worldNode,
   const double minUpNormal)
 {
-  auto bestSurface = std::optional<PlayableSurface>{};
+  auto topVertices = std::vector<vm::vec3d>{};
+  auto topBounds = std::optional<vm::bbox3d>{};
+  auto bestFaceIndex = size_t{0};
+  auto bestNormal = vm::vec3d{};
+  auto bestSpan = -1.0;
+  auto bestAverageZ = std::numeric_limits<double>::lowest();
   const auto& faces = brushNode.brush().faces();
   for (size_t faceIndex = 0; faceIndex < faces.size(); ++faceIndex)
   {
@@ -1245,6 +1252,15 @@ std::optional<PlayableSurface> playableSurfaceForBrush(
     auto averageZ = 0.0;
     for (const auto& vertex : vertices)
     {
+      const auto duplicate = std::ranges::any_of(topVertices, [&](const auto& existing) {
+        return vm::squared_length(existing - vertex) <= GeometryEpsilon * GeometryEpsilon;
+      });
+      if (!duplicate)
+      {
+        topVertices.push_back(vertex);
+      }
+      topBounds = topBounds ? vm::merge(*topBounds, vertex)
+                            : std::optional<vm::bbox3d>{vm::bbox3d{vertex, vertex}};
       const auto projection = vm::dot(vertex, routeDirection);
       minProjection = std::min(minProjection, projection);
       maxProjection = std::max(maxProjection, projection);
@@ -1253,38 +1269,54 @@ std::optional<PlayableSurface> playableSurfaceForBrush(
     averageZ /= static_cast<double>(vertices.size());
 
     const auto span = std::max(0.0, maxProjection - minProjection);
-    const auto projectionTolerance = std::max(0.01, span * 0.01);
-    auto candidate = PlayableSurface{};
-    candidate.brush = &brushNode;
-    candidate.objectId = nodePathId(brushNode, worldNode);
-    candidate.faceIndex = faceIndex;
-    candidate.normal = normal;
-    candidate.bounds = faceBounds(face);
-    candidate.slopeDegrees = std::acos(std::clamp(normal.z(), -1.0, 1.0)) * 180.0 / Pi;
-    candidate.minProjection = minProjection;
-    candidate.maxProjection = maxProjection;
-    candidate.entryZ =
-      averageZAtProjection(vertices, routeDirection, minProjection, projectionTolerance);
-    candidate.exitZ =
-      averageZAtProjection(vertices, routeDirection, maxProjection, projectionTolerance);
-    candidate.averageZ = averageZ;
-
-    if (!bestSurface)
-    {
-      bestSurface = candidate;
-      continue;
-    }
-
-    const auto bestSpan = bestSurface->maxProjection - bestSurface->minProjection;
     if (
       span > bestSpan + GeometryEpsilon
-      || (nearlyEqual(span, bestSpan) && averageZ > bestSurface->averageZ))
+      || (nearlyEqual(span, bestSpan) && averageZ > bestAverageZ))
     {
-      bestSurface = candidate;
+      bestFaceIndex = faceIndex;
+      bestNormal = normal;
+      bestSpan = span;
+      bestAverageZ = averageZ;
     }
   }
 
-  return bestSurface;
+  if (topVertices.empty() || !topBounds)
+  {
+    return std::nullopt;
+  }
+
+  auto minProjection = std::numeric_limits<double>::max();
+  auto maxProjection = std::numeric_limits<double>::lowest();
+  auto averageZ = 0.0;
+  for (const auto& vertex : topVertices)
+  {
+    const auto projection = vm::dot(vertex, routeDirection);
+    minProjection = std::min(minProjection, projection);
+    maxProjection = std::max(maxProjection, projection);
+    averageZ += vertex.z();
+  }
+  averageZ /= static_cast<double>(topVertices.size());
+  const auto span = std::max(0.0, maxProjection - minProjection);
+  const auto projectionTolerance = std::max(0.01, span * 0.01);
+
+  auto surface = PlayableSurface{};
+  surface.brush = &brushNode;
+  surface.objectId = nodePathId(brushNode, worldNode);
+  surface.faceIndex = bestFaceIndex;
+  surface.normal = bestNormal;
+  surface.routeDirection = routeDirection;
+  surface.bounds = *topBounds;
+  surface.vertices = std::move(topVertices);
+  surface.slopeDegrees =
+    std::acos(std::clamp(bestNormal.z(), -1.0, 1.0)) * 180.0 / Pi;
+  surface.minProjection = minProjection;
+  surface.maxProjection = maxProjection;
+  surface.entryZ = averageZAtProjection(
+    surface.vertices, routeDirection, minProjection, projectionTolerance);
+  surface.exitZ = averageZAtProjection(
+    surface.vertices, routeDirection, maxProjection, projectionTolerance);
+  surface.averageZ = averageZ;
+  return surface;
 }
 
 QJsonObject playableSurfaceJson(const PlayableSurface& surface)
@@ -1299,6 +1331,139 @@ QJsonObject playableSurfaceJson(const PlayableSurface& surface)
     {"exitZ", surface.exitZ},
     {"minProjection", surface.minProjection},
     {"maxProjection", surface.maxProjection},
+    {"topVertexCount", static_cast<int>(surface.vertices.size())},
+  };
+}
+
+struct SeamEdge
+{
+  bool valid = false;
+  vm::vec3d minSidePoint = vm::vec3d{};
+  vm::vec3d maxSidePoint = vm::vec3d{};
+  double minSideProjection = 0.0;
+  double maxSideProjection = 0.0;
+};
+
+double distance2D(const vm::vec3d& lhs, const vm::vec3d& rhs)
+{
+  const auto delta = vm::vec2d{lhs.x() - rhs.x(), lhs.y() - rhs.y()};
+  return vm::length(delta);
+}
+
+SeamEdge seamEdgeAtProjection(const PlayableSurface& surface, const bool exitEdge)
+{
+  const auto targetProjection = exitEdge ? surface.maxProjection : surface.minProjection;
+  const auto span = std::max(0.0, surface.maxProjection - surface.minProjection);
+  const auto tolerance = std::max(0.01, span * 0.02);
+  const auto perpendicular =
+    vm::vec3d{-surface.routeDirection.y(), surface.routeDirection.x(), 0.0};
+
+  auto candidates = std::vector<vm::vec3d>{};
+  for (const auto& vertex : surface.vertices)
+  {
+    if (std::abs(vm::dot(vertex, surface.routeDirection) - targetProjection) <= tolerance)
+    {
+      candidates.push_back(vertex);
+    }
+  }
+
+  if (candidates.size() < 2u)
+  {
+    auto sorted = surface.vertices;
+    std::ranges::sort(sorted, [&](const auto& lhs, const auto& rhs) {
+      const auto lhsDistance =
+        std::abs(vm::dot(lhs, surface.routeDirection) - targetProjection);
+      const auto rhsDistance =
+        std::abs(vm::dot(rhs, surface.routeDirection) - targetProjection);
+      return lhsDistance < rhsDistance;
+    });
+    candidates.clear();
+    for (const auto& vertex : sorted)
+    {
+      const auto duplicate = std::ranges::any_of(candidates, [&](const auto& existing) {
+        return vm::squared_length(existing - vertex) <= GeometryEpsilon * GeometryEpsilon;
+      });
+      if (!duplicate)
+      {
+        candidates.push_back(vertex);
+      }
+      if (candidates.size() == 2u)
+      {
+        break;
+      }
+    }
+  }
+
+  if (candidates.size() < 2u)
+  {
+    return {};
+  }
+
+  auto result = SeamEdge{};
+  result.valid = true;
+  result.minSidePoint = candidates.front();
+  result.maxSidePoint = candidates.front();
+  result.minSideProjection = vm::dot(candidates.front(), perpendicular);
+  result.maxSideProjection = result.minSideProjection;
+  for (const auto& vertex : candidates)
+  {
+    const auto sideProjection = vm::dot(vertex, perpendicular);
+    if (sideProjection < result.minSideProjection)
+    {
+      result.minSideProjection = sideProjection;
+      result.minSidePoint = vertex;
+    }
+    if (sideProjection > result.maxSideProjection)
+    {
+      result.maxSideProjection = sideProjection;
+      result.maxSidePoint = vertex;
+    }
+  }
+  return result;
+}
+
+QJsonObject seamEdgeJson(
+  const SeamEdge& fromEdge,
+  const SeamEdge& toEdge,
+  const QString& classification,
+  const double horizontalTolerance,
+  const double verticalTolerance)
+{
+  if (!fromEdge.valid || !toEdge.valid)
+  {
+    return QJsonObject{
+      {"available", false},
+      {"fullWidthContinuous", false},
+    };
+  }
+
+  const auto minSideGap = distance2D(fromEdge.minSidePoint, toEdge.minSidePoint);
+  const auto maxSideGap = distance2D(fromEdge.maxSidePoint, toEdge.maxSidePoint);
+  const auto minSideVerticalStep = toEdge.minSidePoint.z() - fromEdge.minSidePoint.z();
+  const auto maxSideVerticalStep = toEdge.maxSidePoint.z() - fromEdge.maxSidePoint.z();
+  const auto edgeGapMax = std::max(minSideGap, maxSideGap);
+  const auto edgeVerticalStepMax =
+    std::max(std::abs(minSideVerticalStep), std::abs(maxSideVerticalStep));
+  const auto overlapAccepted = classification == "overlap_continuous_height";
+  const auto fullWidthContinuous =
+    (overlapAccepted || edgeGapMax <= horizontalTolerance)
+    && edgeVerticalStepMax <= verticalTolerance;
+
+  return QJsonObject{
+    {"available", true},
+    {"fromMinSidePoint", vecToJson(fromEdge.minSidePoint)},
+    {"fromMaxSidePoint", vecToJson(fromEdge.maxSidePoint)},
+    {"toMinSidePoint", vecToJson(toEdge.minSidePoint)},
+    {"toMaxSidePoint", vecToJson(toEdge.maxSidePoint)},
+    {"minSideGap", minSideGap},
+    {"maxSideGap", maxSideGap},
+    {"innerEdgeGap", minSideGap},
+    {"outerEdgeGap", maxSideGap},
+    {"edgeGapMax", edgeGapMax},
+    {"minSideVerticalStep", minSideVerticalStep},
+    {"maxSideVerticalStep", maxSideVerticalStep},
+    {"edgeVerticalStepMax", edgeVerticalStepMax},
+    {"fullWidthContinuous", fullWidthContinuous},
   };
 }
 
@@ -1338,8 +1503,16 @@ QJsonObject seamJson(
   const auto verticalStep = to.entryZ - from.exitZ;
   const auto classification = seamClassification(
     horizontalGap, verticalStep, horizontalTolerance, verticalTolerance);
-  const auto continuous =
+  const auto centerlineContinuous =
     classification == "continuous" || classification == "overlap_continuous_height";
+  const auto edge = seamEdgeJson(
+    seamEdgeAtProjection(from, true),
+    seamEdgeAtProjection(to, false),
+    classification,
+    horizontalTolerance,
+    verticalTolerance);
+  const auto fullWidthContinuous = edge.value("fullWidthContinuous").toBool(false);
+  const auto continuous = centerlineContinuous && fullWidthContinuous;
   return QJsonObject{
     {"seamIndex", static_cast<int>(seamIndex)},
     {"fromObjectId", from.objectId},
@@ -1351,6 +1524,13 @@ QJsonObject seamJson(
     {"verticalStep", verticalStep},
     {"horizontalGap", horizontalGap},
     {"classification", classification},
+    {"centerlineContinuous", centerlineContinuous},
+    {"fullWidthContinuous", fullWidthContinuous},
+    {"edgeGapMax", edge.value("edgeGapMax")},
+    {"innerEdgeGap", edge.value("innerEdgeGap")},
+    {"outerEdgeGap", edge.value("outerEdgeGap")},
+    {"edgeVerticalStepMax", edge.value("edgeVerticalStepMax")},
+    {"edge", edge},
     {"continuous", continuous},
   };
 }
@@ -2045,6 +2225,46 @@ Result<mdl::Brush> createRampBetweenBrush(
     startRight - vm::vec3d{0, 0, thickness},
     endLeft - vm::vec3d{0, 0, thickness},
     endRight - vm::vec3d{0, 0, thickness},
+  };
+  return builder.createBrush(points, material);
+}
+
+Result<mdl::Brush> createArcRampSegmentBrush(
+  const mdl::BrushBuilder& builder,
+  const vm::vec3d& center,
+  const double innerRadius,
+  const double outerRadius,
+  const double startAngleDegrees,
+  const double endAngleDegrees,
+  const double startZ,
+  const double endZ,
+  const double thickness,
+  const std::string& material)
+{
+  const auto a0 = degreesToRadians(startAngleDegrees);
+  const auto a1 = degreesToRadians(endAngleDegrees);
+
+  const auto pointAt = [&](const double radius, const double angle, const double z) {
+    return vm::vec3d{
+      center.x() + std::cos(angle) * radius,
+      center.y() + std::sin(angle) * radius,
+      center.z() + z};
+  };
+
+  const auto innerStartTop = pointAt(innerRadius, a0, startZ);
+  const auto outerStartTop = pointAt(outerRadius, a0, startZ);
+  const auto innerEndTop = pointAt(innerRadius, a1, endZ);
+  const auto outerEndTop = pointAt(outerRadius, a1, endZ);
+
+  const auto points = std::vector<vm::vec3d>{
+    innerStartTop,
+    outerStartTop,
+    innerEndTop,
+    outerEndTop,
+    innerStartTop - vm::vec3d{0, 0, thickness},
+    outerStartTop - vm::vec3d{0, 0, thickness},
+    innerEndTop - vm::vec3d{0, 0, thickness},
+    outerEndTop - vm::vec3d{0, 0, thickness},
   };
   return builder.createBrush(points, material);
 }
@@ -3701,20 +3921,14 @@ std::vector<QJsonObject> arcRampOperationsFromParams(
   auto operations = std::vector<QJsonObject>{};
   operations.reserve(segments);
   const auto angleStep = turnDegrees / static_cast<double>(segments);
+  const auto innerRadius = radius - width * 0.5;
+  const auto outerRadius = radius + width * 0.5;
   for (size_t i = 0; i < segments; ++i)
   {
     const auto t0 = static_cast<double>(i) / static_cast<double>(segments);
     const auto t1 = static_cast<double>(i + 1u) / static_cast<double>(segments);
-    const auto a0 = (startAngle + angleStep * static_cast<double>(i)) * Pi / 180.0;
-    const auto a1 = (startAngle + angleStep * static_cast<double>(i + 1u)) * Pi / 180.0;
-    const auto start = vm::vec3d{
-      center.x() + std::cos(a0) * radius,
-      center.y() + std::sin(a0) * radius,
-      center.z() + rise * t0};
-    const auto end = vm::vec3d{
-      center.x() + std::cos(a1) * radius,
-      center.y() + std::sin(a1) * radius,
-      center.z() + rise * t1};
+    const auto segmentStartAngle = startAngle + angleStep * static_cast<double>(i);
+    const auto segmentEndAngle = startAngle + angleStep * static_cast<double>(i + 1u);
     auto metadata = baseMetadata;
     if (const auto opMetadata = params.value("metadata"); opMetadata.isObject())
     {
@@ -3730,10 +3944,14 @@ std::vector<QJsonObject> arcRampOperationsFromParams(
       metadata.insert("role", "walkable");
     }
     auto op = QJsonObject{
-      {"type", "ramp_between"},
-      {"start", vecToJson(start)},
-      {"end", vecToJson(end)},
-      {"width", width},
+      {"type", "arc_ramp_segment"},
+      {"center", vecToJson(center)},
+      {"innerRadius", innerRadius},
+      {"outerRadius", outerRadius},
+      {"startAngle", segmentStartAngle},
+      {"endAngle", segmentEndAngle},
+      {"startZ", rise * t0},
+      {"endZ", rise * t1},
       {"thickness", thickness},
       {"metadata", metadata},
     };
@@ -4469,6 +4687,64 @@ std::vector<mdl::Node*> compileBatchOperation(
     if (brush.is_error())
     {
       error = error.isEmpty() ? "Could not create ramp_between brush" : error;
+      return {};
+    }
+    return {new mdl::BrushNode{std::move(brush.value())}};
+  }
+
+  if (type == "arc_ramp_segment")
+  {
+    const auto center = mcpVec3FromJson(operation, "center", error);
+    if (!center)
+    {
+      return {};
+    }
+    const auto innerRadius = optionalDouble(operation, "innerRadius", 0.0);
+    const auto outerRadius = optionalDouble(operation, "outerRadius", 0.0);
+    const auto thickness = snapToGrid(optionalDouble(operation, "thickness", 16.0), grid);
+    if (
+      !finitePositive(innerRadius) || !finitePositive(outerRadius)
+      || outerRadius <= innerRadius + GeometryEpsilon)
+    {
+      error = "arc_ramp_segment requires positive innerRadius < outerRadius";
+      return {};
+    }
+    if (!finitePositive(thickness))
+    {
+      error = "arc_ramp_segment thickness must be greater than zero";
+      return {};
+    }
+    const auto startAngle = optionalDouble(operation, "startAngle", 0.0);
+    const auto endAngle = optionalDouble(operation, "endAngle", startAngle);
+    if (
+      !std::isfinite(startAngle) || !std::isfinite(endAngle)
+      || std::abs(endAngle - startAngle) <= GeometryEpsilon
+      || std::abs(endAngle - startAngle) > 45.0)
+    {
+      error = "arc_ramp_segment angle span must be finite, non-zero, and <= 45 degrees";
+      return {};
+    }
+    const auto startZ = optionalDouble(operation, "startZ", 0.0);
+    const auto endZ = optionalDouble(operation, "endZ", startZ);
+    if (!std::isfinite(startZ) || !std::isfinite(endZ))
+    {
+      error = "arc_ramp_segment startZ/endZ must be finite";
+      return {};
+    }
+    auto brush = createArcRampSegmentBrush(
+      builder,
+      *center,
+      innerRadius,
+      outerRadius,
+      startAngle,
+      endAngle,
+      snapToGrid(startZ, grid),
+      snapToGrid(endZ, grid),
+      thickness,
+      material);
+    if (brush.is_error())
+    {
+      error = "Could not create arc_ramp_segment brush";
       return {};
     }
     return {new mdl::BrushNode{std::move(brush.value())}};
@@ -5393,7 +5669,11 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   auto seams = QJsonArray{};
   auto maxAbsVerticalStep = 0.0;
   auto maxHorizontalGap = 0.0;
+  auto maxEdgeGap = 0.0;
+  auto maxEdgeVerticalStep = 0.0;
   auto continuous = surfaces.size() >= 2u;
+  auto centerlineContinuous = surfaces.size() >= 2u;
+  auto fullWidthContinuous = surfaces.size() >= 2u;
   auto semanticContinuous = surfaces.size() >= 2u;
   const auto seamPairCount =
     surfaces.size() >= 2u ? surfaces.size() - 1u + (closedLoop ? 1u : 0u) : 0u;
@@ -5409,8 +5689,16 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     auto seam = *maybeSeam;
     const auto verticalStep = seam.value("verticalStep").toDouble();
     const auto horizontalGap = seam.value("horizontalGap").toDouble();
+    const auto edgeGap = seam.value("edgeGapMax").toDouble();
+    const auto edgeVerticalStep = seam.value("edgeVerticalStepMax").toDouble();
     maxAbsVerticalStep = std::max(maxAbsVerticalStep, std::abs(verticalStep));
     maxHorizontalGap = std::max(maxHorizontalGap, horizontalGap);
+    maxEdgeGap = std::max(maxEdgeGap, edgeGap);
+    maxEdgeVerticalStep = std::max(maxEdgeVerticalStep, edgeVerticalStep);
+    centerlineContinuous =
+      centerlineContinuous && seam.value("centerlineContinuous").toBool(false);
+    fullWidthContinuous =
+      fullWidthContinuous && seam.value("fullWidthContinuous").toBool(false);
     continuous = continuous && seam.value("continuous").toBool(false);
     const auto seamSemanticContinuous =
       seamSemanticallyContinuous(seam, continuityMode, maxStepHeight, maxJumpGap);
@@ -5429,7 +5717,13 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   {
     warnings.push_back(
       "routeNotContinuous: at least one adjacent playable surface has a vertical "
-      "step or positive horizontal gap outside tolerance.");
+      "step, positive horizontal gap, or full-width edge gap outside tolerance.");
+  }
+  if (centerlineContinuous && !fullWidthContinuous)
+  {
+    warnings.push_back(
+      "fullWidthRouteNotContinuous: centerline seam continuity passed, but inner/"
+      "outer playable edges do not meet within tolerance.");
   }
   if (continuityMode == "stepped")
   {
@@ -5452,6 +5746,8 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     {"surfaceCount", static_cast<int>(surfaces.size())},
     {"seamCount", seams.size()},
     {"continuous", continuous},
+    {"centerlineContinuous", centerlineContinuous},
+    {"fullWidthContinuous", fullWidthContinuous},
     {"semanticContinuous", semanticContinuous},
     {"continuityMode", continuityMode},
     {"orderBy", useMetadataOrder ? "metadataOrder" : "projection"},
@@ -5463,6 +5759,8 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     {"maxJumpGap", maxJumpGap},
     {"maxAbsVerticalStep", maxAbsVerticalStep},
     {"maxHorizontalGap", maxHorizontalGap},
+    {"maxEdgeGap", maxEdgeGap},
+    {"maxEdgeVerticalStep", maxEdgeVerticalStep},
     {"surfaces", surfaceJson},
     {"seams", seams},
     {"unsupportedObjectIds", unsupportedObjectIds},

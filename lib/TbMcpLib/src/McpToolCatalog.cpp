@@ -3019,9 +3019,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "geometry_analyze_route_continuity",
       "Analyze ordered route brush surfaces for playable continuity. Reports each "
       "target's upward playable face and each adjacent seam's verticalStep, "
-      "horizontalGap, and classification so ramp-to-platform ledges are caught even "
-      "when the ramp slope itself is valid. Same-height overlaps are reported as "
-      "overlap_continuous_height and remain continuous.",
+      "horizontalGap, fullWidthContinuous, edgeGapMax, innerEdgeGap, outerEdgeGap, "
+      "and classification so ramp-to-platform ledges or arc segment side gaps are "
+      "caught even when the route centerline looks valid. Same-height overlaps are "
+      "reported as overlap_continuous_height and remain continuous.",
       McpMode::ReadOnly,
       false,
       true,

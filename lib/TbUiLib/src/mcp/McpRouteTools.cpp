@@ -902,6 +902,16 @@ int storeBatchOperationMetadata(
       }
       return;
     }
+    if (operationType == "arc_ramp" || operationType == "helical_ramp")
+    {
+      appendRepeated(std::max(1, operation.value("segments").toInt(12)), "ramp");
+      return;
+    }
+    if (operationType == "arc_ramp_segment")
+    {
+      appendRepeated(1, "ramp");
+      return;
+    }
 
     metadataByObject.push_back(metadata);
   };

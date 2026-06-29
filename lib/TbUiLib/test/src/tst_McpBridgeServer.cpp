@@ -4062,7 +4062,7 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
     QJsonObject{
       {"routeId", "arc-loop"},
       {"orderBy", "metadataOrder"},
-      {"closedLoop", true},
+      {"closedLoop", false},
       {"continuityMode", "stepped"},
       {"maxStepHeight", 256},
       {"horizontalTolerance", 1024},
@@ -4074,13 +4074,102 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
   REQUIRE(arcLoopByRouteId.ok);
   CHECK(arcLoopByRouteId.result.value("selectorMatchedCount").toInt() == 8);
   CHECK(arcLoopByRouteId.result.value("orderBy").toString() == "metadataOrder");
-  CHECK(arcLoopByRouteId.result.value("closedLoop").toBool());
+  CHECK_FALSE(arcLoopByRouteId.result.value("closedLoop").toBool());
   CHECK(arcLoopByRouteId.result.value("warnings")
           .toArray()
           .contains("implicitSelectorFromTopLevelMetadata"));
   const auto arcLoopSeams = arcLoopByRouteId.result.value("seams").toArray();
   REQUIRE(!arcLoopSeams.isEmpty());
-  CHECK(arcLoopSeams.last().toObject().value("loopClosure").toBool());
+  CHECK(arcLoopByRouteId.result.value("maxEdgeGap").toDouble() < 0.001);
+  CHECK(arcLoopByRouteId.result.value("fullWidthContinuous").toBool());
+  CHECK(arcLoopByRouteId.result.value("centerlineContinuous").toBool());
+  for (const auto& seamValue : arcLoopSeams)
+  {
+    const auto seam = seamValue.toObject();
+    CHECK(seam.value("fullWidthContinuous").toBool());
+    CHECK(seam.value("edgeGapMax").toDouble() < 0.001);
+    CHECK(seam.value("innerEdgeGap").toDouble() < 0.001);
+    CHECK(seam.value("outerEdgeGap").toDouble() < 0.001);
+  }
+
+  const auto arcClosedLoopResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"routeId", "arc-loop"},
+      {"orderBy", "metadataOrder"},
+      {"closedLoop", true},
+      {"continuityMode", "stepped"},
+      {"maxStepHeight", 256},
+      {"horizontalTolerance", 1024},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(arcClosedLoopResponse.ok);
+  const auto arcClosedLoopSeams =
+    arcClosedLoopResponse.result.value("seams").toArray();
+  REQUIRE(!arcClosedLoopSeams.isEmpty());
+  CHECK(arcClosedLoopSeams.last().toObject().value("loopClosure").toBool());
+
+  const auto mismatchedArcResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Mismatched arc seam"},
+      {"detail", "ids"},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "arc_ramp_segment"},
+           {"center", QJsonArray{2200, 0, 0}},
+           {"innerRadius", 200},
+           {"outerRadius", 300},
+           {"startAngle", 0},
+           {"endAngle", 10},
+           {"startZ", 0},
+           {"endZ", 16},
+           {"thickness", 16},
+         },
+         QJsonObject{
+           {"type", "arc_ramp_segment"},
+           {"center", QJsonArray{2200, 0, 0}},
+           {"innerRadius", 232},
+           {"outerRadius", 332},
+           {"startAngle", 10},
+           {"endAngle", 20},
+           {"startZ", 16},
+           {"endZ", 32},
+           {"thickness", 16},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(mismatchedArcResponse.ok);
+  const auto mismatchedContinuity = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", mismatchedArcResponse.result.value("operationId").toString()},
+      {"orderBy", "metadataOrder"},
+      {"routeDirection", QJsonArray{0, 1, 0}},
+      {"horizontalTolerance", 1},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(mismatchedContinuity.ok);
+  CHECK_FALSE(mismatchedContinuity.result.value("continuous").toBool());
+  CHECK(mismatchedContinuity.result.value("centerlineContinuous").toBool());
+  CHECK_FALSE(mismatchedContinuity.result.value("fullWidthContinuous").toBool());
+  CHECK(mismatchedContinuity.result.value("maxEdgeGap").toDouble() > 1.0);
+  CHECK(
+    mismatchedContinuity.result.value("warnings").toArray().contains(
+      "fullWidthRouteNotContinuous: centerline seam continuity passed, but inner/"
+      "outer playable edges do not meet within tolerance."));
 
   const auto closedLoopResponse = geometryAnalyzeRouteContinuityForMapResult(
     map,
