@@ -21,6 +21,7 @@
 #include <QJsonObject>
 
 #include "McpBridgeServerTools.h"
+#include "McpResponseUtils.h"
 #include "fs/PathMatcher.h"
 #include "fs/TraversalMode.h"
 #include "mcp/McpError.h"
@@ -172,13 +173,13 @@ QString makeOperationId(int& nextOperationIndex)
   return QString{"mcp-op-%1"}.arg(nextOperationIndex++);
 }
 
-QJsonObject mutationResultJson(const McpOperationRecord& operation)
+QJsonObject mutationResultJson(
+  const McpOperationRecord& operation, const QString& idsMode)
 {
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
-  result.insert("changedObjectIds", operation.changedObjectIdsJson());
-  result.insert("changedObjectCount", operation.changedObjectIds.size());
+  mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
 }
 
@@ -188,14 +189,15 @@ void recordOperation(
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& changedObjectIds,
-  QJsonObject& result)
+  QJsonObject& result,
+  const QString& idsMode = "count")
 {
   auto operation = McpOperationRecord{};
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
   operation.setChangedObjectIds(changedObjectIds);
-  result = mutationResultJson(operation);
+  result = mutationResultJson(operation, idsMode);
   history.push_back(std::move(operation));
 }
 
@@ -495,7 +497,13 @@ McpBridgeToolResult placeAssetResult(
 
   auto result = QJsonObject{};
   recordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+    history,
+    nextOperationIndex,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result,
+    mcpIdsModeFromParams(params));
   result.insert("entity", nodeSummaryJson(*entityNode, map.worldNode()));
   result.insert("assetPath", path);
   return McpBridgeToolResult::success(std::move(result));

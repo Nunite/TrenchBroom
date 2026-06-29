@@ -29,6 +29,7 @@
 #include <QStringList>
 
 #include "McpBridgeServerTools.h"
+#include "McpResponseUtils.h"
 #include "McpSelectionQuery.h"
 #include "PreferenceManager.h"
 #include "Preferences.h"
@@ -72,8 +73,6 @@ namespace mcp = tb::mcp;
 
 namespace
 {
-constexpr auto DefaultIdSampleLimit = 12;
-
 
 QJsonArray vecToJson(const vm::vec3d& value)
 {
@@ -464,74 +463,13 @@ QString makeOperationId(int& nextOperationIndex)
   return QString{"mcp-op-%1"}.arg(nextOperationIndex++);
 }
 
-QString idsModeFromParams(const QJsonObject& params)
-{
-  const auto idsMode = params.value("idsMode").toString().trimmed().toLower();
-  if (!idsMode.isEmpty())
-  {
-    return idsMode;
-  }
-
-  const auto detail = params.value("detail").toString("summary").trimmed().toLower();
-  if (detail == "ids" || detail == "full")
-  {
-    return "full";
-  }
-  if (detail == "sample" || detail == "none" || detail == "count")
-  {
-    return detail;
-  }
-  return "count";
-}
-
-QJsonArray sampleArray(const QJsonArray& values, const int limit)
-{
-  auto result = QJsonArray{};
-  const auto count = std::min(values.size(), static_cast<qsizetype>(limit));
-  for (auto i = qsizetype{0}; i < count; ++i)
-  {
-    result.push_back(values[i]);
-  }
-  return result;
-}
-
-void applyChangedObjectIdsMode(
-  QJsonObject& result, const QJsonArray& changedObjectIds, const QString& idsMode)
-{
-  const auto mode = idsMode.trimmed().toLower();
-  result.remove("changedObjectIds");
-  result.remove("changedObjectIdSample");
-  result.insert("changedObjectCount", changedObjectIds.size());
-
-  if (mode == "full")
-  {
-    result.insert("changedObjectIds", changedObjectIds);
-  }
-  else if (mode == "sample")
-  {
-    result.insert(
-      "changedObjectIdSample", sampleArray(changedObjectIds, DefaultIdSampleLimit));
-  }
-  else if (mode == "none" || mode == "count" || mode.isEmpty())
-  {
-    return;
-  }
-  else
-  {
-    auto warnings = result.value("warnings").toArray();
-    warnings.push_back(
-      QString{"unknownIdsMode: %1; returned changedObjectCount only"}.arg(idsMode));
-    result.insert("warnings", warnings);
-  }
-}
-
 QJsonObject mutationResultJson(
   const McpOperationRecord& operation, const QString& idsMode)
 {
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
-  applyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
+  mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
 }
 
@@ -1012,7 +950,7 @@ McpBridgeToolResult textureApplyResult(
     transactionName,
     changedNodes,
     result,
-    idsModeFromParams(params));
+    mcpIdsModeFromParams(params));
   result.insert("material", material);
   result.insert("faceCount", static_cast<int>(handles.size()));
   result.insert("faceSemantic", params.value("faceSemantic").toString("all"));
@@ -1136,7 +1074,7 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
     transactionName,
     changedNodes,
     result,
-    idsModeFromParams(params));
+    mcpIdsModeFromParams(params));
   result.insert("material", material);
   result.insert("brushCount", static_cast<int>(matches.size()));
   result.insert("faceCount", static_cast<int>(handles.size()));
@@ -1326,7 +1264,7 @@ McpBridgeToolResult faceTextureSetResult(
     transactionName,
     changedNodes,
     result,
-    idsModeFromParams(params));
+    mcpIdsModeFromParams(params));
   result.insert("faceCount", static_cast<int>(handles.size()));
   result.insert("faceSemantic", params.value("faceSemantic").toString("all"));
   return McpBridgeToolResult::success(std::move(result));
@@ -1402,7 +1340,7 @@ McpBridgeToolResult textureReplaceResult(
     transactionName,
     changedNodes,
     result,
-    idsModeFromParams(params));
+    mcpIdsModeFromParams(params));
   result.insert("find", find);
   result.insert("replace", replace);
   result.insert("faceCount", static_cast<int>(handles.size()));
@@ -1473,7 +1411,7 @@ McpBridgeToolResult textureAlignFaceResult(
     transactionName,
     changedNodes,
     result,
-    idsModeFromParams(params));
+    mcpIdsModeFromParams(params));
   result.insert("mode", mode);
   result.insert("faceCount", static_cast<int>(handles.size()));
   result.insert("faceSemantic", params.value("faceSemantic").toString("all"));
@@ -1535,7 +1473,7 @@ McpBridgeToolResult textureCopyFromFaceResult(
     transactionName,
     changedNodes,
     result,
-    idsModeFromParams(params));
+    mcpIdsModeFromParams(params));
   result.insert("faceCount", static_cast<int>(handles.size()));
   result.insert("source", brushFaceJson(*source, map.worldNode()));
   return McpBridgeToolResult::success(std::move(result));

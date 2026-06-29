@@ -2412,9 +2412,9 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   REQUIRE(deleteResponse.ok);
   CHECK(deleteResponse.result.value("operationKind").toString() == "delete");
   CHECK(deleteResponse.result.value("changedObjectCount").toInt() == 0);
-  const auto deletedObjectIds = deleteResponse.result.value("deletedObjectIds").toArray();
-  REQUIRE(deletedObjectIds.size() == 1);
-  CHECK(deletedObjectIds.first().toString() == stableDeleteTarget);
+  CHECK(deleteResponse.result.value("deletedObjectCount").toInt() == 1);
+  CHECK(deleteResponse.result.value("deletedObjectIds").isUndefined());
+  CHECK(deleteResponse.result.value("deletedObjectIdSample").isUndefined());
   REQUIRE(history.size() >= 4u);
   CHECK(history.back().operationKind == "delete");
   REQUIRE(history.back().deletedObjectIds.size() == 1);
@@ -2434,6 +2434,35 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
     inspectDeleteResponse.result.value("deletedObjectIds").toArray();
   REQUIRE(inspectedDeletedObjectIds.size() == 1);
   CHECK(inspectedDeletedObjectIds.first().toString() == stableDeleteTarget);
+
+  const auto fullDeleteCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "10",
+    "secret",
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{1152, 0, 0}},
+         {"max", QJsonArray{1216, 64, 16}},
+       }}},
+      {"detail", "ids"},
+    },
+    mcp::McpMode::Edit});
+  REQUIRE(fullDeleteCreateResponse.ok);
+  const auto fullDeleteTarget =
+    fullDeleteCreateResponse.result.value("changedObjectIds").toArray().first().toString();
+  const auto fullDeleteResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    "11",
+    "secret",
+    "objects_delete",
+    QJsonObject{{"objectIds", QJsonArray{fullDeleteTarget}}, {"idsMode", "full"}},
+    mcp::McpMode::Edit});
+  REQUIRE(fullDeleteResponse.ok);
+  const auto fullDeletedObjectIds =
+    fullDeleteResponse.result.value("deletedObjectIds").toArray();
+  REQUIRE(fullDeletedObjectIds.size() == 1);
+  CHECK(fullDeletedObjectIds.first().toString() == fullDeleteTarget);
 }
 
 TEST_CASE("McpBridgeServer scopes selector metadata and modules to active document")
@@ -3045,7 +3074,7 @@ TEST_CASE("McpBridgeServer deletes operations without long object id lists")
   const auto deleteResponse = deleteObjectsByOperationForMapResult(
     map,
     "objects_delete_by_operation",
-    QJsonObject{{"operationId", history.front().operationId}},
+    QJsonObject{{"operationId", history.front().operationId}, {"idsMode", "full"}},
     history,
     nextOperationIndex,
     registry);

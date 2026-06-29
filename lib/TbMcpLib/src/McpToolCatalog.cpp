@@ -2144,6 +2144,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"classname", stringProperty("Optional classname, defaults to cycler_sprite.")},
           {"property", stringProperty("Optional model property key, defaults to model.")},
           {"select", boolProperty("Select the created entity.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"path"}),
     },
@@ -2161,6 +2164,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"property",
            stringProperty("Optional sprite property key, defaults to model.")},
           {"select", boolProperty("Select the created entity.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"path"}),
     },
@@ -2179,6 +2185,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"property",
            stringProperty("Optional sound property key, defaults to message.")},
           {"select", boolProperty("Select the created entity.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"path"}),
     },
@@ -2399,6 +2408,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(
         {
           {"objectIds", arrayProperty("MCP object ids to delete.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for deleted object ids. Defaults to count.")},
         },
         {"objectIds"}),
     },
@@ -2424,6 +2436,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
         {"leafOnly", boolProperty("Return only leaf matches before deletion.")},
         {"limit", integerProperty("Maximum matched object count, defaults to 100.")},
+        {"idsMode",
+         stringProperty(
+           "none, count, sample, or full for deleted object ids. Defaults to count.")},
       }),
     },
     {
@@ -2437,6 +2452,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {
           {"operationId",
            stringProperty("Operation id returned by a mutating MCP tool.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for deleted object ids. Defaults to count.")},
         },
         {"operationId"}),
     },
@@ -2518,6 +2536,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {
           {"problemIds", arrayProperty("Problem ids from problems_check.")},
           {"quickFix", stringProperty("Safe quick fix description to apply.")},
+          {"idsMode",
+           stringProperty(
+             "none, count, sample, or full for changed object ids. Defaults to count.")},
         },
         {"problemIds", "quickFix"}),
     },
@@ -2529,6 +2550,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       objectSchema({
         {"includeHidden", boolProperty("Include hidden issues.")},
+        {"idsMode",
+         stringProperty(
+           "none, count, sample, or full for changed object ids. Defaults to count.")},
       }),
     },
     {

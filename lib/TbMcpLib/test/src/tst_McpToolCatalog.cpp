@@ -1186,12 +1186,16 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(deleteTool);
     CHECK(deleteTool->category == "object");
     CHECK(deleteTool->requiredMode == McpMode::Edit);
+    CHECK(
+      deleteTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
 
     const auto deleteOperationTool = findToolDefinition("objects_delete_by_operation");
     REQUIRE(deleteOperationTool);
     CHECK(deleteOperationTool->inputSchema.value("required")
             .toArray()
             .contains("operationId"));
+    CHECK(
+      deleteOperationTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
 
     const auto transformTool = findToolDefinition("objects_transform");
     REQUIRE(transformTool);
@@ -1257,6 +1261,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(faceTextureProperties.value("faceSemantic").isObject());
     CHECK(faceTextureProperties.value("idsMode").isObject());
 
+    const auto assetPlaceTool = findToolDefinition("asset_place_model");
+    REQUIRE(assetPlaceTool);
+    CHECK(
+      assetPlaceTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
+
     const auto reviewTargetsTool = findToolDefinition("render_review_targets");
     REQUIRE(reviewTargetsTool);
     const auto reviewTargetProperties =
@@ -1313,6 +1322,11 @@ TEST_CASE("McpToolCatalog")
       entityBatchTool->inputSchema.value("properties").toObject();
     CHECK(entityBatchProperties.value("entities").toObject().value("items").isObject());
     CHECK(entityBatchProperties.value("idsMode").isObject());
+
+    const auto problemsFixTool = findToolDefinition("problems_fix");
+    REQUIRE(problemsFixTool);
+    CHECK(
+      problemsFixTool->inputSchema.value("properties").toObject().value("idsMode").isObject());
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")
