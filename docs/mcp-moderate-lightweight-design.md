@@ -311,6 +311,20 @@ The Modeling profile should show only the normal path:
 
 Everything else should be hidden but searchable.
 
+Current Phase 4 status:
+
+- The Modeling profile is capped at 45 visible implemented tools in catalog tests.
+- Default-visible tools keep the normal path: status/open, IR preview/apply from inline
+  JSON or file, selector/module/group inspect and review, transform/delete, entity
+  checked creation and property edits, common batch geometry, heightmap import/preview,
+  geometry/map validation, texture search/apply, and review rendering.
+- Lower-frequency recovery and diagnostic tools are hidden from Modeling by default but
+  remain searchable by exact name: `map_search`, `history_list`, `operation_select`,
+  `module_select`, and `ir_validate`.
+- The workflow skill mirrors this split: default flows use `map_snapshot`,
+  `history_status`, `operation_inspect`, `selector_preview`, `module_inspect`, and IR
+  preview/apply; hidden tools are reserved for diagnostics or manual recovery.
+
 ### Phase 5: Remove Or Retire Redundant C++ Convenience
 
 Do not delete immediately. First:

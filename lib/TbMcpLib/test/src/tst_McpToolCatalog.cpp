@@ -347,7 +347,7 @@ TEST_CASE("McpToolCatalog")
     names.sort();
 
     INFO("Modeling profile tools: " << names.join(", ").toStdString());
-    CHECK(names.size() <= 50);
+    CHECK(names.size() <= 45);
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
@@ -358,7 +358,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("selection_by_bounds"));
     CHECK(!names.contains("selection_grow"));
     CHECK(names.contains("map_snapshot"));
-    CHECK(names.contains("map_search"));
+    CHECK(!names.contains("map_search"));
     CHECK(!names.contains("fgd_entities_list"));
     CHECK(!names.contains("entity_schema"));
     CHECK(names.contains("entity_create_checked"));
@@ -370,9 +370,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("entity_update"));
     CHECK(!names.contains("entity_delete"));
     CHECK(names.contains("operation_inspect"));
-    CHECK(names.contains("operation_select"));
+    CHECK(!names.contains("operation_select"));
     CHECK(names.contains("operation_validate"));
-    CHECK(names.contains("history_list"));
+    CHECK(!names.contains("history_list"));
     CHECK(names.contains("history_undo_mcp"));
     CHECK(names.contains("history_redo_mcp"));
     CHECK(names.contains("selector_preview"));
@@ -381,7 +381,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("render_review_selector"));
     CHECK(names.contains("module_list"));
     CHECK(names.contains("module_inspect"));
-    CHECK(names.contains("module_select"));
+    CHECK(!names.contains("module_select"));
     CHECK(names.contains("module_render_review"));
     CHECK(names.contains("module_validate"));
     CHECK(!names.contains("brush_types_list"));
@@ -409,7 +409,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("python_generate_blockout"));
     CHECK(names.contains("heightmap_import_grayscale"));
     CHECK(names.contains("heightmap_preview_grayscale"));
-    CHECK(names.contains("ir_validate"));
+    CHECK(!names.contains("ir_validate"));
     CHECK(names.contains("ir_compile_preview"));
     CHECK(names.contains("ir_apply"));
     CHECK(names.contains("geometry_analyze_selection"));
@@ -753,7 +753,12 @@ TEST_CASE("McpToolCatalog")
          {"viewport_capture_3d",
           "render_review_targets",
           "selection_by_metadata",
-          "face_list"})
+          "face_list",
+          "map_search",
+          "history_list",
+          "operation_select",
+          "module_select",
+          "ir_validate"})
     {
       CAPTURE(hiddenToolName);
       const auto tools = toolsSearchJson(
@@ -881,11 +886,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("render_review_selector"));
     CHECK(names.contains("module_list"));
     CHECK(names.contains("module_inspect"));
-    CHECK(names.contains("module_select"));
+    CHECK(!names.contains("module_select"));
     CHECK(names.contains("module_render_review"));
     CHECK(names.contains("module_validate"));
     CHECK(names.contains("module_compact"));
-    CHECK(names.contains("ir_validate"));
+    CHECK(!names.contains("ir_validate"));
     CHECK(names.contains("ir_compile_preview"));
     CHECK(names.contains("ir_compile_preview_from_file"));
     CHECK(names.contains("ir_apply"));
