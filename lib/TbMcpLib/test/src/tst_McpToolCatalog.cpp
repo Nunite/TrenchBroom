@@ -1226,6 +1226,76 @@ TEST_CASE("McpToolCatalog")
     CHECK(!tool.value("visibleInCurrentProfile").toBool());
   }
 
+  SECTION("catalog keeps scene prefab growth out of implemented tools")
+  {
+    const auto bannedSceneToolNames = QStringList{
+      "create_temple",
+      "create_cottage",
+      "create_kz_route",
+      "create_courtyard",
+      "create_racetrack",
+      "temple_create",
+      "cottage_create",
+      "kz_route_create",
+      "courtyard_create",
+      "racetrack_create",
+    };
+
+    for (const auto& bannedName : bannedSceneToolNames)
+    {
+      CAPTURE(bannedName);
+      CHECK(!findToolDefinition(bannedName));
+    }
+
+    for (const auto& tool : defaultToolCatalog())
+    {
+      CAPTURE(tool.name);
+      if (tool.name == "prefabs_list" || tool.name == "prefab_create")
+      {
+        CHECK(!tool.implemented);
+        CHECK(tool.description.contains("skill recipes"));
+        CHECK(tool.description.contains("IR"));
+        continue;
+      }
+
+      CHECK(!tool.name.contains("prefab", Qt::CaseInsensitive));
+      CHECK(!tool.name.contains("temple", Qt::CaseInsensitive));
+      CHECK(!tool.name.contains("cottage", Qt::CaseInsensitive));
+      CHECK(!tool.name.contains("courtyard", Qt::CaseInsensitive));
+      CHECK(!tool.name.contains("racetrack", Qt::CaseInsensitive));
+    }
+
+    const auto modelingTools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    auto modelingNames = QStringList{};
+    for (const auto& tool : modelingTools)
+    {
+      modelingNames.push_back(tool.toObject().value("name").toString());
+    }
+
+    CHECK(!modelingNames.contains("prefabs_list"));
+    CHECK(!modelingNames.contains("prefab_create"));
+    for (const auto& bannedName : bannedSceneToolNames)
+    {
+      CAPTURE(bannedName);
+      CHECK(!modelingNames.contains(bannedName));
+    }
+
+    const auto allEditTools = toolsListJson(McpMode::Edit, false, McpToolProfile::Full);
+    auto prefabCreateJson = QJsonObject{};
+    for (const auto& tool : allEditTools)
+    {
+      const auto object = tool.toObject();
+      if (object.value("name").toString() == "prefab_create")
+      {
+        prefabCreateJson = object;
+        break;
+      }
+    }
+    REQUIRE(!prefabCreateJson.isEmpty());
+    CHECK(prefabCreateJson.value("description").toString().contains("skill recipes"));
+    CHECK(prefabCreateJson.value("description").toString().contains("IR files"));
+  }
+
   SECTION("safe batch modeling helpers have structured schemas")
   {
     const auto boxesTool = findToolDefinition("brush_create_boxes_batch");

@@ -182,6 +182,29 @@ Deliverables:
 - Mark current scene-like paths as recipe candidates.
 - Add review checks to prevent Modeling profile growth without justification.
 
+Current Phase 1 guardrails:
+
+- The `trenchbroom-mcp-scene-workflow` skill states that scene-specific prefab
+  behavior belongs in recipes and IR, not in MCP tools.
+- `prefabs_list` and `prefab_create` remain reserved, unimplemented catalog
+  placeholders. Their catalog descriptions point agents to skill recipes and IR file
+  apply instead of C++ prefab behavior.
+- Catalog tests reject scene-level tool names such as `create_temple`,
+  `create_cottage`, `create_kz_route`, `create_courtyard`, and `create_racetrack`.
+  The tests also keep reserved prefab placeholders out of the implemented Modeling
+  profile.
+- Existing borderline paths are classified as follows:
+
+| Path | Phase 1 classification |
+| --- | --- |
+| `blockout_create_batch` typed operations | Keep in MCP as generic atomic/batch geometry. |
+| `brush_create_boxes_batch` / `brush_create_polygon_batch` | Keep in MCP as generic batch primitives. |
+| `ir_compile_preview_from_file` / `ir_apply_from_file` | Keep in MCP as the recipe transport boundary. |
+| `blockout_create_spiral_stairs` | Keep as existing generic stair primitive; do not expand into route/building prefab logic. |
+| Legacy `blockout_create_room/corridor/ramp/doorway` helpers | Compatibility/convenience only; not the default Modeling path. |
+| `python_generate_blockout` | Legacy/script bridge; complex reusable scene composition should move to skill recipe scripts that emit IR files. |
+| Temple/courtyard/KZ/route/house/industrial scene layouts | Recipe candidates, not C++ MCP tools. |
+
 ### Phase 2: Move Composition To Recipes
 
 Move reusable scene construction into skill scripts:

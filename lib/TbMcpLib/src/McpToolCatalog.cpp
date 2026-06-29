@@ -2238,7 +2238,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "prefabs_list",
-      "List available prefabs. Reserved until TrenchBroom exposes a prefab provider.",
+      "List available prefabs. Reserved placeholder, hidden from normal Modeling "
+      "workflows. Agent scene composition should use skill recipes that emit IR files, "
+      "then apply them with ir_compile_preview_from_file and ir_apply_from_file.",
       McpMode::ReadOnly,
       false,
       false,
@@ -2246,7 +2248,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "prefab_create",
-      "Create a prefab instance. Reserved until TrenchBroom exposes a prefab provider.",
+      "Create a prefab instance. Reserved placeholder, hidden from normal Modeling "
+      "workflows. Do not add scene-specific C++ prefab behavior here; use skill "
+      "recipes and IR files for temples, routes, courtyards, houses, and similar "
+      "composition.",
       McpMode::Edit,
       true,
       false,
