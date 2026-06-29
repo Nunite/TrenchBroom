@@ -60,7 +60,7 @@ namespace
 
 constexpr auto DefaultSampleLimit = 12;
 
-struct SelectorDiagnostics
+struct SelectorDiagnosticsInternal
 {
   int matchedBeforeLimit = 0;
   bool limitApplied = false;
@@ -144,7 +144,7 @@ bool metadataObjectMatches(const QJsonObject& actual, const QJsonObject& expecte
   return true;
 }
 
-QJsonObject selectorFromParams(const QJsonObject& params)
+QJsonObject selectorFromParamsInternal(const QJsonObject& params)
 {
   auto selector = params.value("selector").isObject()
                     ? params.value("selector").toObject()
@@ -478,7 +478,7 @@ bool nodeMatchesMetadata(
     metadataForNode(map, node, metadataStore, objectRegistry), metadata);
 }
 
-std::vector<mdl::Node*> resolveSelectorNodes(
+std::vector<mdl::Node*> resolveSelectorNodesInternal(
   mdl::Map& map,
   const QJsonObject& selector,
   const std::vector<McpOperationRecord>& history,
@@ -487,7 +487,7 @@ std::vector<mdl::Node*> resolveSelectorNodes(
   const McpObjectRegistry& objectRegistry,
   QJsonArray& warnings,
   QString& error,
-  SelectorDiagnostics* diagnostics = nullptr)
+  SelectorDiagnosticsInternal* diagnostics = nullptr)
 {
   auto candidates = std::vector<mdl::Node*>{};
   auto seeded = false;
@@ -1538,6 +1538,42 @@ void mergeModuleFromOperationResult(
 
 } // namespace
 
+QJsonObject selectorFromParams(const QJsonObject& params)
+{
+  return selectorFromParamsInternal(params);
+}
+
+std::vector<mdl::Node*> resolveSelectorNodes(
+  mdl::Map& map,
+  const QJsonObject& selector,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry,
+  QJsonArray& warnings,
+  QString& error,
+  McpSelectorDiagnostics* diagnostics)
+{
+  auto internalDiagnostics = SelectorDiagnosticsInternal{};
+  auto nodes = resolveSelectorNodesInternal(
+    map,
+    selector,
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry,
+    warnings,
+    error,
+    diagnostics != nullptr ? &internalDiagnostics : nullptr);
+  if (diagnostics != nullptr)
+  {
+    diagnostics->matchedBeforeLimit = internalDiagnostics.matchedBeforeLimit;
+    diagnostics->limitApplied = internalDiagnostics.limitApplied;
+    diagnostics->staleExcluded = internalDiagnostics.staleExcluded;
+  }
+  return nodes;
+}
+
 McpBridgeToolResult selectorPreviewResult(
   AppController& appController,
   const QJsonObject& params,
@@ -1572,7 +1608,7 @@ McpBridgeToolResult selectorPreviewForMapResult(
   auto warnings = QJsonArray{};
   auto error = QString{};
   const auto selector = selectorFromParams(params);
-  auto diagnostics = SelectorDiagnostics{};
+  auto diagnostics = McpSelectorDiagnostics{};
   const auto nodes = resolveSelectorNodes(
     map,
     selector,

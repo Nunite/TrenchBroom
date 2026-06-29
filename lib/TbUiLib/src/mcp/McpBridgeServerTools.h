@@ -39,6 +39,13 @@ namespace tb::ui
 class AppController;
 class McpObjectRegistry;
 
+struct McpSelectorDiagnostics
+{
+  int matchedBeforeLimit = 0;
+  bool limitApplied = false;
+  int staleExcluded = 0;
+};
+
 McpBridgeToolResult noActiveDocumentFailure();
 McpBridgeToolResult invalidParamsFailure(const QString& message);
 
@@ -258,6 +265,17 @@ McpBridgeToolResult selectorPreviewForMapResult(
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
   const std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry);
+QJsonObject selectorFromParams(const QJsonObject& params);
+std::vector<mdl::Node*> resolveSelectorNodes(
+  mdl::Map& map,
+  const QJsonObject& selector,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry,
+  QJsonArray& warnings,
+  QString& error,
+  McpSelectorDiagnostics* diagnostics = nullptr);
 McpBridgeToolResult objectsSelectBySelectorResult(
   AppController& appController,
   const QJsonObject& params,
@@ -554,7 +572,9 @@ McpBridgeToolResult transformObjectsResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
-  const McpObjectRegistry& objectRegistry);
+  const McpObjectRegistry& objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const std::map<QString, McpModuleRecord>* moduleStore);
 McpBridgeToolResult transformObjectsForMapResult(
   mdl::Map& map,
   const QString& toolName,
@@ -562,6 +582,15 @@ McpBridgeToolResult transformObjectsForMapResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult transformObjectsForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const std::map<QString, McpModuleRecord>* moduleStore);
 
 McpBridgeToolResult brushTypesListResult();
 McpBridgeToolResult createBrushResult(

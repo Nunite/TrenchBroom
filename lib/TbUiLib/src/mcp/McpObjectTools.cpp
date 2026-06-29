@@ -431,10 +431,16 @@ std::optional<std::vector<mdl::Node*>> nodesFromObjectIdsOrOperations(
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
   const McpObjectRegistry& objectRegistry,
-  QString& error)
+  QString& error,
+  QJsonObject* diagnostics = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  const std::map<QString, McpModuleRecord>* moduleStore = nullptr)
 {
   auto result = std::vector<mdl::Node*>{};
-  if (params.value("objectIds").isArray())
+  auto source = QString{};
+  auto selectorWarnings = QJsonArray{};
+  const auto objectIdsProvided = params.value("objectIds").isArray();
+  if (objectIdsProvided)
   {
     auto objectNodes = nodesFromObjectIds(map, params, error);
     if (!objectNodes)
@@ -442,6 +448,7 @@ std::optional<std::vector<mdl::Node*>> nodesFromObjectIdsOrOperations(
       return std::nullopt;
     }
     result.insert(std::end(result), std::begin(*objectNodes), std::end(*objectNodes));
+    source = "objectIds";
   }
 
   auto operationIds = operationIdsFromParams(params, error);
@@ -449,27 +456,96 @@ std::optional<std::vector<mdl::Node*>> nodesFromObjectIdsOrOperations(
   {
     return std::nullopt;
   }
-  for (const auto& operationId : *operationIds)
+  const auto operationIdsProvided = !operationIds->isEmpty();
+  if (!objectIdsProvided)
   {
-    const auto operation = findOperation(history, operationId);
-    if (!operation)
+    for (const auto& operationId : *operationIds)
     {
-      error = QString{"Unknown MCP operation id: %1"}.arg(operationId);
+      const auto operation = findOperation(history, operationId);
+      if (!operation)
+      {
+        error = QString{"Unknown MCP operation id: %1"}.arg(operationId);
+        return std::nullopt;
+      }
+      auto operationNodes = nodesFromOperation(map, **operation, objectRegistry, error);
+      if (!operationNodes)
+      {
+        return std::nullopt;
+      }
+      result.insert(
+        std::end(result), std::begin(*operationNodes), std::end(*operationNodes));
+    }
+    if (operationIdsProvided)
+    {
+      source = "operationIds";
+    }
+  }
+
+  if (
+    !objectIdsProvided && !operationIdsProvided && result.empty()
+    && params.value("selector").isObject() && metadataStore != nullptr
+    && moduleStore != nullptr)
+  {
+    auto selectorDiagnostics = McpSelectorDiagnostics{};
+    const auto selector = selectorFromParams(params);
+    result = resolveSelectorNodes(
+      map,
+      selector,
+      history,
+      *metadataStore,
+      *moduleStore,
+      objectRegistry,
+      selectorWarnings,
+      error,
+      &selectorDiagnostics);
+    if (!error.isEmpty())
+    {
       return std::nullopt;
     }
-    auto operationNodes = nodesFromOperation(map, **operation, objectRegistry, error);
-    if (!operationNodes)
+    source = "selector";
+    if (diagnostics != nullptr)
     {
-      return std::nullopt;
+      diagnostics->insert("selector", selector);
+      diagnostics->insert("selectorMatchedCount", selectorDiagnostics.matchedBeforeLimit);
+      diagnostics->insert("matchedBeforeLimit", selectorDiagnostics.matchedBeforeLimit);
+      diagnostics->insert("limitApplied", selectorDiagnostics.limitApplied);
+      diagnostics->insert("staleExcluded", selectorDiagnostics.staleExcluded);
+      diagnostics->insert("selectorWarnings", selectorWarnings);
     }
-    result.insert(
-      std::end(result), std::begin(*operationNodes), std::end(*operationNodes));
   }
 
   result = kdl::vec_sort_and_remove_duplicates(std::move(result));
+  if (diagnostics != nullptr)
+  {
+    diagnostics->insert("targetSource", source);
+    diagnostics->insert("resolvedObjectCount", static_cast<int>(result.size()));
+    if (operationIdsProvided)
+    {
+      diagnostics->insert(
+        "sourceOperationIds", QJsonArray::fromStringList(*operationIds));
+      diagnostics->insert("sourceOperationCount", operationIds->size());
+    }
+  }
   if (result.empty())
   {
-    error = "objects_transform requires objectIds, operationId, or operationIds";
+    if (objectIdsProvided)
+    {
+      error = "objectIds must contain at least one live transform target";
+    }
+    else if (operationIdsProvided)
+    {
+      error = "operationIds must resolve to at least one live transform target";
+    }
+    else if (params.value("selector").isObject())
+    {
+      error = "selector resolved to no live transform targets";
+    }
+    else
+    {
+      error =
+        "objects_transform requires objectIds, operationId, operationIds, or selector "
+        "that resolves to live objects";
+    }
     return std::nullopt;
   }
   return result;
@@ -499,6 +575,56 @@ vm::bbox3d boundsForNodes(const std::vector<mdl::Node*>& nodes)
     builder.add(node->logicalBounds());
   }
   return builder.bounds();
+}
+
+QJsonArray objectIdsJson(
+  mdl::Map& map,
+  const std::vector<mdl::Node*>& nodes,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto result = QJsonArray{};
+  for (const auto* node : nodes)
+  {
+    if (node == nullptr)
+    {
+      continue;
+    }
+    result.push_back(
+      objectRegistry.externalIdForLegacy(map, nodePathId(*node, map.worldNode())));
+  }
+  return result;
+}
+
+void applyIdsMode(
+  QJsonObject& result,
+  mdl::Map& map,
+  const std::vector<mdl::Node*>& nodes,
+  const McpObjectRegistry& objectRegistry,
+  const QString& idsMode,
+  const int sampleLimit)
+{
+  const auto normalized = idsMode.trimmed().toLower();
+  result.remove("changedObjectIds");
+  if (normalized == "full")
+  {
+    const auto ids = objectIdsJson(map, nodes, objectRegistry);
+    result.insert("objectIds", ids);
+    result.insert("changedObjectIds", ids);
+    return;
+  }
+  if (normalized == "sample")
+  {
+    const auto clampedSampleLimit = std::clamp(sampleLimit, 0, 100);
+    auto sampleNodes = nodes;
+    if (static_cast<int>(sampleNodes.size()) > clampedSampleLimit)
+    {
+      sampleNodes.resize(static_cast<size_t>(clampedSampleLimit));
+    }
+    result.insert("objectIdSample", objectIdsJson(map, sampleNodes, objectRegistry));
+    result.insert("objectIdCount", static_cast<int>(nodes.size()));
+    return;
+  }
+  result.insert("objectIdCount", static_cast<int>(nodes.size()));
 }
 
 std::optional<vm::vec3d> optionalCenterFromJson(
@@ -784,7 +910,9 @@ McpBridgeToolResult transformObjectsResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
-  const McpObjectRegistry& objectRegistry)
+  const McpObjectRegistry& objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const std::map<QString, McpModuleRecord>* moduleStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -798,7 +926,9 @@ McpBridgeToolResult transformObjectsResult(
     params,
     history,
     nextOperationIndex,
-    objectRegistry);
+    objectRegistry,
+    metadataStore,
+    moduleStore);
 }
 
 McpBridgeToolResult transformObjectsForMapResult(
@@ -809,11 +939,38 @@ McpBridgeToolResult transformObjectsForMapResult(
   int& nextOperationIndex,
   const McpObjectRegistry& objectRegistry)
 {
+  return transformObjectsForMapResult(
+    map, toolName, params, history, nextOperationIndex, objectRegistry, nullptr, nullptr);
+}
+
+McpBridgeToolResult transformObjectsForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const std::map<QString, McpModuleRecord>* moduleStore)
+{
   auto error = QString{};
-  const auto nodes =
-    nodesFromObjectIdsOrOperations(map, params, history, objectRegistry, error);
+  auto targetDiagnostics = QJsonObject{};
+  const auto nodes = nodesFromObjectIdsOrOperations(
+    map,
+    params,
+    history,
+    objectRegistry,
+    error,
+    &targetDiagnostics,
+    metadataStore,
+    moduleStore);
   if (!nodes)
   {
+    if (!targetDiagnostics.isEmpty())
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams, error, targetDiagnostics);
+    }
     return invalidParamsFailure(error);
   }
   auto transformNodes = removeDescendantNodes(*nodes);
@@ -822,6 +979,7 @@ McpBridgeToolResult transformObjectsForMapResult(
     return invalidParamsFailure(
       "objectIds must contain at least one transformable object");
   }
+  const auto beforeBounds = boundsForNodes(transformNodes);
   for (const auto* node : transformNodes)
   {
     if (node == &map.worldNode() || !map.editorContext().selectable(*node))
@@ -912,15 +1070,39 @@ McpBridgeToolResult transformObjectsForMapResult(
   auto result = QJsonObject{};
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, changedObjectIds, result);
+  const auto afterBounds = boundsForNodes(transformNodes);
   result.insert("operation", operation);
-  result.insert("bounds", boundsToJson(boundsForNodes(transformNodes)));
+  result.insert("bounds", boundsToJson(afterBounds));
+  result.insert("beforeBounds", boundsToJson(beforeBounds));
+  result.insert("afterBounds", boundsToJson(afterBounds));
+  result.insert("targetCount", static_cast<int>(transformNodes.size()));
+  result.insert(
+    "resolvedObjectCount", targetDiagnostics.value("resolvedObjectCount").toInt());
   result.insert("selectedCount", static_cast<int>(transformNodes.size()));
+  result.insert("targetSource", targetDiagnostics.value("targetSource").toString());
+  if (targetDiagnostics.contains("selector"))
+  {
+    result.insert("selector", targetDiagnostics.value("selector"));
+    result.insert(
+      "selectorMatchedCount", targetDiagnostics.value("selectorMatchedCount"));
+    result.insert("matchedBeforeLimit", targetDiagnostics.value("matchedBeforeLimit"));
+    result.insert("limitApplied", targetDiagnostics.value("limitApplied"));
+    result.insert("staleExcluded", targetDiagnostics.value("staleExcluded"));
+    result.insert("warnings", targetDiagnostics.value("selectorWarnings").toArray());
+  }
   if (auto operationIds = operationIdsFromParams(params, error);
       operationIds && !operationIds->isEmpty())
   {
     result.insert("sourceOperationIds", QJsonArray::fromStringList(*operationIds));
     result.insert("sourceOperationCount", operationIds->size());
   }
+  applyIdsMode(
+    result,
+    map,
+    transformNodes,
+    objectRegistry,
+    params.value("idsMode").toString("count"),
+    params.value("sampleLimit").toInt(12));
   result.insert(
     "validation",
     QJsonObject{

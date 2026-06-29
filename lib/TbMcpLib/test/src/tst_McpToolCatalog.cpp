@@ -1170,6 +1170,11 @@ TEST_CASE("McpToolCatalog")
       transformTool->inputSchema.value("properties").toObject();
     CHECK(transformProperties.value("operationId").isObject());
     CHECK(transformProperties.value("operationIds").isObject());
+    CHECK(transformProperties.value("selector").isObject());
+    CHECK(transformProperties.value("idsMode").isObject());
+    CHECK(transformProperties.value("sampleLimit").isObject());
+    CHECK(transformTool->description.contains("selector"));
+    CHECK(transformTool->description.contains("stretched"));
     CHECK(transformTool->inputSchema.value("required").toArray().contains("operation"));
     CHECK(!transformTool->inputSchema.value("required").toArray().contains("objectIds"));
 

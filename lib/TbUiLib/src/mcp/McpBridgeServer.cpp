@@ -624,7 +624,9 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             params,
             m_operationHistory,
             m_nextOperationIndex,
-            m_objectRegistry);
+            m_objectRegistry,
+            &m_brushMetadata,
+            &m_modules);
         }
         if (toolName == "map_validate")
         {

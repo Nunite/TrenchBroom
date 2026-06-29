@@ -2391,7 +2391,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "objects_transform",
-      "Transform one or more selectable objects using translate, rotate, or scale.",
+      "Transform one or more selectable objects using translate, rotate, or scale. "
+      "Prefer selector targets for module/route/part iteration so generated scene "
+      "pieces can be stretched, moved, or rotated without deleting and rebuilding them.",
       McpMode::Edit,
       true,
       true,
@@ -2404,6 +2406,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"operationIds",
            arrayProperty(
              "Optional MCP operation ids whose live changed objects are transformed.")},
+          {"selector",
+           withDescription(
+             selectorSchema(),
+             "Optional structured selector for live transform targets. Used when "
+             "objectIds and operationIds are omitted.")},
           {"operation",
            stringProperty("Transform operation: translate, rotate, or scale.")},
           {"delta", vec3Property("Translation delta in map units.")},
@@ -2412,6 +2419,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"scale", numberOrVec3Property("Scale factor number or [x,y,z] factors.")},
           {"center",
            vec3Property("Optional transform center. Defaults to object bounds center.")},
+          {"idsMode",
+           stringProperty(
+             "Returned target id detail: count (default), sample, full, or none.")},
+          {"sampleLimit",
+           integerProperty("Maximum sampled ids when idsMode=sample. Defaults to 12.")},
         },
         {"operation"}),
     },

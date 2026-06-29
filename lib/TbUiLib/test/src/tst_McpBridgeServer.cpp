@@ -2626,6 +2626,164 @@ TEST_CASE("McpBridgeServer object transform summaries")
   CHECK(transformByOperationResponse.result.value("sourceOperationCount").toInt() == 1);
 }
 
+TEST_CASE("McpBridgeServer transforms selector targets without long id lists")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+
+  const auto createResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Selector transform arc ramp"},
+      {"detail", "ids"},
+      {"select", false},
+      {"defaultMetadata",
+       QJsonObject{
+         {"moduleId", "selector-transform-route"},
+         {"routeId", "selector-transform-route"},
+         {"part", "road"},
+         {"role", "walkable"},
+       }},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "arc_ramp"},
+           {"center", QJsonArray{0, 0, 0}},
+           {"radius", 256},
+           {"width", 96},
+           {"startAngle", 0},
+           {"turnDegrees", 180},
+           {"rise", 128},
+           {"segments", 32},
+           {"thickness", 16},
+           {"metadata", QJsonObject{{"order", 1}}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore);
+  const auto createError =
+    createResponse.ok ? std::string{} : createResponse.error.message.toStdString();
+  INFO(createError);
+  REQUIRE(createResponse.ok);
+  CHECK(createResponse.result.value("changedObjectCount").toInt() == 32);
+  CHECK(createResponse.result.value("metadataCount").toInt() == 32);
+
+  const auto previewResponse = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "selector-transform-route"}}},
+      {"idsMode", "count"},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(previewResponse.ok);
+  CHECK(previewResponse.result.value("matchedCount").toInt() == 32);
+  CHECK(previewResponse.result.value("objectIdCount").toInt() == 32);
+  CHECK(previewResponse.result.value("objectIds").isUndefined());
+
+  const auto transformResponse = transformObjectsForMapResult(
+    map,
+    "objects_transform",
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "selector-transform-route"}}},
+      {"operation", "scale"},
+      {"scale", QJsonArray{1.12, 1.0, 1.0}},
+      {"idsMode", "count"},
+    },
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  const auto transformError =
+    transformResponse.ok ? std::string{} : transformResponse.error.message.toStdString();
+  INFO(transformError);
+  REQUIRE(transformResponse.ok);
+  CHECK(transformResponse.result.value("targetSource").toString() == "selector");
+  CHECK(transformResponse.result.value("targetCount").toInt() == 32);
+  CHECK(transformResponse.result.value("resolvedObjectCount").toInt() == 32);
+  CHECK(transformResponse.result.value("selectorMatchedCount").toInt() == 32);
+  CHECK(transformResponse.result.value("matchedBeforeLimit").toInt() == 32);
+  CHECK(transformResponse.result.value("staleExcluded").toInt() == 0);
+  CHECK(transformResponse.result.value("changedObjectCount").toInt() == 32);
+  CHECK(transformResponse.result.value("objectIdCount").toInt() == 32);
+  CHECK(transformResponse.result.value("changedObjectIds").isUndefined());
+  CHECK(transformResponse.result.value("objectIds").isUndefined());
+  CHECK(!transformResponse.result.value("operationId").toString().isEmpty());
+  CHECK(history.back().toolName == "objects_transform");
+
+  const auto beforeBounds = transformResponse.result.value("beforeBounds").toObject();
+  const auto afterBounds = transformResponse.result.value("afterBounds").toObject();
+  const auto beforeMin = beforeBounds.value("min").toArray();
+  const auto beforeMax = beforeBounds.value("max").toArray();
+  const auto afterMin = afterBounds.value("min").toArray();
+  const auto afterMax = afterBounds.value("max").toArray();
+  const auto beforeWidth = beforeMax.at(0).toDouble() - beforeMin.at(0).toDouble();
+  const auto afterWidth = afterMax.at(0).toDouble() - afterMin.at(0).toDouble();
+  const auto beforeDepth = beforeMax.at(1).toDouble() - beforeMin.at(1).toDouble();
+  const auto afterDepth = afterMax.at(1).toDouble() - afterMin.at(1).toDouble();
+  CHECK(afterWidth > beforeWidth * 1.10);
+  CHECK(afterDepth == beforeDepth);
+
+  const auto continuityResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"routeId", "selector-transform-route"},
+      {"orderBy", "metadataOrder"},
+      {"continuityMode", "stepped"},
+      {"horizontalTolerance", 128},
+      {"maxStepHeight", 256},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(continuityResponse.ok);
+  CHECK(continuityResponse.result.value("selectorMatchedCount").toInt() == 32);
+  CHECK(continuityResponse.result.value("orderBy").toString() == "metadataOrder");
+
+  const auto missResponse = transformObjectsForMapResult(
+    map,
+    "objects_transform",
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "missing-transform-route"}}},
+      {"operation", "scale"},
+      {"scale", QJsonArray{1.1, 1.0, 1.0}},
+    },
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  CHECK_FALSE(missResponse.ok);
+  CHECK(missResponse.error.message.contains("selector resolved to no live"));
+  CHECK(
+    missResponse.error.details.value("selector").toObject().value("moduleId").toString()
+    == "missing-transform-route");
+  CHECK(missResponse.error.details.value("selectorMatchedCount").toInt() == 0);
+  CHECK(history.back().toolName == "objects_transform");
+}
+
 TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
 {
   auto appControllerFixture = AppControllerFixture{};
@@ -4107,8 +4265,7 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
     &metadataStore,
     &moduleStore);
   REQUIRE(arcClosedLoopResponse.ok);
-  const auto arcClosedLoopSeams =
-    arcClosedLoopResponse.result.value("seams").toArray();
+  const auto arcClosedLoopSeams = arcClosedLoopResponse.result.value("seams").toArray();
   REQUIRE(!arcClosedLoopSeams.isEmpty());
   CHECK(arcClosedLoopSeams.last().toObject().value("loopClosure").toBool());
 
@@ -4166,10 +4323,11 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
   CHECK(mismatchedContinuity.result.value("centerlineContinuous").toBool());
   CHECK_FALSE(mismatchedContinuity.result.value("fullWidthContinuous").toBool());
   CHECK(mismatchedContinuity.result.value("maxEdgeGap").toDouble() > 1.0);
-  CHECK(
-    mismatchedContinuity.result.value("warnings").toArray().contains(
-      "fullWidthRouteNotContinuous: centerline seam continuity passed, but inner/"
-      "outer playable edges do not meet within tolerance."));
+  CHECK(mismatchedContinuity.result.value("warnings")
+          .toArray()
+          .contains(
+            "fullWidthRouteNotContinuous: centerline seam continuity passed, but inner/"
+            "outer playable edges do not meet within tolerance."));
 
   const auto closedLoopResponse = geometryAnalyzeRouteContinuityForMapResult(
     map,
