@@ -710,7 +710,8 @@ RenderGeometry buildRenderGeometry(
   const int maxFaces,
   const bool includeEntityLabels,
   const bool includeOrderLabels,
-  const bool includeDirectionLabels)
+  const bool includeDirectionLabels,
+  const int labelStride)
 {
   auto geometry = RenderGeometry{};
   geometry.targetObjectCount = static_cast<int>(nodes.size());
@@ -836,6 +837,11 @@ RenderGeometry buildRenderGeometry(
     {
       if (node == nullptr)
       {
+        continue;
+      }
+      if (labelStride > 1 && ((order - 1) % labelStride) != 0)
+      {
+        ++order;
         continue;
       }
       const auto center = node->logicalBounds().center();
@@ -1863,16 +1869,30 @@ McpBridgeToolResult renderReviewNodesForMapResult(
   const auto edgeMode = reviewEdgeModeFromParams(params, warnings);
   const auto verticalExaggeration = verticalExaggerationFromParams(params, warnings);
   const auto includeEntityLabels = optionalBool(params, "includeEntityLabels", true);
-  const auto includeOrderLabels = optionalBool(params, "includeOrderLabels", false);
+  const auto autoHideLabelsThreshold =
+    optionalIntClamped(params, "autoHideLabelsThreshold", 120, 0, 10000);
+  auto includeOrderLabels = optionalBool(params, "includeOrderLabels", false);
+  if (
+    includeOrderLabels && autoHideLabelsThreshold > 0
+    && static_cast<int>(nodes.size()) > autoHideLabelsThreshold)
+  {
+    includeOrderLabels = false;
+    warnings.push_back(
+      QString{"orderLabelsAutoHidden: targetObjectCount=%1 exceeds threshold=%2"}
+        .arg(nodes.size())
+        .arg(autoHideLabelsThreshold));
+  }
   const auto includeDirectionLabels =
     optionalBool(params, "includeDirectionLabels", false);
+  const auto labelStride = optionalIntClamped(params, "labelStride", 1, 1, 1000);
   auto geometry = buildRenderGeometry(
     nodes,
     warnings,
     maxFaces,
     includeEntityLabels,
     includeOrderLabels,
-    includeDirectionLabels);
+    includeDirectionLabels,
+    labelStride);
   if (geometry.faces.empty() && geometry.edges.empty())
   {
     addBboxToGeometry(geometry, targetBounds);
@@ -2109,16 +2129,30 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
   const auto edgeMode = reviewEdgeModeFromParams(params, warnings);
   const auto verticalExaggeration = verticalExaggerationFromParams(params, warnings);
   const auto includeEntityLabels = optionalBool(params, "includeEntityLabels", true);
-  const auto includeOrderLabels = optionalBool(params, "includeOrderLabels", false);
+  const auto autoHideLabelsThreshold =
+    optionalIntClamped(params, "autoHideLabelsThreshold", 120, 0, 10000);
+  auto includeOrderLabels = optionalBool(params, "includeOrderLabels", false);
+  if (
+    includeOrderLabels && autoHideLabelsThreshold > 0
+    && static_cast<int>(nodes.size()) > autoHideLabelsThreshold)
+  {
+    includeOrderLabels = false;
+    warnings.push_back(
+      QString{"orderLabelsAutoHidden: targetObjectCount=%1 exceeds threshold=%2"}
+        .arg(nodes.size())
+        .arg(autoHideLabelsThreshold));
+  }
   const auto includeDirectionLabels =
     optionalBool(params, "includeDirectionLabels", false);
+  const auto labelStride = optionalIntClamped(params, "labelStride", 1, 1, 1000);
   auto geometry = buildRenderGeometry(
     nodes,
     warnings,
     maxFaces,
     includeEntityLabels,
     includeOrderLabels,
-    includeDirectionLabels);
+    includeDirectionLabels,
+    labelStride);
   if (geometry.faces.empty() && geometry.edges.empty())
   {
     addBboxToGeometry(geometry, *targetBounds);

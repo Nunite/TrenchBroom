@@ -50,6 +50,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("documents_open_verified"));
     CHECK(findToolDefinition("documents_activate"));
     CHECK(findToolDefinition("documents_save"));
+    CHECK(findToolDefinition("documents_save_current"));
+    CHECK(findToolDefinition("documents_save_as"));
     CHECK(findToolDefinition("documents_close"));
     CHECK(findToolDefinition("documents_export"));
     CHECK(findToolDefinition("map_snapshot"));
@@ -80,11 +82,14 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("module_select"));
     CHECK(findToolDefinition("module_render_review"));
     CHECK(findToolDefinition("module_validate"));
+    CHECK(findToolDefinition("module_compact"));
     CHECK(findToolDefinition("fgd_entities_list"));
     CHECK(findToolDefinition("entity_schema"));
     CHECK(findToolDefinition("entity_create_from_schema"));
     CHECK(findToolDefinition("entity_create_checked"));
     CHECK(findToolDefinition("entity_create_checked_batch"));
+    CHECK(findToolDefinition("entity_properties_update"));
+    CHECK(findToolDefinition("entity_properties_delete"));
     CHECK(findToolDefinition("entity_tie_brushes"));
     CHECK(findToolDefinition("entity_untie_brushes"));
     CHECK(findToolDefinition("brush_types_list"));
@@ -140,7 +145,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("heightmap_preview_grayscale"));
     CHECK(findToolDefinition("ir_validate"));
     CHECK(findToolDefinition("ir_compile_preview"));
+    CHECK(findToolDefinition("ir_compile_preview_from_file"));
     CHECK(findToolDefinition("ir_apply"));
+    CHECK(findToolDefinition("ir_apply_from_file"));
     CHECK(findToolDefinition("tb_tools_search"));
     CHECK(findToolDefinition("actions_list"));
     CHECK(findToolDefinition("overlay_set"));
@@ -722,6 +729,18 @@ TEST_CASE("McpToolCatalog")
             .toObject()
             .value("checkRouteContinuity")
             .isObject());
+    CHECK(moduleValidate->inputSchema.value("properties")
+            .toObject()
+            .value("orderBy")
+            .isObject());
+    CHECK(moduleValidate->inputSchema.value("properties")
+            .toObject()
+            .value("closedLoop")
+            .isObject());
+
+    const auto moduleCompact = findToolDefinition("module_compact");
+    REQUIRE(moduleCompact);
+    CHECK(moduleCompact->inputSchema.value("required").toArray().contains("moduleId"));
 
     const auto irApply = findToolDefinition("ir_apply");
     REQUIRE(irApply);
@@ -733,6 +752,17 @@ TEST_CASE("McpToolCatalog")
     CHECK(irProperties.value("entities").isObject());
     CHECK(irProperties.value("moduleId").isObject());
     CHECK(irProperties.value("defaultMetadata").isObject());
+
+    const auto irPreviewFile = findToolDefinition("ir_compile_preview_from_file");
+    REQUIRE(irPreviewFile);
+    CHECK(irPreviewFile->requiredMode == McpMode::ReadOnly);
+    CHECK(irPreviewFile->inputSchema.value("required").toArray().contains("path"));
+
+    const auto irApplyFile = findToolDefinition("ir_apply_from_file");
+    REQUIRE(irApplyFile);
+    CHECK(irApplyFile->requiredMode == McpMode::Edit);
+    CHECK(irApplyFile->mutatesDocument);
+    CHECK(irApplyFile->inputSchema.value("required").toArray().contains("path"));
 
     const auto blockoutBatch = findToolDefinition("blockout_create_batch");
     REQUIRE(blockoutBatch);
@@ -750,6 +780,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(operationItems.value("parts").isObject());
     CHECK(operationItems.value("partMaterials").isObject());
     CHECK(operationItems.value("partMetadata").isObject());
+    CHECK(operationItems.value("radius").isObject());
+    CHECK(operationItems.value("rise").isObject());
+    CHECK(operationItems.value("orderStart").isObject());
+    CHECK(operationItems.value("orderStep").isObject());
 
     const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
     auto names = QStringList{};
@@ -766,9 +800,12 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("module_select"));
     CHECK(names.contains("module_render_review"));
     CHECK(names.contains("module_validate"));
+    CHECK(names.contains("module_compact"));
     CHECK(names.contains("ir_validate"));
     CHECK(names.contains("ir_compile_preview"));
+    CHECK(names.contains("ir_compile_preview_from_file"));
     CHECK(names.contains("ir_apply"));
+    CHECK(names.contains("ir_apply_from_file"));
 
     const auto moduleList = findToolDefinition("module_list");
     REQUIRE(moduleList);
@@ -1189,6 +1226,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(reviewTargetProperties.value("includeEntityLabels").isObject());
     CHECK(reviewTargetProperties.value("includeOrderLabels").isObject());
     CHECK(reviewTargetProperties.value("includeDirectionLabels").isObject());
+    CHECK(reviewTargetProperties.value("labelStride").isObject());
+    CHECK(reviewTargetProperties.value("autoHideLabelsThreshold").isObject());
     CHECK(reviewTargetProperties.value("contactSheetMaxCaptures").isObject());
 
     const auto validateTool = findToolDefinition("map_validate");
@@ -1196,7 +1235,25 @@ TEST_CASE("McpToolCatalog")
     const auto validateProperties =
       validateTool->inputSchema.value("properties").toObject();
     CHECK(validateProperties.value("includeProblems").isObject());
+    CHECK(validateProperties.value("groupByType").isObject());
     CHECK(validateProperties.value("limit").isObject());
+
+    const auto routeContinuityToolForOrder =
+      findToolDefinition("geometry_analyze_route_continuity");
+    REQUIRE(routeContinuityToolForOrder);
+    const auto routeContinuityOrderProperties =
+      routeContinuityToolForOrder->inputSchema.value("properties").toObject();
+    CHECK(routeContinuityOrderProperties.value("orderBy").isObject());
+    CHECK(routeContinuityOrderProperties.value("closedLoop").isObject());
+
+    const auto updatePropsTool = findToolDefinition("entity_properties_update");
+    REQUIRE(updatePropsTool);
+    CHECK(
+      updatePropsTool->inputSchema.value("required").toArray().contains("properties"));
+
+    const auto deletePropsTool = findToolDefinition("entity_properties_delete");
+    REQUIRE(deletePropsTool);
+    CHECK(deletePropsTool->inputSchema.value("required").toArray().contains("keys"));
 
     const auto entityTool = findToolDefinition("entity_create_checked");
     REQUIRE(entityTool);

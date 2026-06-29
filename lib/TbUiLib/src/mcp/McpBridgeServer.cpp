@@ -129,7 +129,9 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return documentActivateResult(appController, params);
         }
-        if (toolName == "documents_save")
+        if (
+          toolName == "documents_save" || toolName == "documents_save_current"
+          || toolName == "documents_save_as")
         {
           return documentSaveResult(appController, params);
         }
@@ -316,6 +318,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             m_modules,
             m_objectRegistry);
         }
+        if (toolName == "module_compact")
+        {
+          return moduleCompactResult(
+            appController, params, m_brushMetadata, m_modules, m_objectRegistry);
+        }
         if (toolName == "actions_list")
         {
           return McpBridgeToolResult::success(actionsListJson(appController));
@@ -356,6 +363,28 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return deleteEntityResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
+        if (toolName == "entity_properties_update")
+        {
+          return entityPropertiesUpdateResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
+        }
+        if (toolName == "entity_properties_delete")
+        {
+          return entityPropertiesDeleteResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_objectRegistry);
         }
         if (toolName == "fgd_entities_list")
         {
@@ -658,9 +687,24 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return irCompilePreviewResult(appController, params);
         }
+        if (toolName == "ir_compile_preview_from_file")
+        {
+          return irCompilePreviewFromFileResult(appController, params);
+        }
         if (toolName == "ir_apply")
         {
           return irApplyResult(
+            appController,
+            toolName,
+            params,
+            m_operationHistory,
+            m_nextOperationIndex,
+            m_brushMetadata,
+            m_modules);
+        }
+        if (toolName == "ir_apply_from_file")
+        {
+          return irApplyFromFileResult(
             appController,
             toolName,
             params,

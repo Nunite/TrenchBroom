@@ -331,6 +331,9 @@ QJsonObject blockoutBatchOperationSchema()
      R"({"type":"curved_corridor","center":[0,0,0],"innerRadius":128,)"
      R"("outerRadius":256,"startAngle":0,"turnDegrees":90,"height":128,)"
      R"("segments":8,"wallThickness":16,"caps":"both"}; )"
+     R"({"type":"arc_ramp","center":[0,0,0],"radius":256,"width":128,)"
+     R"("startAngle":0,"turnDegrees":180,"rise":128,"segments":24,) "
+     R"("thickness":16}; )"
      R"({"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}; )"
      R"({"type":"ramp_between","start":[0,0,0],"end":[256,0,64],)"
      R"("width":128,"thickness":16}; )"
@@ -347,8 +350,10 @@ QJsonObject blockoutBatchOperationSchema()
                        "polyhedron, cylinder_sector, path_ribbon, repeat_translate, "
                        "repeat_grid, stepped_mass, support_posts_between. Convenience "
                        "structural types: room, corridor, curved_corridor, stairs, "
-                       "ramp_between, wedge, ramp, doorway, cover, sky_shell. Prefer "
-                       "ramp_between over legacy ramp for route/surf/slide semantics.")},
+                       "arc_ramp, helical_ramp, ramp_between, wedge, ramp, doorway, "
+                       "cover, sky_shell. Prefer arc_ramp/helical_ramp or ramp_between "
+                       "over terraced curved_corridor/legacy ramp for route/surf/slide "
+                       "semantics.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"start",
@@ -380,7 +385,8 @@ QJsonObject blockoutBatchOperationSchema()
        {"points3d",
         arrayProperty(
           "Optional path_ribbon centerline points as [x,y,z]. When present, each "
-          "ribbon segment follows the lower endpoint Z plus zOffset.")},
+          "ribbon segment follows the lower endpoint Z plus zOffset; it does not "
+          "interpolate a continuous ramp surface between different Z values.")},
        {"points", arrayProperty("Convex polyhedron points as [x,y,z].")},
        {"minZ", numberProperty("Minimum Z for prism or cylinder_sector.")},
        {"maxZ", numberProperty("Maximum Z for prism or cylinder_sector.")},
@@ -397,11 +403,25 @@ QJsonObject blockoutBatchOperationSchema()
         numberProperty("Outer radius for cylinder_sector/curved_corridor.")},
        {"startAngle", numberProperty("Start angle in degrees.")},
        {"endAngle", numberProperty("End angle in degrees for cylinder_sector.")},
-       {"turnDegrees", numberProperty("Arc sweep in degrees for curved_corridor.")},
+       {"turnDegrees",
+        numberProperty("Arc sweep in degrees for curved_corridor or arc_ramp.")},
+       {"radius", numberProperty("Centerline radius for arc_ramp/helical_ramp.")},
+       {"rise", numberProperty("Total Z change for arc_ramp/helical_ramp.")},
+       {"orderStart",
+        numberProperty("Starting metadata order for arc_ramp/helical_ramp segments.")},
+       {"orderStep",
+        numberProperty("Metadata order increment for arc_ramp/helical_ramp segments.")},
        {"height", numberProperty("Height for curved_corridor.")},
-       {"slopeStartZ", numberProperty("Starting Z offset for sloped curved_corridor.")},
-       {"slopeEndZ", numberProperty("Ending Z offset for sloped curved_corridor.")},
-       {"segments", integerProperty("Segment count for curved_corridor.")},
+       {"slopeStartZ",
+        numberProperty(
+          "Starting Z offset for terraced curved_corridor; this does not create "
+          "continuous sloped top faces.")},
+       {"slopeEndZ",
+        numberProperty(
+          "Ending Z offset for terraced curved_corridor; use arc_ramp/helical_ramp "
+          "for true sloped curved surfaces.")},
+       {"segments",
+        integerProperty("Segment count for curved_corridor or arc_ramp/helical_ramp.")},
        {"wallThickness", numberProperty("Wall thickness for curved_corridor.")},
        {"floorThickness", numberProperty("Floor thickness for curved_corridor.")},
        {"ceilingThickness", numberProperty("Ceiling thickness for curved_corridor.")},
@@ -558,6 +578,33 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"index", integerProperty("Optional document index from documents_list.")},
         {"path", stringProperty("Optional absolute save path.")},
       }),
+    },
+    {
+      "documents_save_current",
+      "Save the active document. Alias of documents_save for automated MCP flows; "
+      "use expectedDocumentPath to guard the active map before saving.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema({
+        {"expectedDocumentPath",
+         stringProperty("Optional active document guard before saving.")},
+      }),
+    },
+    {
+      "documents_save_as",
+      "Save the active document to an absolute path. Alias of documents_save with "
+      "path and optional expectedDocumentPath guard.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema(
+        {
+          {"path", stringProperty("Absolute save path.")},
+          {"expectedDocumentPath",
+           stringProperty("Optional active document guard before saving.")},
+        },
+        {"path"}),
     },
     {
       "documents_close",
@@ -1044,6 +1091,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty(
            "Draw arrows between ordered targets. route_platform enables this by "
            "default.")},
+        {"labelStride",
+         integerProperty(
+           "Draw only every Nth order label when includeOrderLabels is true. Defaults "
+           "to 1.")},
+        {"autoHideLabelsThreshold",
+         integerProperty(
+           "Automatically hide dense order labels when targetObjectCount exceeds this "
+           "threshold. Defaults to 120; use 0 to disable.")},
         {"maxDetailedFaces",
          integerProperty(
            "Maximum brush faces rendered as real polygons before falling back to bounds "
@@ -1121,6 +1176,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty(
            "Draw arrows between ordered targets. route_platform enables this by "
            "default.")},
+        {"labelStride",
+         integerProperty(
+           "Draw only every Nth order label when includeOrderLabels is true. Defaults "
+           "to 1.")},
+        {"autoHideLabelsThreshold",
+         integerProperty(
+           "Automatically hide dense order labels when targetObjectCount exceeds this "
+           "threshold. Defaults to 120; use 0 to disable.")},
         {"maxDetailedFaces",
          integerProperty(
            "Maximum brush faces rendered as real polygons before falling back to bounds "
@@ -1215,6 +1278,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty(
            "Draw arrows between ordered targets. route_platform enables this by "
            "default.")},
+        {"labelStride",
+         integerProperty(
+           "Draw only every Nth order label when includeOrderLabels is true. Defaults "
+           "to 1.")},
+        {"autoHideLabelsThreshold",
+         integerProperty(
+           "Automatically hide dense order labels when targetObjectCount exceeds this "
+           "threshold. Defaults to 120; use 0 to disable.")},
         {"sceneName", stringProperty("Optional scene/review label.")},
         {"returnBase64",
          boolProperty(
@@ -1285,6 +1356,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"combineViews", boolProperty("Write contact_sheet.png. Defaults to true.")},
         {"contactSheetMaxCaptures",
          integerProperty("Maximum contact sheet panels. Defaults to 2.")},
+        {"labelStride",
+         integerProperty("Draw only every Nth order label when labels are enabled.")},
+        {"autoHideLabelsThreshold",
+         integerProperty("Hide dense order labels above this target count.")},
         {"outputDir", stringProperty("Optional review output root.")},
         {"detail", stringProperty("summary or full. Defaults to summary.")},
       }),
@@ -1348,6 +1423,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"views", arrayProperty("Optional review view names.")},
           {"preset", stringProperty("Optional review preset.")},
           {"style", stringProperty("Optional review style.")},
+          {"labelStride",
+           integerProperty("Draw only every Nth order label when labels are enabled.")},
+          {"autoHideLabelsThreshold",
+           integerProperty("Hide dense order labels above this target count.")},
           {"outputDir", stringProperty("Optional review output root.")},
           {"detail", stringProperty("summary or full. Defaults to summary.")},
         },
@@ -1385,6 +1464,27 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            numberProperty(
              "Used with continuityMode=jump_gaps. Maximum jump gap treated as "
              "semantically continuous.")},
+          {"orderBy",
+           stringProperty(
+             "Passed through to geometry_analyze_route_continuity: projection or "
+             "metadataOrder. Use metadataOrder for routeId/order chains.")},
+          {"closedLoop",
+           boolProperty(
+             "Passed through to geometry_analyze_route_continuity. When true, the "
+             "last ordered route surface is checked against the first.")},
+        },
+        {"moduleId"}),
+    },
+    {
+      "module_compact",
+      "Remove stale session metadata/object references for one module. This cleans "
+      "MCP session state only and does not modify the map or undo stack.",
+      McpMode::Edit,
+      false,
+      true,
+      objectSchema(
+        {
+          {"moduleId", stringProperty("Session metadata module id.")},
         },
         {"moduleId"}),
     },
@@ -1416,6 +1516,37 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"removeKeys", arrayProperty("Property keys to remove.")},
         },
         {"objectId"}),
+    },
+    {
+      "entity_properties_update",
+      "Batch update entity key/value properties by objectIds or operationIds. Prefer "
+      "this over deleting and recreating entities for key cleanup.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"objectIds", arrayProperty("Entity object ids to update.")},
+          {"operationIds",
+           arrayProperty("MCP operation ids whose live entity objects are updated.")},
+          {"properties", stringObjectProperty("Properties to add or update.")},
+        },
+        {"properties"}),
+    },
+    {
+      "entity_properties_delete",
+      "Batch delete entity property keys by objectIds or operationIds.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"objectIds", arrayProperty("Entity object ids to update.")},
+          {"operationIds",
+           arrayProperty("MCP operation ids whose live entity objects are updated.")},
+          {"keys", arrayProperty("Entity property keys to remove.")},
+        },
+        {"keys"}),
     },
     {
       "entity_delete",
@@ -2296,6 +2427,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty(
            "Include a limited problems array. Defaults to false to keep validation "
            "responses compact.")},
+        {"groupByType",
+         boolProperty(
+           "Return grouped problem counts with sample object ids and bounds. Useful for "
+           "large generated maps with repeated warnings.")},
         {"limit", integerProperty("Maximum problem entries when includeProblems=true.")},
       }),
     },
@@ -2671,6 +2806,20 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "ir_compile_preview_from_file",
+      "Read a local JSON IR file and preview the same minimal scene IR without "
+      "mutating the map. Use this when generated IR would be too large for the "
+      "conversation context.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema(
+        {
+          {"path", stringProperty("Absolute local path to a JSON IR file.")},
+        },
+        {"path"}),
+    },
+    {
       "ir_apply",
       "Apply minimal scene IR by dispatching to existing atomic MCP operations in "
       "transactions. This is an orchestration convenience for skill-generated IR, not "
@@ -2704,6 +2853,21 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "ir_apply_from_file",
+      "Read a local JSON IR file and apply it through existing atomic MCP operations. "
+      "The file is transport only; it does not add scene prefab semantics.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"path", stringProperty("Absolute local path to a JSON IR file.")},
+          {"expectedDocumentPath",
+           stringProperty("Optional active document guard before mutating.")},
+        },
+        {"path"}),
+    },
+    {
       "blockout_create_curved_corridor",
       "Create a curved corridor as one transaction using floor, ceiling, inner wall, "
       "outer wall, and optional caps.",
@@ -2717,8 +2881,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"startAngle", numberProperty("Start angle in degrees.")},
         {"turnDegrees", numberProperty("Arc length in degrees.")},
         {"height", numberProperty("Playable height, defaults to 128.")},
-        {"slopeStartZ", numberProperty("Starting Z offset for an uphill/downhill arc.")},
-        {"slopeEndZ", numberProperty("Ending Z offset for an uphill/downhill arc.")},
+        {"slopeStartZ",
+         numberProperty(
+           "Starting Z offset for a terraced uphill/downhill arc. This does not create "
+           "continuous sloped top faces.")},
+        {"slopeEndZ",
+         numberProperty(
+           "Ending Z offset for a terraced uphill/downhill arc. Use arc_ramp or "
+           "helical_ramp for true sloped curved surfaces.")},
         {"segments", integerProperty("Segment count, defaults to 12.")},
         {"wallThickness", numberProperty("Wall thickness, defaults to 16.")},
         {"floorThickness", numberProperty("Floor thickness, defaults to 16.")},
@@ -2907,6 +3077,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          numberProperty(
            "Minimum face normal.z for playable surfaces. Defaults to 0.2 so ramps and "
            "flat tops are included while walls are ignored.")},
+        {"orderBy",
+         stringProperty(
+           "Route seam order: projection (default) or metadataOrder for ordered route "
+           "metadata.")},
+        {"closedLoop",
+         boolProperty(
+           "When true, also checks the final ordered surface back to the first and "
+           "marks that seam with loopClosure.")},
       }),
     },
     {
@@ -3197,6 +3375,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "module_select",
     "module_render_review",
     "module_validate",
+    "module_compact",
     "operation_inspect",
     "operation_select",
     "operation_validate",
@@ -3223,7 +3402,9 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "heightmap_preview_grayscale",
     "ir_validate",
     "ir_compile_preview",
+    "ir_compile_preview_from_file",
     "ir_apply",
+    "ir_apply_from_file",
     "shape_library_list",
     "brush_metadata_set",
     "brush_metadata_get",
@@ -3242,6 +3423,8 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "entity_create_checked",
     "entity_create_checked_batch",
     "entity_create_from_schema",
+    "entity_properties_update",
+    "entity_properties_delete",
     "entity_tie_brushes",
     "entity_untie_brushes",
     "textures_list",

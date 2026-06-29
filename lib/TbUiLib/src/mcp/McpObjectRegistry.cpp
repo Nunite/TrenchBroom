@@ -225,7 +225,9 @@ mdl::Node* findNodeByAddress(mdl::Node& root, const quintptr nodeAddress)
 
 bool isObjectIdKey(const QString& key)
 {
-  if (key.endsWith("ObjectId") || key.endsWith("ObjectIds"))
+  if (
+    key.endsWith("ObjectId") || key.endsWith("ObjectIds") || key.endsWith("objectId")
+    || key.endsWith("objectIds"))
   {
     return true;
   }
@@ -233,7 +235,12 @@ bool isObjectIdKey(const QString& key)
   static const auto Keys = QStringList{
     "objectId",
     "objectIds",
+    "changedObjectIds",
+    "deletedObjectIds",
     "faceOwnerBrushIds",
+    "nonGridAlignedObjectIds",
+    "objectIdSample",
+    "targetObjectIds",
   };
   return Keys.contains(key);
 }
@@ -675,6 +682,11 @@ QJsonObject McpObjectRegistry::externalizeResult(
     }
     if (resolveLegacyObjectId(map, value) == nullptr)
     {
+      const auto legacyIt = m_legacyToStable.find(value);
+      if (legacyIt != m_legacyToStable.end() && m_records.contains(legacyIt->second))
+      {
+        return legacyIt->second;
+      }
       diagnostics.push_back(QJsonObject{
         {"objectId", value},
         {"legacy", true},

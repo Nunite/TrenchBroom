@@ -923,9 +923,30 @@ QJsonObject paramsWithSelectorObjectIds(
   QJsonArray& warnings,
   QString& error)
 {
-  if (!params.value("selector").isObject())
+  auto resolvedParams = params;
+  if (
+    !resolvedParams.value("selector").isObject()
+    && !resolvedParams.value("objectIds").isArray()
+    && !resolvedParams.contains("operationId")
+    && !resolvedParams.contains("operationIds"))
   {
-    return params;
+    auto implicitSelector = QJsonObject{};
+    for (const auto& key : {"moduleId", "part", "role", "routeId", "order"})
+    {
+      if (!resolvedParams.value(key).isUndefined())
+      {
+        implicitSelector.insert(key, resolvedParams.value(key));
+      }
+    }
+    if (!implicitSelector.isEmpty())
+    {
+      resolvedParams.insert("selector", implicitSelector);
+      warnings.push_back("implicitSelectorFromTopLevelMetadata");
+    }
+  }
+  if (!resolvedParams.value("selector").isObject())
+  {
+    return resolvedParams;
   }
   if (metadataStore == nullptr || moduleStore == nullptr || objectRegistry == nullptr)
   {
@@ -935,7 +956,8 @@ QJsonObject paramsWithSelectorObjectIds(
 
   const auto selectorResult = selectorPreviewForMapResult(
     map,
-    QJsonObject{{"selector", params.value("selector").toObject()}, {"idsMode", "full"}},
+    QJsonObject{
+      {"selector", resolvedParams.value("selector").toObject()}, {"idsMode", "full"}},
     history,
     *metadataStore,
     *moduleStore,
@@ -946,7 +968,7 @@ QJsonObject paramsWithSelectorObjectIds(
     return {};
   }
 
-  auto result = params;
+  auto result = resolvedParams;
   result.insert("objectIds", selectorResult.result.value("objectIds").toArray());
   result.insert("selectorMatchedCount", selectorResult.result.value("matchedCount"));
   for (const auto& warning : selectorResult.result.value("warnings").toArray())
@@ -954,6 +976,47 @@ QJsonObject paramsWithSelectorObjectIds(
     warnings.push_back(warning);
   }
   return result;
+}
+
+QString scopedMetadataKey(const QString& documentFingerprint, const QString& objectId)
+{
+  return documentFingerprint.isEmpty()
+           ? objectId
+           : QString{"%1|%2"}.arg(documentFingerprint, objectId);
+}
+
+std::optional<QJsonObject> metadataForBrushNode(
+  mdl::Map& map,
+  mdl::BrushNode& brush,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const McpObjectRegistry* objectRegistry)
+{
+  if (metadataStore == nullptr)
+  {
+    return std::nullopt;
+  }
+  const auto documentFingerprint = documentFingerprintForMap(map, objectRegistry);
+  const auto legacyId = nodePathId(brush, map.worldNode());
+  auto candidates = QStringList{legacyId};
+  if (objectRegistry != nullptr)
+  {
+    candidates.push_front(objectRegistry->externalIdForLegacy(map, legacyId));
+  }
+  for (const auto& objectId : candidates)
+  {
+    for (const auto& key :
+         QStringList{scopedMetadataKey(documentFingerprint, objectId), objectId})
+    {
+      const auto it = metadataStore->find(key);
+      if (
+        it != metadataStore->end() && !it->second.stale
+        && (it->second.documentFingerprint.isEmpty() || it->second.documentFingerprint == documentFingerprint))
+      {
+        return it->second.metadata;
+      }
+    }
+  }
+  return std::nullopt;
 }
 
 std::optional<vm::vec3d> optionalRouteDirectionFromParams(
@@ -1124,6 +1187,7 @@ struct PlayableSurface
   double entryZ = 0.0;
   double exitZ = 0.0;
   double averageZ = 0.0;
+  std::optional<double> metadataOrder;
 };
 
 double averageZAtProjection(
@@ -2033,6 +2097,47 @@ QJsonArray blockoutWarningsForOperations(const QJsonArray& operations, const dou
       if (const auto warning = rampBetweenGridWarning(operation, grid))
       {
         warnings.push_back(QString{"operations[%1]: %2"}.arg(i).arg(*warning));
+      }
+    }
+    else if (type == "curved_corridor")
+    {
+      const auto slopeStartZ = optionalDouble(operation, "slopeStartZ", 0.0);
+      const auto slopeEndZ = optionalDouble(operation, "slopeEndZ", slopeStartZ);
+      if (std::abs(slopeEndZ - slopeStartZ) > GeometryEpsilon)
+      {
+        warnings.push_back(QString{
+          "operations[%1]: terracedCurvedCorridor: slopeStartZ/slopeEndZ raises "
+          "each corridor segment as a flat terrace; it does not create continuous "
+          "sloped top faces. Use arc_ramp/helical_ramp or ramp_between segments for "
+          "smooth ascending route surfaces."}
+                             .arg(i));
+      }
+    }
+    else if (type == "path_ribbon" && operation.value("points3d").isArray())
+    {
+      auto error = QString{};
+      const auto points3d = centerlinePoints3DFromJson(operation, "points3d", error);
+      if (points3d)
+      {
+        auto hasZDelta = false;
+        for (size_t pointIndex = 0; pointIndex + 1u < points3d->size(); ++pointIndex)
+        {
+          if (
+            std::abs((*points3d)[pointIndex + 1u].z() - (*points3d)[pointIndex].z())
+            > GeometryEpsilon)
+          {
+            hasZDelta = true;
+            break;
+          }
+        }
+        if (hasZDelta)
+        {
+          warnings.push_back(QString{
+            "operations[%1]: flatPoints3dPathRibbon: points3d path_ribbon uses "
+            "the lower endpoint Z for each flat segment; it does not interpolate a "
+            "ramp surface between different Z values."}
+                               .arg(i));
+        }
       }
     }
   }
@@ -3525,6 +3630,155 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(
   return operations;
 }
 
+bool validateArcRampParams(const QJsonObject& params, QString& error)
+{
+  const auto centerValue = params.value("center");
+  if (!centerValue.isArray() || centerValue.toArray().size() != 3)
+  {
+    error = "center must be provided for arc_ramp as [x,y,z]";
+    return false;
+  }
+  const auto radius = optionalDouble(params, "radius", 256.0);
+  const auto width = optionalDouble(params, "width", 128.0);
+  const auto thickness = optionalDouble(params, "thickness", 16.0);
+  const auto turnDegrees = optionalDouble(params, "turnDegrees", 90.0);
+  const auto segments = optionalSize(params, "segments", 12);
+  if (!finitePositive(radius) || !finitePositive(width) || !finitePositive(thickness))
+  {
+    error = "arc_ramp radius, width, and thickness must be greater than zero";
+    return false;
+  }
+  if (width >= radius * 2.0)
+  {
+    error = "arc_ramp width must be smaller than diameter";
+    return false;
+  }
+  if (
+    !std::isfinite(turnDegrees) || std::abs(turnDegrees) <= GeometryEpsilon
+    || std::abs(turnDegrees) > 360.0)
+  {
+    error = "arc_ramp turnDegrees must be greater than zero and at most 360 degrees";
+    return false;
+  }
+  if (segments < 1 || segments > 512)
+  {
+    error = "arc_ramp segments must be between 1 and 512";
+    return false;
+  }
+  if (std::abs(turnDegrees) / static_cast<double>(segments) > 45.0)
+  {
+    error =
+      "arc_ramp segments too low; use enough segments so each ramp chord is <= 45 "
+      "degrees";
+    return false;
+  }
+  if (!std::isfinite(optionalDouble(params, "rise", 0.0)))
+  {
+    error = "arc_ramp rise must be finite";
+    return false;
+  }
+  return true;
+}
+
+std::vector<QJsonObject> arcRampOperationsFromParams(
+  const QJsonObject& params, const QJsonObject& baseMetadata)
+{
+  const auto centerValue = params.value("center").toArray();
+  const auto center = vm::vec3d{
+    centerValue[0].toDouble(), centerValue[1].toDouble(), centerValue[2].toDouble()};
+  const auto radius = optionalDouble(params, "radius", 256.0);
+  const auto width = optionalDouble(params, "width", 128.0);
+  const auto startAngle = optionalDouble(params, "startAngle", 0.0);
+  const auto turnDegrees = optionalDouble(params, "turnDegrees", 90.0);
+  const auto rise = optionalDouble(params, "rise", 0.0);
+  const auto segments = std::max<size_t>(1, optionalSize(params, "segments", 12));
+  const auto thickness = optionalDouble(params, "thickness", 16.0);
+  const auto material = params.value("material").toString();
+  const auto orderStart =
+    optionalDouble(params, "orderStart", baseMetadata.value("order").toDouble(0.0));
+  const auto orderStep = optionalDouble(params, "orderStep", 1.0);
+
+  auto operations = std::vector<QJsonObject>{};
+  operations.reserve(segments);
+  const auto angleStep = turnDegrees / static_cast<double>(segments);
+  for (size_t i = 0; i < segments; ++i)
+  {
+    const auto t0 = static_cast<double>(i) / static_cast<double>(segments);
+    const auto t1 = static_cast<double>(i + 1u) / static_cast<double>(segments);
+    const auto a0 = (startAngle + angleStep * static_cast<double>(i)) * Pi / 180.0;
+    const auto a1 = (startAngle + angleStep * static_cast<double>(i + 1u)) * Pi / 180.0;
+    const auto start = vm::vec3d{
+      center.x() + std::cos(a0) * radius,
+      center.y() + std::sin(a0) * radius,
+      center.z() + rise * t0};
+    const auto end = vm::vec3d{
+      center.x() + std::cos(a1) * radius,
+      center.y() + std::sin(a1) * radius,
+      center.z() + rise * t1};
+    auto metadata = baseMetadata;
+    if (const auto opMetadata = params.value("metadata"); opMetadata.isObject())
+    {
+      metadata = mergeMetadataObjects(metadata, opMetadata.toObject());
+    }
+    metadata.insert("order", orderStart + orderStep * static_cast<double>(i));
+    if (!metadata.contains("part"))
+    {
+      metadata.insert("part", "ramp");
+    }
+    if (!metadata.contains("role"))
+    {
+      metadata.insert("role", "walkable");
+    }
+    auto op = QJsonObject{
+      {"type", "ramp_between"},
+      {"start", vecToJson(start)},
+      {"end", vecToJson(end)},
+      {"width", width},
+      {"thickness", thickness},
+      {"metadata", metadata},
+    };
+    if (!material.isEmpty())
+    {
+      op.insert("material", material);
+    }
+    operations.push_back(std::move(op));
+  }
+  return operations;
+}
+
+std::vector<QJsonObject> expandedBatchOperations(
+  const QJsonArray& operations, const QJsonObject& defaultMetadata = {})
+{
+  auto result = std::vector<QJsonObject>{};
+  for (const auto& operationValue : operations)
+  {
+    if (!operationValue.isObject())
+    {
+      continue;
+    }
+    const auto operation = operationValue.toObject();
+    const auto type = operation.value("type").toString().trimmed().toLower();
+    if (type == "arc_ramp" || type == "helical_ramp")
+    {
+      auto error = QString{};
+      if (!validateArcRampParams(operation, error))
+      {
+        result.push_back(operation);
+        continue;
+      }
+      for (const auto& child : arcRampOperationsFromParams(operation, defaultMetadata))
+      {
+        result.push_back(child);
+      }
+    }
+    else
+    {
+      result.push_back(operation);
+    }
+  }
+  return result;
+}
+
 std::optional<std::vector<PathRibbonSegment>> pathRibbonSegmentsFromParams(
   const QJsonObject& params, const double grid, QString& error)
 {
@@ -3968,6 +4222,29 @@ std::vector<mdl::Node*> compileBatchOperation(
     auto result = std::vector<mdl::Node*>{};
     for (const auto& childOperation :
          curvedCorridorOperationsFromParams(operation, operationMetadata))
+    {
+      auto childNodes = compileBatchOperation(
+        map, builder, childOperation, material, grid, error, operationMetadata);
+      if (!error.isEmpty())
+      {
+        deleteNodes(result);
+        deleteNodes(childNodes);
+        return {};
+      }
+      result.insert(result.end(), childNodes.begin(), childNodes.end());
+    }
+    return result;
+  }
+
+  if (type == "arc_ramp" || type == "helical_ramp")
+  {
+    if (!validateArcRampParams(operation, error))
+    {
+      return {};
+    }
+    auto result = std::vector<mdl::Node*>{};
+    for (const auto& childOperation :
+         arcRampOperationsFromParams(operation, operationMetadata))
     {
       auto childNodes = compileBatchOperation(
         map, builder, childOperation, material, grid, error, operationMetadata);
@@ -4825,8 +5102,8 @@ McpBridgeToolResult geometryAnalyzeSlopesForMapResult(
   {
     return invalidParamsFailure(error);
   }
-  const auto brushes =
-    brushNodesFromObjectIdsAndOperations(map, resolvedParams, history, objectRegistry, error);
+  const auto brushes = brushNodesFromObjectIdsAndOperations(
+    map, resolvedParams, history, objectRegistry, error);
   if (!brushes)
   {
     return invalidParamsFailure(error);
@@ -4941,8 +5218,8 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   {
     return invalidParamsFailure(error);
   }
-  const auto brushes =
-    brushNodesFromObjectIdsAndOperations(map, resolvedParams, history, objectRegistry, error);
+  const auto brushes = brushNodesFromObjectIdsAndOperations(
+    map, resolvedParams, history, objectRegistry, error);
   if (!brushes)
   {
     return invalidParamsFailure(error);
@@ -4951,6 +5228,35 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   {
     return invalidParamsFailure(
       "geometry_analyze_route_continuity requires at least two target brushes");
+  }
+
+  const auto orderBy =
+    resolvedParams.value("orderBy").toString("projection").trimmed().toLower();
+  const auto useMetadataOrder =
+    orderBy == "metadataorder" || orderBy == "metadata" || orderBy == "order";
+  if (!useMetadataOrder && orderBy != "projection" && !orderBy.isEmpty())
+  {
+    return invalidParamsFailure("orderBy must be projection or metadataOrder");
+  }
+  const auto closedLoop = resolvedParams.value("closedLoop").toBool(false);
+
+  auto orderedBrushes = *brushes;
+  if (useMetadataOrder)
+  {
+    std::ranges::stable_sort(orderedBrushes, [&](auto* lhs, auto* rhs) {
+      const auto lhsMetadata =
+        lhs != nullptr ? metadataForBrushNode(map, *lhs, metadataStore, objectRegistry)
+                       : std::nullopt;
+      const auto rhsMetadata =
+        rhs != nullptr ? metadataForBrushNode(map, *rhs, metadataStore, objectRegistry)
+                       : std::nullopt;
+      const auto lhsOrder = lhsMetadata ? lhsMetadata->value("order").toDouble(0.0) : 0.0;
+      const auto rhsOrder = rhsMetadata ? rhsMetadata->value("order").toDouble(0.0) : 0.0;
+      return lhsOrder < rhsOrder;
+    });
+    warnings.push_back(
+      "orderBy=metadataOrder uses session metadata.order for route seam order; "
+      "ensure all route surfaces have unique order values.");
   }
 
   auto routeDirection = optionalRouteDirectionFromParams(resolvedParams, error);
@@ -4962,7 +5268,7 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   if (!routeDirection)
   {
     auto warning = QString{};
-    const auto inferred = routeDirectionFromBrushCenters(*brushes, warning);
+    const auto inferred = routeDirectionFromBrushCenters(orderedBrushes, warning);
     if (vm::is_zero(inferred, GeometryEpsilon))
     {
       return invalidParamsFailure(warning);
@@ -4971,7 +5277,8 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     warnings.push_back(warning);
   }
 
-  const auto minUpNormal = optionalClampedDouble(resolvedParams, "minUpNormal", 0.2, 0.0, 1.0);
+  const auto minUpNormal =
+    optionalClampedDouble(resolvedParams, "minUpNormal", 0.2, 0.0, 1.0);
   const auto horizontalTolerance =
     optionalClampedDouble(resolvedParams, "horizontalTolerance", 1.0, 0.0, 1024.0);
   const auto verticalTolerance =
@@ -4992,8 +5299,8 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
 
   auto surfaces = std::vector<PlayableSurface>{};
   auto unsupportedObjectIds = QJsonArray{};
-  surfaces.reserve(brushes->size());
-  for (auto* brush : *brushes)
+  surfaces.reserve(orderedBrushes.size());
+  for (auto* brush : orderedBrushes)
   {
     auto surface =
       playableSurfaceForBrush(*brush, *routeDirection, map.worldNode(), minUpNormal);
@@ -5002,28 +5309,104 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
       unsupportedObjectIds.push_back(nodePathId(*brush, map.worldNode()));
       continue;
     }
+    if (
+      const auto metadata =
+        metadataForBrushNode(map, *brush, metadataStore, objectRegistry))
+    {
+      if (metadata->contains("order"))
+      {
+        surface->metadataOrder = metadata->value("order").toDouble();
+      }
+    }
     surfaces.push_back(*surface);
   }
 
-  std::ranges::sort(surfaces, [](const auto& lhs, const auto& rhs) {
-    return lhs.minProjection < rhs.minProjection;
-  });
+  if (!useMetadataOrder)
+  {
+    std::ranges::sort(surfaces, [](const auto& lhs, const auto& rhs) {
+      return lhs.minProjection < rhs.minProjection;
+    });
+  }
 
   auto surfaceJson = QJsonArray{};
   for (const auto& surface : surfaces)
   {
-    surfaceJson.push_back(playableSurfaceJson(surface));
+    auto surfaceObject = playableSurfaceJson(surface);
+    if (surface.metadataOrder)
+    {
+      surfaceObject.insert("metadataOrder", *surface.metadataOrder);
+    }
+    surfaceJson.push_back(surfaceObject);
   }
+
+  const auto seamForPair = [&](
+                             const size_t fromIndex,
+                             const size_t toIndex,
+                             const size_t seamIndex,
+                             const bool loopClosure) -> std::optional<QJsonObject> {
+    if (!useMetadataOrder)
+    {
+      auto seam = seamJson(
+        surfaces[fromIndex],
+        surfaces[toIndex],
+        seamIndex,
+        horizontalTolerance,
+        verticalTolerance);
+      if (loopClosure)
+      {
+        seam.insert("loopClosure", true);
+      }
+      return seam;
+    }
+
+    auto* fromBrush = orderedBrushes[fromIndex];
+    auto* toBrush = orderedBrushes[toIndex];
+    auto localDirection =
+      toBrush->logicalBounds().center() - fromBrush->logicalBounds().center();
+    if (vm::is_zero(vm::vec2d{localDirection.x(), localDirection.y()}, GeometryEpsilon))
+    {
+      localDirection = *routeDirection;
+    }
+    else
+    {
+      localDirection =
+        vm::normalize(vm::vec3d{localDirection.x(), localDirection.y(), 0.0});
+    }
+    const auto fromSurface =
+      playableSurfaceForBrush(*fromBrush, localDirection, map.worldNode(), minUpNormal);
+    const auto toSurface =
+      playableSurfaceForBrush(*toBrush, localDirection, map.worldNode(), minUpNormal);
+    if (!fromSurface || !toSurface)
+    {
+      return std::nullopt;
+    }
+    auto seam = seamJson(
+      *fromSurface, *toSurface, seamIndex, horizontalTolerance, verticalTolerance);
+    seam.insert("localRouteDirection", vecToJson(localDirection));
+    if (loopClosure)
+    {
+      seam.insert("loopClosure", true);
+    }
+    return seam;
+  };
 
   auto seams = QJsonArray{};
   auto maxAbsVerticalStep = 0.0;
   auto maxHorizontalGap = 0.0;
   auto continuous = surfaces.size() >= 2u;
   auto semanticContinuous = surfaces.size() >= 2u;
-  for (size_t i = 0; i + 1u < surfaces.size(); ++i)
+  const auto seamPairCount =
+    surfaces.size() >= 2u ? surfaces.size() - 1u + (closedLoop ? 1u : 0u) : 0u;
+  for (size_t i = 0; i < seamPairCount; ++i)
   {
-    auto seam =
-      seamJson(surfaces[i], surfaces[i + 1u], i, horizontalTolerance, verticalTolerance);
+    const auto fromIndex = i;
+    const auto toIndex = (i + 1u) % surfaces.size();
+    auto maybeSeam = seamForPair(fromIndex, toIndex, i, closedLoop && toIndex == 0u);
+    if (!maybeSeam)
+    {
+      continue;
+    }
+    auto seam = *maybeSeam;
     const auto verticalStep = seam.value("verticalStep").toDouble();
     const auto horizontalGap = seam.value("horizontalGap").toDouble();
     maxAbsVerticalStep = std::max(maxAbsVerticalStep, std::abs(verticalStep));
@@ -5071,6 +5454,8 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     {"continuous", continuous},
     {"semanticContinuous", semanticContinuous},
     {"continuityMode", continuityMode},
+    {"orderBy", useMetadataOrder ? "metadataOrder" : "projection"},
+    {"closedLoop", closedLoop},
     {"routeDirection", vecToJson(*routeDirection)},
     {"horizontalTolerance", horizontalTolerance},
     {"verticalTolerance", verticalTolerance},
@@ -5221,6 +5606,13 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   {
     return invalidParamsFailure("operations must not be empty");
   }
+  for (auto i = 0; i < operations.size(); ++i)
+  {
+    if (!operations[i].isObject())
+    {
+      return invalidParamsFailure(QString{"operations[%1] must be an object"}.arg(i));
+    }
+  }
 
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
   const auto defaultMaterial = materialNameFromParams(map, batchParams);
@@ -5232,6 +5624,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   {
     return invalidParamsFailure("grid must be greater than zero");
   }
+  const auto expandedOperations = expandedBatchOperations(operations, defaultMetadata);
 
   auto nodes = std::vector<mdl::Node*>{};
   auto errors = QJsonArray{};
@@ -5240,17 +5633,10 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   auto failedOperationIndex = -1;
   auto failedOperationType = QString{};
   auto failedOperationPreview = QJsonObject{};
-  for (auto i = 0; i < operations.size(); ++i)
+  for (auto i = 0; i < static_cast<int>(expandedOperations.size()); ++i)
   {
-    if (!operations[i].isObject())
-    {
-      errors.push_back(QString{"operations[%1] must be an object"}.arg(i));
-      failedOperationIndex = i;
-      break;
-    }
-
     auto error = QString{};
-    const auto operation = operations[i].toObject();
+    const auto operation = expandedOperations[static_cast<size_t>(i)];
     auto operationNodes = compileBatchOperation(
       map, builder, operation, defaultMaterial, grid, error, defaultMetadata);
     if (!error.isEmpty() || operationNodes.empty())
@@ -5290,7 +5676,10 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   if (!errors.isEmpty())
   {
     auto validation = batchValidationJson(
-      false, errors, operations.size(), static_cast<int>(nodes.size()));
+      false,
+      errors,
+      static_cast<int>(expandedOperations.size()),
+      static_cast<int>(nodes.size()));
     validation.insert(
       "compiledOperationCount", failedOperationIndex < 0 ? 0 : failedOperationIndex);
     validation.insert("compiledBrushCount", static_cast<int>(nodes.size()));
@@ -5319,8 +5708,11 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   const auto brushCount = static_cast<int>(nodes.size());
   const auto bounds = boundsForNodes(nodes);
   const auto fullResults = pendingNodeSummariesJson(nodes);
-  const auto validation =
-    batchValidationJson(true, {}, operations.size(), static_cast<int>(nodes.size()));
+  const auto validation = batchValidationJson(
+    true,
+    {},
+    static_cast<int>(expandedOperations.size()),
+    static_cast<int>(nodes.size()));
   const auto changedObjectIds = addNodesWithTransaction(
     map,
     transactionName.isEmpty() ? QString{"MCP: Blockout batch"} : transactionName,
@@ -5378,7 +5770,14 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
         ? history.back().changedObjectIds
         : QStringList{};
     const auto metadataCount = storeBatchOperationMetadata(
-      operations,
+      [&]() {
+        auto expanded = QJsonArray{};
+        for (const auto& operation : expandedOperations)
+        {
+          expanded.push_back(operation);
+        }
+        return expanded;
+      }(),
       changedIds,
       documentFingerprintForMap(map),
       defaultMetadata,
@@ -5412,6 +5811,13 @@ McpBridgeToolResult blockoutCompilePreviewForMapResult(
   {
     return invalidParamsFailure("operations must not be empty");
   }
+  for (auto i = 0; i < operations.size(); ++i)
+  {
+    if (!operations[i].isObject())
+    {
+      return invalidParamsFailure(QString{"operations[%1] must be an object"}.arg(i));
+    }
+  }
 
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
   const auto defaultMaterial = materialNameFromParams(map, params);
@@ -5423,6 +5829,7 @@ McpBridgeToolResult blockoutCompilePreviewForMapResult(
   {
     return invalidParamsFailure("grid must be greater than zero");
   }
+  const auto expandedOperations = expandedBatchOperations(operations, defaultMetadata);
 
   auto nodes = std::vector<mdl::Node*>{};
   auto errors = QJsonArray{};
@@ -5430,17 +5837,10 @@ McpBridgeToolResult blockoutCompilePreviewForMapResult(
   auto failedOperationIndex = -1;
   auto failedOperationType = QString{};
   auto failedOperationPreview = QJsonObject{};
-  for (auto i = 0; i < operations.size(); ++i)
+  for (auto i = 0; i < static_cast<int>(expandedOperations.size()); ++i)
   {
-    if (!operations[i].isObject())
-    {
-      errors.push_back(QString{"operations[%1] must be an object"}.arg(i));
-      failedOperationIndex = i;
-      break;
-    }
-
     auto error = QString{};
-    const auto operation = operations[i].toObject();
+    const auto operation = expandedOperations[static_cast<size_t>(i)];
     auto operationNodes = compileBatchOperation(
       map, builder, operation, defaultMaterial, grid, error, defaultMetadata);
     if (!error.isEmpty() || operationNodes.empty())
@@ -5462,8 +5862,10 @@ McpBridgeToolResult blockoutCompilePreviewForMapResult(
     {"valid", valid},
     {"willCommit", false},
     {"operationCount", operations.size()},
+    {"compiledPrimitiveOperationCount", static_cast<int>(expandedOperations.size())},
     {"compiledOperationCount",
-     valid ? operations.size() : std::max(0, failedOperationIndex)},
+     valid ? static_cast<int>(expandedOperations.size())
+           : std::max(0, failedOperationIndex)},
     {"estimatedBrushCount", static_cast<int>(nodes.size())},
     {"grid", grid},
     {"material", QString::fromStdString(defaultMaterial)},

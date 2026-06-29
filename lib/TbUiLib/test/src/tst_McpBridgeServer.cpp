@@ -18,9 +18,11 @@
  */
 
 #include <QColor>
+#include <QFile>
 #include <QFileInfo>
 #include <QImage>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QTemporaryDir>
 
@@ -2298,7 +2300,12 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
     pathShiftResponse.result.value("changedObjectIds").toArray();
   REQUIRE(pathShiftObjectIds.size() == 3);
   const auto deletedStableId = pathShiftObjectIds[1].toString();
-  const auto shiftedStableId = pathShiftObjectIds[2].toString();
+  REQUIRE(history.size() >= 3u);
+  REQUIRE(history.back().changedObjectIds.size() == 3);
+  const auto deletedStableIdForState =
+    registry.externalIdForLegacy(map, history.back().changedObjectIds[1]);
+  const auto shiftedStableIdForState =
+    registry.externalIdForLegacy(map, history.back().changedObjectIds[2]);
 
   const auto deleteShiftedSiblingResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "4",
@@ -2309,7 +2316,7 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   REQUIRE(deleteShiftedSiblingResponse.ok);
 
   const auto shiftedState =
-    registry.liveStateJson(map, QStringList{shiftedStableId}, false, true);
+    registry.liveStateJson(map, QStringList{shiftedStableIdForState}, false, true);
   CHECK(shiftedState.value("valid").toBool());
   CHECK(shiftedState.value("liveObjectCount").toInt() == 1);
   CHECK(shiftedState.value("mismatchCount").toInt() == 0);
@@ -2319,7 +2326,7 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   CHECK(shiftedDiagnostics.value("pathChanged").toBool());
 
   const auto deletedStableState =
-    registry.liveStateJson(map, QStringList{deletedStableId}, false, true);
+    registry.liveStateJson(map, QStringList{deletedStableIdForState}, false, true);
   CHECK(!deletedStableState.value("valid").toBool());
   CHECK(deletedStableState.value("staleObjectCount").toInt() == 1);
   CHECK(deletedStableState.value("mismatchCount").toInt() == 0);
@@ -2499,8 +2506,8 @@ TEST_CASE("McpBridgeServer scopes selector metadata and modules to active docume
   REQUIRE(selector.ok);
   CHECK(selector.result.value("matchedCount").toInt() == 1);
 
-  const auto modules =
-    moduleListForMapResult(map, QJsonObject{}, metadataStore, moduleStore, objectRegistry);
+  const auto modules = moduleListForMapResult(
+    map, QJsonObject{}, metadataStore, moduleStore, objectRegistry);
   REQUIRE(modules.ok);
   CHECK(modules.result.value("moduleCount").toInt() == 1);
   const auto moduleArray = modules.result.value("modules").toArray();
@@ -3408,7 +3415,8 @@ TEST_CASE("McpBridgeServer batch blockout tools")
 
   const auto historyResponse = historyListResult(history);
   REQUIRE(historyResponse.ok);
-  CHECK(historyResponse.result.value("count").toInt() == static_cast<int>(history.size()));
+  CHECK(
+    historyResponse.result.value("count").toInt() == static_cast<int>(history.size()));
   const auto historyOperation =
     historyResponse.result.value("operations").toArray().first().toObject();
   CHECK(historyOperation.value("operationId").toString() == operationId);
@@ -3802,6 +3810,51 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(!invalidSnapValidation.value("valid").toBool());
   CHECK(invalidSnapValidation.value("errors").toArray().first().toString().contains(
     "snapMode"));
+
+  const auto terracedCurvedPreview = blockoutCompilePreviewForMapResult(
+    map,
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "curved_corridor"},
+           {"center", QJsonArray{1024, 0, 0}},
+           {"innerRadius", 64},
+           {"outerRadius", 128},
+           {"turnDegrees", 90},
+           {"height", 96},
+           {"segments", 4},
+           {"slopeStartZ", 0},
+           {"slopeEndZ", 64},
+         },
+       }},
+    });
+  REQUIRE(terracedCurvedPreview.ok);
+  CHECK(terracedCurvedPreview.result.value("warnings")
+          .toArray()
+          .first()
+          .toString()
+          .contains("terracedCurvedCorridor"));
+
+  const auto flatRibbonPreview = blockoutCompilePreviewForMapResult(
+    map,
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "path_ribbon"},
+           {"points3d", QJsonArray{QJsonArray{0, 1024, 0}, QJsonArray{256, 1024, 64}}},
+           {"width", 96},
+           {"thickness", 16},
+         },
+       }},
+    });
+  REQUIRE(flatRibbonPreview.ok);
+  CHECK(flatRibbonPreview.result.value("warnings")
+          .toArray()
+          .first()
+          .toString()
+          .contains("flatPoints3dPathRibbon"));
 }
 
 TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic modes")
@@ -3954,6 +4007,102 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
   REQUIRE(jumpGapResponse.ok);
   CHECK_FALSE(jumpGapResponse.result.value("continuous").toBool());
   CHECK(jumpGapResponse.result.value("semanticContinuous").toBool());
+
+  const auto arcRampResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Arc ramp"},
+      {"detail", "ids"},
+      {"defaultMetadata",
+       QJsonObject{
+         {"moduleId", "arc-ramp-module"},
+         {"routeId", "arc-loop"},
+         {"role", "walkable"},
+       }},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "arc_ramp"},
+           {"center", QJsonArray{1600, 0, 0}},
+           {"radius", 256},
+           {"width", 96},
+           {"startAngle", 0},
+           {"turnDegrees", 90},
+           {"rise", 128},
+           {"segments", 8},
+           {"thickness", 16},
+           {"metadata", QJsonObject{{"part", "road"}, {"order", 100}}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(arcRampResponse.ok);
+  CHECK(arcRampResponse.result.value("brushCount").toInt() == 8);
+  CHECK(arcRampResponse.result.value("changedObjectCount").toInt() == 8);
+
+  const auto arcSlopes = geometryAnalyzeSlopesForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", arcRampResponse.result.value("operationId").toString()},
+      {"routeDirection", QJsonArray{-1, 1, 0}},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(arcSlopes.ok);
+  CHECK(arcSlopes.result.value("slopeCount").toInt() >= 1);
+
+  const auto arcLoopByRouteId = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"routeId", "arc-loop"},
+      {"orderBy", "metadataOrder"},
+      {"closedLoop", true},
+      {"continuityMode", "stepped"},
+      {"maxStepHeight", 256},
+      {"horizontalTolerance", 1024},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(arcLoopByRouteId.ok);
+  CHECK(arcLoopByRouteId.result.value("selectorMatchedCount").toInt() == 8);
+  CHECK(arcLoopByRouteId.result.value("orderBy").toString() == "metadataOrder");
+  CHECK(arcLoopByRouteId.result.value("closedLoop").toBool());
+  CHECK(arcLoopByRouteId.result.value("warnings")
+          .toArray()
+          .contains("implicitSelectorFromTopLevelMetadata"));
+  const auto arcLoopSeams = arcLoopByRouteId.result.value("seams").toArray();
+  REQUIRE(!arcLoopSeams.isEmpty());
+  CHECK(arcLoopSeams.last().toObject().value("loopClosure").toBool());
+
+  const auto closedLoopResponse = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "selector-route"}, {"role", "walkable"}}},
+      {"orderBy", "metadataOrder"},
+      {"closedLoop", true},
+      {"routeDirection", QJsonArray{1, 0, 0}},
+      {"continuityMode", "stepped"},
+      {"maxStepHeight", 128},
+      {"horizontalTolerance", 1024},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(closedLoopResponse.ok);
+  CHECK(closedLoopResponse.result.value("orderBy").toString() == "metadataOrder");
+  CHECK(closedLoopResponse.result.value("closedLoop").toBool());
+  const auto seams = closedLoopResponse.result.value("seams").toArray();
+  REQUIRE(!seams.isEmpty());
+  CHECK(seams.last().toObject().value("loopClosure").toBool());
 }
 
 TEST_CASE("McpBridgeServer route metadata tools")
@@ -4667,6 +4816,119 @@ TEST_CASE("McpBridgeServer checked entity batch")
     CHECK(map.worldNode().descendantCount() == descendantCountBefore);
     CHECK(history.empty());
   }
+
+  SECTION("updates and deletes entity properties by operation id")
+  {
+    const auto createResponse = createEntityCheckedBatchForMapResult(
+      map,
+      "entity_create_checked_batch",
+      QJsonObject{
+        {"detail", "ids"},
+        {"entities",
+         QJsonArray{
+           QJsonObject{
+             {"classname", "test_light"},
+             {"origin", QJsonArray{64, 0, 128}},
+             {"properties", QJsonObject{{"targetname", "temp_light"}, {"_light", "100"}}},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(createResponse.ok);
+
+    auto objectRegistry = McpObjectRegistry{};
+    const auto updateResponse = entityPropertiesUpdateForMapResult(
+      map,
+      "entity_properties_update",
+      QJsonObject{
+        {"operationIds", QJsonArray{createResponse.result.value("operationId")}},
+        {"properties", QJsonObject{{"_light", "255 255 255 200"}}},
+      },
+      history,
+      history,
+      nextOperationIndex,
+      objectRegistry);
+    REQUIRE(updateResponse.ok);
+    CHECK(updateResponse.result.value("entityCount").toInt() == 1);
+
+    const auto deleteResponse = entityPropertiesDeleteForMapResult(
+      map,
+      "entity_properties_delete",
+      QJsonObject{
+        {"operationIds", QJsonArray{createResponse.result.value("operationId")}},
+        {"keys", QJsonArray{"targetname"}},
+      },
+      history,
+      history,
+      nextOperationIndex,
+      objectRegistry);
+    REQUIRE(deleteResponse.ok);
+    CHECK(deleteResponse.result.value("entityCount").toInt() == 1);
+  }
+}
+
+TEST_CASE("McpBridgeServer file based IR tools")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto tempDir = QTemporaryDir{};
+  REQUIRE(tempDir.isValid());
+  const auto path = tempDir.filePath("scene-ir.json");
+  auto file = QFile{path};
+  REQUIRE(file.open(QIODevice::WriteOnly));
+  file.write(QJsonDocument{
+    QJsonObject{
+      {"moduleId", "file-ir-module"},
+      {"defaultMetadata", QJsonObject{{"moduleId", "file-ir-module"}}},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+           {"metadata", QJsonObject{{"part", "floor"}}},
+         },
+       }},
+    }}.toJson());
+  file.close();
+
+  const auto previewResponse =
+    irCompilePreviewFromFileForMapResult(map, QJsonObject{{"path", path}});
+  REQUIRE(previewResponse.ok);
+  CHECK(
+    previewResponse.result.value("tool").toString() == "ir_compile_preview_from_file");
+  CHECK(!previewResponse.result.value("willCommit").toBool());
+  CHECK(previewResponse.result.value("sourcePath").toString() == path);
+  CHECK(previewResponse.result.value("estimatedBrushCount").toInt() == 1);
+
+  const auto applyResponse = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{{"path", path}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore);
+  REQUIRE(applyResponse.ok);
+  CHECK(applyResponse.result.value("tool").toString() == "ir_apply_from_file");
+  CHECK(applyResponse.result.value("sourcePath").toString() == path);
+  CHECK(applyResponse.result.value("operationCount").toInt() == 1);
+  CHECK(applyResponse.result.value("changedObjectCount").toInt() == 1);
 }
 
 TEST_CASE("McpBridgeServer Python blockout tools")

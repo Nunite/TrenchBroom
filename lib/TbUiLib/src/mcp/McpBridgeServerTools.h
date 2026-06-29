@@ -319,11 +319,46 @@ McpBridgeToolResult moduleValidateResult(
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
   const std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult irValidateResult(AppController& appController, const QJsonObject& params);
+McpBridgeToolResult moduleCompactResult(
+  AppController& appController,
+  const QJsonObject& params,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult irValidateResult(
+  AppController& appController, const QJsonObject& params);
 McpBridgeToolResult irCompilePreviewResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult irCompilePreviewFromFileResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult irCompilePreviewFromFileForMapResult(
+  mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult irApplyResult(
   AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore);
+McpBridgeToolResult irApplyForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore);
+McpBridgeToolResult irApplyFromFileResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore);
+McpBridgeToolResult irApplyFromFileForMapResult(
+  mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
@@ -408,6 +443,38 @@ McpBridgeToolResult deleteEntityResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult entityPropertiesUpdateResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& operationHistory,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult entityPropertiesUpdateForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& operationHistory,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult entityPropertiesDeleteResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& operationHistory,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult entityPropertiesDeleteForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& operationHistory,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult fgdEntitiesListResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult entitySchemaResult(

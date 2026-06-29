@@ -270,6 +270,15 @@ QJsonObject issueJson(const mdl::Issue& issue, const mdl::WorldNode& worldNode)
   return result;
 }
 
+QJsonObject issueBoundsJson(const mdl::Issue& issue)
+{
+  const auto& bounds = issue.node().logicalBounds();
+  return QJsonObject{
+    {"min", QJsonArray{bounds.min.x(), bounds.min.y(), bounds.min.z()}},
+    {"max", QJsonArray{bounds.max.x(), bounds.max.y(), bounds.max.z()}},
+  };
+}
+
 std::vector<const mdl::Issue*> collectMapIssues(
   mdl::Map& map, const bool includeHidden, const size_t limit = 0)
 {
@@ -332,6 +341,45 @@ QJsonObject problemsJson(mdl::Map& map, const QJsonObject& params)
     {"safeFixableCount", safeFixableCount},
     {"problems", results},
   };
+}
+
+QJsonArray groupedIssuesJson(mdl::Map& map, const bool includeHidden)
+{
+  struct Group
+  {
+    int count = 0;
+    QString message;
+    QJsonArray sampleObjectIds;
+    QJsonArray sampleBounds;
+  };
+
+  auto groups = std::map<QString, Group>{};
+  for (const auto* issue : collectMapIssues(map, includeHidden))
+  {
+    const auto message = QString::fromStdString(issue->description());
+    const auto key = QString{"%1|%2"}.arg(QString::number(issue->type()), message);
+    auto& group = groups[key];
+    ++group.count;
+    group.message = message;
+    if (group.sampleObjectIds.size() < 5)
+    {
+      group.sampleObjectIds.push_back(nodePathId(issue->node(), map.worldNode()));
+      group.sampleBounds.push_back(issueBoundsJson(*issue));
+    }
+  }
+
+  auto result = QJsonArray{};
+  for (const auto& [key, group] : groups)
+  {
+    Q_UNUSED(key);
+    result.push_back(QJsonObject{
+      {"message", group.message},
+      {"count", group.count},
+      {"sampleObjectIds", group.sampleObjectIds},
+      {"sampleBounds", group.sampleBounds},
+    });
+  }
+  return result;
 }
 
 std::vector<const mdl::Issue*> findIssuesByIds(
@@ -418,6 +466,14 @@ McpBridgeToolResult mapValidateResult(
   }
 
   auto result = problemsJson(mapWindow->document().map(), params);
+  if (mcpOptionalBool(params, "groupByType", false))
+  {
+    result.insert(
+      "groups",
+      groupedIssuesJson(
+        mapWindow->document().map(), mcpOptionalBool(params, "includeHidden", false)));
+    result.insert("detail", "groupedSummary");
+  }
   if (!mcpOptionalBool(params, "includeProblems", false))
   {
     result.remove("problems");

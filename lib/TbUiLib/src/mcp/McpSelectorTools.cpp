@@ -17,7 +17,10 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QStringList>
 
@@ -56,6 +59,13 @@ namespace
 {
 
 constexpr auto DefaultSampleLimit = 12;
+
+struct SelectorDiagnostics
+{
+  int matchedBeforeLimit = 0;
+  bool limitApplied = false;
+  int staleExcluded = 0;
+};
 
 QJsonArray stringsToJson(const QStringList& values)
 {
@@ -315,7 +325,8 @@ const McpBrushMetadataRecord* findMetadataRecord(
   const QString& documentFingerprint,
   const std::map<QString, McpBrushMetadataRecord>& metadataStore)
 {
-  const auto scopedIt = metadataStore.find(metadataStoreKey(documentFingerprint, objectId));
+  const auto scopedIt =
+    metadataStore.find(metadataStoreKey(documentFingerprint, objectId));
   if (scopedIt != metadataStore.end())
   {
     return &scopedIt->second;
@@ -324,8 +335,7 @@ const McpBrushMetadataRecord* findMetadataRecord(
   const auto legacyIt = metadataStore.find(objectId);
   if (
     legacyIt == metadataStore.end()
-    || (!legacyIt->second.documentFingerprint.isEmpty()
-        && legacyIt->second.documentFingerprint != documentFingerprint))
+    || (!legacyIt->second.documentFingerprint.isEmpty() && legacyIt->second.documentFingerprint != documentFingerprint))
   {
     return nullptr;
   }
@@ -412,8 +422,7 @@ const McpModuleRecord* findModuleRecord(
   for (const auto& [key, module] : moduleStore)
   {
     Q_UNUSED(key);
-    if (
-      module.moduleId == moduleId && recordMatchesDocument(module, documentFingerprint))
+    if (module.moduleId == moduleId && recordMatchesDocument(module, documentFingerprint))
     {
       return &module;
     }
@@ -477,12 +486,14 @@ std::vector<mdl::Node*> resolveSelectorNodes(
   const std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry,
   QJsonArray& warnings,
-  QString& error)
+  QString& error,
+  SelectorDiagnostics* diagnostics = nullptr)
 {
   auto candidates = std::vector<mdl::Node*>{};
   auto seeded = false;
   auto seededByModuleId = false;
   const auto documentFingerprint = documentFingerprintForMap(map);
+  auto staleExcluded = 0;
 
   const auto moduleId = selector.value("moduleId").toString().trimmed();
   if (!moduleId.isEmpty())
@@ -494,6 +505,10 @@ std::vector<mdl::Node*> resolveSelectorNodes(
         if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
         {
           candidates.push_back(node);
+        }
+        else
+        {
+          ++staleExcluded;
         }
       }
       seeded = true;
@@ -522,6 +537,10 @@ std::vector<mdl::Node*> resolveSelectorNodes(
       if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
       {
         candidates.push_back(node);
+      }
+      else
+      {
+        ++staleExcluded;
       }
     }
     seeded = true;
@@ -558,6 +577,10 @@ std::vector<mdl::Node*> resolveSelectorNodes(
         {
           candidates.push_back(node);
         }
+        else
+        {
+          ++staleExcluded;
+        }
       }
       for (const auto& [storedModuleId, module] : moduleStore)
       {
@@ -573,6 +596,10 @@ std::vector<mdl::Node*> resolveSelectorNodes(
           if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
           {
             candidates.push_back(node);
+          }
+          else
+          {
+            ++staleExcluded;
           }
         }
       }
@@ -617,11 +644,20 @@ std::vector<mdl::Node*> resolveSelectorNodes(
   }
 
   candidates = dedupeNodes(std::move(candidates));
+  const auto matchedBeforeLimit = static_cast<int>(candidates.size());
   const auto limit = std::clamp(selector.value("limit").toInt(100), 1, 10000);
+  auto limitApplied = false;
   if (static_cast<int>(candidates.size()) > limit)
   {
     candidates.resize(static_cast<size_t>(limit));
+    limitApplied = true;
     warnings.push_back(QString{"selectorResultTruncated: limit=%1"}.arg(limit));
+  }
+  if (diagnostics != nullptr)
+  {
+    diagnostics->matchedBeforeLimit = matchedBeforeLimit;
+    diagnostics->limitApplied = limitApplied;
+    diagnostics->staleExcluded = staleExcluded;
   }
   return candidates;
 }
@@ -877,14 +913,15 @@ QJsonObject moduleMetadataFromObjects(
 QJsonArray modulePartSummary(
   const QString& moduleId,
   const QString& documentFingerprint,
-  const std::map<QString, McpBrushMetadataRecord>& metadataStore)
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const bool staleOnly = false)
 {
   auto counts = std::map<QString, int>{};
   for (const auto& [objectId, record] : metadataStore)
   {
     Q_UNUSED(objectId);
     if (
-      record.stale || !recordMatchesDocument(record, documentFingerprint)
+      record.stale != staleOnly || !recordMatchesDocument(record, documentFingerprint)
       || record.metadata.value("moduleId").toString() != moduleId)
     {
       continue;
@@ -932,7 +969,8 @@ McpModuleRecord mergedModuleRecord(
   auto result = McpModuleRecord{};
   result.moduleId = moduleId;
   result.documentFingerprint = documentFingerprint;
-  result.metadata = moduleMetadataFromObjects(moduleId, documentFingerprint, metadataStore);
+  result.metadata =
+    moduleMetadataFromObjects(moduleId, documentFingerprint, metadataStore);
   if (const auto* module = findModuleRecord(moduleId, documentFingerprint, moduleStore))
   {
     result = *module;
@@ -980,7 +1018,12 @@ QJsonObject moduleSummary(
     {"operationIds", stringsToJson(module.operationIds)},
     {"operationCount", module.operationIds.size()},
     {"metadata", module.metadata},
-    {"parts", modulePartSummary(module.moduleId, module.documentFingerprint, metadataStore)},
+    {"parts",
+     modulePartSummary(module.moduleId, module.documentFingerprint, metadataStore)},
+    {"liveParts",
+     modulePartSummary(module.moduleId, module.documentFingerprint, metadataStore)},
+    {"staleParts",
+     modulePartSummary(module.moduleId, module.documentFingerprint, metadataStore, true)},
     {"bounds", nodes.empty() ? QJsonObject{} : boundsToJson(boundsForNodes(nodes))},
   };
 }
@@ -1189,6 +1232,53 @@ std::optional<QJsonObject> irFromParams(const QJsonObject& params, QString& erro
   return std::nullopt;
 }
 
+std::optional<QJsonObject> irFromFileParams(const QJsonObject& params, QString& error)
+{
+  const auto path = params.value("path").toString().trimmed();
+  if (path.isEmpty())
+  {
+    error = "file-based IR requires path";
+    return std::nullopt;
+  }
+  const auto info = QFileInfo{path};
+  if (!info.isAbsolute())
+  {
+    error = "file-based IR path must be absolute";
+    return std::nullopt;
+  }
+  if (!info.isFile() || !info.isReadable())
+  {
+    error = QString{"IR file is not readable: %1"}.arg(path);
+    return std::nullopt;
+  }
+  if (info.size() > 10 * 1024 * 1024)
+  {
+    error = "IR file is too large; maximum size is 10 MiB";
+    return std::nullopt;
+  }
+
+  auto file = QFile{path};
+  if (!file.open(QIODevice::ReadOnly))
+  {
+    error = QString{"Could not open IR file: %1"}.arg(path);
+    return std::nullopt;
+  }
+  auto parseError = QJsonParseError{};
+  const auto document = QJsonDocument::fromJson(file.readAll(), &parseError);
+  if (parseError.error != QJsonParseError::NoError || !document.isObject())
+  {
+    error =
+      QString{"IR file must contain a JSON object: %1"}.arg(parseError.errorString());
+    return std::nullopt;
+  }
+  auto ir = document.object();
+  if (!validateIrShape(ir, error))
+  {
+    return std::nullopt;
+  }
+  return ir;
+}
+
 QJsonObject mergeObjects(QJsonObject base, const QJsonObject& overlay)
 {
   for (auto it = overlay.begin(); it != overlay.end(); ++it)
@@ -1241,12 +1331,22 @@ QStringList projectedOperationParts(const QJsonObject& operation)
   {
     const auto child = operation.value("operation").toObject();
     const auto childParts = projectedOperationParts(child);
-    const auto count =
-      type == "repeat_translate" ? std::max(1, operation.value("count").toInt(1))
-                                 : repeatGridCountEstimate(operation.value("counts"));
+    const auto count = type == "repeat_translate"
+                         ? std::max(1, operation.value("count").toInt(1))
+                         : repeatGridCountEstimate(operation.value("counts"));
     for (auto i = 0; i < count; ++i)
     {
       parts.append(childParts);
+    }
+  }
+  else if (type == "arc_ramp" || type == "helical_ramp")
+  {
+    const auto count = std::max(1, operation.value("segments").toInt(12));
+    const auto part =
+      operation.value("metadata").toObject().value("part").toString("ramp");
+    for (auto i = 0; i < count; ++i)
+    {
+      append(part);
     }
   }
   return parts;
@@ -1304,6 +1404,10 @@ QJsonObject irPreviewJson(const QJsonObject& ir)
                             ? operation.value("points3d").toArray()
                             : operation.value("points2d").toArray();
       estimatedBrushCount += std::max(0, static_cast<int>(points.size()) - 1);
+    }
+    else if (type == "arc_ramp" || type == "helical_ramp")
+    {
+      estimatedBrushCount += std::max(1, operation.value("segments").toInt(12));
     }
     else if (type == "repeat_translate")
     {
@@ -1468,6 +1572,7 @@ McpBridgeToolResult selectorPreviewForMapResult(
   auto warnings = QJsonArray{};
   auto error = QString{};
   const auto selector = selectorFromParams(params);
+  auto diagnostics = SelectorDiagnostics{};
   const auto nodes = resolveSelectorNodes(
     map,
     selector,
@@ -1476,7 +1581,8 @@ McpBridgeToolResult selectorPreviewForMapResult(
     moduleStore,
     objectRegistry,
     warnings,
-    error);
+    error,
+    &diagnostics);
   if (!error.isEmpty())
   {
     return invalidParamsFailure(error);
@@ -1491,6 +1597,9 @@ McpBridgeToolResult selectorPreviewForMapResult(
     warnings,
     params.value("idsMode").toString("sample"));
   result.insert("tool", "selector_preview");
+  result.insert("matchedBeforeLimit", diagnostics.matchedBeforeLimit);
+  result.insert("limitApplied", diagnostics.limitApplied);
+  result.insert("staleExcluded", diagnostics.staleExcluded);
   return McpBridgeToolResult::success(result);
 }
 
@@ -1926,8 +2035,14 @@ McpBridgeToolResult moduleValidateResult(
       continuityParams.insert("routeDirection", params.value("routeDirection"));
     }
     for (const auto& key :
-         {"continuityMode", "maxStepHeight", "maxJumpGap", "verticalTolerance",
-          "horizontalTolerance", "minUpNormal"})
+         {"continuityMode",
+          "maxStepHeight",
+          "maxJumpGap",
+          "verticalTolerance",
+          "horizontalTolerance",
+          "minUpNormal",
+          "orderBy",
+          "closedLoop"})
     {
       if (params.contains(key))
       {
@@ -1935,23 +2050,95 @@ McpBridgeToolResult moduleValidateResult(
       }
     }
     const auto continuity = geometryAnalyzeRouteContinuityForMapResult(
-      map,
-      continuityParams,
-      history,
-      &objectRegistry,
-      &metadataStore,
-      &moduleStore);
+      map, continuityParams, history, &objectRegistry, &metadataStore, &moduleStore);
     result.insert("routeContinuity", continuity.result);
     if (
       continuity.ok
-      && !continuity.result
-            .value("semanticContinuous")
+      && !continuity.result.value("semanticContinuous")
             .toBool(continuity.result.value("continuous").toBool(false)))
     {
       result.insert("valid", false);
     }
   }
   return McpBridgeToolResult::success(result);
+}
+
+McpBridgeToolResult moduleCompactResult(
+  AppController& appController,
+  const QJsonObject& params,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (mapWindow == nullptr)
+  {
+    return noActiveDocumentFailure();
+  }
+  const auto moduleId = params.value("moduleId").toString().trimmed();
+  if (moduleId.isEmpty())
+  {
+    return invalidParamsFailure("module_compact requires moduleId");
+  }
+  auto& map = mapWindow->document().map();
+  const auto documentFingerprint = documentFingerprintForMap(map);
+  auto warnings = QJsonArray{};
+  auto removedMetadataCount = 0;
+  for (auto it = metadataStore.begin(); it != metadataStore.end();)
+  {
+    const auto& record = it->second;
+    if (
+      recordMatchesDocument(record, documentFingerprint)
+      && record.metadata.value("moduleId").toString() == moduleId && record.stale)
+    {
+      it = metadataStore.erase(it);
+      ++removedMetadataCount;
+    }
+    else
+    {
+      ++it;
+    }
+  }
+
+  auto removedObjectIdCount = 0;
+  const auto key = moduleStoreKey(documentFingerprint, moduleId);
+  auto moduleIt = moduleStore.find(key);
+  if (moduleIt == moduleStore.end())
+  {
+    for (auto it = moduleStore.begin(); it != moduleStore.end(); ++it)
+    {
+      if (
+        it->second.moduleId == moduleId
+        && recordMatchesDocument(it->second, documentFingerprint))
+      {
+        moduleIt = it;
+        break;
+      }
+    }
+  }
+  if (moduleIt != moduleStore.end())
+  {
+    auto& objectIds = moduleIt->second.objectIds;
+    const auto before = objectIds.size();
+    objectIds.erase(
+      std::remove_if(
+        objectIds.begin(),
+        objectIds.end(),
+        [&](const auto& objectId) {
+          return resolveObjectId(map, objectId, objectRegistry, warnings) == nullptr;
+        }),
+      objectIds.end());
+    removedObjectIdCount = before - objectIds.size();
+  }
+
+  const auto module =
+    mergedModuleRecord(moduleId, documentFingerprint, metadataStore, moduleStore);
+  auto summary = moduleSummary(map, module, metadataStore, objectRegistry);
+  summary.insert("tool", "module_compact");
+  summary.insert("removedStaleMetadataCount", removedMetadataCount);
+  summary.insert("removedStaleObjectIdCount", removedObjectIdCount);
+  summary.insert("warnings", warnings);
+  return McpBridgeToolResult::success(summary);
 }
 
 McpBridgeToolResult irValidateResult(
@@ -1989,6 +2176,41 @@ McpBridgeToolResult irCompilePreviewResult(
   return McpBridgeToolResult::success(preview);
 }
 
+McpBridgeToolResult irCompilePreviewFromFileResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto error = QString{};
+  const auto ir = irFromFileParams(params, error);
+  if (!ir)
+  {
+    return invalidParamsFailure(error);
+  }
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  auto preview = mapWindow != nullptr
+                   ? irPreviewJsonForMap(mapWindow->document().map(), *ir)
+                   : irPreviewJson(*ir);
+  preview.insert("tool", "ir_compile_preview_from_file");
+  preview.insert("willCommit", false);
+  preview.insert("sourcePath", params.value("path").toString());
+  return McpBridgeToolResult::success(preview);
+}
+
+McpBridgeToolResult irCompilePreviewFromFileForMapResult(
+  mdl::Map& map, const QJsonObject& params)
+{
+  auto error = QString{};
+  const auto ir = irFromFileParams(params, error);
+  if (!ir)
+  {
+    return invalidParamsFailure(error);
+  }
+  auto preview = irPreviewJsonForMap(map, *ir);
+  preview.insert("tool", "ir_compile_preview_from_file");
+  preview.insert("willCommit", false);
+  preview.insert("sourcePath", params.value("path").toString());
+  return McpBridgeToolResult::success(preview);
+}
+
 McpBridgeToolResult irApplyResult(
   AppController& appController,
   const QString& toolName,
@@ -2004,7 +2226,6 @@ McpBridgeToolResult irApplyResult(
     return noActiveDocumentFailure();
   }
   auto& map = mapWindow->document().map();
-  const auto documentFingerprint = documentFingerprintForMap(map);
   auto error = QString{};
   const auto ir = irFromParams(params, error);
   if (!ir)
@@ -2012,6 +2233,33 @@ McpBridgeToolResult irApplyResult(
     return invalidParamsFailure(error);
   }
 
+  return irApplyForMapResult(
+    map,
+    toolName,
+    QJsonObject{{"ir", *ir}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore);
+}
+
+McpBridgeToolResult irApplyForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore)
+{
+  auto error = QString{};
+  const auto ir = irFromParams(params, error);
+  if (!ir)
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto documentFingerprint = documentFingerprintForMap(map);
   const auto defaultMetadata = ir->value("defaultMetadata").isObject()
                                  ? ir->value("defaultMetadata").toObject()
                                  : QJsonObject{};
@@ -2049,7 +2297,7 @@ McpBridgeToolResult irApplyResult(
     {
       batchParams.insert("defaultMetadata", mergedDefaultMetadata);
     }
-    auto result = blockoutCreateBatchForMapResult(
+    auto blockoutResult = blockoutCreateBatchForMapResult(
       map,
       "blockout_create_batch",
       batchParams,
@@ -2057,9 +2305,10 @@ McpBridgeToolResult irApplyResult(
       nextOperationIndex,
       &metadataStore,
       &moduleStore);
-    ok = ok && result.ok
-         && result.result.value("validation").toObject().value("valid").toBool(true);
-    appliedOperations.push_back(result.result);
+    ok =
+      ok && blockoutResult.ok
+      && blockoutResult.result.value("validation").toObject().value("valid").toBool(true);
+    appliedOperations.push_back(blockoutResult.result);
     if (!ok)
     {
       warnings.push_back("irApplyPreflightFailed");
@@ -2081,12 +2330,12 @@ McpBridgeToolResult irApplyResult(
       }
       return McpBridgeToolResult::success(resultObject);
     }
-    const auto operationId = result.result.value("operationId").toString();
+    const auto operationId = blockoutResult.result.value("operationId").toString();
     if (!operationId.isEmpty())
     {
       operationIds.push_back(operationId);
     }
-    for (const auto& value : result.result.value("changedObjectIds").toArray())
+    for (const auto& value : blockoutResult.result.value("changedObjectIds").toArray())
     {
       if (value.isString())
       {
@@ -2094,7 +2343,7 @@ McpBridgeToolResult irApplyResult(
       }
     }
     mergeModuleFromOperationResult(
-      result.result, documentFingerprint, mergedDefaultMetadata, moduleStore);
+      blockoutResult.result, documentFingerprint, mergedDefaultMetadata, moduleStore);
   }
 
   if (const auto entities = ir->value("entities"); entities.isArray())
@@ -2150,6 +2399,64 @@ McpBridgeToolResult irApplyResult(
     result.insert("resourceUri", QString{"tbmcp://module/%1"}.arg(moduleId));
   }
   return McpBridgeToolResult::success(result);
+}
+
+McpBridgeToolResult irApplyFromFileResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore)
+{
+  auto error = QString{};
+  const auto ir = irFromFileParams(params, error);
+  if (!ir)
+  {
+    return invalidParamsFailure(error);
+  }
+  auto applyParams = params;
+  applyParams.insert("ir", *ir);
+  auto result = irApplyResult(
+    appController,
+    toolName,
+    applyParams,
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore);
+  if (result.ok)
+  {
+    result.result.insert("sourcePath", params.value("path").toString());
+  }
+  return result;
+}
+
+McpBridgeToolResult irApplyFromFileForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore)
+{
+  auto error = QString{};
+  const auto ir = irFromFileParams(params, error);
+  if (!ir)
+  {
+    return invalidParamsFailure(error);
+  }
+  auto applyParams = params;
+  applyParams.insert("ir", *ir);
+  auto result = irApplyForMapResult(
+    map, toolName, applyParams, history, nextOperationIndex, metadataStore, moduleStore);
+  if (result.ok)
+  {
+    result.result.insert("sourcePath", params.value("path").toString());
+  }
+  return result;
 }
 
 } // namespace tb::ui

@@ -58,10 +58,7 @@ mcp::McpBridgeResponse makeFailure(
 }
 
 void syncOperationHistoryWithExternalResult(
-  std::vector<McpOperationRecord>& history,
-  mdl::Map& map,
-  const McpObjectRegistry& objectRegistry,
-  const QJsonObject& result)
+  std::vector<McpOperationRecord>& history, const QJsonObject& result)
 {
   const auto operationId = result.value("operationId").toString();
   if (operationId.isEmpty())
@@ -76,18 +73,6 @@ void syncOperationHistoryWithExternalResult(
     return;
   }
 
-  auto stableObjectIds = QJsonArray{};
-  for (const auto& objectId : it->changedObjectIds)
-  {
-    stableObjectIds.push_back(objectRegistry.externalIdForLegacy(map, objectId));
-  }
-  it->setChangedObjectIds(stableObjectIds);
-  auto stableDeletedObjectIds = QJsonArray{};
-  for (const auto& objectId : it->deletedObjectIds)
-  {
-    stableDeletedObjectIds.push_back(objectRegistry.externalIdForLegacy(map, objectId));
-  }
-  it->setDeletedObjectIds(stableDeletedObjectIds);
   it->setSummary(result);
 }
 
@@ -405,8 +390,7 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
     if (resultMap != nullptr)
     {
       auto externalResult = m_objectRegistry.externalizeResult(*resultMap, result.result);
-      syncOperationHistoryWithExternalResult(
-        m_operationHistory, *resultMap, m_objectRegistry, externalResult);
+      syncOperationHistoryWithExternalResult(m_operationHistory, externalResult);
       return mcp::McpBridgeResponse::success(request.id, std::move(externalResult));
     }
     return mcp::McpBridgeResponse::success(request.id, result.result);

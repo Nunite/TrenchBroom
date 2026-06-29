@@ -50,6 +50,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/mcp/McpObjectRegistry.h"
 
 #include "kd/vector_utils.h"
 
@@ -348,6 +349,136 @@ std::optional<std::vector<std::string>> stringArrayFromJson(
     result.push_back(item.toString().toStdString());
   }
   return result;
+}
+
+QStringList operationIdsFromParams(const QJsonObject& params, QString& error)
+{
+  auto result = QStringList{};
+  const auto operationId = params.value("operationId").toString().trimmed();
+  if (!operationId.isEmpty())
+  {
+    result.push_back(operationId);
+  }
+  const auto operationIds = params.value("operationIds");
+  if (!operationIds.isUndefined())
+  {
+    if (!operationIds.isArray())
+    {
+      error = "operationIds must be an array";
+      return {};
+    }
+    for (const auto& value : operationIds.toArray())
+    {
+      if (!value.isString())
+      {
+        error = "operationIds must contain only strings";
+        return {};
+      }
+      const auto id = value.toString().trimmed();
+      if (!id.isEmpty())
+      {
+        result.push_back(id);
+      }
+    }
+  }
+  result.removeDuplicates();
+  return result;
+}
+
+const McpOperationRecord* findOperation(
+  const std::vector<McpOperationRecord>& history, const QString& operationId)
+{
+  const auto it = std::ranges::find_if(
+    history, [&](const auto& operation) { return operation.operationId == operationId; });
+  return it == history.end() ? nullptr : &*it;
+}
+
+mdl::Node* resolveObjectId(
+  mdl::Map& map,
+  const QString& objectId,
+  const McpObjectRegistry& objectRegistry,
+  QJsonArray& warnings)
+{
+  const auto resolved = objectRegistry.resolveExternalId(map, objectId);
+  if (!resolved.ok)
+  {
+    if (auto* legacyNode = resolveNodeId(map.worldNode(), objectId))
+    {
+      return legacyNode;
+    }
+    warnings.push_back(resolved.diagnostic);
+    return nullptr;
+  }
+  return resolveNodeId(map.worldNode(), resolved.legacyPathId);
+}
+
+std::vector<mdl::EntityNodeBase*> entityTargetsFromParams(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& operationHistory,
+  const McpObjectRegistry& objectRegistry,
+  QJsonArray& warnings,
+  QString& error)
+{
+  auto nodes = std::vector<mdl::EntityNodeBase*>{};
+  if (params.value("selector").isObject())
+  {
+    error =
+      "selector targets are not implemented for entity property tools yet; use objectIds "
+      "or operationIds";
+    return {};
+  }
+
+  if (const auto objectIds = params.value("objectIds"); objectIds.isArray())
+  {
+    for (const auto& value : objectIds.toArray())
+    {
+      if (!value.isString())
+      {
+        error = "objectIds must contain only strings";
+        return {};
+      }
+      if (auto* node = resolveObjectId(map, value.toString(), objectRegistry, warnings))
+      {
+        if (auto* entityNode = dynamic_cast<mdl::EntityNodeBase*>(node))
+        {
+          nodes.push_back(entityNode);
+        }
+      }
+    }
+  }
+
+  for (const auto& operationId : operationIdsFromParams(params, error))
+  {
+    if (!error.isEmpty())
+    {
+      return {};
+    }
+    const auto* operation = findOperation(operationHistory, operationId);
+    if (operation == nullptr)
+    {
+      warnings.push_back(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+      continue;
+    }
+    for (const auto& objectId : operation->changedObjectIds)
+    {
+      if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
+      {
+        if (auto* entityNode = dynamic_cast<mdl::EntityNodeBase*>(node))
+        {
+          nodes.push_back(entityNode);
+        }
+      }
+    }
+  }
+
+  nodes.erase(std::remove(nodes.begin(), nodes.end(), nullptr), nodes.end());
+  nodes.erase(std::unique(nodes.begin(), nodes.end()), nodes.end());
+  if (nodes.empty())
+  {
+    error = "No live entity targets matched objectIds or operationIds";
+  }
+  return nodes;
 }
 
 bool executeTransaction(
@@ -780,6 +911,183 @@ McpBridgeToolResult deleteEntityResult(
   auto result = QJsonObject{};
   mcpRecordOperation(
     history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult entityPropertiesUpdateResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& operationHistory,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return entityPropertiesUpdateForMapResult(
+    mapWindow->document().map(),
+    toolName,
+    params,
+    operationHistory,
+    history,
+    nextOperationIndex,
+    objectRegistry);
+}
+
+McpBridgeToolResult entityPropertiesUpdateForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& operationHistory,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto error = QString{};
+  const auto properties = stringMapFromJson(params, "properties", error);
+  if (!properties)
+  {
+    return invalidParamsFailure(error);
+  }
+  if (properties->empty())
+  {
+    return invalidParamsFailure("entity_properties_update requires non-empty properties");
+  }
+
+  auto warnings = QJsonArray{};
+  const auto entityNodes = entityTargetsFromParams(
+    map, params, operationHistory, objectRegistry, warnings, error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto nodesToSwap = std::vector<std::pair<mdl::Node*, mdl::NodeContents>>{};
+  for (auto* entityNode : entityNodes)
+  {
+    auto entity = entityNode->entity();
+    for (const auto& [key, value] : *properties)
+    {
+      if (key != mdl::EntityPropertyKeys::Classname)
+      {
+        entity.addOrUpdateProperty(key, value);
+      }
+    }
+    removeEmptyEntityProperties(entity);
+    nodesToSwap.emplace_back(entityNode, mdl::NodeContents{std::move(entity)});
+  }
+
+  const auto transactionName =
+    params.value("transactionName").toString("MCP: Update entity properties");
+  const auto changedObjectIds =
+    updateNodeContentsWithTransaction(map, transactionName, std::move(nodesToSwap));
+  if (!changedObjectIds)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not update entity properties");
+  }
+
+  auto result = QJsonObject{};
+  mcpRecordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  result.insert("entityCount", static_cast<int>(entityNodes.size()));
+  result.insert("warnings", warnings);
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult entityPropertiesDeleteResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& operationHistory,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return entityPropertiesDeleteForMapResult(
+    mapWindow->document().map(),
+    toolName,
+    params,
+    operationHistory,
+    history,
+    nextOperationIndex,
+    objectRegistry);
+}
+
+McpBridgeToolResult entityPropertiesDeleteForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& operationHistory,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto error = QString{};
+  auto removeKeys = stringArrayFromJson(params, "keys", error);
+  if (!removeKeys)
+  {
+    return invalidParamsFailure(error);
+  }
+  if (removeKeys->empty())
+  {
+    removeKeys = stringArrayFromJson(params, "removeKeys", error);
+  }
+  if (!removeKeys || removeKeys->empty())
+  {
+    return invalidParamsFailure("entity_properties_delete requires keys");
+  }
+
+  auto warnings = QJsonArray{};
+  const auto entityNodes = entityTargetsFromParams(
+    map, params, operationHistory, objectRegistry, warnings, error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  auto nodesToSwap = std::vector<std::pair<mdl::Node*, mdl::NodeContents>>{};
+  for (auto* entityNode : entityNodes)
+  {
+    auto entity = entityNode->entity();
+    for (const auto& key : *removeKeys)
+    {
+      if (
+        key != mdl::EntityPropertyKeys::Classname
+        && key != mdl::EntityPropertyKeys::Origin)
+      {
+        entity.removeProperty(key);
+      }
+    }
+    nodesToSwap.emplace_back(entityNode, mdl::NodeContents{std::move(entity)});
+  }
+
+  const auto transactionName =
+    params.value("transactionName").toString("MCP: Delete entity properties");
+  const auto changedObjectIds =
+    updateNodeContentsWithTransaction(map, transactionName, std::move(nodesToSwap));
+  if (!changedObjectIds)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InternalError, "Could not delete entity properties");
+  }
+
+  auto result = QJsonObject{};
+  mcpRecordOperation(
+    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+  result.insert("entityCount", static_cast<int>(entityNodes.size()));
+  result.insert("warnings", warnings);
   return McpBridgeToolResult::success(std::move(result));
 }
 
