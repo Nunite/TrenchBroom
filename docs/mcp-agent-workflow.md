@@ -2,7 +2,9 @@
 
 本文档面向接入 MCP 的 Agent / Client，说明如何安全地使用当前分支暴露的工具完成“读取地图、生成白盒、放置资产、贴图、截图检查、验证、保存”的闭环。
 
-底层架构和工具状态见 `docs/mcp-integration-plan.md`。这里不重复协议实现细节，只记录推荐工作方式和可直接复用的 Agent 指令。
+当前 MCP 分层和开发边界见 `docs/mcp-development-governance.md`，
+轻量化状态见 `docs/mcp-lightweight-roadmap.md`。这里不重复协议实现细节，
+只记录推荐工作方式和可直接复用的 Agent 指令。
 
 ## 基本原则
 
