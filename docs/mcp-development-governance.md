@@ -333,6 +333,14 @@ softer the closer they move to creative intent.
 - When a skill needs new MCP support, describe it as a generic primitive,
   selector/module operation, validator, review feature, compact-output
   improvement, or failure-recovery improvement.
+- Skills should express policies more than procedures: goals, constraints,
+  validation requirements, recovery strategies, and heuristics.
+- Avoid rigid step-by-step procedures unless editor safety, compatibility,
+  deterministic recipe output, validation gates, or failure recovery require
+  them.
+- Prefer soft routing language such as "usually", "recommend",
+  "common pattern", and "may". Reserve "must", "always", and exact sequences
+  for safety, compatibility, deterministic output, validation, and recovery.
 - Creative rules may be flexible. Mutation, validation, compatibility,
   performance, and recovery rules are strict.
 
