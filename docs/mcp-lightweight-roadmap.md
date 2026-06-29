@@ -432,8 +432,8 @@ Use this table as the rolling implementation checklist.
 | P1 | Add summary/default modes to slope and continuity analysis | C++ MCP | Done: default summary returns counts/samples; `detail:"full"` returns full slope/seam evidence. |
 | P1 | Document absolute review output path in skill workflow | Skill | Done in `trenchbroom-mcp-scene-workflow`; keep in sync when review defaults change. |
 | P1 | Add route validation modes | C++ MCP + Skill | Done for MCP route continuity: `continuous`, `stepped`, `jump_chain`, `spiral`, `closed_loop`, plus recipe profile aliases. |
-| P2 | Add recipe catalog/listing | Skill | Pending |
-| P2 | Add profile-size regression test | MCP catalog tests | Pending |
+| P2 | Add recipe catalog/listing | Skill | Done in `trenchbroom-mcp-scene-workflow/scripts/list_recipes.py`; lists manifests, examples, and recommended validation without generating IR. |
+| P2 | Add profile-size regression test | MCP catalog tests | Done: `McpToolCatalog` now guards Modeling profile size and hidden-tool search behavior. |
 | P2 | Improve entity glyph and label policy in review | C++ MCP | Pending |
 | P2 | Add Codex CLI regression prompts | Skill/testing | Pending |
 | P3 | Evaluate legacy/convenience tools for deprecation text | MCP catalog docs | Pending |
