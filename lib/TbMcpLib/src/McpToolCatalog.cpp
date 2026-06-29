@@ -893,7 +893,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_current",
-      "Capture the current TrenchBroom window as a PNG for MCP visual feedback.",
+      "Debug helper: capture the current TrenchBroom window as a PNG. For Agent "
+      "scene review, prefer render_review_current_scene, render_review_selector, or "
+      "render_review_operation.",
       McpMode::ReadOnly,
       false,
       true,
@@ -904,7 +906,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_3d",
-      "Capture a visible 3D map viewport as a PNG for MCP visual feedback.",
+      "Debug helper: capture a visible 3D map viewport as a PNG. For isolated Agent "
+      "scene review, prefer render_review_selector or render_review_operation.",
       McpMode::ReadOnly,
       false,
       true,
@@ -915,7 +918,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_2d",
-      "Capture a visible 2D map viewport as a PNG for MCP visual feedback.",
+      "Debug helper: capture a visible 2D map viewport as a PNG. For isolated Agent "
+      "scene review, prefer render_review_selector or render_review_operation.",
       McpMode::ReadOnly,
       false,
       true,
@@ -926,10 +930,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "viewport_capture_scene_review",
-      "Create a compact whitebox scene review package by focusing optional object ids, "
-      "highlighting them, and capturing requested current/3d/2d viewport screenshots. "
-      "Use objectIds, operationIds, framing presets, camera bounds, or explicit "
-      "camera position/target for deterministic review.",
+      "Legacy viewport review helper. It captures live UI viewports and is mainly "
+      "useful for debugging camera/layout issues. For normal Agent self-review, "
+      "prefer geometry review tools such as render_review_selector, "
+      "render_review_operation, or render_review_current_scene.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1013,9 +1017,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "render_review_targets",
-      "Render an isolated Agent-readable geometry review bundle using only target "
-      "object geometry. This CPU/QImage renderer does not touch TrenchBroom viewport "
-      "layout, selection, map visibility, undo, or OpenGL state.",
+      "Low-level geometry review renderer used by higher-level review tools. Prefer "
+      "render_review_selector, render_review_operation, or render_review_current_scene "
+      "unless you already have explicit objectIds/operationIds and need direct "
+      "control.",
       McpMode::ReadOnly,
       false,
       true,
@@ -3127,7 +3132,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "selection_by_metadata",
-      "Find or select brushes by session-level route/object metadata.",
+      "Legacy metadata selector. Prefer structured selectors with selector_preview, "
+      "objects_select_by_selector, objects_delete_by_selector, and "
+      "render_review_selector.",
       McpMode::ReadOnly,
       false,
       true,
@@ -3371,12 +3378,6 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "documents_open_verified",
     "map_snapshot",
     "map_search",
-    "selection_get",
-    "selection_set",
-    "selection_filter",
-    "selection_by_bounds",
-    "selection_grow",
-    "render_review_targets",
     "render_review_current_scene",
     "render_review_operation",
     "selector_preview",
@@ -3396,18 +3397,6 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "history_status",
     "history_undo_mcp",
     "history_redo_mcp",
-    "brush_types_list",
-    "brush_create",
-    "brush_create_box",
-    "brush_create_wedge",
-    "brush_create_cylinder",
-    "brush_create_cone",
-    "brush_create_pipe",
-    "brush_create_sphere",
-    "brush_create_pyramid",
-    "brush_create_tetrahedron",
-    "brush_create_prism",
-    "brush_create_cylinder_sector",
     "brush_create_boxes_batch",
     "brush_create_polygon_batch",
     "blockout_create_batch",
@@ -3418,40 +3407,16 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "ir_compile_preview_from_file",
     "ir_apply",
     "ir_apply_from_file",
-    "shape_library_list",
-    "brush_metadata_set",
-    "brush_metadata_get",
-    "selection_by_metadata",
-    "route_geometry_analyze_chain",
-    "geometry_analyze_selection",
     "geometry_analyze_slopes",
     "geometry_analyze_route_continuity",
-    "blockout_validate",
-    "objects_delete",
-    "objects_delete_by_filter",
-    "objects_delete_by_operation",
     "objects_transform",
-    "fgd_entities_list",
-    "entity_schema",
     "entity_create_checked",
     "entity_create_checked_batch",
-    "entity_create_from_schema",
     "entity_properties_update",
     "entity_properties_delete",
-    "entity_tie_brushes",
-    "entity_untie_brushes",
     "textures_list",
     "texture_search",
-    "texture_lock_get",
-    "texture_lock_set",
-    "texture_apply",
     "texture_apply_by_filter",
-    "texture_replace",
-    "texture_align_face",
-    "texture_copy_from_face",
-    "face_list",
-    "face_select",
-    "face_texture_set",
     "map_validate",
     "problems_check",
   };

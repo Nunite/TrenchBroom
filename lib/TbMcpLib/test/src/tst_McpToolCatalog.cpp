@@ -342,20 +342,20 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
     CHECK(names.contains("tb_tools_search"));
-    CHECK(names.contains("selection_get"));
-    CHECK(names.contains("selection_set"));
-    CHECK(names.contains("selection_filter"));
-    CHECK(names.contains("selection_by_bounds"));
-    CHECK(names.contains("selection_grow"));
+    CHECK(!names.contains("selection_get"));
+    CHECK(!names.contains("selection_set"));
+    CHECK(!names.contains("selection_filter"));
+    CHECK(!names.contains("selection_by_bounds"));
+    CHECK(!names.contains("selection_grow"));
     CHECK(names.contains("map_snapshot"));
     CHECK(names.contains("map_search"));
-    CHECK(names.contains("fgd_entities_list"));
-    CHECK(names.contains("entity_schema"));
+    CHECK(!names.contains("fgd_entities_list"));
+    CHECK(!names.contains("entity_schema"));
     CHECK(names.contains("entity_create_checked"));
     CHECK(names.contains("entity_create_checked_batch"));
-    CHECK(names.contains("entity_create_from_schema"));
-    CHECK(names.contains("entity_tie_brushes"));
-    CHECK(names.contains("entity_untie_brushes"));
+    CHECK(!names.contains("entity_create_from_schema"));
+    CHECK(!names.contains("entity_tie_brushes"));
+    CHECK(!names.contains("entity_untie_brushes"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("entity_update"));
     CHECK(!names.contains("entity_delete"));
@@ -374,26 +374,26 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("module_select"));
     CHECK(names.contains("module_render_review"));
     CHECK(names.contains("module_validate"));
-    CHECK(names.contains("brush_types_list"));
-    CHECK(names.contains("brush_create"));
-    CHECK(names.contains("brush_create_box"));
-    CHECK(names.contains("brush_create_wedge"));
-    CHECK(names.contains("brush_create_cylinder"));
-    CHECK(names.contains("brush_create_cone"));
-    CHECK(names.contains("brush_create_pipe"));
-    CHECK(names.contains("brush_create_sphere"));
-    CHECK(names.contains("brush_create_pyramid"));
-    CHECK(names.contains("brush_create_tetrahedron"));
-    CHECK(names.contains("brush_create_prism"));
-    CHECK(names.contains("brush_create_cylinder_sector"));
+    CHECK(!names.contains("brush_types_list"));
+    CHECK(!names.contains("brush_create"));
+    CHECK(!names.contains("brush_create_box"));
+    CHECK(!names.contains("brush_create_wedge"));
+    CHECK(!names.contains("brush_create_cylinder"));
+    CHECK(!names.contains("brush_create_cone"));
+    CHECK(!names.contains("brush_create_pipe"));
+    CHECK(!names.contains("brush_create_sphere"));
+    CHECK(!names.contains("brush_create_pyramid"));
+    CHECK(!names.contains("brush_create_tetrahedron"));
+    CHECK(!names.contains("brush_create_prism"));
+    CHECK(!names.contains("brush_create_cylinder_sector"));
     CHECK(names.contains("brush_create_boxes_batch"));
     CHECK(names.contains("brush_create_polygon_batch"));
     CHECK(!names.contains("brush_create_from_planes"));
-    CHECK(names.contains("shape_library_list"));
-    CHECK(names.contains("brush_metadata_set"));
-    CHECK(names.contains("brush_metadata_get"));
-    CHECK(names.contains("selection_by_metadata"));
-    CHECK(names.contains("route_geometry_analyze_chain"));
+    CHECK(!names.contains("shape_library_list"));
+    CHECK(!names.contains("brush_metadata_set"));
+    CHECK(!names.contains("brush_metadata_get"));
+    CHECK(!names.contains("selection_by_metadata"));
+    CHECK(!names.contains("route_geometry_analyze_chain"));
     CHECK(!names.contains("kz_distance_analyze_chain"));
     CHECK(names.contains("blockout_create_batch"));
     CHECK(!names.contains("python_generate_blockout"));
@@ -402,24 +402,24 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("ir_validate"));
     CHECK(names.contains("ir_compile_preview"));
     CHECK(names.contains("ir_apply"));
-    CHECK(names.contains("geometry_analyze_selection"));
-    CHECK(names.contains("blockout_validate"));
-    CHECK(names.contains("objects_delete"));
-    CHECK(names.contains("objects_delete_by_filter"));
-    CHECK(names.contains("objects_delete_by_operation"));
+    CHECK(!names.contains("geometry_analyze_selection"));
+    CHECK(!names.contains("blockout_validate"));
+    CHECK(!names.contains("objects_delete"));
+    CHECK(!names.contains("objects_delete_by_filter"));
+    CHECK(!names.contains("objects_delete_by_operation"));
     CHECK(names.contains("objects_transform"));
     CHECK(names.contains("textures_list"));
     CHECK(names.contains("texture_search"));
-    CHECK(names.contains("texture_lock_get"));
-    CHECK(names.contains("texture_lock_set"));
-    CHECK(names.contains("texture_apply"));
+    CHECK(!names.contains("texture_lock_get"));
+    CHECK(!names.contains("texture_lock_set"));
+    CHECK(!names.contains("texture_apply"));
     CHECK(names.contains("texture_apply_by_filter"));
-    CHECK(names.contains("texture_replace"));
-    CHECK(names.contains("texture_align_face"));
-    CHECK(names.contains("texture_copy_from_face"));
-    CHECK(names.contains("face_list"));
-    CHECK(names.contains("face_select"));
-    CHECK(names.contains("face_texture_set"));
+    CHECK(!names.contains("texture_replace"));
+    CHECK(!names.contains("texture_align_face"));
+    CHECK(!names.contains("texture_copy_from_face"));
+    CHECK(!names.contains("face_list"));
+    CHECK(!names.contains("face_select"));
+    CHECK(!names.contains("face_texture_set"));
     CHECK(names.contains("map_validate"));
     CHECK(names.contains("problems_check"));
 
@@ -458,14 +458,14 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("viewport_camera_set"));
     CHECK(!names.contains("viewport_capture_3d"));
     CHECK(!names.contains("viewport_capture_scene_review"));
-    CHECK(names.contains("render_review_targets"));
+    CHECK(!names.contains("render_review_targets"));
     CHECK(names.contains("render_review_current_scene"));
     CHECK(names.contains("render_review_operation"));
     CHECK(!names.contains("overlay_set"));
     CHECK(!names.contains("overlay_clear"));
   }
 
-  SECTION("modeling read-only profile exposes entity schema but not entity creation")
+  SECTION("modeling read-only profile hides entity schema helpers by default")
   {
     const auto tools = toolsListJson(McpMode::ReadOnly, true, McpToolProfile::Modeling);
     auto names = QStringList{};
@@ -474,11 +474,19 @@ TEST_CASE("McpToolCatalog")
       names.push_back(tool.toObject().value("name").toString());
     }
 
-    CHECK(names.contains("fgd_entities_list"));
-    CHECK(names.contains("entity_schema"));
+    CHECK(!names.contains("fgd_entities_list"));
+    CHECK(!names.contains("entity_schema"));
     CHECK(!names.contains("entity_create"));
     CHECK(!names.contains("entity_create_from_schema"));
     CHECK(!names.contains("entity_create_checked_batch"));
+
+    const auto searchResults = toolsSearchJson(
+      "entity_schema", "", "schema", McpMode::ReadOnly, McpToolProfile::Modeling);
+    REQUIRE(searchResults.size() == 1);
+    const auto found = searchResults.first().toObject();
+    CHECK(found.value("name").toString() == "entity_schema");
+    CHECK(!found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("inputSchema").isObject());
   }
 
   SECTION("heightmap import tool requires image path and is modeling visible")
@@ -821,8 +829,8 @@ TEST_CASE("McpToolCatalog")
     const auto tool = findToolDefinition("viewport_capture_scene_review");
     REQUIRE(tool);
 
-    CHECK(tool->description.contains("focusing optional object ids"));
-    CHECK(tool->description.contains("explicit camera position/target"));
+    CHECK(tool->description.contains("Legacy viewport review helper"));
+    CHECK(tool->description.contains("render_review_selector"));
 
     const auto properties = tool->inputSchema.value("properties").toObject();
     CHECK(properties.value("objectIds").isObject());
@@ -839,13 +847,13 @@ TEST_CASE("McpToolCatalog")
     CHECK(properties.value("clearSelectionBeforeCapture").isObject());
   }
 
-  SECTION("render review operation is visible for modeling self-verification")
+  SECTION("render review targets stays hidden behind higher-level review tools")
   {
     const auto targetTool = findToolDefinition("render_review_targets");
     REQUIRE(targetTool);
 
-    CHECK(targetTool->description.contains("geometry review bundle"));
-    CHECK(targetTool->description.contains("does not touch TrenchBroom viewport"));
+    CHECK(targetTool->description.contains("Low-level geometry review renderer"));
+    CHECK(targetTool->description.contains("Prefer render_review_selector"));
 
     const auto targetProperties = targetTool->inputSchema.value("properties").toObject();
     CHECK(targetProperties.value("operationIds").isObject());
@@ -915,9 +923,17 @@ TEST_CASE("McpToolCatalog")
     {
       names.push_back(listedTool.toObject().value("name").toString());
     }
-    CHECK(names.contains("render_review_targets"));
+    CHECK(!names.contains("render_review_targets"));
     CHECK(names.contains("render_review_current_scene"));
     CHECK(names.contains("render_review_operation"));
+
+    const auto searchResults = toolsSearchJson(
+      "render_review_targets", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    REQUIRE(searchResults.size() == 1);
+    const auto found = searchResults.first().toObject();
+    CHECK(found.value("name").toString() == "render_review_targets");
+    CHECK(!found.value("visibleInCurrentProfile").toBool());
+    CHECK(found.value("inputSchema").isObject());
   }
 
   SECTION("viewport camera set schema supports explicit look-at review")
@@ -1300,7 +1316,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(canCallTool(*kzDistanceTool, McpMode::ReadOnly));
   }
 
-  SECTION("route metadata tools are modeling-visible and KZ alias is searchable")
+  SECTION("route metadata legacy tools are hidden and searchable")
   {
     const auto editTools = toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling);
     auto editNames = QStringList{};
@@ -1308,12 +1324,12 @@ TEST_CASE("McpToolCatalog")
     {
       editNames.push_back(tool.toObject().value("name").toString());
     }
-    CHECK(editNames.contains("shape_library_list"));
+    CHECK(!editNames.contains("shape_library_list"));
     CHECK(editNames.contains("brush_create_polygon_batch"));
-    CHECK(editNames.contains("brush_metadata_set"));
-    CHECK(editNames.contains("brush_metadata_get"));
-    CHECK(editNames.contains("selection_by_metadata"));
-    CHECK(editNames.contains("route_geometry_analyze_chain"));
+    CHECK(!editNames.contains("brush_metadata_set"));
+    CHECK(!editNames.contains("brush_metadata_get"));
+    CHECK(!editNames.contains("selection_by_metadata"));
+    CHECK(!editNames.contains("route_geometry_analyze_chain"));
     CHECK(!editNames.contains("kz_distance_analyze_chain"));
 
     const auto searchResults = toolsSearchJson(
@@ -1330,12 +1346,20 @@ TEST_CASE("McpToolCatalog")
     }
 
     REQUIRE(!found.isEmpty());
-    CHECK(found.value("visibleInCurrentProfile").toBool());
+    CHECK(!found.value("visibleInCurrentProfile").toBool());
     CHECK(found.value("inputSchema")
             .toObject()
             .value("properties")
             .toObject()
             .contains("routeId"));
+
+    const auto metadataResults = toolsSearchJson(
+      "selection_by_metadata", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    REQUIRE(metadataResults.size() == 1);
+    const auto metadataTool = metadataResults.first().toObject();
+    CHECK(metadataTool.value("name").toString() == "selection_by_metadata");
+    CHECK(!metadataTool.value("visibleInCurrentProfile").toBool());
+    CHECK(metadataTool.value("description").toString().contains("Prefer structured"));
 
     const auto aliasResults = toolsSearchJson(
       "kz_distance_analyze_chain", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
