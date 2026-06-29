@@ -2079,8 +2079,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "history_list",
-      "List the MCP operation timeline for the active bridge session, including "
-      "creation time and live/stale object counts when a document is active.",
+      "Hidden diagnostic timeline for the active bridge session, including creation "
+      "time and live/stale object counts when a document is active. Prefer "
+      "history_status for normal Agent workflow and operation_inspect for a specific "
+      "operation.",
       McpMode::ReadOnly,
       false,
       true,
@@ -2117,7 +2119,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "operation_select",
-      "Select live map objects created or changed by an MCP operation.",
+      "Hidden manual recovery helper that selects live map objects created or changed "
+      "by an MCP operation. Prefer selector_preview, module_inspect, "
+      "render_review_operation, or operation_inspect unless a human explicitly needs "
+      "the native selection changed.",
       McpMode::ReadOnly,
       false,
       true,
@@ -2466,9 +2471,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "objects_delete_by_filter",
-      "Delete selectable objects matched by a safe selection_filter-style query. "
-      "Defaults exclude node:world, require selectable matches, and remove redundant "
-      "descendants before deleting.",
+      "Expert destructive helper that deletes selectable objects matched by a safe "
+      "selection_filter-style query. Defaults exclude node:world, require selectable "
+      "matches, and remove redundant descendants before deleting. Prefer structured "
+      "selector_preview followed by objects_delete_by_selector for generated MCP "
+      "content.",
       McpMode::Edit,
       true,
       true,
@@ -2493,8 +2500,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "objects_delete_by_operation",
-      "Delete the live selectable objects changed by a previous MCP operation. Prefer "
-      "this over passing long objectIds arrays when removing generated modules.",
+      "Compatibility helper that deletes the live selectable objects changed by a "
+      "previous MCP operation. Prefer structured selector/module deletion for current "
+      "workflows; use this only when an operation id is the clearest target.",
       McpMode::Edit,
       true,
       true,
@@ -2724,7 +2732,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "blockout_create_room",
-      "Create a room from Blockout IR.",
+      "Legacy convenience helper for quick room shells. Prefer blockout_create_batch "
+      "with typed operations or a skill recipe that emits IR for reusable building "
+      "layouts.",
       McpMode::Edit,
       true,
       true,
@@ -2740,7 +2750,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "blockout_create_corridor",
-      "Create a rectangular corridor shell from Blockout IR.",
+      "Legacy convenience helper for quick rectangular corridor shells. Prefer "
+      "blockout_create_batch path/corridor primitives or recipe-generated IR for "
+      "reusable routes.",
       McpMode::Edit,
       true,
       true,
@@ -2756,7 +2768,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "blockout_create_stairs",
-      "Create box-based stairs from Blockout IR.",
+      "Legacy convenience helper for simple box-based stairs. Prefer "
+      "blockout_create_batch stairs operations with metadata/parts, or recipe IR for "
+      "larger stair modules.",
       McpMode::Edit,
       true,
       true,
@@ -2773,7 +2787,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "blockout_create_ramp",
-      "Create a wedge ramp from Blockout IR.",
+      "Legacy low-semantic ramp helper. Prefer blockout_create_batch ramp_between or "
+      "arc_ramp/helical_ramp so route direction and slope validation remain clear.",
       McpMode::Edit,
       true,
       true,
@@ -2789,7 +2804,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "blockout_create_doorway",
-      "Create a wall with a rectangular doorway by splitting it into convex boxes.",
+      "Legacy convenience helper for a wall with a rectangular doorway. Prefer typed "
+      "blockout_create_batch boxes or recipe IR when doorway layout is part of a "
+      "larger building module.",
       McpMode::Edit,
       true,
       true,
@@ -2806,7 +2823,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "blockout_create_cover",
-      "Create a low cover box from Blockout IR.",
+      "Legacy convenience helper for a low cover box. Prefer blockout_create_batch "
+      "box operations with explicit part/role metadata.",
       McpMode::Edit,
       true,
       true,
@@ -2821,7 +2839,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "blockout_create_sky_shell",
-      "Create a sky shell around a playable volume.",
+      "Legacy convenience helper for a sky shell around a playable volume. Prefer "
+      "recipe-generated IR or explicit blockout_create_batch shell geometry for "
+      "complex scenes.",
       McpMode::Edit,
       true,
       true,
@@ -2870,8 +2890,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "python_generate_blockout",
-      "Run a local Python script in a subprocess to generate Blockout IR, then compile "
-      "the returned operations through blockout_create_batch.",
+      "Legacy script bridge that runs local Python source and compiles returned "
+      "Blockout IR through blockout_create_batch. Prefer skill recipe scripts that "
+      "write IR files, then use ir_compile_preview_from_file and ir_apply_from_file.",
       McpMode::Edit,
       true,
       true,

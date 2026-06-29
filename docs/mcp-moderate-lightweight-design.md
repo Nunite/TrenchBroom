@@ -334,6 +334,32 @@ Do not delete immediately. First:
 3. Confirm real scenario runs no longer need the tool.
 4. Remove only after compatibility risk is low.
 
+Current Phase 5 status:
+
+- No tools are hard-deleted in this phase. Compatibility remains intact while default
+  discovery is slimmer.
+- Catalog descriptions now mark legacy/compatibility/expert paths and point to the
+  replacement workflow:
+  - legacy blockout helpers (`blockout_create_room/corridor/stairs/ramp/doorway/cover/sky_shell`)
+    point to `blockout_create_batch`, route-aware primitives, or recipe-generated IR.
+  - `python_generate_blockout` points to skill recipe scripts that write IR files and
+    `ir_compile_preview_from_file` / `ir_apply_from_file`.
+  - low-level deletion/recovery helpers (`objects_delete_by_filter`,
+    `objects_delete_by_operation`, `operation_select`, `history_list`) point to
+    selector/module/operation inspect/status workflows.
+  - legacy metadata and route aliases continue to point to structured selectors,
+    modules, `geometry_analyze_slopes`, and `geometry_analyze_route_continuity`.
+- Catalog tests enforce replacement guidance for each retired convenience path so
+  future descriptions do not drift back toward default Agent usage.
+- Real Phase 2 and Phase 4 TB scenario runs completed through the recipe/IR and
+  default Modeling paths without relying on hidden legacy tools, which satisfies the
+  "hide before remove" gate for this iteration.
+
+Future removal remains intentionally deferred. A tool should only be deleted after
+real scenario regression shows it is unused, exact-name search replacement text has
+existed long enough for agents/users to migrate, and no known external client depends
+on the old call.
+
 ## Size Reduction Strategy
 
 ### High-Value Reductions

@@ -1301,6 +1301,41 @@ TEST_CASE("McpToolCatalog")
     CHECK(prefabCreateJson.value("description").toString().contains("IR files"));
   }
 
+  SECTION("retired convenience paths carry replacement guidance")
+  {
+    const auto expectedDescriptionFragments = std::map<QString, QStringList>{
+      {"history_list", {"Hidden diagnostic", "history_status"}},
+      {"operation_select", {"Hidden manual recovery", "selector_preview"}},
+      {"objects_delete_by_filter", {"Expert destructive", "objects_delete_by_selector"}},
+      {"objects_delete_by_operation", {"Compatibility helper", "selector/module"}},
+      {"blockout_create_room", {"Legacy convenience", "skill recipe"}},
+      {"blockout_create_corridor", {"Legacy convenience", "recipe-generated IR"}},
+      {"blockout_create_stairs", {"Legacy convenience", "blockout_create_batch"}},
+      {"blockout_create_ramp", {"Legacy low-semantic", "ramp_between"}},
+      {"blockout_create_doorway", {"Legacy convenience", "recipe IR"}},
+      {"blockout_create_cover", {"Legacy convenience", "part/role metadata"}},
+      {"blockout_create_sky_shell", {"Legacy convenience", "recipe-generated IR"}},
+      {"python_generate_blockout", {"Legacy script bridge", "ir_apply_from_file"}},
+      {"brush_metadata_set", {"Legacy", "defaultMetadata"}},
+      {"brush_metadata_get", {"Legacy", "selector_preview"}},
+      {"selection_by_metadata", {"Legacy", "structured selectors"}},
+      {"route_geometry_analyze_chain", {"Prefer", "geometry_analyze_route_continuity"}},
+      {"kz_distance_analyze_chain", {"Compatibility alias", "geometry_analyze_route_continuity"}},
+    };
+
+    for (const auto& [toolName, fragments] : expectedDescriptionFragments)
+    {
+      CAPTURE(toolName);
+      const auto tool = findToolDefinition(toolName);
+      REQUIRE(tool);
+      for (const auto& fragment : fragments)
+      {
+        CAPTURE(fragment);
+        CHECK(tool->description.contains(fragment));
+      }
+    }
+  }
+
   SECTION("safe batch modeling helpers have structured schemas")
   {
     const auto boxesTool = findToolDefinition("brush_create_boxes_batch");
