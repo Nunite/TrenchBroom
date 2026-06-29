@@ -317,6 +317,25 @@ for parameter details; the skill owns routing and judgment.
 When adding a recipe, update the skill recipe manifest, examples, validator, and
 recommended MCP validation path. Do not add a matching C++ prefab tool.
 
+## Skill Development Rules
+
+Skill constraints get stricter the closer they move to the editor kernel, and
+softer the closer they move to creative intent.
+
+- Workflow skills may choose tool order, validation order, recovery paths, and
+  when to use recipes.
+- Recipe scripts may encode prefab-like composition, but must emit deterministic
+  IR only.
+- Domain skills may judge style, gameplay, difficulty, or route intent, but
+  must not claim editor facts that MCP did not validate.
+- Skills must not mutate maps directly, call TrenchBroom internals, edit `.map`
+  files, or bypass MCP document guards and undo transactions.
+- When a skill needs new MCP support, describe it as a generic primitive,
+  selector/module operation, validator, review feature, compact-output
+  improvement, or failure-recovery improvement.
+- Creative rules may be flexible. Mutation, validation, compatibility,
+  performance, and recovery rules are strict.
+
 ## Review Checklist
 
 Before merging or committing MCP work, verify:
