@@ -110,4 +110,6 @@
 - Avoid unnecessary churn, including changing the same code multiple times in a branch when a cleaner edit is possible.
 - Prefer changes that read like a clean transformation from the original state to the desired result.
 - When creating a series of commits, keep each commit coherent, buildable, and with the relevant tests passing when practical.
+- After completing and verifying a coherent source or documentation change, commit it without waiting for the user to ask again, unless the user explicitly says not to commit or the worktree contains unrelated changes that cannot be safely separated.
+- Stage only files that belong to the completed change. Leave unrelated dirty files, generated maps, screenshots, logs, and temporary reports unstaged unless the user explicitly asks to include them.
 - When asked to write commit messages, explain why the change was made in the context of a feature or bug fix, not just what changed.
