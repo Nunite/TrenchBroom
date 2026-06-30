@@ -275,6 +275,16 @@ double snapToGrid(const double value, const double grid)
   return grid > 0.0 && std::isfinite(grid) ? std::round(value / grid) * grid : value;
 }
 
+QJsonArray vec2PointsToJson(const std::vector<vm::vec2d>& points)
+{
+  auto result = QJsonArray{};
+  for (const auto& point : points)
+  {
+    result.push_back(QJsonArray{point.x(), point.y()});
+  }
+  return result;
+}
+
 std::optional<QJsonArray> cleanedPoints2dArray(
   const QJsonValue& value, const double grid, QString& error)
 {
@@ -344,6 +354,114 @@ std::optional<QJsonArray> cleanedPoints2dArray(
   return result;
 }
 
+std::optional<std::vector<vm::vec2d>> vec2PointsFromJsonArray(
+  const QJsonArray& array, QString& error)
+{
+  auto result = std::vector<vm::vec2d>{};
+  result.reserve(static_cast<size_t>(array.size()));
+  for (auto i = 0; i < array.size(); ++i)
+  {
+    const auto value = array[i];
+    if (!value.isArray())
+    {
+      error = QString{"points2d[%1] must be [x,y]"}.arg(i);
+      return std::nullopt;
+    }
+    const auto point = value.toArray();
+    if (point.size() < 2 || !point[0].isDouble() || !point[1].isDouble())
+    {
+      error = QString{"points2d[%1] must contain x and y numbers"}.arg(i);
+      return std::nullopt;
+    }
+    result.emplace_back(point[0].toDouble(), point[1].toDouble());
+  }
+  return result;
+}
+
+double polygonSignedArea(const std::vector<vm::vec2d>& points)
+{
+  auto area = 0.0;
+  for (auto i = size_t{0}; i < points.size(); ++i)
+  {
+    const auto& current = points[i];
+    const auto& next = points[(i + 1) % points.size()];
+    area += current.x() * next.y() - next.x() * current.y();
+  }
+  return area * 0.5;
+}
+
+QJsonObject polygonConvexityDiagnostic(
+  const std::vector<vm::vec2d>& points, const int brushIndex)
+{
+  auto result = QJsonObject{
+    {"brushIndex", brushIndex},
+    {"pointCount", static_cast<int>(points.size())},
+  };
+
+  if (points.size() < 3)
+  {
+    result.insert("valid", false);
+    result.insert(
+      "reason", "points2d must contain at least 3 unique non-collinear points");
+    return result;
+  }
+
+  auto sign = 0;
+  auto failingVertices = QJsonArray{};
+  auto failingEdges = QJsonArray{};
+  for (auto i = size_t{0}; i < points.size(); ++i)
+  {
+    const auto previousIndex = (i + points.size() - 1) % points.size();
+    const auto nextIndex = (i + 1) % points.size();
+    const auto& previous = points[previousIndex];
+    const auto& current = points[i];
+    const auto& next = points[nextIndex];
+    const auto incoming = current - previous;
+    const auto outgoing = next - current;
+    const auto cross = incoming.x() * outgoing.y() - incoming.y() * outgoing.x();
+    if (std::abs(cross) <= 0.001)
+    {
+      failingVertices.push_back(static_cast<int>(i));
+      failingEdges.push_back(QJsonObject{
+        {"from", static_cast<int>(previousIndex)},
+        {"through", static_cast<int>(i)},
+        {"to", static_cast<int>(nextIndex)},
+        {"reason", "collinear_or_duplicate_after_grid_snap"},
+        {"cross", cross},
+      });
+      continue;
+    }
+
+    const auto currentSign = cross > 0.0 ? 1 : -1;
+    if (sign == 0)
+    {
+      sign = currentSign;
+    }
+    else if (sign != currentSign)
+    {
+      failingVertices.push_back(static_cast<int>(i));
+      failingEdges.push_back(QJsonObject{
+        {"from", static_cast<int>(previousIndex)},
+        {"through", static_cast<int>(i)},
+        {"to", static_cast<int>(nextIndex)},
+        {"reason", "concave_turn"},
+        {"cross", cross},
+      });
+    }
+  }
+
+  result.insert("valid", failingVertices.isEmpty());
+  if (!failingVertices.isEmpty())
+  {
+    result.insert("reason", "points2d must form a strictly convex polygon");
+    result.insert("failingPointIndices", failingVertices);
+    result.insert("failingEdges", failingEdges);
+  }
+  result.insert("signedArea", polygonSignedArea(points));
+  result.insert("points2d", vec2PointsToJson(points));
+  return result;
+}
+
 QJsonObject metadataForObject(
   const QString& objectId,
   const QString& documentFingerprint,
@@ -359,8 +477,7 @@ QJsonObject metadataForObject(
   }
   if (
     it == metadataStore.end() || it->second.stale
-    || (!it->second.documentFingerprint.isEmpty()
-        && it->second.documentFingerprint != documentFingerprint))
+    || (!it->second.documentFingerprint.isEmpty() && it->second.documentFingerprint != documentFingerprint))
   {
     return {};
   }
@@ -519,8 +636,7 @@ void sortMetadataObjectIdsByOrder(
       return entry.second.objectId == objectId && !entry.second.stale
              && recordMatchesDocument(entry.second, documentFingerprint);
     });
-    return it != metadataStore.end()
-           && it->second.metadata.value("order").isDouble();
+    return it != metadataStore.end() && it->second.metadata.value("order").isDouble();
   });
   if (!allHaveOrder)
   {
@@ -745,24 +861,23 @@ int storeBatchOperationMetadata(
     return base;
   };
 
-  const auto partMetadata = [&](const QJsonObject& operation,
-                                const QString& partName,
-                                const QJsonObject& base) {
-    auto result = base;
-    if (!partName.isEmpty())
-    {
-      result.insert("part", partName);
-    }
-    if (operation.value("partMetadata").isObject())
-    {
-      const auto partMetadataObject = operation.value("partMetadata").toObject();
-      if (partMetadataObject.value(partName).isObject())
+  const auto partMetadata =
+    [&](const QJsonObject& operation, const QString& partName, const QJsonObject& base) {
+      auto result = base;
+      if (!partName.isEmpty())
       {
-        result = mergeMetadata(result, partMetadataObject.value(partName).toObject());
+        result.insert("part", partName);
       }
-    }
-    return result;
-  };
+      if (operation.value("partMetadata").isObject())
+      {
+        const auto partMetadataObject = operation.value("partMetadata").toObject();
+        if (partMetadataObject.value(partName).isObject())
+        {
+          result = mergeMetadata(result, partMetadataObject.value(partName).toObject());
+        }
+      }
+      return result;
+    };
 
   const auto partRequested = [](const QJsonObject& operation, const QString& partName) {
     if (!operation.value("parts").isArray())
@@ -967,7 +1082,8 @@ int storeBatchOperationMetadata(
       auto& module = (*moduleStore)[moduleKey];
       module.moduleId = moduleId;
       module.documentFingerprint = documentFingerprint;
-      module.metadata = mergeMetadata(module.metadata, moduleLevelMetadata(defaultMetadata));
+      module.metadata =
+        mergeMetadata(module.metadata, moduleLevelMetadata(defaultMetadata));
       module.metadata = mergeMetadata(module.metadata, moduleLevelMetadata(metadata));
       module.objectIds.push_back(objectId);
       module.objectIds.removeDuplicates();
@@ -1093,6 +1209,9 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
 
   auto operations = QJsonArray{};
   auto normalizedPointCount = 0;
+  auto polygonDiagnostics = QJsonArray{};
+  auto errors = QJsonArray{};
+  auto firstInvalidPolygonIndex = -1;
   const auto grid =
     params.value("grid").isDouble() ? params.value("grid").toDouble() : 0.0;
   for (auto i = 0; i < brushes.size(); ++i)
@@ -1103,7 +1222,62 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
       cleanedPoints2dArray(operation.value("points2d"), grid, error);
     if (!cleanedPoints)
     {
-      return invalidParamsFailure(QString{"brushes[%1].%2"}.arg(i).arg(error));
+      if (firstInvalidPolygonIndex < 0)
+      {
+        firstInvalidPolygonIndex = i;
+      }
+      errors.push_back(QString{"brushes[%1].%2"}.arg(i).arg(error));
+      polygonDiagnostics.push_back(QJsonObject{
+        {"brushIndex", i},
+        {"valid", false},
+        {"reason", error},
+      });
+      continue;
+    }
+
+    auto pointsError = QString{};
+    auto points = vec2PointsFromJsonArray(*cleanedPoints, pointsError);
+    if (!points)
+    {
+      if (firstInvalidPolygonIndex < 0)
+      {
+        firstInvalidPolygonIndex = i;
+      }
+      errors.push_back(QString{"brushes[%1].%2"}.arg(i).arg(pointsError));
+      polygonDiagnostics.push_back(QJsonObject{
+        {"brushIndex", i},
+        {"valid", false},
+        {"reason", pointsError},
+      });
+      continue;
+    }
+    auto diagnostic = polygonConvexityDiagnostic(*points, i);
+    if (!diagnostic.value("valid").toBool(false))
+    {
+      if (firstInvalidPolygonIndex < 0)
+      {
+        firstInvalidPolygonIndex = i;
+      }
+      errors.push_back(
+        QString{"brushes[%1].%2"}.arg(i).arg(diagnostic.value("reason").toString()));
+      polygonDiagnostics.push_back(diagnostic);
+      continue;
+    }
+
+    const auto minZ = operation.value("minZ").toDouble(0.0);
+    const auto maxZ = operation.value("maxZ").toDouble(64.0);
+    if (!std::isfinite(minZ) || !std::isfinite(maxZ) || minZ >= maxZ)
+    {
+      if (firstInvalidPolygonIndex < 0)
+      {
+        firstInvalidPolygonIndex = i;
+      }
+      const auto reason = QString{"minZ must be smaller than maxZ"};
+      errors.push_back(QString{"brushes[%1].%2"}.arg(i).arg(reason));
+      diagnostic.insert("valid", false);
+      diagnostic.insert("reason", reason);
+      polygonDiagnostics.push_back(diagnostic);
+      continue;
     }
     operation.insert("points2d", *cleanedPoints);
     normalizedPointCount +=
@@ -1111,6 +1285,29 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
     operation.remove("metadata");
     operation.insert("type", "prism");
     operations.push_back(operation);
+  }
+
+  if (!errors.isEmpty())
+  {
+    const auto invalidPolygonCount = errors.size();
+    return McpBridgeToolResult::success(QJsonObject{
+      {"valid", false},
+      {"validation",
+       QJsonObject{
+         {"valid", false},
+         {"errors", errors},
+         {"failedOperationIndex", firstInvalidPolygonIndex},
+         {"failedOperationType", "prism"},
+         {"compiledOperationCount", 0},
+         {"compiledBrushCount", 0},
+         {"invalidPolygonCount", invalidPolygonCount},
+       }},
+      {"polygonDiagnostics", polygonDiagnostics},
+      {"invalidPolygonCount", invalidPolygonCount},
+      {"firstInvalidPolygonIndex", firstInvalidPolygonIndex},
+      {"mutatedDocument", false},
+      {"recoveryAction", "fix_polygon_points_then_retry"},
+    });
   }
 
   const auto requestedDetail = detailFromParams(params);
@@ -1160,11 +1357,11 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
     }
     metadataStore[metadataStoreKey(documentFingerprint, objectId)] =
       McpBrushMetadataRecord{
-      objectId,
-      documentFingerprint,
-      brushMetadata,
-      false,
-    };
+        objectId,
+        documentFingerprint,
+        brushMetadata,
+        false,
+      };
     ++metadataCount;
   }
 
@@ -1239,11 +1436,11 @@ McpBridgeToolResult brushMetadataSetForMapResult(
   {
     metadataStore[metadataStoreKey(documentFingerprint, objectId)] =
       McpBrushMetadataRecord{
-      objectId,
-      documentFingerprint,
-      *metadata,
-      false,
-    };
+        objectId,
+        documentFingerprint,
+        *metadata,
+        false,
+      };
   }
 
   return McpBridgeToolResult::success(QJsonObject{
@@ -1292,8 +1489,8 @@ McpBridgeToolResult brushMetadataGetForMapResult(
     auto* node = resolveNodeId(map.worldNode(), objectId);
     const auto live = dynamic_cast<mdl::BrushNode*>(node) != nullptr;
     const auto explicitlyStale = it != metadataStore.end() && it->second.stale;
-    const auto wrongDocument =
-      it != metadataStore.end() && !recordMatchesDocument(it->second, documentFingerprint);
+    const auto wrongDocument = it != metadataStore.end()
+                               && !recordMatchesDocument(it->second, documentFingerprint);
     const auto stale = !live || explicitlyStale || wrongDocument;
     if (stale)
     {
@@ -1313,9 +1510,9 @@ McpBridgeToolResult brushMetadataGetForMapResult(
     {
       object.insert(
         "staleReason",
-        !live             ? "objectId does not resolve to a live brush"
-        : wrongDocument   ? "metadata belongs to a different document"
-                           : "metadata record was marked stale");
+        !live           ? "objectId does not resolve to a live brush"
+        : wrongDocument ? "metadata belongs to a different document"
+                        : "metadata record was marked stale");
     }
     results.push_back(object);
   }

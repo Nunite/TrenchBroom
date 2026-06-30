@@ -1868,7 +1868,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "brush_create_polygon_batch",
       "Create many convex prism platforms from 2D polygons in one transaction. "
       "Prefer this for diamond, trapezoid, chamfered, and route-guiding platforms "
-      "instead of box-only chains.",
+      "instead of box-only chains. Invalid batches fail before mutation and return "
+      "polygonDiagnostics with failing point/edge indices for every invalid polygon.",
       McpMode::Edit,
       true,
       true,

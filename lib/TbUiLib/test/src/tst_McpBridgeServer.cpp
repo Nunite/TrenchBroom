@@ -6568,6 +6568,16 @@ TEST_CASE("McpBridgeServer route metadata tools")
              {"minZ", 0},
              {"maxZ", 16},
            },
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{128, 0},
+                QJsonArray{192, 0},
+                QJsonArray{192, 64},
+                QJsonArray{128, 64}}},
+             {"minZ", 32},
+             {"maxZ", 16},
+           },
          }},
       },
       history,
@@ -6575,7 +6585,19 @@ TEST_CASE("McpBridgeServer route metadata tools")
       metadataStore);
 
     REQUIRE(response.ok);
-    CHECK(!response.result.value("validation").toObject().value("valid").toBool());
+    const auto validation = response.result.value("validation").toObject();
+    CHECK(!validation.value("valid").toBool());
+    CHECK(response.result.value("mutatedDocument").toBool(true) == false);
+    CHECK(response.result.value("invalidPolygonCount").toInt() == 2);
+    CHECK(validation.value("invalidPolygonCount").toInt() == 2);
+    CHECK(response.result.value("firstInvalidPolygonIndex").toInt() == 0);
+    const auto diagnostics = response.result.value("polygonDiagnostics").toArray();
+    REQUIRE(diagnostics.size() == 2);
+    CHECK(diagnostics[0].toObject().value("brushIndex").toInt() == 0);
+    CHECK(diagnostics[0].toObject().value("reason").toString().contains("convex"));
+    CHECK(!diagnostics[0].toObject().value("failingPointIndices").toArray().isEmpty());
+    CHECK(diagnostics[1].toObject().value("brushIndex").toInt() == 1);
+    CHECK(diagnostics[1].toObject().value("reason").toString().contains("minZ"));
     CHECK(map.worldNode().descendantCount() == descendantCount);
     CHECK(metadataStore.empty());
   }

@@ -1496,6 +1496,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(polygonTool->requiredMode == McpMode::Edit);
     CHECK(polygonTool->mutatesDocument);
     CHECK(polygonTool->category == "brush");
+    CHECK(polygonTool->description.contains("polygonDiagnostics"));
     const auto polygonSchema = polygonTool->inputSchema.value("properties").toObject();
     const auto polygonItem =
       polygonSchema.value("brushes").toObject().value("items").toObject();
