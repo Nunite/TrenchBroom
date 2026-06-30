@@ -2825,7 +2825,7 @@ TEST_CASE("McpBridgeServer")
   }
 }
 
-TEST_CASE("McpBridgeServer selection_set reports non-document mutation state")
+TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -2844,6 +2844,19 @@ TEST_CASE("McpBridgeServer selection_set reports non-document mutation state")
   REQUIRE(response.ok);
   CHECK(response.result.value("selectedCount").toInt(-1) == 0);
   CHECK(response.result.value("mutatedDocument").toBool(true) == false);
+
+  const auto filterResponse = selectionFilterForMapResult(document->map(), QJsonObject{});
+  REQUIRE(filterResponse.ok);
+  CHECK(filterResponse.result.value("mutatedDocument").toBool(true) == false);
+
+  const auto boundsResponse = selectionByBoundsForMapResult(
+    document->map(),
+    QJsonObject{
+      {"min", QJsonArray{-16, -16, -16}},
+      {"max", QJsonArray{16, 16, 16}},
+    });
+  REQUIRE(boundsResponse.ok);
+  CHECK(boundsResponse.result.value("mutatedDocument").toBool(true) == false);
 }
 
 TEST_CASE("McpBridgeServer spiral stair geometry tools")

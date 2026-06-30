@@ -377,6 +377,7 @@ McpBridgeToolResult selectionFilterForMapResult(mdl::Map& map, const QJsonObject
     {"objectIds", objectIds},
     {"count", objectIds.size()},
     {"detail", detail == "full" ? "full" : "summary"},
+    {"mutatedDocument", false},
     {"filters",
      QJsonObject{
        {"excludeWorld", options.excludeWorld},

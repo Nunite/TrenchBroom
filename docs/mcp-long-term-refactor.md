@@ -227,6 +227,9 @@ Next Phase 2 item:
   changes editor selection state without mutating the map document.
 - Done: `selection_by_metadata` reports `mutatedDocument:false` on success
   because it may change editor selection without mutating the map document.
+- Done: `selection_filter` and `selection_by_bounds` report
+  `mutatedDocument:false` on success because they may change editor selection
+  without mutating the map document.
 - Done: `group_create_from_selection` precondition failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before grouping.
 - Done: `group_rename_selected` precondition failures report
