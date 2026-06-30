@@ -204,6 +204,7 @@ QJsonObject selectionJson(AppController& appController);
 QJsonObject selectionJsonForMap(const mdl::Map& map);
 McpBridgeToolResult selectionSetResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult selectionSetForMapResult(mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult selectionFilterResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult selectionFilterForMapResult(mdl::Map& map, const QJsonObject& params);

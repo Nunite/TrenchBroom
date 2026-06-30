@@ -265,13 +265,17 @@ McpBridgeToolResult selectionSetResult(
     return noActiveDocumentFailure();
   }
 
+  return selectionSetForMapResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult selectionSetForMapResult(mdl::Map& map, const QJsonObject& params)
+{
   const auto objectIdsValue = params.value("objectIds");
   if (!objectIdsValue.isArray())
   {
     return invalidParamsFailure("selection_set requires objectIds array");
   }
 
-  auto& map = mapWindow->document().map();
   auto nodes = std::vector<mdl::Node*>{};
   for (const auto& objectIdValue : objectIdsValue.toArray())
   {
@@ -306,7 +310,11 @@ McpBridgeToolResult selectionSetResult(
     selectedIds.push_back(mcpNodePathId(*node, map.worldNode()));
   }
   return McpBridgeToolResult::success(
-    QJsonObject{{"selectedObjectIds", selectedIds}, {"selectedCount", selectedIds.size()}});
+    QJsonObject{
+      {"selectedObjectIds", selectedIds},
+      {"selectedCount", selectedIds.size()},
+      {"mutatedDocument", false},
+    });
 }
 
 McpBridgeToolResult selectionFilterResult(

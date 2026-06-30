@@ -2825,6 +2825,27 @@ TEST_CASE("McpBridgeServer")
   }
 }
 
+TEST_CASE("McpBridgeServer selection_set reports non-document mutation state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+
+  const auto response =
+    selectionSetForMapResult(document->map(), QJsonObject{{"objectIds", QJsonArray{}}});
+
+  REQUIRE(response.ok);
+  CHECK(response.result.value("selectedCount").toInt(-1) == 0);
+  CHECK(response.result.value("mutatedDocument").toBool(true) == false);
+}
+
 TEST_CASE("McpBridgeServer spiral stair geometry tools")
 {
   auto appControllerFixture = AppControllerFixture{};
