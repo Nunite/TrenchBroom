@@ -6999,6 +6999,7 @@ TEST_CASE("McpBridgeServer route metadata tools")
       metadataStore);
     REQUIRE(setResponse.ok);
     CHECK(setResponse.result.value("count").toInt() == 1);
+    CHECK(setResponse.result.value("mutatedDocument").toBool(true) == false);
 
     const auto getResponse = brushMetadataGetForMapResult(
       map, QJsonObject{{"objectIds", objectIds}}, metadataStore);
@@ -7057,6 +7058,7 @@ TEST_CASE("McpBridgeServer route metadata tools")
       },
       metadataStore);
     REQUIRE(customSetResponse.ok);
+    CHECK(customSetResponse.result.value("mutatedDocument").toBool(true) == false);
 
     const auto customSelectResponse = selectionByMetadataForMapResult(
       map,

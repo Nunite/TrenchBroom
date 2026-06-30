@@ -1448,6 +1448,7 @@ McpBridgeToolResult brushMetadataSetForMapResult(
     {"count", static_cast<int>(objectIds->size())},
     {"objectIds", stringVectorToJson(*objectIds)},
     {"metadata", *metadata},
+    {"mutatedDocument", false},
   });
 }
 
