@@ -333,6 +333,46 @@ QJsonObject selectorSchema()
   };
 }
 
+const QStringList& knownToolCategories()
+{
+  static const auto Categories = QStringList{
+    "asset",
+    "blockout",
+    "brush",
+    "core",
+    "entity",
+    "general",
+    "geometry",
+    "group",
+    "heightmap",
+    "object",
+    "operation",
+    "python",
+    "route",
+    "selection",
+    "texture",
+    "viewport",
+  };
+  return Categories;
+}
+
+const QStringList& knownToolLifecycles()
+{
+  static const auto Lifecycles = QStringList{
+    "deprecated",
+    "experimental",
+    "legacy",
+    "stable",
+  };
+  return Lifecycles;
+}
+
+void assertKnownToolMetadata(const McpToolDefinition& tool)
+{
+  Q_ASSERT(knownToolCategories().contains(tool.category));
+  Q_ASSERT(knownToolLifecycles().contains(tool.lifecycle));
+}
+
 QJsonObject withDescription(QJsonObject schema, const QString& description)
 {
   schema.insert("description", description);
@@ -3555,6 +3595,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       {
         tool.lifecycle = "experimental";
       }
+      assertKnownToolMetadata(tool);
       addExpectedDocumentPathGuardSchema(tool);
     }
     return tools;

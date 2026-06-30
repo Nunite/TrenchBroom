@@ -1407,6 +1407,30 @@ TEST_CASE("McpToolCatalog")
 
   SECTION("catalog exposes lifecycle/category metadata and blocks arbitrary execution tools")
   {
+    const auto knownCategories = QStringList{
+      "asset",
+      "blockout",
+      "brush",
+      "core",
+      "entity",
+      "general",
+      "geometry",
+      "group",
+      "heightmap",
+      "object",
+      "operation",
+      "python",
+      "route",
+      "selection",
+      "texture",
+      "viewport",
+    };
+    const auto knownLifecycles = QStringList{
+      "deprecated",
+      "experimental",
+      "legacy",
+      "stable",
+    };
     const auto bannedExecutionToolNames = QStringList{
       "execute_trenchbroom_code",
       "execute_tb_code",
@@ -1425,10 +1449,8 @@ TEST_CASE("McpToolCatalog")
     for (const auto& tool : defaultToolCatalog())
     {
       CAPTURE(tool.name);
-      const auto knownLifecycle =
-        tool.lifecycle == "stable" || tool.lifecycle == "experimental"
-        || tool.lifecycle == "legacy" || tool.lifecycle == "deprecated";
-      CHECK(knownLifecycle);
+      CHECK(knownCategories.contains(tool.category));
+      CHECK(knownLifecycles.contains(tool.lifecycle));
       CHECK(!tool.lifecycle.isEmpty());
       CHECK(!tool.category.isEmpty());
       CHECK(!tool.name.contains("execute_trenchbroom", Qt::CaseInsensitive));

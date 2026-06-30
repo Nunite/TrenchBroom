@@ -174,15 +174,15 @@ Next Phase 1 item:
   covered by a drift test.
 - Done: selector metadata field wording is centralized in the catalog and
   covered by a drift test.
-- Missing: lifecycle/profile/category/search metadata is not enforced from one
-  obvious catalog edit path.
+- Done: lifecycle/category metadata values are centralized near the catalog
+  edit path and covered by a focused catalog test.
 - Done: catalog metadata tests prove common selector/module wording does not
   drift for the centralized fragments above.
 
 Next Phase 2 item:
 
-- Make lifecycle/profile/category/search metadata enforcement more explicit
-  from the catalog edit path and add a focused catalog test.
+- Audit Phase 2 against the Done criteria and either close it or identify the
+  next missing profile/search metadata enforcement gap.
 
 ### Phase 3 Status: Partial
 
