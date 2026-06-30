@@ -263,7 +263,8 @@ TEST_CASE("McpToolCatalog")
     names.sort();
 
     INFO("Modeling profile tools: " << names.join(", ").toStdString());
-    CHECK(names.size() <= 46);
+    CHECK(
+      names.size() <= 47); // geometry_csg_selection adds one recovery-safe CSG primitive.
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
@@ -330,6 +331,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("ir_compile_preview"));
     CHECK(names.contains("ir_apply"));
     CHECK(names.contains("geometry_analyze_selection"));
+    CHECK(names.contains("geometry_csg_selection"));
     CHECK(!names.contains("blockout_validate"));
     CHECK(!names.contains("objects_delete"));
     CHECK(!names.contains("objects_delete_by_filter"));
@@ -566,6 +568,46 @@ TEST_CASE("McpToolCatalog")
     CHECK(found.value("inputSchema").isObject());
   }
 
+  SECTION("CSG selection tool exposes compact selection-only schema")
+  {
+    const auto tool = findToolDefinition("geometry_csg_selection");
+    REQUIRE(tool);
+    CHECK(tool->requiredMode == McpMode::Edit);
+    CHECK(tool->mutatesDocument);
+    CHECK(tool->category == "geometry");
+    CHECK(tool->description.contains("selection-only"));
+
+    const auto schema = tool->inputSchema;
+    CHECK(schema.value("required").toArray().contains("operation"));
+    const auto properties = schema.value("properties").toObject();
+    CHECK(properties.value("operation")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("convex_merge"));
+    CHECK(properties.value("operation")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("subtract"));
+    CHECK(properties.value("operation")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("intersect"));
+    CHECK(properties.value("operation")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("hollow"));
+    CHECK(properties.value("idsMode")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("sample"));
+    CHECK(properties.value("expectedDocumentPath").isObject());
+  }
+
   SECTION("core profile keeps only compact discovery and batch-oriented tools")
   {
     const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Core);
@@ -585,6 +627,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("viewport_capture_current"));
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("blockout_validate"));
+    CHECK(!names.contains("geometry_csg_selection"));
     CHECK(!names.contains("python_generate_blockout"));
     CHECK(!names.contains("documents_open"));
     CHECK(!names.contains("entity_create"));
@@ -614,6 +657,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_create_prism"));
     CHECK(names.contains("brush_create_cylinder_sector"));
     CHECK(names.contains("brush_create_polygon_batch"));
+    CHECK(names.contains("geometry_csg_selection"));
     CHECK(!names.contains("brush_create_arch"));
     CHECK(!names.contains("brush_create_torus"));
   }

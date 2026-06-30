@@ -3271,6 +3271,32 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "geometry_csg_selection",
+      "Run native TrenchBroom CSG on the current selection. This is a "
+      "selection-only boolean geometry primitive; prepare complex targets first with "
+      "selection_set, objects_select_by_selector, or manual user selection.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"operation",
+           stringProperty(
+             "CSG operation: convex_merge, subtract, intersect, or hollow. "
+             "convex_merge accepts selected brushes or brush faces; the others require "
+             "selected brush nodes only.")},
+          {"expectedDocumentPath",
+           stringProperty(
+             "Optional active document guard. Fails before mutation if the active map "
+             "path differs.")},
+          {"idsMode",
+           stringProperty(
+             "count, sample, or full for changed/deleted object ids. Defaults to "
+             "sample; full returns complete changedObjectIds and deletedObjectIds.")},
+        },
+        {"operation"}),
+    },
+    {
       "geometry_analyze_slopes",
       "Analyze live brush slope faces for ramp/wedge/surf/slide validation. Reports "
       "face normals, slope angle, rise direction, and whether each slope ascends or "
@@ -3589,6 +3615,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       {
         tool.category = "heightmap";
       }
+      else if (tool.name.startsWith("geometry_"))
+      {
+        tool.category = "geometry";
+      }
       else if (
         tool.name == "shape_library_list" || tool.name.startsWith("brush_metadata_")
         || tool.name == "selection_by_metadata"
@@ -3685,6 +3715,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "ir_compile_preview_from_file",
     "ir_apply",
     "ir_apply_from_file",
+    "geometry_csg_selection",
     "geometry_analyze_selection",
     "geometry_analyze_slopes",
     "geometry_analyze_route_continuity",

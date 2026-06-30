@@ -562,9 +562,7 @@ bool removeVertices(
 }
 
 static std::optional<std::vector<vm::vec3d>> chamferNewVertexPositions(
-  const Brush& brush,
-  std::vector<vm::vec3d> vertexPositions,
-  const double distance)
+  const Brush& brush, std::vector<vm::vec3d> vertexPositions, const double distance)
 {
   if (vertexPositions.empty())
   {
@@ -624,7 +622,10 @@ static std::optional<std::vector<vm::vec3d>> chamferNewVertexPositions(
 }
 
 bool chamferVertices(
-  Map& map, const std::string& commandName, std::vector<vm::vec3d> vertexPositions, const double distance)
+  Map& map,
+  const std::string& commandName,
+  std::vector<vm::vec3d> vertexPositions,
+  const double distance)
 {
   if (distance <= 0.0)
   {
@@ -655,7 +656,8 @@ bool chamferVertices(
           return false;
         }
 
-        const auto chamfered = chamferNewVertexPositions(brush, verticesToChamfer, distance);
+        const auto chamfered =
+          chamferNewVertexPositions(brush, verticesToChamfer, distance);
         if (!chamfered)
         {
           return false;
@@ -663,7 +665,11 @@ bool chamferVertices(
 
         kdl::vec_append(newVertexPositions, *chamfered);
 
-        return brush.chamferVertices(map.worldBounds(), verticesToChamfer, distance, map.editorContext().uvLock())
+        return brush.chamferVertices(
+                 map.worldBounds(),
+                 verticesToChamfer,
+                 distance,
+                 map.editorContext().uvLock())
                | kdl::if_error([&](auto e) {
                    map.logger().error() << "Could not chamfer brush vertices: " << e.msg;
                  })
@@ -678,7 +684,8 @@ bool chamferVertices(
     auto changedLinkedGroups = collectContainingGroups(
       *newNodes | std::views::keys | kdl::ranges::to<std::vector>());
 
-    newVertexPositions = kdl::vec_sort_and_remove_duplicates(std::move(newVertexPositions));
+    newVertexPositions =
+      kdl::vec_sort_and_remove_duplicates(std::move(newVertexPositions));
 
     const auto result = map.executeAndStore(std::make_unique<BrushVertexCommand>(
       commandName,
@@ -842,6 +849,11 @@ bool snapVertices(Map& map, const double snapTo)
 
 bool csgConvexMerge(Map& map)
 {
+  return csgConvexMerge(map, "CSG Convex Merge");
+}
+
+bool csgConvexMerge(Map& map, const std::string& commandName)
+{
   if (!map.selection().hasBrushFaces() && !map.selection().hasOnlyBrushes())
   {
     return false;
@@ -909,7 +921,7 @@ bool csgConvexMerge(Map& map)
 
              auto* brushNode = new BrushNode{std::move(b)};
 
-             auto transaction = Transaction{map, "CSG Convex Merge"};
+             auto transaction = Transaction{map, commandName};
              deselectAll(map);
              if (addNodes(map, {{parentNode, {brushNode}}}).empty())
              {
@@ -927,13 +939,18 @@ bool csgConvexMerge(Map& map)
 
 bool csgSubtract(Map& map)
 {
+  return csgSubtract(map, "CSG Subtract");
+}
+
+bool csgSubtract(Map& map, const std::string& commandName)
+{
   const auto subtrahendNodes = std::vector<BrushNode*>{map.selection().brushes};
   if (subtrahendNodes.empty())
   {
     return false;
   }
 
-  auto transaction = Transaction{map, "CSG Subtract"};
+  auto transaction = Transaction{map, commandName};
   // Select touching, but don't delete the subtrahends yet
   selectTouchingNodes(map, false);
 
@@ -992,6 +1009,11 @@ bool csgSubtract(Map& map)
 
 bool csgIntersect(Map& map)
 {
+  return csgIntersect(map, "CSG Intersect");
+}
+
+bool csgIntersect(Map& map, const std::string& commandName)
+{
   const auto brushes = map.selection().brushes;
   if (brushes.size() < 2u)
   {
@@ -1015,7 +1037,7 @@ bool csgIntersect(Map& map)
 
   const auto toRemove = std::vector<Node*>{std::begin(brushes), std::end(brushes)};
 
-  auto transaction = Transaction{map, "CSG Intersect"};
+  auto transaction = Transaction{map, commandName};
   deselectNodes(map, toRemove);
 
   if (valid)
@@ -1038,6 +1060,11 @@ bool csgIntersect(Map& map)
 }
 
 bool csgHollow(Map& map)
+{
+  return csgHollow(map, "CSG Hollow");
+}
+
+bool csgHollow(Map& map, const std::string& commandName)
 {
   const auto brushNodes = map.selection().brushes;
   if (brushNodes.empty())
@@ -1085,7 +1112,7 @@ bool csgHollow(Map& map)
     return false;
   }
 
-  auto transaction = Transaction{map, "CSG Hollow"};
+  auto transaction = Transaction{map, commandName};
   deselectAll(map);
   const auto added = addNodes(map, toAdd);
   if (added.empty())

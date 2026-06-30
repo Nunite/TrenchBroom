@@ -775,6 +775,19 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
 
+McpBridgeToolResult geometryCsgSelectionResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult geometryCsgSelectionForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+
 McpBridgeToolResult shapeLibraryListResult();
 McpBridgeToolResult brushCreatePolygonBatchResult(
   AppController& appController,

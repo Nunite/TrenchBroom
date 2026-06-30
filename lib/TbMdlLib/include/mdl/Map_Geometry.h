@@ -66,7 +66,10 @@ bool addVertex(Map& map, const vm::vec3d& vertexPosition);
 bool removeVertices(
   Map& map, const std::string& commandName, std::vector<vm::vec3d> vertexPositions);
 bool chamferVertices(
-  Map& map, const std::string& commandName, std::vector<vm::vec3d> vertexPositions, double distance);
+  Map& map,
+  const std::string& commandName,
+  std::vector<vm::vec3d> vertexPositions,
+  double distance);
 bool chamferEdges(
   Map& map,
   const std::string& commandName,
@@ -77,9 +80,13 @@ bool chamferEdges(
 bool snapVertices(Map& map, double snapTo);
 
 bool csgConvexMerge(Map& map);
+bool csgConvexMerge(Map& map, const std::string& commandName);
 bool csgSubtract(Map& map);
+bool csgSubtract(Map& map, const std::string& commandName);
 bool csgIntersect(Map& map);
+bool csgIntersect(Map& map, const std::string& commandName);
 bool csgHollow(Map& map);
+bool csgHollow(Map& map, const std::string& commandName);
 
 bool extrudeBrushes(
   Map& map, const std::vector<vm::polygon3d>& faces, const vm::vec3d& delta);

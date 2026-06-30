@@ -728,6 +728,11 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return heightmapPreviewGrayscaleResult(appController, params);
         }
+        if (toolName == "geometry_csg_selection")
+        {
+          return geometryCsgSelectionResult(
+            appController, toolName, params, m_operationHistory, m_nextOperationIndex);
+        }
         if (toolName == "ir_validate")
         {
           return irValidateResult(appController, params);

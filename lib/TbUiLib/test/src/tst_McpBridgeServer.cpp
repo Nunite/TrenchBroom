@@ -1977,7 +1977,8 @@ TEST_CASE("McpBridgeServer")
     CHECK(history.back().undone);
   }
 
-  SECTION("history_undo_mcp rejects operation from a different document before native undo")
+  SECTION(
+    "history_undo_mcp rejects operation from a different document before native undo")
   {
     auto appControllerFixture = AppControllerFixture{};
     auto& appController = appControllerFixture.appController();
@@ -2072,7 +2073,8 @@ TEST_CASE("McpBridgeServer")
     CHECK(history.back().undone);
   }
 
-  SECTION("history_undo_to_operation stops at cross-document operation with partial diagnostic")
+  SECTION(
+    "history_undo_to_operation stops at cross-document operation with partial diagnostic")
   {
     auto appControllerFixture = AppControllerFixture{};
     auto& appController = appControllerFixture.appController();
@@ -2148,7 +2150,8 @@ TEST_CASE("McpBridgeServer")
     CHECK(history.back().undone);
   }
 
-  SECTION("history_redo_mcp rejects operation from a different document before native redo")
+  SECTION(
+    "history_redo_mcp rejects operation from a different document before native redo")
   {
     auto appControllerFixture = AppControllerFixture{};
     auto& appController = appControllerFixture.appController();
@@ -2202,6 +2205,258 @@ TEST_CASE("McpBridgeServer")
     CHECK(history.back().undone);
     REQUIRE(map.redoCommandName() != nullptr);
     CHECK(QString::fromStdString(*map.redoCommandName()) == "MCP: Redo cross document");
+  }
+
+  SECTION("geometry_csg_selection reports invalid selection before mutation")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto noSelection = geometryCsgSelectionForMapResult(
+      map,
+      "geometry_csg_selection",
+      QJsonObject{{"operation", "subtract"}},
+      history,
+      nextOperationIndex);
+    CHECK(!noSelection.ok);
+    CHECK_FALSE(noSelection.error.details.value("mutatedDocument").toBool());
+    CHECK(noSelection.error.details.value("selectionSummary").isObject());
+
+    const auto create = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: CSG single box"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 64}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(create.ok);
+    const auto tooFew = geometryCsgSelectionForMapResult(
+      map,
+      "geometry_csg_selection",
+      QJsonObject{{"operation", "intersect"}},
+      history,
+      nextOperationIndex);
+    CHECK(!tooFew.ok);
+    CHECK_FALSE(tooFew.error.details.value("mutatedDocument").toBool());
+    CHECK(tooFew.error.details.value("requiredSelection").toString().contains("two"));
+  }
+
+  SECTION("geometry_csg_selection runs hollow with compact ids and undo")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto create = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: CSG hollow source"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{128, 128, 128}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(create.ok);
+    const auto descendantCountBefore = map.worldNode().descendantCount();
+
+    const auto hollow = geometryCsgSelectionForMapResult(
+      map,
+      "geometry_csg_selection",
+      QJsonObject{{"operation", "hollow"}, {"idsMode", "sample"}},
+      history,
+      nextOperationIndex);
+
+    const auto error = hollow.ok ? std::string{} : hollow.error.message.toStdString();
+    INFO(error);
+    REQUIRE(hollow.ok);
+    CHECK(hollow.result.value("mutatedDocument").toBool());
+    CHECK(hollow.result.value("operation").toString() == "hollow");
+    CHECK(hollow.result.value("transactionName").toString() == "MCP: CSG Hollow");
+    CHECK(hollow.result.value("changedObjectCount").toInt() > 1);
+    CHECK(hollow.result.value("deletedObjectCount").toInt() == 1);
+    CHECK(hollow.result.value("changedObjectIdSample").toArray().size() > 1);
+    CHECK(!hollow.result.contains("changedObjectIds"));
+    CHECK(history.back().toolName == "geometry_csg_selection");
+    CHECK(history.back().transactionName == "MCP: CSG Hollow");
+    CHECK(history.back().deletedObjectIds.size() == 1);
+    CHECK(map.worldNode().descendantCount() > descendantCountBefore);
+
+    const auto undo = historyUndoForMapResult(map, history);
+    REQUIRE(undo.ok);
+    CHECK(history.back().undone);
+    CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+  }
+
+  SECTION("geometry_csg_selection supports intersect and full ids")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto create = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: CSG intersect sources"},
+        {"operations",
+         QJsonArray{
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{0, 0, 0}},
+             {"max", QJsonArray{96, 96, 96}},
+           },
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{32, 32, 32}},
+             {"max", QJsonArray{128, 128, 128}},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(create.ok);
+    CHECK(map.selection().nodes.size() == 2u);
+
+    const auto intersect = geometryCsgSelectionForMapResult(
+      map,
+      "geometry_csg_selection",
+      QJsonObject{{"operation", "intersect"}, {"idsMode", "full"}},
+      history,
+      nextOperationIndex);
+
+    REQUIRE(intersect.ok);
+    CHECK(intersect.result.value("operation").toString() == "intersect");
+    CHECK(intersect.result.value("changedObjectCount").toInt() == 1);
+    CHECK(intersect.result.value("deletedObjectCount").toInt() == 2);
+    CHECK(intersect.result.value("changedObjectIds").toArray().size() == 1);
+    CHECK(intersect.result.value("deletedObjectIds").toArray().size() == 2);
+    CHECK(
+      intersect.result.value("selectionAfter").toObject().value("brushCount").toInt()
+      == 1);
+  }
+
+  SECTION("geometry_csg_selection supports convex merge and subtract")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto mergeSources = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: CSG merge sources"},
+        {"operations",
+         QJsonArray{
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{0, 0, 0}},
+             {"max", QJsonArray{64, 64, 64}},
+           },
+           QJsonObject{
+             {"type", "box"},
+             {"min", QJsonArray{64, 0, 0}},
+             {"max", QJsonArray{128, 64, 64}},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(mergeSources.ok);
+
+    const auto merge = geometryCsgSelectionForMapResult(
+      map,
+      "geometry_csg_selection",
+      QJsonObject{{"operation", "convex_merge"}},
+      history,
+      nextOperationIndex);
+
+    REQUIRE(merge.ok);
+    CHECK(merge.result.value("changedObjectCount").toInt() == 1);
+    CHECK(merge.result.value("deletedObjectCount").toInt() == 2);
+    CHECK(map.selection().brushes.size() == 1u);
+
+    const auto subtractSources = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: CSG subtract cutter"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{32, 16, 16}},
+           {"max", QJsonArray{96, 48, 48}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(subtractSources.ok);
+    REQUIRE(map.selection().brushes.size() == 1u);
+
+    const auto subtract = geometryCsgSelectionForMapResult(
+      map,
+      "geometry_csg_selection",
+      QJsonObject{{"operation", "subtract"}},
+      history,
+      nextOperationIndex);
+
+    REQUIRE(subtract.ok);
+    CHECK(subtract.result.value("operation").toString() == "subtract");
+    CHECK(subtract.result.value("deletedObjectCount").toInt() >= 1);
+    CHECK(subtract.result.value("changedObjectCount").toInt() >= 1);
   }
 
   SECTION("geometry review renderer writes isolated nonblank review bundle")
