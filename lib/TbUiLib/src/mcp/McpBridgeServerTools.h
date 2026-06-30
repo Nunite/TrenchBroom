@@ -187,6 +187,11 @@ McpBridgeToolResult faceSelectResult(
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult faceSelectForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult faceTextureSetResult(
   AppController& appController,
   const QString& toolName,

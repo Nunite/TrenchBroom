@@ -1213,7 +1213,16 @@ McpBridgeToolResult faceSelectResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return faceSelectForMapResult(
+    mapWindow->document().map(), params, history, objectRegistry);
+}
+
+McpBridgeToolResult faceSelectForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry)
+{
   auto error = QString{};
   auto handles = std::vector<mdl::BrushFaceHandle>{};
   if (params.value("faces").isArray())
@@ -1248,6 +1257,7 @@ McpBridgeToolResult faceSelectResult(
   return McpBridgeToolResult::success(QJsonObject{
     {"faces", faces},
     {"selectedCount", faces.size()},
+    {"mutatedDocument", false},
   });
 }
 

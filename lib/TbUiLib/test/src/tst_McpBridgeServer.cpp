@@ -4915,6 +4915,52 @@ TEST_CASE("McpBridgeServer texture_align_face reports pre-mutation failures")
     == "choose_supported_alignment_mode");
 }
 
+TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto createResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+      {"detail", "ids"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(createResponse.ok);
+  const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(objectIds.size() == 1);
+
+  const auto response = faceSelectForMapResult(
+    map,
+    QJsonObject{{"objectId", objectIds.first().toString()}, {"faceIndex", 0}},
+    history,
+    objectRegistry);
+  REQUIRE(response.ok);
+  CHECK(response.result.value("selectedCount").toInt() == 1);
+  CHECK(response.result.value("mutatedDocument").toBool(true) == false);
+  CHECK(map.selection().brushFaces.size() == 1u);
+}
+
 TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
 {
   auto appControllerFixture = AppControllerFixture{};
