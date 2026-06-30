@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <array>
 #include <functional>
+#include <map>
 
 namespace tb::mcp
 {
@@ -3765,6 +3766,24 @@ QJsonObject toMcpToolDiagnosticJson(
   };
 }
 
+namespace
+{
+
+QJsonObject toMcpToolSummaryJson(
+  const McpToolDefinition& tool, const McpToolProfile profile)
+{
+  return QJsonObject{
+    {"name", tool.name},
+    {"description", tool.description},
+    {"category", tool.category},
+    {"expert", tool.expert},
+    {"requiredMode", modeName(tool.requiredMode)},
+    {"visibleInCurrentProfile", visibleInProfile(tool, profile)},
+  };
+}
+
+} // namespace
+
 QJsonArray toolsListJson(
   const McpMode mode, const bool implementedOnly, const McpToolProfile profile)
 {
@@ -3796,6 +3815,72 @@ QJsonArray toolsListJson(const McpMode mode, const bool implementedOnly)
 QJsonArray toolsListJson(const McpMode mode)
 {
   return toolsListJson(mode, true, McpToolProfile::Modeling);
+}
+
+QJsonArray toolsSummaryJson(
+  const McpMode mode, const bool implementedOnly, const McpToolProfile profile)
+{
+  auto result = QJsonArray{};
+  for (const auto& tool : defaultToolCatalog())
+  {
+    if (implementedOnly && !tool.implemented)
+    {
+      continue;
+    }
+    if (!allowsMode(mode, tool.requiredMode))
+    {
+      continue;
+    }
+    if (!visibleInProfile(tool, profile))
+    {
+      continue;
+    }
+    result.push_back(toMcpToolSummaryJson(tool, profile));
+  }
+  return result;
+}
+
+QJsonObject toolProfileStatsJson(
+  const McpMode mode, const bool implementedOnly, const McpToolProfile profile)
+{
+  auto categoryCounts = std::map<QString, int>{};
+  auto implementedToolCount = 0;
+  auto expertToolCount = 0;
+
+  for (const auto& tool : defaultToolCatalog())
+  {
+    if (implementedOnly && !tool.implemented)
+    {
+      continue;
+    }
+    if (!allowsMode(mode, tool.requiredMode))
+    {
+      continue;
+    }
+    if (!visibleInProfile(tool, profile))
+    {
+      continue;
+    }
+
+    ++implementedToolCount;
+    ++categoryCounts[tool.category];
+    if (tool.expert)
+    {
+      ++expertToolCount;
+    }
+  }
+
+  auto categoryCountsJson = QJsonObject{};
+  for (const auto& [category, count] : categoryCounts)
+  {
+    categoryCountsJson.insert(category, count);
+  }
+
+  return QJsonObject{
+    {"implementedToolCount", implementedToolCount},
+    {"expertToolCount", expertToolCount},
+    {"toolCategoryCounts", categoryCountsJson},
+  };
 }
 
 namespace
@@ -3943,22 +4028,21 @@ QJsonArray toolsSearchJson(
     detail.trimmed().toLower() == "schema" || detail.trimmed().toLower() == "full";
   const auto tokens = toolSearchTokens(normalizedQuery);
 
-  auto result = QJsonArray{};
-  const auto appendTool = [&](const auto& tool) {
-    auto object = QJsonObject{
-      {"name", tool.name},
-      {"description", tool.description},
-      {"category", tool.category},
-      {"expert", tool.expert},
-      {"requiredMode", modeName(tool.requiredMode)},
-      {"visibleInCurrentProfile", visibleInProfile(tool, profile)},
+  const auto appendTool =
+    [&](QJsonArray& result, const auto& tool, const bool includeToolSchema) {
+      auto object = toMcpToolSummaryJson(tool, profile);
+      if (includeToolSchema)
+      {
+        object.insert("inputSchema", tool.inputSchema);
+      }
+      else if (includeSchema)
+      {
+        object.insert("schemaAvailable", true);
+        object.insert("schemaOmittedReason", "multiple_matches");
+        object.insert("schemaQuery", tool.name);
+      }
+      result.push_back(std::move(object));
     };
-    if (includeSchema)
-    {
-      object.insert("inputSchema", tool.inputSchema);
-    }
-    result.push_back(std::move(object));
-  };
 
   auto exactMatches = std::vector<std::reference_wrapper<const McpToolDefinition>>{};
   if (!normalizedQuery.isEmpty())
@@ -3988,13 +4072,37 @@ QJsonArray toolsSearchJson(
   }
   if (!exactMatches.empty())
   {
+    auto result = QJsonArray{};
     for (const auto& tool : exactMatches)
     {
-      appendTool(tool.get());
+      appendTool(result, tool.get(), includeSchema);
     }
     return result;
   }
 
+  auto nameFragmentMatches =
+    std::vector<std::reference_wrapper<const McpToolDefinition>>{};
+  if (!normalizedQuery.isEmpty())
+  {
+    for (const auto& tool : defaultToolCatalog())
+    {
+      if (
+        tool.implemented && allowsMode(mode, tool.requiredMode)
+        && tool.name.toLower().contains(normalizedQuery)
+        && (normalizedCategory.isEmpty() || tool.category.compare(normalizedCategory, Qt::CaseInsensitive) == 0))
+      {
+        nameFragmentMatches.push_back(std::cref(tool));
+      }
+    }
+  }
+  if (nameFragmentMatches.size() == 1)
+  {
+    auto result = QJsonArray{};
+    appendTool(result, nameFragmentMatches.front().get(), includeSchema);
+    return result;
+  }
+
+  auto matches = std::vector<std::reference_wrapper<const McpToolDefinition>>{};
   for (const auto& tool : defaultToolCatalog())
   {
     if (!tool.implemented || !allowsMode(mode, tool.requiredMode))
@@ -4020,7 +4128,14 @@ QJsonArray toolsSearchJson(
       continue;
     }
 
-    appendTool(tool);
+    matches.push_back(std::cref(tool));
+  }
+
+  auto result = QJsonArray{};
+  const auto includeToolSchema = includeSchema && matches.size() == 1;
+  for (const auto& tool : matches)
+  {
+    appendTool(result, tool.get(), includeToolSchema);
   }
   return result;
 }

@@ -630,6 +630,87 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("application").toString() == "TrenchBroom");
   }
 
+  SECTION("serves compact tb_doctor output")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto appServer = McpBridgeServer{appController};
+    REQUIRE(
+      appServer.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto summaryResponse = appServer.dispatchRequest(
+      mcp::McpBridgeRequest{"1", "secret", "tb_doctor", {}, mcp::McpMode::ReadOnly});
+    REQUIRE(summaryResponse.ok);
+    CHECK(summaryResponse.result.value("detail").toString() == "summary");
+    CHECK_FALSE(summaryResponse.result.contains("implementedTools"));
+    CHECK_FALSE(summaryResponse.result.contains("toolDiagnostics"));
+    CHECK(summaryResponse.result.value("implementedToolCount").toInt() > 0);
+    CHECK(summaryResponse.result.value("expertToolCount").isDouble());
+    CHECK(summaryResponse.result.value("toolCategoryCounts").isObject());
+    CHECK(summaryResponse.result.value("schemaLookupHint")
+            .toString()
+            .contains("tb_tools_search"));
+    CHECK(summaryResponse.result.contains("overlay"));
+    CHECK(
+      QJsonDocument{summaryResponse.result}.toJson(QJsonDocument::Compact).size() < 4096);
+
+    const auto fullResponse = appServer.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "tb_doctor",
+      QJsonObject{{"detail", "full"}},
+      mcp::McpMode::ReadOnly});
+    REQUIRE(fullResponse.ok);
+    CHECK(fullResponse.result.value("detail").toString() == "full");
+    CHECK(fullResponse.result.value("toolDiagnostics").isArray());
+    const auto implementedTools = fullResponse.result.value("implementedTools").toArray();
+    REQUIRE(!implementedTools.isEmpty());
+    const auto firstTool = implementedTools.first().toObject();
+    CHECK(firstTool.value("name").isString());
+    CHECK(firstTool.value("category").isString());
+    CHECK(firstTool.value("requiredMode").isString());
+    CHECK(firstTool.value("visibleInCurrentProfile").isBool());
+    CHECK_FALSE(firstTool.contains("inputSchema"));
+  }
+
+  SECTION("serves compact broad tool schema search")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto appServer = McpBridgeServer{appController};
+    REQUIRE(
+      appServer.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto broadResponse = appServer.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "tb_tools_search",
+      QJsonObject{{"query", "selector"}, {"detail", "schema"}},
+      mcp::McpMode::ReadOnly});
+    REQUIRE(broadResponse.ok);
+    const auto broadTools = broadResponse.result.value("tools").toArray();
+    REQUIRE(broadTools.size() > 1);
+    for (const auto& tool : broadTools)
+    {
+      const auto object = tool.toObject();
+      CHECK_FALSE(object.contains("inputSchema"));
+      CHECK(object.value("schemaAvailable").toBool());
+      CHECK(object.value("schemaOmittedReason").toString() == "multiple_matches");
+      CHECK(object.value("schemaQuery").toString() == object.value("name").toString());
+    }
+
+    const auto exactResponse = appServer.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "tb_tools_search",
+      QJsonObject{{"query", "blockout_create_batch"}, {"detail", "schema"}},
+      mcp::McpMode::ReadOnly});
+    REQUIRE(exactResponse.ok);
+    const auto exactTools = exactResponse.result.value("tools").toArray();
+    REQUIRE(exactTools.size() == 1);
+    CHECK(exactTools.first().toObject().value("inputSchema").isObject());
+  }
+
   SECTION("status includes bridge and process identity")
   {
     auto appControllerFixture = AppControllerFixture{};

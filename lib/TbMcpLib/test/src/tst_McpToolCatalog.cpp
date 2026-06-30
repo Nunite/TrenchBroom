@@ -438,7 +438,10 @@ TEST_CASE("McpToolCatalog")
       const auto name = object.value("name").toString();
       searchNames.push_back(name);
       visibility[name] = object.value("visibleInCurrentProfile").toBool();
-      CHECK(object.value("inputSchema").isObject());
+      CHECK_FALSE(object.value("inputSchema").isObject());
+      CHECK(object.value("schemaAvailable").toBool());
+      CHECK(object.value("schemaOmittedReason").toString() == "multiple_matches");
+      CHECK(object.value("schemaQuery").toString() == name);
     }
     CHECK(searchNames.contains("group_create_from_selection"));
     CHECK(searchNames.contains("group_inspect"));
@@ -448,6 +451,15 @@ TEST_CASE("McpToolCatalog")
     CHECK(visibility["group_inspect"]);
     CHECK_FALSE(visibility["group_rename_selected"]);
     CHECK_FALSE(visibility["group_ungroup_selected"]);
+
+    const auto exactSearchResults = toolsSearchJson(
+      "group_create_from_selection",
+      "",
+      "schema",
+      McpMode::Edit,
+      McpToolProfile::Modeling);
+    REQUIRE(exactSearchResults.size() == 1);
+    CHECK(exactSearchResults.first().toObject().value("inputSchema").isObject());
   }
 
   SECTION("modeling read-only profile hides entity schema helpers by default")
@@ -1045,6 +1057,24 @@ TEST_CASE("McpToolCatalog")
     CHECK(found.value("inputSchema").isObject());
   }
 
+  SECTION("tool search omits schemas from broad schema queries")
+  {
+    const auto tools =
+      toolsSearchJson("selector", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    REQUIRE(tools.size() > 1);
+
+    for (const auto& tool : tools)
+    {
+      const auto object = tool.toObject();
+      const auto name = object.value("name").toString();
+      CAPTURE(name);
+      CHECK_FALSE(object.value("inputSchema").isObject());
+      CHECK(object.value("schemaAvailable").toBool());
+      CHECK(object.value("schemaOmittedReason").toString() == "multiple_matches");
+      CHECK(object.value("schemaQuery").toString() == name);
+    }
+  }
+
   SECTION("tool search matches tokenized schema queries")
   {
     const auto tools = toolsSearchJson(
@@ -1598,7 +1628,21 @@ TEST_CASE("McpToolCatalog")
     CHECK(found.value("description")
             .toString()
             .contains("geometry_analyze_route_continuity"));
-    CHECK(found.value("inputSchema")
+    CHECK_FALSE(found.value("inputSchema").isObject());
+    CHECK(found.value("schemaAvailable").toBool());
+    CHECK(found.value("schemaOmittedReason").toString() == "multiple_matches");
+    CHECK(found.value("schemaQuery").toString() == "route_geometry_analyze_chain");
+
+    const auto exactRouteResults = toolsSearchJson(
+      "route_geometry_analyze_chain",
+      "",
+      "schema",
+      McpMode::Edit,
+      McpToolProfile::Modeling);
+    REQUIRE(exactRouteResults.size() == 1);
+    CHECK(exactRouteResults.first()
+            .toObject()
+            .value("inputSchema")
             .toObject()
             .value("properties")
             .toObject()

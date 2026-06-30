@@ -65,7 +65,8 @@ QJsonObject makeStatus(
   const QString& bridgeInstanceId = {},
   const QString& bridgeStartedAt = {},
   const McpObjectRegistry* objectRegistry = nullptr);
-QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig& config);
+QJsonObject doctorJson(
+  AppController& appController, const mcp::McpBridgeConfig& config, bool fullDetail);
 QJsonObject bridgeIdentityJson(
   const QString& bridgeInstanceId,
   const QString& bridgeStartedAt,

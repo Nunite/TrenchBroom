@@ -80,18 +80,10 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         }
         if (toolName == "tb_doctor")
         {
-          auto doctor = doctorJson(appController, m_config);
+          const auto fullDetail =
+            params.value("detail").toString("summary").trimmed().toLower() == "full";
+          auto doctor = doctorJson(appController, m_config, fullDetail);
           doctor.insert("overlay", m_overlayState);
-          if (params.value("detail").toString("summary").trimmed().toLower() != "full")
-          {
-            doctor.remove("implementedTools");
-            doctor.remove("toolDiagnostics");
-            doctor.insert("detail", "summary");
-          }
-          else
-          {
-            doctor.insert("detail", "full");
-          }
           return McpBridgeToolResult::success(std::move(doctor));
         }
         if (toolName == "tb_tools_search")

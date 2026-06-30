@@ -25,9 +25,9 @@
 #include <QStringList>
 
 #include "McpBridgeServerTools.h"
+#include "fs/DiskIO.h"
 #include "mcp/McpError.h"
 #include "mcp/McpToolCatalog.h"
-#include "fs/DiskIO.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushNode.h"
 #include "mdl/Entity.h"
@@ -111,14 +111,13 @@ QJsonObject documentOpenDiagnostic(
 std::optional<std::tuple<std::string, mdl::MapFormat>> detectGameAndFormatForMcp(
   AppController& appController, const std::filesystem::path& path, QString& error)
 {
-  const auto detected =
-    fs::Disk::withInputStream(path, mdl::readMapHeader)
-    | kdl::transform_error([&](const auto& e) {
-        error = QString::fromStdString(e.msg);
-        return std::pair<std::optional<std::string>, mdl::MapFormat>{
-          std::nullopt, mdl::MapFormat::Unknown};
-      })
-    | kdl::value();
+  const auto detected = fs::Disk::withInputStream(path, mdl::readMapHeader)
+                        | kdl::transform_error([&](const auto& e) {
+                            error = QString::fromStdString(e.msg);
+                            return std::pair<std::optional<std::string>, mdl::MapFormat>{
+                              std::nullopt, mdl::MapFormat::Unknown};
+                          })
+                        | kdl::value();
 
   auto [gameName, mapFormat] = detected;
   if (!gameName)
@@ -139,9 +138,11 @@ std::optional<std::tuple<std::string, mdl::MapFormat>> detectGameAndFormatForMcp
   const auto* gameInfo = appController.gameManager().gameInfo(*gameName);
   if (gameInfo == nullptr)
   {
-    error = QString{"Autodetected game '%1' is not available in this TrenchBroom "
-                    "configuration."}
-              .arg(QString::fromStdString(*gameName));
+    error =
+      QString{
+        "Autodetected game '%1' is not available in this TrenchBroom "
+        "configuration."}
+        .arg(QString::fromStdString(*gameName));
     return std::nullopt;
   }
 
@@ -174,8 +175,8 @@ McpBridgeToolResult openDocumentForMcp(
       appController,
       path,
       "openFailed",
-      QString{"Game is no longer available after autodetect: %1"}
-        .arg(QString::fromStdString(gameName)),
+      QString{"Game is no longer available after autodetect: %1"}.arg(
+        QString::fromStdString(gameName)),
       bridgeInstanceId));
   }
 
@@ -595,8 +596,8 @@ McpBridgeToolResult documentOpenResult(
     {
       return McpBridgeToolResult::failure(
         mcp::McpErrorCode::InvalidParams,
-        openResult.result.value("message")
-          .toString(QString{"Failed to open document: %1"}.arg(pathToQString(path))),
+        openResult.result.value("message").toString(
+          QString{"Failed to open document: %1"}.arg(pathToQString(path))),
         openResult.result);
     }
     return openResult;
@@ -993,10 +994,10 @@ QJsonObject makeStatus(
   return result;
 }
 
-QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig& config)
+QJsonObject doctorJson(
+  AppController& appController, const mcp::McpBridgeConfig& config, const bool fullDetail)
 {
-  const auto implementedTools = mcp::toolsListJson(config.mode, true, config.toolProfile);
-  return QJsonObject{
+  auto result = QJsonObject{
     {"configPath", mcp::defaultConfigPath()},
     {"pipeName", config.pipeName},
     {"mode", mcp::modeName(config.mode)},
@@ -1006,10 +1007,30 @@ QJsonObject doctorJson(AppController& appController, const mcp::McpBridgeConfig&
     {"documentCount",
      static_cast<int>(appController.mapWindowManager().mapWindows().size())},
     {"activeDocument", appController.mapWindowManager().topMapWindow() != nullptr},
-    {"implementedToolCount", implementedTools.size()},
-    {"implementedTools", implementedTools},
-    {"toolDiagnostics", mcp::toolDiagnosticsJson(config.mode)},
+    {"schemaLookupHint",
+     "Use tb_tools_search(detail:\"schema\", query:\"exact_tool_name\") to inspect one "
+     "tool schema."},
   };
+
+  const auto stats = mcp::toolProfileStatsJson(config.mode, true, config.toolProfile);
+  for (auto it = stats.begin(); it != stats.end(); ++it)
+  {
+    result.insert(it.key(), it.value());
+  }
+
+  if (fullDetail)
+  {
+    result.insert("detail", "full");
+    result.insert(
+      "implementedTools", mcp::toolsSummaryJson(config.mode, true, config.toolProfile));
+    result.insert("toolDiagnostics", mcp::toolDiagnosticsJson(config.mode));
+  }
+  else
+  {
+    result.insert("detail", "summary");
+  }
+
+  return result;
 }
 
 } // namespace tb::ui

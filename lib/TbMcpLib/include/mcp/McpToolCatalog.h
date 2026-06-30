@@ -63,6 +63,9 @@ QJsonObject toMcpToolDiagnosticJson(const McpToolDefinition& tool, McpMode curre
 QJsonArray toolsListJson(McpMode mode, bool implementedOnly, McpToolProfile profile);
 QJsonArray toolsListJson(McpMode mode, bool implementedOnly);
 QJsonArray toolsListJson(McpMode mode);
+QJsonArray toolsSummaryJson(McpMode mode, bool implementedOnly, McpToolProfile profile);
+QJsonObject toolProfileStatsJson(
+  McpMode mode, bool implementedOnly, McpToolProfile profile);
 QJsonArray toolsSearchJson(
   const QString& query,
   const QString& category,
