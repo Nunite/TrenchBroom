@@ -196,10 +196,14 @@ Goal: move scene generation strength out of C++ and into deterministic recipes.
 
 Work:
 
+- keep the project-owned skill source in
+  `skills/trenchbroom-mcp-scene-workflow`
 - keep recipe scripts deterministic and side-effect-free
 - require recipes to emit IR files, not mutate maps
 - add recipe manifests, examples, validators, and recommended MCP validation
   paths
+- sync the runtime skill copy with `scripts\sync-trenchbroom-mcp-skill.ps1`
+  after recipe or workflow changes
 - add recipe patterns for common scene families before asking for new C++ tools
 - promote only repeated generic needs into MCP primitives
 
@@ -249,8 +253,12 @@ logic, makes tests narrower, or gives a clear ownership boundary.
 
 ## Skill Synchronization
 
-When C++ MCP behavior changes, sync only workflow guidance into
-`C:\Users\Trh\.cc-switch\skills\trenchbroom-mcp-scene-workflow`:
+The project-owned skill source is
+`skills/trenchbroom-mcp-scene-workflow`. The runtime copy on this machine is
+`C:\Users\Trh\.cc-switch\skills\trenchbroom-mcp-scene-workflow`.
+
+When C++ MCP behavior changes, edit the project copy and sync only workflow
+guidance into the runtime copy:
 
 - which tool to use by default
 - when to use recipe/IR instead of direct MCP
@@ -259,6 +267,13 @@ When C++ MCP behavior changes, sync only workflow guidance into
 - how to recover targets through selectors, modules, groups, or selection
 
 Do not copy full C++ schemas into the skill.
+
+Use these checks for skill and recipe changes:
+
+```powershell
+python skills\trenchbroom-mcp-scene-workflow\scripts\validate_recipes.py
+powershell -ExecutionPolicy Bypass -File scripts\sync-trenchbroom-mcp-skill.ps1 -Check
+```
 
 ## Non-Goals
 

@@ -325,6 +325,11 @@ Layer decision:
 
 ## Skill Synchronization Rules
 
+The project-owned skill source lives at
+`skills/trenchbroom-mcp-scene-workflow`. The local runtime copy is
+`C:\Users\Trh\.cc-switch\skills\trenchbroom-mcp-scene-workflow`; update it with
+`scripts\sync-trenchbroom-mcp-skill.ps1` after editing the project copy.
+
 When C++ MCP behavior changes, update the skill only for workflow decisions:
 
 - which tool to call by default
@@ -337,7 +342,9 @@ Do not put long C++ schema copies into the skill. MCP schema remains the source
 for parameter details; the skill owns routing and judgment.
 
 When adding a recipe, update the skill recipe manifest, examples, validator, and
-recommended MCP validation path. Do not add a matching C++ prefab tool.
+recommended MCP validation path. Run
+`python skills\trenchbroom-mcp-scene-workflow\scripts\validate_recipes.py`
+before syncing the runtime copy. Do not add a matching C++ prefab tool.
 
 ## Skill Development Rules
 

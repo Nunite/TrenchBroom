@@ -1,0 +1,13 @@
+{
+  "moduleId": "recipe-temple-courtyard-stress",
+  "width": 1536,
+  "depth": 1152,
+  "baseHeight": 64,
+  "hallWidth": 640,
+  "hallDepth": 448,
+  "hallHeight": 320,
+  "roofHeight": 96,
+  "columnCount": 10,
+  "columnSize": 32,
+  "includeEntities": true
+}

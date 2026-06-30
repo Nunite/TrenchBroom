@@ -1,0 +1,15 @@
+interface:
+  display_name: "TrenchBroom MCP Scene Workflow"
+  short_description: "Atomic TrenchBroom MCP scene workflow"
+  default_prompt: "Use $trenchbroom-mcp-scene-workflow to plan, build, validate, and report a disposable TrenchBroom MCP scene with atomic tools."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "trenchbroom"
+      description: "Local TrenchBroom HTTP MCP bridge"
+      transport: "streamable_http"
+      url: "http://127.0.0.1:37666/mcp/"
+
+policy:
+  allow_implicit_invocation: true

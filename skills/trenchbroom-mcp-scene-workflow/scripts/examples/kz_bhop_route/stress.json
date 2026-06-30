@@ -1,0 +1,13 @@
+{
+  "moduleId": "recipe-kz-bhop-stress",
+  "routeId": "kz-bhop-stress",
+  "platformCount": 14,
+  "spacing": 256,
+  "platformWidth": 128,
+  "platformDepth": 96,
+  "platformHeight": 32,
+  "zStep": 48,
+  "slideWidth": 128,
+  "includeSlide": true,
+  "includeEntities": true
+}

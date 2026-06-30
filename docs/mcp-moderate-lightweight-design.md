@@ -249,10 +249,13 @@ Current Phase 2 status:
   concise markdown report plus generated IR files.
 - Recipe scripts only emit IR JSON. They do not call TrenchBroom, MCP, or `tb2`
   directly.
+- The canonical skill source is tracked under
+  `skills/trenchbroom-mcp-scene-workflow`; sync it to the runtime skill directory
+  with `scripts\sync-trenchbroom-mcp-skill.ps1`.
 
 Phase 2 validation evidence from the current branch:
 
-- `python C:\Users\Trh\.cc-switch\skills\trenchbroom-mcp-scene-workflow\scripts\validate_recipes.py --out-dir build-release-codex\codex-mcp-lightweight\phase2-recipes\ir --report build-release-codex\codex-mcp-lightweight\phase2-recipes\recipe-validation.md`
+- `python skills\trenchbroom-mcp-scene-workflow\scripts\validate_recipes.py --out-dir build-release-codex\codex-mcp-lightweight\phase2-recipes\ir --report build-release-codex\codex-mcp-lightweight\phase2-recipes\recipe-validation.md`
   validated 9 examples; 9 passed.
 - Real Release TB MCP validation used disposable `map_test\unnamed.map` sessions and
   `ir_compile_preview_from_file` / `ir_apply_from_file` for the three default IR

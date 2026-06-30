@@ -1,0 +1,15 @@
+{
+  "moduleId": "recipe-ascending-loop-stress",
+  "routeId": "ascending-loop-stress",
+  "center": [0, 0, 0],
+  "radius": 512,
+  "width": 160,
+  "rise": 512,
+  "segments": 96,
+  "supportEvery": 6,
+  "turnDegrees": 540,
+  "railHeight": 56,
+  "railWidth": 16,
+  "supportSize": 24,
+  "includeEntities": true
+}

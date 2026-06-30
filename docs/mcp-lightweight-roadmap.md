@@ -69,6 +69,9 @@ This order matters because every later phase depends on short, stable tool outpu
   - `temple_courtyard`
   - `kz_bhop_route`
 - Recipe scripts now have manifests, parameter validation, `--describe`, `--validate-only`, grouped examples, and a skill-side validator.
+- The canonical skill source is tracked under
+  `skills/trenchbroom-mcp-scene-workflow`; sync it to the runtime skill directory
+  with `scripts\sync-trenchbroom-mcp-skill.ps1`.
 - Real TB acceptance has validated the recipe path against a disposable map.
 
 ## Phase 1: Output Compaction And Path Clarity
@@ -444,7 +447,7 @@ Use this table as the rolling implementation checklist.
 | P2 | Add recipe catalog/listing | Skill | Done in `trenchbroom-mcp-scene-workflow/scripts/list_recipes.py`; lists manifests, examples, and recommended validation without generating IR. |
 | P2 | Add profile-size regression test | MCP catalog tests | Done: `McpToolCatalog` now guards Modeling profile size and hidden-tool search behavior. |
 | P2 | Improve entity glyph and label policy in review | C++ MCP | Done: entity glyphs remain visible while dense classname labels auto-hide; `labelParts` labels important metadata parts with stride/threshold controls, and review summaries report entity/order/part label counts. |
-| P2 | Add Codex CLI regression prompts | Skill/testing | Done in `C:\Users\Trh\.cc-switch\skills\trenchbroom-mcp-scene-workflow\references\codex-cli-regression-prompts.md` for ascending spiral, temple courtyard, and KZ bhop/slide disposable flows. |
+| P2 | Add Codex CLI regression prompts | Skill/testing | Done in `skills\trenchbroom-mcp-scene-workflow\references\codex-cli-regression-prompts.md` and synced to the runtime skill for ascending spiral, temple courtyard, and KZ bhop/slide disposable flows. |
 | P3 | Evaluate legacy/convenience tools for deprecation text | MCP catalog docs | Done: hidden viewport, low-level review, legacy metadata, and legacy route analysis entries stay searchable and describe recommended selector/module/review/continuity replacements. |
 
 ## Non-Goals

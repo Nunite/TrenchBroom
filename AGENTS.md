@@ -86,7 +86,8 @@
 - Before adding or changing TrenchBroom MCP tools, read and follow `docs/mcp-development-governance.md`.
 - C++ MCP is the guarded editor execution kernel. Do not add scene prefab tools such as `create_temple`, `create_courtyard`, `create_kz_route`, `create_racetrack`, `create_house`, or similar layout-specific generators.
 - Put prefab-like composition, gameplay/domain judgement, and reusable scene families into skill recipes that emit IR files. MCP should preview/apply the IR, recover targets, validate geometry, and render reviews.
-- The local skill copy to sync for TrenchBroom MCP workflow changes is `C:\Users\Trh\.cc-switch\skills\trenchbroom-mcp-scene-workflow`.
+- The canonical TrenchBroom MCP workflow skill source is `skills\trenchbroom-mcp-scene-workflow`; sync it to the local runtime copy at `C:\Users\Trh\.cc-switch\skills\trenchbroom-mcp-scene-workflow` with `scripts\sync-trenchbroom-mcp-skill.ps1`.
+- After changing the TrenchBroom MCP workflow skill or recipes, run `python skills\trenchbroom-mcp-scene-workflow\scripts\validate_recipes.py` and `powershell -ExecutionPolicy Bypass -File scripts\sync-trenchbroom-mcp-skill.ps1 -Check`.
 - Add a C++ MCP capability only when it needs TrenchBroom internals such as document guards, undo transactions, selection/object identity, live map geometry, validation, or review rendering.
 - After MCP C++ source, catalog, bridge, config, or UI integration changes, build the Release `TrenchBroom` target before declaring the work done, in addition to focused MCP tests.
 - New high-volume MCP outputs must be compact by default (`idsMode:"count"` or `"sample"`, `detail:"summary"` style behavior) with full ids/details opt-in.

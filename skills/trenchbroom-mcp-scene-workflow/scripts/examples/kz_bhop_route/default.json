@@ -1,0 +1,14 @@
+{
+  "moduleId": "recipe-kz-bhop-default",
+  "routeId": "kz-bhop-default",
+  "platformCount": 7,
+  "spacing": 224,
+  "platformWidth": 112,
+  "platformDepth": 96,
+  "platformHeight": 32,
+  "zStep": 32,
+  "includeSlide": true,
+  "material": "__TB_empty",
+  "markerMaterial": "__TB_empty",
+  "includeEntities": true
+}
