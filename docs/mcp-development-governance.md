@@ -206,7 +206,23 @@ Every non-trivial MCP change must include:
 
 Documentation-only governance changes need static checks, not a Release rebuild.
 
-### Rule 11: IR Compatibility Must Be Intentional
+### Rule 11: Discovery Problems Are Not Tool Requests
+
+When an Agent cannot find or choose the right workflow, fix discovery before
+adding tools:
+
+- improve skill routing, tool descriptions, `tb_status` / `tb_doctor` hints, or
+  `tb_tools_search`
+- add or update local docs/searchable guidance
+- add catalog contract tests for tool additions, removals, profile visibility,
+  schemas, and initialization instructions
+
+Do not add alias, prefab, convenience, or arbitrary-execution tools just to make
+behavior easier to remember. Do not add generic escape hatches such as
+`execute_trenchbroom_code`, `run_tb_script`, or `run_cpp` unless a separate
+security design makes them hidden, expert-only, document-guarded, and audited.
+
+### Rule 12: IR Compatibility Must Be Intentional
 
 IR is a public boundary between recipes and C++ MCP. Changes to IR shape must be
 version-aware:
@@ -221,7 +237,7 @@ version-aware:
 Recipes should include a schema/version marker once the IR shape changes beyond
 small additive fields.
 
-### Rule 12: Tool Lifecycle Must Be Explicit
+### Rule 13: Tool Lifecycle Must Be Explicit
 
 Every MCP tool should fit one lifecycle state:
 
@@ -235,7 +251,7 @@ keep exact-name search working, and add replacement text in the schema. Changing
 default profile visibility counts as a compatibility change and needs catalog
 test coverage.
 
-### Rule 13: Performance Budgets Must Be Clear
+### Rule 14: Performance Budgets Must Be Clear
 
 MCP tools should have predictable cost. New high-volume tools must define:
 
@@ -248,7 +264,7 @@ MCP tools should have predictable cost. New high-volume tools must define:
 Review and validation tools should prefer bounded summaries, small samples, and
 resource paths over huge inline payloads.
 
-### Rule 14: Failure Recovery Must Be Structured
+### Rule 15: Failure Recovery Must Be Structured
 
 Mutating tools must either commit one clear transaction or fail before mutation.
 Partial mutation is allowed only when explicitly documented and reported.
@@ -362,7 +378,9 @@ Before merging or committing MCP work, verify:
 - route/slope semantics are validated by geometry tools
 - review images remain readable
 - docs and skill routing are updated when workflow changes
+- discovery issues are fixed through docs/search/skill hints before new tools
 - IR compatibility and tool lifecycle are intentional
+- tool catalog/profile/schema/instruction changes are covered by contract tests
 - performance and failure behavior are documented for high-volume tools
 - focused tests and real TB acceptance match the change risk
 
