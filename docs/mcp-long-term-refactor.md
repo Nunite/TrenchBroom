@@ -162,7 +162,7 @@ Next Phase 1 item:
 
 - Phase 1 is closed. Continue with Phase 2.
 
-### Phase 2 Status: Partial
+### Phase 2 Status: Done
 
 - Done: the shared `idsMode` wording for high-frequency safe batch modeling
   helpers is centralized in the catalog and covered by a drift test.
@@ -181,8 +181,7 @@ Next Phase 1 item:
 
 Next Phase 2 item:
 
-- Audit Phase 2 against the Done criteria and either close it or identify the
-  next missing profile/search metadata enforcement gap.
+- Phase 2 is closed. Continue with Phase 3.
 
 ### Phase 3 Status: Partial
 
