@@ -91,6 +91,13 @@ QJsonObject arrayProperty(const QString& description, const QJsonObject& items)
   };
 }
 
+QJsonObject changedIdsModeProperty()
+{
+  return stringProperty(
+    "none, count, sample, or full for changed object ids. Defaults to count; full "
+    "maps to detail=ids.");
+}
+
 QJsonObject vec3Property(const QString& description)
 {
   return QJsonObject{
@@ -1859,10 +1866,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"grid", numberProperty("Grid size for snapping generated geometry.")},
           {"select", boolProperty("Select generated boxes.")},
           {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
-          {"idsMode",
-           stringProperty(
-             "none, count, sample, or full for changed object ids. Defaults to count; "
-             "full maps to detail=ids.")},
+          {"idsMode", changedIdsModeProperty()},
         },
         {"boxes"}),
     },
@@ -1888,10 +1892,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            stringProperty(
              "Transaction label, defaults to MCP: Create polygon platform batch.")},
           {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
-          {"idsMode",
-           stringProperty(
-             "none, count, sample, or full for changed object ids. Defaults to count; "
-             "full maps to detail=ids.")},
+          {"idsMode", changedIdsModeProperty()},
           {"material",
            stringProperty("Default material for brushes without a material field.")},
         },
@@ -2765,10 +2766,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"grid", numberProperty("Grid size for snapping generated geometry.")},
           {"select", boolProperty("Select generated brushes.")},
           {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
-          {"idsMode",
-           stringProperty(
-             "none, count, sample, or full for changed object ids. Defaults to count; "
-             "full maps to detail=ids.")},
+          {"idsMode", changedIdsModeProperty()},
           {"defaultMetadata", genericMetadataSchema()},
           {"operations",
            arrayProperty(

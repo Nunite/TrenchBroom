@@ -162,10 +162,12 @@ Next Phase 1 item:
 
 - Phase 1 is closed. Continue with Phase 2.
 
-### Phase 2 Status: Missing
+### Phase 2 Status: Partial
 
-- Missing: common schema fragments are not centralized enough to make selector,
-  module, compact-output, and recovery wording single-source.
+- Done: the shared `idsMode` wording for high-frequency safe batch modeling
+  helpers is centralized in the catalog and covered by a drift test.
+- Missing: selector, module, compact-output, and recovery wording are not yet
+  centralized enough to be single-source.
 - Missing: lifecycle/profile/category/search metadata is not enforced from one
   obvious catalog edit path.
 - Partial: catalog metadata tests exist, but they do not yet prove common
@@ -173,7 +175,7 @@ Next Phase 1 item:
 
 Next Phase 2 item:
 
-- After Phase 1 closes, centralize the smallest repeated catalog wording/schema
+- Centralize the next smallest repeated selector/module or recovery schema
   fragment that has multiple current users and add a focused catalog test.
 
 ### Phase 3 Status: Partial

@@ -1731,6 +1731,26 @@ TEST_CASE("McpToolCatalog")
             .isObject());
   }
 
+  SECTION("safe batch modeling helpers share idsMode wording")
+  {
+    const auto idsModeDescription = [](const QString& toolName) {
+      const auto tool = findToolDefinition(toolName);
+      REQUIRE(tool);
+      return tool->inputSchema.value("properties")
+        .toObject()
+        .value("idsMode")
+        .toObject()
+        .value("description")
+        .toString();
+    };
+
+    const auto description = idsModeDescription("brush_create_boxes_batch");
+    CHECK(description.contains("Defaults to count"));
+    CHECK(description.contains("full maps to detail=ids"));
+    CHECK(idsModeDescription("brush_create_polygon_batch") == description);
+    CHECK(idsModeDescription("blockout_create_batch") == description);
+  }
+
   SECTION("mode gating rejects edit tools in read-only mode")
   {
     const auto editTool = findToolDefinition("entity_create");
