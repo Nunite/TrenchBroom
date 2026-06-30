@@ -223,6 +223,9 @@ Next Phase 2 item:
 - Done: shared brush/batch mutation records from `McpBrushTools` report
   `mutatedDocument:true` and document identity in result summaries and history
   records.
+- Done: `blockout_create_batch` top-level preflight failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before compiling or
+  committing brushes.
 - Done: asset placement mutation records report `mutatedDocument:true` and
   document identity in result summaries and history records.
 - Done: asset placement precondition failures report `mutatedDocument:false`,

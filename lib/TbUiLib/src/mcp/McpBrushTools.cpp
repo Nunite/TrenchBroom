@@ -243,6 +243,15 @@ QJsonObject mutationResultJson(const McpOperationRecord& operation)
   return result;
 }
 
+QJsonObject preMutationFailureDetails(
+  QJsonObject details, const QString& recoveryAction)
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return details;
+}
+
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
@@ -6374,18 +6383,33 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   const auto operationsValue = batchParams.value("operations");
   if (!operationsValue.isArray())
   {
-    return invalidParamsFailure("blockout_create_batch requires operations array");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "blockout_create_batch requires operations array",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "operations"}},
+        "provide_batch_operations_then_retry"));
   }
   const auto operations = operationsValue.toArray();
   if (operations.isEmpty())
   {
-    return invalidParamsFailure("operations must not be empty");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "operations must not be empty",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "operations"}},
+        "provide_batch_operations_then_retry"));
   }
   for (auto i = 0; i < operations.size(); ++i)
   {
     if (!operations[i].isObject())
     {
-      return invalidParamsFailure(QString{"operations[%1] must be an object"}.arg(i));
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        QString{"operations[%1] must be an object"}.arg(i),
+        preMutationFailureDetails(
+          QJsonObject{{"targetSource", "operations"}},
+          "fix_batch_operation_objects_then_retry"));
     }
   }
 
@@ -6397,7 +6421,11 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
                                  : QJsonObject{};
   if (!finitePositive(grid))
   {
-    return invalidParamsFailure("grid must be greater than zero");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "grid must be greater than zero",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "grid"}}, "provide_positive_grid_then_retry"));
   }
   const auto expandedOperations = expandedBatchOperations(operations, defaultMetadata);
 

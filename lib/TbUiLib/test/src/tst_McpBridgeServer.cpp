@@ -5408,6 +5408,17 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
 
+  const auto missingOperationsResponse = blockoutCreateBatchForMapResult(
+    map, "blockout_create_batch", QJsonObject{}, history, nextOperationIndex);
+  REQUIRE_FALSE(missingOperationsResponse.ok);
+  CHECK(
+    missingOperationsResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(missingOperationsResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingOperationsResponse.error.details.value("recoveryAction").toString()
+    == "provide_batch_operations_then_retry");
+
   const auto batchResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",
