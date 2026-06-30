@@ -60,7 +60,7 @@ MANIFEST = {
         {"name": "rise", "type": "number"},
         {"name": "thickness", "type": "number", "min": 1},
         {"name": "startAngle", "type": "number"},
-        {"name": "turnDegrees", "type": "number"},
+        {"name": "turnDegrees", "type": "number", "min": 1, "max": 360},
         {"name": "segments", "type": "integer", "min": 4},
         {"name": "railHeight", "type": "number", "min": 0},
         {"name": "railWidth", "type": "number", "min": 1},

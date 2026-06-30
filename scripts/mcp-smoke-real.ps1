@@ -5,6 +5,7 @@ param(
   [switch] $KeepOpen,
   [switch] $ReviewScenes,
   [switch] $RecipeVisualAcceptance,
+  [string[]] $RecipeVisualVariants = @("minimal"),
   [switch] $SkipDefaultSmoke
 )
 
@@ -213,72 +214,79 @@ function Invoke-RecipeVisualAcceptance {
   $recipeRoot = Resolve-Path (Join-Path $PSScriptRoot "..\skills\trenchbroom-mcp-scene-workflow")
   $catalog = & python (Join-Path $recipeRoot "scripts\list_recipes.py") --json | ConvertFrom-Json
   $reviewOutput = New-Item -ItemType Directory -Force -Path (Join-Path $OutputRoot "recipe-reviews")
+  $variants = @($RecipeVisualVariants | ForEach-Object { $_ -split "," } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
   $results = @()
 
   foreach ($recipe in @($catalog.recipes)) {
-    if (-not @($recipe.examples).Contains("minimal")) {
-      continue
-    }
-
     $recipeId = [string] $recipe.id
-    $irPath = Join-Path $OutputRoot "$recipeId-minimal-visual.ir.json"
-    & python `
-      (Join-Path $recipeRoot "scripts\recipes\$recipeId.py") `
-      --params (Join-Path $recipeRoot "scripts\examples\$recipeId\minimal.json") `
-      --out $irPath | Out-Null
+    foreach ($variant in $variants) {
+      if (-not @($recipe.examples).Contains($variant)) {
+        continue
+      }
 
-    $preview = Invoke-McpTool -Tool "ir_compile_preview_from_file" -Arguments ([ordered] @{
-      path = $irPath
-      detail = "summary"
-    }) -TimeoutSec 30
-    if (-not [bool] $preview.valid) {
-      throw "$recipeId recipe IR preview failed"
-    }
+      $irPath = Join-Path $OutputRoot "$recipeId-$variant-visual.ir.json"
+      & python `
+        (Join-Path $recipeRoot "scripts\recipes\$recipeId.py") `
+        --params (Join-Path $recipeRoot "scripts\examples\$recipeId\$variant.json") `
+        --out $irPath | Out-Null
 
-    $applyArgs = [ordered] @{
-      path = $irPath
-      expectedDocumentPath = $TestMap
-      idsMode = "count"
-    }
-    if ($preview.previewId) {
-      $applyArgs.previewId = $preview.previewId
-    }
-    $apply = Invoke-McpTool -Tool "ir_apply_from_file" -Arguments $applyArgs -TimeoutSec 45
-    if (-not [bool] $apply.valid) {
-      throw "$recipeId recipe IR apply failed"
-    }
+      $preview = Invoke-McpTool -Tool "ir_compile_preview_from_file" -Arguments ([ordered] @{
+        path = $irPath
+        detail = "summary"
+      }) -TimeoutSec 30
+      if (-not [bool] $preview.valid) {
+        throw "$recipeId $variant recipe IR preview failed"
+      }
 
-    $moduleId = [string] $apply.moduleId
-    $review = Invoke-McpTool -Tool "module_render_review" -Arguments ([ordered] @{
-      moduleId = $moduleId
-      sceneName = "$recipeId-minimal-visual"
-      outputDir = $reviewOutput.FullName
-      views = @("iso_overview_ne", "top_plan")
-      imageSize = @(1200, 900)
-      includeBoundsBox = $true
-      detail = "full"
-      returnBase64 = $false
-    }) -TimeoutSec 60
-    Assert-ReviewQuality -Review $review -Name "$recipeId recipe visual acceptance"
+      $applyArgs = [ordered] @{
+        path = $irPath
+        expectedDocumentPath = $TestMap
+        idsMode = "count"
+      }
+      if ($preview.previewId) {
+        $applyArgs.previewId = $preview.previewId
+      }
+      $apply = Invoke-McpTool -Tool "ir_apply_from_file" -Arguments $applyArgs -TimeoutSec 45
+      if (-not [bool] $apply.valid) {
+        throw "$recipeId $variant recipe IR apply failed"
+      }
 
-    $results += [ordered] @{
-      recipe = $recipeId
-      variant = "minimal"
-      irPath = $irPath
-      moduleId = $moduleId
-      operationIds = $apply.operationIds
-      reviewId = $review.reviewId
-      targetObjectCount = $review.targetObjectCount
-      qualityValid = $review.qualityValid
-      preferredCapturePath = $review.preferredCapturePath
-      contactSheet = $review.contactSheet
-      captures = @($review.captures | ForEach-Object { Get-CaptureSummary $_ })
+      $moduleId = [string] $apply.moduleId
+      $review = Invoke-McpTool -Tool "module_render_review" -Arguments ([ordered] @{
+        moduleId = $moduleId
+        sceneName = "$recipeId-$variant-visual"
+        outputDir = $reviewOutput.FullName
+        views = @("iso_overview_ne", "top_plan")
+        imageSize = @(1200, 900)
+        includeBoundsBox = $true
+        detail = "full"
+        returnBase64 = $false
+      }) -TimeoutSec 60
+      Assert-ReviewQuality -Review $review -Name "$recipeId $variant recipe visual acceptance"
+
+      $results += [ordered] @{
+        recipe = $recipeId
+        variant = $variant
+        irPath = $irPath
+        moduleId = $moduleId
+        operationIds = $apply.operationIds
+        reviewId = $review.reviewId
+        targetObjectCount = $review.targetObjectCount
+        qualityValid = $review.qualityValid
+        preferredCapturePath = $review.preferredCapturePath
+        contactSheet = $review.contactSheet
+        captures = @($review.captures | ForEach-Object { Get-CaptureSummary $_ })
+      }
     }
+  }
+
+  if ($results.Count -eq 0) {
+    throw "No recipe visual acceptance cases matched variants: $($variants -join ', ')"
   }
 
   return [ordered] @{
     recipeCount = $results.Count
-    variant = "minimal"
+    variants = $variants
     results = $results
   }
 }

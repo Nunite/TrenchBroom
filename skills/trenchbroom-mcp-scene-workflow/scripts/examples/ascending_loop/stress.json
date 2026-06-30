@@ -7,7 +7,7 @@
   "rise": 512,
   "segments": 96,
   "supportEvery": 6,
-  "turnDegrees": 540,
+  "turnDegrees": 360,
   "railHeight": 56,
   "railWidth": 16,
   "supportSize": 24,
