@@ -1398,7 +1398,7 @@ TEST_CASE("McpToolCatalog")
     }
   }
 
-  SECTION("catalog exposes lifecycle metadata and blocks arbitrary execution tools")
+  SECTION("catalog exposes lifecycle/category metadata and blocks arbitrary execution tools")
   {
     const auto bannedExecutionToolNames = QStringList{
       "execute_trenchbroom_code",
@@ -1423,6 +1423,7 @@ TEST_CASE("McpToolCatalog")
         || tool.lifecycle == "legacy" || tool.lifecycle == "deprecated";
       CHECK(knownLifecycle);
       CHECK(!tool.lifecycle.isEmpty());
+      CHECK(!tool.category.isEmpty());
       CHECK(!tool.name.contains("execute_trenchbroom", Qt::CaseInsensitive));
       CHECK(!tool.name.contains("run_cpp", Qt::CaseInsensitive));
     }
@@ -1438,10 +1439,13 @@ TEST_CASE("McpToolCatalog")
     const auto summary = toolsSummaryJson(McpMode::Edit, true, McpToolProfile::Modeling);
     REQUIRE(!summary.isEmpty());
     CHECK(summary.first().toObject().contains("lifecycle"));
+    CHECK(summary.first().toObject().contains("category"));
 
     const auto stats =
       toolProfileStatsJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    const auto categoryCounts = stats.value("toolCategoryCounts").toObject();
     const auto lifecycleCounts = stats.value("toolLifecycleCounts").toObject();
+    CHECK(categoryCounts.value("brush").toInt() > 0);
     CHECK(lifecycleCounts.value("stable").toInt() > 0);
   }
 
