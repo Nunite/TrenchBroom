@@ -229,6 +229,8 @@ Next Phase 2 item:
   `mutatedDocument:false`, `retrySafe`, and recovery actions before grouping.
 - Done: `group_rename_selected` precondition failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before renaming.
+- Done: `group_ungroup_selected` precondition failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before ungrouping.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 

@@ -1676,12 +1676,26 @@ McpBridgeToolResult groupUngroupSelectedForMapResult(
 {
   if (!map.selection().hasNodes())
   {
-    return invalidParamsFailure("group_ungroup_selected requires selected groups");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "group_ungroup_selected requires selected groups",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "select_groups_then_retry"},
+      });
   }
   auto selectedGroups = map.selection().groups;
   if (selectedGroups.empty())
   {
-    return invalidParamsFailure("group_ungroup_selected requires selected groups");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "group_ungroup_selected requires selected groups",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "select_groups_then_retry"},
+      });
   }
 
   auto groupIds = QJsonArray{};
