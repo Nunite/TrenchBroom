@@ -1363,7 +1363,11 @@ McpBridgeToolResult textureReplaceResult(
   const auto replace = params.value("replace").toString().trimmed();
   if (find.isEmpty() || replace.isEmpty())
   {
-    return invalidParamsFailure("texture_replace requires find and replace");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "texture_replace requires find and replace",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "material"}}, "provide_find_and_replace_then_retry"));
   }
 
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -1378,11 +1382,19 @@ McpBridgeToolResult textureReplaceResult(
                                 : map.selection().allBrushFaces();
   if (scope != "map" && scope != "selection")
   {
-    return invalidParamsFailure("scope must be selection or map");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "scope must be selection or map",
+      preMutationFailureDetails(
+        QJsonObject{{"scope", scope}}, "choose_selection_or_map_scope"));
   }
   if (handles.empty())
   {
-    return invalidParamsFailure("texture_replace found no candidate faces");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "texture_replace found no candidate faces",
+      preMutationFailureDetails(
+        QJsonObject{{"scope", scope}}, "select_faces_or_use_map_scope"));
   }
 
   const auto findMaterial = find.toStdString();
@@ -1397,7 +1409,12 @@ McpBridgeToolResult textureReplaceResult(
     handles.end());
   if (handles.empty())
   {
-    return invalidParamsFailure("No faces use the requested material");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "No faces use the requested material",
+      preMutationFailureDetails(
+        QJsonObject{{"find", find}, {"scope", scope}},
+        "choose_existing_material_or_expand_scope"));
   }
 
   const auto changedNodes = changedBrushIds(handles, map.worldNode());

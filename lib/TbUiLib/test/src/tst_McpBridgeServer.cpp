@@ -4871,6 +4871,27 @@ TEST_CASE("McpBridgeServer texture_apply reports pre-mutation failures")
     == "add_material_then_retry");
 }
 
+TEST_CASE("McpBridgeServer texture_replace reports pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  const auto response = textureReplaceResult(
+    appController,
+    "texture_replace",
+    QJsonObject{},
+    history,
+    nextOperationIndex);
+  REQUIRE_FALSE(response.ok);
+  CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(response.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    response.error.details.value("recoveryAction").toString()
+    == "provide_find_and_replace_then_retry");
+}
+
 TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
 {
   auto appControllerFixture = AppControllerFixture{};

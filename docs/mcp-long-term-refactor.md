@@ -208,6 +208,9 @@ Next Phase 2 item:
 - Done: `texture_apply` reports structured `mutatedDocument:false`,
   `retrySafe`, and recovery actions for pre-mutation material and face-target
   failures.
+- Done: `texture_replace` reports structured `mutatedDocument:false`,
+  `retrySafe`, and recovery actions for pre-mutation material, scope, and target
+  failures.
 - Done: `geometry_csg_selection` reports document identity on successful
   operation records and structured `mutatedDocument:false` / `retrySafe` /
   `recoveryAction` diagnostics for pre-mutation selection failures.
