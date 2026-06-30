@@ -115,7 +115,7 @@ scripts\mcp-config.ps1 -Print
 4. 对每个结构调用 `blockout_validate`，先检查尺寸、厚度、grid 和非凸风险。
 5. 优先用 `blockout_create_batch` 一次提交 typed object `operations[]`，默认选择 primitive operations：`box`、`prism`、`cylinder`、`cylinder_sector`、`polyhedron`、`path_ribbon`、`repeat_translate`、`repeat_grid`、`stepped_mass`、`support_posts_between`。例如 `{"type":"box","min":[0,0,0],"max":[128,128,16]}`、`{"type":"path_ribbon","points2d":[[0,0],[512,0],[768,256]],"width":160,"minZ":0,"maxZ":16}`。
 6. 只需要批量创建平台/跳块时用 `brush_create_boxes_batch`，传 `boxes: [{min,max,material?}]`；需要棱形、切角或引导形状时用 `brush_create_polygon_batch`，避免多次单 brush 调用产生大量 undo/history。
-7. `blockout_create_room`、`blockout_create_corridor`、`blockout_create_stairs`、`blockout_create_ramp`、`blockout_create_doorway`、`blockout_create_cover`、`blockout_create_sky_shell` 属于 convenience helpers，只用于快速草图、旧 workflow 兼容或用户明确要求，不作为 Modeling 默认路径。
+7. `blockout_create_room`、`blockout_create_corridor`、`blockout_create_stairs`、`blockout_create_ramp`、`blockout_create_doorway`、`blockout_create_cover`、`blockout_create_sky_shell` 的独立工具入口已移除。旧 `blockout_create_batch` operation type 可用于兼容或快速草图；新场景组合应优先走 skill recipe/IR 或显式 primitive operations。
 8. 默认只保留返回的 `operationId` / `resourceUri`，需要 ids 时再用 `operation_inspect(detail=ids)`。
 9. 写入工具支持 `expectedDocumentPath`。当 Agent 已经从 `tb_status` 记录了目标地图路径时，大型批量创建、删除、贴图替换、heightmap import、实体创建和保存都应传这个 guard。
 10. 用 `render_review_operation` 收集几何 review 包；复杂场景默认看 `preferredCapturePath` 的 2 图 contact sheet，必要时再打开 manifest 里的单独视图 PNG。
@@ -281,7 +281,7 @@ MCP 写操作会返回：
 
 - MCP 默认关闭，需要用户在 Preferences 中启用。
 - `Danger` 模式和任意 `tb2` 脚本执行还没有开放。
-- `prefabs_list` / `prefab_create` 只是 catalog 占位，当前不出现在默认可调用工具里。
+- `prefabs_list` / `prefab_create` 已从 MCP catalog 移除；recipe catalog 由 skill 的 `scripts/list_recipes.py` 管理。
 - `brush_create_arch` / `brush_create_torus` 当前标记为 unsupported。
 - Overlay 第一版能画 object bounds、point、bounds 和 label，但还不是全局通用 overlay manager。
 - Viewport capture 截取的是当前 UI 控件状态，不是独立离屏渲染器。

@@ -785,12 +785,7 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             &m_modules,
             &m_objectRegistry);
         }
-        if (
-          toolName == "blockout_create_room" || toolName == "blockout_create_corridor"
-          || toolName == "blockout_create_stairs" || toolName == "blockout_create_ramp"
-          || toolName == "blockout_create_doorway" || toolName == "blockout_create_cover"
-          || toolName == "blockout_create_sky_shell"
-          || toolName == "blockout_create_spiral_stairs")
+        if (toolName == "blockout_create_spiral_stairs")
         {
           return blockoutCreateResult(
             appController, toolName, params, m_operationHistory, m_nextOperationIndex);

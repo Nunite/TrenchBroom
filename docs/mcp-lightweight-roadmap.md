@@ -59,6 +59,9 @@ This order matters because every later phase depends on short, stable tool outpu
 
 - Modeling profile has been slimmed. Hidden tools remain searchable with `tb_tools_search(detail:"schema")`.
 - Legacy `Balanced` config input is treated as `Modeling`; it is not a separate advertised profile.
+- Prefab placeholders and legacy direct blockout helper tool names have been removed
+  from the MCP catalog; old structural `blockout_create_batch` operation types remain
+  compatibility/quick-sketch payloads only.
 - CPU geometry review renderer is the default isolated review path. Contact sheets default to at most two panels.
 - Selector/module workflows exist and support recovery, review, delete, and transform.
 - Skill recipes exist for:

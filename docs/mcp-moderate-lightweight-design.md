@@ -195,13 +195,13 @@ Current Phase 1 guardrails:
 
 - The `trenchbroom-mcp-scene-workflow` skill states that scene-specific prefab
   behavior belongs in recipes and IR, not in MCP tools.
-- `prefabs_list` and `prefab_create` remain reserved, unimplemented catalog
-  placeholders. Their catalog descriptions point agents to skill recipes and IR file
-  apply instead of C++ prefab behavior.
+- `prefabs_list` and `prefab_create` have been removed from the MCP catalog. Recipe
+  discovery belongs to the skill's recipe manifest/listing scripts, and C++ MCP keeps
+  only IR preview/apply as the transport boundary.
 - Catalog tests reject scene-level tool names such as `create_temple`,
   `create_cottage`, `create_kz_route`, `create_courtyard`, and `create_racetrack`.
-  The tests also keep reserved prefab placeholders out of the implemented Modeling
-  profile.
+  The tests also keep removed prefab placeholders and direct blockout helper names
+  out of every tool profile and exact-name search result.
 - Existing borderline paths are classified as follows:
 
 | Path | Phase 1 classification |
@@ -210,7 +210,7 @@ Current Phase 1 guardrails:
 | `brush_create_boxes_batch` / `brush_create_polygon_batch` | Keep in MCP as generic batch primitives. |
 | `ir_compile_preview_from_file` / `ir_apply_from_file` | Keep in MCP as the recipe transport boundary. |
 | `blockout_create_spiral_stairs` | Keep as existing generic stair primitive; do not expand into route/building prefab logic. |
-| Legacy `blockout_create_room/corridor/ramp/doorway` helpers | Compatibility/convenience only; not the default Modeling path. |
+| Legacy `blockout_create_room/corridor/stairs/ramp/doorway/cover/sky_shell` helpers | Direct tool surface removed; batch operation types remain compatibility-only. |
 | `python_generate_blockout` | Legacy/script bridge; complex reusable scene composition should move to skill recipe scripts that emit IR files. |
 | Temple/courtyard/KZ/route/house/industrial scene layouts | Recipe candidates, not C++ MCP tools. |
 
@@ -345,12 +345,14 @@ Do not delete immediately. First:
 
 Current Phase 5 status:
 
-- No tools are hard-deleted in this phase. Compatibility remains intact while default
-  discovery is slimmer.
+- The unused prefab placeholders and legacy direct blockout helper tool surface have
+  been deleted from the catalog. Compatibility for old payloads remains in
+  `blockout_create_batch` operation types while default discovery is slimmer.
 - Catalog descriptions now mark legacy/compatibility/expert paths and point to the
   replacement workflow:
-  - legacy blockout helpers (`blockout_create_room/corridor/stairs/ramp/doorway/cover/sky_shell`)
-    point to `blockout_create_batch`, route-aware primitives, or recipe-generated IR.
+  - legacy blockout batch operation types (`room`, `corridor`, `stairs`, `ramp`,
+    `doorway`, `cover`, `sky_shell`) are described as compatibility/quick-sketch
+    payloads; new composition should use recipes/IR or explicit primitives.
   - `python_generate_blockout` points to skill recipe scripts that write IR files and
     `ir_compile_preview_from_file` / `ir_apply_from_file`.
   - low-level deletion/recovery helpers (`objects_delete_by_filter`,
@@ -358,16 +360,16 @@ Current Phase 5 status:
     selector/module/operation inspect/status workflows.
   - legacy metadata and route aliases continue to point to structured selectors,
     modules, `geometry_analyze_slopes`, and `geometry_analyze_route_continuity`.
-- Catalog tests enforce replacement guidance for each retired convenience path so
-  future descriptions do not drift back toward default Agent usage.
+- Catalog tests enforce that the removed direct helper names no longer appear in
+  Full/profile/search output, and that `blockout_create_batch` carries the
+  compatibility/recipe guidance for legacy operation types.
 - Real Phase 2 and Phase 4 TB scenario runs completed through the recipe/IR and
-  default Modeling paths without relying on hidden legacy tools, which satisfies the
-  "hide before remove" gate for this iteration.
+  default Modeling paths without relying on the removed direct helper surface, which
+  satisfies the removal gate for this iteration.
 
-Future removal remains intentionally deferred. A tool should only be deleted after
-real scenario regression shows it is unused, exact-name search replacement text has
-existed long enough for agents/users to migrate, and no known external client depends
-on the old call.
+Further removal of compatibility payload support remains intentionally deferred. A
+batch operation type should only be deleted after old IR/workflows have migrated and
+no known external client depends on the old payload shape.
 
 ## Size Reduction Strategy
 

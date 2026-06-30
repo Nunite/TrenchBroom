@@ -583,13 +583,11 @@ TEST_CASE("McpBridgeServer")
         {"warnings", QJsonArray{}},
       });
     }
-    if (toolName == "blockout_create_room" || toolName == "blockout_create_spiral_stairs")
+    if (toolName == "blockout_create_spiral_stairs")
     {
       return McpBridgeToolResult::success(QJsonObject{
         {"operationId", "mcp-op-3"},
-        {"transactionName",
-         toolName == "blockout_create_room" ? "MCP: Blockout room"
-                                            : "MCP: Blockout spiral stairs"},
+        {"transactionName", "MCP: Blockout spiral stairs"},
       });
     }
     return McpBridgeToolResult::failure(
@@ -1534,7 +1532,7 @@ TEST_CASE("McpBridgeServer")
     REQUIRE(
       server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
 
-    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+    const auto removedRoomResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
       "secret",
       "blockout_create_room",
@@ -1544,8 +1542,10 @@ TEST_CASE("McpBridgeServer")
       },
       mcp::McpMode::Edit});
 
-    CHECK(response.ok);
-    CHECK(response.result.value("operationId").toString() == "mcp-op-3");
+    CHECK_FALSE(removedRoomResponse.ok);
+    REQUIRE(removedRoomResponse.error);
+    CHECK(removedRoomResponse.error->code == mcp::McpErrorCode::ToolNotFound);
+    CHECK(removedRoomResponse.error->message.contains("Unknown MCP tool"));
 
     const auto spiralResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "2",

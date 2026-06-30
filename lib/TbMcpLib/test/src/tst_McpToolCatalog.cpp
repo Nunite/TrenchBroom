@@ -28,6 +28,27 @@
 namespace tb::mcp
 {
 
+namespace
+{
+
+const QStringList& removedPrefabConvenienceToolNames()
+{
+  static const auto Names = QStringList{
+    "prefabs_list",
+    "prefab_create",
+    "blockout_create_room",
+    "blockout_create_corridor",
+    "blockout_create_stairs",
+    "blockout_create_ramp",
+    "blockout_create_doorway",
+    "blockout_create_cover",
+    "blockout_create_sky_shell",
+  };
+  return Names;
+}
+
+} // namespace
+
 TEST_CASE("McpToolCatalog")
 {
   SECTION("parses and names tool profiles")
@@ -129,8 +150,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("compile_run"));
     CHECK(findToolDefinition("compile_log_tail"));
     CHECK(findToolDefinition("leaks_load_pointfile"));
-    CHECK(findToolDefinition("prefabs_list"));
-    CHECK(findToolDefinition("prefab_create"));
+    CHECK(!findToolDefinition("prefabs_list"));
+    CHECK(!findToolDefinition("prefab_create"));
     CHECK(findToolDefinition("texture_lock_get"));
     CHECK(findToolDefinition("texture_lock_set"));
     CHECK(findToolDefinition("texture_apply_by_filter"));
@@ -145,6 +166,13 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("history_status"));
     CHECK(findToolDefinition("blockout_create_batch"));
     CHECK(findToolDefinition("blockout_create_curved_corridor"));
+    CHECK(!findToolDefinition("blockout_create_room"));
+    CHECK(!findToolDefinition("blockout_create_corridor"));
+    CHECK(!findToolDefinition("blockout_create_stairs"));
+    CHECK(!findToolDefinition("blockout_create_ramp"));
+    CHECK(!findToolDefinition("blockout_create_doorway"));
+    CHECK(!findToolDefinition("blockout_create_cover"));
+    CHECK(!findToolDefinition("blockout_create_sky_shell"));
     CHECK(findToolDefinition("python_generate_blockout"));
     CHECK(findToolDefinition("heightmap_import_grayscale"));
     CHECK(findToolDefinition("heightmap_preview_grayscale"));
@@ -862,12 +890,27 @@ TEST_CASE("McpToolCatalog")
       blockoutBatch->inputSchema.value("properties").toObject();
     CHECK(batchProperties.value("defaultMetadata").isObject());
 
-    const auto operationItems = batchProperties.value("operations")
-                                  .toObject()
-                                  .value("items")
-                                  .toObject()
-                                  .value("properties")
-                                  .toObject();
+    const auto operationsProperty = batchProperties.value("operations").toObject();
+    CHECK(operationsProperty.value("description").toString().contains("compatibility"));
+    CHECK(operationsProperty.value("description").toString().contains("skill recipes"));
+    CHECK(operationsProperty.value("description").toString().contains("explicit"));
+
+    const auto operationItemSchema = operationsProperty.value("items").toObject();
+    CHECK(operationItemSchema.value("description")
+            .toString()
+            .contains("Legacy compatibility"));
+    CHECK(operationItemSchema.value("description").toString().contains("quick sketches"));
+    const auto operationItems = operationItemSchema.value("properties").toObject();
+    CHECK(operationItems.value("type")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("Legacy compatibility structural types"));
+    CHECK(operationItems.value("type")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("skill recipes/IR"));
     CHECK(operationItems.value("metadata").isObject());
     CHECK(operationItems.value("parts").isObject());
     CHECK(operationItems.value("partMaterials").isObject());
@@ -1178,6 +1221,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemDescription.contains(R"("counts":6)"));
     CHECK(itemDescription.contains(R"("type":"stepped_mass")"));
     CHECK(itemDescription.contains(R"("type":"support_posts_between")"));
+    CHECK(itemDescription.contains("Legacy compatibility"));
+    CHECK(itemDescription.contains("skill recipes"));
     CHECK(
       operations.value("items").toObject().value("required").toArray().contains("type"));
 
@@ -1296,17 +1341,15 @@ TEST_CASE("McpToolCatalog")
       CHECK(!findToolDefinition(bannedName));
     }
 
+    for (const auto& removedName : removedPrefabConvenienceToolNames())
+    {
+      CAPTURE(removedName);
+      CHECK(!findToolDefinition(removedName));
+    }
+
     for (const auto& tool : defaultToolCatalog())
     {
       CAPTURE(tool.name);
-      if (tool.name == "prefabs_list" || tool.name == "prefab_create")
-      {
-        CHECK(!tool.implemented);
-        CHECK(tool.description.contains("skill recipes"));
-        CHECK(tool.description.contains("IR"));
-        continue;
-      }
-
       CHECK(!tool.name.contains("prefab", Qt::CaseInsensitive));
       CHECK(!tool.name.contains("temple", Qt::CaseInsensitive));
       CHECK(!tool.name.contains("cottage", Qt::CaseInsensitive));
@@ -1322,8 +1365,11 @@ TEST_CASE("McpToolCatalog")
       modelingNames.push_back(tool.toObject().value("name").toString());
     }
 
-    CHECK(!modelingNames.contains("prefabs_list"));
-    CHECK(!modelingNames.contains("prefab_create"));
+    for (const auto& removedName : removedPrefabConvenienceToolNames())
+    {
+      CAPTURE(removedName);
+      CHECK(!modelingNames.contains(removedName));
+    }
     for (const auto& bannedName : bannedSceneToolNames)
     {
       CAPTURE(bannedName);
@@ -1331,19 +1377,24 @@ TEST_CASE("McpToolCatalog")
     }
 
     const auto allEditTools = toolsListJson(McpMode::Edit, false, McpToolProfile::Full);
-    auto prefabCreateJson = QJsonObject{};
+    auto fullNames = QStringList{};
     for (const auto& tool : allEditTools)
     {
-      const auto object = tool.toObject();
-      if (object.value("name").toString() == "prefab_create")
+      fullNames.push_back(tool.toObject().value("name").toString());
+    }
+    for (const auto& removedName : removedPrefabConvenienceToolNames())
+    {
+      CAPTURE(removedName);
+      CHECK(!fullNames.contains(removedName));
+
+      const auto searchResults =
+        toolsSearchJson(removedName, "", "schema", McpMode::Edit, McpToolProfile::Full);
+      for (const auto& searchResult : searchResults)
       {
-        prefabCreateJson = object;
-        break;
+        CAPTURE(searchResult.toObject().value("name").toString());
+        CHECK(searchResult.toObject().value("name").toString() != removedName);
       }
     }
-    REQUIRE(!prefabCreateJson.isEmpty());
-    CHECK(prefabCreateJson.value("description").toString().contains("skill recipes"));
-    CHECK(prefabCreateJson.value("description").toString().contains("IR files"));
   }
 
   SECTION("retired convenience paths carry replacement guidance")
@@ -1353,13 +1404,6 @@ TEST_CASE("McpToolCatalog")
       {"operation_select", {"Hidden manual recovery", "selector_preview"}},
       {"objects_delete_by_filter", {"Expert destructive", "objects_delete_by_selector"}},
       {"objects_delete_by_operation", {"Compatibility helper", "selector/module"}},
-      {"blockout_create_room", {"Legacy convenience", "skill recipe"}},
-      {"blockout_create_corridor", {"Legacy convenience", "recipe-generated IR"}},
-      {"blockout_create_stairs", {"Legacy convenience", "blockout_create_batch"}},
-      {"blockout_create_ramp", {"Legacy low-semantic", "ramp_between"}},
-      {"blockout_create_doorway", {"Legacy convenience", "recipe IR"}},
-      {"blockout_create_cover", {"Legacy convenience", "part/role metadata"}},
-      {"blockout_create_sky_shell", {"Legacy convenience", "recipe-generated IR"}},
       {"python_generate_blockout", {"Legacy script bridge", "ir_apply_from_file"}},
       {"brush_metadata_set", {"Legacy", "defaultMetadata"}},
       {"brush_metadata_get", {"Legacy", "selector_preview"}},
@@ -1380,23 +1424,6 @@ TEST_CASE("McpToolCatalog")
         CHECK(tool->description.contains(fragment));
       }
     }
-
-    const auto doorwayTool = findToolDefinition("blockout_create_doorway");
-    REQUIRE(doorwayTool);
-    CHECK(doorwayTool->description.contains("does not cut existing"));
-    CHECK(doorwayTool->description.contains("selection-based CSG"));
-    const auto doorwayProperties =
-      doorwayTool->inputSchema.value("properties").toObject();
-    CHECK(doorwayProperties.value("doorMin")
-            .toObject()
-            .value("description")
-            .toString()
-            .contains("does not subtract from existing walls"));
-    CHECK(doorwayProperties.value("doorMax")
-            .toObject()
-            .value("description")
-            .toString()
-            .contains("does not subtract from existing walls"));
   }
 
   SECTION("safe batch modeling helpers have structured schemas")

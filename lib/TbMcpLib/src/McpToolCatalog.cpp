@@ -309,9 +309,11 @@ QJsonObject blockoutBatchOperationSchema()
     {"type", "object"},
     {"description",
      "Typed Blockout IR operation object. Primitive modeling operations should be "
-     "preferred for ordinary Agent-generated geometry. Convenience structural "
-     "operations are supported for compatibility and quick prototypes, but they are "
-     "not the default path for precise modeling. Primitive examples: "
+     "preferred for ordinary Agent-generated geometry. Legacy structural operation "
+     "types such as room, corridor, stairs, ramp, doorway, cover, and sky_shell remain "
+     "for compatibility and quick sketches only; reusable scene composition should "
+     "come from skill recipes that emit IR, or from explicit box/prism/polyhedron/"
+     "brush_create_polygon_batch primitives. Primitive examples: "
      R"({"type":"box","min":[0,0,0],"max":[128,128,16],"material":"clip"}; )"
      R"({"type":"cylinder","min":[-64,-64,0],"max":[64,64,128],)"
      R"("sides":16,"axis":"z"}; )"
@@ -330,7 +332,7 @@ QJsonObject blockoutBatchOperationSchema()
      R"("levels":5,"inset":96,"stepHeight":64}; )"
      R"({"type":"support_posts_between","points2d":[[-256,-256],[256,-256]],)"
      R"("bottomZ":0,"topZ":192,"postSize":32}; )"
-     "Convenience examples: "
+     "Legacy compatibility quick-sketch examples: "
      R"({"type":"room","min":[0,0,0],"max":[512,512,128],"thickness":16}; )"
      R"({"type":"corridor","min":[0,0,0],"max":[512,128,128],"thickness":16}; )"
      R"({"type":"curved_corridor","center":[0,0,0],"innerRadius":128,)"
@@ -353,13 +355,16 @@ QJsonObject blockoutBatchOperationSchema()
        {"type",
         stringProperty("Operation type. Primitive modeling types: box, cylinder, prism, "
                        "polyhedron, cylinder_sector, path_ribbon, repeat_translate, "
-                       "repeat_grid, stepped_mass, support_posts_between. Convenience "
+                       "repeat_grid, stepped_mass, support_posts_between, arc_ramp, "
+                       "helical_ramp, ramp_between, and wedge. Legacy compatibility "
                        "structural types: room, corridor, curved_corridor, stairs, "
-                       "arc_ramp, helical_ramp, ramp_between, wedge, ramp, doorway, "
-                       "cover, sky_shell. doorway creates a new segmented wall with an "
-                       "opening; it does not cut existing room/wall brushes. Prefer "
-                       "arc_ramp/helical_ramp or ramp_between over terraced "
-                       "curved_corridor/legacy ramp for route/surf/slide semantics.")},
+                       "ramp, doorway, cover, sky_shell. Use legacy structural types "
+                       "only for old payloads or quick sketches; new scene composition "
+                       "should use skill recipes/IR or explicit primitive operations. "
+                       "doorway creates a new segmented wall with an opening; it does "
+                       "not cut existing room/wall brushes. Prefer arc_ramp/helical_ramp "
+                       "or ramp_between over terraced curved_corridor/legacy ramp for "
+                       "route/surf/slide semantics.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"start",
@@ -2276,32 +2281,6 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"path"}),
     },
     {
-      "prefabs_list",
-      "List available prefabs. Reserved placeholder, hidden from normal Modeling "
-      "workflows. Agent scene composition should use skill recipes that emit IR files, "
-      "then apply them with ir_compile_preview_from_file and ir_apply_from_file.",
-      McpMode::ReadOnly,
-      false,
-      false,
-      objectSchema(),
-    },
-    {
-      "prefab_create",
-      "Create a prefab instance. Reserved placeholder, hidden from normal Modeling "
-      "workflows. Do not add scene-specific C++ prefab behavior here; use skill "
-      "recipes and IR files for temples, routes, courtyards, houses, and similar "
-      "composition.",
-      McpMode::Edit,
-      true,
-      false,
-      objectSchema(
-        {
-          {"id", stringProperty("Prefab id from prefabs_list.")},
-          {"origin", vec3Property("Prefab origin in map units.")},
-        },
-        {"id"}),
-    },
-    {
       "textures_list",
       "List loaded materials in the active document. With an empty query, returns the "
       "first N materials plus currentMaterial and fallbackMaterial.",
@@ -2765,139 +2744,6 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"path"}),
     },
     {
-      "blockout_create_room",
-      "Legacy convenience helper for quick room shells. Prefer blockout_create_batch "
-      "with typed operations or a skill recipe that emits IR for reusable building "
-      "layouts.",
-      McpMode::Edit,
-      true,
-      true,
-      objectSchema(
-        {
-          {"min", vec3Property("Inner room minimum corner.")},
-          {"max", vec3Property("Inner room maximum corner.")},
-          {"thickness", numberProperty("Wall thickness, defaults to 16.")},
-          {"material", stringProperty("Brush material, defaults to current material.")},
-          {"select", boolProperty("Select generated brushes.")},
-        },
-        {"min", "max"}),
-    },
-    {
-      "blockout_create_corridor",
-      "Legacy convenience helper for quick rectangular corridor shells. Prefer "
-      "blockout_create_batch path/corridor primitives or recipe-generated IR for "
-      "reusable routes.",
-      McpMode::Edit,
-      true,
-      true,
-      objectSchema(
-        {
-          {"min", vec3Property("Inner corridor minimum corner.")},
-          {"max", vec3Property("Inner corridor maximum corner.")},
-          {"thickness", numberProperty("Wall thickness, defaults to 16.")},
-          {"material", stringProperty("Brush material, defaults to current material.")},
-          {"select", boolProperty("Select generated brushes.")},
-        },
-        {"min", "max"}),
-    },
-    {
-      "blockout_create_stairs",
-      "Legacy convenience helper for simple box-based stairs. Prefer "
-      "blockout_create_batch stairs operations with metadata/parts, or recipe IR for "
-      "larger stair modules.",
-      McpMode::Edit,
-      true,
-      true,
-      objectSchema(
-        {
-          {"min", vec3Property("Staircase minimum corner.")},
-          {"max", vec3Property("Staircase maximum corner.")},
-          {"steps", integerProperty("Step count, defaults to 8.")},
-          {"axis", stringProperty("Run direction axis: x or y.")},
-          {"material", stringProperty("Brush material, defaults to current material.")},
-          {"select", boolProperty("Select generated brushes.")},
-        },
-        {"min", "max"}),
-    },
-    {
-      "blockout_create_ramp",
-      "Legacy low-semantic ramp helper. Prefer blockout_create_batch ramp_between or "
-      "arc_ramp/helical_ramp so route direction and slope validation remain clear.",
-      McpMode::Edit,
-      true,
-      true,
-      objectSchema(
-        {
-          {"min", vec3Property("Ramp minimum corner.")},
-          {"max", vec3Property("Ramp maximum corner.")},
-          {"axis", stringProperty("Run direction axis: x or y.")},
-          {"material", stringProperty("Brush material, defaults to current material.")},
-          {"select", boolProperty("Select generated brush.")},
-        },
-        {"min", "max"}),
-    },
-    {
-      "blockout_create_doorway",
-      "Legacy convenience helper that creates a new segmented wall with a rectangular "
-      "doorway. It does not cut existing room/wall brushes. Prefer typed "
-      "blockout_create_batch boxes or recipe IR when doorway layout is part of a "
-      "larger building module; use selection-based CSG when subtracting from existing "
-      "walls.",
-      McpMode::Edit,
-      true,
-      true,
-      objectSchema(
-        {
-          {"min", vec3Property("Wall minimum corner.")},
-          {"max", vec3Property("Wall maximum corner.")},
-          {"doorMin",
-           vec3Property(
-             "Door opening minimum corner. Required; this creates a new segmented "
-             "wall and does not subtract from existing walls.")},
-          {"doorMax",
-           vec3Property(
-             "Door opening maximum corner. Required; this creates a new segmented "
-             "wall and does not subtract from existing walls.")},
-          {"material", stringProperty("Brush material, defaults to current material.")},
-          {"select", boolProperty("Select generated brushes.")},
-        },
-        {"min", "max", "doorMin", "doorMax"}),
-    },
-    {
-      "blockout_create_cover",
-      "Legacy convenience helper for a low cover box. Prefer blockout_create_batch "
-      "box operations with explicit part/role metadata.",
-      McpMode::Edit,
-      true,
-      true,
-      objectSchema(
-        {
-          {"min", vec3Property("Cover minimum corner.")},
-          {"max", vec3Property("Cover maximum corner.")},
-          {"material", stringProperty("Brush material, defaults to current material.")},
-          {"select", boolProperty("Select generated brush.")},
-        },
-        {"min", "max"}),
-    },
-    {
-      "blockout_create_sky_shell",
-      "Legacy convenience helper for a sky shell around a playable volume. Prefer "
-      "recipe-generated IR or explicit blockout_create_batch shell geometry for "
-      "complex scenes.",
-      McpMode::Edit,
-      true,
-      true,
-      objectSchema(
-        {
-          {"min", vec3Property("Inner playable minimum corner.")},
-          {"max", vec3Property("Inner playable maximum corner.")},
-          {"thickness", numberProperty("Sky shell thickness, defaults to 16.")},
-          {"material", stringProperty("Sky material, defaults to sky.")},
-          {"select", boolProperty("Select generated brushes.")},
-        },
-        {"min", "max"}),
-    },
-    {
       "blockout_create_batch",
       "Create multiple blockout operations in one transaction. Prefer this over many "
       "atomic brush_create calls for architectural generation.",
@@ -2917,11 +2763,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"defaultMetadata", genericMetadataSchema()},
           {"operations",
            arrayProperty(
-             "Array of blockout operations. Supported types include box, cylinder, "
-             "prism, polyhedron, cylinder_sector, room, corridor, curved_corridor, "
-             "path_ribbon, repeat_translate, repeat_grid, stepped_mass, "
-             "support_posts_between, stairs, ramp, doorway, cover, and sky_shell. Each "
-             "item must be an object with a type field; use "
+             "Array of blockout operations. Primitive types include box, cylinder, "
+             "prism, polyhedron, cylinder_sector, path_ribbon, repeat_translate, "
+             "repeat_grid, stepped_mass, support_posts_between, arc_ramp, "
+             "helical_ramp, ramp_between, and wedge. Legacy compatibility/quick-sketch "
+             "types include room, corridor, curved_corridor, stairs, ramp, doorway, "
+             "cover, and sky_shell; new scene composition should use skill recipes/IR "
+             "or explicit primitive operations. Each item must be an object with a type "
+             "field; use "
              "tb_tools_search(detail=schema, query=\"blockout_create_batch operations\") "
              "for examples. Diagonal ramp_between can be valid but may return "
              "offAxisRampMayProduceNonGridVertices when side vertices are not "
