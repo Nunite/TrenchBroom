@@ -4959,6 +4959,18 @@ TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
   CHECK(response.result.value("selectedCount").toInt() == 1);
   CHECK(response.result.value("mutatedDocument").toBool(true) == false);
   CHECK(map.selection().brushFaces.size() == 1u);
+
+  mdl::deselectAll(map);
+  const auto missingTargetResponse =
+    faceSelectForMapResult(map, QJsonObject{}, history, objectRegistry);
+  REQUIRE_FALSE(missingTargetResponse.ok);
+  CHECK(
+    missingTargetResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(missingTargetResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingTargetResponse.error.details.value("recoveryAction").toString()
+    == "provide_faces_or_select_brush_faces");
 }
 
 TEST_CASE("McpBridgeServer applies texture to semantic operation faces")

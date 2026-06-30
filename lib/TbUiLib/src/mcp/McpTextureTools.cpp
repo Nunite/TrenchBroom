@@ -1241,8 +1241,12 @@ McpBridgeToolResult faceSelectForMapResult(
 
   if (handles.empty())
   {
-    return invalidParamsFailure(
-      error.isEmpty() ? "face_select requires faces or objectId/faceIndex" : error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error.isEmpty() ? "face_select requires faces or objectId/faceIndex" : error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "faces_or_selection"}},
+        "provide_faces_or_select_brush_faces"));
   }
 
   mdl::deselectAll(map);

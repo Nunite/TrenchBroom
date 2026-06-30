@@ -244,6 +244,8 @@ Next Phase 2 item:
   without mutating the map document.
 - Done: `face_select` reports `mutatedDocument:false` on success because it
   changes editor face selection without mutating the map document.
+- Done: `face_select` precondition failures report `mutatedDocument:false`,
+  `retrySafe`, and recovery actions before changing face selection.
 - Done: `group_create_from_selection` precondition failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before grouping.
 - Done: `group_rename_selected` precondition failures report
