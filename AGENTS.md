@@ -87,6 +87,7 @@
 - C++ MCP is the guarded editor execution kernel. Do not add scene prefab tools such as `create_temple`, `create_courtyard`, `create_kz_route`, `create_racetrack`, `create_house`, or similar layout-specific generators.
 - Put prefab-like composition, gameplay/domain judgement, and reusable scene families into skill recipes that emit IR files. MCP should preview/apply the IR, recover targets, validate geometry, and render reviews.
 - Add a C++ MCP capability only when it needs TrenchBroom internals such as document guards, undo transactions, selection/object identity, live map geometry, validation, or review rendering.
+- After MCP C++ source, catalog, bridge, config, or UI integration changes, build the Release `TrenchBroom` target before declaring the work done, in addition to focused MCP tests.
 - New high-volume MCP outputs must be compact by default (`idsMode:"count"` or `"sample"`, `detail:"summary"` style behavior) with full ids/details opt-in.
 - Modeling profile growth requires justification. Prefer hidden/searchable expert tools over visible duplicate convenience aliases.
 - For dense old maps or ambiguous brush ownership, prefer user selection plus selection-aware MCP tools instead of complex automatic brush matching.
