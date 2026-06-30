@@ -1646,7 +1646,12 @@ McpBridgeToolResult cachedIrApplyParams(
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::InvalidParams,
       QString{"Unknown or expired IR previewId: %1"}.arg(previewId),
-      QJsonObject{{"previewId", previewId}, {"mutatedDocument", false}});
+      QJsonObject{
+        {"previewId", previewId},
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "run_ir_compile_preview_from_file_again"},
+      });
   }
 
   const auto& record = it->second;
@@ -1662,6 +1667,8 @@ McpBridgeToolResult cachedIrApplyParams(
         {"currentDocumentFingerprint", currentFingerprint},
         {"cachedActiveDocumentPath", record.activeDocumentPath},
         {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "activate_original_document_or_preview_again"},
       });
   }
 
@@ -1676,6 +1683,8 @@ McpBridgeToolResult cachedIrApplyParams(
         {"previewId", previewId},
         {"sourcePath", record.sourcePath},
         {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "restore_ir_file_or_preview_again"},
       });
   }
 
@@ -1691,6 +1700,8 @@ McpBridgeToolResult cachedIrApplyParams(
         {"cachedIrHash", record.irHash},
         {"currentIrHash", currentHash},
         {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "preview_changed_ir_file_again"},
       });
   }
 

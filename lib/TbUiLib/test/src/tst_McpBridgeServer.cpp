@@ -7513,6 +7513,13 @@ TEST_CASE("McpBridgeServer file based IR tools")
     &expiredPreviewCache);
   CHECK(!expiredPreviewResponse.ok);
   CHECK(expiredPreviewResponse.error.message.contains("Unknown or expired"));
+  CHECK(
+    expiredPreviewResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(expiredPreviewResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    expiredPreviewResponse.error.details.value("recoveryAction").toString()
+    == "run_ir_compile_preview_from_file_again");
 
   auto otherDocument = MapDocument::createDocument(
                          appController.environmentConfig(),
@@ -7536,6 +7543,10 @@ TEST_CASE("McpBridgeServer file based IR tools")
   CHECK(wrongDocumentResponse.error.message.contains("different active document"));
   CHECK(
     wrongDocumentResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(wrongDocumentResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    wrongDocumentResponse.error.details.value("recoveryAction").toString()
+    == "activate_original_document_or_preview_again");
 
   const auto invalidPreviewPath = tempDir.filePath("invalid-preview-ir.json");
   auto invalidPreviewFile = QFile{invalidPreviewPath};
@@ -7611,12 +7622,12 @@ TEST_CASE("McpBridgeServer file based IR tools")
   REQUIRE(modules.size() == 1);
   const auto module = modules.first().toObject();
   CHECK(module.value("moduleId").toString() == "file-ir-module");
-  CHECK(module.value("liveObjectCount").toInt() == 1);
+  CHECK(module.value("liveObjectCount").toInt() == 2);
   CHECK(module.value("staleObjectCount").toInt() == 0);
   const auto parts = module.value("parts").toArray();
   REQUIRE(parts.size() == 1);
   CHECK(parts.first().toObject().value("part").toString() == "floor");
-  CHECK(parts.first().toObject().value("count").toInt() == 1);
+  CHECK(parts.first().toObject().value("count").toInt() == 2);
 
   const auto selectorResponse = selectorPreviewForMapResult(
     map,
@@ -7664,6 +7675,10 @@ TEST_CASE("McpBridgeServer file based IR tools")
   CHECK(
     changedFileApplyResponse.error.details.value("mutatedDocument").toBool(true)
     == false);
+  CHECK(changedFileApplyResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    changedFileApplyResponse.error.details.value("recoveryAction").toString()
+    == "preview_changed_ir_file_again");
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeRejectedApply);
 
   const auto unknownPreviewResponse = irApplyFromFileForMapResult(
@@ -7678,6 +7693,13 @@ TEST_CASE("McpBridgeServer file based IR tools")
     &previewCache);
   CHECK(!unknownPreviewResponse.ok);
   CHECK(unknownPreviewResponse.error.message.contains("Unknown or expired"));
+  CHECK(
+    unknownPreviewResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(unknownPreviewResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    unknownPreviewResponse.error.details.value("recoveryAction").toString()
+    == "run_ir_compile_preview_from_file_again");
 
   REQUIRE(changedFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
   changedFile.write(QJsonDocument{

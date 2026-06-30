@@ -221,6 +221,8 @@ Next Phase 2 item:
 - Done: invalid `brush_create_polygon_batch` preflight results report
   `mutatedDocument:false`, `retrySafe`, and a recovery action without committing
   brushes.
+- Done: cached `ir_apply_from_file` previewId guard failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before applying IR.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 
