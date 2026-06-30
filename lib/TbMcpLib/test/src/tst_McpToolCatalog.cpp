@@ -1398,6 +1398,53 @@ TEST_CASE("McpToolCatalog")
     }
   }
 
+  SECTION("catalog exposes lifecycle metadata and blocks arbitrary execution tools")
+  {
+    const auto bannedExecutionToolNames = QStringList{
+      "execute_trenchbroom_code",
+      "execute_tb_code",
+      "run_tb_script",
+      "run_cpp",
+      "eval_cpp",
+      "eval_trenchbroom",
+    };
+
+    for (const auto& bannedName : bannedExecutionToolNames)
+    {
+      CAPTURE(bannedName);
+      CHECK(!findToolDefinition(bannedName));
+    }
+
+    for (const auto& tool : defaultToolCatalog())
+    {
+      CAPTURE(tool.name);
+      const auto knownLifecycle =
+        tool.lifecycle == "stable" || tool.lifecycle == "experimental"
+        || tool.lifecycle == "legacy" || tool.lifecycle == "deprecated";
+      CHECK(knownLifecycle);
+      CHECK(!tool.lifecycle.isEmpty());
+      CHECK(!tool.name.contains("execute_trenchbroom", Qt::CaseInsensitive));
+      CHECK(!tool.name.contains("run_cpp", Qt::CaseInsensitive));
+    }
+
+    const auto pythonTool = findToolDefinition("python_generate_blockout");
+    REQUIRE(pythonTool);
+    CHECK(pythonTool->lifecycle == "legacy");
+
+    const auto unsupportedTool = findToolDefinition("brush_create_arch");
+    REQUIRE(unsupportedTool);
+    CHECK(unsupportedTool->lifecycle == "experimental");
+
+    const auto summary = toolsSummaryJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    REQUIRE(!summary.isEmpty());
+    CHECK(summary.first().toObject().contains("lifecycle"));
+
+    const auto stats =
+      toolProfileStatsJson(McpMode::Edit, true, McpToolProfile::Modeling);
+    const auto lifecycleCounts = stats.value("toolLifecycleCounts").toObject();
+    CHECK(lifecycleCounts.value("stable").toInt() > 0);
+  }
+
   SECTION("retired convenience paths carry replacement guidance")
   {
     const auto expectedDescriptionFragments = std::map<QString, QStringList>{
@@ -1831,6 +1878,9 @@ TEST_CASE("McpToolCatalog")
     CHECK(archDiagnostic.value("availableInCurrentMode").toBool());
     CHECK(archDiagnostic.value("mutatesDocument").toBool());
     CHECK_FALSE(archDiagnostic.value("implemented").toBool());
+    CHECK(archDiagnostic.value("category").toString() == "brush");
+    CHECK(archDiagnostic.value("expert").toBool());
+    CHECK(archDiagnostic.value("lifecycle").toString() == "experimental");
   }
 }
 

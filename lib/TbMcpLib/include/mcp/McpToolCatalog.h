@@ -48,6 +48,7 @@ struct McpToolDefinition
   QJsonObject inputSchema;
   QString category = "general";
   bool expert = false;
+  QString lifecycle = "stable";
 };
 
 const std::vector<McpToolDefinition>& defaultToolCatalog();

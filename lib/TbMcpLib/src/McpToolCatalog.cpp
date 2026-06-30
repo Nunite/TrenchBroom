@@ -3459,6 +3459,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       else if (tool.name.startsWith("viewport_"))
       {
         tool.category = "viewport";
+        tool.lifecycle = "experimental";
       }
       else if (tool.name.startsWith("asset_"))
       {
@@ -3487,6 +3488,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       else if (tool.name.startsWith("python_"))
       {
         tool.category = "python";
+        tool.lifecycle = "legacy";
       }
       else if (tool.name.startsWith("heightmap_"))
       {
@@ -3502,17 +3504,34 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         || tool.name == "route_geometry_analyze_chain")
       {
         tool.category = "route";
+        tool.lifecycle = "legacy";
       }
       else if (tool.name == "kz_distance_analyze_chain")
       {
         tool.category = "route";
         tool.expert = true;
+        tool.lifecycle = "legacy";
       }
       else if (
         tool.name == "tb_status" || tool.name == "tb_doctor"
         || tool.name == "tb_tools_search")
       {
         tool.category = "core";
+      }
+      if (
+        tool.name == "history_list" || tool.name == "operation_select"
+        || tool.name == "objects_delete_by_filter"
+        || tool.name == "objects_delete_by_operation"
+        || tool.name == "python_generate_blockout"
+        || tool.name.startsWith("brush_metadata_") || tool.name == "selection_by_metadata"
+        || tool.name == "route_geometry_analyze_chain"
+        || tool.name == "kz_distance_analyze_chain")
+      {
+        tool.lifecycle = "legacy";
+      }
+      if (!tool.implemented)
+      {
+        tool.lifecycle = "experimental";
       }
       addExpectedDocumentPathGuardSchema(tool);
     }
@@ -3671,6 +3690,9 @@ QJsonObject toMcpToolDiagnosticJson(
     {"availableInCurrentMode", allowsMode(currentMode, tool.requiredMode)},
     {"mutatesDocument", tool.mutatesDocument},
     {"implemented", tool.implemented},
+    {"category", tool.category},
+    {"expert", tool.expert},
+    {"lifecycle", tool.lifecycle},
   };
 }
 
@@ -3685,6 +3707,7 @@ QJsonObject toMcpToolSummaryJson(
     {"description", tool.description},
     {"category", tool.category},
     {"expert", tool.expert},
+    {"lifecycle", tool.lifecycle},
     {"requiredMode", modeName(tool.requiredMode)},
     {"visibleInCurrentProfile", visibleInProfile(tool, profile)},
   };
@@ -3752,6 +3775,7 @@ QJsonObject toolProfileStatsJson(
   const McpMode mode, const bool implementedOnly, const McpToolProfile profile)
 {
   auto categoryCounts = std::map<QString, int>{};
+  auto lifecycleCounts = std::map<QString, int>{};
   auto implementedToolCount = 0;
   auto expertToolCount = 0;
 
@@ -3772,6 +3796,7 @@ QJsonObject toolProfileStatsJson(
 
     ++implementedToolCount;
     ++categoryCounts[tool.category];
+    ++lifecycleCounts[tool.lifecycle];
     if (tool.expert)
     {
       ++expertToolCount;
@@ -3784,10 +3809,17 @@ QJsonObject toolProfileStatsJson(
     categoryCountsJson.insert(category, count);
   }
 
+  auto lifecycleCountsJson = QJsonObject{};
+  for (const auto& [lifecycle, count] : lifecycleCounts)
+  {
+    lifecycleCountsJson.insert(lifecycle, count);
+  }
+
   return QJsonObject{
     {"implementedToolCount", implementedToolCount},
     {"expertToolCount", expertToolCount},
     {"toolCategoryCounts", categoryCountsJson},
+    {"toolLifecycleCounts", lifecycleCountsJson},
   };
 }
 
@@ -3858,6 +3890,7 @@ QString searchableToolText(const McpToolDefinition& tool, const bool includeSche
       expandedName,
       tool.description,
       tool.category,
+      tool.lifecycle,
     }
       .join("\n")
       .toLower();

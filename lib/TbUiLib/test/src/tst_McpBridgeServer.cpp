@@ -645,6 +645,7 @@ TEST_CASE("McpBridgeServer")
     CHECK(summaryResponse.result.value("implementedToolCount").toInt() > 0);
     CHECK(summaryResponse.result.value("expertToolCount").isDouble());
     CHECK(summaryResponse.result.value("toolCategoryCounts").isObject());
+    CHECK(summaryResponse.result.value("toolLifecycleCounts").isObject());
     CHECK(summaryResponse.result.value("schemaLookupHint")
             .toString()
             .contains("tb_tools_search"));
@@ -675,6 +676,7 @@ TEST_CASE("McpBridgeServer")
     const auto firstTool = implementedTools.first().toObject();
     CHECK(firstTool.value("name").isString());
     CHECK(firstTool.value("category").isString());
+    CHECK(firstTool.value("lifecycle").isString());
     CHECK(firstTool.value("requiredMode").isString());
     CHECK(firstTool.value("visibleInCurrentProfile").isBool());
     CHECK_FALSE(firstTool.contains("inputSchema"));
