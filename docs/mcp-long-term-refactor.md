@@ -218,6 +218,9 @@ Next Phase 2 item:
   records.
 - Done: safe problem-fix mutation records report `mutatedDocument:true` and
   document identity in result summaries and history records.
+- Done: invalid `brush_create_polygon_batch` preflight results report
+  `mutatedDocument:false`, `retrySafe`, and a recovery action without committing
+  brushes.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 

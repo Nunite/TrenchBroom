@@ -6842,6 +6842,7 @@ TEST_CASE("McpBridgeServer route metadata tools")
     const auto validation = response.result.value("validation").toObject();
     CHECK(!validation.value("valid").toBool());
     CHECK(response.result.value("mutatedDocument").toBool(true) == false);
+    CHECK(response.result.value("retrySafe").toBool(false));
     CHECK(response.result.value("invalidPolygonCount").toInt() == 2);
     CHECK(validation.value("invalidPolygonCount").toInt() == 2);
     CHECK(response.result.value("firstInvalidPolygonIndex").toInt() == 0);

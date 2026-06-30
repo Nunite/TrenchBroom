@@ -1306,6 +1306,7 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
       {"invalidPolygonCount", invalidPolygonCount},
       {"firstInvalidPolygonIndex", firstInvalidPolygonIndex},
       {"mutatedDocument", false},
+      {"retrySafe", true},
       {"recoveryAction", "fix_polygon_points_then_retry"},
     });
   }
