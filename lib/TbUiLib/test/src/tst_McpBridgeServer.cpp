@@ -4299,6 +4299,23 @@ TEST_CASE("McpBridgeServer native group tools")
   auto objectRegistry = McpObjectRegistry{};
   auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
 
+  const auto noSelectionGroupResponse = groupCreateFromSelectionForMapResult(
+    map,
+    "group_create_from_selection",
+    QJsonObject{{"name", "empty-group"}},
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    &metadataStore);
+  REQUIRE_FALSE(noSelectionGroupResponse.ok);
+  CHECK(
+    noSelectionGroupResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(noSelectionGroupResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    noSelectionGroupResponse.error.details.value("recoveryAction").toString()
+    == "select_objects_then_retry");
+
   const auto createBrushes = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",

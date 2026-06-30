@@ -1414,11 +1414,25 @@ McpBridgeToolResult groupCreateFromSelectionForMapResult(
   const auto name = params.value("name").toString().trimmed();
   if (name.isEmpty())
   {
-    return invalidParamsFailure("group_create_from_selection requires name");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "group_create_from_selection requires name",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_group_name_then_retry"},
+      });
   }
   if (!map.selection().hasNodes())
   {
-    return invalidParamsFailure("group_create_from_selection requires selected objects");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "group_create_from_selection requires selected objects",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "select_objects_then_retry"},
+      });
   }
 
   const auto selectedBefore = map.selection().nodes;

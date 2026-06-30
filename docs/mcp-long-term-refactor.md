@@ -225,6 +225,8 @@ Next Phase 2 item:
   `mutatedDocument:false`, `retrySafe`, and recovery actions before applying IR.
 - Done: `selection_set` reports `mutatedDocument:false` on success because it
   changes editor selection state without mutating the map document.
+- Done: `group_create_from_selection` precondition failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before grouping.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 
