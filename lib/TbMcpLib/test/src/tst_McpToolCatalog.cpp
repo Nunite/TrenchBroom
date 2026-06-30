@@ -879,6 +879,21 @@ TEST_CASE("McpToolCatalog")
             .value("description")
             .toString()
             .contains("360"));
+    CHECK(operationItems.value("doorMin")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("Required when type is doorway"));
+    CHECK(operationItems.value("doorMin")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("does not subtract from existing walls"));
+    CHECK(operationItems.value("doorMax")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("Required when type is doorway"));
     CHECK(operationItems.value("orderStart").isObject());
     CHECK(operationItems.value("orderStep").isObject());
 
@@ -1365,6 +1380,23 @@ TEST_CASE("McpToolCatalog")
         CHECK(tool->description.contains(fragment));
       }
     }
+
+    const auto doorwayTool = findToolDefinition("blockout_create_doorway");
+    REQUIRE(doorwayTool);
+    CHECK(doorwayTool->description.contains("does not cut existing"));
+    CHECK(doorwayTool->description.contains("selection-based CSG"));
+    const auto doorwayProperties =
+      doorwayTool->inputSchema.value("properties").toObject();
+    CHECK(doorwayProperties.value("doorMin")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("does not subtract from existing walls"));
+    CHECK(doorwayProperties.value("doorMax")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("does not subtract from existing walls"));
   }
 
   SECTION("safe batch modeling helpers have structured schemas")

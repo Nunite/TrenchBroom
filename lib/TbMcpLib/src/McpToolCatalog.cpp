@@ -356,9 +356,10 @@ QJsonObject blockoutBatchOperationSchema()
                        "repeat_grid, stepped_mass, support_posts_between. Convenience "
                        "structural types: room, corridor, curved_corridor, stairs, "
                        "arc_ramp, helical_ramp, ramp_between, wedge, ramp, doorway, "
-                       "cover, sky_shell. Prefer arc_ramp/helical_ramp or ramp_between "
-                       "over terraced curved_corridor/legacy ramp for route/surf/slide "
-                       "semantics.")},
+                       "cover, sky_shell. doorway creates a new segmented wall with an "
+                       "opening; it does not cut existing room/wall brushes. Prefer "
+                       "arc_ramp/helical_ramp or ramp_between over terraced "
+                       "curved_corridor/legacy ramp for route/surf/slide semantics.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"start",
@@ -449,8 +450,16 @@ QJsonObject blockoutBatchOperationSchema()
           "has weak route semantics; prefer ramp_between start/end.")},
        {"sides", integerProperty("Cylinder side count, clamped to 3..128.")},
        {"thickness", numberProperty("Shell thickness for room/corridor/sky_shell.")},
-       {"doorMin", vec3Property("Door opening minimum corner for doorway.")},
-       {"doorMax", vec3Property("Door opening maximum corner for doorway.")},
+       {"doorMin",
+        vec3Property(
+          "Door opening minimum corner. Required when type is doorway. The doorway "
+          "operation creates a new segmented wall; it does not subtract from existing "
+          "walls.")},
+       {"doorMax",
+        vec3Property(
+          "Door opening maximum corner. Required when type is doorway. The doorway "
+          "operation creates a new segmented wall; it does not subtract from existing "
+          "walls.")},
        {"snapMode",
         stringProperty(
           "Circular vertex snap mode for cylinder/cylinder_sector/curved_corridor: "
@@ -2829,9 +2838,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "blockout_create_doorway",
-      "Legacy convenience helper for a wall with a rectangular doorway. Prefer typed "
+      "Legacy convenience helper that creates a new segmented wall with a rectangular "
+      "doorway. It does not cut existing room/wall brushes. Prefer typed "
       "blockout_create_batch boxes or recipe IR when doorway layout is part of a "
-      "larger building module.",
+      "larger building module; use selection-based CSG when subtracting from existing "
+      "walls.",
       McpMode::Edit,
       true,
       true,
@@ -2839,8 +2850,14 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {
           {"min", vec3Property("Wall minimum corner.")},
           {"max", vec3Property("Wall maximum corner.")},
-          {"doorMin", vec3Property("Door opening minimum corner.")},
-          {"doorMax", vec3Property("Door opening maximum corner.")},
+          {"doorMin",
+           vec3Property(
+             "Door opening minimum corner. Required; this creates a new segmented "
+             "wall and does not subtract from existing walls.")},
+          {"doorMax",
+           vec3Property(
+             "Door opening maximum corner. Required; this creates a new segmented "
+             "wall and does not subtract from existing walls.")},
           {"material", stringProperty("Brush material, defaults to current material.")},
           {"select", boolProperty("Select generated brushes.")},
         },
@@ -3212,8 +3229,16 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
              "or spiral_stairs.")},
           {"min", vec3Property("Minimum corner.")},
           {"max", vec3Property("Maximum corner.")},
-          {"doorMin", vec3Property("Door opening minimum corner for doorway.")},
-          {"doorMax", vec3Property("Door opening maximum corner for doorway.")},
+          {"doorMin",
+           vec3Property(
+             "Door opening minimum corner. Required when type is doorway. doorway "
+             "validates a freestanding segmented wall, not a cut into existing "
+             "walls.")},
+          {"doorMax",
+           vec3Property(
+             "Door opening maximum corner. Required when type is doorway. doorway "
+             "validates a freestanding segmented wall, not a cut into existing "
+             "walls.")},
           {"thickness", numberProperty("Optional wall thickness.")},
           {"steps", integerProperty("Optional stair step count.")},
           {"innerRadius", numberProperty("Optional spiral stair inner radius.")},

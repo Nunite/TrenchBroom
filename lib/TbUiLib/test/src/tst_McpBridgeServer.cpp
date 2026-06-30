@@ -5311,6 +5311,50 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     == "box");
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
+  const auto missingDoorBoundsResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "doorway"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{128, 16, 128}},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(missingDoorBoundsResponse.ok);
+  const auto missingDoorBoundsValidation =
+    missingDoorBoundsResponse.result.value("validation").toObject();
+  CHECK_FALSE(missingDoorBoundsValidation.value("valid").toBool());
+  CHECK(missingDoorBoundsValidation.value("failedOperationType").toString() == "doorway");
+  const auto missingDoorBoundsErrors =
+    missingDoorBoundsValidation.value("errors").toArray();
+  REQUIRE(missingDoorBoundsErrors.size() == 1);
+  CHECK(missingDoorBoundsErrors.first().toString().contains(
+    "operations[0]: doorway requires doorMin and doorMax"));
+  CHECK_FALSE(missingDoorBoundsErrors.first().toString().contains(
+    "must be an array of three numbers"));
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+
+  const auto validateDoorwayMissingBounds = blockoutValidateResult(QJsonObject{
+    {"type", "doorway"},
+    {"min", QJsonArray{0, 0, 0}},
+    {"max", QJsonArray{128, 16, 128}},
+  });
+  REQUIRE(validateDoorwayMissingBounds.ok);
+  CHECK_FALSE(validateDoorwayMissingBounds.result.value("valid").toBool());
+  const auto validateDoorwayErrors =
+    validateDoorwayMissingBounds.result.value("errors").toArray();
+  REQUIRE(validateDoorwayErrors.size() == 1);
+  CHECK(validateDoorwayErrors.first().toString().contains(
+    "doorway requires doorMin and doorMax"));
+  CHECK_FALSE(validateDoorwayErrors.first().toString().contains(
+    "must be an array of three numbers"));
+
   const auto partiallyInvalidResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",

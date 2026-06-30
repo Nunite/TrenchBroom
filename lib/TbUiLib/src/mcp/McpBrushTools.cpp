@@ -576,6 +576,26 @@ std::optional<vm::bbox3d> boundsFromJson(
   return vm::bbox3d{*min, *max};
 }
 
+bool requireDoorwayBounds(const QJsonObject& params, QString& error)
+{
+  auto missing = QStringList{};
+  if (!params.contains("doorMin"))
+  {
+    missing.push_back("doorMin");
+  }
+  if (!params.contains("doorMax"))
+  {
+    missing.push_back("doorMax");
+  }
+  if (missing.isEmpty())
+  {
+    return true;
+  }
+
+  error = QString{"doorway requires %1"}.arg(missing.join(" and "));
+  return false;
+}
+
 std::string mcpOptionalString(
   const QJsonObject& params, const QString& key, const std::string& defaultValue = {})
 {
@@ -3382,6 +3402,10 @@ std::optional<QJsonObject> validateBlockoutParams(
   }
   else if (type == "doorway")
   {
+    if (!requireDoorwayBounds(params, error))
+    {
+      return std::nullopt;
+    }
     const auto door = boundsFromJson(params, "doorMin", "doorMax", error);
     if (!door)
     {
@@ -5019,6 +5043,10 @@ std::vector<mdl::Node*> compileBatchOperation(
     {
       return {};
     }
+    if (!requireDoorwayBounds(operation, error))
+    {
+      return {};
+    }
     const auto door = boundsFromJson(operation, "doorMin", "doorMax", error);
     if (!door)
     {
@@ -5467,6 +5495,10 @@ McpBridgeToolResult blockoutCreateResult(
   }
   else if (toolName == "blockout_create_doorway")
   {
+    if (!requireDoorwayBounds(params, error))
+    {
+      return invalidParamsFailure(error);
+    }
     const auto door = boundsFromJson(params, "doorMin", "doorMax", error);
     if (!door)
     {
