@@ -4813,6 +4813,10 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     &moduleStore,
     &objectRegistry);
   REQUIRE(floorRibbonResponse.ok);
+  CHECK(std::ranges::any_of(
+    floorRibbonResponse.result.value("warnings").toArray(), [](const auto& warning) {
+      return warning.toString().contains("pathRibbonFloorPartPreserved");
+    }));
   const auto ribbonFloorPreview = selectorPreviewForMapResult(
     map,
     QJsonObject{

@@ -2432,6 +2432,23 @@ std::optional<QString> rampBetweenGridWarning(
     "grid, or accept off-grid diagonal ramp geometry."};
 }
 
+bool jsonArrayContainsString(
+  const QJsonValue& value, const QString& candidate, const Qt::CaseSensitivity cs)
+{
+  if (!value.isArray())
+  {
+    return false;
+  }
+  for (const auto& item : value.toArray())
+  {
+    if (item.toString().compare(candidate, cs) == 0)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
 QJsonArray blockoutWarningsForOperations(const QJsonArray& operations, const double grid)
 {
   auto warnings = QJsonArray{};
@@ -2490,6 +2507,15 @@ QJsonArray blockoutWarningsForOperations(const QJsonArray& operations, const dou
                                .arg(i));
         }
       }
+    }
+    if (
+      type == "path_ribbon"
+      && jsonArrayContainsString(operation.value("parts"), "floor", Qt::CaseInsensitive))
+    {
+      warnings.push_back(QString{
+        "operations[%1]: pathRibbonFloorPartPreserved: parts:[\"floor\"] stores "
+        "metadata part floor; unspecified path_ribbon output defaults to part surface."}
+                           .arg(i));
     }
   }
   return warnings;
@@ -3732,31 +3758,12 @@ bool partRequested(const QJsonObject& operation, const QString& partName)
   {
     return false;
   }
-  for (const auto& part : partArray)
-  {
-    if (part.toString().compare(partName, Qt::CaseInsensitive) == 0)
-    {
-      return true;
-    }
-  }
-  return false;
+  return jsonArrayContainsString(parts, partName, Qt::CaseInsensitive);
 }
 
 bool explicitPartRequested(const QJsonObject& operation, const QString& partName)
 {
-  const auto parts = operation.value("parts");
-  if (!parts.isArray())
-  {
-    return false;
-  }
-  for (const auto& part : parts.toArray())
-  {
-    if (part.toString().compare(partName, Qt::CaseInsensitive) == 0)
-    {
-      return true;
-    }
-  }
-  return false;
+  return jsonArrayContainsString(operation.value("parts"), partName, Qt::CaseInsensitive);
 }
 
 QJsonArray requestedPartsJson(const QJsonObject& operation)

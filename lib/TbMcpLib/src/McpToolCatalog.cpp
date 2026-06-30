@@ -379,7 +379,9 @@ QJsonObject blockoutBatchOperationSchema()
         arrayProperty(
           "Optional part names to generate for part-aware operations. curved_corridor "
           "supports floor, ceiling, inner_wall, outer_wall, start_cap, end_cap; "
-          "path_ribbon supports surface/floor/ribbon; stairs supports steps.")},
+          "path_ribbon supports surface/floor/ribbon, preserves explicit floor "
+          "metadata, and defaults unspecified output to surface; stairs supports "
+          "steps.")},
        {"partMaterials",
         QJsonObject{
           {"type", "object"},
