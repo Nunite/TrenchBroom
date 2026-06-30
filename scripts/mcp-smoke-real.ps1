@@ -4,7 +4,8 @@ param(
   [string] $WorkDir = "build-release-codex\codex-mcp-real-tests",
   [switch] $KeepOpen,
   [switch] $ReviewScenes,
-  [switch] $RecipeVisualAcceptance
+  [switch] $RecipeVisualAcceptance,
+  [switch] $SkipDefaultSmoke
 )
 
 $ErrorActionPreference = "Stop"
@@ -210,59 +211,75 @@ function Invoke-RecipeVisualAcceptance {
   )
 
   $recipeRoot = Resolve-Path (Join-Path $PSScriptRoot "..\skills\trenchbroom-mcp-scene-workflow")
-  $irPath = Join-Path $OutputRoot "simple-house-visual.ir.json"
-  & python `
-    (Join-Path $recipeRoot "scripts\recipes\simple_house.py") `
-    --params (Join-Path $recipeRoot "scripts\examples\simple_house\minimal.json") `
-    --out $irPath | Out-Null
-
-  $preview = Invoke-McpTool -Tool "ir_compile_preview_from_file" -Arguments ([ordered] @{
-    path = $irPath
-    detail = "summary"
-  }) -TimeoutSec 30
-  if (-not [bool] $preview.valid) {
-    throw "simple_house recipe IR preview failed"
-  }
-
-  $applyArgs = [ordered] @{
-    path = $irPath
-    expectedDocumentPath = $TestMap
-    idsMode = "count"
-  }
-  if ($preview.previewId) {
-    $applyArgs.previewId = $preview.previewId
-  }
-  $apply = Invoke-McpTool -Tool "ir_apply_from_file" -Arguments $applyArgs -TimeoutSec 45
-  if (-not [bool] $apply.valid) {
-    throw "simple_house recipe IR apply failed"
-  }
-
-  $moduleId = [string] $apply.moduleId
+  $catalog = & python (Join-Path $recipeRoot "scripts\list_recipes.py") --json | ConvertFrom-Json
   $reviewOutput = New-Item -ItemType Directory -Force -Path (Join-Path $OutputRoot "recipe-reviews")
-  $review = Invoke-McpTool -Tool "module_render_review" -Arguments ([ordered] @{
-    moduleId = $moduleId
-    sceneName = "recipe-simple-house-visual"
-    outputDir = $reviewOutput.FullName
-    views = @("iso_overview_ne", "top_plan")
-    imageSize = @(1200, 900)
-    includeBoundsBox = $true
-    detail = "full"
-    returnBase64 = $false
-  }) -TimeoutSec 60
-  Assert-ReviewQuality -Review $review -Name "simple_house recipe visual acceptance"
+  $results = @()
+
+  foreach ($recipe in @($catalog.recipes)) {
+    if (-not @($recipe.examples).Contains("minimal")) {
+      continue
+    }
+
+    $recipeId = [string] $recipe.id
+    $irPath = Join-Path $OutputRoot "$recipeId-minimal-visual.ir.json"
+    & python `
+      (Join-Path $recipeRoot "scripts\recipes\$recipeId.py") `
+      --params (Join-Path $recipeRoot "scripts\examples\$recipeId\minimal.json") `
+      --out $irPath | Out-Null
+
+    $preview = Invoke-McpTool -Tool "ir_compile_preview_from_file" -Arguments ([ordered] @{
+      path = $irPath
+      detail = "summary"
+    }) -TimeoutSec 30
+    if (-not [bool] $preview.valid) {
+      throw "$recipeId recipe IR preview failed"
+    }
+
+    $applyArgs = [ordered] @{
+      path = $irPath
+      expectedDocumentPath = $TestMap
+      idsMode = "count"
+    }
+    if ($preview.previewId) {
+      $applyArgs.previewId = $preview.previewId
+    }
+    $apply = Invoke-McpTool -Tool "ir_apply_from_file" -Arguments $applyArgs -TimeoutSec 45
+    if (-not [bool] $apply.valid) {
+      throw "$recipeId recipe IR apply failed"
+    }
+
+    $moduleId = [string] $apply.moduleId
+    $review = Invoke-McpTool -Tool "module_render_review" -Arguments ([ordered] @{
+      moduleId = $moduleId
+      sceneName = "$recipeId-minimal-visual"
+      outputDir = $reviewOutput.FullName
+      views = @("iso_overview_ne", "top_plan")
+      imageSize = @(1200, 900)
+      includeBoundsBox = $true
+      detail = "full"
+      returnBase64 = $false
+    }) -TimeoutSec 60
+    Assert-ReviewQuality -Review $review -Name "$recipeId recipe visual acceptance"
+
+    $results += [ordered] @{
+      recipe = $recipeId
+      variant = "minimal"
+      irPath = $irPath
+      moduleId = $moduleId
+      operationIds = $apply.operationIds
+      reviewId = $review.reviewId
+      targetObjectCount = $review.targetObjectCount
+      qualityValid = $review.qualityValid
+      preferredCapturePath = $review.preferredCapturePath
+      contactSheet = $review.contactSheet
+      captures = @($review.captures | ForEach-Object { Get-CaptureSummary $_ })
+    }
+  }
 
   return [ordered] @{
-    recipe = "simple_house"
+    recipeCount = $results.Count
     variant = "minimal"
-    irPath = $irPath
-    moduleId = $moduleId
-    operationIds = $apply.operationIds
-    reviewId = $review.reviewId
-    targetObjectCount = $review.targetObjectCount
-    qualityValid = $review.qualityValid
-    preferredCapturePath = $review.preferredCapturePath
-    contactSheet = $review.contactSheet
-    captures = @($review.captures | ForEach-Object { Get-CaptureSummary $_ })
+    results = $results
   }
 }
 
@@ -292,43 +309,61 @@ try {
   }
   $status = Wait-McpStatus -ExpectedProcessId $process.Id -ExpectedDocumentPath $testMap
 
-  $create = Invoke-McpTool -Tool "blockout_create_batch" -Arguments ([ordered] @{
-    expectedDocumentPath = $testMap
-    name = "mcp_smoke_scene_review"
-    detail = "ids"
-    select = $true
-    operations = @(
-      [ordered] @{ type = "box"; min = @(0, 0, 0); max = @(128, 128, 64); material = "__TB_empty" },
-      [ordered] @{ type = "box"; min = @(160, 0, 0); max = @(288, 96, 48); material = "__TB_empty" },
-      [ordered] @{ type = "box"; min = @(320, 32, 0); max = @(448, 160, 96); material = "__TB_empty" }
-    )
-  })
+  $sceneReviewResult = $null
+  $heightmapResult = $null
+  $statusAfterUndo = $null
+  if (-not $SkipDefaultSmoke) {
+    $create = Invoke-McpTool -Tool "blockout_create_batch" -Arguments ([ordered] @{
+      expectedDocumentPath = $testMap
+      name = "mcp_smoke_scene_review"
+      detail = "ids"
+      select = $true
+      operations = @(
+        [ordered] @{ type = "box"; min = @(0, 0, 0); max = @(128, 128, 64); material = "__TB_empty" },
+        [ordered] @{ type = "box"; min = @(160, 0, 0); max = @(288, 96, 48); material = "__TB_empty" },
+        [ordered] @{ type = "box"; min = @(320, 32, 0); max = @(448, 160, 96); material = "__TB_empty" }
+      )
+    })
 
-  $sceneReview =
-    Invoke-ReviewBundle -Name "mcp-smoke-scene-review" -OperationId $create.operationId -OutputRoot $reviewOutputRoot.FullName
+    $sceneReviewResult = [ordered] @{
+      operationId = $create.operationId
+      brushCount = $create.brushCount
+      review = Invoke-ReviewBundle -Name "mcp-smoke-scene-review" -OperationId $create.operationId -OutputRoot $reviewOutputRoot.FullName
+    }
 
-  $heightmapArgs = [ordered] @{
-    imagePath = $heightmapPath
-    expectedDocumentPath = $testMap
-    origin = @(1024, 0, 0)
-    cellSize = 32
-    heightScale = 128
-    heightSteps = 16
-    maxSize = 16
-    maxBrushes = 400
-    material = "__TB_empty"
-    mode = "terraced_brushes"
-    select = $true
-    detail = "summary"
+    $heightmapArgs = [ordered] @{
+      imagePath = $heightmapPath
+      expectedDocumentPath = $testMap
+      origin = @(1024, 0, 0)
+      cellSize = 32
+      heightScale = 128
+      heightSteps = 16
+      maxSize = 16
+      maxBrushes = 400
+      material = "__TB_empty"
+      mode = "terraced_brushes"
+      select = $true
+      detail = "summary"
+    }
+    $preview = Invoke-McpTool -Tool "heightmap_preview_grayscale" -Arguments $heightmapArgs
+    $import = Invoke-McpTool -Tool "heightmap_import_grayscale" -Arguments $heightmapArgs
+    $validation = Invoke-McpTool -Tool "operation_validate" -Arguments ([ordered] @{
+      operationId = $import.operationId
+      detail = "summary"
+    })
+    $undo = Invoke-McpTool -Tool "history_undo_mcp"
+    $statusAfterUndo = Invoke-McpTool -Tool "tb_status"
+    $heightmapResult = [ordered] @{
+      imagePath = $heightmapPath
+      previewBrushCount = $preview.estimatedBrushCount
+      importBrushCount = $import.brushCount
+      previewOutputBounds = $preview.outputBounds
+      importOutputBounds = $import.heightmap.outputBounds
+      importTopLevelBounds = $import.bounds
+      validation = $validation
+      undo = $undo
+    }
   }
-  $preview = Invoke-McpTool -Tool "heightmap_preview_grayscale" -Arguments $heightmapArgs
-  $import = Invoke-McpTool -Tool "heightmap_import_grayscale" -Arguments $heightmapArgs
-  $validation = Invoke-McpTool -Tool "operation_validate" -Arguments ([ordered] @{
-    operationId = $import.operationId
-    detail = "summary"
-  })
-  $undo = Invoke-McpTool -Tool "history_undo_mcp"
-  $statusAfterUndo = Invoke-McpTool -Tool "tb_status"
 
   $reviewSceneResults = @()
   if ($ReviewScenes) {
@@ -441,21 +476,8 @@ try {
       documentFingerprint = $status.documentFingerprint
       documentEpoch = $status.documentEpoch
     }
-    sceneReview = [ordered] @{
-      operationId = $create.operationId
-      brushCount = $create.brushCount
-      review = $sceneReview
-    }
-    heightmap = [ordered] @{
-      imagePath = $heightmapPath
-      previewBrushCount = $preview.estimatedBrushCount
-      importBrushCount = $import.brushCount
-      previewOutputBounds = $preview.outputBounds
-      importOutputBounds = $import.heightmap.outputBounds
-      importTopLevelBounds = $import.bounds
-      validation = $validation
-      undo = $undo
-    }
+    sceneReview = $sceneReviewResult
+    heightmap = $heightmapResult
     reviewScenes = $reviewSceneResults
     recipeVisualAcceptance = $recipeVisualAcceptanceResult
     reviewOutputRoot = $reviewOutputRoot.FullName
