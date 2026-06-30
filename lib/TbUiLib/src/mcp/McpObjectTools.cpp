@@ -1571,12 +1571,25 @@ McpBridgeToolResult groupRenameSelectedForMapResult(
   const auto name = params.value("name").toString().trimmed();
   if (name.isEmpty())
   {
-    return invalidParamsFailure("group_rename_selected requires name");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "group_rename_selected requires name",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_group_name_then_retry"},
+      });
   }
   if (!map.selection().hasOnlyGroups())
   {
-    return invalidParamsFailure(
-      "group_rename_selected requires the current selection to contain only groups");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "group_rename_selected requires the current selection to contain only groups",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "select_groups_then_retry"},
+      });
   }
 
   const auto groups = map.selection().groups;

@@ -227,6 +227,8 @@ Next Phase 2 item:
   changes editor selection state without mutating the map document.
 - Done: `group_create_from_selection` precondition failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before grouping.
+- Done: `group_rename_selected` precondition failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before renaming.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 

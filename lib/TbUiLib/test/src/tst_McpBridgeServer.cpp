@@ -4316,6 +4316,22 @@ TEST_CASE("McpBridgeServer native group tools")
     noSelectionGroupResponse.error.details.value("recoveryAction").toString()
     == "select_objects_then_retry");
 
+  const auto noGroupRenameResponse = groupRenameSelectedForMapResult(
+    map,
+    "group_rename_selected",
+    QJsonObject{{"name", "renamed-group"}},
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  REQUIRE_FALSE(noGroupRenameResponse.ok);
+  CHECK(
+    noGroupRenameResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(noGroupRenameResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    noGroupRenameResponse.error.details.value("recoveryAction").toString()
+    == "select_groups_then_retry");
+
   const auto createBrushes = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",
