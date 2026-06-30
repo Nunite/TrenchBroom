@@ -236,6 +236,9 @@ Next Phase 2 item:
   objects.
 - Done: safe problem-fix mutation records report `mutatedDocument:true` and
   document identity in result summaries and history records.
+- Done: `problems_fix` precondition failures report `mutatedDocument:false`,
+  `retrySafe`, and recovery actions for missing/stale problem ids, missing
+  quick fix, and unsafe or inapplicable quick fix failures.
 - Done: invalid `brush_create_polygon_batch` preflight results report
   `mutatedDocument:false`, `retrySafe`, and a recovery action without committing
   brushes.

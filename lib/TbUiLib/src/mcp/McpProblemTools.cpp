@@ -118,6 +118,15 @@ QJsonObject mutationResultJson(
   return result;
 }
 
+QJsonObject preMutationFailureDetails(
+  QJsonObject details, const QString& recoveryAction)
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return details;
+}
+
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
@@ -523,20 +532,35 @@ McpBridgeToolResult problemsFixForMapResult(
   const auto problemIds = requiredStringListFromJson(params, "problemIds", error);
   if (!problemIds)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "problemIds"}},
+        "provide_problem_ids_then_retry"));
   }
 
   const auto quickFixDescription = params.value("quickFix").toString().trimmed();
   if (quickFixDescription.isEmpty())
   {
-    return invalidParamsFailure("problems_fix requires quickFix");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "problems_fix requires quickFix",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "quickFix"}},
+        "provide_quick_fix_then_retry"));
   }
 
   const auto issues = findIssuesByIds(
     map, *problemIds, mcpOptionalBool(params, "includeHidden", false), error);
   if (!error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "problemIds"}},
+        "refresh_problems_then_retry"));
   }
 
   const auto* quickFix = findSafeQuickFix(map.worldNode(), issues, quickFixDescription);
@@ -544,7 +568,10 @@ McpBridgeToolResult problemsFixForMapResult(
   {
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::Forbidden,
-      QString{"Quick fix is not safe or not applicable: %1"}.arg(quickFixDescription));
+      QString{"Quick fix is not safe or not applicable: %1"}.arg(quickFixDescription),
+      preMutationFailureDetails(
+        QJsonObject{{"quickFix", quickFixDescription}},
+        "choose_safe_applicable_quick_fix"));
   }
 
   auto changedObjectIds = QJsonArray{};

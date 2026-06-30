@@ -3693,6 +3693,61 @@ TEST_CASE("McpBridgeServer problem fixes record document identity")
   CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 }
 
+TEST_CASE("McpBridgeServer problems_fix reports pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  const auto missingIdsResponse =
+    problemsFixForMapResult(map, "problems_fix", QJsonObject{}, history, nextOperationIndex);
+  REQUIRE_FALSE(missingIdsResponse.ok);
+  CHECK(missingIdsResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(missingIdsResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingIdsResponse.error.details.value("recoveryAction").toString()
+    == "provide_problem_ids_then_retry");
+
+  const auto missingQuickFixResponse = problemsFixForMapResult(
+    map,
+    "problems_fix",
+    QJsonObject{{"problemIds", QJsonArray{"problem:missing"}}},
+    history,
+    nextOperationIndex);
+  REQUIRE_FALSE(missingQuickFixResponse.ok);
+  CHECK(
+    missingQuickFixResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(
+    missingQuickFixResponse.error.details.value("recoveryAction").toString()
+    == "provide_quick_fix_then_retry");
+
+  const auto missingProblemResponse = problemsFixForMapResult(
+    map,
+    "problems_fix",
+    QJsonObject{
+      {"problemIds", QJsonArray{"problem:missing"}},
+      {"quickFix", "Delete"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE_FALSE(missingProblemResponse.ok);
+  CHECK(missingProblemResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(
+    missingProblemResponse.error.details.value("recoveryAction").toString()
+    == "refresh_problems_then_retry");
+}
+
 TEST_CASE("McpBridgeServer externalizes native group object ids")
 {
   auto appControllerFixture = AppControllerFixture{};
