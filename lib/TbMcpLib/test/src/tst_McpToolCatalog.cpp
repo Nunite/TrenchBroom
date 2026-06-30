@@ -1792,6 +1792,56 @@ TEST_CASE("McpToolCatalog")
           == selectorModuleIdDescription);
   }
 
+  SECTION("recovery tools share live operation target wording")
+  {
+    const auto propertyDescription = [](const QString& toolName,
+                                        const QString& propertyName) {
+      const auto tool = findToolDefinition(toolName);
+      REQUIRE(tool);
+      return tool->inputSchema.value("properties")
+        .toObject()
+        .value(propertyName)
+        .toObject()
+        .value("description")
+        .toString();
+    };
+
+    const auto transformOperationId =
+      propertyDescription("objects_transform", "operationId");
+    const auto transformOperationIds =
+      propertyDescription("objects_transform", "operationIds");
+    CHECK(transformOperationId.contains("live changed objects"));
+    CHECK(transformOperationIds.contains("live changed objects"));
+
+    const auto slopeOperationId =
+      propertyDescription("geometry_analyze_slopes", "operationId");
+    const auto slopeOperationIds =
+      propertyDescription("geometry_analyze_slopes", "operationIds");
+    CHECK(slopeOperationId.contains("live changed brush objects"));
+    CHECK(slopeOperationIds.contains("live changed brush objects"));
+    CHECK(
+      propertyDescription("geometry_analyze_route_continuity", "operationId")
+      == slopeOperationId);
+    CHECK(
+      propertyDescription("geometry_analyze_route_continuity", "operationIds")
+      == slopeOperationIds);
+
+    const auto faceTextureTool = findToolDefinition("face_texture_set");
+    REQUIRE(faceTextureTool);
+    const auto faceTextureProperties =
+      faceTextureTool->inputSchema.value("properties").toObject();
+    CHECK(faceTextureProperties.value("operationId")
+            .toObject()
+            .value("description")
+            .toString()
+          == slopeOperationId);
+    CHECK(faceTextureProperties.value("operationIds")
+            .toObject()
+            .value("description")
+            .toString()
+          == slopeOperationIds);
+  }
+
   SECTION("mode gating rejects edit tools in read-only mode")
   {
     const auto editTool = findToolDefinition("entity_create");

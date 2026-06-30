@@ -168,8 +168,10 @@ Next Phase 1 item:
   helpers is centralized in the catalog and covered by a drift test.
 - Done: the shared `moduleId` wording used by selector and module tools is
   centralized in the catalog and covered by a drift test.
-- Missing: selector, compact-output, and recovery wording are not yet
-  centralized enough to be single-source.
+- Done: shared live operation target wording for recovery-oriented tools is
+  centralized in the catalog and covered by a drift test.
+- Missing: selector and compact-output wording are not yet centralized enough
+  to be single-source.
 - Missing: lifecycle/profile/category/search metadata is not enforced from one
   obvious catalog edit path.
 - Partial: catalog metadata tests exist, but they do not yet prove common
@@ -177,8 +179,8 @@ Next Phase 1 item:
 
 Next Phase 2 item:
 
-- Centralize the next smallest repeated selector or recovery schema fragment
-  that has multiple current users and add a focused catalog test.
+- Centralize the next smallest repeated selector or compact-output schema
+  fragment that has multiple current users and add a focused catalog test.
 
 ### Phase 3 Status: Partial
 

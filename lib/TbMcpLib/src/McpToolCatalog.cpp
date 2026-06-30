@@ -103,6 +103,20 @@ QJsonObject moduleIdProperty()
   return stringProperty("Session metadata moduleId.");
 }
 
+QJsonObject liveOperationIdTargetProperty(const QString& objectKind = "objects")
+{
+  return stringProperty(
+    QString("Optional MCP operation id whose live changed %1 are used as targets.")
+      .arg(objectKind));
+}
+
+QJsonObject liveOperationIdsTargetProperty(const QString& objectKind = "objects")
+{
+  return arrayProperty(
+    QString("Optional MCP operation ids whose live changed %1 are used as targets.")
+      .arg(objectKind));
+}
+
 QJsonObject vec3Property(const QString& description)
 {
   return QJsonObject{
@@ -191,14 +205,8 @@ QJsonObject faceTargetSchemaProperties()
      arrayProperty(
        "Optional brush, brush entity, group, or operation target object ids. All child "
        "brush faces are candidates.")},
-    {"operationId",
-     stringProperty(
-       "Optional MCP operation id. Live changed brush objects from the operation are "
-       "used as candidates.")},
-    {"operationIds",
-     arrayProperty(
-       "Optional MCP operation ids. Live changed brush objects from all operations are "
-       "used as candidates.")},
+    {"operationId", liveOperationIdTargetProperty("brush objects")},
+    {"operationIds", liveOperationIdsTargetProperty("brush objects")},
     {"faceIndex",
      integerProperty("Optional face index when objectId names a single brush.")},
     {"idsMode",
@@ -2557,12 +2565,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(
         {
           {"objectIds", arrayProperty("MCP object ids to transform.")},
-          {"operationId",
-           stringProperty(
-             "Optional MCP operation id whose live changed objects are transformed.")},
-          {"operationIds",
-           arrayProperty(
-             "Optional MCP operation ids whose live changed objects are transformed.")},
+          {"operationId", liveOperationIdTargetProperty()},
+          {"operationIds", liveOperationIdsTargetProperty()},
           {"selector",
            withDescription(
              selectorSchema(),
@@ -3193,10 +3197,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       false,
       true,
       objectSchema({
-        {"operationId", stringProperty("Single MCP operation id to analyze.")},
-        {"operationIds",
-         arrayProperty(
-           "MCP operation ids whose live changed brush objects should be analyzed.")},
+        {"operationId", liveOperationIdTargetProperty("brush objects")},
+        {"operationIds", liveOperationIdsTargetProperty("brush objects")},
         {"objectIds", arrayProperty("Explicit MCP object ids to analyze.")},
         {"selector",
          withDescription(
@@ -3240,10 +3242,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       false,
       true,
       objectSchema({
-        {"operationId", stringProperty("Single MCP operation id to analyze.")},
-        {"operationIds",
-         arrayProperty(
-           "MCP operation ids whose live changed brush objects should be analyzed.")},
+        {"operationId", liveOperationIdTargetProperty("brush objects")},
+        {"operationIds", liveOperationIdsTargetProperty("brush objects")},
         {"objectIds",
          arrayProperty(
            "Explicit MCP object ids to analyze. The analyzer sorts them along the "
