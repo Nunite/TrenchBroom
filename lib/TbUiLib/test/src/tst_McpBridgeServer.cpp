@@ -4883,6 +4883,10 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   REQUIRE(batchResponse.ok);
   const auto operationId = batchResponse.result.value("operationId").toString();
   CHECK(!operationId.isEmpty());
+  CHECK(batchResponse.result.value("mutatedDocument").toBool());
+  CHECK(
+    batchResponse.result.value("documentFingerprint").toString()
+    == documentFingerprintForMap(map));
   CHECK(batchResponse.result.value("transactionName").toString() == "MCP: Test batch");
   CHECK(batchResponse.result.value("brushCount").toInt() == 5);
   CHECK(batchResponse.result.value("changedObjectCount").toInt() == 5);
@@ -4895,6 +4899,8 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(batchResponse.result.value("warnings").toArray().isEmpty());
   CHECK(map.selection().nodes.size() == 5u);
   CHECK(batchResponse.result.value("intentSummaries").toArray().size() == 3);
+  REQUIRE_FALSE(history.empty());
+  CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 
   const auto idsModeResponse = blockoutCreateBatchForMapResult(
     map,

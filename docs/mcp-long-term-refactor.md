@@ -208,6 +208,9 @@ Next Phase 2 item:
 - Done: `geometry_csg_selection` reports document identity on successful
   operation records and structured `mutatedDocument:false` / `retrySafe` /
   `recoveryAction` diagnostics for pre-mutation selection failures.
+- Done: shared brush/batch mutation records from `McpBrushTools` report
+  `mutatedDocument:true` and document identity in result summaries and history
+  records.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 

@@ -44,6 +44,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/QPathUtils.h"
 #include "ui/mcp/McpObjectRegistry.h"
 
 #include "vm/bbox.h"
@@ -233,6 +234,9 @@ QJsonObject mutationResultJson(const McpOperationRecord& operation)
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
+  result.insert("mutatedDocument", true);
+  result.insert("activeDocumentPath", operation.documentPath);
+  result.insert("documentFingerprint", operation.documentFingerprint);
   result.insert("changedObjectCount", operation.changedObjectIds.size());
   result.insert(
     "resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId));
@@ -242,6 +246,7 @@ QJsonObject mutationResultJson(const McpOperationRecord& operation)
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
+  mdl::Map& map,
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& changedObjectIds,
@@ -252,6 +257,8 @@ void mcpRecordOperation(
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
+  operation.documentPath = map.path().empty() ? QString{} : pathAsQString(map.path());
+  operation.documentFingerprint = documentFingerprintForMap(map);
   operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation);
   operation.setSummary(result);
@@ -5590,7 +5597,7 @@ McpBridgeToolResult blockoutCreateResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+    history, nextOperationIndex, map, toolName, transactionName, *changedObjectIds, result);
   result.insert("brushCount", brushCount);
   result.insert("material", QString::fromStdString(material));
   result.insert(
@@ -5648,6 +5655,7 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     "blockout_create_spiral_stairs",
     transactionName,
     *changedObjectIds,
@@ -6512,6 +6520,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName.isEmpty() ? QString{"MCP: Blockout batch"} : transactionName,
     *changedObjectIds,
@@ -6760,7 +6769,7 @@ McpBridgeToolResult createBrushResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, toolName, transactionName, *changedObjectIds, result);
+    history, nextOperationIndex, map, toolName, transactionName, *changedObjectIds, result);
   result.insert("type", type);
   result.insert("brushCount", brushJson.size());
   result.insert("bounds", boundsToJson(bounds));
