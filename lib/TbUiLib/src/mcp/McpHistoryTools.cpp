@@ -78,6 +78,8 @@ QJsonObject operationRecordJson(const McpOperationRecord& operation)
   result.insert(
     "operationKind",
     operation.operationKind.isEmpty() ? "mutation" : operation.operationKind);
+  result.insert("documentPath", operation.documentPath);
+  result.insert("documentFingerprint", operation.documentFingerprint);
   result.insert("createdAt", operation.createdAt);
   result.insert("createdAtMs", operation.createdAtMs);
   result.insert("changedObjectCount", operation.changedObjectIds.size());
@@ -276,6 +278,19 @@ QJsonArray operationHistoryJson(
 
 } // namespace
 
+bool operationMatchesActiveDocument(
+  const mdl::Map& map,
+  const McpOperationRecord& operation,
+  const McpObjectRegistry* objectRegistry = nullptr);
+QJsonObject documentMismatchDetails(
+  const mdl::Map& map,
+  const McpOperationRecord& operation,
+  const QString& operationIdKey,
+  bool mutatedDocument,
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const QStringList& undoneOperationIds = {},
+  const QStringList& remainingOperationIds = {});
+
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history)
 {
   return McpBridgeToolResult::success(QJsonObject{
@@ -383,6 +398,11 @@ McpBridgeToolResult historyStatusForMapResult(
 
   result.insert("latestUndoCandidateId", latestIt->operationId);
   result.insert("latestUndoCandidateTransactionName", latestIt->transactionName);
+  if (!operationMatchesActiveDocument(map, *latestIt, &objectRegistry))
+  {
+    result.insert("reasonIfUnavailable", "latestMcpOperationBelongsToDifferentDocument");
+    return McpBridgeToolResult::success(result);
+  }
   const auto* undoName = map.undoCommandName();
   result.insert(
     "nativeUndoCommandName",
@@ -818,7 +838,9 @@ McpBridgeToolResult operationValidateResult(
 }
 
 McpBridgeToolResult historyUndoResult(
-  AppController& appController, std::vector<McpOperationRecord>& history)
+  AppController& appController,
+  std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -826,11 +848,13 @@ McpBridgeToolResult historyUndoResult(
     return noActiveDocumentFailure();
   }
 
-  return historyUndoForMapResult(mapWindow->document().map(), history);
+  return historyUndoForMapResult(mapWindow->document().map(), history, &objectRegistry);
 }
 
 McpBridgeToolResult historyUndoForMapResult(
-  mdl::Map& map, std::vector<McpOperationRecord>& history)
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
 {
   auto it = std::find_if(history.rbegin(), history.rend(), [](const auto& operation) {
     return !operation.undone;
@@ -839,6 +863,14 @@ McpBridgeToolResult historyUndoForMapResult(
   {
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::Forbidden, "No MCP operation is available to undo");
+  }
+
+  if (!operationMatchesActiveDocument(map, *it, objectRegistry))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden,
+      "The latest MCP operation belongs to a different document",
+      documentMismatchDetails(map, *it, "targetOperationId", false, objectRegistry));
   }
 
   auto skippedSelectionCommands = 0;
@@ -904,10 +936,61 @@ QStringList remainingOperationIdsToTarget(
   return result;
 }
 
+bool operationMatchesActiveDocument(
+  const mdl::Map& map,
+  const McpOperationRecord& operation,
+  const McpObjectRegistry* objectRegistry)
+{
+  const auto activeFingerprint = documentFingerprintForMap(map, objectRegistry);
+  if (!operation.documentFingerprint.isEmpty() && !activeFingerprint.isEmpty())
+  {
+    return operation.documentFingerprint == activeFingerprint;
+  }
+
+  const auto activePath = pathAsQString(map.path());
+  if (!operation.documentPath.isEmpty() && !activePath.isEmpty())
+  {
+    return operation.documentPath == activePath;
+  }
+
+  return true;
+}
+
+QJsonObject documentMismatchDetails(
+  const mdl::Map& map,
+  const McpOperationRecord& operation,
+  const QString& operationIdKey,
+  const bool mutatedDocument,
+  const McpObjectRegistry* objectRegistry,
+  const QStringList& undoneOperationIds,
+  const QStringList& remainingOperationIds)
+{
+  auto details = QJsonObject{
+    {"mutatedDocument", mutatedDocument},
+    {"partiallyUndone", mutatedDocument},
+    {operationIdKey, operation.operationId},
+    {"operationDocumentPath", operation.documentPath},
+    {"activeDocumentPath", pathAsQString(map.path())},
+    {"operationDocumentFingerprint", operation.documentFingerprint},
+    {"activeDocumentFingerprint", documentFingerprintForMap(map, objectRegistry)},
+    {"recoveryAction", "activate_original_document_or_refresh_status"},
+  };
+  if (!undoneOperationIds.isEmpty())
+  {
+    details.insert("undoneOperationIds", stringListJson(undoneOperationIds));
+  }
+  if (!remainingOperationIds.isEmpty())
+  {
+    details.insert("remainingOperationIds", stringListJson(remainingOperationIds));
+  }
+  return details;
+}
+
 McpBridgeToolResult historyUndoToOperationResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
-  const QJsonObject& params)
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -915,11 +998,15 @@ McpBridgeToolResult historyUndoToOperationResult(
     return noActiveDocumentFailure();
   }
 
-  return historyUndoToOperationForMapResult(mapWindow->document().map(), history, params);
+  return historyUndoToOperationForMapResult(
+    mapWindow->document().map(), history, params, &objectRegistry);
 }
 
 McpBridgeToolResult historyUndoToOperationForMapResult(
-  mdl::Map& map, std::vector<McpOperationRecord>& history, const QJsonObject& params)
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry* objectRegistry)
 {
   const auto targetOperationId = params.value("operationId").toString().trimmed();
   if (targetOperationId.isEmpty())
@@ -967,6 +1054,21 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
            stringListJson(remainingOperationIdsToTarget(history, targetOperationId))},
           {"recoveryAction", "refresh_status_or_validate"},
         });
+    }
+
+    if (!operationMatchesActiveDocument(map, *it, objectRegistry))
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::Forbidden,
+        "The next MCP operation to undo belongs to a different document",
+        documentMismatchDetails(
+          map,
+          *it,
+          "blockedOperationId",
+          !undoneOperationIds.isEmpty(),
+          objectRegistry,
+          undoneOperationIds,
+          remainingOperationIdsToTarget(history, targetOperationId)));
     }
 
     auto skippedThisOperation = 0;
@@ -1029,7 +1131,9 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
 }
 
 McpBridgeToolResult historyRedoResult(
-  AppController& appController, std::vector<McpOperationRecord>& history)
+  AppController& appController,
+  std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -1037,6 +1141,14 @@ McpBridgeToolResult historyRedoResult(
     return noActiveDocumentFailure();
   }
 
+  return historyRedoForMapResult(mapWindow->document().map(), history, &objectRegistry);
+}
+
+McpBridgeToolResult historyRedoForMapResult(
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry)
+{
   auto it = std::find_if(history.begin(), history.end(), [](const auto& operation) {
     return operation.undone;
   });
@@ -1046,7 +1158,14 @@ McpBridgeToolResult historyRedoResult(
       mcp::McpErrorCode::Forbidden, "No MCP operation is available to redo");
   }
 
-  auto& map = mapWindow->document().map();
+  if (!operationMatchesActiveDocument(map, *it, objectRegistry))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden,
+      "The MCP operation to redo belongs to a different document",
+      documentMismatchDetails(map, *it, "targetOperationId", false, objectRegistry));
+  }
+
   const auto* redoName = map.redoCommandName();
   if (!redoName || QString::fromStdString(*redoName) != it->transactionName)
   {

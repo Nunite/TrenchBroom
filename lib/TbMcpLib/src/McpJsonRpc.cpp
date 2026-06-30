@@ -161,10 +161,13 @@ QJsonObject mcpInitializeResult(const QJsonObject& params)
        {"title", "TrenchBroom MCP"},
        {"version", ServerVersion},
      }},
+    {"associatedSkills", QJsonArray{"trenchbroom-mcp-scene-workflow"}},
     {"instructions",
-     "Use structured tools to inspect and edit the running TrenchBroom instance. "
-     "The TrenchBroom app must be running and MCP must be enabled in Preferences > "
-     "MCP."},
+      "Use structured tools to inspect and edit the running TrenchBroom instance. "
+      "When building or editing TrenchBroom scenes, load "
+      "trenchbroom-mcp-scene-workflow for scene workflow and recipe guidance. "
+      "The TrenchBroom app must be running and MCP must be enabled in Preferences > "
+      "MCP."},
   };
 }
 

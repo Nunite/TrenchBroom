@@ -68,6 +68,8 @@ struct McpOperationRecord
   QString toolName;
   QString transactionName;
   QString operationKind;
+  QString documentPath;
+  QString documentFingerprint;
   QStringList changedObjectIds;
   QStringList deletedObjectIds;
   QString createdAt;

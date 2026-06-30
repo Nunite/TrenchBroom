@@ -57,10 +57,32 @@ mcp::McpBridgeResponse makeFailure(
     request.id, mcp::McpError{code, message, std::move(details)});
 }
 
-void syncOperationHistoryWithExternalResult(
-  std::vector<McpOperationRecord>& history, const QJsonObject& result)
+void applyDocumentIdentityToOperation(
+  McpOperationRecord& operation,
+  mdl::Map& map,
+  const McpObjectRegistry& objectRegistry,
+  const QJsonObject& result)
 {
-  const auto operationId = result.value("operationId").toString();
+  operation.documentPath = result.value("activeDocumentPath").toString();
+  if (operation.documentPath.isEmpty() && !map.path().empty())
+  {
+    operation.documentPath = pathAsQString(map.path());
+  }
+
+  operation.documentFingerprint = result.value("documentFingerprint").toString();
+  if (operation.documentFingerprint.isEmpty())
+  {
+    operation.documentFingerprint = objectRegistry.documentFingerprint(map);
+  }
+}
+
+void syncOneOperationHistoryWithExternalResult(
+  std::vector<McpOperationRecord>& history,
+  const QString& operationId,
+  mdl::Map& map,
+  const McpObjectRegistry& objectRegistry,
+  const QJsonObject& result)
+{
   if (operationId.isEmpty())
   {
     return;
@@ -78,6 +100,7 @@ void syncOperationHistoryWithExternalResult(
     operation.setChangedObjectIds(result.value("changedObjectIds").toArray());
     operation.setDeletedObjectIds(result.value("deletedObjectIds").toArray());
     operation.setSummary(result);
+    applyDocumentIdentityToOperation(operation, map, objectRegistry, result);
     history.push_back(std::move(operation));
     return;
   }
@@ -93,6 +116,24 @@ void syncOperationHistoryWithExternalResult(
     it->setDeletedObjectIds(deletedObjectIds);
   }
   it->setSummary(result);
+  applyDocumentIdentityToOperation(*it, map, objectRegistry, result);
+}
+
+void syncOperationHistoryWithExternalResult(
+  std::vector<McpOperationRecord>& history,
+  mdl::Map& map,
+  const McpObjectRegistry& objectRegistry,
+  const QJsonObject& result)
+{
+  syncOneOperationHistoryWithExternalResult(
+    history, result.value("operationId").toString(), map, objectRegistry, result);
+
+  const auto operationIds = result.value("operationIds").toArray();
+  for (const auto& operationId : operationIds)
+  {
+    syncOneOperationHistoryWithExternalResult(
+      history, operationId.toString(), map, objectRegistry, result);
+  }
 }
 
 } // namespace
@@ -259,6 +300,8 @@ QJsonObject resourceObject(
     {"toolName", operation.toolName},
     {"transactionName", operation.transactionName},
     {"operationKind", operation.operationKind},
+    {"documentPath", operation.documentPath},
+    {"documentFingerprint", operation.documentFingerprint},
     {"createdAt", operation.createdAt},
     {"createdAtMs", operation.createdAtMs},
     {"changedObjectCount", operation.changedObjectIds.size()},
@@ -418,7 +461,8 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
     if (resultMap != nullptr)
     {
       auto externalResult = m_objectRegistry.externalizeResult(*resultMap, result.result);
-      syncOperationHistoryWithExternalResult(m_operationHistory, externalResult);
+      syncOperationHistoryWithExternalResult(
+        m_operationHistory, *resultMap, m_objectRegistry, externalResult);
       return mcp::McpBridgeResponse::success(request.id, std::move(externalResult));
     }
     return mcp::McpBridgeResponse::success(request.id, result.result);

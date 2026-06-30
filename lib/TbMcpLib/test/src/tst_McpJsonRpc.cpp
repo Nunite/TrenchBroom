@@ -37,6 +37,19 @@ TEST_CASE("McpJsonRpc")
     CHECK(capabilities.contains("resources"));
   }
 
+  SECTION("initialize advertises TrenchBroom workflow skill")
+  {
+    const auto result = mcpInitializeResult({});
+
+    CHECK(
+      result.value("associatedSkills").toArray().contains(
+        "trenchbroom-mcp-scene-workflow"));
+    CHECK(
+      result.value("instructions").toString().contains(
+        "trenchbroom-mcp-scene-workflow"));
+    CHECK(result.value("instructions").toString().contains("TrenchBroom scenes"));
+  }
+
   SECTION("tools list remains visible when TrenchBroom mode is off")
   {
     const auto result = mcpToolsListResult(McpMode::Off);

@@ -467,17 +467,31 @@ McpBridgeToolResult operationValidateResult(
   const std::vector<McpOperationRecord>& history,
   const QJsonObject& params);
 McpBridgeToolResult historyUndoResult(
-  AppController& appController, std::vector<McpOperationRecord>& history);
+  AppController& appController,
+  std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult historyUndoForMapResult(
-  mdl::Map& map, std::vector<McpOperationRecord>& history);
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult historyUndoToOperationResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
-  const QJsonObject& params);
+  const QJsonObject& params,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult historyUndoToOperationForMapResult(
-  mdl::Map& map, std::vector<McpOperationRecord>& history, const QJsonObject& params);
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult historyRedoResult(
-  AppController& appController, std::vector<McpOperationRecord>& history);
+  AppController& appController,
+  std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult historyRedoForMapResult(
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry = nullptr);
 
 McpBridgeToolResult createEntityResult(
   AppController& appController,

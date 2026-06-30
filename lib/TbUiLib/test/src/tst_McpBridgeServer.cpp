@@ -1977,6 +1977,233 @@ TEST_CASE("McpBridgeServer")
     CHECK(history.back().undone);
   }
 
+  SECTION("history_undo_mcp rejects operation from a different document before native undo")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto create = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Same transaction name"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(create.ok);
+    REQUIRE(map.undoCommandName() != nullptr);
+    CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: Same transaction name");
+
+    history.back().documentPath = "D:/maps/original.map";
+    history.back().documentFingerprint = "doc:original";
+    const auto undo = historyUndoForMapResult(map, history);
+
+    CHECK(!undo.ok);
+    CHECK_FALSE(undo.error.details.value("mutatedDocument").toBool());
+    CHECK(
+      undo.error.details.value("targetOperationId").toString()
+      == create.result.value("operationId").toString());
+    CHECK(
+      undo.error.details.value("operationDocumentPath").toString()
+      == "D:/maps/original.map");
+    CHECK(undo.error.details.contains("activeDocumentPath"));
+    CHECK(
+      undo.error.details.value("recoveryAction").toString()
+      == "activate_original_document_or_refresh_status");
+    CHECK_FALSE(history.back().undone);
+    REQUIRE(map.undoCommandName() != nullptr);
+    CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: Same transaction name");
+  }
+
+  SECTION("history_undo_mcp accepts matching registry document fingerprint")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto objectRegistry = McpObjectRegistry{};
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto create = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Registry fingerprint undo"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(create.ok);
+    history.back().documentFingerprint = objectRegistry.documentFingerprint(map);
+
+    const auto undo = historyUndoForMapResult(map, history, &objectRegistry);
+
+    REQUIRE(undo.ok);
+    CHECK(history.back().undone);
+  }
+
+  SECTION("history_undo_to_operation stops at cross-document operation with partial diagnostic")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto first = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Cross document first"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(first.ok);
+    history.back().documentPath = "D:/maps/original.map";
+    history.back().documentFingerprint = "doc:original";
+
+    const auto latest = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Cross document latest"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{128, 0, 0}},
+           {"max", QJsonArray{192, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(latest.ok);
+    history.back().documentPath.clear();
+    history.back().documentFingerprint.clear();
+
+    const auto undo = historyUndoToOperationForMapResult(
+      map,
+      history,
+      QJsonObject{{"operationId", first.result.value("operationId").toString()}});
+
+    CHECK(!undo.ok);
+    CHECK(undo.error.details.value("mutatedDocument").toBool());
+    CHECK(undo.error.details.value("partiallyUndone").toBool());
+    CHECK(
+      undo.error.details.value("blockedOperationId").toString()
+      == first.result.value("operationId").toString());
+    CHECK(
+      undo.error.details.value("operationDocumentPath").toString()
+      == "D:/maps/original.map");
+    CHECK(
+      undo.error.details.value("recoveryAction").toString()
+      == "activate_original_document_or_refresh_status");
+    const auto undoneIds = undo.error.details.value("undoneOperationIds").toArray();
+    REQUIRE(undoneIds.size() == 1);
+    CHECK(undoneIds.first().toString() == latest.result.value("operationId").toString());
+    CHECK_FALSE(history.front().undone);
+    CHECK(history.back().undone);
+  }
+
+  SECTION("history_redo_mcp rejects operation from a different document before native redo")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto create = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Redo cross document"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(create.ok);
+    map.undoCommand();
+    history.back().undone = true;
+    history.back().documentPath = "D:/maps/original.map";
+    history.back().documentFingerprint = "doc:original";
+    REQUIRE(map.redoCommandName() != nullptr);
+    CHECK(QString::fromStdString(*map.redoCommandName()) == "MCP: Redo cross document");
+
+    const auto redo = historyRedoForMapResult(map, history);
+
+    CHECK(!redo.ok);
+    CHECK_FALSE(redo.error.details.value("mutatedDocument").toBool());
+    CHECK(
+      redo.error.details.value("targetOperationId").toString()
+      == create.result.value("operationId").toString());
+    CHECK(
+      redo.error.details.value("operationDocumentPath").toString()
+      == "D:/maps/original.map");
+    CHECK(
+      redo.error.details.value("recoveryAction").toString()
+      == "activate_original_document_or_refresh_status");
+    CHECK(history.back().undone);
+    REQUIRE(map.redoCommandName() != nullptr);
+    CHECK(QString::fromStdString(*map.redoCommandName()) == "MCP: Redo cross document");
+  }
+
   SECTION("geometry review renderer writes isolated nonblank review bundle")
   {
     auto appControllerFixture = AppControllerFixture{};
