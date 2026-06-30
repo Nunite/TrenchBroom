@@ -3470,6 +3470,7 @@ TEST_CASE("McpBridgeServer selector delete reports pre-mutation failure state")
 
   REQUIRE_FALSE(response.ok);
   CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(response.error.details.value("retrySafe").toBool(false));
   CHECK(response.error.details.value("matchedCount").toInt(-1) == 0);
   CHECK(
     response.error.details.value("recoveryAction").toString()
@@ -3490,6 +3491,7 @@ TEST_CASE("McpBridgeServer selector delete reports pre-mutation failure state")
   CHECK(
     invalidSelectorResponse.error.details.value("mutatedDocument").toBool(true)
     == false);
+  CHECK(invalidSelectorResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     invalidSelectorResponse.error.details.value("recoveryAction").toString()
     == "fix_selector_then_retry");

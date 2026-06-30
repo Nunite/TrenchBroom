@@ -2169,6 +2169,7 @@ McpBridgeToolResult objectsDeleteBySelectorForMapResult(
       error,
       QJsonObject{
         {"mutatedDocument", false},
+        {"retrySafe", true},
         {"selector", selector},
         {"recoveryAction", "fix_selector_then_retry"},
       });
@@ -2186,6 +2187,7 @@ McpBridgeToolResult objectsDeleteBySelectorForMapResult(
       "objects_delete_by_selector matched no deletable objects",
       QJsonObject{
         {"mutatedDocument", false},
+        {"retrySafe", true},
         {"selector", selector},
         {"matchedCount", 0},
         {"recoveryAction", "preview_selector_or_refresh_status"},
@@ -2215,6 +2217,7 @@ McpBridgeToolResult objectsDeleteBySelectorForMapResult(
       "Matched selector objects cannot be deleted",
       QJsonObject{
         {"mutatedDocument", false},
+        {"retrySafe", true},
         {"selector", selector},
         {"matchedCount", deletedIds.size()},
         {"recoveryAction", "preview_selector_or_use_user_selection"},

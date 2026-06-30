@@ -193,9 +193,9 @@ Next Phase 2 item:
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor
   inspection paths.
-- Done: `objects_delete_by_selector` reports explicit `mutatedDocument` and
-  `recoveryAction` diagnostics for no-match, selector error, and forbidden
-  pre-mutation failure paths.
+- Done: `objects_delete_by_selector` reports explicit `mutatedDocument`,
+  `retrySafe`, and `recoveryAction` diagnostics for no-match, selector error,
+  and forbidden pre-mutation failure paths.
 - Done: object delete tools report document identity on successful operation
   records and structured `mutatedDocument:false` / `retrySafe` /
   `recoveryAction` diagnostics for pre-mutation target failures.
