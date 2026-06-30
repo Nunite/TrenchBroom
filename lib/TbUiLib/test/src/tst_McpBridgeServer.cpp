@@ -7183,10 +7183,15 @@ TEST_CASE("McpBridgeServer checked entity batch")
       nextOperationIndex,
       objectRegistry);
     REQUIRE(updateResponse.ok);
+    CHECK(updateResponse.result.value("mutatedDocument").toBool());
+    CHECK(
+      updateResponse.result.value("documentFingerprint").toString()
+      == documentFingerprintForMap(map));
     CHECK(updateResponse.result.value("entityCount").toInt() == 1);
     CHECK(updateResponse.result.value("changedObjectCount").toInt() == 1);
     CHECK(updateResponse.result.value("changedObjectIds").isUndefined());
     CHECK(updateResponse.result.value("changedObjectIdSample").isUndefined());
+    CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 
     const auto deleteResponse = entityPropertiesDeleteForMapResult(
       map,
@@ -7201,10 +7206,50 @@ TEST_CASE("McpBridgeServer checked entity batch")
       nextOperationIndex,
       objectRegistry);
     REQUIRE(deleteResponse.ok);
+    CHECK(deleteResponse.result.value("mutatedDocument").toBool());
     CHECK(deleteResponse.result.value("entityCount").toInt() == 1);
     CHECK(deleteResponse.result.value("changedObjectCount").toInt() == 1);
     CHECK(deleteResponse.result.value("changedObjectIds").isUndefined());
     CHECK(deleteResponse.result.value("changedObjectIdSample").toArray().size() == 1);
+
+    const auto invalidUpdateResponse = entityPropertiesUpdateForMapResult(
+      map,
+      "entity_properties_update",
+      QJsonObject{
+        {"operationIds", QJsonArray{createResponse.result.value("operationId")}},
+        {"properties", QJsonObject{}},
+      },
+      history,
+      history,
+      nextOperationIndex,
+      objectRegistry);
+    REQUIRE_FALSE(invalidUpdateResponse.ok);
+    CHECK(
+      invalidUpdateResponse.error.details.value("mutatedDocument").toBool(true)
+      == false);
+    CHECK(invalidUpdateResponse.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      invalidUpdateResponse.error.details.value("recoveryAction").toString()
+      == "add_properties_then_retry");
+
+    const auto missingTargetDeleteResponse = entityPropertiesDeleteForMapResult(
+      map,
+      "entity_properties_delete",
+      QJsonObject{
+        {"operationIds", QJsonArray{"mcp-op-missing"}},
+        {"keys", QJsonArray{"targetname"}},
+      },
+      history,
+      history,
+      nextOperationIndex,
+      objectRegistry);
+    REQUIRE_FALSE(missingTargetDeleteResponse.ok);
+    CHECK(
+      missingTargetDeleteResponse.error.details.value("mutatedDocument").toBool(true)
+      == false);
+    CHECK(
+      missingTargetDeleteResponse.error.details.value("recoveryAction").toString()
+      == "refresh_status_or_fix_entity_targets");
 
     const auto fullUpdateResponse = entityPropertiesUpdateForMapResult(
       map,

@@ -199,6 +199,9 @@ Next Phase 2 item:
 - Done: object delete tools report document identity on successful operation
   records and structured `mutatedDocument:false` / `retrySafe` /
   `recoveryAction` diagnostics for pre-mutation target failures.
+- Done: entity property update/delete tools report document identity on
+  successful operation records and structured `mutatedDocument:false` /
+  `retrySafe` / `recoveryAction` diagnostics for pre-mutation target failures.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 

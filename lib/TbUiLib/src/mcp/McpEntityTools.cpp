@@ -51,6 +51,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/QPathUtils.h"
 #include "ui/mcp/McpObjectRegistry.h"
 
 #include "kd/vector_utils.h"
@@ -227,13 +228,26 @@ QJsonObject mutationResultJson(
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
+  result.insert("mutatedDocument", true);
+  result.insert("activeDocumentPath", operation.documentPath);
+  result.insert("documentFingerprint", operation.documentFingerprint);
   mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
+}
+
+QJsonObject preMutationFailureDetails(
+  QJsonObject details, const QString& recoveryAction)
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return details;
 }
 
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
+  mdl::Map& map,
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& changedObjectIds,
@@ -244,6 +258,8 @@ void mcpRecordOperation(
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
+  operation.documentPath = map.path().empty() ? QString{} : pathAsQString(map.path());
+  operation.documentFingerprint = documentFingerprintForMap(map);
   operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation, idsMode);
   history.push_back(std::move(operation));
@@ -802,6 +818,7 @@ McpBridgeToolResult createEntityResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,
@@ -878,6 +895,7 @@ McpBridgeToolResult updateEntityResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,
@@ -926,6 +944,7 @@ McpBridgeToolResult deleteEntityResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,
@@ -972,11 +991,21 @@ McpBridgeToolResult entityPropertiesUpdateForMapResult(
   const auto properties = stringMapFromJson(params, "properties", error);
   if (!properties)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "entityProperties"}},
+        "fix_properties_then_retry"));
   }
   if (properties->empty())
   {
-    return invalidParamsFailure("entity_properties_update requires non-empty properties");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "entity_properties_update requires non-empty properties",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "entityProperties"}},
+        "add_properties_then_retry"));
   }
 
   auto warnings = QJsonArray{};
@@ -984,7 +1013,12 @@ McpBridgeToolResult entityPropertiesUpdateForMapResult(
     map, params, operationHistory, objectRegistry, warnings, error);
   if (!error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "entityTargets"}},
+        "refresh_status_or_fix_entity_targets"));
   }
 
   auto nodesToSwap = std::vector<std::pair<mdl::Node*, mdl::NodeContents>>{};
@@ -1009,13 +1043,18 @@ McpBridgeToolResult entityPropertiesUpdateForMapResult(
   if (!changedObjectIds)
   {
     return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError, "Could not update entity properties");
+      mcp::McpErrorCode::InternalError,
+      "Could not update entity properties",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "entityTargets"}},
+        "refresh_status_or_retry"));
   }
 
   auto result = QJsonObject{};
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,
@@ -1069,7 +1108,12 @@ McpBridgeToolResult entityPropertiesDeleteForMapResult(
   auto removeKeys = stringArrayFromJson(params, "keys", error);
   if (!removeKeys)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "entityProperties"}},
+        "fix_keys_then_retry"));
   }
   if (removeKeys->empty())
   {
@@ -1077,7 +1121,12 @@ McpBridgeToolResult entityPropertiesDeleteForMapResult(
   }
   if (!removeKeys || removeKeys->empty())
   {
-    return invalidParamsFailure("entity_properties_delete requires keys");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "entity_properties_delete requires keys",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "entityProperties"}},
+        "add_keys_then_retry"));
   }
 
   auto warnings = QJsonArray{};
@@ -1085,7 +1134,12 @@ McpBridgeToolResult entityPropertiesDeleteForMapResult(
     map, params, operationHistory, objectRegistry, warnings, error);
   if (!error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "entityTargets"}},
+        "refresh_status_or_fix_entity_targets"));
   }
 
   auto nodesToSwap = std::vector<std::pair<mdl::Node*, mdl::NodeContents>>{};
@@ -1111,13 +1165,18 @@ McpBridgeToolResult entityPropertiesDeleteForMapResult(
   if (!changedObjectIds)
   {
     return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError, "Could not delete entity properties");
+      mcp::McpErrorCode::InternalError,
+      "Could not delete entity properties",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "entityTargets"}},
+        "refresh_status_or_retry"));
   }
 
   auto result = QJsonObject{};
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,
@@ -1277,6 +1336,7 @@ McpBridgeToolResult createEntityFromSchemaResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,
@@ -1468,6 +1528,7 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     finalTransactionName,
     *changedObjectIds,
@@ -1546,6 +1607,7 @@ McpBridgeToolResult tieBrushesResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     QString{"MCP: Tie brushes to %1"}.arg(classname),
     changedObjectIds,
@@ -1641,6 +1703,7 @@ McpBridgeToolResult untieBrushesResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     "MCP: Untie brushes",
     changedObjectIds,
