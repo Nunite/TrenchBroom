@@ -233,6 +233,9 @@ Next Phase 2 item:
   `mutatedDocument:false`, `retrySafe`, and recovery actions before ungrouping.
 - Done: `brush_metadata_set` reports `mutatedDocument:false` on success because
   it updates MCP metadata state without mutating the map document.
+- Done: `brush_metadata_set` precondition failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before updating
+  metadata state.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 

@@ -7001,6 +7001,23 @@ TEST_CASE("McpBridgeServer route metadata tools")
     CHECK(setResponse.result.value("count").toInt() == 1);
     CHECK(setResponse.result.value("mutatedDocument").toBool(true) == false);
 
+    const auto missingTargetSetResponse = brushMetadataSetForMapResult(
+      map,
+      QJsonObject{
+        {"objectIds", QJsonArray{"node:999"}},
+        {"metadata", QJsonObject{{"routeId", "missing"}}},
+      },
+      metadataStore);
+    REQUIRE_FALSE(missingTargetSetResponse.ok);
+    CHECK(
+      missingTargetSetResponse.error.details.value("mutatedDocument").toBool(true)
+      == false);
+    CHECK(missingTargetSetResponse.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      missingTargetSetResponse.error.details.value("recoveryAction").toString()
+      == "refresh_status_or_select_live_brushes");
+    CHECK(metadataStore.size() == 2u);
+
     const auto getResponse = brushMetadataGetForMapResult(
       map, QJsonObject{{"objectIds", objectIds}}, metadataStore);
     REQUIRE(getResponse.ok);

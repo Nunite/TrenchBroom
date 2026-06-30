@@ -1405,21 +1405,49 @@ McpBridgeToolResult brushMetadataSetForMapResult(
   auto objectIds = stringListFromJson(params, "objectIds", error);
   if (!objectIds)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "fix_object_ids_then_retry"},
+      });
   }
   if (objectIds->empty())
   {
-    return invalidParamsFailure("objectIds must not be empty");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "objectIds must not be empty",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_brush_object_ids_then_retry"},
+      });
   }
 
   auto metadata = metadataFromJsonValue(params.value("metadata"), "metadata", error);
   if (!metadata)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "fix_metadata_then_retry"},
+      });
   }
   if (metadata->isEmpty())
   {
-    return invalidParamsFailure("metadata must not be empty");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "metadata must not be empty",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_metadata_then_retry"},
+      });
   }
 
   for (const auto& objectId : *objectIds)
@@ -1427,8 +1455,15 @@ McpBridgeToolResult brushMetadataSetForMapResult(
     auto* node = resolveNodeId(map.worldNode(), objectId);
     if (dynamic_cast<mdl::BrushNode*>(node) == nullptr)
     {
-      return invalidParamsFailure(
-        QString{"Object id is not a live brush: %1"}.arg(objectId));
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        QString{"Object id is not a live brush: %1"}.arg(objectId),
+        QJsonObject{
+          {"mutatedDocument", false},
+          {"retrySafe", true},
+          {"objectId", objectId},
+          {"recoveryAction", "refresh_status_or_select_live_brushes"},
+        });
     }
   }
 
