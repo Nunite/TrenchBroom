@@ -469,13 +469,26 @@ QJsonObject mutationResultJson(
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
+  result.insert("mutatedDocument", true);
+  result.insert("activeDocumentPath", operation.documentPath);
+  result.insert("documentFingerprint", operation.documentFingerprint);
   mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
+}
+
+QJsonObject preMutationFailureDetails(
+  QJsonObject details, const QString& recoveryAction)
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return details;
 }
 
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
+  mdl::Map& map,
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& changedObjectIds,
@@ -486,6 +499,8 @@ void mcpRecordOperation(
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
+  operation.documentPath = pathToQString(map.path());
+  operation.documentFingerprint = documentFingerprintForMap(map);
   operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation, idsMode);
   history.push_back(std::move(operation));
@@ -974,6 +989,7 @@ McpBridgeToolResult textureApplyResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedNodes,
@@ -1021,7 +1037,11 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
   const auto material = params.value("material").toString().trimmed();
   if (material.isEmpty())
   {
-    return invalidParamsFailure("texture_apply_by_filter requires material");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "texture_apply_by_filter requires material",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "material"}}, "add_material_then_retry"));
   }
 
   auto error = QString{};
@@ -1035,7 +1055,12 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
       nodesFromObjectIdsAndOperations(map, params, history, objectRegistry, error);
     if (!nodes)
     {
-      return invalidParamsFailure(error);
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        error,
+        preMutationFailureDetails(
+          QJsonObject{{"targetSource", "objectIdsOrOperations"}},
+          "refresh_status_or_fix_texture_targets"));
     }
     matches = *nodes;
     handles = brushFaceHandlesFromNodes(matches);
@@ -1060,7 +1085,11 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
     matches = mcpFilteredNodes(map, filterParams, options, error);
     if (!error.isEmpty())
     {
-      return invalidParamsFailure(error);
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        error,
+        preMutationFailureDetails(
+          QJsonObject{{"targetSource", "filter"}}, "fix_filter_then_retry"));
     }
 
     for (auto* node : matches)
@@ -1078,8 +1107,15 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
   handles = filterFaceHandlesBySemantic(std::move(handles), params, error);
   if (handles.empty())
   {
-    return invalidParamsFailure(
-      error.isEmpty() ? "texture_apply_by_filter matched no brush faces" : error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error.isEmpty() ? "texture_apply_by_filter matched no brush faces" : error,
+      preMutationFailureDetails(
+        QJsonObject{
+          {"targetSource", "filter"},
+          {"matchedBrushCount", static_cast<int>(matches.size())},
+        },
+        "preview_filter_or_choose_face_semantic"));
   }
 
   auto changedNodes = changedBrushIds(handles, map.worldNode());
@@ -1093,13 +1129,17 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
   if (!ok)
   {
     return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError, "Could not apply texture by filter");
+      mcp::McpErrorCode::InternalError,
+      "Could not apply texture by filter",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "filter"}}, "refresh_status_or_retry"));
   }
 
   auto result = QJsonObject{};
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedNodes,
@@ -1292,6 +1332,7 @@ McpBridgeToolResult faceTextureSetResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedNodes,
@@ -1368,6 +1409,7 @@ McpBridgeToolResult textureReplaceResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedNodes,
@@ -1442,6 +1484,7 @@ McpBridgeToolResult textureAlignFaceResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedNodes,
@@ -1504,6 +1547,7 @@ McpBridgeToolResult textureCopyFromFaceResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedNodes,

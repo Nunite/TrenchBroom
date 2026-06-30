@@ -4516,6 +4516,10 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
   const auto error = response.ok ? std::string{} : response.error.message.toStdString();
   INFO(error);
   REQUIRE(response.ok);
+  CHECK(response.result.value("mutatedDocument").toBool());
+  CHECK(
+    response.result.value("documentFingerprint").toString()
+    == documentFingerprintForMap(map));
   CHECK(response.result.value("material").toString() == "target_mat");
   CHECK(response.result.value("materialExists").toBool(true) == false);
   CHECK(!response.result.value("fallbackMaterial").toString().isEmpty());
@@ -4524,6 +4528,7 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
   CHECK(response.result.value("changedObjectCount").toInt() == 1);
   CHECK(response.result.value("changedObjectIds").isUndefined());
   CHECK(response.result.value("changedObjectIdSample").isUndefined());
+  CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 
   const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
   REQUIRE(objectIds.size() == 2);
@@ -4573,6 +4578,40 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
   REQUIRE(fullResponse.ok);
   CHECK(fullResponse.result.value("materialExists").toBool(true) == false);
   CHECK(fullResponse.result.value("changedObjectIds").toArray().size() == 1);
+
+  const auto missingMaterialResponse = textureApplyByFilterForMapResult(
+    map,
+    "texture_apply_by_filter",
+    QJsonObject{
+      {"type", "brush"},
+      {"min", QJsonArray{-16, -16, -16}},
+      {"max", QJsonArray{80, 80, 32}},
+      {"boundsMode", "intersects"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE_FALSE(missingMaterialResponse.ok);
+  CHECK(
+    missingMaterialResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(missingMaterialResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingMaterialResponse.error.details.value("recoveryAction").toString()
+    == "add_material_then_retry");
+
+  const auto missingTargetResponse = textureApplyByFilterForMapResult(
+    map,
+    "texture_apply_by_filter",
+    QJsonObject{{"material", "target_mat"}, {"operationId", "mcp-op-missing"}},
+    history,
+    nextOperationIndex);
+  REQUIRE_FALSE(missingTargetResponse.ok);
+  CHECK(
+    missingTargetResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(
+    missingTargetResponse.error.details.value("recoveryAction").toString()
+    == "refresh_status_or_fix_texture_targets");
 }
 
 TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
