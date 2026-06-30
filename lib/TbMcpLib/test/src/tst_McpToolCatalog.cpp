@@ -1751,6 +1751,30 @@ TEST_CASE("McpToolCatalog")
     CHECK(idsModeDescription("blockout_create_batch") == description);
   }
 
+  SECTION("compact output tools share detail wording")
+  {
+    const auto detailDescription = [](const QString& toolName) {
+      const auto tool = findToolDefinition(toolName);
+      REQUIRE(tool);
+      return tool->inputSchema.value("properties")
+        .toObject()
+        .value("detail")
+        .toObject()
+        .value("description")
+        .toString();
+    };
+
+    const auto idsDetail = detailDescription("blockout_create_batch");
+    CHECK(idsDetail == "summary, ids, or full. Defaults to summary.");
+    CHECK(detailDescription("brush_create_boxes_batch") == idsDetail);
+    CHECK(detailDescription("brush_create_polygon_batch") == idsDetail);
+    CHECK(detailDescription("operation_inspect") == idsDetail);
+
+    const auto fullDetail = detailDescription("module_render_review");
+    CHECK(fullDetail == "summary or full. Defaults to summary.");
+    CHECK(detailDescription("operation_validate") == fullDetail);
+  }
+
   SECTION("selector and module tools share moduleId wording")
   {
     const auto propertyDescription = [](const QString& toolName,

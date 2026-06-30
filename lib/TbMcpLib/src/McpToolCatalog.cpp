@@ -98,6 +98,16 @@ QJsonObject changedIdsModeProperty()
     "maps to detail=ids.");
 }
 
+QJsonObject summaryFullDetailProperty()
+{
+  return stringProperty("summary or full. Defaults to summary.");
+}
+
+QJsonObject summaryIdsFullDetailProperty()
+{
+  return stringProperty("summary, ids, or full. Defaults to summary.");
+}
+
 QJsonObject moduleIdProperty()
 {
   return stringProperty("Session metadata moduleId.");
@@ -781,7 +791,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            boolProperty("Return only leaf nodes. Defaults to true for bounds queries.")},
           {"exactTypeOnly",
            boolProperty("Require exact type matches when type is supplied.")},
-          {"detail", stringProperty("summary or full. Defaults to summary.")},
+          {"detail", summaryFullDetailProperty()},
         },
         {"min", "max"}),
     },
@@ -1436,7 +1446,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"autoHideLabelsThreshold",
          integerProperty("Hide dense order/entity/part labels above this target count.")},
         {"outputDir", stringProperty("Optional review output root.")},
-        {"detail", stringProperty("summary or full. Defaults to summary.")},
+        {"detail", summaryFullDetailProperty()},
       }),
     },
     {
@@ -1513,7 +1523,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            integerProperty(
              "Hide dense order/entity/part labels above this target count.")},
           {"outputDir", stringProperty("Optional review output root.")},
-          {"detail", stringProperty("summary or full. Defaults to summary.")},
+          {"detail", summaryFullDetailProperty()},
         },
         {"moduleId"}),
     },
@@ -1748,7 +1758,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            stringProperty(
              "Transaction label, defaults to MCP: Create checked entities.")},
           {"select", boolProperty("Select created entities.")},
-          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"detail", summaryIdsFullDetailProperty()},
           {"idsMode",
            stringProperty(
              "none, count, sample, or full for changed object ids. Defaults to count; "
@@ -1878,7 +1888,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            stringProperty("Default material for boxes without a material field.")},
           {"grid", numberProperty("Grid size for snapping generated geometry.")},
           {"select", boolProperty("Select generated boxes.")},
-          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"detail", summaryIdsFullDetailProperty()},
           {"idsMode", changedIdsModeProperty()},
         },
         {"boxes"}),
@@ -1904,7 +1914,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"transactionName",
            stringProperty(
              "Transaction label, defaults to MCP: Create polygon platform batch.")},
-          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"detail", summaryIdsFullDetailProperty()},
           {"idsMode", changedIdsModeProperty()},
           {"material",
            stringProperty("Default material for brushes without a material field.")},
@@ -2151,7 +2161,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {
           {"operationId",
            stringProperty("Operation id returned by a mutating MCP tool.")},
-          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"detail", summaryIdsFullDetailProperty()},
           {"idsMode",
            stringProperty(
              "none, count, sample, or full for changed/deleted object ids. Defaults "
@@ -2186,7 +2196,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {
           {"operationId",
            stringProperty("Operation id returned by a mutating MCP tool.")},
-          {"detail", stringProperty("summary or full. Defaults to summary.")},
+          {"detail", summaryFullDetailProperty()},
           {"idsMode",
            stringProperty(
              "none, count, sample, or full for changed/deleted object ids. Defaults "
@@ -2774,7 +2784,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
           {"name", stringProperty("Transaction label, defaults to MCP: Blockout batch.")},
           {"grid", numberProperty("Grid size for snapping generated geometry.")},
           {"select", boolProperty("Select generated brushes.")},
-          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"detail", summaryIdsFullDetailProperty()},
           {"idsMode", changedIdsModeProperty()},
           {"defaultMetadata", genericMetadataSchema()},
           {"operations",
@@ -2815,11 +2825,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            integerProperty("Subprocess timeout in milliseconds. Defaults to 5000.")},
           {"grid", numberProperty("Grid size for snapping generated geometry.")},
           {"select", boolProperty("Select generated brushes.")},
-          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
-          {"idsMode",
-           stringProperty(
-             "none, count, sample, or full for changed object ids. Defaults to count; "
-             "full maps to detail=ids.")},
+          {"detail", summaryIdsFullDetailProperty()},
+          {"idsMode", changedIdsModeProperty()},
           {"material", stringProperty("Default material passed to blockout batch.")},
         },
         {"script"}),
@@ -2865,7 +2872,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            stringProperty(
              "Object id verbosity: none, count, sample, or full. Maps to summary/ids "
              "detail internally.")},
-          {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+          {"detail", summaryIdsFullDetailProperty()},
         },
         {"imagePath"}),
     },
@@ -3077,7 +3084,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"partMaterials", genericMetadataSchema()},
         {"partMetadata", genericMetadataSchema()},
         {"select", boolProperty("Select generated brushes.")},
-        {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+        {"detail", summaryIdsFullDetailProperty()},
       }),
     },
     {
@@ -3140,7 +3147,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          stringProperty(
            "none, count, sample, or full for changed object ids. Defaults to count; "
            "full maps to detail=ids.")},
-        {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+        {"detail", summaryIdsFullDetailProperty()},
       }),
     },
     {
@@ -3152,7 +3159,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       objectSchema({
         {"grid", numberProperty("Grid size for alignment checks, defaults to 1.")},
-        {"detail", stringProperty("summary, ids, or full. Defaults to summary.")},
+        {"detail", summaryIdsFullDetailProperty()},
         {"maxBrushes",
          integerProperty(
            "Maximum per-brush entries returned for ids/full detail, defaults to 100.")},
