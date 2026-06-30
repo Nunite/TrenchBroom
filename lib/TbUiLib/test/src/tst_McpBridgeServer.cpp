@@ -3432,6 +3432,62 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   CHECK(fullDeletedObjectIds.first().toString() == fullDeleteTarget);
 }
 
+TEST_CASE("McpBridgeServer selector delete reports pre-mutation failure state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto response = objectsDeleteBySelectorForMapResult(
+    map,
+    "objects_delete_by_selector",
+    QJsonObject{{"selector", QJsonObject{{"moduleId", "missing-module"}}}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+
+  REQUIRE_FALSE(response.ok);
+  CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(response.error.details.value("matchedCount").toInt(-1) == 0);
+  CHECK(
+    response.error.details.value("recoveryAction").toString()
+    == "preview_selector_or_refresh_status");
+
+  const auto invalidSelectorResponse = objectsDeleteBySelectorForMapResult(
+    map,
+    "objects_delete_by_selector",
+    QJsonObject{
+      {"selector", QJsonObject{{"operationIds", QJsonArray{QJsonValue{42}}}}}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+
+  REQUIRE_FALSE(invalidSelectorResponse.ok);
+  CHECK(
+    invalidSelectorResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(
+    invalidSelectorResponse.error.details.value("recoveryAction").toString()
+    == "fix_selector_then_retry");
+}
+
 TEST_CASE("McpBridgeServer externalizes native group object ids")
 {
   auto appControllerFixture = AppControllerFixture{};
@@ -3747,6 +3803,7 @@ TEST_CASE("McpBridgeServer selector metadata round trips through IR and operatio
     moduleStore,
     objectRegistry);
   REQUIRE(deleteResponse.ok);
+  CHECK(deleteResponse.result.value("mutatedDocument").toBool());
   CHECK(deleteResponse.result.value("matchedCount").toInt() == 1);
 
   const auto deletedPartPreview = selectorPreviewForMapResult(

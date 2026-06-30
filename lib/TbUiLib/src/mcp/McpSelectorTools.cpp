@@ -2157,7 +2157,14 @@ McpBridgeToolResult objectsDeleteBySelectorForMapResult(
     map, selector, history, metadataStore, moduleStore, objectRegistry, warnings, error);
   if (!error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"selector", selector},
+        {"recoveryAction", "fix_selector_then_retry"},
+      });
   }
   nodes.erase(
     std::remove_if(
@@ -2167,8 +2174,15 @@ McpBridgeToolResult objectsDeleteBySelectorForMapResult(
     nodes.end());
   if (nodes.empty())
   {
-    return invalidParamsFailure(
-      "objects_delete_by_selector matched no deletable objects");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "objects_delete_by_selector matched no deletable objects",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"selector", selector},
+        {"matchedCount", 0},
+        {"recoveryAction", "preview_selector_or_refresh_status"},
+      });
   }
 
   const auto transactionName =
@@ -2190,7 +2204,14 @@ McpBridgeToolResult objectsDeleteBySelectorForMapResult(
   if (!changedObjectIds)
   {
     return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::Forbidden, "Matched selector objects cannot be deleted");
+      mcp::McpErrorCode::Forbidden,
+      "Matched selector objects cannot be deleted",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"selector", selector},
+        {"matchedCount", deletedIds.size()},
+        {"recoveryAction", "preview_selector_or_use_user_selection"},
+      });
   }
 
   markDeletedMetadata(
@@ -2204,6 +2225,7 @@ McpBridgeToolResult objectsDeleteBySelectorForMapResult(
                               : transactionName,
     deletedIds,
     result);
+  result.insert("mutatedDocument", true);
   result.insert("matchedCount", deletedIds.size());
   result.insert("selector", selector);
   result.insert("warnings", warnings);

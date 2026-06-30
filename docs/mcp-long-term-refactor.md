@@ -193,13 +193,16 @@ Next Phase 2 item:
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor
   inspection paths.
+- Done: `objects_delete_by_selector` reports explicit `mutatedDocument` and
+  `recoveryAction` diagnostics for no-match, selector error, and forbidden
+  pre-mutation failure paths.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 
 Next Phase 3 item:
 
-- Audit one mutation family at a time for document identity, mutation-state, and
-  recovery-action consistency.
+- Continue auditing one mutation family at a time for document identity,
+  mutation-state, and recovery-action consistency.
 
 ### Phase 4 Status: Partial
 
