@@ -1816,6 +1816,39 @@ TEST_CASE("McpToolCatalog")
           == selectorModuleIdDescription);
   }
 
+  SECTION("selector schema keeps metadata fields together")
+  {
+    const auto selectorTool = findToolDefinition("selector_preview");
+    REQUIRE(selectorTool);
+    const auto selectorProperties =
+      selectorTool->inputSchema.value("properties")
+        .toObject()
+        .value("selector")
+        .toObject()
+        .value("properties")
+        .toObject();
+
+    const auto metadataFields = QStringList{
+      "moduleId",
+      "part",
+      "role",
+      "order",
+      "routeId",
+      "temporary",
+      "generatedBy",
+    };
+    for (const auto& field : metadataFields)
+    {
+      CAPTURE(field);
+      CHECK(selectorProperties.value(field).isObject());
+      CHECK(selectorProperties.value(field)
+              .toObject()
+              .value("description")
+              .toString()
+              .contains("Session metadata"));
+    }
+  }
+
   SECTION("recovery tools share live operation target wording")
   {
     const auto propertyDescription = [](const QString& toolName,

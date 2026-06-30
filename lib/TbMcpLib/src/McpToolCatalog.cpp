@@ -293,36 +293,42 @@ QJsonObject genericMetadataSchema()
   };
 }
 
+QJsonObject selectorMetadataProperties()
+{
+  return QJsonObject{
+    {"moduleId", moduleIdProperty()},
+    {"part", stringProperty("Session metadata part.")},
+    {"role", stringProperty("Session metadata role.")},
+    {"order", numberProperty("Session metadata order.")},
+    {"routeId", stringProperty("Session metadata routeId.")},
+    {"temporary", boolProperty("Session metadata temporary flag.")},
+    {"generatedBy", stringProperty("Session metadata generatedBy value.")},
+  };
+}
+
 QJsonObject selectorSchema()
 {
+  auto properties = selectorMetadataProperties();
+  properties.insert("metadata", genericMetadataSchema());
+  properties.insert("operationId", stringProperty("Single MCP operation id target."));
+  properties.insert("operationIds", arrayProperty("MCP operation id targets."));
+  properties.insert("type", stringProperty("Node type filter, e.g. brush, entity, group."));
+  properties.insert("classname", stringProperty("Entity classname filter."));
+  properties.insert("targetname", stringProperty("Entity targetname filter."));
+  properties.insert("material", stringProperty("Brush material filter."));
+  properties.insert("query", stringProperty("Text query over id/type/name/entity properties."));
+  properties.insert("min", vec3Property("Optional bounds minimum."));
+  properties.insert("max", vec3Property("Optional bounds maximum."));
+  properties.insert("boundsMode", stringProperty("Bounds mode: intersects or contains."));
+  properties.insert("limit", integerProperty("Maximum matched objects, defaults to 100."));
+
   return QJsonObject{
     {"type", "object"},
     {"description",
      "Structured selector v1. Matches live objects by metadata, type, bounds, "
      "material, classname/targetname, operationId/operationIds, or moduleId. This is "
      "intentionally JSON, not a free-text DSL."},
-    {"properties",
-     QJsonObject{
-       {"metadata", genericMetadataSchema()},
-       {"moduleId", moduleIdProperty()},
-       {"part", stringProperty("Session metadata part.")},
-       {"role", stringProperty("Session metadata role.")},
-       {"order", numberProperty("Session metadata order.")},
-       {"routeId", stringProperty("Session metadata routeId.")},
-       {"temporary", boolProperty("Session metadata temporary flag.")},
-       {"generatedBy", stringProperty("Session metadata generatedBy value.")},
-       {"operationId", stringProperty("Single MCP operation id target.")},
-       {"operationIds", arrayProperty("MCP operation id targets.")},
-       {"type", stringProperty("Node type filter, e.g. brush, entity, group.")},
-       {"classname", stringProperty("Entity classname filter.")},
-       {"targetname", stringProperty("Entity targetname filter.")},
-       {"material", stringProperty("Brush material filter.")},
-       {"query", stringProperty("Text query over id/type/name/entity properties.")},
-       {"min", vec3Property("Optional bounds minimum.")},
-       {"max", vec3Property("Optional bounds maximum.")},
-       {"boundsMode", stringProperty("Bounds mode: intersects or contains.")},
-       {"limit", integerProperty("Maximum matched objects, defaults to 100.")},
-     }},
+    {"properties", properties},
     {"additionalProperties", false},
   };
 }

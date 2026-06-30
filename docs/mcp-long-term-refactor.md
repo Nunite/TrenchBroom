@@ -172,16 +172,17 @@ Next Phase 1 item:
   centralized in the catalog and covered by a drift test.
 - Done: common compact-output `detail` wording is centralized in the catalog and
   covered by a drift test.
-- Missing: selector wording is not yet centralized enough to be single-source.
+- Done: selector metadata field wording is centralized in the catalog and
+  covered by a drift test.
 - Missing: lifecycle/profile/category/search metadata is not enforced from one
   obvious catalog edit path.
-- Partial: catalog metadata tests exist, but they do not yet prove common
-  selector/module docs cannot drift.
+- Done: catalog metadata tests prove common selector/module wording does not
+  drift for the centralized fragments above.
 
 Next Phase 2 item:
 
-- Centralize the next smallest repeated selector schema fragment that has
-  multiple current users and add a focused catalog test.
+- Make lifecycle/profile/category/search metadata enforcement more explicit
+  from the catalog edit path and add a focused catalog test.
 
 ### Phase 3 Status: Partial
 
