@@ -1712,6 +1712,16 @@ McpBridgeToolResult cachedIrApplyParams(
   return McpBridgeToolResult::success(applyParams);
 }
 
+McpBridgeToolResult irApplyFromFilePreMutationFailure(
+  const QString& message, QString recoveryAction, QJsonObject details = {})
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", std::move(recoveryAction));
+  return McpBridgeToolResult::failure(
+    mcp::McpErrorCode::InvalidParams, message, std::move(details));
+}
+
 QJsonObject mergeObjects(QJsonObject base, const QJsonObject& overlay)
 {
   for (auto it = overlay.begin(); it != overlay.end(); ++it)
@@ -2994,7 +3004,9 @@ McpBridgeToolResult irApplyFromFileResult(
     }
     if (previewCache == nullptr)
     {
-      return invalidParamsFailure("ir_apply_from_file previewId cache is unavailable");
+      return irApplyFromFilePreMutationFailure(
+        "ir_apply_from_file previewId cache is unavailable",
+        "run_ir_compile_preview_from_file_again");
     }
     const auto cached =
       cachedIrApplyParams(mapWindow->document().map(), paramsWithPath, *previewCache);
@@ -3009,7 +3021,10 @@ McpBridgeToolResult irApplyFromFileResult(
   const auto ir = irFromFileParams(paramsWithPath, error);
   if (!ir)
   {
-    return invalidParamsFailure(error);
+    return irApplyFromFilePreMutationFailure(
+      error,
+      "fix_ir_file_or_preview_again",
+      QJsonObject{{"sourcePath", paramsWithPath.value("path").toString()}});
   }
   auto applyParams = paramsWithPath;
   applyParams.insert("ir", *ir);
@@ -3052,7 +3067,9 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   {
     if (previewCache == nullptr)
     {
-      return invalidParamsFailure("ir_apply_from_file previewId cache is unavailable");
+      return irApplyFromFilePreMutationFailure(
+        "ir_apply_from_file previewId cache is unavailable",
+        "run_ir_compile_preview_from_file_again");
     }
     const auto cached = cachedIrApplyParams(map, paramsWithPath, *previewCache);
     if (!cached.ok)
@@ -3066,7 +3083,10 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   const auto ir = irFromFileParams(paramsWithPath, error);
   if (!ir)
   {
-    return invalidParamsFailure(error);
+    return irApplyFromFilePreMutationFailure(
+      error,
+      "fix_ir_file_or_preview_again",
+      QJsonObject{{"sourcePath", paramsWithPath.value("path").toString()}});
   }
   auto applyParams = paramsWithPath;
   applyParams.insert("ir", *ir);

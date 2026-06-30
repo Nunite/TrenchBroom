@@ -8003,6 +8003,81 @@ TEST_CASE("McpBridgeServer file based IR tools")
   CHECK(previewResponse.result.value("expiresAfterSeconds").toInt() == 600);
   CHECK(previewCache.size() == 1u);
 
+  const auto descendantCountBeforeRejectedApply = map.worldNode().descendantCount();
+  const auto missingPathApplyResponse = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore);
+  CHECK(!missingPathApplyResponse.ok);
+  CHECK(missingPathApplyResponse.error.message == "file-based IR requires path");
+  CHECK(
+    missingPathApplyResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(missingPathApplyResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingPathApplyResponse.error.details.value("recoveryAction").toString()
+    == "fix_ir_file_or_preview_again");
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeRejectedApply);
+
+  const auto invalidApplyPath = tempDir.filePath("invalid-apply-ir.json");
+  auto invalidApplyFile = QFile{invalidApplyPath};
+  REQUIRE(invalidApplyFile.open(QIODevice::WriteOnly));
+  invalidApplyFile.write(QJsonDocument{
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         },
+       }},
+    }}.toJson());
+  invalidApplyFile.close();
+  const auto invalidApplyResponse = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{{"path", invalidApplyPath}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore);
+  CHECK(!invalidApplyResponse.ok);
+  CHECK(invalidApplyResponse.error.message.contains("requires type"));
+  CHECK(
+    invalidApplyResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(invalidApplyResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidApplyResponse.error.details.value("recoveryAction").toString()
+    == "fix_ir_file_or_preview_again");
+  CHECK(
+    invalidApplyResponse.error.details.value("sourcePath").toString()
+    == invalidApplyPath);
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeRejectedApply);
+
+  const auto unavailableCacheResponse = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{{"previewId", previewResponse.result.value("previewId").toString()}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore);
+  CHECK(!unavailableCacheResponse.ok);
+  CHECK(unavailableCacheResponse.error.message.contains("cache is unavailable"));
+  CHECK(
+    unavailableCacheResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(unavailableCacheResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    unavailableCacheResponse.error.details.value("recoveryAction").toString()
+    == "run_ir_compile_preview_from_file_again");
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeRejectedApply);
+
   const auto expiredPreviewId = previewResponse.result.value("previewId").toString();
   auto expiredPreviewCache = previewCache;
   expiredPreviewCache[expiredPreviewId].expiresAtMs = 1;
@@ -8163,7 +8238,7 @@ TEST_CASE("McpBridgeServer file based IR tools")
     }}.toJson());
   changedFile.close();
 
-  const auto descendantCountBeforeRejectedApply = map.worldNode().descendantCount();
+  const auto descendantCountBeforeChangedFileApply = map.worldNode().descendantCount();
   const auto changedFileApplyResponse = irApplyFromFileForMapResult(
     map,
     "ir_apply_from_file",
@@ -8184,7 +8259,7 @@ TEST_CASE("McpBridgeServer file based IR tools")
   CHECK(
     changedFileApplyResponse.error.details.value("recoveryAction").toString()
     == "preview_changed_ir_file_again");
-  CHECK(map.worldNode().descendantCount() == descendantCountBeforeRejectedApply);
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeChangedFileApply);
 
   const auto unknownPreviewResponse = irApplyFromFileForMapResult(
     map,

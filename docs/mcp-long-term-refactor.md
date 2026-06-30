@@ -250,6 +250,8 @@ Next Phase 2 item:
   brushes.
 - Done: cached `ir_apply_from_file` previewId guard failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before applying IR.
+- Done: direct `ir_apply_from_file` path/cache/IR-shape failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before applying IR.
 - Done: `heightmap_import_grayscale` preview/parameter failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before importing
   brushes.
