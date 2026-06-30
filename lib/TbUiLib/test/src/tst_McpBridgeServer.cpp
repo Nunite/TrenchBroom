@@ -4663,6 +4663,11 @@ TEST_CASE("McpBridgeServer native group tools")
     map, QJsonObject{{"objectId", selectedChildIds.first()}}, objectRegistry);
   CHECK_FALSE(inspectNonGroup.ok);
   CHECK(inspectNonGroup.error.message.contains("not a group"));
+  CHECK(inspectNonGroup.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(inspectNonGroup.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    inspectNonGroup.error.details.value("recoveryAction").toString()
+    == "provide_group_target_or_select_group");
 
   mdl::deselectAll(map);
   mdl::selectNodes(map, {selectedChildren.front()});

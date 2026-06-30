@@ -263,6 +263,8 @@ Next Phase 2 item:
   brush face texture attributes.
 - Done: `group_create_from_selection` precondition failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before grouping.
+- Done: `group_inspect` target failures report `mutatedDocument:false`,
+  `retrySafe`, and recovery actions for invalid group targets.
 - Done: `group_rename_selected` precondition failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before renaming.
 - Done: `group_ungroup_selected` precondition failures report

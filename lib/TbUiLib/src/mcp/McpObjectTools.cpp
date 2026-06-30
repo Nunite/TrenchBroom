@@ -1509,7 +1509,12 @@ McpBridgeToolResult groupInspectForMapResult(
   auto groups = groupTargetsFromParamsOrSelection(map, params, objectRegistry, error);
   if (!groups)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "group_or_selection"}},
+        "provide_group_target_or_select_group"));
   }
 
   const auto includeChildren = params.value("includeChildren").toBool(false);
