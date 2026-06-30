@@ -121,6 +121,10 @@ primitive, selector/module operation, validator, review feature, or compact outp
 improvement. Promote recipe behavior into MCP only after repeated independent
 workflows prove it is a generic editor capability.
 
+Use bundled recipes for common prefab-like requests such as `simple_house`,
+`temple_courtyard`, `terrain_pass`, `cave_pass`, `ascending_loop`, and
+`kz_bhop_route` before considering new MCP tools.
+
 ## Selector Rules
 
 Use structured JSON selectors, not free text DSL:
