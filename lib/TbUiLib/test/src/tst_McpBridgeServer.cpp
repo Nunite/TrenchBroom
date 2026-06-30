@@ -4722,14 +4722,36 @@ TEST_CASE("McpBridgeServer deletes operations without long object id lists")
   REQUIRE(deleteResponse.ok);
   CHECK(deleteResponse.result.value("sourceOperationId").toString() == "mcp-op-1");
   CHECK(deleteResponse.result.value("operationKind").toString() == "delete");
+  CHECK(deleteResponse.result.value("mutatedDocument").toBool());
+  CHECK(
+    deleteResponse.result.value("documentFingerprint").toString()
+    == documentFingerprintForMap(map));
   CHECK(deleteResponse.result.value("changedObjectCount").toInt() == 0);
   CHECK(deleteResponse.result.value("deletedCount").toInt() == 2);
   CHECK(deleteResponse.result.value("deletedObjectIds").toArray().size() == 2);
   CHECK(map.worldNode().descendantCount() == 1u);
   REQUIRE(history.size() == 2u);
   CHECK(history.back().operationKind == "delete");
+  CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
   CHECK(history.back().changedObjectIds.empty());
   CHECK(history.back().deletedObjectIds.size() == 2);
+
+  const auto staleDeleteResponse = deleteObjectsByOperationForMapResult(
+    map,
+    "objects_delete_by_operation",
+    QJsonObject{{"operationId", history.front().operationId}},
+    history,
+    nextOperationIndex,
+    registry);
+  REQUIRE_FALSE(staleDeleteResponse.ok);
+  CHECK(staleDeleteResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(staleDeleteResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    staleDeleteResponse.error.details.value("recoveryAction").toString()
+    == "inspect_operation_or_refresh_status");
+  CHECK(
+    staleDeleteResponse.error.details.value("operationId").toString()
+    == history.front().operationId);
 
   const auto validateDelete = operationValidateForMapResult(
     map, history, QJsonObject{{"operationId", history.back().operationId}}, registry);

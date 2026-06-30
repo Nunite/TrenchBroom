@@ -44,6 +44,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/QPathUtils.h"
 #include "ui/mcp/McpObjectRegistry.h"
 
 #include "kd/vector_utils.h"
@@ -144,8 +145,20 @@ QJsonObject mutationResultJson(
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
+  result.insert("mutatedDocument", true);
+  result.insert("activeDocumentPath", operation.documentPath);
+  result.insert("documentFingerprint", operation.documentFingerprint);
   mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
+}
+
+QJsonObject preMutationFailureDetails(
+  QJsonObject details, const QString& recoveryAction)
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return details;
 }
 
 struct NodeTypeCounts
@@ -491,6 +504,7 @@ std::optional<std::vector<mdl::GroupNode*>> groupTargetsFromParamsOrSelection(
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
+  mdl::Map& map,
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& changedObjectIds,
@@ -501,6 +515,8 @@ void mcpRecordOperation(
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
+  operation.documentPath = map.path().empty() ? QString{} : pathAsQString(map.path());
+  operation.documentFingerprint = documentFingerprintForMap(map);
   operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation, idsMode);
   history.push_back(std::move(operation));
@@ -1123,7 +1139,11 @@ McpBridgeToolResult deleteObjectsForMapResult(
   const auto nodes = nodesFromObjectIds(map, params, error);
   if (!nodes)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "objectIds"}}, "refresh_status_or_ids"));
   }
 
   const auto transactionName = QString{"MCP: Delete objects"};
@@ -1131,13 +1151,21 @@ McpBridgeToolResult deleteObjectsForMapResult(
   if (!changedObjectIds)
   {
     return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::Forbidden, "One or more objects cannot be deleted");
+      mcp::McpErrorCode::Forbidden,
+      "One or more objects cannot be deleted",
+      preMutationFailureDetails(
+        QJsonObject{
+          {"targetSource", "objectIds"},
+          {"requestedCount", params.value("objectIds").toArray().size()},
+        },
+        "preview_targets_or_use_user_selection"));
   }
 
   auto result = QJsonObject{};
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,
@@ -1170,14 +1198,22 @@ McpBridgeToolResult deleteObjectsByFilterResult(
     || (!params.value("min").isUndefined() && !params.value("max").isUndefined());
   if (!hasFilter)
   {
-    return invalidParamsFailure(
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
       "objects_delete_by_filter requires at least one filter: type, classname, "
-      "targetname, material, query, or bounds");
+      "targetname, material, query, or bounds",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "filter"}}, "add_filter_then_retry"));
   }
   if (
     params.value("type").toString().trimmed().compare("world", Qt::CaseInsensitive) == 0)
   {
-    return invalidParamsFailure("objects_delete_by_filter cannot delete world");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "objects_delete_by_filter cannot delete world",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "filter"}, {"type", "world"}},
+        "choose_deletable_filter_then_retry"));
   }
 
   auto error = QString{};
@@ -1192,11 +1228,20 @@ McpBridgeToolResult deleteObjectsByFilterResult(
   auto nodes = mcpFilteredNodes(map, params, options, error);
   if (!error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "filter"}}, "fix_filter_then_retry"));
   }
   if (nodes.empty())
   {
-    return invalidParamsFailure("objects_delete_by_filter matched no deletable objects");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "objects_delete_by_filter matched no deletable objects",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "filter"}, {"matchedCount", 0}},
+        "preview_filter_or_refresh_status"));
   }
 
   const auto transactionName = QString{"MCP: Delete objects by filter"};
@@ -1204,13 +1249,21 @@ McpBridgeToolResult deleteObjectsByFilterResult(
   if (!changedObjectIds)
   {
     return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::Forbidden, "Matched objects cannot be deleted");
+      mcp::McpErrorCode::Forbidden,
+      "Matched objects cannot be deleted",
+      preMutationFailureDetails(
+        QJsonObject{
+          {"targetSource", "filter"},
+          {"matchedCount", static_cast<int>(nodes.size())},
+        },
+        "preview_filter_or_use_user_selection"));
   }
 
   auto result = QJsonObject{};
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,
@@ -1255,19 +1308,33 @@ McpBridgeToolResult deleteObjectsByOperationForMapResult(
   const auto operationId = params.value("operationId").toString().trimmed();
   if (operationId.isEmpty())
   {
-    return invalidParamsFailure("objects_delete_by_operation requires operationId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "objects_delete_by_operation requires operationId",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "operationId"}}, "inspect_history_then_retry"));
   }
   const auto operation = findOperation(history, operationId);
   if (!operation)
   {
-    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Unknown MCP operation id: %1"}.arg(operationId),
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "operationId"}, {"operationId", operationId}},
+        "inspect_history_then_retry"));
   }
 
   auto error = QString{};
   const auto nodes = nodesFromOperation(map, **operation, objectRegistry, error);
   if (!nodes)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "operationId"}, {"operationId", operationId}},
+        "inspect_operation_or_refresh_status"));
   }
 
   const auto transactionName =
@@ -1281,13 +1348,22 @@ McpBridgeToolResult deleteObjectsByOperationForMapResult(
   if (!changedObjectIds)
   {
     return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::Forbidden, "Operation objects cannot be deleted");
+      mcp::McpErrorCode::Forbidden,
+      "Operation objects cannot be deleted",
+      preMutationFailureDetails(
+        QJsonObject{
+          {"targetSource", "operationId"},
+          {"operationId", operationId},
+          {"matchedCount", static_cast<int>(nodes->size())},
+        },
+        "inspect_operation_or_use_user_selection"));
   }
 
   auto result = QJsonObject{};
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,
@@ -1367,6 +1443,7 @@ McpBridgeToolResult groupCreateFromSelectionForMapResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedObjectIds,
@@ -1503,6 +1580,7 @@ McpBridgeToolResult groupRenameSelectedForMapResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     groupIds,
@@ -1600,6 +1678,7 @@ McpBridgeToolResult groupUngroupSelectedForMapResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedObjectIds,
@@ -1796,6 +1875,7 @@ McpBridgeToolResult transformObjectsForMapResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedObjectIds,

@@ -196,6 +196,9 @@ Next Phase 2 item:
 - Done: `objects_delete_by_selector` reports explicit `mutatedDocument` and
   `recoveryAction` diagnostics for no-match, selector error, and forbidden
   pre-mutation failure paths.
+- Done: object delete tools report document identity on successful operation
+  records and structured `mutatedDocument:false` / `retrySafe` /
+  `recoveryAction` diagnostics for pre-mutation target failures.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 
