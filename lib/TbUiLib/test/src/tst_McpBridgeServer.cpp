@@ -3603,6 +3603,56 @@ TEST_CASE("McpBridgeServer asset placement records document identity")
   CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 }
 
+TEST_CASE("McpBridgeServer asset placement reports pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  const auto missingPathResponse =
+    placeAssetForMapResult(map, "asset_place_model", QJsonObject{}, history, nextOperationIndex);
+  REQUIRE_FALSE(missingPathResponse.ok);
+  CHECK(missingPathResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(missingPathResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingPathResponse.error.details.value("recoveryAction").toString()
+    == "provide_asset_path_then_retry");
+
+  const auto typeMismatchResponse = placeAssetForMapResult(
+    map,
+    "asset_place_sprite",
+    QJsonObject{{"path", "models/player.mdl"}},
+    history,
+    nextOperationIndex);
+  REQUIRE_FALSE(typeMismatchResponse.ok);
+  CHECK(typeMismatchResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(
+    typeMismatchResponse.error.details.value("recoveryAction").toString()
+    == "choose_matching_asset_place_tool_or_path");
+
+  const auto invalidOriginResponse = placeAssetForMapResult(
+    map,
+    "asset_place_model",
+    QJsonObject{{"path", "models/player.mdl"}, {"origin", QJsonArray{0, 0}}},
+    history,
+    nextOperationIndex);
+  REQUIRE_FALSE(invalidOriginResponse.ok);
+  CHECK(invalidOriginResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(
+    invalidOriginResponse.error.details.value("recoveryAction").toString()
+    == "provide_valid_origin_then_retry");
+}
+
 TEST_CASE("McpBridgeServer problem fixes record document identity")
 {
   auto appControllerFixture = AppControllerFixture{};

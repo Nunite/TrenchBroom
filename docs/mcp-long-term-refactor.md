@@ -225,6 +225,9 @@ Next Phase 2 item:
   records.
 - Done: asset placement mutation records report `mutatedDocument:true` and
   document identity in result summaries and history records.
+- Done: asset placement precondition failures report `mutatedDocument:false`,
+  `retrySafe`, and recovery actions for missing path, type mismatch, and invalid
+  origin failures.
 - Done: `objects_delete_by_selector` delete records report
   `mutatedDocument:true` and document identity in result summaries and history
   records.

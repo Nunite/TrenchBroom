@@ -104,6 +104,15 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
   };
 }
 
+QJsonObject preMutationFailureDetails(
+  QJsonObject details, const QString& recoveryAction)
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return details;
+}
+
 QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)
 {
   if (&node == &worldNode)
@@ -453,7 +462,11 @@ McpBridgeToolResult placeAssetForMapResult(
   const auto path = params.value("path").toString().trimmed();
   if (path.isEmpty())
   {
-    return invalidParamsFailure(QString{"%1 requires path"}.arg(toolName));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"%1 requires path"}.arg(toolName),
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "asset_path"}}, "provide_asset_path_then_retry"));
   }
 
   auto assetType = BrowserCellType::Model;
@@ -479,8 +492,16 @@ McpBridgeToolResult placeAssetForMapResult(
     assetTypeForExtension(std::filesystem::path{path.toStdString()});
   if (actualType != assetType)
   {
-    return invalidParamsFailure(
-      QString{"path does not match %1 asset type"}.arg(browserCellTypeName(assetType)));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"path does not match %1 asset type"}.arg(browserCellTypeName(assetType)),
+      preMutationFailureDetails(
+        QJsonObject{
+          {"path", path},
+          {"expectedAssetType", browserCellTypeName(assetType)},
+          {"actualAssetType", browserCellTypeName(actualType)},
+        },
+        "choose_matching_asset_place_tool_or_path"));
   }
 
   auto error = QString{};
@@ -495,7 +516,11 @@ McpBridgeToolResult placeAssetForMapResult(
     const auto originVec = vec3FromJson(params, "origin", error);
     if (!originVec)
     {
-      return invalidParamsFailure(error);
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        error,
+        preMutationFailureDetails(
+          QJsonObject{{"targetSource", "origin"}}, "provide_valid_origin_then_retry"));
     }
     entity.setOrigin(*originVec);
   }
