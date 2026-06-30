@@ -3492,6 +3492,43 @@ TEST_CASE("McpBridgeServer selector delete reports pre-mutation failure state")
   CHECK(
     invalidSelectorResponse.error.details.value("recoveryAction").toString()
     == "fix_selector_then_retry");
+
+  const auto createResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"defaultMetadata", QJsonObject{{"moduleId", "delete-target"}}},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(createResponse.ok);
+
+  const auto deleteResponse = objectsDeleteBySelectorForMapResult(
+    map,
+    "objects_delete_by_selector",
+    QJsonObject{{"selector", QJsonObject{{"moduleId", "delete-target"}}}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+
+  REQUIRE(deleteResponse.ok);
+  CHECK(deleteResponse.result.value("mutatedDocument").toBool());
+  CHECK(
+    deleteResponse.result.value("documentFingerprint").toString()
+    == documentFingerprintForMap(map));
+  CHECK(deleteResponse.result.value("operationKind").toString() == "delete");
+  CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 }
 
 TEST_CASE("McpBridgeServer asset placement records document identity")

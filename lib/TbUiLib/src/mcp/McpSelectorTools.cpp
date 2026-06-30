@@ -41,6 +41,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/QPathUtils.h"
 #include "ui/mcp/McpObjectRegistry.h"
 
 #include "vm/bbox.h"
@@ -1014,6 +1015,7 @@ QString makeOperationId(int& nextOperationIndex)
 void recordDeleteOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
+  mdl::Map& map,
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& deletedObjectIds,
@@ -1024,12 +1026,17 @@ void recordDeleteOperation(
   operation.toolName = toolName;
   operation.transactionName = transactionName;
   operation.operationKind = "delete";
+  operation.documentPath = map.path().empty() ? QString{} : pathAsQString(map.path());
+  operation.documentFingerprint = documentFingerprintForMap(map);
   operation.setChangedObjectIds(QJsonArray{});
   operation.setDeletedObjectIds(deletedObjectIds);
 
   result = QJsonObject{
     {"operationId", operation.operationId},
     {"transactionName", operation.transactionName},
+    {"mutatedDocument", true},
+    {"activeDocumentPath", operation.documentPath},
+    {"documentFingerprint", operation.documentFingerprint},
     {"operationKind", operation.operationKind},
     {"changedObjectCount", 0},
     {"changedObjectIds", QJsonArray{}},
@@ -2220,6 +2227,7 @@ McpBridgeToolResult objectsDeleteBySelectorForMapResult(
   recordDeleteOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName.isEmpty() ? QString{"MCP: Delete objects by selector"}
                               : transactionName,
