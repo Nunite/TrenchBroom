@@ -63,6 +63,9 @@ def validate_example(
 ) -> dict[str, Any]:
     manifest, build = load_recipe(recipe_path)
     recipe_id = str(manifest["id"])
+    validation_steps = manifest.get("recommendedValidation", [])
+    if not any("render_review" in str(step) for step in validation_steps):
+        raise ValueError("recipe manifest must include a render_review validation step")
     params = merge_defaults(manifest, load_json(params_path))
     param_warnings = validate_params(manifest, params)
     first_ir = build(params)

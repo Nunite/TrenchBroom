@@ -109,6 +109,12 @@ Common recipe path:
 Recipes must not call TrenchBroom, MCP, or `tb2` directly. MCP remains the only
 map mutation layer.
 
+Prefab-like recipes must have an explicit visual acceptance path. A recipe is not
+accepted just because IR validation and `map_validate` pass; its manifest must
+recommend `module_render_review`, `render_review_selector`, or another review
+tool, and real workflow acceptance should inspect the rendered output for the
+requested scene intent.
+
 When adding or proposing a new recipe, do not add a matching C++ MCP prefab tool.
 If the recipe reveals missing MCP support, phrase the feedback as a generic
 primitive, selector/module operation, validator, review feature, or compact output

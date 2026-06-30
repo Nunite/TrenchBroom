@@ -204,6 +204,8 @@ Work:
   paths
 - sync the runtime skill copy with `scripts\sync-trenchbroom-mcp-skill.ps1`
   after recipe or workflow changes
+- require prefab-like recipes to declare a visual acceptance path through
+  `module_render_review`, `render_review_selector`, or another review tool
 - add recipe patterns for common scene families before asking for new C++ tools
 - promote only repeated generic needs into MCP primitives
 
@@ -211,6 +213,7 @@ Done when:
 
 - houses, routes, courtyards, caves, terrain passes, and gameplay layouts are
   recipe/IR workflows
+- recipe validation fails when a prefab-like recipe has no review step
 - MCP only sees generic operations, metadata, preview/apply, validation, and
   review
 
@@ -229,6 +232,8 @@ Work:
 
 Done when:
 
+- prefab-like recipe acceptance includes inspected review output, not just IR
+  validation or `map_validate`
 - a visually bad but valid scene produces useful review feedback
 - route/terrain validation does not confuse primary and secondary surfaces when
   metadata is explicit
@@ -298,6 +303,7 @@ Before considering this refactor direction healthy, verify:
 - mutation tools report document identity, mutation state, retry safety, and
   recovery action
 - review outputs are readable and path-based
+- prefab-like recipe workflows require visual review before acceptance
 - route/slope claims are validated by geometry facts
 - recipe workflows cover prefab-like scene requests
 - skill routing is visible in initialization/status paths

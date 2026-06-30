@@ -10,6 +10,9 @@ not call TrenchBroom, MCP, or `tb2` directly.
   IR emission.
 - MCP C++ owns document guards, undo transactions, selector/module state,
   validation, and review.
+- Prefab-like recipes must include a visual acceptance path in
+  `recommendedValidation`. Static IR validation is not enough; real acceptance
+  must inspect review output for scene readability and intent.
 - Python `tb2` plugins are human-facing UI/plugin workflows. If UI plugins need
   prefab logic later, reuse recipe scripts to emit IR instead of duplicating
   generation rules.
