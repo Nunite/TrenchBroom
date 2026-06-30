@@ -408,7 +408,9 @@ QJsonObject blockoutBatchOperationSchema()
        {"startAngle", numberProperty("Start angle in degrees.")},
        {"endAngle", numberProperty("End angle in degrees for cylinder_sector.")},
        {"turnDegrees",
-        numberProperty("Arc sweep in degrees for curved_corridor or arc_ramp.")},
+        numberProperty(
+          "Arc sweep in degrees for curved_corridor, arc_ramp, or helical_ramp. "
+          "Must be finite, non-zero, and at most 360 degrees.")},
        {"radius", numberProperty("Centerline radius for arc_ramp/helical_ramp.")},
        {"rise", numberProperty("Total Z change for arc_ramp/helical_ramp.")},
        {"orderStart",
@@ -426,9 +428,12 @@ QJsonObject blockoutBatchOperationSchema()
           "for true sloped curved surfaces.")},
        {"segments",
         integerProperty("Segment count for curved_corridor or arc_ramp/helical_ramp.")},
-       {"wallThickness", numberProperty("Wall thickness for curved_corridor.")},
-       {"floorThickness", numberProperty("Floor thickness for curved_corridor.")},
-       {"ceilingThickness", numberProperty("Ceiling thickness for curved_corridor.")},
+       {"wallThickness",
+        numberProperty("Inner/outer wall thickness for curved_corridor wall parts.")},
+       {"floorThickness",
+        numberProperty("Floor slab thickness for curved_corridor floor parts.")},
+       {"ceilingThickness",
+        numberProperty("Ceiling slab thickness for curved_corridor ceiling parts.")},
        {"caps", stringProperty("curved_corridor caps: none, start, end, or both.")},
        {"levels", integerProperty("stepped_mass level count, 1..256.")},
        {"inset", numberProperty("stepped_mass xy inset per level.")},
@@ -2163,6 +2168,23 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(),
     },
     {
+      "history_undo_to_operation",
+      "Undo MCP operations from the latest operation back to and including the given "
+      "operationId. Stops with structured diagnostics if the native undo stack no "
+      "longer matches the expected MCP transaction.",
+      McpMode::Edit,
+      true,
+      true,
+      objectSchema(
+        {
+          {"operationId",
+           stringProperty(
+             "Target MCP operation id to undo through, inclusive. The operation must "
+             "still be in the current bridge history.")},
+        },
+        {"operationId"}),
+    },
+    {
       "history_redo_mcp",
       "Redo the latest MCP operation undone by history_undo_mcp.",
       McpMode::Edit,
@@ -3136,7 +3158,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"innerRadius", numberProperty("Playable inner radius.")},
         {"outerRadius", numberProperty("Playable outer radius.")},
         {"startAngle", numberProperty("Start angle in degrees.")},
-        {"turnDegrees", numberProperty("Arc length in degrees.")},
+        {"turnDegrees",
+         numberProperty(
+           "Arc length in degrees. Must be finite, non-zero, and at most 360.")},
         {"height", numberProperty("Playable height, defaults to 128.")},
         {"slopeStartZ",
          numberProperty(
@@ -3147,9 +3171,13 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Ending Z offset for a terraced uphill/downhill arc. Use arc_ramp or "
            "helical_ramp for true sloped curved surfaces.")},
         {"segments", integerProperty("Segment count, defaults to 12.")},
-        {"wallThickness", numberProperty("Wall thickness, defaults to 16.")},
-        {"floorThickness", numberProperty("Floor thickness, defaults to 16.")},
-        {"ceilingThickness", numberProperty("Ceiling thickness, defaults to 16.")},
+        {"wallThickness",
+         numberProperty(
+           "Thickness for inner_wall and outer_wall parts, defaults to 16.")},
+        {"floorThickness",
+         numberProperty("Thickness for floor part slabs, defaults to 16.")},
+        {"ceilingThickness",
+         numberProperty("Thickness for ceiling part slabs, defaults to 16.")},
         {"caps", stringProperty("none, start, end, or both. Defaults to none.")},
         {"snapMode",
          stringProperty(
@@ -3207,7 +3235,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"steps", integerProperty("Step count, defaults to 24.")},
         {"stepHeight", numberProperty("Step height, defaults to 8.")},
         {"startAngle", numberProperty("Start angle in degrees, defaults to 0.")},
-        {"turnDegrees", numberProperty("Total turn angle, defaults to 360.")},
+        {"turnDegrees",
+         numberProperty(
+           "Total turn angle, defaults to 360. Must be finite, non-zero, and at "
+           "most 360.")},
         {"clockwise", boolProperty("Rotate clockwise instead of counter-clockwise.")},
         {"baseZ", numberProperty("Base Z, defaults to center.z.")},
         {"column", boolProperty("Create a center column, defaults to true.")},
@@ -3308,7 +3339,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          withDescription(
            selectorSchema(),
            "Structured selector for live route targets. Prefer this over operationIds "
-           "when an operation also contains rails/supports/markers.")},
+           "when an operation also contains walls, rails, supports, markers, or caps. "
+           "Common filters are moduleId plus role:\"walkable\" or part:\"floor\".")},
         {"routeDirection",
          vec3Property(
            "Optional travel direction vector. X/Y determine route ordering and seam "
@@ -3641,6 +3673,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "operation_validate",
     "history_status",
     "history_undo_mcp",
+    "history_undo_to_operation",
     "history_redo_mcp",
     "brush_create_boxes_batch",
     "brush_create_polygon_batch",

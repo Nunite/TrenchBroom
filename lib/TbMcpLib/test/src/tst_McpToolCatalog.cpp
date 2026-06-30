@@ -263,7 +263,7 @@ TEST_CASE("McpToolCatalog")
     names.sort();
 
     INFO("Modeling profile tools: " << names.join(", ").toStdString());
-    CHECK(names.size() <= 45);
+    CHECK(names.size() <= 46);
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
@@ -290,6 +290,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("operation_validate"));
     CHECK(!names.contains("history_list"));
     CHECK(names.contains("history_undo_mcp"));
+    CHECK(names.contains("history_undo_to_operation"));
     CHECK(names.contains("history_redo_mcp"));
     CHECK(names.contains("selector_preview"));
     CHECK(names.contains("objects_select_by_selector"));
@@ -642,6 +643,31 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(tool);
 
     const auto properties = tool->inputSchema.value("properties").toObject();
+    CHECK(properties.value("turnDegrees")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("360"));
+    CHECK(properties.value("slopeStartZ")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("terraced"));
+    CHECK(properties.value("wallThickness")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("inner_wall"));
+    CHECK(properties.value("floorThickness")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("floor"));
+    CHECK(properties.value("ceilingThickness")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("ceiling"));
     CHECK(properties.value("snapMode").isObject());
     CHECK(properties.value("snapMode")
             .toObject()
@@ -792,6 +818,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(operationItems.value("partMetadata").isObject());
     CHECK(operationItems.value("radius").isObject());
     CHECK(operationItems.value("rise").isObject());
+    CHECK(operationItems.value("turnDegrees")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("360"));
     CHECK(operationItems.value("orderStart").isObject());
     CHECK(operationItems.value("orderStep").isObject());
 
@@ -1342,6 +1373,12 @@ TEST_CASE("McpToolCatalog")
             .value("idsMode")
             .isObject());
 
+    const auto undoToTool = findToolDefinition("history_undo_to_operation");
+    REQUIRE(undoToTool);
+    CHECK(undoToTool->requiredMode == McpMode::Edit);
+    CHECK(undoToTool->mutatesDocument);
+    CHECK(undoToTool->inputSchema.value("required").toArray().contains("operationId"));
+
     const auto transformTool = findToolDefinition("objects_transform");
     REQUIRE(transformTool);
     const auto transformProperties =
@@ -1382,6 +1419,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(routeContinuityProperties.value("operationIds").isObject());
     CHECK(routeContinuityProperties.value("objectIds").isObject());
     CHECK(routeContinuityProperties.value("selector").isObject());
+    CHECK(routeContinuityProperties.value("selector")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("role:\"walkable\""));
     CHECK(routeContinuityProperties.value("routeDirection").isObject());
     CHECK(routeContinuityProperties.value("start").isObject());
     CHECK(routeContinuityProperties.value("end").isObject());

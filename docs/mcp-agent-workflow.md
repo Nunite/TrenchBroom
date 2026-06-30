@@ -135,6 +135,7 @@ scripts\mcp-config.ps1 -Print
 3. 批量创建后立即调用 `geometry_analyze_slopes(operationId=..., start=..., end=...)` 或传 `routeDirection`。
 4. 检查每个候选坡面返回的 `normal`、`slopeDegrees`、`riseDirection`、`heightDeltaAlongRoute`、`classification`。预期上坡应看到 `classification=ascending` 且 `heightDeltaAlongRoute > 0`；反向复测应暴露 `descending`。
 5. 再调用 `geometry_analyze_route_continuity(operationId=..., start=..., end=...)` 检查相邻可跑面。重点看 `continuous`、每个 seam 的 `verticalStep`、`horizontalGap` 和 `classification`；例如 ramp 顶面接到平台底面时会报 `step_up` 和约等于平台厚度的 `verticalStep`。
+   当同一个 operation 同时生成 floor、wall、rail、support 或 marker 时，不要让连续性分析混入护栏/墙体；优先传 `selector`，例如 `moduleId + role:"walkable"` 或 `moduleId + part:"floor"`。如果未传 selector 且结果带 `mixedTargetWarning`、`partCounts`、`roleCounts`，应按推荐 selector 重新分析。
 6. 最后看 `render_review_operation` 的 contact sheet。默认最多 2 张并列；如果需要更多视角，打开单独 PNG，不要把过多视图挤进一张图。
 7. 复杂路线按主体、护边、标记分阶段创建，保留少量关键 `operationId`，降低 history 追踪和回滚成本。
 
@@ -253,6 +254,7 @@ MCP 写操作会返回：
 - 删除类 operation 会标记 `operationKind=delete`，并把被删除对象放在 `deletedObjectIds` / `deletedObjectCount` 中。不要把 delete operation 的 `liveObjectCount` 当作“被删对象还活着”；删除记录主要用于审计和 undo/redo。
 - `selection_get` 中 `brushFaceCount` 表示当前选择的 brush face 数量；整 brush 选择的总 face 数使用 `selectedBrushFaceCount` / `selectedBrushTotalFaceCount`。
 - 发现最近一次 MCP 操作错误时调用 `history_undo_mcp`。
+- 需要回退一串连续 MCP 操作时调用 `history_undo_to_operation(operationId=...)`，它会从最新未撤销 MCP operation 一直撤销到目标 operation。若中途发现原生 undo 栈已被用户编辑或非预期命令打断，工具会报告 `mutatedDocument`、`partiallyUndone`、`undoneOperationIds`、`remainingOperationIds` 和 `recoveryAction`；此时先刷新状态或重新验证地图，不要继续盲目删除对象。
 - 不要用 `objects_delete` 代替 undo，除非用户明确要删除对象。
 - 保存前调用 `map_validate` 和 `problems_check`。
 - 用户确认后再调用 `documents_save` 或 `documents_export`。

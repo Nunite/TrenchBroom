@@ -93,6 +93,7 @@ QJsonObject operationRecordDetailJson(
 {
   auto result = operationRecordJson(operation);
   result.insert("detail", detail);
+  result.insert("summary", operation.summary());
   if (detail == "ids" || detail == "full")
   {
     result.insert("changedObjectIds", operation.changedObjectIdsJson());
@@ -100,8 +101,15 @@ QJsonObject operationRecordDetailJson(
   }
   if (detail == "full")
   {
-    result.insert("summary", operation.summary());
-    result.insert("operationDetail", operation.detail());
+    const auto operationDetail = operation.detail();
+    result.insert("operationDetail", operationDetail);
+    if (operationDetail.value("expandedOperations").isArray())
+    {
+      result.insert("expandedOperations", operationDetail.value("expandedOperations"));
+      result.insert(
+        "expandedOperationsTruncated",
+        operationDetail.value("expandedOperationsTruncated").toBool(false));
+    }
   }
   return result;
 }
@@ -865,6 +873,159 @@ McpBridgeToolResult historyUndoForMapResult(
     {"skippedSelectionCommands", skippedSelectionCommands},
     {"undone", true},
   });
+}
+
+QJsonArray stringListJson(const QStringList& values)
+{
+  auto result = QJsonArray{};
+  for (const auto& value : values)
+  {
+    result.push_back(value);
+  }
+  return result;
+}
+
+QStringList remainingOperationIdsToTarget(
+  const std::vector<McpOperationRecord>& history, const QString& targetOperationId)
+{
+  auto result = QStringList{};
+  for (auto it = history.rbegin(); it != history.rend(); ++it)
+  {
+    if (it->undone)
+    {
+      continue;
+    }
+    result.push_back(it->operationId);
+    if (it->operationId == targetOperationId)
+    {
+      break;
+    }
+  }
+  return result;
+}
+
+McpBridgeToolResult historyUndoToOperationResult(
+  AppController& appController,
+  std::vector<McpOperationRecord>& history,
+  const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return historyUndoToOperationForMapResult(mapWindow->document().map(), history, params);
+}
+
+McpBridgeToolResult historyUndoToOperationForMapResult(
+  mdl::Map& map, std::vector<McpOperationRecord>& history, const QJsonObject& params)
+{
+  const auto targetOperationId = params.value("operationId").toString().trimmed();
+  if (targetOperationId.isEmpty())
+  {
+    return invalidParamsFailure("history_undo_to_operation requires operationId");
+  }
+
+  const auto targetIndex = findOperationIndex(history, targetOperationId);
+  if (!targetIndex)
+  {
+    return invalidParamsFailure(
+      QString{"Unknown MCP operation id: %1"}.arg(targetOperationId));
+  }
+  if (history[*targetIndex].undone)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden,
+      "Target MCP operation is already undone",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"targetOperationId", targetOperationId},
+        {"recoveryAction", "refresh_status_or_validate"},
+      });
+  }
+
+  auto undoneOperationIds = QStringList{};
+  auto skippedSelectionCommandCount = 0;
+
+  while (true)
+  {
+    auto it = std::find_if(history.rbegin(), history.rend(), [](const auto& operation) {
+      return !operation.undone;
+    });
+    if (it == history.rend())
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::Forbidden,
+        "No MCP operation remains to undo before reaching target",
+        QJsonObject{
+          {"mutatedDocument", !undoneOperationIds.isEmpty()},
+          {"partiallyUndone", !undoneOperationIds.isEmpty()},
+          {"targetOperationId", targetOperationId},
+          {"undoneOperationIds", stringListJson(undoneOperationIds)},
+          {"remainingOperationIds",
+           stringListJson(remainingOperationIdsToTarget(history, targetOperationId))},
+          {"recoveryAction", "refresh_status_or_validate"},
+        });
+    }
+
+    auto skippedThisOperation = 0;
+    while (const auto* undoName = map.undoCommandName())
+    {
+      const auto commandName = QString::fromStdString(*undoName);
+      if (commandName == it->transactionName)
+      {
+        break;
+      }
+      if (!isSelectionCommandName(commandName))
+      {
+        break;
+      }
+
+      map.undoCommand();
+      ++skippedThisOperation;
+      ++skippedSelectionCommandCount;
+    }
+
+    const auto* undoName = map.undoCommandName();
+    if (!undoName || QString::fromStdString(*undoName) != it->transactionName)
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::Forbidden,
+        "The next MCP operation to undo is no longer on top of the native undo stack",
+        QJsonObject{
+          {"mutatedDocument", !undoneOperationIds.isEmpty()},
+          {"partiallyUndone", !undoneOperationIds.isEmpty()},
+          {"targetOperationId", targetOperationId},
+          {"blockedOperationId", it->operationId},
+          {"nativeUndoCommandName",
+           undoName != nullptr ? QString::fromStdString(*undoName) : QString{}},
+          {"undoneOperationIds", stringListJson(undoneOperationIds)},
+          {"remainingOperationIds",
+           stringListJson(remainingOperationIdsToTarget(history, targetOperationId))},
+          {"skippedSelectionCommandCount", skippedSelectionCommandCount},
+          {"skippedSelectionCommandsForBlockedOperation", skippedThisOperation},
+          {"recoveryAction", "refresh_status_or_validate"},
+        });
+    }
+
+    const auto operationId = it->operationId;
+    map.undoCommand();
+    it->undone = true;
+    undoneOperationIds.push_back(operationId);
+
+    if (operationId == targetOperationId)
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"mutatedDocument", true},
+        {"undone", true},
+        {"targetOperationId", targetOperationId},
+        {"undoneOperationIds", stringListJson(undoneOperationIds)},
+        {"undoneCount", undoneOperationIds.size()},
+        {"skippedSelectionCommandCount", skippedSelectionCommandCount},
+      });
+    }
+  }
 }
 
 McpBridgeToolResult historyRedoResult(

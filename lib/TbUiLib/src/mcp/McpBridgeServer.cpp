@@ -516,6 +516,10 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return historyUndoResult(appController, m_operationHistory);
         }
+        if (toolName == "history_undo_to_operation")
+        {
+          return historyUndoToOperationResult(appController, m_operationHistory, params);
+        }
         if (toolName == "history_redo_mcp")
         {
           return historyRedoResult(appController, m_operationHistory);

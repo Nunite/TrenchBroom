@@ -469,6 +469,12 @@ McpBridgeToolResult historyUndoResult(
   AppController& appController, std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyUndoForMapResult(
   mdl::Map& map, std::vector<McpOperationRecord>& history);
+McpBridgeToolResult historyUndoToOperationResult(
+  AppController& appController,
+  std::vector<McpOperationRecord>& history,
+  const QJsonObject& params);
+McpBridgeToolResult historyUndoToOperationForMapResult(
+  mdl::Map& map, std::vector<McpOperationRecord>& history, const QJsonObject& params);
 McpBridgeToolResult historyRedoResult(
   AppController& appController, std::vector<McpOperationRecord>& history);
 

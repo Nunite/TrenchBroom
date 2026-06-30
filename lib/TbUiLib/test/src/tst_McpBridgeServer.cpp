@@ -1639,6 +1639,241 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("reasonIfUnavailable").isNull());
   }
 
+  SECTION("history_undo_to_operation undoes back to the requested operation")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+    auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+
+    const auto first = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Undo target first"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+           {"metadata", QJsonObject{{"routeId", "undo-to-selection-skip"}}},
+         }}},
+      },
+      history,
+      nextOperationIndex,
+      &metadataStore);
+    REQUIRE(first.ok);
+    const auto second = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Undo target second"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{128, 0, 0}},
+           {"max", QJsonArray{192, 64, 16}},
+           {"metadata", QJsonObject{{"routeId", "undo-to-selection-skip"}}},
+         }}},
+      },
+      history,
+      nextOperationIndex,
+      &metadataStore);
+    REQUIRE(second.ok);
+
+    const auto selectResponse = selectionByMetadataForMapResult(
+      map,
+      QJsonObject{
+        {"routeId", "undo-to-selection-skip"},
+        {"select", true},
+      },
+      metadataStore);
+    REQUIRE(selectResponse.ok);
+    CHECK(map.selection().nodes.size() == 2u);
+    REQUIRE(map.undoCommandName() != nullptr);
+    CHECK(QString::fromStdString(*map.undoCommandName()) == "Select 2 Objects");
+
+    const auto undo = historyUndoToOperationForMapResult(
+      map,
+      history,
+      QJsonObject{{"operationId", first.result.value("operationId").toString()}});
+
+    REQUIRE(undo.ok);
+    CHECK(undo.result.value("mutatedDocument").toBool());
+    CHECK(undo.result.value("undone").toBool());
+    CHECK(undo.result.value("undoneCount").toInt() == 2);
+    CHECK(undo.result.value("skippedSelectionCommandCount").toInt() == 2);
+    const auto undoneIds = undo.result.value("undoneOperationIds").toArray();
+    REQUIRE(undoneIds.size() == 2);
+    CHECK(undoneIds[0].toString() == second.result.value("operationId").toString());
+    CHECK(undoneIds[1].toString() == first.result.value("operationId").toString());
+    CHECK(history[0].undone);
+    CHECK(history[1].undone);
+  }
+
+  SECTION("history_undo_to_operation reports blocked native undo stack")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto create = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Blocked undo target"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(create.ok);
+
+    const auto unrelated = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "User non-MCP operation"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{128, 0, 0}},
+           {"max", QJsonArray{192, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(unrelated.ok);
+    history.back().undone = true;
+
+    const auto undo = historyUndoToOperationForMapResult(
+      map,
+      history,
+      QJsonObject{{"operationId", create.result.value("operationId").toString()}});
+
+    CHECK(!undo.ok);
+    CHECK_FALSE(undo.error.details.value("mutatedDocument").toBool());
+    CHECK_FALSE(undo.error.details.value("partiallyUndone").toBool());
+    CHECK(
+      undo.error.details.value("blockedOperationId").toString()
+      == create.result.value("operationId").toString());
+    CHECK(
+      undo.error.details.value("nativeUndoCommandName").toString()
+      == "User non-MCP operation");
+    CHECK(
+      undo.error.details.value("recoveryAction").toString()
+      == "refresh_status_or_validate");
+    CHECK_FALSE(history.front().undone);
+  }
+
+  SECTION("history_undo_to_operation reports partial mutation when blocked mid-run")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    auto document = MapDocument::createDocument(
+                      appController.environmentConfig(),
+                      mdl::QuakeGameInfo,
+                      mdl::MapFormat::Valve,
+                      vm::bbox3d{8192.0},
+                      appController.taskManager(),
+                      appController.glManager().resourceManager())
+                    | kdl::value();
+    auto& map = document->map();
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+
+    const auto first = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Partial undo first"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(first.ok);
+    const auto unrelated = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "User middle operation"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{128, 0, 0}},
+           {"max", QJsonArray{192, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(unrelated.ok);
+    history.back().undone = true;
+    const auto latest = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"name", "MCP: Partial undo latest"},
+        {"operations",
+         QJsonArray{QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{256, 0, 0}},
+           {"max", QJsonArray{320, 64, 16}},
+         }}},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(latest.ok);
+
+    const auto undo = historyUndoToOperationForMapResult(
+      map,
+      history,
+      QJsonObject{{"operationId", first.result.value("operationId").toString()}});
+
+    CHECK(!undo.ok);
+    CHECK(undo.error.details.value("mutatedDocument").toBool());
+    CHECK(undo.error.details.value("partiallyUndone").toBool());
+    CHECK(
+      undo.error.details.value("blockedOperationId").toString()
+      == first.result.value("operationId").toString());
+    CHECK(
+      undo.error.details.value("nativeUndoCommandName").toString()
+      == "User middle operation");
+    const auto undoneIds = undo.error.details.value("undoneOperationIds").toArray();
+    REQUIRE(undoneIds.size() == 1);
+    CHECK(undoneIds.first().toString() == latest.result.value("operationId").toString());
+    CHECK_FALSE(history.front().undone);
+    CHECK(history.back().undone);
+  }
+
   SECTION("geometry review renderer writes isolated nonblank review bundle")
   {
     auto appControllerFixture = AppControllerFixture{};
@@ -4476,6 +4711,12 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   REQUIRE(invalidResponse.ok);
   const auto invalidValidation = invalidResponse.result.value("validation").toObject();
   CHECK(!invalidValidation.value("valid").toBool());
+  CHECK(
+    invalidResponse.result.value("expansion")
+      .toObject()
+      .value("expandedOperationCount")
+      .toInt()
+    == 1);
   CHECK(invalidValidation.value("failedOperationIndex").toInt() == 0);
   CHECK(invalidValidation.value("failedOperationType").toString() == "box");
   CHECK(invalidValidation.value("compiledOperationCount").toInt() == 0);
@@ -4774,7 +5015,60 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   CHECK(curvedResponse.result.value("brushCount").toInt() == 14);
   CHECK(curvedResponse.result.value("changedObjectIds").isUndefined());
   CHECK(curvedResponse.result.value("validation").toObject().value("valid").toBool());
+  const auto curvedExpansion = curvedResponse.result.value("expansion").toObject();
+  CHECK(curvedExpansion.value("sourceOperationCount").toInt() == 1);
+  CHECK(curvedExpansion.value("expandedOperationCount").toInt() == 14);
+  CHECK(curvedExpansion.value("segments").toInt() == 3);
+  CHECK(
+    curvedExpansion.value("brushCountByPart").toObject().value("outer_wall").toInt()
+    == 3);
+  CHECK(curvedExpansion.value("brushCountByPart").toObject().value("floor").toInt() == 3);
   CHECK(map.selection().nodes.size() == 14u);
+
+  auto curvedMetadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto curvedModuleStore = std::map<QString, McpModuleRecord>{};
+  auto curvedObjectRegistry = McpObjectRegistry{};
+  const auto metadataCurvedResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_curved_corridor",
+    QJsonObject{
+      {"center", QJsonArray{384, 256, 0}},
+      {"innerRadius", 64},
+      {"outerRadius", 128},
+      {"turnDegrees", 90},
+      {"segments", 2},
+      {"select", false},
+      {"metadata", QJsonObject{{"moduleId", "curved-selector"}, {"routeId", "arc-a"}}},
+    },
+    history,
+    nextOperationIndex,
+    &curvedMetadataStore,
+    &curvedModuleStore,
+    &curvedObjectRegistry);
+  REQUIRE(metadataCurvedResponse.ok);
+  CHECK(metadataCurvedResponse.result.value("metadataCount").toInt() == 8);
+  const auto floorPreview = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "curved-selector"}, {"role", "walkable"}}},
+    },
+    history,
+    curvedMetadataStore,
+    curvedModuleStore,
+    curvedObjectRegistry);
+  REQUIRE(floorPreview.ok);
+  CHECK(floorPreview.result.value("matchedCount").toInt() == 2);
+  const auto wallPreview = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "curved-selector"}, {"part", "outer_wall"}}},
+    },
+    history,
+    curvedMetadataStore,
+    curvedModuleStore,
+    curvedObjectRegistry);
+  REQUIRE(wallPreview.ok);
+  CHECK(wallPreview.result.value("matchedCount").toInt() == 2);
 
   const auto radialCurvedResponse = blockoutCreateBatchForMapResult(
     map,
@@ -4822,6 +5116,57 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     radialInput.value("operations").toArray().first().toObject();
   CHECK(radialOperation.value("snapMode").toString() == "radial");
   CHECK(radialInput.value("grid").toDouble() == 16.0);
+  CHECK(
+    radialInspectResponse.result.value("summary")
+      .toObject()
+      .value("expansion")
+      .toObject()
+      .value("expandedOperationCount")
+      .toInt()
+    == 12);
+  CHECK(radialInspectResponse.result.value("expandedOperations").toArray().size() == 12);
+  CHECK(!radialInspectResponse.result.value("expandedOperationsTruncated").toBool());
+
+  const auto invalidTurnResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_curved_corridor",
+    QJsonObject{
+      {"center", QJsonArray{640, 0, 0}},
+      {"innerRadius", 64},
+      {"outerRadius", 128},
+      {"turnDegrees", 361},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(invalidTurnResponse.ok);
+  CHECK(invalidTurnResponse.result.value("validation")
+          .toObject()
+          .value("errors")
+          .toArray()
+          .first()
+          .toString()
+          .contains("360"));
+
+  const auto invalidWallResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_curved_corridor",
+    QJsonObject{
+      {"center", QJsonArray{700, 0, 0}},
+      {"innerRadius", 64},
+      {"outerRadius", 128},
+      {"turnDegrees", 90},
+      {"wallThickness", 0},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(invalidWallResponse.ok);
+  CHECK(invalidWallResponse.result.value("validation")
+          .toObject()
+          .value("errors")
+          .toArray()
+          .first()
+          .toString()
+          .contains("inner_wall"));
 
   const auto invalidSnapResponse = blockoutCreateBatchForMapResult(
     map,
@@ -4975,6 +5320,27 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
                 .first()
                 .toObject()
                 .contains("edge"));
+  CHECK(selectorContinuity.result.value("mixedTargetWarning").isUndefined());
+
+  const auto mixedContinuity = geometryAnalyzeRouteContinuityForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", routeResponse.result.value("operationId").toString()},
+      {"start", QJsonArray{0, 48, 16}},
+      {"end", QJsonArray{512, 48, 64}},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(mixedContinuity.ok);
+  CHECK(mixedContinuity.result.value("mixedTargetWarning")
+          .toString()
+          .contains("explicit selector"));
+  CHECK(
+    mixedContinuity.result.value("partCounts").toObject().value("platform").toInt() == 2);
+  CHECK(mixedContinuity.result.value("partCounts").toObject().value("ramp").toInt() == 1);
+  CHECK(mixedContinuity.result.value("recommendedSelector").isObject());
 
   const auto selectorSlopes = geometryAnalyzeSlopesForMapResult(
     map,

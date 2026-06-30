@@ -3696,94 +3696,6 @@ size_t repeatGridInstanceCount(const std::vector<size_t>& counts)
   return result;
 }
 
-std::vector<QJsonObject> curvedCorridorOperationsFromParams(const QJsonObject& params)
-{
-  const auto center = params.value("center").toArray();
-  const auto innerRadius = optionalDouble(params, "innerRadius", 128.0);
-  const auto outerRadius = optionalDouble(params, "outerRadius", 224.0);
-  const auto startAngle = optionalDouble(params, "startAngle", -90.0);
-  const auto turnDegrees = optionalDouble(params, "turnDegrees", 180.0);
-  const auto height = optionalDouble(params, "height", 128.0);
-  const auto segments = std::max<size_t>(1, optionalSize(params, "segments", 12));
-  const auto wallThickness = optionalDouble(params, "wallThickness", 16.0);
-  const auto floorThickness = optionalDouble(params, "floorThickness", 16.0);
-  const auto ceilingThickness = optionalDouble(params, "ceilingThickness", 16.0);
-  const auto caps = params.value("caps").toString("none").toLower();
-  const auto material = params.value("material").toString();
-  const auto snapMode = params.value("snapMode").toString("radial").toLower();
-  const auto slopeStartZ = optionalDouble(params, "slopeStartZ", 0.0);
-  const auto slopeEndZ = optionalDouble(params, "slopeEndZ", slopeStartZ);
-
-  auto operations = std::vector<QJsonObject>{};
-  operations.reserve(segments * 4 + 2);
-
-  const auto step = turnDegrees / static_cast<double>(segments);
-  for (size_t i = 0; i < segments; ++i)
-  {
-    const auto a0 = startAngle + step * static_cast<double>(i);
-    const auto a1 = a0 + step;
-    const auto t0 = static_cast<double>(i) / static_cast<double>(segments);
-    const auto t1 = static_cast<double>(i + 1) / static_cast<double>(segments);
-    const auto segmentT = (t0 + t1) * 0.5;
-    const auto segmentBaseZ = slopeStartZ + (slopeEndZ - slopeStartZ) * segmentT;
-    const auto addSector =
-      [&](const double inner, const double outer, const double minZ, const double maxZ) {
-        auto op = QJsonObject{
-          {"type", "cylinder_sector"},
-          {"center", center},
-          {"innerRadius", inner},
-          {"outerRadius", outer},
-          {"startAngle", a0},
-          {"endAngle", a1},
-          {"minZ", minZ + segmentBaseZ},
-          {"maxZ", maxZ + segmentBaseZ},
-          {"snapMode", snapMode},
-        };
-        if (!material.isEmpty())
-        {
-          op.insert("material", material);
-        }
-        operations.push_back(std::move(op));
-      };
-
-    addSector(innerRadius, outerRadius, 0.0, floorThickness);
-    addSector(innerRadius, outerRadius, height, height + ceilingThickness);
-    addSector(innerRadius - wallThickness, innerRadius, floorThickness, height);
-    addSector(outerRadius, outerRadius + wallThickness, floorThickness, height);
-  }
-
-  const auto addCap = [&](const double angle) {
-    const auto half = std::abs(step) / 2.0;
-    auto op = QJsonObject{
-      {"type", "cylinder_sector"},
-      {"center", center},
-      {"innerRadius", innerRadius - wallThickness},
-      {"outerRadius", outerRadius + wallThickness},
-      {"startAngle", angle - half},
-      {"endAngle", angle + half},
-      {"minZ", angle == startAngle ? slopeStartZ : slopeEndZ},
-      {"maxZ",
-       (angle == startAngle ? slopeStartZ : slopeEndZ) + height + ceilingThickness},
-      {"snapMode", snapMode},
-    };
-    if (!material.isEmpty())
-    {
-      op.insert("material", material);
-    }
-    operations.push_back(std::move(op));
-  };
-
-  if (caps == "start" || caps == "both")
-  {
-    addCap(startAngle);
-  }
-  if (caps == "end" || caps == "both")
-  {
-    addCap(startAngle + turnDegrees);
-  }
-  return operations;
-}
-
 bool partRequested(const QJsonObject& operation, const QString& partName)
 {
   const auto parts = operation.value("parts");
@@ -3806,6 +3718,163 @@ bool partRequested(const QJsonObject& operation, const QString& partName)
   return false;
 }
 
+QJsonArray requestedPartsJson(const QJsonObject& operation)
+{
+  const auto parts = operation.value("parts");
+  if (!parts.isArray())
+  {
+    return QJsonArray{
+      "floor", "ceiling", "inner_wall", "outer_wall", "start_cap", "end_cap"};
+  }
+  return parts.toArray();
+}
+
+void incrementObjectCount(QJsonObject& object, const QString& key, const int amount = 1)
+{
+  if (key.isEmpty())
+  {
+    return;
+  }
+  object.insert(key, object.value(key).toInt() + amount);
+}
+
+QJsonArray jsonArrayFromOperations(
+  const std::vector<QJsonObject>& operations, const int limit = 512)
+{
+  auto result = QJsonArray{};
+  const auto count = std::min<int>(static_cast<int>(operations.size()), limit);
+  for (auto i = 0; i < count; ++i)
+  {
+    result.push_back(operations[static_cast<size_t>(i)]);
+  }
+  return result;
+}
+
+QJsonObject expansionSummaryJson(
+  const QJsonArray& sourceOperations,
+  const std::vector<QJsonObject>& expandedOperations,
+  const QJsonArray& warnings,
+  const double grid)
+{
+  auto brushCountByType = QJsonObject{};
+  auto brushCountByPart = QJsonObject{};
+  auto partsRequested = QJsonArray{};
+  auto derivedParameters = QJsonObject{{"grid", grid}};
+  auto segmentCount = 0;
+
+  for (const auto& value : sourceOperations)
+  {
+    if (!value.isObject())
+    {
+      continue;
+    }
+    const auto operation = value.toObject();
+    const auto type = operation.value("type").toString().trimmed().toLower();
+    if (type == "curved_corridor")
+    {
+      segmentCount += static_cast<int>(optionalSize(operation, "segments", 12));
+      if (partsRequested.isEmpty())
+      {
+        partsRequested = requestedPartsJson(operation);
+      }
+      derivedParameters.insert(
+        "wallThickness", optionalDouble(operation, "wallThickness", 16.0));
+      derivedParameters.insert(
+        "floorThickness", optionalDouble(operation, "floorThickness", 16.0));
+      derivedParameters.insert(
+        "ceilingThickness", optionalDouble(operation, "ceilingThickness", 16.0));
+      derivedParameters.insert("caps", operation.value("caps").toString("none"));
+      derivedParameters.insert(
+        "terracedSlope",
+        std::abs(
+          optionalDouble(
+            operation, "slopeEndZ", optionalDouble(operation, "slopeStartZ", 0.0))
+          - optionalDouble(operation, "slopeStartZ", 0.0))
+          > GeometryEpsilon);
+    }
+  }
+
+  for (const auto& operation : expandedOperations)
+  {
+    const auto type = operation.value("type").toString().trimmed().toLower();
+    incrementObjectCount(brushCountByType, type.isEmpty() ? "unknown" : type);
+    if (operation.value("metadata").isObject())
+    {
+      incrementObjectCount(
+        brushCountByPart,
+        operation.value("metadata").toObject().value("part").toString());
+    }
+  }
+
+  auto result = QJsonObject{
+    {"sourceOperationCount", sourceOperations.size()},
+    {"expandedOperationCount", static_cast<int>(expandedOperations.size())},
+    {"brushCountByType", brushCountByType},
+    {"brushCountByPart", brushCountByPart},
+    {"warnings", warnings},
+    {"derivedParameters", derivedParameters},
+  };
+  if (!partsRequested.isEmpty())
+  {
+    result.insert("partsRequested", partsRequested);
+  }
+  if (segmentCount > 0)
+  {
+    result.insert("segments", segmentCount);
+  }
+  return result;
+}
+
+QJsonObject targetMetadataMixJson(
+  mdl::Map& map,
+  const std::vector<mdl::BrushNode*>& brushes,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const McpObjectRegistry* objectRegistry)
+{
+  auto partCounts = QJsonObject{};
+  auto roleCounts = QJsonObject{};
+  auto metadataCount = 0;
+  for (auto* brush : brushes)
+  {
+    if (brush == nullptr)
+    {
+      continue;
+    }
+    const auto metadata =
+      metadataForBrushNode(map, *brush, metadataStore, objectRegistry);
+    if (!metadata)
+    {
+      continue;
+    }
+    ++metadataCount;
+    incrementObjectCount(partCounts, metadata->value("part").toString());
+    incrementObjectCount(roleCounts, metadata->value("role").toString());
+  }
+
+  auto result = QJsonObject{
+    {"metadataCount", metadataCount},
+    {"partCounts", partCounts},
+    {"roleCounts", roleCounts},
+    {"mixedParts", partCounts.size() > 1},
+    {"mixedRoles", roleCounts.size() > 1},
+  };
+  if (partCounts.size() > 1 || roleCounts.size() > 1)
+  {
+    result.insert(
+      "mixedTargetWarning",
+      "Matched route continuity targets contain multiple metadata parts or roles. "
+      "Pass an explicit selector such as moduleId + role:\"walkable\" or moduleId + "
+      "part:\"floor\" so rails, walls, supports, markers, and caps are not analyzed "
+      "as route surfaces.");
+    result.insert(
+      "recommendedSelector",
+      QJsonObject{
+        {"metadata", QJsonObject{{"role", "walkable"}}},
+      });
+  }
+  return result;
+}
+
 QString partMaterial(
   const QJsonObject& operation, const QString& partName, const QString& fallback)
 {
@@ -3824,8 +3893,17 @@ QString partMaterial(
 QJsonObject partMetadata(
   const QJsonObject& operation, const QString& partName, const QJsonObject& base)
 {
-  auto result = base;
+  auto result = mergeMetadataObjects(base, operation.value("metadata").toObject());
   result.insert("part", partName);
+  if (partName == "floor")
+  {
+    result.insert("role", "walkable");
+  }
+  else if (
+    partName == "ceiling" || partName.endsWith("_wall") || partName.endsWith("_cap"))
+  {
+    result.insert("role", "boundary");
+  }
   if (const auto partMetadataValue = operation.value("partMetadata");
       partMetadataValue.isObject())
   {
@@ -3961,12 +4039,13 @@ std::vector<QJsonObject> curvedCorridorOperationsFromParams(
   return operations;
 }
 
-bool validateArcRampParams(const QJsonObject& params, QString& error)
+bool validateArcRampParams(
+  const QJsonObject& params, QString& error, const QString& typeName = "arc_ramp")
 {
   const auto centerValue = params.value("center");
   if (!centerValue.isArray() || centerValue.toArray().size() != 3)
   {
-    error = "center must be provided for arc_ramp as [x,y,z]";
+    error = QString{"center must be provided for %1 as [x,y,z]"}.arg(typeName);
     return false;
   }
   const auto radius = optionalDouble(params, "radius", 256.0);
@@ -3976,24 +4055,27 @@ bool validateArcRampParams(const QJsonObject& params, QString& error)
   const auto segments = optionalSize(params, "segments", 12);
   if (!finitePositive(radius) || !finitePositive(width) || !finitePositive(thickness))
   {
-    error = "arc_ramp radius, width, and thickness must be greater than zero";
+    error =
+      QString{"%1 radius, width, and thickness must be greater than zero"}.arg(typeName);
     return false;
   }
   if (width >= radius * 2.0)
   {
-    error = "arc_ramp width must be smaller than diameter";
+    error = QString{"%1 width must be smaller than diameter"}.arg(typeName);
     return false;
   }
   if (
     !std::isfinite(turnDegrees) || std::abs(turnDegrees) <= GeometryEpsilon
     || std::abs(turnDegrees) > 360.0)
   {
-    error = "arc_ramp turnDegrees must be greater than zero and at most 360 degrees";
+    error =
+      QString{"%1 turnDegrees must be greater than zero and at most 360 degrees"}.arg(
+        typeName);
     return false;
   }
   if (segments < 1 || segments > 512)
   {
-    error = "arc_ramp segments must be between 1 and 512";
+    error = QString{"%1 segments must be between 1 and 512"}.arg(typeName);
     return false;
   }
   if (std::abs(turnDegrees) / static_cast<double>(segments) > 45.0)
@@ -4005,11 +4087,13 @@ bool validateArcRampParams(const QJsonObject& params, QString& error)
   }
   if (!std::isfinite(optionalDouble(params, "rise", 0.0)))
   {
-    error = "arc_ramp rise must be finite";
+    error = QString{"%1 rise must be finite"}.arg(typeName);
     return false;
   }
   return true;
 }
+
+bool validateCurvedCorridorParams(const QJsonObject& params, QString& error);
 
 std::vector<QJsonObject> arcRampOperationsFromParams(
   const QJsonObject& params, const QJsonObject& baseMetadata)
@@ -4087,10 +4171,24 @@ std::vector<QJsonObject> expandedBatchOperations(
     }
     const auto operation = operationValue.toObject();
     const auto type = operation.value("type").toString().trimmed().toLower();
-    if (type == "arc_ramp" || type == "helical_ramp")
+    if (type == "curved_corridor")
     {
       auto error = QString{};
-      if (!validateArcRampParams(operation, error))
+      if (!validateCurvedCorridorParams(operation, error))
+      {
+        result.push_back(operation);
+        continue;
+      }
+      for (const auto& child :
+           curvedCorridorOperationsFromParams(operation, defaultMetadata))
+      {
+        result.push_back(child);
+      }
+    }
+    else if (type == "arc_ramp" || type == "helical_ramp")
+    {
+      auto error = QString{};
+      if (!validateArcRampParams(operation, error, type))
       {
         result.push_back(operation);
         continue;
@@ -4354,7 +4452,25 @@ bool validateCurvedCorridorParams(const QJsonObject& params, QString& error)
     !finitePositive(height) || !finitePositive(wallThickness)
     || !finitePositive(floorThickness) || !finitePositive(ceilingThickness))
   {
-    error = "height and thickness values must be greater than zero";
+    if (!finitePositive(height))
+    {
+      error = "curved_corridor height must be greater than zero";
+    }
+    else if (!finitePositive(wallThickness))
+    {
+      error =
+        "curved_corridor wallThickness must be greater than zero for inner_wall/"
+        "outer_wall parts";
+    }
+    else if (!finitePositive(floorThickness))
+    {
+      error = "curved_corridor floorThickness must be greater than zero for floor part";
+    }
+    else
+    {
+      error =
+        "curved_corridor ceilingThickness must be greater than zero for ceiling part";
+    }
     return false;
   }
   if (!std::isfinite(slopeStartZ) || !std::isfinite(slopeEndZ))
@@ -4364,7 +4480,9 @@ bool validateCurvedCorridorParams(const QJsonObject& params, QString& error)
   }
   if (innerRadius <= wallThickness)
   {
-    error = "innerRadius must be larger than wallThickness";
+    error =
+      "curved_corridor innerRadius must be larger than wallThickness so inner_wall "
+      "has positive radius";
     return false;
   }
   if (segments < 1 || segments > 128)
@@ -4376,7 +4494,9 @@ bool validateCurvedCorridorParams(const QJsonObject& params, QString& error)
     !std::isfinite(turnDegrees) || std::abs(turnDegrees) <= GeometryEpsilon
     || std::abs(turnDegrees) > 360.0)
   {
-    error = "turnDegrees must be greater than zero and at most 360 degrees";
+    error =
+      "curved_corridor turnDegrees must be finite, greater than zero, and at most "
+      "360 degrees";
     return false;
   }
   if (std::abs(turnDegrees) / static_cast<double>(segments) > 180.0)
@@ -4567,7 +4687,7 @@ std::vector<mdl::Node*> compileBatchOperation(
 
   if (type == "arc_ramp" || type == "helical_ramp")
   {
-    if (!validateArcRampParams(operation, error))
+    if (!validateArcRampParams(operation, error, type))
     {
       return {};
     }
@@ -5681,6 +5801,13 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
       "geometry_analyze_route_continuity requires at least two operation/object/"
       "selector target brushes or at least two selected brush nodes");
   }
+  const auto selectorProvided = params.value("selector").isObject();
+  const auto targetMix =
+    targetMetadataMixJson(map, *brushes, metadataStore, objectRegistry);
+  if (!selectorProvided && (!targetMix.value("mixedTargetWarning").toString().isEmpty()))
+  {
+    warnings.push_back(targetMix.value("mixedTargetWarning").toString());
+  }
 
   const auto orderBy =
     resolvedParams.value("orderBy").toString("projection").trimmed().toLower();
@@ -5995,6 +6122,13 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     {"unsupportedObjectCount", unsupportedObjectIds.size()},
     {"warnings", warnings},
   };
+  if (!selectorProvided && (!targetMix.value("mixedTargetWarning").toString().isEmpty()))
+  {
+    result.insert("mixedTargetWarning", targetMix.value("mixedTargetWarning"));
+    result.insert("partCounts", targetMix.value("partCounts"));
+    result.insert("roleCounts", targetMix.value("roleCounts"));
+    result.insert("recommendedSelector", targetMix.value("recommendedSelector"));
+  }
   if (detail == "full")
   {
     result.insert("surfaces", surfaceJson);
@@ -6150,6 +6284,13 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
       {"detail", params.value("detail").toString("summary")},
       {"grid", params.value("grid").toDouble(1.0)},
     };
+    for (const auto& key : {"defaultMetadata", "metadata", "partMetadata"})
+    {
+      if (params.contains(key))
+      {
+        batchParams.insert(key, params.value(key));
+      }
+    }
   }
 
   const auto operationsValue = batchParams.value("operations");
@@ -6185,6 +6326,8 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   auto nodes = std::vector<mdl::Node*>{};
   auto errors = QJsonArray{};
   auto warnings = blockoutWarningsForOperations(operations, grid);
+  const auto expansion =
+    expansionSummaryJson(operations, expandedOperations, warnings, grid);
   auto intentSummaries = QJsonArray{};
   auto failedOperationIndex = -1;
   auto failedOperationType = QString{};
@@ -6256,6 +6399,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
     return McpBridgeToolResult::success(QJsonObject{
       {"valid", false},
       {"validation", validation},
+      {"expansion", expansion},
     });
   }
 
@@ -6287,6 +6431,9 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
     {"grid", grid},
     {"validation", validation},
     {"results", fullResults},
+    {"expansion", expansion},
+    {"expandedOperations", jsonArrayFromOperations(expandedOperations)},
+    {"expandedOperationsTruncated", expandedOperations.size() > 512u},
   };
   if (!intentSummaries.isEmpty())
   {
@@ -6303,6 +6450,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
   result.insert("brushCount", brushCount);
   result.insert("bounds", boundsToJson(bounds));
   result.insert("validation", validation);
+  result.insert("expansion", expansion);
   result.insert("material", QString::fromStdString(defaultMaterial));
   result.insert(
     "materials",
