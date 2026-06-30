@@ -131,6 +131,102 @@ operation, review feature, or skill recipe.
 
 ## Refactor Phases
 
+## Implementation Status
+
+Use this checklist as the execution tracker. Evidence must come from current
+source, tests, committed changes, or real TB smoke output; intent alone does not
+count.
+
+### Phase 1 Status: Partial
+
+- Done: `Core / Modeling / Full` are the only advertised profiles; legacy
+  `Balanced` config input migrates to `Modeling`.
+- Done: direct prefab placeholders and legacy direct blockout helper tool names
+  are removed from the catalog, with legacy payload support kept in batch/IR.
+- Done: `tb_doctor` and broad `tb_tools_search(detail:"schema")` use compact
+  output, while exact-name schema lookup remains available.
+- Done: `initialize`, `tb_status`, and `tb_doctor` expose the associated
+  `trenchbroom-mcp-scene-workflow` skill hint.
+- Done: catalog and bridge tests cover profile parsing, deleted tool names,
+  compact doctor/search behavior, and skill hints.
+- Partial: remaining Modeling surface still needs a final duplicate/convenience
+  audit against the "small normal Agent workbench" target.
+
+Next Phase 1 item:
+
+- Audit current Modeling-visible tools and either justify, hide, or document any
+  duplicate convenience surface that remains.
+
+### Phase 2 Status: Missing
+
+- Missing: common schema fragments are not centralized enough to make selector,
+  module, compact-output, and recovery wording single-source.
+- Missing: lifecycle/profile/category/search metadata is not enforced from one
+  obvious catalog edit path.
+- Partial: catalog metadata tests exist, but they do not yet prove common
+  selector/module docs cannot drift.
+
+Next Phase 2 item:
+
+- After Phase 1 closes, centralize the smallest repeated catalog wording/schema
+  fragment that has multiple current users and add a focused catalog test.
+
+### Phase 3 Status: Partial
+
+- Done: operation records carry document path/fingerprint and undo/redo guards
+  reject wrong-document history operations before mutation.
+- Done: `history_undo_to_operation` exists with structured partial-failure
+  diagnostics.
+- Done: stale target warnings are summarized by default in selector/module
+  paths, with full detail opt-in.
+- Done: compound operation expansion summaries exist for batch/curved corridor
+  inspection paths.
+- Partial: mutation tools still need a full audit for consistent mutation state,
+  retry safety, recovery action, and compact stale output.
+
+Next Phase 3 item:
+
+- Audit one mutation family at a time for document identity, mutation-state, and
+  recovery-action consistency.
+
+### Phase 4 Status: Partial
+
+- Done: project skill source is `skills/trenchbroom-mcp-scene-workflow`, with
+  runtime sync through `scripts\sync-trenchbroom-mcp-skill.ps1`.
+- Done: recipe validator enforces deterministic IR and requires a render-review
+  validation path for prefab-like recipes.
+- Done: bundled recipes cover houses, routes, courtyards, caves, terrain passes,
+  ascending loops, and KZ/bhop gameplay layouts.
+- Done: real TB visual smoke covers bundled recipe `minimal/default/stress`
+  variants, and representative contact sheets have been inspected.
+- Partial: recipe coverage can still expand, but new recipes should wait until
+  the current ordered phase requires Phase 4 work.
+
+Next Phase 4 item:
+
+- When Phase 4 is active again, add recipe coverage only for a missing common
+  scene family, with validator, runtime sync, real TB visual acceptance, and
+  inspected review output.
+
+### Phase 5 Status: Partial
+
+- Done: route target filtering has explicit selector/module guidance, mixed
+  target warnings, and explicit slope/continuity mode routing in skill guidance.
+- Done: non-convex polygon batch diagnostics report `polygonDiagnostics` with
+  failing point/edge information for invalid polygons.
+- Done: texture apply/replace paths report material existence so missing
+  materials are discoverable.
+- Partial: visual review still mostly reports render quality, not "looks like
+  the requested target" critique.
+- Missing: generic organic primitives remain a future kernel decision; current
+  cave/terrain strength stays in recipes.
+
+Next Phase 5 item:
+
+- After earlier phases close, improve one validation/review feedback path that
+  catches visually bad but technically valid output without adding scene-prefab
+  C++ behavior.
+
 ### Phase 1: Catalog And Discovery Cleanup
 
 Goal: reduce tool-surface confusion without removing useful execution paths.
