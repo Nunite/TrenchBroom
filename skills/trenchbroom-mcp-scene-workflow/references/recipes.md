@@ -43,6 +43,7 @@ python <skill>\scripts\recipes\ascending_loop.py --params <params.json> --out <i
 python <skill>\scripts\recipes\temple_courtyard.py --params <params.json> --out <ir.json>
 python <skill>\scripts\recipes\kz_bhop_route.py --params <params.json> --out <ir.json>
 python <skill>\scripts\recipes\terrain_pass.py --params <params.json> --out <ir.json>
+python <skill>\scripts\recipes\simple_house.py --params <params.json> --out <ir.json>
 ```
 
 Validate all bundled examples and optionally emit IR files:
@@ -101,6 +102,9 @@ If the flow fails, classify the failure before changing MCP code:
   markers, spawn, and light. It is for blockout composition, not organic cave
   quality; use selector `{moduleId, part:"path"}` for route continuity and review
   renders for visual judgement.
+- `simple_house`: emits explicit segmented wall boxes, door/window frames, roof
+  slabs, spawn, and light. It replaces direct room/doorway helper usage for house
+  blockouts; openings are segmented geometry, not CSG cuts into existing brushes.
 
 ## IR Shape
 
