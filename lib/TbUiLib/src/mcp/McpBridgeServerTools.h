@@ -199,6 +199,13 @@ McpBridgeToolResult faceTextureSetResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult faceTextureSetForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 
 QJsonObject actionsListJson(AppController& appController);
 McpBridgeToolResult actionExecuteResult(

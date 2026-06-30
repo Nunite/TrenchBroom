@@ -4973,6 +4973,51 @@ TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
     == "provide_faces_or_select_brush_faces");
 }
 
+TEST_CASE("McpBridgeServer face_texture_set reports pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto missingAttributesResponse = faceTextureSetForMapResult(
+    map, "face_texture_set", QJsonObject{}, history, nextOperationIndex, objectRegistry);
+  REQUIRE_FALSE(missingAttributesResponse.ok);
+  CHECK(
+    missingAttributesResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(missingAttributesResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingAttributesResponse.error.details.value("recoveryAction").toString()
+    == "provide_face_texture_attributes_then_retry");
+
+  const auto missingTargetResponse = faceTextureSetForMapResult(
+    map,
+    "face_texture_set",
+    QJsonObject{{"material", "brick"}},
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  REQUIRE_FALSE(missingTargetResponse.ok);
+  CHECK(
+    missingTargetResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(missingTargetResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingTargetResponse.error.details.value("recoveryAction").toString()
+    == "provide_faces_or_select_brush_faces");
+}
+
 TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
 {
   auto appControllerFixture = AppControllerFixture{};

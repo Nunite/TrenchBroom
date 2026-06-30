@@ -1323,19 +1323,45 @@ McpBridgeToolResult faceTextureSetResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return faceTextureSetForMapResult(
+    mapWindow->document().map(),
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    objectRegistry);
+}
+
+McpBridgeToolResult faceTextureSetForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
   auto error = QString{};
   const auto update = updateBrushFaceAttributesFromParams(params, error);
   if (!update)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "face_texture_attributes"}},
+        "provide_face_texture_attributes_then_retry"));
   }
 
   auto handles =
     faceSelectionHandlesFromParams(map, params, history, &objectRegistry, error);
   if (handles.empty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error.isEmpty() ? "face_texture_set matched no brush faces" : error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "faces_or_selection"}},
+        "provide_faces_or_select_brush_faces"));
   }
 
   const auto changedNodes = changedBrushIds(handles, map.worldNode());
