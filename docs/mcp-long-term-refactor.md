@@ -166,7 +166,9 @@ Next Phase 1 item:
 
 - Done: the shared `idsMode` wording for high-frequency safe batch modeling
   helpers is centralized in the catalog and covered by a drift test.
-- Missing: selector, module, compact-output, and recovery wording are not yet
+- Done: the shared `moduleId` wording used by selector and module tools is
+  centralized in the catalog and covered by a drift test.
+- Missing: selector, compact-output, and recovery wording are not yet
   centralized enough to be single-source.
 - Missing: lifecycle/profile/category/search metadata is not enforced from one
   obvious catalog edit path.
@@ -175,8 +177,8 @@ Next Phase 1 item:
 
 Next Phase 2 item:
 
-- Centralize the next smallest repeated selector/module or recovery schema
-  fragment that has multiple current users and add a focused catalog test.
+- Centralize the next smallest repeated selector or recovery schema fragment
+  that has multiple current users and add a focused catalog test.
 
 ### Phase 3 Status: Partial
 

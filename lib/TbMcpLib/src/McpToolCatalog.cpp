@@ -98,6 +98,11 @@ QJsonObject changedIdsModeProperty()
     "maps to detail=ids.");
 }
 
+QJsonObject moduleIdProperty()
+{
+  return stringProperty("Session metadata moduleId.");
+}
+
 QJsonObject vec3Property(const QString& description)
 {
   return QJsonObject{
@@ -281,7 +286,7 @@ QJsonObject selectorSchema()
     {"properties",
      QJsonObject{
        {"metadata", genericMetadataSchema()},
-       {"moduleId", stringProperty("Session metadata moduleId.")},
+       {"moduleId", moduleIdProperty()},
        {"part", stringProperty("Session metadata part.")},
        {"role", stringProperty("Session metadata role.")},
        {"order", numberProperty("Session metadata order.")},
@@ -1454,7 +1459,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       objectSchema(
         {
-          {"moduleId", stringProperty("Session metadata module id.")},
+          {"moduleId", moduleIdProperty()},
           {"idsMode", stringProperty("sample or full. Defaults to sample.")},
         },
         {"moduleId"}),
@@ -1467,7 +1472,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       objectSchema(
         {
-          {"moduleId", stringProperty("Session metadata module id.")},
+          {"moduleId", moduleIdProperty()},
           {"idsMode",
            stringProperty("none, count, sample, or full. Defaults to sample.")},
         },
@@ -1483,7 +1488,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       objectSchema(
         {
-          {"moduleId", stringProperty("Session metadata module id.")},
+          {"moduleId", moduleIdProperty()},
           {"limit",
            integerProperty(
              "Optional maximum matched objects; omitted means full live module.")},
@@ -1514,7 +1519,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       objectSchema(
         {
-          {"moduleId", stringProperty("Session metadata module id.")},
+          {"moduleId", moduleIdProperty()},
           {"checkRouteContinuity",
            boolProperty(
              "Also run geometry_analyze_route_continuity. Defaults to walkable/road/"
@@ -1567,7 +1572,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       true,
       objectSchema(
         {
-          {"moduleId", stringProperty("Session metadata module id.")},
+          {"moduleId", moduleIdProperty()},
         },
         {"moduleId"}),
     },

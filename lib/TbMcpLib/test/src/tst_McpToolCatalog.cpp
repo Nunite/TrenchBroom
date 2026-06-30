@@ -1751,6 +1751,47 @@ TEST_CASE("McpToolCatalog")
     CHECK(idsModeDescription("blockout_create_batch") == description);
   }
 
+  SECTION("selector and module tools share moduleId wording")
+  {
+    const auto propertyDescription = [](const QString& toolName,
+                                        const QString& propertyName) {
+      const auto tool = findToolDefinition(toolName);
+      REQUIRE(tool);
+      return tool->inputSchema.value("properties")
+        .toObject()
+        .value(propertyName)
+        .toObject()
+        .value("description")
+        .toString();
+    };
+
+    const auto selectorTool = findToolDefinition("selector_preview");
+    REQUIRE(selectorTool);
+    const auto selectorModuleIdDescription =
+      selectorTool->inputSchema.value("properties")
+        .toObject()
+        .value("selector")
+        .toObject()
+        .value("properties")
+        .toObject()
+        .value("moduleId")
+        .toObject()
+        .value("description")
+        .toString();
+
+    CHECK(selectorModuleIdDescription == "Session metadata moduleId.");
+    CHECK(propertyDescription("module_inspect", "moduleId")
+          == selectorModuleIdDescription);
+    CHECK(propertyDescription("module_select", "moduleId")
+          == selectorModuleIdDescription);
+    CHECK(propertyDescription("module_render_review", "moduleId")
+          == selectorModuleIdDescription);
+    CHECK(propertyDescription("module_validate", "moduleId")
+          == selectorModuleIdDescription);
+    CHECK(propertyDescription("module_compact", "moduleId")
+          == selectorModuleIdDescription);
+  }
+
   SECTION("mode gating rejects edit tools in read-only mode")
   {
     const auto editTool = findToolDefinition("entity_create");
