@@ -39,6 +39,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/QPathUtils.h"
 
 #include "kd/overload.h"
 
@@ -110,6 +111,9 @@ QJsonObject mutationResultJson(
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
+  result.insert("mutatedDocument", true);
+  result.insert("activeDocumentPath", operation.documentPath);
+  result.insert("documentFingerprint", operation.documentFingerprint);
   mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
 }
@@ -117,6 +121,7 @@ QJsonObject mutationResultJson(
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
+  mdl::Map& map,
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& changedObjectIds,
@@ -127,6 +132,8 @@ void mcpRecordOperation(
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
+  operation.documentPath = map.path().empty() ? QString{} : pathAsQString(map.path());
+  operation.documentFingerprint = documentFingerprintForMap(map);
   operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation, idsMode);
   history.push_back(std::move(operation));
@@ -501,7 +508,17 @@ McpBridgeToolResult problemsFixResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return problemsFixForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult problemsFixForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   auto error = QString{};
   const auto problemIds = requiredStringListFromJson(params, "problemIds", error);
   if (!problemIds)
@@ -551,6 +568,7 @@ McpBridgeToolResult problemsFixResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedObjectIds,
@@ -574,7 +592,17 @@ McpBridgeToolResult mapFixAllSafeResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return mapFixAllSafeForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult mapFixAllSafeForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   const auto includeHidden = mcpOptionalBool(params, "includeHidden", false);
   auto changedObjectIds = QJsonArray{};
   auto fixedCount = 0;
@@ -630,6 +658,7 @@ McpBridgeToolResult mapFixAllSafeResult(
   mcpRecordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     changedObjectIds,

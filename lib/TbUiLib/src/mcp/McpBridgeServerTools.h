@@ -932,8 +932,20 @@ McpBridgeToolResult problemsFixResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult problemsFixForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult mapFixAllSafeResult(
   AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult mapFixAllSafeForMapResult(
+  mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,

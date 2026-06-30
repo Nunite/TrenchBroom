@@ -40,6 +40,7 @@
 #include "mdl/GroupNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
+#include "mdl/Map_Entities.h"
 #include "mdl/Map_Groups.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
@@ -3563,6 +3564,46 @@ TEST_CASE("McpBridgeServer asset placement records document identity")
     == documentFingerprintForMap(map));
   REQUIRE_FALSE(history.empty());
   CHECK(history.back().toolName == "asset_place_model");
+  CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
+}
+
+TEST_CASE("McpBridgeServer problem fixes record document identity")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  mdl::deselectAll(map);
+  mdl::selectNodes(map, {&map.worldNode()});
+  REQUIRE(mdl::setEntityProperty(map, "", ""));
+
+  const auto response = mapFixAllSafeForMapResult(
+    map,
+    "map_fix_all_safe",
+    QJsonObject{{"idsMode", "sample"}, {"includeHidden", true}},
+    history,
+    nextOperationIndex);
+
+  const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+  INFO(error);
+  REQUIRE(response.ok);
+  CHECK(response.result.value("mutatedDocument").toBool());
+  CHECK(
+    response.result.value("documentFingerprint").toString()
+    == documentFingerprintForMap(map));
+  CHECK(response.result.value("fixedCount").toInt() == 1);
+  REQUIRE_FALSE(history.empty());
+  CHECK(history.back().toolName == "map_fix_all_safe");
   CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 }
 
