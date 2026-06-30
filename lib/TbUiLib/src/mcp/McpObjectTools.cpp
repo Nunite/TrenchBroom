@@ -1811,34 +1811,78 @@ McpBridgeToolResult transformObjectsForMapResult(
     moduleStore);
   if (!nodes)
   {
-    if (!targetDiagnostics.isEmpty())
+    auto targetSource = targetDiagnostics.value("targetSource").toString();
+    if (targetSource.isEmpty())
     {
-      return McpBridgeToolResult::failure(
-        mcp::McpErrorCode::InvalidParams, error, targetDiagnostics);
+      if (params.value("objectIds").isArray())
+      {
+        targetSource = "objectIds";
+      }
+      else if (params.contains("operationId") || params.contains("operationIds"))
+      {
+        targetSource = "operationIds";
+      }
+      else if (params.value("selector").isObject())
+      {
+        targetSource = "selector";
+      }
     }
-    return invalidParamsFailure(error);
+    const auto recoveryAction =
+      targetSource == "selector"       ? QString{"preview_selector_or_refresh_status"}
+      : targetSource == "operationIds" ? QString{"inspect_operation_or_refresh_status"}
+      : targetSource == "objectIds"    ? QString{"refresh_status_or_ids"}
+      : targetSource == "selection"    ? QString{"select_objects_then_retry"}
+                                       : QString{"provide_transform_targets_then_retry"};
+    if (!targetSource.isEmpty() && !targetDiagnostics.contains("targetSource"))
+    {
+      targetDiagnostics.insert("targetSource", targetSource);
+    }
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(targetDiagnostics, recoveryAction));
   }
   auto transformNodes = removeDescendantNodes(*nodes);
   if (transformNodes.empty())
   {
-    return invalidParamsFailure(
-      "objectIds must contain at least one transformable object");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "objectIds must contain at least one transformable object",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "objectIds"}}, "refresh_status_or_ids"));
   }
   const auto beforeBounds = boundsForNodes(transformNodes);
   for (const auto* node : transformNodes)
   {
     if (node == &map.worldNode() || !map.editorContext().selectable(*node))
     {
-      return invalidParamsFailure(QString{"Object cannot be transformed: %1"}.arg(
-        nodePathId(*node, map.worldNode())));
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        QString{"Object cannot be transformed: %1"}.arg(
+          nodePathId(*node, map.worldNode())),
+        preMutationFailureDetails(
+          QJsonObject{{"objectId", nodePathId(*node, map.worldNode())}},
+          "preview_targets_or_use_user_selection"));
     }
   }
 
   const auto operation = params.value("operation").toString().trimmed().toLower();
   if (operation.isEmpty())
   {
-    return invalidParamsFailure("objects_transform requires operation");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "objects_transform requires operation",
+      preMutationFailureDetails(QJsonObject{}, "fix_transform_parameters_then_retry"));
   }
+
+  const auto parameterFailure = [&](const QString& message) {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      message,
+      preMutationFailureDetails(
+        QJsonObject{{"operation", operation}},
+        "fix_transform_parameters_then_retry"));
+  };
 
   auto transformation = vm::mat4x4d{};
   auto transactionName = QString{};
@@ -1847,7 +1891,7 @@ McpBridgeToolResult transformObjectsForMapResult(
     const auto delta = mcpVec3FromJson(params, "delta", error);
     if (!delta)
     {
-      return invalidParamsFailure(error);
+      return parameterFailure(error);
     }
     transformation = vm::translation_matrix(*delta);
     transactionName = "MCP: Translate objects";
@@ -1857,17 +1901,17 @@ McpBridgeToolResult transformObjectsForMapResult(
     const auto center = optionalCenterFromJson(params, transformNodes, error);
     if (!center)
     {
-      return invalidParamsFailure(error);
+      return parameterFailure(error);
     }
     const auto axis = transformAxisFromJson(params, error);
     if (!axis)
     {
-      return invalidParamsFailure(error);
+      return parameterFailure(error);
     }
     const auto angle = numberFromJson(params, "angle", error);
     if (!angle)
     {
-      return invalidParamsFailure(error);
+      return parameterFailure(error);
     }
     transformation = vm::translation_matrix(*center)
                      * vm::rotation_matrix(*axis, vm::to_radians(*angle))
@@ -1879,12 +1923,12 @@ McpBridgeToolResult transformObjectsForMapResult(
     const auto center = optionalCenterFromJson(params, transformNodes, error);
     if (!center)
     {
-      return invalidParamsFailure(error);
+      return parameterFailure(error);
     }
     const auto factors = scaleFactorsFromJson(params, error);
     if (!factors)
     {
-      return invalidParamsFailure(error);
+      return parameterFailure(error);
     }
     transformation = vm::translation_matrix(*center) * vm::scaling_matrix(*factors)
                      * vm::translation_matrix(-*center);
@@ -1892,7 +1936,7 @@ McpBridgeToolResult transformObjectsForMapResult(
   }
   else
   {
-    return invalidParamsFailure("operation must be translate, rotate, or scale");
+    return parameterFailure("operation must be translate, rotate, or scale");
   }
 
   auto changedObjectIds = QJsonArray{};

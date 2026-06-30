@@ -216,6 +216,9 @@ Next Phase 2 item:
 - Done: `objects_delete_by_selector` delete records report
   `mutatedDocument:true` and document identity in result summaries and history
   records.
+- Done: `objects_transform` precondition failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before transforming
+  objects.
 - Done: safe problem-fix mutation records report `mutatedDocument:true` and
   document identity in result summaries and history records.
 - Done: invalid `brush_create_polygon_batch` preflight results report

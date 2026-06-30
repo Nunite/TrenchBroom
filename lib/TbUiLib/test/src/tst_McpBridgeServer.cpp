@@ -4291,6 +4291,33 @@ TEST_CASE("McpBridgeServer transforms selector targets without long id lists")
     missResponse.error.details.value("selector").toObject().value("moduleId").toString()
     == "missing-transform-route");
   CHECK(missResponse.error.details.value("selectorMatchedCount").toInt() == 0);
+  CHECK(missResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(missResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missResponse.error.details.value("recoveryAction").toString()
+    == "preview_selector_or_refresh_status");
+  CHECK(history.back().toolName == "objects_transform");
+
+  const auto invalidOperationResponse = transformObjectsForMapResult(
+    map,
+    "objects_transform",
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "selector-transform-route"}}},
+      {"operation", "skew"},
+    },
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  CHECK_FALSE(invalidOperationResponse.ok);
+  CHECK(
+    invalidOperationResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(invalidOperationResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidOperationResponse.error.details.value("recoveryAction").toString()
+    == "fix_transform_parameters_then_retry");
   CHECK(history.back().toolName == "objects_transform");
 }
 
