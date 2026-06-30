@@ -156,6 +156,14 @@ prefer explicit `brush_create_polygon_batch` / IR polyhedron geometry, or create
 small sample first and inspect review output before building the full module.
 `operation_validate` proves brush validity, not architectural readability.
 
+## Material Rules
+
+Use `texture_search` before relying on a named texture. `texture_apply`,
+`texture_apply_by_filter`, and `texture_replace` report material existence fields;
+if `materialExists` or `replaceMaterialExists` is false, treat the write as a
+placeholder/tag and either choose a loaded material from `texture_search` or report
+that the requested material was not available.
+
 ## Review Rules
 
 Use review renderer output as evidence, not as the only validator. Contact sheets are for quick recognition; if a scene is dense, inspect individual captures. For terrain or routes, request side/iso views and `verticalExaggeration` when height changes are subtle.

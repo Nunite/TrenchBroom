@@ -4460,6 +4460,8 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
   INFO(error);
   REQUIRE(response.ok);
   CHECK(response.result.value("material").toString() == "target_mat");
+  CHECK(response.result.value("materialExists").toBool(true) == false);
+  CHECK(!response.result.value("fallbackMaterial").toString().isEmpty());
   CHECK(response.result.value("brushCount").toInt() == 1);
   CHECK(response.result.value("faceCount").toInt() == 6);
   CHECK(response.result.value("changedObjectCount").toInt() == 1);
@@ -4493,6 +4495,8 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
     history,
     nextOperationIndex);
   REQUIRE(sampleResponse.ok);
+  CHECK(sampleResponse.result.value("materialExists").toBool(true) == false);
+  CHECK(!sampleResponse.result.value("fallbackMaterial").toString().isEmpty());
   CHECK(sampleResponse.result.value("changedObjectIds").isUndefined());
   CHECK(sampleResponse.result.value("changedObjectIdSample").toArray().size() == 1);
 
@@ -4510,6 +4514,7 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
     history,
     nextOperationIndex);
   REQUIRE(fullResponse.ok);
+  CHECK(fullResponse.result.value("materialExists").toBool(true) == false);
   CHECK(fullResponse.result.value("changedObjectIds").toArray().size() == 1);
 }
 

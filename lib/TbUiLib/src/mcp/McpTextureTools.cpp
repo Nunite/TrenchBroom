@@ -540,6 +540,34 @@ QString fallbackMaterialName(mdl::Map& map)
            : current;
 }
 
+bool materialExists(mdl::Map& map, const QString& name)
+{
+  const auto materialName = name.trimmed().toStdString();
+  if (materialName.empty())
+  {
+    return false;
+  }
+  if (kdl::ci::str_is_equal(materialName, mdl::BrushFaceAttributes::NoMaterialName))
+  {
+    return true;
+  }
+
+  const auto& materials = map.materialManager().materials();
+  return std::any_of(
+    std::begin(materials), std::end(materials), [&](const auto* material) {
+      return material && kdl::ci::str_is_equal(material->name(), materialName);
+    });
+}
+
+void insertMissingMaterialFallback(
+  QJsonObject& result, mdl::Map& map, const QString& material)
+{
+  if (!materialExists(map, material))
+  {
+    result.insert("fallbackMaterial", fallbackMaterialName(map));
+  }
+}
+
 QJsonObject brushFaceAttributesJson(const mdl::BrushFaceAttributes& attributes)
 {
   return QJsonObject{
@@ -952,6 +980,8 @@ McpBridgeToolResult textureApplyResult(
     result,
     mcpIdsModeFromParams(params));
   result.insert("material", material);
+  result.insert("materialExists", materialExists(map, material));
+  insertMissingMaterialFallback(result, map, material);
   result.insert("faceCount", static_cast<int>(handles.size()));
   result.insert("faceSemantic", params.value("faceSemantic").toString("all"));
   return McpBridgeToolResult::success(std::move(result));
@@ -1076,6 +1106,8 @@ McpBridgeToolResult textureApplyByFilterForMapResult(
     result,
     mcpIdsModeFromParams(params));
   result.insert("material", material);
+  result.insert("materialExists", materialExists(map, material));
+  insertMissingMaterialFallback(result, map, material);
   result.insert("brushCount", static_cast<int>(matches.size()));
   result.insert("faceCount", static_cast<int>(handles.size()));
   result.insert("faceSemantic", params.value("faceSemantic").toString("all"));
@@ -1343,6 +1375,9 @@ McpBridgeToolResult textureReplaceResult(
     mcpIdsModeFromParams(params));
   result.insert("find", find);
   result.insert("replace", replace);
+  result.insert("findMaterialExists", materialExists(map, find));
+  result.insert("replaceMaterialExists", materialExists(map, replace));
+  insertMissingMaterialFallback(result, map, replace);
   result.insert("faceCount", static_cast<int>(handles.size()));
   return McpBridgeToolResult::success(std::move(result));
 }

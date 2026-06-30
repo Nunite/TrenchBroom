@@ -2332,7 +2332,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     {
       "texture_apply",
       "Apply a material to selected faces, target objects, operation targets, or a "
-      "semantic subset such as top/bottom/side faces.",
+      "semantic subset such as top/bottom/side faces. Result reports whether the "
+      "requested material exists in the loaded material set.",
       McpMode::Edit,
       true,
       true,
@@ -2347,7 +2348,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Apply a material to brushes matched by a safe selection_filter-style query. "
       "The tool only edits brush faces and ignores world/group/layer parents. It also "
       "accepts objectIds or operationIds as direct targets, then can narrow by "
-      "faceSemantic or normal.",
+      "faceSemantic or normal. Result reports materialExists and a fallbackMaterial "
+      "when the requested material is not loaded.",
       McpMode::Edit,
       true,
       true,
@@ -2371,7 +2373,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "texture_replace",
-      "Replace one material with another on selected faces/brushes or the whole map.",
+      "Replace one material with another on selected faces/brushes or the whole map. "
+      "Result reports find/replace material existence.",
       McpMode::Edit,
       true,
       true,
