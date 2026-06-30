@@ -214,6 +214,9 @@ Next Phase 2 item:
 - Done: `texture_align_face` reports structured `mutatedDocument:false`,
   `retrySafe`, and recovery actions for pre-mutation mode and face-target
   failures.
+- Done: `texture_copy_from_face` reports structured `mutatedDocument:false`,
+  `retrySafe`, and recovery actions for pre-mutation source-face and target-face
+  failures.
 - Done: `geometry_csg_selection` reports document identity on successful
   operation records and structured `mutatedDocument:false` / `retrySafe` /
   `recoveryAction` diagnostics for pre-mutation selection failures.

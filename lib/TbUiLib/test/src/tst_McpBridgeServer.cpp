@@ -4915,6 +4915,74 @@ TEST_CASE("McpBridgeServer texture_align_face reports pre-mutation failures")
     == "choose_supported_alignment_mode");
 }
 
+TEST_CASE("McpBridgeServer texture_copy_from_face reports pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto missingSourceResponse = textureCopyFromFaceForMapResult(
+    map,
+    "texture_copy_from_face",
+    QJsonObject{},
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  REQUIRE_FALSE(missingSourceResponse.ok);
+  CHECK(missingSourceResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(missingSourceResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingSourceResponse.error.details.value("recoveryAction").toString()
+    == "provide_valid_source_face_then_retry");
+
+  const auto createResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+      {"detail", "ids"},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(createResponse.ok);
+  const auto objectIds = createResponse.result.value("changedObjectIds").toArray();
+  REQUIRE(objectIds.size() == 1);
+  mdl::deselectAll(map);
+
+  const auto missingTargetResponse = textureCopyFromFaceForMapResult(
+    map,
+    "texture_copy_from_face",
+    QJsonObject{
+      {"sourceObjectId", objectIds.first().toString()},
+      {"sourceFaceIndex", 0},
+    },
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  REQUIRE_FALSE(missingTargetResponse.ok);
+  CHECK(missingTargetResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(missingTargetResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingTargetResponse.error.details.value("recoveryAction").toString()
+    == "provide_target_faces_or_select_brush_faces");
+}
+
 TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
 {
   auto appControllerFixture = AppControllerFixture{};

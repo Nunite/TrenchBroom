@@ -1584,13 +1584,34 @@ McpBridgeToolResult textureCopyFromFaceResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return textureCopyFromFaceForMapResult(
+    mapWindow->document().map(),
+    toolName,
+    params,
+    history,
+    nextOperationIndex,
+    objectRegistry);
+}
+
+McpBridgeToolResult textureCopyFromFaceForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry)
+{
   auto error = QString{};
   const auto source =
     brushFaceHandleFromJson(map, params, "sourceObjectId", "sourceFaceIndex", error);
   if (!source)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "source_face"}},
+        "provide_valid_source_face_then_retry"));
   }
 
   auto targetParams = params;
@@ -1600,7 +1621,12 @@ McpBridgeToolResult textureCopyFromFaceResult(
     map, targetParams, history, &objectRegistry, error);
   if (handles.empty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error.isEmpty() ? "texture_copy_from_face matched no target brush faces" : error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "target_faces_or_selection"}},
+        "provide_target_faces_or_select_brush_faces"));
   }
 
   const auto sourceAttributes = source->face().attributes();

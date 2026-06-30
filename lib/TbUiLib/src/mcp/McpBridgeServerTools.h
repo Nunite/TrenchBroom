@@ -177,6 +177,13 @@ McpBridgeToolResult textureCopyFromFaceResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult textureCopyFromFaceForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult faceListResult(
   AppController& appController,
   const QJsonObject& params,
