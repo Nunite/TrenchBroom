@@ -62,6 +62,28 @@ namespace mcp = tb::mcp;
 namespace
 {
 
+QJsonObject mcpSkillHintsJson()
+{
+  return QJsonObject{
+    {"associatedSkills", QJsonArray{"trenchbroom-mcp-scene-workflow"}},
+    {"skillWorkflowHint",
+     "Use trenchbroom-mcp-scene-workflow when building or editing TrenchBroom "
+     "scenes with MCP."},
+    {"recipeWorkflowHint",
+     "For prefab-like scenes, routes, or architecture, use skill recipes to emit "
+     "IR, then apply via ir_compile_preview_from_file and ir_apply_from_file."},
+  };
+}
+
+void addMcpSkillHints(QJsonObject& object)
+{
+  const auto hints = mcpSkillHintsJson();
+  for (auto it = hints.begin(); it != hints.end(); ++it)
+  {
+    object.insert(it.key(), it.value());
+  }
+}
+
 QJsonArray vecToJson(const vm::vec3d& value)
 {
   return QJsonArray{
@@ -975,6 +997,7 @@ QJsonObject makeStatus(
     {"openDocumentsSummary", documentsListJson(appController).value("documents")},
     {"activeDocument", false},
   };
+  addMcpSkillHints(result);
 
   if (auto* mapWindow = appController.mapWindowManager().topMapWindow())
   {
@@ -1011,6 +1034,7 @@ QJsonObject doctorJson(
      "Use tb_tools_search(detail:\"schema\", query:\"exact_tool_name\") to inspect one "
      "tool schema."},
   };
+  addMcpSkillHints(result);
 
   const auto stats = mcp::toolProfileStatsJson(config.mode, true, config.toolProfile);
   for (auto it = stats.begin(); it != stats.end(); ++it)

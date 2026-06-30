@@ -650,6 +650,15 @@ TEST_CASE("McpBridgeServer")
     CHECK(summaryResponse.result.value("schemaLookupHint")
             .toString()
             .contains("tb_tools_search"));
+    CHECK(summaryResponse.result.value("associatedSkills")
+            .toArray()
+            .contains("trenchbroom-mcp-scene-workflow"));
+    CHECK(summaryResponse.result.value("skillWorkflowHint")
+            .toString()
+            .contains("trenchbroom-mcp-scene-workflow"));
+    CHECK(summaryResponse.result.value("recipeWorkflowHint")
+            .toString()
+            .contains("ir_compile_preview_from_file"));
     CHECK(summaryResponse.result.contains("overlay"));
     CHECK(
       QJsonDocument{summaryResponse.result}.toJson(QJsonDocument::Compact).size() < 4096);
@@ -671,6 +680,12 @@ TEST_CASE("McpBridgeServer")
     CHECK(firstTool.value("requiredMode").isString());
     CHECK(firstTool.value("visibleInCurrentProfile").isBool());
     CHECK_FALSE(firstTool.contains("inputSchema"));
+    CHECK(fullResponse.result.value("associatedSkills")
+            .toArray()
+            .contains("trenchbroom-mcp-scene-workflow"));
+    CHECK(fullResponse.result.value("recipeWorkflowHint")
+            .toString()
+            .contains("ir_apply_from_file"));
   }
 
   SECTION("serves compact broad tool schema search")
@@ -728,6 +743,13 @@ TEST_CASE("McpBridgeServer")
     CHECK(status.value("httpPort").toInt() == 45678);
     CHECK(status.contains("openDocumentCount"));
     CHECK(status.contains("openDocumentsSummary"));
+    CHECK(status.value("associatedSkills")
+            .toArray()
+            .contains("trenchbroom-mcp-scene-workflow"));
+    CHECK(status.value("skillWorkflowHint")
+            .toString()
+            .contains("trenchbroom-mcp-scene-workflow"));
+    CHECK(status.value("recipeWorkflowHint").toString().contains("skill recipes"));
   }
 
   SECTION("serves wired read-only tools")
