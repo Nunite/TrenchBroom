@@ -5419,6 +5419,15 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     missingOperationsResponse.error.details.value("recoveryAction").toString()
     == "provide_batch_operations_then_retry");
 
+  const auto missingBoxesResponse = createBoxesBatchForMapResult(
+    map, "brush_create_boxes_batch", QJsonObject{}, history, nextOperationIndex);
+  REQUIRE_FALSE(missingBoxesResponse.ok);
+  CHECK(missingBoxesResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(missingBoxesResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingBoxesResponse.error.details.value("recoveryAction").toString()
+    == "provide_box_specs_then_retry");
+
   const auto batchResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",

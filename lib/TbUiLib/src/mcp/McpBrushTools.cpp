@@ -6286,16 +6286,41 @@ McpBridgeToolResult createBoxesBatchResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex)
 {
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return createBoxesBatchForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult createBoxesBatchForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   const auto boxesValue = params.value("boxes");
   if (!boxesValue.isArray())
   {
-    return invalidParamsFailure("brush_create_boxes_batch requires boxes array");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "brush_create_boxes_batch requires boxes array",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "boxes"}}, "provide_box_specs_then_retry"));
   }
 
   const auto boxes = boxesValue.toArray();
   if (boxes.isEmpty())
   {
-    return invalidParamsFailure("boxes must not be empty");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "boxes must not be empty",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "boxes"}}, "provide_box_specs_then_retry"));
   }
 
   auto operations = QJsonArray{};
@@ -6303,7 +6328,12 @@ McpBridgeToolResult createBoxesBatchResult(
   {
     if (!boxes[i].isObject())
     {
-      return invalidParamsFailure(QString{"boxes[%1] must be an object"}.arg(i));
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::InvalidParams,
+        QString{"boxes[%1] must be an object"}.arg(i),
+        preMutationFailureDetails(
+          QJsonObject{{"targetSource", "boxes"}},
+          "fix_box_spec_objects_then_retry"));
     }
     auto operation = boxes[i].toObject();
     operation.insert("type", "box");
@@ -6325,8 +6355,7 @@ McpBridgeToolResult createBoxesBatchResult(
     batchParams.insert("material", params.value("material"));
   }
 
-  return blockoutCreateBatchResult(
-    appController, toolName, batchParams, history, nextOperationIndex);
+  return blockoutCreateBatchForMapResult(map, toolName, batchParams, history, nextOperationIndex);
 }
 
 McpBridgeToolResult blockoutCreateBatchForMapResult(

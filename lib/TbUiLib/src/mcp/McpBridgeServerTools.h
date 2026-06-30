@@ -737,6 +737,12 @@ McpBridgeToolResult createBoxesBatchResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult createBoxesBatchForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult blockoutValidateResult(const QJsonObject& params);
 McpBridgeToolResult blockoutCreateResult(
   AppController& appController,

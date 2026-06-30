@@ -226,6 +226,9 @@ Next Phase 2 item:
 - Done: `blockout_create_batch` top-level preflight failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before compiling or
   committing brushes.
+- Done: `brush_create_boxes_batch` top-level preflight failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before delegating to
+  batch brush creation.
 - Done: asset placement mutation records report `mutatedDocument:true` and
   document identity in result summaries and history records.
 - Done: asset placement precondition failures report `mutatedDocument:false`,
