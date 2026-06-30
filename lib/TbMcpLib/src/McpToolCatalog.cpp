@@ -3628,7 +3628,6 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "entity_create_checked_batch",
     "entity_properties_update",
     "entity_properties_delete",
-    "textures_list",
     "texture_search",
     "texture_apply_by_filter",
     "map_validate",

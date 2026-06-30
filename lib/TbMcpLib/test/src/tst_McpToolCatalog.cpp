@@ -369,7 +369,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("group_inspect"));
     CHECK(!names.contains("group_rename_selected"));
     CHECK(!names.contains("group_ungroup_selected"));
-    CHECK(names.contains("textures_list"));
+    CHECK(!names.contains("textures_list"));
     CHECK(names.contains("texture_search"));
     CHECK(!names.contains("texture_lock_get"));
     CHECK(!names.contains("texture_lock_set"));
@@ -388,6 +388,13 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("action_execute"));
     CHECK(!names.contains("asset_search"));
     CHECK(!names.contains("asset_place_model"));
+
+    const auto textureListSearch =
+      toolsSearchJson("textures_list", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    REQUIRE(textureListSearch.size() == 1);
+    CHECK(textureListSearch.first().toObject().value("name").toString() == "textures_list");
+    CHECK_FALSE(
+      textureListSearch.first().toObject().value("visibleInCurrentProfile").toBool());
     CHECK(!names.contains("asset_place_sprite"));
     CHECK(!names.contains("asset_place_sound"));
     CHECK(!names.contains("blockout_create_room"));

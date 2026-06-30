@@ -149,6 +149,9 @@ count.
   `trenchbroom-mcp-scene-workflow` skill hint.
 - Done: catalog and bridge tests cover profile parsing, deleted tool names,
   compact doctor/search behavior, and skill hints.
+- Done: `textures_list` is hidden from Modeling as duplicate material discovery
+  surface; `texture_search` remains the default visible material lookup and
+  exact search still finds `textures_list`.
 - Partial: remaining Modeling surface still needs a final duplicate/convenience
   audit against the "small normal Agent workbench" target.
 
