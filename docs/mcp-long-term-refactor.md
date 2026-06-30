@@ -1,0 +1,276 @@
+# MCP Long-Term Refactor Blueprint
+
+This document describes the target shape for a long-term TrenchBroom MCP
+refactor. It is a design roadmap, not an implementation plan for one patch.
+
+The reference model is the official Blender Lab MCP design: a small bridge, a
+bounded tool surface, compact discovery, and strong tests around the exposed
+catalog. TrenchBroom should keep a stricter boundary than Blender because map
+mutation needs document guards, undo transactions, live object identity, and
+geometry validation.
+
+`docs/mcp-development-governance.md` remains the normative rule set. If this
+blueprint conflicts with it, follow the governance document first.
+
+## Target Shape
+
+The desired architecture is:
+
+```text
+Agent / Skill
+  owns scene intent, recipe choice, visual judgement, workflow routing
+
+Recipe Scripts
+  own prefab-like composition and deterministic IR generation
+
+IR
+  owns large operation transport and preview/apply boundary
+
+C++ MCP Kernel
+  owns guarded editor execution, facts, recovery, validation, review
+
+TrenchBroom Document
+  owns native map state, selection, undo, rendering, and persistence
+```
+
+C++ MCP should feel less like a scene generator and more like a narrow editor
+kernel with reliable facts and safe mutations.
+
+## Design Principles
+
+### 1. Keep The Kernel Small
+
+MCP tools should exist only for editor-kernel responsibilities:
+
+- active document identity, document path, and fingerprint checks
+- undoable transactions and operation history
+- live object identity, selection, selectors, modules, and stale recovery
+- atomic brush, entity, texture, face, transform, and CSG mutations
+- map validation, geometry facts, slope/route continuity, and problem checks
+- review rendering, screenshots, manifests, and resource paths
+- IR preview/apply and compact diagnostics
+
+Do not add C++ tools for scene families, building styles, route genres, or
+gameplay concepts. Those belong in skill recipes.
+
+### 2. Make Discovery Better Before Adding Tools
+
+If the Agent cannot find the right path, prefer:
+
+- better skill description/frontmatter
+- better `initialize`, `tb_status`, or `tb_doctor` hints
+- better `tb_tools_search` behavior
+- better local docs or searchable guidance
+- better schema wording for existing tools
+
+Do not add alias tools or convenience wrappers just to make a workflow easier to
+remember.
+
+### 3. Tool Catalog Is A Contract
+
+The visible MCP catalog should be treated as API surface:
+
+- `Core`, `Modeling`, and `Full` profile membership is intentional
+- hidden/searchable tools remain discoverable by exact name
+- schema changes need focused catalog tests
+- default-visible Modeling growth needs justification
+- deleted tools need tests proving they are gone
+
+Catalog drift should fail tests, not surprise Agents.
+
+### 4. Compact Output By Default
+
+High-volume tools should return summaries first:
+
+- counts, bounds, samples, warnings, and paths
+- `idsMode:"count"` or `"sample"` by default
+- `detail:"summary"` by default
+- full ids, surfaces, seams, stale records, and schemas only on request
+
+Large payloads should go to resource files or manifests rather than the chat
+context.
+
+### 5. Visual Review Is Evidence, Not Truth
+
+Screenshots and review renders help judge readability, but geometry claims must
+be validated by tools:
+
+- use `map_validate` and `problems_check` for map health
+- use `operation_validate` and `module_validate` for generated ownership
+- use slope and route continuity tools for ramps, stairs, routes, surf, slide,
+  and terrain
+- keep review labels bounded and contact sheets readable
+
+### 6. No Arbitrary Execution Escape Hatch
+
+Do not add generic tools such as `execute_trenchbroom_code`, `run_cpp`, or
+`run_tb_script`. If a future debug escape hatch is unavoidable, it must be:
+
+- hidden from Modeling
+- expert-only in Full
+- document-guarded
+- audited in operation/history output
+- unable to bypass undo and document safety
+
+The preferred escape hatch is still a new generic primitive, validator, selector
+operation, review feature, or skill recipe.
+
+## Refactor Phases
+
+### Phase 1: Catalog And Discovery Cleanup
+
+Goal: reduce tool-surface confusion without removing useful execution paths.
+
+Work:
+
+- keep `Core / Modeling / Full` as the only active profiles
+- keep Modeling as the normal Agent workbench
+- remove or hide duplicate convenience aliases
+- keep legacy payload support inside batch/IR where compatibility needs it
+- make `tb_doctor` and broad `tb_tools_search(detail:"schema")` compact
+- expose associated skill hints in `initialize`, `tb_status`, and `tb_doctor`
+- add catalog tests for profile visibility, deleted names, exact search, and
+  schema summaries
+
+Done when:
+
+- Modeling has no scene-prefab direct helper tools
+- broad diagnostics stay compact
+- exact-name schema lookup still works
+- skill routing is visible before scene work starts
+
+### Phase 2: Tool Definition Single Source
+
+Goal: reduce schema drift and repeated hand-maintained metadata.
+
+Work:
+
+- centralize common schema fragments where practical
+- keep selector/module metadata wording consistent
+- ensure tool descriptions mention compact defaults and recovery paths
+- make lifecycle/profile/category/search behavior explicit in one place
+- add tests that catch missing lifecycle/profile/category fields
+
+Done when:
+
+- adding a tool requires one obvious catalog edit path
+- common selector/module docs stop diverging
+- profile/search/schema tests fail on accidental exposure
+
+### Phase 3: Operation History And Recovery Hardening
+
+Goal: make every mutation recoverable and diagnosable.
+
+Work:
+
+- ensure mutation records carry document path and fingerprint
+- keep undo/redo guarded by document identity
+- compact stale warnings by default
+- expose operation expansion summaries for compound tools
+- keep partial mutation diagnostics structured
+- prefer selectors/modules over long id lists across turns
+
+Done when:
+
+- wrong-document undo/redo fails before mutation
+- stale records are summarized unless `detail:"full"`
+- compound operations can be inspected without huge payloads
+
+### Phase 4: Recipe And IR Maturity
+
+Goal: move scene generation strength out of C++ and into deterministic recipes.
+
+Work:
+
+- keep recipe scripts deterministic and side-effect-free
+- require recipes to emit IR files, not mutate maps
+- add recipe manifests, examples, validators, and recommended MCP validation
+  paths
+- add recipe patterns for common scene families before asking for new C++ tools
+- promote only repeated generic needs into MCP primitives
+
+Done when:
+
+- houses, routes, courtyards, caves, terrain passes, and gameplay layouts are
+  recipe/IR workflows
+- MCP only sees generic operations, metadata, preview/apply, validation, and
+  review
+
+### Phase 5: Validation And Review Quality
+
+Goal: make generated scenes easier to judge and fix.
+
+Work:
+
+- improve route target filtering through explicit selector/module metadata
+- keep slope/continuity modes explicit
+- add compact mixed-target warnings
+- improve non-convex polygon diagnostics
+- add generic organic primitives only when they remain scene-neutral
+- improve texture/material existence checks and replacement workflows
+
+Done when:
+
+- a visually bad but valid scene produces useful review feedback
+- route/terrain validation does not confuse primary and secondary surfaces when
+  metadata is explicit
+- material problems are discoverable without manual guessing
+
+## File And Module Direction
+
+Long term, large MCP files should move toward responsibility-based units:
+
+- catalog/profile/search/doctor/status
+- document guard and bridge transport
+- operation history and resources
+- selector/module/object registry
+- brush and batch primitives
+- geometry validators and analysis
+- review rendering
+- IR preview/apply
+- entities/textures/faces
+
+Do not split files just because they are large. Split when it removes repeated
+logic, makes tests narrower, or gives a clear ownership boundary.
+
+## Skill Synchronization
+
+When C++ MCP behavior changes, sync only workflow guidance into
+`C:\Users\Trh\.cc-switch\skills\trenchbroom-mcp-scene-workflow`:
+
+- which tool to use by default
+- when to use recipe/IR instead of direct MCP
+- which validation mode to choose
+- how to keep output compact
+- how to recover targets through selectors, modules, groups, or selection
+
+Do not copy full C++ schemas into the skill.
+
+## Non-Goals
+
+This refactor should not:
+
+- recreate Blender's arbitrary Python execution model
+- turn MCP into an asset marketplace or external generator platform
+- add scene-prefab C++ tools
+- make Full profile the default Agent surface
+- replace geometry validation with screenshots
+- remove legacy compatibility payloads before old workflows have a migration
+  path
+
+## Acceptance Checklist
+
+Before considering this refactor direction healthy, verify:
+
+- Modeling profile is small enough for normal Agent work
+- `tb_doctor` and broad tool search stay compact
+- exact schema lookup still works
+- deleted/hidden legacy tools have catalog tests
+- mutation tools report document identity, mutation state, retry safety, and
+  recovery action
+- review outputs are readable and path-based
+- route/slope claims are validated by geometry facts
+- recipe workflows cover prefab-like scene requests
+- skill routing is visible in initialization/status paths
+- focused MCP tests and real TB disposable-map smoke match the risk of each
+  implementation phase
