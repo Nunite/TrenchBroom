@@ -7042,6 +7042,7 @@ TEST_CASE("McpBridgeServer route metadata tools")
       },
       metadataStore);
     REQUIRE(selectResponse.ok);
+    CHECK(selectResponse.result.value("mutatedDocument").toBool(true) == false);
     CHECK(selectResponse.result.value("count").toInt() == 2);
     CHECK(map.selection().nodes.size() == 2u);
 
@@ -7085,6 +7086,7 @@ TEST_CASE("McpBridgeServer route metadata tools")
       },
       metadataStore);
     REQUIRE(customSelectResponse.ok);
+    CHECK(customSelectResponse.result.value("mutatedDocument").toBool(true) == false);
     CHECK(customSelectResponse.result.value("count").toInt() == 1);
 
     const auto topLevelCustomSelectResponse = selectionByMetadataForMapResult(
@@ -7095,6 +7097,9 @@ TEST_CASE("McpBridgeServer route metadata tools")
       },
       metadataStore);
     REQUIRE(topLevelCustomSelectResponse.ok);
+    CHECK(
+      topLevelCustomSelectResponse.result.value("mutatedDocument").toBool(true)
+      == false);
     CHECK(topLevelCustomSelectResponse.result.value("count").toInt() == 1);
   }
 

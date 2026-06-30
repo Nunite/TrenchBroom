@@ -1626,6 +1626,7 @@ McpBridgeToolResult selectionByMetadataForMapResult(
     {"selected", params.value("select").toBool(false)},
     {"staleCount", staleCount},
     {"truncated", matchingIds.size() >= limit},
+    {"mutatedDocument", false},
   };
   if (staleCount > 0)
   {
