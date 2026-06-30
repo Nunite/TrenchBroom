@@ -952,7 +952,11 @@ McpBridgeToolResult textureApplyResult(
   const auto material = params.value("material").toString().trimmed();
   if (material.isEmpty())
   {
-    return invalidParamsFailure("texture_apply requires material");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "texture_apply requires material",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "material"}}, "add_material_then_retry"));
   }
 
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -967,7 +971,12 @@ McpBridgeToolResult textureApplyResult(
     brushFaceHandlesFromTargetsOrSelection(map, params, history, &objectRegistry, error);
   if (handles.empty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error.isEmpty() ? "texture_apply matched no brush faces" : error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "faces_or_selection"}},
+        "select_faces_or_fix_texture_targets"));
   }
 
   auto changedNodes = changedBrushIds(handles, map.worldNode());

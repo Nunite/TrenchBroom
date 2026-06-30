@@ -4846,6 +4846,31 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
     == "refresh_status_or_fix_texture_targets");
 }
 
+TEST_CASE("McpBridgeServer texture_apply reports pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto missingMaterialResponse = textureApplyResult(
+    appController,
+    "texture_apply",
+    QJsonObject{},
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  REQUIRE_FALSE(missingMaterialResponse.ok);
+  CHECK(
+    missingMaterialResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(missingMaterialResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingMaterialResponse.error.details.value("recoveryAction").toString()
+    == "add_material_then_retry");
+}
+
 TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
 {
   auto appControllerFixture = AppControllerFixture{};
