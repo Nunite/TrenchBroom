@@ -205,6 +205,9 @@ Next Phase 2 item:
 - Done: `texture_apply_by_filter` reports document identity on successful
   operation records and structured `mutatedDocument:false` / `retrySafe` /
   `recoveryAction` diagnostics for pre-mutation target failures.
+- Done: `geometry_csg_selection` reports document identity on successful
+  operation records and structured `mutatedDocument:false` / `retrySafe` /
+  `recoveryAction` diagnostics for pre-mutation selection failures.
 - Partial: mutation tools still need a full audit for consistent mutation state,
   retry safety, recovery action, and compact stale output.
 

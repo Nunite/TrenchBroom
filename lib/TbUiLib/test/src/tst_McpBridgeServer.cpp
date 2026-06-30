@@ -2233,6 +2233,7 @@ TEST_CASE("McpBridgeServer")
       nextOperationIndex);
     CHECK(!noSelection.ok);
     CHECK_FALSE(noSelection.error.details.value("mutatedDocument").toBool());
+    CHECK(noSelection.error.details.value("retrySafe").toBool(false));
     CHECK(noSelection.error.details.value("selectionSummary").isObject());
 
     const auto create = blockoutCreateBatchForMapResult(
@@ -2258,6 +2259,7 @@ TEST_CASE("McpBridgeServer")
       nextOperationIndex);
     CHECK(!tooFew.ok);
     CHECK_FALSE(tooFew.error.details.value("mutatedDocument").toBool());
+    CHECK(tooFew.error.details.value("retrySafe").toBool(false));
     CHECK(tooFew.error.details.value("requiredSelection").toString().contains("two"));
   }
 
@@ -2307,12 +2309,16 @@ TEST_CASE("McpBridgeServer")
     CHECK(hollow.result.value("mutatedDocument").toBool());
     CHECK(hollow.result.value("operation").toString() == "hollow");
     CHECK(hollow.result.value("transactionName").toString() == "MCP: CSG Hollow");
+    CHECK(
+      hollow.result.value("documentFingerprint").toString()
+      == documentFingerprintForMap(map));
     CHECK(hollow.result.value("changedObjectCount").toInt() > 1);
     CHECK(hollow.result.value("deletedObjectCount").toInt() == 1);
     CHECK(hollow.result.value("changedObjectIdSample").toArray().size() > 1);
     CHECK(!hollow.result.contains("changedObjectIds"));
     CHECK(history.back().toolName == "geometry_csg_selection");
     CHECK(history.back().transactionName == "MCP: CSG Hollow");
+    CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
     CHECK(history.back().deletedObjectIds.size() == 1);
     CHECK(map.worldNode().descendantCount() > descendantCountBefore);
 

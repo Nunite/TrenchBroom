@@ -33,6 +33,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/QPathUtils.h"
 
 namespace tb::ui
 {
@@ -96,6 +97,7 @@ McpBridgeToolResult csgSelectionFailure(
     reason,
     QJsonObject{
       {"mutatedDocument", false},
+      {"retrySafe", true},
       {"reason", reason},
       {"selectionSummary", selectionSummaryJson(selection)},
       {"requiredSelection", requiredSelection},
@@ -198,6 +200,7 @@ McpBridgeToolResult geometryCsgSelectionForMapResult(
       "hollow",
       QJsonObject{
         {"mutatedDocument", false},
+        {"retrySafe", true},
         {"reason", "invalidOperation"},
         {"recoveryAction", "inspect_schema_and_retry"},
       });
@@ -254,6 +257,7 @@ McpBridgeToolResult geometryCsgSelectionForMapResult(
       QString{"CSG %1 did not produce a mutation"}.arg(operation),
       QJsonObject{
         {"mutatedDocument", false},
+        {"retrySafe", true},
         {"reason", "nativeCsgReturnedFalse"},
         {"selectionSummary", selectionSummaryJson(selection)},
         {"requiredSelection", "valid native CSG brush selection"},
@@ -276,10 +280,14 @@ McpBridgeToolResult geometryCsgSelectionForMapResult(
   record.operationId = makeOperationId(nextOperationIndex);
   record.toolName = toolName;
   record.transactionName = transactionName;
+  record.documentPath = map.path().empty() ? QString{} : pathAsQString(map.path());
+  record.documentFingerprint = documentFingerprintForMap(map);
   record.setChangedObjectIds(changedObjectIds);
   record.setDeletedObjectIds(deletedObjectIds);
 
   result.insert("operationId", record.operationId);
+  result.insert("activeDocumentPath", record.documentPath);
+  result.insert("documentFingerprint", record.documentFingerprint);
   result.insert("resourceUri", QString{"tbmcp://operation/%1"}.arg(record.operationId));
   const auto idsMode = csgIdsModeFromParams(params);
   mcpApplyChangedObjectIdsMode(result, changedObjectIds, idsMode);
