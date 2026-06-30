@@ -1,0 +1,9 @@
+{
+  "moduleId": "recipe-terrain-pass-stress",
+  "routeId": "recipe-terrain-pass-stress",
+  "length": 1536,
+  "width": 192,
+  "cliffHeight": 256,
+  "cliffThickness": 128,
+  "rockCount": 14
+}

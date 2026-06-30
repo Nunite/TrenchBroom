@@ -1,0 +1,9 @@
+{
+  "moduleId": "recipe-terrain-pass-minimal",
+  "routeId": "recipe-terrain-pass-minimal",
+  "length": 512,
+  "width": 128,
+  "cliffHeight": 128,
+  "rockCount": 2,
+  "includeEntities": false
+}
