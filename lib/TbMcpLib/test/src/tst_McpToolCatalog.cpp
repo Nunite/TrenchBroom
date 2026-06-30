@@ -34,13 +34,12 @@ TEST_CASE("McpToolCatalog")
   {
     CHECK(toolProfileName(McpToolProfile::Core) == "Core");
     CHECK(toolProfileName(McpToolProfile::Modeling) == "Modeling");
-    CHECK(toolProfileName(McpToolProfile::Balanced) == "Balanced");
     CHECK(toolProfileName(McpToolProfile::Full) == "Full");
 
     CHECK(parseToolProfile("Core") == McpToolProfile::Core);
     CHECK(parseToolProfile("Modeling") == McpToolProfile::Modeling);
     CHECK(parseToolProfile("modeling") == McpToolProfile::Modeling);
-    CHECK(parseToolProfile("Balanced") == McpToolProfile::Balanced);
+    CHECK(parseToolProfile("Balanced") == McpToolProfile::Modeling);
     CHECK(parseToolProfile("Full") == McpToolProfile::Full);
   }
 
@@ -161,7 +160,7 @@ TEST_CASE("McpToolCatalog")
 
   SECTION("read-only mode lists implemented read-only tools only")
   {
-    const auto tools = toolsListJson(McpMode::ReadOnly, true, McpToolProfile::Balanced);
+    const auto tools = toolsListJson(McpMode::ReadOnly, true, McpToolProfile::Full);
     auto names = QStringList{};
     for (const auto& tool : tools)
     {
@@ -196,7 +195,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("brush_metadata_get"));
     CHECK(names.contains("selection_by_metadata"));
     CHECK(names.contains("route_geometry_analyze_chain"));
-    CHECK(!names.contains("kz_distance_analyze_chain"));
+    CHECK(names.contains("kz_distance_analyze_chain"));
     CHECK(names.contains("overlay_set"));
     CHECK(names.contains("history_list"));
     CHECK(names.contains("history_status"));
@@ -247,89 +246,6 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("python_generate_blockout"));
     CHECK(!names.contains("action_execute"));
     CHECK(!names.contains("history_undo_mcp"));
-  }
-
-  SECTION("balanced edit mode lists common tools and hides expert brush tools")
-  {
-    const auto tools = toolsListJson(McpMode::Edit, true, McpToolProfile::Balanced);
-    auto names = QStringList{};
-    for (const auto& tool : tools)
-    {
-      names.push_back(tool.toObject().value("name").toString());
-    }
-
-    CHECK(names.contains("action_execute"));
-    CHECK(names.contains("documents_open"));
-    CHECK(names.contains("documents_save"));
-    CHECK(names.contains("documents_close"));
-    CHECK(names.contains("documents_export"));
-    CHECK(names.contains("entity_create"));
-    CHECK(names.contains("entity_update"));
-    CHECK(names.contains("entity_delete"));
-    CHECK(names.contains("entity_create_from_schema"));
-    CHECK(names.contains("entity_create_checked"));
-    CHECK(names.contains("entity_tie_brushes"));
-    CHECK(names.contains("entity_untie_brushes"));
-    CHECK(names.contains("brush_types_list"));
-    CHECK(!names.contains("brush_create"));
-    CHECK(!names.contains("brush_create_box"));
-    CHECK(!names.contains("brush_create_wedge"));
-    CHECK(!names.contains("brush_create_cylinder"));
-    CHECK(!names.contains("brush_create_cone"));
-    CHECK(!names.contains("brush_create_pipe"));
-    CHECK(!names.contains("brush_create_sphere"));
-    CHECK(!names.contains("brush_create_pyramid"));
-    CHECK(!names.contains("brush_create_tetrahedron"));
-    CHECK(!names.contains("brush_create_from_planes"));
-    CHECK(!names.contains("brush_create_prism"));
-    CHECK(!names.contains("brush_create_cylinder_sector"));
-    CHECK(!names.contains("brush_create_arch"));
-    CHECK(!names.contains("brush_create_torus"));
-    CHECK(names.contains("asset_place_model"));
-    CHECK(names.contains("asset_place_sprite"));
-    CHECK(names.contains("asset_place_sound"));
-    CHECK(!names.contains("prefabs_list"));
-    CHECK(!names.contains("prefab_create"));
-    CHECK(names.contains("textures_list"));
-    CHECK(names.contains("texture_apply"));
-    CHECK(names.contains("texture_replace"));
-    CHECK(names.contains("texture_align_face"));
-    CHECK(names.contains("texture_copy_from_face"));
-    CHECK(names.contains("face_list"));
-    CHECK(names.contains("face_select"));
-    CHECK(names.contains("face_texture_set"));
-    CHECK(names.contains("objects_delete"));
-    CHECK(names.contains("objects_delete_by_operation"));
-    CHECK(names.contains("objects_transform"));
-    CHECK(names.contains("map_validate"));
-    CHECK(names.contains("problems_check"));
-    CHECK(names.contains("problems_fix"));
-    CHECK(names.contains("map_fix_all_safe"));
-    CHECK(names.contains("compile_profiles_list"));
-    CHECK(names.contains("compile_run"));
-    CHECK(names.contains("compile_log_tail"));
-    CHECK(names.contains("leaks_load_pointfile"));
-    CHECK(names.contains("blockout_create_room"));
-    CHECK(names.contains("blockout_create_corridor"));
-    CHECK(names.contains("blockout_create_stairs"));
-    CHECK(names.contains("blockout_create_ramp"));
-    CHECK(names.contains("blockout_create_doorway"));
-    CHECK(names.contains("blockout_create_cover"));
-    CHECK(names.contains("blockout_create_sky_shell"));
-    CHECK(names.contains("blockout_create_spiral_stairs"));
-    CHECK(names.contains("blockout_create_batch"));
-    CHECK(names.contains("blockout_create_curved_corridor"));
-    CHECK(names.contains("python_generate_blockout"));
-    CHECK(names.contains("heightmap_import_grayscale"));
-    CHECK(names.contains("heightmap_preview_grayscale"));
-    CHECK(names.contains("blockout_validate"));
-    CHECK(names.contains("geometry_analyze_selection"));
-    CHECK(names.contains("blockout_validate_spiral_stairs"));
-    CHECK(names.contains("history_undo_mcp"));
-    CHECK(names.contains("history_redo_mcp"));
-    CHECK(names.contains("viewport_capture_current"));
-    CHECK(names.contains("viewport_capture_3d"));
-    CHECK(names.contains("viewport_capture_2d"));
   }
 
   SECTION("modeling profile is the default and keeps modeling tools visible")
@@ -1079,7 +995,7 @@ TEST_CASE("McpToolCatalog")
   SECTION("tool search can discover hidden expert tools")
   {
     const auto tools = toolsSearchJson(
-      "from_planes", "brush", "schema", McpMode::Edit, McpToolProfile::Balanced);
+      "from_planes", "brush", "schema", McpMode::Edit, McpToolProfile::Modeling);
     auto found = QJsonObject{};
     for (const auto& tool : tools)
     {

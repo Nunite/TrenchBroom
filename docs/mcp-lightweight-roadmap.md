@@ -24,6 +24,7 @@ if there is a conflict, follow the governance document and update this roadmap.
 - Prefer file-based IR for large batches: `ir_compile_preview_from_file` then `ir_apply_from_file`.
 - Default all large outputs to summaries. Full ids and full face/seam details must be opt-in.
 - Keep Modeling profile focused on the normal Agent path. Hide debug, viewport, legacy, and low-level expert tools, but keep them searchable.
+- Use only the active `Core` / `Modeling` / `Full` tool profiles: `Core` for compact smoke and discovery, `Modeling` as the recommended default, and `Full` for expert/debug fallback.
 - Treat review images as evidence, not as the only validator. Route and slope intent must pass geometry checks.
 
 ## Ownership Matrix
@@ -57,6 +58,7 @@ This order matters because every later phase depends on short, stable tool outpu
 ## Current State
 
 - Modeling profile has been slimmed. Hidden tools remain searchable with `tb_tools_search(detail:"schema")`.
+- Legacy `Balanced` config input is treated as `Modeling`; it is not a separate advertised profile.
 - CPU geometry review renderer is the default isolated review path. Contact sheets default to at most two panels.
 - Selector/module workflows exist and support recovery, review, delete, and transform.
 - Skill recipes exist for:

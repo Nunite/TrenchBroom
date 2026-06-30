@@ -100,12 +100,10 @@ void McpPreferencePane::createGui()
   m_toolProfileCombo = new QComboBox{};
   addToolProfile(*m_toolProfileCombo, tr("Core"), mcp::McpToolProfile::Core);
   addToolProfile(*m_toolProfileCombo, tr("Modeling"), mcp::McpToolProfile::Modeling);
-  addToolProfile(*m_toolProfileCombo, tr("Balanced"), mcp::McpToolProfile::Balanced);
   addToolProfile(*m_toolProfileCombo, tr("Full"), mcp::McpToolProfile::Full);
   m_toolProfileCombo->setToolTip(
-    tr("Core exposes only compact discovery tools. Modeling is the recommended "
-       "default for brush, face, transform, batch, and Python IR tools. Balanced "
-       "exposes general editor tools. Full also exposes expert and debug tools."));
+    tr("Core is compact discovery and smoke. Modeling is the recommended default. "
+       "Full is for expert and debug tools."));
   connect(
     m_toolProfileCombo,
     QOverload<int>::of(&QComboBox::currentIndexChanged),

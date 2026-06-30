@@ -109,7 +109,8 @@ TEST_CASE("McpBridgeConfig")
       {"toolProfile", "Balanced"},
     });
     REQUIRE(balanced);
-    CHECK(balanced->toolProfile == McpToolProfile::Balanced);
+    CHECK(balanced->toolProfile == McpToolProfile::Modeling);
+    CHECK(toJson(*balanced).value("toolProfile").toString() == "Modeling");
   }
 
   SECTION("rejects invalid json")

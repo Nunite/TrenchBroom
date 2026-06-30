@@ -187,6 +187,12 @@ recovery, transform/delete, validation, review, and common atomic creation/editi
 Debug, viewport, low-level, legacy, and duplicate convenience entries should be
 hidden but searchable.
 
+The active MCP tool profiles are `Core`, `Modeling`, and `Full`. `Core` is for
+compact discovery and smoke checks, `Modeling` is the recommended Agent default,
+and `Full` is for expert/debug use. Legacy config strings such as `Balanced` may
+parse as `Modeling`, but new docs, UI, and tool output must not advertise a
+separate balanced profile.
+
 ### Rule 10: Tests And Real TB Acceptance Are Required
 
 Every non-trivial MCP change must include:

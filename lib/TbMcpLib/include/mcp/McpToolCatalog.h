@@ -35,7 +35,6 @@ enum class McpToolProfile
 {
   Core,
   Modeling,
-  Balanced,
   Full,
 };
 
@@ -49,7 +48,6 @@ struct McpToolDefinition
   QJsonObject inputSchema;
   QString category = "general";
   bool expert = false;
-  McpToolProfile minimumProfile = McpToolProfile::Balanced;
 };
 
 const std::vector<McpToolDefinition>& defaultToolCatalog();

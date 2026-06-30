@@ -123,7 +123,7 @@ TEST_CASE("McpJsonRpc")
       [](const QString&, const QJsonObject&) {
         return McpBridgeResponse::success("request", {});
       },
-      McpToolProfile::Balanced,
+      McpToolProfile::Modeling,
       [](const QString& uri) -> std::optional<QJsonObject> {
         if (uri == "tbmcp://operation/mcp-op-1")
         {

@@ -3501,24 +3501,20 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       {
         tool.category = "brush";
         tool.expert = true;
-        tool.minimumProfile = McpToolProfile::Full;
         if (
           tool.name == "brush_create_boxes_batch"
           || tool.name == "brush_create_polygon_batch")
         {
           tool.expert = false;
-          tool.minimumProfile = McpToolProfile::Modeling;
         }
       }
       else if (tool.name.startsWith("blockout_"))
       {
         tool.category = "blockout";
-        tool.minimumProfile = McpToolProfile::Core;
       }
       else if (tool.name.startsWith("operation_") || tool.name.startsWith("history_"))
       {
         tool.category = "operation";
-        tool.minimumProfile = McpToolProfile::Core;
       }
       else if (tool.name.startsWith("selection_"))
       {
@@ -3539,11 +3535,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       else if (tool.name.startsWith("group_"))
       {
         tool.category = "group";
-        tool.minimumProfile = McpToolProfile::Modeling;
         if (tool.name == "group_rename_selected" || tool.name == "group_ungroup_selected")
         {
           tool.expert = true;
-          tool.minimumProfile = McpToolProfile::Full;
         }
       }
       else if (tool.name.startsWith("texture_") || tool.name.startsWith("face_"))
@@ -3561,7 +3555,6 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       else if (tool.name.startsWith("heightmap_"))
       {
         tool.category = "heightmap";
-        tool.minimumProfile = McpToolProfile::Modeling;
       }
       else if (
         tool.name == "shape_library_list" || tool.name.startsWith("brush_metadata_")
@@ -3569,20 +3562,17 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         || tool.name == "route_geometry_analyze_chain")
       {
         tool.category = "route";
-        tool.minimumProfile = McpToolProfile::Modeling;
       }
       else if (tool.name == "kz_distance_analyze_chain")
       {
         tool.category = "route";
         tool.expert = true;
-        tool.minimumProfile = McpToolProfile::Full;
       }
       else if (
         tool.name == "tb_status" || tool.name == "tb_doctor"
         || tool.name == "tb_tools_search")
       {
         tool.category = "core";
-        tool.minimumProfile = McpToolProfile::Core;
       }
       addExpectedDocumentPathGuardSchema(tool);
     }
@@ -3600,8 +3590,6 @@ QString toolProfileName(const McpToolProfile profile)
     return "Core";
   case McpToolProfile::Modeling:
     return "Modeling";
-  case McpToolProfile::Balanced:
-    return "Balanced";
   case McpToolProfile::Full:
     return "Full";
   }
@@ -3621,29 +3609,13 @@ std::optional<McpToolProfile> parseToolProfile(const QString& profile)
   }
   if (normalized == "balanced")
   {
-    return McpToolProfile::Balanced;
+    return McpToolProfile::Modeling;
   }
   if (normalized == "full")
   {
     return McpToolProfile::Full;
   }
   return std::nullopt;
-}
-
-int profileRank(const McpToolProfile profile)
-{
-  switch (profile)
-  {
-  case McpToolProfile::Core:
-    return 0;
-  case McpToolProfile::Modeling:
-    return 1;
-  case McpToolProfile::Balanced:
-    return 2;
-  case McpToolProfile::Full:
-    return 3;
-  }
-  return 1;
 }
 
 bool visibleInModelingProfile(const McpToolDefinition& tool)
@@ -3719,7 +3691,7 @@ bool visibleInProfile(const McpToolDefinition& tool, const McpToolProfile profil
   {
     return visibleInModelingProfile(tool);
   }
-  return !tool.expert && profileRank(profile) >= profileRank(tool.minimumProfile);
+  return false;
 }
 
 std::optional<McpToolDefinition> findToolDefinition(const QString& name)

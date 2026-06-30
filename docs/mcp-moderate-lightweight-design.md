@@ -48,6 +48,11 @@ Medium lightweight target:
 | Skill recipe scripts | growing | larger and more capable |
 | Total capability | high | same or higher |
 
+The active tool-profile surface is `Core` / `Modeling` / `Full`: `Core` remains a
+compact smoke/discovery set, `Modeling` is the recommended Agent workspace, and
+`Full` is the expert/debug fallback. Legacy `Balanced` config input may migrate to
+`Modeling`, but it is no longer a separate design target.
+
 This means the total system may not become smaller. The point is to move code to the
 right layer:
 
