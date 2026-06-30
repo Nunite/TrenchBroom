@@ -137,7 +137,7 @@ Use this checklist as the execution tracker. Evidence must come from current
 source, tests, committed changes, or real TB smoke output; intent alone does not
 count.
 
-### Phase 1 Status: Partial
+### Phase 1 Status: Done
 
 - Done: `Core / Modeling / Full` are the only advertised profiles; legacy
   `Balanced` config input migrates to `Modeling`.
@@ -152,13 +152,15 @@ count.
 - Done: `textures_list` is hidden from Modeling as duplicate material discovery
   surface; `texture_search` remains the default visible material lookup and
   exact search still finds `textures_list`.
-- Partial: remaining Modeling surface still needs a final duplicate/convenience
-  audit against the "small normal Agent workbench" target.
+- Done: the remaining Modeling-visible surface is covered by focused catalog
+  tests and matches the skill's normal Agent workbench: status/open, IR
+  preview/apply, selector/module/operation recovery, history recovery, common
+  batch geometry, selection-aware CSG, validation, review, checked entities,
+  texture search/apply, grouping, map validation, and problem checks.
 
 Next Phase 1 item:
 
-- Audit current Modeling-visible tools and either justify, hide, or document any
-  duplicate convenience surface that remains.
+- Phase 1 is closed. Continue with Phase 2.
 
 ### Phase 2 Status: Missing
 
