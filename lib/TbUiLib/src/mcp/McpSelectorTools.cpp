@@ -1712,7 +1712,7 @@ McpBridgeToolResult cachedIrApplyParams(
   return McpBridgeToolResult::success(applyParams);
 }
 
-McpBridgeToolResult irApplyFromFilePreMutationFailure(
+McpBridgeToolResult irApplyPreMutationFailure(
   const QString& message, QString recoveryAction, QJsonObject details = {})
 {
   details.insert("mutatedDocument", false);
@@ -2804,7 +2804,7 @@ McpBridgeToolResult irApplyResult(
   const auto ir = irFromParams(params, error);
   if (!ir)
   {
-    return invalidParamsFailure(error);
+    return irApplyPreMutationFailure(error, "fix_ir_payload_then_retry");
   }
 
   auto applyParams = params;
@@ -2834,7 +2834,7 @@ McpBridgeToolResult irApplyForMapResult(
   const auto ir = irFromParams(params, error);
   if (!ir)
   {
-    return invalidParamsFailure(error);
+    return irApplyPreMutationFailure(error, "fix_ir_payload_then_retry");
   }
 
   const auto documentFingerprint = documentFingerprintForMap(map);
@@ -3004,7 +3004,7 @@ McpBridgeToolResult irApplyFromFileResult(
     }
     if (previewCache == nullptr)
     {
-      return irApplyFromFilePreMutationFailure(
+      return irApplyPreMutationFailure(
         "ir_apply_from_file previewId cache is unavailable",
         "run_ir_compile_preview_from_file_again");
     }
@@ -3021,7 +3021,7 @@ McpBridgeToolResult irApplyFromFileResult(
   const auto ir = irFromFileParams(paramsWithPath, error);
   if (!ir)
   {
-    return irApplyFromFilePreMutationFailure(
+    return irApplyPreMutationFailure(
       error,
       "fix_ir_file_or_preview_again",
       QJsonObject{{"sourcePath", paramsWithPath.value("path").toString()}});
@@ -3067,7 +3067,7 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   {
     if (previewCache == nullptr)
     {
-      return irApplyFromFilePreMutationFailure(
+      return irApplyPreMutationFailure(
         "ir_apply_from_file previewId cache is unavailable",
         "run_ir_compile_preview_from_file_again");
     }
@@ -3083,7 +3083,7 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   const auto ir = irFromFileParams(paramsWithPath, error);
   if (!ir)
   {
-    return irApplyFromFilePreMutationFailure(
+    return irApplyPreMutationFailure(
       error,
       "fix_ir_file_or_preview_again",
       QJsonObject{{"sourcePath", paramsWithPath.value("path").toString()}});

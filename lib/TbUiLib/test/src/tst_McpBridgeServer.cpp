@@ -3947,6 +3947,47 @@ TEST_CASE("McpBridgeServer scopes selector metadata and modules to active docume
   CHECK(currentFingerprint != otherFingerprint);
 }
 
+TEST_CASE("McpBridgeServer ir_apply reports pre-mutation payload failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto descendantCountBeforeInvalidApply = map.worldNode().descendantCount();
+  const auto invalidApplyResponse = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{{"ir", QJsonArray{}}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  CHECK(!invalidApplyResponse.ok);
+  CHECK(invalidApplyResponse.error.message == "IR field must be an object");
+  CHECK(
+    invalidApplyResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(invalidApplyResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidApplyResponse.error.details.value("recoveryAction").toString()
+    == "fix_ir_payload_then_retry");
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalidApply);
+}
+
 TEST_CASE("McpBridgeServer selector metadata round trips through IR and operations")
 {
   auto appControllerFixture = AppControllerFixture{};
