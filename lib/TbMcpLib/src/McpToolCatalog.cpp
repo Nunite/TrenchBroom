@@ -1356,6 +1356,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"selector", selectorSchema()},
         {"idsMode", stringProperty("none, count, sample, or full. Defaults to sample.")},
         {"sampleLimit", integerProperty("Maximum sample summaries, defaults to 12.")},
+        {"detail",
+         stringProperty("summary or full. Defaults to summary; full expands stale target "
+                        "diagnostics.")},
       }),
     },
     {

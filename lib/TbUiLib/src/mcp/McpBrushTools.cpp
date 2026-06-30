@@ -3742,6 +3742,23 @@ bool partRequested(const QJsonObject& operation, const QString& partName)
   return false;
 }
 
+bool explicitPartRequested(const QJsonObject& operation, const QString& partName)
+{
+  const auto parts = operation.value("parts");
+  if (!parts.isArray())
+  {
+    return false;
+  }
+  for (const auto& part : parts.toArray())
+  {
+    if (part.toString().compare(partName, Qt::CaseInsensitive) == 0)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
 QJsonArray requestedPartsJson(const QJsonObject& operation)
 {
   const auto parts = operation.value("parts");
@@ -3953,6 +3970,19 @@ QJsonObject withGeneratedPartMetadata(
     operation.insert("material", material);
   }
   return operation;
+}
+
+QString pathRibbonOutputPartName(const QJsonObject& operation)
+{
+  if (explicitPartRequested(operation, "floor"))
+  {
+    return "floor";
+  }
+  if (explicitPartRequested(operation, "ribbon"))
+  {
+    return "ribbon";
+  }
+  return "surface";
 }
 
 std::vector<QJsonObject> curvedCorridorOperationsFromParams(
@@ -4740,11 +4770,12 @@ std::vector<mdl::Node*> compileBatchOperation(
     {
       return {};
     }
+    const auto partName = pathRibbonOutputPartName(operation);
     const auto surfaceMaterial =
-      partMaterial(operation, "surface", QString::fromStdString(material));
+      partMaterial(operation, partName, QString::fromStdString(material));
     return createPathRibbonNodes(
       builder,
-      withGeneratedPartMetadata(operation, "surface", surfaceMaterial, operationMetadata),
+      withGeneratedPartMetadata(operation, partName, surfaceMaterial, operationMetadata),
       grid,
       surfaceMaterial.toStdString(),
       error);

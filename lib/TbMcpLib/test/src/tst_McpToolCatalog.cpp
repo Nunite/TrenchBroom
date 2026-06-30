@@ -817,6 +817,7 @@ TEST_CASE("McpToolCatalog")
       selectorTool->inputSchema.value("properties").toObject();
     CHECK(selectorProperties.value("selector").isObject());
     CHECK(selectorProperties.value("idsMode").isObject());
+    CHECK(selectorProperties.value("detail").isObject());
 
     const auto selectorSchema =
       selectorProperties.value("selector").toObject().value("properties").toObject();

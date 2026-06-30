@@ -783,6 +783,21 @@ int storeBatchOperationMetadata(
     }
     return false;
   };
+  const auto explicitPartRequested =
+    [](const QJsonObject& operation, const QString& partName) {
+      if (!operation.value("parts").isArray())
+      {
+        return false;
+      }
+      for (const auto& part : operation.value("parts").toArray())
+      {
+        if (part.toString().compare(partName, Qt::CaseInsensitive) == 0)
+        {
+          return true;
+        }
+      }
+      return false;
+    };
 
   std::function<void(const QJsonObject&, const QJsonObject&)> appendOperationMetadata;
   auto metadataByObject = std::vector<QJsonObject>{};
@@ -898,7 +913,11 @@ int storeBatchOperationMetadata(
         const auto points = operation.value("points3d").isArray()
                               ? operation.value("points3d").toArray()
                               : operation.value("points2d").toArray();
-        appendRepeated(std::max(1, static_cast<int>(points.size()) - 1), "surface");
+        const auto partName = explicitPartRequested(operation, "floor") ? QString{"floor"}
+                              : explicitPartRequested(operation, "ribbon")
+                                ? QString{"ribbon"}
+                                : QString{"surface"};
+        appendRepeated(std::max(1, static_cast<int>(points.size()) - 1), partName);
       }
       return;
     }

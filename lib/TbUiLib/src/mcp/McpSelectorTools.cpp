@@ -304,6 +304,53 @@ mdl::Node* resolveObjectId(
   return node;
 }
 
+bool isStaleWarning(const QJsonValue& warning)
+{
+  if (warning.isObject())
+  {
+    const auto object = warning.toObject();
+    return object.value("stale").toBool(false) || object.contains("staleReason");
+  }
+  return warning.toString().contains("does not resolve", Qt::CaseInsensitive)
+         || warning.toString().contains("stale", Qt::CaseInsensitive);
+}
+
+QJsonArray compactWarnings(const QJsonArray& warnings, const bool fullDetail)
+{
+  if (fullDetail)
+  {
+    return warnings;
+  }
+
+  auto result = QJsonArray{};
+  auto staleCount = 0;
+  auto staleSample = QJsonArray{};
+  for (const auto& warning : warnings)
+  {
+    if (!isStaleWarning(warning))
+    {
+      result.push_back(warning);
+      continue;
+    }
+    ++staleCount;
+    if (staleSample.size() < 3)
+    {
+      staleSample.push_back(warning);
+    }
+  }
+  if (staleCount > 0)
+  {
+    result.push_back(QJsonObject{
+      {"type", "staleTargetSummary"},
+      {"count", staleCount},
+      {"sample", staleSample},
+      {"detailHint", "Pass detail:\"full\" to expand stale target diagnostics."},
+      {"recoveryAction", "module_compact_or_refresh_status"},
+    });
+  }
+  return result;
+}
+
 bool objectIdResolvesLive(
   mdl::Map& map, const QString& objectId, const McpObjectRegistry& objectRegistry)
 {
@@ -760,7 +807,8 @@ QJsonObject compactTargetResult(
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
   const McpObjectRegistry& objectRegistry,
   const QJsonArray& warnings,
-  const QString& idsMode)
+  const QString& idsMode,
+  const bool fullWarnings = false)
 {
   auto objectIds = QStringList{};
   auto samples = QJsonArray{};
@@ -785,7 +833,7 @@ QJsonObject compactTargetResult(
   auto result = QJsonObject{
     {"selector", selector},
     {"matchedCount", static_cast<int>(nodes.size())},
-    {"warnings", warnings},
+    {"warnings", compactWarnings(warnings, fullWarnings)},
   };
   if (includeSamples)
   {
@@ -2001,7 +2049,8 @@ McpBridgeToolResult selectorPreviewForMapResult(
     metadataStore,
     objectRegistry,
     warnings,
-    params.value("idsMode").toString("sample"));
+    params.value("idsMode").toString("sample"),
+    params.value("detail").toString("summary").trimmed().toLower() == "full");
   result.insert("tool", "selector_preview");
   result.insert("matchedBeforeLimit", diagnostics.matchedBeforeLimit);
   result.insert("limitApplied", diagnostics.limitApplied);
@@ -2410,7 +2459,10 @@ McpBridgeToolResult moduleValidateResult(
     {"liveObjectCount", static_cast<int>(nodes.size())},
     {"staleObjectCount", staleCount},
     {"operationIds", stringsToJson(module.operationIds)},
-    {"warnings", warnings},
+    {"warnings",
+     compactWarnings(
+       warnings,
+       params.value("detail").toString("summary").trimmed().toLower() == "full")},
   };
   if (!nodes.empty())
   {

@@ -3769,6 +3769,33 @@ TEST_CASE("McpBridgeServer selector metadata round trips through IR and operatio
   const auto afterDeleteModule = afterDeleteModules.first().toObject();
   CHECK(afterDeleteModule.value("liveObjectCount").toInt() == 2);
   CHECK(afterDeleteModule.value("staleParts").toArray().size() == 1);
+
+  const auto staleModuleValidation = moduleValidateResult(
+    appController,
+    QJsonObject{{"moduleId", "roundtrip-cottage"}},
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(staleModuleValidation.ok);
+  CHECK_FALSE(staleModuleValidation.result.value("valid").toBool());
+  CHECK(staleModuleValidation.result.value("staleObjectCount").toInt() == 1);
+  const auto compactWarnings = staleModuleValidation.result.value("warnings").toArray();
+  REQUIRE(compactWarnings.size() == 1);
+  CHECK(
+    compactWarnings.first().toObject().value("type").toString() == "staleTargetSummary");
+
+  const auto fullStaleModuleValidation = moduleValidateResult(
+    appController,
+    QJsonObject{{"moduleId", "roundtrip-cottage"}, {"detail", "full"}},
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(fullStaleModuleValidation.ok);
+  CHECK(
+    fullStaleModuleValidation.result.value("warnings").toArray().size()
+    > compactWarnings.size());
 }
 
 TEST_CASE("McpBridgeServer object transform summaries")
@@ -4754,6 +4781,43 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     nextOperationIndex);
   REQUIRE(idsModeResponse.ok);
   CHECK(idsModeResponse.result.value("changedObjectIds").toArray().size() == 1);
+
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+  const auto floorRibbonResponse = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"defaultMetadata", QJsonObject{{"moduleId", "ribbon-floor-module"}}},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "path_ribbon"},
+         {"parts", QJsonArray{"floor"}},
+         {"points2d", QJsonArray{QJsonArray{640, 0}, QJsonArray{768, 0}}},
+         {"width", 64},
+         {"minZ", 0},
+         {"maxZ", 16},
+       }}},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(floorRibbonResponse.ok);
+  const auto ribbonFloorPreview = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "ribbon-floor-module"}, {"part", "floor"}}},
+      {"idsMode", "count"},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(ribbonFloorPreview.ok);
+  CHECK(ribbonFloorPreview.result.value("matchedCount").toInt() == 1);
 
   const auto diagonalRampPreviewResponse = blockoutCompilePreviewForMapResult(
     map,
