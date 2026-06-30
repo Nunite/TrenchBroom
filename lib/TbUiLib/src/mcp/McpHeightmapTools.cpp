@@ -23,6 +23,7 @@
 #include <QJsonObject>
 
 #include "McpBridgeServerTools.h"
+#include "mcp/McpError.h"
 #include "mdl/Map.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
@@ -37,6 +38,7 @@
 
 namespace tb::ui
 {
+namespace mcp = tb::mcp;
 namespace
 {
 
@@ -49,6 +51,15 @@ constexpr auto DefaultAdaptiveMaxCellSpan = 4;
 constexpr auto HardMaxSize = 256;
 constexpr auto HardMaxBrushes = 4096;
 constexpr auto SurfaceEpsilon = 0.01;
+
+QJsonObject preMutationFailureDetails(
+  QJsonObject details, const QString& recoveryAction)
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return details;
+}
 
 struct HeightmapOrigin
 {
@@ -1068,7 +1079,12 @@ McpBridgeToolResult heightmapImportGrayscaleForMapResult(
   const auto preview = buildHeightmapPreview(params);
   if (!preview.ok)
   {
-    return invalidParamsFailure(preview.error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      preview.error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "heightmap_preview"}},
+        "fix_heightmap_parameters_then_retry"));
   }
   if (preview.operations.isEmpty())
   {

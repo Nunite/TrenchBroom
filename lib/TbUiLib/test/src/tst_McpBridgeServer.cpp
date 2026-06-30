@@ -8571,6 +8571,11 @@ TEST_CASE("McpBridgeServer grayscale heightmap import tool")
 
     CHECK(!response.ok);
     CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
+    CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+    CHECK(response.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      response.error.details.value("recoveryAction").toString()
+      == "fix_heightmap_parameters_then_retry");
     CHECK(map.worldNode().descendantCount() == descendantCount);
   }
 

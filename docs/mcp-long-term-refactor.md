@@ -244,6 +244,9 @@ Next Phase 2 item:
   brushes.
 - Done: cached `ir_apply_from_file` previewId guard failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before applying IR.
+- Done: `heightmap_import_grayscale` preview/parameter failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before importing
+  brushes.
 - Done: `selection_set` reports `mutatedDocument:false` on success because it
   changes editor selection state without mutating the map document.
 - Done: `selection_by_metadata` reports `mutatedDocument:false` on success
