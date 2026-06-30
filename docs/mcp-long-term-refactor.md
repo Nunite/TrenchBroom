@@ -36,6 +36,20 @@ TrenchBroom Document
 C++ MCP should feel less like a scene generator and more like a narrow editor
 kernel with reliable facts and safe mutations.
 
+## Execution Priority
+
+Use this order when choosing follow-up work:
+
+```text
+delete exposed surface > compact outputs > improve discovery > add kernel primitive
+```
+
+Start by removing, hiding, or consolidating confusing tool surface. Then make
+remaining diagnostics and searches smaller by default. Then improve skill,
+status, doctor, search, and schema guidance. Add new C++ code only when the
+missing capability is a reusable editor-kernel primitive that needs
+TrenchBroom internals.
+
 ## Design Principles
 
 ### 1. Keep The Kernel Small
