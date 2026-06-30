@@ -1474,8 +1474,11 @@ McpBridgeToolResult textureAlignFaceResult(
   }
   else
   {
-    return invalidParamsFailure(
-      "texture_align_face mode must be reset, paraxial, world, parallel, or face");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "texture_align_face mode must be reset, paraxial, world, parallel, or face",
+      preMutationFailureDetails(
+        QJsonObject{{"mode", mode}}, "choose_supported_alignment_mode"));
   }
 
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -1490,7 +1493,12 @@ McpBridgeToolResult textureAlignFaceResult(
     brushFaceHandlesFromTargetsOrSelection(map, params, history, &objectRegistry, error);
   if (handles.empty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error.isEmpty() ? "texture_align_face matched no brush faces" : error,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "faces_or_selection"}},
+        "select_faces_or_fix_texture_targets"));
   }
 
   const auto changedNodes = changedBrushIds(handles, map.worldNode());

@@ -4892,6 +4892,29 @@ TEST_CASE("McpBridgeServer texture_replace reports pre-mutation failures")
     == "provide_find_and_replace_then_retry");
 }
 
+TEST_CASE("McpBridgeServer texture_align_face reports pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto response = textureAlignFaceResult(
+    appController,
+    "texture_align_face",
+    QJsonObject{{"mode", "diagonal"}},
+    history,
+    nextOperationIndex,
+    objectRegistry);
+  REQUIRE_FALSE(response.ok);
+  CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(response.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    response.error.details.value("recoveryAction").toString()
+    == "choose_supported_alignment_mode");
+}
+
 TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
 {
   auto appControllerFixture = AppControllerFixture{};
