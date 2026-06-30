@@ -179,6 +179,9 @@ QJsonObject mutationResultJson(
   auto result = QJsonObject{};
   result.insert("operationId", operation.operationId);
   result.insert("transactionName", operation.transactionName);
+  result.insert("mutatedDocument", true);
+  result.insert("activeDocumentPath", operation.documentPath);
+  result.insert("documentFingerprint", operation.documentFingerprint);
   mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
 }
@@ -186,6 +189,7 @@ QJsonObject mutationResultJson(
 void recordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
+  mdl::Map& map,
   const QString& toolName,
   const QString& transactionName,
   const QJsonArray& changedObjectIds,
@@ -196,6 +200,8 @@ void recordOperation(
   operation.operationId = makeOperationId(nextOperationIndex);
   operation.toolName = toolName;
   operation.transactionName = transactionName;
+  operation.documentPath = pathToQString(map.path());
+  operation.documentFingerprint = documentFingerprintForMap(map);
   operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation, idsMode);
   history.push_back(std::move(operation));
@@ -427,6 +433,23 @@ McpBridgeToolResult placeAssetResult(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex)
 {
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return placeAssetForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult placeAssetForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   const auto path = params.value("path").toString().trimmed();
   if (path.isEmpty())
   {
@@ -460,12 +483,6 @@ McpBridgeToolResult placeAssetResult(
       QString{"path does not match %1 asset type"}.arg(browserCellTypeName(assetType)));
   }
 
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
-  {
-    return noActiveDocumentFailure();
-  }
-
   auto error = QString{};
   auto entity = mdl::Entity{
     {{mdl::EntityPropertyKeys::Classname,
@@ -483,7 +500,6 @@ McpBridgeToolResult placeAssetResult(
     entity.setOrigin(*originVec);
   }
 
-  auto& map = mapWindow->document().map();
   auto* entityNode = new mdl::EntityNode{std::move(entity)};
   const auto transactionName = QString{"MCP: Place %1 asset"}.arg(transactionLabel);
   const auto changedObjectIds = addNodesWithTransaction(
@@ -499,6 +515,7 @@ McpBridgeToolResult placeAssetResult(
   recordOperation(
     history,
     nextOperationIndex,
+    map,
     toolName,
     transactionName,
     *changedObjectIds,

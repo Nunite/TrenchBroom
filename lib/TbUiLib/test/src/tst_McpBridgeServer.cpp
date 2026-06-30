@@ -3494,6 +3494,41 @@ TEST_CASE("McpBridgeServer selector delete reports pre-mutation failure state")
     == "fix_selector_then_retry");
 }
 
+TEST_CASE("McpBridgeServer asset placement records document identity")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  const auto response = placeAssetForMapResult(
+    map,
+    "asset_place_model",
+    QJsonObject{{"path", "models/player.mdl"}, {"idsMode", "sample"}},
+    history,
+    nextOperationIndex);
+
+  const auto error = response.ok ? std::string{} : response.error.message.toStdString();
+  INFO(error);
+  REQUIRE(response.ok);
+  CHECK(response.result.value("mutatedDocument").toBool());
+  CHECK(
+    response.result.value("documentFingerprint").toString()
+    == documentFingerprintForMap(map));
+  REQUIRE_FALSE(history.empty());
+  CHECK(history.back().toolName == "asset_place_model");
+  CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
+}
+
 TEST_CASE("McpBridgeServer externalizes native group object ids")
 {
   auto appControllerFixture = AppControllerFixture{};

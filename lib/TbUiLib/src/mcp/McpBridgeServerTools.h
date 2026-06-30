@@ -123,6 +123,12 @@ McpBridgeToolResult placeAssetResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult placeAssetForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 
 McpBridgeToolResult textureSearchResult(
   AppController& appController, const QJsonObject& params);
