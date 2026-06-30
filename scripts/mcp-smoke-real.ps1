@@ -3,7 +3,8 @@ param(
   [string] $SourceMap = "build-release-codex\app\TrenchBroom\map_test\unnamed.map",
   [string] $WorkDir = "build-release-codex\codex-mcp-real-tests",
   [switch] $KeepOpen,
-  [switch] $ReviewScenes
+  [switch] $ReviewScenes,
+  [switch] $RecipeVisualAcceptance
 )
 
 $ErrorActionPreference = "Stop"
@@ -202,6 +203,69 @@ function Invoke-ReviewBundle {
   }
 }
 
+function Invoke-RecipeVisualAcceptance {
+  param(
+    [string] $TestMap,
+    [string] $OutputRoot
+  )
+
+  $recipeRoot = Resolve-Path (Join-Path $PSScriptRoot "..\skills\trenchbroom-mcp-scene-workflow")
+  $irPath = Join-Path $OutputRoot "simple-house-visual.ir.json"
+  & python `
+    (Join-Path $recipeRoot "scripts\recipes\simple_house.py") `
+    --params (Join-Path $recipeRoot "scripts\examples\simple_house\minimal.json") `
+    --out $irPath | Out-Null
+
+  $preview = Invoke-McpTool -Tool "ir_compile_preview_from_file" -Arguments ([ordered] @{
+    path = $irPath
+    detail = "summary"
+  }) -TimeoutSec 30
+  if (-not [bool] $preview.valid) {
+    throw "simple_house recipe IR preview failed"
+  }
+
+  $applyArgs = [ordered] @{
+    path = $irPath
+    expectedDocumentPath = $TestMap
+    idsMode = "count"
+  }
+  if ($preview.previewId) {
+    $applyArgs.previewId = $preview.previewId
+  }
+  $apply = Invoke-McpTool -Tool "ir_apply_from_file" -Arguments $applyArgs -TimeoutSec 45
+  if (-not [bool] $apply.valid) {
+    throw "simple_house recipe IR apply failed"
+  }
+
+  $moduleId = [string] $apply.moduleId
+  $reviewOutput = New-Item -ItemType Directory -Force -Path (Join-Path $OutputRoot "recipe-reviews")
+  $review = Invoke-McpTool -Tool "module_render_review" -Arguments ([ordered] @{
+    moduleId = $moduleId
+    sceneName = "recipe-simple-house-visual"
+    outputDir = $reviewOutput.FullName
+    views = @("iso_overview_ne", "top_plan")
+    imageSize = @(1200, 900)
+    includeBoundsBox = $true
+    detail = "full"
+    returnBase64 = $false
+  }) -TimeoutSec 60
+  Assert-ReviewQuality -Review $review -Name "simple_house recipe visual acceptance"
+
+  return [ordered] @{
+    recipe = "simple_house"
+    variant = "minimal"
+    irPath = $irPath
+    moduleId = $moduleId
+    operationIds = $apply.operationIds
+    reviewId = $review.reviewId
+    targetObjectCount = $review.targetObjectCount
+    qualityValid = $review.qualityValid
+    preferredCapturePath = $review.preferredCapturePath
+    contactSheet = $review.contactSheet
+    captures = @($review.captures | ForEach-Object { Get-CaptureSummary $_ })
+  }
+}
+
 $resolvedExe = (Resolve-Path $TrenchBroomExe).Path
 $resolvedSourceMap = (Resolve-Path $SourceMap).Path
 $resolvedWorkDir = New-Item -ItemType Directory -Force -Path $WorkDir
@@ -240,26 +304,8 @@ try {
     )
   })
 
-  $framingResults = @()
-  foreach ($framing in @("overview_orbit", "top_fit", "side_profile")) {
-    $review = Invoke-McpTool -Tool "viewport_capture_scene_review" -Arguments ([ordered] @{
-      sceneName = "mcp-smoke-$framing"
-      operationIds = @($create.operationId)
-      framing = $framing
-      layout = "fourPanes"
-      views = @("current", "3d", "2d")
-      highlight = $false
-      clearSelectionBeforeCapture = $true
-      returnBase64 = $false
-    })
-    $framingResults += [ordered] @{
-      framing = $framing
-      cameraControlled = $review.cameraControlled
-      focusedObjectCount = $review.focusedObjectCount
-      captureCount = $review.captureCount
-      captures = @($review.captures | ForEach-Object { Get-CaptureSummary $_ })
-    }
-  }
+  $sceneReview =
+    Invoke-ReviewBundle -Name "mcp-smoke-scene-review" -OperationId $create.operationId -OutputRoot $reviewOutputRoot.FullName
 
   $heightmapArgs = [ordered] @{
     imagePath = $heightmapPath
@@ -282,7 +328,7 @@ try {
     detail = "summary"
   })
   $undo = Invoke-McpTool -Tool "history_undo_mcp"
-  $history = Invoke-McpTool -Tool "history_status"
+  $statusAfterUndo = Invoke-McpTool -Tool "tb_status"
 
   $reviewSceneResults = @()
   if ($ReviewScenes) {
@@ -382,6 +428,12 @@ try {
     $reviewSceneResults += Invoke-ReviewBundle -Name "review-smooth-track-turn" -OperationId $track.operationId -OutputRoot $reviewOutputRoot.FullName
   }
 
+  $recipeVisualAcceptanceResult = $null
+  if ($RecipeVisualAcceptance) {
+    $recipeVisualAcceptanceResult =
+      Invoke-RecipeVisualAcceptance -TestMap $testMap -OutputRoot $resolvedWorkDir.FullName
+  }
+
   [ordered] @{
     status = [ordered] @{
       processId = $status.processId
@@ -392,7 +444,7 @@ try {
     sceneReview = [ordered] @{
       operationId = $create.operationId
       brushCount = $create.brushCount
-      framings = $framingResults
+      review = $sceneReview
     }
     heightmap = [ordered] @{
       imagePath = $heightmapPath
@@ -405,8 +457,9 @@ try {
       undo = $undo
     }
     reviewScenes = $reviewSceneResults
+    recipeVisualAcceptance = $recipeVisualAcceptanceResult
     reviewOutputRoot = $reviewOutputRoot.FullName
-    historyAfterSmoke = $history
+    statusAfterUndo = $statusAfterUndo
   } | ConvertTo-Json -Depth 100
 } finally {
   if (-not $KeepOpen) {
