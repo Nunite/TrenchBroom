@@ -2863,6 +2863,101 @@ TEST_CASE(
     == "refresh_status_or_validate");
 }
 
+TEST_CASE("McpBridgeServer single-step history reports pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+
+  const auto emptyUndo = historyUndoForMapResult(map, history);
+  CHECK(!emptyUndo.ok);
+  CHECK_FALSE(emptyUndo.error.details.value("mutatedDocument").toBool(true));
+  CHECK_FALSE(emptyUndo.error.details.value("partiallyUndone").toBool(true));
+  CHECK(emptyUndo.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    emptyUndo.error.details.value("recoveryAction").toString()
+    == "refresh_status_or_validate");
+
+  const auto emptyRedo = historyRedoForMapResult(map, history);
+  CHECK(!emptyRedo.ok);
+  CHECK_FALSE(emptyRedo.error.details.value("mutatedDocument").toBool(true));
+  CHECK_FALSE(emptyRedo.error.details.value("partiallyUndone").toBool(true));
+  CHECK(emptyRedo.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    emptyRedo.error.details.value("recoveryAction").toString()
+    == "refresh_status_or_validate");
+
+  const auto create = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Single undo target"},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(create.ok);
+
+  const auto unrelated = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "User non-MCP operation"},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{128, 0, 0}},
+         {"max", QJsonArray{192, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(unrelated.ok);
+  history.back().undone = true;
+
+  const auto blockedUndo = historyUndoForMapResult(map, history);
+  CHECK(!blockedUndo.ok);
+  CHECK_FALSE(blockedUndo.error.details.value("mutatedDocument").toBool(true));
+  CHECK(blockedUndo.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    blockedUndo.error.details.value("targetOperationId").toString()
+    == create.result.value("operationId").toString());
+  CHECK(
+    blockedUndo.error.details.value("nativeUndoCommandName").toString()
+    == "User non-MCP operation");
+  CHECK(
+    blockedUndo.error.details.value("recoveryAction").toString()
+    == "refresh_status_or_validate");
+
+  history.front().undone = true;
+  const auto blockedRedo = historyRedoForMapResult(map, history);
+  CHECK(!blockedRedo.ok);
+  CHECK_FALSE(blockedRedo.error.details.value("mutatedDocument").toBool(true));
+  CHECK(blockedRedo.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    blockedRedo.error.details.value("targetOperationId").toString()
+    == create.result.value("operationId").toString());
+  CHECK(blockedRedo.error.details.value("nativeRedoCommandName").toString().isEmpty());
+  CHECK(
+    blockedRedo.error.details.value("recoveryAction").toString()
+    == "refresh_status_or_validate");
+}
+
 TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
 {
   auto appControllerFixture = AppControllerFixture{};

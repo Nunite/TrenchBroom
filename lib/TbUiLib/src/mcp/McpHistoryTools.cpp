@@ -837,6 +837,22 @@ McpBridgeToolResult operationValidateResult(
   return McpBridgeToolResult::success(result);
 }
 
+QJsonObject historyPreMutationFailureDetails(
+  const QString& recoveryAction, const QString& targetOperationId = {})
+{
+  auto details = QJsonObject{
+    {"mutatedDocument", false},
+    {"partiallyUndone", false},
+    {"retrySafe", true},
+    {"recoveryAction", recoveryAction},
+  };
+  if (!targetOperationId.isEmpty())
+  {
+    details.insert("targetOperationId", targetOperationId);
+  }
+  return details;
+}
+
 McpBridgeToolResult historyUndoResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
@@ -862,7 +878,9 @@ McpBridgeToolResult historyUndoForMapResult(
   if (it == history.rend())
   {
     return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::Forbidden, "No MCP operation is available to undo");
+      mcp::McpErrorCode::Forbidden,
+      "No MCP operation is available to undo",
+      historyPreMutationFailureDetails("refresh_status_or_validate"));
   }
 
   if (!operationMatchesActiveDocument(map, *it, objectRegistry))
@@ -893,14 +911,22 @@ McpBridgeToolResult historyUndoForMapResult(
   const auto* undoName = map.undoCommandName();
   if (!undoName || QString::fromStdString(*undoName) != it->transactionName)
   {
+    auto details =
+      historyPreMutationFailureDetails("refresh_status_or_validate", it->operationId);
+    details.insert(
+      "nativeUndoCommandName",
+      undoName != nullptr ? QString::fromStdString(*undoName) : QString{});
+    details.insert("skippedSelectionCommands", skippedSelectionCommands);
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::Forbidden,
-      "The latest MCP operation is no longer on top of the undo stack");
+      "The latest MCP operation is no longer on top of the undo stack",
+      std::move(details));
   }
 
   map.undoCommand();
   it->undone = true;
   return McpBridgeToolResult::success(QJsonObject{
+    {"mutatedDocument", true},
     {"operation", operationRecordJson(*it)},
     {"skippedSelectionCommands", skippedSelectionCommands},
     {"undone", true},
@@ -968,6 +994,7 @@ QJsonObject documentMismatchDetails(
   auto details = QJsonObject{
     {"mutatedDocument", mutatedDocument},
     {"partiallyUndone", mutatedDocument},
+    {"retrySafe", !mutatedDocument},
     {operationIdKey, operation.operationId},
     {"operationDocumentPath", operation.documentPath},
     {"activeDocumentPath", pathAsQString(map.path())},
@@ -982,22 +1009,6 @@ QJsonObject documentMismatchDetails(
   if (!remainingOperationIds.isEmpty())
   {
     details.insert("remainingOperationIds", stringListJson(remainingOperationIds));
-  }
-  return details;
-}
-
-QJsonObject historyUndoToOperationPreMutationDetails(
-  const QString& recoveryAction, const QString& targetOperationId = {})
-{
-  auto details = QJsonObject{
-    {"mutatedDocument", false},
-    {"partiallyUndone", false},
-    {"retrySafe", true},
-    {"recoveryAction", recoveryAction},
-  };
-  if (!targetOperationId.isEmpty())
-  {
-    details.insert("targetOperationId", targetOperationId);
   }
   return details;
 }
@@ -1030,7 +1041,7 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::InvalidParams,
       "history_undo_to_operation requires operationId",
-      historyUndoToOperationPreMutationDetails("provide_operation_id_then_retry"));
+      historyPreMutationFailureDetails("provide_operation_id_then_retry"));
   }
 
   const auto targetIndex = findOperationIndex(history, targetOperationId);
@@ -1039,16 +1050,14 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::InvalidParams,
       QString{"Unknown MCP operation id: %1"}.arg(targetOperationId),
-      historyUndoToOperationPreMutationDetails(
-        "refresh_status_or_validate", targetOperationId));
+      historyPreMutationFailureDetails("refresh_status_or_validate", targetOperationId));
   }
   if (history[*targetIndex].undone)
   {
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::Forbidden,
       "Target MCP operation is already undone",
-      historyUndoToOperationPreMutationDetails(
-        "refresh_status_or_validate", targetOperationId));
+      historyPreMutationFailureDetails("refresh_status_or_validate", targetOperationId));
   }
 
   auto undoneOperationIds = QStringList{};
@@ -1174,7 +1183,9 @@ McpBridgeToolResult historyRedoForMapResult(
   if (it == history.end())
   {
     return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::Forbidden, "No MCP operation is available to redo");
+      mcp::McpErrorCode::Forbidden,
+      "No MCP operation is available to redo",
+      historyPreMutationFailureDetails("refresh_status_or_validate"));
   }
 
   if (!operationMatchesActiveDocument(map, *it, objectRegistry))
@@ -1188,14 +1199,21 @@ McpBridgeToolResult historyRedoForMapResult(
   const auto* redoName = map.redoCommandName();
   if (!redoName || QString::fromStdString(*redoName) != it->transactionName)
   {
+    auto details =
+      historyPreMutationFailureDetails("refresh_status_or_validate", it->operationId);
+    details.insert(
+      "nativeRedoCommandName",
+      redoName != nullptr ? QString::fromStdString(*redoName) : QString{});
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::Forbidden,
-      "The MCP operation is no longer on top of the redo stack");
+      "The MCP operation is no longer on top of the redo stack",
+      std::move(details));
   }
 
   map.redoCommand();
   it->undone = false;
   return McpBridgeToolResult::success(QJsonObject{
+    {"mutatedDocument", true},
     {"operation", operationRecordJson(*it)},
     {"redone", true},
   });

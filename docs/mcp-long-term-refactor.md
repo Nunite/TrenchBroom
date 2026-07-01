@@ -192,6 +192,10 @@ Next Phase 2 item:
 - Done: `history_undo_to_operation` reports structured `mutatedDocument:false`,
   `retrySafe`, and recovery actions for missing or unknown target operation ids
   before touching the native undo stack.
+- Done: single-step `history_undo_mcp` / `history_redo_mcp` report structured
+  `mutatedDocument`, `retrySafe`, and recovery actions for empty history and
+  native stack mismatch failures, and mark successful undo/redo as map
+  mutations.
 - Done: stale target warnings are summarized by default in selector/module
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor
