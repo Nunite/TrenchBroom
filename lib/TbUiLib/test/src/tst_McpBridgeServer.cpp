@@ -3081,6 +3081,42 @@ TEST_CASE("McpBridgeServer operation_validate reports recovery target failures")
   CHECK_FALSE(valid.result.value("mutatedDocument").toBool(true));
 }
 
+TEST_CASE("McpBridgeServer operation_inspect reports recovery target failures")
+{
+  auto history = std::vector<McpOperationRecord>{};
+
+  const auto missingId = operationInspectResult(history, QJsonObject{});
+  CHECK(!missingId.ok);
+  CHECK_FALSE(missingId.error.details.value("mutatedDocument").toBool(true));
+  CHECK(missingId.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingId.error.details.value("recoveryAction").toString()
+    == "provide_operation_id_then_retry");
+
+  const auto unknownId =
+    operationInspectResult(history, QJsonObject{{"operationId", "mcp-op-missing"}});
+  CHECK(!unknownId.ok);
+  CHECK_FALSE(unknownId.error.details.value("mutatedDocument").toBool(true));
+  CHECK(unknownId.error.details.value("retrySafe").toBool(false));
+  CHECK(unknownId.error.details.value("operationId").toString() == "mcp-op-missing");
+  CHECK(
+    unknownId.error.details.value("recoveryAction").toString()
+    == "refresh_status_or_validate");
+
+  auto operation = McpOperationRecord{};
+  operation.operationId = "mcp-op-1";
+  operation.toolName = "blockout_create_batch";
+  operation.transactionName = "MCP: Inspect test";
+  operation.changedObjectIds = {"node:world"};
+  history.push_back(operation);
+
+  const auto inspect =
+    operationInspectResult(history, QJsonObject{{"operationId", "mcp-op-1"}});
+  REQUIRE(inspect.ok);
+  CHECK_FALSE(inspect.result.value("mutatedDocument").toBool(true));
+  CHECK(inspect.result.value("operationId").toString() == "mcp-op-1");
+}
+
 TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
 {
   auto appControllerFixture = AppControllerFixture{};

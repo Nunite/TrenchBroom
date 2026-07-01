@@ -492,17 +492,24 @@ McpBridgeToolResult operationInspectResult(
   const auto operationId = params.value("operationId").toString();
   if (operationId.isEmpty())
   {
-    return invalidParamsFailure("operation_inspect requires operationId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "operation_inspect requires operationId",
+      operationTargetFailureDetails("provide_operation_id_then_retry"));
   }
 
   const auto operation = findOperationCopy(history, operationId);
   if (!operation)
   {
-    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Unknown MCP operation id: %1"}.arg(operationId),
+      operationTargetFailureDetails("refresh_status_or_validate", operationId));
   }
 
-  return McpBridgeToolResult::success(
-    operationRecordDetailJson(*operation, detailFromParams(params)));
+  auto result = operationRecordDetailJson(*operation, detailFromParams(params));
+  result.insert("mutatedDocument", false);
+  return McpBridgeToolResult::success(std::move(result));
 }
 
 McpBridgeToolResult operationInspectResult(
@@ -514,17 +521,24 @@ McpBridgeToolResult operationInspectResult(
   const auto operationId = params.value("operationId").toString();
   if (operationId.isEmpty())
   {
-    return invalidParamsFailure("operation_inspect requires operationId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "operation_inspect requires operationId",
+      operationTargetFailureDetails("provide_operation_id_then_retry"));
   }
 
   const auto operation = findOperationCopy(history, operationId);
   if (!operation)
   {
-    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Unknown MCP operation id: %1"}.arg(operationId),
+      operationTargetFailureDetails("refresh_status_or_validate", operationId));
   }
 
   const auto detail = detailFromParams(params);
   auto result = operationRecordDetailJson(*operation, detail);
+  result.insert("mutatedDocument", false);
   if (auto* mapWindow = appController.mapWindowManager().topMapWindow())
   {
     auto liveState = objectRegistry.liveStateJson(
@@ -560,16 +574,23 @@ McpBridgeToolResult operationInspectResult(
   const auto operationId = params.value("operationId").toString();
   if (operationId.isEmpty())
   {
-    return invalidParamsFailure("operation_inspect requires operationId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "operation_inspect requires operationId",
+      operationTargetFailureDetails("provide_operation_id_then_retry"));
   }
 
   const auto operation = findOperationCopy(history, operationId);
   if (!operation)
   {
-    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Unknown MCP operation id: %1"}.arg(operationId),
+      operationTargetFailureDetails("refresh_status_or_validate", operationId));
   }
 
   auto result = operationRecordDetailJson(*operation, detailFromParams(params));
+  result.insert("mutatedDocument", false);
   if (auto* mapWindow = appController.mapWindowManager().topMapWindow())
   {
     const auto liveState =
