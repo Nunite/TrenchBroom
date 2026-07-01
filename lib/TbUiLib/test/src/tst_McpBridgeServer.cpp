@@ -3117,6 +3117,53 @@ TEST_CASE("McpBridgeServer operation_inspect reports recovery target failures")
   CHECK(inspect.result.value("operationId").toString() == "mcp-op-1");
 }
 
+TEST_CASE("McpBridgeServer module_compact reports non-document mutation state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto missingId = moduleCompactForMapResult(
+    map, QJsonObject{}, metadataStore, moduleStore, objectRegistry);
+  CHECK(!missingId.ok);
+  CHECK_FALSE(missingId.error.details.value("mutatedDocument").toBool(true));
+  CHECK(missingId.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingId.error.details.value("recoveryAction").toString()
+    == "provide_module_id_then_retry");
+
+  const auto fingerprint = documentFingerprintForMap(map, &objectRegistry);
+  moduleStore[QString{"%1|stale-module"}.arg(fingerprint)] = McpModuleRecord{
+    "stale-module",
+    fingerprint,
+    {"node:999"},
+    {},
+    {},
+  };
+
+  const auto compact = moduleCompactForMapResult(
+    map,
+    QJsonObject{{"moduleId", "stale-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(compact.ok);
+  CHECK_FALSE(compact.result.value("mutatedDocument").toBool(true));
+  CHECK(compact.result.value("removedStaleObjectIdCount").toInt() == 1);
+  CHECK(moduleStore.begin()->second.objectIds.empty());
+}
+
 TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
 {
   auto appControllerFixture = AppControllerFixture{};

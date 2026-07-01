@@ -389,6 +389,12 @@ McpBridgeToolResult moduleCompactResult(
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult moduleCompactForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult irValidateResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult irCompilePreviewResult(

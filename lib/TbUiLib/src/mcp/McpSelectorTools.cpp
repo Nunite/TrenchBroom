@@ -2626,12 +2626,34 @@ McpBridgeToolResult moduleCompactResult(
   {
     return noActiveDocumentFailure();
   }
+
+  return moduleCompactForMapResult(
+    mapWindow->document().map(),
+    params,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+}
+
+McpBridgeToolResult moduleCompactForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
   const auto moduleId = params.value("moduleId").toString().trimmed();
   if (moduleId.isEmpty())
   {
-    return invalidParamsFailure("module_compact requires moduleId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "module_compact requires moduleId",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_module_id_then_retry"},
+      });
   }
-  auto& map = mapWindow->document().map();
   const auto documentFingerprint = documentFingerprintForMap(map);
   auto warnings = QJsonArray{};
   auto removedMetadataCount = 0;
@@ -2689,6 +2711,7 @@ McpBridgeToolResult moduleCompactResult(
   summary.insert("tool", "module_compact");
   summary.insert("removedStaleMetadataCount", removedMetadataCount);
   summary.insert("removedStaleObjectIdCount", removedObjectIdCount);
+  summary.insert("mutatedDocument", false);
   summary.insert("warnings", warnings);
   return McpBridgeToolResult::success(summary);
 }
