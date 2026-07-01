@@ -2874,6 +2874,21 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
   REQUIRE(filterResponse.ok);
   CHECK(filterResponse.result.value("mutatedDocument").toBool(true) == false);
 
+  const auto invalidFilterResponse = selectionFilterForMapResult(
+    document->map(),
+    QJsonObject{
+      {"min", QJsonArray{16, 16, 16}},
+      {"max", QJsonArray{-16, -16, -16}},
+    });
+  CHECK(!invalidFilterResponse.ok);
+  CHECK(
+    invalidFilterResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(invalidFilterResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidFilterResponse.error.details.value("recoveryAction").toString()
+    == "fix_selection_query_then_retry");
+
   const auto boundsResponse = selectionByBoundsForMapResult(
     document->map(),
     QJsonObject{
@@ -2882,6 +2897,21 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
     });
   REQUIRE(boundsResponse.ok);
   CHECK(boundsResponse.result.value("mutatedDocument").toBool(true) == false);
+
+  const auto invalidBoundsResponse = selectionByBoundsForMapResult(
+    document->map(),
+    QJsonObject{
+      {"min", QJsonArray{16, 16, 16}},
+      {"max", QJsonArray{-16, -16, -16}},
+    });
+  CHECK(!invalidBoundsResponse.ok);
+  CHECK(
+    invalidBoundsResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(invalidBoundsResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidBoundsResponse.error.details.value("recoveryAction").toString()
+    == "fix_selection_query_then_retry");
 }
 
 TEST_CASE("McpBridgeServer spiral stair geometry tools")

@@ -358,7 +358,7 @@ McpBridgeToolResult selectionFilterForMapResult(mdl::Map& map, const QJsonObject
   const auto matches = mcpFilteredNodes(map, params, options, error);
   if (!error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return selectionPreconditionFailure(error, "fix_selection_query_then_retry");
   }
 
   if (mcpOptionalBool(params, "select", false))
