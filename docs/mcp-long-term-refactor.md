@@ -305,6 +305,9 @@ Next Phase 2 item:
 - Done: `heightmap_import_grayscale` preview/parameter failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before importing
   brushes.
+- Done: legacy `python_generate_blockout` script/process/JSON failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before applying
+  generated blockout operations.
 - Done: `selection_set` reports `mutatedDocument:false` on success because it
   changes editor selection state without mutating the map document.
 - Done: `selection_set` precondition failures report `mutatedDocument:false`,

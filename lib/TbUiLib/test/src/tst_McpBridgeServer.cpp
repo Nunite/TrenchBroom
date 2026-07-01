@@ -9458,6 +9458,32 @@ print(json.dumps({
     CHECK(!response.ok);
     CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
     CHECK(response.error.details.value("valid").toBool(true) == false);
+    CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+    CHECK(response.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      response.error.details.value("recoveryAction").toString()
+      == "fix_python_blockout_script_then_retry");
+    CHECK(map.worldNode().descendantCount() == descendantCount);
+  }
+
+  SECTION("requires script before mutation")
+  {
+    const auto descendantCount = map.worldNode().descendantCount();
+    const auto response = pythonGenerateBlockoutForMapResult(
+      map,
+      "python_generate_blockout",
+      QJsonObject{},
+      history,
+      nextOperationIndex,
+      metadataStore);
+
+    CHECK(!response.ok);
+    CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
+    CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+    CHECK(response.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      response.error.details.value("recoveryAction").toString()
+      == "provide_python_blockout_script_then_retry");
     CHECK(map.worldNode().descendantCount() == descendantCount);
   }
 
@@ -9475,6 +9501,11 @@ print(json.dumps({
     CHECK(!response.ok);
     CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
     CHECK(response.error.details.value("message").toString().contains("operations"));
+    CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+    CHECK(response.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      response.error.details.value("recoveryAction").toString()
+      == "fix_python_blockout_script_then_retry");
     CHECK(map.worldNode().descendantCount() == descendantCount);
   }
 

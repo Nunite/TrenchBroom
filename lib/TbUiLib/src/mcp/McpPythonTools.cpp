@@ -94,6 +94,9 @@ McpBridgeToolResult processFailure(
     result.insert("stdout", QString::fromUtf8(stdoutBytes.left(4096)));
   }
   result.insert("valid", false);
+  result.insert("mutatedDocument", false);
+  result.insert("retrySafe", true);
+  result.insert("recoveryAction", "fix_python_blockout_script_then_retry");
 
   auto failure = McpBridgeToolResult::failure(code, message);
   failure.error.details = std::move(result);
@@ -136,7 +139,14 @@ McpBridgeToolResult pythonGenerateBlockoutForMapResult(
   const auto script = params.value("script").toString();
   if (script.trimmed().isEmpty())
   {
-    return invalidParamsFailure("python_generate_blockout requires script");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "python_generate_blockout requires script",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_python_blockout_script_then_retry"},
+      });
   }
 
   auto tempDir = QTemporaryDir{};
