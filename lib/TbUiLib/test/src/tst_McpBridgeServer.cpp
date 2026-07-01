@@ -2837,6 +2837,8 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
                     appController.taskManager(),
                     appController.glManager().resourceManager())
                   | kdl::value();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
 
   const auto response =
     selectionSetForMapResult(document->map(), QJsonObject{{"objectIds", QJsonArray{}}});
@@ -2912,6 +2914,41 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
   CHECK(
     invalidBoundsResponse.error.details.value("recoveryAction").toString()
     == "fix_selection_query_then_retry");
+
+  const auto growResponse = selectionGrowForMapResult(document->map(), QJsonObject{});
+  REQUIRE(growResponse.ok);
+  CHECK(growResponse.result.value("selectedCount").toInt(-1) == 0);
+  CHECK(growResponse.result.value("mutatedDocument").toBool(true) == false);
+
+  const auto createResponse = blockoutCreateBatchForMapResult(
+    document->map(),
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{64, 64, 64}},
+         },
+       }},
+      {"select", true},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(createResponse.ok);
+
+  const auto invalidGrowResponse =
+    selectionGrowForMapResult(document->map(), QJsonObject{{"mode", "cousins"}});
+  CHECK(!invalidGrowResponse.ok);
+  CHECK(
+    invalidGrowResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(invalidGrowResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidGrowResponse.error.details.value("recoveryAction").toString()
+    == "fix_selection_grow_mode_then_retry");
+  CHECK(invalidGrowResponse.error.details.value("mode").toString() == "cousins");
 }
 
 TEST_CASE("McpBridgeServer spiral stair geometry tools")

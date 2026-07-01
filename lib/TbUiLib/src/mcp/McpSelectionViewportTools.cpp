@@ -452,12 +452,19 @@ McpBridgeToolResult selectionGrowResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return selectionGrowForMapResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult selectionGrowForMapResult(mdl::Map& map, const QJsonObject& params)
+{
   const auto selectedNodes = map.selection().nodes;
   if (selectedNodes.empty())
   {
-    return McpBridgeToolResult::success(
-      QJsonObject{{"selectedObjectIds", QJsonArray{}}, {"selectedCount", 0}});
+    return McpBridgeToolResult::success(QJsonObject{
+      {"selectedObjectIds", QJsonArray{}},
+      {"selectedCount", 0},
+      {"mutatedDocument", false},
+    });
   }
 
   const auto mode = params.value("mode").toString("parents").trimmed().toLower();
@@ -505,8 +512,10 @@ McpBridgeToolResult selectionGrowResult(
   }
   else
   {
-    return invalidParamsFailure(
-      "selection_grow mode must be parents, children, or siblings");
+    return selectionPreconditionFailure(
+      "selection_grow mode must be parents, children, or siblings",
+      "fix_selection_grow_mode_then_retry",
+      QJsonObject{{"mode", mode}});
   }
 
   mdl::deselectAll(map);
@@ -524,6 +533,7 @@ McpBridgeToolResult selectionGrowResult(
     {"mode", mode},
     {"selectedObjectIds", selectedIds},
     {"selectedCount", selectedIds.size()},
+    {"mutatedDocument", false},
   });
 }
 

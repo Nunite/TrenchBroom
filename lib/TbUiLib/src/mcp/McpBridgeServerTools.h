@@ -233,6 +233,7 @@ McpBridgeToolResult selectionByBoundsForMapResult(
   mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult selectionGrowResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult selectionGrowForMapResult(mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult viewportFocusResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult viewportClearMarksResult(

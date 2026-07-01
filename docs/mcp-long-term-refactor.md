@@ -269,6 +269,8 @@ Next Phase 2 item:
 - Done: `selection_filter` and `selection_by_bounds` precondition failures
   report `mutatedDocument:false`, `retrySafe`, and recovery actions before
   changing editor selection state.
+- Done: `selection_grow` reports `mutatedDocument:false` on success and
+  structured precondition failures before changing editor selection state.
 - Done: `face_select` reports `mutatedDocument:false` on success because it
   changes editor face selection without mutating the map document.
 - Done: `face_select` precondition failures report `mutatedDocument:false`,
