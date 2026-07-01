@@ -324,6 +324,8 @@ Next Phase 2 item:
   structured precondition failures before changing editor selection state.
 - Done: `face_select` reports `mutatedDocument:false` on success because it
   changes editor face selection without mutating the map document.
+- Done: `face_list` target failures report `mutatedDocument:false`,
+  `retrySafe`, and recovery actions for invalid face targets.
 - Done: `face_select` precondition failures report `mutatedDocument:false`,
   `retrySafe`, and recovery actions before changing face selection.
 - Done: `face_texture_set` precondition failures report

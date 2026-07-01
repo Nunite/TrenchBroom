@@ -190,6 +190,11 @@ McpBridgeToolResult faceListResult(
   const QJsonObject& params,
   const std::vector<McpOperationRecord>& history,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult faceListForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult faceSelectResult(
   AppController& appController,
   const QJsonObject& params,

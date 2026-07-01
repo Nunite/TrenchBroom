@@ -6057,7 +6057,26 @@ TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
   CHECK(response.result.value("mutatedDocument").toBool(true) == false);
   CHECK(map.selection().brushFaces.size() == 1u);
 
+  const auto listResponse = faceListForMapResult(
+    map,
+    QJsonObject{{"objectId", objectIds.first().toString()}, {"faceIndex", 0}},
+    history,
+    objectRegistry);
+  REQUIRE(listResponse.ok);
+  CHECK(listResponse.result.value("count").toInt() == 1);
+
   mdl::deselectAll(map);
+  const auto missingListTargetResponse =
+    faceListForMapResult(map, QJsonObject{{"objectId", "missing"}}, history, objectRegistry);
+  REQUIRE_FALSE(missingListTargetResponse.ok);
+  CHECK(
+    missingListTargetResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(missingListTargetResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingListTargetResponse.error.details.value("recoveryAction").toString()
+    == "provide_face_targets_or_select_brush_faces");
+
   const auto missingTargetResponse =
     faceSelectForMapResult(map, QJsonObject{}, history, objectRegistry);
   REQUIRE_FALSE(missingTargetResponse.ok);

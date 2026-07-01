@@ -1190,13 +1190,29 @@ McpBridgeToolResult faceListResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return faceListForMapResult(
+    mapWindow->document().map(), params, history, objectRegistry);
+}
+
+McpBridgeToolResult faceListForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry& objectRegistry)
+{
   auto error = QString{};
   auto handles =
     brushFaceHandlesFromTargetsOrSelection(map, params, history, &objectRegistry, error);
   if (handles.empty() && !error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_face_targets_or_select_brush_faces"},
+      });
   }
 
   const auto limit = optionalSize(params, "limit", 500);
