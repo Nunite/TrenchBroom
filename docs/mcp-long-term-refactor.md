@@ -354,7 +354,7 @@ Next Phase 3 item:
 
 - Phase 3 is closed. Continue with Phase 4.
 
-### Phase 4 Status: Partial
+### Phase 4 Status: Done
 
 - Done: project skill source is `skills/trenchbroom-mcp-scene-workflow`, with
   runtime sync through `scripts\sync-trenchbroom-mcp-skill.ps1`.
@@ -364,14 +364,14 @@ Next Phase 3 item:
   ascending loops, and KZ/bhop gameplay layouts.
 - Done: real TB visual smoke covers bundled recipe `minimal/default/stress`
   variants, and representative contact sheets have been inspected.
-- Partial: recipe coverage can still expand, but new recipes should wait until
-  the current ordered phase requires Phase 4 work.
+- Done: recipe coverage is intentionally closed for this phase; future recipes
+  should wait for a concrete missing common scene family and must include
+  validator, runtime sync, real TB visual acceptance, and inspected review
+  output.
 
 Next Phase 4 item:
 
-- When Phase 4 is active again, add recipe coverage only for a missing common
-  scene family, with validator, runtime sync, real TB visual acceptance, and
-  inspected review output.
+- Phase 4 is closed. Continue with Phase 5.
 
 ### Phase 5 Status: Partial
 
