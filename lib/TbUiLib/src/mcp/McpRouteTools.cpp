@@ -207,6 +207,16 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
   };
 }
 
+McpBridgeToolResult preMutationInvalidParamsFailure(
+  const QString& message, const QString& recoveryAction, QJsonObject details = {})
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return McpBridgeToolResult::failure(
+    mcp::McpErrorCode::InvalidParams, message, std::move(details));
+}
+
 bool isModuleLevelMetadataKey(const QString& key)
 {
   static const auto Keys = QStringList{
@@ -1191,20 +1201,24 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
   const auto brushesValue = params.value("brushes");
   if (!brushesValue.isArray())
   {
-    return invalidParamsFailure("brush_create_polygon_batch requires brushes array");
+    return preMutationInvalidParamsFailure(
+      "brush_create_polygon_batch requires brushes array",
+      "provide_polygon_brushes_then_retry");
   }
 
   const auto brushes = brushesValue.toArray();
   if (brushes.isEmpty())
   {
-    return invalidParamsFailure("brushes must not be empty");
+    return preMutationInvalidParamsFailure(
+      "brushes must not be empty", "provide_polygon_brushes_then_retry");
   }
 
   auto error = QString{};
   const auto metadata = metadataArrayFromBrushes(brushes, error);
   if (!metadata)
   {
-    return invalidParamsFailure(error);
+    return preMutationInvalidParamsFailure(
+      error, "fix_polygon_metadata_then_retry");
   }
 
   auto operations = QJsonArray{};

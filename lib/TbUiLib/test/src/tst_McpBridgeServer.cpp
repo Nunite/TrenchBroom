@@ -7420,6 +7420,50 @@ TEST_CASE("McpBridgeServer route metadata tools")
   SECTION("rejects invalid polygon batch without committing")
   {
     const auto descendantCount = map.worldNode().descendantCount();
+    const auto missingBrushesResponse = brushCreatePolygonBatchForMapResult(
+      map,
+      "brush_create_polygon_batch",
+      QJsonObject{},
+      history,
+      nextOperationIndex,
+      metadataStore);
+    CHECK(!missingBrushesResponse.ok);
+    CHECK(
+      missingBrushesResponse.error.details.value("mutatedDocument").toBool(true)
+      == false);
+    CHECK(missingBrushesResponse.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      missingBrushesResponse.error.details.value("recoveryAction").toString()
+      == "provide_polygon_brushes_then_retry");
+
+    const auto invalidMetadataResponse = brushCreatePolygonBatchForMapResult(
+      map,
+      "brush_create_polygon_batch",
+      QJsonObject{
+        {"brushes",
+         QJsonArray{
+           QJsonObject{
+             {"points2d",
+              QJsonArray{
+                QJsonArray{0, 0},
+                QJsonArray{64, 0},
+                QJsonArray{64, 64}}},
+             {"metadata", "not an object"},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore);
+    CHECK(!invalidMetadataResponse.ok);
+    CHECK(
+      invalidMetadataResponse.error.details.value("mutatedDocument").toBool(true)
+      == false);
+    CHECK(invalidMetadataResponse.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      invalidMetadataResponse.error.details.value("recoveryAction").toString()
+      == "fix_polygon_metadata_then_retry");
+
     const auto response = brushCreatePolygonBatchForMapResult(
       map,
       "brush_create_polygon_batch",
