@@ -2312,7 +2312,23 @@ McpBridgeToolResult renderReviewSelectorResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return renderReviewSelectorForMapResult(
+    mapWindow->document().map(),
+    params,
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+}
+
+McpBridgeToolResult renderReviewSelectorForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
   auto warnings = QJsonArray{};
   auto error = QString{};
   const auto selector = selectorFromParams(params);
@@ -2320,7 +2336,15 @@ McpBridgeToolResult renderReviewSelectorResult(
     map, selector, history, metadataStore, moduleStore, objectRegistry, warnings, error);
   if (!error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"selector", selector},
+        {"recoveryAction", "fix_selector_then_retry"},
+      });
   }
   auto objectIds = nodeIdsJson(map, nodes, objectRegistry);
   auto reviewParams = params;

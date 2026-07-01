@@ -4888,6 +4888,39 @@ TEST_CASE("McpBridgeServer selector_preview reports recovery state")
   CHECK(preview.result.value("matchedCount").toInt() == 1);
 }
 
+TEST_CASE("McpBridgeServer render_review_selector reports recovery state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto invalidSelector = renderReviewSelectorForMapResult(
+    map,
+    QJsonObject{{"operationIds", QJsonArray{QJsonValue{42}}}},
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  CHECK(!invalidSelector.ok);
+  CHECK_FALSE(invalidSelector.error.details.value("mutatedDocument").toBool(true));
+  CHECK(invalidSelector.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidSelector.error.details.value("recoveryAction").toString()
+    == "fix_selector_then_retry");
+}
+
 TEST_CASE("McpBridgeServer object transform summaries")
 {
   auto appControllerFixture = AppControllerFixture{};

@@ -352,6 +352,13 @@ McpBridgeToolResult renderReviewSelectorResult(
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
   const std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult renderReviewSelectorForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult moduleListResult(
   AppController& appController,
   const QJsonObject& params,
