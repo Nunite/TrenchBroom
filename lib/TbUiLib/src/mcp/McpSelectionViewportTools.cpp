@@ -61,6 +61,16 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
   return QJsonObject{{"min", vecToJson(bounds.min)}, {"max", vecToJson(bounds.max)}};
 }
 
+McpBridgeToolResult selectionPreconditionFailure(
+  const QString& message, const QString& recoveryAction, QJsonObject details = {})
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return McpBridgeToolResult::failure(
+    mcp::McpErrorCode::InvalidParams, message, std::move(details));
+}
+
 QJsonObject mcpNodeSummaryJson(const mdl::Node& node, const mdl::WorldNode& worldNode)
 {
   auto result = QJsonObject{
@@ -273,7 +283,8 @@ McpBridgeToolResult selectionSetForMapResult(mdl::Map& map, const QJsonObject& p
   const auto objectIdsValue = params.value("objectIds");
   if (!objectIdsValue.isArray())
   {
-    return invalidParamsFailure("selection_set requires objectIds array");
+    return selectionPreconditionFailure(
+      "selection_set requires objectIds array", "provide_object_ids_then_retry");
   }
 
   auto nodes = std::vector<mdl::Node*>{};
@@ -281,19 +292,25 @@ McpBridgeToolResult selectionSetForMapResult(mdl::Map& map, const QJsonObject& p
   {
     if (!objectIdValue.isString())
     {
-      return invalidParamsFailure("objectIds must contain only strings");
+      return selectionPreconditionFailure(
+        "objectIds must contain only strings", "fix_object_ids_then_retry");
     }
     const auto objectId = objectIdValue.toString();
     const auto path = McpObjectRegistry::parseLegacyObjectId(objectId);
     auto* node = path ? map.worldNode().resolvePath(*path) : nullptr;
     if (node == nullptr)
     {
-      return invalidParamsFailure(QString{"Unknown MCP object id: %1"}.arg(objectId));
+      return selectionPreconditionFailure(
+        QString{"Unknown MCP object id: %1"}.arg(objectId),
+        "refresh_status_or_fix_object_ids",
+        QJsonObject{{"objectId", objectId}});
     }
     if (!map.editorContext().selectable(*node))
     {
-      return invalidParamsFailure(
-        QString{"MCP object id is not selectable: %1"}.arg(objectId));
+      return selectionPreconditionFailure(
+        QString{"MCP object id is not selectable: %1"}.arg(objectId),
+        "select_supported_object_ids_then_retry",
+        QJsonObject{{"objectId", objectId}});
     }
     nodes.push_back(node);
   }

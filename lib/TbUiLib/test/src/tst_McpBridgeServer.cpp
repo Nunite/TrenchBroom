@@ -2845,6 +2845,31 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
   CHECK(response.result.value("selectedCount").toInt(-1) == 0);
   CHECK(response.result.value("mutatedDocument").toBool(true) == false);
 
+  const auto missingObjectIdsResponse =
+    selectionSetForMapResult(document->map(), QJsonObject{});
+  CHECK(!missingObjectIdsResponse.ok);
+  CHECK(
+    missingObjectIdsResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(missingObjectIdsResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingObjectIdsResponse.error.details.value("recoveryAction").toString()
+    == "provide_object_ids_then_retry");
+
+  const auto unknownObjectResponse = selectionSetForMapResult(
+    document->map(), QJsonObject{{"objectIds", QJsonArray{"mcp-object-missing"}}});
+  CHECK(!unknownObjectResponse.ok);
+  CHECK(
+    unknownObjectResponse.error.details.value("mutatedDocument").toBool(true)
+    == false);
+  CHECK(unknownObjectResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    unknownObjectResponse.error.details.value("recoveryAction").toString()
+    == "refresh_status_or_fix_object_ids");
+  CHECK(
+    unknownObjectResponse.error.details.value("objectId").toString()
+    == "mcp-object-missing");
+
   const auto filterResponse = selectionFilterForMapResult(document->map(), QJsonObject{});
   REQUIRE(filterResponse.ok);
   CHECK(filterResponse.result.value("mutatedDocument").toBool(true) == false);
