@@ -526,14 +526,32 @@ McpBridgeToolResult createEntityResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult createEntityForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult updateEntityResult(
   AppController& appController,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult updateEntityForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult deleteEntityResult(
   AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult deleteEntityForMapResult(
+  mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
@@ -580,8 +598,20 @@ McpBridgeToolResult createEntityFromSchemaResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult createEntityFromSchemaForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult createEntityCheckedResult(
   AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult createEntityCheckedForMapResult(
+  mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
@@ -604,8 +634,20 @@ McpBridgeToolResult tieBrushesResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult tieBrushesForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult untieBrushesResult(
   AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
+McpBridgeToolResult untieBrushesForMapResult(
+  mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,

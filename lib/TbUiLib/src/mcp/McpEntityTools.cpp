@@ -235,8 +235,7 @@ QJsonObject mutationResultJson(
   return result;
 }
 
-QJsonObject preMutationFailureDetails(
-  QJsonObject details, const QString& recoveryAction)
+QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
 {
   details.insert("mutatedDocument", false);
   details.insert("retrySafe", true);
@@ -251,6 +250,11 @@ McpBridgeToolResult preMutationInvalidParamsFailure(
     mcp::McpErrorCode::InvalidParams,
     message,
     preMutationFailureDetails(std::move(details), recoveryAction));
+}
+
+QJsonObject targetSourceDetails(const QString& targetSource)
+{
+  return QJsonObject{{"targetSource", targetSource}};
 }
 
 void mcpRecordOperation(
@@ -765,30 +769,26 @@ std::optional<std::vector<mdl::BrushNode*>> brushNodesFromParamsOrSelection(
 
 } // namespace
 
-McpBridgeToolResult createEntityResult(
-  AppController& appController,
+McpBridgeToolResult createEntityForMapResult(
+  mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex)
 {
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
-  {
-    return noActiveDocumentFailure();
-  }
-
   const auto classname = params.value("classname").toString().trimmed();
   if (classname.isEmpty())
   {
-    return invalidParamsFailure("entity_create requires classname");
+    return preMutationInvalidParamsFailure(
+      "entity_create requires classname", "provide_entity_classname_then_retry");
   }
 
   auto error = QString{};
   const auto properties = stringMapFromJson(params, "properties", error);
   if (!properties)
   {
-    return invalidParamsFailure(error);
+    return preMutationInvalidParamsFailure(
+      error, "fix_entity_properties_then_retry", targetSourceDetails("properties"));
   }
 
   auto entity =
@@ -798,7 +798,8 @@ McpBridgeToolResult createEntityResult(
     const auto originVec = mcpVec3FromJson(params, "origin", error);
     if (!originVec)
     {
-      return invalidParamsFailure(error);
+      return preMutationInvalidParamsFailure(
+        error, "fix_entity_origin_then_retry", targetSourceDetails("origin"));
     }
     entity.setOrigin(*originVec);
   }
@@ -811,7 +812,6 @@ McpBridgeToolResult createEntityResult(
     }
   }
 
-  auto& map = mapWindow->document().map();
   auto* entityNode = new mdl::EntityNode{std::move(entity)};
   const auto transactionName = QString{"MCP: Create %1"}.arg(classname);
   const auto changedObjectIds = addNodesWithTransaction(
@@ -837,7 +837,7 @@ McpBridgeToolResult createEntityResult(
   return McpBridgeToolResult::success(std::move(result));
 }
 
-McpBridgeToolResult updateEntityResult(
+McpBridgeToolResult createEntityResult(
   AppController& appController,
   const QString& toolName,
   const QJsonObject& params,
@@ -850,30 +850,46 @@ McpBridgeToolResult updateEntityResult(
     return noActiveDocumentFailure();
   }
 
+  return createEntityForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult updateEntityForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   const auto objectId = params.value("objectId").toString().trimmed();
   if (objectId.isEmpty())
   {
-    return invalidParamsFailure("entity_update requires objectId");
+    return preMutationInvalidParamsFailure(
+      "entity_update requires objectId", "provide_entity_object_id_then_retry");
   }
 
-  auto& map = mapWindow->document().map();
   auto* node = resolveNodeId(map.worldNode(), objectId);
   auto* entityNode = dynamic_cast<mdl::EntityNodeBase*>(node);
   if (!entityNode)
   {
-    return invalidParamsFailure(QString{"Object is not an entity: %1"}.arg(objectId));
+    return preMutationInvalidParamsFailure(
+      QString{"Object is not an entity: %1"}.arg(objectId),
+      "refresh_status_or_select_entity_then_retry",
+      QJsonObject{{"objectId", objectId}, {"targetSource", "objectId"}});
   }
 
   auto error = QString{};
   const auto properties = stringMapFromJson(params, "properties", error);
   if (!properties)
   {
-    return invalidParamsFailure(error);
+    return preMutationInvalidParamsFailure(
+      error, "fix_entity_properties_then_retry", targetSourceDetails("properties"));
   }
   const auto removeKeys = stringArrayFromJson(params, "removeKeys", error);
   if (!removeKeys)
   {
-    return invalidParamsFailure(error);
+    return preMutationInvalidParamsFailure(
+      error, "fix_remove_keys_then_retry", targetSourceDetails("removeKeys"));
   }
 
   auto entity = entityNode->entity();
@@ -914,7 +930,7 @@ McpBridgeToolResult updateEntityResult(
   return McpBridgeToolResult::success(std::move(result));
 }
 
-McpBridgeToolResult deleteEntityResult(
+McpBridgeToolResult updateEntityResult(
   AppController& appController,
   const QString& toolName,
   const QJsonObject& params,
@@ -927,17 +943,31 @@ McpBridgeToolResult deleteEntityResult(
     return noActiveDocumentFailure();
   }
 
+  return updateEntityForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult deleteEntityForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   const auto objectId = params.value("objectId").toString().trimmed();
   if (objectId.isEmpty())
   {
-    return invalidParamsFailure("entity_delete requires objectId");
+    return preMutationInvalidParamsFailure(
+      "entity_delete requires objectId", "provide_entity_object_id_then_retry");
   }
 
-  auto& map = mapWindow->document().map();
   auto* node = resolveNodeId(map.worldNode(), objectId);
   if (!node)
   {
-    return invalidParamsFailure(QString{"Unknown MCP object id: %1"}.arg(objectId));
+    return preMutationInvalidParamsFailure(
+      QString{"Unknown MCP object id: %1"}.arg(objectId),
+      "refresh_status_or_fix_object_id_then_retry",
+      QJsonObject{{"objectId", objectId}, {"targetSource", "objectId"}});
   }
 
   const auto transactionName = QString{"MCP: Delete object"};
@@ -946,7 +976,10 @@ McpBridgeToolResult deleteEntityResult(
   {
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::Forbidden,
-      QString{"Object cannot be deleted: %1"}.arg(objectId));
+      QString{"Object cannot be deleted: %1"}.arg(objectId),
+      preMutationFailureDetails(
+        QJsonObject{{"objectId", objectId}, {"targetSource", "objectId"}},
+        "choose_deletable_object_then_retry"));
   }
 
   auto result = QJsonObject{};
@@ -960,6 +993,23 @@ McpBridgeToolResult deleteEntityResult(
     result,
     mcpIdsModeFromParams(params));
   return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult deleteEntityResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return deleteEntityForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
 }
 
 McpBridgeToolResult entityPropertiesUpdateResult(
@@ -1004,8 +1054,7 @@ McpBridgeToolResult entityPropertiesUpdateForMapResult(
       mcp::McpErrorCode::InvalidParams,
       error,
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "entityProperties"}},
-        "fix_properties_then_retry"));
+        QJsonObject{{"targetSource", "entityProperties"}}, "fix_properties_then_retry"));
   }
   if (properties->empty())
   {
@@ -1013,8 +1062,7 @@ McpBridgeToolResult entityPropertiesUpdateForMapResult(
       mcp::McpErrorCode::InvalidParams,
       "entity_properties_update requires non-empty properties",
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "entityProperties"}},
-        "add_properties_then_retry"));
+        QJsonObject{{"targetSource", "entityProperties"}}, "add_properties_then_retry"));
   }
 
   auto warnings = QJsonArray{};
@@ -1055,8 +1103,7 @@ McpBridgeToolResult entityPropertiesUpdateForMapResult(
       mcp::McpErrorCode::InternalError,
       "Could not update entity properties",
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "entityTargets"}},
-        "refresh_status_or_retry"));
+        QJsonObject{{"targetSource", "entityTargets"}}, "refresh_status_or_retry"));
   }
 
   auto result = QJsonObject{};
@@ -1121,8 +1168,7 @@ McpBridgeToolResult entityPropertiesDeleteForMapResult(
       mcp::McpErrorCode::InvalidParams,
       error,
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "entityProperties"}},
-        "fix_keys_then_retry"));
+        QJsonObject{{"targetSource", "entityProperties"}}, "fix_keys_then_retry"));
   }
   if (removeKeys->empty())
   {
@@ -1134,8 +1180,7 @@ McpBridgeToolResult entityPropertiesDeleteForMapResult(
       mcp::McpErrorCode::InvalidParams,
       "entity_properties_delete requires keys",
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "entityProperties"}},
-        "add_keys_then_retry"));
+        QJsonObject{{"targetSource", "entityProperties"}}, "add_keys_then_retry"));
   }
 
   auto warnings = QJsonArray{};
@@ -1177,8 +1222,7 @@ McpBridgeToolResult entityPropertiesDeleteForMapResult(
       mcp::McpErrorCode::InternalError,
       "Could not delete entity properties",
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "entityTargets"}},
-        "refresh_status_or_retry"));
+        QJsonObject{{"targetSource", "entityTargets"}}, "refresh_status_or_retry"));
   }
 
   auto result = QJsonObject{};
@@ -1274,39 +1318,37 @@ McpBridgeToolResult entitySchemaResult(
   return McpBridgeToolResult::success(entityDefinitionJson(*definition));
 }
 
-McpBridgeToolResult createEntityFromSchemaResult(
-  AppController& appController,
+McpBridgeToolResult createEntityFromSchemaForMapResult(
+  mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex)
 {
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
-  {
-    return noActiveDocumentFailure();
-  }
-
   const auto classname = params.value("classname").toString().trimmed();
   if (classname.isEmpty())
   {
-    return invalidParamsFailure("entity_create_from_schema requires classname");
+    return preMutationInvalidParamsFailure(
+      "entity_create_from_schema requires classname",
+      "provide_entity_classname_then_retry");
   }
 
-  auto& map = mapWindow->document().map();
   const auto* definition =
     map.entityDefinitionManager().definition(classname.toStdString());
   if (!definition || mdl::getType(*definition) != mdl::EntityDefinitionType::Point)
   {
-    return invalidParamsFailure(
-      QString{"Unknown point entity classname: %1"}.arg(classname));
+    return preMutationInvalidParamsFailure(
+      QString{"Unknown point entity classname: %1"}.arg(classname),
+      "choose_defined_point_entity_classname_then_retry",
+      QJsonObject{{"classname", classname}});
   }
 
   auto error = QString{};
   const auto properties = stringMapFromJson(params, "properties", error);
   if (!properties)
   {
-    return invalidParamsFailure(error);
+    return preMutationInvalidParamsFailure(
+      error, "fix_entity_properties_then_retry", targetSourceDetails("properties"));
   }
 
   auto origin = vm::vec3d{0, 0, 0};
@@ -1315,7 +1357,8 @@ McpBridgeToolResult createEntityFromSchemaResult(
     const auto parsedOrigin = mcpVec3FromJson(params, "origin", error);
     if (!parsedOrigin)
     {
-      return invalidParamsFailure(error);
+      return preMutationInvalidParamsFailure(
+        error, "fix_entity_origin_then_retry", targetSourceDetails("origin"));
     }
     origin = *parsedOrigin;
   }
@@ -1356,6 +1399,66 @@ McpBridgeToolResult createEntityFromSchemaResult(
   return McpBridgeToolResult::success(std::move(result));
 }
 
+McpBridgeToolResult createEntityFromSchemaResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return createEntityFromSchemaForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult createEntityCheckedForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  const auto classname = params.value("classname").toString().trimmed();
+  if (classname.isEmpty())
+  {
+    return preMutationInvalidParamsFailure(
+      "entity_create_checked requires classname", "provide_entity_classname_then_retry");
+  }
+
+  const auto* definition =
+    map.entityDefinitionManager().definition(classname.toStdString());
+  if (!definition)
+  {
+    return preMutationInvalidParamsFailure(
+      QString{"FGD does not define entity classname: %1"}.arg(classname),
+      "choose_defined_point_entity_classname_then_retry",
+      QJsonObject{{"classname", classname}});
+  }
+  if (mdl::getType(*definition) != mdl::EntityDefinitionType::Point)
+  {
+    return preMutationInvalidParamsFailure(
+      QString{"entity_create_checked only creates point entities; %1 is %2"}
+        .arg(classname)
+        .arg(entityDefinitionTypeName(*definition)),
+      "choose_point_entity_classname_then_retry",
+      QJsonObject{{"classname", classname}});
+  }
+
+  auto result = createEntityFromSchemaForMapResult(
+    map, toolName, params, history, nextOperationIndex);
+  if (result.ok)
+  {
+    result.result.insert("checked", true);
+    result.result.insert("schemaClassname", classname);
+  }
+  return result;
+}
+
 McpBridgeToolResult createEntityCheckedResult(
   AppController& appController,
   const QString& toolName,
@@ -1369,36 +1472,8 @@ McpBridgeToolResult createEntityCheckedResult(
     return noActiveDocumentFailure();
   }
 
-  const auto classname = params.value("classname").toString().trimmed();
-  if (classname.isEmpty())
-  {
-    return invalidParamsFailure("entity_create_checked requires classname");
-  }
-
-  const auto* definition =
-    mapWindow->document().map().entityDefinitionManager().definition(
-      classname.toStdString());
-  if (!definition)
-  {
-    return invalidParamsFailure(
-      QString{"FGD does not define entity classname: %1"}.arg(classname));
-  }
-  if (mdl::getType(*definition) != mdl::EntityDefinitionType::Point)
-  {
-    return invalidParamsFailure(
-      QString{"entity_create_checked only creates point entities; %1 is %2"}
-        .arg(classname)
-        .arg(entityDefinitionTypeName(*definition)));
-  }
-
-  auto result = createEntityFromSchemaResult(
-    appController, toolName, params, history, nextOperationIndex);
-  if (result.ok)
-  {
-    result.result.insert("checked", true);
-    result.result.insert("schemaClassname", classname);
-  }
-  return result;
+  return createEntityCheckedForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
 }
 
 McpBridgeToolResult createEntityCheckedBatchResult(
@@ -1581,39 +1656,39 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
   return McpBridgeToolResult::success(std::move(result));
 }
 
-McpBridgeToolResult tieBrushesResult(
-  AppController& appController,
+McpBridgeToolResult tieBrushesForMapResult(
+  mdl::Map& map,
   const QString& toolName,
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex)
 {
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
-  {
-    return noActiveDocumentFailure();
-  }
-
   const auto classname = params.value("classname").toString().trimmed();
   if (classname.isEmpty())
   {
-    return invalidParamsFailure("entity_tie_brushes requires classname");
+    return preMutationInvalidParamsFailure(
+      "entity_tie_brushes requires classname",
+      "provide_brush_entity_classname_then_retry");
   }
 
-  auto& map = mapWindow->document().map();
   const auto* definition =
     map.entityDefinitionManager().definition(classname.toStdString());
   if (!definition || mdl::getType(*definition) != mdl::EntityDefinitionType::Brush)
   {
-    return invalidParamsFailure(
-      QString{"Unknown brush entity classname: %1"}.arg(classname));
+    return preMutationInvalidParamsFailure(
+      QString{"Unknown brush entity classname: %1"}.arg(classname),
+      "choose_defined_brush_entity_classname_then_retry",
+      QJsonObject{{"classname", classname}});
   }
 
   auto error = QString{};
   const auto brushes = brushNodesFromParamsOrSelection(map, params, error);
   if (!brushes)
   {
-    return invalidParamsFailure(error);
+    return preMutationInvalidParamsFailure(
+      error,
+      "select_brushes_or_fix_object_ids_then_retry",
+      targetSourceDetails("brushes"));
   }
 
   mdl::deselectAll(map);
@@ -1645,7 +1720,7 @@ McpBridgeToolResult tieBrushesResult(
   return McpBridgeToolResult::success(std::move(result));
 }
 
-McpBridgeToolResult untieBrushesResult(
+McpBridgeToolResult tieBrushesResult(
   AppController& appController,
   const QString& toolName,
   const QJsonObject& params,
@@ -1658,7 +1733,17 @@ McpBridgeToolResult untieBrushesResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return tieBrushesForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult untieBrushesForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   auto brushes = std::vector<mdl::BrushNode*>{};
   const auto objectIdsValue = params.value("objectIds");
   if (objectIdsValue.isUndefined())
@@ -1671,7 +1756,10 @@ McpBridgeToolResult untieBrushesResult(
     {
       if (!objectIdValue.isString())
       {
-        return invalidParamsFailure("objectIds must contain only strings");
+        return preMutationInvalidParamsFailure(
+          "objectIds must contain only strings",
+          "fix_object_ids_then_retry",
+          targetSourceDetails("objectIds"));
       }
       auto* node = resolveNodeId(map.worldNode(), objectIdValue.toString());
       if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node))
@@ -1690,15 +1778,21 @@ McpBridgeToolResult untieBrushesResult(
       }
       else
       {
-        return invalidParamsFailure(
+        return preMutationInvalidParamsFailure(
           QString{"Object is not a brush or brush entity: %1"}.arg(
-            objectIdValue.toString()));
+            objectIdValue.toString()),
+          "select_brush_entity_brushes_or_fix_object_ids_then_retry",
+          QJsonObject{
+            {"objectId", objectIdValue.toString()}, {"targetSource", "objectIds"}});
       }
     }
   }
   else
   {
-    return invalidParamsFailure("objectIds must be an array");
+    return preMutationInvalidParamsFailure(
+      "objectIds must be an array",
+      "fix_object_ids_then_retry",
+      targetSourceDetails("objectIds"));
   }
 
   brushes.erase(
@@ -1710,7 +1804,10 @@ McpBridgeToolResult untieBrushesResult(
   brushes = kdl::vec_sort_and_remove_duplicates(std::move(brushes));
   if (brushes.empty())
   {
-    return invalidParamsFailure("No brush entity brushes selected or specified");
+    return preMutationInvalidParamsFailure(
+      "No brush entity brushes selected or specified",
+      "select_brush_entity_brushes_then_retry",
+      targetSourceDetails("brushes"));
   }
 
   auto changedObjectIds = QJsonArray{};
@@ -1738,6 +1835,23 @@ McpBridgeToolResult untieBrushesResult(
     result,
     mcpIdsModeFromParams(params));
   return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult untieBrushesResult(
+  AppController& appController,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return untieBrushesForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
 }
 
 } // namespace tb::ui

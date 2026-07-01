@@ -5245,6 +5245,70 @@ TEST_CASE("McpBridgeServer texture_copy_from_face reports pre-mutation failures"
     == "provide_target_faces_or_select_brush_faces");
 }
 
+TEST_CASE("McpBridgeServer entity mutations report pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  map.entityDefinitionManager().setDefinitions({
+    {"test_light", {}, "", {}, mdl::PointEntityDefinition{vm::bbox3d{8.0}, {}, {}}},
+  });
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  const auto descendantCountBefore = map.worldNode().descendantCount();
+
+  const auto checkFailure = [](const auto& response, const QString& recoveryAction) {
+    REQUIRE_FALSE(response.ok);
+    CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+    CHECK(response.error.details.value("retrySafe").toBool(false));
+    CHECK(response.error.details.value("recoveryAction").toString() == recoveryAction);
+  };
+
+  checkFailure(
+    createEntityForMapResult(
+      map, "entity_create", QJsonObject{}, history, nextOperationIndex),
+    "provide_entity_classname_then_retry");
+  checkFailure(
+    updateEntityForMapResult(
+      map, "entity_update", QJsonObject{}, history, nextOperationIndex),
+    "provide_entity_object_id_then_retry");
+  checkFailure(
+    deleteEntityForMapResult(
+      map, "entity_delete", QJsonObject{}, history, nextOperationIndex),
+    "provide_entity_object_id_then_retry");
+  checkFailure(
+    createEntityFromSchemaForMapResult(
+      map, "entity_create_from_schema", QJsonObject{}, history, nextOperationIndex),
+    "provide_entity_classname_then_retry");
+  checkFailure(
+    createEntityCheckedForMapResult(
+      map,
+      "entity_create_checked",
+      QJsonObject{{"classname", "not_a_real_entity"}},
+      history,
+      nextOperationIndex),
+    "choose_defined_point_entity_classname_then_retry");
+  checkFailure(
+    tieBrushesForMapResult(
+      map, "entity_tie_brushes", QJsonObject{}, history, nextOperationIndex),
+    "provide_brush_entity_classname_then_retry");
+  checkFailure(
+    untieBrushesForMapResult(
+      map, "entity_untie_brushes", QJsonObject{}, history, nextOperationIndex),
+    "select_brush_entity_brushes_then_retry");
+
+  CHECK(history.empty());
+  CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+}
+
 TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
 {
   auto appControllerFixture = AppControllerFixture{};
