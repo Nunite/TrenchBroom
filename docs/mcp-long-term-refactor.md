@@ -202,6 +202,8 @@ Next Phase 2 item:
   marks successful validation as `mutatedDocument:false`.
 - Done: `operation_inspect` reports structured retry-safe target failures and
   marks successful inspection as `mutatedDocument:false`.
+- Done: `module_inspect` reports structured retry-safe target failures and marks
+  successful inspection as `mutatedDocument:false`.
 - Done: `module_compact` reports structured retry-safe target failures and marks
   successful stale metadata/session cleanup as `mutatedDocument:false`.
 - Done: `module_validate` reports structured retry-safe target failures for

@@ -4692,6 +4692,65 @@ TEST_CASE("McpBridgeServer module_validate reports recovery state")
     == "validate-module");
 }
 
+TEST_CASE("McpBridgeServer module_inspect reports recovery state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto missingId = moduleInspectForMapResult(
+    map, QJsonObject{}, metadataStore, moduleStore, objectRegistry);
+  CHECK(!missingId.ok);
+  CHECK_FALSE(missingId.error.details.value("mutatedDocument").toBool(true));
+  CHECK(missingId.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingId.error.details.value("recoveryAction").toString()
+    == "provide_module_id_then_retry");
+
+  const auto create = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"defaultMetadata", QJsonObject{{"moduleId", "inspect-module"}}},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(create.ok);
+
+  const auto inspect = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "inspect-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(inspect.ok);
+  CHECK_FALSE(inspect.result.value("mutatedDocument").toBool(true));
+  CHECK(inspect.result.value("moduleId").toString() == "inspect-module");
+  CHECK(inspect.result.value("liveObjectCount").toInt() == 1);
+}
+
 TEST_CASE("McpBridgeServer object transform summaries")
 {
   auto appControllerFixture = AppControllerFixture{};

@@ -363,6 +363,12 @@ McpBridgeToolResult moduleInspectResult(
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
   const std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult moduleInspectForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult moduleSelectResult(
   AppController& appController,
   const QJsonObject& params,

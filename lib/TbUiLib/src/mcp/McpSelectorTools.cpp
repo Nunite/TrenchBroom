@@ -2403,17 +2403,35 @@ McpBridgeToolResult moduleInspectResult(
   {
     return noActiveDocumentFailure();
   }
+  return moduleInspectForMapResult(
+    mapWindow->document().map(), params, metadataStore, moduleStore, objectRegistry);
+}
+
+McpBridgeToolResult moduleInspectForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
   const auto moduleId = params.value("moduleId").toString().trimmed();
   if (moduleId.isEmpty())
   {
-    return invalidParamsFailure("module_inspect requires moduleId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "module_inspect requires moduleId",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_module_id_then_retry"},
+      });
   }
-  auto& map = mapWindow->document().map();
   const auto documentFingerprint = documentFingerprintForMap(map);
   auto module =
     mergedModuleRecord(moduleId, documentFingerprint, metadataStore, moduleStore);
   auto summary = moduleSummary(map, module, metadataStore, objectRegistry);
   summary.insert("tool", "module_inspect");
+  summary.insert("mutatedDocument", false);
   if (params.value("idsMode").toString("sample") == "full")
   {
     summary.insert("objectIds", stringsToJson(module.objectIds));
