@@ -189,6 +189,9 @@ Next Phase 2 item:
   reject wrong-document history operations before mutation.
 - Done: `history_undo_to_operation` exists with structured partial-failure
   diagnostics.
+- Done: `history_undo_to_operation` reports structured `mutatedDocument:false`,
+  `retrySafe`, and recovery actions for missing or unknown target operation ids
+  before touching the native undo stack.
 - Done: stale target warnings are summarized by default in selector/module
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor

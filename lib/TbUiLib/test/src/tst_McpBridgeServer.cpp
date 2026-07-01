@@ -2825,6 +2825,44 @@ TEST_CASE("McpBridgeServer")
   }
 }
 
+TEST_CASE(
+  "McpBridgeServer history_undo_to_operation reports pre-mutation target failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+
+  const auto missingId = historyUndoToOperationForMapResult(map, history, QJsonObject{});
+  CHECK(!missingId.ok);
+  CHECK_FALSE(missingId.error.details.value("mutatedDocument").toBool(true));
+  CHECK_FALSE(missingId.error.details.value("partiallyUndone").toBool(true));
+  CHECK(missingId.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingId.error.details.value("recoveryAction").toString()
+    == "provide_operation_id_then_retry");
+
+  const auto unknownId = historyUndoToOperationForMapResult(
+    map, history, QJsonObject{{"operationId", "mcp-op-missing"}});
+  CHECK(!unknownId.ok);
+  CHECK_FALSE(unknownId.error.details.value("mutatedDocument").toBool(true));
+  CHECK_FALSE(unknownId.error.details.value("partiallyUndone").toBool(true));
+  CHECK(unknownId.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    unknownId.error.details.value("targetOperationId").toString() == "mcp-op-missing");
+  CHECK(
+    unknownId.error.details.value("recoveryAction").toString()
+    == "refresh_status_or_validate");
+}
+
 TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
 {
   auto appControllerFixture = AppControllerFixture{};

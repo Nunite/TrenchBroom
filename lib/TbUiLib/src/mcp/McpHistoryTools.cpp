@@ -986,6 +986,22 @@ QJsonObject documentMismatchDetails(
   return details;
 }
 
+QJsonObject historyUndoToOperationPreMutationDetails(
+  const QString& recoveryAction, const QString& targetOperationId = {})
+{
+  auto details = QJsonObject{
+    {"mutatedDocument", false},
+    {"partiallyUndone", false},
+    {"retrySafe", true},
+    {"recoveryAction", recoveryAction},
+  };
+  if (!targetOperationId.isEmpty())
+  {
+    details.insert("targetOperationId", targetOperationId);
+  }
+  return details;
+}
+
 McpBridgeToolResult historyUndoToOperationResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
@@ -1011,25 +1027,28 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
   const auto targetOperationId = params.value("operationId").toString().trimmed();
   if (targetOperationId.isEmpty())
   {
-    return invalidParamsFailure("history_undo_to_operation requires operationId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "history_undo_to_operation requires operationId",
+      historyUndoToOperationPreMutationDetails("provide_operation_id_then_retry"));
   }
 
   const auto targetIndex = findOperationIndex(history, targetOperationId);
   if (!targetIndex)
   {
-    return invalidParamsFailure(
-      QString{"Unknown MCP operation id: %1"}.arg(targetOperationId));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Unknown MCP operation id: %1"}.arg(targetOperationId),
+      historyUndoToOperationPreMutationDetails(
+        "refresh_status_or_validate", targetOperationId));
   }
   if (history[*targetIndex].undone)
   {
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::Forbidden,
       "Target MCP operation is already undone",
-      QJsonObject{
-        {"mutatedDocument", false},
-        {"targetOperationId", targetOperationId},
-        {"recoveryAction", "refresh_status_or_validate"},
-      });
+      historyUndoToOperationPreMutationDetails(
+        "refresh_status_or_validate", targetOperationId));
   }
 
   auto undoneOperationIds = QStringList{};
