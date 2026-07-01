@@ -4608,6 +4608,90 @@ TEST_CASE("McpBridgeServer selector metadata round trips through IR and operatio
     > compactWarnings.size());
 }
 
+TEST_CASE("McpBridgeServer module_validate reports recovery state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto missingId = moduleValidateForMapResult(
+    map, QJsonObject{}, history, metadataStore, moduleStore, objectRegistry);
+  CHECK(!missingId.ok);
+  CHECK_FALSE(missingId.error.details.value("mutatedDocument").toBool(true));
+  CHECK(missingId.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingId.error.details.value("recoveryAction").toString()
+    == "provide_module_id_then_retry");
+
+  const auto create = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"defaultMetadata", QJsonObject{{"moduleId", "validate-module"}}},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(create.ok);
+
+  const auto valid = moduleValidateForMapResult(
+    map,
+    QJsonObject{{"moduleId", "validate-module"}},
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(valid.ok);
+  CHECK_FALSE(valid.result.value("mutatedDocument").toBool(true));
+  CHECK(valid.result.value("valid").toBool());
+
+  const auto invalidContinuitySelector = moduleValidateForMapResult(
+    map,
+    QJsonObject{
+      {"moduleId", "validate-module"},
+      {"checkRouteContinuity", true},
+      {"continuitySelector",
+       QJsonObject{
+         {"min", QJsonArray{0, 0, 0}},
+       }},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  CHECK(!invalidContinuitySelector.ok);
+  CHECK_FALSE(
+    invalidContinuitySelector.error.details.value("mutatedDocument").toBool(true));
+  CHECK(invalidContinuitySelector.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidContinuitySelector.error.details.value("recoveryAction").toString()
+    == "fix_continuity_selector_then_retry");
+  CHECK(
+    invalidContinuitySelector.error.details.value("moduleId").toString()
+    == "validate-module");
+}
+
 TEST_CASE("McpBridgeServer object transform summaries")
 {
   auto appControllerFixture = AppControllerFixture{};

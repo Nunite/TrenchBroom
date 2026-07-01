@@ -204,6 +204,9 @@ Next Phase 2 item:
   marks successful inspection as `mutatedDocument:false`.
 - Done: `module_compact` reports structured retry-safe target failures and marks
   successful stale metadata/session cleanup as `mutatedDocument:false`.
+- Done: `module_validate` reports structured retry-safe target failures for
+  missing module ids and invalid continuity selectors, and marks successful
+  validation as `mutatedDocument:false`.
 - Done: stale target warnings are summarized by default in selector/module
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor

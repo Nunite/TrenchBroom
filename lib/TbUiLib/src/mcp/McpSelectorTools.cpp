@@ -2481,12 +2481,35 @@ McpBridgeToolResult moduleValidateResult(
   {
     return noActiveDocumentFailure();
   }
+  return moduleValidateForMapResult(
+    mapWindow->document().map(),
+    params,
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+}
+
+McpBridgeToolResult moduleValidateForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
   const auto moduleId = params.value("moduleId").toString().trimmed();
   if (moduleId.isEmpty())
   {
-    return invalidParamsFailure("module_validate requires moduleId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "module_validate requires moduleId",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_module_id_then_retry"},
+      });
   }
-  auto& map = mapWindow->document().map();
   const auto documentFingerprint = documentFingerprintForMap(map);
   auto module =
     mergedModuleRecord(moduleId, documentFingerprint, metadataStore, moduleStore);
@@ -2508,6 +2531,7 @@ McpBridgeToolResult moduleValidateResult(
   auto result = QJsonObject{
     {"tool", "module_validate"},
     {"moduleId", moduleId},
+    {"mutatedDocument", false},
     {"valid", staleCount == 0 && !nodes.empty()},
     {"objectCount", module.objectIds.size()},
     {"liveObjectCount", static_cast<int>(nodes.size())},
@@ -2546,7 +2570,15 @@ McpBridgeToolResult moduleValidateResult(
         continuityError);
       if (!continuityError.isEmpty())
       {
-        return invalidParamsFailure(continuityError);
+        return McpBridgeToolResult::failure(
+          mcp::McpErrorCode::InvalidParams,
+          continuityError,
+          QJsonObject{
+            {"mutatedDocument", false},
+            {"retrySafe", true},
+            {"recoveryAction", "fix_continuity_selector_then_retry"},
+            {"moduleId", moduleId},
+          });
       }
     }
     else
