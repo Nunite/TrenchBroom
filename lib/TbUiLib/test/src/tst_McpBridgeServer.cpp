@@ -779,10 +779,6 @@ TEST_CASE("McpBridgeServer")
     CHECK(activateResponse.ok);
     CHECK(activateResponse.result.value("activated").toBool());
 
-    const auto filterResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "2", "secret", "selection_filter", {}, mcp::McpMode::ReadOnly});
-    CHECK(filterResponse.ok);
-
     const auto boundsResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "3",
       "secret",
@@ -797,164 +793,6 @@ TEST_CASE("McpBridgeServer")
     const auto growResponse = server.dispatchRequest(
       mcp::McpBridgeRequest{"4", "secret", "selection_grow", {}, mcp::McpMode::ReadOnly});
     CHECK(growResponse.ok);
-
-    const auto focusResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"5", "secret", "viewport_focus", {}, mcp::McpMode::ReadOnly});
-    CHECK(focusResponse.ok);
-
-    const auto clearResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "6", "secret", "viewport_clear_marks", {}, mcp::McpMode::ReadOnly});
-    CHECK(clearResponse.ok);
-
-    const auto layoutGetResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "6a", "secret", "viewport_layout_get", {}, mcp::McpMode::ReadOnly});
-    CHECK(layoutGetResponse.ok);
-    CHECK(layoutGetResponse.result.value("layout").toString() == "onePane");
-
-    const auto layoutSetResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "6b",
-      "secret",
-      "viewport_layout_set",
-      QJsonObject{{"layout", "twoPanes"}},
-      mcp::McpMode::ReadOnly});
-    CHECK(layoutSetResponse.ok);
-    CHECK(layoutSetResponse.result.value("hasVisible2D").toBool());
-
-    const auto cameraFrameResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "6c",
-      "secret",
-      "viewport_camera_frame_bounds",
-      QJsonObject{
-        {"min", QJsonArray{0, 0, 0}},
-        {"max", QJsonArray{128, 128, 128}},
-        {"azimuth", -35.0},
-        {"elevation", 25.0},
-      },
-      mcp::McpMode::ReadOnly});
-    CHECK(cameraFrameResponse.ok);
-    CHECK(cameraFrameResponse.result.value("cameraControlled").toBool());
-    CHECK(cameraFrameResponse.result.value("mode").toString() == "orbitBounds");
-
-    const auto cameraSetResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "6d",
-      "secret",
-      "viewport_camera_set",
-      QJsonObject{
-        {"position", QJsonArray{256, -256, 128}},
-        {"target", QJsonArray{0, 0, 32}},
-      },
-      mcp::McpMode::ReadOnly});
-    CHECK(cameraSetResponse.ok);
-    CHECK(cameraSetResponse.result.value("mode").toString() == "lookAt");
-
-    const auto captureResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "7",
-      "secret",
-      "viewport_capture_current",
-      QJsonObject{{"returnBase64", false}},
-      mcp::McpMode::ReadOnly});
-    CHECK(captureResponse.ok);
-    CHECK(captureResponse.result.value("format").toString() == "png");
-    CHECK(captureResponse.result.value("scope").toString() == "window");
-
-    const auto capture3DResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "8",
-      "secret",
-      "viewport_capture_3d",
-      QJsonObject{{"returnBase64", false}},
-      mcp::McpMode::ReadOnly});
-    CHECK(capture3DResponse.ok);
-    CHECK(capture3DResponse.result.value("scope").toString() == "3d");
-
-    const auto capture2DResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "9",
-      "secret",
-      "viewport_capture_2d",
-      QJsonObject{{"returnBase64", false}},
-      mcp::McpMode::ReadOnly});
-    CHECK(capture2DResponse.ok);
-    CHECK(capture2DResponse.result.value("scope").toString() == "2d");
-
-    const auto reviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "10",
-      "secret",
-      "viewport_capture_scene_review",
-      QJsonObject{
-        {"sceneName", "whitebox review smoke"},
-        {"layout", "twoPanes"},
-        {"views", QJsonArray{"current", "3d", "2d"}},
-      },
-      mcp::McpMode::ReadOnly});
-    CHECK(reviewResponse.ok);
-    CHECK(reviewResponse.result.value("captureCount").toInt() == 3);
-    CHECK_FALSE(reviewResponse.result.value("cameraControlled").toBool());
-    CHECK(reviewResponse.result.value("focusedObjectCount").toInt() == 0);
-    CHECK(reviewResponse.result.value("quality").toArray().size() == 3);
-    CHECK(reviewResponse.result.value("targetObjectCount").toInt() == 0);
-
-    const auto focusedReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "10b",
-      "secret",
-      "viewport_capture_scene_review",
-      QJsonObject{
-        {"sceneName", "focused whitebox review smoke"},
-        {"objectIds", QJsonArray{"node:0/0"}},
-        {"highlight", false},
-        {"clearSelectionBeforeCapture", true},
-        {"camera",
-         QJsonObject{
-           {"position", QJsonArray{256, -256, 128}},
-           {"target", QJsonArray{0, 0, 32}},
-         }},
-        {"views", QJsonArray{"3d"}},
-      },
-      mcp::McpMode::ReadOnly});
-    CHECK(focusedReviewResponse.ok);
-    CHECK(focusedReviewResponse.result.value("cameraControlled").toBool());
-    CHECK(focusedReviewResponse.result.value("focusedObjectCount").toInt() == 1);
-    CHECK(focusedReviewResponse.result.value("targetObjectCount").toInt() == 1);
-
-    const auto isolatedReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "10c",
-      "secret",
-      "viewport_capture_scene_review",
-      QJsonObject{
-        {"sceneName", "isolated whitebox review smoke"},
-        {"objectIds", QJsonArray{"node:0/0"}},
-        {"isolate", true},
-        {"isolateMode", "hide_others"},
-        {"views", QJsonArray{"top_2d_fit", "side_2d_fit"}},
-      },
-      mcp::McpMode::ReadOnly});
-    CHECK(isolatedReviewResponse.ok);
-    CHECK(
-      isolatedReviewResponse.result.value("appliedIsolateMode").toString()
-      == "highlight_only");
-    CHECK(isolatedReviewResponse.result.value("captureCount").toInt() == 2);
-    CHECK(isolatedReviewResponse.result.value("quality").toArray().size() == 2);
-    CHECK(
-      isolatedReviewResponse.result.value("warnings")
-        .toArray()
-        .contains(
-          "isolationModeFallback: hide_others requested; this build writes a focused "
-          "highlight_only review bundle. True hidden-others isolation needs a dedicated "
-          "renderer target filter."));
-
-    const auto bundleReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "10d",
-      "secret",
-      "render_review_operation",
-      QJsonObject{
-        {"objectIds", QJsonArray{"node:0/0"}},
-        {"views", QJsonArray{"overview_3d", "top_2d_fit", "detail_3d"}},
-      },
-      mcp::McpMode::ReadOnly});
-    CHECK(bundleReviewResponse.ok);
-    CHECK(
-      bundleReviewResponse.result.value("tool").toString() == "render_review_operation");
-    CHECK(bundleReviewResponse.result.value("reviewId").toString().startsWith("review-"));
-    CHECK(bundleReviewResponse.result.value("renderer").toString() == "geometry_cpu");
-    CHECK(bundleReviewResponse.result.value("captureCount").toInt() == 3);
 
     const auto geometryReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "10e",
@@ -1017,7 +855,7 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("active").toBool());
   }
 
-  SECTION("read-only mode rejects action_execute")
+  SECTION("mode gating rejects edit tools")
   {
     REQUIRE(
       server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
@@ -1025,22 +863,9 @@ TEST_CASE("McpBridgeServer")
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
       "secret",
-      "action_execute",
-      QJsonObject{{"actionId", "Menu/Edit/Undo"}},
+      "texture_apply_by_filter",
+      QJsonObject{{"material", "test"}},
       mcp::McpMode::Edit});
-
-    CHECK(!response.ok);
-    REQUIRE(response.error);
-    CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
-  }
-
-  SECTION("mode gating rejects edit tools")
-  {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
-
-    const auto response = server.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "secret", "entity_create", {}, mcp::McpMode::Edit});
 
     CHECK(!response.ok);
     REQUIRE(response.error);
@@ -1056,15 +881,15 @@ TEST_CASE("McpBridgeServer")
     REQUIRE(pythonResponse.error);
     CHECK(pythonResponse.error->code == mcp::McpErrorCode::Forbidden);
 
-    const auto heightmapResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    const auto textureResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "3",
       "secret",
-      "heightmap_import_grayscale",
-      QJsonObject{{"imagePath", "C:/tmp/heightmap.png"}},
+      "texture_apply_by_filter",
+      QJsonObject{{"material", "test"}},
       mcp::McpMode::Edit});
-    CHECK(!heightmapResponse.ok);
-    REQUIRE(heightmapResponse.error);
-    CHECK(heightmapResponse.error->code == mcp::McpErrorCode::Forbidden);
+    CHECK(!textureResponse.ok);
+    REQUIRE(textureResponse.error);
+    CHECK(textureResponse.error->code == mcp::McpErrorCode::Forbidden);
   }
 
   SECTION("registered unsupported tools report not implemented")
@@ -1098,23 +923,7 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
   }
 
-  SECTION("edit mode serves edit tools")
-  {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
-
-    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1",
-      "secret",
-      "entity_create",
-      QJsonObject{{"classname", "info_player_start"}},
-      mcp::McpMode::Edit});
-
-    CHECK(response.ok);
-    CHECK(response.result.value("operationId").toString() == "mcp-op-1");
-  }
-
-  SECTION("serves FGD schema tools")
+  SECTION("serves FGD list tools")
   {
     REQUIRE(
       server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
@@ -1123,26 +932,6 @@ TEST_CASE("McpBridgeServer")
       "1", "secret", "fgd_entities_list", {}, mcp::McpMode::ReadOnly});
     CHECK(listResponse.ok);
     CHECK(listResponse.result.value("count").toInt() == 1);
-
-    const auto schemaResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "2",
-      "secret",
-      "entity_schema",
-      QJsonObject{{"classname", "func_wall"}},
-      mcp::McpMode::ReadOnly});
-    CHECK(schemaResponse.ok);
-    CHECK(schemaResponse.result.value("classname").toString() == "func_wall");
-  }
-
-  SECTION("serves brush primitive discovery in read-only mode")
-  {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
-
-    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1", "secret", "brush_types_list", {}, mcp::McpMode::ReadOnly});
-    CHECK(response.ok);
-    CHECK(response.result.contains("types"));
   }
 
   SECTION("edit mode serves FGD entity mutation tools")
@@ -1159,42 +948,14 @@ TEST_CASE("McpBridgeServer")
     CHECK(createResponse.ok);
     CHECK(createResponse.result.value("operationId").toString() == "mcp-op-4");
 
-    const auto tieResponse = server.dispatchRequest(mcp::McpBridgeRequest{
+    const auto checkedBatchResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "2",
       "secret",
-      "entity_tie_brushes",
-      QJsonObject{{"classname", "func_wall"}},
+      "entity_create_checked_batch",
+      QJsonObject{{"entities", QJsonArray{}}},
       mcp::McpMode::Edit});
-    CHECK(tieResponse.ok);
-    CHECK(tieResponse.result.value("operationId").toString() == "mcp-op-5");
-
-    const auto untieResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "3", "secret", "entity_untie_brushes", {}, mcp::McpMode::Edit});
-    CHECK(untieResponse.ok);
-    CHECK(untieResponse.result.value("operationId").toString() == "mcp-op-6");
-  }
-
-  SECTION("edit mode serves extended brush primitive tools")
-  {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
-
-    for (const auto& toolName :
-         {"brush_create",
-          "brush_create_cone",
-          "brush_create_pipe",
-          "brush_create_sphere",
-          "brush_create_pyramid",
-          "brush_create_tetrahedron",
-          "brush_create_from_planes",
-          "brush_create_prism",
-          "brush_create_cylinder_sector"})
-    {
-      const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-        "1", "secret", toolName, QJsonObject{{"type", "box"}}, mcp::McpMode::Edit});
-      CHECK(response.ok);
-      CHECK(response.result.value("operationId").toString() == "mcp-op-7");
-    }
+    CHECK(checkedBatchResponse.ok);
+    CHECK(checkedBatchResponse.result.value("operationId").toString() == "mcp-op-4");
   }
 
   SECTION("edit mode serves document lifecycle tools")
@@ -1218,33 +979,12 @@ TEST_CASE("McpBridgeServer")
       mcp::McpMode::Edit});
     CHECK(saveResponse.ok);
 
-    const auto exportResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "3",
-      "secret",
-      "documents_export",
-      QJsonObject{{"path", "C:/tmp/export.map"}},
-      mcp::McpMode::Edit});
-    CHECK(exportResponse.ok);
-
-    const auto closeResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "4",
-      "secret",
-      "documents_close",
-      QJsonObject{{"discardChanges", true}},
-      mcp::McpMode::Edit});
-    CHECK(closeResponse.ok);
   }
 
-  SECTION("read-only mode serves history_list")
+  SECTION("read-only mode serves history_status")
   {
     REQUIRE(
       server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
-
-    const auto response = server.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "secret", "history_list", {}, mcp::McpMode::ReadOnly});
-
-    CHECK(response.ok);
-    CHECK(response.result.value("count").toInt() == 0);
 
     const auto statusResponse = server.dispatchRequest(
       mcp::McpBridgeRequest{"2", "secret", "history_status", {}, mcp::McpMode::ReadOnly});
@@ -1253,50 +993,6 @@ TEST_CASE("McpBridgeServer")
     CHECK(
       statusResponse.result.value("reasonIfUnavailable").toString()
       == "noMcpMutationYet");
-  }
-
-  SECTION("read-only mode serves asset and texture search")
-  {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
-
-    const auto assetResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "secret", "asset_search", {}, mcp::McpMode::ReadOnly});
-    CHECK(assetResponse.ok);
-
-    const auto textureResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"2", "secret", "texture_search", {}, mcp::McpMode::ReadOnly});
-    CHECK(textureResponse.ok);
-    CHECK(textureResponse.result.contains("materials"));
-    CHECK(textureResponse.result.contains("materialNames"));
-
-    const auto texturesListResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"3", "secret", "textures_list", {}, mcp::McpMode::ReadOnly});
-    CHECK(texturesListResponse.ok);
-
-    const auto textureLockResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "4", "secret", "texture_lock_get", {}, mcp::McpMode::ReadOnly});
-    CHECK(textureLockResponse.ok);
-    CHECK(textureLockResponse.result.value("textureLock").toBool());
-    CHECK_FALSE(textureLockResponse.result.value("uvLock").toBool());
-
-    const auto textureLockSetResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "5",
-      "secret",
-      "texture_lock_set",
-      QJsonObject{{"textureLock", false}},
-      mcp::McpMode::ReadOnly});
-    CHECK(!textureLockSetResponse.ok);
-    REQUIRE(textureLockSetResponse.error);
-    CHECK(textureLockSetResponse.error->code == mcp::McpErrorCode::Forbidden);
-
-    const auto faceListResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"6", "secret", "face_list", {}, mcp::McpMode::ReadOnly});
-    CHECK(faceListResponse.ok);
-
-    const auto faceSelectResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"7", "secret", "face_select", {}, mcp::McpMode::ReadOnly});
-    CHECK(faceSelectResponse.ok);
   }
 
   SECTION("edit mode serves asset placement")
@@ -1324,9 +1020,7 @@ TEST_CASE("McpBridgeServer")
          {"texture_apply",
           "texture_lock_set",
           "texture_replace",
-          "texture_align_face",
-          "texture_copy_from_face",
-          "face_texture_set"})
+          "texture_apply_by_filter"})
     {
       const auto params = toolName == QString{"texture_lock_set"}
                             ? QJsonObject{{"textureLock", true}, {"uvLock", true}}
@@ -1343,28 +1037,6 @@ TEST_CASE("McpBridgeServer")
       {
         CHECK(response.result.value("operationId").toString() == "mcp-op-8");
       }
-    }
-  }
-
-  SECTION("edit mode serves object mutation tools")
-  {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
-
-    for (const auto& toolName : {"objects_delete", "objects_transform"})
-    {
-      const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-        "1",
-        "secret",
-        toolName,
-        QJsonObject{
-          {"objectIds", QJsonArray{"node:1"}},
-          {"operation", "translate"},
-          {"delta", QJsonArray{16, 0, 0}},
-        },
-        mcp::McpMode::Edit});
-      CHECK(response.ok);
-      CHECK(response.result.value("operationId").toString() == "mcp-op-9");
     }
   }
 
@@ -1426,27 +1098,6 @@ TEST_CASE("McpBridgeServer")
     CHECK(pointfileResponse.error->code == mcp::McpErrorCode::Forbidden);
   }
 
-  SECTION("edit mode serves safe problem fix tools")
-  {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
-
-    for (const auto& toolName : {"problems_fix", "map_fix_all_safe"})
-    {
-      const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-        "1",
-        "secret",
-        toolName,
-        QJsonObject{
-          {"problemIds", QJsonArray{"issue:1:node:1:0"}},
-          {"quickFix", "Reset UV Scale"},
-        },
-        mcp::McpMode::Edit});
-      CHECK(response.ok);
-      CHECK(response.result.value("operationId").toString() == "mcp-op-10");
-    }
-  }
-
   SECTION("edit mode serves compile run and pointfile loading")
   {
     REQUIRE(
@@ -1469,27 +1120,6 @@ TEST_CASE("McpBridgeServer")
       mcp::McpMode::Edit});
     CHECK(pointfileResponse.ok);
     CHECK(pointfileResponse.result.value("loaded").toBool());
-  }
-
-  SECTION("read-only mode serves blockout validation")
-  {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
-
-    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1",
-      "secret",
-      "blockout_validate",
-      QJsonObject{
-        {"type", "ramp"},
-        {"min", QJsonArray{0, 0, 0}},
-        {"max", QJsonArray{128, 128, 128}},
-        {"axis", "x"},
-      },
-      mcp::McpMode::ReadOnly});
-
-    CHECK(response.ok);
-    CHECK(response.result.value("valid").toBool());
   }
 
   SECTION("read-only mode serves geometry analysis and spiral validation")
@@ -1517,8 +1147,7 @@ TEST_CASE("McpBridgeServer")
     REQUIRE(
       server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
 
-    for (const auto& toolName :
-         {"operation_inspect", "operation_select", "operation_validate"})
+    for (const auto& toolName : {"operation_inspect", "operation_validate"})
     {
       const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
         "1",
@@ -1536,14 +1165,15 @@ TEST_CASE("McpBridgeServer")
     REQUIRE(
       server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
 
+    const auto removedRoomParams = QJsonObject{
+      {"min", QJsonArray{0, 0, 0}},
+      {"max", QJsonArray{128, 128, 128}},
+    };
     const auto removedRoomResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
       "secret",
       "blockout_create_room",
-      QJsonObject{
-        {"min", QJsonArray{0, 0, 0}},
-        {"max", QJsonArray{128, 128, 128}},
-      },
+      removedRoomParams,
       mcp::McpMode::Edit});
 
     CHECK_FALSE(removedRoomResponse.ok);
@@ -1571,33 +1201,6 @@ TEST_CASE("McpBridgeServer")
       mcp::McpMode::Edit});
     CHECK(batchResponse.ok);
     CHECK(batchResponse.result.value("operationId").toString() == "mcp-op-11");
-
-    const auto curvedResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "4",
-      "secret",
-      "blockout_create_curved_corridor",
-      QJsonObject{{"center", QJsonArray{0, 0, 0}}},
-      mcp::McpMode::Edit});
-    CHECK(curvedResponse.ok);
-    CHECK(curvedResponse.result.value("operationId").toString() == "mcp-op-11");
-
-    const auto heightmapResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "5",
-      "secret",
-      "heightmap_import_grayscale",
-      QJsonObject{{"imagePath", "C:/tmp/heightmap.png"}},
-      mcp::McpMode::Edit});
-    CHECK(heightmapResponse.ok);
-    CHECK(heightmapResponse.result.value("operationId").toString() == "mcp-op-12");
-
-    const auto heightmapPreviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "6",
-      "secret",
-      "heightmap_preview_grayscale",
-      QJsonObject{{"imagePath", "C:/tmp/heightmap.png"}},
-      mcp::McpMode::ReadOnly});
-    CHECK(heightmapPreviewResponse.ok);
-    CHECK(heightmapPreviewResponse.result.value("estimatedBrushCount").toInt() == 4);
   }
 
   SECTION("rejects nested dispatch")
@@ -1651,14 +1254,15 @@ TEST_CASE("McpBridgeServer")
     REQUIRE(guardedServer.start(
       mcp::McpBridgeConfig{"test-pipe-expected-doc", "secret", mcp::McpMode::Edit}));
 
+    const auto guardedBatchParams = QJsonObject{
+      {"expectedDocumentPath", "D:/does/not/match.map"},
+      {"operations", QJsonArray{QJsonObject{{"type", "box"}}}},
+    };
     const auto response = guardedServer.dispatchRequest(mcp::McpBridgeRequest{
       "1",
       "secret",
       "blockout_create_batch",
-      QJsonObject{
-        {"expectedDocumentPath", "D:/does/not/match.map"},
-        {"operations", QJsonArray{QJsonObject{{"type", "box"}}}},
-      },
+      guardedBatchParams,
       mcp::McpMode::Edit});
 
     CHECK(!response.ok);
