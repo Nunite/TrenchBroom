@@ -373,7 +373,7 @@ Next Phase 4 item:
 
 - Phase 4 is closed. Continue with Phase 5.
 
-### Phase 5 Status: Partial
+### Phase 5 Status: Done
 
 - Done: route target filtering has explicit selector/module guidance, mixed
   target warnings, and explicit slope/continuity mode routing in skill guidance.
@@ -384,13 +384,15 @@ Next Phase 4 item:
 - Done: review tools now report `semanticAcceptance` metadata and schema wording
   that makes `qualityValid` explicitly mean render readability only; the Agent or
   skill still must inspect the contact sheet against requested scene intent.
-- Missing: generic organic primitives remain a future kernel decision; current
-  cave/terrain strength stays in recipes.
+- Done: generic organic primitives are deferred. Current evidence shows
+  cave/terrain strength belongs in recipes (`cave_pass` and `terrain_pass`) with
+  visual review acceptance; no repeated independent workflow yet proves a
+  scene-neutral C++ kernel primitive is needed.
 
 Next Phase 5 item:
 
-- Decide whether a scene-neutral organic primitive is justified by repeated real
-  cave/terrain workflows, or keep that strength in recipes.
+- Phase 5 is closed. Continue with the file/module direction work only when a
+  concrete MCP change needs it.
 
 ### Phase 1: Catalog And Discovery Cleanup
 
