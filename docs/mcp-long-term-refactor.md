@@ -223,6 +223,8 @@ Next Phase 2 item:
 - Done: `texture_copy_from_face` reports structured `mutatedDocument:false`,
   `retrySafe`, and recovery actions for pre-mutation source-face and target-face
   failures.
+- Done: `texture_lock_set` reports `mutatedDocument:false` for editor lock-state
+  changes and structured retry-safe diagnostics for invalid lock parameters.
 - Done: `geometry_csg_selection` reports document identity on successful
   operation records and structured `mutatedDocument:false` / `retrySafe` /
   `recoveryAction` diagnostics for pre-mutation selection failures.

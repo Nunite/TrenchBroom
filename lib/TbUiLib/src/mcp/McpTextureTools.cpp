@@ -476,8 +476,7 @@ QJsonObject mutationResultJson(
   return result;
 }
 
-QJsonObject preMutationFailureDetails(
-  QJsonObject details, const QString& recoveryAction)
+QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
 {
   details.insert("mutatedDocument", false);
   details.insert("retrySafe", true);
@@ -707,31 +706,34 @@ McpBridgeToolResult textureLockGetResult(AppController& appController)
   return McpBridgeToolResult::success(textureLockJson(mapWindow->document().map()));
 }
 
-McpBridgeToolResult textureLockSetResult(
-  AppController& appController, const QJsonObject& params)
+McpBridgeToolResult textureLockSetForMapResult(mdl::Map& map, const QJsonObject& params)
 {
-  auto* mapWindow = appController.mapWindowManager().topMapWindow();
-  if (!mapWindow)
-  {
-    return noActiveDocumentFailure();
-  }
-
   const auto textureLockValue = params.value("textureLock");
   const auto uvLockValue = params.value("uvLock");
   if (textureLockValue.isUndefined() && uvLockValue.isUndefined())
   {
-    return invalidParamsFailure("texture_lock_set requires textureLock or uvLock");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "texture_lock_set requires textureLock or uvLock",
+      preMutationFailureDetails(QJsonObject{}, "provide_texture_or_uv_lock_then_retry"));
   }
   if (!textureLockValue.isUndefined() && !textureLockValue.isBool())
   {
-    return invalidParamsFailure("textureLock must be a boolean");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "textureLock must be a boolean",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "textureLock"}}, "fix_texture_lock_then_retry"));
   }
   if (!uvLockValue.isUndefined() && !uvLockValue.isBool())
   {
-    return invalidParamsFailure("uvLock must be a boolean");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "uvLock must be a boolean",
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "uvLock"}}, "fix_uv_lock_then_retry"));
   }
 
-  auto& map = mapWindow->document().map();
   auto& editorContext = map.editorContext();
   if (textureLockValue.isBool())
   {
@@ -748,7 +750,20 @@ McpBridgeToolResult textureLockSetResult(
 
   auto result = textureLockJson(map);
   result.insert("changed", true);
+  result.insert("mutatedDocument", false);
   return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult textureLockSetResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return textureLockSetForMapResult(mapWindow->document().map(), params);
 }
 
 std::optional<mdl::BrushFaceHandle> brushFaceHandleFromJson(

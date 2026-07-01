@@ -136,6 +136,7 @@ McpBridgeToolResult textureSearchForMapResult(mdl::Map& map, const QJsonObject& 
 McpBridgeToolResult textureLockGetResult(AppController& appController);
 McpBridgeToolResult textureLockSetResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult textureLockSetForMapResult(mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult textureApplyResult(
   AppController& appController,
   const QString& toolName,

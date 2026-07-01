@@ -5154,6 +5154,38 @@ TEST_CASE("McpBridgeServer texture_replace reports pre-mutation failures")
     == "provide_find_and_replace_then_retry");
 }
 
+TEST_CASE("McpBridgeServer texture_lock_set reports non-document mutation state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+
+  const auto missingParamsResponse = textureLockSetForMapResult(map, QJsonObject{});
+  REQUIRE_FALSE(missingParamsResponse.ok);
+  CHECK(
+    missingParamsResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(missingParamsResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingParamsResponse.error.details.value("recoveryAction").toString()
+    == "provide_texture_or_uv_lock_then_retry");
+
+  const auto response =
+    textureLockSetForMapResult(map, QJsonObject{{"textureLock", true}, {"uvLock", true}});
+  REQUIRE(response.ok);
+  CHECK(response.result.value("changed").toBool());
+  CHECK(response.result.value("textureLock").toBool());
+  CHECK(response.result.value("uvLock").toBool());
+  CHECK(response.result.value("mutatedDocument").toBool(true) == false);
+}
+
 TEST_CASE("McpBridgeServer texture_align_face reports pre-mutation failures")
 {
   auto appControllerFixture = AppControllerFixture{};
