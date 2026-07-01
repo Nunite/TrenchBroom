@@ -1481,9 +1481,10 @@ TEST_CASE("McpBridgeServer")
       "secret",
       "blockout_validate",
       QJsonObject{
-        {"type", "room"},
+        {"type", "ramp"},
         {"min", QJsonArray{0, 0, 0}},
         {"max", QJsonArray{128, 128, 128}},
+        {"axis", "x"},
       },
       mcp::McpMode::ReadOnly});
 
@@ -2548,8 +2549,7 @@ TEST_CASE("McpBridgeServer")
     CHECK(semanticAcceptance.value("required").toBool());
     CHECK(!semanticAcceptance.value("automated").toBool(true));
     CHECK(
-      semanticAcceptance.value("status").toString()
-      == "requires_human_or_skill_review");
+      semanticAcceptance.value("status").toString() == "requires_human_or_skill_review");
     CHECK(map.modified() == wasModified);
     CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
     CHECK(QFileInfo{response.result.value("outputDir").toString()}.isAbsolute());
@@ -3212,8 +3212,7 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
     document->map(), QJsonObject{{"objectIds", QJsonArray{"mcp-object-missing"}}});
   CHECK(!unknownObjectResponse.ok);
   CHECK(
-    unknownObjectResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    unknownObjectResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(unknownObjectResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     unknownObjectResponse.error.details.value("recoveryAction").toString()
@@ -3234,8 +3233,7 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
     });
   CHECK(!invalidFilterResponse.ok);
   CHECK(
-    invalidFilterResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    invalidFilterResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(invalidFilterResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     invalidFilterResponse.error.details.value("recoveryAction").toString()
@@ -3258,8 +3256,7 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
     });
   CHECK(!invalidBoundsResponse.ok);
   CHECK(
-    invalidBoundsResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    invalidBoundsResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(invalidBoundsResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     invalidBoundsResponse.error.details.value("recoveryAction").toString()
@@ -3291,9 +3288,7 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
   const auto invalidGrowResponse =
     selectionGrowForMapResult(document->map(), QJsonObject{{"mode", "cousins"}});
   CHECK(!invalidGrowResponse.ok);
-  CHECK(
-    invalidGrowResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+  CHECK(invalidGrowResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(invalidGrowResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     invalidGrowResponse.error.details.value("recoveryAction").toString()
@@ -3974,8 +3969,7 @@ TEST_CASE("McpBridgeServer selector delete reports pre-mutation failure state")
   const auto invalidSelectorResponse = objectsDeleteBySelectorForMapResult(
     map,
     "objects_delete_by_selector",
-    QJsonObject{
-      {"selector", QJsonObject{{"operationIds", QJsonArray{QJsonValue{42}}}}}},
+    QJsonObject{{"selector", QJsonObject{{"operationIds", QJsonArray{QJsonValue{42}}}}}},
     history,
     nextOperationIndex,
     metadataStore,
@@ -3984,8 +3978,7 @@ TEST_CASE("McpBridgeServer selector delete reports pre-mutation failure state")
 
   REQUIRE_FALSE(invalidSelectorResponse.ok);
   CHECK(
-    invalidSelectorResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    invalidSelectorResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(invalidSelectorResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     invalidSelectorResponse.error.details.value("recoveryAction").toString()
@@ -4080,8 +4073,8 @@ TEST_CASE("McpBridgeServer asset placement reports pre-mutation failures")
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
 
-  const auto missingPathResponse =
-    placeAssetForMapResult(map, "asset_place_model", QJsonObject{}, history, nextOperationIndex);
+  const auto missingPathResponse = placeAssetForMapResult(
+    map, "asset_place_model", QJsonObject{}, history, nextOperationIndex);
   REQUIRE_FALSE(missingPathResponse.ok);
   CHECK(missingPathResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(missingPathResponse.error.details.value("retrySafe").toBool(false));
@@ -4096,7 +4089,8 @@ TEST_CASE("McpBridgeServer asset placement reports pre-mutation failures")
     history,
     nextOperationIndex);
   REQUIRE_FALSE(typeMismatchResponse.ok);
-  CHECK(typeMismatchResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(
+    typeMismatchResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(
     typeMismatchResponse.error.details.value("recoveryAction").toString()
     == "choose_matching_asset_place_tool_or_path");
@@ -4108,7 +4102,8 @@ TEST_CASE("McpBridgeServer asset placement reports pre-mutation failures")
     history,
     nextOperationIndex);
   REQUIRE_FALSE(invalidOriginResponse.ok);
-  CHECK(invalidOriginResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(
+    invalidOriginResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(
     invalidOriginResponse.error.details.value("recoveryAction").toString()
     == "provide_valid_origin_then_retry");
@@ -4170,8 +4165,8 @@ TEST_CASE("McpBridgeServer problems_fix reports pre-mutation failures")
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
 
-  const auto missingIdsResponse =
-    problemsFixForMapResult(map, "problems_fix", QJsonObject{}, history, nextOperationIndex);
+  const auto missingIdsResponse = problemsFixForMapResult(
+    map, "problems_fix", QJsonObject{}, history, nextOperationIndex);
   REQUIRE_FALSE(missingIdsResponse.ok);
   CHECK(missingIdsResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(missingIdsResponse.error.details.value("retrySafe").toBool(false));
@@ -4187,8 +4182,7 @@ TEST_CASE("McpBridgeServer problems_fix reports pre-mutation failures")
     nextOperationIndex);
   REQUIRE_FALSE(missingQuickFixResponse.ok);
   CHECK(
-    missingQuickFixResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    missingQuickFixResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(
     missingQuickFixResponse.error.details.value("recoveryAction").toString()
     == "provide_quick_fix_then_retry");
@@ -4203,7 +4197,8 @@ TEST_CASE("McpBridgeServer problems_fix reports pre-mutation failures")
     history,
     nextOperationIndex);
   REQUIRE_FALSE(missingProblemResponse.ok);
-  CHECK(missingProblemResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(
+    missingProblemResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(
     missingProblemResponse.error.details.value("recoveryAction").toString()
     == "refresh_problems_then_retry");
@@ -4440,8 +4435,7 @@ TEST_CASE("McpBridgeServer ir_apply reports pre-mutation payload failures")
   CHECK(!invalidApplyResponse.ok);
   CHECK(invalidApplyResponse.error.message == "IR field must be an object");
   CHECK(
-    invalidApplyResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    invalidApplyResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(invalidApplyResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     invalidApplyResponse.error.details.value("recoveryAction").toString()
@@ -5304,8 +5298,7 @@ TEST_CASE("McpBridgeServer native group tools")
     objectRegistry);
   REQUIRE_FALSE(noGroupRenameResponse.ok);
   CHECK(
-    noGroupRenameResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    noGroupRenameResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(noGroupRenameResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     noGroupRenameResponse.error.details.value("recoveryAction").toString()
@@ -5321,8 +5314,7 @@ TEST_CASE("McpBridgeServer native group tools")
     &metadataStore);
   REQUIRE_FALSE(noGroupUngroupResponse.ok);
   CHECK(
-    noGroupUngroupResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    noGroupUngroupResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(noGroupUngroupResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     noGroupUngroupResponse.error.details.value("recoveryAction").toString()
@@ -5768,8 +5760,7 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
     nextOperationIndex);
   REQUIRE_FALSE(missingMaterialResponse.ok);
   CHECK(
-    missingMaterialResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    missingMaterialResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(missingMaterialResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     missingMaterialResponse.error.details.value("recoveryAction").toString()
@@ -5783,8 +5774,7 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
     nextOperationIndex);
   REQUIRE_FALSE(missingTargetResponse.ok);
   CHECK(
-    missingTargetResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    missingTargetResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(
     missingTargetResponse.error.details.value("recoveryAction").toString()
     == "refresh_status_or_fix_texture_targets");
@@ -5807,8 +5797,7 @@ TEST_CASE("McpBridgeServer texture_apply reports pre-mutation failures")
     objectRegistry);
   REQUIRE_FALSE(missingMaterialResponse.ok);
   CHECK(
-    missingMaterialResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    missingMaterialResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(missingMaterialResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     missingMaterialResponse.error.details.value("recoveryAction").toString()
@@ -5823,11 +5812,7 @@ TEST_CASE("McpBridgeServer texture_replace reports pre-mutation failures")
   auto nextOperationIndex = 1;
 
   const auto response = textureReplaceResult(
-    appController,
-    "texture_replace",
-    QJsonObject{},
-    history,
-    nextOperationIndex);
+    appController, "texture_replace", QJsonObject{}, history, nextOperationIndex);
   REQUIRE_FALSE(response.ok);
   CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(response.error.details.value("retrySafe").toBool(false));
@@ -5916,7 +5901,8 @@ TEST_CASE("McpBridgeServer texture_copy_from_face reports pre-mutation failures"
     nextOperationIndex,
     objectRegistry);
   REQUIRE_FALSE(missingSourceResponse.ok);
-  CHECK(missingSourceResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(
+    missingSourceResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(missingSourceResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     missingSourceResponse.error.details.value("recoveryAction").toString()
@@ -5952,7 +5938,8 @@ TEST_CASE("McpBridgeServer texture_copy_from_face reports pre-mutation failures"
     nextOperationIndex,
     objectRegistry);
   REQUIRE_FALSE(missingTargetResponse.ok);
-  CHECK(missingTargetResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(
+    missingTargetResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(missingTargetResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     missingTargetResponse.error.details.value("recoveryAction").toString()
@@ -6077,8 +6064,8 @@ TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
   CHECK(listResponse.result.value("count").toInt() == 1);
 
   mdl::deselectAll(map);
-  const auto missingListTargetResponse =
-    faceListForMapResult(map, QJsonObject{{"objectId", "missing"}}, history, objectRegistry);
+  const auto missingListTargetResponse = faceListForMapResult(
+    map, QJsonObject{{"objectId", "missing"}}, history, objectRegistry);
   REQUIRE_FALSE(missingListTargetResponse.ok);
   CHECK(
     missingListTargetResponse.error.details.value("mutatedDocument").toBool(true)
@@ -6092,8 +6079,7 @@ TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
     faceSelectForMapResult(map, QJsonObject{}, history, objectRegistry);
   REQUIRE_FALSE(missingTargetResponse.ok);
   CHECK(
-    missingTargetResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    missingTargetResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(missingTargetResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     missingTargetResponse.error.details.value("recoveryAction").toString()
@@ -6137,8 +6123,7 @@ TEST_CASE("McpBridgeServer face_texture_set reports pre-mutation failures")
     objectRegistry);
   REQUIRE_FALSE(missingTargetResponse.ok);
   CHECK(
-    missingTargetResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    missingTargetResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(missingTargetResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     missingTargetResponse.error.details.value("recoveryAction").toString()
@@ -6407,7 +6392,8 @@ TEST_CASE("McpBridgeServer batch blockout tools")
   const auto missingBoxesResponse = createBoxesBatchForMapResult(
     map, "brush_create_boxes_batch", QJsonObject{}, history, nextOperationIndex);
   REQUIRE_FALSE(missingBoxesResponse.ok);
-  CHECK(missingBoxesResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(
+    missingBoxesResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(missingBoxesResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     missingBoxesResponse.error.details.value("recoveryAction").toString()
@@ -7097,49 +7083,49 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     == "box");
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
-  const auto missingDoorBoundsResponse = blockoutCreateBatchForMapResult(
-    map,
-    "blockout_create_batch",
-    QJsonObject{
-      {"operations",
-       QJsonArray{
-         QJsonObject{
-           {"type", "doorway"},
-           {"min", QJsonArray{0, 0, 0}},
-           {"max", QJsonArray{128, 16, 128}},
-         },
-       }},
-    },
-    history,
-    nextOperationIndex);
-  REQUIRE(missingDoorBoundsResponse.ok);
-  const auto missingDoorBoundsValidation =
-    missingDoorBoundsResponse.result.value("validation").toObject();
-  CHECK_FALSE(missingDoorBoundsValidation.value("valid").toBool());
-  CHECK(missingDoorBoundsValidation.value("failedOperationType").toString() == "doorway");
-  const auto missingDoorBoundsErrors =
-    missingDoorBoundsValidation.value("errors").toArray();
-  REQUIRE(missingDoorBoundsErrors.size() == 1);
-  CHECK(missingDoorBoundsErrors.first().toString().contains(
-    "operations[0]: doorway requires doorMin and doorMax"));
-  CHECK_FALSE(missingDoorBoundsErrors.first().toString().contains(
-    "must be an array of three numbers"));
-  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+  for (const auto* removedType :
+       {"room", "corridor", "sky_shell", "doorway", "cover", "stairs"})
+  {
+    const auto removedTypeResponse = blockoutCreateBatchForMapResult(
+      map,
+      "blockout_create_batch",
+      QJsonObject{
+        {"operations",
+         QJsonArray{
+           QJsonObject{
+             {"type", removedType},
+             {"min", QJsonArray{0, 0, 0}},
+             {"max", QJsonArray{128, 128, 128}},
+           },
+         }},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(removedTypeResponse.ok);
+    const auto removedTypeValidation =
+      removedTypeResponse.result.value("validation").toObject();
+    CHECK_FALSE(removedTypeValidation.value("valid").toBool());
+    CHECK(removedTypeValidation.value("failedOperationIndex").toInt() == 0);
+    CHECK(removedTypeValidation.value("failedOperationType").toString() == removedType);
+    const auto removedTypeErrors = removedTypeValidation.value("errors").toArray();
+    REQUIRE(removedTypeErrors.size() == 1);
+    CHECK(removedTypeErrors.first().toString().contains(
+      QString{"%1 moved to trenchbroom-mcp-scene-workflow recipes"}.arg(removedType)));
+    CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
-  const auto validateDoorwayMissingBounds = blockoutValidateResult(QJsonObject{
-    {"type", "doorway"},
-    {"min", QJsonArray{0, 0, 0}},
-    {"max", QJsonArray{128, 16, 128}},
-  });
-  REQUIRE(validateDoorwayMissingBounds.ok);
-  CHECK_FALSE(validateDoorwayMissingBounds.result.value("valid").toBool());
-  const auto validateDoorwayErrors =
-    validateDoorwayMissingBounds.result.value("errors").toArray();
-  REQUIRE(validateDoorwayErrors.size() == 1);
-  CHECK(validateDoorwayErrors.first().toString().contains(
-    "doorway requires doorMin and doorMax"));
-  CHECK_FALSE(validateDoorwayErrors.first().toString().contains(
-    "must be an array of three numbers"));
+    const auto validateRemovedType = blockoutValidateResult(QJsonObject{
+      {"type", removedType},
+      {"min", QJsonArray{0, 0, 0}},
+      {"max", QJsonArray{128, 128, 128}},
+    });
+    REQUIRE(validateRemovedType.ok);
+    CHECK_FALSE(validateRemovedType.result.value("valid").toBool());
+    const auto validateRemovedTypeErrors =
+      validateRemovedType.result.value("errors").toArray();
+    REQUIRE(validateRemovedTypeErrors.size() == 1);
+    CHECK(validateRemovedTypeErrors.first().toString().contains(
+      QString{"%1 moved to trenchbroom-mcp-scene-workflow recipes"}.arg(removedType)));
+  }
 
   const auto partiallyInvalidResponse = blockoutCreateBatchForMapResult(
     map,
@@ -7332,34 +7318,6 @@ TEST_CASE("McpBridgeServer batch blockout tools")
           .first()
           .toString()
           .contains("offsets[0]"));
-  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
-
-  const auto invalidStairsResponse = blockoutCreateBatchForMapResult(
-    map,
-    "blockout_create_batch",
-    QJsonObject{
-      {"grid", 16},
-      {"operations",
-       QJsonArray{
-         QJsonObject{
-           {"type", "stairs"},
-           {"min", QJsonArray{512, 320, 32}},
-           {"max", QJsonArray{768, 608, 128}},
-           {"steps", 6},
-           {"axis", "x"},
-         },
-       }},
-    },
-    history,
-    nextOperationIndex);
-  REQUIRE(invalidStairsResponse.ok);
-  const auto invalidStairsValidation =
-    invalidStairsResponse.result.value("validation").toObject();
-  CHECK(!invalidStairsValidation.value("valid").toBool());
-  CHECK(invalidStairsValidation.value("failedOperationIndex").toInt() == 0);
-  CHECK(invalidStairsValidation.value("failedOperationType").toString() == "stairs");
-  CHECK(invalidStairsValidation.value("errors").toArray().first().toString().contains(
-    "integer units"));
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
 
   const auto invalidRepeatResponse = blockoutCreateBatchForMapResult(
@@ -8296,10 +8254,7 @@ TEST_CASE("McpBridgeServer route metadata tools")
          QJsonArray{
            QJsonObject{
              {"points2d",
-              QJsonArray{
-                QJsonArray{0, 0},
-                QJsonArray{64, 0},
-                QJsonArray{64, 64}}},
+              QJsonArray{QJsonArray{0, 0}, QJsonArray{64, 0}, QJsonArray{64, 64}}},
              {"metadata", "not an object"},
            },
          }},
@@ -8537,8 +8492,7 @@ TEST_CASE("McpBridgeServer route metadata tools")
       metadataStore);
     REQUIRE(topLevelCustomSelectResponse.ok);
     CHECK(
-      topLevelCustomSelectResponse.result.value("mutatedDocument").toBool(true)
-      == false);
+      topLevelCustomSelectResponse.result.value("mutatedDocument").toBool(true) == false);
     CHECK(topLevelCustomSelectResponse.result.value("count").toInt() == 1);
   }
 
@@ -8833,11 +8787,7 @@ TEST_CASE("McpBridgeServer checked entity batch")
   {
     const auto descendantCountBefore = map.worldNode().descendantCount();
     const auto missingEntitiesResponse = createEntityCheckedBatchForMapResult(
-      map,
-      "entity_create_checked_batch",
-      QJsonObject{},
-      history,
-      nextOperationIndex);
+      map, "entity_create_checked_batch", QJsonObject{}, history, nextOperationIndex);
     CHECK(!missingEntitiesResponse.ok);
     CHECK(
       missingEntitiesResponse.error.details.value("mutatedDocument").toBool(true)
@@ -8948,8 +8898,7 @@ TEST_CASE("McpBridgeServer checked entity batch")
       objectRegistry);
     REQUIRE_FALSE(invalidUpdateResponse.ok);
     CHECK(
-      invalidUpdateResponse.error.details.value("mutatedDocument").toBool(true)
-      == false);
+      invalidUpdateResponse.error.details.value("mutatedDocument").toBool(true) == false);
     CHECK(invalidUpdateResponse.error.details.value("retrySafe").toBool(false));
     CHECK(
       invalidUpdateResponse.error.details.value("recoveryAction").toString()
@@ -9101,8 +9050,7 @@ TEST_CASE("McpBridgeServer file based IR tools")
   CHECK(!invalidApplyResponse.ok);
   CHECK(invalidApplyResponse.error.message.contains("requires type"));
   CHECK(
-    invalidApplyResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    invalidApplyResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(invalidApplyResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     invalidApplyResponse.error.details.value("recoveryAction").toString()
@@ -9147,8 +9095,7 @@ TEST_CASE("McpBridgeServer file based IR tools")
   CHECK(!expiredPreviewResponse.ok);
   CHECK(expiredPreviewResponse.error.message.contains("Unknown or expired"));
   CHECK(
-    expiredPreviewResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    expiredPreviewResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(expiredPreviewResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     expiredPreviewResponse.error.details.value("recoveryAction").toString()
@@ -9327,8 +9274,7 @@ TEST_CASE("McpBridgeServer file based IR tools")
   CHECK(!unknownPreviewResponse.ok);
   CHECK(unknownPreviewResponse.error.message.contains("Unknown or expired"));
   CHECK(
-    unknownPreviewResponse.error.details.value("mutatedDocument").toBool(true)
-    == false);
+    unknownPreviewResponse.error.details.value("mutatedDocument").toBool(true) == false);
   CHECK(unknownPreviewResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     unknownPreviewResponse.error.details.value("recoveryAction").toString()

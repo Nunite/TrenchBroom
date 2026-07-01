@@ -1843,18 +1843,6 @@ QJsonObject irPreviewJson(const QJsonObject& ir)
         estimatedBrushCount += 2;
       }
     }
-    else if (type == "room" || type == "corridor" || type == "sky_shell")
-    {
-      estimatedBrushCount += 6;
-    }
-    else if (type == "doorway")
-    {
-      estimatedBrushCount += 4;
-    }
-    else if (type == "stairs")
-    {
-      estimatedBrushCount += std::max(1, operation.value("steps").toInt(8));
-    }
     else if (type == "path_ribbon")
     {
       const auto points = operation.value("points3d").isArray()
@@ -2774,11 +2762,7 @@ McpBridgeToolResult moduleCompactResult(
   }
 
   return moduleCompactForMapResult(
-    mapWindow->document().map(),
-    params,
-    metadataStore,
-    moduleStore,
-    objectRegistry);
+    mapWindow->document().map(), params, metadataStore, moduleStore, objectRegistry);
 }
 
 McpBridgeToolResult moduleCompactForMapResult(

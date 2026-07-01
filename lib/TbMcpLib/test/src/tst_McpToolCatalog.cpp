@@ -389,10 +389,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("asset_search"));
     CHECK(!names.contains("asset_place_model"));
 
-    const auto textureListSearch =
-      toolsSearchJson("textures_list", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    const auto textureListSearch = toolsSearchJson(
+      "textures_list", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
     REQUIRE(textureListSearch.size() == 1);
-    CHECK(textureListSearch.first().toObject().value("name").toString() == "textures_list");
+    CHECK(
+      textureListSearch.first().toObject().value("name").toString() == "textures_list");
     CHECK_FALSE(
       textureListSearch.first().toObject().value("visibleInCurrentProfile").toBool());
     CHECK(!names.contains("asset_place_sprite"));
@@ -899,26 +900,31 @@ TEST_CASE("McpToolCatalog")
     CHECK(batchProperties.value("defaultMetadata").isObject());
 
     const auto operationsProperty = batchProperties.value("operations").toObject();
-    CHECK(operationsProperty.value("description").toString().contains("compatibility"));
     CHECK(operationsProperty.value("description").toString().contains("skill recipes"));
     CHECK(operationsProperty.value("description").toString().contains("explicit"));
 
     const auto operationItemSchema = operationsProperty.value("items").toObject();
-    CHECK(operationItemSchema.value("description")
-            .toString()
-            .contains("Legacy compatibility"));
-    CHECK(operationItemSchema.value("description").toString().contains("quick sketches"));
+    const auto operationItemDescription =
+      operationItemSchema.value("description").toString();
+    CHECK(operationItemDescription.contains("Primitive examples"));
+    CHECK(operationItemDescription.contains("skill recipes"));
+    CHECK_FALSE(operationItemDescription.contains(R"("type":"room")"));
+    CHECK_FALSE(operationItemDescription.contains(R"("type":"corridor")"));
+    CHECK_FALSE(operationItemDescription.contains(R"("type":"stairs")"));
+    CHECK_FALSE(operationItemDescription.contains(R"("type":"doorway")"));
+    CHECK_FALSE(operationItemDescription.contains(R"("type":"cover")"));
+    CHECK_FALSE(operationItemDescription.contains(R"("type":"sky_shell")"));
     const auto operationItems = operationItemSchema.value("properties").toObject();
-    CHECK(operationItems.value("type")
-            .toObject()
-            .value("description")
-            .toString()
-            .contains("Legacy compatibility structural types"));
-    CHECK(operationItems.value("type")
-            .toObject()
-            .value("description")
-            .toString()
-            .contains("skill recipes/IR"));
+    const auto typeDescription =
+      operationItems.value("type").toObject().value("description").toString();
+    CHECK(typeDescription.contains("Primitive modeling types"));
+    CHECK(typeDescription.contains("skill recipes/IR"));
+    CHECK_FALSE(typeDescription.contains("room,"));
+    CHECK_FALSE(typeDescription.contains("corridor,"));
+    CHECK_FALSE(typeDescription.contains("stairs,"));
+    CHECK_FALSE(typeDescription.contains("doorway,"));
+    CHECK_FALSE(typeDescription.contains("cover,"));
+    CHECK_FALSE(typeDescription.contains("sky_shell"));
     CHECK(operationItems.value("metadata").isObject());
     CHECK(operationItems.value("parts").isObject());
     CHECK(operationItems.value("partMaterials").isObject());
@@ -930,21 +936,8 @@ TEST_CASE("McpToolCatalog")
             .value("description")
             .toString()
             .contains("360"));
-    CHECK(operationItems.value("doorMin")
-            .toObject()
-            .value("description")
-            .toString()
-            .contains("Required when type is doorway"));
-    CHECK(operationItems.value("doorMin")
-            .toObject()
-            .value("description")
-            .toString()
-            .contains("does not subtract from existing walls"));
-    CHECK(operationItems.value("doorMax")
-            .toObject()
-            .value("description")
-            .toString()
-            .contains("Required when type is doorway"));
+    CHECK_FALSE(operationItems.value("doorMin").isObject());
+    CHECK_FALSE(operationItems.value("doorMax").isObject());
     CHECK(operationItems.value("orderStart").isObject());
     CHECK(operationItems.value("orderStep").isObject());
 
@@ -1032,7 +1025,8 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(currentSceneTool);
     CHECK(currentSceneTool->description.contains("active document"));
     CHECK(currentSceneTool->description.contains("preferredCapturePath"));
-    CHECK(currentSceneTool->description.contains("qualityValid only checks render readability"));
+    CHECK(currentSceneTool->description.contains(
+      "qualityValid only checks render readability"));
 
     const auto currentSceneProperties =
       currentSceneTool->inputSchema.value("properties").toObject();
@@ -1097,7 +1091,8 @@ TEST_CASE("McpToolCatalog")
 
     const auto selectorTool = findToolDefinition("render_review_selector");
     REQUIRE(selectorTool);
-    CHECK(selectorTool->description.contains("qualityValid only checks render readability"));
+    CHECK(
+      selectorTool->description.contains("qualityValid only checks render readability"));
     CHECK(selectorTool->inputSchema.value("properties")
             .toObject()
             .value("labelParts")
@@ -1105,7 +1100,8 @@ TEST_CASE("McpToolCatalog")
 
     const auto moduleReviewTool = findToolDefinition("module_render_review");
     REQUIRE(moduleReviewTool);
-    CHECK(moduleReviewTool->description.contains("qualityValid only checks render readability"));
+    CHECK(moduleReviewTool->description.contains(
+      "qualityValid only checks render readability"));
     CHECK(moduleReviewTool->inputSchema.value("properties")
             .toObject()
             .value("labelParts")
@@ -1233,8 +1229,13 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemDescription.contains(R"("counts":6)"));
     CHECK(itemDescription.contains(R"("type":"stepped_mass")"));
     CHECK(itemDescription.contains(R"("type":"support_posts_between")"));
-    CHECK(itemDescription.contains("Legacy compatibility"));
     CHECK(itemDescription.contains("skill recipes"));
+    CHECK_FALSE(itemDescription.contains(R"("type":"room")"));
+    CHECK_FALSE(itemDescription.contains(R"("type":"corridor")"));
+    CHECK_FALSE(itemDescription.contains(R"("type":"stairs")"));
+    CHECK_FALSE(itemDescription.contains(R"("type":"doorway")"));
+    CHECK_FALSE(itemDescription.contains(R"("type":"cover")"));
+    CHECK_FALSE(itemDescription.contains(R"("type":"sky_shell")"));
     CHECK(
       operations.value("items").toObject().value("required").toArray().contains("type"));
 
@@ -1256,6 +1257,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(itemProperties.value("bottomZ").isObject());
     CHECK(itemProperties.value("topZ").isObject());
     CHECK(itemProperties.value("postSize").isObject());
+    CHECK_FALSE(itemProperties.value("doorMin").isObject());
+    CHECK_FALSE(itemProperties.value("doorMax").isObject());
     const auto childOperation = itemProperties.value("operation").toObject();
     CHECK(childOperation.value("type").toString() == "object");
     CHECK(childOperation.value("additionalProperties").toBool());
@@ -1409,7 +1412,8 @@ TEST_CASE("McpToolCatalog")
     }
   }
 
-  SECTION("catalog exposes lifecycle/category metadata and blocks arbitrary execution tools")
+  SECTION(
+    "catalog exposes lifecycle/category metadata and blocks arbitrary execution tools")
   {
     const auto knownCategories = QStringList{
       "asset",
@@ -1803,56 +1807,55 @@ TEST_CASE("McpToolCatalog")
 
   SECTION("selector and module tools share moduleId wording")
   {
-    const auto propertyDescription = [](const QString& toolName,
-                                        const QString& propertyName) {
-      const auto tool = findToolDefinition(toolName);
-      REQUIRE(tool);
-      return tool->inputSchema.value("properties")
-        .toObject()
-        .value(propertyName)
-        .toObject()
-        .value("description")
-        .toString();
-    };
+    const auto propertyDescription =
+      [](const QString& toolName, const QString& propertyName) {
+        const auto tool = findToolDefinition(toolName);
+        REQUIRE(tool);
+        return tool->inputSchema.value("properties")
+          .toObject()
+          .value(propertyName)
+          .toObject()
+          .value("description")
+          .toString();
+      };
 
     const auto selectorTool = findToolDefinition("selector_preview");
     REQUIRE(selectorTool);
-    const auto selectorModuleIdDescription =
-      selectorTool->inputSchema.value("properties")
-        .toObject()
-        .value("selector")
-        .toObject()
-        .value("properties")
-        .toObject()
-        .value("moduleId")
-        .toObject()
-        .value("description")
-        .toString();
+    const auto selectorModuleIdDescription = selectorTool->inputSchema.value("properties")
+                                               .toObject()
+                                               .value("selector")
+                                               .toObject()
+                                               .value("properties")
+                                               .toObject()
+                                               .value("moduleId")
+                                               .toObject()
+                                               .value("description")
+                                               .toString();
 
     CHECK(selectorModuleIdDescription == "Session metadata moduleId.");
-    CHECK(propertyDescription("module_inspect", "moduleId")
-          == selectorModuleIdDescription);
-    CHECK(propertyDescription("module_select", "moduleId")
-          == selectorModuleIdDescription);
-    CHECK(propertyDescription("module_render_review", "moduleId")
-          == selectorModuleIdDescription);
-    CHECK(propertyDescription("module_validate", "moduleId")
-          == selectorModuleIdDescription);
-    CHECK(propertyDescription("module_compact", "moduleId")
-          == selectorModuleIdDescription);
+    CHECK(
+      propertyDescription("module_inspect", "moduleId") == selectorModuleIdDescription);
+    CHECK(
+      propertyDescription("module_select", "moduleId") == selectorModuleIdDescription);
+    CHECK(
+      propertyDescription("module_render_review", "moduleId")
+      == selectorModuleIdDescription);
+    CHECK(
+      propertyDescription("module_validate", "moduleId") == selectorModuleIdDescription);
+    CHECK(
+      propertyDescription("module_compact", "moduleId") == selectorModuleIdDescription);
   }
 
   SECTION("selector schema keeps metadata fields together")
   {
     const auto selectorTool = findToolDefinition("selector_preview");
     REQUIRE(selectorTool);
-    const auto selectorProperties =
-      selectorTool->inputSchema.value("properties")
-        .toObject()
-        .value("selector")
-        .toObject()
-        .value("properties")
-        .toObject();
+    const auto selectorProperties = selectorTool->inputSchema.value("properties")
+                                      .toObject()
+                                      .value("selector")
+                                      .toObject()
+                                      .value("properties")
+                                      .toObject();
 
     const auto metadataFields = QStringList{
       "moduleId",
@@ -1877,17 +1880,17 @@ TEST_CASE("McpToolCatalog")
 
   SECTION("recovery tools share live operation target wording")
   {
-    const auto propertyDescription = [](const QString& toolName,
-                                        const QString& propertyName) {
-      const auto tool = findToolDefinition(toolName);
-      REQUIRE(tool);
-      return tool->inputSchema.value("properties")
-        .toObject()
-        .value(propertyName)
-        .toObject()
-        .value("description")
-        .toString();
-    };
+    const auto propertyDescription =
+      [](const QString& toolName, const QString& propertyName) {
+        const auto tool = findToolDefinition(toolName);
+        REQUIRE(tool);
+        return tool->inputSchema.value("properties")
+          .toObject()
+          .value(propertyName)
+          .toObject()
+          .value("description")
+          .toString();
+      };
 
     const auto transformOperationId =
       propertyDescription("objects_transform", "operationId");
@@ -1913,16 +1916,18 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(faceTextureTool);
     const auto faceTextureProperties =
       faceTextureTool->inputSchema.value("properties").toObject();
-    CHECK(faceTextureProperties.value("operationId")
-            .toObject()
-            .value("description")
-            .toString()
-          == slopeOperationId);
-    CHECK(faceTextureProperties.value("operationIds")
-            .toObject()
-            .value("description")
-            .toString()
-          == slopeOperationIds);
+    CHECK(
+      faceTextureProperties.value("operationId")
+        .toObject()
+        .value("description")
+        .toString()
+      == slopeOperationId);
+    CHECK(
+      faceTextureProperties.value("operationIds")
+        .toObject()
+        .value("description")
+        .toString()
+      == slopeOperationIds);
   }
 
   SECTION("mode gating rejects edit tools in read-only mode")

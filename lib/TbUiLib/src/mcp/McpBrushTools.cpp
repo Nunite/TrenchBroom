@@ -65,6 +65,15 @@ namespace mcp = tb::mcp;
 namespace
 {
 
+const auto RemovedPrefabBatchTypes = QStringList{
+  "room",
+  "corridor",
+  "sky_shell",
+  "doorway",
+  "cover",
+  "stairs",
+};
+
 constexpr auto DefaultGeometrySampleLimit = 6;
 
 struct PathRibbonSegment
@@ -243,8 +252,7 @@ QJsonObject mutationResultJson(const McpOperationRecord& operation)
   return result;
 }
 
-QJsonObject preMutationFailureDetails(
-  QJsonObject details, const QString& recoveryAction)
+QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
 {
   details.insert("mutatedDocument", false);
   details.insert("retrySafe", true);
@@ -3401,6 +3409,12 @@ SpiralGeometryChecks analyzeSpiralGeometry(
 std::optional<QJsonObject> validateBlockoutParams(
   const QString& type, const QJsonObject& params, QString& error)
 {
+  if (RemovedPrefabBatchTypes.contains(type))
+  {
+    error = QString{"%1 moved to trenchbroom-mcp-scene-workflow recipes"}.arg(type);
+    return std::nullopt;
+  }
+
   if (type == "spiral_stairs")
   {
     const auto spiralParams = spiralStairsParamsFromJson(params, error);
@@ -3425,40 +3439,7 @@ std::optional<QJsonObject> validateBlockoutParams(
     return std::nullopt;
   }
 
-  if (type == "room" || type == "corridor" || type == "sky_shell")
-  {
-    const auto thickness = optionalDouble(params, "thickness", 16.0);
-    if (!validThickness(thickness))
-    {
-      error = "thickness must be greater than zero";
-      return std::nullopt;
-    }
-  }
-  else if (type == "stairs")
-  {
-    if (optionalSize(params, "steps", 8) == 0)
-    {
-      error = "steps must be greater than zero";
-      return std::nullopt;
-    }
-  }
-  else if (type == "doorway")
-  {
-    if (!requireDoorwayBounds(params, error))
-    {
-      return std::nullopt;
-    }
-    const auto door = boundsFromJson(params, "doorMin", "doorMax", error);
-    if (!door)
-    {
-      return std::nullopt;
-    }
-    if (!doorwayBounds(*bounds, *door, error))
-    {
-      return std::nullopt;
-    }
-  }
-  else if (type != "ramp" && type != "cover")
+  if (type != "ramp")
   {
     error = "Unknown blockout type";
     return std::nullopt;
@@ -4804,7 +4785,13 @@ std::vector<mdl::Node*> compileBatchOperation(
       error);
   }
 
-  if (type == "box" || type == "cover")
+  if (RemovedPrefabBatchTypes.contains(type))
+  {
+    error = QString{"%1 moved to trenchbroom-mcp-scene-workflow recipes"}.arg(type);
+    return {};
+  }
+
+  if (type == "box")
   {
     const auto bounds = boundsFromJson(operation, error);
     if (!bounds)
@@ -4851,79 +4838,6 @@ std::vector<mdl::Node*> compileBatchOperation(
       return {};
     }
     return {new mdl::BrushNode{std::move(*brush)}};
-  }
-
-  if (type == "room" || type == "corridor")
-  {
-    const auto bounds = boundsFromJson(operation, error);
-    if (!bounds)
-    {
-      return {};
-    }
-    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
-    if (!snappedBounds)
-    {
-      return {};
-    }
-    const auto shellBounds = roomShellBounds(
-      *snappedBounds,
-      snapToGrid(optionalDouble(operation, "thickness", 16.0), grid),
-      error);
-    if (!shellBounds)
-    {
-      return {};
-    }
-    return brushNodesFromBounds(builder, *shellBounds, material, error);
-  }
-
-  if (type == "sky_shell")
-  {
-    const auto bounds = boundsFromJson(operation, error);
-    if (!bounds)
-    {
-      return {};
-    }
-    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
-    if (!snappedBounds)
-    {
-      return {};
-    }
-    return brushNodesFromBounds(
-      builder,
-      skyShellBounds(
-        *snappedBounds, snapToGrid(optionalDouble(operation, "thickness", 16.0), grid)),
-      mcpOptionalString(operation, "material", "sky"),
-      error);
-  }
-
-  if (type == "stairs")
-  {
-    if (!partRequested(operation, "steps"))
-    {
-      return {};
-    }
-    const auto bounds = boundsFromJson(operation, error);
-    if (!bounds)
-    {
-      return {};
-    }
-    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
-    if (!snappedBounds)
-    {
-      return {};
-    }
-    const auto axis = axisFromJson(operation, "axis", vm::axis::x, error);
-    if (!axis)
-    {
-      return {};
-    }
-    const auto stairBoxes =
-      stairsBounds(*snappedBounds, optionalSize(operation, "steps", 8), *axis, error);
-    if (!stairBoxes)
-    {
-      return {};
-    }
-    return brushNodesFromBounds(builder, *stairBoxes, material, error);
   }
 
   if (type == "stepped_mass")
@@ -5083,40 +4997,6 @@ std::vector<mdl::Node*> compileBatchOperation(
       return {};
     }
     return {new mdl::BrushNode{std::move(brush.value())}};
-  }
-
-  if (type == "doorway")
-  {
-    const auto bounds = boundsFromJson(operation, error);
-    if (!bounds)
-    {
-      return {};
-    }
-    const auto snappedBounds = snapBoundsToGrid(*bounds, grid, error);
-    if (!snappedBounds)
-    {
-      return {};
-    }
-    if (!requireDoorwayBounds(operation, error))
-    {
-      return {};
-    }
-    const auto door = boundsFromJson(operation, "doorMin", "doorMax", error);
-    if (!door)
-    {
-      return {};
-    }
-    const auto snappedDoor = snapBoundsToGrid(*door, grid, error);
-    if (!snappedDoor)
-    {
-      return {};
-    }
-    const auto segments = doorwayBounds(*snappedBounds, *snappedDoor, error);
-    if (!segments)
-    {
-      return {};
-    }
-    return brushNodesFromBounds(builder, *segments, material, error);
   }
 
   if (type == "prism")
@@ -5492,6 +5372,17 @@ McpBridgeToolResult blockoutCreateResult(
       mapWindow->document().map(), params, history, nextOperationIndex);
   }
 
+  const auto removedToolPrefix = QString{"blockout_create_"};
+  if (
+    toolName.startsWith(removedToolPrefix)
+    && RemovedPrefabBatchTypes.contains(toolName.mid(removedToolPrefix.size())))
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::ToolNotFound,
+      QString{"%1 moved to trenchbroom-mcp-scene-workflow recipes"}.arg(toolName),
+      preMutationFailureDetails({}, "use_skill_recipe_then_ir_apply"));
+  }
+
   auto error = QString{};
   auto& map = mapWindow->document().map();
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
@@ -5606,7 +5497,13 @@ McpBridgeToolResult blockoutCreateResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, map, toolName, transactionName, *changedObjectIds, result);
+    history,
+    nextOperationIndex,
+    map,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result);
   result.insert("brushCount", brushCount);
   result.insert("material", QString::fromStdString(material));
   result.insert(
@@ -6338,8 +6235,7 @@ McpBridgeToolResult createBoxesBatchForMapResult(
         mcp::McpErrorCode::InvalidParams,
         QString{"boxes[%1] must be an object"}.arg(i),
         preMutationFailureDetails(
-          QJsonObject{{"targetSource", "boxes"}},
-          "fix_box_spec_objects_then_retry"));
+          QJsonObject{{"targetSource", "boxes"}}, "fix_box_spec_objects_then_retry"));
     }
     auto operation = boxes[i].toObject();
     operation.insert("type", "box");
@@ -6361,7 +6257,8 @@ McpBridgeToolResult createBoxesBatchForMapResult(
     batchParams.insert("material", params.value("material"));
   }
 
-  return blockoutCreateBatchForMapResult(map, toolName, batchParams, history, nextOperationIndex);
+  return blockoutCreateBatchForMapResult(
+    map, toolName, batchParams, history, nextOperationIndex);
 }
 
 McpBridgeToolResult blockoutCreateBatchForMapResult(
@@ -6846,7 +6743,13 @@ McpBridgeToolResult createBrushForMapResult(
 
   auto result = QJsonObject{};
   mcpRecordOperation(
-    history, nextOperationIndex, map, toolName, transactionName, *changedObjectIds, result);
+    history,
+    nextOperationIndex,
+    map,
+    toolName,
+    transactionName,
+    *changedObjectIds,
+    result);
   result.insert("type", type);
   result.insert("brushCount", brushJson.size());
   result.insert("bounds", boundsToJson(bounds));

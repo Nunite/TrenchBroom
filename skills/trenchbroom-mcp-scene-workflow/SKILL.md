@@ -121,7 +121,8 @@ primitive, selector/module operation, validator, review feature, or compact outp
 improvement. Promote recipe behavior into MCP only after repeated independent
 workflows prove it is a generic editor capability.
 
-The currently bundled prefab-like recipe is `ascending_loop`. Removed or failed
+Bundled prefab-like recipes are intentionally small: `ascending_loop`,
+`rect_shell`, `opening_wall`, `cover_block`, and `stair_run`. Removed or failed
 visual-acceptance recipes should be rebuilt as new deterministic IR recipes only
 after explicit human visual acceptance, not restored as C++ MCP prefab tools.
 
@@ -152,11 +153,12 @@ when the shape matters.
 Do not look for direct legacy helpers such as `blockout_create_room`,
 `blockout_create_doorway`, `blockout_create_cover`, or
 `blockout_create_sky_shell`; those MCP tool names are removed from the catalog.
-For room, doorway, cover, sky shell, simple stair, or ramp composition, prefer
-recipe/IR or explicit primitive operations in `blockout_create_batch`. The legacy
-batch `doorway` operation creates a new segmented wall with an opening; it does
-not cut existing brushes. For openings in existing geometry, select the target wall
-and cutter brush, then use `geometry_csg_selection(operation:"subtract")`.
+For room, corridor, sky shell, doorway, cover, and straight stair composition,
+use `rect_shell`, `opening_wall`, `cover_block`, or `stair_run` recipes, or write
+explicit primitive IR. `opening_wall` creates a new segmented wall with an
+opening; it does not cut existing brushes. For openings in existing geometry,
+select the target wall and cutter brush, then use
+`geometry_csg_selection(operation:"subtract")`.
 
 ## Architectural Rules
 

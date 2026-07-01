@@ -312,15 +312,18 @@ QJsonObject selectorSchema()
   properties.insert("metadata", genericMetadataSchema());
   properties.insert("operationId", stringProperty("Single MCP operation id target."));
   properties.insert("operationIds", arrayProperty("MCP operation id targets."));
-  properties.insert("type", stringProperty("Node type filter, e.g. brush, entity, group."));
+  properties.insert(
+    "type", stringProperty("Node type filter, e.g. brush, entity, group."));
   properties.insert("classname", stringProperty("Entity classname filter."));
   properties.insert("targetname", stringProperty("Entity targetname filter."));
   properties.insert("material", stringProperty("Brush material filter."));
-  properties.insert("query", stringProperty("Text query over id/type/name/entity properties."));
+  properties.insert(
+    "query", stringProperty("Text query over id/type/name/entity properties."));
   properties.insert("min", vec3Property("Optional bounds minimum."));
   properties.insert("max", vec3Property("Optional bounds maximum."));
   properties.insert("boundsMode", stringProperty("Bounds mode: intersects or contains."));
-  properties.insert("limit", integerProperty("Maximum matched objects, defaults to 100."));
+  properties.insert(
+    "limit", integerProperty("Maximum matched objects, defaults to 100."));
 
   return QJsonObject{
     {"type", "object"},
@@ -385,11 +388,10 @@ QJsonObject blockoutBatchOperationSchema()
     {"type", "object"},
     {"description",
      "Typed Blockout IR operation object. Primitive modeling operations should be "
-     "preferred for ordinary Agent-generated geometry. Legacy structural operation "
-     "types such as room, corridor, stairs, ramp, doorway, cover, and sky_shell remain "
-     "for compatibility and quick sketches only; reusable scene composition should "
-     "come from skill recipes that emit IR, or from explicit box/prism/polyhedron/"
-     "brush_create_polygon_batch primitives. Primitive examples: "
+     "preferred for ordinary Agent-generated geometry. Room, corridor, sky shell, "
+     "doorway, cover, and straight stair composition moved to skill recipes that "
+     "emit IR. Use explicit box/prism/polyhedron/brush_create_polygon_batch "
+     "primitives for custom structures. Primitive examples: "
      R"({"type":"box","min":[0,0,0],"max":[128,128,16],"material":"clip"}; )"
      R"({"type":"cylinder","min":[-64,-64,0],"max":[64,64,128],)"
      R"("sides":16,"axis":"z"}; )"
@@ -408,39 +410,28 @@ QJsonObject blockoutBatchOperationSchema()
      R"("levels":5,"inset":96,"stepHeight":64}; )"
      R"({"type":"support_posts_between","points2d":[[-256,-256],[256,-256]],)"
      R"("bottomZ":0,"topZ":192,"postSize":32}; )"
-     "Legacy compatibility quick-sketch examples: "
-     R"({"type":"room","min":[0,0,0],"max":[512,512,128],"thickness":16}; )"
-     R"({"type":"corridor","min":[0,0,0],"max":[512,128,128],"thickness":16}; )"
      R"({"type":"curved_corridor","center":[0,0,0],"innerRadius":128,)"
      R"("outerRadius":256,"startAngle":0,"turnDegrees":90,"height":128,)"
      R"("segments":8,"wallThickness":16,"caps":"both"}; )"
      R"({"type":"arc_ramp","center":[0,0,0],"radius":256,"width":128,)"
      R"("startAngle":0,"turnDegrees":180,"rise":128,"segments":24,) "
      R"("thickness":16}; )"
-     R"({"type":"stairs","min":[0,0,0],"max":[256,128,128],"steps":8,"axis":"x"}; )"
      R"({"type":"ramp_between","start":[0,0,0],"end":[256,0,64],)"
      R"("width":128,"thickness":16}; )"
      R"({"type":"wedge","min":[0,0,0],"max":[256,128,64],"axis":"x"}; )"
-     R"({"type":"ramp","min":[0,0,0],"max":[256,128,64],"axis":"x"}; )"
-     R"({"type":"doorway","min":[0,0,0],"max":[256,16,128],)"
-     R"("doorMin":[96,0,0],"doorMax":[160,16,96]}; )"
-     R"({"type":"cover","min":[0,0,0],"max":[64,32,48]}; )"
-     R"({"type":"sky_shell","min":[-512,-512,0],"max":[512,512,256],"thickness":16}.)"},
+     R"({"type":"ramp","min":[0,0,0],"max":[256,128,64],"axis":"x"}.)"},
     {"properties",
      QJsonObject{
        {"type",
         stringProperty("Operation type. Primitive modeling types: box, cylinder, prism, "
                        "polyhedron, cylinder_sector, path_ribbon, repeat_translate, "
                        "repeat_grid, stepped_mass, support_posts_between, arc_ramp, "
-                       "helical_ramp, ramp_between, and wedge. Legacy compatibility "
-                       "structural types: room, corridor, curved_corridor, stairs, "
-                       "ramp, doorway, cover, sky_shell. Use legacy structural types "
-                       "only for old payloads or quick sketches; new scene composition "
-                       "should use skill recipes/IR or explicit primitive operations. "
-                       "doorway creates a new segmented wall with an opening; it does "
-                       "not cut existing room/wall brushes. Prefer arc_ramp/helical_ramp "
-                       "or ramp_between over terraced curved_corridor/legacy ramp for "
-                       "route/surf/slide semantics.")},
+                       "helical_ramp, ramp_between, and wedge. curved_corridor and "
+                       "legacy ramp remain for compatibility; scene-shell, opening, "
+                       "obstacle, and straight-step composition should use skill "
+                       "recipes/IR or explicit primitive operations. Prefer "
+                       "arc_ramp/helical_ramp or ramp_between over terraced "
+                       "curved_corridor/legacy ramp for route/surf/slide semantics.")},
        {"min", vec3Property("Minimum corner for box-like operations.")},
        {"max", vec3Property("Maximum corner for box-like operations.")},
        {"start",
@@ -456,8 +447,7 @@ QJsonObject blockoutBatchOperationSchema()
           "Optional part names to generate for part-aware operations. curved_corridor "
           "supports floor, ceiling, inner_wall, outer_wall, start_cap, end_cap; "
           "path_ribbon supports surface/floor/ribbon, preserves explicit floor "
-          "metadata, and defaults unspecified output to surface; stairs supports "
-          "steps.")},
+          "metadata, and defaults unspecified output to surface.")},
        {"partMaterials",
         QJsonObject{
           {"type", "object"},
@@ -528,21 +518,10 @@ QJsonObject blockoutBatchOperationSchema()
        {"postSize", numberProperty("support_posts_between square post width/depth.")},
        {"steps", integerProperty("Stair step count.")},
        {"axis",
-        stringProperty(
-          "Axis for cylinder/stairs/wedge/legacy ramp: x, y, or z. Legacy ramp "
-          "has weak route semantics; prefer ramp_between start/end.")},
+        stringProperty("Axis for cylinder/wedge/legacy ramp: x, y, or z. Legacy ramp "
+                       "has weak route semantics; prefer ramp_between start/end.")},
        {"sides", integerProperty("Cylinder side count, clamped to 3..128.")},
-       {"thickness", numberProperty("Shell thickness for room/corridor/sky_shell.")},
-       {"doorMin",
-        vec3Property(
-          "Door opening minimum corner. Required when type is doorway. The doorway "
-          "operation creates a new segmented wall; it does not subtract from existing "
-          "walls.")},
-       {"doorMax",
-        vec3Property(
-          "Door opening maximum corner. Required when type is doorway. The doorway "
-          "operation creates a new segmented wall; it does not subtract from existing "
-          "walls.")},
+       {"thickness", numberProperty("Brush thickness for ramp/path primitives.")},
        {"snapMode",
         stringProperty(
           "Circular vertex snap mode for cylinder/cylinder_sector/curved_corridor: "
@@ -2845,11 +2824,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
              "Array of blockout operations. Primitive types include box, cylinder, "
              "prism, polyhedron, cylinder_sector, path_ribbon, repeat_translate, "
              "repeat_grid, stepped_mass, support_posts_between, arc_ramp, "
-             "helical_ramp, ramp_between, and wedge. Legacy compatibility/quick-sketch "
-             "types include room, corridor, curved_corridor, stairs, ramp, doorway, "
-             "cover, and sky_shell; new scene composition should use skill recipes/IR "
-             "or explicit primitive operations. Each item must be an object with a type "
-             "field; use "
+             "helical_ramp, ramp_between, and wedge. Room, corridor, sky shell, "
+             "doorway, cover, and straight stair composition should use skill "
+             "recipes/IR or explicit primitive operations. curved_corridor and legacy "
+             "ramp remain for compatibility only. Each item must be an object with a "
+             "type field; use "
              "tb_tools_search(detail=schema, query=\"blockout_create_batch operations\") "
              "for examples. Diagonal ramp_between can be valid but may return "
              "offAxisRampMayProduceNonGridVertices when side vertices are not "
@@ -3150,22 +3129,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {
           {"type",
            stringProperty(
-             "IR type: room, corridor, stairs, ramp, doorway, cover, sky_shell, "
-             "or spiral_stairs.")},
+             "IR type for legacy validation. Supported values: ramp or spiral_stairs. "
+             "Room, corridor, sky shell, doorway, cover, and straight stair composition "
+             "moved to trenchbroom-mcp-scene-workflow recipes.")},
           {"min", vec3Property("Minimum corner.")},
           {"max", vec3Property("Maximum corner.")},
-          {"doorMin",
-           vec3Property(
-             "Door opening minimum corner. Required when type is doorway. doorway "
-             "validates a freestanding segmented wall, not a cut into existing "
-             "walls.")},
-          {"doorMax",
-           vec3Property(
-             "Door opening maximum corner. Required when type is doorway. doorway "
-             "validates a freestanding segmented wall, not a cut into existing "
-             "walls.")},
-          {"thickness", numberProperty("Optional wall thickness.")},
-          {"steps", integerProperty("Optional stair step count.")},
+          {"thickness", numberProperty("Optional ramp thickness.")},
           {"innerRadius", numberProperty("Optional spiral stair inner radius.")},
           {"outerRadius", numberProperty("Optional spiral stair outer radius.")},
           {"stepHeight", numberProperty("Optional spiral stair step height.")},

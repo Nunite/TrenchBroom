@@ -24,25 +24,25 @@ List available recipes and recommended validation paths:
 ```powershell
 python <skill>\scripts\list_recipes.py
 python <skill>\scripts\list_recipes.py --json
-python <skill>\scripts\list_recipes.py --recipe ascending_loop
+python <skill>\scripts\list_recipes.py --recipe rect_shell
 ```
 
 Describe a recipe without generating IR:
 
 ```powershell
-python <skill>\scripts\recipes\ascending_loop.py --describe
+python <skill>\scripts\recipes\<recipe>.py --describe
 ```
 
 Validate params and generated IR without writing a file:
 
 ```powershell
-python <skill>\scripts\recipes\ascending_loop.py --params <params.json> --validate-only
+python <skill>\scripts\recipes\<recipe>.py --params <params.json> --validate-only
 ```
 
 Generate IR:
 
 ```powershell
-python <skill>\scripts\recipes\ascending_loop.py --params <params.json> --out <ir.json>
+python <skill>\scripts\recipes\<recipe>.py --params <params.json> --out <ir.json>
 ```
 
 Validate all bundled examples and optionally emit IR files:
@@ -96,6 +96,13 @@ acceptance failed; rebuild them only as new recipes with inspected review output
   pass `closedLoop:true` only when the intended start/end seam is actually
   connected. Circular geometry can produce non-integer vertex warnings; treat
   them as grid cleanliness warnings only when slope, continuity, and review pass.
+- `rect_shell`: replaces legacy `room`, `corridor`, and `sky_shell` batch types
+  with explicit box IR. Use `kind` only for recipe defaults and metadata.
+- `opening_wall`: replaces legacy `doorway` batch type. It creates a freestanding
+  segmented wall, not a cut into existing brushes.
+- `cover_block`: replaces legacy `cover` batch type with one explicit box.
+- `stair_run`: replaces legacy straight `stairs` batch type with ordered box
+  steps; validate as route mode `stairs_or_steps` when used as a route.
 
 ## IR Shape
 

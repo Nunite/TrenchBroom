@@ -46,6 +46,13 @@ def load_recipe(path: Path) -> tuple[dict[str, Any], Any]:
     return manifest, build
 
 
+def available_variants(recipe_id: str) -> list[str]:
+    recipe_examples = EXAMPLES_DIR / recipe_id
+    if not recipe_examples.exists():
+        return []
+    return [path.stem for path in sorted(recipe_examples.glob("*.json"))]
+
+
 def example_paths(recipe_id: str, variants: list[str]) -> list[tuple[str, Path]]:
     result: list[tuple[str, Path]] = []
     for variant in variants:
@@ -128,8 +135,7 @@ def main() -> None:
     parser.add_argument(
         "--variant",
         action="append",
-        choices=["minimal", "default", "stress"],
-        help="Example variant to validate; defaults to all",
+        help="Example variant to validate; defaults to all JSON examples for each recipe",
     )
     parser.add_argument("--out-dir", help="Optional directory for generated IR files")
     parser.add_argument("--report", help="Optional markdown report path")
@@ -137,7 +143,7 @@ def main() -> None:
     args = parser.parse_args()
 
     requested_recipes = set(args.recipe or [])
-    variants = args.variant or ["minimal", "default", "stress"]
+    requested_variants = args.variant
     out_dir = Path(args.out_dir).resolve() if args.out_dir else None
     if out_dir:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -150,6 +156,7 @@ def main() -> None:
         recipe_id = str(manifest["id"])
         if requested_recipes and recipe_id not in requested_recipes:
             continue
+        variants = requested_variants or available_variants(recipe_id)
         paths = example_paths(recipe_id, variants)
         if not paths:
             results.append(

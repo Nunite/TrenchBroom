@@ -5,6 +5,7 @@ param(
   [switch] $KeepOpen,
   [switch] $ReviewScenes,
   [switch] $RecipeVisualAcceptance,
+  [string[]] $RecipeVisualRecipes = @(),
   [string[]] $RecipeVisualVariants = @("minimal"),
   [switch] $SkipDefaultSmoke
 )
@@ -58,8 +59,16 @@ function Wait-McpStatus {
 
   $deadline = (Get-Date).AddMilliseconds($TimeoutMs)
   $lastStatus = $null
+  $lastError = $null
   do {
-    $lastStatus = Invoke-McpTool -Tool "tb_status"
+    try {
+      $lastStatus = Invoke-McpTool -Tool "tb_status"
+      $lastError = $null
+    } catch {
+      $lastError = $_.Exception.Message
+      Start-Sleep -Milliseconds 500
+      continue
+    }
     $documentMatches = [string]::IsNullOrWhiteSpace($ExpectedDocumentPath) -or
       $lastStatus.activeDocumentPath -eq $ExpectedDocumentPath
     if ($lastStatus.processId -eq $ExpectedProcessId -and $documentMatches) {
@@ -68,6 +77,9 @@ function Wait-McpStatus {
     Start-Sleep -Milliseconds 500
   } while ((Get-Date) -lt $deadline)
 
+  if ($lastError) {
+    throw "MCP bridge did not become ready for PID $ExpectedProcessId; last error: $lastError"
+  }
   if ($lastStatus.processId -ne $ExpectedProcessId) {
     throw "tb_status.processId=$($lastStatus.processId) does not match launched PID $ExpectedProcessId"
   }
@@ -214,11 +226,19 @@ function Invoke-RecipeVisualAcceptance {
   $recipeRoot = Resolve-Path (Join-Path $PSScriptRoot "..\skills\trenchbroom-mcp-scene-workflow")
   $catalog = & python (Join-Path $recipeRoot "scripts\list_recipes.py") --json | ConvertFrom-Json
   $reviewOutput = New-Item -ItemType Directory -Force -Path (Join-Path $OutputRoot "recipe-reviews")
+  $recipeFilter = @($RecipeVisualRecipes | ForEach-Object { $_ -split "," } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
   $variants = @($RecipeVisualVariants | ForEach-Object { $_ -split "," } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  $baselineMapValidation = Invoke-McpTool -Tool "map_validate" -Arguments ([ordered] @{
+    groupByType = $true
+  }) -TimeoutSec 30
+  $baselineProblemCount = [int] $baselineMapValidation.count
   $results = @()
 
   foreach ($recipe in @($catalog.recipes)) {
     $recipeId = [string] $recipe.id
+    if ($recipeFilter.Count -gt 0 -and -not $recipeFilter.Contains($recipeId)) {
+      continue
+    }
     foreach ($variant in $variants) {
       if (-not @($recipe.examples).Contains($variant)) {
         continue
@@ -252,6 +272,21 @@ function Invoke-RecipeVisualAcceptance {
       }
 
       $moduleId = [string] $apply.moduleId
+      $moduleValidation = Invoke-McpTool -Tool "module_validate" -Arguments ([ordered] @{
+        moduleId = $moduleId
+      }) -TimeoutSec 30
+      if (-not [bool] $moduleValidation.valid) {
+        throw "$recipeId $variant module validation failed"
+      }
+
+      $mapValidation = Invoke-McpTool -Tool "map_validate" -Arguments ([ordered] @{
+        groupByType = $true
+      }) -TimeoutSec 30
+      $mapProblemCount = [int] $mapValidation.count
+      if ($mapProblemCount -gt $baselineProblemCount) {
+        throw "$recipeId $variant map validation introduced new problems"
+      }
+
       $review = Invoke-McpTool -Tool "module_render_review" -Arguments ([ordered] @{
         moduleId = $moduleId
         sceneName = "$recipeId-$variant-visual"
@@ -270,6 +305,9 @@ function Invoke-RecipeVisualAcceptance {
         irPath = $irPath
         moduleId = $moduleId
         operationIds = $apply.operationIds
+        moduleValidation = $moduleValidation
+        mapValidation = $mapValidation
+        baselineMapProblemCount = $baselineProblemCount
         reviewId = $review.reviewId
         targetObjectCount = $review.targetObjectCount
         qualityValid = $review.qualityValid
@@ -286,7 +324,9 @@ function Invoke-RecipeVisualAcceptance {
 
   return [ordered] @{
     recipeCount = $results.Count
+    recipes = $recipeFilter
     variants = $variants
+    baselineMapValidation = $baselineMapValidation
     results = $results
   }
 }

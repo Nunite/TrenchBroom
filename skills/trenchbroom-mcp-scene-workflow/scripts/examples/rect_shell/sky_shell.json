@@ -1,0 +1,8 @@
+{
+  "moduleId": "recipe-rect-shell-sky-shell",
+  "kind": "sky_shell",
+  "min": [-384, -384, 0],
+  "max": [384, 384, 384],
+  "thickness": 16,
+  "skyMaterial": "sky"
+}

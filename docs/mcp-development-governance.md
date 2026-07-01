@@ -115,7 +115,7 @@ Current classifications:
 | `blockout_create_batch` | Generic batch geometry, keep. |
 | `ir_compile_preview_from_file` / `ir_apply_from_file` | Recipe transport boundary, keep. |
 | `blockout_create_spiral_stairs` | Generic stair primitive, keep but do not turn into route prefab logic. |
-| `blockout_create_room/corridor/stairs/ramp/doorway/cover/sky_shell` | Direct tool surface removed. Legacy `blockout_create_batch` operation types may remain only for compatibility or quick sketches. |
+| `blockout_create_room/corridor/stairs/ramp/doorway/cover/sky_shell` | Direct tool surface removed. `room`, `corridor`, `stairs`, `doorway`, `cover`, and `sky_shell` batch types moved to skill recipes; legacy `ramp` remains only for compatibility pending separate review. |
 | `python_generate_blockout` | Legacy/script bridge. Prefer skill recipes that emit IR. |
 | KZ/temple/courtyard/track/house layouts | Recipe candidates, not C++ MCP tools. |
 
