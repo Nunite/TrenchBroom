@@ -2067,7 +2067,15 @@ McpBridgeToolResult selectorPreviewForMapResult(
     &diagnostics);
   if (!error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"selector", selector},
+        {"recoveryAction", "fix_selector_then_retry"},
+      });
   }
 
   auto result = compactTargetResult(
@@ -2080,6 +2088,7 @@ McpBridgeToolResult selectorPreviewForMapResult(
     params.value("idsMode").toString("sample"),
     params.value("detail").toString("summary").trimmed().toLower() == "full");
   result.insert("tool", "selector_preview");
+  result.insert("mutatedDocument", false);
   result.insert("matchedBeforeLimit", diagnostics.matchedBeforeLimit);
   result.insert("limitApplied", diagnostics.limitApplied);
   result.insert("staleExcluded", diagnostics.staleExcluded);

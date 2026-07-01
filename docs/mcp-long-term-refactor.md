@@ -212,6 +212,8 @@ Next Phase 2 item:
 - Done: selector-driven selection recovery, including `module_select`, reports
   structured retry-safe failures and marks successful selection as
   `mutatedDocument:false`.
+- Done: `selector_preview` reports structured retry-safe selector failures and
+  marks successful previews as `mutatedDocument:false`.
 - Done: stale target warnings are summarized by default in selector/module
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor
