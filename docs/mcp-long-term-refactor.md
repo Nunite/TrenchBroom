@@ -183,7 +183,7 @@ Next Phase 2 item:
 
 - Phase 2 is closed. Continue with Phase 3.
 
-### Phase 3 Status: Partial
+### Phase 3 Status: Done
 
 - Done: operation records carry document path/fingerprint and undo/redo guards
   reject wrong-document history operations before mutation.
@@ -344,13 +344,15 @@ Next Phase 2 item:
 - Done: `brush_metadata_set` precondition failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before updating
   metadata state.
-- Partial: mutation tools still need a full audit for consistent mutation state,
-  retry safety, recovery action, and compact stale output.
+- Done: remaining bare `invalidParamsFailure` call sites were audited after the
+  mutation-family passes above. The remaining sites are read-only
+  search/schema/preview/validation/review helpers, compile/pointfile or document
+  lifecycle paths, or app-controller routing errors rather than MCP operation
+  history mutation paths.
 
 Next Phase 3 item:
 
-- Continue auditing one mutation family at a time for document identity,
-  mutation-state, and recovery-action consistency.
+- Phase 3 is closed. Continue with Phase 4.
 
 ### Phase 4 Status: Partial
 
