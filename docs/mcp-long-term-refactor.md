@@ -209,6 +209,9 @@ Next Phase 2 item:
 - Done: `module_validate` reports structured retry-safe target failures for
   missing module ids and invalid continuity selectors, and marks successful
   validation as `mutatedDocument:false`.
+- Done: selector-driven selection recovery, including `module_select`, reports
+  structured retry-safe failures and marks successful selection as
+  `mutatedDocument:false`.
 - Done: stale target warnings are summarized by default in selector/module
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor

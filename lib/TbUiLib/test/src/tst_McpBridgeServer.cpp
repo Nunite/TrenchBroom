@@ -4751,6 +4751,79 @@ TEST_CASE("McpBridgeServer module_inspect reports recovery state")
   CHECK(inspect.result.value("liveObjectCount").toInt() == 1);
 }
 
+TEST_CASE("McpBridgeServer selector selection reports recovery state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto missingModuleId = moduleSelectResult(
+    appController, QJsonObject{}, metadataStore, moduleStore, objectRegistry);
+  CHECK(!missingModuleId.ok);
+  CHECK_FALSE(missingModuleId.error.details.value("mutatedDocument").toBool(true));
+  CHECK(missingModuleId.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingModuleId.error.details.value("recoveryAction").toString()
+    == "provide_module_id_then_retry");
+
+  const auto invalidSelector = objectsSelectBySelectorForMapResult(
+    map,
+    QJsonObject{{"operationIds", QJsonArray{QJsonValue{42}}}},
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  CHECK(!invalidSelector.ok);
+  CHECK_FALSE(invalidSelector.error.details.value("mutatedDocument").toBool(true));
+  CHECK(invalidSelector.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidSelector.error.details.value("recoveryAction").toString()
+    == "fix_selector_then_retry");
+
+  const auto create = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"defaultMetadata", QJsonObject{{"moduleId", "select-module"}}},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(create.ok);
+
+  const auto selected = objectsSelectBySelectorForMapResult(
+    map,
+    QJsonObject{{"moduleId", "select-module"}},
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(selected.ok);
+  CHECK_FALSE(selected.result.value("mutatedDocument").toBool(true));
+  CHECK(selected.result.value("selectedCount").toInt() == 1);
+}
+
 TEST_CASE("McpBridgeServer object transform summaries")
 {
   auto appControllerFixture = AppControllerFixture{};

@@ -320,6 +320,13 @@ McpBridgeToolResult objectsSelectBySelectorResult(
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
   const std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult objectsSelectBySelectorForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult objectsDeleteBySelectorResult(
   AppController& appController,
   const QString& toolName,

@@ -2103,7 +2103,23 @@ McpBridgeToolResult objectsSelectBySelectorResult(
     return noActiveDocumentFailure();
   }
 
-  auto& map = mapWindow->document().map();
+  return objectsSelectBySelectorForMapResult(
+    mapWindow->document().map(),
+    params,
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+}
+
+McpBridgeToolResult objectsSelectBySelectorForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
   auto warnings = QJsonArray{};
   auto error = QString{};
   const auto selector = selectorFromParams(params);
@@ -2111,7 +2127,15 @@ McpBridgeToolResult objectsSelectBySelectorResult(
     map, selector, history, metadataStore, moduleStore, objectRegistry, warnings, error);
   if (!error.isEmpty())
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"selector", selector},
+        {"recoveryAction", "fix_selector_then_retry"},
+      });
   }
   nodes.erase(
     std::remove_if(
@@ -2137,6 +2161,7 @@ McpBridgeToolResult objectsSelectBySelectorResult(
     warnings,
     params.value("idsMode").toString("sample"));
   result.insert("tool", "objects_select_by_selector");
+  result.insert("mutatedDocument", false);
   result.insert("selectedCount", static_cast<int>(nodes.size()));
   return McpBridgeToolResult::success(result);
 }
@@ -2458,9 +2483,21 @@ McpBridgeToolResult moduleSelectResult(
   const std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry)
 {
+  const auto moduleId = params.value("moduleId").toString().trimmed();
+  if (moduleId.isEmpty())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "module_select requires moduleId",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_module_id_then_retry"},
+      });
+  }
   auto selectorParams = params;
   auto selector = selectorFromParams(params);
-  selector.insert("moduleId", params.value("moduleId"));
+  selector.insert("moduleId", moduleId);
   selectorParams.insert("selector", selector);
   return objectsSelectBySelectorResult(
     appController, selectorParams, {}, metadataStore, moduleStore, objectRegistry);
