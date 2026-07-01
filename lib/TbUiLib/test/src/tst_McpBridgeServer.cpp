@@ -4921,6 +4921,25 @@ TEST_CASE("McpBridgeServer render_review_selector reports recovery state")
     == "fix_selector_then_retry");
 }
 
+TEST_CASE("McpBridgeServer module_render_review reports recovery state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto history = std::vector<McpOperationRecord>{};
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto missingModuleId = moduleRenderReviewResult(
+    appController, QJsonObject{}, history, metadataStore, moduleStore, objectRegistry);
+  CHECK(!missingModuleId.ok);
+  CHECK_FALSE(missingModuleId.error.details.value("mutatedDocument").toBool(true));
+  CHECK(missingModuleId.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingModuleId.error.details.value("recoveryAction").toString()
+    == "provide_module_id_then_retry");
+}
+
 TEST_CASE("McpBridgeServer object transform summaries")
 {
   auto appControllerFixture = AppControllerFixture{};

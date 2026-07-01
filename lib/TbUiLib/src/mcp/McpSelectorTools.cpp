@@ -2544,9 +2544,21 @@ McpBridgeToolResult moduleRenderReviewResult(
   const std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry)
 {
+  const auto moduleId = params.value("moduleId").toString().trimmed();
+  if (moduleId.isEmpty())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "module_render_review requires moduleId",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_module_id_then_retry"},
+      });
+  }
   auto selectorParams = params;
   auto selector = selectorFromParams(params);
-  selector.insert("moduleId", params.value("moduleId"));
+  selector.insert("moduleId", moduleId);
   if (!selector.contains("limit"))
   {
     selector.insert("limit", params.value("limit").toInt(10000));

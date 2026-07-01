@@ -216,6 +216,8 @@ Next Phase 2 item:
   marks successful previews as `mutatedDocument:false`.
 - Done: `render_review_selector` reports structured retry-safe selector failures
   before review rendering.
+- Done: `module_render_review` reports structured retry-safe failures for
+  missing module ids before routing to selector review.
 - Done: stale target warnings are summarized by default in selector/module
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor
