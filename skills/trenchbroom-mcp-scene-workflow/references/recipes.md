@@ -43,11 +43,6 @@ Generate IR:
 
 ```powershell
 python <skill>\scripts\recipes\ascending_loop.py --params <params.json> --out <ir.json>
-python <skill>\scripts\recipes\temple_courtyard.py --params <params.json> --out <ir.json>
-python <skill>\scripts\recipes\kz_bhop_route.py --params <params.json> --out <ir.json>
-python <skill>\scripts\recipes\terrain_pass.py --params <params.json> --out <ir.json>
-python <skill>\scripts\recipes\cave_pass.py --params <params.json> --out <ir.json>
-python <skill>\scripts\recipes\simple_house.py --params <params.json> --out <ir.json>
 ```
 
 Validate all bundled examples and optionally emit IR files:
@@ -90,6 +85,10 @@ If the flow fails, classify the failure before changing MCP code:
 
 ## Recipe Notes
 
+Current bundled recipe coverage is intentionally narrow. Earlier house, temple,
+KZ/bhop, cave, and terrain recipe drafts were removed after human visual
+acceptance failed; rebuild them only as new recipes with inspected review output.
+
 - `ascending_loop`: emits an `arc_ramp` operation plus rails, supports, markers,
   spawn, and light. `arc_ramp` expands into `arc_ramp_segment` operations whose
   selectable part is `ramp`; use `selector:{moduleId, part:"ramp"}` for slope
@@ -97,22 +96,6 @@ If the flow fails, classify the failure before changing MCP code:
   pass `closedLoop:true` only when the intended start/end seam is actually
   connected. Circular geometry can produce non-integer vertex warnings; treat
   them as grid cleanliness warnings only when slope, continuity, and review pass.
-- `temple_courtyard`: emits structure and guidance parts for architectural
-  whitebox review. Validate part recovery with `selector_preview(selector={moduleId})`.
-- `kz_bhop_route`: emits ordered platforms, markers, and an optional slide. Bhop
-  gaps can be intentional; strict geometric continuity may be false even when
-  route intent is valid. Interpret continuity as stepped/jump route evidence.
-- `terrain_pass`: emits a whitebox walkable ribbon with side cliffs, rock blocks,
-  markers, spawn, and light. It is for blockout composition, not organic cave
-  quality; use selector `{moduleId, part:"path"}` for route continuity and review
-  renders for visual judgement.
-- `cave_pass`: emits a whitebox cave corridor with a walkable ribbon, side walls,
-  ceiling bands, rocks, markers, spawn, and light. It is intentionally a recipe
-  layer composition, not a C++ cave primitive; accept it only after review reads
-  as a cave.
-- `simple_house`: emits explicit segmented wall boxes, door/window frames, roof
-  slabs, spawn, and light. It replaces direct room/doorway helper usage for house
-  blockouts; openings are segmented geometry, not CSG cuts into existing brushes.
 
 ## IR Shape
 

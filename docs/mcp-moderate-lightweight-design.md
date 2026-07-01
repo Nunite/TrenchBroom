@@ -219,8 +219,6 @@ Current Phase 1 guardrails:
 Move reusable scene construction into skill scripts:
 
 - `ascending_loop`
-- `temple_courtyard`
-- `kz_bhop_route`
 - future `cottage_house`
 - future `industrial_module`
 
@@ -236,14 +234,14 @@ Each recipe must support:
 
 Current Phase 2 status:
 
-- The `trenchbroom-mcp-scene-workflow` skill contains production-style recipe
-  scripts for `ascending_loop`, `temple_courtyard`, and `kz_bhop_route`.
+- The `trenchbroom-mcp-scene-workflow` skill contains the retained
+  production-style recipe script for `ascending_loop`.
 - Each recipe exposes a `MANIFEST` with id, name, version, parameter specs,
   defaults, output parts, expected warnings, and recommended MCP validation tools.
 - Each recipe supports `--describe`, `--validate-only`, `--params <params.json>`,
   and `--out <ir.json>`.
-- Grouped `minimal`, `default`, and `stress` parameter examples exist for all three
-  recipes.
+- Grouped `minimal`, `default`, and `stress` parameter examples exist for the
+  retained recipe.
 - `scripts/validate_recipes.py` validates params, builds IR twice to check
   deterministic output, checks metadata coverage and required parts, and can emit a
   concise markdown report plus generated IR files.
@@ -255,21 +253,15 @@ Current Phase 2 status:
 
 Phase 2 validation evidence from the current branch:
 
-- `python skills\trenchbroom-mcp-scene-workflow\scripts\validate_recipes.py --out-dir build-release-codex\codex-mcp-lightweight\phase2-recipes\ir --report build-release-codex\codex-mcp-lightweight\phase2-recipes\recipe-validation.md`
-  validated 9 examples; 9 passed.
-- Real Release TB MCP validation used disposable `map_test\unnamed.map` sessions and
-  `ir_compile_preview_from_file` / `ir_apply_from_file` for the three default IR
-  files.
+- `python skills\trenchbroom-mcp-scene-workflow\scripts\validate_recipes.py`
+  validates the retained examples.
+- Real Release TB MCP validation used disposable `map_test\unnamed.map` sessions
+  and `ir_compile_preview_from_file` / `ir_apply_from_file` for default IR files.
 - `ascending_loop/default` previewed 42 recipe operations as 73 compiled brushes,
   applied 75 objects, recovered module parts, reported `slopeCount=32`, and route
   continuity reported `continuous=true` / `fullWidthContinuous=true`.
-- `temple_courtyard/default` previewed 26 operations, applied 29 objects, recovered
-  all architectural parts, and wrote a readable `module_render_review` contact sheet.
-  `map_validate(groupByType:true)` only reported the baseline worldspawn empty
-  property warnings from the disposable map.
-- `kz_bhop_route/default` previewed 15 operations, applied 17 objects, recovered
-  platform/marker/slide parts, reported the slide as `ascending`, and route continuity
-  exposed intentional jump-chain horizontal gaps with semantic continuity.
+- Earlier `temple_courtyard` and `kz_bhop_route` drafts were removed after human
+  visual acceptance failed; rebuild them before using those scene families again.
 - Crash log count stayed at 17 before and after the real TB recipe validation.
 
 ### Phase 3: Keep MCP As The Execution Kernel
@@ -512,11 +504,11 @@ Check:
 
 ### Real TB Acceptance
 
-Run at least three disposable scenes:
+Run retained and rebuilt disposable scenes:
 
 1. Ascending spiral or road route.
-2. Temple/courtyard or dense building whitebox.
-3. KZ/bhop/slide route.
+2. Dense building whitebox after a rebuilt recipe exists.
+3. KZ/bhop/slide route after a rebuilt recipe exists.
 
 Each run must record:
 

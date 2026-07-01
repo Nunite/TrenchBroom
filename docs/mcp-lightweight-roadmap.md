@@ -66,8 +66,9 @@ This order matters because every later phase depends on short, stable tool outpu
 - Selector/module workflows exist and support recovery, review, delete, and transform.
 - Skill recipes exist for:
   - `ascending_loop`
-  - `temple_courtyard`
-  - `kz_bhop_route`
+- Earlier `cave_pass`, `kz_bhop_route`, `simple_house`, `temple_courtyard`, and
+  `terrain_pass` recipe drafts were removed after human visual acceptance failed.
+  Reintroduce them only as rebuilt recipes with inspected review output.
 - Recipe scripts now have manifests, parameter validation, `--describe`, `--validate-only`, grouped examples, and a skill-side validator.
 - The canonical skill source is tracked under
   `skills/trenchbroom-mcp-scene-workflow`; sync it to the runtime skill directory
@@ -160,7 +161,7 @@ Acceptance:
 Test targets:
 
 - Unit tests for each route mode with known pass/fail geometry.
-- Real TB route cases: spiral ramp, flat road, bhop chain, slide ramp, stepped stairs.
+- Real TB route cases: spiral ramp, flat road, slide ramp, stepped stairs.
 
 ## Phase 3: Selector And Module As The Main Target System
 
@@ -354,9 +355,9 @@ Goal: measure Agent experience, not just tool coverage.
 Regression scenes:
 
 - Ascending spiral or road route.
-- Temple/courtyard or dense architectural whitebox.
-- KZ/bhop/slide route.
-- Terrain/heightmap route when terrain tools change.
+- Dense architectural whitebox when such a recipe is rebuilt.
+- KZ/bhop/slide route when such a recipe is rebuilt.
+- Terrain/heightmap route when terrain tools change or such a recipe is rebuilt.
 - Industrial material/entity edit pass when texture/entity tools change.
 
 Required checks:
@@ -447,7 +448,7 @@ Use this table as the rolling implementation checklist.
 | P2 | Add recipe catalog/listing | Skill | Done in `trenchbroom-mcp-scene-workflow/scripts/list_recipes.py`; lists manifests, examples, and recommended validation without generating IR. |
 | P2 | Add profile-size regression test | MCP catalog tests | Done: `McpToolCatalog` now guards Modeling profile size and hidden-tool search behavior. |
 | P2 | Improve entity glyph and label policy in review | C++ MCP | Done: entity glyphs remain visible while dense classname labels auto-hide; `labelParts` labels important metadata parts with stride/threshold controls, and review summaries report entity/order/part label counts. |
-| P2 | Add Codex CLI regression prompts | Skill/testing | Done in `skills\trenchbroom-mcp-scene-workflow\references\codex-cli-regression-prompts.md` and synced to the runtime skill for ascending spiral, temple courtyard, and KZ bhop/slide disposable flows. |
+| P2 | Add Codex CLI regression prompts | Skill/testing | Done in `skills\trenchbroom-mcp-scene-workflow\references\codex-cli-regression-prompts.md` for the retained ascending spiral disposable flow. |
 | P3 | Evaluate legacy/convenience tools for deprecation text | MCP catalog docs | Done: hidden viewport, low-level review, legacy metadata, and legacy route analysis entries stay searchable and describe recommended selector/module/review/continuity replacements. |
 
 ## Non-Goals

@@ -121,9 +121,9 @@ primitive, selector/module operation, validator, review feature, or compact outp
 improvement. Promote recipe behavior into MCP only after repeated independent
 workflows prove it is a generic editor capability.
 
-Use bundled recipes for common prefab-like requests such as `simple_house`,
-`temple_courtyard`, `terrain_pass`, `cave_pass`, `ascending_loop`, and
-`kz_bhop_route` before considering new MCP tools.
+The currently bundled prefab-like recipe is `ascending_loop`. Removed or failed
+visual-acceptance recipes should be rebuilt as new deterministic IR recipes only
+after explicit human visual acceptance, not restored as C++ MCP prefab tools.
 
 ## Selector Rules
 

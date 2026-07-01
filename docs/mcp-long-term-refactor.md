@@ -360,10 +360,9 @@ Next Phase 3 item:
   runtime sync through `scripts\sync-trenchbroom-mcp-skill.ps1`.
 - Done: recipe validator enforces deterministic IR and requires a render-review
   validation path for prefab-like recipes.
-- Done: bundled recipes cover houses, routes, courtyards, caves, terrain passes,
-  ascending loops, and KZ/bhop gameplay layouts.
-- Done: real TB visual smoke covers bundled recipe `minimal/default/stress`
-  variants, and representative contact sheets have been inspected.
+- Done: the retained bundled recipe is `ascending_loop`.
+- Done: earlier house, courtyard, cave, terrain, and KZ/bhop recipe drafts were
+  removed after human visual acceptance failed.
 - Done: recipe coverage is intentionally closed for this phase; future recipes
   should wait for a concrete missing common scene family and must include
   validator, runtime sync, real TB visual acceptance, and inspected review
@@ -384,10 +383,9 @@ Next Phase 4 item:
 - Done: review tools now report `semanticAcceptance` metadata and schema wording
   that makes `qualityValid` explicitly mean render readability only; the Agent or
   skill still must inspect the contact sheet against requested scene intent.
-- Done: generic organic primitives are deferred. Current evidence shows
-  cave/terrain strength belongs in recipes (`cave_pass` and `terrain_pass`) with
-  visual review acceptance; no repeated independent workflow yet proves a
-  scene-neutral C++ kernel primitive is needed.
+- Done: generic organic primitives are deferred. Removed cave/terrain drafts
+  should be rebuilt as visually accepted recipes before any C++ primitive is
+  considered.
 
 Next Phase 5 item:
 
@@ -474,8 +472,7 @@ Work:
 
 Done when:
 
-- houses, routes, courtyards, caves, terrain passes, and gameplay layouts are
-  recipe/IR workflows
+- retained or rebuilt prefab-like scene families are recipe/IR workflows
 - recipe validation fails when a prefab-like recipe has no review step
 - MCP only sees generic operations, metadata, preview/apply, validation, and
   review
