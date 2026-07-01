@@ -196,6 +196,8 @@ Next Phase 2 item:
   `mutatedDocument`, `retrySafe`, and recovery actions for empty history and
   native stack mismatch failures, and mark successful undo/redo as map
   mutations.
+- Done: `operation_select` reports structured retry-safe target failures and
+  marks successful selection recovery as `mutatedDocument:false`.
 - Done: stale target warnings are summarized by default in selector/module
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor

@@ -2958,6 +2958,68 @@ TEST_CASE("McpBridgeServer single-step history reports pre-mutation failures")
     == "refresh_status_or_validate");
 }
 
+TEST_CASE("McpBridgeServer operation_select reports non-document mutation state")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto registry = McpObjectRegistry{};
+
+  const auto missingId =
+    operationSelectForMapResult(map, history, QJsonObject{}, &registry);
+  CHECK(!missingId.ok);
+  CHECK_FALSE(missingId.error.details.value("mutatedDocument").toBool(true));
+  CHECK(missingId.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    missingId.error.details.value("recoveryAction").toString()
+    == "provide_operation_id_then_retry");
+
+  const auto unknownId = operationSelectForMapResult(
+    map, history, QJsonObject{{"operationId", "mcp-op-missing"}}, &registry);
+  CHECK(!unknownId.ok);
+  CHECK_FALSE(unknownId.error.details.value("mutatedDocument").toBool(true));
+  CHECK(unknownId.error.details.value("retrySafe").toBool(false));
+  CHECK(unknownId.error.details.value("operationId").toString() == "mcp-op-missing");
+  CHECK(
+    unknownId.error.details.value("recoveryAction").toString()
+    == "refresh_status_or_validate");
+
+  const auto create = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(create.ok);
+
+  const auto selected = operationSelectForMapResult(
+    map,
+    history,
+    QJsonObject{{"operationId", create.result.value("operationId").toString()}},
+    &registry);
+  REQUIRE(selected.ok);
+  CHECK_FALSE(selected.result.value("mutatedDocument").toBool(true));
+  CHECK(selected.result.value("selectedCount").toInt() == 1);
+  CHECK(map.selection().nodes.size() == 1u);
+}
+
 TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
 {
   auto appControllerFixture = AppControllerFixture{};

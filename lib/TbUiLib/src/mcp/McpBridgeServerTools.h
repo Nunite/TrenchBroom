@@ -476,6 +476,11 @@ McpBridgeToolResult operationSelectResult(
   const std::vector<McpOperationRecord>& history,
   const QJsonObject& params,
   const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult operationSelectForMapResult(
+  mdl::Map& map,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult operationSelectResult(
   AppController& appController,
   const std::vector<McpOperationRecord>& history,

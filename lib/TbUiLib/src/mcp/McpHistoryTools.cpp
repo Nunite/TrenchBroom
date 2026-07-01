@@ -471,6 +471,21 @@ std::optional<McpOperationRecord> findOperationCopy(
   return history[*index];
 }
 
+QJsonObject operationTargetFailureDetails(
+  const QString& recoveryAction, const QString& operationId = {})
+{
+  auto details = QJsonObject{
+    {"mutatedDocument", false},
+    {"retrySafe", true},
+    {"recoveryAction", recoveryAction},
+  };
+  if (!operationId.isEmpty())
+  {
+    details.insert("operationId", operationId);
+  }
+  return details;
+}
+
 McpBridgeToolResult operationInspectResult(
   const std::vector<McpOperationRecord>& history, const QJsonObject& params)
 {
@@ -579,30 +594,52 @@ McpBridgeToolResult operationSelectResult(
     return noActiveDocumentFailure();
   }
 
+  return operationSelectForMapResult(
+    mapWindow->document().map(), history, params, &objectRegistry);
+}
+
+McpBridgeToolResult operationSelectForMapResult(
+  mdl::Map& map,
+  const std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  const McpObjectRegistry* objectRegistry)
+{
   const auto operationId = params.value("operationId").toString();
   if (operationId.isEmpty())
   {
-    return invalidParamsFailure("operation_select requires operationId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "operation_select requires operationId",
+      operationTargetFailureDetails("provide_operation_id_then_retry"));
   }
 
   const auto operation = findOperationCopy(history, operationId);
   if (!operation)
   {
-    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Unknown MCP operation id: %1"}.arg(operationId),
+      operationTargetFailureDetails("refresh_status_or_validate", operationId));
   }
 
-  auto& map = mapWindow->document().map();
   auto diagnostic =
-    objectRegistry.liveStateJson(map, operation->changedObjectIds, operation->undone);
+    objectRegistry != nullptr
+      ? objectRegistry->liveStateJson(map, operation->changedObjectIds, operation->undone)
+      : operationLiveStateJson(map, *operation);
   auto nodes = std::vector<mdl::Node*>{};
   for (const auto& value : operation->changedObjectIds)
   {
-    const auto resolved = objectRegistry.resolveExternalId(map, value);
-    if (!resolved.ok)
+    auto legacyPathId = value;
+    if (objectRegistry != nullptr)
     {
-      continue;
+      const auto resolved = objectRegistry->resolveExternalId(map, value);
+      if (!resolved.ok)
+      {
+        continue;
+      }
+      legacyPathId = resolved.legacyPathId;
     }
-    const auto path = parseNodePathId(resolved.legacyPathId);
+    const auto path = parseNodePathId(legacyPathId);
     if (path)
     {
       if (auto* node = map.worldNode().resolvePath(*path))
@@ -623,6 +660,7 @@ McpBridgeToolResult operationSelectResult(
 
   auto result = QJsonObject{
     {"operationId", operationId},
+    {"mutatedDocument", false},
     {"selectedCount", static_cast<int>(nodes.size())},
   };
   for (auto it = diagnostic.begin(); it != diagnostic.end(); ++it)
@@ -656,65 +694,7 @@ McpBridgeToolResult operationSelectResult(
     return noActiveDocumentFailure();
   }
 
-  const auto operationId = params.value("operationId").toString();
-  if (operationId.isEmpty())
-  {
-    return invalidParamsFailure("operation_select requires operationId");
-  }
-
-  const auto operation = findOperationCopy(history, operationId);
-  if (!operation)
-  {
-    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
-  }
-
-  auto& map = mapWindow->document().map();
-  auto diagnostic = operationLiveStateJson(map, *operation);
-  auto nodes = std::vector<mdl::Node*>{};
-  for (const auto& value : operation->changedObjectIds)
-  {
-    const auto path = parseNodePathId(value);
-    if (!path)
-    {
-      continue;
-    }
-    if (auto* node = map.worldNode().resolvePath(*path))
-    {
-      if (map.editorContext().selectable(*node))
-      {
-        nodes.push_back(node);
-      }
-    }
-  }
-
-  mdl::deselectAll(map);
-  if (!nodes.empty())
-  {
-    mdl::selectNodes(map, nodes);
-  }
-
-  auto result = QJsonObject{
-    {"operationId", operationId},
-    {"selectedCount", static_cast<int>(nodes.size())},
-  };
-  for (auto it = diagnostic.begin(); it != diagnostic.end(); ++it)
-  {
-    result.insert(it.key(), it.value());
-  }
-  if (nodes.empty() && !operation->changedObjectIds.empty())
-  {
-    result.insert(
-      "diagnostic",
-      "No live selectable objects were found for this operation in the active document.");
-    if (!result.contains("suggestedAction"))
-    {
-      result.insert(
-        "suggestedAction",
-        "Use selection_filter/selection_by_bounds or operation_inspect(detail=full) to "
-        "re-identify current objects.");
-    }
-  }
-  return McpBridgeToolResult::success(result);
+  return operationSelectForMapResult(mapWindow->document().map(), history, params);
 }
 
 McpBridgeToolResult operationValidateResult(
