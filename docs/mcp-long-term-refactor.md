@@ -198,6 +198,8 @@ Next Phase 2 item:
   mutations.
 - Done: `operation_select` reports structured retry-safe target failures and
   marks successful selection recovery as `mutatedDocument:false`.
+- Done: `operation_validate` reports structured retry-safe target failures and
+  marks successful validation as `mutatedDocument:false`.
 - Done: stale target warnings are summarized by default in selector/module
   paths, with full detail opt-in.
 - Done: compound operation expansion summaries exist for batch/curved corridor

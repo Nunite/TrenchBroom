@@ -722,13 +722,19 @@ McpBridgeToolResult operationValidateForMapResult(
   const auto operationId = params.value("operationId").toString();
   if (operationId.isEmpty())
   {
-    return invalidParamsFailure("operation_validate requires operationId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "operation_validate requires operationId",
+      operationTargetFailureDetails("provide_operation_id_then_retry"));
   }
 
   const auto operation = findOperationCopy(history, operationId);
   if (!operation)
   {
-    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Unknown MCP operation id: %1"}.arg(operationId),
+      operationTargetFailureDetails("refresh_status_or_validate", operationId));
   }
 
   const auto detail = detailFromParams(params);
@@ -752,6 +758,7 @@ McpBridgeToolResult operationValidateForMapResult(
 
   auto result = QJsonObject{
     {"operationId", operationId},
+    {"mutatedDocument", false},
     {"valid", liveState.value("valid").toBool(false)},
     {"undone", operation->undone},
     {"operationKind",
@@ -788,13 +795,19 @@ McpBridgeToolResult operationValidateResult(
   const auto operationId = params.value("operationId").toString();
   if (operationId.isEmpty())
   {
-    return invalidParamsFailure("operation_validate requires operationId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "operation_validate requires operationId",
+      operationTargetFailureDetails("provide_operation_id_then_retry"));
   }
 
   const auto operation = findOperationCopy(history, operationId);
   if (!operation)
   {
-    return invalidParamsFailure(QString{"Unknown MCP operation id: %1"}.arg(operationId));
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      QString{"Unknown MCP operation id: %1"}.arg(operationId),
+      operationTargetFailureDetails("refresh_status_or_validate", operationId));
   }
 
   const auto liveState = operationLiveStateJson(mapWindow->document().map(), *operation);
@@ -803,6 +816,7 @@ McpBridgeToolResult operationValidateResult(
 
   auto result = QJsonObject{
     {"operationId", operationId},
+    {"mutatedDocument", false},
     {"valid", liveState.value("valid").toBool(false)},
     {"undone", operation->undone},
     {"changedObjectCount", operation->changedObjectIds.size()},
