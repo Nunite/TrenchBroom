@@ -1006,29 +1006,6 @@ int storeBatchOperationMetadata(
       }
       return;
     }
-    if (operationType == "room" || operationType == "corridor")
-    {
-      appendRepeated(6, "shell");
-      return;
-    }
-    if (operationType == "sky_shell")
-    {
-      appendRepeated(6, "sky_shell");
-      return;
-    }
-    if (operationType == "doorway")
-    {
-      appendRepeated(4, "wall_segment");
-      return;
-    }
-    if (operationType == "stairs")
-    {
-      if (partRequested(operation, "steps"))
-      {
-        appendRepeated(std::max(1, operation.value("steps").toInt(8)), "steps");
-      }
-      return;
-    }
     if (operationType == "path_ribbon")
     {
       if (
