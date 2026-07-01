@@ -1635,7 +1635,14 @@ McpBridgeToolResult cachedIrApplyParams(
   const auto previewId = params.value("previewId").toString().trimmed();
   if (previewId.isEmpty())
   {
-    return invalidParamsFailure("ir_apply_from_file requires path or previewId");
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "ir_apply_from_file requires path or previewId",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "provide_path_or_preview_id_then_retry"},
+      });
   }
 
   const auto nowMs = QDateTime::currentMSecsSinceEpoch();
@@ -1720,6 +1727,13 @@ McpBridgeToolResult irApplyPreMutationFailure(
   details.insert("recoveryAction", std::move(recoveryAction));
   return McpBridgeToolResult::failure(
     mcp::McpErrorCode::InvalidParams, message, std::move(details));
+}
+
+McpBridgeToolResult irApplyFromFileMissingTargetFailure()
+{
+  return irApplyPreMutationFailure(
+    "ir_apply_from_file requires path or previewId",
+    "provide_path_or_preview_id_then_retry");
 }
 
 QJsonObject mergeObjects(QJsonObject base, const QJsonObject& overlay)
@@ -3150,6 +3164,12 @@ McpBridgeToolResult irApplyFromFileResult(
   std::map<QString, McpIrPreviewCacheRecord>* previewCache)
 {
   auto paramsWithPath = params;
+  if (
+    paramsWithPath.value("path").toString().trimmed().isEmpty()
+    && paramsWithPath.value("previewId").toString().trimmed().isEmpty())
+  {
+    return irApplyFromFileMissingTargetFailure();
+  }
   if (!paramsWithPath.value("previewId").toString().trimmed().isEmpty())
   {
     auto* mapWindow = appController.mapWindowManager().topMapWindow();
@@ -3218,6 +3238,12 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   std::map<QString, McpIrPreviewCacheRecord>* previewCache)
 {
   auto paramsWithPath = params;
+  if (
+    paramsWithPath.value("path").toString().trimmed().isEmpty()
+    && paramsWithPath.value("previewId").toString().trimmed().isEmpty())
+  {
+    return irApplyFromFileMissingTargetFailure();
+  }
   if (!paramsWithPath.value("previewId").toString().trimmed().isEmpty())
   {
     if (previewCache == nullptr)

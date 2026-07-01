@@ -9034,14 +9034,16 @@ TEST_CASE("McpBridgeServer file based IR tools")
     metadataStore,
     moduleStore);
   CHECK(!missingPathApplyResponse.ok);
-  CHECK(missingPathApplyResponse.error.message == "file-based IR requires path");
+  CHECK(
+    missingPathApplyResponse.error.message
+    == "ir_apply_from_file requires path or previewId");
   CHECK(
     missingPathApplyResponse.error.details.value("mutatedDocument").toBool(true)
     == false);
   CHECK(missingPathApplyResponse.error.details.value("retrySafe").toBool(false));
   CHECK(
     missingPathApplyResponse.error.details.value("recoveryAction").toString()
-    == "fix_ir_file_or_preview_again");
+    == "provide_path_or_preview_id_then_retry");
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeRejectedApply);
 
   const auto invalidApplyPath = tempDir.filePath("invalid-apply-ir.json");

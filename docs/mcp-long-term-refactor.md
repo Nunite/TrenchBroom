@@ -296,6 +296,8 @@ Next Phase 2 item:
   brushes.
 - Done: cached `ir_apply_from_file` previewId guard failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before applying IR.
+- Done: `ir_apply_from_file` missing path/previewId failures report
+  `mutatedDocument:false`, `retrySafe`, and a recovery action before applying IR.
 - Done: direct `ir_apply_from_file` path/cache/IR-shape failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before applying IR.
 - Done: direct `ir_apply` payload failures report `mutatedDocument:false`,
