@@ -7936,6 +7936,21 @@ TEST_CASE("McpBridgeServer checked entity batch")
   SECTION("rejects unknown class without committing")
   {
     const auto descendantCountBefore = map.worldNode().descendantCount();
+    const auto missingEntitiesResponse = createEntityCheckedBatchForMapResult(
+      map,
+      "entity_create_checked_batch",
+      QJsonObject{},
+      history,
+      nextOperationIndex);
+    CHECK(!missingEntitiesResponse.ok);
+    CHECK(
+      missingEntitiesResponse.error.details.value("mutatedDocument").toBool(true)
+      == false);
+    CHECK(missingEntitiesResponse.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      missingEntitiesResponse.error.details.value("recoveryAction").toString()
+      == "provide_entities_then_retry");
+
     const auto response = createEntityCheckedBatchForMapResult(
       map,
       "entity_create_checked_batch",
@@ -7951,6 +7966,13 @@ TEST_CASE("McpBridgeServer checked entity batch")
 
     CHECK(!response.ok);
     CHECK(response.error.code == mcp::McpErrorCode::InvalidParams);
+    CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+    CHECK(response.error.details.value("retrySafe").toBool(false));
+    CHECK(
+      response.error.details.value("recoveryAction").toString()
+      == "choose_defined_point_entity_classname_then_retry");
+    CHECK(response.error.details.value("entityIndex").toInt(-1) == 1);
+    CHECK(response.error.details.value("classname").toString() == "not_a_real_entity");
     CHECK(map.worldNode().descendantCount() == descendantCountBefore);
     CHECK(history.empty());
   }

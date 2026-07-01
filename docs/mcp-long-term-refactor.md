@@ -202,6 +202,9 @@ Next Phase 2 item:
 - Done: entity property update/delete tools report document identity on
   successful operation records and structured `mutatedDocument:false` /
   `retrySafe` / `recoveryAction` diagnostics for pre-mutation target failures.
+- Done: `entity_create_checked_batch` precondition failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before creating
+  entities.
 - Done: `texture_apply_by_filter` reports document identity on successful
   operation records and structured `mutatedDocument:false` / `retrySafe` /
   `recoveryAction` diagnostics for pre-mutation target failures.

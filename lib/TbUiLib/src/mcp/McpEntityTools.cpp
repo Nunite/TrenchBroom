@@ -244,6 +244,15 @@ QJsonObject preMutationFailureDetails(
   return details;
 }
 
+McpBridgeToolResult preMutationInvalidParamsFailure(
+  const QString& message, const QString& recoveryAction, QJsonObject details = {})
+{
+  return McpBridgeToolResult::failure(
+    mcp::McpErrorCode::InvalidParams,
+    message,
+    preMutationFailureDetails(std::move(details), recoveryAction));
+}
+
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
@@ -1419,13 +1428,16 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
   const auto entitiesValue = params.value("entities");
   if (!entitiesValue.isArray())
   {
-    return invalidParamsFailure("entity_create_checked_batch requires entities array");
+    return preMutationInvalidParamsFailure(
+      "entity_create_checked_batch requires entities array",
+      "provide_entities_then_retry");
   }
 
   const auto entitiesArray = entitiesValue.toArray();
   if (entitiesArray.isEmpty())
   {
-    return invalidParamsFailure("entities must not be empty");
+    return preMutationInvalidParamsFailure(
+      "entities must not be empty", "provide_entities_then_retry");
   }
 
   auto nodes = std::vector<mdl::Node*>{};
@@ -1446,7 +1458,10 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
     if (!entityValue.isObject())
     {
       cleanupNodes();
-      return invalidParamsFailure(QString{"entities[%1] must be an object"}.arg(i));
+      return preMutationInvalidParamsFailure(
+        QString{"entities[%1] must be an object"}.arg(i),
+        "fix_entity_payload_then_retry",
+        QJsonObject{{"entityIndex", i}});
     }
 
     const auto entityParams = entityValue.toObject();
@@ -1454,7 +1469,10 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
     if (classname.isEmpty())
     {
       cleanupNodes();
-      return invalidParamsFailure(QString{"entities[%1] requires classname"}.arg(i));
+      return preMutationInvalidParamsFailure(
+        QString{"entities[%1] requires classname"}.arg(i),
+        "provide_entity_classname_then_retry",
+        QJsonObject{{"entityIndex", i}});
     }
 
     const auto* definition =
@@ -1462,16 +1480,20 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
     if (!definition)
     {
       cleanupNodes();
-      return invalidParamsFailure(
-        QString{"FGD does not define entity classname: %1"}.arg(classname));
+      return preMutationInvalidParamsFailure(
+        QString{"FGD does not define entity classname: %1"}.arg(classname),
+        "choose_defined_point_entity_classname_then_retry",
+        QJsonObject{{"entityIndex", i}, {"classname", classname}});
     }
     if (mdl::getType(*definition) != mdl::EntityDefinitionType::Point)
     {
       cleanupNodes();
-      return invalidParamsFailure(
+      return preMutationInvalidParamsFailure(
         QString{"entity_create_checked_batch only creates point entities; %1 is %2"}
           .arg(classname)
-          .arg(entityDefinitionTypeName(*definition)));
+          .arg(entityDefinitionTypeName(*definition)),
+        "choose_point_entity_classname_then_retry",
+        QJsonObject{{"entityIndex", i}, {"classname", classname}});
     }
 
     auto error = QString{};
@@ -1479,7 +1501,10 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
     if (!properties)
     {
       cleanupNodes();
-      return invalidParamsFailure(QString{"entities[%1].%2"}.arg(i).arg(error));
+      return preMutationInvalidParamsFailure(
+        QString{"entities[%1].%2"}.arg(i).arg(error),
+        "fix_entity_properties_then_retry",
+        QJsonObject{{"entityIndex", i}});
     }
 
     auto origin = vm::vec3d{0, 0, 0};
@@ -1489,7 +1514,10 @@ McpBridgeToolResult createEntityCheckedBatchForMapResult(
       if (!parsedOrigin)
       {
         cleanupNodes();
-        return invalidParamsFailure(QString{"entities[%1].%2"}.arg(i).arg(error));
+        return preMutationInvalidParamsFailure(
+          QString{"entities[%1].%2"}.arg(i).arg(error),
+          "fix_entity_origin_then_retry",
+          QJsonObject{{"entityIndex", i}, {"classname", classname}});
       }
       origin = *parsedOrigin;
     }
