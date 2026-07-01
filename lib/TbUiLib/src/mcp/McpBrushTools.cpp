@@ -5627,7 +5627,10 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   const auto spiralParams = spiralStairsParamsFromJson(params, error);
   if (!spiralParams)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails({}, "fix_spiral_stairs_parameters_then_retry"));
   }
 
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
@@ -5635,7 +5638,10 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   auto brushes = createSpiralStairBrushes(builder, *spiralParams, material, error);
   if (!brushes)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails({}, "fix_spiral_stairs_parameters_then_retry"));
   }
 
   auto nodes = std::vector<mdl::Node*>{};

@@ -2967,6 +2967,25 @@ TEST_CASE("McpBridgeServer spiral stair geometry tools")
   auto history = std::vector<McpOperationRecord>{};
   auto nextOperationIndex = 1;
   auto objectRegistry = McpObjectRegistry{};
+  const auto descendantCountBeforeInvalid = map.worldNode().descendantCount();
+  const auto invalidResponse = blockoutCreateSpiralStairsForMapResult(
+    map,
+    QJsonObject{
+      {"innerRadius", 128},
+      {"outerRadius", 32},
+      {"steps", 24},
+    },
+    history,
+    nextOperationIndex);
+  CHECK(!invalidResponse.ok);
+  CHECK(invalidResponse.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(invalidResponse.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    invalidResponse.error.details.value("recoveryAction").toString()
+    == "fix_spiral_stairs_parameters_then_retry");
+  CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalid);
+  CHECK(history.empty());
+
   const auto createResponse = blockoutCreateSpiralStairsForMapResult(
     map,
     QJsonObject{
