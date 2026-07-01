@@ -600,26 +600,6 @@ std::optional<vm::bbox3d> boundsFromJson(
   return vm::bbox3d{*min, *max};
 }
 
-bool requireDoorwayBounds(const QJsonObject& params, QString& error)
-{
-  auto missing = QStringList{};
-  if (!params.contains("doorMin"))
-  {
-    missing.push_back("doorMin");
-  }
-  if (!params.contains("doorMax"))
-  {
-    missing.push_back("doorMax");
-  }
-  if (missing.isEmpty())
-  {
-    return true;
-  }
-
-  error = QString{"doorway requires %1"}.arg(missing.join(" and "));
-  return false;
-}
-
 std::string mcpOptionalString(
   const QJsonObject& params, const QString& key, const std::string& defaultValue = {})
 {
@@ -2806,152 +2786,6 @@ std::optional<mdl::Brush> createBrushFromPlaneTriples(
   return std::move(brush.value());
 }
 
-bool validThickness(const double thickness)
-{
-  return std::isfinite(thickness) && thickness > 0.0;
-}
-
-std::optional<std::vector<vm::bbox3d>> roomShellBounds(
-  const vm::bbox3d& innerBounds, const double thickness, QString& error)
-{
-  if (!validThickness(thickness))
-  {
-    error = "thickness must be greater than zero";
-    return std::nullopt;
-  }
-
-  const auto& min = innerBounds.min;
-  const auto& max = innerBounds.max;
-  auto result = std::vector<vm::bbox3d>{};
-  result.reserve(6);
-  result.emplace_back(
-    vm::vec3d{min.x() - thickness, min.y() - thickness, min.z() - thickness},
-    vm::vec3d{max.x() + thickness, max.y() + thickness, min.z()});
-  result.emplace_back(
-    vm::vec3d{min.x() - thickness, min.y() - thickness, max.z()},
-    vm::vec3d{max.x() + thickness, max.y() + thickness, max.z() + thickness});
-  result.emplace_back(
-    vm::vec3d{min.x() - thickness, min.y() - thickness, min.z()},
-    vm::vec3d{min.x(), max.y() + thickness, max.z()});
-  result.emplace_back(
-    vm::vec3d{max.x(), min.y() - thickness, min.z()},
-    vm::vec3d{max.x() + thickness, max.y() + thickness, max.z()});
-  result.emplace_back(
-    vm::vec3d{min.x(), min.y() - thickness, min.z()},
-    vm::vec3d{max.x(), min.y(), max.z()});
-  result.emplace_back(
-    vm::vec3d{min.x(), max.y(), min.z()},
-    vm::vec3d{max.x(), max.y() + thickness, max.z()});
-  return result;
-}
-
-std::optional<std::vector<vm::bbox3d>> doorwayBounds(
-  const vm::bbox3d& wallBounds, const vm::bbox3d& doorBounds, QString& error)
-{
-  if (
-    doorBounds.min.x() < wallBounds.min.x() || doorBounds.max.x() > wallBounds.max.x()
-    || doorBounds.min.y() < wallBounds.min.y() || doorBounds.max.y() > wallBounds.max.y()
-    || doorBounds.min.z() < wallBounds.min.z() || doorBounds.max.z() > wallBounds.max.z())
-  {
-    error = "door bounds must be inside wall bounds";
-    return std::nullopt;
-  }
-
-  auto result = std::vector<vm::bbox3d>{};
-  const auto addIfNonEmpty = [&](const vm::bbox3d& bounds) {
-    if (
-      bounds.min.x() < bounds.max.x() && bounds.min.y() < bounds.max.y()
-      && bounds.min.z() < bounds.max.z())
-    {
-      result.push_back(bounds);
-    }
-  };
-
-  const auto& min = wallBounds.min;
-  const auto& max = wallBounds.max;
-  const auto& dMin = doorBounds.min;
-  const auto& dMax = doorBounds.max;
-
-  const auto wallSize = max - min;
-  const auto splitAlongX = wallSize.x() >= wallSize.y();
-  if (splitAlongX)
-  {
-    addIfNonEmpty(vm::bbox3d{min, vm::vec3d{dMin.x(), max.y(), max.z()}});
-    addIfNonEmpty(vm::bbox3d{vm::vec3d{dMax.x(), min.y(), min.z()}, max});
-    addIfNonEmpty(vm::bbox3d{
-      vm::vec3d{dMin.x(), min.y(), dMax.z()}, vm::vec3d{dMax.x(), max.y(), max.z()}});
-  }
-  else
-  {
-    addIfNonEmpty(vm::bbox3d{min, vm::vec3d{max.x(), dMin.y(), max.z()}});
-    addIfNonEmpty(vm::bbox3d{vm::vec3d{min.x(), dMax.y(), min.z()}, max});
-    addIfNonEmpty(vm::bbox3d{
-      vm::vec3d{min.x(), dMin.y(), dMax.z()}, vm::vec3d{max.x(), dMax.y(), max.z()}});
-  }
-
-  if (result.empty())
-  {
-    error = "doorway did not produce any wall segments";
-    return std::nullopt;
-  }
-  return result;
-}
-
-std::optional<std::vector<vm::bbox3d>> stairsBounds(
-  const vm::bbox3d& bounds, const size_t steps, const vm::axis::type axis, QString& error)
-{
-  if (steps == 0)
-  {
-    error = "steps must be greater than zero";
-    return std::nullopt;
-  }
-  if (axis != vm::axis::x && axis != vm::axis::y)
-  {
-    error = "stairs axis must be x or y";
-    return std::nullopt;
-  }
-
-  const auto& min = bounds.min;
-  const auto& max = bounds.max;
-  const auto runMin = axis == vm::axis::x ? min.x() : min.y();
-  const auto runMax = axis == vm::axis::x ? max.x() : max.y();
-  const auto runStep = (runMax - runMin) / static_cast<double>(steps);
-  const auto riseStep = (max.z() - min.z()) / static_cast<double>(steps);
-  if (!gridAligned(runStep, 1.0) || !gridAligned(riseStep, 1.0))
-  {
-    error =
-      QString{
-        "stairs run/rise step size must be integer units; got runStep=%1 and "
-        "riseStep=%2 for %3 steps"}
-        .arg(runStep)
-        .arg(riseStep)
-        .arg(steps);
-    return std::nullopt;
-  }
-
-  auto result = std::vector<vm::bbox3d>{};
-  result.reserve(steps);
-  for (size_t i = 0; i < steps; ++i)
-  {
-    const auto stepMinRun = runMin + runStep * static_cast<double>(i);
-    const auto stepMaxRun = runMin + runStep * static_cast<double>(i + 1);
-    const auto stepMaxZ = min.z() + riseStep * static_cast<double>(i + 1);
-    if (axis == vm::axis::x)
-    {
-      result.emplace_back(
-        vm::vec3d{stepMinRun, min.y(), min.z()},
-        vm::vec3d{stepMaxRun, max.y(), stepMaxZ});
-    }
-    else
-    {
-      result.emplace_back(
-        vm::vec3d{min.x(), stepMinRun, min.z()},
-        vm::vec3d{max.x(), stepMaxRun, stepMaxZ});
-    }
-  }
-  return result;
-}
-
 std::optional<std::vector<vm::bbox3d>> steppedMassBounds(
   const vm::bbox3d& baseBounds,
   const size_t levels,
@@ -3033,14 +2867,6 @@ std::optional<std::vector<vm::bbox3d>> supportPostBounds(
       vm::vec3d{point.x() + halfSize, point.y() + halfSize, topZ});
   }
   return result;
-}
-
-std::vector<vm::bbox3d> skyShellBounds(
-  const vm::bbox3d& innerBounds, const double thickness)
-{
-  auto error = QString{};
-  return roomShellBounds(innerBounds, thickness, error)
-    .value_or(std::vector<vm::bbox3d>{});
 }
 
 struct SpiralStairsParams
@@ -5259,7 +5085,7 @@ std::optional<std::vector<mdl::Brush>> createBrushesForType(
     }
     const auto sides = clampedSizeParam(params, "sides", 16, 3, 128);
     const auto thickness = optionalDouble(params, "thickness", 16.0);
-    if (!validThickness(thickness))
+    if (!finitePositive(thickness))
     {
       error = "thickness must be greater than zero";
       return std::nullopt;
@@ -5383,135 +5209,10 @@ McpBridgeToolResult blockoutCreateResult(
       preMutationFailureDetails({}, "use_skill_recipe_then_ir_apply"));
   }
 
-  auto error = QString{};
-  auto& map = mapWindow->document().map();
-  const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
-  auto material = materialNameFromParams(map, params);
-  auto nodes = std::vector<mdl::Node*>{};
-  auto transactionName = QString{};
-
-  const auto bounds = boundsFromJson(params, error);
-  if (!bounds)
-  {
-    return invalidParamsFailure(error);
-  }
-  if (toolName == "blockout_create_room" || toolName == "blockout_create_corridor")
-  {
-    const auto shellBounds =
-      roomShellBounds(*bounds, optionalDouble(params, "thickness", 16.0), error);
-    if (!shellBounds)
-    {
-      return invalidParamsFailure(error);
-    }
-    nodes = brushNodesFromBounds(builder, *shellBounds, material, error);
-    transactionName = toolName == "blockout_create_room" ? "MCP: Blockout room"
-                                                         : "MCP: Blockout corridor";
-  }
-  else if (toolName == "blockout_create_stairs")
-  {
-    const auto axis = axisFromJson(params, "axis", vm::axis::x, error);
-    if (!axis)
-    {
-      return invalidParamsFailure(error);
-    }
-    const auto stairBoxes =
-      stairsBounds(*bounds, optionalSize(params, "steps", 8), *axis, error);
-    if (!stairBoxes)
-    {
-      return invalidParamsFailure(error);
-    }
-    nodes = brushNodesFromBounds(builder, *stairBoxes, material, error);
-    transactionName = "MCP: Blockout stairs";
-  }
-  else if (toolName == "blockout_create_ramp")
-  {
-    const auto axis = axisFromJson(params, "axis", vm::axis::x, error);
-    if (!axis)
-    {
-      return invalidParamsFailure(error);
-    }
-    auto brush = createWedgeBrush(builder, *bounds, *axis, material);
-    if (brush.is_error())
-    {
-      return invalidParamsFailure("Could not create ramp brush");
-    }
-    nodes.push_back(new mdl::BrushNode{std::move(brush.value())});
-    transactionName = "MCP: Blockout ramp";
-  }
-  else if (toolName == "blockout_create_doorway")
-  {
-    if (!requireDoorwayBounds(params, error))
-    {
-      return invalidParamsFailure(error);
-    }
-    const auto door = boundsFromJson(params, "doorMin", "doorMax", error);
-    if (!door)
-    {
-      return invalidParamsFailure(error);
-    }
-    const auto wallSegments = doorwayBounds(*bounds, *door, error);
-    if (!wallSegments)
-    {
-      return invalidParamsFailure(error);
-    }
-    nodes = brushNodesFromBounds(builder, *wallSegments, material, error);
-    transactionName = "MCP: Blockout doorway";
-  }
-  else if (toolName == "blockout_create_cover")
-  {
-    nodes = brushNodesFromBounds(builder, {*bounds}, material, error);
-    transactionName = "MCP: Blockout cover";
-  }
-  else if (toolName == "blockout_create_sky_shell")
-  {
-    material = mcpOptionalString(params, "material", "sky");
-    const auto shellBounds =
-      skyShellBounds(*bounds, optionalDouble(params, "thickness", 16.0));
-    if (shellBounds.empty())
-    {
-      return invalidParamsFailure("Could not create sky shell bounds");
-    }
-    nodes = brushNodesFromBounds(builder, shellBounds, material, error);
-    transactionName = "MCP: Blockout sky shell";
-  }
-
-  if (nodes.empty())
-  {
-    return invalidParamsFailure(
-      error.isEmpty() ? "No blockout brushes were generated" : error);
-  }
-
-  const auto brushCount = static_cast<int>(nodes.size());
-  const auto generatedBounds = boundsForNodes(nodes);
-  const auto changedObjectIds = addNodesWithTransaction(
-    map, transactionName, nodes, mcpOptionalBool(params, "select", true));
-  if (!changedObjectIds)
-  {
-    for (auto* node : nodes)
-    {
-      delete node;
-    }
-    return McpBridgeToolResult::failure(
-      mcp::McpErrorCode::InternalError, "Could not add blockout brushes");
-  }
-
-  auto result = QJsonObject{};
-  mcpRecordOperation(
-    history,
-    nextOperationIndex,
-    map,
-    toolName,
-    transactionName,
-    *changedObjectIds,
-    result);
-  result.insert("brushCount", brushCount);
-  result.insert("material", QString::fromStdString(material));
-  result.insert(
-    "materials",
-    stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
-  result.insert("bounds", boundsToJson(generatedBounds));
-  applyDetailLevel(result, *changedObjectIds, idDetailFromParams(params));
-  return McpBridgeToolResult::success(std::move(result));
+  return McpBridgeToolResult::failure(
+    mcp::McpErrorCode::ToolNotFound,
+    QString{"Unknown MCP tool: %1"}.arg(toolName),
+    preMutationFailureDetails({}, "search_tools_or_use_blockout_create_batch"));
 }
 
 McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
