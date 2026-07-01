@@ -237,6 +237,9 @@ Next Phase 2 item:
 - Done: `brush_create_boxes_batch` top-level preflight failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before delegating to
   batch brush creation.
+- Done: single `brush_create*` primitive precondition failures report
+  `mutatedDocument:false`, `retrySafe`, and recovery actions before committing
+  brushes.
 - Done: `blockout_create_spiral_stairs` precondition failures report
   `mutatedDocument:false`, `retrySafe`, and recovery actions before committing
   brushes.

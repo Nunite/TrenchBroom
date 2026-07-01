@@ -6796,8 +6796,18 @@ McpBridgeToolResult createBrushResult(
     return noActiveDocumentFailure();
   }
 
+  return createBrushForMapResult(
+    mapWindow->document().map(), toolName, params, history, nextOperationIndex);
+}
+
+McpBridgeToolResult createBrushForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex)
+{
   auto error = QString{};
-  auto& map = mapWindow->document().map();
   const auto material = materialNameFromParams(map, params);
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
 
@@ -6805,7 +6815,11 @@ McpBridgeToolResult createBrushResult(
   auto brushes = createBrushesForType(map, builder, type, params, material, error);
   if (!brushes)
   {
-    return invalidParamsFailure(error);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      error,
+      preMutationFailureDetails(
+        QJsonObject{{"type", type}}, "fix_brush_parameters_then_retry"));
   }
 
   auto nodes = std::vector<mdl::Node*>{};

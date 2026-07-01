@@ -775,6 +775,12 @@ McpBridgeToolResult createBrushResult(
   const QJsonObject& params,
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex);
+McpBridgeToolResult createBrushForMapResult(
+  mdl::Map& map,
+  const QString& toolName,
+  const QJsonObject& params,
+  std::vector<McpOperationRecord>& history,
+  int& nextOperationIndex);
 McpBridgeToolResult createBoxesBatchResult(
   AppController& appController,
   const QString& toolName,

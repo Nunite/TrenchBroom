@@ -5640,6 +5640,42 @@ TEST_CASE("McpBridgeServer deletes operations without long object id lists")
   CHECK(fullState.contains("objectDiagnostics"));
 }
 
+TEST_CASE("McpBridgeServer brush primitives report pre-mutation failures")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  const auto descendantCountBefore = map.worldNode().descendantCount();
+
+  const auto response = createBrushForMapResult(
+    map,
+    "brush_create",
+    QJsonObject{
+      {"type", "torus"}, {"min", QJsonArray{0, 0, 0}}, {"max", QJsonArray{64, 64, 64}}},
+    history,
+    nextOperationIndex);
+
+  REQUIRE_FALSE(response.ok);
+  CHECK(response.error.details.value("mutatedDocument").toBool(true) == false);
+  CHECK(response.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    response.error.details.value("recoveryAction").toString()
+    == "fix_brush_parameters_then_retry");
+  CHECK(response.error.details.value("type").toString() == "torus");
+  CHECK(history.empty());
+  CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+}
+
 TEST_CASE("McpBridgeServer batch blockout tools")
 {
   auto appControllerFixture = AppControllerFixture{};
