@@ -381,16 +381,16 @@ Next Phase 4 item:
   failing point/edge information for invalid polygons.
 - Done: texture apply/replace paths report material existence so missing
   materials are discoverable.
-- Partial: visual review still mostly reports render quality, not "looks like
-  the requested target" critique.
+- Done: review tools now report `semanticAcceptance` metadata and schema wording
+  that makes `qualityValid` explicitly mean render readability only; the Agent or
+  skill still must inspect the contact sheet against requested scene intent.
 - Missing: generic organic primitives remain a future kernel decision; current
   cave/terrain strength stays in recipes.
 
 Next Phase 5 item:
 
-- After earlier phases close, improve one validation/review feedback path that
-  catches visually bad but technically valid output without adding scene-prefab
-  C++ behavior.
+- Decide whether a scene-neutral organic primitive is justified by repeated real
+  cave/terrain workflows, or keep that strength in recipes.
 
 ### Phase 1: Catalog And Discovery Cleanup
 

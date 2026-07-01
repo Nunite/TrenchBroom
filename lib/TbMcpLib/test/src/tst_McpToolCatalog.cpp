@@ -1032,6 +1032,7 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(currentSceneTool);
     CHECK(currentSceneTool->description.contains("active document"));
     CHECK(currentSceneTool->description.contains("preferredCapturePath"));
+    CHECK(currentSceneTool->description.contains("qualityValid only checks render readability"));
 
     const auto currentSceneProperties =
       currentSceneTool->inputSchema.value("properties").toObject();
@@ -1054,6 +1055,7 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(tool);
 
     CHECK(tool->description.contains("isolated Agent-readable geometry review bundle"));
+    CHECK(tool->description.contains("qualityValid only checks render readability"));
 
     const auto properties = tool->inputSchema.value("properties").toObject();
     CHECK(properties.value("operationIds").isObject());
@@ -1095,6 +1097,7 @@ TEST_CASE("McpToolCatalog")
 
     const auto selectorTool = findToolDefinition("render_review_selector");
     REQUIRE(selectorTool);
+    CHECK(selectorTool->description.contains("qualityValid only checks render readability"));
     CHECK(selectorTool->inputSchema.value("properties")
             .toObject()
             .value("labelParts")
@@ -1102,6 +1105,7 @@ TEST_CASE("McpToolCatalog")
 
     const auto moduleReviewTool = findToolDefinition("module_render_review");
     REQUIRE(moduleReviewTool);
+    CHECK(moduleReviewTool->description.contains("qualityValid only checks render readability"));
     CHECK(moduleReviewTool->inputSchema.value("properties")
             .toObject()
             .value("labelParts")

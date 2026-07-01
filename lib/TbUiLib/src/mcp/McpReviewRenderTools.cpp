@@ -1938,6 +1938,18 @@ bool writeManifest(const std::filesystem::path& path, const QJsonObject& manifes
   return true;
 }
 
+QJsonObject reviewSemanticAcceptance()
+{
+  return QJsonObject{
+    {"required", true},
+    {"automated", false},
+    {"status", "requires_human_or_skill_review"},
+    {"hint",
+     "qualityValid only checks render readability; inspect preferredCapturePath "
+     "or contactSheet against the requested scene intent before accepting the result."},
+  };
+}
+
 QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolName)
 {
   auto compact = QJsonObject{
@@ -1962,6 +1974,7 @@ QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolNa
     {"targetBounds", result.value("targetBounds")},
     {"captureCount", result.value("captureCount")},
     {"qualityValid", result.value("qualityValid")},
+    {"semanticAcceptance", result.value("semanticAcceptance")},
     {"warnings", result.value("warnings")},
     {"faceCount", result.value("faceCount")},
     {"edgeCount", result.value("edgeCount")},
@@ -2095,6 +2108,7 @@ McpBridgeToolResult renderReviewNodesForMapResult(
       {"unsupportedObjectCount", 0},
       {"captureCount", 0},
       {"qualityValid", false},
+      {"semanticAcceptance", reviewSemanticAcceptance()},
       {"warnings", QJsonArray{"noReviewTargets"}},
       {"note", "No live map objects were available for review."},
     });
@@ -2271,6 +2285,7 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     {"captures", captures},
     {"quality", quality},
     {"qualityValid", qualityValid},
+    {"semanticAcceptance", reviewSemanticAcceptance()},
     {"warnings", warnings},
     {"materials", materialNames},
     {"maxDetailedFaces", maxFaces},
@@ -2340,6 +2355,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
       {"captures", QJsonArray{}},
       {"quality", QJsonArray{}},
       {"qualityValid", false},
+      {"semanticAcceptance", reviewSemanticAcceptance()},
       {"warnings", warnings},
       {"note", "render_review_targets requires live operationIds, objectIds, or bounds."},
     });
@@ -2519,6 +2535,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"captures", captures},
     {"quality", quality},
     {"qualityValid", qualityValid},
+    {"semanticAcceptance", reviewSemanticAcceptance()},
     {"warnings", warnings},
     {"materials", materialNames},
     {"maxDetailedFaces", maxFaces},

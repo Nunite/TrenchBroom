@@ -2543,6 +2543,13 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("targetBrushCount").toInt() == 2);
     CHECK(response.result.value("captureCount").toInt() == 5);
     CHECK(response.result.value("qualityValid").toBool());
+    const auto semanticAcceptance =
+      response.result.value("semanticAcceptance").toObject();
+    CHECK(semanticAcceptance.value("required").toBool());
+    CHECK(!semanticAcceptance.value("automated").toBool(true));
+    CHECK(
+      semanticAcceptance.value("status").toString()
+      == "requires_human_or_skill_review");
     CHECK(map.modified() == wasModified);
     CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
     CHECK(QFileInfo{response.result.value("outputDir").toString()}.isAbsolute());
@@ -2636,6 +2643,10 @@ TEST_CASE("McpBridgeServer")
     CHECK(response.result.value("renderer").toString() == "geometry_cpu");
     CHECK(response.result.value("targetBrushCount").toInt() == 2);
     CHECK(response.result.value("qualityValid").toBool());
+    const auto semanticAcceptance =
+      response.result.value("semanticAcceptance").toObject();
+    CHECK(semanticAcceptance.value("required").toBool());
+    CHECK(!semanticAcceptance.value("automated").toBool(true));
     CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
     CHECK(response.result.value("captures").isUndefined());
     CHECK(response.result.value("targetObjectIds").isUndefined());
