@@ -19,6 +19,7 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QStringList>
 
 #include "mcp/McpJsonRpc.h"
 
@@ -26,6 +27,21 @@
 
 namespace tb::mcp
 {
+
+namespace
+{
+
+QStringList toolNames(const QJsonArray& tools)
+{
+  auto result = QStringList{};
+  for (const auto& tool : tools)
+  {
+    result.push_back(tool.toObject().value("name").toString());
+  }
+  return result;
+}
+
+} // namespace
 
 TEST_CASE("McpJsonRpc")
 {
@@ -54,11 +70,25 @@ TEST_CASE("McpJsonRpc")
   {
     const auto result = mcpToolsListResult(McpMode::Off);
     const auto tools = result.value("tools").toArray();
+    const auto names = toolNames(tools);
 
     CHECK(result.value("trenchBroomMode").toString() == "Off");
     CHECK(result.value("toolProfile").toString() == "Modeling");
     CHECK(!tools.isEmpty());
     CHECK(tools.first().toObject().value("name").toString() == "tb_status");
+    CHECK(!names.contains("blockout_create_batch"));
+    CHECK(!names.contains("entity_create_checked"));
+  }
+
+  SECTION("tools list uses current read-only mode")
+  {
+    const auto result = mcpToolsListResult(McpMode::ReadOnly);
+    const auto names = toolNames(result.value("tools").toArray());
+
+    CHECK(result.value("trenchBroomMode").toString() == "ReadOnly");
+    CHECK(names.contains("tb_status"));
+    CHECK(!names.contains("blockout_create_batch"));
+    CHECK(!names.contains("entity_create_checked"));
   }
 
   SECTION("tools call forwards arguments to caller")

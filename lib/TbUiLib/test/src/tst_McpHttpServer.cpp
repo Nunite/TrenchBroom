@@ -24,6 +24,7 @@
 #include <QJsonObject>
 #include <QTcpSocket>
 #include <QUuid>
+#include <QStringList>
 
 #include "ui/mcp/McpBridgeServer.h"
 #include "ui/mcp/McpHttpServer.h"
@@ -146,6 +147,16 @@ QJsonObject jsonObject(const HttpResponse& response)
   return document.object();
 }
 
+QStringList toolNames(const QJsonArray& tools)
+{
+  auto result = QStringList{};
+  for (const auto& tool : tools)
+  {
+    result.push_back(tool.toObject().value("name").toString());
+  }
+  return result;
+}
+
 QByteArray jsonRequest(
   const int id, const QString& method, const QJsonObject& params = {})
 {
@@ -207,8 +218,12 @@ TEST_CASE("McpHttpServer")
 
     CHECK(response.statusCode == 200);
     const auto result = jsonObject(response).value("result").toObject();
-    CHECK(!result.value("tools").toArray().isEmpty());
+    const auto names = toolNames(result.value("tools").toArray());
+    CHECK(!names.isEmpty());
     CHECK(result.value("trenchBroomMode").toString() == "ReadOnly");
+    CHECK(names.contains("tb_status"));
+    CHECK(!names.contains("entity_create_checked"));
+    CHECK(!names.contains("blockout_create_batch"));
   }
 
   SECTION("notification returns accepted")

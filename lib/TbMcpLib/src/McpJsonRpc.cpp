@@ -118,6 +118,11 @@ QString toolResultText(const QJsonObject& json)
   return compactJsonText(json);
 }
 
+McpMode discoveryMode(const McpMode currentMode)
+{
+  return currentMode == McpMode::Off ? McpMode::ReadOnly : currentMode;
+}
+
 } // namespace
 
 QJsonObject jsonRpcResult(const QJsonValue& id, QJsonObject result)
@@ -174,7 +179,7 @@ QJsonObject mcpInitializeResult(const QJsonObject& params)
 QJsonObject mcpToolsListResult(const McpMode currentMode, const McpToolProfile profile)
 {
   return QJsonObject{
-    {"tools", toolsListJson(McpMode::Edit, true, profile)},
+    {"tools", toolsListJson(discoveryMode(currentMode), true, profile)},
     {"trenchBroomMode", modeName(currentMode)},
     {"toolProfile", toolProfileName(profile)},
   };

@@ -272,6 +272,18 @@ TEST_CASE("McpBridgeServer")
         {"outputDir", params.value("outputDir").toString()},
       });
     }
+    if (toolName == "render_review_current_scene")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"tool", "render_review_current_scene"},
+        {"renderer", "geometry_cpu"},
+        {"reviewId", "review-session-test"},
+        {"resourceUri", "tbmcp://review/review-session-test"},
+        {"targetObjectCount", 2},
+        {"captureCount", 1},
+        {"absolutePreferredCapturePath", "C:/tmp/review-session-test.png"},
+      });
+    }
     if (toolName == "render_review_targets")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -627,6 +639,26 @@ TEST_CASE("McpBridgeServer")
 
     CHECK(response.ok);
     CHECK(response.result.value("application").toString() == "TrenchBroom");
+  }
+
+  SECTION("caches review resources returned by tools")
+  {
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "render_review_current_scene",
+      QJsonObject{},
+      mcp::McpMode::ReadOnly});
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("resourceUri").toString() == "tbmcp://review/review-session-test");
+    const auto resource = server.readResource(response.result.value("resourceUri").toString());
+    REQUIRE(resource);
+    CHECK(resource->value("reviewId").toString() == "review-session-test");
+    CHECK(resource->value("tool").toString() == "render_review_current_scene");
+    CHECK(resource->value("targetObjectCount").toInt() == 2);
   }
 
   SECTION("serves compact tb_doctor output")

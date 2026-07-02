@@ -136,6 +136,7 @@ private:
   mutable std::map<QString, McpBrushMetadataRecord> m_brushMetadata;
   mutable std::map<QString, McpModuleRecord> m_modules;
   mutable std::map<QString, McpIrPreviewCacheRecord> m_irPreviewCache;
+  mutable std::map<QString, QJsonObject> m_reviewResources;
   mutable int m_nextIrPreviewIndex = 1;
   mutable McpObjectRegistry m_objectRegistry;
   mutable bool m_dispatchInProgress = false;

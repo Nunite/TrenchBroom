@@ -136,6 +136,77 @@ void syncOperationHistoryWithExternalResult(
   }
 }
 
+QJsonObject compactReviewResource(const QJsonObject& result)
+{
+  auto compact = QJsonObject{};
+  const auto copy = [&](const QString& key) {
+    if (result.contains(key))
+    {
+      compact.insert(key, result.value(key));
+    }
+  };
+  for (const auto& key :
+       {"tool",
+        "renderer",
+        "style",
+        "edgeMode",
+        "reviewId",
+        "resourceUri",
+        "preferredCapturePath",
+        "absolutePreferredCapturePath",
+        "outputDir",
+        "absoluteOutputDir",
+        "manifestPath",
+        "absoluteManifestPath",
+        "targetObjectCount",
+        "targetObjectIdsCount",
+        "targetObjectIdsSample",
+        "idsMode",
+        "targetBrushCount",
+        "unsupportedObjectCount",
+        "targetBounds",
+        "captureCount",
+        "qualityValid",
+        "semanticAcceptance",
+        "warnings",
+        "faceCount",
+        "edgeCount",
+        "labelCount",
+        "entityLabelCount",
+        "orderLabelCount",
+        "partLabelCount",
+        "simplified",
+        "verticalExaggeration"})
+  {
+    copy(key);
+  }
+
+  const auto contactSheet = result.value("contactSheet").toObject();
+  if (!contactSheet.isEmpty())
+  {
+    compact.insert(
+      "contactSheet",
+      QJsonObject{
+        {"path", contactSheet.value("path")},
+        {"absolutePath", contactSheet.value("absolutePath")},
+        {"width", contactSheet.value("width")},
+        {"height", contactSheet.value("height")},
+        {"fileSize", contactSheet.value("fileSize")},
+        {"valid", contactSheet.value("valid")},
+      });
+  }
+  return compact;
+}
+
+void cacheReviewResource(std::map<QString, QJsonObject>& resources, const QJsonObject& result)
+{
+  const auto resourceUri = result.value("resourceUri").toString();
+  if (resourceUri.startsWith("tbmcp://review/"))
+  {
+    resources[resourceUri] = compactReviewResource(result);
+  }
+}
+
 } // namespace
 
 McpOperationRecord::McpOperationRecord()
@@ -255,6 +326,7 @@ void McpBridgeServer::clearSessionState()
   m_modules.clear();
   m_objectRegistry.clear();
   m_irPreviewCache.clear();
+  m_reviewResources.clear();
   m_nextIrPreviewIndex = 1;
 }
 
@@ -328,6 +400,17 @@ QJsonObject resourceObject(
 
 std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) const
 {
+  static const auto ReviewPrefix = QString{"tbmcp://review/"};
+  if (uri.startsWith(ReviewPrefix))
+  {
+    const auto it = m_reviewResources.find(uri);
+    if (it != m_reviewResources.end())
+    {
+      return it->second;
+    }
+    return std::nullopt;
+  }
+
   static const auto Prefix = QString{"tbmcp://operation/"};
   if (!uri.startsWith(Prefix))
   {
@@ -463,8 +546,10 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
       auto externalResult = m_objectRegistry.externalizeResult(*resultMap, result.result);
       syncOperationHistoryWithExternalResult(
         m_operationHistory, *resultMap, m_objectRegistry, externalResult);
+      cacheReviewResource(m_reviewResources, externalResult);
       return mcp::McpBridgeResponse::success(request.id, std::move(externalResult));
     }
+    cacheReviewResource(m_reviewResources, result.result);
     return mcp::McpBridgeResponse::success(request.id, result.result);
   }
   return mcp::McpBridgeResponse::failure(request.id, result.error);
