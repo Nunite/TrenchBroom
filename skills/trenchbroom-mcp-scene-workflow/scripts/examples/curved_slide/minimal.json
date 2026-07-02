@@ -1,0 +1,11 @@
+{
+  "moduleId": "recipe-curved-slide-minimal",
+  "routeId": "curved-slide-minimal",
+  "radius": 192,
+  "width": 96,
+  "turnDegrees": 120,
+  "crossSlopeDegrees": 48,
+  "segments": 12,
+  "thickness": 16,
+  "material": "TRIM_SHIT1_ALBE"
+}

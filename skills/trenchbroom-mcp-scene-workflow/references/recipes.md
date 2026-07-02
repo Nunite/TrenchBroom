@@ -96,6 +96,12 @@ acceptance failed; rebuild them only as new recipes with inspected review output
   pass `closedLoop:true` only when the intended start/end seam is actually
   connected. Circular geometry can produce non-integer vertex warnings; treat
   them as grid cleanliness warnings only when slope, continuity, and review pass.
+- `curved_slide`: emits ordered convex `polyhedron` slide segments with a
+  cross-slope across the route width. Use `selector:{moduleId, part:"slide"}` for
+  slope analysis and review before accepting readability. Banked slides can fail
+  route centerline continuity even when adjacent segment edges meet; inspect
+  `fullWidthContinuous`, `maxEdgeGap`, and `slopeCount` before deciding whether
+  the recipe geometry needs rebuilding.
 - `rect_shell`: replaces legacy `room`, `corridor`, and `sky_shell` batch types
   with explicit box IR. Use `kind` only for recipe defaults and metadata.
 - `opening_wall`: replaces legacy `doorway` batch type. It creates a freestanding
