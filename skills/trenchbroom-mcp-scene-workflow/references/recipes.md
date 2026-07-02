@@ -13,6 +13,10 @@ not call TrenchBroom, MCP, or `tb2` directly.
 - Prefab-like recipes must include a visual acceptance path in
   `recommendedValidation`. Static IR validation is not enough; real acceptance
   must inspect review output for scene readability and intent.
+- Prefab-like recipes should expose reusable composition atoms first, then build
+  scene variants from those atoms. Prefer helpers for banked arcs, rails,
+  supports, connectors, openings, markers, and similar pieces over one-off
+  whole-scene generators.
 - Python `tb2` plugins are human-facing UI/plugin workflows. If UI plugins need
   prefab logic later, reuse recipe scripts to emit IR instead of duplicating
   generation rules.
