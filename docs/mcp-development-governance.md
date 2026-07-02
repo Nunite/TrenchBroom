@@ -37,12 +37,6 @@ Skill recipe scripts own reusable scene composition and domain intent:
 Recipes must emit IR JSON files. They must not call TrenchBroom, MCP, or `tb2`
 directly, and they must not edit `.map` files.
 
-Prefab-like recipes should be composed from small reusable recipe primitives
-whenever practical. Prefer atomized helpers such as banked arc sections, rail
-pieces, supports, connectors, openings, and markers over one-off whole-scene
-generators. Scene recipes may exist as thin composition wrappers, but the reusable
-capability should live at the smallest useful recipe-layer unit.
-
 ### IR Owns
 
 IR is the boundary format between recipe intent and C++ execution:
