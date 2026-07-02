@@ -119,6 +119,15 @@ void FaceAttribsEditor::alignClicked()
   alignUV(m_document.map(), policy);
 }
 
+void FaceAttribsEditor::alignContinuouslyClicked()
+{
+  const auto policy = qApp->keyboardModifiers().testFlag(Qt::ShiftModifier)
+                        ? mdl::UvPolicy::prev
+                        : mdl::UvPolicy::next;
+
+  alignUVContinuously(m_document.map(), policy);
+}
+
 void FaceAttribsEditor::justifyClicked(const mdl::UvJustifyDirection uvJustifyDirection)
 {
   const auto uvPolicy = qApp->keyboardModifiers().testFlag(Qt::ShiftModifier)
@@ -433,6 +442,13 @@ Hold %1 to cycle backwards.)")
     this);
   m_autoFitButton =
     createBitmapButton("AutoFitTexture.svg", tr("Fit texture to face."), this);
+  m_alignContinuouslyButton = createBitmapButton(
+    "AlignTexture.svg",
+    tr(R"(Continuously align selected adjacent faces.
+Click again to cycle through edges.
+Hold %1 to cycle backwards.)")
+      .arg(nativeModifierLabel(Qt::SHIFT)),
+    this);
 
   auto* innerLayout = new QGridLayout{};
   innerLayout->addWidget(m_justifyUpButton, 0, 1);
@@ -444,6 +460,7 @@ Hold %1 to cycle backwards.)")
   innerLayout->addWidget(m_alignButton, 3, 0);
   innerLayout->addWidget(m_fitHButton, 3, 1);
   innerLayout->addWidget(m_fitVButton, 3, 2);
+  innerLayout->addWidget(m_alignContinuouslyButton, 4, 0);
 
   innerLayout->setContentsMargins(QMargins{0, 0, 0, 0});
   innerLayout->setSpacing(LayoutConstants::NarrowHMargin);
@@ -611,6 +628,11 @@ void FaceAttribsEditor::bindEvents()
 {
   connect(
     m_alignButton, &QAbstractButton::clicked, this, &FaceAttribsEditor::alignClicked);
+  connect(
+    m_alignContinuouslyButton,
+    &QAbstractButton::clicked,
+    this,
+    &FaceAttribsEditor::alignContinuouslyClicked);
   connect(m_justifyUpButton, &QAbstractButton::clicked, [&]() {
     justifyClicked(mdl::UvJustifyDirection::Up);
   });
@@ -833,6 +855,7 @@ void FaceAttribsEditor::updateControls()
     m_fitHButton->setEnabled(true);
     m_fitVButton->setEnabled(true);
     m_autoFitButton->setEnabled(true);
+    m_alignContinuouslyButton->setEnabled(true);
 
     m_xOffsetEditor->setEnabled(true);
     m_yOffsetEditor->setEnabled(true);
@@ -920,6 +943,7 @@ void FaceAttribsEditor::updateControls()
     m_fitHButton->setEnabled(false);
     m_fitVButton->setEnabled(false);
     m_autoFitButton->setEnabled(false);
+    m_alignContinuouslyButton->setEnabled(false);
 
     disableAndSetPlaceholder(m_xOffsetEditor, "n/a");
     disableAndSetPlaceholder(m_yOffsetEditor, "n/a");

@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
 #include "mdl/CatchConfig.h"
@@ -35,6 +36,8 @@
 #include "mdl/UVCoordSystem.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
 
+#include "kd/result.h"
+
 #include "vm/approx.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -47,6 +50,107 @@ namespace
 auto& getFace(const BrushNode& brushNode, const size_t faceIndex)
 {
   return brushNode.brush().face(faceIndex);
+}
+
+bool faceContainsAllPoints(const BrushFace& face, const std::vector<vm::vec3d>& points)
+{
+  const auto faceVertices = face.vertexPositions();
+  return std::ranges::all_of(points, [&](const auto& point) {
+    return std::ranges::any_of(faceVertices, [&](const auto& vertex) {
+      return vm::is_equal(point, vertex, vm::Cd::almost_zero());
+    });
+  });
+}
+
+size_t findFaceContaining(
+  const BrushNode& brushNode, const std::vector<vm::vec3d>& points)
+{
+  const auto& brush = brushNode.brush();
+  for (size_t i = 0u; i < brush.faceCount(); ++i)
+  {
+    if (faceContainsAllPoints(brush.face(i), points))
+    {
+      return i;
+    }
+  }
+  FAIL("Could not find brush face");
+}
+
+bool faceUVsMatchAtPoints(
+  const BrushFace& lhs, const BrushFace& rhs, const std::vector<vm::vec3d>& points)
+{
+  return std::ranges::all_of(points, [&](const auto& point) {
+    return uvCoordsEqual(lhs.uvCoords(point), rhs.uvCoords(point));
+  });
+}
+
+bool uvAxesFollowFacePlane(const BrushFace& face)
+{
+  return vm::dot(face.uAxis(), face.normal()) == vm::approx{0.0}
+         && vm::dot(face.vAxis(), face.normal()) == vm::approx{0.0};
+}
+
+struct AdjacentSlopeFaces
+{
+  BrushNode* firstBrushNode = nullptr;
+  size_t firstFaceIndex = 0u;
+  BrushNode* secondBrushNode = nullptr;
+  size_t secondFaceIndex = 0u;
+  std::vector<vm::vec3d> sharedEdgePoints;
+};
+
+AdjacentSlopeFaces createAdjacentSlopeFaces(Map& map)
+{
+  const auto builder = BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+  const auto material = std::string{"material"};
+
+  auto* firstBrushNode = new BrushNode{
+    builder.createBrush(
+      std::vector<vm::vec3d>{
+        {-64, 0, 0},
+        {0, 0, 32},
+        {-64, 64, 0},
+        {0, 64, 32},
+        {-64, 0, -16},
+        {0, 0, -16},
+        {-64, 64, -16},
+        {0, 64, -16},
+      },
+      material)
+    | kdl::value()};
+  auto* secondBrushNode = new BrushNode{
+    builder.createBrush(
+      std::vector<vm::vec3d>{
+        {0, 0, 32},
+        {64, 0, 0},
+        {0, 64, 32},
+        {64, 64, 0},
+        {0, 0, -16},
+        {64, 0, -16},
+        {0, 64, -16},
+        {64, 64, -16},
+      },
+      material)
+    | kdl::value()};
+
+  addNodes(
+    map, {{parentForNodes(map), std::vector<Node*>{firstBrushNode, secondBrushNode}}});
+
+  const auto sharedEdgePoints = std::vector<vm::vec3d>{{0, 0, 32}, {0, 64, 32}};
+  const auto firstFaceIndex = findFaceContaining(
+    *firstBrushNode,
+    {{-64, 0, 0}, {-64, 64, 0}, sharedEdgePoints[0], sharedEdgePoints[1]});
+  const auto secondFaceIndex = findFaceContaining(
+    *secondBrushNode,
+    {{64, 0, 0}, {64, 64, 0}, sharedEdgePoints[0], sharedEdgePoints[1]});
+
+  return {
+    firstBrushNode,
+    firstFaceIndex,
+    secondBrushNode,
+    secondFaceIndex,
+    sharedEdgePoints,
+  };
 }
 
 } // namespace
@@ -840,6 +944,29 @@ TEST_CASE("Map_Brushes")
         getFace(*brushNode, *otherFaceIndex).attributes(),
         MatchesBrushFaceAttributes(originalOtherFaceAttributes));
     }
+  }
+
+  SECTION("alignUVContinuously")
+  {
+    auto& map = fixture.create(QuakeFixtureConfig);
+    const auto slopeFaces = createAdjacentSlopeFaces(map);
+
+    deselectAll(map);
+    selectBrushFaces(
+      map,
+      {
+        {slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex},
+        {slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex},
+      });
+
+    CHECK(alignUVContinuously(map, UvPolicy::next));
+
+    CHECK(faceUVsMatchAtPoints(
+      getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
+      getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex),
+      slopeFaces.sharedEdgePoints));
+    CHECK(uvAxesFollowFacePlane(
+      getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex)));
   }
 
   SECTION("justifyUV")

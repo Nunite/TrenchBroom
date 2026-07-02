@@ -30,14 +30,24 @@
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Transaction.h"
+#include "mdl/UVCoordSystem.h"
 #include "mdl/UVUtils.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/WorldNode.h"
+
+#include <queue>
+#include <unordered_map>
 
 namespace tb::mdl
 {
 namespace
 {
+
+struct SelectedFace
+{
+  BrushNode* node = nullptr;
+  size_t faceIndex = 0u;
+};
 
 auto invertHorizontalAxis(
   const mdl::UvAxis horizontalUvAxis,
@@ -167,6 +177,47 @@ void compensateOffset(
   }
 }
 
+bool sameFace(const SelectedFace& lhs, const SelectedFace& rhs)
+{
+  return lhs.node == rhs.node && lhs.faceIndex == rhs.faceIndex;
+}
+
+BrushFace& faceAt(Brush& brush, const SelectedFace& face)
+{
+  return brush.face(face.faceIndex);
+}
+
+bool shareEdge(const BrushFace& lhs, const BrushFace& rhs)
+{
+  size_t sharedVertexCount = 0u;
+  const auto rhsVertices = rhs.vertexPositions();
+  for (const auto& lhsVertex : lhs.vertexPositions())
+  {
+    if (std::ranges::any_of(rhsVertices, [&](const auto& rhsVertex) {
+          return vm::is_equal(lhsVertex, rhsVertex, vm::Cd::almost_zero());
+        }))
+    {
+      ++sharedVertexCount;
+    }
+  }
+  return sharedVertexCount >= 2u;
+}
+
+void copyUVContinuously(const BrushFace& sourceFace, BrushFace& targetFace)
+{
+  if (auto snapshot = sourceFace.takeUVCoordSystemSnapshot())
+  {
+    auto attributes = targetFace.attributes();
+    attributes.setOffset(sourceFace.attributes().offset());
+    attributes.setScale(sourceFace.attributes().scale());
+    attributes.setRotation(sourceFace.attributes().rotation());
+    targetFace.setAttributes(attributes);
+    targetFace.copyUVCoordSystemFromFace(
+      *snapshot, sourceFace.attributes(), sourceFace.boundary(), WrapStyle::Rotation);
+    targetFace.resetUVCoordSystemCache();
+  }
+}
+
 } // namespace
 
 bool createBrush(Map& map, const std::vector<vm::vec3d>& points)
@@ -280,6 +331,90 @@ void alignUV(Map& map, const UvPolicy uvPolicy)
       evaluate(mdl::align(brushFace, uvPolicy), brushFace);
       return true;
     });
+}
+
+bool alignUVContinuously(Map& map, const UvPolicy uvPolicy)
+{
+  auto brushes = std::unordered_map<BrushNode*, Brush>{};
+  auto faces = std::vector<SelectedFace>{};
+  for (const auto& handle : map.selection().allBrushFaces())
+  {
+    auto face = SelectedFace{handle.node(), handle.faceIndex()};
+    if (std::ranges::any_of(
+          faces, [&](const auto& existing) { return sameFace(existing, face); }))
+    {
+      continue;
+    }
+
+    brushes.try_emplace(face.node, face.node->brush());
+    faces.push_back(face);
+  }
+
+  if (faces.empty())
+  {
+    return true;
+  }
+
+  auto adjacentFaces = std::vector<std::vector<size_t>>(faces.size());
+  for (size_t i = 0u; i < faces.size(); ++i)
+  {
+    const auto& lhs = faceAt(brushes.at(faces[i].node), faces[i]);
+    for (size_t j = i + 1u; j < faces.size(); ++j)
+    {
+      const auto& rhs = faceAt(brushes.at(faces[j].node), faces[j]);
+      if (shareEdge(lhs, rhs))
+      {
+        adjacentFaces[i].push_back(j);
+        adjacentFaces[j].push_back(i);
+      }
+    }
+  }
+
+  auto visited = std::vector<bool>(faces.size(), false);
+  for (size_t start = 0u; start < faces.size(); ++start)
+  {
+    if (visited[start])
+    {
+      continue;
+    }
+
+    evaluate(
+      mdl::align(faceAt(brushes.at(faces[start].node), faces[start]), uvPolicy),
+      faceAt(brushes.at(faces[start].node), faces[start]));
+
+    auto queue = std::queue<size_t>{};
+    visited[start] = true;
+    queue.push(start);
+
+    while (!queue.empty())
+    {
+      const auto sourceIndex = queue.front();
+      queue.pop();
+      const auto sourceFace =
+        faceAt(brushes.at(faces[sourceIndex].node), faces[sourceIndex]);
+
+      for (const auto targetIndex : adjacentFaces[sourceIndex])
+      {
+        if (visited[targetIndex])
+        {
+          continue;
+        }
+
+        visited[targetIndex] = true;
+        copyUVContinuously(
+          sourceFace, faceAt(brushes.at(faces[targetIndex].node), faces[targetIndex]));
+        queue.push(targetIndex);
+      }
+    }
+  }
+
+  auto newNodes = std::vector<std::pair<Node*, NodeContents>>{};
+  newNodes.reserve(brushes.size());
+  for (auto& [brushNode, brush] : brushes)
+  {
+    newNodes.emplace_back(brushNode, NodeContents{std::move(brush)});
+  }
+  return updateNodeContents(map, "Continuously Align Texture", std::move(newNodes));
 }
 
 void justifyUV(
