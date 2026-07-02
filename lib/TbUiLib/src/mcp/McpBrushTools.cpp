@@ -5396,10 +5396,15 @@ McpBridgeToolResult geometryAnalyzeSlopesForMapResult(
     warnings.push_back("noSlopedFaces: no upward non-flat slope faces matched filters.");
     minReportedSlope = 0.0;
   }
+  const auto passed = !slopes.isEmpty();
 
   auto result = QJsonObject{
     {"tool", "geometry_analyze_slopes"},
     {"detail", detail},
+    {"passed", passed},
+    {"recoveryAction",
+     passed ? "continue_validation_or_review"
+            : "rebuild_with_true_slope_or_adjust_targets"},
     {"source", useSelectionTargets ? "selection" : "targets"},
     {"targetSource", useSelectionTargets ? "selection" : "targets"},
     {"targetBrushCount", static_cast<int>(brushes->size())},
@@ -5779,10 +5784,15 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
       "routeMode=spiral checks ordered adjacent segment continuity but does not check "
       "the final surface back to the first unless closedLoop is also true.");
   }
+  const auto passed = semanticContinuous && unsupportedObjectIds.isEmpty();
 
   auto result = QJsonObject{
     {"tool", "geometry_analyze_route_continuity"},
     {"detail", detail},
+    {"passed", passed},
+    {"recoveryAction",
+     passed ? "continue_validation_or_review"
+            : "inspect_failing_seam_sample_then_fix_route_geometry"},
     {"source", useSelectionTargets ? "selection" : "targets"},
     {"targetSource", useSelectionTargets ? "selection" : "targets"},
     {"targetBrushCount", static_cast<int>(brushes->size())},

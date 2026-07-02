@@ -37,6 +37,7 @@ design decisions remain under Agent control.
 5. For direct creation tools, pass `defaultMetadata` and per-operation `metadata`. For part-aware primitives, use `parts`, `partMaterials`, and `partMetadata` instead of generating extra parts and deleting them later.
 6. Recover generated targets with `module_*` or structured selectors:
    - `module_list` defaults to live modules only; use `includeStale:true` only when debugging prior-document/session residue.
+   - Use `module_inspect(idsMode:"count")` for counts, `idsMode:"sample"` for a small identity check, and `idsMode:"full"` only when a later tool truly needs every object id.
    - `selector_preview` before destructive actions.
    - `objects_select_by_selector` for inspection/editing.
    - `objects_delete_by_selector` only after preview confirms the intended count/sample.
@@ -50,7 +51,7 @@ design decisions remain under Agent control.
    - `history_status`, `operation_validate`, and `module_validate`.
    - `map_validate(groupByType:true)` and `problems_check` before reporting done on dense maps.
    - `geometry_analyze_route_continuity` for ramps, platforms, roads, stairs, rails, and route seams.
-   - `geometry_analyze_slopes` for ramp/surf/slide/wedge/ascending intent. If a sloped surface was intended and `slopeCount` is 0, treat the build as failed and rebuild with a true slope primitive.
+   - `geometry_analyze_slopes` for ramp/surf/slide/wedge/ascending intent. Use `passed`, `slopeCount`, warning samples, and `recoveryAction` from the summary before asking for full detail. If a sloped surface was intended and `passed` is false or `slopeCount` is 0, treat the build as failed and rebuild with a true slope primitive.
 9. Review visually with `module_render_review`, `render_review_selector`, `render_review_operation`, or `render_review_current_scene(scope:"selection")` for user-selected targets. Pass an absolute `outputDir` for saved review bundles. Prefer contact sheets with at most two panels. Use `labelParts` only for important metadata parts such as rails, route surfaces, supports, markers, or spawn points; use `labelStride` / `autoHideLabelsThreshold` for dense ordered routes, then open individual PNGs only when needed.
 10. Report friction as MCP design feedback: P0 crash/wrong-map/data loss, P1 blocked real workflow, P2 awkward or context-heavy, P3 documentation/default issue.
 
@@ -188,7 +189,7 @@ For route-like scenes, give every playable piece `routeId` and `order`. After ge
 
 - Run `geometry_analyze_route_continuity` with `start/end`, `routeDirection`, or `orderBy:"metadataOrder"`. Use `routeMode:"continuous"`, `"stepped"`, `"jump_chain"`, `"spiral"`, or `"closed_loop"` to declare intent. For circular routes, pass `routeMode:"closed_loop"` or `closedLoop:true` only when the final surface is meant to connect back to the first.
 - Run `geometry_analyze_slopes` for every ramp/surf/slide/wedge/ascending section. `slopeCount=0` is a failure when a smooth slope was requested.
-- Leave slope/continuity `detail` at the summary default for normal acceptance. Use `detail:"full"` only when you need every face/seam object for debugging.
+- Leave slope/continuity `detail` at the summary default for normal acceptance. Use summary `passed` and `recoveryAction` first; use `detail:"full"` only when you need every face/seam object for debugging.
 - Treat discontinuities, vertical steps, wrong slope direction, rail intersections, and support posts piercing road surfaces as MCP feedback unless the design intentionally calls for them.
 - For smooth ascending loops, prefer `arc_ramp` / `helical_ramp` or explicit true `ramp_between` segments. Do not treat `curved_corridor slopeStartZ/slopeEndZ` as a final smooth road surface; it is stepped/terraced unless the MCP result proves otherwise.
 - `path_ribbon points3d` is useful for flat ribbons along 3D waypoints, but adjacent Z changes are not proof of an interpolated ramp surface. If height changes matter, verify slopes or rebuild with true ramp geometry.

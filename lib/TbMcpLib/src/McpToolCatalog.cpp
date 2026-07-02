@@ -1508,7 +1508,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(
         {
           {"moduleId", moduleIdProperty()},
-          {"idsMode", stringProperty("sample or full. Defaults to sample.")},
+          {"idsMode",
+           stringProperty("none, count, sample, or full. Defaults to sample.")},
         },
         {"moduleId"}),
     },
@@ -3220,7 +3221,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Analyze live brush slope faces for ramp/wedge/surf/slide validation. Reports "
       "face normals, slope angle, rise direction, and whether each slope ascends or "
       "descends along routeDirection or start -> end. This is geometry/mapper "
-      "semantics only, not gameplay difficulty analysis. If operationIds, objectIds, "
+      "semantics only, not gameplay difficulty analysis. Summary includes passed, "
+      "slopeCount, warning samples, and recoveryAction. If operationIds, objectIds, "
       "and selector are omitted, analyzes the current user-selected brushes.",
       McpMode::ReadOnly,
       false,
@@ -3263,10 +3265,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "target's upward playable face and each adjacent seam's verticalStep, "
       "horizontalGap, fullWidthContinuous, edgeGapMax, innerEdgeGap, outerEdgeGap, "
       "and classification so ramp-to-platform ledges or arc segment side gaps are "
-      "caught even when the route centerline looks valid. Same-height overlaps are "
-      "reported as overlap_continuous_height and remain continuous. If operationIds, "
-      "objectIds, and selector are omitted, analyzes the current user-selected "
-      "brushes.",
+      "caught even when the route centerline looks valid. Summary includes passed, "
+      "max gap/step fields, failing seam samples, and recoveryAction. Same-height "
+      "overlaps are reported as overlap_continuous_height and remain continuous. If "
+      "operationIds, objectIds, and selector are omitted, analyzes the current "
+      "user-selected brushes.",
       McpMode::ReadOnly,
       false,
       true,

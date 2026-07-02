@@ -2492,13 +2492,14 @@ McpBridgeToolResult moduleInspectForMapResult(
   auto summary = moduleSummary(map, module, metadataStore, objectRegistry);
   summary.insert("tool", "module_inspect");
   summary.insert("mutatedDocument", false);
-  if (params.value("idsMode").toString("sample") == "full")
+  const auto idsMode = params.value("idsMode").toString("sample").trimmed().toLower();
+  summary.insert("objectIdCount", module.objectIds.size());
+  if (idsMode == "full")
   {
     summary.insert("objectIds", stringsToJson(module.objectIds));
   }
-  else
+  else if (idsMode == "sample" || idsMode.isEmpty())
   {
-    summary.insert("objectIdCount", module.objectIds.size());
     auto sample = QStringList{};
     for (auto i = 0;
          i < std::min(DefaultSampleLimit, static_cast<int>(module.objectIds.size()));
@@ -2507,6 +2508,13 @@ McpBridgeToolResult moduleInspectForMapResult(
       sample.push_back(module.objectIds[i]);
     }
     summary.insert("objectIdSample", stringsToJson(sample));
+  }
+  else if (idsMode != "none" && idsMode != "count")
+  {
+    auto warnings = summary.value("warnings").toArray();
+    warnings.push_back(
+      QString{"unknownIdsMode: %1; returned objectIdCount only"}.arg(idsMode));
+    summary.insert("warnings", warnings);
   }
   return McpBridgeToolResult::success(summary);
 }

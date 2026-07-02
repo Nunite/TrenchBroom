@@ -643,7 +643,8 @@ TEST_CASE("McpBridgeServer")
 
   SECTION("caches review resources returned by tools")
   {
-    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
 
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
@@ -653,8 +654,11 @@ TEST_CASE("McpBridgeServer")
       mcp::McpMode::ReadOnly});
 
     REQUIRE(response.ok);
-    CHECK(response.result.value("resourceUri").toString() == "tbmcp://review/review-session-test");
-    const auto resource = server.readResource(response.result.value("resourceUri").toString());
+    CHECK(
+      response.result.value("resourceUri").toString()
+      == "tbmcp://review/review-session-test");
+    const auto resource =
+      server.readResource(response.result.value("resourceUri").toString());
     REQUIRE(resource);
     CHECK(resource->value("reviewId").toString() == "review-session-test");
     CHECK(resource->value("tool").toString() == "render_review_current_scene");
@@ -1010,7 +1014,6 @@ TEST_CASE("McpBridgeServer")
       QJsonObject{{"path", "C:/tmp/test.map"}},
       mcp::McpMode::Edit});
     CHECK(saveResponse.ok);
-
   }
 
   SECTION("read-only mode serves history_status")
@@ -1202,11 +1205,7 @@ TEST_CASE("McpBridgeServer")
       {"max", QJsonArray{128, 128, 128}},
     };
     const auto removedRoomResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1",
-      "secret",
-      "blockout_create_room",
-      removedRoomParams,
-      mcp::McpMode::Edit});
+      "1", "secret", "blockout_create_room", removedRoomParams, mcp::McpMode::Edit});
 
     CHECK_FALSE(removedRoomResponse.ok);
     REQUIRE(removedRoomResponse.error);
@@ -1291,11 +1290,7 @@ TEST_CASE("McpBridgeServer")
       {"operations", QJsonArray{QJsonObject{{"type", "box"}}}},
     };
     const auto response = guardedServer.dispatchRequest(mcp::McpBridgeRequest{
-      "1",
-      "secret",
-      "blockout_create_batch",
-      guardedBatchParams,
-      mcp::McpMode::Edit});
+      "1", "secret", "blockout_create_batch", guardedBatchParams, mcp::McpMode::Edit});
 
     CHECK(!response.ok);
     REQUIRE(response.error);
@@ -4390,6 +4385,41 @@ TEST_CASE("McpBridgeServer module_inspect reports recovery state")
   CHECK_FALSE(inspect.result.value("mutatedDocument").toBool(true));
   CHECK(inspect.result.value("moduleId").toString() == "inspect-module");
   CHECK(inspect.result.value("liveObjectCount").toInt() == 1);
+  CHECK(inspect.result.value("objectIdCount").toInt() == 1);
+  CHECK(inspect.result.value("objectIdSample").toArray().size() == 1);
+
+  const auto countInspect = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "inspect-module"}, {"idsMode", "count"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(countInspect.ok);
+  CHECK(countInspect.result.value("objectIdCount").toInt() == 1);
+  CHECK(countInspect.result.value("objectIdSample").isUndefined());
+  CHECK(countInspect.result.value("objectIds").isUndefined());
+
+  const auto noneInspect = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "inspect-module"}, {"idsMode", "none"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(noneInspect.ok);
+  CHECK(noneInspect.result.value("objectIdCount").toInt() == 1);
+  CHECK(noneInspect.result.value("objectIdSample").isUndefined());
+  CHECK(noneInspect.result.value("objectIds").isUndefined());
+
+  const auto fullInspect = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "inspect-module"}, {"idsMode", "full"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(fullInspect.ok);
+  CHECK(fullInspect.result.value("objectIdCount").toInt() == 1);
+  CHECK(fullInspect.result.value("objectIds").toArray().size() == 1);
+  CHECK(fullInspect.result.value("objectIdSample").isUndefined());
 }
 
 TEST_CASE("McpBridgeServer selector selection reports recovery state")
@@ -6227,6 +6257,10 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     },
     history);
   REQUIRE(slopeResponse.ok);
+  CHECK(slopeResponse.result.value("passed").toBool());
+  CHECK(
+    slopeResponse.result.value("recoveryAction").toString()
+    == "continue_validation_or_review");
   CHECK(slopeResponse.result.value("routeDirectionProvided").toBool());
   const auto slopes = slopeResponse.result.value("slopes").toArray();
   REQUIRE(!slopes.isEmpty());
@@ -6292,6 +6326,7 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     QJsonObject{{"routeDirection", QJsonArray{1, 0, 0}}, {"detail", "full"}},
     history);
   REQUIRE(selectionSlopeResponse.ok);
+  CHECK(selectionSlopeResponse.result.value("passed").toBool());
   CHECK(selectionSlopeResponse.result.value("source").toString() == "selection");
   CHECK(selectionSlopeResponse.result.value("targetSource").toString() == "selection");
   CHECK(
@@ -6341,6 +6376,10 @@ TEST_CASE("McpBridgeServer batch blockout tools")
     },
     history);
   REQUIRE(brokenContinuityResponse.ok);
+  CHECK_FALSE(brokenContinuityResponse.result.value("passed").toBool());
+  CHECK(
+    brokenContinuityResponse.result.value("recoveryAction").toString()
+    == "inspect_failing_seam_sample_then_fix_route_geometry");
   CHECK_FALSE(brokenContinuityResponse.result.value("continuous").toBool());
   const auto brokenSeams = brokenContinuityResponse.result.value("seams").toArray();
   REQUIRE(brokenSeams.size() == 2);
@@ -7362,6 +7401,7 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
     &metadataStore,
     &moduleStore);
   REQUIRE(selectorSlopes.ok);
+  CHECK(selectorSlopes.result.value("passed").toBool());
   CHECK(selectorSlopes.result.value("selectorMatchedCount").toInt() == 1);
   CHECK(selectorSlopes.result.value("slopeCount").toInt() >= 1);
   CHECK(selectorSlopes.result.value("detail").toString() == "summary");
@@ -7384,6 +7424,7 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
     history,
     &objectRegistry);
   REQUIRE(steppedResponse.ok);
+  CHECK(steppedResponse.result.value("passed").toBool());
   CHECK_FALSE(steppedResponse.result.value("continuous").toBool());
   CHECK(steppedResponse.result.value("semanticContinuous").toBool());
 
@@ -7600,6 +7641,7 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
     &metadataStore,
     &moduleStore);
   REQUIRE(mismatchedContinuity.ok);
+  CHECK_FALSE(mismatchedContinuity.result.value("passed").toBool());
   CHECK_FALSE(mismatchedContinuity.result.value("continuous").toBool());
   CHECK(mismatchedContinuity.result.value("centerlineContinuous").toBool());
   CHECK_FALSE(mismatchedContinuity.result.value("fullWidthContinuous").toBool());
