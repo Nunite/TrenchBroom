@@ -123,10 +123,9 @@ improvement. Promote recipe behavior into MCP only after repeated independent
 workflows prove it is a generic editor capability.
 
 Bundled prefab-like recipes are intentionally small: `ascending_loop`,
-`curved_slide`, `rect_shell`, `opening_wall`, `cover_block`, and `stair_run`.
-Removed or failed visual-acceptance recipes should be rebuilt as new deterministic
-IR recipes only after explicit human visual acceptance, not restored as C++ MCP
-prefab tools.
+`rect_shell`, `opening_wall`, `cover_block`, and `stair_run`. Removed or failed
+visual-acceptance recipes should be rebuilt as new deterministic IR recipes only
+after explicit human visual acceptance, not restored as C++ MCP prefab tools.
 
 ## Selector Rules
 
