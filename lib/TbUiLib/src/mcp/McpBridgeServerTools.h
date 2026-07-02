@@ -1043,8 +1043,10 @@ McpBridgeToolResult leaksLoadPointfileResult(
 
 McpBridgeToolResult problemsCheckResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult problemsCheckForMapResult(mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult mapValidateResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult mapValidateForMapResult(mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult problemsFixResult(
   AppController& appController,
   const QString& toolName,

@@ -118,8 +118,7 @@ QJsonObject mutationResultJson(
   return result;
 }
 
-QJsonObject preMutationFailureDetails(
-  QJsonObject details, const QString& recoveryAction)
+QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
 {
   details.insert("mutatedDocument", false);
   details.insert("retrySafe", true);
@@ -355,8 +354,12 @@ QJsonObject problemsJson(mdl::Map& map, const QJsonObject& params)
 
   return QJsonObject{
     {"valid", issues.empty()},
+    {"passed", issues.empty()},
     {"count", results.size()},
     {"safeFixableCount", safeFixableCount},
+    {"recoveryAction",
+     issues.empty() ? "continue_validation_or_review"
+                    : "inspect_problem_summary_then_fix_or_review"},
     {"problems", results},
   };
 }
@@ -471,7 +474,12 @@ McpBridgeToolResult problemsCheckResult(
     return noActiveDocumentFailure();
   }
 
-  return McpBridgeToolResult::success(problemsJson(mapWindow->document().map(), params));
+  return problemsCheckForMapResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult problemsCheckForMapResult(mdl::Map& map, const QJsonObject& params)
+{
+  return McpBridgeToolResult::success(problemsJson(map, params));
 }
 
 McpBridgeToolResult mapValidateResult(
@@ -483,13 +491,16 @@ McpBridgeToolResult mapValidateResult(
     return noActiveDocumentFailure();
   }
 
-  auto result = problemsJson(mapWindow->document().map(), params);
+  return mapValidateForMapResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult mapValidateForMapResult(mdl::Map& map, const QJsonObject& params)
+{
+  auto result = problemsJson(map, params);
   if (mcpOptionalBool(params, "groupByType", false))
   {
     result.insert(
-      "groups",
-      groupedIssuesJson(
-        mapWindow->document().map(), mcpOptionalBool(params, "includeHidden", false)));
+      "groups", groupedIssuesJson(map, mcpOptionalBool(params, "includeHidden", false)));
     result.insert("detail", "groupedSummary");
   }
   if (!mcpOptionalBool(params, "includeProblems", false))
@@ -536,8 +547,7 @@ McpBridgeToolResult problemsFixForMapResult(
       mcp::McpErrorCode::InvalidParams,
       error,
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "problemIds"}},
-        "provide_problem_ids_then_retry"));
+        QJsonObject{{"targetSource", "problemIds"}}, "provide_problem_ids_then_retry"));
   }
 
   const auto quickFixDescription = params.value("quickFix").toString().trimmed();
@@ -547,8 +557,7 @@ McpBridgeToolResult problemsFixForMapResult(
       mcp::McpErrorCode::InvalidParams,
       "problems_fix requires quickFix",
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "quickFix"}},
-        "provide_quick_fix_then_retry"));
+        QJsonObject{{"targetSource", "quickFix"}}, "provide_quick_fix_then_retry"));
   }
 
   const auto issues = findIssuesByIds(
@@ -559,8 +568,7 @@ McpBridgeToolResult problemsFixForMapResult(
       mcp::McpErrorCode::InvalidParams,
       error,
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "problemIds"}},
-        "refresh_problems_then_retry"));
+        QJsonObject{{"targetSource", "problemIds"}}, "refresh_problems_then_retry"));
   }
 
   const auto* quickFix = findSafeQuickFix(map.worldNode(), issues, quickFixDescription);

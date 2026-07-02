@@ -2707,7 +2707,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "map_validate",
-      "Validate the active map and return compact problem counts by default.",
+      "Validate the active map and return compact passed/count/recoveryAction "
+      "problem counts by default.",
       McpMode::ReadOnly,
       false,
       true,
@@ -2726,7 +2727,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "problems_check",
-      "Return map validation problems with safe quick fix metadata.",
+      "Return map validation problems with passed/recoveryAction and safe quick fix "
+      "metadata.",
       McpMode::ReadOnly,
       false,
       true,

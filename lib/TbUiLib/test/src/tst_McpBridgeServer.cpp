@@ -3780,6 +3780,56 @@ TEST_CASE("McpBridgeServer problem fixes record document identity")
   CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 }
 
+TEST_CASE("McpBridgeServer map validation reports recovery summaries")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+
+  const auto cleanValidateResponse =
+    mapValidateForMapResult(map, QJsonObject{{"groupByType", true}});
+  REQUIRE(cleanValidateResponse.ok);
+  CHECK(cleanValidateResponse.result.value("valid").toBool());
+  CHECK(cleanValidateResponse.result.value("passed").toBool());
+  CHECK(cleanValidateResponse.result.value("count").toInt() == 0);
+  CHECK(
+    cleanValidateResponse.result.value("recoveryAction").toString()
+    == "continue_validation_or_review");
+  CHECK(cleanValidateResponse.result.value("problems").isUndefined());
+  CHECK(cleanValidateResponse.result.value("groups").isArray());
+
+  mdl::deselectAll(map);
+  mdl::selectNodes(map, {&map.worldNode()});
+  REQUIRE(mdl::setEntityProperty(map, "", ""));
+
+  const auto invalidValidateResponse =
+    mapValidateForMapResult(map, QJsonObject{{"groupByType", true}});
+  REQUIRE(invalidValidateResponse.ok);
+  CHECK_FALSE(invalidValidateResponse.result.value("valid").toBool());
+  CHECK_FALSE(invalidValidateResponse.result.value("passed").toBool());
+  CHECK(invalidValidateResponse.result.value("count").toInt() == 1);
+  CHECK(
+    invalidValidateResponse.result.value("recoveryAction").toString()
+    == "inspect_problem_summary_then_fix_or_review");
+
+  const auto problemsResponse =
+    problemsCheckForMapResult(map, QJsonObject{{"includeHidden", true}});
+  REQUIRE(problemsResponse.ok);
+  CHECK_FALSE(problemsResponse.result.value("passed").toBool());
+  CHECK(problemsResponse.result.value("safeFixableCount").toInt() == 1);
+  CHECK(
+    problemsResponse.result.value("recoveryAction").toString()
+    == "inspect_problem_summary_then_fix_or_review");
+}
+
 TEST_CASE("McpBridgeServer problems_fix reports pre-mutation failures")
 {
   auto appControllerFixture = AppControllerFixture{};

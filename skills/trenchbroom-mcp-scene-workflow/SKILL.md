@@ -49,7 +49,7 @@ design decisions remain under Agent control.
    - Do not invent complex bounds/material/metadata selector rules for old or manually edited geometry unless the user explicitly asks for that. User selection is the source of truth when brush counts get large.
 8. Validate after each meaningful phase:
    - `history_status`, `operation_validate`, and `module_validate`.
-   - `map_validate(groupByType:true)` and `problems_check` before reporting done on dense maps.
+   - `map_validate(groupByType:true)` and `problems_check` before reporting done on dense maps. Use `passed`, compact counts/groups, safe-fix counts, and `recoveryAction` before asking for problem detail.
    - `geometry_analyze_route_continuity` for ramps, platforms, roads, stairs, rails, and route seams.
    - `geometry_analyze_slopes` for ramp/surf/slide/wedge/ascending intent. Use `passed`, `slopeCount`, warning samples, and `recoveryAction` from the summary before asking for full detail. If a sloped surface was intended and `passed` is false or `slopeCount` is 0, treat the build as failed and rebuild with a true slope primitive.
 9. Review visually with `module_render_review`, `render_review_selector`, `render_review_operation`, or `render_review_current_scene(scope:"selection")` for user-selected targets. Pass an absolute `outputDir` for saved review bundles. Prefer contact sheets with at most two panels. Use `labelParts` only for important metadata parts such as rails, route surfaces, supports, markers, or spawn points; use `labelStride` / `autoHideLabelsThreshold` for dense ordered routes, then open individual PNGs only when needed.
