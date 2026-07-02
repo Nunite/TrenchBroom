@@ -3668,6 +3668,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "entity_properties_delete",
     "texture_search",
     "texture_apply_by_filter",
+    "texture_align_face",
     "map_validate",
     "problems_check",
   };

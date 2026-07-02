@@ -376,7 +376,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("texture_apply"));
     CHECK(names.contains("texture_apply_by_filter"));
     CHECK(!names.contains("texture_replace"));
-    CHECK(!names.contains("texture_align_face"));
+    CHECK(names.contains("texture_align_face"));
     CHECK(!names.contains("texture_copy_from_face"));
     CHECK(!names.contains("face_list"));
     CHECK(!names.contains("face_select"));
@@ -396,6 +396,11 @@ TEST_CASE("McpToolCatalog")
       textureListSearch.first().toObject().value("name").toString() == "textures_list");
     CHECK_FALSE(
       textureListSearch.first().toObject().value("visibleInCurrentProfile").toBool());
+    const auto textureCopySearch = toolsSearchJson(
+      "texture_copy_from_face", "", "schema", McpMode::Edit, McpToolProfile::Modeling);
+    REQUIRE(textureCopySearch.size() == 1);
+    CHECK_FALSE(
+      textureCopySearch.first().toObject().value("visibleInCurrentProfile").toBool());
     CHECK(!names.contains("asset_place_sprite"));
     CHECK(!names.contains("asset_place_sound"));
     CHECK(!names.contains("blockout_create_room"));

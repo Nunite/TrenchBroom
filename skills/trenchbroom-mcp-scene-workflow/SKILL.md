@@ -64,7 +64,7 @@ Treat the Modeling profile as the normal Agent workbench. It intentionally expos
 | Bind/open/status | `tb_status`, `documents_open_verified`, `map_snapshot`, `history_status` |
 | Bulk geometry | `ir_compile_preview`, `ir_compile_preview_from_file`, `ir_apply`, `ir_apply_from_file`, `blockout_create_batch`, `brush_create_boxes_batch`, `brush_create_polygon_batch`, `heightmap_preview_grayscale`, `heightmap_import_grayscale` |
 | Target recovery | `selector_preview`, `module_list`, `module_inspect`, `operation_inspect`, `operation_validate`, `geometry_analyze_selection` |
-| Iteration edits | `objects_transform` on selection or selector, `objects_delete_by_selector`, `entity_properties_update`, `entity_properties_delete`, `texture_apply_by_filter` |
+| Iteration edits | `objects_transform` on selection or selector, `objects_delete_by_selector`, `entity_properties_update`, `entity_properties_delete`, `texture_apply_by_filter`, `texture_align_face` |
 | Boolean geometry | `geometry_csg_selection` after user or selector-driven brush selection |
 | User-visible organization | `group_create_from_selection`, `group_inspect`; search for `group_rename_selected` / `group_ungroup_selected` when needed |
 | Validation | `geometry_analyze_selection`, `geometry_analyze_slopes`, `geometry_analyze_route_continuity`, `module_validate`, `map_validate(groupByType:true)`, `problems_check` |
@@ -176,6 +176,13 @@ Use `texture_search` before relying on a named texture. `texture_apply`,
 if `materialExists` or `replaceMaterialExists` is false, treat the write as a
 placeholder/tag and either choose a loaded material from `texture_search` or report
 that the requested material was not available.
+
+For UV/material alignment, prefer `texture_align_face` on the current face
+selection or a narrow target with `faceSemantic` / `normal`. Use `mode:"paraxial"`
+for world/grid alignment, `mode:"parallel"` for face-plane alignment, and
+`mode:"reset"` only when intentionally clearing custom UV axes. Search for
+`texture_copy_from_face` or `face_texture_set` only when exact source-face copying
+or numeric UV edits are required.
 
 ## Review Rules
 
