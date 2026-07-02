@@ -84,10 +84,9 @@ bool faceUVsMatchAtPoints(
   });
 }
 
-bool uvAxesFollowFacePlane(const BrushFace& face)
+bool uvAxesMatch(const BrushFace& lhs, const BrushFace& rhs)
 {
-  return vm::dot(face.uAxis(), face.normal()) == vm::approx{0.0}
-         && vm::dot(face.vAxis(), face.normal()) == vm::approx{0.0};
+  return lhs.uAxis() == vm::approx{rhs.uAxis()} && lhs.vAxis() == vm::approx{rhs.vAxis()};
 }
 
 bool uAxisFollowsBand(const BrushFace& face, const BrushFace& nextFace)
@@ -976,7 +975,8 @@ TEST_CASE("Map_Brushes")
     CHECK(uAxisFollowsBand(
       getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
       getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex)));
-    CHECK(uvAxesFollowFacePlane(
+    CHECK(uvAxesMatch(
+      getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
       getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex)));
   }
 
