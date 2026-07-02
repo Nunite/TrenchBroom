@@ -84,17 +84,17 @@ bool faceUVsMatchAtPoints(
   });
 }
 
-bool uvAxesMatch(const BrushFace& lhs, const BrushFace& rhs)
+vm::vec2f textureCoords(const BrushFace& face, const vm::vec3d& point)
 {
-  return lhs.uAxis() == vm::approx{rhs.uAxis()} && lhs.vAxis() == vm::approx{rhs.vAxis()};
+  return vm::vec2f{
+    face.toUVCoordSystemMatrix(face.attributes().offset(), face.attributes().scale())
+    * point};
 }
 
-bool vAxisFollowsBandBackwards(const BrushFace& face, const BrushFace& nextFace)
+bool textureCoordsEqual(
+  const BrushFace& face, const vm::vec3d& point, const vm::vec2f& expected)
 {
-  const auto direction = nextFace.center() - face.center();
-  const auto projectedDirection =
-    vm::normalize(direction - vm::dot(direction, face.normal()) * face.normal());
-  return vm::dot(face.vAxis(), projectedDirection) < -0.9;
+  return textureCoords(face, point) == vm::approx{expected};
 }
 
 struct AdjacentSlopeFaces
@@ -103,6 +103,8 @@ struct AdjacentSlopeFaces
   size_t firstFaceIndex = 0u;
   BrushNode* secondBrushNode = nullptr;
   size_t secondFaceIndex = 0u;
+  std::vector<vm::vec3d> firstFacePoints;
+  std::vector<vm::vec3d> secondFacePoints;
   std::vector<vm::vec3d> sharedEdgePoints;
 };
 
@@ -156,6 +158,8 @@ AdjacentSlopeFaces createAdjacentSlopeFaces(Map& map)
     firstFaceIndex,
     secondBrushNode,
     secondFaceIndex,
+    {{-64, 0, 0}, {-64, 64, 0}, sharedEdgePoints[1], sharedEdgePoints[0]},
+    {sharedEdgePoints[0], sharedEdgePoints[1], {64, 64, 0}, {64, 0, 0}},
     sharedEdgePoints,
   };
 }
@@ -972,12 +976,42 @@ TEST_CASE("Map_Brushes")
       getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
       getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex),
       slopeFaces.sharedEdgePoints));
-    CHECK(vAxisFollowsBandBackwards(
+
+    const auto expectedFaceLength =
+      float(vm::length(slopeFaces.firstFacePoints[3] - slopeFaces.firstFacePoints[0]));
+    CHECK(textureCoordsEqual(
       getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
-      getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex)));
-    CHECK(uvAxesMatch(
+      slopeFaces.firstFacePoints[0],
+      vm::vec2f{0, 0}));
+    CHECK(textureCoordsEqual(
       getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
-      getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex)));
+      slopeFaces.firstFacePoints[1],
+      vm::vec2f{0, 64}));
+    CHECK(textureCoordsEqual(
+      getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
+      slopeFaces.firstFacePoints[2],
+      vm::vec2f{expectedFaceLength, 64}));
+    CHECK(textureCoordsEqual(
+      getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
+      slopeFaces.firstFacePoints[3],
+      vm::vec2f{expectedFaceLength, 0}));
+
+    CHECK(textureCoordsEqual(
+      getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex),
+      slopeFaces.secondFacePoints[0],
+      vm::vec2f{expectedFaceLength, 0}));
+    CHECK(textureCoordsEqual(
+      getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex),
+      slopeFaces.secondFacePoints[1],
+      vm::vec2f{expectedFaceLength, 64}));
+    CHECK(textureCoordsEqual(
+      getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex),
+      slopeFaces.secondFacePoints[2],
+      vm::vec2f{expectedFaceLength * 2.0f, 64}));
+    CHECK(textureCoordsEqual(
+      getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex),
+      slopeFaces.secondFacePoints[3],
+      vm::vec2f{expectedFaceLength * 2.0f, 0}));
   }
 
   SECTION("justifyUV")
