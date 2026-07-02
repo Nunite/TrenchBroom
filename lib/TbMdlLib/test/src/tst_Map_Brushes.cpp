@@ -89,12 +89,12 @@ bool uvAxesMatch(const BrushFace& lhs, const BrushFace& rhs)
   return lhs.uAxis() == vm::approx{rhs.uAxis()} && lhs.vAxis() == vm::approx{rhs.vAxis()};
 }
 
-bool uAxisFollowsBand(const BrushFace& face, const BrushFace& nextFace)
+bool vAxisFollowsBandBackwards(const BrushFace& face, const BrushFace& nextFace)
 {
   const auto direction = nextFace.center() - face.center();
   const auto projectedDirection =
     vm::normalize(direction - vm::dot(direction, face.normal()) * face.normal());
-  return vm::dot(face.uAxis(), projectedDirection) > 0.9;
+  return vm::dot(face.vAxis(), projectedDirection) < -0.9;
 }
 
 struct AdjacentSlopeFaces
@@ -972,7 +972,7 @@ TEST_CASE("Map_Brushes")
       getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
       getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex),
       slopeFaces.sharedEdgePoints));
-    CHECK(uAxisFollowsBand(
+    CHECK(vAxisFollowsBandBackwards(
       getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
       getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex)));
     CHECK(uvAxesMatch(
