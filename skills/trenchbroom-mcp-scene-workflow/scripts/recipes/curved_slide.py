@@ -3,14 +3,22 @@
 
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR.parent / "lib"))
 
-from ir_builder import DEFAULT_MATERIAL, integer, make_ir, number, run_recipe_cli, string, vec3  # noqa: E402
+from ir_builder import (  # noqa: E402
+    DEFAULT_MATERIAL,
+    integer,
+    make_ir,
+    number,
+    op_banked_arc_segments,
+    run_recipe_cli,
+    string,
+    vec3,
+)
 
 
 MANIFEST = {
@@ -70,35 +78,6 @@ MANIFEST = {
 }
 
 
-def _polar(center: list[float], radius: float, angle_degrees: float, z: float) -> list[float]:
-    angle = math.radians(angle_degrees)
-    return [
-        center[0] + math.cos(angle) * radius,
-        center[1] + math.sin(angle) * radius,
-        center[2] + z,
-    ]
-
-
-def _slide_segment_points(
-    center: list[float],
-    inner_radius: float,
-    outer_radius: float,
-    start_angle: float,
-    end_angle: float,
-    z_inner: float,
-    z_outer: float,
-    thickness: float,
-) -> list[list[float]]:
-    top = [
-        _polar(center, inner_radius, start_angle, z_inner),
-        _polar(center, outer_radius, start_angle, z_outer),
-        _polar(center, outer_radius, end_angle, z_outer),
-        _polar(center, inner_radius, end_angle, z_inner),
-    ]
-    bottom = [[point[0], point[1], point[2] - thickness] for point in top]
-    return top + bottom
-
-
 def build(params: dict) -> dict:
     module_id = string(params, "moduleId", "recipe-curved-slide")
     route_id = string(params, "routeId", module_id)
@@ -113,42 +92,20 @@ def build(params: dict) -> dict:
     grid = integer(params, "grid", 1)
     material = string(params, "material", DEFAULT_MATERIAL)
 
-    if abs(turn_degrees) <= 0.001:
-        raise ValueError("turnDegrees must not be zero")
-    if width >= radius * 2:
-        raise ValueError("width must be smaller than diameter")
-
-    inner_radius = radius - width / 2
-    outer_radius = radius + width / 2
-    cross_rise = math.tan(math.radians(cross_slope_degrees)) * width
-    z_inner = 0.0
-    z_outer = cross_rise
-    angle_step = turn_degrees / segments
-
-    operations = []
-    for index in range(segments):
-        operations.append(
-            {
-                "type": "polyhedron",
-                "points": _slide_segment_points(
-                    center,
-                    inner_radius,
-                    outer_radius,
-                    start_angle + angle_step * index,
-                    start_angle + angle_step * (index + 1),
-                    z_inner,
-                    z_outer,
-                    thickness,
-                ),
-                "material": material,
-                "metadata": {
-                    "part": "slide",
-                    "role": "walkable",
-                    "routeId": route_id,
-                    "order": index + 1,
-                },
-            }
-        )
+    operations = op_banked_arc_segments(
+        center=center,
+        radius=radius,
+        width=width,
+        start_angle=start_angle,
+        turn_degrees=turn_degrees,
+        cross_slope_degrees=cross_slope_degrees,
+        segments=segments,
+        thickness=thickness,
+        part="slide",
+        role="walkable",
+        route_id=route_id,
+        material=material,
+    )
 
     return make_ir(
         name="MCP Recipe: Curved slide",
