@@ -218,6 +218,36 @@ void copyUVContinuously(const BrushFace& sourceFace, BrushFace& targetFace)
   }
 }
 
+bool alignUVToBandDirection(BrushFace& face, const BrushFace& nextFace)
+{
+  const auto direction = nextFace.center() - face.center();
+  const auto projectedDirection =
+    direction - vm::dot(direction, face.normal()) * face.normal();
+  if (vm::is_zero(projectedDirection, vm::Cd::almost_zero()))
+  {
+    return false;
+  }
+
+  const auto toUV =
+    face.toUVCoordSystemMatrix(face.attributes().offset(), vm::vec2f{1, 1});
+  const auto centerUV = vm::vec2f{toUV * face.center()};
+  const auto targetUV =
+    vm::vec2f{toUV * (face.center() + vm::normalize(projectedDirection))};
+  const auto uvDirection = targetUV - centerUV;
+  if (vm::is_zero(uvDirection, vm::Cf::almost_zero()))
+  {
+    return false;
+  }
+
+  evaluate(
+    UpdateBrushFaceAttributes{
+      .rotation =
+        SetValue{face.measureUVAngle(vm::vec2f{0, 0}, vm::normalize(uvDirection))},
+    },
+    face);
+  return true;
+}
+
 } // namespace
 
 bool createBrush(Map& map, const std::vector<vm::vec3d>& points)
@@ -378,9 +408,17 @@ bool alignUVContinuously(Map& map, const UvPolicy uvPolicy)
       continue;
     }
 
-    evaluate(
-      mdl::align(faceAt(brushes.at(faces[start].node), faces[start]), uvPolicy),
-      faceAt(brushes.at(faces[start].node), faces[start]));
+    auto& startFace = faceAt(brushes.at(faces[start].node), faces[start]);
+    if (
+      adjacentFaces[start].empty()
+      || !alignUVToBandDirection(
+        startFace,
+        faceAt(
+          brushes.at(faces[adjacentFaces[start].front()].node),
+          faces[adjacentFaces[start].front()])))
+    {
+      evaluate(mdl::align(startFace, uvPolicy), startFace);
+    }
 
     auto queue = std::queue<size_t>{};
     visited[start] = true;

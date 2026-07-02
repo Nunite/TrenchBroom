@@ -90,6 +90,14 @@ bool uvAxesFollowFacePlane(const BrushFace& face)
          && vm::dot(face.vAxis(), face.normal()) == vm::approx{0.0};
 }
 
+bool uAxisFollowsBand(const BrushFace& face, const BrushFace& nextFace)
+{
+  const auto direction = nextFace.center() - face.center();
+  const auto projectedDirection =
+    vm::normalize(direction - vm::dot(direction, face.normal()) * face.normal());
+  return vm::dot(face.uAxis(), projectedDirection) > 0.9;
+}
+
 struct AdjacentSlopeFaces
 {
   BrushNode* firstBrushNode = nullptr;
@@ -965,6 +973,9 @@ TEST_CASE("Map_Brushes")
       getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
       getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex),
       slopeFaces.sharedEdgePoints));
+    CHECK(uAxisFollowsBand(
+      getFace(*slopeFaces.firstBrushNode, slopeFaces.firstFaceIndex),
+      getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex)));
     CHECK(uvAxesFollowFacePlane(
       getFace(*slopeFaces.secondBrushNode, slopeFaces.secondFaceIndex)));
   }
