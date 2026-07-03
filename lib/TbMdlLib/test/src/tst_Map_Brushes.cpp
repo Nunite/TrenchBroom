@@ -17,7 +17,6 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "fs/TestEnvironment.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
@@ -32,7 +31,6 @@
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Matchers.h"
-#include "mdl/NodeQueries.h"
 #include "mdl/TestFactory.h"
 #include "mdl/TestUtils.h"
 #include "mdl/UVCoordSystem.h"
@@ -95,22 +93,6 @@ vm::vec2f textureCoords(const BrushFace& face, const vm::vec3d& point)
   return vm::vec2f{
     face.toUVCoordSystemMatrix(face.attributes().offset(), face.attributes().scale())
     * point};
-}
-
-std::vector<vm::vec3d> sharedVertices(const BrushFace& lhs, const BrushFace& rhs)
-{
-  auto result = std::vector<vm::vec3d>{};
-  for (const auto& lhsVertex : lhs.vertexPositions())
-  {
-    for (const auto& rhsVertex : rhs.vertexPositions())
-    {
-      if (vm::is_equal(lhsVertex, rhsVertex, vm::Cd::almost_zero()))
-      {
-        result.push_back(lhsVertex);
-      }
-    }
-  }
-  return result;
 }
 
 } // namespace
@@ -980,138 +962,6 @@ TEST_CASE("Map_Brushes")
       CHECK(!unwrapUVAsQuads(map));
       CHECK_THAT(
         firstLower.face().attributes(), MatchesBrushFaceAttributes(originalAttributes));
-    }
-
-    SECTION("Unwraps curved slide brushes selected as nodes")
-    {
-      auto env = fs::TestEnvironment{};
-      env.createFile("curved-slide-sample.map", R"(// Game: Half-Life
-// Format: Valve
-// entity 0
-{
-"mapversion" "220"
-"classname" "worldspawn"
-// brush 0
-{
-( -384 -640 420 ) ( -377 -565 404 ) ( -377 -565 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -256 -640 240 ) ( -377 -565 404 ) ( -384 -640 404 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -251 -590 240 ) ( -377 -565 404 ) ( -256 -640 240 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -256 -640 256 ) ( -384 -640 404 ) ( -384 -640 420 ) TRIM_SHIT1_ALBE [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -251 -590 256 ) ( -377 -565 404 ) ( -251 -590 240 ) TRIM_SHIT1_ALBE [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -251 -590 256 ) ( -384 -640 420 ) ( -377 -565 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -251 -590 256 ) ( -256 -640 256 ) ( -384 -640 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -251 -590 256 ) ( -256 -640 240 ) ( -256 -640 256 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-}
-// brush 1
-{
-( -377 -565 420 ) ( -355 -493 404 ) ( -355 -493 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -237 -542 240 ) ( -377 -565 404 ) ( -251 -590 240 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -237 -542 240 ) ( -355 -493 404 ) ( -377 -565 404 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -251 -590 256 ) ( -377 -565 404 ) ( -377 -565 420 ) TRIM_SHIT1_ALBE [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -237 -542 256 ) ( -355 -493 404 ) ( -237 -542 240 ) TRIM_SHIT1_ALBE [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -251 -590 256 ) ( -377 -565 420 ) ( -355 -493 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -237 -542 256 ) ( -251 -590 256 ) ( -355 -493 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -237 -542 256 ) ( -251 -590 240 ) ( -251 -590 256 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-}
-// brush 2
-{
-( -355 -493 420 ) ( -319 -427 404 ) ( -319 -427 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -213 -498 240 ) ( -355 -493 404 ) ( -237 -542 240 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -237 -542 256 ) ( -355 -493 404 ) ( -355 -493 420 ) TRIM_SHIT1_ALBE [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -213 -498 256 ) ( -319 -427 404 ) ( -213 -498 240 ) TRIM_SHIT1_ALBE [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -213 -498 256 ) ( -355 -493 420 ) ( -319 -427 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -213 -498 256 ) ( -237 -542 240 ) ( -237 -542 256 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-}
-// brush 3
-{
-( -319 -427 420 ) ( -272 -368 404 ) ( -272 -368 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -213 -498 240 ) ( -272 -368 404 ) ( -319 -427 404 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -181 -459 240 ) ( -272 -368 404 ) ( -213 -498 240 ) TRIM_SHIT1_ALBE [ 1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1
-( -213 -498 256 ) ( -319 -427 404 ) ( -319 -427 420 ) TRIM_SHIT1_ALBE [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -181 -459 256 ) ( -213 -498 256 ) ( -319 -427 420 ) TRIM_SHIT1_ALBE [ 1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1
-( -181 -459 256 ) ( -319 -427 420 ) ( -272 -368 420 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -181 -459 256 ) ( -272 -368 404 ) ( -181 -459 240 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -181 -459 256 ) ( -213 -498 240 ) ( -213 -498 256 ) TRIM_SHIT1_ALBE [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-}
-}
-)");
-
-      auto& map = fixture.load(env.dir() / "curved-slide-sample.map", QuakeFixtureConfig);
-      const auto brushNodes = collectDescendants(
-        std::vector<Node*>{&map.worldNode()}, [](const BrushNode&) { return true; });
-      REQUIRE(brushNodes.size() == 4u);
-
-      deselectAll(map);
-      selectNodes(map, brushNodes);
-
-      const auto selectedFaces = map.selection().allBrushFaces();
-      REQUIRE(!selectedFaces.empty());
-      struct OriginalUV
-      {
-        BrushFaceAttributes attributes;
-        vm::vec3d uAxis;
-        vm::vec3d vAxis;
-      };
-      auto originalUVs = std::vector<OriginalUV>{};
-      originalUVs.reserve(selectedFaces.size());
-      for (const auto& handle : selectedFaces)
-      {
-        originalUVs.push_back(
-          {handle.face().attributes(), handle.face().uAxis(), handle.face().vAxis()});
-      }
-
-      CHECK(unwrapUVAsQuads(map));
-
-      const auto changedFaces = map.selection().allBrushFaces();
-      REQUIRE(changedFaces.size() == originalUVs.size());
-      auto changedFaceCount = 0u;
-      auto changed = std::vector<bool>(changedFaces.size(), false);
-      for (size_t i = 0u; i < changedFaces.size(); ++i)
-      {
-        const auto& face = changedFaces[i].face();
-        const auto& original = originalUVs[i];
-        if (
-          !MatchesBrushFaceAttributes(original.attributes).match(face.attributes())
-          || !(face.uAxis() == vm::approx{original.uAxis})
-          || !(face.vAxis() == vm::approx{original.vAxis}))
-        {
-          changed[i] = true;
-          ++changedFaceCount;
-        }
-      }
-      CHECK(changedFaceCount > 0u);
-
-      auto sharedEdgeCount = 0u;
-      auto continuousSharedEdgeCount = 0u;
-      for (size_t i = 0u; i < changedFaces.size(); ++i)
-      {
-        for (size_t j = i + 1u; j < changedFaces.size(); ++j)
-        {
-          if (!changed[i] || !changed[j])
-          {
-            continue;
-          }
-
-          const auto shared =
-            sharedVertices(changedFaces[i].face(), changedFaces[j].face());
-          if (shared.size() != 2u)
-          {
-            continue;
-          }
-
-          ++sharedEdgeCount;
-          if (
-            textureCoords(changedFaces[i].face(), shared[0])
-              == vm::approx{textureCoords(changedFaces[j].face(), shared[0])}
-            && textureCoords(changedFaces[i].face(), shared[1])
-                 == vm::approx{textureCoords(changedFaces[j].face(), shared[1])})
-          {
-            ++continuousSharedEdgeCount;
-          }
-        }
-      }
-      CHECK(sharedEdgeCount > 0u);
-      CHECK(continuousSharedEdgeCount > 0u);
     }
   }
 

@@ -36,8 +36,6 @@
 #include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/WorldNode.h"
 
-#include <algorithm>
-#include <cmath>
 #include <unordered_map>
 
 namespace tb::mdl
@@ -64,12 +62,6 @@ struct TriangleUV
   size_t faceIndex;
   std::array<vm::vec3d, 3> points;
   std::array<vm::vec2f, 3> uvs;
-};
-
-struct ScoredUnwrapQuad
-{
-  UnwrapQuad quad;
-  double score;
 };
 
 bool samePoint(const vm::vec3d& lhs, const vm::vec3d& rhs)
@@ -129,97 +121,6 @@ std::optional<UnwrapQuad> makeUnwrapQuad(
 
   return UnwrapQuad{
     firstFace, secondFace, {*firstOuter, shared[1], *secondOuter, shared[0]}};
-}
-
-double pointDistance(const vm::vec3d& lhs, const vm::vec3d& rhs)
-{
-  return vm::length(lhs - rhs);
-}
-
-std::optional<double> normalizedDot(const vm::vec3d& lhs, const vm::vec3d& rhs)
-{
-  const auto lhsLength = vm::length(lhs);
-  const auto rhsLength = vm::length(rhs);
-  if (
-    vm::is_zero(lhsLength, vm::Cd::almost_zero())
-    || vm::is_zero(rhsLength, vm::Cd::almost_zero()))
-  {
-    return std::nullopt;
-  }
-
-  return vm::dot(lhs, rhs) / (lhsLength * rhsLength);
-}
-
-std::optional<vm::vec3d> triangleNormal(const std::vector<vm::vec3d>& vertices)
-{
-  const auto normal = vm::cross(vertices[1] - vertices[0], vertices[2] - vertices[0]);
-  const auto length = vm::length(normal);
-  if (vm::is_zero(length, vm::Cd::almost_zero()))
-  {
-    return std::nullopt;
-  }
-  return normal / length;
-}
-
-std::optional<double> scoreUnwrapQuad(
-  const UnwrapQuad& quad, const std::vector<SelectedTriangleFace>& faces)
-{
-  const auto e0 = quad.corners[1] - quad.corners[0];
-  const auto e1 = quad.corners[2] - quad.corners[1];
-  const auto e2 = quad.corners[3] - quad.corners[2];
-  const auto e3 = quad.corners[0] - quad.corners[3];
-
-  const auto l0 = vm::length(e0);
-  const auto l1 = vm::length(e1);
-  const auto l2 = vm::length(e2);
-  const auto l3 = vm::length(e3);
-  if (
-    vm::is_zero(l0, vm::Cd::almost_zero()) || vm::is_zero(l1, vm::Cd::almost_zero())
-    || vm::is_zero(l2, vm::Cd::almost_zero()) || vm::is_zero(l3, vm::Cd::almost_zero()))
-  {
-    return std::nullopt;
-  }
-
-  const auto dot02 = normalizedDot(e0, e2);
-  const auto dot13 = normalizedDot(e1, e3);
-  const auto dot01 = normalizedDot(e0, e1);
-  if (!dot02 || !dot13 || !dot01)
-  {
-    return std::nullopt;
-  }
-
-  const auto normal0 = triangleNormal(faces[quad.firstFace].vertices);
-  const auto normal1 = triangleNormal(faces[quad.secondFace].vertices);
-  if (!normal0 || !normal1)
-  {
-    return std::nullopt;
-  }
-
-  const auto shared =
-    sharedPoints(faces[quad.firstFace].vertices, faces[quad.secondFace].vertices);
-  if (shared.size() != 2u)
-  {
-    return std::nullopt;
-  }
-
-  const auto max02 = std::max(l0, l2);
-  const auto max13 = std::max(l1, l3);
-  const auto oppositeLengthPenalty =
-    std::abs(l0 - l2) / max02 + std::abs(l1 - l3) / max13;
-  const auto parallelPenalty = (1.0 - std::abs(*dot02)) + (1.0 - std::abs(*dot13));
-  const auto rightAnglePenalty = std::abs(*dot01);
-  const auto normalPenalty = 1.0 - std::abs(vm::dot(*normal0, *normal1));
-
-  const auto sharedLength = pointDistance(shared[0], shared[1]);
-  if (vm::is_zero(sharedLength, vm::Cd::almost_zero()))
-  {
-    return std::nullopt;
-  }
-  const auto meanOuterEdgeLength = (l0 + l1 + l2 + l3) / 4.0;
-  const auto diagonalPenalty = meanOuterEdgeLength / sharedLength;
-
-  return normalPenalty * 8.0 + parallelPenalty * 2.0 + rightAnglePenalty
-         + oppositeLengthPenalty + diagonalPenalty;
 }
 
 std::optional<std::pair<size_t, size_t>> matchingQuadEdge(
@@ -619,76 +520,78 @@ bool unwrapUVAsQuads(Map& map)
     return false;
   }
 
-  auto candidates = std::vector<ScoredUnwrapQuad>{};
-  for (size_t i = 0u; i < faces.size(); ++i)
-  {
-    for (size_t j = i + 1u; j < faces.size(); ++j)
-    {
-      if (const auto quad = makeUnwrapQuad(i, j, faces))
-      {
-        if (const auto score = scoreUnwrapQuad(*quad, faces))
-        {
-          candidates.push_back({*quad, *score});
-        }
-      }
-    }
-  }
-  std::ranges::sort(
-    candidates, [](const auto& lhs, const auto& rhs) { return lhs.score < rhs.score; });
-
   auto quads = std::vector<UnwrapQuad>{};
   auto usedFaces = std::vector<bool>(faces.size(), false);
-  for (const auto& candidate : candidates)
+  for (size_t i = 0u; i < faces.size(); ++i)
   {
-    if (usedFaces[candidate.quad.firstFace] || usedFaces[candidate.quad.secondFace])
+    if (usedFaces[i])
     {
       continue;
     }
 
-    usedFaces[candidate.quad.firstFace] = true;
-    usedFaces[candidate.quad.secondFace] = true;
-    quads.push_back(candidate.quad);
+    auto match = std::optional<UnwrapQuad>{};
+    for (size_t j = i + 1u; j < faces.size(); ++j)
+    {
+      if (usedFaces[j])
+      {
+        continue;
+      }
+      if (const auto quad = makeUnwrapQuad(i, j, faces))
+      {
+        if (match)
+        {
+          return false;
+        }
+        match = quad;
+      }
+    }
+
+    if (!match)
+    {
+      return false;
+    }
+
+    usedFaces[i] = true;
+    usedFaces[match->secondFace] = true;
+    quads.push_back(*match);
   }
 
-  if (quads.size() != faces.size() / 2u)
+  if (quads.empty())
   {
     return false;
   }
 
   auto quadUVs = std::vector<std::optional<std::array<vm::vec2f, 4>>>(quads.size());
-  for (size_t seedIndex = 0u; seedIndex < quads.size(); ++seedIndex)
+  quadUVs[0] = makeFirstQuadUVs(quads[0]);
+  auto changed = true;
+  while (changed)
   {
-    if (quadUVs[seedIndex])
+    changed = false;
+    for (size_t i = 0u; i < quads.size(); ++i)
     {
-      continue;
-    }
-
-    quadUVs[seedIndex] = makeFirstQuadUVs(quads[seedIndex]);
-    auto changed = true;
-    while (changed)
-    {
-      changed = false;
-      for (size_t i = 0u; i < quads.size(); ++i)
+      if (!quadUVs[i])
       {
-        if (!quadUVs[i])
+        continue;
+      }
+      for (size_t j = 0u; j < quads.size(); ++j)
+      {
+        if (quadUVs[j])
         {
           continue;
         }
-        for (size_t j = 0u; j < quads.size(); ++j)
+        if (const auto edge = matchingQuadEdge(quads[i], quads[j]))
         {
-          if (quadUVs[j])
-          {
-            continue;
-          }
-          if (const auto edge = matchingQuadEdge(quads[i], quads[j]))
-          {
-            quadUVs[j] =
-              attachQuadUVs(*quadUVs[i], quads[i], quads[j], edge->first, edge->second);
-            changed = true;
-          }
+          quadUVs[j] =
+            attachQuadUVs(*quadUVs[i], quads[i], quads[j], edge->first, edge->second);
+          changed = true;
         }
       }
     }
+  }
+
+  if (std::ranges::any_of(quadUVs, [](const auto& uv) { return !uv; }))
+  {
+    return false;
   }
 
   auto triangleUVs = std::vector<TriangleUV>{};
