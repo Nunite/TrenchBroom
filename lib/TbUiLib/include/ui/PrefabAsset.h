@@ -25,6 +25,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace tb::ui
 {
@@ -39,6 +40,18 @@ std::filesystem::path prefabPathForName(
   const std::filesystem::path& directory, const std::string& name);
 
 std::filesystem::path prefabThumbnailPath(const std::filesystem::path& prefabPath);
+
+std::string appendPrefabMaterialCollections(
+  const std::string& prefabText,
+  const std::vector<std::filesystem::path>& materialCollections);
+
+std::vector<std::filesystem::path> prefabMaterialCollections(
+  const std::string& prefabText);
+
+std::string appendPrefabWadPaths(
+  const std::string& prefabText, const std::vector<std::string>& wadPaths);
+
+std::vector<std::string> prefabWadPaths(const std::string& prefabText);
 
 QImage cropPrefabThumbnailImage(const QImage& image);
 

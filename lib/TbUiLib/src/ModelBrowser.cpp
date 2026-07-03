@@ -48,16 +48,20 @@
 #include "mdl/BrushNode.h"
 #include "mdl/EntityModelManager.h"
 #include "mdl/EntityNode.h"
+#include "mdl/GameConfig.h"
 #include "mdl/GameFileSystem.h"
+#include "mdl/GameInfo.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
+#include "mdl/Map_Assets.h"
 #include "mdl/Map_CopyPaste.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Map_World.h"
 #include "mdl/PatchNode.h"
 #include "mdl/SetVisibilityCommand.h"
 #include "mdl/Transaction.h"
+#include "mdl/WadPropertyUtils.h"
 #include "mdl/WorldNode.h"
 #include "ui/AppController.h"
 #include "ui/AssetBrowserModel.h"
@@ -203,6 +207,18 @@ Result<void> savePrefabThumbnail(
   }
 
   return kdl::void_success;
+}
+
+std::vector<std::string> currentPrefabWadPaths(const mdl::Map& map)
+{
+  if (const auto wadPropertyKey = map.gameInfo().gameConfig.materialConfig.property)
+  {
+    if (const auto* wadProperty = map.worldNode().entity().property(*wadPropertyKey))
+    {
+      return mdl::splitWadProperty(*wadProperty);
+    }
+  }
+  return {};
 }
 
 } // namespace
@@ -651,7 +667,10 @@ void ModelBrowser::saveSelectionAsPrefab()
     return;
   }
 
-  const auto prefabText = mdl::serializeSelectedNodes(map);
+  const auto prefabText = appendPrefabWadPaths(
+    appendPrefabMaterialCollections(
+      mdl::serializeSelectedNodes(map), mdl::enabledMaterialCollections(map)),
+    currentPrefabWadPaths(map));
   const auto filePath = prefabPathForName(prefabDirectory, prefabName.toStdString());
   const auto result = writePrefabAsset(filePath, prefabText);
   if (result.is_error())

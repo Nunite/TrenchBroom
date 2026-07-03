@@ -89,6 +89,56 @@ TEST_CASE("PrefabAsset")
       == std::filesystem::path{"prefabs/crate.png"});
   }
 
+  SECTION("stores prefab material collection metadata as comments")
+  {
+    const auto prefabText =
+      std::string{"// entity 0\n{\n\"classname\" \"info_null\"\n}\n"};
+
+    const auto textWithMetadata = appendPrefabMaterialCollections(
+      prefabText,
+      {
+        "textures/base.wad",
+        "textures/detail.wad",
+        "textures/base.wad",
+      });
+
+    CHECK(
+      textWithMetadata
+      == std::string{"// tb-prefab-material-collection: textures/base.wad\n"
+                     "// tb-prefab-material-collection: textures/detail.wad\n"
+                     "// entity 0\n"
+                     "{\n"
+                     "\"classname\" \"info_null\"\n"
+                     "}\n"});
+    CHECK(
+      prefabMaterialCollections(textWithMetadata)
+      == std::vector<std::filesystem::path>{
+        "textures/base.wad",
+        "textures/detail.wad",
+      });
+  }
+
+  SECTION("stores prefab wad metadata as comments")
+  {
+    const auto prefabText =
+      std::string{"// entity 0\n{\n\"classname\" \"info_null\"\n}\n"};
+
+    const auto textWithMetadata =
+      appendPrefabWadPaths(prefabText, {"halflife.wad", "liquids.wad", "halflife.wad"});
+
+    CHECK(
+      textWithMetadata
+      == std::string{"// tb-prefab-wad: halflife.wad\n"
+                     "// tb-prefab-wad: liquids.wad\n"
+                     "// entity 0\n"
+                     "{\n"
+                     "\"classname\" \"info_null\"\n"
+                     "}\n"});
+    CHECK(
+      prefabWadPaths(textWithMetadata)
+      == std::vector<std::string>{"halflife.wad", "liquids.wad"});
+  }
+
   SECTION("rejects duplicate prefab names")
   {
     auto env = fs::TestEnvironment{};

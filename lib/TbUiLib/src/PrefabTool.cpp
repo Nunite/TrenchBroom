@@ -19,34 +19,47 @@
 
 #include "ui/PrefabTool.h"
 
+#include <QMessageBox>
+#include <QPushButton>
+
 #include "Logger.h"
 #include "ParserStatus.h"
 #include "fs/DiskIO.h"
 #include "fs/File.h"
 #include "fs/Reader.h"
+#include "gl/MaterialManager.h"
 #include "mdl/BrushNode.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityProperties.h"
+#include "mdl/GameConfig.h"
 #include "mdl/GameFileSystem.h"
+#include "mdl/GameInfo.h"
 #include "mdl/Group.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
+#include "mdl/Map_Assets.h"
 #include "mdl/Map_CopyPaste.h"
 #include "mdl/Map_Geometry.h"
+#include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/NodeReader.h"
 #include "mdl/PasteType.h"
 #include "mdl/PatchNode.h"
 #include "mdl/Transaction.h"
+#include "mdl/WadPropertyUtils.h"
 #include "mdl/WorldNode.h"
 #include "ui/MapDocument.h"
 #include "ui/PrefabAsset.h"
 
 #include "kd/path_utils.h"
+#include "kd/ranges/to.h"
+#include "kd/string_utils.h"
 #include "kd/vector_utils.h"
 
 #include "vm/mat_ext.h"
+
+#include <ranges>
 
 namespace tb::ui
 {
@@ -225,6 +238,209 @@ bool translatePrefabNodes(
   return result;
 }
 
+void collectPrefabMaterialNames(std::vector<std::string>& result, const mdl::Node& node)
+{
+  node.accept(kdl::overload(
+    [&](const mdl::WorldNode& worldNode) {
+      for (const auto* child : worldNode.children())
+      {
+        collectPrefabMaterialNames(result, *child);
+      }
+    },
+    [&](const mdl::LayerNode& layerNode) {
+      for (const auto* child : layerNode.children())
+      {
+        collectPrefabMaterialNames(result, *child);
+      }
+    },
+    [&](const mdl::GroupNode& groupNode) {
+      for (const auto* child : groupNode.children())
+      {
+        collectPrefabMaterialNames(result, *child);
+      }
+    },
+    [&](const mdl::EntityNode& entityNode) {
+      for (const auto* child : entityNode.children())
+      {
+        collectPrefabMaterialNames(result, *child);
+      }
+    },
+    [&](const mdl::BrushNode& brushNode) {
+      for (const auto& face : brushNode.brush().faces())
+      {
+        const auto& materialName = face.attributes().materialName();
+        if (!materialName.empty())
+        {
+          result.push_back(materialName);
+        }
+      }
+    },
+    [&](const mdl::PatchNode& patchNode) {
+      const auto& materialName = patchNode.patch().materialName();
+      if (!materialName.empty())
+      {
+        result.push_back(materialName);
+      }
+    }));
+}
+
+std::vector<std::string> prefabMaterialNames(mdl::Map& map, const std::string& prefabText)
+{
+  auto nodesResult = readPrefabAssetNodes(map, prefabText);
+  if (nodesResult.is_error())
+  {
+    return {};
+  }
+
+  auto nodes = std::move(nodesResult.value());
+  auto result = std::vector<std::string>{};
+  for (const auto* node : nodes)
+  {
+    collectPrefabMaterialNames(result, *node);
+  }
+  kdl::vec_clear_and_delete(nodes);
+  return kdl::vec_sort_and_remove_duplicates(std::move(result));
+}
+
+std::vector<std::string> missingPrefabMaterials(mdl::Map& map, const std::string& text)
+{
+  auto result = prefabMaterialNames(map, text);
+  std::erase_if(result, [&](const auto& materialName) {
+    return map.materialManager().material(materialName) != nullptr;
+  });
+  return result;
+}
+
+PrefabTool::PrefabMaterialImportAction defaultMaterialImportCallback(
+  const std::vector<std::string>& missingMaterials,
+  const std::vector<std::filesystem::path>& materialCollections,
+  const std::vector<std::string>& wadPaths)
+{
+  auto details = QString{};
+  for (const auto& materialName : missingMaterials)
+  {
+    details += QString::fromStdString(materialName) + "\n";
+  }
+  if (!materialCollections.empty() || !wadPaths.empty())
+  {
+    details += "\nSources:\n";
+    for (const auto& path : materialCollections)
+    {
+      details += QString::fromStdString(path.generic_string()) + "\n";
+    }
+    for (const auto& path : wadPaths)
+    {
+      details += QString::fromStdString(path) + "\n";
+    }
+  }
+
+  auto messageBox = QMessageBox{};
+  messageBox.setWindowTitle(QObject::tr("Place Prefab"));
+  messageBox.setText(QObject::tr("This prefab uses materials that are not loaded."));
+  messageBox.setInformativeText(
+    QObject::tr("Import the prefab material sources into this map?"));
+  messageBox.setDetailedText(details.trimmed());
+
+  auto* importButton =
+    messageBox.addButton(QObject::tr("Import and Place"), QMessageBox::AcceptRole);
+  const auto* continueButton = messageBox.addButton(
+    QObject::tr("Place Without Importing"), QMessageBox::DestructiveRole);
+  messageBox.addButton(QMessageBox::Cancel);
+  messageBox.setDefaultButton(importButton);
+  messageBox.exec();
+
+  if (messageBox.clickedButton() == importButton)
+  {
+    return PrefabTool::PrefabMaterialImportAction::Import;
+  }
+  if (messageBox.clickedButton() == continueButton)
+  {
+    return PrefabTool::PrefabMaterialImportAction::ContinueWithoutImport;
+  }
+  return PrefabTool::PrefabMaterialImportAction::Cancel;
+}
+
+void importPrefabMaterialSources(
+  mdl::Map& map,
+  const std::vector<std::filesystem::path>& materialCollections,
+  const std::vector<std::string>& wadPaths)
+{
+  if (!wadPaths.empty() || !materialCollections.empty())
+  {
+    auto entity = map.worldNode().entity();
+    if (!wadPaths.empty() && map.gameInfo().gameConfig.materialConfig.property)
+    {
+      auto wads = std::vector<std::string>{};
+      if (
+        const auto* wadProperty =
+          entity.property(*map.gameInfo().gameConfig.materialConfig.property))
+      {
+        wads = mdl::splitWadProperty(*wadProperty);
+      }
+      kdl::vec_append(wads, wadPaths);
+      entity.addOrUpdateProperty(
+        *map.gameInfo().gameConfig.materialConfig.property,
+        mdl::joinWadProperty(kdl::vec_sort_and_remove_duplicates(std::move(wads))));
+    }
+
+    if (!materialCollections.empty())
+    {
+      auto enabledMaterialCollections = mdl::enabledMaterialCollections(map);
+      kdl::vec_append(enabledMaterialCollections, materialCollections);
+      entity.addOrUpdateProperty(
+        mdl::EntityPropertyKeys::TbEnabledMaterialCollections,
+        kdl::str_join(
+          kdl::vec_sort_and_remove_duplicates(std::move(enabledMaterialCollections))
+            | std::views::transform([](const auto& path) { return path.string(); })
+            | kdl::ranges::to<std::vector>(),
+          ";"));
+    }
+
+    mdl::updateNodeContents(
+      map,
+      "Import Prefab Materials",
+      {{&map.worldNode(), mdl::NodeContents{std::move(entity)}}},
+      {});
+  }
+
+  mdl::reloadMaterialCollections(map);
+}
+
+bool ensurePrefabMaterials(
+  mdl::Map& map,
+  const std::string& prefabText,
+  const PrefabTool::PrefabMaterialImportCallback& callback)
+{
+  const auto materialCollections = prefabMaterialCollections(prefabText);
+  const auto wadPaths = prefabWadPaths(prefabText);
+  if (materialCollections.empty() && wadPaths.empty())
+  {
+    return true;
+  }
+
+  const auto missingMaterials = missingPrefabMaterials(map, prefabText);
+  if (missingMaterials.empty())
+  {
+    return true;
+  }
+
+  const auto action = callback ? callback(missingMaterials, materialCollections, wadPaths)
+                               : defaultMaterialImportCallback(
+                                   missingMaterials, materialCollections, wadPaths);
+  switch (action)
+  {
+  case PrefabTool::PrefabMaterialImportAction::Import:
+    importPrefabMaterialSources(map, materialCollections, wadPaths);
+    return true;
+  case PrefabTool::PrefabMaterialImportAction::ContinueWithoutImport:
+    return true;
+  case PrefabTool::PrefabMaterialImportAction::Cancel:
+    return false;
+  }
+
+  return false;
+}
+
 } // namespace
 
 PrefabTool::PrefabTool(MapDocument& document)
@@ -256,6 +472,11 @@ const std::vector<mdl::Node*>& PrefabTool::previewNodes() const
 size_t PrefabTool::previewVersion() const
 {
   return m_previewVersion;
+}
+
+void PrefabTool::setMaterialImportCallback(PrefabMaterialImportCallback callback)
+{
+  m_materialImportCallback = std::move(callback);
 }
 
 bool PrefabTool::updatePreview(
@@ -313,6 +534,10 @@ bool PrefabTool::placePrefab(
   auto& map = m_document.map();
   const auto textResult = readPrefabAssetText(map.gameFileSystem(), path);
   if (textResult.is_error())
+  {
+    return false;
+  }
+  if (!ensurePrefabMaterials(map, textResult.value(), m_materialImportCallback))
   {
     return false;
   }

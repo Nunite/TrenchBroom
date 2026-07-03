@@ -31,12 +31,14 @@
 #include "ui/SystemPaths.h"
 
 #include "kd/path_utils.h"
+#include "kd/vector_utils.h"
 
 #include <fmt/format.h>
 #include <fmt/std.h>
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 
 namespace tb::ui
 {
@@ -45,6 +47,8 @@ namespace
 
 constexpr auto ThumbnailCropPaddingRatio = 0.12;
 constexpr auto ThumbnailBackgroundTolerance = 10;
+constexpr auto MaterialCollectionMetadataPrefix = "// tb-prefab-material-collection: ";
+constexpr auto WadMetadataPrefix = "// tb-prefab-wad: ";
 
 bool differsFromBackground(const QColor& color, const QColor& background)
 {
@@ -52,6 +56,47 @@ bool differsFromBackground(const QColor& color, const QColor& background)
          || std::abs(color.green() - background.green()) > ThumbnailBackgroundTolerance
          || std::abs(color.blue() - background.blue()) > ThumbnailBackgroundTolerance
          || std::abs(color.alpha() - background.alpha()) > ThumbnailBackgroundTolerance;
+}
+
+template <typename T, typename ToString>
+std::string appendPrefabMetadata(
+  const std::string& prefabText,
+  std::vector<T> values,
+  const std::string_view prefix,
+  ToString toString)
+{
+  values.erase(
+    std::remove_if(
+      values.begin(), values.end(), [](const auto& value) { return value.empty(); }),
+    values.end());
+  values = kdl::vec_sort_and_remove_duplicates(std::move(values));
+
+  auto result = std::string{};
+  for (const auto& value : values)
+  {
+    result += prefix;
+    result += toString(value);
+    result += '\n';
+  }
+  result += prefabText;
+  return result;
+}
+
+template <typename T, typename FromString>
+std::vector<T> prefabMetadata(
+  const std::string& prefabText, const std::string_view prefix, FromString fromString)
+{
+  auto result = std::vector<T>{};
+  auto stream = std::istringstream{prefabText};
+  auto line = std::string{};
+  while (std::getline(stream, line))
+  {
+    if (line.starts_with(prefix))
+    {
+      result.push_back(fromString(line.substr(prefix.size())));
+    }
+  }
+  return kdl::vec_sort_and_remove_duplicates(std::move(result));
 }
 
 } // namespace
@@ -92,6 +137,39 @@ std::filesystem::path prefabThumbnailPath(const std::filesystem::path& prefabPat
   auto path = prefabPath;
   path.replace_extension(".png");
   return path;
+}
+
+std::string appendPrefabMaterialCollections(
+  const std::string& prefabText,
+  const std::vector<std::filesystem::path>& materialCollections)
+{
+  return appendPrefabMetadata(
+    prefabText,
+    materialCollections,
+    MaterialCollectionMetadataPrefix,
+    [](const auto& path) { return path.generic_string(); });
+}
+
+std::vector<std::filesystem::path> prefabMaterialCollections(
+  const std::string& prefabText)
+{
+  return prefabMetadata<std::filesystem::path>(
+    prefabText, MaterialCollectionMetadataPrefix, [](const auto& str) {
+      return std::filesystem::path{str};
+    });
+}
+
+std::string appendPrefabWadPaths(
+  const std::string& prefabText, const std::vector<std::string>& wadPaths)
+{
+  return appendPrefabMetadata(
+    prefabText, wadPaths, WadMetadataPrefix, [](const auto& str) { return str; });
+}
+
+std::vector<std::string> prefabWadPaths(const std::string& prefabText)
+{
+  return prefabMetadata<std::string>(
+    prefabText, WadMetadataPrefix, [](const auto& str) { return str; });
 }
 
 QImage cropPrefabThumbnailImage(const QImage& image)

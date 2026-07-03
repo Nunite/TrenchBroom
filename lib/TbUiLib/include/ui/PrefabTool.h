@@ -41,11 +41,25 @@ class MapDocument;
 
 class PrefabTool : public Tool
 {
+public:
+  enum class PrefabMaterialImportAction
+  {
+    Import,
+    ContinueWithoutImport,
+    Cancel,
+  };
+
+  using PrefabMaterialImportCallback = std::function<PrefabMaterialImportAction(
+    const std::vector<std::string>&,
+    const std::vector<std::filesystem::path>&,
+    const std::vector<std::string>&)>;
+
 private:
   MapDocument& m_document;
   std::optional<vm::bbox3d> m_previewBounds;
   std::vector<mdl::Node*> m_previewNodes;
   size_t m_previewVersion = 0;
+  PrefabMaterialImportCallback m_materialImportCallback;
 
 public:
   using PlacementDelta = std::function<vm::vec3d(
@@ -59,6 +73,7 @@ public:
   const std::optional<vm::bbox3d>& previewBounds() const;
   const std::vector<mdl::Node*>& previewNodes() const;
   size_t previewVersion() const;
+  void setMaterialImportCallback(PrefabMaterialImportCallback callback);
   bool updatePreview(
     const std::filesystem::path& path,
     const InputState& inputState,
