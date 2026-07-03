@@ -5,6 +5,7 @@ param(
   [string] $TestFilter = "",
   [string] $TestTarget = "",
   [string] $TestExe = "",
+  [string] $QtBin = "D:\Qtx\6.11.1\msvc2022_64\bin",
   [string] $VsDevCmd = "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat",
   [switch] $NoVsDevCmd,
   [switch] $NoFilter
@@ -192,6 +193,21 @@ function Invoke-FilteredCommand {
   }
 }
 
+function Add-PathPrefixToCommand {
+  param(
+    [string] $Command,
+    [string] $PathPrefix
+  )
+
+  if ([string]::IsNullOrWhiteSpace($PathPrefix)) {
+    return $Command
+  }
+  if (-not (Test-Path $PathPrefix)) {
+    throw "Path prefix not found: $PathPrefix"
+  }
+  return "set `"PATH=$PathPrefix;%PATH%`" && $Command"
+}
+
 $resolvedBuildDir = Resolve-Path -Path $BuildDir -ErrorAction SilentlyContinue
 if (-not $resolvedBuildDir) {
   throw "Build directory not found: $BuildDir"
@@ -215,6 +231,7 @@ if (-not $NoVsDevCmd) {
   }
   $cmakeCommand = "call `"$VsDevCmd`" -arch=x64 -host_arch=x64 >nul && $cmakeCommand"
 }
+$cmakeCommand = Add-PathPrefixToCommand $cmakeCommand $QtBin
 
 Invoke-FilteredCommand `
   -Title "Build $Target ($Config)" `
@@ -234,6 +251,7 @@ if ($TestFilter) {
   $testName = if ([string]::IsNullOrWhiteSpace($TestTarget)) { [System.IO.Path]::GetFileNameWithoutExtension($testExe) } else { $TestTarget }
   $safeFilter = Get-SafeFileNamePart $TestFilter
   $testCommand = Join-CommandArgs @($testExe, $TestFilter)
+  $testCommand = Add-PathPrefixToCommand $testCommand $QtBin
   Invoke-FilteredCommand `
     -Title "Run $testName $TestFilter" `
     -Command $testCommand `
