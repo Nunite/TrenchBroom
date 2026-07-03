@@ -19,6 +19,7 @@
 
 #include "ui/PrefabToolController.h"
 
+#include "Color.h"
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "gl/Camera.h"
@@ -28,12 +29,15 @@
 #include "mdl/HitAdapter.h"
 #include "mdl/HitFilter.h"
 #include "mdl/Map.h"
+#include "mdl/Node.h"
 #include "mdl/PickResult.h"
-#include "render/RenderService.h"
+#include "render/BrushRenderer.h"
+#include "render/ObjectRenderer.h"
 #include "ui/DropTracker.h"
 #include "ui/InputState.h"
 #include "ui/PrefabTool.h"
 
+#include "vm/intersection.h"
 #include "vm/plane.h"
 #include "vm/vec.h"
 
@@ -58,6 +62,39 @@ std::optional<DropPayload> parseDropPayload(const std::string& payload)
     return std::nullopt;
   }
   return DropPayload{payload.substr(0, separatorPos), payload.substr(separatorPos + 1)};
+}
+
+void addNodeRecursive(render::ObjectRenderer& renderer, mdl::Node& node)
+{
+  renderer.addNode(node);
+  for (auto* child : node.children())
+  {
+    addNodeRecursive(renderer, *child);
+  }
+}
+
+void setupPrefabPreviewRenderer(render::ObjectRenderer& renderer)
+{
+  renderer.setShowOverlays(false);
+  renderer.setShowBrushEdges(true);
+  renderer.setShowOccludedObjects(true);
+  renderer.setOccludedEdgeColor(RgbaF{
+    pref(Preferences::SelectedEdgeColor).to<RgbF>(),
+    pref(Preferences::OccludedSelectedEdgeAlpha)});
+  renderer.setTint(true);
+  renderer.setTintColor(pref(Preferences::SelectedFaceColor));
+
+  renderer.setOverrideGroupColors(true);
+  renderer.setGroupBoundsColor(pref(Preferences::SelectedEdgeColor));
+
+  renderer.setOverrideEntityBoundsColor(true);
+  renderer.setEntityBoundsColor(pref(Preferences::SelectedEdgeColor));
+  renderer.setShowEntityAngles(true);
+  renderer.setEntityAngleColor(pref(Preferences::AngleIndicatorColor));
+
+  renderer.setBrushFaceColor(pref(Preferences::FaceColor));
+  renderer.setBrushEdgeColor(pref(Preferences::SelectedEdgeColor));
+  renderer.setUseReadable2DBrushOutlines(false);
 }
 
 class PrefabDropTracker : public DropTracker
@@ -115,7 +152,15 @@ vm::vec3d placementDelta2D(
       : referenceBounds.max;
   const auto dragPlane = vm::plane3d{anchor, -pickRay.direction};
 
-  return map.grid().moveDeltaForBounds(dragPlane, bounds, map.worldBounds(), pickRay);
+  const auto distance = vm::intersect_ray_plane(pickRay, dragPlane);
+  if (!distance)
+  {
+    return vm::vec3d{};
+  }
+
+  const auto hitPoint = vm::point_at_distance(pickRay, *distance);
+  const auto targetPoint = map.grid().snap(hitPoint, dragPlane);
+  return prefabCenterPlacementDelta(bounds, targetPoint);
 }
 
 vm::vec3d placementDelta3D(
@@ -127,21 +172,24 @@ vm::vec3d placementDelta3D(
   using namespace mdl::HitFilters;
 
   const auto& grid = map.grid();
-  const auto& pickRay = inputState.pickRay();
   const auto& hit = inputState.pickResult().first(type(mdl::BrushNode::BrushHitType));
   if (const auto faceHandle = mdl::hitToFaceHandle(hit))
   {
-    return grid.moveDeltaForBounds(
-      faceHandle->face().boundary(), bounds, map.worldBounds(), pickRay);
+    const auto targetPoint = grid.snap(hit.hitPoint(), faceHandle->face().boundary());
+    return prefabCenterPlacementDelta(bounds, targetPoint);
   }
 
-  const auto point = grid.snap(inputState.defaultPointUnderMouse());
-  const auto targetPlane =
-    vm::plane3d{point, -vm::vec3d{inputState.camera().direction()}};
-  return grid.moveDeltaForBounds(targetPlane, bounds, map.worldBounds(), pickRay);
+  const auto targetPoint = grid.snap(inputState.defaultPointUnderMouse());
+  return prefabCenterPlacementDelta(bounds, targetPoint);
 }
 
 } // namespace
+
+vm::vec3d prefabCenterPlacementDelta(
+  const vm::bbox3d& bounds, const vm::vec3d& targetPoint)
+{
+  return targetPoint - bounds.center();
+}
 
 PrefabToolController::PrefabToolController(PrefabTool& tool)
   : m_tool{tool}
@@ -185,18 +233,45 @@ std::unique_ptr<DropTracker> PrefabToolController::acceptDrop(
   return createDropTracker(std::filesystem::path{parsedPayload->value});
 }
 
+void PrefabToolController::validatePreviewRenderer() const
+{
+  if (m_previewRenderer && m_previewRendererVersion == m_tool.previewVersion())
+  {
+    return;
+  }
+
+  m_previewRenderer.reset();
+  m_previewRendererVersion = m_tool.previewVersion();
+
+  if (m_tool.previewNodes().empty())
+  {
+    return;
+  }
+
+  auto& map = m_tool.map();
+  m_previewRenderer = std::make_unique<render::ObjectRenderer>(
+    map.logger(),
+    map.entityModelManager(),
+    map.editorContext(),
+    render::BrushRenderer::NoFilter{});
+  setupPrefabPreviewRenderer(*m_previewRenderer);
+
+  for (auto* node : m_tool.previewNodes())
+  {
+    addNodeRecursive(*m_previewRenderer, *node);
+  }
+}
+
 void PrefabToolController::render(
   const InputState&,
   render::RenderContext& renderContext,
   render::RenderBatch& renderBatch)
 {
-  if (const auto& bounds = m_tool.previewBounds())
+  validatePreviewRenderer();
+  if (m_previewRenderer)
   {
-    auto renderService = render::RenderService{renderContext, renderBatch};
-    renderService.setForegroundColor(pref(Preferences::SelectionBoundsColor));
-    renderService.setLineWidth(2.0f);
-    renderService.setShowOccludedObjectsTransparent();
-    renderService.renderBounds(vm::bbox3f{*bounds});
+    m_previewRenderer->renderOpaque(renderContext, renderBatch);
+    m_previewRenderer->renderTransparent(renderContext, renderBatch);
   }
 }
 

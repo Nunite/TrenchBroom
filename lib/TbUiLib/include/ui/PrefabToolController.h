@@ -21,6 +21,9 @@
 
 #include "ui/ToolController.h"
 
+#include "vm/bbox.h"
+#include "vm/vec.h"
+
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -28,11 +31,24 @@
 namespace tb::ui
 {
 class PrefabTool;
+}
+
+namespace tb::render
+{
+class ObjectRenderer;
+}
+
+namespace tb::ui
+{
+vm::vec3d prefabCenterPlacementDelta(
+  const vm::bbox3d& bounds, const vm::vec3d& targetPoint);
 
 class PrefabToolController : public ToolController
 {
 private:
   PrefabTool& m_tool;
+  mutable std::unique_ptr<render::ObjectRenderer> m_previewRenderer;
+  mutable size_t m_previewRendererVersion = 0;
 
 protected:
   explicit PrefabToolController(PrefabTool& tool);
@@ -56,6 +72,7 @@ private:
 
   virtual std::unique_ptr<DropTracker> createDropTracker(
     std::filesystem::path prefabPath) const = 0;
+  void validatePreviewRenderer() const;
 };
 
 class PrefabToolController2D : public PrefabToolController

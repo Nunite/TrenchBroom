@@ -20,11 +20,13 @@
 #include "Logger.h"
 #include "TestLogger.h"
 #include "fs/TestEnvironment.h"
+#include "mdl/Node.h"
 #include "ui/InputState.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
 #include "ui/PrefabAsset.h"
 #include "ui/PrefabTool.h"
+#include "ui/PrefabToolController.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -70,6 +72,10 @@ void checkPreviewBounds(PrefabTool& tool, const std::filesystem::path& prefabPat
 
   REQUIRE(tool.previewBounds());
   CHECK(*tool.previewBounds() == vm::bbox3d{{16.0, 32.0, 32.0}, {80.0, 96.0, 48.0}});
+  REQUIRE(tool.previewNodes().size() == 1u);
+  CHECK(
+    tool.previewNodes().front()->logicalBounds()
+    == vm::bbox3d{{16.0, 32.0, 32.0}, {80.0, 96.0, 48.0}});
 }
 
 } // namespace
@@ -91,6 +97,7 @@ TEST_CASE("PrefabTool")
     tool.clearPreview();
 
     CHECK_FALSE(tool.previewBounds());
+    CHECK(tool.previewNodes().empty());
   }
 
   SECTION("updates preview bounds for saved prefab snippets")
@@ -121,6 +128,33 @@ TEST_CASE("PrefabTool")
     document.setTargetLogger(nullptr);
   }
 
+  SECTION("increments preview version when preview changes")
+  {
+    auto env = fs::TestEnvironment{};
+    const auto prefabPath = env.dir() / "crate.tbprefab";
+    REQUIRE(writePrefabAsset(prefabPath, BrushPrefabText));
+
+    const auto initialVersion = tool.previewVersion();
+    REQUIRE(tool.updatePreview(
+      prefabPath, InputState{}, [](auto&, const auto&, const auto&, const auto&) {
+        return vm::vec3d{};
+      }));
+    CHECK(tool.previewVersion() == initialVersion + 1u);
+
+    tool.clearPreview();
+
+    CHECK(tool.previewVersion() == initialVersion + 2u);
+  }
+
+  SECTION("placement delta centers the prefab at the target point")
+  {
+    const auto bounds = vm::bbox3d{{0.0, 0.0, -16.0}, {64.0, 64.0, 0.0}};
+    const auto targetPoint = vm::vec3d{128.0, 256.0, 16.0};
+    const auto delta = prefabCenterPlacementDelta(bounds, targetPoint);
+
+    CHECK(bounds.translate(delta).center() == targetPoint);
+  }
+
   SECTION("clears preview for invalid prefab")
   {
     CHECK_FALSE(tool.updatePreview(
@@ -133,6 +167,7 @@ TEST_CASE("PrefabTool")
         return vm::vec3d{};
       }));
     CHECK_FALSE(tool.previewBounds());
+    CHECK(tool.previewNodes().empty());
   }
 }
 

@@ -31,7 +31,8 @@
 namespace tb::mdl
 {
 class Map;
-}
+class Node;
+} // namespace tb::mdl
 
 namespace tb::ui
 {
@@ -43,15 +44,21 @@ class PrefabTool : public Tool
 private:
   MapDocument& m_document;
   std::optional<vm::bbox3d> m_previewBounds;
+  std::vector<mdl::Node*> m_previewNodes;
+  size_t m_previewVersion = 0;
 
 public:
   using PlacementDelta = std::function<vm::vec3d(
     mdl::Map&, const InputState&, const vm::bbox3d&, const vm::bbox3d&)>;
 
   explicit PrefabTool(MapDocument& document);
+  ~PrefabTool() override { clearPreview(); }
 
+  mdl::Map& map() const;
   bool canPlacePrefab(const std::filesystem::path& path) const;
   const std::optional<vm::bbox3d>& previewBounds() const;
+  const std::vector<mdl::Node*>& previewNodes() const;
+  size_t previewVersion() const;
   bool updatePreview(
     const std::filesystem::path& path,
     const InputState& inputState,

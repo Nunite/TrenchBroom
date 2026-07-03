@@ -28,6 +28,7 @@
 #include "mdl/EntityNode.h"
 #include "mdl/EntityProperties.h"
 #include "mdl/GameFileSystem.h"
+#include "mdl/Group.h"
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
@@ -44,6 +45,8 @@
 
 #include "kd/path_utils.h"
 #include "kd/vector_utils.h"
+
+#include "vm/mat_ext.h"
 
 namespace tb::ui
 {
@@ -134,21 +137,92 @@ vm::bbox3d computePrefabAssetBounds(const std::vector<mdl::Node*>& nodes)
   return builder.initialized() ? builder.bounds() : vm::bbox3d{};
 }
 
-Result<vm::bbox3d> readPrefabAssetBounds(mdl::Map& map, const std::string& text)
+Result<std::vector<mdl::Node*>> readPrefabAssetNodes(
+  mdl::Map& map, const std::string& text)
 {
   auto parserStatus = SilentParserStatus{};
   return mdl::NodeReader::read(
-           text,
-           map.worldNode().mapFormat(),
-           map.worldBounds(),
-           map.worldNode().entityPropertyConfig(),
-           parserStatus,
-           map.taskManager())
-         | kdl::transform([](auto nodes) {
-             const auto bounds = computePrefabAssetBounds(nodes);
-             kdl::vec_clear_and_delete(nodes);
-             return bounds;
-           });
+    text,
+    map.worldNode().mapFormat(),
+    map.worldBounds(),
+    map.worldNode().entityPropertyConfig(),
+    parserStatus,
+    map.taskManager());
+}
+
+bool translatePrefabNode(mdl::Node& node, const vm::vec3d& delta, mdl::Map& map)
+{
+  const auto transformation = vm::translation_matrix(delta);
+  const auto updateAngleProperty =
+    map.worldNode().entityPropertyConfig().updateAnglePropertyAfterTransform;
+
+  return node.accept(kdl::overload(
+    [&](mdl::WorldNode& worldNode) {
+      auto result = true;
+      for (auto* child : worldNode.children())
+      {
+        result = translatePrefabNode(*child, delta, map) && result;
+      }
+      return result;
+    },
+    [&](mdl::LayerNode& layerNode) {
+      auto result = true;
+      for (auto* child : layerNode.children())
+      {
+        result = translatePrefabNode(*child, delta, map) && result;
+      }
+      return result;
+    },
+    [&](mdl::GroupNode& groupNode) {
+      auto group = groupNode.group();
+      group.transform(transformation);
+      groupNode.setGroup(std::move(group));
+
+      auto result = true;
+      for (auto* child : groupNode.children())
+      {
+        result = translatePrefabNode(*child, delta, map) && result;
+      }
+      return result;
+    },
+    [&](mdl::EntityNode& entityNode) {
+      auto entity = entityNode.entity();
+      entity.transform(transformation, updateAngleProperty);
+      entityNode.setEntity(std::move(entity));
+
+      auto result = true;
+      for (auto* child : entityNode.children())
+      {
+        result = translatePrefabNode(*child, delta, map) && result;
+      }
+      return result;
+    },
+    [&](mdl::BrushNode& brushNode) {
+      auto brush = brushNode.brush();
+      if (brush.transform(map.worldBounds(), transformation, false).is_error())
+      {
+        return false;
+      }
+      brushNode.setBrush(std::move(brush));
+      return true;
+    },
+    [&](mdl::PatchNode& patchNode) {
+      auto patch = patchNode.patch();
+      patch.transform(transformation);
+      patchNode.setPatch(std::move(patch));
+      return true;
+    }));
+}
+
+bool translatePrefabNodes(
+  const std::vector<mdl::Node*>& nodes, const vm::vec3d& delta, mdl::Map& map)
+{
+  auto result = true;
+  for (auto* node : nodes)
+  {
+    result = translatePrefabNode(*node, delta, map) && result;
+  }
+  return result;
 }
 
 } // namespace
@@ -164,9 +238,24 @@ bool PrefabTool::canPlacePrefab(const std::filesystem::path& path) const
   return isPrefabAssetPath(path);
 }
 
+mdl::Map& PrefabTool::map() const
+{
+  return m_document.map();
+}
+
 const std::optional<vm::bbox3d>& PrefabTool::previewBounds() const
 {
   return m_previewBounds;
+}
+
+const std::vector<mdl::Node*>& PrefabTool::previewNodes() const
+{
+  return m_previewNodes;
+}
+
+size_t PrefabTool::previewVersion() const
+{
+  return m_previewVersion;
 }
 
 bool PrefabTool::updatePreview(
@@ -182,22 +271,38 @@ bool PrefabTool::updatePreview(
     return false;
   }
 
-  const auto boundsResult = readPrefabAssetBounds(map, textResult.value());
-  if (boundsResult.is_error())
+  auto nodesResult = readPrefabAssetNodes(map, textResult.value());
+  if (nodesResult.is_error())
   {
     clearPreview();
     return false;
   }
 
-  const auto& bounds = boundsResult.value();
+  auto nodes = std::move(nodesResult.value());
+  const auto bounds = computePrefabAssetBounds(nodes);
   const auto delta = placementDelta(map, inputState, bounds, map.referenceBounds());
+  if (!translatePrefabNodes(nodes, delta, map))
+  {
+    kdl::vec_clear_and_delete(nodes);
+    clearPreview();
+    return false;
+  }
+
+  kdl::vec_clear_and_delete(m_previewNodes);
+  m_previewNodes = std::move(nodes);
   m_previewBounds = bounds.translate(delta);
+  ++m_previewVersion;
   return true;
 }
 
 void PrefabTool::clearPreview()
 {
-  m_previewBounds = std::nullopt;
+  if (m_previewBounds || !m_previewNodes.empty())
+  {
+    kdl::vec_clear_and_delete(m_previewNodes);
+    m_previewBounds = std::nullopt;
+    ++m_previewVersion;
+  }
 }
 
 bool PrefabTool::placePrefab(
