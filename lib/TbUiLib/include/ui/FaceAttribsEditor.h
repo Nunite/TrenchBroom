@@ -64,7 +64,6 @@ private:
   QAbstractButton* m_fitHButton = nullptr;
   QAbstractButton* m_fitVButton = nullptr;
   QAbstractButton* m_autoFitButton = nullptr;
-  QAbstractButton* m_alignContinuouslyButton = nullptr;
 
   QLabel* m_materialName = nullptr;
   QLabel* m_textureSize = nullptr;
@@ -104,7 +103,6 @@ public:
 
 private:
   void alignClicked();
-  void alignContinuouslyClicked();
   void justifyClicked(mdl::UvJustifyDirection uvJustifyDirection);
   void fitClicked(mdl::UvFitDirection uvFitDirection);
   void autoFitClicked();
