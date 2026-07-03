@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
 #include "mdl/CatchConfig.h"
@@ -47,6 +48,51 @@ namespace
 auto& getFace(const BrushNode& brushNode, const size_t faceIndex)
 {
   return brushNode.brush().face(faceIndex);
+}
+
+BrushFaceHandle addTriangleFaceBrush(
+  Map& map, const std::array<vm::vec3d, 3>& facePoints, const vm::vec3d& innerPoint)
+{
+  auto builder = BrushBuilder{
+    map.worldNode().mapFormat(),
+    map.worldBounds(),
+    map.gameInfo().gameConfig.faceAttribsConfig.defaults};
+
+  auto brush =
+    builder.createBrush(
+      std::vector<vm::vec3d>{facePoints[0], facePoints[1], facePoints[2], innerPoint},
+      map.currentMaterialName())
+    | kdl::value();
+  auto* brushNode = new BrushNode{std::move(brush)};
+  addNodes(map, {{parentForNodes(map), {brushNode}}});
+
+  const auto hasPoint = [](const std::vector<vm::vec3d>& points, const vm::vec3d& point) {
+    return std::ranges::any_of(points, [&](const auto& candidate) {
+      return vm::is_equal(candidate, point, vm::Cd::almost_zero());
+    });
+  };
+  auto faceIndex = std::optional<size_t>{};
+  for (size_t i = 0; i < brushNode->brush().faceCount(); ++i)
+  {
+    const auto vertices = brushNode->brush().face(i).vertexPositions();
+    if (
+      vertices.size() == facePoints.size()
+      && std::ranges::all_of(
+        facePoints, [&](const auto& point) { return hasPoint(vertices, point); }))
+    {
+      faceIndex = i;
+      break;
+    }
+  }
+  REQUIRE(faceIndex);
+  return BrushFaceHandle{brushNode, *faceIndex};
+}
+
+vm::vec2f textureCoords(const BrushFace& face, const vm::vec3d& point)
+{
+  return vm::vec2f{
+    face.toUVCoordSystemMatrix(face.attributes().offset(), face.attributes().scale())
+    * point};
 }
 
 } // namespace
@@ -839,6 +885,83 @@ TEST_CASE("Map_Brushes")
       CHECK_THAT(
         getFace(*brushNode, *otherFaceIndex).attributes(),
         MatchesBrushFaceAttributes(originalOtherFaceAttributes));
+    }
+  }
+
+  SECTION("unwrapUVAsQuads")
+  {
+    const auto p0 = vm::vec3d{0, 0, 0};
+    const auto p1 = vm::vec3d{0, 0, 64};
+    const auto p2 = vm::vec3d{64, 0, 64};
+    const auto p3 = vm::vec3d{64, 0, 0};
+    const auto p4 = vm::vec3d{128, 0, 64};
+    const auto p5 = vm::vec3d{128, 0, 0};
+    const auto innerPoint = vm::vec3d{32, 32, 32};
+
+    SECTION("Unwraps paired triangle faces into rectangular quads")
+    {
+      auto& map = fixture.create(QuakeFixtureConfig);
+      const auto firstLower = addTriangleFaceBrush(map, {p0, p1, p3}, innerPoint);
+      const auto firstUpper = addTriangleFaceBrush(map, {p1, p2, p3}, innerPoint);
+      const auto secondLower = addTriangleFaceBrush(map, {p3, p2, p5}, innerPoint);
+      const auto secondUpper = addTriangleFaceBrush(map, {p2, p4, p5}, innerPoint);
+      const auto unselectedFace = addTriangleFaceBrush(map, {p0, p1, p5}, innerPoint);
+
+      const auto originalUnselectedAttributes = unselectedFace.face().attributes();
+
+      deselectAll(map);
+      selectBrushFaces(map, {firstLower, firstUpper, secondLower, secondUpper});
+
+      CHECK(unwrapUVAsQuads(map));
+
+      CHECK(textureCoords(firstLower.face(), p0) == vm::approx{vm::vec2f{0, 0}});
+      CHECK(textureCoords(firstLower.face(), p1) == vm::approx{vm::vec2f{0, 64}});
+      CHECK(textureCoords(firstLower.face(), p3) == vm::approx{vm::vec2f{64, 0}});
+
+      CHECK(textureCoords(firstUpper.face(), p1) == vm::approx{vm::vec2f{0, 64}});
+      CHECK(textureCoords(firstUpper.face(), p2) == vm::approx{vm::vec2f{64, 64}});
+      CHECK(textureCoords(firstUpper.face(), p3) == vm::approx{vm::vec2f{64, 0}});
+
+      CHECK(textureCoords(secondLower.face(), p3) == vm::approx{vm::vec2f{64, 0}});
+      CHECK(textureCoords(secondLower.face(), p2) == vm::approx{vm::vec2f{64, 64}});
+      CHECK(textureCoords(secondLower.face(), p5) == vm::approx{vm::vec2f{128, 0}});
+
+      CHECK(textureCoords(secondUpper.face(), p2) == vm::approx{vm::vec2f{64, 64}});
+      CHECK(textureCoords(secondUpper.face(), p4) == vm::approx{vm::vec2f{128, 64}});
+      CHECK(textureCoords(secondUpper.face(), p5) == vm::approx{vm::vec2f{128, 0}});
+
+      CHECK_THAT(
+        unselectedFace.face().attributes(),
+        MatchesBrushFaceAttributes(originalUnselectedAttributes));
+    }
+
+    SECTION("Returns false for Standard UV maps")
+    {
+      auto& standardMap = fixture.create({.mapFormat = MapFormat::Standard});
+      const auto lower = addTriangleFaceBrush(standardMap, {p0, p1, p3}, innerPoint);
+      const auto upper = addTriangleFaceBrush(standardMap, {p1, p2, p3}, innerPoint);
+      const auto originalAttributes = lower.face().attributes();
+
+      deselectAll(standardMap);
+      selectBrushFaces(standardMap, {lower, upper});
+
+      CHECK(!unwrapUVAsQuads(standardMap));
+      CHECK_THAT(
+        lower.face().attributes(), MatchesBrushFaceAttributes(originalAttributes));
+    }
+
+    SECTION("Returns false for unpaired triangles")
+    {
+      auto& map = fixture.create(QuakeFixtureConfig);
+      const auto firstLower = addTriangleFaceBrush(map, {p0, p1, p3}, innerPoint);
+
+      deselectAll(map);
+      selectBrushFaces(map, {firstLower});
+      const auto originalAttributes = firstLower.face().attributes();
+
+      CHECK(!unwrapUVAsQuads(map));
+      CHECK_THAT(
+        firstLower.face().attributes(), MatchesBrushFaceAttributes(originalAttributes));
     }
   }
 
