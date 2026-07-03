@@ -238,10 +238,10 @@ bool alignUVToBandDirection(BrushFace& face, const BrushFace& nextFace)
     return false;
   }
 
-  const auto uDirection = vm::normalize(vm::vec2f{-uvDirection.y(), uvDirection.x()});
   evaluate(
     UpdateBrushFaceAttributes{
-      .rotation = SetValue{face.measureUVAngle(vm::vec2f{0, 0}, uDirection)},
+      .rotation =
+        SetValue{face.measureUVAngle(vm::vec2f{0, 0}, vm::normalize(uvDirection))},
     },
     face);
   return true;
