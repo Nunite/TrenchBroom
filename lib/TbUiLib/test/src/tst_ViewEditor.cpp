@@ -19,6 +19,7 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QPointer>
 #include <QPushButton>
 #include <QtTest/QTest>
 
@@ -236,6 +237,18 @@ TEST_CASE("ViewEditor")
     QApplication::processEvents();
 
     CHECK_FALSE(prefs.get(Preferences::ShowFPS));
+  }
+
+  SECTION("does not rebuild controls for the startup documentWasLoaded notification")
+  {
+    auto* showFPSCheckBox = findCheckBox(editor.findChildren<QCheckBox*>(), "Show FPS");
+    REQUIRE(showFPSCheckBox != nullptr);
+    auto showFPSCheckBoxPointer = QPointer<QCheckBox>{showFPSCheckBox};
+
+    document.documentWasLoadedNotifier();
+    QApplication::processEvents();
+
+    CHECK(showFPSCheckBoxPointer == showFPSCheckBox);
   }
 }
 

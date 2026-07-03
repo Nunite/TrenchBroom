@@ -267,7 +267,10 @@ void ViewEditor::connectObservers()
 
 void ViewEditor::documentWasLoaded()
 {
-  createGui();
+  if (m_guiMap != &m_document.map())
+  {
+    createGui();
+  }
   refreshGui();
 }
 
@@ -289,6 +292,7 @@ void ViewEditor::preferenceDidChange(const std::filesystem::path&)
 
 void ViewEditor::createGui()
 {
+  m_guiMap = &m_document.map();
   deleteChildWidgetsAndDeleteLayout(this);
 
   auto* sizer = new QGridLayout{};

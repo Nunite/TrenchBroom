@@ -36,6 +36,7 @@ namespace mdl
 {
 class EditorContext;
 class EntityDefinitionManager;
+class Map;
 class SmartTag;
 
 struct EntityDefinition;
@@ -109,6 +110,7 @@ private:
   QCheckBox* m_showSoftBoundsCheckBox = nullptr;
 
   NotifierConnection m_notifierConnection;
+  const mdl::Map* m_guiMap = nullptr;
 
 public:
   explicit ViewEditor(MapDocument& document, QWidget* parent = nullptr);
