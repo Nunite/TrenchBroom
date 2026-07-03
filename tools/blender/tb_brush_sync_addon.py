@@ -281,6 +281,10 @@ def import_request_file(path=REQUEST_PATH):
     return import_request(_read_json(path))
 
 
+def _point_key(point):
+    return tuple(round(float(value), 5) for value in point)
+
+
 def _polygon_payload(obj, polygon, index, face_ids, face_vertices, uv_layer, material_names):
     loop_vertex_ids = [
         int(obj.data.loops[loop_index].vertex_index) for loop_index in polygon.loop_indices
@@ -383,25 +387,29 @@ def create_uv_workmesh():
             base = len(vertices)
             if quad is None:
                 work_vertices = payload["loopVertexIds"]
+                work_points = [tuple(mesh.vertices[vertex_id].co) for vertex_id in work_vertices]
                 polygon_uvs.append(payload["uvs"])
                 face_refs.append(
                     {
                         "faces": [payload],
                         "workVertices": work_vertices,
+                        "workPoints": [list(point) for point in work_points],
                         "materialIndex": payload["materialIndex"],
                     }
                 )
             else:
                 work_vertices = quad["vertices"]
+                work_points = [tuple(mesh.vertices[vertex_id].co) for vertex_id in work_vertices]
                 polygon_uvs.append(quad["uvs"])
                 face_refs.append(
                     {
                         "faces": quad["refs"],
                         "workVertices": work_vertices,
+                        "workPoints": [list(point) for point in work_points],
                         "materialIndex": quad["materialIndex"],
                     }
                 )
-            vertices.extend([tuple(mesh.vertices[vertex_id].co) for vertex_id in work_vertices])
+            vertices.extend(work_points)
             polygons.append(list(range(base, base + len(work_vertices))))
 
     mesh = bpy.data.meshes.new("TB UV Workmesh Mesh")
@@ -437,41 +445,81 @@ def _append_response_faces(response, obj):
 
     if obj.get("tb_uv_workmesh"):
         face_refs = list(obj.get("tb_face_refs", []))
+        if any(not ref.get("workPoints") for ref in face_refs):
+            response["warnings"].append(f"{obj.name}: recreate UV workmesh before export")
+            return
+
+        unmatched_ref_indices = set(range(len(face_refs)))
         for index, polygon in enumerate(mesh.polygons):
-            if index >= len(face_refs):
-                response["warnings"].append(f"{obj.name}: extra polygon {index}")
-                continue
-            ref = dict(face_refs[index])
             material_slot = None
             if 0 <= polygon.material_index < len(obj.material_slots):
                 material_slot = obj.material_slots[polygon.material_index].material
             texture_size = _material_texture_size(material_slot)
-            polygon_uv_by_vertex = {
-                int(vertex): _loop_uv(uv_layer, loop_index, texture_size)
-                for vertex, loop_index in zip(ref.get("workVertices", []), polygon.loop_indices)
-            }
-            for face in ref.get("faces", []):
-                material = _export_material_name(material_slot) if material_slot else str(face.get("material", ""))
-                face_vertices = list(map(int, face.get("vertices", [])))
-                if any(vertex not in polygon_uv_by_vertex for vertex in face_vertices):
-                    response["warnings"].append(
-                        f"{face.get('brushId', '')}/{face.get('faceId', '')}: topology changed"
-                    )
-                    continue
-                response["faces"].append(
-                    {
-                        "brushId": str(face.get("brushId", "")),
-                        "faceId": str(face.get("faceId", "")),
-                        "material": material,
-                        "loops": [
-                            {
-                                "vertex": int(vertex),
-                                "uv": polygon_uv_by_vertex[int(vertex)],
-                            }
-                            for vertex in face_vertices
-                        ],
-                    }
+
+            uv_by_point = {
+                _point_key(mesh.vertices[mesh.loops[loop_index].vertex_index].co): _loop_uv(
+                    uv_layer, loop_index, texture_size
                 )
+                for loop_index in polygon.loop_indices
+            }
+            polygon_points = set(uv_by_point)
+            matches = [
+                ref_index
+                for ref_index in unmatched_ref_indices
+                if {_point_key(point) for point in face_refs[ref_index].get("workPoints", [])}
+                == polygon_points
+            ]
+            if not matches:
+                matches = [
+                    ref_index
+                    for ref_index in unmatched_ref_indices
+                    if {_point_key(point) for point in face_refs[ref_index].get("workPoints", [])}
+                    <= polygon_points
+                ]
+            if not matches:
+                response["warnings"].append(f"{obj.name}: polygon {index} has no TB face ref")
+                continue
+
+            for ref_index in matches:
+                unmatched_ref_indices.remove(ref_index)
+                ref = dict(face_refs[ref_index])
+                polygon_uv_by_vertex = {
+                    int(vertex): uv_by_point[_point_key(point)]
+                    for vertex, point in zip(
+                        ref.get("workVertices", []), ref.get("workPoints", [])
+                    )
+                    if _point_key(point) in uv_by_point
+                }
+                for face in ref.get("faces", []):
+                    material = (
+                        _export_material_name(material_slot)
+                        if material_slot
+                        else str(face.get("material", ""))
+                    )
+                    face_vertices = list(map(int, face.get("vertices", [])))
+                    if any(vertex not in polygon_uv_by_vertex for vertex in face_vertices):
+                        response["warnings"].append(
+                            f"{face.get('brushId', '')}/{face.get('faceId', '')}: topology changed"
+                        )
+                        continue
+                    response["faces"].append(
+                        {
+                            "brushId": str(face.get("brushId", "")),
+                            "faceId": str(face.get("faceId", "")),
+                            "material": material,
+                            "loops": [
+                                {
+                                    "vertex": int(vertex),
+                                    "uv": polygon_uv_by_vertex[int(vertex)],
+                                }
+                                for vertex in face_vertices
+                            ],
+                        }
+                    )
+        if unmatched_ref_indices:
+            response["warnings"].append(
+                f"{obj.name}: {len(unmatched_ref_indices)} TB face refs were not exported"
+            )
         return
 
     brush_id = str(obj.get("tb_brush_id", ""))

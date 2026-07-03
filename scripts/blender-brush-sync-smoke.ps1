@@ -133,18 +133,35 @@ bpy.ops.mesh.select_all(action="SELECT")
 bpy.ops.mesh.remove_doubles(threshold=0.001)
 bpy.ops.object.mode_set(mode="OBJECT")
 assert len(workmesh.data.vertices) == 6, len(workmesh.data.vertices)
-uv_layer = workmesh.data.uv_layers[module.UV_LAYER_NAME]
-for polygon in workmesh.data.polygons:
-    for offset, loop_index in enumerate(polygon.loop_indices):
-        uv_layer.data[loop_index].uv = (float(offset) * 0.125, 0.25)
+old_mesh = workmesh.data
+new_mesh = bpy.data.meshes.new("TB UV Workmesh Reordered")
+new_mesh.from_pydata(
+    [tuple(vertex.co) for vertex in old_mesh.vertices],
+    [],
+    [list(polygon.vertices) for polygon in reversed(old_mesh.polygons)],
+)
+new_mesh.update()
+for material in old_mesh.materials:
+    new_mesh.materials.append(material)
+for new_polygon, old_polygon in zip(new_mesh.polygons, reversed(old_mesh.polygons)):
+    new_polygon.material_index = old_polygon.material_index
+uv_layer = new_mesh.uv_layers.new(name=module.UV_LAYER_NAME)
+for polygon in new_mesh.polygons:
+    for loop_index in polygon.loop_indices:
+        vertex_index = new_mesh.loops[loop_index].vertex_index
+        co = new_mesh.vertices[vertex_index].co
+        uv_layer.data[loop_index].uv = (co.x / 128.0, co.y / 128.0)
+workmesh.data = new_mesh
+if old_mesh.users == 0:
+    bpy.data.meshes.remove(old_mesh)
 
 response = module.export_response(response_path)
 assert len(response["faces"]) == 3, response
 faces = {(face["brushId"], face["faceId"]): face for face in response["faces"]}
 assert faces[("brush1", "face0")]["loops"][1]["vertex"] == 1, response
-assert faces[("brush1", "face0")]["loops"][1]["uv"] == [16.0, 32.0], response
+assert faces[("brush1", "face0")]["loops"][1]["uv"] == [48.0, -16.0], response
 assert faces[("brush0", "face1")]["loops"][2]["vertex"] == 3, response
-assert faces[("brush0", "face1")]["loops"][2]["uv"] == [48.0, 32.0], response
+assert faces[("brush0", "face1")]["loops"][2]["uv"] == [-16.0, 16.0], response
 with open(success_path, "w", encoding="utf-8") as f:
     f.write("ok")
 "@ | Set-Content -LiteralPath $driverPath -Encoding UTF8
@@ -167,7 +184,10 @@ if ($result.sessionId -ne "smoke-session") {
 if ($result.faces.Count -ne 3) {
   throw "Expected 3 output faces, got $($result.faces.Count)"
 }
-$face = $result.faces[0]
+$face = $result.faces | Where-Object { $_.brushId -eq "brush0" -and $_.faceId -eq "face0" } | Select-Object -First 1
+if ($null -eq $face) {
+  throw "Missing brush0/face0"
+}
 if ($face.brushId -ne "brush0" -or $face.faceId -ne "face0") {
   throw "Unexpected face identity: $($face.brushId)/$($face.faceId)"
 }
