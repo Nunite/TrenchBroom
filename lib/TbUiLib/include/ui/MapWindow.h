@@ -79,6 +79,7 @@ class Inspector;
 enum class InspectorPage;
 class MapDocument;
 class MapViewBase;
+class MapView3D;
 enum class MapViewLayout;
 class ObjExportDialog;
 class SignalDelayer;
@@ -443,6 +444,7 @@ public:
 
   void focusChange(QWidget* oldFocus, QWidget* newFocus);
 
+  MapView3D* currentOrFirstVisible3DMapView();
   MapViewBase* currentMapViewBase();
 
 private:

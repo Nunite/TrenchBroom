@@ -92,6 +92,7 @@
 #include "ui/LaunchGameEngineDialog.h"
 #include "ui/MapDocument.h"
 #include "ui/MapView2D.h"
+#include "ui/MapView3D.h"
 #include "ui/MapViewBase.h"
 #include "ui/MapViewLayout.h"
 #include "ui/MapViewToolBox.h"
@@ -2715,6 +2716,24 @@ void MapWindow::focusChange(QWidget* /* oldFocus */, QWidget* newFocus)
 
   updateActionState();
   updateUndoRedoActions();
+}
+
+MapView3D* MapWindow::currentOrFirstVisible3DMapView()
+{
+  if (auto* current3D = dynamic_cast<MapView3D*>(currentMapViewBase());
+      current3D && current3D->isVisible())
+  {
+    return current3D;
+  }
+
+  const auto views = findChildren<MapView3D*>();
+  if (auto it = std::ranges::find_if(views, [](auto* view) { return view->isVisible(); });
+      it != std::end(views))
+  {
+    return *it;
+  }
+
+  return nullptr;
 }
 
 MapViewBase* MapWindow::currentMapViewBase()

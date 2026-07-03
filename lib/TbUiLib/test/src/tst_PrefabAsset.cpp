@@ -76,6 +76,13 @@ TEST_CASE("PrefabAsset")
       == std::filesystem::path{"prefabs/crate.tbprefab"});
   }
 
+  SECTION("builds thumbnail path from a prefab path")
+  {
+    CHECK(
+      prefabThumbnailPath("prefabs/crate.tbprefab")
+      == std::filesystem::path{"prefabs/crate.png"});
+  }
+
   SECTION("rejects duplicate prefab names")
   {
     auto env = fs::TestEnvironment{};

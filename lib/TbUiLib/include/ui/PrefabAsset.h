@@ -36,6 +36,8 @@ std::filesystem::path configuredPrefabDirectory();
 std::filesystem::path prefabPathForName(
   const std::filesystem::path& directory, const std::string& name);
 
+std::filesystem::path prefabThumbnailPath(const std::filesystem::path& prefabPath);
+
 Result<void> checkPrefabNameAvailable(
   const std::filesystem::path& directory, const std::string& name);
 

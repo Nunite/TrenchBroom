@@ -67,6 +67,13 @@ std::filesystem::path prefabPathForName(
   return path;
 }
 
+std::filesystem::path prefabThumbnailPath(const std::filesystem::path& prefabPath)
+{
+  auto path = prefabPath;
+  path.replace_extension(".png");
+  return path;
+}
+
 Result<void> checkPrefabNameAvailable(
   const std::filesystem::path& directory, const std::string& name)
 {

@@ -17,9 +17,14 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QImage>
+#include <QRgb>
+
 #include "fs/TestEnvironment.h"
 #include "mdl/GameFileSystem.h"
 #include "ui/AssetPreviewProvider.h"
+#include "ui/PrefabAsset.h"
+#include "ui/QPathUtils.h"
 
 #include <cstdint>
 #include <cstring>
@@ -171,6 +176,37 @@ TEST_CASE("AssetPreviewProvider")
 
     CHECK(preview.status == AssetPreviewStatus::Missing);
     CHECK(preview.soundPath.empty());
+  }
+
+  SECTION("valid prefab thumbnail returns ready preview")
+  {
+    const auto path = env.dir() / "crate.tbprefab";
+    writeBytes(path, {'p', 'r', 'e', 'f', 'a', 'b'});
+
+    auto image = QImage{2, 1, QImage::Format_RGBA8888};
+    image.setPixel(0, 0, qRgba(255, 0, 0, 255));
+    image.setPixel(1, 0, qRgba(0, 255, 0, 128));
+    REQUIRE(image.save(pathAsQString(prefabThumbnailPath(path))));
+
+    const auto preview = provider.preview(
+      BrowserAsset{BrowserCellType::Prefab, "prefabs/crate.tbprefab", path});
+
+    REQUIRE(preview.status == AssetPreviewStatus::Ready);
+    REQUIRE(preview.sprite.has_value());
+    CHECK(preview.sprite->width == 2u);
+    CHECK(preview.sprite->height == 1u);
+    CHECK(preview.sprite->rgba.size() == 8u);
+  }
+
+  SECTION("missing prefab thumbnail returns missing preview")
+  {
+    const auto preview = provider.preview(BrowserAsset{
+      BrowserCellType::Prefab,
+      "prefabs/missing.tbprefab",
+      env.dir() / "missing.tbprefab"});
+
+    CHECK(preview.status == AssetPreviewStatus::Missing);
+    CHECK_FALSE(preview.sprite.has_value());
   }
 }
 

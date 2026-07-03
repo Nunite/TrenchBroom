@@ -19,14 +19,21 @@
 
 #include "ui/AssetPreviewProvider.h"
 
+#include <QImage>
+
 #include "fs/DiskIO.h"
 #include "fs/File.h"
+#include "fs/PathInfo.h"
 #include "fs/Reader.h"
 #include "mdl/GameFileSystem.h"
+#include "ui/PrefabAsset.h"
+#include "ui/QPathUtils.h"
 
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <span>
+#include <vector>
 
 namespace tb::ui
 {
@@ -44,9 +51,10 @@ AssetPreviewState AssetPreviewProvider::preview(const BrowserAsset& asset) const
     return spritePreview(asset);
   case BrowserCellType::Sound:
     return soundPreview(asset);
+  case BrowserCellType::Prefab:
+    return prefabPreview(asset);
   case BrowserCellType::Folder:
   case BrowserCellType::Model:
-  case BrowserCellType::Prefab:
     return {AssetPreviewStatus::Unsupported, std::nullopt};
   }
 
@@ -115,6 +123,33 @@ AssetPreviewState AssetPreviewProvider::soundPreview(const BrowserAsset& asset) 
   return fileResult.is_error()
            ? AssetPreviewState{AssetPreviewStatus::Missing, std::nullopt}
            : AssetPreviewState{AssetPreviewStatus::Ready, std::nullopt, soundPath};
+}
+
+AssetPreviewState AssetPreviewProvider::prefabPreview(const BrowserAsset& asset) const
+{
+  const auto& path = asset.absolutePath.empty() ? asset.path : asset.absolutePath;
+  const auto thumbnailPath = prefabThumbnailPath(path);
+  if (
+    !thumbnailPath.is_absolute()
+    || fs::Disk::pathInfo(thumbnailPath) == fs::PathInfo::Unknown)
+  {
+    return {AssetPreviewStatus::Missing, std::nullopt};
+  }
+
+  auto image = QImage{pathAsQString(thumbnailPath)};
+  if (image.isNull())
+  {
+    return {AssetPreviewStatus::Error, std::nullopt};
+  }
+
+  image = image.convertToFormat(QImage::Format_RGBA8888);
+  auto rgba = std::vector<std::uint8_t>{};
+  rgba.resize(size_t(image.sizeInBytes()));
+  std::memcpy(rgba.data(), image.constBits(), rgba.size());
+
+  return {
+    AssetPreviewStatus::Ready,
+    GoldSrcSpritePreview{size_t(image.width()), size_t(image.height()), std::move(rgba)}};
 }
 
 AssetPreviewMap loadAssetPreviews(

@@ -21,6 +21,7 @@
 
 #include <QFileSystemWatcher>
 #include <QHBoxLayout>
+#include <QImage>
 #include <QInputDialog>
 #include <QKeyEvent>
 #include <QLabel>
@@ -41,22 +42,34 @@
 #include "fs/PathInfo.h"
 #include "fs/PathMatcher.h"
 #include "fs/TraversalMode.h"
+#include "mdl/BrushNode.h"
 #include "mdl/EntityModelManager.h"
+#include "mdl/EntityNode.h"
 #include "mdl/GameFileSystem.h"
+#include "mdl/GroupNode.h"
+#include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_CopyPaste.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/Map_World.h"
+#include "mdl/PatchNode.h"
+#include "mdl/SetVisibilityCommand.h"
+#include "mdl/Transaction.h"
+#include "mdl/WorldNode.h"
 #include "ui/AppController.h"
 #include "ui/AssetBrowserModel.h"
 #include "ui/BitmapButton.h"
 #include "ui/ImageUtils.h"
 #include "ui/MapDocument.h"
+#include "ui/MapView3D.h"
+#include "ui/MapWindow.h"
 #include "ui/ModelBrowserView.h"
 #include "ui/PrefabAsset.h"
 #include "ui/QPathUtils.h"
 #include "ui/QWidgetUtils.h"
 #include "ui/SearchBox.h"
 
+#include "kd/overload.h"
 #include "kd/path_utils.h"
 #include "kd/ranges/to.h"
 
@@ -70,6 +83,7 @@ namespace
 {
 
 const auto AssetRootPath = std::filesystem::path{};
+constexpr auto PrefabThumbnailMaxSize = 512;
 
 std::filesystem::path userPrefabAssetPath(const std::filesystem::path& path)
 {
@@ -86,6 +100,92 @@ std::filesystem::path userPrefabBrowserPath(const std::filesystem::path& path)
 {
   return std::filesystem::path{"prefabs"}
          / path.lexically_relative(configuredPrefabDirectory());
+}
+
+bool isolateSelectionForThumbnail(mdl::Map& map)
+{
+  auto selectedNodes = std::vector<mdl::Node*>{};
+  auto unselectedNodes = std::vector<mdl::Node*>{};
+
+  const auto collectNode = [&](auto& node) {
+    if (node.transitivelySelected() || node.descendantSelected())
+    {
+      selectedNodes.push_back(&node);
+    }
+    else
+    {
+      unselectedNodes.push_back(&node);
+    }
+  };
+
+  map.worldNode().accept(kdl::overload(
+    [](auto&& thisLambda, mdl::WorldNode& worldNode) {
+      worldNode.visitChildren(thisLambda);
+    },
+    [](auto&& thisLambda, mdl::LayerNode& layerNode) {
+      layerNode.visitChildren(thisLambda);
+    },
+    [&](auto&& thisLambda, mdl::GroupNode& groupNode) {
+      collectNode(groupNode);
+      groupNode.visitChildren(thisLambda);
+    },
+    [&](auto&& thisLambda, mdl::EntityNode& entityNode) {
+      collectNode(entityNode);
+      entityNode.visitChildren(thisLambda);
+    },
+    [&](mdl::BrushNode& brushNode) { collectNode(brushNode); },
+    [&](mdl::PatchNode& patchNode) { collectNode(patchNode); }));
+
+  return map.executeAndStore(mdl::SetVisibilityCommand::hide(unselectedNodes))
+         && map.executeAndStore(mdl::SetVisibilityCommand::show(selectedNodes));
+}
+
+MapWindow* parentMapWindow(QWidget& widget)
+{
+  return dynamic_cast<MapWindow*>(widget.window());
+}
+
+Result<void> savePrefabThumbnail(
+  MapWindow& mapWindow, mdl::Map& map, const std::filesystem::path& prefabPath)
+{
+  auto* view = mapWindow.currentOrFirstVisible3DMapView();
+  if (!view)
+  {
+    return Error{"No visible 3D view available for prefab thumbnail"};
+  }
+
+  auto transaction = mdl::Transaction{map, "Capture Prefab Thumbnail"};
+  if (!isolateSelectionForThumbnail(map))
+  {
+    transaction.cancel();
+    return Error{"Failed to isolate selection for prefab thumbnail"};
+  }
+  mdl::deselectAll(map);
+  view->repaint();
+
+  auto image = view->grabFramebuffer();
+  transaction.cancel();
+
+  if (image.isNull())
+  {
+    return Error{"Failed to capture prefab thumbnail"};
+  }
+
+  if (std::max(image.width(), image.height()) > PrefabThumbnailMaxSize)
+  {
+    image = image.scaled(
+      PrefabThumbnailMaxSize,
+      PrefabThumbnailMaxSize,
+      Qt::KeepAspectRatio,
+      Qt::SmoothTransformation);
+  }
+
+  if (!image.save(pathAsQString(prefabThumbnailPath(prefabPath)), "PNG"))
+  {
+    return Error{"Failed to write prefab thumbnail"};
+  }
+
+  return kdl::void_success;
 }
 
 } // namespace
@@ -475,6 +575,21 @@ void ModelBrowser::saveSelectionAsPrefab()
     const auto& error = std::get<tb::Error>(result.error());
     QMessageBox::warning(this, tr("Save Prefab"), QString::fromStdString(error.msg));
     return;
+  }
+
+  if (auto* mapWindow = parentMapWindow(*this))
+  {
+    if (const auto thumbnailResult = savePrefabThumbnail(*mapWindow, map, filePath);
+        thumbnailResult.is_error())
+    {
+      const auto& error = std::get<tb::Error>(thumbnailResult.error());
+      QMessageBox::warning(this, tr("Save Prefab"), QString::fromStdString(error.msg));
+    }
+  }
+  else
+  {
+    QMessageBox::warning(
+      this, tr("Save Prefab"), tr("Could not find map window for prefab thumbnail"));
   }
 
   m_lastWriteTimes.clear();

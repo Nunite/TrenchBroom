@@ -115,6 +115,11 @@ bool shouldRenderErrorText(const BrowserCellType type, const AssetPreviewState* 
   return false;
 }
 
+bool canRenderImagePreview(const BrowserCellType type)
+{
+  return type == BrowserCellType::Sprite || type == BrowserCellType::Prefab;
+}
+
 } // namespace
 
 LayoutBounds soundPreviewButtonBounds(const LayoutBounds& itemBounds)
@@ -708,7 +713,7 @@ void ModelBrowserView::renderAssetPlaceholders(
           {
             const auto& item = cellData(cell);
             const auto* preview =
-              item.type == BrowserCellType::Sprite || item.type == BrowserCellType::Sound
+              canRenderImagePreview(item.type) || item.type == BrowserCellType::Sound
                 ? assetPreview(item.path)
                 : nullptr;
             if (
@@ -1001,7 +1006,7 @@ void ModelBrowserView::renderSpritePreviews(
       for (const auto& cell : row.cells())
       {
         const auto& item = cellData(cell);
-        if (item.type != BrowserCellType::Sprite)
+        if (!canRenderImagePreview(item.type))
         {
           continue;
         }
