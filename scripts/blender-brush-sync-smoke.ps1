@@ -50,6 +50,26 @@ $payload = @{
           )
         }
       )
+    },
+    @{
+      id = "brush1"
+      vertices = @(
+        @(16.0, -16.0, -16.0), @(48.0, -16.0, -16.0),
+        @(48.0, 16.0, -16.0), @(16.0, 16.0, -16.0)
+      )
+      faces = @(
+        @{
+          id = "face0"
+          vertices = @(0, 1, 2, 3)
+          material = "bongs2"
+          loops = @(
+            @{vertex = 0; uv = @(0.0, 0.0)},
+            @{vertex = 1; uv = @(64.0, 0.0)},
+            @{vertex = 2; uv = @(64.0, 64.0)},
+            @{vertex = 3; uv = @(0.0, 64.0)}
+          )
+        }
+      )
     }
   )
 } | ConvertTo-Json -Depth 8
@@ -72,7 +92,7 @@ sys.modules[spec.name] = module
 spec.loader.exec_module(module)
 
 count = module.import_request_file(request_path)
-assert count == 1, count
+assert count == 2, count
 obj = bpy.data.objects["TB Brush brush0"]
 material = bpy.data.materials["bongs2"]
 assert material.node_tree is not None, "WAD material should use nodes"
@@ -88,16 +108,27 @@ uv_layer = obj.data.uv_layers[module.UV_LAYER_NAME]
 uvs = [tuple(uv_layer.data[loop_index].uv) for loop_index in obj.data.polygons[0].loop_indices]
 assert uvs[1] == (0.5, 0.0), uvs
 assert uvs[2] == (0.5, 0.5), uvs
-mat = bpy.data.materials.new("new_sync")
-obj.data.materials.clear()
-obj.data.materials.append(mat)
-obj.data.polygons[0].material_index = 0
-uv_layer = obj.data.uv_layers[module.UV_LAYER_NAME]
-for offset, loop_index in enumerate(obj.data.polygons[0].loop_indices):
-    uv_layer.data[loop_index].uv = (float(offset) * 8.0, 32.0)
+workmesh = module.create_uv_workmesh()
+assert workmesh.name == module.WORKMESH_NAME, workmesh.name
+assert len(workmesh.data.polygons) == 2, len(workmesh.data.polygons)
+bpy.ops.object.select_all(action="DESELECT")
+bpy.context.view_layer.objects.active = workmesh
+workmesh.select_set(True)
+bpy.ops.object.mode_set(mode="EDIT")
+bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.mesh.remove_doubles(threshold=0.001)
+bpy.ops.object.mode_set(mode="OBJECT")
+assert len(workmesh.data.vertices) == 6, len(workmesh.data.vertices)
+uv_layer = workmesh.data.uv_layers[module.UV_LAYER_NAME]
+for polygon in workmesh.data.polygons:
+    for offset, loop_index in enumerate(polygon.loop_indices):
+        uv_layer.data[loop_index].uv = (float(offset) * 0.125, 0.25)
 
 response = module.export_response(response_path)
-assert len(response["faces"]) == 1, response
+assert len(response["faces"]) == 2, response
+assert response["faces"][1]["brushId"] == "brush1", response
+assert response["faces"][1]["loops"][1]["vertex"] == 1, response
+assert response["faces"][1]["loops"][1]["uv"] == [16.0, 32.0], response
 with open(success_path, "w", encoding="utf-8") as f:
     f.write("ok")
 "@ | Set-Content -LiteralPath $driverPath -Encoding UTF8
@@ -117,15 +148,15 @@ if ($result.schema -ne "tb.blenderBrushSync.v1") {
 if ($result.sessionId -ne "smoke-session") {
   throw "Unexpected session id: $($result.sessionId)"
 }
-if ($result.faces.Count -ne 1) {
-  throw "Expected 1 output face, got $($result.faces.Count)"
+if ($result.faces.Count -ne 2) {
+  throw "Expected 2 output faces, got $($result.faces.Count)"
 }
 $face = $result.faces[0]
 if ($face.brushId -ne "brush0" -or $face.faceId -ne "face0") {
   throw "Unexpected face identity: $($face.brushId)/$($face.faceId)"
 }
-if ($face.material -ne "new_sync") {
-  throw "Expected material new_sync, got $($face.material)"
+if ($face.material -ne "bongs2") {
+  throw "Expected material bongs2, got $($face.material)"
 }
 if ($face.loops.Count -ne 4) {
   throw "Expected 4 loops, got $($face.loops.Count)"
@@ -134,4 +165,4 @@ if ($face.loops[0].vertex -ne 0) {
   throw "Expected first loop vertex id 0, got $($face.loops[0].vertex)"
 }
 
-Write-Host "TB Blender brush sync smoke passed: $($result.faces.Count) face"
+Write-Host "TB Blender brush sync smoke passed: $($result.faces.Count) faces"

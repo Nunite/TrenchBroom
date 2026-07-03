@@ -20,6 +20,7 @@ import bpy
 SCHEMA = "tb.blenderBrushSync.v1"
 COLLECTION_NAME = "TB Sync"
 UV_LAYER_NAME = "TB_UV"
+WORKMESH_NAME = "TB UV Workmesh"
 SYNC_DIR = Path(os.environ.get("TEMP") or tempfile.gettempdir()) / "trenchbroom-blender-sync"
 REQUEST_PATH = SYNC_DIR / "request.json"
 RESPONSE_PATH = SYNC_DIR / "response.json"
@@ -203,6 +204,14 @@ def _object_name(brush_id):
     return f"TB Brush {brush_id}"
 
 
+def _source_objects(collection):
+    return [
+        obj
+        for obj in collection.objects
+        if obj.type == "MESH" and obj.get("tb_sync_schema") == SCHEMA and obj.name != WORKMESH_NAME
+    ]
+
+
 def import_request(payload):
     if payload.get("schema") != SCHEMA:
         raise ValueError("Unsupported TB brush sync schema")
@@ -272,9 +281,167 @@ def import_request_file(path=REQUEST_PATH):
     return import_request(_read_json(path))
 
 
+def create_uv_workmesh():
+    collection = bpy.data.collections.get(COLLECTION_NAME)
+    if collection is None:
+        raise ValueError("Missing TB Sync collection")
+
+    old_obj = bpy.data.objects.get(WORKMESH_NAME)
+    if old_obj is not None:
+        old_mesh = old_obj.data
+        bpy.data.objects.remove(old_obj, do_unlink=True)
+        if old_mesh.users == 0:
+            bpy.data.meshes.remove(old_mesh)
+
+    vertices = []
+    polygons = []
+    face_refs = []
+    material_names = []
+    polygon_uvs = []
+
+    for obj in _source_objects(collection):
+        mesh = obj.data
+        uv_layer = mesh.uv_layers.get(UV_LAYER_NAME) or mesh.uv_layers.active
+        face_ids = list(obj.get("tb_face_ids", []))
+        face_vertices = list(obj.get("tb_face_vertices", []))
+        for index, polygon in enumerate(mesh.polygons):
+            if index >= len(face_ids) or index >= len(face_vertices):
+                continue
+            base = len(vertices)
+            loop_vertex_ids = [
+                int(mesh.loops[loop_index].vertex_index) for loop_index in polygon.loop_indices
+            ]
+            vertices.extend([tuple(mesh.vertices[vertex_id].co) for vertex_id in loop_vertex_ids])
+            polygons.append(list(range(base, base + len(loop_vertex_ids))))
+            material_name = ""
+            if 0 <= polygon.material_index < len(obj.material_slots):
+                material = obj.material_slots[polygon.material_index].material
+                if material:
+                    material_name = _export_material_name(material)
+            if material_name not in material_names:
+                material_names.append(material_name)
+            polygon_uvs.append(
+                [
+                    tuple(uv_layer.data[loop_index].uv) if uv_layer else (0.0, 0.0)
+                    for loop_index in polygon.loop_indices
+                ]
+            )
+            face_refs.append(
+                {
+                    "brushId": str(obj.get("tb_brush_id", "")),
+                    "faceId": str(face_ids[index]),
+                    "vertices": list(map(int, face_vertices[index])),
+                    "material": material_name,
+                    "materialIndex": material_names.index(material_name),
+                }
+            )
+
+    mesh = bpy.data.meshes.new("TB UV Workmesh Mesh")
+    mesh.from_pydata(vertices, [], polygons)
+    mesh.update()
+    workmesh = bpy.data.objects.new(WORKMESH_NAME, mesh)
+    collection.objects.link(workmesh)
+    for name in material_names:
+        workmesh.data.materials.append(_material(name))
+    uv_layer = mesh.uv_layers.new(name=UV_LAYER_NAME)
+    for polygon, uvs, ref in zip(mesh.polygons, polygon_uvs, face_refs):
+        polygon.material_index = int(ref["materialIndex"])
+        for loop_index, uv in zip(polygon.loop_indices, uvs):
+            uv_layer.data[loop_index].uv = uv
+
+    workmesh["tb_sync_schema"] = SCHEMA
+    workmesh["tb_uv_workmesh"] = True
+    workmesh["tb_face_refs"] = face_refs
+    return workmesh
+
+
 def _loop_uv(uv_layer, loop_index, texture_size):
     uv = uv_layer.data[loop_index].uv
     return _to_tb_uv(uv, texture_size)
+
+
+def _append_response_faces(response, obj):
+    mesh = obj.data
+    uv_layer = mesh.uv_layers.get(UV_LAYER_NAME) or mesh.uv_layers.active
+    if uv_layer is None:
+        response["warnings"].append(f"{obj.name}: missing UV layer")
+        return
+
+    if obj.get("tb_uv_workmesh"):
+        face_refs = list(obj.get("tb_face_refs", []))
+        for index, polygon in enumerate(mesh.polygons):
+            if index >= len(face_refs):
+                response["warnings"].append(f"{obj.name}: extra polygon {index}")
+                continue
+            ref = dict(face_refs[index])
+            vertices = list(map(int, ref.get("vertices", [])))
+            if len(vertices) != len(polygon.loop_indices):
+                response["warnings"].append(f"{ref.get('brushId', '')}/{ref.get('faceId', '')}: topology changed")
+                continue
+            material_slot = None
+            if 0 <= polygon.material_index < len(obj.material_slots):
+                material_slot = obj.material_slots[polygon.material_index].material
+            texture_size = _material_texture_size(material_slot)
+            material = _export_material_name(material_slot) if material_slot else str(ref.get("material", ""))
+            response["faces"].append(
+                {
+                    "brushId": str(ref.get("brushId", "")),
+                    "faceId": str(ref.get("faceId", "")),
+                    "material": material,
+                    "loops": [
+                        {
+                            "vertex": vertices[offset],
+                            "uv": _loop_uv(uv_layer, loop_index, texture_size),
+                        }
+                        for offset, loop_index in enumerate(polygon.loop_indices)
+                    ],
+                }
+            )
+        return
+
+    brush_id = str(obj.get("tb_brush_id", ""))
+    face_ids = list(obj.get("tb_face_ids", []))
+    expected_vertices = list(obj.get("tb_face_vertices", []))
+    if len(mesh.polygons) != len(face_ids):
+        response["warnings"].append(f"{brush_id}: polygon count changed")
+
+    for index, polygon in enumerate(mesh.polygons):
+        if index >= len(face_ids) or index >= len(expected_vertices):
+            response["warnings"].append(f"{brush_id}: extra polygon {index}")
+            continue
+
+        loop_vertices = [
+            int(mesh.loops[loop_index].vertex_index) for loop_index in polygon.loop_indices
+        ]
+        if loop_vertices != list(map(int, expected_vertices[index])):
+            response["warnings"].append(f"{brush_id}/{face_ids[index]}: topology changed")
+            continue
+
+        material = ""
+        material_slot = None
+        if 0 <= polygon.material_index < len(obj.material_slots):
+            material_slot = obj.material_slots[polygon.material_index].material
+            if material_slot:
+                material = _export_material_name(material_slot)
+        texture_size = _material_texture_size(material_slot)
+
+        loops = []
+        for loop_index in polygon.loop_indices:
+            loops.append(
+                {
+                    "vertex": int(mesh.loops[loop_index].vertex_index),
+                    "uv": _loop_uv(uv_layer, loop_index, texture_size),
+                }
+            )
+
+        response["faces"].append(
+            {
+                "brushId": brush_id,
+                "faceId": str(face_ids[index]),
+                "material": material,
+                "loops": loops,
+            }
+        )
 
 
 def export_response(path=RESPONSE_PATH):
@@ -286,58 +453,12 @@ def export_response(path=RESPONSE_PATH):
         _write_json(path, response)
         return response
 
-    for obj in collection.objects:
-        if obj.type != "MESH" or obj.get("tb_sync_schema") != SCHEMA:
-            continue
-
-        mesh = obj.data
-        brush_id = str(obj.get("tb_brush_id", ""))
-        face_ids = list(obj.get("tb_face_ids", []))
-        expected_vertices = list(obj.get("tb_face_vertices", []))
-        uv_layer = mesh.uv_layers.get(UV_LAYER_NAME) or mesh.uv_layers.active
-        if uv_layer is None:
-            response["warnings"].append(f"{brush_id}: missing UV layer")
-            continue
-        if len(mesh.polygons) != len(face_ids):
-            response["warnings"].append(f"{brush_id}: polygon count changed")
-
-        for index, polygon in enumerate(mesh.polygons):
-            if index >= len(face_ids) or index >= len(expected_vertices):
-                response["warnings"].append(f"{brush_id}: extra polygon {index}")
-                continue
-
-            loop_vertices = [
-                int(mesh.loops[loop_index].vertex_index) for loop_index in polygon.loop_indices
-            ]
-            if loop_vertices != list(map(int, expected_vertices[index])):
-                response["warnings"].append(f"{brush_id}/{face_ids[index]}: topology changed")
-                continue
-
-            material = ""
-            material_slot = None
-            if 0 <= polygon.material_index < len(obj.material_slots):
-                material_slot = obj.material_slots[polygon.material_index].material
-                if material_slot:
-                    material = _export_material_name(material_slot)
-            texture_size = _material_texture_size(material_slot)
-
-            loops = []
-            for loop_index in polygon.loop_indices:
-                loops.append(
-                    {
-                        "vertex": int(mesh.loops[loop_index].vertex_index),
-                        "uv": _loop_uv(uv_layer, loop_index, texture_size),
-                    }
-                )
-
-            response["faces"].append(
-                {
-                    "brushId": brush_id,
-                    "faceId": str(face_ids[index]),
-                    "material": material,
-                    "loops": loops,
-                }
-            )
+    workmesh = bpy.data.objects.get(WORKMESH_NAME)
+    if workmesh is not None and workmesh.name in collection.objects.keys():
+        _append_response_faces(response, workmesh)
+    else:
+        for obj in _source_objects(collection):
+            _append_response_faces(response, obj)
 
     _write_json(path, response)
     return response
@@ -387,6 +508,22 @@ class TB_BRUSH_SYNC_OT_export(bpy.types.Operator):
             return {"CANCELLED"}
 
 
+class TB_BRUSH_SYNC_OT_create_workmesh(bpy.types.Operator):
+    bl_idname = "tb_brush_sync.create_uv_workmesh"
+    bl_label = "Create UV Workmesh"
+
+    def execute(self, context):
+        try:
+            obj = create_uv_workmesh()
+            context.view_layer.objects.active = obj
+            obj.select_set(True)
+            self.report({"INFO"}, "Created TB UV workmesh")
+            return {"FINISHED"}
+        except Exception as exc:
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
+
+
 class TB_BRUSH_SYNC_PT_panel(bpy.types.Panel):
     bl_label = "TB Brush Sync"
     bl_idname = "TB_BRUSH_SYNC_PT_panel"
@@ -397,12 +534,14 @@ class TB_BRUSH_SYNC_PT_panel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator(TB_BRUSH_SYNC_OT_import.bl_idname)
+        layout.operator(TB_BRUSH_SYNC_OT_create_workmesh.bl_idname)
         layout.operator(TB_BRUSH_SYNC_OT_export.bl_idname)
         layout.label(text=f"Folder: {SYNC_DIR}")
 
 
 classes = (
     TB_BRUSH_SYNC_OT_import,
+    TB_BRUSH_SYNC_OT_create_workmesh,
     TB_BRUSH_SYNC_OT_export,
     TB_BRUSH_SYNC_PT_panel,
 )
