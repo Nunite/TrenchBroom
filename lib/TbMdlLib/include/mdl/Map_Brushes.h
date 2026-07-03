@@ -81,7 +81,6 @@ bool flipUV(
   vm::direction cameraRelativeFlipDirection);
 
 void alignUV(Map& map, UvPolicy uvPolicy);
-bool unwrapUVAsQuads(Map& map);
 void justifyUV(Map& map, UvJustifyDirection uvJustifyDirection, UvPolicy uvPolicy);
 void fitUV(Map& map, UvFitDirection uvFitDirection, UvPolicy uvPolicy);
 void autoFitUV(Map& map);
