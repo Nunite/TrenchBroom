@@ -69,6 +69,15 @@ struct TriangleUVUpdate
 
 bool setTriangleUVs(Map& map, const std::vector<TriangleUVUpdate>& updates);
 
+struct FaceUVUpdate
+{
+  BrushFaceHandle face;
+  std::vector<vm::vec3d> points;
+  std::vector<vm::vec2f> uvs;
+};
+
+bool setFaceUVs(Map& map, const std::vector<FaceUVUpdate>& updates);
+
 bool copyUV(
   Map& map,
   const UVCoordSystemSnapshot& coordSystemSnapshot,

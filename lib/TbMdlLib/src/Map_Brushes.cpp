@@ -39,6 +39,7 @@
 #include "vm/scalar.h"
 
 #include <array>
+#include <cmath>
 #include <optional>
 
 namespace tb::mdl
@@ -195,6 +196,109 @@ std::optional<vm::vec3d> solveAxis(
   return (s * edge1) + (t * edge2);
 }
 
+struct FaceUVProjection
+{
+  vm::vec3d uAxis;
+  vm::vec3d vAxis;
+  vm::vec2f offset;
+};
+
+std::optional<FaceUVProjection> solveFaceUVProjection(
+  const std::vector<vm::vec3d>& points, const std::vector<vm::vec2f>& uvs)
+{
+  if (points.size() != uvs.size() || points.size() < 3u)
+  {
+    return std::nullopt;
+  }
+
+  auto basis = std::optional<std::array<size_t, 3>>{};
+  for (size_t i = 1; i + 1u < points.size() && !basis; ++i)
+  {
+    for (size_t j = i + 1u; j < points.size() && !basis; ++j)
+    {
+      const auto edge1 = points[i] - points[0];
+      const auto edge2 = points[j] - points[0];
+      if (!vm::is_zero(
+            vm::dot(vm::cross(edge1, edge2), vm::cross(edge1, edge2)),
+            vm::Cd::almost_zero()))
+      {
+        basis = std::array<size_t, 3>{0u, i, j};
+      }
+    }
+  }
+  if (!basis)
+  {
+    return std::nullopt;
+  }
+
+  const auto basisPoints = std::array<vm::vec3d, 3>{
+    points[(*basis)[0]],
+    points[(*basis)[1]],
+    points[(*basis)[2]],
+  };
+  const auto uCoords = std::array<float, 3>{
+    uvs[(*basis)[0]].x(),
+    uvs[(*basis)[1]].x(),
+    uvs[(*basis)[2]].x(),
+  };
+  const auto vCoords = std::array<float, 3>{
+    uvs[(*basis)[0]].y(),
+    uvs[(*basis)[1]].y(),
+    uvs[(*basis)[2]].y(),
+  };
+  const auto uAxis = solveAxis(basisPoints, uCoords);
+  const auto vAxis = solveAxis(basisPoints, vCoords);
+  if (!uAxis || !vAxis)
+  {
+    return std::nullopt;
+  }
+
+  const auto offset = vm::vec2f{
+    uvs[0].x() - float(vm::dot(points[0], *uAxis)),
+    uvs[0].y() - float(vm::dot(points[0], *vAxis)),
+  };
+
+  for (size_t i = 0; i < points.size(); ++i)
+  {
+    const auto projectedUV = vm::vec2f{
+      float(vm::dot(points[i], *uAxis)) + offset.x(),
+      float(vm::dot(points[i], *vAxis)) + offset.y(),
+    };
+    if (
+      std::abs(projectedUV.x() - uvs[i].x()) > 0.001f
+      || std::abs(projectedUV.y() - uvs[i].y()) > 0.001f)
+    {
+      return std::nullopt;
+    }
+  }
+
+  return FaceUVProjection{*uAxis, *vAxis, offset};
+}
+
+bool applyFaceUV(BrushFace& face, const FaceUVUpdate& update)
+{
+  if (face.vertexCount() != update.points.size())
+  {
+    return false;
+  }
+
+  const auto projection = solveFaceUVProjection(update.points, update.uvs);
+  if (!projection)
+  {
+    return false;
+  }
+
+  auto attributes = face.attributes();
+  attributes.setOffset(projection->offset);
+  attributes.setScale(vm::vec2f{1, 1});
+  attributes.setRotation(0.0f);
+
+  face.setAttributes(attributes);
+  face.restoreUVCoordSystemSnapshot(
+    ParallelUVCoordSystemSnapshot{projection->uAxis, projection->vAxis});
+  return true;
+}
+
 bool applyTriangleUV(BrushFace& face, const TriangleUVUpdate& update)
 {
   if (face.vertexCount() != 3u)
@@ -202,34 +306,13 @@ bool applyTriangleUV(BrushFace& face, const TriangleUVUpdate& update)
     return false;
   }
 
-  const auto uCoords = std::array<float, 3>{
-    update.uvs[0].x(),
-    update.uvs[1].x(),
-    update.uvs[2].x(),
-  };
-  const auto vCoords = std::array<float, 3>{
-    update.uvs[0].y(),
-    update.uvs[1].y(),
-    update.uvs[2].y(),
-  };
-  const auto uAxis = solveAxis(update.points, uCoords);
-  const auto vAxis = solveAxis(update.points, vCoords);
-  if (!uAxis || !vAxis)
-  {
-    return false;
-  }
-
-  auto attributes = face.attributes();
-  attributes.setOffset(vm::vec2f{
-    update.uvs[0].x() - float(vm::dot(update.points[0], *uAxis)),
-    update.uvs[0].y() - float(vm::dot(update.points[0], *vAxis)),
-  });
-  attributes.setScale(vm::vec2f{1, 1});
-  attributes.setRotation(0.0f);
-
-  face.setAttributes(attributes);
-  face.restoreUVCoordSystemSnapshot(ParallelUVCoordSystemSnapshot{*uAxis, *vAxis});
-  return true;
+  return applyFaceUV(
+    face,
+    FaceUVUpdate{
+      update.face,
+      {update.points[0], update.points[1], update.points[2]},
+      {update.uvs[0], update.uvs[1], update.uvs[2]},
+    });
 }
 
 } // namespace
@@ -291,6 +374,27 @@ bool setTriangleUVs(Map& map, const std::vector<TriangleUVUpdate>& updates)
   auto updateIndex = size_t{0};
   return applyAndSwap(map, "Set Triangle UVs", faceHandles, [&](auto& face) {
     return applyTriangleUV(face, updates[updateIndex++]);
+  });
+}
+
+bool setFaceUVs(Map& map, const std::vector<FaceUVUpdate>& updates)
+{
+  if (!isParallelUVCoordSystem(map.worldNode().mapFormat()))
+  {
+    return false;
+  }
+
+  auto faceHandles = std::vector<BrushFaceHandle>{};
+  faceHandles.reserve(updates.size());
+  for (const auto& update : updates)
+  {
+    faceHandles.push_back(update.face);
+  }
+
+  auto updateIndex = size_t{0};
+  return applyAndSwap(map, "Set Face UVs", faceHandles, [&](auto& face) {
+    const auto& update = updates[updateIndex++];
+    return applyFaceUV(face, update);
   });
 }
 

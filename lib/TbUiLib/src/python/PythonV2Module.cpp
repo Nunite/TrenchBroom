@@ -903,6 +903,31 @@ py::dict selectedTriangleUVs(SelectionHandle& selection)
   return result;
 }
 
+py::list faceVertices(FaceHandle& face)
+{
+  auto result = py::list{};
+  for (const auto& vertex : face.get().vertexPositions())
+  {
+    result.append(vec3ToTuple(vertex));
+  }
+  return result;
+}
+
+py::list faceUVLoops(FaceHandle& face)
+{
+  const auto& brushFace = face.get();
+  const auto vertices = brushFace.vertexPositions();
+  auto result = py::list{};
+  for (size_t i = 0; i < vertices.size(); ++i)
+  {
+    auto loop = py::dict{};
+    loop["vertex"] = i;
+    loop["uv"] = vec2ToTuple(textureCoords(brushFace, vertices[i]));
+    result.append(loop);
+  }
+  return result;
+}
+
 std::vector<mdl::Node*> selectableNodesFromObjects(const py::iterable& objects)
 {
   auto result = std::vector<mdl::Node*>{};
@@ -1329,6 +1354,47 @@ bool setDocumentTriangleUVs(DocumentHandle& document, const py::object& triangle
     });
   }
   return mdl::setTriangleUVs(doc.map(), updates);
+}
+
+bool setFaceUVLoops(FaceHandle& face, const py::iterable& loopObjects)
+{
+  auto& document = DocumentHandle{face.document, face.generation}.get();
+  auto& brushNode =
+    BrushHandle{face.document, face.generation, face.brush, face.nodeGeneration}.get();
+  if (face.faceIndex >= brushNode.brush().faceCount())
+  {
+    throw std::runtime_error{"Face is no longer valid"};
+  }
+
+  const auto vertices = brushNode.brush().face(face.faceIndex).vertexPositions();
+  auto uvs = std::vector<vm::vec2f>(vertices.size());
+  auto assigned = std::vector<bool>(vertices.size(), false);
+
+  for (const auto loopObject : loopObjects)
+  {
+    const auto loop = py::reinterpret_borrow<py::dict>(loopObject);
+    const auto vertexIndex = py::cast<size_t>(loop["vertex"]);
+    if (vertexIndex >= vertices.size())
+    {
+      return false;
+    }
+    uvs[vertexIndex] = vec2FromObject(loop["uv"]);
+    assigned[vertexIndex] = true;
+  }
+  if (!std::ranges::all_of(assigned, [](const auto value) { return value; }))
+  {
+    return false;
+  }
+
+  const auto ok = mdl::setFaceUVs(
+    document.map(),
+    {{
+      mdl::BrushFaceHandle{&brushNode, face.faceIndex},
+      vertices,
+      uvs,
+    }});
+  face.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(face.brush);
+  return ok;
 }
 
 void setFaceMaterial(FaceHandle& face, const std::string& materialName)
@@ -1914,6 +1980,8 @@ void defineModule(py::module_& module)
   });
 
   py::class_<FaceHandle>(module, "Face")
+    .def_property_readonly("vertices", faceVertices)
+    .def_property_readonly("uv_loops", faceUVLoops)
     .def_property(
       "texture_name",
       [](FaceHandle& self) { return self.get().attributes().materialName(); },
@@ -1955,6 +2023,7 @@ void defineModule(py::module_& module)
         return value ? py::cast(*value) : py::none();
       },
       setFaceSurfaceValue)
+    .def("set_uv_loops", setFaceUVLoops)
     .def("set_material", setFaceMaterial);
 
   py::class_<MaterialHandle>(module, "Material")

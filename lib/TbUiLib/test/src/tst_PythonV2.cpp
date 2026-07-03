@@ -47,8 +47,10 @@
 #include "ui/python/PythonRuntime.h"
 #include "ui/python/PythonScripting.h"
 
+#include "vm/approx.h"
 #include "vm/bbox.h"
 
+#include <fstream>
 #include <map>
 #include <vector>
 
@@ -83,6 +85,13 @@ struct CurrentPathGuard
 private:
   std::filesystem::path m_oldCurrentPath;
 };
+
+vm::vec2f textureCoords(const mdl::BrushFace& face, const vm::vec3d& point)
+{
+  return vm::vec2f{
+    face.toUVCoordSystemMatrix(face.attributes().offset(), face.attributes().scale())
+    * point};
+}
 
 std::vector<QWidget*> pluginPanels(MapWindow& window)
 {
@@ -736,6 +745,51 @@ assert [loop["uv"] for loop in updated["loops"]] == uvs, updated
     REQUIRE(scriptSucceeded);
   }
 
+  SECTION("exposes face vertices and UV loops to Python")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "original") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_face_uv.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+face = doc.selection.brushes[0].faces()[0]
+assert len(face.vertices) == 4, face.vertices
+loops = face.uv_loops
+assert len(loops) == 4, loops
+uvs = [(16.0, 8.0), (80.0, 8.0), (80.0, 40.0), (16.0, 40.0)]
+for loop, uv in zip(loops, uvs):
+    loop["uv"] = uv
+assert face.set_uv_loops(loops)
+assert [loop["uv"] for loop in face.uv_loops] == uvs, face.uv_loops
+bad = face.uv_loops
+bad[3]["uv"] = (23.0, 40.0)
+assert not face.set_uv_loops(bad)
+assert [loop["uv"] for loop in face.uv_loops] == uvs, face.uv_loops
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_face_uv.py";
+
+    const auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+  }
+
   SECTION("reads selected brush and vertex tool vertices")
   {
     auto& map = window.document().map();
@@ -1129,6 +1183,120 @@ assert face.surface_value == 3.5
     CHECK(text.contains(QStringLiteral("textures/example")));
     CHECK(text.contains(QStringLiteral("example/stone (64x32)")));
     manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 blender brush sync example plugin")
+  {
+    const auto syncDir =
+      std::filesystem::temp_directory_path() / "trenchbroom-blender-sync";
+    const auto requestPath = syncDir / "request.json";
+    const auto responsePath = syncDir / "response.json";
+    std::filesystem::remove(requestPath);
+    std::filesystem::remove(responsePath);
+
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "old_sync") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/blender_brush_sync"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+    auto* sendButton = static_cast<QPushButton*>(nullptr);
+    auto* applyButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Send Selection"))
+      {
+        sendButton = button;
+      }
+      if (button->text() == QStringLiteral("Apply Pending"))
+      {
+        applyButton = button;
+      }
+    }
+    REQUIRE(sendButton != nullptr);
+    REQUIRE(applyButton != nullptr);
+
+    sendButton->click();
+
+    REQUIRE(std::filesystem::exists(requestPath));
+    auto requestStream = std::ifstream{requestPath};
+    const auto requestJson =
+      std::string{std::istreambuf_iterator<char>{requestStream}, {}};
+    CHECK(requestJson.find(R"("schema": "tb.blenderBrushSync.v1")") != std::string::npos);
+    CHECK(requestJson.find(R"("brushes")") != std::string::npos);
+    CHECK(requestJson.find(R"("faces")") != std::string::npos);
+
+    const auto vertices = brushNode->brush().face(0).vertexPositions();
+    REQUIRE(vertices.size() == 4u);
+
+    const auto sessionKey = std::string{R"("sessionId": )"};
+    const auto sessionStart = requestJson.find(sessionKey);
+    REQUIRE(sessionStart != std::string::npos);
+    const auto sessionValueStart =
+      requestJson.find('"', sessionStart + sessionKey.size());
+    REQUIRE(sessionValueStart != std::string::npos);
+    const auto sessionValueEnd = requestJson.find('"', sessionValueStart + 1);
+    REQUIRE(sessionValueEnd != std::string::npos);
+    const auto sessionValue =
+      requestJson.substr(sessionValueStart, sessionValueEnd - sessionValueStart + 1);
+
+    auto response = std::ofstream{responsePath};
+    response << R"({
+  "schema": "tb.blenderBrushSync.v1",
+  "sessionId": )"
+             << sessionValue << R"(,
+  "faces": [
+    {
+      "brushId": "brush0",
+      "faceId": "face0",
+      "material": "new_sync",
+      "loops": [
+        {"vertex": 0, "uv": [16.0, 8.0]},
+        {"vertex": 1, "uv": [80.0, 8.0]},
+        {"vertex": 2, "uv": [80.0, 40.0]},
+        {"vertex": 3, "uv": [16.0, 40.0]}
+      ]
+    }
+  ],
+  "warnings": []
+})";
+    response.close();
+
+    applyButton->click();
+    const auto& face = brushNode->brush().face(0);
+    CHECK(face.attributes().materialName() == "new_sync");
+    const auto expectedUVs = std::array<vm::vec2f, 4>{
+      vm::vec2f{16.0f, 8.0f},
+      vm::vec2f{80.0f, 8.0f},
+      vm::vec2f{80.0f, 40.0f},
+      vm::vec2f{16.0f, 40.0f},
+    };
+    for (size_t i = 0; i < vertices.size(); ++i)
+    {
+      const auto uv = textureCoords(face, vertices[i]);
+      CHECK(uv.x() == vm::approx{expectedUVs[i].x()});
+      CHECK(uv.y() == vm::approx{expectedUVs[i].y()});
+    }
+    manager.unloadPlugins(window);
+    QApplication::processEvents();
+    auto ignoredError = std::error_code{};
+    std::filesystem::remove(requestPath, ignoredError);
+    ignoredError.clear();
+    std::filesystem::remove(responsePath, ignoredError);
   }
 
   SECTION("runs v2 event callback example script")

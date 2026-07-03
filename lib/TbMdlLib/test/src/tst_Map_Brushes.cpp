@@ -966,6 +966,104 @@ TEST_CASE("Map_Brushes")
     }
   }
 
+  SECTION("setFaceUVs")
+  {
+    auto& map = fixture.create(QuakeFixtureConfig);
+
+    auto* brushNode = createBrushNode(map);
+    addNodes(map, {{parentForNodes(map), {brushNode}}});
+
+    const auto faceIndex = brushNode->brush().findFace(vm::vec3d{0, -1, 0});
+    REQUIRE(faceIndex);
+
+    const auto otherFaceIndex = brushNode->brush().findFace(vm::vec3d{1, 0, 0});
+    REQUIRE(otherFaceIndex);
+    const auto originalOtherFaceAttributes =
+      getFace(*brushNode, *otherFaceIndex).attributes();
+
+    const auto vertices = getFace(*brushNode, *faceIndex).vertexPositions();
+    REQUIRE(vertices.size() == 4u);
+
+    const auto targetUVs = std::vector<vm::vec2f>{
+      {32, 16},
+      {160, 16},
+      {160, 80},
+      {32, 80},
+    };
+
+    CHECK(setFaceUVs(
+      map,
+      {{
+        BrushFaceHandle{brushNode, *faceIndex},
+        vertices,
+        targetUVs,
+      }}));
+
+    const auto& changedFace = getFace(*brushNode, *faceIndex);
+    for (size_t i = 0; i < vertices.size(); ++i)
+    {
+      CHECK(textureCoords(changedFace, vertices[i]) == vm::approx{targetUVs[i]});
+    }
+    CHECK_THAT(
+      getFace(*brushNode, *otherFaceIndex).attributes(),
+      MatchesBrushFaceAttributes(originalOtherFaceAttributes));
+
+    SECTION("Returns false for non affine UVs")
+    {
+      const auto beforeAttributes = changedFace.attributes();
+      const auto beforeUAxis = changedFace.uAxis();
+      const auto beforeVAxis = changedFace.vAxis();
+      auto nonAffineUVs = targetUVs;
+      nonAffineUVs[3] = nonAffineUVs[3] + vm::vec2f{7, 0};
+
+      CHECK(!setFaceUVs(
+        map,
+        {{
+          BrushFaceHandle{brushNode, *faceIndex},
+          vertices,
+          nonAffineUVs,
+        }}));
+
+      const auto& unchangedFace = getFace(*brushNode, *faceIndex);
+      CHECK_THAT(
+        unchangedFace.attributes(), MatchesBrushFaceAttributes(beforeAttributes));
+      CHECK(unchangedFace.uAxis() == vm::approx{beforeUAxis});
+      CHECK(unchangedFace.vAxis() == vm::approx{beforeVAxis});
+    }
+
+    SECTION("Returns false for non parallel UV maps")
+    {
+      auto standardFixture = MapFixture{};
+      auto& standardMap = standardFixture.create({.mapFormat = MapFormat::Standard});
+
+      auto* standardBrushNode = createBrushNode(standardMap);
+      addNodes(standardMap, {{parentForNodes(standardMap), {standardBrushNode}}});
+
+      const auto standardFaceIndex =
+        standardBrushNode->brush().findFace(vm::vec3d{0, -1, 0});
+      REQUIRE(standardFaceIndex);
+
+      const auto standardVertices =
+        getFace(*standardBrushNode, *standardFaceIndex).vertexPositions();
+      REQUIRE(standardVertices.size() == 4u);
+
+      const auto originalAttributes =
+        getFace(*standardBrushNode, *standardFaceIndex).attributes();
+
+      CHECK(!setFaceUVs(
+        standardMap,
+        {{
+          BrushFaceHandle{standardBrushNode, *standardFaceIndex},
+          standardVertices,
+          targetUVs,
+        }}));
+
+      CHECK_THAT(
+        getFace(*standardBrushNode, *standardFaceIndex).attributes(),
+        MatchesBrushFaceAttributes(originalAttributes));
+    }
+  }
+
   SECTION("justifyUV")
   {
     auto& map = fixture.create(QuakeFixtureConfig);
