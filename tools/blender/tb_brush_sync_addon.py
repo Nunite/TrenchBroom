@@ -10,6 +10,7 @@ bl_info = {
 
 import json
 import os
+import struct
 import tempfile
 from pathlib import Path
 
@@ -24,6 +25,7 @@ REQUEST_PATH = SYNC_DIR / "request.json"
 RESPONSE_PATH = SYNC_DIR / "response.json"
 
 _last_request_mtime = None
+_texture_cache = {}
 
 
 def _read_json(path):
@@ -53,7 +55,148 @@ def _material(name):
     material = bpy.data.materials.get(material_name)
     if material is None:
         material = bpy.data.materials.new(material_name)
+    material["tb_material_name"] = name
     return material
+
+
+def _read_wad_texture(wad_path, texture_name):
+    key = (str(wad_path).lower(), texture_name.lower())
+    if key in _texture_cache:
+        return _texture_cache[key]
+
+    with open(wad_path, "rb") as f:
+        if f.read(4) != b"WAD3":
+            return None
+        lump_count = struct.unpack("<I", f.read(4))[0]
+        lump_offset = struct.unpack("<I", f.read(4))[0]
+        f.seek(lump_offset)
+        lumps = []
+        for _ in range(lump_count):
+            offset, compressed_length, full_length = struct.unpack("<III", f.read(12))
+            lump_type = struct.unpack("<B", f.read(1))[0]
+            compression = struct.unpack("<B", f.read(1))[0]
+            f.seek(2, 1)
+            name = f.read(16).split(b"\x00")[0].decode("ascii", errors="ignore")
+            lumps.append((name, offset, lump_type, compression, compressed_length, full_length))
+
+        target = texture_name.split("/")[-1].lower()
+        for name, offset, lump_type, compression, _compressed_length, _full_length in lumps:
+            if name.lower() != target or lump_type not in {0x40, 0x42, 0x43, 0x46} or compression:
+                continue
+
+            f.seek(offset)
+            if lump_type in {0x40, 0x43}:
+                f.seek(16, 1)
+            width = struct.unpack("<I", f.read(4))[0]
+            height = struct.unpack("<I", f.read(4))[0]
+            if width <= 0 or height <= 0 or width > 4096 or height > 4096:
+                return None
+            if lump_type in {0x40, 0x43}:
+                f.seek(16, 1)
+            pixels = f.read(width * height)
+            if lump_type in {0x40, 0x43}:
+                f.seek((width // 2) * (height // 2), 1)
+                f.seek((width // 4) * (height // 4), 1)
+                f.seek((width // 8) * (height // 8), 1)
+            f.seek(2, 1)
+            palette_bytes = f.read(256 * 3)
+            palette = [
+                (
+                    palette_bytes[i] / 255.0,
+                    palette_bytes[i + 1] / 255.0,
+                    palette_bytes[i + 2] / 255.0,
+                    0.0 if name.startswith("{") and index == 255 else 1.0,
+                )
+                for index, i in enumerate(range(0, min(len(palette_bytes), 768), 3))
+                if i + 2 < len(palette_bytes)
+            ]
+            texture = {"name": name, "width": width, "height": height, "pixels": pixels, "palette": palette}
+            _texture_cache[key] = texture
+            return texture
+    return None
+
+
+def _image_from_wad_texture(texture):
+    image = bpy.data.images.get(texture["name"])
+    if image is not None:
+        return image
+
+    image = bpy.data.images.new(texture["name"], texture["width"], texture["height"])
+    rgba = []
+    for pixel in texture["pixels"]:
+        rgba.extend(texture["palette"][pixel] if pixel < len(texture["palette"]) else (0.0, 0.0, 0.0, 1.0))
+    image.pixels = rgba
+    image.pack()
+    return image
+
+
+def _material_from_wad(name, wad_paths):
+    for wad_path in wad_paths:
+        texture = _read_wad_texture(wad_path, name)
+        if texture is None:
+            continue
+
+        image = _image_from_wad_texture(texture)
+        material = bpy.data.materials.get(name)
+        if material is None:
+            material = bpy.data.materials.new(name)
+        material["tb_material_name"] = name
+        material.use_nodes = True
+        nodes = material.node_tree.nodes
+        nodes.clear()
+        output = nodes.new("ShaderNodeOutputMaterial")
+        bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+        tex = nodes.new("ShaderNodeTexImage")
+        tex.image = image
+        material.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        material.node_tree.links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
+        if texture["name"].startswith("{"):
+            material.node_tree.links.new(tex.outputs["Alpha"], bsdf.inputs["Alpha"])
+            material.blend_method = "BLEND"
+        return material
+    return _material(name)
+
+
+def _material_texture_size(material):
+    if material is None or material.node_tree is None:
+        return None
+    for node in material.node_tree.nodes:
+        if node.bl_idname != "ShaderNodeTexImage" or node.image is None:
+            continue
+        width, height = node.image.size[:]
+        if width > 0 and height > 0:
+            return float(width), float(height)
+    return None
+
+
+def _to_blender_uv(uv, texture_size):
+    u, v = float(uv[0]), float(uv[1])
+    if texture_size is None:
+        return u, v
+    width, height = texture_size
+    return u / width, v / height
+
+
+def _to_tb_uv(uv, texture_size):
+    u, v = float(uv.x), float(uv.y)
+    if texture_size is not None:
+        width, height = texture_size
+        u *= width
+        v *= height
+    return [round(u, 6), round(v, 6)]
+
+
+def _export_material_name(material):
+    name = material.name
+    original = material.get("tb_material_name")
+    if not isinstance(original, str):
+        return name
+    if not original and name == "__TB_EMPTY__":
+        return original
+    suffix = name.removeprefix(original + ".")
+    if name == original or (suffix != name and suffix.isdigit()):
+        return original
+    return name
 
 
 def _object_name(brush_id):
@@ -66,6 +209,7 @@ def import_request(payload):
 
     collection = _sync_collection()
     session_id = payload.get("sessionId", "")
+    wad_paths = [str(path) for path in payload.get("wadPaths", []) if Path(str(path)).exists()]
 
     for brush in payload.get("brushes", []):
         brush_id = str(brush["id"])
@@ -102,19 +246,23 @@ def import_request(payload):
             material_name = str(face.get("material") or "")
             if material_name not in material_names:
                 material_names.append(material_name)
-                obj.data.materials.append(_material(material_name))
+                obj.data.materials.append(_material_from_wad(material_name, wad_paths))
 
         material_index = {name: index for index, name in enumerate(material_names)}
         uv_layer = mesh.uv_layers.new(name=UV_LAYER_NAME)
         for face_payload, polygon in zip(faces, mesh.polygons):
-            polygon.material_index = material_index.get(str(face_payload.get("material") or ""), 0)
+            material_name = str(face_payload.get("material") or "")
+            polygon.material_index = material_index.get(material_name, 0)
+            material = obj.data.materials[polygon.material_index]
+            texture_size = _material_texture_size(material)
             uv_by_vertex = {
                 int(loop["vertex"]): loop.get("uv", [0.0, 0.0])
                 for loop in face_payload.get("loops", [])
             }
             for loop_index in polygon.loop_indices:
                 vertex_index = int(mesh.loops[loop_index].vertex_index)
-                uv_layer.data[loop_index].uv = uv_by_vertex.get(vertex_index, [0.0, 0.0])
+                uv = uv_by_vertex.get(vertex_index, [0.0, 0.0])
+                uv_layer.data[loop_index].uv = _to_blender_uv(uv, texture_size)
 
     bpy.context.scene["tb_sync_session_id"] = session_id
     return len(payload.get("brushes", []))
@@ -124,9 +272,9 @@ def import_request_file(path=REQUEST_PATH):
     return import_request(_read_json(path))
 
 
-def _loop_uv(uv_layer, loop_index):
+def _loop_uv(uv_layer, loop_index, texture_size):
     uv = uv_layer.data[loop_index].uv
-    return [round(float(uv.x), 6), round(float(uv.y), 6)]
+    return _to_tb_uv(uv, texture_size)
 
 
 def export_response(path=RESPONSE_PATH):
@@ -166,17 +314,19 @@ def export_response(path=RESPONSE_PATH):
                 continue
 
             material = ""
+            material_slot = None
             if 0 <= polygon.material_index < len(obj.material_slots):
-                slot = obj.material_slots[polygon.material_index]
-                if slot.material:
-                    material = slot.material.name
+                material_slot = obj.material_slots[polygon.material_index].material
+                if material_slot:
+                    material = _export_material_name(material_slot)
+            texture_size = _material_texture_size(material_slot)
 
             loops = []
             for loop_index in polygon.loop_indices:
                 loops.append(
                     {
                         "vertex": int(mesh.loops[loop_index].vertex_index),
-                        "uv": _loop_uv(uv_layer, loop_index),
+                        "uv": _loop_uv(uv_layer, loop_index, texture_size),
                     }
                 )
 

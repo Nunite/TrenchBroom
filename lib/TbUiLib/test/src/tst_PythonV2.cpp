@@ -34,6 +34,7 @@
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
 #include "mdl/Map_Brushes.h"
+#include "mdl/Map_Entities.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/VertexHandleManager.h"
@@ -1195,6 +1196,11 @@ assert face.surface_value == 3.5
     std::filesystem::remove(responsePath);
 
     auto& map = window.document().map();
+    const auto wadPath =
+      std::filesystem::absolute("lib/TbMdlLib/test/fixture/mdl/LoadMipTexture/hl.wad");
+    mdl::selectNodes(map, {&map.worldNode()});
+    REQUIRE(mdl::setEntityProperty(map, "wad", wadPath.generic_string()));
+
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "old_sync") | kdl::value()};
@@ -1237,6 +1243,8 @@ assert face.surface_value == 3.5
     const auto requestJson =
       std::string{std::istreambuf_iterator<char>{requestStream}, {}};
     CHECK(requestJson.find(R"("schema": "tb.blenderBrushSync.v1")") != std::string::npos);
+    CHECK(requestJson.find(R"("wadPaths")") != std::string::npos);
+    CHECK(requestJson.find("hl.wad") != std::string::npos);
     CHECK(requestJson.find(R"("brushes")") != std::string::npos);
     CHECK(requestJson.find(R"("faces")") != std::string::npos);
 

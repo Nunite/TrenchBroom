@@ -6,8 +6,12 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $addonPath = Join-Path $repoRoot "tools\blender\tb_brush_sync_addon.py"
+$wadPath = Join-Path $repoRoot "lib\TbMdlLib\test\fixture\mdl\LoadMipTexture\hl.wad"
 if (!(Test-Path -LiteralPath $addonPath)) {
   throw "Missing Blender brush sync addon: $addonPath"
+}
+if (!(Test-Path -LiteralPath $wadPath)) {
+  throw "Missing WAD fixture: $wadPath"
 }
 if (!(Test-Path -LiteralPath $BlenderExe)) {
   throw "Missing Blender executable: $BlenderExe"
@@ -18,10 +22,12 @@ New-Item -ItemType Directory -Path $workDir | Out-Null
 $requestPath = Join-Path $workDir "request.json"
 $responsePath = Join-Path $workDir "response.json"
 $driverPath = Join-Path $workDir "driver.py"
+$successPath = Join-Path $workDir "success.txt"
 
 $payload = @{
   schema = "tb.blenderBrushSync.v1"
   sessionId = "smoke-session"
+  wadPaths = @($wadPath)
   brushes = @(
     @{
       id = "brush0"
@@ -35,7 +41,7 @@ $payload = @{
         @{
           id = "face0"
           vertices = @(0, 1, 2, 3)
-          material = "old_sync"
+          material = "bongs2"
           loops = @(
             @{vertex = 0; uv = @(0.0, 0.0)},
             @{vertex = 1; uv = @(64.0, 0.0)},
@@ -58,6 +64,7 @@ import bpy
 addon_path = r'''$addonPath'''
 request_path = r'''$requestPath'''
 response_path = r'''$responsePath'''
+success_path = r'''$successPath'''
 
 spec = importlib.util.spec_from_file_location("tb_brush_sync_addon", addon_path)
 module = importlib.util.module_from_spec(spec)
@@ -67,6 +74,20 @@ spec.loader.exec_module(module)
 count = module.import_request_file(request_path)
 assert count == 1, count
 obj = bpy.data.objects["TB Brush brush0"]
+material = bpy.data.materials["bongs2"]
+assert material.node_tree is not None, "WAD material should use nodes"
+image_nodes = [
+    node for node in material.node_tree.nodes
+    if node.bl_idname == "ShaderNodeTexImage" and node.image
+]
+assert len(image_nodes) == 1, image_nodes
+assert image_nodes[0].image.has_data, "WAD image was not loaded"
+assert image_nodes[0].image.size[0] == 128, image_nodes[0].image.size[:]
+assert image_nodes[0].image.size[1] == 128, image_nodes[0].image.size[:]
+uv_layer = obj.data.uv_layers[module.UV_LAYER_NAME]
+uvs = [tuple(uv_layer.data[loop_index].uv) for loop_index in obj.data.polygons[0].loop_indices]
+assert uvs[1] == (0.5, 0.0), uvs
+assert uvs[2] == (0.5, 0.5), uvs
 mat = bpy.data.materials.new("new_sync")
 obj.data.materials.clear()
 obj.data.materials.append(mat)
@@ -77,11 +98,16 @@ for offset, loop_index in enumerate(obj.data.polygons[0].loop_indices):
 
 response = module.export_response(response_path)
 assert len(response["faces"]) == 1, response
+with open(success_path, "w", encoding="utf-8") as f:
+    f.write("ok")
 "@ | Set-Content -LiteralPath $driverPath -Encoding UTF8
 
 & $BlenderExe --factory-startup --background --python $driverPath
 if ($LASTEXITCODE -ne 0) {
   throw "Blender brush sync smoke failed with exit code $LASTEXITCODE"
+}
+if (!(Test-Path -LiteralPath $successPath)) {
+  throw "Blender brush sync smoke did not complete its Python assertions"
 }
 
 $result = Get-Content -Raw -LiteralPath $responsePath | ConvertFrom-Json

@@ -32,6 +32,41 @@ def _write_json(path, payload):
     os.replace(temp_path, path)
 
 
+def _existing_wad_path(path, doc):
+    if not path:
+        return None
+    wad_path = Path(path)
+    candidates = [wad_path]
+    if not wad_path.is_absolute() and doc.path:
+        candidates.append(Path(doc.path).parent / wad_path)
+    for candidate in candidates:
+        if candidate.exists() and candidate.suffix.lower() == ".wad":
+            return str(candidate)
+    return str(wad_path) if wad_path.suffix.lower() == ".wad" else None
+
+
+def _wad_paths(doc):
+    result = []
+    seen = set()
+
+    def add(path):
+        resolved = _existing_wad_path(path, doc)
+        if resolved and resolved.lower() not in seen:
+            seen.add(resolved.lower())
+            result.append(resolved)
+
+    for entity in doc.entities:
+        if entity.classname == "worldspawn":
+            wad_value = entity.get("wad", "")
+            for path in wad_value.split(";"):
+                add(path.strip())
+            break
+
+    for collection in doc.material_collections:
+        add(collection.path)
+    return result
+
+
 class BlenderBrushSync:
     def __init__(self):
         self.panel = tb.create_plugin_panel(PANEL_TITLE)
@@ -125,6 +160,7 @@ class BlenderBrushSync:
                 "schema": SCHEMA,
                 "sessionId": self.session_id,
                 "createdAt": time.time(),
+                "wadPaths": _wad_paths(tb.current_document()),
                 "brushes": [
                     self.export_brush(brush, brush_index)
                     for brush_index, brush in enumerate(brushes)
