@@ -360,6 +360,14 @@ void ModelBrowser::bindEvents()
     m_view, &ModelBrowserView::folderActivated, this, [&](const QString& folderPath) {
       setCurrentFolderPath(std::filesystem::path{folderPath.toStdString()});
     });
+  connect(
+    m_view, &ModelBrowserView::renamePrefabRequested, this, [&](const QString& path) {
+      renamePrefab(pathFromQString(path));
+    });
+  connect(
+    m_view, &ModelBrowserView::deletePrefabRequested, this, [&](const QString& path) {
+      deletePrefab(pathFromQString(path));
+    });
 
   connect(m_reloadButton, &QToolButton::clicked, this, [&]() {
     m_lastWriteTimes.clear();
@@ -590,6 +598,77 @@ void ModelBrowser::saveSelectionAsPrefab()
   {
     QMessageBox::warning(
       this, tr("Save Prefab"), tr("Could not find map window for prefab thumbnail"));
+  }
+
+  m_lastWriteTimes.clear();
+  m_assetRefreshPending = false;
+  rescanWatchedDirectory();
+}
+
+void ModelBrowser::renamePrefab(std::filesystem::path prefabPath)
+{
+  const auto absPath = userPrefabAssetPath(prefabPath);
+  if (absPath.empty())
+  {
+    return;
+  }
+
+  auto ok = false;
+  auto prefabName = QInputDialog::getText(
+    this,
+    tr("Rename Prefab"),
+    tr("Prefab name:"),
+    QLineEdit::Normal,
+    pathAsQString(absPath.stem()),
+    &ok);
+  if (!ok)
+  {
+    return;
+  }
+
+  prefabName = prefabName.trimmed();
+  if (prefabName.isEmpty())
+  {
+    return;
+  }
+
+  const auto result = renamePrefabAsset(absPath, prefabName.toStdString());
+  if (result.is_error())
+  {
+    const auto& error = std::get<tb::Error>(result.error());
+    QMessageBox::warning(this, tr("Rename Prefab"), QString::fromStdString(error.msg));
+    return;
+  }
+
+  m_lastWriteTimes.clear();
+  m_assetRefreshPending = false;
+  rescanWatchedDirectory();
+}
+
+void ModelBrowser::deletePrefab(std::filesystem::path prefabPath)
+{
+  const auto absPath = userPrefabAssetPath(prefabPath);
+  if (absPath.empty())
+  {
+    return;
+  }
+
+  if (
+    QMessageBox::question(
+      this,
+      tr("Delete Prefab"),
+      tr("Delete prefab \"%1\"?").arg(pathAsQString(absPath.stem())))
+    != QMessageBox::Yes)
+  {
+    return;
+  }
+
+  const auto result = deletePrefabAsset(absPath);
+  if (result.is_error())
+  {
+    const auto& error = std::get<tb::Error>(result.error());
+    QMessageBox::warning(this, tr("Delete Prefab"), QString::fromStdString(error.msg));
+    return;
   }
 
   m_lastWriteTimes.clear();

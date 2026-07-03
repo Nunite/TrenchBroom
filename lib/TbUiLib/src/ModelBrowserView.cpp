@@ -524,6 +524,19 @@ void ModelBrowserView::doContextMenu(
   }
 
   const auto& item = cellData(*cell);
+  if (item.type == BrowserCellType::Prefab)
+  {
+    auto menu = QMenu{this};
+    menu.addAction(tr("Rename..."), this, [this, prefabPath = item.path]() {
+      emit renamePrefabRequested(pathAsGenericQString(prefabPath));
+    });
+    menu.addAction(tr("Delete"), this, [this, prefabPath = item.path]() {
+      emit deletePrefabRequested(pathAsGenericQString(prefabPath));
+    });
+    menu.exec(event->globalPos());
+    return;
+  }
+
   if (item.type != BrowserCellType::Model)
   {
     return;

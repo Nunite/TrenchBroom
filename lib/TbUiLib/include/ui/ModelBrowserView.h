@@ -177,6 +177,8 @@ private:
 
 signals:
   void folderActivated(const QString& folderPath);
+  void renamePrefabRequested(const QString& prefabPath);
+  void deletePrefabRequested(const QString& prefabPath);
 };
 
 } // namespace tb::ui

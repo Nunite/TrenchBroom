@@ -45,4 +45,9 @@ Result<std::string> readPrefabAsset(const std::filesystem::path& path);
 
 Result<void> writePrefabAsset(const std::filesystem::path& path, const std::string& text);
 
+Result<void> renamePrefabAsset(
+  const std::filesystem::path& path, const std::string& name);
+
+Result<void> deletePrefabAsset(const std::filesystem::path& path);
+
 } // namespace tb::ui

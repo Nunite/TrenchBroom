@@ -23,6 +23,8 @@
 #include "ui/PrefabAsset.h"
 #include "ui/SystemPaths.h"
 
+#include <fstream>
+
 #include <catch2/catch_test_macros.hpp>
 
 namespace tb::ui
@@ -92,6 +94,56 @@ TEST_CASE("PrefabAsset")
 
     CHECK_FALSE(checkPrefabNameAvailable(env.dir(), "crate"));
     CHECK(checkPrefabNameAvailable(env.dir(), "new_crate"));
+  }
+
+  SECTION("renames prefab and thumbnail")
+  {
+    auto env = fs::TestEnvironment{};
+    const auto oldPath = env.dir() / "crate.tbprefab";
+    const auto newPath = env.dir() / "barrel.tbprefab";
+
+    REQUIRE(writePrefabAsset(oldPath, "prefab"));
+    std::ofstream{prefabThumbnailPath(oldPath)} << "png";
+
+    REQUIRE(renamePrefabAsset(oldPath, "barrel"));
+
+    CHECK_FALSE(env.fileExists("crate.tbprefab"));
+    CHECK_FALSE(env.fileExists("crate.png"));
+    CHECK(env.fileExists("barrel.tbprefab"));
+    CHECK(env.fileExists("barrel.png"));
+    CHECK(readPrefabAsset(newPath).value() == "prefab");
+  }
+
+  SECTION("renames prefab over orphan thumbnail")
+  {
+    auto env = fs::TestEnvironment{};
+    const auto oldPath = env.dir() / "crate.tbprefab";
+    const auto newPath = env.dir() / "barrel.tbprefab";
+
+    REQUIRE(writePrefabAsset(oldPath, "prefab"));
+    std::ofstream{prefabThumbnailPath(oldPath)} << "png";
+    std::ofstream{prefabThumbnailPath(newPath)} << "orphan";
+
+    REQUIRE(renamePrefabAsset(oldPath, "barrel"));
+
+    CHECK_FALSE(env.fileExists("crate.tbprefab"));
+    CHECK_FALSE(env.fileExists("crate.png"));
+    CHECK(env.fileExists("barrel.tbprefab"));
+    CHECK(env.fileExists("barrel.png"));
+  }
+
+  SECTION("deletes prefab and thumbnail")
+  {
+    auto env = fs::TestEnvironment{};
+    const auto path = env.dir() / "crate.tbprefab";
+
+    REQUIRE(writePrefabAsset(path, "prefab"));
+    std::ofstream{prefabThumbnailPath(path)} << "png";
+
+    REQUIRE(deletePrefabAsset(path));
+
+    CHECK_FALSE(env.fileExists("crate.tbprefab"));
+    CHECK_FALSE(env.fileExists("crate.png"));
   }
 }
 

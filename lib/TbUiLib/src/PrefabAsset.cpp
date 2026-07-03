@@ -125,4 +125,49 @@ Result<void> writePrefabAsset(const std::filesystem::path& path, const std::stri
            });
 }
 
+Result<void> renamePrefabAsset(const std::filesystem::path& path, const std::string& name)
+{
+  if (!isPrefabAssetPath(path))
+  {
+    return Error{"Not a prefab asset"};
+  }
+  if (fs::Disk::pathInfo(path) != fs::PathInfo::File)
+  {
+    return Error{"Prefab asset does not exist"};
+  }
+
+  const auto newPath = prefabPathForName(path.parent_path(), name);
+  if (newPath == path)
+  {
+    return kdl::void_success;
+  }
+  if (const auto result = checkPrefabNameAvailable(path.parent_path(), name);
+      result.is_error())
+  {
+    return result;
+  }
+
+  return fs::Disk::moveFile(path, newPath) | kdl::and_then([&]() -> Result<void> {
+           const auto oldThumbnailPath = prefabThumbnailPath(path);
+           if (fs::Disk::pathInfo(oldThumbnailPath) != fs::PathInfo::File)
+           {
+             return kdl::void_success;
+           }
+           return fs::Disk::moveFile(oldThumbnailPath, prefabThumbnailPath(newPath));
+         });
+}
+
+Result<void> deletePrefabAsset(const std::filesystem::path& path)
+{
+  if (!isPrefabAssetPath(path))
+  {
+    return Error{"Not a prefab asset"};
+  }
+
+  return fs::Disk::deleteFile(path) | kdl::and_then([&](auto) -> Result<void> {
+           return fs::Disk::deleteFile(prefabThumbnailPath(path))
+                  | kdl::transform([](auto) {});
+         });
+}
+
 } // namespace tb::ui
