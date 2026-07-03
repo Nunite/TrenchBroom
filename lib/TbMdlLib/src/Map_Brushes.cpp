@@ -27,19 +27,14 @@
 #include "mdl/GameConfig.h"
 #include "mdl/GameInfo.h"
 #include "mdl/Map.h"
-#include "mdl/MapFormat.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
-#include "mdl/ParallelUVCoordSystem.h"
 #include "mdl/Transaction.h"
 #include "mdl/UVCoordSystem.h"
 #include "mdl/UVUtils.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/WorldNode.h"
 
-#include <algorithm>
-#include <numeric>
-#include <optional>
 #include <queue>
 #include <unordered_map>
 
@@ -52,18 +47,6 @@ struct SelectedFace
 {
   BrushNode* node = nullptr;
   size_t faceIndex = 0u;
-};
-
-struct FaceEdge
-{
-  vm::vec3d first;
-  vm::vec3d second;
-};
-
-struct FaceComponentPath
-{
-  std::vector<size_t> component;
-  std::vector<size_t> path;
 };
 
 auto invertHorizontalAxis(
@@ -204,24 +187,9 @@ BrushFace& faceAt(Brush& brush, const SelectedFace& face)
   return brush.face(face.faceIndex);
 }
 
-bool samePoint(const vm::vec3d& lhs, const vm::vec3d& rhs)
+bool shareEdge(const BrushFace& lhs, const BrushFace& rhs)
 {
-  return vm::is_equal(lhs, rhs, vm::Cd::almost_zero());
-}
-
-bool edgeContainsPoint(const FaceEdge& edge, const vm::vec3d& point)
-{
-  return samePoint(edge.first, point) || samePoint(edge.second, point);
-}
-
-FaceEdge reverseEdge(const FaceEdge& edge)
-{
-  return {edge.second, edge.first};
-}
-
-std::optional<FaceEdge> sharedEdge(const BrushFace& lhs, const BrushFace& rhs)
-{
-  auto sharedVertices = std::vector<vm::vec3d>{};
+  size_t sharedVertexCount = 0u;
   const auto rhsVertices = rhs.vertexPositions();
   for (const auto& lhsVertex : lhs.vertexPositions())
   {
@@ -229,288 +197,54 @@ std::optional<FaceEdge> sharedEdge(const BrushFace& lhs, const BrushFace& rhs)
           return vm::is_equal(lhsVertex, rhsVertex, vm::Cd::almost_zero());
         }))
     {
-      sharedVertices.push_back(lhsVertex);
+      ++sharedVertexCount;
     }
   }
-  if (sharedVertices.size() < 2u)
+  return sharedVertexCount >= 2u;
+}
+
+void copyUVContinuously(const BrushFace& sourceFace, BrushFace& targetFace)
+{
+  if (auto snapshot = sourceFace.takeUVCoordSystemSnapshot())
   {
-    return std::nullopt;
+    auto attributes = targetFace.attributes();
+    attributes.setOffset(sourceFace.attributes().offset());
+    attributes.setScale(sourceFace.attributes().scale());
+    attributes.setRotation(sourceFace.attributes().rotation());
+    targetFace.setAttributes(attributes);
+    targetFace.restoreUVCoordSystemSnapshot(*snapshot);
+    targetFace.resetUVCoordSystemCache();
   }
-  return FaceEdge{sharedVertices[0], sharedVertices[1]};
 }
 
-bool shareEdge(const BrushFace& lhs, const BrushFace& rhs)
+bool alignUVToBandDirection(BrushFace& face, const BrushFace& nextFace)
 {
-  return sharedEdge(lhs, rhs).has_value();
-}
-
-std::optional<FaceEdge> oppositeEdge(const BrushFace& face, const FaceEdge& edge)
-{
-  const auto vertices = face.vertexPositions();
-  auto result = std::optional<FaceEdge>{};
-  auto bestDot = -1.0;
-  const auto edgeDirection = vm::normalize(edge.second - edge.first);
-
-  for (size_t i = 0u; i < vertices.size(); ++i)
-  {
-    const auto candidate = FaceEdge{vertices[i], vertices[(i + 1u) % vertices.size()]};
-    if (
-      edgeContainsPoint(edge, candidate.first)
-      || edgeContainsPoint(edge, candidate.second))
-    {
-      continue;
-    }
-
-    const auto candidateVector = candidate.second - candidate.first;
-    if (vm::is_zero(candidateVector, vm::Cd::almost_zero()))
-    {
-      continue;
-    }
-
-    const auto candidateDot =
-      vm::abs(vm::dot(vm::normalize(candidateVector), edgeDirection));
-    if (candidateDot > bestDot)
-    {
-      bestDot = candidateDot;
-      result = candidate;
-    }
-  }
-  return result;
-}
-
-FaceEdge orientEdgeForPairing(const FaceEdge& edge, const FaceEdge& reference)
-{
-  const auto sameDirectionDistance = vm::squared_length(edge.first - reference.first)
-                                     + vm::squared_length(edge.second - reference.second);
-  const auto reversedDistance = vm::squared_length(edge.second - reference.first)
-                                + vm::squared_length(edge.first - reference.second);
-  return sameDirectionDistance <= reversedDistance ? edge : reverseEdge(edge);
-}
-
-bool alignUnwrappedFace(
-  BrushFace& face,
-  FaceEdge previousEdge,
-  FaceEdge nextEdge,
-  const double startU,
-  double& endU)
-{
-  const auto travelVector = nextEdge.first - previousEdge.first;
-  const auto widthVector = previousEdge.second - previousEdge.first;
-  if (
-    vm::is_zero(travelVector, vm::Cd::almost_zero())
-    || vm::is_zero(widthVector, vm::Cd::almost_zero()))
+  const auto direction = nextFace.center() - face.center();
+  const auto projectedDirection =
+    direction - vm::dot(direction, face.normal()) * face.normal();
+  if (vm::is_zero(projectedDirection, vm::Cd::almost_zero()))
   {
     return false;
   }
 
-  const auto travelLength = (vm::length(nextEdge.first - previousEdge.first)
-                             + vm::length(nextEdge.second - previousEdge.second))
-                            / 2.0;
-  const auto widthLength = vm::length(widthVector);
-
-  const auto aa = vm::dot(travelVector, travelVector);
-  const auto ab = vm::dot(travelVector, widthVector);
-  const auto bb = vm::dot(widthVector, widthVector);
-  const auto determinant = aa * bb - ab * ab;
-  if (vm::is_zero(determinant, vm::Cd::almost_zero()))
+  const auto toUV =
+    face.toUVCoordSystemMatrix(face.attributes().offset(), vm::vec2f{1, 1});
+  const auto centerUV = vm::vec2f{toUV * face.center()};
+  const auto targetUV =
+    vm::vec2f{toUV * (face.center() + vm::normalize(projectedDirection))};
+  const auto uvDirection = targetUV - centerUV;
+  if (vm::is_zero(uvDirection, vm::Cf::almost_zero()))
   {
     return false;
   }
 
-  auto uAxis = travelLength * (bb * travelVector - ab * widthVector) / determinant;
-  auto vAxis = widthLength * (aa * widthVector - ab * travelVector) / determinant;
-
-  if (vm::dot(vm::cross(uAxis, vAxis), face.normal()) < 0.0)
-  {
-    previousEdge = reverseEdge(previousEdge);
-    nextEdge = reverseEdge(nextEdge);
-    vAxis = -vAxis;
-  }
-
-  auto attributes = face.attributes();
-  attributes.setOffset(vm::vec2f{
-    float(startU - vm::dot(previousEdge.first, uAxis)),
-    -float(vm::dot(previousEdge.first, vAxis)),
-  });
-  attributes.setScale(vm::vec2f{1, 1});
-  attributes.setRotation(0.0f);
-  face.setAttributes(attributes);
-
-  const auto snapshot = ParallelUVCoordSystemSnapshot{uAxis, vAxis};
-  face.restoreUVCoordSystemSnapshot(snapshot);
-  face.resetUVCoordSystemCache();
-
-  endU = startU + travelLength;
+  const auto uDirection = vm::normalize(vm::vec2f{-uvDirection.y(), uvDirection.x()});
+  evaluate(
+    UpdateBrushFaceAttributes{
+      .rotation = SetValue{face.measureUVAngle(vm::vec2f{0, 0}, uDirection)},
+    },
+    face);
   return true;
-}
-
-bool alignUnwrappedFacePath(
-  const std::vector<size_t>& order,
-  std::unordered_map<BrushNode*, Brush>& brushes,
-  const std::vector<SelectedFace>& faces)
-{
-  if (order.size() < 2u)
-  {
-    return false;
-  }
-
-  auto previousNextEdge = std::optional<FaceEdge>{};
-  auto startU = 0.0;
-  for (size_t i = 0u; i < order.size(); ++i)
-  {
-    auto& face = faceAt(brushes.at(faces[order[i]].node), faces[order[i]]);
-
-    auto previousEdge = std::optional<FaceEdge>{};
-    auto nextEdge = std::optional<FaceEdge>{};
-    if (i == 0u)
-    {
-      const auto& followingFace =
-        faceAt(brushes.at(faces[order[i + 1u]].node), faces[order[i + 1u]]);
-      nextEdge = sharedEdge(face, followingFace);
-      previousEdge = nextEdge ? oppositeEdge(face, *nextEdge) : std::nullopt;
-      if (previousEdge && nextEdge)
-      {
-        nextEdge = orientEdgeForPairing(*nextEdge, *previousEdge);
-      }
-    }
-    else
-    {
-      previousEdge = previousNextEdge;
-      if (i + 1u < order.size())
-      {
-        const auto& followingFace =
-          faceAt(brushes.at(faces[order[i + 1u]].node), faces[order[i + 1u]]);
-        nextEdge = sharedEdge(face, followingFace);
-      }
-      else if (previousEdge)
-      {
-        nextEdge = oppositeEdge(face, *previousEdge);
-      }
-      if (previousEdge && nextEdge)
-      {
-        nextEdge = orientEdgeForPairing(*nextEdge, *previousEdge);
-      }
-    }
-
-    if (!previousEdge || !nextEdge)
-    {
-      return false;
-    }
-
-    auto endU = startU;
-    if (!alignUnwrappedFace(face, *previousEdge, *nextEdge, startU, endU))
-    {
-      return false;
-    }
-
-    startU = endU;
-    previousNextEdge = *nextEdge;
-  }
-
-  return true;
-}
-
-void alignFacesIndividually(
-  const std::vector<size_t>& order,
-  std::unordered_map<BrushNode*, Brush>& brushes,
-  const std::vector<SelectedFace>& faces,
-  const UvPolicy uvPolicy)
-{
-  for (const auto index : order)
-  {
-    evaluate(
-      mdl::align(faceAt(brushes.at(faces[index].node), faces[index]), uvPolicy),
-      faceAt(brushes.at(faces[index].node), faces[index]));
-  }
-}
-
-FaceComponentPath faceComponentPath(
-  const size_t start,
-  const std::vector<std::vector<size_t>>& adjacentFaces,
-  std::vector<bool>& visited)
-{
-  auto component = std::vector<size_t>{};
-  auto queue = std::queue<size_t>{};
-  auto inComponent = std::vector<bool>(adjacentFaces.size(), false);
-
-  visited[start] = true;
-  queue.push(start);
-  while (!queue.empty())
-  {
-    const auto index = queue.front();
-    queue.pop();
-
-    component.push_back(index);
-    inComponent[index] = true;
-    for (const auto adjacentIndex : adjacentFaces[index])
-    {
-      if (!visited[adjacentIndex])
-      {
-        visited[adjacentIndex] = true;
-        queue.push(adjacentIndex);
-      }
-    }
-  }
-
-  if (component.size() <= 1u)
-  {
-    return {component, component};
-  }
-
-  auto endpoint = std::optional<size_t>{};
-  size_t endpointCount = 0u;
-  for (const auto index : component)
-  {
-    const auto degree = std::ranges::count_if(
-      adjacentFaces[index], [&](const auto i) { return inComponent[i]; });
-    if (degree > 2)
-    {
-      return {component, {}};
-    }
-    if (degree == 1)
-    {
-      ++endpointCount;
-      endpoint = endpoint.value_or(index);
-    }
-  }
-  if (endpointCount != 2u || !endpoint)
-  {
-    return {component, {}};
-  }
-
-  auto result = std::vector<size_t>{};
-  auto pathVisited = std::vector<bool>(adjacentFaces.size(), false);
-  auto previous = std::optional<size_t>{};
-  auto current = *endpoint;
-  while (true)
-  {
-    result.push_back(current);
-    pathVisited[current] = true;
-
-    auto next = std::optional<size_t>{};
-    for (const auto adjacentIndex : adjacentFaces[current])
-    {
-      if (
-        inComponent[adjacentIndex] && adjacentIndex != previous
-        && !pathVisited[adjacentIndex])
-      {
-        next = adjacentIndex;
-        break;
-      }
-    }
-
-    if (!next)
-    {
-      break;
-    }
-    previous = current;
-    current = *next;
-  }
-
-  return {
-    component,
-    result.size() == component.size() ? result : std::vector<size_t>{},
-  };
 }
 
 } // namespace
@@ -630,7 +364,6 @@ void alignUV(Map& map, const UvPolicy uvPolicy)
 
 bool alignUVContinuously(Map& map, const UvPolicy uvPolicy)
 {
-  const auto mapFormat = map.worldNode().mapFormat();
   auto brushes = std::unordered_map<BrushNode*, Brush>{};
   auto faces = std::vector<SelectedFace>{};
   for (const auto& handle : map.selection().allBrushFaces())
@@ -666,28 +399,48 @@ bool alignUVContinuously(Map& map, const UvPolicy uvPolicy)
     }
   }
 
-  if (!isParallelUVCoordSystem(mapFormat))
+  auto visited = std::vector<bool>(faces.size(), false);
+  for (size_t start = 0u; start < faces.size(); ++start)
   {
-    auto allFaces = std::vector<size_t>(faces.size());
-    std::iota(allFaces.begin(), allFaces.end(), 0u);
-    alignFacesIndividually(allFaces, brushes, faces, uvPolicy);
-  }
-  else
-  {
-    auto visited = std::vector<bool>(faces.size(), false);
-    for (size_t start = 0u; start < faces.size(); ++start)
+    if (visited[start])
     {
-      if (visited[start])
-      {
-        continue;
-      }
+      continue;
+    }
 
-      const auto componentPath = faceComponentPath(start, adjacentFaces, visited);
-      if (
-        componentPath.path.size() < 2u
-        || !alignUnwrappedFacePath(componentPath.path, brushes, faces))
+    auto& startFace = faceAt(brushes.at(faces[start].node), faces[start]);
+    if (
+      adjacentFaces[start].empty()
+      || !alignUVToBandDirection(
+        startFace,
+        faceAt(
+          brushes.at(faces[adjacentFaces[start].front()].node),
+          faces[adjacentFaces[start].front()])))
+    {
+      evaluate(mdl::align(startFace, uvPolicy), startFace);
+    }
+
+    auto queue = std::queue<size_t>{};
+    visited[start] = true;
+    queue.push(start);
+
+    while (!queue.empty())
+    {
+      const auto sourceIndex = queue.front();
+      queue.pop();
+      const auto sourceFace =
+        faceAt(brushes.at(faces[sourceIndex].node), faces[sourceIndex]);
+
+      for (const auto targetIndex : adjacentFaces[sourceIndex])
       {
-        alignFacesIndividually(componentPath.component, brushes, faces, uvPolicy);
+        if (visited[targetIndex])
+        {
+          continue;
+        }
+
+        visited[targetIndex] = true;
+        copyUVContinuously(
+          sourceFace, faceAt(brushes.at(faces[targetIndex].node), faces[targetIndex]));
+        queue.push(targetIndex);
       }
     }
   }
