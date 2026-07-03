@@ -249,6 +249,7 @@ def import_request(payload):
         obj["tb_brush_id"] = brush_id
         obj["tb_face_ids"] = [str(face["id"]) for face in faces]
         obj["tb_face_vertices"] = [list(map(int, face["vertices"])) for face in faces]
+        obj.hide_viewport = False
 
         material_names = []
         for face in faces:
@@ -428,6 +429,9 @@ def create_uv_workmesh():
     workmesh["tb_sync_schema"] = SCHEMA
     workmesh["tb_uv_workmesh"] = True
     workmesh["tb_face_refs"] = face_refs
+    workmesh.hide_viewport = False
+    for obj in _source_objects(collection):
+        obj.hide_viewport = True
     return workmesh
 
 

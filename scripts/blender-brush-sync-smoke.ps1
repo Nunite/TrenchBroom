@@ -125,6 +125,14 @@ workmesh = module.create_uv_workmesh()
 assert workmesh.name == module.WORKMESH_NAME, workmesh.name
 assert len(workmesh.data.polygons) == 2, len(workmesh.data.polygons)
 assert len(workmesh.data.polygons[0].vertices) == 4, len(workmesh.data.polygons[0].vertices)
+assert bpy.data.objects["TB Brush brush0"].hide_viewport, "Source brush should hide after workmesh creation"
+assert bpy.data.objects["TB Brush brush1"].hide_viewport, "Source brush should hide after workmesh creation"
+assert not workmesh.hide_viewport, "Workmesh should remain visible"
+count = module.import_request_file(request_path)
+assert count == 2, count
+assert not bpy.data.objects["TB Brush brush0"].hide_viewport, "Import should show source brush"
+assert not bpy.data.objects["TB Brush brush1"].hide_viewport, "Import should show source brush"
+workmesh = module.create_uv_workmesh()
 bpy.ops.object.select_all(action="DESELECT")
 bpy.context.view_layer.objects.active = workmesh
 workmesh.select_set(True)
