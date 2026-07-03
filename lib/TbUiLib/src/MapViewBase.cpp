@@ -244,6 +244,16 @@ void MapViewBase::setIsCurrent(const bool isCurrent)
   m_isCurrent = isCurrent;
 }
 
+bool MapViewBase::renderingThumbnail() const
+{
+  return m_renderingThumbnail;
+}
+
+void MapViewBase::setRenderingThumbnail(const bool renderingThumbnail)
+{
+  m_renderingThumbnail = renderingThumbnail;
+}
+
 void MapViewBase::showPieMenu()
 {
   auto* mapWindow = dynamic_cast<MapWindow*>(window());
@@ -1150,15 +1160,18 @@ void MapViewBase::renderContents(gl::Gl& gl)
 
   renderGrid(renderContext, renderBatch);
   renderMap(m_document.mapRenderer(), renderContext, renderBatch);
-  renderTools(m_toolBox, renderContext, renderBatch);
+  if (!m_renderingThumbnail)
+  {
+    renderTools(m_toolBox, renderContext, renderBatch);
 
-  renderCoordinateSystem(renderContext, renderBatch);
-  renderSoftWorldBounds(renderContext, renderBatch);
-  renderPointFile(renderContext, renderBatch);
-  renderPortalFile(renderContext, renderBatch);
-  renderMcpOverlay(renderContext, renderBatch);
-  renderCompass(renderBatch);
-  renderFPS(renderContext, renderBatch);
+    renderCoordinateSystem(renderContext, renderBatch);
+    renderSoftWorldBounds(renderContext, renderBatch);
+    renderPointFile(renderContext, renderBatch);
+    renderPortalFile(renderContext, renderBatch);
+    renderMcpOverlay(renderContext, renderBatch);
+    renderCompass(renderBatch);
+    renderFPS(renderContext, renderBatch);
+  }
 
   renderBatch.render(renderContext);
 }

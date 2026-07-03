@@ -155,15 +155,15 @@ Result<void> savePrefabThumbnail(
   }
 
   auto transaction = mdl::Transaction{map, "Capture Prefab Thumbnail"};
+  const auto selectedNodes = map.selection().nodes;
   if (!isolateSelectionForThumbnail(map))
   {
     transaction.cancel();
     return Error{"Failed to isolate selection for prefab thumbnail"};
   }
   mdl::deselectAll(map);
-  view->repaint();
 
-  auto image = view->grabFramebuffer();
+  auto image = view->grabPrefabThumbnailFramebuffer(selectedNodes);
   transaction.cancel();
 
   if (image.isNull())

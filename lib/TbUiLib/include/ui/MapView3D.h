@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include <QImage>
+
 #include "NotifierConnection.h"
 #include "ui/MapViewBase.h"
 
@@ -32,6 +34,11 @@ namespace tb
 namespace gl
 {
 class PerspectiveCamera;
+}
+
+namespace mdl
+{
+class Node;
 }
 
 namespace ui
@@ -51,6 +58,8 @@ private:
 public:
   MapView3D(AppController& appController, MapDocument& document, MapViewToolBox& toolBox);
   ~MapView3D() override;
+
+  QImage grabPrefabThumbnailFramebuffer(const std::vector<mdl::Node*>& nodes);
 
 private:
   void initializeCamera();

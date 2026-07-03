@@ -92,6 +92,29 @@ MapView3D::MapView3D(
 
 MapView3D::~MapView3D() = default;
 
+QImage MapView3D::grabPrefabThumbnailFramebuffer(const std::vector<mdl::Node*>& nodes)
+{
+  const auto oldPosition = m_camera->position();
+  const auto oldDirection = m_camera->direction();
+  const auto oldUp = m_camera->up();
+  const auto oldZoom = m_camera->zoom();
+
+  if (!nodes.empty())
+  {
+    moveCameraToPosition(focusCameraOnObjectsPosition(nodes), false);
+  }
+  setRenderingThumbnail(true);
+  repaint();
+
+  auto image = grabFramebuffer();
+
+  setRenderingThumbnail(false);
+  m_camera->moveTo(oldPosition);
+  m_camera->setDirection(oldDirection, oldUp);
+  m_camera->setZoom(oldZoom);
+  return image;
+}
+
 void MapView3D::initializeCamera()
 {
   m_camera->moveTo(vm::vec3f{-80.0f, -128.0f, 96.0f});

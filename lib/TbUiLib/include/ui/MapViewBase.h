@@ -96,6 +96,7 @@ protected:
 private:
   std::unique_ptr<render::Compass> m_compass;
   std::unique_ptr<render::PrimitiveRenderer> m_portalFileRenderer;
+  bool m_renderingThumbnail = false;
 
   /**
    * Tracks whether this map view has most recently gotten the focus. This is tracked and
@@ -137,6 +138,10 @@ public:
 
   virtual gl::Camera& camera() = 0;
   void showPieMenu();
+
+protected:
+  bool renderingThumbnail() const;
+  void setRenderingThumbnail(bool renderingThumbnail);
 
 private:
   void bindEvents();
