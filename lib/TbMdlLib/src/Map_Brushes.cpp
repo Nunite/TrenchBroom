@@ -212,7 +212,8 @@ void copyUVContinuously(const BrushFace& sourceFace, BrushFace& targetFace)
     attributes.setScale(sourceFace.attributes().scale());
     attributes.setRotation(sourceFace.attributes().rotation());
     targetFace.setAttributes(attributes);
-    targetFace.restoreUVCoordSystemSnapshot(*snapshot);
+    targetFace.copyUVCoordSystemFromFace(
+      *snapshot, sourceFace.attributes(), sourceFace.boundary(), WrapStyle::Rotation);
     targetFace.resetUVCoordSystemCache();
   }
 }
