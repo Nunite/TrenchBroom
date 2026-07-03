@@ -32,6 +32,7 @@
 #include <vector>
 
 class QAbstractButton;
+class QComboBox;
 class QEvent;
 class QFileSystemWatcher;
 class QHBoxLayout;
@@ -60,6 +61,7 @@ private:
   QHBoxLayout* m_breadcrumbLayout = nullptr;
   QToolButton* m_savePrefabButton = nullptr;
   QToolButton* m_reloadButton = nullptr;
+  QComboBox* m_iconSizeCombo = nullptr;
   QLineEdit* m_folderEdit = nullptr;
   QLineEdit* m_searchBox = nullptr;
 
@@ -103,6 +105,7 @@ private:
   void showBreadcrumbBar();
   void updateFolderEdit();
   void updateSavePrefabButton();
+  void updateIconSizeCombo();
   void saveSelectionAsPrefab();
   void renamePrefab(std::filesystem::path prefabPath);
   void deletePrefab(std::filesystem::path prefabPath);

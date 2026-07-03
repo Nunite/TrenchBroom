@@ -19,6 +19,7 @@
 
 #include "ui/ModelBrowser.h"
 
+#include <QComboBox>
 #include <QFileSystemWatcher>
 #include <QHBoxLayout>
 #include <QImage>
@@ -37,6 +38,8 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include "PreferenceManager.h"
+#include "Preferences.h"
 #include "fs/DiskIO.h"
 #include "fs/FileSystem.h"
 #include "fs/PathInfo.h"
@@ -84,6 +87,18 @@ namespace
 
 const auto AssetRootPath = std::filesystem::path{};
 constexpr auto PrefabThumbnailMaxSize = 512;
+
+std::optional<float> assetIconSizeForComboIndex(QComboBox* combo, const int index)
+{
+  if (!combo || index < 0)
+  {
+    return std::nullopt;
+  }
+
+  auto ok = false;
+  const auto value = combo->itemData(index).toFloat(&ok);
+  return ok ? std::optional<float>{value} : std::nullopt;
+}
 
 std::filesystem::path userPrefabAssetPath(const std::filesystem::path& path)
 {
@@ -235,6 +250,17 @@ void ModelBrowser::createGui(AppController& appController)
   m_savePrefabButton = createBitmapButton("Add.svg", tr("Save selection as prefab"));
   m_savePrefabButton->setEnabled(false);
 
+  m_iconSizeCombo = new QComboBox{};
+  m_iconSizeCombo->setToolTip(tr("Asset icon size"));
+  m_iconSizeCombo->addItem("50%", 0.5f);
+  m_iconSizeCombo->addItem("75%", 0.75f);
+  m_iconSizeCombo->addItem("100%", 1.0f);
+  m_iconSizeCombo->addItem("150%", 1.5f);
+  m_iconSizeCombo->addItem("200%", 2.0f);
+  m_iconSizeCombo->addItem("250%", 2.5f);
+  m_iconSizeCombo->addItem("300%", 3.0f);
+  updateIconSizeCombo();
+
   m_searchBox = createSearchBox();
 
   auto* pathRowLayout = new QHBoxLayout{};
@@ -242,6 +268,7 @@ void ModelBrowser::createGui(AppController& appController)
   pathRowLayout->setSpacing(0);
   pathRowLayout->addWidget(m_pathStack, 1);
   pathRowLayout->addWidget(m_savePrefabButton, 0);
+  pathRowLayout->addWidget(m_iconSizeCombo, 0);
   pathRowLayout->addWidget(m_reloadButton, 0);
 
   auto* controlsLayout = new QVBoxLayout{};
@@ -377,12 +404,33 @@ void ModelBrowser::bindEvents()
 
   connect(
     m_savePrefabButton, &QToolButton::clicked, this, [&]() { saveSelectionAsPrefab(); });
+
+  connect(
+    m_iconSizeCombo,
+    QOverload<int>::of(&QComboBox::currentIndexChanged),
+    this,
+    [&](const int index) {
+      if (const auto value = assetIconSizeForComboIndex(m_iconSizeCombo, index))
+      {
+        setPref(Preferences::AssetBrowserIconSize, *value);
+      }
+    });
 }
 
 void ModelBrowser::connectObservers()
 {
   m_notifierConnection +=
     m_document.documentWasLoadedNotifier.connect(this, &ModelBrowser::documentWasLoaded);
+  m_notifierConnection +=
+    PreferenceManager::instance().preferenceDidChangeNotifier.connect(
+      [this](const auto& path) {
+        if (path == Preferences::AssetBrowserIconSize.path)
+        {
+          updateIconSizeCombo();
+          m_view->invalidate();
+          m_view->update();
+        }
+      });
   connectMapObservers();
 }
 
@@ -420,6 +468,28 @@ void ModelBrowser::showEvent(QShowEvent* event)
 {
   QWidget::showEvent(event);
   scheduleAssetRefresh();
+}
+
+void ModelBrowser::updateIconSizeCombo()
+{
+  if (!m_iconSizeCombo)
+  {
+    return;
+  }
+
+  const auto value = pref(Preferences::AssetBrowserIconSize);
+  auto index = 2;
+  for (auto i = 0; i < m_iconSizeCombo->count(); ++i)
+  {
+    if (assetIconSizeForComboIndex(m_iconSizeCombo, i) == value)
+    {
+      index = i;
+      break;
+    }
+  }
+
+  const auto blocker = QSignalBlocker{m_iconSizeCombo};
+  m_iconSizeCombo->setCurrentIndex(index);
 }
 
 bool ModelBrowser::eventFilter(QObject* obj, QEvent* event)

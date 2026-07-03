@@ -248,6 +248,7 @@ inline auto BrowserBackgroundColor =
   Preference<Color>{"Browser/Background color", RgbF{0.14f, 0.14f, 0.14f}};
 inline auto MaterialBrowserIconSize =
   Preference<float>{"Texture Browser/Icon size", 1.0f};
+inline auto AssetBrowserIconSize = Preference<float>{"Asset Browser/Icon size", 1.0f};
 inline auto PrefabDirectory = Preference<std::filesystem::path>{"Prefab/Directory", {}};
 inline auto MaterialBrowserDefaultColor =
   Preference<Color>{"Texture Browser/Default color", RgbaF{0.0f, 0.0f, 0.0f, 0.0f}};

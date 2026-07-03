@@ -80,6 +80,13 @@ namespace
 
 constexpr auto SoundPreviewButtonSize = 24.0f;
 constexpr auto SoundPreviewButtonMargin = 8.0f;
+constexpr auto DefaultAssetCellSize = 93.0f;
+
+float assetCellSize()
+{
+  return DefaultAssetCellSize
+         * std::clamp(pref(Preferences::AssetBrowserIconSize), 0.5f, 3.0f);
+}
 
 std::optional<RgbaF> assetPlaceholderColor(const BrowserCellType type)
 {
@@ -270,13 +277,14 @@ void ModelBrowserView::resourcesWereProcessed(const std::vector<mdl::ResourceId>
 
 void ModelBrowserView::doInitLayout(Layout& layout)
 {
+  const auto cellSize = assetCellSize();
   layout.setOuterMargin(5.0f);
   layout.setGroupMargin(0.0f);
   layout.setRowMargin(5.0f);
   layout.setCellMargin(5.0f);
   layout.setTitleMargin(2.0f);
-  layout.setCellWidth(93.0f, 93.0f);
-  layout.setCellHeight(93.0f, 93.0f);
+  layout.setCellWidth(cellSize, cellSize);
+  layout.setCellHeight(cellSize, cellSize);
   layout.setMaxUpScale(1.5f);
 }
 
@@ -286,13 +294,14 @@ void ModelBrowserView::doReloadLayout(Layout& layout)
   const auto fontSize = pref(Preferences::BrowserFontSize);
   const auto font = gl::FontDescriptor{fontPath, size_t(fontSize)};
   const auto maxCellWidth = layout.maxCellWidth();
+  const auto cellSize = assetCellSize();
   for (const auto& entry :
        modelBrowserEntries(m_rootFolderPath, m_assets, m_currentFolderPath, m_searchText))
   {
     const auto titleHeight = fontManager().font(font).measure(entry.title).y();
 
     layout.addItem(
-      entry.cellData, entry.title, 93.0f, 93.0f, maxCellWidth, titleHeight + 4.0f);
+      entry.cellData, entry.title, cellSize, cellSize, maxCellWidth, titleHeight + 4.0f);
   }
 }
 
