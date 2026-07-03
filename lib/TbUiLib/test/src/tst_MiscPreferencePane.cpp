@@ -18,6 +18,7 @@
  */
 
 #include <QCheckBox>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
 
@@ -41,6 +42,7 @@ TEST_CASE("MiscPreferencePane")
   prefs.set(Preferences::Enable2DBoxSelection, true);
   prefs.set(Preferences::PythonPluginDirectories, "C:/tb/plugin");
   prefs.set(Preferences::PieMenuAction, "Menu/Edit/Undo|Menu/Edit/Redo");
+  prefs.set(Preferences::PrefabDirectory, "C:/tb/prefabs");
 
   auto pane = MiscPreferencePane{appControllerFixture.appController()};
 
@@ -85,6 +87,22 @@ TEST_CASE("MiscPreferencePane")
     CHECK_FALSE(prefs.get(Preferences::Enable2DBoxSelection));
     CHECK(prefs.get(Preferences::PythonPluginDirectories) == "C:/tb/plugin");
     CHECK(prefs.get(Preferences::PieMenuAction) == "Menu/Edit/Undo|Menu/Edit/Redo");
+    CHECK(prefs.get(Preferences::PrefabDirectory).empty());
+  }
+
+  SECTION("loads prefab directory preference")
+  {
+    auto* prefabDirectoryEdit = pane.findChild<QLineEdit*>("prefabDirectoryEdit");
+
+    REQUIRE(prefabDirectoryEdit != nullptr);
+    CHECK(prefabDirectoryEdit->text() == QStringLiteral("C:/tb/prefabs"));
+  }
+
+  SECTION("reset clears prefab directory preference")
+  {
+    pane.resetToDefaults();
+
+    CHECK(prefs.get(Preferences::PrefabDirectory).empty());
   }
 
   SECTION("links to separate management dialogs")

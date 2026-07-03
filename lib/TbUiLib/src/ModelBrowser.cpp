@@ -19,9 +19,9 @@
 
 #include "ui/ModelBrowser.h"
 
-#include <QFileDialog>
 #include <QFileSystemWatcher>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -71,15 +71,21 @@ namespace
 
 const auto AssetRootPath = std::filesystem::path{};
 
-std::filesystem::path defaultPrefabPath(const mdl::Map& map)
+std::filesystem::path userPrefabAssetPath(const std::filesystem::path& path)
 {
-  auto modPath = std::filesystem::path{};
-  if (const auto enabledMods = mdl::enabledMods(map); !enabledMods.empty())
+  const auto prefix = std::filesystem::path{"prefabs"};
+  if (path.empty() || !kdl::path_has_prefix(path, prefix))
   {
-    modPath = std::filesystem::path{enabledMods.front()};
+    return {};
   }
 
-  return map.gamePath() / modPath / "prefabs" / "selection.tbprefab";
+  return configuredPrefabDirectory() / path.lexically_relative(prefix);
+}
+
+std::filesystem::path userPrefabBrowserPath(const std::filesystem::path& path)
+{
+  return std::filesystem::path{"prefabs"}
+         / path.lexically_relative(configuredPrefabDirectory());
 }
 
 } // namespace
@@ -437,21 +443,32 @@ void ModelBrowser::saveSelectionAsPrefab()
     return;
   }
 
-  auto defaultPath = defaultPrefabPath(map);
-  auto filePathText = QFileDialog::getSaveFileName(
-    this, tr("Save Prefab"), pathAsQString(defaultPath), tr("Prefab Files (*.tbprefab)"));
-  if (filePathText.isEmpty())
+  auto ok = false;
+  auto prefabName = QInputDialog::getText(
+    this, tr("Save Prefab"), tr("Prefab name:"), QLineEdit::Normal, {}, &ok);
+  if (!ok)
   {
     return;
   }
 
-  auto filePath = pathFromQString(filePathText);
-  if (filePath.extension().empty())
+  prefabName = prefabName.trimmed();
+  if (prefabName.isEmpty())
   {
-    filePath.replace_extension(".tbprefab");
+    return;
+  }
+
+  const auto prefabDirectory = configuredPrefabDirectory();
+  if (const auto result =
+        checkPrefabNameAvailable(prefabDirectory, prefabName.toStdString());
+      result.is_error())
+  {
+    const auto& error = std::get<tb::Error>(result.error());
+    QMessageBox::warning(this, tr("Save Prefab"), QString::fromStdString(error.msg));
+    return;
   }
 
   const auto prefabText = mdl::serializeSelectedNodes(map);
+  const auto filePath = prefabPathForName(prefabDirectory, prefabName.toStdString());
   const auto result = writePrefabAsset(filePath, prefabText);
   if (result.is_error())
   {
@@ -579,12 +596,34 @@ std::optional<std::vector<BrowserAsset>> ModelBrowser::scanAssets() const
     m_folderPath,
     modRoots,
     [&](const auto& rootPath) {
+      if (rootPath == std::filesystem::path{"prefabs"})
+      {
+        return fs::Disk::find(
+                 configuredPrefabDirectory(),
+                 fs::TraversalMode::Recursive,
+                 fs::makeExtensionPathMatcher(
+                   std::vector<std::filesystem::path>{".tbprefab"}))
+               | kdl::transform([](const auto& paths) {
+                   return paths | std::views::transform(userPrefabBrowserPath)
+                          | kdl::ranges::to<std::vector>();
+                 });
+      }
+
       return fs.find(
         rootPath,
         fs::TraversalMode::Recursive,
         fs::makeExtensionPathMatcher(assetBrowserExtensions()));
     },
-    [&](const auto& path) { return fs.makeAbsolute(path); },
+    [&](const auto& path) {
+      if (isPrefabAssetPath(path))
+      {
+        const auto absPath = userPrefabAssetPath(path);
+        return absPath.empty()
+                 ? Result<std::filesystem::path>{Error{"Invalid prefab path"}}
+                 : Result<std::filesystem::path>{absPath};
+      }
+      return fs.makeAbsolute(path);
+    },
     assetBrowserRoots());
 }
 

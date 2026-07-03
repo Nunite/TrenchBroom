@@ -2,9 +2,11 @@
 
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QFileDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
@@ -15,6 +17,8 @@
 #include "Preferences.h"
 #include "ui/AppController.h"
 #include "ui/PieMenuSettingsDialog.h"
+#include "ui/PrefabAsset.h"
+#include "ui/QPathUtils.h"
 #include "ui/QStyleUtils.h"
 #include "ui/ViewConstants.h"
 
@@ -106,6 +110,35 @@ void MiscPreferencePane::createGui()
   m_pieMenuSettingsButton = new QPushButton{tr("Pie Menu Settings...")};
   m_pythonPluginManagerButton = new QPushButton{tr("Python Plugin Manager...")};
 
+  m_prefabDirectoryEdit = new QLineEdit{};
+  m_prefabDirectoryEdit->setObjectName("prefabDirectoryEdit");
+  m_prefabDirectoryEdit->setPlaceholderText(pathAsQString(defaultPrefabDirectory()));
+
+  m_choosePrefabDirectoryButton = new QPushButton{tr("...")};
+
+  connect(m_prefabDirectoryEdit, &QLineEdit::editingFinished, this, [this]() {
+    auto& prefs = PreferenceManager::instance();
+    prefs.set(
+      Preferences::PrefabDirectory, pathFromQString(m_prefabDirectoryEdit->text()));
+  });
+
+  connect(m_choosePrefabDirectoryButton, &QPushButton::clicked, this, [this]() {
+    auto& prefs = PreferenceManager::instance();
+    auto directory = prefs.getPendingValue(Preferences::PrefabDirectory);
+    if (directory.empty())
+    {
+      directory = defaultPrefabDirectory();
+    }
+
+    const auto pathStr = QFileDialog::getExistingDirectory(
+      this, tr("Prefab Directory"), pathAsQString(directory));
+    if (!pathStr.isEmpty())
+    {
+      m_prefabDirectoryEdit->setText(pathStr);
+      prefs.set(Preferences::PrefabDirectory, pathFromQString(pathStr));
+    }
+  });
+
   connect(m_pieMenuSettingsButton, &QPushButton::clicked, this, [this]() {
     auto dialog = PieMenuSettingsDialog{this};
     dialog.exec();
@@ -115,7 +148,15 @@ void MiscPreferencePane::createGui()
     m_appController.showPythonPluginManager();
   });
 
+  auto* prefabDirectoryLayout = new QHBoxLayout{};
+  prefabDirectoryLayout->setContentsMargins(QMargins{});
+  prefabDirectoryLayout->setSpacing(LayoutConstants::MediumHMargin);
+  prefabDirectoryLayout->addWidget(m_prefabDirectoryEdit, 1);
+  prefabDirectoryLayout->addWidget(m_choosePrefabDirectoryButton);
+
   auto* toolLayout = new QVBoxLayout{};
+  toolLayout->addWidget(new QLabel{tr("Prefab directory")});
+  toolLayout->addLayout(prefabDirectoryLayout);
   toolLayout->addWidget(m_pieMenuSettingsButton);
   toolLayout->addWidget(m_pythonPluginManagerButton);
 
@@ -144,6 +185,7 @@ void MiscPreferencePane::doResetToDefaults()
   prefs.resetToDefault(Preferences::Language);
   prefs.resetToDefault(Preferences::PrefixWorldspawnHeaderOnCopy);
   prefs.resetToDefault(Preferences::Enable2DBoxSelection);
+  prefs.resetToDefault(Preferences::PrefabDirectory);
   updateControls();
 }
 
@@ -153,6 +195,7 @@ void MiscPreferencePane::updateControls()
   const auto chineseBlocker = QSignalBlocker{m_chineseRadioButton};
   const auto prefixBlocker = QSignalBlocker{m_prefixWorldspawnOnCopyCheckBox};
   const auto boxSelectionBlocker = QSignalBlocker{m_enable2DBoxSelectionCheckBox};
+  const auto prefabDirectoryBlocker = QSignalBlocker{m_prefabDirectoryEdit};
 
   const auto& language = pref(Preferences::Language);
   m_englishRadioButton->setChecked(language == Preferences::languageEnglish());
@@ -160,6 +203,8 @@ void MiscPreferencePane::updateControls()
   m_prefixWorldspawnOnCopyCheckBox->setChecked(
     pref(Preferences::PrefixWorldspawnHeaderOnCopy));
   m_enable2DBoxSelectionCheckBox->setChecked(pref(Preferences::Enable2DBoxSelection));
+  m_prefabDirectoryEdit->setText(pathAsQString(
+    PreferenceManager::instance().getPendingValue(Preferences::PrefabDirectory)));
 }
 
 bool MiscPreferencePane::validate()

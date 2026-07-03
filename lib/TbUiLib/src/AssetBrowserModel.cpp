@@ -216,7 +216,7 @@ std::optional<std::vector<BrowserAsset>> collectBrowserAssets(
         absPath = path.lexically_normal();
       }
 
-      if (!modRoots.empty())
+      if (!modRoots.empty() && assetType != BrowserCellType::Prefab)
       {
         if (absPath.empty())
         {

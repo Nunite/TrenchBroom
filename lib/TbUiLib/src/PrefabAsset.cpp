@@ -20,11 +20,18 @@
 #include "ui/PrefabAsset.h"
 
 #include "Error.h"
+#include "PreferenceManager.h"
+#include "Preferences.h"
 #include "fs/DiskIO.h"
 #include "fs/File.h"
+#include "fs/PathInfo.h"
 #include "fs/Reader.h"
+#include "ui/SystemPaths.h"
 
 #include "kd/path_utils.h"
+
+#include <fmt/format.h>
+#include <fmt/std.h>
 
 namespace tb::ui
 {
@@ -32,6 +39,47 @@ namespace tb::ui
 bool isPrefabAssetPath(const std::filesystem::path& path)
 {
   return kdl::path_to_lower(path.extension()) == ".tbprefab";
+}
+
+std::filesystem::path defaultPrefabDirectory()
+{
+  return SystemPaths::userDataDirectory() / "prefabs";
+}
+
+std::filesystem::path configuredPrefabDirectory()
+{
+  const auto& directory = pref(Preferences::PrefabDirectory);
+  if (directory.empty() || fs::Disk::pathInfo(directory) != fs::PathInfo::Directory)
+  {
+    return defaultPrefabDirectory();
+  }
+  return directory;
+}
+
+std::filesystem::path prefabPathForName(
+  const std::filesystem::path& directory, const std::string& name)
+{
+  auto path = directory / std::filesystem::path{name}.filename();
+  if (path.extension().empty())
+  {
+    path.replace_extension(".tbprefab");
+  }
+  return path;
+}
+
+Result<void> checkPrefabNameAvailable(
+  const std::filesystem::path& directory, const std::string& name)
+{
+  const auto path = prefabPathForName(directory, name);
+  if (!isPrefabAssetPath(path))
+  {
+    return Error{"Prefab name must use the .tbprefab extension"};
+  }
+  if (fs::Disk::pathInfo(path) != fs::PathInfo::Unknown)
+  {
+    return Error{fmt::format("Prefab already exists: {}", path.filename())};
+  }
+  return kdl::void_success;
 }
 
 Result<std::string> readPrefabAsset(const std::filesystem::path& path)

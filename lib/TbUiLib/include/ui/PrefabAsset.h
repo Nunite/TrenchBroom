@@ -29,6 +29,16 @@ namespace tb::ui
 
 bool isPrefabAssetPath(const std::filesystem::path& path);
 
+std::filesystem::path defaultPrefabDirectory();
+
+std::filesystem::path configuredPrefabDirectory();
+
+std::filesystem::path prefabPathForName(
+  const std::filesystem::path& directory, const std::string& name);
+
+Result<void> checkPrefabNameAvailable(
+  const std::filesystem::path& directory, const std::string& name);
+
 Result<std::string> readPrefabAsset(const std::filesystem::path& path);
 
 Result<void> writePrefabAsset(const std::filesystem::path& path, const std::string& text);

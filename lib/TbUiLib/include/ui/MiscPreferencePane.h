@@ -4,6 +4,7 @@
 
 class QButtonGroup;
 class QCheckBox;
+class QLineEdit;
 class QPushButton;
 class QRadioButton;
 
@@ -22,6 +23,8 @@ private:
   QButtonGroup* m_languageButtonGroup = nullptr;
   QCheckBox* m_prefixWorldspawnOnCopyCheckBox = nullptr;
   QCheckBox* m_enable2DBoxSelectionCheckBox = nullptr;
+  QLineEdit* m_prefabDirectoryEdit = nullptr;
+  QPushButton* m_choosePrefabDirectoryButton = nullptr;
   QPushButton* m_pieMenuSettingsButton = nullptr;
   QPushButton* m_pythonPluginManagerButton = nullptr;
 

@@ -168,6 +168,31 @@ TEST_CASE("AssetBrowserModel")
     CHECK((*assets)[0].absolutePath == std::filesystem::path{"game/mod1/models/a.mdl"});
   }
 
+  SECTION("keeps prefab assets outside enabled mod roots")
+  {
+    const auto assets = collectBrowserAssets(
+      {},
+      {std::filesystem::path{"game/mod1"}},
+      [](const auto& rootPath) {
+        if (rootPath == std::filesystem::path{"prefabs"})
+        {
+          return Result<std::vector<std::filesystem::path>>{
+            std::vector<std::filesystem::path>{"prefabs/crate.tbprefab"}};
+        }
+        return Result<std::vector<std::filesystem::path>>{
+          std::vector<std::filesystem::path>{}};
+      },
+      [](const auto& path) {
+        return Result<std::filesystem::path>{"user/prefabs" / path.filename()};
+      },
+      assetBrowserRoots());
+
+    REQUIRE(assets.has_value());
+    REQUIRE(assets->size() == 1u);
+    CHECK((*assets)[0].type == BrowserCellType::Prefab);
+    CHECK((*assets)[0].path == std::filesystem::path{"prefabs/crate.tbprefab"});
+  }
+
   SECTION("detects added modified and removed model assets")
   {
     const auto oldAssets = std::vector<BrowserAsset>{

@@ -32,6 +32,8 @@
 #include "ui/MapDocument.h"
 #include "ui/PrefabAsset.h"
 
+#include "kd/path_utils.h"
+
 namespace tb::ui
 {
 namespace
@@ -48,6 +50,13 @@ Result<std::string> readPrefabAssetText(
   if (path.is_absolute())
   {
     return ui::readPrefabAsset(path);
+  }
+
+  const auto prefix = std::filesystem::path{"prefabs"};
+  if (kdl::path_has_prefix(path, prefix))
+  {
+    return ui::readPrefabAsset(
+      configuredPrefabDirectory() / path.lexically_relative(prefix));
   }
 
   return gameFileSystem.openFile(path) | kdl::transform([](auto file) {

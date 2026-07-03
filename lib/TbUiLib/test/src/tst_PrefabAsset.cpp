@@ -17,8 +17,11 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "PreferenceManager.h"
+#include "Preferences.h"
 #include "fs/TestEnvironment.h"
 #include "ui/PrefabAsset.h"
+#include "ui/SystemPaths.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -45,6 +48,43 @@ TEST_CASE("PrefabAsset")
 
     REQUIRE(readResult);
     CHECK(readResult.value() == text);
+  }
+
+  SECTION("uses user data prefab directory by default")
+  {
+    CHECK(defaultPrefabDirectory() == SystemPaths::userDataDirectory() / "prefabs");
+  }
+
+  SECTION("uses configured prefab directory when set")
+  {
+    auto env = fs::TestEnvironment{};
+    auto& prefs = PreferenceManager::instance();
+    prefs.set(Preferences::PrefabDirectory, env.dir());
+
+    CHECK(configuredPrefabDirectory() == env.dir());
+
+    prefs.resetToDefault(Preferences::PrefabDirectory);
+  }
+
+  SECTION("builds prefab path from a name")
+  {
+    CHECK(
+      prefabPathForName("prefabs", "crate")
+      == std::filesystem::path{"prefabs/crate.tbprefab"});
+    CHECK(
+      prefabPathForName("prefabs", "crate.tbprefab")
+      == std::filesystem::path{"prefabs/crate.tbprefab"});
+  }
+
+  SECTION("rejects duplicate prefab names")
+  {
+    auto env = fs::TestEnvironment{};
+    const auto path = env.dir() / "crate.tbprefab";
+
+    REQUIRE(writePrefabAsset(path, "prefab"));
+
+    CHECK_FALSE(checkPrefabNameAvailable(env.dir(), "crate"));
+    CHECK(checkPrefabNameAvailable(env.dir(), "new_crate"));
   }
 }
 
