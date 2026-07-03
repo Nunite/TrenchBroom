@@ -281,6 +281,64 @@ def import_request_file(path=REQUEST_PATH):
     return import_request(_read_json(path))
 
 
+def _polygon_payload(obj, polygon, index, face_ids, face_vertices, uv_layer, material_names):
+    loop_vertex_ids = [
+        int(obj.data.loops[loop_index].vertex_index) for loop_index in polygon.loop_indices
+    ]
+    material_name = ""
+    if 0 <= polygon.material_index < len(obj.material_slots):
+        material = obj.material_slots[polygon.material_index].material
+        if material:
+            material_name = _export_material_name(material)
+    if material_name not in material_names:
+        material_names.append(material_name)
+    return {
+        "brushId": str(obj.get("tb_brush_id", "")),
+        "faceId": str(face_ids[index]),
+        "vertices": list(map(int, face_vertices[index])),
+        "loopVertexIds": loop_vertex_ids,
+        "material": material_name,
+        "materialIndex": material_names.index(material_name),
+        "uvs": [
+            tuple(uv_layer.data[loop_index].uv) if uv_layer else (0.0, 0.0)
+            for loop_index in polygon.loop_indices
+        ],
+    }
+
+
+def _quad_from_triangles(a, b):
+    if len(a["loopVertexIds"]) != 3 or len(b["loopVertexIds"]) != 3:
+        return None
+    if a["materialIndex"] != b["materialIndex"]:
+        return None
+    shared = set(a["loopVertexIds"]) & set(b["loopVertexIds"])
+    if len(shared) != 2:
+        return None
+    unique_a = [vertex for vertex in a["loopVertexIds"] if vertex not in shared][0]
+    unique_b = [vertex for vertex in b["loopVertexIds"] if vertex not in shared][0]
+    a_vertices = a["loopVertexIds"]
+    unique_a_index = a_vertices.index(unique_a)
+    quad_vertices = [
+        a_vertices[(unique_a_index - 1) % 3],
+        unique_a,
+        a_vertices[(unique_a_index + 1) % 3],
+        unique_b,
+    ]
+    if len(set(quad_vertices)) != 4:
+        return None
+
+    uv_by_vertex = {}
+    for payload in (a, b):
+        for vertex, uv in zip(payload["loopVertexIds"], payload["uvs"]):
+            uv_by_vertex.setdefault(vertex, uv)
+    return {
+        "vertices": quad_vertices,
+        "uvs": [uv_by_vertex[vertex] for vertex in quad_vertices],
+        "refs": [a, b],
+        "materialIndex": a["materialIndex"],
+    }
+
+
 def create_uv_workmesh():
     collection = bpy.data.collections.get(COLLECTION_NAME)
     if collection is None:
@@ -304,37 +362,47 @@ def create_uv_workmesh():
         uv_layer = mesh.uv_layers.get(UV_LAYER_NAME) or mesh.uv_layers.active
         face_ids = list(obj.get("tb_face_ids", []))
         face_vertices = list(obj.get("tb_face_vertices", []))
-        for index, polygon in enumerate(mesh.polygons):
-            if index >= len(face_ids) or index >= len(face_vertices):
+        payloads = [
+            _polygon_payload(obj, polygon, index, face_ids, face_vertices, uv_layer, material_names)
+            for index, polygon in enumerate(mesh.polygons)
+            if index < len(face_ids) and index < len(face_vertices)
+        ]
+        used = set()
+        for index, payload in enumerate(payloads):
+            if index in used:
                 continue
+            quad = None
+            for other_index in range(index + 1, len(payloads)):
+                if other_index in used:
+                    continue
+                quad = _quad_from_triangles(payload, payloads[other_index])
+                if quad is not None:
+                    used.add(other_index)
+                    break
+            used.add(index)
             base = len(vertices)
-            loop_vertex_ids = [
-                int(mesh.loops[loop_index].vertex_index) for loop_index in polygon.loop_indices
-            ]
-            vertices.extend([tuple(mesh.vertices[vertex_id].co) for vertex_id in loop_vertex_ids])
-            polygons.append(list(range(base, base + len(loop_vertex_ids))))
-            material_name = ""
-            if 0 <= polygon.material_index < len(obj.material_slots):
-                material = obj.material_slots[polygon.material_index].material
-                if material:
-                    material_name = _export_material_name(material)
-            if material_name not in material_names:
-                material_names.append(material_name)
-            polygon_uvs.append(
-                [
-                    tuple(uv_layer.data[loop_index].uv) if uv_layer else (0.0, 0.0)
-                    for loop_index in polygon.loop_indices
-                ]
-            )
-            face_refs.append(
-                {
-                    "brushId": str(obj.get("tb_brush_id", "")),
-                    "faceId": str(face_ids[index]),
-                    "vertices": list(map(int, face_vertices[index])),
-                    "material": material_name,
-                    "materialIndex": material_names.index(material_name),
-                }
-            )
+            if quad is None:
+                work_vertices = payload["loopVertexIds"]
+                polygon_uvs.append(payload["uvs"])
+                face_refs.append(
+                    {
+                        "faces": [payload],
+                        "workVertices": work_vertices,
+                        "materialIndex": payload["materialIndex"],
+                    }
+                )
+            else:
+                work_vertices = quad["vertices"]
+                polygon_uvs.append(quad["uvs"])
+                face_refs.append(
+                    {
+                        "faces": quad["refs"],
+                        "workVertices": work_vertices,
+                        "materialIndex": quad["materialIndex"],
+                    }
+                )
+            vertices.extend([tuple(mesh.vertices[vertex_id].co) for vertex_id in work_vertices])
+            polygons.append(list(range(base, base + len(work_vertices))))
 
     mesh = bpy.data.meshes.new("TB UV Workmesh Mesh")
     mesh.from_pydata(vertices, [], polygons)
@@ -374,29 +442,36 @@ def _append_response_faces(response, obj):
                 response["warnings"].append(f"{obj.name}: extra polygon {index}")
                 continue
             ref = dict(face_refs[index])
-            vertices = list(map(int, ref.get("vertices", [])))
-            if len(vertices) != len(polygon.loop_indices):
-                response["warnings"].append(f"{ref.get('brushId', '')}/{ref.get('faceId', '')}: topology changed")
-                continue
             material_slot = None
             if 0 <= polygon.material_index < len(obj.material_slots):
                 material_slot = obj.material_slots[polygon.material_index].material
             texture_size = _material_texture_size(material_slot)
-            material = _export_material_name(material_slot) if material_slot else str(ref.get("material", ""))
-            response["faces"].append(
-                {
-                    "brushId": str(ref.get("brushId", "")),
-                    "faceId": str(ref.get("faceId", "")),
-                    "material": material,
-                    "loops": [
-                        {
-                            "vertex": vertices[offset],
-                            "uv": _loop_uv(uv_layer, loop_index, texture_size),
-                        }
-                        for offset, loop_index in enumerate(polygon.loop_indices)
-                    ],
-                }
-            )
+            polygon_uv_by_vertex = {
+                int(vertex): _loop_uv(uv_layer, loop_index, texture_size)
+                for vertex, loop_index in zip(ref.get("workVertices", []), polygon.loop_indices)
+            }
+            for face in ref.get("faces", []):
+                material = _export_material_name(material_slot) if material_slot else str(face.get("material", ""))
+                face_vertices = list(map(int, face.get("vertices", [])))
+                if any(vertex not in polygon_uv_by_vertex for vertex in face_vertices):
+                    response["warnings"].append(
+                        f"{face.get('brushId', '')}/{face.get('faceId', '')}: topology changed"
+                    )
+                    continue
+                response["faces"].append(
+                    {
+                        "brushId": str(face.get("brushId", "")),
+                        "faceId": str(face.get("faceId", "")),
+                        "material": material,
+                        "loops": [
+                            {
+                                "vertex": int(vertex),
+                                "uv": polygon_uv_by_vertex[int(vertex)],
+                            }
+                            for vertex in face_vertices
+                        ],
+                    }
+                )
         return
 
     brush_id = str(obj.get("tb_brush_id", ""))

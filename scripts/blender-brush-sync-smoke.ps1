@@ -40,11 +40,20 @@ $payload = @{
       faces = @(
         @{
           id = "face0"
-          vertices = @(0, 1, 2, 3)
+          vertices = @(0, 1, 2)
           material = "bongs2"
           loops = @(
             @{vertex = 0; uv = @(0.0, 0.0)},
             @{vertex = 1; uv = @(64.0, 0.0)},
+            @{vertex = 2; uv = @(64.0, 64.0)}
+          )
+        },
+        @{
+          id = "face1"
+          vertices = @(0, 2, 3)
+          material = "bongs2"
+          loops = @(
+            @{vertex = 0; uv = @(0.0, 0.0)},
             @{vertex = 2; uv = @(64.0, 64.0)},
             @{vertex = 3; uv = @(0.0, 64.0)}
           )
@@ -111,6 +120,7 @@ assert uvs[2] == (0.5, 0.5), uvs
 workmesh = module.create_uv_workmesh()
 assert workmesh.name == module.WORKMESH_NAME, workmesh.name
 assert len(workmesh.data.polygons) == 2, len(workmesh.data.polygons)
+assert len(workmesh.data.polygons[0].vertices) == 4, len(workmesh.data.polygons[0].vertices)
 bpy.ops.object.select_all(action="DESELECT")
 bpy.context.view_layer.objects.active = workmesh
 workmesh.select_set(True)
@@ -125,10 +135,12 @@ for polygon in workmesh.data.polygons:
         uv_layer.data[loop_index].uv = (float(offset) * 0.125, 0.25)
 
 response = module.export_response(response_path)
-assert len(response["faces"]) == 2, response
-assert response["faces"][1]["brushId"] == "brush1", response
-assert response["faces"][1]["loops"][1]["vertex"] == 1, response
-assert response["faces"][1]["loops"][1]["uv"] == [16.0, 32.0], response
+assert len(response["faces"]) == 3, response
+faces = {(face["brushId"], face["faceId"]): face for face in response["faces"]}
+assert faces[("brush1", "face0")]["loops"][1]["vertex"] == 1, response
+assert faces[("brush1", "face0")]["loops"][1]["uv"] == [16.0, 32.0], response
+assert faces[("brush0", "face1")]["loops"][2]["vertex"] == 3, response
+assert faces[("brush0", "face1")]["loops"][2]["uv"] == [48.0, 32.0], response
 with open(success_path, "w", encoding="utf-8") as f:
     f.write("ok")
 "@ | Set-Content -LiteralPath $driverPath -Encoding UTF8
@@ -148,8 +160,8 @@ if ($result.schema -ne "tb.blenderBrushSync.v1") {
 if ($result.sessionId -ne "smoke-session") {
   throw "Unexpected session id: $($result.sessionId)"
 }
-if ($result.faces.Count -ne 2) {
-  throw "Expected 2 output faces, got $($result.faces.Count)"
+if ($result.faces.Count -ne 3) {
+  throw "Expected 3 output faces, got $($result.faces.Count)"
 }
 $face = $result.faces[0]
 if ($face.brushId -ne "brush0" -or $face.faceId -ne "face0") {
@@ -158,8 +170,8 @@ if ($face.brushId -ne "brush0" -or $face.faceId -ne "face0") {
 if ($face.material -ne "bongs2") {
   throw "Expected material bongs2, got $($face.material)"
 }
-if ($face.loops.Count -ne 4) {
-  throw "Expected 4 loops, got $($face.loops.Count)"
+if ($face.loops.Count -ne 3) {
+  throw "Expected 3 loops, got $($face.loops.Count)"
 }
 if ($face.loops[0].vertex -ne 0) {
   throw "Expected first loop vertex id 0, got $($face.loops[0].vertex)"
