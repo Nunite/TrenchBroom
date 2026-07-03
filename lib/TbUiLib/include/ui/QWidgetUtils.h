@@ -24,6 +24,6 @@ class QWidget;
 namespace tb::ui
 {
 
-void deleteChildWidgetsLaterAndDeleteLayout(QWidget* widget);
+void deleteChildWidgetsAndDeleteLayout(QWidget* widget);
 
 } // namespace tb::ui

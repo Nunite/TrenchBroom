@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2010 Kristian Duske
+ Copyright (C) 2026 Kristian Duske
 
  This file is part of TrenchBroom.
 
@@ -17,22 +17,35 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QLabel>
+#include <QPointer>
+#include <QVBoxLayout>
+#include <QWidget>
+
 #include "ui/QWidgetUtils.h"
 
-#include <QLayout>
-#include <QWidget>
+#include <catch2/catch_test_macros.hpp>
 
 namespace tb::ui
 {
 
-void deleteChildWidgetsAndDeleteLayout(QWidget* widget)
+TEST_CASE("QWidgetUtils")
 {
-  delete widget->layout();
-
-  const auto children = widget->findChildren<QWidget*>("", Qt::FindDirectChildrenOnly);
-  for (auto* childWidget : children)
+  SECTION("deleteChildWidgetsAndDeleteLayout deletes direct child widgets immediately")
   {
-    delete childWidget;
+    auto widget = QWidget{};
+    auto* layout = new QVBoxLayout{};
+    auto* label = new QLabel{"old child", &widget};
+    auto labelPointer = QPointer<QLabel>{label};
+
+    layout->addWidget(label);
+    widget.setLayout(layout);
+
+    deleteChildWidgetsAndDeleteLayout(&widget);
+
+    CHECK(widget.layout() == nullptr);
+    CHECK(labelPointer == nullptr);
+    CHECK(widget.findChildren<QWidget*>("", Qt::FindDirectChildrenOnly).empty());
   }
 }
 

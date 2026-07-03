@@ -62,7 +62,7 @@ void FlagsEditor::setFlags(
   m_checkBoxes.resize(count, nullptr);
   m_values.resize(count, 0);
 
-  deleteChildWidgetsLaterAndDeleteLayout(this);
+  deleteChildWidgetsAndDeleteLayout(this);
 
   auto* layout = new QGridLayout{};
   layout->setHorizontalSpacing(LayoutConstants::WideHMargin);

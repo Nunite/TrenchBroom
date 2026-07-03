@@ -289,7 +289,7 @@ void ViewEditor::preferenceDidChange(const std::filesystem::path&)
 
 void ViewEditor::createGui()
 {
-  deleteChildWidgetsLaterAndDeleteLayout(this);
+  deleteChildWidgetsAndDeleteLayout(this);
 
   auto* sizer = new QGridLayout{};
   sizer->setContentsMargins(
