@@ -48,6 +48,7 @@
 #include "mdl/Map_World.h"
 #include "ui/AppController.h"
 #include "ui/AssetBrowserModel.h"
+#include "ui/BitmapButton.h"
 #include "ui/ImageUtils.h"
 #include "ui/MapDocument.h"
 #include "ui/ModelBrowserView.h"
@@ -125,10 +126,7 @@ void ModelBrowser::createGui(AppController& appController)
   m_reloadButton->setToolTip(tr("Reload assets"));
   m_reloadButton->setAutoRaise(true);
 
-  m_savePrefabButton = new QToolButton{};
-  m_savePrefabButton->setIcon(loadSVGIcon(std::filesystem::path{"Add.svg"}));
-  m_savePrefabButton->setToolTip(tr("Save selection as prefab"));
-  m_savePrefabButton->setAutoRaise(true);
+  m_savePrefabButton = createBitmapButton("Add.svg", tr("Save selection as prefab"));
   m_savePrefabButton->setEnabled(false);
 
   m_searchBox = createSearchBox();
