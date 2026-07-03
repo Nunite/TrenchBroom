@@ -43,6 +43,7 @@
   cmd.exe /c 'call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build build-release-codex --target TbUiLibTest --config Release --parallel'
   ```
 - If a plain `cmake --build build-release-codex ...` fails with missing SDK tools, missing `kernel32.lib`, or `type_traits`/STL lookup errors, assume the shell environment is incomplete and go back to `scripts\build_release_codex.cmd` instead of debugging source code first.
+- If Release crashes after changing a class layout in a header, suspect stale `.obj` files before chasing random Qt stacks. This happened after adding a `MapViewToolBox` member: `SwitchableMapViewContainer.cpp.obj` was not rebuilt, so `make_unique<MapViewToolBox>` allocated the old size and the constructor corrupted the heap. Force-rebuild the dependent target or delete the stale object/build tree.
 - Run focused Catch2 tests directly from the build tree, for example:
   ```powershell
   build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "ModelBrowserView"
@@ -77,6 +78,7 @@
   - Outliner and property editor customizations.
 - Legacy Python `tb` compatibility was intentionally removed from the active plugin path. Do not reintroduce legacy `tb` module registration unless explicitly requested; new plugin examples should use `tb2` or `import tb2 as tb`.
 - If a change touches the unified asset browser, run at least `TbUiLibTest "ModelBrowserView"` and any specific parser/preview tests such as `GoldSrcSpritePreview`.
+- In `ModelBrowser` toolbar-style buttons, prefer existing helpers such as `createBitmapButton(...)` instead of hand-rolling `QToolButton + loadSVGIcon(...)`. A prefab save button created by hand with `Add.svg` triggered Release heap corruption that surfaced later in `QTreeWidget` / `QStyledItemDelegate` construction.
 - If a change touches Python plugins, run focused `TbUiLibTest` filters for `PythonV2` and `PythonPluginManifest`, plus any relevant panel/timer tests.
 - If a change touches rendering, be careful with Release-only behavior and OpenGL resource lifetime. Several previous issues only reproduced in Release builds, so build the Release executable before declaring rendering work done.
 - Keep local noise out of commits. In this project, `.codegraph/`, temporary markdown experiments, generated crash logs, and ad hoc asset/debug files should not be committed unless the user explicitly asks.
