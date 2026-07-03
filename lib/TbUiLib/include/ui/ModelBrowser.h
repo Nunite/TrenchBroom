@@ -83,6 +83,8 @@ private:
   NotifierConnection m_mapNotifierConnection;
   bool m_assetRefreshPending = true;
   bool m_assetRefreshQueued = false;
+  bool m_deferAssetRefreshAfterDocumentLoad = false;
+  int m_assetRefreshDeferralGeneration = 0;
 
 public:
   ModelBrowser(
@@ -115,6 +117,7 @@ private:
   void markAssetsDirty();
   void ensureAssetsLoaded();
   void scheduleAssetRefresh();
+  void scheduleDeferredAssetRefreshAfterDocumentLoad();
   std::optional<std::vector<BrowserAsset>> scanAssets() const;
   void reloadModels();
   void rebuildFolderTree();

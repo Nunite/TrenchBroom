@@ -86,6 +86,7 @@ namespace
 {
 
 const auto AssetRootPath = std::filesystem::path{};
+const auto DocumentLoadAssetRefreshDelay = 1500;
 constexpr auto PrefabThumbnailMaxSize = 512;
 
 std::optional<float> assetIconSizeForComboIndex(QComboBox* combo, const int index)
@@ -448,7 +449,10 @@ void ModelBrowser::connectMapObservers()
 void ModelBrowser::documentWasLoaded()
 {
   connectMapObservers();
-  markAssetsDirty();
+  ++m_assetRefreshDeferralGeneration;
+  m_assetRefreshPending = true;
+  m_deferAssetRefreshAfterDocumentLoad = isVisible();
+  scheduleDeferredAssetRefreshAfterDocumentLoad();
   updateSavePrefabButton();
 }
 
@@ -468,6 +472,7 @@ void ModelBrowser::modsDidChange()
 void ModelBrowser::showEvent(QShowEvent* event)
 {
   QWidget::showEvent(event);
+  scheduleDeferredAssetRefreshAfterDocumentLoad();
   scheduleAssetRefresh();
 }
 
@@ -816,6 +821,8 @@ void ModelBrowser::setCurrentFolderPath(std::filesystem::path currentFolderPath)
 
 void ModelBrowser::markAssetsDirty()
 {
+  m_deferAssetRefreshAfterDocumentLoad = false;
+  ++m_assetRefreshDeferralGeneration;
   m_assetRefreshPending = true;
   scheduleAssetRefresh();
 }
@@ -835,13 +842,32 @@ void ModelBrowser::ensureAssetsLoaded()
 
 void ModelBrowser::scheduleAssetRefresh()
 {
-  if (!isVisible() || m_assetRefreshQueued)
+  if (!isVisible() || m_assetRefreshQueued || m_deferAssetRefreshAfterDocumentLoad)
   {
     return;
   }
 
   m_assetRefreshQueued = true;
   QTimer::singleShot(0, this, [this]() { ensureAssetsLoaded(); });
+}
+
+void ModelBrowser::scheduleDeferredAssetRefreshAfterDocumentLoad()
+{
+  if (!isVisible() || !m_deferAssetRefreshAfterDocumentLoad || !m_assetRefreshPending)
+  {
+    return;
+  }
+
+  const auto generation = m_assetRefreshDeferralGeneration;
+  QTimer::singleShot(DocumentLoadAssetRefreshDelay, this, [this, generation]() {
+    if (generation != m_assetRefreshDeferralGeneration)
+    {
+      return;
+    }
+
+    m_deferAssetRefreshAfterDocumentLoad = false;
+    scheduleAssetRefresh();
+  });
 }
 
 std::optional<std::vector<BrowserAsset>> ModelBrowser::scanAssets() const
