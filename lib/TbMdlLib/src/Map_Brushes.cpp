@@ -27,12 +27,19 @@
 #include "mdl/GameConfig.h"
 #include "mdl/GameInfo.h"
 #include "mdl/Map.h"
+#include "mdl/MapFormat.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/ParallelUVCoordSystem.h"
 #include "mdl/Transaction.h"
 #include "mdl/UVUtils.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/WorldNode.h"
+
+#include "vm/scalar.h"
+
+#include <array>
+#include <optional>
 
 namespace tb::mdl
 {
@@ -167,6 +174,64 @@ void compensateOffset(
   }
 }
 
+std::optional<vm::vec3d> solveAxis(
+  const std::array<vm::vec3d, 3>& points, const std::array<float, 3>& coords)
+{
+  const auto edge1 = points[1] - points[0];
+  const auto edge2 = points[2] - points[0];
+  const auto a = vm::dot(edge1, edge1);
+  const auto b = vm::dot(edge1, edge2);
+  const auto c = vm::dot(edge2, edge2);
+  const auto determinant = (a * c) - (b * b);
+  if (vm::is_zero(determinant, vm::Cd::almost_zero()))
+  {
+    return std::nullopt;
+  }
+
+  const auto d1 = double(coords[1] - coords[0]);
+  const auto d2 = double(coords[2] - coords[0]);
+  const auto s = ((d1 * c) - (d2 * b)) / determinant;
+  const auto t = ((d2 * a) - (d1 * b)) / determinant;
+  return (s * edge1) + (t * edge2);
+}
+
+bool applyTriangleUV(BrushFace& face, const TriangleUVUpdate& update)
+{
+  if (face.vertexCount() != 3u)
+  {
+    return false;
+  }
+
+  const auto uCoords = std::array<float, 3>{
+    update.uvs[0].x(),
+    update.uvs[1].x(),
+    update.uvs[2].x(),
+  };
+  const auto vCoords = std::array<float, 3>{
+    update.uvs[0].y(),
+    update.uvs[1].y(),
+    update.uvs[2].y(),
+  };
+  const auto uAxis = solveAxis(update.points, uCoords);
+  const auto vAxis = solveAxis(update.points, vCoords);
+  if (!uAxis || !vAxis)
+  {
+    return false;
+  }
+
+  auto attributes = face.attributes();
+  attributes.setOffset(vm::vec2f{
+    update.uvs[0].x() - float(vm::dot(update.points[0], *uAxis)),
+    update.uvs[0].y() - float(vm::dot(update.points[0], *vAxis)),
+  });
+  attributes.setScale(vm::vec2f{1, 1});
+  attributes.setRotation(0.0f);
+
+  face.setAttributes(attributes);
+  face.restoreUVCoordSystemSnapshot(ParallelUVCoordSystemSnapshot{*uAxis, *vAxis});
+  return true;
+}
+
 } // namespace
 
 bool createBrush(Map& map, const std::vector<vm::vec3d>& points)
@@ -207,6 +272,26 @@ bool setBrushFaceAttributes(Map& map, const UpdateBrushFaceAttributes& update)
       evaluate(update, brushFace);
       return true;
     });
+}
+
+bool setTriangleUVs(Map& map, const std::vector<TriangleUVUpdate>& updates)
+{
+  if (!isParallelUVCoordSystem(map.worldNode().mapFormat()))
+  {
+    return false;
+  }
+
+  auto faceHandles = std::vector<BrushFaceHandle>{};
+  faceHandles.reserve(updates.size());
+  for (const auto& update : updates)
+  {
+    faceHandles.push_back(update.face);
+  }
+
+  auto updateIndex = size_t{0};
+  return applyAndSwap(map, "Set Triangle UVs", faceHandles, [&](auto& face) {
+    return applyTriangleUV(face, updates[updateIndex++]);
+  });
 }
 
 bool copyUV(

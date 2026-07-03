@@ -19,10 +19,13 @@
 
 #pragma once
 
+#include "mdl/BrushFaceHandle.h"
+
 #include "vm/plane.h"
 #include "vm/util.h"
 #include "vm/vec.h"
 
+#include <array>
 #include <vector>
 
 namespace tb::mdl
@@ -56,6 +59,15 @@ enum class UvFitDirection
 bool createBrush(Map& map, const std::vector<vm::vec3d>& points);
 
 bool setBrushFaceAttributes(Map& map, const UpdateBrushFaceAttributes& update);
+
+struct TriangleUVUpdate
+{
+  BrushFaceHandle face;
+  std::array<vm::vec3d, 3> points;
+  std::array<vm::vec2f, 3> uvs;
+};
+
+bool setTriangleUVs(Map& map, const std::vector<TriangleUVUpdate>& updates);
 
 bool copyUV(
   Map& map,

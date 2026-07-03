@@ -17,7 +17,9 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
+#include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
 #include "mdl/CatchConfig.h"
 #include "mdl/EditorContext.h"
@@ -37,6 +39,8 @@
 
 #include "vm/approx.h"
 
+#include <array>
+
 #include <catch2/catch_test_macros.hpp>
 
 namespace tb::mdl
@@ -47,6 +51,13 @@ namespace
 auto& getFace(const BrushNode& brushNode, const size_t faceIndex)
 {
   return brushNode.brush().face(faceIndex);
+}
+
+vm::vec2f textureCoords(const BrushFace& face, const vm::vec3d& point)
+{
+  return vm::vec2f{
+    face.toUVCoordSystemMatrix(face.attributes().offset(), face.attributes().scale())
+    * point};
 }
 
 } // namespace
@@ -839,6 +850,119 @@ TEST_CASE("Map_Brushes")
       CHECK_THAT(
         getFace(*brushNode, *otherFaceIndex).attributes(),
         MatchesBrushFaceAttributes(originalOtherFaceAttributes));
+    }
+  }
+
+  SECTION("setTriangleUVs")
+  {
+    auto& map = fixture.create(QuakeFixtureConfig);
+
+    const auto points = std::vector<vm::vec3d>{
+      {0, 0, 0},
+      {64, 0, 0},
+      {0, 64, 0},
+      {0, 0, 64},
+    };
+
+    const auto builder = BrushBuilder{
+      map.worldNode().mapFormat(),
+      map.worldBounds(),
+      map.gameInfo().gameConfig.faceAttribsConfig.defaults};
+    auto* brushNode = new BrushNode{
+      builder.createBrush(points, map.currentMaterialName()) | kdl::value()};
+    addNodes(map, {{parentForNodes(map), {brushNode}}});
+
+    const auto faceIndex = brushNode->brush().findFace(vm::vec3d{0, 0, -1});
+    REQUIRE(faceIndex);
+    const auto vertices = getFace(*brushNode, *faceIndex).vertexPositions();
+    REQUIRE(vertices.size() == 3u);
+
+    const auto originalUV = textureCoords(getFace(*brushNode, *faceIndex), vertices[0]);
+    const auto originalOtherFaceAttributes = getFace(*brushNode, 1u).attributes();
+    const auto updatePoints = std::array<vm::vec3d, 3>{
+      vertices[0],
+      vertices[1],
+      vertices[2],
+    };
+
+    const auto targetUVs = std::array<vm::vec2f, 3>{
+      vm::vec2f{32, 16},
+      vm::vec2f{160, 16},
+      vm::vec2f{32, 80},
+    };
+
+    CHECK(setTriangleUVs(
+      map,
+      {{
+        BrushFaceHandle{brushNode, *faceIndex},
+        updatePoints,
+        targetUVs,
+      }}));
+
+    const auto& changedFace = getFace(*brushNode, *faceIndex);
+    CHECK(textureCoords(changedFace, vertices[0]) == vm::approx{targetUVs[0]});
+    CHECK(textureCoords(changedFace, vertices[1]) == vm::approx{targetUVs[1]});
+    CHECK(textureCoords(changedFace, vertices[2]) == vm::approx{targetUVs[2]});
+    CHECK_THAT(
+      getFace(*brushNode, 1u).attributes(),
+      MatchesBrushFaceAttributes(originalOtherFaceAttributes));
+
+    SECTION("Undo and redo")
+    {
+      map.undoCommand();
+      CHECK(
+        textureCoords(getFace(*brushNode, *faceIndex), vertices[0])
+        == vm::approx{originalUV});
+
+      map.redoCommand();
+      CHECK(
+        textureCoords(getFace(*brushNode, *faceIndex), vertices[0])
+        == vm::approx{targetUVs[0]});
+    }
+
+    SECTION("Returns false for non parallel UV map formats")
+    {
+      auto standardFixture = MapFixture{};
+      auto& standardMap = standardFixture.create();
+
+      const auto standardBuilder = BrushBuilder{
+        standardMap.worldNode().mapFormat(),
+        standardMap.worldBounds(),
+        standardMap.gameInfo().gameConfig.faceAttribsConfig.defaults};
+      auto* standardBrushNode = new BrushNode{
+        standardBuilder.createBrush(points, standardMap.currentMaterialName())
+        | kdl::value()};
+      addNodes(standardMap, {{parentForNodes(standardMap), {standardBrushNode}}});
+
+      const auto standardFaceIndex =
+        standardBrushNode->brush().findFace(vm::vec3d{0, 0, -1});
+      REQUIRE(standardFaceIndex);
+      const auto standardVertices =
+        getFace(*standardBrushNode, *standardFaceIndex).vertexPositions();
+      REQUIRE(standardVertices.size() == 3u);
+
+      const auto originalAttributes =
+        getFace(*standardBrushNode, *standardFaceIndex).attributes();
+      const auto originalUAxis = getFace(*standardBrushNode, *standardFaceIndex).uAxis();
+      const auto originalVAxis = getFace(*standardBrushNode, *standardFaceIndex).vAxis();
+
+      CHECK(!setTriangleUVs(
+        standardMap,
+        {{
+          BrushFaceHandle{standardBrushNode, *standardFaceIndex},
+          std::array<vm::vec3d, 3>{
+            standardVertices[0],
+            standardVertices[1],
+            standardVertices[2],
+          },
+          targetUVs,
+        }}));
+
+      const auto& unchangedFace = getFace(*standardBrushNode, *standardFaceIndex);
+      CHECK_THAT(
+        unchangedFace.attributes(), MatchesBrushFaceAttributes(originalAttributes));
+      CHECK(unchangedFace.uAxis() == vm::approx{originalUAxis});
+      CHECK(unchangedFace.vAxis() == vm::approx{originalVAxis});
     }
   }
 

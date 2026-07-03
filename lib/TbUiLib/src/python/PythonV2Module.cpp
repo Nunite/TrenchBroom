@@ -76,6 +76,7 @@
 #include <pybind11/stl.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -653,6 +654,11 @@ py::tuple vec2ToTuple(const vm::vec2f& value)
   return py::make_tuple(value.x(), value.y());
 }
 
+py::tuple vec3ToTuple(const vm::vec3d& value)
+{
+  return py::make_tuple(value.x(), value.y(), value.z());
+}
+
 vm::vec2f vec2FromObject(const py::handle& object)
 {
   auto sequence = py::reinterpret_borrow<py::sequence>(object);
@@ -661,6 +667,25 @@ vm::vec2f vec2FromObject(const py::handle& object)
     throw py::type_error{"Expected a 2-item sequence"};
   }
   return vm::vec2f{py::cast<float>(sequence[0]), py::cast<float>(sequence[1])};
+}
+
+vm::vec2f textureCoords(const mdl::BrushFace& face, const vm::vec3d& point)
+{
+  return vm::vec2f{
+    face.toUVCoordSystemMatrix(face.attributes().offset(), face.attributes().scale())
+    * point};
+}
+
+size_t addVertex(std::vector<vm::vec3d>& vertices, const vm::vec3d& point)
+{
+  const auto it = std::ranges::find(vertices, point);
+  if (it != std::end(vertices))
+  {
+    return static_cast<size_t>(std::distance(std::begin(vertices), it));
+  }
+
+  vertices.push_back(point);
+  return vertices.size() - 1u;
 }
 
 std::vector<EntityHandle> allEntities(MapDocument& document)
@@ -808,6 +833,73 @@ std::vector<std::vector<Vec3>> selectedBrushVertices(SelectionHandle& selection)
     }
     result.push_back(std::move(vertices));
   }
+  return result;
+}
+
+std::vector<mdl::BrushFaceHandle> selectedTriangleFaceHandles(SelectionHandle& selection)
+{
+  const auto& mapSelection = selection.getDocument().map().selection();
+  auto faceHandles = mapSelection.brushFaces;
+  if (faceHandles.empty())
+  {
+    for (auto* brushNode : mapSelection.brushes)
+    {
+      for (size_t i = 0; i < brushNode->brush().faceCount(); ++i)
+      {
+        faceHandles.emplace_back(brushNode, i);
+      }
+    }
+  }
+
+  auto result = std::vector<mdl::BrushFaceHandle>{};
+  for (const auto& faceHandle : faceHandles)
+  {
+    if (faceHandle.face().vertexCount() == 3u)
+    {
+      result.push_back(faceHandle);
+    }
+  }
+  return result;
+}
+
+py::dict selectedTriangleUVs(SelectionHandle& selection)
+{
+  auto vertices = std::vector<vm::vec3d>{};
+  auto triangles = py::list{};
+  for (const auto& faceHandle : selectedTriangleFaceHandles(selection))
+  {
+    const auto& face = faceHandle.face();
+    const auto faceVertices = face.vertexPositions();
+
+    auto triangleVertices = py::list{};
+    auto loopList = py::list{};
+    for (const auto& vertex : faceVertices)
+    {
+      const auto vertexIndex = addVertex(vertices, vertex);
+      triangleVertices.append(vertexIndex);
+
+      auto loop = py::dict{};
+      loop["vertex"] = vertexIndex;
+      loop["uv"] = vec2ToTuple(textureCoords(face, vertex));
+      loopList.append(loop);
+    }
+
+    auto triangle = py::dict{};
+    triangle["id"] = "tri" + std::to_string(py::len(triangles));
+    triangle["vertices"] = triangleVertices;
+    triangle["loops"] = loopList;
+    triangles.append(triangle);
+  }
+
+  auto vertexList = py::list{};
+  for (const auto& vertex : vertices)
+  {
+    vertexList.append(vec3ToTuple(vertex));
+  }
+
+  auto result = py::dict{};
+  result["vertices"] = vertexList;
+  result["triangles"] = triangles;
   return result;
 }
 
@@ -1157,6 +1249,86 @@ bool setSelectionProperty(
     transaction.cancel();
     throw;
   }
+}
+
+py::list triangleListFromObject(const py::handle& object)
+{
+  if (py::isinstance<py::dict>(object))
+  {
+    auto dict = py::reinterpret_borrow<py::dict>(object);
+    return py::reinterpret_borrow<py::list>(dict["triangles"]);
+  }
+  return py::reinterpret_borrow<py::list>(object);
+}
+
+bool setDocumentTriangleUVs(DocumentHandle& document, const py::object& trianglesObject)
+{
+  auto& doc = document.get();
+  auto selection =
+    SelectionHandle{&doc, PythonHandleRegistry::instance().documentGeneration(&doc)};
+  const auto faceHandles = selectedTriangleFaceHandles(selection);
+  const auto triangles = triangleListFromObject(trianglesObject);
+  if (
+    faceHandles.empty() || static_cast<size_t>(py::len(triangles)) != faceHandles.size())
+  {
+    return false;
+  }
+
+  auto updates = std::vector<mdl::TriangleUVUpdate>{};
+  updates.reserve(faceHandles.size());
+  for (size_t i = 0; i < faceHandles.size(); ++i)
+  {
+    const auto triangle = py::reinterpret_borrow<py::dict>(triangles[i]);
+    const auto loops = py::reinterpret_borrow<py::list>(triangle["loops"]);
+    if (py::len(loops) != 3u)
+    {
+      return false;
+    }
+
+    const auto vertices = faceHandles[i].face().vertexPositions();
+    auto uvs = std::array<vm::vec2f, 3>{};
+    auto assigned = std::array<bool, 3>{};
+    auto triangleVertices = py::list{};
+    if (triangle.contains("vertices"))
+    {
+      triangleVertices = py::reinterpret_borrow<py::list>(triangle["vertices"]);
+      if (py::len(triangleVertices) != 3u)
+      {
+        return false;
+      }
+    }
+
+    for (size_t j = 0; j < 3u; ++j)
+    {
+      const auto loop = py::reinterpret_borrow<py::dict>(loops[j]);
+      auto localIndex = j;
+      if (py::len(triangleVertices) == 3u && loop.contains("vertex"))
+      {
+        const auto vertexIndex = py::cast<size_t>(loop["vertex"]);
+        const auto it = std::ranges::find_if(triangleVertices, [&](const auto item) {
+          return py::cast<size_t>(item) == vertexIndex;
+        });
+        if (it == std::end(triangleVertices))
+        {
+          return false;
+        }
+        localIndex = static_cast<size_t>(std::distance(std::begin(triangleVertices), it));
+      }
+      uvs[localIndex] = vec2FromObject(loop["uv"]);
+      assigned[localIndex] = true;
+    }
+    if (!std::ranges::all_of(assigned, [](const auto value) { return value; }))
+    {
+      return false;
+    }
+
+    updates.push_back(mdl::TriangleUVUpdate{
+      faceHandles[i],
+      {vertices[0], vertices[1], vertices[2]},
+      uvs,
+    });
+  }
+  return mdl::setTriangleUVs(doc.map(), updates);
 }
 
 void setFaceMaterial(FaceHandle& face, const std::string& materialName)
@@ -1605,6 +1777,7 @@ void defineModule(py::module_& module)
         return TransactionHandle{&self.get(), self.generation, std::move(name)};
       },
       py::arg("name") = "Python v2 Script")
+    .def("set_triangle_uvs", setDocumentTriangleUVs, py::arg("triangles"))
     .def(
       "select",
       [](DocumentHandle& self, const py::iterable& objects) {
@@ -1670,6 +1843,7 @@ void defineModule(py::module_& module)
       py::arg("value"),
       py::arg("create_if_missing") = true)
     .def("brush_vertices", selectedBrushVertices)
+    .def("triangle_uvs", selectedTriangleUVs)
     .def("set", setSelection)
     .def("add", addSelection)
     .def("deselect_all", deselectAllSelection)

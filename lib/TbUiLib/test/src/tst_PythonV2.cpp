@@ -677,6 +677,65 @@ assert len(doc.selection.brushes) == 0
     CHECK_FALSE(map.selection().hasAny());
   }
 
+  SECTION("exposes selected triangle UVs to Python")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode = new mdl::BrushNode{
+      builder.createBrush(
+        std::vector<vm::vec3d>{
+          vm::vec3d{-32, 0, 0},
+          vm::vec3d{32, 0, 0},
+          vm::vec3d{0, 0, 64},
+          vm::vec3d{-32, 64, 0},
+          vm::vec3d{32, 64, 0},
+          vm::vec3d{0, 64, 64},
+        },
+        "original")
+      | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+
+    const auto faceIndex = brushNode->brush().findFace(vm::vec3d{0, -1, 0});
+    REQUIRE(faceIndex);
+    mdl::selectBrushFaces(map, {{brushNode, *faceIndex}});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_triangle_uv.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+payload = doc.selection.triangle_uvs()
+triangles = payload["triangles"]
+assert len(triangles) == 1, f"triangle count: {len(triangles)}"
+tri = triangles[0]
+assert len(tri["vertices"]) == 3, f"vertex count: {len(tri['vertices'])}"
+assert len(tri["loops"]) == 3, f"loop count: {len(tri['loops'])}"
+
+uvs = [(10.0, 20.0), (40.0, 20.0), (10.0, 60.0)]
+for loop, uv in zip(tri["loops"], uvs):
+    loop["uv"] = uv
+
+assert doc.set_triangle_uvs(payload), "set_triangle_uvs failed"
+updated = doc.selection.triangle_uvs()["triangles"][0]
+assert [loop["uv"] for loop in updated["loops"]] == uvs, updated
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_triangle_uv.py";
+
+    const auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+  }
+
   SECTION("reads selected brush and vertex tool vertices")
   {
     auto& map = window.document().map();
