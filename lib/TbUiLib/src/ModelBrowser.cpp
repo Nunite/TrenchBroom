@@ -19,11 +19,13 @@
 
 #include "ui/ModelBrowser.h"
 
+#include <QFileDialog>
 #include <QFileSystemWatcher>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QScrollBar>
 #include <QShowEvent>
 #include <QSignalBlocker>
@@ -42,12 +44,14 @@
 #include "mdl/EntityModelManager.h"
 #include "mdl/GameFileSystem.h"
 #include "mdl/Map.h"
+#include "mdl/Map_CopyPaste.h"
 #include "mdl/Map_World.h"
 #include "ui/AppController.h"
 #include "ui/AssetBrowserModel.h"
 #include "ui/ImageUtils.h"
 #include "ui/MapDocument.h"
 #include "ui/ModelBrowserView.h"
+#include "ui/PrefabAsset.h"
 #include "ui/QPathUtils.h"
 #include "ui/QWidgetUtils.h"
 #include "ui/SearchBox.h"
@@ -65,6 +69,17 @@ namespace
 {
 
 const auto AssetRootPath = std::filesystem::path{};
+
+std::filesystem::path defaultPrefabPath(const mdl::Map& map)
+{
+  auto modPath = std::filesystem::path{};
+  if (const auto enabledMods = mdl::enabledMods(map); !enabledMods.empty())
+  {
+    modPath = std::filesystem::path{enabledMods.front()};
+  }
+
+  return map.gamePath() / modPath / "prefabs" / "selection.tbprefab";
+}
 
 } // namespace
 
@@ -110,12 +125,19 @@ void ModelBrowser::createGui(AppController& appController)
   m_reloadButton->setToolTip(tr("Reload assets"));
   m_reloadButton->setAutoRaise(true);
 
+  m_savePrefabButton = new QToolButton{};
+  m_savePrefabButton->setIcon(loadSVGIcon(std::filesystem::path{"Add.svg"}));
+  m_savePrefabButton->setToolTip(tr("Save selection as prefab"));
+  m_savePrefabButton->setAutoRaise(true);
+  m_savePrefabButton->setEnabled(false);
+
   m_searchBox = createSearchBox();
 
   auto* pathRowLayout = new QHBoxLayout{};
   pathRowLayout->setContentsMargins(0, 0, 0, 0);
   pathRowLayout->setSpacing(0);
   pathRowLayout->addWidget(m_pathStack, 1);
+  pathRowLayout->addWidget(m_savePrefabButton, 0);
   pathRowLayout->addWidget(m_reloadButton, 0);
 
   auto* controlsLayout = new QVBoxLayout{};
@@ -240,6 +262,9 @@ void ModelBrowser::bindEvents()
     m_assetRefreshPending = false;
     rescanWatchedDirectory();
   });
+
+  connect(
+    m_savePrefabButton, &QToolButton::clicked, this, [&]() { saveSelectionAsPrefab(); });
 }
 
 void ModelBrowser::connectObservers()
@@ -254,12 +279,16 @@ void ModelBrowser::connectMapObservers()
   m_mapNotifierConnection.disconnect();
   m_mapNotifierConnection +=
     m_document.map().modsDidChangeNotifier.connect(this, &ModelBrowser::modsDidChange);
+  m_mapNotifierConnection += m_document.selectionDidChangeNotifier.connect(
+    [this](const auto&) { updateSavePrefabButton(); });
+  updateSavePrefabButton();
 }
 
 void ModelBrowser::documentWasLoaded()
 {
   connectMapObservers();
   markAssetsDirty();
+  updateSavePrefabButton();
 }
 
 void ModelBrowser::modsDidChange()
@@ -267,10 +296,12 @@ void ModelBrowser::modsDidChange()
   if (m_folderPath != AssetRootPath)
   {
     setFolderPath(AssetRootPath);
+    updateSavePrefabButton();
     return;
   }
 
   markAssetsDirty();
+  updateSavePrefabButton();
 }
 
 void ModelBrowser::showEvent(QShowEvent* event)
@@ -392,6 +423,50 @@ void ModelBrowser::updateFolderEdit()
   }
 }
 
+void ModelBrowser::updateSavePrefabButton()
+{
+  if (m_savePrefabButton)
+  {
+    m_savePrefabButton->setEnabled(m_document.map().selection().hasNodes());
+  }
+}
+
+void ModelBrowser::saveSelectionAsPrefab()
+{
+  auto& map = m_document.map();
+  if (!map.selection().hasNodes())
+  {
+    return;
+  }
+
+  auto defaultPath = defaultPrefabPath(map);
+  auto filePathText = QFileDialog::getSaveFileName(
+    this, tr("Save Prefab"), pathAsQString(defaultPath), tr("Prefab Files (*.tbprefab)"));
+  if (filePathText.isEmpty())
+  {
+    return;
+  }
+
+  auto filePath = pathFromQString(filePathText);
+  if (filePath.extension().empty())
+  {
+    filePath.replace_extension(".tbprefab");
+  }
+
+  const auto prefabText = mdl::serializeSelectedNodes(map);
+  const auto result = writePrefabAsset(filePath, prefabText);
+  if (result.is_error())
+  {
+    const auto& error = std::get<tb::Error>(result.error());
+    QMessageBox::warning(this, tr("Save Prefab"), QString::fromStdString(error.msg));
+    return;
+  }
+
+  m_lastWriteTimes.clear();
+  m_assetRefreshPending = false;
+  rescanWatchedDirectory();
+}
+
 void ModelBrowser::setFolderPath(std::filesystem::path folderPath)
 {
   folderPath = folderPath.lexically_normal();
@@ -482,9 +557,10 @@ std::optional<std::vector<BrowserAsset>> ModelBrowser::scanAssets() const
         return fs::Disk::find(
           rootPath,
           fs::TraversalMode::Recursive,
-          fs::makeExtensionPathMatcher(goldSrcAssetExtensions()));
+          fs::makeExtensionPathMatcher(assetBrowserExtensions()));
       },
-      [](const auto& path) { return Result<std::filesystem::path>{path}; });
+      [](const auto& path) { return Result<std::filesystem::path>{path}; },
+      assetBrowserRoots());
   }
 
   const auto& map = m_document.map();
@@ -508,9 +584,10 @@ std::optional<std::vector<BrowserAsset>> ModelBrowser::scanAssets() const
       return fs.find(
         rootPath,
         fs::TraversalMode::Recursive,
-        fs::makeExtensionPathMatcher(goldSrcAssetExtensions()));
+        fs::makeExtensionPathMatcher(assetBrowserExtensions()));
     },
-    [&](const auto& path) { return fs.makeAbsolute(path); });
+    [&](const auto& path) { return fs.makeAbsolute(path); },
+    assetBrowserRoots());
 }
 
 void ModelBrowser::reloadModels()
@@ -652,7 +729,7 @@ void ModelBrowser::setWatchedDirectory()
 
   if (m_folderPath.empty())
   {
-    for (const auto& [type, rootPath] : goldSrcAssetRoots())
+    for (const auto& [type, rootPath] : assetBrowserRoots())
     {
       unused(type);
       if (auto absPathResult = fs.makeAbsolute(rootPath); !absPathResult.is_error())

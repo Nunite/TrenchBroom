@@ -58,6 +58,7 @@ private:
   QStackedWidget* m_pathStack = nullptr;
   QWidget* m_breadcrumbBar = nullptr;
   QHBoxLayout* m_breadcrumbLayout = nullptr;
+  QToolButton* m_savePrefabButton = nullptr;
   QToolButton* m_reloadButton = nullptr;
   QLineEdit* m_folderEdit = nullptr;
   QLineEdit* m_searchBox = nullptr;
@@ -101,6 +102,8 @@ private:
   void showPathEditor();
   void showBreadcrumbBar();
   void updateFolderEdit();
+  void updateSavePrefabButton();
+  void saveSelectionAsPrefab();
   void setFolderPath(std::filesystem::path folderPath);
   void setCurrentFolderPath(std::filesystem::path currentFolderPath);
   void markAssetsDirty();

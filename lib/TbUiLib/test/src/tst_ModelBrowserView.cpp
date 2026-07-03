@@ -141,6 +141,7 @@ TEST_CASE("ModelBrowserView")
       {BrowserCellType::Model, "models/barrel.mdl"},
       {BrowserCellType::Sprite, "sprites/glow01.spr"},
       {BrowserCellType::Sound, "sound/ambience/hum.wav"},
+      {BrowserCellType::Prefab, "prefabs/crate.tbprefab"},
     };
 
     const auto entries = modelBrowserEntries(unifiedRoot, unifiedAssets, {}, {});
@@ -151,13 +152,14 @@ TEST_CASE("ModelBrowserView")
         BrowserCellType::Folder,
         BrowserCellType::Folder,
         BrowserCellType::Folder,
+        BrowserCellType::Folder,
       }));
     CHECK_THAT(
       entryTitles(entries),
-      Equals(std::vector<std::string>{"models", "sound", "sprites"}));
+      Equals(std::vector<std::string>{"models", "prefabs", "sound", "sprites"}));
     CHECK_THAT(
       entryPaths(entries),
-      Equals(std::vector<std::string>{"models", "sound", "sprites"}));
+      Equals(std::vector<std::string>{"models", "prefabs", "sound", "sprites"}));
   }
 
   SECTION("shows assets inside unified folders")
@@ -167,6 +169,7 @@ TEST_CASE("ModelBrowserView")
       {BrowserCellType::Model, "models/barrel.mdl"},
       {BrowserCellType::Sprite, "sprites/glow01.spr"},
       {BrowserCellType::Sound, "sound/ambience/hum.wav"},
+      {BrowserCellType::Prefab, "prefabs/crate.tbprefab"},
     };
 
     const auto entries = modelBrowserEntries(unifiedRoot, unifiedAssets, "sprites", {});
@@ -179,6 +182,27 @@ TEST_CASE("ModelBrowserView")
       entryTitles(entries), Equals(std::vector<std::string>{"..", "glow01.spr"}));
     CHECK_THAT(
       entryPaths(entries), Equals(std::vector<std::string>{"", "sprites/glow01.spr"}));
+  }
+
+  SECTION("shows prefab assets inside the unified prefab folder")
+  {
+    const auto unifiedRoot = std::filesystem::path{};
+    const auto unifiedAssets = std::vector<BrowserAsset>{
+      {BrowserCellType::Model, "models/barrel.mdl"},
+      {BrowserCellType::Prefab, "prefabs/crate.tbprefab"},
+    };
+
+    const auto entries = modelBrowserEntries(unifiedRoot, unifiedAssets, "prefabs", {});
+
+    CHECK_THAT(
+      entryTypes(entries),
+      Equals(
+        std::vector<BrowserCellType>{BrowserCellType::Folder, BrowserCellType::Prefab}));
+    CHECK_THAT(
+      entryTitles(entries), Equals(std::vector<std::string>{"..", "crate.tbprefab"}));
+    CHECK_THAT(
+      entryPaths(entries),
+      Equals(std::vector<std::string>{"", "prefabs/crate.tbprefab"}));
   }
 
   SECTION("sound preview button bounds stay inside item")

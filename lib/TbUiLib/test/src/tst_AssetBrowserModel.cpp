@@ -45,6 +45,18 @@ std::vector<std::string> genericStrings(const std::vector<std::filesystem::path>
   return result;
 }
 
+std::vector<std::string> rootStrings(
+  const std::vector<std::pair<BrowserCellType, std::filesystem::path>>& roots)
+{
+  auto result = std::vector<std::string>{};
+  for (const auto& [type, path] : roots)
+  {
+    (void)type;
+    result.push_back(path.generic_string());
+  }
+  return result;
+}
+
 } // namespace
 
 TEST_CASE("AssetBrowserModel")
@@ -54,7 +66,25 @@ TEST_CASE("AssetBrowserModel")
     CHECK(assetTypeForExtension("models/foo.mdl") == BrowserCellType::Model);
     CHECK(assetTypeForExtension("sprites/foo.SPR") == BrowserCellType::Sprite);
     CHECK(assetTypeForExtension("sound/foo.wav") == BrowserCellType::Sound);
+    CHECK(assetTypeForExtension("prefabs/crate.TBPREFAB") == BrowserCellType::Prefab);
     CHECK(assetTypeForExtension("maps/foo.bsp") == BrowserCellType::Folder);
+  }
+
+  SECTION("uses prefab assets only in the UI browser asset set")
+  {
+    CHECK_THAT(
+      rootStrings(goldSrcAssetRoots()),
+      Equals(std::vector<std::string>{"models", "sprites", "sound"}));
+    CHECK_THAT(
+      genericStrings(goldSrcAssetExtensions()),
+      Equals(std::vector<std::string>{".mdl", ".spr", ".wav"}));
+
+    CHECK_THAT(
+      rootStrings(assetBrowserRoots()),
+      Equals(std::vector<std::string>{"models", "sprites", "sound", "prefabs"}));
+    CHECK_THAT(
+      genericStrings(assetBrowserExtensions()),
+      Equals(std::vector<std::string>{".mdl", ".spr", ".wav", ".tbprefab"}));
   }
 
   SECTION("collects root model sprite and sound assets")
@@ -90,6 +120,29 @@ TEST_CASE("AssetBrowserModel")
     CHECK((*assets)[0].displayName == "tree.mdl");
     CHECK((*assets)[1].displayName == "hum.wav");
     CHECK((*assets)[2].displayName == "glow.spr");
+  }
+
+  SECTION("collects prefab assets for the UI browser roots")
+  {
+    const auto assets = collectBrowserAssets(
+      {},
+      {},
+      [](const auto& rootPath) {
+        if (rootPath == std::filesystem::path{"prefabs"})
+        {
+          return Result<std::vector<std::filesystem::path>>{
+            std::vector<std::filesystem::path>{"prefabs/crate.tbprefab"}};
+        }
+        return Result<std::vector<std::filesystem::path>>{
+          std::vector<std::filesystem::path>{}};
+      },
+      [](const auto& path) { return Result<std::filesystem::path>{path}; },
+      assetBrowserRoots());
+
+    REQUIRE(assets.has_value());
+    REQUIRE(assets->size() == 1u);
+    CHECK((*assets)[0].type == BrowserCellType::Prefab);
+    CHECK((*assets)[0].path == std::filesystem::path{"prefabs/crate.tbprefab"});
   }
 
   SECTION("filters assets outside enabled mod roots")

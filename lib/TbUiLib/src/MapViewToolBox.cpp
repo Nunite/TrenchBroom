@@ -30,6 +30,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MoveObjectsTool.h"
 #include "ui/PathTool.h"
+#include "ui/PrefabTool.h"
 #include "ui/RotateTool.h"
 #include "ui/ScaleTool.h"
 #include "ui/ShearTool.h"
@@ -112,6 +113,11 @@ FaceTool& MapViewToolBox::faceTool()
 PathTool& MapViewToolBox::pathTool()
 {
   return *m_pathTool;
+}
+
+PrefabTool& MapViewToolBox::prefabTool()
+{
+  return *m_prefabTool;
 }
 
 void MapViewToolBox::toggleAssembleBrushTool()
@@ -308,6 +314,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   m_edgeTool = std::make_unique<EdgeTool>(m_document);
   m_faceTool = std::make_unique<FaceTool>(m_document);
   m_pathTool = std::make_unique<PathTool>(m_document.map());
+  m_prefabTool = std::make_unique<PrefabTool>(m_document);
 
   addExclusiveToolGroup(
     assembleBrushTool(),
@@ -344,6 +351,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   registerTool(edgeTool(), bookCtrl);
   registerTool(faceTool(), bookCtrl);
   registerTool(createEntityTool(), bookCtrl);
+  registerTool(prefabTool(), bookCtrl);
   registerTool(drawShapeTool(), bookCtrl);
   registerTool(pathTool(), bookCtrl);
 

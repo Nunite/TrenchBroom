@@ -83,6 +83,8 @@ QString browserCellTypeName(const BrowserCellType type)
     return "sprite";
   case BrowserCellType::Sound:
     return "sound";
+  case BrowserCellType::Prefab:
+    return "prefab";
   }
   return "unknown";
 }
@@ -104,8 +106,7 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
   };
 }
 
-QJsonObject preMutationFailureDetails(
-  QJsonObject details, const QString& recoveryAction)
+QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
 {
   details.insert("mutatedDocument", false);
   details.insert("retrySafe", true);

@@ -51,6 +51,7 @@ class VertexTool;
 class EdgeTool;
 class FaceTool;
 class PathTool;
+class PrefabTool;
 
 class MapViewToolBox : public ToolBox
 {
@@ -62,6 +63,7 @@ private:
   std::unique_ptr<CreateEntityTool> m_createEntityTool;
   std::unique_ptr<DrawShapeTool> m_drawShapeTool;
   std::unique_ptr<PathTool> m_pathTool;
+  std::unique_ptr<PrefabTool> m_prefabTool;
   std::unique_ptr<MoveObjectsTool> m_moveObjectsTool;
   std::unique_ptr<ExtrudeTool> m_extrudeTool;
   std::unique_ptr<RotateTool> m_rotateTool;
@@ -83,6 +85,7 @@ public: // tools
   CreateEntityTool& createEntityTool();
   DrawShapeTool& drawShapeTool();
   PathTool& pathTool();
+  PrefabTool& prefabTool();
   MoveObjectsTool& moveObjectsTool();
   ExtrudeTool& extrudeTool();
   RotateTool& rotateTool();

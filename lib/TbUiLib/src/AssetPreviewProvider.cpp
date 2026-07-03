@@ -46,6 +46,7 @@ AssetPreviewState AssetPreviewProvider::preview(const BrowserAsset& asset) const
     return soundPreview(asset);
   case BrowserCellType::Folder:
   case BrowserCellType::Model:
+  case BrowserCellType::Prefab:
     return {AssetPreviewStatus::Unsupported, std::nullopt};
   }
 

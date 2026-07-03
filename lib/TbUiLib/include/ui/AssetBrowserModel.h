@@ -42,6 +42,7 @@ enum class BrowserCellType
   Model,
   Sprite,
   Sound,
+  Prefab,
 };
 
 struct BrowserCellData
@@ -82,6 +83,10 @@ const std::vector<std::pair<BrowserCellType, std::filesystem::path>>& goldSrcAss
 
 const std::vector<std::filesystem::path>& goldSrcAssetExtensions();
 
+const std::vector<std::pair<BrowserCellType, std::filesystem::path>>& assetBrowserRoots();
+
+const std::vector<std::filesystem::path>& assetBrowserExtensions();
+
 BrowserCellType assetTypeForExtension(const std::filesystem::path& path);
 
 bool isEntityModelAsset(const BrowserAsset& asset);
@@ -95,7 +100,9 @@ std::optional<std::vector<BrowserAsset>> collectBrowserAssets(
   const std::function<
     Result<std::vector<std::filesystem::path>>(const std::filesystem::path&)>& findAssets,
   const std::function<Result<std::filesystem::path>(const std::filesystem::path&)>&
-    makeAbsolute);
+    makeAbsolute,
+  const std::vector<std::pair<BrowserCellType, std::filesystem::path>>& rootFilters =
+    goldSrcAssetRoots());
 
 AssetWriteTimes assetLastWriteTimes(const std::vector<BrowserAsset>& assets);
 

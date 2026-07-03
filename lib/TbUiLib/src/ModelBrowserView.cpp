@@ -89,6 +89,8 @@ std::optional<RgbaF> assetPlaceholderColor(const BrowserCellType type)
     return RgbaF{0.78f, 0.12f, 0.16f, 0.22f};
   case BrowserCellType::Sound:
     return RgbaF{0.66f, 0.54f, 0.95f, 0.35f};
+  case BrowserCellType::Prefab:
+    return RgbaF{0.20f, 0.58f, 0.48f, 0.30f};
   case BrowserCellType::Folder:
   case BrowserCellType::Model:
     return std::nullopt;
@@ -106,6 +108,7 @@ bool shouldRenderErrorText(const BrowserCellType type, const AssetPreviewState* 
     return preview && preview->status != AssetPreviewStatus::Ready;
   case BrowserCellType::Folder:
   case BrowserCellType::Model:
+  case BrowserCellType::Prefab:
     return false;
   }
 
@@ -311,6 +314,8 @@ void ModelBrowserView::doRender(
   renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Sprite);
   renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Sound);
   renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Sound);
+  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Prefab);
+  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Prefab);
   renderFolders(gl, layout, y, height);
   renderAssetPlaceholders(gl, layout, y, height);
   renderSoundPreviewButtons(gl, layout, y, height);
@@ -546,7 +551,8 @@ void ModelBrowserView::doContextMenu(
     }
     else
     {
-      const auto absPathResult = m_document.map().gameFileSystem().makeAbsolute(modelPath);
+      const auto absPathResult =
+        m_document.map().gameFileSystem().makeAbsolute(modelPath);
       if (!absPathResult.is_error())
       {
         absPath = absPathResult.value();
@@ -1447,6 +1453,8 @@ QString ModelBrowserView::dndData(const Cell& cell)
     return QString{"sprite:"} + pathAsGenericQString(item.path);
   case BrowserCellType::Sound:
     return QString{"sound:"} + pathAsGenericQString(item.path);
+  case BrowserCellType::Prefab:
+    return QString{"prefab:"} + pathAsGenericQString(item.path);
   case BrowserCellType::Folder:
     return "";
   }

@@ -57,6 +57,7 @@
 #include "ui/MapViewToolBox.h"
 #include "ui/MoveObjectsToolController.h"
 #include "ui/PathToolController.h"
+#include "ui/PrefabToolController.h"
 #include "ui/RotateToolController.h"
 #include "ui/ScaleToolController.h"
 #include "ui/SelectionTool.h"
@@ -114,6 +115,7 @@ void MapView3D::initializeToolChain(MapViewToolBox& toolBox)
   addToolController(std::make_unique<FaceToolController>(toolBox.faceTool()));
   addToolController(
     std::make_unique<CreateEntityToolController3D>(toolBox.createEntityTool()));
+  addToolController(std::make_unique<PrefabToolController3D>(toolBox.prefabTool()));
   addToolController(std::make_unique<SetBrushFaceAttributesTool>(m_document));
   addToolController(std::make_unique<PathToolController>(toolBox.pathTool()));
   addToolController(std::make_unique<SelectionTool>(m_document));

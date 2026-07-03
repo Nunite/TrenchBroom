@@ -194,6 +194,9 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PluginInspector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PopupButton.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PopupWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PrefabAsset.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PrefabTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PrefabToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PreferenceDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PreferencePane.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PythonPluginManagerDialog.cpp
@@ -456,6 +459,9 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PluginInspector.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PopupButton.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PopupWindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PrefabAsset.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PrefabTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PrefabToolController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PreferenceDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PreferencePane.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PythonPluginManagerDialog.h

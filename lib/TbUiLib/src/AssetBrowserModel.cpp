@@ -109,6 +109,25 @@ const std::vector<std::filesystem::path>& goldSrcAssetExtensions()
   return Extensions;
 }
 
+const std::vector<std::pair<BrowserCellType, std::filesystem::path>>& assetBrowserRoots()
+{
+  static const auto Roots =
+    std::vector<std::pair<BrowserCellType, std::filesystem::path>>{
+      {BrowserCellType::Model, std::filesystem::path{"models"}},
+      {BrowserCellType::Sprite, std::filesystem::path{"sprites"}},
+      {BrowserCellType::Sound, std::filesystem::path{"sound"}},
+      {BrowserCellType::Prefab, std::filesystem::path{"prefabs"}},
+    };
+  return Roots;
+}
+
+const std::vector<std::filesystem::path>& assetBrowserExtensions()
+{
+  static const auto Extensions =
+    std::vector<std::filesystem::path>{".mdl", ".spr", ".wav", ".tbprefab"};
+  return Extensions;
+}
+
 BrowserCellType assetTypeForExtension(const std::filesystem::path& path)
 {
   const auto extension = kdl::path_to_lower(path.extension());
@@ -123,6 +142,10 @@ BrowserCellType assetTypeForExtension(const std::filesystem::path& path)
   if (extension == ".wav")
   {
     return BrowserCellType::Sound;
+  }
+  if (extension == ".tbprefab")
+  {
+    return BrowserCellType::Prefab;
   }
   return BrowserCellType::Folder;
 }
@@ -152,20 +175,21 @@ std::optional<std::vector<BrowserAsset>> collectBrowserAssets(
   const std::function<
     Result<std::vector<std::filesystem::path>>(const std::filesystem::path&)>& findAssets,
   const std::function<Result<std::filesystem::path>(const std::filesystem::path&)>&
-    makeAbsolute)
+    makeAbsolute,
+  const std::vector<std::pair<BrowserCellType, std::filesystem::path>>& rootFilters)
 {
-  auto rootFilters = std::vector<std::pair<BrowserCellType, std::filesystem::path>>{};
+  auto roots = std::vector<std::pair<BrowserCellType, std::filesystem::path>>{};
   if (folderPath.empty())
   {
-    rootFilters = goldSrcAssetRoots();
+    roots = rootFilters;
   }
   else
   {
-    rootFilters.emplace_back(BrowserCellType::Folder, folderPath);
+    roots.emplace_back(BrowserCellType::Folder, folderPath);
   }
 
   auto assets = std::vector<BrowserAsset>{};
-  for (const auto& [rootType, rootPath] : rootFilters)
+  for (const auto& [rootType, rootPath] : roots)
   {
     unused(rootType);
     auto pathsResult = findAssets(rootPath);
