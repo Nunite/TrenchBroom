@@ -26,6 +26,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <optional>
 
 namespace tb::mdl
 {
@@ -41,6 +42,7 @@ class PrefabTool : public Tool
 {
 private:
   MapDocument& m_document;
+  std::optional<vm::bbox3d> m_previewBounds;
 
 public:
   using PlacementDelta = std::function<vm::vec3d(
@@ -49,6 +51,12 @@ public:
   explicit PrefabTool(MapDocument& document);
 
   bool canPlacePrefab(const std::filesystem::path& path) const;
+  const std::optional<vm::bbox3d>& previewBounds() const;
+  bool updatePreview(
+    const std::filesystem::path& path,
+    const InputState& inputState,
+    const PlacementDelta& placementDelta);
+  void clearPreview();
   bool placePrefab(
     const std::filesystem::path& path,
     const InputState& inputState,

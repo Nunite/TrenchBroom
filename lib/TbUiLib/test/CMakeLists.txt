@@ -36,6 +36,7 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PieMenuSettingsDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PreferenceDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PrefabAsset.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PrefabTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PluginInspector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonPluginManifest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonV2.cpp

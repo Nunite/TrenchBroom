@@ -49,6 +49,10 @@ private:
     const InputState& inputState, const std::string& payload) const override;
   std::unique_ptr<DropTracker> acceptDrop(
     const InputState& inputState, const std::string& payload) override;
+  void render(
+    const InputState& inputState,
+    render::RenderContext& renderContext,
+    render::RenderBatch& renderBatch) override;
 
   virtual std::unique_ptr<DropTracker> createDropTracker(
     std::filesystem::path prefabPath) const = 0;

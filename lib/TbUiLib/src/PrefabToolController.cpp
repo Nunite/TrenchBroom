@@ -19,6 +19,8 @@
 
 #include "ui/PrefabToolController.h"
 
+#include "PreferenceManager.h"
+#include "Preferences.h"
 #include "gl/Camera.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
@@ -27,6 +29,7 @@
 #include "mdl/HitFilter.h"
 #include "mdl/Map.h"
 #include "mdl/PickResult.h"
+#include "render/RenderService.h"
 #include "ui/DropTracker.h"
 #include "ui/InputState.h"
 #include "ui/PrefabTool.h"
@@ -75,14 +78,26 @@ public:
   {
   }
 
-  bool move(const InputState&) override { return true; }
+  bool move(const InputState& inputState) override
+  {
+    m_tool.updatePreview(m_prefabPath, inputState, m_placementDelta);
+    m_tool.refreshViews();
+    return true;
+  }
 
   bool drop(const InputState& inputState) override
   {
-    return m_tool.placePrefab(m_prefabPath, inputState, m_placementDelta);
+    const auto placed = m_tool.placePrefab(m_prefabPath, inputState, m_placementDelta);
+    m_tool.clearPreview();
+    m_tool.refreshViews();
+    return placed;
   }
 
-  void leave(const InputState&) override {}
+  void leave(const InputState&) override
+  {
+    m_tool.clearPreview();
+    m_tool.refreshViews();
+  }
 };
 
 vm::vec3d placementDelta2D(
@@ -168,6 +183,21 @@ std::unique_ptr<DropTracker> PrefabToolController::acceptDrop(
   }
 
   return createDropTracker(std::filesystem::path{parsedPayload->value});
+}
+
+void PrefabToolController::render(
+  const InputState&,
+  render::RenderContext& renderContext,
+  render::RenderBatch& renderBatch)
+{
+  if (const auto& bounds = m_tool.previewBounds())
+  {
+    auto renderService = render::RenderService{renderContext, renderBatch};
+    renderService.setForegroundColor(pref(Preferences::SelectionBoundsColor));
+    renderService.setLineWidth(2.0f);
+    renderService.setShowOccludedObjectsTransparent();
+    renderService.renderBounds(vm::bbox3f{*bounds});
+  }
 }
 
 PrefabToolController2D::PrefabToolController2D(PrefabTool& tool)
