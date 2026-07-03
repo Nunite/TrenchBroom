@@ -26,6 +26,7 @@
   scripts\build_release_codex.cmd
   ```
 - This is important because the local Windows SDK tools are installed under `D:\Windows Kits\10\...`, not only the default Visual Studio-discovered path. The wrapper script pins `VsDevCmd.bat`, `rc.exe`, and `mt.exe` so Release rebuilds stay reproducible.
+- This branch's local Qt is `D:\Qtx\6.11.1\msvc2022_64`. Keep its `bin` directory first in `PATH` for both builds and direct test runs; if old Qt 6.9.3 DLLs are earlier in `PATH`, Qt-linked test executables can fail with `0xc0000139` during Catch2 discovery or test startup.
 - The wrapper script deletes and recreates the target build directory before configuring. Do not point it at an arbitrary directory unless you intentionally want a full clean rebuild there.
 - If you need the same clean Release flow for another directory, pass it explicitly:
   ```powershell
