@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include <QImage>
+
 #include "Result.h"
 
 #include <filesystem>
@@ -37,6 +39,8 @@ std::filesystem::path prefabPathForName(
   const std::filesystem::path& directory, const std::string& name);
 
 std::filesystem::path prefabThumbnailPath(const std::filesystem::path& prefabPath);
+
+QImage cropPrefabThumbnailImage(const QImage& image);
 
 Result<void> checkPrefabNameAvailable(
   const std::filesystem::path& directory, const std::string& name);

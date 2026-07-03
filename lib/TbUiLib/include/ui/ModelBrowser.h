@@ -109,6 +109,7 @@ private:
   void saveSelectionAsPrefab();
   void renamePrefab(std::filesystem::path prefabPath);
   void deletePrefab(std::filesystem::path prefabPath);
+  void removePrefabFromBrowser(const std::filesystem::path& prefabPath);
   void setFolderPath(std::filesystem::path folderPath);
   void setCurrentFolderPath(std::filesystem::path currentFolderPath);
   void markAssetsDirty();

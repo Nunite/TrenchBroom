@@ -178,7 +178,8 @@ Result<void> savePrefabThumbnail(
   }
   mdl::deselectAll(map);
 
-  auto image = view->grabPrefabThumbnailFramebuffer(selectedNodes);
+  auto image =
+    cropPrefabThumbnailImage(view->grabPrefabThumbnailFramebuffer(selectedNodes));
   transaction.cancel();
 
   if (image.isNull())
@@ -741,9 +742,27 @@ void ModelBrowser::deletePrefab(std::filesystem::path prefabPath)
     return;
   }
 
-  m_lastWriteTimes.clear();
-  m_assetRefreshPending = false;
-  rescanWatchedDirectory();
+  removePrefabFromBrowser(prefabPath);
+}
+
+void ModelBrowser::removePrefabFromBrowser(const std::filesystem::path& prefabPath)
+{
+  const auto oldSize = m_assets.size();
+  std::erase_if(m_assets, [&](const auto& asset) {
+    return asset.type == BrowserCellType::Prefab && asset.path == prefabPath;
+  });
+
+  if (m_assets.size() == oldSize)
+  {
+    m_lastWriteTimes.clear();
+    scheduleRescan();
+    return;
+  }
+
+  m_lastWriteTimes = assetLastWriteTimes(m_assets);
+  rebuildFolderTree();
+  m_view->setAssets(m_folderPath, m_assets);
+  m_view->setCurrentFolderPath(m_currentFolderPath);
 }
 
 void ModelBrowser::setFolderPath(std::filesystem::path folderPath)

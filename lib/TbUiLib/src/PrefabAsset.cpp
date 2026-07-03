@@ -19,6 +19,8 @@
 
 #include "ui/PrefabAsset.h"
 
+#include <QColor>
+
 #include "Error.h"
 #include "PreferenceManager.h"
 #include "Preferences.h"
@@ -33,8 +35,26 @@
 #include <fmt/format.h>
 #include <fmt/std.h>
 
+#include <algorithm>
+#include <cmath>
+
 namespace tb::ui
 {
+namespace
+{
+
+constexpr auto ThumbnailCropPaddingRatio = 0.12;
+constexpr auto ThumbnailBackgroundTolerance = 10;
+
+bool differsFromBackground(const QColor& color, const QColor& background)
+{
+  return std::abs(color.red() - background.red()) > ThumbnailBackgroundTolerance
+         || std::abs(color.green() - background.green()) > ThumbnailBackgroundTolerance
+         || std::abs(color.blue() - background.blue()) > ThumbnailBackgroundTolerance
+         || std::abs(color.alpha() - background.alpha()) > ThumbnailBackgroundTolerance;
+}
+
+} // namespace
 
 bool isPrefabAssetPath(const std::filesystem::path& path)
 {
@@ -74,6 +94,49 @@ std::filesystem::path prefabThumbnailPath(const std::filesystem::path& prefabPat
   return path;
 }
 
+QImage cropPrefabThumbnailImage(const QImage& image)
+{
+  if (image.isNull() || image.width() < 2 || image.height() < 2)
+  {
+    return image;
+  }
+
+  const auto background = image.pixelColor(0, 0);
+  auto left = image.width();
+  auto top = image.height();
+  auto right = -1;
+  auto bottom = -1;
+
+  for (auto y = 0; y < image.height(); ++y)
+  {
+    for (auto x = 0; x < image.width(); ++x)
+    {
+      if (differsFromBackground(image.pixelColor(x, y), background))
+      {
+        left = std::min(left, x);
+        top = std::min(top, y);
+        right = std::max(right, x);
+        bottom = std::max(bottom, y);
+      }
+    }
+  }
+
+  if (right < left || bottom < top)
+  {
+    return image;
+  }
+
+  const auto padding = int(
+    std::round(std::max(right - left + 1, bottom - top + 1) * ThumbnailCropPaddingRatio));
+  const auto cropLeft = std::max(0, left - padding);
+  const auto cropTop = std::max(0, top - padding);
+  const auto cropRight = std::min(image.width() - 1, right + padding);
+  const auto cropBottom = std::min(image.height() - 1, bottom + padding);
+
+  return image.copy(
+    cropLeft, cropTop, cropRight - cropLeft + 1, cropBottom - cropTop + 1);
+}
+
 Result<void> checkPrefabNameAvailable(
   const std::filesystem::path& directory, const std::string& name)
 {
@@ -84,7 +147,7 @@ Result<void> checkPrefabNameAvailable(
   }
   if (fs::Disk::pathInfo(path) != fs::PathInfo::Unknown)
   {
-    return Error{fmt::format("Prefab already exists: {}", path.filename())};
+    return Error{fmt::format("Prefab already exists: {}", path.filename().string())};
   }
   return kdl::void_success;
 }

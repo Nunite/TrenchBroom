@@ -17,6 +17,9 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QColor>
+
+#include "Error.h"
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "fs/TestEnvironment.h"
@@ -24,6 +27,7 @@
 #include "ui/SystemPaths.h"
 
 #include <fstream>
+#include <variant>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -92,8 +96,31 @@ TEST_CASE("PrefabAsset")
 
     REQUIRE(writePrefabAsset(path, "prefab"));
 
-    CHECK_FALSE(checkPrefabNameAvailable(env.dir(), "crate"));
+    const auto result = checkPrefabNameAvailable(env.dir(), "crate");
+
+    REQUIRE_FALSE(result);
+    CHECK(std::get<Error>(result.error()).msg == "Prefab already exists: crate.tbprefab");
     CHECK(checkPrefabNameAvailable(env.dir(), "new_crate"));
+  }
+
+  SECTION("crops prefab thumbnails around non-background pixels")
+  {
+    auto image = QImage{100, 80, QImage::Format_RGBA8888};
+    image.fill(QColor{32, 32, 32, 255});
+    for (auto y = 30; y < 40; ++y)
+    {
+      for (auto x = 45; x < 55; ++x)
+      {
+        image.setPixelColor(x, y, QColor{200, 160, 80, 255});
+      }
+    }
+
+    const auto cropped = cropPrefabThumbnailImage(image);
+
+    CHECK(cropped.width() < image.width());
+    CHECK(cropped.height() < image.height());
+    CHECK(cropped.width() >= 10);
+    CHECK(cropped.height() >= 10);
   }
 
   SECTION("renames prefab and thumbnail")
