@@ -19,7 +19,8 @@
 
 #include "ui/PrefabTool.h"
 
-#include "SimpleParserStatus.h"
+#include "Logger.h"
+#include "ParserStatus.h"
 #include "fs/DiskIO.h"
 #include "fs/File.h"
 #include "fs/Reader.h"
@@ -48,6 +49,21 @@ namespace tb::ui
 {
 namespace
 {
+
+class SilentParserStatus : public ParserStatus
+{
+private:
+  NullLogger m_logger;
+
+public:
+  SilentParserStatus()
+    : ParserStatus{m_logger, ""}
+  {
+  }
+
+private:
+  void doProgress(double) override {}
+};
 
 Result<std::string> readPrefabAssetText(
   const mdl::GameFileSystem& gameFileSystem, const std::filesystem::path& path)
@@ -120,7 +136,7 @@ vm::bbox3d computePrefabAssetBounds(const std::vector<mdl::Node*>& nodes)
 
 Result<vm::bbox3d> readPrefabAssetBounds(mdl::Map& map, const std::string& text)
 {
-  auto parserStatus = SimpleParserStatus{map.logger()};
+  auto parserStatus = SilentParserStatus{};
   return mdl::NodeReader::read(
            text,
            map.worldNode().mapFormat(),

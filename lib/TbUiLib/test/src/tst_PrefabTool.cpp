@@ -17,6 +17,8 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "Logger.h"
+#include "TestLogger.h"
 #include "fs/TestEnvironment.h"
 #include "ui/InputState.h"
 #include "ui/MapDocument.h"
@@ -98,6 +100,25 @@ TEST_CASE("PrefabTool")
     REQUIRE(writePrefabAsset(prefabPath, SavedPrefabText));
 
     checkPreviewBounds(tool, prefabPath);
+  }
+
+  SECTION("does not log while updating preview")
+  {
+    auto logger = TestLogger{};
+    document.setTargetLogger(&logger);
+
+    auto env = fs::TestEnvironment{};
+    const auto prefabPath = env.dir() / "crate.tbprefab";
+    REQUIRE(writePrefabAsset(prefabPath, SavedPrefabText));
+
+    const auto messageCount = logger.countMessages();
+    CHECK(tool.updatePreview(
+      prefabPath, InputState{}, [](auto&, const auto&, const auto&, const auto&) {
+        return vm::vec3d{};
+      }));
+    CHECK(logger.countMessages() == messageCount);
+
+    document.setTargetLogger(nullptr);
   }
 
   SECTION("clears preview for invalid prefab")
