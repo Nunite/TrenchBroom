@@ -38,6 +38,8 @@
 #include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
+#include "mdl/MapFormat.h"
+#include "mdl/MapReader.h"
 #include "mdl/Map_Assets.h"
 #include "mdl/Map_CopyPaste.h"
 #include "mdl/Map_Geometry.h"
@@ -79,6 +81,52 @@ public:
 
 private:
   void doProgress(double) override {}
+};
+
+class PrefabWadReader : public mdl::MapReader
+{
+private:
+  std::string m_wadPropertyKey;
+  std::vector<std::string> m_wadPaths;
+
+public:
+  PrefabWadReader(
+    const std::string_view str,
+    const mdl::MapFormat sourceMapFormat,
+    const mdl::MapFormat targetMapFormat,
+    const mdl::EntityPropertyConfig& entityPropertyConfig,
+    std::string wadPropertyKey)
+    : MapReader{str, sourceMapFormat, targetMapFormat, entityPropertyConfig}
+    , m_wadPropertyKey{std::move(wadPropertyKey)}
+  {
+  }
+
+  Result<void> read(
+    const vm::bbox3d& worldBounds, ParserStatus& status, kdl::task_manager& taskManager)
+  {
+    return readEntities(worldBounds, status, taskManager);
+  }
+
+  std::vector<std::string> wadPaths()
+  {
+    std::erase_if(m_wadPaths, [](const auto& path) { return path.empty(); });
+    return kdl::vec_sort_and_remove_duplicates(std::move(m_wadPaths));
+  }
+
+private:
+  mdl::Node* onWorldNode(
+    std::unique_ptr<mdl::WorldNode> worldNode, ParserStatus&) override
+  {
+    if (const auto* wadProperty = worldNode->entity().property(m_wadPropertyKey))
+    {
+      kdl::vec_append(m_wadPaths, mdl::splitWadProperty(*wadProperty));
+    }
+    return nullptr;
+  }
+
+  void onLayerNode(std::unique_ptr<mdl::Node>, ParserStatus&) override {}
+
+  void onNode(mdl::Node*, std::unique_ptr<mdl::Node>, ParserStatus&) override {}
 };
 
 Result<std::string> readPrefabAssetText(
@@ -302,6 +350,32 @@ std::vector<std::string> prefabMaterialNames(mdl::Map& map, const std::string& p
   return kdl::vec_sort_and_remove_duplicates(std::move(result));
 }
 
+std::vector<std::string> prefabWorldspawnWadPaths(
+  mdl::Map& map, const std::string& prefabText)
+{
+  if (!map.gameInfo().gameConfig.materialConfig.property)
+  {
+    return {};
+  }
+
+  auto parserStatus = SilentParserStatus{};
+  for (const auto compatibleMapFormat :
+       mdl::compatibleFormats(map.worldNode().mapFormat()))
+  {
+    auto reader = PrefabWadReader{
+      prefabText,
+      compatibleMapFormat,
+      map.worldNode().mapFormat(),
+      map.worldNode().entityPropertyConfig(),
+      *map.gameInfo().gameConfig.materialConfig.property};
+    if (reader.read(map.worldBounds(), parserStatus, map.taskManager()))
+    {
+      return reader.wadPaths();
+    }
+  }
+  return {};
+}
+
 std::vector<std::string> missingPrefabMaterials(mdl::Map& map, const std::string& text)
 {
   auto result = prefabMaterialNames(map, text);
@@ -412,7 +486,11 @@ bool ensurePrefabMaterials(
   const PrefabTool::PrefabMaterialImportCallback& callback)
 {
   const auto materialCollections = prefabMaterialCollections(prefabText);
-  const auto wadPaths = prefabWadPaths(prefabText);
+  auto wadPaths = prefabWadPaths(prefabText);
+  if (wadPaths.empty())
+  {
+    wadPaths = prefabWorldspawnWadPaths(map, prefabText);
+  }
   if (materialCollections.empty() && wadPaths.empty())
   {
     return true;

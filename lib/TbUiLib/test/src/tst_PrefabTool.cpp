@@ -281,6 +281,53 @@ TEST_CASE("PrefabTool")
     REQUIRE(wads);
     CHECK(*wads == "source.wad");
   }
+
+  SECTION("imports prefab wad sources from saved worldspawn metadata")
+  {
+    auto quakeFixture = MapDocumentFixture{};
+    auto& quakeDocument = quakeFixture.create(mdl::QuakeFixtureConfig);
+    auto quakeTool = PrefabTool{quakeDocument};
+
+    auto env = fs::TestEnvironment{};
+    const auto prefabPath = env.dir() / "crate.tbprefab";
+    REQUIRE(writePrefabAsset(
+      prefabPath,
+      R"(// entity 0
+{
+"classname" "worldspawn"
+"wad" "source.wad"
+// brush 0
+{
+( -0 -0 -16 ) ( -0 -0  -0 ) ( 64 -0 -16 ) tex1 1 2 3 4 5
+( -0 -0 -16 ) ( -0 64 -16 ) ( -0 -0  -0 ) tex2 0 0 0 1 1
+( -0 -0 -16 ) ( 64 -0 -16 ) ( -0 64 -16 ) tex3 0 0 0 1 1
+( 64 64  -0 ) ( -0 64  -0 ) ( 64 64 -16 ) tex4 0 0 0 1 1
+( 64 64  -0 ) ( 64 64 -16 ) ( 64 -0  -0 ) tex5 0 0 0 1 1
+( 64 64  -0 ) ( 64 -0  -0 ) ( -0 64  -0 ) tex6 0 0 0 1 1
+}
+}
+)"));
+
+    auto callbackCount = 0;
+    auto wadPaths = std::vector<std::string>{};
+    quakeTool.setMaterialImportCallback([&](const auto&, const auto&, const auto& wads) {
+      ++callbackCount;
+      wadPaths = wads;
+      return PrefabTool::PrefabMaterialImportAction::Import;
+    });
+
+    REQUIRE(quakeTool.placePrefab(
+      prefabPath, InputState{}, [](auto&, const auto&, const auto&, const auto&) {
+        return vm::vec3d{};
+      }));
+
+    CHECK(callbackCount == 1);
+    CHECK(wadPaths == std::vector<std::string>{"source.wad"});
+    const auto* wads =
+      quakeDocument.map().worldNode().entity().property(mdl::EntityPropertyKeys::Wad);
+    REQUIRE(wads);
+    CHECK(*wads == "source.wad");
+  }
 }
 
 } // namespace tb::ui
