@@ -640,6 +640,24 @@ void ModelBrowser::rebuildFolderTree()
   rootItem->setIcon(0, folderIcon);
   m_folderTreeItems.emplace(std::filesystem::path{}, rootItem);
 
+  if (m_folderPath.empty())
+  {
+    for (const auto& [type, rootPath] : assetBrowserRoots())
+    {
+      unused(type);
+      if (rootPath.empty() || m_folderTreeItems.contains(rootPath))
+      {
+        continue;
+      }
+
+      auto* item = new QTreeWidgetItem{
+        rootItem, QStringList{QString::fromStdString(rootPath.generic_string())}};
+      item->setData(0, Qt::UserRole, QString::fromStdString(rootPath.generic_string()));
+      item->setIcon(0, folderIcon);
+      m_folderTreeItems.emplace(rootPath, item);
+    }
+  }
+
   for (const auto& asset : m_assets)
   {
     const auto& assetPath = asset.path;

@@ -162,6 +162,26 @@ TEST_CASE("ModelBrowserView")
       Equals(std::vector<std::string>{"models", "prefabs", "sound", "sprites"}));
   }
 
+  SECTION("shows empty unified root folders")
+  {
+    const auto entries = modelBrowserEntries({}, {}, {}, {});
+
+    CHECK_THAT(
+      entryTypes(entries),
+      Equals(std::vector<BrowserCellType>{
+        BrowserCellType::Folder,
+        BrowserCellType::Folder,
+        BrowserCellType::Folder,
+        BrowserCellType::Folder,
+      }));
+    CHECK_THAT(
+      entryTitles(entries),
+      Equals(std::vector<std::string>{"models", "prefabs", "sound", "sprites"}));
+    CHECK_THAT(
+      entryPaths(entries),
+      Equals(std::vector<std::string>{"models", "prefabs", "sound", "sprites"}));
+  }
+
   SECTION("shows assets inside unified folders")
   {
     const auto unifiedRoot = std::filesystem::path{};

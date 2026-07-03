@@ -329,6 +329,18 @@ std::vector<ModelBrowserEntry> modelBrowserEntries(
   auto folderChildren = std::vector<std::filesystem::path>{};
   auto assetChildren = std::vector<BrowserAsset>{};
 
+  if (rootFolderPath.empty() && normalizedCurrentFolderPath.empty())
+  {
+    for (const auto& [type, rootPath] : assetBrowserRoots())
+    {
+      unused(type);
+      if (!hasSearch || matches(rootPath))
+      {
+        folderChildren.push_back(rootPath);
+      }
+    }
+  }
+
   for (const auto& asset : assets)
   {
     const auto& assetPath = asset.path;
