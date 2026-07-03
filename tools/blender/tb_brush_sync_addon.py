@@ -545,6 +545,10 @@ def poll_request():
         return 1.0
 
     mtime = REQUEST_PATH.stat().st_mtime
+    if _last_request_mtime is None:
+        _last_request_mtime = mtime
+        return 1.0
+
     if mtime != _last_request_mtime:
         _last_request_mtime = mtime
         try:
