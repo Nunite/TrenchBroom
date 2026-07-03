@@ -70,6 +70,7 @@
 #include <algorithm>
 #include <memory>
 #include <ranges>
+#include <set>
 #include <variant>
 #include <vector>
 
@@ -125,6 +126,12 @@ bool shouldRenderErrorText(const BrowserCellType type, const AssetPreviewState* 
 bool canRenderImagePreview(const BrowserCellType type)
 {
   return type == BrowserCellType::Sprite || type == BrowserCellType::Prefab;
+}
+
+bool canLoadPreview(const BrowserCellType type)
+{
+  return type == BrowserCellType::Sprite || type == BrowserCellType::Prefab
+         || type == BrowserCellType::Sound;
 }
 
 } // namespace
@@ -184,10 +191,8 @@ void ModelBrowserView::setAssets(
   std::filesystem::path rootFolderPath, std::vector<BrowserAsset> assets)
 {
   m_rootFolderPath = std::move(rootFolderPath);
+  removeStalePreviews(assets);
   m_assets = std::move(assets);
-  m_assetPreviews.clear();
-  invalidateSpritePreviewTextures();
-  loadPreviews();
   m_currentFolderPath.clear();
   m_hasSelection = false;
   m_hasHover = false;
@@ -267,10 +272,7 @@ void ModelBrowserView::setSearchText(QString searchText)
 
 void ModelBrowserView::resourcesWereProcessed(const std::vector<mdl::ResourceId>&)
 {
-  m_assetPreviews.clear();
-  invalidateSpritePreviewTextures();
   stopSoundPreview();
-  loadPreviews();
   invalidate();
   update();
 }
@@ -311,6 +313,7 @@ void ModelBrowserView::doRender(
   gl::Gl& gl, Layout& layout, const float y, const float height)
 {
   deletePendingSpritePreviewTextures(gl);
+  loadMissingVisiblePreviews(layout, y, height);
 
   const auto viewLeft = float(0);
   const auto viewTop = float(size().height());
@@ -394,10 +397,82 @@ const AssetPreviewState* ModelBrowserView::assetPreview(
   return it != std::end(m_assetPreviews) ? &it->second : nullptr;
 }
 
-void ModelBrowserView::loadPreviews()
+void ModelBrowserView::removeStalePreviews(const std::vector<BrowserAsset>& assets)
 {
-  m_assetPreviews =
-    loadAssetPreviews(AssetPreviewProvider{m_document.map().gameFileSystem()}, m_assets);
+  auto currentAssets = std::map<std::filesystem::path, BrowserAsset>{};
+  for (const auto& asset : assets)
+  {
+    currentAssets.emplace(asset.path, asset);
+  }
+
+  for (auto it = std::begin(m_assetPreviews); it != std::end(m_assetPreviews);)
+  {
+    const auto assetIt = currentAssets.find(it->first);
+    if (assetIt == std::end(currentAssets))
+    {
+      if (m_spritePreviewTextures.contains(it->first))
+      {
+        invalidateSpritePreviewTextures();
+      }
+      it = m_assetPreviews.erase(it);
+      continue;
+    }
+
+    const auto oldAssetIt = std::ranges::find(
+      m_assets, it->first, [](const auto& asset) { return asset.path; });
+    if (
+      oldAssetIt == std::end(m_assets)
+      || oldAssetIt->lastModified != assetIt->second.lastModified)
+    {
+      if (m_spritePreviewTextures.contains(it->first))
+      {
+        invalidateSpritePreviewTextures();
+      }
+      it = m_assetPreviews.erase(it);
+      continue;
+    }
+
+    ++it;
+  }
+}
+
+void ModelBrowserView::loadMissingVisiblePreviews(
+  Layout& layout, const float y, const float height)
+{
+  auto paths = std::set<std::filesystem::path>{};
+  for (const auto& group : layout.groups())
+  {
+    if (!group.intersectsY(y, height))
+    {
+      continue;
+    }
+
+    for (const auto& row : group.rows())
+    {
+      if (!row.intersectsY(y, height))
+      {
+        continue;
+      }
+
+      for (const auto& cell : row.cells())
+      {
+        const auto& item = cellData(cell);
+        if (canLoadPreview(item.type) && !m_assetPreviews.contains(item.path))
+        {
+          paths.insert(item.path);
+        }
+      }
+    }
+  }
+
+  if (paths.empty())
+  {
+    return;
+  }
+
+  auto previews = loadAssetPreviews(
+    AssetPreviewProvider{m_document.map().gameFileSystem()}, m_assets, paths);
+  m_assetPreviews.merge(previews);
 }
 
 void ModelBrowserView::invalidateSpritePreviewTextures()

@@ -33,6 +33,7 @@
 #include <filesystem>
 #include <map>
 #include <optional>
+#include <set>
 #include <vector>
 
 class QEvent;
@@ -143,7 +144,8 @@ private:
   void ensureFolderIconTexture(gl::Gl& gl);
   void destroyFolderIconTexture();
   const AssetPreviewState* assetPreview(const std::filesystem::path& path) const;
-  void loadPreviews();
+  void removeStalePreviews(const std::vector<BrowserAsset>& assets);
+  void loadMissingVisiblePreviews(Layout& layout, float y, float height);
   void invalidateSpritePreviewTextures();
   void deletePendingSpritePreviewTextures(gl::Gl& gl);
   const SpritePreviewTexture* ensureSpritePreviewTexture(

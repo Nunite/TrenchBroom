@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <set>
 #include <span>
 #include <vector>
 
@@ -153,11 +154,18 @@ AssetPreviewState AssetPreviewProvider::prefabPreview(const BrowserAsset& asset)
 }
 
 AssetPreviewMap loadAssetPreviews(
-  const AssetPreviewProvider& provider, const std::vector<BrowserAsset>& assets)
+  const AssetPreviewProvider& provider,
+  const std::vector<BrowserAsset>& assets,
+  const std::set<std::filesystem::path>& paths)
 {
   auto previews = AssetPreviewMap{};
   for (const auto& asset : assets)
   {
+    if (!paths.empty() && !paths.contains(asset.path))
+    {
+      continue;
+    }
+
     const auto preview = provider.preview(asset);
     if (preview.status != AssetPreviewStatus::Unsupported)
     {
@@ -165,6 +173,12 @@ AssetPreviewMap loadAssetPreviews(
     }
   }
   return previews;
+}
+
+AssetPreviewMap loadAssetPreviews(
+  const AssetPreviewProvider& provider, const std::vector<BrowserAsset>& assets)
+{
+  return loadAssetPreviews(provider, assets, {});
 }
 
 } // namespace tb::ui

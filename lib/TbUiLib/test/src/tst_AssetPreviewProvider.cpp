@@ -169,6 +169,24 @@ TEST_CASE("AssetPreviewProvider")
     CHECK(previews.contains("sprites/missing.spr"));
   }
 
+  SECTION("loads only requested previews")
+  {
+    const auto soundPath = env.dir() / "hum.wav";
+    writeBytes(soundPath, {'R', 'I', 'F', 'F'});
+
+    const auto previews = loadAssetPreviews(
+      provider,
+      {
+        BrowserAsset{BrowserCellType::Sound, "sound/ambience/hum.wav", soundPath},
+        BrowserAsset{
+          BrowserCellType::Sprite, "sprites/missing.spr", env.dir() / "missing.spr"},
+      },
+      {std::filesystem::path{"sound/ambience/hum.wav"}});
+
+    CHECK(previews.contains("sound/ambience/hum.wav"));
+    CHECK_FALSE(previews.contains("sprites/missing.spr"));
+  }
+
   SECTION("missing WAV returns missing")
   {
     const auto preview = provider.preview(BrowserAsset{

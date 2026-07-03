@@ -25,6 +25,7 @@
 #include <filesystem>
 #include <map>
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace tb::mdl
@@ -72,5 +73,9 @@ using AssetPreviewMap = std::map<std::filesystem::path, AssetPreviewState>;
 
 AssetPreviewMap loadAssetPreviews(
   const AssetPreviewProvider& provider, const std::vector<BrowserAsset>& assets);
+AssetPreviewMap loadAssetPreviews(
+  const AssetPreviewProvider& provider,
+  const std::vector<BrowserAsset>& assets,
+  const std::set<std::filesystem::path>& paths);
 
 } // namespace tb::ui
