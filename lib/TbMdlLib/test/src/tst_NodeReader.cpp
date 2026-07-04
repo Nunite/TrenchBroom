@@ -116,31 +116,6 @@ TEST_CASE("NodeReader")
       != nullptr);
   }
 
-  SECTION("readGroupArrayModifierProperties")
-  {
-    const auto data = R"(// entity 0
-{
-"classname" "func_group"
-"_tb_type" "_tb_group"
-"_tb_name" "Array Source"
-"_tb_id" "3"
-"_tb_array_id" "array-1"
-"_tb_array_role" "source"
-"_tb_array_settings" "{\"count\":3}"
-}
-)";
-
-    auto nodes =
-      NodeReader::read(data, MapFormat::Standard, worldBounds, {}, status, taskManager);
-    REQUIRE(nodes);
-
-    auto* groupNode = dynamic_cast<GroupNode*>(nodes.value().at(0));
-    REQUIRE(groupNode != nullptr);
-    CHECK(groupNode->group().property("_tb_array_id") == "array-1");
-    CHECK(groupNode->group().property("_tb_array_role") == "source");
-    CHECK(groupNode->group().property("_tb_array_settings") == R"({\"count\":3})");
-  }
-
   SECTION("readScientificNotation")
   {
     // https://github.com/TrenchBroom/TrenchBroom/issues/4270

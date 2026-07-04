@@ -38,7 +38,6 @@
 
 #include "kd/contracts.h"
 #include "kd/result.h"
-#include "kd/string_compare.h"
 #include "kd/string_format.h"
 #include "kd/string_utils.h"
 #include "kd/task_manager.h"
@@ -60,10 +59,6 @@ namespace tb::mdl
 
 namespace
 {
-bool isArrayModifierProperty(const EntityProperty& property)
-{
-  return kdl::cs::str_is_prefix(property.key(), "_tb_array_");
-}
 
 template <typename T>
 auto getFilePosition(const T& info)
@@ -504,13 +499,6 @@ CreateNodeResult createGroupNode(const MapReader::EntityInfo& entityInfo)
   if (transformation)
   {
     group.setTransformation(*transformation);
-  }
-  for (const auto& property : entityInfo.properties)
-  {
-    if (isArrayModifierProperty(property))
-    {
-      group.setProperty(property.key(), property.value());
-    }
   }
 
   auto groupNode = std::make_unique<GroupNode>(std::move(group));
