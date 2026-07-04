@@ -1763,6 +1763,52 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     manager.unloadPlugins(window);
   }
 
+  SECTION("loads v2 curve sweep example plugin")
+  {
+    auto& map = window.document().map();
+    map.vertexHandles().add(vm::vec3d{0.0, 0.0, 0.0});
+    map.vertexHandles().add(vm::vec3d{128.0, 0.0, 0.0});
+    map.vertexHandles().add(vm::vec3d{256.0, 64.0, 0.0});
+    map.vertexHandles().select(vm::vec3d{0.0, 0.0, 0.0});
+    map.vertexHandles().select(vm::vec3d{128.0, 0.0, 0.0});
+    map.vertexHandles().select(vm::vec3d{256.0, 64.0, 0.0});
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/curve_sweep"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+
+    auto* recordButton = static_cast<QPushButton*>(nullptr);
+    auto* applyButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Record Path From Vertex Handles"))
+      {
+        recordButton = button;
+      }
+      if (button->text() == QStringLiteral("Apply Sweep"))
+      {
+        applyButton = button;
+      }
+    }
+    REQUIRE(recordButton != nullptr);
+    REQUIRE(applyButton != nullptr);
+
+    recordButton->click();
+    applyButton->click();
+    CHECK(map.worldNode().defaultLayer()->childCount() == 2u);
+    manager.unloadPlugins(window);
+  }
+
   SECTION("runs v2 entity brush modifier example script")
   {
     auto& map = window.document().map();

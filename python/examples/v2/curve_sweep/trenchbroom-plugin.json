@@ -1,0 +1,10 @@
+{
+  "id": "trenchbroom.examples.v2.curve_sweep",
+  "name": "Curve Sweep",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "pluginType": "ui",
+  "entry": "main.py",
+  "description": "Builds connected triangular brush segments along recorded vertex-handle path points.",
+  "author": "TrenchBroom"
+}
