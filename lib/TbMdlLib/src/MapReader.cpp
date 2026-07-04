@@ -645,28 +645,33 @@ std::vector<std::optional<NodeInfo>> createNodesFromObjectInfos(
   // create nodes in parallel, moving data out of objectInfos
   // we store optionals in the result vector to make the elements default constructible,
   // which is a requirement for parallel transform
-  auto tasks = objectInfos | std::views::transform([&](auto& objectInfo) {
-                 return std::function{[&]() -> CreateNodeResult {
-                   return std::visit(
-                     kdl::overload(
-                       [&](MapReader::EntityInfo& entityInfo) {
-                         return createNodeFromEntityInfo(
-                           entityPropertyConfig, std::move(entityInfo), mapFormat);
-                       },
-                       [&](MapReader::BrushInfo& brushInfo) {
-                         return createBrushNode(std::move(brushInfo), worldBounds);
-                       },
-                       [&](MapReader::PatchInfo& patchInfo) {
-                         return createPatchNode(std::move(patchInfo));
-                       }),
-                     objectInfo);
-                 }};
-               });
+  auto tasks = std::vector<std::function<CreateNodeResult()>>{};
+  tasks.reserve(objectInfos.size());
+  for (auto& objectInfo : objectInfos)
+  {
+    tasks.emplace_back(
+      [&entityPropertyConfig, &worldBounds, mapFormat, objectInfo = std::move(objectInfo)]()
+        mutable -> CreateNodeResult {
+        return std::visit(
+          kdl::overload(
+            [&](MapReader::EntityInfo& entityInfo) {
+              return createNodeFromEntityInfo(
+                entityPropertyConfig, std::move(entityInfo), mapFormat);
+            },
+            [&](MapReader::BrushInfo& brushInfo) {
+              return createBrushNode(std::move(brushInfo), worldBounds);
+            },
+            [&](MapReader::PatchInfo& patchInfo) {
+              return createPatchNode(std::move(patchInfo));
+            }),
+          objectInfo);
+      });
+  }
 
   auto results = taskManager.run_tasks_and_wait(std::move(tasks));
   return results | std::views::transform([&](auto& createNodeResult) {
            return std::move(createNodeResult)
-                  | kdl::transform([&](NodeInfo&& nodeInfo) -> std::optional<NodeInfo> {
+                  | kdl::transform([](NodeInfo&& nodeInfo) -> std::optional<NodeInfo> {
                       return std::move(nodeInfo);
                     })
                   | kdl::transform_error(
