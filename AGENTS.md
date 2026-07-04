@@ -46,6 +46,10 @@
   ```
 - If a plain `cmake --build build-release-codex ...` fails with missing SDK tools, missing `kernel32.lib`, or `type_traits`/STL lookup errors, assume the shell environment is incomplete and go back to `scripts\build_release_codex.cmd` instead of debugging source code first.
 - If Release crashes after changing a class layout in a header, suspect stale `.obj` files before chasing random Qt stacks. This happened after adding a `MapViewToolBox` member: `SwitchableMapViewContainer.cpp.obj` was not rebuilt, so `make_unique<MapViewToolBox>` allocated the old size and the constructor corrupted the heap. Force-rebuild the dependent target or delete the stale object/build tree.
+- For Release heap corruption, do not trust the final crash stack if it ends in Qt widget/tool destructors during shutdown. Enable PageHeap with `D:\Windows Kits\10\Debuggers\x64\gflags.exe /p /enable TrenchBroom.exe /full`, run under `D:\Windows Kits\10\Debuggers\x64\cdb.exe`, and capture the first-chance stack; it is usually closer to the real write-after-free or bad capture.
+- Disable PageHeap when done with `D:\Windows Kits\10\Debuggers\x64\gflags.exe /p /disable TrenchBroom.exe` (and any test exe you enabled). Leaving PageHeap on makes later smoke tests painfully slow and can turn normal UI checks into false alarms.
+- If a crash disappears after `scripts\build_release_codex.cmd`, still look for the source-level lifetime bug. A clean rebuild can hide stale-object symptoms, but it does not prove the code is safe.
+- Be careful with lazy ranges/views feeding async tasks. Do not capture loop variables, view elements, or transform lambda references by `&` into `task_manager` tasks; move or copy each work item into the closure before scheduling it.
 - Run focused Catch2 tests directly from the build tree, for example:
   ```powershell
   build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "ModelBrowserView"
@@ -64,7 +68,7 @@
 - Useful static checks before commit:
   ```powershell
   git diff --check
-  rg -n "^(<<<<<<<|=======|>>>>>>>)" lib app CMakeLists.txt
+  rg -n "^(<<<<<<<|=======$|>>>>>>>)( |$)" lib app CMakeLists.txt
   ```
 
 ## Current custom branch notes
