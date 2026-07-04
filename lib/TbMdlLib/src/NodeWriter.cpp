@@ -191,6 +191,14 @@ void NodeWriter::writeNodes(
   m_serializer->endFile();
 }
 
+void NodeWriter::writeWorldspawnHeader(kdl::task_manager& taskManager)
+{
+  m_serializer->beginFile({}, taskManager);
+  m_serializer->entity(
+    m_world, m_world.entity().properties(), {}, std::vector<BrushNode*>{});
+  m_serializer->endFile();
+}
+
 void NodeWriter::writeWorldBrushes(const std::vector<BrushNode*>& brushes)
 {
   if (!brushes.empty())

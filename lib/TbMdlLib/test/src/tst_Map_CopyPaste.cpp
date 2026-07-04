@@ -27,6 +27,7 @@
 #include "mdl/Map.h"
 #include "mdl/MapFixture.h"
 #include "mdl/Map_CopyPaste.h"
+#include "mdl/Map_Entities.h"
 #include "mdl/Map_Geometry.h"
 #include "mdl/Map_Groups.h"
 #include "mdl/Map_Nodes.h"
@@ -96,6 +97,18 @@ TEST_CASE("Map_CopyPaste")
 // entity 1
 {
 "some_key" "some_value"
+}
+)");
+    }
+
+    SECTION("worldspawn header includes worldspawn properties")
+    {
+      REQUIRE(setEntityProperty(map, "wad", "textures/test.wad"));
+
+      CHECK(serializeWorldspawnHeader(map) == R"(// entity 0
+{
+"classname" "worldspawn"
+"wad" "textures/test.wad"
 }
 )");
     }

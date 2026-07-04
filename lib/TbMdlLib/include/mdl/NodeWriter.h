@@ -64,6 +64,7 @@ private:
 
 public:
   void writeNodes(const std::vector<Node*>& nodes, kdl::task_manager& taskManager);
+  void writeWorldspawnHeader(kdl::task_manager& taskManager);
 
 private:
   void writeWorldBrushes(const std::vector<BrushNode*>& brushes);

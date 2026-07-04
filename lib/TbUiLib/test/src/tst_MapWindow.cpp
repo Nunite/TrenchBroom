@@ -19,6 +19,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QClipboard>
 #include <QComboBox>
 #include <QKeyEvent>
 #include <QLabel>
@@ -37,6 +38,7 @@
 #include "gl/ResourceManager.h"
 #include "gl/TestGl.h"
 #include "gl/TestUtils.h"
+#include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceAttributes.h"
 #include "mdl/BrushNode.h"
@@ -162,6 +164,29 @@ TEST_CASE("MapWindow")
   UNSCOPED_INFO("creating MapWindow");
   auto window = MapWindow{appController, std::move(document)};
   UNSCOPED_INFO("MapWindow created");
+
+  SECTION("copy prefixes worldspawn header when enabled")
+  {
+    auto& map = window.document().map();
+    auto worldEntity = map.worldNode().entity();
+    worldEntity.addOrUpdateProperty(mdl::EntityPropertyKeys::Wad, "textures/test.wad");
+    map.worldNode().setEntity(std::move(worldEntity));
+
+    const auto builder = mdl::BrushBuilder{
+      map.worldNode().mapFormat(),
+      map.worldBounds(),
+      map.gameInfo().gameConfig.faceAttribsConfig.defaults};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "some_material") | kdl::value()};
+    mdl::addNodes(map, {{map.worldNode().defaultLayer(), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    setPref(Preferences::PrefixWorldspawnHeaderOnCopy, true);
+    window.copyToClipboard();
+
+    CHECK(QApplication::clipboard()->text().contains(
+      QStringLiteral("\"wad\" \"textures/test.wad\"")));
+  }
 
   SECTION("load resets grid size dropdown")
   {

@@ -258,6 +258,14 @@ std::string serializeSelectedNodes(Map& map)
   return stream.str();
 }
 
+std::string serializeWorldspawnHeader(Map& map)
+{
+  auto stream = std::stringstream{};
+  auto writer = NodeWriter{map.worldNode(), stream};
+  writer.writeWorldspawnHeader(map.taskManager());
+  return stream.str();
+}
+
 std::string serializeSelectedBrushFaces(Map& map)
 {
   auto stream = std::stringstream{};

@@ -28,6 +28,7 @@ class Map;
 enum class PasteType;
 
 std::string serializeSelectedNodes(Map& map);
+std::string serializeWorldspawnHeader(Map& map);
 std::string serializeSelectedBrushFaces(Map& map);
 
 PasteType paste(Map& map, const std::string& str);

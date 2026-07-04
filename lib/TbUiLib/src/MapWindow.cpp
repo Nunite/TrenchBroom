@@ -1454,9 +1454,13 @@ void MapWindow::copyToClipboard()
 {
   auto& map = m_document->map();
   const auto& selection = map.selection();
-  const auto str = selection.hasNodes()        ? serializeSelectedNodes(map)
-                   : selection.hasBrushFaces() ? serializeSelectedBrushFaces(map)
-                                               : std::string{};
+  auto str = selection.hasNodes()        ? serializeSelectedNodes(map)
+             : selection.hasBrushFaces() ? serializeSelectedBrushFaces(map)
+                                         : std::string{};
+  if (selection.hasNodes() && pref(Preferences::PrefixWorldspawnHeaderOnCopy))
+  {
+    str = serializeWorldspawnHeader(map) + str;
+  }
 
   auto* clipboard = QApplication::clipboard();
   clipboard->setText(mapStringToUnicode(map.encoding(), str));
