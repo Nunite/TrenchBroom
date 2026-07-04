@@ -38,6 +38,7 @@
   powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbUiLibTest -TestFilter "McpBridgeServer"
   powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbMcpLibTest -TestExe build-release-codex\lib\TbMcpLib\test\TbMcpLibTest.exe -TestFilter "McpToolCatalog"
   ```
+- Do not run two `build-filtered.ps1` / Ninja builds against the same `build-release-codex` tree at the same time. Shared targets such as `TbMdlLib` can race while writing `.obj` files and fail with `Permission denied`; run those wrapper builds serially.
 - If the filtered output hides something relevant, rerun with `-NoFilter` or inspect the matching log in `build-release-codex\codex-logs`.
 - For UI/library work, build the focused test target first. If the filtered wrapper is unavailable, use the explicit Visual Studio environment form:
   ```powershell
