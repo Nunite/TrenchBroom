@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPointer>
@@ -30,13 +31,16 @@
 #include "mdl/EntityNode.h"
 #include "mdl/EntityProperties.h"
 #include "mdl/GameConfigFixture.h"
+#include "mdl/GroupNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFormat.h"
 #include "mdl/Map_Brushes.h"
 #include "mdl/Map_Entities.h"
+#include "mdl/Map_Groups.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/PatchNode.h"
 #include "mdl/VertexHandleManager.h"
 #include "mdl/WorldNode.h"
 #include "ui/AppControllerFixture.h"
@@ -48,11 +52,15 @@
 #include "ui/python/PythonRuntime.h"
 #include "ui/python/PythonScripting.h"
 
+#include "kd/overload.h"
+
 #include "vm/approx.h"
 #include "vm/bbox.h"
 
 #include <fstream>
+#include <functional>
 #include <map>
+#include <sstream>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -92,6 +100,60 @@ vm::vec2f textureCoords(const mdl::BrushFace& face, const vm::vec3d& point)
   return vm::vec2f{
     face.toUVCoordSystemMatrix(face.attributes().offset(), face.attributes().scale())
     * point};
+}
+
+std::vector<mdl::GroupNode*> arrayGroups(mdl::Map& map, const std::string& role = "")
+{
+  auto result = std::vector<mdl::GroupNode*>{};
+  auto visitNode = std::function<void(mdl::Node&)>{};
+  visitNode = [&](mdl::Node& node) {
+    node.accept(kdl::overload(
+      [&](mdl::WorldNode& worldNode) { worldNode.visitChildren(visitNode); },
+      [&](mdl::LayerNode& layerNode) { layerNode.visitChildren(visitNode); },
+      [&](mdl::GroupNode& groupNode) {
+        if (
+          !groupNode.group().property("_tb_array_id").empty()
+          && (role.empty() || groupNode.group().property("_tb_array_role") == role))
+        {
+          result.push_back(&groupNode);
+        }
+        groupNode.visitChildren(visitNode);
+      },
+      [](mdl::EntityNode&) {},
+      [](mdl::BrushNode&) {},
+      [](mdl::PatchNode&) {}));
+  };
+  visitNode(map.worldNode());
+  return result;
+}
+
+size_t brushCount(const mdl::Node& node)
+{
+  auto result = size_t{0};
+  auto visitNode = std::function<void(const mdl::Node&)>{};
+  visitNode = [&](const mdl::Node& child) {
+    child.accept(kdl::overload(
+      [&](const mdl::WorldNode& worldNode) { worldNode.visitChildren(visitNode); },
+      [&](const mdl::LayerNode& layerNode) { layerNode.visitChildren(visitNode); },
+      [&](const mdl::GroupNode& groupNode) { groupNode.visitChildren(visitNode); },
+      [&](const mdl::EntityNode& entityNode) { entityNode.visitChildren(visitNode); },
+      [&](const mdl::BrushNode&) { ++result; },
+      [](const mdl::PatchNode&) {}));
+  };
+  visitNode(node);
+  return result;
+}
+
+std::string describeArrayGroups(mdl::Map& map)
+{
+  auto str = std::stringstream{};
+  for (auto* groupNode : arrayGroups(map))
+  {
+    str << groupNode->group().name() << ":"
+        << groupNode->group().property("_tb_array_role") << ":" << brushCount(*groupNode)
+        << ";";
+  }
+  return str.str();
 }
 
 std::vector<QWidget*> pluginPanels(MapWindow& window)
@@ -880,6 +942,93 @@ assert len(doc.selection.brushes) == 1
     REQUIRE(scriptSucceeded);
     CHECK(map.selection().brushes.size() == 1u);
     CHECK(map.worldNode().defaultLayer()->childCount() == 3u);
+  }
+
+  SECTION("edits groups and deletes objects")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "array") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_groups_delete.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+group = doc.selection.group("Array Source")
+group.set("_tb_array_id", "array-1")
+group.set("_tb_array_role", "source")
+assert group.name == "Array Source"
+assert group.get("_tb_array_id") == "array-1"
+assert len(group.brushes) == 1
+assert len(doc.groups) == 1
+assert len(doc.selection.groups) == 1
+objects = doc.selection.objects
+assert len(objects) == 1
+doc.selection.duplicate_objects()
+assert len(doc.selection.objects) == 1
+doc.delete(doc.selection.objects)
+assert len(doc.groups) == 1
+assert len(doc.entities[0].brushes) == 1
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_groups_delete.py";
+
+    const auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+  }
+
+  SECTION("convex merges brushes from a closed group")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* leftBrushNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{0, 0, 0}, {32, 64, 64}}, "array") | kdl::value()};
+    auto* rightBrushNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{32, 0, 0}, {64, 64, 64}}, "array") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {leftBrushNode, rightBrushNode}}});
+    mdl::selectNodes(map, {leftBrushNode, rightBrushNode});
+    auto* groupNode = mdl::groupSelectedNodes(map, "Array Generated");
+    REQUIRE(groupNode != nullptr);
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_convex_merge.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+group = doc.selection.groups[0]
+assert len(group.brushes) == 2
+assert doc.convex_merge(group.brushes)
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_convex_merge.py";
+
+    const auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+    CHECK(brushCount(*groupNode) == 1u);
   }
 
   SECTION("chamfers selected vertex and edge handles")
@@ -1760,6 +1909,136 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     recordButton->click();
     distributeButton->click();
     CHECK(map.worldNode().defaultLayer()->childCount() > 1u);
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("loads v2 array modifier example plugin")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "array_modifier") | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/array_modifier"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+
+    auto* captureButton = static_cast<QPushButton*>(nullptr);
+    auto* commitButton = static_cast<QPushButton*>(nullptr);
+    auto* applyButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Capture Source"))
+      {
+        captureButton = button;
+      }
+      if (button->text() == QStringLiteral("Commit Live"))
+      {
+        commitButton = button;
+      }
+      if (button->text() == QStringLiteral("Apply"))
+      {
+        applyButton = button;
+      }
+    }
+    REQUIRE(captureButton != nullptr);
+    REQUIRE(commitButton != nullptr);
+    REQUIRE(applyButton != nullptr);
+
+    auto* count = panel->findChild<QSpinBox*>(QStringLiteral("tb2_panel_int_count"));
+    REQUIRE(count != nullptr);
+    count->setValue(3);
+
+    captureButton->click();
+    commitButton->click();
+
+    auto sourceGroups = arrayGroups(map, "source");
+    auto generatedGroups = arrayGroups(map, "generated");
+    CAPTURE(describeArrayGroups(map));
+    REQUIRE(sourceGroups.size() == 1u);
+    REQUIRE(generatedGroups.size() == 2u);
+    CHECK(
+      sourceGroups.front()->group().property("_tb_array_settings").find("\"count\":3")
+      != std::string::npos);
+
+    applyButton->click();
+    CHECK(arrayGroups(map).empty());
+
+    manager.unloadPlugins(window);
+  }
+
+  SECTION("array modifier merge uses convex merge for compatible brush copies")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* leftBrushNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{0, 0, 0}, {32, 64, 64}}, "array_modifier")
+      | kdl::value()};
+    auto* rightBrushNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{32, 0, 0}, {64, 64, 64}}, "array_modifier")
+      | kdl::value()};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {leftBrushNode, rightBrushNode}}});
+    mdl::selectNodes(map, {leftBrushNode, rightBrushNode});
+
+    const auto pluginDir = std::filesystem::path{"python/examples/v2/array_modifier"};
+    REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
+
+    auto manager = PythonPluginManager{};
+    manager.reload({pluginDir});
+    REQUIRE(manager.errors().empty());
+    REQUIRE(manager.plugins().size() == 1u);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(manager.loadPlugins(window));
+
+    const auto panels = pluginPanels(window);
+    REQUIRE_FALSE(panels.empty());
+    auto* panel = panels.back();
+
+    auto* captureButton = static_cast<QPushButton*>(nullptr);
+    auto* commitButton = static_cast<QPushButton*>(nullptr);
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Capture Source"))
+      {
+        captureButton = button;
+      }
+      if (button->text() == QStringLiteral("Commit Live"))
+      {
+        commitButton = button;
+      }
+    }
+    REQUIRE(captureButton != nullptr);
+    REQUIRE(commitButton != nullptr);
+
+    auto* count = panel->findChild<QSpinBox*>(QStringLiteral("tb2_panel_int_count"));
+    auto* merge =
+      panel->findChild<QCheckBox*>(QStringLiteral("tb2_panel_checkbox_merge"));
+    REQUIRE(count != nullptr);
+    REQUIRE(merge != nullptr);
+    count->setValue(2);
+    merge->setChecked(true);
+    CHECK(merge->isChecked());
+
+    captureButton->click();
+    commitButton->click();
+
+    const auto generatedGroups = arrayGroups(map, "generated");
+    CAPTURE(describeArrayGroups(map));
+    REQUIRE(generatedGroups.size() == 1u);
+    CHECK(brushCount(*generatedGroups.front()) == 1u);
+
     manager.unloadPlugins(window);
   }
 

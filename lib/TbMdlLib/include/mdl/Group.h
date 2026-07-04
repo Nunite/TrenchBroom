@@ -19,24 +19,26 @@
 
 #pragma once
 
+#include "mdl/EntityProperties.h"
 
 #include "kd/reflection_decl.h"
 
 #include "vm/mat.h"
 
 #include <string>
+#include <vector>
 
 namespace tb::mdl
 {
-
 class Group
 {
 private:
   std::string m_name;
 
   vm::mat4x4d m_transformation;
+  std::vector<EntityProperty> m_properties;
 
-  kdl_reflect_decl(Group, m_name, m_transformation);
+  kdl_reflect_decl(Group, m_name, m_transformation, m_properties);
 
 public:
   explicit Group(std::string name);
@@ -47,6 +49,11 @@ public:
   const vm::mat4x4d& transformation() const;
   void setTransformation(const vm::mat4x4d& transformation);
   void transform(const vm::mat4x4d& transformation);
+
+  const std::vector<EntityProperty>& properties() const;
+  const std::string& property(const std::string& key) const;
+  void setProperty(std::string key, std::string value);
+  void removeProperty(const std::string& key);
 };
 
 } // namespace tb::mdl

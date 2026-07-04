@@ -923,6 +923,55 @@ TEST_CASE("NodeWriter")
         *groupNode->persistentId());
       CHECK(actual == expected);
     }
+
+    SECTION("Group node writes array modifier properties")
+    {
+      auto group = groupNode->group();
+      group.setProperty("_tb_array_id", "array-1");
+      group.setProperty("_tb_array_role", "source");
+      group.setProperty("_tb_array_settings", R"({"count":3})");
+      groupNode->setGroup(std::move(group));
+
+      auto str = std::stringstream{};
+      auto writer = NodeWriter{worldNode, str};
+      writer.writeMap(taskManager);
+
+      const auto actual = str.str();
+      const auto expected = fmt::format(
+        R"(// entity 0
+{{
+"classname" "worldspawn"
+}}
+// entity 1
+{{
+"classname" "func_group"
+"_tb_type" "_tb_group"
+"_tb_name" "Group"
+"_tb_id" "{}"
+"_tb_linked_group_id" "group_link_id"
+"_tb_array_id" "array-1"
+"_tb_array_role" "source"
+"_tb_array_settings" "{{\"count\":3}}"
+}}
+)",
+        *groupNode->persistentId());
+      CHECK(actual == expected);
+    }
+
+    SECTION("Stripped group node omits array modifier properties")
+    {
+      auto group = groupNode->group();
+      group.setProperty("_tb_array_id", "array-1");
+      group.setProperty("_tb_array_role", "source");
+      groupNode->setGroup(std::move(group));
+
+      auto str = std::stringstream{};
+      auto writer = NodeWriter{worldNode, str};
+      writer.setStripTbProperties(true);
+      writer.writeMap(taskManager);
+
+      CHECK(str.str().find("_tb_array_") == std::string::npos);
+    }
   }
 
   SECTION("writeNodesWithLinkedGroup")

@@ -19,6 +19,8 @@
 
 #include "mdl/Group.h"
 
+#include "mdl/EntityProperties.h"
+
 #include "kd/reflection_impl.h"
 
 #include "vm/mat_io.h" // IWYU pragma: keep
@@ -56,6 +58,36 @@ void Group::setTransformation(const vm::mat4x4d& transformation)
 void Group::transform(const vm::mat4x4d& transformation)
 {
   m_transformation = transformation * m_transformation;
+}
+
+const std::vector<EntityProperty>& Group::properties() const
+{
+  return m_properties;
+}
+
+const std::string& Group::property(const std::string& key) const
+{
+  return findEntityPropertyOrDefault(m_properties, key);
+}
+
+void Group::setProperty(std::string key, std::string value)
+{
+  if (auto it = findEntityProperty(m_properties, key); it != std::end(m_properties))
+  {
+    it->setValue(std::move(value));
+  }
+  else
+  {
+    m_properties.emplace_back(std::move(key), std::move(value));
+  }
+}
+
+void Group::removeProperty(const std::string& key)
+{
+  if (auto it = findEntityProperty(m_properties, key); it != std::end(m_properties))
+  {
+    m_properties.erase(it);
+  }
 }
 
 } // namespace tb::mdl

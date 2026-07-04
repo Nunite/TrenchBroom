@@ -44,10 +44,12 @@
 #include "mdl/Map_Brushes.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/Map_Geometry.h"
+#include "mdl/Map_Groups.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/PatchNode.h"
 #include "mdl/Selection.h"
+#include "mdl/SelectionChange.h"
 #include "mdl/Transaction.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/VertexHandleManager.h"
@@ -215,6 +217,26 @@ struct EntityHandle
       throw std::runtime_error{"Entity is no longer valid"};
     }
     return *entity;
+  }
+};
+
+struct GroupHandle
+{
+  MapDocument* document = nullptr;
+  size_t generation = 0;
+  mdl::GroupNode* group = nullptr;
+  size_t nodeGeneration = 0;
+
+  mdl::GroupNode& get() const
+  {
+    DocumentHandle{document, generation}.get();
+    if (
+      group == nullptr
+      || nodeGeneration != PythonHandleRegistry::instance().nodeGeneration(group))
+    {
+      throw std::runtime_error{"Group is no longer valid"};
+    }
+    return *group;
   }
 };
 
@@ -723,6 +745,38 @@ std::vector<EntityHandle> allEntities(MapDocument& document)
   return handles;
 }
 
+std::vector<GroupHandle> allGroups(MapDocument& document)
+{
+  auto groups = std::vector<mdl::GroupNode*>{};
+  auto visitNode = std::function<void(mdl::Node&)>{};
+  visitNode = [&](mdl::Node& node) {
+    node.accept(kdl::overload(
+      [&](mdl::WorldNode& worldNode) { worldNode.visitChildren(visitNode); },
+      [&](mdl::LayerNode& layerNode) { layerNode.visitChildren(visitNode); },
+      [&](mdl::GroupNode& groupNode) {
+        groups.push_back(&groupNode);
+        groupNode.visitChildren(visitNode);
+      },
+      [](mdl::EntityNode&) {},
+      [](mdl::BrushNode&) {},
+      [](mdl::PatchNode&) {}));
+  };
+  visitNode(document.map().worldNode());
+
+  auto result = std::vector<GroupHandle>{};
+  result.reserve(groups.size());
+  const auto generation = PythonHandleRegistry::instance().documentGeneration(&document);
+  for (auto* group : groups)
+  {
+    result.push_back(GroupHandle{
+      &document,
+      generation,
+      group,
+      PythonHandleRegistry::instance().nodeGeneration(group)});
+  }
+  return result;
+}
+
 std::vector<BrushHandle> entityBrushes(EntityHandle& entity)
 {
   auto& entityNode = entity.get();
@@ -762,6 +816,35 @@ std::vector<BrushHandle> entityBrushes(EntityHandle& entity)
   return result;
 }
 
+std::vector<BrushHandle> groupBrushes(GroupHandle& group)
+{
+  auto& groupNode = group.get();
+  auto brushes = std::vector<mdl::BrushNode*>{};
+  auto visitNode = std::function<void(mdl::Node&)>{};
+  visitNode = [&](mdl::Node& node) {
+    node.accept(kdl::overload(
+      [](mdl::WorldNode&) {},
+      [](mdl::LayerNode&) {},
+      [&](mdl::GroupNode& childGroupNode) { childGroupNode.visitChildren(visitNode); },
+      [&](mdl::EntityNode& entityNode) { entityNode.visitChildren(visitNode); },
+      [&](mdl::BrushNode& brushNode) { brushes.push_back(&brushNode); },
+      [](mdl::PatchNode&) {}));
+  };
+  groupNode.visitChildren(visitNode);
+
+  auto result = std::vector<BrushHandle>{};
+  result.reserve(brushes.size());
+  for (auto* brush : brushes)
+  {
+    result.push_back(BrushHandle{
+      group.document,
+      group.generation,
+      brush,
+      PythonHandleRegistry::instance().nodeGeneration(brush)});
+  }
+  return result;
+}
+
 std::vector<EntityHandle> selectedEntities(SelectionHandle& selection)
 {
   auto& document = selection.getDocument();
@@ -790,6 +873,57 @@ std::vector<EntityHandle> selectedAllEntities(SelectionHandle& selection)
       generation,
       entity,
       PythonHandleRegistry::instance().nodeGeneration(entity)});
+  }
+  return result;
+}
+
+std::vector<GroupHandle> selectedGroups(SelectionHandle& selection)
+{
+  auto& document = selection.getDocument();
+  auto result = std::vector<GroupHandle>{};
+  const auto generation = PythonHandleRegistry::instance().documentGeneration(&document);
+  for (auto* group : document.map().selection().groups)
+  {
+    result.push_back(GroupHandle{
+      &document,
+      generation,
+      group,
+      PythonHandleRegistry::instance().nodeGeneration(group)});
+  }
+  return result;
+}
+
+std::vector<BrushHandle> selectedBrushes(SelectionHandle& selection)
+{
+  auto& document = selection.getDocument();
+  auto result = std::vector<BrushHandle>{};
+  const auto& brushes = document.map().selection().brushes;
+  result.reserve(brushes.size());
+  for (auto* brush : brushes)
+  {
+    result.push_back(BrushHandle{
+      &document,
+      selection.generation,
+      brush,
+      PythonHandleRegistry::instance().nodeGeneration(brush)});
+  }
+  return result;
+}
+
+py::list selectedObjects(SelectionHandle& selection)
+{
+  auto result = py::list{};
+  for (auto& group : selectedGroups(selection))
+  {
+    result.append(py::cast(group));
+  }
+  for (auto& entity : selectedEntities(selection))
+  {
+    result.append(py::cast(entity));
+  }
+  for (auto& brush : selectedBrushes(selection))
+  {
+    result.append(py::cast(brush));
   }
   return result;
 }
@@ -939,6 +1073,11 @@ std::vector<mdl::Node*> selectableNodesFromObjects(const py::iterable& objects)
       auto& entity = py::cast<EntityHandle&>(pyObject);
       result.push_back(&entity.get());
     }
+    else if (py::isinstance<GroupHandle>(pyObject))
+    {
+      auto& group = py::cast<GroupHandle&>(pyObject);
+      result.push_back(&group.get());
+    }
     else if (py::isinstance<BrushHandle>(pyObject))
     {
       auto& brush = py::cast<BrushHandle&>(pyObject);
@@ -950,6 +1089,36 @@ std::vector<mdl::Node*> selectableNodesFromObjects(const py::iterable& objects)
     }
   }
   return result;
+}
+
+py::object objectHandleForNode(MapDocument& document, mdl::Node* node)
+{
+  const auto generation = PythonHandleRegistry::instance().documentGeneration(&document);
+  return node->accept(kdl::overload(
+    [&](mdl::WorldNode&) -> py::object { return py::none(); },
+    [&](mdl::LayerNode&) -> py::object { return py::none(); },
+    [&](mdl::GroupNode& groupNode) -> py::object {
+      return py::cast(GroupHandle{
+        &document,
+        generation,
+        &groupNode,
+        PythonHandleRegistry::instance().nodeGeneration(&groupNode)});
+    },
+    [&](mdl::EntityNode& entityNode) -> py::object {
+      return py::cast(EntityHandle{
+        &document,
+        generation,
+        &entityNode,
+        PythonHandleRegistry::instance().nodeGeneration(&entityNode)});
+    },
+    [&](mdl::BrushNode& brushNode) -> py::object {
+      return py::cast(BrushHandle{
+        &document,
+        generation,
+        &brushNode,
+        PythonHandleRegistry::instance().nodeGeneration(&brushNode)});
+    },
+    [&](mdl::PatchNode&) -> py::object { return py::none(); }));
 }
 
 vm::vec3d selectionCenter(mdl::Map& map)
@@ -965,12 +1134,17 @@ vm::vec3d selectionCenter(mdl::Map& map)
 bool updateSelection(
   SelectionHandle& selection,
   const std::vector<mdl::Node*>& nodes,
-  const std::string& name)
+  const std::string& name,
+  const bool replace)
 {
   auto& document = selection.getDocument();
   auto transaction = ScopedPythonTransaction{document, name};
   try
   {
+    if (replace)
+    {
+      mdl::deselectAll(document.map());
+    }
     mdl::selectNodes(document.map(), nodes);
     if (!transaction.commit())
     {
@@ -988,7 +1162,7 @@ bool updateSelection(
 bool setSelection(SelectionHandle& selection, const py::iterable& objects)
 {
   return updateSelection(
-    selection, selectableNodesFromObjects(objects), "Python v2 Set Selection");
+    selection, selectableNodesFromObjects(objects), "Python v2 Set Selection", true);
 }
 
 bool addSelection(SelectionHandle& selection, const py::iterable& objects)
@@ -998,7 +1172,7 @@ bool addSelection(SelectionHandle& selection, const py::iterable& objects)
   auto nodesToAdd = selectableNodesFromObjects(objects);
   nodes.insert(nodes.end(), nodesToAdd.begin(), nodesToAdd.end());
   nodes = kdl::vec_sort_and_remove_duplicates(std::move(nodes));
-  return updateSelection(selection, nodes, "Python v2 Add Selection");
+  return updateSelection(selection, nodes, "Python v2 Add Selection", false);
 }
 
 bool deselectAllSelection(SelectionHandle& selection)
@@ -1039,6 +1213,27 @@ bool duplicateSelection(SelectionHandle& selection)
     transaction.cancel();
     throw;
   }
+}
+
+py::list duplicateSelectionObjects(SelectionHandle& selection)
+{
+  duplicateSelection(selection);
+  return selectedObjects(selection);
+}
+
+GroupHandle groupSelection(SelectionHandle& selection, const std::string& name)
+{
+  auto& document = selection.getDocument();
+  auto* group = mdl::groupSelectedNodes(document.map(), name);
+  if (group == nullptr)
+  {
+    throw std::runtime_error{"Could not group selection"};
+  }
+  return GroupHandle{
+    &document,
+    selection.generation,
+    group,
+    PythonHandleRegistry::instance().nodeGeneration(group)};
 }
 
 bool translateSelection(
@@ -1182,6 +1377,157 @@ bool chamferSelectionEdges(
   }
 }
 
+bool convexMergeSelection(SelectionHandle& selection)
+{
+  auto& document = selection.getDocument();
+  auto& map = document.map();
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Convex Merge"};
+  try
+  {
+    const auto ok = mdl::csgConvexMerge(map, "Python v2 Convex Merge");
+    if (!ok || !transaction.commit())
+    {
+      transaction.cancel();
+      return false;
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
+std::vector<mdl::BrushNode*> brushNodesFromObjects(const py::iterable& objects)
+{
+  auto result = std::vector<mdl::BrushNode*>{};
+  for (const auto object : objects)
+  {
+    auto pyObject = py::reinterpret_borrow<py::object>(object);
+    if (py::isinstance<BrushHandle>(pyObject))
+    {
+      auto& brush = py::cast<BrushHandle&>(pyObject);
+      result.push_back(&brush.get());
+    }
+    else
+    {
+      throw py::type_error{"Expected Brush"};
+    }
+  }
+  return result;
+}
+
+void selectRawNodes(mdl::Map& map, const std::vector<mdl::Node*>& nodes)
+{
+  auto selected = std::vector<mdl::Node*>{};
+  for (auto* node : nodes)
+  {
+    if (!node->selected())
+    {
+      node->select();
+      selected.push_back(node);
+    }
+  }
+  if (!selected.empty())
+  {
+    auto selectionChange = mdl::SelectionChange{};
+    selectionChange.selectedNodes = std::move(selected);
+    map.selectionDidChangeNotifier(selectionChange);
+  }
+}
+
+std::vector<mdl::Node*> linkedNodes(const mdl::Map& map, std::vector<mdl::Node*> nodes)
+{
+  nodes.erase(
+    std::remove_if(
+      std::begin(nodes),
+      std::end(nodes),
+      [&](const auto* node) {
+        return node == nullptr
+               || (node != &map.worldNode() && !node->isDescendantOf(map.worldNode()));
+      }),
+    std::end(nodes));
+  return nodes;
+}
+
+bool convexMergeObjects(DocumentHandle& document, const py::iterable& objects)
+{
+  auto& doc = document.get();
+  auto& map = doc.map();
+  auto brushes = brushNodesFromObjects(objects);
+  if (brushes.empty())
+  {
+    return false;
+  }
+
+  auto transaction = ScopedPythonTransaction{doc, "Python v2 Convex Merge"};
+  try
+  {
+    auto previousNodes = map.selection().nodes;
+    auto previousBrushFaces = map.selection().brushFaces;
+
+    mdl::deselectAll(map);
+    auto brushNodes = std::vector<mdl::Node*>{};
+    brushNodes.reserve(brushes.size());
+    for (auto* brush : brushes)
+    {
+      brushNodes.push_back(brush);
+    }
+    selectRawNodes(map, brushNodes);
+
+    const auto ok = mdl::csgConvexMerge(map, "Python v2 Convex Merge");
+
+    if (ok)
+    {
+      const auto isMergedBrush = [&](const auto* node) {
+        return std::ranges::find(brushNodes, node) != std::end(brushNodes);
+      };
+      previousNodes.erase(
+        std::remove_if(std::begin(previousNodes), std::end(previousNodes), isMergedBrush),
+        std::end(previousNodes));
+      previousBrushFaces.erase(
+        std::remove_if(
+          std::begin(previousBrushFaces),
+          std::end(previousBrushFaces),
+          [&](const auto& handle) { return isMergedBrush(handle.node()); }),
+        std::end(previousBrushFaces));
+    }
+
+    mdl::deselectAll(map);
+    auto linkedPreviousNodes = linkedNodes(map, std::move(previousNodes));
+    if (!linkedPreviousNodes.empty())
+    {
+      mdl::selectNodes(map, linkedPreviousNodes);
+    }
+    previousBrushFaces.erase(
+      std::remove_if(
+        std::begin(previousBrushFaces),
+        std::end(previousBrushFaces),
+        [&](const auto& handle) {
+          auto* node = handle.node();
+          return node == nullptr || !node->isDescendantOf(map.worldNode());
+        }),
+      std::end(previousBrushFaces));
+    if (!previousBrushFaces.empty())
+    {
+      mdl::selectBrushFaces(map, previousBrushFaces);
+    }
+
+    if (!ok || !transaction.commit())
+    {
+      transaction.cancel();
+      return false;
+    }
+    return true;
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
+}
+
 void withPreservedSelection(
   MapDocument& document,
   std::string transactionName,
@@ -1248,6 +1594,67 @@ void removeEntityProperty(EntityHandle& entity, const std::string& key)
   });
 
   entity.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(entity.entity);
+}
+
+void setGroupProperty(
+  GroupHandle& group, const std::string& key, const std::string& value)
+{
+  auto& document = DocumentHandle{group.document, group.generation}.get();
+  auto& groupNode = group.get();
+  auto newGroup = groupNode.group();
+  newGroup.setProperty(key, value);
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Set Group Property"};
+  if (
+    !mdl::updateNodeContents(
+      document.map(),
+      "Python v2 Set Group Property",
+      {{&groupNode, mdl::NodeContents{newGroup}}})
+    || !transaction.commit())
+  {
+    transaction.cancel();
+    throw std::runtime_error{"Could not set group property"};
+  }
+  group.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(group.group);
+}
+
+void removeGroupProperty(GroupHandle& group, const std::string& key)
+{
+  auto& document = DocumentHandle{group.document, group.generation}.get();
+  auto& groupNode = group.get();
+  auto newGroup = groupNode.group();
+  newGroup.removeProperty(key);
+  auto transaction = ScopedPythonTransaction{document, "Python v2 Remove Group Property"};
+  if (
+    !mdl::updateNodeContents(
+      document.map(),
+      "Python v2 Remove Group Property",
+      {{&groupNode, mdl::NodeContents{newGroup}}})
+    || !transaction.commit())
+  {
+    transaction.cancel();
+    throw std::runtime_error{"Could not remove group property"};
+  }
+  group.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(group.group);
+}
+
+void deleteObjects(DocumentHandle& document, const py::iterable& objects)
+{
+  auto& doc = document.get();
+  auto nodes = selectableNodesFromObjects(objects);
+  auto transaction = ScopedPythonTransaction{doc, "Python v2 Delete Objects"};
+  try
+  {
+    mdl::removeNodes(doc.map(), nodes);
+    if (!transaction.commit())
+    {
+      throw std::runtime_error{"Could not delete objects"};
+    }
+  }
+  catch (...)
+  {
+    transaction.cancel();
+    throw;
+  }
 }
 
 bool setSelectionProperty(
@@ -1789,6 +2196,8 @@ void defineModule(py::module_& module)
     .def_property_readonly(
       "entities", [](DocumentHandle& self) { return allEntities(self.get()); })
     .def_property_readonly(
+      "groups", [](DocumentHandle& self) { return allGroups(self.get()); })
+    .def_property_readonly(
       "selection",
       [](DocumentHandle& self) { return SelectionHandle{&self.get(), self.generation}; })
     .def_property_readonly(
@@ -1844,6 +2253,8 @@ void defineModule(py::module_& module)
       },
       py::arg("name") = "Python v2 Script")
     .def("set_triangle_uvs", setDocumentTriangleUVs, py::arg("triangles"))
+    .def("delete", deleteObjects, py::arg("objects"))
+    .def("convex_merge", convexMergeObjects, py::arg("objects"))
     .def(
       "select",
       [](DocumentHandle& self, const py::iterable& objects) {
@@ -1885,23 +2296,10 @@ void defineModule(py::module_& module)
 
   py::class_<SelectionHandle>(module, "Selection")
     .def_property_readonly("entities", selectedEntities)
+    .def_property_readonly("groups", selectedGroups)
     .def_property_readonly("all_entities", selectedAllEntities)
-    .def_property_readonly(
-      "brushes",
-      [](SelectionHandle& self) {
-        auto result = std::vector<BrushHandle>{};
-        const auto& brushes = self.getDocument().map().selection().brushes;
-        result.reserve(brushes.size());
-        for (auto* brush : brushes)
-        {
-          result.push_back(BrushHandle{
-            &self.getDocument(),
-            self.generation,
-            brush,
-            PythonHandleRegistry::instance().nodeGeneration(brush)});
-        }
-        return result;
-      })
+    .def_property_readonly("brushes", selectedBrushes)
+    .def_property_readonly("objects", selectedObjects)
     .def(
       "set_property",
       setSelectionProperty,
@@ -1915,6 +2313,8 @@ void defineModule(py::module_& module)
     .def("deselect_all", deselectAllSelection)
     .def("clear", deselectAllSelection)
     .def("duplicate", duplicateSelection)
+    .def("duplicate_objects", duplicateSelectionObjects)
+    .def("group", groupSelection, py::arg("name"))
     .def("translate", translateSelection)
     .def(
       "rotate",
@@ -1940,7 +2340,8 @@ void defineModule(py::module_& module)
       "chamfer_edges",
       chamferSelectionEdges,
       py::arg("distance"),
-      py::arg("segments") = 1);
+      py::arg("segments") = 1)
+    .def("convex_merge", convexMergeSelection);
 
   py::class_<EntityHandle>(module, "Entity")
     .def_property_readonly(
@@ -1966,6 +2367,37 @@ void defineModule(py::module_& module)
       py::arg("default") = py::none())
     .def("set", setEntityProperty)
     .def("remove", removeEntityProperty);
+
+  py::class_<GroupHandle>(module, "Group")
+    .def_property_readonly(
+      "name", [](GroupHandle& self) { return self.get().group().name(); })
+    .def_property_readonly("brushes", groupBrushes)
+    .def(
+      "keys",
+      [](GroupHandle& self) {
+        auto result = std::vector<std::string>{};
+        for (const auto& property : self.get().group().properties())
+        {
+          result.push_back(property.key());
+        }
+        return result;
+      })
+    .def(
+      "get",
+      [](GroupHandle& self, const std::string& key, py::object defaultValue) {
+        for (const auto& property : self.get().group().properties())
+        {
+          if (property.key() == key)
+          {
+            return py::cast(property.value());
+          }
+        }
+        return defaultValue;
+      },
+      py::arg("key"),
+      py::arg("default") = py::none())
+    .def("set", setGroupProperty)
+    .def("remove", removeGroupProperty);
 
   py::class_<BrushHandle>(module, "Brush").def("faces", [](BrushHandle& self) {
     auto result = std::vector<FaceHandle>{};

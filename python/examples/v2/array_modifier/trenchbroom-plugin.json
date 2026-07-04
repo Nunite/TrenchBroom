@@ -1,0 +1,10 @@
+{
+  "id": "trenchbroom.examples.v2.array_modifier",
+  "name": "Array Modifier",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "pluginType": "ui",
+  "entry": "main.py",
+  "description": "Creates a live Blender-style array preview from selected TrenchBroom objects.",
+  "author": "TrenchBroom"
+}

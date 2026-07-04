@@ -362,6 +362,11 @@ std::vector<EntityProperty> NodeSerializer::groupProperties(const GroupNode& gro
     result.emplace_back(EntityPropertyKeys::TbGroupTransformation, transformationStr);
   }
 
+  for (const auto& property : groupNode.group().properties())
+  {
+    result.push_back(property);
+  }
+
   return result;
 }
 
