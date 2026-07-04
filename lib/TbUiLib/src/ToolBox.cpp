@@ -47,6 +47,25 @@ void ToolBox::addTool(Tool& tool)
     tool.toolHandleSelectionChangedNotifier.connect(toolHandleSelectionChangedNotifier);
 }
 
+void ToolBox::clearTransientState(const InputState& inputState)
+{
+  if (m_gestureTracker)
+  {
+    m_gestureTracker->cancel();
+    m_gestureTracker = nullptr;
+  }
+  if (m_dropTracker)
+  {
+    m_dropTracker->leave(inputState);
+    m_dropTracker = nullptr;
+  }
+}
+
+void ToolBox::disconnectObservers()
+{
+  m_notifierConnection.disconnect();
+}
+
 void ToolBox::pick(
   ToolChain& chain, const InputState& inputState, mdl::PickResult& pickResult)
 {

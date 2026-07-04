@@ -90,6 +90,8 @@ public: // picking
   void pick(ToolChain& chain, const InputState& inputState, mdl::PickResult& pickResult);
 
 public: // event handling
+  void clearTransientState(const InputState& inputState);
+  void disconnectObservers();
   bool dragEnter(ToolChain& chain, const InputState& inputState, const std::string& text);
   bool dragMove(ToolChain& chain, const InputState& inputState, const std::string& text);
   void dragLeave(ToolChain& chain, const InputState& inputState);

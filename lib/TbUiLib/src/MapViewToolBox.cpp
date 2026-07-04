@@ -27,6 +27,7 @@
 #include "ui/EdgeTool.h"
 #include "ui/ExtrudeTool.h"
 #include "ui/FaceTool.h"
+#include "ui/InputState.h"
 #include "ui/MapDocument.h"
 #include "ui/MoveObjectsTool.h"
 #include "ui/PathTool.h"
@@ -48,7 +49,13 @@ MapViewToolBox::MapViewToolBox(MapDocument& document, QStackedLayout* bookCtrl)
   connectObservers();
 }
 
-MapViewToolBox::~MapViewToolBox() = default;
+MapViewToolBox::~MapViewToolBox()
+{
+  m_notifierConnection.disconnect();
+  disconnectObservers();
+  clearTransientState(InputState{});
+  m_prefabTool->clearPreview();
+}
 
 ClipTool& MapViewToolBox::clipTool()
 {

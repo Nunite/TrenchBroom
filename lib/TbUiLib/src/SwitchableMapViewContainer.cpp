@@ -26,6 +26,7 @@
 #include "mdl/Map.h"
 #include "mdl/PointTrace.h"
 #include "ui/FourPaneMapView.h"
+#include "ui/InputState.h"
 #include "ui/Inspector.h"
 #include "ui/MapDocument.h"
 #include "ui/MapViewActivationTracker.h"
@@ -59,8 +60,13 @@ SwitchableMapViewContainer::~SwitchableMapViewContainer()
 {
   // we must destroy our children before we destroy our resources because they might still
   // use them in their destructors
+  m_notifierConnection.disconnect();
   m_activationTracker->clear();
+  m_toolBox->clearTransientState(InputState{});
   delete m_mapView;
+  m_mapView = nullptr;
+  delete m_mapViewBar;
+  m_mapViewBar = nullptr;
 }
 
 void SwitchableMapViewContainer::connectTopWidgets(Inspector* inspector)
