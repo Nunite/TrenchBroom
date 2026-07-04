@@ -45,10 +45,13 @@
 #include <array>
 #include <csignal>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 #if defined(_WIN32) && defined(_MSC_VER)
+#include <DbgHelp.h>
 #include <windows.h>
 #endif
 
@@ -61,6 +64,10 @@ AppController* appControllerForCrashReporter = nullptr;
 bool crashReporterGuiEnabled = true;
 bool crashReporterIsReportingCrash = false;
 std::string windowsExceptionDetails;
+
+#if defined(_WIN32) && defined(_MSC_VER)
+PEXCEPTION_POINTERS windowsExceptionPointers = nullptr;
+#endif
 
 const MapDocument* topDocument()
 {
@@ -113,27 +120,64 @@ std::filesystem::path savedMapPath()
   return document ? document->map().path() : std::filesystem::path{};
 }
 
+void writeMiniDump(const std::filesystem::path& path)
+{
+#if defined(_WIN32) && defined(_MSC_VER)
+  const auto file = CreateFileW(
+    path.wstring().c_str(),
+    GENERIC_WRITE,
+    0,
+    nullptr,
+    CREATE_ALWAYS,
+    FILE_ATTRIBUTE_NORMAL,
+    nullptr);
+  if (file == INVALID_HANDLE_VALUE)
+  {
+    std::cerr << "could not create minidump: " << GetLastError() << std::endl;
+    return;
+  }
+
+  auto exceptionInfo = MINIDUMP_EXCEPTION_INFORMATION{};
+  auto* exceptionInfoPtr = static_cast<MINIDUMP_EXCEPTION_INFORMATION*>(nullptr);
+  if (windowsExceptionPointers != nullptr)
+  {
+    exceptionInfo.ThreadId = GetCurrentThreadId();
+    exceptionInfo.ExceptionPointers = windowsExceptionPointers;
+    exceptionInfo.ClientPointers = FALSE;
+    exceptionInfoPtr = &exceptionInfo;
+  }
+
+  const auto written = MiniDumpWriteDump(
+    GetCurrentProcess(),
+    GetCurrentProcessId(),
+    file,
+    MiniDumpNormal,
+    exceptionInfoPtr,
+    nullptr,
+    nullptr);
+  CloseHandle(file);
+
+  if (written)
+  {
+    std::cerr << "wrote minidump to " << path.string() << std::endl;
+  }
+  else
+  {
+    std::cerr << "could not write minidump: " << GetLastError() << std::endl;
+  }
+#else
+  (void)path;
+#endif
+}
+
 std::filesystem::path crashReportBasePath()
 {
   const auto mapPath = savedMapPath();
-  const auto crashLogPath = !mapPath.empty()
-                              ? mapPath.parent_path() / mapPath.stem() += "-crash.txt"
-                              : pathFromQString(QStandardPaths::writableLocation(
-                                  QStandardPaths::DocumentsLocation))
-                                  / "trenchbroom-crash.txt";
-
-  // ensure it doesn't exist
-  auto index = 0;
-  auto testCrashLogPath = crashLogPath;
-  while (fs::Disk::pathInfo(testCrashLogPath) == fs::PathInfo::File)
-  {
-    ++index;
-
-    const auto testCrashLogName = fmt::format("{}-{}.txt", crashLogPath.stem(), index);
-    testCrashLogPath = crashLogPath.parent_path() / testCrashLogName;
-  }
-
-  return kdl::path_remove_extension(testCrashLogPath);
+  const auto documentsPath =
+    pathFromQString(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
+  return makeCrashReportBasePath(mapPath, documentsPath, [](const auto& path) {
+    return fs::Disk::pathInfo(path) == fs::PathInfo::File;
+  });
 }
 
 [[noreturn]] void reportCrashAndExit(
@@ -142,6 +186,7 @@ std::filesystem::path crashReportBasePath()
   // just abort if we reenter reportCrashAndExit (i.e. if it crashes)
   if (std::exchange(crashReporterIsReportingCrash, true))
   {
+    std::signal(SIGABRT, SIG_DFL);
     std::abort();
   }
 
@@ -156,6 +201,10 @@ std::filesystem::path crashReportBasePath()
     const auto reportPath = kdl::path_add_extension(basePath, ".txt");
     auto logPath = kdl::path_add_extension(basePath, ".log");
     auto mapPath = kdl::path_add_extension(basePath, ".map");
+    auto dumpPath = std::filesystem::path{};
+#if defined(_WIN32) && defined(_MSC_VER)
+    dumpPath = crashReportArtifactPath(basePath, ".dmp");
+#endif
 
     fs::Disk::withOutputStream(reportPath, [&](auto& stream) {
       stream << report;
@@ -163,6 +212,11 @@ std::filesystem::path crashReportBasePath()
     }) | kdl::transform_error([](const auto& e) {
       std::cerr << "could not write crash log: " << e.msg << std::endl;
     });
+
+    if (!dumpPath.empty())
+    {
+      writeMiniDump(dumpPath);
+    }
 
     // save the map
     if (const auto* document = topDocument())
@@ -187,7 +241,7 @@ std::filesystem::path crashReportBasePath()
 
     if (crashReporterGuiEnabled)
     {
-      auto dialog = CrashDialog{reason, reportPath, mapPath, logPath};
+      auto dialog = CrashDialog{reason, reportPath, mapPath, logPath, dumpPath};
       dialog.exec();
     }
   }) | kdl::transform_error([](const auto& e) {
@@ -198,6 +252,7 @@ std::filesystem::path crashReportBasePath()
   std::cerr << "crash log:" << std::endl;
   std::cerr << report << std::endl;
 
+  std::signal(SIGABRT, SIG_DFL);
   std::abort();
 }
 
@@ -226,6 +281,7 @@ std::string moduleNameForAddress(const void* address)
 
 LONG WINAPI TrenchBroomUnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionPtrs)
 {
+  windowsExceptionPointers = pExceptionPtrs;
   windowsExceptionDetails = fmt::format(
     "Exception code:\t0x{:08x}\n"
     "Exception address:\t{}\n"
@@ -239,27 +295,90 @@ LONG WINAPI TrenchBroomUnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionPt
     std::to_string(pExceptionPtrs->ExceptionRecord->ExceptionCode));
   // return EXCEPTION_EXECUTE_HANDLER; unreachable
 }
-#else
-void CrashHandler(const int /* signum */)
+#endif
+
+void SignalCrashHandler(const int signum)
 {
-  reportCrashAndExit(cpptrace::generate_trace(), "SIGSEGV");
+  std::signal(signum, SIG_DFL);
+  reportCrashAndExit(cpptrace::generate_trace(), fmt::format("signal {}", signum));
+}
+
+#if !defined(_WIN32) || !defined(_MSC_VER)
+void CrashHandler(const int signum)
+{
+  SignalCrashHandler(signum);
 }
 #endif
 
+void TerminateHandler()
+{
+  auto reason = std::string{"std::terminate"};
+  if (const auto exception = std::current_exception())
+  {
+    try
+    {
+      std::rethrow_exception(exception);
+    }
+    catch (const std::exception& e)
+    {
+      reason = fmt::format("std::terminate: {}", e.what());
+    }
+    catch (...)
+    {
+      reason = "std::terminate: unknown exception";
+    }
+  }
+  reportCrashAndExit(cpptrace::generate_trace(), reason);
+}
+
 } // namespace
 
-CrashReporter::CrashReporter(AppController& appController)
+std::filesystem::path makeCrashReportBasePath(
+  const std::filesystem::path& savedMapPath,
+  const std::filesystem::path& documentsPath,
+  const CrashReportPathExists& pathExists)
 {
-  appControllerForCrashReporter = &appController;
+  const auto crashLogPath =
+    !savedMapPath.empty()
+      ? savedMapPath.parent_path() / (savedMapPath.stem().string() + "-crash.txt")
+      : documentsPath / "trenchbroom-crash.txt";
+
+  auto index = 0;
+  auto testCrashLogPath = crashLogPath;
+  while (pathExists(testCrashLogPath))
+  {
+    ++index;
+    testCrashLogPath = crashLogPath.parent_path()
+                       / fmt::format("{}-{}.txt", crashLogPath.stem().string(), index);
+  }
+
+  return kdl::path_remove_extension(testCrashLogPath);
+}
+
+std::filesystem::path crashReportArtifactPath(
+  const std::filesystem::path& basePath, const std::filesystem::path& extension)
+{
+  auto result = basePath;
+  result.replace_extension(extension);
+  return result;
+}
+
+void installCrashHandlers()
+{
+  std::set_terminate(TerminateHandler);
+  std::signal(SIGABRT, SignalCrashHandler);
 
 #if defined(_WIN32) && defined(_MSC_VER)
-  // with MSVC, set our own handler for segfaults so we can access the context
-  // pointer, to allow StackWalker to read the backtrace.
-  // see also: http://crashrpt.sourceforge.net/docs/html/exception_handling.html
   SetUnhandledExceptionFilter(TrenchBroomUnhandledExceptionFilter);
 #else
   signal(SIGSEGV, CrashHandler);
 #endif
+}
+
+CrashReporter::CrashReporter(AppController& appController)
+{
+  appControllerForCrashReporter = &appController;
+  installCrashHandlers();
 }
 
 [[noreturn]] void CrashReporter::reportCrashAndExit(const std::string& reason)

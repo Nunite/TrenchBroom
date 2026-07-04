@@ -64,7 +64,10 @@ bool loadStyleSheets()
   if (auto file = QFile{pathAsQPath(path)}; file.exists())
   {
     // closed automatically by destructor
-    file.open(QFile::ReadOnly | QFile::Text);
+    if (!file.open(QFile::ReadOnly | QFile::Text))
+    {
+      return false;
+    }
     qApp->setStyleSheet(QTextStream{&file}.readAll());
 
     return true;
@@ -333,6 +336,8 @@ int main(int argc, char* argv[])
   // QApplication must be created before QPreferenceStore because QPreferenceStore uses
   // QFileSystemWatcher, which requires a QApplication instance
   auto app = QApplication{argc, argv};
+
+  installCrashHandlers();
 
   // PreferenceManager is destroyed by TrenchBroomApp::~TrenchBroomApp()
   PreferenceManager::createInstance(

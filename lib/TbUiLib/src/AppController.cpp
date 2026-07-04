@@ -461,8 +461,9 @@ void AppController::debugShowCrashReportDialog()
   const auto reportPath = ui::SystemPaths::userDataDirectory() / "crashreport.txt";
   const auto mapPath = ui::SystemPaths::userDataDirectory() / "crashreport.map";
   const auto logPath = ui::SystemPaths::userDataDirectory() / "crashreport.log";
+  const auto dumpPath = ui::SystemPaths::userDataDirectory() / "crashreport.dmp";
 
-  auto dialog = CrashDialog{"Debug crash", reportPath, mapPath, logPath};
+  auto dialog = CrashDialog{"Debug crash", reportPath, mapPath, logPath, dumpPath};
   dialog.exec();
 }
 

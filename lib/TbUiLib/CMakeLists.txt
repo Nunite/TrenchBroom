@@ -582,6 +582,10 @@ target_link_libraries(TbUiLib
     VmLib
 )
 
+if(WIN32)
+  target_link_libraries(TbUiLib PRIVATE Dbghelp)
+endif()
+
 target_compile_definitions(TbUiLib
   PRIVATE
     TB_PYTHON3_EXECUTABLE="${Python3_EXECUTABLE}"

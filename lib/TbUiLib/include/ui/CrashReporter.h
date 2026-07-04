@@ -19,12 +19,25 @@
 
 #pragma once
 
+#include <filesystem>
 #include <functional>
 #include <string>
 
 namespace tb::ui
 {
 class AppController;
+
+using CrashReportPathExists = std::function<bool(const std::filesystem::path&)>;
+
+std::filesystem::path makeCrashReportBasePath(
+  const std::filesystem::path& savedMapPath,
+  const std::filesystem::path& documentsPath,
+  const CrashReportPathExists& pathExists);
+
+std::filesystem::path crashReportArtifactPath(
+  const std::filesystem::path& basePath, const std::filesystem::path& extension);
+
+void installCrashHandlers();
 
 class CrashReporter
 {

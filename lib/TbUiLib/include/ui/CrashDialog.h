@@ -35,14 +35,16 @@ public:
     const std::string& reason,
     const std::filesystem::path& reportPath,
     const std::filesystem::path& mapPath,
-    const std::filesystem::path& logPath);
+    const std::filesystem::path& logPath,
+    const std::filesystem::path& dumpPath);
 
 private:
   void createGui(
     const std::string& reason,
     const std::filesystem::path& reportPath,
     const std::filesystem::path& mapPath,
-    const std::filesystem::path& logPath);
+    const std::filesystem::path& logPath,
+    const std::filesystem::path& dumpPath);
 };
 
 } // namespace tb::ui

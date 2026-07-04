@@ -39,31 +39,34 @@ CrashDialog::CrashDialog(
   const std::string& reason,
   const std::filesystem::path& reportPath,
   const std::filesystem::path& mapPath,
-  const std::filesystem::path& logPath)
+  const std::filesystem::path& logPath,
+  const std::filesystem::path& dumpPath)
 {
-  createGui(reason, reportPath, mapPath, logPath);
+  createGui(reason, reportPath, mapPath, logPath, dumpPath);
 }
 
 void CrashDialog::createGui(
   const std::string& reason,
   const std::filesystem::path& reportPath,
   const std::filesystem::path& mapPath,
-  const std::filesystem::path& logPath)
+  const std::filesystem::path& logPath,
+  const std::filesystem::path& dumpPath)
 {
   setWindowTitle(tr("Crash"));
 
   auto* header = new DialogHeader{"Crash Report"};
 
   auto* text1 = new QLabel{
-    tr("TrenchBroom has crashed, but was able to save a crash report,"
-       "a log file and the current state of the map to the following locations.\n\n"
-       "Please create an issue report and upload all three files.")};
+    tr("TrenchBroom has crashed, but was able to save diagnostic files and the "
+       "current state of the map to the following locations.\n\n"
+       "Please create an issue report and upload these files.")};
   text1->setWordWrap(true);
 
   auto* reasonText = new QLabel{QString::fromStdString(reason)};
   auto* reportPathText = new QLabel{pathAsQString(reportPath)};
   auto* mapPathText = new QLabel{pathAsQString(mapPath)};
   auto* logPathText = new QLabel{pathAsQString(logPath)};
+  auto* dumpPathText = new QLabel{pathAsQString(dumpPath)};
   auto* versionText = new QLabel{getBuildVersion()};
   auto* buildText = new QLabel{getBuildIdStr()};
 
@@ -83,6 +86,10 @@ void CrashDialog::createGui(
   reportLayout->addRow("Crash Report", reportPathText);
   reportLayout->addRow("Map File", mapPathText);
   reportLayout->addRow("Log File", logPathText);
+  if (!dumpPath.empty())
+  {
+    reportLayout->addRow("Minidump", dumpPathText);
+  }
 
   auto* buttonBox = new QDialogButtonBox{};
   buttonBox->addButton(QDialogButtonBox::Close);
