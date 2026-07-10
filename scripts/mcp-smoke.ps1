@@ -1,5 +1,6 @@
 param(
   [string] $Url = "",
+  [string] $Token = "",
   [ValidateSet("None", "Current", "3D", "2D")]
   [string] $Capture = "None",
   [int] $TimeoutSec = 5,
@@ -64,6 +65,7 @@ function Invoke-McpRequest {
 
   $headers = @{
     Accept = "application/json, text/event-stream"
+    Authorization = "Bearer $script:McpToken"
     "MCP-Protocol-Version" = "2025-06-18"
   }
 
@@ -151,6 +153,17 @@ if (Test-Path $configPath) {
 } else {
   throw "MCP config does not exist: $configPath. Start TrenchBroom once and enable MCP in Preferences > MCP."
 }
+
+if ([string]::IsNullOrWhiteSpace($Token)) {
+  $Token = $env:TB_MCP_TOKEN
+}
+if ([string]::IsNullOrWhiteSpace($Token)) {
+  $Token = $config.token
+}
+if ([string]::IsNullOrWhiteSpace($Token)) {
+  throw "MCP bearer token is required. Pass -Token, set TB_MCP_TOKEN, or regenerate the MCP config."
+}
+$script:McpToken = $Token
 
 if ([string]::IsNullOrWhiteSpace($Url)) {
   throw "MCP Url is required."

@@ -28,6 +28,9 @@
 
 #include "mcp/McpJsonRpc.h"
 
+#include <algorithm>
+#include <optional>
+
 namespace tb::ui
 {
 namespace
@@ -43,10 +46,14 @@ QByteArray reasonPhrase(const int statusCode)
   {
   case 200:
     return "OK";
+  case 204:
+    return "No Content";
   case 202:
     return "Accepted";
   case 400:
     return "Bad Request";
+  case 401:
+    return "Unauthorized";
   case 403:
     return "Forbidden";
   case 404:
@@ -77,17 +84,42 @@ QString headerValue(const QList<QByteArray>& lines, const QByteArray& key)
   return {};
 }
 
-bool hasAllowedOrigin(const QList<QByteArray>& lines)
+std::optional<QByteArray> allowedOrigin(const QList<QByteArray>& lines)
 {
   const auto origin = headerValue(lines, "Origin");
   if (origin.isEmpty())
   {
-    return true;
+    return QByteArray{};
   }
 
   const auto url = QUrl{origin};
-  return url.host() == "127.0.0.1"
-         || url.host().compare("localhost", Qt::CaseInsensitive) == 0;
+  if (
+    url.host() == "127.0.0.1"
+    || url.host().compare("localhost", Qt::CaseInsensitive) == 0)
+  {
+    return origin.toUtf8();
+  }
+  return std::nullopt;
+}
+
+bool constantTimeEquals(const QByteArray& lhs, const QByteArray& rhs)
+{
+  const auto count = std::max(lhs.size(), rhs.size());
+  auto difference = static_cast<unsigned int>(lhs.size() ^ rhs.size());
+  for (auto i = qsizetype{0}; i < count; ++i)
+  {
+    const auto left = i < lhs.size() ? static_cast<unsigned char>(lhs[i]) : 0u;
+    const auto right = i < rhs.size() ? static_cast<unsigned char>(rhs[i]) : 0u;
+    difference |= left ^ right;
+  }
+  return difference == 0u;
+}
+
+bool hasValidAuthorization(const QList<QByteArray>& lines, const QString& configuredToken)
+{
+  const auto authorization = headerValue(lines, "Authorization").toUtf8();
+  const auto expected = QByteArray{"Bearer "} + configuredToken.toUtf8();
+  return constantTimeEquals(authorization, expected);
 }
 
 QString methodFromRequestLine(const QByteArray& requestLine)
@@ -266,7 +298,8 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
     return;
   }
 
-  if (!hasAllowedOrigin(lines))
+  const auto responseOrigin = allowedOrigin(lines);
+  if (!responseOrigin)
   {
     writeHttpResponse(
       socket, 403, reasonPhrase(403), "application/json", jsonBody("Invalid Origin"));
@@ -274,16 +307,42 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
     return;
   }
 
+  if (method == "OPTIONS")
+  {
+    writeHttpResponse(socket, 204, reasonPhrase(204), {}, {}, *responseOrigin);
+    socket.disconnectFromHost();
+    return;
+  }
+
+  if (!hasValidAuthorization(lines, m_config.token))
+  {
+    writeHttpResponse(
+      socket,
+      401,
+      reasonPhrase(401),
+      "application/json",
+      jsonBody("Missing or invalid bearer token"),
+      *responseOrigin,
+      "WWW-Authenticate: Bearer\r\n");
+    socket.disconnectFromHost();
+    return;
+  }
+
   if (method == "GET")
   {
-    writeSseStream(socket);
+    writeSseStream(socket, *responseOrigin);
     return;
   }
 
   if (method != "POST")
   {
     writeHttpResponse(
-      socket, 405, reasonPhrase(405), "application/json", jsonBody("Method not allowed"));
+      socket,
+      405,
+      reasonPhrase(405),
+      "application/json",
+      jsonBody("Method not allowed"),
+      *responseOrigin);
     socket.disconnectFromHost();
     return;
   }
@@ -299,7 +358,8 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
       reasonPhrase(400),
       "application/json",
       QJsonDocument{mcp::jsonRpcError({}, -32700, "Parse error")}.toJson(
-        QJsonDocument::Compact));
+        QJsonDocument::Compact),
+      *responseOrigin);
     socket.disconnectFromHost();
     return;
   }
@@ -322,7 +382,7 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
 
   if (!response)
   {
-    writeHttpResponse(socket, 202, reasonPhrase(202), "text/plain", {});
+    writeHttpResponse(socket, 202, reasonPhrase(202), "text/plain", {}, *responseOrigin);
     socket.disconnectFromHost();
     return;
   }
@@ -332,18 +392,24 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
     200,
     reasonPhrase(200),
     "application/json",
-    QJsonDocument{*response}.toJson(QJsonDocument::Compact));
+    QJsonDocument{*response}.toJson(QJsonDocument::Compact),
+    *responseOrigin);
   socket.disconnectFromHost();
 }
 
-void McpHttpServer::writeSseStream(QTcpSocket& socket) const
+void McpHttpServer::writeSseStream(
+  QTcpSocket& socket, const QByteArray& allowedOrigin) const
 {
   auto response = QByteArray{};
   response += "HTTP/1.1 200 " + reasonPhrase(200) + "\r\n";
   response += "Connection: keep-alive\r\n";
   response += "Cache-Control: no-cache, no-transform\r\n";
   response += "Content-Type: text/event-stream\r\n";
-  response += "Access-Control-Allow-Origin: http://127.0.0.1\r\n";
+  if (!allowedOrigin.isEmpty())
+  {
+    response += "Access-Control-Allow-Origin: " + allowedOrigin + "\r\n";
+    response += "Vary: Origin\r\n";
+  }
   response += "\r\n";
   response += ": TrenchBroom MCP stream ready\r\n\r\n";
   socket.write(response);
@@ -355,12 +421,23 @@ void McpHttpServer::writeHttpResponse(
   const int statusCode,
   const QByteArray& reason,
   const QByteArray& contentType,
-  const QByteArray& body) const
+  const QByteArray& body,
+  const QByteArray& allowedOrigin,
+  const QByteArray& extraHeaders) const
 {
   auto response = QByteArray{};
   response += "HTTP/1.1 " + QByteArray::number(statusCode) + " " + reason + "\r\n";
   response += "Connection: close\r\n";
-  response += "Access-Control-Allow-Origin: http://127.0.0.1\r\n";
+  if (!allowedOrigin.isEmpty())
+  {
+    response += "Access-Control-Allow-Origin: " + allowedOrigin + "\r\n";
+    response += "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
+    response +=
+      "Access-Control-Allow-Headers: Authorization, Content-Type, "
+      "MCP-Protocol-Version\r\n";
+    response += "Vary: Origin\r\n";
+  }
+  response += extraHeaders;
   if (!contentType.isEmpty())
   {
     response += "Content-Type: " + contentType + "\r\n";

@@ -39,6 +39,9 @@ $resolvedOutputDir = (Resolve-Path $OutputDir).Path
 $mcpServer = [ordered] @{
   type = "http"
   url = $url
+  headers = [ordered] @{
+    Authorization = "Bearer <token from config>"
+  }
 }
 
 $mcpServers = [ordered] @{
@@ -51,9 +54,13 @@ $genericConfig = [ordered] @{
   name = $ServerName
   type = "http"
   url = $url
+  headers = [ordered] @{
+    Authorization = "Bearer <token from config>"
+  }
   notes = @(
     "Start TrenchBroom first.",
     "Enable MCP in Preferences > MCP and use ReadOnly or Edit mode.",
+    "Replace <token from config> with the token stored in the TrenchBroom MCP config.",
     "Run scripts\\mcp-smoke.ps1 to verify the local HTTP endpoint."
   )
 }
@@ -62,6 +69,7 @@ $codexToml = @"
 [mcp_servers.$ServerName]
 type = "http"
 url = "$(Escape-TomlString $url)"
+bearer_token_env_var = "TB_MCP_TOKEN"
 "@
 
 $genericPath = Join-Path $resolvedOutputDir "trenchbroom-mcp.http.json"
@@ -91,8 +99,16 @@ $url
 ## Claude Code
 
 ```powershell
+`$env:TB_MCP_TOKEN = "<token from config>"
 claude mcp remove $ServerName -s user
-claude mcp add --scope user --transport http $ServerName $url
+claude mcp add --scope user --transport http --header "Authorization: Bearer `$env:TB_MCP_TOKEN" $ServerName $url
+```
+
+## Codex
+
+```powershell
+`$env:TB_MCP_TOKEN = "<token from config>"
+codex mcp add $ServerName --url $url --bearer-token-env-var TB_MCP_TOKEN
 ```
 
 ## Before Connecting
@@ -126,8 +142,13 @@ Write-Host "  $readmePath"
 if ($Print) {
   Write-Host ""
   Write-Host "Claude Code command:"
+  Write-Host '$env:TB_MCP_TOKEN = "<token from config>"'
   Write-Host "claude mcp remove $ServerName -s user"
-  Write-Host "claude mcp add --scope user --transport http $ServerName $url"
+  Write-Host 'claude mcp add --scope user --transport http --header "Authorization: Bearer $env:TB_MCP_TOKEN"' $ServerName $url
+  Write-Host ""
+  Write-Host "Codex command:"
+  Write-Host '$env:TB_MCP_TOKEN = "<token from config>"'
+  Write-Host "codex mcp add $ServerName --url $url --bearer-token-env-var TB_MCP_TOKEN"
   Write-Host ""
   Write-Host "mcpServers JSON:"
   Get-Content -Path $mcpServersPath

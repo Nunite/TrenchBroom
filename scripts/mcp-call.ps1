@@ -1,5 +1,6 @@
 param(
   [string] $Url = "",
+  [string] $Token = "",
   [string] $Tool = "",
   [string] $ArgumentsJson = "{}",
   [string] $ArgumentsPath = "",
@@ -151,6 +152,7 @@ function Invoke-McpRequest {
 
   $headers = @{
     Accept = "application/json, text/event-stream"
+    Authorization = "Bearer $script:McpToken"
     "MCP-Protocol-Version" = "2025-06-18"
   }
 
@@ -181,6 +183,17 @@ if (Test-Path $configPath) {
 } elseif ([string]::IsNullOrWhiteSpace($Url)) {
   $Url = "http://127.0.0.1:37666/mcp"
 }
+
+if ([string]::IsNullOrWhiteSpace($Token)) {
+  $Token = $env:TB_MCP_TOKEN
+}
+if ([string]::IsNullOrWhiteSpace($Token) -and $null -ne $config) {
+  $Token = $config.token
+}
+if ([string]::IsNullOrWhiteSpace($Token)) {
+  throw "MCP bearer token is required. Pass -Token, set TB_MCP_TOKEN, or start TrenchBroom once to create the MCP config."
+}
+$script:McpToken = $Token
 
 if ([string]::IsNullOrWhiteSpace($TrenchBroomExe)) {
   $TrenchBroomExe = Join-Path "build-release-codex" "app\TrenchBroom\TrenchBroom.exe"

@@ -82,12 +82,24 @@ McpBridgeServer makeBridgeServer()
 }
 
 QByteArray makeHttpRequest(
-  const QByteArray& method, const QByteArray& path, const QByteArray& body = {})
+  const QByteArray& method,
+  const QByteArray& path,
+  const QByteArray& body = {},
+  const QByteArray& token = TestToken,
+  const QByteArray& origin = {})
 {
   auto request = QByteArray{};
   request += method + " " + path + " HTTP/1.1\r\n";
   request += "Host: 127.0.0.1\r\n";
   request += "Connection: close\r\n";
+  if (!token.isEmpty())
+  {
+    request += "Authorization: Bearer " + token + "\r\n";
+  }
+  if (!origin.isEmpty())
+  {
+    request += "Origin: " + origin + "\r\n";
+  }
   if (!body.isEmpty())
   {
     request += "Content-Type: application/json\r\n";
@@ -279,7 +291,22 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     CHECK(response.body.contains("TrenchBroom MCP stream ready"));
   }
 
-  SECTION("localhost requests do not need authorization header")
+  SECTION("get rejects requests without authorization")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer = McpHttpServer{bridgeServer};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    const auto response =
+      sendRequest(httpServer.port(), makeHttpRequest("GET", "/mcp", {}, {}));
+
+    CHECK(response.statusCode == 401);
+    CHECK(response.headers.contains("WWW-Authenticate: Bearer"));
+  }
+
+  SECTION("localhost requests require authorization header")
   {
     auto bridgeServer = makeBridgeServer();
     auto httpServer = McpHttpServer{bridgeServer};
@@ -288,11 +315,61 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     REQUIRE(httpServer.start(config));
 
     const auto response = sendRequest(
-      httpServer.port(), makeHttpRequest("POST", "/mcp", jsonRequest(3, "tools/list")));
+      httpServer.port(),
+      makeHttpRequest("POST", "/mcp", jsonRequest(3, "tools/list"), {}));
 
-    CHECK(response.statusCode == 200);
-    const auto result = jsonObject(response).value("result").toObject();
-    CHECK(!result.value("tools").toArray().isEmpty());
+    CHECK(response.statusCode == 401);
+    CHECK(response.headers.contains("WWW-Authenticate: Bearer"));
+  }
+
+  SECTION("localhost requests reject an invalid bearer token")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer = McpHttpServer{bridgeServer};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    const auto response = sendRequest(
+      httpServer.port(),
+      makeHttpRequest("POST", "/mcp", jsonRequest(3, "tools/list"), "wrong-token"));
+
+    CHECK(response.statusCode == 401);
+  }
+
+  SECTION("cors preflight echoes an allowed origin")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer = McpHttpServer{bridgeServer};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    const auto response = sendRequest(
+      httpServer.port(),
+      makeHttpRequest("OPTIONS", "/mcp", {}, {}, "http://localhost:3000"));
+
+    CHECK(response.statusCode == 204);
+    CHECK(
+      response.headers.contains("Access-Control-Allow-Origin: http://localhost:3000"));
+    CHECK(response.headers.contains("Access-Control-Allow-Headers: Authorization"));
+  }
+
+  SECTION("cors rejects non-loopback origins")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer = McpHttpServer{bridgeServer};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    const auto response = sendRequest(
+      httpServer.port(),
+      makeHttpRequest(
+        "POST", "/mcp", jsonRequest(3, "tools/list"), TestToken, "https://example.com"));
+
+    CHECK(response.statusCode == 403);
+    CHECK_FALSE(response.headers.contains("Access-Control-Allow-Origin"));
   }
 
   SECTION("read-only mode rejects edit tools")

@@ -198,7 +198,8 @@ QJsonObject compactReviewResource(const QJsonObject& result)
   return compact;
 }
 
-void cacheReviewResource(std::map<QString, QJsonObject>& resources, const QJsonObject& result)
+void cacheReviewResource(
+  std::map<QString, QJsonObject>& resources, const QJsonObject& result)
 {
   const auto resourceUri = result.value("resourceUri").toString();
   if (resourceUri.startsWith("tbmcp://review/"))
@@ -474,12 +475,16 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
       QString{"MCP tool is registered but not implemented yet: %1"}.arg(request.tool));
   }
 
-  if (!mcp::canCallTool(*tool, m_config.mode))
+  const auto effectiveMode =
+    request.requestedMode && mcp::allowsMode(m_config.mode, *request.requestedMode)
+      ? *request.requestedMode
+      : m_config.mode;
+  if (!mcp::canCallTool(*tool, effectiveMode))
   {
     return makeFailure(
       request,
       mcp::McpErrorCode::Forbidden,
-      QString{"MCP tool is not available in mode %1"}.arg(mcp::modeName(m_config.mode)));
+      QString{"MCP tool is not available in mode %1"}.arg(mcp::modeName(effectiveMode)));
   }
 
   struct DispatchGuard

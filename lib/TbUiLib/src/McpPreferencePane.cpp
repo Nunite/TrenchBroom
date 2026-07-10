@@ -8,6 +8,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QUrl>
@@ -57,6 +58,14 @@ mcp::McpToolProfile toolProfileFromCombo(const QComboBox& combo)
 int findToolProfileIndex(const QComboBox& combo, const mcp::McpToolProfile profile)
 {
   return combo.findData(mcp::toolProfileName(profile), ModeRole);
+}
+
+QString claudeCommand(const QString& httpUrl, const QString& token)
+{
+  return QString{
+    "claude mcp add --scope user --transport http --header \"Authorization: Bearer "
+    "%1\" trenchbroom %2"}
+    .arg(token, httpUrl);
 }
 
 } // namespace
@@ -144,10 +153,15 @@ void McpPreferencePane::createGui()
     this,
     &McpPreferencePane::openConfigFolder);
 
+  m_rotateTokenButton = new QPushButton{tr("Rotate Token")};
+  connect(
+    m_rotateTokenButton, &QPushButton::clicked, this, &McpPreferencePane::rotateToken);
+
   auto* configPathLayout = new QHBoxLayout{};
   configPathLayout->setContentsMargins(0, 0, 0, 0);
   configPathLayout->addWidget(m_configPathEdit, 1);
   configPathLayout->addWidget(m_openConfigFolderButton);
+  configPathLayout->addWidget(m_rotateTokenButton);
 
   m_statusLabel = new QLabel{};
   setInfoStyle(m_statusLabel);
@@ -218,8 +232,7 @@ void McpPreferencePane::updateControls()
     QString{"http://%1:%2/mcp"}.arg(m_config.httpHost).arg(m_config.httpPort);
   m_httpUrlEdit->setText(httpUrl);
   m_pipeNameEdit->setText(m_config.pipeName);
-  m_claudeCommandEdit->setText(
-    QString{"claude mcp add --scope user --transport http trenchbroom %1"}.arg(httpUrl));
+  m_claudeCommandEdit->setText(claudeCommand(httpUrl, "<token from config>"));
   m_configPathEdit->setText(QDir::toNativeSeparators(m_configPath));
 
   const auto modeText = mcp::modeName(m_config.mode);
@@ -315,7 +328,25 @@ void McpPreferencePane::pipeNameChanged(const QString& text)
 
 void McpPreferencePane::copyClaudeCommand()
 {
-  QGuiApplication::clipboard()->setText(m_claudeCommandEdit->text());
+  const auto httpUrl =
+    QString{"http://%1:%2/mcp"}.arg(m_config.httpHost).arg(m_config.httpPort);
+  QGuiApplication::clipboard()->setText(claudeCommand(httpUrl, m_config.token));
+}
+
+void McpPreferencePane::rotateToken()
+{
+  const auto answer = QMessageBox::question(
+    this,
+    tr("Rotate MCP Token"),
+    tr("Rotating the token immediately disconnects existing HTTP and stdio clients. "
+       "Continue?"));
+  if (answer != QMessageBox::Yes)
+  {
+    return;
+  }
+
+  m_config.token = mcp::generateBridgeToken();
+  applyConfigChange();
 }
 
 void McpPreferencePane::openConfigFolder()

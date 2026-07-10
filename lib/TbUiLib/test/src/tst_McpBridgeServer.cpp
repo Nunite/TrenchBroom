@@ -629,6 +629,24 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     CHECK(response.error->code == mcp::McpErrorCode::Unauthorized);
   }
 
+  SECTION("requested mode can only reduce configured permissions")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "entity_create",
+      QJsonObject{{"classname", "info_player_start"}},
+      mcp::McpMode::ReadOnly});
+
+    CHECK(!response.ok);
+    REQUIRE(response.error);
+    CHECK(response.error->code == mcp::McpErrorCode::Forbidden);
+    CHECK(response.error->message.contains("ReadOnly"));
+  }
+
   SECTION("serves tb_status")
   {
     REQUIRE(

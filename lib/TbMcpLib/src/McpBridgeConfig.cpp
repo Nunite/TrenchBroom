@@ -19,6 +19,7 @@
 
 #include "mcp/McpBridgeConfig.h"
 
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
@@ -303,6 +304,13 @@ bool writeBridgeConfig(
       *error = QString{"Could not commit MCP config: %1"}.arg(file.errorString());
     }
     return false;
+  }
+
+  if (!QFile::setPermissions(filePath, QFileDevice::ReadOwner | QFileDevice::WriteOwner))
+  {
+    qWarning().noquote()
+      << QString{"Could not restrict MCP config permissions to the current user: %1"}.arg(
+           filePath);
   }
 
   return true;

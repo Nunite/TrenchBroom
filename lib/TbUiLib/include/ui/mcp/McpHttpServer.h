@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <QByteArray>
 #include <QObject>
 
 #include "mcp/McpBridgeConfig.h"
@@ -55,13 +56,15 @@ public:
 private:
   void handleNewConnection();
   void handleSocketReadyRead(QTcpSocket& socket);
-  void writeSseStream(QTcpSocket& socket) const;
+  void writeSseStream(QTcpSocket& socket, const QByteArray& allowedOrigin) const;
   void writeHttpResponse(
     QTcpSocket& socket,
     int statusCode,
     const QByteArray& reason,
     const QByteArray& contentType,
-    const QByteArray& body) const;
+    const QByteArray& body,
+    const QByteArray& allowedOrigin = {},
+    const QByteArray& extraHeaders = {}) const;
 };
 
 } // namespace tb::ui

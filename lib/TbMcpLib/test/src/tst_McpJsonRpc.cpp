@@ -53,16 +53,23 @@ TEST_CASE("McpJsonRpc")
     CHECK(capabilities.contains("resources"));
   }
 
+  SECTION("initialize reports the supported protocol version")
+  {
+    const auto result =
+      mcpInitializeResult(QJsonObject{{"protocolVersion", "unsupported-version"}});
+
+    CHECK(result.value("protocolVersion").toString() == "2025-06-18");
+  }
+
   SECTION("initialize advertises TrenchBroom workflow skill")
   {
     const auto result = mcpInitializeResult({});
 
+    CHECK(result.value("associatedSkills")
+            .toArray()
+            .contains("trenchbroom-mcp-scene-workflow"));
     CHECK(
-      result.value("associatedSkills").toArray().contains(
-        "trenchbroom-mcp-scene-workflow"));
-    CHECK(
-      result.value("instructions").toString().contains(
-        "trenchbroom-mcp-scene-workflow"));
+      result.value("instructions").toString().contains("trenchbroom-mcp-scene-workflow"));
     CHECK(result.value("instructions").toString().contains("TrenchBroom scenes"));
   }
 
@@ -151,6 +158,32 @@ TEST_CASE("McpJsonRpc")
       });
 
     CHECK(!response);
+  }
+
+  SECTION("rejects invalid JSON-RPC envelopes")
+  {
+    const auto invalidVersion = handleMcpJsonRpcRequest(
+      QJsonObject{{"id", 1}, {"method", "ping"}},
+      McpMode::ReadOnly,
+      [](const QString&, const QJsonObject&) {
+        return McpBridgeResponse::success("request", {});
+      });
+    REQUIRE(invalidVersion);
+    CHECK(invalidVersion->value("error").toObject().value("code").toInt() == -32600);
+
+    const auto invalidParams = handleMcpJsonRpcRequest(
+      QJsonObject{
+        {"jsonrpc", "2.0"},
+        {"id", 2},
+        {"method", "ping"},
+        {"params", QJsonArray{}},
+      },
+      McpMode::ReadOnly,
+      [](const QString&, const QJsonObject&) {
+        return McpBridgeResponse::success("request", {});
+      });
+    REQUIRE(invalidParams);
+    CHECK(invalidParams->value("error").toObject().value("code").toInt() == -32602);
   }
 
   SECTION("resources read returns JSON resource contents")

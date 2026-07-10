@@ -149,12 +149,10 @@ QJsonObject jsonRpcError(const QJsonValue& id, const int code, const QString& me
 
 QJsonObject mcpInitializeResult(const QJsonObject& params)
 {
-  const auto requestedVersion = params.value("protocolVersion").toString();
-  const auto protocolVersion =
-    requestedVersion.isEmpty() ? QString{ProtocolVersion} : requestedVersion;
+  Q_UNUSED(params);
 
   return QJsonObject{
-    {"protocolVersion", protocolVersion},
+    {"protocolVersion", ProtocolVersion},
     {"capabilities",
      QJsonObject{
        {"resources", QJsonObject{}},
@@ -168,11 +166,11 @@ QJsonObject mcpInitializeResult(const QJsonObject& params)
      }},
     {"associatedSkills", QJsonArray{"trenchbroom-mcp-scene-workflow"}},
     {"instructions",
-      "Use structured tools to inspect and edit the running TrenchBroom instance. "
-      "When building or editing TrenchBroom scenes, load "
-      "trenchbroom-mcp-scene-workflow for scene workflow and recipe guidance. "
-      "The TrenchBroom app must be running and MCP must be enabled in Preferences > "
-      "MCP."},
+     "Use structured tools to inspect and edit the running TrenchBroom instance. "
+     "When building or editing TrenchBroom scenes, load "
+     "trenchbroom-mcp-scene-workflow for scene workflow and recipe guidance. "
+     "The TrenchBroom app must be running and MCP must be enabled in Preferences > "
+     "MCP."},
   };
 }
 
@@ -237,8 +235,16 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
   const McpResourceReader& resourceReader)
 {
   const auto id = request.value("id");
+  if (request.value("jsonrpc").toString() != "2.0")
+  {
+    return jsonRpcError(id, -32600, "JSON-RPC version must be 2.0");
+  }
   const auto method = request.value("method").toString();
   const auto paramsValue = request.value("params");
+  if (!paramsValue.isUndefined() && !paramsValue.isObject())
+  {
+    return jsonRpcError(id, -32602, "JSON-RPC params must be an object");
+  }
   const auto params = paramsValue.isObject() ? paramsValue.toObject() : QJsonObject{};
   const auto isNotification = request.value("id").isUndefined();
 
