@@ -65,8 +65,8 @@ grouped examples for new work.
 After generating IR, use:
 
 1. `ir_compile_preview_from_file`
-2. `ir_apply_from_file` with the returned `previewId` when available. Fall back
-   to `path` only when the preview cache is unavailable or expired.
+2. `ir_apply_from_file` with the returned `previewId`. If the preview expired or
+   the file changed, compile a new preview instead of applying by path alone.
 3. `module_inspect` or `selector_preview`
 4. `geometry_analyze_slopes` / `geometry_analyze_route_continuity` when route-like
 5. `map_validate(groupByType:true)`
@@ -110,6 +110,7 @@ Use a minimal JSON wrapper around existing atomic MCP operations:
 
 ```json
 {
+  "schemaVersion": 1,
   "name": "MCP: Apply scene module",
   "moduleId": "route-a",
   "defaultMetadata": {
@@ -141,3 +142,7 @@ Keep IR small and explicit. Do not invent scene operations unless MCP already
 exposes them. If an intent cannot be expressed atomically, decompose it into
 generic `blockout_create_batch`, `brush_create_polygon_batch`, entity, texture,
 selector, and metadata operations.
+
+New recipes must emit integer `schemaVersion:1`. Unversioned IR is accepted only
+for legacy compatibility and returns `legacyUnversionedIr`; future or invalid
+versions are rejected before mutation.

@@ -18,20 +18,23 @@ complex scene generation out of C++ and into skill scripts.
 
 ## Current Size
 
-Current `lib/TbUiLib/src/mcp` size is about **856 KB** across 24 source/header files.
+Current `lib/TbUiLib/src/mcp` size is about **927 KB** across 31 source/header files.
+Reliability work increased the total because authentication, bounded session state,
+atomic IR rollback, structured recovery, and focused interfaces now live in the C++
+kernel. The lightweight target remains a direction, not a claim that this branch has
+already reached 550-650 KB.
 
 The largest files are:
 
 | File | Approx size |
 | --- | ---: |
-| `McpBrushTools.cpp` | 196 KB |
-| `McpReviewRenderTools.cpp` | 80 KB |
-| `McpSelectorTools.cpp` | 78 KB |
-| `McpSelectionViewportTools.cpp` | 63 KB |
-| `McpObjectTools.cpp` | 50 KB |
-| `McpEntityTools.cpp` | 45 KB |
-| `McpRouteTools.cpp` | 44 KB |
-| `McpTextureTools.cpp` | 41 KB |
+| `McpBrushTools.cpp` | 200 KB |
+| `McpSelectorTools.cpp` | 101 KB |
+| `McpReviewRenderTools.cpp` | 81 KB |
+| `McpObjectTools.cpp` | 56 KB |
+| `McpEntityTools.cpp` | 52 KB |
+| `McpRouteTools.cpp` | 51 KB |
+| `McpTextureTools.cpp` | 48 KB |
 
 The size is not caused by transport code alone. The MCP layer now contains editor
 automation, object identity, metadata/module tracking, geometry primitives, validation,
@@ -43,7 +46,7 @@ Medium lightweight target:
 
 | Area | Current | Target |
 | --- | ---: | ---: |
-| `lib/TbUiLib/src/mcp` C++ code | ~856 KB | ~550-650 KB |
+| `lib/TbUiLib/src/mcp` C++ code | ~927 KB | ~550-650 KB |
 | Default Modeling profile | short but still broad | shorter, high-frequency only |
 | Skill recipe scripts | growing | larger and more capable |
 | Total capability | high | same or higher |
@@ -171,6 +174,18 @@ Suggested target layout:
 | `McpObjectTools.cpp` | keep transform/delete/group object operations |
 | `McpSelectionViewportTools.cpp` | hide most viewport tools from Modeling profile |
 | `McpToolCatalog.cpp` | move repeated schema fragments into smaller helper builders |
+
+Current structural progress:
+
+- `McpSessionState.cpp` owns bounded session data and operation-record serialization.
+- `McpToolRegistry.cpp` owns tool registration and dispatch lookup.
+- `McpToolCatalogSerialization.cpp` owns catalog JSON and profile statistics.
+- IR and history declarations have focused internal headers.
+- Session-state and registry contracts have independent Catch2 files and filters.
+
+`McpBrushTools.cpp`, `McpSelectorTools.cpp`, and the remaining broad bridge test still
+need deeper domain splits. Do those splits only when they remove shared logic or make a
+subsystem independently testable.
 
 File splitting alone does not make MCP lighter. It only improves maintainability. Real
 lightweighting comes from moving prefab-like composition into recipes.
@@ -317,7 +332,8 @@ Everything else should be hidden but searchable.
 
 Current Phase 4 status:
 
-- The Modeling profile is capped at 45 visible implemented tools in catalog tests.
+- The catalog baseline is 139 tools, 137 implemented tools, and 47
+  Modeling-visible implemented tools. Catalog tests lock these values for this branch.
 - Default-visible tools keep the normal path: status/open, IR preview/apply from inline
   JSON or file, selector/module/group inspect and review, transform/delete, entity
   checked creation and property edits, common batch geometry, heightmap import/preview,
@@ -471,8 +487,9 @@ Medium lightweighting is successful when:
 Run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbUiLibTest -TestFilter "*McpBridgeServer*"
+powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbUiLibTest -TestFilter "[McpBridgeServer]"
 powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbMcpLibTest -TestExe build-release-codex\lib\TbMcpLib\test\TbMcpLibTest.exe -TestFilter "McpToolCatalog"
+powershell -ExecutionPolicy Bypass -File scripts\mcp-reliability-acceptance.ps1
 ```
 
 Required coverage:

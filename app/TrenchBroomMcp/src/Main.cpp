@@ -117,7 +117,8 @@ int runServer()
 int main(int argc, char* argv[])
 {
   auto app = QCoreApplication{argc, argv};
-  QCoreApplication::setApplicationName("trenchbroom-mcp");
+  QCoreApplication::setApplicationName("TrenchBroom");
+  QCoreApplication::setOrganizationName("");
 
   return tb::mcp::runServer();
 }

@@ -237,6 +237,10 @@ version-aware:
 Recipes should include a schema/version marker once the IR shape changes beyond
 small additive fields.
 
+The current IR version is `schemaVersion:1`. New recipes must emit it. The C++
+kernel accepts an unversioned document as v1 with a `legacyUnversionedIr` warning,
+and rejects non-integer versions, versions below 1, and future versions before mutation.
+
 ### Rule 13: Tool Lifecycle Must Be Explicit
 
 Every MCP tool should fit one lifecycle state:
@@ -264,6 +268,16 @@ MCP tools should have predictable cost. New high-volume tools must define:
 Review and validation tools should prefer bounded summaries, small samples, and
 resource paths over huge inline payloads.
 
+The bridge uses fixed response budgets by cost class: Fast 10 seconds, Normal 30
+seconds, and Long 120 seconds. Connection and write waits remain 5 seconds. A
+timeout must report the tool, request id, timeout, unknown mutation state, unsafe
+retry status, and history-inspection recovery steps.
+
+Session state is bounded: 1024 operation records, 128 review resources, 64 IR
+previews with a 10-minute TTL, and the current plus three recent document
+fingerprints. `tb_status` and `tb_doctor` must expose limits, counts, and eviction
+counters. Reads of evicted resources must return recovery guidance.
+
 ### Rule 15: Failure Recovery Must Be Structured
 
 Mutating tools must either commit one clear transaction or fail before mutation.
@@ -280,6 +294,28 @@ Failures should return structured diagnostics that tell the Agent:
   rebuild
 
 Crash, wrong-map write, data loss, and unclear mutation state are P0 issues.
+
+IR apply is one native transaction. Geometry, entities, history, metadata,
+modules, preview state, counters, and object identity must either commit together
+or remain unchanged. A successful aggregate apply returns a parent operation and
+compatible child-operation ids; child operations cannot be undone independently.
+
+### Rule 16: Local Transport Still Requires Authentication
+
+HTTP listens only on loopback and requires `Authorization: Bearer <token>` for
+every `/mcp` GET and POST. Missing and incorrect credentials return `401` with
+`WWW-Authenticate: Bearer`. CORS may echo only an allowed request origin and must
+allow the `Authorization` header for preflight.
+
+The token is a secret. UI text may show placeholders, but copied client commands
+must add the real value only at copy time. Codex configurations should use
+`--bearer-token-env-var`; scripts resolve credentials in this order: explicit
+`-Token`, `TB_MCP_TOKEN`, then the TrenchBroom config.
+
+The stdio shim and TrenchBroom must read the same config path. JSON-RPC requests
+must declare `jsonrpc:"2.0"`; params must be an object; initialize advertises only
+the supported `2025-06-18` protocol. The effective mode is the stricter of the
+configured mode and `requestedMode`.
 
 ## New Capability Decision Checklist
 

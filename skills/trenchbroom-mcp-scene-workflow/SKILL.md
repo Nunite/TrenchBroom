@@ -26,14 +26,14 @@ design decisions remain under Agent control.
 
 ## Common Flow
 
-1. Confirm binding before writing: call `tb_status`; record `processId`, `bridgeInstanceId`, `activeDocumentPath`, and `documentFingerprint`. If `tb_status` returns `associatedSkills` containing `trenchbroom-mcp-scene-workflow`, treat this skill as the workflow owner for scene intent and recipe routing.
-2. Open disposable maps with `documents_open_verified` when switching documents. Do not pass `expectedDocumentPath` to open a different map; use that guard on mutating tools after the target document is active.
+1. Confirm binding before writing: connect with the configured Bearer token, call `tb_status`, and record `processId`, `bridgeInstanceId`, `activeDocumentPath`, and `documentFingerprint`. Pass both document guards to later mutations. If `tb_status` returns `associatedSkills` containing `trenchbroom-mcp-scene-workflow`, treat this skill as the workflow owner for scene intent and recipe routing.
+2. Open disposable maps with `documents_open_verified` when switching documents. Do not pass document guards to open a different map; use both path and fingerprint guards on mutating tools after the target document is active.
 3. Split the scene into `moduleId`s and parts before geometry:
    - `moduleId`: stable session name such as `temple-main-hall`, `route-a`, `terrain-pass`.
    - `part`: structural part such as `floor`, `wall`, `roof`, `rail`, `support`, `marker`, `spawn`.
    - `role`: playable purpose such as `walkable`, `boundary`, `guidance`, `decoration`, `lighting`.
    - Optional: `routeId`, `order`, `temporary`, `generatedBy`.
-4. Prefer `ir_compile_preview` before bulk writes. For large operation sets, write the IR JSON to a local file and use `ir_compile_preview_from_file` / `ir_apply_from_file` so the conversation does not carry a huge payload. Use apply only after preview counts/bounds make sense.
+4. Prefer `ir_compile_preview` before bulk writes. New IR must contain `schemaVersion:1`. For large operation sets, write the IR JSON to a local file and use `ir_compile_preview_from_file` / `ir_apply_from_file` so the conversation does not carry a huge payload. Apply with the returned `previewId`; if the file changes after preview, preview it again.
 5. For direct creation tools, pass `defaultMetadata` and per-operation `metadata`. For part-aware primitives, use `parts`, `partMaterials`, and `partMetadata` instead of generating extra parts and deleting them later.
 6. Recover generated targets with `module_*` or structured selectors:
    - `module_list` defaults to live modules only; use `includeStale:true` only when debugging prior-document/session residue.
@@ -54,6 +54,13 @@ design decisions remain under Agent control.
    - `geometry_analyze_slopes` for ramp/surf/slide/wedge/ascending intent. Use `passed`, `slopeCount`, warning samples, and `recoveryAction` from the summary before asking for full detail. If a sloped surface was intended and `passed` is false or `slopeCount` is 0, treat the build as failed and rebuild with a true slope primitive.
 9. Review visually with `module_render_review`, `render_review_selector`, `render_review_operation`, or `render_review_current_scene(scope:"selection")` for user-selected targets. Pass an absolute `outputDir` for saved review bundles. Prefer contact sheets with at most two panels. Use `labelParts` only for important metadata parts such as rails, route surfaces, supports, markers, or spawn points; use `labelStride` / `autoHideLabelsThreshold` for dense ordered routes, then open individual PNGs only when needed.
 10. Report friction as MCP design feedback: P0 crash/wrong-map/data loss, P1 blocked real workflow, P2 awkward or context-heavy, P3 documentation/default issue.
+
+An IR apply is one aggregate operation. Keep `parentOperationId` as the undo/redo
+target and treat `childOperationIds` as audit detail. If apply fails, require
+`mutatedDocument:false`, `partialMutation:false`, and `retrySafe:true` before retrying.
+If stdio times out, mutation state is unknown: inspect `history_status` and recent
+operations before retrying. If an operation or review resource was evicted from the
+bounded session cache, follow its `recoveryAction` instead of guessing stale ids.
 
 ## Default Tool Choice
 
@@ -103,8 +110,8 @@ Common recipe path:
 2. Run `python <skill>/scripts/recipes/<recipe>.py --describe` to inspect parameters when needed.
 3. Generate or choose params from `scripts/examples/<recipe>/minimal|default|stress.json`.
 4. Run the recipe with `--params <params.json> --out <ir.json>`.
-5. Use `ir_compile_preview_from_file`, then apply with the returned `previewId`
-   when available.
+5. Confirm the generated file contains `schemaVersion:1`. Use
+   `ir_compile_preview_from_file`, then apply with the returned `previewId`.
 6. Recover targets with `module_inspect` / `selector_preview`, validate, and review.
 
 Recipes must not call TrenchBroom, MCP, or `tb2` directly. MCP remains the only

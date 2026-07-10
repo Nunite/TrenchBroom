@@ -3,7 +3,8 @@
 本文档面向接入 MCP 的 Agent / Client，说明如何安全地使用当前分支暴露的工具完成“读取地图、生成白盒、放置资产、贴图、截图检查、验证、保存”的闭环。
 
 当前 MCP 分层和开发边界见 `docs/mcp-development-governance.md`，
-轻量化状态见 `docs/mcp-lightweight-roadmap.md`。这里不重复协议实现细节，
+安全边界见 `docs/mcp-security-threat-model.md`，轻量化状态见
+`docs/mcp-lightweight-roadmap.md`。这里不重复协议实现细节，
 只记录推荐工作方式和可直接复用的 Agent 指令。
 
 ## 基本原则
@@ -18,7 +19,10 @@
 
 ## 启动检查
 
-在 MCP client 中连接 `trenchbroom-mcp.exe` 后，Agent 应先执行：
+优先通过 loopback HTTP 连接 `/mcp`。每个 GET/POST 都必须携带
+`Authorization: Bearer <token>`；Codex 使用 `--bearer-token-env-var
+TB_MCP_TOKEN`。`trenchbroom-mcp.exe` 仅作为兼容 stdio shim，并读取与
+TrenchBroom 相同的配置文件。连接后，Agent 应先执行：
 
 1. `tools/list`
 2. `tb_status`
@@ -28,7 +32,10 @@
 判断规则：
 
 - `tools/list` 为空且 `tb_status` 返回 `Forbidden`：TrenchBroom MCP mode 仍是 `Off`。
-- `tb_status` 连接失败：TrenchBroom 未运行、bridge 未启动，或配置 token/pipeName 不匹配。
+- HTTP 返回 `401`：Bearer token 缺失或错误。按 `-Token`、
+  `TB_MCP_TOKEN`、TrenchBroom config 的顺序检查；不要把 token 写入日志或文档。
+- `tb_status` 连接失败：TrenchBroom 未运行、bridge 未启动，或配置
+  token、pipeName、端口不匹配。
 - `tb_status.processId`、`bridgeInstanceId`、`activeDocumentPath`、`documentFingerprint` 是本轮请求链路的身份锚点。写入前必须确认它们指向预期 TrenchBroom 进程和预期地图。
 - `documents_list` 为空：需要先让用户打开地图，或在 `Edit` mode 下使用 `documents_open_verified` 打开绝对路径。
 - `tb_doctor` 报告活动文档不存在：不要执行 map / selection / edit 工具，先激活或打开文档。
@@ -85,7 +92,7 @@ scripts\mcp-config.ps1 -Print
 5. 所有坐标和尺寸使用 GoldSrc units，并尽量按 16 units 网格对齐。
 6. 每次写操作后读取 operationId，需要时再用 `operation_inspect(detail=ids)` 取对象 id；用截图工具检查，不要长期携带大 object id 列表。
 7. 发现结果错误时优先使用 history_undo_mcp 回滚最近一次 MCP 操作，而不是用删除工具硬删一片对象。
-8. 大型或破坏性写入应传 expectedDocumentPath，防止写到错误地图。
+8. 所有写入都应同时传 expectedDocumentPath 和 expectedDocumentFingerprint；两者都提供时必须同时匹配。
 9. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认。
 10. 如果工具返回 unsupported、Forbidden 或 Unauthorized，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
 ```
@@ -117,10 +124,17 @@ scripts\mcp-config.ps1 -Print
 6. 只需要批量创建平台/跳块时用 `brush_create_boxes_batch`，传 `boxes: [{min,max,material?}]`；需要棱形、切角或引导形状时用 `brush_create_polygon_batch`，避免多次单 brush 调用产生大量 undo/history。
 7. `blockout_create_room`、`blockout_create_corridor`、`blockout_create_stairs`、`blockout_create_ramp`、`blockout_create_doorway`、`blockout_create_cover`、`blockout_create_sky_shell` 的独立工具入口已移除。旧 `blockout_create_batch` operation type 可用于兼容或快速草图；新场景组合应优先走 skill recipe/IR 或显式 primitive operations。
 8. 默认只保留返回的 `operationId` / `resourceUri`，需要 ids 时再用 `operation_inspect(detail=ids)`。
-9. 写入工具支持 `expectedDocumentPath`。当 Agent 已经从 `tb_status` 记录了目标地图路径时，大型批量创建、删除、贴图替换、heightmap import、实体创建和保存都应传这个 guard。
+9. 写入工具支持 `expectedDocumentPath` 和 `expectedDocumentFingerprint`。
+   Agent 从 `tb_status` 记录目标身份后，应把两个 guard 一起传给批量创建、
+   删除、贴图替换、heightmap import、实体创建和保存。
 10. 用 `render_review_operation` 收集几何 review 包；复杂场景默认看 `preferredCapturePath` 的 2 图 contact sheet，必要时再打开 manifest 里的单独视图 PNG。
 11. 根据截图调整尺寸或位置，必要时使用 `objects_transform` 平移/旋转/缩放。
 12. 调用 `history_status` 确认最近 MCP operation 是否还在 undo 栈顶；再调用 `map_validate` / `problems_check`。
+
+IR 文件必须输出 `schemaVersion:1`。无版本文件只为兼容而接受，并返回
+`legacyUnversionedIr`。`ir_compile_preview_from_file` 返回 `previewId` 后，
+`ir_apply_from_file` 应同时提交原路径和该 id；文件内容发生变化时，apply
+会在写入前拒绝。
 
 不要让 Agent 直接使用 `brush_create_from_planes` 做普通白盒。它是 `Full` / 搜索可发现的专家工具，只适合已有明确 plane 数据且需要严格校验的场景。复杂批量结构也不要默认走 `python_generate_blockout`；除非用户明确要求脚本生成，优先用 typed batch primitive operations 分阶段落地。
 
@@ -247,6 +261,11 @@ MCP 写操作会返回：
 - `transactionName`
 - `changedObjectIds`
 
+`ir_apply` / `ir_apply_from_file` 成功时还会返回 `parentOperationId` 和
+`childOperationIds`。父 operation 对应一个原生 undo 项；子 operation 仅用于
+兼容和审计，不能独立撤销。一次 `history_undo_mcp` 必须同时移除该 IR 的几何
+和实体，一次 redo 必须全部恢复。
+
 推荐规则：
 
 - 一次布局阶段完成后调用 `history_list`，查看最近 MCP 操作时间线。每条记录包含 `createdAt`、`createdAtMs`、`toolName`、`transactionName`、`changedObjectCount`；有活动文档时还包含 `liveObjectCount`、`staleObjectCount` 和 `valid`。
@@ -255,6 +274,11 @@ MCP 写操作会返回：
 - `selection_get` 中 `brushFaceCount` 表示当前选择的 brush face 数量；整 brush 选择的总 face 数使用 `selectedBrushFaceCount` / `selectedBrushTotalFaceCount`。
 - 发现最近一次 MCP 操作错误时调用 `history_undo_mcp`。
 - 需要回退一串连续 MCP 操作时调用 `history_undo_to_operation(operationId=...)`，它会从最新未撤销 MCP operation 一直撤销到目标 operation。若中途发现原生 undo 栈已被用户编辑或非预期命令打断，工具会报告 `mutatedDocument`、`partiallyUndone`、`undoneOperationIds`、`remainingOperationIds` 和 `recoveryAction`；此时先刷新状态或重新验证地图，不要继续盲目删除对象。
+- stdio 调用超时时，不要直接重试。超时响应的 `mutatedDocument` 为
+  `unknown`、`retrySafe=false`；先调用 `history_status`，再检查最近 operation。
+- `tb_status.sessionState` 和 `tb_doctor.sessionState` 显示会话预算、当前数量和
+  淘汰计数。读取已淘汰 operation/review resource 时，按返回的
+  `recoveryAction` 刷新 history 或重新生成 review。
 - 不要用 `objects_delete` 代替 undo，除非用户明确要删除对象。
 - 保存前调用 `map_validate` 和 `problems_check`。
 - 用户确认后再调用 `documents_save` 或 `documents_export`。
@@ -286,3 +310,6 @@ MCP 写操作会返回：
 - Overlay 第一版能画 object bounds、point、bounds 和 label，但还不是全局通用 overlay manager。
 - Viewport capture 截取的是当前 UI 控件状态，不是独立离屏渲染器。
 - MCP history 只在 MCP 操作仍位于 TrenchBroom 原生 undo/redo 栈顶时可靠；用户手动编辑插入后，Agent 应重新读取状态再继续。
+- 会话 registry 不写入 `.map`。它最多保留 1024 个 operation record、128 个
+  review resource、64 个 IR preview（10 分钟 TTL），以及当前和最近 3 个
+  document fingerprint。
