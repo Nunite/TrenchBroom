@@ -916,6 +916,10 @@ TEST_CASE("McpToolCatalog")
             .toObject()
             .value("closedLoop")
             .isObject());
+    CHECK(moduleValidate->inputSchema.value("properties")
+            .toObject()
+            .value("qualityPolicy")
+            .isObject());
 
     const auto moduleCompact = findToolDefinition("module_compact");
     REQUIRE(moduleCompact);
@@ -931,12 +935,17 @@ TEST_CASE("McpToolCatalog")
     CHECK(irProperties.value("entities").isObject());
     CHECK(irProperties.value("moduleId").isObject());
     CHECK(irProperties.value("defaultMetadata").isObject());
+    CHECK(irProperties.value("qualityPolicy").isObject());
 
     const auto irPreviewFile = findToolDefinition("ir_compile_preview_from_file");
     REQUIRE(irPreviewFile);
     CHECK(irPreviewFile->requiredMode == McpMode::ReadOnly);
     CHECK(irPreviewFile->description.contains("previewId"));
     CHECK(irPreviewFile->inputSchema.value("required").toArray().contains("path"));
+    CHECK(irPreviewFile->inputSchema.value("properties")
+            .toObject()
+            .value("qualityPolicy")
+            .isObject());
 
     const auto irApplyFile = findToolDefinition("ir_apply_from_file");
     REQUIRE(irApplyFile);
@@ -947,12 +956,14 @@ TEST_CASE("McpToolCatalog")
       irApplyFile->inputSchema.value("properties").toObject();
     CHECK(irApplyFileProperties.value("path").isObject());
     CHECK(irApplyFileProperties.value("previewId").isObject());
+    CHECK(irApplyFileProperties.value("qualityPolicy").isObject());
 
     const auto blockoutBatch = findToolDefinition("blockout_create_batch");
     REQUIRE(blockoutBatch);
     const auto batchProperties =
       blockoutBatch->inputSchema.value("properties").toObject();
     CHECK(batchProperties.value("defaultMetadata").isObject());
+    CHECK(batchProperties.value("qualityPolicy").isObject());
 
     const auto operationsProperty = batchProperties.value("operations").toObject();
     CHECK(operationsProperty.value("description").toString().contains("skill recipes"));
@@ -1712,6 +1723,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(routeContinuityProperties.value("validationMode").isObject());
     CHECK(routeContinuityProperties.value("maxStepHeight").isObject());
     CHECK(routeContinuityProperties.value("maxJumpGap").isObject());
+    CHECK(routeContinuityProperties.value("qualityPolicy").isObject());
     CHECK(routeContinuityProperties.value("detail").isObject());
 
     const auto slopeTool = findToolDefinition("geometry_analyze_slopes");

@@ -1576,6 +1576,11 @@ QJsonObject seamJson(
   const double verticalTolerance)
 {
   const auto horizontalGap = to.minProjection - from.maxProjection;
+  const auto positiveGap = std::max(0.0, horizontalGap);
+  const auto overlapDepth = std::max(0.0, -horizontalGap);
+  const auto seamRelation = horizontalGap > horizontalTolerance    ? "gap"
+                            : horizontalGap < -horizontalTolerance ? "overlap"
+                                                                   : "touching";
   const auto verticalStep = to.entryZ - from.exitZ;
   const auto classification = seamClassification(
     horizontalGap, verticalStep, horizontalTolerance, verticalTolerance);
@@ -1599,10 +1604,14 @@ QJsonObject seamJson(
     {"toEntryZ", to.entryZ},
     {"verticalStep", verticalStep},
     {"horizontalGap", horizontalGap},
+    {"seamRelation", seamRelation},
+    {"positiveGap", positiveGap},
+    {"overlapDepth", overlapDepth},
     {"classification", classification},
     {"centerlineContinuous", centerlineContinuous},
     {"fullWidthContinuous", fullWidthContinuous},
     {"edgeGapMax", edge.value("edgeGapMax")},
+    {"edgeEndpointDistanceMax", edge.value("edgeGapMax")},
     {"innerEdgeGap", edge.value("innerEdgeGap")},
     {"outerEdgeGap", edge.value("outerEdgeGap")},
     {"edgeVerticalStepMax", edge.value("edgeVerticalStepMax")},
@@ -1624,7 +1633,11 @@ QJsonObject seamSummaryJson(const QJsonObject& seam)
     {"fullWidthContinuous", seam.value("fullWidthContinuous")},
     {"verticalStep", seam.value("verticalStep")},
     {"horizontalGap", seam.value("horizontalGap")},
+    {"seamRelation", seam.value("seamRelation")},
+    {"positiveGap", seam.value("positiveGap")},
+    {"overlapDepth", seam.value("overlapDepth")},
     {"edgeGapMax", seam.value("edgeGapMax")},
+    {"edgeEndpointDistanceMax", seam.value("edgeEndpointDistanceMax")},
     {"edgeVerticalStepMax", seam.value("edgeVerticalStepMax")},
   };
   if (seam.value("loopClosure").toBool(false))
@@ -1949,6 +1962,225 @@ vm::vec2d snapSectorPoint(
 
   const auto snapped = snapToGrid(point, grid);
   return snapped;
+}
+
+double arcChordLength(const double radius, const double angleDegrees)
+{
+  const auto radians = std::abs(angleDegrees) * Pi / 180.0;
+  return 2.0 * radius * std::sin(radians * 0.5);
+}
+
+double arcSagitta(const double radius, const double angleDegrees)
+{
+  const auto radians = std::abs(angleDegrees) * Pi / 180.0;
+  return radius * (1.0 - std::cos(radians * 0.5));
+}
+
+int suggestedCurveSegments(
+  const double turnDegrees, const double radius, const McpQualityPolicy& policy)
+{
+  auto suggested = std::max(
+    1,
+    static_cast<int>(
+      std::ceil(std::abs(turnDegrees) / policy.maxDirectionChangeDegrees)));
+  if (radius > GeometryEpsilon && policy.maxSagitta < radius)
+  {
+    const auto maxHalfAngle =
+      std::acos(std::clamp(1.0 - policy.maxSagitta / radius, -1.0, 1.0));
+    if (maxHalfAngle > GeometryEpsilon)
+    {
+      const auto maxSegmentAngleDegrees = 2.0 * maxHalfAngle * 180.0 / Pi;
+      suggested = std::max(
+        suggested,
+        static_cast<int>(std::ceil(std::abs(turnDegrees) / maxSegmentAngleDegrees)));
+    }
+  }
+  return suggested;
+}
+
+double curveSnapDisplacement(
+  const QJsonObject& operation,
+  const double innerRadius,
+  const double outerRadius,
+  const double startAngle,
+  const double turnDegrees,
+  const int segments,
+  const double grid)
+{
+  if (operation.value("snapMode").toString("radial").trimmed().toLower() != "grid")
+  {
+    return 0.0;
+  }
+  const auto centerValue = operation.value("center").toArray();
+  if (centerValue.size() < 2)
+  {
+    return 0.0;
+  }
+  const auto center = vm::vec2d{centerValue[0].toDouble(), centerValue[1].toDouble()};
+  auto result = 0.0;
+  for (auto i = 0; i <= segments; ++i)
+  {
+    const auto angle =
+      startAngle + turnDegrees * static_cast<double>(i) / static_cast<double>(segments);
+    for (const auto radius : {innerRadius, outerRadius})
+    {
+      const auto ideal = polarPoint(center, radius, angle);
+      const auto snapped = snapToGrid(ideal, grid);
+      result = std::max(result, vm::length(snapped - ideal));
+    }
+  }
+  return result;
+}
+
+std::optional<QJsonObject> curveQualityForOperation(
+  const QJsonObject& operation,
+  const int operationIndex,
+  const double grid,
+  const McpQualityPolicy& policy)
+{
+  const auto type = operation.value("type").toString().trimmed().toLower();
+  auto innerRadius = 0.0;
+  auto outerRadius = 0.0;
+  auto startAngle = optionalDouble(operation, "startAngle", 0.0);
+  auto turnDegrees = optionalDouble(operation, "turnDegrees", 90.0);
+  auto segments = static_cast<int>(optionalSize(operation, "segments", 12));
+  auto estimatedBrushCount = segments;
+  auto snapDisplacement = 0.0;
+  if (type == "curved_corridor")
+  {
+    innerRadius = optionalDouble(operation, "innerRadius", 128.0);
+    outerRadius = optionalDouble(operation, "outerRadius", 224.0);
+    estimatedBrushCount = segments * 4;
+    const auto caps = operation.value("caps").toString("none").trimmed().toLower();
+    if (caps == "start" || caps == "end")
+    {
+      ++estimatedBrushCount;
+    }
+    else if (caps == "both")
+    {
+      estimatedBrushCount += 2;
+    }
+    snapDisplacement = curveSnapDisplacement(
+      operation, innerRadius, outerRadius, startAngle, turnDegrees, segments, grid);
+  }
+  else if (type == "arc_ramp" || type == "helical_ramp")
+  {
+    const auto radius = optionalDouble(operation, "radius", 256.0);
+    const auto width = optionalDouble(operation, "width", 128.0);
+    innerRadius = radius - width * 0.5;
+    outerRadius = radius + width * 0.5;
+  }
+  else
+  {
+    return std::nullopt;
+  }
+
+  if (
+    segments <= 0 || !finitePositive(innerRadius) || !finitePositive(outerRadius)
+    || !std::isfinite(turnDegrees))
+  {
+    return std::nullopt;
+  }
+
+  const auto anglePerSegment = std::abs(turnDegrees) / static_cast<double>(segments);
+  const auto maxSagitta = arcSagitta(outerRadius, anglePerSegment);
+  const auto exceeds = anglePerSegment > policy.maxDirectionChangeDegrees
+                       || maxSagitta > policy.maxSagitta
+                       || snapDisplacement > policy.maxSnapDisplacement;
+  const auto status = exceeds ? (policy.strict() ? "failed" : "warning") : "passed";
+  const auto suggestedSegments = suggestedCurveSegments(turnDegrees, outerRadius, policy);
+  return QJsonObject{
+    {"operationIndex", operationIndex},
+    {"type", type},
+    {"segments", segments},
+    {"anglePerSegmentDegrees", anglePerSegment},
+    {"innerChordLength", arcChordLength(innerRadius, anglePerSegment)},
+    {"outerChordLength", arcChordLength(outerRadius, anglePerSegment)},
+    {"maxSagitta", maxSagitta},
+    {"maxSnapDisplacement", snapDisplacement},
+    {"estimatedBrushCount", estimatedBrushCount},
+    {"estimatedFaceCount", estimatedBrushCount * 6},
+    {"suggestedSegments", suggestedSegments},
+    {"unachievableWithinSegmentLimit", suggestedSegments > 128},
+    {"qualityStatus", status},
+  };
+}
+
+QJsonObject curveQualityForOperations(
+  const QJsonArray& operations,
+  const double grid,
+  const McpQualityPolicy& policy,
+  QJsonArray& warnings)
+{
+  auto samples = QJsonArray{};
+  auto count = 0;
+  auto maxDirectionChange = 0.0;
+  auto maxSagitta = 0.0;
+  auto maxSnapDisplacement = 0.0;
+  auto suggestedSegments = 0;
+  auto hasWarning = false;
+  auto hasFailure = false;
+  auto unachievable = false;
+  for (auto i = 0; i < operations.size(); ++i)
+  {
+    if (!operations[i].isObject())
+    {
+      continue;
+    }
+    const auto metric =
+      curveQualityForOperation(operations[i].toObject(), i, grid, policy);
+    if (!metric)
+    {
+      continue;
+    }
+    ++count;
+    maxDirectionChange =
+      std::max(maxDirectionChange, metric->value("anglePerSegmentDegrees").toDouble());
+    maxSagitta = std::max(maxSagitta, metric->value("maxSagitta").toDouble());
+    maxSnapDisplacement =
+      std::max(maxSnapDisplacement, metric->value("maxSnapDisplacement").toDouble());
+    suggestedSegments =
+      std::max(suggestedSegments, metric->value("suggestedSegments").toInt());
+    unachievable =
+      unachievable || metric->value("unachievableWithinSegmentLimit").toBool();
+    hasFailure = hasFailure || metric->value("qualityStatus").toString() == "failed";
+    hasWarning = hasWarning || metric->value("qualityStatus").toString() == "warning";
+    if (samples.size() < DefaultGeometrySampleLimit)
+    {
+      samples.push_back(*metric);
+    }
+  }
+
+  const auto status = count == 0   ? QString{"not_evaluated"}
+                      : hasFailure ? QString{"failed"}
+                      : hasWarning ? QString{"warning"}
+                                   : QString{"passed"};
+  if (status == "warning" || status == "failed")
+  {
+    warnings.push_back(
+      QString{"curveQuality%1: one or more curved operations exceed the %2 quality "
+              "policy; inspect curveQuality.operationSample and suggestedSegments."}
+        .arg(status == "failed" ? "Failed" : "Warning", policy.intent));
+  }
+
+  return QJsonObject{
+    {"qualityPolicy", qualityPolicyJson(policy)},
+    {"qualityStatus", status},
+    {"acceptancePassed", status != "failed"},
+    {"curveOperationCount", count},
+    {"maxDirectionChangeDegrees", maxDirectionChange},
+    {"maxSagitta", maxSagitta},
+    {"maxSnapDisplacement", maxSnapDisplacement},
+    {"suggestedSegments", suggestedSegments},
+    {"unachievableWithinSegmentLimit", unachievable},
+    {"evaluatedMetrics",
+     count > 0 ? QJsonArray{"direction_change", "sagitta", "snap_displacement"}
+               : QJsonArray{}},
+    {"unavailableMetrics",
+     count > 0 ? QJsonArray{}
+               : QJsonArray{"direction_change", "sagitta", "snap_displacement"}},
+    {"operationSample", samples},
+  };
 }
 
 std::optional<std::vector<vm::vec2d>> sectorPolygon(
@@ -5538,6 +5770,12 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   const auto verticalTolerance =
     optionalClampedDouble(resolvedParams, "verticalTolerance", 0.5, 0.0, 1024.0);
   const auto detail = summaryOrFullDetail(resolvedParams);
+  auto qualityError = QString{};
+  const auto qualityPolicy = qualityPolicyFromJson(resolvedParams, qualityError);
+  if (!qualityPolicy)
+  {
+    return invalidParamsFailure(qualityError);
+  }
   auto routeMode =
     resolvedParams.value("routeMode")
       .toString(
@@ -5625,6 +5863,62 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     surfaceJson.push_back(surfaceObject);
   }
 
+  auto maxDirectionChangeDegrees = 0.0;
+  auto directionChangeSample = QJsonArray{};
+  const auto directionSampleCount = checkClosedLoop && surfaces.size() >= 3u
+                                      ? surfaces.size()
+                                    : surfaces.size() >= 3u ? surfaces.size() - 2u
+                                                            : 0u;
+  for (size_t sampleIndex = 0; sampleIndex < directionSampleCount; ++sampleIndex)
+  {
+    const auto centerIndex = checkClosedLoop ? sampleIndex : sampleIndex + 1u;
+    const auto previousIndex =
+      centerIndex == 0u ? surfaces.size() - 1u : centerIndex - 1u;
+    const auto nextIndex = (centerIndex + 1u) % surfaces.size();
+    const auto incomingDelta =
+      surfaces[centerIndex].bounds.center() - surfaces[previousIndex].bounds.center();
+    const auto outgoingDelta =
+      surfaces[nextIndex].bounds.center() - surfaces[centerIndex].bounds.center();
+    auto incoming = vm::vec3d{incomingDelta.x(), incomingDelta.y(), 0.0};
+    auto outgoing = vm::vec3d{outgoingDelta.x(), outgoingDelta.y(), 0.0};
+    if (vm::is_zero(incoming, GeometryEpsilon) || vm::is_zero(outgoing, GeometryEpsilon))
+    {
+      continue;
+    }
+    incoming = vm::normalize(incoming);
+    outgoing = vm::normalize(outgoing);
+    const auto directionChange =
+      std::acos(std::clamp(vm::dot(incoming, outgoing), -1.0, 1.0)) * 180.0 / Pi;
+    maxDirectionChangeDegrees = std::max(maxDirectionChangeDegrees, directionChange);
+    if (directionChangeSample.size() < DefaultGeometrySampleLimit)
+    {
+      directionChangeSample.push_back(QJsonObject{
+        {"surfaceIndex", static_cast<int>(centerIndex)},
+        {"objectId", surfaces[centerIndex].objectId},
+        {"directionChangeDegrees", directionChange},
+      });
+    }
+  }
+
+  const auto directionMetricAvailable = !directionChangeSample.isEmpty();
+  const auto directionExceeded =
+    directionMetricAvailable
+    && maxDirectionChangeDegrees > qualityPolicy->maxDirectionChangeDegrees;
+  const auto qualityStatus =
+    !directionMetricAvailable ? QString{"not_evaluated"}
+    : directionExceeded ? qualityPolicy->strict() ? QString{"failed"} : QString{"warning"}
+                        : QString{"passed"};
+  if (qualityStatus == "warning" || qualityStatus == "failed")
+  {
+    warnings.push_back(
+      QString{"routeCurveQuality%1: centerline direction change %2 degrees exceeds "
+              "the %3 policy limit of %4 degrees."}
+        .arg(qualityStatus == "failed" ? "Failed" : "Warning")
+        .arg(maxDirectionChangeDegrees)
+        .arg(qualityPolicy->intent)
+        .arg(qualityPolicy->maxDirectionChangeDegrees));
+  }
+
   const auto seamForPair = [&](
                              const size_t fromIndex,
                              const size_t toIndex,
@@ -5680,6 +5974,8 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
   auto maxAbsVerticalStep = 0.0;
   auto maxHorizontalGap = 0.0;
   auto maxEdgeGap = 0.0;
+  auto maxPositiveGap = 0.0;
+  auto maxOverlapDepth = 0.0;
   auto maxEdgeVerticalStep = 0.0;
   auto continuous = surfaces.size() >= 2u;
   auto centerlineContinuous = surfaces.size() >= 2u;
@@ -5702,10 +5998,14 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     const auto verticalStep = seam.value("verticalStep").toDouble();
     const auto horizontalGap = seam.value("horizontalGap").toDouble();
     const auto edgeGap = seam.value("edgeGapMax").toDouble();
+    const auto positiveGap = seam.value("positiveGap").toDouble();
+    const auto overlapDepth = seam.value("overlapDepth").toDouble();
     const auto edgeVerticalStep = seam.value("edgeVerticalStepMax").toDouble();
     maxAbsVerticalStep = std::max(maxAbsVerticalStep, std::abs(verticalStep));
     maxHorizontalGap = std::max(maxHorizontalGap, horizontalGap);
     maxEdgeGap = std::max(maxEdgeGap, edgeGap);
+    maxPositiveGap = std::max(maxPositiveGap, positiveGap);
+    maxOverlapDepth = std::max(maxOverlapDepth, overlapDepth);
     maxEdgeVerticalStep = std::max(maxEdgeVerticalStep, edgeVerticalStep);
     centerlineContinuous =
       centerlineContinuous && seam.value("centerlineContinuous").toBool(false);
@@ -5766,14 +6066,17 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
       "the final surface back to the first unless closedLoop is also true.");
   }
   const auto passed = semanticContinuous && unsupportedObjectIds.isEmpty();
+  const auto acceptancePassed = passed && qualityStatus != "failed";
 
   auto result = QJsonObject{
     {"tool", "geometry_analyze_route_continuity"},
     {"detail", detail},
     {"passed", passed},
+    {"acceptancePassed", acceptancePassed},
     {"recoveryAction",
-     passed ? "continue_validation_or_review"
-            : "inspect_failing_seam_sample_then_fix_route_geometry"},
+     !passed                     ? "inspect_failing_seam_sample_then_fix_route_geometry"
+     : qualityStatus == "failed" ? "increase_segments_then_rebuild_and_revalidate"
+                                 : "continue_validation_or_review"},
     {"source", useSelectionTargets ? "selection" : "targets"},
     {"targetSource", useSelectionTargets ? "selection" : "targets"},
     {"targetBrushCount", static_cast<int>(brushes->size())},
@@ -5782,9 +6085,11 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     {"failingSeamCount", failingSeamCount},
     {"semanticFailingSeamCount", semanticFailingSeamCount},
     {"continuous", continuous},
+    {"strictSurfaceContinuous", continuous},
     {"centerlineContinuous", centerlineContinuous},
     {"fullWidthContinuous", fullWidthContinuous},
     {"semanticContinuous", semanticContinuous},
+    {"walkableContinuous", semanticContinuous},
     {"continuityMode", continuityMode},
     {"routeMode", routeMode},
     {"orderBy", useMetadataOrder ? "metadataOrder" : "projection"},
@@ -5797,12 +6102,25 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityForMapResult(
     {"maxAbsVerticalStep", maxAbsVerticalStep},
     {"maxHorizontalGap", maxHorizontalGap},
     {"maxEdgeGap", maxEdgeGap},
+    {"maxEndpointDistance", maxEdgeGap},
+    {"maxPositiveGap", maxPositiveGap},
+    {"maxOverlapDepth", maxOverlapDepth},
     {"maxEdgeVerticalStep", maxEdgeVerticalStep},
     {"surfaceSample", jsonSample(surfaceJson)},
     {"failingSeamSample", seamSummarySample(seams, true)},
     {"seamSample", seamSummarySample(seams, false)},
     {"unsupportedObjectCount", unsupportedObjectIds.size()},
     {"warnings", warnings},
+    {"qualityPolicy", qualityPolicyJson(*qualityPolicy)},
+    {"qualityStatus", qualityStatus},
+    {"directionMetricMethod", "centerline_polyline"},
+    {"maxDirectionChangeDegrees", maxDirectionChangeDegrees},
+    {"directionChangeSample", directionChangeSample},
+    {"passScope", QJsonArray{"walkable_surface_continuity"}},
+    {"evaluatedMetrics",
+     directionMetricAvailable ? QJsonArray{"direction_change"} : QJsonArray{}},
+    {"unavailableMetrics", QJsonArray{"sagitta", "snap_displacement"}},
+    {"notEvaluated", QJsonArray{"aesthetic_intent", "bsp_compile", "game_collision"}},
   };
   if (!selectorProvided && (!targetMix.value("mixedTargetWarning").toString().isEmpty()))
   {
@@ -5995,7 +6313,8 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
       {"detail", params.value("detail").toString("summary")},
       {"grid", params.value("grid").toDouble(1.0)},
     };
-    for (const auto& key : {"defaultMetadata", "metadata", "partMetadata"})
+    for (const auto& key :
+         {"defaultMetadata", "metadata", "partMetadata", "qualityPolicy"})
     {
       if (params.contains(key))
       {
@@ -6051,11 +6370,23 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
       preMutationFailureDetails(
         QJsonObject{{"targetSource", "grid"}}, "provide_positive_grid_then_retry"));
   }
+  auto qualityError = QString{};
+  const auto qualityPolicy = qualityPolicyFromJson(batchParams, qualityError);
+  if (!qualityPolicy)
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      qualityError,
+      preMutationFailureDetails(
+        QJsonObject{{"targetSource", "qualityPolicy"}}, "fix_quality_policy_then_retry"));
+  }
   const auto expandedOperations = expandedBatchOperations(operations, defaultMetadata);
 
   auto nodes = std::vector<mdl::Node*>{};
   auto errors = QJsonArray{};
   auto warnings = blockoutWarningsForOperations(operations, grid);
+  const auto curveQuality =
+    curveQualityForOperations(operations, grid, *qualityPolicy, warnings);
   const auto expansion =
     expansionSummaryJson(operations, expandedOperations, warnings, grid);
   auto intentSummaries = QJsonArray{};
@@ -6130,6 +6461,35 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
       {"valid", false},
       {"validation", validation},
       {"expansion", expansion},
+      {"qualityPolicy", qualityPolicyJson(*qualityPolicy)},
+      {"curveQuality", curveQuality},
+      {"qualityStatus", curveQuality.value("qualityStatus")},
+      {"acceptancePassed", false},
+    });
+  }
+
+  if (!curveQuality.value("acceptancePassed").toBool(true))
+  {
+    const auto compiledBrushCount = static_cast<int>(nodes.size());
+    deleteNodes(nodes);
+    auto validation = batchValidationJson(
+      false,
+      QJsonArray{"curve quality does not satisfy smooth qualityPolicy"},
+      static_cast<int>(expandedOperations.size()),
+      compiledBrushCount);
+    validation.insert("failureKind", "curve_quality");
+    return McpBridgeToolResult::success(QJsonObject{
+      {"valid", false},
+      {"mutatedDocument", false},
+      {"retrySafe", true},
+      {"recoveryAction", "increase_segments_or_adjust_snap_then_preview_again"},
+      {"validation", validation},
+      {"expansion", expansion},
+      {"warnings", warnings},
+      {"qualityPolicy", qualityPolicyJson(*qualityPolicy)},
+      {"curveQuality", curveQuality},
+      {"qualityStatus", curveQuality.value("qualityStatus")},
+      {"acceptancePassed", false},
     });
   }
 
@@ -6164,6 +6524,8 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
     {"expansion", expansion},
     {"expandedOperations", jsonArrayFromOperations(expandedOperations)},
     {"expandedOperationsTruncated", expandedOperations.size() > 512u},
+    {"qualityPolicy", qualityPolicyJson(*qualityPolicy)},
+    {"curveQuality", curveQuality},
   };
   if (!intentSummaries.isEmpty())
   {
@@ -6188,6 +6550,10 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
     stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
   result.insert("grid", grid);
   result.insert("warnings", warnings);
+  result.insert("qualityPolicy", qualityPolicyJson(*qualityPolicy));
+  result.insert("curveQuality", curveQuality);
+  result.insert("qualityStatus", curveQuality.value("qualityStatus"));
+  result.insert("acceptancePassed", true);
   if (!intentSummaries.isEmpty())
   {
     result.insert("intentSummaries", intentSummaries);
@@ -6269,11 +6635,19 @@ McpBridgeToolResult blockoutCompilePreviewForMapResult(
   {
     return invalidParamsFailure("grid must be greater than zero");
   }
+  auto qualityError = QString{};
+  const auto qualityPolicy = qualityPolicyFromJson(params, qualityError);
+  if (!qualityPolicy)
+  {
+    return invalidParamsFailure(qualityError);
+  }
   const auto expandedOperations = expandedBatchOperations(operations, defaultMetadata);
 
   auto nodes = std::vector<mdl::Node*>{};
   auto errors = QJsonArray{};
   auto warnings = blockoutWarningsForOperations(operations, grid);
+  const auto curveQuality =
+    curveQualityForOperations(operations, grid, *qualityPolicy, warnings);
   auto failedOperationIndex = -1;
   auto failedOperationType = QString{};
   auto failedOperationPreview = QJsonObject{};
@@ -6297,7 +6671,8 @@ McpBridgeToolResult blockoutCompilePreviewForMapResult(
     nodes.insert(nodes.end(), operationNodes.begin(), operationNodes.end());
   }
 
-  const auto valid = errors.isEmpty();
+  const auto valid =
+    errors.isEmpty() && curveQuality.value("acceptancePassed").toBool(true);
   auto result = QJsonObject{
     {"valid", valid},
     {"willCommit", false},
@@ -6311,6 +6686,10 @@ McpBridgeToolResult blockoutCompilePreviewForMapResult(
     {"material", QString::fromStdString(defaultMaterial)},
     {"errors", errors},
     {"warnings", warnings},
+    {"qualityPolicy", qualityPolicyJson(*qualityPolicy)},
+    {"curveQuality", curveQuality},
+    {"qualityStatus", curveQuality.value("qualityStatus")},
+    {"acceptancePassed", valid},
   };
   if (!nodes.empty())
   {

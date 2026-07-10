@@ -6960,7 +6960,21 @@ TEST_CASE("McpBridgeServer batch blockout tools", "[McpBridgeServer]")
   REQUIRE(overlapSeams.size() == 1);
   const auto overlapSeam = overlapSeams.first().toObject();
   CHECK(overlapSeam.value("classification").toString() == "overlap_continuous_height");
+  CHECK(overlapSeam.value("seamRelation").toString() == "overlap");
+  CHECK(overlapSeam.value("positiveGap").toDouble() == 0.0);
+  CHECK(overlapSeam.value("overlapDepth").toDouble() == 16.0);
+  CHECK(
+    overlapSeam.value("edgeEndpointDistanceMax").toDouble()
+    == overlapSeam.value("edgeGapMax").toDouble());
   CHECK(overlapSeam.value("continuous").toBool());
+  CHECK(overlapContinuityResponse.result.value("maxPositiveGap").toDouble() == 0.0);
+  CHECK(overlapContinuityResponse.result.value("maxOverlapDepth").toDouble() == 16.0);
+  CHECK(overlapContinuityResponse.result.value("strictSurfaceContinuous").toBool());
+  CHECK(overlapContinuityResponse.result.value("walkableContinuous").toBool());
+  CHECK(overlapContinuityResponse.result.value("acceptancePassed").toBool());
+  CHECK(overlapContinuityResponse.result.value("passScope")
+          .toArray()
+          .contains("walkable_surface_continuity"));
 
   const auto ribbonResponse = blockoutCreateBatchForMapResult(
     map,
@@ -7954,6 +7968,89 @@ TEST_CASE(
   CHECK(jumpChainResponse.result.value("semanticContinuous").toBool());
   CHECK(jumpChainResponse.result.value("routeMode").toString() == "jump_chain");
 
+  const auto coarseArcOperations = QJsonArray{
+    QJsonObject{
+      {"type", "arc_ramp"},
+      {"center", QJsonArray{1600, 0, 0}},
+      {"radius", 256},
+      {"width", 96},
+      {"startAngle", 0},
+      {"turnDegrees", 90},
+      {"rise", 128},
+      {"segments", 4},
+      {"thickness", 16},
+    },
+  };
+  const auto balancedCurvePreview = blockoutCompilePreviewForMapResult(
+    map, QJsonObject{{"operations", coarseArcOperations}});
+  REQUIRE(balancedCurvePreview.ok);
+  CHECK(balancedCurvePreview.result.value("valid").toBool());
+  CHECK(balancedCurvePreview.result.value("qualityStatus").toString() == "warning");
+  CHECK(balancedCurvePreview.result.value("acceptancePassed").toBool());
+  CHECK(
+    balancedCurvePreview.result.value("curveQuality")
+      .toObject()
+      .value("suggestedSegments")
+      .toInt()
+    > 4);
+
+  const auto smoothCurvePreview = blockoutCompilePreviewForMapResult(
+    map,
+    QJsonObject{
+      {"operations", coarseArcOperations},
+      {"qualityPolicy", QJsonObject{{"intent", "smooth"}}},
+    });
+  REQUIRE(smoothCurvePreview.ok);
+  CHECK_FALSE(smoothCurvePreview.result.value("valid").toBool());
+  CHECK(smoothCurvePreview.result.value("qualityStatus").toString() == "failed");
+  CHECK_FALSE(smoothCurvePreview.result.value("acceptancePassed").toBool());
+
+  const auto gridCurvePreview = blockoutCompilePreviewForMapResult(
+    map,
+    QJsonObject{
+      {"grid", 16},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "curved_corridor"},
+         {"center", QJsonArray{0, 0, 0}},
+         {"innerRadius", 128},
+         {"outerRadius", 224},
+         {"turnDegrees", 180},
+         {"segments", 12},
+         {"snapMode", "grid"},
+       }}},
+    });
+  REQUIRE(gridCurvePreview.ok);
+  CHECK(
+    gridCurvePreview.result.value("curveQuality")
+      .toObject()
+      .value("maxSnapDisplacement")
+      .toDouble()
+    > 1.0);
+
+  const auto radialCurvePreview = blockoutCompilePreviewForMapResult(
+    map,
+    QJsonObject{
+      {"grid", 16},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "curved_corridor"},
+         {"center", QJsonArray{0, 0, 0}},
+         {"innerRadius", 128},
+         {"outerRadius", 224},
+         {"turnDegrees", 180},
+         {"segments", 12},
+         {"snapMode", "radial"},
+       }}},
+    });
+  REQUIRE(radialCurvePreview.ok);
+  CHECK(
+    radialCurvePreview.result.value("curveQuality")
+      .toObject()
+      .value("maxSnapDisplacement")
+      .toDouble()
+    == 0.0);
+
   const auto arcRampResponse = blockoutCreateBatchForMapResult(
     map,
     "blockout_create_batch",
@@ -8030,6 +8127,13 @@ TEST_CASE(
   CHECK(arcLoopByRouteId.result.value("maxEdgeGap").toDouble() < 0.001);
   CHECK(arcLoopByRouteId.result.value("fullWidthContinuous").toBool());
   CHECK(arcLoopByRouteId.result.value("centerlineContinuous").toBool());
+  CHECK(arcLoopByRouteId.result.value("walkableContinuous").toBool());
+  CHECK(arcLoopByRouteId.result.value("acceptancePassed").toBool());
+  CHECK(arcLoopByRouteId.result.value("qualityStatus").toString() == "passed");
+  CHECK(
+    arcLoopByRouteId.result.value("directionMetricMethod").toString()
+    == "centerline_polyline");
+  CHECK(arcLoopByRouteId.result.value("maxDirectionChangeDegrees").toDouble() > 0.0);
   for (const auto& seamValue : arcLoopSeams)
   {
     const auto seam = seamValue.toObject();

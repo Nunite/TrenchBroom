@@ -301,6 +301,23 @@ QJsonObject genericMetadataSchema()
   };
 }
 
+QJsonObject qualityPolicySchema()
+{
+  return objectSchema({
+    {"intent",
+     stringProperty(
+       "Curve approximation intent: draft, balanced, or smooth. Balanced is the "
+       "default. Draft/balanced threshold misses warn; smooth threshold misses fail "
+       "acceptance.")},
+    {"maxDirectionChangeDegrees",
+     numberProperty("Optional positive maximum direction change per segment.")},
+    {"maxSagitta",
+     numberProperty("Optional positive maximum arc-to-chord error in map units.")},
+    {"maxSnapDisplacement",
+     numberProperty("Optional positive maximum vertex snap displacement in map units.")},
+  });
+}
+
 QJsonObject selectorMetadataProperties()
 {
   return QJsonObject{
@@ -1601,6 +1618,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
              "ramp/platform metadata targets; pass continuitySelector for a custom "
              "subset.")},
           {"continuitySelector", selectorSchema()},
+          {"qualityPolicy", qualityPolicySchema()},
           {"start", vec3Property("Optional route start for continuity.")},
           {"end", vec3Property("Optional route end for continuity.")},
           {"routeDirection", vec3Property("Optional route direction for continuity.")},
@@ -2841,6 +2859,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(
         {
           {"name", stringProperty("Transaction label, defaults to MCP: Blockout batch.")},
+          {"qualityPolicy", qualityPolicySchema()},
           {"grid", numberProperty("Grid size for snapping generated geometry.")},
           {"select", boolProperty("Select generated brushes.")},
           {"detail", summaryIdsFullDetailProperty()},
@@ -2986,6 +3005,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          }},
         {"schemaVersion",
          integerProperty("Optional flattened IR schema version. Current version is 1.")},
+        {"qualityPolicy", qualityPolicySchema()},
         {"operations",
          arrayProperty(
            "Optional blockout_create_batch operations array. Every item must be an "
@@ -3014,6 +3034,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          }},
         {"schemaVersion",
          integerProperty("Optional flattened IR schema version. Current version is 1.")},
+        {"qualityPolicy", qualityPolicySchema()},
         {"operations",
          arrayProperty(
            "Optional blockout_create_batch operations array. Every item must be an "
@@ -3036,6 +3057,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(
         {
           {"path", stringProperty("Absolute local path to a JSON IR file.")},
+          {"qualityPolicy",
+           withDescription(
+             qualityPolicySchema(),
+             "Optional request override for the IR qualityPolicy.")},
         },
         {"path"}),
     },
@@ -3058,6 +3083,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          }},
         {"schemaVersion",
          integerProperty("Optional flattened IR schema version. Current version is 1.")},
+        {"qualityPolicy", qualityPolicySchema()},
         {"operations",
          arrayProperty(
            "Optional blockout_create_batch operations array. Every item must be an "
@@ -3093,6 +3119,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Optional cached preview id from ir_compile_preview_from_file. When "
            "provided, path is read from the cache and the file hash/document "
            "fingerprint must still match.")},
+        {"qualityPolicy",
+         withDescription(
+           qualityPolicySchema(), "Optional request override for the IR qualityPolicy.")},
         {"expectedDocumentPath",
          stringProperty("Optional active document guard before mutating.")},
         {"idsMode",
@@ -3138,6 +3167,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          stringProperty(
            "XY vertex snap mode: radial, grid, or none. Defaults to radial to keep "
            "arc boundaries visually continuous.")},
+        {"qualityPolicy", qualityPolicySchema()},
         {"grid", numberProperty("Grid size for Z/thickness snapping and grid mode.")},
         {"material", stringProperty("Brush material, defaults to current material.")},
         {"defaultMetadata", genericMetadataSchema()},
@@ -3295,11 +3325,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "geometry_analyze_route_continuity",
       "Analyze ordered route brush surfaces for playable continuity. Reports each "
       "target's upward playable face and each adjacent seam's verticalStep, "
-      "horizontalGap, fullWidthContinuous, edgeGapMax, innerEdgeGap, outerEdgeGap, "
-      "and classification so ramp-to-platform ledges or arc segment side gaps are "
-      "caught even when the route centerline looks valid. Summary includes passed, "
-      "max gap/step fields, failing seam samples, and recoveryAction. Same-height "
-      "overlaps are reported as overlap_continuous_height and remain continuous. If "
+      "horizontalGap, fullWidthContinuous, positiveGap, overlapDepth, and "
+      "classification. edgeGapMax is retained as a legacy endpoint-distance metric "
+      "and does not necessarily represent an empty seam. New workflows should use "
+      "positiveGap, overlapDepth, and acceptancePassed. Summary includes passed, max "
+      "gap/step fields, failing seam samples, and recoveryAction. Same-height overlaps "
+      "are reported as overlap_continuous_height and remain continuous. If "
       "operationIds, objectIds, and selector are omitted, analyzes the current "
       "user-selected brushes.",
       McpMode::ReadOnly,
@@ -3371,6 +3402,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
          boolProperty(
            "When true, also checks the final ordered surface back to the first and "
            "marks that seam with loopClosure.")},
+        {"qualityPolicy", qualityPolicySchema()},
         {"detail",
          stringProperty(
            "summary or full. Defaults to summary. Summary returns continuity totals "

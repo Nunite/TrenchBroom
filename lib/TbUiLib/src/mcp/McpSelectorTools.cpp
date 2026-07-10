@@ -1378,6 +1378,11 @@ bool validateIrShape(QJsonObject& ir, QString& error, QJsonArray* warnings = nul
     }
   }
 
+  if (!qualityPolicyFromJson(ir, error))
+  {
+    return false;
+  }
+
   const auto operationsValue = ir.value("operations");
   const auto entitiesValue = ir.value("entities");
   const auto hasOperations = !operationsValue.isUndefined() && !operationsValue.isNull();
@@ -1449,6 +1454,10 @@ std::optional<QJsonObject> irFromParams(
   if (irValue.isObject())
   {
     auto ir = irValue.toObject();
+    if (params.value("qualityPolicy").isObject())
+    {
+      ir.insert("qualityPolicy", params.value("qualityPolicy"));
+    }
     if (!validateIrShape(ir, error, warnings))
     {
       return std::nullopt;
@@ -1482,7 +1491,13 @@ std::optional<QJsonObject> irFromParams(
       ir.insert("entities", params.value("entities"));
     }
     for (const auto& key :
-         {"schemaVersion", "name", "moduleId", "defaultMetadata", "material", "grid"})
+         {"schemaVersion",
+          "name",
+          "moduleId",
+          "defaultMetadata",
+          "material",
+          "grid",
+          "qualityPolicy"})
     {
       if (params.contains(key))
       {
@@ -1540,6 +1555,10 @@ std::optional<QJsonObject> irFromFileParams(
     return std::nullopt;
   }
   auto ir = document.object();
+  if (params.value("qualityPolicy").isObject())
+  {
+    ir.insert("qualityPolicy", params.value("qualityPolicy"));
+  }
   if (!validateIrShape(ir, error, warnings))
   {
     return std::nullopt;
@@ -1744,6 +1763,12 @@ McpBridgeToolResult cachedIrApplyParams(
   applyParams.insert("path", record.sourcePath);
   applyParams.insert("previewId", previewId);
   applyParams.insert("irHash", record.irHash);
+  if (
+    !applyParams.contains("qualityPolicy")
+    && record.preview.value("qualityPolicy").isObject())
+  {
+    applyParams.insert("qualityPolicy", record.preview.value("qualityPolicy"));
+  }
   return McpBridgeToolResult::success(applyParams);
 }
 
@@ -1901,7 +1926,14 @@ QJsonObject irPreviewJson(const QJsonObject& ir)
     }
   }
 
-  return QJsonObject{
+  auto qualityError = QString{};
+  const auto qualityPolicy = qualityPolicyFromJson(ir, qualityError);
+  if (!qualityPolicy)
+  {
+    warnings.push_back(qualityError);
+  }
+
+  auto result = QJsonObject{
     {"valid", warnings.isEmpty()},
     {"schemaVersion", ir.value("schemaVersion").toInt(CurrentIrSchemaVersion)},
     {"operationCount", operations.size()},
@@ -1912,6 +1944,11 @@ QJsonObject irPreviewJson(const QJsonObject& ir)
     {"moduleId", ir.value("moduleId").toString()},
     {"warnings", warnings},
   };
+  if (qualityPolicy)
+  {
+    result.insert("qualityPolicy", qualityPolicyJson(*qualityPolicy));
+  }
+  return result;
 }
 
 void appendIrWarnings(QJsonObject& result, const QJsonArray& compatibilityWarnings)
@@ -1956,6 +1993,10 @@ QJsonObject irPreviewJsonForMap(mdl::Map& map, const QJsonObject& ir)
     {
       batchParams.insert("material", ir.value("material"));
     }
+    if (ir.contains("qualityPolicy"))
+    {
+      batchParams.insert("qualityPolicy", ir.value("qualityPolicy"));
+    }
     if (!mergedDefaultMetadata.isEmpty())
     {
       batchParams.insert("defaultMetadata", mergedDefaultMetadata);
@@ -1973,6 +2014,14 @@ QJsonObject irPreviewJsonForMap(mdl::Map& map, const QJsonObject& ir)
         "estimatedBrushCount",
         blockoutPreview.result.value("estimatedBrushCount")
           .toInt(preview.value("estimatedBrushCount").toInt()));
+      for (const auto& key :
+           {"qualityPolicy", "curveQuality", "qualityStatus", "acceptancePassed"})
+      {
+        if (blockoutPreview.result.contains(key))
+        {
+          preview.insert(key, blockoutPreview.result.value(key));
+        }
+      }
       if (blockoutPreview.result.contains("bounds"))
       {
         preview.insert("bounds", blockoutPreview.result.value("bounds"));
@@ -2814,13 +2863,18 @@ McpBridgeToolResult moduleValidateForMapResult(
         continuityParams.insert(key, params.value(key));
       }
     }
+    if (params.contains("qualityPolicy"))
+    {
+      continuityParams.insert("qualityPolicy", params.value("qualityPolicy"));
+    }
     const auto continuity = geometryAnalyzeRouteContinuityForMapResult(
       map, continuityParams, history, &objectRegistry, &metadataStore, &moduleStore);
     result.insert("routeContinuity", continuity.result);
     if (
       continuity.ok
-      && !continuity.result.value("semanticContinuous")
-            .toBool(continuity.result.value("continuous").toBool(false)))
+      && !continuity.result.value("acceptancePassed")
+            .toBool(continuity.result.value("semanticContinuous")
+                      .toBool(continuity.result.value("continuous").toBool(false))))
     {
       result.insert("valid", false);
     }
@@ -3149,6 +3203,10 @@ McpBridgeToolResult irApplyForMapResult(
     {
       batchParams.insert("material", ir->value("material"));
     }
+    if (ir->contains("qualityPolicy"))
+    {
+      batchParams.insert("qualityPolicy", ir->value("qualityPolicy"));
+    }
     if (!mergedDefaultMetadata.isEmpty())
     {
       batchParams.insert("defaultMetadata", mergedDefaultMetadata);
@@ -3252,6 +3310,7 @@ McpBridgeToolResult irApplyForMapResult(
       "refresh_status_then_retry_ir_apply");
   }
 
+  const auto normalizedPreview = irPreviewJsonForMap(map, *ir);
   auto result = QJsonObject{
     {"tool", toolName},
     {"valid", true},
@@ -3265,12 +3324,20 @@ McpBridgeToolResult irApplyForMapResult(
     {"transactionName", transactionName},
     {"changedObjectCount", objectIds.size()},
     {"applied", appliedOperations},
-    {"preview", irPreviewJsonForMap(map, *ir)},
+    {"preview", normalizedPreview},
     {"warnings", compatibilityWarnings},
     {"mutatedDocument", true},
     {"partialMutation", false},
     {"atomic", true},
   };
+  for (const auto& key :
+       {"qualityPolicy", "curveQuality", "qualityStatus", "acceptancePassed"})
+  {
+    if (normalizedPreview.contains(key))
+    {
+      result.insert(key, normalizedPreview.value(key));
+    }
+  }
   applyChangedObjectIdsMode(result, objectIds, idsMode);
   compactAppliedOperationResults(result, idsMode);
   if (!moduleId.isEmpty())
