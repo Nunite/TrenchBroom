@@ -936,6 +936,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(irProperties.value("moduleId").isObject());
     CHECK(irProperties.value("defaultMetadata").isObject());
     CHECK(irProperties.value("qualityPolicy").isObject());
+    CHECK(irProperties.value("requireMaterialAvailable").isObject());
     CHECK(irProperties.value("applyMode").isObject());
     CHECK(irProperties.value("expectedIrHash").isObject());
     CHECK(irProperties.value("expectedTargetModuleRevision").isObject());
@@ -949,6 +950,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(irPreviewProperties.value("applyMode").isObject());
     CHECK(irPreviewProperties.value("moduleId").isObject());
     CHECK(irPreviewProperties.value("defaultMetadata").isObject());
+    CHECK(irPreviewProperties.value("requireMaterialAvailable").isObject());
 
     const auto irPreviewFile = findToolDefinition("ir_compile_preview_from_file");
     REQUIRE(irPreviewFile);
@@ -963,6 +965,10 @@ TEST_CASE("McpToolCatalog")
             .toObject()
             .value("applyMode")
             .isObject());
+    CHECK(irPreviewFile->inputSchema.value("properties")
+            .toObject()
+            .value("requireMaterialAvailable")
+            .isObject());
 
     const auto irApplyFile = findToolDefinition("ir_apply_from_file");
     REQUIRE(irApplyFile);
@@ -975,6 +981,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(irApplyFileProperties.value("previewId").isObject());
     CHECK(irApplyFileProperties.value("qualityPolicy").isObject());
     CHECK(irApplyFileProperties.value("applyMode").isObject());
+    CHECK(irApplyFileProperties.value("requireMaterialAvailable").isObject());
 
     const auto blockoutBatch = findToolDefinition("blockout_create_batch");
     REQUIRE(blockoutBatch);
@@ -982,6 +989,15 @@ TEST_CASE("McpToolCatalog")
       blockoutBatch->inputSchema.value("properties").toObject();
     CHECK(batchProperties.value("defaultMetadata").isObject());
     CHECK(batchProperties.value("qualityPolicy").isObject());
+    CHECK(batchProperties.value("material").isObject());
+    CHECK(batchProperties.value("requireMaterialAvailable").isObject());
+
+    const auto brushCreate = findToolDefinition("brush_create");
+    REQUIRE(brushCreate);
+    CHECK(brushCreate->inputSchema.value("properties")
+            .toObject()
+            .value("requireMaterialAvailable")
+            .isObject());
 
     const auto operationsProperty = batchProperties.value("operations").toObject();
     CHECK(operationsProperty.value("description").toString().contains("skill recipes"));
@@ -1094,6 +1110,11 @@ TEST_CASE("McpToolCatalog")
     CHECK(targetProperties.value("views").isObject());
     CHECK(targetProperties.value("style").isObject());
     CHECK(targetProperties.value("edgeMode").isObject());
+    CHECK(targetProperties.value("edgeMode")
+            .toObject()
+            .value("description")
+            .toString()
+            .contains("silhouette"));
     CHECK(targetProperties.value("combineViews").isObject());
     CHECK(targetProperties.value("contactSheetSize").isObject());
     CHECK(targetProperties.value("contactSheetMaxCaptures").isObject());

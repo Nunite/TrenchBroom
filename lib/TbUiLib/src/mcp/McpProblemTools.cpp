@@ -319,12 +319,14 @@ QJsonObject problemsJson(mdl::Map& map, const QJsonObject& params)
 {
   const auto includeHidden = mcpOptionalBool(params, "includeHidden", false);
   const auto limit = optionalSize(params, "limit", 500);
-  const auto issues = collectMapIssues(map, includeHidden, limit);
+  const auto issues = collectMapIssues(map, includeHidden);
+  const auto returnedCount = std::min(limit, issues.size());
 
   auto results = QJsonArray{};
   auto safeFixableCount = 0;
-  for (const auto* issue : issues)
+  for (auto i = size_t{0}; i < returnedCount; ++i)
   {
+    const auto* issue = issues[i];
     const auto json = issueJson(*issue, map.worldNode());
     if (!json.value("safeQuickFixes").toArray().empty())
     {
@@ -337,6 +339,9 @@ QJsonObject problemsJson(mdl::Map& map, const QJsonObject& params)
     {"valid", issues.empty()},
     {"passed", issues.empty()},
     {"count", results.size()},
+    {"totalCount", static_cast<qint64>(issues.size())},
+    {"returnedCount", results.size()},
+    {"truncated", returnedCount < issues.size()},
     {"safeFixableCount", safeFixableCount},
     {"recoveryAction",
      issues.empty() ? "continue_validation_or_review"

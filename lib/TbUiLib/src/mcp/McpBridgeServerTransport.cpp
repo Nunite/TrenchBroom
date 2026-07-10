@@ -557,6 +557,18 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
         result.result.insert(
           "auditOperationIds", mutationAuditOperationIds(result.result, undoOperationId));
       }
+      if (tool->mutatesDocument)
+      {
+        const auto documentModified = result.result.value("mutatedDocument").toBool(true);
+        result.result.insert(
+          "completionState",
+          QJsonObject{
+            {"documentModified", documentModified},
+            {"saveRequired", documentModified},
+            {"visualReview", "not_run"},
+            {"bspCompile", "not_run"},
+          });
+      }
       auto externalResult =
         m_session.objectRegistry.externalizeResult(*resultMap, result.result);
       syncOperationHistoryWithExternalResult(

@@ -1678,6 +1678,13 @@ bool validateIrShape(QJsonObject& ir, QString& error, QJsonArray* warnings = nul
     return false;
   }
   ir.insert("applyMode", applyMode);
+  if (
+    ir.contains("requireMaterialAvailable")
+    && !ir.value("requireMaterialAvailable").isBool())
+  {
+    error = "IR requireMaterialAvailable must be boolean";
+    return false;
+  }
 
   const auto operationsValue = ir.value("operations");
   const auto entitiesValue = ir.value("entities");
@@ -1758,6 +1765,10 @@ std::optional<QJsonObject> irFromParams(
     {
       ir.insert("applyMode", params.value("applyMode"));
     }
+    if (params.contains("requireMaterialAvailable"))
+    {
+      ir.insert("requireMaterialAvailable", params.value("requireMaterialAvailable"));
+    }
     if (!validateIrShape(ir, error, warnings))
     {
       return std::nullopt;
@@ -1798,7 +1809,8 @@ std::optional<QJsonObject> irFromParams(
           "material",
           "grid",
           "qualityPolicy",
-          "applyMode"})
+          "applyMode",
+          "requireMaterialAvailable"})
     {
       if (params.contains(key))
       {
@@ -1863,6 +1875,10 @@ std::optional<QJsonObject> irFromFileParams(
   if (params.contains("applyMode"))
   {
     ir.insert("applyMode", params.value("applyMode"));
+  }
+  if (params.contains("requireMaterialAvailable"))
+  {
+    ir.insert("requireMaterialAvailable", params.value("requireMaterialAvailable"));
   }
   if (!validateIrShape(ir, error, warnings))
   {
@@ -2313,6 +2329,11 @@ QJsonObject irPreviewJsonForMap(mdl::Map& map, const QJsonObject& ir)
     if (ir.contains("qualityPolicy"))
     {
       batchParams.insert("qualityPolicy", ir.value("qualityPolicy"));
+    }
+    if (ir.contains("requireMaterialAvailable"))
+    {
+      batchParams.insert(
+        "requireMaterialAvailable", ir.value("requireMaterialAvailable"));
     }
     if (!mergedDefaultMetadata.isEmpty())
     {
@@ -3917,6 +3938,11 @@ McpBridgeToolResult irApplyForMapResult(
     if (ir->contains("qualityPolicy"))
     {
       batchParams.insert("qualityPolicy", ir->value("qualityPolicy"));
+    }
+    if (ir->contains("requireMaterialAvailable"))
+    {
+      batchParams.insert(
+        "requireMaterialAvailable", ir->value("requireMaterialAvailable"));
     }
     if (!mergedDefaultMetadata.isEmpty())
     {

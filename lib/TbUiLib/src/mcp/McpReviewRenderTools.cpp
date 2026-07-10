@@ -147,8 +147,27 @@ enum class ReviewEdgeMode
   Auto,
   All,
   Minimal,
+  Silhouette,
   None,
 };
+
+QString reviewEdgeModeName(const ReviewEdgeMode edgeMode)
+{
+  switch (edgeMode)
+  {
+  case ReviewEdgeMode::All:
+    return "all";
+  case ReviewEdgeMode::Minimal:
+    return "minimal";
+  case ReviewEdgeMode::Silhouette:
+    return "silhouette";
+  case ReviewEdgeMode::None:
+    return "none";
+  case ReviewEdgeMode::Auto:
+    return "auto";
+  }
+  return "auto";
+}
 
 QString reviewStyleName(const ReviewStyle style)
 {
@@ -204,6 +223,10 @@ ReviewEdgeMode reviewEdgeModeFromParams(const QJsonObject& params, QJsonArray& w
   if (edgeMode == "minimal" || edgeMode == "sparse")
   {
     return ReviewEdgeMode::Minimal;
+  }
+  if (edgeMode == "silhouette" || edgeMode == "outline")
+  {
+    return ReviewEdgeMode::Silhouette;
   }
   if (edgeMode == "none" || edgeMode == "off")
   {
@@ -1555,6 +1578,7 @@ QJsonObject renderCapture(
 
   auto targetPixelBounds = QRectF{};
   auto totalFaceArea = 0.0;
+  auto projectedFacePolygons = std::vector<QPolygonF>{};
   if (style == ReviewStyle::HeightHeatmapEdges)
   {
     painter.setPen(Qt::NoPen);
@@ -1575,6 +1599,7 @@ QJsonObject renderCapture(
     }
     if (polygon.size() >= 3)
     {
+      projectedFacePolygons.push_back(polygon);
       totalFaceArea += polygonArea(polygon);
       painter.setBrush(faceColorForStyle(face, view, targetBounds, style));
       painter.drawPolygon(polygon);
@@ -1597,14 +1622,51 @@ QJsonObject renderCapture(
   }
 
   auto edgeLength = 0.0;
+  auto edgePixelCount = 0;
   const auto effectiveEdgeMode =
     requestedEdgeMode == ReviewEdgeMode::Auto
       ? (style == ReviewStyle::HeightHeatmapEdges ? ReviewEdgeMode::Minimal
                                                   : ReviewEdgeMode::All)
       : requestedEdgeMode;
+  if (effectiveEdgeMode == ReviewEdgeMode::Silhouette)
+  {
+    auto mask = QImage{imageSize, QImage::Format_Grayscale8};
+    mask.fill(0);
+    auto maskPainter = QPainter{&mask};
+    maskPainter.setRenderHint(QPainter::Antialiasing, false);
+    maskPainter.setPen(Qt::NoPen);
+    maskPainter.setBrush(Qt::white);
+    for (const auto& polygon : projectedFacePolygons)
+    {
+      maskPainter.drawPolygon(polygon);
+    }
+    maskPainter.end();
+
+    painter.setPen(QPen{QColor{26, 26, 24}, 1.5});
+    const auto covered = [&](const int x, const int y) {
+      return x >= 0 && y >= 0 && x < mask.width() && y < mask.height()
+             && qGray(mask.pixel(x, y)) > 127;
+    };
+    for (auto y = 0; y < mask.height(); ++y)
+    {
+      for (auto x = 0; x < mask.width(); ++x)
+      {
+        if (
+          covered(x, y)
+          && (!covered(x - 1, y) || !covered(x + 1, y) || !covered(x, y - 1) || !covered(x, y + 1)))
+        {
+          painter.drawPoint(x, y);
+          ++edgePixelCount;
+        }
+      }
+    }
+    edgeLength = edgePixelCount;
+  }
   for (const auto& edge : geometry.edges)
   {
-    if (effectiveEdgeMode == ReviewEdgeMode::None)
+    if (
+      effectiveEdgeMode == ReviewEdgeMode::None
+      || effectiveEdgeMode == ReviewEdgeMode::Silhouette)
     {
       continue;
     }
@@ -1629,6 +1691,7 @@ QJsonObject renderCapture(
     const auto b = projectPoint(edge.b, view, minU, maxU, minV, maxV, imageSize, padding);
     painter.drawLine(a.point, b.point);
     edgeLength += std::hypot(a.point.x() - b.point.x(), a.point.y() - b.point.y());
+    ++edgePixelCount;
     targetPixelBounds = targetPixelBounds.united(QRectF{a.point, QSizeF{1, 1}});
     targetPixelBounds = targetPixelBounds.united(QRectF{b.point, QSizeF{1, 1}});
   }
@@ -1701,11 +1764,15 @@ QJsonObject renderCapture(
     {"format", "png"},
     {"projection", view.projection},
     {"style", reviewStyleName(style)},
-    {"edgeMode",
-     effectiveEdgeMode == ReviewEdgeMode::All       ? "all"
-     : effectiveEdgeMode == ReviewEdgeMode::Minimal ? "minimal"
-     : effectiveEdgeMode == ReviewEdgeMode::None    ? "none"
-                                                    : "auto"},
+    {"edgeMode", reviewEdgeModeName(effectiveEdgeMode)},
+    {"edgeInterpretation",
+     effectiveEdgeMode == ReviewEdgeMode::Silhouette ? "silhouette"
+     : effectiveEdgeMode == ReviewEdgeMode::None     ? "none"
+                                                     : "construction"},
+    {"internalBrushEdgesDrawn",
+     effectiveEdgeMode != ReviewEdgeMode::Silhouette
+       && effectiveEdgeMode != ReviewEdgeMode::None},
+    {"edgePixelCount", edgePixelCount},
     {"targetCoverage", coverage},
     {"targetWidthRatio", widthRatio},
     {"targetHeightRatio", heightRatio},
@@ -1957,6 +2024,9 @@ QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolNa
     {"renderer", result.value("renderer")},
     {"style", result.value("style")},
     {"edgeMode", result.value("edgeMode")},
+    {"edgeInterpretation", result.value("edgeInterpretation")},
+    {"internalBrushEdgesDrawn", result.value("internalBrushEdgesDrawn")},
+    {"visualReviewRequired", result.value("visualReviewRequired")},
     {"reviewId", result.value("reviewId")},
     {"resourceUri", result.value("resourceUri")},
     {"preferredCapturePath", result.value("preferredCapturePath")},
@@ -2108,6 +2178,9 @@ McpBridgeToolResult renderReviewNodesForMapResult(
       {"unsupportedObjectCount", 0},
       {"captureCount", 0},
       {"qualityValid", false},
+      {"edgeInterpretation", "none"},
+      {"internalBrushEdgesDrawn", false},
+      {"visualReviewRequired", false},
       {"semanticAcceptance", reviewSemanticAcceptance()},
       {"warnings", QJsonArray{"noReviewTargets"}},
       {"note", "No live map objects were available for review."},
@@ -2130,6 +2203,13 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     appendWarning(warnings, "emptyGeometryFallback: target rendered as bounds only.");
   }
   applyVerticalExaggerationToGeometry(geometry, targetBounds, verticalExaggeration);
+  if (edgeMode == ReviewEdgeMode::Silhouette && geometry.simplified)
+  {
+    appendWarning(
+      warnings,
+      "silhouetteLowConfidence: detailed geometry exceeded the face budget and was "
+      "simplified to bounds.");
+  }
   if (!geometry.faces.empty() || !geometry.edges.empty())
   {
     targetBounds = boundsForGeometry(geometry);
@@ -2232,11 +2312,7 @@ McpBridgeToolResult renderReviewNodesForMapResult(
         .arg(reviewId)
         .arg(reviewStyleName(style))
         .arg(verticalExaggeration)
-        .arg(
-          edgeMode == ReviewEdgeMode::All       ? "all"
-          : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
-          : edgeMode == ReviewEdgeMode::None    ? "none"
-                                                : "auto")
+        .arg(reviewEdgeModeName(edgeMode))
         .arg(geometry.targetBrushCount),
       contactSheetSize);
     annotateContactSheet(contactSheet, captures.size(), contactSheetMaxCaptures);
@@ -2262,11 +2338,14 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     {"renderer", "geometry_cpu"},
     {"style", reviewStyleName(style)},
     {"verticalExaggeration", verticalExaggeration},
-    {"edgeMode",
-     edgeMode == ReviewEdgeMode::All       ? "all"
-     : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
-     : edgeMode == ReviewEdgeMode::None    ? "none"
-                                           : "auto"},
+    {"edgeMode", reviewEdgeModeName(edgeMode)},
+    {"edgeInterpretation",
+     edgeMode == ReviewEdgeMode::Silhouette ? "silhouette"
+     : edgeMode == ReviewEdgeMode::None     ? "none"
+                                            : "construction"},
+    {"internalBrushEdgesDrawn",
+     edgeMode != ReviewEdgeMode::Silhouette && edgeMode != ReviewEdgeMode::None},
+    {"visualReviewRequired", false},
     {"reviewId", reviewId},
     {"resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId)},
     {"outputDir", pathToQString(outputDir)},
@@ -2355,6 +2434,9 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
       {"captures", QJsonArray{}},
       {"quality", QJsonArray{}},
       {"qualityValid", false},
+      {"edgeInterpretation", "none"},
+      {"internalBrushEdgesDrawn", false},
+      {"visualReviewRequired", false},
       {"semanticAcceptance", reviewSemanticAcceptance()},
       {"warnings", warnings},
       {"note", "render_review_targets requires live operationIds, objectIds, or bounds."},
@@ -2376,6 +2458,13 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     appendWarning(warnings, "emptyGeometryFallback: target rendered as bounds only.");
   }
   applyVerticalExaggerationToGeometry(geometry, *targetBounds, verticalExaggeration);
+  if (edgeMode == ReviewEdgeMode::Silhouette && geometry.simplified)
+  {
+    appendWarning(
+      warnings,
+      "silhouetteLowConfidence: detailed geometry exceeded the face budget and was "
+      "simplified to bounds.");
+  }
   const auto geometryBounds = boundsForGeometry(geometry);
   if (!geometry.faces.empty() || !geometry.edges.empty())
   {
@@ -2479,11 +2568,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
         .arg(reviewId)
         .arg(reviewStyleName(style))
         .arg(verticalExaggeration)
-        .arg(
-          edgeMode == ReviewEdgeMode::All       ? "all"
-          : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
-          : edgeMode == ReviewEdgeMode::None    ? "none"
-                                                : "auto")
+        .arg(reviewEdgeModeName(edgeMode))
         .arg(geometry.targetBrushCount),
       contactSheetSize);
     annotateContactSheet(contactSheet, captures.size(), contactSheetMaxCaptures);
@@ -2511,11 +2596,14 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"renderer", "geometry_cpu"},
     {"style", reviewStyleName(style)},
     {"verticalExaggeration", verticalExaggeration},
-    {"edgeMode",
-     edgeMode == ReviewEdgeMode::All       ? "all"
-     : edgeMode == ReviewEdgeMode::Minimal ? "minimal"
-     : edgeMode == ReviewEdgeMode::None    ? "none"
-                                           : "auto"},
+    {"edgeMode", reviewEdgeModeName(edgeMode)},
+    {"edgeInterpretation",
+     edgeMode == ReviewEdgeMode::Silhouette ? "silhouette"
+     : edgeMode == ReviewEdgeMode::None     ? "none"
+                                            : "construction"},
+    {"internalBrushEdgesDrawn",
+     edgeMode != ReviewEdgeMode::Silhouette && edgeMode != ReviewEdgeMode::None},
+    {"visualReviewRequired", false},
     {"reviewId", reviewId},
     {"resourceUri", QString{"tbmcp://review/%1"}.arg(reviewId)},
     {"outputDir", pathToQString(outputDir)},

@@ -1182,7 +1182,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "to 1.0; route_platform defaults to 1.6.")},
         {"edgeMode",
          stringProperty(
-           "Edge drawing mode: auto, all, minimal, or none. For terrain review, "
+           "Edge drawing mode: auto, all, minimal, silhouette, or none. silhouette "
+           "extracts only the projected coverage boundary. For terrain review, "
            "height_heatmap_edges defaults to minimal so same-height grid lines do not "
            "overwhelm the image; use none for clean color-only height maps.")},
         {"combineViews",
@@ -1276,8 +1277,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "to 1.0; route_platform defaults to 1.6.")},
         {"edgeMode",
          stringProperty(
-           "Optional edge drawing override: auto, all, minimal, or none. Dense terrain "
-           "defaults to none for a clean first-pass image.")},
+           "Optional edge drawing override: auto, all, minimal, silhouette, or none. "
+           "Dense terrain defaults to none for a clean first-pass image.")},
         {"views",
          arrayProperty(
            "Optional views. Defaults to iso_overview_ne, top_plan, side_elevation_long, "
@@ -1381,8 +1382,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "to 1.0; route_platform defaults to 1.6.")},
         {"edgeMode",
          stringProperty(
-           "Edge drawing mode: auto, all, minimal, or none. Use none/minimal for dense "
-           "terrain or heightmap captures.")},
+           "Edge drawing mode: auto, all, minimal, silhouette, or none. Use silhouette "
+           "for the projected outer shape and none/minimal for dense terrain.")},
         {"combineViews",
          boolProperty(
            "Write a combined contact_sheet.png and return it as preferredCapturePath. "
@@ -2860,6 +2861,11 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {
           {"name", stringProperty("Transaction label, defaults to MCP: Blockout batch.")},
           {"qualityPolicy", qualityPolicySchema()},
+          {"material", stringProperty("Default brush material for the batch.")},
+          {"requireMaterialAvailable",
+           boolProperty(
+             "When true, reject before mutation if any requested material is not "
+             "currently loaded. Defaults to false.")},
           {"grid", numberProperty("Grid size for snapping generated geometry.")},
           {"select", boolProperty("Select generated brushes.")},
           {"detail", summaryIdsFullDetailProperty()},
@@ -3006,6 +3012,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"schemaVersion",
          integerProperty("Optional flattened IR schema version. Current version is 1.")},
         {"qualityPolicy", qualityPolicySchema()},
+        {"requireMaterialAvailable",
+         boolProperty(
+           "When true, reject missing requested materials before mutation. Defaults "
+           "to false.")},
         {"applyMode",
          stringProperty(
            "create or replace_module. Replacement preview reports exact module "
@@ -3041,6 +3051,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"schemaVersion",
          integerProperty("Optional flattened IR schema version. Current version is 1.")},
         {"qualityPolicy", qualityPolicySchema()},
+        {"requireMaterialAvailable",
+         boolProperty(
+           "When true, reject missing requested materials before mutation. Defaults "
+           "to false.")},
         {"applyMode",
          stringProperty(
            "create or replace_module. Replacement preview reports exact module "
@@ -3073,6 +3087,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            withDescription(
              qualityPolicySchema(),
              "Optional request override for the IR qualityPolicy.")},
+          {"requireMaterialAvailable",
+           boolProperty(
+             "Optional strict material availability override. Defaults to false.")},
           {"applyMode",
            stringProperty(
              "Optional create or replace_module override. File replacement must be "
@@ -3100,6 +3117,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"schemaVersion",
          integerProperty("Optional flattened IR schema version. Current version is 1.")},
         {"qualityPolicy", qualityPolicySchema()},
+        {"requireMaterialAvailable",
+         boolProperty(
+           "When true, reject missing requested materials before mutation. Defaults "
+           "to false.")},
         {"applyMode",
          stringProperty(
            "create or replace_module. replace_module requires the exact expected "
@@ -3151,6 +3172,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"qualityPolicy",
          withDescription(
            qualityPolicySchema(), "Optional request override for the IR qualityPolicy.")},
+        {"requireMaterialAvailable",
+         boolProperty(
+           "Optional strict material availability override. Defaults to false.")},
         {"applyMode",
          stringProperty(
            "Optional create or replace_module override. replace_module requires "
@@ -3581,10 +3605,38 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {
           tool.expert = false;
         }
+        if (
+          tool.name != "brush_create_boxes_batch"
+          && tool.name != "brush_create_polygon_batch")
+        {
+          auto schema = tool.inputSchema;
+          auto properties = schema.value("properties").toObject();
+          properties.insert(
+            "requireMaterialAvailable",
+            boolProperty(
+              "When true, reject before mutation if the requested material is not "
+              "currently loaded. Defaults to false."));
+          schema.insert("properties", properties);
+          tool.inputSchema = schema;
+        }
       }
       else if (tool.name.startsWith("blockout_"))
       {
         tool.category = "blockout";
+        if (
+          tool.name == "blockout_create_curved_corridor"
+          || tool.name == "blockout_create_spiral_stairs")
+        {
+          auto schema = tool.inputSchema;
+          auto properties = schema.value("properties").toObject();
+          properties.insert(
+            "requireMaterialAvailable",
+            boolProperty(
+              "When true, reject before mutation if any requested material is not "
+              "currently loaded. Defaults to false."));
+          schema.insert("properties", properties);
+          tool.inputSchema = schema;
+        }
       }
       else if (tool.name.startsWith("operation_") || tool.name.startsWith("history_"))
       {

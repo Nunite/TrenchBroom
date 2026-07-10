@@ -2336,6 +2336,45 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     }
 
     CHECK(QFileInfo::exists(response.result.value("manifestPath").toString()));
+
+    const auto renderEdgeMode = [&](const QString& edgeMode, const QString& outputDir) {
+      return renderReviewTargetsForMapResult(
+        map,
+        QJsonObject{
+          {"operationIds", QJsonArray{history.front().operationId}},
+          {"views", QJsonArray{"top_plan"}},
+          {"style", "whitebox_edges"},
+          {"edgeMode", edgeMode},
+          {"combineViews", false},
+          {"includeAxes", false},
+          {"imageSize", QJsonArray{900, 650}},
+          {"outputDir", outputDir},
+          {"detail", "full"},
+        },
+        history,
+        &registry);
+    };
+    const auto allEdges = renderEdgeMode("all", tempDir.filePath("review-all-edges"));
+    const auto silhouette =
+      renderEdgeMode("silhouette", tempDir.filePath("review-silhouette"));
+    REQUIRE(allEdges.ok);
+    REQUIRE(silhouette.ok);
+    CHECK(silhouette.result.value("edgeMode").toString() == "silhouette");
+    CHECK(silhouette.result.value("edgeInterpretation").toString() == "silhouette");
+    CHECK_FALSE(silhouette.result.value("internalBrushEdgesDrawn").toBool(true));
+    CHECK_FALSE(silhouette.result.value("visualReviewRequired").toBool(true));
+    const auto allCapture =
+      allEdges.result.value("captures").toArray().first().toObject();
+    const auto silhouetteCapture =
+      silhouette.result.value("captures").toArray().first().toObject();
+    CHECK(
+      std::abs(
+        allCapture.value("targetCoverage").toDouble()
+        - silhouetteCapture.value("targetCoverage").toDouble())
+      < 0.02);
+    CHECK(
+      silhouetteCapture.value("edgeDensity").toDouble()
+      < allCapture.value("edgeDensity").toDouble());
   }
 
   SECTION("current scene review auto-collects brushes and returns compact summary")
@@ -3964,6 +4003,10 @@ TEST_CASE(
     problemsCheckForMapResult(map, QJsonObject{{"includeHidden", true}});
   REQUIRE(problemsResponse.ok);
   CHECK_FALSE(problemsResponse.result.value("passed").toBool());
+  CHECK(
+    problemsResponse.result.value("totalCount").toInt()
+    == problemsResponse.result.value("returnedCount").toInt());
+  CHECK_FALSE(problemsResponse.result.value("truncated").toBool(true));
   const auto problems = problemsResponse.result.value("problems").toArray();
   CHECK(std::ranges::any_of(problems, [](const auto& value) {
     const auto problem = value.toObject();
@@ -3973,6 +4016,15 @@ TEST_CASE(
   CHECK(
     problemsResponse.result.value("recoveryAction").toString()
     == "inspect_problem_summary_then_fix_or_review");
+
+  const auto truncated =
+    problemsCheckForMapResult(map, QJsonObject{{"includeHidden", true}, {"limit", 1}});
+  REQUIRE(truncated.ok);
+  CHECK(truncated.result.value("returnedCount").toInt() == 1);
+  CHECK(truncated.result.value("totalCount").toInt() >= 1);
+  CHECK(
+    truncated.result.value("truncated").toBool()
+    == (truncated.result.value("totalCount").toInt() > 1));
 }
 
 TEST_CASE(
@@ -5590,6 +5642,131 @@ TEST_CASE(
     == "provide_module_id_then_retry");
 }
 
+TEST_CASE(
+  "McpBridgeServer missing materials warn by default and reject in strict mode",
+  "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  const auto descendantCountBefore = map.worldNode().descendantCount();
+
+  const auto compatible = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"material", "not_loaded/material"},
+      {"select", false},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(compatible.ok);
+  CHECK(compatible.result.value("mutatedDocument").toBool());
+  const auto compatiblePreflight =
+    compatible.result.value("materialPreflight").toObject();
+  CHECK(compatiblePreflight.value("missingMaterialCount").toInt() == 1);
+  const auto defaultMaterial = compatiblePreflight.value("defaultMaterial").toObject();
+  CHECK(defaultMaterial.value("requestedMaterial").toString() == "not_loaded/material");
+  CHECK(defaultMaterial.value("effectiveMaterial").toString() == "not_loaded/material");
+  CHECK(defaultMaterial.value("source").toString() == "request");
+  CHECK_FALSE(defaultMaterial.value("currentlyLoaded").toBool(true));
+  CHECK_FALSE(defaultMaterial.value("placeholderMaterial").toBool(true));
+  CHECK(compatiblePreflight.value("missingMaterialSample")
+          .toArray()
+          .contains("not_loaded/material"));
+  CHECK(map.worldNode().descendantCount() == descendantCountBefore + 1);
+
+  const auto countBeforeStrict = map.worldNode().descendantCount();
+  const auto historyBeforeStrict = history.size();
+  const auto strict = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"material", "still_not_loaded/material"},
+      {"requireMaterialAvailable", true},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{80, 0, 0}},
+         {"max", QJsonArray{144, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE_FALSE(strict.ok);
+  CHECK_FALSE(strict.error.details.value("mutatedDocument").toBool(true));
+  CHECK(strict.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    strict.error.details.value("recoveryAction").toString()
+    == "load_materials_or_disable_strict_material_check");
+  CHECK(map.worldNode().descendantCount() == countBeforeStrict);
+  CHECK(history.size() == historyBeforeStrict);
+
+  const auto strictBrush = createBrushForMapResult(
+    map,
+    "brush_create_box",
+    QJsonObject{
+      {"min", QJsonArray{160, 0, 0}},
+      {"max", QJsonArray{224, 64, 16}},
+      {"material", "missing/brush_material"},
+      {"requireMaterialAvailable", true},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE_FALSE(strictBrush.ok);
+  CHECK(map.worldNode().descendantCount() == countBeforeStrict);
+  CHECK(history.size() == historyBeforeStrict);
+
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+  const auto strictIr = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"ir",
+       QJsonObject{
+         {"moduleId", "strict-material-ir"},
+         {"defaultMetadata", QJsonObject{{"moduleId", "strict-material-ir"}}},
+         {"material", "missing/ir_material"},
+         {"requireMaterialAvailable", true},
+         {"operations",
+          QJsonArray{QJsonObject{
+            {"type", "box"},
+            {"min", QJsonArray{240, 0, 0}},
+            {"max", QJsonArray{304, 64, 16}},
+          }}},
+       }},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  REQUIRE_FALSE(strictIr.ok);
+  CHECK_FALSE(strictIr.error.details.value("mutatedDocument").toBool(true));
+  CHECK(map.worldNode().descendantCount() == countBeforeStrict);
+  CHECK(history.size() == historyBeforeStrict);
+  CHECK(metadataStore.empty());
+  CHECK(moduleStore.empty());
+}
+
 TEST_CASE("McpBridgeServer object transform summaries", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
@@ -5668,6 +5845,12 @@ TEST_CASE("McpBridgeServer object transform summaries", "[McpBridgeServer]")
   CHECK(transformResponse.result.value("auditOperationIds")
           .toArray()
           .contains(transformResponse.result.value("operationId")));
+  const auto completionState =
+    transformResponse.result.value("completionState").toObject();
+  CHECK(completionState.value("documentModified").toBool());
+  CHECK(completionState.value("saveRequired").toBool());
+  CHECK(completionState.value("visualReview").toString() == "not_run");
+  CHECK(completionState.value("bspCompile").toString() == "not_run");
   CHECK(transformResponse.result.value("changedObjectCount").toInt() == 1);
   CHECK(transformResponse.result.value("selectedCount").toInt() == 1);
   CHECK(transformResponse.result.value("validation").toObject().value("valid").toBool());

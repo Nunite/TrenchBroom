@@ -23,6 +23,8 @@
 
 #include "McpBridgeServerTools.h"
 #include "McpToolSupport.h"
+#include "gl/Material.h"
+#include "gl/MaterialManager.h"
 #include "mcp/McpError.h"
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/Brush.h"
@@ -47,6 +49,8 @@
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
 #include "ui/mcp/McpObjectRegistry.h"
+
+#include "kd/string_compare.h"
 
 #include "vm/bbox.h"
 
@@ -2432,6 +2436,106 @@ std::string materialNameFromParams(mdl::Map& map, const QJsonObject& params)
     material = "__TB_empty";
   }
   return material;
+}
+
+bool brushMaterialIsLoaded(mdl::Map& map, const QString& material)
+{
+  const auto name = material.trimmed().toStdString();
+  if (name.empty() || kdl::ci::str_is_equal(name, "__TB_empty"))
+  {
+    return false;
+  }
+  return std::ranges::any_of(map.materialManager().materials(), [&](const auto* entry) {
+    return entry != nullptr && kdl::ci::str_is_equal(entry->name(), name);
+  });
+}
+
+QJsonObject materialResolutionJson(mdl::Map& map, const QJsonObject& params)
+{
+  const auto requested = params.value("material").toString().trimmed();
+  const auto current = QString::fromStdString(map.currentMaterialName()).trimmed();
+  const auto effective = !requested.isEmpty() ? requested
+                         : !current.isEmpty() ? current
+                                              : QString{"__TB_empty"};
+  return QJsonObject{
+    {"requestedMaterial", requested},
+    {"effectiveMaterial", effective},
+    {"source",
+     !requested.isEmpty() ? "request"
+     : !current.isEmpty() ? "current"
+                          : "fallback"},
+    {"currentlyLoaded", brushMaterialIsLoaded(map, effective)},
+    {"placeholderMaterial", effective.compare("__TB_empty", Qt::CaseInsensitive) == 0},
+  };
+}
+
+QJsonObject batchMaterialPreflight(
+  mdl::Map& map, const QJsonObject& params, const QJsonArray& operations)
+{
+  auto materials = QStringList{};
+  const auto defaultResolution = materialResolutionJson(map, params);
+  materials.push_back(defaultResolution.value("effectiveMaterial").toString());
+  for (const auto& value : operations)
+  {
+    const auto operation = value.toObject();
+    const auto material = operation.value("material").toString().trimmed();
+    if (!material.isEmpty())
+    {
+      materials.push_back(material);
+    }
+    const auto partMaterials = operation.value("partMaterials").toObject();
+    for (auto it = partMaterials.begin(); it != partMaterials.end(); ++it)
+    {
+      const auto partMaterial = it.value().toString().trimmed();
+      if (!partMaterial.isEmpty())
+      {
+        materials.push_back(partMaterial);
+      }
+    }
+  }
+  materials.removeDuplicates();
+
+  auto missing = QStringList{};
+  auto resolutions = QJsonArray{};
+  for (const auto& material : materials)
+  {
+    const auto placeholder = material.compare("__TB_empty", Qt::CaseInsensitive) == 0;
+    const auto loaded = brushMaterialIsLoaded(map, material);
+    resolutions.push_back(QJsonObject{
+      {"requestedMaterial", material},
+      {"effectiveMaterial", material},
+      {"source",
+       material == defaultResolution.value("effectiveMaterial").toString()
+         ? defaultResolution.value("source")
+         : QJsonValue{"operation"}},
+      {"currentlyLoaded", loaded},
+      {"placeholderMaterial", placeholder},
+    });
+    if (!loaded && !placeholder)
+    {
+      missing.push_back(material);
+    }
+  }
+  return QJsonObject{
+    {"defaultMaterial", defaultResolution},
+    {"checkedMaterialCount", materials.size()},
+    {"missingMaterialCount", missing.size()},
+    {"missingMaterialSample", QJsonArray::fromStringList(missing.mid(0, 8))},
+    {"resolutions", resolutions},
+  };
+}
+
+McpBridgeToolResult strictMaterialFailure(const QJsonObject& preflight)
+{
+  return McpBridgeToolResult::failure(
+    mcp::McpErrorCode::InvalidParams,
+    "One or more requested materials are not loaded",
+    QJsonObject{
+      {"mutatedDocument", false},
+      {"retrySafe", true},
+      {"recoveryAction", "load_materials_or_disable_strict_material_check"},
+      {"materialPreflight", preflight},
+    });
 }
 
 std::optional<QJsonArray> addNodesWithTransaction(
@@ -5445,6 +5549,19 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
   }
 
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+  const auto materialResolution = materialResolutionJson(map, params);
+  if (
+    params.value("requireMaterialAvailable").toBool(false)
+    && !materialResolution.value("currentlyLoaded").toBool(false)
+    && !materialResolution.value("placeholderMaterial").toBool(false))
+  {
+    return strictMaterialFailure(QJsonObject{
+      {"defaultMaterial", materialResolution},
+      {"missingMaterialCount", 1},
+      {"missingMaterialSample",
+       QJsonArray{materialResolution.value("effectiveMaterial")}},
+    });
+  }
   auto material = materialNameFromParams(map, params);
   auto brushes = createSpiralStairBrushes(builder, *spiralParams, material, error);
   if (!brushes)
@@ -5488,6 +5605,7 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
     result);
   result.insert("brushCount", brushCount);
   result.insert("material", QString::fromStdString(material));
+  result.insert("materialResolution", materialResolution);
   result.insert(
     "materials",
     stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
@@ -6314,7 +6432,11 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
       {"grid", params.value("grid").toDouble(1.0)},
     };
     for (const auto& key :
-         {"defaultMetadata", "metadata", "partMetadata", "qualityPolicy"})
+         {"defaultMetadata",
+          "metadata",
+          "partMetadata",
+          "qualityPolicy",
+          "requireMaterialAvailable"})
     {
       if (params.contains(key))
       {
@@ -6381,10 +6503,30 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
         QJsonObject{{"targetSource", "qualityPolicy"}}, "fix_quality_policy_then_retry"));
   }
   const auto expandedOperations = expandedBatchOperations(operations, defaultMetadata);
+  const auto materialPreflight = batchMaterialPreflight(map, batchParams, operations);
+  if (
+    batchParams.value("requireMaterialAvailable").toBool(false)
+    && materialPreflight.value("missingMaterialCount").toInt() > 0)
+  {
+    return strictMaterialFailure(materialPreflight);
+  }
 
   auto nodes = std::vector<mdl::Node*>{};
   auto errors = QJsonArray{};
   auto warnings = blockoutWarningsForOperations(operations, grid);
+  if (materialPreflight.value("missingMaterialCount").toInt() > 0)
+  {
+    warnings.push_back(QJsonObject{
+      {"type", "missingMaterials"},
+      {"count", materialPreflight.value("missingMaterialCount")},
+      {"sample", materialPreflight.value("missingMaterialSample")},
+      {"placeholderNamesAllowed", true},
+    });
+    if (params.value("requireMaterialAvailable").toBool(false))
+    {
+      errors.push_back("one or more requested materials are not loaded");
+    }
+  }
   const auto curveQuality =
     curveQualityForOperations(operations, grid, *qualityPolicy, warnings);
   const auto expansion =
@@ -6465,6 +6607,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
       {"curveQuality", curveQuality},
       {"qualityStatus", curveQuality.value("qualityStatus")},
       {"acceptancePassed", false},
+      {"materialPreflight", materialPreflight},
     });
   }
 
@@ -6490,6 +6633,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
       {"curveQuality", curveQuality},
       {"qualityStatus", curveQuality.value("qualityStatus")},
       {"acceptancePassed", false},
+      {"materialPreflight", materialPreflight},
     });
   }
 
@@ -6550,6 +6694,7 @@ McpBridgeToolResult blockoutCreateBatchForMapResult(
     stringListToJsonArray(brushMaterialsForObjectIds(map, *changedObjectIds)));
   result.insert("grid", grid);
   result.insert("warnings", warnings);
+  result.insert("materialPreflight", materialPreflight);
   result.insert("qualityPolicy", qualityPolicyJson(*qualityPolicy));
   result.insert("curveQuality", curveQuality);
   result.insert("qualityStatus", curveQuality.value("qualityStatus"));
@@ -6642,10 +6787,24 @@ McpBridgeToolResult blockoutCompilePreviewForMapResult(
     return invalidParamsFailure(qualityError);
   }
   const auto expandedOperations = expandedBatchOperations(operations, defaultMetadata);
+  const auto materialPreflight = batchMaterialPreflight(map, params, operations);
 
   auto nodes = std::vector<mdl::Node*>{};
   auto errors = QJsonArray{};
   auto warnings = blockoutWarningsForOperations(operations, grid);
+  if (materialPreflight.value("missingMaterialCount").toInt() > 0)
+  {
+    warnings.push_back(QJsonObject{
+      {"type", "missingMaterials"},
+      {"count", materialPreflight.value("missingMaterialCount")},
+      {"sample", materialPreflight.value("missingMaterialSample")},
+      {"placeholderNamesAllowed", true},
+    });
+    if (params.value("requireMaterialAvailable").toBool(false))
+    {
+      errors.push_back("one or more requested materials are not loaded");
+    }
+  }
   const auto curveQuality =
     curveQualityForOperations(operations, grid, *qualityPolicy, warnings);
   auto failedOperationIndex = -1;
@@ -6690,6 +6849,7 @@ McpBridgeToolResult blockoutCompilePreviewForMapResult(
     {"curveQuality", curveQuality},
     {"qualityStatus", curveQuality.value("qualityStatus")},
     {"acceptancePassed", valid},
+    {"materialPreflight", materialPreflight},
   };
   if (!nodes.empty())
   {
@@ -6776,6 +6936,19 @@ McpBridgeToolResult createBrushForMapResult(
   int& nextOperationIndex)
 {
   auto error = QString{};
+  const auto materialResolution = materialResolutionJson(map, params);
+  if (
+    params.value("requireMaterialAvailable").toBool(false)
+    && !materialResolution.value("currentlyLoaded").toBool(false)
+    && !materialResolution.value("placeholderMaterial").toBool(false))
+  {
+    return strictMaterialFailure(QJsonObject{
+      {"defaultMaterial", materialResolution},
+      {"missingMaterialCount", 1},
+      {"missingMaterialSample",
+       QJsonArray{materialResolution.value("effectiveMaterial")}},
+    });
+  }
   const auto material = materialNameFromParams(map, params);
   const auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
 
@@ -6824,6 +6997,7 @@ McpBridgeToolResult createBrushForMapResult(
   result.insert("type", type);
   result.insert("brushCount", brushJson.size());
   result.insert("bounds", boundsToJson(bounds));
+  result.insert("materialResolution", materialResolution);
   applyDetailLevel(result, *changedObjectIds, idDetailFromParams(params), brushJson);
   return McpBridgeToolResult::success(std::move(result));
 }
