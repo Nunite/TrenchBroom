@@ -51,6 +51,20 @@ const QStringList& removedPrefabConvenienceToolNames()
 
 TEST_CASE("McpToolCatalog")
 {
+  SECTION("keeps the compatibility catalog and default profile baseline")
+  {
+    const auto& catalog = defaultToolCatalog();
+    auto implementedCount = size_t{0};
+    for (const auto& tool : catalog)
+    {
+      implementedCount += tool.implemented ? 1u : 0u;
+    }
+
+    CHECK(catalog.size() == 139u);
+    CHECK(implementedCount == 137u);
+    CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 47);
+  }
+
   SECTION("parses and names tool profiles")
   {
     CHECK(toolProfileName(McpToolProfile::Core) == "Core");

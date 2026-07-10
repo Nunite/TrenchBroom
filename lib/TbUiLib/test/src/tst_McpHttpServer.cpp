@@ -22,9 +22,9 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QStringList>
 #include <QTcpSocket>
 #include <QUuid>
-#include <QStringList>
 
 #include "ui/mcp/McpBridgeServer.h"
 #include "ui/mcp/McpHttpServer.h"
@@ -82,9 +82,7 @@ McpBridgeServer makeBridgeServer()
 }
 
 QByteArray makeHttpRequest(
-  const QByteArray& method,
-  const QByteArray& path,
-  const QByteArray& body = {})
+  const QByteArray& method, const QByteArray& path, const QByteArray& body = {})
 {
   auto request = QByteArray{};
   request += method + " " + path + " HTTP/1.1\r\n";
@@ -174,7 +172,7 @@ QByteArray jsonRequest(
 
 } // namespace
 
-TEST_CASE("McpHttpServer")
+TEST_CASE("McpHttpServer", "[McpHttpServer]")
 {
   SECTION("off mode does not listen")
   {

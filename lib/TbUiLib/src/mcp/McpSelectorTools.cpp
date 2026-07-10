@@ -2626,6 +2626,8 @@ McpBridgeToolResult moduleValidateForMapResult(
   auto warnings = QJsonArray{};
   auto nodes = std::vector<mdl::Node*>{};
   auto staleCount = 0;
+  auto accountedObjectIds = module.objectIds;
+  accountedObjectIds.removeDuplicates();
   for (const auto& objectId : module.objectIds)
   {
     if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
@@ -2638,12 +2640,34 @@ McpBridgeToolResult moduleValidateForMapResult(
     }
   }
 
+  for (const auto& [storedObjectId, record] : metadataStore)
+  {
+    Q_UNUSED(storedObjectId);
+    if (
+      !recordMatchesDocument(record, documentFingerprint)
+      || record.metadata.value("moduleId").toString() != moduleId
+      || accountedObjectIds.contains(record.objectId))
+    {
+      continue;
+    }
+    if (record.stale || !objectIdResolvesLive(map, record.objectId, objectRegistry))
+    {
+      accountedObjectIds.push_back(record.objectId);
+      ++staleCount;
+      warnings.push_back(QJsonObject{
+        {"objectId", record.objectId},
+        {"stale", true},
+        {"staleReason", "module metadata target no longer resolves"},
+      });
+    }
+  }
+
   auto result = QJsonObject{
     {"tool", "module_validate"},
     {"moduleId", moduleId},
     {"mutatedDocument", false},
     {"valid", staleCount == 0 && !nodes.empty()},
-    {"objectCount", module.objectIds.size()},
+    {"objectCount", accountedObjectIds.size()},
     {"liveObjectCount", static_cast<int>(nodes.size())},
     {"staleObjectCount", staleCount},
     {"operationIds", stringsToJson(module.operationIds)},

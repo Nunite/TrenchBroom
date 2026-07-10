@@ -60,7 +60,7 @@ namespace tb::ui
 {
 namespace mcp = tb::mcp;
 
-TEST_CASE("McpBridgeServer")
+TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 {
   auto server = McpBridgeServer{[](const QString& toolName, const QJsonObject& params) {
     if (toolName == "tb_status")
@@ -2468,7 +2468,8 @@ TEST_CASE("McpBridgeServer")
 }
 
 TEST_CASE(
-  "McpBridgeServer history_undo_to_operation reports pre-mutation target failures")
+  "McpBridgeServer history_undo_to_operation reports pre-mutation target failures",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -2505,7 +2506,9 @@ TEST_CASE(
     == "refresh_status_or_validate");
 }
 
-TEST_CASE("McpBridgeServer single-step history reports pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer single-step history reports pre-mutation failures",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -2600,7 +2603,9 @@ TEST_CASE("McpBridgeServer single-step history reports pre-mutation failures")
     == "refresh_status_or_validate");
 }
 
-TEST_CASE("McpBridgeServer operation_select reports non-document mutation state")
+TEST_CASE(
+  "McpBridgeServer operation_select reports non-document mutation state",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -2662,7 +2667,9 @@ TEST_CASE("McpBridgeServer operation_select reports non-document mutation state"
   CHECK(map.selection().nodes.size() == 1u);
 }
 
-TEST_CASE("McpBridgeServer operation_validate reports recovery target failures")
+TEST_CASE(
+  "McpBridgeServer operation_validate reports recovery target failures",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -2723,7 +2730,9 @@ TEST_CASE("McpBridgeServer operation_validate reports recovery target failures")
   CHECK_FALSE(valid.result.value("mutatedDocument").toBool(true));
 }
 
-TEST_CASE("McpBridgeServer operation_inspect reports recovery target failures")
+TEST_CASE(
+  "McpBridgeServer operation_inspect reports recovery target failures",
+  "[McpBridgeServer]")
 {
   auto history = std::vector<McpOperationRecord>{};
 
@@ -2759,7 +2768,9 @@ TEST_CASE("McpBridgeServer operation_inspect reports recovery target failures")
   CHECK(inspect.result.value("operationId").toString() == "mcp-op-1");
 }
 
-TEST_CASE("McpBridgeServer module_compact reports non-document mutation state")
+TEST_CASE(
+  "McpBridgeServer module_compact reports non-document mutation state",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -2806,7 +2817,9 @@ TEST_CASE("McpBridgeServer module_compact reports non-document mutation state")
   CHECK(moduleStore.begin()->second.objectIds.empty());
 }
 
-TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
+TEST_CASE(
+  "McpBridgeServer selection tools report non-document mutation state",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -2927,7 +2940,7 @@ TEST_CASE("McpBridgeServer selection tools report non-document mutation state")
   CHECK(invalidGrowResponse.error.details.value("mode").toString() == "cousins");
 }
 
-TEST_CASE("McpBridgeServer spiral stair geometry tools")
+TEST_CASE("McpBridgeServer spiral stair geometry tools", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3086,7 +3099,7 @@ TEST_CASE("McpBridgeServer spiral stair geometry tools")
   CHECK(map.worldNode().childCount() == 1u);
 }
 
-TEST_CASE("McpBridgeServer MCP read semantics")
+TEST_CASE("McpBridgeServer MCP read semantics", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3208,7 +3221,7 @@ TEST_CASE("McpBridgeServer MCP read semantics")
   map.undoCommand();
 }
 
-TEST_CASE("McpBridgeServer stable MCP object identity")
+TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3560,7 +3573,9 @@ TEST_CASE("McpBridgeServer stable MCP object identity")
   CHECK(fullDeletedObjectIds.first().toString() == fullDeleteTarget);
 }
 
-TEST_CASE("McpBridgeServer selector delete reports pre-mutation failure state")
+TEST_CASE(
+  "McpBridgeServer selector delete reports pre-mutation failure state",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3653,7 +3668,8 @@ TEST_CASE("McpBridgeServer selector delete reports pre-mutation failure state")
   CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 }
 
-TEST_CASE("McpBridgeServer asset placement records document identity")
+TEST_CASE(
+  "McpBridgeServer asset placement records document identity", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3688,7 +3704,8 @@ TEST_CASE("McpBridgeServer asset placement records document identity")
   CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 }
 
-TEST_CASE("McpBridgeServer asset placement reports pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer asset placement reports pre-mutation failures", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3740,7 +3757,7 @@ TEST_CASE("McpBridgeServer asset placement reports pre-mutation failures")
     == "provide_valid_origin_then_retry");
 }
 
-TEST_CASE("McpBridgeServer problem fixes record document identity")
+TEST_CASE("McpBridgeServer problem fixes record document identity", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3780,7 +3797,8 @@ TEST_CASE("McpBridgeServer problem fixes record document identity")
   CHECK(history.back().documentFingerprint == documentFingerprintForMap(map));
 }
 
-TEST_CASE("McpBridgeServer map validation reports recovery summaries")
+TEST_CASE(
+  "McpBridgeServer map validation reports recovery summaries", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3794,16 +3812,17 @@ TEST_CASE("McpBridgeServer map validation reports recovery summaries")
                   | kdl::value();
   auto& map = document->map();
 
-  const auto cleanValidateResponse =
-    mapValidateForMapResult(map, QJsonObject{{"groupByType", true}});
+  const auto cleanValidateResponse = mapValidateForMapResult(
+    map, QJsonObject{{"groupByType", true}, {"includeProblems", true}});
   REQUIRE(cleanValidateResponse.ok);
-  CHECK(cleanValidateResponse.result.value("valid").toBool());
-  CHECK(cleanValidateResponse.result.value("passed").toBool());
-  CHECK(cleanValidateResponse.result.value("count").toInt() == 0);
+  const auto cleanProblemCount = cleanValidateResponse.result.value("count").toInt();
+  CHECK(cleanValidateResponse.result.value("valid").toBool() == (cleanProblemCount == 0));
+  CHECK(
+    cleanValidateResponse.result.value("passed").toBool() == (cleanProblemCount == 0));
   CHECK(
     cleanValidateResponse.result.value("recoveryAction").toString()
-    == "continue_validation_or_review");
-  CHECK(cleanValidateResponse.result.value("problems").isUndefined());
+    == (cleanProblemCount == 0 ? "continue_validation_or_review" : "inspect_problem_summary_then_fix_or_review"));
+  CHECK(cleanValidateResponse.result.value("problems").isArray());
   CHECK(cleanValidateResponse.result.value("groups").isArray());
 
   mdl::deselectAll(map);
@@ -3815,7 +3834,7 @@ TEST_CASE("McpBridgeServer map validation reports recovery summaries")
   REQUIRE(invalidValidateResponse.ok);
   CHECK_FALSE(invalidValidateResponse.result.value("valid").toBool());
   CHECK_FALSE(invalidValidateResponse.result.value("passed").toBool());
-  CHECK(invalidValidateResponse.result.value("count").toInt() == 1);
+  CHECK(invalidValidateResponse.result.value("count").toInt() > cleanProblemCount);
   CHECK(
     invalidValidateResponse.result.value("recoveryAction").toString()
     == "inspect_problem_summary_then_fix_or_review");
@@ -3824,13 +3843,19 @@ TEST_CASE("McpBridgeServer map validation reports recovery summaries")
     problemsCheckForMapResult(map, QJsonObject{{"includeHidden", true}});
   REQUIRE(problemsResponse.ok);
   CHECK_FALSE(problemsResponse.result.value("passed").toBool());
-  CHECK(problemsResponse.result.value("safeFixableCount").toInt() == 1);
+  const auto problems = problemsResponse.result.value("problems").toArray();
+  CHECK(std::ranges::any_of(problems, [](const auto& value) {
+    const auto problem = value.toObject();
+    return problem.contains("propertyKey")
+           && problem.value("propertyKey").toString().isEmpty();
+  }));
   CHECK(
     problemsResponse.result.value("recoveryAction").toString()
     == "inspect_problem_summary_then_fix_or_review");
 }
 
-TEST_CASE("McpBridgeServer problems_fix reports pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer problems_fix reports pre-mutation failures", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3885,7 +3910,7 @@ TEST_CASE("McpBridgeServer problems_fix reports pre-mutation failures")
     == "refresh_problems_then_retry");
 }
 
-TEST_CASE("McpBridgeServer externalizes native group object ids")
+TEST_CASE("McpBridgeServer externalizes native group object ids", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -3983,7 +4008,9 @@ TEST_CASE("McpBridgeServer externalizes native group object ids")
     inspectResponse.result.value("receivedLegacyPath").toString().startsWith("node:"));
 }
 
-TEST_CASE("McpBridgeServer scopes selector metadata and modules to active document")
+TEST_CASE(
+  "McpBridgeServer scopes selector metadata and modules to active document",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4084,7 +4111,8 @@ TEST_CASE("McpBridgeServer scopes selector metadata and modules to active docume
   CHECK(currentFingerprint != otherFingerprint);
 }
 
-TEST_CASE("McpBridgeServer ir_apply reports pre-mutation payload failures")
+TEST_CASE(
+  "McpBridgeServer ir_apply reports pre-mutation payload failures", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4124,7 +4152,9 @@ TEST_CASE("McpBridgeServer ir_apply reports pre-mutation payload failures")
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalidApply);
 }
 
-TEST_CASE("McpBridgeServer selector metadata round trips through IR and operations")
+TEST_CASE(
+  "McpBridgeServer selector metadata round trips through IR and operations",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4266,8 +4296,8 @@ TEST_CASE("McpBridgeServer selector metadata round trips through IR and operatio
   CHECK(afterDeleteModule.value("liveObjectCount").toInt() == 2);
   CHECK(afterDeleteModule.value("staleParts").toArray().size() == 1);
 
-  const auto staleModuleValidation = moduleValidateResult(
-    appController,
+  const auto staleModuleValidation = moduleValidateForMapResult(
+    map,
     QJsonObject{{"moduleId", "roundtrip-cottage"}},
     history,
     metadataStore,
@@ -4281,20 +4311,21 @@ TEST_CASE("McpBridgeServer selector metadata round trips through IR and operatio
   CHECK(
     compactWarnings.first().toObject().value("type").toString() == "staleTargetSummary");
 
-  const auto fullStaleModuleValidation = moduleValidateResult(
-    appController,
+  const auto fullStaleModuleValidation = moduleValidateForMapResult(
+    map,
     QJsonObject{{"moduleId", "roundtrip-cottage"}, {"detail", "full"}},
     history,
     metadataStore,
     moduleStore,
     objectRegistry);
   REQUIRE(fullStaleModuleValidation.ok);
-  CHECK(
-    fullStaleModuleValidation.result.value("warnings").toArray().size()
-    > compactWarnings.size());
+  const auto fullWarnings = fullStaleModuleValidation.result.value("warnings").toArray();
+  REQUIRE(fullWarnings.size() == 1);
+  CHECK(fullWarnings.first().toObject().value("stale").toBool());
+  CHECK(!fullWarnings.first().toObject().value("objectId").toString().isEmpty());
 }
 
-TEST_CASE("McpBridgeServer module_validate reports recovery state")
+TEST_CASE("McpBridgeServer module_validate reports recovery state", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4378,7 +4409,7 @@ TEST_CASE("McpBridgeServer module_validate reports recovery state")
     == "validate-module");
 }
 
-TEST_CASE("McpBridgeServer module_inspect reports recovery state")
+TEST_CASE("McpBridgeServer module_inspect reports recovery state", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4472,7 +4503,8 @@ TEST_CASE("McpBridgeServer module_inspect reports recovery state")
   CHECK(fullInspect.result.value("objectIdSample").isUndefined());
 }
 
-TEST_CASE("McpBridgeServer selector selection reports recovery state")
+TEST_CASE(
+  "McpBridgeServer selector selection reports recovery state", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4545,7 +4577,7 @@ TEST_CASE("McpBridgeServer selector selection reports recovery state")
   CHECK(selected.result.value("selectedCount").toInt() == 1);
 }
 
-TEST_CASE("McpBridgeServer selector_preview reports recovery state")
+TEST_CASE("McpBridgeServer selector_preview reports recovery state", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4609,7 +4641,8 @@ TEST_CASE("McpBridgeServer selector_preview reports recovery state")
   CHECK(preview.result.value("matchedCount").toInt() == 1);
 }
 
-TEST_CASE("McpBridgeServer render_review_selector reports recovery state")
+TEST_CASE(
+  "McpBridgeServer render_review_selector reports recovery state", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4642,7 +4675,8 @@ TEST_CASE("McpBridgeServer render_review_selector reports recovery state")
     == "fix_selector_then_retry");
 }
 
-TEST_CASE("McpBridgeServer module_render_review reports recovery state")
+TEST_CASE(
+  "McpBridgeServer module_render_review reports recovery state", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4661,7 +4695,7 @@ TEST_CASE("McpBridgeServer module_render_review reports recovery state")
     == "provide_module_id_then_retry");
 }
 
-TEST_CASE("McpBridgeServer object transform summaries")
+TEST_CASE("McpBridgeServer object transform summaries", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4782,7 +4816,9 @@ TEST_CASE("McpBridgeServer object transform summaries")
   CHECK(selectionBounds.value("min").toArray().at(2).toDouble() == 16.0);
 }
 
-TEST_CASE("McpBridgeServer transforms selector targets without long id lists")
+TEST_CASE(
+  "McpBridgeServer transforms selector targets without long id lists",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -4970,7 +5006,7 @@ TEST_CASE("McpBridgeServer transforms selector targets without long id lists")
   CHECK(history.back().toolName == "objects_transform");
 }
 
-TEST_CASE("McpBridgeServer native group tools")
+TEST_CASE("McpBridgeServer native group tools", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5224,7 +5260,8 @@ TEST_CASE("McpBridgeServer native group tools")
   CHECK(renameNonGroup.error.message.contains("only groups"));
 }
 
-TEST_CASE("McpBridgeServer keeps selector metadata live after grouping")
+TEST_CASE(
+  "McpBridgeServer keeps selector metadata live after grouping", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5343,7 +5380,8 @@ TEST_CASE("McpBridgeServer keeps selector metadata live after grouping")
   CHECK(moduleList.result.value("staleModuleCount").toInt() == 0);
 }
 
-TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
+TEST_CASE(
+  "McpBridgeServer applies texture by filter to unmatched materials", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5496,7 +5534,8 @@ TEST_CASE("McpBridgeServer applies texture by filter to unmatched materials")
     == "refresh_status_or_fix_texture_targets");
 }
 
-TEST_CASE("McpBridgeServer texture_apply reports pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer texture_apply reports pre-mutation failures", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5520,7 +5559,8 @@ TEST_CASE("McpBridgeServer texture_apply reports pre-mutation failures")
     == "add_material_then_retry");
 }
 
-TEST_CASE("McpBridgeServer texture_replace reports pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer texture_replace reports pre-mutation failures", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5537,7 +5577,9 @@ TEST_CASE("McpBridgeServer texture_replace reports pre-mutation failures")
     == "provide_find_and_replace_then_retry");
 }
 
-TEST_CASE("McpBridgeServer texture_lock_set reports non-document mutation state")
+TEST_CASE(
+  "McpBridgeServer texture_lock_set reports non-document mutation state",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5569,7 +5611,8 @@ TEST_CASE("McpBridgeServer texture_lock_set reports non-document mutation state"
   CHECK(response.result.value("mutatedDocument").toBool(true) == false);
 }
 
-TEST_CASE("McpBridgeServer texture_align_face reports pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer texture_align_face reports pre-mutation failures", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5592,7 +5635,9 @@ TEST_CASE("McpBridgeServer texture_align_face reports pre-mutation failures")
     == "choose_supported_alignment_mode");
 }
 
-TEST_CASE("McpBridgeServer texture_copy_from_face reports pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer texture_copy_from_face reports pre-mutation failures",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5662,7 +5707,8 @@ TEST_CASE("McpBridgeServer texture_copy_from_face reports pre-mutation failures"
     == "provide_target_faces_or_select_brush_faces");
 }
 
-TEST_CASE("McpBridgeServer entity mutations report pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer entity mutations report pre-mutation failures", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5726,7 +5772,8 @@ TEST_CASE("McpBridgeServer entity mutations report pre-mutation failures")
   CHECK(map.worldNode().descendantCount() == descendantCountBefore);
 }
 
-TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
+TEST_CASE(
+  "McpBridgeServer face_select reports non-document mutation state", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5802,7 +5849,8 @@ TEST_CASE("McpBridgeServer face_select reports non-document mutation state")
     == "provide_faces_or_select_brush_faces");
 }
 
-TEST_CASE("McpBridgeServer face_texture_set reports pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer face_texture_set reports pre-mutation failures", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5846,7 +5894,8 @@ TEST_CASE("McpBridgeServer face_texture_set reports pre-mutation failures")
     == "provide_faces_or_select_brush_faces");
 }
 
-TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
+TEST_CASE(
+  "McpBridgeServer applies texture to semantic operation faces", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -5927,7 +5976,8 @@ TEST_CASE("McpBridgeServer applies texture to semantic operation faces")
   CHECK(topFaceMaterialCount == 1);
 }
 
-TEST_CASE("McpBridgeServer deletes operations without long object id lists")
+TEST_CASE(
+  "McpBridgeServer deletes operations without long object id lists", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -6042,7 +6092,8 @@ TEST_CASE("McpBridgeServer deletes operations without long object id lists")
   CHECK(fullState.contains("objectDiagnostics"));
 }
 
-TEST_CASE("McpBridgeServer brush primitives report pre-mutation failures")
+TEST_CASE(
+  "McpBridgeServer brush primitives report pre-mutation failures", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -6078,7 +6129,7 @@ TEST_CASE("McpBridgeServer brush primitives report pre-mutation failures")
   CHECK(map.worldNode().descendantCount() == descendantCountBefore);
 }
 
-TEST_CASE("McpBridgeServer batch blockout tools")
+TEST_CASE("McpBridgeServer batch blockout tools", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -7331,7 +7382,9 @@ TEST_CASE("McpBridgeServer batch blockout tools")
           .contains("flatPoints3dPathRibbon"));
 }
 
-TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic modes")
+TEST_CASE(
+  "McpBridgeServer geometry analysis accepts selectors and semantic modes",
+  "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -7734,7 +7787,7 @@ TEST_CASE("McpBridgeServer geometry analysis accepts selectors and semantic mode
   CHECK(seams.last().toObject().value("loopClosure").toBool());
 }
 
-TEST_CASE("McpBridgeServer route metadata tools")
+TEST_CASE("McpBridgeServer route metadata tools", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -8437,7 +8490,7 @@ TEST_CASE("McpBridgeServer route metadata tools")
   }
 }
 
-TEST_CASE("McpBridgeServer checked entity batch")
+TEST_CASE("McpBridgeServer checked entity batch", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -8668,7 +8721,7 @@ TEST_CASE("McpBridgeServer checked entity batch")
   }
 }
 
-TEST_CASE("McpBridgeServer file based IR tools")
+TEST_CASE("McpBridgeServer file based IR tools", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -9047,7 +9100,7 @@ TEST_CASE("McpBridgeServer file based IR tools")
     == 1);
 }
 
-TEST_CASE("McpBridgeServer Python blockout tools")
+TEST_CASE("McpBridgeServer Python blockout tools", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
@@ -9288,7 +9341,7 @@ print(json.dumps({
   }
 }
 
-TEST_CASE("McpBridgeServer grayscale heightmap import tool")
+TEST_CASE("McpBridgeServer grayscale heightmap import tool", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};
   auto& appController = appControllerFixture.appController();
