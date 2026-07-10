@@ -22,6 +22,8 @@
 #include <QJsonDocument>
 #include <QStringList>
 
+#include "McpToolCatalogInternal.h"
+
 #include <algorithm>
 #include <array>
 #include <functional>
@@ -3781,161 +3783,6 @@ bool canCallTool(const McpToolDefinition& tool, const McpMode mode)
   return tool.implemented && allowsMode(mode, tool.requiredMode);
 }
 
-QJsonObject toMcpToolJson(const McpToolDefinition& tool)
-{
-  return QJsonObject{
-    {"name", tool.name},
-    {"description", tool.description},
-    {"inputSchema", tool.inputSchema},
-  };
-}
-
-QJsonObject toMcpToolDiagnosticJson(
-  const McpToolDefinition& tool, const McpMode currentMode)
-{
-  return QJsonObject{
-    {"name", tool.name},
-    {"requiredMode", modeName(tool.requiredMode)},
-    {"availableInCurrentMode", allowsMode(currentMode, tool.requiredMode)},
-    {"mutatesDocument", tool.mutatesDocument},
-    {"implemented", tool.implemented},
-    {"category", tool.category},
-    {"expert", tool.expert},
-    {"lifecycle", tool.lifecycle},
-    {"costClass", toolCostClassName(tool.costClass)},
-    {"timeoutMs", toolResponseTimeoutMs(tool.costClass)},
-  };
-}
-
-namespace
-{
-
-QJsonObject toMcpToolSummaryJson(
-  const McpToolDefinition& tool, const McpToolProfile profile)
-{
-  return QJsonObject{
-    {"name", tool.name},
-    {"description", tool.description},
-    {"category", tool.category},
-    {"expert", tool.expert},
-    {"lifecycle", tool.lifecycle},
-    {"requiredMode", modeName(tool.requiredMode)},
-    {"visibleInCurrentProfile", visibleInProfile(tool, profile)},
-    {"costClass", toolCostClassName(tool.costClass)},
-    {"timeoutMs", toolResponseTimeoutMs(tool.costClass)},
-  };
-}
-
-} // namespace
-
-QJsonArray toolsListJson(
-  const McpMode mode, const bool implementedOnly, const McpToolProfile profile)
-{
-  auto result = QJsonArray{};
-  for (const auto& tool : defaultToolCatalog())
-  {
-    if (implementedOnly && !tool.implemented)
-    {
-      continue;
-    }
-    if (!allowsMode(mode, tool.requiredMode))
-    {
-      continue;
-    }
-    if (!visibleInProfile(tool, profile))
-    {
-      continue;
-    }
-    result.push_back(toMcpToolJson(tool));
-  }
-  return result;
-}
-
-QJsonArray toolsListJson(const McpMode mode, const bool implementedOnly)
-{
-  return toolsListJson(mode, implementedOnly, McpToolProfile::Modeling);
-}
-
-QJsonArray toolsListJson(const McpMode mode)
-{
-  return toolsListJson(mode, true, McpToolProfile::Modeling);
-}
-
-QJsonArray toolsSummaryJson(
-  const McpMode mode, const bool implementedOnly, const McpToolProfile profile)
-{
-  auto result = QJsonArray{};
-  for (const auto& tool : defaultToolCatalog())
-  {
-    if (implementedOnly && !tool.implemented)
-    {
-      continue;
-    }
-    if (!allowsMode(mode, tool.requiredMode))
-    {
-      continue;
-    }
-    if (!visibleInProfile(tool, profile))
-    {
-      continue;
-    }
-    result.push_back(toMcpToolSummaryJson(tool, profile));
-  }
-  return result;
-}
-
-QJsonObject toolProfileStatsJson(
-  const McpMode mode, const bool implementedOnly, const McpToolProfile profile)
-{
-  auto categoryCounts = std::map<QString, int>{};
-  auto lifecycleCounts = std::map<QString, int>{};
-  auto implementedToolCount = 0;
-  auto expertToolCount = 0;
-
-  for (const auto& tool : defaultToolCatalog())
-  {
-    if (implementedOnly && !tool.implemented)
-    {
-      continue;
-    }
-    if (!allowsMode(mode, tool.requiredMode))
-    {
-      continue;
-    }
-    if (!visibleInProfile(tool, profile))
-    {
-      continue;
-    }
-
-    ++implementedToolCount;
-    ++categoryCounts[tool.category];
-    ++lifecycleCounts[tool.lifecycle];
-    if (tool.expert)
-    {
-      ++expertToolCount;
-    }
-  }
-
-  auto categoryCountsJson = QJsonObject{};
-  for (const auto& [category, count] : categoryCounts)
-  {
-    categoryCountsJson.insert(category, count);
-  }
-
-  auto lifecycleCountsJson = QJsonObject{};
-  for (const auto& [lifecycle, count] : lifecycleCounts)
-  {
-    lifecycleCountsJson.insert(lifecycle, count);
-  }
-
-  return QJsonObject{
-    {"implementedToolCount", implementedToolCount},
-    {"expertToolCount", expertToolCount},
-    {"toolCategoryCounts", categoryCountsJson},
-    {"toolLifecycleCounts", lifecycleCountsJson},
-  };
-}
-
 namespace
 {
 
@@ -4190,16 +4037,6 @@ QJsonArray toolsSearchJson(
   for (const auto& tool : matches)
   {
     appendTool(result, tool.get(), includeToolSchema);
-  }
-  return result;
-}
-
-QJsonArray toolDiagnosticsJson(const McpMode currentMode)
-{
-  auto result = QJsonArray{};
-  for (const auto& tool : defaultToolCatalog())
-  {
-    result.push_back(toMcpToolDiagnosticJson(tool, currentMode));
   }
   return result;
 }

@@ -22,6 +22,8 @@
 #include <QJsonObject>
 #include <QString>
 
+#include "McpHistoryTools.h"
+#include "McpIrTools.h"
 #include "Result.h"
 #include "ui/mcp/McpBridgeServer.h"
 
@@ -427,143 +429,6 @@ McpBridgeToolResult moduleCompactForMapResult(
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
   const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult irValidateResult(
-  AppController& appController, const QJsonObject& params);
-McpBridgeToolResult irCompilePreviewResult(
-  AppController& appController, const QJsonObject& params);
-McpBridgeToolResult irCompilePreviewFromFileResult(
-  AppController& appController,
-  const QJsonObject& params,
-  std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr,
-  int* nextPreviewIndex = nullptr);
-McpBridgeToolResult irCompilePreviewFromFileForMapResult(
-  mdl::Map& map,
-  const QJsonObject& params,
-  std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr,
-  int* nextPreviewIndex = nullptr);
-McpBridgeToolResult irApplyResult(
-  AppController& appController,
-  const QString& toolName,
-  const QJsonObject& params,
-  std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex,
-  std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore,
-  McpObjectRegistry* objectRegistry = nullptr);
-McpBridgeToolResult irApplyForMapResult(
-  mdl::Map& map,
-  const QString& toolName,
-  const QJsonObject& params,
-  std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex,
-  std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore,
-  McpObjectRegistry* objectRegistry = nullptr);
-McpBridgeToolResult irApplyFromFileResult(
-  AppController& appController,
-  const QString& toolName,
-  const QJsonObject& params,
-  std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex,
-  std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore,
-  McpObjectRegistry* objectRegistry = nullptr,
-  std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr);
-McpBridgeToolResult irApplyFromFileForMapResult(
-  mdl::Map& map,
-  const QString& toolName,
-  const QJsonObject& params,
-  std::vector<McpOperationRecord>& history,
-  int& nextOperationIndex,
-  std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  std::map<QString, McpModuleRecord>& moduleStore,
-  McpObjectRegistry* objectRegistry = nullptr,
-  std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr);
-
-McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
-McpBridgeToolResult historyListResult(
-  AppController& appController,
-  const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult historyStatusResult(
-  AppController& appController,
-  const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry& objectRegistry,
-  const QString& bridgeInstanceId = {},
-  const QString& bridgeStartedAt = {});
-McpBridgeToolResult historyStatusForMapResult(
-  mdl::Map& map,
-  const std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry& objectRegistry,
-  const QString& bridgeInstanceId = {},
-  const QString& bridgeStartedAt = {},
-  const QString& activeDocumentPath = {});
-McpBridgeToolResult operationInspectResult(
-  const std::vector<McpOperationRecord>& history, const QJsonObject& params);
-McpBridgeToolResult operationInspectResult(
-  AppController& appController,
-  const std::vector<McpOperationRecord>& history,
-  const QJsonObject& params,
-  const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult operationInspectResult(
-  AppController& appController,
-  const std::vector<McpOperationRecord>& history,
-  const QJsonObject& params);
-McpBridgeToolResult operationSelectResult(
-  AppController& appController,
-  const std::vector<McpOperationRecord>& history,
-  const QJsonObject& params,
-  const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult operationSelectForMapResult(
-  mdl::Map& map,
-  const std::vector<McpOperationRecord>& history,
-  const QJsonObject& params,
-  const McpObjectRegistry* objectRegistry = nullptr);
-McpBridgeToolResult operationSelectResult(
-  AppController& appController,
-  const std::vector<McpOperationRecord>& history,
-  const QJsonObject& params);
-McpBridgeToolResult operationValidateResult(
-  AppController& appController,
-  const std::vector<McpOperationRecord>& history,
-  const QJsonObject& params,
-  const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult operationValidateForMapResult(
-  mdl::Map& map,
-  const std::vector<McpOperationRecord>& history,
-  const QJsonObject& params,
-  const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult operationValidateResult(
-  AppController& appController,
-  const std::vector<McpOperationRecord>& history,
-  const QJsonObject& params);
-McpBridgeToolResult historyUndoResult(
-  AppController& appController,
-  std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult historyUndoForMapResult(
-  mdl::Map& map,
-  std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry = nullptr);
-McpBridgeToolResult historyUndoToOperationResult(
-  AppController& appController,
-  std::vector<McpOperationRecord>& history,
-  const QJsonObject& params,
-  const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult historyUndoToOperationForMapResult(
-  mdl::Map& map,
-  std::vector<McpOperationRecord>& history,
-  const QJsonObject& params,
-  const McpObjectRegistry* objectRegistry = nullptr);
-McpBridgeToolResult historyRedoResult(
-  AppController& appController,
-  std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry& objectRegistry);
-McpBridgeToolResult historyRedoForMapResult(
-  mdl::Map& map,
-  std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry* objectRegistry = nullptr);
-
 McpBridgeToolResult createEntityResult(
   AppController& appController,
   const QString& toolName,

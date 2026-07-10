@@ -159,7 +159,9 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpDocumentTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpEntityTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHistoryTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHistoryTools.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHeightmapTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpIrTools.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpRouteTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpObjectTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpObjectRegistry.cpp
@@ -169,12 +171,15 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectorTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectionQuery.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectionQuery.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSessionState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpSelectionViewportTools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServerTransport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpBridgeServerTools.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpHttpServer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpTextureTools.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpToolRegistry.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpToolRegistry.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mcp/McpToolSupport.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveHandleDragTracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MoveObjectsTool.cpp

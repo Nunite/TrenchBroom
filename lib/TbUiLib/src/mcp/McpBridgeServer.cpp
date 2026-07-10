@@ -25,6 +25,7 @@
 #include <QUuid>
 
 #include "McpBridgeServerTools.h"
+#include "McpToolRegistry.h"
 #include "mcp/McpError.h"
 #include "mcp/McpToolCatalog.h"
 #include "ui/AppController.h"
@@ -37,52 +38,6 @@
 namespace tb::ui
 {
 namespace mcp = tb::mcp;
-
-class McpToolRegistry
-{
-private:
-  std::map<QString, McpBridgeServer::ToolHandler> m_handlers;
-  int m_duplicateRegistrationCount = 0;
-
-public:
-  bool registerHandler(QString toolName, McpBridgeServer::ToolHandler handler)
-  {
-    const auto [it, inserted] =
-      m_handlers.emplace(std::move(toolName), std::move(handler));
-    Q_UNUSED(it);
-    if (!inserted)
-    {
-      ++m_duplicateRegistrationCount;
-    }
-    return inserted;
-  }
-
-  McpBridgeToolResult dispatch(const QString& toolName, const QJsonObject& params) const
-  {
-    const auto it = m_handlers.find(toolName);
-    if (it == m_handlers.end())
-    {
-      return McpBridgeToolResult::failure(
-        mcp::McpErrorCode::ToolNotFound,
-        QString{"MCP tool has no registered handler: %1"}.arg(toolName));
-    }
-    return it->second(toolName, params);
-  }
-
-  QStringList toolNames() const
-  {
-    auto result = QStringList{};
-    result.reserve(static_cast<qsizetype>(m_handlers.size()));
-    for (const auto& [name, handler] : m_handlers)
-    {
-      Q_UNUSED(handler);
-      result.push_back(name);
-    }
-    return result;
-  }
-
-  int duplicateRegistrationCount() const { return m_duplicateRegistrationCount; }
-};
 
 McpBridgeToolResult noActiveDocumentFailure()
 {
