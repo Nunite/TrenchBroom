@@ -265,6 +265,12 @@ void addExpectedDocumentPathGuardSchema(McpToolDefinition& tool)
     stringProperty(
       "Optional active document path guard. If set, the tool refuses to mutate when "
       "the current active document path differs."));
+  properties.insert(
+    "expectedDocumentFingerprint",
+    stringProperty(
+      "Optional active document fingerprint guard. If set, the tool refuses to "
+      "mutate when the current document identity differs. When path and fingerprint "
+      "are both provided, both must match."));
   tool.inputSchema.insert("properties", properties);
 }
 
@@ -2976,6 +2982,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
             "operations entries require type and entity entries require classname."},
            {"additionalProperties", true},
          }},
+        {"schemaVersion",
+         integerProperty("Optional flattened IR schema version. Current version is 1.")},
         {"operations",
          arrayProperty(
            "Optional blockout_create_batch operations array. Every item must be an "
@@ -3002,6 +3010,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
             "operations entries require type and entity entries require classname."},
            {"additionalProperties", true},
          }},
+        {"schemaVersion",
+         integerProperty("Optional flattened IR schema version. Current version is 1.")},
         {"operations",
          arrayProperty(
            "Optional blockout_create_batch operations array. Every item must be an "
@@ -3044,6 +3054,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
             "operations entries require type and entity entries require classname."},
            {"additionalProperties", true},
          }},
+        {"schemaVersion",
+         integerProperty("Optional flattened IR schema version. Current version is 1.")},
         {"operations",
          arrayProperty(
            "Optional blockout_create_batch operations array. Every item must be an "

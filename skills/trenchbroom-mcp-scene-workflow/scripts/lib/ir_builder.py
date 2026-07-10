@@ -17,6 +17,7 @@ from typing import Any
 
 DEFAULT_MATERIAL = "__TB_empty"
 GENERATED_BY = "trenchbroom-mcp-scene-workflow"
+IR_SCHEMA_VERSION = 1
 
 
 def load_params(path: str | None) -> dict[str, Any]:
@@ -99,6 +100,7 @@ def make_ir(
     if extra_metadata:
         metadata.update(extra_metadata)
     result: dict[str, Any] = {
+        "schemaVersion": IR_SCHEMA_VERSION,
         "name": name,
         "moduleId": module_id,
         "defaultMetadata": metadata,
@@ -339,6 +341,8 @@ def validate_ir(ir: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(ir, dict):
         errors.append("IR root must be an object")
         return {"valid": False, "errors": errors, "warnings": warnings, "summary": {}}
+    if ir.get("schemaVersion") != IR_SCHEMA_VERSION:
+        errors.append(f"IR schemaVersion must be {IR_SCHEMA_VERSION}")
     if not ir.get("moduleId"):
         errors.append("IR must include moduleId")
     default_metadata = ir.get("defaultMetadata")

@@ -1308,7 +1308,15 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
                       appController.taskManager(),
                       appController.glManager().resourceManager())
                     | kdl::value();
+    const auto mapPath = getFixtureRoot() / "test/ui/MapDocument/emptyValveMap.map";
+    REQUIRE(document->load(
+      appController.environmentConfig(),
+      mdl::QuakeGameInfo,
+      mdl::MapFormat::Unknown,
+      vm::bbox3d{8192.0},
+      mapPath));
     auto& map = document->map();
+    const auto expectedPath = QString::fromStdString(map.path().string());
     auto handlerCalled = false;
     auto guardedServer = McpBridgeServer{
       [&](const QString&, const QJsonObject&) {
@@ -1338,6 +1346,41 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     CHECK(response.error->details.contains("bridgeInstanceId"));
     CHECK(response.error->details.contains("httpPort"));
     CHECK(!handlerCalled);
+
+    const auto fingerprint = McpObjectRegistry{}.documentFingerprint(map);
+    const auto fingerprintResponse = guardedServer.dispatchRequest(mcp::McpBridgeRequest{
+      "2",
+      "secret",
+      "blockout_create_batch",
+      QJsonObject{
+        {"expectedDocumentPath", expectedPath},
+        {"expectedDocumentFingerprint", "doc:not-the-active-document"},
+        {"operations", QJsonArray{QJsonObject{{"type", "box"}}}},
+      },
+      mcp::McpMode::Edit});
+
+    CHECK(!fingerprintResponse.ok);
+    REQUIRE(fingerprintResponse.error);
+    CHECK(fingerprintResponse.error->message.contains("expectedDocumentFingerprint"));
+    CHECK(
+      fingerprintResponse.error->details.value("actualDocumentFingerprint").toString()
+      == fingerprint);
+    CHECK_FALSE(fingerprintResponse.error->details.value("mutatedDocument").toBool(true));
+    CHECK(fingerprintResponse.error->details.value("retrySafe").toBool(false));
+    CHECK(!handlerCalled);
+
+    const auto matchingResponse = guardedServer.dispatchRequest(mcp::McpBridgeRequest{
+      "3",
+      "secret",
+      "blockout_create_batch",
+      QJsonObject{
+        {"expectedDocumentPath", expectedPath},
+        {"expectedDocumentFingerprint", fingerprint},
+        {"operations", QJsonArray{QJsonObject{{"type", "box"}}}},
+      },
+      mcp::McpMode::Edit});
+    CHECK(matchingResponse.ok);
+    CHECK(handlerCalled);
   }
 
   SECTION("status and history report the same active document fingerprint")
@@ -4184,6 +4227,249 @@ TEST_CASE(
     invalidApplyResponse.error.details.value("recoveryAction").toString()
     == "fix_ir_payload_then_retry");
   CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalidApply);
+
+  for (const auto& invalidVersion :
+       QJsonArray{QJsonValue{"1"}, QJsonValue{0}, QJsonValue{2}, QJsonValue{1.5}})
+  {
+    const auto versionResponse = irApplyForMapResult(
+      map,
+      "ir_apply",
+      QJsonObject{
+        {"ir",
+         QJsonObject{
+           {"schemaVersion", invalidVersion},
+           {"operations",
+            QJsonArray{QJsonObject{
+              {"type", "box"},
+              {"min", QJsonArray{0, 0, 0}},
+              {"max", QJsonArray{64, 64, 16}},
+            }}},
+         }},
+      },
+      history,
+      nextOperationIndex,
+      metadataStore,
+      moduleStore,
+      &objectRegistry);
+    CHECK_FALSE(versionResponse.ok);
+    CHECK(versionResponse.error.message.contains("schemaVersion"));
+    CHECK_FALSE(versionResponse.error.details.value("mutatedDocument").toBool(true));
+    CHECK_FALSE(versionResponse.error.details.value("partialMutation").toBool(true));
+    CHECK(versionResponse.error.details.value("retrySafe").toBool(false));
+    CHECK(map.worldNode().descendantCount() == descendantCountBeforeInvalidApply);
+    CHECK(history.empty());
+    CHECK(nextOperationIndex == 1);
+  }
+}
+
+TEST_CASE(
+  "McpBridgeServer ir_apply rolls back geometry when entity validation fails",
+  "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto descendantCountBefore = map.worldNode().descendantCount();
+  const auto modifiedBefore = map.modified();
+  const auto failed = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"ir",
+       QJsonObject{
+         {"schemaVersion", 1},
+         {"moduleId", "atomic-failure"},
+         {"defaultMetadata", QJsonObject{{"moduleId", "atomic-failure"}}},
+         {"select", false},
+         {"operations",
+          QJsonArray{QJsonObject{
+            {"type", "box"},
+            {"min", QJsonArray{0, 0, 0}},
+            {"max", QJsonArray{64, 64, 16}},
+            {"metadata", QJsonObject{{"part", "floor"}}},
+          }}},
+         {"entities",
+          QJsonArray{QJsonObject{
+            {"classname", "mcp_missing_entity_class"},
+            {"origin", QJsonArray{0, 0, 32}},
+          }}},
+       }},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+
+  REQUIRE_FALSE(failed.ok);
+  CHECK(failed.error.details.value("failureStage").toString() == "entities");
+  CHECK_FALSE(failed.error.details.value("mutatedDocument").toBool(true));
+  CHECK_FALSE(failed.error.details.value("partialMutation").toBool(true));
+  CHECK(failed.error.details.value("retrySafe").toBool(false));
+  CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+  CHECK(map.modified() == modifiedBefore);
+  CHECK(map.undoCommandName() == nullptr);
+  CHECK(history.empty());
+  CHECK(nextOperationIndex == 1);
+  CHECK(metadataStore.empty());
+  CHECK(moduleStore.empty());
+
+  const auto valid = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"ir",
+       QJsonObject{
+         {"schemaVersion", 1},
+         {"moduleId", "atomic-success-after-failure"},
+         {"defaultMetadata", QJsonObject{{"moduleId", "atomic-success-after-failure"}}},
+         {"select", false},
+         {"operations",
+          QJsonArray{QJsonObject{
+            {"type", "box"},
+            {"min", QJsonArray{0, 0, 0}},
+            {"max", QJsonArray{64, 64, 16}},
+            {"metadata", QJsonObject{{"part", "floor"}}},
+          }}},
+       }},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  REQUIRE(valid.ok);
+  CHECK(valid.result.value("operationIds").toArray().first().toString() == "mcp-op-1");
+  CHECK(valid.result.value("parentOperationId").toString() == "mcp-op-2");
+  CHECK(std::ranges::any_of(
+    metadataStore, [](const auto& entry) { return entry.second.objectId == "mcp:1:1"; }));
+}
+
+TEST_CASE(
+  "McpBridgeServer ir_apply commits one aggregate undo operation", "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  map.entityDefinitionManager().setDefinitions({
+    {"test_spawn", {}, "", {}, mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}}},
+  });
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+  const auto descendantCountBefore = map.worldNode().descendantCount();
+
+  const auto apply = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"idsMode", "full"},
+      {"ir",
+       QJsonObject{
+         {"schemaVersion", 1},
+         {"name", "MCP: Atomic IR test"},
+         {"select", false},
+         {"selectEntities", false},
+         {"operations",
+          QJsonArray{QJsonObject{
+            {"type", "box"},
+            {"min", QJsonArray{0, 0, 0}},
+            {"max", QJsonArray{64, 64, 16}},
+          }}},
+         {"entities",
+          QJsonArray{QJsonObject{
+            {"classname", "test_spawn"},
+            {"origin", QJsonArray{32, 32, 32}},
+          }}},
+       }},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+
+  const auto applyError = apply.ok ? std::string{} : apply.error.message.toStdString();
+  INFO(applyError);
+  REQUIRE(apply.ok);
+  CHECK(apply.result.value("schemaVersion").toInt() == 1);
+  CHECK(apply.result.value("atomic").toBool());
+  CHECK_FALSE(apply.result.value("partialMutation").toBool(true));
+  CHECK(apply.result.value("changedObjectCount").toInt() == 2);
+  const auto parentOperationId = apply.result.value("parentOperationId").toString();
+  const auto childOperationIds = apply.result.value("childOperationIds").toArray();
+  REQUIRE_FALSE(parentOperationId.isEmpty());
+  REQUIRE(childOperationIds.size() == 2);
+  CHECK(apply.result.value("operationIds").toArray() == childOperationIds);
+  CHECK(history.size() == 3u);
+  CHECK(history.back().operationId == parentOperationId);
+  CHECK(history.back().undoable);
+  CHECK(history.back().childOperationIds.size() == 2);
+  CHECK_FALSE(history.at(0).undoable);
+  CHECK_FALSE(history.at(1).undoable);
+  CHECK(history.at(0).parentOperationId == parentOperationId);
+  CHECK(history.at(1).parentOperationId == parentOperationId);
+  CHECK(map.worldNode().descendantCount() == descendantCountBefore + 2);
+  REQUIRE(map.undoCommandName() != nullptr);
+  CHECK(QString::fromStdString(*map.undoCommandName()) == "MCP: Atomic IR test");
+
+  const auto childValidation = operationValidateForMapResult(
+    map,
+    history,
+    QJsonObject{{"operationId", childOperationIds.first().toString()}},
+    objectRegistry);
+  REQUIRE(childValidation.ok);
+  CHECK_FALSE(childValidation.result.value("undoable").toBool(true));
+  CHECK(
+    childValidation.result.value("parentOperationId").toString() == parentOperationId);
+  CHECK(
+    childValidation.result.value("recoveryAction").toString()
+    == "inspect_or_undo_parent_operation");
+
+  const auto childUndo = historyUndoToOperationForMapResult(
+    map,
+    history,
+    QJsonObject{{"operationId", childOperationIds.first().toString()}},
+    &objectRegistry);
+  REQUIRE_FALSE(childUndo.ok);
+  CHECK(
+    childUndo.error.details.value("parentOperationId").toString() == parentOperationId);
+
+  const auto undo = historyUndoForMapResult(map, history, &objectRegistry);
+  REQUIRE(undo.ok);
+  CHECK(map.worldNode().descendantCount() == descendantCountBefore);
+  CHECK(
+    std::ranges::all_of(history, [](const auto& operation) { return operation.undone; }));
+
+  const auto redo = historyRedoForMapResult(map, history, &objectRegistry);
+  REQUIRE(redo.ok);
+  CHECK(map.worldNode().descendantCount() == descendantCountBefore + 2);
+  CHECK(std::ranges::none_of(
+    history, [](const auto& operation) { return operation.undone; }));
 }
 
 TEST_CASE(
@@ -4249,6 +4535,8 @@ TEST_CASE(
     applyResponse.ok ? std::string{} : applyResponse.error.message.toStdString();
   INFO(applyError);
   REQUIRE(applyResponse.ok);
+  CHECK(applyResponse.result.value("schemaVersion").toInt() == 1);
+  CHECK(applyResponse.result.value("warnings").toArray().contains("legacyUnversionedIr"));
   const auto operationIds = applyResponse.result.value("operationIds").toArray();
   REQUIRE(operationIds.size() == 1);
   const auto operationId = operationIds.first().toString();
@@ -8801,6 +9089,9 @@ TEST_CASE("McpBridgeServer file based IR tools", "[McpBridgeServer]")
   REQUIRE(previewResponse.ok);
   CHECK(
     previewResponse.result.value("tool").toString() == "ir_compile_preview_from_file");
+  CHECK(previewResponse.result.value("schemaVersion").toInt() == 1);
+  CHECK(
+    previewResponse.result.value("warnings").toArray().contains("legacyUnversionedIr"));
   CHECK(!previewResponse.result.value("willCommit").toBool());
   CHECK(
     previewResponse.result.value("sourcePath").toString()
@@ -9000,6 +9291,9 @@ TEST_CASE("McpBridgeServer file based IR tools", "[McpBridgeServer]")
     moduleStore);
   REQUIRE(applyResponse.ok);
   CHECK(applyResponse.result.value("tool").toString() == "ir_apply_from_file");
+  CHECK(applyResponse.result.value("schemaVersion").toInt() == 1);
+  CHECK(applyResponse.result.value("warnings").toArray().contains("legacyUnversionedIr"));
+  CHECK_FALSE(applyResponse.result.value("parentOperationId").toString().isEmpty());
   CHECK(
     applyResponse.result.value("sourcePath").toString()
     == QFileInfo{path}.canonicalFilePath());

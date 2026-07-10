@@ -65,6 +65,21 @@ TEST_CASE("McpToolCatalog")
     CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 47);
   }
 
+  SECTION("all mutating tools expose path and fingerprint guards")
+  {
+    for (const auto& tool : defaultToolCatalog())
+    {
+      if (!tool.mutatesDocument)
+      {
+        continue;
+      }
+      const auto properties = tool.inputSchema.value("properties").toObject();
+      INFO(tool.name.toStdString());
+      CHECK(properties.value("expectedDocumentPath").isObject());
+      CHECK(properties.value("expectedDocumentFingerprint").isObject());
+    }
+  }
+
   SECTION("parses and names tool profiles")
   {
     CHECK(toolProfileName(McpToolProfile::Core) == "Core");

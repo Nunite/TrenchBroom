@@ -449,7 +449,7 @@ McpBridgeToolResult irApplyResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry = nullptr);
+  McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult irApplyForMapResult(
   mdl::Map& map,
   const QString& toolName,
@@ -458,7 +458,7 @@ McpBridgeToolResult irApplyForMapResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry = nullptr);
+  McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult irApplyFromFileResult(
   AppController& appController,
   const QString& toolName,
@@ -467,7 +467,7 @@ McpBridgeToolResult irApplyFromFileResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry = nullptr,
+  McpObjectRegistry* objectRegistry = nullptr,
   std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr);
 McpBridgeToolResult irApplyFromFileForMapResult(
   mdl::Map& map,
@@ -477,7 +477,7 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry = nullptr,
+  McpObjectRegistry* objectRegistry = nullptr,
   std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr);
 
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);

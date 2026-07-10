@@ -87,6 +87,17 @@ QJsonObject operationRecordJson(const McpOperationRecord& operation)
   result.insert(
     "resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId));
   result.insert("undone", operation.undone);
+  result.insert("undoable", operation.undoable);
+  if (!operation.parentOperationId.isEmpty())
+  {
+    result.insert("parentOperationId", operation.parentOperationId);
+    result.insert("recoveryAction", "inspect_or_undo_parent_operation");
+  }
+  if (!operation.childOperationIds.isEmpty())
+  {
+    result.insert(
+      "childOperationIds", QJsonArray::fromStringList(operation.childOperationIds));
+  }
   return result;
 }
 
@@ -388,8 +399,10 @@ McpBridgeToolResult historyStatusForMapResult(
     return McpBridgeToolResult::success(result);
   }
 
-  const auto latestIt = std::find_if(
-    history.rbegin(), history.rend(), [](const auto& op) { return !op.undone; });
+  const auto latestIt =
+    std::find_if(history.rbegin(), history.rend(), [](const auto& op) {
+      return op.undoable && !op.undone;
+    });
   if (latestIt == history.rend())
   {
     result.insert("reasonIfUnavailable", "allMcpOperationsUndone");
@@ -469,6 +482,24 @@ std::optional<McpOperationRecord> findOperationCopy(
     return std::nullopt;
   }
   return history[*index];
+}
+
+void setOperationUndoneState(
+  std::vector<McpOperationRecord>& history, const QString& operationId, const bool undone)
+{
+  const auto index = findOperationIndex(history, operationId);
+  if (!index)
+  {
+    return;
+  }
+  history[*index].undone = undone;
+  for (const auto& childOperationId : history[*index].childOperationIds)
+  {
+    if (const auto childIndex = findOperationIndex(history, childOperationId))
+    {
+      history[*childIndex].undone = undone;
+    }
+  }
 }
 
 QJsonObject operationTargetFailureDetails(
@@ -789,7 +820,14 @@ McpBridgeToolResult operationValidateForMapResult(
     {"liveObjectCount", liveObjectCount},
     {"staleObjectCount", staleObjectCount},
     {"mismatchCount", mismatchCount},
+    {"undoable", operation->undoable},
+    {"parentOperationId", operation->parentOperationId},
+    {"childOperationIds", QJsonArray::fromStringList(operation->childOperationIds)},
   };
+  if (!operation->undoable && !operation->parentOperationId.isEmpty())
+  {
+    result.insert("recoveryAction", "inspect_or_undo_parent_operation");
+  }
   if (detail == "ids" || detail == "full")
   {
     result.insert("changedObjectIds", operation->changedObjectIdsJson());
@@ -844,7 +882,14 @@ McpBridgeToolResult operationValidateResult(
     {"liveObjectCount", liveObjectCount},
     {"staleObjectCount", staleObjectCount},
     {"mismatchCount", 0},
+    {"undoable", operation->undoable},
+    {"parentOperationId", operation->parentOperationId},
+    {"childOperationIds", QJsonArray::fromStringList(operation->childOperationIds)},
   };
+  if (!operation->undoable && !operation->parentOperationId.isEmpty())
+  {
+    result.insert("recoveryAction", "inspect_or_undo_parent_operation");
+  }
   for (auto it = liveState.begin(); it != liveState.end(); ++it)
   {
     result.insert(it.key(), it.value());
@@ -888,7 +933,7 @@ McpBridgeToolResult historyUndoForMapResult(
   const McpObjectRegistry* objectRegistry)
 {
   auto it = std::find_if(history.rbegin(), history.rend(), [](const auto& operation) {
-    return !operation.undone;
+    return operation.undoable && !operation.undone;
   });
   if (it == history.rend())
   {
@@ -939,10 +984,12 @@ McpBridgeToolResult historyUndoForMapResult(
   }
 
   map.undoCommand();
-  it->undone = true;
+  const auto operationId = it->operationId;
+  setOperationUndoneState(history, operationId, true);
+  const auto operation = findOperationCopy(history, operationId);
   return McpBridgeToolResult::success(QJsonObject{
     {"mutatedDocument", true},
-    {"operation", operationRecordJson(*it)},
+    {"operation", operation ? operationRecordJson(*operation) : QJsonObject{}},
     {"skippedSelectionCommands", skippedSelectionCommands},
     {"undone", true},
   });
@@ -964,7 +1011,7 @@ QStringList remainingOperationIdsToTarget(
   auto result = QStringList{};
   for (auto it = history.rbegin(); it != history.rend(); ++it)
   {
-    if (it->undone)
+    if (it->undone || !it->undoable)
     {
       continue;
     }
@@ -1074,6 +1121,16 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
       "Target MCP operation is already undone",
       historyPreMutationFailureDetails("refresh_status_or_validate", targetOperationId));
   }
+  if (!history[*targetIndex].undoable)
+  {
+    auto details = historyPreMutationFailureDetails(
+      "inspect_or_undo_parent_operation", targetOperationId);
+    details.insert("parentOperationId", history[*targetIndex].parentOperationId);
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::Forbidden,
+      "Child MCP operations cannot be undone independently",
+      std::move(details));
+  }
 
   auto undoneOperationIds = QStringList{};
   auto skippedSelectionCommandCount = 0;
@@ -1081,7 +1138,7 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
   while (true)
   {
     auto it = std::find_if(history.rbegin(), history.rend(), [](const auto& operation) {
-      return !operation.undone;
+      return operation.undoable && !operation.undone;
     });
     if (it == history.rend())
     {
@@ -1156,7 +1213,7 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
 
     const auto operationId = it->operationId;
     map.undoCommand();
-    it->undone = true;
+    setOperationUndoneState(history, operationId, true);
     undoneOperationIds.push_back(operationId);
 
     if (operationId == targetOperationId)
@@ -1193,7 +1250,7 @@ McpBridgeToolResult historyRedoForMapResult(
   const McpObjectRegistry* objectRegistry)
 {
   auto it = std::find_if(history.begin(), history.end(), [](const auto& operation) {
-    return operation.undone;
+    return operation.undoable && operation.undone;
   });
   if (it == history.end())
   {
@@ -1226,10 +1283,12 @@ McpBridgeToolResult historyRedoForMapResult(
   }
 
   map.redoCommand();
-  it->undone = false;
+  const auto operationId = it->operationId;
+  setOperationUndoneState(history, operationId, false);
+  const auto operation = findOperationCopy(history, operationId);
   return McpBridgeToolResult::success(QJsonObject{
     {"mutatedDocument", true},
-    {"operation", operationRecordJson(*it)},
+    {"operation", operation ? operationRecordJson(*operation) : QJsonObject{}},
     {"redone", true},
   });
 }

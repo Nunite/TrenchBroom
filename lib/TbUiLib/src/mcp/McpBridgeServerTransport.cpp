@@ -128,6 +128,11 @@ void syncOperationHistoryWithExternalResult(
   syncOneOperationHistoryWithExternalResult(
     history, result.value("operationId").toString(), map, objectRegistry, result);
 
+  if (!result.value("parentOperationId").toString().isEmpty())
+  {
+    return;
+  }
+
   const auto operationIds = result.value("operationIds").toArray();
   for (const auto& operationId : operationIds)
   {
@@ -414,6 +419,9 @@ QJsonObject resourceObject(
     {"changedObjectCount", operation.changedObjectIds.size()},
     {"deletedObjectCount", operation.deletedObjectIds.size()},
     {"undone", operation.undone},
+    {"undoable", operation.undoable},
+    {"parentOperationId", operation.parentOperationId},
+    {"childOperationIds", QJsonArray::fromStringList(operation.childOperationIds)},
     {"summary", operation.summary()},
     {"detail", operation.detail()},
   };
@@ -557,6 +565,40 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
           QJsonObject{
             {"expectedDocumentPath", expectedDocumentPath},
             {"actualDocumentPath", actualDocumentPath},
+            {"mutatedDocument", false},
+            {"retrySafe", true},
+            {"recoveryAction", "activate_expected_document_then_retry"},
+            {"processId", static_cast<int>(QCoreApplication::applicationPid())},
+            {"bridgeInstanceId", m_bridgeInstanceId},
+            {"bridgeStartedAt", m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs)},
+            {"httpPort", static_cast<int>(m_config.httpPort)},
+          });
+      }
+    }
+
+    const auto expectedDocumentFingerprint =
+      params.value("expectedDocumentFingerprint").toString().trimmed();
+    if (!expectedDocumentFingerprint.isEmpty())
+    {
+      const auto actualDocumentFingerprint =
+        map != nullptr ? m_objectRegistry.documentFingerprint(*map) : QString{};
+      if (actualDocumentFingerprint != expectedDocumentFingerprint)
+      {
+        return makeFailure(
+          request,
+          mcp::McpErrorCode::Forbidden,
+          QString{"Active document does not match expectedDocumentFingerprint. "
+                  "Expected '%1', actual '%2'."}
+            .arg(expectedDocumentFingerprint, actualDocumentFingerprint),
+          QJsonObject{
+            {"expectedDocumentFingerprint", expectedDocumentFingerprint},
+            {"actualDocumentFingerprint", actualDocumentFingerprint},
+            {"actualDocumentPath",
+             map != nullptr && !map->path().empty() ? pathAsQString(map->path())
+                                                    : QString{}},
+            {"mutatedDocument", false},
+            {"retrySafe", true},
+            {"recoveryAction", "refresh_status_or_activate_expected_document"},
             {"processId", static_cast<int>(QCoreApplication::applicationPid())},
             {"bridgeInstanceId", m_bridgeInstanceId},
             {"bridgeStartedAt", m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs)},

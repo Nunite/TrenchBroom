@@ -63,6 +63,7 @@ namespace
 
 constexpr auto DefaultSampleLimit = 12;
 constexpr auto IrPreviewCacheTtlMs = qint64{10 * 60 * 1000};
+constexpr auto CurrentIrSchemaVersion = 1;
 
 struct SelectorDiagnosticsInternal
 {
@@ -1352,8 +1353,43 @@ QStringList allModuleIds(
   return ids;
 }
 
-bool validateIrShape(const QJsonObject& ir, QString& error)
+bool validateIrShape(QJsonObject& ir, QString& error, QJsonArray* warnings = nullptr)
 {
+  const auto schemaVersionValue = ir.value("schemaVersion");
+  if (schemaVersionValue.isUndefined())
+  {
+    ir.insert("schemaVersion", CurrentIrSchemaVersion);
+    if (warnings != nullptr)
+    {
+      warnings->push_back("legacyUnversionedIr");
+    }
+  }
+  else
+  {
+    if (!schemaVersionValue.isDouble())
+    {
+      error = "IR schemaVersion must be an integer";
+      return false;
+    }
+    const auto schemaVersion = schemaVersionValue.toInt();
+    if (schemaVersionValue.toDouble() != static_cast<double>(schemaVersion))
+    {
+      error = "IR schemaVersion must be an integer";
+      return false;
+    }
+    if (schemaVersion < 1)
+    {
+      error = "IR schemaVersion must be at least 1";
+      return false;
+    }
+    if (schemaVersion > CurrentIrSchemaVersion)
+    {
+      error = QString{"Unsupported IR schemaVersion %1; current version is %2"}.arg(
+        schemaVersion, CurrentIrSchemaVersion);
+      return false;
+    }
+  }
+
   const auto operationsValue = ir.value("operations");
   const auto entitiesValue = ir.value("entities");
   const auto hasOperations = !operationsValue.isUndefined() && !operationsValue.isNull();
@@ -1418,13 +1454,14 @@ bool validateIrShape(const QJsonObject& ir, QString& error)
   return true;
 }
 
-std::optional<QJsonObject> irFromParams(const QJsonObject& params, QString& error)
+std::optional<QJsonObject> irFromParams(
+  const QJsonObject& params, QString& error, QJsonArray* warnings = nullptr)
 {
   const auto irValue = params.value("ir");
   if (irValue.isObject())
   {
     auto ir = irValue.toObject();
-    if (!validateIrShape(ir, error))
+    if (!validateIrShape(ir, error, warnings))
     {
       return std::nullopt;
     }
@@ -1456,14 +1493,15 @@ std::optional<QJsonObject> irFromParams(const QJsonObject& params, QString& erro
     {
       ir.insert("entities", params.value("entities"));
     }
-    for (const auto& key : {"name", "moduleId", "defaultMetadata", "material", "grid"})
+    for (const auto& key :
+         {"schemaVersion", "name", "moduleId", "defaultMetadata", "material", "grid"})
     {
       if (params.contains(key))
       {
         ir.insert(key, params.value(key));
       }
     }
-    if (!validateIrShape(ir, error))
+    if (!validateIrShape(ir, error, warnings))
     {
       return std::nullopt;
     }
@@ -1473,7 +1511,8 @@ std::optional<QJsonObject> irFromParams(const QJsonObject& params, QString& erro
   return std::nullopt;
 }
 
-std::optional<QJsonObject> irFromFileParams(const QJsonObject& params, QString& error)
+std::optional<QJsonObject> irFromFileParams(
+  const QJsonObject& params, QString& error, QJsonArray* warnings = nullptr)
 {
   const auto path = params.value("path").toString().trimmed();
   if (path.isEmpty())
@@ -1513,7 +1552,7 @@ std::optional<QJsonObject> irFromFileParams(const QJsonObject& params, QString& 
     return std::nullopt;
   }
   auto ir = document.object();
-  if (!validateIrShape(ir, error))
+  if (!validateIrShape(ir, error, warnings))
   {
     return std::nullopt;
   }
@@ -1723,7 +1762,12 @@ McpBridgeToolResult irApplyPreMutationFailure(
   const QString& message, QString recoveryAction, QJsonObject details = {})
 {
   details.insert("mutatedDocument", false);
+  details.insert("partialMutation", false);
   details.insert("retrySafe", true);
+  if (!details.contains("failureStage"))
+  {
+    details.insert("failureStage", "validation");
+  }
   details.insert("recoveryAction", std::move(recoveryAction));
   return McpBridgeToolResult::failure(
     mcp::McpErrorCode::InvalidParams, message, std::move(details));
@@ -1870,6 +1914,7 @@ QJsonObject irPreviewJson(const QJsonObject& ir)
 
   return QJsonObject{
     {"valid", warnings.isEmpty()},
+    {"schemaVersion", ir.value("schemaVersion").toInt(CurrentIrSchemaVersion)},
     {"operationCount", operations.size()},
     {"entityCount", entities.size()},
     {"estimatedBrushCount", estimatedBrushCount},
@@ -1878,6 +1923,20 @@ QJsonObject irPreviewJson(const QJsonObject& ir)
     {"moduleId", ir.value("moduleId").toString()},
     {"warnings", warnings},
   };
+}
+
+void appendIrWarnings(QJsonObject& result, const QJsonArray& compatibilityWarnings)
+{
+  if (compatibilityWarnings.isEmpty())
+  {
+    return;
+  }
+  auto warnings = result.value("warnings").toArray();
+  for (const auto& warning : compatibilityWarnings)
+  {
+    warnings.push_back(warning);
+  }
+  result.insert("warnings", warnings);
 }
 
 QJsonObject irPreviewJsonForMap(mdl::Map& map, const QJsonObject& ir)
@@ -2882,7 +2941,8 @@ McpBridgeToolResult irValidateResult(
   AppController& appController, const QJsonObject& params)
 {
   auto error = QString{};
-  const auto ir = irFromParams(params, error);
+  auto compatibilityWarnings = QJsonArray{};
+  const auto ir = irFromParams(params, error, &compatibilityWarnings);
   if (!ir)
   {
     return invalidParamsFailure(error);
@@ -2891,6 +2951,7 @@ McpBridgeToolResult irValidateResult(
   auto preview = mapWindow != nullptr
                    ? irPreviewJsonForMap(mapWindow->document().map(), *ir)
                    : irPreviewJson(*ir);
+  appendIrWarnings(preview, compatibilityWarnings);
   preview.insert("tool", "ir_validate");
   return McpBridgeToolResult::success(preview);
 }
@@ -2899,7 +2960,8 @@ McpBridgeToolResult irCompilePreviewResult(
   AppController& appController, const QJsonObject& params)
 {
   auto error = QString{};
-  const auto ir = irFromParams(params, error);
+  auto compatibilityWarnings = QJsonArray{};
+  const auto ir = irFromParams(params, error, &compatibilityWarnings);
   if (!ir)
   {
     return invalidParamsFailure(error);
@@ -2908,6 +2970,7 @@ McpBridgeToolResult irCompilePreviewResult(
   auto preview = mapWindow != nullptr
                    ? irPreviewJsonForMap(mapWindow->document().map(), *ir)
                    : irPreviewJson(*ir);
+  appendIrWarnings(preview, compatibilityWarnings);
   preview.insert("tool", "ir_compile_preview");
   preview.insert("willCommit", false);
   return McpBridgeToolResult::success(preview);
@@ -2920,7 +2983,8 @@ McpBridgeToolResult irCompilePreviewFromFileResult(
   int* nextPreviewIndex)
 {
   auto error = QString{};
-  const auto ir = irFromFileParams(params, error);
+  auto compatibilityWarnings = QJsonArray{};
+  const auto ir = irFromFileParams(params, error, &compatibilityWarnings);
   if (!ir)
   {
     return invalidParamsFailure(error);
@@ -2929,6 +2993,7 @@ McpBridgeToolResult irCompilePreviewFromFileResult(
   auto preview = mapWindow != nullptr
                    ? irPreviewJsonForMap(mapWindow->document().map(), *ir)
                    : irPreviewJson(*ir);
+  appendIrWarnings(preview, compatibilityWarnings);
   preview.insert("tool", "ir_compile_preview_from_file");
   preview.insert("willCommit", false);
   preview.insert("sourcePath", canonicalIrFilePath(params.value("path").toString()));
@@ -2955,12 +3020,14 @@ McpBridgeToolResult irCompilePreviewFromFileForMapResult(
   int* nextPreviewIndex)
 {
   auto error = QString{};
-  const auto ir = irFromFileParams(params, error);
+  auto compatibilityWarnings = QJsonArray{};
+  const auto ir = irFromFileParams(params, error, &compatibilityWarnings);
   if (!ir)
   {
     return invalidParamsFailure(error);
   }
   auto preview = irPreviewJsonForMap(map, *ir);
+  appendIrWarnings(preview, compatibilityWarnings);
   preview.insert("tool", "ir_compile_preview_from_file");
   preview.insert("willCommit", false);
   preview.insert("sourcePath", canonicalIrFilePath(params.value("path").toString()));
@@ -2977,27 +3044,17 @@ McpBridgeToolResult irApplyResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry)
+  McpObjectRegistry* objectRegistry)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (mapWindow == nullptr)
   {
     return noActiveDocumentFailure();
   }
-  auto& map = mapWindow->document().map();
-  auto error = QString{};
-  const auto ir = irFromParams(params, error);
-  if (!ir)
-  {
-    return irApplyPreMutationFailure(error, "fix_ir_payload_then_retry");
-  }
-
-  auto applyParams = params;
-  applyParams.insert("ir", *ir);
   return irApplyForMapResult(
-    map,
+    mapWindow->document().map(),
     toolName,
-    applyParams,
+    params,
     history,
     nextOperationIndex,
     metadataStore,
@@ -3013,16 +3070,46 @@ McpBridgeToolResult irApplyForMapResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry)
+  McpObjectRegistry* objectRegistry)
 {
   auto error = QString{};
-  const auto ir = irFromParams(params, error);
+  auto compatibilityWarnings = params.value("_irCompatibilityWarnings").toArray();
+  auto parsedWarnings = QJsonArray{};
+  const auto ir = irFromParams(params, error, &parsedWarnings);
   if (!ir)
   {
     return irApplyPreMutationFailure(error, "fix_ir_payload_then_retry");
   }
+  for (const auto& warning : parsedWarnings)
+  {
+    compatibilityWarnings.push_back(warning);
+  }
 
-  const auto documentFingerprint = documentFingerprintForMap(map);
+  const auto rollbackFailure = [&](
+                                 const mcp::McpErrorCode code,
+                                 const QString& stage,
+                                 const QString& message,
+                                 const QString& recoveryAction,
+                                 QJsonObject details = {}) {
+    details.insert("failureStage", stage);
+    details.insert("mutatedDocument", false);
+    details.insert("partialMutation", false);
+    details.insert("retrySafe", true);
+    details.insert("recoveryAction", recoveryAction);
+    return McpBridgeToolResult::failure(code, message, std::move(details));
+  };
+
+  auto stagedHistory = history;
+  auto stagedNextOperationIndex = nextOperationIndex;
+  auto stagedMetadataStore = metadataStore;
+  auto stagedModuleStore = moduleStore;
+  auto stagedObjectRegistry =
+    objectRegistry != nullptr ? *objectRegistry : McpObjectRegistry{};
+  auto* stagedObjectRegistryPtr =
+    objectRegistry != nullptr ? &stagedObjectRegistry : nullptr;
+
+  const auto documentFingerprint =
+    documentFingerprintForMap(map, stagedObjectRegistryPtr);
   const auto defaultMetadata = ir->value("defaultMetadata").isObject()
                                  ? ir->value("defaultMetadata").toObject()
                                  : QJsonObject{};
@@ -3034,18 +3121,34 @@ McpBridgeToolResult irApplyForMapResult(
     mergedDefaultMetadata.insert("moduleId", moduleId);
   }
 
+  const auto transactionName = [&] {
+    const auto requested = ir->value("name").toString().trimmed();
+    return requested.isEmpty() ? QString{"MCP: Apply IR"} : requested;
+  }();
+  auto transaction = mdl::Transaction{map, transactionName.toStdString()};
+  const auto cancelAndFail = [&](
+                               const mcp::McpErrorCode code,
+                               const QString& stage,
+                               const QString& message,
+                               const QString& recoveryAction,
+                               QJsonObject details = {}) {
+    if (transaction.state() == mdl::Transaction::State::Running)
+    {
+      transaction.cancel();
+    }
+    return rollbackFailure(code, stage, message, recoveryAction, std::move(details));
+  };
+
+  const auto historyStart = stagedHistory.size();
   auto appliedOperations = QJsonArray{};
-  auto operationIds = QStringList{};
-  auto objectIds = QStringList{};
-  auto warnings = QJsonArray{};
-  auto ok = true;
   const auto idsMode = params.value("idsMode").toString("count");
 
-  if (const auto operations = ir->value("operations"); operations.isArray())
+  if (const auto operations = ir->value("operations");
+      operations.isArray() && !operations.toArray().isEmpty())
   {
     auto batchParams = QJsonObject{
       {"operations", operations.toArray()},
-      {"name", ir->value("name").toString("MCP: Apply IR blockout")},
+      {"name", transactionName},
       {"select", ir->value("select").toBool(true)},
       {"detail", "ids"},
     };
@@ -3065,54 +3168,40 @@ McpBridgeToolResult irApplyForMapResult(
       map,
       "blockout_create_batch",
       batchParams,
-      history,
-      nextOperationIndex,
-      &metadataStore,
-      &moduleStore,
-      objectRegistry);
-    ok =
-      ok && blockoutResult.ok
-      && blockoutResult.result.value("validation").toObject().value("valid").toBool(true);
+      stagedHistory,
+      stagedNextOperationIndex,
+      &stagedMetadataStore,
+      &stagedModuleStore,
+      stagedObjectRegistryPtr);
     appliedOperations.push_back(blockoutResult.result);
-    if (!ok)
+    const auto geometryValid =
+      blockoutResult.ok
+      && blockoutResult.result.value("validation").toObject().value("valid").toBool(true);
+    if (!geometryValid)
     {
-      warnings.push_back("irApplyPreflightFailed");
-      auto resultObject = QJsonObject{
-        {"tool", toolName},
-        {"valid", false},
-        {"moduleId", moduleId},
-        {"operationIds", QJsonArray{}},
-        {"operationCount", 0},
-        {"changedObjectCount", 0},
-        {"applied", appliedOperations},
-        {"preview", irPreviewJsonForMap(map, *ir)},
-        {"warnings", warnings},
-      };
-      applyChangedObjectIdsMode(resultObject, {}, idsMode);
-      compactAppliedOperationResults(resultObject, idsMode);
-      if (!moduleId.isEmpty())
+      auto details = QJsonObject{{"stageResult", blockoutResult.result}};
+      if (!blockoutResult.ok)
       {
-        resultObject.insert("resourceUri", QString{"tbmcp://module/%1"}.arg(moduleId));
+        details.insert("stageError", blockoutResult.error.message);
+        details.insert("stageErrorDetails", blockoutResult.error.details);
       }
-      return McpBridgeToolResult::success(resultObject);
-    }
-    const auto operationId = blockoutResult.result.value("operationId").toString();
-    if (!operationId.isEmpty())
-    {
-      operationIds.push_back(operationId);
-    }
-    for (const auto& value : blockoutResult.result.value("changedObjectIds").toArray())
-    {
-      if (value.isString())
-      {
-        objectIds.push_back(value.toString());
-      }
+      return cancelAndFail(
+        blockoutResult.ok ? mcp::McpErrorCode::InvalidParams : blockoutResult.error.code,
+        "geometry",
+        blockoutResult.ok ? "IR geometry validation failed"
+                          : blockoutResult.error.message,
+        "fix_ir_geometry_then_preview_and_retry",
+        std::move(details));
     }
     mergeModuleFromOperationResult(
-      blockoutResult.result, documentFingerprint, mergedDefaultMetadata, moduleStore);
+      blockoutResult.result,
+      documentFingerprint,
+      mergedDefaultMetadata,
+      stagedModuleStore);
   }
 
-  if (const auto entities = ir->value("entities"); entities.isArray())
+  if (const auto entities = ir->value("entities");
+      entities.isArray() && !entities.toArray().isEmpty())
   {
     auto entityParams = QJsonObject{
       {"entities", entities.toArray()},
@@ -3122,48 +3211,118 @@ McpBridgeToolResult irApplyForMapResult(
       {"detail", "ids"},
     };
     auto result = createEntityCheckedBatchForMapResult(
-      map, "entity_create_checked_batch", entityParams, history, nextOperationIndex);
-    ok = ok && result.ok;
+      map,
+      "entity_create_checked_batch",
+      entityParams,
+      stagedHistory,
+      stagedNextOperationIndex);
     appliedOperations.push_back(result.result);
-    const auto operationId = result.result.value("operationId").toString();
-    if (!operationId.isEmpty())
+    if (!result.ok)
     {
-      operationIds.push_back(operationId);
-    }
-    for (const auto& value : result.result.value("changedObjectIds").toArray())
-    {
-      if (value.isString())
-      {
-        objectIds.push_back(value.toString());
-      }
+      return cancelAndFail(
+        result.error.code,
+        "entities",
+        result.error.message,
+        "fix_ir_entities_then_preview_and_retry",
+        QJsonObject{
+          {"stageErrorDetails", result.error.details},
+          {"stageResult", result.result},
+        });
     }
     mergeModuleFromOperationResult(
-      result.result, documentFingerprint, mergedDefaultMetadata, moduleStore);
+      result.result, documentFingerprint, mergedDefaultMetadata, stagedModuleStore);
   }
 
-  operationIds.removeDuplicates();
-  objectIds.removeDuplicates();
-  if (!ok)
+  auto childOperationIds = QStringList{};
+  auto objectIds = QStringList{};
+  for (auto i = historyStart; i < stagedHistory.size(); ++i)
   {
-    warnings.push_back("irApplyPartialFailure");
+    auto& child = stagedHistory[i];
+    childOperationIds.push_back(child.operationId);
+    objectIds.append(child.changedObjectIds);
+  }
+  childOperationIds.removeDuplicates();
+  objectIds.removeDuplicates();
+
+  const auto parentOperationId = QString{"mcp-op-%1"}.arg(stagedNextOperationIndex++);
+  for (auto i = historyStart; i < stagedHistory.size(); ++i)
+  {
+    stagedHistory[i].undoable = false;
+    stagedHistory[i].parentOperationId = parentOperationId;
+    stagedHistory[i].documentPath =
+      map.path().empty() ? QString{} : pathAsQString(map.path());
+    stagedHistory[i].documentFingerprint = documentFingerprint;
+  }
+
+  if (!transaction.commit())
+  {
+    return rollbackFailure(
+      mcp::McpErrorCode::InternalError,
+      "commit",
+      "Could not commit the aggregate IR transaction",
+      "refresh_status_then_retry_ir_apply");
   }
 
   auto result = QJsonObject{
     {"tool", toolName},
-    {"valid", ok},
+    {"valid", true},
+    {"schemaVersion", ir->value("schemaVersion").toInt(CurrentIrSchemaVersion)},
     {"moduleId", moduleId},
-    {"operationIds", stringsToJson(operationIds)},
-    {"operationCount", operationIds.size()},
+    {"operationId", parentOperationId},
+    {"parentOperationId", parentOperationId},
+    {"childOperationIds", stringsToJson(childOperationIds)},
+    {"operationIds", stringsToJson(childOperationIds)},
+    {"operationCount", childOperationIds.size()},
+    {"transactionName", transactionName},
     {"changedObjectCount", objectIds.size()},
     {"applied", appliedOperations},
     {"preview", irPreviewJsonForMap(map, *ir)},
-    {"warnings", warnings},
+    {"warnings", compatibilityWarnings},
+    {"mutatedDocument", true},
+    {"partialMutation", false},
+    {"atomic", true},
   };
   applyChangedObjectIdsMode(result, objectIds, idsMode);
   compactAppliedOperationResults(result, idsMode);
   if (!moduleId.isEmpty())
   {
     result.insert("resourceUri", QString{"tbmcp://module/%1"}.arg(moduleId));
+  }
+
+  auto parent = McpOperationRecord{};
+  parent.operationId = parentOperationId;
+  parent.toolName = toolName;
+  parent.transactionName = transactionName;
+  parent.operationKind = "aggregate";
+  parent.documentPath = map.path().empty() ? QString{} : pathAsQString(map.path());
+  parent.documentFingerprint = documentFingerprint;
+  parent.changedObjectIds = objectIds;
+  parent.childOperationIds = childOperationIds;
+  parent.setSummary(result);
+  parent.setDetail(QJsonObject{{"ir", *ir}, {"applied", appliedOperations}});
+  stagedHistory.push_back(std::move(parent));
+
+  if (!moduleId.isEmpty())
+  {
+    for (auto& [key, module] : stagedModuleStore)
+    {
+      Q_UNUSED(key);
+      if (
+        module.moduleId == moduleId && module.documentFingerprint == documentFingerprint
+        && !module.operationIds.contains(parentOperationId))
+      {
+        module.operationIds.push_back(parentOperationId);
+      }
+    }
+  }
+
+  history = std::move(stagedHistory);
+  nextOperationIndex = stagedNextOperationIndex;
+  metadataStore = std::move(stagedMetadataStore);
+  moduleStore = std::move(stagedModuleStore);
+  if (objectRegistry != nullptr)
+  {
+    *objectRegistry = std::move(stagedObjectRegistry);
   }
   return McpBridgeToolResult::success(result);
 }
@@ -3176,7 +3335,7 @@ McpBridgeToolResult irApplyFromFileResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry,
+  McpObjectRegistry* objectRegistry,
   std::map<QString, McpIrPreviewCacheRecord>* previewCache)
 {
   auto paramsWithPath = params;
@@ -3209,7 +3368,8 @@ McpBridgeToolResult irApplyFromFileResult(
   }
 
   auto error = QString{};
-  const auto ir = irFromFileParams(paramsWithPath, error);
+  auto compatibilityWarnings = QJsonArray{};
+  const auto ir = irFromFileParams(paramsWithPath, error, &compatibilityWarnings);
   if (!ir)
   {
     return irApplyPreMutationFailure(
@@ -3219,6 +3379,7 @@ McpBridgeToolResult irApplyFromFileResult(
   }
   auto applyParams = paramsWithPath;
   applyParams.insert("ir", *ir);
+  applyParams.insert("_irCompatibilityWarnings", compatibilityWarnings);
   auto result = irApplyResult(
     appController,
     toolName,
@@ -3250,7 +3411,7 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   int& nextOperationIndex,
   std::map<QString, McpBrushMetadataRecord>& metadataStore,
   std::map<QString, McpModuleRecord>& moduleStore,
-  const McpObjectRegistry* objectRegistry,
+  McpObjectRegistry* objectRegistry,
   std::map<QString, McpIrPreviewCacheRecord>* previewCache)
 {
   auto paramsWithPath = params;
@@ -3277,7 +3438,8 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   }
 
   auto error = QString{};
-  const auto ir = irFromFileParams(paramsWithPath, error);
+  auto compatibilityWarnings = QJsonArray{};
+  const auto ir = irFromFileParams(paramsWithPath, error, &compatibilityWarnings);
   if (!ir)
   {
     return irApplyPreMutationFailure(
@@ -3287,6 +3449,7 @@ McpBridgeToolResult irApplyFromFileForMapResult(
   }
   auto applyParams = paramsWithPath;
   applyParams.insert("ir", *ir);
+  applyParams.insert("_irCompatibilityWarnings", compatibilityWarnings);
   auto result = irApplyForMapResult(
     map,
     toolName,

@@ -77,6 +77,9 @@ struct McpOperationRecord
   QByteArray summaryJson;
   QByteArray detailJson;
   bool undone = false;
+  bool undoable = true;
+  QString parentOperationId;
+  QStringList childOperationIds;
 
   McpOperationRecord();
   void setChangedObjectIds(const QJsonArray& ids);
