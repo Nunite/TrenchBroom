@@ -41,16 +41,34 @@ McpBridgeToolResult irValidateResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult irCompilePreviewResult(
   AppController& appController, const QJsonObject& params);
+McpBridgeToolResult irCompilePreviewResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
+McpBridgeToolResult irCompilePreviewForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry);
 McpBridgeToolResult irCompilePreviewFromFileResult(
   AppController& appController,
   const QJsonObject& params,
   std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr,
-  int* nextPreviewIndex = nullptr);
+  int* nextPreviewIndex = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  const std::map<QString, McpModuleRecord>* moduleStore = nullptr,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult irCompilePreviewFromFileForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
   std::map<QString, McpIrPreviewCacheRecord>* previewCache = nullptr,
-  int* nextPreviewIndex = nullptr);
+  int* nextPreviewIndex = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  const std::map<QString, McpModuleRecord>* moduleStore = nullptr,
+  const McpObjectRegistry* objectRegistry = nullptr);
 McpBridgeToolResult irApplyResult(
   AppController& appController,
   const QString& toolName,

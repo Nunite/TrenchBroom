@@ -659,7 +659,9 @@ QString moduleContentHash(
       externalObjectIdForNode(map, *node, objectRegistry),
       QByteArray::fromStdString(stream.str()));
   }
-  std::ranges::sort(serializedNodes, {}, &std::pair<QString, QByteArray>::first);
+  std::ranges::sort(serializedNodes, [](const auto& lhs, const auto& rhs) {
+    return lhs.second != rhs.second ? lhs.second < rhs.second : lhs.first < rhs.first;
+  });
   auto bytes = QByteArray{};
   for (const auto& [objectId, serialized] : serializedNodes)
   {
@@ -1446,6 +1448,104 @@ QJsonObject moduleSummary(
   };
 }
 
+QString canonicalIrHash(const QJsonObject& ir)
+{
+  return QString{"sha256:%1"}.arg(QString::fromLatin1(
+    QCryptographicHash::hash(
+      QJsonDocument{ir}.toJson(QJsonDocument::Compact), QCryptographicHash::Sha256)
+      .toHex()));
+}
+
+std::vector<mdl::Node*> canonicalModuleNodes(
+  mdl::Map& map, const McpModuleRecord& module, const McpObjectRegistry& objectRegistry)
+{
+  auto nodes = std::vector<mdl::Node*>{};
+  for (const auto& objectId : module.objectIds)
+  {
+    auto warnings = QJsonArray{};
+    if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings);
+        node != nullptr && !nodeInVector(nodes, *node))
+    {
+      nodes.push_back(node);
+    }
+  }
+  return nodes;
+}
+
+QJsonObject replacementTargetState(
+  mdl::Map& map,
+  const QJsonObject& ir,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
+  const auto defaultMetadata = ir.value("defaultMetadata").toObject();
+  const auto moduleId =
+    ir.value("moduleId").toString(defaultMetadata.value("moduleId").toString());
+  const auto documentFingerprint = documentFingerprintForMap(map, &objectRegistry);
+  const auto module =
+    mergedModuleRecord(moduleId, documentFingerprint, metadataStore, moduleStore);
+  const auto nodes = canonicalModuleNodes(map, module, objectRegistry);
+  auto canonicalObjectIds = QStringList{};
+  for (auto* node : nodes)
+  {
+    canonicalObjectIds.push_back(externalObjectIdForNode(map, *node, objectRegistry));
+  }
+  canonicalObjectIds.removeDuplicates();
+  canonicalObjectIds.sort(Qt::CaseInsensitive);
+  const auto currentHash = moduleContentHash(map, nodes, objectRegistry);
+  auto effectiveRevision = module.revision;
+  if (effectiveRevision <= 0 && !nodes.empty())
+  {
+    effectiveRevision = 1;
+  }
+  else if (!module.contentHash.isEmpty() && module.contentHash != currentHash)
+  {
+    ++effectiveRevision;
+  }
+  const auto exists =
+    findModuleRecord(moduleId, documentFingerprint, moduleStore) != nullptr
+    || !module.objectIds.isEmpty();
+  return QJsonObject{
+    {"targetModuleExists", exists},
+    {"targetModuleRevision", effectiveRevision},
+    {"targetModuleContentHash", currentHash},
+    {"targetCanonicalObjectCount", canonicalObjectIds.size()},
+    {"targetCanonicalObjectIds", stringsToJson(canonicalObjectIds)},
+  };
+}
+
+void enrichIrPreviewForApply(
+  QJsonObject& preview,
+  mdl::Map& map,
+  const QJsonObject& ir,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const std::map<QString, McpModuleRecord>* moduleStore,
+  const McpObjectRegistry* objectRegistry)
+{
+  preview.insert("applyMode", ir.value("applyMode").toString("create"));
+  preview.insert("irHash", canonicalIrHash(ir));
+  if (
+    ir.value("applyMode").toString("create") != "replace_module"
+    || metadataStore == nullptr || moduleStore == nullptr || objectRegistry == nullptr)
+  {
+    return;
+  }
+  const auto target =
+    replacementTargetState(map, ir, *metadataStore, *moduleStore, *objectRegistry);
+  for (auto it = target.begin(); it != target.end(); ++it)
+  {
+    preview.insert(it.key(), it.value());
+  }
+  if (!target.value("targetModuleExists").toBool(false))
+  {
+    preview.insert("valid", false);
+    auto warnings = preview.value("warnings").toArray();
+    warnings.push_back("replaceModuleTargetNotFound");
+    preview.insert("warnings", warnings);
+  }
+}
+
 bool metadataMarksContinuityTarget(const QJsonObject& metadata)
 {
   const auto role = metadata.value("role").toString().trimmed().toLower();
@@ -1571,6 +1671,14 @@ bool validateIrShape(QJsonObject& ir, QString& error, QJsonArray* warnings = nul
     return false;
   }
 
+  const auto applyMode = ir.value("applyMode").toString("create").trimmed().toLower();
+  if (applyMode != "create" && applyMode != "replace_module")
+  {
+    error = "IR applyMode must be create or replace_module";
+    return false;
+  }
+  ir.insert("applyMode", applyMode);
+
   const auto operationsValue = ir.value("operations");
   const auto entitiesValue = ir.value("entities");
   const auto hasOperations = !operationsValue.isUndefined() && !operationsValue.isNull();
@@ -1646,6 +1754,10 @@ std::optional<QJsonObject> irFromParams(
     {
       ir.insert("qualityPolicy", params.value("qualityPolicy"));
     }
+    if (params.contains("applyMode"))
+    {
+      ir.insert("applyMode", params.value("applyMode"));
+    }
     if (!validateIrShape(ir, error, warnings))
     {
       return std::nullopt;
@@ -1685,7 +1797,8 @@ std::optional<QJsonObject> irFromParams(
           "defaultMetadata",
           "material",
           "grid",
-          "qualityPolicy"})
+          "qualityPolicy",
+          "applyMode"})
     {
       if (params.contains(key))
       {
@@ -1746,6 +1859,10 @@ std::optional<QJsonObject> irFromFileParams(
   if (params.value("qualityPolicy").isObject())
   {
     ir.insert("qualityPolicy", params.value("qualityPolicy"));
+  }
+  if (params.contains("applyMode"))
+  {
+    ir.insert("applyMode", params.value("applyMode"));
   }
   if (!validateIrShape(ir, error, warnings))
   {
@@ -1951,6 +2068,18 @@ McpBridgeToolResult cachedIrApplyParams(
   applyParams.insert("path", record.sourcePath);
   applyParams.insert("previewId", previewId);
   applyParams.insert("irHash", record.irHash);
+  applyParams.insert("expectedIrHash", record.irHash);
+  if (record.preview.value("applyMode").toString() == "replace_module")
+  {
+    applyParams.insert("applyMode", "replace_module");
+    applyParams.insert(
+      "expectedTargetModuleRevision", record.preview.value("targetModuleRevision"));
+    applyParams.insert(
+      "expectedTargetModuleContentHash", record.preview.value("targetModuleContentHash"));
+    applyParams.insert(
+      "expectedTargetCanonicalObjectIds",
+      record.preview.value("targetCanonicalObjectIds"));
+  }
   if (
     !applyParams.contains("qualityPolicy")
     && record.preview.value("qualityPolicy").isObject())
@@ -3360,8 +3489,47 @@ McpBridgeToolResult irValidateResult(
   auto preview = mapWindow != nullptr
                    ? irPreviewJsonForMap(mapWindow->document().map(), *ir)
                    : irPreviewJson(*ir);
+  if (mapWindow != nullptr)
+  {
+    enrichIrPreviewForApply(
+      preview, mapWindow->document().map(), *ir, nullptr, nullptr, nullptr);
+  }
   appendIrWarnings(preview, compatibilityWarnings);
   preview.insert("tool", "ir_validate");
+  return McpBridgeToolResult::success(preview);
+}
+
+McpBridgeToolResult irCompilePreviewResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto error = QString{};
+  auto compatibilityWarnings = QJsonArray{};
+  const auto ir = irFromParams(params, error, &compatibilityWarnings);
+  if (!ir)
+  {
+    return invalidParamsFailure(error);
+  }
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  auto preview = mapWindow != nullptr
+                   ? irPreviewJsonForMap(mapWindow->document().map(), *ir)
+                   : irPreviewJson(*ir);
+  if (mapWindow != nullptr)
+  {
+    enrichIrPreviewForApply(
+      preview,
+      mapWindow->document().map(),
+      *ir,
+      &metadataStore,
+      &moduleStore,
+      &objectRegistry);
+  }
+  appendIrWarnings(preview, compatibilityWarnings);
+  preview.insert("tool", "ir_compile_preview");
+  preview.insert("willCommit", false);
   return McpBridgeToolResult::success(preview);
 }
 
@@ -3379,6 +3547,34 @@ McpBridgeToolResult irCompilePreviewResult(
   auto preview = mapWindow != nullptr
                    ? irPreviewJsonForMap(mapWindow->document().map(), *ir)
                    : irPreviewJson(*ir);
+  if (mapWindow != nullptr)
+  {
+    enrichIrPreviewForApply(
+      preview, mapWindow->document().map(), *ir, nullptr, nullptr, nullptr);
+  }
+  appendIrWarnings(preview, compatibilityWarnings);
+  preview.insert("tool", "ir_compile_preview");
+  preview.insert("willCommit", false);
+  return McpBridgeToolResult::success(preview);
+}
+
+McpBridgeToolResult irCompilePreviewForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  const std::map<QString, McpModuleRecord>& moduleStore,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto error = QString{};
+  auto compatibilityWarnings = QJsonArray{};
+  const auto ir = irFromParams(params, error, &compatibilityWarnings);
+  if (!ir)
+  {
+    return invalidParamsFailure(error);
+  }
+  auto preview = irPreviewJsonForMap(map, *ir);
+  enrichIrPreviewForApply(
+    preview, map, *ir, &metadataStore, &moduleStore, &objectRegistry);
   appendIrWarnings(preview, compatibilityWarnings);
   preview.insert("tool", "ir_compile_preview");
   preview.insert("willCommit", false);
@@ -3389,7 +3585,10 @@ McpBridgeToolResult irCompilePreviewFromFileResult(
   AppController& appController,
   const QJsonObject& params,
   std::map<QString, McpIrPreviewCacheRecord>* previewCache,
-  int* nextPreviewIndex)
+  int* nextPreviewIndex,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const std::map<QString, McpModuleRecord>* moduleStore,
+  const McpObjectRegistry* objectRegistry)
 {
   auto error = QString{};
   auto compatibilityWarnings = QJsonArray{};
@@ -3408,6 +3607,13 @@ McpBridgeToolResult irCompilePreviewFromFileResult(
   preview.insert("sourcePath", canonicalIrFilePath(params.value("path").toString()));
   if (mapWindow != nullptr)
   {
+    enrichIrPreviewForApply(
+      preview,
+      mapWindow->document().map(),
+      *ir,
+      metadataStore,
+      moduleStore,
+      objectRegistry);
     attachIrPreviewCacheRecord(
       preview,
       mapWindow->document().map(),
@@ -3426,7 +3632,10 @@ McpBridgeToolResult irCompilePreviewFromFileForMapResult(
   mdl::Map& map,
   const QJsonObject& params,
   std::map<QString, McpIrPreviewCacheRecord>* previewCache,
-  int* nextPreviewIndex)
+  int* nextPreviewIndex,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const std::map<QString, McpModuleRecord>* moduleStore,
+  const McpObjectRegistry* objectRegistry)
 {
   auto error = QString{};
   auto compatibilityWarnings = QJsonArray{};
@@ -3436,6 +3645,7 @@ McpBridgeToolResult irCompilePreviewFromFileForMapResult(
     return invalidParamsFailure(error);
   }
   auto preview = irPreviewJsonForMap(map, *ir);
+  enrichIrPreviewForApply(preview, map, *ir, metadataStore, moduleStore, objectRegistry);
   appendIrWarnings(preview, compatibilityWarnings);
   preview.insert("tool", "ir_compile_preview_from_file");
   preview.insert("willCommit", false);
@@ -3524,10 +3734,118 @@ McpBridgeToolResult irApplyForMapResult(
                                  : QJsonObject{};
   const auto moduleId =
     ir->value("moduleId").toString(defaultMetadata.value("moduleId").toString());
+  const auto applyMode = ir->value("applyMode").toString("create");
   auto mergedDefaultMetadata = defaultMetadata;
   if (!moduleId.isEmpty() && !mergedDefaultMetadata.contains("moduleId"))
   {
     mergedDefaultMetadata.insert("moduleId", moduleId);
+  }
+
+  auto previousModuleRevision = 0;
+  auto previousModuleContentHash = QString{};
+  auto replacementNodes = std::vector<mdl::Node*>{};
+  auto removedObjectIds = QStringList{};
+  if (applyMode == "replace_module")
+  {
+    if (objectRegistry == nullptr)
+    {
+      return rollbackFailure(
+        mcp::McpErrorCode::InternalError,
+        "replacement_guard",
+        "replace_module requires the MCP object registry",
+        "refresh_status_then_preview_again");
+    }
+    if (moduleId.trimmed().isEmpty())
+    {
+      return rollbackFailure(
+        mcp::McpErrorCode::InvalidParams,
+        "replacement_guard",
+        "replace_module requires IR moduleId",
+        "add_module_id_then_preview_again");
+    }
+    reconcileMcpSessionForMap(
+      map, stagedMetadataStore, stagedModuleStore, stagedObjectRegistry);
+    const auto targetState = replacementTargetState(
+      map, *ir, stagedMetadataStore, stagedModuleStore, stagedObjectRegistry);
+    if (!targetState.value("targetModuleExists").toBool(false))
+    {
+      return rollbackFailure(
+        mcp::McpErrorCode::InvalidParams,
+        "replacement_guard",
+        QString{"replace_module target does not exist: %1"}.arg(moduleId),
+        "refresh_module_and_preview_again",
+        QJsonObject{{"moduleId", moduleId}});
+    }
+
+    const auto actualIrHash = params.value("irHash").toString().trimmed().isEmpty()
+                                ? canonicalIrHash(*ir)
+                                : params.value("irHash").toString().trimmed();
+    const auto expectedIrHash = params.value("expectedIrHash").toString().trimmed();
+    const auto expectedContentHash =
+      params.value("expectedTargetModuleContentHash").toString().trimmed();
+    const auto expectedRevisionValue = params.value("expectedTargetModuleRevision");
+    const auto expectedIdsValue = params.value("expectedTargetCanonicalObjectIds");
+    if (
+      expectedIrHash.isEmpty() || expectedContentHash.isEmpty()
+      || !expectedRevisionValue.isDouble() || !expectedIdsValue.isArray())
+    {
+      return rollbackFailure(
+        mcp::McpErrorCode::InvalidParams,
+        "replacement_guard",
+        "replace_module requires expectedIrHash, expectedTargetModuleRevision, "
+        "expectedTargetModuleContentHash, and expectedTargetCanonicalObjectIds",
+        "run_ir_compile_preview_again");
+    }
+
+    auto expectedIds = stringListFromArray(expectedIdsValue.toArray());
+    for (auto& expectedId : expectedIds)
+    {
+      if (McpObjectRegistry::isLegacyObjectId(expectedId))
+      {
+        expectedId = stagedObjectRegistry.externalIdForLegacy(map, expectedId);
+      }
+    }
+    auto actualIds =
+      stringListFromArray(targetState.value("targetCanonicalObjectIds").toArray());
+    expectedIds.removeDuplicates();
+    expectedIds.sort(Qt::CaseInsensitive);
+    actualIds.removeDuplicates();
+    actualIds.sort(Qt::CaseInsensitive);
+    const auto actualRevision = targetState.value("targetModuleRevision").toInt();
+    const auto actualContentHash =
+      targetState.value("targetModuleContentHash").toString();
+    if (
+      expectedIrHash != actualIrHash || expectedRevisionValue.toInt() != actualRevision
+      || expectedContentHash != actualContentHash || expectedIds != actualIds)
+    {
+      return rollbackFailure(
+        mcp::McpErrorCode::InvalidParams,
+        "replacement_guard",
+        "replace_module preview guard no longer matches the IR or target module",
+        "run_ir_compile_preview_again",
+        QJsonObject{
+          {"expectedIrHash", expectedIrHash},
+          {"actualIrHash", actualIrHash},
+          {"expectedTargetModuleRevision", expectedRevisionValue},
+          {"actualTargetModuleRevision", actualRevision},
+          {"expectedTargetModuleContentHash", expectedContentHash},
+          {"actualTargetModuleContentHash", actualContentHash},
+          {"expectedTargetCanonicalObjectIds", stringsToJson(expectedIds)},
+          {"actualTargetCanonicalObjectIds", stringsToJson(actualIds)},
+        });
+    }
+
+    previousModuleRevision = actualRevision;
+    previousModuleContentHash = actualContentHash;
+    const auto targetModule = mergedModuleRecord(
+      moduleId, documentFingerprint, stagedMetadataStore, stagedModuleStore);
+    replacementNodes = canonicalModuleNodes(map, targetModule, stagedObjectRegistry);
+    for (auto* node : replacementNodes)
+    {
+      removedObjectIds.push_back(
+        externalObjectIdForNode(map, *node, stagedObjectRegistry));
+    }
+    removedObjectIds.removeDuplicates();
   }
 
   const auto transactionName = [&] {
@@ -3551,6 +3869,33 @@ McpBridgeToolResult irApplyForMapResult(
   const auto historyStart = stagedHistory.size();
   auto appliedOperations = QJsonArray{};
   const auto idsMode = params.value("idsMode").toString("count");
+
+  if (applyMode == "replace_module")
+  {
+    if (!replacementNodes.empty())
+    {
+      const auto removed = removeNodesWithTransaction(
+        map,
+        QString{"%1: remove previous module"}.arg(transactionName),
+        replacementNodes);
+      if (!removed)
+      {
+        return cancelAndFail(
+          mcp::McpErrorCode::InternalError,
+          "remove_previous_module",
+          "Could not remove the previous module inside the aggregate transaction",
+          "refresh_module_and_preview_again");
+      }
+    }
+    std::erase_if(stagedMetadataStore, [&](const auto& entry) {
+      return recordMatchesDocument(entry.second, documentFingerprint)
+             && entry.second.metadata.value("moduleId").toString() == moduleId;
+    });
+    std::erase_if(stagedModuleStore, [&](const auto& entry) {
+      return recordMatchesDocument(entry.second, documentFingerprint)
+             && entry.second.moduleId == moduleId;
+    });
+  }
 
   if (const auto operations = ir->value("operations");
       operations.isArray() && !operations.toArray().isEmpty())
@@ -3686,6 +4031,11 @@ McpBridgeToolResult irApplyForMapResult(
     {"tool", toolName},
     {"valid", true},
     {"schemaVersion", ir->value("schemaVersion").toInt(CurrentIrSchemaVersion)},
+    {"applyMode", applyMode},
+    {"irHash",
+     params.value("irHash").toString().trimmed().isEmpty()
+       ? canonicalIrHash(*ir)
+       : params.value("irHash").toString().trimmed()},
     {"moduleId", moduleId},
     {"operationId", parentOperationId},
     {"parentOperationId", parentOperationId},
@@ -3701,6 +4051,12 @@ McpBridgeToolResult irApplyForMapResult(
     {"partialMutation", false},
     {"atomic", true},
   };
+  if (applyMode == "replace_module")
+  {
+    result.insert("previousModuleRevision", previousModuleRevision);
+    result.insert("previousModuleContentHash", previousModuleContentHash);
+    result.insert("removedCanonicalObjectCount", removedObjectIds.size());
+  }
   for (const auto& key :
        {"qualityPolicy", "curveQuality", "qualityStatus", "acceptancePassed"})
   {
@@ -3724,6 +4080,7 @@ McpBridgeToolResult irApplyForMapResult(
   parent.documentPath = map.path().empty() ? QString{} : pathAsQString(map.path());
   parent.documentFingerprint = documentFingerprint;
   parent.changedObjectIds = objectIds;
+  parent.deletedObjectIds = removedObjectIds;
   parent.childOperationIds = childOperationIds;
   parent.setSummary(result);
   parent.setDetail(QJsonObject{{"ir", *ir}, {"applied", appliedOperations}});
@@ -3741,7 +4098,41 @@ McpBridgeToolResult irApplyForMapResult(
         module.operationIds.push_back(parentOperationId);
       }
     }
+    if (applyMode == "replace_module")
+    {
+      for (auto& [key, module] : stagedModuleStore)
+      {
+        Q_UNUSED(key);
+        if (
+          module.moduleId == moduleId
+          && recordMatchesDocument(module, documentFingerprint))
+        {
+          module.revision = previousModuleRevision;
+          module.contentHash.clear();
+          break;
+        }
+      }
+    }
   }
+
+  if (objectRegistry != nullptr)
+  {
+    reconcileMcpSessionForMap(
+      map,
+      stagedMetadataStore,
+      stagedModuleStore,
+      stagedObjectRegistry,
+      parentOperationId);
+    if (!moduleId.isEmpty())
+    {
+      const auto module = mergedModuleRecord(
+        moduleId, documentFingerprint, stagedMetadataStore, stagedModuleStore);
+      result.insert("moduleRevision", module.revision);
+      result.insert("moduleContentHash", module.contentHash);
+      result.insert("createdCanonicalObjectCount", module.objectIds.size());
+    }
+  }
+  stagedHistory.back().setSummary(result);
 
   history = std::move(stagedHistory);
   nextOperationIndex = stagedNextOperationIndex;
@@ -3803,6 +4194,14 @@ McpBridgeToolResult irApplyFromFileResult(
       error,
       "fix_ir_file_or_preview_again",
       QJsonObject{{"sourcePath", paramsWithPath.value("path").toString()}});
+  }
+  if (
+    ir->value("applyMode").toString("create") == "replace_module"
+    && paramsWithPath.value("previewId").toString().trimmed().isEmpty())
+  {
+    return irApplyPreMutationFailure(
+      "replace_module file apply requires previewId",
+      "run_ir_compile_preview_from_file_again");
   }
   auto applyParams = paramsWithPath;
   applyParams.insert("ir", *ir);
@@ -3873,6 +4272,14 @@ McpBridgeToolResult irApplyFromFileForMapResult(
       error,
       "fix_ir_file_or_preview_again",
       QJsonObject{{"sourcePath", paramsWithPath.value("path").toString()}});
+  }
+  if (
+    ir->value("applyMode").toString("create") == "replace_module"
+    && paramsWithPath.value("previewId").toString().trimmed().isEmpty())
+  {
+    return irApplyPreMutationFailure(
+      "replace_module file apply requires previewId",
+      "run_ir_compile_preview_from_file_again");
   }
   auto applyParams = paramsWithPath;
   applyParams.insert("ir", *ir);

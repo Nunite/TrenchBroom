@@ -759,12 +759,19 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         }
         if (toolName == "ir_compile_preview")
         {
-          return irCompilePreviewResult(appController, params);
+          return irCompilePreviewResult(
+            appController, params, m_brushMetadata, m_modules, m_objectRegistry);
         }
         if (toolName == "ir_compile_preview_from_file")
         {
           return irCompilePreviewFromFileResult(
-            appController, params, &m_irPreviewCache, &m_nextIrPreviewIndex);
+            appController,
+            params,
+            &m_irPreviewCache,
+            &m_nextIrPreviewIndex,
+            &m_brushMetadata,
+            &m_modules,
+            &m_objectRegistry);
         }
         if (toolName == "ir_apply")
         {

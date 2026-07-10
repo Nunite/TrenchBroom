@@ -936,6 +936,19 @@ TEST_CASE("McpToolCatalog")
     CHECK(irProperties.value("moduleId").isObject());
     CHECK(irProperties.value("defaultMetadata").isObject());
     CHECK(irProperties.value("qualityPolicy").isObject());
+    CHECK(irProperties.value("applyMode").isObject());
+    CHECK(irProperties.value("expectedIrHash").isObject());
+    CHECK(irProperties.value("expectedTargetModuleRevision").isObject());
+    CHECK(irProperties.value("expectedTargetModuleContentHash").isObject());
+    CHECK(irProperties.value("expectedTargetCanonicalObjectIds").isObject());
+
+    const auto irPreview = findToolDefinition("ir_compile_preview");
+    REQUIRE(irPreview);
+    const auto irPreviewProperties =
+      irPreview->inputSchema.value("properties").toObject();
+    CHECK(irPreviewProperties.value("applyMode").isObject());
+    CHECK(irPreviewProperties.value("moduleId").isObject());
+    CHECK(irPreviewProperties.value("defaultMetadata").isObject());
 
     const auto irPreviewFile = findToolDefinition("ir_compile_preview_from_file");
     REQUIRE(irPreviewFile);
@@ -945,6 +958,10 @@ TEST_CASE("McpToolCatalog")
     CHECK(irPreviewFile->inputSchema.value("properties")
             .toObject()
             .value("qualityPolicy")
+            .isObject());
+    CHECK(irPreviewFile->inputSchema.value("properties")
+            .toObject()
+            .value("applyMode")
             .isObject());
 
     const auto irApplyFile = findToolDefinition("ir_apply_from_file");
@@ -957,6 +974,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(irApplyFileProperties.value("path").isObject());
     CHECK(irApplyFileProperties.value("previewId").isObject());
     CHECK(irApplyFileProperties.value("qualityPolicy").isObject());
+    CHECK(irApplyFileProperties.value("applyMode").isObject());
 
     const auto blockoutBatch = findToolDefinition("blockout_create_batch");
     REQUIRE(blockoutBatch);

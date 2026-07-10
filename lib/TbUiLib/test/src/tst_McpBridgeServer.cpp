@@ -4567,6 +4567,308 @@ TEST_CASE(
 }
 
 TEST_CASE(
+  "McpBridgeServer replace_module uses exact preview guards and one native undo",
+  "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto create = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"ir",
+       QJsonObject{
+         {"schemaVersion", 1},
+         {"moduleId", "replace-test-module"},
+         {"defaultMetadata", QJsonObject{{"moduleId", "replace-test-module"}}},
+         {"select", false},
+         {"operations",
+          QJsonArray{QJsonObject{
+            {"type", "box"},
+            {"min", QJsonArray{0, 0, 0}},
+            {"max", QJsonArray{64, 64, 16}},
+          }}},
+       }},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  REQUIRE(create.ok);
+  const auto initialDescendantCount = map.worldNode().descendantCount();
+  const auto initialState = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "replace-test-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(initialState.ok);
+  CHECK(initialState.result.value("moduleRevision").toInt() == 1);
+
+  const auto replacementIr = QJsonObject{
+    {"schemaVersion", 1},
+    {"applyMode", "replace_module"},
+    {"moduleId", "replace-test-module"},
+    {"defaultMetadata", QJsonObject{{"moduleId", "replace-test-module"}}},
+    {"select", false},
+    {"operations",
+     QJsonArray{
+       QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{96, 64, 16}},
+       },
+       QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 80, 0}},
+         {"max", QJsonArray{96, 96, 32}},
+       },
+     }},
+  };
+  const auto preview = irCompilePreviewForMapResult(
+    map, QJsonObject{{"ir", replacementIr}}, metadataStore, moduleStore, objectRegistry);
+  REQUIRE(preview.ok);
+  CHECK(preview.result.value("valid").toBool());
+  CHECK(preview.result.value("targetModuleExists").toBool());
+  CHECK(preview.result.value("targetModuleRevision").toInt() == 1);
+  CHECK(preview.result.value("targetCanonicalObjectCount").toInt() == 1);
+
+  const auto metadataBeforeReplace = metadataStore;
+  const auto modulesBeforeReplace = moduleStore;
+  const auto replace = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"ir", replacementIr},
+      {"expectedIrHash", preview.result.value("irHash")},
+      {"expectedTargetModuleRevision", preview.result.value("targetModuleRevision")},
+      {"expectedTargetModuleContentHash",
+       preview.result.value("targetModuleContentHash")},
+      {"expectedTargetCanonicalObjectIds",
+       preview.result.value("targetCanonicalObjectIds")},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  const auto replaceError =
+    replace.ok ? std::string{} : replace.error.message.toStdString();
+  INFO(replaceError);
+  REQUIRE(replace.ok);
+  CHECK(replace.result.value("applyMode").toString() == "replace_module");
+  CHECK(replace.result.value("previousModuleRevision").toInt() == 1);
+  CHECK(replace.result.value("moduleRevision").toInt() == 2);
+  CHECK(replace.result.value("removedCanonicalObjectCount").toInt() == 1);
+  CHECK(replace.result.value("createdCanonicalObjectCount").toInt() == 2);
+  CHECK(map.worldNode().descendantCount() == initialDescendantCount + 1);
+  const auto replaceOperationId = replace.result.value("parentOperationId").toString();
+  attachMcpSessionDelta(
+    history,
+    replaceOperationId,
+    metadataBeforeReplace,
+    modulesBeforeReplace,
+    metadataStore,
+    moduleStore);
+  const auto replacementHash = replace.result.value("moduleContentHash").toString();
+
+  const auto undo =
+    historyUndoForMapResult(map, history, &objectRegistry, &metadataStore, &moduleStore);
+  REQUIRE(undo.ok);
+  CHECK(map.worldNode().descendantCount() == initialDescendantCount);
+  const auto restored = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "replace-test-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(restored.ok);
+  CHECK(restored.result.value("moduleRevision").toInt() == 1);
+  CHECK(
+    restored.result.value("moduleContentHash").toString()
+    == initialState.result.value("moduleContentHash").toString());
+  CHECK(restored.result.value("canonicalObjectCount").toInt() == 1);
+
+  const auto redo =
+    historyRedoForMapResult(map, history, &objectRegistry, &metadataStore, &moduleStore);
+  REQUIRE(redo.ok);
+  CHECK(map.worldNode().descendantCount() == initialDescendantCount + 1);
+  const auto redone = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "replace-test-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(redone.ok);
+  CHECK(redone.result.value("moduleRevision").toInt() == 2);
+  CHECK(redone.result.value("moduleContentHash").toString() == replacementHash);
+  CHECK(redone.result.value("canonicalObjectCount").toInt() == 2);
+}
+
+TEST_CASE(
+  "McpBridgeServer replace_module rejects stale target and rolls back later stages",
+  "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+  const auto create = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"ir",
+       QJsonObject{
+         {"moduleId", "guarded-module"},
+         {"defaultMetadata", QJsonObject{{"moduleId", "guarded-module"}}},
+         {"select", false},
+         {"operations",
+          QJsonArray{QJsonObject{
+            {"type", "box"},
+            {"min", QJsonArray{0, 0, 0}},
+            {"max", QJsonArray{64, 64, 16}},
+          }}},
+       }},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  REQUIRE(create.ok);
+
+  const auto replacementIr = QJsonObject{
+    {"schemaVersion", 1},
+    {"applyMode", "replace_module"},
+    {"moduleId", "guarded-module"},
+    {"defaultMetadata", QJsonObject{{"moduleId", "guarded-module"}}},
+    {"select", false},
+    {"operations",
+     QJsonArray{QJsonObject{
+       {"type", "box"},
+       {"min", QJsonArray{0, 0, 0}},
+       {"max", QJsonArray{96, 96, 16}},
+     }}},
+  };
+  const auto preview = irCompilePreviewForMapResult(
+    map, QJsonObject{{"ir", replacementIr}}, metadataStore, moduleStore, objectRegistry);
+  REQUIRE(preview.ok);
+
+  const auto transform = transformObjectsForMapResult(
+    map,
+    "objects_transform",
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "guarded-module"}}},
+      {"operation", "translate"},
+      {"delta", QJsonArray{16, 0, 0}},
+    },
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(transform.ok);
+  const auto historyCountAfterManualEdit = history.size();
+  const auto descendantCountAfterManualEdit = map.worldNode().descendantCount();
+  const auto staleReplace = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"ir", replacementIr},
+      {"expectedIrHash", preview.result.value("irHash")},
+      {"expectedTargetModuleRevision", preview.result.value("targetModuleRevision")},
+      {"expectedTargetModuleContentHash",
+       preview.result.value("targetModuleContentHash")},
+      {"expectedTargetCanonicalObjectIds",
+       preview.result.value("targetCanonicalObjectIds")},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  REQUIRE_FALSE(staleReplace.ok);
+  CHECK_FALSE(staleReplace.error.details.value("mutatedDocument").toBool(true));
+  CHECK(staleReplace.error.details.value("retrySafe").toBool(false));
+  CHECK(
+    staleReplace.error.details.value("failureStage").toString() == "replacement_guard");
+  CHECK(history.size() == historyCountAfterManualEdit);
+  CHECK(map.worldNode().descendantCount() == descendantCountAfterManualEdit);
+
+  const auto refreshedPreview = irCompilePreviewForMapResult(
+    map, QJsonObject{{"ir", replacementIr}}, metadataStore, moduleStore, objectRegistry);
+  REQUIRE(refreshedPreview.ok);
+  auto invalidEntityIr = replacementIr;
+  invalidEntityIr.insert(
+    "entities", QJsonArray{QJsonObject{{"classname", "not_a_defined_entity"}}});
+  const auto invalidPreview = irCompilePreviewForMapResult(
+    map,
+    QJsonObject{{"ir", invalidEntityIr}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(invalidPreview.ok);
+  const auto historyBeforeInvalidApply = history;
+  const auto metadataBeforeInvalidApply = metadataStore;
+  const auto modulesBeforeInvalidApply = moduleStore;
+  const auto countBeforeInvalidApply = map.worldNode().descendantCount();
+  const auto invalidApply = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"ir", invalidEntityIr},
+      {"expectedIrHash", invalidPreview.result.value("irHash")},
+      {"expectedTargetModuleRevision",
+       invalidPreview.result.value("targetModuleRevision")},
+      {"expectedTargetModuleContentHash",
+       invalidPreview.result.value("targetModuleContentHash")},
+      {"expectedTargetCanonicalObjectIds",
+       invalidPreview.result.value("targetCanonicalObjectIds")},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  REQUIRE_FALSE(invalidApply.ok);
+  CHECK_FALSE(invalidApply.error.details.value("mutatedDocument").toBool(true));
+  CHECK_FALSE(invalidApply.error.details.value("partialMutation").toBool(true));
+  CHECK(invalidApply.error.details.value("retrySafe").toBool(false));
+  CHECK(map.worldNode().descendantCount() == countBeforeInvalidApply);
+  CHECK(history.size() == historyBeforeInvalidApply.size());
+  CHECK(metadataStore.size() == metadataBeforeInvalidApply.size());
+  CHECK(moduleStore.size() == modulesBeforeInvalidApply.size());
+}
+
+TEST_CASE(
   "McpBridgeServer selector metadata round trips through IR and operations",
   "[McpBridgeServer]")
 {
@@ -9808,6 +10110,128 @@ TEST_CASE("McpBridgeServer file based IR tools", "[McpBridgeServer]")
       .toArray()
       .size()
     == 1);
+}
+
+TEST_CASE(
+  "McpBridgeServer file replace_module requires and reuses preview guards",
+  "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+  auto previewCache = std::map<QString, McpIrPreviewCacheRecord>{};
+  auto nextPreviewIndex = 1;
+  const auto create = irApplyForMapResult(
+    map,
+    "ir_apply",
+    QJsonObject{
+      {"ir",
+       QJsonObject{
+         {"moduleId", "file-replace-module"},
+         {"defaultMetadata", QJsonObject{{"moduleId", "file-replace-module"}}},
+         {"select", false},
+         {"operations",
+          QJsonArray{QJsonObject{
+            {"type", "box"},
+            {"min", QJsonArray{0, 0, 0}},
+            {"max", QJsonArray{64, 64, 16}},
+          }}},
+       }},
+    },
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry);
+  REQUIRE(create.ok);
+
+  auto tempDir = QTemporaryDir{};
+  REQUIRE(tempDir.isValid());
+  const auto path = tempDir.filePath("replace-module.json");
+  auto file = QFile{path};
+  REQUIRE(file.open(QIODevice::WriteOnly));
+  file.write(QJsonDocument{
+    QJsonObject{
+      {"schemaVersion", 1},
+      {"applyMode", "replace_module"},
+      {"moduleId", "file-replace-module"},
+      {"defaultMetadata", QJsonObject{{"moduleId", "file-replace-module"}}},
+      {"select", false},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{128, 64, 16}},
+       }}},
+    }}.toJson());
+  file.close();
+
+  const auto pathOnly = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{{"path", path}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry,
+    &previewCache);
+  REQUIRE_FALSE(pathOnly.ok);
+  CHECK(pathOnly.error.message.contains("requires previewId"));
+  CHECK_FALSE(pathOnly.error.details.value("mutatedDocument").toBool(true));
+
+  const auto preview = irCompilePreviewFromFileForMapResult(
+    map,
+    QJsonObject{{"path", path}},
+    &previewCache,
+    &nextPreviewIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(preview.ok);
+  CHECK(preview.result.value("targetModuleRevision").toInt() == 1);
+  CHECK(preview.result.value("targetCanonicalObjectCount").toInt() == 1);
+  REQUIRE(previewCache.size() == 1u);
+  const auto previewId = preview.result.value("previewId").toString();
+  REQUIRE_FALSE(previewId.isEmpty());
+  CHECK(previewCache.at(previewId).preview.value("targetModuleRevision").toInt() == 1);
+  CHECK(
+    previewCache.at(previewId).preview.value("targetCanonicalObjectIds").toArray().size()
+    == 1);
+
+  const auto replace = irApplyFromFileForMapResult(
+    map,
+    "ir_apply_from_file",
+    QJsonObject{{"previewId", previewId}},
+    history,
+    nextOperationIndex,
+    metadataStore,
+    moduleStore,
+    &objectRegistry,
+    &previewCache);
+  const auto replaceError =
+    replace.ok ? std::string{} : replace.error.message.toStdString();
+  INFO(replaceError);
+  REQUIRE(replace.ok);
+  CHECK(replace.result.value("usedPreviewCache").toBool());
+  CHECK(replace.result.value("applyMode").toString() == "replace_module");
+  CHECK(replace.result.value("previousModuleRevision").toInt() == 1);
+  CHECK(replace.result.value("moduleRevision").toInt() == 2);
+  CHECK(replace.result.value("removedCanonicalObjectCount").toInt() == 1);
+  CHECK(replace.result.value("createdCanonicalObjectCount").toInt() == 1);
 }
 
 TEST_CASE("McpBridgeServer Python blockout tools", "[McpBridgeServer]")

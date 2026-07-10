@@ -3006,6 +3006,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"schemaVersion",
          integerProperty("Optional flattened IR schema version. Current version is 1.")},
         {"qualityPolicy", qualityPolicySchema()},
+        {"applyMode",
+         stringProperty(
+           "create or replace_module. Replacement preview reports exact module "
+           "revision, content hash, and canonical object guards.")},
+        {"moduleId", stringProperty("Module id used by replace_module preview.")},
+        {"defaultMetadata", genericMetadataSchema()},
         {"operations",
          arrayProperty(
            "Optional blockout_create_batch operations array. Every item must be an "
@@ -3035,6 +3041,12 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"schemaVersion",
          integerProperty("Optional flattened IR schema version. Current version is 1.")},
         {"qualityPolicy", qualityPolicySchema()},
+        {"applyMode",
+         stringProperty(
+           "create or replace_module. Replacement preview reports exact module "
+           "revision, content hash, and canonical object guards.")},
+        {"moduleId", stringProperty("Module id used by replace_module preview.")},
+        {"defaultMetadata", genericMetadataSchema()},
         {"operations",
          arrayProperty(
            "Optional blockout_create_batch operations array. Every item must be an "
@@ -3061,6 +3073,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            withDescription(
              qualityPolicySchema(),
              "Optional request override for the IR qualityPolicy.")},
+          {"applyMode",
+           stringProperty(
+             "Optional create or replace_module override. File replacement must be "
+             "applied later with the returned previewId.")},
         },
         {"path"}),
     },
@@ -3084,6 +3100,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"schemaVersion",
          integerProperty("Optional flattened IR schema version. Current version is 1.")},
         {"qualityPolicy", qualityPolicySchema()},
+        {"applyMode",
+         stringProperty(
+           "create or replace_module. replace_module requires the exact expected "
+           "guards returned by ir_compile_preview.")},
         {"operations",
          arrayProperty(
            "Optional blockout_create_batch operations array. Every item must be an "
@@ -3093,6 +3113,15 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
            "Optional entity_create_checked_batch entities array. Every item must be "
            "an object with classname.")},
         {"moduleId", stringProperty("Optional module id copied into defaultMetadata.")},
+        {"expectedIrHash",
+         stringProperty("Required preview IR hash for replace_module.")},
+        {"expectedTargetModuleRevision",
+         integerProperty("Required preview module revision for replace_module.")},
+        {"expectedTargetModuleContentHash",
+         stringProperty("Required preview module content hash for replace_module.")},
+        {"expectedTargetCanonicalObjectIds",
+         arrayProperty(
+           "Required exact canonical live object set returned by replacement preview.")},
         {"defaultMetadata", genericMetadataSchema()},
         {"name", stringProperty("Optional blockout transaction name.")},
         {"grid", numberProperty("Optional grid snap size.")},
@@ -3122,6 +3151,10 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
         {"qualityPolicy",
          withDescription(
            qualityPolicySchema(), "Optional request override for the IR qualityPolicy.")},
+        {"applyMode",
+         stringProperty(
+           "Optional create or replace_module override. replace_module requires "
+           "previewId and does not accept a path-only apply.")},
         {"expectedDocumentPath",
          stringProperty("Optional active document guard before mutating.")},
         {"idsMode",
