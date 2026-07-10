@@ -53,6 +53,8 @@ def recipe_summary(manifest: dict[str, Any]) -> dict[str, Any]:
         "requiredParts": output.get("requiredParts", []),
         "examples": example_variants(recipe_id),
         "expectedWarnings": manifest.get("expectedWarnings", []),
+        "qualityPolicy": manifest.get("qualityPolicy", {}),
+        "reviewPolicy": manifest.get("reviewPolicy", {}),
         "recommendedValidation": manifest.get("recommendedValidation", []),
     }
 
@@ -73,6 +75,8 @@ def markdown_catalog(recipes: list[dict[str, Any]]) -> str:
     lines.extend(["", "## Validation"])
     for recipe in recipes:
         lines.extend([f"", f"### `{recipe['id']}`"])
+        lines.append(f"- Quality policy: `{json.dumps(recipe['qualityPolicy'], separators=(',', ':'))}`")
+        lines.append(f"- Review policy: `{json.dumps(recipe['reviewPolicy'], separators=(',', ':'))}`")
         for step in recipe["recommendedValidation"]:
             lines.append(f"- `{step}`")
         if recipe["expectedWarnings"]:

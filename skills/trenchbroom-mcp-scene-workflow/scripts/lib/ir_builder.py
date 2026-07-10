@@ -18,6 +18,7 @@ from typing import Any
 DEFAULT_MATERIAL = "__TB_empty"
 GENERATED_BY = "trenchbroom-mcp-scene-workflow"
 IR_SCHEMA_VERSION = 1
+QUALITY_INTENTS = ("draft", "balanced", "smooth")
 
 
 def load_params(path: str | None) -> dict[str, Any]:
@@ -88,6 +89,7 @@ def make_ir(
     route_id: str | None = None,
     role: str | None = None,
     extra_metadata: dict[str, Any] | None = None,
+    quality_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "moduleId": module_id,
@@ -106,6 +108,7 @@ def make_ir(
         "defaultMetadata": metadata,
         "grid": grid,
         "material": material,
+        "qualityPolicy": quality_policy or {"intent": "balanced"},
         "operations": operations,
     }
     if entities:
@@ -239,6 +242,9 @@ def validate_params(manifest: dict[str, Any], params: dict[str, Any]) -> list[st
         type_name = str(spec.get("type", "any"))
         if not _type_matches(value, type_name):
             raise ValueError(f"{name} must be {type_name}")
+        if "enum" in spec and value not in spec["enum"]:
+            choices = ", ".join(str(choice) for choice in spec["enum"])
+            raise ValueError(f"{name} must be one of: {choices}")
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             if "min" in spec and value < spec["min"]:
                 raise ValueError(f"{name} must be >= {spec['min']}")
@@ -371,8 +377,32 @@ def validate_ir(ir: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
     if entities is not None and not isinstance(entities, list):
         errors.append("entities must be a list when present")
 
+    quality_policy = ir.get("qualityPolicy")
+    if not isinstance(quality_policy, dict):
+        errors.append("IR must include qualityPolicy")
+    else:
+        intent = quality_policy.get("intent")
+        if intent not in QUALITY_INTENTS:
+            errors.append("qualityPolicy.intent must be draft, balanced, or smooth")
+        for key in (
+            "maxDirectionChangeDegrees",
+            "maxSagitta",
+            "maxSnapDisplacement",
+        ):
+            if key in quality_policy:
+                value = quality_policy[key]
+                if (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(float(value))
+                    or value <= 0
+                ):
+                    errors.append(f"qualityPolicy.{key} must be a positive finite number")
+
     summary = summarize_ir(ir)
     output = manifest.get("output", {})
+    if output.get("routeLike") and not isinstance(manifest.get("qualityPolicy"), dict):
+        errors.append("route-like recipe manifest must declare qualityPolicy")
     expected_parts = set(output.get("requiredParts", output.get("parts", [])))
     actual_parts = set(summary.get("parts", {}).keys())
     missing_parts = sorted(expected_parts - actual_parts)

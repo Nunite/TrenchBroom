@@ -5,6 +5,7 @@
   "width": 96,
   "rise": 128,
   "segments": 16,
+  "qualityIntent": "draft",
   "supportEvery": 8,
   "includeEntities": false
 }

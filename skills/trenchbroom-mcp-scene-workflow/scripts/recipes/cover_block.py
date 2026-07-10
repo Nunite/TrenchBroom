@@ -37,6 +37,8 @@ MANIFEST = {
         "parts": ["cover"],
         "routeLike": False,
     },
+    "qualityPolicy": {"intent": "balanced"},
+    "reviewPolicy": {"recommended": True, "required": False},
     "recommendedValidation": [
         "ir_compile_preview_from_file",
         "ir_apply_from_file",

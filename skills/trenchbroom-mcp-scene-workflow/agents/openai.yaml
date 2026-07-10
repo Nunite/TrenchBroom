@@ -1,7 +1,7 @@
 interface:
   display_name: "TrenchBroom MCP Scene Workflow"
-  short_description: "Atomic TrenchBroom MCP scene workflow"
-  default_prompt: "Use $trenchbroom-mcp-scene-workflow to plan, build, validate, and report a disposable TrenchBroom MCP scene with atomic tools."
+  short_description: "Guarded TrenchBroom scene build and review"
+  default_prompt: "Use $trenchbroom-mcp-scene-workflow to build or replace a guarded TrenchBroom module, validate quality against a baseline, and report optional review evidence."
 
 dependencies:
   tools:

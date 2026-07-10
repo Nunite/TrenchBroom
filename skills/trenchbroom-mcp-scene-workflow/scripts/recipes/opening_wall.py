@@ -41,6 +41,8 @@ MANIFEST = {
         "parts": ["wall_side_a", "wall_side_b", "opening_header"],
         "routeLike": False,
     },
+    "qualityPolicy": {"intent": "balanced"},
+    "reviewPolicy": {"recommended": True, "required": False},
     "expectedWarnings": [
         "opening_wall creates a new segmented wall; use geometry_csg_selection(subtract) to cut existing brushes."
     ],

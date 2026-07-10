@@ -26,16 +26,17 @@ design decisions remain under Agent control.
 
 ## Common Flow
 
-1. Confirm binding before writing: connect with the configured Bearer token, call `tb_status`, and record `processId`, `bridgeInstanceId`, `activeDocumentPath`, and `documentFingerprint`. Pass both document guards to later mutations. If `tb_status` returns `associatedSkills` containing `trenchbroom-mcp-scene-workflow`, treat this skill as the workflow owner for scene intent and recipe routing.
+1. Confirm binding before writing: connect with the configured Bearer token, call `tb_status`, and record `processId`, `bridgeInstanceId`, `activeDocumentPath`, and `documentFingerprint`. Pass both document guards to later mutations. Record a pre-mutation `problems_check` baseline, including stable problem ids and whether the response is truncated. If `tb_status` returns `associatedSkills` containing `trenchbroom-mcp-scene-workflow`, treat this skill as the workflow owner for scene intent and recipe routing.
 2. Open disposable maps with `documents_open_verified` when switching documents. Do not pass document guards to open a different map; use both path and fingerprint guards on mutating tools after the target document is active.
 3. Split the scene into `moduleId`s and parts before geometry:
    - `moduleId`: stable session name such as `temple-main-hall`, `route-a`, `terrain-pass`.
    - `part`: structural part such as `floor`, `wall`, `roof`, `rail`, `support`, `marker`, `spawn`.
    - `role`: playable purpose such as `walkable`, `boundary`, `guidance`, `decoration`, `lighting`.
    - Optional: `routeId`, `order`, `temporary`, `generatedBy`.
-4. Prefer `ir_compile_preview` before bulk writes. New IR must contain `schemaVersion:1`. For large operation sets, write the IR JSON to a local file and use `ir_compile_preview_from_file` / `ir_apply_from_file` so the conversation does not carry a huge payload. Apply with the returned `previewId`; if the file changes after preview, preview it again.
-5. For direct creation tools, pass `defaultMetadata` and per-operation `metadata`. For part-aware primitives, use `parts`, `partMaterials`, and `partMetadata` instead of generating extra parts and deleting them later.
-6. Recover generated targets with `module_*` or structured selectors:
+4. Choose a quality intent from the user's goal: `draft` for fast blockout, `balanced` by default, and `smooth` only when the user explicitly wants strict curve quality. Add `qualityPolicy` to IR v1 and run the curve-quality preview before applying. Warnings do not block `draft` or `balanced`; a failed `smooth` policy blocks acceptance.
+5. Prefer `ir_compile_preview` before bulk writes. New IR must contain `schemaVersion:1`. Use `applyMode:"create"` for a new module. For an existing generated module, use `applyMode:"replace_module"` and preserve the preview's IR hash, target module revision, content hash, and canonical object-set guards. For large operation sets, use file preview/apply with the returned `previewId`; if the file or target module changes, preview again.
+6. For direct creation tools, pass `defaultMetadata` and per-operation `metadata`. For part-aware primitives, use `parts`, `partMaterials`, and `partMetadata` instead of generating extra parts and deleting them later.
+7. Recover generated targets with `module_*` or structured selectors:
    - `module_list` defaults to live modules only; use `includeStale:true` only when debugging prior-document/session residue.
    - Use `module_inspect(idsMode:"count")` for counts, `idsMode:"sample"` for a small identity check, and `idsMode:"full"` only when a later tool truly needs every object id.
    - `selector_preview` before destructive actions.
@@ -43,20 +44,20 @@ design decisions remain under Agent control.
    - `objects_delete_by_selector` only after preview confirms the intended count/sample.
    - Avoid carrying hundreds of object ids in context; use `idsMode: "count"` or `"sample"` unless full ids are necessary.
    - Use native groups only as a visible organization/selection layer for humans; keep semantic recovery in module metadata and selectors.
-7. For dense existing maps or ambiguous brush ownership, prefer user selection over clever automatic brush matching:
+8. For dense existing maps or ambiguous brush ownership, prefer user selection over clever automatic brush matching:
    - Ask the user to select the target brushes in TrenchBroom, or use the current selection if they already did.
    - Then use selection-aware tools such as `geometry_analyze_selection`, `geometry_analyze_slopes`, `geometry_analyze_route_continuity`, `objects_transform`, and `render_review_current_scene(scope:"selection")`.
    - Do not invent complex bounds/material/metadata selector rules for old or manually edited geometry unless the user explicitly asks for that. User selection is the source of truth when brush counts get large.
-8. Validate after each meaningful phase:
+9. Validate after each meaningful phase:
    - `history_status`, `operation_validate`, and `module_validate`.
-   - `map_validate(groupByType:true)` and `problems_check` before reporting done on dense maps. Use `passed`, compact counts/groups, safe-fix counts, and `recoveryAction` before asking for problem detail.
-   - `geometry_analyze_route_continuity` for ramps, platforms, roads, stairs, rails, and route seams.
+   - `map_validate(groupByType:true)` and `problems_check` before reporting done. If both problem responses are untruncated, compare stable ids and report `introduced`, `resolved`, and `preExisting`; otherwise compare grouped counts only and label the result low-confidence.
+   - `geometry_analyze_route_continuity` for ramps, platforms, roads, stairs, rails, and route seams. Read `walkableContinuous`, `qualityStatus`, `acceptancePassed`, and `notEvaluated`; do not use legacy `passed` as the completion verdict.
    - `geometry_analyze_slopes` for ramp/surf/slide/wedge/ascending intent. Use `passed`, `slopeCount`, warning samples, and `recoveryAction` from the summary before asking for full detail. If a sloped surface was intended and `passed` is false or `slopeCount` is 0, treat the build as failed and rebuild with a true slope primitive.
-9. Review visually with `module_render_review`, `render_review_selector`, `render_review_operation`, or `render_review_current_scene(scope:"selection")` for user-selected targets. Pass an absolute `outputDir` for saved review bundles. Prefer contact sheets with at most two panels. Use `labelParts` only for important metadata parts such as rails, route surfaces, supports, markers, or spawn points; use `labelStride` / `autoHideLabelsThreshold` for dense ordered routes, then open individual PNGs only when needed.
-10. Report friction as MCP design feedback: P0 crash/wrong-map/data loss, P1 blocked real workflow, P2 awkward or context-heavy, P3 documentation/default issue.
+10. Optionally collect visual evidence with `module_render_review`, `render_review_selector`, `render_review_operation`, or `render_review_current_scene(scope:"selection")`. For shape-sensitive modules, prefer one `edgeMode:"all"` construction view and one `edgeMode:"silhouette"` outline view. Review evidence never changes `acceptancePassed`; if review was skipped, report `visualReview:"not_run"`.
+11. Report module revision/content hash, problem delta, `completionState.saveRequired`, visual review status, BSP compile status, and `notEvaluated`. Never describe map validation as BSP or game-collision validation. Report friction as P0 crash/wrong-map/data loss, P1 blocked real workflow, P2 awkward or context-heavy, or P3 documentation/default issue.
 
-An IR apply is one aggregate operation. Keep `parentOperationId` as the undo/redo
-target and treat `childOperationIds` as audit detail. If apply fails, require
+An IR apply is one aggregate operation. Keep `undoOperationId` / `parentOperationId`
+as the undo/redo target and treat `childOperationIds` / `auditOperationIds` as audit detail. If apply fails, require
 `mutatedDocument:false`, `partialMutation:false`, and `retrySafe:true` before retrying.
 If stdio times out, mutation state is unknown: inspect `history_status` and recent
 operations before retrying. If an operation or review resource was evicted from the
@@ -117,11 +118,10 @@ Common recipe path:
 Recipes must not call TrenchBroom, MCP, or `tb2` directly. MCP remains the only
 map mutation layer.
 
-Prefab-like recipes must have an explicit visual acceptance path. A recipe is not
-accepted just because IR validation and `map_validate` pass; its manifest must
-recommend `module_render_review`, `render_review_selector`, or another review
-tool, and real workflow acceptance should inspect the rendered output for the
-requested scene intent.
+Prefab-like recipes must declare `qualityPolicy` and
+`reviewPolicy:{recommended:true,required:false}`. Their manifest must recommend a
+review tool, but review remains optional evidence and is not a static recipe or
+`acceptancePassed` gate. Never claim a visual verdict when review was not run.
 
 When adding or proposing a new recipe, do not add a matching C++ MCP prefab tool.
 If the recipe reveals missing MCP support, phrase the feedback as a generic
@@ -193,7 +193,7 @@ or numeric UV edits are required.
 
 ## Review Rules
 
-Use review renderer output as evidence, not as the only validator. Contact sheets are for quick recognition; if a scene is dense, inspect individual captures. For terrain or routes, request side/iso views and `verticalExaggeration` when height changes are subtle.
+Use review renderer output as optional evidence, not as an automatic validator. Use `edgeMode:"all"` to expose construction seams and `edgeMode:"silhouette"` to judge the outer profile without internal Brush edges. Contact sheets are for quick recognition; if a scene is dense, inspect individual captures. For terrain or routes, request side/iso views and `verticalExaggeration` when height changes are subtle.
 
 Keep labels sparse. Entity glyph markers remain useful without classname text on dense modules, so let `autoHideLabelsThreshold` hide entity/order/part labels by default. When the structure needs semantic callouts, prefer `labelParts:["road","rail"]` or another short part list instead of labeling every object.
 
@@ -203,14 +203,14 @@ For route-like scenes, give every playable piece `routeId` and `order`. After ge
 
 - Run `geometry_analyze_route_continuity` with `start/end`, `routeDirection`, or `orderBy:"metadataOrder"`. Use `routeMode:"continuous"`, `"stepped"`, `"jump_chain"`, `"spiral"`, or `"closed_loop"` to declare intent. For circular routes, pass `routeMode:"closed_loop"` or `closedLoop:true` only when the final surface is meant to connect back to the first.
 - Run `geometry_analyze_slopes` for every ramp/surf/slide/wedge/ascending section. `slopeCount=0` is a failure when a smooth slope was requested.
-- Leave slope/continuity `detail` at the summary default for normal acceptance. Use summary `passed` and `recoveryAction` first; use `detail:"full"` only when you need every face/seam object for debugging.
+- Leave slope/continuity `detail` at the summary default for normal acceptance. Use `walkableContinuous`, `qualityStatus`, `acceptancePassed`, `notEvaluated`, and `recoveryAction`; use `detail:"full"` only when you need every face/seam object for debugging. Treat `seamRelation:"overlap"` as overlap, not a gap, even when legacy endpoint-distance fields are large.
 - Treat discontinuities, vertical steps, wrong slope direction, rail intersections, and support posts piercing road surfaces as MCP feedback unless the design intentionally calls for them.
 - For smooth ascending loops, prefer `arc_ramp` / `helical_ramp` or explicit true `ramp_between` segments. Do not treat `curved_corridor slopeStartZ/slopeEndZ` as a final smooth road surface; it is stepped/terraced unless the MCP result proves otherwise.
 - `path_ribbon points3d` is useful for flat ribbons along 3D waypoints, but adjacent Z changes are not proof of an interpolated ramp surface. If height changes matter, verify slopes or rebuild with true ramp geometry.
 - If preview/apply returns `offAxisRampMayProduceNonGridVertices`, choose an axis-aligned `ramp_between`/`wedge` for strict grid geometry, lower the grid, or explicitly accept off-grid diagonal ramp vertices.
 - For generated stairs, selector metadata may normalize the authored part to `steps`; query `part:"steps"` or use a broader module/role selector when recovering stairs.
 - Same-height route overlaps can be continuous; inspect seam `classification` and `continuous` instead of treating any overlap as a break.
-- After deleting/rebuilding a route module, use `module_inspect` live-only stats and `module_compact` to clear stale session records before reporting counts.
+- Prefer guarded `replace_module` over delete/rebuild for generated routes. Normal mutation/Undo/Redo reconciliation refreshes live module identity automatically. Use `module_compact` only as exceptional recovery for stale or legacy aliases.
 
 ## Codex CLI Regression
 

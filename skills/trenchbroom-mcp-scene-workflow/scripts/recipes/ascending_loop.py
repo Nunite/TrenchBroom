@@ -28,7 +28,7 @@ from ir_builder import (  # noqa: E402
 MANIFEST = {
     "id": "ascending_loop",
     "name": "Ascending loop",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "summary": "Generate a smooth rising loop route with optional rails, support posts, start/finish markers, spawn, and light.",
     "defaultParams": {
         "moduleId": "recipe-ascending-loop",
@@ -40,7 +40,8 @@ MANIFEST = {
         "thickness": 16,
         "startAngle": 0,
         "turnDegrees": 360,
-        "segments": 32,
+        "segments": 36,
+        "qualityIntent": "balanced",
         "railHeight": 48,
         "railWidth": 16,
         "supportSize": 24,
@@ -62,6 +63,7 @@ MANIFEST = {
         {"name": "startAngle", "type": "number"},
         {"name": "turnDegrees", "type": "number", "min": 1, "max": 360},
         {"name": "segments", "type": "integer", "min": 4},
+        {"name": "qualityIntent", "type": "string", "enum": ["draft", "balanced", "smooth"]},
         {"name": "railHeight", "type": "number", "min": 0},
         {"name": "railWidth", "type": "number", "min": 1},
         {"name": "supportSize", "type": "number", "min": 1},
@@ -80,8 +82,13 @@ MANIFEST = {
         "routeLike": True,
         "closedLoopRecommended": False,
     },
+    "qualityPolicy": {
+        "intentParam": "qualityIntent",
+        "defaultIntent": "balanced",
+    },
+    "reviewPolicy": {"recommended": True, "required": False},
     "expectedWarnings": [
-        "Circular arc geometry can produce non-integer vertex warnings; accept them only when slope, continuity, and review pass."
+        "Circular arc geometry can produce non-integer vertex warnings; accept them only when slope and continuity acceptance pass."
     ],
     "recommendedValidation": [
         "ir_compile_preview_from_file",
@@ -109,7 +116,8 @@ def build(params: dict) -> dict:
     thickness = number(params, "thickness", 16)
     start_angle = number(params, "startAngle", 0)
     turn_degrees = number(params, "turnDegrees", 360)
-    segments = integer(params, "segments", 32)
+    segments = integer(params, "segments", 36)
+    quality_intent = string(params, "qualityIntent", "balanced")
     rail_height = number(params, "railHeight", 48)
     rail_width = number(params, "railWidth", 16)
     support_size = number(params, "supportSize", 24)
@@ -222,6 +230,7 @@ def build(params: dict) -> dict:
         grid=grid,
         operations=operations,
         entities=entities,
+        quality_policy={"intent": quality_intent},
     )
 
 

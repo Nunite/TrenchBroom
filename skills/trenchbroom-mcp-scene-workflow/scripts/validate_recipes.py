@@ -19,7 +19,7 @@ import sys
 
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
-from ir_builder import merge_defaults, validate_ir, validate_params, write_json  # noqa: E402
+from ir_builder import QUALITY_INTENTS, merge_defaults, validate_ir, validate_params, write_json  # noqa: E402
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -46,6 +46,38 @@ def load_recipe(path: Path) -> tuple[dict[str, Any], Any]:
     return manifest, build
 
 
+def validate_manifest(manifest: dict[str, Any]) -> None:
+    quality_policy = manifest.get("qualityPolicy")
+    if not isinstance(quality_policy, dict):
+        raise ValueError("recipe manifest must include qualityPolicy")
+    if "intent" in quality_policy:
+        if quality_policy["intent"] not in QUALITY_INTENTS:
+            raise ValueError("qualityPolicy.intent must be draft, balanced, or smooth")
+    else:
+        intent_param = quality_policy.get("intentParam")
+        default_intent = quality_policy.get("defaultIntent")
+        if not isinstance(intent_param, str) or not intent_param:
+            raise ValueError("qualityPolicy must include intent or intentParam")
+        if default_intent not in QUALITY_INTENTS:
+            raise ValueError("qualityPolicy.defaultIntent must be draft, balanced, or smooth")
+
+    review_policy = manifest.get("reviewPolicy")
+    if not isinstance(review_policy, dict):
+        raise ValueError("recipe manifest must include reviewPolicy")
+    if review_policy.get("recommended") is not True or review_policy.get("required") is not False:
+        raise ValueError("reviewPolicy must set recommended=true and required=false")
+
+    validation_steps = manifest.get("recommendedValidation", [])
+    if not isinstance(validation_steps, list) or not any(
+        "render_review" in str(step) for step in validation_steps
+    ):
+        raise ValueError("recipe manifest must include a render_review validation path")
+
+    output = manifest.get("output", {})
+    if output.get("routeLike") and not quality_policy:
+        raise ValueError("route-like recipe manifest must declare qualityPolicy")
+
+
 def available_variants(recipe_id: str) -> list[str]:
     recipe_examples = EXAMPLES_DIR / recipe_id
     if not recipe_examples.exists():
@@ -69,16 +101,26 @@ def validate_example(
     out_dir: Path | None,
 ) -> dict[str, Any]:
     manifest, build = load_recipe(recipe_path)
+    validate_manifest(manifest)
     recipe_id = str(manifest["id"])
-    validation_steps = manifest.get("recommendedValidation", [])
-    if not any("render_review" in str(step) for step in validation_steps):
-        raise ValueError("recipe manifest must include a render_review validation step")
     params = merge_defaults(manifest, load_json(params_path))
     param_warnings = validate_params(manifest, params)
     first_ir = build(params)
     second_ir = build(params)
     deterministic = canonical_digest(first_ir) == canonical_digest(second_ir)
     validation = validate_ir(first_ir, manifest)
+    manifest_quality = manifest["qualityPolicy"]
+    expected_intent = manifest_quality.get("intent")
+    if expected_intent is None:
+        expected_intent = params.get(
+            manifest_quality["intentParam"], manifest_quality["defaultIntent"]
+        )
+    actual_intent = first_ir.get("qualityPolicy", {}).get("intent")
+    if actual_intent != expected_intent:
+        validation["valid"] = False
+        validation.setdefault("errors", []).append(
+            f"IR qualityPolicy.intent {actual_intent!r} does not match manifest intent {expected_intent!r}"
+        )
     warnings = param_warnings + list(validation.get("warnings", []))
 
     output_path = None

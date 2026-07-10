@@ -6,6 +6,7 @@
   "width": 160,
   "rise": 512,
   "segments": 96,
+  "qualityIntent": "smooth",
   "supportEvery": 6,
   "turnDegrees": 360,
   "railHeight": 56,

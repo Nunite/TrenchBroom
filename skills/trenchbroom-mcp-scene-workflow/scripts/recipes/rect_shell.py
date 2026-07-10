@@ -52,6 +52,8 @@ MANIFEST = {
         "parts": ["floor", "ceiling", "wall_north", "wall_south", "wall_east", "wall_west"],
         "routeLike": False,
     },
+    "qualityPolicy": {"intent": "balanced"},
+    "reviewPolicy": {"recommended": True, "required": False},
     "recommendedValidation": [
         "ir_compile_preview_from_file",
         "ir_apply_from_file",
