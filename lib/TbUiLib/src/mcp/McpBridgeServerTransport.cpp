@@ -141,6 +141,54 @@ void syncOperationHistoryWithExternalResult(
   }
 }
 
+QString mutationUndoOperationId(const QJsonObject& result)
+{
+  for (const auto& key : {"undoOperationId", "parentOperationId", "operationId"})
+  {
+    const auto value = result.value(key).toString().trimmed();
+    if (!value.isEmpty())
+    {
+      return value;
+    }
+  }
+  return result.value("operation").toObject().value("operationId").toString().trimmed();
+}
+
+QJsonArray mutationAuditOperationIds(
+  const QJsonObject& result, const QString& undoOperationId)
+{
+  auto ids = QStringList{};
+  for (const auto& key : {"auditOperationIds", "childOperationIds", "operationIds"})
+  {
+    for (const auto& value : result.value(key).toArray())
+    {
+      const auto id = value.toString().trimmed();
+      if (!id.isEmpty())
+      {
+        ids.push_back(id);
+      }
+    }
+    if (!ids.isEmpty())
+    {
+      break;
+    }
+  }
+  if (!undoOperationId.isEmpty())
+  {
+    ids.push_back(undoOperationId);
+  }
+  ids.removeDuplicates();
+  return QJsonArray::fromStringList(ids);
+}
+
+bool operationIsUndoable(
+  const std::vector<McpOperationRecord>& history, const QString& operationId)
+{
+  const auto it = std::ranges::find_if(
+    history, [&](const auto& operation) { return operation.operationId == operationId; });
+  return it == history.end() ? !operationId.isEmpty() : it->undoable;
+}
+
 } // namespace
 
 bool McpBridgeServer::start(const mcp::McpBridgeConfig& config, QString* error)
@@ -471,12 +519,44 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
     map != nullptr ? m_session.objectRegistry.documentFingerprint(*map) : QString{};
   m_session.rememberDocumentFingerprint(requestDocumentFingerprint);
 
-  const auto result = m_toolHandler(request.tool, params);
+  const auto metadataBefore = tool->mutatesDocument
+                                ? m_session.brushMetadata
+                                : std::map<QString, McpBrushMetadataRecord>{};
+  const auto modulesBefore =
+    tool->mutatesDocument ? m_session.modules : std::map<QString, McpModuleRecord>{};
+  auto result = m_toolHandler(request.tool, params);
   if (result.ok)
   {
     auto* resultMap = m_activeMapProvider ? m_activeMapProvider() : nullptr;
     if (resultMap != nullptr)
     {
+      if (tool->mutatesDocument && result.result.value("mutatedDocument").toBool(true))
+      {
+        const auto undoOperationId = mutationUndoOperationId(result.result);
+        reconcileMcpSessionForMap(
+          *resultMap,
+          m_session.brushMetadata,
+          m_session.modules,
+          m_session.objectRegistry,
+          undoOperationId);
+        if (!undoOperationId.isEmpty())
+        {
+          attachMcpSessionDelta(
+            m_session.operationHistory,
+            undoOperationId,
+            metadataBefore,
+            modulesBefore,
+            m_session.brushMetadata,
+            m_session.modules);
+        }
+        result.result.insert("undoOperationId", undoOperationId);
+        result.result.insert(
+          "undoable",
+          !undoOperationId.isEmpty()
+            && operationIsUndoable(m_session.operationHistory, undoOperationId));
+        result.result.insert(
+          "auditOperationIds", mutationAuditOperationIds(result.result, undoOperationId));
+      }
       auto externalResult =
         m_session.objectRegistry.externalizeResult(*resultMap, result.result);
       syncOperationHistoryWithExternalResult(

@@ -320,6 +320,25 @@ std::vector<mdl::Node*> resolveSelectorNodes(
   QJsonArray& warnings,
   QString& error,
   McpSelectorDiagnostics* diagnostics = nullptr);
+void reconcileMcpSessionForMap(
+  mdl::Map& map,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore,
+  McpObjectRegistry& objectRegistry,
+  const QString& activeOperationId = {},
+  bool allowLegacyPathRebind = false);
+void attachMcpSessionDelta(
+  std::vector<McpOperationRecord>& history,
+  const QString& operationId,
+  const std::map<QString, McpBrushMetadataRecord>& metadataBefore,
+  const std::map<QString, McpModuleRecord>& modulesBefore,
+  const std::map<QString, McpBrushMetadataRecord>& metadataAfter,
+  const std::map<QString, McpModuleRecord>& modulesAfter);
+void restoreMcpSessionDelta(
+  const McpOperationRecord& operation,
+  bool before,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore);
 McpBridgeToolResult objectsSelectBySelectorResult(
   AppController& appController,
   const QJsonObject& params,

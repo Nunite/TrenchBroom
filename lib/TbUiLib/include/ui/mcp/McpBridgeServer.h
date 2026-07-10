@@ -80,6 +80,8 @@ struct McpOperationRecord
   bool undoable = true;
   QString parentOperationId;
   QStringList childOperationIds;
+  QByteArray sessionBeforeJson;
+  QByteArray sessionAfterJson;
 
   McpOperationRecord();
   void setChangedObjectIds(const QJsonArray& ids);
@@ -107,6 +109,10 @@ struct McpModuleRecord
   QStringList objectIds;
   QStringList operationIds;
   QJsonObject metadata;
+  int revision = 0;
+  QString activeOperationId;
+  QString contentHash;
+  QJsonObject qualityPolicy;
 };
 
 struct McpIrPreviewCacheRecord

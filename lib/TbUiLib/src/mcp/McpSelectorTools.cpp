@@ -36,6 +36,7 @@
 #include "mdl/Map.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Node.h"
+#include "mdl/NodeWriter.h"
 #include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
 #include "ui/AppController.h"
@@ -53,6 +54,7 @@
 #include <optional>
 #include <ranges>
 #include <set>
+#include <sstream>
 #include <vector>
 
 namespace tb::ui
@@ -505,6 +507,168 @@ QString moduleStoreKey(const QString& documentFingerprint, const QString& module
   return documentFingerprint.isEmpty()
            ? moduleId
            : QString{"%1|%2"}.arg(documentFingerprint, moduleId);
+}
+
+QJsonObject metadataRecordJson(const McpBrushMetadataRecord& record)
+{
+  return QJsonObject{
+    {"objectId", record.objectId},
+    {"documentFingerprint", record.documentFingerprint},
+    {"metadata", record.metadata},
+    {"stale", record.stale},
+  };
+}
+
+McpBrushMetadataRecord metadataRecordFromJson(const QJsonObject& object)
+{
+  auto record = McpBrushMetadataRecord{};
+  record.objectId = object.value("objectId").toString();
+  record.documentFingerprint = object.value("documentFingerprint").toString();
+  record.metadata = object.value("metadata").toObject();
+  record.stale = object.value("stale").toBool(false);
+  return record;
+}
+
+QJsonObject moduleRecordJson(const McpModuleRecord& record)
+{
+  return QJsonObject{
+    {"moduleId", record.moduleId},
+    {"documentFingerprint", record.documentFingerprint},
+    {"objectIds", stringsToJson(record.objectIds)},
+    {"operationIds", stringsToJson(record.operationIds)},
+    {"metadata", record.metadata},
+    {"revision", record.revision},
+    {"activeOperationId", record.activeOperationId},
+    {"contentHash", record.contentHash},
+    {"qualityPolicy", record.qualityPolicy},
+  };
+}
+
+QStringList stringListFromArray(const QJsonArray& values)
+{
+  auto result = QStringList{};
+  for (const auto& value : values)
+  {
+    if (value.isString())
+    {
+      result.push_back(value.toString());
+    }
+  }
+  return result;
+}
+
+McpModuleRecord moduleRecordFromJson(const QJsonObject& object)
+{
+  auto record = McpModuleRecord{};
+  record.moduleId = object.value("moduleId").toString();
+  record.documentFingerprint = object.value("documentFingerprint").toString();
+  record.objectIds = stringListFromArray(object.value("objectIds").toArray());
+  record.operationIds = stringListFromArray(object.value("operationIds").toArray());
+  record.metadata = object.value("metadata").toObject();
+  record.revision = object.value("revision").toInt();
+  record.activeOperationId = object.value("activeOperationId").toString();
+  record.contentHash = object.value("contentHash").toString();
+  record.qualityPolicy = object.value("qualityPolicy").toObject();
+  return record;
+}
+
+template <typename Record>
+QJsonObject changedRecordSnapshot(
+  const std::map<QString, Record>& before,
+  const std::map<QString, Record>& after,
+  const bool useBefore,
+  const std::function<QJsonObject(const Record&)>& toJson)
+{
+  auto keys = std::set<QString>{};
+  for (const auto& [key, record] : before)
+  {
+    Q_UNUSED(record);
+    keys.insert(key);
+  }
+  for (const auto& [key, record] : after)
+  {
+    Q_UNUSED(record);
+    keys.insert(key);
+  }
+
+  auto result = QJsonObject{};
+  for (const auto& key : keys)
+  {
+    const auto beforeIt = before.find(key);
+    const auto afterIt = after.find(key);
+    const auto beforeJson =
+      beforeIt != before.end() ? toJson(beforeIt->second) : QJsonObject{};
+    const auto afterJson =
+      afterIt != after.end() ? toJson(afterIt->second) : QJsonObject{};
+    if ((beforeIt != before.end()) == (afterIt != after.end()) && beforeJson == afterJson)
+    {
+      continue;
+    }
+
+    const auto selected = useBefore ? beforeIt : afterIt;
+    const auto& source = useBefore ? before : after;
+    if (selected == source.end())
+    {
+      result.insert(key, QJsonValue{QJsonValue::Null});
+    }
+    else
+    {
+      result.insert(key, toJson(selected->second));
+    }
+  }
+  return result;
+}
+
+QByteArray sessionDeltaJson(
+  const std::map<QString, McpBrushMetadataRecord>& metadataBefore,
+  const std::map<QString, McpModuleRecord>& modulesBefore,
+  const std::map<QString, McpBrushMetadataRecord>& metadataAfter,
+  const std::map<QString, McpModuleRecord>& modulesAfter,
+  const bool useBefore)
+{
+  const auto metadata = changedRecordSnapshot<McpBrushMetadataRecord>(
+    metadataBefore, metadataAfter, useBefore, metadataRecordJson);
+  const auto modules = changedRecordSnapshot<McpModuleRecord>(
+    modulesBefore, modulesAfter, useBefore, moduleRecordJson);
+  if (metadata.isEmpty() && modules.isEmpty())
+  {
+    return {};
+  }
+  return QJsonDocument{QJsonObject{{"metadata", metadata}, {"modules", modules}}}.toJson(
+    QJsonDocument::Compact);
+}
+
+QString moduleContentHash(
+  mdl::Map& map,
+  const std::vector<mdl::Node*>& nodes,
+  const McpObjectRegistry& objectRegistry)
+{
+  auto serializedNodes = std::vector<std::pair<QString, QByteArray>>{};
+  serializedNodes.reserve(nodes.size());
+  for (auto* node : nodes)
+  {
+    if (node == nullptr)
+    {
+      continue;
+    }
+    auto stream = std::ostringstream{};
+    auto writer = mdl::NodeWriter{map.worldNode(), stream};
+    writer.setStripTbProperties(true);
+    writer.writeNodes({node}, map.taskManager());
+    serializedNodes.emplace_back(
+      externalObjectIdForNode(map, *node, objectRegistry),
+      QByteArray::fromStdString(stream.str()));
+  }
+  std::ranges::sort(serializedNodes, {}, &std::pair<QString, QByteArray>::first);
+  auto bytes = QByteArray{};
+  for (const auto& [objectId, serialized] : serializedNodes)
+  {
+    Q_UNUSED(objectId);
+    bytes.append(serialized);
+    bytes.append('\0');
+  }
+  return QString{"sha256:%1"}.arg(QString::fromLatin1(
+    QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex()));
 }
 
 QStringList liveModuleObjectIdsFromMetadata(
@@ -1211,6 +1375,7 @@ QJsonObject moduleSummary(
   const McpObjectRegistry& objectRegistry)
 {
   auto liveCount = 0;
+  auto liveReferenceCount = 0;
   auto staleCount = 0;
   auto warnings = QJsonArray{};
   auto nodes = std::vector<mdl::Node*>{};
@@ -1220,6 +1385,7 @@ QJsonObject moduleSummary(
   {
     if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings))
     {
+      ++liveReferenceCount;
       if (nodeInVector(nodes, *node))
       {
         continue;
@@ -1232,13 +1398,35 @@ QJsonObject moduleSummary(
       ++staleCount;
     }
   }
+  auto rootOperationIds = QStringList{};
+  if (!module.activeOperationId.isEmpty())
+  {
+    rootOperationIds.push_back(module.activeOperationId);
+  }
+  else if (!module.operationIds.isEmpty())
+  {
+    rootOperationIds.push_back(module.operationIds.back());
+  }
+  const auto contentHash = module.contentHash.isEmpty()
+                             ? moduleContentHash(map, nodes, objectRegistry)
+                             : module.contentHash;
   return QJsonObject{
     {"moduleId", module.moduleId},
     {"objectCount", module.objectIds.size()},
+    {"storedReferenceCount", module.objectIds.size()},
+    {"canonicalObjectCount", liveCount},
+    {"duplicateAliasCount", std::max(0, liveReferenceCount - liveCount)},
+    {"staleReferenceCount", staleCount},
     {"liveObjectCount", liveCount},
     {"staleObjectCount", staleCount},
     {"operationIds", stringsToJson(module.operationIds)},
+    {"rootOperationIds", stringsToJson(rootOperationIds)},
+    {"auditOperationIds", stringsToJson(module.operationIds)},
     {"operationCount", module.operationIds.size()},
+    {"moduleRevision", module.revision <= 0 && !nodes.empty() ? 1 : module.revision},
+    {"moduleContentHash", contentHash},
+    {"activeOperationId", module.activeOperationId},
+    {"qualityPolicy", module.qualityPolicy},
     {"metadata", module.metadata},
     {"parts",
      modulePartSummary(
@@ -2051,6 +2239,7 @@ void mergeModuleFromOperationResult(
   const QJsonObject& result,
   const QString& documentFingerprint,
   const QJsonObject& defaultMetadata,
+  const QJsonObject& qualityPolicy,
   std::map<QString, McpModuleRecord>& moduleStore)
 {
   const auto moduleId = defaultMetadata.value("moduleId").toString().trimmed();
@@ -2062,6 +2251,10 @@ void mergeModuleFromOperationResult(
   module.moduleId = moduleId;
   module.documentFingerprint = documentFingerprint;
   module.metadata = mergeObjects(module.metadata, moduleLevelMetadata(defaultMetadata));
+  if (!qualityPolicy.isEmpty())
+  {
+    module.qualityPolicy = qualityPolicy;
+  }
   const auto operationId = result.value("operationId").toString().trimmed();
   if (!operationId.isEmpty())
   {
@@ -2079,6 +2272,179 @@ void mergeModuleFromOperationResult(
 }
 
 } // namespace
+
+void reconcileMcpSessionForMap(
+  mdl::Map& map,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore,
+  McpObjectRegistry& objectRegistry,
+  const QString& activeOperationId,
+  const bool allowLegacyPathRebind)
+{
+  const auto documentFingerprint = documentFingerprintForMap(map, &objectRegistry);
+  auto reconciledMetadata = std::map<QString, McpBrushMetadataRecord>{};
+  for (const auto& [storedObjectId, storedRecord] : metadataStore)
+  {
+    auto record = storedRecord;
+    if (!recordMatchesDocument(record, documentFingerprint))
+    {
+      reconciledMetadata.insert_or_assign(storedObjectId, std::move(record));
+      continue;
+    }
+
+    auto* node = static_cast<mdl::Node*>(nullptr);
+    const auto resolved = objectRegistry.resolveExternalId(map, record.objectId);
+    if (resolved.ok && resolved.diagnostic.value("live").toBool(true))
+    {
+      if (const auto path = McpObjectRegistry::parseLegacyObjectId(resolved.legacyPathId))
+      {
+        node = map.worldNode().resolvePath(*path);
+      }
+    }
+    else if (allowLegacyPathRebind && !resolved.legacyPathId.isEmpty())
+    {
+      if (const auto path = McpObjectRegistry::parseLegacyObjectId(resolved.legacyPathId))
+      {
+        node = map.worldNode().resolvePath(*path);
+      }
+    }
+
+    if (node == nullptr)
+    {
+      record.stale = true;
+      reconciledMetadata.insert_or_assign(storedObjectId, std::move(record));
+      continue;
+    }
+
+    record.objectId = objectRegistry.registerNode(map, *node);
+    record.documentFingerprint = documentFingerprint;
+    record.stale = false;
+    const auto key = metadataStoreKey(documentFingerprint, record.objectId);
+    if (auto it = reconciledMetadata.find(key); it != reconciledMetadata.end())
+    {
+      for (auto metadataIt = record.metadata.begin(); metadataIt != record.metadata.end();
+           ++metadataIt)
+      {
+        if (!it->second.metadata.contains(metadataIt.key()))
+        {
+          it->second.metadata.insert(metadataIt.key(), metadataIt.value());
+        }
+      }
+    }
+    else
+    {
+      reconciledMetadata.emplace(key, std::move(record));
+    }
+  }
+  metadataStore = std::move(reconciledMetadata);
+
+  for (auto& [storedModuleId, module] : moduleStore)
+  {
+    Q_UNUSED(storedModuleId);
+    if (!recordMatchesDocument(module, documentFingerprint))
+    {
+      continue;
+    }
+
+    auto candidateIds = module.objectIds;
+    candidateIds.append(
+      moduleObjectIdsFromMetadata(module.moduleId, documentFingerprint, metadataStore));
+    auto nodes = std::vector<mdl::Node*>{};
+    for (const auto& objectId : candidateIds)
+    {
+      auto warnings = QJsonArray{};
+      if (auto* node = resolveObjectId(map, objectId, objectRegistry, warnings);
+          node != nullptr && !nodeInVector(nodes, *node))
+      {
+        nodes.push_back(node);
+      }
+    }
+
+    auto canonicalObjectIds = QStringList{};
+    canonicalObjectIds.reserve(static_cast<qsizetype>(nodes.size()));
+    for (auto* node : nodes)
+    {
+      canonicalObjectIds.push_back(objectRegistry.registerNode(map, *node));
+    }
+    canonicalObjectIds.removeDuplicates();
+    canonicalObjectIds.sort(Qt::CaseInsensitive);
+
+    const auto newContentHash = moduleContentHash(map, nodes, objectRegistry);
+    const auto contentChanged =
+      module.contentHash.isEmpty() || module.contentHash != newContentHash;
+    if (contentChanged)
+    {
+      module.revision = module.revision <= 0 ? 1 : module.revision + 1;
+      if (!activeOperationId.isEmpty())
+      {
+        module.activeOperationId = activeOperationId;
+      }
+    }
+    module.documentFingerprint = documentFingerprint;
+    module.objectIds = std::move(canonicalObjectIds);
+    module.contentHash = newContentHash;
+  }
+}
+
+void attachMcpSessionDelta(
+  std::vector<McpOperationRecord>& history,
+  const QString& operationId,
+  const std::map<QString, McpBrushMetadataRecord>& metadataBefore,
+  const std::map<QString, McpModuleRecord>& modulesBefore,
+  const std::map<QString, McpBrushMetadataRecord>& metadataAfter,
+  const std::map<QString, McpModuleRecord>& modulesAfter)
+{
+  const auto it = std::ranges::find_if(
+    history, [&](const auto& operation) { return operation.operationId == operationId; });
+  if (it == history.end())
+  {
+    return;
+  }
+  it->sessionBeforeJson =
+    sessionDeltaJson(metadataBefore, modulesBefore, metadataAfter, modulesAfter, true);
+  it->sessionAfterJson =
+    sessionDeltaJson(metadataBefore, modulesBefore, metadataAfter, modulesAfter, false);
+}
+
+void restoreMcpSessionDelta(
+  const McpOperationRecord& operation,
+  const bool before,
+  std::map<QString, McpBrushMetadataRecord>& metadataStore,
+  std::map<QString, McpModuleRecord>& moduleStore)
+{
+  const auto bytes = before ? operation.sessionBeforeJson : operation.sessionAfterJson;
+  const auto document = QJsonDocument::fromJson(bytes);
+  if (!document.isObject())
+  {
+    return;
+  }
+  const auto root = document.object();
+  const auto metadata = root.value("metadata").toObject();
+  for (auto it = metadata.begin(); it != metadata.end(); ++it)
+  {
+    if (it.value().isNull())
+    {
+      metadataStore.erase(it.key());
+    }
+    else if (it.value().isObject())
+    {
+      metadataStore.insert_or_assign(
+        it.key(), metadataRecordFromJson(it.value().toObject()));
+    }
+  }
+  const auto modules = root.value("modules").toObject();
+  for (auto it = modules.begin(); it != modules.end(); ++it)
+  {
+    if (it.value().isNull())
+    {
+      moduleStore.erase(it.key());
+    }
+    else if (it.value().isObject())
+    {
+      moduleStore.insert_or_assign(it.key(), moduleRecordFromJson(it.value().toObject()));
+    }
+  }
+}
 
 QJsonObject selectorFromParams(const QJsonObject& params)
 {
@@ -3244,6 +3610,7 @@ McpBridgeToolResult irApplyForMapResult(
       blockoutResult.result,
       documentFingerprint,
       mergedDefaultMetadata,
+      ir->value("qualityPolicy").toObject(),
       stagedModuleStore);
   }
 
@@ -3277,7 +3644,11 @@ McpBridgeToolResult irApplyForMapResult(
         });
     }
     mergeModuleFromOperationResult(
-      result.result, documentFingerprint, mergedDefaultMetadata, stagedModuleStore);
+      result.result,
+      documentFingerprint,
+      mergedDefaultMetadata,
+      ir->value("qualityPolicy").toObject(),
+      stagedModuleStore);
   }
 
   auto childOperationIds = QStringList{};

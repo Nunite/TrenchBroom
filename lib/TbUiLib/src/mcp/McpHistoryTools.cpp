@@ -916,7 +916,9 @@ QJsonObject historyPreMutationFailureDetails(
 McpBridgeToolResult historyUndoResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry& objectRegistry)
+  McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -924,13 +926,25 @@ McpBridgeToolResult historyUndoResult(
     return noActiveDocumentFailure();
   }
 
-  return historyUndoForMapResult(mapWindow->document().map(), history, &objectRegistry);
+  return historyUndoForMapResult(
+    mapWindow->document().map(), history, &objectRegistry, metadataStore, moduleStore);
 }
 
 McpBridgeToolResult historyUndoForMapResult(
   mdl::Map& map,
   std::vector<McpOperationRecord>& history,
   const McpObjectRegistry* objectRegistry)
+{
+  return historyUndoForMapResult(
+    map, history, const_cast<McpObjectRegistry*>(objectRegistry), nullptr, nullptr);
+}
+
+McpBridgeToolResult historyUndoForMapResult(
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  McpObjectRegistry* objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
 {
   auto it = std::find_if(history.rbegin(), history.rend(), [](const auto& operation) {
     return operation.undoable && !operation.undone;
@@ -983,9 +997,16 @@ McpBridgeToolResult historyUndoForMapResult(
       std::move(details));
   }
 
+  const auto sessionOperation = *it;
   map.undoCommand();
   const auto operationId = it->operationId;
   setOperationUndoneState(history, operationId, true);
+  if (metadataStore != nullptr && moduleStore != nullptr && objectRegistry != nullptr)
+  {
+    restoreMcpSessionDelta(sessionOperation, true, *metadataStore, *moduleStore);
+    reconcileMcpSessionForMap(
+      map, *metadataStore, *moduleStore, *objectRegistry, operationId, true);
+  }
   const auto operation = findOperationCopy(history, operationId);
   return McpBridgeToolResult::success(QJsonObject{
     {"mutatedDocument", true},
@@ -1079,7 +1100,9 @@ McpBridgeToolResult historyUndoToOperationResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
   const QJsonObject& params,
-  const McpObjectRegistry& objectRegistry)
+  McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -1088,7 +1111,12 @@ McpBridgeToolResult historyUndoToOperationResult(
   }
 
   return historyUndoToOperationForMapResult(
-    mapWindow->document().map(), history, params, &objectRegistry);
+    mapWindow->document().map(),
+    history,
+    params,
+    &objectRegistry,
+    metadataStore,
+    moduleStore);
 }
 
 McpBridgeToolResult historyUndoToOperationForMapResult(
@@ -1096,6 +1124,23 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
   std::vector<McpOperationRecord>& history,
   const QJsonObject& params,
   const McpObjectRegistry* objectRegistry)
+{
+  return historyUndoToOperationForMapResult(
+    map,
+    history,
+    params,
+    const_cast<McpObjectRegistry*>(objectRegistry),
+    nullptr,
+    nullptr);
+}
+
+McpBridgeToolResult historyUndoToOperationForMapResult(
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  McpObjectRegistry* objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
 {
   const auto targetOperationId = params.value("operationId").toString().trimmed();
   if (targetOperationId.isEmpty())
@@ -1211,9 +1256,16 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
         });
     }
 
+    const auto sessionOperation = *it;
     const auto operationId = it->operationId;
     map.undoCommand();
     setOperationUndoneState(history, operationId, true);
+    if (metadataStore != nullptr && moduleStore != nullptr && objectRegistry != nullptr)
+    {
+      restoreMcpSessionDelta(sessionOperation, true, *metadataStore, *moduleStore);
+      reconcileMcpSessionForMap(
+        map, *metadataStore, *moduleStore, *objectRegistry, operationId, true);
+    }
     undoneOperationIds.push_back(operationId);
 
     if (operationId == targetOperationId)
@@ -1233,7 +1285,9 @@ McpBridgeToolResult historyUndoToOperationForMapResult(
 McpBridgeToolResult historyRedoResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry& objectRegistry)
+  McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
 {
   auto* mapWindow = appController.mapWindowManager().topMapWindow();
   if (!mapWindow)
@@ -1241,13 +1295,25 @@ McpBridgeToolResult historyRedoResult(
     return noActiveDocumentFailure();
   }
 
-  return historyRedoForMapResult(mapWindow->document().map(), history, &objectRegistry);
+  return historyRedoForMapResult(
+    mapWindow->document().map(), history, &objectRegistry, metadataStore, moduleStore);
 }
 
 McpBridgeToolResult historyRedoForMapResult(
   mdl::Map& map,
   std::vector<McpOperationRecord>& history,
   const McpObjectRegistry* objectRegistry)
+{
+  return historyRedoForMapResult(
+    map, history, const_cast<McpObjectRegistry*>(objectRegistry), nullptr, nullptr);
+}
+
+McpBridgeToolResult historyRedoForMapResult(
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  McpObjectRegistry* objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore)
 {
   auto it = std::find_if(history.begin(), history.end(), [](const auto& operation) {
     return operation.undoable && operation.undone;
@@ -1282,9 +1348,16 @@ McpBridgeToolResult historyRedoForMapResult(
       std::move(details));
   }
 
+  const auto sessionOperation = *it;
   map.redoCommand();
   const auto operationId = it->operationId;
   setOperationUndoneState(history, operationId, false);
+  if (metadataStore != nullptr && moduleStore != nullptr && objectRegistry != nullptr)
+  {
+    restoreMcpSessionDelta(sessionOperation, false, *metadataStore, *moduleStore);
+    reconcileMcpSessionForMap(
+      map, *metadataStore, *moduleStore, *objectRegistry, operationId, true);
+  }
   const auto operation = findOperationCopy(history, operationId);
   return McpBridgeToolResult::success(QJsonObject{
     {"mutatedDocument", true},

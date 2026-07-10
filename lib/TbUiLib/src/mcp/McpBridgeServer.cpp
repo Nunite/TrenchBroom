@@ -511,16 +511,31 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         }
         if (toolName == "history_undo_mcp")
         {
-          return historyUndoResult(appController, m_operationHistory, m_objectRegistry);
+          return historyUndoResult(
+            appController,
+            m_operationHistory,
+            m_objectRegistry,
+            &m_brushMetadata,
+            &m_modules);
         }
         if (toolName == "history_undo_to_operation")
         {
           return historyUndoToOperationResult(
-            appController, m_operationHistory, params, m_objectRegistry);
+            appController,
+            m_operationHistory,
+            params,
+            m_objectRegistry,
+            &m_brushMetadata,
+            &m_modules);
         }
         if (toolName == "history_redo_mcp")
         {
-          return historyRedoResult(appController, m_operationHistory, m_objectRegistry);
+          return historyRedoResult(
+            appController,
+            m_operationHistory,
+            m_objectRegistry,
+            &m_brushMetadata,
+            &m_modules);
         }
         if (toolName == "objects_delete_by_operation")
         {

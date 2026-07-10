@@ -4425,6 +4425,8 @@ TEST_CASE(
   auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
   auto moduleStore = std::map<QString, McpModuleRecord>{};
   auto objectRegistry = McpObjectRegistry{};
+  const auto metadataBefore = metadataStore;
+  const auto modulesBefore = moduleStore;
   const auto descendantCountBefore = map.worldNode().descendantCount();
 
   const auto apply = irApplyForMapResult(
@@ -4436,6 +4438,9 @@ TEST_CASE(
        QJsonObject{
          {"schemaVersion", 1},
          {"name", "MCP: Atomic IR test"},
+         {"moduleId", "atomic-ir-module"},
+         {"defaultMetadata", QJsonObject{{"moduleId", "atomic-ir-module"}}},
+         {"qualityPolicy", QJsonObject{{"intent", "balanced"}}},
          {"select", false},
          {"selectEntities", false},
          {"operations",
@@ -4468,6 +4473,31 @@ TEST_CASE(
   const auto childOperationIds = apply.result.value("childOperationIds").toArray();
   REQUIRE_FALSE(parentOperationId.isEmpty());
   REQUIRE(childOperationIds.size() == 2);
+  reconcileMcpSessionForMap(
+    map, metadataStore, moduleStore, objectRegistry, parentOperationId);
+  attachMcpSessionDelta(
+    history,
+    parentOperationId,
+    metadataBefore,
+    modulesBefore,
+    metadataStore,
+    moduleStore);
+  const auto moduleBeforeUndo = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "atomic-ir-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(moduleBeforeUndo.ok);
+  CHECK(moduleBeforeUndo.result.value("canonicalObjectCount").toInt() == 2);
+  CHECK(moduleBeforeUndo.result.value("moduleRevision").toInt() == 1);
+  const auto moduleHash = moduleBeforeUndo.result.value("moduleContentHash").toString();
+  REQUIRE(moduleHash.startsWith("sha256:"));
+  CHECK(
+    moduleBeforeUndo.result.value("activeOperationId").toString() == parentOperationId);
+  CHECK(
+    moduleBeforeUndo.result.value("qualityPolicy").toObject().value("intent").toString()
+    == "balanced");
   CHECK(apply.result.value("operationIds").toArray() == childOperationIds);
   CHECK(history.size() == 3u);
   CHECK(history.back().operationId == parentOperationId);
@@ -4503,17 +4533,37 @@ TEST_CASE(
   CHECK(
     childUndo.error.details.value("parentOperationId").toString() == parentOperationId);
 
-  const auto undo = historyUndoForMapResult(map, history, &objectRegistry);
+  const auto undo =
+    historyUndoForMapResult(map, history, &objectRegistry, &metadataStore, &moduleStore);
   REQUIRE(undo.ok);
   CHECK(map.worldNode().descendantCount() == descendantCountBefore);
   CHECK(
     std::ranges::all_of(history, [](const auto& operation) { return operation.undone; }));
+  const auto moduleAfterUndo = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "atomic-ir-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(moduleAfterUndo.ok);
+  CHECK(moduleAfterUndo.result.value("canonicalObjectCount").toInt() == 0);
 
-  const auto redo = historyRedoForMapResult(map, history, &objectRegistry);
+  const auto redo =
+    historyRedoForMapResult(map, history, &objectRegistry, &metadataStore, &moduleStore);
   REQUIRE(redo.ok);
   CHECK(map.worldNode().descendantCount() == descendantCountBefore + 2);
   CHECK(std::ranges::none_of(
     history, [](const auto& operation) { return operation.undone; }));
+  const auto moduleAfterRedo = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "atomic-ir-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(moduleAfterRedo.ok);
+  CHECK(moduleAfterRedo.result.value("canonicalObjectCount").toInt() == 2);
+  CHECK(moduleAfterRedo.result.value("moduleRevision").toInt() == 1);
+  CHECK(moduleAfterRedo.result.value("moduleContentHash").toString() == moduleHash);
 }
 
 TEST_CASE(
@@ -4867,6 +4917,183 @@ TEST_CASE("McpBridgeServer module_inspect reports recovery state", "[McpBridgeSe
   CHECK(fullInspect.result.value("objectIdCount").toInt() == 1);
   CHECK(fullInspect.result.value("objectIds").toArray().size() == 1);
   CHECK(fullInspect.result.value("objectIdSample").isUndefined());
+
+  const auto createOperationId = create.result.value("operationId").toString();
+  reconcileMcpSessionForMap(
+    map, metadataStore, moduleStore, objectRegistry, createOperationId);
+  const auto initialState = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "inspect-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(initialState.ok);
+  CHECK(initialState.result.value("moduleRevision").toInt() == 1);
+  const auto initialHash = initialState.result.value("moduleContentHash").toString();
+  REQUIRE(initialHash.startsWith("sha256:"));
+
+  const auto metadataBeforeTransform = metadataStore;
+  const auto modulesBeforeTransform = moduleStore;
+  const auto transform = transformObjectsForMapResult(
+    map,
+    "objects_transform",
+    QJsonObject{
+      {"selector", QJsonObject{{"moduleId", "inspect-module"}}},
+      {"operation", "translate"},
+      {"delta", QJsonArray{16, 0, 0}},
+    },
+    history,
+    nextOperationIndex,
+    objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(transform.ok);
+  const auto transformOperationId = transform.result.value("operationId").toString();
+  reconcileMcpSessionForMap(
+    map, metadataStore, moduleStore, objectRegistry, transformOperationId);
+  attachMcpSessionDelta(
+    history,
+    transformOperationId,
+    metadataBeforeTransform,
+    modulesBeforeTransform,
+    metadataStore,
+    moduleStore);
+  const auto transformedState = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "inspect-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(transformedState.ok);
+  CHECK(transformedState.result.value("moduleRevision").toInt() == 2);
+  const auto transformedHash =
+    transformedState.result.value("moduleContentHash").toString();
+  CHECK(transformedHash != initialHash);
+  CHECK(
+    transformedState.result.value("activeOperationId").toString()
+    == transformOperationId);
+
+  const auto undo =
+    historyUndoForMapResult(map, history, &objectRegistry, &metadataStore, &moduleStore);
+  REQUIRE(undo.ok);
+  const auto restoredState = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "inspect-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(restoredState.ok);
+  CHECK(restoredState.result.value("moduleRevision").toInt() == 1);
+  CHECK(restoredState.result.value("moduleContentHash").toString() == initialHash);
+  CHECK(restoredState.result.value("canonicalObjectCount").toInt() == 1);
+
+  const auto redo =
+    historyRedoForMapResult(map, history, &objectRegistry, &metadataStore, &moduleStore);
+  REQUIRE(redo.ok);
+  const auto redoneState = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "inspect-module"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(redoneState.ok);
+  CHECK(redoneState.result.value("moduleRevision").toInt() == 2);
+  CHECK(redoneState.result.value("moduleContentHash").toString() == transformedHash);
+  CHECK(redoneState.result.value("canonicalObjectCount").toInt() == 1);
+}
+
+TEST_CASE(
+  "McpBridgeServer module statistics canonicalize stable and legacy aliases",
+  "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+  auto operations = QJsonArray{};
+  for (auto i = 0; i < 54; ++i)
+  {
+    const auto x = (i % 9) * 32;
+    const auto y = (i / 9) * 32;
+    operations.push_back(QJsonObject{
+      {"type", "box"},
+      {"min", QJsonArray{x, y, 0}},
+      {"max", QJsonArray{x + 16, y + 16, 16}},
+    });
+  }
+
+  const auto create = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"select", false},
+      {"detail", "ids"},
+      {"defaultMetadata", QJsonObject{{"moduleId", "alias-module"}}},
+      {"operations", operations},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(create.ok);
+  REQUIRE(metadataStore.size() == 54u);
+  REQUIRE(moduleStore.size() == 1u);
+
+  auto aliases = QStringList{};
+  for (const auto& [key, record] : metadataStore)
+  {
+    Q_UNUSED(key);
+    aliases.push_back(record.objectId);
+    const auto resolved = objectRegistry.resolveExternalId(map, record.objectId);
+    REQUIRE(resolved.ok);
+    aliases.push_back(resolved.legacyPathId);
+  }
+  REQUIRE(aliases.size() == 108);
+  moduleStore.begin()->second.objectIds = aliases;
+
+  const auto aliased = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "alias-module"}, {"idsMode", "count"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(aliased.ok);
+  CHECK(aliased.result.value("storedReferenceCount").toInt() == 108);
+  CHECK(aliased.result.value("canonicalObjectCount").toInt() == 54);
+  CHECK(aliased.result.value("duplicateAliasCount").toInt() == 54);
+  CHECK(aliased.result.value("staleReferenceCount").toInt() == 0);
+
+  reconcileMcpSessionForMap(
+    map,
+    metadataStore,
+    moduleStore,
+    objectRegistry,
+    create.result.value("operationId").toString());
+  const auto reconciled = moduleInspectForMapResult(
+    map,
+    QJsonObject{{"moduleId", "alias-module"}, {"idsMode", "count"}},
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(reconciled.ok);
+  CHECK(reconciled.result.value("storedReferenceCount").toInt() == 54);
+  CHECK(reconciled.result.value("canonicalObjectCount").toInt() == 54);
+  CHECK(reconciled.result.value("duplicateAliasCount").toInt() == 0);
+  CHECK(reconciled.result.value("moduleRevision").toInt() == 1);
+  CHECK(reconciled.result.value("moduleContentHash").toString().startsWith("sha256:"));
 }
 
 TEST_CASE(
@@ -5132,6 +5359,13 @@ TEST_CASE("McpBridgeServer object transform summaries", "[McpBridgeServer]")
                                 : transformResponse.error->message;
   INFO(transformError.toStdString());
   REQUIRE(transformResponse.ok);
+  CHECK(
+    transformResponse.result.value("undoOperationId").toString()
+    == transformResponse.result.value("operationId").toString());
+  CHECK(transformResponse.result.value("undoable").toBool());
+  CHECK(transformResponse.result.value("auditOperationIds")
+          .toArray()
+          .contains(transformResponse.result.value("operationId")));
   CHECK(transformResponse.result.value("changedObjectCount").toInt() == 1);
   CHECK(transformResponse.result.value("selectedCount").toInt() == 1);
   CHECK(transformResponse.result.value("validation").toObject().value("valid").toBool());

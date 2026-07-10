@@ -96,28 +96,53 @@ McpBridgeToolResult operationValidateResult(
 McpBridgeToolResult historyUndoResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry& objectRegistry);
+  McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult historyUndoForMapResult(
   mdl::Map& map,
   std::vector<McpOperationRecord>& history,
   const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult historyUndoForMapResult(
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  McpObjectRegistry* objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore);
 McpBridgeToolResult historyUndoToOperationResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
   const QJsonObject& params,
-  const McpObjectRegistry& objectRegistry);
+  McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult historyUndoToOperationForMapResult(
   mdl::Map& map,
   std::vector<McpOperationRecord>& history,
   const QJsonObject& params,
   const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult historyUndoToOperationForMapResult(
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  const QJsonObject& params,
+  McpObjectRegistry* objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore);
 McpBridgeToolResult historyRedoResult(
   AppController& appController,
   std::vector<McpOperationRecord>& history,
-  const McpObjectRegistry& objectRegistry);
+  McpObjectRegistry& objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult historyRedoForMapResult(
   mdl::Map& map,
   std::vector<McpOperationRecord>& history,
   const McpObjectRegistry* objectRegistry = nullptr);
+McpBridgeToolResult historyRedoForMapResult(
+  mdl::Map& map,
+  std::vector<McpOperationRecord>& history,
+  McpObjectRegistry* objectRegistry,
+  std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  std::map<QString, McpModuleRecord>* moduleStore);
 
 } // namespace tb::ui
