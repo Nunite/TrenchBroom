@@ -298,6 +298,11 @@ QString AppController::mcpHttpServerUrl() const
   return m_mcpHttpServer->url();
 }
 
+const QString& AppController::mcpStartupError() const
+{
+  return m_mcpStartupError;
+}
+
 void AppController::askForAutoUpdates()
 {
   if (pref(Preferences::AskForAutoUpdates))
@@ -485,25 +490,29 @@ void AppController::connectObservers()
 
 void AppController::startMcpBridge()
 {
+  m_mcpStartupError.clear();
   auto error = QString{};
   const auto config = mcp::readOrCreateBridgeConfig(mcp::defaultConfigPath(), &error);
   if (!config)
   {
-    FileLogger::instance().warn()
-      << "Could not initialize MCP bridge config: " << error.toStdString();
+    m_mcpStartupError = QString{"Could not initialize MCP bridge config: %1"}.arg(error);
+    FileLogger::instance().warn() << m_mcpStartupError.toStdString();
     return;
   }
 
   if (!m_mcpBridgeServer->start(*config, &error) && config->mode != mcp::McpMode::Off)
   {
-    FileLogger::instance().warn()
-      << "Could not start MCP bridge: " << error.toStdString();
+    m_mcpStartupError = QString{"Could not start MCP bridge: %1"}.arg(error);
+    FileLogger::instance().warn() << m_mcpStartupError.toStdString();
+    m_mcpHttpServer->stop();
+    return;
   }
 
   if (!m_mcpHttpServer->start(*config, &error) && config->mode != mcp::McpMode::Off)
   {
-    FileLogger::instance().warn()
-      << "Could not start MCP HTTP server: " << error.toStdString();
+    m_mcpStartupError = QString{"Could not start MCP HTTP server: %1"}.arg(error);
+    FileLogger::instance().warn() << m_mcpStartupError.toStdString();
+    m_mcpBridgeServer->stop();
   }
 }
 

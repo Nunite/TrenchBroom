@@ -78,6 +78,27 @@ TEST_CASE("McpToolCatalog")
     CHECK(parseToolProfile("Full") == McpToolProfile::Full);
   }
 
+  SECTION("publishes cost metadata only through diagnostics and search")
+  {
+    const auto status = findToolDefinition("tb_status");
+    REQUIRE(status);
+    CHECK(status->costClass == McpToolCostClass::Fast);
+
+    const auto listed = toMcpToolJson(*status);
+    CHECK_FALSE(listed.contains("costClass"));
+    CHECK_FALSE(listed.contains("timeoutMs"));
+
+    const auto diagnostic = toMcpToolDiagnosticJson(*status, McpMode::ReadOnly);
+    CHECK(diagnostic.value("costClass").toString() == "Fast");
+    CHECK(diagnostic.value("timeoutMs").toInt() == 10'000);
+
+    const auto search = toolsSearchJson(
+      "tb_status", {}, "summary", McpMode::ReadOnly, McpToolProfile::Core);
+    REQUIRE(search.size() == 1);
+    CHECK(search.at(0).toObject().value("costClass").toString() == "Fast");
+    CHECK(search.at(0).toObject().value("timeoutMs").toInt() == 10'000);
+  }
+
   SECTION("contains first-phase tools")
   {
     CHECK(findToolDefinition("tb_status"));

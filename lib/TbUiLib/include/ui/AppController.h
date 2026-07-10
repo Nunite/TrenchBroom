@@ -20,6 +20,7 @@
 #pragma once
 
 #include <QObject>
+#include <QString>
 
 #include "Result.h"
 
@@ -93,6 +94,7 @@ private:
   std::unique_ptr<ActionManager> m_actionManager;
   std::unique_ptr<McpBridgeServer> m_mcpBridgeServer;
   std::unique_ptr<McpHttpServer> m_mcpHttpServer;
+  QString m_mcpStartupError;
   std::unique_ptr<WelcomeWindow> m_welcomeWindow;
   std::unique_ptr<AboutDialog> m_aboutDialog;
 
@@ -136,6 +138,7 @@ public:
   bool mcpBridgeIsListening() const;
   bool mcpHttpServerIsListening() const;
   QString mcpHttpServerUrl() const;
+  const QString& mcpStartupError() const;
 
   void askForAutoUpdates();
   void triggerAutoUpdateCheck();

@@ -372,6 +372,25 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     CHECK_FALSE(response.headers.contains("Access-Control-Allow-Origin"));
   }
 
+  SECTION("reports an active HTTP instance without replacing it")
+  {
+    auto firstBridgeServer = makeBridgeServer();
+    auto firstHttpServer = McpHttpServer{firstBridgeServer};
+    auto firstConfig = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(firstBridgeServer.start(firstConfig));
+    REQUIRE(firstHttpServer.start(firstConfig));
+
+    auto secondBridgeServer = makeBridgeServer();
+    auto secondHttpServer = McpHttpServer{secondBridgeServer};
+    auto secondConfig = makeConfig(mcp::McpMode::ReadOnly);
+    secondConfig.httpPort = firstHttpServer.port();
+    auto error = QString{};
+
+    CHECK_FALSE(secondHttpServer.start(secondConfig, &error));
+    CHECK(error.contains("already listening"));
+    CHECK(firstHttpServer.isListening());
+  }
+
   SECTION("read-only mode rejects edit tools")
   {
     auto bridgeServer = makeBridgeServer();

@@ -38,6 +38,13 @@ enum class McpToolProfile
   Full,
 };
 
+enum class McpToolCostClass
+{
+  Fast,
+  Normal,
+  Long,
+};
+
 struct McpToolDefinition
 {
   QString name;
@@ -49,12 +56,16 @@ struct McpToolDefinition
   QString category = "general";
   bool expert = false;
   QString lifecycle = "stable";
+  McpToolCostClass costClass = McpToolCostClass::Normal;
 };
 
 const std::vector<McpToolDefinition>& defaultToolCatalog();
 
 QString toolProfileName(McpToolProfile profile);
 std::optional<McpToolProfile> parseToolProfile(const QString& profile);
+QString toolCostClassName(McpToolCostClass costClass);
+int toolResponseTimeoutMs(McpToolCostClass costClass);
+McpToolCostClass toolCostClassForName(const QString& name);
 
 std::optional<McpToolDefinition> findToolDefinition(const QString& name);
 bool canCallTool(const McpToolDefinition& tool, McpMode mode);

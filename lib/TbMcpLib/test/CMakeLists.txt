@@ -21,3 +21,20 @@ target_link_libraries(TbMcpLibTest
 
 include(Catch)
 catch_discover_tests(TbMcpLibTest)
+
+add_executable(TbMcpStdioClientTest)
+
+target_sources(TbMcpStdioClientTest PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_McpBridgeClient.cpp
+)
+
+target_link_libraries(TbMcpStdioClientTest
+  PRIVATE
+    CompilerConfig
+    PrecompileStdHeaders
+    Catch2::Catch2WithMain
+    Qt6::Core
+    TbMcpLib
+)
+
+catch_discover_tests(TbMcpStdioClientTest)

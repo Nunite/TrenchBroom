@@ -19,6 +19,7 @@
 
 #include "ui/mcp/McpHttpServer.h"
 
+#include <QAbstractSocket>
 #include <QHostAddress>
 #include <QJsonDocument>
 #include <QJsonParseError>
@@ -175,7 +176,11 @@ bool McpHttpServer::start(const mcp::McpBridgeConfig& config, QString* error)
   {
     if (error)
     {
-      *error = m_server->errorString();
+      *error =
+        m_server->serverError() == QAbstractSocket::AddressInUseError
+          ? QString{"Another TrenchBroom MCP instance is already listening on %1"}.arg(
+              url())
+          : m_server->errorString();
     }
     m_server.reset();
     return false;

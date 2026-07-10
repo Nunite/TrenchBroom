@@ -223,6 +223,13 @@ QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& to
   if (!error.details.isEmpty())
   {
     structuredError.insert("details", error.details);
+    for (auto it = error.details.constBegin(); it != error.details.constEnd(); ++it)
+    {
+      if (!structuredError.contains(it.key()))
+      {
+        structuredError.insert(it.key(), it.value());
+      }
+    }
   }
   return textToolResult(compactJsonText(structuredError), true, structuredError);
 }

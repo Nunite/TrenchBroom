@@ -24,7 +24,9 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLocalServer>
 #include <QTemporaryDir>
+#include <QUuid>
 
 #include "../../src/mcp/McpBridgeServerTools.h"
 #include "Result.h"
@@ -614,6 +616,20 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
       mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Off}, &error));
     CHECK(error.isEmpty());
     CHECK(!server.isListening());
+  }
+
+  SECTION("does not remove an active bridge pipe")
+  {
+    const auto pipeName =
+      QString{"trenchbroom-mcp-active-%1"}.arg(QUuid::createUuid().toString());
+    auto activeServer = QLocalServer{};
+    REQUIRE(activeServer.listen(pipeName));
+
+    auto error = QString{};
+    CHECK_FALSE(server.start(
+      mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}, &error));
+    CHECK(error.contains("already listening"));
+    CHECK(activeServer.isListening());
   }
 
   SECTION("rejects wrong token")

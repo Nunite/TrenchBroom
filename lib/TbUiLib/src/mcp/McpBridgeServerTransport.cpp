@@ -305,12 +305,46 @@ bool McpBridgeServer::start(const mcp::McpBridgeConfig& config, QString* error)
     this,
     &McpBridgeServer::handleNewConnection);
 
-  QLocalServer::removeServer(m_config.pipeName);
-  if (!m_server->listen(m_config.pipeName))
+  auto probe = QLocalSocket{};
+  probe.connectToServer(m_config.pipeName);
+  if (probe.waitForConnected(250))
   {
     if (error)
     {
-      *error = m_server->errorString();
+      *error =
+        QString{"Another TrenchBroom MCP instance is already listening on pipe '%1'"}.arg(
+          m_config.pipeName);
+    }
+    m_server.reset();
+    return false;
+  }
+
+  if (
+    probe.error() != QLocalSocket::ServerNotFoundError
+    && probe.error() != QLocalSocket::ConnectionRefusedError)
+  {
+    if (error)
+    {
+      *error = QString{"Could not verify whether MCP pipe '%1' is active: %2"}.arg(
+        m_config.pipeName, probe.errorString());
+    }
+    m_server.reset();
+    return false;
+  }
+
+  if (m_server->listen(m_config.pipeName))
+  {
+    return true;
+  }
+
+  if (
+    !QLocalServer::removeServer(m_config.pipeName)
+    || !m_server->listen(m_config.pipeName))
+  {
+    if (error)
+    {
+      *error = QString{"Could not claim inactive MCP pipe '%1': %2"}.arg(
+        m_config.pipeName, m_server->errorString());
     }
     m_server.reset();
     return false;

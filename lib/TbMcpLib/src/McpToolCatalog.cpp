@@ -574,6 +574,22 @@ QJsonObject checkedEntityBatchItemSchema()
     {"classname"});
 }
 
+bool isLongRunningTool(const McpToolDefinition& tool)
+{
+  return tool.name.startsWith("ir_") || tool.name.startsWith("heightmap_")
+         || tool.name.startsWith("python_") || tool.name.contains("review")
+         || tool.name == "compile_run";
+}
+
+bool isFastTool(const McpToolDefinition& tool)
+{
+  return !tool.mutatesDocument
+         && (tool.category == "core" || tool.name.endsWith("_list")
+             || tool.name.endsWith("_get") || tool.name.endsWith("_search")
+             || tool.name.endsWith("_inspect") || tool.name.endsWith("_status")
+             || tool.name == "entity_schema");
+}
+
 } // namespace
 
 const std::vector<McpToolDefinition>& defaultToolCatalog()
@@ -3576,6 +3592,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       {
         tool.lifecycle = "experimental";
       }
+      tool.costClass = isLongRunningTool(tool) ? McpToolCostClass::Long
+                       : isFastTool(tool)      ? McpToolCostClass::Fast
+                                               : McpToolCostClass::Normal;
       assertKnownToolMetadata(tool);
       addExpectedDocumentPathGuardSchema(tool);
     }
@@ -3619,6 +3638,40 @@ std::optional<McpToolProfile> parseToolProfile(const QString& profile)
     return McpToolProfile::Full;
   }
   return std::nullopt;
+}
+
+QString toolCostClassName(const McpToolCostClass costClass)
+{
+  switch (costClass)
+  {
+  case McpToolCostClass::Fast:
+    return "Fast";
+  case McpToolCostClass::Normal:
+    return "Normal";
+  case McpToolCostClass::Long:
+    return "Long";
+  }
+  return "Normal";
+}
+
+int toolResponseTimeoutMs(const McpToolCostClass costClass)
+{
+  switch (costClass)
+  {
+  case McpToolCostClass::Fast:
+    return 10'000;
+  case McpToolCostClass::Normal:
+    return 30'000;
+  case McpToolCostClass::Long:
+    return 120'000;
+  }
+  return 30'000;
+}
+
+McpToolCostClass toolCostClassForName(const QString& name)
+{
+  const auto tool = findToolDefinition(name);
+  return tool ? tool->costClass : McpToolCostClass::Normal;
 }
 
 bool visibleInModelingProfile(const McpToolDefinition& tool)
@@ -3737,6 +3790,8 @@ QJsonObject toMcpToolDiagnosticJson(
     {"category", tool.category},
     {"expert", tool.expert},
     {"lifecycle", tool.lifecycle},
+    {"costClass", toolCostClassName(tool.costClass)},
+    {"timeoutMs", toolResponseTimeoutMs(tool.costClass)},
   };
 }
 
@@ -3754,6 +3809,8 @@ QJsonObject toMcpToolSummaryJson(
     {"lifecycle", tool.lifecycle},
     {"requiredMode", modeName(tool.requiredMode)},
     {"visibleInCurrentProfile", visibleInProfile(tool, profile)},
+    {"costClass", toolCostClassName(tool.costClass)},
+    {"timeoutMs", toolResponseTimeoutMs(tool.costClass)},
   };
 }
 

@@ -20,12 +20,10 @@
 #include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QLocalSocket>
 #include <QTextStream>
-#include <QUuid>
 
+#include "mcp/McpBridgeClient.h"
 #include "mcp/McpBridgeConfig.h"
-#include "mcp/McpBridgeMessages.h"
 #include "mcp/McpError.h"
 #include "mcp/McpJsonRpc.h"
 
@@ -33,8 +31,6 @@ namespace tb::mcp
 {
 namespace
 {
-
-constexpr auto BridgeTimeoutMs = 5000;
 
 std::optional<McpBridgeConfig> loadConfig(QString* error)
 {
@@ -60,68 +56,8 @@ McpBridgeResponse callBridge(const QString& toolName, const QJsonObject& argumen
       {}, McpError{McpErrorCode::Forbidden, "TrenchBroom MCP bridge is disabled"});
   }
 
-  auto socket = QLocalSocket{};
-  socket.connectToServer(config->pipeName);
-  if (!socket.waitForConnected(BridgeTimeoutMs))
-  {
-    return McpBridgeResponse::failure(
-      {},
-      McpError{
-        McpErrorCode::InternalError,
-        QString{"Could not connect to TrenchBroom MCP bridge '%1': %2"}.arg(
-          config->pipeName, socket.errorString())});
-  }
-
-  const auto request = McpBridgeRequest{
-    QUuid::createUuid().toString(QUuid::WithoutBraces),
-    config->token,
-    toolName,
-    arguments,
-    config->mode,
-  };
-
-  socket.write(QJsonDocument{toJson(request)}.toJson(QJsonDocument::Compact));
-  socket.write("\n");
-  if (!socket.waitForBytesWritten(BridgeTimeoutMs))
-  {
-    return McpBridgeResponse::failure(
-      {},
-      McpError{
-        McpErrorCode::InternalError,
-        QString{"Could not write MCP bridge request: %1"}.arg(socket.errorString())});
-  }
-
-  if (!socket.waitForReadyRead(BridgeTimeoutMs))
-  {
-    return McpBridgeResponse::failure(
-      {},
-      McpError{
-        McpErrorCode::InternalError,
-        QString{"Timed out waiting for MCP bridge response: %1"}.arg(
-          socket.errorString())});
-  }
-
-  auto parseError = QJsonParseError{};
-  const auto document = QJsonDocument::fromJson(socket.readLine().trimmed(), &parseError);
-  if (parseError.error != QJsonParseError::NoError || !document.isObject())
-  {
-    return McpBridgeResponse::failure(
-      {},
-      McpError{McpErrorCode::InvalidRequest, "Invalid JSON response from MCP bridge"});
-  }
-
-  auto parseMessage = QString{};
-  const auto response = bridgeResponseFromJson(document.object(), &parseMessage);
-  if (!response)
-  {
-    return McpBridgeResponse::failure(
-      {},
-      McpError{
-        McpErrorCode::InvalidRequest,
-        QString{"Invalid MCP bridge response: %1"}.arg(parseMessage)});
-  }
-
-  return *response;
+  static const auto Client = McpBridgeClient{};
+  return Client.call(*config, toolName, arguments);
 }
 
 std::optional<QJsonObject> handleRequest(const QJsonObject& request)

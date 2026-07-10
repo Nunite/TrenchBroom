@@ -237,7 +237,9 @@ void McpPreferencePane::updateControls()
 
   const auto modeText = mcp::modeName(m_config.mode);
   const auto statusText =
-    m_appController.mcpHttpServerIsListening()
+    !m_appController.mcpStartupError().isEmpty()
+      ? tr("MCP startup failed: %1").arg(m_appController.mcpStartupError())
+    : m_appController.mcpHttpServerIsListening()
       ? tr("HTTP endpoint running in %1 mode").arg(modeText)
     : m_config.mode == mcp::McpMode::Off
       ? tr("Disabled")
