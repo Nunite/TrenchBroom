@@ -23,6 +23,7 @@
 #include <QJsonObject>
 
 #include "McpBridgeServerTools.h"
+#include "McpToolSupport.h"
 #include "mcp/McpError.h"
 #include "mdl/Map.h"
 #include "ui/AppController.h"
@@ -51,15 +52,6 @@ constexpr auto DefaultAdaptiveMaxCellSpan = 4;
 constexpr auto HardMaxSize = 256;
 constexpr auto HardMaxBrushes = 4096;
 constexpr auto SurfaceEpsilon = 0.01;
-
-QJsonObject preMutationFailureDetails(
-  QJsonObject details, const QString& recoveryAction)
-{
-  details.insert("mutatedDocument", false);
-  details.insert("retrySafe", true);
-  details.insert("recoveryAction", recoveryAction);
-  return details;
-}
 
 struct HeightmapOrigin
 {

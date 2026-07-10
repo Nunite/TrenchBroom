@@ -22,6 +22,7 @@
 #include <QStringList>
 
 #include "McpBridgeServerTools.h"
+#include "McpToolSupport.h"
 #include "mcp/McpError.h"
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/Brush.h"
@@ -250,14 +251,6 @@ QJsonObject mutationResultJson(const McpOperationRecord& operation)
   result.insert(
     "resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId));
   return result;
-}
-
-QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
-{
-  details.insert("mutatedDocument", false);
-  details.insert("retrySafe", true);
-  details.insert("recoveryAction", recoveryAction);
-  return details;
 }
 
 void mcpRecordOperation(
@@ -2207,18 +2200,6 @@ std::string materialNameFromParams(mdl::Map& map, const QJsonObject& params)
     material = "__TB_empty";
   }
   return material;
-}
-
-bool executeTransaction(
-  mdl::Map& map, const QString& transactionName, const std::function<bool()>& operation)
-{
-  auto transaction = mdl::Transaction{map, transactionName.toStdString()};
-  if (!operation())
-  {
-    transaction.cancel();
-    return false;
-  }
-  return transaction.commit();
 }
 
 std::optional<QJsonArray> addNodesWithTransaction(

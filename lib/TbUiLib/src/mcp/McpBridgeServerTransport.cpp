@@ -203,17 +203,260 @@ QJsonObject compactReviewResource(const QJsonObject& result)
   return compact;
 }
 
-void cacheReviewResource(
-  std::map<QString, QJsonObject>& resources, const QJsonObject& result)
+} // namespace
+
+void McpSessionState::clear()
 {
-  const auto resourceUri = result.value("resourceUri").toString();
-  if (resourceUri.startsWith("tbmcp://review/"))
+  nextOperationIndex = 1;
+  operationHistory.clear();
+  brushMetadata.clear();
+  modules.clear();
+  irPreviewCache.clear();
+  reviewResources.clear();
+  nextIrPreviewIndex = 1;
+  objectRegistry.clear();
+  recentDocumentFingerprints.clear();
+  evictions = {};
+  evictedResourceHints.clear();
+}
+
+void McpSessionState::rememberDocumentFingerprint(const QString& documentFingerprint)
+{
+  if (documentFingerprint.isEmpty())
   {
-    resources[resourceUri] = compactReviewResource(result);
+    return;
+  }
+
+  recentDocumentFingerprints.removeAll(documentFingerprint);
+  recentDocumentFingerprints.prepend(documentFingerprint);
+  while (recentDocumentFingerprints.size() > MaxDocumentFingerprints)
+  {
+    const auto evictedFingerprint = recentDocumentFingerprints.takeLast();
+    ++evictions.documentFingerprints;
+
+    const auto oldOperationCount = operationHistory.size();
+    std::erase_if(operationHistory, [&](const auto& operation) {
+      if (operation.documentFingerprint != evictedFingerprint)
+      {
+        return false;
+      }
+      evictedResourceHints[QString{"tbmcp://operation/%1"}.arg(operation.operationId)] =
+        QJsonObject{
+          {"evicted", true},
+          {"resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId)},
+          {"reason", "document_fingerprint_budget"},
+          {"recoveryAction", "refresh_history_for_active_document"},
+        };
+      return true;
+    });
+    evictions.operationRecords += oldOperationCount - operationHistory.size();
+
+    std::erase_if(brushMetadata, [&](const auto& entry) {
+      return entry.second.documentFingerprint == evictedFingerprint;
+    });
+    std::erase_if(modules, [&](const auto& entry) {
+      return entry.second.documentFingerprint == evictedFingerprint;
+    });
+
+    const auto oldPreviewCount = irPreviewCache.size();
+    std::erase_if(irPreviewCache, [&](const auto& entry) {
+      return entry.second.documentFingerprint == evictedFingerprint;
+    });
+    evictions.irPreviews += oldPreviewCount - irPreviewCache.size();
+
+    const auto oldReviewCount = reviewResources.size();
+    std::erase_if(reviewResources, [&](const auto& entry) {
+      if (entry.second.documentFingerprint != evictedFingerprint)
+      {
+        return false;
+      }
+      evictedResourceHints[entry.first] = QJsonObject{
+        {"evicted", true},
+        {"resourceUri", entry.first},
+        {"reason", "document_fingerprint_budget"},
+        {"recoveryAction", "activate_document_and_regenerate_review"},
+      };
+      return true;
+    });
+    evictions.reviewResources += oldReviewCount - reviewResources.size();
+  }
+
+  evictions.objectRegistryRecords +=
+    objectRegistry.retainDocumentFingerprints(recentDocumentFingerprints);
+  while (evictedResourceHints.size() > 512u)
+  {
+    evictedResourceHints.erase(evictedResourceHints.begin());
   }
 }
 
-} // namespace
+void McpSessionState::prune(const QString& activeDocumentFingerprint, const qint64 nowMs)
+{
+  rememberDocumentFingerprint(activeDocumentFingerprint);
+
+  const auto rememberEvictedResource = [&](const QString& uri, QJsonObject hint) {
+    hint.insert("resourceUri", uri);
+    hint.insert("evictedAtMs", nowMs);
+    evictedResourceHints[uri] = std::move(hint);
+    while (evictedResourceHints.size() > 512u)
+    {
+      evictedResourceHints.erase(evictedResourceHints.begin());
+    }
+  };
+
+  for (auto it = irPreviewCache.begin(); it != irPreviewCache.end();)
+  {
+    if (it->second.expiresAtMs > nowMs)
+    {
+      ++it;
+      continue;
+    }
+    rememberEvictedResource(
+      QString{"tbmcp://ir-preview/%1"}.arg(it->first),
+      QJsonObject{
+        {"evicted", true},
+        {"reason", "expired"},
+        {"recoveryAction", "compile_preview_again"},
+      });
+    it = irPreviewCache.erase(it);
+    ++evictions.irPreviews;
+  }
+  while (irPreviewCache.size() > MaxIrPreviews)
+  {
+    const auto oldest = std::ranges::min_element(
+      irPreviewCache, {}, [](const auto& entry) { return entry.second.createdAtMs; });
+    rememberEvictedResource(
+      QString{"tbmcp://ir-preview/%1"}.arg(oldest->first),
+      QJsonObject{
+        {"evicted", true},
+        {"reason", "preview_budget"},
+        {"recoveryAction", "compile_preview_again"},
+      });
+    irPreviewCache.erase(oldest);
+    ++evictions.irPreviews;
+  }
+
+  while (reviewResources.size() > MaxReviewResources)
+  {
+    const auto oldest = std::ranges::min_element(
+      reviewResources, {}, [](const auto& entry) { return entry.second.createdAtMs; });
+    rememberEvictedResource(
+      oldest->first,
+      QJsonObject{
+        {"evicted", true},
+        {"reason", "review_resource_budget"},
+        {"recoveryAction", "regenerate_review"},
+      });
+    reviewResources.erase(oldest);
+    ++evictions.reviewResources;
+  }
+
+  const auto eraseOperationFamily = [&](const McpOperationRecord& candidate) {
+    const auto parentOperationId = candidate.parentOperationId.isEmpty()
+                                     ? candidate.operationId
+                                     : candidate.parentOperationId;
+    const auto oldSize = operationHistory.size();
+    std::erase_if(operationHistory, [&](const auto& operation) {
+      const auto remove = operation.operationId == parentOperationId
+                          || operation.parentOperationId == parentOperationId;
+      if (remove)
+      {
+        rememberEvictedResource(
+          QString{"tbmcp://operation/%1"}.arg(operation.operationId),
+          QJsonObject{
+            {"evicted", true},
+            {"reason", "operation_record_budget"},
+            {"recoveryAction", "refresh_history_status"},
+          });
+      }
+      return remove;
+    });
+    evictions.operationRecords += oldSize - operationHistory.size();
+  };
+
+  while (operationHistory.size() > MaxOperationRecords)
+  {
+    const auto oldestMatching = [&](const auto& predicate) {
+      auto result = operationHistory.end();
+      for (auto it = operationHistory.begin(); it != operationHistory.end(); ++it)
+      {
+        if (
+          predicate(*it)
+          && (result == operationHistory.end() || it->createdAtMs < result->createdAtMs))
+        {
+          result = it;
+        }
+      }
+      return result;
+    };
+
+    auto candidate =
+      oldestMatching([](const auto& operation) { return operation.undone; });
+    if (candidate == operationHistory.end())
+    {
+      candidate = oldestMatching([&](const auto& operation) {
+        return !activeDocumentFingerprint.isEmpty()
+               && operation.documentFingerprint != activeDocumentFingerprint;
+      });
+    }
+    if (candidate == operationHistory.end())
+    {
+      candidate = oldestMatching([](const auto&) { return true; });
+    }
+    eraseOperationFamily(*candidate);
+  }
+}
+
+void McpSessionState::cacheReviewResource(
+  const QJsonObject& result, const QString& documentFingerprint)
+{
+  const auto resourceUri = result.value("resourceUri").toString();
+  if (!resourceUri.startsWith("tbmcp://review/"))
+  {
+    return;
+  }
+  reviewResources[resourceUri] = McpReviewResourceRecord{
+    compactReviewResource(result),
+    result.value("documentFingerprint").toString(documentFingerprint),
+    QDateTime::currentMSecsSinceEpoch(),
+  };
+  evictedResourceHints.erase(resourceUri);
+}
+
+std::optional<QJsonObject> McpSessionState::evictedResourceHint(const QString& uri) const
+{
+  const auto it = evictedResourceHints.find(uri);
+  return it != evictedResourceHints.end() ? std::optional{it->second} : std::nullopt;
+}
+
+QJsonObject McpSessionState::diagnosticsJson() const
+{
+  return QJsonObject{
+    {"limits",
+     QJsonObject{
+       {"operationRecords", static_cast<qint64>(MaxOperationRecords)},
+       {"reviewResources", static_cast<qint64>(MaxReviewResources)},
+       {"irPreviews", static_cast<qint64>(MaxIrPreviews)},
+       {"irPreviewTtlMs", IrPreviewTtlMs},
+       {"documentFingerprints", MaxDocumentFingerprints},
+     }},
+    {"counts",
+     QJsonObject{
+       {"operationRecords", static_cast<qint64>(operationHistory.size())},
+       {"reviewResources", static_cast<qint64>(reviewResources.size())},
+       {"irPreviews", static_cast<qint64>(irPreviewCache.size())},
+       {"documentFingerprints", recentDocumentFingerprints.size()},
+       {"objectRegistryRecords", static_cast<qint64>(objectRegistry.recordCount())},
+     }},
+    {"evictions",
+     QJsonObject{
+       {"operationRecords", static_cast<qint64>(evictions.operationRecords)},
+       {"reviewResources", static_cast<qint64>(evictions.reviewResources)},
+       {"irPreviews", static_cast<qint64>(evictions.irPreviews)},
+       {"documentFingerprints", static_cast<qint64>(evictions.documentFingerprints)},
+       {"objectRegistryRecords", static_cast<qint64>(evictions.objectRegistryRecords)},
+     }},
+  };
+}
 
 McpOperationRecord::McpOperationRecord()
 {
@@ -361,13 +604,7 @@ bool McpBridgeServer::start(const mcp::McpBridgeConfig& config, QString* error)
 void McpBridgeServer::clearSessionState()
 {
   m_overlayState = QJsonObject{};
-  m_operationHistory.clear();
-  m_brushMetadata.clear();
-  m_modules.clear();
-  m_objectRegistry.clear();
-  m_irPreviewCache.clear();
-  m_reviewResources.clear();
-  m_nextIrPreviewIndex = 1;
+  m_session.clear();
 }
 
 void McpBridgeServer::stop()
@@ -446,12 +683,12 @@ std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) con
   static const auto ReviewPrefix = QString{"tbmcp://review/"};
   if (uri.startsWith(ReviewPrefix))
   {
-    const auto it = m_reviewResources.find(uri);
-    if (it != m_reviewResources.end())
+    const auto it = m_session.reviewResources.find(uri);
+    if (it != m_session.reviewResources.end())
     {
-      return it->second;
+      return it->second.resource;
     }
-    return std::nullopt;
+    return m_session.evictedResourceHint(uri);
   }
 
   static const auto Prefix = QString{"tbmcp://operation/"};
@@ -461,22 +698,24 @@ std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) con
   }
 
   const auto operationId = uri.mid(Prefix.size());
-  const auto it = std::ranges::find_if(m_operationHistory, [&](const auto& operation) {
-    return operation.operationId == operationId;
-  });
-  if (it == m_operationHistory.end())
+  const auto it = std::ranges::find_if(
+    m_session.operationHistory,
+    [&](const auto& operation) { return operation.operationId == operationId; });
+  if (it == m_session.operationHistory.end())
   {
-    return std::nullopt;
+    return m_session.evictedResourceHint(uri);
   }
 
   if (m_activeMapProvider)
   {
     if (auto* map = m_activeMapProvider())
     {
-      return m_objectRegistry.externalizeResult(
+      return m_session.objectRegistry.externalizeResult(
         *map,
         resourceObject(
-          *it, m_objectRegistry.liveStateJson(*map, it->changedObjectIds, it->undone)));
+          *it,
+          m_session.objectRegistry.liveStateJson(
+            *map, it->changedObjectIds, it->undone)));
     }
   }
 
@@ -581,7 +820,7 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
     if (!expectedDocumentFingerprint.isEmpty())
     {
       const auto actualDocumentFingerprint =
-        map != nullptr ? m_objectRegistry.documentFingerprint(*map) : QString{};
+        map != nullptr ? m_session.objectRegistry.documentFingerprint(*map) : QString{};
       if (actualDocumentFingerprint != expectedDocumentFingerprint)
       {
         return makeFailure(
@@ -610,7 +849,8 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   if (map != nullptr)
   {
     auto error = QString{};
-    const auto internalParams = m_objectRegistry.internalizeParams(*map, params, error);
+    const auto internalParams =
+      m_session.objectRegistry.internalizeParams(*map, params, error);
     if (!internalParams)
     {
       return makeFailure(request, mcp::McpErrorCode::InvalidParams, error);
@@ -618,21 +858,31 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
     params = *internalParams;
   }
 
+  const auto requestDocumentFingerprint =
+    map != nullptr ? m_session.objectRegistry.documentFingerprint(*map) : QString{};
+  m_session.rememberDocumentFingerprint(requestDocumentFingerprint);
+
   const auto result = m_toolHandler(request.tool, params);
   if (result.ok)
   {
     auto* resultMap = m_activeMapProvider ? m_activeMapProvider() : nullptr;
     if (resultMap != nullptr)
     {
-      auto externalResult = m_objectRegistry.externalizeResult(*resultMap, result.result);
+      auto externalResult =
+        m_session.objectRegistry.externalizeResult(*resultMap, result.result);
       syncOperationHistoryWithExternalResult(
-        m_operationHistory, *resultMap, m_objectRegistry, externalResult);
-      cacheReviewResource(m_reviewResources, externalResult);
+        m_session.operationHistory, *resultMap, m_session.objectRegistry, externalResult);
+      const auto activeDocumentFingerprint =
+        m_session.objectRegistry.documentFingerprint(*resultMap);
+      m_session.cacheReviewResource(externalResult, activeDocumentFingerprint);
+      m_session.prune(activeDocumentFingerprint, QDateTime::currentMSecsSinceEpoch());
       return mcp::McpBridgeResponse::success(request.id, std::move(externalResult));
     }
-    cacheReviewResource(m_reviewResources, result.result);
+    m_session.cacheReviewResource(result.result);
+    m_session.prune({}, QDateTime::currentMSecsSinceEpoch());
     return mcp::McpBridgeResponse::success(request.id, result.result);
   }
+  m_session.prune(requestDocumentFingerprint, QDateTime::currentMSecsSinceEpoch());
   return mcp::McpBridgeResponse::failure(request.id, result.error);
 }
 

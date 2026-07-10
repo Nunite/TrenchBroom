@@ -26,6 +26,7 @@
 
 #include "McpBridgeServerTools.h"
 #include "mcp/McpError.h"
+#include "mcp/McpToolCatalog.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
@@ -36,6 +37,52 @@
 namespace tb::ui
 {
 namespace mcp = tb::mcp;
+
+class McpToolRegistry
+{
+private:
+  std::map<QString, McpBridgeServer::ToolHandler> m_handlers;
+  int m_duplicateRegistrationCount = 0;
+
+public:
+  bool registerHandler(QString toolName, McpBridgeServer::ToolHandler handler)
+  {
+    const auto [it, inserted] =
+      m_handlers.emplace(std::move(toolName), std::move(handler));
+    Q_UNUSED(it);
+    if (!inserted)
+    {
+      ++m_duplicateRegistrationCount;
+    }
+    return inserted;
+  }
+
+  McpBridgeToolResult dispatch(const QString& toolName, const QJsonObject& params) const
+  {
+    const auto it = m_handlers.find(toolName);
+    if (it == m_handlers.end())
+    {
+      return McpBridgeToolResult::failure(
+        mcp::McpErrorCode::ToolNotFound,
+        QString{"MCP tool has no registered handler: %1"}.arg(toolName));
+    }
+    return it->second(toolName, params);
+  }
+
+  QStringList toolNames() const
+  {
+    auto result = QStringList{};
+    result.reserve(static_cast<qsizetype>(m_handlers.size()));
+    for (const auto& [name, handler] : m_handlers)
+    {
+      Q_UNUSED(handler);
+      result.push_back(name);
+    }
+    return result;
+  }
+
+  int duplicateRegistrationCount() const { return m_duplicateRegistrationCount; }
+};
 
 McpBridgeToolResult noActiveDocumentFailure()
 {
@@ -71,12 +118,14 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
       [&appController, this](const auto& toolName, const auto& params) {
         if (toolName == "tb_status")
         {
-          return McpBridgeToolResult::success(makeStatus(
+          auto status = makeStatus(
             appController,
             m_config,
             m_bridgeInstanceId,
             m_bridgeStartedAtUtc.toString(Qt::ISODateWithMs),
-            &m_objectRegistry));
+            &m_objectRegistry);
+          status.insert("sessionState", m_session.diagnosticsJson());
+          return McpBridgeToolResult::success(std::move(status));
         }
         if (toolName == "tb_doctor")
         {
@@ -84,6 +133,7 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             params.value("detail").toString("summary").trimmed().toLower() == "full";
           auto doctor = doctorJson(appController, m_config, fullDetail);
           doctor.insert("overlay", m_overlayState);
+          doctor.insert("sessionState", m_session.diagnosticsJson());
           return McpBridgeToolResult::success(std::move(doctor));
         }
         if (toolName == "tb_tools_search")
@@ -829,10 +879,35 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
       },
       parent}
 {
+  auto legacyDispatcher = std::make_shared<ToolHandler>(std::move(m_toolHandler));
+  m_toolRegistry = std::make_unique<McpToolRegistry>();
+  for (const auto& tool : mcp::defaultToolCatalog())
+  {
+    if (tool.implemented)
+    {
+      m_toolRegistry->registerHandler(
+        tool.name, [legacyDispatcher](const auto& toolName, const auto& params) {
+          return (*legacyDispatcher)(toolName, params);
+        });
+    }
+  }
+  m_toolHandler = [this](const auto& toolName, const auto& params) {
+    return m_toolRegistry->dispatch(toolName, params);
+  };
   m_activeMapProvider = [&appController]() -> mdl::Map* {
     auto* mapWindow = appController.mapWindowManager().topMapWindow();
     return mapWindow != nullptr ? &mapWindow->document().map() : nullptr;
   };
+}
+
+QStringList McpBridgeServer::registeredToolNames() const
+{
+  return m_toolRegistry != nullptr ? m_toolRegistry->toolNames() : QStringList{};
+}
+
+int McpBridgeServer::duplicateToolRegistrationCount() const
+{
+  return m_toolRegistry != nullptr ? m_toolRegistry->duplicateRegistrationCount() : 0;
 }
 
 McpBridgeServer::McpBridgeServer(ToolHandler toolHandler, QObject* parent)

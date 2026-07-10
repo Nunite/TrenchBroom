@@ -23,6 +23,7 @@
 
 #include "McpBridgeServerTools.h"
 #include "McpResponseUtils.h"
+#include "McpToolSupport.h"
 #include "mcp/McpError.h"
 #include "mdl/BrushNode.h"
 #include "mdl/EntityNode.h"
@@ -118,14 +119,6 @@ QJsonObject mutationResultJson(
   return result;
 }
 
-QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
-{
-  details.insert("mutatedDocument", false);
-  details.insert("retrySafe", true);
-  details.insert("recoveryAction", recoveryAction);
-  return details;
-}
-
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
@@ -202,18 +195,6 @@ std::optional<std::vector<QString>> requiredStringListFromJson(
     return std::nullopt;
   }
   return values;
-}
-
-bool executeTransaction(
-  mdl::Map& map, const QString& transactionName, const std::function<bool()>& operation)
-{
-  auto transaction = mdl::Transaction{map, transactionName.toStdString()};
-  if (!operation())
-  {
-    transaction.cancel();
-    return false;
-  }
-  return transaction.commit();
 }
 
 QString problemId(const mdl::Issue& issue, const mdl::WorldNode& worldNode)

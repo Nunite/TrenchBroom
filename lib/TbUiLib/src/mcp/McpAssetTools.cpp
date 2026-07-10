@@ -22,6 +22,7 @@
 
 #include "McpBridgeServerTools.h"
 #include "McpResponseUtils.h"
+#include "McpToolSupport.h"
 #include "fs/PathMatcher.h"
 #include "fs/TraversalMode.h"
 #include "mcp/McpError.h"
@@ -104,14 +105,6 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
     {"min", vecToJson(bounds.min)},
     {"max", vecToJson(bounds.max)},
   };
-}
-
-QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
-{
-  details.insert("mutatedDocument", false);
-  details.insert("retrySafe", true);
-  details.insert("recoveryAction", recoveryAction);
-  return details;
 }
 
 QString nodePathId(const mdl::Node& node, const mdl::WorldNode& worldNode)

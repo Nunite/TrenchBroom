@@ -31,6 +31,7 @@
 #include "../../src/mcp/McpBridgeServerTools.h"
 #include "Result.h"
 #include "gl/GlManager.h"
+#include "mcp/McpToolCatalog.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
@@ -54,6 +55,7 @@
 #include "ui/MapWindowManager.h"
 #include "ui/mcp/McpBridgeServer.h"
 
+#include <algorithm>
 #include <optional>
 
 #include <catch2/catch_test_macros.hpp>
@@ -699,6 +701,43 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     CHECK(resource->value("targetObjectCount").toInt() == 2);
   }
 
+  SECTION("evicted review resources return structured recovery guidance")
+  {
+    auto resourceServer = McpBridgeServer{[](const QString&, const QJsonObject& params) {
+      const auto index = params.value("index").toInt();
+      return McpBridgeToolResult::success(QJsonObject{
+        {"tool", "render_review_current_scene"},
+        {"reviewId", QString{"review-%1"}.arg(index, 3, 10, QLatin1Char{'0'})},
+        {"resourceUri",
+         QString{"tbmcp://review/review-%1"}.arg(index, 3, 10, QLatin1Char{'0'})},
+      });
+    }};
+    REQUIRE(resourceServer.start(
+      mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+
+    for (auto i = 0; i <= static_cast<int>(McpSessionState::MaxReviewResources); ++i)
+    {
+      const auto response = resourceServer.dispatchRequest(mcp::McpBridgeRequest{
+        QString::number(i),
+        "secret",
+        "render_review_current_scene",
+        QJsonObject{{"index", i}},
+        mcp::McpMode::ReadOnly});
+      REQUIRE(response.ok);
+    }
+
+    const auto evicted = resourceServer.readResource("tbmcp://review/review-000");
+    REQUIRE(evicted);
+    CHECK(evicted->value("evicted").toBool());
+    CHECK(evicted->value("reason").toString() == "review_resource_budget");
+    CHECK(evicted->value("recoveryAction").toString() == "regenerate_review");
+
+    const auto retained = resourceServer.readResource("tbmcp://review/review-128");
+    REQUIRE(retained);
+    CHECK_FALSE(retained->value("evicted").toBool());
+    CHECK(retained->value("reviewId").toString() == "review-128");
+  }
+
   SECTION("serves compact tb_doctor output")
   {
     auto appControllerFixture = AppControllerFixture{};
@@ -730,6 +769,12 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
             .toString()
             .contains("ir_compile_preview_from_file"));
     CHECK(summaryResponse.result.contains("overlay"));
+    const auto sessionState = summaryResponse.result.value("sessionState").toObject();
+    CHECK(
+      sessionState.value("limits").toObject().value("operationRecords").toInt()
+      == static_cast<int>(McpSessionState::MaxOperationRecords));
+    CHECK(sessionState.value("counts").isObject());
+    CHECK(sessionState.value("evictions").isObject());
     CHECK(
       QJsonDocument{summaryResponse.result}.toJson(QJsonDocument::Compact).size() < 4096);
 
@@ -757,6 +802,26 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     CHECK(fullResponse.result.value("recipeWorkflowHint")
             .toString()
             .contains("ir_apply_from_file"));
+  }
+
+  SECTION("implemented catalog tools have exactly one registered handler")
+  {
+    auto appControllerFixture = AppControllerFixture{};
+    auto& appController = appControllerFixture.appController();
+    const auto appServer = McpBridgeServer{appController};
+
+    auto expectedNames = QStringList{};
+    for (const auto& tool : mcp::defaultToolCatalog())
+    {
+      if (tool.implemented)
+      {
+        expectedNames.push_back(tool.name);
+      }
+    }
+    expectedNames.sort();
+
+    CHECK(appServer.registeredToolNames() == expectedNames);
+    CHECK(appServer.duplicateToolRegistrationCount() == 0);
   }
 
   SECTION("serves compact broad tool schema search")
@@ -3015,6 +3080,97 @@ TEST_CASE(
     invalidGrowResponse.error.details.value("recoveryAction").toString()
     == "fix_selection_grow_mode_then_retry");
   CHECK(invalidGrowResponse.error.details.value("mode").toString() == "cousins");
+}
+
+TEST_CASE("McpSessionState enforces bounded caches", "[McpBridgeServer]")
+{
+  const auto nowMs = QDateTime::currentMSecsSinceEpoch();
+
+  SECTION("operation records prefer evicting undone entries")
+  {
+    auto state = McpSessionState{};
+    for (auto i = 0; i <= static_cast<int>(McpSessionState::MaxOperationRecords); ++i)
+    {
+      auto operation = McpOperationRecord{};
+      operation.operationId = QString{"mcp-op-%1"}.arg(i);
+      operation.documentFingerprint = "doc:active";
+      operation.createdAtMs = nowMs + i;
+      operation.undone = i == 0;
+      state.operationHistory.push_back(std::move(operation));
+    }
+
+    state.prune("doc:active", nowMs);
+
+    CHECK(state.operationHistory.size() == McpSessionState::MaxOperationRecords);
+    CHECK(state.evictions.operationRecords == 1u);
+    CHECK_FALSE(std::ranges::any_of(state.operationHistory, [](const auto& operation) {
+      return operation.operationId == "mcp-op-0";
+    }));
+    const auto hint = state.evictedResourceHint("tbmcp://operation/mcp-op-0");
+    REQUIRE(hint);
+    CHECK(hint->value("recoveryAction").toString() == "refresh_history_status");
+  }
+
+  SECTION("IR previews expire and stay within the fixed budget")
+  {
+    auto state = McpSessionState{};
+    for (auto i = 0; i < 66; ++i)
+    {
+      const auto previewId = QString{"ir-preview-%1"}.arg(i);
+      state.irPreviewCache[previewId] = McpIrPreviewCacheRecord{
+        previewId,
+        {},
+        {},
+        "doc:active",
+        {},
+        nowMs + i,
+        i == 0 ? nowMs - 1 : nowMs + McpSessionState::IrPreviewTtlMs,
+        {},
+      };
+    }
+
+    state.prune("doc:active", nowMs);
+
+    CHECK(state.irPreviewCache.size() == McpSessionState::MaxIrPreviews);
+    CHECK(state.evictions.irPreviews == 2u);
+    CHECK_FALSE(state.irPreviewCache.contains("ir-preview-0"));
+    CHECK_FALSE(state.irPreviewCache.contains("ir-preview-1"));
+  }
+
+  SECTION("only the current and three recent document fingerprints are retained")
+  {
+    auto state = McpSessionState{};
+    state.brushMetadata["doc:1|mcp:1:1"] =
+      McpBrushMetadataRecord{"mcp:1:1", "doc:1", {}, false};
+    state.modules["doc:1|module"] = McpModuleRecord{"module", "doc:1"};
+
+    for (auto i = 1; i <= 5; ++i)
+    {
+      state.rememberDocumentFingerprint(QString{"doc:%1"}.arg(i));
+    }
+
+    CHECK(
+      state.recentDocumentFingerprints
+      == QStringList{"doc:5", "doc:4", "doc:3", "doc:2"});
+    CHECK(state.evictions.documentFingerprints == 1u);
+    CHECK(state.brushMetadata.empty());
+    CHECK(state.modules.empty());
+  }
+
+  SECTION("diagnostics expose limits, counts, and eviction counters")
+  {
+    auto state = McpSessionState{};
+    state.rememberDocumentFingerprint("doc:active");
+    const auto diagnostics = state.diagnosticsJson();
+
+    CHECK(
+      diagnostics.value("limits").toObject().value("reviewResources").toInt()
+      == static_cast<int>(McpSessionState::MaxReviewResources));
+    CHECK(
+      diagnostics.value("counts").toObject().value("documentFingerprints").toInt() == 1);
+    CHECK(
+      diagnostics.value("evictions").toObject().value("operationRecords").toInt() == 0);
+  }
 }
 
 TEST_CASE("McpBridgeServer spiral stair geometry tools", "[McpBridgeServer]")

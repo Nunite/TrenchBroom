@@ -31,6 +31,7 @@
 #include "McpBridgeServerTools.h"
 #include "McpResponseUtils.h"
 #include "McpSelectionQuery.h"
+#include "McpToolSupport.h"
 #include "PreferenceManager.h"
 #include "Preferences.h"
 #include "gl/Material.h"
@@ -476,14 +477,6 @@ QJsonObject mutationResultJson(
   return result;
 }
 
-QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
-{
-  details.insert("mutatedDocument", false);
-  details.insert("retrySafe", true);
-  details.insert("recoveryAction", recoveryAction);
-  return details;
-}
-
 void mcpRecordOperation(
   std::vector<McpOperationRecord>& history,
   int& nextOperationIndex,
@@ -514,18 +507,6 @@ size_t optionalSize(
     return defaultValue;
   }
   return static_cast<size_t>(std::max(0, value.toInt()));
-}
-
-bool executeTransaction(
-  mdl::Map& map, const QString& transactionName, const std::function<bool()>& operation)
-{
-  auto transaction = mdl::Transaction{map, transactionName.toStdString()};
-  if (!operation())
-  {
-    transaction.cancel();
-    return false;
-  }
-  return transaction.commit();
 }
 
 } // namespace
@@ -1438,7 +1419,8 @@ McpBridgeToolResult textureReplaceResult(
       mcp::McpErrorCode::InvalidParams,
       "texture_replace requires find and replace",
       preMutationFailureDetails(
-        QJsonObject{{"targetSource", "material"}}, "provide_find_and_replace_then_retry"));
+        QJsonObject{{"targetSource", "material"}},
+        "provide_find_and_replace_then_retry"));
   }
 
   auto* mapWindow = appController.mapWindowManager().topMapWindow();

@@ -25,6 +25,7 @@
 #include "Macros.h"
 #include "McpBridgeServerTools.h"
 #include "McpResponseUtils.h"
+#include "McpToolSupport.h"
 #include "mcp/McpError.h"
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/Brush.h"
@@ -233,23 +234,6 @@ QJsonObject mutationResultJson(
   result.insert("documentFingerprint", operation.documentFingerprint);
   mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
-}
-
-QJsonObject preMutationFailureDetails(QJsonObject details, const QString& recoveryAction)
-{
-  details.insert("mutatedDocument", false);
-  details.insert("retrySafe", true);
-  details.insert("recoveryAction", recoveryAction);
-  return details;
-}
-
-McpBridgeToolResult preMutationInvalidParamsFailure(
-  const QString& message, const QString& recoveryAction, QJsonObject details = {})
-{
-  return McpBridgeToolResult::failure(
-    mcp::McpErrorCode::InvalidParams,
-    message,
-    preMutationFailureDetails(std::move(details), recoveryAction));
 }
 
 QJsonObject targetSourceDetails(const QString& targetSource)
@@ -510,18 +494,6 @@ std::vector<mdl::EntityNodeBase*> entityTargetsFromParams(
     error = "No live entity targets matched objectIds or operationIds";
   }
   return nodes;
-}
-
-bool executeTransaction(
-  mdl::Map& map, const QString& transactionName, const std::function<bool()>& operation)
-{
-  auto transaction = mdl::Transaction{map, transactionName.toStdString()};
-  if (!operation())
-  {
-    transaction.cancel();
-    return false;
-  }
-  return transaction.commit();
 }
 
 std::optional<QJsonArray> addNodesWithTransaction(

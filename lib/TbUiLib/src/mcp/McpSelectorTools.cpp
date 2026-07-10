@@ -28,6 +28,7 @@
 
 #include "McpBridgeServerTools.h"
 #include "McpSelectionQuery.h"
+#include "McpToolSupport.h"
 #include "mcp/McpError.h"
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/BrushNode.h"
@@ -62,7 +63,6 @@ namespace
 {
 
 constexpr auto DefaultSampleLimit = 12;
-constexpr auto IrPreviewCacheTtlMs = qint64{10 * 60 * 1000};
 constexpr auto CurrentIrSchemaVersion = 1;
 
 struct SelectorDiagnosticsInternal
@@ -954,18 +954,6 @@ QJsonArray nodeIdsJson(
   return result;
 }
 
-bool executeTransaction(
-  mdl::Map& map, const QString& transactionName, const std::function<bool()>& operation)
-{
-  auto transaction = mdl::Transaction{map, transactionName.toStdString()};
-  if (!operation())
-  {
-    transaction.cancel();
-    return false;
-  }
-  return transaction.commit();
-}
-
 std::optional<QJsonArray> removeNodesWithTransaction(
   mdl::Map& map, const QString& transactionName, std::vector<mdl::Node*> nodes)
 {
@@ -1652,7 +1640,7 @@ void attachIrPreviewCacheRecord(
   record.documentFingerprint = documentFingerprintForMap(map);
   record.activeDocumentPath = QString::fromStdString(map.path().string());
   record.createdAtMs = nowMs;
-  record.expiresAtMs = nowMs + IrPreviewCacheTtlMs;
+  record.expiresAtMs = nowMs + McpSessionState::IrPreviewTtlMs;
 
   preview.insert("cacheable", true);
   preview.insert("previewId", previewId);
@@ -1661,7 +1649,8 @@ void attachIrPreviewCacheRecord(
   preview.insert("activeDocumentPath", record.activeDocumentPath);
   preview.insert("createdAtMs", QString::number(record.createdAtMs));
   preview.insert("expiresAtMs", QString::number(record.expiresAtMs));
-  preview.insert("expiresAfterSeconds", static_cast<int>(IrPreviewCacheTtlMs / 1000));
+  preview.insert(
+    "expiresAfterSeconds", static_cast<int>(McpSessionState::IrPreviewTtlMs / 1000));
   record.preview = preview;
   previewCache->insert_or_assign(previewId, record);
 }

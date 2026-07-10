@@ -71,6 +71,8 @@ private:
 
 public:
   void clear();
+  size_t retainDocumentFingerprints(const QStringList& documentFingerprints);
+  size_t recordCount() const;
 
   int documentEpoch(mdl::Map& map) const;
   QString documentFingerprint(mdl::Map& map) const;

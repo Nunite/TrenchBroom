@@ -22,6 +22,7 @@
 #include <QStringList>
 
 #include "McpBridgeServerTools.h"
+#include "McpToolSupport.h"
 #include "mcp/McpError.h"
 #include "mdl/BrushNode.h"
 #include "mdl/Map.h"
@@ -205,16 +206,6 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
     {"min", vecToJson(bounds.min)},
     {"max", vecToJson(bounds.max)},
   };
-}
-
-McpBridgeToolResult preMutationInvalidParamsFailure(
-  const QString& message, const QString& recoveryAction, QJsonObject details = {})
-{
-  details.insert("mutatedDocument", false);
-  details.insert("retrySafe", true);
-  details.insert("recoveryAction", recoveryAction);
-  return McpBridgeToolResult::failure(
-    mcp::McpErrorCode::InvalidParams, message, std::move(details));
 }
 
 bool isModuleLevelMetadataKey(const QString& key)
@@ -1194,8 +1185,7 @@ McpBridgeToolResult brushCreatePolygonBatchForMapResult(
   const auto metadata = metadataArrayFromBrushes(brushes, error);
   if (!metadata)
   {
-    return preMutationInvalidParamsFailure(
-      error, "fix_polygon_metadata_then_retry");
+    return preMutationInvalidParamsFailure(error, "fix_polygon_metadata_then_retry");
   }
 
   auto operations = QJsonArray{};

@@ -121,6 +121,54 @@ struct McpIrPreviewCacheRecord
   QJsonObject preview;
 };
 
+struct McpReviewResourceRecord
+{
+  QJsonObject resource;
+  QString documentFingerprint;
+  qint64 createdAtMs = 0;
+};
+
+struct McpSessionEvictionCounters
+{
+  quint64 operationRecords = 0;
+  quint64 reviewResources = 0;
+  quint64 irPreviews = 0;
+  quint64 documentFingerprints = 0;
+  quint64 objectRegistryRecords = 0;
+};
+
+class McpSessionState
+{
+public:
+  static constexpr auto MaxOperationRecords = size_t{1024};
+  static constexpr auto MaxReviewResources = size_t{128};
+  static constexpr auto MaxIrPreviews = size_t{64};
+  static constexpr auto MaxDocumentFingerprints = qsizetype{4};
+  static constexpr auto IrPreviewTtlMs = qint64{10 * 60 * 1000};
+
+  int nextOperationIndex = 1;
+  std::vector<McpOperationRecord> operationHistory;
+  std::map<QString, McpBrushMetadataRecord> brushMetadata;
+  std::map<QString, McpModuleRecord> modules;
+  std::map<QString, McpIrPreviewCacheRecord> irPreviewCache;
+  std::map<QString, McpReviewResourceRecord> reviewResources;
+  int nextIrPreviewIndex = 1;
+  McpObjectRegistry objectRegistry;
+  QStringList recentDocumentFingerprints;
+  McpSessionEvictionCounters evictions;
+  std::map<QString, QJsonObject> evictedResourceHints;
+
+  void clear();
+  void rememberDocumentFingerprint(const QString& documentFingerprint);
+  void prune(const QString& activeDocumentFingerprint, qint64 nowMs);
+  void cacheReviewResource(
+    const QJsonObject& resource, const QString& documentFingerprint = {});
+  std::optional<QJsonObject> evictedResourceHint(const QString& uri) const;
+  QJsonObject diagnosticsJson() const;
+};
+
+class McpToolRegistry;
+
 class McpBridgeServer : public QObject
 {
   Q_OBJECT
@@ -134,14 +182,15 @@ private:
   ToolHandler m_toolHandler;
   ActiveMapProvider m_activeMapProvider;
   QJsonObject m_overlayState;
-  mutable int m_nextOperationIndex = 1;
-  mutable std::vector<McpOperationRecord> m_operationHistory;
-  mutable std::map<QString, McpBrushMetadataRecord> m_brushMetadata;
-  mutable std::map<QString, McpModuleRecord> m_modules;
-  mutable std::map<QString, McpIrPreviewCacheRecord> m_irPreviewCache;
-  mutable std::map<QString, QJsonObject> m_reviewResources;
-  mutable int m_nextIrPreviewIndex = 1;
-  mutable McpObjectRegistry m_objectRegistry;
+  mutable McpSessionState m_session;
+  int& m_nextOperationIndex = m_session.nextOperationIndex;
+  std::vector<McpOperationRecord>& m_operationHistory = m_session.operationHistory;
+  std::map<QString, McpBrushMetadataRecord>& m_brushMetadata = m_session.brushMetadata;
+  std::map<QString, McpModuleRecord>& m_modules = m_session.modules;
+  std::map<QString, McpIrPreviewCacheRecord>& m_irPreviewCache = m_session.irPreviewCache;
+  int& m_nextIrPreviewIndex = m_session.nextIrPreviewIndex;
+  McpObjectRegistry& m_objectRegistry = m_session.objectRegistry;
+  std::unique_ptr<McpToolRegistry> m_toolRegistry;
   mutable bool m_dispatchInProgress = false;
   QString m_bridgeInstanceId;
   QDateTime m_bridgeStartedAtUtc;
@@ -163,6 +212,8 @@ public:
   QString pipeName() const;
   mcp::McpMode mode() const;
   const QJsonObject& overlayState() const;
+  QStringList registeredToolNames() const;
+  int duplicateToolRegistrationCount() const;
 
   mcp::McpBridgeResponse dispatchRequest(const mcp::McpBridgeRequest& request) const;
   std::optional<QJsonObject> readResource(const QString& uri) const;

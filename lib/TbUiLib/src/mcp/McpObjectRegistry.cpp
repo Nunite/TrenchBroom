@@ -295,6 +295,24 @@ void McpObjectRegistry::clear()
   m_legacyToStable.clear();
 }
 
+size_t McpObjectRegistry::retainDocumentFingerprints(
+  const QStringList& documentFingerprints)
+{
+  const auto oldSize = m_records.size();
+  std::erase_if(m_records, [&](const auto& entry) {
+    return !documentFingerprints.contains(entry.second.documentFingerprint);
+  });
+  std::erase_if(m_legacyToStable, [&](const auto& entry) {
+    return !m_records.contains(entry.second);
+  });
+  return oldSize - m_records.size();
+}
+
+size_t McpObjectRegistry::recordCount() const
+{
+  return m_records.size();
+}
+
 int McpObjectRegistry::documentEpoch(mdl::Map& map) const
 {
   const auto mapAddress = reinterpret_cast<quintptr>(&map);

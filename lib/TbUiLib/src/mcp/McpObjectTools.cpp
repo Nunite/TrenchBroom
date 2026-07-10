@@ -24,6 +24,7 @@
 #include "McpBridgeServerTools.h"
 #include "McpResponseUtils.h"
 #include "McpSelectionQuery.h"
+#include "McpToolSupport.h"
 #include "mcp/McpError.h"
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/BrushNode.h"
@@ -150,15 +151,6 @@ QJsonObject mutationResultJson(
   result.insert("documentFingerprint", operation.documentFingerprint);
   mcpApplyChangedObjectIdsMode(result, operation.changedObjectIdsJson(), idsMode);
   return result;
-}
-
-QJsonObject preMutationFailureDetails(
-  QJsonObject details, const QString& recoveryAction)
-{
-  details.insert("mutatedDocument", false);
-  details.insert("retrySafe", true);
-  details.insert("recoveryAction", recoveryAction);
-  return details;
 }
 
 struct NodeTypeCounts
@@ -612,18 +604,6 @@ std::optional<std::vector<QString>> stringListFromJson(
     result.push_back(item.toString());
   }
   return result;
-}
-
-bool executeTransaction(
-  mdl::Map& map, const QString& transactionName, const std::function<bool()>& operation)
-{
-  auto transaction = mdl::Transaction{map, transactionName.toStdString()};
-  if (!operation())
-  {
-    transaction.cancel();
-    return false;
-  }
-  return transaction.commit();
 }
 
 std::optional<QJsonArray> removeNodesWithTransaction(
@@ -1885,8 +1865,7 @@ McpBridgeToolResult transformObjectsForMapResult(
       mcp::McpErrorCode::InvalidParams,
       message,
       preMutationFailureDetails(
-        QJsonObject{{"operation", operation}},
-        "fix_transform_parameters_then_retry"));
+        QJsonObject{{"operation", operation}}, "fix_transform_parameters_then_retry"));
   };
 
   auto transformation = vm::mat4x4d{};
