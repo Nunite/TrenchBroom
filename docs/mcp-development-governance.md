@@ -153,9 +153,13 @@ Visual review must stay readable and bounded:
 - individual captures remain available in the manifest
 - dense labels must auto-hide or stride
 - review paths should be absolute or directly openable
+- `edgeMode:"all"` may expose construction seams; `edgeMode:"silhouette"` should
+  isolate the projected outer boundary without internal Brush edges
 
 Route, ramp, stair, surf, slide, and terrain claims must be backed by geometry
-validation, not screenshots alone.
+validation, not screenshots alone. Review is optional evidence and must not change
+`acceptancePassed`. If review was not run, responses and reports must say so rather
+than imply a visual verdict.
 
 ### Rule 8: Validation Semantics Must Be Explicit
 
@@ -172,6 +176,22 @@ Do not infer a closed loop just because a route looks circular. Use
 
 If a smooth slope is intended, `geometry_analyze_slopes` must report at least one
 slope. `slopeCount=0` is a failed build for ramp/surf/slide/ascending intent.
+
+Route and curve tools use `qualityPolicy.intent` with `draft`, `balanced`, or
+`smooth`. `balanced` is the default. Quality overruns warn for `draft` and
+`balanced`; only an explicitly selected `smooth` policy turns them into a failed
+acceptance. Threshold overrides must be positive finite numbers.
+
+Continuity output must distinguish topology and walkability from curve quality:
+
+- use `seamRelation`, `positiveGap`, and `overlapDepth` for gap/touch/overlap facts
+- retain legacy endpoint-distance fields only for compatibility
+- use `walkableContinuous`, `qualityStatus`, and `acceptancePassed` for new flows
+- state unavailable metrics and facts outside scope, including aesthetic intent,
+  BSP compile behavior, and game collision
+
+Centerline direction change is a polyline metric, not a claim of mathematical
+tangent continuity or visual beauty.
 
 ### Rule 9: Modeling Profile Growth Requires Justification
 
@@ -240,6 +260,8 @@ small additive fields.
 The current IR version is `schemaVersion:1`. New recipes must emit it. The C++
 kernel accepts an unversioned document as v1 with a `legacyUnversionedIr` warning,
 and rejects non-integer versions, versions below 1, and future versions before mutation.
+`qualityPolicy`, `applyMode`, and `requireMaterialAvailable` are additive IR v1
+fields and do not require a schema-version bump.
 
 ### Rule 13: Tool Lifecycle Must Be Explicit
 
@@ -298,7 +320,20 @@ Crash, wrong-map write, data loss, and unclear mutation state are P0 issues.
 IR apply is one native transaction. Geometry, entities, history, metadata,
 modules, preview state, counters, and object identity must either commit together
 or remain unchanged. A successful aggregate apply returns a parent operation and
-compatible child-operation ids; child operations cannot be undone independently.
+compatible child-operation ids; `undoOperationId` / the parent is the only undo
+target, while child/audit ids are diagnostic detail.
+
+Generated-module iteration should use `applyMode:"replace_module"`, not an
+unguarded delete/create sequence. Inline replacement must match preview IR hash,
+module revision, module content hash, and the exact canonical live object set.
+File replacement must use its cached `previewId`. Any mismatch must fail before
+mutation and request a new preview. Undo/redo must restore map content and affected
+session metadata/module identity together, then reconcile aliases and stale ids.
+
+Material names are editor facts, not proof that a WAD is loaded. Default behavior
+may preserve a missing requested name with a warning; `requireMaterialAvailable:true`
+must reject the full mutation during preflight. Successful mutations must report a
+`completionState` that keeps save, visual review, and BSP compile status explicit.
 
 ### Rule 16: Local Transport Still Requires Authentication
 

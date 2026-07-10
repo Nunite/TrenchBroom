@@ -259,7 +259,7 @@ void mcpRecordOperation(
   operation.documentFingerprint = documentFingerprintForMap(map);
   operation.setChangedObjectIds(changedObjectIds);
   result = mutationResultJson(operation, idsMode);
-  history.push_back(std::move(operation));
+  appendMcpOperationRecord(history, std::move(operation));
 }
 
 std::optional<vm::vec3d> mcpVec3FromJson(

@@ -38,8 +38,10 @@ validate and apply it.
 | Client requests more privilege than configured | The effective mode is the stricter of configured mode and `requestedMode`. Tool catalog mode checks run before dispatch. |
 | Write reaches the wrong map | Mutating tools accept `expectedDocumentPath` and `expectedDocumentFingerprint`; when both are present, both must match. |
 | Partial IR mutation leaves inconsistent editor/session state | `ir_apply` uses one outer native transaction and stages history, counters, metadata, modules, and object registry state. Any stage failure rolls back all state. |
-| Previewed IR changes before apply | File preview records a content hash. `ir_apply_from_file` rejects a changed file before mutation. |
+| Previewed IR or replacement target changes before apply | File preview records the IR hash. `replace_module` also guards module revision, content hash, and the exact canonical live object set; file replacement requires its cached `previewId`. Any mismatch fails before mutation. |
 | Unsupported IR version changes semantics | New IR uses integer `schemaVersion:1`. Invalid versions, versions below 1, and future versions fail before mutation. |
+| Missing material silently appears valid | Mutation responses distinguish requested/effective material and availability. `requireMaterialAvailable:true` rejects missing materials during preflight. |
+| Review image is treated as a safety or correctness gate | Review reports construction/silhouette interpretation and remains optional evidence. It cannot change static `acceptancePassed`, map validation, BSP, or collision status. |
 | Timeout causes unsafe blind retry | Tool cost classes use 10/30/120-second response waits. Timeout diagnostics report `mutatedDocument:"unknown"`, `retrySafe:false`, request identity, and history recovery steps. |
 | Unbounded session data exhausts memory | Session limits are 1024 operation records, 128 reviews, 64 previews with a 10-minute TTL, and four document fingerprints. Status and doctor expose counts and evictions. |
 | Stale or evicted resource is mistaken for live state | Resource reads return structured eviction and recovery guidance. Object resolution reports stale/live/mismatch state. |

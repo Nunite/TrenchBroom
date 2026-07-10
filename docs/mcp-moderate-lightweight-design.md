@@ -258,26 +258,31 @@ Current Phase 2 status:
 - Grouped `minimal`, `default`, and `stress` parameter examples exist for the
   retained recipe.
 - `scripts/validate_recipes.py` validates params, builds IR twice to check
-  deterministic output, checks metadata coverage and required parts, and can emit a
-  concise markdown report plus generated IR files.
+  deterministic output, checks metadata coverage, required parts, quality/review
+  policies, and can emit a concise markdown report plus generated IR files.
 - Recipe scripts only emit IR JSON. They do not call TrenchBroom, MCP, or `tb2`
   directly.
 - The canonical skill source is tracked under
   `skills/trenchbroom-mcp-scene-workflow`; sync it to the runtime skill directory
   with `scripts\sync-trenchbroom-mcp-skill.ps1`.
 
-Phase 2 validation evidence from the current branch:
+Phase 2 historical validation evidence from the current branch:
 
 - `python skills\trenchbroom-mcp-scene-workflow\scripts\validate_recipes.py`
   validates the retained examples.
 - Real Release TB MCP validation used disposable `map_test\unnamed.map` sessions
   and `ir_compile_preview_from_file` / `ir_apply_from_file` for default IR files.
-- `ascending_loop/default` previewed 42 recipe operations as 73 compiled brushes,
+- The earlier `ascending_loop/default` previewed 42 recipe operations as 73 compiled brushes,
   applied 75 objects, recovered module parts, reported `slopeCount=32`, and route
   continuity reported `continuous=true` / `fullWidthContinuous=true`.
 - Earlier `temple_courtyard` and `kz_bhop_route` drafts were removed after human
   visual acceptance failed; rebuild them before using those scene families again.
 - Crash log count stayed at 17 before and after the real TB recipe validation.
+
+The current recipe contract supersedes that default payload: `ascending_loop`
+version 1.1.0 uses 36 segments and explicit `draft` / `balanced` / `smooth`
+examples. The validator currently passes all 12 grouped examples deterministically;
+every manifest declares `qualityPolicy` and optional `reviewPolicy`.
 
 ### Phase 3: Keep MCP As The Execution Kernel
 
@@ -306,9 +311,19 @@ Current Phase 3 status:
   writes through normal transactions/history, registers module metadata, and the
   resulting module can be recovered with `module_list` and `selector_preview` without
   carrying long object id arrays.
+- Existing generated modules can be atomically replaced with exact preview guards
+  for IR hash, module revision/content hash, and canonical live objects. One parent
+  operation owns undo/redo while child ids remain audit detail.
+- Module inspection separates stored aliases from canonical live nodes and reports
+  revision, content hash, active operation, duplicate aliases, and stale references.
+- Continuity output distinguishes positive gaps, touching, and overlap from legacy
+  endpoint distance, and combines walkability with explicit curve quality policy in
+  `acceptancePassed`.
 - Review tools return `preferredCapturePath` and contact-sheet metadata, and default
   contact sheets include at most two source captures while keeping individual PNGs in
   the manifest.
+- Review supports construction edges and projected silhouette-only evidence; it is
+  optional and never changes static acceptance.
 - Compact `idsMode` responses are covered for create, transform, delete, entity, IR,
   selector, review, and operation flows.
 - Real TB validation during Phase 2 exercised the execution kernel with three

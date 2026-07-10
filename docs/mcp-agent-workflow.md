@@ -13,8 +13,8 @@
 - 写操作只使用 MCP 结构化工具，依赖 TrenchBroom 自身 transaction 和 undo/redo。
 - 默认先用 `ReadOnly` 做诊断、查询、截图和 overlay；只有确实要修改地图时再切到 `Edit`。
 - 白盒生成优先使用 Blockout IR 工具，不直接拼 brush 顶点。
-- 所有尺寸默认使用 GoldSrc units，优先按 16 units 网格对齐。
-- 每轮大修改后立刻调用 `map_validate` / `problems_check`，必要时用 `history_undo_mcp` 回滚最近一次 MCP 操作。
+- 所有尺寸使用 GoldSrc units。直墙和盒体优先按 16 units 对齐；曲线先按半径、段数和 `qualityPolicy` 评估，再选择更细网格，不能把 16 units 当作曲线质量保证。
+- 修改前先记录 `problems_check` 基线；每轮大修改后调用 `map_validate` / `problems_check` 比较增量，必要时用 `history_undo_mcp` 回滚最近一次 MCP 聚合操作。
 - 保存、关闭 dirty 文档、运行编译这类动作要由用户明确授权，Agent 不应静默执行。
 
 ## 启动检查
@@ -37,6 +37,7 @@ TrenchBroom 相同的配置文件。连接后，Agent 应先执行：
 - `tb_status` 连接失败：TrenchBroom 未运行、bridge 未启动，或配置
   token、pipeName、端口不匹配。
 - `tb_status.processId`、`bridgeInstanceId`、`activeDocumentPath`、`documentFingerprint` 是本轮请求链路的身份锚点。写入前必须确认它们指向预期 TrenchBroom 进程和预期地图。
+- 写入前记录 `problems_check` 的 stable problem ids、`totalCount`、`returnedCount` 和 `truncated`。前后结果都未截断时比较 introduced/resolved/pre-existing ids；发生截断时只比较 grouped counts，并标记低置信。
 - `documents_list` 为空：需要先让用户打开地图，或在 `Edit` mode 下使用 `documents_open_verified` 打开绝对路径。
 - `tb_doctor` 报告活动文档不存在：不要执行 map / selection / edit 工具，先激活或打开文档。
 - 多个 TrenchBroom 进程同时存在时，MCP HTTP 端口只控制该端口 owner 所属进程；不要假设它就是屏幕上最前面的 TB。`scripts/mcp-call.ps1` 会显示端口 owner PID，并可与 `tb_status.processId` 对照。
@@ -85,16 +86,18 @@ scripts\mcp-config.ps1 -Print
 你正在通过 TrenchBroom MCP 控制一个正在运行的 TrenchBroom 实例。
 
 工作规则：
-1. 先调用 tb_status、tb_doctor、documents_list，确认 MCP 已启用且有活动文档，并记录 processId、activeDocumentPath、documentFingerprint。
+1. 先调用 tb_status、tb_doctor、documents_list，确认 MCP 已启用且有活动文档，并记录 processId、bridgeInstanceId、activeDocumentPath、documentFingerprint；再记录 problems_check 基线。
 2. 查询地图时使用 document_snapshot、map_snapshot、map_search、selection_get、fgd_entities_list、textures_list、asset_search。
 3. 修改地图时只使用结构化 MCP 工具，不直接写 .map 文件，也不运行任意 Python 脚本。
 4. 白盒生成必须优先使用 `blockout_validate` 和 `blockout_create_batch` 的 primitive operations；不要直接生成任意 brush 顶点。
-5. 所有坐标和尺寸使用 GoldSrc units，并尽量按 16 units 网格对齐。
-6. 每次写操作后读取 operationId，需要时再用 `operation_inspect(detail=ids)` 取对象 id；用截图工具检查，不要长期携带大 object id 列表。
-7. 发现结果错误时优先使用 history_undo_mcp 回滚最近一次 MCP 操作，而不是用删除工具硬删一片对象。
-8. 所有写入都应同时传 expectedDocumentPath 和 expectedDocumentFingerprint；两者都提供时必须同时匹配。
-9. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认。
-10. 如果工具返回 unsupported、Forbidden 或 Unauthorized，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
+5. 所有坐标和尺寸使用 GoldSrc units。直线结构优先 16 units；曲线按 qualityPolicy 的 sagitta、方向变化和 snap displacement 指标选择 grid/segments。
+6. 新模块使用 applyMode=create；迭代已有生成模块使用 replace_module 和 preview 返回的全部精确 guard，不要先删除再创建。
+7. 每次写操作后保留 undoOperationId 和 module revision/content hash；child/audit operation ids 只用于审计。不要长期携带大 object id 列表。
+8. 发现结果错误时优先使用 history_undo_mcp 回滚最近一次 MCP 聚合操作，而不是用删除工具硬删一片对象。
+9. 所有写入都应同时传 expectedDocumentPath 和 expectedDocumentFingerprint；两者都提供时必须同时匹配。
+10. 最终验收读取 acceptancePassed、qualityStatus、walkableContinuous 和 notEvaluated；Review 是可选证据，不替代静态验证。
+11. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认。
+12. 如果工具返回 unsupported、Forbidden 或 Unauthorized，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
 ```
 
 ## 读取地图
@@ -107,7 +110,7 @@ scripts\mcp-config.ps1 -Print
 4. `selection_get`：读取用户当前选择。
 5. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
 6. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
-7. 场景自验收优先用 `render_review_operation` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。
+7. 需要视觉证据时优先用 `render_review_operation` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。未执行 Review 时不要给出视觉结论。
 8. `viewport_capture_scene_review` 只作为真实 TrenchBroom 视口辅助调试使用。需要确认 UI 视角或用户当前视图时再调用；自动化验收不要依赖它来隔离对象。
 
 对象操作必须使用 MCP 返回的 `objectId`，不要根据实体顺序或 UI 文本猜测内部指针。
@@ -118,7 +121,7 @@ scripts\mcp-config.ps1 -Print
 
 1. 先让 Agent 提炼布局，包括主房间、走廊、楼梯、门洞、掩体、出生点和目标点。
 2. 给出 rough bounds，例如房间 `[0,0,0]` 到 `[512,384,192]`。
-3. 确认全部尺寸按 16 units 对齐。
+3. 直墙和盒体优先按 16 units 对齐；曲线根据质量预览建议调整 segments/grid。
 4. 对每个结构调用 `blockout_validate`，先检查尺寸、厚度、grid 和非凸风险。
 5. 优先用 `blockout_create_batch` 一次提交 typed object `operations[]`，默认选择 primitive operations：`box`、`prism`、`cylinder`、`cylinder_sector`、`polyhedron`、`path_ribbon`、`repeat_translate`、`repeat_grid`、`stepped_mass`、`support_posts_between`。例如 `{"type":"box","min":[0,0,0],"max":[128,128,16]}`、`{"type":"path_ribbon","points2d":[[0,0],[512,0],[768,256]],"width":160,"minZ":0,"maxZ":16}`。
 6. 只需要批量创建平台/跳块时用 `brush_create_boxes_batch`，传 `boxes: [{min,max,material?}]`；需要棱形、切角或引导形状时用 `brush_create_polygon_batch`，避免多次单 brush 调用产生大量 undo/history。
@@ -127,14 +130,26 @@ scripts\mcp-config.ps1 -Print
 9. 写入工具支持 `expectedDocumentPath` 和 `expectedDocumentFingerprint`。
    Agent 从 `tb_status` 记录目标身份后，应把两个 guard 一起传给批量创建、
    删除、贴图替换、heightmap import、实体创建和保存。
-10. 用 `render_review_operation` 收集几何 review 包；复杂场景默认看 `preferredCapturePath` 的 2 图 contact sheet，必要时再打开 manifest 里的单独视图 PNG。
+10. 可选用 `render_review_operation` 收集几何 review 包。`edgeMode:"all"` 用于查看 Brush 施工边，`edgeMode:"silhouette"` 用于查看外轮廓；复杂场景默认看 `preferredCapturePath` 的 2 图 contact sheet，必要时再打开单图。
 11. 根据截图调整尺寸或位置，必要时使用 `objects_transform` 平移/旋转/缩放。
-12. 调用 `history_status` 确认最近 MCP operation 是否还在 undo 栈顶；再调用 `map_validate` / `problems_check`。
+12. 调用 `history_status` 确认最近 MCP operation 是否还在 undo 栈顶；再调用 `map_validate` / `problems_check`，并报告 `completionState` 中未保存、未 Review、未 BSP 编译的状态。
 
 IR 文件必须输出 `schemaVersion:1`。无版本文件只为兼容而接受，并返回
 `legacyUnversionedIr`。`ir_compile_preview_from_file` 返回 `previewId` 后，
 `ir_apply_from_file` 应同时提交原路径和该 id；文件内容发生变化时，apply
 会在写入前拒绝。
+
+IR v1 可选携带：
+
+- `qualityPolicy`：`draft|balanced|smooth`，默认 `balanced`。draft/balanced 超限警告；只有显式 smooth 超限才使质量验收失败。
+- `applyMode`：新模块用 `create`；迭代模块用 `replace_module`。Inline apply 必须回传 `expectedIrHash`、`expectedTargetModuleRevision`、`expectedTargetModuleContentHash`、`expectedTargetCanonicalObjectIds`；file replace 必须使用 `previewId`。
+- `requireMaterialAvailable`：默认 false，允许缺失材质名作为占位并警告；设为 true 时，任一请求材质未加载都会在修改前拒绝整批操作。
+
+内置质量阈值为：draft = 22.5° / 8 units sagitta / 8 units snap，
+balanced = 12° / 2 / 2，smooth = 7.5° / 1 / 1。调用方可用正有限数
+覆盖 `maxDirectionChangeDegrees`、`maxSagitta`、`maxSnapDisplacement`。
+质量预览还应读取 `suggestedSegments`、估算 Brush/face 数和
+`unachievableWithinSegmentLimit`，避免为追求平滑无限增加 Brush。
 
 不要让 Agent 直接使用 `brush_create_from_planes` 做普通白盒。它是 `Full` / 搜索可发现的专家工具，只适合已有明确 plane 数据且需要严格校验的场景。复杂批量结构也不要默认走 `python_generate_blockout`；除非用户明确要求脚本生成，优先用 typed batch primitive operations 分阶段落地。
 
@@ -148,9 +163,9 @@ IR 文件必须输出 `schemaVersion:1`。无版本文件只为兼容而接受�
 2. 新路线优先用 `{"type":"ramp_between","start":[...],"end":[...],"width":...,"thickness":...}`，表达“沿 start -> end 行进”；旧 `ramp(min,max,axis)` 只用于兼容或快速草图。
 3. 批量创建后立即调用 `geometry_analyze_slopes(operationId=..., start=..., end=...)` 或传 `routeDirection`。
 4. 检查每个候选坡面返回的 `normal`、`slopeDegrees`、`riseDirection`、`heightDeltaAlongRoute`、`classification`。预期上坡应看到 `classification=ascending` 且 `heightDeltaAlongRoute > 0`；反向复测应暴露 `descending`。
-5. 再调用 `geometry_analyze_route_continuity(operationId=..., start=..., end=...)` 检查相邻可跑面。重点看 `continuous`、每个 seam 的 `verticalStep`、`horizontalGap` 和 `classification`；例如 ramp 顶面接到平台底面时会报 `step_up` 和约等于平台厚度的 `verticalStep`。
+5. 再调用 `geometry_analyze_route_continuity(operationId=..., start=..., end=..., qualityPolicy=...)` 检查相邻可跑面。新流程重点看 `walkableContinuous`、`qualityStatus`、`acceptancePassed`、`notEvaluated`，以及每个 seam 的 `seamRelation`、`positiveGap`、`overlapDepth`、`verticalStep` 和 `classification`。`edgeGapMax` 是兼容保留的端点距离，不等于真实裂缝；overlap 的 `positiveGap` 为 0，即使端点距离很大也不能误报为空洞。
    当同一个 operation 同时生成 floor、wall、rail、support 或 marker 时，不要让连续性分析混入护栏/墙体；优先传 `selector`，例如 `moduleId + role:"walkable"` 或 `moduleId + part:"floor"`。如果未传 selector 且结果带 `mixedTargetWarning`、`partCounts`、`roleCounts`，应按推荐 selector 重新分析。
-6. 最后看 `render_review_operation` 的 contact sheet。默认最多 2 张并列；如果需要更多视角，打开单独 PNG，不要把过多视图挤进一张图。
+6. Review 可选。需要视觉证据时分别生成 `edgeMode:"all"` 的施工图和 `edgeMode:"silhouette"` 的外轮廓图。它们不改变 `acceptancePassed`；未执行时明确报告 `visualReview:not_run`。
 7. 复杂路线按主体、护边、标记分阶段创建，保留少量关键 `operationId`，降低 history 追踪和回滚成本。
 
 ## KZ 平台链工作流
@@ -255,14 +270,16 @@ Brush entity 工作流：
 
 ## 回滚与保存
 
-MCP 写操作会返回：
+MCP 写操作的公共结果包括：
 
-- `operationId`
+- `undoOperationId` / `operationId`
 - `transactionName`
-- `changedObjectIds`
+- `auditOperationIds`
+- 紧凑的 changed object count/sample
+- `completionState.documentModified/saveRequired/visualReview/bspCompile`
 
 `ir_apply` / `ir_apply_from_file` 成功时还会返回 `parentOperationId` 和
-`childOperationIds`。父 operation 对应一个原生 undo 项；子 operation 仅用于
+`childOperationIds`。`undoOperationId` 始终指向父 operation，对应一个原生 undo 项；子 operation 仅用于
 兼容和审计，不能独立撤销。一次 `history_undo_mcp` 必须同时移除该 IR 的几何
 和实体，一次 redo 必须全部恢复。
 
@@ -279,6 +296,7 @@ MCP 写操作会返回：
 - `tb_status.sessionState` 和 `tb_doctor.sessionState` 显示会话预算、当前数量和
   淘汰计数。读取已淘汰 operation/review resource 时，按返回的
   `recoveryAction` 刷新 history 或重新生成 review。
+- `module_inspect` 的真实几何数量优先看 `canonicalObjectCount` / live counts；`storedReferenceCount` 可能包含兼容 alias。正常 mutation、Undo、Redo 会自动 reconciliation，只有异常 stale/legacy alias 恢复才使用 `module_compact`。
 - 不要用 `objects_delete` 代替 undo，除非用户明确要删除对象。
 - 保存前调用 `map_validate` 和 `problems_check`。
 - 用户确认后再调用 `documents_save` 或 `documents_export`。
@@ -295,9 +313,9 @@ MCP 写操作会返回：
 5. `blockout_create_batch` 用 primitive operations 一次或分阶段提交主体几何，例如房间墙/地/顶用多个 `box`，弧形或折线路线用 `path_ribbon`，重复支撑用 `repeat_translate` / `repeat_grid`
 6. `brush_create_polygon_batch` 创建需要玩家引导的非矩形平台、切角平台或箭头形落点
 7. `entity_create_checked_batch` 放置 spawn、基础 light 或目标点；创建前先确认 FGD/schema
-8. `viewport_capture_scene_review` 做视觉验收
-9. `map_validate` / `problems_check`
-10. 用户确认后 `documents_save`
+8. `map_validate` / `problems_check` 并与修改前基线比较
+9. 可选生成 `render_review_operation(edgeMode="all")` 和 `edgeMode="silhouette"` 证据
+10. 报告 `completionState`、`notEvaluated`、保存和 BSP 状态；用户确认后再 `documents_save`
 
 如果材质名不确定，先用 `texture_search` 查找 `dev`、`clip`、`sky` 等关键词；不要硬编码不存在的材质。
 

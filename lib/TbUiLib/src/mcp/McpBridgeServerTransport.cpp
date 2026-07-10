@@ -101,7 +101,7 @@ void syncOneOperationHistoryWithExternalResult(
     operation.setDeletedObjectIds(result.value("deletedObjectIds").toArray());
     operation.setSummary(result);
     applyDocumentIdentityToOperation(operation, map, objectRegistry, result);
-    history.push_back(std::move(operation));
+    appendMcpOperationRecord(history, std::move(operation));
     return;
   }
 
@@ -539,7 +539,11 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
           m_session.modules,
           m_session.objectRegistry,
           undoOperationId);
-        if (!undoOperationId.isEmpty())
+        const auto historyToolManagesSessionDelta =
+          request.tool == "history_undo_mcp"
+          || request.tool == "history_undo_to_operation"
+          || request.tool == "history_redo_mcp";
+        if (!undoOperationId.isEmpty() && !historyToolManagesSessionDelta)
         {
           attachMcpSessionDelta(
             m_session.operationHistory,

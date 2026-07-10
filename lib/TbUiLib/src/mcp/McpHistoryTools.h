@@ -36,6 +36,9 @@ namespace tb::ui
 
 class AppController;
 
+void appendMcpOperationRecord(
+  std::vector<McpOperationRecord>& history, McpOperationRecord operation);
+
 McpBridgeToolResult historyListResult(const std::vector<McpOperationRecord>& history);
 McpBridgeToolResult historyListResult(
   AppController& appController,

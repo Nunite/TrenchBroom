@@ -1940,6 +1940,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     REQUIRE(create.ok);
     map.undoCommand();
     history.back().undone = true;
+    history.back().redoable = true;
     history.back().documentPath = "D:/maps/original.map";
     history.back().documentFingerprint = "doc:original";
     REQUIRE(map.redoCommandName() != nullptr);
@@ -2750,6 +2751,7 @@ TEST_CASE(
     == "refresh_status_or_validate");
 
   history.front().undone = true;
+  history.front().redoable = true;
   const auto blockedRedo = historyRedoForMapResult(map, history);
   CHECK(!blockedRedo.ok);
   CHECK_FALSE(blockedRedo.error.details.value("mutatedDocument").toBool(true));
@@ -2761,6 +2763,73 @@ TEST_CASE(
   CHECK(
     blockedRedo.error.details.value("recoveryAction").toString()
     == "refresh_status_or_validate");
+}
+
+TEST_CASE(
+  "McpBridgeServer new mutations discard abandoned MCP redo candidates",
+  "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  const auto initialDescendantCount = map.worldNode().descendantCount();
+
+  const auto first = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Abandoned redo candidate"},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(first.ok);
+  REQUIRE(history.size() == 1);
+  REQUIRE(historyUndoForMapResult(map, history).ok);
+  CHECK(history[0].undone);
+  CHECK(history[0].redoable);
+
+  const auto second = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Current redo candidate"},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{128, 0, 0}},
+         {"max", QJsonArray{192, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex);
+  REQUIRE(second.ok);
+  REQUIRE(history.size() == 2);
+  CHECK_FALSE(history[0].redoable);
+
+  REQUIRE(historyUndoForMapResult(map, history).ok);
+  CHECK(history[1].undone);
+  CHECK(history[1].redoable);
+  const auto redo = historyRedoForMapResult(map, history);
+  REQUIRE(redo.ok);
+  CHECK_FALSE(history[1].undone);
+  CHECK_FALSE(history[1].redoable);
+  CHECK(map.worldNode().descendantCount() == initialDescendantCount + 1);
 }
 
 TEST_CASE(

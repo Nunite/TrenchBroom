@@ -277,7 +277,7 @@ void mcpRecordOperation(
   result = mutationResultJson(operation);
   operation.setSummary(result);
   operation.setDetail(detail);
-  history.push_back(std::move(operation));
+  appendMcpOperationRecord(history, std::move(operation));
 }
 
 void applyDetailLevel(

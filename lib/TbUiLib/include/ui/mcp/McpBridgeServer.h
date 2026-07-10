@@ -78,6 +78,7 @@ struct McpOperationRecord
   QByteArray detailJson;
   bool undone = false;
   bool undoable = true;
+  bool redoable = false;
   QString parentOperationId;
   QStringList childOperationIds;
   QByteArray sessionBeforeJson;

@@ -1200,7 +1200,7 @@ void recordDeleteOperation(
     {"resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId)},
   };
   operation.setSummary(result);
-  history.push_back(std::move(operation));
+  appendMcpOperationRecord(history, std::move(operation));
 }
 
 void markDeletedMetadata(

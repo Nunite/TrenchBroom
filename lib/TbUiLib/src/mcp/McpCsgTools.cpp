@@ -294,7 +294,7 @@ McpBridgeToolResult geometryCsgSelectionForMapResult(
   mcpApplyDeletedObjectIdsMode(result, deletedObjectIds, idsMode);
 
   record.setSummary(result);
-  history.push_back(std::move(record));
+  appendMcpOperationRecord(history, std::move(record));
   return McpBridgeToolResult::success(result);
 }
 

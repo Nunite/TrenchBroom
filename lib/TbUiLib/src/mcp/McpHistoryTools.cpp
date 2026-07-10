@@ -88,6 +88,7 @@ QJsonObject operationRecordJson(const McpOperationRecord& operation)
     "resourceUri", QString{"tbmcp://operation/%1"}.arg(operation.operationId));
   result.insert("undone", operation.undone);
   result.insert("undoable", operation.undoable);
+  result.insert("redoable", operation.redoable);
   if (!operation.parentOperationId.isEmpty())
   {
     result.insert("parentOperationId", operation.parentOperationId);
@@ -288,6 +289,17 @@ QJsonArray operationHistoryJson(
 }
 
 } // namespace
+
+void appendMcpOperationRecord(
+  std::vector<McpOperationRecord>& history, McpOperationRecord operation)
+{
+  for (auto& existing : history)
+  {
+    existing.redoable = false;
+  }
+  operation.redoable = false;
+  history.push_back(std::move(operation));
+}
 
 bool operationMatchesActiveDocument(
   const mdl::Map& map,
@@ -493,11 +505,13 @@ void setOperationUndoneState(
     return;
   }
   history[*index].undone = undone;
+  history[*index].redoable = undone;
   for (const auto& childOperationId : history[*index].childOperationIds)
   {
     if (const auto childIndex = findOperationIndex(history, childOperationId))
     {
       history[*childIndex].undone = undone;
+      history[*childIndex].redoable = undone && history[*childIndex].undoable;
     }
   }
 }
@@ -1316,7 +1330,7 @@ McpBridgeToolResult historyRedoForMapResult(
   std::map<QString, McpModuleRecord>* moduleStore)
 {
   auto it = std::find_if(history.begin(), history.end(), [](const auto& operation) {
-    return operation.undoable && operation.undone;
+    return operation.undoable && operation.undone && operation.redoable;
   });
   if (it == history.end())
   {

@@ -283,6 +283,42 @@ try {
   Assert-True (@($tools.result.tools).Count -eq 47) `
     "Modeling tools/list count changed: $(@($tools.result.tools).Count)"
 
+  $problemBaseline = Invoke-McpTool -Url $url -Token $token -Tool "problems_check"
+  Assert-True ($null -ne $problemBaseline.totalCount) "problems_check totalCount missing"
+  Assert-True ($null -ne $problemBaseline.returnedCount) "problems_check returnedCount missing"
+  Assert-True ($null -ne $problemBaseline.truncated) "problems_check truncated missing"
+
+  $coarseCurveIr = [ordered] @{
+    schemaVersion = 1
+    moduleId = "reliability-curve-quality"
+    operations = @([ordered] @{
+      type = "arc_ramp"
+      center = @(1600, 0, 0)
+      radius = 256
+      width = 96
+      startAngle = 0
+      turnDegrees = 90
+      rise = 128
+      segments = 4
+      thickness = 16
+    })
+  }
+  $balancedCurve = Invoke-McpTool -Url $url -Token $token -Tool "ir_compile_preview" `
+    -Arguments ([ordered] @{ ir = $coarseCurveIr })
+  Assert-True ($balancedCurve.qualityStatus -eq "warning") `
+    "Balanced coarse curve did not warn"
+  Assert-True ([bool] $balancedCurve.acceptancePassed) `
+    "Balanced coarse curve unexpectedly failed acceptance"
+  Assert-True ($balancedCurve.curveQuality.suggestedSegments -gt 4) `
+    "Curve preview did not suggest more segments"
+  $coarseCurveIr["qualityPolicy"] = [ordered] @{ intent = "smooth" }
+  $smoothCurve = Invoke-McpTool -Url $url -Token $token -Tool "ir_compile_preview" `
+    -Arguments ([ordered] @{ ir = $coarseCurveIr })
+  Assert-True ($smoothCurve.qualityStatus -eq "failed") `
+    "Smooth coarse curve did not fail quality"
+  Assert-True (-not [bool] $smoothCurve.acceptancePassed) `
+    "Smooth coarse curve unexpectedly passed acceptance"
+
   $fingerprintA = [string] $status.documentFingerprint
   $guard = [ordered] @{
     expectedDocumentPath = $mapA
@@ -328,6 +364,99 @@ try {
   Assert-True ($afterRedo.brushCount -eq $afterApply.brushCount) "Atomic redo did not restore geometry"
   Assert-True ($afterRedo.entityCount -eq $afterApply.entityCount) "Atomic redo did not restore entity"
   Invoke-McpTool -Url $url -Token $token -Tool "history_undo_mcp" | Out-Null
+
+  $replaceCreateIr = [ordered] @{
+    schemaVersion = 1
+    applyMode = "create"
+    moduleId = "reliability-replace"
+    defaultMetadata = [ordered] @{ moduleId = "reliability-replace" }
+    select = $false
+    operations = @([ordered] @{ type = "box"; min = @(0, 256, 0); max = @(64, 320, 16) })
+  }
+  Invoke-McpTool -Url $url -Token $token -Tool "ir_apply" -TimeoutSec 120 `
+    -Arguments ([ordered] @{
+      ir = $replaceCreateIr
+      expectedDocumentPath = $mapA
+      expectedDocumentFingerprint = $fingerprintA
+    }) | Out-Null
+  $replaceInitial = Invoke-McpTool -Url $url -Token $token -Tool "module_inspect" `
+    -Arguments ([ordered] @{ moduleId = "reliability-replace"; idsMode = "count" })
+  Assert-True ($replaceInitial.moduleRevision -eq 1) "Replacement module did not start at revision 1"
+  Assert-True ($replaceInitial.canonicalObjectCount -eq 1) "Replacement module initial count is wrong"
+
+  $replacementIr = [ordered] @{
+    schemaVersion = 1
+    applyMode = "replace_module"
+    moduleId = "reliability-replace"
+    defaultMetadata = [ordered] @{ moduleId = "reliability-replace" }
+    select = $false
+    operations = @(
+      [ordered] @{ type = "box"; min = @(0, 256, 0); max = @(96, 320, 16) },
+      [ordered] @{ type = "box"; min = @(0, 336, 0); max = @(96, 352, 32) }
+    )
+  }
+  $replacePreview = Invoke-McpTool -Url $url -Token $token -Tool "ir_compile_preview" `
+    -Arguments ([ordered] @{ ir = $replacementIr })
+  Assert-True ($replacePreview.targetModuleRevision -eq 1) `
+    "Replacement preview returned the wrong target revision"
+  $replaceApply = Invoke-McpTool -Url $url -Token $token -Tool "ir_apply" -TimeoutSec 120 `
+    -Arguments ([ordered] @{
+      ir = $replacementIr
+      expectedIrHash = $replacePreview.irHash
+      expectedTargetModuleRevision = $replacePreview.targetModuleRevision
+      expectedTargetModuleContentHash = $replacePreview.targetModuleContentHash
+      expectedTargetCanonicalObjectIds = @($replacePreview.targetCanonicalObjectIds)
+      expectedDocumentPath = $mapA
+      expectedDocumentFingerprint = $fingerprintA
+    })
+  Assert-True ($replaceApply.moduleRevision -eq 2) "Replacement did not advance module revision"
+  Assert-True ($replaceApply.removedCanonicalObjectCount -eq 1) `
+    "Replacement removed the wrong canonical object count"
+  Assert-True ($replaceApply.createdCanonicalObjectCount -eq 2) `
+    "Replacement created the wrong canonical object count"
+  $replaceAppliedState = Invoke-McpTool -Url $url -Token $token -Tool "module_inspect" `
+    -Arguments ([ordered] @{ moduleId = "reliability-replace"; idsMode = "count" })
+  Assert-True ($replaceApply.moduleContentHash -eq $replaceAppliedState.moduleContentHash) `
+    "Replacement response/session hash mismatch: response $($replaceApply.moduleContentHash), session $($replaceAppliedState.moduleContentHash)"
+  Assert-True ($replaceAppliedState.canonicalObjectCount -eq 2) `
+    "Replacement session lost objects immediately after apply: canonical $($replaceAppliedState.canonicalObjectCount), stored $($replaceAppliedState.storedReferenceCount), bounds $(ConvertTo-CompactJson $replaceAppliedState.bounds)"
+  $replacementHash = [string] $replaceAppliedState.moduleContentHash
+  Invoke-McpTool -Url $url -Token $token -Tool "history_undo_mcp" | Out-Null
+  $replaceUndone = Invoke-McpTool -Url $url -Token $token -Tool "module_inspect" `
+    -Arguments ([ordered] @{ moduleId = "reliability-replace"; idsMode = "count" })
+  Assert-True ($replaceUndone.moduleRevision -eq 1) "Replacement undo did not restore revision 1"
+  Assert-True ($replaceUndone.moduleContentHash -eq $replaceInitial.moduleContentHash) `
+    "Replacement undo did not restore the original module hash"
+  $replaceRedoResult = Invoke-McpTool -Url $url -Token $token -Tool "history_redo_mcp"
+  Assert-True ($replaceRedoResult.operation.operationId -eq $replaceApply.undoOperationId) `
+    "Replacement redo selected $($replaceRedoResult.operation.operationId) instead of $($replaceApply.undoOperationId)"
+  $replaceRedone = Invoke-McpTool -Url $url -Token $token -Tool "module_inspect" `
+    -Arguments ([ordered] @{ moduleId = "reliability-replace"; idsMode = "count" })
+  $replaceRedoMap = Invoke-McpTool -Url $url -Token $token -Tool "map_snapshot"
+  Assert-True ($replaceRedone.moduleRevision -eq 2) "Replacement redo did not restore revision 2"
+  Assert-True ($replaceRedone.moduleContentHash -eq $replacementHash) `
+    "Replacement redo hash mismatch: expected $replacementHash, got $($replaceRedone.moduleContentHash), canonical $($replaceRedone.canonicalObjectCount), map brushes $($replaceRedoMap.brushCount), bounds $(ConvertTo-CompactJson $replaceRedone.bounds)"
+  Invoke-McpTool -Url $url -Token $token -Tool "history_undo_mcp" | Out-Null
+  Invoke-McpTool -Url $url -Token $token -Tool "history_undo_mcp" | Out-Null
+
+  $strictMaterialBaseline = Get-StateSnapshot -Url $url -Token $token
+  $strictMaterial = Invoke-McpTool -Url $url -Token $token -Tool "ir_apply" -AllowError `
+    -Arguments ([ordered] @{
+      ir = [ordered] @{
+        schemaVersion = 1
+        moduleId = "reliability-missing-material"
+        material = "missing/reliability_material"
+        requireMaterialAvailable = $true
+        operations = @([ordered] @{ type = "box"; min = @(512, 256, 0); max = @(576, 320, 16) })
+      }
+      expectedDocumentPath = $mapA
+      expectedDocumentFingerprint = $fingerprintA
+    })
+  Assert-True (-not [bool] $strictMaterial.mutatedDocument) `
+    "Strict missing material mutated the map"
+  $strictMaterialAfter = Get-StateSnapshot -Url $url -Token $token
+  Assert-StateEqual -Expected $strictMaterialBaseline -Actual $strictMaterialAfter `
+    -Context "Strict material preflight"
 
   $failureBaseline = Get-StateSnapshot -Url $url -Token $token
   $invalid = Invoke-McpTool -Url $url -Token $token -Tool "ir_apply" -AllowError `
@@ -394,15 +523,41 @@ try {
       expectedDocumentFingerprint = $status.documentFingerprint
       name = "MCP: review resource acceptance"
       select = $false
-      operations = @([ordered] @{ type = "box"; min = @(768, 0, 0); max = @(832, 64, 32) })
+      operations = @(
+        [ordered] @{ type = "box"; min = @(768, 0, 0); max = @(832, 64, 32) },
+        [ordered] @{ type = "box"; min = @(832, 0, 0); max = @(896, 64, 32) }
+      )
     })
+  $reviewAll = Invoke-McpTool -Url $url -Token $token -Tool "render_review_operation" `
+    -Arguments ([ordered] @{
+      operationIds = @($reviewCreate.operationId)
+      views = @("top_plan")
+      edgeMode = "all"
+      combineViews = $false
+      detail = "full"
+      imageSize = @(900, 650)
+      outputDir = (Join-Path $resolvedWorkDir.FullName "review-all")
+    }) -TimeoutSec 120
   $review = Invoke-McpTool -Url $url -Token $token -Tool "render_review_operation" `
     -Arguments ([ordered] @{
       operationIds = @($reviewCreate.operationId)
       views = @("top_plan")
+      edgeMode = "silhouette"
+      combineViews = $false
+      detail = "full"
       imageSize = @(900, 650)
-      outputDir = (Join-Path $resolvedWorkDir.FullName "review")
+      outputDir = (Join-Path $resolvedWorkDir.FullName "review-silhouette")
     }) -TimeoutSec 120
+  Assert-True ($review.edgeInterpretation -eq "silhouette") `
+    "Silhouette review did not report silhouette interpretation"
+  Assert-True (-not [bool] $review.internalBrushEdgesDrawn) `
+    "Silhouette review reported internal Brush edges"
+  Assert-True (-not [bool] $review.visualReviewRequired) `
+    "Review incorrectly became an acceptance requirement"
+  Assert-True ($review.captures[0].edgeDensity -lt $reviewAll.captures[0].edgeDensity) `
+    "Silhouette review did not reduce edge density"
+  Assert-True ([Math]::Abs($review.captures[0].targetCoverage - $reviewAll.captures[0].targetCoverage) -lt 0.02) `
+    "Silhouette review changed target coverage too much"
   Assert-True (-not [string]::IsNullOrWhiteSpace($review.resourceUri)) "Review resource URI missing"
   $resource = Invoke-McpRpc -Url $url -Token $token -Method "resources/read" `
     -Params ([ordered] @{ uri = $review.resourceUri })
@@ -445,6 +600,11 @@ try {
     toolsListCount = @($tools.result.tools).Count
     parentOperationId = $apply.parentOperationId
     childOperationCount = @($apply.childOperationIds).Count
+    balancedQualityStatus = $balancedCurve.qualityStatus
+    smoothQualityStatus = $smoothCurve.qualityStatus
+    replacedModuleRevision = $replaceApply.moduleRevision
+    silhouetteEdgeDensity = $review.captures[0].edgeDensity
+    allEdgeDensity = $reviewAll.captures[0].edgeDensity
     stdioElapsedMs = $stdio.elapsedMs
     reviewResourceUri = $review.resourceUri
     evictedReviewResourceUri = $firstReviewResourceUri
