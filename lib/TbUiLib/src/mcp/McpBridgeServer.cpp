@@ -170,6 +170,10 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return selectionInspectResult(appController, params);
         }
+        if (toolName == "entity_link_chain_inspect")
+        {
+          return entityLinkChainInspectResult(appController, params);
+        }
         if (toolName == "selection_set")
         {
           return selectionSetResult(appController, params);

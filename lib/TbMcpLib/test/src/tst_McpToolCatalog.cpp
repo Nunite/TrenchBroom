@@ -60,9 +60,9 @@ TEST_CASE("McpToolCatalog")
       implementedCount += tool.implemented ? 1u : 0u;
     }
 
-    CHECK(catalog.size() == 141u);
-    CHECK(implementedCount == 139u);
-    CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 48);
+    CHECK(catalog.size() == 142u);
+    CHECK(implementedCount == 140u);
+    CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 50);
   }
 
   SECTION("all mutating tools expose path and fingerprint guards")
@@ -346,11 +346,13 @@ TEST_CASE("McpToolCatalog")
     INFO("Modeling profile tools: " << names.join(", ").toStdString());
     CHECK(
       names.size()
-      <= 48); // shell seam validation is visible for annotated recipe workflows.
+      <= 50); // selection/entity link inspection is visible for path workflows.
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
     CHECK(names.contains("tb_tools_search"));
+    CHECK(names.contains("selection_inspect"));
+    CHECK(names.contains("entity_link_chain_inspect"));
     CHECK(!names.contains("selection_get"));
     CHECK(!names.contains("selection_set"));
     CHECK(!names.contains("selection_filter"));

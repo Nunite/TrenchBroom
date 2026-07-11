@@ -3573,6 +3573,95 @@ TEST_CASE("McpBridgeServer selection_inspect", "[McpBridgeServer]")
   }
 }
 
+TEST_CASE("McpBridgeServer entity_link_chain_inspect", "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+
+  auto corner01Entity = mdl::Entity{{
+    {"classname", "path_corner"},
+    {"targetname", "corner01"},
+    {"target", "corner02"},
+  }};
+  corner01Entity.setOrigin(vm::vec3d{0.0, 0.0, 0.0});
+  auto* corner01 = new mdl::EntityNode{std::move(corner01Entity)};
+  auto corner02Entity = mdl::Entity{{
+    {"classname", "path_corner"},
+    {"targetname", "corner02"},
+    {"target", "corner03"},
+  }};
+  corner02Entity.setOrigin(vm::vec3d{128.0, 0.0, 16.0});
+  auto* corner02 = new mdl::EntityNode{std::move(corner02Entity)};
+  auto corner03Entity = mdl::Entity{{
+    {"classname", "path_corner"},
+    {"targetname", "corner03"},
+  }};
+  corner03Entity.setOrigin(vm::vec3d{256.0, 64.0, 32.0});
+  auto* corner03 = new mdl::EntityNode{std::move(corner03Entity)};
+  mdl::addNodes(map, {{mdl::parentForNodes(map), {corner01, corner02, corner03}}});
+  mdl::selectNodes(map, {corner01});
+
+  SECTION("follows selected path_corner target links")
+  {
+    const auto response = entityLinkChainInspectForMapResult(
+      map,
+      QJsonObject{
+        {"classname", "path_corner"},
+        {"start", QJsonObject{{"source", "selection"}}},
+        {"nameKey", "targetname"},
+        {"nextKey", "target"},
+        {"detail", "summary"},
+      });
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("chainComplete").toBool());
+    CHECK(response.result.value("nodeCount").toInt() == 3);
+    CHECK(response.result.value("edgeCount").toInt() == 2);
+    CHECK(response.result.value("hasCycle").toBool() == false);
+    const auto nodes = response.result.value("nodes").toArray();
+    REQUIRE(nodes.size() == 3);
+    CHECK(nodes[0].toObject().value("targetname").toString() == "corner01");
+    CHECK(nodes[1].toObject().value("targetname").toString() == "corner02");
+    CHECK(nodes[2].toObject().value("targetname").toString() == "corner03");
+    CHECK(nodes[1].toObject().value("origin").toArray()[2].toDouble() == 16.0);
+  }
+
+  SECTION("reports duplicate targetnames without guessing")
+  {
+    auto duplicateEntity = mdl::Entity{{
+      {"classname", "path_corner"},
+      {"targetname", "corner02"},
+    }};
+    duplicateEntity.setOrigin(vm::vec3d{512.0, 0.0, 0.0});
+    auto* duplicate = new mdl::EntityNode{std::move(duplicateEntity)};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {duplicate}}});
+
+    const auto response = entityLinkChainInspectForMapResult(
+      map,
+      QJsonObject{
+        {"classname", "path_corner"},
+        {"start", QJsonObject{{"source", "selection"}}},
+      });
+
+    REQUIRE(response.ok);
+    CHECK_FALSE(response.result.value("chainComplete").toBool());
+    CHECK(response.result.value("duplicateNameCount").toInt() == 1);
+    const auto failures = response.result.value("failures").toArray();
+    REQUIRE(failures.size() >= 1);
+    CHECK(
+      failures.first().toObject().value("status").toString() == "duplicate_targetname");
+  }
+}
+
 TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 {
   auto appControllerFixture = AppControllerFixture{};

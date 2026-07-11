@@ -233,6 +233,10 @@ McpBridgeToolResult selectionInspectResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult selectionInspectForMapResult(
   mdl::Map& map, const QJsonObject& params);
+McpBridgeToolResult entityLinkChainInspectResult(
+  AppController& appController, const QJsonObject& params);
+McpBridgeToolResult entityLinkChainInspectForMapResult(
+  mdl::Map& map, const QJsonObject& params);
 McpBridgeToolResult selectionSetResult(
   AppController& appController, const QJsonObject& params);
 McpBridgeToolResult selectionSetForMapResult(mdl::Map& map, const QJsonObject& params);

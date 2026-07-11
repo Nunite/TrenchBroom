@@ -107,6 +107,15 @@ QJsonObject entityPropertiesJson(const mdl::Entity& entity)
   return result;
 }
 
+QString entityPropertyString(const mdl::Entity& entity, const QString& key)
+{
+  if (const auto* value = entity.property(key.toStdString()))
+  {
+    return QString::fromStdString(*value);
+  }
+  return {};
+}
+
 QJsonObject brushMaterialsJson(const mdl::Brush& brush)
 {
   auto counts = std::map<std::string, int>{};
@@ -142,6 +151,85 @@ QJsonArray brushFacesJson(const mdl::Brush& brush)
     });
   }
   return result;
+}
+
+bool entityMatchesClassname(
+  const mdl::EntityNodeBase& entityNode, const QString& classname)
+{
+  return classname.isEmpty()
+         || QString::fromStdString(entityNode.entity().classname())
+                .compare(classname, Qt::CaseInsensitive)
+              == 0;
+}
+
+void collectEntityNodes(
+  const mdl::Node& node,
+  const mdl::WorldNode& worldNode,
+  const QString& classname,
+  std::vector<const mdl::EntityNodeBase*>& entities)
+{
+  if (&node != &worldNode)
+  {
+    if (const auto* entityNode = dynamic_cast<const mdl::EntityNodeBase*>(&node))
+    {
+      if (entityMatchesClassname(*entityNode, classname))
+      {
+        entities.push_back(entityNode);
+      }
+    }
+  }
+
+  for (const auto* child : node.children())
+  {
+    collectEntityNodes(*child, worldNode, classname, entities);
+  }
+}
+
+QJsonObject linkedEntityNodeJson(
+  const mdl::EntityNodeBase& entityNode,
+  const mdl::WorldNode& worldNode,
+  const QString& nameKey,
+  const QString& nextKey,
+  const QString& detail)
+{
+  const auto& entity = entityNode.entity();
+  auto result = QJsonObject{
+    {"objectId", mcpNodePathId(entityNode, worldNode)},
+    {"type", "entity"},
+    {"classname", QString::fromStdString(entity.classname())},
+    {"origin", vecToJson(entity.origin())},
+    {nameKey, entityPropertyString(entity, nameKey)},
+    {nextKey, entityPropertyString(entity, nextKey)},
+  };
+  if (detail == "full")
+  {
+    result.insert("properties", entityPropertiesJson(entity));
+  }
+  return result;
+}
+
+QJsonObject linkFailureJson(
+  const QString& status,
+  const QString& from,
+  const QString& to,
+  const QString& recoveryAction)
+{
+  return QJsonObject{
+    {"status", status},
+    {"from", from},
+    {"to", to},
+    {"recoveryAction", recoveryAction},
+  };
+}
+
+McpBridgeToolResult entityLinkPreconditionFailure(
+  const QString& message, const QString& recoveryAction, QJsonObject details = {})
+{
+  details.insert("mutatedDocument", false);
+  details.insert("retrySafe", true);
+  details.insert("recoveryAction", recoveryAction);
+  return McpBridgeToolResult::failure(
+    mcp::McpErrorCode::InvalidParams, message, std::move(details));
 }
 
 QJsonObject selectedFaceJson(
@@ -456,6 +544,240 @@ McpBridgeToolResult selectionInspectResult(
     return noActiveDocumentFailure();
   }
   return selectionInspectForMapResult(mapWindow->document().map(), params);
+}
+
+McpBridgeToolResult entityLinkChainInspectForMapResult(
+  mdl::Map& map, const QJsonObject& params)
+{
+  const auto classname = params.value("classname").toString().trimmed();
+  const auto nameKey = params.value("nameKey").toString("targetname").trimmed();
+  const auto nextKey = params.value("nextKey").toString("target").trimmed();
+  const auto detailValue = params.value("detail").toString("summary").trimmed().toLower();
+  if (nameKey.isEmpty() || nextKey.isEmpty())
+  {
+    return entityLinkPreconditionFailure(
+      "entity_link_chain_inspect requires non-empty nameKey and nextKey",
+      "provide_entity_link_keys_then_retry");
+  }
+  if (detailValue != "summary" && detailValue != "full")
+  {
+    return entityLinkPreconditionFailure(
+      "entity_link_chain_inspect detail must be summary or full",
+      "fix_entity_link_detail_then_retry",
+      QJsonObject{{"detail", detailValue}});
+  }
+  const auto includeAllNodes = mcpOptionalBool(params, "includeAllNodes", false);
+
+  const auto& worldNode = map.worldNode();
+  auto candidates = std::vector<const mdl::EntityNodeBase*>{};
+  collectEntityNodes(worldNode, worldNode, classname, candidates);
+
+  auto byName = std::map<QString, std::vector<const mdl::EntityNodeBase*>>{};
+  for (const auto* entityNode : candidates)
+  {
+    const auto name = entityPropertyString(entityNode->entity(), nameKey);
+    if (!name.isEmpty())
+    {
+      byName[name].push_back(entityNode);
+    }
+  }
+
+  auto duplicateNames = QJsonArray{};
+  for (const auto& [name, nodes] : byName)
+  {
+    if (nodes.size() > 1u)
+    {
+      duplicateNames.push_back(QJsonObject{
+        {"name", name},
+        {"count", static_cast<int>(nodes.size())},
+      });
+    }
+  }
+
+  const auto startObject = params.value("start").toObject();
+  const auto startSource =
+    startObject.value("source").toString("selection").trimmed().toLower();
+  auto* startNode = static_cast<const mdl::EntityNodeBase*>(nullptr);
+  if (startSource == "selection")
+  {
+    auto selectedCandidates = std::vector<const mdl::EntityNodeBase*>{};
+    for (const auto* node : map.selection().nodes)
+    {
+      if (const auto* entityNode = dynamic_cast<const mdl::EntityNodeBase*>(node))
+      {
+        if (entityMatchesClassname(*entityNode, classname))
+        {
+          selectedCandidates.push_back(entityNode);
+        }
+      }
+    }
+    if (selectedCandidates.size() != 1u)
+    {
+      return entityLinkPreconditionFailure(
+        "entity_link_chain_inspect requires exactly one selected matching entity when "
+        "start.source is selection",
+        "select_one_start_entity_or_use_start_targetname",
+        QJsonObject{
+          {"selectedMatchingEntityCount", static_cast<int>(selectedCandidates.size())},
+          {"classname", classname},
+        });
+    }
+    startNode = selectedCandidates.front();
+  }
+  else if (startSource == "targetname")
+  {
+    const auto startName = startObject.value("targetname").toString().trimmed();
+    if (startName.isEmpty())
+    {
+      return entityLinkPreconditionFailure(
+        "start.targetname must be non-empty when start.source is targetname",
+        "provide_start_targetname_then_retry");
+    }
+    const auto it = byName.find(startName);
+    if (it == byName.end())
+    {
+      return entityLinkPreconditionFailure(
+        "start targetname was not found",
+        "choose_existing_start_targetname_then_retry",
+        QJsonObject{{"targetname", startName}});
+    }
+    if (it->second.size() != 1u)
+    {
+      return entityLinkPreconditionFailure(
+        "start targetname is ambiguous",
+        "choose_unique_start_targetname_then_retry",
+        QJsonObject{
+          {"targetname", startName},
+          {"matchCount", static_cast<int>(it->second.size())}});
+    }
+    startNode = it->second.front();
+  }
+  else
+  {
+    return entityLinkPreconditionFailure(
+      "start.source must be selection or targetname",
+      "fix_entity_link_start_source_then_retry",
+      QJsonObject{{"source", startSource}});
+  }
+
+  auto nodes = QJsonArray{};
+  auto edges = QJsonArray{};
+  auto failures = QJsonArray{};
+  auto warnings = QJsonArray{};
+  auto visited = std::set<const mdl::EntityNodeBase*>{};
+  auto chainComplete = true;
+  auto hasCycle = false;
+  auto* current = startNode;
+  while (current != nullptr)
+  {
+    nodes.push_back(
+      linkedEntityNodeJson(*current, worldNode, nameKey, nextKey, detailValue));
+    if (!visited.insert(current).second)
+    {
+      chainComplete = false;
+      hasCycle = true;
+      break;
+    }
+
+    const auto fromName = entityPropertyString(current->entity(), nameKey);
+    const auto nextName = entityPropertyString(current->entity(), nextKey);
+    if (fromName.isEmpty())
+    {
+      warnings.push_back(QJsonObject{
+        {"status", "missing_name"},
+        {"objectId", mcpNodePathId(*current, worldNode)},
+        {"key", nameKey},
+      });
+    }
+    if (nextName.isEmpty())
+    {
+      break;
+    }
+
+    auto edge = QJsonObject{{"from", fromName}, {"to", nextName}};
+    const auto targetIt = byName.find(nextName);
+    if (targetIt == byName.end())
+    {
+      edge.insert("status", "missing_target");
+      edges.push_back(edge);
+      failures.push_back(linkFailureJson(
+        "missing_target", fromName, nextName, "fix_missing_entity_target_or_stop_chain"));
+      chainComplete = false;
+      break;
+    }
+    if (targetIt->second.size() != 1u)
+    {
+      edge.insert("status", "duplicate_targetname");
+      edge.insert("matchCount", static_cast<int>(targetIt->second.size()));
+      edges.push_back(edge);
+      failures.push_back(linkFailureJson(
+        "duplicate_targetname",
+        fromName,
+        nextName,
+        "rename_duplicate_targetname_then_retry"));
+      chainComplete = false;
+      break;
+    }
+
+    const auto* target = targetIt->second.front();
+    if (visited.contains(target))
+    {
+      edge.insert("status", "cycle");
+      edges.push_back(edge);
+      failures.push_back(linkFailureJson(
+        "cycle", fromName, nextName, "break_entity_link_cycle_then_retry"));
+      chainComplete = false;
+      hasCycle = true;
+      break;
+    }
+
+    edge.insert("status", "resolved");
+    edges.push_back(edge);
+    current = target;
+  }
+
+  auto result = QJsonObject{
+    {"classname", classname},
+    {"nameKey", nameKey},
+    {"nextKey", nextKey},
+    {"startObjectId", mcpNodePathId(*startNode, worldNode)},
+    {"startSource", startSource},
+    {"chainComplete", chainComplete},
+    {"hasCycle", hasCycle},
+    {"nodeCount", nodes.size()},
+    {"edgeCount", edges.size()},
+    {"candidateNodeCount", static_cast<int>(candidates.size())},
+    {"duplicateNameCount", duplicateNames.size()},
+    {"nodes", nodes},
+    {"edges", edges},
+    {"failures", failures},
+    {"warnings", warnings},
+    {"mutatedDocument", false},
+  };
+
+  if (includeAllNodes)
+  {
+    auto allNodes = QJsonArray{};
+    for (const auto* entityNode : candidates)
+    {
+      allNodes.push_back(
+        linkedEntityNodeJson(*entityNode, worldNode, nameKey, nextKey, "summary"));
+    }
+    result.insert("allNodes", allNodes);
+    result.insert("duplicateNames", duplicateNames);
+  }
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult entityLinkChainInspectResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  return entityLinkChainInspectForMapResult(mapWindow->document().map(), params);
 }
 
 McpBridgeToolResult selectionSetResult(

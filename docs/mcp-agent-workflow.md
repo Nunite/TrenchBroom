@@ -109,10 +109,11 @@ scripts\mcp-config.ps1 -Print
 3. `map_search`：按 classname、targetname、属性或关键词查找对象。
 4. `selection_get`：读取用户当前选择摘要。
 5. `selection_inspect`：需要确认用户选中的具体实体、读取 entity key/value、brush face/material 摘要或 group 子对象时使用；默认 `detail:"summary"`，需要实体链路时用 `detail:"full"` 或 `includeProperties:true`。
-6. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
-7. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
-8. 需要视觉证据时优先用 `render_review_operation` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。未执行 Review 时不要给出视觉结论。
-9. `viewport_capture_scene_review` 只作为真实 TrenchBroom 视口辅助调试使用。需要确认 UI 视角或用户当前视图时再调用；自动化验收不要依赖它来隔离对象。
+6. `entity_link_chain_inspect`：需要读取当前活动 map 内实体 key/value 链路时使用，例如 `path_corner targetname -> target`。它返回断链、重复 targetname、循环等结构化结果。若 `selection_inspect` 或等价实体属性/链路读取工具不可调用，必须停止报告 MCP 能力缺口；未经用户明确批准，不要读取磁盘 `.map` 作为 fallback。
+7. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
+8. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
+9. 需要视觉证据时优先用 `render_review_operation` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。未执行 Review 时不要给出视觉结论。
+10. `viewport_capture_scene_review` 只作为真实 TrenchBroom 视口辅助调试使用。需要确认 UI 视角或用户当前视图时再调用；自动化验收不要依赖它来隔离对象。
 
 对象操作必须使用 MCP 返回的 `objectId`，不要根据实体顺序或 UI 文本猜测内部指针。
 
@@ -175,7 +176,7 @@ balanced = 12° / 2 / 2，smooth = 7.5° / 1 / 1。调用方可用正有限数
 沿现有 `path_corner` 链生成 tunnel / corridor 时，不要让 Agent 根据空间距离猜路线：
 
 1. 让用户选中起点或当前目标实体后，先调用 `selection_inspect(detail:"full", includeProperties:true)`，确认 `classname`、`origin`、`targetname`、`target`。
-2. 按 `targetname -> target` 建链；只在解析下一个 target 时用 `map_search` 查命名实体。
+2. 调用 `entity_link_chain_inspect(classname:"path_corner", start:{source:"selection"}, nameKey:"targetname", nextKey:"target")` 建链。不要根据空间距离推断顺序；如果链路读取工具不可调用，停止并报告 MCP cannot expose path_corner target links，除非用户明确批准读取 `.map` 文件。
 3. 用 `trenchbroom-mcp-scene-workflow` skill 的 `path_tunnel` recipe 生成矩形隧道 IR；如果用户要拱形、管状或自定义截面，改用 `path_sweep`。recipe 把每个 origin 当作隧道地面中心线，使用共享 miter 截面连接相邻段，并在 brush metadata 中写入 `shellSeams`。
 4. 需要保留纹理时，在 recipe 参数里传 `partMaterials` 和 `texturePolicy`。recipe 会写入 `textureRole` / `texturePolicy` metadata；精确 face UV 复制或重新对齐放到 apply 后，用 `texture_copy_from_face`、`texture_align_face` 或 `texture_apply_by_filter` 处理。
 5. 走 file flow：`ir_compile_preview_from_file`，再用返回的 `previewId` 调 `ir_apply_from_file`。迭代旧版本时使用 `replace_module`，不要先删除再创建。

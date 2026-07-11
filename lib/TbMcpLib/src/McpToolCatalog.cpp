@@ -814,6 +814,40 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "entity_link_chain_inspect",
+      "Inspect entity key/value links in the active map without reading the .map file. "
+      "Defaults to the current selected entity as the start and follows targetname -> "
+      "target style links. Reports missing links, duplicate names, and cycles instead "
+      "of guessing.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"classname",
+         stringProperty(
+           "Optional entity classname filter such as path_corner. When set, the "
+           "start and resolved nodes must match it.")},
+        {"start",
+         withDescription(
+           QJsonObject{{"type", "object"}},
+           "Start descriptor. Use {source:'selection'} or "
+           "{source:'targetname', targetname:'name'}. Defaults to selection.")},
+        {"nameKey",
+         stringProperty(
+           "Entity property used as the node name. Defaults to targetname.")},
+        {"nextKey",
+         stringProperty(
+           "Entity property used as the outgoing link. Defaults to target.")},
+        {"detail",
+         stringProperty(
+           "summary or full. Defaults to summary; full includes complete properties.")},
+        {"includeAllNodes",
+         boolProperty(
+           "Include a compact list of all candidate nodes and duplicate names. "
+           "Defaults to false.")},
+      }),
+    },
+    {
       "selection_set",
       "Set the current editor selection using MCP object ids.",
       McpMode::ReadOnly,
@@ -3867,6 +3901,8 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "tb_tools_search",
     "documents_open_verified",
     "map_snapshot",
+    "selection_inspect",
+    "entity_link_chain_inspect",
     "render_review_current_scene",
     "render_review_operation",
     "selector_preview",
