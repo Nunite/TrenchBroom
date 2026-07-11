@@ -3491,6 +3491,37 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       }),
     },
     {
+      "geometry_analyze_shell_seams",
+      "Analyze annotated shell seam metadata on generated brush shells. This "
+      "read-only validator groups brush metadata shellSeams by key and checks "
+      "participant counts, shared vertex coordinates, and maxVertexDelta. It does "
+      "not infer intended seams from arbitrary old map geometry; targets without "
+      "shellSeams should be rebuilt with an annotated recipe or reviewed visually. "
+      "If operationIds, objectIds, and selector are omitted, analyzes the current "
+      "user-selected brushes.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"operationId", liveOperationIdTargetProperty("brush objects")},
+        {"operationIds", liveOperationIdsTargetProperty("brush objects")},
+        {"objectIds", arrayProperty("Explicit MCP brush object ids to analyze.")},
+        {"selector",
+         withDescription(
+           selectorSchema(),
+           "Structured selector for generated shell targets. For recipe output, "
+           "prefer moduleId or moduleId plus routeId.")},
+        {"tolerance",
+         numberProperty(
+           "Maximum per-vertex offset in map units accepted for matching seam "
+           "annotations. Defaults to 0.01.")},
+        {"detail",
+         stringProperty(
+           "summary or full. Defaults to summary. Summary returns counts and seam "
+           "samples; full also returns every seam diagnostic.")},
+      }),
+    },
+    {
       "brush_metadata_set",
       "Legacy object-id metadata setter. Prefer passing defaultMetadata/metadata to "
       "creation tools or using structured selectors/modules for recovery.",
@@ -3866,6 +3897,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "geometry_analyze_selection",
     "geometry_analyze_slopes",
     "geometry_analyze_route_continuity",
+    "geometry_analyze_shell_seams",
     "objects_transform",
     "group_create_from_selection",
     "group_inspect",

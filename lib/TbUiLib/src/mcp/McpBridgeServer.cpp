@@ -849,6 +849,16 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
             &m_brushMetadata,
             &m_modules);
         }
+        if (toolName == "geometry_analyze_shell_seams")
+        {
+          return geometryAnalyzeShellSeamsResult(
+            appController,
+            params,
+            m_operationHistory,
+            &m_objectRegistry,
+            &m_brushMetadata,
+            &m_modules);
+        }
         if (toolName == "blockout_validate_spiral_stairs")
         {
           return blockoutValidateSpiralStairsResult(

@@ -88,6 +88,14 @@ struct PathRibbonSegment
   double maxZ = 16.0;
 };
 
+struct ShellSeamParticipant
+{
+  QString objectId;
+  QString part;
+  double order = 0.0;
+  std::vector<vm::vec3d> vertices;
+};
+
 QJsonArray vecToJson(const vm::vec3d& value)
 {
   return QJsonArray{
@@ -102,6 +110,31 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
   return QJsonObject{
     {"min", vecToJson(bounds.min)},
     {"max", vecToJson(bounds.max)},
+  };
+}
+
+std::optional<vm::vec3d> vec3FromJsonValue(const QJsonValue& value)
+{
+  if (!value.isArray())
+  {
+    return std::nullopt;
+  }
+  const auto array = value.toArray();
+  if (array.size() != 3)
+  {
+    return std::nullopt;
+  }
+  for (const auto& component : array)
+  {
+    if (!component.isDouble())
+    {
+      return std::nullopt;
+    }
+  }
+  return vm::vec3d{
+    array.at(0).toDouble(),
+    array.at(1).toDouble(),
+    array.at(2).toDouble(),
   };
 }
 
@@ -1099,6 +1132,164 @@ std::optional<QJsonObject> metadataForBrushNode(
     }
   }
   return std::nullopt;
+}
+
+QString objectIdForBrushNode(
+  mdl::Map& map, mdl::BrushNode& brush, const McpObjectRegistry* objectRegistry)
+{
+  auto objectId = nodePathId(brush, map.worldNode());
+  if (objectRegistry != nullptr)
+  {
+    objectId = objectRegistry->externalIdForLegacy(map, objectId);
+  }
+  return objectId;
+}
+
+std::vector<vm::vec3d> sortedVertices(std::vector<vm::vec3d> vertices)
+{
+  std::ranges::sort(vertices, [](const auto& lhs, const auto& rhs) {
+    if (lhs.x() != rhs.x())
+    {
+      return lhs.x() < rhs.x();
+    }
+    if (lhs.y() != rhs.y())
+    {
+      return lhs.y() < rhs.y();
+    }
+    return lhs.z() < rhs.z();
+  });
+  return vertices;
+}
+
+std::optional<std::vector<vm::vec3d>> shellSeamVerticesFromJson(
+  const QJsonObject& seam, QString& error)
+{
+  const auto verticesValue = seam.value("vertices");
+  if (!verticesValue.isArray())
+  {
+    error = "shellSeams entries must include vertices";
+    return std::nullopt;
+  }
+  auto vertices = std::vector<vm::vec3d>{};
+  const auto verticesArray = verticesValue.toArray();
+  if (verticesArray.isEmpty())
+  {
+    error = "shellSeams vertices must not be empty";
+    return std::nullopt;
+  }
+  vertices.reserve(static_cast<size_t>(verticesArray.size()));
+  for (const auto& vertexValue : verticesArray)
+  {
+    const auto vertex = vec3FromJsonValue(vertexValue);
+    if (!vertex)
+    {
+      error = "shellSeams vertices must be [x, y, z] arrays";
+      return std::nullopt;
+    }
+    vertices.push_back(*vertex);
+  }
+  return vertices;
+}
+
+QJsonObject shellSeamParticipantJson(const ShellSeamParticipant& participant)
+{
+  return QJsonObject{
+    {"objectId", participant.objectId},
+    {"part", participant.part},
+    {"order", participant.order},
+    {"vertexCount", static_cast<int>(participant.vertices.size())},
+  };
+}
+
+QJsonObject shellSeamDiagnosticJson(
+  const QString& key,
+  const std::vector<ShellSeamParticipant>& participants,
+  const double tolerance)
+{
+  auto participantJson = QJsonArray{};
+  for (const auto& participant : participants)
+  {
+    participantJson.push_back(shellSeamParticipantJson(participant));
+  }
+
+  auto continuous = participants.size() == 2u;
+  auto maxVertexDelta = 0.0;
+  auto vertexCount =
+    participants.empty() ? 0 : static_cast<int>(participants.front().vertices.size());
+  auto warning = QString{};
+  if (participants.size() != 2u)
+  {
+    warning = QString{"expected 2 participants, found %1"}.arg(participants.size());
+  }
+  else
+  {
+    const auto reference = sortedVertices(participants.front().vertices);
+    for (size_t i = 1; i < participants.size(); ++i)
+    {
+      const auto candidate = sortedVertices(participants[i].vertices);
+      if (candidate.size() != reference.size())
+      {
+        continuous = false;
+        warning = "participant vertex counts differ";
+        vertexCount = std::min(vertexCount, static_cast<int>(candidate.size()));
+        continue;
+      }
+      for (size_t vertexIndex = 0; vertexIndex < reference.size(); ++vertexIndex)
+      {
+        const auto delta = vm::length(candidate[vertexIndex] - reference[vertexIndex]);
+        maxVertexDelta = std::max(maxVertexDelta, delta);
+        if (delta > tolerance)
+        {
+          continuous = false;
+        }
+      }
+    }
+  }
+
+  auto result = QJsonObject{
+    {"key", key},
+    {"participantCount", static_cast<int>(participants.size())},
+    {"vertexCount", vertexCount},
+    {"maxVertexDelta", maxVertexDelta},
+    {"continuous", continuous},
+    {"participants", participantJson},
+  };
+  if (!warning.isEmpty())
+  {
+    result.insert("warning", warning);
+  }
+  return result;
+}
+
+QJsonObject shellSeamSummaryJson(const QJsonObject& seam)
+{
+  return QJsonObject{
+    {"key", seam.value("key")},
+    {"participantCount", seam.value("participantCount")},
+    {"vertexCount", seam.value("vertexCount")},
+    {"maxVertexDelta", seam.value("maxVertexDelta")},
+    {"continuous", seam.value("continuous")},
+    {"warning", seam.value("warning")},
+  };
+}
+
+QJsonArray shellSeamSummarySample(const QJsonArray& seams, const bool failingOnly)
+{
+  auto result = QJsonArray{};
+  for (const auto& seamValue : seams)
+  {
+    const auto seam = seamValue.toObject();
+    if (failingOnly && seam.value("continuous").toBool(false))
+    {
+      continue;
+    }
+    result.push_back(shellSeamSummaryJson(seam));
+    if (result.size() >= DefaultGeometrySampleLimit)
+    {
+      break;
+    }
+  }
+  return result;
 }
 
 std::optional<vm::vec3d> optionalRouteDirectionFromParams(
@@ -6275,6 +6466,221 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityResult(
   }
 
   return geometryAnalyzeRouteContinuityForMapResult(
+    mapWindow->document().map(),
+    params,
+    history,
+    objectRegistry,
+    metadataStore,
+    moduleStore);
+}
+
+McpBridgeToolResult geometryAnalyzeShellSeamsForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const std::map<QString, McpModuleRecord>* moduleStore)
+{
+  auto error = QString{};
+  auto warnings = QJsonArray{};
+  const auto resolvedParams = paramsWithSelectorObjectIds(
+    map, params, history, objectRegistry, metadataStore, moduleStore, warnings, error);
+  if (!error.isEmpty())
+  {
+    return invalidParamsFailure(error);
+  }
+
+  const auto useSelectionTargets = !hasExplicitBrushTargetParams(params);
+  auto brushes = std::optional<std::vector<mdl::BrushNode*>>{};
+  if (useSelectionTargets)
+  {
+    brushes = selectedBrushNodes(map);
+  }
+  else
+  {
+    brushes = brushNodesFromObjectIdsAndOperations(
+      map, resolvedParams, history, objectRegistry, error);
+    if (!brushes)
+    {
+      return invalidParamsFailure(error);
+    }
+  }
+  if (brushes->empty())
+  {
+    return invalidParamsFailure(
+      "geometry_analyze_shell_seams requires operationIds, objectIds, selector "
+      "targets, or selected brush nodes");
+  }
+
+  const auto tolerance =
+    optionalClampedDouble(resolvedParams, "tolerance", 0.01, 0.0, 1024.0);
+  const auto detail = summaryOrFullDetail(resolvedParams);
+  auto seamGroups = std::map<QString, std::vector<ShellSeamParticipant>>{};
+  auto annotatedBrushCount = 0;
+  auto invalidAnnotationError = QString{};
+  for (auto* brush : *brushes)
+  {
+    if (brush == nullptr)
+    {
+      continue;
+    }
+    const auto metadata =
+      metadataForBrushNode(map, *brush, metadataStore, objectRegistry);
+    if (!metadata)
+    {
+      continue;
+    }
+    const auto shellSeamsValue = metadata->value("shellSeams");
+    if (!shellSeamsValue.isArray())
+    {
+      continue;
+    }
+    const auto shellSeams = shellSeamsValue.toArray();
+    if (shellSeams.isEmpty())
+    {
+      continue;
+    }
+    ++annotatedBrushCount;
+    for (const auto& seamValue : shellSeams)
+    {
+      if (!seamValue.isObject())
+      {
+        invalidAnnotationError = "shellSeams entries must be objects";
+        break;
+      }
+      const auto seam = seamValue.toObject();
+      const auto key = seam.value("key").toString().trimmed();
+      if (key.isEmpty())
+      {
+        invalidAnnotationError = "shellSeams entries must include key";
+        break;
+      }
+      const auto vertices = shellSeamVerticesFromJson(seam, invalidAnnotationError);
+      if (!vertices)
+      {
+        break;
+      }
+      seamGroups[key].push_back(ShellSeamParticipant{
+        objectIdForBrushNode(map, *brush, objectRegistry),
+        metadata->value("part").toString(),
+        metadata->value("order").toDouble(0.0),
+        *vertices,
+      });
+    }
+    if (!invalidAnnotationError.isEmpty())
+    {
+      break;
+    }
+  }
+
+  if (!invalidAnnotationError.isEmpty())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      invalidAnnotationError,
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"recoveryAction", "use_annotated_recipe_or_visual_review"},
+      });
+  }
+
+  if (seamGroups.empty())
+  {
+    return McpBridgeToolResult::failure(
+      mcp::McpErrorCode::InvalidParams,
+      "No shellSeams metadata found on target brushes; shell seam analysis only "
+      "validates annotated recipe output.",
+      QJsonObject{
+        {"mutatedDocument", false},
+        {"retrySafe", true},
+        {"targetBrushCount", static_cast<int>(brushes->size())},
+        {"annotatedBrushCount", annotatedBrushCount},
+        {"recoveryAction", "use_annotated_recipe_or_visual_review"},
+      });
+  }
+
+  if (annotatedBrushCount < static_cast<int>(brushes->size()))
+  {
+    warnings.push_back(
+      "unannotatedTargetBrushes: some target brushes have no shellSeams metadata; "
+      "acceptancePassed is false because the shell cannot be fully verified.");
+  }
+
+  auto seams = QJsonArray{};
+  auto maxVertexDelta = 0.0;
+  auto failingSeamCount = 0;
+  auto shellContinuous = true;
+  for (const auto& [key, participants] : seamGroups)
+  {
+    auto seam = shellSeamDiagnosticJson(key, participants, tolerance);
+    const auto seamContinuous = seam.value("continuous").toBool(false);
+    shellContinuous = shellContinuous && seamContinuous;
+    if (!seamContinuous)
+    {
+      ++failingSeamCount;
+    }
+    maxVertexDelta = std::max(maxVertexDelta, seam.value("maxVertexDelta").toDouble(0.0));
+    seams.push_back(std::move(seam));
+  }
+  if (!shellContinuous)
+  {
+    warnings.push_back(
+      "shellSeamsNotContinuous: at least one annotated shell seam has a missing "
+      "participant, mismatched vertex count, or vertex offset above tolerance.");
+  }
+  const auto allTargetsAnnotated =
+    annotatedBrushCount == static_cast<int>(brushes->size());
+  const auto acceptancePassed = shellContinuous && allTargetsAnnotated;
+
+  auto result = QJsonObject{
+    {"tool", "geometry_analyze_shell_seams"},
+    {"detail", detail},
+    {"source", useSelectionTargets ? "selection" : "targets"},
+    {"targetSource", useSelectionTargets ? "selection" : "targets"},
+    {"targetBrushCount", static_cast<int>(brushes->size())},
+    {"annotatedBrushCount", annotatedBrushCount},
+    {"seamCount", seams.size()},
+    {"failingSeamCount", failingSeamCount},
+    {"maxVertexDelta", maxVertexDelta},
+    {"tolerance", tolerance},
+    {"shellContinuous", shellContinuous},
+    {"acceptancePassed", acceptancePassed},
+    {"failingSeamSample", shellSeamSummarySample(seams, true)},
+    {"seamSample", shellSeamSummarySample(seams, false)},
+    {"warnings", warnings},
+    {"mutatedDocument", false},
+    {"recoveryAction",
+     acceptancePassed ? "continue_validation_or_review"
+                      : "inspect_failing_seam_sample_then_rebuild_annotated_shell"},
+  };
+  if (detail == "full")
+  {
+    result.insert("seams", seams);
+  }
+  if (resolvedParams.contains("selectorMatchedCount"))
+  {
+    result.insert("selectorMatchedCount", resolvedParams.value("selectorMatchedCount"));
+  }
+  return McpBridgeToolResult::success(std::move(result));
+}
+
+McpBridgeToolResult geometryAnalyzeShellSeamsResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore,
+  const std::map<QString, McpModuleRecord>* moduleStore)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+
+  return geometryAnalyzeShellSeamsForMapResult(
     mapWindow->document().map(),
     params,
     history,

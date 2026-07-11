@@ -71,17 +71,22 @@ Before generating IR, record `tb_status` document guards and an unmodified
    `applyMode:"replace_module"` for iteration.
 4. Apply with the returned `previewId`. Replacement must retain the preview's IR
    hash, module revision/content hash, and canonical live object-set guards. If
-   the preview, file, or module changes, preview again.
+   the preview, file, or module changes, preview again. If apply reports an IR
+   hash mismatch, regenerate or re-preview the current IR file and apply the new
+   `previewId`; do not manually reuse stale hashes.
 5. Recover with `module_inspect` or `selector_preview` and record module
    revision/content hash.
 6. Run `geometry_analyze_slopes` and/or
    `geometry_analyze_route_continuity` when route-like. Use
    `walkableContinuous`, `qualityStatus`, `acceptancePassed`, and `notEvaluated`;
    legacy `passed` is not the acceptance verdict.
-7. Run `map_validate(groupByType:true)` and `problems_check`. Compare stable
+7. Run `geometry_analyze_shell_seams` when recipe metadata includes
+   `shellSeams`, such as `path_tunnel`. This validator checks only annotated
+   shell intent and does not infer seams from arbitrary map geometry.
+8. Run `map_validate(groupByType:true)` and `problems_check`. Compare stable
    problem ids when both responses are untruncated; otherwise compare grouped
    counts and label the delta low-confidence.
-8. Optionally render construction evidence with `edgeMode:"all"` and outline
+9. Optionally render construction evidence with `edgeMode:"all"` and outline
    evidence with `edgeMode:"silhouette"`.
 
 Quality warnings do not block `draft` or `balanced`. Only an explicitly selected
@@ -114,6 +119,15 @@ acceptance failed; rebuild them only as new recipes with inspected review output
   them as grid cleanliness warnings only when slope and acceptance checks pass.
   The grouped examples intentionally use `draft` for minimal, `balanced` for
   default (36 segments), and `smooth` for stress.
+- `path_tunnel`: emits annotated `polyhedron` IR for floor, ceiling,
+  `wall_left`, `wall_right`, and optional end caps along a path_corner-style
+  point chain. `points` are floor centerline origins; floor thickness extends
+  downward, walls extend outward, and ceiling thickness extends above
+  `origin.z + height`. First version supports horizontal-projection polylines
+  with per-point Z and `cornerMode:"miter"` only. Interior nodes share one miter
+  section across adjacent segments and every internal/cap seam is recorded in
+  `metadata.shellSeams`. Validate with
+  `geometry_analyze_shell_seams(selector:{moduleId})` before visual review.
 - `rect_shell`: replaces legacy `room`, `corridor`, and `sky_shell` batch types
   with explicit box IR. Use `kind` only for recipe defaults and metadata.
 - `opening_wall`: replaces legacy `doorway` batch type. It creates a freestanding

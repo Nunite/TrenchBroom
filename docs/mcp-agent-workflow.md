@@ -95,7 +95,7 @@ scripts\mcp-config.ps1 -Print
 7. 每次写操作后保留 undoOperationId 和 module revision/content hash；child/audit operation ids 只用于审计。不要长期携带大 object id 列表。
 8. 发现结果错误时优先使用 history_undo_mcp 回滚最近一次 MCP 聚合操作，而不是用删除工具硬删一片对象。
 9. 所有写入都应同时传 expectedDocumentPath 和 expectedDocumentFingerprint；两者都提供时必须同时匹配。
-10. 最终验收读取 acceptancePassed、qualityStatus、walkableContinuous 和 notEvaluated；Review 是可选证据，不替代静态验证。
+10. 最终验收读取 acceptancePassed、qualityStatus、walkableContinuous、shellContinuous 和 notEvaluated；Review 是可选证据，不替代静态验证。
 11. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认。
 12. 如果工具返回 unsupported、Forbidden 或 Unauthorized，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
 ```
@@ -138,7 +138,8 @@ scripts\mcp-config.ps1 -Print
 IR 文件必须输出 `schemaVersion:1`。无版本文件只为兼容而接受，并返回
 `legacyUnversionedIr`。`ir_compile_preview_from_file` 返回 `previewId` 后，
 `ir_apply_from_file` 应同时提交原路径和该 id；文件内容发生变化时，apply
-会在写入前拒绝。
+会在写入前拒绝。遇到 IR hash mismatch 时，重新生成或重新 preview 当前
+IR 文件，再使用新的 `previewId` apply，不要手动复用旧 hash。
 
 IR v1 可选携带：
 
@@ -168,6 +169,17 @@ balanced = 12° / 2 / 2，smooth = 7.5° / 1 / 1。调用方可用正有限数
    当同一个 operation 同时生成 floor、wall、rail、support 或 marker 时，不要让连续性分析混入护栏/墙体；优先传 `selector`，例如 `moduleId + role:"walkable"` 或 `moduleId + part:"floor"`。如果未传 selector 且结果带 `mixedTargetWarning`、`partCounts`、`roleCounts`，应按推荐 selector 重新分析。
 6. Review 可选。需要视觉证据时分别生成 `edgeMode:"all"` 的施工图和 `edgeMode:"silhouette"` 的外轮廓图。它们不改变 `acceptancePassed`；未执行时明确报告 `visualReview:not_run`。
 7. 复杂路线按主体、护边、标记分阶段创建，保留少量关键 `operationId`，降低 history 追踪和回滚成本。
+
+## path_corner 隧道工作流
+
+沿现有 `path_corner` 链生成 tunnel / corridor 时，不要让 Agent 根据空间距离猜路线：
+
+1. 让用户选中起点或当前目标实体后，先调用 `selection_inspect(detail:"full", includeProperties:true)`，确认 `classname`、`origin`、`targetname`、`target`。
+2. 按 `targetname -> target` 建链；只在解析下一个 target 时用 `map_search` 查命名实体。
+3. 用 `trenchbroom-mcp-scene-workflow` skill 的 `path_tunnel` recipe 生成 IR。recipe 把每个 origin 当作隧道地面中心线，使用共享 miter 截面连接相邻段，并在 brush metadata 中写入 `shellSeams`。
+4. 走 file flow：`ir_compile_preview_from_file`，再用返回的 `previewId` 调 `ir_apply_from_file`。迭代旧版本时使用 `replace_module`，不要先删除再创建。
+5. 验证顺序：`geometry_analyze_shell_seams(selector:{moduleId})`、`module_render_review(edgeMode:"all")`、`module_render_review(edgeMode:"silhouette")`、`map_validate(groupByType:true)`、`problems_check`。
+6. `geometry_analyze_shell_seams` 只验证 recipe 标注的 seam。缺少 `shellSeams` 时它不会猜测地图意图，应改用 annotated recipe 或视觉 review。
 
 ## KZ 平台链工作流
 

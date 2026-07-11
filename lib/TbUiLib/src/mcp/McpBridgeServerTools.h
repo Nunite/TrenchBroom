@@ -912,6 +912,20 @@ McpBridgeToolResult geometryAnalyzeRouteContinuityResult(
   const McpObjectRegistry* objectRegistry = nullptr,
   const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
   const std::map<QString, McpModuleRecord>* moduleStore = nullptr);
+McpBridgeToolResult geometryAnalyzeShellSeamsForMapResult(
+  mdl::Map& map,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  const std::map<QString, McpModuleRecord>* moduleStore = nullptr);
+McpBridgeToolResult geometryAnalyzeShellSeamsResult(
+  AppController& appController,
+  const QJsonObject& params,
+  const std::vector<McpOperationRecord>& history,
+  const McpObjectRegistry* objectRegistry = nullptr,
+  const std::map<QString, McpBrushMetadataRecord>* metadataStore = nullptr,
+  const std::map<QString, McpModuleRecord>* moduleStore = nullptr);
 McpBridgeToolResult blockoutValidateSpiralStairsResult(
   mdl::Map& map,
   const QJsonObject& params,

@@ -60,9 +60,9 @@ TEST_CASE("McpToolCatalog")
       implementedCount += tool.implemented ? 1u : 0u;
     }
 
-    CHECK(catalog.size() == 140u);
-    CHECK(implementedCount == 138u);
-    CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 47);
+    CHECK(catalog.size() == 141u);
+    CHECK(implementedCount == 139u);
+    CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 48);
   }
 
   SECTION("all mutating tools expose path and fingerprint guards")
@@ -209,6 +209,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("geometry_analyze_selection"));
     CHECK(findToolDefinition("geometry_analyze_slopes"));
     CHECK(findToolDefinition("geometry_analyze_route_continuity"));
+    CHECK(findToolDefinition("geometry_analyze_shell_seams"));
     CHECK(findToolDefinition("blockout_create_spiral_stairs"));
     CHECK(findToolDefinition("blockout_validate_spiral_stairs"));
     CHECK(findToolDefinition("operation_inspect"));
@@ -292,6 +293,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("geometry_analyze_selection"));
     CHECK(names.contains("geometry_analyze_slopes"));
     CHECK(names.contains("geometry_analyze_route_continuity"));
+    CHECK(names.contains("geometry_analyze_shell_seams"));
     CHECK(names.contains("blockout_validate_spiral_stairs"));
     CHECK(!names.contains("documents_open"));
     CHECK(!names.contains("documents_save"));
@@ -343,7 +345,8 @@ TEST_CASE("McpToolCatalog")
 
     INFO("Modeling profile tools: " << names.join(", ").toStdString());
     CHECK(
-      names.size() <= 47); // geometry_csg_selection adds one recovery-safe CSG primitive.
+      names.size()
+      <= 48); // shell seam validation is visible for annotated recipe workflows.
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
@@ -410,6 +413,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(names.contains("ir_compile_preview"));
     CHECK(names.contains("ir_apply"));
     CHECK(names.contains("geometry_analyze_selection"));
+    CHECK(names.contains("geometry_analyze_shell_seams"));
     CHECK(names.contains("geometry_csg_selection"));
     CHECK(!names.contains("blockout_validate"));
     CHECK(!names.contains("objects_delete"));

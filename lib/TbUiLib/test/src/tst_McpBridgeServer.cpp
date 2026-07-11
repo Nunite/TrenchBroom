@@ -560,6 +560,15 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
         {"continuous", true},
       });
     }
+    if (toolName == "geometry_analyze_shell_seams")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"targetBrushCount", 0},
+        {"annotatedBrushCount", 0},
+        {"seamCount", 0},
+        {"shellContinuous", true},
+      });
+    }
     if (toolName == "blockout_validate_spiral_stairs")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -9157,6 +9166,207 @@ TEST_CASE(
   const auto seams = closedLoopResponse.result.value("seams").toArray();
   REQUIRE(!seams.isEmpty());
   CHECK(seams.last().toObject().value("loopClosure").toBool());
+}
+
+TEST_CASE("McpBridgeServer geometry_analyze_shell_seams", "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+  auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
+  auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
+  auto moduleStore = std::map<QString, McpModuleRecord>{};
+  auto objectRegistry = McpObjectRegistry{};
+
+  const auto seam = [](const QString& key, const int x) {
+    return QJsonObject{
+      {"key", key},
+      {"vertices",
+       QJsonArray{
+         QJsonArray{x, 0, 0},
+         QJsonArray{x, 64, 0},
+         QJsonArray{x, 64, 96},
+         QJsonArray{x, 0, 96},
+       }},
+    };
+  };
+
+  const auto continuousShell = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Annotated shell seam"},
+      {"detail", "ids"},
+      {"defaultMetadata",
+       QJsonObject{
+         {"moduleId", "shell-seam-pass"},
+         {"routeId", "shell-route-a"},
+         {"recipe", "path_tunnel"},
+       }},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{0, 0, 0}},
+           {"max", QJsonArray{128, 64, 96}},
+           {"metadata",
+            QJsonObject{
+              {"part", "wall_left"},
+              {"role", "shell"},
+              {"order", 1},
+              {"shellSeams", QJsonArray{seam("section:1:left", 128)}},
+            }},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{128, 0, 0}},
+           {"max", QJsonArray{256, 64, 96}},
+           {"metadata",
+            QJsonObject{
+              {"part", "wall_left"},
+              {"role", "shell"},
+              {"order", 2},
+              {"shellSeams", QJsonArray{seam("section:1:left", 128)}},
+            }},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(continuousShell.ok);
+
+  const auto continuousAnalysis = geometryAnalyzeShellSeamsForMapResult(
+    map,
+    QJsonObject{
+      {"operationId", continuousShell.result.value("operationId").toString()},
+      {"detail", "full"},
+    },
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(continuousAnalysis.ok);
+  CHECK(continuousAnalysis.result.value("shellContinuous").toBool());
+  CHECK(continuousAnalysis.result.value("acceptancePassed").toBool());
+  CHECK(continuousAnalysis.result.value("targetBrushCount").toInt() == 2);
+  CHECK(continuousAnalysis.result.value("annotatedBrushCount").toInt() == 2);
+  CHECK(continuousAnalysis.result.value("seamCount").toInt() == 1);
+  CHECK(continuousAnalysis.result.value("failingSeamCount").toInt() == 0);
+  CHECK(continuousAnalysis.result.value("maxVertexDelta").toDouble() == 0.0);
+  CHECK(continuousAnalysis.result.value("seams").toArray().size() == 1);
+
+  const auto gappedShell = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Gapped annotated shell seam"},
+      {"detail", "ids"},
+      {"defaultMetadata",
+       QJsonObject{
+         {"moduleId", "shell-seam-fail"},
+         {"routeId", "shell-route-b"},
+         {"recipe", "path_tunnel"},
+       }},
+      {"operations",
+       QJsonArray{
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{512, 0, 0}},
+           {"max", QJsonArray{640, 64, 96}},
+           {"metadata",
+            QJsonObject{
+              {"part", "wall_right"},
+              {"role", "shell"},
+              {"order", 1},
+              {"shellSeams", QJsonArray{seam("section:1:right", 640)}},
+            }},
+         },
+         QJsonObject{
+           {"type", "box"},
+           {"min", QJsonArray{641, 0, 0}},
+           {"max", QJsonArray{769, 64, 96}},
+           {"metadata",
+            QJsonObject{
+              {"part", "wall_right"},
+              {"role", "shell"},
+              {"order", 2},
+              {"shellSeams", QJsonArray{seam("section:1:right", 641)}},
+            }},
+         },
+       }},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(gappedShell.ok);
+
+  const auto gappedAnalysis = geometryAnalyzeShellSeamsForMapResult(
+    map,
+    QJsonObject{{"operationId", gappedShell.result.value("operationId").toString()}},
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  REQUIRE(gappedAnalysis.ok);
+  CHECK_FALSE(gappedAnalysis.result.value("shellContinuous").toBool());
+  CHECK_FALSE(gappedAnalysis.result.value("acceptancePassed").toBool());
+  CHECK(gappedAnalysis.result.value("failingSeamCount").toInt() > 0);
+  CHECK(gappedAnalysis.result.value("maxVertexDelta").toDouble() > 0.0);
+  CHECK(gappedAnalysis.result.value("failingSeamSample").toArray().size() == 1);
+  CHECK(
+    gappedAnalysis.result.value("recoveryAction").toString()
+    == "inspect_failing_seam_sample_then_rebuild_annotated_shell");
+
+  const auto unannotatedShell = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"name", "MCP: Unannotated shell"},
+      {"detail", "ids"},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{1024, 0, 0}},
+         {"max", QJsonArray{1152, 64, 96}},
+       }}},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(unannotatedShell.ok);
+
+  const auto unannotatedAnalysis = geometryAnalyzeShellSeamsForMapResult(
+    map,
+    QJsonObject{{"operationId", unannotatedShell.result.value("operationId").toString()}},
+    history,
+    &objectRegistry,
+    &metadataStore,
+    &moduleStore);
+  CHECK_FALSE(unannotatedAnalysis.ok);
+  CHECK(
+    (unannotatedAnalysis.error.message.contains("shellSeams")
+     || unannotatedAnalysis.error.message.contains("annotated")));
+  CHECK(
+    unannotatedAnalysis.error.details.value("recoveryAction").toString()
+    == "use_annotated_recipe_or_visual_review");
+  CHECK_FALSE(unannotatedAnalysis.error.details.value("mutatedDocument").toBool());
+  CHECK(unannotatedAnalysis.error.details.value("retrySafe").toBool());
 }
 
 TEST_CASE("McpBridgeServer route metadata tools", "[McpBridgeServer]")

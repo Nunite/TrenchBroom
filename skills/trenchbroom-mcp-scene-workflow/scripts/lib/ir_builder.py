@@ -170,6 +170,28 @@ def op_ramp_between(
     return op
 
 
+def op_polyhedron(
+    points: list[list[float]],
+    *,
+    part: str,
+    role: str,
+    order: int,
+    material: str | None = None,
+    extra_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {"part": part, "role": role, "order": order}
+    if extra_metadata:
+        metadata.update(extra_metadata)
+    op: dict[str, Any] = {
+        "type": "polyhedron",
+        "points": points,
+        "metadata": metadata,
+    }
+    if material:
+        op["material"] = material
+    return op
+
+
 def entity(
     classname: str,
     origin: list[float],
@@ -298,6 +320,21 @@ def _operation_bounds(operation: dict[str, Any]) -> tuple[list[float], list[floa
                 p = polar_point(center, side_radius, angle, z)
                 bounds = _extend_bounds(bounds, [p[0], p[1], p[2] - thickness], p)
         return None if bounds is None else (bounds[0], bounds[1])
+    if op_type == "polyhedron" and "points" in operation:
+        points = operation.get("points")
+        if not isinstance(points, list) or not points:
+            return None
+        bounds: list[list[float]] | None = None
+        for point in points:
+            if (
+                not isinstance(point, list)
+                or len(point) != 3
+                or not all(isinstance(component, (int, float)) for component in point)
+            ):
+                return None
+            p = [float(point[0]), float(point[1]), float(point[2])]
+            bounds = _extend_bounds(bounds, p, p)
+        return None if bounds is None else (bounds[0], bounds[1])
     return None
 
 
@@ -358,10 +395,13 @@ def validate_ir(ir: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
         for key in ("moduleId", "generatedBy"):
             if not default_metadata.get(key):
                 errors.append(f"defaultMetadata must include {key}")
+    output = manifest.get("output", {})
     operations = ir.get("operations")
     if not isinstance(operations, list) or not operations:
         errors.append("IR must include at least one operation")
     else:
+        shell_seam_groups: dict[str, list[tuple[int, tuple[tuple[float, float, float], ...]]]] = {}
+        operations_with_shell_seams = 0
         for index, operation in enumerate(operations):
             if not isinstance(operation, dict):
                 errors.append(f"operation[{index}] must be an object")
@@ -373,6 +413,48 @@ def validate_ir(ir: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
             for key in ("part", "role", "order"):
                 if key not in metadata:
                     errors.append(f"operation[{index}] metadata must include {key}")
+            shell_seams = metadata.get("shellSeams")
+            if shell_seams is not None:
+                if not isinstance(shell_seams, list) or not shell_seams:
+                    errors.append(f"operation[{index}] metadata.shellSeams must be a non-empty array")
+                else:
+                    operations_with_shell_seams += 1
+                    for seam_index, seam in enumerate(shell_seams):
+                        if not isinstance(seam, dict):
+                            errors.append(f"operation[{index}] shellSeams[{seam_index}] must be an object")
+                            continue
+                        seam_key = seam.get("key")
+                        vertices = seam.get("vertices")
+                        if not isinstance(seam_key, str) or not seam_key:
+                            errors.append(f"operation[{index}] shellSeams[{seam_index}] must include key")
+                            continue
+                        if not isinstance(vertices, list) or not vertices:
+                            errors.append(f"operation[{index}] shellSeams[{seam_index}] must include vertices")
+                            continue
+                        canonical_vertices = []
+                        for vertex_index, vertex in enumerate(vertices):
+                            if (
+                                not isinstance(vertex, list)
+                                or len(vertex) != 3
+                                or not all(isinstance(component, (int, float)) and not isinstance(component, bool) for component in vertex)
+                            ):
+                                errors.append(
+                                    f"operation[{index}] shellSeams[{seam_index}] vertices[{vertex_index}] must be [x, y, z]"
+                                )
+                                canonical_vertices = []
+                                break
+                            canonical_vertices.append((float(vertex[0]), float(vertex[1]), float(vertex[2])))
+                        if canonical_vertices:
+                            shell_seam_groups.setdefault(seam_key, []).append((index, tuple(sorted(canonical_vertices))))
+        if output.get("shellSeams"):
+            if operations_with_shell_seams != len(operations):
+                errors.append("all operations must include metadata.shellSeams for shell seam recipes")
+            for seam_key, participants in sorted(shell_seam_groups.items()):
+                if len(participants) != 2:
+                    errors.append(f"shell seam {seam_key!r} must have exactly two participants")
+                    continue
+                if participants[0][1] != participants[1][1]:
+                    errors.append(f"shell seam {seam_key!r} participant vertices differ")
     entities = ir.get("entities", [])
     if entities is not None and not isinstance(entities, list):
         errors.append("entities must be a list when present")
@@ -400,7 +482,6 @@ def validate_ir(ir: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
                     errors.append(f"qualityPolicy.{key} must be a positive finite number")
 
     summary = summarize_ir(ir)
-    output = manifest.get("output", {})
     if output.get("routeLike") and not isinstance(manifest.get("qualityPolicy"), dict):
         errors.append("route-like recipe manifest must declare qualityPolicy")
     expected_parts = set(output.get("requiredParts", output.get("parts", [])))

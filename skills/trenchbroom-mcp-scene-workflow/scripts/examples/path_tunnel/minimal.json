@@ -1,0 +1,8 @@
+{
+  "moduleId": "recipe-path-tunnel-minimal",
+  "routeId": "corner-chain-a",
+  "points": [
+    [0, 0, 0],
+    [256, 0, 0]
+  ]
+}

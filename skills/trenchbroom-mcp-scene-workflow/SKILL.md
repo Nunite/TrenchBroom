@@ -54,6 +54,7 @@ design decisions remain under Agent control.
    - `map_validate(groupByType:true)` and `problems_check` before reporting done. If both problem responses are untruncated, compare stable ids and report `introduced`, `resolved`, and `preExisting`; otherwise compare grouped counts only and label the result low-confidence.
    - `geometry_analyze_route_continuity` for ramps, platforms, roads, stairs, rails, and route seams. Read `walkableContinuous`, `qualityStatus`, `acceptancePassed`, and `notEvaluated`; do not use legacy `passed` as the completion verdict.
    - `geometry_analyze_slopes` for ramp/surf/slide/wedge/ascending intent. Use `passed`, `slopeCount`, warning samples, and `recoveryAction` from the summary before asking for full detail. If a sloped surface was intended and `passed` is false or `slopeCount` is 0, treat the build as failed and rebuild with a true slope primitive.
+   - `geometry_analyze_shell_seams` for recipe output that annotates `shellSeams`, such as `path_tunnel`. This validates only annotated shell intent; missing annotations mean rebuild with an annotated recipe or use visual review, not automatic inference.
 10. Optionally collect visual evidence with `module_render_review`, `render_review_selector`, `render_review_operation`, or `render_review_current_scene(scope:"selection")`. For shape-sensitive modules, prefer one `edgeMode:"all"` construction view and one `edgeMode:"silhouette"` outline view. Review evidence never changes `acceptancePassed`; if review was skipped, report `visualReview:"not_run"`.
 11. Report module revision/content hash, problem delta, `completionState.saveRequired`, visual review status, BSP compile status, and `notEvaluated`. Never describe map validation as BSP or game-collision validation. Report friction as P0 crash/wrong-map/data loss, P1 blocked real workflow, P2 awkward or context-heavy, or P3 documentation/default issue.
 
@@ -76,7 +77,7 @@ Treat the Modeling profile as the normal Agent workbench. It intentionally expos
 | Iteration edits | `objects_transform` on selection or selector, `objects_delete_by_selector`, `entity_properties_update`, `entity_properties_delete`, `texture_apply_by_filter`, `texture_align_face` |
 | Boolean geometry | `geometry_csg_selection` after user or selector-driven brush selection |
 | User-visible organization | `group_create_from_selection`, `group_inspect`; search for `group_rename_selected` / `group_ungroup_selected` when needed |
-| Validation | `geometry_analyze_selection`, `geometry_analyze_slopes`, `geometry_analyze_route_continuity`, `module_validate`, `map_validate(groupByType:true)`, `problems_check` |
+| Validation | `geometry_analyze_selection`, `geometry_analyze_slopes`, `geometry_analyze_route_continuity`, `geometry_analyze_shell_seams`, `module_validate`, `map_validate(groupByType:true)`, `problems_check` |
 | Visual review | `render_review_selector`, `render_review_operation`, `render_review_current_scene`, `module_render_review` |
 
 When a needed capability is not visible, search for it explicitly with `tb_tools_search(detail:"schema")` and check `visibleInCurrentProfile:false`. Hidden/searchable tools are for specific expert cases:
@@ -131,7 +132,7 @@ improvement. Promote recipe behavior into MCP only after repeated independent
 workflows prove it is a generic editor capability.
 
 Bundled prefab-like recipes are intentionally small: `ascending_loop`,
-`rect_shell`, `opening_wall`, `cover_block`, and `stair_run`. Removed or failed
+`path_tunnel`, `rect_shell`, `opening_wall`, `cover_block`, and `stair_run`. Removed or failed
 visual-acceptance recipes should be rebuilt as new deterministic IR recipes only
 after explicit human visual acceptance, not restored as C++ MCP prefab tools.
 
@@ -212,6 +213,15 @@ For route-like scenes, give every playable piece `routeId` and `order`. After ge
 - For generated stairs, selector metadata may normalize the authored part to `steps`; query `part:"steps"` or use a broader module/role selector when recovering stairs.
 - Same-height route overlaps can be continuous; inspect seam `classification` and `continuous` instead of treating any overlap as a break.
 - Prefer guarded `replace_module` over delete/rebuild for generated routes. Normal mutation/Undo/Redo reconciliation refreshes live module identity automatically. Use `module_compact` only as exceptional recovery for stale or legacy aliases.
+
+When the user asks for a tunnel/corridor along `path_corner`, path, or route entities:
+
+- Start from current selection when available. Call `selection_inspect(detail:"full", includeProperties:true)` and read selected entity `classname`, `origin`, `targetname`, and `target`.
+- Build the chain by `targetname -> target`; use map search only to resolve the next named entity after confirming the selected starting point. Do not infer path order from spatial proximity when entity links are present.
+- Generate IR with the `path_tunnel` recipe. Treat each `path_corner.origin` as the floor centerline; the recipe uses shared miter sections at nodes to avoid corner gaps.
+- Use file flow: generate an IR file, run `ir_compile_preview_from_file`, then call `ir_apply_from_file` with the returned `previewId`. If apply reports an IR hash mismatch, regenerate or re-preview the current IR file and apply the new `previewId`; do not reuse an old hash by hand.
+- Validate with `geometry_analyze_shell_seams(selector:{moduleId})`, then `module_render_review(edgeMode:"all")`, `module_render_review(edgeMode:"silhouette")`, `map_validate(groupByType:true)`, and `problems_check`.
+- Report seam validator results separately from visual review. `shellContinuous` / `acceptancePassed` are static annotation checks; review remains human-visible evidence.
 
 ## Codex CLI Regression
 

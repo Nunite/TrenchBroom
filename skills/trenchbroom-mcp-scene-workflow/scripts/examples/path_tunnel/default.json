@@ -1,0 +1,20 @@
+{
+  "moduleId": "recipe-path-tunnel-default",
+  "routeId": "corner-chain-default",
+  "points": [
+    [0, 0, 0],
+    [256, 0, 0],
+    [384, 128, 16],
+    [384, 384, 32]
+  ],
+  "width": 128,
+  "height": 128,
+  "wallThickness": 16,
+  "floorThickness": 16,
+  "ceilingThickness": 16,
+  "grid": 16,
+  "material": "__TB_empty",
+  "cornerMode": "miter",
+  "miterLimit": 4,
+  "capEnds": true
+}
