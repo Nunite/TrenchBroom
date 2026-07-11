@@ -24,6 +24,42 @@ recipe output, validation gates, compatibility, and failure recovery. Creative
 planning, layout organization, aesthetics, gameplay interpretation, and high-level
 design decisions remain under Agent control.
 
+## Minimum Agent Checklist
+
+For every TrenchBroom MCP scene task, satisfy this checklist before claiming the
+work is done:
+
+1. Bind first: call `tb_status`, `tb_doctor`, and `documents_list`; record
+   `activeDocumentPath`, `documentFingerprint`, `processId`, and
+   `bridgeInstanceId`.
+2. Treat TrenchBroom MCP as the source of truth. Do not read or write `.map`
+   files directly unless the user explicitly approves that fallback.
+3. If a tool, operation type, parameter, recipe, or selector shape is uncertain,
+   call `tb_tools_search(detail:"schema")` or inspect the recipe manifest before
+   guessing.
+4. Before mutating, record a `problems_check` baseline and pass both
+   `expectedDocumentPath` and `expectedDocumentFingerprint` when the tool accepts
+   document guards.
+5. For generated geometry, set `moduleId` and useful `part` / `role` metadata;
+   use `replace_module` or file preview/apply with `previewId` for iteration.
+6. For ambiguous existing geometry, use the user's current selection plus
+   `selection_inspect`; do not infer intent from bounds, classnames, or material
+   selectors when selection context exists.
+7. For linked entities, use `entity_link_chain_inspect`; stop and report the MCP
+   capability gap if entity properties or links are unavailable.
+8. Preview selectors before destructive actions. If selector counts disagree with
+   module or history counts, inspect `matchedBeforeLimit`, `limitApplied`,
+   `staleExcluded`, and the module/operation/metadata count diagnostics.
+9. Review images are evidence, not validation. `renderReadable` only means the
+   render output is readable; it does not prove semantic geometry correctness.
+10. Run the relevant validators: at minimum `map_validate(groupByType:true)` and
+    `problems_check`; add slope, route-continuity, or shell-seam analysis when
+    the scene intent depends on those properties.
+11. Save only after explicit user confirmation, using `documents_save_current`
+    or `documents_save_as`.
+12. Final reports must separate static validator results, visual review status,
+    save status, BSP/game validation status, and any `notEvaluated` limitations.
+
 ## Common Flow
 
 Use this as a lightweight editor loop for interactive scene work. Do not create
