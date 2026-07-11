@@ -215,6 +215,23 @@ QString problemId(const mdl::Issue& issue, const mdl::WorldNode& worldNode)
   return id;
 }
 
+QString problemStableKey(const mdl::Issue& issue, const mdl::WorldNode& worldNode)
+{
+  auto key = QString{"issue:%1:%2"}
+               .arg(QString::number(issue.type()))
+               .arg(nodePathId(issue.node(), worldNode));
+  if (const auto* faceIssue = dynamic_cast<const mdl::BrushFaceIssue*>(&issue))
+  {
+    key += QString{":face:%1"}.arg(QString::number(faceIssue->faceIndex()));
+  }
+  if (const auto* propertyIssue = dynamic_cast<const mdl::EntityPropertyIssue*>(&issue))
+  {
+    key +=
+      QString{":property:%1"}.arg(QString::fromStdString(propertyIssue->propertyKey()));
+  }
+  return key;
+}
+
 bool isSafeQuickFixDescription(const QString& description)
 {
   static const auto SafeDescriptions = std::set<QString>{
@@ -247,6 +264,7 @@ QJsonObject issueJson(const mdl::Issue& issue, const mdl::WorldNode& worldNode)
 {
   auto result = QJsonObject{
     {"id", problemId(issue, worldNode)},
+    {"stableKey", problemStableKey(issue, worldNode)},
     {"type", issue.type()},
     {"severity", "warning"},
     {"message", QString::fromStdString(issue.description())},

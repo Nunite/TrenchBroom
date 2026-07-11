@@ -3664,6 +3664,41 @@ TEST_CASE("McpBridgeServer entity_link_chain_inspect", "[McpBridgeServer]")
     CHECK(
       failures.first().toObject().value("status").toString() == "duplicate_targetname");
   }
+
+  SECTION("reports candidate starts when selection is not a matching entity")
+  {
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+    const auto createBrush = createBrushForMapResult(
+      map,
+      "brush_create_box",
+      QJsonObject{
+        {"min", QJsonArray{0, 0, 0}},
+        {"max", QJsonArray{64, 64, 16}},
+        {"material", "debug/entity_link_candidate"},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(createBrush.ok);
+
+    const auto response = entityLinkChainInspectForMapResult(
+      map,
+      QJsonObject{
+        {"classname", "path_corner"},
+        {"start", QJsonObject{{"source", "selection"}}},
+        {"includeAllNodes", true},
+      });
+
+    REQUIRE_FALSE(response.ok);
+    CHECK(
+      response.error.details.value("recoveryAction").toString()
+      == "select_one_start_entity_or_use_start_targetname");
+    CHECK(response.error.details.value("selectedMatchingEntityCount").toInt() == 0);
+    CHECK(response.error.details.value("candidateNodeCount").toInt() == 3);
+    const auto allNodes = response.error.details.value("allNodes").toArray();
+    REQUIRE(allNodes.size() == 3);
+    CHECK(allNodes.first().toObject().value("targetname").toString() == "corner01");
+  }
 }
 
 TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
@@ -4295,8 +4330,16 @@ TEST_CASE(
   const auto problems = problemsResponse.result.value("problems").toArray();
   CHECK(std::ranges::any_of(problems, [](const auto& value) {
     const auto problem = value.toObject();
-    return problem.contains("propertyKey")
-           && problem.value("propertyKey").toString().isEmpty();
+    if (
+      !problem.contains("stableKey") || !problem.contains("propertyKey")
+      || !problem.value("propertyKey").toString().isEmpty())
+    {
+      return false;
+    }
+    const auto stableKey = problem.value("stableKey").toString();
+    return stableKey != problem.value("id").toString()
+           && !stableKey.contains(
+             QString{":%1:property:"}.arg(problem.value("lineNumber").toInt()));
   }));
   CHECK(
     problemsResponse.result.value("recoveryAction").toString()
@@ -5871,6 +5914,36 @@ TEST_CASE("McpBridgeServer selector_preview reports recovery state", "[McpBridge
   REQUIRE(preview.ok);
   CHECK_FALSE(preview.result.value("mutatedDocument").toBool(true));
   CHECK(preview.result.value("matchedCount").toInt() == 1);
+
+  auto cornerEntity = mdl::Entity{{
+    {"classname", "path_corner"},
+    {"targetname", "selector-corner-01"},
+    {"target", "selector-corner-02"},
+  }};
+  cornerEntity.setOrigin(vm::vec3d{128.0, 0.0, 0.0});
+  auto* corner = new mdl::EntityNode{std::move(cornerEntity)};
+  mdl::addNodes(map, {{mdl::parentForNodes(map), {corner}}});
+
+  const auto entityPreview = selectorPreviewForMapResult(
+    map,
+    QJsonObject{
+      {"classname", "path_corner"},
+      {"detail", "full"},
+      {"idsMode", "sample"},
+    },
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(entityPreview.ok);
+  CHECK(entityPreview.result.value("matchedCount").toInt() == 1);
+  const auto sample = entityPreview.result.value("sample").toArray();
+  REQUIRE(sample.size() == 1);
+  const auto entitySample = sample.first().toObject();
+  CHECK(entitySample.value("classname").toString() == "path_corner");
+  const auto properties = entitySample.value("properties").toObject();
+  CHECK(properties.value("targetname").toString() == "selector-corner-01");
+  CHECK(properties.value("target").toString() == "selector-corner-02");
 }
 
 TEST_CASE(

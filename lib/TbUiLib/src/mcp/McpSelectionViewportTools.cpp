@@ -593,6 +593,24 @@ McpBridgeToolResult entityLinkChainInspectForMapResult(
       });
     }
   }
+  const auto candidateDetails = [&]() {
+    auto details = QJsonObject{
+      {"candidateNodeCount", static_cast<int>(candidates.size())},
+      {"duplicateNameCount", duplicateNames.size()},
+    };
+    if (includeAllNodes)
+    {
+      auto allNodes = QJsonArray{};
+      for (const auto* entityNode : candidates)
+      {
+        allNodes.push_back(
+          linkedEntityNodeJson(*entityNode, worldNode, nameKey, nextKey, "summary"));
+      }
+      details.insert("allNodes", allNodes);
+      details.insert("duplicateNames", duplicateNames);
+    }
+    return details;
+  };
 
   const auto startObject = params.value("start").toObject();
   const auto startSource =
@@ -613,14 +631,15 @@ McpBridgeToolResult entityLinkChainInspectForMapResult(
     }
     if (selectedCandidates.size() != 1u)
     {
+      auto details = candidateDetails();
+      details.insert(
+        "selectedMatchingEntityCount", static_cast<int>(selectedCandidates.size()));
+      details.insert("classname", classname);
       return entityLinkPreconditionFailure(
         "entity_link_chain_inspect requires exactly one selected matching entity when "
         "start.source is selection",
         "select_one_start_entity_or_use_start_targetname",
-        QJsonObject{
-          {"selectedMatchingEntityCount", static_cast<int>(selectedCandidates.size())},
-          {"classname", classname},
-        });
+        std::move(details));
     }
     startNode = selectedCandidates.front();
   }

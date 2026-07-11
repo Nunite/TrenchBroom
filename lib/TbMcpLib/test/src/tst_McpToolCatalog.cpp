@@ -62,7 +62,7 @@ TEST_CASE("McpToolCatalog")
 
     CHECK(catalog.size() == 142u);
     CHECK(implementedCount == 140u);
-    CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 52);
+    CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 53);
   }
 
   SECTION("all mutating tools expose path and fingerprint guards")
@@ -346,7 +346,7 @@ TEST_CASE("McpToolCatalog")
     INFO("Modeling profile tools: " << names.join(", ").toStdString());
     CHECK(
       names.size()
-      <= 52); // save-current/as and entity link inspection are visible for workflows.
+      <= 53); // save-current/as, documents_list, and entity link inspection are visible.
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
@@ -471,6 +471,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("blockout_create_curved_corridor"));
     CHECK(!names.contains("blockout_validate_spiral_stairs"));
     CHECK(!names.contains("documents_open"));
+    CHECK(names.contains("documents_list"));
     CHECK(names.contains("documents_open_verified"));
     CHECK(!names.contains("documents_save"));
     CHECK(names.contains("documents_save_current"));

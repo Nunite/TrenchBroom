@@ -38,7 +38,7 @@ TrenchBroom 相同的配置文件。连接后，Agent 应先执行：
   token、pipeName、端口不匹配。
 - `tb_status.processId`、`bridgeInstanceId`、`activeDocumentPath`、`documentFingerprint` 是本轮请求链路的身份锚点。写入前必须确认它们指向预期 TrenchBroom 进程和预期地图。
 - 写入前记录 `problems_check` 的 stable problem ids、`totalCount`、`returnedCount` 和 `truncated`。前后结果都未截断时比较 introduced/resolved/pre-existing ids；发生截断时只比较 grouped counts，并标记低置信。
-- `documents_list` 为空：需要先让用户打开地图，或在 `Edit` mode 下使用 `documents_open_verified` 打开绝对路径。
+- `documents_list` 不可调用：用 `tb_status.openDocumentsSummary` 或 `tb_doctor` 的文档摘要作为低置信 fallback，并在报告里说明；`documents_list` 为空：需要先让用户打开地图，或在 `Edit` mode 下使用 `documents_open_verified` 打开绝对路径。
 - `tb_doctor` 报告活动文档不存在：不要执行 map / selection / edit 工具，先激活或打开文档。
 - 多个 TrenchBroom 进程同时存在时，MCP HTTP 端口只控制该端口 owner 所属进程；不要假设它就是屏幕上最前面的 TB。`scripts/mcp-call.ps1` 会显示端口 owner PID，并可与 `tb_status.processId` 对照。
 
@@ -86,7 +86,7 @@ scripts\mcp-config.ps1 -Print
 你正在通过 TrenchBroom MCP 控制一个正在运行的 TrenchBroom 实例。
 
 工作规则：
-1. 先调用 tb_status、tb_doctor、documents_list，确认 MCP 已启用且有活动文档，并记录 processId、bridgeInstanceId、activeDocumentPath、documentFingerprint；再记录 problems_check 基线。
+1. 先调用 tb_status、tb_doctor、documents_list，确认 MCP 已启用且有活动文档，并记录 processId、bridgeInstanceId、activeDocumentPath、documentFingerprint；如果当前 client/profile 没暴露 documents_list，可用 tb_status.openDocumentsSummary 或 tb_doctor 文档摘要作为 fallback 并标明低置信；再记录 problems_check 基线。
 2. 查询地图时使用 document_snapshot、map_snapshot、map_search、selection_get、fgd_entities_list、textures_list、asset_search。
 3. 修改地图时只使用结构化 MCP 工具，不直接写 .map 文件，也不运行任意 Python 脚本。
 4. 白盒生成必须优先使用 `blockout_validate` 和 `blockout_create_batch` 的 primitive operations；不要直接生成任意 brush 顶点。
@@ -109,7 +109,7 @@ scripts\mcp-config.ps1 -Print
 3. `map_search`：按 classname、targetname、属性或关键词查找对象。
 4. `selection_get`：读取用户当前选择摘要。
 5. `selection_inspect`：需要确认用户选中的具体实体、读取 entity key/value、brush face/material 摘要或 group 子对象时使用；默认 `detail:"summary"`，需要实体链路时用 `detail:"full"` 或 `includeProperties:true`。
-6. `entity_link_chain_inspect`：需要读取当前活动 map 内实体 key/value 链路时使用，例如 `path_corner targetname -> target`。它返回断链、重复 targetname、循环等结构化结果。若 `selection_inspect` 或等价实体属性/链路读取工具不可调用，必须停止报告 MCP 能力缺口；未经用户明确批准，不要读取磁盘 `.map` 作为 fallback。
+6. `entity_link_chain_inspect`：需要读取当前活动 map 内实体 key/value 链路时使用，例如 `path_corner targetname -> target`。它返回断链、重复 targetname、循环等结构化结果；当前选择不是起点时，可用 `includeAllNodes:true` 读取候选节点，再用显式 `start:{source:"targetname"}` 重试。若 `selection_inspect` 或等价实体属性/链路读取工具不可调用，必须停止报告 MCP 能力缺口；未经用户明确批准，不要读取磁盘 `.map` 作为 fallback。
 7. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
 8. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
 9. 需要视觉证据时优先用 `render_review_operation`、`module_render_review` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。`renderReadable=true` 只说明渲染产物可读，不说明隧道闭合、没有穿模或设计符合意图。未执行 Review 或未人工/skill 检查图像时不要给出视觉结论。
@@ -179,13 +179,16 @@ balanced = 12° / 2 / 2，smooth = 7.5° / 1 / 1。调用方可用正有限数
 
 沿现有 `path_corner` 链生成 tunnel / corridor 时，不要让 Agent 根据空间距离猜路线：
 
-1. 让用户选中起点或当前目标实体后，先调用 `selection_inspect(detail:"full", includeProperties:true)`，确认 `classname`、`origin`、`targetname`、`target`。
-2. 调用 `entity_link_chain_inspect(classname:"path_corner", start:{source:"selection"}, nameKey:"targetname", nextKey:"target")` 建链。不要根据空间距离推断顺序；如果链路读取工具不可调用，停止并报告 MCP cannot expose path_corner target links，除非用户明确批准读取 `.map` 文件。
-3. 用 `trenchbroom-mcp-scene-workflow` skill 的 `path_tunnel` recipe 生成矩形隧道 IR；如果用户要拱形、管状或自定义截面，改用 `path_sweep`。recipe 把每个 origin 当作隧道地面中心线，使用共享 miter 截面连接相邻段，并在 brush metadata 中写入 `shellSeams`。
-4. 需要保留纹理时，在 recipe 参数里传 `partMaterials` 和 `texturePolicy`。recipe 会写入 `textureRole` / `texturePolicy` metadata；精确 face UV 复制或重新对齐放到 apply 后，用 `texture_copy_from_face`、`texture_align_face` 或 `texture_apply_by_filter` 处理。
-5. 走 file flow：`ir_compile_preview_from_file`，再用返回的 `previewId` 调 `ir_apply_from_file`。迭代旧版本时使用 `replace_module`，不要先删除再创建。
-6. 验证顺序：`geometry_analyze_shell_seams(selector:{moduleId})`、`module_render_review(edgeMode:"all")`、`module_render_review(edgeMode:"silhouette")`、`map_validate(groupByType:true)`、`problems_check`。
-7. `geometry_analyze_shell_seams` 只验证 recipe 标注的 seam。缺少 `shellSeams` 时它不会猜测地图意图，应改用 annotated recipe 或视觉 review。
+1. 先调用 `selection_inspect(detail:"full", includeProperties:true)`。如果当前选择正好是一个 `path_corner`，把它作为起点，确认 `classname`、`origin`、`targetname`、`target`。
+2. 如果当前选择是 brush / face 组合，且用户表达的是“用这个沿 path 生成隧道”，把选择理解为截面、材质或模板提示，不要把它当作 path 起点。非矩形、斜顶、拱形、管状或用户选中截面时，优先用 `path_sweep` custom profile；`path_tunnel` 只适合矩形壳体。
+3. MCP 当前还没有“从选中 brush 自动提取 sweep profile”的稳定工具。Agent 可以基于 `selection_inspect` / `geometry_analyze_selection` 近似推导 profile，但最终报告必须说明这是近似；不确定时应要求用户提供宽、高、截面点或确认近似结果。
+4. 调用 `entity_link_chain_inspect(classname:"path_corner", start:{source:"selection"}, nameKey:"targetname", nextKey:"target")` 建链。当前选择不是起点时，用 `includeAllNodes:true` 获取候选节点，再用显式 `start:{source:"targetname"}` 重试。不要为了读取实体属性而先 `objects_select_by_selector` 改掉用户的 brush/profile 选择；此时优先用 `selector_preview(detail:"full")` 或链路工具的候选输出。
+5. 不要根据空间距离推断顺序；如果链路读取工具不可调用，停止并报告 MCP cannot expose path_corner target links，除非用户明确批准读取 `.map` 文件。
+6. 用 `trenchbroom-mcp-scene-workflow` skill 的 `path_tunnel` recipe 生成矩形隧道 IR；如果用户要拱形、管状、斜顶或自定义截面，改用 `path_sweep`。recipe 把每个 origin 当作隧道地面中心线，使用共享 miter 截面连接相邻段，并在 brush metadata 中写入 `shellSeams`。
+7. 需要保留纹理时，在 recipe 参数里传 `partMaterials` 和 `texturePolicy`。recipe 会写入 `textureRole` / `texturePolicy` metadata；精确 face UV 复制或重新对齐放到 apply 后，用 `texture_copy_from_face`、`texture_align_face` 或 `texture_apply_by_filter` 处理。
+8. 走 file flow：`ir_compile_preview_from_file`，再用返回的 `previewId` 调 `ir_apply_from_file`。迭代旧版本时使用 `replace_module`，不要先删除再创建。
+9. 验证顺序：`geometry_analyze_shell_seams(selector:{moduleId})`、`module_render_review(edgeMode:"all")`、`module_render_review(edgeMode:"silhouette")`、`map_validate(groupByType:true)`、`problems_check`。
+10. `geometry_analyze_shell_seams` 只验证 recipe 标注的 seam。缺少 `shellSeams` 时它不会猜测地图意图，应改用 annotated recipe 或视觉 review。
 
 ## KZ 平台链工作流
 

@@ -33,6 +33,8 @@
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/BrushNode.h"
 #include "mdl/EditorContext.h"
+#include "mdl/Entity.h"
+#include "mdl/EntityNodeBase.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Node.h"
@@ -108,6 +110,17 @@ QJsonObject boundsToJson(const vm::bbox3d& bounds)
     {"min", vecToJson(bounds.min)},
     {"max", vecToJson(bounds.max)},
   };
+}
+
+QJsonObject entityPropertiesJson(const mdl::Entity& entity)
+{
+  auto result = QJsonObject{};
+  for (const auto& property : entity.properties())
+  {
+    result.insert(
+      QString::fromStdString(property.key()), QString::fromStdString(property.value()));
+  }
+  return result;
 }
 
 vm::bbox3d boundsForNodes(const std::vector<mdl::Node*>& nodes)
@@ -955,7 +968,8 @@ QJsonObject nodeSummary(
   mdl::Map& map,
   const mdl::Node& node,
   const std::map<QString, McpBrushMetadataRecord>& metadataStore,
-  const McpObjectRegistry& objectRegistry)
+  const McpObjectRegistry& objectRegistry,
+  const bool fullDetail)
 {
   const auto objectId = externalObjectIdForNode(map, node, objectRegistry);
   auto result = QJsonObject{
@@ -965,6 +979,16 @@ QJsonObject nodeSummary(
     {"bounds", boundsToJson(node.logicalBounds())},
     {"metadata", metadataForNode(map, node, metadataStore, objectRegistry)},
   };
+  if (fullDetail)
+  {
+    if (const auto* entityNode = dynamic_cast<const mdl::EntityNodeBase*>(&node))
+    {
+      result.insert(
+        "classname", QString::fromStdString(entityNode->entity().classname()));
+      result.insert("origin", vecToJson(entityNode->entity().origin()));
+      result.insert("properties", entityPropertiesJson(entityNode->entity()));
+    }
+  }
   return result;
 }
 
@@ -994,7 +1018,8 @@ QJsonObject compactTargetResult(
     objectIds.push_back(externalObjectIdForNode(map, *node, objectRegistry));
     if (includeSamples && i < sampleLimit)
     {
-      samples.push_back(nodeSummary(map, *node, metadataStore, objectRegistry));
+      samples.push_back(
+        nodeSummary(map, *node, metadataStore, objectRegistry, fullWarnings));
     }
   }
 

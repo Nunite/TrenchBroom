@@ -31,7 +31,9 @@ work is done:
 
 1. Bind first: call `tb_status`, `tb_doctor`, and `documents_list`; record
    `activeDocumentPath`, `documentFingerprint`, `processId`, and
-   `bridgeInstanceId`.
+   `bridgeInstanceId`. If `documents_list` is not visible in the current client
+   profile, use `tb_status.openDocumentsSummary` or the `tb_doctor` document
+   summary as a lower-confidence fallback and report that fallback.
 2. Treat TrenchBroom MCP as the source of truth. Do not read or write `.map`
    files directly unless the user explicitly approves that fallback.
 3. If a tool, operation type, parameter, recipe, or selector shape is uncertain,
@@ -66,7 +68,7 @@ Use this as a lightweight editor loop for interactive scene work. Do not create
 design documents, plans, or git commits for ordinary map edits unless the user
 asks to change repository source, add a durable recipe, or commit project files.
 
-1. Confirm binding before writing: connect with the configured Bearer token, call `tb_status`, and record `processId`, `bridgeInstanceId`, `activeDocumentPath`, and `documentFingerprint`. Pass both document guards to later mutations. Record a pre-mutation `problems_check` baseline, including stable problem ids and whether the response is truncated. If `tb_status` returns `associatedSkills` containing `trenchbroom-mcp-scene-workflow`, treat this skill as the workflow owner for scene intent and recipe routing.
+1. Confirm binding before writing: connect with the configured Bearer token, call `tb_status`, `tb_doctor`, and `documents_list`, and record `processId`, `bridgeInstanceId`, `activeDocumentPath`, and `documentFingerprint`. If `documents_list` is not callable in the current profile or client, use `tb_status.openDocumentsSummary` / `tb_doctor` document summary only as a fallback and say so. Pass both document guards to later mutations. Record a pre-mutation `problems_check` baseline, including stable problem ids and whether the response is truncated. If `tb_status` returns `associatedSkills` containing `trenchbroom-mcp-scene-workflow`, treat this skill as the workflow owner for scene intent and recipe routing.
 2. Open disposable maps with `documents_open_verified` when switching documents. Do not pass document guards to open a different map; use both path and fingerprint guards on mutating tools after the target document is active.
 3. Split the scene into `moduleId`s and parts before geometry:
    - `moduleId`: stable session name such as `temple-main-hall`, `route-a`, `terrain-pass`.
@@ -267,13 +269,31 @@ For route-like scenes, give every playable piece `routeId` and `order`. After ge
 
 When the user asks for a tunnel/corridor along `path_corner`, path, or route entities:
 
-- Start from current selection when available. Call `selection_inspect(detail:"full", includeProperties:true)` and read selected entity `classname`, `origin`, `targetname`, and `target`.
-- Build the chain by calling `entity_link_chain_inspect(classname:"path_corner", start:{source:"selection"}, nameKey:"targetname", nextKey:"target")`. Do not infer path order from spatial proximity when entity links are present.
+- Start by inspecting the current selection with
+  `selection_inspect(detail:"full", includeProperties:true)`.
+- If the selection contains exactly one `path_corner`, treat it as the route
+  start. Build the chain by calling
+  `entity_link_chain_inspect(classname:"path_corner", start:{source:"selection"}, nameKey:"targetname", nextKey:"target")`.
+- If the selection is brush or face geometry and the user says "use this" /
+  "用这个", treat the selection as a profile, material, or template cue, not as
+  the path start. Use `path_sweep` with a custom profile for sloped, arched, or
+  non-rectangular sections. Since MCP does not yet extract a sweep profile from
+  selected brushes automatically, either derive an approximate profile from
+  `selection_inspect` / `geometry_analyze_selection` and report that limitation,
+  or ask the user for the profile dimensions before applying.
+- If the current selection is not a start entity, call
+  `entity_link_chain_inspect(..., start:{source:"selection"}, includeAllNodes:true)`
+  to get candidate nodes, then use an explicit `start:{source:"targetname"}` once
+  the start is known. Do not change the user's selection just to inspect entity
+  properties; prefer `selector_preview(detail:"full")` when selecting would lose
+  useful brush/profile context.
+- Do not infer path order from spatial proximity when entity links are present.
 - If `selection_inspect` or `entity_link_chain_inspect` is unavailable, stop and report that MCP cannot expose path_corner target links. Do not read the active `.map` file from disk unless the user explicitly approves that fallback.
 - Generate IR with the `path_tunnel` recipe for a rectangular tunnel, or use
-  `path_sweep` when the requested profile is arched, pipe-like, or custom. Treat
-  each `path_corner.origin` as the floor centerline for tunnel presets; the
-  recipes use shared miter sections at nodes to avoid corner gaps.
+  `path_sweep` when the requested profile is arched, pipe-like, selected from
+  brush geometry, or otherwise custom. Treat each `path_corner.origin` as the
+  floor centerline for tunnel presets; the recipes use shared miter sections at
+  nodes to avoid corner gaps.
 - Preserve texture choices with `partMaterials` and `texturePolicy`. If the user
   wants exact copied UVs from existing brush faces, apply the recipe first, then
   use `texture_copy_from_face` or `texture_align_face` on the generated

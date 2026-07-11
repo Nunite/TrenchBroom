@@ -2831,7 +2831,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     {
       "problems_check",
       "Return map validation problems with passed/recoveryAction and safe quick fix "
-      "metadata.",
+      "metadata. Each problem includes a line-sensitive id for problems_fix and a "
+      "stableKey for before/after comparison.",
       McpMode::ReadOnly,
       false,
       true,
@@ -3902,6 +3903,7 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "tb_status",
     "tb_doctor",
     "tb_tools_search",
+    "documents_list",
     "documents_open_verified",
     "documents_save_current",
     "documents_save_as",
