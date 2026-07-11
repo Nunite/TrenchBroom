@@ -34,6 +34,7 @@ MANIFEST = {
         "wallThickness": 16,
         "floorThickness": 16,
         "ceilingThickness": 16,
+        "qualityIntent": "balanced",
         "grid": 16,
         "material": DEFAULT_MATERIAL,
         "partMaterials": {},
@@ -51,6 +52,7 @@ MANIFEST = {
         {"name": "wallThickness", "type": "number", "min": 1},
         {"name": "floorThickness", "type": "number", "min": 1},
         {"name": "ceilingThickness", "type": "number", "min": 1},
+        {"name": "qualityIntent", "type": "string", "enum": ["draft", "balanced", "smooth"]},
         {"name": "grid", "type": "integer", "min": 1},
         {"name": "material", "type": "string"},
         {"name": "partMaterials", "type": "object"},
@@ -68,7 +70,10 @@ MANIFEST = {
         "shellSeams": True,
         "textureMetadata": True,
     },
-    "qualityPolicy": {"intent": "balanced"},
+    "qualityPolicy": {
+        "intentParam": "qualityIntent",
+        "defaultIntent": "balanced",
+    },
     "reviewPolicy": {"recommended": True, "required": False},
     "recommendedValidation": [
         "ir_compile_preview_from_file",
@@ -93,6 +98,7 @@ def build(params: dict[str, Any]) -> dict[str, Any]:
     wall_thickness = number(params, "wallThickness", 16)
     floor_thickness = number(params, "floorThickness", 16)
     ceiling_thickness = number(params, "ceilingThickness", 16)
+    quality_intent = string(params, "qualityIntent", "balanced")
     profile = rect_tunnel_profile(
         width=width,
         height=height,
@@ -116,6 +122,7 @@ def build(params: dict[str, Any]) -> dict[str, Any]:
         miter_limit=number(params, "miterLimit", 4),
         cap_ends=boolean(params, "capEnds", True),
         cap_thickness=wall_thickness,
+        quality_policy={"intent": quality_intent},
         recipe="path_tunnel",
     )
 

@@ -185,10 +185,11 @@ balanced = 12° / 2 / 2，smooth = 7.5° / 1 / 1。调用方可用正有限数
 4. 调用 `entity_link_chain_inspect(classname:"path_corner", start:{source:"selection"}, nameKey:"targetname", nextKey:"target")` 建链。当前选择不是起点时，用 `includeAllNodes:true` 获取候选节点，再用显式 `start:{source:"targetname"}` 重试。不要为了读取实体属性而先 `objects_select_by_selector` 改掉用户的 brush/profile 选择；此时优先用 `selector_preview(detail:"full")` 或链路工具的候选输出。
 5. 不要根据空间距离推断顺序；如果链路读取工具不可调用，停止并报告 MCP cannot expose path_corner target links，除非用户明确批准读取 `.map` 文件。
 6. 用 `trenchbroom-mcp-scene-workflow` skill 的 `path_tunnel` recipe 生成矩形隧道 IR；如果用户要拱形、管状、斜顶或自定义截面，改用 `path_sweep`。recipe 把每个 origin 当作隧道地面中心线，使用共享 miter 截面连接相邻段，并在 brush metadata 中写入 `shellSeams`。
-7. 需要保留纹理时，在 recipe 参数里传 `partMaterials` 和 `texturePolicy`。recipe 会写入 `textureRole` / `texturePolicy` metadata；精确 face UV 复制或重新对齐放到 apply 后，用 `texture_copy_from_face`、`texture_align_face` 或 `texture_apply_by_filter` 处理。
-8. 走 file flow：`ir_compile_preview_from_file`，再用返回的 `previewId` 调 `ir_apply_from_file`。迭代旧版本时使用 `replace_module`，不要先删除再创建。
-9. 验证顺序：`geometry_analyze_shell_seams(selector:{moduleId})`、`module_render_review(edgeMode:"all")`、`module_render_review(edgeMode:"silhouette")`、`map_validate(groupByType:true)`、`problems_check`。
-10. `geometry_analyze_shell_seams` 只验证 recipe 标注的 seam。缺少 `shellSeams` 时它不会猜测地图意图，应改用 annotated recipe 或视觉 review。
+7. 用户要求严格平滑验收时传 `qualityIntent:"smooth"`。如果目标是视觉上更圆的拱顶或管道截面，还要显式提高 `archSegments` / `pipeSegments`；这个参数不会自动把 `path_corner` 折线变成曲线。
+8. 需要保留纹理时，在 recipe 参数里传 `partMaterials` 和 `texturePolicy`。recipe 会写入 `textureRole` / `texturePolicy` metadata；精确 face UV 复制或重新对齐放到 apply 后，用 `texture_copy_from_face`、`texture_align_face` 或 `texture_apply_by_filter` 处理。
+9. 走 file flow：`ir_compile_preview_from_file`，再用返回的 `previewId` 调 `ir_apply_from_file`。迭代旧版本时使用 `replace_module`，不要先删除再创建。
+10. 验证顺序：`geometry_analyze_shell_seams(selector:{moduleId})`、`module_render_review(edgeMode:"all")`、`module_render_review(edgeMode:"silhouette")`、`map_validate(groupByType:true)`、`problems_check`。
+11. `geometry_analyze_shell_seams` 只验证 recipe 标注的 seam。缺少 `shellSeams` 时它不会猜测地图意图，应改用 annotated recipe 或视觉 review。
 
 ## KZ 平台链工作流
 

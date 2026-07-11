@@ -14,6 +14,7 @@
   "wallThickness": 24,
   "floorThickness": 24,
   "ceilingThickness": 24,
+  "qualityIntent": "smooth",
   "grid": 8,
   "material": "__TB_empty",
   "cornerMode": "miter",

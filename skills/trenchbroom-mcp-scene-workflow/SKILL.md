@@ -294,6 +294,10 @@ When the user asks for a tunnel/corridor along `path_corner`, path, or route ent
   brush geometry, or otherwise custom. Treat each `path_corner.origin` as the
   floor centerline for tunnel presets; the recipes use shared miter sections at
   nodes to avoid corner gaps.
+- Use `qualityIntent:"smooth"` when the user asks for strict smoothness
+  acceptance. For visibly smoother arch or pipe cross-sections, also raise
+  `archSegments` or `pipeSegments`; this does not automatically curve a
+  `path_corner` polyline.
 - Preserve texture choices with `partMaterials` and `texturePolicy`. If the user
   wants exact copied UVs from existing brush faces, apply the recipe first, then
   use `texture_copy_from_face` or `texture_align_face` on the generated

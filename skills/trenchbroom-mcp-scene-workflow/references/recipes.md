@@ -125,7 +125,10 @@ acceptance failed; rebuild them only as new recipes with inspected review output
   `shellSeams`, `textureRole`, and `texturePolicy` on every brush. Use
   `partMaterials` to keep floor, wall, ceiling, pipe, and cap material choices.
   This recipe preserves material and texture intent; use MCP texture tools after
-  apply for exact face UV transfer or alignment.
+  apply for exact face UV transfer or alignment. `qualityIntent` can be `draft`,
+  `balanced`, or `smooth`; it controls IR quality acceptance. For visibly smoother
+  arch or pipe profiles, also raise `archSegments` or `pipeSegments`. It does not
+  turn a `path_corner` polyline into a curved path.
 - `path_tunnel`: emits annotated `polyhedron` IR for floor, ceiling,
   `wall_left`, `wall_right`, and optional end caps along a path_corner-style
   point chain. `points` are floor centerline origins; floor thickness extends
@@ -134,8 +137,9 @@ acceptance failed; rebuild them only as new recipes with inspected review output
   with per-point Z and `cornerMode:"miter"` only. Interior nodes share one miter
   section across adjacent segments and every internal/cap seam is recorded in
   `metadata.shellSeams`. `path_tunnel` is a rectangular preset over the shared
-  `path_sweep` core, so it also supports `partMaterials` and `texturePolicy`.
-  Validate with
+  `path_sweep` core, so it also supports `partMaterials`, `texturePolicy`, and
+  `qualityIntent`. Its `smooth` intent tightens route quality acceptance, but the
+  rectangular shell and path polyline remain explicit. Validate with
   `geometry_analyze_shell_seams(selector:{moduleId})` before visual review.
 - `rect_shell`: replaces legacy `room`, `corridor`, and `sky_shell` batch types
   with explicit box IR. Use `kind` only for recipe defaults and metadata.

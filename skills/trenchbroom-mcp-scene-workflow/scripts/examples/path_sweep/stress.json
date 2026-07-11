@@ -6,7 +6,8 @@
   "width": 160,
   "height": 160,
   "wallThickness": 12,
-  "pipeSegments": 12,
+  "pipeSegments": 24,
+  "qualityIntent": "smooth",
   "grid": 4,
   "material": "__TB_empty",
   "partMaterials": {

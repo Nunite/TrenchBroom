@@ -347,6 +347,7 @@ def build_sweep_ir(
     miter_limit: float = 4.0,
     cap_ends: bool = True,
     cap_thickness: float = 16.0,
+    quality_policy: dict[str, Any] | None = None,
     recipe: str = "path_sweep",
 ) -> dict[str, Any]:
     if corner_mode != "miter":
@@ -433,4 +434,5 @@ def build_sweep_ir(
         grid=grid,
         operations=operations,
         extra_metadata={"recipe": recipe, "texturePolicy": texture_policy},
+        quality_policy=quality_policy,
     )

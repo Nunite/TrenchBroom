@@ -40,6 +40,7 @@ MANIFEST = {
         "ceilingThickness": 16,
         "archSegments": 6,
         "pipeSegments": 12,
+        "qualityIntent": "balanced",
         "grid": 16,
         "material": DEFAULT_MATERIAL,
         "partMaterials": {},
@@ -61,6 +62,7 @@ MANIFEST = {
         {"name": "ceilingThickness", "type": "number", "min": 0},
         {"name": "archSegments", "type": "integer", "min": 2},
         {"name": "pipeSegments", "type": "integer", "min": 6},
+        {"name": "qualityIntent", "type": "string", "enum": ["draft", "balanced", "smooth"]},
         {"name": "grid", "type": "integer", "min": 1},
         {"name": "material", "type": "string"},
         {"name": "partMaterials", "type": "object"},
@@ -77,7 +79,10 @@ MANIFEST = {
         "shellSeams": True,
         "textureMetadata": True,
     },
-    "qualityPolicy": {"intent": "balanced"},
+    "qualityPolicy": {
+        "intentParam": "qualityIntent",
+        "defaultIntent": "balanced",
+    },
     "reviewPolicy": {"recommended": True, "required": False},
     "recommendedValidation": [
         "ir_compile_preview_from_file",
@@ -138,6 +143,7 @@ def build(params: dict[str, Any]) -> dict[str, Any]:
     route_id = string(params, "routeId", module_id)
     material = string(params, "material", DEFAULT_MATERIAL)
     grid = integer(params, "grid", 16)
+    quality_intent = string(params, "qualityIntent", "balanced")
     return build_sweep_ir(
         name="MCP Recipe: Path sweep",
         module_id=module_id,
@@ -152,6 +158,7 @@ def build(params: dict[str, Any]) -> dict[str, Any]:
         miter_limit=number(params, "miterLimit", 4),
         cap_ends=boolean(params, "capEnds", True),
         cap_thickness=number(params, "wallThickness", 16),
+        quality_policy={"intent": quality_intent},
         recipe="path_sweep",
     )
 
