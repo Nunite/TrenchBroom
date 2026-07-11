@@ -122,6 +122,12 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
         {"selectedCount", 0},
       });
     }
+    if (toolName == "selection_inspect")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"selectedCount", 0},
+      });
+    }
     if (toolName == "selection_filter")
     {
       return McpBridgeToolResult::success(QJsonObject{
@@ -948,6 +954,22 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
     const auto response = server.dispatchRequest(
       mcp::McpBridgeRequest{"1", "secret", "selection_set", {}, mcp::McpMode::ReadOnly});
+
+    CHECK(response.ok);
+    CHECK(response.result.value("selectedCount").toInt() == 0);
+  }
+
+  SECTION("serves selection_inspect")
+  {
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+
+    const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
+      "1",
+      "secret",
+      "selection_inspect",
+      QJsonObject{{"detail", "summary"}},
+      mcp::McpMode::ReadOnly});
 
     CHECK(response.ok);
     CHECK(response.result.value("selectedCount").toInt() == 0);
@@ -3448,6 +3470,98 @@ TEST_CASE("McpBridgeServer MCP read semantics", "[McpBridgeServer]")
   CHECK(!textureResponse.result.value("fallbackMaterial").toString().isEmpty());
 
   map.undoCommand();
+}
+
+TEST_CASE("McpBridgeServer selection_inspect", "[McpBridgeServer]")
+{
+  auto appControllerFixture = AppControllerFixture{};
+  auto& appController = appControllerFixture.appController();
+  auto document = MapDocument::createDocument(
+                    appController.environmentConfig(),
+                    mdl::QuakeGameInfo,
+                    mdl::MapFormat::Valve,
+                    vm::bbox3d{8192.0},
+                    appController.taskManager(),
+                    appController.glManager().resourceManager())
+                  | kdl::value();
+  auto& map = document->map();
+
+  SECTION("returns selected entity properties in full detail")
+  {
+    auto entity = mdl::Entity{{
+      {"classname", "path_corner"},
+      {"targetname", "corner01"},
+      {"target", "corner02"},
+      {"angles", "0 90 0"},
+    }};
+    entity.setOrigin(vm::vec3d{-256.0, 1008.0, 0.0});
+    auto* entityNode = new mdl::EntityNode{std::move(entity)};
+    mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}});
+    mdl::selectNodes(map, {entityNode});
+
+    const auto response = selectionInspectForMapResult(
+      map, QJsonObject{{"detail", "full"}, {"includeProperties", true}});
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("selectedCount").toInt() == 1);
+    CHECK(response.result.value("detail").toString() == "full");
+    const auto objects = response.result.value("objects").toArray();
+    REQUIRE(objects.size() == 1);
+    const auto object = objects.first().toObject();
+    CHECK(object.value("type").toString() == "entity");
+    CHECK(object.value("classname").toString() == "path_corner");
+    CHECK(object.value("origin").toArray()[0].toDouble() == -256.0);
+    CHECK(object.value("origin").toArray()[1].toDouble() == 1008.0);
+
+    const auto properties = object.value("properties").toObject();
+    CHECK(properties.value("targetname").toString() == "corner01");
+    CHECK(properties.value("target").toString() == "corner02");
+    CHECK(properties.value("angles").toString() == "0 90 0");
+  }
+
+  SECTION("keeps brush face selection compact by default")
+  {
+    auto history = std::vector<McpOperationRecord>{};
+    auto nextOperationIndex = 1;
+    const auto createResponse = createBrushForMapResult(
+      map,
+      "brush_create_box",
+      QJsonObject{
+        {"min", QJsonArray{0, 0, 0}},
+        {"max", QJsonArray{64, 64, 64}},
+        {"material", "debug/selection_inspect"},
+      },
+      history,
+      nextOperationIndex);
+    REQUIRE(createResponse.ok);
+
+    REQUIRE(map.selection().nodes.size() == 1u);
+    auto* brushNode = dynamic_cast<mdl::BrushNode*>(map.selection().nodes.front());
+    REQUIRE(brushNode != nullptr);
+
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, {mdl::BrushFaceHandle{brushNode, 0}});
+
+    const auto response = selectionInspectForMapResult(map, QJsonObject{});
+
+    REQUIRE(response.ok);
+    CHECK(response.result.value("selectedCount").toInt() == 0);
+    CHECK(response.result.value("selectedFaceCount").toInt() == 1);
+    const auto selectedFaces = response.result.value("selectedFaces").toArray();
+    REQUIRE(selectedFaces.size() == 1);
+    const auto selectedFace = selectedFaces.first().toObject();
+    CHECK(selectedFace.value("type").toString() == "face");
+    CHECK(selectedFace.value("faceIndex").toInt() == 0);
+    CHECK(selectedFace.value("material").toString() == "debug/selection_inspect");
+
+    const auto faceOwners = response.result.value("faceOwnerBrushes").toArray();
+    REQUIRE(faceOwners.size() == 1);
+    const auto faceOwner = faceOwners.first().toObject();
+    CHECK(faceOwner.value("type").toString() == "brush");
+    CHECK(faceOwner.value("selectedFaceCount").toInt() == 1);
+    CHECK(faceOwner.value("faceCount").toInt() == 6);
+    CHECK_FALSE(faceOwner.contains("faces"));
+  }
 }
 
 TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")

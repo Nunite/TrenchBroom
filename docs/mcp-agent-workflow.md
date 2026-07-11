@@ -107,11 +107,12 @@ scripts\mcp-config.ps1 -Print
 1. `document_snapshot`：确认活动文档路径、game config、dirty 状态。
 2. `map_snapshot`：读取 worldspawn、实体数量、brush 数量、地图 bounds。
 3. `map_search`：按 classname、targetname、属性或关键词查找对象。
-4. `selection_get`：读取用户当前选择。
-5. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
-6. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
-7. 需要视觉证据时优先用 `render_review_operation` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。未执行 Review 时不要给出视觉结论。
-8. `viewport_capture_scene_review` 只作为真实 TrenchBroom 视口辅助调试使用。需要确认 UI 视角或用户当前视图时再调用；自动化验收不要依赖它来隔离对象。
+4. `selection_get`：读取用户当前选择摘要。
+5. `selection_inspect`：需要确认用户选中的具体实体、读取 entity key/value、brush face/material 摘要或 group 子对象时使用；默认 `detail:"summary"`，需要实体链路时用 `detail:"full"` 或 `includeProperties:true`。
+6. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
+7. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
+8. 需要视觉证据时优先用 `render_review_operation` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。未执行 Review 时不要给出视觉结论。
+9. `viewport_capture_scene_review` 只作为真实 TrenchBroom 视口辅助调试使用。需要确认 UI 视角或用户当前视图时再调用；自动化验收不要依赖它来隔离对象。
 
 对象操作必须使用 MCP 返回的 `objectId`，不要根据实体顺序或 UI 文本猜测内部指针。
 
@@ -288,7 +289,7 @@ MCP 写操作的公共结果包括：
 - 一次布局阶段完成后调用 `history_list`，查看最近 MCP 操作时间线。每条记录包含 `createdAt`、`createdAtMs`、`toolName`、`transactionName`、`changedObjectCount`；有活动文档时还包含 `liveObjectCount`、`staleObjectCount` 和 `valid`。
 - 需要查看某次操作创建/修改的对象时调用 `operation_inspect(detail=ids)`；需要检查对象是否仍然有效时调用 `operation_validate`。
 - 删除类 operation 会标记 `operationKind=delete`，并把被删除对象放在 `deletedObjectIds` / `deletedObjectCount` 中。不要把 delete operation 的 `liveObjectCount` 当作“被删对象还活着”；删除记录主要用于审计和 undo/redo。
-- `selection_get` 中 `brushFaceCount` 表示当前选择的 brush face 数量；整 brush 选择的总 face 数使用 `selectedBrushFaceCount` / `selectedBrushTotalFaceCount`。
+- `selection_get` 中 `brushFaceCount` 表示当前选择的 brush face 数量；整 brush 选择的总 face 数使用 `selectedBrushFaceCount` / `selectedBrushTotalFaceCount`。需要 face 所属 brush 摘要、实体属性或 group 子对象时调用 `selection_inspect`。
 - 发现最近一次 MCP 操作错误时调用 `history_undo_mcp`。
 - 需要回退一串连续 MCP 操作时调用 `history_undo_to_operation(operationId=...)`，它会从最新未撤销 MCP operation 一直撤销到目标 operation。若中途发现原生 undo 栈已被用户编辑或非预期命令打断，工具会报告 `mutatedDocument`、`partiallyUndone`、`undoneOperationIds`、`remainingOperationIds` 和 `recoveryAction`；此时先刷新状态或重新验证地图，不要继续盲目删除对象。
 - stdio 调用超时时，不要直接重试。超时响应的 `mutatedDocument` 为

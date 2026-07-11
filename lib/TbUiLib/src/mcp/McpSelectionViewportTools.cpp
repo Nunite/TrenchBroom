@@ -17,10 +17,15 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QString>
+
 #include "McpBridgeServerTools.h"
 #include "McpSelectionQuery.h"
 #include "mcp/McpError.h"
 #include "mdl/Brush.h"
+#include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
 #include "mdl/EditorContext.h"
@@ -36,12 +41,9 @@
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 
-#include <QJsonArray>
-#include <QJsonObject>
-#include <QString>
-
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace tb::ui
@@ -91,6 +93,112 @@ QJsonObject mcpNodeSummaryJson(const mdl::Node& node, const mdl::WorldNode& worl
   {
     result.insert("faceCount", static_cast<int>(brushNode->brush().faceCount()));
   }
+  return result;
+}
+
+QJsonObject entityPropertiesJson(const mdl::Entity& entity)
+{
+  auto result = QJsonObject{};
+  for (const auto& property : entity.properties())
+  {
+    result.insert(
+      QString::fromStdString(property.key()), QString::fromStdString(property.value()));
+  }
+  return result;
+}
+
+QJsonObject brushMaterialsJson(const mdl::Brush& brush)
+{
+  auto counts = std::map<std::string, int>{};
+  for (const auto& face : brush.faces())
+  {
+    ++counts[face.attributes().materialName()];
+  }
+
+  auto materials = QJsonArray{};
+  for (const auto& [material, count] : counts)
+  {
+    materials.push_back(QJsonObject{
+      {"material", QString::fromStdString(material)},
+      {"faceCount", count},
+    });
+  }
+  return QJsonObject{
+    {"uniqueMaterialCount", static_cast<int>(counts.size())},
+    {"materials", materials},
+  };
+}
+
+QJsonArray brushFacesJson(const mdl::Brush& brush)
+{
+  auto result = QJsonArray{};
+  auto index = 0;
+  for (const auto& face : brush.faces())
+  {
+    result.push_back(QJsonObject{
+      {"index", index++},
+      {"material", QString::fromStdString(face.attributes().materialName())},
+      {"normal", vecToJson(face.normal())},
+    });
+  }
+  return result;
+}
+
+QJsonObject selectedFaceJson(
+  const mdl::BrushFaceHandle& handle, const mdl::WorldNode& worldNode)
+{
+  const auto& face = handle.face();
+  return QJsonObject{
+    {"type", "face"},
+    {"brushId", mcpNodePathId(*handle.node(), worldNode)},
+    {"faceIndex", static_cast<int>(handle.faceIndex())},
+    {"material", QString::fromStdString(face.attributes().materialName())},
+    {"normal", vecToJson(face.normal())},
+  };
+}
+
+QJsonArray childSummariesJson(const mdl::Node& node, const mdl::WorldNode& worldNode)
+{
+  auto result = QJsonArray{};
+  for (const auto* child : node.children())
+  {
+    result.push_back(mcpNodeSummaryJson(*child, worldNode));
+  }
+  return result;
+}
+
+QJsonObject mcpNodeInspectJson(
+  const mdl::Node& node,
+  const mdl::WorldNode& worldNode,
+  const QString& detail,
+  const bool includeProperties,
+  const bool includeChildren)
+{
+  auto result = mcpNodeSummaryJson(node, worldNode);
+
+  if (const auto* entityNode = dynamic_cast<const mdl::EntityNodeBase*>(&node))
+  {
+    result.insert("origin", vecToJson(entityNode->entity().origin()));
+    if (includeProperties || detail == "full")
+    {
+      result.insert("properties", entityPropertiesJson(entityNode->entity()));
+    }
+  }
+
+  if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(&node))
+  {
+    result.insert("materials", brushMaterialsJson(brushNode->brush()));
+    if (detail == "full")
+    {
+      result.insert("faces", brushFacesJson(brushNode->brush()));
+    }
+  }
+
+  if (includeChildren || detail == "full")
+  {
+    result.insert("children", childSummariesJson(node, worldNode));
+  }
+
   return result;
 }
 
@@ -266,6 +374,90 @@ QJsonObject selectionJsonForMap(const mdl::Map& map)
   };
 }
 
+McpBridgeToolResult selectionInspectForMapResult(mdl::Map& map, const QJsonObject& params)
+{
+  const auto detailValue = params.value("detail").toString("summary").trimmed().toLower();
+  if (!detailValue.isEmpty() && detailValue != "summary" && detailValue != "full")
+  {
+    return selectionPreconditionFailure(
+      "selection_inspect detail must be summary or full",
+      "fix_selection_inspect_detail_then_retry",
+      QJsonObject{{"detail", detailValue}});
+  }
+
+  const auto detail = detailValue == "full" ? QString{"full"} : QString{"summary"};
+  const auto includeProperties =
+    mcpOptionalBool(params, "includeProperties", detail == "full");
+  const auto includeChildren = mcpOptionalBool(params, "includeChildren", false);
+
+  const auto& worldNode = map.worldNode();
+  const auto& selection = map.selection();
+  auto objects = QJsonArray{};
+  auto selectedBrushTotalFaceCount = 0;
+  for (const auto* node : selection.nodes)
+  {
+    objects.push_back(
+      mcpNodeInspectJson(*node, worldNode, detail, includeProperties, includeChildren));
+    if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(node))
+    {
+      selectedBrushTotalFaceCount += static_cast<int>(brushNode->brush().faceCount());
+    }
+  }
+
+  auto faceOwnerBrushes = QJsonArray{};
+  auto selectedFaces = QJsonArray{};
+  auto faceCountsByBrush = std::map<const mdl::BrushNode*, int>{};
+  for (const auto& handle : selection.brushFaces)
+  {
+    if (handle.node() == nullptr)
+    {
+      continue;
+    }
+    ++faceCountsByBrush[handle.node()];
+    selectedFaces.push_back(selectedFaceJson(handle, worldNode));
+  }
+  for (const auto& [brushNode, faceCount] : faceCountsByBrush)
+  {
+    if (brushNode == nullptr)
+    {
+      continue;
+    }
+    auto faceOwner = mcpNodeInspectJson(
+      *brushNode, worldNode, detail, includeProperties, includeChildren);
+    faceOwner.insert("selectedFaceCount", faceCount);
+    faceOwnerBrushes.push_back(std::move(faceOwner));
+  }
+
+  return McpBridgeToolResult::success(QJsonObject{
+    {"hasSelection", selection.hasAny()},
+    {"selectedCount", static_cast<int>(selection.nodes.size())},
+    {"selectedFaceCount", static_cast<int>(selection.brushFaces.size())},
+    {"detail", detail},
+    {"includeProperties", includeProperties},
+    {"includeChildren", includeChildren},
+    {"objects", objects},
+    {"selectedFaces", selectedFaces},
+    {"faceOwnerBrushes", faceOwnerBrushes},
+    {"groupCount", static_cast<int>(selection.groups.size())},
+    {"entityCount", static_cast<int>(selection.entities.size())},
+    {"brushCount", static_cast<int>(selection.brushes.size())},
+    {"patchCount", static_cast<int>(selection.patches.size())},
+    {"selectedBrushFaceCount", selectedBrushTotalFaceCount},
+    {"mutatedDocument", false},
+  });
+}
+
+McpBridgeToolResult selectionInspectResult(
+  AppController& appController, const QJsonObject& params)
+{
+  auto* mapWindow = appController.mapWindowManager().topMapWindow();
+  if (!mapWindow)
+  {
+    return noActiveDocumentFailure();
+  }
+  return selectionInspectForMapResult(mapWindow->document().map(), params);
+}
+
 McpBridgeToolResult selectionSetResult(
   AppController& appController, const QJsonObject& params)
 {
@@ -326,12 +518,11 @@ McpBridgeToolResult selectionSetForMapResult(mdl::Map& map, const QJsonObject& p
   {
     selectedIds.push_back(mcpNodePathId(*node, map.worldNode()));
   }
-  return McpBridgeToolResult::success(
-    QJsonObject{
-      {"selectedObjectIds", selectedIds},
-      {"selectedCount", selectedIds.size()},
-      {"mutatedDocument", false},
-    });
+  return McpBridgeToolResult::success(QJsonObject{
+    {"selectedObjectIds", selectedIds},
+    {"selectedCount", selectedIds.size()},
+    {"mutatedDocument", false},
+  });
 }
 
 McpBridgeToolResult selectionFilterResult(
@@ -537,8 +728,7 @@ McpBridgeToolResult selectionGrowForMapResult(mdl::Map& map, const QJsonObject& 
   });
 }
 
-McpBridgeToolResult viewportFocusResult(
-  AppController&, const QJsonObject&)
+McpBridgeToolResult viewportFocusResult(AppController&, const QJsonObject&)
 {
   return retiredViewportToolResult(
     "viewport_focus",
@@ -588,7 +778,8 @@ McpBridgeToolResult viewportCameraFrameBoundsResult(AppController&, const QJsonO
 McpBridgeToolResult viewportCameraSetResult(AppController&, const QJsonObject&)
 {
   return retiredViewportToolResult(
-    "viewport_camera_set", "Use render_review_selector/module_render_review view presets.");
+    "viewport_camera_set",
+    "Use render_review_selector/module_render_review view presets.");
 }
 
 McpBridgeToolResult viewportCaptureCurrentResult(AppController&, const QJsonObject&)

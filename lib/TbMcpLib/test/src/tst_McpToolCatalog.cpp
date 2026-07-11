@@ -60,8 +60,8 @@ TEST_CASE("McpToolCatalog")
       implementedCount += tool.implemented ? 1u : 0u;
     }
 
-    CHECK(catalog.size() == 139u);
-    CHECK(implementedCount == 137u);
+    CHECK(catalog.size() == 140u);
+    CHECK(implementedCount == 138u);
     CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 47);
   }
 
@@ -129,6 +129,7 @@ TEST_CASE("McpToolCatalog")
     CHECK(findToolDefinition("map_snapshot"));
     CHECK(findToolDefinition("map_search"));
     CHECK(findToolDefinition("selection_get"));
+    CHECK(findToolDefinition("selection_inspect"));
     CHECK(findToolDefinition("selection_filter"));
     CHECK(findToolDefinition("selection_by_bounds"));
     CHECK(findToolDefinition("selection_grow"));

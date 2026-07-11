@@ -46,6 +46,7 @@ design decisions remain under Agent control.
    - Use native groups only as a visible organization/selection layer for humans; keep semantic recovery in module metadata and selectors.
 8. For dense existing maps or ambiguous brush ownership, prefer user selection over clever automatic brush matching:
    - Ask the user to select the target brushes in TrenchBroom, or use the current selection if they already did.
+   - Use `selection_inspect` to confirm the current selection and read selected entity key/value properties before inferring intent from map-wide selectors. Use `detail:"summary"` by default, and `detail:"full"` or `includeProperties:true` when entity links such as `targetname` / `target` matter.
    - Then use selection-aware tools such as `geometry_analyze_selection`, `geometry_analyze_slopes`, `geometry_analyze_route_continuity`, `objects_transform`, and `render_review_current_scene(scope:"selection")`.
    - Do not invent complex bounds/material/metadata selector rules for old or manually edited geometry unless the user explicitly asks for that. User selection is the source of truth when brush counts get large.
 9. Validate after each meaningful phase:
@@ -71,7 +72,7 @@ Treat the Modeling profile as the normal Agent workbench. It intentionally expos
 | --- | --- |
 | Bind/open/status | `tb_status`, `documents_open_verified`, `map_snapshot`, `history_status` |
 | Bulk geometry | `ir_compile_preview`, `ir_compile_preview_from_file`, `ir_apply`, `ir_apply_from_file`, `blockout_create_batch`, `brush_create_boxes_batch`, `brush_create_polygon_batch`, `heightmap_preview_grayscale`, `heightmap_import_grayscale` |
-| Target recovery | `selector_preview`, `module_list`, `module_inspect`, `operation_inspect`, `operation_validate`, `geometry_analyze_selection` |
+| Target recovery | `selection_inspect`, `selector_preview`, `module_list`, `module_inspect`, `operation_inspect`, `operation_validate`, `geometry_analyze_selection` |
 | Iteration edits | `objects_transform` on selection or selector, `objects_delete_by_selector`, `entity_properties_update`, `entity_properties_delete`, `texture_apply_by_filter`, `texture_align_face` |
 | Boolean geometry | `geometry_csg_selection` after user or selector-driven brush selection |
 | User-visible organization | `group_create_from_selection`, `group_inspect`; search for `group_rename_selected` / `group_ungroup_selected` when needed |
@@ -144,7 +145,7 @@ Use structured JSON selectors, not free text DSL:
 
 Combine filters only when needed: metadata + type, moduleId + material, operationIds + bounds, classname + bounds. Always preview before select/delete/render when the selection is not obvious.
 
-Selectors are best for objects the Agent just generated with metadata. For old maps, mixed manual edits, or dense brushwork, do not make the Agent guess targets with elaborate selector rules. Let the user select the intended brushes in TrenchBroom, then call selection-aware tools.
+Selectors are best for objects the Agent just generated with metadata. For old maps, mixed manual edits, entity chains, or dense brushwork, do not make the Agent guess targets with elaborate selector rules. Let the user select the intended objects in TrenchBroom, inspect them with `selection_inspect`, then call selection-aware tools.
 
 When the user asks to stretch, shorten, move, rotate, or rescale an existing module/route/part, prefer `selector_preview` followed by `objects_transform` with the same `selector`. Do not delete and rebuild just to make a small proportional or non-uniform transform. Use `idsMode:"count"` or `"sample"` unless full ids are truly needed.
 

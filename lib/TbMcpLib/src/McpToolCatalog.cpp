@@ -791,6 +791,29 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       objectSchema(),
     },
     {
+      "selection_inspect",
+      "Inspect the current editor selection with compact summaries by default. Use "
+      "detail=full or includeProperties=true to read selected entity key/value "
+      "properties such as targetname, target, origin, angles, and custom fields.",
+      McpMode::ReadOnly,
+      false,
+      true,
+      objectSchema({
+        {"detail",
+         stringProperty(
+           "summary or full. Defaults to summary; full expands entity properties, "
+           "brush faces, and child summaries.")},
+        {"includeProperties",
+         boolProperty(
+           "Include complete entity key/value properties. Defaults to true when "
+           "detail=full, otherwise false.")},
+        {"includeChildren",
+         boolProperty(
+           "Include direct child object summaries for selected groups or containers. "
+           "Defaults to false.")},
+      }),
+    },
+    {
       "selection_set",
       "Set the current editor selection using MCP object ids.",
       McpMode::ReadOnly,

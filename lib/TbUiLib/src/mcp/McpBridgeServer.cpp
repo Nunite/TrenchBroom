@@ -166,6 +166,10 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
         {
           return McpBridgeToolResult::success(selectionJson(appController));
         }
+        if (toolName == "selection_inspect")
+        {
+          return selectionInspectResult(appController, params);
+        }
         if (toolName == "selection_set")
         {
           return selectionSetResult(appController, params);
