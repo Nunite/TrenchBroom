@@ -81,7 +81,7 @@ Before generating IR, record `tb_status` document guards and an unmodified
    `walkableContinuous`, `qualityStatus`, `acceptancePassed`, and `notEvaluated`;
    legacy `passed` is not the acceptance verdict.
 7. Run `geometry_analyze_shell_seams` when recipe metadata includes
-   `shellSeams`, such as `path_tunnel`. This validator checks only annotated
+   `shellSeams`, such as `path_sweep` and `path_tunnel`. This validator checks only annotated
    shell intent and does not infer seams from arbitrary map geometry.
 8. Run `map_validate(groupByType:true)` and `problems_check`. Compare stable
    problem ids when both responses are untruncated; otherwise compare grouped
@@ -119,6 +119,13 @@ acceptance failed; rebuild them only as new recipes with inspected review output
   them as grid cleanliness warnings only when slope and acceptance checks pass.
   The grouped examples intentionally use `draft` for minimal, `balanced` for
   default (36 segments), and `smooth` for stress.
+- `path_sweep`: emits annotated `polyhedron` IR by sweeping profile strips along
+  a path. Built-in profiles are `rect_tunnel`, `arch_tunnel`, and `pipe`; `custom`
+  accepts explicit strip quads in `[offset, z]` profile space. It records
+  `shellSeams`, `textureRole`, and `texturePolicy` on every brush. Use
+  `partMaterials` to keep floor, wall, ceiling, pipe, and cap material choices.
+  This recipe preserves material and texture intent; use MCP texture tools after
+  apply for exact face UV transfer or alignment.
 - `path_tunnel`: emits annotated `polyhedron` IR for floor, ceiling,
   `wall_left`, `wall_right`, and optional end caps along a path_corner-style
   point chain. `points` are floor centerline origins; floor thickness extends
@@ -126,7 +133,9 @@ acceptance failed; rebuild them only as new recipes with inspected review output
   `origin.z + height`. First version supports horizontal-projection polylines
   with per-point Z and `cornerMode:"miter"` only. Interior nodes share one miter
   section across adjacent segments and every internal/cap seam is recorded in
-  `metadata.shellSeams`. Validate with
+  `metadata.shellSeams`. `path_tunnel` is a rectangular preset over the shared
+  `path_sweep` core, so it also supports `partMaterials` and `texturePolicy`.
+  Validate with
   `geometry_analyze_shell_seams(selector:{moduleId})` before visual review.
 - `rect_shell`: replaces legacy `room`, `corridor`, and `sky_shell` batch types
   with explicit box IR. Use `kind` only for recipe defaults and metadata.

@@ -176,10 +176,11 @@ balanced = 12° / 2 / 2，smooth = 7.5° / 1 / 1。调用方可用正有限数
 
 1. 让用户选中起点或当前目标实体后，先调用 `selection_inspect(detail:"full", includeProperties:true)`，确认 `classname`、`origin`、`targetname`、`target`。
 2. 按 `targetname -> target` 建链；只在解析下一个 target 时用 `map_search` 查命名实体。
-3. 用 `trenchbroom-mcp-scene-workflow` skill 的 `path_tunnel` recipe 生成 IR。recipe 把每个 origin 当作隧道地面中心线，使用共享 miter 截面连接相邻段，并在 brush metadata 中写入 `shellSeams`。
-4. 走 file flow：`ir_compile_preview_from_file`，再用返回的 `previewId` 调 `ir_apply_from_file`。迭代旧版本时使用 `replace_module`，不要先删除再创建。
-5. 验证顺序：`geometry_analyze_shell_seams(selector:{moduleId})`、`module_render_review(edgeMode:"all")`、`module_render_review(edgeMode:"silhouette")`、`map_validate(groupByType:true)`、`problems_check`。
-6. `geometry_analyze_shell_seams` 只验证 recipe 标注的 seam。缺少 `shellSeams` 时它不会猜测地图意图，应改用 annotated recipe 或视觉 review。
+3. 用 `trenchbroom-mcp-scene-workflow` skill 的 `path_tunnel` recipe 生成矩形隧道 IR；如果用户要拱形、管状或自定义截面，改用 `path_sweep`。recipe 把每个 origin 当作隧道地面中心线，使用共享 miter 截面连接相邻段，并在 brush metadata 中写入 `shellSeams`。
+4. 需要保留纹理时，在 recipe 参数里传 `partMaterials` 和 `texturePolicy`。recipe 会写入 `textureRole` / `texturePolicy` metadata；精确 face UV 复制或重新对齐放到 apply 后，用 `texture_copy_from_face`、`texture_align_face` 或 `texture_apply_by_filter` 处理。
+5. 走 file flow：`ir_compile_preview_from_file`，再用返回的 `previewId` 调 `ir_apply_from_file`。迭代旧版本时使用 `replace_module`，不要先删除再创建。
+6. 验证顺序：`geometry_analyze_shell_seams(selector:{moduleId})`、`module_render_review(edgeMode:"all")`、`module_render_review(edgeMode:"silhouette")`、`map_validate(groupByType:true)`、`problems_check`。
+7. `geometry_analyze_shell_seams` 只验证 recipe 标注的 seam。缺少 `shellSeams` 时它不会猜测地图意图，应改用 annotated recipe 或视觉 review。
 
 ## KZ 平台链工作流
 

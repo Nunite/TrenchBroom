@@ -132,7 +132,7 @@ improvement. Promote recipe behavior into MCP only after repeated independent
 workflows prove it is a generic editor capability.
 
 Bundled prefab-like recipes are intentionally small: `ascending_loop`,
-`path_tunnel`, `rect_shell`, `opening_wall`, `cover_block`, and `stair_run`. Removed or failed
+`path_sweep`, `path_tunnel`, `rect_shell`, `opening_wall`, `cover_block`, and `stair_run`. Removed or failed
 visual-acceptance recipes should be rebuilt as new deterministic IR recipes only
 after explicit human visual acceptance, not restored as C++ MCP prefab tools.
 
@@ -186,6 +186,16 @@ if `materialExists` or `replaceMaterialExists` is false, treat the write as a
 placeholder/tag and either choose a loaded material from `texture_search` or report
 that the requested material was not available.
 
+For sweep-style recipes, preserve texture intent in recipe params instead of
+hard-coding one material. Use `partMaterials` for floor, wall, ceiling, pipe, and
+cap material choices. Use `texturePolicy` metadata to record alignment intent:
+`mode:"part_materials"` for direct material assignment, `mode:"metadata_hints"`
+when a later agent or human should review/apply UVs, and `mode:"post_apply"` when
+the planned workflow includes `texture_apply_by_filter`, `texture_align_face`, or
+`texture_copy_from_face` after IR apply. Recipe metadata records intent; exact
+face UV transfer still belongs to MCP face/texture tools after the generated
+brushes exist.
+
 For UV/material alignment, prefer `texture_align_face` on the current face
 selection or a narrow target with `faceSemantic` / `normal`. Use `mode:"paraxial"`
 for world/grid alignment, `mode:"parallel"` for face-plane alignment, and
@@ -218,7 +228,14 @@ When the user asks for a tunnel/corridor along `path_corner`, path, or route ent
 
 - Start from current selection when available. Call `selection_inspect(detail:"full", includeProperties:true)` and read selected entity `classname`, `origin`, `targetname`, and `target`.
 - Build the chain by `targetname -> target`; use map search only to resolve the next named entity after confirming the selected starting point. Do not infer path order from spatial proximity when entity links are present.
-- Generate IR with the `path_tunnel` recipe. Treat each `path_corner.origin` as the floor centerline; the recipe uses shared miter sections at nodes to avoid corner gaps.
+- Generate IR with the `path_tunnel` recipe for a rectangular tunnel, or use
+  `path_sweep` when the requested profile is arched, pipe-like, or custom. Treat
+  each `path_corner.origin` as the floor centerline for tunnel presets; the
+  recipes use shared miter sections at nodes to avoid corner gaps.
+- Preserve texture choices with `partMaterials` and `texturePolicy`. If the user
+  wants exact copied UVs from existing brush faces, apply the recipe first, then
+  use `texture_copy_from_face` or `texture_align_face` on the generated
+  module/parts.
 - Use file flow: generate an IR file, run `ir_compile_preview_from_file`, then call `ir_apply_from_file` with the returned `previewId`. If apply reports an IR hash mismatch, regenerate or re-preview the current IR file and apply the new `previewId`; do not reuse an old hash by hand.
 - Validate with `geometry_analyze_shell_seams(selector:{moduleId})`, then `module_render_review(edgeMode:"all")`, `module_render_review(edgeMode:"silhouette")`, `map_validate(groupByType:true)`, and `problems_check`.
 - Report seam validator results separately from visual review. `shellContinuous` / `acceptancePassed` are static annotation checks; review remains human-visible evidence.

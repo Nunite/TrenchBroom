@@ -220,6 +220,10 @@ def polar_point(
 
 
 def _type_matches(value: Any, type_name: str) -> bool:
+    if type_name == "array":
+        return isinstance(value, list)
+    if type_name == "object":
+        return isinstance(value, dict)
     if type_name == "string":
         return isinstance(value, str)
     if type_name == "number":
@@ -346,9 +350,14 @@ def summarize_ir(ir: dict[str, Any]) -> dict[str, Any]:
     roles: dict[str, int] = {}
     operations_with_part_role = 0
     operations_with_order = 0
+    operations_with_texture_metadata = 0
+    materials: dict[str, int] = {}
     for operation in operations if isinstance(operations, list) else []:
         if not isinstance(operation, dict):
             continue
+        material = operation.get("material")
+        if isinstance(material, str) and material:
+            materials[material] = materials.get(material, 0) + 1
         op_bounds = _operation_bounds(operation)
         if op_bounds:
             bounds = _extend_bounds(bounds, op_bounds[0], op_bounds[1])
@@ -364,6 +373,8 @@ def summarize_ir(ir: dict[str, Any]) -> dict[str, Any]:
                 operations_with_part_role += 1
             if "order" in metadata:
                 operations_with_order += 1
+            if isinstance(metadata.get("textureRole"), str) and isinstance(metadata.get("texturePolicy"), dict):
+                operations_with_texture_metadata += 1
     return {
         "moduleId": ir.get("moduleId"),
         "operationCount": len(operations) if isinstance(operations, list) else 0,
@@ -371,9 +382,11 @@ def summarize_ir(ir: dict[str, Any]) -> dict[str, Any]:
         "bounds": bounds,
         "parts": dict(sorted(parts.items())),
         "roles": dict(sorted(roles.items())),
+        "materials": dict(sorted(materials.items())),
         "metadataCoverage": {
             "operationsWithPartRole": operations_with_part_role,
             "operationsWithOrder": operations_with_order,
+            "operationsWithTextureMetadata": operations_with_texture_metadata,
         },
     }
 
@@ -402,6 +415,7 @@ def validate_ir(ir: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
     else:
         shell_seam_groups: dict[str, list[tuple[int, tuple[tuple[float, float, float], ...]]]] = {}
         operations_with_shell_seams = 0
+        operations_with_texture_metadata = 0
         for index, operation in enumerate(operations):
             if not isinstance(operation, dict):
                 errors.append(f"operation[{index}] must be an object")
@@ -446,6 +460,15 @@ def validate_ir(ir: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
                             canonical_vertices.append((float(vertex[0]), float(vertex[1]), float(vertex[2])))
                         if canonical_vertices:
                             shell_seam_groups.setdefault(seam_key, []).append((index, tuple(sorted(canonical_vertices))))
+            texture_policy = metadata.get("texturePolicy")
+            texture_role = metadata.get("textureRole")
+            if texture_policy is not None or texture_role is not None:
+                if not isinstance(texture_policy, dict):
+                    errors.append(f"operation[{index}] metadata.texturePolicy must be an object")
+                if not isinstance(texture_role, str) or not texture_role:
+                    errors.append(f"operation[{index}] metadata.textureRole must be a non-empty string")
+                if isinstance(texture_policy, dict) and isinstance(texture_role, str) and texture_role:
+                    operations_with_texture_metadata += 1
         if output.get("shellSeams"):
             if operations_with_shell_seams != len(operations):
                 errors.append("all operations must include metadata.shellSeams for shell seam recipes")
@@ -455,6 +478,8 @@ def validate_ir(ir: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
                     continue
                 if participants[0][1] != participants[1][1]:
                     errors.append(f"shell seam {seam_key!r} participant vertices differ")
+        if output.get("textureMetadata") and operations_with_texture_metadata != len(operations):
+            errors.append("all operations must include metadata.textureRole and metadata.texturePolicy")
     entities = ir.get("entities", [])
     if entities is not None and not isinstance(entities, list):
         errors.append("entities must be a list when present")
