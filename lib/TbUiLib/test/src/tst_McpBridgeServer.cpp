@@ -2327,6 +2327,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     CHECK(response.result.value("targetObjectCount").toInt() == 2);
     CHECK(response.result.value("targetBrushCount").toInt() == 2);
     CHECK(response.result.value("captureCount").toInt() == 5);
+    CHECK(response.result.value("renderReadable").toBool());
     CHECK(response.result.value("qualityValid").toBool());
     const auto semanticAcceptance =
       response.result.value("semanticAcceptance").toObject();
@@ -2465,6 +2466,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     CHECK(response.result.value("scope").toString() == "mcp_history");
     CHECK(response.result.value("renderer").toString() == "geometry_cpu");
     CHECK(response.result.value("targetBrushCount").toInt() == 2);
+    CHECK(response.result.value("renderReadable").toBool());
     CHECK(response.result.value("qualityValid").toBool());
     const auto semanticAcceptance =
       response.result.value("semanticAcceptance").toObject();
@@ -2489,6 +2491,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     CHECK(routeResponse.result.value("edgeMode").toString() == "all");
     CHECK(routeResponse.result.value("verticalExaggeration").toDouble() == 1.6);
     CHECK(routeResponse.result.value("labelCount").toInt() == 2);
+    CHECK(routeResponse.result.value("renderReadable").toBool());
     CHECK(routeResponse.result.value("qualityValid").toBool());
   }
 
@@ -2533,6 +2536,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     CHECK(response.result.value("unsupportedObjectCount").toInt() == 1);
     CHECK(response.result.value("labelCount").toInt() == 1);
     CHECK(response.result.value("edgeCount").toInt() == 3);
+    CHECK(response.result.value("renderReadable").toBool());
     CHECK(response.result.value("qualityValid").toBool());
     CHECK(QFileInfo::exists(response.result.value("preferredCapturePath").toString()));
   }
@@ -5884,6 +5888,7 @@ TEST_CASE(
                   | kdl::value();
   auto& map = document->map();
   auto history = std::vector<McpOperationRecord>{};
+  auto nextOperationIndex = 1;
   auto metadataStore = std::map<QString, McpBrushMetadataRecord>{};
   auto moduleStore = std::map<QString, McpModuleRecord>{};
   auto objectRegistry = McpObjectRegistry{};
@@ -5901,6 +5906,40 @@ TEST_CASE(
   CHECK(
     invalidSelector.error.details.value("recoveryAction").toString()
     == "fix_selector_then_retry");
+
+  const auto create = blockoutCreateBatchForMapResult(
+    map,
+    "blockout_create_batch",
+    QJsonObject{
+      {"defaultMetadata", QJsonObject{{"moduleId", "review-selector-module"}}},
+      {"operations",
+       QJsonArray{QJsonObject{
+         {"type", "box"},
+         {"min", QJsonArray{0, 0, 0}},
+         {"max", QJsonArray{64, 64, 16}},
+       }}},
+    },
+    history,
+    nextOperationIndex,
+    &metadataStore,
+    &moduleStore,
+    &objectRegistry);
+  REQUIRE(create.ok);
+
+  const auto reviewed = renderReviewSelectorForMapResult(
+    map,
+    QJsonObject{{"moduleId", "review-selector-module"}},
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry);
+  REQUIRE(reviewed.ok);
+  CHECK(reviewed.result.value("selectorMatchedCount").toInt() == 1);
+  CHECK(reviewed.result.value("matchedBeforeLimit").toInt() == 1);
+  CHECK_FALSE(reviewed.result.value("limitApplied").toBool(true));
+  CHECK(reviewed.result.value("moduleObjectIdCount").toInt() >= 1);
+  CHECK(reviewed.result.value("renderReadable").toBool());
+  CHECK(reviewed.result.value("qualityValid").toBool());
 }
 
 TEST_CASE(

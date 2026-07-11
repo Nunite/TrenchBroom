@@ -95,8 +95,8 @@ scripts\mcp-config.ps1 -Print
 7. 每次写操作后保留 undoOperationId 和 module revision/content hash；child/audit operation ids 只用于审计。不要长期携带大 object id 列表。
 8. 发现结果错误时优先使用 history_undo_mcp 回滚最近一次 MCP 聚合操作，而不是用删除工具硬删一片对象。
 9. 所有写入都应同时传 expectedDocumentPath 和 expectedDocumentFingerprint；两者都提供时必须同时匹配。
-10. 最终验收读取 acceptancePassed、qualityStatus、walkableContinuous、shellContinuous 和 notEvaluated；Review 是可选证据，不替代静态验证。
-11. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认。
+10. 最终验收读取 acceptancePassed、qualityStatus、walkableContinuous、shellContinuous 和 notEvaluated；Review 的 `renderReadable` 只表示输出图像可读，`qualityValid` 是旧兼容别名，不代表几何语义正确。Review 是可选证据，不替代静态验证。
+11. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认；确认保存当前地图后用 `documents_save_current`，临时文档或另存用 `documents_save_as`。
 12. 如果工具返回 unsupported、Forbidden 或 Unauthorized，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
 ```
 
@@ -112,10 +112,12 @@ scripts\mcp-config.ps1 -Print
 6. `entity_link_chain_inspect`：需要读取当前活动 map 内实体 key/value 链路时使用，例如 `path_corner targetname -> target`。它返回断链、重复 targetname、循环等结构化结果。若 `selection_inspect` 或等价实体属性/链路读取工具不可调用，必须停止报告 MCP 能力缺口；未经用户明确批准，不要读取磁盘 `.map` 作为 fallback。
 7. `selection_filter` / `selection_by_bounds`：按类型、材质、范围筛选对象。
 8. `viewport_capture_current` 或 `viewport_capture_3d`：获得视觉反馈。
-9. 需要视觉证据时优先用 `render_review_operation` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。未执行 Review 时不要给出视觉结论。
+9. 需要视觉证据时优先用 `render_review_operation`、`module_render_review` 或 `render_review_current_scene(scope=mcp_history)`：它们只渲染目标几何，默认 contact sheet 最多拼 2 张图，避免 Agent 读图时每格过小；所有单独 PNG 仍写入 manifest。`renderReadable=true` 只说明渲染产物可读，不说明隧道闭合、没有穿模或设计符合意图。未执行 Review 或未人工/skill 检查图像时不要给出视觉结论。
 10. `viewport_capture_scene_review` 只作为真实 TrenchBroom 视口辅助调试使用。需要确认 UI 视角或用户当前视图时再调用；自动化验收不要依赖它来隔离对象。
 
 对象操作必须使用 MCP 返回的 `objectId`，不要根据实体顺序或 UI 文本猜测内部指针。
+
+当 `selector_preview` / `render_review_selector` 的 `selectorMatchedCount` 或 `matchedBeforeLimit` 与 `module_inspect` / operation history 的 live count 不一致时，不要假设 selector 已抓全。先看 `limitApplied`、`staleExcluded`、`moduleObjectIdCount`、`operationObjectIdCount` 和 `metadataRecordCount`；对完整模块 review 优先用 `module_render_review(moduleId)`，对最近 MCP 结果可退回 `render_review_current_scene(scope=mcp_history)`。
 
 ## 白盒生成流程
 
@@ -128,6 +130,8 @@ scripts\mcp-config.ps1 -Print
 5. 优先用 `blockout_create_batch` 一次提交 typed object `operations[]`，默认选择 primitive operations：`box`、`prism`、`cylinder`、`cylinder_sector`、`polyhedron`、`path_ribbon`、`repeat_translate`、`repeat_grid`、`stepped_mass`、`support_posts_between`。例如 `{"type":"box","min":[0,0,0],"max":[128,128,16]}`、`{"type":"path_ribbon","points2d":[[0,0],[512,0],[768,256]],"width":160,"minZ":0,"maxZ":16}`。
 6. 只需要批量创建平台/跳块时用 `brush_create_boxes_batch`，传 `boxes: [{min,max,material?}]`；需要棱形、切角或引导形状时用 `brush_create_polygon_batch`，避免多次单 brush 调用产生大量 undo/history。
 7. `blockout_create_room`、`blockout_create_corridor`、`blockout_create_stairs`、`blockout_create_ramp`、`blockout_create_doorway`、`blockout_create_cover`、`blockout_create_sky_shell` 的独立工具入口已移除。旧 `blockout_create_batch` operation type 可用于兼容或快速草图；新场景组合应优先走 skill recipe/IR 或显式 primitive operations。
+
+如果不确定某个 operation type 或参数是否存在，先用 `tb_tools_search(query:"blockout_create_batch", detail:"schema")` 或 recipe manifest 查询，不要猜 `tube`、`arch`、`corridor` 这类未确认类型。复杂管状/拱形沿路径结构优先用 `path_sweep` recipe 生成 IR，再走 preview/apply。
 8. 默认只保留返回的 `operationId` / `resourceUri`，需要 ids 时再用 `operation_inspect(detail=ids)`。
 9. 写入工具支持 `expectedDocumentPath` 和 `expectedDocumentFingerprint`。
    Agent 从 `tb_status` 记录目标身份后，应把两个 guard 一起传给批量创建、
@@ -314,7 +318,7 @@ MCP 写操作的公共结果包括：
 - `module_inspect` 的真实几何数量优先看 `canonicalObjectCount` / live counts；`storedReferenceCount` 可能包含兼容 alias。正常 mutation、Undo、Redo 会自动 reconciliation，只有异常 stale/legacy alias 恢复才使用 `module_compact`。
 - 不要用 `objects_delete` 代替 undo，除非用户明确要删除对象。
 - 保存前调用 `map_validate` 和 `problems_check`。
-- 用户确认后再调用 `documents_save` 或 `documents_export`。
+- 用户确认后再调用 `documents_save_current` 保存当前持久地图，或用 `documents_save_as(path=...)` 为临时文档/另存路径写盘；`documents_export` 只用于明确的导出请求。
 - 关闭 dirty 文档必须显式传入 `discardChanges=true`；否则工具会拒绝，避免弹阻塞对话框。
 
 ## 示例：创建一个小型 CS1.6 白盒
@@ -330,7 +334,7 @@ MCP 写操作的公共结果包括：
 7. `entity_create_checked_batch` 放置 spawn、基础 light 或目标点；创建前先确认 FGD/schema
 8. `map_validate` / `problems_check` 并与修改前基线比较
 9. 可选生成 `render_review_operation(edgeMode="all")` 和 `edgeMode="silhouette"` 证据
-10. 报告 `completionState`、`notEvaluated`、保存和 BSP 状态；用户确认后再 `documents_save`
+10. 报告 `completionState`、`notEvaluated`、保存和 BSP 状态；用户确认后再 `documents_save_current` 或 `documents_save_as`
 
 如果材质名不确定，先用 `texture_search` 查找 `dev`、`clip`、`sky` 等关键词；不要硬编码不存在的材质。
 

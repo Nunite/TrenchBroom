@@ -64,6 +64,7 @@ QJsonObject compactReviewResource(const QJsonObject& result)
         "unsupportedObjectCount",
         "targetBounds",
         "captureCount",
+        "renderReadable",
         "qualityValid",
         "semanticAcceptance",
         "warnings",

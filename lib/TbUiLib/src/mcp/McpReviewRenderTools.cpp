@@ -2012,9 +2012,16 @@ QJsonObject reviewSemanticAcceptance()
     {"automated", false},
     {"status", "requires_human_or_skill_review"},
     {"hint",
-     "qualityValid only checks render readability; inspect preferredCapturePath "
-     "or contactSheet against the requested scene intent before accepting the result."},
+     "renderReadable only checks render output readability; inspect preferredCapturePath "
+     "or contactSheet against the requested scene intent before accepting the result. "
+     "qualityValid is a legacy alias for renderReadable."},
   };
+}
+
+void insertRenderReadability(QJsonObject& result, const bool renderReadable)
+{
+  result.insert("renderReadable", renderReadable);
+  result.insert("qualityValid", renderReadable);
 }
 
 QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolName)
@@ -2043,6 +2050,7 @@ QJsonObject compactReviewResult(const QJsonObject& result, const QString& toolNa
     {"unsupportedObjectCount", result.value("unsupportedObjectCount")},
     {"targetBounds", result.value("targetBounds")},
     {"captureCount", result.value("captureCount")},
+    {"renderReadable", result.value("renderReadable")},
     {"qualityValid", result.value("qualityValid")},
     {"semanticAcceptance", result.value("semanticAcceptance")},
     {"warnings", result.value("warnings")},
@@ -2177,6 +2185,7 @@ McpBridgeToolResult renderReviewNodesForMapResult(
       {"targetBrushCount", 0},
       {"unsupportedObjectCount", 0},
       {"captureCount", 0},
+      {"renderReadable", false},
       {"qualityValid", false},
       {"edgeInterpretation", "none"},
       {"internalBrushEdgesDrawn", false},
@@ -2328,7 +2337,7 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     materialNames.push_back(materialName);
   }
 
-  const auto qualityValid =
+  const auto renderReadable =
     !captures.isEmpty() && std::ranges::all_of(quality, [](const auto& entry) {
       return entry.toObject().value("valid").toBool(false);
     });
@@ -2363,7 +2372,6 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     {"captureCount", captures.size()},
     {"captures", captures},
     {"quality", quality},
-    {"qualityValid", qualityValid},
     {"semanticAcceptance", reviewSemanticAcceptance()},
     {"warnings", warnings},
     {"materials", materialNames},
@@ -2376,13 +2384,14 @@ McpBridgeToolResult renderReviewNodesForMapResult(
     {"orderLabelCount", geometry.orderLabelCount},
     {"partLabelCount", geometry.partLabelCount},
   };
+  insertRenderReadability(result, renderReadable);
   addAbsoluteReviewPaths(result);
   if (!writeManifest(outputDir / "manifest.json", result))
   {
     auto updatedWarnings = result.value("warnings").toArray();
     updatedWarnings.push_back("manifestWriteFailed");
     result.insert("warnings", updatedWarnings);
-    result.insert("qualityValid", false);
+    insertRenderReadability(result, false);
   }
 
   if (params.value("detail").toString("summary").trimmed().toLower() != "full")
@@ -2433,6 +2442,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
       {"captureCount", 0},
       {"captures", QJsonArray{}},
       {"quality", QJsonArray{}},
+      {"renderReadable", false},
       {"qualityValid", false},
       {"edgeInterpretation", "none"},
       {"internalBrushEdgesDrawn", false},
@@ -2584,7 +2594,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     materialNames.push_back(materialName);
   }
 
-  const auto qualityValid =
+  const auto renderReadable =
     !captures.isEmpty()
     && std::ranges::all_of(
       quality,
@@ -2622,7 +2632,6 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"captureCount", captures.size()},
     {"captures", captures},
     {"quality", quality},
-    {"qualityValid", qualityValid},
     {"semanticAcceptance", reviewSemanticAcceptance()},
     {"warnings", warnings},
     {"materials", materialNames},
@@ -2635,6 +2644,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     {"orderLabelCount", geometry.orderLabelCount},
     {"partLabelCount", geometry.partLabelCount},
   };
+  insertRenderReadability(result, renderReadable);
   addAbsoluteReviewPaths(result);
 
   if (!writeManifest(outputDir / "manifest.json", result))
@@ -2642,7 +2652,7 @@ McpBridgeToolResult renderReviewTargetsForMapResult(
     auto updatedWarnings = result.value("warnings").toArray();
     updatedWarnings.push_back("manifestWriteFailed");
     result.insert("warnings", updatedWarnings);
-    result.insert("qualityValid", false);
+    insertRenderReadability(result, false);
   }
 
   applyIdsMode(result, "targetObjectIds", resolvedObjectIds, idsModeFromParams(params));

@@ -62,7 +62,7 @@ TEST_CASE("McpToolCatalog")
 
     CHECK(catalog.size() == 142u);
     CHECK(implementedCount == 140u);
-    CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 50);
+    CHECK(toolsListJson(McpMode::Edit, true, McpToolProfile::Modeling).size() == 52);
   }
 
   SECTION("all mutating tools expose path and fingerprint guards")
@@ -346,7 +346,7 @@ TEST_CASE("McpToolCatalog")
     INFO("Modeling profile tools: " << names.join(", ").toStdString());
     CHECK(
       names.size()
-      <= 50); // selection/entity link inspection is visible for path workflows.
+      <= 52); // save-current/as and entity link inspection are visible for workflows.
 
     CHECK(names.contains("tb_status"));
     CHECK(names.contains("tb_doctor"));
@@ -473,6 +473,8 @@ TEST_CASE("McpToolCatalog")
     CHECK(!names.contains("documents_open"));
     CHECK(names.contains("documents_open_verified"));
     CHECK(!names.contains("documents_save"));
+    CHECK(names.contains("documents_save_current"));
+    CHECK(names.contains("documents_save_as"));
     CHECK(!names.contains("documents_close"));
     CHECK(!names.contains("documents_export"));
     CHECK(!names.contains("compile_profiles_list"));
@@ -1137,8 +1139,8 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(currentSceneTool);
     CHECK(currentSceneTool->description.contains("active document"));
     CHECK(currentSceneTool->description.contains("preferredCapturePath"));
-    CHECK(currentSceneTool->description.contains(
-      "qualityValid only checks render readability"));
+    CHECK(currentSceneTool->description.contains("renderReadable only checks"));
+    CHECK(currentSceneTool->description.contains("qualityValid is a legacy alias"));
 
     const auto currentSceneProperties =
       currentSceneTool->inputSchema.value("properties").toObject();
@@ -1161,7 +1163,8 @@ TEST_CASE("McpToolCatalog")
     REQUIRE(tool);
 
     CHECK(tool->description.contains("isolated Agent-readable geometry review bundle"));
-    CHECK(tool->description.contains("qualityValid only checks render readability"));
+    CHECK(tool->description.contains("renderReadable only checks"));
+    CHECK(tool->description.contains("qualityValid is a legacy alias"));
 
     const auto properties = tool->inputSchema.value("properties").toObject();
     CHECK(properties.value("operationIds").isObject());
@@ -1203,8 +1206,8 @@ TEST_CASE("McpToolCatalog")
 
     const auto selectorTool = findToolDefinition("render_review_selector");
     REQUIRE(selectorTool);
-    CHECK(
-      selectorTool->description.contains("qualityValid only checks render readability"));
+    CHECK(selectorTool->description.contains("renderReadable only checks"));
+    CHECK(selectorTool->description.contains("qualityValid is a legacy alias"));
     CHECK(selectorTool->inputSchema.value("properties")
             .toObject()
             .value("labelParts")
@@ -1212,8 +1215,8 @@ TEST_CASE("McpToolCatalog")
 
     const auto moduleReviewTool = findToolDefinition("module_render_review");
     REQUIRE(moduleReviewTool);
-    CHECK(moduleReviewTool->description.contains(
-      "qualityValid only checks render readability"));
+    CHECK(moduleReviewTool->description.contains("renderReadable only checks"));
+    CHECK(moduleReviewTool->description.contains("qualityValid is a legacy alias"));
     CHECK(moduleReviewTool->inputSchema.value("properties")
             .toObject()
             .value("labelParts")

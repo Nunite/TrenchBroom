@@ -2947,8 +2947,17 @@ McpBridgeToolResult renderReviewSelectorForMapResult(
   auto warnings = QJsonArray{};
   auto error = QString{};
   const auto selector = selectorFromParams(params);
+  auto diagnostics = McpSelectorDiagnostics{};
   const auto nodes = resolveSelectorNodes(
-    map, selector, history, metadataStore, moduleStore, objectRegistry, warnings, error);
+    map,
+    selector,
+    history,
+    metadataStore,
+    moduleStore,
+    objectRegistry,
+    warnings,
+    error,
+    &diagnostics);
   if (!error.isEmpty())
   {
     return McpBridgeToolResult::failure(
@@ -2977,6 +2986,12 @@ McpBridgeToolResult renderReviewSelectorForMapResult(
       resultWarnings.push_back(warning);
     }
     result.result.insert("warnings", resultWarnings);
+    result.result.insert("matchedBeforeLimit", diagnostics.matchedBeforeLimit);
+    result.result.insert("limitApplied", diagnostics.limitApplied);
+    result.result.insert("staleExcluded", diagnostics.staleExcluded);
+    result.result.insert("moduleObjectIdCount", diagnostics.moduleObjectIdCount);
+    result.result.insert("operationObjectIdCount", diagnostics.operationObjectIdCount);
+    result.result.insert("metadataRecordCount", diagnostics.metadataRecordCount);
   }
   return result;
 }

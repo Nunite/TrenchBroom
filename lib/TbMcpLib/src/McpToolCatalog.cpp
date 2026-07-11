@@ -1307,8 +1307,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "call. The tool automatically reviews current brush geometry, chooses terrain-"
       "friendly defaults when appropriate, writes a contact_sheet.png, and returns a "
       "small summary with preferredCapturePath. Use detail=full for captures, quality "
-      "arrays, and other manifest details. qualityValid only checks render readability; "
-      "human or skill review must judge whether the image matches the requested scene "
+      "arrays, and other manifest details. renderReadable only checks render output "
+      "readability; qualityValid is a legacy alias, not semantic geometry validation. "
+      "Human or skill review must judge whether the image matches the requested scene "
       "intent.",
       McpMode::ReadOnly,
       false,
@@ -1402,9 +1403,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "Create an isolated Agent-readable geometry review bundle for generated scene "
       "objects. Pass operationIds or objectIds; the CPU renderer draws only target "
       "geometry with whitebox faces and strong outlines, avoiding live viewport "
-      "layout/visibility changes. qualityValid only checks render readability; human "
-      "or skill review must judge whether the image matches the requested scene "
-      "intent.",
+      "layout/visibility changes. renderReadable only checks render output readability; "
+      "qualityValid is a legacy alias, not semantic geometry validation. Human or skill "
+      "review must judge whether the image matches the requested scene intent.",
       McpMode::ReadOnly,
       false,
       true,
@@ -1552,7 +1553,8 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "render_review_selector",
       "Render an isolated geometry review for objects matched by a structured JSON "
       "selector. This composes selector_preview with render_review_targets and keeps "
-      "the MCP response compact. qualityValid only checks render readability; human or "
+      "the MCP response compact. renderReadable only checks render output readability; "
+      "qualityValid is a legacy alias, not semantic geometry validation. Human or "
       "skill review must judge whether the image matches the requested scene intent.",
       McpMode::ReadOnly,
       false,
@@ -1630,8 +1632,9 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
       "module_render_review",
       "Render an isolated review bundle for a session-level module. By default the "
       "selector limit is raised to cover the full live module; pass limit only when "
-      "you intentionally want a partial review. qualityValid only checks render "
-      "readability; human or skill review must judge whether the image matches the "
+      "you intentionally want a partial review. renderReadable only checks render "
+      "output readability; qualityValid is a legacy alias, not semantic geometry "
+      "validation. Human or skill review must judge whether the image matches the "
       "requested scene intent.",
       McpMode::ReadOnly,
       false,
@@ -3900,6 +3903,8 @@ bool visibleInModelingProfile(const McpToolDefinition& tool)
     "tb_doctor",
     "tb_tools_search",
     "documents_open_verified",
+    "documents_save_current",
+    "documents_save_as",
     "map_snapshot",
     "selection_inspect",
     "entity_link_chain_inspect",

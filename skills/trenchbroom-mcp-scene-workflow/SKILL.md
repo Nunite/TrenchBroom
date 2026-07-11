@@ -26,6 +26,10 @@ design decisions remain under Agent control.
 
 ## Common Flow
 
+Use this as a lightweight editor loop for interactive scene work. Do not create
+design documents, plans, or git commits for ordinary map edits unless the user
+asks to change repository source, add a durable recipe, or commit project files.
+
 1. Confirm binding before writing: connect with the configured Bearer token, call `tb_status`, and record `processId`, `bridgeInstanceId`, `activeDocumentPath`, and `documentFingerprint`. Pass both document guards to later mutations. Record a pre-mutation `problems_check` baseline, including stable problem ids and whether the response is truncated. If `tb_status` returns `associatedSkills` containing `trenchbroom-mcp-scene-workflow`, treat this skill as the workflow owner for scene intent and recipe routing.
 2. Open disposable maps with `documents_open_verified` when switching documents. Do not pass document guards to open a different map; use both path and fingerprint guards on mutating tools after the target document is active.
 3. Split the scene into `moduleId`s and parts before geometry:
@@ -56,8 +60,8 @@ design decisions remain under Agent control.
    - `geometry_analyze_route_continuity` for ramps, platforms, roads, stairs, rails, and route seams. Read `walkableContinuous`, `qualityStatus`, `acceptancePassed`, and `notEvaluated`; do not use legacy `passed` as the completion verdict.
    - `geometry_analyze_slopes` for ramp/surf/slide/wedge/ascending intent. Use `passed`, `slopeCount`, warning samples, and `recoveryAction` from the summary before asking for full detail. If a sloped surface was intended and `passed` is false or `slopeCount` is 0, treat the build as failed and rebuild with a true slope primitive.
    - `geometry_analyze_shell_seams` for recipe output that annotates `shellSeams`, such as `path_tunnel`. This validates only annotated shell intent; missing annotations mean rebuild with an annotated recipe or use visual review, not automatic inference.
-10. Optionally collect visual evidence with `module_render_review`, `render_review_selector`, `render_review_operation`, or `render_review_current_scene(scope:"selection")`. For shape-sensitive modules, prefer one `edgeMode:"all"` construction view and one `edgeMode:"silhouette"` outline view. Review evidence never changes `acceptancePassed`; if review was skipped, report `visualReview:"not_run"`.
-11. Report module revision/content hash, problem delta, `completionState.saveRequired`, visual review status, BSP compile status, and `notEvaluated`. Never describe map validation as BSP or game-collision validation. Report friction as P0 crash/wrong-map/data loss, P1 blocked real workflow, P2 awkward or context-heavy, or P3 documentation/default issue.
+10. Optionally collect visual evidence with `module_render_review`, `render_review_selector`, `render_review_operation`, or `render_review_current_scene(scope:"selection")`. For shape-sensitive modules, prefer one `edgeMode:"all"` construction view and one `edgeMode:"silhouette"` outline view. `renderReadable` only means the render output is readable; `qualityValid` is a legacy alias and is not geometry acceptance. Review evidence never changes `acceptancePassed`; if review was skipped, report `visualReview:"not_run"`.
+11. Report module revision/content hash, problem delta, `completionState.saveRequired`, visual review status, BSP compile status, and `notEvaluated`. Never describe map validation as BSP or game-collision validation. Save only after explicit user confirmation, using `documents_save_current` for the active persistent map or `documents_save_as` for a requested path. Report friction as P0 crash/wrong-map/data loss, P1 blocked real workflow, P2 awkward or context-heavy, or P3 documentation/default issue.
 
 An IR apply is one aggregate operation. Keep `undoOperationId` / `parentOperationId`
 as the undo/redo target and treat `childOperationIds` / `auditOperationIds` as audit detail. If apply fails, require
@@ -72,7 +76,7 @@ Treat the Modeling profile as the normal Agent workbench. It intentionally expos
 
 | Task | Default tools |
 | --- | --- |
-| Bind/open/status | `tb_status`, `documents_open_verified`, `map_snapshot`, `history_status` |
+| Bind/open/status | `tb_status`, `documents_open_verified`, `map_snapshot`, `history_status`, `documents_save_current` / `documents_save_as` after explicit user confirmation |
 | Bulk geometry | `ir_compile_preview`, `ir_compile_preview_from_file`, `ir_apply`, `ir_apply_from_file`, `blockout_create_batch`, `brush_create_boxes_batch`, `brush_create_polygon_batch`, `heightmap_preview_grayscale`, `heightmap_import_grayscale` |
 | Target recovery | `selection_inspect`, `entity_link_chain_inspect`, `selector_preview`, `module_list`, `module_inspect`, `operation_inspect`, `operation_validate`, `geometry_analyze_selection` |
 | Iteration edits | `objects_transform` on selection or selector, `objects_delete_by_selector`, `entity_properties_update`, `entity_properties_delete`, `texture_apply_by_filter`, `texture_align_face` |
@@ -81,7 +85,7 @@ Treat the Modeling profile as the normal Agent workbench. It intentionally expos
 | Validation | `geometry_analyze_selection`, `geometry_analyze_slopes`, `geometry_analyze_route_continuity`, `geometry_analyze_shell_seams`, `module_validate`, `map_validate(groupByType:true)`, `problems_check` |
 | Visual review | `render_review_selector`, `render_review_operation`, `render_review_current_scene`, `module_render_review` |
 
-When a needed capability is not visible, search for it explicitly with `tb_tools_search(detail:"schema")` and check `visibleInCurrentProfile:false`. Hidden/searchable tools are for specific expert cases:
+When a needed capability is not visible, or when an operation type/parameter is uncertain, search for it explicitly with `tb_tools_search(detail:"schema")` and check `visibleInCurrentProfile:false`. Do this before guessing `blockout_create_batch` operation names such as tube, arch, or corridor; for path-shaped arches and pipes, prefer the `path_sweep` recipe. Hidden/searchable tools are for specific expert cases:
 
 - `viewport_capture_*` and `viewport_capture_scene_review`: UI viewport/layout/camera debugging. For normal scene review, use the geometry review tools above.
 - `render_review_targets`: low-level review when you already have exact object or operation targets. Prefer selector/module/operation wrappers.
@@ -145,7 +149,7 @@ Use structured JSON selectors, not free text DSL:
 {"selector": {"moduleId": "route-a", "part": "rail"}}
 ```
 
-Combine filters only when needed: metadata + type, moduleId + material, operationIds + bounds, classname + bounds. Always preview before select/delete/render when the selection is not obvious.
+Combine filters only when needed: metadata + type, moduleId + material, operationIds + bounds, classname + bounds. Always preview before select/delete/render when the selection is not obvious. If `selector_preview` or `render_review_selector` returns fewer objects than `module_inspect` or recent operation history, inspect `matchedBeforeLimit`, `limitApplied`, `staleExcluded`, `moduleObjectIdCount`, `operationObjectIdCount`, and `metadataRecordCount`; use `module_render_review(moduleId)` for full generated modules and `render_review_current_scene(scope:"mcp_history")` for recent MCP output when selector recovery is ambiguous.
 
 Selectors are best for objects the Agent just generated with metadata. For old maps, mixed manual edits, entity chains, or dense brushwork, do not make the Agent guess targets with elaborate selector rules. Let the user select the intended objects in TrenchBroom, inspect them with `selection_inspect`, use `entity_link_chain_inspect` for key/value links when needed, then call selection-aware tools.
 
@@ -206,7 +210,7 @@ or numeric UV edits are required.
 
 ## Review Rules
 
-Use review renderer output as optional evidence, not as an automatic validator. Use `edgeMode:"all"` to expose construction seams and `edgeMode:"silhouette"` to judge the outer profile without internal Brush edges. Contact sheets are for quick recognition; if a scene is dense, inspect individual captures. For terrain or routes, request side/iso views and `verticalExaggeration` when height changes are subtle.
+Use review renderer output as optional evidence, not as an automatic validator. `renderReadable=true` only means the PNG/contact sheet was produced and readable; it does not prove no overlaps, no leaks, good tunnel closure, or design intent. Use `edgeMode:"all"` to expose construction seams and `edgeMode:"silhouette"` to judge the outer profile without internal Brush edges. Contact sheets are for quick recognition; if a scene is dense, inspect individual captures. For terrain or routes, request side/iso views and `verticalExaggeration` when height changes are subtle.
 
 Keep labels sparse. Entity glyph markers remain useful without classname text on dense modules, so let `autoHideLabelsThreshold` hide entity/order/part labels by default. When the structure needs semantic callouts, prefer `labelParts:["road","rail"]` or another short part list instead of labeling every object.
 
