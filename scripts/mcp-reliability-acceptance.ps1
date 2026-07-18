@@ -194,6 +194,21 @@ function Invoke-StdioLongTool {
     $initializeResponse = $process.StandardOutput.ReadLine() | ConvertFrom-Json
     Assert-True ($null -eq $initializeResponse.error) "stdio initialize failed"
 
+    $toolsList = [ordered] @{
+      jsonrpc = "2.0"
+      id = 2
+      method = "tools/list"
+      params = @{}
+    }
+    $process.StandardInput.WriteLine((ConvertTo-CompactJson $toolsList))
+    $process.StandardInput.Flush()
+    $toolsListResponse = $process.StandardOutput.ReadLine() | ConvertFrom-Json
+    Assert-True ($null -eq $toolsListResponse.error) "stdio tools/list failed"
+    Assert-True ($toolsListResponse.result.toolProfile -eq "Modeling") `
+      "stdio ignored the configured Modeling profile"
+    Assert-True (@($toolsListResponse.result.tools).Count -eq 53) `
+      "stdio Modeling tools/list count changed: $(@($toolsListResponse.result.tools).Count)"
+
     $script = @'
 import json
 import time
@@ -202,7 +217,7 @@ print(json.dumps({"operations": [{"type": "box", "min": [640, 0, 0], "max": [704
 '@
     $call = [ordered] @{
       jsonrpc = "2.0"
-      id = 2
+      id = 3
       method = "tools/call"
       params = [ordered] @{
         name = "python_generate_blockout"
@@ -226,9 +241,52 @@ print(json.dumps({"operations": [{"type": "box", "min": [640, 0, 0], "max": [704
       "stdio long tool failed: $($callResponse.result.structuredContent.message)"
     Assert-True ($timer.Elapsed.TotalSeconds -ge 5.5) `
       "stdio long tool returned after only $($timer.ElapsedMilliseconds) ms"
+    $resourceUri = [string] $callResponse.result.structuredContent.resourceUri
+    Assert-True (-not [string]::IsNullOrWhiteSpace($resourceUri)) `
+      "stdio long tool did not return an operation resource"
+
+    $cursor = ""
+    $resourceFound = $false
+    $requestId = 4
+    do {
+      $listParams = [ordered] @{}
+      if (-not [string]::IsNullOrWhiteSpace($cursor)) {
+        $listParams.cursor = $cursor
+      }
+      $listRequest = [ordered] @{
+        jsonrpc = "2.0"
+        id = $requestId++
+        method = "resources/list"
+        params = $listParams
+      }
+      $process.StandardInput.WriteLine((ConvertTo-CompactJson $listRequest))
+      $process.StandardInput.Flush()
+      $listResponse = $process.StandardOutput.ReadLine() | ConvertFrom-Json
+      Assert-True ($null -eq $listResponse.error) "stdio resources/list failed"
+      $resourceFound = @($listResponse.result.resources | Where-Object {
+        $_.uri -eq $resourceUri
+      }).Count -eq 1
+      $cursor = [string] $listResponse.result.nextCursor
+    } while (-not $resourceFound -and -not [string]::IsNullOrWhiteSpace($cursor))
+    Assert-True $resourceFound "stdio resources/list omitted the new operation resource"
+
+    $readRequest = [ordered] @{
+      jsonrpc = "2.0"
+      id = $requestId
+      method = "resources/read"
+      params = [ordered] @{ uri = $resourceUri }
+    }
+    $process.StandardInput.WriteLine((ConvertTo-CompactJson $readRequest))
+    $process.StandardInput.Flush()
+    $readResponse = $process.StandardOutput.ReadLine() | ConvertFrom-Json
+    Assert-True ($null -eq $readResponse.error) "stdio resources/read failed"
+    Assert-True ($readResponse.result.contents[0].text -like "*$($callResponse.result.structuredContent.operationId)*") `
+      "stdio resources/read returned the wrong operation"
+
     return [ordered] @{
       elapsedMs = $timer.ElapsedMilliseconds
       operationId = $callResponse.result.structuredContent.operationId
+      resourceUri = $resourceUri
     }
   } finally {
     $process.StandardInput.Close()
@@ -255,7 +313,7 @@ $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
 Assert-True ($config.mode -eq "Edit") "MCP config mode must be Edit for acceptance"
 $toolProfile = if ([string]::IsNullOrWhiteSpace($config.toolProfile)) { "Modeling" } else { [string] $config.toolProfile }
 Assert-True ($toolProfile -eq "Modeling") `
-  "MCP config toolProfile must be Modeling for the 47-tool acceptance baseline"
+  "MCP config toolProfile must be Modeling for the 53-tool acceptance baseline"
 Assert-True (-not [string]::IsNullOrWhiteSpace($config.token)) "MCP config token is missing"
 $url = "http://127.0.0.1:$($config.httpPort)/mcp"
 $token = [string] $config.token
@@ -606,6 +664,7 @@ try {
     silhouetteEdgeDensity = $review.captures[0].edgeDensity
     allEdgeDensity = $reviewAll.captures[0].edgeDensity
     stdioElapsedMs = $stdio.elapsedMs
+    stdioResourceUri = $stdio.resourceUri
     reviewResourceUri = $review.resourceUri
     evictedReviewResourceUri = $firstReviewResourceUri
     retainedReviewResourceUri = $lastReviewResourceUri

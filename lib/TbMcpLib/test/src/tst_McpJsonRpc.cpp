@@ -200,12 +200,18 @@ TEST_CASE("McpJsonRpc")
         return McpBridgeResponse::success("request", {});
       },
       McpToolProfile::Modeling,
-      [](const QString& uri) -> std::optional<QJsonObject> {
+      [](const QString&) {
+        return McpBridgeResponse::success(
+          "resource-list", QJsonObject{{"resources", QJsonArray{}}});
+      },
+      [](const QString& uri) {
         if (uri == "tbmcp://operation/mcp-op-1")
         {
-          return QJsonObject{{"operationId", "mcp-op-1"}};
+          return McpBridgeResponse::success(
+            "resource-read", QJsonObject{{"operationId", "mcp-op-1"}});
         }
-        return std::nullopt;
+        return McpBridgeResponse::failure(
+          "resource-read", McpError{McpErrorCode::InvalidParams, "Resource not found"});
       });
 
     REQUIRE(response);
@@ -215,6 +221,89 @@ TEST_CASE("McpJsonRpc")
     CHECK(contents[0].toObject().value("uri").toString() == "tbmcp://operation/mcp-op-1");
     CHECK(contents[0].toObject().value("mimeType").toString() == "application/json");
     CHECK(contents[0].toObject().value("text").toString().contains("mcp-op-1"));
+  }
+
+  SECTION("resources list returns a bounded provider page")
+  {
+    const auto response = handleMcpJsonRpcRequest(
+      QJsonObject{
+        {"jsonrpc", "2.0"},
+        {"id", 6},
+        {"method", "resources/list"},
+        {"params", QJsonObject{{"cursor", "opaque-cursor"}}},
+      },
+      McpMode::ReadOnly,
+      [](const QString&, const QJsonObject&) {
+        return McpBridgeResponse::success("request", {});
+      },
+      McpToolProfile::Core,
+      [](const QString& cursor) {
+        CHECK(cursor == "opaque-cursor");
+        return McpBridgeResponse::success(
+          "resource-list",
+          QJsonObject{
+            {"resources",
+             QJsonArray{QJsonObject{
+               {"uri", "tbmcp://review/review-1"},
+               {"name", "review-1"},
+               {"mimeType", "application/json"},
+             }}},
+            {"nextCursor", "next-page"},
+          });
+      },
+      [](const QString&) {
+        return McpBridgeResponse::failure(
+          "resource-read", McpError{McpErrorCode::InvalidParams, "not found"});
+      });
+
+    REQUIRE(response);
+    const auto result = response->value("result").toObject();
+    REQUIRE(result.value("resources").toArray().size() == 1);
+    CHECK(result.value("nextCursor").toString() == "next-page");
+  }
+
+  SECTION("resource provider failures map to protocol errors")
+  {
+    const auto listError = handleMcpJsonRpcRequest(
+      QJsonObject{
+        {"jsonrpc", "2.0"},
+        {"id", 7},
+        {"method", "resources/list"},
+        {"params", QJsonObject{{"cursor", "invalid"}}},
+      },
+      McpMode::ReadOnly,
+      [](const QString&, const QJsonObject&) {
+        return McpBridgeResponse::success("request", {});
+      },
+      McpToolProfile::Modeling,
+      [](const QString&) {
+        return McpBridgeResponse::failure(
+          "resource-list",
+          McpError{McpErrorCode::InvalidParams, "Invalid MCP resource cursor"});
+      },
+      {});
+    REQUIRE(listError);
+    CHECK(listError->value("error").toObject().value("code").toInt() == -32602);
+
+    const auto readError = handleMcpJsonRpcRequest(
+      QJsonObject{
+        {"jsonrpc", "2.0"},
+        {"id", 8},
+        {"method", "resources/read"},
+        {"params", QJsonObject{{"uri", "tbmcp://operation/missing"}}},
+      },
+      McpMode::ReadOnly,
+      [](const QString&, const QJsonObject&) {
+        return McpBridgeResponse::success("request", {});
+      },
+      McpToolProfile::Modeling,
+      {},
+      [](const QString&) {
+        return McpBridgeResponse::failure(
+          "resource-read", McpError{McpErrorCode::InvalidParams, "Resource not found"});
+      });
+    REQUIRE(readError);
+    CHECK(readError->value("error").toObject().value("code").toInt() == -32002);
   }
 }
 

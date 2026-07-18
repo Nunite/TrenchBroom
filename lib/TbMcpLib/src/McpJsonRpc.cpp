@@ -155,7 +155,7 @@ QJsonObject mcpInitializeResult(const QJsonObject& params)
     {"protocolVersion", ProtocolVersion},
     {"capabilities",
      QJsonObject{
-       {"resources", QJsonObject{}},
+       {"resources", QJsonObject{{"listChanged", false}}},
        {"tools", QJsonObject{{"listChanged", false}}},
      }},
     {"serverInfo",
@@ -239,6 +239,7 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
   const McpMode currentMode,
   const McpToolCaller& toolCaller,
   const McpToolProfile profile,
+  const McpResourceLister& resourceLister,
   const McpResourceReader& resourceReader)
 {
   const auto id = request.value("id");
@@ -285,6 +286,32 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
     return jsonRpcResult(id, mcpToolCallResult(params, toolCaller));
   }
 
+  if (method == "resources/list")
+  {
+    const auto cursorValue = params.value("cursor");
+    if (!cursorValue.isUndefined() && !cursorValue.isString())
+    {
+      return jsonRpcError(id, -32602, "resources/list cursor must be a string");
+    }
+    if (!resourceLister)
+    {
+      return jsonRpcError(id, -32601, "resources/list is not available");
+    }
+    const auto response = resourceLister(cursorValue.toString());
+    if (!response.ok)
+    {
+      const auto error = response.error.value_or(
+        McpError{McpErrorCode::InternalError, "Unknown MCP resource list error"});
+      const auto code = error.code == McpErrorCode::InvalidParams ? -32602 : -32603;
+      return jsonRpcError(id, code, error.message);
+    }
+    if (!response.result.value("resources").isArray())
+    {
+      return jsonRpcError(id, -32603, "Resource provider returned an invalid list");
+    }
+    return jsonRpcResult(id, response.result);
+  }
+
   if (method == "resources/read")
   {
     const auto uri = params.value("uri").toString();
@@ -296,10 +323,13 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
     {
       return jsonRpcError(id, -32601, "resources/read is not available");
     }
-    const auto resource = resourceReader(uri);
-    if (!resource)
+    const auto response = resourceReader(uri);
+    if (!response.ok)
     {
-      return jsonRpcError(id, -32002, QString{"Resource not found: %1"}.arg(uri));
+      const auto error = response.error.value_or(
+        McpError{McpErrorCode::InternalError, "Unknown MCP resource read error"});
+      const auto code = error.code == McpErrorCode::InvalidParams ? -32002 : -32603;
+      return jsonRpcError(id, code, error.message);
     }
     return jsonRpcResult(
       id,
@@ -308,7 +338,7 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
          QJsonArray{QJsonObject{
            {"uri", uri},
            {"mimeType", "application/json"},
-           {"text", compactJsonText(*resource)},
+           {"text", compactJsonText(response.result)},
          }}}});
   }
 
@@ -319,7 +349,7 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
   const QJsonObject& request, const McpMode currentMode, const McpToolCaller& toolCaller)
 {
   return handleMcpJsonRpcRequest(
-    request, currentMode, toolCaller, McpToolProfile::Modeling, {});
+    request, currentMode, toolCaller, McpToolProfile::Modeling, {}, {});
 }
 
 } // namespace tb::mcp

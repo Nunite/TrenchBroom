@@ -74,6 +74,14 @@ McpBridgeServer makeBridgeServer()
         {"operationId", "mcp-op-1"},
       });
     }
+    if (toolName == "render_review_current_scene")
+    {
+      return McpBridgeToolResult::success(QJsonObject{
+        {"tool", toolName},
+        {"reviewId", "http-review"},
+        {"resourceUri", "tbmcp://review/http-review"},
+      });
+    }
 
     return McpBridgeToolResult::success(QJsonObject{
       {"tool", toolName},
@@ -428,6 +436,74 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     CHECK(names.contains("tb_status"));
     CHECK(!names.contains("entity_create_checked"));
     CHECK(!names.contains("blockout_create_batch"));
+  }
+
+  SECTION("tools list uses the configured profile")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer = McpHttpServer{bridgeServer};
+    auto config = makeConfig(mcp::McpMode::ReadOnly);
+    config.toolProfile = mcp::McpToolProfile::Core;
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    const auto response = sendRequest(
+      httpServer.port(), makeHttpRequest("POST", "/mcp", jsonRequest(22, "tools/list")));
+
+    CHECK(response.statusCode == 200);
+    const auto result = jsonObject(response).value("result").toObject();
+    CHECK(result.value("toolProfile").toString() == "Core");
+    const auto names = toolNames(result.value("tools").toArray());
+    CHECK(names.contains("tb_status"));
+    CHECK_FALSE(names.contains("documents_open"));
+  }
+
+  SECTION("resources list and read expose retained reviews")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer = McpHttpServer{bridgeServer};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    const auto created = sendRequest(
+      httpServer.port(),
+      makeHttpRequest(
+        "POST",
+        "/mcp",
+        jsonRequest(
+          23,
+          "tools/call",
+          QJsonObject{
+            {"name", "render_review_current_scene"},
+            {"arguments", QJsonObject{}},
+          })));
+    REQUIRE(created.statusCode == 200);
+    CHECK_FALSE(jsonObject(created).value("result").toObject().value("isError").toBool());
+
+    const auto listed = sendRequest(
+      httpServer.port(),
+      makeHttpRequest("POST", "/mcp", jsonRequest(24, "resources/list")));
+    REQUIRE(listed.statusCode == 200);
+    const auto resources =
+      jsonObject(listed).value("result").toObject().value("resources").toArray();
+    REQUIRE(resources.size() == 1);
+    CHECK(
+      resources.first().toObject().value("uri").toString()
+      == "tbmcp://review/http-review");
+
+    const auto read = sendRequest(
+      httpServer.port(),
+      makeHttpRequest(
+        "POST",
+        "/mcp",
+        jsonRequest(
+          25, "resources/read", QJsonObject{{"uri", "tbmcp://review/http-review"}})));
+    REQUIRE(read.statusCode == 200);
+    const auto contents =
+      jsonObject(read).value("result").toObject().value("contents").toArray();
+    REQUIRE(contents.size() == 1);
+    CHECK(contents.first().toObject().value("text").toString().contains("http-review"));
   }
 
   SECTION("notification returns accepted")

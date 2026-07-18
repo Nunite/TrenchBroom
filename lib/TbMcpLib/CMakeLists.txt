@@ -8,6 +8,7 @@ target_sources(TbMcpLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/McpError.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/McpJsonRpc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/McpMode.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/McpStdioAdapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/McpToolCatalog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/McpToolCatalogInternal.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/McpToolCatalogSerialization.cpp

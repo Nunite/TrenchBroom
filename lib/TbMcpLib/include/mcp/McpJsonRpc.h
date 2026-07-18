@@ -35,7 +35,8 @@ namespace tb::mcp
 
 using McpToolCaller =
   std::function<McpBridgeResponse(const QString& toolName, const QJsonObject& arguments)>;
-using McpResourceReader = std::function<std::optional<QJsonObject>(const QString& uri)>;
+using McpResourceLister = std::function<McpBridgeResponse(const QString& cursor)>;
+using McpResourceReader = std::function<McpBridgeResponse(const QString& uri)>;
 
 QJsonObject jsonRpcResult(const QJsonValue& id, QJsonObject result);
 QJsonObject jsonRpcError(const QJsonValue& id, int code, const QString& message);
@@ -48,6 +49,7 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
   McpMode currentMode,
   const McpToolCaller& toolCaller,
   McpToolProfile profile,
+  const McpResourceLister& resourceLister,
   const McpResourceReader& resourceReader);
 std::optional<QJsonObject> handleMcpJsonRpcRequest(
   const QJsonObject& request, McpMode currentMode, const McpToolCaller& toolCaller);

@@ -569,7 +569,22 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
       return m_bridgeServer.dispatchRequest(request);
     },
     m_config.toolProfile,
-    [this](const QString& uri) { return m_bridgeServer.readResource(uri); });
+    [this](const QString& cursor) {
+      auto error = QString{};
+      const auto resources = m_bridgeServer.listResources(cursor, &error);
+      return resources ? mcp::McpBridgeResponse::success({}, *resources)
+                       : mcp::McpBridgeResponse::failure(
+                           {}, mcp::McpError{mcp::McpErrorCode::InvalidParams, error});
+    },
+    [this](const QString& uri) {
+      const auto resource = m_bridgeServer.readResource(uri);
+      return resource ? mcp::McpBridgeResponse::success({}, *resource)
+                      : mcp::McpBridgeResponse::failure(
+                          {},
+                          mcp::McpError{
+                            mcp::McpErrorCode::InvalidParams,
+                            QString{"Resource not found: %1"}.arg(uri)});
+    });
 
   if (!response)
   {

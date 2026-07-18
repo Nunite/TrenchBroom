@@ -24,8 +24,8 @@
 
 #include "mcp/McpBridgeClient.h"
 #include "mcp/McpBridgeConfig.h"
-#include "mcp/McpError.h"
 #include "mcp/McpJsonRpc.h"
+#include "mcp/McpStdioAdapter.h"
 
 namespace tb::mcp
 {
@@ -35,29 +35,6 @@ namespace
 std::optional<McpBridgeConfig> loadConfig(QString* error)
 {
   return readOrCreateBridgeConfig(defaultConfigPath(), error);
-}
-
-McpBridgeResponse callBridge(const QString& toolName, const QJsonObject& arguments)
-{
-  auto error = QString{};
-  const auto config = loadConfig(&error);
-  if (!config)
-  {
-    return McpBridgeResponse::failure(
-      {},
-      McpError{
-        McpErrorCode::InternalError,
-        QString{"Could not load MCP config: %1"}.arg(error)});
-  }
-
-  if (config->mode == McpMode::Off)
-  {
-    return McpBridgeResponse::failure(
-      {}, McpError{McpErrorCode::Forbidden, "TrenchBroom MCP bridge is disabled"});
-  }
-
-  static const auto Client = McpBridgeClient{};
-  return Client.call(*config, toolName, arguments);
 }
 
 std::optional<QJsonObject> handleRequest(const QJsonObject& request)
@@ -70,7 +47,8 @@ std::optional<QJsonObject> handleRequest(const QJsonObject& request)
       request.value("id"), -32603, QString{"Could not load MCP config: %1"}.arg(error));
   }
 
-  return handleMcpJsonRpcRequest(request, config->mode, callBridge);
+  static const auto Client = McpBridgeClient{};
+  return handleMcpStdioJsonRpcRequest(request, *config, Client);
 }
 
 void writeJsonLine(QTextStream& out, const QJsonObject& json)
