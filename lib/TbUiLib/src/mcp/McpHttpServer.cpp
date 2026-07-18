@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <utility>
 
 namespace tb::ui
 {
@@ -136,8 +137,15 @@ QString pathFromRequestLine(const QByteArray& requestLine)
 } // namespace
 
 McpHttpServer::McpHttpServer(McpBridgeServer& bridgeServer, QObject* parent)
+  : McpHttpServer{bridgeServer, McpHttpServerLimits{}, parent}
+{
+}
+
+McpHttpServer::McpHttpServer(
+  McpBridgeServer& bridgeServer, McpHttpServerLimits limits, QObject* parent)
   : QObject{parent}
   , m_bridgeServer{bridgeServer}
+  , m_limits{std::move(limits)}
 {
 }
 

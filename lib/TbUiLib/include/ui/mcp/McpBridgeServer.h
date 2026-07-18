@@ -25,6 +25,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QStringList>
+#include <QtGlobal>
 
 #include "mcp/McpBridgeConfig.h"
 #include "mcp/McpBridgeMessages.h"
@@ -49,6 +50,13 @@ namespace tb::ui
 namespace mcp = tb::mcp;
 
 class AppController;
+
+struct McpBridgeTransportLimits
+{
+  qsizetype maxRequestBytes = 4 * 1024 * 1024;
+  int incompleteRequestTimeoutMs = 10'000;
+  int maxConnections = 32;
+};
 
 struct McpBridgeToolResult
 {
@@ -186,6 +194,7 @@ public:
 
 private:
   mcp::McpBridgeConfig m_config;
+  McpBridgeTransportLimits m_transportLimits;
   ToolHandler m_toolHandler;
   ActiveMapProvider m_activeMapProvider;
   QJsonObject m_overlayState;
@@ -205,10 +214,23 @@ private:
 
 public:
   explicit McpBridgeServer(AppController& appController, QObject* parent = nullptr);
+  McpBridgeServer(
+    AppController& appController,
+    McpBridgeTransportLimits transportLimits,
+    QObject* parent = nullptr);
   explicit McpBridgeServer(ToolHandler toolHandler, QObject* parent = nullptr);
   McpBridgeServer(
     ToolHandler toolHandler,
+    McpBridgeTransportLimits transportLimits,
+    QObject* parent = nullptr);
+  McpBridgeServer(
+    ToolHandler toolHandler,
     ActiveMapProvider activeMapProvider,
+    QObject* parent = nullptr);
+  McpBridgeServer(
+    ToolHandler toolHandler,
+    ActiveMapProvider activeMapProvider,
+    McpBridgeTransportLimits transportLimits,
     QObject* parent = nullptr);
   ~McpBridgeServer() override;
 

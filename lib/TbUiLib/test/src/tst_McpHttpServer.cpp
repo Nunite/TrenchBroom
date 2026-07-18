@@ -186,6 +186,16 @@ QByteArray jsonRequest(
 
 TEST_CASE("McpHttpServer", "[McpHttpServer]")
 {
+  SECTION("uses bounded production defaults")
+  {
+    const auto limits = McpHttpServerLimits{};
+    CHECK(limits.maxHeaderBytes == 64 * 1024);
+    CHECK(limits.maxBodyBytes == 4 * 1024 * 1024);
+    CHECK(limits.incompleteRequestTimeoutMs == 10'000);
+    CHECK(limits.maxOrdinaryConnections == 32);
+    CHECK(limits.maxSseConnections == 8);
+  }
+
   SECTION("off mode does not listen")
   {
     auto bridgeServer = makeBridgeServer();

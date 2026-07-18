@@ -69,6 +69,12 @@ McpBridgeToolResult McpBridgeToolResult::failure(
 }
 
 McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
+  : McpBridgeServer{appController, McpBridgeTransportLimits{}, parent}
+{
+}
+
+McpBridgeServer::McpBridgeServer(
+  AppController& appController, McpBridgeTransportLimits transportLimits, QObject* parent)
   : McpBridgeServer{
       [&appController, this](const auto& toolName, const auto& params) {
         if (toolName == "tb_status")
@@ -872,6 +878,7 @@ McpBridgeServer::McpBridgeServer(AppController& appController, QObject* parent)
           mcp::McpErrorCode::ToolNotFound,
           QString{"MCP tool is registered but not wired yet: %1"}.arg(toolName));
       },
+      std::move(transportLimits),
       parent}
 {
   auto legacyDispatcher = std::make_shared<ToolHandler>(std::move(m_toolHandler));
@@ -906,14 +913,35 @@ int McpBridgeServer::duplicateToolRegistrationCount() const
 }
 
 McpBridgeServer::McpBridgeServer(ToolHandler toolHandler, QObject* parent)
+  : McpBridgeServer{std::move(toolHandler), McpBridgeTransportLimits{}, parent}
+{
+}
+
+McpBridgeServer::McpBridgeServer(
+  ToolHandler toolHandler, McpBridgeTransportLimits transportLimits, QObject* parent)
   : QObject{parent}
+  , m_transportLimits{std::move(transportLimits)}
   , m_toolHandler{std::move(toolHandler)}
 {
 }
 
 McpBridgeServer::McpBridgeServer(
   ToolHandler toolHandler, ActiveMapProvider activeMapProvider, QObject* parent)
+  : McpBridgeServer{
+      std::move(toolHandler),
+      std::move(activeMapProvider),
+      McpBridgeTransportLimits{},
+      parent}
+{
+}
+
+McpBridgeServer::McpBridgeServer(
+  ToolHandler toolHandler,
+  ActiveMapProvider activeMapProvider,
+  McpBridgeTransportLimits transportLimits,
+  QObject* parent)
   : QObject{parent}
+  , m_transportLimits{std::move(transportLimits)}
   , m_toolHandler{std::move(toolHandler)}
   , m_activeMapProvider{std::move(activeMapProvider)}
 {

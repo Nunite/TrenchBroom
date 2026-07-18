@@ -21,6 +21,7 @@
 
 #include <QByteArray>
 #include <QObject>
+#include <QtGlobal>
 
 #include "mcp/McpBridgeConfig.h"
 #include "ui/mcp/McpBridgeServer.h"
@@ -34,16 +35,28 @@ namespace tb::ui
 {
 namespace mcp = tb::mcp;
 
+struct McpHttpServerLimits
+{
+  qsizetype maxHeaderBytes = 64 * 1024;
+  qsizetype maxBodyBytes = 4 * 1024 * 1024;
+  int incompleteRequestTimeoutMs = 10'000;
+  int maxOrdinaryConnections = 32;
+  int maxSseConnections = 8;
+};
+
 class McpHttpServer : public QObject
 {
   Q_OBJECT
 private:
   McpBridgeServer& m_bridgeServer;
+  McpHttpServerLimits m_limits;
   mcp::McpBridgeConfig m_config;
   std::unique_ptr<QTcpServer> m_server;
 
 public:
   explicit McpHttpServer(McpBridgeServer& bridgeServer, QObject* parent = nullptr);
+  McpHttpServer(
+    McpBridgeServer& bridgeServer, McpHttpServerLimits limits, QObject* parent = nullptr);
   ~McpHttpServer() override;
 
   bool start(const mcp::McpBridgeConfig& config, QString* error = nullptr);

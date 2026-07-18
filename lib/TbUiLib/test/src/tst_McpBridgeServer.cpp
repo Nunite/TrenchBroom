@@ -65,6 +65,14 @@ namespace mcp = tb::mcp;
 
 TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 {
+  SECTION("uses bounded local transport defaults")
+  {
+    const auto limits = McpBridgeTransportLimits{};
+    CHECK(limits.maxRequestBytes == 4 * 1024 * 1024);
+    CHECK(limits.incompleteRequestTimeoutMs == 10'000);
+    CHECK(limits.maxConnections == 32);
+  }
+
   auto server = McpBridgeServer{[](const QString& toolName, const QJsonObject& params) {
     if (toolName == "tb_status")
     {
