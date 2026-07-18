@@ -188,7 +188,8 @@ QJsonObject mcpToolsListResult(const McpMode currentMode)
   return mcpToolsListResult(currentMode, McpToolProfile::Modeling);
 }
 
-QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& toolCaller)
+QJsonObject mcpToolCallResult(
+  const QJsonObject& params, const McpRequestDispatcher& dispatcher)
 {
   const auto nameValue = params.value("name");
   if (!nameValue.isString() || nameValue.toString().trimmed().isEmpty())
@@ -207,7 +208,8 @@ QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& to
     arguments = argumentsValue.toObject();
   }
 
-  const auto bridgeResponse = toolCaller(nameValue.toString(), arguments);
+  const auto bridgeResponse =
+    dispatcher(McpBridgeRequestType::ToolCall, nameValue.toString(), arguments);
   if (bridgeResponse.ok)
   {
     return textToolResult(
@@ -237,10 +239,8 @@ QJsonObject mcpToolCallResult(const QJsonObject& params, const McpToolCaller& to
 std::optional<QJsonObject> handleMcpJsonRpcRequest(
   const QJsonObject& request,
   const McpMode currentMode,
-  const McpToolCaller& toolCaller,
-  const McpToolProfile profile,
-  const McpResourceLister& resourceLister,
-  const McpResourceReader& resourceReader)
+  const McpRequestDispatcher& dispatcher,
+  const McpToolProfile profile)
 {
   const auto id = request.value("id");
   if (request.value("jsonrpc").toString() != "2.0")
@@ -283,7 +283,7 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
 
   if (method == "tools/call")
   {
-    return jsonRpcResult(id, mcpToolCallResult(params, toolCaller));
+    return jsonRpcResult(id, mcpToolCallResult(params, dispatcher));
   }
 
   if (method == "resources/list")
@@ -293,11 +293,7 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
     {
       return jsonRpcError(id, -32602, "resources/list cursor must be a string");
     }
-    if (!resourceLister)
-    {
-      return jsonRpcError(id, -32601, "resources/list is not available");
-    }
-    const auto response = resourceLister(cursorValue.toString());
+    const auto response = dispatcher(McpBridgeRequestType::ResourcesList, {}, params);
     if (!response.ok)
     {
       const auto error = response.error.value_or(
@@ -319,11 +315,7 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
     {
       return jsonRpcError(id, -32602, "resources/read requires uri");
     }
-    if (!resourceReader)
-    {
-      return jsonRpcError(id, -32601, "resources/read is not available");
-    }
-    const auto response = resourceReader(uri);
+    const auto response = dispatcher(McpBridgeRequestType::ResourceRead, {}, params);
     if (!response.ok)
     {
       const auto error = response.error.value_or(
@@ -343,13 +335,6 @@ std::optional<QJsonObject> handleMcpJsonRpcRequest(
   }
 
   return jsonRpcError(id, -32601, QString{"Method not found: %1"}.arg(method));
-}
-
-std::optional<QJsonObject> handleMcpJsonRpcRequest(
-  const QJsonObject& request, const McpMode currentMode, const McpToolCaller& toolCaller)
-{
-  return handleMcpJsonRpcRequest(
-    request, currentMode, toolCaller, McpToolProfile::Modeling, {}, {});
 }
 
 } // namespace tb::mcp

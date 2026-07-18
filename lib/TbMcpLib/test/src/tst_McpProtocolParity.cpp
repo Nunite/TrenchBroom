@@ -24,7 +24,6 @@
 
 #include "mcp/McpBridgeClient.h"
 #include "mcp/McpJsonRpc.h"
-#include "mcp/McpStdioAdapter.h"
 
 #include <functional>
 #include <memory>
@@ -199,31 +198,17 @@ TEST_CASE(
       return handleMcpJsonRpcRequest(
         json,
         config.mode,
-        [](const QString& toolName, const QJsonObject&) {
-          return protocolBridgeResponse(
-            McpBridgeRequest{"direct", "secret", toolName, {}, McpMode::ReadOnly});
-        },
-        config.toolProfile,
-        [](const QString& cursor) {
+        [](const McpBridgeRequestType type, const QString& tool, QJsonObject params) {
           return protocolBridgeResponse(McpBridgeRequest{
-            "direct-list",
+            "direct",
             "secret",
-            {},
-            QJsonObject{{"cursor", cursor}},
-            std::nullopt,
-            McpBridgeRequestType::ResourcesList,
+            tool,
+            std::move(params),
+            McpMode::ReadOnly,
+            type,
           });
         },
-        [](const QString& uri) {
-          return protocolBridgeResponse(McpBridgeRequest{
-            "direct-read",
-            "secret",
-            {},
-            QJsonObject{{"uri", uri}},
-            std::nullopt,
-            McpBridgeRequestType::ResourceRead,
-          });
-        });
+        config.toolProfile);
     });
   }
 
@@ -232,7 +217,13 @@ TEST_CASE(
     const auto client = McpBridgeClient{
       [] { return std::make_unique<ProtocolConnection>(); }, McpBridgeClientTimeouts{}};
     runProtocolContract([&](const QJsonObject& json) {
-      return handleMcpStdioJsonRpcRequest(json, config, client);
+      return handleMcpJsonRpcRequest(
+        json,
+        config.mode,
+        [&](const McpBridgeRequestType type, const QString& tool, QJsonObject params) {
+          return client.request(config, type, tool, std::move(params));
+        },
+        config.toolProfile);
     });
   }
 }

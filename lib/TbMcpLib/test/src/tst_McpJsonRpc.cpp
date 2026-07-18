@@ -106,8 +106,12 @@ TEST_CASE("McpJsonRpc")
         {"name", "tb_status"},
         {"arguments", QJsonObject{{"hello", "world"}}},
       },
-      [&](const QString& toolName, const QJsonObject& arguments) {
+      [&](
+        const McpBridgeRequestType type,
+        const QString& toolName,
+        const QJsonObject& arguments) {
         called = true;
+        CHECK(type == McpBridgeRequestType::ToolCall);
         CHECK(toolName == "tb_status");
         CHECK(arguments.value("hello").toString() == "world");
         return McpBridgeResponse::success("request", QJsonObject{{"ok", true}});
@@ -125,7 +129,7 @@ TEST_CASE("McpJsonRpc")
         {"name", "blockout_create_batch"},
         {"arguments", QJsonObject{}},
       },
-      [](const QString&, const QJsonObject&) {
+      [](McpBridgeRequestType, const QString&, const QJsonObject&) {
         return McpBridgeResponse::success(
           "request",
           QJsonObject{
@@ -153,7 +157,7 @@ TEST_CASE("McpJsonRpc")
         {"method", "notifications/cancelled"},
       },
       McpMode::ReadOnly,
-      [](const QString&, const QJsonObject&) {
+      [](McpBridgeRequestType, const QString&, const QJsonObject&) {
         return McpBridgeResponse::success("request", {});
       });
 
@@ -165,7 +169,7 @@ TEST_CASE("McpJsonRpc")
     const auto invalidVersion = handleMcpJsonRpcRequest(
       QJsonObject{{"id", 1}, {"method", "ping"}},
       McpMode::ReadOnly,
-      [](const QString&, const QJsonObject&) {
+      [](McpBridgeRequestType, const QString&, const QJsonObject&) {
         return McpBridgeResponse::success("request", {});
       });
     REQUIRE(invalidVersion);
@@ -179,7 +183,7 @@ TEST_CASE("McpJsonRpc")
         {"params", QJsonArray{}},
       },
       McpMode::ReadOnly,
-      [](const QString&, const QJsonObject&) {
+      [](McpBridgeRequestType, const QString&, const QJsonObject&) {
         return McpBridgeResponse::success("request", {});
       });
     REQUIRE(invalidParams);
@@ -196,23 +200,23 @@ TEST_CASE("McpJsonRpc")
         {"params", QJsonObject{{"uri", "tbmcp://operation/mcp-op-1"}}},
       },
       McpMode::ReadOnly,
-      [](const QString&, const QJsonObject&) {
-        return McpBridgeResponse::success("request", {});
-      },
-      McpToolProfile::Modeling,
-      [](const QString&) {
-        return McpBridgeResponse::success(
-          "resource-list", QJsonObject{{"resources", QJsonArray{}}});
-      },
-      [](const QString& uri) {
-        if (uri == "tbmcp://operation/mcp-op-1")
+      [](const McpBridgeRequestType type, const QString&, const QJsonObject& params) {
+        if (
+          type == McpBridgeRequestType::ResourceRead
+          && params.value("uri").toString() == "tbmcp://operation/mcp-op-1")
         {
           return McpBridgeResponse::success(
             "resource-read", QJsonObject{{"operationId", "mcp-op-1"}});
         }
+        if (type == McpBridgeRequestType::ResourcesList)
+        {
+          return McpBridgeResponse::success(
+            "resource-list", QJsonObject{{"resources", QJsonArray{}}});
+        }
         return McpBridgeResponse::failure(
           "resource-read", McpError{McpErrorCode::InvalidParams, "Resource not found"});
-      });
+      },
+      McpToolProfile::Modeling);
 
     REQUIRE(response);
     const auto result = response->value("result").toObject();
@@ -233,12 +237,9 @@ TEST_CASE("McpJsonRpc")
         {"params", QJsonObject{{"cursor", "opaque-cursor"}}},
       },
       McpMode::ReadOnly,
-      [](const QString&, const QJsonObject&) {
-        return McpBridgeResponse::success("request", {});
-      },
-      McpToolProfile::Core,
-      [](const QString& cursor) {
-        CHECK(cursor == "opaque-cursor");
+      [](const McpBridgeRequestType type, const QString&, const QJsonObject& params) {
+        CHECK(type == McpBridgeRequestType::ResourcesList);
+        CHECK(params.value("cursor").toString() == "opaque-cursor");
         return McpBridgeResponse::success(
           "resource-list",
           QJsonObject{
@@ -251,10 +252,7 @@ TEST_CASE("McpJsonRpc")
             {"nextCursor", "next-page"},
           });
       },
-      [](const QString&) {
-        return McpBridgeResponse::failure(
-          "resource-read", McpError{McpErrorCode::InvalidParams, "not found"});
-      });
+      McpToolProfile::Core);
 
     REQUIRE(response);
     const auto result = response->value("result").toObject();
@@ -272,16 +270,12 @@ TEST_CASE("McpJsonRpc")
         {"params", QJsonObject{{"cursor", "invalid"}}},
       },
       McpMode::ReadOnly,
-      [](const QString&, const QJsonObject&) {
-        return McpBridgeResponse::success("request", {});
-      },
-      McpToolProfile::Modeling,
-      [](const QString&) {
+      [](McpBridgeRequestType, const QString&, const QJsonObject&) {
         return McpBridgeResponse::failure(
           "resource-list",
           McpError{McpErrorCode::InvalidParams, "Invalid MCP resource cursor"});
       },
-      {});
+      McpToolProfile::Modeling);
     REQUIRE(listError);
     CHECK(listError->value("error").toObject().value("code").toInt() == -32602);
 
@@ -293,15 +287,11 @@ TEST_CASE("McpJsonRpc")
         {"params", QJsonObject{{"uri", "tbmcp://operation/missing"}}},
       },
       McpMode::ReadOnly,
-      [](const QString&, const QJsonObject&) {
-        return McpBridgeResponse::success("request", {});
-      },
-      McpToolProfile::Modeling,
-      {},
-      [](const QString&) {
+      [](McpBridgeRequestType, const QString&, const QJsonObject&) {
         return McpBridgeResponse::failure(
           "resource-read", McpError{McpErrorCode::InvalidParams, "Resource not found"});
-      });
+      },
+      McpToolProfile::Modeling);
     REQUIRE(readError);
     CHECK(readError->value("error").toObject().value("code").toInt() == -32002);
   }

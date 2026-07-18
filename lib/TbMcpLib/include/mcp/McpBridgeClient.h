@@ -79,17 +79,12 @@ public:
   McpBridgeClient(
     McpBridgeConnectionFactory connectionFactory, McpBridgeClientTimeouts timeouts);
 
-  McpBridgeResponse call(
+  McpBridgeResponse request(
     const McpBridgeConfig& config,
+    McpBridgeRequestType type,
     const QString& toolName,
-    const QJsonObject& arguments,
+    QJsonObject params,
     QString requestId = {}) const;
-  McpBridgeResponse listResources(
-    const McpBridgeConfig& config,
-    const QString& cursor = {},
-    QString requestId = {}) const;
-  McpBridgeResponse readResource(
-    const McpBridgeConfig& config, const QString& uri, QString requestId = {}) const;
 };
 
 } // namespace tb::mcp

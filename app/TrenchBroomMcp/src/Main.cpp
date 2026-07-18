@@ -25,7 +25,6 @@
 #include "mcp/McpBridgeClient.h"
 #include "mcp/McpBridgeConfig.h"
 #include "mcp/McpJsonRpc.h"
-#include "mcp/McpStdioAdapter.h"
 
 namespace tb::mcp
 {
@@ -48,7 +47,21 @@ std::optional<QJsonObject> handleRequest(const QJsonObject& request)
   }
 
   static const auto Client = McpBridgeClient{};
-  return handleMcpStdioJsonRpcRequest(request, *config, Client);
+  return handleMcpJsonRpcRequest(
+    request,
+    config->mode,
+    [&](
+      const McpBridgeRequestType type,
+      const QString& toolName,
+      const QJsonObject& params) {
+      if (config->mode == McpMode::Off)
+      {
+        return McpBridgeResponse::failure(
+          {}, McpError{McpErrorCode::Forbidden, "TrenchBroom MCP bridge is disabled"});
+      }
+      return Client.request(*config, type, toolName, params);
+    },
+    config->toolProfile);
 }
 
 void writeJsonLine(QTextStream& out, const QJsonObject& json)

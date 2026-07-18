@@ -141,7 +141,8 @@ TEST_CASE("McpBridgeClient", "[McpStdioClient]")
                       + '\n';
     const auto client = makeClient(state);
 
-    const auto response = client.call(testConfig(), "documents_list", {}, "request-1");
+    const auto response = client.request(
+      testConfig(), McpBridgeRequestType::ToolCall, "documents_list", {}, "request-1");
 
     REQUIRE(response.ok);
     CHECK(response.id == "request-1");
@@ -169,8 +170,12 @@ TEST_CASE("McpBridgeClient", "[McpStdioClient]")
       + '\n';
     const auto client = makeClient(state);
 
-    const auto response =
-      client.listResources(testConfig(), "opaque-cursor", "resource-list-1");
+    const auto response = client.request(
+      testConfig(),
+      McpBridgeRequestType::ResourcesList,
+      {},
+      QJsonObject{{"cursor", "opaque-cursor"}},
+      "resource-list-1");
 
     REQUIRE(response.ok);
     const auto request = QJsonDocument::fromJson(state->written.trimmed()).object();
@@ -191,8 +196,12 @@ TEST_CASE("McpBridgeClient", "[McpStdioClient]")
       + '\n';
     const auto client = makeClient(state);
 
-    const auto response =
-      client.readResource(testConfig(), "tbmcp://operation/mcp-op-1", "resource-read-1");
+    const auto response = client.request(
+      testConfig(),
+      McpBridgeRequestType::ResourceRead,
+      {},
+      QJsonObject{{"uri", "tbmcp://operation/mcp-op-1"}},
+      "resource-read-1");
 
     REQUIRE(response.ok);
     const auto request = QJsonDocument::fromJson(state->written.trimmed()).object();
@@ -210,7 +219,8 @@ TEST_CASE("McpBridgeClient", "[McpStdioClient]")
     const auto timeouts = McpBridgeClientTimeouts{11, 13, 17, 19, 23};
     const auto client = makeClient(state, timeouts);
 
-    const auto response = client.call(testConfig(), "ir_apply", {}, "request-long");
+    const auto response = client.request(
+      testConfig(), McpBridgeRequestType::ToolCall, "ir_apply", {}, "request-long");
 
     REQUIRE_FALSE(response.ok);
     REQUIRE(response.error);
@@ -227,7 +237,7 @@ TEST_CASE("McpBridgeClient", "[McpStdioClient]")
         {"name", "ir_apply"},
         {"arguments", QJsonObject{}},
       },
-      [&](const QString&, const QJsonObject&) { return response; });
+      [&](McpBridgeRequestType, const QString&, const QJsonObject&) { return response; });
     const auto structured = toolResult.value("structuredContent").toObject();
     CHECK(structured.value("tool").toString() == "ir_apply");
     CHECK(structured.value("requestId").toString() == "request-long");
@@ -247,7 +257,8 @@ TEST_CASE("McpBridgeClient", "[McpStdioClient]")
       + '\n';
     const auto client = makeClient(state);
 
-    const auto response = client.call(testConfig(), "tb_status", {}, "request-1");
+    const auto response = client.request(
+      testConfig(), McpBridgeRequestType::ToolCall, "tb_status", {}, "request-1");
 
     REQUIRE_FALSE(response.ok);
     REQUIRE(response.error);

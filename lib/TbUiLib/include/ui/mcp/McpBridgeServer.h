@@ -258,13 +258,12 @@ public:
   std::optional<QJsonObject> readResource(const QString& uri) const;
 
 private:
+  mcp::McpBridgeResponse dispatchToolCall(const mcp::McpBridgeRequest& request) const;
   void clearSessionState();
   void startRequestDeadline(QLocalSocket& socket);
   void restartRequestDeadline(QLocalSocket& socket);
   void rejectAndDisconnect(QLocalSocket& socket, const QString& message) const;
   void removeConnection(QLocalSocket& socket);
-  mcp::McpBridgeResponse dispatchBridgeRequest(
-    const mcp::McpBridgeRequest& request) const;
   void handleNewConnection();
   void handleSocketReadyRead(QLocalSocket& socket);
   void writeResponse(QLocalSocket& socket, const mcp::McpBridgeResponse& response) const;

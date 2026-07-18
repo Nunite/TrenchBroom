@@ -396,7 +396,7 @@ std::optional<QJsonObject> McpBridgeServer::listResources(
   return m_session.listResources(cursor, error);
 }
 
-mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
+mcp::McpBridgeResponse McpBridgeServer::dispatchToolCall(
   const mcp::McpBridgeRequest& request) const
 {
   if (m_dispatchInProgress)
@@ -648,12 +648,12 @@ void McpBridgeServer::removeConnection(QLocalSocket& socket)
   socket.deleteLater();
 }
 
-mcp::McpBridgeResponse McpBridgeServer::dispatchBridgeRequest(
+mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   const mcp::McpBridgeRequest& request) const
 {
   if (request.type == mcp::McpBridgeRequestType::ToolCall)
   {
-    return dispatchRequest(request);
+    return dispatchToolCall(request);
   }
 
   if (request.token != m_config.token)
@@ -771,7 +771,7 @@ void McpBridgeServer::handleSocketReadyRead(QLocalSocket& socket)
       continue;
     }
 
-    writeResponse(socket, dispatchBridgeRequest(*request));
+    writeResponse(socket, dispatchRequest(*request));
     restartRequestDeadline(socket);
   }
 }

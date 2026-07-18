@@ -558,33 +558,21 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
   const auto response = mcp::handleMcpJsonRpcRequest(
     document.object(),
     m_config.mode,
-    [this](const QString& toolName, const QJsonObject& arguments) {
+    [this](
+      const mcp::McpBridgeRequestType type,
+      const QString& toolName,
+      const QJsonObject& params) {
       const auto request = mcp::McpBridgeRequest{
         "http",
         m_config.token,
         toolName,
-        arguments,
+        params,
         m_config.mode,
+        type,
       };
       return m_bridgeServer.dispatchRequest(request);
     },
-    m_config.toolProfile,
-    [this](const QString& cursor) {
-      auto error = QString{};
-      const auto resources = m_bridgeServer.listResources(cursor, &error);
-      return resources ? mcp::McpBridgeResponse::success({}, *resources)
-                       : mcp::McpBridgeResponse::failure(
-                           {}, mcp::McpError{mcp::McpErrorCode::InvalidParams, error});
-    },
-    [this](const QString& uri) {
-      const auto resource = m_bridgeServer.readResource(uri);
-      return resource ? mcp::McpBridgeResponse::success({}, *resource)
-                      : mcp::McpBridgeResponse::failure(
-                          {},
-                          mcp::McpError{
-                            mcp::McpErrorCode::InvalidParams,
-                            QString{"Resource not found: %1"}.arg(uri)});
-    });
+    m_config.toolProfile);
 
   if (!response)
   {

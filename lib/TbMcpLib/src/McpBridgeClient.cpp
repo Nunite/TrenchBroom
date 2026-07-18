@@ -126,10 +126,11 @@ McpBridgeClient::McpBridgeClient(
 {
 }
 
-McpBridgeResponse McpBridgeClient::call(
+McpBridgeResponse McpBridgeClient::request(
   const McpBridgeConfig& config,
+  const McpBridgeRequestType type,
   const QString& toolName,
-  const QJsonObject& arguments,
+  QJsonObject params,
   QString requestId) const
 {
   if (requestId.isEmpty())
@@ -137,65 +138,25 @@ McpBridgeResponse McpBridgeClient::call(
     requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
   }
 
+  const auto requestName = type == McpBridgeRequestType::ToolCall ? toolName
+                           : type == McpBridgeRequestType::ResourcesList
+                             ? QString{"resources/list"}
+                             : QString{"resources/read"};
+  const auto costClass = type == McpBridgeRequestType::ToolCall
+                           ? toolCostClassForName(toolName)
+                           : McpToolCostClass::Fast;
   return sendRequest(
     config,
     McpBridgeRequest{
-      requestId,
+      std::move(requestId),
       config.token,
       toolName,
-      arguments,
-      config.mode,
-      McpBridgeRequestType::ToolCall,
-    },
-    toolName,
-    toolCostClassForName(toolName));
-}
-
-McpBridgeResponse McpBridgeClient::listResources(
-  const McpBridgeConfig& config, const QString& cursor, QString requestId) const
-{
-  if (requestId.isEmpty())
-  {
-    requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-  }
-  auto params = QJsonObject{};
-  if (!cursor.isEmpty())
-  {
-    params.insert("cursor", cursor);
-  }
-  return sendRequest(
-    config,
-    McpBridgeRequest{
-      requestId,
-      config.token,
-      {},
       std::move(params),
       config.mode,
-      McpBridgeRequestType::ResourcesList,
+      type,
     },
-    "resources/list",
-    McpToolCostClass::Fast);
-}
-
-McpBridgeResponse McpBridgeClient::readResource(
-  const McpBridgeConfig& config, const QString& uri, QString requestId) const
-{
-  if (requestId.isEmpty())
-  {
-    requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-  }
-  return sendRequest(
-    config,
-    McpBridgeRequest{
-      requestId,
-      config.token,
-      {},
-      QJsonObject{{"uri", uri}},
-      config.mode,
-      McpBridgeRequestType::ResourceRead,
-    },
-    "resources/read",
-    McpToolCostClass::Fast);
+    requestName,
+    costClass);
 }
 
 McpBridgeResponse McpBridgeClient::sendRequest(

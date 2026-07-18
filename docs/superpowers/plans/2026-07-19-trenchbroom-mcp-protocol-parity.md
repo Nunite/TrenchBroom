@@ -1,65 +1,43 @@
-# TrenchBroom MCP HTTP/Stdio Protocol Parity Plan
+# TrenchBroom MCP HTTP/Stdio Protocol Parity Record
 
 ## Goal
 
-Make HTTP and stdio expose the configured tool profile and the same retained
-operation/review resource behavior without changing tool schemas, permissions, or map
-mutation semantics.
+Expose the configured tool profile and the same retained operation/review resources
+through HTTP and stdio without changing tool schemas, permissions, or map mutation
+semantics.
 
-## Contract
+## Implemented Contract
 
-- `McpBridgeRequest` remains backward compatible with untyped tool-call JSON.
-- New local bridge request types are `tool_call`, `resources_list`, and
-  `resource_read`.
-- `resources/list` enumerates retained operation and review resources only.
-- Pages contain at most 100 compact resource descriptors and use an opaque cursor.
-- Evicted resources are omitted from enumeration; direct reads retain existing
-  structured eviction guidance.
-- Stdio uses `McpBridgeConfig::toolProfile`; `McpMode` remains the permission ceiling.
+- Local bridge request types are `tool_call`, `resources_list`, and `resource_read`.
+- Untyped legacy bridge requests still parse as tool calls.
+- `resources/list` returns retained operation and review descriptors only.
+- Pages contain at most 100 compact descriptors and use an opaque cursor.
+- Evicted resources are omitted from enumeration; direct reads preserve structured
+  eviction guidance.
+- HTTP and stdio use `McpBridgeConfig::toolProfile`.
+- The configured `McpMode` remains the permission ceiling.
 
-## Task 1: Typed Local Bridge Requests
+## Final Architecture
 
-1. Add failing message roundtrip tests for all request types and legacy tool requests.
-2. Add failing client tests for resource list/read request serialization.
-3. Extend bridge messages and refactor `McpBridgeClient` around one bounded request
-   path.
-4. Build and run `McpBridgeMessages` and `McpBridgeClient` tests.
-5. Commit the typed bridge protocol.
+`McpJsonRpc` owns JSON-RPC validation and response shaping. It sends tool calls and
+resource operations through one typed request dispatcher. HTTP dispatches those
+requests directly to `McpBridgeServer`; stdio sends the same requests through
+`McpBridgeClient` and the authenticated local bridge. There is no separate stdio
+protocol implementation or resource error wrapper.
 
-## Task 2: Retained Resource Enumeration
-
-1. Add failing session tests for operation/review descriptors, 100-entry pagination,
-   invalid cursors, and omission of eviction hints.
-2. Add failing local transport tests for authenticated typed list/read requests.
-3. Implement deterministic resource descriptors and opaque cursor parsing in session
-   state.
-4. Route typed requests in `McpBridgeServer` after token validation.
-5. Build and run session and bridge tests.
-6. Commit resource enumeration and local dispatch.
-
-## Task 3: Shared JSON-RPC and Stdio Adapter
-
-1. Add failing JSON-RPC tests for `resources/list`, pagination, and provider errors.
-2. Add a shared contract suite covering initialize, tools/list, tools/call, errors,
-   notifications, resources/list, and resources/read against direct and stdio
-   adapters.
-3. Add a testable stdio adapter in `TbMcpLib`; make the executable delegate to it.
-4. Pass configured profile, resource lister, and resource reader through HTTP and
-   stdio.
-5. Add focused HTTP tests for Core profile and resource list/read wiring.
-6. Commit protocol parity.
+Resource enumeration and reads are implemented once in `McpSessionState` and
+`McpBridgeServer`. Both transports therefore observe the same pagination, retention,
+and error behavior.
 
 ## Verification
 
-Run serially:
+Focused tests cover bridge message round trips, client request serialization,
+resource pagination and eviction, JSON-RPC error mapping, HTTP behavior, local bridge
+authentication, and the shared direct/stdio protocol contract. The Release app and
+real stdio resource-read acceptance were also run without adding crash logs.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbMcpLibTest -TestExe build-release-codex\lib\TbMcpLib\test\TbMcpLibTest.exe -TestFilter "Mcp*"
-powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbMcpStdioClientTest -TestExe build-release-codex\lib\TbMcpLib\test\TbMcpStdioClientTest.exe -TestFilter "Mcp*"
-powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbUiLibTest -TestExe build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe -TestFilter "McpHttpServer"
-powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbUiLibTest -TestExe build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe -TestFilter "[McpBridgeServer]"
-powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TrenchBroom
-powershell -ExecutionPolicy Bypass -File scripts\mcp-reliability-acceptance.ps1
-```
+Implementation commits:
 
-Finish with `git diff --check`, conflict-marker search, and a clean worktree.
+- `6109adccc` Add typed MCP bridge requests
+- `4032822c2` Expose bounded MCP resource enumeration
+- `68d492045` Unify MCP HTTP and stdio protocol behavior
