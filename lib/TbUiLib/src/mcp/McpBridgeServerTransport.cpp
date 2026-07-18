@@ -24,6 +24,7 @@
 #include <QJsonObject>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QTimer>
 #include <QUuid>
 
 #include "McpBridgeServerTools.h"
@@ -204,6 +205,7 @@ bool McpBridgeServer::start(const mcp::McpBridgeConfig& config, QString* error)
   }
 
   m_server = std::make_unique<QLocalServer>();
+  m_server->setMaxPendingConnections(m_transportLimits.maxConnections);
   connect(
     m_server.get(),
     &QLocalServer::newConnection,
@@ -266,6 +268,15 @@ void McpBridgeServer::clearSessionState()
 
 void McpBridgeServer::stop()
 {
+  const auto connections = m_connections.values();
+  for (auto* socket : connections)
+  {
+    socket->disconnectFromServer();
+    socket->deleteLater();
+  }
+  m_requestDeadlines.clear();
+  m_connections.clear();
+
   if (m_server)
   {
     m_server->close();
@@ -591,25 +602,101 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   return mcp::McpBridgeResponse::failure(request.id, result.error);
 }
 
+void McpBridgeServer::startRequestDeadline(QLocalSocket& socket)
+{
+  auto* timer = new QTimer{&socket};
+  timer->setSingleShot(true);
+  connect(timer, &QTimer::timeout, this, [this, socket = &socket]() {
+    if (!m_connections.contains(socket))
+    {
+      return;
+    }
+    rejectAndDisconnect(*socket, "MCP bridge request timed out");
+  });
+  m_requestDeadlines.insert(&socket, timer);
+  timer->start(m_transportLimits.incompleteRequestTimeoutMs);
+}
+
+void McpBridgeServer::restartRequestDeadline(QLocalSocket& socket)
+{
+  if (auto* timer = m_requestDeadlines.value(&socket))
+  {
+    timer->start(m_transportLimits.incompleteRequestTimeoutMs);
+  }
+}
+
+void McpBridgeServer::rejectAndDisconnect(
+  QLocalSocket& socket, const QString& message) const
+{
+  writeResponse(
+    socket,
+    mcp::McpBridgeResponse::failure(
+      {}, mcp::McpError{mcp::McpErrorCode::InvalidRequest, message}));
+  socket.disconnectFromServer();
+}
+
+void McpBridgeServer::removeConnection(QLocalSocket& socket)
+{
+  m_requestDeadlines.remove(&socket);
+  m_connections.remove(&socket);
+  socket.deleteLater();
+}
+
 void McpBridgeServer::handleNewConnection()
 {
   while (auto* socket = m_server->nextPendingConnection())
   {
     socket->setParent(this);
+    connect(socket, &QLocalSocket::disconnected, this, [this, socket]() {
+      if (m_connections.contains(socket))
+      {
+        removeConnection(*socket);
+      }
+      else
+      {
+        socket->deleteLater();
+      }
+    });
+
+    if (m_connections.size() >= m_transportLimits.maxConnections)
+    {
+      rejectAndDisconnect(*socket, "MCP bridge connection limit reached");
+      continue;
+    }
+
+    m_connections.insert(socket);
+    socket->setReadBufferSize(m_transportLimits.maxRequestBytes + 1);
+    startRequestDeadline(*socket);
     connect(socket, &QLocalSocket::readyRead, this, [this, socket]() {
       handleSocketReadyRead(*socket);
     });
-    connect(socket, &QLocalSocket::disconnected, socket, &QLocalSocket::deleteLater);
   }
 }
 
 void McpBridgeServer::handleSocketReadyRead(QLocalSocket& socket)
 {
+  if (
+    !socket.canReadLine() && socket.bytesAvailable() > m_transportLimits.maxRequestBytes)
+  {
+    rejectAndDisconnect(socket, "MCP bridge request too large");
+    return;
+  }
+
   while (socket.canReadLine())
   {
+    auto line = socket.readLine();
+    if (line.endsWith('\n'))
+    {
+      line.chop(1);
+    }
+    if (line.size() > m_transportLimits.maxRequestBytes)
+    {
+      rejectAndDisconnect(socket, "MCP bridge request too large");
+      return;
+    }
+
     auto parseError = QJsonParseError{};
-    const auto document =
-      QJsonDocument::fromJson(socket.readLine().trimmed(), &parseError);
+    const auto document = QJsonDocument::fromJson(line.trimmed(), &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject())
     {
       writeResponse(
@@ -618,6 +705,7 @@ void McpBridgeServer::handleSocketReadyRead(QLocalSocket& socket)
           {},
           mcp::McpError{
             mcp::McpErrorCode::InvalidRequest, "Invalid MCP bridge JSON request"}));
+      restartRequestDeadline(socket);
       continue;
     }
 
@@ -629,10 +717,12 @@ void McpBridgeServer::handleSocketReadyRead(QLocalSocket& socket)
         socket,
         mcp::McpBridgeResponse::failure(
           {}, mcp::McpError{mcp::McpErrorCode::InvalidRequest, error}));
+      restartRequestDeadline(socket);
       continue;
     }
 
     writeResponse(socket, dispatchRequest(*request));
+    restartRequestDeadline(socket);
   }
 }
 

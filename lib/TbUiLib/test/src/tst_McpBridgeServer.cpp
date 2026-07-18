@@ -18,6 +18,8 @@
  */
 
 #include <QColor>
+#include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
@@ -25,7 +27,9 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocalServer>
+#include <QLocalSocket>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QUuid>
 
 #include "../../src/mcp/McpBridgeServerTools.h"
@@ -62,6 +66,149 @@
 namespace tb::ui
 {
 namespace mcp = tb::mcp;
+
+namespace
+{
+
+mcp::McpBridgeResponse readBridgeResponse(
+  QLocalSocket& socket, const int timeoutMs = 2000)
+{
+  auto timer = QElapsedTimer{};
+  timer.start();
+  while (timer.elapsed() < timeoutMs && !socket.canReadLine())
+  {
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    socket.waitForReadyRead(10);
+  }
+  REQUIRE(socket.canReadLine());
+  auto parseError = QJsonParseError{};
+  const auto document = QJsonDocument::fromJson(socket.readLine().trimmed(), &parseError);
+  REQUIRE(parseError.error == QJsonParseError::NoError);
+  REQUIRE(document.isObject());
+  auto error = QString{};
+  const auto response = mcp::bridgeResponseFromJson(document.object(), &error);
+  INFO(error.toStdString());
+  REQUIRE(response);
+  return *response;
+}
+
+QString uniqueBridgePipeName()
+{
+  return QString{"trenchbroom-mcp-transport-test-%1"}.arg(
+    QUuid::createUuid().toString(QUuid::WithoutBraces));
+}
+
+void processEventsFor(const int durationMs)
+{
+  auto eventLoop = QEventLoop{};
+  QTimer::singleShot(durationMs, &eventLoop, &QEventLoop::quit);
+  eventLoop.exec();
+}
+
+} // namespace
+
+TEST_CASE(
+  "McpBridgeServer bounds local transport input", "[McpBridgeServer][McpBridgeTransport]")
+{
+  const auto makeServer = [](const McpBridgeTransportLimits limits) {
+    return McpBridgeServer{
+      [](const QString&, const QJsonObject&) {
+        return McpBridgeToolResult::success(QJsonObject{{"application", "TrenchBroom"}});
+      },
+      limits};
+  };
+
+  SECTION("accepts a fragmented valid request")
+  {
+    auto server = makeServer(McpBridgeTransportLimits{512, 10'000, 4});
+    const auto pipeName = uniqueBridgePipeName();
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}));
+    auto socket = QLocalSocket{};
+    socket.connectToServer(pipeName);
+    REQUIRE(socket.waitForConnected(1000));
+    auto line = QJsonDocument{mcp::toJson(mcp::McpBridgeRequest{
+                                "1", "secret", "tb_status", {}, mcp::McpMode::ReadOnly})}
+                  .toJson(QJsonDocument::Compact)
+                + "\n";
+    const auto split = line.size() / 2;
+    REQUIRE(socket.write(line.left(split)) == split);
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+    CHECK_FALSE(socket.canReadLine());
+    REQUIRE(socket.write(line.mid(split)) == line.size() - split);
+    CHECK(readBridgeResponse(socket).ok);
+  }
+
+  SECTION("rejects a request line beyond the configured budget")
+  {
+    auto server = makeServer(McpBridgeTransportLimits{64, 10'000, 4});
+    const auto pipeName = uniqueBridgePipeName();
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}));
+    auto socket = QLocalSocket{};
+    socket.connectToServer(pipeName);
+    REQUIRE(socket.waitForConnected(1000));
+    REQUIRE(socket.write(QByteArray(65, 'x')) == 65);
+    const auto response = readBridgeResponse(socket);
+    CHECK_FALSE(response.ok);
+    REQUIRE(response.error);
+    CHECK(response.error->code == mcp::McpErrorCode::InvalidRequest);
+    CHECK(response.error->message.contains("too large"));
+  }
+
+  SECTION("times out an incomplete request line")
+  {
+    auto server = makeServer(McpBridgeTransportLimits{512, 50, 4});
+    const auto pipeName = uniqueBridgePipeName();
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}));
+    auto socket = QLocalSocket{};
+    socket.connectToServer(pipeName);
+    REQUIRE(socket.waitForConnected(1000));
+    REQUIRE(socket.write("{") == 1);
+    const auto response = readBridgeResponse(socket, 1000);
+    CHECK_FALSE(response.ok);
+    REQUIRE(response.error);
+    CHECK(response.error->message.contains("timed out"));
+  }
+
+  SECTION("rejects excess local connections and recovers capacity")
+  {
+    auto server = makeServer(McpBridgeTransportLimits{512, 10'000, 1});
+    const auto pipeName = uniqueBridgePipeName();
+    REQUIRE(
+      server.start(mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}));
+    auto first = QLocalSocket{};
+    first.connectToServer(pipeName);
+    REQUIRE(first.waitForConnected(1000));
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+
+    auto second = QLocalSocket{};
+    second.connectToServer(pipeName);
+    REQUIRE(second.waitForConnected(1000));
+    const auto rejected = readBridgeResponse(second);
+    CHECK_FALSE(rejected.ok);
+    REQUIRE(rejected.error);
+    CHECK(rejected.error->message.contains("connection limit"));
+
+    first.disconnectFromServer();
+    if (first.state() != QLocalSocket::UnconnectedState)
+    {
+      REQUIRE(first.waitForDisconnected(1000));
+    }
+    processEventsFor(100);
+    auto third = QLocalSocket{};
+    third.connectToServer(pipeName);
+    REQUIRE(third.waitForConnected(1000));
+    const auto line =
+      QJsonDocument{mcp::toJson(mcp::McpBridgeRequest{
+                      "3", "secret", "tb_status", {}, mcp::McpMode::ReadOnly})}
+        .toJson(QJsonDocument::Compact)
+      + "\n";
+    REQUIRE(third.write(line) == line.size());
+    CHECK(readBridgeResponse(third).ok);
+  }
+}
 
 TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 {

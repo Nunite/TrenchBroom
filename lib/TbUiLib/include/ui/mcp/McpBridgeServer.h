@@ -21,9 +21,11 @@
 
 #include <QByteArray>
 #include <QDateTime>
+#include <QHash>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QObject>
+#include <QSet>
 #include <QStringList>
 #include <QtGlobal>
 
@@ -39,6 +41,7 @@
 
 class QLocalServer;
 class QLocalSocket;
+class QTimer;
 
 namespace tb::mdl
 {
@@ -211,6 +214,8 @@ private:
   QString m_bridgeInstanceId;
   QDateTime m_bridgeStartedAtUtc;
   std::unique_ptr<QLocalServer> m_server = nullptr;
+  QSet<QLocalSocket*> m_connections;
+  QHash<QLocalSocket*, QTimer*> m_requestDeadlines;
 
 public:
   explicit McpBridgeServer(AppController& appController, QObject* parent = nullptr);
@@ -249,6 +254,10 @@ public:
 
 private:
   void clearSessionState();
+  void startRequestDeadline(QLocalSocket& socket);
+  void restartRequestDeadline(QLocalSocket& socket);
+  void rejectAndDisconnect(QLocalSocket& socket, const QString& message) const;
+  void removeConnection(QLocalSocket& socket);
   void handleNewConnection();
   void handleSocketReadyRead(QLocalSocket& socket);
   void writeResponse(QLocalSocket& socket, const mcp::McpBridgeResponse& response) const;
