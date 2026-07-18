@@ -25,6 +25,7 @@
 #include <QJsonParseError>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QTimer>
 #include <QUrl>
 
 #include "mcp/McpJsonRpc.h"
@@ -186,6 +187,8 @@ bool McpHttpServer::start(const mcp::McpBridgeConfig& config, QString* error)
   }
 
   m_server = std::make_unique<QTcpServer>();
+  m_server->setMaxPendingConnections(
+    m_limits.maxOrdinaryConnections + m_limits.maxSseConnections);
   connect(
     m_server.get(),
     &QTcpServer::newConnection,
@@ -223,6 +226,9 @@ void McpHttpServer::stop()
     socket->disconnectFromHost();
     socket->deleteLater();
   }
+  m_requestDeadlines.clear();
+  m_sseConnections.clear();
+  m_connections.clear();
 }
 
 bool McpHttpServer::isListening() const
@@ -240,15 +246,86 @@ quint16 McpHttpServer::port() const
   return m_server && m_server->isListening() ? m_server->serverPort() : m_config.httpPort;
 }
 
+int McpHttpServer::ordinaryConnectionCount() const
+{
+  return m_connections.size() - m_sseConnections.size();
+}
+
+void McpHttpServer::startRequestDeadline(QTcpSocket& socket)
+{
+  auto* timer = new QTimer{&socket};
+  timer->setSingleShot(true);
+  connect(timer, &QTimer::timeout, this, [this, socket = &socket]() {
+    if (
+      !m_connections.contains(socket)
+      || socket->property("tbMcpHttpRequestComplete").toBool())
+    {
+      return;
+    }
+    socket->setProperty("tbMcpHttpRequestComplete", true);
+    writeHttpResponse(
+      *socket,
+      408,
+      reasonPhrase(408),
+      "application/json",
+      jsonBody("HTTP request timed out"));
+    socket->disconnectFromHost();
+  });
+  m_requestDeadlines.insert(&socket, timer);
+  timer->start(m_limits.incompleteRequestTimeoutMs);
+}
+
+void McpHttpServer::completeRequest(QTcpSocket& socket)
+{
+  socket.setProperty("tbMcpHttpRequestComplete", true);
+  if (auto* timer = m_requestDeadlines.value(&socket))
+  {
+    timer->stop();
+  }
+}
+
+void McpHttpServer::removeConnection(QTcpSocket& socket)
+{
+  m_requestDeadlines.remove(&socket);
+  m_sseConnections.remove(&socket);
+  m_connections.remove(&socket);
+  socket.deleteLater();
+}
+
 void McpHttpServer::handleNewConnection()
 {
   while (auto* socket = m_server->nextPendingConnection())
   {
     socket->setParent(this);
+    connect(socket, &QTcpSocket::disconnected, this, [this, socket]() {
+      if (m_connections.contains(socket))
+      {
+        removeConnection(*socket);
+      }
+      else
+      {
+        socket->deleteLater();
+      }
+    });
+
+    if (ordinaryConnectionCount() >= m_limits.maxOrdinaryConnections)
+    {
+      writeHttpResponse(
+        *socket,
+        503,
+        reasonPhrase(503),
+        "application/json",
+        jsonBody("Too many MCP HTTP connections"));
+      socket->disconnectFromHost();
+      continue;
+    }
+
+    m_connections.insert(socket);
+    socket->setReadBufferSize(m_limits.maxHeaderBytes + 4 + m_limits.maxBodyBytes + 1);
+    startRequestDeadline(*socket);
     connect(socket, &QTcpSocket::readyRead, this, [this, socket]() {
       handleSocketReadyRead(*socket);
     });
-    connect(socket, &QTcpSocket::disconnected, socket, &QTcpSocket::deleteLater);
   }
 }
 
@@ -263,13 +340,16 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
   if (socket.bytesAvailable() > maxRequestBytes)
   {
     socket.setProperty("tbMcpHttpRequestComplete", true);
+    socket.readAll();
     writeHttpResponse(
       socket,
       413,
       reasonPhrase(413),
       "application/json",
       jsonBody("HTTP request too large"));
-    socket.disconnectFromHost();
+    // Give the peer a chance to read the response before Windows resets a socket with
+    // unread inbound data.
+    QTimer::singleShot(25, &socket, [&socket]() { socket.disconnectFromHost(); });
     return;
   }
 
@@ -382,7 +462,7 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
   }
 
   socket.read(totalLength);
-  socket.setProperty("tbMcpHttpRequestComplete", true);
+  completeRequest(socket);
 
   if (path != EndpointPath)
   {
@@ -428,6 +508,19 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
 
   if (method == "GET")
   {
+    if (m_sseConnections.size() >= m_limits.maxSseConnections)
+    {
+      writeHttpResponse(
+        socket,
+        503,
+        reasonPhrase(503),
+        "application/json",
+        jsonBody("Too many MCP SSE connections"),
+        *responseOrigin);
+      socket.disconnectFromHost();
+      return;
+    }
+    m_sseConnections.insert(&socket);
     writeSseStream(socket, *responseOrigin);
     return;
   }

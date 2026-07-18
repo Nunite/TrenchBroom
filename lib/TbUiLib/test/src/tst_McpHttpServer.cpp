@@ -278,6 +278,108 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     CHECK(sendRequest(httpServer.port(), request).statusCode == 400);
   }
 
+  SECTION("times out an incomplete request")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer =
+      McpHttpServer{bridgeServer, McpHttpServerLimits{512, 512, 50, 32, 8}};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    auto socket = QTcpSocket{};
+    socket.connectToHost("127.0.0.1", httpServer.port());
+    REQUIRE(socket.waitForConnected(1000));
+    REQUIRE(socket.write("POST /mcp HTTP/1.1\r\n") > 0);
+    REQUIRE(socket.waitForBytesWritten(1000));
+    CHECK(readResponse(socket, 1000).statusCode == 408);
+  }
+
+  SECTION("times out when the declared body never arrives")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer =
+      McpHttpServer{bridgeServer, McpHttpServerLimits{512, 512, 50, 32, 8}};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    auto socket = QTcpSocket{};
+    socket.connectToHost("127.0.0.1", httpServer.port());
+    REQUIRE(socket.waitForConnected(1000));
+    auto request = makeHttpRequest("POST", "/mcp", {});
+    request.replace("Content-Length: 0", "Content-Length: 16");
+    REQUIRE(socket.write(request) == request.size());
+    REQUIRE(socket.waitForBytesWritten(1000));
+    CHECK(readResponse(socket, 1000).statusCode == 408);
+  }
+
+  SECTION("rejects aggregate bytes beyond the request budget")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer =
+      McpHttpServer{bridgeServer, McpHttpServerLimits{128, 32, 10'000, 32, 8}};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    auto request = makeHttpRequest("POST", "/mcp", {});
+    request += QByteArray(256, 'x');
+    CHECK(sendRequest(httpServer.port(), request).statusCode == 413);
+  }
+
+  SECTION("rejects excess ordinary connections and recovers capacity")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer =
+      McpHttpServer{bridgeServer, McpHttpServerLimits{512, 512, 10'000, 1, 1}};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    auto first = QTcpSocket{};
+    first.connectToHost("127.0.0.1", httpServer.port());
+    REQUIRE(first.waitForConnected(1000));
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+
+    auto second = QTcpSocket{};
+    second.connectToHost("127.0.0.1", httpServer.port());
+    REQUIRE(second.waitForConnected(1000));
+    CHECK(readResponse(second).statusCode == 503);
+
+    first.disconnectFromHost();
+    if (first.state() != QAbstractSocket::UnconnectedState)
+    {
+      REQUIRE(first.waitForDisconnected(1000));
+    }
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+    CHECK(
+      sendRequest(
+        httpServer.port(), makeHttpRequest("POST", "/mcp", jsonRequest(30, "initialize")))
+        .statusCode
+      == 200);
+  }
+
+  SECTION("bounds authenticated SSE connections")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer =
+      McpHttpServer{bridgeServer, McpHttpServerLimits{512, 512, 10'000, 2, 1}};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    auto first = QTcpSocket{};
+    first.connectToHost("127.0.0.1", httpServer.port());
+    REQUIRE(first.waitForConnected(1000));
+    const auto request = makeHttpRequest("GET", "/mcp");
+    REQUIRE(first.write(request) == request.size());
+    REQUIRE(first.waitForBytesWritten(1000));
+    CHECK(readResponse(first).statusCode == 200);
+
+    CHECK(sendRequest(httpServer.port(), request).statusCode == 503);
+  }
+
   SECTION("off mode does not listen")
   {
     auto bridgeServer = makeBridgeServer();

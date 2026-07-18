@@ -20,7 +20,9 @@
 #pragma once
 
 #include <QByteArray>
+#include <QHash>
 #include <QObject>
+#include <QSet>
 #include <QtGlobal>
 
 #include "mcp/McpBridgeConfig.h"
@@ -30,6 +32,7 @@
 
 class QTcpServer;
 class QTcpSocket;
+class QTimer;
 
 namespace tb::ui
 {
@@ -52,6 +55,9 @@ private:
   McpHttpServerLimits m_limits;
   mcp::McpBridgeConfig m_config;
   std::unique_ptr<QTcpServer> m_server;
+  QSet<QTcpSocket*> m_connections;
+  QSet<QTcpSocket*> m_sseConnections;
+  QHash<QTcpSocket*, QTimer*> m_requestDeadlines;
 
 public:
   explicit McpHttpServer(McpBridgeServer& bridgeServer, QObject* parent = nullptr);
@@ -67,6 +73,10 @@ public:
   quint16 port() const;
 
 private:
+  int ordinaryConnectionCount() const;
+  void startRequestDeadline(QTcpSocket& socket);
+  void completeRequest(QTcpSocket& socket);
+  void removeConnection(QTcpSocket& socket);
   void handleNewConnection();
   void handleSocketReadyRead(QTcpSocket& socket);
   void writeSseStream(QTcpSocket& socket, const QByteArray& allowedOrigin) const;
