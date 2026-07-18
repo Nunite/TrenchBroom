@@ -280,7 +280,7 @@ try {
   Assert-True ((Get-HttpStatus -Url $url -Authorization "Bearer $token") -eq 200) `
     "Correct bearer token was rejected"
   $tools = Invoke-McpRpc -Url $url -Token $token -Method "tools/list"
-  Assert-True (@($tools.result.tools).Count -eq 47) `
+  Assert-True (@($tools.result.tools).Count -eq 53) `
     "Modeling tools/list count changed: $(@($tools.result.tools).Count)"
 
   $problemBaseline = Invoke-McpTool -Url $url -Token $token -Tool "problems_check"
