@@ -162,6 +162,7 @@ public:
   static constexpr auto MaxReviewResources = size_t{128};
   static constexpr auto MaxIrPreviews = size_t{64};
   static constexpr auto MaxDocumentFingerprints = qsizetype{4};
+  static constexpr auto MaxResourcesPerPage = qsizetype{100};
   static constexpr auto IrPreviewTtlMs = qint64{10 * 60 * 1000};
 
   int nextOperationIndex = 1;
@@ -181,6 +182,8 @@ public:
   void prune(const QString& activeDocumentFingerprint, qint64 nowMs);
   void cacheReviewResource(
     const QJsonObject& resource, const QString& documentFingerprint = {});
+  std::optional<QJsonObject> listResources(
+    const QString& cursor, QString* error = nullptr) const;
   std::optional<QJsonObject> evictedResourceHint(const QString& uri) const;
   QJsonObject diagnosticsJson() const;
 };
@@ -250,6 +253,8 @@ public:
   int duplicateToolRegistrationCount() const;
 
   mcp::McpBridgeResponse dispatchRequest(const mcp::McpBridgeRequest& request) const;
+  std::optional<QJsonObject> listResources(
+    const QString& cursor, QString* error = nullptr) const;
   std::optional<QJsonObject> readResource(const QString& uri) const;
 
 private:
@@ -258,6 +263,8 @@ private:
   void restartRequestDeadline(QLocalSocket& socket);
   void rejectAndDisconnect(QLocalSocket& socket, const QString& message) const;
   void removeConnection(QLocalSocket& socket);
+  mcp::McpBridgeResponse dispatchBridgeRequest(
+    const mcp::McpBridgeRequest& request) const;
   void handleNewConnection();
   void handleSocketReadyRead(QLocalSocket& socket);
   void writeResponse(QLocalSocket& socket, const mcp::McpBridgeResponse& response) const;

@@ -390,6 +390,12 @@ std::optional<QJsonObject> McpBridgeServer::readResource(const QString& uri) con
   return resourceObject(*it, std::nullopt);
 }
 
+std::optional<QJsonObject> McpBridgeServer::listResources(
+  const QString& cursor, QString* error) const
+{
+  return m_session.listResources(cursor, error);
+}
+
 mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   const mcp::McpBridgeRequest& request) const
 {
@@ -642,6 +648,50 @@ void McpBridgeServer::removeConnection(QLocalSocket& socket)
   socket.deleteLater();
 }
 
+mcp::McpBridgeResponse McpBridgeServer::dispatchBridgeRequest(
+  const mcp::McpBridgeRequest& request) const
+{
+  if (request.type == mcp::McpBridgeRequestType::ToolCall)
+  {
+    return dispatchRequest(request);
+  }
+
+  if (request.token != m_config.token)
+  {
+    return makeFailure(
+      request, mcp::McpErrorCode::Unauthorized, "Invalid MCP bridge token");
+  }
+
+  if (request.type == mcp::McpBridgeRequestType::ResourcesList)
+  {
+    const auto cursorValue = request.params.value("cursor");
+    if (!cursorValue.isUndefined() && !cursorValue.isString())
+    {
+      return makeFailure(
+        request, mcp::McpErrorCode::InvalidParams, "Resource cursor must be a string");
+    }
+    auto error = QString{};
+    const auto result = listResources(cursorValue.toString(), &error);
+    return result ? mcp::McpBridgeResponse::success(request.id, *result)
+                  : makeFailure(request, mcp::McpErrorCode::InvalidParams, error);
+  }
+
+  const auto uriValue = request.params.value("uri");
+  if (!uriValue.isString() || uriValue.toString().trimmed().isEmpty())
+  {
+    return makeFailure(
+      request,
+      mcp::McpErrorCode::InvalidParams,
+      "Resource read requires a non-empty uri");
+  }
+  const auto resource = readResource(uriValue.toString());
+  return resource ? mcp::McpBridgeResponse::success(request.id, *resource)
+                  : makeFailure(
+                      request,
+                      mcp::McpErrorCode::InvalidParams,
+                      QString{"Resource not found: %1"}.arg(uriValue.toString()));
+}
+
 void McpBridgeServer::handleNewConnection()
 {
   while (auto* socket = m_server->nextPendingConnection())
@@ -721,7 +771,7 @@ void McpBridgeServer::handleSocketReadyRead(QLocalSocket& socket)
       continue;
     }
 
-    writeResponse(socket, dispatchRequest(*request));
+    writeResponse(socket, dispatchBridgeRequest(*request));
     restartRequestDeadline(socket);
   }
 }

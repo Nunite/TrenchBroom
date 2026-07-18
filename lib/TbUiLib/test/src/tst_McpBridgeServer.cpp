@@ -112,7 +112,15 @@ TEST_CASE(
 {
   const auto makeServer = [](const McpBridgeTransportLimits limits) {
     return McpBridgeServer{
-      [](const QString&, const QJsonObject&) {
+      [](const QString& toolName, const QJsonObject&) {
+        if (toolName == "render_review_current_scene")
+        {
+          return McpBridgeToolResult::success(QJsonObject{
+            {"tool", toolName},
+            {"reviewId", "transport-review"},
+            {"resourceUri", "tbmcp://review/transport-review"},
+          });
+        }
         return McpBridgeToolResult::success(QJsonObject{{"application", "TrenchBroom"}});
       },
       limits};
@@ -207,6 +215,71 @@ TEST_CASE(
       + "\n";
     REQUIRE(third.write(line) == line.size());
     CHECK(readBridgeResponse(third).ok);
+  }
+
+  SECTION("serves authenticated typed resource list and read requests")
+  {
+    auto server = makeServer(McpBridgeTransportLimits{1024, 10'000, 4});
+    const auto pipeName = uniqueBridgePipeName();
+    REQUIRE(server.start(mcp::McpBridgeConfig{
+      pipeName, "secret", mcp::McpMode::ReadOnly, true, "127.0.0.1", 0}));
+    auto socket = QLocalSocket{};
+    socket.connectToServer(pipeName);
+    REQUIRE(socket.waitForConnected(1000));
+
+    const auto writeRequest = [&](const mcp::McpBridgeRequest& request) {
+      const auto line =
+        QJsonDocument{mcp::toJson(request)}.toJson(QJsonDocument::Compact) + '\n';
+      REQUIRE(socket.write(line) == line.size());
+      return readBridgeResponse(socket);
+    };
+
+    const auto create = writeRequest(mcp::McpBridgeRequest{
+      "create",
+      "secret",
+      "render_review_current_scene",
+      {},
+      mcp::McpMode::ReadOnly,
+    });
+    REQUIRE(create.ok);
+
+    const auto unauthorized = writeRequest(mcp::McpBridgeRequest{
+      "unauthorized",
+      "wrong-token",
+      {},
+      {},
+      std::nullopt,
+      mcp::McpBridgeRequestType::ResourcesList,
+    });
+    CHECK_FALSE(unauthorized.ok);
+    REQUIRE(unauthorized.error);
+    CHECK(unauthorized.error->code == mcp::McpErrorCode::Unauthorized);
+
+    const auto listed = writeRequest(mcp::McpBridgeRequest{
+      "list",
+      "secret",
+      {},
+      {},
+      std::nullopt,
+      mcp::McpBridgeRequestType::ResourcesList,
+    });
+    REQUIRE(listed.ok);
+    const auto resources = listed.result.value("resources").toArray();
+    REQUIRE(resources.size() == 1);
+    CHECK(
+      resources.first().toObject().value("uri").toString()
+      == "tbmcp://review/transport-review");
+
+    const auto read = writeRequest(mcp::McpBridgeRequest{
+      "read",
+      "secret",
+      {},
+      QJsonObject{{"uri", "tbmcp://review/transport-review"}},
+      std::nullopt,
+      mcp::McpBridgeRequestType::ResourceRead,
+    });
+    REQUIRE(read.ok);
+    CHECK(read.result.value("reviewId").toString() == "transport-review");
   }
 }
 

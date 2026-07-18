@@ -31,6 +31,42 @@ namespace tb::ui
 namespace
 {
 
+constexpr auto ResourceCursorPrefix = "tbmcp-resources-v1:";
+
+QString resourceCursor(const qsizetype offset)
+{
+  const auto payload = QByteArray{ResourceCursorPrefix} + QByteArray::number(offset);
+  return QString::fromLatin1(
+    payload.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
+}
+
+std::optional<qsizetype> resourceOffset(const QString& cursor)
+{
+  if (cursor.isEmpty())
+  {
+    return qsizetype{0};
+  }
+
+  const auto encoded = cursor.toLatin1();
+  const auto decoded = QByteArray::fromBase64(encoded, QByteArray::Base64UrlEncoding);
+  if (
+    decoded.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals)
+      != encoded
+    || !decoded.startsWith(ResourceCursorPrefix))
+  {
+    return std::nullopt;
+  }
+
+  auto ok = false;
+  const auto offset =
+    decoded.mid(QByteArray{ResourceCursorPrefix}.size()).toLongLong(&ok);
+  if (!ok || offset < 0)
+  {
+    return std::nullopt;
+  }
+  return static_cast<qsizetype>(offset);
+}
+
 QJsonObject compactReviewResource(const QJsonObject& result)
 {
   auto compact = QJsonObject{};
@@ -316,6 +352,90 @@ void McpSessionState::cacheReviewResource(
   evictedResourceHints.erase(resourceUri);
 }
 
+std::optional<QJsonObject> McpSessionState::listResources(
+  const QString& cursor, QString* error) const
+{
+  if (error)
+  {
+    error->clear();
+  }
+
+  auto resources = std::vector<QJsonObject>{};
+  resources.reserve(operationHistory.size() + reviewResources.size());
+  for (const auto& operation : operationHistory)
+  {
+    if (operation.operationId.isEmpty())
+    {
+      continue;
+    }
+    const auto uri = QString{"tbmcp://operation/%1"}.arg(operation.operationId);
+    auto name = operation.transactionName.trimmed();
+    if (name.isEmpty())
+    {
+      name = operation.toolName.trimmed();
+    }
+    if (name.isEmpty())
+    {
+      name = operation.operationId;
+    }
+    resources.push_back(QJsonObject{
+      {"uri", uri},
+      {"name", name},
+      {"description", QString{"MCP operation %1"}.arg(operation.operationId)},
+      {"mimeType", "application/json"},
+      {"type", "operation"},
+    });
+  }
+
+  for (const auto& [uri, record] : reviewResources)
+  {
+    auto name = record.resource.value("reviewId").toString().trimmed();
+    if (name.isEmpty())
+    {
+      name = record.resource.value("tool").toString().trimmed();
+    }
+    if (name.isEmpty())
+    {
+      name = uri;
+    }
+    resources.push_back(QJsonObject{
+      {"uri", uri},
+      {"name", name},
+      {"description", QString{"MCP review %1"}.arg(name)},
+      {"mimeType", "application/json"},
+      {"type", "review"},
+    });
+  }
+
+  std::ranges::sort(
+    resources, {}, [](const auto& resource) { return resource.value("uri").toString(); });
+
+  const auto offset = resourceOffset(cursor);
+  if (!offset || *offset > static_cast<qsizetype>(resources.size()))
+  {
+    if (error)
+    {
+      *error = "Invalid MCP resource cursor";
+    }
+    return std::nullopt;
+  }
+
+  const auto end =
+    std::min(*offset + MaxResourcesPerPage, static_cast<qsizetype>(resources.size()));
+  auto page = QJsonArray{};
+  for (auto i = *offset; i < end; ++i)
+  {
+    page.push_back(resources[static_cast<size_t>(i)]);
+  }
+
+  auto result = QJsonObject{{"resources", page}};
+  if (end < static_cast<qsizetype>(resources.size()))
+  {
+    result.insert("nextCursor", resourceCursor(end));
+  }
+  return result;
+}
+
 std::optional<QJsonObject> McpSessionState::evictedResourceHint(const QString& uri) const
 {
   const auto it = evictedResourceHints.find(uri);
@@ -332,6 +452,7 @@ QJsonObject McpSessionState::diagnosticsJson() const
        {"irPreviews", static_cast<qint64>(MaxIrPreviews)},
        {"irPreviewTtlMs", IrPreviewTtlMs},
        {"documentFingerprints", MaxDocumentFingerprints},
+       {"resourcesPerPage", MaxResourcesPerPage},
      }},
     {"counts",
      QJsonObject{

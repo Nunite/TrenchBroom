@@ -115,7 +115,67 @@ TEST_CASE("McpSessionState enforces bounded caches", "[McpBridgeServer][McpSessi
     CHECK(
       diagnostics.value("counts").toObject().value("documentFingerprints").toInt() == 1);
     CHECK(
+      diagnostics.value("limits").toObject().value("resourcesPerPage").toInt()
+      == McpSessionState::MaxResourcesPerPage);
+    CHECK(
       diagnostics.value("evictions").toObject().value("operationRecords").toInt() == 0);
+  }
+
+  SECTION("retained operation and review resources use bounded pagination")
+  {
+    auto state = McpSessionState{};
+    for (auto i = 0; i < 101; ++i)
+    {
+      auto operation = McpOperationRecord{};
+      operation.operationId = QString{"mcp-op-%1"}.arg(i, 3, 10, QLatin1Char{'0'});
+      operation.toolName = "blockout_create_batch";
+      operation.transactionName = QString{"MCP operation %1"}.arg(i);
+      state.operationHistory.push_back(std::move(operation));
+    }
+    const auto reviewUri = QString{"tbmcp://review/review-1"};
+    state.reviewResources[reviewUri] = McpReviewResourceRecord{
+      QJsonObject{
+        {"resourceUri", reviewUri},
+        {"reviewId", "review-1"},
+        {"tool", "render_review_current_scene"},
+      },
+      "doc:active",
+      nowMs,
+    };
+    state.evictedResourceHints["tbmcp://review/evicted"] = QJsonObject{
+      {"evicted", true},
+    };
+
+    auto error = QString{};
+    const auto firstPage = state.listResources({}, &error);
+    REQUIRE(firstPage);
+    CHECK(error.isEmpty());
+    const auto firstResources = firstPage->value("resources").toArray();
+    REQUIRE(firstResources.size() == 100);
+    CHECK(firstResources.first().toObject().value("type").toString() == "operation");
+    CHECK(
+      firstResources.first().toObject().value("mimeType").toString()
+      == "application/json");
+    const auto nextCursor = firstPage->value("nextCursor").toString();
+    CHECK_FALSE(nextCursor.isEmpty());
+    CHECK(nextCursor != "100");
+
+    const auto secondPage = state.listResources(nextCursor, &error);
+    REQUIRE(secondPage);
+    const auto secondResources = secondPage->value("resources").toArray();
+    REQUIRE(secondResources.size() == 2);
+    CHECK_FALSE(secondPage->contains("nextCursor"));
+    CHECK(std::ranges::any_of(secondResources, [&](const auto& value) {
+      const auto resource = value.toObject();
+      return resource.value("uri").toString() == reviewUri
+             && resource.value("type").toString() == "review";
+    }));
+    CHECK_FALSE(std::ranges::any_of(secondResources, [](const auto& value) {
+      return value.toObject().value("uri").toString() == "tbmcp://review/evicted";
+    }));
+
+    CHECK_FALSE(state.listResources("not-a-valid-cursor", &error));
+    CHECK(error.contains("cursor"));
   }
 }
 
