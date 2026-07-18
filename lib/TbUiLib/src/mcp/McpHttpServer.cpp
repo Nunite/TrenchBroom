@@ -39,8 +39,6 @@ namespace
 {
 
 constexpr auto EndpointPath = "/mcp";
-constexpr auto MaxHeaderBytes = 64 * 1024;
-constexpr auto MaxBodyBytes = 4 * 1024 * 1024;
 
 QByteArray reasonPhrase(const int statusCode)
 {
@@ -62,6 +60,14 @@ QByteArray reasonPhrase(const int statusCode)
     return "Not Found";
   case 405:
     return "Method Not Allowed";
+  case 408:
+    return "Request Timeout";
+  case 413:
+    return "Content Too Large";
+  case 431:
+    return "Request Header Fields Too Large";
+  case 503:
+    return "Service Unavailable";
   default:
     return "Internal Server Error";
   }
@@ -72,18 +78,24 @@ QByteArray jsonBody(const QString& message)
   return QJsonDocument{QJsonObject{{"error", message}}}.toJson(QJsonDocument::Compact);
 }
 
-QString headerValue(const QList<QByteArray>& lines, const QByteArray& key)
+QList<QByteArray> headerValues(const QList<QByteArray>& lines, const QByteArray& key)
 {
   const auto lowerKey = key.toLower() + ":";
+  auto values = QList<QByteArray>{};
   for (int i = 1; i < lines.size(); ++i)
   {
     const auto line = lines[i];
     if (line.toLower().startsWith(lowerKey))
     {
-      return QString::fromUtf8(line.mid(lowerKey.size()).trimmed());
+      values.push_back(line.mid(lowerKey.size()).trimmed());
     }
   }
-  return {};
+  return values;
+}
+
+QString headerValue(const QList<QByteArray>& lines, const QByteArray& key)
+{
+  return QString::fromUtf8(headerValues(lines, key).value(0));
 }
 
 std::optional<QByteArray> allowedOrigin(const QList<QByteArray>& lines)
@@ -242,20 +254,53 @@ void McpHttpServer::handleNewConnection()
 
 void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
 {
-  const auto requestBytes = socket.peek(MaxHeaderBytes + MaxBodyBytes);
+  if (socket.property("tbMcpHttpRequestComplete").toBool())
+  {
+    return;
+  }
+
+  const auto maxRequestBytes = m_limits.maxHeaderBytes + 4 + m_limits.maxBodyBytes;
+  if (socket.bytesAvailable() > maxRequestBytes)
+  {
+    socket.setProperty("tbMcpHttpRequestComplete", true);
+    writeHttpResponse(
+      socket,
+      413,
+      reasonPhrase(413),
+      "application/json",
+      jsonBody("HTTP request too large"));
+    socket.disconnectFromHost();
+    return;
+  }
+
+  const auto requestBytes = socket.peek(maxRequestBytes);
   const auto headerEnd = requestBytes.indexOf("\r\n\r\n");
   if (headerEnd < 0)
   {
-    if (requestBytes.size() > MaxHeaderBytes)
+    if (requestBytes.size() > m_limits.maxHeaderBytes)
     {
+      socket.setProperty("tbMcpHttpRequestComplete", true);
       writeHttpResponse(
         socket,
-        400,
-        reasonPhrase(400),
+        431,
+        reasonPhrase(431),
         "application/json",
         jsonBody("HTTP header too large"));
       socket.disconnectFromHost();
     }
+    return;
+  }
+
+  if (headerEnd > m_limits.maxHeaderBytes)
+  {
+    socket.setProperty("tbMcpHttpRequestComplete", true);
+    writeHttpResponse(
+      socket,
+      431,
+      reasonPhrase(431),
+      "application/json",
+      jsonBody("HTTP header too large"));
+    socket.disconnectFromHost();
     return;
   }
 
@@ -273,14 +318,40 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
   const auto method = methodFromRequestLine(requestLine);
   const auto path = pathFromRequestLine(requestLine);
 
-  const auto contentLengthText = headerValue(lines, "Content-Length");
+  if (!headerValues(lines, "Transfer-Encoding").isEmpty())
+  {
+    socket.setProperty("tbMcpHttpRequestComplete", true);
+    writeHttpResponse(
+      socket,
+      400,
+      reasonPhrase(400),
+      "application/json",
+      jsonBody("Transfer-Encoding is not supported"));
+    socket.disconnectFromHost();
+    return;
+  }
+
+  const auto contentLengthValues = headerValues(lines, "Content-Length");
+  if (contentLengthValues.size() > 1)
+  {
+    socket.setProperty("tbMcpHttpRequestComplete", true);
+    writeHttpResponse(
+      socket,
+      400,
+      reasonPhrase(400),
+      "application/json",
+      jsonBody("Duplicate Content-Length"));
+    socket.disconnectFromHost();
+    return;
+  }
+
+  const auto contentLengthText = contentLengthValues.value(0);
   auto ok = false;
   const auto contentLength =
-    contentLengthText.isEmpty() ? 0 : contentLengthText.toInt(&ok);
-  if (
-    !contentLengthText.isEmpty()
-    && (!ok || contentLength < 0 || contentLength > MaxBodyBytes))
+    contentLengthText.isEmpty() ? qlonglong{0} : contentLengthText.toLongLong(&ok);
+  if (!contentLengthText.isEmpty() && (!ok || contentLength < 0))
   {
+    socket.setProperty("tbMcpHttpRequestComplete", true);
     writeHttpResponse(
       socket,
       400,
@@ -291,13 +362,27 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
     return;
   }
 
-  const auto totalLength = headerEnd + 4 + contentLength;
+  if (contentLength > m_limits.maxBodyBytes)
+  {
+    socket.setProperty("tbMcpHttpRequestComplete", true);
+    writeHttpResponse(
+      socket,
+      413,
+      reasonPhrase(413),
+      "application/json",
+      jsonBody("HTTP body too large"));
+    socket.disconnectFromHost();
+    return;
+  }
+
+  const auto totalLength = qsizetype{headerEnd + 4} + contentLength;
   if (requestBytes.size() < totalLength)
   {
     return;
   }
 
   socket.read(totalLength);
+  socket.setProperty("tbMcpHttpRequestComplete", true);
 
   if (path != EndpointPath)
   {

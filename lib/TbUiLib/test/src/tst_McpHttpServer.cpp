@@ -110,18 +110,13 @@ QByteArray makeHttpRequest(
   return request;
 }
 
-HttpResponse sendRequest(const quint16 port, const QByteArray& request)
+HttpResponse readResponse(QTcpSocket& socket, const int timeoutMs = 2000)
 {
-  auto socket = QTcpSocket{};
-  socket.connectToHost("127.0.0.1", port);
-  REQUIRE(socket.waitForConnected(1000));
-  REQUIRE(socket.write(request) == request.size());
-  REQUIRE(socket.waitForBytesWritten(1000));
-
   auto bytes = QByteArray{};
   auto timer = QElapsedTimer{};
   timer.start();
-  while (timer.elapsed() < 2000 && socket.state() != QAbstractSocket::UnconnectedState)
+  while (timer.elapsed() < timeoutMs
+         && socket.state() != QAbstractSocket::UnconnectedState)
   {
     QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
     if (socket.waitForReadyRead(10))
@@ -146,6 +141,16 @@ HttpResponse sendRequest(const quint16 port, const QByteArray& request)
   REQUIRE(ok);
 
   return HttpResponse{statusCode, bytes.left(headerEnd), bytes.mid(headerEnd + 4)};
+}
+
+HttpResponse sendRequest(const quint16 port, const QByteArray& request)
+{
+  auto socket = QTcpSocket{};
+  socket.connectToHost("127.0.0.1", port);
+  REQUIRE(socket.waitForConnected(1000));
+  REQUIRE(socket.write(request) == request.size());
+  REQUIRE(socket.waitForBytesWritten(1000));
+  return readResponse(socket);
 }
 
 QJsonObject jsonObject(const HttpResponse& response)
@@ -194,6 +199,83 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     CHECK(limits.incompleteRequestTimeoutMs == 10'000);
     CHECK(limits.maxOrdinaryConnections == 32);
     CHECK(limits.maxSseConnections == 8);
+  }
+
+  SECTION("accepts a valid fragmented request")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer =
+      McpHttpServer{bridgeServer, McpHttpServerLimits{512, 512, 10'000, 32, 8}};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+
+    const auto request = makeHttpRequest("POST", "/mcp", jsonRequest(20, "initialize"));
+    auto socket = QTcpSocket{};
+    socket.connectToHost("127.0.0.1", httpServer.port());
+    REQUIRE(socket.waitForConnected(1000));
+    const auto split = request.size() / 2;
+    REQUIRE(socket.write(request.left(split)) == split);
+    REQUIRE(socket.waitForBytesWritten(1000));
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+    CHECK(socket.bytesAvailable() == 0);
+    REQUIRE(socket.write(request.mid(split)) == request.size() - split);
+    REQUIRE(socket.waitForBytesWritten(1000));
+    CHECK(readResponse(socket).statusCode == 200);
+  }
+
+  SECTION("rejects a header beyond the configured budget")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer =
+      McpHttpServer{bridgeServer, McpHttpServerLimits{96, 512, 10'000, 32, 8}};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+    auto request = makeHttpRequest("POST", "/mcp", jsonRequest(21, "initialize"));
+    request.replace(
+      "Connection: close\r\n",
+      "Connection: close\r\nX-Fill: " + QByteArray(128, 'x') + "\r\n");
+    CHECK(sendRequest(httpServer.port(), request).statusCode == 431);
+  }
+
+  SECTION("rejects a body length beyond the configured budget")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer =
+      McpHttpServer{bridgeServer, McpHttpServerLimits{512, 32, 10'000, 32, 8}};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+    auto request = makeHttpRequest("POST", "/mcp", {});
+    request.replace("Content-Length: 0", "Content-Length: 33");
+    CHECK(sendRequest(httpServer.port(), request).statusCode == 413);
+  }
+
+  SECTION("rejects duplicate content length fields")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer = McpHttpServer{bridgeServer};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+    auto request = makeHttpRequest("POST", "/mcp", {});
+    request.replace(
+      "Content-Length: 0\r\n", "Content-Length: 0\r\nContent-Length: 0\r\n");
+    CHECK(sendRequest(httpServer.port(), request).statusCode == 400);
+  }
+
+  SECTION("rejects unsupported transfer encoding")
+  {
+    auto bridgeServer = makeBridgeServer();
+    auto httpServer = McpHttpServer{bridgeServer};
+    const auto config = makeConfig(mcp::McpMode::ReadOnly);
+    REQUIRE(bridgeServer.start(config));
+    REQUIRE(httpServer.start(config));
+    auto request = makeHttpRequest("POST", "/mcp", {});
+    request.replace(
+      "Content-Length: 0\r\n", "Transfer-Encoding: chunked\r\nContent-Length: 0\r\n");
+    CHECK(sendRequest(httpServer.port(), request).statusCode == 400);
   }
 
   SECTION("off mode does not listen")
