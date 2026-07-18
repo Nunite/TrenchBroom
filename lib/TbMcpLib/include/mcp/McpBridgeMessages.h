@@ -30,6 +30,13 @@
 namespace tb::mcp
 {
 
+enum class McpBridgeRequestType
+{
+  ToolCall,
+  ResourcesList,
+  ResourceRead,
+};
+
 struct McpBridgeRequest
 {
   QString id;
@@ -37,6 +44,7 @@ struct McpBridgeRequest
   QString tool;
   QJsonObject params;
   std::optional<McpMode> requestedMode;
+  McpBridgeRequestType type = McpBridgeRequestType::ToolCall;
 };
 
 struct McpBridgeResponse

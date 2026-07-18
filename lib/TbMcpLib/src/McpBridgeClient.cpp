@@ -137,6 +137,75 @@ McpBridgeResponse McpBridgeClient::call(
     requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
   }
 
+  return sendRequest(
+    config,
+    McpBridgeRequest{
+      requestId,
+      config.token,
+      toolName,
+      arguments,
+      config.mode,
+      McpBridgeRequestType::ToolCall,
+    },
+    toolName,
+    toolCostClassForName(toolName));
+}
+
+McpBridgeResponse McpBridgeClient::listResources(
+  const McpBridgeConfig& config, const QString& cursor, QString requestId) const
+{
+  if (requestId.isEmpty())
+  {
+    requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+  }
+  auto params = QJsonObject{};
+  if (!cursor.isEmpty())
+  {
+    params.insert("cursor", cursor);
+  }
+  return sendRequest(
+    config,
+    McpBridgeRequest{
+      requestId,
+      config.token,
+      {},
+      std::move(params),
+      config.mode,
+      McpBridgeRequestType::ResourcesList,
+    },
+    "resources/list",
+    McpToolCostClass::Fast);
+}
+
+McpBridgeResponse McpBridgeClient::readResource(
+  const McpBridgeConfig& config, const QString& uri, QString requestId) const
+{
+  if (requestId.isEmpty())
+  {
+    requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+  }
+  return sendRequest(
+    config,
+    McpBridgeRequest{
+      requestId,
+      config.token,
+      {},
+      QJsonObject{{"uri", uri}},
+      config.mode,
+      McpBridgeRequestType::ResourceRead,
+    },
+    "resources/read",
+    McpToolCostClass::Fast);
+}
+
+McpBridgeResponse McpBridgeClient::sendRequest(
+  const McpBridgeConfig& config,
+  McpBridgeRequest request,
+  const QString& requestName,
+  const McpToolCostClass costClass) const
+{
+  const auto requestId = request.id;
+
   auto connection = m_connectionFactory();
   connection->connectToServer(config.pipeName);
   if (!connection->waitForConnected(m_timeouts.connectMs))
@@ -147,13 +216,6 @@ McpBridgeResponse McpBridgeClient::call(
         config.pipeName, connection->errorString()));
   }
 
-  const auto request = McpBridgeRequest{
-    requestId,
-    config.token,
-    toolName,
-    arguments,
-    config.mode,
-  };
   auto requestBytes = QJsonDocument{toJson(request)}.toJson(QJsonDocument::Compact);
   requestBytes += '\n';
   if (
@@ -165,8 +227,7 @@ McpBridgeResponse McpBridgeClient::call(
       QString{"Could not write MCP bridge request: %1"}.arg(connection->errorString()));
   }
 
-  const auto responseTimeoutMs =
-    m_timeouts.responseTimeoutMs(toolCostClassForName(toolName));
+  const auto responseTimeoutMs = m_timeouts.responseTimeoutMs(costClass);
   auto timer = QElapsedTimer{};
   timer.start();
   while (!connection->canReadLine())
@@ -179,8 +240,8 @@ McpBridgeResponse McpBridgeClient::call(
         requestId,
         QString{"Timed out waiting %1 ms for MCP bridge response from '%2'"}
           .arg(responseTimeoutMs)
-          .arg(toolName),
-        timeoutDetails(toolName, requestId, responseTimeoutMs));
+          .arg(requestName),
+        timeoutDetails(requestName, requestId, responseTimeoutMs));
     }
   }
 

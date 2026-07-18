@@ -68,6 +68,12 @@ private:
   McpBridgeConnectionFactory m_connectionFactory;
   McpBridgeClientTimeouts m_timeouts;
 
+  McpBridgeResponse sendRequest(
+    const McpBridgeConfig& config,
+    McpBridgeRequest request,
+    const QString& requestName,
+    McpToolCostClass costClass) const;
+
 public:
   McpBridgeClient();
   McpBridgeClient(
@@ -78,6 +84,12 @@ public:
     const QString& toolName,
     const QJsonObject& arguments,
     QString requestId = {}) const;
+  McpBridgeResponse listResources(
+    const McpBridgeConfig& config,
+    const QString& cursor = {},
+    QString requestId = {}) const;
+  McpBridgeResponse readResource(
+    const McpBridgeConfig& config, const QString& uri, QString requestId = {}) const;
 };
 
 } // namespace tb::mcp

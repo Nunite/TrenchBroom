@@ -153,8 +153,54 @@ TEST_CASE("McpBridgeClient", "[McpStdioClient]")
     const auto request = QJsonDocument::fromJson(state->written.trimmed()).object();
     CHECK(request.value("id").toString() == "request-1");
     CHECK(request.value("token").toString() == "secret");
+    CHECK(request.value("type").toString() == "tool_call");
     CHECK(request.value("tool").toString() == "documents_list");
     CHECK(request.value("mode").toString() == "Edit");
+  }
+
+  SECTION("serializes typed resource list requests")
+  {
+    const auto state = std::make_shared<ConnectionState>();
+    state->lineAvailable = true;
+    state->response =
+      QJsonDocument{toJson(McpBridgeResponse::success(
+                      "resource-list-1", QJsonObject{{"resources", QJsonArray{}}}))}
+        .toJson(QJsonDocument::Compact)
+      + '\n';
+    const auto client = makeClient(state);
+
+    const auto response =
+      client.listResources(testConfig(), "opaque-cursor", "resource-list-1");
+
+    REQUIRE(response.ok);
+    const auto request = QJsonDocument::fromJson(state->written.trimmed()).object();
+    CHECK(request.value("type").toString() == "resources_list");
+    CHECK_FALSE(request.contains("tool"));
+    CHECK(
+      request.value("params").toObject().value("cursor").toString() == "opaque-cursor");
+  }
+
+  SECTION("serializes typed resource read requests")
+  {
+    const auto state = std::make_shared<ConnectionState>();
+    state->lineAvailable = true;
+    state->response =
+      QJsonDocument{toJson(McpBridgeResponse::success(
+                      "resource-read-1", QJsonObject{{"operationId", "mcp-op-1"}}))}
+        .toJson(QJsonDocument::Compact)
+      + '\n';
+    const auto client = makeClient(state);
+
+    const auto response =
+      client.readResource(testConfig(), "tbmcp://operation/mcp-op-1", "resource-read-1");
+
+    REQUIRE(response.ok);
+    const auto request = QJsonDocument::fromJson(state->written.trimmed()).object();
+    CHECK(request.value("type").toString() == "resource_read");
+    CHECK_FALSE(request.contains("tool"));
+    CHECK(
+      request.value("params").toObject().value("uri").toString()
+      == "tbmcp://operation/mcp-op-1");
   }
 
   SECTION("returns structured recovery details after a response timeout")

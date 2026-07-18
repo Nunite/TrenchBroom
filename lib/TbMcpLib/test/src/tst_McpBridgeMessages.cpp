@@ -47,6 +47,69 @@ TEST_CASE("McpBridgeMessages")
     CHECK(parsed->params.value("verbose").toBool());
     REQUIRE(parsed->requestedMode);
     CHECK(*parsed->requestedMode == McpMode::ReadOnly);
+    CHECK(parsed->type == McpBridgeRequestType::ToolCall);
+    CHECK(toJson(request).value("type").toString() == "tool_call");
+  }
+
+  SECTION("typed resource requests roundtrip")
+  {
+    const auto listRequest = McpBridgeRequest{
+      "list-1",
+      "secret",
+      {},
+      QJsonObject{{"cursor", "opaque-cursor"}},
+      std::nullopt,
+      McpBridgeRequestType::ResourcesList,
+    };
+    const auto readRequest = McpBridgeRequest{
+      "read-1",
+      "secret",
+      {},
+      QJsonObject{{"uri", "tbmcp://operation/mcp-op-1"}},
+      std::nullopt,
+      McpBridgeRequestType::ResourceRead,
+    };
+
+    const auto parsedList = bridgeRequestFromJson(toJson(listRequest));
+    const auto parsedRead = bridgeRequestFromJson(toJson(readRequest));
+
+    REQUIRE(parsedList);
+    CHECK(parsedList->type == McpBridgeRequestType::ResourcesList);
+    CHECK(parsedList->tool.isEmpty());
+    CHECK(parsedList->params.value("cursor").toString() == "opaque-cursor");
+    REQUIRE(parsedRead);
+    CHECK(parsedRead->type == McpBridgeRequestType::ResourceRead);
+    CHECK(parsedRead->params.value("uri").toString() == "tbmcp://operation/mcp-op-1");
+  }
+
+  SECTION("legacy requests without a type remain tool calls")
+  {
+    const auto parsed = bridgeRequestFromJson(QJsonObject{
+      {"id", "legacy-1"},
+      {"token", "secret"},
+      {"tool", "tb_status"},
+      {"params", QJsonObject{}},
+    });
+
+    REQUIRE(parsed);
+    CHECK(parsed->type == McpBridgeRequestType::ToolCall);
+    CHECK(parsed->tool == "tb_status");
+  }
+
+  SECTION("rejects unknown request types")
+  {
+    auto error = QString{};
+    const auto parsed = bridgeRequestFromJson(
+      QJsonObject{
+        {"id", "1"},
+        {"token", "secret"},
+        {"type", "unknown"},
+        {"params", QJsonObject{}},
+      },
+      &error);
+
+    CHECK_FALSE(parsed);
+    CHECK(error.contains("type"));
   }
 
   SECTION("rejects invalid request params")
