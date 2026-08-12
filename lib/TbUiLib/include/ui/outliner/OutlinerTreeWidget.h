@@ -3,6 +3,7 @@
 #include <QTreeWidget>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 #include "base/NotifierConnection.h"
 
 namespace tb::mdl
@@ -85,6 +86,9 @@ private:
     void scheduleUpdateTree(mdl::Node* revealNode = nullptr);
     void loadIcons();
     void setupTreeItem(QTreeWidgetItem* item, mdl::Node* node);
+    void addLayerContents(QTreeWidgetItem* layerItem, mdl::LayerNode* layer);
+    void refreshTreeParents(std::vector<mdl::Node*> parents);
+    void removeItemMappings(QTreeWidgetItem* item);
     void applyFilter();
     void updateCurrentGroupHighlight();
     

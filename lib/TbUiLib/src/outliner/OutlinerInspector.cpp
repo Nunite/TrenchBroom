@@ -17,6 +17,7 @@
 #include <QSettings>
 #include <QSizePolicy>
 #include <QSize>
+#include <QTimer>
 #include <QWidget>
 
 namespace tb::ui
@@ -48,6 +49,14 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
     m_sortBox->addItem(tr("Default"), static_cast<int>(OutlinerTreeWidget::SortMode::Default));
     m_sortBox->addItem(tr("Type"), static_cast<int>(OutlinerTreeWidget::SortMode::Type));
     m_sortBox->addItem(tr("File Order"), static_cast<int>(OutlinerTreeWidget::SortMode::FileOrder));
+    {
+        const auto settings = QSettings{};
+        const auto sortMode = settings.value(
+            widgetSettingsPath(this, "SortMode"),
+            static_cast<int>(OutlinerTreeWidget::SortMode::Default)).toInt();
+        const auto index = m_sortBox->findData(sortMode);
+        m_sortBox->setCurrentIndex(index >= 0 ? index : 0);
+    }
     topRow->addWidget(m_sortBox);
 
     auto* propertiesToggle = createBitmapToggleButton(
@@ -120,11 +129,29 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
         }
     });
 
-    connect(m_searchField, &QLineEdit::textChanged, m_treeWidget, &OutlinerTreeWidget::setFilterText);
+    auto* searchTimer = new QTimer{this};
+    searchTimer->setInterval(120);
+    searchTimer->setSingleShot(true);
+    connect(m_searchField, &QLineEdit::textChanged, this, [this, searchTimer](const QString& text) {
+        if (text.trimmed().isEmpty()) {
+            searchTimer->stop();
+            m_treeWidget->setFilterText({});
+        } else {
+            searchTimer->start();
+        }
+    });
+    connect(searchTimer, &QTimer::timeout, this, [this]() {
+        m_treeWidget->setFilterText(m_searchField->text());
+    });
     connect(m_sortBox, &QComboBox::currentIndexChanged, this, [this](int index) {
         const auto modeValue = m_sortBox->itemData(index).toInt();
         m_treeWidget->setSortMode(static_cast<OutlinerTreeWidget::SortMode>(modeValue));
+        auto settings = QSettings{};
+        settings.setValue(widgetSettingsPath(this, "SortMode"), modeValue);
     });
+
+    m_treeWidget->setSortMode(static_cast<OutlinerTreeWidget::SortMode>(
+        m_sortBox->currentData().toInt()));
 }
 
 OutlinerInspector::~OutlinerInspector()

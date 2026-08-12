@@ -188,6 +188,21 @@ TEST_CASE("OutlinerTreeWidget")
     CHECK(!itemForNode(tree, fixture.lightEntity)->isHidden());
   }
 
+  SECTION("updates the selected filter when document selection changes")
+  {
+    tree.setFilterText("selected");
+    processOutlinerTreeUpdates();
+
+    CHECK(itemForNode(tree, fixture.infoEntity)->isHidden());
+    CHECK(itemForNode(tree, fixture.lightEntity)->isHidden());
+
+    mdl::selectNodes(map, {fixture.infoEntity});
+    processOutlinerTreeUpdates();
+
+    CHECK(!itemForNode(tree, fixture.infoEntity)->isHidden());
+    CHECK(itemForNode(tree, fixture.lightEntity)->isHidden());
+  }
+
   SECTION("syncs document selection into the tree")
   {
     mdl::selectNodes(map, {fixture.infoEntity});
@@ -226,8 +241,11 @@ TEST_CASE("OutlinerTreeWidget")
     CHECK(tree.selectedItems().empty());
   }
 
-  SECTION("rebuilds when map nodes are added")
+  SECTION("locally refreshes a layer when map nodes are added")
   {
+    auto* layerItemBefore = itemForNode(tree, fixture.defaultLayer);
+    REQUIRE(layerItemBefore != nullptr);
+
     auto* addedEntity = new mdl::EntityNode{mdl::Entity{{{"classname", "trigger_once"}}}};
     mdl::addNodes(map, {{&mdl::parentForNodes(map), {addedEntity}}});
     processOutlinerTreeUpdates();
@@ -235,6 +253,73 @@ TEST_CASE("OutlinerTreeWidget")
     auto* addedItem = itemWithText(tree, "trigger_once");
     REQUIRE(addedItem != nullptr);
     CHECK(addedItem->data(0, Qt::UserRole).value<mdl::Node*>() == addedEntity);
+    CHECK(itemForNode(tree, fixture.defaultLayer) == layerItemBefore);
+  }
+
+  SECTION("locally refreshes a group when nested nodes change")
+  {
+    auto* layerItemBefore = itemForNode(tree, fixture.defaultLayer);
+    auto* groupItemBefore = itemForNode(tree, fixture.group);
+    REQUIRE(layerItemBefore != nullptr);
+    REQUIRE(groupItemBefore != nullptr);
+
+    auto* addedEntity =
+      new mdl::EntityNode{mdl::Entity{{{"classname", "trigger_multiple"}}}};
+    mdl::addNodes(map, {{fixture.group, {addedEntity}}});
+    processOutlinerTreeUpdates();
+
+    CHECK(itemForNode(tree, fixture.defaultLayer) == layerItemBefore);
+    CHECK(itemForNode(tree, fixture.group) == groupItemBefore);
+    CHECK(itemForNode(tree, fixture.groupedEntity) != nullptr);
+    CHECK(itemForNode(tree, addedEntity)->parent() == groupItemBefore);
+  }
+
+  SECTION("locally refreshes a group when nested nodes are removed")
+  {
+    auto* retainedEntity = new mdl::EntityNode{mdl::Entity{{{"classname", "info_null"}}}};
+    mdl::addNodes(map, {{fixture.group, {retainedEntity}}});
+    processOutlinerTreeUpdates();
+
+    auto* layerItemBefore = itemForNode(tree, fixture.defaultLayer);
+    auto* groupItemBefore = itemForNode(tree, fixture.group);
+    REQUIRE(layerItemBefore != nullptr);
+    REQUIRE(groupItemBefore != nullptr);
+
+    mdl::removeNodes(map, {fixture.groupedEntity});
+    processOutlinerTreeUpdates();
+
+    CHECK(itemForNode(tree, fixture.defaultLayer) == layerItemBefore);
+    CHECK(itemForNode(tree, fixture.group) == groupItemBefore);
+    CHECK(itemForNode(tree, fixture.groupedEntity) == nullptr);
+    CHECK(itemForNode(tree, retainedEntity)->parent() == groupItemBefore);
+    CHECK(groupItemBefore->childCount() == 1);
+  }
+
+  SECTION("removes an empty group after its last child is removed")
+  {
+    mdl::removeNodes(map, {fixture.groupedEntity});
+    processOutlinerTreeUpdates();
+
+    CHECK(itemForNode(tree, fixture.groupedEntity) == nullptr);
+    CHECK(itemForNode(tree, fixture.group) == nullptr);
+    CHECK(itemForNode(tree, fixture.defaultLayer) != nullptr);
+  }
+
+  SECTION("applies sorting to local structural updates")
+  {
+    tree.setSortMode(OutlinerTreeWidget::SortMode::FileOrder);
+    processOutlinerTreeUpdates();
+
+    auto* addedEntity =
+      new mdl::EntityNode{mdl::Entity{{{"classname", "0_first_by_name"}}}};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {addedEntity}}});
+    processOutlinerTreeUpdates();
+
+    auto* layerItem = itemForNode(tree, fixture.defaultLayer);
+    REQUIRE(layerItem != nullptr);
+    const auto names = childNames(*layerItem);
+    REQUIRE(names.size() == 4);
+    CHECK(names.back() == "0_first_by_name");
   }
 }
 

@@ -5,6 +5,7 @@
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QPainter>
+#include <QPalette>
 #include <QMimeData>
 #include <QDrag>
 #include <QDragEnterEvent>
@@ -16,6 +17,7 @@
 #include <QMenu>
 #include <QContextMenuEvent>
 #include <QSet>
+#include <QSignalBlocker>
 
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
@@ -43,6 +45,11 @@
 #include "ui/ImageUtils.h"
 #include "kd/memory_utils.h"
 #include "kd/vector_utils.h"
+
+#include <algorithm>
+#include <memory>
+#include <unordered_set>
+#include <utility>
 
 namespace tb::ui
 {
@@ -405,26 +412,6 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     header()->resizeSection(2, 24);
     header()->resizeSection(3, 24);
 
-    // Style similar to LayerTreeWidget
-    setStyleSheet(
-        "QTreeWidget { "
-        "   background-color: #2D2D30;"
-        "   color: #E0E0E0;"
-        "   border: none;"
-        "   font-size: 12px;"
-        "}"
-        "QTreeWidget::item { "
-        "   height: 24px;"
-        "   padding: 2px 0px;"
-        "}"
-        "QTreeWidget::item:selected { "
-        "   background-color: #3F3F46;"
-        "}"
-        "QTreeWidget::item:hover { "
-        "   background-color: #2A2A2D;"
-        "}"
-    );
-
     loadIcons();
 
     setAcceptDrops(true);
@@ -444,11 +431,48 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
             updateCurrentGroupHighlight();
         });
     
-    // Listen to map changes to update tree
+    const auto parentsBeforeRemoval = std::make_shared<std::vector<mdl::Node*>>();
+    const auto complexRemoval = std::make_shared<bool>(false);
+    m_notifierConnection += m_document.nodesWillBeRemovedNotifier.connect(
+        [parentsBeforeRemoval, complexRemoval](const std::vector<mdl::Node*>& nodes) {
+            parentsBeforeRemoval->clear();
+            parentsBeforeRemoval->reserve(nodes.size());
+            *complexRemoval = false;
+
+            const auto removedNodes = std::unordered_set<mdl::Node*>{nodes.begin(), nodes.end()};
+            for (auto* node : nodes) {
+                *complexRemoval = *complexRemoval || dynamic_cast<mdl::GroupNode*>(node)
+                                  || dynamic_cast<mdl::LayerNode*>(node);
+                if (node && node->parent() && !removedNodes.contains(node->parent())) {
+                    parentsBeforeRemoval->push_back(node->parent());
+                }
+            }
+        });
     m_notifierConnection += m_document.nodesWereAddedNotifier.connect(
-        [this](const auto&) { scheduleUpdateTree(); }); // Naive full update for now
+        [this](const std::vector<mdl::Node*>& nodes) {
+            auto parents = std::vector<mdl::Node*>{};
+            parents.reserve(nodes.size());
+            for (auto* node : nodes) {
+                if (!node || dynamic_cast<mdl::GroupNode*>(node)
+                    || dynamic_cast<mdl::LayerNode*>(node)) {
+                    scheduleUpdateTree();
+                    return;
+                }
+                if (node->parent()) {
+                    parents.push_back(node->parent());
+                }
+            }
+            refreshTreeParents(std::move(parents));
+        });
     m_notifierConnection += m_document.nodesWereRemovedNotifier.connect(
-        [this](const auto&) { scheduleUpdateTree(); });
+        [this, parentsBeforeRemoval, complexRemoval](const auto&) {
+            if (*complexRemoval) {
+                scheduleUpdateTree();
+            } else {
+                refreshTreeParents(std::exchange(*parentsBeforeRemoval, {}));
+            }
+            *complexRemoval = false;
+        });
         
     // Optimize nodeDidChange: only update item text/icon, do NOT rebuild tree
     m_notifierConnection += m_document.nodesDidChangeNotifier.connect(
@@ -583,6 +607,8 @@ void OutlinerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
     if (!item || !node) return;
 
     item->setText(0, QString::fromStdString(node->name()));
+    item->setText(1, {});
+    item->setToolTip(1, {});
     item->setData(0, Qt::UserRole, QVariant::fromValue(node));
     m_itemForNode[node] = item;
 
@@ -643,11 +669,10 @@ void OutlinerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
     item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
     
     // Dim hidden items text
-    if (!node->visible()) {
-        item->setForeground(0, QColor(128, 128, 128));
-    } else {
-        item->setForeground(0, QColor(224, 224, 224));
-    }
+    item->setForeground(
+        0,
+        node->visible() ? palette().brush(QPalette::Text)
+                        : palette().brush(QPalette::Disabled, QPalette::Text));
 }
 
 void OutlinerTreeWidget::addNodeToTree(QTreeWidgetItem* parentItem, mdl::Node* node)
@@ -673,6 +698,151 @@ void OutlinerTreeWidget::addNodeToTree(QTreeWidgetItem* parentItem, mdl::Node* n
     // Brushes don't have children in this view usually
 }
 
+void OutlinerTreeWidget::addLayerContents(
+    QTreeWidgetItem* layerItem, mdl::LayerNode* layer)
+{
+    auto groupNodes = std::vector<mdl::Node*>{};
+    auto entityNodes = std::vector<mdl::Node*>{};
+    auto otherNodes = std::vector<mdl::Node*>{};
+    auto worldspawnBrushes = std::vector<mdl::BrushNode*>{};
+
+    for (auto* node : layer->children()) {
+        if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node)) {
+            worldspawnBrushes.push_back(brushNode);
+        } else if (dynamic_cast<mdl::GroupNode*>(node)) {
+            groupNodes.push_back(node);
+        } else if (dynamic_cast<mdl::EntityNode*>(node)) {
+            entityNodes.push_back(node);
+        } else {
+            otherNodes.push_back(node);
+        }
+    }
+
+    sortNodes(m_sortMode, groupNodes);
+    sortNodes(m_sortMode, entityNodes);
+    sortNodes(m_sortMode, otherNodes);
+
+    for (auto* node : groupNodes) {
+        addNodeToTree(layerItem, node);
+    }
+    for (auto* node : entityNodes) {
+        addNodeToTree(layerItem, node);
+    }
+
+    if (!worldspawnBrushes.empty()) {
+        auto* worldspawnItem = new QTreeWidgetItem(layerItem);
+        worldspawnItem->setText(0, "worldspawn");
+        worldspawnItem->setText(1, QString("%1 brushes").arg(worldspawnBrushes.size()));
+        worldspawnItem->setIcon(0, m_brushEntityIcon);
+        worldspawnItem->setData(0, WorldspawnItemRole, true);
+        worldspawnItem->setData(
+            0, WorldspawnLayerRole, QVariant::fromValue(static_cast<mdl::Node*>(layer)));
+        worldspawnItem->setExpanded(false);
+
+        for (auto* brushNode : worldspawnBrushes) {
+            addNodeToTree(worldspawnItem, brushNode);
+        }
+    }
+
+    for (auto* node : otherNodes) {
+        addNodeToTree(layerItem, node);
+    }
+}
+
+void OutlinerTreeWidget::removeItemMappings(QTreeWidgetItem* item)
+{
+    if (!item) {
+        return;
+    }
+
+    if (const auto* node = nodeFromItem(item)) {
+        m_itemForNode.erase(node);
+    }
+    for (int i = 0; i < item->childCount(); ++i) {
+        removeItemMappings(item->child(i));
+    }
+}
+
+void OutlinerTreeWidget::refreshTreeParents(std::vector<mdl::Node*> parents)
+{
+    parents = kdl::vec_sort_and_remove_duplicates(std::move(parents));
+    if (parents.empty()) {
+        return;
+    }
+
+    auto rootParents = std::vector<mdl::Node*>{};
+    rootParents.reserve(parents.size());
+    for (auto* candidate : parents) {
+        auto hasAncestorInBatch = false;
+        for (auto* other : parents) {
+            if (candidate != other && candidate->isDescendantOf(*other)) {
+                hasAncestorInBatch = true;
+                break;
+            }
+        }
+        if (!hasAncestorInBatch) {
+            rootParents.push_back(candidate);
+        }
+    }
+    parents = std::move(rootParents);
+
+    auto parentItems = std::vector<std::pair<mdl::Node*, QTreeWidgetItem*>>{};
+    parentItems.reserve(parents.size());
+    for (auto* parent : parents) {
+        auto* item = findItemForNode(parent);
+        const auto supported = dynamic_cast<mdl::LayerNode*>(parent)
+                               || dynamic_cast<mdl::GroupNode*>(parent)
+                               || dynamic_cast<mdl::EntityNode*>(parent);
+        if (!item || !supported) {
+            scheduleUpdateTree();
+            return;
+        }
+        parentItems.emplace_back(parent, item);
+    }
+
+    auto expandedNodes = std::unordered_map<const mdl::Node*, bool>{};
+    auto expandedWorldspawn = std::unordered_map<const mdl::LayerNode*, bool>{};
+    captureExpandedState(expandedNodes, expandedWorldspawn);
+
+    const auto updatesWereEnabled = updatesEnabled();
+    setUpdatesEnabled(false);
+    const auto signalBlocker = QSignalBlocker{this};
+    const auto wasSyncing = m_syncingSelection;
+    m_syncingSelection = true;
+
+    for (const auto& [parent, item] : parentItems) {
+        while (item->childCount() > 0) {
+            auto* child = item->takeChild(0);
+            removeItemMappings(child);
+            delete child;
+        }
+
+        setupTreeItem(item, parent);
+        if (auto* layer = dynamic_cast<mdl::LayerNode*>(parent)) {
+            addLayerContents(item, layer);
+        } else {
+            auto children = parent->children();
+            sortNodes(m_sortMode, children);
+            for (auto* child : children) {
+                addNodeToTree(item, child);
+            }
+        }
+    }
+
+    restoreExpandedState(expandedNodes, expandedWorldspawn);
+    syncSelectionFromDocument();
+    updateCurrentGroupHighlight();
+    if (m_filterActive) {
+        applyFilter();
+    }
+
+    m_syncingSelection = wasSyncing;
+    setUpdatesEnabled(updatesWereEnabled);
+    if (updatesWereEnabled) {
+        viewport()->update();
+    }
+}
+
 void OutlinerTreeWidget::refreshTreeItemRecursively(QTreeWidgetItem* item)
 {
     if (!item) return;
@@ -688,7 +858,9 @@ void OutlinerTreeWidget::refreshTreeItemRecursively(QTreeWidgetItem* item)
 
 void OutlinerTreeWidget::updateTree()
 {
-    // Prevent selection changes from propagating during rebuild
+    const auto updatesWereEnabled = updatesEnabled();
+    setUpdatesEnabled(false);
+
     const bool wasSyncing = m_syncingSelection;
     m_syncingSelection = true;
     blockSignals(true);
@@ -704,6 +876,7 @@ void OutlinerTreeWidget::updateTree()
     if (!world) {
         m_syncingSelection = wasSyncing;
         blockSignals(false);
+        setUpdatesEnabled(updatesWereEnabled);
         return;
     }
 
@@ -741,55 +914,6 @@ void OutlinerTreeWidget::updateTree()
     // If we want to mimic "Outliner", we might want to flatten layers or show them as folders.
     // Let's iterate all layers and their children.
 
-    const auto addLayerContents = [&](QTreeWidgetItem* layerItem, mdl::LayerNode* layer) {
-        auto groupNodes = std::vector<mdl::Node*>{};
-        auto entityNodes = std::vector<mdl::Node*>{};
-        auto otherNodes = std::vector<mdl::Node*>{};
-        auto worldspawnBrushes = std::vector<mdl::BrushNode*>{};
-
-        for (auto* node : layer->children()) {
-            if (auto* brushNode = dynamic_cast<mdl::BrushNode*>(node)) {
-                worldspawnBrushes.push_back(brushNode);
-            } else if (dynamic_cast<mdl::GroupNode*>(node)) {
-                groupNodes.push_back(node);
-            } else if (dynamic_cast<mdl::EntityNode*>(node)) {
-                entityNodes.push_back(node);
-            } else {
-                otherNodes.push_back(node);
-            }
-        }
-
-        sortNodes(m_sortMode, groupNodes);
-        sortNodes(m_sortMode, entityNodes);
-        sortNodes(m_sortMode, otherNodes);
-
-        for (auto* node : groupNodes) {
-            addNodeToTree(layerItem, node);
-        }
-
-        for (auto* node : entityNodes) {
-            addNodeToTree(layerItem, node);
-        }
-
-        if (!worldspawnBrushes.empty()) {
-            auto* worldspawnItem = new QTreeWidgetItem(layerItem);
-            worldspawnItem->setText(0, "worldspawn");
-            worldspawnItem->setText(1, QString("%1 brushes").arg(worldspawnBrushes.size()));
-            worldspawnItem->setIcon(0, m_brushEntityIcon);
-            worldspawnItem->setData(0, WorldspawnItemRole, true);
-            worldspawnItem->setData(0, WorldspawnLayerRole, QVariant::fromValue(static_cast<mdl::Node*>(layer)));
-            worldspawnItem->setExpanded(false);
-
-            for (auto* brushNode : worldspawnBrushes) {
-                addNodeToTree(worldspawnItem, brushNode);
-            }
-        }
-
-        for (auto* node : otherNodes) {
-            addNodeToTree(layerItem, node);
-        }
-    };
-    
     // Default Layer
     auto* defaultLayer = world->defaultLayer();
     if (defaultLayer) {
@@ -827,6 +951,10 @@ void OutlinerTreeWidget::updateTree()
     
     m_syncingSelection = wasSyncing;
     blockSignals(false);
+    setUpdatesEnabled(updatesWereEnabled);
+    if (updatesWereEnabled) {
+        viewport()->update();
+    }
 }
 
 void OutlinerTreeWidget::updateCurrentGroupHighlight()
@@ -1178,28 +1306,8 @@ QTreeWidgetItem* OutlinerTreeWidget::findItemForNode(const mdl::Node* targetNode
         return nullptr;
     }
 
-    if (const auto it = m_itemForNode.find(targetNode); it != m_itemForNode.end()) {
-        return it->second;
-    }
-
-    QList<QTreeWidgetItem*> queue;
-    
-    // Add top level items
-    for(int i=0; i<topLevelItemCount(); ++i) {
-        queue.append(topLevelItem(i));
-    }
-    
-    while(!queue.isEmpty()) {
-        auto* item = queue.takeFirst();
-        if (nodeFromItem(item) == targetNode) {
-            return item;
-        }
-        
-        for(int i=0; i<item->childCount(); ++i) {
-            queue.append(item->child(i));
-        }
-    }
-    return nullptr;
+    const auto it = m_itemForNode.find(targetNode);
+    return it != m_itemForNode.end() ? it->second : nullptr;
 }
 
 void OutlinerTreeWidget::syncSelectionFromDocument()
@@ -1216,7 +1324,8 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
 
     const auto& selection = m_document.map().selection();
 
-    const auto appendDescendants = [](const mdl::Node* root, std::vector<const mdl::Node*>& out) {
+    const auto appendDescendants = [](
+        const mdl::Node* root, std::unordered_set<const mdl::Node*>& out) {
         if (!root) {
             return;
         }
@@ -1232,9 +1341,7 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
             const auto* node = stack.back();
             stack.pop_back();
 
-            if (!kdl::vec_contains(out, node)) {
-                out.push_back(node);
-            }
+            out.insert(node);
 
             for (const auto* child : node->children()) {
                 if (child) {
@@ -1287,6 +1394,7 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
     };
 
     auto orderedContainers = std::vector<std::pair<size_t, const mdl::Node*>>{};
+    auto seenContainers = std::unordered_set<const mdl::Node*>{};
     for (const auto* node : selection.nodes) {
         for (auto* parent = node ? node->parent() : nullptr; parent != nullptr;
              parent = parent->parent()) {
@@ -1306,14 +1414,7 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
                 continue;
             }
 
-            auto alreadyAdded = false;
-            for (const auto& entry : orderedContainers) {
-                if (entry.second == container) {
-                    alreadyAdded = true;
-                    break;
-                }
-            }
-            if (alreadyAdded) {
+            if (!seenContainers.insert(container).second) {
                 continue;
             }
 
@@ -1322,39 +1423,34 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
                 ++depth;
             }
 
-            auto inserted = false;
-            for (auto it = orderedContainers.begin(); it != orderedContainers.end(); ++it) {
-                if (depth < it->first) {
-                    orderedContainers.insert(it, {depth, container});
-                    inserted = true;
-                    break;
-                }
-            }
-            if (!inserted) {
-                orderedContainers.push_back({depth, container});
-            }
+            orderedContainers.emplace_back(depth, container);
         }
     }
+    std::sort(
+        orderedContainers.begin(),
+        orderedContainers.end(),
+        [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
 
     auto nodesToSelect = std::vector<const mdl::Node*>{};
+    auto nodesToSelectSet = std::unordered_set<const mdl::Node*>{};
 
     const auto addNode = [&](const mdl::Node* node) {
         if (!node) {
             return;
         }
-        if (!kdl::vec_contains(nodesToSelect, node)) {
+        if (nodesToSelectSet.insert(node).second) {
             nodesToSelect.push_back(node);
         }
     };
 
-    auto suppressedChildren = std::vector<const mdl::Node*>{};
+    auto suppressedChildren = std::unordered_set<const mdl::Node*>{};
 
     for (const auto& entry : orderedContainers) {
         const auto* containerNode = entry.second;
         if (!containerNode || !containerNode->hasChildren()) {
             continue;
         }
-        if (kdl::vec_contains(suppressedChildren, containerNode)) {
+        if (suppressedChildren.contains(containerNode)) {
             continue;
         }
 
@@ -1369,7 +1465,7 @@ void OutlinerTreeWidget::syncSelectionFromDocument()
             continue;
         }
 
-        if (kdl::vec_contains(suppressedChildren, node)) {
+        if (suppressedChildren.contains(node)) {
             continue;
         }
 
@@ -1438,6 +1534,9 @@ void OutlinerTreeWidget::onDocumentSelectionChanged(const mdl::SelectionChange& 
         return;
     }
     syncSelectionFromDocument();
+    if (m_filterActive) {
+        applyFilter();
+    }
 }
 
 void OutlinerTreeWidget::onItemSelectionChanged()
@@ -2220,7 +2319,10 @@ void OutlinerTreeWidget::updateVisibilityIconRecursively(QTreeWidgetItem* item, 
     if (!item) return;
 
     item->setIcon(3, isVisible ? m_visibleIcon : m_hiddenIcon);
-    item->setForeground(0, isVisible ? QColor(224, 224, 224) : QColor(128, 128, 128));
+    item->setForeground(
+        0,
+        isVisible ? palette().brush(QPalette::Text)
+                  : palette().brush(QPalette::Disabled, QPalette::Text));
 
     for (int i = 0; i < item->childCount(); ++i) {
         auto* child = item->child(i);
