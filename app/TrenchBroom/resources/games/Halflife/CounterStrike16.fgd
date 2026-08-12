@@ -1389,6 +1389,8 @@
 @PointClass base(Targetname, Angles) sprite() = cycler_sprite : "Sprite Cycler" 
 [
 	model(sprite) : "Sprite"
+	body(integer) : "Body" : 0
+	skin(integer) : "Skin" : 0
 	framerate(integer) : "Frames per second" : 10
 	renderfx(choices) :"Render FX" : 0 =
 	[
@@ -1421,6 +1423,38 @@
 	]
 	renderamt(integer) : "FX Amount (1 - 255)"
 	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	zhlt_studioshadow(choices) : "Opaque (Blocks Light)" : "" =
+	[
+		"": "Normal"
+		1: "Opaque (Blocks Light)"
+	]
+	zhlt_shadowmode(choices) : "Shadow Mode" : 1 =
+	[
+		0: "Fast, Model Bounds"
+		1: "Triangle Tracing (Transparency)"
+		2: "Slow, Triangle Plane Bounds"
+	]
+	zhlt_studiobsp(choices) : "Bake Model into BSP" : "" =
+	[
+		"": "No"
+		1: "Yes"
+	]
+	zhlt_studiobsp_doublesided(choices) : "Generated Back Faces" : 1 =
+	[
+		0: "Invisible"
+		1: "Textured"
+	]
+	zhlt_studiobsp_thickness(string) : "Fallback / Collision Thickness" : "1"
+	zhlt_studiobsp_collision(choices) : "Player Collision Hulls" : 0 =
+	[
+		0: "No"
+		1: "Yes"
+	]
+	zhlt_studiobsp_world(choices) : "BSP Placement Mode" : 0 =
+	[
+		0: "Optimized func_wall Submodel"
+		1: "Direct World Hull 0 (More Nodes / Leaves)"
+	]
 ]
 
 @PointClass Studio()  base(Targetname, Angles, RenderFields) size(-4 -4 -4, 4 4 4) = cycler_wreckage : "Wreckage" 
