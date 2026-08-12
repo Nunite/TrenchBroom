@@ -9,6 +9,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPalette>
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QSignalBlocker>
@@ -130,6 +131,16 @@ private:
         }
     }
 };
+
+void setInactiveEditorPalette(QWidget* editor)
+{
+    auto palette = editor->palette();
+    palette.setColor(
+      QPalette::Disabled,
+      QPalette::PlaceholderText,
+      palette.color(QPalette::Disabled, QPalette::Text));
+    editor->setPalette(palette);
+}
 
 class OutlinerChoiceComboBox : public QComboBox
 {
@@ -438,6 +449,7 @@ OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(MapDocument& document
     m_selectionSummary->setObjectName("outlinerPropertySelectionSummary");
     m_selectionSummary->setAttribute(Qt::WA_StyledBackground, true);
     m_selectionSummary->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_selectionSummary->hide();
 
     m_scrollArea = new QScrollArea{m_propertiesPanel->getPanel()};
     m_scrollArea->setObjectName("outlinerPropertyScrollArea");
@@ -685,6 +697,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     if (entityNodes.empty())
     {
         m_selectionSummary->setText(tr("No entity selected"));
+        m_selectionSummary->hide();
         auto* emptyLabel = new QLabel{tr("No entity selected"), m_scrollContents};
         emptyLabel->setObjectName("infoLabel");
         emptyLabel->setContentsMargins(4, 4, 4, 4);
@@ -702,6 +715,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     {
         m_selectionSummary->setText(
           tr("Mixed selection (%1 entities)").arg(entityNodes.size()));
+        m_selectionSummary->show();
         auto* mixedLabel =
           new QLabel{tr("Different entity types selected"), m_scrollContents};
         mixedLabel->setObjectName("infoLabel");
@@ -716,6 +730,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
       entityNodes.size() == 1
         ? className
         : tr("%1 (%2 entities)").arg(className).arg(entityNodes.size()));
+    m_selectionSummary->setVisible(entityNodes.size() > 1);
 
     const auto* entityDefinition = mdl::selectEntityDefinition(entityNodes);
     const auto keys = buildKeyOrderWithInactiveDefinitions(entityNodes, entityDefinition);
@@ -803,6 +818,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         {
             row->setProperty("inactive", true);
             keyLabel->setProperty("inactive", true);
+            keyLabel->setDisabled(true);
             if (valueCombo)
             {
                 valueCombo->setDisabled(true);
@@ -810,10 +826,12 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             if (valueEdit)
             {
                 valueEdit->setDisabled(true);
+                setInactiveEditorPalette(valueEdit);
                 valueEdit->setPlaceholderText(tr("<inactive>"));
             }
             if (valueCombo && valueCombo->lineEdit())
             {
+                setInactiveEditorPalette(valueCombo->lineEdit());
                 valueCombo->lineEdit()->setPlaceholderText(tr("<inactive>"));
             }
         }

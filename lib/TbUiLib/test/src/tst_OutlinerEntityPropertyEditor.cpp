@@ -21,11 +21,14 @@
 #include <QApplication>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPalette>
 #include <QScrollArea>
 #include <QtTest/QTest>
 
 #include "mdl/BrushNode.h"
 #include "mdl/Entity.h"
+#include "mdl/EntityDefinition.h"
+#include "mdl/EntityDefinitionManager.h"
 #include "mdl/EntityNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
@@ -141,6 +144,7 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     const auto* summary = editor.findChild<QLabel*>("outlinerPropertySelectionSummary");
     REQUIRE(summary != nullptr);
     CHECK(summary->text() == "worldspawn");
+    CHECK(summary->isHidden());
 
     auto* valueEdit = propertyValueEdit(editor, "classname");
     REQUIRE(valueEdit != nullptr);
@@ -162,6 +166,7 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     auto* summary = editor.findChild<QLabel*>("outlinerPropertySelectionSummary");
     REQUIRE(summary != nullptr);
     CHECK(summary->text() == "light (2 entities)");
+    CHECK(!summary->isHidden());
 
     mdl::deselectAll(map);
     mdl::selectNodes(map, {firstLight, playerStart});
@@ -170,6 +175,7 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     summary = editor.findChild<QLabel*>("outlinerPropertySelectionSummary");
     REQUIRE(summary != nullptr);
     CHECK(summary->text() == "Mixed selection (2 entities)");
+    CHECK(!summary->isHidden());
     CHECK(hasInfoLabel(editor, "Different entity types selected"));
   }
 
@@ -180,6 +186,37 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     REQUIRE(scrollArea != nullptr);
     REQUIRE(addKey != nullptr);
     CHECK(!scrollArea->isAncestorOf(addKey));
+  }
+
+  SECTION("uses the disabled text palette for inactive properties")
+  {
+    map.entityDefinitionManager().setDefinitions({{
+      "inactive_test",
+      {},
+      "",
+      {{"optional", mdl::PropertyValueTypes::String{}, "", ""}},
+      mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
+    }});
+    const auto* definition = map.entityDefinitionManager().definition("inactive_test");
+    REQUIRE(definition != nullptr);
+
+    auto* entityNode = mdl::createPointEntity(map, *definition, {0, 0, 0});
+    REQUIRE(entityNode != nullptr);
+    mdl::selectNodes(map, {entityNode});
+    processOutlinerUpdates();
+
+    auto* row = propertyRow(editor, "optional");
+    REQUIRE(row != nullptr);
+
+    auto* keyLabel = row->findChild<QWidget*>("outlinerPropertyKey");
+    auto* valueEdit = row->findChild<QLineEdit*>("outlinerPropertyValue");
+    REQUIRE(keyLabel != nullptr);
+    REQUIRE(valueEdit != nullptr);
+    CHECK(!keyLabel->isEnabled());
+    CHECK(!valueEdit->isEnabled());
+    CHECK(
+      valueEdit->palette().color(QPalette::Disabled, QPalette::PlaceholderText)
+      == valueEdit->palette().color(QPalette::Disabled, QPalette::Text));
   }
 
   SECTION("adapts property rows to narrow and wide panels")

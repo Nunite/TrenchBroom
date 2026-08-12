@@ -40,28 +40,28 @@ QWidget#outlinerPropertyList {
 }
 
 QLabel#outlinerPropertySelectionSummary {
-  background: palette(alternate-base);
-  border-bottom: 1 solid palette(mid);
-  padding: 6px 8px;
-  font-weight: bold;
+  background: palette(base);
+  border-bottom: 1px solid rgba(127, 127, 127, 28);
+  color: palette(text);
+  padding: 4px 8px;
 }
 
 QWidget#outlinerPropertyAddBar {
-  background: palette(window);
-  border-top: 1 solid palette(mid);
+  background: palette(base);
+  border-top: 1px solid rgba(127, 127, 127, 36);
 }
 
 QWidget#outlinerPropertyRow {
-  background: palette(base);
-  border-bottom: 1 solid palette(midlight);
+  background: transparent;
+  border-bottom: 1px solid rgba(127, 127, 127, 20);
 }
 
 QWidget#outlinerPropertyRow:hover {
-  background: palette(alternate-base);
+  background: rgba(127, 127, 127, 16);
 }
 
 QWidget#outlinerPropertyRow[inactive="true"] {
-  background: palette(window);
+  background: transparent;
 }
 
 QWidget#outlinerPropertyKey QLabel {
@@ -69,8 +69,50 @@ QWidget#outlinerPropertyKey QLabel {
 }
 
 QWidget#outlinerPropertyKey[inactive="true"] QLabel {
-  color: palette(mid);
-  font-style: italic;
+  color: palette(text);
+}
+
+QLineEdit#outlinerPropertyValue,
+QComboBox#outlinerPropertyValue,
+QLineEdit#outlinerPropertyAddKey,
+QLineEdit#outlinerPropertyAddValue {
+  background: rgba(127, 127, 127, 10);
+  border: 1px solid rgba(127, 127, 127, 38);
+  border-radius: 3px;
+  padding: 2px 5px;
+}
+
+QLineEdit#outlinerPropertyValue:focus,
+QComboBox#outlinerPropertyValue:focus,
+QLineEdit#outlinerPropertyAddKey:focus,
+QLineEdit#outlinerPropertyAddValue:focus {
+  border-color: palette(highlight);
+  background: rgba(127, 127, 127, 18);
+}
+
+QWidget#outlinerPropertyRow[inactive="true"] QLineEdit#outlinerPropertyValue,
+QWidget#outlinerPropertyRow[inactive="true"] QComboBox#outlinerPropertyValue {
+  background: rgba(127, 127, 127, 8);
+  border-color: rgba(127, 127, 127, 28);
+}
+
+QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder,
+QWidget#outlinerPropertyAddBar QToolButton#toolButton_withBorder {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+}
+
+QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder:hover,
+QWidget#outlinerPropertyAddBar QToolButton#toolButton_withBorder:hover {
+  background: rgba(127, 127, 127, 28);
+  border-color: rgba(127, 127, 127, 36);
+}
+
+QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder:pressed,
+QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder:checked,
+QWidget#outlinerPropertyAddBar QToolButton#toolButton_withBorder:pressed {
+  background: rgba(127, 127, 127, 44);
 }
 
 QWidget#outlinerPropertyColorButton {
