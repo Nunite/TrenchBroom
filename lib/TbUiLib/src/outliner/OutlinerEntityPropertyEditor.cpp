@@ -1,6 +1,7 @@
 #include "ui/outliner/OutlinerEntityPropertyEditor.h"
 
 #include <QApplication>
+#include <QColorDialog>
 #include <QComboBox>
 #include <QEvent>
 #include <QFileDialog>
@@ -10,6 +11,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPalette>
+#include <QPainter>
+#include <QPixmap>
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QSignalBlocker>
@@ -29,7 +32,6 @@
 #include "mdl/Map_Entities.h"
 #include "mdl/PropertyDefinition.h"
 #include "ui/BitmapButton.h"
-#include "ui/ColorButton.h"
 #include "ui/ElidedLabel.h"
 #include "ui/FileDialogDefaultDir.h"
 #include "ui/FlagsEditor.h"
@@ -436,6 +438,19 @@ void getSpawnflagsSetAndMixedValues(
     {
         combineFlags(SpawnflagsNumFlags, getSpawnflagsValue(*it, propertyKey), setFlags, mixedFlags);
     }
+}
+
+QIcon colorSwatchIcon(const QColor& color, const QPalette& palette)
+{
+    auto pixmap = QPixmap{14, 14};
+    pixmap.fill(Qt::transparent);
+
+    auto painter = QPainter{&pixmap};
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(palette.color(QPalette::Mid));
+    painter.setBrush(color);
+    painter.drawRoundedRect(pixmap.rect().adjusted(0, 0, -1, -1), 2, 2);
+    return QIcon{pixmap};
 }
 } // namespace
 
@@ -913,13 +928,15 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             }
         }
 
-        ColorButton* colorButton = nullptr;
+        QToolButton* colorButton = nullptr;
         if (!inactive && (matchesSmartColorKeyPattern(key) || (propertyDef && isColorPropertyDefinition(*propertyDef))))
         {
-            colorButton = new ColorButton{row};
+            colorButton = new QToolButton{row};
             colorButton->setObjectName("outlinerPropertyColorButton");
-            colorButton->setFixedHeight(24);
-            colorButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+            colorButton->setFixedSize(QSize{24, 24});
+            colorButton->setIconSize(QSize{14, 14});
+            colorButton->setProperty("propertyKey", QString::fromStdString(key));
+            colorButton->setToolTip(tr("Choose color"));
 
             auto displayColor = QColor{Qt::black};
             if (!entityNodes.empty())
@@ -959,7 +976,8 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 }
             }
 
-            colorButton->setColor(displayColor);
+            colorButton->setIcon(colorSwatchIcon(displayColor, colorButton->palette()));
+            colorButton->setProperty("displayColor", displayColor);
         }
 
         QToolButton* spawnflagsToggleButton = nullptr;
@@ -1151,7 +1169,18 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 
         if (colorButton)
         {
-            connect(colorButton, &ColorButton::colorChangedByUser, this, [this, key, propertyDef](const QColor& qColor) {
+            connect(colorButton, &QAbstractButton::clicked, this, [this, key, propertyDef, colorButton]() {
+                const auto qColor = QColorDialog::getColor(
+                  colorButton->property("displayColor").value<QColor>(),
+                  colorButton,
+                  tr("Choose color"));
+                if (!qColor.isValid())
+                {
+                    return;
+                }
+
+                colorButton->setIcon(colorSwatchIcon(qColor, colorButton->palette()));
+                colorButton->setProperty("displayColor", qColor);
                 auto requestedColor = Rgb{fromQColor(qColor).to<RgbB>()};
                 if (!m_document.map().selection().allEntities().empty())
                 {

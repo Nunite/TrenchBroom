@@ -23,6 +23,7 @@
 #include <QLineEdit>
 #include <QPalette>
 #include <QScrollArea>
+#include <QToolButton>
 #include <QtTest/QTest>
 
 #include "mdl/BrushNode.h"
@@ -294,27 +295,43 @@ TEST_CASE("OutlinerEntityPropertyEditor")
   {
     mdl::selectNodes(map, std::vector<mdl::Node*>{&map.worldNode()});
     mdl::setEntityProperty(map, "skyname", "2namek", false);
+    mdl::setEntityProperty(map, "_color", "1 0 0", false);
     editor.show();
     editor.resize(800, 600);
     processOutlinerUpdates();
 
     auto* classnameRow = propertyRow(editor, "classname");
     auto* skynameRow = propertyRow(editor, "skyname");
+    auto* colorRow = propertyRow(editor, "_color");
     auto* classnameEdit = propertyValueEdit(editor, "classname");
     auto* skynameEdit = propertyValueEdit(editor, "skyname");
+    auto* colorEdit = propertyValueEdit(editor, "_color");
     REQUIRE(classnameRow != nullptr);
     REQUIRE(skynameRow != nullptr);
+    REQUIRE(colorRow != nullptr);
     REQUIRE(classnameEdit != nullptr);
     REQUIRE(skynameEdit != nullptr);
+    REQUIRE(colorEdit != nullptr);
 
     const auto* classnameActions =
       classnameRow->findChild<QWidget*>("outlinerPropertyActions");
     const auto* skynameActions =
       skynameRow->findChild<QWidget*>("outlinerPropertyActions");
+    const auto* colorActions =
+      colorRow->findChild<QWidget*>("outlinerPropertyActions");
     REQUIRE(classnameActions != nullptr);
     REQUIRE(skynameActions != nullptr);
+    REQUIRE(colorActions != nullptr);
     CHECK(classnameActions->width() == skynameActions->width());
+    CHECK(classnameActions->width() == colorActions->width());
+    CHECK(colorActions->width() == 50);
     CHECK(classnameEdit->geometry().right() == skynameEdit->geometry().right());
+    CHECK(classnameEdit->geometry().right() == colorEdit->geometry().right());
+
+    const auto* colorButton = colorRow->findChild<QToolButton*>(
+      "outlinerPropertyColorButton");
+    REQUIRE(colorButton != nullptr);
+    CHECK(colorButton->size() == QSize{24, 24});
   }
 
   SECTION("refreshes skyname when the selected worldspawn property changes externally")

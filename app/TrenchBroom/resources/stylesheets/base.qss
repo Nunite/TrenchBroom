@@ -115,8 +115,19 @@ QWidget#outlinerPropertyAddBar QToolButton#toolButton_withBorder:pressed {
   background: rgba(127, 127, 127, 44);
 }
 
-QWidget#outlinerPropertyColorButton {
+QToolButton#outlinerPropertyColorButton {
   background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+}
+
+QToolButton#outlinerPropertyColorButton:hover {
+  background: rgba(127, 127, 127, 28);
+  border-color: rgba(127, 127, 127, 36);
+}
+
+QToolButton#outlinerPropertyColorButton:pressed {
+  background: rgba(127, 127, 127, 44);
 }
 
 QWidget#smartSkyboxHeader {
