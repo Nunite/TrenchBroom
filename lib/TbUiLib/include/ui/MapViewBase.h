@@ -22,6 +22,7 @@
 #include "base/NotifierConnection.h"
 #include "ui/ActionContext.h"
 #include "ui/CameraLinkHelper.h"
+#include "ui/MapDocumentActionCache.h"
 #include "ui/MapView.h"
 #include "ui/RenderView.h"
 #include "ui/ToolBoxConnector.h"
@@ -109,6 +110,7 @@ private:
   NotifierConnection m_notifierConnection;
 
 private: // shortcuts
+  MapDocumentActionCache m_actionCache;
   std::vector<std::pair<QShortcut*, const Action*>> m_shortcuts;
 
 protected:

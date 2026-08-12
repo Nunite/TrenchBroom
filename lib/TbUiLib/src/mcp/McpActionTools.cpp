@@ -71,7 +71,7 @@ QJsonObject actionsListJson(AppController& appController)
     const auto enabled = action.enabled(context);
     auto actionJson = QJsonObject{
       {"id", pathAsGenericQString(path)},
-      {"label", action.label()},
+      {"label", QString::fromStdString(action.label())},
       {"enabled", enabled},
       {"menuAction", action.isMenuAction()},
       {"checkable", action.checkable()},

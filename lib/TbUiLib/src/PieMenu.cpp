@@ -61,7 +61,7 @@ std::vector<PieMenuItem> buildPieMenuItems(
 
     const auto& action = it->second;
     result.push_back(PieMenuItem{
-      action.label(),
+      QString::fromStdString(action.label()),
       [executeAction, &action]() { executeAction(action); },
       isActionEnabled(action)});
   }

@@ -137,7 +137,7 @@ TEST_CASE("Actions")
     CHECK(actions.contains("Menu/View/Command Palette..."));
     CHECK(
       pref(actions.at("Menu/View/Command Palette...").preference())
-      == std::vector{QKeySequence{Qt::CTRL | Qt::SHIFT | Qt::Key_P}});
+      == std::vector{KeySequence{"Ctrl+Shift+P"}});
     CHECK(actions.contains("Menu/View/Switch to Map Inspector"));
     CHECK(actions.contains("Menu/View/Switch to Entity Inspector"));
     CHECK(actions.contains("Menu/View/Switch to Face Inspector"));
@@ -151,7 +151,7 @@ TEST_CASE("Actions")
     CHECK(actions.contains("Menu/Edit/Tools/Path Tool"));
     CHECK(
       pref(actions.at("Menu/Edit/Tools/Path Tool").preference())
-      == std::vector{QKeySequence{Qt::Key_P}});
+      == std::vector{KeySequence{"P"}});
   }
 
   SECTION("Custom map view actions are configurable")

@@ -62,7 +62,7 @@ SwitchableMapViewContainer::~SwitchableMapViewContainer()
   // use them in their destructors
   m_notifierConnection.disconnect();
   m_activationTracker->clear();
-  m_toolBox->clearTransientState(InputState{});
+  m_toolBox->clearTransientState(InputState{0.0f, 0.0f});
   delete m_mapView;
   m_mapView = nullptr;
   delete m_mapViewBar;

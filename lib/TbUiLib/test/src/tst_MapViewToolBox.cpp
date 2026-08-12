@@ -20,12 +20,14 @@
 #include <QStackedLayout>
 #include <QWidget>
 
+#include "mdl/Entity.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionManager.h"
 #include "mdl/EntityNode.h"
 #include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapFixture.h"
+#include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/PropertyDefinition.h"
 #include "mdl/WorldNode.h"
@@ -175,6 +177,10 @@ TEST_CASE("MapViewToolBox")
 
   SECTION("path tool is exclusive with other modal tools")
   {
+    auto* entityNode = new mdl::EntityNode{mdl::Entity{{{"classname", "path_corner"}}}};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {entityNode}}});
+    mdl::selectNodes(map, {entityNode});
+
     toolBox.toggleRotateTool();
     REQUIRE(toolBox.rotateToolActive());
 

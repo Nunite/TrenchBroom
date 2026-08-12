@@ -88,7 +88,7 @@ TEST_CASE("PieMenu")
 
     auto executedCount = 0;
     auto makeAction =
-      [&](const std::string& path, const QString& label, const bool enabled) {
+      [&](const std::string& path, const std::string& label, const bool enabled) {
         return Action{
           std::filesystem::path{path},
           label,

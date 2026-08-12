@@ -19,14 +19,19 @@
 
 #include "ui/MapViewToolBox.h"
 
+#include <QStackedLayout>
+#include <QWidget>
+
 #include "mdl/EditorContext.h"
 #include "mdl/Map.h"
 #include "mdl/Selection.h"
 #include "ui/AssembleBrushTool.h"
 #include "ui/ClipTool.h"
 #include "ui/ControlPointTool.h"
+#include "ui/ControlPointToolPage.h"
 #include "ui/CreateEntityTool.h"
 #include "ui/DrawShapeTool.h"
+#include "ui/DrawShapeToolPage.h"
 #include "ui/EdgeTool.h"
 #include "ui/ExtrudeTool.h"
 #include "ui/FaceTool.h"
@@ -36,9 +41,12 @@
 #include "ui/PathTool.h"
 #include "ui/PrefabTool.h"
 #include "ui/RotateTool.h"
+#include "ui/RotateToolPage.h"
 #include "ui/ScaleTool.h"
+#include "ui/ScaleToolPage.h"
 #include "ui/ShearTool.h"
 #include "ui/SweepTool.h"
+#include "ui/SweepToolPage.h"
 #include "ui/VertexTool.h"
 
 #include "kd/contracts.h"
@@ -57,7 +65,7 @@ MapViewToolBox::~MapViewToolBox()
 {
   m_notifierConnection.disconnect();
   disconnectObservers();
-  clearTransientState(InputState{});
+  clearTransientState(InputState{0.0f, 0.0f});
   m_prefabTool->clearPreview();
 }
 
@@ -526,6 +534,8 @@ void MapViewToolBox::moveNodeHandles(const vm::vec3d& delta)
 
 void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
 {
+  m_bookCtrl = bookCtrl;
+
   m_clipTool = std::make_unique<ClipTool>(m_document);
   m_assembleBrushTool = std::make_unique<AssembleBrushTool>(m_document);
   m_createEntityTool = std::make_unique<CreateEntityTool>(m_document);
@@ -578,30 +588,48 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   suppressWhileActive(clipTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
   suppressWhileActive(pathTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
 
-  registerTool(moveObjectsTool(), bookCtrl);
-  registerTool(rotateTool(), bookCtrl);
-  registerTool(sweepTool(), bookCtrl);
-  registerTool(scaleTool(), bookCtrl);
-  registerTool(shearTool(), bookCtrl);
-  registerTool(extrudeTool(), bookCtrl);
-  registerTool(assembleBrushTool(), bookCtrl);
-  registerTool(clipTool(), bookCtrl);
-  registerTool(vertexTool(), bookCtrl);
-  registerTool(edgeTool(), bookCtrl);
-  registerTool(faceTool(), bookCtrl);
-  registerTool(controlPointTool(), bookCtrl);
-  registerTool(createEntityTool(), bookCtrl);
-  registerTool(prefabTool(), bookCtrl);
-  registerTool(drawShapeTool(), bookCtrl);
-  registerTool(pathTool(), bookCtrl);
+  addTool(moveObjectsTool());
+  addTool(rotateTool());
+  addTool(sweepTool());
+  addTool(scaleTool());
+  addTool(shearTool());
+  addTool(extrudeTool());
+  addTool(assembleBrushTool());
+  addTool(clipTool());
+  addTool(vertexTool());
+  addTool(edgeTool());
+  addTool(faceTool());
+  addTool(controlPointTool());
+  addTool(createEntityTool());
+  addTool(prefabTool());
+  addTool(drawShapeTool());
+  addTool(pathTool());
+
+  auto* parent = bookCtrl->parentWidget();
+
+  m_emptyToolPage = new QWidget{parent};
+  bookCtrl->addWidget(m_emptyToolPage);
+
+  m_rotateToolPage = new RotateToolPage{m_document, rotateTool(), parent};
+  bookCtrl->addWidget(m_rotateToolPage);
+
+  m_sweepToolPage = new SweepToolPage{sweepTool(), parent};
+  bookCtrl->addWidget(m_sweepToolPage);
+
+  m_scaleToolPage = new ScaleToolPage{m_document, scaleTool(), parent};
+  bookCtrl->addWidget(m_scaleToolPage);
+
+  m_controlPointToolPage = new ControlPointToolPage{m_document, parent};
+  bookCtrl->addWidget(m_controlPointToolPage);
+
+  auto* drawShapeToolPage =
+    new DrawShapeToolPage{drawShapeTool().extensionManager(), parent};
+  m_notifierConnection += drawShapeToolPage->applyParametersNotifier.connect(
+    [this]() { drawShapeTool().applyExtensionParameters(); });
+  m_drawShapeToolPage = drawShapeToolPage;
+  bookCtrl->addWidget(m_drawShapeToolPage);
 
   updateToolPage();
-}
-
-void MapViewToolBox::registerTool(Tool& tool, QStackedLayout* bookCtrl)
-{
-  tool.createPage(bookCtrl);
-  addTool(tool);
 }
 
 void MapViewToolBox::connectObservers()
@@ -650,47 +678,29 @@ void MapViewToolBox::updateToolPage()
 {
   if (rotateToolActive())
   {
-    rotateTool().showPage();
+    m_bookCtrl->setCurrentWidget(m_rotateToolPage);
   }
   else if (sweepToolActive())
   {
-    sweepTool().showPage();
+    m_bookCtrl->setCurrentWidget(m_sweepToolPage);
   }
   else if (scaleToolActive())
   {
-    scaleTool().showPage();
-  }
-  else if (shearToolActive())
-  {
-    shearTool().showPage();
-  }
-  else if (vertexToolActive())
-  {
-    vertexTool().showPage();
-  }
-  else if (edgeToolActive())
-  {
-    edgeTool().showPage();
-  }
-  else if (faceToolActive())
-  {
-    faceTool().showPage();
+    m_bookCtrl->setCurrentWidget(m_scaleToolPage);
   }
   else if (controlPointToolActive())
   {
-    controlPointTool().showPage();
+    m_bookCtrl->setCurrentWidget(m_controlPointToolPage);
   }
-  else if (clipToolActive())
+  else if (
+    shearToolActive() || vertexToolActive() || edgeToolActive() || faceToolActive()
+    || clipToolActive() || pathToolActive())
   {
-    clipTool().showPage();
-  }
-  else if (pathToolActive())
-  {
-    pathTool().showPage();
+    m_bookCtrl->setCurrentWidget(m_emptyToolPage);
   }
   else
   {
-    drawShapeTool().showPage();
+    m_bookCtrl->setCurrentWidget(m_drawShapeToolPage);
   }
 }
 

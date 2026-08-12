@@ -126,7 +126,7 @@ void PieMenuSettingsDialog::populateActionMenu()
   auto sortedActions = std::map<std::filesystem::path, const Action*>{};
   for (const auto& [path, action] : actionManager.actionsMap())
   {
-    if (!action.label().isEmpty())
+    if (!action.label().empty())
     {
       sortedActions[path] = &action;
     }
@@ -154,7 +154,7 @@ void PieMenuSettingsDialog::populateActionMenu()
       if (isLeaf)
       {
         currentNode->actions.emplace_back(
-          action->label(), QString::fromStdString(path.string()));
+          QString::fromStdString(action->label()), QString::fromStdString(path.string()));
       }
       else
       {
@@ -237,7 +237,8 @@ void PieMenuSettingsDialog::loadPieMenuActions()
   {
     const auto path = std::filesystem::path{pathStr.toStdString()};
     const auto it = actions.find(path);
-    const auto label = it != actions.end() ? it->second.label() : tr("Unknown Action");
+    const auto label = it != actions.end() ? QString::fromStdString(it->second.label())
+                                           : tr("Unknown Action");
 
     auto* item = new QListWidgetItem{label, m_actionList};
     item->setData(Qt::UserRole, pathStr);

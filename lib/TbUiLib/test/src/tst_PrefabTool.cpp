@@ -17,8 +17,8 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "base/Logger.h"
 #include "TestLogger.h"
+#include "base/Logger.h"
 #include "fs/TestEnvironment.h"
 #include "gl/Material.h"
 #include "gl/MaterialCollection.h"
@@ -76,7 +76,9 @@ void checkPreviewBounds(PrefabTool& tool, const std::filesystem::path& prefabPat
   const auto delta = vm::vec3d{16.0, 32.0, 48.0};
 
   CHECK(tool.updatePreview(
-    prefabPath, InputState{}, [&](auto&, const auto&, const auto& bounds, const auto&) {
+    prefabPath,
+    InputState{0.0f, 0.0f},
+    [&](auto&, const auto&, const auto& bounds, const auto&) {
       CHECK(bounds == vm::bbox3d{{0.0, 0.0, -16.0}, {64.0, 64.0, 0.0}});
       return delta;
     }));
@@ -143,9 +145,9 @@ TEST_CASE("PrefabTool")
 
     const auto messageCount = logger.countMessages();
     CHECK(tool.updatePreview(
-      prefabPath, InputState{}, [](auto&, const auto&, const auto&, const auto&) {
-        return vm::vec3d{};
-      }));
+      prefabPath,
+      InputState{0.0f, 0.0f},
+      [](auto&, const auto&, const auto&, const auto&) { return vm::vec3d{}; }));
     CHECK(logger.countMessages() == messageCount);
 
     document.setTargetLogger(nullptr);
@@ -159,9 +161,9 @@ TEST_CASE("PrefabTool")
 
     const auto initialVersion = tool.previewVersion();
     REQUIRE(tool.updatePreview(
-      prefabPath, InputState{}, [](auto&, const auto&, const auto&, const auto&) {
-        return vm::vec3d{};
-      }));
+      prefabPath,
+      InputState{0.0f, 0.0f},
+      [](auto&, const auto&, const auto&, const auto&) { return vm::vec3d{}; }));
     CHECK(tool.previewVersion() == initialVersion + 1u);
 
     tool.clearPreview();
@@ -181,14 +183,14 @@ TEST_CASE("PrefabTool")
   SECTION("clears preview for invalid prefab")
   {
     CHECK_FALSE(tool.updatePreview(
-      "missing.tbprefab", InputState{}, [](auto&, const auto&, const auto&, const auto&) {
-        return vm::vec3d{};
-      }));
+      "missing.tbprefab",
+      InputState{0.0f, 0.0f},
+      [](auto&, const auto&, const auto&, const auto&) { return vm::vec3d{}; }));
 
     CHECK_FALSE(tool.updatePreview(
-      "missing.txt", InputState{}, [](auto&, const auto&, const auto&, const auto&) {
-        return vm::vec3d{};
-      }));
+      "missing.txt",
+      InputState{0.0f, 0.0f},
+      [](auto&, const auto&, const auto&, const auto&) { return vm::vec3d{}; }));
     CHECK_FALSE(tool.previewBounds());
     CHECK(tool.previewNodes().empty());
   }
@@ -221,9 +223,9 @@ TEST_CASE("PrefabTool")
       });
 
     REQUIRE(tool.placePrefab(
-      prefabPath, InputState{}, [](auto&, const auto&, const auto&, const auto&) {
-        return vm::vec3d{};
-      }));
+      prefabPath,
+      InputState{0.0f, 0.0f},
+      [](auto&, const auto&, const auto&, const auto&) { return vm::vec3d{}; }));
 
     CHECK(callbackCount == 1);
     CHECK(
@@ -241,9 +243,9 @@ TEST_CASE("PrefabTool")
       "textures/current.wad", {"tex1", "tex2", "tex3", "tex4", "tex5", "tex6"})));
 
     REQUIRE(tool.placePrefab(
-      prefabPath, InputState{}, [](auto&, const auto&, const auto&, const auto&) {
-        return vm::vec3d{};
-      }));
+      prefabPath,
+      InputState{0.0f, 0.0f},
+      [](auto&, const auto&, const auto&, const auto&) { return vm::vec3d{}; }));
 
     CHECK(callbackCount == 1);
   }
@@ -268,9 +270,9 @@ TEST_CASE("PrefabTool")
     });
 
     REQUIRE(quakeTool.placePrefab(
-      prefabPath, InputState{}, [](auto&, const auto&, const auto&, const auto&) {
-        return vm::vec3d{};
-      }));
+      prefabPath,
+      InputState{0.0f, 0.0f},
+      [](auto&, const auto&, const auto&, const auto&) { return vm::vec3d{}; }));
 
     const auto* enabledMaterialCollections = map.worldNode().entity().property(
       mdl::EntityPropertyKeys::TbEnabledMaterialCollections);
@@ -317,9 +319,9 @@ TEST_CASE("PrefabTool")
     });
 
     REQUIRE(quakeTool.placePrefab(
-      prefabPath, InputState{}, [](auto&, const auto&, const auto&, const auto&) {
-        return vm::vec3d{};
-      }));
+      prefabPath,
+      InputState{0.0f, 0.0f},
+      [](auto&, const auto&, const auto&, const auto&) { return vm::vec3d{}; }));
 
     CHECK(callbackCount == 1);
     CHECK(wadPaths == std::vector<std::string>{"source.wad"});

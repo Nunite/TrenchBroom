@@ -1,9 +1,5 @@
 #include "ui/PathTool.h"
 
-#include <QLabel>
-#include <QPushButton>
-#include <QVBoxLayout>
-
 #include "base/Color.h"
 #include "mdl/EntityDefinitionManager.h"
 #include "mdl/EntityNode.h"
@@ -17,7 +13,6 @@
 #include "render/RenderBatch.h"
 #include "render/RenderContext.h"
 #include "render/RenderService.h"
-#include "ui/QWidgetUtils.h"
 
 namespace tb::ui
 {
@@ -186,12 +181,6 @@ void PathTool::render(
     }
     renderService.renderLineStrip(pointsf);
   }
-}
-
-QWidget* PathTool::doCreatePage(QWidget* parent)
-{
-  // User requested no instructions panel
-  return new QWidget(parent);
 }
 
 } // namespace tb::ui

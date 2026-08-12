@@ -54,8 +54,6 @@ public:
 protected:
   bool doActivate() override;
   bool doDeactivate() override;
-  QWidget* doCreatePage(QWidget* parent) override;
-
 private:
   void connectObservers();
 };

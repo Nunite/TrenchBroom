@@ -197,7 +197,7 @@ TEST_CASE("PathTool")
   {
     auto tool = PathTool{map};
     auto controller = PathToolController{tool};
-    auto inputState = InputState{};
+    auto inputState = InputState{0.0f, 0.0f};
 
     tool.activate();
     tool.addPoint({64.0, 0.0, 0.0});

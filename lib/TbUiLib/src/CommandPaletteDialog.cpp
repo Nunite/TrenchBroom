@@ -32,6 +32,7 @@
 #include "ui/Action.h"
 #include "ui/ActionExecutionContext.h"
 #include "ui/ActionManager.h"
+#include "ui/QKeySequenceUtils.h"
 #include "ui/QStyleUtils.h"
 
 #include <algorithm>
@@ -88,15 +89,17 @@ CommandPaletteDialog::CommandPaletteDialog(
     auto shortcutLabels = QStringList{};
     for (const auto& keySequence : pref(action.preference()))
     {
-      shortcutLabels.push_back(keySequence.toString(QKeySequence::NativeText));
+      shortcutLabels.push_back(
+        toQKeySequence(keySequence).toString(QKeySequence::NativeText));
     }
     const auto shortcut = shortcutLabels.join(", ");
     const auto displayPath = makeDisplayPath(preferencePath);
+    const auto label = QString::fromStdString(action.label());
     auto filterText =
-      QStringList{action.label(), displayPath, preferencePath, shortcut}.join(" ");
+      QStringList{label, displayPath, preferencePath, shortcut}.join(" ");
 
     m_entries.push_back(Entry{
-      action.label(), displayPath, preferencePath, shortcut, std::move(filterText)});
+      label, displayPath, preferencePath, shortcut, std::move(filterText)});
   }
 
   std::ranges::sort(m_entries, [](const auto& lhs, const auto& rhs) {
