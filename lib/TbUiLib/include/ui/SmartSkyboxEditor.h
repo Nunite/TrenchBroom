@@ -10,7 +10,7 @@
 
 class QListWidget;
 class QListWidgetItem;
-class QPushButton;
+class QAbstractButton;
 class QWidget;
 
 namespace tb::mdl
@@ -37,7 +37,7 @@ class SmartSkyboxEditor : public SmartPropertyEditor
 {
   Q_OBJECT
 private:
-  QPushButton* m_refreshButton = nullptr;
+  QAbstractButton* m_refreshButton = nullptr;
   QListWidget* m_listWidget = nullptr;
   std::vector<SmartSkyboxItem> m_skyboxes;
 
@@ -52,6 +52,7 @@ private:
   void doUpdateVisual(const std::vector<mdl::EntityNodeBase*>& nodes) override;
 
   void reloadSkyboxes(bool force = false);
+  void selectCurrentSkybox(const std::vector<mdl::EntityNodeBase*>& nodes);
   void applySkybox(QListWidgetItem* item);
   QIcon iconForSkybox(const SmartSkyboxItem& skybox);
 };

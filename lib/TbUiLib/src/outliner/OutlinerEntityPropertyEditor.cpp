@@ -744,6 +744,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
       && entityNodes.front()->entity().classname()
            == mdl::EntityPropertyValues::WorldspawnClassname;
 
+    auto actionWidgets = std::vector<QWidget*>{};
     for (const auto& key : keys)
     {
         auto* row = new ResponsivePropertyRow{m_scrollContents};
@@ -1019,6 +1020,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         auto* actions = new QWidget{row};
         actions->setObjectName("outlinerPropertyActions");
         actions->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        actionWidgets.push_back(actions);
         auto* actionsLayout = new QHBoxLayout{actions};
         actionsLayout->setContentsMargins(0, 0, 0, 0);
         actionsLayout->setSpacing(2);
@@ -1345,6 +1347,17 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             mdl::removeEntityProperty(m_document.map(), propertyKey);
             scheduleUpdate(true);
         });
+    }
+
+    const auto actionWidth = std::ranges::max(
+      actionWidgets | std::views::transform([](const auto* widget) {
+        return widget->sizeHint().width();
+      }),
+      {},
+      std::identity{});
+    for (auto* actionWidget : actionWidgets)
+    {
+        actionWidget->setFixedWidth(actionWidth);
     }
 
     m_scrollLayout->addStretch(1);

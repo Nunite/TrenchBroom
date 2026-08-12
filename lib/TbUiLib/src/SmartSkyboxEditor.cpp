@@ -1,14 +1,24 @@
 #include "ui/SmartSkyboxEditor.h"
 
+#include <QAbstractButton>
+#include <QHBoxLayout>
+#include <QImage>
+#include <QLabel>
 #include <QListWidget>
-#include <QPushButton>
+#include <QPainter>
+#include <QPixmap>
+#include <QStyledItemDelegate>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include "fs/PathInfo.h"
 #include "fs/TraversalMode.h"
+#include "gl/Texture.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/GameFileSystem.h"
+#include "mdl/LoadTexture.h"
 #include "mdl/Map.h"
+#include "ui/BitmapButton.h"
 #include "ui/MapDocument.h"
 #include "ui/QPathUtils.h"
 
@@ -28,6 +38,89 @@ namespace
 constexpr auto SkySuffixes = std::array{"rt", "bk", "lf", "ft", "up", "dn"};
 constexpr auto SkyExtensions =
   std::array{".tga", ".bmp", ".png", ".jpg", ".jpeg", ".dds"};
+constexpr auto SkyboxItemSize = QSize{172, 52};
+constexpr auto SkyboxPreviewSize = QSize{70, 36};
+
+class SkyboxItemDelegate : public QStyledItemDelegate
+{
+public:
+  explicit SkyboxItemDelegate(QObject* parent)
+    : QStyledItemDelegate{parent}
+  {
+  }
+
+  QSize sizeHint(
+    const QStyleOptionViewItem& /* option */, const QModelIndex& /* index */) const override
+  {
+    return SkyboxItemSize;
+  }
+
+  void paint(
+    QPainter* painter,
+    const QStyleOptionViewItem& option,
+    const QModelIndex& index) const override
+  {
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+
+    const auto tileRect = option.rect.adjusted(2, 2, -2, -2);
+    const auto selected = option.state.testFlag(QStyle::State_Selected);
+    const auto hovered = option.state.testFlag(QStyle::State_MouseOver);
+
+    if (selected || hovered)
+    {
+      auto background = option.palette.color(QPalette::Highlight);
+      if (!selected)
+      {
+        background.setAlpha(36);
+      }
+      painter->setPen(Qt::NoPen);
+      painter->setBrush(background);
+      painter->drawRoundedRect(tileRect, 3, 3);
+    }
+
+    const auto previewRect = QRect{
+      tileRect.left() + 5,
+      tileRect.top() + (tileRect.height() - SkyboxPreviewSize.height()) / 2,
+      SkyboxPreviewSize.width(),
+      SkyboxPreviewSize.height()};
+
+    const auto icon = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
+    if (!icon.isNull())
+    {
+      icon.paint(painter, previewRect, Qt::AlignCenter);
+    }
+    else
+    {
+      auto previewBackground = option.palette.color(QPalette::Base);
+      previewBackground = previewBackground.darker(115);
+      auto previewBorder = option.palette.color(QPalette::Mid);
+      previewBorder.setAlpha(100);
+      painter->setPen(previewBorder);
+      painter->setBrush(previewBackground);
+      painter->drawRoundedRect(previewRect, 2, 2);
+
+      painter->setFont(option.font);
+      painter->setPen(option.palette.color(QPalette::PlaceholderText));
+      painter->drawText(previewRect, Qt::AlignCenter, tr("No preview"));
+    }
+
+    const auto textRect = QRect{
+      previewRect.right() + 7,
+      tileRect.top() + 2,
+      tileRect.right() - previewRect.right() - 11,
+      tileRect.height() - 4};
+    const auto name = index.data(Qt::DisplayRole).toString();
+    const auto elidedName = option.fontMetrics.elidedText(
+      name, Qt::ElideRight, textRect.width());
+    painter->setFont(option.font);
+    painter->setPen(option.palette.color(
+      selected ? QPalette::HighlightedText : QPalette::Text));
+    painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, elidedName);
+
+    painter->restore();
+  }
+};
 
 bool hasSkyboxExtension(const std::filesystem::path& path)
 {
@@ -140,31 +233,63 @@ SmartSkyboxEditor::SmartSkyboxEditor(MapDocument& document, QWidget* parent)
 
 void SmartSkyboxEditor::createGui()
 {
-  setMinimumHeight(220);
+  setFixedHeight(210);
 
   auto* layout = new QVBoxLayout{this};
   layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(4);
 
-  m_refreshButton = new QPushButton{tr("Refresh skyboxes"), this};
+  auto* header = new QWidget{this};
+  header->setObjectName("smartSkyboxHeader");
+  auto* headerLayout = new QHBoxLayout{header};
+  headerLayout->setContentsMargins(2, 0, 2, 0);
+  headerLayout->setSpacing(4);
+
+  auto* title = new QLabel{tr("Skyboxes"), header};
+  title->setObjectName("smartSkyboxTitle");
+
+  m_refreshButton = createBitmapButton("Refresh.svg", tr("Refresh skyboxes"), header);
+  m_refreshButton->setObjectName("smartSkyboxRefreshButton");
+  m_refreshButton->setFixedSize(QSize{24, 24});
+
+  headerLayout->addWidget(title);
+  headerLayout->addStretch(1);
+  headerLayout->addWidget(m_refreshButton);
+
   m_listWidget = new QListWidget{this};
-  m_listWidget->setIconSize(QSize{96, 48});
-  m_listWidget->setMinimumHeight(180);
+  m_listWidget->setObjectName("smartSkyboxList");
+  m_listWidget->setViewMode(QListView::IconMode);
+  m_listWidget->setMovement(QListView::Static);
+  m_listWidget->setResizeMode(QListView::Adjust);
+  m_listWidget->setFlow(QListView::LeftToRight);
+  m_listWidget->setWrapping(true);
+  m_listWidget->setUniformItemSizes(true);
+  m_listWidget->setWordWrap(false);
+  m_listWidget->setTextElideMode(Qt::ElideRight);
+  m_listWidget->setIconSize(SkyboxPreviewSize);
+  m_listWidget->setGridSize(SkyboxItemSize);
+  m_listWidget->setSpacing(2);
+  m_listWidget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  m_listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_listWidget->setItemDelegate(new SkyboxItemDelegate{m_listWidget});
 
-  layout->addWidget(m_refreshButton);
-  layout->addWidget(m_listWidget);
+  layout->addWidget(header);
+  layout->addWidget(m_listWidget, 1);
 
-  connect(m_refreshButton, &QPushButton::clicked, this, [this]() {
+  connect(m_refreshButton, &QAbstractButton::clicked, this, [this]() {
     reloadSkyboxes(true);
   });
   connect(m_listWidget, &QListWidget::itemClicked, this, &SmartSkyboxEditor::applySkybox);
 }
 
-void SmartSkyboxEditor::doUpdateVisual(const std::vector<mdl::EntityNodeBase*>&)
+void SmartSkyboxEditor::doUpdateVisual(
+  const std::vector<mdl::EntityNodeBase*>& nodes)
 {
   if (m_skyboxes.empty())
   {
     reloadSkyboxes();
   }
+  selectCurrentSkybox(nodes);
 }
 
 void SmartSkyboxEditor::reloadSkyboxes(const bool force)
@@ -175,6 +300,10 @@ void SmartSkyboxEditor::reloadSkyboxes(const bool force)
   if (force || !cache.contains(cacheKey))
   {
     cache[cacheKey] = findSmartSkyboxes(document().map().gameFileSystem());
+    if (force)
+    {
+      skyboxIconCache().clear();
+    }
   }
   m_skyboxes = cache[cacheKey];
 
@@ -183,7 +312,8 @@ void SmartSkyboxEditor::reloadSkyboxes(const bool force)
   {
     auto* item =
       new QListWidgetItem{iconForSkybox(skybox), QString::fromStdString(skybox.name)};
-    item->setToolTip(pathAsQPath(skybox.previewPath));
+    item->setToolTip(
+      QString::fromStdString(skybox.name) + "\n" + pathAsQPath(skybox.previewPath));
     m_listWidget->addItem(item);
   }
 
@@ -191,6 +321,35 @@ void SmartSkyboxEditor::reloadSkyboxes(const bool force)
   {
     m_listWidget->setCurrentRow(currentRow);
   }
+}
+
+void SmartSkyboxEditor::selectCurrentSkybox(
+  const std::vector<mdl::EntityNodeBase*>& nodes)
+{
+  m_listWidget->clearSelection();
+  m_listWidget->setCurrentRow(-1);
+  if (nodes.size() != 1)
+  {
+    return;
+  }
+
+  const auto* value = nodes.front()->entity().property(propertyKey());
+  if (!value)
+  {
+    return;
+  }
+
+  const auto it = std::ranges::find_if(m_skyboxes, [&](const auto& skybox) {
+    return kdl::ci::str_is_equal(skybox.name, *value);
+  });
+  if (it == m_skyboxes.end())
+  {
+    return;
+  }
+
+  const auto row = int(std::distance(m_skyboxes.begin(), it));
+  m_listWidget->setCurrentRow(row, QItemSelectionModel::ClearAndSelect);
+  m_listWidget->scrollToItem(m_listWidget->item(row), QAbstractItemView::EnsureVisible);
 }
 
 void SmartSkyboxEditor::applySkybox(QListWidgetItem* item)
@@ -207,19 +366,53 @@ void SmartSkyboxEditor::applySkybox(QListWidgetItem* item)
 
 QIcon SmartSkyboxEditor::iconForSkybox(const SmartSkyboxItem& skybox)
 {
-  const auto absPath = document().map().gameFileSystem().makeAbsolute(skybox.previewPath);
-  if (absPath.is_error())
+  const auto cacheKey =
+    document().map().gamePath().generic_string() + "\n"
+    + skybox.previewPath.generic_string();
+  auto& cache = skyboxIconCache();
+  if (cache.contains(cacheKey))
+  {
+    return cache.at(cacheKey);
+  }
+
+  auto textureResult = mdl::loadTexture(
+    skybox.previewPath, skybox.name, document().map().gameFileSystem());
+  if (textureResult.is_error())
   {
     return {};
   }
 
-  const auto key = absPath.value().generic_string();
-  auto& cache = skyboxIconCache();
-  if (!cache.contains(key))
+  auto texture = std::move(textureResult).value();
+  const auto& buffers = texture.buffersIfLoaded();
+  if (
+    buffers.empty() || texture.width() == 0 || texture.height() == 0
+    || (texture.format() != GL_RGBA && texture.format() != GL_BGRA))
   {
-    cache.emplace(key, QIcon{pathAsQPath(absPath.value())});
+    return {};
   }
-  return cache.at(key);
+
+  const auto& pixels = buffers.front();
+  auto image = QImage{
+    pixels.data(),
+    int(texture.width()),
+    int(texture.height()),
+    qsizetype(texture.width() * 4u),
+    QImage::Format_RGBA8888};
+  image = texture.format() == GL_BGRA ? image.rgbSwapped() : image.copy();
+
+  const auto scaledImage = image.scaled(
+    SkyboxPreviewSize,
+    Qt::KeepAspectRatioByExpanding,
+    Qt::SmoothTransformation);
+  const auto previewImage = scaledImage.copy(
+    (scaledImage.width() - SkyboxPreviewSize.width()) / 2,
+    (scaledImage.height() - SkyboxPreviewSize.height()) / 2,
+    SkyboxPreviewSize.width(),
+    SkyboxPreviewSize.height());
+
+  auto icon = QIcon{QPixmap::fromImage(previewImage)};
+  cache.emplace(cacheKey, icon);
+  return icon;
 }
 
 } // namespace tb::ui

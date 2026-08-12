@@ -271,6 +271,33 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     CHECK(skynameEdit->text() == "morning");
   }
 
+  SECTION("aligns value editors across rows with different actions")
+  {
+    mdl::selectNodes(map, std::vector<mdl::Node*>{&map.worldNode()});
+    mdl::setEntityProperty(map, "skyname", "2namek", false);
+    editor.show();
+    editor.resize(800, 600);
+    processOutlinerUpdates();
+
+    auto* classnameRow = propertyRow(editor, "classname");
+    auto* skynameRow = propertyRow(editor, "skyname");
+    auto* classnameEdit = propertyValueEdit(editor, "classname");
+    auto* skynameEdit = propertyValueEdit(editor, "skyname");
+    REQUIRE(classnameRow != nullptr);
+    REQUIRE(skynameRow != nullptr);
+    REQUIRE(classnameEdit != nullptr);
+    REQUIRE(skynameEdit != nullptr);
+
+    const auto* classnameActions =
+      classnameRow->findChild<QWidget*>("outlinerPropertyActions");
+    const auto* skynameActions =
+      skynameRow->findChild<QWidget*>("outlinerPropertyActions");
+    REQUIRE(classnameActions != nullptr);
+    REQUIRE(skynameActions != nullptr);
+    CHECK(classnameActions->width() == skynameActions->width());
+    CHECK(classnameEdit->geometry().right() == skynameEdit->geometry().right());
+  }
+
   SECTION("refreshes skyname when the selected worldspawn property changes externally")
   {
     mdl::selectNodes(map, std::vector<mdl::Node*>{&map.worldNode()});
