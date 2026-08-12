@@ -19,6 +19,7 @@
 
 #include <QAbstractButton>
 #include <QApplication>
+#include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPalette>
@@ -195,7 +196,13 @@ TEST_CASE("OutlinerEntityPropertyEditor")
       "inactive_test",
       {},
       "",
-      {{"optional", mdl::PropertyValueTypes::String{}, "", ""}},
+      {
+        {"optional", mdl::PropertyValueTypes::String{}, "", ""},
+        {"optional_choice",
+         mdl::PropertyValueTypes::Choice{{{"0", "Off"}, {"1", "On"}}},
+         "",
+         ""},
+      },
       mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
     }});
     const auto* definition = map.entityDefinitionManager().definition("inactive_test");
@@ -215,9 +222,26 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     REQUIRE(valueEdit != nullptr);
     CHECK(keyLabel->isEnabled());
     CHECK(!valueEdit->isEnabled());
+    CHECK(valueEdit->placeholderText() == "<inactive>");
     CHECK(
       valueEdit->palette().color(QPalette::Disabled, QPalette::PlaceholderText)
       == valueEdit->palette().color(QPalette::Disabled, QPalette::Text));
+
+    auto* choiceRow = propertyRow(editor, "optional_choice");
+    REQUIRE(choiceRow != nullptr);
+    auto* valueCombo = choiceRow->findChild<QComboBox*>("outlinerPropertyValue");
+    REQUIRE(valueCombo != nullptr);
+    REQUIRE(valueCombo->lineEdit() != nullptr);
+    CHECK(!valueCombo->isEnabled());
+    CHECK(valueCombo->lineEdit()->placeholderText() == "<inactive>");
+
+    mdl::setEntityProperty(map, "active", "changed", false);
+    const auto changedNodes = std::vector<mdl::Node*>{entityNode};
+    map.nodesDidChangeNotifier(changedNodes);
+    processOutlinerUpdates();
+
+    CHECK(valueEdit->placeholderText() == "<inactive>");
+    CHECK(valueCombo->lineEdit()->placeholderText() == "<inactive>");
   }
 
   SECTION("allows property keys to be selected for copying")

@@ -625,8 +625,15 @@ void OutlinerEntityPropertyEditor::refreshVisiblePropertyValues()
 
         const auto key = keyVariant.toString().toStdString();
         const auto consensus = consensusValue(key, entityNodes);
+        const auto inactive =
+          valueEdit->property("inactive").toBool() && !consensus.anyPresent;
         const QSignalBlocker blocker{valueEdit};
-        if (consensus.mixed)
+        if (inactive)
+        {
+            valueEdit->clear();
+            valueEdit->setPlaceholderText(tr("<inactive>"));
+        }
+        else if (consensus.mixed)
         {
             valueEdit->clear();
             valueEdit->setPlaceholderText(tr("<multiple>"));
@@ -649,10 +656,17 @@ void OutlinerEntityPropertyEditor::refreshVisiblePropertyValues()
 
         const auto key = keyVariant.toString().toStdString();
         const auto consensus = consensusValue(key, entityNodes);
+        const auto inactive =
+          valueCombo->property("inactive").toBool() && !consensus.anyPresent;
         const QSignalBlocker blocker{valueCombo};
         if (auto* comboLineEdit = valueCombo->lineEdit())
         {
-            if (consensus.mixed)
+            if (inactive)
+            {
+                valueCombo->setEditText(QString{});
+                comboLineEdit->setPlaceholderText(tr("<inactive>"));
+            }
+            else if (consensus.mixed)
             {
                 valueCombo->setEditText(QString{});
                 comboLineEdit->setPlaceholderText(tr("<multiple>"));
@@ -831,6 +845,14 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 
         const auto consensus = consensusValue(key, entityNodes);
         const auto inactive = propertyDef != nullptr && !consensus.anyPresent;
+        if (valueCombo)
+        {
+            valueCombo->setProperty("inactive", inactive);
+        }
+        if (valueEdit)
+        {
+            valueEdit->setProperty("inactive", inactive);
+        }
         if (inactive)
         {
             row->setProperty("inactive", true);
@@ -856,13 +878,13 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         {
             if (auto* comboLineEdit = valueCombo->lineEdit())
             {
-                if (consensus.mixed)
+                if (!inactive && consensus.mixed)
                 {
                     const QSignalBlocker blocker{valueCombo};
                     valueCombo->setEditText(QString{});
                     comboLineEdit->setPlaceholderText(tr("<multiple>"));
                 }
-                else
+                else if (!inactive)
                 {
                     const QSignalBlocker blocker{valueCombo};
                     valueCombo->setEditText(
