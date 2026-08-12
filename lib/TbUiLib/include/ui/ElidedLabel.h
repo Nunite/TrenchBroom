@@ -41,6 +41,7 @@ public:
   explicit ElidedLabel(Qt::TextElideMode elideMode, QWidget* parent = nullptr);
 
   const QString& text() const;
+  void setTextInteractionFlags(Qt::TextInteractionFlags flags);
 public slots:
   void setText(const QString& text);
 
@@ -51,6 +52,7 @@ public:
   QSize minimumSizeHint() const override;
 
 protected:
+  bool eventFilter(QObject* watched, QEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
 };
 

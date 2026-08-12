@@ -212,11 +212,30 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     auto* valueEdit = row->findChild<QLineEdit*>("outlinerPropertyValue");
     REQUIRE(keyLabel != nullptr);
     REQUIRE(valueEdit != nullptr);
-    CHECK(!keyLabel->isEnabled());
+    CHECK(keyLabel->isEnabled());
     CHECK(!valueEdit->isEnabled());
     CHECK(
       valueEdit->palette().color(QPalette::Disabled, QPalette::PlaceholderText)
       == valueEdit->palette().color(QPalette::Disabled, QPalette::Text));
+  }
+
+  SECTION("allows property keys to be selected for copying")
+  {
+    editor.show();
+    editor.resize(800, 600);
+    processOutlinerUpdates();
+
+    auto* row = propertyRow(editor, "classname");
+    REQUIRE(row != nullptr);
+    auto* keyWidget = row->findChild<QWidget*>("outlinerPropertyKey");
+    REQUIRE(keyWidget != nullptr);
+    auto* keyLabel = keyWidget->findChild<QLabel*>();
+    REQUIRE(keyLabel != nullptr);
+    CHECK(
+      keyLabel->textInteractionFlags().testFlag(Qt::TextSelectableByMouse));
+
+    QTest::mouseDClick(keyLabel, Qt::LeftButton);
+    CHECK(keyLabel->selectedText() == "classname");
   }
 
   SECTION("adapts property rows to narrow and wide panels")

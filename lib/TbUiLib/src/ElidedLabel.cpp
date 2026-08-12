@@ -20,6 +20,7 @@
 #include "ui/ElidedLabel.h"
 
 #include <QBoxLayout>
+#include <QEvent>
 #include <QLabel>
 #include <QResizeEvent>
 
@@ -34,6 +35,7 @@ ElidedLabel::ElidedLabel(
 {
   setContentsMargins(0, 0, 0, 0);
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+  m_label->installEventFilter(this);
   setText(text);
 }
 
@@ -47,6 +49,19 @@ const QString& ElidedLabel::text() const
   return m_fullText;
 }
 
+void ElidedLabel::setTextInteractionFlags(const Qt::TextInteractionFlags flags)
+{
+  m_label->setTextInteractionFlags(flags);
+  if (flags.testFlag(Qt::TextSelectableByMouse))
+  {
+    m_label->setCursor(Qt::IBeamCursor);
+  }
+  else
+  {
+    m_label->unsetCursor();
+  }
+}
+
 void ElidedLabel::setText(const QString& text)
 {
   m_fullText = text;
@@ -56,7 +71,11 @@ void ElidedLabel::setText(const QString& text)
 void ElidedLabel::updateElidedText(const int width)
 {
   m_elidedText = m_label->fontMetrics().elidedText(m_fullText, m_elideMode, width);
-  m_label->setText(m_elidedText);
+  m_label->setText(
+    m_label->hasFocus() && m_label->textInteractionFlags().testFlag(
+                             Qt::TextSelectableByMouse)
+      ? m_fullText
+      : m_elidedText);
   if (m_elidedText.length() < m_fullText.length())
   {
     m_label->setToolTip(m_fullText);
@@ -70,6 +89,25 @@ void ElidedLabel::updateElidedText(const int width)
 QSize ElidedLabel::minimumSizeHint() const
 {
   return {-1, m_label->sizeHint().height()};
+}
+
+bool ElidedLabel::eventFilter(QObject* watched, QEvent* event)
+{
+  if (
+    watched == m_label
+    && m_label->textInteractionFlags().testFlag(Qt::TextSelectableByMouse))
+  {
+    if (event->type() == QEvent::MouseButtonPress)
+    {
+      m_label->setText(m_fullText);
+    }
+    else if (event->type() == QEvent::FocusOut)
+    {
+      updateElidedText(width());
+    }
+  }
+
+  return QWidget::eventFilter(watched, event);
 }
 
 void ElidedLabel::resizeEvent(QResizeEvent* event)

@@ -758,6 +758,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         keyLabel->setProperty("propertyKey", QString::fromStdString(key));
         keyLabel->setMinimumWidth(0);
         keyLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        keyLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
         QLineEdit* valueEdit = nullptr;
         QComboBox* valueCombo = nullptr;
@@ -819,7 +820,6 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         {
             row->setProperty("inactive", true);
             keyLabel->setProperty("inactive", true);
-            keyLabel->setDisabled(true);
             if (valueCombo)
             {
                 valueCombo->setDisabled(true);
