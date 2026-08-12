@@ -41,6 +41,7 @@ class Entity;
 struct EntityDefinition;
 class EntityModel;
 class EntityModelFrame;
+enum class PitchType;
 struct ModelSpecification;
 
 enum class SetDefaultPropertyMode
@@ -107,6 +108,9 @@ private:
   mutable std::optional<vm::vec3d> m_cachedOrigin;
   mutable std::optional<vm::mat4x4d> m_cachedRotation;
   mutable std::optional<vm::mat4x4d> m_cachedModelTransformation;
+  mutable std::optional<PitchType> m_cachedModelPitchType;
+
+  void invalidateModelDependentCachesIfNeeded() const;
 
 public:
   Entity();
