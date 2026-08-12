@@ -76,7 +76,7 @@ TEST_CASE("SkyRenderer.skyBrushFaceVertexCount")
   auto fixture = mdl::MapFixture{};
   auto& map = fixture.create();
   auto* skyBrush = mdl::createBrushNode(map, "sky");
-  mdl::addNodes(map, {{mdl::parentForNodes(map), {static_cast<mdl::Node*>(skyBrush)}}});
+  mdl::addNodes(map, {{&mdl::parentForNodes(map), {static_cast<mdl::Node*>(skyBrush)}}});
 
   CHECK(skyBrushFaceVertexCount(map) > 0);
 

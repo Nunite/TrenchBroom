@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Color.h"
+#include "base/Color.h"
 #include "gl/FontDescriptor.h"
 #include "gl/VertexArray.h"
 #include "gl/VertexType.h"
@@ -71,7 +71,7 @@ private:
     gl::VertexArray rectArray;
   };
 
-  using TextVertex = gl::VertexTypes::P3UV2C4::Vertex;
+  using TextVertex = gl::VertexTypes::P3Uv2C4::Vertex;
   using RectVertex = gl::VertexTypes::P3C4::Vertex;
 
   gl::FontDescriptor m_fontDescriptor;

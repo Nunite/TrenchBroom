@@ -1,0 +1,103 @@
+#version 120
+
+/*
+ Copyright (C) 2010 Kristian Duske
+
+ This file is part of TrenchBroom.
+
+ TrenchBroom is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ TrenchBroom is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+uniform float Brightness;
+uniform bool ApplyMaterial;
+uniform sampler2D Material;
+uniform bool RenderGrid;
+uniform vec2 GridSizes;
+uniform float GridAlpha;
+uniform vec2 GridScales;
+uniform mat4 GridMatrix;
+uniform vec2 GridDivider;
+uniform float CameraZoom;
+uniform float DpiScale;
+
+varying vec4 modelCoordinates;
+varying vec3 modelNormal;
+varying vec4 faceColor;
+
+// Shared with the other grid shaders (see GridCommon.fragsh).
+float gridLine(float coord, float stripeSize, float isMajor);
+vec3 adaptiveGridColor(vec3 background);
+float texturedGridAlpha(float alpha);
+
+float getSoftStripes(float coord, float gridDivider, float gridSize, float stripeSize)
+{
+  // minor grid line spacing; the coordinate expressed in minor-grid-cell units
+  float minorGridSize = gridSize / gridDivider;
+  float minorCoord = coord / minorGridSize;
+
+  // a major line falls on every `gridDivider`-th minor line
+  float majorCloseness = abs(2.0 * fract(coord / gridSize) - 1.0);
+  float isMajor = step(1.0 - 1.0 / gridDivider, majorCloseness);
+
+  return gridLine(minorCoord, stripeSize, isMajor);
+}
+
+void gridLinesSoft(vec2 inCoords)
+{
+  // the width of the grid lines, corrected by the texture scaling factors and the camera
+  // zoom level
+  vec2 lineWidths = abs(1.0 / GridScales / CameraZoom) * DpiScale;
+  // the widths of each grid stripe
+  vec2 stripeWidths = GridSizes / GridDivider;
+  // ratio of the line widths and the stripe widths
+  vec2 stripeRatios = lineWidths / stripeWidths;
+  vec2 stripeSizes = clamp(1.0 - stripeRatios, 0.0, 1.0);
+
+  float lineAlpha = max(
+    getSoftStripes(inCoords.x, GridDivider.x, GridSizes.x, stripeSizes.x),
+    getSoftStripes(inCoords.y, GridDivider.y, GridSizes.y, stripeSizes.y));
+
+  // Base the light/dark choice on a coarse mip of the texture rather than the
+  // per-fragment color, so the line commits to one shade across noisy detail instead of
+  // speckling.
+  vec3 decisionColor =
+    ApplyMaterial
+      ? clamp(Brightness * texture2D(Material, gl_TexCoord[0].st, 4.0).rgb, 0.0, 1.0)
+      : gl_FragColor.rgb;
+
+  vec3 lineColor = adaptiveGridColor(decisionColor);
+  gl_FragColor.rgb =
+    mix(gl_FragColor.rgb, lineColor, lineAlpha * texturedGridAlpha(GridAlpha));
+}
+
+void main()
+{
+  if (ApplyMaterial)
+  {
+    gl_FragColor = texture2D(Material, gl_TexCoord[0].st);
+  }
+  else
+  {
+    gl_FragColor = faceColor;
+  }
+
+  gl_FragColor = vec4(vec3(Brightness / 2.0 * gl_FragColor), gl_FragColor.a);
+  gl_FragColor = clamp(2.0 * gl_FragColor, 0.0, 1.0);
+
+  if (RenderGrid)
+  {
+    vec4 texCoordinates = GridMatrix * modelCoordinates;
+    gridLinesSoft(texCoordinates.xy);
+  }
+}

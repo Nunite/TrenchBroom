@@ -21,9 +21,9 @@
 
 #include <QKeySequence>
 #include <QString>
+#include <QtSystemDetection>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityProperties.h"
 #include "mdl/Grid.h" // IWYU pragma: keep
@@ -32,11 +32,13 @@
 #include "mdl/Map_Groups.h"    // IWYU pragma: keep
 #include "mdl/Map_Selection.h" // IWYU pragma: keep
 #include "mdl/Tag.h"
+#include "prefs/Preferences.h"
 #include "ui/ActionExecutionContext.h"
 #include "ui/AppController.h" // IWYU pragma: keep
 #include "ui/Inspector.h"
 #include "ui/MapView.h"
 #include "ui/MapViewBase.h"
+#include "ui/MapViewToolBox.h" // IWYU pragma: keep
 #include "ui/MapWindow.h"
 
 #include "kd/contracts.h"
@@ -176,7 +178,8 @@ void ActionManager::createViewActions()
     QKeySequence{Qt::Key_Return},
     [](auto& context) { context.mapView().assembleBrush(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().assembleBrushToolActive();
+      return context.hasDocument()
+             && context.mapWindow().toolBox().assembleBrushToolActive();
     },
   });
   addAction(Action{
@@ -226,7 +229,7 @@ void ActionManager::createViewActions()
     QKeySequence{Qt::CTRL | Qt::Key_Return},
     [](auto& context) { context.mapView().toggleClipSide(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().clipToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().clipToolActive();
     },
   });
   addAction(Action{
@@ -236,18 +239,47 @@ void ActionManager::createViewActions()
     QKeySequence{Qt::Key_Return},
     [](auto& context) { context.mapView().performClip(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().clipToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().clipToolActive();
     },
+  });
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Perform sweep"},
+    QObject::tr("Perform Sweep"),
+    ActionContext::AnyView | ActionContext::AnyOrNoSelection | ActionContext::SweepTool,
+    QKeySequence{Qt::Key_Return},
+    [](auto& context) { context.mapView().performSweep(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().toolBox().sweepToolActive();
+    },
+  });
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Decrease sweep scale"},
+    QObject::tr("Decrease Sweep Scale"),
+    ActionContext::AnyView | ActionContext::SelectionOwnedByTool
+      | ActionContext::SweepTool,
+    QKeySequence{Qt::Key_BracketLeft},
+    [](auto& context) { context.mapView().decreaseSweepScale(); },
+    [](const auto& context) { return context.hasDocument(); },
+  });
+  addAction(Action{
+    std::filesystem::path{"Controls/Map view/Increase sweep scale"},
+    QObject::tr("Increase Sweep Scale"),
+    ActionContext::AnyView | ActionContext::SelectionOwnedByTool
+      | ActionContext::SweepTool,
+    QKeySequence{Qt::Key_BracketRight},
+    [](auto& context) { context.mapView().increaseSweepScale(); },
+    [](const auto& context) { return context.hasDocument(); },
   });
 
   /* ========== Translation ========== */
-  // applies to objects, vertices, handles (e.g. rotation center)
+  // applies to objects, vertices, handles (e.g. rotation center, sweep handle)
   // these preference paths are structured like "action in 2D view; action in 3D view"
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Move objects up; Move objects forward"},
     QObject::tr("Move Forward"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyVertexTool
-      | ActionContext::RotateTool | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::AnyNodeHandleTool
+      | ActionContext::RotateTool | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::Key_Up},
     [](auto& context) { context.mapView().move(vm::direction::forward); },
     [](const auto& context) { return context.hasDocument(); },
@@ -255,8 +287,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Move objects down; Move objects backward"},
     QObject::tr("Move Backward"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyVertexTool
-      | ActionContext::RotateTool | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::AnyNodeHandleTool
+      | ActionContext::RotateTool | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::Key_Down},
     [](auto& context) { context.mapView().move(vm::direction::backward); },
     [](const auto& context) { return context.hasDocument(); },
@@ -264,8 +297,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Move objects left"},
     QObject::tr("Move Left"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyVertexTool
-      | ActionContext::RotateTool | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::AnyNodeHandleTool
+      | ActionContext::RotateTool | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::Key_Left},
     [](auto& context) { context.mapView().move(vm::direction::left); },
     [](const auto& context) { return context.hasDocument(); },
@@ -273,8 +307,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Move objects right"},
     QObject::tr("Move Right"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyVertexTool
-      | ActionContext::RotateTool | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::AnyNodeHandleTool
+      | ActionContext::RotateTool | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::Key_Right},
     [](auto& context) { context.mapView().move(vm::direction::right); },
     [](const auto& context) { return context.hasDocument(); },
@@ -282,8 +317,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Move objects backward; Move objects up"},
     QObject::tr("Move Up"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyVertexTool
-      | ActionContext::RotateTool | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::AnyNodeHandleTool
+      | ActionContext::RotateTool | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::Key_PageUp},
     [](auto& context) { context.mapView().move(vm::direction::up); },
     [](const auto& context) { return context.hasDocument(); },
@@ -291,8 +327,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Move objects forward; Move objects down"},
     QObject::tr("Move Down"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyVertexTool
-      | ActionContext::RotateTool | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::AnyNodeHandleTool
+      | ActionContext::RotateTool | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::Key_PageDown},
     [](auto& context) { context.mapView().move(vm::direction::down); },
     [](const auto& context) { return context.hasDocument(); },
@@ -364,12 +401,13 @@ void ActionManager::createViewActions()
   });
 
   /* ========== Rotation ========== */
-  // applies to objects, vertices, handles (e.g. rotation center)
+  // applies to objects, vertices, handles (e.g. rotation center), the sweep cap
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Roll objects clockwise"},
     QObject::tr("Roll Clockwise"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::RotateTool
-      | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::RotateTool
+      | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::ALT | Qt::Key_Up},
     [](auto& context) { context.mapView().rotate(vm::rotation_axis::roll, true); },
     [](const auto& context) { return context.hasDocument(); },
@@ -377,8 +415,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Roll objects counter-clockwise"},
     QObject::tr("Roll Counter-clockwise"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::RotateTool
-      | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::RotateTool
+      | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::ALT | Qt::Key_Down},
     [](auto& context) { context.mapView().rotate(vm::rotation_axis::roll, false); },
     [](const auto& context) { return context.hasDocument(); },
@@ -386,8 +425,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Yaw objects clockwise"},
     QObject::tr("Yaw Clockwise"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::RotateTool
-      | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::RotateTool
+      | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::ALT | Qt::Key_Left},
     [](auto& context) { context.mapView().rotate(vm::rotation_axis::yaw, true); },
     [](const auto& context) { return context.hasDocument(); },
@@ -395,8 +435,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Yaw objects counter-clockwise"},
     QObject::tr("Yaw Counter-clockwise"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::RotateTool
-      | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::RotateTool
+      | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::ALT | Qt::Key_Right},
     [](auto& context) { context.mapView().rotate(vm::rotation_axis::yaw, false); },
     [](const auto& context) { return context.hasDocument(); },
@@ -404,8 +445,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Pitch objects clockwise"},
     QObject::tr("Pitch Clockwise"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::RotateTool
-      | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::RotateTool
+      | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::ALT | Qt::Key_PageUp},
     [](auto& context) { context.mapView().rotate(vm::rotation_axis::pitch, true); },
     [](const auto& context) { return context.hasDocument(); },
@@ -413,8 +455,9 @@ void ActionManager::createViewActions()
   addAction(Action{
     std::filesystem::path{"Controls/Map view/Pitch objects counter-clockwise"},
     QObject::tr("Pitch Counter-clockwise"),
-    ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::RotateTool
-      | ActionContext::NoTool,
+    ActionContext::AnyView | ActionContext::NodeSelection
+      | ActionContext::SelectionOwnedByTool | ActionContext::RotateTool
+      | ActionContext::SweepTool | ActionContext::NoTool,
     QKeySequence{Qt::ALT | Qt::Key_PageDown},
     [](auto& context) { context.mapView().rotate(vm::rotation_axis::pitch, false); },
     [](const auto& context) { return context.hasDocument(); },
@@ -427,7 +470,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::Key_Up},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::up, MapViewBase::UVActionMode::Normal);
+      context.mapView().moveUv(vm::direction::up, MapViewBase::UvActionMode::Normal);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -437,7 +480,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::SHIFT | Qt::Key_Up},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::up, MapViewBase::UVActionMode::Coarse);
+      context.mapView().moveUv(vm::direction::up, MapViewBase::UvActionMode::Coarse);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -447,7 +490,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::CTRL | Qt::Key_Up},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::up, MapViewBase::UVActionMode::Fine);
+      context.mapView().moveUv(vm::direction::up, MapViewBase::UvActionMode::Fine);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -457,7 +500,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::Key_Down},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::down, MapViewBase::UVActionMode::Normal);
+      context.mapView().moveUv(vm::direction::down, MapViewBase::UvActionMode::Normal);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -467,7 +510,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::SHIFT | Qt::Key_Down},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::down, MapViewBase::UVActionMode::Coarse);
+      context.mapView().moveUv(vm::direction::down, MapViewBase::UvActionMode::Coarse);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -477,7 +520,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::CTRL | Qt::Key_Down},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::down, MapViewBase::UVActionMode::Fine);
+      context.mapView().moveUv(vm::direction::down, MapViewBase::UvActionMode::Fine);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -487,7 +530,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::Key_Left},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::left, MapViewBase::UVActionMode::Normal);
+      context.mapView().moveUv(vm::direction::left, MapViewBase::UvActionMode::Normal);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -497,7 +540,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::SHIFT | Qt::Key_Left},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::left, MapViewBase::UVActionMode::Coarse);
+      context.mapView().moveUv(vm::direction::left, MapViewBase::UvActionMode::Coarse);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -507,7 +550,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::CTRL | Qt::Key_Left},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::left, MapViewBase::UVActionMode::Fine);
+      context.mapView().moveUv(vm::direction::left, MapViewBase::UvActionMode::Fine);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -517,7 +560,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::Key_Right},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::right, MapViewBase::UVActionMode::Normal);
+      context.mapView().moveUv(vm::direction::right, MapViewBase::UvActionMode::Normal);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -527,7 +570,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::SHIFT | Qt::Key_Right},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::right, MapViewBase::UVActionMode::Coarse);
+      context.mapView().moveUv(vm::direction::right, MapViewBase::UvActionMode::Coarse);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -537,7 +580,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::CTRL | Qt::Key_Right},
     [](auto& context) {
-      context.mapView().moveUV(vm::direction::right, MapViewBase::UVActionMode::Fine);
+      context.mapView().moveUv(vm::direction::right, MapViewBase::UvActionMode::Fine);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -547,7 +590,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::Key_PageUp},
     [](auto& context) {
-      context.mapView().rotateUV(true, MapViewBase::UVActionMode::Normal);
+      context.mapView().rotateUv(true, MapViewBase::UvActionMode::Normal);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -557,7 +600,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::SHIFT | Qt::Key_PageUp},
     [](auto& context) {
-      context.mapView().rotateUV(true, MapViewBase::UVActionMode::Coarse);
+      context.mapView().rotateUv(true, MapViewBase::UvActionMode::Coarse);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -567,7 +610,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::CTRL | Qt::Key_PageUp},
     [](auto& context) {
-      context.mapView().rotateUV(true, MapViewBase::UVActionMode::Fine);
+      context.mapView().rotateUv(true, MapViewBase::UvActionMode::Fine);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -577,7 +620,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::Key_PageDown},
     [](auto& context) {
-      context.mapView().rotateUV(false, MapViewBase::UVActionMode::Normal);
+      context.mapView().rotateUv(false, MapViewBase::UvActionMode::Normal);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -587,7 +630,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::SHIFT | Qt::Key_PageDown},
     [](auto& context) {
-      context.mapView().rotateUV(false, MapViewBase::UVActionMode::Coarse);
+      context.mapView().rotateUv(false, MapViewBase::UvActionMode::Coarse);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -597,7 +640,7 @@ void ActionManager::createViewActions()
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::CTRL | Qt::Key_PageDown},
     [](auto& context) {
-      context.mapView().rotateUV(false, MapViewBase::UVActionMode::Fine);
+      context.mapView().rotateUv(false, MapViewBase::UvActionMode::Fine);
     },
     [](const auto& context) { return context.hasDocument(); },
   });
@@ -614,7 +657,7 @@ void ActionManager::createViewActions()
     QObject::tr("Flip textures horizontally"),
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::CTRL | Qt::Key_F},
-    [](auto& context) { context.mapView().flipUV(vm::direction::right); },
+    [](auto& context) { context.mapView().flipUv(vm::direction::right); },
     [](const auto& context) { return context.hasDocument(); },
   });
   addAction(Action{
@@ -622,7 +665,7 @@ void ActionManager::createViewActions()
     QObject::tr("Flip textures vertically"),
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::CTRL | Qt::ALT | Qt::Key_F},
-    [](auto& context) { context.mapView().flipUV(vm::direction::up); },
+    [](auto& context) { context.mapView().flipUv(vm::direction::up); },
     [](const auto& context) { return context.hasDocument(); },
   });
   addAction(Action{
@@ -630,7 +673,7 @@ void ActionManager::createViewActions()
     QObject::tr("Reset texture alignment"),
     ActionContext::AnyView | ActionContext::AnySelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::SHIFT | Qt::Key_R},
-    [](auto& context) { context.mapView().resetUV(); },
+    [](auto& context) { context.mapView().resetUv(); },
     [](const auto& context) { return context.hasDocument(); },
   });
   addAction(Action{
@@ -638,7 +681,7 @@ void ActionManager::createViewActions()
     QObject::tr("Reset texture alignment to world aligned"),
     ActionContext::AnyView | ActionContext::AnySelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::SHIFT | Qt::ALT | Qt::Key_R},
-    [](auto& context) { context.mapView().resetUVToWorld(); },
+    [](auto& context) { context.mapView().resetUvToWorld(); },
     [](const auto& context) { return context.hasDocument(); },
   });
 
@@ -648,7 +691,7 @@ void ActionManager::createViewActions()
     QObject::tr("Make Structural"),
     ActionContext::AnyView | ActionContext::NodeSelection | ActionContext::AnyOrNoTool,
     QKeySequence{Qt::ALT | Qt::Key_S},
-    [](auto& context) { context.mapView().makeStructural(); },
+    [](auto& context) { context.mapView().makeSelectionStructural(); },
     [](const auto& context) { return context.hasDocument(); },
   });
 
@@ -1108,7 +1151,7 @@ void ActionManager::createEditMenu()
     QObject::tr("Delete"),
     ActionContext::Any,
     QKeySequence{
-#ifdef __APPLE__
+#if defined(Q_OS_MACOS)
       Qt::Key_Backspace
 #else
       QKeySequence::Delete
@@ -1219,6 +1262,18 @@ void ActionManager::createEditMenu()
     },
   }));
 
+  auto& patchEditingMenu = editMenu.addMenu("Patches");
+  patchEditingMenu.addItem(addAction(Action{
+    "Menu/Edit/Convert Selection to Patches",
+    QObject::tr("Convert Selection to Patches"),
+    ActionContext::Any,
+    QKeySequence{Qt::CTRL | Qt::Key_P},
+    [](auto& context) { context.mapWindow().convertSelectionToPatches(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().canConvertSelectionToPatches();
+    },
+  }));
+
   auto& texturesMenu = editMenu.addMenu("Textures");
   texturesMenu.addItem(addAction(Action{
     "Menu/Edit/Texture Lock",
@@ -1235,9 +1290,9 @@ void ActionManager::createEditMenu()
     QObject::tr("UV Lock"),
     ActionContext::Any,
     QKeySequence{Qt::Key_U},
-    [](auto& context) { context.mapWindow().toggleUVLock(); },
+    [](auto& context) { context.mapWindow().toggleUvLock(); },
     [](const auto& context) { return context.hasDocument(); },
-    [](const auto&) { return pref(Preferences::UVLock); },
+    [](const auto&) { return pref(Preferences::UvLock); },
     std::filesystem::path{"UVLock.svg"},
   }));
   texturesMenu.addSeparator();
@@ -1432,12 +1487,14 @@ void ActionManager::createToolsMenu()
     QObject::tr("Brush Tool"),
     ActionContext::Any,
     QKeySequence{Qt::Key_B},
-    [](auto& context) { context.mapWindow().toggleAssembleBrushTool(); },
+    [](auto& context) { context.mapWindow().toolBox().toggleAssembleBrushTool(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().canToggleAssembleBrushTool();
+      return context.hasDocument()
+             && context.mapWindow().toolBox().canToggleAssembleBrushTool();
     },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().assembleBrushToolActive();
+      return context.hasDocument()
+             && context.mapWindow().toolBox().assembleBrushToolActive();
     },
     std::filesystem::path{"BrushTool.svg"},
   }));
@@ -1446,12 +1503,12 @@ void ActionManager::createToolsMenu()
     QObject::tr("Clip Tool"),
     ActionContext::Any,
     QKeySequence{Qt::Key_C},
-    [](auto& context) { context.mapWindow().toggleClipTool(); },
+    [](auto& context) { context.mapWindow().toolBox().toggleClipTool(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().canToggleClipTool();
+      return context.hasDocument() && context.mapWindow().toolBox().canToggleClipTool();
     },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().clipToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().clipToolActive();
     },
     std::filesystem::path{"ClipTool.svg"},
   }));
@@ -1460,26 +1517,40 @@ void ActionManager::createToolsMenu()
     QObject::tr("Rotate Tool"),
     ActionContext::Any,
     QKeySequence{Qt::Key_R},
-    [](auto& context) { context.mapWindow().toggleRotateTool(); },
+    [](auto& context) { context.mapWindow().toolBox().toggleRotateTool(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().canToggleRotateTool();
+      return context.hasDocument() && context.mapWindow().toolBox().canToggleRotateTool();
     },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().rotateToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().rotateToolActive();
     },
     std::filesystem::path{"RotateTool.svg"},
+  }));
+  toolsMenu.addItem(addAction(Action{
+    "Menu/Edit/Tools/Sweep Tool",
+    QObject::tr("Sweep Tool"),
+    ActionContext::Any,
+    QKeySequence{Qt::Key_Y},
+    [](auto& context) { context.mapWindow().toolBox().toggleSweepTool(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().toolBox().canToggleSweepTool();
+    },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().toolBox().sweepToolActive();
+    },
+    std::filesystem::path{"SweepTool.svg"},
   }));
   toolsMenu.addItem(addAction(Action{
     "Menu/Edit/Tools/Scale Tool",
     QObject::tr("Scale Tool"),
     ActionContext::Any,
     QKeySequence{Qt::Key_T},
-    [](auto& context) { context.mapWindow().toggleScaleTool(); },
+    [](auto& context) { context.mapWindow().toolBox().toggleScaleTool(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().canToggleScaleTool();
+      return context.hasDocument() && context.mapWindow().toolBox().canToggleScaleTool();
     },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().scaleToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().scaleToolActive();
     },
     std::filesystem::path{"ScaleTool.svg"},
   }));
@@ -1488,12 +1559,12 @@ void ActionManager::createToolsMenu()
     QObject::tr("Shear Tool"),
     ActionContext::Any,
     QKeySequence{Qt::Key_G},
-    [](auto& context) { context.mapWindow().toggleShearTool(); },
+    [](auto& context) { context.mapWindow().toolBox().toggleShearTool(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().canToggleShearTool();
+      return context.hasDocument() && context.mapWindow().toolBox().canToggleShearTool();
     },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().shearToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().shearToolActive();
     },
     std::filesystem::path{"ShearTool.svg"},
   }));
@@ -1502,12 +1573,13 @@ void ActionManager::createToolsMenu()
     QObject::tr("Vertex Tool"),
     ActionContext::Any,
     QKeySequence{Qt::Key_V},
-    [](auto& context) { context.mapWindow().toggleVertexTool(); },
+    [](auto& context) { context.mapWindow().toolBox().toggleVertexTool(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().canToggleVertexTool();
+      return context.hasDocument()
+             && context.mapWindow().toolBox().canToggleAnyVertexTool();
     },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().vertexToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().vertexToolActive();
     },
     std::filesystem::path{"VertexTool.svg"},
   }));
@@ -1516,12 +1588,13 @@ void ActionManager::createToolsMenu()
     QObject::tr("Edge Tool"),
     ActionContext::Any,
     QKeySequence{Qt::Key_E},
-    [](auto& context) { context.mapWindow().toggleEdgeTool(); },
+    [](auto& context) { context.mapWindow().toolBox().toggleEdgeTool(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().canToggleEdgeTool();
+      return context.hasDocument()
+             && context.mapWindow().toolBox().canToggleAnyVertexTool();
     },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().edgeToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().edgeToolActive();
     },
     std::filesystem::path{"EdgeTool.svg"},
   }));
@@ -1530,12 +1603,13 @@ void ActionManager::createToolsMenu()
     QObject::tr("Face Tool"),
     ActionContext::Any,
     QKeySequence{Qt::Key_F},
-    [](auto& context) { context.mapWindow().toggleFaceTool(); },
+    [](auto& context) { context.mapWindow().toolBox().toggleFaceTool(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().canToggleFaceTool();
+      return context.hasDocument()
+             && context.mapWindow().toolBox().canToggleAnyVertexTool();
     },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().faceToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().faceToolActive();
     },
     std::filesystem::path{"FaceTool.svg"},
   }));
@@ -1554,6 +1628,22 @@ void ActionManager::createToolsMenu()
     std::filesystem::path{"Path.svg"},
   }));
   toolsMenu.addItem(addAction(Action{
+    "Menu/Edit/Tools/Control Point Tool",
+    QObject::tr("Control Point Tool"),
+    ActionContext::Any,
+    QKeySequence{},
+    [](auto& context) { context.mapWindow().toolBox().toggleControlPointTool(); },
+    [](const auto& context) {
+      return context.hasDocument()
+             && context.mapWindow().toolBox().canToggleControlPointTool();
+    },
+    [](const auto& context) {
+      return context.hasDocument()
+             && context.mapWindow().toolBox().controlPointToolActive();
+    },
+    std::filesystem::path{"ControlPointTool.svg"},
+  }));
+  toolsMenu.addItem(addAction(Action{
     "Controls/Map view/Deactivate current tool",
     QObject::tr("Deactivate Current Tool"),
     ActionContext::Any,
@@ -1561,7 +1651,7 @@ void ActionManager::createToolsMenu()
     [](auto& context) { context.mapView().deactivateCurrentTool(); },
     [](const auto& context) { return context.hasDocument(); },
     [](const auto& context) {
-      return context.hasDocument() && !context.mapWindow().anyModalToolActive();
+      return context.hasDocument() && !context.mapWindow().toolBox().anyModalToolActive();
     },
     std::filesystem::path{"NoTool.svg"},
   }));
@@ -1911,7 +2001,7 @@ void ActionManager::createViewMenu()
     "Menu/View/Maximize Current View",
     QObject::tr("Maximize Current View"),
     ActionContext::Any,
-#ifdef Q_OS_MACOS
+#if defined(Q_OS_MACOS)
     // Command + Space opens Spotlight so we can't use it, so use Ctrl + Space instead.
     QKeySequence{Qt::META | Qt::Key_Space},
 #else
@@ -2089,7 +2179,9 @@ void ActionManager::createToolbar()
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Edge Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Face Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Path Tool"));
+  m_toolBar.addItem(existingAction("Menu/Edit/Tools/Control Point Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Rotate Tool"));
+  m_toolBar.addItem(existingAction("Menu/Edit/Tools/Sweep Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Scale Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Shear Tool"));
   m_toolBar.addSeparator();

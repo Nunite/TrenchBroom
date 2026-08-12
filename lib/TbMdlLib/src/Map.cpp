@@ -19,8 +19,8 @@
 
 #include "mdl/Map.h"
 
-#include "Logger.h"
-#include "SimpleParserStatus.h"
+#include "base/Logger.h"
+#include "base/SimpleParserStatus.h"
 #include "fs/DiskIO.h"
 #include "fs/PathInfo.h"
 #include "gl/MaterialManager.h"
@@ -46,7 +46,7 @@
 #include "mdl/GameInfo.h"
 #include "mdl/Grid.h"
 #include "mdl/GroupNode.h"
-#include "mdl/InvalidUVScaleValidator.h"
+#include "mdl/InvalidUvScaleValidator.h"
 #include "mdl/Issue.h"
 #include "mdl/LayerNode.h"
 #include "mdl/LinkSourceValidator.h"
@@ -72,6 +72,8 @@
 #include "mdl/MixedBrushContentsValidator.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Node.h"
+#include "mdl/NodeHandleManager.h"
+#include "mdl/NodeHandles.h"
 #include "mdl/NodeIndex.h"
 #include "mdl/NodeQueries.h"
 #include "mdl/NodeReader.h"
@@ -91,7 +93,6 @@
 #include "mdl/UndoableCommand.h"
 #include "mdl/UpdateLinkedGroupsCommand.h"
 #include "mdl/UpdateLinkedGroupsHelper.h"
-#include "mdl/VertexHandleManager.h"
 #include "mdl/WadPropertyUtils.h"
 #include "mdl/WorldBoundsValidator.h"
 #include "mdl/WorldNode.h"
@@ -243,8 +244,11 @@ Result<std::unique_ptr<WorldNode>> createWorldNode(
   if (!config.forceEmptyNewMap)
   {
     const auto builder = BrushBuilder{
-      worldNode->mapFormat(), worldBounds, config.faceAttribsConfig.defaults};
-    builder.createCuboid({128.0, 128.0, 32.0}, BrushFaceAttributes::NoMaterialName)
+      worldNode->mapFormat(),
+      worldBounds,
+      config.faceAttribsConfig.defaultUvAttributes,
+      config.faceAttribsConfig.defaultSurfaceAttributes};
+    builder.createCuboid({128.0, 128.0, 32.0}, BrushFace::NoMaterialName)
       | kdl::transform(
         [&](auto b) { worldNode->defaultLayer()->addChild(new BrushNode{std::move(b)}); })
       | kdl::transform_error(
@@ -354,7 +358,7 @@ auto makeSetMaterialsVisitor(gl::MaterialManager& manager)
       for (size_t i = 0u; i < brush.faceCount(); ++i)
       {
         const auto& face = brush.face(i);
-        auto* material = manager.material(face.attributes().materialName());
+        auto* material = manager.material(face.materialName());
         brushNode.setFaceMaterial(i, material);
       }
     },
@@ -565,15 +569,17 @@ Map::Map(
   , m_worldBounds{worldBounds}
   , m_nodeIndex{std::make_unique<NodeIndex>()}
   , m_entityLinkManager{std::make_unique<EntityLinkManager>(*m_nodeIndex)}
-  , m_vertexHandles{std::make_unique<VertexHandleManager>()}
-  , m_edgeHandles{std::make_unique<EdgeHandleManager>()}
-  , m_faceHandles{std::make_unique<FaceHandleManager>()}
-  , m_currentMaterialName{BrushFaceAttributes::NoMaterialName}
+  , m_currentMaterialName{BrushFace::NoMaterialName}
   , m_repeatStack{std::make_unique<RepeatStack>()}
   , m_commandProcessor{std::make_unique<CommandProcessor>(*this)}
   , m_path{std::move(path)}
   , m_selection{*this}
 {
+  m_nodeHandles.registerHandleType<VertexHandle>();
+  m_nodeHandles.registerHandleType<ControlPointHandle>();
+  m_nodeHandles.registerHandleType<EdgeHandle>();
+  m_nodeHandles.registerHandleType<FaceHandle>();
+
   connectObservers();
 
   editorContext().setCurrentLayer(m_worldNode->defaultLayer());
@@ -761,34 +767,14 @@ MapTextEncoding Map::encoding() const
   return MapTextEncoding::Quake;
 }
 
-VertexHandleManager& Map::vertexHandles()
+NodeHandleManager& Map::nodeHandles()
 {
-  return *m_vertexHandles;
+  return m_nodeHandles;
 }
 
-const VertexHandleManager& Map::vertexHandles() const
+const NodeHandleManager& Map::nodeHandles() const
 {
-  return *m_vertexHandles;
-}
-
-EdgeHandleManager& Map::edgeHandles()
-{
-  return *m_edgeHandles;
-}
-
-const EdgeHandleManager& Map::edgeHandles() const
-{
-  return *m_edgeHandles;
-}
-
-FaceHandleManager& Map::faceHandles()
-{
-  return *m_faceHandles;
-}
-
-const FaceHandleManager& Map::faceHandles() const
-{
-  return *m_faceHandles;
+  return m_nodeHandles;
 }
 
 const std::string& Map::currentMaterialName() const
@@ -943,6 +929,8 @@ Result<void> Map::exportAs(const ExportOptions& options) const
           auto writer = NodeWriter{*m_worldNode, stream};
           writer.setExporting(true);
           writer.setStripTbProperties(mapOptions.stripTbProperties);
+          writer.setStripEntityPattern(mapOptions.stripEntityPattern);
+          writer.setEntityToAdd(mapOptions.entityToAdd);
           writer.writeMap(m_taskManager);
         });
       }),
@@ -1174,7 +1162,7 @@ void Map::registerValidators()
   m_worldNode->registerValidator(
     std::make_unique<PropertyValueWithDoubleQuotationMarksValidator>());
   m_worldNode->registerValidator(std::make_unique<WorldNodePathSeparatorValidator>());
-  m_worldNode->registerValidator(std::make_unique<InvalidUVScaleValidator>());
+  m_worldNode->registerValidator(std::make_unique<InvalidUvScaleValidator>());
 }
 
 void Map::setIssueHidden(const Issue& issue, const bool hidden)
@@ -1314,7 +1302,7 @@ void Map::setMaterials(const std::vector<BrushFaceHandle>& faceHandles)
   {
     BrushNode* node = faceHandle.node();
     const BrushFace& face = faceHandle.face();
-    auto* material = m_materialManager->material(face.attributes().materialName());
+    auto* material = m_materialManager->material(face.materialName());
     node->setFaceMaterial(faceHandle.faceIndex(), material);
   }
   materialUsageCountsDidChangeNotifier();

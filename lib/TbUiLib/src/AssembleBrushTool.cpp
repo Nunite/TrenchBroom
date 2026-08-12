@@ -19,8 +19,8 @@
 
 #include "ui/AssembleBrushTool.h"
 
-#include "Error.h" // IWYU pragma: keep
-#include "Logger.h"
+#include "base/Error.h" // IWYU pragma: keep
+#include "base/Logger.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushNode.h"
 #include "mdl/GameConfig.h"
@@ -55,7 +55,8 @@ void AssembleBrushTool::update(const mdl::Polyhedron3& polyhedron)
     const auto builder = mdl::BrushBuilder{
       m_document.map().worldNode().mapFormat(),
       m_document.map().worldBounds(),
-      m_document.map().gameInfo().gameConfig.faceAttribsConfig.defaults};
+      m_document.map().gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
+      m_document.map().gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes};
 
     builder.createBrush(*m_polyhedron, m_document.map().currentMaterialName())
       | kdl::transform([&](auto b) {

@@ -105,8 +105,7 @@ QStringList brushMaterials(const mdl::BrushNode& brushNode)
   const auto& brush = brushNode.brush();
   for (size_t i = 0; i < brush.faceCount(); ++i)
   {
-    const auto material =
-      QString::fromStdString(brush.face(i).attributes().materialName());
+    const auto material = QString::fromStdString(brush.face(i).materialName());
     if (!materials.contains(material))
     {
       materials.push_back(material);

@@ -38,8 +38,8 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "fs/DiskIO.h"
 #include "fs/FileSystem.h"
 #include "fs/PathInfo.h"

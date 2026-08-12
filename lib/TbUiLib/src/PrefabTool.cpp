@@ -22,8 +22,8 @@
 #include <QMessageBox>
 #include <QPushButton>
 
-#include "Logger.h"
-#include "ParserStatus.h"
+#include "base/Logger.h"
+#include "base/ParserStatus.h"
 #include "fs/DiskIO.h"
 #include "fs/File.h"
 #include "fs/Reader.h"
@@ -316,7 +316,7 @@ void collectPrefabMaterialNames(std::vector<std::string>& result, const mdl::Nod
     [&](const mdl::BrushNode& brushNode) {
       for (const auto& face : brushNode.brush().faces())
       {
-        const auto& materialName = face.attributes().materialName();
+        const auto& materialName = face.materialName();
         if (!materialName.empty())
         {
           result.push_back(materialName);

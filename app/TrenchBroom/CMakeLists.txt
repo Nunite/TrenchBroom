@@ -96,6 +96,9 @@ endif()
 
 # Set up resource compilation for Windows
 if(WIN32)
+    # Generate the UTF-8 code page manifest referenced by TrenchBroom.rc.in below.
+    CONFIGURE_UTF8_MANIFEST(TrenchBroom TB_UTF8_MANIFEST_PATH)
+
     # Create the windows resource file
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/TrenchBroom.rc.in" "${CMAKE_CURRENT_BINARY_DIR}/TrenchBroom.rc" @ONLY)
 
@@ -120,6 +123,12 @@ target_sources(TrenchBroom PRIVATE ${APP_SOURCE} ${INDEX_OUTPUT_PATH} ${DOC_MANU
 
 if(WIN32 OR ${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
     target_sources(TrenchBroom PRIVATE ${APP_SHADER_FILES})
+endif()
+
+if(WIN32 AND COMPILER_IS_MSVC)
+    # We embed our own application manifest via TrenchBroom.rc; tell the linker not to
+    # generate and embed a second one (which would conflict with the RT_MANIFEST resource).
+    target_link_options(TrenchBroom PRIVATE "/MANIFEST:NO")
 endif()
 
 if(APPLE)
@@ -197,8 +206,20 @@ if(APPLE)
                         "$<TARGET_BUNDLE_DIR:TrenchBroom>"
                 VERBATIM)
         else()
+            # macdeployqt copies the Qt frameworks into the bundle after the executable
+            # was linked, which invalidates the linker's ad-hoc signature (the bundle ends
+            # up with no CodeResources seal). Gatekeeper then rejects the app as "damaged".
+            # Re-sign the whole bundle ad-hoc so it has a valid seal. The app still isn't
+            # notarized, so users must clear quarantine, but it is no longer reported as
+            # damaged.
             add_custom_command(TARGET TrenchBroom POST_BUILD
-                COMMAND "${TB_MACDEPLOYQT_PATH}" "$<TARGET_BUNDLE_DIR:TrenchBroom>")
+                COMMAND "${TB_MACDEPLOYQT_PATH}" "$<TARGET_BUNDLE_DIR:TrenchBroom>"
+                COMMAND "codesign"
+                        "--force"
+                        "--deep"
+                        "--sign" "-"
+                        "$<TARGET_BUNDLE_DIR:TrenchBroom>"
+                VERBATIM)
         endif()
     endif()
 endif()
@@ -211,20 +232,10 @@ if(WIN32)
             COMMAND ${CMAKE_COMMAND} -E copy "${TB_RESOURCE_DIR}/win32/icons/DocIcon.ico"    "${CMAKE_CURRENT_BINARY_DIR}"
             COMMAND ${CMAKE_COMMAND} -E copy "${TB_RESOURCE_DIR}/win32/icons/WindowIcon.ico" "${CMAKE_CURRENT_BINARY_DIR}")
 
-    # Copy DLLs to app directory
-    add_custom_command(TARGET TrenchBroom POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:assimp::assimp>" "$<TARGET_FILE_DIR:TrenchBroom>"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeimage::FreeImage>" "$<TARGET_FILE_DIR:TrenchBroom>"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freetype>" "$<TARGET_FILE_DIR:TrenchBroom>"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:tinyxml2::tinyxml2>" "$<TARGET_FILE_DIR:TrenchBroom>"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:miniz::miniz>" "$<TARGET_FILE_DIR:TrenchBroom>"
-    )
-
     if(Python3_RUNTIME_LIBRARY)
         add_custom_command(TARGET TrenchBroom POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different "${Python3_RUNTIME_LIBRARY}" "$<TARGET_FILE_DIR:TrenchBroom>")
     endif()
-
     # Run windeployqt which copies the Qt dlls into the deployable folder, along with necessary runtime dlls by the compiler
     # Only copy translations on release builds, as deploying them takes significantly longer
     if(NOT TB_SKIP_WINDEPLOYQT)
@@ -402,6 +413,45 @@ if(WIN32)
     install(FILES
             ${LIB_UPDATE_SCRIPT}
             DESTINATION update COMPONENT TrenchBroom)
+    install(CODE [[
+        set(TB_INSTALL_UPDATE_SCRIPT "${CMAKE_INSTALL_PREFIX}/update/install_update.bat")
+        file(GLOB_RECURSE TB_INSTALLED_FILES
+             LIST_DIRECTORIES FALSE
+             RELATIVE "${CMAKE_INSTALL_PREFIX}"
+             "${CMAKE_INSTALL_PREFIX}/*")
+        list(SORT TB_INSTALLED_FILES)
+
+        file(GLOB_RECURSE TB_INSTALLED_PATHS
+             LIST_DIRECTORIES TRUE
+             RELATIVE "${CMAKE_INSTALL_PREFIX}"
+             "${CMAKE_INSTALL_PREFIX}/*")
+        foreach(TB_INSTALLED_PATH ${TB_INSTALLED_PATHS})
+            if(IS_DIRECTORY "${CMAKE_INSTALL_PREFIX}/${TB_INSTALLED_PATH}")
+                list(APPEND TB_INSTALLED_DIRS "${TB_INSTALLED_PATH}")
+            endif()
+        endforeach()
+        list(SORT TB_INSTALLED_DIRS)
+        list(REVERSE TB_INSTALLED_DIRS)
+
+        string(APPEND TB_DELETE_INSTALLED_FILES_COMMANDS "rem TB_DELETE_INSTALLED_FILES_BEGIN\n")
+        foreach(TB_INSTALLED_FILE ${TB_INSTALLED_FILES})
+            string(REPLACE "/" "\\" TB_INSTALLED_FILE_NATIVE "${TB_INSTALLED_FILE}")
+            string(APPEND TB_DELETE_INSTALLED_FILES_COMMANDS "if exist \"%TARGET%\\${TB_INSTALLED_FILE_NATIVE}\" del /f /q \"%TARGET%\\${TB_INSTALLED_FILE_NATIVE}\" && echo %TARGET%\\${TB_INSTALLED_FILE_NATIVE}\n")
+        endforeach()
+        foreach(TB_INSTALLED_DIR ${TB_INSTALLED_DIRS})
+            string(REPLACE "/" "\\" TB_INSTALLED_DIR_NATIVE "${TB_INSTALLED_DIR}")
+            string(APPEND TB_DELETE_INSTALLED_FILES_COMMANDS "rd \"%TARGET%\\${TB_INSTALLED_DIR_NATIVE}\" 2>nul\n")
+        endforeach()
+        string(APPEND TB_DELETE_INSTALLED_FILES_COMMANDS "rem TB_DELETE_INSTALLED_FILES_END")
+
+        file(READ "${TB_INSTALL_UPDATE_SCRIPT}" TB_INSTALL_UPDATE_SCRIPT_CONTENT)
+        string(REPLACE
+               "rem TB_DELETE_INSTALLED_FILES"
+               "${TB_DELETE_INSTALLED_FILES_COMMANDS}"
+               TB_INSTALL_UPDATE_SCRIPT_CONTENT
+               "${TB_INSTALL_UPDATE_SCRIPT_CONTENT}")
+        file(WRITE "${TB_INSTALL_UPDATE_SCRIPT}" "${TB_INSTALL_UPDATE_SCRIPT_CONTENT}")
+    ]])
     set(CPACK_GENERATOR "ZIP")
     set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY FALSE)
 
@@ -454,5 +504,14 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     set(CPACK_EXTERNAL_ENABLE_STAGING True)
     set(CPACK_GENERATOR "External")
 endif()
+
+# FetchContent'd dependencies (cpptrace, tinyxml2, ...) register their own
+# install components (headers, pkgconfig, *_development, Unspecified) for
+# their dev artifacts, none of which belong in a packaged TrenchBroom build.
+# On Linux, having more than one component present also makes CPack stage
+# each into its own <component>/usr/... subdirectory instead of merging them
+# into usr/ directly, which broke linuxdeploy's executable lookup. Restrict
+# packaging to just the component we actually ship, on every platform.
+set(CPACK_COMPONENTS_ALL "TrenchBroom")
 
 include(CPack)

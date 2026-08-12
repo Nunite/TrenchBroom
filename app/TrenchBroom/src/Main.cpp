@@ -32,8 +32,8 @@
 #include <QTranslator>
 #include <QtGlobal>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "ui/Action.h"
 #include "ui/ActionBuilder.h"
 #include "ui/ActionExecutionContext.h"

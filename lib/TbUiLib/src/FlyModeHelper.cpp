@@ -22,9 +22,9 @@
 #include <QElapsedTimer>
 #include <QMouseEvent>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "gl/Camera.h"
+#include "prefs/Preferences.h"
 
 #include "vm/vec.h"
 
@@ -40,18 +40,22 @@ qint64 msecsSinceReference()
   return timer.msecsSinceReference();
 }
 
-bool eventMatchesShortcut(const QKeySequence& shortcut, QKeyEvent* event)
+bool eventMatchesShortcut(
+  const std::vector<QKeySequence>& shortcuts, const QKeyEvent& event)
 {
-  if (shortcut.isEmpty())
-  {
-    return false;
-  }
+  return std::ranges::any_of(shortcuts, [&](const auto& shortcut) {
+    if (shortcut.isEmpty())
+    {
+      return false;
+    }
 
-  // NOTE: For triggering fly mode we only support single keys.
-  // e.g. you can't bind Shift+W to fly forward, only Shift or W.
-  const auto ourKey = shortcut[0].key();
-  const auto theirKey = event->key();
-  return ourKey == theirKey;
+    // NOTE: For triggering fly mode we only support single keys.
+    // e.g. you can't bind Shift+W to fly forward, only Shift or W.
+    const auto modifiers = Qt::KeyboardModifiers{};
+    const auto key = event.keyCombination().key();
+    const auto eventSequence = QKeySequence{QKeyCombination{modifiers, key}};
+    return eventSequence.matches(shortcut) == QKeySequence::ExactMatch;
+  });
 }
 
 } // namespace
@@ -89,27 +93,27 @@ void FlyModeHelper::keyDown(QKeyEvent* event)
 
   const auto wasAnyKeyDown = anyKeyDown();
 
-  if (eventMatchesShortcut(forward, event))
+  if (eventMatchesShortcut(forward, *event))
   {
     m_forward = true;
   }
-  if (eventMatchesShortcut(backward, event))
+  if (eventMatchesShortcut(backward, *event))
   {
     m_backward = true;
   }
-  if (eventMatchesShortcut(left, event))
+  if (eventMatchesShortcut(left, *event))
   {
     m_left = true;
   }
-  if (eventMatchesShortcut(right, event))
+  if (eventMatchesShortcut(right, *event))
   {
     m_right = true;
   }
-  if (eventMatchesShortcut(up, event))
+  if (eventMatchesShortcut(up, *event))
   {
     m_up = true;
   }
-  if (eventMatchesShortcut(down, event))
+  if (eventMatchesShortcut(down, *event))
   {
     m_down = true;
   }
@@ -145,27 +149,27 @@ void FlyModeHelper::keyUp(QKeyEvent* event)
     return;
   }
 
-  if (eventMatchesShortcut(forward, event))
+  if (eventMatchesShortcut(forward, *event))
   {
     m_forward = false;
   }
-  if (eventMatchesShortcut(backward, event))
+  if (eventMatchesShortcut(backward, *event))
   {
     m_backward = false;
   }
-  if (eventMatchesShortcut(left, event))
+  if (eventMatchesShortcut(left, *event))
   {
     m_left = false;
   }
-  if (eventMatchesShortcut(right, event))
+  if (eventMatchesShortcut(right, *event))
   {
     m_right = false;
   }
-  if (eventMatchesShortcut(up, event))
+  if (eventMatchesShortcut(up, *event))
   {
     m_up = false;
   }
-  if (eventMatchesShortcut(down, event))
+  if (eventMatchesShortcut(down, *event))
   {
     m_down = false;
   }

@@ -21,7 +21,7 @@
 
 #include <QImage>
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include "ui/MapViewBase.h"
 
 #include <filesystem>
@@ -60,6 +60,7 @@ public:
   ~MapView3D() override;
 
   QImage grabPrefabThumbnailFramebuffer(const std::vector<mdl::Node*>& nodes);
+  const gl::PerspectiveCamera& perspectiveCamera() const;
 
 private:
   void initializeCamera();

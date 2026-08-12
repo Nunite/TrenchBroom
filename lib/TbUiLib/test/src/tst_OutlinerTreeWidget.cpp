@@ -132,7 +132,7 @@ struct OutlinerTreeFixture
     , groupedEntity{new mdl::EntityNode{mdl::Entity{{{"classname", "path_corner"}}}}}
   {
     group->addChild(groupedEntity);
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {lightEntity, infoEntity, group}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {lightEntity, infoEntity, group}}});
   }
 };
 } // namespace
@@ -229,7 +229,7 @@ TEST_CASE("OutlinerTreeWidget")
   SECTION("rebuilds when map nodes are added")
   {
     auto* addedEntity = new mdl::EntityNode{mdl::Entity{{{"classname", "trigger_once"}}}};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {addedEntity}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {addedEntity}}});
     processOutlinerTreeUpdates();
 
     auto* addedItem = itemWithText(tree, "trigger_once");

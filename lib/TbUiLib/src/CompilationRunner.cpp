@@ -29,12 +29,16 @@
 #include "fs/PathInfo.h"
 #include "fs/PathMatcher.h"
 #include "fs/TraversalMode.h"
+#include "gl/PerspectiveCamera.h"
 #include "mdl/CompilationProfile.h"
 #include "mdl/CompilationTask.h"
 #include "mdl/ExportOptions.h"
+#include "mdl/GameEngineProfile.h"
+#include "mdl/GameInfo.h"
 #include "mdl/Map.h"
 #include "ui/CompilationContext.h"
 #include "ui/CompilationVariables.h"
+#include "ui/LaunchGameEngine.h"
 #include "ui/QPathUtils.h"
 
 #include "kd/cmd_utils.h"
@@ -46,9 +50,13 @@
 #include "kd/result_fold.h"
 #include "kd/string_utils.h"
 
+#include "vm/vec_io.h" // IWYU pragma: keep
+
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <fmt/std.h>
 
+#include <algorithm>
 #include <ranges>
 #include <string>
 
@@ -68,6 +76,11 @@ Result<std::string> workDir(const CompilationContext& context)
   {
     return Error{e.what()};
   }
+}
+
+auto makeAbsolute(const std::filesystem::path& path, const std::filesystem::path& workDir)
+{
+  return path.is_absolute() ? path : workDir / path;
 }
 
 } // namespace
@@ -115,22 +128,42 @@ void CompilationExportMapTaskRunner::doExecute()
 {
   emit start();
 
-  interpolate(m_task.targetSpec).and_then([&](const auto& interpolated) {
-    const auto targetPath = kdl::parse_path(interpolated);
-    m_context << "#### Exporting map file '" << pathAsQString(targetPath) << "'\n";
 
-    if (!m_context.test())
-    {
-      return fs::Disk::createDirectory(targetPath.parent_path())
-             | kdl::and_then([&](auto) {
-                 const auto options =
-                   mdl::MapExportOptions{targetPath, m_task.stripTbProperties};
-                 return m_context.map().exportAs(options);
-               });
-    }
-    return Result<void>{};
-  }) | kdl::transform([&]() { emit end(); })
-    | kdl::transform_error([&](auto e) {
+  workDir(m_context)
+      .join(interpolate(m_task.targetSpec))
+      .and_then([&](const auto& workDir, const auto& interpolated) {
+        const auto targetPath = makeAbsolute(kdl::parse_path(interpolated), workDir);
+        m_context << "#### Exporting map file '" << pathAsQString(targetPath) << "'\n";
+
+        auto entityToAdd = m_task.entityToAdd | kdl::optional_transform([&](auto entity) {
+                             const auto position = m_context.camera().position();
+                             const auto yaw = vm::to_degrees(m_context.camera().yaw());
+
+                             entity.addOrUpdateProperty(
+                               mdl::EntityPropertyKeys::Origin,
+                               fmt::format("{}", fmt::streamed(position)));
+                             entity.addOrUpdateProperty(
+                               mdl::EntityPropertyKeys::Angle, fmt::format("{}", yaw));
+
+                             return entity;
+                           });
+
+        if (!m_context.test())
+        {
+          return fs::Disk::createDirectory(targetPath.parent_path())
+                 | kdl::and_then([&](auto) {
+                     const auto options = mdl::MapExportOptions{
+                       targetPath,
+                       m_task.stripTbProperties,
+                       m_task.stripEntityPattern,
+                       std::move(entityToAdd),
+                     };
+                     return m_context.map().exportAs(options);
+                   });
+        }
+        return Result<void>{};
+      })
+    | kdl::transform([&]() { emit end(); }) | kdl::transform_error([&](auto e) {
         m_context << "#### Export failed: " << QString::fromStdString(e.msg) << "\n";
         emit error();
       });
@@ -151,11 +184,17 @@ void CompilationCopyFilesTaskRunner::doExecute()
 {
   emit start();
 
-  interpolate(m_task.sourceSpec)
+  workDir(m_context)
+      .join(interpolate(m_task.sourceSpec))
       .join(interpolate(m_task.targetSpec))
-      .and_then([&](const auto& interpolatedSource, const auto& interpolatedTarget) {
-        const auto sourcePath = kdl::parse_path(interpolatedSource);
-        const auto targetPath = kdl::parse_path(interpolatedTarget);
+      .and_then([&](
+                  const auto& workDir,
+                  const auto& interpolatedSource,
+                  const auto& interpolatedTarget) {
+        const auto sourcePath =
+          makeAbsolute(kdl::parse_path(interpolatedSource), workDir);
+        const auto targetPath =
+          makeAbsolute(kdl::parse_path(interpolatedTarget), workDir);
 
         const auto sourceDirPath = sourcePath.parent_path();
         const auto sourcePathMatcher = kdl::logical_and(
@@ -211,11 +250,17 @@ void CompilationRenameFileTaskRunner::doExecute()
 {
   emit start();
 
-  interpolate(m_task.sourceSpec)
+  workDir(m_context)
+      .join(interpolate(m_task.sourceSpec))
       .join(interpolate(m_task.targetSpec))
-      .and_then([&](const auto& interpolatedSource, const auto& interpolatedTarget) {
-        const auto sourcePath = kdl::parse_path(interpolatedSource);
-        const auto targetPath = kdl::parse_path(interpolatedTarget);
+      .and_then([&](
+                  const auto& workDir,
+                  const auto& interpolatedSource,
+                  const auto& interpolatedTarget) {
+        const auto sourcePath =
+          makeAbsolute(kdl::parse_path(interpolatedSource), workDir);
+        const auto targetPath =
+          makeAbsolute(kdl::parse_path(interpolatedTarget), workDir);
 
         m_context << "#### Renaming '" << pathAsQString(sourcePath) << "' to '"
                   << pathAsQString(targetPath) << "'\n";
@@ -248,35 +293,39 @@ void CompilationDeleteFilesTaskRunner::doExecute()
 {
   emit start();
 
-  interpolate(m_task.targetSpec).and_then([&](const auto& interpolated) {
-    const auto targetPath = kdl::parse_path(interpolated);
+  workDir(m_context)
+      .join(interpolate(m_task.targetSpec))
+      .and_then([&](const auto& workDir, const auto& interpolated) {
+        const auto targetPath = makeAbsolute(kdl::parse_path(interpolated), workDir);
 
-    const auto targetDirPath = targetPath.parent_path();
-    const auto targetPathMatcher = kdl::logical_and(
-      fs::makePathInfoPathMatcher({fs::PathInfo::File}),
-      fs::makeFilenamePathMatcher(targetPath.filename().string()));
+        const auto targetDirPath = targetPath.parent_path();
+        const auto targetPathMatcher = kdl::logical_and(
+          fs::makePathInfoPathMatcher({fs::PathInfo::File}),
+          fs::makeFilenamePathMatcher(targetPath.filename().string()));
 
-    return fs::Disk::find(targetDirPath, fs::TraversalMode::Recursive, targetPathMatcher)
-           | kdl::transform([&](const auto& pathsToDelete) {
-               const auto pathStrsToDelete =
-                 pathsToDelete | std::views::transform([](const auto& path) {
-                   return fmt::format("{}", path);
-                 })
-                 | kdl::ranges::to<std::vector>();
+        return fs::Disk::find(
+                 targetDirPath, fs::TraversalMode::Recursive, targetPathMatcher)
+               | kdl::transform([&](const auto& pathsToDelete) {
+                   const auto pathStrsToDelete =
+                     pathsToDelete | std::views::transform([](const auto& path) {
+                       return fmt::format("{}", path);
+                     })
+                     | kdl::ranges::to<std::vector>();
 
-               m_context << "#### Deleting: "
-                         << QString::fromStdString(kdl::str_join(pathStrsToDelete, ", "))
-                         << "\n";
+                   m_context << "#### Deleting: "
+                             << QString::fromStdString(
+                                  kdl::str_join(pathStrsToDelete, ", "))
+                             << "\n";
 
-               if (!m_context.test())
-               {
-                 return pathsToDelete | std::views::transform(fs::Disk::deleteFile)
-                        | kdl::fold;
-               }
-               return Result<std::vector<bool>>{std::vector<bool>{}};
-             });
-  }) | kdl::transform([&](auto) { emit end(); })
-    | kdl::transform_error([&](auto e) {
+                   if (!m_context.test())
+                   {
+                     return pathsToDelete | std::views::transform(fs::Disk::deleteFile)
+                            | kdl::fold;
+                   }
+                   return Result<std::vector<bool>>{std::vector<bool>{}};
+                 });
+      })
+    | kdl::transform([&](auto) { emit end(); }) | kdl::transform_error([&](auto e) {
         m_context << "#### Delete failed: " << QString::fromStdString(e.msg) << "\n";
         emit error();
       });
@@ -449,6 +498,71 @@ void CompilationRunToolTaskRunner::processReadyReadStandardOutput()
   }
 }
 
+CompilationLaunchEngineTaskRunner::CompilationLaunchEngineTaskRunner(
+  CompilationContext& context, mdl::CompilationLaunchEngine task)
+  : CompilationTaskRunner{context}
+  , m_task{std::move(task)}
+{
+}
+
+CompilationLaunchEngineTaskRunner::~CompilationLaunchEngineTaskRunner() = default;
+
+void CompilationLaunchEngineTaskRunner::doExecute()
+{
+  emit start();
+
+  const auto fail = [&](const QString& message) {
+    m_context << "#### Launch failed: " << message << "\n";
+    if (m_task.treatLaunchFailureAsError)
+    {
+      emit error();
+    }
+    else
+    {
+      m_context << "#### Continuing despite launch failure\n";
+      emit end();
+    }
+  };
+
+  if (m_task.engineProfileId.empty())
+  {
+    fail("Engine profile is not set");
+    return;
+  }
+
+  const auto& engineProfiles = m_context.map().gameInfo().gameEngineConfig.profiles;
+  const auto profileIt = std::ranges::find_if(engineProfiles, [&](const auto& profile) {
+    return profile.id == m_task.engineProfileId;
+  });
+
+  if (profileIt == std::end(engineProfiles))
+  {
+    fail(
+      QString{"Engine profile '"} + QString::fromStdString(m_task.engineProfileId)
+      + "' was not found");
+    return;
+  }
+
+  const auto& profile = *profileIt;
+  m_context << "#### Launching engine profile '" << QString::fromStdString(profile.name)
+            << "' at '" << pathAsQString(profile.path) << "'\n";
+
+  if (m_context.test())
+  {
+    emit end();
+    return;
+  }
+
+  launchGameEngineProfile(profile, LaunchGameEngineVariables{m_context.map()})
+    | kdl::transform([&]() {
+        m_context << "#### Launched\n";
+        emit end();
+      })
+    | kdl::transform_error([&](auto e) { fail(QString::fromStdString(e.msg)); });
+}
+
+void CompilationLaunchEngineTaskRunner::doTerminate() {}
+
 CompilationRunner::CompilationRunner(
   CompilationContext context, const mdl::CompilationProfile& profile, QObject* parent)
   : QObject{parent}
@@ -501,6 +615,13 @@ CompilationRunner::TaskRunnerList CompilationRunner::createTaskRunners(
           {
             result.push_back(
               std::make_unique<CompilationRunToolTaskRunner>(context, runTool));
+          }
+        },
+        [&](const mdl::CompilationLaunchEngine& launchEngine) {
+          if (launchEngine.enabled)
+          {
+            result.push_back(
+              std::make_unique<CompilationLaunchEngineTaskRunner>(context, launchEngine));
           }
         }),
       task);

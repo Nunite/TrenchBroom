@@ -19,8 +19,7 @@
 
 #include "render/MapRenderer.h"
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "gl/MaterialManager.h"
 #include "gl/ResourceId.h"
 #include "gl/ResourceManager.h"
@@ -44,6 +43,7 @@
 #include "mdl/PatchNode.h"
 #include "mdl/SelectionChange.h"
 #include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "render/BrushRenderer.h"
 #include "render/EdgeRenderer.h"
 #include "render/EntityDecalRenderer.h"
@@ -813,6 +813,7 @@ void MapRenderer::resourcesWereProcessed(const std::vector<gl::ResourceId>& reso
   m_defaultRenderer->invalidateMaterials(materials);
   m_selectionRenderer->invalidateMaterials(materials);
   m_lockedRenderer->invalidateMaterials(materials);
+  m_entityDecalRenderer->invalidateMaterials(materials);
 
   const auto& entityModelManager = m_map.entityModelManager();
   const auto entityModels =

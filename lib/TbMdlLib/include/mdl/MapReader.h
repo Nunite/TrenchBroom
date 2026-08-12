@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "FileLocation.h"
-#include "Result.h"
+#include "base/FileLocation.h"
+#include "base/Result.h"
 #include "mdl/BezierPatch.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushFace.h"
@@ -157,7 +157,9 @@ protected: // implement MapParser interface
     const vm::vec3d& point1,
     const vm::vec3d& point2,
     const vm::vec3d& point3,
-    const BrushFaceAttributes& attribs,
+    std::string materialName,
+    const UvAttributes& uvAttributes,
+    const SurfaceAttributes& surfaceAttributes,
     ParserStatus& status) override;
   void onValveBrushFace(
     const FileLocation& location,
@@ -165,7 +167,9 @@ protected: // implement MapParser interface
     const vm::vec3d& point1,
     const vm::vec3d& point2,
     const vm::vec3d& point3,
-    const BrushFaceAttributes& attribs,
+    std::string materialName,
+    const UvAttributes& uvAttributes,
+    const SurfaceAttributes& surfaceAttributes,
     const vm::vec3d& uAxis,
     const vm::vec3d& vAxis,
     ParserStatus& status) override;

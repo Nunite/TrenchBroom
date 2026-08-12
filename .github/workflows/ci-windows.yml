@@ -5,6 +5,7 @@ on:
 permissions:
   packages: write
   contents: write
+  actions: read
 
 jobs:
   windows:
@@ -19,17 +20,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
 
       - name: Setup common prerequisites
         uses: ./.github/actions/setup-common
 
       - name: Setup shared CI environment
         uses: ./.github/actions/setup-shared-env
-
-      - name: Bootstrap vcpkg
-        shell: pwsh
-        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat
 
       - name: Install dependencies
         shell: pwsh
@@ -58,20 +54,6 @@ jobs:
           ccache --set-config=max_size=1G
           ccache --zero-stats
 
-      - name: Add NuGet sources
-        shell: pwsh
-        run: |
-          .$(${{ env.VCPKG_EXE }} fetch nuget) `
-            sources add `
-            -Source "${{ env.FEED_URL }}" `
-            -StorePasswordInClearText `
-            -Name GitHubPackages `
-            -UserName "${{ env.USERNAME }}" `
-            -Password "${{ secrets.GITHUB_TOKEN }}"
-          .$(${{ env.VCPKG_EXE }} fetch nuget) `
-            setapikey "${{ secrets.GITHUB_TOKEN }}" `
-            -Source "${{ env.FEED_URL }}"
-
       - name: Build
         run: cmd.exe /c CI-windows.bat
 
@@ -87,6 +69,52 @@ jobs:
           os: windows-2022
           build-type: ${{ env.TB_BUILD_TYPE }}
           arch: ${{ env.TB_ARCH }}
+
+      - name: Determine signing eligibility
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          # Only sign master/tag builds (not PRs) and only when the SignPath
+          # secret is configured, e.g. on forks or before setup is complete.
+          $isMasterOrTag = ($env:GITHUB_REF -eq 'refs/heads/master') -or ($env:GITHUB_REF -like 'refs/tags/*')
+          $hasToken = -not [string]::IsNullOrEmpty($env:SIGNPATH_API_TOKEN)
+          $shouldSign = $isMasterOrTag -and $hasToken
+          "TB_SIGN_WINDOWS=$($shouldSign.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Upload unsigned artifact for signing
+        id: upload-unsigned-artifact
+        if: ${{ env.TB_SIGN_WINDOWS == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-2022-unsigned
+          path: cmakebuild/*.zip
+          retention-days: 1
+
+      - name: Submit SignPath signing request
+        if: ${{ env.TB_SIGN_WINDOWS == 'true' }}
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: 'e1e71649-9b4d-4512-9772-e91002a78897'
+          project-slug: 'TrenchBroom'
+          # TODO: switch to a 'release-signing' policy/production certificate
+          # once SignPath has issued one; for now everything uses the test cert.
+          signing-policy-slug: 'test-signing'
+          github-artifact-id: ${{ steps.upload-unsigned-artifact.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: cmakebuild/signed
+
+      - name: Replace archive with signed version
+        if: ${{ env.TB_SIGN_WINDOWS == 'true' }}
+        shell: pwsh
+        run: |
+          Get-ChildItem cmakebuild\*.zip | Remove-Item -Force
+          Get-ChildItem cmakebuild\*.zip.md5 -ErrorAction SilentlyContinue | Remove-Item -Force
+          Move-Item cmakebuild\signed\*.zip cmakebuild\
+          Push-Location cmakebuild
+          cmd /c generate_checksum.bat
+          Pop-Location
 
       - name: Upload artifacts
         uses: ./.github/actions/upload-artifacts

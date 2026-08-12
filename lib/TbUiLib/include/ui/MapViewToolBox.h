@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include "ui/ToolBox.h"
 
 #include "vm/vec.h"
@@ -45,6 +45,7 @@ class MapDocument;
 class MoveObjectsTool;
 class ExtrudeTool;
 class RotateTool;
+class SweepTool;
 class ScaleTool;
 class ShearTool;
 class VertexTool;
@@ -52,6 +53,7 @@ class EdgeTool;
 class FaceTool;
 class PathTool;
 class PrefabTool;
+class ControlPointTool;
 
 class MapViewToolBox : public ToolBox
 {
@@ -67,11 +69,13 @@ private:
   std::unique_ptr<MoveObjectsTool> m_moveObjectsTool;
   std::unique_ptr<ExtrudeTool> m_extrudeTool;
   std::unique_ptr<RotateTool> m_rotateTool;
+  std::unique_ptr<SweepTool> m_sweepTool;
   std::unique_ptr<ScaleTool> m_scaleTool;
   std::unique_ptr<ShearTool> m_shearTool;
   std::unique_ptr<VertexTool> m_vertexTool;
   std::unique_ptr<EdgeTool> m_edgeTool;
   std::unique_ptr<FaceTool> m_faceTool;
+  std::unique_ptr<ControlPointTool> m_controlPointTool;
 
   NotifierConnection m_notifierConnection;
 
@@ -80,44 +84,89 @@ public:
   ~MapViewToolBox() override;
 
 public: // tools
+  const ClipTool& clipTool() const;
   ClipTool& clipTool();
+
+  const AssembleBrushTool& assembleBrushTool() const;
   AssembleBrushTool& assembleBrushTool();
+
+  const CreateEntityTool& createEntityTool() const;
   CreateEntityTool& createEntityTool();
+
+  const DrawShapeTool& drawShapeTool() const;
   DrawShapeTool& drawShapeTool();
+
   PathTool& pathTool();
   PrefabTool& prefabTool();
+
+  const MoveObjectsTool& moveObjectsTool() const;
   MoveObjectsTool& moveObjectsTool();
+
+  const ExtrudeTool& extrudeTool() const;
   ExtrudeTool& extrudeTool();
+
+  const RotateTool& rotateTool() const;
   RotateTool& rotateTool();
+
+  const SweepTool& sweepTool() const;
+  SweepTool& sweepTool();
+
+  const ScaleTool& scaleTool() const;
   ScaleTool& scaleTool();
+
+  const ShearTool& shearTool() const;
   ShearTool& shearTool();
+
+  const VertexTool& vertexTool() const;
   VertexTool& vertexTool();
+
+  const EdgeTool& edgeTool() const;
   EdgeTool& edgeTool();
+
+  const FaceTool& faceTool() const;
   FaceTool& faceTool();
 
+  const ControlPointTool& controlPointTool() const;
+  ControlPointTool& controlPointTool();
+
+  bool canToggleAssembleBrushTool() const;
   void toggleAssembleBrushTool();
   bool assembleBrushToolActive() const;
   void performAssembleBrush();
 
+  bool canToggleClipTool() const;
   void toggleClipTool();
   bool clipToolActive() const;
   void toggleClipSide();
   void performClip();
   void removeLastClipPoint();
 
+  bool canToggleRotateTool() const;
   void toggleRotateTool();
   bool rotateToolActive() const;
   double rotateToolAngle() const;
   vm::vec3d rotateToolCenter() const;
   void moveRotationCenter(const vm::vec3d& delta);
 
+  bool canToggleSweepTool() const;
+  void toggleSweepTool();
+  bool sweepToolActive() const;
+  void moveSweepCenter(const vm::vec3d& delta);
+  void rotateSweepCap(const vm::vec3d& axis, double angle);
+  void scaleSweepCap(double distance);
+  void performSweep();
+
+  bool canToggleScaleTool() const;
   void toggleScaleTool();
   bool scaleToolActive() const;
 
+  bool canToggleShearTool() const;
   void toggleShearTool();
   bool shearToolActive() const;
 
+  bool canToggleAnyVertexTool() const;
   bool anyVertexToolActive() const;
+  bool anyNodeHandleToolActive() const;
 
   void toggleVertexTool();
   bool vertexToolActive() const;
@@ -133,9 +182,13 @@ public: // tools
   void performPathCreation();
   void removeLastPathPoint();
 
+  bool canToggleControlPointTool() const;
+  void toggleControlPointTool();
+  bool controlPointToolActive() const;
+
   bool anyModalToolActive() const;
 
-  void moveVertices(const vm::vec3d& delta);
+  void moveNodeHandles(const vm::vec3d& delta);
 
 private: // Tool related methods
   void createTools(QStackedLayout* bookCtrl);

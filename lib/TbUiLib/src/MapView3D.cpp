@@ -19,8 +19,7 @@
 
 #include "ui/MapView3D.h"
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "gl/PerspectiveCamera.h"
 #include "mdl/BezierPatch.h"
 #include "mdl/BrushFace.h"
@@ -35,6 +34,8 @@
 #include "mdl/PatchNode.h"
 #include "mdl/PickResult.h"
 #include "mdl/PointTrace.h"
+#include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "render/BoundsGuideRenderer.h"
 #include "render/Compass3D.h"
 #include "render/MapRenderer.h"
@@ -45,6 +46,8 @@
 #include "ui/CameraAnimation.h"
 #include "ui/CameraTool3D.h"
 #include "ui/ClipToolController.h"
+#include "ui/ControlPointTool.h"
+#include "ui/ControlPointToolController.h"
 #include "ui/CreateEntityToolController.h"
 #include "ui/DrawShapeToolController3D.h"
 #include "ui/EdgeTool.h"
@@ -63,6 +66,7 @@
 #include "ui/SelectionTool.h"
 #include "ui/SetBrushFaceAttributesTool.h"
 #include "ui/ShearToolController.h"
+#include "ui/SweepToolController.h"
 #include "ui/VertexTool.h"
 #include "ui/VertexToolController.h"
 
@@ -115,6 +119,11 @@ QImage MapView3D::grabPrefabThumbnailFramebuffer(const std::vector<mdl::Node*>& 
   return image;
 }
 
+const gl::PerspectiveCamera& MapView3D::perspectiveCamera() const
+{
+  return *m_camera;
+}
+
 void MapView3D::initializeCamera()
 {
   m_camera->moveTo(vm::vec3f{-80.0f, -128.0f, 96.0f});
@@ -127,6 +136,7 @@ void MapView3D::initializeToolChain(MapViewToolBox& toolBox)
   addToolController(
     std::make_unique<MoveObjectsToolController>(toolBox.moveObjectsTool()));
   addToolController(std::make_unique<RotateToolController3D>(toolBox.rotateTool()));
+  addToolController(std::make_unique<SweepToolController3D>(toolBox.sweepTool()));
   addToolController(std::make_unique<ScaleToolController3D>(toolBox.scaleTool()));
   addToolController(std::make_unique<ShearToolController3D>(toolBox.shearTool()));
   addToolController(std::make_unique<ExtrudeToolController3D>(toolBox.extrudeTool()));
@@ -136,6 +146,8 @@ void MapView3D::initializeToolChain(MapViewToolBox& toolBox)
   addToolController(std::make_unique<VertexToolController>(toolBox.vertexTool()));
   addToolController(std::make_unique<EdgeToolController>(toolBox.edgeTool()));
   addToolController(std::make_unique<FaceToolController>(toolBox.faceTool()));
+  addToolController(
+    std::make_unique<ControlPointToolController>(toolBox.controlPointTool()));
   addToolController(
     std::make_unique<CreateEntityToolController3D>(toolBox.createEntityTool()));
   addToolController(std::make_unique<PrefabToolController3D>(toolBox.prefabTool()));

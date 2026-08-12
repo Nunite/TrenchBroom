@@ -19,9 +19,9 @@
 
 #include "ui/ExtrudeTool.h"
 
-#include "Logger.h"
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/Logger.h"
+#include "base/PreferenceManager.h"
+#include "gl/Camera.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushGeometry.h"
 #include "mdl/BrushNode.h"
@@ -36,77 +36,36 @@
 #include "mdl/PickResult.h"
 #include "mdl/Polyhedron.h"
 #include "mdl/TransactionScope.h"
+#include "prefs/Preferences.h"
 #include "ui/MapDocument.h"
 
 #include "kd/contracts.h"
+#include "kd/k.h"
 #include "kd/map_utils.h"
 #include "kd/overload.h"
+#include "kd/ranges/concat_view.h"
 #include "kd/ranges/to.h"
 #include "kd/reflection_impl.h"
 #include "kd/result.h"
 #include "kd/result_fold.h"
 
 #include "vm/distance.h"
+#include "vm/intersection.h"
 #include "vm/line_io.h"  // IWYU pragma: keep
 #include "vm/plane_io.h" // IWYU pragma: keep
 #include "vm/polygon.h"
 #include "vm/vec_io.h" // IWYU pragma: keep
 
+#include <algorithm>
 #include <map>
 #include <ranges>
 #include <vector>
 
 namespace tb::ui
 {
-
-// DragHandle
-
-ExtrudeDragHandle::ExtrudeDragHandle(mdl::BrushFaceHandle i_faceHandle)
-  : faceHandle{std::move(i_faceHandle)}
-  , brushAtDragStart{faceHandle.node()->brush()}
-{
-}
-
-const mdl::BrushFace& ExtrudeDragHandle::faceAtDragStart() const
-{
-  return brushAtDragStart.face(faceHandle.faceIndex());
-}
-
-vm::vec3d ExtrudeDragHandle::faceNormal() const
-{
-  return faceAtDragStart().normal();
-}
-
-kdl_reflect_impl(ExtrudeDragHandle);
-
-kdl_reflect_impl(ExtrudeDragState);
-
-kdl_reflect_impl(ExtrudeHitData);
-
-// ExtrudeTool
-
-const mdl::HitType::Type ExtrudeTool::ExtrudeHitType = mdl::HitType::freeType();
-
-ExtrudeTool::ExtrudeTool(MapDocument& document)
-  : Tool{true}
-  , m_document{document}
-  , m_dragging{false}
-{
-  connectObservers();
-}
-
-bool ExtrudeTool::applies() const
-{
-  return m_document.map().selection().hasBrushes();
-}
-
-const mdl::Grid& ExtrudeTool::grid() const
-{
-  return m_document.map().grid();
-}
-
 namespace
 {
+
 struct EdgeInfo
 {
   mdl::BrushFaceHandle leftFaceHandle;
@@ -162,6 +121,56 @@ std::optional<EdgeInfo> getEdgeInfo(
   return {{leftFaceHandle, rightFaceHandle, leftDot, rightDot, segment, dist}};
 }
 
+std::vector<mdl::BrushFaceHandle> collectCoincidentFaces(
+  const std::vector<mdl::Node*>& nodes,
+  const mdl::BrushFaceHandle& faceHandle,
+  const bool normalSign)
+{
+  auto result = std::vector<mdl::BrushFaceHandle>{};
+
+  const auto& referenceFace = faceHandle.face();
+  const auto referencePlane =
+    normalSign ? referenceFace.boundary() : referenceFace.boundary().flip();
+
+  for (auto* node : nodes)
+  {
+    node->accept(kdl::overload(
+      [](mdl::WorldNode&) {},
+      [](mdl::LayerNode&) {},
+      [](mdl::GroupNode&) {},
+      [](mdl::EntityNode&) {},
+      [&](mdl::BrushNode& brushNode) {
+        const auto& brush = brushNode.brush();
+        for (size_t i = 0; i < brush.faceCount(); ++i)
+        {
+          const auto& face = brush.face(i);
+          if (!face.coplanarWith(referencePlane))
+          {
+            continue;
+          }
+
+          result.emplace_back(&brushNode, i);
+        }
+      },
+      [](mdl::PatchNode&) {}));
+  }
+
+  return result;
+}
+
+std::vector<mdl::BrushFaceHandle> collectCoplanarFaces(
+  const std::vector<mdl::Node*>& nodes, const mdl::BrushFaceHandle& faceHandle)
+{
+  return collectCoincidentFaces(nodes, faceHandle, K(normalSign));
+}
+
+
+std::vector<mdl::BrushFaceHandle> collectOpposingFaces(
+  const std::vector<mdl::Node*>& nodes, const mdl::BrushFaceHandle& faceHandle)
+{
+  return collectCoincidentFaces(nodes, faceHandle, !K(normalSign));
+}
+
 std::optional<EdgeInfo> findClosestHorizonEdge(
   const std::vector<mdl::Node*>& nodes, const vm::ray3d& pickRay)
 {
@@ -183,106 +192,16 @@ std::optional<EdgeInfo> findClosestHorizonEdge(
   }
   return result;
 }
-} // namespace
 
-mdl::Hit ExtrudeTool::pick2D(
-  const vm::ray3d& pickRay, const mdl::PickResult& pickResult) const
+/**
+ * Returns every horizon edge of the given nodes (i.e. all candidates that could possibly
+ * compete for the edge handle at the current pick ray), unlike findClosestHorizonEdge,
+ * which only returns the single closest one.
+ */
+std::vector<EdgeInfo> findHorizonEdges(
+  const std::vector<mdl::Node*>& nodes, const vm::ray3d& pickRay)
 {
-  using namespace mdl::HitFilters;
-
-  const auto& hit = pickResult.first(type(mdl::BrushNode::BrushHitType) && selected());
-  if (hit.isMatch())
-  {
-    return mdl::Hit::NoHit;
-  }
-
-  const auto edgeInfo =
-    findClosestHorizonEdge(m_document.map().selection().nodes, pickRay);
-  if (!edgeInfo)
-  {
-    return mdl::Hit::NoHit;
-  }
-
-  const auto [leftFaceHandle, rightFaceHandle, leftDot, rightDot, segment, distance] =
-    *edgeInfo;
-  const auto hitPoint = vm::point_at_distance(pickRay, distance.position1);
-  const auto handlePosition = vm::point_at_distance(segment, distance.position2);
-
-  // Select the face that is perpendicular to the view direction or the back facing one.
-  if (leftDot >= -vm::Cd::almost_zero() && !vm::is_zero(rightDot, vm::Cd::almost_zero()))
-  {
-    return {
-      ExtrudeHitType,
-      distance.position1,
-      hitPoint,
-      ExtrudeHitData{
-        leftFaceHandle, vm::plane3d{handlePosition, pickRay.direction}, handlePosition}};
-  }
-  return {
-    ExtrudeHitType,
-    distance.position1,
-    hitPoint,
-    ExtrudeHitData{
-      rightFaceHandle, vm::plane3d{handlePosition, pickRay.direction}, handlePosition}};
-}
-
-mdl::Hit ExtrudeTool::pick3D(
-  const vm::ray3d& pickRay, const mdl::PickResult& pickResult) const
-{
-  using namespace mdl::HitFilters;
-
-  const auto& hit = pickResult.first(type(mdl::BrushNode::BrushHitType) && selected());
-  if (const auto faceHandle = hitToFaceHandle(hit))
-  {
-    return {
-      ExtrudeHitType,
-      hit.distance(),
-      hit.hitPoint(),
-      ExtrudeHitData{
-        *faceHandle,
-        vm::line3d{hit.hitPoint(), faceHandle->face().normal()},
-        hit.hitPoint()}};
-  }
-
-  const auto edgeInfo =
-    findClosestHorizonEdge(m_document.map().selection().nodes, pickRay);
-  if (!edgeInfo)
-  {
-    return mdl::Hit::NoHit;
-  }
-
-  const auto [leftFaceHandle, rightFaceHandle, leftDot, rightDot, segment, distance] =
-    *edgeInfo;
-  const auto hitPoint = vm::point_at_distance(pickRay, distance.position1);
-  const auto handlePosition = vm::point_at_distance(segment, distance.position2);
-
-  // choose the face that we are seeing from behind
-  const auto dragFaceHandle = leftDot > rightDot ? leftFaceHandle : rightFaceHandle;
-  const auto referenceFaceHandle = leftDot > rightDot ? rightFaceHandle : leftFaceHandle;
-
-  return {
-    ExtrudeHitType,
-    distance.position1,
-    hitPoint,
-    ExtrudeHitData{
-      dragFaceHandle,
-      vm::plane3d{handlePosition, referenceFaceHandle.face().normal()},
-      handlePosition}};
-}
-
-const std::vector<ExtrudeDragHandle>& ExtrudeTool::proposedDragHandles() const
-{
-  return m_proposedDragHandles;
-}
-
-namespace
-{
-std::vector<mdl::BrushFaceHandle> collectCoplanarFaces(
-  const std::vector<mdl::Node*>& nodes, const mdl::BrushFaceHandle& faceHandle)
-{
-  auto result = std::vector<mdl::BrushFaceHandle>{};
-
-  const auto& referenceFace = faceHandle.face();
+  auto result = std::vector<EdgeInfo>{};
   for (auto* node : nodes)
   {
     node->accept(kdl::overload(
@@ -291,22 +210,107 @@ std::vector<mdl::BrushFaceHandle> collectCoplanarFaces(
       [](mdl::GroupNode&) {},
       [](mdl::EntityNode&) {},
       [&](mdl::BrushNode& brushNode) {
-        const auto& brush = brushNode.brush();
-        for (size_t i = 0; i < brush.faceCount(); ++i)
+        for (const auto* edge : brushNode.brush().edges())
         {
-          const auto& face = brush.face(i);
-          if (!face.coplanarWith(referenceFace.boundary()))
+          if (auto edgeInfo = getEdgeInfo(edge, brushNode, pickRay))
           {
-            continue;
+            result.push_back(std::move(*edgeInfo));
           }
-
-          result.emplace_back(&brushNode, i);
         }
       },
       [](mdl::PatchNode&) {}));
   }
-
   return result;
+}
+
+/**
+ * Returns true if the given edge should take priority over the given direct brush face
+ * hit. The edge's own adjacent face never steals the handle; a different, occluding face
+ * only wins if it is nearer along the ray than the edge.
+ */
+bool edgeHandleWinsOverFace(
+  const gl::Camera& camera,
+  const vm::ray3d& pickRay,
+  const EdgeInfo& edgeInfo,
+  const mdl::Hit& faceHit)
+{
+  const auto edgeDistance = camera.pickLineSegmentHandle(
+    pickRay, edgeInfo.segment, pref(Preferences::HandleRadius));
+  contract_assert(edgeDistance);
+
+  const auto faceHandle = hitToFaceHandle(faceHit);
+  const auto hitIsAdjacentFace =
+    faceHandle
+    && (*faceHandle == edgeInfo.leftFaceHandle || *faceHandle == edgeInfo.rightFaceHandle);
+  return hitIsAdjacentFace || *edgeDistance <= faceHit.distance();
+}
+
+/**
+ * Returns true if some edge of a brush other than excludeBrush is collinear with, and
+ * genuinely overlaps (shares more than a single point with), the given segment. Unlike a
+ * horizon edge, the partner edge does not itself need to pass the front/back-facing test:
+ * at a seam between two flush brushes, only the brush whose own face pair straddles the
+ * silhouette (one face visible, one hidden) produces a horizon edge there; the other
+ * brush's coincident edge typically has both of its adjacent faces on the same side of
+ * that test (their shared visibility ignores that the near brush occludes it), so it is
+ * never classified as a horizon edge itself. Its mere existence as a plain, overlapping
+ * edge belonging to a different brush is what proves the seam is real.
+ */
+bool hasOverlappingEdgeInOtherBrush(
+  const std::vector<mdl::Node*>& nodes,
+  const mdl::BrushNode* excludeBrush,
+  const vm::segment3d& segment)
+{
+  auto eligibleNodes =
+    nodes | std::views::filter([&](const auto* node) { return node != excludeBrush; });
+
+  return std::ranges::any_of(eligibleNodes, [&](const auto* node) {
+    return node->accept(kdl::overload(
+      [](const mdl::WorldNode&) { return false; },
+      [](const mdl::LayerNode&) { return false; },
+      [](const mdl::GroupNode&) { return false; },
+      [](const mdl::EntityNode&) { return false; },
+      [&](const mdl::BrushNode& brushNode) {
+        return std::ranges::any_of(brushNode.brush().edges(), [&](const auto* edge) {
+          return vm::segments_overlap(segment, edge->segment(), vm::Cd::almost_zero());
+        });
+      },
+      [](const mdl::PatchNode&) { return false; }));
+  });
+}
+
+/**
+ * Returns the horizon edge, if any, that should override the given direct brush face hit.
+ * A single nearby horizon edge is never enough on its own -- it is only eligible if it is
+ * within the full handle radius *and* some other brush has a plain edge that is collinear
+ * with, and genuinely overlaps, it. This is the geometric signature of two separate
+ * brushes meeting flush at a seam, which is what makes the touching-face feature possible
+ * in the first place; a face's own distinct edges merely clustering near the cursor does
+ * not qualify, since they all belong to the same brush. Of the eligible edges, the
+ * closest one still has to win out over a closer, non-adjacent occluding face.
+ */
+std::optional<EdgeInfo> selectOverridingEdge(
+  const std::vector<mdl::Node*>& nodes,
+  const gl::Camera& camera,
+  const vm::ray3d& pickRay,
+  const std::vector<EdgeInfo>& edgeInfos,
+  const mdl::Hit& faceHit)
+{
+  auto eligible = edgeInfos | std::views::filter([&](const auto& edgeInfo) {
+                    return camera.pickLineSegmentHandle(
+                             pickRay, edgeInfo.segment, pref(Preferences::HandleRadius))
+                           && hasOverlappingEdgeInOtherBrush(
+                             nodes, edgeInfo.leftFaceHandle.node(), edgeInfo.segment);
+                  });
+
+  if (eligible.empty())
+  {
+    return std::nullopt;
+  }
+
+  const auto& winner = *std::ranges::min_element(eligible);
+  return edgeHandleWinsOverFace(camera, pickRay, winner, faceHit) ? std::optional{winner}
+                                                                  : std::nullopt;
 }
 
 std::vector<ExtrudeDragHandle> getDragHandles(
@@ -320,70 +324,12 @@ std::vector<ExtrudeDragHandle> getDragHandles(
   contract_assert(hit.hasType(ExtrudeTool::ExtrudeHitType));
   const auto& data = hit.target<const ExtrudeHitData&>();
 
-  return collectCoplanarFaces(nodes, data.face)
+  return kdl::views::concat(
+           collectCoplanarFaces(nodes, data.face), collectOpposingFaces(nodes, data.face))
          | std::views::transform(
            [](const auto& faceHandle) { return ExtrudeDragHandle{faceHandle}; })
          | kdl::ranges::to<std::vector>();
 }
-} // namespace
-
-void ExtrudeTool::updateProposedDragHandles(const mdl::PickResult& pickResult)
-{
-  using namespace mdl::HitFilters;
-
-  auto& map = m_document.map();
-  if (m_dragging)
-  {
-    // FIXME: this should be turned into an ensure failure, but it's easy to make it
-    // fail currently by spamming drags/modifiers. Indicates a bug in
-    // ExtrudeToolController thinking we are not dragging when we actually still are.
-    map.logger().error() << "updateProposedDragHandles called during a drag";
-    return;
-  }
-
-  const auto& hit = pickResult.first(type(ExtrudeHitType));
-  const auto& nodes = map.selection().nodes;
-
-  auto newDragHandles = getDragHandles(nodes, hit);
-  if (newDragHandles != m_proposedDragHandles)
-  {
-    m_proposedDragHandles = std::move(newDragHandles);
-    refreshViews();
-  }
-}
-
-std::vector<mdl::BrushFaceHandle> ExtrudeTool::getDragFaces(
-  const std::vector<ExtrudeDragHandle>& dragHandles)
-{
-  auto dragFaces = std::vector<mdl::BrushFaceHandle>{};
-  dragFaces.reserve(dragHandles.size());
-
-  for (const auto& dragHandle : dragHandles)
-  {
-    const auto& brush = dragHandle.faceHandle.node()->brush();
-    if (const auto faceIndex = brush.findFace(dragHandle.faceNormal()))
-    {
-      dragFaces.emplace_back(dragHandle.faceHandle.node(), *faceIndex);
-    }
-  }
-
-  return dragFaces;
-}
-
-/**
- * Starts resizing the faces determined by the previous call to
- * updateProposedDragHandles
- */
-void ExtrudeTool::beginExtrude()
-{
-  contract_pre(!m_dragging);
-
-  m_dragging = true;
-  m_document.map().startTransaction("Resize Brushes", mdl::TransactionScope::LongRunning);
-}
-
-namespace
-{
 
 /**
  * Splits off new brush "outward" from the drag handles.
@@ -572,7 +518,233 @@ std::vector<vm::polygon3d> getPolygons(const std::vector<ExtrudeDragHandle>& dra
          })
          | kdl::ranges::to<std::vector>();
 }
+
 } // namespace
+
+// DragHandle
+
+ExtrudeDragHandle::ExtrudeDragHandle(mdl::BrushFaceHandle i_faceHandle)
+  : faceHandle{std::move(i_faceHandle)}
+  , brushAtDragStart{faceHandle.node()->brush()}
+{
+}
+
+const mdl::BrushFace& ExtrudeDragHandle::faceAtDragStart() const
+{
+  return brushAtDragStart.face(faceHandle.faceIndex());
+}
+
+vm::vec3d ExtrudeDragHandle::faceNormal() const
+{
+  return faceAtDragStart().normal();
+}
+
+kdl_reflect_impl(ExtrudeDragHandle);
+
+kdl_reflect_impl(ExtrudeDragState);
+
+kdl_reflect_impl(ExtrudeHitData);
+
+// ExtrudeTool
+
+const mdl::HitType::Type ExtrudeTool::ExtrudeHitType = mdl::HitType::freeType();
+
+ExtrudeTool::ExtrudeTool(MapDocument& document)
+  : Tool{true}
+  , m_document{document}
+  , m_dragging{false}
+{
+  connectObservers();
+}
+
+bool ExtrudeTool::applies() const
+{
+  return m_document.map().selection().hasBrushes();
+}
+
+const mdl::Grid& ExtrudeTool::grid() const
+{
+  return m_document.map().grid();
+}
+
+mdl::Hit ExtrudeTool::pick2D(
+  const vm::ray3d& pickRay,
+  const gl::Camera& camera,
+  const mdl::PickResult& pickResult) const
+{
+  using namespace mdl::HitFilters;
+
+  const auto makeEdgeHit = [&](const EdgeInfo& edgeInfo) -> mdl::Hit {
+    const auto& [leftFaceHandle, rightFaceHandle, leftDot, rightDot, segment, distance] =
+      edgeInfo;
+    const auto hitPoint = vm::point_at_distance(pickRay, distance.position1);
+    const auto handlePosition = vm::point_at_distance(segment, distance.position2);
+
+    // Select the face that is perpendicular to the view direction or the back facing
+    // one.
+    if (
+      leftDot >= -vm::Cd::almost_zero() && !vm::is_zero(rightDot, vm::Cd::almost_zero()))
+    {
+      return {
+        ExtrudeHitType,
+        distance.position1,
+        hitPoint,
+        ExtrudeHitData{
+          leftFaceHandle,
+          vm::plane3d{handlePosition, pickRay.direction},
+          handlePosition}};
+    }
+    return {
+      ExtrudeHitType,
+      distance.position1,
+      hitPoint,
+      ExtrudeHitData{
+        rightFaceHandle, vm::plane3d{handlePosition, pickRay.direction}, handlePosition}};
+  };
+
+  const auto& hit = pickResult.first(type(mdl::BrushNode::BrushHitType) && selected());
+
+  if (hit.isMatch())
+  {
+    // The cursor is over a brush face. Only engage if a horizon edge handle is grabbed.
+    const auto& nodes = m_document.map().selection().nodes;
+    const auto edgeInfos = findHorizonEdges(nodes, pickRay);
+    if (
+      const auto edgeInfo = selectOverridingEdge(nodes, camera, pickRay, edgeInfos, hit))
+    {
+      return makeEdgeHit(*edgeInfo);
+    }
+    return mdl::Hit::NoHit;
+  }
+
+  const auto edgeInfo =
+    findClosestHorizonEdge(m_document.map().selection().nodes, pickRay);
+  if (!edgeInfo)
+  {
+    return mdl::Hit::NoHit;
+  }
+  return makeEdgeHit(*edgeInfo);
+}
+
+mdl::Hit ExtrudeTool::pick3D(
+  const vm::ray3d& pickRay,
+  const gl::Camera& camera,
+  const mdl::PickResult& pickResult) const
+{
+  using namespace mdl::HitFilters;
+
+  const auto makeEdgeHit = [&](const EdgeInfo& edgeInfo) -> mdl::Hit {
+    const auto& [leftFaceHandle, rightFaceHandle, leftDot, rightDot, segment, distance] =
+      edgeInfo;
+    const auto hitPoint = vm::point_at_distance(pickRay, distance.position1);
+    const auto handlePosition = vm::point_at_distance(segment, distance.position2);
+
+    // choose the face that we are seeing from behind
+    const auto dragFaceHandle = leftDot > rightDot ? leftFaceHandle : rightFaceHandle;
+    const auto referenceFaceHandle =
+      leftDot > rightDot ? rightFaceHandle : leftFaceHandle;
+
+    return {
+      ExtrudeHitType,
+      distance.position1,
+      hitPoint,
+      ExtrudeHitData{
+        dragFaceHandle,
+        vm::plane3d{handlePosition, referenceFaceHandle.face().normal()},
+        handlePosition}};
+  };
+
+  const auto& hit = pickResult.first(type(mdl::BrushNode::BrushHitType) && selected());
+  const auto faceHandle = hitToFaceHandle(hit);
+
+  if (faceHandle)
+  {
+    // The cursor is over a brush face. Prefer it unless a horizon edge handle is grabbed.
+    const auto& nodes = m_document.map().selection().nodes;
+    const auto edgeInfos = findHorizonEdges(nodes, pickRay);
+    if (
+      const auto edgeInfo = selectOverridingEdge(nodes, camera, pickRay, edgeInfos, hit))
+    {
+      return makeEdgeHit(*edgeInfo);
+    }
+    return {
+      ExtrudeHitType,
+      hit.distance(),
+      hit.hitPoint(),
+      ExtrudeHitData{
+        *faceHandle,
+        vm::line3d{hit.hitPoint(), faceHandle->face().normal()},
+        hit.hitPoint()}};
+  }
+
+  const auto edgeInfo =
+    findClosestHorizonEdge(m_document.map().selection().nodes, pickRay);
+  if (!edgeInfo)
+  {
+    return mdl::Hit::NoHit;
+  }
+  return makeEdgeHit(*edgeInfo);
+}
+
+const std::vector<ExtrudeDragHandle>& ExtrudeTool::proposedDragHandles() const
+{
+  return m_proposedDragHandles;
+}
+
+void ExtrudeTool::updateProposedDragHandles(const mdl::PickResult& pickResult)
+{
+  using namespace mdl::HitFilters;
+
+  auto& map = m_document.map();
+  if (m_dragging)
+  {
+    // FIXME: this should be turned into an ensure failure, but it's easy to make it
+    // fail currently by spamming drags/modifiers. Indicates a bug in
+    // ExtrudeToolController thinking we are not dragging when we actually still are.
+    map.logger().error() << "updateProposedDragHandles called during a drag";
+    return;
+  }
+
+  const auto& hit = pickResult.first(type(ExtrudeHitType));
+  const auto& nodes = map.selection().nodes;
+
+  auto newDragHandles = getDragHandles(nodes, hit);
+  if (newDragHandles != m_proposedDragHandles)
+  {
+    m_proposedDragHandles = std::move(newDragHandles);
+    refreshViews();
+  }
+}
+
+std::vector<mdl::BrushFaceHandle> ExtrudeTool::getDragFaces(
+  const std::vector<ExtrudeDragHandle>& dragHandles)
+{
+  auto dragFaces = std::vector<mdl::BrushFaceHandle>{};
+  dragFaces.reserve(dragHandles.size());
+
+  for (const auto& dragHandle : dragHandles)
+  {
+    const auto& brush = dragHandle.faceHandle.node()->brush();
+    if (const auto faceIndex = brush.findFace(dragHandle.faceNormal()))
+    {
+      dragFaces.emplace_back(dragHandle.faceHandle.node(), *faceIndex);
+    }
+  }
+
+  return dragFaces;
+}
+
+/**
+ * Starts resizing the faces determined by the previous call to
+ * updateProposedDragHandles
+ */
+void ExtrudeTool::beginExtrude()
+{
+  contract_pre(!m_dragging);
+
+  m_dragging = true;
+  m_document.map().startTransaction("Resize Brushes", mdl::TransactionScope::LongRunning);
+}
 
 bool ExtrudeTool::extrude(const vm::vec3d& handleDelta, ExtrudeDragState& dragState)
 {

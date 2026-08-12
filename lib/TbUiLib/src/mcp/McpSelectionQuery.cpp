@@ -111,7 +111,7 @@ bool materialMatches(const mdl::Node& node, const QString& materialName)
 
   for (const auto& face : brushNode->brush().faces())
   {
-    if (face.attributes().materialName() == materialName.toStdString())
+    if (face.materialName() == materialName.toStdString())
     {
       return true;
     }

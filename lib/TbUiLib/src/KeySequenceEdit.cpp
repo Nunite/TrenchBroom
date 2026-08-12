@@ -31,13 +31,8 @@ namespace tb::ui
 {
 
 KeySequenceEdit::KeySequenceEdit(QWidget* parent)
-  : KeySequenceEdit{LimitedKeySequenceEdit::MaxCount, parent}
-{
-}
-
-KeySequenceEdit::KeySequenceEdit(const size_t maxCount, QWidget* parent)
   : QWidget{parent}
-  , m_keySequenceEdit{new LimitedKeySequenceEdit{maxCount}}
+  , m_keySequenceEdit{new LimitedKeySequenceEdit{}}
   , m_clearButton{createBitmapButton(
       style()->standardIcon(QStyle::SP_LineEditClearButton), "Clear shortcut")}
 {
@@ -65,6 +60,11 @@ KeySequenceEdit::KeySequenceEdit(const size_t maxCount, QWidget* parent)
   setLayout(layout);
 }
 
+void KeySequenceEdit::setMaxCount(const size_t maxCount)
+{
+  m_keySequenceEdit->setMaxCount(maxCount);
+}
+
 const QKeySequence KeySequenceEdit::keySequence() const
 {
   return m_keySequenceEdit->keySequence();
@@ -77,7 +77,14 @@ void KeySequenceEdit::setKeySequence(const QKeySequence& keySequence)
 
 void KeySequenceEdit::clear()
 {
-  m_keySequenceEdit->clear();
+  if (m_keySequenceEdit->keySequence() != QKeySequence{})
+  {
+    m_keySequenceEdit->clear();
+  }
+  else
+  {
+    m_keySequenceEdit->cancel();
+  }
 }
 
 } // namespace tb::ui

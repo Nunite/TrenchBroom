@@ -27,6 +27,9 @@
 
 namespace kdl
 {
+namespace
+{
+
 struct Error1
 {
   kdl_reflect_inline_empty(Error1);
@@ -96,18 +99,20 @@ struct Counter
   kdl_reflect_inline(Counter, copies, moves);
 };
 
-TEST_CASE("void_success")
-{
-  CHECK(void_success == result<void>{});
-  CHECK(void_success.is_success());
-  CHECK_FALSE(void_success.is_error());
-
-  const auto make_void_success = []() { return void_success; };
-  make_void_success(); // no warning because void_success is not marked as nodiscard
-}
+} // namespace
 
 TEST_CASE("result")
 {
+  SECTION("void_success")
+  {
+    CHECK(void_success == result<void>{});
+    CHECK(void_success.is_success());
+    CHECK(!void_success.is_error());
+
+    const auto make_void_success = []() { return void_success; };
+    make_void_success(); // no warning because void_success is not marked as nodiscard
+  }
+
   SECTION("constructor")
   {
     SECTION("non-void result")
@@ -2228,7 +2233,7 @@ TEST_CASE("result")
       CHECK(constLValueSuccess.if_error([&](const auto&) {
         called = true;
       }) == result<int, Error1, Error2>{1});
-      CHECK_FALSE(called);
+      CHECK(!called);
 
       called = false;
       const auto constLValueError = result<int, Error1, Error2>{Error1{}};
@@ -2247,7 +2252,7 @@ TEST_CASE("result")
       CHECK(constLValueSuccess.if_error([&](const auto&) {
         called = true;
       }) == result<int&, Error1, Error2>{i});
-      CHECK_FALSE(called);
+      CHECK(!called);
 
       called = false;
       const auto constLValueError = result<int&, Error1, Error2>{Error1{}};
@@ -2266,7 +2271,7 @@ TEST_CASE("result")
       CHECK(constLValueSuccess.if_error([&](const auto&) {
         called = true;
       }) == result<const int&, Error1, Error2>{i});
-      CHECK_FALSE(called);
+      CHECK(!called);
 
       called = false;
       const auto constLValueError = result<const int&, Error1, Error2>{Error1{}};
@@ -2284,7 +2289,7 @@ TEST_CASE("result")
       CHECK(constLValueSuccess.if_error([&](const auto&) {
         called = true;
       }) == result<multi_value<int, float>, Error1, Error2>{multi_value{1, 2.0f}});
-      CHECK_FALSE(called);
+      CHECK(!called);
 
       called = false;
       const auto constLValueError =
@@ -2302,7 +2307,7 @@ TEST_CASE("result")
       CHECK(constLValueSuccess.if_error([&](const auto&) {
         called = true;
       }) == kdl::result<void, Error1, Error2>{});
-      CHECK_FALSE(called);
+      CHECK(!called);
 
       called = false;
       const auto constLValueError = result<void, Error1, Error2>{Error1{}};
@@ -2334,6 +2339,76 @@ TEST_CASE("result")
       CHECK(
         fold_results(std::vector<result<int, std::string>>{{1}, {"error"}, {3}})
         == result<std::vector<int>, std::string>{"error"});
+    }
+
+    SECTION("result<void>")
+    {
+      SECTION("with empty range")
+      {
+        CHECK(fold_results(std::vector<result<void>>{}) == void_success);
+      }
+
+      SECTION("success case")
+      {
+        CHECK(
+          fold_results(std::vector{void_success, void_success, void_success})
+          == void_success);
+      }
+
+      SECTION("error case")
+      {
+        CHECK(
+          fold_results(
+            std::vector<result<void, std::string>>{void_success, "error", void_success})
+          == result<void, std::string>{"error"});
+      }
+    }
+  }
+
+  SECTION("collect_values")
+  {
+    SECTION("result<int>")
+    {
+      SECTION("empty range")
+      {
+        CHECK(collect_values(std::vector<result<int>>{}) == std::vector<int>{});
+      }
+
+      SECTION("non-empty range")
+      {
+        CHECK(
+          collect_values(std::vector<result<int>>{{1}, {2}, {3}})
+          == std::vector<int>{1, 2, 3});
+      }
+    }
+
+    SECTION("result<int, Error1, Error2>")
+    {
+      using res = result<int, Error1, Error2>;
+
+      SECTION("empty range")
+      {
+        CHECK(collect_values(std::vector<res>{}) == std::vector<int>{});
+      }
+
+      SECTION("only success values")
+      {
+        CHECK(collect_values(std::vector<res>{{1}, {2}, {3}}) == std::vector{1, 2, 3});
+      }
+
+      SECTION("only errors")
+      {
+        CHECK(
+          collect_values(std::vector<res>{Error1{}, Error2{}, Error1{}})
+          == std::vector<int>{});
+      }
+
+      SECTION("mixed results")
+      {
+        CHECK(
+          collect_values(std::vector<res>{{1}, Error2{}, {2}, Error1{}, {3}})
+          == std::vector{1, 2, 3});
+      }
     }
   }
 
@@ -3119,6 +3194,123 @@ TEST_CASE("result")
           CHECK(collection == out{{1, 2, 3}, {Error2{}, Error1{}}});
         }
       }
+
+      SECTION("result<void, Error1>")
+      {
+        // With a single error type, the error is unpacked from the variant.
+        using res = result<void, Error1>;
+        using out = std::vector<Error1>;
+        static_assert(std::is_same_v<decltype(std::vector<res>{} | collect()), out>);
+
+        SECTION("empty range")
+        {
+          const auto collection = std::vector<res>{} | collect();
+          CHECK(collection == out{});
+        }
+
+        SECTION("only success values")
+        {
+          const auto collection = std::vector<res>{{}, {}, {}} | collect();
+          CHECK(collection == out{});
+        }
+
+        SECTION("only errors")
+        {
+          const auto collection =
+            std::vector<res>{Error1{}, Error1{}, Error1{}} | collect();
+          CHECK(collection == out{Error1{}, Error1{}, Error1{}});
+        }
+
+        SECTION("mixed results")
+        {
+          const auto collection =
+            std::vector<res>{{}, Error1{}, {}, Error1{}, {}} | collect();
+          CHECK(collection == out{Error1{}, Error1{}});
+        }
+      }
+
+      SECTION("result<int, Error1>")
+      {
+        // With a single error type, the error is unpacked from the variant.
+        using res = result<int, Error1>;
+        using out = std::tuple<std::vector<int>, std::vector<Error1>>;
+        static_assert(std::is_same_v<decltype(std::vector<res>{} | collect()), out>);
+
+        SECTION("empty range")
+        {
+          const auto collection = std::vector<res>{} | collect();
+          CHECK(collection == out{{}, {}});
+        }
+
+        SECTION("only success values")
+        {
+          const auto collection = std::vector<res>{{1}, {2}, {3}} | collect();
+          CHECK(collection == out{{1, 2, 3}, {}});
+        }
+
+        SECTION("only errors")
+        {
+          const auto collection =
+            std::vector<res>{Error1{}, Error1{}, Error1{}} | collect();
+          CHECK(collection == out{{}, {Error1{}, Error1{}, Error1{}}});
+        }
+
+        SECTION("mixed results")
+        {
+          const auto collection =
+            std::vector<res>{{1}, Error1{}, {2}, Error1{}, {3}} | collect();
+          CHECK(collection == out{{1, 2, 3}, {Error1{}, Error1{}}});
+        }
+      }
+    }
+
+    SECTION("values")
+    {
+      SECTION("result<int>")
+      {
+        SECTION("empty range")
+        {
+          const auto collection = std::vector<result<int>>{} | values();
+          CHECK(collection == std::vector<int>{});
+        }
+
+        SECTION("non-empty range")
+        {
+          const auto collection = std::vector<result<int>>{{1}, {2}, {3}} | values();
+          CHECK(collection == std::vector{1, 2, 3});
+        }
+      }
+
+      SECTION("result<int, Error1, Error2>")
+      {
+        using res = result<int, Error1, Error2>;
+
+        SECTION("empty range")
+        {
+          const auto collection = std::vector<res>{} | values();
+          CHECK(collection == std::vector<int>{});
+        }
+
+        SECTION("only success values")
+        {
+          const auto collection = std::vector<res>{{1}, {2}, {3}} | values();
+          CHECK(collection == std::vector{1, 2, 3});
+        }
+
+        SECTION("only errors")
+        {
+          const auto collection =
+            std::vector<res>{Error1{}, Error2{}, Error1{}} | values();
+          CHECK(collection == std::vector<int>{});
+        }
+
+        SECTION("mixed results")
+        {
+          const auto collection =
+            std::vector<res>{{1}, Error2{}, {2}, Error1{}, {3}} | values();
+          CHECK(collection == std::vector{1, 2, 3});
+        }
+      }
     }
 
     SECTION("first")
@@ -3147,32 +3339,6 @@ TEST_CASE("result")
                        | first([](const auto&) { return result<int, Error1>{Error1{}}; });
         CHECK(r == std::nullopt);
       }
-    }
-  }
-}
-
-TEST_CASE("result<void>")
-{
-  SECTION("fold_results")
-  {
-    SECTION("with empty range")
-    {
-      CHECK(fold_results(std::vector<result<void>>{}) == void_success);
-    }
-
-    SECTION("success case")
-    {
-      CHECK(
-        fold_results(std::vector{void_success, void_success, void_success})
-        == void_success);
-    }
-
-    SECTION("error case")
-    {
-      CHECK(
-        fold_results(
-          std::vector<result<void, std::string>>{void_success, "error", void_success})
-        == result<void, std::string>{"error"});
     }
   }
 }

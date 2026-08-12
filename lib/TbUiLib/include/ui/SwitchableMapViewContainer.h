@@ -21,15 +21,23 @@
 
 #include <QWidget>
 
-#include "Macros.h"
-#include "NotifierConnection.h"
+#include "base/Macros.h"
+#include "base/NotifierConnection.h"
 #include "ui/MapView.h"
 #include "ui/MapViewLayout.h"
 
-namespace tb::ui
+namespace tb
+{
+namespace gl
+{
+class PerspectiveCamera;
+}
+
+namespace ui
 {
 class AppController;
 class ClipTool;
+class ControlPointTool;
 class EdgeTool;
 class FaceTool;
 class Inspector;
@@ -110,12 +118,16 @@ public:
   VertexTool& vertexTool();
   EdgeTool& edgeTool();
   FaceTool& faceTool();
-  MapViewToolBox& mapViewToolBox();
+
+  const MapViewToolBox& toolBox() const;
+  MapViewToolBox& toolBox();
 
   bool canMoveCameraToNextTracePoint() const;
   bool canMoveCameraToPreviousTracePoint() const;
   void moveCameraToNextTracePoint();
   void moveCameraToPreviousTracePoint();
+
+  const gl::PerspectiveCamera& perspectiveCamera() const;
 
   bool canMaximizeCurrentView() const;
   bool currentViewMaximized() const;
@@ -144,4 +156,5 @@ public: // implement MapView interface
   deleteCopyAndMove(SwitchableMapViewContainer);
 };
 
-} // namespace tb::ui
+} // namespace ui
+} // namespace tb

@@ -19,7 +19,7 @@
 
 #include "gl/Material.h"
 
-#include "Macros.h"
+#include "base/Macros.h"
 #include "gl/GlInterface.h"
 #include "gl/Texture.h"
 
@@ -286,8 +286,6 @@ void Material::deactivate(Gl& gl) const
     case MaterialCulling::Back:
       break;
     }
-
-    gl.bindTexture(GL_TEXTURE_2D, 0);
   }
 }
 
@@ -299,27 +297,6 @@ const Texture* getTexture(const Material* material)
 Texture* getTexture(Material* material)
 {
   return material ? material->texture() : nullptr;
-}
-
-RgbF gridColorForMaterial(const gl::Material* material)
-{
-  if (const auto* texture = getTexture(material))
-  {
-    const auto averageColor = texture->averageColor().to<RgbF>();
-    const auto brightness =
-      (averageColor.get<ColorChannel::r>() + averageColor.get<ColorChannel::g>()
-       + averageColor.get<ColorChannel::b>())
-      / 3.0f;
-
-    if (brightness > 0.50f)
-    {
-      // bright material grid color
-      return RgbF{0, 0, 0};
-    }
-  }
-
-  // dark material grid color
-  return RgbF{1, 1, 1};
 }
 
 } // namespace tb::gl

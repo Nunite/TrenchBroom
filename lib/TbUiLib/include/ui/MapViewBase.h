@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include "ui/ActionContext.h"
 #include "ui/CameraLinkHelper.h"
 #include "ui/MapView.h"
@@ -177,8 +177,9 @@ public:
 
 public: // move, rotate, flip actions
   void move(vm::direction direction);
-  void moveVertices(vm::direction direction);
+  void moveNodeHandles(vm::direction direction);
   void moveRotationCenter(vm::direction direction);
+  void moveSweepCenter(vm::direction direction);
   void moveObjects(vm::direction direction);
   virtual vm::vec3d moveDirection(vm::direction direction) const = 0;
 
@@ -188,34 +189,39 @@ public: // move, rotate, flip actions
   void rotate(vm::rotation_axis axis, bool clockwise);
   vm::vec3d rotationAxis(vm::rotation_axis axis, bool clockwise) const;
 
+  void increaseSweepScale();
+  void decreaseSweepScale();
+
   void flip(vm::direction direction);
   bool canFlip() const;
   virtual size_t flipAxis(vm::direction direction) const = 0;
 
 public: // UV actions
-  enum class UVActionMode
+  enum class UvActionMode
   {
     Normal,
     Coarse,
     Fine
   };
 
-  void moveUV(vm::direction direction, UVActionMode mode);
-  vm::vec2f moveUVOffset(vm::direction direction, UVActionMode mode) const;
-  float moveUVDistance(UVActionMode mode) const;
+  void moveUv(vm::direction direction, UvActionMode mode);
+  vm::vec2f moveUvOffset(vm::direction direction, UvActionMode mode) const;
+  float moveUvDistance(UvActionMode mode) const;
 
-  void rotateUV(bool clockwise, UVActionMode mode);
-  float rotateUVAngle(bool clockwise, UVActionMode mode) const;
+  void rotateUv(bool clockwise, UvActionMode mode);
+  float rotateUvAngle(bool clockwise, UvActionMode mode) const;
 
-  void flipUV(vm::direction direction);
-  void resetUV();
-  void resetUVToWorld();
+  void flipUv(vm::direction direction);
+  void resetUv();
+  void resetUvToWorld();
 
 public: // tool mode actions
   void assembleBrush();
 
   void toggleClipSide();
   void performClip();
+
+  void performSweep();
 
 public: // misc actions
   void resetCameraZoom();
@@ -240,8 +246,7 @@ public: // reparenting objects
    */
   bool canReparentNode(const mdl::Node* node, const mdl::Node* newParent) const;
 
-  void moveSelectedBrushesToEntity();
-  mdl::Node* findNewParentEntityForBrushes(const std::vector<mdl::Node*>& nodes) const;
+  mdl::Node& findNewParentEntityForNodes(const std::vector<mdl::Node*>& nodes) const;
 
   bool canReparentNodes(
     const std::vector<mdl::Node*>& nodes, const mdl::Node* newParent) const;
@@ -272,8 +277,9 @@ public: // tags
   void enableTag(const mdl::SmartTag& tag);
   void disableTag(const mdl::SmartTag& tag);
 
-public: // make structural
-  void makeStructural();
+public: // make structural / move to entity
+  void makeSelectionStructural();
+  void moveSelectedNodesToEntity();
 
 public: // entity definitions
   void toggleEntityDefinitionVisible(const mdl::EntityDefinition& definition);
@@ -378,7 +384,7 @@ private:
   QMenu* makeEntityGroupsMenu(mdl::EntityDefinitionType type);
 
   bool canMergeGroups() const;
-  bool canMakeStructural() const;
+  bool canMakeSelectionStructural() const;
 };
 
 } // namespace ui

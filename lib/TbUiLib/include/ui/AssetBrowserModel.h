@@ -21,7 +21,7 @@
 
 #include <QString>
 
-#include "Result.h"
+#include "base/Result.h"
 
 #include "kd/path_hash.h"
 

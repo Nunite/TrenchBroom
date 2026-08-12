@@ -21,7 +21,7 @@
 
 #include <QWidget>
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include "mdl/TagType.h"
 
 #include <filesystem>
@@ -97,6 +97,8 @@ private:
   QCheckBox* m_showBrushesCheckBox = nullptr;
   std::vector<std::pair<mdl::TagType::Type, QCheckBox*>> m_tagCheckBoxes;
 
+  QCheckBox* m_showPatchesCheckBox = nullptr;
+
   QButtonGroup* m_renderModeRadioGroup = nullptr;
   QCheckBox* m_shadeFacesCheckBox = nullptr;
   QCheckBox* m_showFogCheckBox = nullptr;
@@ -128,6 +130,7 @@ private:
   QWidget* createEntityDefinitionsPanel(QWidget* parent);
   QWidget* createEntitiesPanel(QWidget* parent);
   QWidget* createBrushesPanel(QWidget* parent);
+  QWidget* createPatchesPanel(QWidget* parent);
   void createTagFilter(QWidget* parent);
   void createEmptyTagFilter(QWidget* parent);
   void createTagFilter(QWidget* parent, const std::vector<mdl::SmartTag>& tags);
@@ -138,6 +141,7 @@ private:
   void refreshEntityDefinitionsPanel();
   void refreshEntitiesPanel();
   void refreshBrushesPanel();
+  void refreshPatchesPanel();
   void refreshRendererPanel();
 
   void showEntityClassnamesChanged(bool checked);
@@ -148,6 +152,7 @@ private:
   void showPointEntityModelsChanged(bool checked);
   void showBrushesChanged(bool checked);
   void showTagChanged(bool checked, mdl::TagType::Type tagType);
+  void showPatchesChanged(bool checked);
   void faceRenderModeChanged(int id);
   void shadeFacesChanged(bool checked);
   void showFogChanged(bool checked);

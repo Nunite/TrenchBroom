@@ -30,13 +30,14 @@
 
 namespace tb::mdl
 {
-class BrushFaceAttributes;
+struct UvAttributes;
 class Map;
-class UVCoordSystemSnapshot;
+struct UvCoordSystemSnapshot;
 
 enum class UvAxis;
 enum class UvSign;
 enum class UvPolicy;
+enum class UvFitMode;
 
 struct UpdateBrushFaceAttributes;
 
@@ -78,32 +79,33 @@ struct FaceUVUpdate
 
 bool setFaceUVs(Map& map, const std::vector<FaceUVUpdate>& updates);
 
-bool copyUV(
+bool copyUv(
   Map& map,
-  const UVCoordSystemSnapshot& coordSystemSnapshot,
-  const BrushFaceAttributes& attribs,
+  const UvCoordSystemSnapshot& coordSystemSnapshot,
+  const UvAttributes& uvAttributes,
   const vm::plane3d& sourceFacePlane,
   WrapStyle wrapStyle);
 
-bool translateUV(
+bool translateUv(
   Map& map,
   const vm::vec3f& cameraUp,
   const vm::vec3f& cameraRight,
   const vm::vec2f& delta);
 
-bool rotateUV(Map& map, float angle);
+bool rotateUv(Map& map, float angle);
 
-bool shearUV(Map& map, const vm::vec2f& factors);
+bool shearUv(Map& map, const vm::vec2f& factors);
 
-bool flipUV(
+bool flipUv(
   Map& map,
   const vm::vec3f& cameraUp,
   const vm::vec3f& cameraRight,
   vm::direction cameraRelativeFlipDirection);
 
-void alignUV(Map& map, UvPolicy uvPolicy);
-void justifyUV(Map& map, UvJustifyDirection uvJustifyDirection, UvPolicy uvPolicy);
-void fitUV(Map& map, UvFitDirection uvFitDirection, UvPolicy uvPolicy);
-void autoFitUV(Map& map);
+void alignUv(Map& map, UvPolicy uvPolicy);
+void justifyUv(Map& map, UvJustifyDirection uvJustifyDirection, UvPolicy uvPolicy);
+void fitUv(
+  Map& map, UvFitDirection uvFitDirection, UvPolicy uvPolicy, UvFitMode uvFitMode);
+void autoFitUv(Map& map);
 
 } // namespace tb::mdl

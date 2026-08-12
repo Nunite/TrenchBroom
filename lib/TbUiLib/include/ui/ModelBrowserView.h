@@ -22,7 +22,7 @@
 #include <QImage>
 #include <QString>
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include "ui/AssetBrowserModel.h"
 #include "ui/AssetPreviewProvider.h"
 #include "ui/CellView.h"

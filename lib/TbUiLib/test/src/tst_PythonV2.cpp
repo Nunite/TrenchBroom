@@ -12,10 +12,9 @@
 #include <QThread>
 #include <QTreeWidget>
 
-#include "Logger.h"
-#include "PreferenceManager.h"
-#include "Preferences.h"
-#include "Result.h"
+#include "base/Logger.h"
+#include "base/PreferenceManager.h"
+#include "base/Result.h"
 #include "fs/TestEnvironment.h"
 #include "gl/GlManager.h"
 #include "gl/Material.h"
@@ -37,8 +36,9 @@
 #include "mdl/Map_Entities.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
-#include "mdl/VertexHandleManager.h"
+#include "mdl/NodeHandles.h"
 #include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "ui/AppControllerFixture.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
@@ -89,9 +89,9 @@ private:
 
 vm::vec2f textureCoords(const mdl::BrushFace& face, const vm::vec3d& point)
 {
+  const auto uvAttributes = face.uvAttributes();
   return vm::vec2f{
-    face.toUVCoordSystemMatrix(face.attributes().offset(), face.attributes().scale())
-    * point};
+    face.toUvCoordSystemMatrix(uvAttributes.offset, uvAttributes.scale) * point};
 }
 
 std::vector<QWidget*> pluginPanels(MapWindow& window)
@@ -659,7 +659,7 @@ with tb.current_document().transaction("rollback entity"):
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "original") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
 
     auto env = fs::TestEnvironment{};
     env.createFile(
@@ -703,7 +703,7 @@ assert len(doc.selection.brushes) == 0
         },
         "original")
       | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
 
     const auto faceIndex = brushNode->brush().findFace(vm::vec3d{0, -1, 0});
     REQUIRE(faceIndex);
@@ -752,7 +752,7 @@ assert [loop["uv"] for loop in updated["loops"]] == uvs, updated
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "original") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
     auto env = fs::TestEnvironment{};
@@ -795,13 +795,15 @@ assert [loop["uv"] for loop in face.uv_loops] == uvs, face.uv_loops
   {
     auto& map = window.document().map();
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
-    auto* brushNode =
-      new mdl::BrushNode{builder.createCube(64.0, "original") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    auto* brushNode = new mdl::BrushNode{
+      builder.createCuboid(
+        vm::bbox3d{vm::vec3d{1.0, 2.0, 3.0}, vm::vec3d{65.0, 66.0, 67.0}}, "original")
+      | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
-    map.vertexHandles().add(vm::vec3d{1.0, 2.0, 3.0});
-    map.vertexHandles().select(vm::vec3d{1.0, 2.0, 3.0});
+    map.nodeHandles().addHandles<mdl::VertexHandle>(*brushNode);
+    map.nodeHandles().selectHandle(mdl::VertexHandle{vm::vec3d{1.0, 2.0, 3.0}});
 
     auto env = fs::TestEnvironment{};
     env.createFile(
@@ -838,7 +840,7 @@ assert all(isinstance(v, tb.Vec3) for v in verts_by_brush[0])
       new mdl::BrushNode{builder.createCube(64.0, "move_a") | kdl::value()};
     auto* brushNodeB =
       new mdl::BrushNode{builder.createCube(64.0, "move_b") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNodeA, brushNodeB}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNodeA, brushNodeB}}});
 
     auto env = fs::TestEnvironment{};
     env.createFile(
@@ -890,12 +892,12 @@ assert len(doc.selection.brushes) == 1
       new mdl::BrushNode{builder.createCube(64.0, "chamfer_vertex") | kdl::value()};
     auto* edgeBrush =
       new mdl::BrushNode{builder.createCube(64.0, "chamfer_edge") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {vertexBrush, edgeBrush}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {vertexBrush, edgeBrush}}});
 
-    map.vertexHandles().addHandles(*vertexBrush);
-    const auto vertexHandles = map.vertexHandles().allHandles();
+    map.nodeHandles().addHandles<mdl::VertexHandle>(*vertexBrush);
+    const auto vertexHandles = map.nodeHandles().allHandles<mdl::VertexHandle>();
     REQUIRE_FALSE(vertexHandles.empty());
-    map.vertexHandles().select(vertexHandles.front());
+    map.nodeHandles().selectHandle(vertexHandles.front());
 
     auto env = fs::TestEnvironment{};
     env.createFile(
@@ -922,11 +924,11 @@ assert doc.selection.chamfer_vertices(4.0)
     REQUIRE(scriptSucceeded);
     CHECK(vertexBrush->brush().vertexCount() > 8u);
 
-    map.vertexHandles().clear();
-    map.edgeHandles().addHandles(*edgeBrush);
-    const auto edgeHandles = map.edgeHandles().allHandles();
+    map.nodeHandles().clear<mdl::VertexHandle>();
+    map.nodeHandles().addHandles<mdl::EdgeHandle>(*edgeBrush);
+    const auto edgeHandles = map.nodeHandles().allHandles<mdl::EdgeHandle>();
     REQUIRE_FALSE(edgeHandles.empty());
-    map.edgeHandles().select(edgeHandles.front());
+    map.nodeHandles().selectHandle(edgeHandles.front());
 
     env.createFile(
       "v2_chamfer_edge.py",
@@ -951,7 +953,7 @@ assert doc.selection.chamfer_edges(4.0, 2)
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "original") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
     auto env = fs::TestEnvironment{};
@@ -974,7 +976,7 @@ face.set_material("changed")
     context.scriptPath = env.dir() / "v2_set_face_material.py";
 
     REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
-    CHECK(brushNode->brush().face(0).attributes().materialName() == "changed");
+    CHECK(brushNode->brush().face(0).materialName() == "changed");
     REQUIRE(map.selection().brushes.size() == 1u);
     CHECK(map.selection().brushes.front() == brushNode);
   }
@@ -1028,13 +1030,13 @@ assert face.surface_value == 3.5
     const auto& selectedBrushes = window.document().map().selection().brushes;
     REQUIRE(selectedBrushes.size() == 1u);
     const auto& face = selectedBrushes.front()->brush().faces().front();
-    CHECK(face.attributes().materialName() == "changed");
-    CHECK(face.attributes().offset() == vm::vec2f{12.0f, 24.0f});
-    CHECK(face.attributes().scale() == vm::vec2f{0.5f, 0.25f});
-    CHECK(face.attributes().rotation() == 45.0f);
-    CHECK(face.attributes().surfaceContents() == std::optional<int>{7});
-    CHECK(face.attributes().surfaceFlags() == std::optional<int>{11});
-    CHECK(face.attributes().surfaceValue() == std::optional<float>{3.5f});
+    CHECK(face.materialName() == "changed");
+    CHECK(face.uvAttributes().offset == vm::vec2f{12.0f, 24.0f});
+    CHECK(face.uvAttributes().scale == vm::vec2f{0.5f, 0.25f});
+    CHECK(face.uvAttributes().rotation == 45.0f);
+    CHECK(face.surfaceAttributes().contents == std::optional<int>{7});
+    CHECK(face.surfaceAttributes().flags == std::optional<int>{11});
+    CHECK(face.surfaceAttributes().value == std::optional<float>{3.5f});
   }
 
   SECTION("runs v2 brush builder example script")
@@ -1095,8 +1097,8 @@ assert face.surface_value == 3.5
     CHECK(brushNode->brush().faceCount() == 6u);
 
     applyButton->click();
-    CHECK(brushNode->brush().face(0).attributes().materialName() == "common/caulk");
-    CHECK(brushNode->brush().face(0).attributes().scale() == vm::vec2f{1.0f, 1.0f});
+    CHECK(brushNode->brush().face(0).materialName() == "common/caulk");
+    CHECK(brushNode->brush().face(0).uvAttributes().scale == vm::vec2f{1.0f, 1.0f});
 
     analyzeButton->click();
     auto* status = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_status"));
@@ -1111,7 +1113,7 @@ assert face.surface_value == 3.5
     auto& map = window.document().map();
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode = new mdl::BrushNode{builder.createCube(64.0, "old") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
     const auto pluginDir = std::filesystem::path{"python/examples/v2/texture_replacer"};
@@ -1148,7 +1150,7 @@ assert face.surface_value == 3.5
     auto* status = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_status"));
     REQUIRE(status != nullptr);
     CAPTURE(status->text().toStdString());
-    CHECK(brushNode->brush().face(0).attributes().materialName() == "new");
+    CHECK(brushNode->brush().face(0).materialName() == "new");
     manager.unloadPlugins(window);
   }
 
@@ -1204,7 +1206,7 @@ assert face.surface_value == 3.5
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "old_sync") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
     const auto pluginDir = std::filesystem::path{"python/examples/v2/blender_brush_sync"};
@@ -1286,7 +1288,7 @@ assert face.surface_value == 3.5
 
     applyButton->click();
     const auto& face = brushNode->brush().face(0);
-    CHECK(face.attributes().materialName() == "new_sync");
+    CHECK(face.materialName() == "new_sync");
     const auto expectedUVs = std::array<vm::vec2f, 4>{
       vm::vec2f{16.0f, 8.0f},
       vm::vec2f{80.0f, 8.0f},
@@ -1313,7 +1315,7 @@ assert face.surface_value == 3.5
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "event_callback") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
     const auto pluginDir = std::filesystem::path{"python/examples/v2/event_callback"};
@@ -1512,7 +1514,7 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "plane") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
     const auto pluginDir =
@@ -1552,7 +1554,7 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "verts") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
     const auto pluginDir =
@@ -1569,7 +1571,7 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "plane_builder") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
     const auto pluginDir = std::filesystem::path{"python/examples/v2/plane_builder"};
@@ -1624,12 +1626,12 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "chamfer_example") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
-    map.vertexHandles().addHandles(*brushNode);
-    const auto vertexHandles = map.vertexHandles().allHandles();
+    map.nodeHandles().addHandles<mdl::VertexHandle>(*brushNode);
+    const auto vertexHandles = map.nodeHandles().allHandles<mdl::VertexHandle>();
     REQUIRE_FALSE(vertexHandles.empty());
-    map.vertexHandles().select(vertexHandles.front());
+    map.nodeHandles().selectHandle(vertexHandles.front());
 
     auto manager = PythonPluginManager{};
     const auto chamferToolDir = std::filesystem::path{"python/examples/v2/chamfer_tool"};
@@ -1666,12 +1668,12 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "transform_tool") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
-    map.vertexHandles().addHandles(*brushNode);
-    const auto vertexHandles = map.vertexHandles().allHandles();
+    map.nodeHandles().addHandles<mdl::VertexHandle>(*brushNode);
+    const auto vertexHandles = map.nodeHandles().allHandles<mdl::VertexHandle>();
     REQUIRE_FALSE(vertexHandles.empty());
-    map.vertexHandles().select(vertexHandles.front());
+    map.nodeHandles().selectHandle(vertexHandles.front());
 
     const auto pluginDir = std::filesystem::path{"python/examples/v2/transform_tool"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
@@ -1719,13 +1721,15 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "distribute_tool") | kdl::value()};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
     mdl::selectNodes(map, {brushNode});
 
-    map.vertexHandles().add(vm::vec3d{0.0, 0.0, 0.0});
-    map.vertexHandles().add(vm::vec3d{128.0, 0.0, 0.0});
-    map.vertexHandles().select(vm::vec3d{0.0, 0.0, 0.0});
-    map.vertexHandles().select(vm::vec3d{128.0, 0.0, 0.0});
+    map.nodeHandles().addHandles<mdl::VertexHandle>(*brushNode);
+    const auto vertexHandles = map.nodeHandles().allHandles<mdl::VertexHandle>();
+    REQUIRE(vertexHandles.size() >= 2u);
+    auto vertexHandle = vertexHandles.begin();
+    map.nodeHandles().selectHandle(*vertexHandle++);
+    map.nodeHandles().selectHandle(*vertexHandle);
 
     const auto pluginDir = std::filesystem::path{"python/examples/v2/distribute_tool"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
@@ -1766,12 +1770,16 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
   SECTION("loads v2 curve sweep example plugin")
   {
     auto& map = window.document().map();
-    map.vertexHandles().add(vm::vec3d{0.0, 0.0, 0.0});
-    map.vertexHandles().add(vm::vec3d{128.0, 0.0, 0.0});
-    map.vertexHandles().add(vm::vec3d{256.0, 64.0, 0.0});
-    map.vertexHandles().select(vm::vec3d{0.0, 0.0, 0.0});
-    map.vertexHandles().select(vm::vec3d{128.0, 0.0, 0.0});
-    map.vertexHandles().select(vm::vec3d{256.0, 64.0, 0.0});
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto handleSource =
+      mdl::BrushNode{builder.createCube(64.0, "curve_sweep") | kdl::value()};
+    map.nodeHandles().addHandles<mdl::VertexHandle>(handleSource);
+    const auto vertexHandles = map.nodeHandles().allHandles<mdl::VertexHandle>();
+    REQUIRE(vertexHandles.size() >= 3u);
+    auto vertexHandle = vertexHandles.begin();
+    map.nodeHandles().selectHandle(*vertexHandle++);
+    map.nodeHandles().selectHandle(*vertexHandle++);
+    map.nodeHandles().selectHandle(*vertexHandle);
 
     const auto pluginDir = std::filesystem::path{"python/examples/v2/curve_sweep"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
@@ -1828,7 +1836,7 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
       map, {{static_cast<mdl::Node*>(entityNode), {static_cast<mdl::Node*>(brushNode)}}});
     mdl::selectNodes(map, {entityNode});
 
-    const auto oldOffset = brushNode->brush().face(0).attributes().offset();
+    const auto oldOffset = brushNode->brush().face(0).uvAttributes().offset;
     const auto pluginDir =
       std::filesystem::path{"python/examples/v2/entity_brush_modifier"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
@@ -1836,7 +1844,7 @@ panel.set_html_view("history", '<a href="tb://history/456">Updated</a>')
     CAPTURE(PythonRuntime::instance().lastError());
     REQUIRE(PythonScripting::instance().runScript(window, pluginDir / "main.py"));
 
-    const auto newOffset = brushNode->brush().face(0).attributes().offset();
+    const auto newOffset = brushNode->brush().face(0).uvAttributes().offset;
     CHECK(newOffset.x() == oldOffset.x() + 16.0f);
     CHECK(newOffset.y() == oldOffset.y());
   }

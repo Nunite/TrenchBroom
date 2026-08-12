@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Color.h"
+#include "base/Color.h"
 #include "gl/VertexType.h"
 #include "render/AllocationTracker.h"
 #include "render/EdgeRenderer.h"
@@ -88,6 +88,12 @@ public:
    * Equivalent to updateNode() on all added nodes.
    */
   void invalidate();
+
+  /**
+   * Invalidate the given materials. Used to refresh the renderer after materials have
+   * finished processing asynchronously.
+   */
+  void invalidateMaterials(const std::vector<const gl::Material*>& materials);
 
   /**
    * Equivalent to removeNode() on all added nodes.

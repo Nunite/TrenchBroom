@@ -19,9 +19,12 @@
 
 #pragma once
 
+#include "mdl/Entity.h"
+
 #include "kd/reflection_decl.h"
 
 #include <iosfwd>
+#include <optional>
 #include <string>
 #include <variant>
 
@@ -31,9 +34,17 @@ struct CompilationExportMap
 {
   bool enabled;
   bool stripTbProperties;
+  std::optional<std::string> stripEntityPattern;
+  std::optional<Entity> entityToAdd;
   std::string targetSpec;
 
-  kdl_reflect_decl(CompilationExportMap, enabled, stripTbProperties, targetSpec);
+  kdl_reflect_decl(
+    CompilationExportMap,
+    enabled,
+    stripTbProperties,
+    stripEntityPattern,
+    entityToAdd,
+    targetSpec);
 };
 
 struct CompilationCopyFiles
@@ -73,12 +84,23 @@ struct CompilationRunTool
     CompilationRunTool, enabled, toolSpec, parameterSpec, treatNonZeroResultCodeAsError);
 };
 
+struct CompilationLaunchEngine
+{
+  bool enabled;
+  std::string engineProfileId;
+  bool treatLaunchFailureAsError;
+
+  kdl_reflect_decl(
+    CompilationLaunchEngine, enabled, engineProfileId, treatLaunchFailureAsError);
+};
+
 using CompilationTask = std::variant<
   CompilationExportMap,
   CompilationCopyFiles,
   CompilationRenameFile,
   CompilationDeleteFiles,
-  CompilationRunTool>;
+  CompilationRunTool,
+  CompilationLaunchEngine>;
 
 std::ostream& operator<<(std::ostream& lhs, const CompilationTask& rhs);
 

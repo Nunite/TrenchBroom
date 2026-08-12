@@ -21,6 +21,8 @@
 
 #include <map>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace kdl
@@ -32,8 +34,8 @@ namespace tb
 {
 namespace mdl
 {
-class BrushNode;
 class BrushFace;
+class Entity;
 class EntityNode;
 class LayerNode;
 class Node;
@@ -43,7 +45,7 @@ class WorldNode;
 class NodeWriter
 {
 private:
-  using EntityBrushesMap = std::map<EntityNode*, std::vector<BrushNode*>>;
+  using EntityChildNodesMap = std::map<EntityNode*, std::vector<Node*>>;
 
   const WorldNode& m_world;
   std::unique_ptr<NodeSerializer> m_serializer;
@@ -55,6 +57,8 @@ public:
 
   void setExporting(bool exporting);
   void setStripTbProperties(bool stripTbProperties);
+  void setStripEntityPattern(std::optional<std::string> stripEntityPattern);
+  void setEntityToAdd(std::optional<Entity> entityToAdd);
   void writeMap(kdl::task_manager& taskManager);
 
 private:
@@ -67,8 +71,8 @@ public:
   void writeWorldspawnHeader(kdl::task_manager& taskManager);
 
 private:
-  void writeWorldBrushes(const std::vector<BrushNode*>& brushes);
-  void writeEntityBrushes(const EntityBrushesMap& entityBrushes);
+  void writeWorldNode(const std::vector<Node*>& children);
+  void writeEntityNodes(const EntityChildNodesMap& entityChildNodes);
 
 public:
   void writeBrushFaces(

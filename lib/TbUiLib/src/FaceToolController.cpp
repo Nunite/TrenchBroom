@@ -19,40 +19,45 @@
 
 #include "ui/FaceToolController.h"
 
-#include "mdl/VertexHandleManager.h"
+#include "mdl/NodeHandles.h"
 #include "ui/FaceTool.h"
+#include "ui/NodeHandleToolControllerParts.h"
 
 #include <memory>
 
 namespace tb::ui
 {
+namespace
+{
 
-class FaceToolController::SelectFacePart : public SelectPartBase<vm::polygon3d>
+class SelectFacePart : public NodeHandleToolSelectPartBase<FaceTool, mdl::FaceHandle>
 {
 public:
   explicit SelectFacePart(FaceTool& tool)
-    : SelectPartBase{tool, mdl::FaceHandleManager::HandleHitType}
+    : NodeHandleToolSelectPartBase{tool, mdl::FaceHandle::HandleHitType}
   {
   }
 
 private:
-  bool equalHandles(const vm::polygon3d& lhs, const vm::polygon3d& rhs) const override
+  bool equalHandles(const mdl::FaceHandle& lhs, const mdl::FaceHandle& rhs) const override
   {
-    return compareUnoriented(lhs, rhs, MaxHandleDistance) == 0;
+    return compareUnoriented(lhs.position, rhs.position, MaxHandleDistance) == 0;
   }
 };
 
-class FaceToolController::MoveFacePart : public MovePartBase
+class MoveFacePart : public NodeHandleToolMovePartBase<FaceTool>
 {
 public:
   explicit MoveFacePart(FaceTool& tool)
-    : MovePartBase{tool, mdl::FaceHandleManager::HandleHitType}
+    : NodeHandleToolMovePartBase{tool, mdl::FaceHandle::HandleHitType}
   {
   }
 };
 
+} // namespace
+
 FaceToolController::FaceToolController(FaceTool& tool)
-  : VertexToolControllerBase(tool)
+  : NodeHandleToolControllerBase(tool)
 {
   addController(std::make_unique<MoveFacePart>(tool));
   addController(std::make_unique<SelectFacePart>(tool));

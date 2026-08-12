@@ -19,7 +19,7 @@
 
 #include "ui/DrawShapeTool.h"
 
-#include "Logger.h"
+#include "base/Logger.h"
 #include "mdl/Brush.h" // IWYU pragma: keep
 #include "mdl/BrushNode.h"
 #include "mdl/Map.h"
@@ -101,9 +101,9 @@ QWidget* DrawShapeTool::doCreatePage(QWidget* parent)
             const auto addedNodes = addNodes(
               map,
               {
-                {parentForNodes(map), brushNodes | std::views::transform([](auto& node) {
-                                        return static_cast<mdl::Node*>(node.release());
-                                      }) | kdl::ranges::to<std::vector>()},
+                {&parentForNodes(map), brushNodes | std::views::transform([](auto& node) {
+                                         return static_cast<mdl::Node*>(node.release());
+                                       }) | kdl::ranges::to<std::vector>()},
               });
             selectNodes(map, addedNodes);
 

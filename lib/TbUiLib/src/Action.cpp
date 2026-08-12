@@ -19,38 +19,12 @@
 
 #include "ui/Action.h"
 
-#include "PreferenceManager.h"
 #include "ui/ActionExecutionContext.h"
 
 #include "kd/const_overload.h"
 
-#include <map>
-#include <vector>
-
 namespace tb::ui
 {
-
-namespace
-{
-
-struct ActionConflictCmp
-{
-  bool operator()(const Action* lhs, const Action* rhs) const
-  {
-    if (actionContextMatches(lhs->actionContext(), rhs->actionContext()))
-    {
-      // if the two have the same sequence, they would be in conflict, so we compare the
-      // sequences
-      const auto& lhsKeySequence = pref(lhs->preference());
-      const auto& rhsKeySequence = pref(rhs->preference());
-      return lhsKeySequence < rhsKeySequence;
-    }
-    // otherwise, we just compare by the action context
-    return lhs->actionContext() < rhs->actionContext();
-  }
-};
-
-} // namespace
 
 Action::Action(
   std::filesystem::path preferencePath,
@@ -64,7 +38,7 @@ Action::Action(
   std::optional<QString> statusTip)
   : m_label{std::move(label)}
   , m_actionContext{actionContext}
-  , m_shortcutPreference{std::move(preferencePath), defaultShortcut}
+  , m_shortcutPreference{std::move(preferencePath), {defaultShortcut}}
   , m_execute{std::move(execute)}
   , m_enabled{std::move(enabled)}
   , m_checked{std::move(checked)}
@@ -124,12 +98,12 @@ ActionContext::Type Action::actionContext() const
   return m_actionContext;
 }
 
-const Preference<QKeySequence>& Action::preference() const
+const Preference<std::vector<QKeySequence>>& Action::preference() const
 {
   return m_shortcutPreference;
 }
 
-Preference<QKeySequence>& Action::preference()
+Preference<std::vector<QKeySequence>>& Action::preference()
 {
   return KDL_CONST_OVERLOAD(preference());
 }
@@ -175,31 +149,6 @@ bool Action::isMenuAction() const
 void Action::setIsMenuAction(const bool isMenuAction)
 {
   m_isMenuAction = isMenuAction;
-}
-
-std::vector<size_t> findConflicts(const std::vector<const Action*>& actions)
-{
-  auto entries = std::map<const Action*, size_t, ActionConflictCmp>{};
-  auto conflicts = std::vector<size_t>{};
-
-  for (size_t i = 0; i < actions.size(); ++i)
-  {
-    const auto& action = *actions[i];
-    const auto& keySequence = pref(action.preference());
-    if (keySequence.count() > 0)
-    {
-      const auto [it, noConflict] = entries.emplace(&action, i);
-      if (!noConflict)
-      {
-        // found a duplicate, so there are conflicts
-        const auto otherIndex = it->second;
-        conflicts.emplace_back(otherIndex);
-        conflicts.emplace_back(i);
-      }
-    }
-  }
-
-  return conflicts;
 }
 
 } // namespace tb::ui

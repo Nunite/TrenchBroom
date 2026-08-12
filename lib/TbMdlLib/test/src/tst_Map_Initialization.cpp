@@ -17,7 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Logger.h"
+#include "base/Logger.h"
 #include "fs/TestEnvironment.h"
 #include "gl/ResourceManager.h"
 #include "mdl/Brush.h"
@@ -457,7 +457,7 @@ TEST_CASE("Map_Initialization")
           REQUIRE(map->persistent());
 
           auto* transientEntityNode = new EntityNode{{}};
-          addNodes(*map, {{parentForNodes(*map), {transientEntityNode}}});
+          addNodes(*map, {{&parentForNodes(*map), {transientEntityNode}}});
           REQUIRE(
             map->worldNode().defaultLayer()->children()
             == std::vector<Node*>{transientEntityNode});

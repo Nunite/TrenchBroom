@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "Macros.h"
 #include "ResourceId.h"
-#include "Result.h"
+#include "base/Macros.h"
+#include "base/Result.h"
 
 #include "kd/overload.h"
 #include "kd/reflection_impl.h"
@@ -50,6 +50,8 @@ struct ProcessContext
 
 class TaskResult
 {
+public:
+  virtual ~TaskResult() = default;
 };
 
 template <typename T>

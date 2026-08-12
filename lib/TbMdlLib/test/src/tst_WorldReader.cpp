@@ -22,7 +22,6 @@
 #include "fs/DiskIO.h"
 #include "mdl/BezierPatch.h"
 #include "mdl/BrushFace.h"
-#include "mdl/BrushFaceAttributes.h"
 #include "mdl/BrushNode.h"
 #include "mdl/CatchConfig.h"
 #include "mdl/Entity.h"
@@ -72,7 +71,7 @@ TEST_CASE("WorldReader")
     const auto& world = worldResult.value();
     CHECK(world != nullptr);
     CHECK(world->childCount() == 1u);
-    CHECK_FALSE(world->children().front()->hasChildren());
+    CHECK(!world->children().front()->hasChildren());
   }
 
   SECTION("Empty entity")
@@ -240,7 +239,7 @@ TEST_CASE("WorldReader")
     CHECK(defaultLayer->childCount() == 1u);
 
     auto* brushNode = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brushNode, false);
+    checkBrushUvCoordSystem(brushNode, false);
     const auto& faces = brushNode->brush().faces();
     CHECK(faces.size() == 6u);
 
@@ -250,12 +249,12 @@ TEST_CASE("WorldReader")
       vm::vec3d{0.0, 0.0, 0.0},
       vm::vec3d{64.0, 0.0, -16.0});
     CHECK(face1 != nullptr);
-    CHECK(face1->attributes().materialName() == "tex1");
-    CHECK(face1->attributes().xOffset() == 1.0);
-    CHECK(face1->attributes().yOffset() == 2.0);
-    CHECK(face1->attributes().rotation() == 3.0);
-    CHECK(face1->attributes().xScale() == 4.0);
-    CHECK(face1->attributes().yScale() == 5.0);
+    CHECK(face1->materialName() == "tex1");
+    CHECK(face1->uvAttributes().offset.x() == 1.0);
+    CHECK(face1->uvAttributes().offset.y() == 2.0);
+    CHECK(face1->uvAttributes().rotation == 3.0);
+    CHECK(face1->uvAttributes().scale.x() == 4.0);
+    CHECK(face1->uvAttributes().scale.y() == 5.0);
 
     CHECK(
       findFaceByPoints(
@@ -320,7 +319,7 @@ TEST_CASE("WorldReader")
     CHECK(defaultLayer->childCount() == 1u);
 
     auto* brushNode = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brushNode, false);
+    checkBrushUvCoordSystem(brushNode, false);
     const auto& faces = brushNode->brush().faces();
     CHECK(faces.size() == 6u);
 
@@ -330,11 +329,11 @@ TEST_CASE("WorldReader")
       vm::vec3d{0.0, 0.0, 0.0},
       vm::vec3d{64.0, 0.0, -16.0});
     CHECK(face != nullptr);
-    CHECK(face->attributes().xOffset() == 22.0f);
-    CHECK(face->attributes().xOffset() == 22.0f);
-    CHECK(face->attributes().rotation() == 56.2f);
-    CHECK(face->attributes().xScale() == 1.03433f);
-    CHECK(face->attributes().yScale() == -0.55f);
+    CHECK(face->uvAttributes().offset.x() == 22.0f);
+    CHECK(face->uvAttributes().offset.x() == 22.0f);
+    CHECK(face->uvAttributes().rotation == 56.2f);
+    CHECK(face->uvAttributes().scale.x() == 1.03433f);
+    CHECK(face->uvAttributes().scale.y() == -0.55f);
   }
 
   SECTION("Curly brace in material name")
@@ -363,7 +362,7 @@ TEST_CASE("WorldReader")
     CHECK(defaultLayer->childCount() == 1u);
 
     auto* brushNode = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brushNode, false);
+    checkBrushUvCoordSystem(brushNode, false);
     const auto& faces = brushNode->brush().faces();
     CHECK(faces.size() == 6u);
 
@@ -436,7 +435,7 @@ TEST_CASE("WorldReader")
     auto* defaultLayer = world->children().front();
     CHECK(defaultLayer->childCount() == 1u);
     auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brush, true);
+    checkBrushUvCoordSystem(brush, true);
   }
 
   SECTION("Quake 2 brush format")
@@ -465,7 +464,7 @@ TEST_CASE("WorldReader")
     auto* defaultLayer = world->children().front();
     CHECK(defaultLayer->childCount() == 1u);
     auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brush, false);
+    checkBrushUvCoordSystem(brush, false);
 
     SECTION("surface attributes for face attribsExplicit")
     {
@@ -474,10 +473,10 @@ TEST_CASE("WorldReader")
 
       auto& face = brush->brush().face(*faceIndex);
 
-      CHECK(face.attributes().hasSurfaceAttributes());
-      CHECK(face.attributes().surfaceContents() == 8);
-      CHECK(face.attributes().surfaceFlags() == 9);
-      CHECK(face.attributes().surfaceValue() == 700.0f);
+      CHECK(!face.surfaceAttributes().empty());
+      CHECK(face.surfaceAttributes().contents == 8);
+      CHECK(face.surfaceAttributes().flags == 9);
+      CHECK(face.surfaceAttributes().value == 700.0f);
     }
 
     SECTION("surface attributes for face attribsOmitted")
@@ -487,10 +486,10 @@ TEST_CASE("WorldReader")
 
       auto& face = brush->brush().face(*faceIndex);
 
-      CHECK(!face.attributes().hasSurfaceAttributes());
-      CHECK(!face.attributes().surfaceContents());
-      CHECK(!face.attributes().surfaceFlags());
-      CHECK(!face.attributes().surfaceValue());
+      CHECK(face.surfaceAttributes().empty());
+      CHECK(!face.surfaceAttributes().contents);
+      CHECK(!face.surfaceAttributes().flags);
+      CHECK(!face.surfaceAttributes().value);
     }
 
     SECTION("surface attributes for face attribsExplicitlyZero")
@@ -500,10 +499,10 @@ TEST_CASE("WorldReader")
 
       auto& face = brush->brush().face(*faceIndex);
 
-      CHECK(face.attributes().hasSurfaceAttributes());
-      CHECK(face.attributes().surfaceContents() == 0);
-      CHECK(face.attributes().surfaceFlags() == 0);
-      CHECK(face.attributes().surfaceValue() == 0.0f);
+      CHECK(!face.surfaceAttributes().empty());
+      CHECK(face.surfaceAttributes().contents == 0);
+      CHECK(face.surfaceAttributes().flags == 0);
+      CHECK(face.surfaceAttributes().value == 0.0f);
     }
   }
 
@@ -534,7 +533,7 @@ TEST_CASE("WorldReader")
     auto* defaultLayer = world->children().front();
     CHECK(defaultLayer->childCount() == 1u);
     auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brush, true);
+    checkBrushUvCoordSystem(brush, true);
   }
 
   SECTION("Quake 3 Valve220 brush format")
@@ -564,7 +563,7 @@ TEST_CASE("WorldReader")
     auto* defaultLayer = world->children().front();
     CHECK(defaultLayer->childCount() == 1u);
     auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brush, true);
+    checkBrushUvCoordSystem(brush, true);
   }
 
   SECTION("Daikatana brush format")
@@ -594,7 +593,7 @@ TEST_CASE("WorldReader")
 
     const auto* brushNode =
       static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brushNode, false);
+    checkBrushUvCoordSystem(brushNode, false);
     const auto& brush = brushNode->brush();
 
     const auto c_mf_v3cw_index = brush.findFace("rtz/c_mf_v3cw");
@@ -604,12 +603,13 @@ TEST_CASE("WorldReader")
     REQUIRE(b_rc_v16w_index);
     REQUIRE(c_mf_v3cww_index);
 
-    CHECK(brush.face(*c_mf_v3cw_index).attributes().color() == Color{RgbB{5, 6, 7}});
-    CHECK(brush.face(*b_rc_v16w_index).attributes().surfaceContents() == 1);
-    CHECK(brush.face(*b_rc_v16w_index).attributes().surfaceFlags() == 2);
-    CHECK(brush.face(*b_rc_v16w_index).attributes().surfaceValue() == 3.0);
-    CHECK(brush.face(*b_rc_v16w_index).attributes().color() == Color{RgbB{8, 9, 10}});
-    CHECK_FALSE(brush.face(*c_mf_v3cww_index).attributes().hasColor());
+    CHECK(brush.face(*c_mf_v3cw_index).surfaceAttributes().color == Color{RgbB{5, 6, 7}});
+    CHECK(brush.face(*b_rc_v16w_index).surfaceAttributes().contents == 1);
+    CHECK(brush.face(*b_rc_v16w_index).surfaceAttributes().flags == 2);
+    CHECK(brush.face(*b_rc_v16w_index).surfaceAttributes().value == 3.0);
+    CHECK(
+      brush.face(*b_rc_v16w_index).surfaceAttributes().color == Color{RgbB{8, 9, 10}});
+    CHECK(!brush.face(*c_mf_v3cww_index).surfaceAttributes().color);
   }
 
   SECTION("Invalid Daikatana surface color")
@@ -639,13 +639,13 @@ TEST_CASE("WorldReader")
 
     const auto* brushNode =
       static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brushNode, false);
+    checkBrushUvCoordSystem(brushNode, false);
     const auto& brush = brushNode->brush();
 
     const auto c_mf_v3cw_index = brush.findFace("rtz/c_mf_v3cw");
     REQUIRE(c_mf_v3cw_index);
 
-    CHECK(!brush.face(*c_mf_v3cw_index).attributes().hasColor());
+    CHECK(!brush.face(*c_mf_v3cw_index).surfaceAttributes().color);
   }
 
   SECTION("Daikatana map header")
@@ -689,7 +689,7 @@ TEST_CASE("WorldReader")
     auto* defaultLayer = world->children().front();
     CHECK(defaultLayer->childCount() == 1u);
     auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brush, false);
+    checkBrushUvCoordSystem(brush, false);
   }
 
   SECTION("Standard brush with numeric material name")
@@ -717,7 +717,7 @@ TEST_CASE("WorldReader")
     auto* defaultLayer = world->children().front();
     CHECK(defaultLayer->childCount() == 1u);
     auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brush, false);
+    checkBrushUvCoordSystem(brush, false);
   }
 
   SECTION("Layer with brushes")
@@ -1348,7 +1348,7 @@ common/caulk
     const auto& worldNode = worldResult.value();
     CHECK(worldNode != nullptr);
     CHECK(worldNode->childCount() == 1u);
-    CHECK_FALSE(worldNode->children().front()->hasChildren());
+    CHECK(!worldNode->children().front()->hasChildren());
 
     CHECK(worldNode->entity().hasProperty(mdl::EntityPropertyKeys::Classname));
     CHECK(worldNode->entity().hasProperty("message"));
@@ -1371,7 +1371,7 @@ common/caulk
     const auto& worldNode = worldResult.value();
     CHECK(worldNode != nullptr);
     CHECK(worldNode->childCount() == 1u);
-    CHECK_FALSE(worldNode->children().front()->hasChildren());
+    CHECK(!worldNode->children().front()->hasChildren());
 
     CHECK(worldNode->entity().hasProperty(mdl::EntityPropertyKeys::Classname));
     CHECK(worldNode->entity().hasProperty("path"));
@@ -1394,7 +1394,7 @@ common/caulk
     const auto& worldNode = worldResult.value();
     CHECK(worldNode != nullptr);
     CHECK(worldNode->childCount() == 1u);
-    CHECK_FALSE(worldNode->children().front()->hasChildren());
+    CHECK(!worldNode->children().front()->hasChildren());
 
     CHECK(worldNode->entity().hasProperty(mdl::EntityPropertyKeys::Classname));
     CHECK(worldNode->entity().hasProperty("path"));
@@ -1417,7 +1417,7 @@ common/caulk
     const auto& worldNode = worldResult.value();
     CHECK(worldNode != nullptr);
     CHECK(worldNode->childCount() == 1u);
-    CHECK_FALSE(worldNode->children().front()->hasChildren());
+    CHECK(!worldNode->children().front()->hasChildren());
 
     CHECK(worldNode->entity().hasProperty(mdl::EntityPropertyKeys::Classname));
     CHECK(worldNode->entity().hasProperty("message"));
@@ -1441,7 +1441,7 @@ common/caulk
     const auto& worldNode = worldResult.value();
     CHECK(worldNode != nullptr);
     CHECK(worldNode->childCount() == 1u);
-    CHECK_FALSE(worldNode->children().front()->hasChildren());
+    CHECK(!worldNode->children().front()->hasChildren());
 
     CHECK(worldNode->entity().hasProperty(mdl::EntityPropertyKeys::Classname));
     CHECK(worldNode->entity().hasProperty("message"));
@@ -1472,7 +1472,7 @@ common/caulk
     CHECK(brushNode->logicalBounds() == vm::bbox3d{{-512, -512, -64}, {512, 512, 0}});
     for (const auto& face : brushNode->brush().faces())
     {
-      CHECK("general/sand1" == face.attributes().materialName());
+      CHECK("general/sand1" == face.materialName());
     }
   }
 
@@ -1512,8 +1512,8 @@ common/caulk
 
     for (const auto& face : brush->brush().faces())
     {
-      CHECK(!face.attributes().materialName().empty());
-      CHECK(face.attributes().materialName() == mdl::BrushFaceAttributes::NoMaterialName);
+      CHECK(!face.materialName().empty());
+      CHECK(face.materialName() == mdl::BrushFace::NoMaterialName);
     }
   }
 
@@ -1570,7 +1570,7 @@ common/caulk
       dynamic_cast<mdl::BrushNode*>(defaultLayerNode->children().front());
     REQUIRE(brushNode != nullptr);
 
-    CHECK(brushNode->brush().face(0).attributes().materialName() == expectedName);
+    CHECK(brushNode->brush().face(0).materialName() == expectedName);
   }
 
   SECTION("Linked groups")
@@ -1991,17 +1991,12 @@ common/caulk
     REQUIRE(world != nullptr);
     CHECK(world->mapFormat() == mdl::MapFormat::Standard);
   }
-}
 
-TEST_CASE("WorldReader (Regression)", "[regression]")
-{
-  auto taskManager = kdl::task_manager{};
-  const auto worldBounds = vm::bbox3d{8192.0};
-  auto status = TestParserStatus{};
-
-  SECTION("1424")
+  SECTION("Regression tests")
   {
-    const auto data = R"(
+    SECTION("1424")
+    {
+      const auto data = R"(
 {
 "classname" "worldspawn"
 "message" "yay"
@@ -2015,14 +2010,14 @@ TEST_CASE("WorldReader (Regression)", "[regression]")
 }
 })";
 
-    auto reader = WorldReader{data, mdl::MapFormat::Standard, {}};
-    auto world = reader.read(worldBounds, status, taskManager);
-    CHECK(world != nullptr);
-  }
+      auto reader = WorldReader{data, mdl::MapFormat::Standard, {}};
+      auto world = reader.read(worldBounds, status, taskManager);
+      CHECK(world != nullptr);
+    }
 
-  SECTION("Problematic brush 1")
-  {
-    const auto data = R"(
+    SECTION("Problematic brush 1")
+    {
+      const auto data = R"(
 {
 "classname" "worldspawn"
 {
@@ -2035,32 +2030,32 @@ TEST_CASE("WorldReader (Regression)", "[regression]")
 }
 })";
 
-    auto reader = WorldReader{data, mdl::MapFormat::Standard, {}};
-    auto worldResult = reader.read(worldBounds, status, taskManager);
-    REQUIRE(worldResult);
+      auto reader = WorldReader{data, mdl::MapFormat::Standard, {}};
+      auto worldResult = reader.read(worldBounds, status, taskManager);
+      REQUIRE(worldResult);
 
-    const auto& world = worldResult.value();
-    REQUIRE(world != nullptr);
+      const auto& world = worldResult.value();
+      REQUIRE(world != nullptr);
 
-    CHECK(world->childCount() == 1u);
-    auto* defaultLayer = world->children().front();
-    CHECK(defaultLayer->childCount() == 1u);
+      CHECK(world->childCount() == 1u);
+      auto* defaultLayer = world->children().front();
+      CHECK(defaultLayer->childCount() == 1u);
 
-    auto* brushNode = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brushNode, false);
-    const auto& faces = brushNode->brush().faces();
-    CHECK(faces.size() == 6u);
-    CHECK(findFaceByPoints(faces, {308, 108, 176}, {308, 132, 176}, {252, 132, 176}));
-    CHECK(findFaceByPoints(faces, {252, 132, 208}, {308, 132, 208}, {308, 108, 208}));
-    CHECK(findFaceByPoints(faces, {288, 152, 176}, {288, 152, 208}, {288, 120, 208}));
-    CHECK(findFaceByPoints(faces, {288, 122, 176}, {288, 122, 208}, {308, 102, 208}));
-    CHECK(findFaceByPoints(faces, {308, 100, 176}, {308, 100, 208}, {324, 116, 208}));
-    CHECK(findFaceByPoints(faces, {287, 152, 208}, {287, 152, 176}, {323, 116, 176}));
-  }
+      auto* brushNode = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
+      checkBrushUvCoordSystem(brushNode, false);
+      const auto& faces = brushNode->brush().faces();
+      CHECK(faces.size() == 6u);
+      CHECK(findFaceByPoints(faces, {308, 108, 176}, {308, 132, 176}, {252, 132, 176}));
+      CHECK(findFaceByPoints(faces, {252, 132, 208}, {308, 132, 208}, {308, 108, 208}));
+      CHECK(findFaceByPoints(faces, {288, 152, 176}, {288, 152, 208}, {288, 120, 208}));
+      CHECK(findFaceByPoints(faces, {288, 122, 176}, {288, 122, 208}, {308, 102, 208}));
+      CHECK(findFaceByPoints(faces, {308, 100, 176}, {308, 100, 208}, {324, 116, 208}));
+      CHECK(findFaceByPoints(faces, {287, 152, 208}, {287, 152, 176}, {323, 116, 176}));
+    }
 
-  SECTION("Problematic brush 2")
-  {
-    const auto data = R"(
+    SECTION("Problematic brush 2")
+    {
+      const auto data = R"(
 {
 "classname" "worldspawn"
 {
@@ -2072,23 +2067,23 @@ TEST_CASE("WorldReader (Regression)", "[regression]")
 ( -559 1090 96 ) ( -598 1090 96 ) ( -598 1055 96 ) mt_sr_v13 -16 0 0 1 1
 }
 })";
-    auto reader = WorldReader{data, mdl::MapFormat::Standard, {}};
-    auto worldResult = reader.read(worldBounds, status, taskManager);
-    REQUIRE(worldResult);
+      auto reader = WorldReader{data, mdl::MapFormat::Standard, {}};
+      auto worldResult = reader.read(worldBounds, status, taskManager);
+      REQUIRE(worldResult);
 
-    const auto& world = worldResult.value();
-    REQUIRE(world != nullptr);
+      const auto& world = worldResult.value();
+      REQUIRE(world != nullptr);
 
-    CHECK(world->childCount() == 1u);
-    auto* defaultLayer = world->children().front();
-    CHECK(defaultLayer->childCount() == 1u);
-    auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brush, false);
-  }
+      CHECK(world->childCount() == 1u);
+      auto* defaultLayer = world->children().front();
+      CHECK(defaultLayer->childCount() == 1u);
+      auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
+      checkBrushUvCoordSystem(brush, false);
+    }
 
-  SECTION("Problematic brush 3")
-  {
-    const auto data = R"(
+    SECTION("Problematic brush 3")
+    {
+      const auto data = R"(
 {
 "classname" "worldspawn"
 {
@@ -2100,18 +2095,19 @@ TEST_CASE("WorldReader (Regression)", "[regression]")
 ( -32 1136 32 ) ( -32 1152 -96 ) ( -32 1120 -96 ) b_rc_v4 0 32 90 1 1
 }
 })";
-    auto reader = WorldReader{data, mdl::MapFormat::Standard, {}};
-    auto worldResult = reader.read(worldBounds, status, taskManager);
-    REQUIRE(worldResult);
+      auto reader = WorldReader{data, mdl::MapFormat::Standard, {}};
+      auto worldResult = reader.read(worldBounds, status, taskManager);
+      REQUIRE(worldResult);
 
-    const auto& world = worldResult.value();
-    REQUIRE(world != nullptr);
+      const auto& world = worldResult.value();
+      REQUIRE(world != nullptr);
 
-    CHECK(world->childCount() == 1u);
-    auto* defaultLayer = world->children().front();
-    CHECK(defaultLayer->childCount() == 1u);
-    auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
-    checkBrushUVCoordSystem(brush, false);
+      CHECK(world->childCount() == 1u);
+      auto* defaultLayer = world->children().front();
+      CHECK(defaultLayer->childCount() == 1u);
+      auto* brush = static_cast<mdl::BrushNode*>(defaultLayer->children().front());
+      checkBrushUvCoordSystem(brush, false);
+    }
   }
 }
 

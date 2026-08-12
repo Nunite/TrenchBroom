@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/HitType.h"
@@ -129,8 +129,14 @@ public:
 
   const mdl::Grid& grid() const;
 
-  mdl::Hit pick2D(const vm::ray3d& pickRay, const mdl::PickResult& pickResult) const;
-  mdl::Hit pick3D(const vm::ray3d& pickRay, const mdl::PickResult& pickResult) const;
+  mdl::Hit pick2D(
+    const vm::ray3d& pickRay,
+    const gl::Camera& camera,
+    const mdl::PickResult& pickResult) const;
+  mdl::Hit pick3D(
+    const vm::ray3d& pickRay,
+    const gl::Camera& camera,
+    const mdl::PickResult& pickResult) const;
 
   /**
    * Returns the current proposed drag handles as per the last call to

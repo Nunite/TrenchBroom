@@ -19,9 +19,9 @@
 
 #include "mdl/Map_CopyPaste.h"
 
-#include "Logger.h"
-#include "SimpleParserStatus.h"
-#include "Uuid.h"
+#include "base/Logger.h"
+#include "base/SimpleParserStatus.h"
+#include "base/Uuid.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushFaceReader.h"
@@ -55,7 +55,7 @@ namespace tb::mdl
 namespace
 {
 
-auto extractNodesToPaste(const std::vector<Node*>& nodes, Node* parent)
+auto extractNodesToPaste(const std::vector<Node*>& nodes, Node& parent)
 {
   auto nodesToDetach = std::vector<Node*>{};
   auto nodesToDelete = std::vector<Node*>{};
@@ -75,7 +75,7 @@ auto extractNodesToPaste(const std::vector<Node*>& nodes, Node* parent)
       },
       [&](GroupNode& groupNode) {
         nodesToDetach.push_back(&groupNode);
-        nodesToAdd[parent].push_back(&groupNode);
+        nodesToAdd[&parent].push_back(&groupNode);
       },
       [&](auto&& thisLambda, EntityNode& entityNode) {
         if (isWorldspawn(entityNode.entity().classname()))
@@ -87,16 +87,16 @@ auto extractNodesToPaste(const std::vector<Node*>& nodes, Node* parent)
         else
         {
           nodesToDetach.push_back(&entityNode);
-          nodesToAdd[parent].push_back(&entityNode);
+          nodesToAdd[&parent].push_back(&entityNode);
         }
       },
       [&](BrushNode& brushNode) {
         nodesToDetach.push_back(&brushNode);
-        nodesToAdd[parent].push_back(&brushNode);
+        nodesToAdd[&parent].push_back(&brushNode);
       },
       [&](PatchNode& patchNode) {
         nodesToDetach.push_back(&patchNode);
-        nodesToAdd[parent].push_back(&patchNode);
+        nodesToAdd[&parent].push_back(&patchNode);
       }));
   }
 
@@ -244,7 +244,7 @@ bool pasteBrushFaces(Map& map, const std::vector<BrushFace>& faces)
 {
   contract_pre(!faces.empty());
 
-  const auto update = copyAllExceptContentFlags(faces.back().attributes());
+  const auto update = copyAllExceptContentFlags(faces.back());
   return setBrushFaceAttributes(map, update);
 }
 

@@ -1,7 +1,7 @@
 #include "ui/BoxSelectionTool.h"
 
-#include "Color.h"
-#include "Macros.h"
+#include "base/Color.h"
+#include "base/Macros.h"
 #include "gl/Camera.h"
 #include "mdl/EditorContext.h"
 #include "mdl/Map.h"

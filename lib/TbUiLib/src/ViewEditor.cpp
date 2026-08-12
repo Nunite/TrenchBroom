@@ -27,15 +27,17 @@
 #include <QRadioButton>
 #include <QScrollArea>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "mdl/EditorContext.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionGroup.h"
 #include "mdl/EntityDefinitionManager.h"
 #include "mdl/Map.h"
+#include "mdl/MapFormat.h"
 #include "mdl/Tag.h"
 #include "mdl/TagType.h"
+#include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "ui/BorderPanel.h"
 #include "ui/MapDocument.h"
 #include "ui/PopupButton.h"
@@ -295,20 +297,29 @@ void ViewEditor::createGui()
   m_guiMap = &m_document.map();
   deleteChildWidgetsAndDeleteLayout(this);
 
-  auto* sizer = new QGridLayout{};
-  sizer->setContentsMargins(
+  // this checkbox is only created conditionally, see below
+  m_showPatchesCheckBox = nullptr;
+
+  auto* gridLayout = new QGridLayout{};
+  gridLayout->setContentsMargins(
     LayoutConstants::WideHMargin,
     LayoutConstants::WideVMargin,
     LayoutConstants::WideHMargin,
     LayoutConstants::WideVMargin);
-  sizer->setHorizontalSpacing(LayoutConstants::WideHMargin);
-  sizer->setVerticalSpacing(LayoutConstants::WideVMargin);
-  sizer->addWidget(createEntityDefinitionsPanel(this), 0, 0, 3, 1);
-  sizer->addWidget(createEntitiesPanel(this), 0, 1);
-  sizer->addWidget(createBrushesPanel(this), 1, 1);
-  sizer->addWidget(createRendererPanel(this), 2, 1);
+  gridLayout->setHorizontalSpacing(LayoutConstants::WideHMargin);
+  gridLayout->setVerticalSpacing(LayoutConstants::WideVMargin);
 
-  setLayout(sizer);
+  auto row = 0;
+  gridLayout->addWidget(createEntitiesPanel(this), row++, 1);
+  gridLayout->addWidget(createBrushesPanel(this), row++, 1);
+  if (auto* patchesPanel = createPatchesPanel(this))
+  {
+    gridLayout->addWidget(patchesPanel, row++, 1);
+  }
+  gridLayout->addWidget(createRendererPanel(this), row++, 1);
+  gridLayout->addWidget(createEntityDefinitionsPanel(this), 0, 0, row, 1);
+
+  setLayout(gridLayout);
 }
 
 QWidget* ViewEditor::createEntityDefinitionsPanel(QWidget* parent)
@@ -406,6 +417,34 @@ QWidget* ViewEditor::createBrushesPanel(QWidget* parent)
   contract_assert(innerLayout);
 
   innerLayout->insertWidget(0, m_showBrushesCheckBox);
+
+  return panel;
+}
+
+QWidget* ViewEditor::createPatchesPanel(QWidget* parent)
+{
+  const auto& map = m_document.map();
+  if (!mdl::hasPatchSupport(map.worldNode().mapFormat()))
+  {
+    m_showPatchesCheckBox = nullptr;
+    return nullptr;
+  }
+
+  auto* panel = new TitledPanel{"Patches", parent, false};
+  auto* inner = panel->getPanel();
+
+  m_showPatchesCheckBox = new QCheckBox{tr("Show Patches")};
+  connect(
+    m_showPatchesCheckBox,
+    &QAbstractButton::clicked,
+    this,
+    &ViewEditor::showPatchesChanged);
+
+  auto* innerLayout = new QVBoxLayout{};
+  innerLayout->setContentsMargins(0, 0, 0, 0);
+  innerLayout->setSpacing(0);
+  innerLayout->addWidget(m_showPatchesCheckBox);
+  inner->setLayout(innerLayout);
 
   return panel;
 }
@@ -594,6 +633,7 @@ void ViewEditor::refreshGui()
   refreshEntityDefinitionsPanel();
   refreshEntitiesPanel();
   refreshBrushesPanel();
+  refreshPatchesPanel();
   refreshRendererPanel();
 }
 
@@ -623,6 +663,15 @@ void ViewEditor::refreshBrushesPanel()
   for (const auto& [tagType, checkBox] : m_tagCheckBoxes)
   {
     checkBox->setChecked((tagType & hiddenTags) == 0);
+  }
+}
+
+void ViewEditor::refreshPatchesPanel()
+{
+  const auto& map = m_document.map();
+  if (mdl::hasPatchSupport(map.worldNode().mapFormat()))
+  {
+    m_showPatchesCheckBox->setChecked(pref(Preferences::ShowPatches));
   }
 }
 
@@ -699,6 +748,11 @@ void ViewEditor::showTagChanged(const bool checked, const mdl::TagType::Type tag
   }
 
   editorContext.setHiddenTags(hiddenTags);
+}
+
+void ViewEditor::showPatchesChanged(const bool checked)
+{
+  setPref(Preferences::ShowPatches, checked);
 }
 
 void ViewEditor::faceRenderModeChanged(const int id)

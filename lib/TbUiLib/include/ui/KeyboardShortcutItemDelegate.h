@@ -23,12 +23,16 @@
 
 namespace tb::ui
 {
+class KeyboardShortcutModel;
 
 class KeyboardShortcutItemDelegate : public QStyledItemDelegate
 {
   Q_OBJECT
+private:
+  const KeyboardShortcutModel& m_model;
+
 public:
-  explicit KeyboardShortcutItemDelegate(QObject* parent = nullptr);
+  explicit KeyboardShortcutItemDelegate(const KeyboardShortcutModel& model);
   QWidget* createEditor(
     QWidget* parent,
     const QStyleOptionViewItem& option,

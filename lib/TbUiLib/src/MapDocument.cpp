@@ -19,9 +19,8 @@
 
 #include "ui/MapDocument.h"
 
-#include "LoggingHub.h"
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/LoggingHub.h"
+#include "base/PreferenceManager.h"
 #include "fs/DiskIO.h"
 #include "gl/MaterialManager.h"
 #include "gl/ResourceManager.h"
@@ -43,6 +42,7 @@
 #include "mdl/Transaction.h"
 #include "mdl/UpdateLinkedGroupsHelper.h"
 #include "mdl/WorldReader.h"
+#include "prefs/Preferences.h"
 #include "render/MapRenderer.h"
 #include "ui/ActionManager.h"
 
@@ -192,8 +192,9 @@ void MapDocument::updateMapFromPreferences()
 
   m_map->editorContext().setShowPointEntities(pref(Preferences::ShowPointEntities));
   m_map->editorContext().setShowBrushes(pref(Preferences::ShowBrushes));
+  m_map->editorContext().setShowPatches(pref(Preferences::ShowPatches));
   m_map->editorContext().setAlignmentLock(pref(Preferences::AlignmentLock));
-  m_map->editorContext().setUVLock(pref(Preferences::UVLock));
+  m_map->editorContext().setUvLock(pref(Preferences::UvLock));
 }
 
 mdl::Map& MapDocument::map()

@@ -21,8 +21,8 @@
 #include <QJsonObject>
 #include <QStringList>
 
-#include "Color.h"
-#include "Macros.h"
+#include "base/Color.h"
+#include "base/Macros.h"
 #include "McpBridgeServerTools.h"
 #include "McpResponseUtils.h"
 #include "McpToolSupport.h"
@@ -509,14 +509,14 @@ std::optional<QJsonArray> addNodesWithTransaction(
       mdl::deselectAll(map);
     }
 
-    auto* parent = mdl::parentForNodes(map);
-    if (!parent || !parent->canAddChildren(std::begin(nodes), std::end(nodes)))
+    auto& parent = mdl::parentForNodes(map);
+    if (!parent.canAddChildren(std::begin(nodes), std::end(nodes)))
     {
       return false;
     }
 
     auto nodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
-    nodesToAdd.emplace(parent, nodes);
+    nodesToAdd.emplace(&parent, nodes);
     if (!map.executeAndStore(mdl::AddRemoveNodesCommand::add(nodesToAdd)))
     {
       return false;
@@ -1789,8 +1789,8 @@ McpBridgeToolResult untieBrushesForMapResult(
   }
 
   const auto nodes = kdl::vec_static_cast<mdl::Node*>(brushes);
-  auto* parent = mdl::parentForNodes(map, nodes);
-  if (!parent || !mdl::reparentNodes(map, {{parent, nodes}}))
+  auto& parent = mdl::parentForNodes(map, nodes);
+  if (!mdl::reparentNodes(map, {{&parent, nodes}}))
   {
     return McpBridgeToolResult::failure(
       mcp::McpErrorCode::InternalError, "Failed to untie brushes");

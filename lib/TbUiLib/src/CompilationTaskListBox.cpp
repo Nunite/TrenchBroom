@@ -21,16 +21,20 @@
 
 #include <QBoxLayout>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QCompleter>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSignalBlocker>
 
 #include "el/Interpolate.h"
 #include "mdl/CompilationProfile.h"
 #include "mdl/CompilationTask.h"
+#include "mdl/GameInfo.h"
+#include "mdl/Map.h"
 #include "ui/BorderLine.h"
 #include "ui/CompilationVariables.h"
 #include "ui/FileDialogDefaultDir.h"
@@ -138,7 +142,7 @@ CompilationExportMapTaskEditor::CompilationExportMapTaskEditor(
     LayoutConstants::WideVMargin,
     LayoutConstants::WideHMargin,
     LayoutConstants::WideVMargin);
-  formLayout->setVerticalSpacing(LayoutConstants::NarrowVMargin);
+  formLayout->setVerticalSpacing(LayoutConstants::MediumVMargin);
   formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
   addMainLayout(formLayout);
 
@@ -148,6 +152,21 @@ CompilationExportMapTaskEditor::CompilationExportMapTaskEditor(
 Variables are allowed.)");
   setupCompleter(m_targetEditor);
   formLayout->addRow("File Path", m_targetEditor);
+
+  m_stripEntityPattern = new QLineEdit{};
+  m_stripEntityPattern->setToolTip(
+    tr("Set a GLOB pattern to strip any entities with a matching classname. Example: "
+       "'info_player_*' to strip all info_player_start and all info_player_deatchmatch "
+       "entities."));
+  m_stripEntityPattern->setPlaceholderText("enter GLOB pattern");
+  formLayout->addRow("Strip Entities", m_stripEntityPattern);
+
+  m_dropEntity = new QLineEdit{};
+  m_dropEntity->setToolTip(tr(
+    "Set the classname of an entity that will be added to the map. The entities' origin "
+    "and angles will be set to the camera position and view direction, respectively."));
+  m_dropEntity->setPlaceholderText("enter classname");
+  formLayout->addRow("Add Entity", m_dropEntity);
 
   m_stripTbProperties = new QCheckBox{"Strip TrenchBroom specific entity properties"};
   m_stripTbProperties->setToolTip(
@@ -160,6 +179,16 @@ Variables are allowed.)");
     &QLineEdit::textChanged,
     this,
     &CompilationExportMapTaskEditor::targetSpecChanged);
+  connect(
+    m_stripEntityPattern,
+    &QLineEdit::textChanged,
+    this,
+    &CompilationExportMapTaskEditor::stripEntityPatternChanged);
+  connect(
+    m_dropEntity,
+    &QLineEdit::textChanged,
+    this,
+    &CompilationExportMapTaskEditor::dropEntityChanged);
   connect(
     m_stripTbProperties,
     &QCheckBox::checkStateChanged,
@@ -182,6 +211,20 @@ void CompilationExportMapTaskEditor::updateItem()
     m_stripTbProperties->setCheckState(
       task().stripTbProperties ? Qt::CheckState::Checked : Qt::CheckState::Unchecked);
   }
+
+  const auto stripEntityPattern =
+    QString::fromStdString(task().stripEntityPattern.value_or(""));
+  if (m_stripEntityPattern->text() != stripEntityPattern)
+  {
+    m_stripEntityPattern->setText(stripEntityPattern);
+  }
+
+  const auto dropEntity =
+    QString::fromStdString(task().entityToAdd ? task().entityToAdd->classname() : "");
+  if (m_dropEntity->text() != dropEntity)
+  {
+    m_dropEntity->setText(dropEntity);
+  }
 }
 
 mdl::CompilationExportMap& CompilationExportMapTaskEditor::task()
@@ -194,6 +237,32 @@ mdl::CompilationExportMap& CompilationExportMapTaskEditor::task()
 void CompilationExportMapTaskEditor::targetSpecChanged(const QString& text)
 {
   task().targetSpec = text.toStdString();
+}
+
+void CompilationExportMapTaskEditor::dropEntityChanged(const QString& text)
+{
+  if (text.isEmpty())
+  {
+    task().entityToAdd = std::nullopt;
+  }
+  else
+  {
+    task().entityToAdd = mdl::Entity{{
+      {mdl::EntityPropertyKeys::Classname, text.toStdString()},
+    }};
+  }
+}
+
+void CompilationExportMapTaskEditor::stripEntityPatternChanged(const QString& text)
+{
+  if (text.isEmpty())
+  {
+    task().stripEntityPattern = std::nullopt;
+  }
+  else
+  {
+    task().stripEntityPattern = text.toStdString();
+  }
 }
 
 void CompilationExportMapTaskEditor::stripTbPropertiesChanged(const int state)
@@ -217,7 +286,7 @@ CompilationCopyFilesTaskEditor::CompilationCopyFilesTaskEditor(
     LayoutConstants::WideVMargin,
     LayoutConstants::WideHMargin,
     LayoutConstants::WideVMargin);
-  formLayout->setVerticalSpacing(LayoutConstants::NarrowVMargin);
+  formLayout->setVerticalSpacing(LayoutConstants::MediumVMargin);
   formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
   addMainLayout(formLayout);
 
@@ -301,7 +370,7 @@ CompilationRenameFileTaskEditor::CompilationRenameFileTaskEditor(
     LayoutConstants::WideVMargin,
     LayoutConstants::WideHMargin,
     LayoutConstants::WideVMargin);
-  formLayout->setVerticalSpacing(LayoutConstants::NarrowVMargin);
+  formLayout->setVerticalSpacing(LayoutConstants::MediumVMargin);
   formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
   addMainLayout(formLayout);
 
@@ -386,7 +455,7 @@ CompilationDeleteFilesTaskEditor::CompilationDeleteFilesTaskEditor(
     LayoutConstants::WideVMargin,
     LayoutConstants::WideHMargin,
     LayoutConstants::WideVMargin);
-  formLayout->setVerticalSpacing(LayoutConstants::NarrowVMargin);
+  formLayout->setVerticalSpacing(LayoutConstants::MediumVMargin);
   formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
   addMainLayout(formLayout);
 
@@ -446,7 +515,7 @@ CompilationRunToolTaskEditor::CompilationRunToolTaskEditor(
     LayoutConstants::WideVMargin,
     LayoutConstants::WideHMargin,
     LayoutConstants::WideVMargin);
-  formLayout->setVerticalSpacing(LayoutConstants::NarrowVMargin);
+  formLayout->setVerticalSpacing(LayoutConstants::MediumVMargin);
   formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
   addMainLayout(formLayout);
 
@@ -567,6 +636,97 @@ void CompilationRunToolTaskEditor::treatNonZeroResultCodeAsErrorChanged(const in
   task().treatNonZeroResultCodeAsError = value;
 }
 
+// CompilationLaunchEngineTaskEditor
+
+CompilationLaunchEngineTaskEditor::CompilationLaunchEngineTaskEditor(
+  MapDocument& document,
+  mdl::CompilationProfile& profile,
+  mdl::CompilationTask& task,
+  QWidget* parent)
+  : CompilationTaskEditorBase{"Launch Engine", document, profile, task, parent}
+{
+  contract_pre(std::holds_alternative<mdl::CompilationLaunchEngine>(task));
+
+  auto* formLayout = new QFormLayout{};
+  formLayout->setContentsMargins(
+    LayoutConstants::WideHMargin,
+    LayoutConstants::WideVMargin,
+    LayoutConstants::WideHMargin,
+    LayoutConstants::WideVMargin);
+  formLayout->setVerticalSpacing(LayoutConstants::MediumVMargin);
+  formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+  addMainLayout(formLayout);
+
+  m_engineProfileEditor = new QComboBox{};
+  m_engineProfileEditor->setToolTip(
+    tr("The Launch Engine profile to start when this task runs"));
+  formLayout->addRow("Engine Profile", m_engineProfileEditor);
+
+  m_treatLaunchFailureAsError = new QCheckBox{"Stop on launch failure"};
+  m_treatLaunchFailureAsError->setToolTip(
+    tr("Stop compilation if the engine cannot be launched"));
+  formLayout->addRow("", m_treatLaunchFailureAsError);
+
+  connect(
+    m_engineProfileEditor,
+    QOverload<int>::of(&QComboBox::currentIndexChanged),
+    this,
+    &CompilationLaunchEngineTaskEditor::engineProfileChanged);
+  connect(
+    m_treatLaunchFailureAsError,
+    &QCheckBox::checkStateChanged,
+    this,
+    &CompilationLaunchEngineTaskEditor::treatLaunchFailureAsErrorChanged);
+}
+
+void CompilationLaunchEngineTaskEditor::updateItem()
+{
+  CompilationTaskEditorBase::updateItem();
+
+  const auto signalBlocker = QSignalBlocker{m_engineProfileEditor};
+  m_engineProfileEditor->clear();
+
+  const auto& engineProfiles = m_document.map().gameInfo().gameEngineConfig.profiles;
+  for (const auto& engineProfile : engineProfiles)
+  {
+    m_engineProfileEditor->addItem(
+      QString::fromStdString(engineProfile.name),
+      QString::fromStdString(engineProfile.id));
+  }
+
+  m_engineProfileEditor->setCurrentIndex(
+    m_engineProfileEditor->findData(QString::fromStdString(task().engineProfileId)));
+
+  if (m_treatLaunchFailureAsError->isChecked() != task().treatLaunchFailureAsError)
+  {
+    m_treatLaunchFailureAsError->setCheckState(
+      task().treatLaunchFailureAsError ? Qt::CheckState::Checked
+                                       : Qt::CheckState::Unchecked);
+  }
+}
+
+mdl::CompilationLaunchEngine& CompilationLaunchEngineTaskEditor::task()
+{
+  // This is safe because we know what type of task the editor was initialized with.
+  // We have to do this to avoid using a template as the base class.
+  return std::get<mdl::CompilationLaunchEngine>(m_task);
+}
+
+void CompilationLaunchEngineTaskEditor::engineProfileChanged(const int index)
+{
+  if (index >= 0)
+  {
+    task().engineProfileId =
+      m_engineProfileEditor->itemData(index).toString().toStdString();
+  }
+}
+
+void CompilationLaunchEngineTaskEditor::treatLaunchFailureAsErrorChanged(const int state)
+{
+  const auto value = (state == Qt::Checked);
+  task().treatLaunchFailureAsError = value;
+}
+
 // CompilationTaskListBox
 
 CompilationTaskListBox::CompilationTaskListBox(MapDocument& document, QWidget* parent)
@@ -584,6 +744,13 @@ void CompilationTaskListBox::setProfile(mdl::CompilationProfile* profile)
 void CompilationTaskListBox::reloadTasks()
 {
   reload();
+}
+
+void CompilationTaskListBox::updateTasks()
+{
+  // Refresh existing task editors without rebuilding the list, so scroll position and
+  // selection survive external changes such as editing Launch Engine profiles.
+  updateItems();
 }
 
 size_t CompilationTaskListBox::itemCount() const
@@ -613,6 +780,10 @@ ControlListBoxItemRenderer* CompilationTaskListBox::createItemRenderer(
       },
       [&](const mdl::CompilationRunTool&) -> ControlListBoxItemRenderer* {
         return new CompilationRunToolTaskEditor{m_document, *m_profile, task, parent};
+      },
+      [&](const mdl::CompilationLaunchEngine&) -> ControlListBoxItemRenderer* {
+        return new CompilationLaunchEngineTaskEditor{
+          m_document, *m_profile, task, parent};
       }),
     task);
 

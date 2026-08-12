@@ -40,7 +40,7 @@ TEST_CASE("UpdateLinkedGroupsCommand")
 
   const auto createLinkedGroup = [&]() {
     auto brushNode = createBrushNode(map);
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
     selectNodes(map, {brushNode});
 
     auto* groupNode = groupSelectedNodes(map, "group");
@@ -74,7 +74,7 @@ TEST_CASE("UpdateLinkedGroupsCommand")
     firstCommand.performDo(map);
     secondCommand.performDo(map);
 
-    CHECK_FALSE(firstCommand.collateWith(secondCommand));
+    CHECK(!firstCommand.collateWith(secondCommand));
   }
 }
 

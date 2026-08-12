@@ -1,6 +1,6 @@
 #include "ui/python/PythonRuntime.h"
 
-#include "Logger.h"
+#include "base/Logger.h"
 #include "ui/MapWindow.h"
 #include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonV2Module.h"

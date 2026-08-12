@@ -60,7 +60,7 @@ TEST_CASE("Map_NodeLocking")
       CHECK(layerNode->locked());
 
       map.undoCommand();
-      CHECK_FALSE(layerNode->locked());
+      CHECK(!layerNode->locked());
     }
 
     SECTION("Object nodes")
@@ -73,7 +73,7 @@ TEST_CASE("Map_NodeLocking")
 
       addNodes(
         map,
-        {{parentForNodes(map), {brushNode, entityNode, patchNode, entityNodeInGroup}}});
+        {{&parentForNodes(map), {brushNode, entityNode, patchNode, entityNodeInGroup}}});
       deselectAll(map);
       selectNodes(map, {entityNodeInGroup});
 
@@ -94,10 +94,10 @@ TEST_CASE("Map_NodeLocking")
       SECTION("Undo and redo")
       {
         map.undoCommand();
-        CHECK_FALSE(brushNode->locked());
-        CHECK_FALSE(entityNode->locked());
-        CHECK_FALSE(groupNode->locked());
-        CHECK_FALSE(patchNode->locked());
+        CHECK(!brushNode->locked());
+        CHECK(!entityNode->locked());
+        CHECK(!groupNode->locked());
+        CHECK(!patchNode->locked());
 
         map.redoCommand();
         CHECK(brushNode->locked());
@@ -117,7 +117,7 @@ TEST_CASE("Map_NodeLocking")
 
       addNodes(
         map,
-        {{parentForNodes(map), {brushNode, entityNode, patchNode, entityNodeInGroup}}});
+        {{&parentForNodes(map), {brushNode, entityNode, patchNode, entityNodeInGroup}}});
       deselectAll(map);
       selectNodes(map, {entityNodeInGroup});
 
@@ -245,7 +245,7 @@ TEST_CASE("Map_NodeLocking")
   {
     auto* brushNode = createBrushNode(map);
     auto* entityNode = new EntityNode{Entity{}};
-    addNodes(map, {{parentForNodes(map), {brushNode, entityNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode, entityNode}}});
 
     lockNodes(map, {brushNode});
     REQUIRE(brushNode->locked());
@@ -272,7 +272,7 @@ TEST_CASE("Map_NodeLocking")
     auto* lockedNode = new EntityNode{Entity{}};
     auto* unlockedNode = new EntityNode{Entity{}};
     auto* inheritedNode = new EntityNode{Entity{}};
-    addNodes(map, {{parentForNodes(map), {lockedNode, unlockedNode, inheritedNode}}});
+    addNodes(map, {{&parentForNodes(map), {lockedNode, unlockedNode, inheritedNode}}});
 
     lockNodes(map, {lockedNode});
     unlockNodes(map, {unlockedNode});
@@ -304,7 +304,7 @@ TEST_CASE("Map_NodeLocking")
     auto* lockedNode = new EntityNode{Entity{}};
     auto* unlockedNode = new EntityNode{Entity{}};
     auto* inheritedNode = new EntityNode{Entity{}};
-    addNodes(map, {{parentForNodes(map), {lockedNode, unlockedNode, inheritedNode}}});
+    addNodes(map, {{&parentForNodes(map), {lockedNode, unlockedNode, inheritedNode}}});
 
     lockNodes(map, {lockedNode});
     unlockNodes(map, {unlockedNode});

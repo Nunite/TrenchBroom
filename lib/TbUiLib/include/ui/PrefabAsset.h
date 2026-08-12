@@ -21,7 +21,7 @@
 
 #include <QImage>
 
-#include "Result.h"
+#include "base/Result.h"
 
 #include <filesystem>
 #include <string>

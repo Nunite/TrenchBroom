@@ -86,7 +86,7 @@ TEST_CASE("SmartModelEditor")
       {"model", "models/scientist.mdl"},
       {"mdl", "scientist.mdl"},
     }}};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {entityNode}}});
     mdl::selectNodes(map, {entityNode});
 
     auto manager = SmartPropertyEditorManager{document};

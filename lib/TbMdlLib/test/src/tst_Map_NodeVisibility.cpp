@@ -51,7 +51,7 @@ TEST_CASE("Map_NodeVisibility")
     GIVEN("An unrelated top level node")
     {
       auto* nodeToHide = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {nodeToHide}}});
+      addNodes(map, {{&parentForNodes(map), {nodeToHide}}});
 
       REQUIRE(!nodeToHide->hidden());
 
@@ -69,7 +69,7 @@ TEST_CASE("Map_NodeVisibility")
           CreateNode{[](const auto&) { return createPatchNode(); }});
 
         auto* nodeToIsolate = createNode(map);
-        addNodes(map, {{parentForNodes(map), {nodeToIsolate}}});
+        addNodes(map, {{&parentForNodes(map), {nodeToIsolate}}});
 
         REQUIRE(!nodeToIsolate->hidden());
 
@@ -82,7 +82,7 @@ TEST_CASE("Map_NodeVisibility")
 
           THEN("The node is isolated and selected")
           {
-            CHECK_FALSE(nodeToIsolate->hidden());
+            CHECK(!nodeToIsolate->hidden());
             CHECK(nodeToHide->hidden());
             CHECK(nodeToIsolate->selected());
           }
@@ -93,8 +93,8 @@ TEST_CASE("Map_NodeVisibility")
 
             THEN("All nodes are visible again and selection is restored")
             {
-              CHECK_FALSE(nodeToIsolate->hidden());
-              CHECK_FALSE(nodeToHide->hidden());
+              CHECK(!nodeToIsolate->hidden());
+              CHECK(!nodeToHide->hidden());
 
               CHECK_THAT(map.selection().nodes, UnorderedEquals(selectedNodes));
             }
@@ -110,7 +110,7 @@ TEST_CASE("Map_NodeVisibility")
         auto* entityNode = new EntityNode{Entity{}};
         entityNode->addChildren({childNode1, childNode2});
 
-        addNodes(map, {{parentForNodes(map), {entityNode}}});
+        addNodes(map, {{&parentForNodes(map), {entityNode}}});
 
         // Check initial state
         REQUIRE_FALSE(nodeToHide->hidden());
@@ -161,10 +161,10 @@ TEST_CASE("Map_NodeVisibility")
 
             THEN("All nodes are visible and selection is restored")
             {
-              CHECK_FALSE(nodeToHide->hidden());
-              CHECK_FALSE(entityNode->hidden());
-              CHECK_FALSE(childNode1->hidden());
-              CHECK_FALSE(childNode2->hidden());
+              CHECK(!nodeToHide->hidden());
+              CHECK(!entityNode->hidden());
+              CHECK(!childNode1->hidden());
+              CHECK(!childNode2->hidden());
 
               CHECK_THAT(map.selection().nodes, UnorderedEquals(selectedNodes));
             }
@@ -180,7 +180,7 @@ TEST_CASE("Map_NodeVisibility")
     auto* groupNode = new GroupNode{Group{"group"}};
     auto* groupedEntityNode = new EntityNode{Entity{}};
 
-    addNodes(map, {{parentForNodes(map), {entityNode, groupNode}}});
+    addNodes(map, {{&parentForNodes(map), {entityNode, groupNode}}});
     addNodes(map, {{groupNode, {groupedEntityNode}}});
 
     showNodes(map, {groupedEntityNode});
@@ -204,7 +204,7 @@ TEST_CASE("Map_NodeVisibility")
 
     addNodes(
       map,
-      {{parentForNodes(map), {pointEntityNode, selectedEntityNode, brushEntityNode}}});
+      {{&parentForNodes(map), {pointEntityNode, selectedEntityNode, brushEntityNode}}});
     addNodes(map, {{brushEntityNode, {brushNode, selectedBrushNode}}});
 
     showNodes(map, {selectedBrushNode});
@@ -247,7 +247,8 @@ TEST_CASE("Map_NodeVisibility")
     auto* hiddenBrushNode = createBrushNode(map);
 
     addNodes(
-      map, {{parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
+      map,
+      {{&parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
     addNodes(map, {{brushEntityNode, {brushNode, hiddenBrushNode}}});
 
     shownEntityNode->setVisibilityState(VisibilityState::Shown);
@@ -295,7 +296,8 @@ TEST_CASE("Map_NodeVisibility")
     auto* hiddenBrushNode = createBrushNode(map);
 
     addNodes(
-      map, {{parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
+      map,
+      {{&parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
     addNodes(map, {{brushEntityNode, {brushNode, hiddenBrushNode}}});
 
     shownEntityNode->setVisibilityState(VisibilityState::Shown);
@@ -342,7 +344,8 @@ TEST_CASE("Map_NodeVisibility")
     auto* hiddenBrushNode = createBrushNode(map);
 
     addNodes(
-      map, {{parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
+      map,
+      {{&parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
     addNodes(map, {{brushEntityNode, {brushNode, hiddenBrushNode}}});
 
     shownEntityNode->setVisibilityState(VisibilityState::Shown);
@@ -389,7 +392,8 @@ TEST_CASE("Map_NodeVisibility")
     auto* hiddenBrushNode = createBrushNode(map);
 
     addNodes(
-      map, {{parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
+      map,
+      {{&parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
     addNodes(map, {{brushEntityNode, {brushNode, hiddenBrushNode}}});
 
     shownEntityNode->setVisibilityState(VisibilityState::Shown);
@@ -436,7 +440,8 @@ TEST_CASE("Map_NodeVisibility")
     auto* hiddenBrushNode = createBrushNode(map);
 
     addNodes(
-      map, {{parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
+      map,
+      {{&parentForNodes(map), {shownEntityNode, hiddenEntityNode, brushEntityNode}}});
     addNodes(map, {{brushEntityNode, {brushNode, hiddenBrushNode}}});
 
     shownEntityNode->setVisibilityState(VisibilityState::Shown);

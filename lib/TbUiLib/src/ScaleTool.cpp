@@ -20,8 +20,7 @@
 
 #include "ui/ScaleTool.h"
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "gl/Camera.h"
 #include "mdl/Grid.h"
 #include "mdl/Hit.h"
@@ -30,6 +29,7 @@
 #include "mdl/Map_Geometry.h"
 #include "mdl/PickResult.h"
 #include "mdl/TransactionScope.h"
+#include "prefs/Preferences.h"
 #include "ui/MapDocument.h"
 #include "ui/ScaleToolPage.h"
 
@@ -183,6 +183,8 @@ BBoxEdge::BBoxEdge(const vm::vec3d& p0, const vm::vec3d& p1)
       fmt::format("BBoxEdge created with invalid corner {}", fmt::streamed(p1))};
   }
 }
+
+kdl_reflect_impl(BBoxEdge);
 
 // ProportionalAxes
 

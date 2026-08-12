@@ -19,7 +19,7 @@
 
 #include "mdl/Map_Geometry.h"
 
-#include "Logger.h"
+#include "base/Logger.h"
 #include "mdl/AddRemoveNodesCommand.h"
 #include "mdl/ApplyAndSwap.h"
 #include "mdl/BrushBuilder.h"
@@ -41,12 +41,12 @@
 #include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Node.h"
+#include "mdl/NodeHandles.h"
 #include "mdl/PatchNode.h"
 #include "mdl/Polyhedron3.h"
 #include "mdl/SetLinkIdsCommand.h"
 #include "mdl/SwapNodeContentsCommand.h"
 #include "mdl/Transaction.h"
-#include "mdl/VertexHandleManager.h"
 #include "mdl/WorldNode.h"
 
 #include "kd/overload.h"
@@ -69,10 +69,11 @@ kdl_reflect_impl(TransformVerticesResult);
 bool transformSelection(
   Map& map, const std::string& commandName, const vm::mat4x4d& transformation)
 {
-  if (map.vertexHandles().anySelected())
+  if (map.nodeHandles().anyHandleSelected<VertexHandle>())
   {
-    return transformVertices(map, map.vertexHandles().selectedHandles(), transformation)
-      .success;
+    const auto selectedVertexPositions =
+      VertexHandle::getPositions(map.nodeHandles().selectedHandles<VertexHandle>());
+    return transformVertices(map, selectedVertexPositions, transformation).success;
   }
 
   auto nodesToTransform = std::vector<Node*>{};
@@ -230,7 +231,7 @@ bool flipSelection(mdl::Map& map, const vm::vec3d& center, const vm::axis::type 
 
 
 TransformVerticesResult transformVertices(
-  Map& map, std::vector<vm::vec3d> vertexPositions, const vm::mat4x4d& transform)
+  Map& map, const std::vector<vm::vec3d>& vertexPositions, const vm::mat4x4d& transform)
 {
   auto newVertexPositions = std::vector<vm::vec3d>{};
   auto newNodes = applyToNodeContents(
@@ -288,10 +289,7 @@ TransformVerticesResult transformVertices(
     *newNodes | std::views::keys | kdl::ranges::to<std::vector>());
 
   auto command = std::make_unique<BrushVertexCommand>(
-    std::move(commandName),
-    std::move(*newNodes),
-    std::move(vertexPositions),
-    std::move(newVertexPositions));
+    std::move(commandName), std::move(*newNodes), vertexPositions, newVertexPositions);
 
   if (!map.executeAndStore(std::move(command)))
   {
@@ -310,7 +308,7 @@ TransformVerticesResult transformVertices(
 }
 
 bool transformEdges(
-  Map& map, std::vector<vm::segment3d> edgePositions, const vm::mat4x4d& transform)
+  Map& map, const std::vector<vm::segment3d>& edgePositions, const vm::mat4x4d& transform)
 {
   auto newEdgePositions = std::vector<vm::segment3d>{};
   auto newNodes = applyToNodeContents(
@@ -363,10 +361,7 @@ bool transformEdges(
       *newNodes | std::views::keys | kdl::ranges::to<std::vector>());
 
     const auto result = map.executeAndStore(std::make_unique<BrushEdgeCommand>(
-      commandName,
-      std::move(*newNodes),
-      std::move(edgePositions),
-      std::move(newEdgePositions)));
+      commandName, std::move(*newNodes), edgePositions, newEdgePositions));
 
     if (!result)
     {
@@ -382,7 +377,7 @@ bool transformEdges(
 }
 
 bool transformFaces(
-  Map& map, std::vector<vm::polygon3d> facePositions, const vm::mat4x4d& transform)
+  Map& map, const std::vector<vm::polygon3d>& facePositions, const vm::mat4x4d& transform)
 {
   auto newFacePositions = std::vector<vm::polygon3d>{};
   auto newNodes = applyToNodeContents(
@@ -435,10 +430,7 @@ bool transformFaces(
       *newNodes | std::views::keys | kdl::ranges::to<std::vector>());
 
     const auto result = map.executeAndStore(std::make_unique<BrushFaceCommand>(
-      commandName,
-      std::move(*newNodes),
-      std::move(facePositions),
-      std::move(newFacePositions)));
+      commandName, std::move(*newNodes), facePositions, newFacePositions));
 
     if (!result)
     {
@@ -543,10 +535,7 @@ bool removeVertices(
       *newNodes | std::views::keys | kdl::ranges::to<std::vector>());
 
     const auto result = map.executeAndStore(std::make_unique<BrushVertexCommand>(
-      commandName,
-      std::move(*newNodes),
-      std::move(vertexPositions),
-      std::vector<vm::vec3d>{}));
+      commandName, std::move(*newNodes), vertexPositions, std::vector<vm::vec3d>{}));
 
     if (!result)
     {
@@ -891,7 +880,8 @@ bool csgConvexMerge(Map& map, const std::string& commandName)
   const auto builder = BrushBuilder{
     map.worldNode().mapFormat(),
     map.worldBounds(),
-    map.gameInfo().gameConfig.faceAttribsConfig.defaults};
+    map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
+    map.gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes};
   return builder.createBrush(polyhedron, map.currentMaterialName())
          | kdl::transform([&](auto b) {
              b.cloneFaceAttributesFrom(
@@ -905,25 +895,17 @@ bool csgConvexMerge(Map& map, const std::string& commandName)
 
              // We could be merging brushes that have different parents; use the parent
              // of the first brush.
-             auto* parentNode = static_cast<Node*>(nullptr);
-             if (!map.selection().brushes.empty())
-             {
-               parentNode = map.selection().brushes.front()->parent();
-             }
-             else if (!map.selection().brushFaces.empty())
-             {
-               parentNode = map.selection().brushFaces.front().node()->parent();
-             }
-             else
-             {
-               parentNode = parentForNodes(map);
-             }
+             auto& parentNode = !map.selection().brushes.empty()
+                                  ? *map.selection().brushes.front()->parent()
+                                : !map.selection().brushFaces.empty()
+                                  ? *map.selection().brushFaces.front().node()->parent()
+                                  : parentForNodes(map);
 
              auto* brushNode = new BrushNode{std::move(b)};
 
              auto transaction = Transaction{map, commandName};
              deselectAll(map);
-             if (addNodes(map, {{parentNode, {brushNode}}}).empty())
+             if (addNodes(map, {{&parentNode, {brushNode}}}).empty())
              {
                transaction.cancel();
                return;
@@ -1043,7 +1025,7 @@ bool csgIntersect(Map& map, const std::string& commandName)
   if (valid)
   {
     auto* intersectionNode = new BrushNode{std::move(intersection)};
-    if (addNodes(map, {{parentForNodes(map, toRemove), {intersectionNode}}}).empty())
+    if (addNodes(map, {{&parentForNodes(map, toRemove), {intersectionNode}}}).empty())
     {
       transaction.cancel();
       return false;

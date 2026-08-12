@@ -16,9 +16,6 @@ if(POLICY CMP0063)
   cmake_policy(SET CMP0063 NEW)
 endif()
 
-set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake")
-set(VCPKG_OVERLAY_PORTS "${CMAKE_SOURCE_DIR}/vcpkg-overlay-ports/freeimage;${CMAKE_SOURCE_DIR}/vcpkg-overlay-ports/openexr")
-
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN TRUE)
@@ -67,6 +64,13 @@ else()
   message(FATAL_ERROR "Unsupported compiler detected.")
 endif()
 
+# Templates for embedding a Windows manifest that sets the process active code page to
+# UTF-8 (see cmake/Utils.cmake's CONFIGURE_UTF8_MANIFEST/EMBED_UTF8_MANIFEST functions).
+if(WIN32)
+  set(TB_UTF8_MANIFEST_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/Utf8CodePage.manifest.in")
+  set(TB_UTF8_RC_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/Utf8CodePage.rc.in")
+endif()
+
 include(cmake/Utils.cmake)
 include(cmake/CompilerConfig.cmake)
 include(cmake/PrecompileHeaders.cmake)
@@ -96,31 +100,7 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 # Prevent gtest from being installed
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 
-find_package(assimp CONFIG REQUIRED)
-find_package(cpptrace CONFIG REQUIRED)
-find_package(freeimage CONFIG REQUIRED)
-find_package(freetype CONFIG REQUIRED)
-find_package(Catch2 CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
-find_package(miniz CONFIG REQUIRED)
-find_package(pybind11 CONFIG REQUIRED)
-find_package(tinyxml2 CONFIG REQUIRED)
-find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-find_package(stduuid REQUIRED)
-
-# Find Qt and OpenGL
-find_package(OpenGL REQUIRED)
-find_package(Qt6 COMPONENTS Core Widgets OpenGL OpenGLWidgets Network Svg Test Multimedia REQUIRED)
-
-# Find threads lib, needed to work around a gtest bug, see: https://stackoverflow.com/questions/21116622/undefined-reference-to-pthread-key-create-linker-error
-# The googletest target links to this
-find_package(Threads)
-
-# Use the fast-float library for from_chars on AppleClang, where std::from_chars is not
-# available for floating point types.
-if (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-find_package(FastFloat CONFIG REQUIRED)
-endif()
+include(cmake/Dependencies.cmake)
 
 # Populate version variables using git
 get_git_describe("${GIT_EXECUTABLE}" "${CMAKE_SOURCE_DIR}" GIT_DESCRIBE)

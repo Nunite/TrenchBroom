@@ -33,7 +33,7 @@
 #include <QUuid>
 
 #include "../../src/mcp/McpBridgeServerTools.h"
-#include "Result.h"
+#include "base/Result.h"
 #include "gl/GlManager.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushFaceHandle.h"
@@ -2740,7 +2740,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     auto entity = mdl::Entity{{{"classname", "info_player_start"}}};
     entity.setOrigin(vm::vec3d{64.0, 96.0, 32.0});
     auto* entityNode = new mdl::EntityNode{std::move(entity)};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {entityNode}}});
 
     auto tempDir = QTemporaryDir{};
     REQUIRE(tempDir.isValid());
@@ -2790,7 +2790,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
       auto entity = mdl::Entity{{{"classname", i == 0 ? "info_player_start" : "light"}}};
       entity.setOrigin(vm::vec3d{i * 32.0, 0.0, 32.0});
       auto* entityNode = new mdl::EntityNode{std::move(entity)};
-      mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}});
+      mdl::addNodes(map, {{&mdl::parentForNodes(map), {entityNode}}});
       objectIds.push_back(registry.registerNode(map, *entityNode));
     }
 
@@ -3737,7 +3737,7 @@ TEST_CASE("McpBridgeServer selection_inspect", "[McpBridgeServer]")
     }};
     entity.setOrigin(vm::vec3d{-256.0, 1008.0, 0.0});
     auto* entityNode = new mdl::EntityNode{std::move(entity)};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {entityNode}}});
     mdl::selectNodes(map, {entityNode});
 
     const auto response = selectionInspectForMapResult(
@@ -3839,7 +3839,7 @@ TEST_CASE("McpBridgeServer entity_link_chain_inspect", "[McpBridgeServer]")
   }};
   corner03Entity.setOrigin(vm::vec3d{256.0, 64.0, 32.0});
   auto* corner03 = new mdl::EntityNode{std::move(corner03Entity)};
-  mdl::addNodes(map, {{mdl::parentForNodes(map), {corner01, corner02, corner03}}});
+  mdl::addNodes(map, {{&mdl::parentForNodes(map), {corner01, corner02, corner03}}});
   mdl::selectNodes(map, {corner01});
 
   SECTION("follows selected path_corner target links")
@@ -3875,7 +3875,7 @@ TEST_CASE("McpBridgeServer entity_link_chain_inspect", "[McpBridgeServer]")
     }};
     duplicateEntity.setOrigin(vm::vec3d{512.0, 0.0, 0.0});
     auto* duplicate = new mdl::EntityNode{std::move(duplicateEntity)};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {duplicate}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {duplicate}}});
 
     const auto response = entityLinkChainInspectForMapResult(
       map,
@@ -6150,7 +6150,7 @@ TEST_CASE("McpBridgeServer selector_preview reports recovery state", "[McpBridge
   }};
   cornerEntity.setOrigin(vm::vec3d{128.0, 0.0, 0.0});
   auto* corner = new mdl::EntityNode{std::move(cornerEntity)};
-  mdl::addNodes(map, {{mdl::parentForNodes(map), {corner}}});
+  mdl::addNodes(map, {{&mdl::parentForNodes(map), {corner}}});
 
   const auto entityPreview = selectorPreviewForMapResult(
     map,
@@ -7168,7 +7168,7 @@ TEST_CASE(
   REQUIRE(firstBrushNode != nullptr);
   for (const auto& face : firstBrushNode->brush().faces())
   {
-    CHECK(face.attributes().materialName() == "target_mat");
+    CHECK(face.materialName() == "target_mat");
   }
 
   const auto sampleResponse = textureApplyByFilterForMapResult(
@@ -7668,14 +7668,14 @@ TEST_CASE(
     if (face.normal().z() > 0.75)
     {
       ++topFaceCount;
-      if (face.attributes().materialName() == "top_mat")
+      if (face.materialName() == "top_mat")
       {
         ++topFaceMaterialCount;
       }
     }
     else
     {
-      CHECK(face.attributes().materialName() == "source_mat");
+      CHECK(face.materialName() == "source_mat");
     }
   }
   CHECK(topFaceCount == 1);

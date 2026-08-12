@@ -23,11 +23,9 @@
 #include <QLineEdit>
 #include <QtTest/QTest>
 
-#include <map>
-
+#include "mdl/BrushNode.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
-#include "mdl/BrushNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Entities.h"
 #include "mdl/Map_Nodes.h"
@@ -39,6 +37,8 @@
 #include "ui/MapDocumentFixture.h"
 #include "ui/SmartSkyboxEditor.h"
 #include "ui/outliner/OutlinerEntityPropertyEditor.h"
+
+#include <map>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -200,7 +200,8 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     CHECK(skynameEdit->text() == "morning");
   }
 
-  SECTION("keeps expanded skybox editor available when selection still resolves to worldspawn")
+  SECTION(
+    "keeps expanded skybox editor available when selection still resolves to worldspawn")
   {
     mdl::selectNodes(map, std::vector<mdl::Node*>{&map.worldNode()});
     mdl::setEntityProperty(map, "skyname", "2namek", false);
@@ -208,7 +209,7 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     mdl::addNodes(
       map,
       std::map<mdl::Node*, std::vector<mdl::Node*>>{
-        {mdl::parentForNodes(map), {static_cast<mdl::Node*>(brushNode)}}});
+        {&mdl::parentForNodes(map), {static_cast<mdl::Node*>(brushNode)}}});
     processOutlinerUpdates();
 
     auto* skyboxButton = static_cast<QAbstractButton*>(nullptr);
@@ -244,7 +245,7 @@ TEST_CASE("OutlinerEntityPropertyEditor")
       {"classname", "light"},
       {"targetname", "light_1"},
     }}};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {entityNode}}});
     mdl::selectNodes(map, {entityNode});
     processOutlinerUpdates();
 
@@ -267,7 +268,7 @@ TEST_CASE("OutlinerEntityPropertyEditor")
       {"classname", "light"},
       {"targetname", "light_1"},
     }}};
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {entityNode}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {entityNode}}});
     mdl::selectNodes(map, {entityNode});
     processOutlinerUpdates();
 

@@ -31,45 +31,50 @@ namespace tb::mdl
 
 TEST_CASE("CompilationConfigParser")
 {
-  SECTION("parseBlankConfig")
+  SECTION("invalid input")
   {
-    const auto config = "   ";
-    CHECK(parseCompilationConfig(config).is_error());
+    SECTION("parseBlankConfig")
+    {
+      const auto config = "   ";
+      CHECK(parseCompilationConfig(config).is_error());
+    }
+
+    SECTION("parseEmptyConfig")
+    {
+      const auto config = "  {  } ";
+      CHECK(parseCompilationConfig(config).is_error());
+    }
+
+    SECTION("parseEmptyConfigWithTrailingGarbage")
+    {
+      const auto config = "  {  } asdf";
+      CHECK(parseCompilationConfig(config).is_error());
+    }
+
+    SECTION("parseMissingProfiles")
+    {
+      const auto config = "  { 'version' : 1 } ";
+      CHECK(parseCompilationConfig(config).is_error());
+    }
+
+    SECTION("parseMissingVersion")
+    {
+      const auto config = "  { 'profiles': {} } ";
+      CHECK(parseCompilationConfig(config).is_error());
+    }
   }
 
-  SECTION("parseEmptyConfig")
+  SECTION("profiles")
   {
-    const auto config = "  {  } ";
-    CHECK(parseCompilationConfig(config).is_error());
-  }
+    SECTION("parseEmptyProfiles")
+    {
+      const auto config = "  { 'version': 1, 'profiles': [] } ";
+      CHECK(parseCompilationConfig(config) == mdl::CompilationConfig{{}});
+    }
 
-  SECTION("parseEmptyConfigWithTrailingGarbage")
-  {
-    const auto config = "  {  } asdf";
-    CHECK(parseCompilationConfig(config).is_error());
-  }
-
-  SECTION("parseMissingProfiles")
-  {
-    const auto config = "  { 'version' : 1 } ";
-    CHECK(parseCompilationConfig(config).is_error());
-  }
-
-  SECTION("parseMissingVersion")
-  {
-    const auto config = "  { 'profiles': {} } ";
-    CHECK(parseCompilationConfig(config).is_error());
-  }
-
-  SECTION("parseEmptyProfiles")
-  {
-    const auto config = "  { 'version': 1, 'profiles': [] } ";
-    CHECK(parseCompilationConfig(config) == mdl::CompilationConfig{{}});
-  }
-
-  SECTION("parseOneProfileWithMissingNameAndMissingTasks")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithMissingNameAndMissingTasks")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -77,12 +82,12 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(parseCompilationConfig(config).is_error());
-  }
+      CHECK(parseCompilationConfig(config).is_error());
+    }
 
-  SECTION("parseOneProfileWithNameAndMissingTasks")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndMissingTasks")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -92,12 +97,12 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(parseCompilationConfig(config).is_error());
-  }
+      CHECK(parseCompilationConfig(config).is_error());
+    }
 
-  SECTION("parseOneProfileWithMissingNameAndEmptyTasks")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithMissingNameAndEmptyTasks")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -107,12 +112,12 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(parseCompilationConfig(config).is_error());
-  }
+      CHECK(parseCompilationConfig(config).is_error());
+    }
 
-  SECTION("parseOneProfileWithNameAndEmptyTasks")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndEmptyTasks")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -124,16 +129,16 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(
-      parseCompilationConfig(config)
-      == mdl::CompilationConfig{{
-        {"A profile", "", {}},
-      }});
-  }
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile", "", {}},
+        }});
+    }
 
-  SECTION("parseOneProfileWithNameAndOneInvalidTask")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneInvalidTask")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -145,12 +150,12 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(parseCompilationConfig(config).is_error());
-  }
+      CHECK(parseCompilationConfig(config).is_error());
+    }
 
-  SECTION("parseOneProfileWithNameAndOneTaskWithUnknownType")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneTaskWithUnknownType")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -162,12 +167,15 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(parseCompilationConfig(config).is_error());
+      CHECK(parseCompilationConfig(config).is_error());
+    }
   }
 
-  SECTION("parseOneProfileWithNameAndOneExportTask")
+  SECTION("export task")
   {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneExportTask")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -179,20 +187,25 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(
-      parseCompilationConfig(config)
-      == mdl::CompilationConfig{{
-        {"A profile",
-         "",
-         {
-           mdl::CompilationExportMap{K(enabled), !K(stripTbProperties), "the target"},
-         }},
-      }});
-  }
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationExportMap{
+               K(enabled),
+               !K(stripTbProperties),
+               std::nullopt,
+               std::nullopt,
+               "the target"},
+           }},
+        }});
+    }
 
-  SECTION("parseOneProfileWithNameAndOneExportTaskWithStripProperties")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneExportTaskWithStripProperties")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -204,20 +217,88 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(
-      parseCompilationConfig(config)
-      == mdl::CompilationConfig{{
-        {"A profile",
-         "",
-         {
-           mdl::CompilationExportMap{K(enabled), K(stripTbProperties), "the target"},
-         }},
-      }});
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationExportMap{
+               K(enabled),
+               K(stripTbProperties),
+               std::nullopt,
+               std::nullopt,
+               "the target"},
+           }},
+        }});
+    }
+
+    SECTION("parseOneProfileWithNameAndOneExportTaskWithStripEntityPattern")
+    {
+      const auto config = R"(
+{
+  'version': 1,
+  'profiles': [
+    {
+      'name' : 'A profile',
+      'workdir' : '',
+      'tasks' : [ { 'type' : 'export', 'stripTbProperties': true, 'stripEntityPattern': 'info_player_*', 'target' : 'the target' } ]
+    }
+  ]
+})";
+
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationExportMap{
+               K(enabled),
+               K(stripTbProperties),
+               "info_player_*",
+               std::nullopt,
+               "the target"},
+           }},
+        }});
+    }
+
+    SECTION("parseOneProfileWithNameAndOneExportTaskWithEntityToAdd")
+    {
+      const auto config = R"(
+{
+  'version': 1,
+  'profiles': [
+    {
+      'name' : 'A profile',
+      'workdir' : '',
+      'tasks' : [ { 'type' : 'export', 'stripTbProperties': true, 'entityToAdd': [ { 'key': 'classname', 'value': 'info_player_start' } ], 'target' : 'the target' } ]
+    }
+  ]
+})";
+
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationExportMap{
+               K(enabled),
+               K(stripTbProperties),
+               std::nullopt,
+               mdl::Entity{{{"classname", "info_player_start"}}},
+               "the target"},
+           }},
+        }});
+    }
   }
 
-  SECTION("parseOneProfileWithNameAndOneCopyTaskWithMissingSource")
+  SECTION("copy task")
   {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneCopyTaskWithMissingSource")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -229,12 +310,12 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(parseCompilationConfig(config).is_error());
-  }
+      CHECK(parseCompilationConfig(config).is_error());
+    }
 
-  SECTION("parseOneProfileWithNameAndOneCopyTaskWithMissingTarget")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneCopyTaskWithMissingTarget")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -246,31 +327,12 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(parseCompilationConfig(config).is_error());
-  }
-
-  SECTION(
-    ""
-    "parseOneProfileWithNameAndOneDeleteTaskWithMissingTarget")
-  {
-    const auto config = R"(
-{
-  'version': 1,
-  'profiles': [
-    {
-      'name' : 'A profile',
-      'workdir' : '',
-      'tasks': [ {  'type' : 'delete', } ]
+      CHECK(parseCompilationConfig(config).is_error());
     }
-  ]
-})";
 
-    CHECK(parseCompilationConfig(config).is_error());
-  }
-
-  SECTION("parseOneProfileWithNameAndOneCopyTask")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneCopyTask")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -282,20 +344,23 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(
-      parseCompilationConfig(config)
-      == mdl::CompilationConfig{{
-        {"A profile",
-         "",
-         {
-           mdl::CompilationCopyFiles{K(enabled), "the source", "the target"},
-         }},
-      }});
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationCopyFiles{K(enabled), "the source", "the target"},
+           }},
+        }});
+    }
   }
 
-  SECTION("parseOneProfileWithNameAndOneRenameTask")
+  SECTION("rename task")
   {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneRenameTask")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -307,20 +372,40 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(
-      parseCompilationConfig(config)
-      == mdl::CompilationConfig{{
-        {"A profile",
-         "",
-         {
-           mdl::CompilationRenameFile{K(enabled), "the source", "the target"},
-         }},
-      }});
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationRenameFile{K(enabled), "the source", "the target"},
+           }},
+        }});
+    }
   }
 
-  SECTION("parseOneProfileWithNameAndOneDeleteTask")
+  SECTION("delete task")
   {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneDeleteTaskWithMissingTarget")
+    {
+      const auto config = R"(
+{
+  'version': 1,
+  'profiles': [
+    {
+      'name' : 'A profile',
+      'workdir' : '',
+      'tasks': [ {  'type' : 'delete', } ]
+    }
+  ]
+})";
+
+      CHECK(parseCompilationConfig(config).is_error());
+    }
+
+    SECTION("parseOneProfileWithNameAndOneDeleteTask")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -332,20 +417,23 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(
-      parseCompilationConfig(config)
-      == mdl::CompilationConfig{{
-        {"A profile",
-         "",
-         {
-           mdl::CompilationDeleteFiles{K(enabled), "the target"},
-         }},
-      }});
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationDeleteFiles{K(enabled), "the target"},
+           }},
+        }});
+    }
   }
 
-  SECTION("parseOneProfileWithNameAndOneToolTaskWithMissingTool")
+  SECTION("tool task")
   {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneToolTaskWithMissingTool")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -357,14 +445,12 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(parseCompilationConfig(config).is_error());
-  }
+      CHECK(parseCompilationConfig(config).is_error());
+    }
 
-  SECTION(
-    ""
-    "parseOneProfileWithNameAndOneToolTaskWithMissingParameters")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneToolTaskWithMissingParameters")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'profiles': [
@@ -376,12 +462,12 @@ TEST_CASE("CompilationConfigParser")
   ]
 })";
 
-    CHECK(parseCompilationConfig(config).is_error());
-  }
+      CHECK(parseCompilationConfig(config).is_error());
+    }
 
-  SECTION("parseOneProfileWithNameAndOneToolTask")
-  {
-    const auto config = R"(
+    SECTION("parseOneProfileWithNameAndOneToolTask")
+    {
+      const auto config = R"(
 {
   'version': 1,
   'unexpectedKey': '',
@@ -398,22 +484,101 @@ TEST_CASE("CompilationConfigParser")
     }]
 })";
 
-    CHECK(
-      parseCompilationConfig(config)
-      == mdl::CompilationConfig{{
-        {"A profile",
-         "",
-         {
-           mdl::CompilationRunTool{
-             K(enabled),
-             "tyrbsp.exe",
-             "this and that",
-             !K(treatNonZeroResultCodeAsError)},
-         }},
-      }});
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationRunTool{
+               K(enabled),
+               "tyrbsp.exe",
+               "this and that",
+               !K(treatNonZeroResultCodeAsError)},
+           }},
+        }});
+    }
   }
 
-  SECTION("parseOneProfileWithNameAndFourTasks")
+  SECTION("launch engine task")
+  {
+    SECTION("parseOneProfileWithNameAndOneLaunchEngineTaskWithMissingEngineProfileId")
+    {
+      const auto config = R"(
+{
+  'version': 1,
+  'profiles': [
+    {
+      'name' : 'A profile',
+      'workdir' : '',
+      'tasks': [ {  'type' : 'launchEngine' } ]
+    }
+  ]
+})";
+
+      CHECK(parseCompilationConfig(config).is_error());
+    }
+
+    SECTION("parseOneProfileWithNameAndOneLaunchEngineTask")
+    {
+      const auto config = R"(
+{
+  'version': 1,
+  'unexpectedKey': '',
+  'profiles': [{
+      'name' : 'A profile',
+      'unexpectedKey' : '',
+      'workdir' : '',
+      'tasks' : [{
+        'type' : 'launchEngine',
+        'unexpectedKey' : '',
+        'engineProfileId' : 'Quakespasm'
+      }]
+    }]
+})";
+
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationLaunchEngine{
+               K(enabled), "Quakespasm", !K(treatLaunchFailureAsError)},
+           }},
+        }});
+    }
+
+    SECTION("parseOneProfileWithNameAndOneLaunchEngineTaskWithLaunchFailureAsError")
+    {
+      const auto config = R"(
+{
+  'version': 1,
+  'profiles': [{
+      'name' : 'A profile',
+      'workdir' : '',
+      'tasks' : [{
+        'type' : 'launchEngine',
+        'engineProfileId' : 'Quakespasm',
+        'treatLaunchFailureAsError': true
+      }]
+    }]
+})";
+
+      CHECK(
+        parseCompilationConfig(config)
+        == mdl::CompilationConfig{{
+          {"A profile",
+           "",
+           {
+             mdl::CompilationLaunchEngine{
+               K(enabled), "Quakespasm", K(treatLaunchFailureAsError)},
+           }},
+        }});
+    }
+  }
+
+  SECTION("parseOneProfileWithNameAndFiveTasks")
   {
     const auto config = R"(
 {
@@ -443,6 +608,12 @@ TEST_CASE("CompilationConfigParser")
       'type':'delete',
       'target': 'some other target',
       'enabled': false
+    },
+    {
+      'type':'launchEngine',
+      'engineProfileId': 'Quakespasm',
+      'treatLaunchFailureAsError': true,
+      'enabled': true
     }]
   }]
 })";
@@ -458,6 +629,8 @@ TEST_CASE("CompilationConfigParser")
            mdl::CompilationCopyFiles{!K(enabled), "the source", "the target"},
            mdl::CompilationRenameFile{K(enabled), "the source", "the target"},
            mdl::CompilationDeleteFiles{!K(enabled), "some other target"},
+           mdl::CompilationLaunchEngine{
+             K(enabled), "Quakespasm", K(treatLaunchFailureAsError)},
          }},
       }});
   }

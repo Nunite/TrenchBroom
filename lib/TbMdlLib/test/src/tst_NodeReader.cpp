@@ -22,7 +22,7 @@
 #include "mdl/CatchConfig.h"
 #include "mdl/GroupNode.h"
 #include "mdl/NodeReader.h"
-#include "mdl/ParaxialUVCoordSystem.h"
+#include "mdl/ParaxialUvCoordSystem.h"
 
 #include "kd/task_manager.h"
 
@@ -74,9 +74,7 @@ TEST_CASE("NodeReader")
     REQUIRE(brushNode != nullptr);
 
     auto brush = brushNode->brush();
-    CHECK(
-      dynamic_cast<const ParaxialUVCoordSystem*>(&brush.face(0).uvCoordSystem())
-      != nullptr);
+    CHECK(brush.face(0).uvCoordSystem().is<ParaxialUvCoordSystem>());
   }
 
   SECTION("convertValveToStandardMapFormatInGroups")
@@ -111,9 +109,32 @@ TEST_CASE("NodeReader")
     REQUIRE(brushNode != nullptr);
 
     const auto brush = brushNode->brush();
+    CHECK(brush.face(0).uvCoordSystem().is<ParaxialUvCoordSystem>());
+  }
+
+  SECTION("reportsBrushErrorsWithLocation")
+  {
+    // the brush is missing its top face, so it isn't closed
+    const auto data = R"(
+{
+"classname" "worldspawn"
+{
+( -64 -64 -16 ) ( -64 -63 -16 ) ( -64 -64 -15 ) __TB_empty 0 0 0 1 1
+( -64 -64 -16 ) ( -64 -64 -15 ) ( -63 -64 -16 ) __TB_empty 0 0 0 1 1
+( -64 -64 -16 ) ( -63 -64 -16 ) ( -64 -63 -16 ) __TB_empty 0 0 0 1 1
+( 64 64 16 ) ( 64 65 16 ) ( 65 64 16 ) __TB_empty 0 0 0 1 1
+( 64 64 16 ) ( 65 64 16 ) ( 64 64 17 ) __TB_empty 0 0 0 1 1
+}
+}
+)";
+
+    auto nodes =
+      NodeReader::read(data, MapFormat::Standard, worldBounds, {}, status, taskManager);
+    REQUIRE(nodes);
+
     CHECK(
-      dynamic_cast<const ParaxialUVCoordSystem*>(&brush.face(0).uvCoordSystem())
-      != nullptr);
+      status.messages(LogLevel::Error)
+      == std::vector<std::string>{"At line 4, column 1: Brush is incomplete"});
   }
 
   SECTION("readScientificNotation")

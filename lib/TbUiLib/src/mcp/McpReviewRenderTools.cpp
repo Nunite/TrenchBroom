@@ -919,7 +919,7 @@ RenderGeometry buildRenderGeometry(
       auto renderFace = RenderFace{};
       renderFace.vertices = vertices;
       renderFace.normal = *normal;
-      renderFace.materialName = QString::fromStdString(face.attributes().materialName());
+      renderFace.materialName = QString::fromStdString(face.materialName());
       renderFace.centerZ = 0.0;
       for (const auto& vertex : vertices)
       {

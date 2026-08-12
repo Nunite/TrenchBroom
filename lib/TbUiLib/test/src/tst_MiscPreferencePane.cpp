@@ -22,8 +22,8 @@
 #include <QPushButton>
 #include <QRadioButton>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "ui/AppController.h"
 #include "ui/AppControllerFixture.h"
 #include "ui/MiscPreferencePane.h"

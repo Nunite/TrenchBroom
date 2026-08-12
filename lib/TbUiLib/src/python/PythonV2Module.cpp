@@ -26,7 +26,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-#include "Logger.h"
+#include "base/Logger.h"
 #include "gl/Material.h"
 #include "gl/MaterialCollection.h"
 #include "gl/MaterialManager.h"
@@ -46,11 +46,11 @@
 #include "mdl/Map_Geometry.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/NodeHandles.h"
 #include "mdl/PatchNode.h"
 #include "mdl/Selection.h"
 #include "mdl/Transaction.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
-#include "mdl/VertexHandleManager.h"
 #include "mdl/WorldNode.h"
 #include "ui/Action.h"
 #include "ui/ActionExecutionContext.h"
@@ -671,9 +671,9 @@ vm::vec2f vec2FromObject(const py::handle& object)
 
 vm::vec2f textureCoords(const mdl::BrushFace& face, const vm::vec3d& point)
 {
+  const auto uvAttributes = face.uvAttributes();
   return vm::vec2f{
-    face.toUVCoordSystemMatrix(face.attributes().offset(), face.attributes().scale())
-    * point};
+    face.toUvCoordSystemMatrix(uvAttributes.offset, uvAttributes.scale) * point};
 }
 
 size_t addVertex(std::vector<vm::vec3d>& vertices, const vm::vec3d& point)
@@ -797,11 +797,10 @@ std::vector<EntityHandle> selectedAllEntities(SelectionHandle& selection)
 std::vector<Vec3> vertexToolVertices(DocumentHandle& document)
 {
   auto result = std::vector<Vec3>{};
-  const auto vertices = document.get().map().vertexHandles().selectedHandles();
-  result.reserve(vertices.size());
-  for (const auto& vertex : vertices)
+  auto handles = document.get().map().nodeHandles().selectedHandles<mdl::VertexHandle>();
+  for (const auto& handle : handles)
   {
-    result.push_back(fromVmVec3(vertex));
+    result.push_back(fromVmVec3(handle.position));
   }
   return result;
 }
@@ -1138,7 +1137,11 @@ bool chamferSelectionVertices(SelectionHandle& selection, const double distance)
   try
   {
     const auto ok = mdl::chamferVertices(
-      map, "Python v2 Chamfer Vertices", map.vertexHandles().selectedHandles(), distance);
+      map,
+      "Python v2 Chamfer Vertices",
+      mdl::VertexHandle::getPositions(
+        map.nodeHandles().selectedHandles<mdl::VertexHandle>()),
+      distance);
     if (!ok || !transaction.commit())
     {
       transaction.cancel();
@@ -1165,7 +1168,7 @@ bool chamferSelectionEdges(
     const auto ok = mdl::chamferEdges(
       map,
       "Python v2 Chamfer Edges",
-      map.edgeHandles().selectedHandles(),
+      mdl::EdgeHandle::getPositions(map.nodeHandles().selectedHandles<mdl::EdgeHandle>()),
       distance,
       safeSegments);
     if (!ok || !transaction.commit())
@@ -1502,7 +1505,7 @@ BrushHandle createBrush(const py::iterable& pointObjects, py::object materialNam
   }
 
   auto* brushNode = new mdl::BrushNode{std::move(brush.value())};
-  const auto addedNodes = mdl::addNodes(map, {{mdl::parentForNodes(map), {brushNode}}});
+  const auto addedNodes = mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
   if (addedNodes.empty())
   {
     transaction.cancel();
@@ -1984,42 +1987,42 @@ void defineModule(py::module_& module)
     .def_property_readonly("uv_loops", faceUVLoops)
     .def_property(
       "texture_name",
-      [](FaceHandle& self) { return self.get().attributes().materialName(); },
+      [](FaceHandle& self) { return self.get().materialName(); },
       setFaceMaterial)
     .def_property(
       "material",
-      [](FaceHandle& self) { return self.get().attributes().materialName(); },
+      [](FaceHandle& self) { return self.get().materialName(); },
       setFaceMaterial)
     .def_property(
       "offset",
-      [](FaceHandle& self) { return vec2ToTuple(self.get().attributes().offset()); },
+      [](FaceHandle& self) { return vec2ToTuple(self.get().uvAttributes().offset); },
       setFaceOffset)
     .def_property(
       "scale",
-      [](FaceHandle& self) { return vec2ToTuple(self.get().attributes().scale()); },
+      [](FaceHandle& self) { return vec2ToTuple(self.get().uvAttributes().scale); },
       setFaceScale)
     .def_property(
       "rotation",
-      [](FaceHandle& self) { return self.get().attributes().rotation(); },
+      [](FaceHandle& self) { return self.get().uvAttributes().rotation; },
       setFaceRotation)
     .def_property(
       "surface_contents",
       [](FaceHandle& self) {
-        const auto& value = self.get().attributes().surfaceContents();
+        const auto& value = self.get().surfaceAttributes().contents;
         return value ? py::cast(*value) : py::none();
       },
       setFaceSurfaceContents)
     .def_property(
       "surface_flags",
       [](FaceHandle& self) {
-        const auto& value = self.get().attributes().surfaceFlags();
+        const auto& value = self.get().surfaceAttributes().flags;
         return value ? py::cast(*value) : py::none();
       },
       setFaceSurfaceFlags)
     .def_property(
       "surface_value",
       [](FaceHandle& self) {
-        const auto& value = self.get().attributes().surfaceValue();
+        const auto& value = self.get().surfaceAttributes().value;
         return value ? py::cast(*value) : py::none();
       },
       setFaceSurfaceValue)

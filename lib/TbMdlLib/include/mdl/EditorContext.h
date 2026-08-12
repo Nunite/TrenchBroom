@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Notifier.h"
+#include "base/Notifier.h"
 #include "mdl/TagType.h"
 
 #include "kd/dynamic_bitset.h"
@@ -46,6 +46,7 @@ private:
 
   bool m_showPointEntities = true;
   bool m_showBrushes = true;
+  bool m_showPatches = true;
 
   bool m_blockSelection = false;
 
@@ -76,6 +77,9 @@ public:
   bool showBrushes() const;
   void setShowBrushes(bool showBrushes);
 
+  bool showPatches() const;
+  void setShowPatches(bool showPatches);
+
   bool blockSelection() const;
   void setBlockSelection(bool blockSelection);
 
@@ -92,7 +96,7 @@ public:
   void setAlignmentLock(bool alignmentLock);
 
   bool uvLock() const;
-  void setUVLock(bool uvLock);
+  void setUvLock(bool uvLock);
 
 public:
   bool visible(const Node& node) const;

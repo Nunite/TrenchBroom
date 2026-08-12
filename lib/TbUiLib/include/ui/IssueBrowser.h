@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include "ui/TabBook.h"
 
 class QCheckBox;
@@ -62,8 +62,6 @@ public:
 
 private:
   void connectObservers();
-
-  void reload();
 
   void updateFilterFlags();
 

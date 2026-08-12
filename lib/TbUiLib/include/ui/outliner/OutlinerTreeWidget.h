@@ -3,7 +3,7 @@
 #include <QTreeWidget>
 #include <memory>
 #include <unordered_map>
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 
 namespace tb::mdl
 {

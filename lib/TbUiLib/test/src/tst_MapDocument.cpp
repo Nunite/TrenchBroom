@@ -17,9 +17,9 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Logger.h"
 #include "Observer.h"
 #include "TestEnvironment.h"
+#include "base/Logger.h"
 #include "gl/ResourceManager.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EnvironmentConfig.h"
@@ -184,7 +184,7 @@ TEST_CASE("MapDocument")
 
     auto* transientEntityNode = new mdl::EntityNode{{}};
     addNodes(
-      document->map(), {{mdl::parentForNodes(document->map()), {transientEntityNode}}});
+      document->map(), {{&mdl::parentForNodes(document->map()), {transientEntityNode}}});
     REQUIRE(
       document->map().worldNode().defaultLayer()->children()
       == std::vector<mdl::Node*>{transientEntityNode});

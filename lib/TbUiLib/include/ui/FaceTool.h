@@ -19,39 +19,27 @@
 
 #pragma once
 
-#include "ui/VertexToolBase.h"
-
-#include "vm/polygon.h"
+#include "ui/BrushHandleToolBase.h"
 
 #include <string>
 #include <vector>
 
 namespace tb::ui
 {
-class FaceHandleManager;
 class MapDocument;
 
-class FaceTool : public VertexToolBase<vm::polygon3d>
+class FaceTool : public BrushHandleToolBase<mdl::FaceHandle>
 {
 public:
   explicit FaceTool(MapDocument& document);
 
-public:
-  std::vector<mdl::BrushNode*> findIncidentBrushes(const vm::polygon3d& handle) const;
+  using BrushHandleToolBase::findIncidentNodes;
 
-private:
-  using VertexToolBase::findIncidentBrushes;
-
-public:
   void pick(
     const vm::ray3d& pickRay,
     const gl::Camera& camera,
     double handleRadius,
     mdl::PickResult& pickResult) const override;
-
-public:
-  mdl::FaceHandleManager& handleManager() override;
-  const mdl::FaceHandleManager& handleManager() const override;
 
 public:
   std::tuple<vm::vec3d, vm::vec3d> handlePositionAndHitPoint(

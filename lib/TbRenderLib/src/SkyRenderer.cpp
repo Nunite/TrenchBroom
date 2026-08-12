@@ -19,8 +19,8 @@
 
 #include "render/SkyRenderer.h"
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "fs/PathInfo.h"
 #include "gl/ActiveShader.h"
 #include "gl/Camera.h"
@@ -68,7 +68,7 @@ namespace tb::render
 {
 namespace
 {
-using Vertex = gl::VertexTypes::P3UV2::Vertex;
+using Vertex = gl::VertexTypes::P3Uv2::Vertex;
 constexpr auto SkyFaceCount = size_t{6};
 struct SkyFaceMapping
 {
@@ -97,7 +97,7 @@ std::string worldSkyname(const mdl::Map& map)
 
 bool isSkyFace(const mdl::BrushFace& face)
 {
-  return kdl::ci::str_is_equal(face.attributes().materialName(), "sky");
+  return kdl::ci::str_is_equal(face.materialName(), "sky");
 }
 
 std::shared_ptr<gl::TextureResource> loadLooseSkyTexture(

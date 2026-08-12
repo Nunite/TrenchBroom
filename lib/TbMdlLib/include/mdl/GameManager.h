@@ -19,9 +19,11 @@
 
 #pragma once
 
+#include "base/Notifier.h"
 #include "mdl/CompilationConfig.h"
 #include "mdl/GameInfo.h"
 
+#include <map>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -45,6 +47,9 @@ private:
   std::vector<GameInfo> m_gameInfos;
 
 public:
+  Notifier<const GameInfo&> compilationConfigDidChangeNotifier;
+  Notifier<const GameInfo&> gameEngineConfigDidChangeNotifier;
+
   GameManager(
     std::unique_ptr<fs::WritableFileSystem> configFs, std::vector<GameInfo> gameInfos);
 
@@ -66,7 +71,8 @@ public:
 };
 
 
-Result<kdl::multi_value<GameManager, std::vector<std::string>>> initializeGameManager(
+Result<kdl::multi_value<GameManager, std::map<std::filesystem::path, std::string>>>
+initializeGameManager(
   const std::vector<std::filesystem::path>& gameConfigSearchDirs,
   const std::filesystem::path& userGameDir);
 

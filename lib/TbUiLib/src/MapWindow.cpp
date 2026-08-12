@@ -39,8 +39,7 @@
 #include <QVBoxLayout>
 #include <QtGlobal>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "gl/GlManager.h"
 #include "gl/ResourceManager.h"
 #include "mdl/Autosaver.h"
@@ -50,6 +49,7 @@
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
+#include "mdl/EnvironmentConfig.h"
 #include "mdl/ExportOptions.h"
 #include "mdl/GameInfo.h"
 #include "mdl/Grid.h"
@@ -65,6 +65,7 @@
 #include "mdl/Map_Groups.h"
 #include "mdl/Map_NodeVisibility.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Patches.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Node.h"
@@ -72,6 +73,7 @@
 #include "mdl/PatchNode.h"
 #include "mdl/VisualEffect.h"
 #include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "ui/Action.h"
 #include "ui/ActionBuilder.h"
 #include "ui/ActionExecutionContext.h"
@@ -140,6 +142,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+
 
 namespace tb::ui
 {
@@ -237,6 +240,7 @@ MapWindow::MapWindow(AppController& appController, std::unique_ptr<MapDocument> 
 MapWindow::~MapWindow()
 {
   m_pythonPluginManager.unloadPlugins(*this);
+  disconnect(qApp, &QApplication::focusChanged, this, &MapWindow::focusChange);
 
   // Stop the autosave timer
   m_autosaveTimer->stop();
@@ -254,7 +258,7 @@ MapWindow::~MapWindow()
   // so we don't try to log to a dangling pointer (#1885).
   m_document->setTargetLogger(nullptr);
 
-  m_mapView->deactivateCurrentTool();
+  m_mapView->toolBox().deactivateCurrentTool();
 
   m_notifierConnection.disconnect();
   removeRecentDocumentsMenu();
@@ -294,6 +298,16 @@ const MapDocument& MapWindow::document() const
 MapDocument& MapWindow::document()
 {
   return KDL_CONST_OVERLOAD(document());
+}
+
+const MapViewToolBox& MapWindow::toolBox() const
+{
+  return m_mapView->toolBox();
+}
+
+MapViewToolBox& MapWindow::toolBox()
+{
+  return KDL_CONST_OVERLOAD(toolBox());
 }
 
 Logger& MapWindow::logger() const
@@ -847,13 +861,12 @@ void MapWindow::connectObservers()
   m_notifierConnection +=
     m_document->gridDidChangeNotifier.connect(this, &MapWindow::gridDidChange);
 
-  m_notifierConnection += m_mapView->mapViewToolBox().toolActivatedNotifier.connect(
-    this, &MapWindow::toolActivated);
-  m_notifierConnection += m_mapView->mapViewToolBox().toolDeactivatedNotifier.connect(
-    this, &MapWindow::toolDeactivated);
   m_notifierConnection +=
-    m_mapView->mapViewToolBox().toolHandleSelectionChangedNotifier.connect(
-      this, &MapWindow::toolHandleSelectionChanged);
+    m_mapView->toolBox().toolActivatedNotifier.connect(this, &MapWindow::toolActivated);
+  m_notifierConnection += m_mapView->toolBox().toolDeactivatedNotifier.connect(
+    this, &MapWindow::toolDeactivated);
+  m_notifierConnection += m_mapView->toolBox().toolHandleSelectionChangedNotifier.connect(
+    this, &MapWindow::toolHandleSelectionChanged);
 }
 
 void MapWindow::documentWasLoaded()
@@ -1098,12 +1111,13 @@ bool MapWindow::saveDocument()
 bool MapWindow::saveDocumentAs()
 {
   auto& map = m_document->map();
-  const auto& originalPath = map.path();
-  const auto directory = originalPath.parent_path();
-  const auto fileName = originalPath.filename();
+
+  const auto defaultPath = map.persistent()
+                             ? map.path()
+                             : m_appController.environmentConfig().userDataFolderPath;
 
   const auto newFileName = QFileDialog::getSaveFileName(
-    this, tr("Save map file"), pathAsQPath(originalPath), "Map files (*.map)");
+    this, tr("Save map file"), pathAsQPath(defaultPath), "Map files (*.map)");
   if (newFileName.isEmpty())
   {
     return false;
@@ -1167,8 +1181,12 @@ bool MapWindow::exportDocumentAsMap()
     return false;
   }
 
-  const auto options =
-    mdl::MapExportOptions{pathFromQString(newFileName), !K(stripTbProperties)};
+  const auto options = mdl::MapExportOptions{
+    pathFromQString(newFileName),
+    !K(stripTbProperties),
+    std::nullopt,
+    std::nullopt,
+  };
   return exportDocument(options);
 }
 
@@ -1471,7 +1489,7 @@ bool MapWindow::canCutSelection() const
   const auto& map = m_document->map();
   const auto& selection = map.selection();
   return widgetOrChildHasFocus(m_mapView) && selection.hasNodes()
-         && !m_mapView->anyModalToolActive();
+         && !m_mapView->toolBox().anyModalToolActive();
 }
 
 bool MapWindow::canCopySelection() const
@@ -1579,23 +1597,25 @@ void MapWindow::deleteSelection()
 {
   if (canDeleteSelection())
   {
-    if (m_mapView->clipToolActive())
+    auto& toolBox = m_mapView->toolBox();
+
+    if (toolBox.clipToolActive())
     {
-      m_mapView->clipTool().removeLastPoint();
+      toolBox.clipTool().removeLastPoint();
     }
-    else if (m_mapView->vertexToolActive())
+    else if (toolBox.vertexToolActive())
     {
-      m_mapView->vertexTool().removeSelection();
+      toolBox.vertexTool().removeSelection();
     }
-    else if (m_mapView->edgeToolActive())
+    else if (toolBox.edgeToolActive())
     {
-      m_mapView->edgeTool().removeSelection();
+      toolBox.edgeTool().removeSelection();
     }
-    else if (m_mapView->faceToolActive())
+    else if (toolBox.faceToolActive())
     {
-      m_mapView->faceTool().removeSelection();
+      toolBox.faceTool().removeSelection();
     }
-    else if (!m_mapView->anyModalToolActive())
+    else if (!toolBox.anyModalToolActive())
     {
       auto& map = m_document->map();
       removeSelectedNodes(map);
@@ -1605,21 +1625,23 @@ void MapWindow::deleteSelection()
 
 bool MapWindow::canDeleteSelection() const
 {
-  if (m_mapView->clipToolActive())
+  auto& toolBox = m_mapView->toolBox();
+
+  if (toolBox.clipToolActive())
   {
-    return m_mapView->clipTool().canRemoveLastPoint();
+    return toolBox.clipTool().canRemoveLastPoint();
   }
-  if (m_mapView->vertexToolActive())
+  if (toolBox.vertexToolActive())
   {
-    return m_mapView->vertexTool().canRemoveSelection();
+    return toolBox.vertexTool().canRemoveSelection();
   }
-  if (m_mapView->edgeToolActive())
+  if (toolBox.edgeToolActive())
   {
-    return m_mapView->edgeTool().canRemoveSelection();
+    return toolBox.edgeTool().canRemoveSelection();
   }
-  if (m_mapView->faceToolActive())
+  if (toolBox.faceToolActive())
   {
-    return m_mapView->faceTool().canRemoveSelection();
+    return toolBox.faceTool().canRemoveSelection();
   }
   return canCutSelection();
 }
@@ -1764,7 +1786,7 @@ void MapWindow::groupSelectedObjects()
 bool MapWindow::canGroupSelectedObjects() const
 {
   auto& map = m_document->map();
-  return map.selection().hasNodes() && !m_mapView->anyModalToolActive();
+  return map.selection().hasNodes() && !m_mapView->toolBox().anyModalToolActive();
 }
 
 void MapWindow::ungroupSelectedObjects()
@@ -1778,7 +1800,7 @@ void MapWindow::ungroupSelectedObjects()
 bool MapWindow::canUngroupSelectedObjects() const
 {
   auto& map = m_document->map();
-  return map.selection().hasGroups() && !m_mapView->anyModalToolActive();
+  return map.selection().hasGroups() && !m_mapView->toolBox().anyModalToolActive();
 }
 
 void MapWindow::renameSelectedGroups()
@@ -1836,161 +1858,7 @@ void MapWindow::moveSelectedObjects()
 bool MapWindow::canMoveSelectedObjects() const
 {
   auto& map = m_document->map();
-  return map.selection().hasNodes() && !m_mapView->anyModalToolActive();
-}
-
-bool MapWindow::anyModalToolActive() const
-{
-  return m_mapView->anyModalToolActive();
-}
-
-void MapWindow::toggleAssembleBrushTool()
-{
-  if (canToggleAssembleBrushTool())
-  {
-    m_mapView->toggleAssembleBrushTool();
-  }
-}
-
-bool MapWindow::canToggleAssembleBrushTool() const
-{
-  return m_mapView->canToggleAssembleBrushTool();
-}
-
-bool MapWindow::assembleBrushToolActive() const
-{
-  return m_mapView->assembleBrushToolActive();
-}
-
-void MapWindow::toggleClipTool()
-{
-  if (canToggleClipTool())
-  {
-    m_mapView->toggleClipTool();
-  }
-}
-
-bool MapWindow::canToggleClipTool() const
-{
-  return m_mapView->canToggleClipTool();
-}
-
-bool MapWindow::clipToolActive() const
-{
-  return m_mapView->clipToolActive();
-}
-
-void MapWindow::toggleRotateTool()
-{
-  if (canToggleRotateTool())
-  {
-    m_mapView->toggleRotateTool();
-  }
-}
-
-bool MapWindow::canToggleRotateTool() const
-{
-  return m_mapView->canToggleRotateTool();
-}
-
-bool MapWindow::rotateToolActive() const
-{
-  return m_mapView->rotateToolActive();
-}
-
-void MapWindow::toggleScaleTool()
-{
-  if (canToggleScaleTool())
-  {
-    m_mapView->toggleScaleTool();
-  }
-}
-
-bool MapWindow::canToggleScaleTool() const
-{
-  return m_mapView->canToggleScaleTool();
-}
-
-bool MapWindow::scaleToolActive() const
-{
-  return m_mapView->scaleToolActive();
-}
-
-void MapWindow::toggleShearTool()
-{
-  if (canToggleShearTool())
-  {
-    m_mapView->toggleShearTool();
-  }
-}
-
-bool MapWindow::canToggleShearTool() const
-{
-  return m_mapView->canToggleShearTool();
-}
-
-bool MapWindow::shearToolActive() const
-{
-  return m_mapView->shearToolActive();
-}
-
-bool MapWindow::anyVertexToolActive() const
-{
-  return m_mapView->anyVertexToolActive();
-}
-
-void MapWindow::toggleVertexTool()
-{
-  if (canToggleVertexTool())
-  {
-    m_mapView->toggleVertexTool();
-  }
-}
-
-bool MapWindow::canToggleVertexTool() const
-{
-  return m_mapView->canToggleVertexTools();
-}
-
-bool MapWindow::vertexToolActive() const
-{
-  return m_mapView->vertexToolActive();
-}
-
-void MapWindow::toggleEdgeTool()
-{
-  if (canToggleEdgeTool())
-  {
-    m_mapView->toggleEdgeTool();
-  }
-}
-
-bool MapWindow::canToggleEdgeTool() const
-{
-  return m_mapView->canToggleVertexTools();
-}
-
-bool MapWindow::edgeToolActive() const
-{
-  return m_mapView->edgeToolActive();
-}
-
-void MapWindow::toggleFaceTool()
-{
-  if (canToggleFaceTool())
-  {
-    m_mapView->toggleFaceTool();
-  }
-}
-
-bool MapWindow::canToggleFaceTool() const
-{
-  return m_mapView->canToggleVertexTools();
-}
-
-bool MapWindow::faceToolActive() const
-{
-  return m_mapView->faceToolActive();
+  return map.selection().hasNodes() && !m_mapView->toolBox().anyModalToolActive();
 }
 
 void MapWindow::togglePathTool()
@@ -2032,17 +1900,19 @@ void MapWindow::csgConvexMerge()
 {
   if (canDoCsgConvexMerge())
   {
-    if (m_mapView->vertexToolActive() && m_mapView->vertexTool().canDoCsgConvexMerge())
+    auto& toolBox = m_mapView->toolBox();
+
+    if (toolBox.vertexToolActive() && toolBox.vertexTool().canDoCsgConvexMerge())
     {
-      m_mapView->vertexTool().csgConvexMerge();
+      toolBox.vertexTool().csgConvexMerge();
     }
-    else if (m_mapView->edgeToolActive() && m_mapView->edgeTool().canDoCsgConvexMerge())
+    else if (toolBox.edgeToolActive() && toolBox.edgeTool().canDoCsgConvexMerge())
     {
-      m_mapView->edgeTool().csgConvexMerge();
+      toolBox.edgeTool().csgConvexMerge();
     }
-    else if (m_mapView->faceToolActive() && m_mapView->faceTool().canDoCsgConvexMerge())
+    else if (toolBox.faceToolActive() && toolBox.faceTool().canDoCsgConvexMerge())
     {
-      m_mapView->faceTool().csgConvexMerge();
+      toolBox.faceTool().csgConvexMerge();
     }
     else
     {
@@ -2053,13 +1923,15 @@ void MapWindow::csgConvexMerge()
 
 bool MapWindow::canDoCsgConvexMerge() const
 {
+  const auto& toolBox = m_mapView->toolBox();
   const auto& map = m_document->map();
   const auto& selection = map.selection();
+
   return (selection.hasBrushFaces() && selection.brushFaces.size() > 1)
          || (selection.hasOnlyBrushes() && selection.brushes.size() > 1)
-         || (m_mapView->vertexToolActive() && m_mapView->vertexTool().canDoCsgConvexMerge())
-         || (m_mapView->edgeToolActive() && m_mapView->edgeTool().canDoCsgConvexMerge())
-         || (m_mapView->faceToolActive() && m_mapView->faceTool().canDoCsgConvexMerge());
+         || (toolBox.vertexToolActive() && toolBox.vertexTool().canDoCsgConvexMerge())
+         || (toolBox.edgeToolActive() && toolBox.edgeTool().canDoCsgConvexMerge())
+         || (toolBox.faceToolActive() && toolBox.faceTool().canDoCsgConvexMerge());
 }
 
 void MapWindow::csgSubtract()
@@ -2132,14 +2004,36 @@ bool MapWindow::canSnapVertices() const
   return !selection.allBrushes().empty();
 }
 
+void MapWindow::convertSelectionToPatches()
+{
+  if (canConvertSelectionToPatches())
+  {
+    auto& map = m_document->map();
+    mdl::convertSelectionToPatches(map, 3, 3);
+
+    if (!toolBox().controlPointToolActive())
+    {
+      toolBox().toggleControlPointTool();
+    }
+  }
+}
+
+bool MapWindow::canConvertSelectionToPatches() const
+{
+  const auto& map = m_document->map();
+  const auto& selection = map.selection();
+  return mdl::hasPatchSupport(map.worldNode().mapFormat())
+         && selection.hasAnyBrushFaces();
+}
+
 void MapWindow::toggleAlignmentLock()
 {
   togglePref(Preferences::AlignmentLock);
 }
 
-void MapWindow::toggleUVLock()
+void MapWindow::toggleUvLock()
 {
-  togglePref(Preferences::UVLock);
+  togglePref(Preferences::UvLock);
 }
 
 void MapWindow::toggleShowGrid()
@@ -2345,7 +2239,10 @@ void MapWindow::showCompileDialog()
 {
   if (!m_compilationDialog)
   {
-    m_compilationDialog = new CompilationDialog{m_appController, *m_document, this};
+    const auto& camera = m_mapView->perspectiveCamera();
+
+    m_compilationDialog =
+      new CompilationDialog{m_appController, *m_document, camera, this};
     connect(
       m_compilationDialog,
       &CompilationDialog::compilationProfileStarted,
@@ -2815,29 +2712,26 @@ void MapWindow::changeEvent(QEvent*)
 
 void MapWindow::closeEvent(QCloseEvent* event)
 {
-  if (!closeCompileDialog())
+  if (
+    !closeCompileDialog()
+    || (!m_discardChangesOnClose && !confirmOrDiscardChanges()))
   {
+    m_discardChangesOnClose = false;
     event->ignore();
+    return;
   }
-  else
-  {
-    if (!m_discardChangesOnClose && !confirmOrDiscardChanges())
-    {
-      event->ignore();
-    }
-    else
-    {
-      saveWidgetGeometry(this);
-      saveWidgetState(this);
-      saveWidgetState(m_hSplitter);
-      saveWidgetState(m_vSplitter);
-      saveWidgetState(m_inspector);
-      saveWidgetState(m_infoPanel);
 
-      m_appController.mapWindowManager().removeMapWindow(this);
-      event->accept();
-    }
-  }
+  disconnect(qApp, &QApplication::focusChanged, this, &MapWindow::focusChange);
+
+  saveWidgetGeometry(this);
+  saveWidgetState(this);
+  saveWidgetState(m_hSplitter);
+  saveWidgetState(m_vSplitter);
+  saveWidgetState(m_inspector);
+  saveWidgetState(m_infoPanel);
+
+  m_appController.mapWindowManager().removeMapWindow(this);
+  event->accept();
   m_discardChangesOnClose = false;
   // Don't call superclass implementation
 }

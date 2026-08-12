@@ -32,8 +32,7 @@
 #include "McpResponseUtils.h"
 #include "McpSelectionQuery.h"
 #include "McpToolSupport.h"
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "gl/Material.h"
 #include "gl/MaterialManager.h"
 #include "mcp/McpError.h"
@@ -51,6 +50,7 @@
 #include "mdl/Transaction.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "ui/AppController.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
@@ -530,9 +530,8 @@ QString currentMaterialName(mdl::Map& map)
 QString fallbackMaterialName(mdl::Map& map)
 {
   const auto current = currentMaterialName(map);
-  return current.isEmpty()
-           ? QString::fromStdString(mdl::BrushFaceAttributes::NoMaterialName)
-           : current;
+  return current.isEmpty() ? QString::fromStdString(mdl::BrushFace::NoMaterialName)
+                           : current;
 }
 
 bool materialExists(mdl::Map& map, const QString& name)
@@ -542,7 +541,7 @@ bool materialExists(mdl::Map& map, const QString& name)
   {
     return false;
   }
-  if (kdl::ci::str_is_equal(materialName, mdl::BrushFaceAttributes::NoMaterialName))
+  if (kdl::ci::str_is_equal(materialName, mdl::BrushFace::NoMaterialName))
   {
     return true;
   }
@@ -563,15 +562,16 @@ void insertMissingMaterialFallback(
   }
 }
 
-QJsonObject brushFaceAttributesJson(const mdl::BrushFaceAttributes& attributes)
+QJsonObject brushFaceAttributesJson(const mdl::BrushFace& face)
 {
+  const auto uvAttributes = face.uvAttributes();
   return QJsonObject{
-    {"material", QString::fromStdString(attributes.materialName())},
-    {"xOffset", attributes.xOffset()},
-    {"yOffset", attributes.yOffset()},
-    {"xScale", attributes.xScale()},
-    {"yScale", attributes.yScale()},
-    {"rotation", attributes.rotation()},
+    {"material", QString::fromStdString(face.materialName())},
+    {"xOffset", uvAttributes.offset.x()},
+    {"yOffset", uvAttributes.offset.y()},
+    {"xScale", uvAttributes.scale.x()},
+    {"yScale", uvAttributes.scale.y()},
+    {"rotation", uvAttributes.rotation},
   };
 }
 
@@ -598,10 +598,10 @@ QJsonObject brushFaceJson(
   return QJsonObject{
     {"objectId", nodePathId(*handle.node(), worldNode)},
     {"faceIndex", static_cast<int>(handle.faceIndex())},
-    {"material", QString::fromStdString(face.attributes().materialName())},
+    {"material", QString::fromStdString(face.materialName())},
     {"normal", vecToJson(face.normal())},
     {"bounds", boundsToJson(brushFaceBounds(face))},
-    {"attributes", brushFaceAttributesJson(face.attributes())},
+    {"attributes", brushFaceAttributesJson(face)},
   };
 }
 
@@ -725,8 +725,8 @@ McpBridgeToolResult textureLockSetForMapResult(mdl::Map& map, const QJsonObject&
   if (uvLockValue.isBool())
   {
     const auto uvLock = uvLockValue.toBool();
-    setPref(Preferences::UVLock, uvLock);
-    editorContext.setUVLock(uvLock);
+    setPref(Preferences::UvLock, uvLock);
+    editorContext.setUvLock(uvLock);
   }
 
   auto result = textureLockJson(map);
@@ -1456,8 +1456,7 @@ McpBridgeToolResult textureReplaceResult(
       handles.begin(),
       handles.end(),
       [&](const auto& handle) {
-        return !kdl::ci::str_is_equal(
-          handle.face().attributes().materialName(), findMaterial);
+        return !kdl::ci::str_is_equal(handle.face().materialName(), findMaterial);
       }),
     handles.end());
   if (handles.empty())
@@ -1642,13 +1641,13 @@ McpBridgeToolResult textureCopyFromFaceForMapResult(
         "provide_target_faces_or_select_brush_faces"));
   }
 
-  const auto sourceAttributes = source->face().attributes();
+  const auto sourceFace = source->face();
   const auto changedNodes = changedBrushIds(handles, map.worldNode());
   const auto transactionName = QString{"MCP: Copy face texture"};
   const auto ok = executeTransaction(map, transactionName, [&]() {
     mdl::deselectAll(map);
     mdl::selectBrushFaces(map, handles);
-    return mdl::setBrushFaceAttributes(map, mdl::copyAll(sourceAttributes));
+    return mdl::setBrushFaceAttributes(map, mdl::copyAll(sourceFace));
   });
   if (!ok)
   {

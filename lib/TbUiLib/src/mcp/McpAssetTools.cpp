@@ -268,15 +268,15 @@ std::optional<QJsonArray> addNodesWithTransaction(
     mdl::deselectAll(map);
   }
 
-  auto* parent = mdl::parentForNodes(map);
-  if (!parent || !parent->canAddChildren(std::begin(nodes), std::end(nodes)))
+  auto& parent = mdl::parentForNodes(map);
+  if (!parent.canAddChildren(std::begin(nodes), std::end(nodes)))
   {
     transaction.cancel();
     return std::nullopt;
   }
 
   auto nodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
-  nodesToAdd.emplace(parent, nodes);
+  nodesToAdd.emplace(&parent, nodes);
   if (!map.executeAndStore(mdl::AddRemoveNodesCommand::add(nodesToAdd)))
   {
     transaction.cancel();

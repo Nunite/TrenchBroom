@@ -54,12 +54,13 @@ TEST_CASE("Map_CopyPaste")
     const auto builder = BrushBuilder{
       map.worldNode().mapFormat(),
       map.worldBounds(),
-      map.gameInfo().gameConfig.faceAttribsConfig.defaults};
+      map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
+      map.gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes};
 
     auto* brushNode = new BrushNode{builder.createCube(64.0, "some_material").value()};
     auto* entityNode = new EntityNode{Entity{{{"some_key", "some_value"}}}};
 
-    addNodes(map, {{parentForNodes(map), {brushNode, entityNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode, entityNode}}});
 
     SECTION("nothing is selected")
     {
@@ -112,6 +113,17 @@ TEST_CASE("Map_CopyPaste")
 }
 )");
     }
+
+    SECTION("patch is selected")
+    {
+      // https://github.com/TrenchBroom/TrenchBroom/issues/5367
+
+      auto* patchNode = createPatchNode();
+      addNodes(map, {{&parentForNodes(map), {patchNode}}});
+      selectNodes(map, {patchNode});
+
+      CHECK(serializeSelectedNodes(map) != R"()");
+    }
   }
 
   SECTION("serializeSelectedBrushFaces")
@@ -121,11 +133,12 @@ TEST_CASE("Map_CopyPaste")
     const auto builder = BrushBuilder{
       map.worldNode().mapFormat(),
       map.worldBounds(),
-      map.gameInfo().gameConfig.faceAttribsConfig.defaults};
+      map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
+      map.gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes};
 
     auto* brushNode = new BrushNode{builder.createCube(64.0, "some_material").value()};
 
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
 
     SECTION("nothing is selected")
     {
@@ -191,7 +204,7 @@ TEST_CASE("Map_CopyPaste")
       REQUIRE(worldNode.customLayers().empty());
 
       CHECK(paste(map, data) == PasteType::Node);
-      CHECK_FALSE(worldNode.entity().hasProperty("to_be_ignored"));
+      CHECK(!worldNode.entity().hasProperty("to_be_ignored"));
       CHECK(worldNode.customLayers().empty());
       CHECK(defaultLayerNode.childCount() == 1u);
       CHECK(dynamic_cast<BrushNode*>(defaultLayerNode.children().front()) != nullptr);
@@ -227,7 +240,7 @@ TEST_CASE("Map_CopyPaste")
       REQUIRE(defaultLayerNode.childCount() == 0u);
 
       CHECK(paste(map, data) == PasteType::Node);
-      CHECK_FALSE(worldNode.entity().hasProperty("to_be_ignored"));
+      CHECK(!worldNode.entity().hasProperty("to_be_ignored"));
       CHECK(defaultLayerNode.childCount() == 1u);
 
       const auto* groupNode =
@@ -265,7 +278,7 @@ TEST_CASE("Map_CopyPaste")
       REQUIRE(defaultLayerNode.childCount() == 0u);
 
       CHECK(paste(map, data) == PasteType::Node);
-      CHECK_FALSE(worldNode.entity().hasProperty("to_be_ignored"));
+      CHECK(!worldNode.entity().hasProperty("to_be_ignored"));
       CHECK(defaultLayerNode.childCount() == 1u);
 
       const auto* entityNode =
@@ -300,7 +313,7 @@ TEST_CASE("Map_CopyPaste")
       REQUIRE(defaultLayerNode.childCount() == 0u);
 
       CHECK(paste(map, data) == PasteType::Node);
-      CHECK_FALSE(worldNode.entity().hasProperty("to_be_ignored"));
+      CHECK(!worldNode.entity().hasProperty("to_be_ignored"));
       CHECK(defaultLayerNode.childCount() == 1u);
       CHECK(dynamic_cast<BrushNode*>(defaultLayerNode.children().front()) != nullptr);
     }
@@ -357,6 +370,29 @@ common/caulk
       CHECK(dynamic_cast<PatchNode*>(defaultLayerNode.children().front()) != nullptr);
     }
 
+    SECTION("Copy and paste a single patch")
+    {
+      // https://github.com/TrenchBroom/TrenchBroom/issues/5367
+
+      auto& map = fixture.create({.mapFormat = MapFormat::Quake3});
+
+      auto* patchNode = createPatchNode();
+      addNodes(map, {{&parentForNodes(map), {patchNode}}});
+      selectNodes(map, {patchNode});
+
+      const auto copied = serializeSelectedNodes(map);
+      REQUIRE(copied != R"()");
+
+      const auto originalPatch = patchNode->patch();
+      deselectAll(map);
+      removeNodes(map, {patchNode});
+
+      CHECK(paste(map, copied) == PasteType::Node);
+      CHECK(map.selection().hasOnlyPatches());
+      REQUIRE(map.selection().patches.size() == 1u);
+      CHECK(map.selection().patches.front()->patch() == originalPatch);
+    }
+
     SECTION("Paste and translate a group")
     {
       // https://github.com/TrenchBroom/TrenchBroom/issues/2776
@@ -368,7 +404,7 @@ common/caulk
 
       auto* brushNode1 =
         new BrushNode{builder.createCuboid(box, "material") | kdl::value()};
-      addNodes(map, {{parentForNodes(map), {brushNode1}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode1}}});
       selectNodes(map, {brushNode1});
 
       const auto groupName = std::string{"testGroup"};
@@ -400,7 +436,7 @@ common/caulk
       auto& map = fixture.create();
       auto* brushNode = createBrushNode(map);
 
-      addNodes(map, {{parentForNodes(map), {brushNode}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode}}});
       selectNodes(map, {brushNode});
 
       auto* groupNode = groupSelectedNodes(map, "test");
@@ -456,7 +492,7 @@ common/caulk
       auto& map = fixture.create();
 
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
 
       selectNodes(map, {entityNode});
       auto* groupNode = groupSelectedNodes(map, "test");
@@ -502,7 +538,7 @@ common/caulk
       auto& map = fixture.create();
 
       auto* brushNode = createBrushNode(map);
-      addNodes(map, {{parentForNodes(map), {brushNode}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode}}});
       selectNodes(map, {brushNode});
 
       auto* groupNode = groupSelectedNodes(map, "test");

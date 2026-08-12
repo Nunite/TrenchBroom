@@ -28,7 +28,7 @@
 #include <QStringList>
 #include <QVBoxLayout>
 
-#include "PreferenceManager.h"
+#include "base/PreferenceManager.h"
 #include "ui/Action.h"
 #include "ui/ActionExecutionContext.h"
 #include "ui/ActionManager.h"
@@ -85,7 +85,12 @@ CommandPaletteDialog::CommandPaletteDialog(
     }
 
     const auto preferencePath = QString::fromStdString(path.generic_string());
-    const auto shortcut = pref(action.preference()).toString(QKeySequence::NativeText);
+    auto shortcutLabels = QStringList{};
+    for (const auto& keySequence : pref(action.preference()))
+    {
+      shortcutLabels.push_back(keySequence.toString(QKeySequence::NativeText));
+    }
+    const auto shortcut = shortcutLabels.join(", ");
     const auto displayPath = makeDisplayPath(preferencePath);
     auto filterText =
       QStringList{action.label(), displayPath, preferencePath, shortcut}.join(" ");

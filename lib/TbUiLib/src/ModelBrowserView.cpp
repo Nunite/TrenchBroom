@@ -29,9 +29,9 @@
 #include <QScrollBar>
 #include <QUrl>
 
-#include "Macros.h"
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/Macros.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "fs/DiskIO.h"
 #include "fs/PathInfo.h"
 #include "gl/ActiveShader.h"
@@ -777,7 +777,7 @@ void ModelBrowserView::renderAssetPlaceholders(
   gl::Gl& gl, Layout& layout, const float y, const float height)
 {
   using Vertex = gl::VertexTypes::P2C4::Vertex;
-  using TextVertex = gl::VertexTypes::P2UV2C4::Vertex;
+  using TextVertex = gl::VertexTypes::P2Uv2C4::Vertex;
   auto backgroundVertices = std::vector<Vertex>{};
   auto iconVertices = std::vector<Vertex>{};
   auto errorTextVertices = std::vector<TextVertex>{};
@@ -1079,7 +1079,7 @@ void ModelBrowserView::renderSoundPreviewButtons(
 void ModelBrowserView::renderSpritePreviews(
   gl::Gl& gl, Layout& layout, const float y, const float height)
 {
-  using Vertex = gl::VertexTypes::P2UV2::Vertex;
+  using Vertex = gl::VertexTypes::P2Uv2::Vertex;
 
   auto shader = gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserShader};
   shader.set("ApplyTinting", false);
@@ -1370,7 +1370,7 @@ void ModelBrowserView::renderFolders(
     return;
   }
 
-  using IconVertex = gl::VertexTypes::P2UV2::Vertex;
+  using IconVertex = gl::VertexTypes::P2Uv2::Vertex;
   auto iconVertices = std::vector<IconVertex>{};
 
   for (const auto& group : layout.groups())

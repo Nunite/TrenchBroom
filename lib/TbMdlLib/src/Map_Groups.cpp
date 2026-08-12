@@ -19,8 +19,8 @@
 
 #include "mdl/Map_Groups.h"
 
-#include "Logger.h"
-#include "Uuid.h"
+#include "base/Logger.h"
+#include "base/Uuid.h"
 #include "mdl/ApplyAndSwap.h"
 #include "mdl/CurrentGroupCommand.h"
 #include "mdl/EditorContext.h"
@@ -104,7 +104,8 @@ void linkGroups(Map& map, const std::vector<GroupNode*>& groupNodes)
   {
     const auto& sourceGroupNode = *groupNodes.front();
     const auto targetGroupNodes =
-      kdl::vec_slice_suffix(groupNodes, groupNodes.size() - 1);
+      groupNodes | std::views::drop(1) | kdl::ranges::to<std::vector>();
+
     copyAndReturnLinkIds(sourceGroupNode, targetGroupNodes)
       | kdl::transform([&](auto linkIds) {
           auto linkIdVector = linkIds | kdl::views::as_rvalue
@@ -288,7 +289,7 @@ GroupNode* groupSelectedNodes(Map& map, const std::string& name)
   auto transaction = Transaction{map, "Group Selected Objects"};
   deselectAll(map);
   if (
-    addNodes(map, {{parentForNodes(map, nodes), {group}}}).empty()
+    addNodes(map, {{&parentForNodes(map, nodes), {group}}}).empty()
     || !reparentNodes(map, {{group, nodes}}))
   {
     transaction.cancel();
@@ -412,10 +413,10 @@ GroupNode* createLinkedDuplicate(Map& map)
   auto* groupNode = map.selection().groups.front();
   auto* groupNodeClone =
     static_cast<GroupNode*>(groupNode->cloneRecursively(map.worldBounds()));
-  auto* suggestedParent = parentForNodes(map, {groupNode});
+  auto& suggestedParent = parentForNodes(map, {groupNode});
 
   auto transaction = Transaction{map, "Create Linked Duplicate"};
-  if (addNodes(map, {{suggestedParent, {groupNodeClone}}}).empty())
+  if (addNodes(map, {{&suggestedParent, {groupNodeClone}}}).empty())
   {
     transaction.cancel();
     return nullptr;

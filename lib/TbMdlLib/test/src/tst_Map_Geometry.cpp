@@ -36,10 +36,10 @@
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/Matchers.h"
-#include "mdl/ParallelUVCoordSystem.h"
+#include "mdl/NodeHandles.h"
 #include "mdl/TestFactory.h"
 #include "mdl/TestUtils.h"
-#include "mdl/VertexHandleManager.h"
+#include "mdl/UvCoordSystem.h"
 #include "mdl/WorldNode.h"
 
 #include "kd/ranges/to.h"
@@ -146,7 +146,7 @@ TEST_CASE("Map_Geometry")
       auto* node = createNode(map);
       CAPTURE(node->name());
 
-      addNodes(map, {{parentForNodes(map), {node}}});
+      addNodes(map, {{&parentForNodes(map), {node}}});
 
       const auto originalNode =
         std::unique_ptr<Node>{node->cloneRecursively(map.worldBounds())};
@@ -189,10 +189,10 @@ TEST_CASE("Map_Geometry")
       // https://github.com/TrenchBroom/TrenchBroom/issues/1715
 
       auto* brushNode1 = createBrushNode(map);
-      addNodes(map, {{parentForNodes(map), {brushNode1}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode1}}});
 
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
       reparentNodes(map, {{entityNode, {brushNode1}}});
 
       selectNodes(map, {brushNode1});
@@ -207,7 +207,7 @@ TEST_CASE("Map_Geometry")
 
         THEN("The entity does not have any empty property keys")
         {
-          CHECK_FALSE(hasEmptyName(entityNode->entity().propertyKeys()));
+          CHECK(!hasEmptyName(entityNode->entity().propertyKeys()));
 
           AND_WHEN("The transformation is undone")
           {
@@ -215,7 +215,7 @@ TEST_CASE("Map_Geometry")
 
             THEN("The entity still doesn't have any empty property keys")
             {
-              CHECK_FALSE(hasEmptyName(entityNode->entity().propertyKeys()));
+              CHECK(!hasEmptyName(entityNode->entity().propertyKeys()));
             }
           }
         }
@@ -232,7 +232,7 @@ TEST_CASE("Map_Geometry")
 
       auto* brushNode1 =
         new BrushNode{builder.createCuboid(box, "material") | kdl::value()};
-      addNodes(map, {{parentForNodes(map), {brushNode1}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode1}}});
       selectNodes(map, {brushNode1});
 
       auto* group = groupSelectedNodes(map, "testGroup");
@@ -256,7 +256,7 @@ TEST_CASE("Map_Geometry")
 
         THEN("The brushes in both linked groups have alignment lock forced on")
         {
-          auto getUVCoords =
+          auto getUvCoords =
             [](auto* brushNode, const vm::vec3d& normal) -> std::vector<vm::vec2f> {
             const BrushFace& face =
               brushNode->brush().face(*brushNode->brush().findFace(normal));
@@ -267,8 +267,8 @@ TEST_CASE("Map_Geometry")
 
           // Brushes in linked groups should have alignment lock forced on
           CHECK(uvListsEqual(
-            getUVCoords(brushNode1, vm::vec3d{0, 0, 1}),
-            getUVCoords(linkedBrushNode, vm::vec3d{0, 0, 1})));
+            getUvCoords(brushNode1, vm::vec3d{0, 0, 1}),
+            getUvCoords(linkedBrushNode, vm::vec3d{0, 0, 1})));
         }
       }
     }
@@ -281,7 +281,7 @@ TEST_CASE("Map_Geometry")
     GIVEN("An entity")
     {
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
       selectNodes(map, {entityNode});
 
       WHEN("The entity is translated")
@@ -318,7 +318,7 @@ TEST_CASE("Map_Geometry")
 
       SECTION("two brushes")
       {
-        addNodes(map, {{parentForNodes(map), {brushNode1, brushNode2}}});
+        addNodes(map, {{&parentForNodes(map), {brushNode1, brushNode2}}});
         selectNodes(map, {brushNode1, brushNode2});
 
         const auto boundsCenter = map.selectionBounds()->center();
@@ -345,7 +345,7 @@ TEST_CASE("Map_Geometry")
           {"angle", "45"},
         }}};
 
-        addNodes(map, {{parentForNodes(map), {entityNode}}});
+        addNodes(map, {{&parentForNodes(map), {entityNode}}});
         addNodes(map, {{entityNode, {brushNode1, brushNode2}}});
 
         REQUIRE(*entityNode->entity().property("angle") == "45");
@@ -400,16 +400,16 @@ TEST_CASE("Map_Geometry")
         builder.createCuboid(vm::bbox3d{{-32, -32, -32}, {32, 32, 32}}, "material")
         | kdl::value()};
 
-      addNodes(map, {{parentForNodes(map), {brushNode}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode}}});
       selectNodes(map, {brushNode});
 
-      auto& vertexHandles = map.vertexHandles();
-      vertexHandles.addHandles(*brushNode);
-      vertexHandles.select(std::vector<vm::vec3d>{
-        {-32, -32, 32},
-        {-32, 32, 32},
-        {32, -32, 32},
-        {32, 32, 32},
+      auto& vertexHandles = map.nodeHandles();
+      vertexHandles.addHandles<VertexHandle>(*brushNode);
+      vertexHandles.selectHandles<VertexHandle>(std::vector<VertexHandle>{
+        {{-32, -32, 32}},
+        {{-32, 32, 32}},
+        {{32, -32, 32}},
+        {{32, 32, 32}},
       });
 
       rotateSelection(map, {0, 0, 0}, {0, 0, 1}, vm::to_radians(45.0));
@@ -433,10 +433,10 @@ TEST_CASE("Map_Geometry")
       // https://github.com/TrenchBroom/TrenchBroom/issues/1754
 
       auto* brushNode1 = createBrushNode(map);
-      addNodes(map, {{parentForNodes(map), {brushNode1}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode1}}});
 
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
       reparentNodes(map, {{entityNode, {brushNode1}}});
 
       selectNodes(map, {brushNode1});
@@ -444,13 +444,13 @@ TEST_CASE("Map_Geometry")
       auto* groupNode = groupSelectedNodes(map, "test");
       CHECK(groupNode->selected());
 
-      CHECK_FALSE(entityNode->entity().hasProperty("origin"));
+      CHECK(!entityNode->entity().hasProperty("origin"));
       CHECK(rotateSelection(map, vm::vec3d{0, 0, 0}, vm::vec3d{0, 0, 1}, 10));
-      CHECK_FALSE(entityNode->entity().hasProperty("origin"));
+      CHECK(!entityNode->entity().hasProperty("origin"));
 
       map.undoCommand();
 
-      CHECK_FALSE(entityNode->entity().hasProperty("origin"));
+      CHECK(!entityNode->entity().hasProperty("origin"));
     }
 
     SECTION("Undoing a rotation removes angle key")
@@ -459,7 +459,7 @@ TEST_CASE("Map_Geometry")
         {EntityPropertyKeys::Classname, "test"},
       }}};
 
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
       CHECK(!entityNode->entity().hasProperty("angle"));
 
       selectNodes(map, {entityNode});
@@ -484,7 +484,7 @@ TEST_CASE("Map_Geometry")
     auto* brushNode =
       new BrushNode{builder.createCuboid(initialBBox, "material") | kdl::value()};
 
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
     selectNodes(map, {brushNode});
 
     REQUIRE(brushNode->logicalBounds().size() == vm::vec3d{200, 200, 200});
@@ -495,7 +495,7 @@ TEST_CASE("Map_Geometry")
     SECTION("single brush")
     {
       // attempting an invalid scale has no effect
-      CHECK_FALSE(scaleSelection(map, initialBBox, invalidBBox));
+      CHECK(!scaleSelection(map, initialBBox, invalidBBox));
       CHECK(brushNode->logicalBounds().size() == vm::vec3d{200, 200, 200});
       CHECK(
         brushNode->brush()
@@ -517,7 +517,7 @@ TEST_CASE("Map_Geometry")
       [[maybe_unused]] auto* group = groupSelectedNodes(map, "my group");
 
       // attempting an invalid scale has no effect
-      CHECK_FALSE(scaleSelection(map, initialBBox, invalidBBox));
+      CHECK(!scaleSelection(map, initialBBox, invalidBBox));
       CHECK(brushNode->logicalBounds().size() == vm::vec3d{200, 200, 200});
 
       CHECK(scaleSelection(map, initialBBox, doubleBBox));
@@ -545,7 +545,7 @@ TEST_CASE("Map_Geometry")
       auto* brushNode =
         new BrushNode{builder.createCuboid(initialBBox, "material") | kdl::value()};
 
-      addNodes(map, {{parentForNodes(map), {brushNode}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode}}});
       selectNodes(map, {brushNode});
 
       CHECK_THAT(
@@ -590,7 +590,7 @@ TEST_CASE("Map_Geometry")
       auto* brushNode =
         new BrushNode{builder.createCuboid(initialBBox, "material") | kdl::value()};
 
-      addNodes(map, {{parentForNodes(map), {brushNode}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode}}});
       selectNodes(map, {brushNode});
 
       CHECK_THAT(
@@ -644,8 +644,8 @@ TEST_CASE("Map_Geometry")
     CHECK(checkBrushIntegral(brushNode1));
     CHECK(checkBrushIntegral(brushNode2));
 
-    addNodes(map, {{parentForNodes(map), {brushNode1}}});
-    addNodes(map, {{parentForNodes(map), {brushNode2}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode1}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode2}}});
 
     selectNodes(map, {brushNode1, brushNode2});
 
@@ -670,7 +670,7 @@ TEST_CASE("Map_Geometry")
       builder.createCuboid(vm::bbox3d{{-32, -32, -32}, {32, 32, 32}}, "material")
       | kdl::value()};
 
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
     selectNodes(map, {brushNode});
 
     SECTION("no vertex gets deleted")
@@ -750,7 +750,7 @@ TEST_CASE("Map_Geometry")
       builder.createCuboid(vm::bbox3d{{-32, -32, -32}, {32, 32, 32}}, "material")
       | kdl::value()};
 
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
     selectNodes(map, {brushNode});
 
     SECTION("Edge transform is valid")
@@ -837,7 +837,7 @@ TEST_CASE("Map_Geometry")
       builder.createCuboid(vm::bbox3d{{-32, -32, -32}, {32, 32, 32}}, "material")
       | kdl::value()};
 
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
     selectNodes(map, {brushNode});
 
     SECTION("Face transform is valid")
@@ -936,7 +936,7 @@ TEST_CASE("Map_Geometry")
       builder.createCuboid(vm::bbox3d{{-32, -32, -32}, {32, 32, 32}}, "material")
       | kdl::value()};
 
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
     selectNodes(map, {brushNode});
 
     SECTION("Vertex can be added")
@@ -977,7 +977,7 @@ TEST_CASE("Map_Geometry")
       builder.createCuboid(vm::bbox3d{{-32, -32, -32}, {32, 32, 32}}, "material")
       | kdl::value()};
 
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
     selectNodes(map, {brushNode});
 
     SECTION("Remove single vertex")
@@ -1073,7 +1073,7 @@ TEST_CASE("Map_Geometry")
       // https://github.com/TrenchBroom/TrenchBroom/issues/3768
 
       auto* brushNode = createBrushNode(map);
-      addNodes(map, {{parentForNodes(map), {brushNode}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode}}});
       selectNodes(map, {brushNode});
 
       auto* groupNode = groupSelectedNodes(map, "test");
@@ -1106,7 +1106,7 @@ TEST_CASE("Map_Geometry")
       const auto builder = BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
 
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
 
       auto* brushNode1 = new BrushNode{
         builder.createCuboid(vm::bbox3d{{0, 0, 0}, {32, 64, 64}}, "material")
@@ -1115,7 +1115,7 @@ TEST_CASE("Map_Geometry")
         builder.createCuboid(vm::bbox3d{{32, 0, 0}, {64, 64, 64}}, "material")
         | kdl::value()};
       addNodes(map, {{entityNode, {brushNode1}}});
-      addNodes(map, {{parentForNodes(map), {brushNode2}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode2}}});
       CHECK(entityNode->children().size() == 1u);
 
       selectNodes(map, {brushNode1, brushNode2});
@@ -1132,7 +1132,7 @@ TEST_CASE("Map_Geometry")
       const auto builder = BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
 
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
 
       auto* brushNode1 = new BrushNode{
         builder.createCuboid(vm::bbox3d{{0, 0, 0}, {32, 64, 64}}, "material")
@@ -1141,7 +1141,7 @@ TEST_CASE("Map_Geometry")
         builder.createCuboid(vm::bbox3d{{32, 0, 0}, {64, 64, 64}}, "material")
         | kdl::value()};
       addNodes(map, {{entityNode, {brushNode1}}});
-      addNodes(map, {{parentForNodes(map), {brushNode2}}});
+      addNodes(map, {{&parentForNodes(map), {brushNode2}}});
       REQUIRE(entityNode->children().size() == 1u);
 
       const auto oFace1Index = brushNode1->brush().findFace(vm::vec3d{-1, 0, 0});
@@ -1178,20 +1178,20 @@ TEST_CASE("Map_Geometry")
       const auto builder = BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
 
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
 
-      auto texAlignment = ParallelUVCoordSystem{{1, 0, 0}, {0, 1, 0}};
-      auto texAlignmentSnapshot = texAlignment.takeSnapshot();
+      const auto texAlignmentSnapshot =
+        UvCoordSystemSnapshot{vm::vec3d{1, 0, 0}, vm::vec3d{0, 1, 0}};
 
       auto brush1 = builder.createCuboid(vm::bbox3d{{0, 0, 0}, {32, 64, 64}}, "material")
                     | kdl::value();
       brush1.face(*brush1.findFace(vm::vec3d{0, 0, 1}))
-        .restoreUVCoordSystemSnapshot(*texAlignmentSnapshot);
+        .restoreUvCoordSystemSnapshot(texAlignmentSnapshot);
 
       auto brush2 = builder.createCuboid(vm::bbox3d{{32, 0, 0}, {64, 64, 64}}, "material")
                     | kdl::value();
       brush2.face(*brush2.findFace(vm::vec3d{0, 0, 1}))
-        .restoreUVCoordSystemSnapshot(*texAlignmentSnapshot);
+        .restoreUvCoordSystemSnapshot(texAlignmentSnapshot);
 
       auto* brushNode1 = new BrushNode{std::move(brush1)};
       auto* brushNode2 = new BrushNode{std::move(brush2)};
@@ -1221,7 +1221,7 @@ TEST_CASE("Map_Geometry")
       const auto builder = BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
 
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
 
       auto* minuendNode = new BrushNode{
         builder.createCuboid(
@@ -1267,7 +1267,7 @@ TEST_CASE("Map_Geometry")
       const auto builder = BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
 
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
 
       auto* subtrahend1 = new BrushNode{
         builder.createCuboid(
@@ -1278,7 +1278,7 @@ TEST_CASE("Map_Geometry")
       selectNodes(map, {subtrahend1});
       CHECK(csgSubtract(map));
       CHECK(entityNode->children().size() == 0u);
-      CHECK_FALSE(map.selection().hasNodes());
+      CHECK(!map.selection().hasNodes());
 
       // check that the selection is restored after undo
       map.undoCommand();
@@ -1294,10 +1294,10 @@ TEST_CASE("Map_Geometry")
       const auto builder = BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
 
       auto* entityNode = new EntityNode{Entity{}};
-      addNodes(map, {{parentForNodes(map), {entityNode}}});
+      addNodes(map, {{&parentForNodes(map), {entityNode}}});
 
-      auto texAlignment = ParallelUVCoordSystem{vm::vec3d{1, 0, 0}, vm::vec3d{0, 1, 0}};
-      auto texAlignmentSnapshot = texAlignment.takeSnapshot();
+      const auto texAlignmentSnapshot =
+        UvCoordSystemSnapshot{vm::vec3d{1, 0, 0}, vm::vec3d{0, 1, 0}};
 
       auto brush1 = builder.createCuboid(
                       vm::bbox3d{vm::vec3d{0, 0, 0}, vm::vec3d{64, 64, 64}}, "material")
@@ -1306,7 +1306,7 @@ TEST_CASE("Map_Geometry")
                       vm::bbox3d{vm::vec3d{0, 0, 0}, vm::vec3d{64, 64, 32}}, "material")
                     | kdl::value();
       brush2.face(*brush2.findFace(vm::vec3d{0, 0, 1}))
-        .restoreUVCoordSystemSnapshot(*texAlignmentSnapshot);
+        .restoreUvCoordSystemSnapshot(texAlignmentSnapshot);
 
       auto* brushNode1 = new BrushNode{std::move(brush1)};
       auto* brushNode2 = new BrushNode{std::move(brush2)};
@@ -1412,7 +1412,7 @@ TEST_CASE("Map_Geometry")
       builder.createCuboid(vm::bbox3d{{0, -32, -32}, {64, 32, 32}}, "material")
       | kdl::value()};
 
-    addNodes(map, {{parentForNodes(map), {brushNode1, brushNode2}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode1, brushNode2}}});
     selectNodes(map, {brushNode1, brushNode2});
 
     SECTION("Extrude one brush")
@@ -1474,7 +1474,7 @@ TEST_CASE("Map_Geometry")
     auto& map = fixture.create();
 
     auto* brushNode = createBrushNode(map);
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
     selectNodes(map, {brushNode});
 
     const auto oldFaceCount = faceCount(*brushNode);
@@ -1505,7 +1505,7 @@ TEST_CASE("Map_Geometry")
     auto& map = fixture.create();
 
     auto* brushNode = createBrushNode(map);
-    addNodes(map, {{parentForNodes(map), {brushNode}}});
+    addNodes(map, {{&parentForNodes(map), {brushNode}}});
     selectNodes(map, {brushNode});
 
     const auto oldFaceCount = faceCount(*brushNode);

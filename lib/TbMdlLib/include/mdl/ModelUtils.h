@@ -21,6 +21,7 @@
 
 #include "mdl/Hit.h"
 #include "mdl/HitType.h"
+#include "mdl/NodeTree.h"
 
 #include "vm/bbox.h"
 
@@ -35,8 +36,12 @@ class Node;
 class GroupNode;
 class BrushNode;
 class EntityNode;
+class EntityNodeBase;
 class LayerNode;
 class EditorContext;
+
+template <typename T, typename U>
+class octree;
 
 HitType::Type nodeHitType();
 
@@ -47,6 +52,14 @@ std::vector<LayerNode*> collectContainingLayersUserSorted(
 
 GroupNode* findContainingGroup(Node* node);
 const GroupNode* findContainingGroup(const Node* node);
+
+/**
+ * Returns the entity that owns the given node, i.e. the closest ancestor entity or
+ * world node, treating layers and groups as pass-through. Only brush and patch nodes
+ * can be owned by an entity; returns nullptr for every other node type.
+ */
+EntityNodeBase* findContainingEntity(Node* node);
+const EntityNodeBase* findContainingEntity(const Node* node);
 
 /**
  * Searches the ancestor chain of `node` for the outermost closed group and returns
@@ -93,6 +106,21 @@ std::vector<Node*> collectSelectableNodes(
 std::vector<BrushFaceHandle> collectSelectedBrushFaces(const std::vector<Node*>& nodes);
 std::vector<BrushFaceHandle> collectSelectableBrushFaces(
   const std::vector<Node*>& nodes, const EditorContext& editorContext);
+
+/**
+ * Floods out from the given face and returns every face that forms one connected,
+ * coplanar surface with it, including across touching brushes. Faces only join where they
+ * share an edge, so corners and gaps don't bridge the region.
+ *
+ * Candidate brushes are gathered by querying `nodeTree` with the bounds of each face the
+ * flood reaches, so only brushes near the surface are visited rather than the whole map.
+ * `editorContext` filters out faces that aren't selectable (e.g. on hidden or locked
+ * brushes), which also keeps those brushes from bridging the region.
+ */
+std::vector<BrushFaceHandle> collectConnectedCoplanarFaces(
+  const BrushFaceHandle& startFace,
+  const EditorContext& editorContext,
+  const NodeTree& nodeTree);
 
 vm::bbox3d computeLogicalBounds(
   const std::vector<Node*>& nodes, const vm::bbox3d& defaultBounds = vm::bbox3d());

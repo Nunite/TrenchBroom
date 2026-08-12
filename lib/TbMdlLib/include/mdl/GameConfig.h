@@ -19,11 +19,12 @@
 
 #pragma once
 
-#include "Color.h"
-#include "Preference.h"
+#include "base/Color.h"
+#include "base/Preference.h"
 #include "el/Expression.h"
-#include "mdl/BrushFaceAttributes.h"
+#include "mdl/SurfaceAttributes.h"
 #include "mdl/Tag.h"
+#include "mdl/UvAttributes.h"
 
 #include "kd/reflection_decl.h"
 
@@ -110,7 +111,8 @@ struct FaceAttribsConfig
 {
   FlagsConfig surfaceFlags;
   FlagsConfig contentFlags;
-  BrushFaceAttributes defaults{BrushFaceAttributes::NoMaterialName};
+  UvAttributes defaultUvAttributes;
+  SurfaceAttributes defaultSurfaceAttributes;
 
   kdl_reflect_decl(FaceAttribsConfig, surfaceFlags, contentFlags);
 };

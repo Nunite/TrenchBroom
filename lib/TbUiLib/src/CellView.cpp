@@ -25,8 +25,7 @@
 #include <QScrollBar>
 #include <QToolTip>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "gl/ActiveShader.h"
 #include "gl/FontDescriptor.h"
 #include "gl/FontManager.h"
@@ -36,6 +35,7 @@
 #include "gl/TextureFont.h"
 #include "gl/VertexArray.h"
 #include "gl/VertexType.h"
+#include "prefs/Preferences.h"
 #include "render/Transformation.h"
 #include "ui/CellLayout.h"
 #include "ui/RenderView.h"
@@ -470,7 +470,7 @@ namespace
 auto collectStringVertices(
   CellLayout& layout, const float y, const float height, gl::FontManager& fontManager)
 {
-  using TextVertex = gl::VertexTypes::P2UV2C4::Vertex;
+  using TextVertex = gl::VertexTypes::P2Uv2C4::Vertex;
 
   auto defaultFont = gl::FontDescriptor{
     pref(Preferences::RendererFontPath), size_t(pref(Preferences::BrowserFontSize))};

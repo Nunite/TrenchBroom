@@ -266,7 +266,7 @@ Finally, you can deselect everything by left clicking in the void, or by choosin
 
 ![Selected brush face](images/BrushFaceSelection.png)
 
-To select a brush face, you need to hold #key(Shift) and left click it in the 3D viewport. You can select multiple brush faces by additionally holding #key(Ctrl). To select all faces of a brush, you can left double click that brush while holding #key(Shift). If you additionally hold #key(Ctrl), the faces are added to the current selection. To paint select brush faces, first select one brush face, then left drag while holding #key(Ctrl) and #key(Shift). To deselect all brush faces, simply click in the void or choose #menu(Menu/Edit/Deselect All).
+To select a brush face, you need to hold #key(Shift) and left click it in the 3D viewport. You can select multiple brush faces by additionally holding #key(Ctrl). To select all faces of a brush, you can left double click that brush while holding #key(Shift). If you additionally hold #key(Ctrl), the faces are added to the current selection. To flood fill a whole coplanar surface at once - even where it spans several touching brushes - left double click a face while holding #key(Shift)#key(Alt). Again, hold #key(Ctrl) to add the faces to the current selection. To paint select brush faces, first select one brush face, then left drag while holding #key(Ctrl) and #key(Shift). To deselect all brush faces, simply click in the void or choose #menu(Menu/Edit/Deselect All).
 
 # Editing
 
@@ -332,6 +332,7 @@ Entity Drag Tool      2D, 3D       Permanent     Creating entities by drag and d
 Resize Tool           2D, 3D       Permanent*    Resizing brushes by dragging faces
 Move Tool             2D, 3D       Permanent*    Moving objects around
 Rotate Tool           2D, 3D       Modal         Rotating objects
+Sweep Tool            2D, 3D       Modal         Sweeping brush faces into runs of brushes
 Scale Tool            2D, 3D       Modal         Scaling brushes
 Shear Tool            2D, 3D       Modal         Shearing brushes
 Clip Tool             2D, 3D       Modal         Clipping brushes
@@ -343,6 +344,7 @@ Tool                  Menu
 ----                  -----------
 Complex Shape Tool    #menu(Menu/Edit/Tools/Brush Tool)
 Rotate Tool           #menu(Menu/Edit/Tools/Rotate Tool)
+Sweep Tool            #menu(Menu/Edit/Tools/Sweep Tool)
 Scale Tool            #menu(Menu/Edit/Tools/Scale Tool)
 Shear Tool            #menu(Menu/Edit/Tools/Shear Tool)
 Clip Tool             #menu(Menu/Edit/Tools/Clip Tool)
@@ -360,6 +362,7 @@ State                 Effect
 -----                 ------
 Complex Shape Tool    Discard all placed points; deactivate tool
 Clip Tool             Discard most recently placed clip point; deactivate tool
+Sweep Tool            Move the destination cap back onto the selected faces; deactivate tool
 Vertex Tool           Discard current vertex selection; deactivate tool
 Selection Tool        Discard current selection
 
@@ -425,6 +428,9 @@ Select All in Layers
 Make Structural
 :   Moves brushes back into the world and clears any content flags. See [Brush Entities](#brush_entities).
 
+Select All CLASSNAME
+:   Select every entity in the map which has the same classname as the entity being hovered.
+
 Reveal MATERIALNAME in Material Browser
 :   Switches to the face inspector and scroll to the clicked material in the [Material Browser](#material_browser).
 
@@ -456,12 +462,13 @@ Shape                  Description
 -----                  -----------
 Cuboid                 Creates a cuboid shape
 Stairs                 Creates stairs
+Arch                   Creates a semicircular arch
 Cylinder               Creates a cylinder with a variable number of sides; potentially hollow
 Cone                   Creates a cone with a variable number of sides
 Spheroid (UV)          Creates a spheroid shape made up of triangles and quads with two poles
 Spheroid (Icosahedron) Creates a spheroid shape made up of triangles, based on an icosahedron
 
-Note that the cylinder, cone and UV sphere shapes all have similar options, namely the number of sides and a circle mode.
+Note that the cylinder, cone, UV sphere and arch shapes all have similar options, namely the number of sides and a circle mode.
 By using the same values for these options across different shapes, TrenchBroom will create shapes that fit onto each other perfectly.
 
 There are three circle modes that can be selected via the corresponding buttons:
@@ -482,6 +489,8 @@ This hollow cylinder is scalable because its vertices are all aligned on the gri
 
 If you create an asymmetric scalable shape, it will not be scaled to fit the bounding box drawn with the mouse like the other shapes. Rather, only the middle portion of it will be elongated so that the vertices remain on the grid. This even applies to cones and UV spheres so that the different shapes still fit together.
 
+The arch is created as the top half of a hollow cylinder. The axis is the direction the arch runs through, like a tunnel. Sides, thickness and circle mode work just like the cylinder, so an arch and a cylinder built with the same values will line up. When using scalable circle mode, drawing the bounds taller than a semicircle will extend the sides straight down, acting as "supports" for the arch. 
+
 ### Creating Complex Shapes
 
 ![Drawing a rectangle and duplicating it](images/CreateBrushByDuplicatingPolygon.gif) If you want to create a brush that is not a simple, axis-aligned cuboid, you can use the brush tool. The brush tool allows you to define a set of points and create the convex hull of these points. A convex hull is the smallest convex volume that contains all the points. The points become the vertices of the new brush, unless they are placed within the brush, in which case they are discarded. Accordingly, the brush tool gives you several ways to place points, but there are two limitations: First, you can only place points in the 3D viewport, and second, you can only place points by using other brushes as reference.
@@ -489,6 +498,34 @@ If you create an asymmetric scalable shape, it will not be scaled to fit the bou
 To use the brush tool, you first have to activate it by choosing #menu(Menu/Edit/Tools/Brush Tool). Then, you can place single points onto the grid by left clicking on the faces of other brushes. Additionally, you can left double click on a face to place points on all of its vertices. You can also draw a rectangular shape by left dragging on an existing brush face and thereby place four points at the corners of that rectangle. Finally, if the points you have placed so far form a polygon, you can duplicate and move that polygon along its normal by left dragging it while holding #key(Shift). Once you have placed all points, hit #action(Controls/Map view/Create brush) to actually create the brush.
 
 It is not possible to modify or remove points after they have been placed, except discarding all of them by hitting the #action(Controls/Map view/Cancel) key.
+
+### Creating Patches (Quake 3 only) {#creating_patches}
+
+Patches are created from brush faces. Create a brush and select one or more of its faces, then select #menu(Menu/Edit/Convert Selection to Patches). TrenchBroom will create one patch for each selected face, and the brush (or brushes) will be removed from the map. You can then use the control point tool to refine the patch.
+
+![Square face results in single patch](images/CreatePatches_Square.gif)
+
+Note that the selected faces don't have to be rectangular. TrenchBroom will create multiple patches that match the face's shape exactly. Thereby, it will subdivide the face into quads, and create a patch for each quad. TrenchBroom will prefer a subdivision that results in symmetric patches.
+
+![Octagonal face results in three patches](images/CreatePatches_Octagon.gif)
+
+If the face has an odd number of vertices, one degenerate triangular patch will be created where multiple control points coincide.
+
+![Face with 5 vertices results in a triangular patch](images/CreatePatches_Corner.gif)
+
+### Editing Patches (Quake 3 only) {#editing_patches}
+
+Patches can be edited using the Control Point Tool.
+
+![Editing the Control Points](images/ControlPointTool.png)
+
+Adjusting the control points works in the same way as [editing vertices](#vertex_editing), so we won't repeat all the details here. Just select and drag the control points to adjust the shape of the patch. Like in the vertex tool, control points at the same positions are clumped together so that you can edit the control points of adjacent patches together.
+
+When the tool is active and a patch is selected, you can change the number of rows or columns of the control point grid with the two spin boxes at the top of the map view:
+
+![Editing the Control Point Grid](images/ControlPointToolSpinBoxes.png)
+
+These spin boxes are only enabled if all of the selected patches have the same number of rows and columns of control points. When you adjust one of the two boxes, the patches new shape will approximate the previous shape as closely as possible: When the number of control points increases, the new shape will be exactly the same as the previous shape, but when the number of control points decreases, the new shape cannot represent the previous shape perfectly due to a loss of information.
 
 ### Creating Entities {#creating_entities}
 
@@ -695,7 +732,7 @@ When starting a drag with #key(Ctrl) you can also drag inward to split the origi
 
 ![Splitting a brush inward in the 3D viewport](images/ExtrudeTool3DSplitInwardMode.gif)
 
-You can also extrude several brushes at the same time by moving their faces using the extrude tool, but only if these faces line up perfectly. As the following animation illustrates, it's not enough that the faces are parallel - they have to be identical.
+You can also extrude several brushes at the same time by moving their faces using the extrude tool, but only if these faces line up perfectly. As the following animation illustrates, it's not enough that the faces are parallel - they have to be identical. Note however that their normals can be opposing, so you can also resize the faces where two brushes touch. If the two faces have the exact same vertices, you can pick the shared face(s) for extrusion by hovering over a shared edge. Splitting is disabled when extruding opposing faces to avoid creating overlapping brushes.
 
 ![Extruding multiple brushes](images/ExtrudeTool3DMultipleBrushes.gif)
 
@@ -739,6 +776,31 @@ In the 2D viewport, clip points are just snapped to the visible grid, so they ar
 #### Matching Clip Plane
 
 ![Matching a clip plane](images/MatchingClipPlane.gif) The clip plane can also be defined by matching it to an existing brush face. To match a clip plane to an existing brush face, you have to double click that face in the 3D viewport. As a result, the brush face gets an orange outline, and a clip plane is defined to match the face's plane exactly. This can be quite useful when shaping geometry to other geometry. Note that the plane points of the clip plane are the plane points of the brush face to which the clip plane was matched, so there should be no trouble with microleaks when using this particular function.
+
+### Sweeping {#sweeping}
+
+The sweep tool fills the gap between the selected brush faces and a copy of those faces, called the destination cap, with a run of brushes. Depending on where you place the destination cap and which path you choose, this lofts the faces along a straight line, revolves them around an axis to build arches and pipes, or routes them through an S-curve, optionally twisting and tapering along the way. To use the sweep tool, select one or more brush faces and choose #menu(Menu/Edit/Tools/Sweep Tool).
+
+![Rotating a face to form a bend with the Sweep Tool](images/SweepTool.gif) 
+
+When the sweep tool is active, a ghost outline shows where the destination cap will end up, and a handle allows you to place it:
+
+- Dragging the center of the handle moves the destination cap.
+- Dragging one of the rings rotates it about the corresponding axis.
+- Dragging the green handle scales it uniformly, flaring or tapering the sweep.
+- Pressing #action(Controls/Map view/Move objects up; Move objects forward) and the other movement shortcuts moves the destination cap by one grid step.
+- Pressing #action(Controls/Map view/Roll objects clockwise) and the other rotation shortcuts rotates the destination cap by one angle snap step.
+- Pressing #action(Controls/Map view/Increase sweep scale) or #action(Controls/Map view/Decrease sweep scale) moves the scale handle out or in by one grid step, growing or shrinking the destination cap.
+
+The generated brushes are shown as a preview in the viewports while you place the destination cap. Shortcuts that act on the selection, including UV editing, are unavailable until the tool is deactivated. The controls above the editing views determine how the gap is filled:
+
+- **Segments** is the number of brushes created between the selected faces and the destination cap.
+- **Path** selects how the brushes are laid out: Arc revolves the faces around an axis derived from the rotation, Straight lofts them along a line, and S-bend routes them through an S-curve. The destination cap ends up in the same place in each mode.
+- **Iterations** repeats the sweep, continuing from the previous destination cap. For example, an arc that rises while turning becomes a spiral staircase when swept for multiple iterations.
+- **Snap to integer grid** rounds the vertices of the generated brushes to integer coordinates.
+- **Reset** moves the destination cap back onto the selected faces.
+
+Hit #action(Controls/Map view/Perform sweep) to fill the gap with brushes and select them. Hitting #action(Controls/Map view/Cancel) moves the destination cap back onto the selected faces, and hitting it again deactivates the tool.
 
 ### Vertex Editing {#vertex_editing}
 
@@ -987,9 +1049,11 @@ Justify      Change the offset to justify the texture to the face's bounding box
 Fit          Change the scale to fit the texture (or a multiple of it) onto the face while keeping it justified.
 
 
-![Align, justify and fit buttons](images/AlignJustifyFit.png) Click one of the four triangle buttons to justify the texture against the face's bounding box. If the texture size in the chosen direction is a multiple of the face size along the same axis, you can press the justify button multiple times to step through different options. This can be helpful to justify a texture from a texture atlas. Hold shift when clicking to step through the options in the opposite direction.
+![Align, justify and fit buttons](images/AlignJustifyFit.png) Click one of the four triangle buttons to justify the texture against the face's bounding box. If the texture size in the chosen direction is a multiple of the face size along the same axis, you can press the justify button multiple times to step through different options. This can be helpful to justify a texture from a texture atlas. Hold #key(Shift) when clicking to step through the options in the opposite direction.
 
-The lower three buttons are used to align and fit the texture. Click on the leftmost button to align the texture to the face edges. Click repeatedly to cycle through the face edges. Hold shift while clicking to cycle in the opposite direction. The two remaining buttons fit the texture horizontally and vertically. Again, you can click again to cycle through different fitting options. Repeated clicks cycle through integer fit factors, increasing the repeat count (or, below 1, the corresponding integer divisor) one step at a time. Again, hold shift to cycle through the options in the opposite direction.
+The lower three buttons are used to align and fit the texture. Click on the leftmost button to align the texture to the face edges. Click repeatedly to cycle through the face edges. Hold #key(Shift) while clicking to cycle in the opposite direction. 
+
+The two remaining buttons fit the texture horizontally and vertically. If the texture is smaller than the face, repeated clicks cycle through integer fit factors, increasing the repeat count one step at a time; hold #key(Shift) to cycle through the options in the opposite direction. If the texture is larger than the face, the fit buttons scale it so that the entire texture is visible on the face. To instead show only a fraction (1/n) of the texture, hold #key(Ctrl) while clicking to cycle through the integer subdivisions, and hold #key(Ctrl) and #key(Shift) to cycle through them in the opposite direction. This mode is useful for trim sheets, where several sub-textures are packed into a single image.
 
 The button in the center of the four justification arrows auto fits the texture, i.e. it aligns, justifies and fits the texture.
 
@@ -1532,7 +1596,7 @@ Renderer Font Size          Text size in the map viewports (e.g. entity classnam
 
 ## Mouse Input {#mouse_input}
 
-![Mouse Configuration Dialog (Ubuntu Linux)](images/MousePreferences.png)
+![Mouse Configuration Dialog (macOS)](images/MousePreferences.png)
 
 The mouse input preference pane allows you to change how TrenchBroom interprets mouse movements.
 
@@ -1541,7 +1605,7 @@ Setting     Description
 Mouse Look  Sensitivity and axis inversion for mouse look and orbiting (right click and drag)
 Mouse Pan   Sensitivity and axis inversion for mouse panning (middle click and drag)
 Mouse Move  Sensitivity and settings for moving the camera with the mouse. If you use a tablet, the setting "Alt+MMB drag to move camera" might make navigation easier for you.
-Move Keys   Keyboard shortcuts for moving around in the map, with a separate slider to control the speed.
+Fly Mode    A slider to control the speed in fly mode. The keyboard shortcuts can be adjusted in the Keyboard Preferences.
 
 ## Keyboard Shortcuts {#keyboard_shortcuts}
 
@@ -1624,7 +1688,7 @@ Name
 :    The name of this compilation profile. Need not be unique and can even be empty.
 
 Working directory
-:   A working directory for the compilation profile. This is optional, but very useful because it can be referred to as a variable when specifying the parameters of each task (see below). Variables are allowed (see below).
+:   A working directory for the compilation profile. This is optional, but very useful because it can be referred to as a variable when specifying the parameters of each task (see below). Variables are allowed (see below). Furthermore, relative paths will be interpreted as relative to this directory.
 
 Tasks
 :   A list of tasks which are executed sequentially when the compilation profile is run.
@@ -1642,7 +1706,13 @@ Layers marked "Omit From Export" will not be present in the exported map.
 #### Parameters
 
 Target
-:    The path of the exported file. Variables are allowed.
+:    The path of the exported file. Variables are allowed. Relative paths are implicitly relative to the working directory.
+
+Strip Entities
+:    Set a GLOB pattern to strip any entities with a matching classname. Example: 'info_player_*' to strip all info_player_start and all info_player_deatchmatch entities.
+
+Add Entity
+:    Set the classname of an entity that will be added to the exported map. Example: 'info_player_start'. This entity will have its 'origin' property set to the position of the 3D camera, and its 'angle' property set to the yaw angle of the camera. Useful when testing maps.
 
 Strip TB specific entity properties
 :    Strip any entity properties starting with _tb_ from the exported map file. Some compilers cannot handle these properties.
@@ -1662,9 +1732,23 @@ Parameters
 Stop on nonzero error code
 :    Stop the compilation process if this tool returns an error.
 
+### Launch Engine
+
+Starts one of the current game's configured Launch Engine profiles.
+
+This is useful as the final task in a compile profile, after exporting the map, running compile tools, and copying the output files into the game directory.
+
+#### Parameters
+
+Engine Profile
+:    The Launch Engine profile to start.
+
+Stop on launch failure
+:    Stop the compilation process if the engine cannot be launched. If this is unchecked, the failure is reported and the remaining tasks continue.
+
 ### Copy Files
 
-Copies one or more files.
+Copies one or more files. Relative paths are implicitly relative to the working directory.
 
 #### Parameters
 
@@ -1676,7 +1760,7 @@ Target
 
 ### Rename File
 
-Renames or moves one file.
+Renames or moves one file. Relative paths are implicitly relative to the working directory.
 
 #### Parameters
 
@@ -1688,7 +1772,7 @@ Target
 
 ### Delete Files
 
-Deletes one or more files.
+Deletes one or more files. Relative paths are implicitly relative to the working directory.
 
 #### Parameters
 
@@ -1717,13 +1801,14 @@ If the [game configuration](#game_configuration) for the current game includes c
 It is recommended to use the following general process for compiling maps and to adapt it to your specified needs:
 
 1. Set the working directory to `${MAP_DIR_PATH}`.
-2. Add an *Export Map* task and set its target to `${WORK_DIR_PATH}/${MAP_BASE_NAME}-compile.map`.
+2. Add an *Export Map* task and set its target to `${MAP_BASE_NAME}-compile.map`.
 3. Add *Run Tool* tasks for the compilation tools that you wish to run. Use the expressions `${MAP_BASE_NAME}-compile.map` and `${MAP_BASE_NAME}.bsp` to specify the input and output files for the tools. Since you have set a working directory, you don't need to specify absolute paths here.
-4. Finally, add a *Copy Files* task and set its source to `${WORK_DIR_PATH}/${MAP_BASE_NAME}.bsp` and its target to `${GAME_DIR_PATH}/${MODS[-1]}/maps`. This copies the file to the maps directory within the last enabled mod.
+4. Finally, add a *Copy Files* task and set its source to `${MAP_BASE_NAME}.bsp` and its target to `${GAME_DIR_PATH}/${MODS[-1]}/maps`. This copies the file to the maps directory within the last enabled mod.
+5. Optionally add a *Launch Engine* task at the end to start the game with the latest compiled files.
 
-The last step will copy the bsp file to the appropriate directory within the game path. You can add more *Copy Files* tasks if the compilation produces more than just a bsp file (e.g. lightmap files). Alternatively, you can use a wildcard expression such as `${WORK_DIR_PATH}/${MAP_BASE_NAME}.*` to copy related files.
+The last step will copy the bsp file to the appropriate directory within the game path. You can add more *Copy Files* tasks if the compilation produces more than just a bsp file (e.g. lightmap files). Alternatively, you can use a wildcard expression such as `${MAP_BASE_NAME}.*` to copy related files. If you add a *Launch Engine* task, place it after any file copying tasks so the game starts with the latest compiled output.
 
-To run a compilation profile, click the 'Run' button in the compilation dialog. Note that the 'Run' button changes into a 'Stop' button once the compilation profile is running. If you click on this button again, TrenchBroom will terminate the currently running tool. A running compilation will also be terminated if you close the compilation dialog or if you close the main window, but TrenchBroom will ask you before this happens. Note that the compilation tools are run in the background. You can keep working on your map if you wish.
+To run a compilation profile, click the 'Compile' button in the compilation dialog. Once the compilation profile is running, you can click the 'Stop' button to terminate the currently running tool. A running compilation will also be terminated if you close the compilation dialog or if you close the main window, but TrenchBroom will ask you before this happens. Note that the compilation tools are run in the background. You can keep working on your map if you wish.
 
 If you want to test your compilation profile without actually running it, click the 'Test' button. A test run will only print what each task will do without actually executing it.
 
@@ -1733,7 +1818,7 @@ Once the compilation is done, you can launch a game engine and check out your ma
 
 Before you can launch a game engine in TrenchBroom, you have to make your engine(s) known to TrenchBroom. You can do this by bringing up the game engine profile dialog either from the launch dialog (see below) or from the [game configuration](#game_configuration).
 
-There are two ways to launch a game engine from within TrenchBroom. Either click the 'Launch' button in the compilation dialog or choose #menu(Menu/Run/Launch...). This brings up the launch dialog shown in the following screenshot.
+You can launch a game engine manually by clicking the 'Launch' button in the compilation dialog or choosing #menu(Menu/Run/Launch...). This brings up the launch dialog shown in the following screenshot.
 
 ![Launch Dialog (Mac OS X)](images/LaunchGameEngineDialog.png)
 

@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "Color.h"
-#include "Macros.h"
+#include "base/Color.h"
+#include "base/Macros.h"
 #include "render/LinkRenderer.h"
 
 #include <vector>
@@ -48,9 +48,10 @@ public:
   void setDefaultColor(const Color& color);
   void setSelectedColor(const Color& color);
 
-private:
+  // Exposed for testing.
   std::vector<LinkRenderer::LineVertex> getLinks() override;
 
+private:
   deleteCopy(EntityLinkRenderer);
 };
 

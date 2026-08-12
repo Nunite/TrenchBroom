@@ -20,6 +20,7 @@
 #include "ui/CrashReporter.h"
 
 #include <QStandardPaths>
+#include <QtSystemDetection>
 
 #include "fs/DiskIO.h"
 #include "fs/PathInfo.h"
@@ -50,7 +51,7 @@
 #include <sstream>
 #include <utility>
 
-#if defined(_WIN32) && defined(_MSC_VER)
+#if defined(Q_OS_WIN) && defined(_MSC_VER)
 #include <DbgHelp.h>
 #include <windows.h>
 #endif
@@ -256,7 +257,7 @@ std::filesystem::path crashReportBasePath()
   std::abort();
 }
 
-#if defined(_WIN32) && defined(_MSC_VER)
+#if defined(Q_OS_WIN) && defined(_MSC_VER)
 std::string moduleNameForAddress(const void* address)
 {
   auto module = HMODULE{};
@@ -368,7 +369,10 @@ void installCrashHandlers()
   std::set_terminate(TerminateHandler);
   std::signal(SIGABRT, SignalCrashHandler);
 
-#if defined(_WIN32) && defined(_MSC_VER)
+#if defined(Q_OS_WIN) && defined(_MSC_VER)
+  // with MSVC, set our own handler for segfaults so we can access the context
+  // pointer, to allow StackWalker to read the backtrace.
+  // see also: http://crashrpt.sourceforge.net/docs/html/exception_handling.html
   SetUnhandledExceptionFilter(TrenchBroomUnhandledExceptionFilter);
 #else
   signal(SIGSEGV, CrashHandler);

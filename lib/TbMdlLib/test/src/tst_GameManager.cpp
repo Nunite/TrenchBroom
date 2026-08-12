@@ -17,7 +17,9 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Logger.h"
+#include "Observer.h"
+#include "base/Logger.h"
+#include "base/Uuid.h"
 #include "fs/TestEnvironment.h"
 #include "mdl/CatchConfig.h"
 #include "mdl/GameManager.h"
@@ -183,6 +185,43 @@ TEST_CASE("GameManager")
         | kdl::transform_error([](const auto& e) { FAIL(e); });
     }
 
+    SECTION("collects game config parse errors into warnings")
+    {
+      auto env = fs::TestEnvironment{};
+
+      env.createDirectory(gamesPath);
+      env.createDirectory(userPath);
+
+      writeGameConfig(env, "Quake", "Quake");
+
+      // These configs will fail to parse and should be reported as warnings
+      const auto quake2Path = std::filesystem::path{"Quake 2/GameConfig.cfg"};
+      env.createDirectory(gamesPath / "Quake 2");
+      env.createFile(gamesPath / quake2Path, "{asdf}");
+
+      const auto quake3Path = std::filesystem::path{"Quake 3/GameConfig.cfg"};
+      env.createDirectory(gamesPath / "Quake 3");
+      env.createFile(gamesPath / quake3Path, "{asdf}");
+
+      const auto gameConfigSearchDirs = std::vector{env.dir() / gamesPath};
+      const auto userGameDir = env.dir() / userPath;
+
+      initializeGameManager(gameConfigSearchDirs, userGameDir)
+        | kdl::transform([&](const auto& gameManager, const auto& warnings) {
+            REQUIRE(gameManager.gameInfos().size() == 1);
+
+            // Both failed game configs must be collected into the warnings
+            const auto expectedWarnings = std::map<std::filesystem::path, std::string>{{
+              {quake2Path,
+               "At line 1, column 6: Expected ':', but got '}' (raw data: '}')"},
+              {quake3Path,
+               "At line 1, column 6: Expected ':', but got '}' (raw data: '}')"},
+            }};
+            CHECK(warnings == expectedWarnings);
+          })
+        | kdl::transform_error([](const auto& e) { FAIL(e); });
+    }
+
     SECTION("skips compilation and engine configs with parse errors")
     {
       auto env = fs::TestEnvironment{};
@@ -307,6 +346,9 @@ TEST_CASE("GameManager")
               },
             }};
 
+          auto compilationConfigDidChange =
+            Observer<GameInfo>{gameManager.compilationConfigDidChangeNotifier};
+
           REQUIRE(gameManager.updateCompilationConfig("Quake", compilationConfig, logger)
                     .is_success());
 
@@ -314,6 +356,13 @@ TEST_CASE("GameManager")
           REQUIRE(gameInfo != nullptr);
           CHECK(gameInfo->compilationConfig == compilationConfig);
           CHECK(env.fileExists(userPath / "Quake/CompilationProfiles.cfg"));
+          CHECK(compilationConfigDidChange.notifications == std::vector{*gameInfo});
+
+          // updating with the same config again should not notify
+          compilationConfigDidChange.reset();
+          REQUIRE(gameManager.updateCompilationConfig("Quake", compilationConfig, logger)
+                    .is_success());
+          CHECK(compilationConfigDidChange.notifications == std::vector<GameInfo>{});
         })
       | kdl::transform_error([](const auto& e) { FAIL(e); });
   }
@@ -337,11 +386,15 @@ TEST_CASE("GameManager")
           const auto gameEngineConfig = GameEngineConfig{
             .profiles = {
               {
+                .id = generateUuid(),
                 .name = "name",
                 .path = "workDir",
                 .parameterSpec = "parameters",
               },
             }};
+
+          auto gameEngineConfigDidChange =
+            Observer<GameInfo>{gameManager.gameEngineConfigDidChangeNotifier};
 
           REQUIRE(gameManager.updateGameEngineConfig("Quake", gameEngineConfig, logger)
                     .is_success());
@@ -350,6 +403,13 @@ TEST_CASE("GameManager")
           REQUIRE(gameInfo != nullptr);
           CHECK(gameInfo->gameEngineConfig == gameEngineConfig);
           CHECK(env.fileExists(userPath / "Quake/GameEngineProfiles.cfg"));
+          CHECK(gameEngineConfigDidChange.notifications == std::vector{*gameInfo});
+
+          // updating with the same config again should not notify
+          gameEngineConfigDidChange.reset();
+          REQUIRE(gameManager.updateGameEngineConfig("Quake", gameEngineConfig, logger)
+                    .is_success());
+          CHECK(gameEngineConfigDidChange.notifications == std::vector<GameInfo>{});
         })
       | kdl::transform_error([](const auto& e) { FAIL(e); });
   }

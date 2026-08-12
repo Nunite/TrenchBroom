@@ -19,9 +19,8 @@
 
 #include "ui/ClipTool.h"
 
-#include "Logger.h"
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/Logger.h"
+#include "base/PreferenceManager.h"
 #include "gl/Camera.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
@@ -34,6 +33,7 @@
 #include "mdl/SelectionChange.h"
 #include "mdl/Transaction.h"
 #include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "render/BrushRenderer.h"
 #include "render/RenderService.h"
 #include "ui/MapDocument.h"
@@ -830,7 +830,9 @@ void ClipTool::updateBrushes()
         p1,
         p2,
         p3,
-        mdl::BrushFaceAttributes(map.currentMaterialName()),
+        map.currentMaterialName(),
+        mdl::UvAttributes{},
+        mdl::SurfaceAttributes{},
         map.worldNode().mapFormat())
         | kdl::and_then([&](mdl::BrushFace&& clipFace) {
             setFaceAttributes(brush.faces(), clipFace);
@@ -887,7 +889,7 @@ void ClipTool::setFaceAttributes(
     ++faceIt;
   }
 
-  toSet.setAttributes(*bestMatch);
+  toSet.copyAttributes(*bestMatch);
 }
 
 void ClipTool::clearRenderers()
@@ -975,11 +977,6 @@ bool ClipTool::doDeactivate()
   clearBrushes();
 
   return true;
-}
-
-bool ClipTool::doRemove()
-{
-  return removeLastPoint();
 }
 
 void ClipTool::connectObservers()

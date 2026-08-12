@@ -4,7 +4,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-#include "Color.h"
+#include "base/Color.h"
 #include "mdl/EntityDefinitionManager.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityProperties.h"
@@ -145,8 +145,8 @@ void PathTool::createPathEntities()
 
   mdl::deselectAll(m_map);
 
-  auto* parent = mdl::parentForNodes(m_map);
-  if (mdl::addNodes(m_map, {{parent, newNodes}}).empty())
+  auto& parent = mdl::parentForNodes(m_map);
+  if (mdl::addNodes(m_map, {{&parent, newNodes}}).empty())
   {
     transaction.cancel();
     return;

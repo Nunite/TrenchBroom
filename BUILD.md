@@ -6,29 +6,23 @@ To see how releases of TrenchBroom are packaged, consult our CI scripts instead.
 
 ## All Platforms
 
-First, clone the TrenchBroom repository. `--recursive` is needed because we use git submodules:
+First, clone the TrenchBroom repository:
 
 ```bash
-git clone --recursive https://github.com/TrenchBroom/TrenchBroom.git
-```
-
-If you have an existing git clone, you can update submodules using:
-
-```bash
-git submodule update --init --recursive
+git clone https://github.com/TrenchBroom/TrenchBroom.git
 ```
 
 ## Dependencies
 
-### VCPKG
+### FetchContent
 
-TrenchBroom uses [vcpkg](https://vcpkg.io/) to manage build dependencies except for Qt. vcpkg is integrated into TrenchBroom's build system and will download and build all dependencies once  during cmake's configure phase. This is an automatic process, but it can take a little while when it happens for the first time.
+TrenchBroom uses CMake's [FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html) to manage build dependencies except for Qt. The dependencies are declared in `cmake/dependencies/` and are downloaded and built automatically during cmake's configure and build phases. This is an automatic process, but it can take a little while when it happens for the first time.
 
 ### Qt
 
-TrenchBroom depends on Qt version 6.9. It might work with later versions, but earlier versions will definitely not work. The easiest way to install a specific version of Qt for your platform is the official installer, which requires you to create an account. Follow [these instructions](https://doc.qt.io/qt-6/qt-online-installation.html) to download and and run the Qt installer. Then, install the latest version of Qt 6.9 for your platform.
+TrenchBroom depends on Qt version 6.10. It might work with later versions, but earlier versions will definitely not work. The easiest way to install a specific version of Qt for your platform is the official installer, which requires you to create an account. Follow [these instructions](https://doc.qt.io/qt-6/qt-online-installation.html) to download and and run the Qt installer. Then, install the latest version of Qt 6.10 for your platform.
 
-Note the path where Qt was installed. For example, on Windows the default installation path would look like `C:\Qt\6.9.2\`. We will refer to this path later on as `<QT_INSTALL_DIR>`.
+Note the path where Qt was installed. For example, on Windows the default installation path would look like `C:\Qt\6.10.3\`. We will refer to this path later on as `<QT_INSTALL_DIR>`.
 
 ---
 
@@ -97,7 +91,7 @@ First, download and install Qt (see above).
 If you have a debian-based distribution, open a command prompt and execute this command to install required dependencies:
 
 ```bash
-sudo apt-get install g++ libxi-dev libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev mesa-common-dev libglew-dev libxrandr-dev build-essential libglm-dev libxxf86vm-dev libfreetype6-dev libfreeimage-dev libtinyxml2-dev pandoc cmake p7zip-full ninja-build pkg-config curl
+sudo apt-get install g++ libxi-dev libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev mesa-common-dev libglew-dev libxrandr-dev build-essential libglm-dev libxxf86vm-dev zlib1g-dev pandoc cmake p7zip-full ninja-build pkg-config curl
 ```
 
 > [!IMPORTANT]

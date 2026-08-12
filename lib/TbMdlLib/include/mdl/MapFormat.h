@@ -98,6 +98,8 @@ std::string formatName(MapFormat format);
  * @return the preferred format, then the other compatible formats
  */
 std::vector<MapFormat> compatibleFormats(MapFormat format);
-bool isParallelUVCoordSystem(MapFormat format);
+bool isParallelUvCoordSystem(MapFormat format);
+
+bool hasPatchSupport(MapFormat format);
 
 } // namespace tb::mdl

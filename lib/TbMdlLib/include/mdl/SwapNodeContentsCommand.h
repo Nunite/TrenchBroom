@@ -19,11 +19,10 @@
 
 #pragma once
 
-#include "Macros.h"
+#include "base/Macros.h"
 #include "mdl/NodeContents.h"
 #include "mdl/UpdateLinkedGroupsCommandBase.h"
 
-#include <memory>
 #include <string>
 #include <vector>
 

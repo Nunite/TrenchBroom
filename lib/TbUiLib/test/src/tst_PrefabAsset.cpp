@@ -19,9 +19,9 @@
 
 #include <QColor>
 
-#include "Error.h"
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/Error.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "fs/TestEnvironment.h"
 #include "ui/PrefabAsset.h"
 #include "ui/SystemPaths.h"

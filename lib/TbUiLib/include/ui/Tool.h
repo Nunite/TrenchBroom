@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Notifier.h"
+#include "base/Notifier.h"
 
 class QWidget;
 class QStackedLayout;
@@ -55,6 +55,8 @@ public:
 
   void createPage(QStackedLayout* book);
   void showPage();
+
+  virtual bool ownsSelection() const;
 
 private:
   virtual bool doActivate();

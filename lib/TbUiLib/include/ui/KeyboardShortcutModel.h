@@ -22,13 +22,13 @@
 #include <QAbstractTableModel>
 #include <QString>
 
+#include "ui/ActionInfo.h"
 #include <vector>
 
 class QObject;
 
 namespace tb::ui
 {
-class Action;
 class ActionManager;
 class MapDocument;
 
@@ -36,37 +36,6 @@ class KeyboardShortcutModel : public QAbstractTableModel
 {
   Q_OBJECT
 private:
-  enum class ActionInfoType
-  {
-    Menu,
-    View,
-    Tag,
-    EntityDefinition,
-  };
-
-  class ActionInfo
-  {
-  private:
-    ActionInfoType m_type;
-
-    /**
-     * Path displayed to the user, unrelated to the preference path.
-     */
-    QString m_displayPath;
-    Action* m_action;
-
-  public:
-    ActionInfo(ActionInfoType type, QString displayPath, Action& action);
-
-    const QString& displayPath() const;
-
-    const Action& action() const;
-    Action& action();
-
-    std::strong_ordering operator<=>(const ActionInfo& other) const;
-    bool operator==(const ActionInfo& other) const;
-  };
-
   ActionManager& m_actionManager;
   MapDocument* m_document;
   std::vector<ActionInfo> m_actions;
@@ -87,6 +56,8 @@ public:
 
   Qt::ItemFlags flags(const QModelIndex& index) const override;
 
+  size_t maxKeySequenceCount(const QModelIndex& index) const;
+
   bool hasConflicts() const;
   bool hasConflicts(const QModelIndex& index) const;
 
@@ -95,6 +66,7 @@ private:
 
   void initializeMenuActions();
   void initializeViewActions();
+  void initializeKeys();
   void initializeTagActions();
   void initializeEntityDefinitionActions();
 

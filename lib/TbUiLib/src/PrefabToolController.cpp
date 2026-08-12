@@ -19,9 +19,9 @@
 
 #include "ui/PrefabToolController.h"
 
-#include "Color.h"
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/Color.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "gl/Camera.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"

@@ -1,6 +1,6 @@
 #include "ui/python/PythonPluginManager.h"
 
-#include "Preferences.h"
+#include "prefs/Preferences.h"
 #include "ui/MapWindow.h"
 #include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonRuntime.h"

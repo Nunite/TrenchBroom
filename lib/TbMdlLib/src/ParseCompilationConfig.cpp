@@ -19,7 +19,7 @@
 
 #include "mdl/ParseCompilationConfig.h"
 
-#include "ParserException.h"
+#include "base/ParserException.h"
 #include "el/EvaluationContext.h"
 #include "el/ParseExpression.h"
 #include "el/Value.h"
@@ -39,6 +39,21 @@ namespace tb::mdl
 namespace
 {
 
+Entity toEntity(const el::EvaluationContext& context, const el::Value& entityValue)
+{
+  auto entityProperties = entityValue.arrayValue(context)
+                          | std::views::transform([&](const auto& propertyValue) {
+                              const auto& map = propertyValue.mapValue(context);
+                              return EntityProperty{
+                                map.at("key").stringValue(context),
+                                map.at("value").stringValue(context),
+                              };
+                            })
+                          | kdl::ranges::to<std::vector>();
+
+  return Entity{std::move(entityProperties)};
+}
+
 CompilationExportMap toExportTask(
   const el::EvaluationContext& context, const el::Value& value)
 {
@@ -49,9 +64,21 @@ CompilationExportMap toExportTask(
     value.atOrDefault(context, "stripTbProperties", el::Value{false})
       .booleanValue(context);
 
+  auto stripEntityPattern =
+    value.contains(context, "stripEntityPattern")
+      ? std::optional{value.at(context, "stripEntityPattern").stringValue(context)}
+      : std::nullopt;
+
+  auto entityToAdd =
+    value.contains(context, "entityToAdd")
+      ? std::optional{toEntity(context, value.at(context, "entityToAdd"))}
+      : std::nullopt;
+
   return {
     enabled,
     stripTbProperties,
+    std::move(stripEntityPattern),
+    std::move(entityToAdd),
     value.at(context, "target").stringValue(context),
   };
 }
@@ -113,6 +140,24 @@ CompilationRunTool toToolTask(
   };
 }
 
+CompilationLaunchEngine toLaunchEngineTask(
+  const el::EvaluationContext& context, const el::Value& value)
+{
+  const auto enabled = value.contains(context, "enabled")
+                         ? value.at(context, "enabled").booleanValue(context)
+                         : true;
+  const auto treatLaunchFailureAsError =
+    value.contains(context, "treatLaunchFailureAsError")
+      ? value.at(context, "treatLaunchFailureAsError").booleanValue(context)
+      : false;
+
+  return {
+    enabled,
+    value.at(context, "engineProfileId").stringValue(context),
+    treatLaunchFailureAsError,
+  };
+}
+
 CompilationTask toTask(const el::EvaluationContext& context, const el::Value& value)
 {
   const auto typeName = value.at(context, "type").stringValue(context);
@@ -136,6 +181,10 @@ CompilationTask toTask(const el::EvaluationContext& context, const el::Value& va
   if (typeName == "tool")
   {
     return toToolTask(context, value);
+  }
+  if (typeName == "launchEngine")
+  {
+    return toLaunchEngineTask(context, value);
   }
 
   throw ParserException{fmt::format("Unknown compilation task type '{}'", typeName)};

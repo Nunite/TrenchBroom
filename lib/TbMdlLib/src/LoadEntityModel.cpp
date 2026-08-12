@@ -19,7 +19,7 @@
 
 #include "mdl/LoadEntityModel.h"
 
-#include "Result.h"
+#include "base/Result.h"
 #include "fs/FileSystem.h"
 #include "gl/Resource.h"
 #include "mdl/EntityModel.h"
@@ -110,13 +110,13 @@ Result<EntityModelData> loadEntityModelData(
            {
              return loadFmModel(modelName, reader, fs, logger);
            }
-           if (canLoadImageSpriteModel(path))
-           {
-             return loadImageSpriteModel(modelName, reader, fs, logger);
-           }
            if (canLoadAssimpModel(path))
            {
              return loadAssimpModel(path, fs, logger);
+           }
+           if (canLoadImageSpriteModel(path))
+           {
+             return loadImageSpriteModel(modelName, reader, fs, logger);
            }
            return Error{fmt::format("Unknown model format: {}", path)};
          })

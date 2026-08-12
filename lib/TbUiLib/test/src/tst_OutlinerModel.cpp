@@ -19,7 +19,7 @@
 
 #include <QMimeData>
 
-#include "Logger.h"
+#include "base/Logger.h"
 #include "gl/ResourceManager.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
@@ -62,7 +62,7 @@ struct OutlinerModelFixture
     , groupedEntity{new mdl::EntityNode{mdl::Entity{{{"classname", "path_corner"}}}}}
   {
     group->addChild(groupedEntity);
-    mdl::addNodes(map, {{mdl::parentForNodes(map), {lightEntity, infoEntity, group}}});
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {lightEntity, infoEntity, group}}});
   }
 };
 } // namespace

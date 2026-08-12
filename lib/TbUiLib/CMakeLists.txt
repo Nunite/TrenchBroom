@@ -7,8 +7,10 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ActionBuilder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ActionContext.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ActionExecutionContext.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ActionInfo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ActionManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ActionMenu.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/AngleIndicatorRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Animation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AppController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AppInfoPanel.cpp
@@ -48,6 +50,9 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CompilationVariables.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CommandPaletteDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Console.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ControlPointTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ControlPointToolController.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ControlPointToolPage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ContainerBar.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Contracts.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ControlListBox.cpp
@@ -227,9 +232,14 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ReplaceMaterialDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RotateHandle.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RotateHandleController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RotateTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RotateToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RotateToolPage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SweepTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SweepToolController.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SweepToolPage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SweepToolUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ScaleTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ScaleToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ScaleToolPage.cpp
@@ -238,6 +248,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SetBrushFaceAttributesTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ShearTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ShearToolController.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/KeyboardShortcutUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SignalDelayer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SliderWithLabel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartChoiceEditor.cpp
@@ -267,15 +278,15 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ToolChain.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TwoPaneMapView.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UVCameraTool.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UVEditor.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UVOffsetTool.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UVOriginTool.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UVRotateTool.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UVScaleTool.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UVShearTool.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UVView.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UVViewHelper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UvCameraTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UvEditor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UvOffsetTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UvOriginTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UvRotateTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UvScaleTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UvShearTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UvView.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UvViewHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UpdateConfig.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UpdatePreferencePane.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UpdateVersion.cpp
@@ -298,8 +309,10 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ActionBuilder.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ActionContext.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ActionExecutionContext.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ActionInfo.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ActionManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ActionMenu.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/AngleIndicatorRenderer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Animation.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/AppController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/AppInfoPanel.h
@@ -312,6 +325,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/BorderLine.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/BorderPanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/BoxSelectionTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/BrushHandleToolBase.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CameraAnimation.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CameraLinkHelper.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CameraTool2D.h
@@ -339,6 +353,9 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CompilationVariables.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CommandPaletteDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Console.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ControlPointTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ControlPointToolController.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ControlPointToolPage.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ContainerBar.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Contracts.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ControlListBox.h
@@ -451,6 +468,9 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MoveObjectsToolController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MultiCompletionLineEdit.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MultiPaneMapView.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/NodeHandleToolBase.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/NodeHandleToolControllerBase.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/NodeHandleToolControllerParts.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ObjExportDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/OnePaneMapView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/outliner/OutlinerEntityPropertyEditor.h
@@ -494,9 +514,14 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/RenderView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ReplaceMaterialDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/RotateHandle.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/RotateHandleController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/RotateTool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/RotateToolController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/RotateToolPage.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SweepTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SweepToolController.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SweepToolPage.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SweepToolUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ScaleTool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ScaleToolController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ScaleToolPage.h
@@ -505,6 +530,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SetBrushFaceAttributesTool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ShearTool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ShearToolController.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/KeyboardShortcutUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SignalDelayer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SliderWithLabel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartChoiceEditor.h
@@ -534,23 +560,21 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ToolChain.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ToolController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TwoPaneMapView.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UVCameraTool.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UVEditor.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UVOffsetTool.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UVOriginTool.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UVRotateTool.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UVScaleTool.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UVShearTool.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UVView.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UVViewHelper.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvCameraTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvEditor.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvOffsetTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvOriginTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvRotateTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvScaleTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvShearTool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvView.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvViewHelper.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UpdateConfig.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UpdatePreferencePane.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UpdateVersion.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/VariableStoreModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/VertexTool.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/VertexToolBase.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/VertexToolController.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/VertexToolControllerBase.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ViewConstants.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ViewEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ViewPreferencePane.h
@@ -572,6 +596,7 @@ target_link_libraries(TbUiLib
     pybind11::embed
     Python3::Python
     Qt6::Multimedia
+    ctre::ctre
     Qt6::Svg
   PUBLIC
     KdLib

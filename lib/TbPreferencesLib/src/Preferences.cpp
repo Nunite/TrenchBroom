@@ -17,7 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Preferences.h"
+#include "prefs/Preferences.h"
 
 #include "vm/util.h"
 
@@ -102,7 +102,7 @@ std::vector<Preference<Color>*> colorPreferences()
   };
 }
 
-std::vector<Preference<QKeySequence>*> keyPreferences()
+std::vector<Preference<std::vector<QKeySequence>>*> keyPreferences()
 {
   return {
     &CameraFlyForward,

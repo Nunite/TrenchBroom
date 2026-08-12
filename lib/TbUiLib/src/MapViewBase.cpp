@@ -34,9 +34,8 @@
 #include <QStringList>
 #include <QtGlobal>
 
-#include "Logger.h"
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/Logger.h"
+#include "base/PreferenceManager.h"
 #include "gl/Camera.h"
 #include "gl/FontDescriptor.h"
 #include "gl/FontManager.h"
@@ -73,6 +72,7 @@
 #include "mdl/Transaction.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "render/Compass.h"
 #include "render/MapRenderer.h"
 #include "render/PrimitiveRenderer.h"
@@ -436,11 +436,11 @@ void MapViewBase::createActions()
   m_shortcuts.clear();
 
   auto visitor = [this](const Action& action) {
-    const auto& keySequence = pref(action.preference());
+    const auto& keySequences = pref(action.preference());
 
     auto* shortcut = new QShortcut{this};
     shortcut->setContext(Qt::WidgetWithChildrenShortcut);
-    shortcut->setKey(keySequence);
+    shortcut->setKeys(keySequences | kdl::ranges::to<QList>());
     connect(
       shortcut, &QShortcut::activated, this, [this, &action] { triggerAction(action); });
     connect(shortcut, &QShortcut::activatedAmbiguously, this, [this, &action] {
@@ -462,7 +462,7 @@ void MapViewBase::updateActionBindings()
 {
   for (auto& [shortcut, action] : m_shortcuts)
   {
-    shortcut->setKey(pref(action->preference()));
+    shortcut->setKeys(pref(action->preference()) | kdl::ranges::to<QList>());
   }
 }
 
@@ -499,9 +499,13 @@ void MapViewBase::move(const vm::direction direction)
   {
     moveRotationCenter(direction);
   }
-  else if ((actionContext() & ActionContext::AnyVertexTool) != 0)
+  else if ((actionContext() & ActionContext::AnyNodeHandleTool) != 0)
   {
-    moveVertices(direction);
+    moveNodeHandles(direction);
+  }
+  else if ((actionContext() & ActionContext::SweepTool) != 0)
+  {
+    moveSweepCenter(direction);
   }
   else if ((actionContext() & ActionContext::NodeSelection) != 0)
   {
@@ -518,12 +522,21 @@ void MapViewBase::moveRotationCenter(const vm::direction direction)
   update();
 }
 
-void MapViewBase::moveVertices(const vm::direction direction)
+void MapViewBase::moveSweepCenter(const vm::direction direction)
 {
   const auto& map = m_document.map();
   const auto& grid = map.grid();
   const auto delta = moveDirection(direction) * double(grid.actualSize());
-  m_toolBox.moveVertices(delta);
+  m_toolBox.moveSweepCenter(delta);
+  update();
+}
+
+void MapViewBase::moveNodeHandles(const vm::direction direction)
+{
+  const auto& map = m_document.map();
+  const auto& grid = map.grid();
+  const auto delta = moveDirection(direction) * double(grid.actualSize());
+  m_toolBox.moveNodeHandles(delta);
 }
 
 void MapViewBase::moveObjects(const vm::direction direction)
@@ -555,7 +568,13 @@ void MapViewBase::duplicateAndMoveObjects(const vm::direction direction)
 void MapViewBase::rotate(const vm::rotation_axis axisSpec, const bool clockwise)
 {
   auto& map = m_document.map();
-  if (const auto& bounds = map.selectionBounds())
+  if (m_toolBox.sweepToolActive())
+  {
+    const auto axis = rotationAxis(axisSpec, clockwise);
+    m_toolBox.rotateSweepCap(axis, map.grid().angle());
+    update();
+  }
+  else if (const auto& bounds = map.selectionBounds())
   {
     const auto axis = rotationAxis(axisSpec, clockwise);
     const auto angle = m_toolBox.rotateToolActive() ? vm::abs(m_toolBox.rotateToolAngle())
@@ -590,6 +609,22 @@ vm::vec3d MapViewBase::rotationAxis(
   return clockwise ? -axis : axis;
 }
 
+void MapViewBase::increaseSweepScale()
+{
+  const auto& map = m_document.map();
+  const auto& grid = map.grid();
+  m_toolBox.scaleSweepCap(double(grid.actualSize()));
+  update();
+}
+
+void MapViewBase::decreaseSweepScale()
+{
+  const auto& map = m_document.map();
+  const auto& grid = map.grid();
+  m_toolBox.scaleSweepCap(-double(grid.actualSize()));
+  update();
+}
+
 void MapViewBase::flip(const vm::direction direction)
 {
   if (canFlip())
@@ -616,29 +651,29 @@ bool MapViewBase::canFlip() const
   return !m_toolBox.anyModalToolActive() && map.selection().hasNodes();
 }
 
-void MapViewBase::moveUV(const vm::direction direction, const UVActionMode mode)
+void MapViewBase::moveUv(const vm::direction direction, const UvActionMode mode)
 {
   auto& map = m_document.map();
   if (map.selection().hasBrushFaces())
   {
-    const auto offset = moveUVOffset(direction, mode);
-    translateUV(map, camera().up(), camera().right(), offset);
+    const auto offset = moveUvOffset(direction, mode);
+    translateUv(map, camera().up(), camera().right(), offset);
   }
 }
 
-vm::vec2f MapViewBase::moveUVOffset(
-  const vm::direction direction, const UVActionMode mode) const
+vm::vec2f MapViewBase::moveUvOffset(
+  const vm::direction direction, const UvActionMode mode) const
 {
   switch (direction)
   {
   case vm::direction::up:
-    return vm::vec2f{0.0f, moveUVDistance(mode)};
+    return vm::vec2f{0.0f, moveUvDistance(mode)};
   case vm::direction::down:
-    return vm::vec2f{0.0f, -moveUVDistance(mode)};
+    return vm::vec2f{0.0f, -moveUvDistance(mode)};
   case vm::direction::left:
-    return vm::vec2f{-moveUVDistance(mode), 0.0f};
+    return vm::vec2f{-moveUvDistance(mode), 0.0f};
   case vm::direction::right:
-    return vm::vec2f{moveUVDistance(mode), 0.0f};
+    return vm::vec2f{moveUvDistance(mode), 0.0f};
   case vm::direction::forward:
   case vm::direction::backward:
     return vm::vec2f{};
@@ -646,7 +681,7 @@ vm::vec2f MapViewBase::moveUVOffset(
   }
 }
 
-float MapViewBase::moveUVDistance(const UVActionMode mode) const
+float MapViewBase::moveUvDistance(const UvActionMode mode) const
 {
   const auto& map = m_document.map();
   const auto& grid = map.grid();
@@ -654,27 +689,27 @@ float MapViewBase::moveUVDistance(const UVActionMode mode) const
 
   switch (mode)
   {
-  case UVActionMode::Fine:
+  case UvActionMode::Fine:
     return 1.0f;
-  case UVActionMode::Coarse:
+  case UvActionMode::Coarse:
     return 2.0f * gridSize;
-  case UVActionMode::Normal:
+  case UvActionMode::Normal:
     return gridSize;
     switchDefault();
   }
 }
 
-void MapViewBase::rotateUV(const bool clockwise, const UVActionMode mode)
+void MapViewBase::rotateUv(const bool clockwise, const UvActionMode mode)
 {
   auto& map = m_document.map();
   if (map.selection().hasBrushFaces())
   {
-    const auto angle = rotateUVAngle(clockwise, mode);
-    mdl::rotateUV(map, angle);
+    const auto angle = rotateUvAngle(clockwise, mode);
+    mdl::rotateUv(map, angle);
   }
 }
 
-float MapViewBase::rotateUVAngle(const bool clockwise, const UVActionMode mode) const
+float MapViewBase::rotateUvAngle(const bool clockwise, const UvActionMode mode) const
 {
   const auto& map = m_document.map();
   const auto& grid = map.grid();
@@ -683,40 +718,42 @@ float MapViewBase::rotateUVAngle(const bool clockwise, const UVActionMode mode) 
 
   switch (mode)
   {
-  case UVActionMode::Fine:
+  case UvActionMode::Fine:
     angle = 1.0f;
     break;
-  case UVActionMode::Coarse:
+  case UvActionMode::Coarse:
     angle = 90.0f;
     break;
-  case UVActionMode::Normal:
+  case UvActionMode::Normal:
     angle = gridAngle;
     break;
   }
   return clockwise ? angle : -angle;
 }
 
-void MapViewBase::flipUV(const vm::direction direction)
+void MapViewBase::flipUv(const vm::direction direction)
 {
   auto& map = m_document.map();
   if (map.selection().hasBrushFaces())
   {
-    mdl::flipUV(map, camera().up(), camera().right(), direction);
+    mdl::flipUv(map, camera().up(), camera().right(), direction);
   }
 }
 
-void MapViewBase::resetUV()
+void MapViewBase::resetUv()
 {
   auto& map = m_document.map();
   setBrushFaceAttributes(
-    map, mdl::resetAll(map.gameInfo().gameConfig.faceAttribsConfig.defaults));
+    map, mdl::resetAll(map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes));
 }
 
-void MapViewBase::resetUVToWorld()
+void MapViewBase::resetUvToWorld()
 {
   auto& map = m_document.map();
   setBrushFaceAttributes(
-    map, mdl::resetAllToParaxial(map.gameInfo().gameConfig.faceAttribsConfig.defaults));
+    map,
+    mdl::resetAllToParaxial(
+      map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes));
 }
 
 void MapViewBase::assembleBrush()
@@ -735,6 +772,11 @@ void MapViewBase::toggleClipSide()
 void MapViewBase::performClip()
 {
   m_toolBox.performClip();
+}
+
+void MapViewBase::performSweep()
+{
+  m_toolBox.performSweep();
 }
 
 void MapViewBase::resetCameraZoom()
@@ -814,7 +856,7 @@ void MapViewBase::createBrushEntity(const mdl::EntityDefinition& definition)
 bool MapViewBase::canCreateBrushEntity()
 {
   const auto& map = m_document.map();
-  return map.selection().hasOnlyBrushes();
+  return map.selection().hasOnlyGeometryNodes();
 }
 
 void MapViewBase::toggleTagVisible(const mdl::SmartTag& tag)
@@ -850,50 +892,20 @@ void MapViewBase::disableTag(const mdl::SmartTag& tag)
   transaction.commit();
 }
 
-void MapViewBase::makeStructural()
+void MapViewBase::makeSelectionStructural()
 {
   auto& map = m_document.map();
-  if (!map.selection().hasBrushes())
-  {
-    return;
-  }
-
-  auto toReparent = std::vector<mdl::Node*>{};
-  const auto& selectedBrushes = map.selection().brushes;
-  std::ranges::copy_if(
-    selectedBrushes, std::back_inserter(toReparent), [&](const auto* brushNode) {
-      return brushNode->entity() != &map.worldNode();
-    });
-
-  auto transaction = mdl::Transaction{map, "Make Structural"};
-
-  if (!toReparent.empty())
-  {
-    reparentNodes(toReparent, parentForNodes(map, toReparent), false);
-  }
-
-  auto anyTagDisabled = false;
   auto callback = EnableDisableTagCallback{};
-  for (auto* brush : map.selection().brushes)
-  {
-    for (const auto& tag : map.smartTags())
-    {
-      if (brush->hasTag(tag) || brush->anyFacesHaveAnyTagInMask(tag.type()))
-      {
-        anyTagDisabled = true;
-        tag.disable(callback, map);
-      }
-    }
-  }
+  mdl::makeStructural(map, map.selection().nodes, callback);
+}
 
-  if (!anyTagDisabled && toReparent.empty())
-  {
-    transaction.cancel();
-  }
-  else
-  {
-    transaction.commit();
-  }
+void MapViewBase::moveSelectedNodesToEntity()
+{
+  auto& map = m_document.map();
+  const auto nodes = map.selection().nodes;
+  auto& newParent = findNewParentEntityForNodes(nodes);
+
+  mdl::moveToEntity(map, nodes, newParent);
 }
 
 void MapViewBase::toggleEntityDefinitionVisible(const mdl::EntityDefinition& definition)
@@ -1050,18 +1062,21 @@ ActionContext::Type MapViewBase::actionContext() const
 
   const auto viewContext = viewActionContext();
   const auto toolContext =
-    m_toolBox.assembleBrushToolActive() ? ActionContext::AssembleBrushTool
-    : m_toolBox.clipToolActive()        ? ActionContext::ClipTool
-    : m_toolBox.anyVertexToolActive()   ? ActionContext::AnyVertexTool
-    : m_toolBox.rotateToolActive()      ? ActionContext::RotateTool
-    : m_toolBox.scaleToolActive()       ? ActionContext::ScaleTool
-    : m_toolBox.shearToolActive()       ? ActionContext::ShearTool
-    : m_toolBox.pathToolActive()        ? ActionContext::PathTool
-                                        : ActionContext::NoTool;
-  const auto selectionContext = map.selection().hasNodes() ? ActionContext::NodeSelection
-                                : map.selection().hasBrushFaces()
-                                  ? ActionContext::FaceSelection
-                                  : ActionContext::NoSelection;
+    m_toolBox.assembleBrushToolActive()  ? ActionContext::AssembleBrushTool
+    : m_toolBox.clipToolActive()         ? ActionContext::ClipTool
+    : m_toolBox.anyVertexToolActive()    ? ActionContext::AnyVertexTool
+    : m_toolBox.controlPointToolActive() ? ActionContext::ControlPointTool
+    : m_toolBox.rotateToolActive()       ? ActionContext::RotateTool
+    : m_toolBox.sweepToolActive()        ? ActionContext::SweepTool
+    : m_toolBox.scaleToolActive()        ? ActionContext::ScaleTool
+    : m_toolBox.shearToolActive()        ? ActionContext::ShearTool
+    : m_toolBox.pathToolActive()         ? ActionContext::PathTool
+                                         : ActionContext::NoTool;
+  const auto selectionContext =
+    m_toolBox.selectionOwnedByTool()  ? ActionContext::SelectionOwnedByTool
+    : map.selection().hasNodes()      ? ActionContext::NodeSelection
+    : map.selection().hasBrushFaces() ? ActionContext::FaceSelection
+                                      : ActionContext::NoSelection;
   return viewContext | toolContext | selectionContext;
 }
 
@@ -1441,7 +1456,7 @@ void MapViewBase::showPopupMenuLater()
 
   auto& map = m_document.map();
   const auto& nodes = map.selection().nodes;
-  auto* newBrushParent = findNewParentEntityForBrushes(nodes);
+  auto& newNodeParent = findNewParentEntityForNodes(nodes);
   auto* currentGroup = map.editorContext().currentGroup();
   auto* newGroup = findNewGroupForObjects(nodes);
   auto* mergeGroup = findGroupToMergeGroupsInto(map.selection());
@@ -1557,13 +1572,13 @@ void MapViewBase::showPopupMenuLater()
 
   menu.addSeparator();
 
-  if (map.selection().hasOnlyBrushes())
+  if (map.selection().hasOnlyGeometryNodes())
   {
     auto* moveToWorldAction =
-      menu.addAction(tr("Make Structural"), this, &MapViewBase::makeStructural);
-    moveToWorldAction->setEnabled(canMakeStructural());
+      menu.addAction(tr("Make Structural"), this, &MapViewBase::makeSelectionStructural);
+    moveToWorldAction->setEnabled(canMakeSelectionStructural());
 
-    const auto isEntity = newBrushParent->accept(kdl::overload(
+    const auto isEntity = newNodeParent.accept(kdl::overload(
       [](const mdl::WorldNode&) { return false; },
       [](const mdl::LayerNode&) { return false; },
       [](const mdl::GroupNode&) { return false; },
@@ -1574,16 +1589,40 @@ void MapViewBase::showPopupMenuLater()
     if (isEntity)
     {
       menu.addAction(
-        tr("Move Brushes to Entity %1")
-          .arg(QString::fromStdString(newBrushParent->name())),
+        tr("Move to Entity %1").arg(QString::fromStdString(newNodeParent.name())),
         this,
-        &MapViewBase::moveSelectedBrushesToEntity);
+        &MapViewBase::moveSelectedNodesToEntity);
     }
   }
 
   menu.addSeparator();
 
   using namespace mdl::HitFilters;
+
+  if (const auto* hitNode = mdl::hitToNode(pickResult().first(type(mdl::nodeHitType()))))
+  {
+    // brushes and patches report their containing entity, while a point entity is hit
+    // directly
+    const auto* entityNode = dynamic_cast<const mdl::EntityNodeBase*>(hitNode);
+    if (!entityNode)
+    {
+      entityNode = mdl::findContainingEntity(hitNode);
+    }
+
+    if (entityNode && entityNode != &map.worldNode())
+    {
+      const auto& classname = entityNode->entity().classname();
+      auto* selectEntitiesWithClassnameAction = menu.addAction(
+        tr("Select All %1").arg(QString::fromStdString(classname)),
+        this,
+        [&map, classname] { selectEntitiesWithClassname(map, classname); });
+      selectEntitiesWithClassnameAction->setEnabled(
+        canSelectEntitiesWithClassname(map, classname));
+
+      menu.addSeparator();
+    }
+  }
+
   const auto& hit = pickResult().first(type(mdl::BrushNode::BrushHitType));
   const auto faceHandle = mdl::hitToFaceHandle(hit);
   if (faceHandle)
@@ -1591,14 +1630,13 @@ void MapViewBase::showPopupMenuLater()
     const auto* material = faceHandle->face().material();
     menu.addAction(
       tr("Reveal %1 in Material Browser")
-        .arg(QString::fromStdString(faceHandle->face().attributes().materialName())),
+        .arg(QString::fromStdString(faceHandle->face().materialName())),
       mapWindow,
       [=] { mapWindow->revealMaterial(material); });
 
     menu.addAction(tr("Copy Material Name"), mapWindow, [=] {
       auto* clipboard = QApplication::clipboard();
-      clipboard->setText(
-        QString::fromStdString(faceHandle->face().attributes().materialName()));
+      clipboard->setText(QString::fromStdString(faceHandle->face().materialName()));
     });
 
     menu.addSeparator();
@@ -1820,56 +1858,24 @@ bool MapViewBase::canReparentNode(const mdl::Node* node, const mdl::Node* newPar
          && newParent->canAddChild(*node);
 }
 
-void MapViewBase::moveSelectedBrushesToEntity()
-{
-  auto& map = m_document.map();
-  const auto nodes = map.selection().nodes;
-  auto* newParent = findNewParentEntityForBrushes(nodes);
-  contract_assert(newParent);
-
-  auto transaction =
-    mdl::Transaction{map, "Move " + kdl::str_plural(nodes.size(), "Brush", "Brushes")};
-  reparentNodes(nodes, newParent, false);
-
-  deselectAll(map);
-  selectNodes(map, nodes);
-  transaction.commit();
-}
-
-mdl::Node* MapViewBase::findNewParentEntityForBrushes(
+mdl::Node& MapViewBase::findNewParentEntityForNodes(
   const std::vector<mdl::Node*>& nodes) const
 {
   using namespace mdl::HitFilters;
 
   const auto& map = m_document.map();
-  const auto& hit = pickResult().first(type(mdl::BrushNode::BrushHitType));
-  if (const auto faceHandle = mdl::hitToFaceHandle(hit))
+  const auto& hit =
+    pickResult().first(type(mdl::BrushNode::BrushHitType | mdl::PatchNode::PatchHitType));
+  if (auto* hitNode = mdl::hitToNode(hit))
   {
-    auto* brush = faceHandle->node();
-    auto* newParent = brush->entity();
-
-    if (newParent && newParent != &map.worldNode() && canReparentNodes(nodes, newParent))
+    if (auto* newParent = mdl::findContainingEntity(hitNode);
+        newParent && newParent != &map.worldNode() && canReparentNodes(nodes, newParent))
     {
-      return newParent;
+      return *newParent;
     }
   }
 
-  if (!nodes.empty())
-  {
-    auto* lastNode = nodes.back();
-
-    if (auto* group = mdl::findContainingGroup(lastNode))
-    {
-      return group;
-    }
-
-    if (auto* layer = mdl::findContainingLayer(lastNode))
-    {
-      return layer;
-    }
-  }
-
-  return map.editorContext().currentLayer();
+  return mdl::parentForNodes(map, nodes);
 }
 
 bool MapViewBase::canReparentNodes(
@@ -1957,18 +1963,10 @@ bool MapViewBase::canMergeGroups() const
   return mergeGroup;
 }
 
-bool MapViewBase::canMakeStructural() const
+bool MapViewBase::canMakeSelectionStructural() const
 {
   const auto& map = m_document.map();
-  if (map.selection().hasOnlyBrushes())
-  {
-    const auto& brushes = map.selection().brushes;
-    return std::ranges::any_of(brushes, [&](const auto* brush) {
-      return brush->hasAnyTag() || brush->entity() != &map.worldNode()
-             || brush->anyFaceHasAnyTag();
-    });
-  }
-  return false;
+  return mdl::canMakeStructural(map, map.selection().nodes);
 }
 
 } // namespace tb::ui

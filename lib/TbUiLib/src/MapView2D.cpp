@@ -19,7 +19,7 @@
 
 #include "ui/MapView2D.h"
 
-#include "Macros.h"
+#include "base/Macros.h"
 #include "gl/OrthographicCamera.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
@@ -41,6 +41,8 @@
 #include "ui/CameraLinkHelper.h"
 #include "ui/CameraTool2D.h"
 #include "ui/ClipToolController.h"
+#include "ui/ControlPointTool.h"
+#include "ui/ControlPointToolController.h"
 #include "ui/CreateEntityToolController.h"
 #include "ui/DrawShapeToolController2D.h"
 #include "ui/EdgeTool.h"
@@ -57,6 +59,7 @@
 #include "ui/ScaleToolController.h"
 #include "ui/SelectionTool.h"
 #include "ui/ShearToolController.h"
+#include "ui/SweepToolController.h"
 #include "ui/VertexTool.h"
 #include "ui/VertexToolController.h"
 
@@ -128,6 +131,7 @@ void MapView2D::initializeToolChain(MapViewToolBox& toolBox)
   addToolController(
     std::make_unique<MoveObjectsToolController>(toolBox.moveObjectsTool()));
   addToolController(std::make_unique<RotateToolController2D>(toolBox.rotateTool()));
+  addToolController(std::make_unique<SweepToolController2D>(toolBox.sweepTool()));
   addToolController(std::make_unique<ScaleToolController2D>(toolBox.scaleTool()));
   addToolController(std::make_unique<ShearToolController2D>(toolBox.shearTool()));
   addToolController(std::make_unique<ExtrudeToolController2D>(toolBox.extrudeTool()));
@@ -135,6 +139,8 @@ void MapView2D::initializeToolChain(MapViewToolBox& toolBox)
   addToolController(std::make_unique<VertexToolController>(toolBox.vertexTool()));
   addToolController(std::make_unique<EdgeToolController>(toolBox.edgeTool()));
   addToolController(std::make_unique<FaceToolController>(toolBox.faceTool()));
+  addToolController(
+    std::make_unique<ControlPointToolController>(toolBox.controlPointTool()));
   addToolController(
     std::make_unique<CreateEntityToolController2D>(toolBox.createEntityTool()));
   addToolController(std::make_unique<PrefabToolController2D>(toolBox.prefabTool()));

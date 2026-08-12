@@ -27,7 +27,7 @@ namespace tb::gl::Shaders
 inline const ShaderConfig Grid2DShader = ShaderConfig{
   "2D Grid",
   {"Grid2D.vertsh"},
-  {"Grid.fragsh", "Grid2D.fragsh"},
+  {"GridCommon.fragsh", "Grid.fragsh", "Grid2D.fragsh"},
 };
 
 inline const ShaderConfig VaryingPCShader = ShaderConfig{
@@ -57,7 +57,7 @@ inline const ShaderConfig EntityModelShader = ShaderConfig{
 inline const ShaderConfig FaceShader = ShaderConfig{
   "Face",
   {"Face.vertsh"},
-  {"Grid.fragsh", "MapBounds.fragsh", "Face.fragsh"},
+  {"GridCommon.fragsh", "Grid.fragsh", "MapBounds.fragsh", "Face.fragsh"},
 };
 
 inline const ShaderConfig SkyShader = ShaderConfig{
@@ -69,7 +69,7 @@ inline const ShaderConfig SkyShader = ShaderConfig{
 inline const ShaderConfig PatchShader = ShaderConfig{
   "Patch",
   {"Face.vertsh"},
-  {"Grid.fragsh", "MapBounds.fragsh", "Face.fragsh"},
+  {"GridCommon.fragsh", "Grid.fragsh", "MapBounds.fragsh", "Face.fragsh"},
 };
 
 inline const ShaderConfig EdgeShader = ShaderConfig{
@@ -156,10 +156,10 @@ inline const ShaderConfig TriangleShader = ShaderConfig{
   {"Triangle.fragsh"},
 };
 
-inline const ShaderConfig UVViewShader = ShaderConfig{
+inline const ShaderConfig UvViewShader = ShaderConfig{
   "UV View",
-  {"UVView.vertsh"},
-  {"UVView.fragsh"},
+  {"UvView.vertsh"},
+  {"GridCommon.fragsh", "UvView.fragsh"},
 };
 
 } // namespace tb::gl::Shaders

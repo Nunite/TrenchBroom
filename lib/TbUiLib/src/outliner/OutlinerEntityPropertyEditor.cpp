@@ -16,7 +16,7 @@
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
-#include "Color.h"
+#include "base/Color.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityColorPropertyValue.h"
 #include "mdl/EntityNodeBase.h"

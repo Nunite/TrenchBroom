@@ -17,8 +17,8 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Macros.h"
-#include "NotifierConnection.h"
+#include "base/Macros.h"
+#include "base/NotifierConnection.h"
 #include "mdl/CatchConfig.h"
 #include "mdl/CommandProcessor.h"
 #include "mdl/Map.h"
@@ -178,7 +178,7 @@ private:
   template <class T>
   T popCall() const
   {
-    CHECK_FALSE(m_expectedCalls.empty());
+    CHECK(!m_expectedCalls.empty());
     auto variant = kdl::vec_pop_front(m_expectedCalls);
     auto call = std::get<T>(std::move(variant));
     return call;
@@ -306,7 +306,7 @@ TEST_CASE("CommandProcessor")
     command->expectUndo(true);
 
     CHECK(commandProcessor.executeAndStore(std::move(command)));
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canRedo());
     REQUIRE(commandProcessor.canUndo());
     CHECK(*commandProcessor.undoCommandName() == commandName);
 
@@ -319,7 +319,7 @@ TEST_CASE("CommandProcessor")
       });
 
     CHECK(commandProcessor.undo());
-    CHECK_FALSE(commandProcessor.canUndo());
+    CHECK(!commandProcessor.canUndo());
     REQUIRE(commandProcessor.canRedo());
     CHECK(*commandProcessor.redoCommandName() == commandName);
 
@@ -347,7 +347,7 @@ TEST_CASE("CommandProcessor")
     command->expectUndo(false);
 
     CHECK(commandProcessor.executeAndStore(std::move(command)));
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canRedo());
     REQUIRE(commandProcessor.canUndo());
     CHECK(*commandProcessor.undoCommandName() == commandName);
 
@@ -359,9 +359,9 @@ TEST_CASE("CommandProcessor")
         TN{TN::Type::Done, commandName, K(isObservable), !K(isModification)},
       });
 
-    CHECK_FALSE(commandProcessor.undo());
-    CHECK_FALSE(commandProcessor.canUndo());
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.undo());
+    CHECK(!commandProcessor.canUndo());
+    CHECK(!commandProcessor.canRedo());
 
     CHECK(
       getNotifications()
@@ -383,10 +383,10 @@ TEST_CASE("CommandProcessor")
     auto* commandPtr = command.get();
     command->expectDo(false);
 
-    CHECK_FALSE(commandProcessor.executeAndStore(std::move(command)));
+    CHECK(!commandProcessor.executeAndStore(std::move(command)));
 
-    CHECK_FALSE(commandProcessor.canUndo());
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canUndo());
+    CHECK(!commandProcessor.canRedo());
 
     CHECK(
       getNotifications()
@@ -442,13 +442,13 @@ TEST_CASE("CommandProcessor")
         TN{TN::Type::Done, transactionName, K(isObservable), !K(isModification)},
       });
 
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canRedo());
     REQUIRE(commandProcessor.canUndo());
     CHECK(*commandProcessor.undoCommandName() == transactionName);
 
     CHECK(commandProcessor.undo());
 
-    CHECK_FALSE(commandProcessor.canUndo());
+    CHECK(!commandProcessor.canUndo());
     REQUIRE(commandProcessor.canRedo());
     CHECK(*commandProcessor.redoCommandName() == transactionName);
 
@@ -464,7 +464,7 @@ TEST_CASE("CommandProcessor")
 
     CHECK(commandProcessor.redo());
 
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canRedo());
     REQUIRE(commandProcessor.canUndo());
     CHECK(*commandProcessor.undoCommandName() == transactionName);
 
@@ -533,14 +533,14 @@ TEST_CASE("CommandProcessor")
         CN{CN::Type::Undone, command1Ptr},
       });
 
-    CHECK_FALSE(commandProcessor.canUndo());
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canUndo());
+    CHECK(!commandProcessor.canRedo());
 
     // does nothing, but closes the transaction
     commandProcessor.commitTransaction();
 
-    CHECK_FALSE(commandProcessor.canUndo());
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canUndo());
+    CHECK(!commandProcessor.canRedo());
 
     CHECK(notifications.empty());
   }
@@ -606,13 +606,13 @@ TEST_CASE("CommandProcessor")
         TN{TN::Type::Done, outerTransactionName, K(isObservable), !K(isModification)},
       });
 
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canRedo());
     REQUIRE(commandProcessor.canUndo());
     CHECK(*commandProcessor.undoCommandName() == outerTransactionName);
 
     CHECK(commandProcessor.undo());
 
-    CHECK_FALSE(commandProcessor.canUndo());
+    CHECK(!commandProcessor.canUndo());
     REQUIRE(commandProcessor.canRedo());
     CHECK(*commandProcessor.redoCommandName() == outerTransactionName);
 
@@ -625,6 +625,65 @@ TEST_CASE("CommandProcessor")
         CN{CN::Type::Undone, outerCommandPtr},
         TN{TN::Type::Undone, outerTransactionName, K(isObservable), !K(isModification)},
       });
+  }
+
+  SECTION("isTransactionActive")
+  {
+    SECTION("No enclosing transaction")
+    {
+      CHECK(!commandProcessor.isTransactionActive());
+
+      commandProcessor.executeAndStore(std::make_unique<NullCommand>("command"));
+      CHECK(!commandProcessor.isTransactionActive());
+    }
+
+    SECTION("One enclosing one shot transaction")
+    {
+      REQUIRE(!commandProcessor.isTransactionActive());
+
+      commandProcessor.startTransaction("", TransactionScope::Oneshot);
+      CHECK(commandProcessor.isTransactionActive());
+
+      commandProcessor.executeAndStore(std::make_unique<NullCommand>("command"));
+      CHECK(commandProcessor.isTransactionActive());
+
+      commandProcessor.commitTransaction();
+      CHECK(!commandProcessor.isTransactionActive());
+    }
+
+    SECTION("One enclosing long running transaction")
+    {
+      REQUIRE(!commandProcessor.isTransactionActive());
+
+      commandProcessor.startTransaction("", TransactionScope::LongRunning);
+      CHECK(commandProcessor.isTransactionActive());
+
+      commandProcessor.executeAndStore(std::make_unique<NullCommand>("command"));
+      CHECK(commandProcessor.isTransactionActive());
+
+      commandProcessor.commitTransaction();
+      CHECK(!commandProcessor.isTransactionActive());
+    }
+
+    SECTION("Nested transactions")
+    {
+      REQUIRE(!commandProcessor.isTransactionActive());
+
+      commandProcessor.startTransaction("outer", TransactionScope::Oneshot);
+      CHECK(commandProcessor.isTransactionActive());
+
+      commandProcessor.startTransaction("inner", TransactionScope::Oneshot);
+      CHECK(commandProcessor.isTransactionActive());
+
+      commandProcessor.executeAndStore(std::make_unique<NullCommand>("command"));
+      CHECK(commandProcessor.isTransactionActive());
+
+      commandProcessor.commitTransaction();
+      CHECK(commandProcessor.isTransactionActive());
+
+      commandProcessor.commitTransaction();
+      CHECK(!commandProcessor.isTransactionActive());
+    }
   }
 
   SECTION("isCurrentDocumentStateObservable")
@@ -667,10 +726,10 @@ TEST_CASE("CommandProcessor")
       CHECK(commandProcessor.isCurrentDocumentStateObservable());
 
       commandProcessor.startTransaction("inner", TransactionScope::Oneshot);
-      CHECK_FALSE(commandProcessor.isCurrentDocumentStateObservable());
+      CHECK(!commandProcessor.isCurrentDocumentStateObservable());
 
       commandProcessor.executeAndStore(std::make_unique<NullCommand>("command"));
-      CHECK_FALSE(commandProcessor.isCurrentDocumentStateObservable());
+      CHECK(!commandProcessor.isCurrentDocumentStateObservable());
 
       commandProcessor.commitTransaction();
       CHECK(commandProcessor.isCurrentDocumentStateObservable());
@@ -688,10 +747,10 @@ TEST_CASE("CommandProcessor")
       CHECK(commandProcessor.isCurrentDocumentStateObservable());
 
       commandProcessor.startTransaction("inner", TransactionScope::Oneshot);
-      CHECK_FALSE(commandProcessor.isCurrentDocumentStateObservable());
+      CHECK(!commandProcessor.isCurrentDocumentStateObservable());
 
       commandProcessor.executeAndStore(std::make_unique<NullCommand>("command"));
-      CHECK_FALSE(commandProcessor.isCurrentDocumentStateObservable());
+      CHECK(!commandProcessor.isCurrentDocumentStateObservable());
 
       commandProcessor.commitTransaction();
       CHECK(commandProcessor.isCurrentDocumentStateObservable());
@@ -775,13 +834,13 @@ TEST_CASE("CommandProcessor")
           outerIsModification || innerIsModification},
       });
 
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canRedo());
     REQUIRE(commandProcessor.canUndo());
     CHECK(*commandProcessor.undoCommandName() == outerTransactionName);
 
     CHECK(commandProcessor.undo());
 
-    CHECK_FALSE(commandProcessor.canUndo());
+    CHECK(!commandProcessor.canUndo());
     REQUIRE(commandProcessor.canRedo());
     CHECK(*commandProcessor.redoCommandName() == outerTransactionName);
 
@@ -839,13 +898,13 @@ TEST_CASE("CommandProcessor")
         TN{TN::Type::Done, commandName2, K(isObservable), !K(isModification)},
       });
 
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canRedo());
     REQUIRE(commandProcessor.canUndo());
     CHECK(*commandProcessor.undoCommandName() == commandName1);
 
     CHECK(commandProcessor.undo());
 
-    CHECK_FALSE(commandProcessor.canUndo());
+    CHECK(!commandProcessor.canUndo());
     REQUIRE(commandProcessor.canRedo());
     CHECK(*commandProcessor.redoCommandName() == commandName1);
 
@@ -902,7 +961,7 @@ TEST_CASE("CommandProcessor")
         TN{TN::Type::Done, commandName2, K(isObservable), !K(isModification)},
       });
 
-    CHECK_FALSE(commandProcessor.canRedo());
+    CHECK(!commandProcessor.canRedo());
     REQUIRE(commandProcessor.canUndo());
     CHECK(*commandProcessor.undoCommandName() == commandName2);
 

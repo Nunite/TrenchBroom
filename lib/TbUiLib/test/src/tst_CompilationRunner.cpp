@@ -20,14 +20,19 @@ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
 #include <QCoreApplication>
 #include <QObject>
 #include <QTextEdit>
+#include <QtSystemDetection>
 #include <QtTest/QSignalSpy>
 
 #include "CmdTool.h"
 #include "el/VariableStore.h"
 #include "fs/TestEnvironment.h"
+#include "gl/PerspectiveCamera.h"
 #include "mdl/CompilationProfile.h"
 #include "mdl/CompilationTask.h"
+#include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
+#include "mdl/EntityProperties.h"
+#include "mdl/GameEngineProfile.h"
 #include "mdl/Map.h"
 #include "mdl/MapFixture.h"
 #include "mdl/Map_Nodes.h"
@@ -38,7 +43,6 @@ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
 #include "ui/TextOutputAdapter.h"
 
 #include "kd/k.h"
-#include "kd/path_utils.h"
 #include "kd/string_utils.h"
 
 #include <chrono>
@@ -118,6 +122,7 @@ TEST_CASE("CompilationRunToolTaskRunner")
 {
   auto fixture = mdl::MapFixture{};
   auto& map = fixture.create();
+  auto camera = gl::PerspectiveCamera{};
 
   SECTION("runMissingTool")
   {
@@ -125,7 +130,7 @@ TEST_CASE("CompilationRunToolTaskRunner")
     auto output = QTextEdit{};
     auto outputAdapter = TextOutputAdapter{&output};
 
-    auto context = CompilationContext{map, variables, outputAdapter, false};
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
     auto task = mdl::CompilationRunTool{K(enabled), "", "", false};
     auto runner = CompilationRunToolTaskRunner{context, task};
@@ -135,7 +140,7 @@ TEST_CASE("CompilationRunToolTaskRunner")
 
     CHECK(exec.started);
     CHECK(exec.errored);
-    CHECK_FALSE(exec.ended);
+    CHECK(!exec.ended);
   }
 
   SECTION("system specific path separators")
@@ -155,7 +160,7 @@ TEST_CASE("CompilationRunToolTaskRunner")
     auto output = QTextEdit{};
     auto outputAdapter = TextOutputAdapter{&output};
 
-    auto context = CompilationContext{map, variables, outputAdapter, false};
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
     const auto treatNonZeroResultCodeAsError = GENERATE(true, false);
     auto task = mdl::CompilationRunTool{
@@ -166,7 +171,7 @@ TEST_CASE("CompilationRunToolTaskRunner")
     REQUIRE(exec.executeAndWait(5000ms));
 
     CHECK(exec.started);
-    CHECK_FALSE(exec.errored);
+    CHECK(!exec.errored);
     CHECK(exec.ended);
   }
 
@@ -176,7 +181,7 @@ TEST_CASE("CompilationRunToolTaskRunner")
     auto output = QTextEdit{};
     auto outputAdapter = TextOutputAdapter{&output};
 
-    auto context = CompilationContext{map, variables, outputAdapter, false};
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
     const auto treatNonZeroResultCodeAsError = GENERATE(true, false);
     auto task = mdl::CompilationRunTool{
@@ -187,7 +192,7 @@ TEST_CASE("CompilationRunToolTaskRunner")
     REQUIRE(exec.executeAndWait(5000ms));
 
     CHECK(exec.started);
-    CHECK_FALSE(exec.errored);
+    CHECK(!exec.errored);
     CHECK(exec.ended);
   }
 
@@ -197,7 +202,7 @@ TEST_CASE("CompilationRunToolTaskRunner")
     auto output = QTextEdit{};
     auto outputAdapter = TextOutputAdapter{&output};
 
-    auto context = CompilationContext{map, variables, outputAdapter, false};
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
     const auto treatNonZeroResultCodeAsError = GENERATE(true, false);
     auto task = mdl::CompilationRunTool{
@@ -218,7 +223,7 @@ TEST_CASE("CompilationRunToolTaskRunner")
     auto output = QTextEdit{};
     auto outputAdapter = TextOutputAdapter{&output};
 
-    auto context = CompilationContext{map, variables, outputAdapter, false};
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
     auto task = mdl::CompilationRunTool{
       true, CMD_TOOL_PATH, R"(--printArgs 1 2 str "escaped str")", false};
@@ -237,7 +242,7 @@ str
 escaped str)"));
   }
 
-#if !defined(_WIN32) && !defined(_WIN64)
+#if !defined(Q_OS_WIN)
   // the test is unreliable on Windows
   SECTION("toolAborts")
   {
@@ -245,7 +250,7 @@ escaped str)"));
     auto output = QTextEdit{};
     auto outputAdapter = TextOutputAdapter{&output};
 
-    auto context = CompilationContext{map, variables, outputAdapter, false};
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
     const auto treatNonZeroResultCodeAsError = GENERATE(true, false);
     auto task = mdl::CompilationRunTool{
@@ -257,11 +262,11 @@ escaped str)"));
 
     CHECK(exec.started);
     CHECK(exec.errored);
-    CHECK_FALSE(exec.ended);
+    CHECK(!exec.ended);
   }
 #endif
 
-#if !defined(__APPLE__) || defined(NDEBUG)
+#if !defined(Q_OS_MACOS) || defined(NDEBUG)
   // the test is unreliable on macOS in debug mode
   SECTION("toolCrashes")
   {
@@ -269,7 +274,7 @@ escaped str)"));
     auto output = QTextEdit{};
     auto outputAdapter = TextOutputAdapter{&output};
 
-    auto context = CompilationContext{map, variables, outputAdapter, false};
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
     const auto treatNonZeroResultCodeAsError = GENERATE(true, false);
     auto task = mdl::CompilationRunTool{
@@ -280,22 +285,146 @@ escaped str)"));
     REQUIRE(exec.executeAndWait(5000ms));
 
     CHECK(exec.started);
-#if defined _WIN32
+#if defined(Q_OS_WIN)
     // QProcess does not report a crash on SIGSEGV on Windows
     CHECK(exec.errored == treatNonZeroResultCodeAsError);
     CHECK(exec.ended == !treatNonZeroResultCodeAsError);
 #else
     CHECK(exec.errored);
-    CHECK_FALSE(exec.ended);
+    CHECK(!exec.ended);
 #endif
   }
 #endif
+}
+
+TEST_CASE("CompilationLaunchEngineTaskRunner")
+{
+  auto fixtureConfig = mdl::MapFixtureConfig{};
+  fixtureConfig.gameInfo.gameEngineConfig.profiles = {
+    mdl::GameEngineProfile{
+      .id = "quakespasm-id",
+      .name = "Quakespasm",
+      .path = CMD_TOOL_PATH,
+      .parameterSpec = "--exit 0"},
+    mdl::GameEngineProfile{
+      .id = "missing-engine-id",
+      .name = "Missing Engine",
+      .path = "/does/not/exist",
+      .parameterSpec = ""},
+  };
+
+  auto fixture = mdl::MapFixture{};
+  auto& map = fixture.create(fixtureConfig);
+  auto camera = gl::PerspectiveCamera{};
+
+  SECTION("launchEngine")
+  {
+    auto variables = el::NullVariableStore{};
+    auto output = QTextEdit{};
+    auto outputAdapter = TextOutputAdapter{&output};
+
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
+
+    auto task = mdl::CompilationLaunchEngine{
+      K(enabled), "quakespasm-id", !K(treatLaunchFailureAsError)};
+    auto runner = CompilationLaunchEngineTaskRunner{context, task};
+
+    auto exec = ExecuteTask{runner};
+    REQUIRE(exec.executeAndWait(5000ms));
+
+    CHECK(exec.started);
+    CHECK(!exec.errored);
+    CHECK(exec.ended);
+    CHECK_THAT(
+      output.toPlainText().toStdString(),
+      ContainsSubstring("#### Launching engine profile 'Quakespasm' at '"));
+  }
+
+  SECTION("invalidEngineProfile")
+  {
+    auto variables = el::NullVariableStore{};
+    auto output = QTextEdit{};
+    auto outputAdapter = TextOutputAdapter{&output};
+
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
+
+    const auto engineProfileId = GENERATE(""s, "deleted-profile-id"s);
+    const auto treatLaunchFailureAsError = GENERATE(true, false);
+    CAPTURE(engineProfileId, treatLaunchFailureAsError);
+    auto task = mdl::CompilationLaunchEngine{
+      K(enabled), engineProfileId, treatLaunchFailureAsError};
+    auto runner = CompilationLaunchEngineTaskRunner{context, task};
+
+    auto exec = ExecuteTask{runner};
+    REQUIRE(exec.executeAndWait(5000ms));
+
+    CHECK(exec.started);
+    CHECK(exec.errored == treatLaunchFailureAsError);
+    CHECK(exec.ended == !treatLaunchFailureAsError);
+    CHECK_THAT(
+      output.toPlainText().toStdString(), ContainsSubstring("#### Launch failed: "));
+  }
+
+  SECTION("launchFailure")
+  {
+    auto variables = el::NullVariableStore{};
+    auto output = QTextEdit{};
+    auto outputAdapter = TextOutputAdapter{&output};
+
+    auto context = CompilationContext{map, camera, variables, outputAdapter, false};
+
+    const auto treatLaunchFailureAsError = GENERATE(true, false);
+    CAPTURE(treatLaunchFailureAsError);
+    auto task = mdl::CompilationLaunchEngine{
+      K(enabled), "missing-engine-id", treatLaunchFailureAsError};
+    auto runner = CompilationLaunchEngineTaskRunner{context, task};
+
+    auto exec = ExecuteTask{runner};
+    REQUIRE(exec.executeAndWait(5000ms));
+
+    CHECK(exec.started);
+    CHECK(exec.errored == treatLaunchFailureAsError);
+    CHECK(exec.ended == !treatLaunchFailureAsError);
+    CHECK_THAT(
+      output.toPlainText().toStdString(), ContainsSubstring("#### Launch failed: "));
+  }
+
+  SECTION("testModeDoesNotLaunch")
+  {
+    auto variables = el::NullVariableStore{};
+    auto output = QTextEdit{};
+    auto outputAdapter = TextOutputAdapter{&output};
+
+    auto context = CompilationContext{map, camera, variables, outputAdapter, true};
+
+    auto task = mdl::CompilationLaunchEngine{
+      K(enabled), "missing-engine-id", K(treatLaunchFailureAsError)};
+    auto runner = CompilationLaunchEngineTaskRunner{context, task};
+
+    auto exec = ExecuteTask{runner};
+    REQUIRE(exec.executeAndWait(5000ms));
+
+    CHECK(exec.started);
+    CHECK(!exec.errored);
+    CHECK(exec.ended);
+    CHECK_THAT(
+      output.toPlainText().toStdString(),
+      ContainsSubstring("#### Launching engine profile 'Missing Engine' at '"));
+  }
 }
 
 TEST_CASE("CompilationExportMapTaskRunner")
 {
   auto fixture = mdl::MapFixture{};
   auto& map = fixture.create();
+  auto camera = gl::PerspectiveCamera{
+    90.0f,
+    1.0f,
+    65536.0f,
+    gl::Camera::Viewport{0, 0, 1024, 768},
+    vm::vec3f{1, 2, 3},
+    vm::vec3f{0, 1, 0},
+    vm::vec3f{0, 0, 1}};
 
   auto testEnvironment = fs::TestEnvironment{};
 
@@ -304,33 +433,77 @@ TEST_CASE("CompilationExportMapTaskRunner")
   auto output = QTextEdit{};
   auto outputAdapter = TextOutputAdapter{&output};
 
-  auto context = CompilationContext{map, variables, outputAdapter, false};
+  auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
   SECTION("exportMap")
   {
-    const auto exportPath =
-      GENERATE("${WORK_DIR_PATH}/exported.map", "${WORK_DIR_PATH}\\exported.map");
+    const auto [exportSpec, expectedFilePath] =
+      GENERATE(table<std::string, std::filesystem::path>({
+        {"${WORK_DIR_PATH}/exported.map", "exported.map"},
+        {"${WORK_DIR_PATH}\\exported.map", "exported.map"},
+        {"exported.map", "exported.map"},
+        {"some/nested/exported.map", "some/nested/exported.map"},
+      }));
 
-    CAPTURE(exportPath);
+    CAPTURE(exportSpec);
 
     auto node = new mdl::EntityNode{mdl::Entity{}};
-    addNodes(map, {{parentForNodes(map), {node}}});
+    addNodes(map, {{&parentForNodes(map), {node}}});
 
-    auto task = mdl::CompilationExportMap{K(enabled), !K(stripTbProperties), exportPath};
+    auto task = mdl::CompilationExportMap{
+      K(enabled),
+      !K(stripTbProperties),
+      std::nullopt,
+      std::nullopt,
+      exportSpec,
+    };
 
     auto runner = CompilationExportMapTaskRunner{context, task};
     REQUIRE_NOTHROW(runner.execute());
 
-    CHECK(testEnvironment.fileExists("exported.map"));
+    CHECK(testEnvironment.fileExists(expectedFilePath));
+  }
+
+  SECTION("addEntity")
+  {
+    auto task = mdl::CompilationExportMap{
+      K(enabled),
+      !K(stripTbProperties),
+      std::nullopt,
+      mdl::Entity{{{mdl::EntityPropertyKeys::Classname, "info_player_start"}}},
+      "exported.map",
+    };
+
+    auto runner = CompilationExportMapTaskRunner{context, task};
+    REQUIRE_NOTHROW(runner.execute());
+
+    REQUIRE(testEnvironment.fileExists("exported.map"));
+    REQUIRE(vm::to_degrees(camera.yaw()) == 90.0f);
+    CHECK(testEnvironment.loadFile("exported.map") == R"(// entity 0
+{
+"classname" "worldspawn"
+}
+// entity 1
+{
+"classname" "info_player_start"
+"origin" "1 2 3"
+"angle" "90"
+}
+)");
   }
 
   SECTION("variable interpolation error")
   {
     auto node = new mdl::EntityNode{mdl::Entity{}};
-    addNodes(map, {{parentForNodes(map), {node}}});
+    addNodes(map, {{&parentForNodes(map), {node}}});
 
     auto task = mdl::CompilationExportMap{
-      K(enabled), !K(stripTbProperties), "${WORK_DIR_PATH/exported.map"};
+      K(enabled),
+      !K(stripTbProperties),
+      std::nullopt,
+      std::nullopt,
+      "${WORK_DIR_PATH/exported.map",
+    };
 
     auto runner = CompilationExportMapTaskRunner{context, task};
     REQUIRE_NOTHROW(runner.execute());
@@ -343,6 +516,7 @@ TEST_CASE("CompilationCopyFilesTaskRunner")
 {
   auto fixture = mdl::MapFixture{};
   auto& map = fixture.create();
+  auto camera = gl::PerspectiveCamera{};
 
   auto testEnvironment = fs::TestEnvironment{};
 
@@ -351,27 +525,30 @@ TEST_CASE("CompilationCopyFilesTaskRunner")
   auto output = QTextEdit{};
   auto outputAdapter = TextOutputAdapter{&output};
 
-  auto context = CompilationContext{map, variables, outputAdapter, false};
+  auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
   SECTION("createTargetDirectories")
   {
     const auto sourcePath = "my_map.map";
     testEnvironment.createFile(sourcePath, "{}");
 
-    const auto targetPath = GENERATE("some/other/path"s, "some\\other\\path"s);
+    const auto [targetSpec, expectedTargetPath] =
+      GENERATE(table<std::string, std::filesystem::path>({
+        {"${WORK_DIR_PATH}/some/other/path", "some/other/path"},
+        {"${WORK_DIR_PATH}\\some\\other\\path", "some/other/path"},
+        {"some/other/path", "some/other/path"},
+        {"some\\other\\path", "some/other/path"},
+      }));
 
-    CAPTURE(targetPath);
+    CAPTURE(targetSpec);
 
-    auto task = mdl::CompilationCopyFiles{
-      true,
-      (testEnvironment.dir() / sourcePath).string(),
-      (testEnvironment.dir() / targetPath).string()};
+    auto task = mdl::CompilationCopyFiles{true, sourcePath, targetSpec};
     auto runner = CompilationCopyFilesTaskRunner{context, task};
 
     REQUIRE_NOTHROW(runner.execute());
 
-    CHECK(testEnvironment.directoryExists(kdl::parse_path(targetPath)));
-    CHECK(testEnvironment.loadFile(kdl::parse_path(targetPath) / sourcePath) == "{}");
+    CHECK(testEnvironment.directoryExists(expectedTargetPath));
+    CHECK(testEnvironment.loadFile(expectedTargetPath / sourcePath) == "{}");
   }
 
   SECTION("variable interpolation errors")
@@ -392,6 +569,7 @@ TEST_CASE("CompilationRenameFileTaskRunner")
 {
   auto fixture = mdl::MapFixture{};
   auto& map = fixture.create();
+  auto camera = gl::PerspectiveCamera{};
 
   auto testEnvironment = fs::TestEnvironment{};
 
@@ -400,7 +578,7 @@ TEST_CASE("CompilationRenameFileTaskRunner")
   auto output = QTextEdit{};
   auto outputAdapter = TextOutputAdapter{&output};
 
-  auto context = CompilationContext{map, variables, outputAdapter, false};
+  auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
   SECTION("renameFile")
   {
@@ -409,28 +587,30 @@ TEST_CASE("CompilationRenameFileTaskRunner")
     const auto sourcePath = "my_map.map";
     testEnvironment.createFile(sourcePath, "{}");
 
-    const auto targetPathStr =
-      GENERATE("some/other/path/your_map.map"s, "some\\other\\path\\your_map.map"s);
+    const auto [targetSpec, expectedTargetPath] =
+      GENERATE(table<std::string, std::filesystem::path>({
+        {"${WORK_DIR_PATH}/some/other/path/your_map.map", "some/other/path/your_map.map"},
+        {"${WORK_DIR_PATH}\\some\\other\\path\\your_map.map",
+         "some/other/path/your_map.map"},
+        {"some/other/path/your_map.map", "some/other/path/your_map.map"},
+        {"some\\other\\path\\your_map.map", "some/other/path/your_map.map"},
+      }));
 
-    CAPTURE(targetPathStr);
+    CAPTURE(targetSpec);
 
-    const auto targetPath = kdl::parse_path(targetPathStr);
     if (overwrite)
     {
-      testEnvironment.createDirectory(targetPath.parent_path());
-      testEnvironment.createFile(targetPath, "{...}");
-      REQUIRE(testEnvironment.loadFile(targetPath) == "{...}");
+      testEnvironment.createDirectory(expectedTargetPath.parent_path());
+      testEnvironment.createFile(expectedTargetPath, "{...}");
+      REQUIRE(testEnvironment.loadFile(expectedTargetPath) == "{...}");
     }
 
-    auto task = mdl::CompilationRenameFile{
-      true,
-      (testEnvironment.dir() / sourcePath).string(),
-      (testEnvironment.dir() / targetPathStr).string()};
+    auto task = mdl::CompilationRenameFile{true, sourcePath, targetSpec};
     auto runner = CompilationRenameFileTaskRunner{context, task};
 
     REQUIRE_NOTHROW(runner.execute());
 
-    CHECK(testEnvironment.loadFile(targetPath) == "{}");
+    CHECK(testEnvironment.loadFile(expectedTargetPath) == "{}");
   }
 
   SECTION("variable interpolation errors")
@@ -451,14 +631,16 @@ TEST_CASE("CompilationDeleteFilesTaskRunner")
 {
   auto fixture = mdl::MapFixture{};
   auto& map = fixture.create();
+  auto camera = gl::PerspectiveCamera{};
 
-  auto variables = el::NullVariableStore{};
+  auto testEnvironment = fs::TestEnvironment{};
+
+  const auto testWorkDir = testEnvironment.dir().string();
+  auto variables = CompilationVariables{map, testWorkDir};
   auto output = QTextEdit{};
   auto outputAdapter = TextOutputAdapter{&output};
 
-  auto context = CompilationContext{map, variables, outputAdapter, false};
-
-  auto testEnvironment = fs::TestEnvironment{};
+  auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
   SECTION("deleteTargetPattern")
   {
@@ -472,8 +654,12 @@ TEST_CASE("CompilationDeleteFilesTaskRunner")
     testEnvironment.createFile(file3, "");
     testEnvironment.createDirectory(dir);
 
-    auto task =
-      mdl::CompilationDeleteFiles{K(enabled), (testEnvironment.dir() / "*.lit").string()};
+    const auto targetSpec = GENERATE(
+      std::filesystem::path{"${WORK_DIR_PATH}/*.lit"}, std::filesystem::path{"*.lit"});
+
+    CAPTURE(targetSpec);
+
+    auto task = mdl::CompilationDeleteFiles{K(enabled), targetSpec.string()};
     auto runner = CompilationDeleteFilesTaskRunner{context, task};
 
     REQUIRE_NOTHROW(runner.execute());
@@ -500,17 +686,25 @@ TEST_CASE("CompilationRunner")
   fixtureConfig.gameInfo.gameConfig.fileFormats = std::vector<mdl::MapFormatConfig>{
     {"Valve", {}},
   };
+  fixtureConfig.gameInfo.gameEngineConfig.profiles = {
+    mdl::GameEngineProfile{
+      .id = "quakespasm-id",
+      .name = "Quakespasm",
+      .path = CMD_TOOL_PATH,
+      .parameterSpec = "--exit 0"},
+  };
 
   auto fixture = mdl::MapFixture{};
   auto& map = fixture.load(
     "test/ui/CompilationRunner/valveFormatMapWithoutFormatTag.map", fixtureConfig);
+  auto camera = gl::PerspectiveCamera{};
 
   const auto testWorkDir = std::string{"/some/path"};
   auto variables = CompilationVariables{map, testWorkDir};
   auto output = QTextEdit{};
   auto outputAdapter = TextOutputAdapter{&output};
 
-  auto context = CompilationContext{map, variables, outputAdapter, false};
+  auto context = CompilationContext{map, camera, variables, outputAdapter, false};
 
   auto testEnvironment = fs::TestEnvironment{};
 
@@ -531,7 +725,8 @@ TEST_CASE("CompilationRunner")
       }};
 
     auto runner = CompilationRunner{
-      CompilationContext{map, variables, outputAdapter, false}, compilationProfile};
+      CompilationContext{map, camera, variables, outputAdapter, false},
+      compilationProfile};
 
     auto compilationStartedSpy = QSignalSpy{&runner, SIGNAL(compilationStarted())};
     auto compilationEndedSpy = QSignalSpy{&runner, SIGNAL(compilationEnded())};
@@ -544,7 +739,63 @@ TEST_CASE("CompilationRunner")
     REQUIRE(compilationStartedSpy.count() == 1);
     REQUIRE(compilationEndedSpy.count() == 1);
 
-    CHECK_FALSE(testEnvironment.fileExists(should_not_exist));
+    CHECK(!testEnvironment.fileExists(should_not_exist));
+  }
+
+  SECTION("runLaunchEngineTask")
+  {
+    auto compilationProfile = mdl::CompilationProfile{
+      "name",
+      testEnvironment.dir().string(),
+      {
+        mdl::CompilationLaunchEngine{
+          K(enabled), "quakespasm-id", !K(treatLaunchFailureAsError)},
+      }};
+
+    auto runner = CompilationRunner{
+      CompilationContext{map, camera, variables, outputAdapter, false},
+      compilationProfile};
+
+    auto compilationStartedSpy = QSignalSpy{&runner, SIGNAL(compilationStarted())};
+    auto compilationEndedSpy = QSignalSpy{&runner, SIGNAL(compilationEnded())};
+
+    REQUIRE(compilationStartedSpy.isValid());
+    REQUIRE(compilationEndedSpy.isValid());
+
+    runner.execute();
+    REQUIRE(!runner.running());
+    REQUIRE(compilationStartedSpy.count() == 1);
+    REQUIRE(compilationEndedSpy.count() == 1);
+
+    CHECK_THAT(
+      output.toPlainText().toStdString(),
+      ContainsSubstring("#### Launching engine profile 'Quakespasm' at '"));
+  }
+
+  SECTION("disabledLaunchEngineTaskIsIgnored")
+  {
+    auto compilationProfile = mdl::CompilationProfile{
+      "name",
+      testEnvironment.dir().string(),
+      {
+        mdl::CompilationLaunchEngine{!K(enabled), "", K(treatLaunchFailureAsError)},
+      }};
+
+    auto runner = CompilationRunner{
+      CompilationContext{map, camera, variables, outputAdapter, false},
+      compilationProfile};
+
+    auto compilationStartedSpy = QSignalSpy{&runner, SIGNAL(compilationStarted())};
+    auto compilationEndedSpy = QSignalSpy{&runner, SIGNAL(compilationEnded())};
+
+    REQUIRE(compilationStartedSpy.isValid());
+    REQUIRE(compilationEndedSpy.isValid());
+
+    runner.execute();
+    REQUIRE(!runner.running());
+    REQUIRE(compilationStartedSpy.count() == 0);
+    REQUIRE(compilationEndedSpy.count() == 0);
+    CHECK(output.toPlainText().isEmpty());
   }
 
   SECTION("interpolateToolsVariables")

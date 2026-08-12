@@ -21,7 +21,7 @@
 
 #include "mdl/LoadAssimpModel.h"
 
-#include "ParserException.h"
+#include "base/ParserException.h"
 #include "fs/File.h"
 #include "fs/FileSystem.h"
 #include "fs/PathInfo.h"
@@ -30,7 +30,7 @@
 #include "gl/IndexRangeMap.h"
 #include "gl/IndexRangeMapBuilder.h"
 #include "gl/Texture.h"
-#include "mdl/BrushFaceAttributes.h"
+#include "mdl/BrushFace.h"
 #include "mdl/LoadFreeImageTexture.h"
 #include "mdl/MaterialUtils.h"
 
@@ -221,7 +221,7 @@ std::optional<std::filesystem::path> parseAssimpTexturePath(
 
 std::optional<gl::Texture> loadFallbackTexture(const fs::FileSystem& fs)
 {
-  static const auto NoTextureName = BrushFaceAttributes::NoMaterialName;
+  static const auto NoTextureName = BrushFace::NoMaterialName;
 
   static const auto texturePaths = std::vector<std::filesystem::path>{
     "textures" / kdl::path_add_extension(NoTextureName, ".png"),
@@ -248,12 +248,22 @@ gl::Texture loadFallbackOrDefaultTexture(const fs::FileSystem& fs, Logger& logge
 }
 
 gl::Texture loadTextureFromFileSystem(
-  const std::filesystem::path& path, const fs::FileSystem& fs, Logger& logger)
+  const std::filesystem::path& texturePath,
+  const std::filesystem::path& modelPath,
+  const fs::FileSystem& fs,
+  Logger& logger)
 {
-  return fs.openFile(path) | kdl::and_then([](auto file) {
-           auto reader = file->reader().buffer();
-           return loadFreeImageTexture(reader);
-         })
+  // Some models contain model-relative paths, and some contain paths relative to the file
+  // system root, so we try both. findMaterialFile also resolves the actual file name if
+  // only the extension differs from the path stored in the model.
+  return findMaterialFile(fs, modelPath.parent_path() / texturePath, {})
+         | kdl::or_else(
+           [&](const auto&) { return findMaterialFile(fs, texturePath, {}); })
+         | kdl::and_then([&](const auto& actualPath) { return fs.openFile(actualPath); })
+         | kdl::and_then([](auto file) {
+             auto reader = file->reader().buffer();
+             return loadFreeImageTexture(reader);
+           })
          | kdl::or_else(makeReadTextureErrorHandler(fs, logger)) | kdl::value();
 }
 
@@ -358,8 +368,7 @@ std::vector<gl::Texture> loadTexturesForMaterial(
           parseAssimpTexturePath(assimpPath, materialIndex, modelPath, logger))
       {
         // The texture is not embedded. Load it using the file system.
-        return loadTextureFromFileSystem(
-          modelPath.parent_path() / *texturePath, fs, logger);
+        return loadTextureFromFileSystem(*texturePath, modelPath, fs, logger);
       }
 
       return loadFallbackOrDefaultTexture(fs, logger);

@@ -23,8 +23,8 @@
 #include <QPushButton>
 #include <QtTest/QTest>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "mdl/EditorContext.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionManager.h"

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Result.h"
+#include "base/Result.h"
 #include "mdl/BrushBuilder.h"
 #include "ui/DrawShapeToolExtension.h"
 
@@ -142,11 +142,11 @@ public:
     const vm::bbox3d& bounds, const ShapeParameters& parameters) const override;
 };
 
-class DrawShapeToolUVSphereShapeExtensionPage
+class DrawShapeToolUvSphereShapeExtensionPage
   : public DrawShapeToolCircularShapeExtensionPage
 {
 public:
-  explicit DrawShapeToolUVSphereShapeExtensionPage(
+  explicit DrawShapeToolUvSphereShapeExtensionPage(
     MapDocument& document, ShapeParameters& parameters, QWidget* parent = nullptr);
 
 private:
@@ -155,10 +155,10 @@ private:
   Q_OBJECT
 };
 
-class DrawShapeToolUVSphereExtension : public DrawShapeToolExtension
+class DrawShapeToolUvSphereExtension : public DrawShapeToolExtension
 {
 public:
-  explicit DrawShapeToolUVSphereExtension(MapDocument& document);
+  explicit DrawShapeToolUvSphereExtension(MapDocument& document);
 
   const std::string& name() const override;
   const std::filesystem::path& iconPath() const override;
@@ -184,6 +184,31 @@ class DrawShapeToolStairsExtension : public DrawShapeToolExtension
 {
 public:
   explicit DrawShapeToolStairsExtension(MapDocument& document);
+
+  const std::string& name() const override;
+  const std::filesystem::path& iconPath() const override;
+  DrawShapeToolExtensionPage* createToolPage(
+    ShapeParameters& parameters, QWidget* parent) override;
+  Result<std::vector<mdl::Brush>> createBrushes(
+    const vm::bbox3d& bounds, const ShapeParameters& parameters) const override;
+};
+
+class DrawShapeToolArchShapeExtensionPage : public DrawShapeToolCircularShapeExtensionPage
+{
+public:
+  explicit DrawShapeToolArchShapeExtensionPage(
+    MapDocument& document, ShapeParameters& parameters, QWidget* parent = nullptr);
+
+private:
+  ShapeParameters& m_parameters;
+
+  Q_OBJECT
+};
+
+class DrawShapeToolArchExtension : public DrawShapeToolExtension
+{
+public:
+  explicit DrawShapeToolArchExtension(MapDocument& document);
 
   const std::string& name() const override;
   const std::filesystem::path& iconPath() const override;

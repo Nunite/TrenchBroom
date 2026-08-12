@@ -19,7 +19,7 @@
 
 #include "mdl/Map_Selection.h"
 
-#include "Logger.h"
+#include "base/Logger.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/EditorContext.h"
@@ -32,6 +32,7 @@
 #include "mdl/Map_Nodes.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Node.h"
+#include "mdl/NodeQueries.h"
 #include "mdl/PatchNode.h"
 #include "mdl/SelectionCommand.h"
 #include "mdl/Transaction.h"
@@ -137,7 +138,7 @@ void selectTouchingNodes(Map& map, const vm::axis::type cameraAxis, const bool d
       tallVertices.push_back(maxPlane.project_point(vertex->position()));
     }
 
-    return brushBuilder.createBrush(tallVertices, BrushFaceAttributes::NoMaterialName)
+    return brushBuilder.createBrush(tallVertices, BrushFace::NoMaterialName)
            | kdl::transform(
              [](auto brush) { return std::make_unique<BrushNode>(std::move(brush)); });
   }) | kdl::fold
@@ -262,8 +263,7 @@ void selectBrushesWithMaterial(Map& map, const std::string_view materialName)
     | std::views::filter([&](const auto& node) {
         return std::ranges::any_of(
           collectSelectableBrushFaces({node}, map.editorContext()), [&](const auto& h) {
-            return kdl::ci::str_is_equal(
-              h.face().attributes().materialName(), materialName);
+            return kdl::ci::str_is_equal(h.face().materialName(), materialName);
           });
       })
     | kdl::ranges::to<std::vector>();
@@ -272,6 +272,31 @@ void selectBrushesWithMaterial(Map& map, const std::string_view materialName)
   deselectAll(map);
   selectNodes(map, brushes);
   transaction.commit();
+}
+
+void selectEntitiesWithClassname(Map& map, const std::string_view classname)
+{
+  const auto& editorContext = map.editorContext();
+  const auto* currentGroup = editorContext.currentGroup();
+
+  // Entities in closed groups are selected individually because selecting the containing
+  // group would act on every entity in it, not just the matching ones.
+  const auto nodes =
+    collectNodesAndDescendants({&map.worldNode()}, [&](const EntityNode& entityNode) {
+      return kdl::ci::str_is_equal(entityNode.entity().classname(), classname)
+             && (!currentGroup || entityNode.isDescendantOf(*currentGroup))
+             && editorContext.visible(entityNode) && editorContext.editable(entityNode);
+    });
+
+  auto transaction = Transaction{map, "Select Entities with Classname"};
+  deselectAll(map);
+  selectNodes(map, nodes);
+  transaction.commit();
+}
+
+bool canSelectEntitiesWithClassname(const Map& map, const std::string_view)
+{
+  return map.editorContext().canChangeSelection();
 }
 
 void invertNodeSelection(Map& map)
@@ -372,7 +397,7 @@ void selectBrushFaces(Map& map, const std::vector<BrushFaceHandle>& handles)
   map.executeAndStore(SelectionCommand::select(handles));
   if (!handles.empty())
   {
-    map.setCurrentMaterialName(handles.back().face().attributes().materialName());
+    map.setCurrentMaterialName(handles.back().face().materialName());
   }
 }
 
@@ -381,7 +406,7 @@ void selectBrushFacesWithMaterial(Map& map, const std::string_view materialName)
   const auto faces =
     collectSelectableBrushFaces(std::vector<Node*>{&map.worldNode()}, map.editorContext())
     | std::views::filter([&](const auto& h) {
-        return kdl::ci::str_is_equal(h.face().attributes().materialName(), materialName);
+        return kdl::ci::str_is_equal(h.face().materialName(), materialName);
       })
     | kdl::ranges::to<std::vector>();
 

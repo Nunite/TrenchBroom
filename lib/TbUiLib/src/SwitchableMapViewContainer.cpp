@@ -21,10 +21,10 @@
 
 #include <QGridLayout>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
 #include "mdl/Map.h"
 #include "mdl/PointTrace.h"
+#include "prefs/Preferences.h"
 #include "ui/FourPaneMapView.h"
 #include "ui/InputState.h"
 #include "ui/Inspector.h"
@@ -325,9 +325,14 @@ FaceTool& SwitchableMapViewContainer::faceTool()
   return m_toolBox->faceTool();
 }
 
-MapViewToolBox& SwitchableMapViewContainer::mapViewToolBox()
+const MapViewToolBox& SwitchableMapViewContainer::toolBox() const
 {
   return *m_toolBox;
+}
+
+MapViewToolBox& SwitchableMapViewContainer::toolBox()
+{
+  return KDL_CONST_OVERLOAD(toolBox());
 }
 
 bool SwitchableMapViewContainer::canMoveCameraToNextTracePoint() const
@@ -368,6 +373,11 @@ void SwitchableMapViewContainer::moveCameraToPreviousTracePoint()
     pointTrace->retreat();
     m_mapView->moveCameraToCurrentTracePoint();
   }
+}
+
+const gl::PerspectiveCamera& SwitchableMapViewContainer::perspectiveCamera() const
+{
+  return m_mapView->perspectiveCamera();
 }
 
 bool SwitchableMapViewContainer::canMaximizeCurrentView() const

@@ -1,9 +1,11 @@
 add_executable(TbUiLibTest)
+EMBED_UTF8_MANIFEST(TbUiLibTest)
 
 target_sources(TbUiLibTest
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RunAllTests.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ActionContext.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ActionInfo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_Actions.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_AssetBrowserModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_AssetPreviewProvider.cpp
@@ -14,11 +16,14 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_CompilationProfileManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_CompilationRunner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_CrashReporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_CompilationTaskListBox.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ControlPointTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_DrawShapeToolExtensions.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ViewEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_EntityPropertyModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ExtrudeTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_GoldSrcSpritePreview.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ExtrudeToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_HandleDragTracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_InputEvent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LaunchGameEngine.cpp
@@ -46,6 +51,7 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPathUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPreferenceStore.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPreferenceStoreUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QStringUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QVecUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QWidgetUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PathTool.cpp
@@ -53,12 +59,24 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_RotateTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ScaleTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SelectionTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SetBrushFaceAttributesTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ShearTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SmartModelEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SmartSkyboxEditor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_KeyboardShortcutUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SweepTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SweepToolUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SystemPaths.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_TextOutputAdapter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ToolChain.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UpdateVersion.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UvOffsetTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UvOriginTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UvRotateTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UvScaleTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UvShearTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UvViewHelper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_VertexTool.cpp
 
   PUBLIC FILE_SET cmd_tool TYPE HEADERS
     BASE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>

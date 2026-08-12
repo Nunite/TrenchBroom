@@ -321,152 +321,6 @@ void vec_append(std::vector<T, A>& v, R&& r)
 }
 
 /**
- * Returns a slice of the given vector starting at offset and with count elements.
- *
- * The elements are copied into the returned vector.
- *
- * Precondition: offset + count does not exceed the number of elements in the given vector
- *
- * @tparam T the element type
- * @tparam A the allocator type
- * @param v the vector to return a slice of
- * @param offset the offset of the first element to return
- * @param count the number of elements to return
- * @return a vector containing the slice of the given vector
- */
-template <typename T, typename A>
-std::vector<T, A> vec_slice(
-  const std::vector<T, A>& v, const std::size_t offset, const std::size_t count)
-{
-  contract_pre(offset + count <= v.size());
-
-  std::vector<T, A> result;
-  result.reserve(count);
-
-  for (std::size_t i = 0u; i < count; ++i)
-  {
-    result.push_back(v[i + offset]);
-  }
-
-  return result;
-}
-
-/**
- * Returns a slice of the given vector starting at offset and with count elements.
- *
- * The elements are moved into the returned vector.
- *
- * Precondition: offset + count does not exceed the number of elements in the given vector
- *
- * @tparam T the element type
- * @tparam A the allocator type
- * @param v the vector to return a slice of
- * @param offset the offset of the first element to return
- * @param count the number of elements to return
- * @return a vector containing the slice of the given vector
- */
-template <typename T, typename A>
-std::vector<T, A> vec_slice(
-  std::vector<T, A>&& v, const std::size_t offset, const std::size_t count)
-{
-  contract_pre(offset + count <= v.size());
-
-  std::vector<T, A> result;
-  result.reserve(count);
-
-  for (std::size_t i = 0u; i < count; ++i)
-  {
-    result.push_back(std::move(v[i + offset]));
-  }
-
-  return result;
-}
-
-/**
- * Returns a prefix of the given vector with count elements.
- *
- * The elements are copied into the returned vector.
- *
- * Precondition: count does not exceed the number of elements in the given vector
- *
- * @tparam T the element type
- * @tparam A the allocator type
- * @param v the vector to return a prefix of
- * @param count the number of elements to return
- * @return a vector containing the prefix of the given vector
- */
-template <typename T, typename A>
-std::vector<T, A> vec_slice_prefix(const std::vector<T, A>& v, const std::size_t count)
-{
-  contract_pre(count <= v.size());
-
-  return vec_slice(v, 0u, count);
-}
-
-/**
- * Returns a prefix of the given vector with count elements.
- *
- * The elements are moved into the returned vector.
- *
- * Precondition: count does not exceed the number of elements in the given vector
- *
- * @tparam T the element type
- * @tparam A the allocator type
- * @param v the vector to return a prefix of
- * @param count the number of elements to return
- * @return a vector containing the prefix of the given vector
- */
-template <typename T, typename A>
-std::vector<T, A> vec_slice_prefix(std::vector<T, A>&& v, const std::size_t count)
-{
-  contract_pre(count <= v.size());
-
-  return vec_slice(std::move(v), 0u, count);
-}
-
-/**
- * Returns a suffix of the given vector with count elements.
- *
- * The elements are copied into the returned vector.
- *
- * Precondition: count does not exceed the number of elements in the given vector
- *
- * @tparam T the element type
- * @tparam A the allocator type
- * @param v the vector to return a prefix of
- * @param count the number of elements to return
- * @return a vector containing the prefix of the given vector
- */
-template <typename T, typename A>
-std::vector<T, A> vec_slice_suffix(const std::vector<T, A>& v, const std::size_t count)
-{
-  contract_pre(count <= v.size());
-
-  return vec_slice(v, v.size() - count, count);
-}
-
-/**
- * Returns a suffix of the given vector with count elements.
- *
- * The elements are moved into the returned vector.
- *
- * Precondition: count does not exceed the number of elements in the given vector
- *
- * @tparam T the element type
- * @tparam A the allocator type
- * @param v the vector to return a prefix of
- * @param count the number of elements to return
- * @return a vector containing the prefix of the given vector
- */
-template <typename T, typename A>
-std::vector<T, A> vec_slice_suffix(std::vector<T, A>&& v, const std::size_t count)
-{
-  contract_pre(count <= v.size());
-
-  return vec_slice(std::move(v), v.size() - count, count);
-}
-
-/**
  * Erases every element from the given vector which is equal to the given value using the
  * erase-remove idiom. Returns a vector with the remaining elements.
  *
@@ -550,6 +404,26 @@ std::vector<T, A> vec_sort(std::vector<T, A> v, const Compare& cmp = Compare())
 }
 
 /**
+ * Sorts the elements of the given vector in place and removes all duplicate values. A
+ * value is a duplicate if it is equivalent to its predecessor in the vector. Returns a
+ * vector with the remaining sorted elements.
+ *
+ * @tparam T the type of the vector elements
+ * @tparam A the vector's allocator type
+ * @tparam Compare the type of the comparator to use
+ * @param v the vector to sort and remove duplicates from
+ * @param cmp the comparator to use for sorting and for determining equivalence
+ */
+template <typename T, typename A, typename Compare = std::less<T>>
+void vec_sort_and_remove_duplicates(std::vector<T, A>& v, const Compare& cmp = Compare())
+{
+  std::sort(std::begin(v), std::end(v), cmp);
+  v.erase(
+    std::unique(std::begin(v), std::end(v), kdl::equivalence<T, Compare>(cmp)),
+    std::end(v));
+}
+
+/**
  * Sorts the elements of the given vector and removes all duplicate values. A value is a
  * duplicate if it is equivalent to its predecessor in the vector. Returns a vector with
  * the remaining sorted elements.
@@ -563,13 +437,31 @@ std::vector<T, A> vec_sort(std::vector<T, A> v, const Compare& cmp = Compare())
  */
 template <typename T, typename A, typename Compare = std::less<T>>
 std::vector<T, A> vec_sort_and_remove_duplicates(
-  std::vector<T, A> v, const Compare& cmp = Compare())
+  std::vector<T, A>&& v, const Compare& cmp = Compare())
 {
-  std::sort(std::begin(v), std::end(v), cmp);
-  v.erase(
-    std::unique(std::begin(v), std::end(v), kdl::equivalence<T, Compare>(cmp)),
-    std::end(v));
+  vec_sort_and_remove_duplicates(v, cmp);
   return v;
+}
+
+/**
+ * Sorts the elements of a copy of the given vector and removes all duplicate values. A
+ * value is a duplicate if it is equivalent to its predecessor in the vector. Returns a
+ * vector with the remaining sorted elements.
+ *
+ * @tparam T the type of the vector elements
+ * @tparam A the vector's allocator type
+ * @tparam Compare the type of the comparator to use
+ * @param v the vector to sort and remove duplicates from
+ * @param cmp the comparator to use for sorting and for determining equivalence
+ * @return a vector with the remaining sorted elements
+ */
+template <typename T, typename A, typename Compare = std::less<T>>
+std::vector<T, A> vec_sort_and_remove_duplicates(
+  const std::vector<T, A>& v, const Compare& cmp = Compare())
+{
+  auto x = v;
+  vec_sort_and_remove_duplicates(x, cmp);
+  return x;
 }
 
 /**

@@ -19,84 +19,14 @@
 
 #pragma once
 
-#include "Macros.h"
-#include "mdl/NodeContents.h"
-#include "mdl/SwapNodeContentsCommand.h"
-
-#include "vm/polygon.h"
-#include "vm/segment.h"
-#include "vm/vec.h"
-
-#include <vector>
+#include "mdl/NodeHandleCommand.h"
+#include "mdl/NodeHandles.h"
 
 namespace tb::mdl
 {
-class BrushNode;
 
-namespace detail
-{
-
-std::vector<BrushNode*> collectBrushNodes(
-  const std::vector<std::pair<Node*, NodeContents>>& nodes);
-
-} // namespace detail
-
-template <typename H>
-class VertexHandleManagerBaseT;
-
-template <typename H>
-class BrushVertexCommandT : public SwapNodeContentsCommand
-{
-private:
-  std::vector<H> m_oldPositions;
-  std::vector<H> m_newPositions;
-
-public:
-  BrushVertexCommandT(
-    std::string name,
-    std::vector<std::pair<Node*, NodeContents>> nodes,
-    std::vector<H> oldPositions,
-    std::vector<H> newPositions)
-    : SwapNodeContentsCommand{std::move(name), std::move(nodes)}
-    , m_oldPositions{std::move(oldPositions)}
-    , m_newPositions{std::move(newPositions)}
-  {
-  }
-
-public:
-  bool hasRemainingHandles() const { return !m_newPositions.empty(); }
-
-  template <typename HT>
-  void removeHandles(VertexHandleManagerBaseT<HT>& manager)
-  {
-    const auto nodes = detail::collectBrushNodes(m_nodes);
-    manager.removeHandles(nodes);
-  }
-
-  template <typename HT>
-  void addHandles(VertexHandleManagerBaseT<HT>& manager)
-  {
-    const auto nodes = detail::collectBrushNodes(m_nodes);
-    manager.addHandles(nodes);
-  }
-
-  template <typename HT>
-  void selectNewHandlePositions(VertexHandleManagerBaseT<HT>& manager)
-  {
-    manager.select(m_newPositions);
-  }
-
-  template <typename HT>
-  void selectOldHandlePositions(VertexHandleManagerBaseT<HT>& manager)
-  {
-    manager.select(m_oldPositions);
-  }
-
-  deleteCopyAndMove(BrushVertexCommandT);
-};
-
-using BrushVertexCommand = BrushVertexCommandT<vm::vec3d>;
-using BrushEdgeCommand = BrushVertexCommandT<vm::segment3d>;
-using BrushFaceCommand = BrushVertexCommandT<vm::polygon3d>;
+using BrushVertexCommand = NodeHandleCommand<VertexHandle>;
+using BrushEdgeCommand = NodeHandleCommand<EdgeHandle>;
+using BrushFaceCommand = NodeHandleCommand<FaceHandle>;
 
 } // namespace tb::mdl

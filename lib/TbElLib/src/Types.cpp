@@ -19,7 +19,7 @@
 
 #include "el/Types.h"
 
-#include "Macros.h"
+#include "base/Macros.h"
 
 #include "kd/contracts.h"
 #include "kd/reflection_impl.h"
@@ -112,6 +112,10 @@ ValueType typeForName(const std::string& type)
   if (type == "Range")
   {
     return ValueType::Range;
+  }
+  if (type == "Null")
+  {
+    return ValueType::Null;
   }
   if (type == "Undefined")
   {

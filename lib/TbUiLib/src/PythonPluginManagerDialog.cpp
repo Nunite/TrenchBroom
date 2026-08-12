@@ -32,8 +32,8 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "ui/FileDialogDefaultDir.h"
 #include "ui/QPathUtils.h"
 #include "ui/QStyleUtils.h"

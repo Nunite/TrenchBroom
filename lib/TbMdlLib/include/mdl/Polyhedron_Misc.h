@@ -811,16 +811,18 @@ typename Polyhedron<T, FP, VP>::Edge* Polyhedron<T, FP, VP>::removeEdge(Edge* ed
 
     Let e be the edge to remove. If f1 is a triangle, we merge f1 into n1. Then, if
     f2 is a triangle, we merge that into n2.
-    This can have two outcomes:
+    This can have three outcomes:
 
     - v2 becomes redundant and is removed to repair the topological error. In that case,
       e is also removed and we are done.
+    - e is removed while v2 remains, because repairing a topological error at another
+      vertex merged the faces adjacent to e. We are done in that case, too.
     - v2 remains, and we need to remove e manually. To do that, we transfer all edges
       from v2 to v1, so e becomes a loop, and we can safely remove it after.
 
     Note that n1 and n2 can be identical. If that is the case, then v2 is immediately
-    removed. We also need to be aware that removing v2 may remove e, so we cannot access
-    e again.
+    removed. We also need to be aware that merging faces may remove e or v2, so we must
+    check whether they still exist before accessing them again.
   */
 
   auto* validEdge = edge->next();
@@ -836,6 +838,10 @@ typename Polyhedron<T, FP, VP>::Edge* Polyhedron<T, FP, VP>::removeEdge(Edge* ed
     return std::ranges::find(m_vertices, v2) == m_vertices.end();
   };
 
+  const auto edgeWasRemoved = [&]() {
+    return std::ranges::find(m_edges, edge) == m_edges.end();
+  };
+
   // merge f1 into n1:
   if (
     edge->firstFace()->vertexCount() == 3u
@@ -845,7 +851,7 @@ typename Polyhedron<T, FP, VP>::Edge* Polyhedron<T, FP, VP>::removeEdge(Edge* ed
   }
 
   // merge f2 into n2 if necessary:
-  if (!v2WasRemoved())
+  if (!edgeWasRemoved() && !v2WasRemoved())
   {
     if (
       edge->secondFace()->vertexCount() == 3u
@@ -854,7 +860,7 @@ typename Polyhedron<T, FP, VP>::Edge* Polyhedron<T, FP, VP>::removeEdge(Edge* ed
       return nullptr;
     }
 
-    if (!v2WasRemoved())
+    if (!edgeWasRemoved() && !v2WasRemoved())
     {
       // Transfer all edges from v2 to v1.
       // This results in e being a loop and v2 to be orphaned.
@@ -893,63 +899,6 @@ typename Polyhedron<T, FP, VP>::Edge* Polyhedron<T, FP, VP>::removeEdge(Edge* ed
   }
 
   return validEdge;
-}
-
-template <typename T, typename FP, typename VP>
-void Polyhedron<T, FP, VP>::removeDegenerateFace(Face* face)
-{
-  contract_pre(face != nullptr);
-  contract_pre(face->vertexCount() == 2u);
-
-  // The boundary of the face to remove consists of two half edges:
-  auto* halfEdge1 = face->boundary().front();
-  auto* halfEdge2 = halfEdge1->next();
-  contract_assert(halfEdge2->next() == halfEdge1);
-  contract_assert(halfEdge1->previous() == halfEdge2);
-
-  // The face has two vertices:
-  auto* vertex1 = halfEdge1->origin();
-  auto* vertex2 = halfEdge2->origin();
-
-  // Make sure we don't delete the vertices' leaving edges:
-  vertex1->setLeaving(halfEdge2->twin());
-  vertex2->setLeaving(halfEdge1->twin());
-
-  contract_assert(vertex1->leaving() != halfEdge1);
-  contract_assert(vertex1->leaving() != halfEdge2);
-  contract_assert(vertex2->leaving() != halfEdge1);
-  contract_assert(vertex2->leaving() != halfEdge2);
-
-  // These two edges will be merged into one:
-  auto* edge1 = halfEdge1->edge();
-  auto* edge2 = halfEdge2->edge();
-
-  // The twins of the two half edges of the degenerate face will become twins now.
-  auto* halfEdge1Twin = halfEdge1->twin();
-  auto* halfEdge2Twin = halfEdge2->twin();
-
-  // We will keep edge1 and delete edge2.
-  // Make sure that halfEdge1's twin is the first edge of edge1:
-  edge1->makeFirstEdge(halfEdge1Twin);
-
-  // Now replace halfEdge2 by new halfEdge2Twin:
-  contract_assert(halfEdge2Twin->edge() == edge2);
-  halfEdge2Twin->unsetEdge();
-  edge1->unsetSecondEdge(); // unsets halfEdge1, leaving halfEdge1Twin as the first half
-                            // edge of edge1
-  edge1->setSecondEdge(halfEdge2Twin); // replace halfEdge1 with halfEdge2Twin
-
-  // Now edge1 should be correct:
-  contract_assert(edge1->firstEdge() == halfEdge1Twin);
-  contract_assert(edge1->secondEdge() == halfEdge2Twin);
-
-  // Delete the now obsolete edge.
-  // The constructor doesn't do anything, so no further cleanup is necessary.
-  m_edges.remove(edge2);
-
-  // Delete the degenerate face. This also deletes its boundary of halfEdge1 and
-  // halfEdge2.
-  m_faces.remove(face);
 }
 
 template <typename T, typename FP, typename VP>

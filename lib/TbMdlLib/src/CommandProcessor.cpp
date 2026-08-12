@@ -19,7 +19,7 @@
 
 #include "mdl/CommandProcessor.h"
 
-#include "Notifier.h"
+#include "base/Notifier.h"
 #include "mdl/Command.h"
 #include "mdl/TransactionScope.h"
 #include "mdl/UndoableCommand.h"
@@ -232,6 +232,11 @@ void CommandProcessor::rollbackTransaction()
     undoCommand(**it);
   }
   transaction.commands.clear();
+}
+
+bool CommandProcessor::isTransactionActive() const
+{
+  return !m_transactionStack.empty();
 }
 
 bool CommandProcessor::isCurrentDocumentStateObservable() const

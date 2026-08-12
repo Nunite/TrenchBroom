@@ -35,6 +35,7 @@
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityProperties.h"
+#include "mdl/GameInfo.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
@@ -777,7 +778,7 @@ QStringList brushMaterials(const mdl::Brush& brush)
   auto materials = QStringList{};
   for (const auto& face : brush.faces())
   {
-    const auto material = QString::fromStdString(face.attributes().materialName());
+    const auto material = QString::fromStdString(face.materialName());
     if (!materials.contains(material))
     {
       materials.push_back(material);
@@ -1438,7 +1439,7 @@ QJsonObject slopeFaceJson(
     {"heightDeltaAlongRoute", heightDeltaAlongRoute},
     {"classification", classification},
     {"confidence", confidence},
-    {"material", QString::fromStdString(face.attributes().materialName())},
+    {"material", QString::fromStdString(face.materialName())},
   };
   if (routeDirection)
   {
@@ -2742,14 +2743,14 @@ std::optional<QJsonArray> addNodesWithTransaction(
       mdl::deselectAll(map);
     }
 
-    auto* parent = mdl::parentForNodes(map);
-    if (!parent || !parent->canAddChildren(std::begin(nodes), std::end(nodes)))
+    auto& parent = mdl::parentForNodes(map);
+    if (!parent.canAddChildren(std::begin(nodes), std::end(nodes)))
     {
       return false;
     }
 
     auto nodesToAdd = std::map<mdl::Node*, std::vector<mdl::Node*>>{};
-    nodesToAdd.emplace(parent, nodes);
+    nodesToAdd.emplace(&parent, nodes);
     if (!map.executeAndStore(mdl::AddRemoveNodesCommand::add(nodesToAdd)))
     {
       return false;
@@ -3274,7 +3275,9 @@ std::optional<mdl::Brush> createBrushFromPlaneTriples(
       points[0],
       points[1],
       points[2],
-      mdl::BrushFaceAttributes{material},
+      material,
+      map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
+      map.gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes,
       map.worldNode().mapFormat());
     if (face.is_error())
     {
@@ -5623,7 +5626,7 @@ std::optional<std::vector<mdl::Brush>> createBrushesForType(
       }
       const auto sides = clampedSizeParam(params, "sides", 12, 3, 64);
       const auto rings = clampedSizeParam(params, "rings", 6, 1, 64);
-      brush = builder.createUVSphere(
+      brush = builder.createUvSphere(
         *bounds, mdl::EdgeAlignedCircle{sides}, rings, *axis, material);
     }
   }

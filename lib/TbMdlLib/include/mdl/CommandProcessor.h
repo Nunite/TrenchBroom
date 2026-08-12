@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Notifier.h"
+#include "base/Notifier.h"
 
 #include <chrono>
 #include <memory>
@@ -206,6 +206,11 @@ public:
    * Precondition: a transaction is currently executing.
    */
   void rollbackTransaction();
+
+  /**
+   * Indicates whether a transaction is currently active.
+   */
+  bool isTransactionActive() const;
 
   /**
    * Indicates whether the current document state is observable.

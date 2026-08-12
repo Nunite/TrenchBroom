@@ -17,7 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Result.h"
+#include "base/Result.h"
 #include "fs/File.h"
 #include "fs/FileSystem.h"
 #include "fs/FileSystemMetadata.h"
@@ -76,6 +76,9 @@ public:
 
   Result<std::filesystem::path> makeAbsolute(
     const std::filesystem::path& path) const override;
+
+  Result<void> reload() override;
+
   PathInfo pathInfo(const std::filesystem::path& path) const override;
   const FileSystemMetadata* metadata(
     const std::filesystem::path& path, const std::string& key) const override;

@@ -23,7 +23,7 @@
 #include <QMainWindow>
 #include <QPointer>
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include "mdl/ExportOptions.h"
 #include "ui/python/PythonPluginManager.h"
 
@@ -81,6 +81,7 @@ class MapDocument;
 class MapViewBase;
 class MapView3D;
 enum class MapViewLayout;
+class MapViewToolBox;
 class ObjExportDialog;
 class SignalDelayer;
 class SwitchableMapViewContainer;
@@ -144,8 +145,12 @@ public:
   ~MapWindow() override;
 
   void positionOnScreen(QWidget* reference);
+
   const MapDocument& document() const;
   MapDocument& document();
+
+  const MapViewToolBox& toolBox() const;
+  MapViewToolBox& toolBox();
 
 public: // getters and such
   Logger& logger() const;
@@ -344,7 +349,6 @@ public:
   bool pathToolActive() const;
   void performPathCreation();
   void removeLastPathPoint();
-
   void csgConvexMerge();
   bool canDoCsgConvexMerge() const;
 
@@ -361,10 +365,13 @@ public:
   void snapVerticesToGrid();
   bool canSnapVertices() const;
 
+  void convertSelectionToPatches();
+  bool canConvertSelectionToPatches() const;
+
   void replaceMaterial();
 
   void toggleAlignmentLock();
-  void toggleUVLock();
+  void toggleUvLock();
 
   void toggleShowGrid();
   void toggleSnapToGrid();

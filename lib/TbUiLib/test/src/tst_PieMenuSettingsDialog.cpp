@@ -20,8 +20,8 @@
 #include <QListWidget>
 #include <QPushButton>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "ui/ActionManager.h"
 #include "ui/PieMenuSettingsDialog.h"
 

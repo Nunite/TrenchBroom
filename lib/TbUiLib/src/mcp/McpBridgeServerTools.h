@@ -24,7 +24,7 @@
 
 #include "McpHistoryTools.h"
 #include "McpIrTools.h"
-#include "Result.h"
+#include "base/Result.h"
 #include "ui/mcp/McpBridgeServer.h"
 
 #include <map>

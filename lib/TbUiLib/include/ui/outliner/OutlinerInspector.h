@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ui/TabBook.h"
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include <memory>
 
 namespace tb::mdl

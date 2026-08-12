@@ -22,14 +22,13 @@
 #include <QKeySequence>
 #include <QString>
 
-#include "Macros.h"
-#include "Preference.h"
+#include "base/Macros.h"
+#include "base/Preference.h"
 #include "ui/ActionContext.h"
 
 #include <filesystem>
 #include <functional>
 #include <optional>
-#include <vector>
 
 namespace tb
 {
@@ -56,7 +55,7 @@ class Action
 private:
   QString m_label;
   ActionContext::Type m_actionContext;
-  Preference<QKeySequence> m_shortcutPreference;
+  Preference<std::vector<QKeySequence>> m_shortcutPreference;
 
   ExecuteFn m_execute;
   EnabledFn m_enabled;
@@ -99,8 +98,8 @@ public:
   const QString& label() const;
   ActionContext::Type actionContext() const;
 
-  const Preference<QKeySequence>& preference() const;
-  Preference<QKeySequence>& preference();
+  const Preference<std::vector<QKeySequence>>& preference() const;
+  Preference<std::vector<QKeySequence>>& preference();
 
   void execute(ActionExecutionContext& context) const;
   bool enabled(const ActionExecutionContext& context) const;
@@ -120,8 +119,6 @@ public:
   Action(Action&& other) = default;
   Action& operator=(Action&& other) = default;
 };
-
-std::vector<size_t> findConflicts(const std::vector<const Action*>& actions);
 
 } // namespace ui
 } // namespace tb

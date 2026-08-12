@@ -28,10 +28,9 @@
 #include <QWidget>
 #include <QtTest/QTest>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
-#include "Result.h"
 #include "TestEnvironment.h"
+#include "base/PreferenceManager.h"
+#include "base/Result.h"
 #include "fs/TestEnvironment.h"
 #include "gl/GlManager.h"
 #include "gl/Resource.h"
@@ -40,7 +39,6 @@
 #include "gl/TestUtils.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
-#include "mdl/BrushFaceAttributes.h"
 #include "mdl/BrushNode.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
@@ -53,6 +51,7 @@
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "ui/AppControllerFixture.h"
 #include "ui/CatchConfig.h"
 #include "ui/MapDocument.h"
@@ -175,7 +174,8 @@ TEST_CASE("MapWindow")
     const auto builder = mdl::BrushBuilder{
       map.worldNode().mapFormat(),
       map.worldBounds(),
-      map.gameInfo().gameConfig.faceAttribsConfig.defaults};
+      map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
+      map.gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes};
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "some_material") | kdl::value()};
     mdl::addNodes(map, {{map.worldNode().defaultLayer(), {brushNode}}});
@@ -528,19 +528,19 @@ panel.add_label("Loaded from preferences")
     REQUIRE(uvLockAction != nullptr);
 
     setPref(Preferences::AlignmentLock, true);
-    setPref(Preferences::UVLock, true);
+    setPref(Preferences::UvLock, true);
     QApplication::processEvents();
     CHECK(textureLockAction->isChecked());
     CHECK(uvLockAction->isChecked());
 
     setPref(Preferences::AlignmentLock, false);
-    setPref(Preferences::UVLock, false);
+    setPref(Preferences::UvLock, false);
     QApplication::processEvents();
     CHECK_FALSE(textureLockAction->isChecked());
     CHECK_FALSE(uvLockAction->isChecked());
 
     setPref(Preferences::AlignmentLock, true);
-    setPref(Preferences::UVLock, false);
+    setPref(Preferences::UvLock, false);
   }
 
   SECTION("opens the configured pie menu from the current map view shortcut")

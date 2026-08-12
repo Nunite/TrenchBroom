@@ -20,38 +20,43 @@
 #include "ui/EdgeToolController.h"
 
 #include "ui/EdgeTool.h"
+#include "ui/NodeHandleToolControllerParts.h"
 
 #include <memory>
 
 namespace tb::ui
 {
+namespace
+{
 
-class EdgeToolController::SelectEdgePart : public SelectPartBase<vm::segment3d>
+class SelectEdgePart : public NodeHandleToolSelectPartBase<EdgeTool, mdl::EdgeHandle>
 {
 public:
   explicit SelectEdgePart(EdgeTool& tool)
-    : SelectPartBase{tool, mdl::EdgeHandleManager::HandleHitType}
+    : NodeHandleToolSelectPartBase{tool, mdl::EdgeHandle::HandleHitType}
   {
   }
 
 private:
-  bool equalHandles(const vm::segment3d& lhs, const vm::segment3d& rhs) const override
+  bool equalHandles(const mdl::EdgeHandle& lhs, const mdl::EdgeHandle& rhs) const override
   {
-    return compare(lhs, rhs, MaxHandleDistance) == 0;
+    return compare(lhs.position, rhs.position, MaxHandleDistance) == 0;
   }
 };
 
-class EdgeToolController::MoveEdgePart : public MovePartBase
+class MoveEdgePart : public NodeHandleToolMovePartBase<EdgeTool>
 {
 public:
   explicit MoveEdgePart(EdgeTool& tool)
-    : MovePartBase{tool, mdl::EdgeHandleManager::HandleHitType}
+    : NodeHandleToolMovePartBase{tool, mdl::EdgeHandle::HandleHitType}
   {
   }
 };
 
+} // namespace
+
 EdgeToolController::EdgeToolController(EdgeTool& tool)
-  : VertexToolControllerBase{tool}
+  : NodeHandleToolControllerBase{tool}
 {
   addController(std::make_unique<MoveEdgePart>(tool));
   addController(std::make_unique<SelectEdgePart>(tool));

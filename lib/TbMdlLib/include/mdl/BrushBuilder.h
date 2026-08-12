@@ -19,10 +19,11 @@
 
 #pragma once
 
-#include "BrushFaceAttributes.h"
-#include "Result.h"
+#include "base/Result.h"
 #include "mdl/CircleShape.h"
 #include "mdl/Polyhedron3.h"
+#include "mdl/SurfaceAttributes.h"
+#include "mdl/UvAttributes.h"
 
 #include "vm/bbox.h"
 #include "vm/util.h"
@@ -41,14 +42,16 @@ class BrushBuilder
 private:
   MapFormat m_mapFormat;
   const vm::bbox3d m_worldBounds;
-  const BrushFaceAttributes m_defaultAttribs;
+  const UvAttributes m_defaultUvAttributes;
+  const SurfaceAttributes m_defaultSurfaceAttributes;
 
 public:
   BrushBuilder(MapFormat mapFormat, const vm::bbox3d& worldBounds);
   BrushBuilder(
     MapFormat mapFormat,
     const vm::bbox3d& worldBounds,
-    BrushFaceAttributes defaultAttribs);
+    UvAttributes defaultUvAttributes,
+    SurfaceAttributes defaultSurfaceAttributes);
 
   Result<Brush> createCube(double size, const std::string& materialName) const;
   Result<Brush> createCube(
@@ -101,13 +104,28 @@ public:
     vm::axis::type axis,
     const std::string& textureName) const;
 
+  /**
+   * Creates a semicircular arch as a band of voussoir (wedge) brushes. The arch is the
+   * upper half of a hollow cylinder: its flat springing line sits on the bottom of the
+   * bounds and it rises to fill them. `axis` is the tunnel (extrusion) direction; the
+   * arch rises along the more vertical of the two remaining axes. `thickness` is the wall
+   * thickness of the band. The circle shape selects the same modes as the cylinder
+   * shapes.
+   */
+  Result<std::vector<Brush>> createArch(
+    const vm::bbox3d& bounds,
+    double thickness,
+    const CircleShape& circleShape,
+    vm::axis::type axis,
+    const std::string& textureName) const;
+
   Result<Brush> createCone(
     const vm::bbox3d& bounds,
     const CircleShape& circleShape,
     vm::axis::type axis,
     const std::string& textureName) const;
 
-  Result<Brush> createUVSphere(
+  Result<Brush> createUvSphere(
     const vm::bbox3d& bounds,
     const CircleShape& circleShape,
     size_t numRings,

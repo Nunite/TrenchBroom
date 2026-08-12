@@ -19,7 +19,7 @@
 
 #include "render/BrushOutlineColor.h"
 
-#include "ColorChannel.h"
+#include "base/ColorChannel.h"
 
 #include <set>
 

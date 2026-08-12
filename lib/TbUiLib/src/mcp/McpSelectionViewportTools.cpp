@@ -121,7 +121,7 @@ QJsonObject brushMaterialsJson(const mdl::Brush& brush)
   auto counts = std::map<std::string, int>{};
   for (const auto& face : brush.faces())
   {
-    ++counts[face.attributes().materialName()];
+    ++counts[face.materialName()];
   }
 
   auto materials = QJsonArray{};
@@ -146,7 +146,7 @@ QJsonArray brushFacesJson(const mdl::Brush& brush)
   {
     result.push_back(QJsonObject{
       {"index", index++},
-      {"material", QString::fromStdString(face.attributes().materialName())},
+      {"material", QString::fromStdString(face.materialName())},
       {"normal", vecToJson(face.normal())},
     });
   }
@@ -240,7 +240,7 @@ QJsonObject selectedFaceJson(
     {"type", "face"},
     {"brushId", mcpNodePathId(*handle.node(), worldNode)},
     {"faceIndex", static_cast<int>(handle.faceIndex())},
-    {"material", QString::fromStdString(face.attributes().materialName())},
+    {"material", QString::fromStdString(face.materialName())},
     {"normal", vecToJson(face.normal())},
   };
 }

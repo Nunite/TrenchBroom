@@ -43,7 +43,7 @@ namespace
 {
 bool isSkyFace(const mdl::BrushFace& face)
 {
-  return kdl::ci::str_is_equal(face.attributes().materialName(), "sky");
+  return kdl::ci::str_is_equal(face.materialName(), "sky");
 }
 
 class FilterWrapper : public BrushRenderer::Filter
@@ -68,7 +68,97 @@ public:
   }
 };
 
+bool shouldRenderEdge(
+  const mdl::BrushRendererBrushCache::CachedEdge& edge,
+  const BrushRenderer::Filter::EdgeRenderPolicy policy)
+{
+  using EdgeRenderPolicy = BrushRenderer::Filter::EdgeRenderPolicy;
+
+  switch (policy)
+  {
+  case EdgeRenderPolicy::RenderAll:
+    return true;
+  case EdgeRenderPolicy::RenderIfEitherFaceMarked:
+    return (edge.face1 && edge.face1->isMarked())
+           || (edge.face2 && edge.face2->isMarked());
+  case EdgeRenderPolicy::RenderIfBothFacesMarked:
+    return (edge.face1 && edge.face1->isMarked())
+           && (edge.face2 && edge.face2->isMarked());
+  case EdgeRenderPolicy::RenderNone:
+    return false;
+    switchDefault();
+  }
+}
+
+size_t countMarkedEdgeIndices(
+  const mdl::BrushNode& brushNode, const BrushRenderer::Filter::EdgeRenderPolicy policy)
+{
+  using EdgeRenderPolicy = BrushRenderer::Filter::EdgeRenderPolicy;
+
+  if (policy == EdgeRenderPolicy::RenderNone)
+  {
+    return 0;
+  }
+
+  size_t indexCount = 0;
+  for (const auto& edge : brushNode.brushRendererBrushCache().cachedEdges())
+  {
+    if (shouldRenderEdge(edge, policy))
+    {
+      indexCount += 2;
+    }
+  }
+  return indexCount;
+}
+
+void getMarkedEdgeIndices(
+  const mdl::BrushNode& brushNode,
+  const BrushRenderer::Filter::EdgeRenderPolicy policy,
+  const GLuint brushVerticesStartIndex,
+  GLuint* dest)
+{
+  using EdgeRenderPolicy = BrushRenderer::Filter::EdgeRenderPolicy;
+
+  if (policy == EdgeRenderPolicy::RenderNone)
+  {
+    return;
+  }
+
+  size_t i = 0;
+  for (const auto& edge : brushNode.brushRendererBrushCache().cachedEdges())
+  {
+    if (shouldRenderEdge(edge, policy))
+    {
+      dest[i++] =
+        static_cast<GLuint>(brushVerticesStartIndex + edge.vertexIndex1RelativeToBrush);
+      dest[i++] =
+        static_cast<GLuint>(brushVerticesStartIndex + edge.vertexIndex2RelativeToBrush);
+    }
+  }
+}
+
 } // namespace
+
+size_t triIndicesCountForPolygon(const size_t vertexCount)
+{
+  contract_pre(vertexCount >= 3);
+
+  const size_t indexCount = 3 * (vertexCount - 2);
+  return indexCount;
+}
+
+void addTriIndicesForPolygon(
+  GLuint* dest, const GLuint baseIndex, const size_t vertexCount)
+{
+  contract_pre(vertexCount >= 3);
+
+  for (size_t i = 0; i < vertexCount - 2; ++i)
+  {
+    *(dest++) = baseIndex;
+    *(dest++) = baseIndex + static_cast<GLuint>(i + 1);
+    *(dest++) = baseIndex + static_cast<GLuint>(i + 2);
+  }
+}
 
 // Filter
 
@@ -439,97 +529,9 @@ void BrushRenderer::validate()
     gl::VertexArray::move(std::move(m_coloredEdgeVertices)), gl::PrimType::Lines};
 }
 
-static size_t triIndicesCountForPolygon(const size_t vertexCount)
+namespace
 {
-  contract_pre(vertexCount >= 3);
-
-  const size_t indexCount = 3 * (vertexCount - 2);
-  return indexCount;
-}
-
-static void addTriIndicesForPolygon(
-  GLuint* dest, const GLuint baseIndex, const size_t vertexCount)
-{
-  contract_pre(vertexCount >= 3);
-
-  for (size_t i = 0; i < vertexCount - 2; ++i)
-  {
-    *(dest++) = baseIndex;
-    *(dest++) = baseIndex + static_cast<GLuint>(i + 1);
-    *(dest++) = baseIndex + static_cast<GLuint>(i + 2);
-  }
-}
-
-static inline bool shouldRenderEdge(
-  const mdl::BrushRendererBrushCache::CachedEdge& edge,
-  const BrushRenderer::Filter::EdgeRenderPolicy policy)
-{
-  using EdgeRenderPolicy = BrushRenderer::Filter::EdgeRenderPolicy;
-
-  switch (policy)
-  {
-  case EdgeRenderPolicy::RenderAll:
-    return true;
-  case EdgeRenderPolicy::RenderIfEitherFaceMarked:
-    return (edge.face1 && edge.face1->isMarked())
-           || (edge.face2 && edge.face2->isMarked());
-  case EdgeRenderPolicy::RenderIfBothFacesMarked:
-    return (edge.face1 && edge.face1->isMarked())
-           && (edge.face2 && edge.face2->isMarked());
-  case EdgeRenderPolicy::RenderNone:
-    return false;
-    switchDefault();
-  }
-}
-
-static size_t countMarkedEdgeIndices(
-  const mdl::BrushNode& brushNode, const BrushRenderer::Filter::EdgeRenderPolicy policy)
-{
-  using EdgeRenderPolicy = BrushRenderer::Filter::EdgeRenderPolicy;
-
-  if (policy == EdgeRenderPolicy::RenderNone)
-  {
-    return 0;
-  }
-
-  size_t indexCount = 0;
-  for (const auto& edge : brushNode.brushRendererBrushCache().cachedEdges())
-  {
-    if (shouldRenderEdge(edge, policy))
-    {
-      indexCount += 2;
-    }
-  }
-  return indexCount;
-}
-
-static void getMarkedEdgeIndices(
-  const mdl::BrushNode& brushNode,
-  const BrushRenderer::Filter::EdgeRenderPolicy policy,
-  const GLuint brushVerticesStartIndex,
-  GLuint* dest)
-{
-  using EdgeRenderPolicy = BrushRenderer::Filter::EdgeRenderPolicy;
-
-  if (policy == EdgeRenderPolicy::RenderNone)
-  {
-    return;
-  }
-
-  size_t i = 0;
-  for (const auto& edge : brushNode.brushRendererBrushCache().cachedEdges())
-  {
-    if (shouldRenderEdge(edge, policy))
-    {
-      dest[i++] =
-        static_cast<GLuint>(brushVerticesStartIndex + edge.vertexIndex1RelativeToBrush);
-      dest[i++] =
-        static_cast<GLuint>(brushVerticesStartIndex + edge.vertexIndex2RelativeToBrush);
-    }
-  }
-}
-
-static void addMarkedEdgeVertices(
+void addMarkedEdgeVertices(
   const mdl::BrushNode& brushNode,
   const BrushRenderer::Filter::EdgeRenderPolicy policy,
   const Color& color,
@@ -555,6 +557,7 @@ static void addMarkedEdgeVertices(
     }
   }
 }
+} // namespace
 
 bool BrushRenderer::shouldDrawFaceInTransparentPass(
   const mdl::BrushNode& brushNode, const mdl::BrushFace& face) const

@@ -3,7 +3,7 @@
 #include <QAbstractItemModel>
 #include <QIcon>
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 
 namespace tb::mdl
 {

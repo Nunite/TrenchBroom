@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "NotifierConnection.h"
+#include "base/NotifierConnection.h"
 #include "mdl/HitType.h"
 #include "ui/Tool.h"
 
@@ -168,8 +168,6 @@ private:
 private:
   bool doActivate() override;
   bool doDeactivate() override;
-
-  bool doRemove();
 
   void connectObservers();
   void refresh();

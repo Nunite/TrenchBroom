@@ -17,9 +17,9 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Color.h"
-#include "PreferenceManager.h"
-#include "PreferenceStore.h"
+#include "base/Color.h"
+#include "base/PreferenceManager.h"
+#include "base/PreferenceStore.h"
 
 #include "kd/k.h"
 
@@ -113,9 +113,9 @@ struct MockPreferenceStore : public PreferenceStore
     return false;
   }
 
-  bool load(const std::filesystem::path&, QKeySequence&) override
+  bool load(const std::filesystem::path&, std::vector<QKeySequence>&) override
   {
-    // cannot test QKeySequence here
+    // cannot test std::vector<QKeySequence> here
     return false;
   }
 
@@ -150,12 +150,27 @@ struct MockPreferenceStore : public PreferenceStore
     values[path] = value;
   }
 
-  void save(const std::filesystem::path&, const QKeySequence&) override
+  void save(const std::filesystem::path&, const std::vector<QKeySequence>&) override
   {
-    // can't test QKeySequence here
+    // can't test std::vector<QKeySequence> here
   }
 
   std::unordered_map<std::filesystem::path, Value> values;
+};
+
+/**
+ * Creates the global PreferenceManager instance and destroys it again when it goes out
+ * of scope, so that no instance leaks into other test cases.
+ */
+struct PreferenceManagerInstance
+{
+  template <typename... Args>
+  explicit PreferenceManagerInstance(Args&&... args)
+  {
+    PreferenceManager::createInstance(std::forward<Args>(args)...);
+  }
+
+  ~PreferenceManagerInstance() { PreferenceManager::destroyInstance(); }
 };
 
 } // namespace
@@ -305,7 +320,7 @@ TEST_CASE("PreferenceManager")
         REQUIRE(preferenceManager.getPendingValue(stringPref) == "qwer");
 
         preferenceManager.set(stringPref, "fdsa");
-        CHECK_FALSE(preferenceManager.hasUnsavedChanges());
+        CHECK(!preferenceManager.hasUnsavedChanges());
         CHECK(preferenceManager.get(stringPref) == "fdsa");
         CHECK(preferenceManager.getPendingValue(stringPref) == "fdsa");
       }
@@ -377,19 +392,19 @@ TEST_CASE("PreferenceManager")
 
     SECTION("hasUnsavedChanges")
     {
-      CHECK_FALSE(preferenceManager.hasUnsavedChanges());
+      CHECK(!preferenceManager.hasUnsavedChanges());
 
       preferenceManager.set(stringPref, "qwer");
       CHECK(preferenceManager.hasUnsavedChanges());
 
       preferenceManager.saveChanges();
-      CHECK_FALSE(preferenceManager.hasUnsavedChanges());
+      CHECK(!preferenceManager.hasUnsavedChanges());
 
       preferenceManager.set(stringPref, "fdsa");
       CHECK(preferenceManager.hasUnsavedChanges());
 
       preferenceManager.discardChanges();
-      CHECK_FALSE(preferenceManager.hasUnsavedChanges());
+      CHECK(!preferenceManager.hasUnsavedChanges());
     }
 
     SECTION("when preference store is reloaded")
@@ -416,6 +431,98 @@ TEST_CASE("PreferenceManager")
       CHECK(preferenceManager.get(stringPref) == "qwer");
       CHECK(preferenceManager.getPendingValue(stringPref) == "qwer");
     }
+  }
+
+  SECTION("shouldSaveInstantly")
+  {
+#ifdef __APPLE__
+    CHECK(PreferenceManager::shouldSaveInstantly());
+#else
+    CHECK(!PreferenceManager::shouldSaveInstantly());
+#endif
+  }
+
+  SECTION("saveInstantly")
+  {
+    const auto saveInstantly = GENERATE(true, false);
+    CAPTURE(saveInstantly);
+
+    const auto preferenceManager =
+      PreferenceManager{std::move(preferenceStoreOwner), saveInstantly};
+
+    CHECK(preferenceManager.saveInstantly() == saveInstantly);
+  }
+
+  SECTION("createInstance / instance")
+  {
+    const auto instance =
+      PreferenceManagerInstance{std::move(preferenceStoreOwner), K(saveInstantly)};
+
+    auto boolPref = Preference<bool>{"some/path", false};
+    preferenceStore.values.emplace("some/path", true);
+
+    CHECK(PreferenceManager::instance().saveInstantly());
+    CHECK(PreferenceManager::instance().get(boolPref));
+
+    // the same instance is returned every time
+    CHECK(&PreferenceManager::instance() == &PreferenceManager::instance());
+  }
+
+  SECTION("destroyInstance")
+  {
+    SECTION("a new instance can be created after the previous one was destroyed")
+    {
+      PreferenceManager::createInstance(
+        std::move(preferenceStoreOwner), K(saveInstantly));
+      PreferenceManager::destroyInstance();
+
+      const auto instance = PreferenceManagerInstance{
+        std::make_unique<MockPreferenceStore>(), !K(saveInstantly)};
+
+      CHECK(!PreferenceManager::instance().saveInstantly());
+    }
+  }
+}
+
+TEST_CASE("togglePref")
+{
+  auto preferenceStoreOwner = std::make_unique<MockPreferenceStore>();
+  auto& preferenceStore = *preferenceStoreOwner;
+
+  const auto saveInstantly = GENERATE(true, false);
+  CAPTURE(saveInstantly);
+
+  const auto instance =
+    PreferenceManagerInstance{std::move(preferenceStoreOwner), saveInstantly};
+
+  auto boolPref = Preference<bool>{"some/path", false};
+
+  SECTION("toggles the preference and saves it")
+  {
+    togglePref(boolPref);
+
+    CHECK(PreferenceManager::instance().get(boolPref));
+    CHECK(
+      preferenceStore.values
+      == std::unordered_map<std::filesystem::path, Value>{
+        {"some/path", true},
+      });
+
+    togglePref(boolPref);
+
+    CHECK(!PreferenceManager::instance().get(boolPref));
+    CHECK(
+      preferenceStore.values
+      == std::unordered_map<std::filesystem::path, Value>{
+        {"some/path", false},
+      });
+  }
+
+  SECTION("leaves no unsaved changes behind")
+  {
+    togglePref(boolPref);
+
+    CHECK(!PreferenceManager::instance().hasUnsavedChanges());
   }
 }
 

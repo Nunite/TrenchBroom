@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Result.h"
+#include "base/Result.h"
 #include "mdl/BrushGeometry.h"
 
 #include "kd/reflection_decl.h"
@@ -267,7 +267,7 @@ private:
    * @param right the face of the right polyhedron
    * @return the transformation matrix or nullopt if it cannot be found
    */
-  static std::optional<vm::mat4x4d> findTransformForUVLock(
+  static std::optional<vm::mat4x4d> findTransformForUvLock(
     const PolyhedronMatcher<BrushGeometry>& matcher,
     BrushFaceGeometry* left,
     BrushFaceGeometry* right);
@@ -280,7 +280,7 @@ private:
    * manipulation, and `right` is from the newly modified brush.
    *
    * This function tries to pick 3 vertices from `left` and `right` to generate a
-   * transform (using findTransformForUVLock), and updates the texturing of `right` using
+   * transform (using findTransformForUvLock), and updates the texturing of `right` using
    * that transform applied to `left`. If it can't perform UV lock, `right` remains
    * unmodified.
    *
@@ -291,7 +291,7 @@ private:
    * @param leftFace the face of the left polyhedron
    * @param rightFace the face of the right polyhedron
    */
-  static void applyUVLock(
+  static void applyUvLock(
     const PolyhedronMatcher<BrushGeometry>& matcher,
     const BrushFace& leftFace,
     BrushFace& rightFace);

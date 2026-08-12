@@ -29,7 +29,7 @@
 #include <QPushButton>
 #include <QTextEdit>
 
-#include "Logger.h"
+#include "base/Logger.h"
 #include "mdl/CompilationProfile.h"
 #include "mdl/GameInfo.h"
 #include "mdl/GameManager.h"
@@ -53,10 +53,14 @@ namespace tb::ui
 {
 
 CompilationDialog::CompilationDialog(
-  AppController& appController, MapDocument& document, QWidget* parent)
+  AppController& appController,
+  MapDocument& document,
+  const gl::PerspectiveCamera& camera,
+  QWidget* parent)
   : QDialog{parent}
   , m_appController{appController}
   , m_document{document}
+  , m_camera{camera}
 {
   createGui();
   setMinimumSize(600, 300);
@@ -114,7 +118,8 @@ void CompilationDialog::createGui()
 
   const auto& compilationConfig = m_document.map().gameInfo().compilationConfig;
 
-  m_profileManager = new CompilationProfileManager{m_document, compilationConfig};
+  m_profileManager =
+    new CompilationProfileManager{m_appController, m_document, compilationConfig};
 
   auto* outputPanel = new TitledPanel{tr("Output")};
   m_output = new QTextEdit{};
@@ -246,7 +251,8 @@ Result<void> CompilationDialog::runProfile(
   const mdl::CompilationProfile& profile, const bool test)
 {
   const auto& map = m_document.map();
-  return test ? m_run.test(profile, map, m_output) : m_run.run(profile, map, m_output);
+  return test ? m_run.test(profile, map, m_camera, m_output)
+              : m_run.run(profile, map, m_camera, m_output);
 }
 
 void CompilationDialog::stopCompilation()

@@ -13,8 +13,8 @@
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "ui/AppController.h"
 #include "ui/PieMenuSettingsDialog.h"
 #include "ui/PrefabAsset.h"

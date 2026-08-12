@@ -72,7 +72,8 @@ QString compilationTaskTypeName(const mdl::CompilationTask& task)
       [](const mdl::CompilationCopyFiles&) { return QString{"copy_files"}; },
       [](const mdl::CompilationRenameFile&) { return QString{"rename_file"}; },
       [](const mdl::CompilationDeleteFiles&) { return QString{"delete_files"}; },
-      [](const mdl::CompilationRunTool&) { return QString{"run_tool"}; }),
+      [](const mdl::CompilationRunTool&) { return QString{"run_tool"}; },
+      [](const mdl::CompilationLaunchEngine&) { return QString{"launch_engine"}; }),
     task);
 }
 
@@ -111,6 +112,10 @@ QJsonObject compilationTaskJson(const mdl::CompilationTask& task, const int inde
         result.insert("parameters", QString::fromStdString(value.parameterSpec));
         result.insert(
           "treatNonZeroResultCodeAsError", value.treatNonZeroResultCodeAsError);
+      },
+      [&](const mdl::CompilationLaunchEngine& value) {
+        result.insert("engineProfileId", QString::fromStdString(value.engineProfileId));
+        result.insert("treatLaunchFailureAsError", value.treatLaunchFailureAsError);
       }),
     task);
 

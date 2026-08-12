@@ -11,8 +11,8 @@
 #include <QVBoxLayout>
 #include <QWidgetAction>
 
-#include "PreferenceManager.h"
-#include "Preferences.h"
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "ui/Action.h"
 #include "ui/ActionManager.h"
 #include "ui/ViewConstants.h"

@@ -115,6 +115,16 @@ void NodeWriter::setStripTbProperties(const bool stripTbProperties)
   m_serializer->setStripTbProperties(stripTbProperties);
 }
 
+void NodeWriter::setStripEntityPattern(std::optional<std::string> stripEntityPattern)
+{
+  m_serializer->setStripEntityPattern(std::move(stripEntityPattern));
+}
+
+void NodeWriter::setEntityToAdd(std::optional<Entity> entityToAdd)
+{
+  m_serializer->setEntityToAdd(std::move(entityToAdd));
+}
+
 void NodeWriter::writeMap(kdl::task_manager& taskManager)
 {
   m_serializer->beginFile({&m_world}, taskManager);
@@ -155,12 +165,14 @@ void NodeWriter::writeNodes(
 {
   m_serializer->beginFile(kdl::vec_static_cast<const Node*>(nodes), taskManager);
 
-  // Assort nodes according to their type and, in case of brushes, whether they are entity
-  // or world brushes.
+  // Assort nodes according to their type and, in case of brushes and patches, whether
+  // they are entity or world children. Brushes and patches belonging to the same parent
+  // are kept in the relative order in which they appear in `nodes` so that round-tripping
+  // a mixed selection through copy/paste does not reorder an entity's children.
   std::vector<Node*> groups;
   std::vector<Node*> entities;
-  std::vector<BrushNode*> worldBrushes;
-  EntityBrushesMap entityBrushes;
+  std::vector<Node*> worldChildren;
+  EntityChildNodesMap entityChildNodes;
 
   for (auto* node : nodes)
   {
@@ -172,18 +184,27 @@ void NodeWriter::writeNodes(
       [&](BrushNode& brushNode) {
         if (auto* entityNode = dynamic_cast<EntityNode*>(brushNode.parent()))
         {
-          entityBrushes[entityNode].push_back(&brushNode);
+          entityChildNodes[entityNode].push_back(&brushNode);
         }
         else
         {
-          worldBrushes.push_back(&brushNode);
+          worldChildren.push_back(&brushNode);
         }
       },
-      [](PatchNode&) {}));
+      [&](PatchNode& patchNode) {
+        if (auto* entityNode = dynamic_cast<EntityNode*>(patchNode.parent()))
+        {
+          entityChildNodes[entityNode].push_back(&patchNode);
+        }
+        else
+        {
+          worldChildren.push_back(&patchNode);
+        }
+      }));
   }
 
-  writeWorldBrushes(worldBrushes);
-  writeEntityBrushes(entityBrushes);
+  writeWorldNode(worldChildren);
+  writeEntityNodes(entityChildNodes);
 
   doWriteNodes(*m_serializer, groups);
   doWriteNodes(*m_serializer, entities);
@@ -195,23 +216,23 @@ void NodeWriter::writeWorldspawnHeader(kdl::task_manager& taskManager)
 {
   m_serializer->beginFile({}, taskManager);
   m_serializer->entity(
-    m_world, m_world.entity().properties(), {}, std::vector<BrushNode*>{});
+    m_world, m_world.entity().properties(), {}, std::vector<Node*>{});
   m_serializer->endFile();
 }
 
-void NodeWriter::writeWorldBrushes(const std::vector<BrushNode*>& brushes)
+void NodeWriter::writeWorldNode(const std::vector<Node*>& children)
 {
-  if (!brushes.empty())
+  if (!children.empty())
   {
-    m_serializer->entity(m_world, m_world.entity().properties(), {}, brushes);
+    m_serializer->entity(m_world, m_world.entity().properties(), {}, children);
   }
 }
 
-void NodeWriter::writeEntityBrushes(const EntityBrushesMap& entityBrushes)
+void NodeWriter::writeEntityNodes(const EntityChildNodesMap& entityChildNodes)
 {
-  for (const auto& [entityNode, brushes] : entityBrushes)
+  for (const auto& [entityNode, children] : entityChildNodes)
   {
-    m_serializer->entity(*entityNode, entityNode->entity().properties(), {}, brushes);
+    m_serializer->entity(*entityNode, entityNode->entity().properties(), {}, children);
   }
 }
 

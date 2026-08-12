@@ -26,6 +26,7 @@
 
 class QCheckBox;
 class QCompleter;
+class QComboBox;
 class QHBoxLayout;
 class QLayout;
 class QLineEdit;
@@ -65,11 +66,10 @@ protected:
     mdl::CompilationTask& task,
     QWidget* parent);
 
-protected:
   void setupCompleter(MultiCompletionLineEdit* lineEdit);
   void addMainLayout(QLayout* layout);
 
-protected:
+public:
   void updateItem() override;
 
 private:
@@ -81,6 +81,8 @@ class CompilationExportMapTaskEditor : public CompilationTaskEditorBase
   Q_OBJECT
 private:
   MultiCompletionLineEdit* m_targetEditor = nullptr;
+  QLineEdit* m_stripEntityPattern = nullptr;
+  QLineEdit* m_dropEntity = nullptr;
   QCheckBox* m_stripTbProperties = nullptr;
 
 public:
@@ -90,11 +92,14 @@ public:
     mdl::CompilationTask& task,
     QWidget* parent = nullptr);
 
-private:
   void updateItem() override;
+
+private:
   mdl::CompilationExportMap& task();
 private slots:
   void targetSpecChanged(const QString& text);
+  void stripEntityPatternChanged(const QString& text);
+  void dropEntityChanged(const QString& text);
   void stripTbPropertiesChanged(int state);
 };
 
@@ -112,8 +117,9 @@ public:
     mdl::CompilationTask& task,
     QWidget* parent = nullptr);
 
-private:
   void updateItem() override;
+
+private:
   mdl::CompilationCopyFiles& task();
 private slots:
   void sourceSpecChanged(const QString& text);
@@ -134,8 +140,9 @@ public:
     mdl::CompilationTask& task,
     QWidget* parent = nullptr);
 
-private:
   void updateItem() override;
+
+private:
   mdl::CompilationRenameFile& task();
 private slots:
   void sourceSpecChanged(const QString& text);
@@ -155,8 +162,9 @@ public:
     mdl::CompilationTask& task,
     QWidget* parent = nullptr);
 
-private:
   void updateItem() override;
+
+private:
   mdl::CompilationDeleteFiles& task();
 private slots:
   void targetSpecChanged(const QString& text);
@@ -177,14 +185,38 @@ public:
     mdl::CompilationTask& task,
     QWidget* parent = nullptr);
 
-private:
   void updateItem() override;
+
+private:
   mdl::CompilationRunTool& task();
 private slots:
   void browseTool();
   void toolSpecChanged(const QString& text);
   void parameterSpecChanged(const QString& text);
   void treatNonZeroResultCodeAsErrorChanged(int state);
+};
+
+class CompilationLaunchEngineTaskEditor : public CompilationTaskEditorBase
+{
+  Q_OBJECT
+private:
+  QComboBox* m_engineProfileEditor = nullptr;
+  QCheckBox* m_treatLaunchFailureAsError = nullptr;
+
+public:
+  CompilationLaunchEngineTaskEditor(
+    MapDocument& document,
+    mdl::CompilationProfile& profile,
+    mdl::CompilationTask& task,
+    QWidget* parent = nullptr);
+
+  void updateItem() override;
+
+private:
+  mdl::CompilationLaunchEngine& task();
+private slots:
+  void engineProfileChanged(int index);
+  void treatLaunchFailureAsErrorChanged(int state);
 };
 
 class CompilationTaskListBox : public ControlListBox
@@ -201,6 +233,7 @@ public:
 
 public:
   void reloadTasks();
+  void updateTasks();
 
 private:
   size_t itemCount() const override;

@@ -19,7 +19,7 @@
 
 #include "mdl/GameManager.h"
 
-#include "Logger.h"
+#include "base/Logger.h"
 #include "fs/DiskFileSystem.h"
 #include "fs/DiskIO.h"
 #include "fs/PathInfo.h"
@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <iostream>
 #include <sstream>
+#include <tuple>
 
 namespace tb::mdl
 {
@@ -46,6 +47,26 @@ namespace
 const auto gameConfigFilename = "GameConfig.cfg";
 const auto compilationConfigFilename = "CompilationProfiles.cfg";
 const auto gameEngineConfigFilename = "GameEngineProfiles.cfg";
+
+struct LoadConfigError
+{
+  std::filesystem::path path;
+  std::string msg;
+};
+
+template <typename Value>
+using LoadConfigResult = kdl::result<Value, LoadConfigError>;
+
+template <typename Config>
+auto toLoadConfigResult(const auto& path)
+{
+  return kdl::or_else([=](auto e) {
+    return LoadConfigResult<Config>{LoadConfigError{
+      path,
+      std::move(e.msg),
+    }};
+  });
+}
 
 Result<std::unique_ptr<fs::WritableVirtualFileSystem>> createFileSystem(
   const std::vector<std::filesystem::path>& gameConfigSearchDirs,
@@ -68,7 +89,7 @@ Result<std::unique_ptr<fs::WritableVirtualFileSystem>> createFileSystem(
 }
 
 Result<void> migrateConfigFiles(
-  const std::filesystem::path& userGameDir, const GameConfig& config)
+  fs::FileSystem& fs, const std::filesystem::path& userGameDir, const GameConfig& config)
 {
   const auto legacyDir = userGameDir / config.name;
   const auto newDir = userGameDir / config.configFileFolder();
@@ -82,13 +103,14 @@ Result<void> migrateConfigFiles(
     case fs::PathInfo::Directory:
       break;
     case fs::PathInfo::Unknown:
-      return fs::Disk::renameDirectory(legacyDir, newDir);
+      return fs::Disk::renameDirectory(legacyDir, newDir)
+             | kdl::transform([&]() { std::ignore = fs.reload(); });
     }
   }
   return Result<void>{};
 }
 
-Result<void> loadCompilationConfig(const fs::FileSystem& fs, GameInfo& gameInfo)
+LoadConfigResult<void> loadCompilationConfig(const fs::FileSystem& fs, GameInfo& gameInfo)
 {
   const auto path = gameInfo.gameConfig.configFileFolder() / compilationConfigFilename;
   if (fs.pathInfo(path) == fs::PathInfo::File)
@@ -97,6 +119,7 @@ Result<void> loadCompilationConfig(const fs::FileSystem& fs, GameInfo& gameInfo)
              auto reader = profilesFile->reader().buffer();
              return parseCompilationConfig(reader.stringView());
            })
+           | toLoadConfigResult<CompilationConfig>(path)
            | kdl::transform([&](auto compilationConfig) {
                gameInfo.compilationConfig = std::move(compilationConfig);
              })
@@ -104,10 +127,10 @@ Result<void> loadCompilationConfig(const fs::FileSystem& fs, GameInfo& gameInfo)
              [&](const auto&) { gameInfo.compilationConfigParseFailed = true; });
   }
 
-  return Result<void>{};
+  return LoadConfigResult<void>{};
 }
 
-Result<void> loadGameEngineConfig(const fs::FileSystem& fs, GameInfo& gameInfo)
+LoadConfigResult<void> loadGameEngineConfig(const fs::FileSystem& fs, GameInfo& gameInfo)
 {
   const auto path = gameInfo.gameConfig.configFileFolder() / gameEngineConfigFilename;
   if (fs.pathInfo(path) == fs::PathInfo::File)
@@ -116,6 +139,7 @@ Result<void> loadGameEngineConfig(const fs::FileSystem& fs, GameInfo& gameInfo)
              auto reader = profilesFile->reader().buffer();
              return parseGameEngineConfig(reader.stringView());
            })
+           | toLoadConfigResult<GameEngineConfig>(path)
            | kdl::transform([&](auto gameEngineConfig) {
                gameInfo.gameEngineConfig = std::move(gameEngineConfig);
              })
@@ -123,11 +147,11 @@ Result<void> loadGameEngineConfig(const fs::FileSystem& fs, GameInfo& gameInfo)
              [&](const auto&) { gameInfo.gameEngineConfigParseFailed = true; });
   }
 
-  return Result<void>{};
+  return LoadConfigResult<void>{};
 }
 
 Result<GameConfig> loadGameConfig(
-  const fs::FileSystem& fs,
+  fs::FileSystem& fs,
   const std::filesystem::path& userGameDir,
   const std::filesystem::path& path)
 {
@@ -137,20 +161,23 @@ Result<GameConfig> loadGameConfig(
              return parseGameConfig(reader.stringView(), absolutePath);
            })
          | kdl::transform([&](auto config) {
-             migrateConfigFiles(userGameDir, config) | kdl::transform_error([&](auto e) {
-               std::cerr << "Could not migrate user config files: '" << e.msg << "\n";
-             });
+             migrateConfigFiles(fs, userGameDir, config)
+               | kdl::transform_error([&](auto e) {
+                   std::cerr << "Could not migrate user config files: '" << e.msg << "\n";
+                 });
              return config;
            });
 }
 
-Result<GameInfo> loadGameInfo(
-  const fs::FileSystem& fs,
+LoadConfigResult<GameInfo> loadGameInfo(
+  fs::FileSystem& fs,
   const std::filesystem::path& userGameDir,
   const std::filesystem::path& path,
-  std::vector<std::string>& warnings)
+  std::map<std::filesystem::path, std::string>& warnings)
 {
-  const auto saveWarning = [&](const auto& e) { warnings.push_back(e.msg); };
+  const auto saveWarning = [&](LoadConfigError e) {
+    warnings.emplace(std::move(e.path), std::move(e.msg));
+  };
 
   return loadGameConfig(fs, userGameDir, path) | kdl::transform([&](auto gameConfig) {
            auto gameInfo = makeGameInfo(std::move(gameConfig));
@@ -159,13 +186,14 @@ Result<GameInfo> loadGameInfo(
            loadGameEngineConfig(fs, gameInfo) | kdl::transform_error(saveWarning);
 
            return gameInfo;
-         });
+         })
+         | toLoadConfigResult<GameInfo>(path);
 }
 
 Result<std::vector<GameInfo>> loadGameInfos(
-  const fs::FileSystem& fs,
+  fs::FileSystem& fs,
   const std::filesystem::path& userGameDir,
-  std::vector<std::string>& warnings)
+  std::map<std::filesystem::path, std::string>& warnings)
 {
   return fs.find(
            {},
@@ -177,6 +205,11 @@ Result<std::vector<GameInfo>> loadGameInfos(
                  return loadGameInfo(fs, userGameDir, configFilePath, warnings);
                })
                | kdl::collect();
+
+             for (auto error : errors)
+             {
+               warnings.emplace(std::move(error.path), std::move(error.msg));
+             }
 
              return std::move(gameInfos);
            });
@@ -205,72 +238,80 @@ void backupFile(
   }
 }
 
-Result<void> writeCompilationConfig(
+template <typename Config>
+Result<bool> writeConfig(
+  fs::WritableFileSystem& fs,
+  GameInfo& gameInfo,
+  Config GameInfo::*configField,
+  bool GameInfo::*parseFailedField,
+  Config newConfig,
+  const std::filesystem::path& filename,
+  const std::string_view configLabel,
+  Logger& logger)
+{
+  auto& currentConfig = gameInfo.*configField;
+  auto& parseFailed = gameInfo.*parseFailedField;
+
+  if (!parseFailed && currentConfig == newConfig)
+  {
+    // NOTE: this is not just an optimization, but important for ensuring that
+    // we don't clobber data saved by a newer version of TB, unless we actually
+    // make changes to the config in this version of TB (see:
+    // https://github.com/TrenchBroom/TrenchBroom/issues/3424)
+    logger.debug() << "Skipping writing unchanged " << configLabel << " for "
+                   << gameInfo.gameConfig.name;
+    return false;
+  }
+
+  const auto profilesPath = gameInfo.gameConfig.configFileFolder() / filename;
+  backupFile(fs, profilesPath, parseFailed, logger);
+
+  return fs.createDirectory(profilesPath.parent_path()) | kdl::and_then([&](auto) {
+           auto stream = std::stringstream{};
+           stream << toValue(newConfig) << "\n";
+           return fs.createFileAtomic(profilesPath, stream.str());
+         })
+         | kdl::transform([&]() {
+             currentConfig = std::move(newConfig);
+             logger.debug() << "Wrote " << configLabel << " to " << profilesPath;
+             return true;
+           });
+}
+
+Result<bool> writeCompilationConfig(
   fs::WritableFileSystem& fs,
   GameInfo& gameInfo,
   CompilationConfig compilationConfig,
   Logger& logger)
 {
-  if (
-    !gameInfo.compilationConfigParseFailed
-    && gameInfo.compilationConfig == compilationConfig)
-  {
-    // NOTE: this is not just an optimization, but important for ensuring that
-    // we don't clobber data saved by a newer version of TB, unless we actually
-    // make changes to the config in this version of TB (see:
-    // https://github.com/TrenchBroom/TrenchBroom/issues/3424)
-    logger.debug() << "Skipping writing unchanged compilation config for "
-                   << gameInfo.gameConfig.name;
-    return Result<void>{};
-  }
-
-  const auto profilesPath =
-    gameInfo.gameConfig.configFileFolder() / compilationConfigFilename;
-  backupFile(fs, profilesPath, gameInfo.compilationConfigParseFailed, logger);
-
-  return fs.createDirectory(profilesPath.parent_path()) | kdl::and_then([&](auto) {
-           auto stream = std::stringstream{};
-           stream << toValue(compilationConfig) << "\n";
-           return fs.createFileAtomic(profilesPath, stream.str());
-         })
-         | kdl::transform([&]() {
-             gameInfo.compilationConfig = std::move(compilationConfig);
-             logger.debug() << "Wrote compilation config to " << profilesPath;
-           });
+  return writeConfig(
+    fs,
+    gameInfo,
+    &GameInfo::compilationConfig,
+    &GameInfo::compilationConfigParseFailed,
+    std::move(compilationConfig),
+    compilationConfigFilename,
+    "compilation config",
+    logger);
 }
 
-Result<void> writeGameEngineConfig(
+// Returns whether gameInfo.gameEngineConfig was actually updated (false if the write
+// was skipped because the config was unchanged), so callers can gate a notifier on it.
+Result<bool> writeGameEngineConfig(
   fs::WritableFileSystem& fs,
   GameInfo& gameInfo,
   GameEngineConfig gameEngineConfig,
   Logger& logger)
 {
-  if (
-    !gameInfo.gameEngineConfigParseFailed
-    && gameInfo.gameEngineConfig == gameEngineConfig)
-  {
-    // NOTE: this is not just an optimization, but important for ensuring that
-    // we don't clobber data saved by a newer version of TB, unless we actually
-    // make changes to the config in this version of TB (see:
-    // https://github.com/TrenchBroom/TrenchBroom/issues/3424)
-    logger.debug() << "Skipping writing unchanged game engine config for "
-                   << gameInfo.gameConfig.name;
-    return Result<void>{};
-  }
-
-  const auto profilesPath =
-    gameInfo.gameConfig.configFileFolder() / gameEngineConfigFilename;
-  backupFile(fs, profilesPath, gameInfo.gameEngineConfigParseFailed, logger);
-
-  return fs.createDirectory(profilesPath.parent_path()) | kdl::and_then([&](auto) {
-           auto stream = std::stringstream{};
-           stream << toValue(gameEngineConfig) << "\n";
-           return fs.createFileAtomic(profilesPath, stream.str());
-         })
-         | kdl::transform([&]() {
-             gameInfo.gameEngineConfig = std::move(gameEngineConfig);
-             logger.debug() << "Wrote game engine config to " << profilesPath;
-           });
+  return writeConfig(
+    fs,
+    gameInfo,
+    &GameInfo::gameEngineConfig,
+    &GameInfo::gameEngineConfigParseFailed,
+    std::move(gameEngineConfig),
+    gameEngineConfigFilename,
+    "game engine config",
+    logger);
 }
 
 } // namespace
@@ -317,7 +358,13 @@ Result<void> GameManager::updateCompilationConfig(
   if (auto* info = gameInfo(gameName))
   {
     return writeCompilationConfig(
-      *m_configFs, *info, std::move(compilationConfig), logger);
+             *m_configFs, *info, std::move(compilationConfig), logger)
+           | kdl::transform([&](const auto changed) {
+               if (changed)
+               {
+                 compilationConfigDidChangeNotifier(*info);
+               }
+             });
   }
   return Error{fmt::format("Unknown game: {}", gameName)};
 }
@@ -327,18 +374,25 @@ Result<void> GameManager::updateGameEngineConfig(
 {
   if (auto* info = gameInfo(gameName))
   {
-    return writeGameEngineConfig(*m_configFs, *info, std::move(gameEngineConfig), logger);
+    return writeGameEngineConfig(*m_configFs, *info, std::move(gameEngineConfig), logger)
+           | kdl::transform([&](const auto changed) {
+               if (changed)
+               {
+                 gameEngineConfigDidChangeNotifier(*info);
+               }
+             });
   }
   return Error{fmt::format("Unknown game: {}", gameName)};
 }
 
-Result<kdl::multi_value<GameManager, std::vector<std::string>>> initializeGameManager(
+Result<kdl::multi_value<GameManager, std::map<std::filesystem::path, std::string>>>
+initializeGameManager(
   const std::vector<std::filesystem::path>& gameConfigSearchDirs,
   const std::filesystem::path& userGameDir)
 {
   return createFileSystem(gameConfigSearchDirs, userGameDir)
          | kdl::and_then([&](auto fs) {
-             auto warnings = std::vector<std::string>{};
+             auto warnings = std::map<std::filesystem::path, std::string>{};
              return loadGameInfos(*fs, userGameDir, warnings)
                     | kdl::transform([&](auto gameInfos) {
                         return kdl::multi_value{
