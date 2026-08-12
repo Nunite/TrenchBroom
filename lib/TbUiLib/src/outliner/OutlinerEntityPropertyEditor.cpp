@@ -1369,11 +1369,21 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                         return;
                     }
 
+                    auto value = valueCombo->currentText();
+                    const auto optionIndex = valueCombo->findText(value, Qt::MatchExactly);
+                    if (optionIndex >= 0)
+                    {
+                        const auto valueVariant = valueCombo->itemData(optionIndex);
+                        if (valueVariant.isValid())
+                        {
+                            value = valueVariant.toString();
+                        }
+                    }
+
                     mdl::setEntityProperty(
                         m_document.map(),
                         keyVariant.toString().toStdString(),
-                        mapStringFromUnicode(
-                          m_document.map().encoding(), valueCombo->currentText()),
+                        mapStringFromUnicode(m_document.map().encoding(), value),
                         false);
                     scheduleUpdate();
                 });

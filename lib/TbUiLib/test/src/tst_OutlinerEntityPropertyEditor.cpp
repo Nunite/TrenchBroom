@@ -444,6 +444,54 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     CHECK(*entity.property("targetname") == "renamed_light");
   }
 
+  SECTION("stores choice values instead of display labels")
+  {
+    map.entityDefinitionManager().setDefinitions({{
+      "choice_test",
+      {},
+      "",
+      {{"mode",
+        mdl::PropertyValueTypes::Choice{{{"0", "Invisible"}, {"1", "Textured"}}},
+        "",
+        ""}},
+      mdl::PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
+    }});
+    const auto* definition = map.entityDefinitionManager().definition("choice_test");
+    REQUIRE(definition != nullptr);
+
+    auto* entityNode = mdl::createPointEntity(map, *definition, {0, 0, 0});
+    REQUIRE(entityNode != nullptr);
+    mdl::setEntityProperty(map, "mode", "1", false);
+    processOutlinerUpdates();
+
+    auto* row = propertyRow(editor, "mode");
+    REQUIRE(row != nullptr);
+    auto* valueCombo = row->findChild<QComboBox*>("outlinerPropertyValue");
+    REQUIRE(valueCombo != nullptr);
+    REQUIRE(valueCombo->lineEdit() != nullptr);
+
+    valueCombo->lineEdit()->setText("0 : Invisible");
+    emit valueCombo->lineEdit()->editingFinished();
+    processOutlinerUpdates();
+
+    const auto& selectedAfterChoice = selectedEntity(map).entity();
+    REQUIRE(selectedAfterChoice.property("mode") != nullptr);
+    CHECK(*selectedAfterChoice.property("mode") == "0");
+
+    row = propertyRow(editor, "mode");
+    REQUIRE(row != nullptr);
+    valueCombo = row->findChild<QComboBox*>("outlinerPropertyValue");
+    REQUIRE(valueCombo != nullptr);
+    REQUIRE(valueCombo->lineEdit() != nullptr);
+    valueCombo->lineEdit()->setText("custom");
+    emit valueCombo->lineEdit()->editingFinished();
+    processOutlinerUpdates();
+
+    const auto& selectedAfterCustomValue = selectedEntity(map).entity();
+    REQUIRE(selectedAfterCustomValue.property("mode") != nullptr);
+    CHECK(*selectedAfterCustomValue.property("mode") == "custom");
+  }
+
   SECTION("adds and removes selected entity properties")
   {
     auto* entityNode = new mdl::EntityNode{mdl::Entity{{
