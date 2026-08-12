@@ -663,11 +663,13 @@ void OutlinerEntityPropertyEditor::refreshVisiblePropertyValues()
         {
             if (inactive)
             {
+                valueCombo->setCurrentIndex(-1);
                 valueCombo->setEditText(QString{});
                 comboLineEdit->setPlaceholderText(tr("<inactive>"));
             }
             else if (consensus.mixed)
             {
+                valueCombo->setCurrentIndex(-1);
                 valueCombo->setEditText(QString{});
                 comboLineEdit->setPlaceholderText(tr("<multiple>"));
             }
@@ -869,6 +871,9 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             }
             if (valueCombo && valueCombo->lineEdit())
             {
+                const QSignalBlocker blocker{valueCombo};
+                valueCombo->setCurrentIndex(-1);
+                valueCombo->setEditText(QString{});
                 setInactiveEditorPalette(valueCombo->lineEdit());
                 valueCombo->lineEdit()->setPlaceholderText(tr("<inactive>"));
             }
@@ -881,6 +886,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
                 if (!inactive && consensus.mixed)
                 {
                     const QSignalBlocker blocker{valueCombo};
+                    valueCombo->setCurrentIndex(-1);
                     valueCombo->setEditText(QString{});
                     comboLineEdit->setPlaceholderText(tr("<multiple>"));
                 }

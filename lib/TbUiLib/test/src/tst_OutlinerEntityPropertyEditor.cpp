@@ -233,6 +233,8 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     REQUIRE(valueCombo != nullptr);
     REQUIRE(valueCombo->lineEdit() != nullptr);
     CHECK(!valueCombo->isEnabled());
+    CHECK(valueCombo->currentIndex() == -1);
+    CHECK(valueCombo->currentText().isEmpty());
     CHECK(valueCombo->lineEdit()->placeholderText() == "<inactive>");
 
     mdl::setEntityProperty(map, "active", "changed", false);
@@ -241,6 +243,8 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     processOutlinerUpdates();
 
     CHECK(valueEdit->placeholderText() == "<inactive>");
+    CHECK(valueCombo->currentIndex() == -1);
+    CHECK(valueCombo->currentText().isEmpty());
     CHECK(valueCombo->lineEdit()->placeholderText() == "<inactive>");
   }
 
