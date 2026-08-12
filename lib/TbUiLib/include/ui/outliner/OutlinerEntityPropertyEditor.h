@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+class QLabel;
 class QLineEdit;
 class QScrollArea;
 class QVBoxLayout;
@@ -34,10 +35,12 @@ private:
     NotifierConnection m_notifierConnection;
 
     TitledPanel* m_propertiesPanel = nullptr;
+    QLabel* m_selectionSummary = nullptr;
     QScrollArea* m_scrollArea = nullptr;
     QWidget* m_scrollContents = nullptr;
     QVBoxLayout* m_scrollLayout = nullptr;
 
+    QWidget* m_addPropertyBar = nullptr;
     QLineEdit* m_addKey = nullptr;
     QLineEdit* m_addValue = nullptr;
 

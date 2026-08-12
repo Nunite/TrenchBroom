@@ -21,6 +21,7 @@
 #include <QApplication>
 #include <QLabel>
 #include <QLineEdit>
+#include <QScrollArea>
 #include <QtTest/QTest>
 
 #include "mdl/BrushNode.h"
@@ -70,8 +71,7 @@ QWidget* propertyRow(OutlinerEntityPropertyEditor& editor, const QString& key)
 {
   for (auto* row : propertyRows(editor))
   {
-    if (const auto* keyLabel = row->findChild<QLabel*>("outlinerPropertyKey");
-        keyLabel != nullptr && keyLabel->text() == key)
+    if (row->property("propertyKey").toString() == key)
     {
       return row;
     }
@@ -138,9 +138,63 @@ TEST_CASE("OutlinerEntityPropertyEditor")
   {
     CHECK(!hasInfoLabel(editor, "No entity selected"));
 
+    const auto* summary = editor.findChild<QLabel*>("outlinerPropertySelectionSummary");
+    REQUIRE(summary != nullptr);
+    CHECK(summary->text() == "worldspawn");
+
     auto* valueEdit = propertyValueEdit(editor, "classname");
     REQUIRE(valueEdit != nullptr);
     CHECK(valueEdit->text() == "worldspawn");
+  }
+
+  SECTION("summarizes same-type and mixed entity selections")
+  {
+    auto* firstLight = new mdl::EntityNode{mdl::Entity{{{"classname", "light"}}}};
+    auto* secondLight = new mdl::EntityNode{mdl::Entity{{{"classname", "light"}}}};
+    auto* playerStart =
+      new mdl::EntityNode{mdl::Entity{{{"classname", "info_player_start"}}}};
+    mdl::addNodes(
+      map, {{&mdl::parentForNodes(map), {firstLight, secondLight, playerStart}}});
+
+    mdl::selectNodes(map, {firstLight, secondLight});
+    processOutlinerUpdates();
+
+    auto* summary = editor.findChild<QLabel*>("outlinerPropertySelectionSummary");
+    REQUIRE(summary != nullptr);
+    CHECK(summary->text() == "light (2 entities)");
+
+    mdl::deselectAll(map);
+    mdl::selectNodes(map, {firstLight, playerStart});
+    processOutlinerUpdates();
+
+    summary = editor.findChild<QLabel*>("outlinerPropertySelectionSummary");
+    REQUIRE(summary != nullptr);
+    CHECK(summary->text() == "Mixed selection (2 entities)");
+    CHECK(hasInfoLabel(editor, "Different entity types selected"));
+  }
+
+  SECTION("keeps add controls outside the scrolling property list")
+  {
+    const auto* scrollArea = editor.findChild<QScrollArea*>("outlinerPropertyScrollArea");
+    const auto* addKey = editor.findChild<QLineEdit*>("outlinerPropertyAddKey");
+    REQUIRE(scrollArea != nullptr);
+    REQUIRE(addKey != nullptr);
+    CHECK(!scrollArea->isAncestorOf(addKey));
+  }
+
+  SECTION("adapts property rows to narrow and wide panels")
+  {
+    editor.show();
+    editor.resize(320, 600);
+    processOutlinerUpdates();
+
+    auto* row = propertyRow(editor, "classname");
+    REQUIRE(row != nullptr);
+    CHECK(row->property("compact").toBool());
+
+    editor.resize(800, 600);
+    processOutlinerUpdates();
+    CHECK(!row->property("compact").toBool());
   }
 
   SECTION("shows skybox editor control for worldspawn skyname")

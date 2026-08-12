@@ -35,100 +35,44 @@ QScrollArea#outlinerPropertyScrollArea {
   background: transparent;
 }
 
-QWidget#outlinerPropertyCard {
-  background-color: rgba(255, 255, 255, 12);
-  border: 1 solid rgba(0, 0, 0, 80);
-  border-radius: 8;
+QWidget#outlinerPropertyList {
+  background: palette(base);
+}
+
+QLabel#outlinerPropertySelectionSummary {
+  background: palette(alternate-base);
+  border-bottom: 1 solid palette(mid);
+  padding: 6px 8px;
+  font-weight: bold;
+}
+
+QWidget#outlinerPropertyAddBar {
+  background: palette(window);
+  border-top: 1 solid palette(mid);
 }
 
 QWidget#outlinerPropertyRow {
-  background-color: rgba(0, 0, 0, 28);
-  border: 1 solid rgba(0, 0, 0, 70);
-  border-radius: 8;
+  background: palette(base);
+  border-bottom: 1 solid palette(midlight);
 }
 
 QWidget#outlinerPropertyRow:hover {
-  background-color: rgba(255, 255, 255, 14);
+  background: palette(alternate-base);
 }
 
 QWidget#outlinerPropertyRow[inactive="true"] {
-  background-color: rgba(0, 0, 0, 18);
-  border: 1 solid rgba(0, 0, 0, 55);
+  background: palette(window);
 }
 
-QWidget#outlinerPropertyRow[inactive="true"]:hover {
-  background-color: rgba(255, 255, 255, 10);
+QWidget#outlinerPropertyKey QLabel {
+  color: palette(text);
 }
 
-QLabel#outlinerPropertyKey {
-  color: rgba(255, 255, 255, 190);
-}
-
-QLabel#outlinerPropertyKey[inactive="true"] {
-  color: rgba(255, 255, 255, 130);
+QWidget#outlinerPropertyKey[inactive="true"] QLabel {
+  color: palette(mid);
   font-style: italic;
-}
-
-QLineEdit#outlinerPropertyValue,
-QComboBox#outlinerPropertyValue,
-QLineEdit#outlinerPropertyAddKey,
-QLineEdit#outlinerPropertyAddValue {
-  background-color: rgba(0, 0, 0, 32);
-  border: 1 solid rgba(0, 0, 0, 75);
-  border-radius: 8;
-  padding: 3px 6px;
-  color: rgba(255, 255, 255, 230);
-  selection-background-color: rgba(255, 255, 255, 35);
-  selection-color: rgba(255, 255, 255, 255);
-}
-
-QLineEdit#outlinerPropertyValue:focus,
-QComboBox#outlinerPropertyValue:focus,
-QLineEdit#outlinerPropertyAddKey:focus,
-QLineEdit#outlinerPropertyAddValue:focus {
-  border: 1 solid rgba(255, 255, 255, 70);
-  background-color: rgba(255, 255, 255, 10);
-  color: rgba(255, 255, 255, 255);
-}
-
-QLineEdit#outlinerPropertyValue:disabled,
-QComboBox#outlinerPropertyValue:disabled,
-QLineEdit#outlinerPropertyAddKey:disabled,
-QLineEdit#outlinerPropertyAddValue:disabled {
-  color: rgba(255, 255, 255, 140);
-  background-color: rgba(0, 0, 0, 18);
-  border: 1 solid rgba(0, 0, 0, 55);
-}
-
-QComboBox#outlinerPropertyValue QAbstractItemView {
-  background-color: rgba(0, 0, 0, 220);
-  color: rgba(255, 255, 255, 230);
-  selection-background-color: rgba(255, 255, 255, 35);
-  selection-color: rgba(255, 255, 255, 255);
 }
 
 QWidget#outlinerPropertyColorButton {
   background: transparent;
-}
-
-QWidget#outlinerPropertyColorButton QPushButton {
-  background-color: rgba(0, 0, 0, 32);
-  border: 1 solid rgba(0, 0, 0, 75);
-  border-radius: 8;
-  padding: 3px 6px;
-  color: rgba(255, 255, 255, 230);
-}
-
-QWidget#outlinerPropertyColorButton QPushButton:hover {
-  background-color: rgba(255, 255, 255, 10);
-}
-
-QWidget#outlinerPropertyColorButton QPushButton:pressed {
-  background-color: rgba(255, 255, 255, 14);
-}
-
-QWidget#outlinerPropertyColorButton QPushButton:disabled {
-  color: rgba(255, 255, 255, 140);
-  background-color: rgba(0, 0, 0, 18);
-  border: 1 solid rgba(0, 0, 0, 55);
 }

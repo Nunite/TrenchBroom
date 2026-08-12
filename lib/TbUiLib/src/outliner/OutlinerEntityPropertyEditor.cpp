@@ -1,13 +1,15 @@
 #include "ui/outliner/OutlinerEntityPropertyEditor.h"
 
 #include <QApplication>
-#include <QEvent>
-#include <QFrame>
-#include <QFileDialog>
-#include <QHBoxLayout>
 #include <QComboBox>
+#include <QEvent>
+#include <QFileDialog>
+#include <QFrame>
+#include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QResizeEvent>
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QStringList>
@@ -17,8 +19,8 @@
 #include <QWheelEvent>
 
 #include "base/Color.h"
-#include "mdl/EntityDefinition.h"
 #include "mdl/EntityColorPropertyValue.h"
+#include "mdl/EntityDefinition.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/EntityProperties.h"
 #include "mdl/GameInfo.h"
@@ -27,6 +29,7 @@
 #include "mdl/PropertyDefinition.h"
 #include "ui/BitmapButton.h"
 #include "ui/ColorButton.h"
+#include "ui/ElidedLabel.h"
 #include "ui/FileDialogDefaultDir.h"
 #include "ui/FlagsEditor.h"
 #include "ui/MapDocument.h"
@@ -49,6 +52,85 @@ namespace tb::ui
 {
 namespace
 {
+class ResponsivePropertyRow : public QWidget
+{
+private:
+    static constexpr int CompactWidth = 420;
+
+    QGridLayout* m_layout = nullptr;
+    QWidget* m_keyWidget = nullptr;
+    QWidget* m_valueWidget = nullptr;
+    QWidget* m_actionsWidget = nullptr;
+    bool m_compact = false;
+
+public:
+    explicit ResponsivePropertyRow(QWidget* parent = nullptr)
+        : QWidget{parent}
+        , m_layout{new QGridLayout{this}}
+    {
+        m_layout->setContentsMargins(8, 5, 6, 5);
+        m_layout->setHorizontalSpacing(6);
+        m_layout->setVerticalSpacing(4);
+    }
+
+    void setWidgets(QWidget* keyWidget, QWidget* valueWidget, QWidget* actionsWidget)
+    {
+        m_keyWidget = keyWidget;
+        m_valueWidget = valueWidget;
+        m_actionsWidget = actionsWidget;
+        updateLayout(width());
+    }
+
+protected:
+    void resizeEvent(QResizeEvent* event) override
+    {
+        QWidget::resizeEvent(event);
+        updateLayout(event->size().width());
+    }
+
+private:
+    void updateLayout(const int width)
+    {
+        if (!m_keyWidget || !m_valueWidget || !m_actionsWidget)
+        {
+            return;
+        }
+
+        const auto compact = width < CompactWidth;
+        if (m_layout->indexOf(m_keyWidget) >= 0 && compact == m_compact)
+        {
+            return;
+        }
+
+        m_layout->removeWidget(m_keyWidget);
+        m_layout->removeWidget(m_valueWidget);
+        m_layout->removeWidget(m_actionsWidget);
+        for (auto i = 0; i < 3; ++i)
+        {
+            m_layout->setColumnStretch(i, 0);
+        }
+
+        m_compact = compact;
+        setProperty("compact", compact);
+
+        if (compact)
+        {
+            m_layout->addWidget(m_keyWidget, 0, 0);
+            m_layout->addWidget(m_actionsWidget, 0, 1, Qt::AlignRight);
+            m_layout->addWidget(m_valueWidget, 1, 0, 1, 2);
+            m_layout->setColumnStretch(0, 1);
+        }
+        else
+        {
+            m_layout->addWidget(m_keyWidget, 0, 0);
+            m_layout->addWidget(m_valueWidget, 0, 1);
+            m_layout->addWidget(m_actionsWidget, 0, 2, Qt::AlignRight);
+            m_layout->setColumnStretch(0, 1);
+            m_layout->setColumnStretch(1, 2);
+        }
+    }
+};
+
 class OutlinerChoiceComboBox : public QComboBox
 {
 private:
@@ -352,13 +434,18 @@ OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(MapDocument& document
 {
     m_propertiesPanel = new TitledPanel{tr("Entity"), true, true};
 
+    m_selectionSummary = new QLabel{m_propertiesPanel->getPanel()};
+    m_selectionSummary->setObjectName("outlinerPropertySelectionSummary");
+    m_selectionSummary->setAttribute(Qt::WA_StyledBackground, true);
+    m_selectionSummary->setTextInteractionFlags(Qt::TextSelectableByMouse);
+
     m_scrollArea = new QScrollArea{m_propertiesPanel->getPanel()};
     m_scrollArea->setObjectName("outlinerPropertyScrollArea");
     m_scrollArea->setFrameShape(QFrame::NoFrame);
     m_scrollArea->setWidgetResizable(true);
 
     m_scrollContents = new QWidget{m_scrollArea};
-    m_scrollContents->setObjectName("outlinerPropertyCard");
+    m_scrollContents->setObjectName("outlinerPropertyList");
     m_scrollContents->setAttribute(Qt::WA_StyledBackground, true);
     m_scrollLayout = new QVBoxLayout{m_scrollContents};
     m_scrollLayout->setContentsMargins(0, 0, 0, 0);
@@ -366,10 +453,54 @@ OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(MapDocument& document
     m_scrollLayout->addStretch(1);
     m_scrollArea->setWidget(m_scrollContents);
 
+    auto* addPropertyBar = new ResponsivePropertyRow{m_propertiesPanel->getPanel()};
+    m_addPropertyBar = addPropertyBar;
+    addPropertyBar->setObjectName("outlinerPropertyAddBar");
+    addPropertyBar->setAttribute(Qt::WA_StyledBackground, true);
+
+    m_addKey = new QLineEdit{m_addPropertyBar};
+    m_addKey->setObjectName("outlinerPropertyAddKey");
+    m_addKey->setPlaceholderText(tr("Key"));
+    m_addKey->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+
+    m_addValue = new QLineEdit{m_addPropertyBar};
+    m_addValue->setObjectName("outlinerPropertyAddValue");
+    m_addValue->setPlaceholderText(tr("Value"));
+    m_addValue->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+    auto* addActions = new QWidget{m_addPropertyBar};
+    auto* addActionsLayout = new QHBoxLayout{addActions};
+    addActionsLayout->setContentsMargins(0, 0, 0, 0);
+    addActionsLayout->setSpacing(2);
+
+    auto* addButton = createBitmapButton("Add.svg", tr("Add property"), addActions);
+    addButton->setObjectName("toolButton_withBorder");
+    addButton->setIconSize(QSize{16, 16});
+    addButton->setFixedSize(QSize{24, 24});
+    addActionsLayout->addWidget(addButton);
+
+    addPropertyBar->setWidgets(m_addKey, m_addValue, addActions);
+
+    connect(addButton, &QAbstractButton::clicked, this, [this]() {
+        const auto key = m_addKey->text().trimmed();
+        if (key.isEmpty())
+        {
+            return;
+        }
+
+        mdl::setEntityProperty(
+          m_document.map(), key.toStdString(), m_addValue->text().toStdString(), false);
+        m_addKey->clear();
+        m_addValue->clear();
+        scheduleUpdate(true);
+    });
+
     auto* propertiesLayout = new QVBoxLayout{m_propertiesPanel->getPanel()};
-    propertiesLayout->setContentsMargins(4, 4, 4, 4);
+    propertiesLayout->setContentsMargins(0, 0, 0, 0);
     propertiesLayout->setSpacing(0);
+    propertiesLayout->addWidget(m_selectionSummary, 0);
     propertiesLayout->addWidget(m_scrollArea, 1);
+    propertiesLayout->addWidget(m_addPropertyBar, 0);
 
     auto* layout = new QVBoxLayout{this};
     layout->setContentsMargins(0, 0, 0, 0);
@@ -551,51 +682,9 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 
     clearLayout(clearLayout, m_scrollLayout);
 
-    auto* addRow = new QWidget{m_scrollContents};
-    addRow->setObjectName("outlinerPropertyRow");
-    addRow->setAttribute(Qt::WA_StyledBackground, true);
-    auto* addLayout = new QHBoxLayout{addRow};
-    addLayout->setContentsMargins(6, 4, 6, 4);
-    addLayout->setSpacing(4);
-
-    m_addKey = new QLineEdit{addRow};
-    m_addKey->setObjectName("outlinerPropertyAddKey");
-    m_addKey->setPlaceholderText(tr("Key"));
-    m_addKey->setMinimumWidth(120);
-    m_addKey->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-
-    m_addValue = new QLineEdit{addRow};
-    m_addValue->setObjectName("outlinerPropertyAddValue");
-    m_addValue->setPlaceholderText(tr("Value"));
-    m_addValue->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-
-    auto* addButton = createBitmapButton("Add.svg", tr("Add property"), addRow);
-    addButton->setObjectName("toolButton_withBorder");
-    addButton->setIconSize(QSize{16, 16});
-    addButton->setFixedSize(QSize{24, 24});
-
-    addLayout->addWidget(m_addKey);
-    addLayout->addWidget(m_addValue, 1);
-    addLayout->addWidget(addButton);
-
-    m_scrollLayout->addWidget(addRow, 0);
-
-    connect(addButton, &QAbstractButton::clicked, this, [this]() {
-        const auto key = m_addKey->text().trimmed();
-        if (key.isEmpty())
-        {
-            return;
-        }
-
-        mdl::setEntityProperty(
-          m_document.map(), key.toStdString(), m_addValue->text().toStdString(), false);
-        m_addKey->clear();
-        m_addValue->clear();
-        scheduleUpdate(true);
-    });
-
     if (entityNodes.empty())
     {
+        m_selectionSummary->setText(tr("No entity selected"));
         auto* emptyLabel = new QLabel{tr("No entity selected"), m_scrollContents};
         emptyLabel->setObjectName("infoLabel");
         emptyLabel->setContentsMargins(4, 4, 4, 4);
@@ -604,21 +693,29 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
         return;
     }
 
+    const auto& firstClass = entityNodes.front()->entity().classname();
+    const auto sameClass = std::ranges::all_of(entityNodes, [&](const auto* entityNode) {
+        return entityNode->entity().classname() == firstClass;
+    });
+
+    if (!sameClass)
     {
-        const auto& firstClass = entityNodes.front()->entity().classname();
-        for (size_t i = 1; i < entityNodes.size(); ++i)
-        {
-            if (entityNodes[i]->entity().classname() != firstClass)
-            {
-                auto* mixedLabel = new QLabel{tr("Different entity types selected"), m_scrollContents};
-                mixedLabel->setObjectName("infoLabel");
-                mixedLabel->setContentsMargins(4, 4, 4, 4);
-                m_scrollLayout->addWidget(mixedLabel, 0);
-                m_scrollLayout->addStretch(1);
-                return;
-            }
-        }
+        m_selectionSummary->setText(
+          tr("Mixed selection (%1 entities)").arg(entityNodes.size()));
+        auto* mixedLabel =
+          new QLabel{tr("Different entity types selected"), m_scrollContents};
+        mixedLabel->setObjectName("infoLabel");
+        mixedLabel->setContentsMargins(8, 8, 8, 8);
+        m_scrollLayout->addWidget(mixedLabel, 0);
+        m_scrollLayout->addStretch(1);
+        return;
     }
+
+    const auto className = mapStringToUnicode(m_document.map().encoding(), firstClass);
+    m_selectionSummary->setText(
+      entityNodes.size() == 1
+        ? className
+        : tr("%1 (%2 entities)").arg(className).arg(entityNodes.size()));
 
     const auto* entityDefinition = mdl::selectEntityDefinition(entityNodes);
     const auto keys = buildKeyOrderWithInactiveDefinitions(entityNodes, entityDefinition);
@@ -634,17 +731,17 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
 
     for (const auto& key : keys)
     {
-        auto* row = new QWidget{m_scrollContents};
+        auto* row = new ResponsivePropertyRow{m_scrollContents};
         row->setObjectName("outlinerPropertyRow");
+        row->setProperty("propertyKey", QString::fromStdString(key));
         row->setAttribute(Qt::WA_StyledBackground, true);
-        auto* rowLayout = new QHBoxLayout{row};
-        rowLayout->setContentsMargins(6, 4, 6, 4);
-        rowLayout->setSpacing(4);
 
-        auto* keyLabel = new QLabel{QString::fromStdString(key), row};
+        auto* keyLabel = new ElidedLabel{
+          mapStringToUnicode(m_document.map().encoding(), key), Qt::ElideRight, row};
         keyLabel->setObjectName("outlinerPropertyKey");
-        keyLabel->setMinimumWidth(120);
-        keyLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+        keyLabel->setProperty("propertyKey", QString::fromStdString(key));
+        keyLabel->setMinimumWidth(0);
+        keyLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
         QLineEdit* valueEdit = nullptr;
         QComboBox* valueCombo = nullptr;
@@ -901,37 +998,38 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
             skyboxToggleButton->setArrowType(m_skyboxEditorExpanded ? Qt::DownArrow : Qt::RightArrow);
         }
 
-        rowLayout->addWidget(keyLabel);
-        if (valueCombo)
-        {
-            rowLayout->addWidget(valueCombo, 1);
-        }
-        else
-        {
-            rowLayout->addWidget(valueEdit, 1);
-        }
+        auto* actions = new QWidget{row};
+        actions->setObjectName("outlinerPropertyActions");
+        actions->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        auto* actionsLayout = new QHBoxLayout{actions};
+        actionsLayout->setContentsMargins(0, 0, 0, 0);
+        actionsLayout->setSpacing(2);
+
         if (spawnflagsToggleButton)
         {
-            rowLayout->addWidget(spawnflagsToggleButton);
+            actionsLayout->addWidget(spawnflagsToggleButton);
         }
         if (wadToggleButton)
         {
-            rowLayout->addWidget(wadToggleButton);
+            actionsLayout->addWidget(wadToggleButton);
         }
         if (skyboxToggleButton)
         {
-            rowLayout->addWidget(skyboxToggleButton);
+            actionsLayout->addWidget(skyboxToggleButton);
         }
         if (modelBrowseButton)
         {
-            rowLayout->addWidget(modelBrowseButton);
+            actionsLayout->addWidget(modelBrowseButton);
         }
         if (colorButton)
         {
-            rowLayout->addWidget(colorButton);
+            actionsLayout->addWidget(colorButton);
         }
-        rowLayout->addWidget(activateButton);
-        rowLayout->addWidget(removeButton);
+        actionsLayout->addWidget(activateButton);
+        actionsLayout->addWidget(removeButton);
+
+        row->setWidgets(
+          keyLabel, valueCombo ? static_cast<QWidget*>(valueCombo) : valueEdit, actions);
 
         m_scrollLayout->addWidget(row, 0);
 
