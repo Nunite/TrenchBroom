@@ -38,6 +38,7 @@
 #include "mdl/PickResult.h"
 #include "mdl/Polyhedron.h"
 #include "mdl/TransactionScope.h"
+#include "mdl/UvUtils.h"
 #include "mdl/WorldNode.h"
 #include "prefs/Preferences.h"
 #include "ui/MapDocument.h"
@@ -60,6 +61,7 @@
 #include "vm/vec_io.h" // IWYU pragma: keep
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <ranges>
 #include <vector>
@@ -531,6 +533,69 @@ void copyFaceAttributesWrapped(
   }
 }
 
+void orthogonalizeStampSideUvs(
+  const mdl::BrushFace& sourceFace, mdl::BrushFace& targetFace, const vm::segment3d& seam)
+{
+  const auto skew =
+    mdl::measureUvSkew(targetFace.uAxis(), targetFace.vAxis(), targetFace.normal());
+  if (!skew || *skew <= 0.001f)
+  {
+    return;
+  }
+
+  const auto seamVector = seam.end() - seam.start();
+  const auto seamLength = vm::length(seamVector);
+  if (seamLength <= vm::Cd::almost_zero())
+  {
+    return;
+  }
+
+  const auto sourceStartUv = sourceFace.uvCoords(seam.start());
+  const auto sourceEndUv = sourceFace.uvCoords(seam.end());
+  const auto uvDelta = sourceEndUv - sourceStartUv;
+  const auto sourceScale = sourceFace.uvAttributes().scale;
+  const auto scaledUvDelta = vm::vec2d{
+    double(uvDelta.x()) * double(mdl::safeScale(sourceScale.x())),
+    double(uvDelta.y()) * double(mdl::safeScale(sourceScale.y()))};
+  const auto scaledUvLength = vm::length(scaledUvDelta);
+  if (scaledUvLength <= vm::Cd::almost_zero())
+  {
+    return;
+  }
+
+  const auto scaleFactor = seamLength / scaledUvLength;
+  if (!std::isfinite(scaleFactor))
+  {
+    return;
+  }
+
+  auto uvAttributes = sourceFace.uvAttributes();
+  uvAttributes.scale = vm::vec2f{
+    float(double(mdl::safeScale(sourceScale.x())) * scaleFactor),
+    float(double(mdl::safeScale(sourceScale.y())) * scaleFactor)};
+
+  const auto seamDirection = seamVector / seamLength;
+  const auto normal = targetFace.normal();
+  const auto perpendicular = vm::normalize(vm::cross(normal, seamDirection));
+  const auto uAlongSeam =
+    double(uvDelta.x()) * double(uvAttributes.scale.x()) / seamLength;
+  const auto vAlongSeam =
+    double(uvDelta.y()) * double(uvAttributes.scale.y()) / seamLength;
+
+  const auto currentHandedness =
+    vm::dot(vm::cross(targetFace.uAxis(), targetFace.vAxis()), normal) < 0.0 ? -1.0 : 1.0;
+  const auto uAxis =
+    uAlongSeam * seamDirection - currentHandedness * vAlongSeam * perpendicular;
+  const auto vAxis =
+    vAlongSeam * seamDirection + currentHandedness * uAlongSeam * perpendicular;
+
+  uvAttributes.offset = vm::vec2f::zero();
+  targetFace.setUvAttributes(uvAttributes);
+  targetFace.restoreUvCoordSystemSnapshot(mdl::UvCoordSystemSnapshot{uAxis, vAxis});
+  uvAttributes.offset = sourceStartUv - targetFace.uvCoords(seam.start());
+  targetFace.setUvAttributes(uvAttributes);
+}
+
 void applyStampFaceAttributes(
   const ExtrudeDragHandle& dragHandle,
   mdl::Brush& stampedBrush,
@@ -572,6 +637,7 @@ void applyStampFaceAttributes(
     {
       copyFaceAttributesWrapped(
         sourceSide, *targetSide, mdl::WrapStyle::Rotation, materialManager);
+      orthogonalizeStampSideUvs(sourceSide, *targetSide, seam);
     }
   }
 }

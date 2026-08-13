@@ -39,6 +39,7 @@
 #include "mdl/NodeQueries.h"
 #include "mdl/PickResult.h"
 #include "mdl/TestUtils.h"
+#include "mdl/UvUtils.h"
 #include "mdl/WorldNode.h"
 #include "ui/ExtrudeTool.h"
 #include "ui/MapDocument.h"
@@ -1018,6 +1019,82 @@ TEST_CASE("ExtrudeTool")
         == vm::approx{sourceSide.uvCoords(seam.end()), 0.0001f});
     }
     CHECK(foundAngledSide);
+  }
+
+  SECTION("stamp removes inherited UV skew while preserving the seam")
+  {
+    auto& document = fixture.create({.mapFormat = mdl::MapFormat::Valve});
+    auto& map = document.map();
+
+    auto tool = ExtrudeTool{document};
+    auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+    auto brush =
+      builder.createCuboid(
+        vm::bbox3d{16.0}, "left", "right", "skew-side", "back", "cap", "bottom")
+      | kdl::value();
+
+    const auto sourceCapIndex = brush.findFace("cap");
+    const auto sourceSideIndex = brush.findFace("skew-side");
+    REQUIRE(sourceCapIndex);
+    REQUIRE(sourceSideIndex);
+    auto& sourceSide = brush.face(*sourceSideIndex);
+    sourceSide.restoreUvCoordSystemSnapshot(
+      mdl::UvCoordSystemSnapshot{vm::vec3d{1, 0, 0}, vm::vec3d{0.5, 0, 1}});
+    sourceSide.setUvAttributes(
+      mdl::UvAttributes{vm::vec2f{13.0f, -7.0f}, vm::vec2f{1.0f, 1.0f}, 0.0f});
+
+    const auto sourceSkew =
+      mdl::measureUvSkew(sourceSide.uAxis(), sourceSide.vAxis(), sourceSide.normal());
+    REQUIRE(sourceSkew);
+    CHECK(*sourceSkew > 20.0f);
+
+    auto* brushNode = new mdl::BrushNode{std::move(brush)};
+    addNodes(map, {{map.editorContext().currentLayer(), {brushNode}}});
+    selectNodes(map, {brushNode});
+
+    performPick(map, tool, vm::ray3d{{0, 0, 32}, {0, 0, -1}});
+    auto dragState = ExtrudeDragState{
+      tool.proposedDragHandles(),
+      ExtrudeTool::getDragFaces(tool.proposedDragHandles()),
+      false,
+      vm::vec3d{0, 0, 0}};
+
+    tool.beginStamp();
+    REQUIRE(tool.stamp(vm::vec3d{0, 0, 16}, dragState));
+    tool.commit(dragState);
+
+    const auto brushes = map.selection().brushes;
+    REQUIRE(brushes.size() == 1u);
+    const auto& stampedBrush = brushes.front()->brush();
+    const auto stampedSideIndex = stampedBrush.findFace("skew-side");
+    REQUIRE(stampedSideIndex);
+    const auto& stampedSide = stampedBrush.face(*stampedSideIndex);
+
+    const auto stampedSkew =
+      mdl::measureUvSkew(stampedSide.uAxis(), stampedSide.vAxis(), stampedSide.normal());
+    REQUIRE(stampedSkew);
+    CHECK(vm::is_equal(*stampedSkew, 0.0f, 0.0001f));
+
+    const auto& originalSide = brushNode->brush().face(*sourceSideIndex);
+    const auto& originalCap = brushNode->brush().face(*sourceCapIndex);
+    auto seam = std::optional<vm::segment3d>{};
+    for (const auto* edge : originalCap.edges())
+    {
+      const auto segment = edge->segment();
+      if (originalSide.geometry()->findEdge(
+            segment.start(), segment.end(), vm::Cd::almost_zero()))
+      {
+        seam = segment;
+        break;
+      }
+    }
+    REQUIRE(seam);
+    CHECK(
+      stampedSide.uvCoords(seam->start())
+      == vm::approx{originalSide.uvCoords(seam->start()), 0.0001f});
+    CHECK(
+      stampedSide.uvCoords(seam->end())
+      == vm::approx{originalSide.uvCoords(seam->end()), 0.0001f});
   }
 
   SECTION("stamp is denied when dragged inward")
