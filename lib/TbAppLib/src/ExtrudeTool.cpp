@@ -22,6 +22,7 @@
 #include "base/Logger.h"
 #include "base/PreferenceManager.h"
 #include "gl/Camera.h"
+#include "gl/MaterialManager.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushGeometry.h"
@@ -512,10 +513,73 @@ bool splitBrushesInward(
   return true;
 }
 
+void copyFaceAttributesWrapped(
+  const mdl::BrushFace& sourceFace,
+  mdl::BrushFace& targetFace,
+  const mdl::WrapStyle wrapStyle,
+  gl::MaterialManager& materialManager)
+{
+  targetFace.setMaterialName(sourceFace.materialName());
+  targetFace.setUvAttributes(sourceFace.uvAttributes());
+  targetFace.setSurfaceAttributes(sourceFace.surfaceAttributes());
+  targetFace.setMaterial(materialManager.material(sourceFace.materialName()));
+
+  if (const auto snapshot = sourceFace.takeUvCoordSystemSnapshot())
+  {
+    targetFace.copyUvCoordSystemFromFace(
+      *snapshot, sourceFace.uvAttributes(), sourceFace.boundary(), wrapStyle);
+  }
+}
+
+void applyStampFaceAttributes(
+  const ExtrudeDragHandle& dragHandle,
+  mdl::Brush& stampedBrush,
+  gl::MaterialManager& materialManager)
+{
+  const auto& sourceBrush = dragHandle.brushAtDragStart;
+  const auto& sourceCap = dragHandle.faceAtDragStart();
+
+  // Both caps derive from the dragged face. The end cap keeps the same global UV
+  // projection, while the coincident start cap is normally hidden by the source brush.
+  for (auto& targetFace : stampedBrush.faces())
+  {
+    if (vm::is_parallel(targetFace.normal(), sourceCap.normal()))
+    {
+      copyFaceAttributesWrapped(
+        sourceCap, targetFace, mdl::WrapStyle::Rotation, materialManager);
+    }
+  }
+
+  // Each side face grows from one boundary edge of the dragged face. Use that exact
+  // edge to find the source brush's adjacent face and rotate its UV projection across
+  // the seam onto the stamped side face.
+  for (const auto* sourceEdge : sourceCap.edges())
+  {
+    const auto* sourceSideGeometry = sourceEdge->firstFace() == sourceCap.geometry()
+                                       ? sourceEdge->secondFace()
+                                       : sourceEdge->firstFace();
+    const auto sourceSideIndex = sourceSideGeometry->payload();
+    contract_assert(sourceSideIndex);
+    const auto& sourceSide = sourceBrush.face(*sourceSideIndex);
+    const auto seam = sourceEdge->segment();
+
+    const auto targetSide = std::ranges::find_if(stampedBrush.faces(), [&](auto& face) {
+      return !vm::is_parallel(face.normal(), sourceCap.normal())
+             && face.geometry()->findEdge(
+               seam.start(), seam.end(), vm::Cd::almost_zero());
+    });
+    if (targetSide != std::end(stampedBrush.faces()))
+    {
+      copyFaceAttributesWrapped(
+        sourceSide, *targetSide, mdl::WrapStyle::Rotation, materialManager);
+    }
+  }
+}
+
 /**
- * Stamps a new brush per drag handle, shaped as the convex hull of the dragged face's
- * vertices at their original position and at the current (dragged) position. The original
- * brushes are left unchanged.
+ * Stamps one new brush per drag handle. Its convex hull spans the dragged face's
+ *
+ * original and current vertices. The original brushes are left unchanged.
  *
  * - rolls back the transaction
  * - adds one new brush per drag handle
@@ -555,6 +619,9 @@ bool stampBrushes(mdl::Map& map, const vm::vec3d& delta, ExtrudeDragState& dragS
 
              return brushBuilder.createBrush(points, face.materialName())
                     | kdl::transform([&](auto brush) {
+                        applyStampFaceAttributes(
+                          dragHandle, brush, map.materialManager());
+
                         auto* newBrushNode = new mdl::BrushNode(std::move(brush));
                         newNodes[brushNode->parent()].push_back(newBrushNode);
 

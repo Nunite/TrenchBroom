@@ -851,9 +851,21 @@ TEST_CASE("ExtrudeTool")
     constexpr auto brushBounds = vm::bbox3d{16.0};
 
     auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
-    auto* brushNode1 = new mdl::BrushNode{
+    auto brush =
       builder.createCuboid(brushBounds, "left", "right", "front", "back", "top", "bottom")
-      | kdl::value()};
+      | kdl::value();
+    for (size_t i = 0; i < brush.faceCount(); ++i)
+    {
+      auto& face = brush.face(i);
+      face.setUvAttributes(mdl::UvAttributes{
+        vm::vec2f{float(i) + 0.25f, float(i) + 0.5f},
+        vm::vec2f{0.5f + float(i) * 0.125f, 1.25f + float(i) * 0.125f},
+        15.0f + float(i) * 7.0f});
+      auto surfaceAttributes = face.surfaceAttributes();
+      surfaceAttributes.flags = int(i) + 1;
+      face.setSurfaceAttributes(surfaceAttributes);
+    }
+    auto* brushNode1 = new mdl::BrushNode{std::move(brush)};
 
     addNodes(map, {{map.editorContext().currentLayer(), {brushNode1}}});
     selectNodes(map, {brushNode1});
@@ -891,13 +903,121 @@ TEST_CASE("ExtrudeTool")
       CHECK(newBrushNode != brushNode1);
       CHECK(newBrushNode->logicalBounds() == vm::bbox3d{{-16, -16, 16}, {16, 16, 32}});
 
-      // stamped from the top face, so every face of the new brush carries its material
+      // The caps inherit the dragged face, while each side continues the material of
+      // the source brush face adjacent to the corresponding seam edge.
       CHECK_THAT(
         newBrushNode->brush().faces() | std::views::transform([](const auto& face) {
           return face.materialName();
         }) | kdl::ranges::to<std::vector>(),
-        RangeEquals(std::vector<std::string>(newBrushNode->brush().faceCount(), "top")));
+        UnorderedRangeEquals(
+          std::vector<std::string>{"left", "right", "front", "back", "top", "top"}));
+
+      const auto& sourceCap =
+        brushNode1->brush().face(*brushNode1->brush().findFace("top"));
+      for (const auto* sourceEdge : sourceCap.edges())
+      {
+        const auto* sourceSideGeometry = sourceEdge->firstFace() == sourceCap.geometry()
+                                           ? sourceEdge->secondFace()
+                                           : sourceEdge->firstFace();
+        const auto sourceSideIndex = sourceSideGeometry->payload();
+        REQUIRE(sourceSideIndex);
+        const auto& sourceSide = brushNode1->brush().face(*sourceSideIndex);
+        const auto targetSideIndex =
+          newBrushNode->brush().findFace(sourceSide.materialName());
+        REQUIRE(targetSideIndex);
+        const auto& targetSide = newBrushNode->brush().face(*targetSideIndex);
+        const auto seam = sourceEdge->segment();
+
+        CHECK(targetSide.uvAttributes().scale == sourceSide.uvAttributes().scale);
+        CHECK(targetSide.uvAttributes().rotation == sourceSide.uvAttributes().rotation);
+        CHECK(targetSide.surfaceAttributes() == sourceSide.surfaceAttributes());
+        CHECK(
+          targetSide.uvCoords(seam.start())
+          == vm::approx{sourceSide.uvCoords(seam.start()), 0.0001f});
+        CHECK(
+          targetSide.uvCoords(seam.end())
+          == vm::approx{sourceSide.uvCoords(seam.end()), 0.0001f});
+      }
     }
+  }
+
+  SECTION("stamp wraps UVs across angled side faces")
+  {
+    auto& document = fixture.create();
+    auto& map = document.map();
+
+    auto tool = ExtrudeTool{document};
+    auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+    auto brush = builder.createBrush(
+                   std::vector<vm::vec3d>{
+                     {-16, -16, -16},
+                     {16, -16, -16},
+                     {16, 16, -16},
+                     {-16, 16, -16},
+                     {-8, -16, 16},
+                     {24, -16, 16},
+                     {24, 16, 16},
+                     {-8, 16, 16},
+                   },
+                   "material")
+                 | kdl::value();
+
+    const auto sourceCapIndex = brush.findFace(vm::vec3d{0, 0, 1});
+    REQUIRE(sourceCapIndex);
+    for (size_t i = 0; i < brush.faceCount(); ++i)
+    {
+      auto& face = brush.face(i);
+      face.setMaterialName(i == *sourceCapIndex ? "cap" : "side" + std::to_string(i));
+      face.setUvAttributes(mdl::UvAttributes{
+        vm::vec2f{float(i) + 0.25f, float(i) + 0.5f},
+        vm::vec2f{0.5f + float(i) * 0.125f, 1.25f + float(i) * 0.125f},
+        15.0f + float(i) * 7.0f});
+    }
+
+    auto* brushNode = new mdl::BrushNode{std::move(brush)};
+    addNodes(map, {{map.editorContext().currentLayer(), {brushNode}}});
+    selectNodes(map, {brushNode});
+
+    const auto pickResult = performPick(map, tool, vm::ray3d{{4, 0, 32}, {0, 0, -1}});
+    auto dragState = ExtrudeDragState{
+      tool.proposedDragHandles(),
+      ExtrudeTool::getDragFaces(tool.proposedDragHandles()),
+      false,
+      vm::vec3d{0, 0, 0}};
+
+    tool.beginStamp();
+    REQUIRE(tool.stamp(vm::vec3d{0, 0, 16}, dragState));
+    tool.commit(dragState);
+
+    const auto brushes = map.selection().brushes;
+    REQUIRE(brushes.size() == 1u);
+    const auto& stampedBrush = brushes.front()->brush();
+    const auto& sourceCap = brushNode->brush().face(*sourceCapIndex);
+
+    auto foundAngledSide = false;
+    for (const auto* sourceEdge : sourceCap.edges())
+    {
+      const auto* sourceSideGeometry = sourceEdge->firstFace() == sourceCap.geometry()
+                                         ? sourceEdge->secondFace()
+                                         : sourceEdge->firstFace();
+      const auto sourceSideIndex = sourceSideGeometry->payload();
+      REQUIRE(sourceSideIndex);
+      const auto& sourceSide = brushNode->brush().face(*sourceSideIndex);
+      const auto stampedSideIndex = stampedBrush.findFace(sourceSide.materialName());
+      REQUIRE(stampedSideIndex);
+      const auto& stampedSide = stampedBrush.face(*stampedSideIndex);
+      const auto seam = sourceEdge->segment();
+
+      foundAngledSide =
+        foundAngledSide || !vm::is_parallel(sourceSide.normal(), stampedSide.normal());
+      CHECK(
+        stampedSide.uvCoords(seam.start())
+        == vm::approx{sourceSide.uvCoords(seam.start()), 0.0001f});
+      CHECK(
+        stampedSide.uvCoords(seam.end())
+        == vm::approx{sourceSide.uvCoords(seam.end()), 0.0001f});
+    }
+    CHECK(foundAngledSide);
   }
 
   SECTION("stamp is denied when dragged inward")
