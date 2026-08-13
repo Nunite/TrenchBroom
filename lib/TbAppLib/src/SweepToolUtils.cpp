@@ -238,6 +238,63 @@ std::vector<std::vector<vm::mat4x4d>> computeTransformTable(
          | kdl::ranges::to<std::vector>();
 }
 
+bool pointsArePlanar(const std::vector<vm::vec3d>& points)
+{
+  if (points.size() < 4u)
+  {
+    return true;
+  }
+
+  const auto plane = vm::from_points(std::begin(points), std::end(points));
+  return plane && std::ranges::all_of(points, [&](const auto& point) {
+           return std::abs(plane->point_distance(point)) <= vm::Cd::almost_zero();
+         });
+}
+
+bool canSnapStationToInteger(const SweepSource& source, const vm::mat4x4d& transform)
+{
+  return std::ranges::all_of(source.faces, [&](const auto& face) {
+    const auto points = face.polygon.vertices()
+                        | std::views::transform(
+                          [&](const auto& point) { return vm::round(transform * point); })
+                        | kdl::ranges::to<std::vector>();
+    return pointsArePlanar(points);
+  });
+}
+
+std::vector<std::vector<bool>> computeIntegerSnapTable(
+  const SweepSource& source,
+  const SweepParameters& parameters,
+  const std::vector<std::vector<vm::mat4x4d>>& transforms)
+{
+  auto result = std::vector<std::vector<bool>>(
+    parameters.iterations, std::vector<bool>(parameters.segments + 1u, false));
+  if (parameters.alignment != SweepAlignment::Integer)
+  {
+    return result;
+  }
+
+  for (size_t r = 0; r < parameters.iterations; ++r)
+  {
+    for (size_t s = 0; s <= parameters.segments; ++s)
+    {
+      // Keep the original source cap exact. Reuse the previous iteration's decision at
+      // shared caps so both runs generate identical coordinates.
+      if (r == 0u && s == 0u)
+      {
+        continue;
+      }
+      if (r > 0u && s == 0u)
+      {
+        result[r][s] = result[r - 1u][parameters.segments];
+        continue;
+      }
+      result[r][s] = canSnapStationToInteger(source, transforms[r][s]);
+    }
+  }
+  return result;
+}
+
 bool pointsContain(
   const std::vector<vm::vec3d>& points,
   const vm::vec3d& candidate,
@@ -1654,13 +1711,17 @@ SweepResult generateSweepBrushes(
 
   // precompute the transform table once since it never depends on the face or vertex
   const auto transforms = computeTransformTable(source, transform, parameters);
+  const auto integerSnap = computeIntegerSnapTable(source, parameters, transforms);
 
   // a station vertex depends only on (r, s), so adjacent segments compute their shared
-  // cap vertices identically and the mesh stays watertight even when snapping
+  // cap vertices identically and the mesh stays watertight even when snapping. Rounding
+  // individual vertices can twist a planar cap; in that case retain the exact transformed
+  // station so MAP compilers do not choose incompatible diagonals for adjacent brushes.
   const auto station = [&](const vm::vec3d& v, const size_t r, const size_t s) {
-    const auto p = transforms[r][s] * v;
-    // station 0 of the first iteration is the source face itself and must stay exact
-    return snapToInteger && (s > 0 || r > 0) ? vm::round(p) : p;
+    const auto& stationTransform =
+      r > 0u && s == 0u ? transforms[r - 1u][N] : transforms[r][s];
+    const auto p = stationTransform * v;
+    return snapToInteger && integerSnap[r][s] ? vm::round(p) : p;
   };
 
   auto continuousUvLayout = std::optional<ContinuousUvLayout>{};

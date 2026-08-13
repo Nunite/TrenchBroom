@@ -880,6 +880,41 @@ TEST_CASE("SweepToolUtils functions")
       const auto& brushes = result.brushes.at(&defaultParent);
       REQUIRE(brushes.size() == source.faces.size() * parameters.segments);
 
+      auto retainedAnExactStation = false;
+      for (size_t sourceFaceIndex = 0; sourceFaceIndex < source.faces.size();
+           ++sourceFaceIndex)
+      {
+        const auto vertexCount = source.faces[sourceFaceIndex].polygon.vertexCount();
+        for (size_t segmentIndex = 1; segmentIndex < parameters.segments; ++segmentIndex)
+        {
+          const auto& previous =
+            brushes[sourceFaceIndex * parameters.segments + segmentIndex - 1u]->brush();
+          const auto& current =
+            brushes[sourceFaceIndex * parameters.segments + segmentIndex]->brush();
+          auto sharedPoints = std::vector<vm::vec3d>{};
+          for (const auto& vertexPosition : previous.vertexPositions())
+          {
+            if (current.hasVertex(vertexPosition, 0.001))
+            {
+              sharedPoints.push_back(vertexPosition);
+            }
+          }
+
+          REQUIRE(sharedPoints.size() == vertexCount);
+          const auto sharedPlane =
+            vm::from_points(std::begin(sharedPoints), std::end(sharedPoints));
+          REQUIRE(sharedPlane);
+          CHECK(std::ranges::all_of(sharedPoints, [&](const auto& point) {
+            return std::abs(sharedPlane->point_distance(point)) <= 0.001;
+          }));
+          retainedAnExactStation =
+            retainedAnExactStation
+            || std::ranges::any_of(
+              sharedPoints, [](const auto& point) { return point != vm::round(point); });
+        }
+      }
+      CHECK(retainedAnExactStation);
+
       using Edge = std::pair<vm::vec3d, vm::vec3d>;
       auto boundaryEdges = std::vector<Edge>{};
       for (const auto& face : source.faces)
@@ -948,13 +983,17 @@ TEST_CASE("SweepToolUtils functions")
               parameters,
               double(segmentIndex + 1u) / double(parameters.segments),
               rotation);
-            const auto quad = std::array{
-              segmentIndex == 0u ? edge.first : vm::round(startTransform * edge.first),
-              segmentIndex == 0u ? edge.second : vm::round(startTransform * edge.second),
-              vm::round(endTransform * edge.second),
-              vm::round(endTransform * edge.first)};
             const auto& brush =
               brushes[sourceFaceIndex * parameters.segments + segmentIndex]->brush();
+            const auto actualPoint = [&](const vm::vec3d& expected) {
+              return brush.findClosestVertexPosition(expected);
+            };
+            const auto quad = std::array{
+              actualPoint(segmentIndex == 0u ? edge.first : startTransform * edge.first),
+              actualPoint(
+                segmentIndex == 0u ? edge.second : startTransform * edge.second),
+              actualPoint(endTransform * edge.second),
+              actualPoint(endTransform * edge.first)};
             for (const auto& face : brush.faces())
             {
               const auto faceVertices = face.vertexPositions();
