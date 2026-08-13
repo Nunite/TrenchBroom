@@ -1019,6 +1019,75 @@ TEST_CASE("SweepToolUtils functions")
       CHECK(conditions.back() <= 30.0);
     }
 
+    SECTION("continuous UVs retain source rotations on the Lws_newtool quarter turn")
+    {
+      const auto makeAttributes = [](
+                                    const vm::vec3d& normal,
+                                    const vm::vec3d& uAxis,
+                                    const vm::vec3d& vAxis,
+                                    const float rotation) {
+        return SweepFaceAttributes{
+          "continuous",
+          mdl::UvAttributes{.scale = vm::vec2f{1, 1}, .rotation = rotation},
+          mdl::SurfaceAttributes{},
+          mdl::UvCoordSystemSnapshot{uAxis, vAxis},
+          vm::plane3d{0.0, normal}};
+      };
+      const auto capAttributes =
+        makeAttributes(vm::vec3d{1, 0, 0}, vm::vec3d{0, 1, 0}, vm::vec3d{0, 0, -1}, 270);
+      const auto sideAttributes = std::array{
+        makeAttributes(
+          vm::normalize(vm::vec3d{0, -1, 0}),
+          vm::vec3d{1, 0, 0},
+          vm::vec3d{0, 0, -1},
+          90),
+        makeAttributes(
+          vm::normalize(vm::vec3d{0, -0.242535625, -0.9701425}),
+          vm::vec3d{-1, 0, 0},
+          vm::vec3d{0, -0.9701425, 0.242535625},
+          90),
+        makeAttributes(
+          vm::normalize(vm::vec3d{0, 1, 0}),
+          vm::vec3d{-1, 0, 0},
+          vm::vec3d{0, 0, -1},
+          90),
+        makeAttributes(
+          vm::normalize(vm::vec3d{0, 0.242535625, 0.9701425}),
+          vm::vec3d{1, 0, 0},
+          vm::vec3d{0, 0.9701425, -0.242535625},
+          90)};
+      source.faces = {SweepFace{
+        vm::polygon3d{
+          {-336, 48, -272}, {-336, 48, -152}, {-336, 64, -156}, {-336, 64, -272}},
+        &defaultParent,
+        capAttributes,
+        {sideAttributes[0], sideAttributes[1], sideAttributes[2], sideAttributes[3]}}};
+      source.center = vm::vec3d{-336, 208, -152};
+      source.normal = vm::vec3d{1, 0, 0};
+      transform.translation = vm::vec3d{512, -512, 0};
+      transform.rotation = vm::quatd{vm::vec3d{0, 0, -1}, vm::Cd::half_pi()};
+      parameters.segments = 4;
+      parameters.pathMode = SweepPathMode::Arc;
+      parameters.alignment = SweepAlignment::Integer;
+      parameters.uvMode = SweepUvMode::Continuous;
+
+      const auto result = generateSweepBrushes(map, source, transform, parameters);
+      CHECK(result.issues.empty());
+      const auto& brushes = result.brushes.at(&defaultParent);
+      REQUIRE(brushes.size() == parameters.segments);
+
+      for (const auto& brush : brushes)
+      {
+        for (const auto& face : brush->brush().faces())
+        {
+          const auto rotation = face.uvAttributes().rotation;
+          CHECK(
+            (std::abs(rotation - 90.0f) <= 0.001f
+             || std::abs(rotation - 270.0f) <= 0.001f));
+        }
+      }
+    }
+
     SECTION("continuous UVs solve large twisted strips without a dense matrix")
     {
       const auto attributes = SweepFaceAttributes{
