@@ -791,6 +791,73 @@ assert [loop["uv"] for loop in face.uv_loops] == uvs, face.uv_loops
     REQUIRE(scriptSucceeded);
   }
 
+  SECTION("exposes selected brush faces and updates their UVs atomically")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "original") | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectBrushFaces(map, {{brushNode, 0u}, {brushNode, 1u}});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_selected_face_uv.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+faces = doc.selection.brush_faces
+assert len(faces) == 2, len(faces)
+
+updates = []
+expected = []
+for face_index, face in enumerate(faces):
+    loops = face.uv_loops
+    base = (face_index + 1) * 32.0
+    target = [
+        (base, 16.0),
+        (base + 64.0, 16.0),
+        (base + 64.0, 80.0),
+        (base, 80.0),
+    ]
+    for loop, uv in zip(loops, target):
+        loop["uv"] = uv
+    updates.append({"face": face, "material": f"updated_{face_index}", "loops": loops})
+    expected.append(target)
+
+assert doc.set_face_uvs(updates)
+for face_index, (face, target) in enumerate(zip(doc.selection.brush_faces, expected)):
+    assert [loop["uv"] for loop in face.uv_loops] == target, face.uv_loops
+    assert face.texture_name == f"updated_{face_index}", face.texture_name
+
+before = [[loop["uv"] for loop in face.uv_loops] for face in doc.selection.brush_faces]
+bad_updates = []
+for face in doc.selection.brush_faces:
+    bad_updates.append({"face": face, "loops": face.uv_loops})
+bad_updates[1]["loops"][3]["uv"] = (
+    bad_updates[1]["loops"][3]["uv"][0] + 7.0,
+    bad_updates[1]["loops"][3]["uv"][1],
+)
+assert not doc.set_face_uvs(bad_updates)
+after = [[loop["uv"] for loop in face.uv_loops] for face in doc.selection.brush_faces]
+assert after == before, (before, after)
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_selected_face_uv.py";
+
+    const auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+  }
+
   SECTION("reads selected brush and vertex tool vertices")
   {
     auto& map = window.document().map();
@@ -1207,7 +1274,7 @@ assert face.surface_value == 3.5
     auto* brushNode =
       new mdl::BrushNode{builder.createCube(64.0, "old_sync") | kdl::value()};
     mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
-    mdl::selectNodes(map, {brushNode});
+    mdl::selectBrushFaces(map, {{brushNode, 0u}});
 
     const auto pluginDir = std::filesystem::path{"python/examples/v2/blender_brush_sync"};
     REQUIRE(std::filesystem::exists(pluginDir / "trenchbroom-plugin.json"));
@@ -1249,6 +1316,8 @@ assert face.surface_value == 3.5
     CHECK(requestJson.find("hl.wad") != std::string::npos);
     CHECK(requestJson.find(R"("brushes")") != std::string::npos);
     CHECK(requestJson.find(R"("faces")") != std::string::npos);
+    CHECK(requestJson.find(R"("selectionMode": "faces")") != std::string::npos);
+    CHECK(requestJson.find(R"("face1")") == std::string::npos);
 
     const auto vertices = brushNode->brush().face(0).vertexPositions();
     REQUIRE(vertices.size() == 4u);

@@ -1,10 +1,10 @@
 {
   "id": "trenchbroom.examples.v2.blender_brush_sync",
   "name": "Blender Brush Sync",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "apiVersion": 2,
   "pluginType": "ui",
   "entry": "main.py",
-  "description": "Sends selected brushes to Blender and applies material/UV edits back to TrenchBroom.",
+  "description": "Sends selected faces or brushes to Blender and applies material/UV edits back to TrenchBroom.",
   "author": "TrenchBroom"
 }

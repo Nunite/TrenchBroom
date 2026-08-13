@@ -1,5 +1,5 @@
 param(
-  [string]$BlenderExe = "D:\Program Files\Blender Foundation\Blender 5.1\blender.exe"
+  [string]$BlenderExe = "D:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +27,7 @@ $successPath = Join-Path $workDir "success.txt"
 $payload = @{
   schema = "tb.blenderBrushSync.v1"
   sessionId = "smoke-session"
+  selectionMode = "faces"
   wadPaths = @($wadPath)
   brushes = @(
     @{
@@ -121,18 +122,29 @@ uv_layer = obj.data.uv_layers[module.UV_LAYER_NAME]
 uvs = [tuple(uv_layer.data[loop_index].uv) for loop_index in obj.data.polygons[0].loop_indices]
 assert uvs[1] == (0.5, 0.0), uvs
 assert uvs[2] == (0.5, 0.5), uvs
-workmesh = module.create_uv_workmesh()
+workmesh = bpy.data.objects[module.WORKMESH_NAME]
 assert workmesh.name == module.WORKMESH_NAME, workmesh.name
+assert bpy.context.view_layer.objects.active == workmesh, "Face sync should activate workmesh"
+assert workmesh.select_get(), "Face sync should select workmesh"
 assert len(workmesh.data.polygons) == 2, len(workmesh.data.polygons)
 assert len(workmesh.data.polygons[0].vertices) == 4, len(workmesh.data.polygons[0].vertices)
+assert len(workmesh.data.vertices) == 6, len(workmesh.data.vertices)
+edge_uses = {}
+for polygon in workmesh.data.polygons:
+    polygon_vertices = list(map(int, polygon.vertices))
+    for index, vertex in enumerate(polygon_vertices):
+        edge = tuple(sorted((vertex, polygon_vertices[(index + 1) % len(polygon_vertices)])))
+        edge_uses[edge] = edge_uses.get(edge, 0) + 1
+assert 2 in edge_uses.values(), edge_uses
 assert bpy.data.objects["TB Brush brush0"].hide_viewport, "Source brush should hide after workmesh creation"
 assert bpy.data.objects["TB Brush brush1"].hide_viewport, "Source brush should hide after workmesh creation"
 assert not workmesh.hide_viewport, "Workmesh should remain visible"
 count = module.import_request_file(request_path)
 assert count == 2, count
-assert not bpy.data.objects["TB Brush brush0"].hide_viewport, "Import should show source brush"
-assert not bpy.data.objects["TB Brush brush1"].hide_viewport, "Import should show source brush"
-workmesh = module.create_uv_workmesh()
+assert bpy.data.objects.get(module.WORKMESH_NAME) is not None, "Face sync should recreate workmesh"
+assert bpy.data.objects["TB Brush brush0"].hide_viewport, "Face sync should hide source brush"
+assert bpy.data.objects["TB Brush brush1"].hide_viewport, "Face sync should hide source brush"
+workmesh = bpy.data.objects[module.WORKMESH_NAME]
 bpy.ops.object.select_all(action="DESELECT")
 bpy.context.view_layer.objects.active = workmesh
 workmesh.select_set(True)

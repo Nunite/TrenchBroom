@@ -26,6 +26,8 @@
 #include "vm/vec.h"
 
 #include <array>
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace tb::mdl
@@ -75,6 +77,7 @@ struct FaceUVUpdate
   BrushFaceHandle face;
   std::vector<vm::vec3d> points;
   std::vector<vm::vec2f> uvs;
+  std::optional<std::string> materialName = std::nullopt;
 };
 
 bool setFaceUVs(Map& map, const std::vector<FaceUVUpdate>& updates);

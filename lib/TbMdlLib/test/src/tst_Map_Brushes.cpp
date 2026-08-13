@@ -1001,9 +1001,11 @@ TEST_CASE("Map_Brushes")
         BrushFaceHandle{brushNode, *faceIndex},
         vertices,
         targetUVs,
+        "updated",
       }}));
 
     const auto& changedFace = getFace(*brushNode, *faceIndex);
+    CHECK(changedFace.materialName() == "updated");
     for (size_t i = 0; i < vertices.size(); ++i)
     {
       CHECK(textureCoords(changedFace, vertices[i]) == vm::approx{targetUVs[i]});

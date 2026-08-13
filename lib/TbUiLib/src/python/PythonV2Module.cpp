@@ -927,6 +927,24 @@ py::list faceUVLoops(FaceHandle& face)
   return result;
 }
 
+std::vector<FaceHandle> selectedBrushFaces(SelectionHandle& selection)
+{
+  auto result = std::vector<FaceHandle>{};
+  const auto& faceHandles = selection.getDocument().map().selection().brushFaces;
+  result.reserve(faceHandles.size());
+  for (const auto& faceHandle : faceHandles)
+  {
+    auto* brushNode = faceHandle.node();
+    result.push_back(FaceHandle{
+      &selection.getDocument(),
+      selection.generation,
+      brushNode,
+      PythonHandleRegistry::instance().nodeGeneration(brushNode),
+      faceHandle.faceIndex()});
+  }
+  return result;
+}
+
 std::vector<mdl::Node*> selectableNodesFromObjects(const py::iterable& objects)
 {
   auto result = std::vector<mdl::Node*>{};
@@ -1357,6 +1375,66 @@ bool setDocumentTriangleUVs(DocumentHandle& document, const py::object& triangle
     });
   }
   return mdl::setTriangleUVs(doc.map(), updates);
+}
+
+bool setDocumentFaceUVs(DocumentHandle& document, const py::iterable& updateObjects)
+{
+  auto& doc = document.get();
+  auto updates = std::vector<mdl::FaceUVUpdate>{};
+  for (const auto updateObject : updateObjects)
+  {
+    const auto update = py::reinterpret_borrow<py::dict>(updateObject);
+    auto face = py::cast<FaceHandle>(update["face"]);
+    if (face.document != &doc)
+    {
+      return false;
+    }
+    auto& brushNode =
+      BrushHandle{face.document, face.generation, face.brush, face.nodeGeneration}.get();
+    if (face.faceIndex >= brushNode.brush().faceCount())
+    {
+      throw std::runtime_error{"Face is no longer valid"};
+    }
+
+    const auto vertices = brushNode.brush().face(face.faceIndex).vertexPositions();
+    const auto loops = py::reinterpret_borrow<py::list>(update["loops"]);
+    if (static_cast<size_t>(py::len(loops)) != vertices.size())
+    {
+      return false;
+    }
+
+    auto uvs = std::vector<vm::vec2f>(vertices.size());
+    auto assigned = std::vector<bool>(vertices.size(), false);
+    for (const auto loopObject : loops)
+    {
+      const auto loop = py::reinterpret_borrow<py::dict>(loopObject);
+      const auto vertexIndex = py::cast<size_t>(loop["vertex"]);
+      if (vertexIndex >= vertices.size() || assigned[vertexIndex])
+      {
+        return false;
+      }
+      uvs[vertexIndex] = vec2FromObject(loop["uv"]);
+      assigned[vertexIndex] = true;
+    }
+    if (!std::ranges::all_of(assigned, [](const auto value) { return value; }))
+    {
+      return false;
+    }
+
+    auto materialName = std::optional<std::string>{};
+    if (update.contains("material") && !update["material"].is_none())
+    {
+      materialName = py::cast<std::string>(update["material"]);
+    }
+    updates.push_back(mdl::FaceUVUpdate{
+      mdl::BrushFaceHandle{&brushNode, face.faceIndex},
+      vertices,
+      std::move(uvs),
+      std::move(materialName),
+    });
+  }
+
+  return !updates.empty() && mdl::setFaceUVs(doc.map(), updates);
 }
 
 bool setFaceUVLoops(FaceHandle& face, const py::iterable& loopObjects)
@@ -1847,6 +1925,7 @@ void defineModule(py::module_& module)
       },
       py::arg("name") = "Python v2 Script")
     .def("set_triangle_uvs", setDocumentTriangleUVs, py::arg("triangles"))
+    .def("set_face_uvs", setDocumentFaceUVs, py::arg("updates"))
     .def(
       "select",
       [](DocumentHandle& self, const py::iterable& objects) {
@@ -1905,6 +1984,7 @@ void defineModule(py::module_& module)
         }
         return result;
       })
+    .def_property_readonly("brush_faces", selectedBrushFaces)
     .def(
       "set_property",
       setSelectionProperty,

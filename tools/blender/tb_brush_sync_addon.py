@@ -1,10 +1,10 @@
 bl_info = {
     "name": "TB Brush Sync",
     "author": "TrenchBroom",
-    "version": (1, 0, 0),
+    "version": (1, 1, 0),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > TB Sync",
-    "description": "Synchronize selected TrenchBroom brushes for UV/material editing.",
+    "description": "Synchronize selected TrenchBroom faces or brushes for UV/material editing.",
     "category": "Import-Export",
 }
 
@@ -216,9 +216,29 @@ def import_request(payload):
     if payload.get("schema") != SCHEMA:
         raise ValueError("Unsupported TB brush sync schema")
 
+    active_object = bpy.context.view_layer.objects.active
+    if active_object is not None and active_object.mode != "OBJECT":
+        bpy.ops.object.mode_set(mode="OBJECT")
+
     collection = _sync_collection()
     session_id = payload.get("sessionId", "")
     wad_paths = [str(path) for path in payload.get("wadPaths", []) if Path(str(path)).exists()]
+    requested_brush_ids = {str(brush["id"]) for brush in payload.get("brushes", [])}
+
+    old_workmesh = bpy.data.objects.get(WORKMESH_NAME)
+    if old_workmesh is not None:
+        old_mesh = old_workmesh.data
+        bpy.data.objects.remove(old_workmesh, do_unlink=True)
+        if old_mesh.users == 0:
+            bpy.data.meshes.remove(old_mesh)
+
+    for obj in list(_source_objects(collection)):
+        if str(obj.get("tb_brush_id", "")) in requested_brush_ids:
+            continue
+        old_mesh = obj.data
+        bpy.data.objects.remove(obj, do_unlink=True)
+        if old_mesh.users == 0:
+            bpy.data.meshes.remove(old_mesh)
 
     for brush in payload.get("brushes", []):
         brush_id = str(brush["id"])
@@ -275,6 +295,14 @@ def import_request(payload):
                 uv_layer.data[loop_index].uv = _to_blender_uv(uv, texture_size)
 
     bpy.context.scene["tb_sync_session_id"] = session_id
+    selection_mode = payload.get("selectionMode", "brushes")
+    bpy.context.scene["tb_sync_selection_mode"] = selection_mode
+    if selection_mode == "faces":
+        workmesh = create_uv_workmesh()
+        for obj in bpy.context.selected_objects:
+            obj.select_set(False)
+        workmesh.select_set(True)
+        bpy.context.view_layer.objects.active = workmesh
     return len(payload.get("brushes", []))
 
 
@@ -357,10 +385,18 @@ def create_uv_workmesh():
             bpy.data.meshes.remove(old_mesh)
 
     vertices = []
+    vertex_indices = {}
     polygons = []
     face_refs = []
     material_names = []
     polygon_uvs = []
+
+    def intern_vertex(point):
+        key = _point_key(point)
+        if key not in vertex_indices:
+            vertex_indices[key] = len(vertices)
+            vertices.append(tuple(point))
+        return vertex_indices[key]
 
     for obj in _source_objects(collection):
         mesh = obj.data
@@ -385,7 +421,6 @@ def create_uv_workmesh():
                     used.add(other_index)
                     break
             used.add(index)
-            base = len(vertices)
             if quad is None:
                 work_vertices = payload["loopVertexIds"]
                 work_points = [tuple(mesh.vertices[vertex_id].co) for vertex_id in work_vertices]
@@ -410,8 +445,7 @@ def create_uv_workmesh():
                         "materialIndex": quad["materialIndex"],
                     }
                 )
-            vertices.extend(work_points)
-            polygons.append(list(range(base, base + len(work_vertices))))
+            polygons.append([intern_vertex(point) for point in work_points])
 
     mesh = bpy.data.meshes.new("TB UV Workmesh Mesh")
     mesh.from_pydata(vertices, [], polygons)

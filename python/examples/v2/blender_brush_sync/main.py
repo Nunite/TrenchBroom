@@ -98,11 +98,14 @@ class BlenderBrushSync:
             brushes.extend(entity.brushes)
         return brushes
 
-    def export_brush(self, brush, brush_index):
+    def selected_faces(self):
+        return list(tb.current_document().selection.brush_faces)
+
+    def export_faces(self, faces, brush_index):
         brush_id = f"brush{brush_index}"
         vertices = []
         vertex_ids = {}
-        faces = []
+        exported_faces = []
         face_cache = {}
 
         def intern_vertex(point):
@@ -112,7 +115,7 @@ class BlenderBrushSync:
                 vertices.append(list(key))
             return vertex_ids[key]
 
-        for face_index, face in enumerate(brush.faces()):
+        for face_index, face in enumerate(faces):
             face_id = f"face{face_index}"
             face_vertices = list(face.vertices)
             local_to_brush = [intern_vertex(point) for point in face_vertices]
@@ -126,7 +129,7 @@ class BlenderBrushSync:
                     }
                 )
 
-            faces.append(
+            exported_faces.append(
                 {
                     "id": face_id,
                     "vertices": local_to_brush,
@@ -145,13 +148,17 @@ class BlenderBrushSync:
             }
 
         self.cache[brush_id] = {"faces": face_cache}
-        return {"id": brush_id, "vertices": vertices, "faces": faces}
+        return {"id": brush_id, "vertices": vertices, "faces": exported_faces}
+
+    def export_brush(self, brush, brush_index):
+        return self.export_faces(list(brush.faces()), brush_index)
 
     def send_selection(self):
         try:
-            brushes = self.selected_brushes()
-            if not brushes:
-                self.log("No selected brushes.")
+            selected_faces = self.selected_faces()
+            brushes = [] if selected_faces else self.selected_brushes()
+            if not selected_faces and not brushes:
+                self.log("No selected brushes or faces.")
                 return
 
             self.session_id = uuid.uuid4().hex
@@ -161,17 +168,26 @@ class BlenderBrushSync:
                 "sessionId": self.session_id,
                 "createdAt": time.time(),
                 "wadPaths": _wad_paths(tb.current_document()),
-                "brushes": [
-                    self.export_brush(brush, brush_index)
-                    for brush_index, brush in enumerate(brushes)
-                ],
+                "selectionMode": "faces" if selected_faces else "brushes",
+                "brushes": (
+                    [
+                        self.export_faces([face], face_index)
+                        for face_index, face in enumerate(selected_faces)
+                    ]
+                    if selected_faces
+                    else [
+                        self.export_brush(brush, brush_index)
+                        for brush_index, brush in enumerate(brushes)
+                    ]
+                ),
             }
             _write_json(REQUEST_PATH, payload)
             if RESPONSE_PATH.exists():
                 RESPONSE_PATH.unlink()
             face_count = sum(len(brush["faces"]) for brush in payload["brushes"])
             self.pending_response_mtime = None
-            self.log(f"Sent {len(brushes)} brushes, {face_count} faces.")
+            subject = "selected" if selected_faces else "from brushes"
+            self.log(f"Sent {face_count} faces ({subject}).")
         except Exception as e:
             self.log(f"Error: {e}")
             raise
@@ -206,8 +222,7 @@ class BlenderBrushSync:
                 return
 
             warnings = list(response.get("warnings", []))
-            material_count = 0
-            uv_count = 0
+            pending_updates = []
             skipped = 0
             doc = tb.current_document()
 
@@ -235,11 +250,6 @@ class BlenderBrushSync:
                         warnings.append(f"Brush changed in TrenchBroom: {brush_id}/{face_id}")
                         continue
 
-                    material = face_payload.get("material")
-                    if isinstance(material, str):
-                        face.texture_name = material
-                        material_count += 1
-
                     local_loops = []
                     for loop in loops:
                         brush_vertex = int(loop["vertex"])
@@ -249,16 +259,23 @@ class BlenderBrushSync:
                                 "uv": _as_uv(loop["uv"]),
                             }
                         )
-                    if face.set_uv_loops(local_loops):
-                        uv_count += 1
-                    else:
-                        skipped += 1
-                        warnings.append(f"UVs are not affine/parallel: {brush_id}/{face_id}")
+                    pending_updates.append(
+                        {
+                            "face": face,
+                            "material": face_payload.get("material"),
+                            "loops": local_loops,
+                        }
+                    )
+
+                applied = bool(pending_updates) and doc.set_face_uvs(pending_updates)
+                if pending_updates and not applied:
+                    skipped += len(pending_updates)
+                    warnings.append("UV batch is not affine/parallel; no faces were changed")
 
             RESPONSE_PATH.unlink(missing_ok=True)
             suffix = f", {len(warnings)} warnings" if warnings else ""
             self.log(
-                f"Applied {material_count} materials, {uv_count} UV faces, "
+                f"Applied {len(pending_updates) if applied else 0} UV/material faces, "
                 f"skipped {skipped}{suffix}."
             )
         except Exception as e:

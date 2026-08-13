@@ -295,6 +295,10 @@ bool applyFaceUV(BrushFace& face, const FaceUVUpdate& update)
   });
   face.restoreUvCoordSystemSnapshot(
     UvCoordSystemSnapshot{projection->uAxis, projection->vAxis});
+  if (update.materialName)
+  {
+    face.setMaterialName(*update.materialName);
+  }
   return true;
 }
 
