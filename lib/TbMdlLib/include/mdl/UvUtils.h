@@ -24,6 +24,7 @@
 #include "vm/scalar.h"
 #include "vm/vec.h"
 
+#include <optional>
 #include <tuple>
 
 namespace tb::mdl
@@ -33,6 +34,16 @@ namespace tb::mdl
  * Return the up and right axes for a camera that looks at the given face.
  */
 std::tuple<vm::vec3d, vm::vec3d> computeCameraAxesForFaceNormal(const vm::vec3d& normal);
+
+/**
+ * Returns the angular deviation from orthogonality of the UV axes after projecting
+ * them
+ * onto the face plane. A value of 0 means that the mapping has no affine skew.
+ * Returns
+ * nullopt if either projected axis is degenerate.
+ */
+std::optional<float> measureUvSkew(
+  const vm::vec3d& uAxis, const vm::vec3d& vAxis, const vm::vec3d& faceNormal);
 
 /**
  * Returns the given scaling factor, or 1 if it is 0.

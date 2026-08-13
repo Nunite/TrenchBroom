@@ -23,6 +23,9 @@
 
 #include "vm/mat_ext.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace tb::mdl
 {
 
@@ -32,6 +35,34 @@ std::tuple<vm::vec3d, vm::vec3d> computeCameraAxesForFaceNormal(const vm::vec3d&
                        ? vm::normalize(vm::cross(vm::vec3d{0, 0, 1}, normal))
                        : vm::vec3d{1, 0, 0};
   return {vm::normalize(vm::cross(normal, right)), right};
+}
+
+std::optional<float> measureUvSkew(
+  const vm::vec3d& uAxis, const vm::vec3d& vAxis, const vm::vec3d& faceNormal)
+{
+  if (vm::is_zero(faceNormal, vm::Cd::almost_zero()))
+  {
+    return std::nullopt;
+  }
+
+  const auto normal = vm::normalize(faceNormal);
+  const auto project = [&](const auto& axis) {
+    return axis - vm::dot(axis, normal) * normal;
+  };
+  const auto projectedUAxis = project(uAxis);
+  const auto projectedVAxis = project(vAxis);
+  if (
+    vm::is_zero(projectedUAxis, vm::Cd::almost_zero())
+    || vm::is_zero(projectedVAxis, vm::Cd::almost_zero()))
+  {
+    return std::nullopt;
+  }
+
+  const auto axisDot = std::clamp(
+    std::abs(vm::dot(vm::normalize(projectedUAxis), vm::normalize(projectedVAxis))),
+    0.0,
+    1.0);
+  return float(vm::to_degrees(std::asin(axisDot)));
 }
 
 vm::vec2f computeUvCoords(

@@ -72,6 +72,8 @@ private:
   SpinControl* m_xScaleEditor = nullptr;
   SpinControl* m_yScaleEditor = nullptr;
   SpinControl* m_rotationEditor = nullptr;
+  QLabel* m_uvSkewLabel = nullptr;
+  SpinControl* m_uvSkewEditor = nullptr;
   QLabel* m_surfaceValueLabel = nullptr;
   QWidget* m_surfaceValueEditorLayout = nullptr;
   SpinControl* m_surfaceValueEditor = nullptr;

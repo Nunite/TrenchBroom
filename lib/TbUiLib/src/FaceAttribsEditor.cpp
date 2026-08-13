@@ -38,6 +38,7 @@
 #include "mdl/Map_Brushes.h"
 #include "mdl/UpdateBrushFaceAttributes.h"
 #include "mdl/UvAlignment.h"
+#include "mdl/UvUtils.h"
 #include "mdl/WorldNode.h"
 #include "ui/BitmapButton.h"
 #include "ui/BorderLine.h"
@@ -514,6 +515,18 @@ QWidget* FaceAttribsEditor::createAttribsWidget()
   m_rotationEditor = new SpinControl{};
   m_rotationEditor->setRange(min, max);
   m_rotationEditor->setDigits(0, 6);
+  m_rotationEditor->setToolTip(
+    tr("Stored Valve rotation; affine UV axis skew is shown separately."));
+
+  m_uvSkewLabel = new QLabel{"UV Skew"};
+  setEmphasizedStyle(m_uvSkewLabel);
+  m_uvSkewEditor = new SpinControl{};
+  m_uvSkewEditor->setRange(0.0, 90.0);
+  m_uvSkewEditor->setDigits(0, 3);
+  m_uvSkewEditor->setSuffix(" deg");
+  m_uvSkewEditor->setReadOnly(true);
+  m_uvSkewEditor->setButtonSymbols(QAbstractSpinBox::NoButtons);
+  m_uvSkewEditor->setToolTip(tr("Angular deviation from orthogonal UV axes."));
 
   m_surfaceValueLabel = new QLabel{"Value"};
   setEmphasizedStyle(m_surfaceValueLabel);
@@ -589,6 +602,11 @@ QWidget* FaceAttribsEditor::createAttribsWidget()
 
   faceAttribsLayout->addWidget(rotationLabel, r, c++, LabelFlags);
   faceAttribsLayout->addWidget(m_rotationEditor, r, c++);
+  faceAttribsLayout->addWidget(m_uvSkewLabel, r, c++, LabelFlags);
+  faceAttribsLayout->addWidget(m_uvSkewEditor, r, c++);
+  ++r;
+  c = 0;
+
   faceAttribsLayout->addWidget(m_surfaceValueLabel, r, c++, LabelFlags);
   faceAttribsLayout->addWidget(m_surfaceValueEditorLayout, r, c++);
   ++r;
@@ -759,6 +777,7 @@ void FaceAttribsEditor::updateControls()
   const auto blockRotationEditor = QSignalBlocker{m_rotationEditor};
   const auto blockXScaleEditor = QSignalBlocker{m_xScaleEditor};
   const auto blockYScaleEditor = QSignalBlocker{m_yScaleEditor};
+  const auto blockUvSkewEditor = QSignalBlocker{m_uvSkewEditor};
   const auto blockSurfaceValueEditor = QSignalBlocker{m_surfaceValueEditor};
   const auto blockSurfaceFlagsEditor = QSignalBlocker{m_surfaceFlagsEditor};
   const auto blockContentFlagsEditor = QSignalBlocker{m_contentFlagsEditor};
@@ -780,6 +799,11 @@ void FaceAttribsEditor::updateControls()
 
   setColorAttribEditorVisible(hasColorAttribs());
 
+  const auto showsUvSkew =
+    mdl::isParallelUvCoordSystem(m_document.map().worldNode().mapFormat());
+  m_uvSkewLabel->setVisible(showsUvSkew);
+  m_uvSkewEditor->setVisible(showsUvSkew);
+
   const auto faceHandles = m_document.map().selection().allBrushFaces();
   if (!faceHandles.empty())
   {
@@ -787,6 +811,7 @@ void FaceAttribsEditor::updateControls()
     auto xOffsetMulti = false;
     auto yOffsetMulti = false;
     auto rotationMulti = false;
+    auto uvSkewMulti = false;
     auto xScaleMulti = false;
     auto yScaleMulti = false;
     auto surfaceValueMulti = false;
@@ -799,6 +824,8 @@ void FaceAttribsEditor::updateControls()
     const auto xOffset = firstUvAttributes.offset.x();
     const auto yOffset = firstUvAttributes.offset.y();
     const auto rotation = firstUvAttributes.rotation;
+    const auto uvSkew =
+      mdl::measureUvSkew(firstFace.uAxis(), firstFace.vAxis(), firstFace.normal());
     const auto xScale = firstUvAttributes.scale.x();
     const auto yScale = firstUvAttributes.scale.y();
     auto setSurfaceFlags = firstFace.resolvedSurfaceFlags();
@@ -821,6 +848,10 @@ void FaceAttribsEditor::updateControls()
       xOffsetMulti |= (xOffset != uvAttributes.offset.x());
       yOffsetMulti |= (yOffset != uvAttributes.offset.y());
       rotationMulti |= (rotation != uvAttributes.rotation);
+      const auto faceUvSkew =
+        mdl::measureUvSkew(face.uAxis(), face.vAxis(), face.normal());
+      uvSkewMulti |=
+        !uvSkew || !faceUvSkew || !vm::is_equal(*uvSkew, *faceUvSkew, 0.001f);
       xScaleMulti |= (xScale != uvAttributes.scale.x());
       yScaleMulti |= (yScale != uvAttributes.scale.y());
       surfaceValueMulti |= (surfaceValue != face.resolvedSurfaceValue());
@@ -851,6 +882,7 @@ void FaceAttribsEditor::updateControls()
     m_xOffsetEditor->setEnabled(true);
     m_yOffsetEditor->setEnabled(true);
     m_rotationEditor->setEnabled(true);
+    m_uvSkewEditor->setEnabled(showsUvSkew);
     m_xScaleEditor->setEnabled(true);
     m_yScaleEditor->setEnabled(true);
     m_surfaceValueEditor->setEnabled(true);
@@ -895,6 +927,14 @@ void FaceAttribsEditor::updateControls()
     setValueOrMulti(m_xOffsetEditor, xOffsetMulti, double(xOffset));
     setValueOrMulti(m_yOffsetEditor, yOffsetMulti, double(yOffset));
     setValueOrMulti(m_rotationEditor, rotationMulti, double(rotation));
+    if (uvSkew)
+    {
+      setValueOrMulti(m_uvSkewEditor, uvSkewMulti, double(*uvSkew));
+    }
+    else
+    {
+      disableAndSetPlaceholder(m_uvSkewEditor, "n/a");
+    }
     setValueOrMulti(m_xScaleEditor, xScaleMulti, double(xScale));
     setValueOrMulti(m_yScaleEditor, yScaleMulti, double(yScale));
     setValueOrMulti(m_surfaceValueEditor, surfaceValueMulti, double(surfaceValue));
@@ -940,6 +980,7 @@ void FaceAttribsEditor::updateControls()
     disableAndSetPlaceholder(m_xScaleEditor, "n/a");
     disableAndSetPlaceholder(m_yScaleEditor, "n/a");
     disableAndSetPlaceholder(m_rotationEditor, "n/a");
+    disableAndSetPlaceholder(m_uvSkewEditor, "n/a");
     disableAndSetPlaceholder(m_surfaceValueEditor, "n/a");
 
     m_surfaceFlagsEditor->setEnabled(false);

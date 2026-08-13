@@ -57,4 +57,38 @@ TEST_CASE("computeCameraAxesForFaceNormal")
   }
 }
 
+TEST_CASE("measureUvSkew")
+{
+  SECTION("returns zero for orthogonal axes regardless of their rotation")
+  {
+    CHECK(
+      measureUvSkew(vm::vec3d{1, 1, 0}, vm::vec3d{-1, 1, 0}, vm::vec3d{0, 0, 1})
+      == vm::approx{0.0f});
+  }
+
+  SECTION("measures affine skew")
+  {
+    const auto skew = measureUvSkew(
+      vm::vec3d{0, -0.8439833689478853, 0},
+      vm::vec3d{0, -0.4343567650594142, 0.9999997369174299},
+      vm::vec3d{-1, 0, 0});
+    REQUIRE(skew);
+    CHECK(vm::is_equal(*skew, 23.47f, 0.01f));
+  }
+
+  SECTION("ignores components along the face normal")
+  {
+    CHECK(
+      measureUvSkew(vm::vec3d{4, 1, 0}, vm::vec3d{-7, 0, 1}, vm::vec3d{1, 0, 0})
+      == vm::approx{0.0f});
+  }
+
+  SECTION("rejects degenerate projected axes")
+  {
+    CHECK(
+      measureUvSkew(vm::vec3d{1, 0, 0}, vm::vec3d{0, 1, 0}, vm::vec3d{1, 0, 0})
+      == std::nullopt);
+  }
+}
+
 } // namespace tb::mdl

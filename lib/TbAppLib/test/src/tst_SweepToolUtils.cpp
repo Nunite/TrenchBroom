@@ -1019,7 +1019,8 @@ TEST_CASE("SweepToolUtils functions")
       CHECK(conditions.back() <= 30.0);
     }
 
-    SECTION("continuous UVs retain source rotations on the Lws_newtool quarter turn")
+    SECTION(
+      "continuous UVs retain stored rotations independently of their affine UV axes")
     {
       const auto makeAttributes = [](
                                     const vm::vec3d& normal,
