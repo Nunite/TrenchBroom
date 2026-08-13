@@ -20,8 +20,12 @@
 
 #include "Matchers.h"
 #include "gl/Camera.h"
+#include "gl/Material.h"
+#include "gl/MaterialCollection.h"
+#include "gl/MaterialManager.h"
 #include "gl/OrthographicCamera.h"
 #include "gl/PerspectiveCamera.h"
+#include "gl/TextureResource.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
@@ -1025,6 +1029,12 @@ TEST_CASE("ExtrudeTool")
   {
     auto& document = fixture.create({.mapFormat = mdl::MapFormat::Valve});
     auto& map = document.map();
+
+    auto materials = std::vector<gl::Material>{};
+    materials.emplace_back("skew-side", gl::createTextureResource(gl::Texture{64, 32}));
+    auto materialCollections = std::vector<gl::MaterialCollection>{};
+    materialCollections.emplace_back(std::move(materials));
+    map.materialManager().setMaterialCollections(std::move(materialCollections));
 
     auto tool = ExtrudeTool{document};
     auto builder = mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};

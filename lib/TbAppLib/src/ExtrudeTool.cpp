@@ -550,10 +550,16 @@ void orthogonalizeStampSideUvs(
     return;
   }
 
-  const auto sourceStartUv = sourceFace.uvCoords(seam.start());
-  const auto sourceEndUv = sourceFace.uvCoords(seam.end());
-  const auto uvDelta = sourceEndUv - sourceStartUv;
   const auto sourceScale = sourceFace.uvAttributes().scale;
+  const auto sourceOffset = sourceFace.uvAttributes().offset;
+  const auto sourceStartUv =
+    mdl::computeUvCoords(
+      seam.start(), sourceFace.uAxis(), sourceFace.vAxis(), sourceScale)
+    + sourceOffset;
+  const auto sourceEndUv =
+    mdl::computeUvCoords(seam.end(), sourceFace.uAxis(), sourceFace.vAxis(), sourceScale)
+    + sourceOffset;
+  const auto uvDelta = sourceEndUv - sourceStartUv;
   const auto scaledUvDelta = vm::vec2d{
     double(uvDelta.x()) * double(mdl::safeScale(sourceScale.x())),
     double(uvDelta.y()) * double(mdl::safeScale(sourceScale.y()))};
@@ -592,7 +598,10 @@ void orthogonalizeStampSideUvs(
   uvAttributes.offset = vm::vec2f::zero();
   targetFace.setUvAttributes(uvAttributes);
   targetFace.restoreUvCoordSystemSnapshot(mdl::UvCoordSystemSnapshot{uAxis, vAxis});
-  uvAttributes.offset = sourceStartUv - targetFace.uvCoords(seam.start());
+  uvAttributes.offset =
+    sourceStartUv
+    - mdl::computeUvCoords(
+      seam.start(), targetFace.uAxis(), targetFace.vAxis(), uvAttributes.scale);
   targetFace.setUvAttributes(uvAttributes);
 }
 
