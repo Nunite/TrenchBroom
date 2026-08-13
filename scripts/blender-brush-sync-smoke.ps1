@@ -100,7 +100,9 @@ spec = importlib.util.spec_from_file_location("tb_brush_sync_addon", addon_path)
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module
 spec.loader.exec_module(module)
+module.SYNC_DIR = module.Path(r'''$workDir''')
 module.REQUEST_PATH = module.Path(request_path)
+module.RESPONSE_PATH = module.Path(response_path)
 module._last_request_mtime = None
 module.poll_request()
 assert not bpy.data.collections.get(module.COLLECTION_NAME), "Startup poll imported stale request"

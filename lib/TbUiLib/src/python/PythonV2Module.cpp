@@ -1377,7 +1377,8 @@ bool setDocumentTriangleUVs(DocumentHandle& document, const py::object& triangle
   return mdl::setTriangleUVs(doc.map(), updates);
 }
 
-bool setDocumentFaceUVs(DocumentHandle& document, const py::iterable& updateObjects)
+bool setDocumentFaceUVsImpl(
+  DocumentHandle& document, const py::iterable& updateObjects, const bool splitNonAffine)
 {
   auto& doc = document.get();
   auto updates = std::vector<mdl::FaceUVUpdate>{};
@@ -1434,7 +1435,20 @@ bool setDocumentFaceUVs(DocumentHandle& document, const py::iterable& updateObje
     });
   }
 
-  return !updates.empty() && mdl::setFaceUVs(doc.map(), updates);
+  return !updates.empty()
+         && (splitNonAffine ? mdl::setFaceUVsWithSplit(doc.map(), updates)
+                            : mdl::setFaceUVs(doc.map(), updates));
+}
+
+bool setDocumentFaceUVs(DocumentHandle& document, const py::iterable& updateObjects)
+{
+  return setDocumentFaceUVsImpl(document, updateObjects, false);
+}
+
+bool setDocumentFaceUVsWithSplit(
+  DocumentHandle& document, const py::iterable& updateObjects)
+{
+  return setDocumentFaceUVsImpl(document, updateObjects, true);
 }
 
 bool setFaceUVLoops(FaceHandle& face, const py::iterable& loopObjects)
@@ -1926,6 +1940,7 @@ void defineModule(py::module_& module)
       py::arg("name") = "Python v2 Script")
     .def("set_triangle_uvs", setDocumentTriangleUVs, py::arg("triangles"))
     .def("set_face_uvs", setDocumentFaceUVs, py::arg("updates"))
+    .def("set_face_uvs_with_split", setDocumentFaceUVsWithSplit, py::arg("updates"))
     .def(
       "select",
       [](DocumentHandle& self, const py::iterable& objects) {

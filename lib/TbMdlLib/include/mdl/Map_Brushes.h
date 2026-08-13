@@ -82,6 +82,15 @@ struct FaceUVUpdate
 
 bool setFaceUVs(Map& map, const std::vector<FaceUVUpdate>& updates);
 
+/**
+ * Applies affine face UV updates normally. If a brush has one non-affine quad
+ * update,
+ * splits the brush through the quad diagonal and applies one affine projection
+ * to each
+ * resulting triangular face.
+ */
+bool setFaceUVsWithSplit(Map& map, const std::vector<FaceUVUpdate>& updates);
+
 bool copyUv(
   Map& map,
   const UvCoordSystemSnapshot& coordSystemSnapshot,

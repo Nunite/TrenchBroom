@@ -842,6 +842,8 @@ bad_updates[1]["loops"][3]["uv"] = (
 assert not doc.set_face_uvs(bad_updates)
 after = [[loop["uv"] for loop in face.uv_loops] for face in doc.selection.brush_faces]
 assert after == before, (before, after)
+assert doc.set_face_uvs_with_split(bad_updates)
+assert len(doc.selection.brushes) == 2, len(doc.selection.brushes)
 )");
 
     auto context = PythonExecutionContext{};
@@ -1257,12 +1259,12 @@ assert face.surface_value == 3.5
 
   SECTION("loads v2 blender brush sync example plugin")
   {
-    const auto syncDir =
-      std::filesystem::temp_directory_path() / "trenchbroom-blender-sync";
+    auto syncEnv = fs::TestEnvironment{};
+    const auto syncDir = syncEnv.dir() / "blender-sync";
+    REQUIRE(std::filesystem::create_directories(syncDir));
     const auto requestPath = syncDir / "request.json";
     const auto responsePath = syncDir / "response.json";
-    std::filesystem::remove(requestPath);
-    std::filesystem::remove(responsePath);
+    const auto pendingRequestPath = syncDir / "pending-request.json";
 
     auto& map = window.document().map();
     const auto wadPath =
@@ -1284,6 +1286,12 @@ assert face.surface_value == 3.5
     REQUIRE(manager.errors().empty());
     REQUIRE(manager.plugins().size() == 1u);
     CAPTURE(PythonRuntime::instance().lastError());
+    syncEnv.createFile(
+      "set_sync_env.py",
+      "import os\nos.environ['TB_BLENDER_SYNC_DIR'] = r'" + syncDir.generic_string()
+        + "'\n");
+    REQUIRE(
+      PythonScripting::instance().runScript(window, syncEnv.dir() / "set_sync_env.py"));
     REQUIRE(manager.loadPlugins(window));
 
     const auto panels = pluginPanels(window);
@@ -1291,6 +1299,7 @@ assert face.surface_value == 3.5
     auto* panel = panels.back();
     auto* sendButton = static_cast<QPushButton*>(nullptr);
     auto* applyButton = static_cast<QPushButton*>(nullptr);
+    auto* splitButton = static_cast<QPushButton*>(nullptr);
     for (auto* button : panel->findChildren<QPushButton*>())
     {
       if (button->text() == QStringLiteral("Send Selection"))
@@ -1301,16 +1310,25 @@ assert face.surface_value == 3.5
       {
         applyButton = button;
       }
+      if (button->text() == QStringLiteral("Apply + Split"))
+      {
+        splitButton = button;
+      }
     }
     REQUIRE(sendButton != nullptr);
     REQUIRE(applyButton != nullptr);
+    REQUIRE(splitButton != nullptr);
+    auto* status = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_status"));
+    REQUIRE(status != nullptr);
 
     sendButton->click();
 
     REQUIRE(std::filesystem::exists(requestPath));
+    REQUIRE(std::filesystem::exists(pendingRequestPath));
     auto requestStream = std::ifstream{requestPath};
     const auto requestJson =
       std::string{std::istreambuf_iterator<char>{requestStream}, {}};
+    requestStream.close();
     CHECK(requestJson.find(R"("schema": "tb.blenderBrushSync.v1")") != std::string::npos);
     CHECK(requestJson.find(R"("wadPaths")") != std::string::npos);
     CHECK(requestJson.find("hl.wad") != std::string::npos);
@@ -1321,6 +1339,7 @@ assert face.surface_value == 3.5
 
     const auto vertices = brushNode->brush().face(0).vertexPositions();
     REQUIRE(vertices.size() == 4u);
+    const auto boundary = brushNode->brush().face(0).boundary();
 
     const auto sessionKey = std::string{R"("sessionId": )"};
     const auto sessionStart = requestJson.find(sessionKey);
@@ -1347,7 +1366,7 @@ assert face.surface_value == 3.5
         {"vertex": 0, "uv": [16.0, 8.0]},
         {"vertex": 1, "uv": [80.0, 8.0]},
         {"vertex": 2, "uv": [80.0, 40.0]},
-        {"vertex": 3, "uv": [16.0, 40.0]}
+        {"vertex": 3, "uv": [23.0, 40.0]}
       ]
     }
   ],
@@ -1356,22 +1375,65 @@ assert face.surface_value == 3.5
     response.close();
 
     applyButton->click();
-    const auto& face = brushNode->brush().face(0);
-    CHECK(face.materialName() == "new_sync");
+    CHECK(std::filesystem::exists(responsePath));
+    CHECK(brushNode->brush().face(0).materialName() == "old_sync");
+    CHECK(status->text().contains(QStringLiteral("Apply + Split")));
+
+    manager.unloadPlugins(window);
+    QApplication::processEvents();
+    REQUIRE(manager.loadPlugins(window));
+    const auto reloadedPanels = pluginPanels(window);
+    REQUIRE_FALSE(reloadedPanels.empty());
+    panel = reloadedPanels.back();
+    status = panel->findChild<QLabel*>(QStringLiteral("tb2_panel_label_status"));
+    REQUIRE(status != nullptr);
+    CHECK(status->text().contains(QStringLiteral("Recovered pending Blender response")));
+    splitButton = nullptr;
+    for (auto* button : panel->findChildren<QPushButton*>())
+    {
+      if (button->text() == QStringLiteral("Apply + Split"))
+      {
+        splitButton = button;
+      }
+    }
+    REQUIRE(splitButton != nullptr);
+    splitButton->click();
+    CAPTURE(status->text().toStdString());
+    CHECK_FALSE(std::filesystem::exists(responsePath));
+    CHECK_FALSE(std::filesystem::exists(requestPath));
+    CHECK_FALSE(std::filesystem::exists(pendingRequestPath));
+    REQUIRE(map.selection().brushes.size() == 2u);
+    CHECK(status->text().contains(QStringLiteral("split 1 non-affine faces")));
     const auto expectedUVs = std::array<vm::vec2f, 4>{
       vm::vec2f{16.0f, 8.0f},
       vm::vec2f{80.0f, 8.0f},
       vm::vec2f{80.0f, 40.0f},
-      vm::vec2f{16.0f, 40.0f},
+      vm::vec2f{23.0f, 40.0f},
     };
-    for (size_t i = 0; i < vertices.size(); ++i)
+    for (const auto* piece : map.selection().brushes)
     {
-      const auto uv = textureCoords(face, vertices[i]);
-      CHECK(uv.x() == vm::approx{expectedUVs[i].x()});
-      CHECK(uv.y() == vm::approx{expectedUVs[i].y()});
+      const auto faceIndex = piece->brush().findFace(boundary);
+      REQUIRE(faceIndex);
+      const auto& face = piece->brush().face(*faceIndex);
+      CHECK(face.vertexCount() == 3u);
+      CHECK(face.materialName() == "new_sync");
+      for (const auto& vertex : face.vertexPositions())
+      {
+        const auto originalVertex = std::ranges::find(vertices, vertex);
+        REQUIRE(originalVertex != std::end(vertices));
+        const auto originalIndex =
+          size_t(std::distance(std::begin(vertices), originalVertex));
+        const auto uv = textureCoords(face, vertex);
+        CHECK(uv.x() == vm::approx{expectedUVs[originalIndex].x()});
+        CHECK(uv.y() == vm::approx{expectedUVs[originalIndex].y()});
+      }
     }
     manager.unloadPlugins(window);
     QApplication::processEvents();
+    syncEnv.createFile(
+      "clear_sync_env.py", "import os\nos.environ.pop('TB_BLENDER_SYNC_DIR', None)\n");
+    REQUIRE(
+      PythonScripting::instance().runScript(window, syncEnv.dir() / "clear_sync_env.py"));
     auto ignoredError = std::error_code{};
     std::filesystem::remove(requestPath, ignoredError);
     ignoredError.clear();

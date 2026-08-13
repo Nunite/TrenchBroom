@@ -1,7 +1,7 @@
 {
   "id": "trenchbroom.examples.v2.blender_brush_sync",
   "name": "Blender Brush Sync",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "apiVersion": 2,
   "pluginType": "ui",
   "entry": "main.py",

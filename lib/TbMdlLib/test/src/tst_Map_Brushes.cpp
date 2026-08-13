@@ -1066,6 +1066,90 @@ TEST_CASE("Map_Brushes")
         getFace(*standardBrushNode, *standardFaceIndex),
         MatchesBrushFaceAttributes(originalFace));
     }
+
+    SECTION("Splits a brush to preserve non affine quad UVs")
+    {
+      const auto points = std::vector<vm::vec3d>{
+        {-64, 0, 0},
+        {64, 0, 0},
+        {-32, 0, 64},
+        {32, 0, 64},
+        {-64, 64, 0},
+        {64, 64, 0},
+        {-32, 64, 64},
+        {32, 64, 64},
+      };
+      const auto builder = BrushBuilder{
+        map.worldNode().mapFormat(),
+        map.worldBounds(),
+        map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
+        map.gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes};
+      auto* trapezoid =
+        new BrushNode{builder.createBrush(points, "original") | kdl::value()};
+      addNodes(map, {{&parentForNodes(map), {trapezoid}}});
+
+      const auto trapezoidFaceIndex = trapezoid->brush().findFace(vm::vec3d{0, -1, 0});
+      REQUIRE(trapezoidFaceIndex);
+      const auto trapezoidBoundary =
+        trapezoid->brush().face(*trapezoidFaceIndex).boundary();
+      const auto trapezoidVertices =
+        trapezoid->brush().face(*trapezoidFaceIndex).vertexPositions();
+      REQUIRE(trapezoidVertices.size() == 4u);
+      const auto trapezoidUVs = std::vector<vm::vec2f>{
+        {0, 0},
+        {128, 0},
+        {128, 64},
+        {0, 64},
+      };
+
+      CHECK(!setFaceUVs(
+        map,
+        {{
+          BrushFaceHandle{trapezoid, *trapezoidFaceIndex},
+          trapezoidVertices,
+          trapezoidUVs,
+          "updated",
+        }}));
+      CHECK(setFaceUVsWithSplit(
+        map,
+        {{
+          BrushFaceHandle{trapezoid, *trapezoidFaceIndex},
+          trapezoidVertices,
+          trapezoidUVs,
+          "updated",
+        }}));
+
+      REQUIRE(map.selection().brushes.size() == 2u);
+      for (const auto* piece : map.selection().brushes)
+      {
+        const auto pieceFaceIndex = piece->brush().findFace(trapezoidBoundary);
+        REQUIRE(pieceFaceIndex);
+        const auto& face = piece->brush().face(*pieceFaceIndex);
+        CHECK(face.vertexCount() == 3u);
+        CHECK(face.materialName() == "updated");
+        for (const auto& vertex : face.vertexPositions())
+        {
+          const auto originalVertex = std::ranges::find(trapezoidVertices, vertex);
+          REQUIRE(originalVertex != std::end(trapezoidVertices));
+          const auto originalIndex =
+            size_t(std::distance(std::begin(trapezoidVertices), originalVertex));
+          CHECK(textureCoords(face, vertex) == vm::approx{trapezoidUVs[originalIndex]});
+        }
+        const auto internalFace =
+          std::ranges::find_if(piece->brush().faces(), [&](const auto& candidate) {
+            return std::ranges::none_of(
+              trapezoid->brush().faces(), [&](const auto& sourceFace) {
+                return vm::is_equal(
+                  candidate.boundary(), sourceFace.boundary(), vm::Cd::almost_zero());
+              });
+          });
+        REQUIRE(internalFace != std::end(piece->brush().faces()));
+        CHECK(internalFace->materialName() == "updated");
+      }
+
+      map.undoCommand();
+      CHECK(trapezoid->parent() != nullptr);
+    }
   }
 
   SECTION("justifyUv")

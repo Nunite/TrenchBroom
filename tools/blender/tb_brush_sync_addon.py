@@ -1,7 +1,7 @@
 bl_info = {
     "name": "TB Brush Sync",
     "author": "TrenchBroom",
-    "version": (1, 1, 0),
+    "version": (1, 2, 0),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > TB Sync",
     "description": "Synchronize selected TrenchBroom faces or brushes for UV/material editing.",
@@ -21,7 +21,10 @@ SCHEMA = "tb.blenderBrushSync.v1"
 COLLECTION_NAME = "TB Sync"
 UV_LAYER_NAME = "TB_UV"
 WORKMESH_NAME = "TB UV Workmesh"
-SYNC_DIR = Path(os.environ.get("TEMP") or tempfile.gettempdir()) / "trenchbroom-blender-sync"
+SYNC_DIR = Path(
+    os.environ.get("TB_BLENDER_SYNC_DIR")
+    or Path(os.environ.get("TEMP") or tempfile.gettempdir()) / "trenchbroom-blender-sync"
+)
 REQUEST_PATH = SYNC_DIR / "request.json"
 RESPONSE_PATH = SYNC_DIR / "response.json"
 
