@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include "base/Notifier.h"
 #include "base/NotifierConnection.h"
 #include "mdl/Hit.h"
 #include "mdl/HitType.h"
@@ -80,12 +81,15 @@ private:
   SweepTransform m_transform;
   SweepParameters m_parameters;
 
-  std::map<mdl::Node*, std::vector<std::unique_ptr<mdl::BrushNode>>> m_previewBrushes;
+  SweepBrushMap m_previewBrushes;
+  std::vector<SweepIssue> m_sweepIssues;
   std::unique_ptr<render::BrushRenderer> m_brushRenderer;
 
   NotifierConnection m_notifierConnection;
 
 public:
+  Notifier<> sweepResultDidChangeNotifier;
+
   explicit SweepTool(MapDocument& document);
   ~SweepTool() override;
 
@@ -114,6 +118,9 @@ public:
 
   void updateBrushes();
   void commitSweep();
+
+  const std::vector<SweepIssue>& sweepIssues() const;
+  bool canCommitSweep() const;
 
   void renderDestinationGhost(
     render::RenderContext& renderContext, render::RenderBatch& renderBatch) const;

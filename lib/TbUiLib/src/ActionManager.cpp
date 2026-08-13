@@ -39,6 +39,7 @@
 #include "ui/MapViewToolBox.h" // IWYU pragma: keep
 #include "ui/MapWindow.h"
 #include "ui/StandardShortcut.h"
+#include "ui/SweepTool.h"
 
 #include "kd/contracts.h"
 
@@ -250,7 +251,8 @@ void ActionManager::createViewActions()
     KeySequence{"Return"},
     [](auto& context) { context.mapView().performSweep(); },
     [](const auto& context) {
-      return context.hasDocument() && context.mapWindow().toolBox().sweepToolActive();
+      return context.hasDocument() && context.mapWindow().toolBox().sweepToolActive()
+             && context.mapWindow().toolBox().sweepTool().canCommitSweep();
     },
   });
   addAction(Action{

@@ -26,6 +26,7 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QStyle>
 
 #include "ui/BorderLine.h"
 #include "ui/SweepTool.h"
@@ -40,11 +41,16 @@ SweepToolPage::SweepToolPage(SweepTool& tool, QWidget* parent)
 {
   createGui();
 
+  m_notifierConnection +=
+    m_tool.sweepResultDidChangeNotifier.connect([this]() { updateStatus(); });
+
   const auto& parameters = m_tool.parameters();
   m_segments->setValue(int(parameters.segments));
   m_iterations->setValue(int(parameters.iterations));
   m_pathMode->setCurrentIndex(m_pathMode->findData(int(parameters.pathMode)));
+  m_uvMode->setCurrentIndex(m_uvMode->findData(int(parameters.uvMode)));
   m_snapToInteger->setChecked(parameters.alignment == SweepAlignment::Integer);
+  updateStatus();
 }
 
 void SweepToolPage::createGui()
@@ -70,11 +76,26 @@ void SweepToolPage::createGui()
   m_iterations->setToolTip(
     tr("Repeats the sweep, continuing from the previous destination cap"));
 
+  auto* uvText = new QLabel{tr("UV")};
+  m_uvMode = new QComboBox{};
+  m_uvMode->addItem(tr("Preserve"), int(SweepUvMode::Preserve));
+  m_uvMode->addItem(tr("Continuous"), int(SweepUvMode::Continuous));
+  m_uvMode->setToolTip(
+    tr("Continuous globally unfolds connected boundary faces across the sweep while "
+       "preserving the source texture scale; requires a Valve-style map format"));
+
   m_snapToInteger = new QCheckBox{tr("Snap to integer grid")};
   m_snapToInteger->setToolTip(tr("Round generated vertices to integer coordinates"));
 
   m_resetButton = new QPushButton{tr("Reset")};
   m_resetButton->setToolTip(tr("Move the destination cap back onto the selected faces"));
+
+  m_statusIcon = new QLabel{this};
+  const auto iconSize = style()->pixelMetric(QStyle::PM_SmallIconSize);
+  m_statusIcon->setPixmap(
+    style()->standardIcon(QStyle::SP_MessageBoxWarning).pixmap(iconSize, iconSize));
+  m_statusIcon->setFixedSize(iconSize, iconSize);
+  m_statusLabel = new QLabel{this};
 
   connect(
     m_segments,
@@ -91,6 +112,11 @@ void SweepToolPage::createGui()
     QOverload<int>::of(&QSpinBox::valueChanged),
     this,
     &SweepToolPage::iterationsChanged);
+  connect(
+    m_uvMode,
+    QOverload<int>::of(&QComboBox::currentIndexChanged),
+    this,
+    &SweepToolPage::uvModeChanged);
   connect(
     m_snapToInteger, &QCheckBox::toggled, this, &SweepToolPage::snapToIntegerChanged);
   connect(m_resetButton, &QAbstractButton::clicked, this, &SweepToolPage::resetClicked);
@@ -111,14 +137,42 @@ void SweepToolPage::createGui()
   layout->addSpacing(LayoutConstants::NarrowHMargin);
   layout->addWidget(m_iterations, 0, Qt::AlignVCenter);
   layout->addSpacing(LayoutConstants::WideHMargin);
+  layout->addWidget(uvText, 0, Qt::AlignVCenter);
+  layout->addSpacing(LayoutConstants::NarrowHMargin);
+  layout->addWidget(m_uvMode, 0, Qt::AlignVCenter);
+  layout->addSpacing(LayoutConstants::WideHMargin);
   layout->addWidget(new BorderLine{BorderLine::Direction::Vertical}, 0);
   layout->addSpacing(LayoutConstants::WideHMargin);
   layout->addWidget(m_snapToInteger, 0, Qt::AlignVCenter);
   layout->addSpacing(LayoutConstants::WideHMargin);
   layout->addWidget(m_resetButton, 0, Qt::AlignVCenter);
+  layout->addSpacing(LayoutConstants::WideHMargin);
+  layout->addWidget(m_statusIcon, 0, Qt::AlignVCenter);
+  layout->addSpacing(LayoutConstants::NarrowHMargin);
+  layout->addWidget(m_statusLabel, 0, Qt::AlignVCenter);
   layout->addStretch(1);
 
   setLayout(layout);
+}
+
+void SweepToolPage::updateStatus()
+{
+  const auto& issues = m_tool.sweepIssues();
+  const auto hasIssues = !issues.empty();
+  m_statusIcon->setVisible(hasIssues);
+  m_statusLabel->setVisible(hasIssues);
+
+  if (!hasIssues)
+  {
+    m_statusLabel->clear();
+    m_statusLabel->setToolTip({});
+    return;
+  }
+
+  m_statusLabel->setText(
+    tr("%n sweep issue(s) - hover for details", "", int(issues.size())));
+  m_statusLabel->setToolTip(QString::fromStdString(issues.front().message));
+  m_statusIcon->setToolTip(m_statusLabel->toolTip());
 }
 
 void SweepToolPage::segmentsChanged(const int value)
@@ -147,6 +201,16 @@ void SweepToolPage::iterationsChanged(const int value)
   {
     auto parameters = m_tool.parameters();
     parameters.iterations = size_t(value);
+    m_tool.setParameters(parameters);
+  }
+}
+
+void SweepToolPage::uvModeChanged(const int index)
+{
+  if (index >= 0)
+  {
+    auto parameters = m_tool.parameters();
+    parameters.uvMode = SweepUvMode(m_uvMode->itemData(index).toInt());
     m_tool.setParameters(parameters);
   }
 }

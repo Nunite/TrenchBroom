@@ -20,15 +20,24 @@
 
 #pragma once
 
+#include "mdl/SurfaceAttributes.h"
+#include "mdl/UvAttributes.h"
+#include "mdl/UvCoordSystem.h"
+
 #include "kd/reflection_decl.h"
 
+#include "vm/plane.h"
 #include "vm/polygon.h"
 #include "vm/quat.h"
 #include "vm/vec.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <map>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace tb
@@ -43,7 +52,7 @@ class Node;
 namespace ui
 {
 
-enum class SweepAlignment
+enum class SweepAlignment : std::uint8_t
 {
   Integer,
   Free,
@@ -60,12 +69,39 @@ enum class SweepPathMode
 
 std::ostream& operator<<(std::ostream& lhs, SweepPathMode rhs);
 
+enum class SweepUvMode : std::uint8_t
+{
+  Preserve,
+  Continuous,
+};
+
+std::ostream& operator<<(std::ostream& lhs, SweepUvMode rhs);
+
+struct SweepFaceAttributes
+{
+  std::string materialName;
+  mdl::UvAttributes uvAttributes;
+  mdl::SurfaceAttributes surfaceAttributes;
+  std::optional<mdl::UvCoordSystemSnapshot> uvCoordSystemSnapshot;
+  vm::plane3d sourceBoundary;
+
+  kdl_reflect_decl(
+    SweepFaceAttributes,
+    materialName,
+    uvAttributes,
+    surfaceAttributes,
+    uvCoordSystemSnapshot,
+    sourceBoundary);
+};
+
 struct SweepFace
 {
   vm::polygon3d polygon;
   mdl::Node* parent = nullptr;
+  std::optional<SweepFaceAttributes> capAttributes;
+  std::vector<std::optional<SweepFaceAttributes>> sideAttributes;
 
-  kdl_reflect_decl(SweepFace, polygon, parent);
+  kdl_reflect_decl(SweepFace, polygon, parent, capAttributes, sideAttributes);
 };
 
 struct SweepSource
@@ -97,8 +133,33 @@ struct SweepParameters
   size_t iterations = 1;
   SweepPathMode pathMode = SweepPathMode::Arc;
   SweepAlignment alignment = SweepAlignment::Integer;
+  SweepUvMode uvMode = SweepUvMode::Preserve;
 
-  kdl_reflect_decl(SweepParameters, segments, iterations, pathMode, alignment);
+  kdl_reflect_decl(SweepParameters, segments, iterations, pathMode, alignment, uvMode);
+};
+
+// Keep the allocation footprint of the pre-continuous-UV layout. SweepTool is allocated
+// across library boundaries, and a stale constructor object must never under-allocate it.
+static_assert(
+  sizeof(SweepParameters)
+  == ((2u * sizeof(size_t) + 2u * sizeof(int) + alignof(size_t) - 1u) / alignof(size_t) * alignof(size_t)));
+
+using SweepBrushMap = std::map<mdl::Node*, std::vector<std::unique_ptr<mdl::BrushNode>>>;
+
+struct SweepIssue
+{
+  size_t sourceFaceIndex = 0;
+  size_t iteration = 0;
+  size_t segment = 0;
+  std::string message;
+
+  kdl_reflect_decl(SweepIssue, sourceFaceIndex, iteration, segment, message);
+};
+
+struct SweepResult
+{
+  SweepBrushMap brushes;
+  std::vector<SweepIssue> issues;
 };
 
 /**
@@ -134,10 +195,15 @@ vm::mat4x4d stationTransform(
  * parent if that node no longer exists). Station vertices are rounded to integer
  * coordinates when `parameters.alignment` is `SweepAlignment::Integer`, except at the
  * very first station of the first iteration, which is kept exact since it corresponds to
- * the original source face. Segments that degenerate into invalid brushes are skipped and
- * logged rather than causing the whole sweep to fail.
+ * the original source face. Invalid or collapsed segments are reported in the returned
+ *
+ * result. Valid brushes are still returned for preview, but callers must not commit a
+ *
+ * result that contains issues. Generated faces inherit material, UV and surface
+ *
+ * attributes from the selected face and its adjacent source faces.
  */
-std::map<mdl::Node*, std::vector<std::unique_ptr<mdl::BrushNode>>> generateSweepBrushes(
+SweepResult generateSweepBrushes(
   mdl::Map& map,
   const SweepSource& source,
   const SweepTransform& transform,

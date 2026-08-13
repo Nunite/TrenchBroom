@@ -18,6 +18,7 @@
  */
 
 #include "mdl/Brush.h"
+#include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
 #include "mdl/CatchConfig.h"
 #include "mdl/Entity.h"
@@ -94,6 +95,68 @@ TEST_CASE("SweepTool")
       CHECK(tool.parameters() == parameters);
       CHECK(tool.destinationCenter() == vm::vec3d{16, 0, 0});
       CHECK(tool.hasScaleHandle());
+    }
+
+    SECTION("generated faces inherit source face attributes")
+    {
+      const auto capAttributes =
+        mdl::UvAttributes{vm::vec2f{8, 12}, vm::vec2f{0.5f, 2.0f}, 30.0f};
+      const auto capSurfaceAttributes = mdl::SurfaceAttributes{1, 2, 3.0f, std::nullopt};
+      const auto sideAttributes =
+        mdl::UvAttributes{vm::vec2f{4, 6}, vm::vec2f{2.0f, 0.25f}, 15.0f};
+      const auto sideSurfaceAttributes =
+        mdl::SurfaceAttributes{4, 8, 12.0f, std::nullopt};
+
+      auto sourceBrush = brushNode->brush();
+      const auto capFaceIndex = *sourceBrush.findFace(vm::vec3d{1, 0, 0});
+      auto& capFace = sourceBrush.face(capFaceIndex);
+      capFace.setMaterialName("sweep_cap");
+      capFace.setUvAttributes(capAttributes);
+      capFace.setSurfaceAttributes(capSurfaceAttributes);
+
+      const auto sideFaceIndex = *sourceBrush.findFace(vm::vec3d{0, 1, 0});
+      auto& sideFace = sourceBrush.face(sideFaceIndex);
+      sideFace.setMaterialName("sweep_side");
+      sideFace.setUvAttributes(sideAttributes);
+      sideFace.setSurfaceAttributes(sideSurfaceAttributes);
+      const auto sourceSideUvSnapshot = sideFace.takeUvCoordSystemSnapshot();
+      brushNode->setBrush(std::move(sourceBrush));
+
+      // Reactivate so the tool captures the updated source attributes as independent
+      // data.
+      REQUIRE(tool.deactivate());
+      selectBrushFaces(map, {{brushNode, capFaceIndex}});
+      REQUIRE(tool.activate());
+      tool.setParameters(
+        SweepParameters{1, 1, SweepPathMode::Straight, SweepAlignment::Free});
+
+      auto* parent = brushNode->parent();
+      const auto childCountBefore = parent->childCount();
+      tool.setDestinationCenter(tool.destinationCenter() + vm::vec3d{64, 0, 0});
+      tool.commitSweep();
+
+      REQUIRE(parent->childCount() == childCountBefore + 1);
+      const auto* generatedNode =
+        static_cast<const mdl::BrushNode*>(parent->children()[childCountBefore]);
+      const auto& generatedBrush = generatedNode->brush();
+
+      for (const auto normal : {vm::vec3d{-1, 0, 0}, vm::vec3d{1, 0, 0}})
+      {
+        const auto generatedCapIndex = generatedBrush.findFace(normal);
+        REQUIRE(generatedCapIndex);
+        const auto& generatedCap = generatedBrush.face(*generatedCapIndex);
+        CHECK(generatedCap.materialName() == "sweep_cap");
+        CHECK(generatedCap.uvAttributes() == capAttributes);
+        CHECK(generatedCap.surfaceAttributes() == capSurfaceAttributes);
+      }
+
+      const auto generatedSideIndex = generatedBrush.findFace(vm::vec3d{0, 1, 0});
+      REQUIRE(generatedSideIndex);
+      const auto& generatedSide = generatedBrush.face(*generatedSideIndex);
+      CHECK(generatedSide.materialName() == "sweep_side");
+      CHECK(generatedSide.uvAttributes() == sideAttributes);
+      CHECK(generatedSide.surfaceAttributes() == sideSurfaceAttributes);
+      CHECK(generatedSide.takeUvCoordSystemSnapshot() == sourceSideUvSnapshot);
     }
 
     SECTION("setTransform round-trips")
@@ -272,6 +335,19 @@ TEST_CASE("SweepTool")
         tool.setParameters(zeroSegmentParameters);
         tool.setDestinationCenter(vm::vec3d{80, 0, 0});
 
+        tool.commitSweep();
+
+        CHECK(parent->childCount() == childCountBefore);
+      }
+
+      SECTION("invalid segments prevent committing a partial sweep")
+      {
+        tool.setParameters(
+          SweepParameters{2, 1, SweepPathMode::Straight, SweepAlignment::Integer});
+        tool.setDestinationCenter(tool.destinationCenter() + vm::vec3d{1, 0, 0});
+
+        REQUIRE(!tool.sweepIssues().empty());
+        CHECK(!tool.canCommitSweep());
         tool.commitSweep();
 
         CHECK(parent->childCount() == childCountBefore);

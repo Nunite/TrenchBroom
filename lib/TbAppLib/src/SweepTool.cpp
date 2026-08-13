@@ -22,6 +22,7 @@
 
 #include "base/PreferenceManager.h"
 #include "gl/Camera.h"
+#include "mdl/Brush.h"
 #include "mdl/BrushFace.h" // IWYU pragma: keep
 #include "mdl/BrushNode.h" // IWYU pragma: keep
 #include "mdl/Grid.h"
@@ -69,12 +70,72 @@ vm::vec3d clampScale(const vm::vec3d& factors)
   return vm::max(factors, vm::vec3d::fill(SweepTool::MinScaleFactor));
 }
 
+SweepFaceAttributes captureFaceAttributes(const mdl::BrushFace& face)
+{
+  return SweepFaceAttributes{
+    face.materialName(),
+    face.uvAttributes(),
+    face.surfaceAttributes(),
+    face.takeUvCoordSystemSnapshot(),
+    face.boundary(),
+  };
+}
+
+bool containsVertex(const mdl::BrushFace& face, const vm::vec3d& vertex)
+{
+  return std::ranges::any_of(face.vertexPositions(), [&](const auto& candidate) {
+    return vm::is_equal(candidate, vertex, vm::Cd::almost_zero());
+  });
+}
+
+std::optional<SweepFaceAttributes> adjacentFaceAttributes(
+  const mdl::Brush& brush,
+  const size_t selectedFaceIndex,
+  const vm::vec3d& edgeStart,
+  const vm::vec3d& edgeEnd)
+{
+  for (size_t i = 0; i < brush.faceCount(); ++i)
+  {
+    if (i == selectedFaceIndex)
+    {
+      continue;
+    }
+
+    const auto& face = brush.face(i);
+    if (containsVertex(face, edgeStart) && containsVertex(face, edgeEnd))
+    {
+      return captureFaceAttributes(face);
+    }
+  }
+
+  return std::nullopt;
+}
+
 auto initializeFaces(const auto& faces)
 {
   return faces | std::views::transform([](const auto& faceHandle) {
            const auto& face = faceHandle.face();
            auto polygon = face.polygon();
-           return SweepFace{std::move(polygon), faceHandle.node()->parent()};
+           const auto& vertices = polygon.vertices();
+           const auto& brush = faceHandle.node()->brush();
+
+           auto sideAttributes = std::vector<std::optional<SweepFaceAttributes>>{};
+           sideAttributes.reserve(vertices.size());
+           for (size_t i = 0; i < vertices.size(); ++i)
+           {
+             sideAttributes.push_back(adjacentFaceAttributes(
+               brush,
+               faceHandle.faceIndex(),
+               vertices[i],
+               vertices[(i + 1) % vertices.size()]));
+           }
+
+           return SweepFace{
+             std::move(polygon),
+             faceHandle.node()->parent(),
+             captureFaceAttributes(face),
+             std::move(sideAttributes),
+           };
          })
          | kdl::ranges::to<std::vector>();
 }
@@ -222,7 +283,9 @@ bool SweepTool::doDeactivate()
   m_source = SweepSource{};
 
   m_previewBrushes.clear();
+  m_sweepIssues.clear();
   m_brushRenderer->clear();
+  sweepResultDidChangeNotifier();
 
   refreshViews();
 
@@ -302,12 +365,15 @@ void SweepTool::updateBrushes()
   if (active())
   {
     m_previewBrushes.clear();
+    m_sweepIssues.clear();
     m_brushRenderer->clear();
 
     if (!m_source.faces.empty() && m_parameters.segments > 0 && !m_transform.isNoOp())
     {
-      m_previewBrushes =
+      auto result =
         generateSweepBrushes(m_document.map(), m_source, m_transform, m_parameters);
+      m_previewBrushes = std::move(result.brushes);
+      m_sweepIssues = std::move(result.issues);
 
       for (const auto& [parent, brushNodes] : m_previewBrushes)
       {
@@ -318,13 +384,14 @@ void SweepTool::updateBrushes()
       }
     }
 
+    sweepResultDidChangeNotifier();
     refreshViews();
   }
 }
 
 void SweepTool::commitSweep()
 {
-  if (!m_previewBrushes.empty())
+  if (canCommitSweep())
   {
     auto nodesToAdd = m_previewBrushes | std::views::transform([](auto& entry) {
                         auto& [parent, childrenPtrs] = entry;
@@ -349,6 +416,16 @@ void SweepTool::commitSweep()
   }
 
   refreshViews();
+}
+
+const std::vector<SweepIssue>& SweepTool::sweepIssues() const
+{
+  return m_sweepIssues;
+}
+
+bool SweepTool::canCommitSweep() const
+{
+  return !m_previewBrushes.empty() && m_sweepIssues.empty();
 }
 
 void SweepTool::renderDestinationGhost(

@@ -365,6 +365,11 @@ void MapViewToolBox::performSweep()
 {
   contract_pre(sweepToolActive());
 
+  if (!m_sweepTool->canCommitSweep())
+  {
+    return;
+  }
+
   m_sweepTool->commitSweep();
   deactivateCurrentTool();
 }

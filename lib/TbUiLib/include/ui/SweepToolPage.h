@@ -21,8 +21,11 @@
 
 #include <QWidget>
 
+#include "base/NotifierConnection.h"
+
 class QCheckBox;
 class QComboBox;
+class QLabel;
 class QPushButton;
 class QSpinBox;
 
@@ -43,18 +46,25 @@ private:
   QSpinBox* m_segments = nullptr;
   QComboBox* m_pathMode = nullptr;
   QSpinBox* m_iterations = nullptr;
+  QComboBox* m_uvMode = nullptr;
   QCheckBox* m_snapToInteger = nullptr;
   QPushButton* m_resetButton = nullptr;
+  QLabel* m_statusIcon = nullptr;
+  QLabel* m_statusLabel = nullptr;
+
+  NotifierConnection m_notifierConnection;
 
 public:
   explicit SweepToolPage(SweepTool& tool, QWidget* parent = nullptr);
 
 private:
   void createGui();
+  void updateStatus();
 
   void segmentsChanged(int value);
   void pathModeChanged(int index);
   void iterationsChanged(int value);
+  void uvModeChanged(int index);
   void snapToIntegerChanged(bool checked);
   void resetClicked();
 };

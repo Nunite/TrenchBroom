@@ -789,7 +789,7 @@ In the 2D viewport, clip points are just snapped to the visible grid, so they ar
 
 ### Sweeping {#sweeping}
 
-The sweep tool fills the gap between the selected brush faces and a copy of those faces, called the destination cap, with a run of brushes. Depending on where you place the destination cap and which path you choose, this lofts the faces along a straight line, revolves them around an axis to build arches and pipes, or routes them through an S-curve, optionally twisting and tapering along the way. To use the sweep tool, select one or more brush faces and choose #menu(Menu/Edit/Tools/Sweep Tool).
+The sweep tool fills the gap between the selected brush faces and a copy of those faces, called the destination cap, with a run of brushes. Depending on where you place the destination cap and which path you choose, this lofts the faces along a straight line, revolves them around an axis to build arches and pipes, or routes them through an S-curve, optionally twisting and tapering along the way. The UV setting can preserve the source projections or continuously rotate the texture alignment across connected boundary faces and sweep segments in Valve-style map formats. Continuous alignment preserves the texture scale and leaves one seam around a closed profile. To use the sweep tool, select one or more brush faces and choose #menu(Menu/Edit/Tools/Sweep Tool).
 
 ![Rotating a face to form a bend with the Sweep Tool](images/SweepTool.gif) 
 
