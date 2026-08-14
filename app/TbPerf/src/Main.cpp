@@ -343,7 +343,8 @@ PerfResult runCase(const PerfCase& perfCase, const PerfOptions& options)
   std::sort(timings.begin(), timings.end());
   const auto sum = std::accumulate(timings.begin(), timings.end(), 0.0);
   const auto p95Index = std::min<size_t>(
-    timings.size() - 1, static_cast<size_t>(std::ceil(timings.size() * 0.95)) - 1);
+    timings.size() - 1,
+    static_cast<size_t>(std::ceil(static_cast<double>(timings.size()) * 0.95)) - 1);
 
   return PerfResult{
     perfCase.suite,
