@@ -89,16 +89,6 @@ QJsonArray stringsToJson(const QStringList& values)
   return result;
 }
 
-QJsonArray stringsToJson(const std::vector<QString>& values)
-{
-  auto result = QJsonArray{};
-  for (const auto& value : values)
-  {
-    result.push_back(value);
-  }
-  return result;
-}
-
 QJsonArray vecToJson(const vm::vec3d& value)
 {
   return QJsonArray{value.x(), value.y(), value.z()};

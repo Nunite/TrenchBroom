@@ -2054,7 +2054,7 @@ std::optional<mdl::Brush> createPrismBrush(
     error = "Could not create prism brush from points2d";
     return std::nullopt;
   }
-  return std::move(brush.value());
+  return std::move(brush).value();
 }
 
 std::optional<std::vector<vm::vec2d>> sectorPolygon(
@@ -2461,7 +2461,7 @@ std::optional<mdl::Brush> createCylinderBrushFromPolygon(
       error = "Could not create cylinder brush from the given bounds";
       return std::nullopt;
     }
-    return std::move(brush.value());
+    return std::move(brush).value();
   }
 
   auto planeBounds = vm::bbox3d{};
@@ -2541,7 +2541,7 @@ std::optional<mdl::Brush> createCylinderBrushFromPolygon(
     error = "Could not create cylinder brush from snapped points";
     return std::nullopt;
   }
-  return std::move(brush.value());
+  return std::move(brush).value();
 }
 
 std::optional<vm::axis::type> axisFromJson(
@@ -3247,7 +3247,7 @@ std::optional<mdl::Brush> createBrushFromPlaneTriples(
       error = QString{"planes[%1] does not define a valid plane"}.arg(planeIndex);
       return std::nullopt;
     }
-    faces.push_back(std::move(face.value()));
+    faces.push_back(std::move(face).value());
     ++planeIndex;
   }
 
@@ -3257,7 +3257,7 @@ std::optional<mdl::Brush> createBrushFromPlaneTriples(
     error = "planes do not form a valid closed convex brush";
     return std::nullopt;
   }
-  return std::move(brush.value());
+  return std::move(brush).value();
 }
 
 std::optional<std::vector<vm::bbox3d>> steppedMassBounds(
@@ -3772,7 +3772,7 @@ std::vector<mdl::Node*> brushNodesFromBounds(
       error = "Could not create one or more blockout brushes";
       return {};
     }
-    result.push_back(new mdl::BrushNode{std::move(brush.value())});
+    result.push_back(new mdl::BrushNode{std::move(brush).value()});
   }
   return result;
 }
@@ -5212,7 +5212,7 @@ std::vector<mdl::Node*> compileBatchOperation(
       error = error.isEmpty() ? "Could not create ramp_between brush" : error;
       return {};
     }
-    return {new mdl::BrushNode{std::move(brush.value())}};
+    return {new mdl::BrushNode{std::move(brush).value()}};
   }
 
   if (type == "arc_ramp_segment")
@@ -5270,7 +5270,7 @@ std::vector<mdl::Node*> compileBatchOperation(
       error = "Could not create arc_ramp_segment brush";
       return {};
     }
-    return {new mdl::BrushNode{std::move(brush.value())}};
+    return {new mdl::BrushNode{std::move(brush).value()}};
   }
 
   if (type == "ramp" || type == "wedge")
@@ -5296,7 +5296,7 @@ std::vector<mdl::Node*> compileBatchOperation(
       error = QString{"Could not create %1 brush"}.arg(type);
       return {};
     }
-    return {new mdl::BrushNode{std::move(brush.value())}};
+    return {new mdl::BrushNode{std::move(brush).value()}};
   }
 
   if (type == "prism")
@@ -5333,7 +5333,7 @@ std::vector<mdl::Node*> compileBatchOperation(
       error = "Could not create convex polyhedron brush from points";
       return {};
     }
-    return {new mdl::BrushNode{std::move(brush.value())}};
+    return {new mdl::BrushNode{std::move(brush).value()}};
   }
 
   if (type == "cylinder_sector")
@@ -5571,7 +5571,7 @@ std::optional<std::vector<mdl::Brush>> createBrushesForType(
       error = "Could not create pipe brushes from the given bounds";
       return std::nullopt;
     }
-    return std::move(brushes.value());
+    return std::move(brushes).value();
   }
   else if (type == "sphere")
   {
@@ -5627,7 +5627,7 @@ std::optional<std::vector<mdl::Brush>> createBrushesForType(
     error = QString{"Could not create %1 brush from the given parameters"}.arg(type);
     return std::nullopt;
   }
-  return std::vector<mdl::Brush>{std::move(brush.value())};
+  return std::vector<mdl::Brush>{std::move(brush).value()};
 }
 
 } // namespace
