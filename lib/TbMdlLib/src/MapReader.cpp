@@ -668,8 +668,10 @@ std::vector<std::optional<NodeInfo>> createNodesFromObjectInfos(
   for (auto& objectInfo : objectInfos)
   {
     tasks.emplace_back(
-      [&entityPropertyConfig, &worldBounds, mapFormat, objectInfo = std::move(objectInfo)]()
-        mutable -> CreateNodeResult {
+      [&entityPropertyConfig,
+       &worldBounds,
+       mapFormat,
+       taskObjectInfo = std::move(objectInfo)]() mutable -> CreateNodeResult {
         return std::visit(
           kdl::overload(
             [&](MapReader::EntityInfo& entityInfo) {
@@ -682,7 +684,7 @@ std::vector<std::optional<NodeInfo>> createNodesFromObjectInfos(
             [&](MapReader::PatchInfo& patchInfo) {
               return createPatchNode(std::move(patchInfo));
             }),
-          objectInfo);
+          taskObjectInfo);
       });
   }
 
