@@ -18,6 +18,7 @@
  */
 
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStackedLayout>
@@ -34,9 +35,13 @@
 #include "mdl/MapFixture.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
+#include "mdl/NodeHandleManager.h"
+#include "mdl/NodeHandles.h"
 #include "mdl/PropertyDefinition.h"
 #include "mdl/WorldNode.h"
 #include "ui/CatchConfig.h"
+#include "ui/ChamferTool.h"
+#include "ui/ChamferToolPage.h"
 #include "ui/CreateEntityTool.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
@@ -240,6 +245,53 @@ TEST_CASE("MapViewToolBox")
     CHECK(iterations->isEnabled());
     CHECK_FALSE(swapEnds->isVisibleTo(page));
     CHECK(reset->isEnabled());
+  }
+
+  SECTION("chamfer page applies edge chamfers and switches handle targets")
+  {
+    const auto builder =
+      mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+    auto* brushNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{-16, -16, -16}, {16, 16, 16}}, "material")
+      | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    toolBox.toggleChamferTool();
+    REQUIRE(toolBox.chamferToolActive());
+
+    auto* page = dynamic_cast<ChamferToolPage*>(bookCtrl.currentWidget());
+    REQUIRE(page != nullptr);
+
+    auto* target = page->findChild<QComboBox*>(QStringLiteral("chamferTarget"));
+    auto* distance = page->findChild<QDoubleSpinBox*>(QStringLiteral("chamferDistance"));
+    auto* segments = page->findChild<QSpinBox*>(QStringLiteral("chamferSegments"));
+    auto* apply = page->findChild<QPushButton*>(QStringLiteral("chamferApply"));
+    REQUIRE(target != nullptr);
+    REQUIRE(distance != nullptr);
+    REQUIRE(segments != nullptr);
+    REQUIRE(apply != nullptr);
+    CHECK_FALSE(apply->isEnabled());
+
+    const auto edge = mdl::EdgeHandle{vm::segment3d{{-16, -16, 16}, {16, -16, 16}}};
+    const auto edgeHit =
+      mdl::Hit{mdl::EdgeHandle::HandleHitType, 0.0, edge.position.center(), edge};
+    toolBox.chamferTool().edgeTool().select({edgeHit}, false);
+
+    distance->setValue(4.0);
+    segments->setValue(2);
+    REQUIRE(apply->isEnabled());
+
+    const auto oldFaceCount = brushNode->brush().faceCount();
+    apply->click();
+    CHECK(brushNode->brush().faceCount() == oldFaceCount + 2u);
+
+    target->setCurrentIndex(target->findText("Vertices"));
+    CHECK(toolBox.chamferTool().target() == ChamferTarget::Vertices);
+    CHECK(segments->isHidden());
+    CHECK(
+      map.nodeHandles().allHandles<mdl::VertexHandle>().size()
+      == brushNode->brush().vertexCount());
   }
 
   SECTION("create entity tool creates model entities from browser payloads")

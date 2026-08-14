@@ -39,6 +39,7 @@ struct SelectionChange;
 namespace ui
 {
 class ClipTool;
+class ChamferTool;
 class AssembleBrushTool;
 class CreateEntityTool;
 class DrawShapeTool;
@@ -63,6 +64,7 @@ private:
   QStackedLayout* m_bookCtrl = nullptr;
 
   std::unique_ptr<ClipTool> m_clipTool;
+  std::unique_ptr<ChamferTool> m_chamferTool;
   std::unique_ptr<AssembleBrushTool> m_assembleBrushTool;
   std::unique_ptr<CreateEntityTool> m_createEntityTool;
   std::unique_ptr<DrawShapeTool> m_drawShapeTool;
@@ -80,6 +82,7 @@ private:
   std::unique_ptr<ControlPointTool> m_controlPointTool;
 
   QWidget* m_emptyToolPage = nullptr;
+  QWidget* m_chamferToolPage = nullptr;
   QWidget* m_rotateToolPage = nullptr;
   QWidget* m_sweepToolPage = nullptr;
   QWidget* m_scaleToolPage = nullptr;
@@ -95,6 +98,9 @@ public:
 public: // tools
   const ClipTool& clipTool() const;
   ClipTool& clipTool();
+
+  const ChamferTool& chamferTool() const;
+  ChamferTool& chamferTool();
 
   const AssembleBrushTool& assembleBrushTool() const;
   AssembleBrushTool& assembleBrushTool();
@@ -149,6 +155,10 @@ public: // tools
   void toggleClipSide();
   void performClip();
   void removeLastClipPoint();
+
+  bool canToggleChamferTool() const;
+  void toggleChamferTool();
+  bool chamferToolActive() const;
 
   bool canToggleRotateTool() const;
   void toggleRotateTool();

@@ -20,6 +20,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/BorderLine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/BorderPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CellView.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ChamferToolPage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ChoosePathTypeDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ClickableLabel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ClickableTitleBar.cpp
@@ -265,6 +266,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/BorderLine.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/BorderPanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CellView.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ChamferToolPage.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ChoosePathTypeDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ClickableLabel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ClickableTitleBar.h

@@ -79,6 +79,7 @@
 #include "ui/ActionExecutionContext.h"
 #include "ui/ActionManager.h"
 #include "ui/AppController.h"
+#include "ui/ChamferTool.h"
 #include "ui/ChoosePathTypeDialog.h"
 #include "ui/ClipTool.h"
 #include "ui/ColorButton.h"
@@ -1611,6 +1612,10 @@ void MapWindow::deleteSelection()
     {
       toolBox.edgeTool().removeSelection();
     }
+    else if (toolBox.chamferToolActive())
+    {
+      toolBox.chamferTool().removeSelection();
+    }
     else if (toolBox.faceToolActive())
     {
       toolBox.faceTool().removeSelection();
@@ -1638,6 +1643,10 @@ bool MapWindow::canDeleteSelection() const
   if (toolBox.edgeToolActive())
   {
     return toolBox.edgeTool().canRemoveSelection();
+  }
+  if (toolBox.chamferToolActive())
+  {
+    return toolBox.chamferTool().canRemoveSelection();
   }
   if (toolBox.faceToolActive())
   {

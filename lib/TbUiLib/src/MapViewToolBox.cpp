@@ -26,6 +26,8 @@
 #include "mdl/Map.h"
 #include "mdl/Selection.h"
 #include "ui/AssembleBrushTool.h"
+#include "ui/ChamferTool.h"
+#include "ui/ChamferToolPage.h"
 #include "ui/ClipTool.h"
 #include "ui/ControlPointTool.h"
 #include "ui/ControlPointToolPage.h"
@@ -72,6 +74,16 @@ MapViewToolBox::~MapViewToolBox()
 ClipTool& MapViewToolBox::clipTool()
 {
   return *m_clipTool;
+}
+
+const ChamferTool& MapViewToolBox::chamferTool() const
+{
+  return *m_chamferTool;
+}
+
+ChamferTool& MapViewToolBox::chamferTool()
+{
+  return KDL_CONST_OVERLOAD(chamferTool());
 }
 
 const AssembleBrushTool& MapViewToolBox::assembleBrushTool() const
@@ -279,6 +291,25 @@ void MapViewToolBox::removeLastClipPoint()
   m_clipTool->removeLastPoint();
 }
 
+bool MapViewToolBox::canToggleChamferTool() const
+{
+  const auto& map = m_document.map();
+  return chamferToolActive() || map.selection().hasOnlyBrushes();
+}
+
+void MapViewToolBox::toggleChamferTool()
+{
+  if (canToggleChamferTool())
+  {
+    toggleTool(chamferTool());
+  }
+}
+
+bool MapViewToolBox::chamferToolActive() const
+{
+  return m_chamferTool->active();
+}
+
 bool MapViewToolBox::canToggleRotateTool() const
 {
   const auto& map = m_document.map();
@@ -415,13 +446,14 @@ bool MapViewToolBox::shearToolActive() const
 bool MapViewToolBox::canToggleAnyVertexTool() const
 {
   const auto& map = m_document.map();
-  return vertexToolActive() || edgeToolActive() || faceToolActive()
+  return vertexToolActive() || edgeToolActive() || faceToolActive() || chamferToolActive()
          || map.selection().hasOnlyBrushes();
 }
 
 bool MapViewToolBox::anyVertexToolActive() const
 {
-  return vertexToolActive() || edgeToolActive() || faceToolActive();
+  return vertexToolActive() || edgeToolActive() || faceToolActive()
+         || chamferToolActive();
 }
 
 bool MapViewToolBox::anyNodeHandleToolActive() const
@@ -535,6 +567,10 @@ void MapViewToolBox::moveNodeHandles(const vm::vec3d& delta)
   {
     controlPointTool().moveSelection(delta);
   }
+  else if (chamferToolActive())
+  {
+    chamferTool().moveSelection(delta);
+  }
 }
 
 void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
@@ -542,6 +578,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   m_bookCtrl = bookCtrl;
 
   m_clipTool = std::make_unique<ClipTool>(m_document);
+  m_chamferTool = std::make_unique<ChamferTool>(m_document);
   m_assembleBrushTool = std::make_unique<AssembleBrushTool>(m_document);
   m_createEntityTool = std::make_unique<CreateEntityTool>(m_document);
   m_drawShapeTool = std::make_unique<DrawShapeTool>(m_document);
@@ -567,6 +604,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
     controlPointTool(),
     edgeTool(),
     faceTool(),
+    chamferTool(),
     clipTool(),
     pathTool());
 
@@ -575,6 +613,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
     vertexTool(),
     edgeTool(),
     faceTool(),
+    chamferTool(),
     controlPointTool(),
     clipTool(),
     pathTool());
@@ -588,6 +627,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   suppressWhileActive(vertexTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
   suppressWhileActive(edgeTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
   suppressWhileActive(faceTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
+  suppressWhileActive(chamferTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
   suppressWhileActive(
     controlPointTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
   suppressWhileActive(clipTool(), moveObjectsTool(), extrudeTool(), drawShapeTool());
@@ -604,6 +644,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   addTool(vertexTool());
   addTool(edgeTool());
   addTool(faceTool());
+  addTool(chamferTool());
   addTool(controlPointTool());
   addTool(createEntityTool());
   addTool(prefabTool());
@@ -614,6 +655,9 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
 
   m_emptyToolPage = new QWidget{parent};
   bookCtrl->addWidget(m_emptyToolPage);
+
+  m_chamferToolPage = new ChamferToolPage{m_document, chamferTool(), parent};
+  bookCtrl->addWidget(m_chamferToolPage);
 
   m_rotateToolPage = new RotateToolPage{m_document, rotateTool(), parent};
   bookCtrl->addWidget(m_rotateToolPage);
@@ -692,6 +736,10 @@ void MapViewToolBox::updateToolPage()
   else if (scaleToolActive())
   {
     m_bookCtrl->setCurrentWidget(m_scaleToolPage);
+  }
+  else if (chamferToolActive())
+  {
+    m_bookCtrl->setCurrentWidget(m_chamferToolPage);
   }
   else if (controlPointToolActive())
   {

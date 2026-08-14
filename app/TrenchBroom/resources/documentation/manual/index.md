@@ -814,6 +814,10 @@ The generated brushes are shown as a preview in the viewports while you place th
 
 Hit #action(Controls/Map view/Perform sweep) to fill the gap with brushes and select them. Hitting #action(Controls/Map view/Cancel) moves the destination cap back onto the selected faces, and hitting it again deactivates the tool.
 
+### Chamfering {#chamfering}
+
+Choose #menu(Menu/Edit/Tools/Chamfer Tool) to bevel selected brush edges or cut selected brush corners. The target selector switches between edge and vertex handles. Select one or more handles, set the chamfer distance, and apply the operation. Edge chamfers also support multiple segments for a rounded profile. UV Lock controls how the affected face projections are preserved.
+
 ### Vertex Editing {#vertex_editing}
 
 TrenchBroom includes three separate tools to edit a brush's vertices: the [vertex tool](#vertex_tool) for editing individual vertices, the [edge tool](#edge_tool) for editing individual edges, and the [face tool](#face_tool) for editing individual faces. The vertex tool is the most powerful of the three because in addition to moving vertices around, you can also add and remove vertices from the brush(es). Conversely, the edge and face tools only allow you to move faces around.

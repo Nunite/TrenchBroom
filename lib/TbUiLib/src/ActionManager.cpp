@@ -1598,6 +1598,21 @@ void ActionManager::createToolsMenu()
     std::filesystem::path{"EdgeTool.svg"},
   }));
   toolsMenu.addItem(addAction(Action{
+    "Menu/Edit/Tools/Chamfer Tool",
+    "Chamfer Tool",
+    ActionContext::Any,
+    KeySequence{},
+    [](auto& context) { context.mapWindow().toolBox().toggleChamferTool(); },
+    [](const auto& context) {
+      return context.hasDocument()
+             && context.mapWindow().toolBox().canToggleChamferTool();
+    },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapWindow().toolBox().chamferToolActive();
+    },
+    std::filesystem::path{"ChamferTool.svg"},
+  }));
+  toolsMenu.addItem(addAction(Action{
     "Menu/Edit/Tools/Face Tool",
     "Face Tool",
     ActionContext::Any,
@@ -2176,6 +2191,7 @@ void ActionManager::createToolbar()
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Clip Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Vertex Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Edge Tool"));
+  m_toolBar.addItem(existingAction("Menu/Edit/Tools/Chamfer Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Face Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Path Tool"));
   m_toolBar.addItem(existingAction("Menu/Edit/Tools/Control Point Tool"));

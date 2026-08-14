@@ -46,6 +46,7 @@
 #include "ui/AssembleBrushToolController3D.h"
 #include "ui/CameraAnimation.h"
 #include "ui/CameraTool3D.h"
+#include "ui/ChamferTool.h"
 #include "ui/ClipToolController.h"
 #include "ui/ControlPointTool.h"
 #include "ui/ControlPointToolController.h"
@@ -146,6 +147,10 @@ void MapView3D::initializeToolChain(MapViewToolBox& toolBox)
   addToolController(std::make_unique<ClipToolController3D>(toolBox.clipTool()));
   addToolController(std::make_unique<VertexToolController>(toolBox.vertexTool()));
   addToolController(std::make_unique<EdgeToolController>(toolBox.edgeTool()));
+  addToolController(
+    std::make_unique<VertexToolController>(toolBox.chamferTool().vertexTool()));
+  addToolController(
+    std::make_unique<EdgeToolController>(toolBox.chamferTool().edgeTool()));
   addToolController(std::make_unique<FaceToolController>(toolBox.faceTool()));
   addToolController(
     std::make_unique<ControlPointToolController>(toolBox.controlPointTool()));
