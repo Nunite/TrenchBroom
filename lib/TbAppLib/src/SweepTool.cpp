@@ -561,13 +561,13 @@ void SweepTool::updateBrushes()
         generateSweepBrushes(m_document.map(), m_source, m_transform, m_parameters);
       m_previewBrushes = std::move(result.brushes);
       m_sweepIssues = std::move(result.issues);
+    }
 
-      for (const auto& [parent, brushNodes] : m_previewBrushes)
+    for (const auto& [parent, brushNodes] : m_previewBrushes)
+    {
+      for (auto& brushNode : brushNodes)
       {
-        for (auto& brushNode : brushNodes)
-        {
-          m_brushRenderer->addBrush(*brushNode);
-        }
+        m_brushRenderer->addBrush(*brushNode);
       }
     }
 
