@@ -3298,6 +3298,7 @@ TEST_CASE(
     {},
     {},
     {},
+    {},
   };
 
   const auto compact = moduleCompactForMapResult(
