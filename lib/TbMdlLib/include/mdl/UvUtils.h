@@ -26,9 +26,26 @@
 
 #include <optional>
 #include <tuple>
+#include <vector>
 
 namespace tb::mdl
 {
+
+struct FaceUVProjection
+{
+  vm::vec3d uAxis;
+  vm::vec3d vAxis;
+  vm::vec2f offset;
+};
+
+/**
+ * Solves the affine world-to-UV projection defined by the given corresponding
+ * points.
+ * Returns nullopt if the input is degenerate or the UV coordinates are not
+ * affine.
+ */
+std::optional<FaceUVProjection> solveFaceUVProjection(
+  const std::vector<vm::vec3d>& points, const std::vector<vm::vec2f>& uvs);
 
 /**
  * Return the up and right axes for a camera that looks at the given face.

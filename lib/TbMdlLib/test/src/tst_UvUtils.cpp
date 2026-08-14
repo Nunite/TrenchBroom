@@ -23,11 +23,50 @@
 #include "vm/approx.h"
 
 #include <tuple>
+#include <vector>
 
 #include <catch2/catch_test_macros.hpp>
 
 namespace tb::mdl
 {
+
+TEST_CASE("solveFaceUVProjection")
+{
+  SECTION("solves an affine projection from non-axis-aligned points")
+  {
+    const auto points =
+      std::vector<vm::vec3d>{{0, 0, 0}, {2, 0, 0}, {2, 3, 0}, {0, 3, 0}};
+    const auto uvs = std::vector<vm::vec2f>{{5, -2}, {9, 0}, {12, 9}, {8, 7}};
+
+    const auto projection = solveFaceUVProjection(points, uvs);
+    REQUIRE(projection);
+    CHECK(projection->uAxis == vm::approx(vm::vec3d{2, 1, 0}));
+    CHECK(projection->vAxis == vm::approx(vm::vec3d{1, 3, 0}));
+    CHECK(projection->offset == vm::approx(vm::vec2f{5, -2}));
+  }
+
+  SECTION("finds a valid basis when the first three points are collinear")
+  {
+    const auto points =
+      std::vector<vm::vec3d>{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {0, 1, 0}};
+    const auto uvs = std::vector<vm::vec2f>{{0, 0}, {1, 0}, {2, 0}, {0, 1}};
+
+    CHECK(solveFaceUVProjection(points, uvs).has_value());
+  }
+
+  SECTION("rejects non-affine and degenerate input")
+  {
+    CHECK_FALSE(
+      solveFaceUVProjection(
+        {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}, {{0, 0}, {1, 0}, {2, 1}, {0, 1}})
+        .has_value());
+    CHECK_FALSE(
+      solveFaceUVProjection({{0, 0, 0}, {1, 0, 0}, {2, 0, 0}}, {{0, 0}, {1, 0}, {2, 0}})
+        .has_value());
+    CHECK_FALSE(solveFaceUVProjection({{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}, {{0, 0}, {1, 0}})
+                  .has_value());
+  }
+}
 
 TEST_CASE("computeCameraAxesForFaceNormal")
 {

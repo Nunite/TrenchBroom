@@ -252,24 +252,50 @@ def parse_map(path: Path, epsilon: float) -> list[Entity]:
     entities: list[Entity] = []
     current_entity: Entity | None = None
     current_brush: Brush | None = None
+    pending_entity: tuple[int, int] | None = None
+    pending_brush: tuple[int, int] | None = None
+    depth = 0
     for line_number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
-        if match := ENTITY_RE.match(line):
-            current_entity = Entity(int(match.group(1)), line_number)
-            entities.append(current_entity)
-            current_brush = None
+        if depth == 0 and (match := ENTITY_RE.match(line)):
+            pending_entity = (int(match.group(1)), line_number)
             continue
-        if match := BRUSH_RE.match(line):
-            if current_entity is None:
-                continue
-            current_brush = Brush(int(match.group(1)), line_number)
-            current_entity.brushes.append(current_brush)
+        if depth == 1 and (match := BRUSH_RE.match(line)):
+            pending_brush = (int(match.group(1)), line_number)
             continue
-        if current_brush is not None:
+
+        token = line.strip()
+        if token == "{":
+            if depth == 0:
+                index, start_line = pending_entity or (len(entities), line_number)
+                current_entity = Entity(index, start_line)
+                entities.append(current_entity)
+                current_brush = None
+                pending_entity = None
+            elif depth == 1 and current_entity is not None:
+                index, start_line = pending_brush or (
+                    len(current_entity.brushes),
+                    line_number,
+                )
+                current_brush = Brush(index, start_line)
+                current_entity.brushes.append(current_brush)
+                pending_brush = None
+            depth += 1
+            continue
+        if token == "}":
+            if depth == 2:
+                current_brush = None
+                pending_brush = None
+            elif depth == 1:
+                current_entity = None
+            depth = max(depth - 1, 0)
+            continue
+
+        if depth == 2 and current_brush is not None:
             face = parse_face(line, line_number)
             if face is not None:
                 current_brush.faces.append(face)
                 continue
-        if current_entity is not None and current_brush is None:
+        if depth == 1 and current_entity is not None:
             if match := PROPERTY_RE.match(line):
                 current_entity.properties[match.group(1)] = match.group(2)
 

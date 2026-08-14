@@ -147,6 +147,52 @@ TEST_CASE("SmartSkyboxEditor")
     CHECK_FALSE(list->item(0)->icon().isNull());
     CHECK(list->item(0)->icon().actualSize(QSize{70, 36}) == QSize{70, 36});
   }
+
+  SECTION("decodes compressed DDS previews")
+  {
+    auto fixture = MapDocumentFixture{};
+    auto& document = fixture.create();
+
+    const auto imagePath = std::filesystem::path{__FILE__}
+                             .parent_path()
+                             .parent_path()
+                             .parent_path()
+                             .parent_path()
+                           / "TbMdlLib/test/fixture/mdl/LoadDdsTexture/dds_bc1.dds";
+    auto imageFileResult = fs::Disk::openFile(imagePath);
+    REQUIRE(imageFileResult.is_success());
+    const auto imageFile = imageFileResult.value();
+
+    auto skyboxFiles = std::vector<fs::Entry>{};
+    for (const auto* suffix : {"rt", "bk", "lf", "ft", "up", "dn"})
+    {
+      skyboxFiles.push_back(
+        fs::FileEntry{"memory_dds" + std::string{suffix} + ".dds", imageFile});
+    }
+
+    document.map().gameFileSystem().mount(
+      {},
+      std::make_unique<fs::TestFileSystem>(
+        fs::DirectoryEntry{
+          "",
+          {fs::DirectoryEntry{
+            "gfx", {fs::DirectoryEntry{"env", std::move(skyboxFiles)}}}}},
+        std::unordered_map<std::string, fs::FileSystemMetadata>{},
+        "Z:/not-a-real-dds-skybox-path"));
+
+    auto editor = SmartSkyboxEditor{document};
+    editor.activate(mdl::EntityPropertyKeys::Skyname);
+    editor.update({&document.map().worldNode()});
+
+    const auto* list = editor.findChild<QListWidget*>("smartSkyboxList");
+    auto* refreshButton = editor.findChild<QAbstractButton*>("smartSkyboxRefreshButton");
+    REQUIRE(list != nullptr);
+    REQUIRE(refreshButton != nullptr);
+    refreshButton->click();
+    REQUIRE(list->count() == 1);
+    CHECK_FALSE(list->item(0)->icon().isNull());
+    CHECK(list->item(0)->icon().actualSize(QSize{70, 36}) == QSize{70, 36});
+  }
 }
 
 } // namespace tb::ui

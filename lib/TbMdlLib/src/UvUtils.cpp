@@ -24,10 +24,95 @@
 #include "vm/mat_ext.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace tb::mdl
 {
+namespace
+{
+
+std::optional<vm::vec3d> solveUvAxis(
+  const std::array<vm::vec3d, 3>& points, const std::array<float, 3>& coordinates)
+{
+  const auto edge1 = points[1] - points[0];
+  const auto edge2 = points[2] - points[0];
+  const auto a = vm::dot(edge1, edge1);
+  const auto b = vm::dot(edge1, edge2);
+  const auto c = vm::dot(edge2, edge2);
+  const auto determinant = a * c - b * b;
+  if (vm::is_zero(determinant, vm::Cd::almost_zero()))
+  {
+    return std::nullopt;
+  }
+
+  const auto d1 = double(coordinates[1] - coordinates[0]);
+  const auto d2 = double(coordinates[2] - coordinates[0]);
+  const auto s = (d1 * c - d2 * b) / determinant;
+  const auto t = (d2 * a - d1 * b) / determinant;
+  return s * edge1 + t * edge2;
+}
+
+} // namespace
+
+std::optional<FaceUVProjection> solveFaceUVProjection(
+  const std::vector<vm::vec3d>& points, const std::vector<vm::vec2f>& uvs)
+{
+  if (points.size() != uvs.size() || points.size() < 3u)
+  {
+    return std::nullopt;
+  }
+
+  auto basis = std::optional<std::array<size_t, 3>>{};
+  for (size_t i = 0u; i + 2u < points.size() && !basis; ++i)
+  {
+    for (size_t j = i + 1u; j + 1u < points.size() && !basis; ++j)
+    {
+      for (size_t k = j + 1u; k < points.size(); ++k)
+      {
+        if (!vm::is_zero(
+              vm::squared_length(vm::cross(points[j] - points[i], points[k] - points[i])),
+              vm::Cd::almost_zero()))
+        {
+          basis = std::array{i, j, k};
+          break;
+        }
+      }
+    }
+  }
+  if (!basis)
+  {
+    return std::nullopt;
+  }
+
+  const auto basisPoints =
+    std::array{points[(*basis)[0]], points[(*basis)[1]], points[(*basis)[2]]};
+  const auto basisUvs = std::array{uvs[(*basis)[0]], uvs[(*basis)[1]], uvs[(*basis)[2]]};
+  const auto uAxis =
+    solveUvAxis(basisPoints, {basisUvs[0].x(), basisUvs[1].x(), basisUvs[2].x()});
+  const auto vAxis =
+    solveUvAxis(basisPoints, {basisUvs[0].y(), basisUvs[1].y(), basisUvs[2].y()});
+  if (!uAxis || !vAxis)
+  {
+    return std::nullopt;
+  }
+
+  const auto offset = vm::vec2f{
+    uvs[0].x() - float(vm::dot(points[0], *uAxis)),
+    uvs[0].y() - float(vm::dot(points[0], *vAxis))};
+  for (size_t i = 0u; i < points.size(); ++i)
+  {
+    const auto projected = vm::vec2f{
+      float(vm::dot(points[i], *uAxis)) + offset.x(),
+      float(vm::dot(points[i], *vAxis)) + offset.y()};
+    if (!vm::is_equal(projected, uvs[i], 0.002f))
+    {
+      return std::nullopt;
+    }
+  }
+
+  return FaceUVProjection{*uAxis, *vAxis, offset};
+}
 
 std::tuple<vm::vec3d, vm::vec3d> computeCameraAxesForFaceNormal(const vm::vec3d& normal)
 {

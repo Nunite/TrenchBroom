@@ -578,6 +578,49 @@ TEST_CASE("SweepToolUtils functions")
       CHECK(result.issues.front().message.find("topology") != std::string::npos);
     }
 
+    SECTION("bridge rejects duplicate topology faces")
+    {
+      source.faces.push_back(source.faces.front());
+      const auto targetFace = SweepFace{squareAt(64.0)};
+      const auto target =
+        SweepTarget{{targetFace, targetFace}, vm::vec3d{64, 0, 0}, vm::vec3d{-1, 0, 0}};
+
+      const auto result = generateBridgeBrushes(map, source, target, parameters);
+      CHECK(result.brushes.empty());
+      REQUIRE(result.issues.size() == 1u);
+      CHECK(result.issues.front().message.find("topology") != std::string::npos);
+    }
+
+    SECTION("bridge bounds ambiguous topology matching")
+    {
+      const auto disconnectedSquareAt = [](const double x, const double y) {
+        return vm::polygon3d{
+          {x, y - 8, -8},
+          {x, y - 8, 8},
+          {x, y + 8, 8},
+          {x, y + 8, -8},
+        };
+      };
+
+      source.faces.clear();
+      auto targetFaces = std::vector<SweepFace>{};
+      for (size_t i = 0u; i < 8u; ++i)
+      {
+        const auto y = double(i) * 40.0;
+        source.faces.emplace_back(disconnectedSquareAt(0.0, y), &defaultParent);
+        targetFaces.emplace_back(disconnectedSquareAt(64.0, y));
+      }
+      source.center = vm::vec3d{0, 140, 0};
+      source.normal = vm::vec3d{1, 0, 0};
+      const auto target =
+        SweepTarget{std::move(targetFaces), vm::vec3d{64, 140, 0}, vm::vec3d{-1, 0, 0}};
+
+      const auto result = generateBridgeBrushes(map, source, target, parameters);
+      CHECK(result.brushes.empty());
+      REQUIRE(result.issues.size() == 1u);
+      CHECK(result.issues.front().message.find("ambiguous") != std::string::npos);
+    }
+
     SECTION("iterations continue from the previous destination cap")
     {
       transform.translation = vm::vec3d{64, 0, 0};

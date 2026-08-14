@@ -35,6 +35,7 @@
 #include "mdl/Map_Selection.h"
 #include "mdl/Node.h"
 #include "mdl/Transaction.h"
+#include "mdl/UvUtils.h"
 #include "mdl/WorldNode.h"
 #include "render/BrushRenderer.h"
 #include "ui/MapDocument.h"
@@ -53,6 +54,7 @@
 #include "vm/vec.h"
 #include "vm/vec_io.h" // IWYU pragma: keep
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <functional>
@@ -1372,27 +1374,6 @@ void applyFaceAttributes(
   face.setMaterial(materialManager.material(attributes.materialName));
 }
 
-std::optional<vm::vec3d> solveUvAxis(
-  const std::array<vm::vec3d, 3>& points, const std::array<float, 3>& coordinates)
-{
-  const auto edge1 = points[1] - points[0];
-  const auto edge2 = points[2] - points[0];
-  const auto a = vm::dot(edge1, edge1);
-  const auto b = vm::dot(edge1, edge2);
-  const auto c = vm::dot(edge2, edge2);
-  const auto determinant = a * c - b * b;
-  if (std::abs(determinant) < vm::Cd::almost_zero())
-  {
-    return std::nullopt;
-  }
-
-  const auto d1 = double(coordinates[1] - coordinates[0]);
-  const auto d2 = double(coordinates[2] - coordinates[0]);
-  const auto s = (d1 * c - d2 * b) / determinant;
-  const auto t = (d2 * a - d1 * b) / determinant;
-  return s * edge1 + t * edge2;
-}
-
 bool applyContinuousFaceUvs(
   mdl::BrushFace& face,
   const std::array<vm::vec3d, 4>& points,
@@ -1418,71 +1399,20 @@ bool applyContinuousFaceUvs(
     facePoints.push_back(*pointIt);
     faceUvs.push_back(uvs[pointIndex]);
   }
-  if (facePoints.size() < 3u)
+  const auto projection = mdl::solveFaceUVProjection(facePoints, faceUvs);
+  if (!projection)
   {
     return false;
-  }
-
-  auto basisIndices = std::optional<std::array<size_t, 3>>{};
-  for (size_t i = 0; i + 2u < facePoints.size() && !basisIndices; ++i)
-  {
-    for (size_t j = i + 1u; j + 1u < facePoints.size() && !basisIndices; ++j)
-    {
-      for (size_t k = j + 1u; k < facePoints.size(); ++k)
-      {
-        const auto edge1 = facePoints[j] - facePoints[i];
-        const auto edge2 = facePoints[k] - facePoints[i];
-        if (vm::squared_length(vm::cross(edge1, edge2)) > 1e-12)
-        {
-          basisIndices = std::array{i, j, k};
-          break;
-        }
-      }
-    }
-  }
-  if (!basisIndices)
-  {
-    return false;
-  }
-
-  const auto basisPoints = std::array{
-    facePoints[(*basisIndices)[0]],
-    facePoints[(*basisIndices)[1]],
-    facePoints[(*basisIndices)[2]]};
-  const auto basisUvs = std::array{
-    faceUvs[(*basisIndices)[0]],
-    faceUvs[(*basisIndices)[1]],
-    faceUvs[(*basisIndices)[2]]};
-  const auto uAxis =
-    solveUvAxis(basisPoints, {basisUvs[0].x(), basisUvs[1].x(), basisUvs[2].x()});
-  const auto vAxis =
-    solveUvAxis(basisPoints, {basisUvs[0].y(), basisUvs[1].y(), basisUvs[2].y()});
-  if (!uAxis || !vAxis)
-  {
-    return false;
-  }
-
-  const auto offset = vm::vec2f{
-    faceUvs[0].x() - float(vm::dot(facePoints[0], *uAxis)),
-    faceUvs[0].y() - float(vm::dot(facePoints[0], *vAxis))};
-  for (size_t i = 0; i < facePoints.size(); ++i)
-  {
-    const auto projected = vm::vec2f{
-      float(vm::dot(facePoints[i], *uAxis)) + offset.x(),
-      float(vm::dot(facePoints[i], *vAxis)) + offset.y()};
-    if (!vm::is_equal(projected, faceUvs[i], 0.002f))
-    {
-      return false;
-    }
   }
 
   auto uvAttributes = sourceUvAttributes;
-  uvAttributes.offset = offset;
+  uvAttributes.offset = projection->offset;
   uvAttributes.scale = vm::vec2f{
     usableUvScale(uvAttributes.scale.x()), usableUvScale(uvAttributes.scale.y())};
   face.setUvAttributes(uvAttributes);
   face.restoreUvCoordSystemSnapshot(mdl::UvCoordSystemSnapshot{
-    *uAxis * double(uvAttributes.scale.x()), *vAxis * double(uvAttributes.scale.y())});
+    projection->uAxis * double(uvAttributes.scale.x()),
+    projection->vAxis * double(uvAttributes.scale.y())});
   return true;
 }
 
@@ -1597,11 +1527,24 @@ struct BridgeMatch
   vm::quatd rotation;
 };
 
+struct BridgeMatchResult
+{
+  std::optional<BridgeMatch> match;
+  bool complexityLimitExceeded = false;
+};
+
 struct FaceComponentTopology
 {
   std::vector<vm::vec3d> vertices;
   std::vector<std::vector<size_t>> faceVertices;
+  std::vector<std::vector<size_t>> vertexSignatures;
+  std::map<std::pair<size_t, size_t>, size_t> edgeFaceCounts;
 };
+
+std::pair<size_t, size_t> canonicalEdge(const size_t first, const size_t second)
+{
+  return std::minmax(first, second);
+}
 
 FaceComponentTopology buildFaceComponentTopology(const std::vector<SweepFace>& faces)
 {
@@ -1617,7 +1560,36 @@ FaceComponentTopology buildFaceComponentTopology(const std::vector<SweepFace>& f
     }
     result.faceVertices.push_back(std::move(indices));
   }
+
+  result.vertexSignatures.resize(result.vertices.size());
+  for (const auto& faceVertices : result.faceVertices)
+  {
+    for (size_t i = 0u; i < faceVertices.size(); ++i)
+    {
+      result.vertexSignatures[faceVertices[i]].push_back(faceVertices.size());
+      ++result.edgeFaceCounts[canonicalEdge(
+        faceVertices[i], faceVertices[(i + 1u) % faceVertices.size()])];
+    }
+  }
+  for (auto& signature : result.vertexSignatures)
+  {
+    std::ranges::sort(signature);
+  }
   return result;
+}
+
+bool hasDuplicateTopologyFaces(const FaceComponentTopology& topology)
+{
+  auto faces = std::set<std::vector<size_t>>{};
+  for (auto faceVertices : topology.faceVertices)
+  {
+    std::ranges::sort(faceVertices);
+    if (!faces.insert(std::move(faceVertices)).second)
+    {
+      return true;
+    }
+  }
+  return false;
 }
 
 std::optional<vm::quatd> bridgeRotation(
@@ -1659,21 +1631,96 @@ std::optional<vm::quatd> bridgeRotation(
   return vm::quatd{destinationNormal, roll} * normalRotation;
 }
 
-std::optional<BridgeMatch> matchBridgeComponents(
+BridgeMatchResult matchBridgeComponents(
   const SweepSource& source, const SweepTarget& target)
 {
   if (source.faces.empty() || source.faces.size() != target.faces.size())
   {
-    return std::nullopt;
+    return {};
   }
 
   const auto sourceTopology = buildFaceComponentTopology(source.faces);
   const auto targetTopology = buildFaceComponentTopology(target.faces);
   if (
     sourceTopology.vertices.size() != targetTopology.vertices.size()
-    || sourceTopology.vertices.size() < 3u)
+    || sourceTopology.vertices.size() < 3u || hasDuplicateTopologyFaces(sourceTopology)
+    || hasDuplicateTopologyFaces(targetTopology))
   {
-    return std::nullopt;
+    return {};
+  }
+
+  struct FaceCandidate
+  {
+    size_t targetFaceIndex;
+    bool reversed;
+    size_t shift;
+  };
+
+  const auto targetVertexFor = [](
+                                 const std::vector<size_t>& targetFaceVertices,
+                                 const bool reversed,
+                                 const size_t shift,
+                                 const size_t index) {
+    return targetFaceVertices
+      [reversed ? (shift + targetFaceVertices.size() - index) % targetFaceVertices.size()
+                : (shift + index) % targetFaceVertices.size()];
+  };
+
+  const auto faceTopologyCompatible = [&](
+                                        const size_t sourceFaceIndex,
+                                        const size_t targetFaceIndex,
+                                        const bool reversed,
+                                        const size_t shift) {
+    const auto& sourceFaceVertices = sourceTopology.faceVertices[sourceFaceIndex];
+    const auto& targetFaceVertices = targetTopology.faceVertices[targetFaceIndex];
+    if (sourceFaceVertices.size() != targetFaceVertices.size())
+    {
+      return false;
+    }
+
+    for (size_t i = 0u; i < sourceFaceVertices.size(); ++i)
+    {
+      const auto sourceVertex = sourceFaceVertices[i];
+      const auto sourceNext = sourceFaceVertices[(i + 1u) % sourceFaceVertices.size()];
+      const auto targetVertex = targetVertexFor(targetFaceVertices, reversed, shift, i);
+      const auto targetNext =
+        targetVertexFor(targetFaceVertices, reversed, shift, i + 1u);
+      if (
+        sourceTopology.vertexSignatures[sourceVertex]
+          != targetTopology.vertexSignatures[targetVertex]
+        || sourceTopology.edgeFaceCounts.at(canonicalEdge(sourceVertex, sourceNext))
+             != targetTopology.edgeFaceCounts.at(canonicalEdge(targetVertex, targetNext)))
+      {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  auto faceCandidates = std::vector<std::vector<FaceCandidate>>(source.faces.size());
+  for (size_t sourceFaceIndex = 0u; sourceFaceIndex < source.faces.size();
+       ++sourceFaceIndex)
+  {
+    for (size_t targetFaceIndex = 0u; targetFaceIndex < target.faces.size();
+         ++targetFaceIndex)
+    {
+      const auto targetVertexCount = targetTopology.faceVertices[targetFaceIndex].size();
+      for (const auto reversed : {false, true})
+      {
+        for (size_t shift = 0u; shift < targetVertexCount; ++shift)
+        {
+          if (faceTopologyCompatible(sourceFaceIndex, targetFaceIndex, reversed, shift))
+          {
+            faceCandidates[sourceFaceIndex].push_back(
+              FaceCandidate{targetFaceIndex, reversed, shift});
+          }
+        }
+      }
+    }
+    if (faceCandidates[sourceFaceIndex].empty())
+    {
+      return {};
+    }
   }
 
   auto best = std::optional<BridgeMatch>{};
@@ -1769,9 +1816,7 @@ std::optional<BridgeMatch> matchBridgeComponents(
     for (size_t i = 0u; i < sourceFaceVertices.size(); ++i)
     {
       const auto sourceVertex = sourceFaceVertices[i];
-      const auto targetVertex = targetFaceVertices
-        [reversed ? (shift + targetFaceVertices.size() - i) % targetFaceVertices.size()
-                  : (shift + i) % targetFaceVertices.size()];
+      const auto targetVertex = targetVertexFor(targetFaceVertices, reversed, shift, i);
       if (
         (vertexMapping[sourceVertex] && *vertexMapping[sourceVertex] != targetVertex)
         || (reverseVertexMapping[targetVertex] && *reverseVertexMapping[targetVertex] != sourceVertex))
@@ -1792,9 +1837,7 @@ std::optional<BridgeMatch> matchBridgeComponents(
     for (size_t i = 0u; i < sourceFaceVertices.size(); ++i)
     {
       const auto sourceVertex = sourceFaceVertices[i];
-      const auto targetVertex = targetFaceVertices
-        [reversed ? (shift + targetFaceVertices.size() - i) % targetFaceVertices.size()
-                  : (shift + i) % targetFaceVertices.size()];
+      const auto targetVertex = targetVertexFor(targetFaceVertices, reversed, shift, i);
       vertexMapping[sourceVertex] = targetVertex;
       reverseVertexMapping[targetVertex] = sourceVertex;
     }
@@ -1805,8 +1848,17 @@ std::optional<BridgeMatch> matchBridgeComponents(
   // Mapping one polygon cycle pins its vertices. Edge-connected neighboring faces then
   // have at least two pinned vertices, which keeps this backtracking search narrow while
   // guaranteeing one shared-vertex mapping for the entire component.
+  constexpr auto MaxSearchStates = size_t{10'000};
+  auto searchStates = size_t{0};
+  auto complexityLimitExceeded = false;
   std::function<void()> search;
   search = [&]() {
+    if (complexityLimitExceeded || ++searchStates > MaxSearchStates)
+    {
+      complexityLimitExceeded = true;
+      return;
+    }
+
     auto sourceFaceIndex = source.faces.size();
     auto mostMappedVertices = size_t{0};
     for (size_t i = 0u; i < source.faces.size(); ++i)
@@ -1818,7 +1870,10 @@ std::optional<BridgeMatch> matchBridgeComponents(
       const auto mappedVertices = size_t(std::ranges::count_if(
         sourceTopology.faceVertices[i],
         [&](const auto vertex) { return vertexMapping[vertex].has_value(); }));
-      if (sourceFaceIndex == source.faces.size() || mappedVertices > mostMappedVertices)
+      if (
+        sourceFaceIndex == source.faces.size() || mappedVertices > mostMappedVertices
+        || (mappedVertices == mostMappedVertices
+            && faceCandidates[i].size() < faceCandidates[sourceFaceIndex].size()))
       {
         sourceFaceIndex = i;
         mostMappedVertices = mappedVertices;
@@ -1831,42 +1886,35 @@ std::optional<BridgeMatch> matchBridgeComponents(
     }
 
     const auto& sourceFaceVertices = sourceTopology.faceVertices[sourceFaceIndex];
-    for (size_t targetFaceIndex = 0u; targetFaceIndex < target.faces.size();
-         ++targetFaceIndex)
+    for (const auto& candidate : faceCandidates[sourceFaceIndex])
     {
-      const auto& targetFaceVertices = targetTopology.faceVertices[targetFaceIndex];
-      if (
-        targetFaceUsed[targetFaceIndex]
-        || sourceFaceVertices.size() != targetFaceVertices.size())
+      const auto& targetFaceVertices =
+        targetTopology.faceVertices[candidate.targetFaceIndex];
+      if (targetFaceUsed[candidate.targetFaceIndex])
       {
         continue;
       }
 
-      for (const auto reversed : {false, true})
+      if (!faceCandidateCompatible(
+            sourceFaceVertices, targetFaceVertices, candidate.reversed, candidate.shift))
       {
-        for (size_t shift = 0u; shift < targetFaceVertices.size(); ++shift)
-        {
-          if (!faceCandidateCompatible(
-                sourceFaceVertices, targetFaceVertices, reversed, shift))
-          {
-            continue;
-          }
-
-          const auto previousVertexMapping = vertexMapping;
-          const auto previousReverseVertexMapping = reverseVertexMapping;
-          assignFaceCandidate(sourceFaceIndex, targetFaceIndex, reversed, shift);
-          search();
-          vertexMapping = previousVertexMapping;
-          reverseVertexMapping = previousReverseVertexMapping;
-          faceMapping[sourceFaceIndex].reset();
-          targetFaceUsed[targetFaceIndex] = false;
-        }
+        continue;
       }
+
+      const auto previousVertexMapping = vertexMapping;
+      const auto previousReverseVertexMapping = reverseVertexMapping;
+      assignFaceCandidate(
+        sourceFaceIndex, candidate.targetFaceIndex, candidate.reversed, candidate.shift);
+      search();
+      vertexMapping = previousVertexMapping;
+      reverseVertexMapping = previousReverseVertexMapping;
+      faceMapping[sourceFaceIndex].reset();
+      targetFaceUsed[candidate.targetFaceIndex] = false;
     }
   };
 
   search();
-  return best;
+  return BridgeMatchResult{std::move(best), complexityLimitExceeded};
 }
 
 template <typename Station>
@@ -2126,7 +2174,20 @@ SweepResult generateBridgeBrushes(
     return result;
   }
 
-  const auto match = matchBridgeComponents(source, target);
+  const auto matchResult = matchBridgeComponents(source, target);
+  if (matchResult.complexityLimitExceeded)
+  {
+    auto result = SweepResult{};
+    result.issues.push_back(SweepIssue{
+      0,
+      0,
+      0,
+      "Bridge topology is too ambiguous to match safely; simplify the selected face "
+      "components"});
+    return result;
+  }
+
+  const auto& match = matchResult.match;
   if (!match)
   {
     auto result = SweepResult{};

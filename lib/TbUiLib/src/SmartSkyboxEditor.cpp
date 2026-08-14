@@ -11,12 +11,13 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include "fs/File.h"
 #include "fs/PathInfo.h"
 #include "fs/TraversalMode.h"
 #include "gl/Texture.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/GameFileSystem.h"
-#include "mdl/LoadTexture.h"
+#include "mdl/LoadFreeImageTexture.h"
 #include "mdl/Map.h"
 #include "ui/BitmapButton.h"
 #include "ui/MapDocument.h"
@@ -375,8 +376,14 @@ QIcon SmartSkyboxEditor::iconForSkybox(const SmartSkyboxItem& skybox)
     return cache.at(cacheKey);
   }
 
-  auto textureResult = mdl::loadTexture(
-    skybox.previewPath, skybox.name, document().map().gameFileSystem());
+  auto fileResult = document().map().gameFileSystem().openFile(skybox.previewPath);
+  if (fileResult.is_error())
+  {
+    return {};
+  }
+
+  auto reader = fileResult.value()->reader().buffer();
+  auto textureResult = mdl::loadFreeImageTexture(reader);
   if (textureResult.is_error())
   {
     return {};
