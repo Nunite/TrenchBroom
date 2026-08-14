@@ -205,6 +205,57 @@ TEST_CASE("MapViewToolBox")
     CHECK_FALSE(toolBox.rotateToolActive());
   }
 
+  SECTION("assemble, clip, and path tools are reported as modal tools")
+  {
+    CHECK_FALSE(toolBox.anyModalToolActive());
+
+    toolBox.toggleAssembleBrushTool();
+    CHECK(toolBox.anyModalToolActive());
+    toolBox.toggleAssembleBrushTool();
+    CHECK_FALSE(toolBox.anyModalToolActive());
+
+    toolBox.togglePathTool();
+    CHECK(toolBox.anyModalToolActive());
+    toolBox.togglePathTool();
+    CHECK_FALSE(toolBox.anyModalToolActive());
+
+    const auto builder =
+      mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+    auto* brushNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{-16, -16, -16}, {16, 16, 16}}, "material")
+      | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    toolBox.toggleClipTool();
+    CHECK(toolBox.anyModalToolActive());
+  }
+
+  SECTION("vertex tool coexists with transforms but not sweep")
+  {
+    const auto builder =
+      mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+    auto* brushNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{-16, -16, -16}, {16, 16, 16}}, "material")
+      | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
+    toolBox.toggleVertexTool();
+    toolBox.toggleRotateTool();
+    CHECK(toolBox.vertexToolActive());
+    CHECK(toolBox.rotateToolActive());
+
+    toolBox.toggleRotateTool();
+    const auto faceIndex = *brushNode->brush().findFace(vm::vec3d{1, 0, 0});
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, {{brushNode, faceIndex}});
+    toolBox.toggleSweepTool();
+
+    CHECK(toolBox.sweepToolActive());
+    CHECK_FALSE(toolBox.vertexToolActive());
+  }
+
   SECTION("sweep page exposes bridge controls for two selected faces")
   {
     const auto builder =

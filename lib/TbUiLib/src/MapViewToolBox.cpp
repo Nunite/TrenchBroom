@@ -543,8 +543,9 @@ bool MapViewToolBox::controlPointToolActive() const
 
 bool MapViewToolBox::anyModalToolActive() const
 {
-  return rotateToolActive() || sweepToolActive() || scaleToolActive() || shearToolActive()
-         || anyNodeHandleToolActive();
+  return assembleBrushToolActive() || clipToolActive() || rotateToolActive()
+         || sweepToolActive() || scaleToolActive() || shearToolActive()
+         || anyNodeHandleToolActive() || pathToolActive();
 }
 
 void MapViewToolBox::moveNodeHandles(const vm::vec3d& delta)
@@ -611,6 +612,7 @@ void MapViewToolBox::createTools(QStackedLayout* bookCtrl)
   addExclusiveToolGroup(
     assembleBrushTool(),
     vertexTool(),
+    sweepTool(),
     edgeTool(),
     faceTool(),
     chamferTool(),
