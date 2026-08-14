@@ -44,8 +44,8 @@ struct BrushOutlineColorState
   bool hasSelectedFaces = false;
   vm::bbox3d brushBounds;
   size_t brushFaceCount = 0;
-  std::optional<vm::bbox3d> brushEntityBounds;
-  std::string_view brushEntityClassname;
+  std::optional<vm::bbox3d> brushEntityBounds{};
+  std::string_view brushEntityClassname{};
 };
 
 const std::vector<Color>& readable2DBrushOutlinePalette();
