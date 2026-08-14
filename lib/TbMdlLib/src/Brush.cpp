@@ -802,39 +802,38 @@ static std::optional<BrushGeometry> chamferEdgesInGeometry(
       return std::nullopt;
     }
 
-    const auto offset = distance * sinHalfAngle;
-    if (!(offset > eps))
+    const auto cosHalfAngle = vm::sqrt((1.0 + dot) * 0.5);
+    if (!(cosHalfAngle > eps))
     {
       return std::nullopt;
     }
 
-    if (segments == 1)
+    const auto angle = std::acos(dot);
+    if (!(angle > eps))
     {
-      const auto pointOnPlane = a - bisectorNormal * offset;
-      chamferPlanes.emplace_back(pointOnPlane, bisectorNormal);
+      return std::nullopt;
     }
-    else
+
+    const auto sign = vm::dot(edgeDir, vm::cross(n1, n2)) >= 0.0 ? 1.0 : -1.0;
+    const auto step = sign * (angle / static_cast<double>(segments));
+
+    // The bevel endpoints remain `distance` units from the original edge. Each
+    // plane spans consecutive points on the circle tangent to the adjacent faces.
+    const auto circleCenter = a - bisectorNormal * (distance / sinHalfAngle);
+    const auto circleRadius = distance * cosHalfAngle / sinHalfAngle;
+    const auto chordOffset =
+      circleRadius * std::cos(angle / (2.0 * static_cast<double>(segments)));
+
+    for (int i = 0; i < segments; ++i)
     {
-      const auto angle = std::acos(dot);
-      if (!(angle > eps))
+      const auto rot = vm::quatd{edgeDir, step * (static_cast<double>(i) + 0.5)};
+      const auto normal = vm::normalize(rot * n1);
+      if (vm::is_zero(normal, eps))
       {
         return std::nullopt;
       }
 
-      const auto sign = vm::dot(edgeDir, vm::cross(n1, n2)) >= 0.0 ? 1.0 : -1.0;
-      const auto step = sign * (angle / static_cast<double>(segments + 1));
-
-      for (int i = 1; i <= segments; ++i)
-      {
-        const auto rot = vm::quatd{edgeDir, step * static_cast<double>(i)};
-        const auto normal = vm::normalize(rot * n1);
-        if (vm::is_zero(normal, eps))
-        {
-          return std::nullopt;
-        }
-
-        chamferPlanes.emplace_back(a - normal * offset, normal);
-      }
+      chamferPlanes.emplace_back(circleCenter + normal * chordOffset, normal);
     }
   }
 
@@ -909,7 +908,8 @@ bool Brush::canChamferEdges(
     return false;
   }
 
-  const auto points = chamferEdgesInGeometry(*m_geometry, edgePositions, distance, segments);
+  const auto points =
+    chamferEdgesInGeometry(*m_geometry, edgePositions, distance, segments);
   if (!points)
   {
     return false;

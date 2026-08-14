@@ -1811,18 +1811,28 @@ TEST_CASE("Brush")
       CHECK(worldBounds.contains(brush.bounds()));
     }
 
-    SECTION("multiple edge segments add intermediate bevel faces")
+    SECTION("multiple edge segments form a stable circular bevel")
     {
+      const auto segments = GENERATE(2, 3, 4, 8);
+      CAPTURE(segments);
+
       auto brush = builder.createCube(64.0, "material") | kdl::value();
       const auto oldEdge = vm::segment3d{{32.0, 32.0, -32.0}, {32.0, 32.0, 32.0}};
 
-      CHECK(brush.canChamferEdges(worldBounds, {oldEdge}, 16.0, 3));
-      REQUIRE(brush.chamferEdges(worldBounds, {oldEdge}, 16.0, 3));
+      CHECK(brush.canChamferEdges(worldBounds, {oldEdge}, 16.0, segments));
+      REQUIRE(brush.chamferEdges(worldBounds, {oldEdge}, 16.0, segments));
 
       CHECK_FALSE(brush.hasEdge(oldEdge));
-      CHECK(brush.vertexCount() == 12u);
-      CHECK(brush.faceCount() == 8u);
+      CHECK(brush.vertexCount() == 8u + 2u * static_cast<size_t>(segments));
+      CHECK(brush.faceCount() == 6u + static_cast<size_t>(segments));
       CHECK(brush.fullySpecified());
+      CHECK(worldBounds.contains(brush.bounds()));
+
+      constexpr auto epsilon = 0.0001;
+      CHECK(brush.hasVertex({16.0, 32.0, -32.0}, epsilon));
+      CHECK(brush.hasVertex({16.0, 32.0, 32.0}, epsilon));
+      CHECK(brush.hasVertex({32.0, 16.0, -32.0}, epsilon));
+      CHECK(brush.hasVertex({32.0, 16.0, 32.0}, epsilon));
     }
 
     SECTION("rejects invalid edge chamfers")
