@@ -1918,7 +1918,8 @@ void defineModule(py::module_& module)
         const auto result = document.map().save();
         if (result.is_error())
         {
-          result.if_error([](const auto& e) { throw std::runtime_error{e.msg}; });
+          static_cast<void>(
+            result.if_error([](const auto& e) { throw std::runtime_error{e.msg}; }));
         }
       })
     .def(
@@ -1928,7 +1929,8 @@ void defineModule(py::module_& module)
         const auto result = document.reload();
         if (result.is_error())
         {
-          result.if_error([](const auto& e) { throw std::runtime_error{e.msg}; });
+          static_cast<void>(
+            result.if_error([](const auto& e) { throw std::runtime_error{e.msg}; }));
         }
         PythonHandleRegistry::instance().invalidateDocument(&document);
       })

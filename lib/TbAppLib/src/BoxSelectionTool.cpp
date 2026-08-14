@@ -1,7 +1,6 @@
 #include "ui/BoxSelectionTool.h"
 
 #include "base/Color.h"
-#include "base/Macros.h"
 #include "gl/Camera.h"
 #include "mdl/EditorContext.h"
 #include "mdl/Map.h"
@@ -21,6 +20,7 @@
 #include "vm/intersection.h"
 
 #include <algorithm>
+#include <stdexcept>
 #include <unordered_set>
 #include <vector>
 
@@ -44,7 +44,8 @@ vm::bbox2d projectBounds(const vm::bbox3d& bounds, const vm::axis::type viewAxis
     return vm::bbox2d{
       vm::vec2d{bounds.min.x(), bounds.min.y()},
       vm::vec2d{bounds.max.x(), bounds.max.y()}};
-    switchDefault();
+  default:
+    throw std::logic_error{"Invalid view axis"};
   }
 }
 
