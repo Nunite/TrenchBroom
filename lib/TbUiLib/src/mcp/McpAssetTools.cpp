@@ -362,7 +362,9 @@ QJsonObject assetJson(const BrowserAsset& asset)
   if (asset.lastModified)
   {
     json.insert(
-      "lastModified", QString::number(asset.lastModified->time_since_epoch().count()));
+      "lastModified",
+      QString::number(
+        static_cast<qlonglong>(asset.lastModified->time_since_epoch().count())));
   }
 
   return json;

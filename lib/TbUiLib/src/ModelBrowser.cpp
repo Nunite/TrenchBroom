@@ -39,7 +39,6 @@
 #include <QVBoxLayout>
 
 #include "base/PreferenceManager.h"
-#include "prefs/Preferences.h"
 #include "fs/DiskIO.h"
 #include "fs/FileSystem.h"
 #include "fs/PathInfo.h"
@@ -63,6 +62,7 @@
 #include "mdl/Transaction.h"
 #include "mdl/WadPropertyUtils.h"
 #include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "ui/AppController.h"
 #include "ui/AssetBrowserModel.h"
 #include "ui/BitmapButton.h"
@@ -662,7 +662,7 @@ void ModelBrowser::saveSelectionAsPrefab()
         checkPrefabNameAvailable(prefabDirectory, prefabName.toStdString());
       result.is_error())
   {
-    const auto& error = std::get<tb::Error>(result.error());
+    const auto error = std::get<tb::Error>(result.error());
     QMessageBox::warning(this, tr("Save Prefab"), QString::fromStdString(error.msg));
     return;
   }
@@ -675,7 +675,7 @@ void ModelBrowser::saveSelectionAsPrefab()
   const auto result = writePrefabAsset(filePath, prefabText);
   if (result.is_error())
   {
-    const auto& error = std::get<tb::Error>(result.error());
+    const auto error = std::get<tb::Error>(result.error());
     QMessageBox::warning(this, tr("Save Prefab"), QString::fromStdString(error.msg));
     return;
   }
@@ -685,7 +685,7 @@ void ModelBrowser::saveSelectionAsPrefab()
     if (const auto thumbnailResult = savePrefabThumbnail(*mapWindow, map, filePath);
         thumbnailResult.is_error())
     {
-      const auto& error = std::get<tb::Error>(thumbnailResult.error());
+      const auto error = std::get<tb::Error>(thumbnailResult.error());
       QMessageBox::warning(this, tr("Save Prefab"), QString::fromStdString(error.msg));
     }
   }
@@ -730,7 +730,7 @@ void ModelBrowser::renamePrefab(std::filesystem::path prefabPath)
   const auto result = renamePrefabAsset(absPath, prefabName.toStdString());
   if (result.is_error())
   {
-    const auto& error = std::get<tb::Error>(result.error());
+    const auto error = std::get<tb::Error>(result.error());
     QMessageBox::warning(this, tr("Rename Prefab"), QString::fromStdString(error.msg));
     return;
   }
@@ -761,7 +761,7 @@ void ModelBrowser::deletePrefab(std::filesystem::path prefabPath)
   const auto result = deletePrefabAsset(absPath);
   if (result.is_error())
   {
-    const auto& error = std::get<tb::Error>(result.error());
+    const auto error = std::get<tb::Error>(result.error());
     QMessageBox::warning(this, tr("Delete Prefab"), QString::fromStdString(error.msg));
     return;
   }
