@@ -248,28 +248,28 @@ quint16 McpHttpServer::port() const
 
 int McpHttpServer::ordinaryConnectionCount() const
 {
-  return m_connections.size() - m_sseConnections.size();
+  return static_cast<int>(m_connections.size() - m_sseConnections.size());
 }
 
 void McpHttpServer::startRequestDeadline(QTcpSocket& socket)
 {
   auto* timer = new QTimer{&socket};
   timer->setSingleShot(true);
-  connect(timer, &QTimer::timeout, this, [this, socket = &socket]() {
+  connect(timer, &QTimer::timeout, this, [this, socketPtr = &socket]() {
     if (
-      !m_connections.contains(socket)
-      || socket->property("tbMcpHttpRequestComplete").toBool())
+      !m_connections.contains(socketPtr)
+      || socketPtr->property("tbMcpHttpRequestComplete").toBool())
     {
       return;
     }
-    socket->setProperty("tbMcpHttpRequestComplete", true);
+    socketPtr->setProperty("tbMcpHttpRequestComplete", true);
     writeHttpResponse(
-      *socket,
+      *socketPtr,
       408,
       reasonPhrase(408),
       "application/json",
       jsonBody("HTTP request timed out"));
-    socket->disconnectFromHost();
+    socketPtr->disconnectFromHost();
   });
   m_requestDeadlines.insert(&socket, timer);
   timer->start(m_limits.incompleteRequestTimeoutMs);

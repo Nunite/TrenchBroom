@@ -612,12 +612,12 @@ void McpBridgeServer::startRequestDeadline(QLocalSocket& socket)
 {
   auto* timer = new QTimer{&socket};
   timer->setSingleShot(true);
-  connect(timer, &QTimer::timeout, this, [this, socket = &socket]() {
-    if (!m_connections.contains(socket))
+  connect(timer, &QTimer::timeout, this, [this, socketPtr = &socket]() {
+    if (!m_connections.contains(socketPtr))
     {
       return;
     }
-    rejectAndDisconnect(*socket, "MCP bridge request timed out");
+    rejectAndDisconnect(*socketPtr, "MCP bridge request timed out");
   });
   m_requestDeadlines.insert(&socket, timer);
   timer->start(m_transportLimits.incompleteRequestTimeoutMs);
