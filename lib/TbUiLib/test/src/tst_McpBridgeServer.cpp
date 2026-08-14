@@ -3295,6 +3295,9 @@ TEST_CASE(
     {"node:999"},
     {},
     {},
+    {},
+    {},
+    {},
   };
 
   const auto compact = moduleCompactForMapResult(
@@ -4800,6 +4803,10 @@ TEST_CASE(
     QStringList{"node:0"},
     QStringList{"mcp-op-other"},
     QJsonObject{{"moduleId", "doc-b-module"}, {"role", "walkable"}},
+    0,
+    {},
+    {},
+    {},
   };
   metadataStore[QString{"%1|node:0"}.arg(otherFingerprint)] = McpBrushMetadataRecord{
     "node:0",

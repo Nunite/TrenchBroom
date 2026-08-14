@@ -88,7 +88,8 @@ TEST_CASE("McpSessionState enforces bounded caches", "[McpBridgeServer][McpSessi
     auto state = McpSessionState{};
     state.brushMetadata["doc:1|mcp:1:1"] =
       McpBrushMetadataRecord{"mcp:1:1", "doc:1", {}, false};
-    state.modules["doc:1|module"] = McpModuleRecord{"module", "doc:1"};
+    state.modules["doc:1|module"] =
+      McpModuleRecord{"module", "doc:1", {}, {}, {}, 0, {}, {}, {}};
 
     for (auto i = 1; i <= 5; ++i)
     {

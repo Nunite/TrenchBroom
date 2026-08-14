@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y software-properties-common && \
       zlib1g-dev \
       libfuse2 \
       libgtk-3-0 \
+      libpulse0 \
       libx11-xcb1 \
       libxcb-cursor0 \
       libxcb-icccm4 \
