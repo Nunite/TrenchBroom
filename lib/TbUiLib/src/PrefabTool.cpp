@@ -340,7 +340,7 @@ std::vector<std::string> prefabMaterialNames(mdl::Map& map, const std::string& p
     return {};
   }
 
-  auto nodes = std::move(nodesResult.value());
+  auto nodes = std::move(nodesResult).value();
   auto result = std::vector<std::string>{};
   for (const auto* node : nodes)
   {
@@ -577,7 +577,7 @@ bool PrefabTool::updatePreview(
     return false;
   }
 
-  auto nodes = std::move(nodesResult.value());
+  auto nodes = std::move(nodesResult).value();
   const auto bounds = computePrefabAssetBounds(nodes);
   const auto delta = placementDelta(map, inputState, bounds, map.referenceBounds());
   if (!translatePrefabNodes(nodes, delta, map))

@@ -180,11 +180,6 @@ vm::plane3d toVmPlane(const Plane& value)
   return vm::plane3d{value.dist, toVmVec3(value.normal)};
 }
 
-Plane fromVmPlane(const vm::plane3d& value)
-{
-  return Plane{fromVmVec3(value.normal), value.distance};
-}
-
 struct DocumentHandle
 {
   MapDocument* document = nullptr;
@@ -1607,7 +1602,7 @@ BrushHandle createBrush(const py::iterable& pointObjects, py::object materialNam
     throw std::runtime_error{"Could not create brush from points"};
   }
 
-  auto* brushNode = new mdl::BrushNode{std::move(brush.value())};
+  auto* brushNode = new mdl::BrushNode{std::move(brush).value()};
   const auto addedNodes = mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
   if (addedNodes.empty())
   {
