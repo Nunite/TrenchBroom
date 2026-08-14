@@ -42,7 +42,7 @@ struct McpError
 {
   McpErrorCode code = McpErrorCode::InternalError;
   QString message;
-  QJsonObject details;
+  QJsonObject details{};
 };
 
 QString errorCodeName(McpErrorCode code);
