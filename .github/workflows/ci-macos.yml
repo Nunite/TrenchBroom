@@ -50,7 +50,7 @@ jobs:
             echo "TB_ENABLE_UBSAN=0" >> $GITHUB_ENV
           fi
           if [[ "${{ matrix.tb-build-type }}" != "sanitize" ]] && \
-             [[ "${{ github.ref }}" == "refs/heads/master" || "${{ github.ref }}" == refs/tags/* ]] && \
+             [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/* ]] && \
              [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12 }}" ]] && \
              [[ -n "${{ secrets.ACTIONS_MAC_SIGN_CERTIFICATES_P12_PASSWORD }}" ]] && \
              [[ -n "${{ secrets.ACTIONS_MAC_SIGN_IDENTITY }}" ]] && \
@@ -96,7 +96,7 @@ jobs:
         run: ccache --show-stats
 
       - name: Save ccache
-        if: ${{ success() && github.ref == 'refs/heads/master' }}
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
         uses: ./.github/actions/ccache-save
         with:
           os: ${{ matrix.os }}

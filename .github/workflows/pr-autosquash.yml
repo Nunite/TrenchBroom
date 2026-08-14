@@ -119,7 +119,7 @@ jobs:
               body,
             });
 
-  rebase-master:
+  rebase-main:
     if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '@bot rebase') }}
     runs-on: ubuntu-latest
     env:
@@ -189,11 +189,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Rebase onto master
+      - name: Rebase onto main
         run: |
           set -euo pipefail
-          git fetch origin master
-          git rebase origin/master
+          git fetch origin main
+          git rebase origin/main
 
       - name: Push rebased history
         if: ${{ steps.command.outputs.dry_run != 'true' }}
@@ -213,8 +213,8 @@ jobs:
             let body;
             if (status === "success") {
               body = dryRun
-                ? "Rebase dry-run succeeded. Rebase onto origin/master completed without conflicts; no push was performed."
-                : "Rebase succeeded. The PR branch was rebased onto origin/master and force-pushed.";
+                ? "Rebase dry-run succeeded. Rebase onto origin/main completed without conflicts; no push was performed."
+                : "Rebase succeeded. The PR branch was rebased onto origin/main and force-pushed.";
             } else {
               body = `Rebase (${mode}) failed. Check the workflow logs for details.`;
             }

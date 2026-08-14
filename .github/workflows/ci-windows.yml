@@ -63,7 +63,7 @@ jobs:
         run: ccache --show-stats
 
       - name: Save ccache
-        if: ${{ success() && github.ref == 'refs/heads/master' }}
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
         uses: ./.github/actions/ccache-save
         with:
           os: windows-2022
@@ -75,11 +75,11 @@ jobs:
         env:
           SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
         run: |
-          # Only sign master/tag builds (not PRs) and only when the SignPath
+          # Only sign main/tag builds (not PRs) and only when the SignPath
           # secret is configured, e.g. on forks or before setup is complete.
-          $isMasterOrTag = ($env:GITHUB_REF -eq 'refs/heads/master') -or ($env:GITHUB_REF -like 'refs/tags/*')
+          $isMainOrTag = ($env:GITHUB_REF -eq 'refs/heads/main') -or ($env:GITHUB_REF -like 'refs/tags/*')
           $hasToken = -not [string]::IsNullOrEmpty($env:SIGNPATH_API_TOKEN)
-          $shouldSign = $isMasterOrTag -and $hasToken
+          $shouldSign = $isMainOrTag -and $hasToken
           "TB_SIGN_WINDOWS=$($shouldSign.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Upload unsigned artifact for signing
