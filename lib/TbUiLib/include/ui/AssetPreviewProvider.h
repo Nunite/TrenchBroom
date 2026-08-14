@@ -47,8 +47,8 @@ enum class AssetPreviewStatus
 struct AssetPreviewState
 {
   AssetPreviewStatus status = AssetPreviewStatus::Unsupported;
-  std::optional<GoldSrcSpritePreview> sprite;
-  std::filesystem::path soundPath;
+  std::optional<GoldSrcSpritePreview> sprite = std::nullopt;
+  std::filesystem::path soundPath{};
 
   friend bool operator==(const AssetPreviewState&, const AssetPreviewState&) = default;
 };
