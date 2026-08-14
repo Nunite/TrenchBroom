@@ -500,11 +500,11 @@ panel.add_label("Loaded from preferences")
 
     QCursor::setPos({300, 300});
     mapView->showPieMenu();
-    QApplication::processEvents();
 
+    QTRY_VERIFY_WITH_TIMEOUT(findVisiblePieMenu() != nullptr, 1000);
     auto* menu = findVisiblePieMenu();
     REQUIRE(menu != nullptr);
-    REQUIRE(QTest::qWaitForWindowExposed(menu));
+    QTRY_VERIFY_WITH_TIMEOUT(menu->isVisible(), 1000);
 
     const auto center = QPoint{menu->width() / 2, menu->height() / 2};
     sendMouseMove(*menu, center + QPoint{0, -80});

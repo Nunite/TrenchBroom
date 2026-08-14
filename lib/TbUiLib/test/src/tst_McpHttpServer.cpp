@@ -50,7 +50,8 @@ struct HttpResponse
 mcp::McpBridgeConfig makeConfig(const mcp::McpMode mode)
 {
   return mcp::McpBridgeConfig{
-    QString{"trenchbroom-mcp-http-test-%1"}.arg(QUuid::createUuid().toString()),
+    QString{"tb-http-%1"}.arg(
+      QUuid::createUuid().toString(QUuid::WithoutBraces).left(12)),
     TestToken,
     mode,
     true,

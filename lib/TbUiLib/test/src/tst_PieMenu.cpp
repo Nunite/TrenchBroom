@@ -131,7 +131,7 @@ TEST_CASE("PieMenu")
     menu.addItem("One", [&]() { executed = true; });
     menu.addItem("Two", []() {});
     menu.showAt({300, 300});
-    CHECK(QTest::qWaitForWindowExposed(&menu));
+    QTRY_VERIFY_WITH_TIMEOUT(menu.isVisible(), 1000);
 
     const auto center = QPoint{menu.width() / 2, menu.height() / 2};
     sendMouseMove(menu, center + QPoint{0, -80});
@@ -148,7 +148,7 @@ TEST_CASE("PieMenu")
 
     menu.addItem("Disabled", [&]() { executed = true; }, false);
     menu.showAt({300, 300});
-    CHECK(QTest::qWaitForWindowExposed(&menu));
+    QTRY_VERIFY_WITH_TIMEOUT(menu.isVisible(), 1000);
 
     const auto center = QPoint{menu.width() / 2, menu.height() / 2};
     sendMouseMove(menu, center + QPoint{0, -80});

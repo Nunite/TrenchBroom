@@ -20,6 +20,11 @@ namespace tb::ui
 std::optional<std::string> modelPathForSmartModelEditor(
   const std::filesystem::path& absModelPath, const std::filesystem::path& gamePath)
 {
+  if (gamePath.empty())
+  {
+    return std::nullopt;
+  }
+
   std::error_code ec;
   const auto relativeModelPathFull =
     std::filesystem::relative(absModelPath, gamePath, ec);

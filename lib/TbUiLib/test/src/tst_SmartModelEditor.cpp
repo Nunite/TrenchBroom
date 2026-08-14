@@ -39,12 +39,12 @@ namespace tb::ui
 
 TEST_CASE("SmartModelEditor")
 {
+  const auto gamePath = std::filesystem::path{"game"};
+
   SECTION("uses path from models directory when model is below game path")
   {
     CHECK(
-      modelPathForSmartModelEditor(
-        std::filesystem::path{R"(C:\Games\HalfLife\valve\models\props\crate.mdl)"},
-        std::filesystem::path{R"(C:\Games\HalfLife\valve)"})
+      modelPathForSmartModelEditor(gamePath / "models" / "props" / "crate.mdl", gamePath)
       == std::optional<std::string>{"models/props/crate.mdl"});
   }
 
@@ -52,17 +52,14 @@ TEST_CASE("SmartModelEditor")
   {
     CHECK(
       modelPathForSmartModelEditor(
-        std::filesystem::path{R"(C:\Games\HalfLife\valve\custom\pack\models\barney.mdl)"},
-        std::filesystem::path{R"(C:\Games\HalfLife\valve)"})
+        gamePath / "custom" / "pack" / "models" / "barney.mdl", gamePath)
       == std::optional<std::string>{"models/barney.mdl"});
   }
 
   SECTION("falls back to game relative path outside models directory")
   {
     CHECK(
-      modelPathForSmartModelEditor(
-        std::filesystem::path{R"(C:\Games\HalfLife\valve\sprites\hud.spr)"},
-        std::filesystem::path{R"(C:\Games\HalfLife\valve)"})
+      modelPathForSmartModelEditor(gamePath / "sprites" / "hud.spr", gamePath)
       == std::optional<std::string>{"sprites/hud.spr"});
   }
 
@@ -70,8 +67,7 @@ TEST_CASE("SmartModelEditor")
   {
     CHECK(
       modelPathForSmartModelEditor(
-        std::filesystem::path{R"(C:\Games\HalfLife\valve\models\props\crate.mdl)"},
-        std::filesystem::path{})
+        gamePath / "models" / "props" / "crate.mdl", std::filesystem::path{})
       == std::nullopt);
   }
 

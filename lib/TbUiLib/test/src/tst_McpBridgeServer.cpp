@@ -94,8 +94,8 @@ mcp::McpBridgeResponse readBridgeResponse(
 
 QString uniqueBridgePipeName()
 {
-  return QString{"trenchbroom-mcp-transport-test-%1"}.arg(
-    QUuid::createUuid().toString(QUuid::WithoutBraces));
+  return QString{"tb-test-%1"}.arg(
+    QUuid::createUuid().toString(QUuid::WithoutBraces).left(12));
 }
 
 void processEventsFor(const int durationMs)
@@ -864,8 +864,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("does not remove an active bridge pipe")
   {
-    const auto pipeName =
-      QString{"trenchbroom-mcp-active-%1"}.arg(QUuid::createUuid().toString());
+    const auto pipeName = uniqueBridgePipeName();
     auto activeServer = QLocalServer{};
     REQUIRE(activeServer.listen(pipeName));
 

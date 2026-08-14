@@ -260,8 +260,7 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     REQUIRE(keyWidget != nullptr);
     auto* keyLabel = keyWidget->findChild<QLabel*>();
     REQUIRE(keyLabel != nullptr);
-    CHECK(
-      keyLabel->textInteractionFlags().testFlag(Qt::TextSelectableByMouse));
+    CHECK(keyLabel->textInteractionFlags().testFlag(Qt::TextSelectableByMouse));
 
     QTest::mouseDClick(keyLabel, Qt::LeftButton);
     CHECK(keyLabel->selectedText() == "classname");
@@ -327,6 +326,7 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     editor.show();
     editor.resize(800, 600);
     processOutlinerUpdates();
+    QTRY_VERIFY_WITH_TIMEOUT(propertyRow(editor, "skyname") != nullptr, 1000);
 
     auto* classnameRow = propertyRow(editor, "classname");
     auto* skynameRow = propertyRow(editor, "skyname");
@@ -345,8 +345,7 @@ TEST_CASE("OutlinerEntityPropertyEditor")
       classnameRow->findChild<QWidget*>("outlinerPropertyActions");
     const auto* skynameActions =
       skynameRow->findChild<QWidget*>("outlinerPropertyActions");
-    const auto* colorActions =
-      colorRow->findChild<QWidget*>("outlinerPropertyActions");
+    const auto* colorActions = colorRow->findChild<QWidget*>("outlinerPropertyActions");
     REQUIRE(classnameActions != nullptr);
     REQUIRE(skynameActions != nullptr);
     REQUIRE(colorActions != nullptr);
@@ -356,8 +355,8 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     CHECK(classnameEdit->geometry().right() == skynameEdit->geometry().right());
     CHECK(classnameEdit->geometry().right() == colorEdit->geometry().right());
 
-    const auto* colorButton = colorRow->findChild<QToolButton*>(
-      "outlinerPropertyColorButton");
+    const auto* colorButton =
+      colorRow->findChild<QToolButton*>("outlinerPropertyColorButton");
     REQUIRE(colorButton != nullptr);
     CHECK(colorButton->size() == QSize{24, 24});
   }
