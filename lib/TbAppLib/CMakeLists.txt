@@ -13,6 +13,7 @@ target_sources(TbAppLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CameraTool3D.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CellLayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ChamferTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ChamferToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ClipTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ClipToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ControlPointTool.cpp
@@ -84,6 +85,7 @@ target_sources(TbAppLib
       ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CameraTool3D.h
       ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/CellLayout.h
       ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ChamferTool.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ChamferToolController.h
       ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ClipTool.h
       ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ClipToolController.h
       ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ControlPointTool.h

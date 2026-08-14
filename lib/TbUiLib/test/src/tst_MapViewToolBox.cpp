@@ -26,6 +26,7 @@
 
 #include "mdl/BrushBuilder.h"
 #include "mdl/BrushNode.h"
+#include "mdl/EditorContext.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionManager.h"
@@ -259,6 +260,7 @@ TEST_CASE("MapViewToolBox")
 
     toolBox.toggleChamferTool();
     REQUIRE(toolBox.chamferToolActive());
+    CHECK(map.editorContext().blockSelection());
 
     auto* page = dynamic_cast<ChamferToolPage*>(bookCtrl.currentWidget());
     REQUIRE(page != nullptr);
@@ -277,9 +279,11 @@ TEST_CASE("MapViewToolBox")
     const auto edgeHit =
       mdl::Hit{mdl::EdgeHandle::HandleHitType, 0.0, edge.position.center(), edge};
     toolBox.chamferTool().edgeTool().select({edgeHit}, false);
+    REQUIRE(toolBox.chamferTool().hasPreview());
 
     distance->setValue(4.0);
     segments->setValue(2);
+    CHECK((toolBox.chamferTool().parameters() == ChamferParameters{4.0, 2}));
     REQUIRE(apply->isEnabled());
 
     const auto oldFaceCount = brushNode->brush().faceCount();
@@ -292,6 +296,10 @@ TEST_CASE("MapViewToolBox")
     CHECK(
       map.nodeHandles().allHandles<mdl::VertexHandle>().size()
       == brushNode->brush().vertexCount());
+
+    toolBox.toggleChamferTool();
+    CHECK_FALSE(toolBox.chamferToolActive());
+    CHECK_FALSE(map.editorContext().blockSelection());
   }
 
   SECTION("create entity tool creates model entities from browser payloads")

@@ -816,7 +816,7 @@ Hit #action(Controls/Map view/Perform sweep) to fill the gap with brushes and se
 
 ### Chamfering {#chamfering}
 
-Choose #menu(Menu/Edit/Tools/Chamfer Tool) to bevel selected brush edges or cut selected brush corners. The target selector switches between edge and vertex handles. Select one or more handles, set the chamfer distance, and apply the operation. Edge chamfers also support multiple segments for a rounded profile. UV Lock controls how the affected face projections are preserved.
+Choose #menu(Menu/Edit/Tools/Chamfer Tool) to bevel selected brush edges or cut selected brush corners. The target selector switches between edge and vertex handles. Select one or more handles to preview the result, then adjust the chamfer distance and apply the operation. Edge chamfers also support multiple segments for a rounded profile. UV Lock controls how the affected face projections are preserved.
 
 ### Vertex Editing {#vertex_editing}
 

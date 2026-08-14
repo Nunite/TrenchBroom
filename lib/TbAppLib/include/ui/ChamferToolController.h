@@ -19,48 +19,30 @@
 
 #pragma once
 
-#include <QWidget>
-
-#include "base/NotifierConnection.h"
-
-class QComboBox;
-class QDoubleSpinBox;
-class QLabel;
-class QPushButton;
-class QSpinBox;
+#include "ui/ToolController.h"
 
 namespace tb::ui
 {
 class ChamferTool;
-class MapDocument;
 
-class ChamferToolPage : public QWidget
+class ChamferToolController : public ToolController
 {
-  Q_OBJECT
 private:
-  MapDocument& m_document;
   ChamferTool& m_tool;
 
-  QComboBox* m_target = nullptr;
-  QDoubleSpinBox* m_distance = nullptr;
-  QLabel* m_segmentsLabel = nullptr;
-  QSpinBox* m_segments = nullptr;
-  QLabel* m_status = nullptr;
-  QPushButton* m_apply = nullptr;
-
-  NotifierConnection m_notifierConnection;
-
 public:
-  ChamferToolPage(MapDocument& document, ChamferTool& tool, QWidget* parent = nullptr);
+  explicit ChamferToolController(ChamferTool& tool);
 
 private:
-  void createGui();
-  void connectObservers();
-  void targetChanged(int index);
-  void distanceChanged(double value);
-  void segmentsChanged(int value);
-  void applyChamfer();
-  void updateGui();
+  Tool& tool() override;
+  const Tool& tool() const override;
+
+  void setRenderOptions(
+    const InputState& inputState, render::RenderContext& renderContext) const override;
+  void render(
+    const InputState& inputState,
+    render::RenderContext& renderContext,
+    render::RenderBatch& renderBatch) override;
 };
 
 } // namespace tb::ui

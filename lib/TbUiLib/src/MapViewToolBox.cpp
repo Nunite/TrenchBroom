@@ -710,7 +710,7 @@ void MapViewToolBox::toolDeactivated(Tool&)
 void MapViewToolBox::updateEditorContext()
 {
   auto& editorContext = m_document.map().editorContext();
-  editorContext.setBlockSelection(assembleBrushToolActive());
+  editorContext.setBlockSelection(assembleBrushToolActive() || chamferToolActive());
 }
 
 void MapViewToolBox::documentWasLoaded()

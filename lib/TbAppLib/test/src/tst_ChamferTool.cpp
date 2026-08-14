@@ -82,11 +82,19 @@ TEST_CASE("ChamferTool")
   {
     REQUIRE(tool.activate());
     const auto edge = mdl::EdgeHandle{vm::segment3d{{-16, -16, 16}, {16, -16, 16}}};
-    map.nodeHandles().selectHandle(edge);
+    const auto edgeHit =
+      mdl::Hit{mdl::EdgeHandle::HandleHitType, 0.0, edge.position.center(), edge};
+    tool.edgeTool().select({edgeHit}, false);
 
     const auto oldFaceCount = brushNode->brush().faceCount();
-    REQUIRE(tool.canApply(4.0, 2));
-    REQUIRE(tool.apply(4.0, 2));
+    CHECK(tool.hasPreview());
+    CHECK(brushNode->brush().faceCount() == oldFaceCount);
+
+    tool.setParameters(ChamferParameters{4.0, 2});
+    REQUIRE(tool.hasPreview());
+    REQUIRE(tool.canApply());
+    CHECK(brushNode->brush().faceCount() == oldFaceCount);
+    REQUIRE(tool.apply());
 
     CHECK(brushNode->brush().faceCount() == oldFaceCount + 2u);
     CHECK_FALSE(brushNode->brush().hasEdge(edge.position));
@@ -102,10 +110,15 @@ TEST_CASE("ChamferTool")
     tool.setTarget(ChamferTarget::Vertices);
 
     const auto vertex = mdl::VertexHandle{vm::vec3d{16, 16, 16}};
-    map.nodeHandles().selectHandle(vertex);
+    const auto vertexHit =
+      mdl::Hit{mdl::VertexHandle::HandleHitType, 0.0, vertex.position, vertex};
+    tool.vertexTool().select({vertexHit}, false);
 
     const auto oldFaceCount = brushNode->brush().faceCount();
-    REQUIRE(tool.apply(4.0, 1));
+    tool.setParameters(ChamferParameters{4.0, 1});
+    REQUIRE(tool.hasPreview());
+    CHECK(brushNode->brush().faceCount() == oldFaceCount);
+    REQUIRE(tool.apply());
 
     CHECK(brushNode->brush().faceCount() == oldFaceCount + 1u);
     CHECK_FALSE(brushNode->brush().hasVertex(vertex.position));
@@ -115,13 +128,54 @@ TEST_CASE("ChamferTool")
   {
     REQUIRE(tool.activate());
 
-    CHECK_FALSE(tool.canApply(4.0, 1));
-    CHECK_FALSE(tool.apply(4.0, 1));
+    CHECK_FALSE(tool.hasPreview());
+    CHECK_FALSE(tool.canApply());
+    CHECK_FALSE(tool.apply());
 
-    map.nodeHandles().selectHandle(
-      mdl::EdgeHandle{vm::segment3d{{-16, -16, 16}, {16, -16, 16}}});
-    CHECK_FALSE(tool.canApply(0.0, 1));
-    CHECK_FALSE(tool.canApply(4.0, 0));
+    const auto edge = mdl::EdgeHandle{vm::segment3d{{-16, -16, 16}, {16, -16, 16}}};
+    const auto edgeHit =
+      mdl::Hit{mdl::EdgeHandle::HandleHitType, 0.0, edge.position.center(), edge};
+    tool.edgeTool().select({edgeHit}, false);
+    REQUIRE(tool.hasPreview());
+
+    tool.setParameters(ChamferParameters{0.0, 1});
+    CHECK_FALSE(tool.hasPreview());
+    CHECK_FALSE(tool.canApply());
+
+    tool.setParameters(ChamferParameters{4.0, 0});
+    CHECK_FALSE(tool.hasPreview());
+    CHECK_FALSE(tool.canApply());
+  }
+
+  SECTION("invalid geometry clears the preview")
+  {
+    REQUIRE(tool.activate());
+
+    const auto edge = mdl::EdgeHandle{vm::segment3d{{-16, -16, 16}, {16, -16, 16}}};
+    const auto edgeHit =
+      mdl::Hit{mdl::EdgeHandle::HandleHitType, 0.0, edge.position.center(), edge};
+    tool.edgeTool().select({edgeHit}, false);
+    REQUIRE(tool.hasPreview());
+
+    tool.setParameters(ChamferParameters{64.0, 1});
+    CHECK_FALSE(tool.hasPreview());
+    CHECK(tool.previewFailed());
+    CHECK_FALSE(tool.canApply());
+    CHECK(brushNode->brush().faceCount() == 6u);
+  }
+
+  SECTION("deactivation discards the preview")
+  {
+    REQUIRE(tool.activate());
+
+    const auto edge = mdl::EdgeHandle{vm::segment3d{{-16, -16, 16}, {16, -16, 16}}};
+    const auto edgeHit =
+      mdl::Hit{mdl::EdgeHandle::HandleHitType, 0.0, edge.position.center(), edge};
+    tool.edgeTool().select({edgeHit}, false);
+    REQUIRE(tool.hasPreview());
+
+    REQUIRE(tool.deactivate());
+    CHECK_FALSE(tool.hasPreview());
   }
 }
 

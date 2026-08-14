@@ -28,6 +28,20 @@
 #include "vm/vec.h"
 
 #include <cstddef>
+#include <memory>
+#include <vector>
+
+namespace tb::mdl
+{
+class BrushNode;
+}
+
+namespace tb::render
+{
+class BrushRenderer;
+class RenderBatch;
+class RenderContext;
+} // namespace tb::render
 
 namespace tb::ui
 {
@@ -39,6 +53,14 @@ enum class ChamferTarget
   Vertices,
 };
 
+struct ChamferParameters
+{
+  double distance = 8.0;
+  int segments = 1;
+
+  friend bool operator==(const ChamferParameters&, const ChamferParameters&) = default;
+};
+
 class ChamferTool : public Tool
 {
 private:
@@ -46,29 +68,46 @@ private:
   EdgeTool m_edgeTool;
   VertexTool m_vertexTool;
   ChamferTarget m_target = ChamferTarget::Edges;
+  ChamferParameters m_parameters;
+  std::vector<std::unique_ptr<mdl::BrushNode>> m_previewBrushes;
+  std::unique_ptr<render::BrushRenderer> m_brushRenderer;
+  bool m_previewFailed = false;
   NotifierConnection m_notifierConnection;
 
 public:
   Notifier<ChamferTool&> targetDidChangeNotifier;
+  Notifier<ChamferTool&> parametersDidChangeNotifier;
 
 public:
   explicit ChamferTool(MapDocument& document);
+  ~ChamferTool() override;
 
   ChamferTarget target() const;
   void setTarget(ChamferTarget target);
+
+  const ChamferParameters& parameters() const;
+  void setParameters(const ChamferParameters& parameters);
 
   EdgeTool& edgeTool();
   VertexTool& vertexTool();
 
   size_t selectedHandleCount() const;
-  bool canApply(double distance, int segments) const;
-  bool apply(double distance, int segments);
+  bool hasPreview() const;
+  bool previewFailed() const;
+  bool canApply() const;
+  bool apply();
+
+  void renderPreview(
+    render::RenderContext& renderContext, render::RenderBatch& renderBatch) const;
 
   bool canRemoveSelection() const;
   void removeSelection();
   void moveSelection(const vm::vec3d& delta);
 
 private:
+  void clearPreview();
+  void updatePreview();
+
   bool activateTargetTool();
   void deactivateTargetTool();
 

@@ -63,14 +63,14 @@ void ChamferToolPage::createGui()
   m_distance->setRange(0.01, 100000.0);
   m_distance->setDecimals(2);
   m_distance->setSingleStep(1.0);
-  m_distance->setValue(8.0);
+  m_distance->setValue(m_tool.parameters().distance);
   m_distance->setKeyboardTracking(false);
 
   m_segmentsLabel = new QLabel{tr("Segments")};
   m_segments = new QSpinBox{};
   m_segments->setObjectName(QStringLiteral("chamferSegments"));
   m_segments->setRange(1, 64);
-  m_segments->setValue(1);
+  m_segments->setValue(m_tool.parameters().segments);
 
   m_status = new QLabel{};
   m_status->setObjectName(QStringLiteral("chamferStatus"));
@@ -83,6 +83,16 @@ void ChamferToolPage::createGui()
     qOverload<int>(&QComboBox::currentIndexChanged),
     this,
     &ChamferToolPage::targetChanged);
+  connect(
+    m_distance,
+    qOverload<double>(&QDoubleSpinBox::valueChanged),
+    this,
+    &ChamferToolPage::distanceChanged);
+  connect(
+    m_segments,
+    qOverload<int>(&QSpinBox::valueChanged),
+    this,
+    &ChamferToolPage::segmentsChanged);
   connect(m_apply, &QPushButton::clicked, this, &ChamferToolPage::applyChamfer);
 
   auto* layout = new QHBoxLayout{};
@@ -110,6 +120,8 @@ void ChamferToolPage::connectObservers()
     m_tool.toolActivatedNotifier.connect([this](const auto&) { updateGui(); });
   m_notifierConnection +=
     m_tool.targetDidChangeNotifier.connect([this](const auto&) { updateGui(); });
+  m_notifierConnection +=
+    m_tool.parametersDidChangeNotifier.connect([this](const auto&) { updateGui(); });
   m_notifierConnection += m_tool.toolHandleSelectionChangedNotifier.connect(
     [this](const auto&) { updateGui(); });
 }
@@ -119,9 +131,23 @@ void ChamferToolPage::targetChanged(const int index)
   m_tool.setTarget(ChamferTarget(m_target->itemData(index).toInt()));
 }
 
+void ChamferToolPage::distanceChanged(const double value)
+{
+  auto parameters = m_tool.parameters();
+  parameters.distance = value;
+  m_tool.setParameters(parameters);
+}
+
+void ChamferToolPage::segmentsChanged(const int value)
+{
+  auto parameters = m_tool.parameters();
+  parameters.segments = value;
+  m_tool.setParameters(parameters);
+}
+
 void ChamferToolPage::applyChamfer()
 {
-  if (!m_tool.apply(m_distance->value(), m_segments->value()))
+  if (!m_tool.apply())
   {
     m_status->setText(tr("Chamfer failed"));
     return;
@@ -139,16 +165,32 @@ void ChamferToolPage::updateGui()
     m_target->setCurrentIndex(targetIndex);
   }
 
+  {
+    const auto blocker = QSignalBlocker{m_distance};
+    m_distance->setValue(m_tool.parameters().distance);
+  }
+  {
+    const auto blocker = QSignalBlocker{m_segments};
+    m_segments->setValue(m_tool.parameters().segments);
+  }
+
   const auto edges = target == ChamferTarget::Edges;
   m_segmentsLabel->setVisible(edges);
   m_segments->setVisible(edges);
 
   const auto count = static_cast<int>(std::min<size_t>(
     m_tool.selectedHandleCount(), static_cast<size_t>(std::numeric_limits<int>::max())));
-  m_status->setText(
-    edges ? tr("%n edge(s) selected", nullptr, count)
-          : tr("%n vertex/vertices selected", nullptr, count));
-  m_apply->setEnabled(m_tool.canApply(m_distance->value(), m_segments->value()));
+  if (m_tool.previewFailed())
+  {
+    m_status->setText(tr("Chamfer cannot be applied"));
+  }
+  else
+  {
+    m_status->setText(
+      edges ? tr("%n edge(s) selected", nullptr, count)
+            : tr("%n vertex/vertices selected", nullptr, count));
+  }
+  m_apply->setEnabled(m_tool.canApply());
 }
 
 } // namespace tb::ui

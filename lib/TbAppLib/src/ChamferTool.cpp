@@ -19,14 +19,25 @@
 
 #include "ui/ChamferTool.h"
 
+#include "base/PreferenceManager.h"
+#include "mdl/Brush.h"
+#include "mdl/BrushNode.h"
+#include "mdl/EditorContext.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Geometry.h"
 #include "mdl/NodeHandleManager.h"
 #include "mdl/NodeHandles.h"
+#include "prefs/Preferences.h"
+#include "render/BrushRenderer.h"
+#include "render/RenderBatch.h"
+#include "render/RenderContext.h"
 #include "ui/MapDocument.h"
 
 #include "kd/contracts.h"
+#include "kd/result.h"
 #include "kd/string_format.h"
+
+#include <utility>
 
 namespace tb::ui
 {
@@ -36,16 +47,21 @@ ChamferTool::ChamferTool(MapDocument& document)
   , m_document{document}
   , m_edgeTool{document}
   , m_vertexTool{document}
+  , m_brushRenderer{std::make_unique<render::BrushRenderer>()}
 {
   const auto connectTool = [this](Tool& tool) {
-    m_notifierConnection +=
-      tool.refreshViewsNotifier.connect([this](Tool&) { refreshViews(); });
+    m_notifierConnection += tool.refreshViewsNotifier.connect([this](Tool&) {
+      updatePreview();
+      refreshViews();
+    });
     m_notifierConnection += tool.toolHandleSelectionChangedNotifier.connect(
       [this](Tool&) { notifyToolHandleSelectionChanged(); });
   };
   connectTool(m_edgeTool);
   connectTool(m_vertexTool);
 }
+
+ChamferTool::~ChamferTool() = default;
 
 ChamferTarget ChamferTool::target() const
 {
@@ -73,8 +89,27 @@ void ChamferTool::setTarget(const ChamferTarget target)
     contract_assert(activated);
   }
 
+  updatePreview();
   targetDidChangeNotifier(*this);
   notifyToolHandleSelectionChanged();
+  refreshViews();
+}
+
+const ChamferParameters& ChamferTool::parameters() const
+{
+  return m_parameters;
+}
+
+void ChamferTool::setParameters(const ChamferParameters& parameters)
+{
+  if (m_parameters == parameters)
+  {
+    return;
+  }
+
+  m_parameters = parameters;
+  updatePreview();
+  parametersDidChangeNotifier(*this);
   refreshViews();
 }
 
@@ -101,15 +136,24 @@ size_t ChamferTool::selectedHandleCount() const
   return 0u;
 }
 
-bool ChamferTool::canApply(const double distance, const int segments) const
+bool ChamferTool::hasPreview() const
 {
-  return active() && selectedHandleCount() > 0u && distance > 0.0
-         && (m_target == ChamferTarget::Vertices || segments > 0);
+  return !m_previewBrushes.empty() && !m_previewFailed;
 }
 
-bool ChamferTool::apply(const double distance, const int segments)
+bool ChamferTool::previewFailed() const
 {
-  if (!canApply(distance, segments))
+  return m_previewFailed;
+}
+
+bool ChamferTool::canApply() const
+{
+  return active() && hasPreview();
+}
+
+bool ChamferTool::apply()
+{
+  if (!canApply())
   {
     return false;
   }
@@ -124,7 +168,8 @@ bool ChamferTool::apply(const double distance, const int segments)
       mdl::EdgeHandle::getPositions(map.nodeHandles().selectedHandles<mdl::EdgeHandle>());
     const auto commandName =
       kdl::str_plural(edgePositions.size(), "Chamfer Brush Edge", "Chamfer Brush Edges");
-    result = mdl::chamferEdges(map, commandName, edgePositions, distance, segments);
+    result = mdl::chamferEdges(
+      map, commandName, edgePositions, m_parameters.distance, m_parameters.segments);
     break;
   }
   case ChamferTarget::Vertices: {
@@ -132,17 +177,39 @@ bool ChamferTool::apply(const double distance, const int segments)
       map.nodeHandles().selectedHandles<mdl::VertexHandle>());
     const auto commandName = kdl::str_plural(
       vertexPositions.size(), "Chamfer Brush Vertex", "Chamfer Brush Vertices");
-    result = mdl::chamferVertices(map, commandName, vertexPositions, distance);
+    result =
+      mdl::chamferVertices(map, commandName, vertexPositions, m_parameters.distance);
     break;
   }
   }
 
+  updatePreview();
   if (result)
   {
     notifyToolHandleSelectionChanged();
     refreshViews();
   }
   return result;
+}
+
+void ChamferTool::renderPreview(
+  render::RenderContext& renderContext, render::RenderBatch& renderBatch) const
+{
+  if (!hasPreview())
+  {
+    return;
+  }
+
+  m_brushRenderer->setFaceColor(pref(Preferences::FaceColor));
+  m_brushRenderer->setEdgeColor(pref(Preferences::SelectedEdgeColor));
+  m_brushRenderer->setShowEdges(true);
+  m_brushRenderer->setShowOccludedEdges(true);
+  m_brushRenderer->setOccludedEdgeColor(RgbaF{
+    pref(Preferences::SelectedEdgeColor).to<RgbF>(),
+    pref(Preferences::OccludedSelectedEdgeAlpha)});
+  m_brushRenderer->setTint(true);
+  m_brushRenderer->setTintColor(pref(Preferences::SelectedFaceColor));
+  m_brushRenderer->render(renderContext, renderBatch);
 }
 
 bool ChamferTool::canRemoveSelection() const
@@ -185,6 +252,122 @@ void ChamferTool::moveSelection(const vm::vec3d& delta)
   }
 }
 
+void ChamferTool::clearPreview()
+{
+  m_brushRenderer->clear();
+  m_previewBrushes.clear();
+  m_previewFailed = false;
+}
+
+void ChamferTool::updatePreview()
+{
+  clearPreview();
+
+  if (
+    !active() || selectedHandleCount() == 0u || m_parameters.distance <= 0.0
+    || (m_target == ChamferTarget::Edges && m_parameters.segments < 1))
+  {
+    return;
+  }
+
+  auto& map = m_document.map();
+  const auto edgePositions = m_target == ChamferTarget::Edges
+                               ? mdl::EdgeHandle::getPositions(
+                                   map.nodeHandles().selectedHandles<mdl::EdgeHandle>())
+                               : std::vector<vm::segment3d>{};
+  const auto vertexPositions =
+    m_target == ChamferTarget::Vertices
+      ? mdl::VertexHandle::getPositions(
+          map.nodeHandles().selectedHandles<mdl::VertexHandle>())
+      : std::vector<vm::vec3d>{};
+
+  auto previewBrushes = std::vector<std::unique_ptr<mdl::BrushNode>>{};
+  previewBrushes.reserve(map.selection().brushes.size());
+  auto affected = false;
+
+  for (const auto* sourceNode : map.selection().brushes)
+  {
+    auto previewBrush = sourceNode->brush();
+
+    if (m_target == ChamferTarget::Edges)
+    {
+      auto brushEdges = std::vector<vm::segment3d>{};
+      for (const auto& edge : edgePositions)
+      {
+        if (previewBrush.hasEdge(edge))
+        {
+          brushEdges.push_back(edge);
+        }
+      }
+
+      if (!brushEdges.empty())
+      {
+        affected = true;
+        if (
+          !previewBrush.canChamferEdges(
+            map.worldBounds(), brushEdges, m_parameters.distance, m_parameters.segments)
+          || !(
+            previewBrush.chamferEdges(
+              map.worldBounds(),
+              brushEdges,
+              m_parameters.distance,
+              m_parameters.segments,
+              map.editorContext().uvLock())
+            | kdl::is_success()))
+        {
+          clearPreview();
+          m_previewFailed = true;
+          return;
+        }
+      }
+    }
+    else
+    {
+      auto brushVertices = std::vector<vm::vec3d>{};
+      for (const auto& vertex : vertexPositions)
+      {
+        if (previewBrush.hasVertex(vertex))
+        {
+          brushVertices.push_back(vertex);
+        }
+      }
+
+      if (!brushVertices.empty())
+      {
+        affected = true;
+        if (
+          !previewBrush.canChamferVertices(
+            map.worldBounds(), brushVertices, m_parameters.distance)
+          || !(
+            previewBrush.chamferVertices(
+              map.worldBounds(),
+              brushVertices,
+              m_parameters.distance,
+              map.editorContext().uvLock())
+            | kdl::is_success()))
+        {
+          clearPreview();
+          m_previewFailed = true;
+          return;
+        }
+      }
+    }
+
+    previewBrushes.push_back(std::make_unique<mdl::BrushNode>(std::move(previewBrush)));
+  }
+
+  if (!affected)
+  {
+    return;
+  }
+
+  m_previewBrushes = std::move(previewBrushes);
+  for (const auto& brushNode : m_previewBrushes)
+  {
+    m_brushRenderer->addBrush(*brushNode);
+  }
+}
+
 bool ChamferTool::activateTargetTool()
 {
   switch (m_target)
@@ -220,6 +403,8 @@ bool ChamferTool::doActivate()
 bool ChamferTool::doDeactivate()
 {
   deactivateTargetTool();
+  clearPreview();
+  refreshViews();
   return true;
 }
 
