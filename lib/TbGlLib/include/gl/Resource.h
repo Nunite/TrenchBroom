@@ -61,7 +61,7 @@ private:
   Result<T> m_result;
 
 public:
-  explicit LoaderTaskResult(Result<T> result)
+  explicit LoaderTaskResult(Result<T>&& result)
     : m_result{std::move(result)}
   {
   }
@@ -148,7 +148,8 @@ template <typename T>
 ResourceState<T> triggerLoading(ResourceUnloaded<T> state, TaskRunner taskRunner)
 {
   auto future = taskRunner([loader = std::move(state.loader)]() {
-    return std::make_unique<LoaderTaskResult<T>>(loader());
+    auto result = loader();
+    return std::make_unique<LoaderTaskResult<T>>(std::move(result));
   });
   return ResourceLoading<T>{std::move(future)};
 }

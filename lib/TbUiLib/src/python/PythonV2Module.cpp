@@ -94,6 +94,17 @@ namespace
 {
 std::unordered_map<MapDocument*, size_t> g_activePythonTransactions;
 
+template <typename Result>
+void throwIfError(const Result& result)
+{
+  auto message = std::optional<std::string>{};
+  static_cast<void>(result.if_error([&](const auto& error) { message = error.msg; }));
+  if (message)
+  {
+    throw std::runtime_error{*message};
+  }
+}
+
 struct Vec3
 {
   double x = 0.0;
@@ -1915,23 +1926,13 @@ void defineModule(py::module_& module)
       "save",
       [](DocumentHandle& self) {
         auto& document = self.get();
-        const auto result = document.map().save();
-        if (result.is_error())
-        {
-          static_cast<void>(
-            result.if_error([](const auto& e) { throw std::runtime_error{e.msg}; }));
-        }
+        throwIfError(document.map().save());
       })
     .def(
       "reload",
       [](DocumentHandle& self) {
         auto& document = self.get();
-        const auto result = document.reload();
-        if (result.is_error())
-        {
-          static_cast<void>(
-            result.if_error([](const auto& e) { throw std::runtime_error{e.msg}; }));
-        }
+        throwIfError(document.reload());
         PythonHandleRegistry::instance().invalidateDocument(&document);
       })
     .def(

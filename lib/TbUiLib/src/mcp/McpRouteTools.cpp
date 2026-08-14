@@ -200,14 +200,6 @@ QJsonArray vecToJson(const vm::vec3d& value)
   return QJsonArray{value.x(), value.y(), value.z()};
 }
 
-QJsonObject boundsToJson(const vm::bbox3d& bounds)
-{
-  return QJsonObject{
-    {"min", vecToJson(bounds.min)},
-    {"max", vecToJson(bounds.max)},
-  };
-}
-
 bool isModuleLevelMetadataKey(const QString& key)
 {
   static const auto Keys = QStringList{
@@ -499,32 +491,6 @@ QString metadataStoreKey(const QString& documentFingerprint, const QString& obje
            : QString{"%1|%2"}.arg(documentFingerprint, objectId);
 }
 
-bool metadataMatches(
-  const QJsonObject& metadata, const QString& key, const QJsonObject& params)
-{
-  const auto expected = params.value(key).toString().trimmed();
-  if (expected.isEmpty())
-  {
-    return true;
-  }
-  return metadata.value(key).toString().compare(expected, Qt::CaseInsensitive) == 0;
-}
-
-bool metadataNumberMatches(
-  const QJsonObject& metadata, const QString& key, const QJsonObject& params)
-{
-  const auto expected = params.value(key);
-  if (expected.isUndefined())
-  {
-    return true;
-  }
-  if (!expected.isDouble() || !metadata.value(key).isDouble())
-  {
-    return false;
-  }
-  return metadata.value(key).toDouble() == expected.toDouble();
-}
-
 bool metadataObjectMatches(const QJsonObject& metadata, const QJsonObject& expected)
 {
   for (const auto& key : expected.keys())
@@ -679,20 +645,6 @@ std::vector<mdl::BrushNode*> liveBrushNodesFromObjectIds(
     result.push_back(brush);
   }
   return result;
-}
-
-QJsonArray metadataKeysJson()
-{
-  return QJsonArray{
-    "routeId",
-    "intent",
-    "difficulty",
-    "movementType",
-    "takeoffEdge",
-    "landingWindow",
-    "incomingDirection",
-    "outgoingDirection",
-  };
 }
 
 std::optional<QJsonObject> metadataFromJsonValue(

@@ -368,17 +368,6 @@ vm::bbox3d boundsForNodes(const std::vector<mdl::Node*>& nodes)
   return result;
 }
 
-QJsonArray nodeSummariesJson(
-  const std::vector<mdl::Node*>& nodes, const mdl::WorldNode& worldNode)
-{
-  auto result = QJsonArray{};
-  for (const auto* node : nodes)
-  {
-    result.push_back(nodeSummaryJson(*node, worldNode));
-  }
-  return result;
-}
-
 QJsonObject pendingNodeSummaryJson(const mdl::Node& node)
 {
   auto result = QJsonObject{
@@ -599,32 +588,6 @@ std::optional<vm::bbox3d> boundsFromJson(const QJsonObject& params, QString& err
     || !std::isfinite(max->x()) || !std::isfinite(max->y()) || !std::isfinite(max->z()))
   {
     error = "min must be smaller than max on all axes";
-    return std::nullopt;
-  }
-
-  return vm::bbox3d{*min, *max};
-}
-
-std::optional<vm::bbox3d> boundsFromJson(
-  const QJsonObject& params, const QString& minKey, const QString& maxKey, QString& error)
-{
-  const auto min = mcpVec3FromJson(params, minKey, error);
-  if (!min)
-  {
-    return std::nullopt;
-  }
-  const auto max = mcpVec3FromJson(params, maxKey, error);
-  if (!max)
-  {
-    return std::nullopt;
-  }
-
-  if (
-    min->x() >= max->x() || min->y() >= max->y() || min->z() >= max->z()
-    || !std::isfinite(min->x()) || !std::isfinite(min->y()) || !std::isfinite(min->z())
-    || !std::isfinite(max->x()) || !std::isfinite(max->y()) || !std::isfinite(max->z()))
-  {
-    error = QString{"%1 must be smaller than %2 on all axes"}.arg(minKey, maxKey);
     return std::nullopt;
   }
 
