@@ -33,6 +33,9 @@ struct GoldSrcSpritePreview
   std::size_t width = 0u;
   std::size_t height = 0u;
   std::vector<std::uint8_t> rgba;
+
+  friend bool operator==(const GoldSrcSpritePreview&, const GoldSrcSpritePreview&) =
+    default;
 };
 
 std::optional<GoldSrcSpritePreview> loadGoldSrcSpritePreview(
