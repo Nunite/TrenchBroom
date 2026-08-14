@@ -43,11 +43,13 @@ class SweepToolPage : public QWidget
 private:
   SweepTool& m_tool;
 
+  QComboBox* m_mode = nullptr;
   QSpinBox* m_segments = nullptr;
   QComboBox* m_pathMode = nullptr;
   QSpinBox* m_iterations = nullptr;
   QComboBox* m_uvMode = nullptr;
   QCheckBox* m_snapToInteger = nullptr;
+  QPushButton* m_swapEndsButton = nullptr;
   QPushButton* m_resetButton = nullptr;
   QLabel* m_statusIcon = nullptr;
   QLabel* m_statusLabel = nullptr;
@@ -59,13 +61,17 @@ public:
 
 private:
   void createGui();
+  void toolActivated();
   void updateStatus();
+  void updateControls();
 
+  void modeChanged(int index);
   void segmentsChanged(int value);
   void pathModeChanged(int index);
   void iterationsChanged(int value);
   void uvModeChanged(int index);
   void snapToIntegerChanged(bool checked);
+  void swapEndsClicked();
   void resetClicked();
 };
 

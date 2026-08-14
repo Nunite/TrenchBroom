@@ -67,6 +67,11 @@ const Tool& SweepToolController::tool() const
 
 void SweepToolController::pick(const InputState& inputState, mdl::PickResult& pickResult)
 {
+  if (!m_tool.destinationEditable())
+  {
+    return;
+  }
+
   const auto rotateHit = doPick(inputState);
   const auto scaleHit = m_tool.pickScaleHandle(inputState.pickRay(), inputState.camera());
 
@@ -90,9 +95,12 @@ void SweepToolController::render(
   render::RenderBatch& renderBatch)
 {
   m_tool.renderPreview(renderContext, renderBatch);
-  doRenderHandle(renderContext, renderBatch);
   m_tool.renderDestinationGhost(renderContext, renderBatch);
-  m_tool.renderScaleHandle(renderContext, renderBatch);
+  if (m_tool.destinationEditable())
+  {
+    doRenderHandle(renderContext, renderBatch);
+    m_tool.renderScaleHandle(renderContext, renderBatch);
+  }
   ToolControllerGroup::render(inputState, renderContext, renderBatch);
 }
 

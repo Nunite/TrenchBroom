@@ -78,8 +78,14 @@ private:
   RotateHandle m_handle;
 
   SweepSource m_source;
+  std::optional<SweepSource> m_bridgeSource;
+  std::optional<SweepTarget> m_bridgeTarget;
+  std::optional<SweepSource> m_bridgeAlternateSource;
+  std::optional<SweepTarget> m_bridgeAlternateTarget;
+  bool m_bridgeFacesAreDistinct = false;
   SweepTransform m_transform;
   SweepParameters m_parameters;
+  SweepConstructionMode m_constructionMode = SweepConstructionMode::Sweep;
 
   SweepBrushMap m_previewBrushes;
   std::vector<SweepIssue> m_sweepIssues;
@@ -105,6 +111,12 @@ public:
 
   const SweepParameters& parameters() const;
   void setParameters(const SweepParameters& parameters);
+
+  SweepConstructionMode constructionMode() const;
+  void setConstructionMode(SweepConstructionMode mode);
+  bool bridgeAvailable() const;
+  void swapBridgeEnds();
+  bool destinationEditable() const;
 
   vm::vec3d destinationCenter() const;
   void setDestinationCenter(const vm::vec3d& position);

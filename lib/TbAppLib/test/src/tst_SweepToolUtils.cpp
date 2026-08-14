@@ -343,6 +343,124 @@ TEST_CASE("SweepToolUtils functions")
       CHECK(brushes[3]->logicalBounds() == vm::bbox3d{{48, -16, -16}, {64, 16, 16}});
     }
 
+    SECTION("bridge matches and reaches a differently sized target face exactly")
+    {
+      const auto targetVertices = std::vector<vm::vec3d>{
+        {64, -24, -12},
+        {64, -24, 12},
+        {64, 24, 12},
+        {64, 24, -12},
+      };
+      const auto target = SweepTarget{
+        vm::polygon3d{
+          {64, 24, 12},
+          {64, -24, 12},
+          {64, -24, -12},
+          {64, 24, -12},
+        },
+        vm::vec3d{64, 0, 0},
+        vm::vec3d{-1, 0, 0},
+        std::nullopt,
+      };
+      parameters.segments = 3;
+
+      const auto result = generateBridgeBrushes(map, source, target, parameters);
+      CHECK(result.issues.empty());
+      REQUIRE(result.brushes.contains(&defaultParent));
+      const auto& brushes = result.brushes.at(&defaultParent);
+      REQUIRE(brushes.size() == 3u);
+
+      const auto containsPoints = [](const mdl::Brush& brush, const auto& points) {
+        return std::ranges::any_of(brush.faces(), [&](const auto& face) {
+          const auto faceVertices = face.vertexPositions();
+          return std::ranges::all_of(points, [&](const auto& point) {
+            return std::ranges::any_of(faceVertices, [&](const auto& vertex) {
+              return vm::is_equal(vertex, point, vm::Cd::almost_zero());
+            });
+          });
+        });
+      };
+
+      CHECK(containsPoints(
+        brushes.front()->brush(), source.faces.front().polygon.vertices()));
+      CHECK(containsPoints(brushes.back()->brush(), targetVertices));
+
+      for (size_t i = 0u; i + 1u < brushes.size(); ++i)
+      {
+        const auto& lhs = brushes[i]->brush();
+        const auto& rhs = brushes[i + 1u]->brush();
+        const auto hasSharedCap =
+          std::ranges::any_of(lhs.faces(), [&](const auto& lhsFace) {
+            const auto lhsVertices = lhsFace.vertexPositions();
+            return lhsVertices.size() == 4u
+                   && std::ranges::any_of(rhs.faces(), [&](const auto& rhsFace) {
+                        const auto rhsVertices = rhsFace.vertexPositions();
+                        return rhsVertices.size() == lhsVertices.size()
+                               && std::ranges::all_of(
+                                 lhsVertices, [&](const auto& point) {
+                                   return std::ranges::any_of(
+                                     rhsVertices, [&](const auto& candidate) {
+                                       return vm::is_equal(
+                                         point, candidate, vm::Cd::almost_zero());
+                                     });
+                                 });
+                      });
+          });
+        CHECK(hasSharedCap);
+      }
+    }
+
+    SECTION("bridge rejects mismatched vertex counts")
+    {
+      const auto target = SweepTarget{
+        vm::polygon3d{{64, -16, -16}, {64, 16, 0}, {64, -16, 16}},
+        vm::vec3d{64, -16.0 / 3.0, 0},
+        vm::vec3d{-1, 0, 0},
+        std::nullopt,
+      };
+
+      const auto result = generateBridgeBrushes(map, source, target, parameters);
+      CHECK(result.brushes.empty());
+      REQUIRE(result.issues.size() == 1u);
+      CHECK(result.issues.front().message.find("same vertex count") != std::string::npos);
+    }
+
+    SECTION("bridge follows an arc into a perpendicular target face")
+    {
+      const auto targetVertices = std::vector<vm::vec3d>{
+        {-16, 64, -16},
+        {-16, 64, 16},
+        {16, 64, 16},
+        {16, 64, -16},
+      };
+      const auto target = SweepTarget{
+        vm::polygon3d{targetVertices},
+        vm::vec3d{0, 64, 0},
+        vm::vec3d{0, -1, 0},
+        std::nullopt,
+      };
+      parameters.segments = 4;
+      parameters.pathMode = SweepPathMode::Arc;
+
+      const auto result = generateBridgeBrushes(map, source, target, parameters);
+      CHECK(result.issues.empty());
+      REQUIRE(result.brushes.contains(&defaultParent));
+      const auto& brushes = result.brushes.at(&defaultParent);
+      REQUIRE(brushes.size() == 4u);
+      CHECK(std::ranges::all_of(
+        brushes, [](const auto& brush) { return brush->brush().fullySpecified(); }));
+
+      const auto& lastBrush = brushes.back()->brush();
+      CHECK(std::ranges::any_of(lastBrush.faces(), [&](const auto& face) {
+        const auto faceVertices = face.vertexPositions();
+        return std::ranges::all_of(targetVertices, [&](const auto& targetVertex) {
+          return std::ranges::any_of(faceVertices, [&](const auto& candidate) {
+            return vm::is_equal(candidate, targetVertex, vm::Cd::almost_zero());
+          });
+        });
+      }));
+    }
+
     SECTION("iterations continue from the previous destination cap")
     {
       transform.translation = vm::vec3d{64, 0, 0};

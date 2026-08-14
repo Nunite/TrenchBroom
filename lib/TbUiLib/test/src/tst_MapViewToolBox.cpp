@@ -17,9 +17,14 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QComboBox>
+#include <QPushButton>
+#include <QSpinBox>
 #include <QStackedLayout>
 #include <QWidget>
 
+#include "mdl/BrushBuilder.h"
+#include "mdl/BrushNode.h"
 #include "mdl/Entity.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionManager.h"
@@ -37,6 +42,10 @@
 #include "ui/MapDocumentFixture.h"
 #include "ui/MapViewToolBox.h"
 #include "ui/PathTool.h"
+#include "ui/SweepTool.h"
+#include "ui/SweepToolPage.h"
+
+#include "kd/result.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
@@ -188,6 +197,49 @@ TEST_CASE("MapViewToolBox")
 
     CHECK(toolBox.pathToolActive());
     CHECK_FALSE(toolBox.rotateToolActive());
+  }
+
+  SECTION("sweep page exposes bridge controls for two selected faces")
+  {
+    const auto builder =
+      mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+    auto* sourceNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{-16, -16, -16}, {16, 16, 16}}, "source")
+      | kdl::value()};
+    auto* targetNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{80, -24, -12}, {112, 24, 12}}, "target")
+      | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {sourceNode, targetNode}}});
+    const auto sourceFaceIndex = *sourceNode->brush().findFace(vm::vec3d{1, 0, 0});
+    const auto targetFaceIndex = *targetNode->brush().findFace(vm::vec3d{-1, 0, 0});
+    mdl::selectBrushFaces(
+      map, {{sourceNode, sourceFaceIndex}, {targetNode, targetFaceIndex}});
+
+    toolBox.toggleSweepTool();
+    REQUIRE(toolBox.sweepToolActive());
+    auto* page = dynamic_cast<SweepToolPage*>(bookCtrl.currentWidget());
+    REQUIRE(page != nullptr);
+
+    auto* mode = page->findChild<QComboBox*>(QStringLiteral("sweepMode"));
+    REQUIRE(mode != nullptr);
+    mode->setCurrentIndex(mode->findText("Bridge"));
+
+    CHECK(toolBox.sweepTool().constructionMode() == SweepConstructionMode::Bridge);
+    auto* iterations = page->findChild<QSpinBox*>(QStringLiteral("sweepIterations"));
+    auto* swapEnds = page->findChild<QPushButton*>(QStringLiteral("sweepSwapEnds"));
+    auto* reset = page->findChild<QPushButton*>(QStringLiteral("sweepReset"));
+    REQUIRE(iterations != nullptr);
+    REQUIRE(swapEnds != nullptr);
+    REQUIRE(reset != nullptr);
+    CHECK_FALSE(iterations->isEnabled());
+    CHECK(swapEnds->isVisibleTo(page));
+    CHECK(swapEnds->isEnabled());
+    CHECK_FALSE(reset->isEnabled());
+
+    mode->setCurrentIndex(mode->findText("Sweep"));
+    CHECK(iterations->isEnabled());
+    CHECK_FALSE(swapEnds->isVisibleTo(page));
+    CHECK(reset->isEnabled());
   }
 
   SECTION("create entity tool creates model entities from browser payloads")

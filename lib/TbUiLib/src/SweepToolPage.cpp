@@ -32,6 +32,9 @@
 #include "ui/SweepTool.h"
 #include "ui/ViewConstants.h"
 
+#include <array>
+#include <memory>
+
 namespace tb::ui
 {
 
@@ -41,20 +44,48 @@ SweepToolPage::SweepToolPage(SweepTool& tool, QWidget* parent)
 {
   createGui();
 
+  m_notifierConnection += m_tool.sweepResultDidChangeNotifier.connect([this]() {
+    updateControls();
+    updateStatus();
+  });
   m_notifierConnection +=
-    m_tool.sweepResultDidChangeNotifier.connect([this]() { updateStatus(); });
+    m_tool.toolActivatedNotifier.connect([this](const auto&) { toolActivated(); });
 
+  toolActivated();
+}
+
+void SweepToolPage::toolActivated()
+{
   const auto& parameters = m_tool.parameters();
+  const auto blockers = std::array{
+    std::make_unique<QSignalBlocker>(m_mode),
+    std::make_unique<QSignalBlocker>(m_segments),
+    std::make_unique<QSignalBlocker>(m_iterations),
+    std::make_unique<QSignalBlocker>(m_pathMode),
+    std::make_unique<QSignalBlocker>(m_uvMode),
+    std::make_unique<QSignalBlocker>(m_snapToInteger),
+  };
+  m_mode->setCurrentIndex(m_mode->findData(int(m_tool.constructionMode())));
   m_segments->setValue(int(parameters.segments));
   m_iterations->setValue(int(parameters.iterations));
   m_pathMode->setCurrentIndex(m_pathMode->findData(int(parameters.pathMode)));
   m_uvMode->setCurrentIndex(m_uvMode->findData(int(parameters.uvMode)));
   m_snapToInteger->setChecked(parameters.alignment == SweepAlignment::Integer);
+  updateControls();
   updateStatus();
 }
 
 void SweepToolPage::createGui()
 {
+  auto* modeText = new QLabel{tr("Mode")};
+  m_mode = new QComboBox{};
+  m_mode->setObjectName(QStringLiteral("sweepMode"));
+  m_mode->addItem(tr("Sweep"), int(SweepConstructionMode::Sweep));
+  m_mode->addItem(tr("Bridge"), int(SweepConstructionMode::Bridge));
+  m_mode->setToolTip(
+    tr("Bridge connects the first selected face to the second selected face and locks "
+       "the destination to its exact vertices"));
+
   auto* segmentsText = new QLabel{tr("Segments")};
   m_segments = new QSpinBox{this};
   m_segments->setRange(1, 64);
@@ -72,6 +103,7 @@ void SweepToolPage::createGui()
 
   auto* iterationsText = new QLabel{tr("Iterations")};
   m_iterations = new QSpinBox{this};
+  m_iterations->setObjectName(QStringLiteral("sweepIterations"));
   m_iterations->setRange(1, 8);
   m_iterations->setToolTip(
     tr("Repeats the sweep, continuing from the previous destination cap"));
@@ -87,7 +119,12 @@ void SweepToolPage::createGui()
   m_snapToInteger = new QCheckBox{tr("Snap to integer grid")};
   m_snapToInteger->setToolTip(tr("Round generated vertices to integer coordinates"));
 
+  m_swapEndsButton = new QPushButton{tr("Swap ends")};
+  m_swapEndsButton->setObjectName(QStringLiteral("sweepSwapEnds"));
+  m_swapEndsButton->setToolTip(tr("Use the other selected face as the bridge entrance"));
+
   m_resetButton = new QPushButton{tr("Reset")};
+  m_resetButton->setObjectName(QStringLiteral("sweepReset"));
   m_resetButton->setToolTip(tr("Move the destination cap back onto the selected faces"));
 
   m_statusIcon = new QLabel{this};
@@ -97,6 +134,11 @@ void SweepToolPage::createGui()
   m_statusIcon->setFixedSize(iconSize, iconSize);
   m_statusLabel = new QLabel{this};
 
+  connect(
+    m_mode,
+    QOverload<int>::of(&QComboBox::currentIndexChanged),
+    this,
+    &SweepToolPage::modeChanged);
   connect(
     m_segments,
     QOverload<int>::of(&QSpinBox::valueChanged),
@@ -119,12 +161,18 @@ void SweepToolPage::createGui()
     &SweepToolPage::uvModeChanged);
   connect(
     m_snapToInteger, &QCheckBox::toggled, this, &SweepToolPage::snapToIntegerChanged);
+  connect(
+    m_swapEndsButton, &QAbstractButton::clicked, this, &SweepToolPage::swapEndsClicked);
   connect(m_resetButton, &QAbstractButton::clicked, this, &SweepToolPage::resetClicked);
 
   auto* layout = new QHBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(0);
 
+  layout->addWidget(modeText, 0, Qt::AlignVCenter);
+  layout->addSpacing(LayoutConstants::NarrowHMargin);
+  layout->addWidget(m_mode, 0, Qt::AlignVCenter);
+  layout->addSpacing(LayoutConstants::WideHMargin);
   layout->addWidget(segmentsText, 0, Qt::AlignVCenter);
   layout->addSpacing(LayoutConstants::NarrowHMargin);
   layout->addWidget(m_segments, 0, Qt::AlignVCenter);
@@ -145,6 +193,8 @@ void SweepToolPage::createGui()
   layout->addSpacing(LayoutConstants::WideHMargin);
   layout->addWidget(m_snapToInteger, 0, Qt::AlignVCenter);
   layout->addSpacing(LayoutConstants::WideHMargin);
+  layout->addWidget(m_swapEndsButton, 0, Qt::AlignVCenter);
+  layout->addSpacing(LayoutConstants::WideHMargin);
   layout->addWidget(m_resetButton, 0, Qt::AlignVCenter);
   layout->addSpacing(LayoutConstants::WideHMargin);
   layout->addWidget(m_statusIcon, 0, Qt::AlignVCenter);
@@ -153,6 +203,15 @@ void SweepToolPage::createGui()
   layout->addStretch(1);
 
   setLayout(layout);
+}
+
+void SweepToolPage::updateControls()
+{
+  const auto bridge = m_tool.constructionMode() == SweepConstructionMode::Bridge;
+  m_iterations->setEnabled(!bridge);
+  m_swapEndsButton->setVisible(bridge);
+  m_swapEndsButton->setEnabled(bridge && m_tool.bridgeAvailable());
+  m_resetButton->setEnabled(!bridge);
 }
 
 void SweepToolPage::updateStatus()
@@ -173,6 +232,14 @@ void SweepToolPage::updateStatus()
     tr("%n sweep issue(s) - hover for details", "", int(issues.size())));
   m_statusLabel->setToolTip(QString::fromStdString(issues.front().message));
   m_statusIcon->setToolTip(m_statusLabel->toolTip());
+}
+
+void SweepToolPage::modeChanged(const int index)
+{
+  if (index >= 0)
+  {
+    m_tool.setConstructionMode(SweepConstructionMode(m_mode->itemData(index).toInt()));
+  }
 }
 
 void SweepToolPage::segmentsChanged(const int value)
@@ -220,6 +287,11 @@ void SweepToolPage::snapToIntegerChanged(const bool checked)
   auto parameters = m_tool.parameters();
   parameters.alignment = checked ? SweepAlignment::Integer : SweepAlignment::Free;
   m_tool.setParameters(parameters);
+}
+
+void SweepToolPage::swapEndsClicked()
+{
+  m_tool.swapBridgeEnds();
 }
 
 void SweepToolPage::resetClicked()

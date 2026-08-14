@@ -1496,7 +1496,9 @@ void applySegmentAttributes(
   gl::MaterialManager& materialManager,
   std::vector<SweepIssue>& issues,
   const size_t iteration,
-  const size_t segment)
+  const size_t segment,
+  const bool finalSegment,
+  const std::optional<SweepFaceAttributes>* targetCapAttributes)
 {
   for (auto& face : brush.faces())
   {
@@ -1513,13 +1515,24 @@ void applySegmentAttributes(
 
   for (auto& face : brush.faces())
   {
-    if (
-      sourceFace.capAttributes
-      && (faceUsesOnlyPoints(face, startCap) || faceUsesOnlyPoints(face, endCap)))
+    if (sourceFace.capAttributes && faceUsesOnlyPoints(face, startCap))
     {
       applyFaceAttributes(
         face, *sourceFace.capAttributes, mdl::WrapStyle::Rotation, materialManager);
       continue;
+    }
+
+    if (faceUsesOnlyPoints(face, endCap))
+    {
+      const auto* attributes = finalSegment && targetCapAttributes && *targetCapAttributes
+                                 ? &**targetCapAttributes
+                               : sourceFace.capAttributes ? &*sourceFace.capAttributes
+                                                          : nullptr;
+      if (attributes)
+      {
+        applyFaceAttributes(face, *attributes, mdl::WrapStyle::Rotation, materialManager);
+        continue;
+      }
     }
 
     for (size_t i = 0; i < sidePoints.size() && i < sourceFace.sideAttributes.size(); ++i)
@@ -1573,6 +1586,202 @@ void applySegmentAttributes(
       }
     }
   }
+}
+
+struct BridgeMatch
+{
+  std::vector<vm::vec3d> targetVertices;
+  vm::quatd rotation;
+};
+
+std::optional<BridgeMatch> matchBridgeVertices(
+  const SweepSource& source, const SweepTarget& target)
+{
+  if (source.faces.size() != 1u)
+  {
+    return std::nullopt;
+  }
+
+  const auto& sourceVertices = source.faces.front().polygon.vertices();
+  const auto& targetVertices = target.polygon.vertices();
+  if (sourceVertices.size() < 3u || sourceVertices.size() != targetVertices.size())
+  {
+    return std::nullopt;
+  }
+
+  const auto destinationNormal = -target.normal;
+  if (
+    vm::is_zero(source.normal, vm::Cd::almost_zero())
+    || vm::is_zero(destinationNormal, vm::Cd::almost_zero()))
+  {
+    return std::nullopt;
+  }
+
+  const auto normalRotation = vm::quatd{source.normal, destinationNormal};
+  auto best = std::optional<BridgeMatch>{};
+  auto bestError = std::numeric_limits<double>::max();
+
+  for (const auto reversed : {false, true})
+  {
+    for (size_t shift = 0u; shift < targetVertices.size(); ++shift)
+    {
+      auto candidate = std::vector<vm::vec3d>{};
+      candidate.reserve(targetVertices.size());
+      for (size_t i = 0u; i < targetVertices.size(); ++i)
+      {
+        const auto index = reversed
+                             ? (shift + targetVertices.size() - i) % targetVertices.size()
+                             : (shift + i) % targetVertices.size();
+        candidate.push_back(targetVertices[index]);
+      }
+
+      const auto sourceEdge = sourceVertices[1] - sourceVertices[0];
+      const auto targetEdge = candidate[1] - candidate[0];
+      if (
+        vm::is_zero(sourceEdge, vm::Cd::almost_zero())
+        || vm::is_zero(targetEdge, vm::Cd::almost_zero()))
+      {
+        continue;
+      }
+
+      const auto rotatedSourceEdge = normalRotation * vm::normalize(sourceEdge);
+      const auto targetEdgeDirection = vm::normalize(targetEdge);
+      const auto roll =
+        vm::measure_angle(targetEdgeDirection, rotatedSourceEdge, destinationNormal);
+      const auto rotation = vm::quatd{destinationNormal, roll} * normalRotation;
+
+      auto numerator = 0.0;
+      auto denominator = 0.0;
+      for (size_t i = 0u; i < sourceVertices.size(); ++i)
+      {
+        const auto sourceOffset = rotation * (sourceVertices[i] - source.center);
+        const auto targetOffset = candidate[i] - target.center;
+        numerator += vm::dot(sourceOffset, targetOffset);
+        denominator += vm::squared_length(sourceOffset);
+      }
+      const auto scale = denominator > vm::Cd::almost_zero()
+                           ? std::max(numerator / denominator, 0.001)
+                           : 1.0;
+
+      auto error = 0.0;
+      for (size_t i = 0u; i < sourceVertices.size(); ++i)
+      {
+        const auto expected = rotation * (sourceVertices[i] - source.center) * scale;
+        error += vm::squared_length(expected - (candidate[i] - target.center));
+      }
+      if (error < bestError)
+      {
+        bestError = error;
+        best = BridgeMatch{std::move(candidate), rotation};
+      }
+    }
+  }
+
+  return best;
+}
+
+template <typename Station>
+SweepResult generateBrushRun(
+  mdl::Map& map,
+  const SweepSource& source,
+  const SweepParameters& parameters,
+  const Station& station,
+  const std::optional<SweepFaceAttributes>* targetCapAttributes = nullptr)
+{
+  auto result = SweepResult{};
+  if (parameters.segments == 0u || parameters.iterations == 0u)
+  {
+    return result;
+  }
+
+  if (
+    parameters.uvMode == SweepUvMode::Continuous
+    && !mdl::isParallelUvCoordSystem(map.worldNode().mapFormat()))
+  {
+    result.issues.push_back(
+      SweepIssue{0, 0, 0, "Continuous UVs require a Valve-style map format"});
+    return result;
+  }
+
+  const auto builder = mdl::BrushBuilder{
+    map.worldNode().mapFormat(),
+    map.worldBounds(),
+    map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
+    map.gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes};
+  const auto materialName = map.currentMaterialName();
+  const auto N = parameters.segments;
+
+  auto continuousUvLayout = std::optional<ContinuousUvLayout>{};
+  if (parameters.uvMode == SweepUvMode::Continuous)
+  {
+    continuousUvLayout =
+      buildContinuousUvLayout(source, parameters, map.materialManager(), station);
+    result.issues = continuousUvLayout->issues;
+    if (!result.issues.empty())
+    {
+      return result;
+    }
+  }
+
+  for (size_t sourceFaceIndex = 0; sourceFaceIndex < source.faces.size();
+       ++sourceFaceIndex)
+  {
+    const auto& sourceFace = source.faces[sourceFaceIndex];
+    auto& parent = sourceFace.parent ? *sourceFace.parent : parentForNodes(map);
+    const auto& sourceVertices = sourceFace.polygon.vertices();
+    for (size_t r = 0; r < parameters.iterations; ++r)
+    {
+      for (size_t i = 0; i < N; ++i)
+      {
+        const auto startCap =
+          sourceVertices
+          | std::views::transform([&](const auto& v) { return station(v, r, i); })
+          | kdl::ranges::to<std::vector>();
+        const auto endCap =
+          sourceVertices
+          | std::views::transform([&](const auto& v) { return station(v, r, i + 1u); })
+          | kdl::ranges::to<std::vector>();
+        auto points = std::vector<vm::vec3d>{};
+        points.reserve(startCap.size() * 2u);
+        for (size_t j = 0; j < startCap.size(); ++j)
+        {
+          points.push_back(startCap[j]);
+          points.push_back(endCap[j]);
+        }
+
+        builder.createBrush(points, materialName) | kdl::transform([&](auto brush) {
+          const auto finalSegment =
+            r + 1u == parameters.iterations && i + 1u == parameters.segments;
+          applySegmentAttributes(
+            brush,
+            sourceFace,
+            sourceFaceIndex,
+            startCap,
+            endCap,
+            r * N + i,
+            continuousUvLayout ? &*continuousUvLayout : nullptr,
+            map.materialManager(),
+            result.issues,
+            r,
+            i,
+            finalSegment,
+            targetCapAttributes);
+
+          result.brushes[&parent].push_back(
+            std::make_unique<mdl::BrushNode>(std::move(brush)));
+        }) | kdl::transform_error([&](auto e) {
+          map.logger().debug() << "Sweep: could not create segment brush: " << e.msg;
+          result.issues.push_back(SweepIssue{sourceFaceIndex, r, i, e.msg});
+        });
+      }
+    }
+  }
+
+  if (continuousUvLayout && !result.issues.empty())
+  {
+    result.brushes.clear();
+  }
+  return result;
 }
 
 } // namespace
@@ -1630,6 +1839,7 @@ kdl_reflect_impl(SweepParameters);
 kdl_reflect_impl(SweepFaceAttributes);
 kdl_reflect_impl(SweepFace);
 kdl_reflect_impl(SweepSource);
+kdl_reflect_impl(SweepTarget);
 kdl_reflect_impl(SweepIssue);
 
 vm::vec3d SweepTransform::destinationCenter(const SweepSource& source) const
@@ -1683,31 +1893,12 @@ SweepResult generateSweepBrushes(
   const SweepTransform& transform,
   const SweepParameters& parameters)
 {
-  auto result = SweepResult{};
-  if (parameters.segments == 0u || parameters.iterations == 0u)
-  {
-    return result;
-  }
-
-  if (
-    parameters.uvMode == SweepUvMode::Continuous
-    && !mdl::isParallelUvCoordSystem(map.worldNode().mapFormat()))
-  {
-    result.issues.push_back(
-      SweepIssue{0, 0, 0, "Continuous UVs require a Valve-style map format"});
-    return result;
-  }
-
-  const auto builder = mdl::BrushBuilder{
-    map.worldNode().mapFormat(),
-    map.worldBounds(),
-    map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
-    map.gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes};
-
-  const auto materialName = map.currentMaterialName();
-
   const auto snapToInteger = parameters.alignment == SweepAlignment::Integer;
   const auto N = parameters.segments;
+  if (N == 0u || parameters.iterations == 0u)
+  {
+    return {};
+  }
 
   // precompute the transform table once since it never depends on the face or vertex
   const auto transforms = computeTransformTable(source, transform, parameters);
@@ -1723,78 +1914,102 @@ SweepResult generateSweepBrushes(
     const auto p = stationTransform * v;
     return snapToInteger && integerSnap[r][s] ? vm::round(p) : p;
   };
+  return generateBrushRun(map, source, parameters, station);
+}
 
-  auto continuousUvLayout = std::optional<ContinuousUvLayout>{};
-  if (parameters.uvMode == SweepUvMode::Continuous)
+SweepResult generateBridgeBrushes(
+  mdl::Map& map,
+  const SweepSource& source,
+  const SweepTarget& target,
+  const SweepParameters& parameters)
+{
+  if (parameters.segments == 0u)
   {
-    continuousUvLayout =
-      buildContinuousUvLayout(source, parameters, map.materialManager(), station);
-    result.issues = continuousUvLayout->issues;
-    if (!result.issues.empty())
-    {
-      return result;
-    }
+    return {};
+  }
+  if (parameters.iterations != 1u)
+  {
+    auto result = SweepResult{};
+    result.issues.push_back(
+      SweepIssue{0, 0, 0, "Bridge mode supports exactly one iteration"});
+    return result;
   }
 
-  // each source face produces its own run of brushes, grouped under its original parent
-  for (size_t sourceFaceIndex = 0; sourceFaceIndex < source.faces.size();
-       ++sourceFaceIndex)
+  const auto match = matchBridgeVertices(source, target);
+  if (!match)
   {
-    const auto& sourceFace = source.faces[sourceFaceIndex];
-    // fall back to the default insertion parent if the captured parent has been deleted
-    auto& parent = sourceFace.parent ? *sourceFace.parent : parentForNodes(map);
+    auto result = SweepResult{};
+    result.issues.push_back(SweepIssue{
+      0, 0, 0, "Bridge requires exactly two convex faces with the same vertex count"});
+    return result;
+  }
 
-    const auto& sourceVertices = sourceFace.polygon.vertices();
-    for (size_t r = 0; r < parameters.iterations; ++r)
+  const auto& sourceVertices = source.faces.front().polygon.vertices();
+  auto transform = SweepTransform{target.center - source.center, match->rotation};
+  const auto rotation = transform.effectiveRotation();
+  auto targetLocalOffsets = std::vector<vm::vec3d>{};
+  targetLocalOffsets.reserve(sourceVertices.size());
+  for (size_t i = 0u; i < sourceVertices.size(); ++i)
+  {
+    targetLocalOffsets.push_back(
+      rotation.conjugate() * (match->targetVertices[i] - target.center));
+  }
+
+  auto bridgeParameters = parameters;
+  bridgeParameters.iterations = 1u;
+  auto stations = std::vector<std::vector<vm::vec3d>>(
+    bridgeParameters.segments + 1u, std::vector<vm::vec3d>(sourceVertices.size()));
+  for (size_t segment = 0u; segment <= bridgeParameters.segments; ++segment)
+  {
+    if (segment == 0u)
     {
-      for (size_t i = 0; i < N; ++i)
+      stations[segment] = sourceVertices;
+      continue;
+    }
+    if (segment == bridgeParameters.segments)
+    {
+      stations[segment] = match->targetVertices;
+      continue;
+    }
+
+    const auto t = double(segment) / double(bridgeParameters.segments);
+    const auto blend = t * t * (3.0 - 2.0 * t);
+    const auto partialRotation =
+      rotation.angle() > vm::Cd::almost_zero()
+        ? vm::quatd{vm::normalize(rotation.axis()), rotation.angle() * t}
+        : vm::quatd{vm::vec3d{0, 0, 1}, 0.0};
+    const auto center =
+      stationTransform(source, transform, bridgeParameters, t, rotation) * source.center;
+    for (size_t vertexIndex = 0u; vertexIndex < sourceVertices.size(); ++vertexIndex)
+    {
+      const auto sourceOffset = sourceVertices[vertexIndex] - source.center;
+      const auto localOffset =
+        sourceOffset * (1.0 - blend) + targetLocalOffsets[vertexIndex] * blend;
+      stations[segment][vertexIndex] = center + partialRotation * localOffset;
+    }
+
+    if (bridgeParameters.alignment == SweepAlignment::Integer)
+    {
+      const auto rounded =
+        stations[segment]
+        | std::views::transform([](const auto& point) { return vm::round(point); })
+        | kdl::ranges::to<std::vector>();
+      if (pointsArePlanar(rounded))
       {
-        const auto startCap =
-          sourceVertices
-          | std::views::transform([&](const auto& v) { return station(v, r, i); })
-          | kdl::ranges::to<std::vector>();
-        const auto endCap =
-          sourceVertices
-          | std::views::transform([&](const auto& v) { return station(v, r, i + 1); })
-          | kdl::ranges::to<std::vector>();
-        auto points = std::vector<vm::vec3d>{};
-        points.reserve(startCap.size() * 2u);
-        for (size_t j = 0; j < startCap.size(); ++j)
-        {
-          points.push_back(startCap[j]);
-          points.push_back(endCap[j]);
-        }
-
-        builder.createBrush(points, materialName) | kdl::transform([&](auto brush) {
-          applySegmentAttributes(
-            brush,
-            sourceFace,
-            sourceFaceIndex,
-            startCap,
-            endCap,
-            r * N + i,
-            continuousUvLayout ? &*continuousUvLayout : nullptr,
-            map.materialManager(),
-            result.issues,
-            r,
-            i);
-
-          auto brushNode = std::make_unique<mdl::BrushNode>(std::move(brush));
-          result.brushes[&parent].push_back(std::move(brushNode));
-        }) | kdl::transform_error([&](auto e) {
-          map.logger().debug() << "Sweep: could not create segment brush: " << e.msg;
-          result.issues.push_back(SweepIssue{sourceFaceIndex, r, i, e.msg});
-        });
+        stations[segment] = rounded;
       }
     }
   }
 
-  if (continuousUvLayout && !result.issues.empty())
-  {
-    result.brushes.clear();
-  }
+  const auto station = [&](const vm::vec3d& point, const size_t, const size_t segment) {
+    const auto pointIt = std::ranges::find_if(sourceVertices, [&](const auto& candidate) {
+      return vm::is_equal(candidate, point, vm::Cd::almost_zero());
+    });
+    contract_assert(pointIt != sourceVertices.end());
+    return stations[segment][size_t(std::distance(sourceVertices.begin(), pointIt))];
+  };
 
-  return result;
+  return generateBrushRun(map, source, bridgeParameters, station, &target.capAttributes);
 }
 
 } // namespace tb::ui

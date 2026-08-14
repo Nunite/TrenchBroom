@@ -207,6 +207,18 @@ auto initializeSweepSource(const auto& faces)
   };
 }
 
+SweepTarget initializeSweepTarget(const mdl::BrushFaceHandle& faceHandle)
+{
+  const auto& face = faceHandle.face();
+  auto polygon = face.polygon();
+  return SweepTarget{
+    std::move(polygon),
+    face.polygon().center(),
+    face.normal(),
+    captureFaceAttributes(face),
+  };
+}
+
 vm::vec3d scaleArmAtCap(const vm::vec3d& scaleBase, const SweepTransform& transform)
 {
   return transform.effectiveRotation() * scaleBase;
@@ -270,6 +282,25 @@ bool SweepTool::doActivate()
   }
 
   m_source = initializeSweepSource(faces);
+  m_bridgeSource.reset();
+  m_bridgeTarget.reset();
+  m_bridgeAlternateSource.reset();
+  m_bridgeAlternateTarget.reset();
+  m_bridgeFacesAreDistinct = false;
+  if (faces.size() == 2u)
+  {
+    const auto sourceFaces = std::array{faces.front()};
+    const auto alternateSourceFaces = std::array{faces.back()};
+    m_bridgeSource = initializeSweepSource(sourceFaces);
+    m_bridgeTarget = initializeSweepTarget(faces.back());
+    m_bridgeAlternateSource = initializeSweepSource(alternateSourceFaces);
+    m_bridgeAlternateTarget = initializeSweepTarget(faces.front());
+    m_bridgeFacesAreDistinct = faces.front().node() != faces.back().node();
+  }
+  if (m_constructionMode == SweepConstructionMode::Bridge && !bridgeAvailable())
+  {
+    m_constructionMode = SweepConstructionMode::Sweep;
+  }
 
   connectObservers();
   reset();
@@ -281,6 +312,11 @@ bool SweepTool::doDeactivate()
 {
   m_notifierConnection.disconnect();
   m_source = SweepSource{};
+  m_bridgeSource.reset();
+  m_bridgeTarget.reset();
+  m_bridgeAlternateSource.reset();
+  m_bridgeAlternateTarget.reset();
+  m_bridgeFacesAreDistinct = false;
 
   m_previewBrushes.clear();
   m_sweepIssues.clear();
@@ -320,13 +356,61 @@ void SweepTool::setParameters(const SweepParameters& parameters)
   updateBrushes();
 }
 
+SweepConstructionMode SweepTool::constructionMode() const
+{
+  return m_constructionMode;
+}
+
+void SweepTool::setConstructionMode(const SweepConstructionMode mode)
+{
+  if (m_constructionMode != mode)
+  {
+    m_constructionMode = mode;
+    m_handle.setPosition(destinationCenter());
+    updateBrushes();
+  }
+}
+
+bool SweepTool::bridgeAvailable() const
+{
+  return m_bridgeFacesAreDistinct && m_bridgeSource && m_bridgeTarget
+         && m_bridgeSource->faces.front().polygon.vertexCount()
+              == m_bridgeTarget->polygon.vertexCount();
+}
+
+void SweepTool::swapBridgeEnds()
+{
+  if (
+    m_bridgeSource && m_bridgeTarget && m_bridgeAlternateSource
+    && m_bridgeAlternateTarget)
+  {
+    std::swap(m_bridgeSource, m_bridgeAlternateSource);
+    std::swap(m_bridgeTarget, m_bridgeAlternateTarget);
+    m_handle.setPosition(destinationCenter());
+    updateBrushes();
+  }
+}
+
+bool SweepTool::destinationEditable() const
+{
+  return m_constructionMode == SweepConstructionMode::Sweep;
+}
+
 vm::vec3d SweepTool::destinationCenter() const
 {
+  if (m_constructionMode == SweepConstructionMode::Bridge && m_bridgeTarget)
+  {
+    return m_bridgeTarget->center;
+  }
   return m_transform.destinationCenter(m_source);
 }
 
 void SweepTool::setDestinationCenter(const vm::vec3d& position)
 {
+  if (!destinationEditable())
+  {
+    return;
+  }
   auto transform = m_transform;
   transform.translation = position - m_source.center;
   setTransform(transform);
@@ -334,6 +418,10 @@ void SweepTool::setDestinationCenter(const vm::vec3d& position)
 
 void SweepTool::rotateDestinationCap(const vm::vec3d& axis, const double angle)
 {
+  if (!destinationEditable())
+  {
+    return;
+  }
   auto transform = m_transform;
   transform.rotation = vm::quatd{vm::normalize(axis), angle} * transform.rotation;
   setTransform(transform);
@@ -341,11 +429,22 @@ void SweepTool::rotateDestinationCap(const vm::vec3d& axis, const double angle)
 
 void SweepTool::reset()
 {
-  setTransform(SweepTransform{});
+  if (destinationEditable())
+  {
+    setTransform(SweepTransform{});
+  }
+  else
+  {
+    updateBrushes();
+  }
 }
 
 bool SweepTool::cancel()
 {
+  if (!destinationEditable())
+  {
+    return false;
+  }
   if (!m_transform.isNoOp())
   {
     reset();
@@ -368,7 +467,25 @@ void SweepTool::updateBrushes()
     m_sweepIssues.clear();
     m_brushRenderer->clear();
 
-    if (!m_source.faces.empty() && m_parameters.segments > 0 && !m_transform.isNoOp())
+    if (m_constructionMode == SweepConstructionMode::Bridge && m_parameters.segments > 0)
+    {
+      if (bridgeAvailable())
+      {
+        auto parameters = m_parameters;
+        parameters.iterations = 1u;
+        auto result = generateBridgeBrushes(
+          m_document.map(), *m_bridgeSource, *m_bridgeTarget, parameters);
+        m_previewBrushes = std::move(result.brushes);
+        m_sweepIssues = std::move(result.issues);
+      }
+      else
+      {
+        m_sweepIssues.push_back(SweepIssue{
+          0, 0, 0, "Bridge requires equal-sided faces on two different brushes"});
+      }
+    }
+    else if (
+      !m_source.faces.empty() && m_parameters.segments > 0 && !m_transform.isNoOp())
     {
       auto result =
         generateSweepBrushes(m_document.map(), m_source, m_transform, m_parameters);
@@ -408,7 +525,9 @@ void SweepTool::commitSweep()
     m_brushRenderer->clear();
 
     auto& map = m_document.map();
-    auto transaction = mdl::Transaction{map, "Sweep"};
+    auto transaction = mdl::Transaction{
+      map,
+      m_constructionMode == SweepConstructionMode::Bridge ? "Bridge Faces" : "Sweep"};
     const auto addedNodes = mdl::addNodes(map, nodesToAdd);
     mdl::deselectAll(map);
     mdl::selectNodes(map, addedNodes);
@@ -438,6 +557,17 @@ void SweepTool::renderDestinationGhost(
 
   auto renderService = render::RenderService{renderContext, renderBatch};
   renderService.setLineWidth(2.0f);
+
+  if (m_constructionMode == SweepConstructionMode::Bridge && m_bridgeTarget)
+  {
+    const auto& vertices = m_bridgeTarget->polygon.vertices();
+    const auto loop = kdl::views::concat(vertices, vertices | std::views::take(1))
+                      | std::views::transform([](const auto& v) { return vm::vec3f{v}; })
+                      | kdl::ranges::to<std::vector>();
+    renderService.setForegroundColor(pref(Preferences::HandleColor));
+    renderService.renderLineStrip(loop);
+    return;
+  }
 
   const auto renderCaps = [&](const vm::mat4x4d& transform) {
     for (const auto& sourceFace : m_source.faces)
@@ -489,7 +619,7 @@ void SweepTool::renderPreview(
 
 bool SweepTool::hasScaleHandle() const
 {
-  return !m_source.faces.empty()
+  return destinationEditable() && !m_source.faces.empty()
          && vm::squared_length(m_source.scaleBaseVector) > vm::Cd::almost_zero();
 }
 
@@ -655,16 +785,29 @@ void SweepTool::nodesWereRemoved(const std::vector<mdl::Node*>& nodes)
 {
   // a source face's parent may be deleted while the tool is active; null it so the commit
   // falls back to the default parent
-  auto mustRebuild = false;
-  for (auto& sourceFace : m_source.faces)
-  {
-    if (
-      sourceFace.parent
-      && (kdl::vec_contains(nodes, sourceFace.parent) || sourceFace.parent->isDescendantOf(nodes)))
+  const auto clearRemovedParents = [&](auto& source) {
+    auto changed = false;
+    for (auto& sourceFace : source.faces)
     {
-      sourceFace.parent = nullptr;
-      mustRebuild = true;
+      if (
+        sourceFace.parent
+        && (kdl::vec_contains(nodes, sourceFace.parent) || sourceFace.parent->isDescendantOf(nodes)))
+      {
+        sourceFace.parent = nullptr;
+        changed = true;
+      }
     }
+    return changed;
+  };
+
+  auto mustRebuild = clearRemovedParents(m_source);
+  if (m_bridgeSource)
+  {
+    mustRebuild = clearRemovedParents(*m_bridgeSource) || mustRebuild;
+  }
+  if (m_bridgeAlternateSource)
+  {
+    mustRebuild = clearRemovedParents(*m_bridgeAlternateSource) || mustRebuild;
   }
   if (mustRebuild)
   {

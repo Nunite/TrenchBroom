@@ -77,6 +77,12 @@ enum class SweepUvMode : std::uint8_t
 
 std::ostream& operator<<(std::ostream& lhs, SweepUvMode rhs);
 
+enum class SweepConstructionMode : std::uint8_t
+{
+  Sweep,
+  Bridge,
+};
+
 struct SweepFaceAttributes
 {
   std::string materialName;
@@ -112,6 +118,16 @@ struct SweepSource
   vm::vec3d scaleBaseVector;
 
   kdl_reflect_decl(SweepSource, faces, center, normal, scaleBaseVector);
+};
+
+struct SweepTarget
+{
+  vm::polygon3d polygon;
+  vm::vec3d center;
+  vm::vec3d normal;
+  std::optional<SweepFaceAttributes> capAttributes;
+
+  kdl_reflect_decl(SweepTarget, polygon, center, normal, capAttributes);
 };
 
 struct SweepTransform
@@ -207,6 +223,21 @@ SweepResult generateSweepBrushes(
   mdl::Map& map,
   const SweepSource& source,
   const SweepTransform& transform,
+  const SweepParameters& parameters);
+
+/**
+ * Connects one source face to a target face. The target vertex ring is matched
+ * against
+ * the source across cyclic shifts and both winding directions. The first and
+ * last
+ * stations use the selected face vertices verbatim, so the generated run remains
+ * flush
+ * with both existing brushes.
+ */
+SweepResult generateBridgeBrushes(
+  mdl::Map& map,
+  const SweepSource& source,
+  const SweepTarget& target,
   const SweepParameters& parameters);
 
 } // namespace ui

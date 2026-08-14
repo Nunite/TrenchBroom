@@ -18,6 +18,7 @@
  */
 
 #include "mdl/Brush.h"
+#include "mdl/BrushBuilder.h"
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
 #include "mdl/CatchConfig.h"
@@ -378,6 +379,60 @@ TEST_CASE("SweepTool")
 
     tool.commitSweep();
     CHECK(defaultParent->childCount() == childCountBefore + 2);
+  }
+
+  SECTION("bridge selected faces")
+  {
+    const auto builder =
+      mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+    auto* sourceNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{-16, -16, -16}, {16, 16, 16}}, "source")
+      | kdl::value()};
+    auto* targetNode = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{80, -24, -12}, {112, 24, 12}}, "target")
+      | kdl::value()};
+    auto& parent = parentForNodes(map);
+    addNodes(map, {{&parent, {sourceNode, targetNode}}});
+
+    const auto sourceFaceIndex = *sourceNode->brush().findFace(vm::vec3d{1, 0, 0});
+    const auto targetFaceIndex = *targetNode->brush().findFace(vm::vec3d{-1, 0, 0});
+    selectBrushFaces(map, {{sourceNode, sourceFaceIndex}, {targetNode, targetFaceIndex}});
+
+    REQUIRE(tool.activate());
+    tool.setParameters(
+      SweepParameters{3, 4, SweepPathMode::Straight, SweepAlignment::Free});
+    tool.setConstructionMode(SweepConstructionMode::Bridge);
+
+    CHECK(tool.bridgeAvailable());
+    CHECK(!tool.destinationEditable());
+    CHECK(tool.destinationCenter() == vm::vec3d{80, 0, 0});
+    CHECK(tool.canCommitSweep());
+    CHECK(tool.sweepIssues().empty());
+    CHECK(!tool.hasScaleHandle());
+
+    tool.swapBridgeEnds();
+    CHECK(tool.destinationCenter() == vm::vec3d{16, 0, 0});
+    CHECK(tool.canCommitSweep());
+    tool.swapBridgeEnds();
+    CHECK(tool.destinationCenter() == vm::vec3d{80, 0, 0});
+
+    tool.setDestinationCenter(vm::vec3d{256, 0, 0});
+    tool.rotateDestinationCap(vm::vec3d{0, 0, 1}, vm::Cd::half_pi());
+    CHECK(tool.destinationCenter() == vm::vec3d{80, 0, 0});
+
+    const auto sourceBrush = sourceNode->brush();
+    const auto targetBrush = targetNode->brush();
+    const auto childCountBefore = parent.childCount();
+    tool.commitSweep();
+
+    CHECK(parent.childCount() == childCountBefore + 3u);
+    CHECK(sourceNode->brush() == sourceBrush);
+    CHECK(targetNode->brush() == targetBrush);
+    REQUIRE(map.undoCommandName());
+    CHECK(*map.undoCommandName() == "Bridge Faces");
+
+    map.undoCommand();
+    CHECK(parent.childCount() == childCountBefore);
   }
 
   SECTION(
