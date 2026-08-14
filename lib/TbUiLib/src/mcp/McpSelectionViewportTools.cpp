@@ -348,19 +348,6 @@ bool mcpOptionalBool(
   return value.isBool() ? value.toBool() : defaultValue;
 }
 
-QJsonObject selectionSummaryJson(const mdl::Selection& selection)
-{
-  return QJsonObject{
-    {"hasSelection", selection.hasAny()},
-    {"nodeCount", static_cast<int>(selection.nodes.size())},
-    {"groupCount", static_cast<int>(selection.groups.size())},
-    {"entityCount", static_cast<int>(selection.entities.size())},
-    {"brushCount", static_cast<int>(selection.brushes.size())},
-    {"patchCount", static_cast<int>(selection.patches.size())},
-    {"brushFaceCount", static_cast<int>(selection.brushFaces.size())},
-  };
-}
-
 McpBridgeToolResult retiredViewportToolResult(
   const QString& toolName, const QString& replacement)
 {

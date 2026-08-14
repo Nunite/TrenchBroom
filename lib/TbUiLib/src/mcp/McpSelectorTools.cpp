@@ -3494,7 +3494,7 @@ McpBridgeToolResult moduleCompactForMapResult(
     }
   }
 
-  auto removedObjectIdCount = 0;
+  auto removedObjectIdCount = qsizetype{0};
   const auto key = moduleStoreKey(documentFingerprint, moduleId);
   auto moduleIt = moduleStore.find(key);
   if (moduleIt == moduleStore.end())

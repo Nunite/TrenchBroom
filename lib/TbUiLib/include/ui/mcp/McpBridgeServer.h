@@ -24,6 +24,7 @@
 #include <QHash>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QLocalServer>
 #include <QObject>
 #include <QSet>
 #include <QStringList>
@@ -39,7 +40,6 @@
 #include <memory>
 #include <vector>
 
-class QLocalServer;
 class QLocalSocket;
 class QTimer;
 
@@ -216,7 +216,7 @@ private:
   mutable bool m_dispatchInProgress = false;
   QString m_bridgeInstanceId;
   QDateTime m_bridgeStartedAtUtc;
-  std::unique_ptr<QLocalServer> m_server = nullptr;
+  std::unique_ptr<QLocalServer> m_server;
   QSet<QLocalSocket*> m_connections;
   QHash<QLocalSocket*, QTimer*> m_requestDeadlines;
 

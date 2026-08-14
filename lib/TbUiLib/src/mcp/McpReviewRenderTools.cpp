@@ -1840,6 +1840,7 @@ QJsonObject writeContactSheet(
 
   for (auto i = 0; i < count; ++i)
   {
+    const auto& [label, sourceImage] = loaded[static_cast<size_t>(i)];
     const auto column = i % columns;
     const auto row = i / columns;
     const auto cell = QRect{
@@ -1854,12 +1855,11 @@ QJsonObject writeContactSheet(
 
     const auto labelHeight = 22;
     painter.setPen(QPen{QColor{56, 56, 52}, 1});
-    painter.drawText(
-      cell.adjusted(8, 2, -8, 0), Qt::AlignLeft | Qt::AlignTop, loaded[i].first);
+    painter.drawText(cell.adjusted(8, 2, -8, 0), Qt::AlignLeft | Qt::AlignTop, label);
 
     const auto imageRect = cell.adjusted(8, labelHeight, -8, -8);
-    const auto scaled = loaded[i].second.scaled(
-      imageRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    const auto scaled =
+      sourceImage.scaled(imageRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
     const auto target = QRect{
       imageRect.x() + (imageRect.width() - scaled.width()) / 2,
       imageRect.y() + (imageRect.height() - scaled.height()) / 2,
@@ -1907,7 +1907,7 @@ QJsonArray capturesForContactSheet(const QJsonArray& captures, const int maxCapt
 }
 
 void annotateContactSheet(
-  QJsonObject& contactSheet, const int totalCaptureCount, const int maxCaptures)
+  QJsonObject& contactSheet, const qsizetype totalCaptureCount, const int maxCaptures)
 {
   if (contactSheet.isEmpty())
   {
@@ -1915,7 +1915,8 @@ void annotateContactSheet(
   }
 
   const auto includedCaptureCount =
-    std::min(totalCaptureCount, maxCaptures <= 0 ? totalCaptureCount : maxCaptures);
+    maxCaptures <= 0 ? totalCaptureCount
+                     : std::min(totalCaptureCount, static_cast<qsizetype>(maxCaptures));
   contactSheet.insert("sourceCaptureCount", totalCaptureCount);
   contactSheet.insert("includedCaptureCount", includedCaptureCount);
   contactSheet.insert("omittedCaptureCount", totalCaptureCount - includedCaptureCount);

@@ -1125,7 +1125,7 @@ TEST_CASE("SweepToolUtils functions")
         mdl::SurfaceAttributes{},
         std::nullopt,
         vm::plane3d{704.0, vm::vec3d{1, 0, 0}}};
-      const auto point = [](const double y, const double z) {
+      const auto makePoint = [](const double y, const double z) {
         return vm::vec3d{704, y, z};
       };
       const auto polygon = [&](const std::initializer_list<vm::vec3d> vertices) {
@@ -1136,13 +1136,38 @@ TEST_CASE("SweepToolUtils functions")
           std::vector<std::optional<SweepFaceAttributes>>(4u, attributes)};
       };
       source.faces = {
-        polygon({point(-240, 216), point(-200, 296), point(-188, 284), point(-224, 212)}),
-        polygon({point(-200, 296), point(-120, 336), point(-116, 320), point(-188, 284)}),
-        polygon({point(-240, 96), point(-240, 216), point(-224, 212), point(-224, 96)}),
-        polygon({point(-120, 336), point(-40, 336), point(-44, 320), point(-116, 320)}),
-        polygon({point(-40, 336), point(40, 296), point(28, 284), point(-44, 320)}),
-        polygon({point(40, 296), point(80, 216), point(64, 212), point(28, 284)}),
-        polygon({point(80, 216), point(80, 96), point(64, 96), point(64, 212)}),
+        polygon(
+          {makePoint(-240, 216),
+           makePoint(-200, 296),
+           makePoint(-188, 284),
+           makePoint(-224, 212)}),
+        polygon(
+          {makePoint(-200, 296),
+           makePoint(-120, 336),
+           makePoint(-116, 320),
+           makePoint(-188, 284)}),
+        polygon(
+          {makePoint(-240, 96),
+           makePoint(-240, 216),
+           makePoint(-224, 212),
+           makePoint(-224, 96)}),
+        polygon(
+          {makePoint(-120, 336),
+           makePoint(-40, 336),
+           makePoint(-44, 320),
+           makePoint(-116, 320)}),
+        polygon(
+          {makePoint(-40, 336),
+           makePoint(40, 296),
+           makePoint(28, 284),
+           makePoint(-44, 320)}),
+        polygon(
+          {makePoint(40, 296),
+           makePoint(80, 216),
+           makePoint(64, 212),
+           makePoint(28, 284)}),
+        polygon(
+          {makePoint(80, 216), makePoint(80, 96), makePoint(64, 96), makePoint(64, 212)}),
       };
       source.center = vm::vec3d{704, -80, 216};
       source.normal = vm::vec3d{1, 0, 0};

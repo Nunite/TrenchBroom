@@ -104,8 +104,8 @@ struct SweepFace
 {
   vm::polygon3d polygon;
   mdl::Node* parent = nullptr;
-  std::optional<SweepFaceAttributes> capAttributes;
-  std::vector<std::optional<SweepFaceAttributes>> sideAttributes;
+  std::optional<SweepFaceAttributes> capAttributes = std::nullopt;
+  std::vector<std::optional<SweepFaceAttributes>> sideAttributes = {};
 
   kdl_reflect_decl(SweepFace, polygon, parent, capAttributes, sideAttributes);
 };
