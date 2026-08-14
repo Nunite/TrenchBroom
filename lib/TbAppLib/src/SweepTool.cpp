@@ -88,6 +88,75 @@ bool containsVertex(const mdl::BrushFace& face, const vm::vec3d& vertex)
   });
 }
 
+bool facesShareEdge(const mdl::BrushFaceHandle& lhs, const mdl::BrushFaceHandle& rhs)
+{
+  const auto lhsVertices = lhs.face().vertexPositions();
+  const auto rhsVertices = rhs.face().vertexPositions();
+  for (size_t lhsIndex = 0u; lhsIndex < lhsVertices.size(); ++lhsIndex)
+  {
+    const auto& lhsStart = lhsVertices[lhsIndex];
+    const auto& lhsEnd = lhsVertices[(lhsIndex + 1u) % lhsVertices.size()];
+    for (size_t rhsIndex = 0u; rhsIndex < rhsVertices.size(); ++rhsIndex)
+    {
+      const auto& rhsStart = rhsVertices[rhsIndex];
+      const auto& rhsEnd = rhsVertices[(rhsIndex + 1u) % rhsVertices.size()];
+      if (
+        (vm::is_equal(lhsStart, rhsStart, vm::Cd::almost_zero())
+         && vm::is_equal(lhsEnd, rhsEnd, vm::Cd::almost_zero()))
+        || (vm::is_equal(lhsStart, rhsEnd, vm::Cd::almost_zero()) && vm::is_equal(lhsEnd, rhsStart, vm::Cd::almost_zero())))
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+std::vector<std::vector<mdl::BrushFaceHandle>> connectedFaceComponents(
+  const std::vector<mdl::BrushFaceHandle>& faces)
+{
+  auto result = std::vector<std::vector<mdl::BrushFaceHandle>>{};
+  auto assigned = std::vector<bool>(faces.size(), false);
+  for (size_t seed = 0u; seed < faces.size(); ++seed)
+  {
+    if (assigned[seed])
+    {
+      continue;
+    }
+
+    auto indices = std::vector<size_t>{seed};
+    assigned[seed] = true;
+    for (size_t cursor = 0u; cursor < indices.size(); ++cursor)
+    {
+      for (size_t candidate = 0u; candidate < faces.size(); ++candidate)
+      {
+        if (
+          !assigned[candidate]
+          && facesShareEdge(faces[indices[cursor]], faces[candidate]))
+        {
+          assigned[candidate] = true;
+          indices.push_back(candidate);
+        }
+      }
+    }
+
+    result.push_back(
+      indices | std::views::transform([&](const auto index) { return faces[index]; })
+      | kdl::ranges::to<std::vector>());
+  }
+  return result;
+}
+
+bool componentsUseDistinctBrushes(
+  const std::vector<mdl::BrushFaceHandle>& lhs,
+  const std::vector<mdl::BrushFaceHandle>& rhs)
+{
+  return std::ranges::none_of(lhs, [&](const auto& lhsFace) {
+    return std::ranges::any_of(
+      rhs, [&](const auto& rhsFace) { return lhsFace.node() == rhsFace.node(); });
+  });
+}
+
 std::optional<SweepFaceAttributes> adjacentFaceAttributes(
   const mdl::Brush& brush,
   const size_t selectedFaceIndex,
@@ -207,15 +276,12 @@ auto initializeSweepSource(const auto& faces)
   };
 }
 
-SweepTarget initializeSweepTarget(const mdl::BrushFaceHandle& faceHandle)
+SweepTarget initializeSweepTarget(const auto& faces)
 {
-  const auto& face = faceHandle.face();
-  auto polygon = face.polygon();
   return SweepTarget{
-    std::move(polygon),
-    face.polygon().center(),
-    face.normal(),
-    captureFaceAttributes(face),
+    initializeFaces(faces),
+    initializeCenter(faces),
+    initializeNormal(faces),
   };
 }
 
@@ -287,15 +353,16 @@ bool SweepTool::doActivate()
   m_bridgeAlternateSource.reset();
   m_bridgeAlternateTarget.reset();
   m_bridgeFacesAreDistinct = false;
-  if (faces.size() == 2u)
+  const auto bridgeComponents = connectedFaceComponents(faces);
+  if (bridgeComponents.size() == 2u)
   {
-    const auto sourceFaces = std::array{faces.front()};
-    const auto alternateSourceFaces = std::array{faces.back()};
+    const auto& sourceFaces = bridgeComponents.front();
+    const auto& targetFaces = bridgeComponents.back();
     m_bridgeSource = initializeSweepSource(sourceFaces);
-    m_bridgeTarget = initializeSweepTarget(faces.back());
-    m_bridgeAlternateSource = initializeSweepSource(alternateSourceFaces);
-    m_bridgeAlternateTarget = initializeSweepTarget(faces.front());
-    m_bridgeFacesAreDistinct = faces.front().node() != faces.back().node();
+    m_bridgeTarget = initializeSweepTarget(targetFaces);
+    m_bridgeAlternateSource = initializeSweepSource(targetFaces);
+    m_bridgeAlternateTarget = initializeSweepTarget(sourceFaces);
+    m_bridgeFacesAreDistinct = componentsUseDistinctBrushes(sourceFaces, targetFaces);
   }
   if (m_constructionMode == SweepConstructionMode::Bridge && !bridgeAvailable())
   {
@@ -374,8 +441,7 @@ void SweepTool::setConstructionMode(const SweepConstructionMode mode)
 bool SweepTool::bridgeAvailable() const
 {
   return m_bridgeFacesAreDistinct && m_bridgeSource && m_bridgeTarget
-         && m_bridgeSource->faces.front().polygon.vertexCount()
-              == m_bridgeTarget->polygon.vertexCount();
+         && m_bridgeSource->faces.size() == m_bridgeTarget->faces.size();
 }
 
 void SweepTool::swapBridgeEnds()
@@ -481,7 +547,11 @@ void SweepTool::updateBrushes()
       else
       {
         m_sweepIssues.push_back(SweepIssue{
-          0, 0, 0, "Bridge requires equal-sided faces on two different brushes"});
+          0,
+          0,
+          0,
+          "Bridge requires two disconnected, equal-sized face components on different "
+          "brushes"});
       }
     }
     else if (
@@ -560,12 +630,16 @@ void SweepTool::renderDestinationGhost(
 
   if (m_constructionMode == SweepConstructionMode::Bridge && m_bridgeTarget)
   {
-    const auto& vertices = m_bridgeTarget->polygon.vertices();
-    const auto loop = kdl::views::concat(vertices, vertices | std::views::take(1))
-                      | std::views::transform([](const auto& v) { return vm::vec3f{v}; })
-                      | kdl::ranges::to<std::vector>();
     renderService.setForegroundColor(pref(Preferences::HandleColor));
-    renderService.renderLineStrip(loop);
+    for (const auto& targetFace : m_bridgeTarget->faces)
+    {
+      const auto& vertices = targetFace.polygon.vertices();
+      const auto loop =
+        kdl::views::concat(vertices, vertices | std::views::take(1))
+        | std::views::transform([](const auto& v) { return vm::vec3f{v}; })
+        | kdl::ranges::to<std::vector>();
+      renderService.renderLineStrip(loop);
+    }
     return;
   }
 

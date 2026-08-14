@@ -82,9 +82,9 @@ void SweepToolPage::createGui()
   m_mode->setObjectName(QStringLiteral("sweepMode"));
   m_mode->addItem(tr("Sweep"), int(SweepConstructionMode::Sweep));
   m_mode->addItem(tr("Bridge"), int(SweepConstructionMode::Bridge));
-  m_mode->setToolTip(
-    tr("Bridge connects the first selected face to the second selected face and locks "
-       "the destination to its exact vertices"));
+  m_mode->setToolTip(tr(
+    "Bridge connects two disconnected sets of selected faces and locks the destination "
+    "to its exact vertices"));
 
   auto* segmentsText = new QLabel{tr("Segments")};
   m_segments = new QSpinBox{this};

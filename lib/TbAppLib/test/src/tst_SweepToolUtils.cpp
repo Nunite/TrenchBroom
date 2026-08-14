@@ -352,15 +352,10 @@ TEST_CASE("SweepToolUtils functions")
         {64, 24, -12},
       };
       const auto target = SweepTarget{
-        vm::polygon3d{
-          {64, 24, 12},
-          {64, -24, 12},
-          {64, -24, -12},
-          {64, 24, -12},
-        },
+        {SweepFace{
+          vm::polygon3d{{64, 24, 12}, {64, -24, 12}, {64, -24, -12}, {64, 24, -12}}}},
         vm::vec3d{64, 0, 0},
         vm::vec3d{-1, 0, 0},
-        std::nullopt,
       };
       parameters.segments = 3;
 
@@ -413,16 +408,15 @@ TEST_CASE("SweepToolUtils functions")
     SECTION("bridge rejects mismatched vertex counts")
     {
       const auto target = SweepTarget{
-        vm::polygon3d{{64, -16, -16}, {64, 16, 0}, {64, -16, 16}},
+        {SweepFace{vm::polygon3d{{64, -16, -16}, {64, 16, 0}, {64, -16, 16}}}},
         vm::vec3d{64, -16.0 / 3.0, 0},
         vm::vec3d{-1, 0, 0},
-        std::nullopt,
       };
 
       const auto result = generateBridgeBrushes(map, source, target, parameters);
       CHECK(result.brushes.empty());
       REQUIRE(result.issues.size() == 1u);
-      CHECK(result.issues.front().message.find("same vertex count") != std::string::npos);
+      CHECK(result.issues.front().message.find("matching") != std::string::npos);
     }
 
     SECTION("bridge follows an arc into a perpendicular target face")
@@ -434,10 +428,9 @@ TEST_CASE("SweepToolUtils functions")
         {16, 64, -16},
       };
       const auto target = SweepTarget{
-        vm::polygon3d{targetVertices},
+        {SweepFace{vm::polygon3d{targetVertices}}},
         vm::vec3d{0, 64, 0},
         vm::vec3d{0, -1, 0},
-        std::nullopt,
       };
       parameters.segments = 4;
       parameters.pathMode = SweepPathMode::Arc;
@@ -459,6 +452,130 @@ TEST_CASE("SweepToolUtils functions")
           });
         });
       }));
+    }
+
+    SECTION("bridge matches a connected multi-face profile as one topology")
+    {
+      const auto sourceLower =
+        vm::polygon3d{{0, -16, -16}, {0, -16, 16}, {0, 0, 16}, {0, 0, -16}};
+      const auto sourceUpper =
+        vm::polygon3d{{0, 0, -16}, {0, 0, 16}, {0, 16, 16}, {0, 16, -16}};
+      source.faces = {
+        SweepFace{sourceLower, &defaultParent},
+        SweepFace{sourceUpper, &defaultParent},
+      };
+      source.center = vm::vec3d{0, 0, 0};
+      source.normal = vm::vec3d{1, 0, 0};
+
+      const auto targetLower =
+        vm::polygon3d{{64, 0, -12}, {64, 0, 12}, {64, -24, 12}, {64, -24, -12}};
+      const auto targetUpper =
+        vm::polygon3d{{64, 24, 12}, {64, 0, 12}, {64, 0, -12}, {64, 24, -12}};
+      const auto target = SweepTarget{
+        {
+          SweepFace{targetUpper},
+          SweepFace{targetLower},
+        },
+        vm::vec3d{64, 0, 0},
+        vm::vec3d{-1, 0, 0},
+      };
+      parameters.segments = 3;
+
+      const auto result = generateBridgeBrushes(map, source, target, parameters);
+      CHECK(result.issues.empty());
+      REQUIRE(result.brushes.contains(&defaultParent));
+      const auto& brushes = result.brushes.at(&defaultParent);
+      REQUIRE(brushes.size() == 6u);
+      CHECK(std::ranges::all_of(
+        brushes, [](const auto& brush) { return brush->brush().fullySpecified(); }));
+
+      const auto sharedFacePoints = [](const mdl::Brush& lhs, const mdl::Brush& rhs) {
+        return std::ranges::any_of(lhs.faces(), [&](const auto& lhsFace) {
+          const auto lhsVertices = lhsFace.vertexPositions();
+          return lhsVertices.size() >= 3u
+                 && std::ranges::any_of(rhs.faces(), [&](const auto& rhsFace) {
+                      const auto rhsVertices = rhsFace.vertexPositions();
+                      return rhsVertices.size() == lhsVertices.size()
+                             && std::ranges::all_of(lhsVertices, [&](const auto& point) {
+                                  return std::ranges::any_of(
+                                    rhsVertices, [&](const auto& candidate) {
+                                      return vm::is_equal(
+                                        point, candidate, vm::Cd::almost_zero());
+                                    });
+                                });
+                    });
+        });
+      };
+
+      for (size_t segment = 0u; segment < parameters.segments; ++segment)
+      {
+        CHECK(sharedFacePoints(
+          brushes[segment]->brush(), brushes[parameters.segments + segment]->brush()));
+      }
+
+      const auto containsPoints = [](const mdl::Brush& brush, const auto& points) {
+        return std::ranges::any_of(brush.faces(), [&](const auto& face) {
+          const auto faceVertices = face.vertexPositions();
+          return std::ranges::all_of(points, [&](const auto& point) {
+            return std::ranges::any_of(faceVertices, [&](const auto& vertex) {
+              return vm::is_equal(vertex, point, vm::Cd::almost_zero());
+            });
+          });
+        });
+      };
+      CHECK(containsPoints(brushes[0]->brush(), sourceLower.vertices()));
+      CHECK(containsPoints(brushes[3]->brush(), sourceUpper.vertices()));
+      CHECK(containsPoints(brushes[2]->brush(), targetLower.vertices()));
+      CHECK(containsPoints(brushes[5]->brush(), targetUpper.vertices()));
+
+      const auto attributes = SweepFaceAttributes{
+        "continuous",
+        mdl::UvAttributes{},
+        mdl::SurfaceAttributes{},
+        std::nullopt,
+        vm::plane3d{0.0, vm::vec3d{1, 0, 0}}};
+      for (auto& sourceFace : source.faces)
+      {
+        sourceFace.sideAttributes =
+          std::vector<std::optional<SweepFaceAttributes>>(4u, attributes);
+      }
+      parameters.uvMode = SweepUvMode::Continuous;
+
+      const auto continuousResult =
+        generateBridgeBrushes(map, source, target, parameters);
+      CHECK(continuousResult.issues.empty());
+      REQUIRE(continuousResult.brushes.contains(&defaultParent));
+      CHECK(continuousResult.brushes.at(&defaultParent).size() == 6u);
+    }
+
+    SECTION("bridge rejects different shared-edge topology")
+    {
+      const auto sourceLower =
+        vm::polygon3d{{0, -16, -16}, {0, -16, 16}, {0, 0, 16}, {0, 0, -16}};
+      const auto sourceUpper =
+        vm::polygon3d{{0, 0, -16}, {0, 0, 16}, {0, 16, 16}, {0, 16, -16}};
+      source.faces = {
+        SweepFace{sourceLower, &defaultParent},
+        SweepFace{sourceUpper, &defaultParent},
+      };
+      source.center = vm::vec3d{0, 0, 0};
+      source.normal = vm::vec3d{1, 0, 0};
+
+      const auto target = SweepTarget{
+        {
+          SweepFace{
+            vm::polygon3d{{64, -24, -12}, {64, -24, 12}, {64, -8, 12}, {64, -8, -12}}},
+          SweepFace{
+            vm::polygon3d{{64, 8, -12}, {64, 8, 12}, {64, 24, 12}, {64, 24, -12}}},
+        },
+        vm::vec3d{64, 0, 0},
+        vm::vec3d{-1, 0, 0},
+      };
+
+      const auto result = generateBridgeBrushes(map, source, target, parameters);
+      CHECK(result.brushes.empty());
+      REQUIRE(result.issues.size() == 1u);
+      CHECK(result.issues.front().message.find("topology") != std::string::npos);
     }
 
     SECTION("iterations continue from the previous destination cap")

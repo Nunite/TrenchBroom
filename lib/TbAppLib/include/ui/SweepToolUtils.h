@@ -122,12 +122,11 @@ struct SweepSource
 
 struct SweepTarget
 {
-  vm::polygon3d polygon;
+  std::vector<SweepFace> faces;
   vm::vec3d center;
   vm::vec3d normal;
-  std::optional<SweepFaceAttributes> capAttributes;
 
-  kdl_reflect_decl(SweepTarget, polygon, center, normal, capAttributes);
+  kdl_reflect_decl(SweepTarget, faces, center, normal);
 };
 
 struct SweepTransform
@@ -226,13 +225,12 @@ SweepResult generateSweepBrushes(
   const SweepParameters& parameters);
 
 /**
- * Connects one source face to a target face. The target vertex ring is matched
- * against
- * the source across cyclic shifts and both winding directions. The first and
- * last
- * stations use the selected face vertices verbatim, so the generated run remains
- * flush
- * with both existing brushes.
+ * Connects two topologically equivalent face components. Shared vertices are matched
+ * as
+ * one component, so adjacent brushes reuse identical station coordinates. The end
+
+ * * stations use the selected vertices verbatim and remain flush with existing brushes.
+
  */
 SweepResult generateBridgeBrushes(
   mdl::Map& map,

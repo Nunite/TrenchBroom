@@ -435,6 +435,64 @@ TEST_CASE("SweepTool")
     CHECK(parent.childCount() == childCountBefore);
   }
 
+  SECTION("bridge two connected face components")
+  {
+    const auto builder =
+      mdl::BrushBuilder{map.worldNode().mapFormat(), map.worldBounds()};
+    auto& parent = parentForNodes(map);
+    auto* sourceLower = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{-16, -16, -16}, {0, 0, 16}}, "source")
+      | kdl::value()};
+    auto* sourceUpper = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{-16, 0, -16}, {0, 16, 16}}, "source")
+      | kdl::value()};
+    auto* targetLower = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{64, -24, -12}, {80, 0, 12}}, "target")
+      | kdl::value()};
+    auto* targetUpper = new mdl::BrushNode{
+      builder.createCuboid(vm::bbox3d{{64, 0, -12}, {80, 24, 12}}, "target")
+      | kdl::value()};
+    addNodes(map, {{&parent, {sourceLower, sourceUpper, targetLower, targetUpper}}});
+
+    const auto sourceLowerFace = *sourceLower->brush().findFace(vm::vec3d{1, 0, 0});
+    const auto sourceUpperFace = *sourceUpper->brush().findFace(vm::vec3d{1, 0, 0});
+    const auto targetLowerFace = *targetLower->brush().findFace(vm::vec3d{-1, 0, 0});
+    const auto targetUpperFace = *targetUpper->brush().findFace(vm::vec3d{-1, 0, 0});
+    selectBrushFaces(
+      map,
+      {
+        {sourceLower, sourceLowerFace},
+        {sourceUpper, sourceUpperFace},
+        {targetUpper, targetUpperFace},
+        {targetLower, targetLowerFace},
+      });
+
+    REQUIRE(tool.activate());
+    tool.setParameters(
+      SweepParameters{3, 1, SweepPathMode::Straight, SweepAlignment::Free});
+    tool.setConstructionMode(SweepConstructionMode::Bridge);
+
+    CHECK(tool.bridgeAvailable());
+    CHECK(tool.canCommitSweep());
+    CHECK(tool.sweepIssues().empty());
+    CHECK(tool.destinationCenter() == vm::vec3d{64, 0, 0});
+
+    tool.swapBridgeEnds();
+    CHECK(tool.destinationCenter() == vm::vec3d{0, 0, 0});
+    CHECK(tool.canCommitSweep());
+    tool.swapBridgeEnds();
+    CHECK(tool.destinationCenter() == vm::vec3d{64, 0, 0});
+
+    const auto childCountBefore = parent.childCount();
+    tool.commitSweep();
+    CHECK(parent.childCount() == childCountBefore + 6u);
+    REQUIRE(map.undoCommandName());
+    CHECK(*map.undoCommandName() == "Bridge Faces");
+
+    map.undoCommand();
+    CHECK(parent.childCount() == childCountBefore);
+  }
+
   SECTION(
     "sweeping faces with cancelling normals falls back to a straight path in S-Bend mode")
   {

@@ -55,6 +55,7 @@
 
 #include <array>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <map>
 #include <numeric>
@@ -1590,25 +1591,42 @@ void applySegmentAttributes(
 
 struct BridgeMatch
 {
+  std::vector<vm::vec3d> sourceVertices;
   std::vector<vm::vec3d> targetVertices;
+  std::vector<size_t> targetFaceIndices;
   vm::quatd rotation;
 };
 
-std::optional<BridgeMatch> matchBridgeVertices(
-  const SweepSource& source, const SweepTarget& target)
+struct FaceComponentTopology
 {
-  if (source.faces.size() != 1u)
-  {
-    return std::nullopt;
-  }
+  std::vector<vm::vec3d> vertices;
+  std::vector<std::vector<size_t>> faceVertices;
+};
 
-  const auto& sourceVertices = source.faces.front().polygon.vertices();
-  const auto& targetVertices = target.polygon.vertices();
-  if (sourceVertices.size() < 3u || sourceVertices.size() != targetVertices.size())
+FaceComponentTopology buildFaceComponentTopology(const std::vector<SweepFace>& faces)
+{
+  auto result = FaceComponentTopology{};
+  result.faceVertices.reserve(faces.size());
+  for (const auto& face : faces)
   {
-    return std::nullopt;
+    auto indices = std::vector<size_t>{};
+    indices.reserve(face.polygon.vertexCount());
+    for (const auto& vertex : face.polygon.vertices())
+    {
+      indices.push_back(findOrAddVertex(result.vertices, vertex));
+    }
+    result.faceVertices.push_back(std::move(indices));
   }
+  return result;
+}
 
+std::optional<vm::quatd> bridgeRotation(
+  const SweepSource& source,
+  const SweepTarget& target,
+  const FaceComponentTopology& sourceTopology,
+  const FaceComponentTopology& targetTopology,
+  const std::vector<size_t>& vertexMapping)
+{
   const auto destinationNormal = -target.normal;
   if (
     vm::is_zero(source.normal, vm::Cd::almost_zero())
@@ -1618,65 +1636,236 @@ std::optional<BridgeMatch> matchBridgeVertices(
   }
 
   const auto normalRotation = vm::quatd{source.normal, destinationNormal};
+  auto cosine = 0.0;
+  auto sine = 0.0;
+  for (size_t i = 0u; i < sourceTopology.vertices.size(); ++i)
+  {
+    const auto sourceOffset =
+      normalRotation * (sourceTopology.vertices[i] - source.center);
+    const auto targetOffset = targetTopology.vertices[vertexMapping[i]] - target.center;
+    const auto sourceInPlane =
+      sourceOffset - destinationNormal * vm::dot(sourceOffset, destinationNormal);
+    const auto targetInPlane =
+      targetOffset - destinationNormal * vm::dot(targetOffset, destinationNormal);
+    cosine += vm::dot(sourceInPlane, targetInPlane);
+    sine += vm::dot(vm::cross(sourceInPlane, targetInPlane), destinationNormal);
+  }
+
+  auto roll = std::atan2(sine, cosine);
+  if (roll < 0.0)
+  {
+    roll += vm::Cd::two_pi();
+  }
+  return vm::quatd{destinationNormal, roll} * normalRotation;
+}
+
+std::optional<BridgeMatch> matchBridgeComponents(
+  const SweepSource& source, const SweepTarget& target)
+{
+  if (source.faces.empty() || source.faces.size() != target.faces.size())
+  {
+    return std::nullopt;
+  }
+
+  const auto sourceTopology = buildFaceComponentTopology(source.faces);
+  const auto targetTopology = buildFaceComponentTopology(target.faces);
+  if (
+    sourceTopology.vertices.size() != targetTopology.vertices.size()
+    || sourceTopology.vertices.size() < 3u)
+  {
+    return std::nullopt;
+  }
+
   auto best = std::optional<BridgeMatch>{};
   auto bestError = std::numeric_limits<double>::max();
+  auto bestRotationAngle = std::numeric_limits<double>::max();
+  auto vertexMapping = std::vector<std::optional<size_t>>(sourceTopology.vertices.size());
+  auto reverseVertexMapping =
+    std::vector<std::optional<size_t>>(targetTopology.vertices.size());
+  auto faceMapping = std::vector<std::optional<size_t>>(source.faces.size());
+  auto targetFaceUsed = std::vector<bool>(target.faces.size(), false);
 
-  for (const auto reversed : {false, true})
-  {
-    for (size_t shift = 0u; shift < targetVertices.size(); ++shift)
+  // Topology can have several valid symmetries. Score complete mappings by the best
+  // uniform fit, then prefer the least rotation to avoid twisting symmetric profiles.
+  const auto scoreCompleteMapping = [&]() {
+    auto completeVertexMapping = std::vector<size_t>{};
+    completeVertexMapping.reserve(vertexMapping.size());
+    for (const auto targetVertex : vertexMapping)
     {
-      auto candidate = std::vector<vm::vec3d>{};
-      candidate.reserve(targetVertices.size());
-      for (size_t i = 0u; i < targetVertices.size(); ++i)
+      if (!targetVertex)
       {
-        const auto index = reversed
-                             ? (shift + targetVertices.size() - i) % targetVertices.size()
-                             : (shift + i) % targetVertices.size();
-        candidate.push_back(targetVertices[index]);
+        return;
       }
+      completeVertexMapping.push_back(*targetVertex);
+    }
 
-      const auto sourceEdge = sourceVertices[1] - sourceVertices[0];
-      const auto targetEdge = candidate[1] - candidate[0];
+    const auto rotation = bridgeRotation(
+      source, target, sourceTopology, targetTopology, completeVertexMapping);
+    if (!rotation)
+    {
+      return;
+    }
+
+    auto numerator = 0.0;
+    auto denominator = 0.0;
+    for (size_t i = 0u; i < sourceTopology.vertices.size(); ++i)
+    {
+      const auto sourceOffset = *rotation * (sourceTopology.vertices[i] - source.center);
+      const auto targetOffset =
+        targetTopology.vertices[completeVertexMapping[i]] - target.center;
+      numerator += vm::dot(sourceOffset, targetOffset);
+      denominator += vm::squared_length(sourceOffset);
+    }
+    const auto scale = denominator > vm::Cd::almost_zero()
+                         ? std::max(numerator / denominator, 0.001)
+                         : 1.0;
+
+    auto error = 0.0;
+    for (size_t i = 0u; i < sourceTopology.vertices.size(); ++i)
+    {
+      const auto expected =
+        *rotation * (sourceTopology.vertices[i] - source.center) * scale;
+      const auto actual =
+        targetTopology.vertices[completeVertexMapping[i]] - target.center;
+      error += vm::squared_length(expected - actual);
+    }
+    const auto rotationAngle =
+      std::min(rotation->angle(), vm::Cd::two_pi() - rotation->angle());
+    if (
+      error > bestError + vm::Cd::almost_zero()
+      || (std::abs(error - bestError) <= vm::Cd::almost_zero() && rotationAngle >= bestRotationAngle))
+    {
+      return;
+    }
+
+    auto completeFaceMapping = std::vector<size_t>{};
+    completeFaceMapping.reserve(faceMapping.size());
+    for (const auto targetFace : faceMapping)
+    {
+      if (!targetFace)
+      {
+        return;
+      }
+      completeFaceMapping.push_back(*targetFace);
+    }
+
+    bestError = error;
+    bestRotationAngle = rotationAngle;
+    best = BridgeMatch{
+      sourceTopology.vertices,
+      completeVertexMapping | std::views::transform([&](const auto index) {
+        return targetTopology.vertices[index];
+      }) | kdl::ranges::to<std::vector>(),
+      std::move(completeFaceMapping),
+      *rotation,
+    };
+  };
+
+  const auto faceCandidateCompatible = [&](
+                                         const std::vector<size_t>& sourceFaceVertices,
+                                         const std::vector<size_t>& targetFaceVertices,
+                                         const bool reversed,
+                                         const size_t shift) {
+    for (size_t i = 0u; i < sourceFaceVertices.size(); ++i)
+    {
+      const auto sourceVertex = sourceFaceVertices[i];
+      const auto targetVertex = targetFaceVertices
+        [reversed ? (shift + targetFaceVertices.size() - i) % targetFaceVertices.size()
+                  : (shift + i) % targetFaceVertices.size()];
       if (
-        vm::is_zero(sourceEdge, vm::Cd::almost_zero())
-        || vm::is_zero(targetEdge, vm::Cd::almost_zero()))
+        (vertexMapping[sourceVertex] && *vertexMapping[sourceVertex] != targetVertex)
+        || (reverseVertexMapping[targetVertex] && *reverseVertexMapping[targetVertex] != sourceVertex))
+      {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const auto assignFaceCandidate = [&](
+                                     const size_t sourceFaceIndex,
+                                     const size_t targetFaceIndex,
+                                     const bool reversed,
+                                     const size_t shift) {
+    const auto& sourceFaceVertices = sourceTopology.faceVertices[sourceFaceIndex];
+    const auto& targetFaceVertices = targetTopology.faceVertices[targetFaceIndex];
+    for (size_t i = 0u; i < sourceFaceVertices.size(); ++i)
+    {
+      const auto sourceVertex = sourceFaceVertices[i];
+      const auto targetVertex = targetFaceVertices
+        [reversed ? (shift + targetFaceVertices.size() - i) % targetFaceVertices.size()
+                  : (shift + i) % targetFaceVertices.size()];
+      vertexMapping[sourceVertex] = targetVertex;
+      reverseVertexMapping[targetVertex] = sourceVertex;
+    }
+    faceMapping[sourceFaceIndex] = targetFaceIndex;
+    targetFaceUsed[targetFaceIndex] = true;
+  };
+
+  // Mapping one polygon cycle pins its vertices. Edge-connected neighboring faces then
+  // have at least two pinned vertices, which keeps this backtracking search narrow while
+  // guaranteeing one shared-vertex mapping for the entire component.
+  std::function<void()> search;
+  search = [&]() {
+    auto sourceFaceIndex = source.faces.size();
+    auto mostMappedVertices = size_t{0};
+    for (size_t i = 0u; i < source.faces.size(); ++i)
+    {
+      if (faceMapping[i])
+      {
+        continue;
+      }
+      const auto mappedVertices = size_t(std::ranges::count_if(
+        sourceTopology.faceVertices[i],
+        [&](const auto vertex) { return vertexMapping[vertex].has_value(); }));
+      if (sourceFaceIndex == source.faces.size() || mappedVertices > mostMappedVertices)
+      {
+        sourceFaceIndex = i;
+        mostMappedVertices = mappedVertices;
+      }
+    }
+    if (sourceFaceIndex == source.faces.size())
+    {
+      scoreCompleteMapping();
+      return;
+    }
+
+    const auto& sourceFaceVertices = sourceTopology.faceVertices[sourceFaceIndex];
+    for (size_t targetFaceIndex = 0u; targetFaceIndex < target.faces.size();
+         ++targetFaceIndex)
+    {
+      const auto& targetFaceVertices = targetTopology.faceVertices[targetFaceIndex];
+      if (
+        targetFaceUsed[targetFaceIndex]
+        || sourceFaceVertices.size() != targetFaceVertices.size())
       {
         continue;
       }
 
-      const auto rotatedSourceEdge = normalRotation * vm::normalize(sourceEdge);
-      const auto targetEdgeDirection = vm::normalize(targetEdge);
-      const auto roll =
-        vm::measure_angle(targetEdgeDirection, rotatedSourceEdge, destinationNormal);
-      const auto rotation = vm::quatd{destinationNormal, roll} * normalRotation;
+      for (const auto reversed : {false, true})
+      {
+        for (size_t shift = 0u; shift < targetFaceVertices.size(); ++shift)
+        {
+          if (!faceCandidateCompatible(
+                sourceFaceVertices, targetFaceVertices, reversed, shift))
+          {
+            continue;
+          }
 
-      auto numerator = 0.0;
-      auto denominator = 0.0;
-      for (size_t i = 0u; i < sourceVertices.size(); ++i)
-      {
-        const auto sourceOffset = rotation * (sourceVertices[i] - source.center);
-        const auto targetOffset = candidate[i] - target.center;
-        numerator += vm::dot(sourceOffset, targetOffset);
-        denominator += vm::squared_length(sourceOffset);
-      }
-      const auto scale = denominator > vm::Cd::almost_zero()
-                           ? std::max(numerator / denominator, 0.001)
-                           : 1.0;
-
-      auto error = 0.0;
-      for (size_t i = 0u; i < sourceVertices.size(); ++i)
-      {
-        const auto expected = rotation * (sourceVertices[i] - source.center) * scale;
-        error += vm::squared_length(expected - (candidate[i] - target.center));
-      }
-      if (error < bestError)
-      {
-        bestError = error;
-        best = BridgeMatch{std::move(candidate), rotation};
+          const auto previousVertexMapping = vertexMapping;
+          const auto previousReverseVertexMapping = reverseVertexMapping;
+          assignFaceCandidate(sourceFaceIndex, targetFaceIndex, reversed, shift);
+          search();
+          vertexMapping = previousVertexMapping;
+          reverseVertexMapping = previousReverseVertexMapping;
+          faceMapping[sourceFaceIndex].reset();
+          targetFaceUsed[targetFaceIndex] = false;
+        }
       }
     }
-  }
+  };
 
+  search();
   return best;
 }
 
@@ -1686,7 +1875,7 @@ SweepResult generateBrushRun(
   const SweepSource& source,
   const SweepParameters& parameters,
   const Station& station,
-  const std::optional<SweepFaceAttributes>* targetCapAttributes = nullptr)
+  const std::vector<std::optional<SweepFaceAttributes>>* targetCapAttributes = nullptr)
 {
   auto result = SweepResult{};
   if (parameters.segments == 0u || parameters.iterations == 0u)
@@ -1765,7 +1954,9 @@ SweepResult generateBrushRun(
             r,
             i,
             finalSegment,
-            targetCapAttributes);
+            targetCapAttributes && sourceFaceIndex < targetCapAttributes->size()
+              ? &(*targetCapAttributes)[sourceFaceIndex]
+              : nullptr);
 
           result.brushes[&parent].push_back(
             std::make_unique<mdl::BrushNode>(std::move(brush)));
@@ -1935,21 +2126,24 @@ SweepResult generateBridgeBrushes(
     return result;
   }
 
-  const auto match = matchBridgeVertices(source, target);
+  const auto match = matchBridgeComponents(source, target);
   if (!match)
   {
     auto result = SweepResult{};
     result.issues.push_back(SweepIssue{
-      0, 0, 0, "Bridge requires exactly two convex faces with the same vertex count"});
+      0,
+      0,
+      0,
+      "Bridge face components must have matching face, vertex, and shared-edge "
+      "topology"});
     return result;
   }
 
-  const auto& sourceVertices = source.faces.front().polygon.vertices();
   auto transform = SweepTransform{target.center - source.center, match->rotation};
   const auto rotation = transform.effectiveRotation();
   auto targetLocalOffsets = std::vector<vm::vec3d>{};
-  targetLocalOffsets.reserve(sourceVertices.size());
-  for (size_t i = 0u; i < sourceVertices.size(); ++i)
+  targetLocalOffsets.reserve(match->sourceVertices.size());
+  for (size_t i = 0u; i < match->sourceVertices.size(); ++i)
   {
     targetLocalOffsets.push_back(
       rotation.conjugate() * (match->targetVertices[i] - target.center));
@@ -1958,12 +2152,12 @@ SweepResult generateBridgeBrushes(
   auto bridgeParameters = parameters;
   bridgeParameters.iterations = 1u;
   auto stations = std::vector<std::vector<vm::vec3d>>(
-    bridgeParameters.segments + 1u, std::vector<vm::vec3d>(sourceVertices.size()));
+    bridgeParameters.segments + 1u, std::vector<vm::vec3d>(match->sourceVertices.size()));
   for (size_t segment = 0u; segment <= bridgeParameters.segments; ++segment)
   {
     if (segment == 0u)
     {
-      stations[segment] = sourceVertices;
+      stations[segment] = match->sourceVertices;
       continue;
     }
     if (segment == bridgeParameters.segments)
@@ -1980,9 +2174,10 @@ SweepResult generateBridgeBrushes(
         : vm::quatd{vm::vec3d{0, 0, 1}, 0.0};
     const auto center =
       stationTransform(source, transform, bridgeParameters, t, rotation) * source.center;
-    for (size_t vertexIndex = 0u; vertexIndex < sourceVertices.size(); ++vertexIndex)
+    for (size_t vertexIndex = 0u; vertexIndex < match->sourceVertices.size();
+         ++vertexIndex)
     {
-      const auto sourceOffset = sourceVertices[vertexIndex] - source.center;
+      const auto sourceOffset = match->sourceVertices[vertexIndex] - source.center;
       const auto localOffset =
         sourceOffset * (1.0 - blend) + targetLocalOffsets[vertexIndex] * blend;
       stations[segment][vertexIndex] = center + partialRotation * localOffset;
@@ -2002,14 +2197,21 @@ SweepResult generateBridgeBrushes(
   }
 
   const auto station = [&](const vm::vec3d& point, const size_t, const size_t segment) {
-    const auto pointIt = std::ranges::find_if(sourceVertices, [&](const auto& candidate) {
-      return vm::is_equal(candidate, point, vm::Cd::almost_zero());
-    });
-    contract_assert(pointIt != sourceVertices.end());
-    return stations[segment][size_t(std::distance(sourceVertices.begin(), pointIt))];
+    const auto pointIt =
+      std::ranges::find_if(match->sourceVertices, [&](const auto& candidate) {
+        return vm::is_equal(candidate, point, vm::Cd::almost_zero());
+      });
+    contract_assert(pointIt != match->sourceVertices.end());
+    return stations[segment]
+                   [size_t(std::distance(match->sourceVertices.begin(), pointIt))];
   };
 
-  return generateBrushRun(map, source, bridgeParameters, station, &target.capAttributes);
+  auto targetCapAttributes = match->targetFaceIndices
+                             | std::views::transform([&](const auto targetFaceIndex) {
+                                 return target.faces[targetFaceIndex].capAttributes;
+                               })
+                             | kdl::ranges::to<std::vector>();
+  return generateBrushRun(map, source, bridgeParameters, station, &targetCapAttributes);
 }
 
 } // namespace tb::ui
