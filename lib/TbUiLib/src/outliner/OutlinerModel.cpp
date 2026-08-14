@@ -232,7 +232,7 @@ QMimeData* OutlinerModel::mimeData(const QModelIndexList& indexes) const
 
     for (auto* node : uniqueNodes)
     {
-        stream << (quint64)node;
+        stream << static_cast<quint64>(reinterpret_cast<quintptr>(node));
     }
 
     mimeData->setData("application/x-trenchbroom-nodes", encodedData);
@@ -256,7 +256,8 @@ bool OutlinerModel::dropMimeData(const QMimeData* data, Qt::DropAction action, i
     while (!stream.atEnd()) {
         quint64 ptrVal;
         stream >> ptrVal;
-        nodes.push_back((mdl::Node*)ptrVal);
+        nodes.push_back(
+            reinterpret_cast<mdl::Node*>(static_cast<quintptr>(ptrVal)));
     }
 
     if (nodes.empty()) return false;
