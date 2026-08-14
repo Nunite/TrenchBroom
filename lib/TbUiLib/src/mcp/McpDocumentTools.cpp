@@ -959,7 +959,12 @@ McpBridgeToolResult documentExportResult(
   }
 
   const auto stripTbProperties = mcpOptionalBool(params, "stripTbProperties", true);
-  const auto options = mdl::MapExportOptions{exportPath, stripTbProperties};
+  const auto options = mdl::MapExportOptions{
+    exportPath,
+    stripTbProperties,
+    std::nullopt,
+    std::nullopt,
+  };
   const auto result = mapWindow->document().map().exportAs(options);
   if (!result)
   {

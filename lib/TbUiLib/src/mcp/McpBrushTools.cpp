@@ -5773,7 +5773,7 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
     nodes.push_back(new mdl::BrushNode{std::move(brush)});
   }
 
-  const auto brushCount = static_cast<int>(nodes.size());
+  const auto brushCount = nodes.size();
   const auto bounds = boundsForNodes(nodes);
   const auto transactionName = QString{"MCP: Blockout spiral stairs"};
   const auto changedObjectIds = addNodesWithTransaction(
@@ -5797,7 +5797,7 @@ McpBridgeToolResult blockoutCreateSpiralStairsForMapResult(
     transactionName,
     *changedObjectIds,
     result);
-  result.insert("brushCount", brushCount);
+  result.insert("brushCount", static_cast<int>(brushCount));
   result.insert("material", QString::fromStdString(material));
   result.insert("materialResolution", materialResolution);
   result.insert(

@@ -705,7 +705,7 @@ QJsonArray operationsFromAdaptiveSurface(
   }
 
   stats.surfaceCellCount = static_cast<int>(cells.size());
-  stats.triangleBrushCount = result.size();
+  stats.triangleBrushCount = static_cast<int>(result.size());
   return result;
 }
 
