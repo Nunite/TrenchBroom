@@ -22,29 +22,26 @@
 #include <QBoxLayout>
 #include <QCloseEvent>
 #include <QDialogButtonBox>
+#include <QLabel>
+#include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScreen>
+#include <QSignalBlocker>
 #include <QStackedWidget>
-#include <QToolBar>
-#include <QToolButton>
-#include <QtSystemDetection>
 
 #include "base/PreferenceManager.h"
-#include "ui/ImageUtils.h"
-#include "ui/QStyleUtils.h"
-#include "ui/UpdatePreferencePane.h"
-#if !defined(Q_OS_MACOS)
-#include "ui/BorderLine.h"
-#endif
 #include "ui/ColorsPreferencePane.h"
 #include "ui/DialogButtonLayout.h"
 #include "ui/GamesPreferencePane.h"
+#include "ui/ImageUtils.h"
 #include "ui/KeyboardPreferencePane.h"
 #include "ui/McpPreferencePane.h"
 #include "ui/MiscPreferencePane.h"
 #include "ui/MousePreferencePane.h"
 #include "ui/PreferencePane.h"
+#include "ui/QStyleUtils.h"
+#include "ui/UpdatePreferencePane.h"
 #include "ui/ViewPreferencePane.h"
 
 #include <algorithm>
@@ -55,8 +52,9 @@ namespace tb::ui
 namespace
 {
 
-constexpr int PreferenceDialogMinWidth = 800;
-constexpr int PreferenceDialogMinHeight = 300;
+constexpr int PreferenceDialogMinWidth = 920;
+constexpr int PreferenceDialogMinHeight = 560;
+constexpr int PreferenceNavigationWidth = 184;
 
 } // namespace
 
@@ -81,6 +79,7 @@ PreferenceDialog::PreferenceDialog(
   , m_appController{appController}
   , m_document{document}
 {
+  setObjectName("PreferenceDialog_Dialog");
   setWindowTitle(tr("Preferences"));
   setWindowIconTB(this);
   createGui();
@@ -154,29 +153,40 @@ void PreferenceDialog::createGui()
   const auto mcpImage = loadSVGIcon("GeneralPreferences.svg");
   const auto updateImage = loadSVGIcon("UpdatePreferences.svg");
 
-  m_toolBar = new QToolBar{};
-  m_toolBar->setFloatable(false);
-  m_toolBar->setMovable(false);
-  m_toolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-  m_toolBar->addAction(gamesImage, tr("Games"), [&]() { switchToPane(PrefPane::Games); });
-  m_toolBar->addAction(viewImage, tr("View"), [&]() { switchToPane(PrefPane::View); });
-  m_toolBar->addAction(
-    colorsImage, tr("Colors"), [&]() { switchToPane(PrefPane::Colors); });
-  m_toolBar->addAction(mouseImage, tr("Mouse"), [&]() { switchToPane(PrefPane::Mouse); });
-  m_toolBar->addAction(
-    keyboardImage, tr("Keyboard"), [&]() { switchToPane(PrefPane::Keyboard); });
-  m_toolBar->addAction(miscImage, tr("Misc"), [&]() { switchToPane(PrefPane::Misc); });
-  m_toolBar->addAction(mcpImage, tr("MCP"), [&]() { switchToPane(PrefPane::Mcp); });
-  m_toolBar->addAction(
-    updateImage, tr("Update"), [&]() { switchToPane(PrefPane::Update); });
+  m_navigation = new QListWidget{};
+  m_navigation->setObjectName("PreferenceDialog_NavigationList");
+  m_navigation->setIconSize(QSize{18, 18});
+  m_navigation->setSelectionMode(QAbstractItemView::SingleSelection);
+  m_navigation->setUniformItemSizes(true);
+  m_navigation->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_navigation->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-  // Don't display tooltips for pane switcher buttons...
-  for (auto* button : m_toolBar->findChildren<QToolButton*>())
-  {
-    button->installEventFilter(this);
-  }
+  new QListWidgetItem{gamesImage, tr("Games"), m_navigation};
+  new QListWidgetItem{viewImage, tr("View"), m_navigation};
+  new QListWidgetItem{colorsImage, tr("Colors"), m_navigation};
+  new QListWidgetItem{mouseImage, tr("Mouse"), m_navigation};
+  new QListWidgetItem{keyboardImage, tr("Keyboard"), m_navigation};
+  new QListWidgetItem{miscImage, tr("Misc"), m_navigation};
+  new QListWidgetItem{mcpImage, tr("MCP"), m_navigation};
+  new QListWidgetItem{updateImage, tr("Update"), m_navigation};
+
+  auto* navigationTitle = new QLabel{tr("SETTINGS")};
+  navigationTitle->setObjectName("PreferenceDialog_NavigationTitle");
+
+  auto* navigationLayout = new QVBoxLayout{};
+  navigationLayout->setContentsMargins(8, 12, 8, 8);
+  navigationLayout->setSpacing(6);
+  navigationLayout->addWidget(navigationTitle);
+  navigationLayout->addWidget(m_navigation, 1);
+
+  auto* navigation = new QWidget{};
+  navigation->setObjectName("PreferenceDialog_Navigation");
+  navigation->setAttribute(Qt::WA_StyledBackground);
+  navigation->setFixedWidth(PreferenceNavigationWidth);
+  navigation->setLayout(navigationLayout);
 
   m_stackedWidget = new QStackedWidget{};
+  m_stackedWidget->setObjectName("PreferenceDialog_Pages");
   m_stackedWidget->addWidget(new GamesPreferencePane{m_appController, m_document});
   m_stackedWidget->addWidget(new ViewPreferencePane{});
   m_stackedWidget->addWidget(new ColorsPreferencePane{});
@@ -192,6 +202,7 @@ void PreferenceDialog::createGui()
       : QDialogButtonBox::RestoreDefaults | QDialogButtonBox::Ok | QDialogButtonBox::Apply
           | QDialogButtonBox::Cancel,
     this};
+  m_buttonBox->setObjectName("PreferenceDialog_ButtonBox");
 
   auto* resetButton = m_buttonBox->button(QDialogButtonBox::RestoreDefaults);
   resetButton->setText(tr("Restore Defaults"));
@@ -222,17 +233,34 @@ void PreferenceDialog::createGui()
       });
   }
 
-  auto* layout = new QVBoxLayout{};
+  m_pageTitle = new QLabel{};
+  m_pageTitle->setObjectName("PreferenceDialog_PageTitle");
+
+  auto* contentLayout = new QVBoxLayout{};
+  contentLayout->setContentsMargins(0, 0, 0, 0);
+  contentLayout->setSpacing(0);
+  contentLayout->addWidget(m_pageTitle);
+  contentLayout->addWidget(m_stackedWidget, 1);
+  contentLayout->addLayout(wrapDialogButtonBox(m_buttonBox));
+
+  auto* content = new QWidget{};
+  content->setObjectName("PreferenceDialog_Content");
+  content->setAttribute(Qt::WA_StyledBackground);
+  content->setLayout(contentLayout);
+
+  auto* layout = new QHBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(0);
+  layout->addWidget(navigation);
+  layout->addWidget(content, 1);
   setLayout(layout);
 
-  layout->setMenuBar(m_toolBar);
-#if !defined(Q_OS_MACOS)
-  layout->addWidget(new BorderLine{});
-#endif
-  layout->addWidget(m_stackedWidget, 1);
-  layout->addLayout(wrapDialogButtonBox(m_buttonBox));
+  connect(m_navigation, &QListWidget::currentRowChanged, this, [this](const int row) {
+    if (row >= int(PrefPane::First) && row <= int(PrefPane::Last))
+    {
+      switchToPane(static_cast<PrefPane>(row));
+    }
+  });
 }
 
 QSize PreferenceDialog::initialDialogSize() const
@@ -255,14 +283,23 @@ QSize PreferenceDialog::initialDialogSize() const
 
 void PreferenceDialog::switchToPane(const PrefPane pane)
 {
-  if (currentPane()->validate())
+  const auto paneIndex = int(pane);
+  if (!currentPane()->validate())
   {
-    m_stackedWidget->setCurrentIndex(int(pane));
-    currentPane()->updateControls();
-
-    auto* resetButton = m_buttonBox->button(QDialogButtonBox::RestoreDefaults);
-    resetButton->setEnabled(currentPane()->canResetToDefaults());
+    const auto blocker = QSignalBlocker{m_navigation};
+    m_navigation->setCurrentRow(m_stackedWidget->currentIndex());
+    return;
   }
+
+  m_stackedWidget->setCurrentIndex(paneIndex);
+  currentPane()->updateControls();
+
+  const auto blocker = QSignalBlocker{m_navigation};
+  m_navigation->setCurrentRow(paneIndex);
+  m_pageTitle->setText(m_navigation->item(paneIndex)->text());
+
+  auto* resetButton = m_buttonBox->button(QDialogButtonBox::RestoreDefaults);
+  resetButton->setEnabled(currentPane()->canResetToDefaults());
 }
 
 PreferencePane* PreferenceDialog::currentPane() const
@@ -280,12 +317,6 @@ void PreferenceDialog::connectObservers()
 void PreferenceDialog::resetToDefaults()
 {
   currentPane()->resetToDefaults();
-}
-
-// Don't display tooltips for pane switcher buttons...
-bool PreferenceDialog::eventFilter(QObject* o, QEvent* e)
-{
-  return e->type() != QEvent::ToolTip ? QDialog::eventFilter(o, e) : true;
 }
 
 } // namespace tb::ui

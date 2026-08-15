@@ -1,7 +1,7 @@
 param(
   [string] $BuildDir = "build-release-codex",
   [string] $QtBin = "D:\Qtx\6.11.1\msvc2022_64\bin",
-  [string[]] $Targets = @("welcome", "workbench", "outliner", "supporting"),
+  [string[]] $Targets = @("welcome", "workbench", "outliner", "supporting", "preferences"),
   [string[]] $Themes = @("light", "dark"),
   [string[]] $ScaleFactors = @("1", "1.5", "2"),
   [string] $MapPath = "lib\TbMdlLib\test\fixture\mdl\Map\initialMap.map",
@@ -129,8 +129,8 @@ function New-UiSnapshotContactSheet {
 
 $normalizedTargets = @($Targets | ForEach-Object { $_.ToLowerInvariant() })
 foreach ($target in $normalizedTargets) {
-  if ($target -notin @("welcome", "workbench", "outliner", "supporting")) {
-    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, or supporting."
+  if ($target -notin @("welcome", "workbench", "outliner", "supporting", "preferences")) {
+    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, supporting, or preferences."
   }
 }
 foreach ($theme in $Themes) {
@@ -201,10 +201,10 @@ foreach ($target in $normalizedTargets) {
       $processInfo.FileName = $executable
       $processInfo.Arguments =
         "--ui-snapshot `"$imagePath`" --ui-snapshot-theme $theme"
+      if ($target -ne "welcome" -and $target -ne "workbench") {
+        $processInfo.Arguments += " --ui-snapshot-page $target"
+      }
       if ($target -eq "workbench" -or $target -eq "outliner" -or $target -eq "supporting") {
-        if ($target -ne "workbench") {
-          $processInfo.Arguments += " --ui-snapshot-page $target"
-        }
         $processInfo.Arguments += " `"$($resolvedMapPath.Path)`""
       }
       $processInfo.WorkingDirectory = Split-Path -Parent $executable

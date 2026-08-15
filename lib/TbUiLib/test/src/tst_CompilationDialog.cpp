@@ -71,7 +71,9 @@ TEST_CASE("CompilationDialog")
     auto dialog = CompilationDialog{appController, document, camera};
 
     auto* profileManager = dialog.findChild<CompilationProfileManager*>();
+    auto* buttonBar = dialog.findChild<QWidget*>("DialogButtonBar");
     REQUIRE(profileManager != nullptr);
+    REQUIRE(buttonBar != nullptr);
 
     SECTION("returns true and selects an existing profile")
     {

@@ -160,6 +160,10 @@ QPushButton:disabled {
   color: @tb-disabled-text;
 }
 
+QWidget#DialogButtonBar {
+  background: @tb-panel-background;
+}
+
 QLineEdit,
 QComboBox,
 QSpinBox,
@@ -454,6 +458,74 @@ QStatusBar QComboBox#MapWindow_GridChoice:hover {
 
 QDialog#CommandPalette_Dialog {
   background: @tb-elevated-background;
+}
+
+QDialog#PreferenceDialog_Dialog {
+  background: @tb-editor-background;
+}
+
+QWidget#PreferenceDialog_Navigation {
+  background: @tb-sidebar-background;
+  border-right: 1px solid @tb-border;
+}
+
+QLabel#PreferenceDialog_NavigationTitle {
+  color: @tb-secondary-text;
+  font-size: 11px;
+  font-weight: bold;
+  min-height: 22px;
+  padding: 0 7px;
+}
+
+QListWidget#PreferenceDialog_NavigationList {
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+}
+
+QListWidget#PreferenceDialog_NavigationList::item {
+  background: transparent;
+  border: 1px solid transparent;
+  border-left: 2px solid transparent;
+  border-radius: 5px;
+  color: @tb-secondary-text;
+  min-height: 34px;
+  padding: 2px 7px;
+}
+
+QListWidget#PreferenceDialog_NavigationList::item:hover {
+  background: @tb-hover-background;
+  color: @tb-text;
+}
+
+QListWidget#PreferenceDialog_NavigationList::item:selected,
+QListWidget#PreferenceDialog_NavigationList::item:selected:!active {
+  background: @tb-pressed-background;
+  border-left-color: @tb-accent;
+  color: @tb-text;
+}
+
+QWidget#PreferenceDialog_Content,
+QStackedWidget#PreferenceDialog_Pages,
+QWidget#PreferencePane,
+QWidget#PreferencePane_Content {
+  background: @tb-editor-background;
+}
+
+QLabel#PreferenceDialog_PageTitle {
+  background: @tb-panel-background;
+  border-bottom: 1px solid @tb-border;
+  color: @tb-text;
+  font-size: 16px;
+  font-weight: bold;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+QScrollArea#PreferencePane_ScrollArea {
+  background: @tb-editor-background;
+  border: none;
 }
 
 QLineEdit#CommandPalette_SearchBox {

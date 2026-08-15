@@ -28,6 +28,8 @@ namespace tb::ui
 PreferencePane::PreferencePane(QWidget* parent)
   : QWidget{parent}
 {
+  setObjectName("PreferencePane");
+  setAttribute(Qt::WA_StyledBackground);
 }
 
 PreferencePane::~PreferencePane() = default;
@@ -46,9 +48,12 @@ QSize PreferencePane::contentSizeHint() const
 void PreferencePane::createScrollableContent(QLayout* contentLayout)
 {
   m_content = new QWidget{};
+  m_content->setObjectName("PreferencePane_Content");
+  m_content->setAttribute(Qt::WA_StyledBackground);
   m_content->setLayout(contentLayout);
 
   auto* scrollArea = new QScrollArea{this};
+  scrollArea->setObjectName("PreferencePane_ScrollArea");
   scrollArea->setWidget(m_content);
   scrollArea->setWidgetResizable(true);
   scrollArea->setFrameShape(QFrame::NoFrame);

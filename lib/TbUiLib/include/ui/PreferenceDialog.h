@@ -24,8 +24,9 @@
 #include "base/NotifierConnection.h"
 
 class QDialogButtonBox;
+class QLabel;
+class QListWidget;
 class QStackedWidget;
-class QToolBar;
 class QWidget;
 
 namespace tb::ui
@@ -42,7 +43,8 @@ private:
 
   AppController& m_appController;
   MapDocument* m_document = nullptr;
-  QToolBar* m_toolBar = nullptr;
+  QListWidget* m_navigation = nullptr;
+  QLabel* m_pageTitle = nullptr;
   QStackedWidget* m_stackedWidget = nullptr;
   QDialogButtonBox* m_buttonBox = nullptr;
 
@@ -54,7 +56,6 @@ public:
 
 protected: // QWidget overrides
   void closeEvent(QCloseEvent* event) override;
-  bool eventFilter(QObject* o, QEvent* e) override;
 
 private:
   void createGui();

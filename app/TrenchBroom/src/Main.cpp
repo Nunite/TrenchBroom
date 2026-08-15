@@ -24,6 +24,7 @@
 #include <QDebug>
 #include <QEvent>
 #include <QFile>
+#include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPointer>
@@ -54,6 +55,7 @@
 #include "ui/Inspector.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/PreferenceDialog.h"
 #include "ui/QPathUtils.h"
 #include "ui/QPreferenceStore.h"
 #include "ui/RecentDocuments.h"
@@ -304,7 +306,7 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     QStringList{"enableDraftReleaseUpdates"}, "Enable draft release updates."};
   const auto uiSnapshotOption = QCommandLineOption{
     QStringList{"ui-snapshot"},
-    "Capture the welcome window, or a map workbench when one map is provided, and exit.",
+    "Capture a deterministic application surface and exit.",
     "path"};
   const auto uiSnapshotThemeOption = QCommandLineOption{
     QStringList{"ui-snapshot-theme"},
@@ -313,7 +315,7 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "system"};
   const auto uiSnapshotPageOption = QCommandLineOption{
     QStringList{"ui-snapshot-page"},
-    "Select the map workbench page to capture: map, outliner, or supporting.",
+    "Select the surface to capture: map, outliner, supporting, or preferences.",
     "page",
     "map"};
 
@@ -356,12 +358,15 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
   const auto snapshotPage = parser.value(uiSnapshotPageOption).trimmed().toLower();
   if (
     snapshotPage != QStringLiteral("map") && snapshotPage != QStringLiteral("outliner")
-    && snapshotPage != QStringLiteral("supporting"))
+    && snapshotPage != QStringLiteral("supporting")
+    && snapshotPage != QStringLiteral("preferences"))
   {
     qCritical() << "Unsupported UI snapshot page:" << snapshotPage;
     return std::nullopt;
   }
-  if (options.fileNames.empty() && snapshotPage != QStringLiteral("map"))
+  if (
+    options.fileNames.empty() && snapshotPage != QStringLiteral("map")
+    && snapshotPage != QStringLiteral("preferences"))
   {
     qCritical() << "The selected UI snapshot page requires one map file";
     return std::nullopt;
@@ -428,6 +433,17 @@ void configureSupportingSnapshot(QWidget& targetWidget)
   }
 }
 
+void configurePreferencesSnapshot(QWidget& targetWidget)
+{
+  if (
+    auto* navigation = targetWidget.findChild<QListWidget*>(
+      QStringLiteral("PreferenceDialog_NavigationList")))
+  {
+    navigation->setCurrentRow(1);
+    navigation->setFocus(Qt::OtherFocusReason);
+  }
+}
+
 void scheduleUiSnapshot(
   QApplication& app,
   QWidget& targetWidget,
@@ -451,6 +467,10 @@ void scheduleUiSnapshot(
     {
       configureSupportingSnapshot(*guardedWidget);
     }
+    else if (targetName == QStringLiteral("preferences"))
+    {
+      configurePreferencesSnapshot(*guardedWidget);
+    }
     guardedWidget->ensurePolished();
     guardedWidget->update();
     QTimer::singleShot(250, &app, [&app, guardedWidget, targetName, options]() {
@@ -468,6 +488,10 @@ void scheduleUiSnapshot(
       else if (targetName == QStringLiteral("supporting"))
       {
         configureSupportingSnapshot(*guardedWidget);
+      }
+      else if (targetName == QStringLiteral("preferences"))
+      {
+        configurePreferencesSnapshot(*guardedWidget);
       }
       auto error = QString{};
       const auto snapshotOptions = UiSnapshotOptions{
@@ -634,8 +658,17 @@ int main(int argc, char* argv[])
   {
     auto* targetWidget = static_cast<QWidget*>(nullptr);
     auto targetName = QString{};
+    auto preferencesDialog = std::unique_ptr<PreferenceDialog>{};
 
-    if (commandLineOptions->fileNames.empty())
+    if (commandLineOptions->uiSnapshot->page == QStringLiteral("preferences"))
+    {
+      preferencesDialog = std::make_unique<PreferenceDialog>(*appController, nullptr);
+      targetWidget = preferencesDialog.get();
+      targetName = QStringLiteral("preferences");
+      targetWidget->resize(960, 640);
+      configurePreferencesSnapshot(*targetWidget);
+    }
+    else if (commandLineOptions->fileNames.empty())
     {
       targetWidget = findWelcomeWindow();
       targetName = QStringLiteral("welcome");

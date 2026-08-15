@@ -20,6 +20,7 @@
 #include "ui/DialogButtonLayout.h"
 
 #include <QBoxLayout>
+#include <QWidget>
 
 #include "ui/BorderLine.h"
 #include "ui/ViewConstants.h"
@@ -38,11 +39,16 @@ QLayout* wrapDialogButtonBox(QWidget* buttonBox)
   innerLayout->setSpacing(0);
   innerLayout->addWidget(buttonBox);
 
+  auto* buttonBar = new QWidget{};
+  buttonBar->setObjectName("DialogButtonBar");
+  buttonBar->setAttribute(Qt::WA_StyledBackground);
+  buttonBar->setLayout(innerLayout);
+
   auto* outerLayout = new QVBoxLayout{};
   outerLayout->setContentsMargins(QMargins{});
   outerLayout->setSpacing(0);
   outerLayout->addWidget(new BorderLine{});
-  outerLayout->addLayout(innerLayout);
+  outerLayout->addWidget(buttonBar);
 
   return outerLayout;
 }
@@ -58,11 +64,16 @@ QLayout* wrapDialogButtonBox(QLayout* buttonBox)
   innerLayout->setSpacing(0);
   innerLayout->addLayout(buttonBox);
 
+  auto* buttonBar = new QWidget{};
+  buttonBar->setObjectName("DialogButtonBar");
+  buttonBar->setAttribute(Qt::WA_StyledBackground);
+  buttonBar->setLayout(innerLayout);
+
   auto* outerLayout = new QVBoxLayout{};
   outerLayout->setContentsMargins(QMargins{});
   outerLayout->setSpacing(0);
   outerLayout->addWidget(new BorderLine{});
-  outerLayout->addLayout(innerLayout);
+  outerLayout->addWidget(buttonBar);
 
   return outerLayout;
 }

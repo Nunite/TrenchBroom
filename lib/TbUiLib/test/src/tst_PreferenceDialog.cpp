@@ -18,9 +18,12 @@
  */
 
 #include <QHeaderView>
+#include <QLabel>
+#include <QListWidget>
 #include <QSortFilterProxyModel>
+#include <QStackedWidget>
 #include <QTableView>
-#include <QToolBar>
+#include <QtTest/QTest>
 
 #include "ui/AppControllerFixture.h"
 #include "ui/ColorsPreferencePane.h"
@@ -54,20 +57,35 @@ TEST_CASE("PreferenceDialog")
 
   SECTION("uses stable preference panes")
   {
-    auto* toolBar = dialog->findChild<QToolBar*>();
-    REQUIRE(toolBar != nullptr);
+    CHECK(dialog->objectName() == "PreferenceDialog_Dialog");
 
-    auto actionNames = QStringList{};
-    for (auto* action : toolBar->actions())
+    auto* navigation = dialog->findChild<QListWidget*>("PreferenceDialog_NavigationList");
+    auto* pages = dialog->findChild<QStackedWidget*>("PreferenceDialog_Pages");
+    auto* pageTitle = dialog->findChild<QLabel*>("PreferenceDialog_PageTitle");
+    auto* buttonBar = dialog->findChild<QWidget*>("DialogButtonBar");
+    REQUIRE(navigation != nullptr);
+    REQUIRE(pages != nullptr);
+    REQUIRE(pageTitle != nullptr);
+    REQUIRE(buttonBar != nullptr);
+
+    auto paneNames = QStringList{};
+    for (auto i = 0; i < navigation->count(); ++i)
     {
-      actionNames << action->text();
-      action->trigger();
+      paneNames << navigation->item(i)->text();
+      navigation->setCurrentRow(i);
+      CHECK(pages->currentIndex() == i);
+      CHECK(pageTitle->text() == navigation->item(i)->text());
     }
 
     CHECK(
-      actionNames
+      paneNames
       == QStringList{
         "Games", "View", "Colors", "Mouse", "Keyboard", "Misc", "MCP", "Update"});
+
+    navigation->setCurrentRow(0);
+    QTest::keyClick(navigation, Qt::Key_Down);
+    CHECK(navigation->currentRow() == 1);
+    CHECK(pages->currentIndex() == 1);
   }
 
   dialog.reset();
