@@ -18,15 +18,20 @@
  */
 
 #include <QApplication>
+#include <QColor>
+#include <QComboBox>
 #include <QHeaderView>
 #include <QLabel>
 #include <QListWidget>
+#include <QMetaObject>
 #include <QSortFilterProxyModel>
 #include <QStackedWidget>
 #include <QTableView>
 #include <QTimer>
 #include <QtTest/QTest>
 
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "ui/AppControllerFixture.h"
 #include "ui/ColorsPreferencePane.h"
 #include "ui/GamesPreferencePane.h"
@@ -124,12 +129,41 @@ TEST_CASE("PreferenceDialog.preferencePanes")
   SECTION("View")
   {
     auto pane = std::make_unique<ViewPreferencePane>();
+
+    auto* themeCombo =
+      pane->findChild<QComboBox*>(QStringLiteral("ViewPreference_ThemeCombo"));
+    REQUIRE(themeCombo != nullptr);
+    CHECK(themeCombo->count() == 3);
+    CHECK(themeCombo->itemText(0).toStdString() == Preferences::SystemTheme);
+    CHECK(themeCombo->itemText(1).toStdString() == Preferences::LightTheme);
+    CHECK(themeCombo->itemText(2).toStdString() == Preferences::DarkTheme);
+
+    auto& prefs = PreferenceManager::instance();
+    const auto previousTheme = prefs.get(Preferences::Theme);
+    themeCombo->setCurrentIndex(1);
+    REQUIRE(QMetaObject::invokeMethod(
+      themeCombo, "activated", Qt::DirectConnection, Q_ARG(int, 1)));
+    CHECK(prefs.getPendingValue(Preferences::Theme) == Preferences::LightTheme);
+    prefs.set(Preferences::Theme, previousTheme);
+
     pane.reset();
   }
 
   SECTION("Colors")
   {
     auto pane = std::make_unique<ColorsPreferencePane>();
+
+    auto* table = pane->findChild<QTableView*>(QStringLiteral("ColorsPreference_Table"));
+    REQUIRE(table != nullptr);
+    REQUIRE(table->model() != nullptr);
+    REQUIRE(table->model()->rowCount() > 0);
+
+    const auto swatch = table->model()
+                          ->data(table->model()->index(0, 0), Qt::DecorationRole)
+                          .value<QColor>();
+    CHECK(swatch.isValid());
+    CHECK(table->iconSize() == QSize{48, 12});
+
     pane.reset();
   }
 

@@ -206,7 +206,9 @@ ThemeTokens loadStyle(
   const auto useDarkTheme =
     (themeOverride && *themeOverride == QStringLiteral("dark"))
     || (!themeOverride && pref(Preferences::Theme) == Preferences::DarkTheme);
-  const auto useLightTheme = themeOverride && *themeOverride == QStringLiteral("light");
+  const auto useLightTheme =
+    (themeOverride && *themeOverride == QStringLiteral("light"))
+    || (!themeOverride && pref(Preferences::Theme) == Preferences::LightTheme);
 
   // Explicit themes use Fusion for deterministic cross-platform rendering.
   if (useDarkTheme)
@@ -315,7 +317,8 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "system"};
   const auto uiSnapshotPageOption = QCommandLineOption{
     QStringList{"ui-snapshot-page"},
-    "Select the surface to capture: map, outliner, supporting, or preferences.",
+    "Select the surface to capture: map, outliner, supporting, preferences, or "
+    "preferences-colors.",
     "page",
     "map"};
 
@@ -359,14 +362,16 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
   if (
     snapshotPage != QStringLiteral("map") && snapshotPage != QStringLiteral("outliner")
     && snapshotPage != QStringLiteral("supporting")
-    && snapshotPage != QStringLiteral("preferences"))
+    && snapshotPage != QStringLiteral("preferences")
+    && snapshotPage != QStringLiteral("preferences-colors"))
   {
     qCritical() << "Unsupported UI snapshot page:" << snapshotPage;
     return std::nullopt;
   }
   if (
     options.fileNames.empty() && snapshotPage != QStringLiteral("map")
-    && snapshotPage != QStringLiteral("preferences"))
+    && snapshotPage != QStringLiteral("preferences")
+    && snapshotPage != QStringLiteral("preferences-colors"))
   {
     qCritical() << "The selected UI snapshot page requires one map file";
     return std::nullopt;
@@ -433,13 +438,13 @@ void configureSupportingSnapshot(QWidget& targetWidget)
   }
 }
 
-void configurePreferencesSnapshot(QWidget& targetWidget)
+void configurePreferencesSnapshot(QWidget& targetWidget, const QString& targetName)
 {
   if (
     auto* navigation = targetWidget.findChild<QListWidget*>(
       QStringLiteral("PreferenceDialog_NavigationList")))
   {
-    navigation->setCurrentRow(1);
+    navigation->setCurrentRow(targetName == QStringLiteral("preferences-colors") ? 2 : 1);
     navigation->setFocus(Qt::OtherFocusReason);
   }
 }
@@ -467,9 +472,9 @@ void scheduleUiSnapshot(
     {
       configureSupportingSnapshot(*guardedWidget);
     }
-    else if (targetName == QStringLiteral("preferences"))
+    else if (targetName.startsWith(QStringLiteral("preferences")))
     {
-      configurePreferencesSnapshot(*guardedWidget);
+      configurePreferencesSnapshot(*guardedWidget, targetName);
     }
     guardedWidget->ensurePolished();
     guardedWidget->update();
@@ -489,9 +494,9 @@ void scheduleUiSnapshot(
       {
         configureSupportingSnapshot(*guardedWidget);
       }
-      else if (targetName == QStringLiteral("preferences"))
+      else if (targetName.startsWith(QStringLiteral("preferences")))
       {
-        configurePreferencesSnapshot(*guardedWidget);
+        configurePreferencesSnapshot(*guardedWidget, targetName);
       }
       auto error = QString{};
       const auto snapshotOptions = UiSnapshotOptions{
@@ -660,13 +665,13 @@ int main(int argc, char* argv[])
     auto targetName = QString{};
     auto preferencesDialog = std::unique_ptr<PreferenceDialog>{};
 
-    if (commandLineOptions->uiSnapshot->page == QStringLiteral("preferences"))
+    if (commandLineOptions->uiSnapshot->page.startsWith(QStringLiteral("preferences")))
     {
       preferencesDialog = std::make_unique<PreferenceDialog>(*appController, nullptr);
       targetWidget = preferencesDialog.get();
-      targetName = QStringLiteral("preferences");
+      targetName = commandLineOptions->uiSnapshot->page;
       targetWidget->resize(960, 640);
-      configurePreferencesSnapshot(*targetWidget);
+      configurePreferencesSnapshot(*targetWidget, targetName);
     }
     else if (commandLineOptions->fileNames.empty())
     {

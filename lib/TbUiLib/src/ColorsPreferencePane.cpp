@@ -23,6 +23,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QSize>
 #include <QSortFilterProxyModel>
 #include <QTableView>
 
@@ -44,7 +45,9 @@ ColorsPreferencePane::ColorsPreferencePane(QWidget* parent)
   m_proxy->setFilterKeyColumn(-1); // Filter based on all columns
 
   m_table = new QTableView{};
+  m_table->setObjectName(QStringLiteral("ColorsPreference_Table"));
   m_table->setCornerButtonEnabled(false);
+  m_table->setIconSize(QSize{48, 12});
   m_table->setModel(m_proxy);
 
   m_table->setHorizontalHeader(new QHeaderView{Qt::Horizontal});

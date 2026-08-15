@@ -1,7 +1,14 @@
 param(
   [string] $BuildDir = "build-release-codex",
   [string] $QtBin = "D:\Qtx\6.11.1\msvc2022_64\bin",
-  [string[]] $Targets = @("welcome", "workbench", "outliner", "supporting", "preferences"),
+  [string[]] $Targets = @(
+    "welcome",
+    "workbench",
+    "outliner",
+    "supporting",
+    "preferences",
+    "preferences-colors"
+  ),
   [string[]] $Themes = @("light", "dark"),
   [string[]] $ScaleFactors = @("1", "1.5", "2"),
   [string] $MapPath = "lib\TbMdlLib\test\fixture\mdl\Map\initialMap.map",
@@ -129,8 +136,15 @@ function New-UiSnapshotContactSheet {
 
 $normalizedTargets = @($Targets | ForEach-Object { $_.ToLowerInvariant() })
 foreach ($target in $normalizedTargets) {
-  if ($target -notin @("welcome", "workbench", "outliner", "supporting", "preferences")) {
-    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, supporting, or preferences."
+  if ($target -notin @(
+      "welcome",
+      "workbench",
+      "outliner",
+      "supporting",
+      "preferences",
+      "preferences-colors"
+    )) {
+    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, supporting, preferences, or preferences-colors."
   }
 }
 foreach ($theme in $Themes) {

@@ -46,6 +46,7 @@ inline auto IncludeDraftReleaseUpdates = Preference<bool>{
 inline auto MapViewLayout = Preference<int>{"Views/Map view layout", 0};
 
 inline const auto SystemTheme = std::string{"System"};
+inline const auto LightTheme = std::string{"Light"};
 inline const auto DarkTheme = std::string{"Dark"};
 inline auto Theme = Preference<std::string>{"Theme", SystemTheme};
 inline const auto EnglishLanguage = std::string{"English"};

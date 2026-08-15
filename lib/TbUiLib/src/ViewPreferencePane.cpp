@@ -112,8 +112,10 @@ QWidget* ViewPreferencePane::createViewPreferences()
   setEmphasizedStyle(viewPrefsHeader);
 
   m_themeCombo = new QComboBox{};
+  m_themeCombo->setObjectName(QStringLiteral("ViewPreference_ThemeCombo"));
   m_themeCombo->addItems({
     QString::fromStdString(Preferences::SystemTheme),
+    QString::fromStdString(Preferences::LightTheme),
     QString::fromStdString(Preferences::DarkTheme),
   });
   auto* themeInfo = new QLabel{};

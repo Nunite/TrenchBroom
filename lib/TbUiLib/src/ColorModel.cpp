@@ -117,8 +117,9 @@ QVariant ColorModel::data(const QModelIndex& index, const int role) const
     }
   }
 
-  // Colorize the first cell background with the associated preference color
-  if (role == Qt::BackgroundRole && index.column() == 0)
+  // Use decoration instead of the cell background so application QSS cannot cover the
+  // swatch.
+  if (role == Qt::DecorationRole && index.column() == 0)
   {
     auto& prefs = PreferenceManager::instance();
 
@@ -126,7 +127,7 @@ QVariant ColorModel::data(const QModelIndex& index, const int role) const
     auto color = toQColor(prefs.getPendingValue(colorPreference));
     color.setAlpha(255); // Ignore alpha
 
-    return QBrush{color};
+    return color;
   }
 
   return {};

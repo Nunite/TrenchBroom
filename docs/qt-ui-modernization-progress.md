@@ -176,19 +176,22 @@ testing shows that the earlier phases do not meet the product goal.
 - Build the Release `TrenchBroom` target before completing a workbench phase.
 - Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
   capture the isolated welcome window, representative map workbench, and deterministic
-  expanded Outliner/entity-properties, supporting Assets-panel, and Preferences states
-  in light and dark themes at 100%, 150%, and 200% scale. The 30-state matrix validates
+  expanded Outliner/entity-properties, supporting Assets-panel, and Preferences View
+  and Colors states in light and dark themes at 100%, 150%, and 200% scale. The 36-state
+  matrix validates
   image dimensions, device-pixel ratio, nonblank pixels, font support, and image hashes,
   then writes PNG and JSON evidence plus a labeled visual-comparison contact sheet under
   `build-release-codex\codex-logs\ui-theme-acceptance`.
 - Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark
-  [--ui-snapshot-page map|outliner|supporting|preferences] [map-file]` for a focused
-  single capture. Omitting the map captures Welcome unless `preferences` is selected;
-  supplying one captures the workbench. The Outliner page expands its hierarchy,
+  [--ui-snapshot-page map|outliner|supporting|preferences|preferences-colors]
+  [map-file]` for a focused
+  single capture. Omitting the map captures Welcome unless `preferences` or
+  `preferences-colors` is selected; supplying one captures the workbench. The Outliner
+  page expands its hierarchy,
   properties panel, and active selection before rendering; the Supporting page opens
-  Assets and expands the bottom panel; the Preferences page selects View in the category
-  sidebar. Snapshot mode uses temporary preferences, disables background services, and
-  renders through the native Qt platform without showing the window.
+  Assets and expands the bottom panel; the Preferences pages select View or Colors in the
+  category sidebar. Snapshot mode uses temporary preferences, disables background services,
+  and renders through the native Qt platform without showing the window.
 - Verify keyboard-only navigation, focus visibility, disabled states, and text fit.
 - Keep generated screenshots and temporary visual reports out of commits unless they
   are intentionally selected as maintained references.
@@ -242,4 +245,7 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-15 | Verified | Passed `PreferenceDialog,CompilationDialog` (42 assertions), built Release `TrenchBroom`, and passed the 30-state matrix at `20260815-224706-711`. |
 | 2026-08-15 | Fixed | Diagnosed the Preferences-close crash as stale MSVC object code caused by localized `/showIncludes` output; forced English compiler diagnostics in the checked-in Release build wrappers so Ninja records header dependencies. |
 | 2026-08-15 | Verified | Completed a clean Release `TrenchBroom` rebuild, confirmed `AppController.cpp.obj` has 454 Ninja dependency entries including `PreferenceDialog.h`, and passed the production-entry `PreferenceDialog` open/close regression test (27 assertions) from a freshly built `TbUiLibTest`. |
+| 2026-08-15 | Fixed | Added the missing explicit Light theme preference and restored visible color swatches using decoration data that cannot be covered by table QSS. |
+| 2026-08-15 | Complete | Added the Preferences Colors page to deterministic UI acceptance, expanding the default matrix from 30 to 36 states. |
+| 2026-08-15 | Verified | Passed `PreferenceDialog`, `PreferenceDialog.preferencePanes`, `Theme`, and `UiSnapshot` (88 assertions), built Release `TrenchBroom`, and visually confirmed Light/Dark Preferences Colors snapshots at `20260815-233423-160`. |
 | 2026-08-15 | Next | Collect user feedback before considering the deferred Phase 5 title-bar, document-tab, or docking changes. |
