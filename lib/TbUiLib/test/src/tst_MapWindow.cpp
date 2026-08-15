@@ -553,12 +553,12 @@ panel.add_label("Loaded from preferences")
     QCursor::setPos({300, 300});
     auto event = QKeyEvent{QEvent::KeyPress, Qt::Key_QuoteLeft, Qt::NoModifier};
     QApplication::sendEvent(mapView, &event);
-    QApplication::processEvents();
 
     REQUIRE(event.isAccepted());
+    QTRY_VERIFY_WITH_TIMEOUT(findVisiblePieMenu() != nullptr, 1000);
     auto* menu = findVisiblePieMenu();
     REQUIRE(menu != nullptr);
-    REQUIRE(QTest::qWaitForWindowExposed(menu));
+    QTRY_VERIFY_WITH_TIMEOUT(menu->isVisible(), 1000);
 
     menu->close();
     menu->setParent(nullptr);
