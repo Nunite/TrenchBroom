@@ -29,6 +29,7 @@
 #include "ui/IssueBrowser.h"
 #include "ui/MapDocument.h"
 #include "ui/ModelInspector.h"
+#include "ui/TabBar.h"
 #include "ui/TabBook.h"
 #include "ui/WidgetState.h"
 
@@ -40,11 +41,16 @@ InfoPanel::InfoPanel(AppController& appController, MapDocument& document, QWidge
 {
   m_tabBook = new TabBook{};
   m_tabBook->setObjectName("InfoPanel_TabBook");
+  m_tabBook->tabBar()->setObjectName("InfoPanel_TabBar");
 
   m_console = new Console{};
+  m_console->setObjectName("InfoPanel_Console");
   m_pythonConsole = new PythonConsole{};
+  m_pythonConsole->setObjectName("InfoPanel_PythonConsole");
   m_issueBrowser = new IssueBrowser{document};
+  m_issueBrowser->setObjectName("InfoPanel_Issues");
   m_modelInspector = new ModelInspector{appController, document};
+  m_modelInspector->setObjectName("InfoPanel_Assets");
 
   m_tabBook->addPage(m_console, tr("Console"));
   m_tabBook->addPage(m_pythonConsole, tr("Python Console"));
@@ -72,6 +78,16 @@ Console* InfoPanel::console() const
 Console* InfoPanel::pythonConsole() const
 {
   return m_pythonConsole;
+}
+
+void InfoPanel::switchToPage(const InfoPanelPage page)
+{
+  m_tabBook->switchToPage(static_cast<int>(page));
+}
+
+InfoPanelPage InfoPanel::currentPage() const
+{
+  return static_cast<InfoPanelPage>(m_tabBook->currentPageIndex());
 }
 
 QByteArray InfoPanel::saveState() const

@@ -82,6 +82,11 @@ void TabBook::switchToPage(const int index)
   m_tabBook->setCurrentIndex(index);
 }
 
+int TabBook::currentPageIndex() const
+{
+  return m_tabBook->currentIndex();
+}
+
 QByteArray TabBook::saveState() const
 {
   auto result = QByteArray{};

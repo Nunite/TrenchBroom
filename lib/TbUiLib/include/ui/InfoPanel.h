@@ -34,6 +34,14 @@ class MapDocument;
 class ModelInspector;
 class TabBook;
 
+enum class InfoPanelPage
+{
+  Console,
+  PythonConsole,
+  Issues,
+  Assets,
+};
+
 class InfoPanel : public QWidget
 {
   Q_OBJECT
@@ -50,6 +58,8 @@ public:
 
   Console* console() const;
   Console* pythonConsole() const;
+  void switchToPage(InfoPanelPage page);
+  InfoPanelPage currentPage() const;
 
   QByteArray saveState() const;
   bool restoreState(const QByteArray& state);

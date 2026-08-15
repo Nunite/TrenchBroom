@@ -30,6 +30,7 @@
 #include <QProxyStyle>
 #include <QSettings>
 #include <QSignalBlocker>
+#include <QSplitter>
 #include <QString>
 #include <QStyleHints>
 #include <QSurfaceFormat>
@@ -49,6 +50,7 @@
 #include "ui/Contracts.h"
 #include "ui/CrashReporter.h"
 #include "ui/FileEventFilter.h"
+#include "ui/InfoPanel.h"
 #include "ui/Inspector.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
@@ -311,7 +313,7 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "system"};
   const auto uiSnapshotPageOption = QCommandLineOption{
     QStringList{"ui-snapshot-page"},
-    "Select the map workbench page to capture: map or outliner.",
+    "Select the map workbench page to capture: map, outliner, or supporting.",
     "page",
     "map"};
 
@@ -352,14 +354,16 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
   }
 
   const auto snapshotPage = parser.value(uiSnapshotPageOption).trimmed().toLower();
-  if (snapshotPage != QStringLiteral("map") && snapshotPage != QStringLiteral("outliner"))
+  if (
+    snapshotPage != QStringLiteral("map") && snapshotPage != QStringLiteral("outliner")
+    && snapshotPage != QStringLiteral("supporting"))
   {
     qCritical() << "Unsupported UI snapshot page:" << snapshotPage;
     return std::nullopt;
   }
   if (options.fileNames.empty() && snapshotPage != QStringLiteral("map"))
   {
-    qCritical() << "--ui-snapshot-page outliner requires one map file";
+    qCritical() << "The selected UI snapshot page requires one map file";
     return std::nullopt;
   }
 
@@ -407,6 +411,23 @@ void configureOutlinerSnapshot(QWidget& targetWidget)
   }
 }
 
+void configureSupportingSnapshot(QWidget& targetWidget)
+{
+  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
+  if (mapWindow == nullptr)
+  {
+    return;
+  }
+
+  mapWindow->switchToInfoPanelPage(InfoPanelPage::Assets);
+  if (
+    auto* splitter = mapWindow->findChild<QSplitter*>(
+      QStringLiteral("MapWindow_VerticalSplitterSplitter")))
+  {
+    splitter->setSizes(QList<int>{560, 340});
+  }
+}
+
 void scheduleUiSnapshot(
   QApplication& app,
   QWidget& targetWidget,
@@ -426,6 +447,10 @@ void scheduleUiSnapshot(
     {
       configureOutlinerSnapshot(*guardedWidget);
     }
+    else if (targetName == QStringLiteral("supporting"))
+    {
+      configureSupportingSnapshot(*guardedWidget);
+    }
     guardedWidget->ensurePolished();
     guardedWidget->update();
     QTimer::singleShot(250, &app, [&app, guardedWidget, targetName, options]() {
@@ -439,6 +464,10 @@ void scheduleUiSnapshot(
       if (targetName == QStringLiteral("outliner"))
       {
         configureOutlinerSnapshot(*guardedWidget);
+      }
+      else if (targetName == QStringLiteral("supporting"))
+      {
+        configureSupportingSnapshot(*guardedWidget);
       }
       auto error = QString{};
       const auto snapshotOptions = UiSnapshotOptions{
@@ -617,9 +646,9 @@ int main(int argc, char* argv[])
     }
     else
     {
-      targetName = commandLineOptions->uiSnapshot->page == QStringLiteral("outliner")
-                     ? QStringLiteral("outliner")
-                     : QStringLiteral("workbench");
+      targetName = commandLineOptions->uiSnapshot->page == QStringLiteral("map")
+                     ? QStringLiteral("workbench")
+                     : commandLineOptions->uiSnapshot->page;
       if (openFiles(*appController, commandLineOptions->fileNames))
       {
         auto* mapWindow = appController->mapWindowManager().topMapWindow();
@@ -631,6 +660,10 @@ int main(int argc, char* argv[])
           {
             mapWindow->switchToInspectorPage(InspectorPage::Outliner);
             configureOutlinerSnapshot(*mapWindow);
+          }
+          else if (commandLineOptions->uiSnapshot->page == QStringLiteral("supporting"))
+          {
+            configureSupportingSnapshot(*mapWindow);
           }
         }
       }

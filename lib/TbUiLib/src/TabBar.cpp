@@ -20,6 +20,7 @@
 #include "ui/TabBar.h"
 
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QStackedLayout>
@@ -42,6 +43,8 @@ TabBarButton::TabBarButton(const QString& label, QWidget* parent)
   setObjectName("TabBarButton");
   setAttribute(Qt::WA_Hover);
   setAttribute(Qt::WA_StyledBackground);
+  setFocusPolicy(Qt::StrongFocus);
+  setAccessibleName(label);
   setFixedHeight(30);
   m_label->setObjectName("TabBarButtonLabel");
 
@@ -72,8 +75,27 @@ void TabBarButton::mousePressEvent(QMouseEvent* event)
 {
   if (event->button() == Qt::LeftButton)
   {
+    setFocus(Qt::MouseFocusReason);
     emit clicked();
+    event->accept();
+    return;
   }
+
+  QWidget::mousePressEvent(event);
+}
+
+void TabBarButton::keyPressEvent(QKeyEvent* event)
+{
+  if (
+    event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter
+    || event->key() == Qt::Key_Space)
+  {
+    emit clicked();
+    event->accept();
+    return;
+  }
+
+  QWidget::keyPressEvent(event);
 }
 
 // TabBar

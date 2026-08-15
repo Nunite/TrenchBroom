@@ -245,8 +245,10 @@ ModelBrowser::~ModelBrowser()
 void ModelBrowser::createGui(AppController& appController)
 {
   m_pathStack = new QStackedWidget{};
+  m_pathStack->setObjectName("ModelBrowser_PathStack");
 
   m_breadcrumbBar = new QWidget{};
+  m_breadcrumbBar->setObjectName("ModelBrowser_BreadcrumbBar");
   m_breadcrumbLayout = new QHBoxLayout{};
   m_breadcrumbLayout->setContentsMargins(6, 0, 0, 0);
   m_breadcrumbLayout->setSpacing(4);
@@ -254,6 +256,7 @@ void ModelBrowser::createGui(AppController& appController)
   m_breadcrumbBar->installEventFilter(this);
 
   m_folderEdit = new QLineEdit{};
+  m_folderEdit->setObjectName("ModelBrowser_FolderEdit");
   m_folderEdit->installEventFilter(this);
 
   m_pathStack->addWidget(m_breadcrumbBar);
@@ -261,14 +264,17 @@ void ModelBrowser::createGui(AppController& appController)
   m_pathStack->setCurrentWidget(m_breadcrumbBar);
 
   m_reloadButton = new QToolButton{};
+  m_reloadButton->setObjectName("ModelBrowser_ReloadButton");
   m_reloadButton->setIcon(loadSVGIcon(std::filesystem::path{"Refresh.svg"}));
   m_reloadButton->setToolTip(tr("Reload assets"));
   m_reloadButton->setAutoRaise(true);
 
   m_savePrefabButton = createBitmapButton("Add.svg", tr("Save selection as prefab"));
+  m_savePrefabButton->setObjectName("ModelBrowser_SavePrefabButton");
   m_savePrefabButton->setEnabled(false);
 
   m_iconSizeCombo = new QComboBox{};
+  m_iconSizeCombo->setObjectName("ModelBrowser_IconSize");
   m_iconSizeCombo->setToolTip(tr("Asset icon size"));
   m_iconSizeCombo->addItem("50%", 0.5f);
   m_iconSizeCombo->addItem("75%", 0.75f);
@@ -280,6 +286,7 @@ void ModelBrowser::createGui(AppController& appController)
   updateIconSizeCombo();
 
   m_searchBox = createSearchBox();
+  m_searchBox->setObjectName("ModelBrowser_Search");
 
   auto* pathRowLayout = new QHBoxLayout{};
   pathRowLayout->setContentsMargins(0, 0, 0, 0);
@@ -296,9 +303,12 @@ void ModelBrowser::createGui(AppController& appController)
   controlsLayout->addWidget(m_searchBox, 0);
 
   auto* controls = new QWidget{};
+  controls->setObjectName("ModelBrowser_Controls");
+  controls->setAttribute(Qt::WA_StyledBackground);
   controls->setLayout(controlsLayout);
 
   m_folderTree = new QTreeWidget{};
+  m_folderTree->setObjectName("ModelBrowser_FolderTree");
   m_folderTree->setHeaderHidden(true);
   m_folderTree->setUniformRowHeights(true);
   m_folderTree->setIconSize(QSize{16, 16});
@@ -314,9 +324,11 @@ void ModelBrowser::createGui(AppController& appController)
   browserLayout->addWidget(m_scrollBar, 0);
 
   auto* browser = new QWidget{};
+  browser->setObjectName("ModelBrowser_AssetView");
   browser->setLayout(browserLayout);
 
   auto* splitter = new QSplitter{Qt::Horizontal};
+  splitter->setObjectName("ModelBrowser_Splitter");
   splitter->setChildrenCollapsible(false);
   splitter->addWidget(m_folderTree);
   splitter->addWidget(browser);

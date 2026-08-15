@@ -39,6 +39,7 @@
 #include <QTableWidget>
 #include <QTimer>
 #include <QToolBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QtGlobal>
 
@@ -584,6 +585,7 @@ void MapWindow::updateToolBarWidgets()
   const auto& grid = map.grid();
   const auto sizeIndex = grid.size() - mdl::Grid::MinSize;
   m_gridChoice->setCurrentIndex(sizeIndex);
+  m_snapToggle->setChecked(grid.snap());
 }
 
 void MapWindow::createStatusBar()
@@ -601,7 +603,14 @@ void MapWindow::createStatusBar()
     m_gridChoice->addItem(gridSizeStr, QVariant(i));
   }
 
+  m_snapToggle = new QToolButton{};
+  m_snapToggle->setObjectName("MapWindow_SnapToggle");
+  m_snapToggle->setText(tr("Snap"));
+  m_snapToggle->setToolTip(tr("Snap to grid"));
+  m_snapToggle->setCheckable(true);
+
   statusBar()->addWidget(m_statusBarLabel, 1);
+  statusBar()->addPermanentWidget(m_snapToggle);
   statusBar()->addPermanentWidget(m_gridChoice);
   statusBar()->addWidget(m_appController.updater().createUpdateIndicator());
 }
@@ -822,8 +831,7 @@ QString describeSelection(const mdl::Map& map)
                                  hiddenDescriptors, ", ", ", and ", " and ")));
   }
 
-  return QString::fromLatin1("   ")
-         + pipeSeparatedSections.join(QLatin1String("   |   "));
+  return pipeSeparatedSections.join(QLatin1String("   |   "));
 }
 
 } // namespace
@@ -1094,6 +1102,7 @@ void MapWindow::bindEvents()
     QOverload<int>::of(&QComboBox::activated),
     this,
     [this](const int index) { setGridSize(index + mdl::Grid::MinSize); });
+  connect(m_snapToggle, &QToolButton::clicked, this, &MapWindow::toggleSnapToGrid);
   connect(QApplication::clipboard(), &QClipboard::dataChanged, this, [this]() {
     // update the "Paste" menu items
     this->updateActionState();
@@ -2244,6 +2253,13 @@ void MapWindow::switchToInspectorPage(const InspectorPage page)
   m_inspectorSurface->show();
   m_inspector->show();
   m_inspector->switchToPage(page);
+}
+
+void MapWindow::switchToInfoPanelPage(const InfoPanelPage page)
+{
+  m_infoPanelSurface->show();
+  m_infoPanel->show();
+  m_infoPanel->switchToPage(page);
 }
 
 void MapWindow::toggleToolbar()

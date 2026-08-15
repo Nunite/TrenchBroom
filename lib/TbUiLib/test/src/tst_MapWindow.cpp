@@ -23,9 +23,12 @@
 #include <QComboBox>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QStatusBar>
+#include <QToolButton>
 #include <QWidget>
 #include <QtTest/QTest>
 
@@ -53,8 +56,11 @@
 #include "mdl/Map_Selection.h"
 #include "mdl/WorldNode.h"
 #include "prefs/Preferences.h"
+#include "ui/ActionExecutionContext.h"
 #include "ui/AppControllerFixture.h"
 #include "ui/CatchConfig.h"
+#include "ui/CommandPaletteDialog.h"
+#include "ui/InfoPanel.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
 #include "ui/MapViewBase.h"
@@ -175,8 +181,16 @@ TEST_CASE("MapWindow")
     REQUIRE(inspectorSurface != nullptr);
 
     auto* gridChoice = window.findChild<QComboBox*>("MapWindow_GridChoice");
+    auto* snapToggle = window.findChild<QToolButton*>("MapWindow_SnapToggle");
     REQUIRE(gridChoice != nullptr);
+    REQUIRE(snapToggle != nullptr);
     CHECK(gridChoice->parentWidget() == window.statusBar());
+    CHECK(snapToggle->parentWidget() == window.statusBar());
+    CHECK(snapToggle->isChecked() == window.document().map().grid().snap());
+
+    QTest::mouseClick(snapToggle, Qt::LeftButton);
+    CHECK_FALSE(window.document().map().grid().snap());
+    CHECK_FALSE(snapToggle->isChecked());
 
     const auto infoPanelWasHidden = infoPanelSurface->isHidden();
     window.toggleInfoPanel();
@@ -189,6 +203,41 @@ TEST_CASE("MapWindow")
     CHECK(inspectorSurface->isHidden() != inspectorWasHidden);
     window.toggleInspector();
     CHECK(inspectorSurface->isHidden() == inspectorWasHidden);
+  }
+
+  SECTION("switches to the supporting Assets surface")
+  {
+    auto* infoPanel = window.findChild<InfoPanel*>("MapWindow_InfoPanel");
+    REQUIRE(infoPanel != nullptr);
+
+    window.switchToInfoPanelPage(InfoPanelPage::Assets);
+
+    CHECK(infoPanel->currentPage() == InfoPanelPage::Assets);
+    CHECK_FALSE(window.findChild<QWidget*>("MapWindow_InfoPanelSurface")->isHidden());
+    CHECK(window.findChild<QWidget*>("InfoPanel_Assets") != nullptr);
+    CHECK(window.findChild<QWidget*>("ModelBrowser_Controls") != nullptr);
+    CHECK(window.findChild<QWidget*>("ModelBrowser_FolderTree") != nullptr);
+  }
+
+  SECTION("uses a focused command palette structure")
+  {
+    auto context =
+      ActionExecutionContext{appController, &window, window.currentMapViewBase()};
+    auto dialog = CommandPaletteDialog{
+      appController.actionManager(),
+      context,
+      std::filesystem::path{"Menu/View/Command Palette..."},
+      &window};
+
+    CHECK(dialog.objectName() == "CommandPalette_Dialog");
+    auto* searchBox = dialog.findChild<QLineEdit*>("CommandPalette_SearchBox");
+    auto* actionList = dialog.findChild<QListWidget*>("CommandPalette_ActionList");
+    REQUIRE(searchBox != nullptr);
+    REQUIRE(actionList != nullptr);
+    CHECK(searchBox->placeholderText() == "Search commands...");
+    CHECK_FALSE(actionList->alternatingRowColors());
+    CHECK(actionList->selectionMode() == QAbstractItemView::SingleSelection);
+    CHECK(actionList->count() > 0);
   }
 
   SECTION("copy prefixes worldspawn header when enabled")

@@ -69,6 +69,7 @@ Console::Console(QWidget* parent)
   , m_timer{new QTimer{this}}
 {
   m_textView = new QTextEdit{};
+  m_textView->setObjectName("Console_TextView");
   m_textView->setReadOnly(true);
   m_textView->setWordWrapMode(QTextOption::NoWrap);
   m_textView->setContextMenuPolicy(Qt::CustomContextMenu);

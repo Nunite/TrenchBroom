@@ -26,6 +26,7 @@
 #include <vector>
 
 class QHBoxLayout;
+class QKeyEvent;
 class QLabel;
 class QStackedLayout;
 
@@ -49,6 +50,7 @@ public:
 
 protected:
   void mousePressEvent(QMouseEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
 
 signals:
   void clicked();

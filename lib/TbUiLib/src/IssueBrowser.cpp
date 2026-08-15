@@ -50,7 +50,9 @@ IssueBrowser::IssueBrowser(MapDocument& document, QWidget* parent)
 QWidget* IssueBrowser::createTabBarPage(QWidget* parent)
 {
   auto* barPage = new QWidget{parent};
+  barPage->setObjectName("IssueBrowser_TabActions");
   m_showHiddenIssuesCheckBox = new QCheckBox{"Show hidden issues"};
+  m_showHiddenIssuesCheckBox->setObjectName("IssueBrowser_ShowHidden");
   connect(
     m_showHiddenIssuesCheckBox,
     &QCheckBox::checkStateChanged,
@@ -58,6 +60,7 @@ QWidget* IssueBrowser::createTabBarPage(QWidget* parent)
     &IssueBrowser::showHiddenIssuesChanged);
 
   m_filterEditor = new FlagsPopupEditor{1, "Filter", false};
+  m_filterEditor->setObjectName("IssueBrowser_Filter");
   connect(
     m_filterEditor, &FlagsPopupEditor::flagChanged, this, &IssueBrowser::filterChanged);
 

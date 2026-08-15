@@ -22,7 +22,6 @@
 #include <QAbstractItemView>
 #include <QEvent>
 #include <QKeyEvent>
-#include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QStringList>
@@ -34,7 +33,6 @@
 #include "ui/ActionManager.h"
 #include "ui/QKeySequenceUtils.h"
 #include "ui/QStringUtils.h"
-#include "ui/QStyleUtils.h"
 
 #include <algorithm>
 
@@ -77,6 +75,7 @@ CommandPaletteDialog::CommandPaletteDialog(
   , m_searchBox{new QLineEdit{this}}
   , m_actionList{new QListWidget{this}}
 {
+  setObjectName("CommandPalette_Dialog");
   setWindowTitle(tr("Command Palette"));
   setModal(true);
   resize(720, 480);
@@ -122,18 +121,14 @@ CommandPaletteDialog::CommandPaletteDialog(
 
   m_actionList->setObjectName("CommandPalette_ActionList");
   m_actionList->setSelectionMode(QAbstractItemView::SingleSelection);
-  m_actionList->setAlternatingRowColors(true);
+  m_actionList->setAlternatingRowColors(false);
   m_actionList->installEventFilter(this);
 
-  auto* hintLabel = new QLabel{tr("Press Enter to run the selected command.")};
-  setInfoStyle(hintLabel);
-
   auto* layout = new QVBoxLayout{};
-  layout->setContentsMargins(12, 12, 12, 12);
-  layout->setSpacing(8);
+  layout->setContentsMargins(8, 8, 8, 8);
+  layout->setSpacing(6);
   layout->addWidget(m_searchBox);
   layout->addWidget(m_actionList, 1);
-  layout->addWidget(hintLabel);
   setLayout(layout);
 
   connect(

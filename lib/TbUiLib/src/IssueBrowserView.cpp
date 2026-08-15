@@ -68,6 +68,7 @@ void IssueBrowserView::createGui()
   m_tableModel = new IssueBrowserModel{this};
 
   m_tableView = new QTableView{};
+  m_tableView->setObjectName("IssueBrowser_Table");
   m_tableView->setModel(m_tableModel);
   m_tableView->verticalHeader()->setVisible(false);
   m_tableView->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);

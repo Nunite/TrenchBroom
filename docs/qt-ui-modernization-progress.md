@@ -5,7 +5,7 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-15
-- Current stage: Phase 3 inspector and outliner modernization complete; Phase 4 ready to start
+- Current stage: Phase 4 in progress; supporting workbench surfaces pass complete
 
 ## Objective
 
@@ -134,11 +134,12 @@ significant custom interaction and painting code.
 
 ### Phase 4: Supporting Surfaces
 
-Status: pending
+Status: in progress (supporting surfaces pass complete)
 
-- [ ] Restyle Console, Issues, and Python panel tabs.
-- [ ] Expand the status bar with concise selection, grid, snap, mode, and warning state.
-- [ ] Restyle the existing command palette as a focused workbench overlay.
+- [x] Restyle Console, Issues, Python panel tabs, and the Assets browser surface.
+- [x] Expand the status bar with concise grid and snap state; defer selection, mode, and
+      warning segments until they have stable application-state sources.
+- [x] Restyle the existing command palette as a focused workbench overlay.
 - [ ] Apply the shared design system to preferences and high-traffic dialogs.
 
 Expected benefit: medium. These changes complete consistency after the main editing
@@ -175,17 +176,18 @@ testing shows that the earlier phases do not meet the product goal.
 - Build the Release `TrenchBroom` target before completing a workbench phase.
 - Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
   capture the isolated welcome window, representative map workbench, and deterministic
-  expanded Outliner/entity-properties state in light and dark themes at 100%, 150%,
-  and 200% scale. The script validates image dimensions, device-pixel ratio, nonblank
-  pixels, font support, and image hashes, then writes PNG and JSON evidence plus a
-  labeled visual-comparison contact sheet under
+  expanded Outliner/entity-properties and supporting Assets-panel states in light and
+  dark themes at 100%, 150%, and 200% scale. The 24-state matrix validates image
+  dimensions, device-pixel ratio, nonblank pixels, font support, and image hashes, then
+  writes PNG and JSON evidence plus a labeled visual-comparison contact sheet under
   `build-release-codex\codex-logs\ui-theme-acceptance`.
 - Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark
-  [--ui-snapshot-page map|outliner] [map-file]` for a focused single capture. Omitting
-  the map captures Welcome; supplying one captures the workbench. The Outliner page
-  expands its hierarchy, properties panel, and active selection before rendering.
-  Snapshot mode uses temporary preferences, disables background services, and renders
-  through the native Qt platform without showing the window.
+  [--ui-snapshot-page map|outliner|supporting] [map-file]` for a focused single capture.
+  Omitting the map captures Welcome; supplying one captures the workbench. The Outliner
+  page expands its hierarchy, properties panel, and active selection before rendering;
+  the Supporting page opens Assets and expands the bottom panel. Snapshot mode uses
+  temporary preferences, disables background services, and renders through the native
+  Qt platform without showing the window.
 - Verify keyboard-only navigation, focus visibility, disabled states, and text fit.
 - Keep generated screenshots and temporary visual reports out of commits unless they
   are intentionally selected as maintained references.
@@ -230,4 +232,7 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-15 | Complete | Replaced collapsible section show/hide text with compact chevron headers, full-row mouse activation, keyboard activation, hover, and focus states while preserving switchable panel text states. |
 | 2026-08-15 | Complete | Extracted the Outliner drop execution path for deterministic acceptance and covered keyboard row navigation, deliberate non-inline rename behavior, cross-layer reparenting, selection retention, and local tree refresh. |
 | 2026-08-15 | Verified | Passed `CollapsibleTitledPanel` (31 assertions), `OutlinerTreeWidget` (86), `OutlinerEntityPropertyEditor` (107), `MapWindow` (70), `Theme` (19), and `UiSnapshot` (18), built Release `TrenchBroom`, and passed the 18-state matrix at `20260815-221023-403`. |
-| 2026-08-15 | Next | Begin Phase 4 with the Console, Issues, Python, and Assets supporting surfaces. |
+| 2026-08-15 | Complete | Modernized Console, Python Console, Issues, Assets, and shared bottom-panel tabs; added concise Grid/Snap status actions and a compact command-palette presentation. |
+| 2026-08-15 | Complete | Added keyboard activation for shared tab buttons, typed info-panel page selection, and a deterministic Supporting snapshot state. |
+| 2026-08-15 | Verified | Passed `TabBook` (13 assertions), `MapWindow` (88), `Theme` (19), `UiSnapshot` (18), `ModelBrowserView` (30), and `GoldSrcSpritePreview` (13), built Release `TrenchBroom`, and passed the 24-state matrix at `20260815-222920-657`. |
+| 2026-08-15 | Next | Continue Phase 4 with Preferences and high-traffic dialogs. |

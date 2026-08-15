@@ -293,29 +293,198 @@ QWidget#TabBarButton[active="true"] QLabel#TabBarButtonLabel {
   font-weight: bold;
 }
 
-QStatusBar {
+QWidget#InfoPanel_TabBook,
+QWidget#InfoPanel_Console,
+QWidget#InfoPanel_PythonConsole,
+QWidget#InfoPanel_Issues,
+QWidget#InfoPanel_Assets {
   background: @tb-panel-background;
-  border-top: 1px solid @tb-border;
+}
+
+QWidget#InfoPanel_TabBar {
+  background: @tb-panel-background;
+  border-bottom: 1px solid @tb-border;
+}
+
+QWidget#InfoPanel_TabBar QWidget#TabBarButton {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+
+QWidget#InfoPanel_TabBar QWidget#TabBarButton:hover,
+QWidget#InfoPanel_TabBar QWidget#TabBarButton:focus {
+  background: @tb-hover-background;
+}
+
+QWidget#InfoPanel_TabBar QWidget#TabBarButton[active="true"] {
+  background: transparent;
+  border-bottom-color: @tb-accent;
+}
+
+QWidget#InfoPanel_TabBar QWidget#TabBarButton[active="true"] QLabel#TabBarButtonLabel {
+  color: @tb-text;
+  font-weight: normal;
+}
+
+QTextEdit#Console_TextView {
+  background: @tb-editor-background;
+  border: none;
+  color: @tb-text;
+  padding: 5px 7px;
+  selection-background-color: @tb-selection-background;
+  selection-color: @tb-inverse-text;
+}
+
+QWidget#IssueBrowser_TabActions {
+  background: transparent;
+}
+
+QWidget#IssueBrowser_TabActions QCheckBox {
   color: @tb-secondary-text;
+  spacing: 5px;
+}
+
+QTableView#IssueBrowser_Table {
+  background: @tb-editor-background;
+  border: none;
+  padding: 2px;
+}
+
+QWidget#ModelBrowser_Controls {
+  background: @tb-panel-background;
+  border-bottom: 1px solid @tb-border;
+  padding: 4px;
+}
+
+QWidget#ModelBrowser_BreadcrumbBar {
+  background: @tb-input-background;
+  border: 1px solid @tb-border;
+  border-radius: 5px;
+}
+
+QLineEdit#ModelBrowser_Search,
+QLineEdit#ModelBrowser_FolderEdit {
   min-height: 24px;
-  padding: 0 6px;
+}
+
+QToolButton#ModelBrowser_ReloadButton,
+QToolButton#ModelBrowser_SavePrefabButton {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 0;
+}
+
+QToolButton#ModelBrowser_ReloadButton:hover,
+QToolButton#ModelBrowser_SavePrefabButton:hover {
+  background: @tb-hover-background;
+  border-color: @tb-border;
+}
+
+QComboBox#ModelBrowser_IconSize {
+  min-height: 24px;
+  min-width: 58px;
+}
+
+QTreeWidget#ModelBrowser_FolderTree {
+  background: @tb-panel-background;
+  border: none;
+  min-width: 170px;
+  padding: 3px;
+}
+
+QSplitter#ModelBrowser_Splitter::handle {
+  background: @tb-border;
+  width: 1px;
+}
+
+QStatusBar {
+  background: @tb-accent;
+  border: none;
+  color: @tb-inverse-text;
+  min-height: 24px;
+  padding: 0 4px;
 }
 
 QStatusBar::item {
   border: none;
 }
 
+QStatusBar QLabel#MapWindow_StatusLabel,
+QStatusBar QLabel {
+  color: @tb-inverse-text;
+}
+
+QStatusBar QToolButton#MapWindow_SnapToggle {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: @tb-inverse-text;
+  min-height: 20px;
+  padding: 0 6px;
+}
+
+QStatusBar QToolButton#MapWindow_SnapToggle:hover {
+  border-color: @tb-inverse-text;
+}
+
+QStatusBar QToolButton#MapWindow_SnapToggle:checked {
+  background: @tb-inverse-text;
+  color: @tb-accent;
+}
+
 QStatusBar QComboBox#MapWindow_GridChoice {
   background: transparent;
   border-color: transparent;
+  color: @tb-inverse-text;
   min-height: 20px;
   min-width: 72px;
   padding: 0 5px;
 }
 
 QStatusBar QComboBox#MapWindow_GridChoice:hover {
+  background: @tb-inverse-text;
+  border-color: @tb-inverse-text;
+  color: @tb-accent;
+}
+
+QDialog#CommandPalette_Dialog {
+  background: @tb-elevated-background;
+}
+
+QLineEdit#CommandPalette_SearchBox {
+  background: @tb-input-background;
+  border: 1px solid @tb-strong-border;
+  border-radius: 6px;
+  min-height: 30px;
+  padding: 1px 8px;
+}
+
+QListWidget#CommandPalette_ActionList {
+  background: @tb-panel-background;
+  border: 1px solid @tb-border;
+  border-radius: 6px;
+  padding: 3px;
+}
+
+QListWidget#CommandPalette_ActionList::item {
+  border: none;
+  border-radius: 4px;
+  min-height: 38px;
+  padding: 3px 7px;
+}
+
+QListWidget#CommandPalette_ActionList::item:hover {
   background: @tb-hover-background;
-  border-color: @tb-border;
+}
+
+QListWidget#CommandPalette_ActionList::item:selected {
+  background: @tb-selection-background;
+  color: @tb-inverse-text;
 }
 
 QToolTip {

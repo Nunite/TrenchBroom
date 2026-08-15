@@ -42,6 +42,7 @@ class QLabel;
 class QSplitter;
 class QTimer;
 class QToolBar;
+class QToolButton;
 
 namespace tb
 {
@@ -75,6 +76,7 @@ class AppController;
 class CompilationDialog;
 class Console;
 class InfoPanel;
+enum class InfoPanelPage;
 class Inspector;
 enum class InspectorPage;
 class MapDocument;
@@ -118,6 +120,7 @@ private:
   Inspector* m_inspector = nullptr;
 
   QComboBox* m_gridChoice = nullptr;
+  QToolButton* m_snapToggle = nullptr;
   QLabel* m_statusBarLabel = nullptr;
 
   QPointer<CompilationDialog> m_compilationDialog;
@@ -411,6 +414,7 @@ public:
   void showAll();
 
   void switchToInspectorPage(InspectorPage page);
+  void switchToInfoPanelPage(InfoPanelPage page);
 
   void toggleToolbar();
   bool toolbarVisible() const;
