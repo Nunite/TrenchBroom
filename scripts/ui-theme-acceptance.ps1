@@ -1,7 +1,7 @@
 param(
   [string] $BuildDir = "build-release-codex",
   [string] $QtBin = "D:\Qtx\6.11.1\msvc2022_64\bin",
-  [string[]] $Targets = @("welcome", "workbench"),
+  [string[]] $Targets = @("welcome", "workbench", "outliner"),
   [string[]] $Themes = @("light", "dark"),
   [string[]] $ScaleFactors = @("1", "1.5", "2"),
   [string] $MapPath = "lib\TbMdlLib\test\fixture\mdl\Map\initialMap.map",
@@ -129,8 +129,8 @@ function New-UiSnapshotContactSheet {
 
 $normalizedTargets = @($Targets | ForEach-Object { $_.ToLowerInvariant() })
 foreach ($target in $normalizedTargets) {
-  if ($target -notin @("welcome", "workbench")) {
-    throw "Unsupported target '$target'. Expected welcome or workbench."
+  if ($target -notin @("welcome", "workbench", "outliner")) {
+    throw "Unsupported target '$target'. Expected welcome, workbench, or outliner."
   }
 }
 foreach ($theme in $Themes) {
@@ -161,7 +161,9 @@ if (-not $SkipBuild) {
 
 $resolvedBuildDir = Resolve-Path -Path $BuildDir
 $resolvedQtBin = Resolve-Path -Path $QtBin
-$resolvedMapPath = if ($normalizedTargets -contains "workbench") {
+$resolvedMapPath = if (
+  $normalizedTargets -contains "workbench" -or
+  $normalizedTargets -contains "outliner") {
   Resolve-Path -Path $MapPath
 } else {
   $null
@@ -198,7 +200,10 @@ foreach ($target in $normalizedTargets) {
       $processInfo.FileName = $executable
       $processInfo.Arguments =
         "--ui-snapshot `"$imagePath`" --ui-snapshot-theme $theme"
-      if ($target -eq "workbench") {
+      if ($target -eq "workbench" -or $target -eq "outliner") {
+        if ($target -eq "outliner") {
+          $processInfo.Arguments += " --ui-snapshot-page outliner"
+        }
         $processInfo.Arguments += " `"$($resolvedMapPath.Path)`""
       }
       $processInfo.WorkingDirectory = Split-Path -Parent $executable

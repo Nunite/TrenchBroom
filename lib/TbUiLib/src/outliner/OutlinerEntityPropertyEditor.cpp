@@ -43,6 +43,7 @@
 #include "ui/SmartSkyboxEditor.h"
 #include "ui/SmartWadEditor.h"
 #include "ui/TitledPanel.h"
+#include "ui/TitleBar.h"
 #include "ui/ViewUtils.h"
 
 #include "kd/string_compare.h"
@@ -71,7 +72,7 @@ public:
         : QWidget{parent}
         , m_layout{new QGridLayout{this}}
     {
-        m_layout->setContentsMargins(8, 5, 6, 5);
+        m_layout->setContentsMargins(6, 4, 4, 4);
         m_layout->setHorizontalSpacing(6);
         m_layout->setVerticalSpacing(4);
     }
@@ -458,7 +459,10 @@ OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(MapDocument& document
     : QWidget{parent}
     , m_document{document}
 {
-    m_propertiesPanel = new TitledPanel{tr("Entity"), true, true};
+    m_propertiesPanel = new TitledPanel{tr("Entity Properties").toUpper(), true, true};
+    m_propertiesPanel->setObjectName("OutlinerPropertyPanel");
+    m_propertiesPanel->getTitleBar()->setObjectName("OutlinerPropertySectionHeader");
+    m_propertiesPanel->getPanel()->setObjectName("OutlinerPropertyPanelBody");
 
     m_selectionSummary = new QLabel{m_propertiesPanel->getPanel()};
     m_selectionSummary->setObjectName("outlinerPropertySelectionSummary");
@@ -475,7 +479,7 @@ OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(MapDocument& document
     m_scrollContents->setObjectName("outlinerPropertyList");
     m_scrollContents->setAttribute(Qt::WA_StyledBackground, true);
     m_scrollLayout = new QVBoxLayout{m_scrollContents};
-    m_scrollLayout->setContentsMargins(0, 0, 0, 0);
+    m_scrollLayout->setContentsMargins(6, 4, 6, 4);
     m_scrollLayout->setSpacing(2);
     m_scrollLayout->addStretch(1);
     m_scrollArea->setWidget(m_scrollContents);

@@ -112,14 +112,18 @@ workbench layout while retaining the current splitter ownership model.
 
 ### Phase 3: Inspector And Outliner
 
-Status: pending
+Status: in progress (first visual pass complete)
 
-- [ ] Standardize tree row height, indentation, selection, hover, and inactive states.
-- [ ] Reserve stable columns for visibility, lock, group, and warning indicators.
-- [ ] Add consistent panel search and local actions.
-- [ ] Align property names and values into a predictable two-column layout.
+- [x] Standardize tree row height, indentation, rounded selection, hover, and inactive
+      states.
+- [x] Reserve stable 28 px columns for visibility and lock while retaining node type
+      and group indicators in the name hierarchy.
+- [x] Add a consistent inset search, sort, and properties action row.
+- [x] Align property names, values, and actions into a predictable responsive layout.
 - [ ] Introduce reusable collapsible section headers.
-- [ ] Verify multi-selection, keyboard navigation, inline editing, and drag-and-drop.
+- [x] Verify multi-selection, Escape handling, and lock/visibility hit targets.
+- [ ] Add warning indicators when the outliner has a stable warning data source.
+- [ ] Complete manual keyboard navigation, inline editing, and drag-and-drop acceptance.
 
 Expected benefit: very high. Difficulty is medium to high because the outliner has
 significant custom interaction and painting code.
@@ -166,16 +170,18 @@ testing shows that the earlier phases do not meet the product goal.
 - Run relevant focused Catch2 filters for every changed component.
 - Build the Release `TrenchBroom` target before completing a workbench phase.
 - Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
-  capture the isolated welcome window and representative map workbench in light and
-  dark themes at 100%, 150%, and 200% scale. The script validates image dimensions,
-  device-pixel ratio, nonblank pixels, font support, and image hashes, then writes PNG
-  and JSON evidence plus a
+  capture the isolated welcome window, representative map workbench, and deterministic
+  expanded Outliner/entity-properties state in light and dark themes at 100%, 150%,
+  and 200% scale. The script validates image dimensions, device-pixel ratio, nonblank
+  pixels, font support, and image hashes, then writes PNG and JSON evidence plus a
   labeled visual-comparison contact sheet under
   `build-release-codex\codex-logs\ui-theme-acceptance`.
-- Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark [map-file]` for a
-  focused single capture. Omitting the map captures Welcome; supplying one captures the
-  workbench. Snapshot mode uses temporary preferences, disables background services,
-  and renders through the native Qt platform without showing the window.
+- Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark
+  [--ui-snapshot-page map|outliner] [map-file]` for a focused single capture. Omitting
+  the map captures Welcome; supplying one captures the workbench. The Outliner page
+  expands its hierarchy, properties panel, and active selection before rendering.
+  Snapshot mode uses temporary preferences, disables background services, and renders
+  through the native Qt platform without showing the window.
 - Verify keyboard-only navigation, focus visibility, disabled states, and text fit.
 - Keep generated screenshots and temporary visual reports out of commits unless they
   are intentionally selected as maintained references.
@@ -212,4 +218,7 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-15 | Complete | Added rounded editor, inspector, and bottom-panel surfaces; compact segmented tabs; an inspector header; and a quieter toolbar with Grid moved to the status bar. |
 | 2026-08-15 | Complete | Extended deterministic acceptance to capture a real map workbench as well as Welcome without showing native windows. |
 | 2026-08-15 | Verified | Passed `MapWindow`, `Theme`, and `UiSnapshot` tests, built Release `TrenchBroom`, and passed the 12-state Welcome/Workbench Light/Dark DPI matrix. |
-| 2026-08-15 | Next | Start Phase 3 by modernizing inspector and outliner row density, actions, and property layout. |
+| 2026-08-15 | Complete | Added an inset Outliner toolbar, icon-only state columns, compact hierarchy metrics, rounded full-row interaction states, and a quieter responsive entity-property layout. |
+| 2026-08-15 | Complete | Added deterministic Outliner snapshot setup with expanded hierarchy, visible properties, and active selection. |
+| 2026-08-15 | Verified | Passed `OutlinerTreeWidget`, `OutlinerEntityPropertyEditor`, `MapWindow`, `Theme`, and `UiSnapshot` tests, built Release `TrenchBroom`, and passed the 18-state Welcome/Workbench/Outliner Light/Dark DPI matrix. |
+| 2026-08-15 | Next | Finish Phase 3 with reusable collapsible section styling and manual inline-editing and drag-and-drop acceptance. |

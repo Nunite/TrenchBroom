@@ -18,6 +18,7 @@
 #include <QContextMenuEvent>
 #include <QSet>
 #include <QSignalBlocker>
+#include <QStyledItemDelegate>
 
 #include "mdl/Map.h"
 #include "mdl/WorldNode.h"
@@ -53,6 +54,66 @@
 
 namespace tb::ui
 {
+
+namespace
+{
+class OutlinerItemDelegate : public QStyledItemDelegate
+{
+private:
+    const OutlinerTreeWidget& m_tree;
+
+public:
+    explicit OutlinerItemDelegate(OutlinerTreeWidget& tree)
+        : QStyledItemDelegate{&tree}
+        , m_tree{tree}
+    {
+    }
+
+    void paint(
+        QPainter* painter,
+        const QStyleOptionViewItem& option,
+        const QModelIndex& index) const override
+    {
+        auto itemOption = option;
+        initStyleOption(&itemOption, index);
+
+        const auto selected = itemOption.state.testFlag(QStyle::State_Selected);
+        const auto hovered = itemOption.state.testFlag(QStyle::State_MouseOver);
+        if (selected || hovered) {
+            const auto colorGroup = m_tree.hasFocus() ? QPalette::Active : QPalette::Inactive;
+            const auto background = selected
+                ? option.palette.color(colorGroup, QPalette::Highlight)
+                : option.palette.color(QPalette::Midlight);
+            const auto backgroundRect = QRect{
+                3,
+                option.rect.y() + 1,
+                m_tree.viewport()->width() - 6,
+                option.rect.height() - 2};
+
+            painter->save();
+            painter->setClipRect(option.rect);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(background);
+            painter->drawRoundedRect(backgroundRect, 4, 4);
+            painter->restore();
+
+            itemOption.state.setFlag(QStyle::State_Selected, false);
+            itemOption.state.setFlag(QStyle::State_MouseOver, false);
+            itemOption.backgroundBrush = Qt::NoBrush;
+
+            if (selected) {
+                const auto highlightedText = option.palette.color(QPalette::HighlightedText);
+                itemOption.palette.setColor(QPalette::Text, highlightedText);
+                itemOption.palette.setColor(QPalette::WindowText, highlightedText);
+            }
+        }
+
+        const auto* widget = option.widget;
+        auto* style = widget ? widget->style() : QApplication::style();
+        style->drawControl(QStyle::CE_ItemViewItem, &itemOption, painter, widget);
+    }
+};
+} // namespace
 
 static constexpr int WorldspawnItemRole = Qt::UserRole + 1;
 static constexpr int WorldspawnLayerRole = Qt::UserRole + 2;
@@ -386,33 +447,50 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
     : QTreeWidget(parent)
     , m_document(document)
 {
-    setHeaderHidden(false); // Outliner usually has headers? User screenshot shows "Name"
-    
+    setObjectName("OutlinerTreeWidget");
+    setHeaderHidden(false);
+
     QStringList headers;
-    headers << tr("Name") << tr("Info") << tr("L") << tr("V");
+    headers << tr("Name") << tr("Info") << QString{} << QString{};
     setHeaderLabels(headers);
-    
+
     setSelectionMode(QAbstractItemView::ExtendedSelection);
     setDragEnabled(true);
     setDragDropMode(QAbstractItemView::InternalMove);
     setDefaultDropAction(Qt::MoveAction);
     setExpandsOnDoubleClick(false);
     setRootIsDecorated(true);
-    setUniformRowHeights(true); // Using uniform heights for performance, LayerTreeWidget used false?
+    setUniformRowHeights(true);
     setItemsExpandable(true);
     setAllColumnsShowFocus(true);
     setColumnCount(4);
-    
+
+    setMouseTracking(true);
+    setItemDelegate(new OutlinerItemDelegate{*this});
+    setIndentation(14);
+    setIconSize(QSize{16, 16});
+    setTextElideMode(Qt::ElideRight);
+
+    header()->setObjectName("OutlinerTreeHeader");
+    header()->setSectionsClickable(false);
+    header()->setHighlightSections(false);
+    header()->setFixedHeight(26);
     header()->setStretchLastSection(false);
     header()->setSectionResizeMode(0, QHeaderView::Stretch);
-    header()->setSectionResizeMode(1, QHeaderView::ResizeToContents); // Info
-    header()->setSectionResizeMode(2, QHeaderView::Fixed); // Lock
-    header()->setSectionResizeMode(3, QHeaderView::Fixed); // Vis
-    
-    header()->resizeSection(2, 24);
-    header()->resizeSection(3, 24);
+    header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    header()->setSectionResizeMode(2, QHeaderView::Fixed);
+    header()->setSectionResizeMode(3, QHeaderView::Fixed);
+
+    header()->resizeSection(2, 28);
+    header()->resizeSection(3, 28);
 
     loadIcons();
+    headerItem()->setIcon(2, m_lockedIcon);
+    headerItem()->setIcon(3, m_visibleIcon);
+    headerItem()->setToolTip(2, tr("Lock state"));
+    headerItem()->setToolTip(3, tr("Visibility state"));
+    headerItem()->setTextAlignment(2, Qt::AlignCenter);
+    headerItem()->setTextAlignment(3, Qt::AlignCenter);
 
     setAcceptDrops(true);
     viewport()->setAcceptDrops(true);
@@ -667,6 +745,9 @@ void OutlinerTreeWidget::setupTreeItem(QTreeWidgetItem* item, mdl::Node* node)
     // Lock (2) and Visibility (3)
     item->setIcon(2, node->locked() ? m_lockedIcon : m_unlockedIcon);
     item->setIcon(3, node->visible() ? m_visibleIcon : m_hiddenIcon);
+    item->setTextAlignment(2, Qt::AlignCenter);
+    item->setTextAlignment(3, Qt::AlignCenter);
+    item->setForeground(1, palette().brush(QPalette::PlaceholderText));
     
     // Dim hidden items text
     item->setForeground(
@@ -981,7 +1062,9 @@ void OutlinerTreeWidget::updateCurrentGroupHighlight()
 
     if (currentGroup) {
         if (auto* item = findItemForNode(currentGroup)) {
-            const auto highlight = QBrush{QColor{135, 206, 235, 70}}; // 淡蓝色
+            auto highlightColor = palette().color(QPalette::Accent);
+            highlightColor.setAlpha(52);
+            const auto highlight = QBrush{highlightColor};
             for (int c = 0; c < columnCount(); ++c) {
                 item->setBackground(c, highlight);
             }
@@ -995,7 +1078,9 @@ void OutlinerTreeWidget::updateCurrentGroupHighlight()
 
     if (currentLayer) {
         if (auto* item = findItemForNode(currentLayer)) {
-            const auto highlight = QBrush{QColor{255, 215, 0, 70}}; // 金色
+            auto highlightColor = palette().color(QPalette::Midlight);
+            highlightColor.setAlpha(110);
+            const auto highlight = QBrush{highlightColor};
             for (int c = 0; c < columnCount(); ++c) {
                 item->setBackground(c, highlight);
             }
@@ -2078,7 +2163,36 @@ void OutlinerTreeWidget::keyPressEvent(QKeyEvent* event)
 
 void OutlinerTreeWidget::drawRow(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
-    QTreeWidget::drawRow(painter, option, index);
+    auto rowOption = option;
+    const auto selected = option.state.testFlag(QStyle::State_Selected);
+    const auto hovered = option.state.testFlag(QStyle::State_MouseOver);
+
+    if (selected || hovered) {
+        const auto colorGroup = hasFocus() ? QPalette::Active : QPalette::Inactive;
+        const auto background = selected
+            ? option.palette.color(colorGroup, QPalette::Highlight)
+            : option.palette.color(QPalette::Midlight);
+
+        auto backgroundRect = option.rect;
+        backgroundRect.setLeft(0);
+        backgroundRect.setRight(viewport()->width() - 1);
+
+        painter->save();
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(background);
+        painter->drawRoundedRect(backgroundRect.adjusted(3, 1, -3, -1), 4, 4);
+        painter->restore();
+
+        rowOption.state.setFlag(QStyle::State_Selected, false);
+        rowOption.state.setFlag(QStyle::State_MouseOver, false);
+        if (selected) {
+            const auto highlightedText = option.palette.color(QPalette::HighlightedText);
+            rowOption.palette.setColor(QPalette::Text, highlightedText);
+            rowOption.palette.setColor(QPalette::WindowText, highlightedText);
+        }
+    }
+
+    QTreeWidget::drawRow(painter, rowOption, index);
 }
 
 void OutlinerTreeWidget::dragEnterEvent(QDragEnterEvent* event)

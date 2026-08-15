@@ -18,6 +18,7 @@
  */
 
 #include <QApplication>
+#include <QHeaderView>
 #include <QTreeWidgetItem>
 #include <QtTest/QTest>
 
@@ -146,6 +147,21 @@ TEST_CASE("OutlinerTreeWidget")
   auto tree = OutlinerTreeWidget{document};
   processOutlinerTreeUpdates();
 
+  SECTION("uses compact workbench metrics")
+  {
+    CHECK(tree.objectName() == "OutlinerTreeWidget");
+    CHECK(tree.indentation() == 14);
+    CHECK(tree.iconSize() == QSize{16, 16});
+    CHECK(tree.header()->sectionSize(2) == 28);
+    CHECK(tree.header()->sectionSize(3) == 28);
+    CHECK(tree.headerItem()->text(2).isEmpty());
+    CHECK(tree.headerItem()->text(3).isEmpty());
+    CHECK(tree.headerItem()->toolTip(2) == "Lock state");
+    CHECK(tree.headerItem()->toolTip(3) == "Visibility state");
+    CHECK(!tree.headerItem()->icon(2).isNull());
+    CHECK(!tree.headerItem()->icon(3).isNull());
+  }
+
   SECTION("builds layer tree with sorted node contents")
   {
     REQUIRE(tree.topLevelItemCount() == 1);
@@ -225,6 +241,34 @@ TEST_CASE("OutlinerTreeWidget")
     CHECK(map.selection().hasOnlyEntities());
     REQUIRE(map.selection().entities.size() == 1);
     CHECK(map.selection().entities.front() == fixture.lightEntity);
+  }
+
+  SECTION("keeps lock and visibility columns interactive")
+  {
+    tree.resize(600, 400);
+    tree.show();
+    processOutlinerTreeUpdates();
+
+    auto* layerItem = itemForNode(tree, fixture.defaultLayer);
+    REQUIRE(layerItem != nullptr);
+    const auto itemRect = tree.visualItemRect(layerItem);
+    REQUIRE(!itemRect.isEmpty());
+
+    const auto clickColumn = [&](const int column) {
+      const auto x = tree.header()->sectionViewportPosition(column)
+                     + tree.header()->sectionSize(column) / 2;
+      QTest::mouseClick(
+        tree.viewport(), Qt::LeftButton, Qt::NoModifier, QPoint{x, itemRect.center().y()});
+      processOutlinerTreeUpdates();
+    };
+
+    CHECK_FALSE(fixture.defaultLayer->locked());
+    clickColumn(2);
+    CHECK(fixture.defaultLayer->locked());
+
+    CHECK(fixture.defaultLayer->visible());
+    clickColumn(3);
+    CHECK_FALSE(fixture.defaultLayer->visible());
   }
 
   SECTION("escape clears tree and document selection")

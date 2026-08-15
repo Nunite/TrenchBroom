@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QAbstractButton>
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
@@ -28,6 +29,7 @@
 #include <QPointer>
 #include <QProxyStyle>
 #include <QSettings>
+#include <QSignalBlocker>
 #include <QString>
 #include <QStyleHints>
 #include <QSurfaceFormat>
@@ -35,6 +37,7 @@
 #include <QTextStream>
 #include <QTimer>
 #include <QTranslator>
+#include <QTreeWidget>
 #include <QtGlobal>
 
 #include "base/PreferenceManager.h"
@@ -46,6 +49,7 @@
 #include "ui/Contracts.h"
 #include "ui/CrashReporter.h"
 #include "ui/FileEventFilter.h"
+#include "ui/Inspector.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
@@ -74,6 +78,7 @@ struct UiSnapshotCommandLineOptions
 {
   QString outputPath;
   QString theme;
+  QString page;
 };
 
 struct CommandLineOptions
@@ -304,11 +309,17 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "Override the snapshot theme with system, light, or dark.",
     "theme",
     "system"};
+  const auto uiSnapshotPageOption = QCommandLineOption{
+    QStringList{"ui-snapshot-page"},
+    "Select the map workbench page to capture: map or outliner.",
+    "page",
+    "map"};
 
   parser.addOption(portableOption);
   parser.addOption(draftUpdatesOption);
   parser.addOption(uiSnapshotOption);
   parser.addOption(uiSnapshotThemeOption);
+  parser.addOption(uiSnapshotPageOption);
   parser.addPositionalArgument("files", "Map files to open.", "[files...]");
   parser.process(app);
 
@@ -317,9 +328,9 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
 
   if (!parser.isSet(uiSnapshotOption))
   {
-    if (parser.isSet(uiSnapshotThemeOption))
+    if (parser.isSet(uiSnapshotThemeOption) || parser.isSet(uiSnapshotPageOption))
     {
-      qCritical() << "--ui-snapshot-theme requires --ui-snapshot";
+      qCritical() << "UI snapshot options require --ui-snapshot";
       return std::nullopt;
     }
     return options;
@@ -340,8 +351,20 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     return std::nullopt;
   }
 
-  options.uiSnapshot =
-    UiSnapshotCommandLineOptions{parser.value(uiSnapshotOption), snapshotTheme};
+  const auto snapshotPage = parser.value(uiSnapshotPageOption).trimmed().toLower();
+  if (snapshotPage != QStringLiteral("map") && snapshotPage != QStringLiteral("outliner"))
+  {
+    qCritical() << "Unsupported UI snapshot page:" << snapshotPage;
+    return std::nullopt;
+  }
+  if (options.fileNames.empty() && snapshotPage != QStringLiteral("map"))
+  {
+    qCritical() << "--ui-snapshot-page outliner requires one map file";
+    return std::nullopt;
+  }
+
+  options.uiSnapshot = UiSnapshotCommandLineOptions{
+    parser.value(uiSnapshotOption), snapshotTheme, snapshotPage};
   return options;
 }
 
@@ -355,6 +378,33 @@ WelcomeWindow* findWelcomeWindow()
     }
   }
   return nullptr;
+}
+
+void configureOutlinerSnapshot(QWidget& targetWidget)
+{
+  if (auto* propertiesToggle = targetWidget.findChild<QAbstractButton*>(
+        QStringLiteral("OutlinerInspector_PropertiesToggle")))
+  {
+    if (!propertiesToggle->isChecked())
+    {
+      propertiesToggle->click();
+    }
+  }
+
+  if (auto* tree =
+        targetWidget.findChild<QTreeWidget*>(QStringLiteral("OutlinerTreeWidget")))
+  {
+    tree->expandAll();
+    if (auto* firstItem = tree->topLevelItem(0))
+    {
+      const auto signalBlocker = QSignalBlocker{tree};
+      auto* snapshotItem = firstItem->childCount() > 0 ? firstItem->child(0) : firstItem;
+      tree->clearSelection();
+      tree->setCurrentItem(snapshotItem);
+      snapshotItem->setSelected(true);
+      tree->setFocus(Qt::OtherFocusReason);
+    }
+  }
 }
 
 void scheduleUiSnapshot(
@@ -372,6 +422,10 @@ void scheduleUiSnapshot(
       return;
     }
 
+    if (targetName == QStringLiteral("outliner"))
+    {
+      configureOutlinerSnapshot(*guardedWidget);
+    }
     guardedWidget->ensurePolished();
     guardedWidget->update();
     QTimer::singleShot(250, &app, [&app, guardedWidget, targetName, options]() {
@@ -382,6 +436,10 @@ void scheduleUiSnapshot(
         return;
       }
 
+      if (targetName == QStringLiteral("outliner"))
+      {
+        configureOutlinerSnapshot(*guardedWidget);
+      }
       auto error = QString{};
       const auto snapshotOptions = UiSnapshotOptions{
         options.outputPath,
@@ -559,13 +617,21 @@ int main(int argc, char* argv[])
     }
     else
     {
-      targetName = QStringLiteral("workbench");
+      targetName = commandLineOptions->uiSnapshot->page == QStringLiteral("outliner")
+                     ? QStringLiteral("outliner")
+                     : QStringLiteral("workbench");
       if (openFiles(*appController, commandLineOptions->fileNames))
       {
-        targetWidget = appController->mapWindowManager().topMapWindow();
-        if (targetWidget != nullptr)
+        auto* mapWindow = appController->mapWindowManager().topMapWindow();
+        targetWidget = mapWindow;
+        if (mapWindow != nullptr)
         {
-          targetWidget->resize(1440, 900);
+          mapWindow->resize(1440, 900);
+          if (commandLineOptions->uiSnapshot->page == QStringLiteral("outliner"))
+          {
+            mapWindow->switchToInspectorPage(InspectorPage::Outliner);
+            configureOutlinerSnapshot(*mapWindow);
+          }
         }
       }
     }

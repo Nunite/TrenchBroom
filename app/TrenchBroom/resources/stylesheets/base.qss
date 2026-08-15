@@ -392,6 +392,71 @@ QToolButton#toolButton_withBorder:checked {
   background: @tb-pressed-background;
 }
 
+QWidget#OutlinerInspector_Toolbar {
+  background: @tb-sidebar-background;
+  border-bottom: 1px solid @tb-border;
+}
+
+QLineEdit#OutlinerInspector_Search,
+QComboBox#OutlinerInspector_Sort {
+  border-radius: 6px;
+  min-height: 26px;
+}
+
+QComboBox#OutlinerInspector_Sort {
+  min-width: 74px;
+}
+
+QToolButton#OutlinerInspector_PropertiesToggle {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+QToolButton#OutlinerInspector_PropertiesToggle:hover {
+  background: @tb-hover-background;
+  border-color: @tb-border;
+}
+
+QToolButton#OutlinerInspector_PropertiesToggle:pressed,
+QToolButton#OutlinerInspector_PropertiesToggle:checked {
+  background: @tb-pressed-background;
+  border-color: @tb-strong-border;
+}
+
+QTreeWidget#OutlinerTreeWidget {
+  background: @tb-sidebar-background;
+  border: none;
+  padding: 3px 2px 5px 2px;
+}
+
+QTreeWidget#OutlinerTreeWidget::item {
+  background: transparent;
+  border: none;
+  min-height: 24px;
+  padding: 0 3px;
+}
+
+QTreeWidget#OutlinerTreeWidget::item:hover,
+QTreeWidget#OutlinerTreeWidget::item:selected,
+QTreeWidget#OutlinerTreeWidget::item:selected:!active {
+  background: transparent;
+}
+
+QHeaderView#OutlinerTreeHeader::section {
+  background: @tb-sidebar-background;
+  border: none;
+  border-bottom: 1px solid @tb-border;
+  color: @tb-secondary-text;
+  min-height: 25px;
+  padding: 0 5px;
+}
+
+QSplitter#OutlinerInspector_Splitter::handle {
+  background: @tb-border;
+  height: 5px;
+}
+
 tb--ui--BitmapButton {
   border: none;
 }
@@ -402,6 +467,23 @@ tb--ui--BitmapButton::menu-indicator {
 
 QScrollArea#outlinerPropertyScrollArea {
   background: transparent;
+}
+
+QWidget#OutlinerPropertyPanel {
+  background: @tb-sidebar-background;
+}
+
+QWidget#OutlinerPropertySectionHeader {
+  background: @tb-panel-background;
+  min-height: 26px;
+}
+
+QWidget#OutlinerPropertySectionHeader QLabel {
+  color: @tb-secondary-text;
+}
+
+QWidget#OutlinerPropertyPanelBody {
+  background: @tb-sidebar-background;
 }
 
 QWidget#outlinerPropertyList {
@@ -422,7 +504,8 @@ QWidget#outlinerPropertyAddBar {
 
 QWidget#outlinerPropertyRow {
   background: transparent;
-  border-bottom: 1px solid @tb-border;
+  border: none;
+  border-radius: 5px;
 }
 
 QWidget#outlinerPropertyRow:hover {
@@ -434,7 +517,7 @@ QWidget#outlinerPropertyRow[inactive="true"] {
 }
 
 QWidget#outlinerPropertyKey QLabel {
-  color: @tb-text;
+  color: @tb-secondary-text;
 }
 
 QWidget#outlinerPropertyKey[inactive="true"] QLabel {

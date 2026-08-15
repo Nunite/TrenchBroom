@@ -34,17 +34,24 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
 
     auto* topRowWidget = new QWidget{this};
+    topRowWidget->setObjectName("OutlinerInspector_Toolbar");
+    topRowWidget->setAttribute(Qt::WA_StyledBackground, true);
     topRowWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
     auto* topRow = new QHBoxLayout(topRowWidget);
-    topRow->setContentsMargins(0, 0, 0, 0);
+    topRow->setContentsMargins(8, 5, 8, 5);
+    topRow->setSpacing(6);
 
-    m_searchField = createSearchBox();
+    m_searchField = createSearchBox(topRowWidget);
+    m_searchField->setObjectName("OutlinerInspector_Search");
     topRow->addWidget(m_searchField, 10);
 
-    m_sortBox = new QComboBox(this);
+    m_sortBox = new QComboBox(topRowWidget);
+    m_sortBox->setObjectName("OutlinerInspector_Sort");
+    m_sortBox->setToolTip(tr("Sort outliner"));
     m_sortBox->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     m_sortBox->addItem(tr("Default"), static_cast<int>(OutlinerTreeWidget::SortMode::Default));
     m_sortBox->addItem(tr("Type"), static_cast<int>(OutlinerTreeWidget::SortMode::Type));
@@ -63,17 +70,12 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
         "Map_entity.svg",
         tr("Toggle properties panel"),
         this);
-    propertiesToggle->setObjectName("toolButton_withBorder");
+    propertiesToggle->setObjectName("OutlinerInspector_PropertiesToggle");
     propertiesToggle->setIconSize(QSize{16, 16});
-    propertiesToggle->setFixedSize(QSize{24, 24});
+    propertiesToggle->setFixedSize(QSize{28, 28});
     topRow->addWidget(propertiesToggle);
 
-    const auto rowHeight = std::max(
-        {m_searchField->sizeHint().height(),
-         m_sortBox->sizeHint().height(),
-         propertiesToggle->sizeHint().height()});
-    topRowWidget->setMinimumHeight(rowHeight);
-    topRowWidget->setMaximumHeight(rowHeight);
+    topRowWidget->setFixedHeight(38);
 
     layout->addWidget(topRowWidget, 0);
 
