@@ -103,7 +103,8 @@ public:
   AppController(
     std::unique_ptr<kdl::task_manager> taskManager,
     std::unique_ptr<mdl::EnvironmentConfig> environmentConfig,
-    std::unique_ptr<mdl::GameManager> gameManager);
+    std::unique_ptr<mdl::GameManager> gameManager,
+    bool enableBackgroundServices = true);
 
   static constexpr auto useSDI =
 #if defined(Q_OS_WIN)
@@ -112,7 +113,8 @@ public:
     false;
 #endif
 
-  static Result<std::unique_ptr<AppController>> create();
+  static Result<std::unique_ptr<AppController>> create(
+    bool enableBackgroundServices = true);
 
   ~AppController() override;
 

@@ -30,6 +30,16 @@ namespace tb::ui
 
 TEST_CASE("Theme")
 {
+  SECTION("makeLightThemeTokens")
+  {
+    const auto tokens = makeLightThemeTokens();
+
+    CHECK(tokens.windowBackground == (QColor{243, 243, 243}));
+    CHECK(tokens.editorBackground == (QColor{255, 255, 255}));
+    CHECK(tokens.focusBorder == (QColor{0, 120, 212}));
+    CHECK(tokens.text == (QColor{31, 31, 31}));
+  }
+
   SECTION("makeDarkThemeTokens")
   {
     const auto tokens = makeDarkThemeTokens();

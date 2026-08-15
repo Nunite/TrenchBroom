@@ -178,7 +178,8 @@ std::optional<std::tuple<std::string, mdl::MapFormat>> detectOrQueryGameAndForma
 AppController::AppController(
   std::unique_ptr<kdl::task_manager> taskManager,
   std::unique_ptr<mdl::EnvironmentConfig> environmentConfig,
-  std::unique_ptr<mdl::GameManager> gameManager)
+  std::unique_ptr<mdl::GameManager> gameManager,
+  const bool enableBackgroundServices)
   : m_taskManager{std::move(taskManager)}
   , m_environmentConfig{std::move(environmentConfig)}
   , m_gameManager{std::move(gameManager)}
@@ -202,23 +203,29 @@ AppController::AppController(
   connectObservers();
 
   m_recentDocuments->reload();
-  m_reloadRecentDocumentsTimer->start(1s);
-  m_processResourcesTimer->start(20ms);
-  startMcpBridge();
+  if (enableBackgroundServices)
+  {
+    m_reloadRecentDocumentsTimer->start(1s);
+    m_processResourcesTimer->start(20ms);
+    startMcpBridge();
+  }
 }
 
-Result<std::unique_ptr<AppController>> AppController::create()
+Result<std::unique_ptr<AppController>> AppController::create(
+  const bool enableBackgroundServices)
 {
-  return createGameManager() | kdl::transform([&](auto gameManager) {
-           auto taskManager =
-             std::make_unique<kdl::task_manager>(std::thread::hardware_concurrency());
-           auto environmentConfig = createEnvironmentConfig();
+  return createGameManager()
+         | kdl::transform([enableBackgroundServices](auto gameManager) {
+             auto taskManager =
+               std::make_unique<kdl::task_manager>(std::thread::hardware_concurrency());
+             auto environmentConfig = createEnvironmentConfig();
 
-           return std::make_unique<AppController>(
-             std::move(taskManager),
-             std::move(environmentConfig),
-             std::move(gameManager));
-         });
+             return std::make_unique<AppController>(
+               std::move(taskManager),
+               std::move(environmentConfig),
+               std::move(gameManager),
+               enableBackgroundServices);
+           });
 }
 
 AppController::~AppController()

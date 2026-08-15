@@ -99,6 +99,41 @@ ThemeTokens makeSystemThemeTokens(const QPalette& palette)
   return tokens;
 }
 
+ThemeTokens makeLightThemeTokens()
+{
+  auto tokens = ThemeTokens{};
+
+  tokens.windowBackground = QColor{243, 243, 243};
+  tokens.editorBackground = QColor{255, 255, 255};
+  tokens.sidebarBackground = QColor{242, 242, 242};
+  tokens.panelBackground = QColor{249, 249, 249};
+  tokens.elevatedBackground = QColor{255, 255, 255};
+  tokens.inputBackground = QColor{255, 255, 255};
+  tokens.alternateBackground = QColor{248, 248, 248};
+  tokens.buttonBackground = QColor{245, 245, 245};
+
+  tokens.hoverBackground = QColor{232, 232, 232};
+  tokens.pressedBackground = QColor{218, 218, 218};
+  tokens.selectionBackground = QColor{0, 120, 212};
+  tokens.inactiveSelectionBackground = QColor{204, 204, 204};
+
+  tokens.border = QColor{225, 225, 225};
+  tokens.strongBorder = QColor{191, 191, 191};
+  tokens.focusBorder = QColor{0, 120, 212};
+
+  tokens.text = QColor{31, 31, 31};
+  tokens.secondaryText = QColor{97, 97, 97};
+  tokens.disabledText = QColor{160, 160, 160};
+  tokens.inverseText = QColor{255, 255, 255};
+
+  tokens.accent = QColor{0, 102, 184};
+  tokens.error = QColor{196, 43, 28};
+  tokens.warning = QColor{157, 93, 0};
+  tokens.success = QColor{16, 124, 16};
+
+  return tokens;
+}
+
 ThemeTokens makeDarkThemeTokens()
 {
   auto tokens = ThemeTokens{};

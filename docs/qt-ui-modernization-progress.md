@@ -5,7 +5,7 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-15
-- Current stage: Phase 1 theme foundation implemented; visual matrix verification pending
+- Current stage: Phase 1 complete; Phase 2 workbench shell ready to start
 
 ## Objective
 
@@ -76,14 +76,15 @@ Status: complete
 
 ### Phase 1: Theme Foundation
 
-Status: in progress
+Status: complete
 
 - [x] Add a TrenchBroom theme token model.
 - [x] Generate `QPalette` and QSS values from the same token source.
 - [x] Extend `QProxyStyle` for shared control metrics and focus behavior.
 - [x] Standardize hover, pressed, checked, selected, disabled, and focus-visible states.
 - [x] Standardize 16 px and 20 px icon metrics.
-- [ ] Add visual checks for light and dark themes at common DPI scale factors.
+- [x] Add deterministic visual checks for light and dark themes at 100%, 150%, and
+      200% scale factors.
 
 Expected benefit: high. This should remove most of the platform-default Qt appearance
 without changing window structure.
@@ -157,8 +158,15 @@ testing shows that the earlier phases do not meet the product goal.
 - Build the focused `TbUiLibTest` target before running UI tests.
 - Run relevant focused Catch2 filters for every changed component.
 - Build the Release `TrenchBroom` target before completing a workbench phase.
-- Capture comparable light and dark screenshots on representative desktop sizes and
-  DPI scale factors.
+- Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
+  capture the isolated welcome window in light and dark themes at 100%, 150%, and
+  200% scale. The script validates image dimensions, device-pixel ratio, nonblank
+  pixels, font support, and image hashes, then writes PNG and JSON evidence plus a
+  labeled visual-comparison contact sheet under
+  `build-release-codex\codex-logs\ui-theme-acceptance`.
+- Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark` for a focused
+  single capture. Snapshot mode uses temporary preferences, disables background
+  services, and renders through the native Qt platform without showing the window.
 - Verify keyboard-only navigation, focus visibility, disabled states, and text fit.
 - Keep generated screenshots and temporary visual reports out of commits unless they
   are intentionally selected as maintained references.
@@ -185,4 +193,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-15 | Complete | Defined the phased roadmap, initial token scope, and acceptance criteria. |
 | 2026-08-15 | Complete | Added the theme-token foundation, palette generation, QSS expansion, and compact shared control styling. |
 | 2026-08-15 | Verified | Passed the Release `TbUiLibTest "Theme"` test, built `TrenchBroom`, and completed a warning-free current-theme startup and screenshot check. |
-| 2026-08-15 | Next | Verify light and dark themes at common DPI scale factors before starting the workbench shell. |
+| 2026-08-15 | Complete | Added first-class light theme tokens and deterministic in-process UI snapshot capture with PNG, JSON, and a labeled comparison contact sheet. |
+| 2026-08-15 | Verified | Passed `UiSnapshot` and `Theme` tests, built Release `TrenchBroom`, and passed the hidden Light/Dark acceptance matrix at 100%, 150%, and 200% scale with readable native fonts. |
+| 2026-08-15 | Next | Start Phase 2 by modernizing the main workbench shell. |

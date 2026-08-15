@@ -41,6 +41,11 @@
   ```
 - Do not run two `build-filtered.ps1` / Ninja builds against the same `build-release-codex` tree at the same time. Shared targets such as `TbMdlLib` can race while writing `.obj` files and fail with `Permission denied`; run those wrapper builds serially.
 - If the filtered output hides something relevant, rerun with `-NoFilter` or inspect the matching log in `build-release-codex\codex-logs`.
+- For deterministic UI theme acceptance, run the checked-in snapshot matrix:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1
+  ```
+  It builds `TrenchBroom`, then captures the welcome window without showing a native window for Light and Dark themes at 100%, 150%, and 200% scale. PNG snapshots, JSON manifests, an Agent-friendly contact sheet, and the combined report are written under `build-release-codex\codex-logs\ui-theme-acceptance`. Pass `-SkipBuild` only when the executable is already current.
 - For UI/library work, build the focused test target first. If the filtered wrapper is unavailable, use the explicit Visual Studio environment form:
   ```powershell
   cmd.exe /c 'call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build build-release-codex --target TbUiLibTest --config Release --parallel'

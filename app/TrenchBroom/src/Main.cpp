@@ -18,17 +18,22 @@
  */
 
 #include <QApplication>
+#include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QDebug>
 #include <QEvent>
 #include <QFile>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPointer>
 #include <QProxyStyle>
 #include <QSettings>
 #include <QString>
 #include <QStyleHints>
 #include <QSurfaceFormat>
+#include <QTemporaryDir>
 #include <QTextStream>
+#include <QTimer>
 #include <QTranslator>
 #include <QtGlobal>
 
@@ -47,6 +52,11 @@
 #include "ui/RecentDocuments.h"
 #include "ui/SystemPaths.h"
 #include "ui/Theme.h"
+#include "ui/UiSnapshot.h"
+#include "ui/WelcomeWindow.h"
+
+#include <memory>
+#include <optional>
 
 using namespace tb;
 using namespace tb::ui;
@@ -59,7 +69,20 @@ extern void qt_set_sequence_auto_mnemonic(bool b);
 namespace
 {
 
-bool loadStyleSheets(const ThemeTokens& themeTokens)
+struct UiSnapshotCommandLineOptions
+{
+  QString outputPath;
+  QString theme;
+};
+
+struct CommandLineOptions
+{
+  bool enableDraftReleaseUpdates = false;
+  QStringList fileNames;
+  std::optional<UiSnapshotCommandLineOptions> uiSnapshot;
+};
+
+bool loadStyleSheets(const ThemeTokens& themeTokens, QString* error = nullptr)
 {
   const auto path = SystemPaths::findResourceFile("stylesheets/base.qss");
   if (auto file = QFile{pathAsQPath(path)}; file.exists())
@@ -67,17 +90,29 @@ bool loadStyleSheets(const ThemeTokens& themeTokens)
     // closed automatically by destructor
     if (!file.open(QFile::ReadOnly | QFile::Text))
     {
+      if (error != nullptr)
+      {
+        *error = file.errorString();
+      }
       return false;
     }
     auto styleSheet = QTextStream{&file}.readAll();
-    if (auto error = QString{}; !expandThemeStyleSheet(styleSheet, themeTokens, &error))
+    if (!expandThemeStyleSheet(styleSheet, themeTokens, error))
     {
       return false;
     }
 
     qApp->setStyleSheet(styleSheet);
-
+    if (error != nullptr)
+    {
+      error->clear();
+    }
     return true;
+  }
+
+  if (error != nullptr)
+  {
+    *error = QStringLiteral("Could not find stylesheet: %1").arg(pathAsQString(path));
   }
   return false;
 }
@@ -96,7 +131,8 @@ void loadTranslations(QApplication& app)
   }
 }
 
-ThemeTokens loadStyle(QApplication& app)
+ThemeTokens loadStyle(
+  QApplication& app, const std::optional<QString>& themeOverride = std::nullopt)
 {
   // We can't use auto mnemonics in TrenchBroom. e.g. by default with Qt, Alt+D opens
   // the "Debug" menu, Alt+S activates the "Show default properties" checkbox in the
@@ -157,8 +193,13 @@ ThemeTokens loadStyle(QApplication& app)
     }
   };
 
-  // Apply either the Fusion style + dark palette, or the system style
-  if (pref(Preferences::Theme) == Preferences::DarkTheme)
+  const auto useDarkTheme =
+    (themeOverride && *themeOverride == QStringLiteral("dark"))
+    || (!themeOverride && pref(Preferences::Theme) == Preferences::DarkTheme);
+  const auto useLightTheme = themeOverride && *themeOverride == QStringLiteral("light");
+
+  // Explicit themes use Fusion for deterministic cross-platform rendering.
+  if (useDarkTheme)
   {
     app.setStyle(new TrenchBroomProxyStyle{"Fusion"});
     const auto themeTokens = makeDarkThemeTokens();
@@ -167,13 +208,22 @@ ThemeTokens loadStyle(QApplication& app)
     return themeTokens;
   }
 
+  if (useLightTheme)
+  {
+    app.setStyle(new TrenchBroomProxyStyle{"Fusion"});
+    const auto themeTokens = makeLightThemeTokens();
+    app.setPalette(makeThemePalette(themeTokens));
+    app.styleHints()->setColorScheme(Qt::ColorScheme::Light);
+    return themeTokens;
+  }
+
   app.setStyle(new TrenchBroomProxyStyle{});
   return makeSystemThemeTokens(app.palette());
 }
 
-auto createAppController()
+auto createAppController(const bool enableBackgroundServices = true)
 {
-  return AppController::create() | kdl::if_error([](auto e) {
+  return AppController::create(enableBackgroundServices) | kdl::if_error([](auto e) {
            const auto msg =
              fmt::format(R"(Game configurations could not be loaded: {})", e.msg);
 
@@ -233,22 +283,125 @@ bool openFiles(AppController& appController, const QStringList& fileNames)
   return anyDocumentOpened;
 }
 
-bool parseCommandLineAndOpenFiles(AppController& appController)
+std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
 {
   auto parser = QCommandLineParser{};
-  parser.addOption(QCommandLineOption("portable"));
-  parser.addOption(QCommandLineOption("enableDraftReleaseUpdates"));
-  parser.process(*qApp);
+  parser.setApplicationDescription("TrenchBroom level editor");
+  parser.addHelpOption();
 
-  if (parser.isSet("enableDraftReleaseUpdates"))
+  const auto portableOption = QCommandLineOption{
+    QStringList{"portable"}, "Store application settings next to the executable."};
+  const auto draftUpdatesOption = QCommandLineOption{
+    QStringList{"enableDraftReleaseUpdates"}, "Enable draft release updates."};
+  const auto uiSnapshotOption = QCommandLineOption{
+    QStringList{"ui-snapshot"},
+    "Capture the welcome window for automated UI acceptance and exit.",
+    "path"};
+  const auto uiSnapshotThemeOption = QCommandLineOption{
+    QStringList{"ui-snapshot-theme"},
+    "Override the snapshot theme with system, light, or dark.",
+    "theme",
+    "system"};
+
+  parser.addOption(portableOption);
+  parser.addOption(draftUpdatesOption);
+  parser.addOption(uiSnapshotOption);
+  parser.addOption(uiSnapshotThemeOption);
+  parser.addPositionalArgument("files", "Map files to open.", "[files...]");
+  parser.process(app);
+
+  auto options = CommandLineOptions{
+    parser.isSet(draftUpdatesOption), parser.positionalArguments(), std::nullopt};
+
+  if (!parser.isSet(uiSnapshotOption))
   {
-    auto& prefs = PreferenceManager::instance();
-    prefs.set(Preferences::EnableDraftReleaseUpdates, true);
-    prefs.set(Preferences::IncludeDraftReleaseUpdates, true);
-    prefs.saveChanges();
+    if (parser.isSet(uiSnapshotThemeOption))
+    {
+      qCritical() << "--ui-snapshot-theme requires --ui-snapshot";
+      return std::nullopt;
+    }
+    return options;
   }
 
-  return openFiles(appController, parser.positionalArguments());
+  if (!options.fileNames.empty())
+  {
+    qCritical() << "--ui-snapshot cannot be combined with map files";
+    return std::nullopt;
+  }
+
+  const auto snapshotTheme = parser.value(uiSnapshotThemeOption).trimmed().toLower();
+  if (
+    snapshotTheme != QStringLiteral("system") && snapshotTheme != QStringLiteral("light")
+    && snapshotTheme != QStringLiteral("dark"))
+  {
+    qCritical() << "Unsupported UI snapshot theme:" << snapshotTheme;
+    return std::nullopt;
+  }
+
+  options.uiSnapshot =
+    UiSnapshotCommandLineOptions{parser.value(uiSnapshotOption), snapshotTheme};
+  return options;
+}
+
+WelcomeWindow* findWelcomeWindow()
+{
+  for (auto* widget : QApplication::topLevelWidgets())
+  {
+    if (auto* welcomeWindow = qobject_cast<WelcomeWindow*>(widget))
+    {
+      return welcomeWindow;
+    }
+  }
+  return nullptr;
+}
+
+void scheduleUiSnapshot(QApplication& app, const UiSnapshotCommandLineOptions& options)
+{
+  QTimer::singleShot(0, &app, [&app, options]() {
+    auto* welcomeWindow = findWelcomeWindow();
+    if (welcomeWindow == nullptr)
+    {
+      qCritical() << "UI snapshot target was not created: welcome";
+      app.exit(3);
+      return;
+    }
+
+    welcomeWindow->ensurePolished();
+    welcomeWindow->update();
+    const auto guardedWindow = QPointer<WelcomeWindow>{welcomeWindow};
+    QTimer::singleShot(100, &app, [&app, guardedWindow, options]() {
+      if (guardedWindow.isNull())
+      {
+        qCritical() << "UI snapshot target was destroyed before capture";
+        app.exit(3);
+        return;
+      }
+
+      auto error = QString{};
+      const auto snapshotOptions = UiSnapshotOptions{
+        options.outputPath,
+        "welcome",
+        options.theme,
+        qEnvironmentVariable("QT_SCALE_FACTOR", "system")};
+      if (!saveUiSnapshot(*guardedWindow, snapshotOptions, &error))
+      {
+        qCritical().noquote() << "UI snapshot failed:" << error;
+        app.exit(4);
+        return;
+      }
+
+      qInfo().noquote() << "UI snapshot saved:" << options.outputPath;
+      app.exit(0);
+    });
+  });
+}
+
+void enableDraftReleaseUpdates()
+{
+  auto& prefs = PreferenceManager::instance();
+  prefs.set(Preferences::EnableDraftReleaseUpdates, true);
+  prefs.set(Preferences::IncludeDraftReleaseUpdates, true);
+  prefs.saveChanges();
 }
 
 
@@ -325,18 +478,52 @@ int main(int argc, char* argv[])
 
   installCrashHandlers();
 
+  const auto commandLineOptions = parseCommandLine(app);
+  if (!commandLineOptions)
+  {
+    return 2;
+  }
+
+  auto snapshotSettingsDirectory = std::unique_ptr<QTemporaryDir>{};
+  auto preferenceFilePath = pathAsQString(SystemPaths::preferenceFilePath());
+  if (commandLineOptions->uiSnapshot)
+  {
+    snapshotSettingsDirectory = std::make_unique<QTemporaryDir>();
+    if (!snapshotSettingsDirectory->isValid())
+    {
+      qCritical() << "Could not create isolated UI snapshot settings directory";
+      return 2;
+    }
+
+    QSettings::setPath(
+      QSettings::IniFormat, QSettings::UserScope, snapshotSettingsDirectory->path());
+    preferenceFilePath = snapshotSettingsDirectory->filePath("Preferences.json");
+  }
+
   // PreferenceManager is destroyed by TrenchBroomApp::~TrenchBroomApp()
   PreferenceManager::createInstance(
-    std::make_unique<QPreferenceStore>(pathAsQString(SystemPaths::preferenceFilePath())));
+    std::make_unique<QPreferenceStore>(preferenceFilePath));
 
   loadTranslations(app);
 
   // Styles must be loaded before creating the app controller, or they won't apply to
   // the welcome window, which the app controller creates.
-  const auto themeTokens = loadStyle(app);
-  loadStyleSheets(themeTokens);
+  auto themeOverride = std::optional<QString>{};
+  if (commandLineOptions->uiSnapshot)
+  {
+    themeOverride = commandLineOptions->uiSnapshot->theme;
+  }
+  const auto themeTokens = loadStyle(app, themeOverride);
+  if (auto error = QString{}; !loadStyleSheets(themeTokens, &error))
+  {
+    qWarning().noquote() << "Could not load application stylesheet:" << error;
+    if (commandLineOptions->uiSnapshot)
+    {
+      return 3;
+    }
+  }
 
-  auto appController = createAppController();
+  auto appController = createAppController(!commandLineOptions->uiSnapshot.has_value());
   auto crashReporter = CrashReporter{*appController};
   setContractViolationHandler(crashReporter);
 
@@ -346,10 +533,29 @@ int main(int argc, char* argv[])
   installFileEventFilter(*appController);
 #endif
 
+  if (commandLineOptions->enableDraftReleaseUpdates)
+  {
+    enableDraftReleaseUpdates();
+  }
+
+  if (commandLineOptions->uiSnapshot)
+  {
+    auto* welcomeWindow = findWelcomeWindow();
+    if (welcomeWindow == nullptr)
+    {
+      qCritical() << "UI snapshot target was not created: welcome";
+      return 3;
+    }
+    welcomeWindow->setAttribute(Qt::WA_DontShowOnScreen);
+    appController->showWelcomeWindow();
+    scheduleUiSnapshot(app, *commandLineOptions->uiSnapshot);
+    return app.exec();
+  }
+
   appController->askForAutoUpdates();
   appController->triggerAutoUpdateCheck();
 
-  if (!parseCommandLineAndOpenFiles(*appController))
+  if (!openFiles(*appController, commandLineOptions->fileNames))
   {
     appController->showWelcomeWindow();
   }

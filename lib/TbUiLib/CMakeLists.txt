@@ -233,6 +233,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ToolBox.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ToolBoxConnector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TwoPaneMapView.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UiSnapshot.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UvEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UvView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UpdateConfig.cpp
@@ -457,6 +458,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ToolBox.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ToolBoxConnector.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TwoPaneMapView.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UiSnapshot.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UvView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UpdateConfig.h

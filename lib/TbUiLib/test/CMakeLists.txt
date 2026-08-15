@@ -53,6 +53,7 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SystemPaths.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_TextOutputAdapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_Theme.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UiSnapshot.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_UpdateVersion.cpp
 
   PUBLIC FILE_SET cmd_tool TYPE HEADERS
