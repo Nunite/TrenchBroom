@@ -22,8 +22,9 @@
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QLineEdit>
-#include <QPushButton>
 #include <QScrollBar>
+#include <QToolButton>
+#include <QVBoxLayout>
 #include <QtGlobal>
 
 #include "base/PreferenceManager.h"
@@ -84,6 +85,7 @@ void EntityBrowser::createGui(AppController& appController)
   m_sortOrderChoice->addItem(
     tr("Usage"), QVariant::fromValue(mdl::EntityDefinitionSortOrder::Usage));
   m_sortOrderChoice->setCurrentIndex(0);
+  m_sortOrderChoice->setObjectName(QStringLiteral("EntityBrowser_Sort"));
   m_sortOrderChoice->setToolTip(tr("Select ordering criterion"));
   connect(
     m_sortOrderChoice, QOverload<int>::of(&QComboBox::activated), this, [&](int index) {
@@ -92,14 +94,22 @@ void EntityBrowser::createGui(AppController& appController)
       m_view->setSortOrder(sortOrder);
     });
 
-  m_groupButton = new QPushButton{tr("Group")};
+  m_groupButton = new QToolButton{};
+  m_groupButton->setText(tr("Group"));
+  m_groupButton->setObjectName(QStringLiteral("EntityBrowser_GroupToggle"));
+  m_groupButton->setProperty("browserFilterToggle", true);
+  m_groupButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
   m_groupButton->setToolTip(tr("Group entity definitions by category"));
   m_groupButton->setCheckable(true);
   connect(m_groupButton, &QAbstractButton::clicked, this, [&]() {
     m_view->setGroup(m_groupButton->isChecked());
   });
 
-  m_usedButton = new QPushButton{tr("Used")};
+  m_usedButton = new QToolButton{};
+  m_usedButton->setText(tr("Used"));
+  m_usedButton->setObjectName(QStringLiteral("EntityBrowser_UsedToggle"));
+  m_usedButton->setProperty("browserFilterToggle", true);
+  m_usedButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
   m_usedButton->setToolTip(tr("Only show entity definitions currently in use"));
   m_usedButton->setCheckable(true);
   connect(m_usedButton, &QAbstractButton::clicked, this, [&]() {
@@ -107,21 +117,31 @@ void EntityBrowser::createGui(AppController& appController)
   });
 
   m_filterBox = createSearchBox();
+  m_filterBox->setObjectName(QStringLiteral("EntityBrowser_Search"));
   connect(m_filterBox, &QLineEdit::textEdited, this, [&]() {
     m_view->setFilterText(m_filterBox->text().toStdString());
   });
 
-  auto* controlSizer = new QHBoxLayout{};
+  auto* filterRowSizer = new QHBoxLayout{};
+  filterRowSizer->setContentsMargins(0, 0, 0, 0);
+  filterRowSizer->setSpacing(LayoutConstants::NarrowHMargin);
+  filterRowSizer->addWidget(m_sortOrderChoice, 1);
+  filterRowSizer->addWidget(m_groupButton, 0);
+  filterRowSizer->addWidget(m_usedButton, 0);
+
+  auto* filterRow = new QWidget{};
+  filterRow->setObjectName(QStringLiteral("EntityBrowser_FilterRow"));
+  filterRow->setLayout(filterRowSizer);
+
+  auto* controlSizer = new QVBoxLayout{};
   controlSizer->setContentsMargins(
     LayoutConstants::NarrowHMargin,
     LayoutConstants::NarrowVMargin,
     LayoutConstants::NarrowHMargin,
     LayoutConstants::NarrowVMargin);
-  controlSizer->setSpacing(LayoutConstants::NarrowHMargin);
-  controlSizer->addWidget(m_sortOrderChoice, 0);
-  controlSizer->addWidget(m_groupButton, 0);
-  controlSizer->addWidget(m_usedButton, 0);
-  controlSizer->addWidget(m_filterBox, 1);
+  controlSizer->setSpacing(LayoutConstants::NarrowVMargin);
+  controlSizer->addWidget(m_filterBox, 0);
+  controlSizer->addWidget(filterRow, 0);
 
   auto* controls = new QWidget{};
   controls->setObjectName(QStringLiteral("EntityBrowser_Controls"));
@@ -131,8 +151,8 @@ void EntityBrowser::createGui(AppController& appController)
   auto* outerSizer = new QVBoxLayout{};
   outerSizer->setContentsMargins(0, 0, 0, 0);
   outerSizer->setSpacing(0);
-  outerSizer->addWidget(browserPanel, 1);
   outerSizer->addWidget(controls, 0);
+  outerSizer->addWidget(browserPanel, 1);
 
   setLayout(outerSizer);
 }

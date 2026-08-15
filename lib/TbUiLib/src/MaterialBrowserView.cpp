@@ -172,8 +172,11 @@ void MaterialBrowserView::doReloadLayout(Layout& layout)
   {
     for (const auto* collection : getCollections())
     {
-      layout.addGroup(collection->path().string(), float(fontSize) + 2.0f);
-      addMaterialsToLayout(layout, getMaterials(*collection), font);
+      if (const auto materials = getMaterials(*collection); !materials.empty())
+      {
+        layout.addGroup(collection->path().string(), float(fontSize) + 2.0f);
+        addMaterialsToLayout(layout, materials, font);
+      }
     }
   }
   else
@@ -311,6 +314,12 @@ void MaterialBrowserView::doRender(
 
   renderBounds(gl, layout, y, height);
   renderMaterials(gl, layout, y, height);
+}
+
+QString MaterialBrowserView::emptyMessage() const
+{
+  return !m_filterText.empty() || m_hideUnused ? tr("No matching materials")
+                                               : tr("No materials available");
 }
 
 bool MaterialBrowserView::shouldRenderFocusIndicator() const

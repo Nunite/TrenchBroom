@@ -122,11 +122,14 @@ private:
   void renderCellBackgrounds(gl::Gl& gl, float y, float height);
   void renderTitleBackgrounds(gl::Gl& gl, float y, float height);
   void renderTitleStrings(gl::Gl& gl, float y, float height);
+  bool layoutHasCells();
+  void renderEmptyMessage(gl::Gl& gl);
 
   virtual void doInitLayout(Layout& layout) = 0;
   virtual void doReloadLayout(Layout& layout) = 0;
   virtual void doClear();
   virtual void doRender(gl::Gl& gl, Layout& layout, float y, float height) = 0;
+  virtual QString emptyMessage() const;
   virtual void doLeftClick(Layout& layout, float x, float y);
   virtual void doDoubleClick(Layout& layout, float x, float y);
   virtual void doMouseMove(Layout& layout, float x, float y);

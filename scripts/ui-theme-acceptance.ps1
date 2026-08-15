@@ -6,7 +6,9 @@ param(
     "workbench",
     "outliner",
     "entity-browser",
+    "entity-browser-empty",
     "face-inspector",
+    "material-browser-empty",
     "supporting",
     "command-palette",
     "preferences",
@@ -144,13 +146,15 @@ foreach ($target in $normalizedTargets) {
       "workbench",
       "outliner",
       "entity-browser",
+      "entity-browser-empty",
       "face-inspector",
+      "material-browser-empty",
       "supporting",
       "command-palette",
       "preferences",
       "preferences-colors"
     )) {
-    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, entity-browser, face-inspector, supporting, command-palette, preferences, or preferences-colors."
+    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, supporting, command-palette, preferences, or preferences-colors."
   }
 }
 foreach ($theme in $Themes) {
@@ -185,7 +189,9 @@ $resolvedMapPath = if (
   $normalizedTargets -contains "workbench" -or
   $normalizedTargets -contains "outliner" -or
   $normalizedTargets -contains "entity-browser" -or
+  $normalizedTargets -contains "entity-browser-empty" -or
   $normalizedTargets -contains "face-inspector" -or
+  $normalizedTargets -contains "material-browser-empty" -or
   $normalizedTargets -contains "supporting" -or
   $normalizedTargets -contains "command-palette") {
   Resolve-Path -Path $MapPath
@@ -231,7 +237,9 @@ foreach ($target in $normalizedTargets) {
         $target -eq "workbench" -or
         $target -eq "outliner" -or
         $target -eq "entity-browser" -or
+        $target -eq "entity-browser-empty" -or
         $target -eq "face-inspector" -or
+        $target -eq "material-browser-empty" -or
         $target -eq "supporting" -or
         $target -eq "command-palette") {
         $processInfo.Arguments += " `"$($resolvedMapPath.Path)`""

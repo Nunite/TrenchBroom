@@ -26,10 +26,10 @@
 #include <filesystem>
 #include <string>
 
-class QPushButton;
 class QComboBox;
 class QLineEdit;
 class QScrollBar;
+class QToolButton;
 
 namespace tb
 {
@@ -51,8 +51,8 @@ class MaterialBrowser : public QWidget
 private:
   MapDocument& m_document;
   QComboBox* m_sortOrderChoice = nullptr;
-  QPushButton* m_groupButton = nullptr;
-  QPushButton* m_usedButton = nullptr;
+  QToolButton* m_groupButton = nullptr;
+  QToolButton* m_usedButton = nullptr;
   QLineEdit* m_filterBox = nullptr;
   QScrollBar* m_scrollBar = nullptr;
   MaterialBrowserView* m_view = nullptr;

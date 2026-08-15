@@ -24,6 +24,7 @@
 #include <QDebug>
 #include <QEvent>
 #include <QFile>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -318,8 +319,9 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "system"};
   const auto uiSnapshotPageOption = QCommandLineOption{
     QStringList{"ui-snapshot-page"},
-    "Select the surface to capture: map, outliner, entity-browser, face-inspector, "
-    "supporting, command-palette, preferences, or preferences-colors.",
+    "Select the surface to capture: map, outliner, entity-browser, "
+    "entity-browser-empty, face-inspector, material-browser-empty, supporting, "
+    "command-palette, preferences, or preferences-colors.",
     "page",
     "map"};
 
@@ -363,7 +365,9 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
   if (
     snapshotPage != QStringLiteral("map") && snapshotPage != QStringLiteral("outliner")
     && snapshotPage != QStringLiteral("entity-browser")
+    && snapshotPage != QStringLiteral("entity-browser-empty")
     && snapshotPage != QStringLiteral("face-inspector")
+    && snapshotPage != QStringLiteral("material-browser-empty")
     && snapshotPage != QStringLiteral("supporting")
     && snapshotPage != QStringLiteral("command-palette")
     && snapshotPage != QStringLiteral("preferences")
@@ -444,6 +448,14 @@ void configureSupportingSnapshot(QWidget& targetWidget)
   }
 }
 
+bool isInspectorSnapshotTarget(const QString& targetName)
+{
+  return targetName == QStringLiteral("entity-browser")
+         || targetName == QStringLiteral("entity-browser-empty")
+         || targetName == QStringLiteral("face-inspector")
+         || targetName == QStringLiteral("material-browser-empty");
+}
+
 void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName)
 {
   auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
@@ -452,14 +464,26 @@ void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName
     return;
   }
 
+  const auto showEntityBrowser = targetName.startsWith(QStringLiteral("entity-browser"));
   mapWindow->switchToInspectorPage(
-    targetName == QStringLiteral("entity-browser") ? InspectorPage::Entity
-                                                   : InspectorPage::Face);
+    showEntityBrowser ? InspectorPage::Entity : InspectorPage::Face);
   if (
     auto* splitter =
       mapWindow->findChild<QSplitter*>(QStringLiteral("MapWindow_HorizontalSplitter")))
   {
     splitter->setSizes(QList<int>{940, 500});
+  }
+
+  if (targetName.endsWith(QStringLiteral("-empty")))
+  {
+    const auto searchName = showEntityBrowser ? QStringLiteral("EntityBrowser_Search")
+                                              : QStringLiteral("MaterialBrowser_Search");
+    if (auto* search = mapWindow->findChild<QLineEdit*>(searchName))
+    {
+      const auto filterText = QStringLiteral("__ui_snapshot_no_match__");
+      search->setText(filterText);
+      search->textEdited(filterText);
+    }
   }
 }
 
@@ -497,9 +521,7 @@ void scheduleUiSnapshot(
     {
       configureSupportingSnapshot(*guardedWidget);
     }
-    else if (
-      targetName == QStringLiteral("entity-browser")
-      || targetName == QStringLiteral("face-inspector"))
+    else if (isInspectorSnapshotTarget(targetName))
     {
       configureInspectorSnapshot(*guardedWidget, targetName);
     }
@@ -525,9 +547,7 @@ void scheduleUiSnapshot(
       {
         configureSupportingSnapshot(*guardedWidget);
       }
-      else if (
-        targetName == QStringLiteral("entity-browser")
-        || targetName == QStringLiteral("face-inspector"))
+      else if (isInspectorSnapshotTarget(targetName))
       {
         configureInspectorSnapshot(*guardedWidget, targetName);
       }
@@ -755,9 +775,7 @@ int main(int argc, char* argv[])
             {
               configureSupportingSnapshot(*mapWindow);
             }
-            else if (
-              commandLineOptions->uiSnapshot->page == QStringLiteral("entity-browser")
-              || commandLineOptions->uiSnapshot->page == QStringLiteral("face-inspector"))
+            else if (isInspectorSnapshotTarget(commandLineOptions->uiSnapshot->page))
             {
               configureInspectorSnapshot(
                 *mapWindow, commandLineOptions->uiSnapshot->page);

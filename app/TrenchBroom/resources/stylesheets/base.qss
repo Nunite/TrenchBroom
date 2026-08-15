@@ -398,7 +398,46 @@ QWidget#ModelBrowser_Controls {
 QWidget#EntityBrowser_Controls,
 QWidget#MaterialBrowser_Controls {
   background: @tb-panel-background;
-  border-top: 1px solid @tb-border;
+  border-bottom: 1px solid @tb-border;
+}
+
+QWidget#EntityBrowser_FilterRow,
+QWidget#MaterialBrowser_FilterRow {
+  background: transparent;
+}
+
+QLineEdit#EntityBrowser_Search,
+QLineEdit#MaterialBrowser_Search,
+QComboBox#EntityBrowser_Sort,
+QComboBox#MaterialBrowser_Sort {
+  min-height: 24px;
+}
+
+QToolButton[browserFilterToggle="true"] {
+  background: @tb-button-background;
+  border: 1px solid @tb-border;
+  border-radius: 5px;
+  color: @tb-secondary-text;
+  min-height: 24px;
+  min-width: 48px;
+  padding: 0 7px;
+}
+
+QToolButton[browserFilterToggle="true"]:hover {
+  background: @tb-hover-background;
+  border-color: @tb-strong-border;
+  color: @tb-text;
+}
+
+QToolButton[browserFilterToggle="true"]:focus {
+  border-color: @tb-focus-border;
+}
+
+QToolButton[browserFilterToggle="true"]:pressed,
+QToolButton[browserFilterToggle="true"]:checked {
+  background: @tb-pressed-background;
+  border-color: @tb-focus-border;
+  color: @tb-text;
 }
 
 QWidget#ModelBrowser_BreadcrumbBar {

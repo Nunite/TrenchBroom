@@ -23,6 +23,7 @@
 #include <QComboBox>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLayout>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
@@ -229,8 +230,47 @@ TEST_CASE("MapWindow")
     CHECK(window.findChild<QWidget*>("FaceAttribsEditor_MaterialName") != nullptr);
     CHECK(window.findChild<QWidget*>("UvEditor") != nullptr);
     CHECK(window.findChild<QWidget*>("UvEditor_Toolbar") != nullptr);
-    CHECK(window.findChild<QWidget*>("MaterialBrowser_Controls") != nullptr);
-    CHECK(window.findChild<QWidget*>("EntityBrowser_Controls") != nullptr);
+    for (const auto& browserName : {QString{"EntityBrowser"}, QString{"MaterialBrowser"}})
+    {
+      auto* browser = window.findChild<QWidget*>(browserName);
+      auto* controls =
+        window.findChild<QWidget*>(browserName + QStringLiteral("_Controls"));
+      auto* search =
+        window.findChild<QLineEdit*>(browserName + QStringLiteral("_Search"));
+      auto* filterRow =
+        window.findChild<QWidget*>(browserName + QStringLiteral("_FilterRow"));
+      auto* sort = window.findChild<QComboBox*>(browserName + QStringLiteral("_Sort"));
+      auto* groupToggle =
+        window.findChild<QToolButton*>(browserName + QStringLiteral("_GroupToggle"));
+      auto* usedToggle =
+        window.findChild<QToolButton*>(browserName + QStringLiteral("_UsedToggle"));
+
+      REQUIRE(browser != nullptr);
+      REQUIRE(controls != nullptr);
+      REQUIRE(search != nullptr);
+      REQUIRE(filterRow != nullptr);
+      REQUIRE(sort != nullptr);
+      REQUIRE(groupToggle != nullptr);
+      REQUIRE(usedToggle != nullptr);
+
+      CHECK(controls->parentWidget() == browser);
+      CHECK(browser->layout()->indexOf(controls) == 0);
+      CHECK(controls->layout()->count() == 2);
+      CHECK(controls->layout()->indexOf(search) == 0);
+      CHECK(controls->layout()->indexOf(filterRow) == 1);
+      CHECK(filterRow->layout()->count() == 3);
+      CHECK(filterRow->layout()->indexOf(sort) == 0);
+      CHECK(filterRow->layout()->indexOf(groupToggle) == 1);
+      CHECK(filterRow->layout()->indexOf(usedToggle) == 2);
+      CHECK(search->placeholderText() == "Search...");
+      CHECK(sort->count() == 2);
+      CHECK(groupToggle->isCheckable());
+      CHECK(usedToggle->isCheckable());
+      CHECK(groupToggle->property("browserFilterToggle").toBool());
+      CHECK(usedToggle->property("browserFilterToggle").toBool());
+      CHECK(groupToggle->toolButtonStyle() == Qt::ToolButtonTextOnly);
+      CHECK(usedToggle->toolButtonStyle() == Qt::ToolButtonTextOnly);
+    }
   }
 
   SECTION("uses a synchronized vertical inspector navigation rail")

@@ -180,6 +180,23 @@ Status: complete
 Expected benefit: high. The Inspector now has a recognizable workbench navigation layer
 without taking on the platform risk of a custom title bar or general docking system.
 
+### Phase 4.3: Browser Controls And Empty States
+
+Status: complete
+
+- [x] Move Entity and Material browser controls above their content and split them into a
+      full-width search row plus a stable sort/filter row for narrow Inspector widths.
+- [x] Replace generic filter push buttons with compact rounded toggle controls and shared
+      palette-driven hover, focus, pressed, and checked states.
+- [x] Add centered theme-aware empty and no-match messages to OpenGL cell browsers while
+      keeping filtering, selection, drag-and-drop, and resource loading behavior unchanged.
+- [x] Add deterministic Entity and Material empty-result snapshot targets and verify normal
+      and empty browser states in Light and Dark themes at 100%, 150%, and 200% scale.
+
+Expected benefit: medium to high. Search and filter actions now read as a deliberate browser
+toolbar, stay usable in the constrained Inspector, and provide clear feedback instead of a
+blank content region when filters have no results.
+
 ### Phase 5: Optional Structural Work
 
 Status: deferred
@@ -212,13 +229,13 @@ testing shows that the earlier phases do not meet the product goal.
 - Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
   capture the isolated welcome window, representative map workbench, and deterministic
   expanded Outliner/entity-properties, Entity Browser, Face Inspector, supporting
-  Assets panel, Command Palette, and Preferences View and Colors states in light and
-  dark themes at 100%, 150%, and 200% scale. The 54-state matrix validates
-  image dimensions, device-pixel ratio, nonblank pixels, font support, and image hashes,
-  then writes PNG and JSON evidence plus a labeled visual-comparison contact sheet under
-  `build-release-codex\codex-logs\ui-theme-acceptance`.
+  Assets panel, Command Palette, Preferences View and Colors, and Entity/Material empty
+  result states in light and dark themes at 100%, 150%, and 200% scale. The 66-state
+  matrix validates image dimensions, device-pixel ratio, nonblank pixels, font support,
+  and image hashes, then writes PNG and JSON evidence plus a labeled visual-comparison
+  contact sheet under `build-release-codex\codex-logs\ui-theme-acceptance`.
 - Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark
-  [--ui-snapshot-page map|outliner|entity-browser|face-inspector|supporting|command-palette|preferences|preferences-colors]
+  [--ui-snapshot-page map|outliner|entity-browser|entity-browser-empty|face-inspector|material-browser-empty|supporting|command-palette|preferences|preferences-colors]
   [map-file]` for a focused
   single capture. Omitting the map captures Welcome unless `preferences` or
   `preferences-colors` is selected; supplying one captures the workbench. The Outliner
@@ -294,4 +311,7 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Verified | Passed `Theme`, `ModelBrowserView`, and `MapWindow` (162 assertions), built Release `TrenchBroom`, and visually confirmed the 18 affected Light/Dark states at 100%, 150%, and 200% in `20260816-002459-821` and `20260816-002756-942`. |
 | 2026-08-16 | Complete | Replaced the Inspector's visible horizontal tabs with a 44 px vertical icon rail and synchronized page headings while retaining `TabBook` state, shortcuts, plugin ownership, accessibility, and keyboard activation. |
 | 2026-08-16 | Verified | Passed `Theme`, `MapWindow`, and `TabBook` (175 assertions), built Release `TrenchBroom`, and visually confirmed 24 representative Inspector states at 100%, 150%, and 200% in `20260816-004245-712` and `20260816-004359-063`. |
-| 2026-08-16 | Next | Collect hands-on feedback on the navigation rail before refining browser search/filter and empty/loading states or starting a deferred Phase 5 structural experiment. |
+| 2026-08-16 | Complete | Moved Entity and Material search/filter controls into compact top-mounted two-row toolbars with dedicated rounded toggle states. |
+| 2026-08-16 | Complete | Added shared theme-aware OpenGL browser empty messages and deterministic Entity/Material empty-result snapshot targets, expanding the default matrix from 54 to 66 states. |
+| 2026-08-16 | Verified | Passed `Theme`, `MapWindow`, and `ModelBrowserView` (238 assertions), built Release `TrenchBroom`, and visually confirmed 24 normal and empty browser states at 100%, 150%, and 200% in `20260816-010203-138` and `20260816-010310-148`. |
+| 2026-08-16 | Next | Collect hands-on feedback on the Inspector navigation and browser workflows before starting a deferred Phase 5 structural experiment. |

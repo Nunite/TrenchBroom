@@ -51,6 +51,7 @@
 
 #include <algorithm>
 #include <map>
+#include <ranges>
 
 namespace tb::ui
 {
@@ -433,6 +434,10 @@ void CellView::renderContents(gl::Gl& gl)
   gl.frontFace(GL_CCW);
   renderTitleBackgrounds(gl, y, h);
   renderTitleStrings(gl, y, h);
+  if (!layoutHasCells())
+  {
+    renderEmptyMessage(gl);
+  }
 }
 
 void CellView::setupGL(gl::Gl& gl)
@@ -687,7 +692,60 @@ void CellView::renderTitleStrings(gl::Gl& gl, float y, float height)
   }
 }
 
+bool CellView::layoutHasCells()
+{
+  return std::ranges::any_of(m_layout.groups(), [](const auto& group) {
+    return std::ranges::any_of(
+      group.rows(), [](const auto& row) { return !row.cells().empty(); });
+  });
+}
+
+void CellView::renderEmptyMessage(gl::Gl& gl)
+{
+  const auto message = emptyMessage().toStdString();
+  if (message.empty())
+  {
+    return;
+  }
+
+  using TextVertex = gl::VertexTypes::P2Uv2C4::Vertex;
+
+  const auto defaultFont = gl::FontDescriptor{
+    pref(Preferences::RendererFontPath), size_t(pref(Preferences::BrowserFontSize))};
+  const auto maxTextWidth = std::max(float(width()) - 24.0f, 1.0f);
+  const auto descriptor =
+    fontManager().selectFontSize(defaultFont, message, maxTextWidth, 6);
+  auto& font = fontManager().font(descriptor);
+  const auto textSize = font.measure(message);
+  const auto offset = vm::vec2f{
+    std::max((float(width()) - textSize.x()) / 2.0f, 0.0f),
+    std::max((float(height()) - textSize.y()) / 2.0f, 0.0f)};
+  const auto color = RgbaF{browserTextColor(palette()).to<RgbF>(), 0.66f}.toVec();
+  const auto quads = font.quads(message, false, offset);
+  auto vertices = TextVertex::toList(kdl::views::zip(
+    quads | kdl::views::stride(2),
+    quads | std::views::drop(1) | kdl::views::stride(2),
+    kdl::views::repeat(color)));
+
+  auto vertexArray = gl::VertexArray::ref(vertices);
+  vertexArray.prepare(gl, vboManager());
+
+  auto shader = gl::ActiveShader{gl, shaderManager(), gl::Shaders::ColoredTextShader};
+  shader.set("Texture", 0);
+  if (vertexArray.setup(gl, shader.program()))
+  {
+    font.activate(gl);
+    vertexArray.render(gl, gl::PrimType::Quads);
+    vertexArray.cleanup(gl, shader.program());
+    font.deactivate(gl);
+  }
+}
+
 void CellView::doClear() {}
+QString CellView::emptyMessage() const
+{
+  return {};
+}
 void CellView::doLeftClick(Layout&, float, float) {}
 void CellView::doDoubleClick(Layout&, float, float) {}
 void CellView::doMouseMove(Layout&, float, float) {}

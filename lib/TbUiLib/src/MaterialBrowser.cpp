@@ -20,9 +20,10 @@
 #include "ui/MaterialBrowser.h"
 
 #include <QComboBox>
+#include <QHBoxLayout>
 #include <QLineEdit>
-#include <QPushButton>
 #include <QScrollBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QtGlobal>
 
@@ -125,6 +126,7 @@ void MaterialBrowser::createGui(AppController& appController)
   m_sortOrderChoice->addItem(tr("Name"), QVariant::fromValue(MaterialSortOrder::Name));
   m_sortOrderChoice->addItem(tr("Usage"), QVariant::fromValue(MaterialSortOrder::Usage));
   m_sortOrderChoice->setCurrentIndex(0);
+  m_sortOrderChoice->setObjectName(QStringLiteral("MaterialBrowser_Sort"));
   m_sortOrderChoice->setToolTip(tr("Select ordering criterion"));
   connect(
     m_sortOrderChoice, QOverload<int>::of(&QComboBox::activated), this, [&](int index) {
@@ -133,14 +135,22 @@ void MaterialBrowser::createGui(AppController& appController)
       m_view->setSortOrder(sortOrder);
     });
 
-  m_groupButton = new QPushButton{tr("Group")};
+  m_groupButton = new QToolButton{};
+  m_groupButton->setText(tr("Group"));
+  m_groupButton->setObjectName(QStringLiteral("MaterialBrowser_GroupToggle"));
+  m_groupButton->setProperty("browserFilterToggle", true);
+  m_groupButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
   m_groupButton->setToolTip(tr("Group materials by material collection"));
   m_groupButton->setCheckable(true);
   connect(m_groupButton, &QAbstractButton::clicked, this, [&]() {
     m_view->setGroup(m_groupButton->isChecked());
   });
 
-  m_usedButton = new QPushButton{tr("Used")};
+  m_usedButton = new QToolButton{};
+  m_usedButton->setText(tr("Used"));
+  m_usedButton->setObjectName(QStringLiteral("MaterialBrowser_UsedToggle"));
+  m_usedButton->setProperty("browserFilterToggle", true);
+  m_usedButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
   m_usedButton->setToolTip(tr("Only show materials currently in use"));
   m_usedButton->setCheckable(true);
   connect(m_usedButton, &QAbstractButton::clicked, this, [&]() {
@@ -148,21 +158,31 @@ void MaterialBrowser::createGui(AppController& appController)
   });
 
   m_filterBox = createSearchBox();
+  m_filterBox->setObjectName(QStringLiteral("MaterialBrowser_Search"));
   connect(m_filterBox, &QLineEdit::textEdited, this, [&]() {
     m_view->setFilterText(m_filterBox->text().toStdString());
   });
 
-  auto* controlLayout = new QHBoxLayout{};
+  auto* filterRowLayout = new QHBoxLayout{};
+  filterRowLayout->setContentsMargins(0, 0, 0, 0);
+  filterRowLayout->setSpacing(LayoutConstants::NarrowHMargin);
+  filterRowLayout->addWidget(m_sortOrderChoice, 1);
+  filterRowLayout->addWidget(m_groupButton, 0);
+  filterRowLayout->addWidget(m_usedButton, 0);
+
+  auto* filterRow = new QWidget{};
+  filterRow->setObjectName(QStringLiteral("MaterialBrowser_FilterRow"));
+  filterRow->setLayout(filterRowLayout);
+
+  auto* controlLayout = new QVBoxLayout{};
   controlLayout->setContentsMargins(
     LayoutConstants::NarrowHMargin,
     LayoutConstants::NarrowVMargin,
     LayoutConstants::NarrowHMargin,
     LayoutConstants::NarrowVMargin);
-  controlLayout->setSpacing(LayoutConstants::NarrowHMargin);
-  controlLayout->addWidget(m_sortOrderChoice);
-  controlLayout->addWidget(m_groupButton);
-  controlLayout->addWidget(m_usedButton);
-  controlLayout->addWidget(m_filterBox, 1);
+  controlLayout->setSpacing(LayoutConstants::NarrowVMargin);
+  controlLayout->addWidget(m_filterBox, 0);
+  controlLayout->addWidget(filterRow, 0);
 
   auto* controls = new QWidget{};
   controls->setObjectName(QStringLiteral("MaterialBrowser_Controls"));
@@ -172,8 +192,8 @@ void MaterialBrowser::createGui(AppController& appController)
   auto* outerLayout = new QVBoxLayout{};
   outerLayout->setContentsMargins(0, 0, 0, 0);
   outerLayout->setSpacing(0);
-  outerLayout->addWidget(browserPanel, 1);
   outerLayout->addWidget(controls, 0);
+  outerLayout->addWidget(browserPanel, 1);
 
   setLayout(outerLayout);
 }

@@ -23,10 +23,10 @@
 
 #include "base/NotifierConnection.h"
 
-class QPushButton;
 class QComboBox;
 class QLineEdit;
 class QScrollBar;
+class QToolButton;
 
 namespace tb::ui
 {
@@ -40,8 +40,8 @@ class EntityBrowser : public QWidget
 private:
   MapDocument& m_document;
   QComboBox* m_sortOrderChoice = nullptr;
-  QPushButton* m_groupButton = nullptr;
-  QPushButton* m_usedButton = nullptr;
+  QToolButton* m_groupButton = nullptr;
+  QToolButton* m_usedButton = nullptr;
   QLineEdit* m_filterBox = nullptr;
   QScrollBar* m_scrollBar = nullptr;
   EntityBrowserView* m_view = nullptr;

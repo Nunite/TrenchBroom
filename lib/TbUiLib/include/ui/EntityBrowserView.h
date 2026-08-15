@@ -133,6 +133,7 @@ private:
 
   void doClear() override;
   void doRender(gl::Gl& gl, Layout& layout, float y, float height) override;
+  QString emptyMessage() const override;
   bool shouldRenderFocusIndicator() const override;
   Color getBackgroundColor() override;
 

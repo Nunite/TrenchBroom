@@ -308,6 +308,12 @@ void EntityBrowserView::doRender(
   renderModels(gl, layout, y, height, transformation);
 }
 
+QString EntityBrowserView::emptyMessage() const
+{
+  return !m_filterText.empty() || m_hideUnused ? tr("No matching entities")
+                                               : tr("No entity definitions available");
+}
+
 bool EntityBrowserView::shouldRenderFocusIndicator() const
 {
   return false;
