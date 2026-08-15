@@ -1532,9 +1532,7 @@ void MapViewBase::processEvent(const KeyEvent& event)
 
 void MapViewBase::processEvent(const MouseEvent& event)
 {
-  if (
-    smartFaceSelectionPanel() && event.button != MouseEvent::Button::None
-    && event.button != MouseEvent::Button::Middle)
+  if (smartFaceSelectionPanel() && event.button == MouseEvent::Button::Left)
   {
     return;
   }
