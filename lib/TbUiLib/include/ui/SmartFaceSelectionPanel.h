@@ -28,7 +28,6 @@
 #include <vector>
 
 class QComboBox;
-class QCheckBox;
 class QDoubleSpinBox;
 class QLabel;
 class QToolButton;
@@ -58,9 +57,6 @@ private:
   QComboBox* m_operation = nullptr;
   QDoubleSpinBox* m_angle = nullptr;
   QDoubleSpinBox* m_gap = nullptr;
-  QCheckBox* m_followSeedDirection = nullptr;
-  QCheckBox* m_stopAtBranches = nullptr;
-  QCheckBox* m_sameMaterial = nullptr;
 
   std::function<void()> m_parametersDidChange;
   std::function<void()> m_confirm;
