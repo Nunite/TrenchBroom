@@ -114,6 +114,7 @@ public:
   void setFilterText(const std::string& filterText);
 
 private:
+  void resizeEvent(QResizeEvent* event) override;
   void doInitLayout(Layout& layout) override;
   void doReloadLayout(Layout& layout) override;
 

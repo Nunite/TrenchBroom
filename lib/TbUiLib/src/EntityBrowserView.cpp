@@ -61,6 +61,33 @@
 
 namespace tb::ui
 {
+namespace
+{
+constexpr auto EntityBrowserOuterMargin = 5.0f;
+constexpr auto EntityBrowserCellMargin = 5.0f;
+constexpr auto PreferredEntityCellWidth = 93.0f;
+constexpr auto MinimumEntityCellWidth = 82.0f;
+
+float responsiveEntityCellWidth(const float layoutWidth)
+{
+  const auto availableWidth =
+    std::max(1.0f, layoutWidth - 2.0f * EntityBrowserOuterMargin);
+  const auto preferredColumnCount = std::max(
+    1,
+    int(std::round(
+      (availableWidth + EntityBrowserCellMargin)
+      / (PreferredEntityCellWidth + EntityBrowserCellMargin))));
+  const auto maximumColumnCount = std::max(
+    1,
+    int(std::floor(
+      (availableWidth + EntityBrowserCellMargin)
+      / (MinimumEntityCellWidth + EntityBrowserCellMargin))));
+  const auto columnCount = std::min(preferredColumnCount, maximumColumnCount);
+
+  return (availableWidth - float(columnCount - 1) * EntityBrowserCellMargin)
+         / float(columnCount);
+}
+} // namespace
 
 EntityBrowserView::EntityBrowserView(
   AppController& appController, QScrollBar* scrollBar, MapDocument& document)
@@ -127,13 +154,20 @@ void EntityBrowserView::setFilterText(const std::string& filterText)
   }
 }
 
+void EntityBrowserView::resizeEvent(QResizeEvent* event)
+{
+  CellView::resizeEvent(event);
+  invalidate();
+}
+
 void EntityBrowserView::doInitLayout(Layout& layout)
 {
-  layout.setOuterMargin(5.0f);
+  layout.setOuterMargin(EntityBrowserOuterMargin);
   layout.setGroupMargin(5.0f);
   layout.setRowMargin(5.0f);
-  layout.setCellMargin(5.0f);
-  layout.setCellWidth(93.0f, 93.0f);
+  layout.setCellMargin(EntityBrowserCellMargin);
+  const auto cellWidth = responsiveEntityCellWidth(layout.width());
+  layout.setCellWidth(cellWidth, cellWidth);
   layout.setCellHeight(64.0f, 128.0f);
   layout.setMaxUpScale(1.5f);
 }
