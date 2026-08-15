@@ -29,6 +29,7 @@
 #include "kd/ranges/cartesian_product_view.h"
 #include "kd/ranges/to.h"
 #include "kd/stable_remove_duplicates.h"
+#include "kd/string_compare.h"
 #include "kd/vector_utils.h"
 
 #include "vm/bbox.h"
@@ -531,6 +532,7 @@ std::vector<BrushFaceHandle> collectSmartFaceSelection(
   {
     BrushFaceHandle handle;
     vm::vec3d normal;
+    vm::vec3d center;
     std::vector<vm::segment3d> edges;
     vm::bbox3d bounds;
   };
@@ -547,6 +549,7 @@ std::vector<BrushFaceHandle> collectSmartFaceSelection(
     return Candidate{
       handle,
       handle.face().normal(),
+      handle.face().center(),
       edges | kdl::ranges::to<std::vector>(),
       builder.bounds().expand(gapTolerance + epsilon),
     };
@@ -591,6 +594,14 @@ std::vector<BrushFaceHandle> collectSmartFaceSelection(
     });
   };
 
+  const auto materialMatches = [&](const Candidate& candidate) {
+    return !options.sameMaterial
+           || std::ranges::any_of(seedFaces, [&](const auto& seedFace) {
+                return kdl::ci::str_is_equal(
+                  seedFace.face().materialName(), candidate.handle.face().materialName());
+              });
+  };
+
   auto nodeCache = std::unordered_map<Node*, std::vector<BrushFaceHandle>>{};
   const auto selectableFacesOf = [&](Node* node) -> const std::vector<BrushFaceHandle>& {
     auto [it, inserted] = nodeCache.emplace(node, std::vector<BrushFaceHandle>{});
@@ -601,27 +612,13 @@ std::vector<BrushFaceHandle> collectSmartFaceSelection(
     return it->second;
   };
 
-  auto result = std::vector<BrushFaceHandle>{};
-  auto visited = kdl::vector_set<BrushFaceHandle>{};
-  auto pending = std::vector<Candidate>{};
-  for (const auto& seedFace : seedFaces)
-  {
-    if (visited.insert(seedFace).second)
-    {
-      pending.push_back(makeCandidate(seedFace));
-    }
-  }
-
-  while (!pending.empty())
-  {
-    const auto current = kdl::vec_pop_back(pending);
-    result.push_back(current.handle);
-
+  const auto findNeighbors = [&](const Candidate& current) {
+    auto neighbors = std::vector<Candidate>{};
     for (auto* node : nodeTree.find_intersectors(current.bounds))
     {
       for (const auto& handle : selectableFacesOf(node))
       {
-        if (visited.count(handle) != 0)
+        if (handle == current.handle)
         {
           continue;
         }
@@ -629,11 +626,149 @@ std::vector<BrushFaceHandle> collectSmartFaceSelection(
         auto candidate = makeCandidate(handle);
         if (
           current.bounds.intersects(candidate.bounds) && normalMatches(current, candidate)
-          && edgesWithinTolerance(current.edges, candidate.edges))
+          && edgesWithinTolerance(current.edges, candidate.edges)
+          && materialMatches(candidate))
         {
-          visited.insert(handle);
-          pending.push_back(std::move(candidate));
+          neighbors.push_back(std::move(candidate));
         }
+      }
+    }
+    return neighbors;
+  };
+
+  auto result = std::vector<BrushFaceHandle>{};
+  auto visited = kdl::vector_set<BrushFaceHandle>{};
+  auto seeds = std::vector<Candidate>{};
+  for (const auto& seedFace : seedFaces)
+  {
+    if (visited.insert(seedFace).second)
+    {
+      result.push_back(seedFace);
+      seeds.push_back(makeCandidate(seedFace));
+    }
+  }
+
+  struct DirectionalCandidate
+  {
+    Candidate candidate;
+    vm::vec3d direction;
+  };
+
+  const auto followSeedDirection = options.followSeedDirection && seeds.size() >= 2u;
+  if (followSeedDirection)
+  {
+    auto firstSeedIndex = size_t{0u};
+    auto secondSeedIndex = size_t{1u};
+    auto maxDistanceSquared = 0.0;
+    for (auto i = size_t{0u}; i < seeds.size(); ++i)
+    {
+      for (auto j = i + 1u; j < seeds.size(); ++j)
+      {
+        const auto distanceSquared =
+          vm::squared_length(seeds[i].center - seeds[j].center);
+        if (distanceSquared > maxDistanceSquared)
+        {
+          firstSeedIndex = i;
+          secondSeedIndex = j;
+          maxDistanceSquared = distanceSquared;
+        }
+      }
+    }
+
+    if (maxDistanceSquared <= epsilon * epsilon)
+    {
+      return result;
+    }
+
+    const auto outwardDirection = [&](
+                                    const size_t endpointIndex,
+                                    const size_t fallbackIndex) {
+      auto nearestIndex = fallbackIndex;
+      auto nearestDistanceSquared =
+        vm::squared_length(seeds[endpointIndex].center - seeds[fallbackIndex].center);
+      for (auto i = size_t{0u}; i < seeds.size(); ++i)
+      {
+        if (i == endpointIndex)
+        {
+          continue;
+        }
+
+        const auto distanceSquared =
+          vm::squared_length(seeds[endpointIndex].center - seeds[i].center);
+        if (
+          distanceSquared > epsilon * epsilon && distanceSquared < nearestDistanceSquared)
+        {
+          nearestIndex = i;
+          nearestDistanceSquared = distanceSquared;
+        }
+      }
+      return vm::normalize(seeds[endpointIndex].center - seeds[nearestIndex].center);
+    };
+
+    const auto firstDirection = outwardDirection(firstSeedIndex, secondSeedIndex);
+    const auto secondDirection = outwardDirection(secondSeedIndex, firstSeedIndex);
+    auto pending = std::vector<DirectionalCandidate>{
+      {seeds[firstSeedIndex], firstDirection}, {seeds[secondSeedIndex], secondDirection}};
+    const auto minDirectionDot = std::cos(vm::to_radians(maxAngle));
+
+    while (!pending.empty())
+    {
+      auto current = kdl::vec_pop_back(pending);
+      auto continuations = std::vector<DirectionalCandidate>{};
+      for (auto& candidate : findNeighbors(current.candidate))
+      {
+        if (visited.count(candidate.handle) != 0)
+        {
+          continue;
+        }
+
+        const auto delta = candidate.center - current.candidate.center;
+        if (vm::is_zero(delta, epsilon))
+        {
+          continue;
+        }
+
+        const auto direction = vm::normalize(delta);
+        if (vm::dot(current.direction, direction) + epsilon >= minDirectionDot)
+        {
+          continuations.push_back({std::move(candidate), direction});
+        }
+      }
+
+      if (options.stopAtBranches && continuations.size() > 1u)
+      {
+        continue;
+      }
+
+      for (auto& continuation : continuations)
+      {
+        if (visited.insert(continuation.candidate.handle).second)
+        {
+          result.push_back(continuation.candidate.handle);
+          pending.push_back(std::move(continuation));
+        }
+      }
+    }
+
+    return result;
+  }
+
+  auto pending = std::move(seeds);
+  while (!pending.empty())
+  {
+    const auto current = kdl::vec_pop_back(pending);
+    auto neighbors = findNeighbors(current);
+    if (options.stopAtBranches && neighbors.size() > 2u)
+    {
+      continue;
+    }
+
+    for (auto& candidate : neighbors)
+    {
+      if (visited.insert(candidate.handle).second)
+      {
+        result.push_back(candidate.handle);
+        pending.push_back(std::move(candidate));
       }
     }
   }

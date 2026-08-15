@@ -17,12 +17,20 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QPushButton>
 
+#include "kd/result.h"
+#include "mdl/BrushBuilder.h"
+#include "mdl/BrushNode.h"
+#include "mdl/MapFormat.h"
 #include "mdl/ModelUtils.h"
 #include "ui/SmartFaceSelectionPanel.h"
+
+#include "vm/bbox.h"
+#include "vm/vec.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -40,6 +48,9 @@ TEST_CASE("SmartFaceSelectionPanel")
   CHECK(panel.options().mode == mdl::SmartFaceSelectionMode::FaceStrip);
   CHECK(panel.options().angleTolerance == 15.0);
   CHECK(panel.options().gapTolerance == 0.0);
+  CHECK_FALSE(panel.options().followSeedDirection);
+  CHECK_FALSE(panel.options().stopAtBranches);
+  CHECK_FALSE(panel.options().sameMaterial);
   CHECK(panel.operation() == SmartFaceSelectionOperation::Replace);
   CHECK(panel.expanded());
   CHECK(changeCount == 0);
@@ -54,21 +65,36 @@ TEST_CASE("SmartFaceSelectionPanel")
     auto* angle =
       panel.findChild<QDoubleSpinBox*>(QStringLiteral("smartFaceSelectionAngle"));
     auto* gap = panel.findChild<QDoubleSpinBox*>(QStringLiteral("smartFaceSelectionGap"));
+    auto* followSeedDirection = panel.findChild<QCheckBox*>(
+      QStringLiteral("smartFaceSelectionFollowSeedDirection"));
+    auto* stopAtBranches =
+      panel.findChild<QCheckBox*>(QStringLiteral("smartFaceSelectionStopAtBranches"));
+    auto* sameMaterial =
+      panel.findChild<QCheckBox*>(QStringLiteral("smartFaceSelectionSameMaterial"));
     REQUIRE(mode != nullptr);
     REQUIRE(operation != nullptr);
     REQUIRE(angle != nullptr);
     REQUIRE(gap != nullptr);
+    REQUIRE(followSeedDirection != nullptr);
+    REQUIRE(stopAtBranches != nullptr);
+    REQUIRE(sameMaterial != nullptr);
+    CHECK_FALSE(followSeedDirection->isEnabled());
 
     mode->setCurrentIndex(1);
     operation->setCurrentIndex(2);
     angle->setValue(22.5);
     gap->setValue(1.25);
+    stopAtBranches->setChecked(true);
+    sameMaterial->setChecked(true);
 
     CHECK(panel.options().mode == mdl::SmartFaceSelectionMode::Parallel);
     CHECK(panel.options().angleTolerance == 22.5);
     CHECK(panel.options().gapTolerance == 1.25);
+    CHECK_FALSE(panel.options().followSeedDirection);
+    CHECK(panel.options().stopAtBranches);
+    CHECK(panel.options().sameMaterial);
     CHECK(panel.operation() == SmartFaceSelectionOperation::Remove);
-    CHECK(changeCount == 4);
+    CHECK(changeCount == 6);
   }
 
   SECTION("Panel can be collapsed and expanded")
@@ -78,6 +104,44 @@ TEST_CASE("SmartFaceSelectionPanel")
     panel.setExpanded(true);
     CHECK(panel.expanded());
     CHECK(changeCount == 2);
+  }
+
+  SECTION("Following seed direction requires two seed faces and face strip mode")
+  {
+    constexpr auto worldBounds = vm::bbox3d{8192.0};
+    const auto builder = mdl::BrushBuilder{mdl::MapFormat::Standard, worldBounds};
+    auto firstNode = mdl::BrushNode{
+      builder.createCuboid({{0, 0, 0}, {64, 64, 64}}, "material") | kdl::value()};
+    auto secondNode = mdl::BrushNode{
+      builder.createCuboid({{64, 0, 0}, {128, 64, 64}}, "material") | kdl::value()};
+    const auto topFace = [](auto& node) {
+      return mdl::BrushFaceHandle{&node, *node.brush().findFace(vm::vec3d{0, 0, 1})};
+    };
+
+    auto directedPanel = SmartFaceSelectionPanel{
+      {topFace(firstNode), topFace(secondNode)},
+      [&] { ++changeCount; },
+      [&] { ++confirmCount; },
+      [&] { ++cancelCount; }};
+    auto* followSeedDirection = directedPanel.findChild<QCheckBox*>(
+      QStringLiteral("smartFaceSelectionFollowSeedDirection"));
+    auto* mode =
+      directedPanel.findChild<QComboBox*>(QStringLiteral("smartFaceSelectionMode"));
+    REQUIRE(followSeedDirection != nullptr);
+    REQUIRE(mode != nullptr);
+
+    CHECK(followSeedDirection->isEnabled());
+    followSeedDirection->setChecked(true);
+    CHECK(directedPanel.options().followSeedDirection);
+
+    mode->setCurrentIndex(1);
+    CHECK_FALSE(followSeedDirection->isEnabled());
+    CHECK_FALSE(directedPanel.options().followSeedDirection);
+
+    mode->setCurrentIndex(0);
+    CHECK(followSeedDirection->isEnabled());
+    CHECK(directedPanel.options().followSeedDirection);
+    CHECK(changeCount == 3);
   }
 
   SECTION("Apply and cancel buttons invoke their callbacks")

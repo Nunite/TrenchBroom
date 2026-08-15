@@ -19,6 +19,7 @@
 
 #include "ui/SmartFaceSelectionPanel.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QGridLayout>
@@ -76,6 +77,9 @@ mdl::SmartFaceSelectionOptions SmartFaceSelectionPanel::options() const
     mdl::SmartFaceSelectionMode(m_mode->currentData().toInt()),
     m_angle->value(),
     m_gap->value(),
+    m_followSeedDirection->isEnabled() && m_followSeedDirection->isChecked(),
+    m_stopAtBranches->isChecked(),
+    m_sameMaterial->isChecked(),
   };
 }
 
@@ -187,6 +191,22 @@ void SmartFaceSelectionPanel::createGui()
   m_gap->setSingleStep(0.25);
   m_gap->setSuffix(tr(" u"));
 
+  m_followSeedDirection = new QCheckBox{tr("Follow Seed Direction")};
+  m_followSeedDirection->setObjectName(
+    QStringLiteral("smartFaceSelectionFollowSeedDirection"));
+  m_followSeedDirection->setToolTip(
+    tr("Follow the path defined by at least two selected seed faces"));
+  m_followSeedDirection->setEnabled(m_initialSelection.size() >= 2u);
+
+  m_stopAtBranches = new QCheckBox{tr("Stop at Branches")};
+  m_stopAtBranches->setObjectName(QStringLiteral("smartFaceSelectionStopAtBranches"));
+  m_stopAtBranches->setToolTip(
+    tr("Stop before crossing junctions with more than two matching neighbors"));
+
+  m_sameMaterial = new QCheckBox{tr("Same Material")};
+  m_sameMaterial->setObjectName(QStringLiteral("smartFaceSelectionSameMaterial"));
+  m_sameMaterial->setToolTip(tr("Only include faces whose material matches a seed face"));
+
   auto* modeLabel = new QLabel{tr("Match")};
   modeLabel->setBuddy(m_mode);
   auto* operationLabel = new QLabel{tr("Selection")};
@@ -222,7 +242,10 @@ void SmartFaceSelectionPanel::createGui()
   controlsLayout->addWidget(m_angle, 2, 1);
   controlsLayout->addWidget(gapLabel, 3, 0);
   controlsLayout->addWidget(m_gap, 3, 1);
-  controlsLayout->addLayout(buttonLayout, 4, 0, 1, 2);
+  controlsLayout->addWidget(m_followSeedDirection, 4, 0, 1, 2);
+  controlsLayout->addWidget(m_stopAtBranches, 5, 0, 1, 2);
+  controlsLayout->addWidget(m_sameMaterial, 6, 0, 1, 2);
+  controlsLayout->addLayout(buttonLayout, 7, 0, 1, 2);
   controlsLayout->setColumnStretch(1, 1);
   m_controls->setLayout(controlsLayout);
 
@@ -236,8 +259,12 @@ void SmartFaceSelectionPanel::createGui()
   const auto parametersChanged = [this] { m_parametersDidChange(); };
   connect(
     m_collapseButton, &QToolButton::clicked, this, [this] { setExpanded(!expanded()); });
-  connect(
-    m_mode, qOverload<int>(&QComboBox::currentIndexChanged), this, parametersChanged);
+  connect(m_mode, qOverload<int>(&QComboBox::currentIndexChanged), this, [this] {
+    const auto faceStrip = mdl::SmartFaceSelectionMode(m_mode->currentData().toInt())
+                           == mdl::SmartFaceSelectionMode::FaceStrip;
+    m_followSeedDirection->setEnabled(faceStrip && m_initialSelection.size() >= 2u);
+    m_parametersDidChange();
+  });
   connect(
     m_operation,
     qOverload<int>(&QComboBox::currentIndexChanged),
@@ -247,6 +274,9 @@ void SmartFaceSelectionPanel::createGui()
     m_angle, qOverload<double>(&QDoubleSpinBox::valueChanged), this, parametersChanged);
   connect(
     m_gap, qOverload<double>(&QDoubleSpinBox::valueChanged), this, parametersChanged);
+  connect(m_followSeedDirection, &QCheckBox::toggled, this, parametersChanged);
+  connect(m_stopAtBranches, &QCheckBox::toggled, this, parametersChanged);
+  connect(m_sameMaterial, &QCheckBox::toggled, this, parametersChanged);
   connect(cancelButton, &QPushButton::clicked, this, m_cancel);
   connect(applyButton, &QPushButton::clicked, this, m_confirm);
 

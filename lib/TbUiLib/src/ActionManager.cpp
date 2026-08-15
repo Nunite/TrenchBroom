@@ -19,6 +19,7 @@
 
 #include "ui/ActionManager.h"
 
+#include <QObject>
 #include <QtSystemDetection>
 
 #include "base/PreferenceManager.h"
@@ -1340,7 +1341,7 @@ void ActionManager::createSelectionMenu()
   }));
   selectionMenu.addItem(addAction(Action{
     std::filesystem::path{"Menu/Edit/Smart Face Selection..."},
-    "Smart Face Selection...",
+    QObject::tr("Smart Face Selection...").toStdString(),
     ActionContext::View3D | ActionContext::FaceSelection | ActionContext::NoTool,
     KeySequence{},
     [](auto& context) { context.mapView().startSmartFaceSelection(); },

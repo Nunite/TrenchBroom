@@ -842,9 +842,10 @@ TEST_CASE("ModelUtils")
       return node;
     };
 
-    const auto box = [&](const vm::bbox3d& bounds) {
-      return addBrush(builder.createCuboid(bounds, "material") | kdl::value());
-    };
+    const auto box =
+      [&](const vm::bbox3d& bounds, const std::string& material = "material") {
+        return addBrush(builder.createCuboid(bounds, material) | kdl::value());
+      };
 
     const auto topFace = [](auto* node) {
       return BrushFaceHandle{node, *node->brush().findFace(vm::vec3d{0, 0, 1})};
@@ -919,9 +920,11 @@ TEST_CASE("ModelUtils")
       auto* a = slopedBrush(0, 64, 64, 64);
       auto* b = slopedBrush(64, 128, 64, 80);
       auto* c = slopedBrush(128, 192, 80, 112);
+      auto* d = slopedBrush(192, 256, 112, 160);
       const auto aTop = slopeFace(a, 0);
       const auto bTop = slopeFace(b, 16);
       const auto cTop = slopeFace(c, 32);
+      const auto dTop = slopeFace(d, 48);
 
       CHECK_THAT(
         collectSmartFaceSelection(
@@ -929,11 +932,18 @@ TEST_CASE("ModelUtils")
           editorContext,
           nodeTree,
           {SmartFaceSelectionMode::FaceStrip, 20.0, 0.0}),
-        UnorderedEquals(std::vector<BrushFaceHandle>{aTop, bTop, cTop}));
+        UnorderedEquals(std::vector<BrushFaceHandle>{aTop, bTop, cTop, dTop}));
       CHECK_THAT(
         collectSmartFaceSelection(
           {aTop}, editorContext, nodeTree, {SmartFaceSelectionMode::Parallel, 20.0, 0.0}),
         UnorderedEquals(std::vector<BrushFaceHandle>{aTop, bTop}));
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {aTop, bTop, cTop},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 20.0, 0.0, true, false, false}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{aTop, bTop, cTop, dTop}));
     }
 
     SECTION("Locked faces do not enter or bridge the result")
@@ -950,6 +960,82 @@ TEST_CASE("ModelUtils")
           nodeTree,
           {SmartFaceSelectionMode::FaceStrip, 15.0, 0.0}),
         UnorderedEquals(std::vector<BrushFaceHandle>{topFace(a)}));
+    }
+
+    SECTION("Same material matching does not cross a material boundary")
+    {
+      auto* a = box({{0, 0, 0}, {64, 64, 64}}, "Material");
+      auto* b = box({{64, 0, 0}, {128, 64, 64}}, "MATERIAL");
+      auto* c = box({{128, 0, 0}, {192, 64, 64}}, "other");
+
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {topFace(a)},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 0.0, 0.0, false, false, true}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{topFace(a), topFace(b)}));
+
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {topFace(a)},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 0.0, 0.0}),
+        UnorderedEquals(
+          std::vector<BrushFaceHandle>{topFace(a), topFace(b), topFace(c)}));
+    }
+
+    SECTION("Stop at branches includes the junction but does not cross it")
+    {
+      auto* left = box({{-64, 0, 0}, {0, 64, 64}});
+      auto* junction = box({{0, 0, 0}, {64, 64, 64}});
+      auto* right = box({{64, 0, 0}, {128, 64, 64}});
+      auto* branch = box({{0, 64, 0}, {64, 128, 64}});
+
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {topFace(left)},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 0.0, 0.0, false, true, false}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{topFace(left), topFace(junction)}));
+
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {topFace(left)},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 0.0, 0.0}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{
+          topFace(left), topFace(junction), topFace(right), topFace(branch)}));
+    }
+
+    SECTION("Seed direction follows a row without entering a side branch")
+    {
+      auto* before = box({{-64, 0, 0}, {0, 64, 64}});
+      auto* a = box({{0, 0, 0}, {64, 64, 64}});
+      auto* b = box({{64, 0, 0}, {128, 64, 64}});
+      auto* c = box({{128, 0, 0}, {192, 64, 64}});
+      auto* branch = box({{64, 64, 0}, {128, 128, 64}});
+
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {topFace(a), topFace(b)},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 0.0, 0.0, true, false, false}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{
+          topFace(before), topFace(a), topFace(b), topFace(c)}));
+
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {topFace(a), topFace(b)},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 0.0, 0.0}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{
+          topFace(before), topFace(a), topFace(b), topFace(c), topFace(branch)}));
     }
   }
 }

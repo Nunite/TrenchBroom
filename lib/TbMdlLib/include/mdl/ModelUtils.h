@@ -51,6 +51,9 @@ struct SmartFaceSelectionOptions
   SmartFaceSelectionMode mode = SmartFaceSelectionMode::FaceStrip;
   double angleTolerance = 15.0;
   double gapTolerance = 0.0;
+  bool followSeedDirection = false;
+  bool stopAtBranches = false;
+  bool sameMaterial = false;
 };
 
 template <typename T, typename U>
@@ -138,8 +141,11 @@ std::vector<BrushFaceHandle> collectConnectedCoplanarFaces(
 /**
  * Floods from the seed faces across shared or nearby edge segments.
  *
- * FaceStrip follows bends by comparing each candidate to the previous face.
- * Parallel compares candidates to the seeds, preventing angular drift.
+ * FaceStrip mode compares candidates to the previous face so bends can be followed.
+ * Parallel mode compares candidates to the seeds to prevent angular drift.
+ * Directional selection uses the two farthest seed faces as endpoints, derives their
+ * local directions from the nearest seeds, then follows each accepted face.
+ *
  * Hidden and locked faces are excluded by editorContext.
  */
 std::vector<BrushFaceHandle> collectSmartFaceSelection(

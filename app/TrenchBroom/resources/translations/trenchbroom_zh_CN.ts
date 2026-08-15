@@ -543,6 +543,11 @@
         <translation>取消全选</translation>
     </message>
     <message>
+        <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1344"/>
+        <source>Smart Face Selection...</source>
+        <translation>智能面选择...</translation>
+    </message>
+    <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1290"/>
         <source>Select Siblings</source>
         <translation>选择同级对象</translation>
@@ -3771,6 +3776,127 @@ They may contain new features or bug fixes that are not yet part of a stable rel
         <location filename="../../../../lib/TbUiLib/src/ViewPreferencePane.cpp" line="120"/>
         <source>Requires restart after changing</source>
         <translation>更改后需要重启</translation>
+    </message>
+</context>
+<context>
+    <name>tb::ui::SmartFaceSelectionPanel</name>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="105"/>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="296"/>
+        <source>Collapse</source>
+        <translation>折叠</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="105"/>
+        <source>Expand</source>
+        <translation>展开</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="149"/>
+        <source>Smart Face Selection</source>
+        <translation>智能面选择</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="170"/>
+        <source>Face Strip</source>
+        <translation>连续面带</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="171"/>
+        <source>Parallel Faces</source>
+        <translation>平行面</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="175"/>
+        <source>Replace</source>
+        <translation>替换</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="176"/>
+        <source>Add</source>
+        <translation>添加</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="177"/>
+        <source>Remove</source>
+        <translation>移除</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="184"/>
+        <source> deg</source>
+        <translation> 度</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="192"/>
+        <source> u</source>
+        <translation> 单位</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="194"/>
+        <source>Follow Seed Direction</source>
+        <translation>沿种子面方向</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="198"/>
+        <source>Follow the path defined by at least two selected seed faces</source>
+        <translation>沿至少两个已选种子面定义的路径扩展</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="201"/>
+        <source>Stop at Branches</source>
+        <translation>遇分支停止</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="204"/>
+        <source>Stop before crossing junctions with more than two matching neighbors</source>
+        <translation>在超过两个匹配邻面的交汇处前停止</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="206"/>
+        <source>Same Material</source>
+        <translation>相同材质</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="208"/>
+        <source>Only include faces whose material matches a seed face</source>
+        <translation>只包含材质与任一种子面相同的面</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="210"/>
+        <source>Match</source>
+        <translation>匹配方式</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="212"/>
+        <source>Selection</source>
+        <translation>选择方式</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="214"/>
+        <source>Angle</source>
+        <translation>角度</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="216"/>
+        <source>Gap</source>
+        <translation>间隙</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="220"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="223"/>
+        <source>Apply</source>
+        <translation>应用</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../../../../lib/TbUiLib/src/SmartFaceSelectionPanel.cpp" line="303"/>
+        <source>%n face(s)</source>
+        <translation>
+            <numerusform>%n 个面</numerusform>
+        </translation>
     </message>
 </context>
 <context>
