@@ -5,7 +5,7 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-16
-- Current stage: Phase 4.1 browser content and Face Inspector refinement complete
+- Current stage: Phase 4.2 Inspector navigation rail complete
 
 ## Objective
 
@@ -30,9 +30,10 @@ a runtime or source dependency on Code - OSS.
    lower-risk visual work has been evaluated.
 7. Follow Code - OSS Modern UI's 4 px card gaps, 6 px compact-control radius, and 8 px
    workbench-surface radius without copying its DOM or adding a source dependency.
-8. Keep inspector modes as labeled horizontal segmented navigation for now. A narrow
-   icon-only activity rail would reduce clarity with the current icon set and remains an
-   optional structural change.
+8. Use a narrow Inspector navigation rail with repository-owned icons, persistent page
+   headings, tooltips, accessible names, and keyboard activation. This replaces the
+   earlier horizontal segmented navigation after the supporting surfaces established a
+   stable visual hierarchy.
 
 ## Repository Findings
 
@@ -162,6 +163,23 @@ Expected benefit: medium to high. The most visible custom-rendered content now f
 same rounded component language as the surrounding Qt workbench instead of only sharing its
 colors.
 
+### Phase 4.2: Inspector Navigation Rail
+
+Status: complete
+
+- [x] Replace the visible horizontal Inspector tabs with a compact 44 px vertical icon
+      rail while retaining `TabBook` page ownership and state persistence.
+- [x] Add palette-driven hover, focus, checked, and accent-indicator states.
+- [x] Keep page identity explicit through synchronized headings, tooltips, accessible
+      names, and the existing keyboard shortcuts.
+- [x] Verify Map, Entity, Face, Outliner, and Plugin navigation without changing editor,
+      plugin, or document lifecycles.
+- [x] Verify representative Inspector pages in Light and Dark themes at 100%, 150%, and
+      200% scale factors.
+
+Expected benefit: high. The Inspector now has a recognizable workbench navigation layer
+without taking on the platform risk of a custom title bar or general docking system.
+
 ### Phase 5: Optional Structural Work
 
 Status: deferred
@@ -274,4 +292,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Complete | Added shared rounded browser cells with centralized hover/selection state, removed nested Assets tiles, and made custom placeholder, audio, and error rendering theme-aware. |
 | 2026-08-16 | Complete | Refined Face/UV and Entity/Material browser section hierarchy with stable QSS object names and secondary field labels. |
 | 2026-08-16 | Verified | Passed `Theme`, `ModelBrowserView`, and `MapWindow` (162 assertions), built Release `TrenchBroom`, and visually confirmed the 18 affected Light/Dark states at 100%, 150%, and 200% in `20260816-002459-821` and `20260816-002756-942`. |
-| 2026-08-16 | Next | Collect hands-on feedback on browser density and Face Inspector ergonomics before selecting another low-risk Phase 4 refinement or a deferred Phase 5 structural experiment. |
+| 2026-08-16 | Complete | Replaced the Inspector's visible horizontal tabs with a 44 px vertical icon rail and synchronized page headings while retaining `TabBook` state, shortcuts, plugin ownership, accessibility, and keyboard activation. |
+| 2026-08-16 | Verified | Passed `Theme`, `MapWindow`, and `TabBook` (175 assertions), built Release `TrenchBroom`, and visually confirmed 24 representative Inspector states at 100%, 150%, and 200% in `20260816-004245-712` and `20260816-004359-063`. |
+| 2026-08-16 | Next | Collect hands-on feedback on the navigation rail before refining browser search/filter and empty/loading states or starting a deferred Phase 5 structural experiment. |

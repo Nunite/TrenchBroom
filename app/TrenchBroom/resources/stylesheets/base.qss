@@ -125,12 +125,45 @@ QWidget#MapWindow_InspectorSurface {
   background: @tb-sidebar-background;
 }
 
-QLabel#WorkbenchPanelTitle {
+QLabel#WorkbenchPanelTitle,
+QLabel#Inspector_PageTitle {
   background: @tb-sidebar-background;
   color: @tb-secondary-text;
   font-size: 11px;
   font-weight: bold;
   padding: 0 10px;
+}
+
+QLabel#Inspector_PageTitle {
+  border-bottom: 1px solid @tb-border;
+}
+
+QWidget#Inspector_PageContainer,
+QWidget#Inspector_TabBook {
+  background: @tb-panel-background;
+}
+
+QWidget#Inspector_NavigationRail {
+  background: @tb-sidebar-background;
+  border-right: 1px solid @tb-border;
+}
+
+QToolButton[inspectorNavigation="true"] {
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  padding: 0;
+}
+
+QToolButton[inspectorNavigation="true"]:hover,
+QToolButton[inspectorNavigation="true"]:focus {
+  background: @tb-hover-background;
+}
+
+QToolButton[inspectorNavigation="true"]:checked {
+  background: @tb-pressed-background;
+  border-left-color: @tb-accent;
 }
 
 QPushButton {

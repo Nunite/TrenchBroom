@@ -21,6 +21,11 @@
 
 #include <QWidget>
 
+#include <vector>
+
+class QLabel;
+class QToolButton;
+
 namespace tb::ui
 {
 class AppController;
@@ -54,7 +59,11 @@ private:
   OutlinerInspector* m_outlinerInspector = nullptr;
   PluginInspector* m_pluginInspector = nullptr;
 
-  SyncHeightEventFilter* m_syncTabBarEventFilter = nullptr;
+  QLabel* m_pageTitle = nullptr;
+  std::vector<QToolButton*> m_navigationButtons;
+  SyncHeightEventFilter* m_syncHeaderEventFilter = nullptr;
+
+  void updateNavigation(int page);
 
 public:
   Inspector(

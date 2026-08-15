@@ -62,6 +62,7 @@
 #include "ui/CatchConfig.h"
 #include "ui/CommandPaletteDialog.h"
 #include "ui/InfoPanel.h"
+#include "ui/Inspector.h"
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
 #include "ui/MapViewBase.h"
@@ -230,6 +231,58 @@ TEST_CASE("MapWindow")
     CHECK(window.findChild<QWidget*>("UvEditor_Toolbar") != nullptr);
     CHECK(window.findChild<QWidget*>("MaterialBrowser_Controls") != nullptr);
     CHECK(window.findChild<QWidget*>("EntityBrowser_Controls") != nullptr);
+  }
+
+  SECTION("uses a synchronized vertical inspector navigation rail")
+  {
+    auto* navigationRail = window.findChild<QWidget*>("Inspector_NavigationRail");
+    auto* pageTitle = window.findChild<QLabel*>("Inspector_PageTitle");
+    auto* legacyTabBar = window.findChild<QWidget*>("Inspector_LegacyTabBar");
+    auto* mapButton = window.findChild<QToolButton*>("Inspector_NavigationMap");
+    auto* entityButton = window.findChild<QToolButton*>("Inspector_NavigationEntity");
+    auto* faceButton = window.findChild<QToolButton*>("Inspector_NavigationFace");
+    auto* outlinerButton = window.findChild<QToolButton*>("Inspector_NavigationOutliner");
+    auto* pluginButton = window.findChild<QToolButton*>("Inspector_NavigationPlugin");
+
+    REQUIRE(navigationRail != nullptr);
+    REQUIRE(pageTitle != nullptr);
+    REQUIRE(legacyTabBar != nullptr);
+    REQUIRE(mapButton != nullptr);
+    REQUIRE(entityButton != nullptr);
+    REQUIRE(faceButton != nullptr);
+    REQUIRE(outlinerButton != nullptr);
+    REQUIRE(pluginButton != nullptr);
+
+    CHECK(navigationRail->width() == 44);
+    CHECK(legacyTabBar->isHidden());
+    CHECK_FALSE(mapButton->icon().isNull());
+    CHECK_FALSE(entityButton->icon().isNull());
+    CHECK_FALSE(faceButton->icon().isNull());
+    CHECK_FALSE(outlinerButton->icon().isNull());
+    CHECK_FALSE(pluginButton->icon().isNull());
+    CHECK(mapButton->accessibleName() == "Map Inspector");
+    CHECK(mapButton->toolTip().contains("Ctrl+1"));
+    CHECK(entityButton->toolTip().contains("Ctrl+2"));
+    CHECK(faceButton->toolTip().contains("Ctrl+3"));
+
+    window.switchToInspectorPage(InspectorPage::Outliner);
+    CHECK(outlinerButton->isChecked());
+    CHECK(pageTitle->text() == "OUTLINER");
+
+    QTest::keyClick(entityButton, Qt::Key_Space);
+    CHECK(entityButton->isChecked());
+    CHECK_FALSE(outlinerButton->isChecked());
+    CHECK(pageTitle->text() == "ENTITY");
+
+    QTest::mouseClick(faceButton, Qt::LeftButton);
+    CHECK(faceButton->isChecked());
+    CHECK_FALSE(entityButton->isChecked());
+    CHECK(pageTitle->text() == "FACE");
+
+    window.switchToInspectorPage(InspectorPage::Plugin);
+    CHECK(pluginButton->isChecked());
+    CHECK_FALSE(faceButton->isChecked());
+    CHECK(pageTitle->text() == "PLUGINS");
   }
 
   SECTION("uses a focused command palette structure")
