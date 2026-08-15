@@ -5,6 +5,7 @@
 #include <QPainterPath>
 
 #include "ui/Action.h"
+#include "ui/QStringUtils.h"
 
 #include "kd/string_utils.h"
 
@@ -61,7 +62,7 @@ std::vector<PieMenuItem> buildPieMenuItems(
 
     const auto& action = it->second;
     result.push_back(PieMenuItem{
-      QString::fromStdString(action.label()),
+      translateUiText(action.label()),
       [executeAction, &action]() { executeAction(action); },
       isActionEnabled(action)});
   }

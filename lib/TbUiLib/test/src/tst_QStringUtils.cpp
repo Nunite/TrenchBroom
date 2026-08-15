@@ -17,7 +17,9 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QCoreApplication>
 #include <QString>
+#include <QTranslator>
 
 #include "mdl/MapTextEncoding.h"
 #include "ui/QStringUtils.h"
@@ -28,9 +30,44 @@
 
 namespace tb::ui
 {
+namespace
+{
+
+class TestUiTextTranslator : public QTranslator
+{
+public:
+  QString translate(
+    const char* context,
+    const char* sourceText,
+    const char* /* disambiguation */ = nullptr,
+    int /* n */ = -1) const override
+  {
+    if (
+      QString::fromLatin1(context) == QStringLiteral("QObject")
+      && QString::fromUtf8(sourceText) == QStringLiteral("Test Action"))
+    {
+      return QStringLiteral("Translated Action");
+    }
+    return {};
+  }
+};
+
+} // namespace
 
 TEST_CASE("QStringUtils")
 {
+  SECTION("translateUiText")
+  {
+    auto translator = TestUiTextTranslator{};
+    QCoreApplication::installTranslator(&translator);
+
+    CHECK(translateUiText("Test Action") == QStringLiteral("Translated Action"));
+    CHECK(
+      translateUiText("Untranslated Action") == QStringLiteral("Untranslated Action"));
+
+    QCoreApplication::removeTranslator(&translator);
+  }
+
   SECTION("mapStringToUnicode")
   {
     SECTION("Utf8 encoding decodes multi-byte UTF-8 sequences")

@@ -17,6 +17,106 @@
         <translation>%1 (%2)</translation>
     </message>
     <message>
+        <source>File</source>
+        <translation>文件</translation>
+    </message>
+    <message>
+        <source>Open Recent</source>
+        <translation>打开最近文件</translation>
+    </message>
+    <message>
+        <source>Export</source>
+        <translation>导出</translation>
+    </message>
+    <message>
+        <source>Edit</source>
+        <translation>编辑</translation>
+    </message>
+    <message>
+        <source>Transform</source>
+        <translation>变换</translation>
+    </message>
+    <message>
+        <source>CSG</source>
+        <translation>CSG</translation>
+    </message>
+    <message>
+        <source>Vertices</source>
+        <translation>顶点</translation>
+    </message>
+    <message>
+        <source>Patches</source>
+        <translation>曲面</translation>
+    </message>
+    <message>
+        <source>Materials</source>
+        <translation>材质</translation>
+    </message>
+    <message>
+        <source>Selection</source>
+        <translation>选择</translation>
+    </message>
+    <message>
+        <source>Groups</source>
+        <translation>组</translation>
+    </message>
+    <message>
+        <source>Tools</source>
+        <translation>工具</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>视图</translation>
+    </message>
+    <message>
+        <source>Grid</source>
+        <translation>网格</translation>
+    </message>
+    <message>
+        <source>Camera</source>
+        <translation>摄像机</translation>
+    </message>
+    <message>
+        <source>Run</source>
+        <translation>运行</translation>
+    </message>
+    <message>
+        <source>Debug</source>
+        <translation>调试</translation>
+    </message>
+    <message>
+        <source>Help</source>
+        <translation>帮助</translation>
+    </message>
+    <message>
+        <source>Chamfer Tool</source>
+        <translation>倒角工具</translation>
+    </message>
+    <message>
+        <source>Control Point Tool</source>
+        <translation>控制点工具</translation>
+    </message>
+    <message>
+        <source>Convert Selection to Patches</source>
+        <translation>将选中项转换为曲面</translation>
+    </message>
+    <message>
+        <source>Decrease Sweep Scale</source>
+        <translation>减小扫掠缩放</translation>
+    </message>
+    <message>
+        <source>Increase Sweep Scale</source>
+        <translation>增大扫掠缩放</translation>
+    </message>
+    <message>
+        <source>Perform Sweep</source>
+        <translation>执行扫掠</translation>
+    </message>
+    <message>
+        <source>Sweep Tool</source>
+        <translation>扫掠工具</translation>
+    </message>
+    <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="75"/>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="111"/>
         <source>Toggle %1 visible</source>
@@ -406,12 +506,12 @@
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="881"/>
         <source>Wavefront OBJ...</source>
-        <translation>Wavefront OBJ...</translation>
+        <translation>Wavefront OBJ 文件...</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="889"/>
         <source>Map...</source>
-        <translation>Map...</translation>
+        <translation>地图文件...</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="895"/>

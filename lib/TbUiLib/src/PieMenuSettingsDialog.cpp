@@ -15,6 +15,7 @@
 #include "prefs/Preferences.h"
 #include "ui/Action.h"
 #include "ui/ActionManager.h"
+#include "ui/QStringUtils.h"
 #include "ui/ViewConstants.h"
 
 #include <functional>
@@ -154,7 +155,7 @@ void PieMenuSettingsDialog::populateActionMenu()
       if (isLeaf)
       {
         currentNode->actions.emplace_back(
-          QString::fromStdString(action->label()), QString::fromStdString(path.string()));
+          translateUiText(action->label()), QString::fromStdString(path.string()));
       }
       else
       {
@@ -167,7 +168,7 @@ void PieMenuSettingsDialog::populateActionMenu()
   buildMenu = [&](QMenu* menu, const MenuNode& node) {
     for (const auto& [name, subNode] : node.subMenus)
     {
-      auto* subMenu = menu->addMenu(QString::fromStdString(name));
+      auto* subMenu = menu->addMenu(translateUiText(name));
       buildMenu(subMenu, subNode);
     }
 
@@ -237,8 +238,8 @@ void PieMenuSettingsDialog::loadPieMenuActions()
   {
     const auto path = std::filesystem::path{pathStr.toStdString()};
     const auto it = actions.find(path);
-    const auto label = it != actions.end() ? QString::fromStdString(it->second.label())
-                                           : tr("Unknown Action");
+    const auto label =
+      it != actions.end() ? translateUiText(it->second.label()) : tr("Unknown Action");
 
     auto* item = new QListWidgetItem{label, m_actionList};
     item->setData(Qt::UserRole, pathStr);

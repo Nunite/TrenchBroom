@@ -29,6 +29,7 @@
 #include "ui/ActionMenu.h"
 #include "ui/ImageUtils.h"
 #include "ui/QKeySequenceUtils.h"
+#include "ui/QStringUtils.h"
 
 #include "kd/contracts.h"
 #include "kd/ranges/to.h"
@@ -42,7 +43,7 @@ void updateActionKeySequence(QAction& qAction, const Action& tAction)
 {
   const auto& keySequences = pref(tAction.preference());
 
-  auto tooltip = QString::fromStdString(tAction.label());
+  auto tooltip = translateUiText(tAction.label());
   auto qKeySequences =
     keySequences | std::views::transform(toQKeySequence) | kdl::ranges::to<QList>();
   for (const auto& qKeySequence : qKeySequences)
@@ -72,7 +73,7 @@ QAction& findOrCreateQtAction(
   }
 
   auto& qtAction =
-    *actionMap.emplace(&tbAction, new QAction{QString::fromStdString(tbAction.label())})
+    *actionMap.emplace(&tbAction, new QAction{translateUiText(tbAction.label())})
        .first->second;
 
   qtAction.setCheckable(tbAction.checkable());
@@ -82,7 +83,7 @@ QAction& findOrCreateQtAction(
   }
   if (const auto& statusTip = tbAction.statusTip())
   {
-    qtAction.setStatusTip(QString::fromStdString(*statusTip));
+    qtAction.setStatusTip(translateUiText(*statusTip));
   }
   updateActionKeySequence(qtAction, tbAction);
 
@@ -140,11 +141,11 @@ PopulateMenuResult populateMenuBar(
       if (!currentMenu)
       {
         // top level menu
-        currentMenu = qtMenuBar.addMenu(QString::fromStdString(menu.name));
+        currentMenu = qtMenuBar.addMenu(translateUiText(menu.name));
       }
       else
       {
-        currentMenu = currentMenu->addMenu(QString::fromStdString(menu.name));
+        currentMenu = currentMenu->addMenu(translateUiText(menu.name));
       }
 
       if (menu.entryType == MenuEntryType::RecentDocuments)

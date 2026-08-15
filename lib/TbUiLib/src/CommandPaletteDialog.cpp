@@ -33,6 +33,7 @@
 #include "ui/ActionExecutionContext.h"
 #include "ui/ActionManager.h"
 #include "ui/QKeySequenceUtils.h"
+#include "ui/QStringUtils.h"
 #include "ui/QStyleUtils.h"
 
 #include <algorithm>
@@ -45,12 +46,16 @@ namespace
 
 QString makeDisplayPath(QString path)
 {
-  if (path.startsWith("Menu/"))
+  auto components = path.split('/');
+  if (!components.empty() && components.front() == QStringLiteral("Menu"))
   {
-    path.remove(0, QStringLiteral("Menu/").size());
+    components.removeFirst();
   }
-  path.replace("/", " > ");
-  return path;
+  for (auto& component : components)
+  {
+    component = translateUiText(component.toStdString());
+  }
+  return components.join(QStringLiteral(" > "));
 }
 
 bool matchesFilter(const CommandPaletteDialog::Entry& entry, const QString& filter)
@@ -94,12 +99,11 @@ CommandPaletteDialog::CommandPaletteDialog(
     }
     const auto shortcut = shortcutLabels.join(", ");
     const auto displayPath = makeDisplayPath(preferencePath);
-    const auto label = QString::fromStdString(action.label());
-    auto filterText =
-      QStringList{label, displayPath, preferencePath, shortcut}.join(" ");
+    const auto label = translateUiText(action.label());
+    auto filterText = QStringList{label, displayPath, preferencePath, shortcut}.join(" ");
 
-    m_entries.push_back(Entry{
-      label, displayPath, preferencePath, shortcut, std::move(filterText)});
+    m_entries.push_back(
+      Entry{label, displayPath, preferencePath, shortcut, std::move(filterText)});
   }
 
   std::ranges::sort(m_entries, [](const auto& lhs, const auto& rhs) {

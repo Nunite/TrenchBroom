@@ -36,5 +36,12 @@ namespace ui
 QString mapStringToUnicode(mdl::MapTextEncoding encoding, const std::string& string);
 std::string mapStringFromUnicode(mdl::MapTextEncoding encoding, const QString& string);
 
+/**
+ * Translates user-visible text stored as UTF-8 std::string using the shared QObject
+
+ * * translation context.
+ */
+QString translateUiText(const std::string& sourceText);
+
 } // namespace ui
 } // namespace tb

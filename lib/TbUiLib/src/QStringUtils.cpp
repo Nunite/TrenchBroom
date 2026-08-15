@@ -20,6 +20,7 @@
 #include "ui/QStringUtils.h"
 
 #include <QByteArray>
+#include <QCoreApplication>
 #include <QStringEncoder>
 
 #include "base/Macros.h"
@@ -129,6 +130,11 @@ std::string mapStringFromUnicode(
   }
     switchDefault();
   }
+}
+
+QString translateUiText(const std::string& sourceText)
+{
+  return QCoreApplication::translate("QObject", sourceText.c_str());
 }
 
 } // namespace tb::ui

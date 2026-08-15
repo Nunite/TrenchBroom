@@ -93,6 +93,7 @@
 #include "ui/MapWindowManager.h"
 #include "ui/PieMenu.h"
 #include "ui/QKeySequenceUtils.h"
+#include "ui/QStringUtils.h"
 #include "ui/SelectionTool.h"
 #include "ui/SignalDelayer.h"
 #include "ui/SmartFaceSelectionPanel.h"
@@ -462,7 +463,7 @@ void MapViewBase::createActions()
     connect(
       shortcut, &QShortcut::activated, this, [this, &action] { triggerAction(action); });
     connect(shortcut, &QShortcut::activatedAmbiguously, this, [this, &action] {
-      triggerAmbiguousAction(QString::fromStdString(action.label()));
+      triggerAmbiguousAction(translateUiText(action.label()));
     });
     m_shortcuts.emplace_back(shortcut, &action);
   };

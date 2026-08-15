@@ -32,9 +32,10 @@
 #include "ui/KeyboardShortcutUtils.h"
 #include "ui/MapDocument.h"
 #include "ui/QKeySequenceUtils.h"
+#include "ui/QPathUtils.h"
+#include "ui/QStringUtils.h"
 
 #include "kd/contracts.h"
-#include "kd/path_utils.h"
 #include "kd/set_adapter.h"
 #include "kd/vector_utils.h"
 
@@ -123,7 +124,7 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     case 2:
       return QString::fromStdString(actionContextName(actionInfo.actionContext()));
     case 3:
-      return QString::fromStdString(actionInfo.displayPath().generic_string());
+      return pathAsGenericQString(actionInfo.displayPath());
     }
   }
 
@@ -262,12 +263,12 @@ void KeyboardShortcutModel::initializeMenuActions()
     [&](const MenuAction& actionItem) {
       m_actions.emplace_back(
         ActionInfoType::Menu,
-        currentPath / kdl::parse_utf8_path(actionItem.action.label()),
+        currentPath / pathFromQString(translateUiText(actionItem.action.label())),
         actionItem.action.actionContext(),
         actionItem.action.preference());
     },
     [&](const auto& thisLambda, const Menu& menu) {
-      currentPath = currentPath / menu.name;
+      currentPath = currentPath / pathFromQString(translateUiText(menu.name));
       menu.visitEntries(thisLambda);
       currentPath = currentPath.parent_path();
     }));
@@ -278,7 +279,7 @@ void KeyboardShortcutModel::initializeViewActions()
   m_actionManager.visitMapViewActions([&](Action& action) {
     m_actions.emplace_back(
       ActionInfoType::View,
-      "Map View" / kdl::parse_utf8_path(action.label()),
+      pathFromQString(tr("Map View")) / pathFromQString(translateUiText(action.label())),
       action.actionContext(),
       action.preference());
   });
@@ -325,7 +326,7 @@ void KeyboardShortcutModel::initializeTagActions()
   m_actionCache->visitTagActions(m_actionManager, [&](Action& action) {
     m_actions.emplace_back(
       ActionInfoType::Tag,
-      "Tags" / kdl::parse_utf8_path(action.label()),
+      pathFromQString(tr("Tags")) / pathFromQString(translateUiText(action.label())),
       action.actionContext(),
       action.preference());
   });
@@ -338,7 +339,8 @@ void KeyboardShortcutModel::initializeEntityDefinitionActions()
   m_actionCache->visitEntityDefinitionActions(m_actionManager, [&](Action& action) {
     m_actions.emplace_back(
       ActionInfoType::EntityDefinition,
-      "Entity Definitions" / kdl::parse_utf8_path(action.label()),
+      pathFromQString(tr("Entity Definitions"))
+        / pathFromQString(translateUiText(action.label())),
       action.actionContext(),
       action.preference());
   });
