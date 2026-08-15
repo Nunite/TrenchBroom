@@ -24,6 +24,7 @@
 #include <QJsonObject>
 #include <QStringList>
 #include <QTcpSocket>
+#include <QTest>
 #include <QUuid>
 
 #include "ui/mcp/McpBridgeServer.h"
@@ -361,12 +362,12 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     {
       REQUIRE(first.waitForDisconnected(1000));
     }
-    QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
-    CHECK(
+    QTRY_COMPARE_WITH_TIMEOUT(
       sendRequest(
         httpServer.port(), makeHttpRequest("POST", "/mcp", jsonRequest(30, "initialize")))
-        .statusCode
-      == 200);
+        .statusCode,
+      200,
+      1000);
   }
 
   SECTION("bounds authenticated SSE connections")
