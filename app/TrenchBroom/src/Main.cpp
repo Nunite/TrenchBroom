@@ -21,9 +21,12 @@
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QDeadlineTimer>
 #include <QDebug>
+#include <QDir>
 #include <QEvent>
 #include <QFile>
+#include <QFileInfo>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenuBar>
@@ -44,6 +47,14 @@
 #include <QtGlobal>
 
 #include "base/PreferenceManager.h"
+#include "fs/DiskIO.h"
+#include "gl/Material.h"
+#include "gl/MaterialManager.h"
+#include "gl/Resource.h"
+#include "gl/Texture.h"
+#include "mdl/GameManager.h"
+#include "mdl/Map.h"
+#include "mdl/MapHeader.h"
 #include "prefs/Preferences.h"
 #include "ui/Action.h"
 #include "ui/ActionBuilder.h"
@@ -55,6 +66,7 @@
 #include "ui/FileEventFilter.h"
 #include "ui/InfoPanel.h"
 #include "ui/Inspector.h"
+#include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/PreferenceDialog.h"
@@ -85,6 +97,7 @@ struct UiSnapshotCommandLineOptions
   QString outputPath;
   QString theme;
   QString page;
+  QString gamePath;
 };
 
 struct CommandLineOptions
@@ -237,7 +250,7 @@ ThemeTokens loadStyle(
 
 auto createAppController(const bool snapshotMode = false)
 {
-  const auto options = AppControllerOptions{!snapshotMode, !snapshotMode};
+  const auto options = AppControllerOptions{!snapshotMode, !snapshotMode, true};
   return AppController::create(options) | kdl::if_error([](auto e) {
            const auto msg =
              fmt::format(R"(Game configurations could not be loaded: {})", e.msg);
@@ -298,6 +311,50 @@ bool openFiles(AppController& appController, const QStringList& fileNames)
   return anyDocumentOpened;
 }
 
+bool configureUiSnapshotGamePath(
+  AppController& appController,
+  const UiSnapshotCommandLineOptions& options,
+  const QStringList& fileNames)
+{
+  if (options.gamePath.isEmpty())
+  {
+    return true;
+  }
+
+  if (fileNames.empty())
+  {
+    qCritical() << "--ui-snapshot-game-path requires one map file";
+    return false;
+  }
+
+  return fs::Disk::withInputStream(pathFromQString(fileNames.front()), mdl::readMapHeader)
+         | kdl::transform([&](const auto& detectedGameAndFormat) {
+             const auto& gameName = detectedGameAndFormat.first;
+             if (!gameName)
+             {
+               qCritical() << "Could not detect the snapshot map's game";
+               return false;
+             }
+
+             auto* gameInfo = appController.gameManager().gameInfo(*gameName);
+             if (gameInfo == nullptr)
+             {
+               qCritical() << "Snapshot map uses an unavailable game:"
+                           << QString::fromStdString(*gameName);
+               return false;
+             }
+
+             setPref(gameInfo->gamePathPreference, pathFromQString(options.gamePath));
+             return true;
+           })
+         | kdl::transform_error([](const auto& error) {
+             qCritical().noquote() << "Could not read the snapshot map header:"
+                                   << QString::fromStdString(error.msg);
+             return false;
+           })
+         | kdl::value();
+}
+
 std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
 {
   auto parser = QCommandLineParser{};
@@ -324,12 +381,17 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "command-palette, preferences, or preferences-colors.",
     "page",
     "map"};
+  const auto uiSnapshotGamePathOption = QCommandLineOption{
+    QStringList{"ui-snapshot-game-path"},
+    "Set the detected game's path while capturing a UI snapshot.",
+    "path"};
 
   parser.addOption(portableOption);
   parser.addOption(draftUpdatesOption);
   parser.addOption(uiSnapshotOption);
   parser.addOption(uiSnapshotThemeOption);
   parser.addOption(uiSnapshotPageOption);
+  parser.addOption(uiSnapshotGamePathOption);
   parser.addPositionalArgument("files", "Map files to open.", "[files...]");
   parser.process(app);
 
@@ -338,7 +400,9 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
 
   if (!parser.isSet(uiSnapshotOption))
   {
-    if (parser.isSet(uiSnapshotThemeOption) || parser.isSet(uiSnapshotPageOption))
+    if (
+      parser.isSet(uiSnapshotThemeOption) || parser.isSet(uiSnapshotPageOption)
+      || parser.isSet(uiSnapshotGamePathOption))
     {
       qCritical() << "UI snapshot options require --ui-snapshot";
       return std::nullopt;
@@ -385,8 +449,26 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     return std::nullopt;
   }
 
+  auto snapshotGamePath = QString{};
+  if (parser.isSet(uiSnapshotGamePathOption))
+  {
+    const auto gamePathInfo = QFileInfo{parser.value(uiSnapshotGamePathOption)};
+    if (!gamePathInfo.exists() || !gamePathInfo.isDir())
+    {
+      qCritical() << "UI snapshot game path is not a directory:"
+                  << gamePathInfo.filePath();
+      return std::nullopt;
+    }
+    if (options.fileNames.empty())
+    {
+      qCritical() << "--ui-snapshot-game-path requires one map file";
+      return std::nullopt;
+    }
+    snapshotGamePath = gamePathInfo.absoluteFilePath();
+  }
+
   options.uiSnapshot = UiSnapshotCommandLineOptions{
-    parser.value(uiSnapshotOption), snapshotTheme, snapshotPage};
+    parser.value(uiSnapshotOption), snapshotTheme, snapshotPage, snapshotGamePath};
   return options;
 }
 
@@ -456,6 +538,88 @@ bool isInspectorSnapshotTarget(const QString& targetName)
          || targetName == QStringLiteral("material-browser-empty");
 }
 
+bool isMaterialBrowserSnapshotTarget(const QString& targetName)
+{
+  return targetName == QStringLiteral("face-inspector")
+         || targetName == QStringLiteral("material-browser-empty");
+}
+
+enum class UiSnapshotReadinessState
+{
+  Ready,
+  Pending,
+  Failed,
+};
+
+struct UiSnapshotReadiness
+{
+  UiSnapshotReadinessState state;
+  QString detail;
+};
+
+UiSnapshotReadiness uiSnapshotReadiness(QWidget& targetWidget, const QString& targetName)
+{
+  if (!isMaterialBrowserSnapshotTarget(targetName))
+  {
+    return {UiSnapshotReadinessState::Ready, {}};
+  }
+
+  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
+  if (mapWindow == nullptr)
+  {
+    return {
+      UiSnapshotReadinessState::Failed,
+      QStringLiteral("Material browser snapshot target is not a map window")};
+  }
+
+  const auto& materials = mapWindow->document().map().materialManager().materials();
+  if (materials.empty())
+  {
+    return {
+      UiSnapshotReadinessState::Pending,
+      QStringLiteral("Material browser snapshot has no loaded materials")};
+  }
+
+  auto readyCount = size_t{0};
+  auto pendingCount = size_t{0};
+  auto failedNames = QStringList{};
+  for (const auto* material : materials)
+  {
+    const auto& resource = material->textureResource();
+    if (const auto* failed = std::get_if<gl::ResourceFailed>(&resource.state()))
+    {
+      failedNames.push_back(QStringLiteral("%1 (%2)").arg(
+        QString::fromStdString(material->name()), QString::fromStdString(failed->error)));
+    }
+    else if (const auto* texture = material->texture();
+             texture != nullptr && texture->isReady())
+    {
+      ++readyCount;
+    }
+    else
+    {
+      ++pendingCount;
+    }
+  }
+
+  if (!failedNames.empty())
+  {
+    return {
+      UiSnapshotReadinessState::Failed,
+      QStringLiteral("Material textures failed: %1")
+        .arg(failedNames.mid(0, 3).join(QStringLiteral("; ")))};
+  }
+
+  const auto detail = QStringLiteral("Material textures ready: %1/%2; pending: %3")
+                        .arg(readyCount)
+                        .arg(materials.size())
+                        .arg(pendingCount);
+  return {
+    pendingCount == 0 ? UiSnapshotReadinessState::Ready
+                      : UiSnapshotReadinessState::Pending,
+    detail};
+}
+
 void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName)
 {
   auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
@@ -498,6 +662,118 @@ void configurePreferencesSnapshot(QWidget& targetWidget, const QString& targetNa
   }
 }
 
+void failUiSnapshot(
+  QApplication& app,
+  const UiSnapshotCommandLineOptions& options,
+  const QString& message,
+  const int exitCode)
+{
+  qCritical().noquote() << message;
+
+  const auto outputInfo = QFileInfo{options.outputPath};
+  if (QDir{}.mkpath(outputInfo.absolutePath()))
+  {
+    auto failureFile =
+      QFile{outputInfo.dir().filePath(outputInfo.completeBaseName() + ".error.txt")};
+    if (failureFile.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+      QTextStream{&failureFile} << message << Qt::endl;
+    }
+  }
+  app.exit(exitCode);
+}
+
+void captureUiSnapshot(
+  QApplication& app,
+  const QPointer<QWidget>& guardedWidget,
+  const QString& targetName,
+  const UiSnapshotCommandLineOptions& options)
+{
+  if (guardedWidget.isNull())
+  {
+    failUiSnapshot(app, options, "UI snapshot target was destroyed before capture", 3);
+    return;
+  }
+
+  const auto readiness = uiSnapshotReadiness(*guardedWidget, targetName);
+  if (readiness.state != UiSnapshotReadinessState::Ready)
+  {
+    failUiSnapshot(
+      app,
+      options,
+      QStringLiteral("UI snapshot state validation failed: %1").arg(readiness.detail),
+      3);
+    return;
+  }
+
+  auto error = QString{};
+  const auto snapshotOptions = UiSnapshotOptions{
+    options.outputPath,
+    targetName,
+    options.theme,
+    qEnvironmentVariable("QT_SCALE_FACTOR", "system")};
+  if (!saveUiSnapshot(*guardedWidget, snapshotOptions, &error))
+  {
+    failUiSnapshot(app, options, QStringLiteral("UI snapshot failed: %1").arg(error), 4);
+    return;
+  }
+
+  qInfo().noquote() << "UI snapshot saved:" << options.outputPath;
+  app.exit(0);
+}
+
+void waitForUiSnapshotReadiness(
+  QApplication& app,
+  const QPointer<QWidget>& guardedWidget,
+  const QString& targetName,
+  const UiSnapshotCommandLineOptions& options,
+  const QDeadlineTimer deadline)
+{
+  if (guardedWidget.isNull())
+  {
+    failUiSnapshot(
+      app, options, "UI snapshot target was destroyed while waiting for resources", 3);
+    return;
+  }
+
+  const auto readiness = uiSnapshotReadiness(*guardedWidget, targetName);
+  if (readiness.state == UiSnapshotReadinessState::Failed)
+  {
+    failUiSnapshot(
+      app,
+      options,
+      QStringLiteral("UI snapshot resource validation failed: %1").arg(readiness.detail),
+      3);
+    return;
+  }
+  if (readiness.state == UiSnapshotReadinessState::Pending)
+  {
+    if (deadline.hasExpired())
+    {
+      failUiSnapshot(
+        app,
+        options,
+        QStringLiteral("UI snapshot resource wait timed out: %1").arg(readiness.detail),
+        3);
+      return;
+    }
+
+    QTimer::singleShot(50, &app, [&app, guardedWidget, targetName, options, deadline]() {
+      waitForUiSnapshotReadiness(app, guardedWidget, targetName, options, deadline);
+    });
+    return;
+  }
+
+  if (!readiness.detail.isEmpty())
+  {
+    qInfo().noquote() << "UI snapshot resources ready:" << readiness.detail;
+  }
+  guardedWidget->update();
+  QTimer::singleShot(100, &app, [&app, guardedWidget, targetName, options]() {
+    captureUiSnapshot(app, guardedWidget, targetName, options);
+  });
+}
+
 void scheduleUiSnapshot(
   QApplication& app,
   QWidget& targetWidget,
@@ -508,8 +784,12 @@ void scheduleUiSnapshot(
   QTimer::singleShot(0, &app, [&app, guardedWidget, targetName, options]() {
     if (guardedWidget.isNull())
     {
-      qCritical() << "UI snapshot target was destroyed before layout:" << targetName;
-      app.exit(3);
+      failUiSnapshot(
+        app,
+        options,
+        QStringLiteral("UI snapshot target was destroyed before layout: %1")
+          .arg(targetName),
+        3);
       return;
     }
 
@@ -532,44 +812,27 @@ void scheduleUiSnapshot(
     guardedWidget->ensurePolished();
     guardedWidget->update();
     QTimer::singleShot(250, &app, [&app, guardedWidget, targetName, options]() {
-      if (guardedWidget.isNull())
+      if (!guardedWidget.isNull())
       {
-        qCritical() << "UI snapshot target was destroyed before capture";
-        app.exit(3);
-        return;
+        if (targetName == QStringLiteral("outliner"))
+        {
+          configureOutlinerSnapshot(*guardedWidget);
+        }
+        else if (targetName == QStringLiteral("supporting"))
+        {
+          configureSupportingSnapshot(*guardedWidget);
+        }
+        else if (isInspectorSnapshotTarget(targetName))
+        {
+          configureInspectorSnapshot(*guardedWidget, targetName);
+        }
+        else if (targetName.startsWith(QStringLiteral("preferences")))
+        {
+          configurePreferencesSnapshot(*guardedWidget, targetName);
+        }
       }
-
-      if (targetName == QStringLiteral("outliner"))
-      {
-        configureOutlinerSnapshot(*guardedWidget);
-      }
-      else if (targetName == QStringLiteral("supporting"))
-      {
-        configureSupportingSnapshot(*guardedWidget);
-      }
-      else if (isInspectorSnapshotTarget(targetName))
-      {
-        configureInspectorSnapshot(*guardedWidget, targetName);
-      }
-      else if (targetName.startsWith(QStringLiteral("preferences")))
-      {
-        configurePreferencesSnapshot(*guardedWidget, targetName);
-      }
-      auto error = QString{};
-      const auto snapshotOptions = UiSnapshotOptions{
-        options.outputPath,
-        targetName,
-        options.theme,
-        qEnvironmentVariable("QT_SCALE_FACTOR", "system")};
-      if (!saveUiSnapshot(*guardedWidget, snapshotOptions, &error))
-      {
-        qCritical().noquote() << "UI snapshot failed:" << error;
-        app.exit(4);
-        return;
-      }
-
-      qInfo().noquote() << "UI snapshot saved:" << options.outputPath;
-      app.exit(0);
+      waitForUiSnapshotReadiness(
+        app, guardedWidget, targetName, options, QDeadlineTimer{5000});
     });
   });
 }
@@ -718,6 +981,12 @@ int main(int argc, char* argv[])
 
   if (commandLineOptions->uiSnapshot)
   {
+    if (!configureUiSnapshotGamePath(
+          *appController, *commandLineOptions->uiSnapshot, commandLineOptions->fileNames))
+    {
+      return 3;
+    }
+
     auto* targetWidget = static_cast<QWidget*>(nullptr);
     auto targetName = QString{};
     auto preferencesDialog = std::unique_ptr<PreferenceDialog>{};

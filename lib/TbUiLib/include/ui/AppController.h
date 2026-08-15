@@ -74,6 +74,7 @@ struct AppControllerOptions
 {
   bool enableBackgroundServices = true;
   bool showMapWindows = true;
+  bool enableGlResourceProcessing = true;
 };
 
 class AppController : public QObject

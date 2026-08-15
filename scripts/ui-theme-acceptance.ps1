@@ -17,6 +17,9 @@ param(
   [string[]] $Themes = @("light", "dark"),
   [string[]] $ScaleFactors = @("1", "1.5", "2"),
   [string] $MapPath = "lib\TbMdlLib\test\fixture\mdl\Map\initialMap.map",
+  [string] $MaterialMapPath =
+    "lib\TbMdlLib\test\fixture\mdl\Map\reloadMaterialCollectionsQ2.map",
+  [string] $MaterialGamePath = "lib\TbUiLib\test\fixture\mdl\Game\Quake2",
   [string] $OutputDir = "",
   [int] $TimeoutSeconds = 45,
   [switch] $SkipBuild
@@ -185,13 +188,18 @@ if (-not $SkipBuild) {
 
 $resolvedBuildDir = Resolve-Path -Path $BuildDir
 $resolvedQtBin = Resolve-Path -Path $QtBin
+$usesMaterialFixture =
+  $normalizedTargets -contains "face-inspector" -or
+  $normalizedTargets -contains "material-browser-empty"
+$resolvedMaterialMapPath =
+  if ($usesMaterialFixture) { Resolve-Path -Path $MaterialMapPath } else { $null }
+$resolvedMaterialGamePath =
+  if ($usesMaterialFixture) { Resolve-Path -Path $MaterialGamePath } else { $null }
 $resolvedMapPath = if (
   $normalizedTargets -contains "workbench" -or
   $normalizedTargets -contains "outliner" -or
   $normalizedTargets -contains "entity-browser" -or
   $normalizedTargets -contains "entity-browser-empty" -or
-  $normalizedTargets -contains "face-inspector" -or
-  $normalizedTargets -contains "material-browser-empty" -or
   $normalizedTargets -contains "supporting" -or
   $normalizedTargets -contains "command-palette") {
   Resolve-Path -Path $MapPath
@@ -225,6 +233,7 @@ foreach ($target in $normalizedTargets) {
       $baseName = "$target-$theme-$scaleName"
       $imagePath = Join-Path $runDirectory "$baseName.png"
       $manifestPath = Join-Path $runDirectory "$baseName.json"
+      $errorPath = Join-Path $runDirectory "$baseName.error.txt"
 
       $processInfo = [Diagnostics.ProcessStartInfo]::new()
       $processInfo.FileName = $executable
@@ -232,6 +241,14 @@ foreach ($target in $normalizedTargets) {
         "--ui-snapshot `"$imagePath`" --ui-snapshot-theme $theme"
       if ($target -ne "welcome" -and $target -ne "workbench") {
         $processInfo.Arguments += " --ui-snapshot-page $target"
+      }
+      $useMaterialFixture =
+        $target -eq "face-inspector" -or $target -eq "material-browser-empty"
+      $targetMapPath =
+        if ($useMaterialFixture) { $resolvedMaterialMapPath } else { $resolvedMapPath }
+      if ($useMaterialFixture) {
+        $processInfo.Arguments +=
+          " --ui-snapshot-game-path `"$($resolvedMaterialGamePath.Path)`""
       }
       if (
         $target -eq "workbench" -or
@@ -242,7 +259,7 @@ foreach ($target in $normalizedTargets) {
         $target -eq "material-browser-empty" -or
         $target -eq "supporting" -or
         $target -eq "command-palette") {
-        $processInfo.Arguments += " `"$($resolvedMapPath.Path)`""
+        $processInfo.Arguments += " `"$($targetMapPath.Path)`""
       }
       $processInfo.WorkingDirectory = Split-Path -Parent $executable
       $processInfo.UseShellExecute = $false
@@ -269,8 +286,15 @@ foreach ($target in $normalizedTargets) {
       $stdout = $process.StandardOutput.ReadToEnd()
       $stderr = $process.StandardError.ReadToEnd()
       if ($process.ExitCode -ne 0) {
+        $snapshotError = if (Test-Path -LiteralPath $errorPath -PathType Leaf) {
+          Get-Content -LiteralPath $errorPath -Raw
+        } else {
+          "No snapshot diagnostic file was created."
+        }
         throw @"
 UI snapshot failed with exit code $($process.ExitCode): $imagePath
+snapshot diagnostic:
+$snapshotError
 stdout:
 $stdout
 stderr:
@@ -303,6 +327,9 @@ $stderr
         PixelSize = "$($metadata.pixelSize.width)x$($metadata.pixelSize.height)"
         Colors = $metadata.sampledColorCount
         LuminanceRange = $metadata.luminanceRange
+        MapPath = if ($null -eq $targetMapPath) { $null } else { $targetMapPath.Path }
+        GamePath =
+          if ($useMaterialFixture) { $resolvedMaterialGamePath.Path } else { $null }
         Image = $imagePath
         Manifest = $manifestPath
         Sha256 = $metadata.sha256
@@ -319,11 +346,17 @@ New-UiSnapshotContactSheet `
 
 $reportPath = Join-Path $runDirectory "report.json"
 $reportMapPath = if ($null -eq $resolvedMapPath) { $null } else { $resolvedMapPath.Path }
+$reportMaterialMapPath =
+  if ($null -eq $resolvedMaterialMapPath) { $null } else { $resolvedMaterialMapPath.Path }
+$reportMaterialGamePath =
+  if ($null -eq $resolvedMaterialGamePath) { $null } else { $resolvedMaterialGamePath.Path }
 @{
   status = "ok"
   executable = $executable
   qtBin = $resolvedQtBin.Path
   mapPath = $reportMapPath
+  materialMapPath = $reportMaterialMapPath
+  materialGamePath = $reportMaterialGamePath
   contactSheet = $contactSheetPath
   runs = $results
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $reportPath -Encoding UTF8

@@ -5,7 +5,8 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-16
-- Current stage: Phase 4.2 Inspector navigation rail complete
+- Current stage: Phase 4.3 complete; Material Browser acceptance hardened and Phase 4.4
+  scoped
 
 ## Objective
 
@@ -197,6 +198,34 @@ Expected benefit: medium to high. Search and filter actions now read as a delibe
 toolbar, stay usable in the constrained Inspector, and provide clear feedback instead of a
 blank content region when filters have no results.
 
+### Phase 4.4: Material Browser Density And Selection Context
+
+Status: proposed
+
+The resource-backed acceptance capture shows that the current browser is functional, but its
+content layout still reflects the legacy texture-at-native-aspect approach. Tall textures set
+the row height while shorter textures leave uneven dark areas, short labels receive as much
+space as long paths, and changing thumbnail size still requires leaving the browser for View
+preferences.
+
+- [ ] Put every material in a stable preview frame and aspect-fit the texture within it so
+      mixed texture dimensions produce aligned rows without distorting the image.
+- [ ] Elide long labels to one predictable line while retaining the full material name and
+      dimensions in the existing tooltip.
+- [ ] Add an inline compact thumbnail-size control backed by the existing
+      `MaterialBrowserIconSize` preference; reuse the established Assets browser control
+      pattern instead of creating a second size setting.
+- [ ] Add a quiet selected-material information row for the full name, dimensions, collection,
+      and usage count, without introducing a permanent large preview pane.
+- [ ] Extend deterministic acceptance with a dense mixed-aspect fixture state covering a
+      selected material, used/default borders, long names, grouping, and scrolling.
+- [ ] Validate click selection, face application, reveal, filtering, grouping, context actions,
+      and the Replace Material dialog before closing the phase.
+
+Expected benefit: high for repeated material-selection work. Difficulty is medium because the
+OpenGL cell layout and hit testing must change together, but this remains much lower risk than
+new docking or a separate full-size material browser window.
+
 ### Phase 5: Optional Structural Work
 
 Status: deferred
@@ -234,9 +263,14 @@ testing shows that the earlier phases do not meet the product goal.
   matrix validates image dimensions, device-pixel ratio, nonblank pixels, font support,
   and image hashes, then writes PNG and JSON evidence plus a labeled visual-comparison
   contact sheet under `build-release-codex\codex-logs\ui-theme-acceptance`.
+- Face Inspector and Material empty-result captures use the checked-in Quake 2 map/game
+  fixtures rather than the generic empty map. Snapshot mode keeps external background services
+  disabled but continues GL resource processing, waits up to five seconds for every fixture
+  texture to reach GPU-ready state, and fails on missing, failed, or pending resources. Failures
+  write a sibling `.error.txt` file which the acceptance script includes in its exception.
 - Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark
   [--ui-snapshot-page map|outliner|entity-browser|entity-browser-empty|face-inspector|material-browser-empty|supporting|command-palette|preferences|preferences-colors]
-  [map-file]` for a focused
+  [--ui-snapshot-game-path game-directory] [map-file]` for a focused
   single capture. Omitting the map captures Welcome unless `preferences` or
   `preferences-colors` is selected; supplying one captures the workbench. The Outliner
   page expands its hierarchy, properties panel, and active selection before rendering;
@@ -245,7 +279,7 @@ testing shows that the earlier phases do not meet the product goal.
   Palette uses a constrained 640 x 480 layout; the Preferences pages select View or
   Colors in the category sidebar. Snapshot mode uses temporary preferences, disables
   background services, and renders through the native Qt platform without showing the
-  window.
+  window. Material targets require loaded, GPU-ready textures before capture.
 - Verify keyboard-only navigation, focus visibility, disabled states, and text fit.
 - Keep generated screenshots and temporary visual reports out of commits unless they
   are intentionally selected as maintained references.
@@ -314,4 +348,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Complete | Moved Entity and Material search/filter controls into compact top-mounted two-row toolbars with dedicated rounded toggle states. |
 | 2026-08-16 | Complete | Added shared theme-aware OpenGL browser empty messages and deterministic Entity/Material empty-result snapshot targets, expanding the default matrix from 54 to 66 states. |
 | 2026-08-16 | Verified | Passed `Theme`, `MapWindow`, and `ModelBrowserView` (238 assertions), built Release `TrenchBroom`, and visually confirmed 24 normal and empty browser states at 100%, 150%, and 200% in `20260816-010203-138` and `20260816-010310-148`. |
-| 2026-08-16 | Next | Collect hands-on feedback on the Inspector navigation and browser workflows before starting a deferred Phase 5 structural experiment. |
+| 2026-08-16 | Complete | Hardened Material Browser snapshots with a real Quake 2 fixture, isolated game-path configuration, active GL resource processing, GPU-ready texture gates, bounded polling, and persisted failure diagnostics. |
+| 2026-08-16 | Verified | Passed `Theme`, `MapWindow`, `ModelBrowserView`, and `UiSnapshot` (256 assertions), built Release `TrenchBroom`, visually checked and passed the complete 66-state Light/Dark matrix at 100%, 150%, and 200% in `20260816-015438-123`, and confirmed the invalid-game-path guard reports a deterministic resource timeout. |
+| 2026-08-16 | Next | Implement Phase 4.4's stable mixed-aspect grid and inline size control before considering any deferred Phase 5 structural experiment. |
