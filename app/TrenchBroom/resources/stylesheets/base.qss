@@ -362,6 +362,12 @@ QWidget#ModelBrowser_Controls {
   padding: 4px;
 }
 
+QWidget#EntityBrowser_Controls,
+QWidget#MaterialBrowser_Controls {
+  background: @tb-panel-background;
+  border-top: 1px solid @tb-border;
+}
+
 QWidget#ModelBrowser_BreadcrumbBar {
   background: @tb-input-background;
   border: 1px solid @tb-border;
@@ -696,6 +702,40 @@ QHeaderView#OutlinerTreeHeader::section {
 QSplitter#OutlinerInspector_Splitter::handle {
   background: @tb-border;
   height: 5px;
+}
+
+QWidget#FaceAttribsEditor,
+QWidget#UvEditor,
+QWidget#MaterialBrowser {
+  background: @tb-panel-background;
+}
+
+QWidget#UvEditor_Toolbar {
+  background: @tb-panel-background;
+  border-top: 1px solid @tb-border;
+  padding: 3px 0;
+}
+
+QWidget#FaceAttribsEditor_Tools {
+  background: @tb-sidebar-background;
+}
+
+QWidget#FaceAttribsEditor_Attributes {
+  background: @tb-panel-background;
+}
+
+QWidget#FaceAttribsEditor_Attributes QLabel[faceFieldLabel="true"] {
+  color: @tb-secondary-text;
+  font-weight: normal;
+}
+
+QLabel#FaceAttribsEditor_MaterialName {
+  color: @tb-text;
+  font-weight: bold;
+}
+
+QWidget#FaceAttribsEditor_Attributes QDoubleSpinBox {
+  min-width: 70px;
 }
 
 QWidget#ClickableTitleBar {

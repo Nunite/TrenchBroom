@@ -220,6 +220,18 @@ TEST_CASE("MapWindow")
     CHECK(window.findChild<QWidget*>("ModelBrowser_FolderTree") != nullptr);
   }
 
+  SECTION("exposes styled inspector and browser sections")
+  {
+    CHECK(window.findChild<QWidget*>("FaceAttribsEditor") != nullptr);
+    CHECK(window.findChild<QWidget*>("FaceAttribsEditor_Tools") != nullptr);
+    CHECK(window.findChild<QWidget*>("FaceAttribsEditor_Attributes") != nullptr);
+    CHECK(window.findChild<QWidget*>("FaceAttribsEditor_MaterialName") != nullptr);
+    CHECK(window.findChild<QWidget*>("UvEditor") != nullptr);
+    CHECK(window.findChild<QWidget*>("UvEditor_Toolbar") != nullptr);
+    CHECK(window.findChild<QWidget*>("MaterialBrowser_Controls") != nullptr);
+    CHECK(window.findChild<QWidget*>("EntityBrowser_Controls") != nullptr);
+  }
+
   SECTION("uses a focused command palette structure")
   {
     auto context =

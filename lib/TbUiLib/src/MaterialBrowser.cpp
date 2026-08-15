@@ -108,6 +108,7 @@ void MaterialBrowser::setFilterText(const std::string& filterText)
  */
 void MaterialBrowser::createGui(AppController& appController)
 {
+  setObjectName(QStringLiteral("MaterialBrowser"));
   auto* browserPanel = new QWidget{};
   m_scrollBar = new QScrollBar{Qt::Vertical};
 
@@ -163,11 +164,16 @@ void MaterialBrowser::createGui(AppController& appController)
   controlLayout->addWidget(m_usedButton);
   controlLayout->addWidget(m_filterBox, 1);
 
+  auto* controls = new QWidget{};
+  controls->setObjectName(QStringLiteral("MaterialBrowser_Controls"));
+  controls->setAttribute(Qt::WA_StyledBackground);
+  controls->setLayout(controlLayout);
+
   auto* outerLayout = new QVBoxLayout{};
   outerLayout->setContentsMargins(0, 0, 0, 0);
   outerLayout->setSpacing(0);
   outerLayout->addWidget(browserPanel, 1);
-  outerLayout->addLayout(controlLayout, 0);
+  outerLayout->addWidget(controls, 0);
 
   setLayout(outerLayout);
 }

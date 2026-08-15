@@ -26,6 +26,7 @@
 
 class QScrollBar;
 class QDrag;
+class QEvent;
 class QMimeData;
 
 namespace tb::ui
@@ -43,7 +44,7 @@ protected:
 
 private:
   Layout m_layout;
-  Cell* m_selectedCell = nullptr;
+  const Cell* m_hoveredCell = nullptr;
   bool m_layoutInitialized = false;
 
   bool m_valid = false;
@@ -100,6 +101,7 @@ public: // QWidget overrides
   void mouseReleaseEvent(QMouseEvent* event) override;
   void mouseDoubleClickEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
+  void leaveEvent(QEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
   bool event(QEvent* event) override;
   void contextMenuEvent(QContextMenuEvent* event) override;
@@ -117,6 +119,7 @@ private:
   void renderContents(gl::Gl& gl) override;
   void setupGL(gl::Gl& gl);
 
+  void renderCellBackgrounds(gl::Gl& gl, float y, float height);
   void renderTitleBackgrounds(gl::Gl& gl, float y, float height);
   void renderTitleStrings(gl::Gl& gl, float y, float height);
 
@@ -130,6 +133,7 @@ private:
   virtual void doContextMenu(Layout& layout, float x, float y, QContextMenuEvent* event);
 
   virtual bool dndEnabled();
+  virtual bool isCellSelected(const Cell& cell) const;
   virtual QPixmap dndImage(const Cell& cell);
   virtual QString dndData(const Cell& cell);
   virtual QString tooltip(const Cell& cell);

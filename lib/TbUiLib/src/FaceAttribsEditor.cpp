@@ -77,6 +77,13 @@ public:
   };
 };
 
+QLabel* createFieldLabel(const QString& text)
+{
+  auto* label = new QLabel{text};
+  label->setProperty("faceFieldLabel", true);
+  return label;
+}
+
 std::tuple<QList<int>, QStringList, QStringList> getFlags(
   const std::vector<mdl::FlagConfig>& flags)
 {
@@ -102,6 +109,7 @@ FaceAttribsEditor::FaceAttribsEditor(
   , m_document{document}
   , m_updateControlsSignalDelayer{new SignalDelayer{this}}
 {
+  setObjectName(QStringLiteral("FaceAttribsEditor"));
   createGui(appController);
   bindEvents();
   connectObservers();
@@ -460,11 +468,17 @@ Hold %2 to keep trim sheet subdivisions.)")
   innerLayout->setSpacing(LayoutConstants::NarrowHMargin);
 
   auto* outerLayout = new QVBoxLayout{};
-  outerLayout->setContentsMargins(QMargins{0, 0, 0, 0});
+  outerLayout->setContentsMargins(
+    LayoutConstants::NarrowHMargin,
+    LayoutConstants::MediumVMargin,
+    LayoutConstants::NarrowHMargin,
+    LayoutConstants::MediumVMargin);
   outerLayout->addLayout(innerLayout);
   outerLayout->addStretch(0);
 
   auto* container = new QWidget{};
+  container->setObjectName(QStringLiteral("FaceAttribsEditor_Tools"));
+  container->setAttribute(Qt::WA_StyledBackground);
   container->setLayout(outerLayout);
   container->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
   return container;
@@ -472,54 +486,47 @@ Hold %2 to keep trim sheet subdivisions.)")
 
 QWidget* FaceAttribsEditor::createAttribsWidget()
 {
-  auto* materialNameLabel = new QLabel{"Material"};
-  setEmphasizedStyle(materialNameLabel);
+  auto* materialNameLabel = createFieldLabel(QStringLiteral("Material"));
   m_materialName = new QLabel{"none"};
+  m_materialName->setObjectName(QStringLiteral("FaceAttribsEditor_MaterialName"));
   m_materialName->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
-  auto* textureSizeLabel = new QLabel{"Size"};
-  setEmphasizedStyle(textureSizeLabel);
+  auto* textureSizeLabel = createFieldLabel(QStringLiteral("Size"));
   m_textureSize = new QLabel{""};
 
   const auto max = std::numeric_limits<double>::max();
   const auto min = -max;
 
-  auto* xOffsetLabel = new QLabel{"X Offset"};
-  setEmphasizedStyle(xOffsetLabel);
+  auto* xOffsetLabel = createFieldLabel(QStringLiteral("X Offset"));
   m_xOffsetEditor = new SpinControl{};
   m_xOffsetEditor->setRange(min, max);
   m_xOffsetEditor->setDigits(0, 6);
 
-  auto* yOffsetLabel = new QLabel{"Y Offset"};
-  setEmphasizedStyle(yOffsetLabel);
+  auto* yOffsetLabel = createFieldLabel(QStringLiteral("Y Offset"));
   m_yOffsetEditor = new SpinControl{};
   m_yOffsetEditor->setRange(min, max);
   m_yOffsetEditor->setDigits(0, 6);
 
-  auto* xScaleLabel = new QLabel{"X Scale"};
-  setEmphasizedStyle(xScaleLabel);
+  auto* xScaleLabel = createFieldLabel(QStringLiteral("X Scale"));
   m_xScaleEditor = new SpinControl{};
   m_xScaleEditor->setRange(min, max);
   m_xScaleEditor->setIncrements(0.1, 0.25, 0.01);
   m_xScaleEditor->setDigits(0, 6);
 
-  auto* yScaleLabel = new QLabel{"Y Scale"};
-  setEmphasizedStyle(yScaleLabel);
+  auto* yScaleLabel = createFieldLabel(QStringLiteral("Y Scale"));
   m_yScaleEditor = new SpinControl{};
   m_yScaleEditor->setRange(min, max);
   m_yScaleEditor->setIncrements(0.1, 0.25, 0.01);
   m_yScaleEditor->setDigits(0, 6);
 
-  auto* rotationLabel = new QLabel{"Angle"};
-  setEmphasizedStyle(rotationLabel);
+  auto* rotationLabel = createFieldLabel(QStringLiteral("Angle"));
   m_rotationEditor = new SpinControl{};
   m_rotationEditor->setRange(min, max);
   m_rotationEditor->setDigits(0, 6);
   m_rotationEditor->setToolTip(
     tr("Stored Valve rotation; affine UV axis skew is shown separately."));
 
-  m_uvSkewLabel = new QLabel{"UV Skew"};
-  setEmphasizedStyle(m_uvSkewLabel);
+  m_uvSkewLabel = createFieldLabel(QStringLiteral("UV Skew"));
   m_uvSkewEditor = new SpinControl{};
   m_uvSkewEditor->setRange(0.0, 90.0);
   m_uvSkewEditor->setDigits(0, 3);
@@ -528,8 +535,7 @@ QWidget* FaceAttribsEditor::createAttribsWidget()
   m_uvSkewEditor->setButtonSymbols(QAbstractSpinBox::NoButtons);
   m_uvSkewEditor->setToolTip(tr("Angular deviation from orthogonal UV axes."));
 
-  m_surfaceValueLabel = new QLabel{"Value"};
-  setEmphasizedStyle(m_surfaceValueLabel);
+  m_surfaceValueLabel = createFieldLabel(QStringLiteral("Value"));
   m_surfaceValueEditor = new SpinControl{};
   m_surfaceValueEditor->setRange(min, max);
   m_surfaceValueEditor->setIncrements(1.0, 10.0, 100.0);
@@ -539,24 +545,21 @@ QWidget* FaceAttribsEditor::createAttribsWidget()
   m_surfaceValueEditorLayout =
     createUnsetButtonLayout(m_surfaceValueEditor, m_surfaceValueUnsetButton);
 
-  m_surfaceFlagsLabel = new QLabel{"Surface"};
-  setEmphasizedStyle(m_surfaceFlagsLabel);
+  m_surfaceFlagsLabel = createFieldLabel(QStringLiteral("Surface"));
   m_surfaceFlagsEditor = new FlagsPopupEditor{2};
   m_surfaceFlagsUnsetButton =
     createBitmapButton("ResetUV.svg", tr("Unset surface flags"));
   m_surfaceFlagsEditorLayout =
     createUnsetButtonLayout(m_surfaceFlagsEditor, m_surfaceFlagsUnsetButton);
 
-  m_contentFlagsLabel = new QLabel{"Content"};
-  setEmphasizedStyle(m_contentFlagsLabel);
+  m_contentFlagsLabel = createFieldLabel(QStringLiteral("Content"));
   m_contentFlagsEditor = new FlagsPopupEditor{2};
   m_contentFlagsUnsetButton =
     createBitmapButton("ResetUV.svg", tr("Unset content flags"));
   m_contentFlagsEditorLayout =
     createUnsetButtonLayout(m_contentFlagsEditor, m_contentFlagsUnsetButton);
 
-  m_colorLabel = new QLabel{"Color"};
-  setEmphasizedStyle(m_colorLabel);
+  m_colorLabel = createFieldLabel(QStringLiteral("Color"));
   m_colorEditor = new QLineEdit{};
   m_colorEditor->setProperty("error", false);
   m_colorUnsetButton = createBitmapButton("ResetUV.svg", tr("Unset color"));
@@ -631,6 +634,8 @@ QWidget* FaceAttribsEditor::createAttribsWidget()
   faceAttribsLayout->setColumnStretch(3, 1);
 
   auto* container = new QWidget{};
+  container->setObjectName(QStringLiteral("FaceAttribsEditor_Attributes"));
+  container->setAttribute(Qt::WA_StyledBackground);
   container->setLayout(faceAttribsLayout);
   return container;
 }

@@ -21,7 +21,6 @@
 
 #include <QAudioOutput>
 #include <QContextMenuEvent>
-#include <QEvent>
 #include <QInputDialog>
 #include <QMediaPlayer>
 #include <QMenu>
@@ -45,6 +44,7 @@
 #include "gl/TextureFont.h"
 #include "gl/VertexArray.h"
 #include "gl/VertexType.h"
+#include "mdl/BasicShapes.h"
 #include "mdl/EntityModelManager.h"
 #include "mdl/GameFileSystem.h"
 #include "mdl/GoldSrcMdlScaler.h"
@@ -90,22 +90,51 @@ float assetCellSize()
          * std::clamp(pref(Preferences::AssetBrowserIconSize), 0.5f, 3.0f);
 }
 
-std::optional<RgbaF> assetPlaceholderColor(const BrowserCellType type)
+std::optional<RgbaF> assetPlaceholderColor(
+  const BrowserCellType type, const QPalette& palette)
 {
+  const auto lightBackground = palette.color(QPalette::Base).lightnessF() > 0.5f;
   switch (type)
   {
   case BrowserCellType::Sprite:
-    return RgbaF{0.78f, 0.12f, 0.16f, 0.22f};
+    return RgbaF{0.78f, 0.12f, 0.16f, lightBackground ? 0.12f : 0.22f};
   case BrowserCellType::Sound:
-    return RgbaF{0.66f, 0.54f, 0.95f, 0.35f};
+    return RgbaF{0.48f, 0.35f, 0.82f, lightBackground ? 0.14f : 0.28f};
   case BrowserCellType::Prefab:
-    return RgbaF{0.20f, 0.58f, 0.48f, 0.30f};
+    return RgbaF{0.12f, 0.48f, 0.34f, lightBackground ? 0.12f : 0.24f};
   case BrowserCellType::Folder:
   case BrowserCellType::Model:
     return std::nullopt;
   }
 
   return std::nullopt;
+}
+
+void appendRoundedRectVertices(
+  std::vector<gl::VertexTypes::P2C4::Vertex>& vertices,
+  const float left,
+  const float top,
+  const float right,
+  const float bottom,
+  const float y,
+  const float height,
+  const vm::vec4f& color,
+  const float cornerRadius = 4.0f)
+{
+  const auto width = std::max(0.0f, right - left);
+  const auto rectHeight = std::max(0.0f, bottom - top);
+  if (width <= 0.0f || rectHeight <= 0.0f)
+  {
+    return;
+  }
+
+  const auto radius = std::min(cornerRadius, std::min(width, rectHeight) / 2.0f);
+  const auto center =
+    vm::vec2f{left + width / 2.0f, height - (top + rectHeight / 2.0f - y)};
+  for (const auto& vertex : mdl::roundedRect2D(width, rectHeight, radius, 3))
+  {
+    vertices.emplace_back(center + vertex, color);
+  }
 }
 
 bool shouldRenderErrorText(const BrowserCellType type, const AssetPreviewState* preview)
@@ -196,7 +225,6 @@ void ModelBrowserView::setAssets(
   m_assets = std::move(assets);
   m_currentFolderPath.clear();
   m_hasSelection = false;
-  m_hasHover = false;
   stopSoundPreview();
   invalidate();
   update();
@@ -214,46 +242,8 @@ void ModelBrowserView::setCurrentFolderPath(std::filesystem::path currentFolderP
   {
     m_currentFolderPath = std::move(currentFolderPath);
     m_hasSelection = false;
-    m_hasHover = false;
     stopSoundPreview();
     invalidate();
-    update();
-  }
-}
-
-void ModelBrowserView::doMouseMove(Layout& layout, const float x, const float y)
-{
-  if (const auto* cell = layout.cellAt(x, y))
-  {
-    const auto& item = cellData(*cell);
-    const auto changed =
-      !m_hasHover || m_hoverType != item.type || m_hoverPath != item.path;
-
-    m_hoverType = item.type;
-    m_hoverPath = item.path;
-    m_hasHover = true;
-
-    if (changed)
-    {
-      update();
-    }
-  }
-  else
-  {
-    if (m_hasHover)
-    {
-      m_hasHover = false;
-      update();
-    }
-  }
-}
-
-void ModelBrowserView::leaveEvent(QEvent* event)
-{
-  CellView::leaveEvent(event);
-  if (m_hasHover)
-  {
-    m_hasHover = false;
     update();
   }
 }
@@ -326,14 +316,6 @@ void ModelBrowserView::doRender(
     vm::ortho_matrix(-1.0f, 1.0f, viewLeft, viewTop, viewRight, viewBottom),
     vm::view_matrix(vm::vec3f{0, 0, -1}, vm::vec3f{0, 1, 0})
       * vm::translation_matrix(vm::vec3f{0.0f, 0.0f, 0.1f})};
-  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Model);
-  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Model);
-  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Sprite);
-  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Sprite);
-  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Sound);
-  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Sound);
-  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Prefab);
-  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Prefab);
   renderFolders(gl, layout, y, height);
   renderAssetPlaceholders(gl, layout, y, height);
   renderSoundPreviewButtons(gl, layout, y, height);
@@ -560,6 +542,17 @@ bool ModelBrowserView::shouldRenderFocusIndicator() const
 Color ModelBrowserView::getBackgroundColor()
 {
   return browserBackgroundColor(palette());
+}
+
+bool ModelBrowserView::isCellSelected(const Cell& cell) const
+{
+  if (!m_hasSelection)
+  {
+    return false;
+  }
+
+  const auto& item = cellData(cell);
+  return item.type == m_selectedType && item.path == m_selectedPath;
 }
 
 void ModelBrowserView::doLeftClick(Layout& layout, const float x, const float y)
@@ -821,7 +814,7 @@ void ModelBrowserView::renderAssetPlaceholders(
               continue;
             }
 
-            const auto color = assetPlaceholderColor(item.type);
+            const auto color = assetPlaceholderColor(item.type, palette());
             if (!color)
             {
               continue;
@@ -829,17 +822,20 @@ void ModelBrowserView::renderAssetPlaceholders(
 
             const auto& bounds = cell.itemBounds();
             const auto colorVec = color->toVec();
-            addQuad(
+            appendRoundedRectVertices(
               backgroundVertices,
               bounds.left() + 6.0f,
               bounds.top() + 6.0f,
               bounds.right() - 6.0f,
               bounds.bottom() - 6.0f,
+              y,
+              height,
               colorVec);
 
             if (item.type == BrowserCellType::Sound)
             {
-              const auto iconColor = RgbaF{0.90f, 0.86f, 1.0f, 0.92f}.toVec();
+              const auto iconColor =
+                RgbaF{browserTextColor(palette()).to<RgbF>(), 0.88f}.toVec();
               const auto iconSize = std::min(bounds.width, bounds.height) * 0.48f;
               const auto left = bounds.left() + (bounds.width - iconSize) / 2.0f;
               const auto top = bounds.top() + (bounds.height - iconSize) / 2.0f;
@@ -890,7 +886,7 @@ void ModelBrowserView::renderAssetPlaceholders(
               const auto textOffset = vm::vec2f{
                 bounds.left() + std::max((bounds.width - textSize.x()) / 2.0f, 0.0f),
                 height - (bounds.top() - y) - (bounds.height - textSize.y()) / 2.0f};
-              const auto textColor = RgbaF{1.0f, 0.84f, 0.84f, 0.95f}.toVec();
+              const auto textColor = browserErrorColor(palette()).to<RgbaF>().toVec();
               const auto textQuads = font.quads(errorText, false, textOffset);
               const auto textVertices = TextVertex::toList(kdl::views::zip(
                 textQuads | kdl::views::stride(2),
@@ -914,11 +910,13 @@ void ModelBrowserView::renderAssetPlaceholders(
 
   auto vertexArray = gl::VertexArray::move(std::move(backgroundVertices));
   vertexArray.prepare(gl, vboManager());
+  gl.disable(GL_CULL_FACE);
   if (vertexArray.setup(gl, shader.program()))
   {
-    vertexArray.render(gl, gl::PrimType::Quads);
+    vertexArray.render(gl, gl::PrimType::Triangles);
     vertexArray.cleanup(gl, shader.program());
   }
+  gl.enable(GL_CULL_FACE);
 
   auto iconVertexArray = gl::VertexArray::move(std::move(iconVertices));
   iconVertexArray.prepare(gl, vboManager());
@@ -1008,15 +1006,19 @@ void ModelBrowserView::renderSoundPreviewButtons(
         }
 
         const auto bounds = soundPreviewButtonBounds(cell.itemBounds());
-        const auto backgroundColor = RgbaF{0.08f, 0.07f, 0.12f, 0.82f}.toVec();
-        const auto iconColor = RgbaF{0.98f, 0.95f, 1.0f, 0.96f}.toVec();
-        addQuad(
+        const auto backgroundColor = browserCellHoverColor(palette()).to<RgbaF>().toVec();
+        const auto iconColor =
+          RgbaF{browserTextColor(palette()).to<RgbF>(), 0.96f}.toVec();
+        appendRoundedRectVertices(
           backgroundVertices,
           bounds.left(),
           bounds.top(),
           bounds.right(),
           bounds.bottom(),
-          backgroundColor);
+          y,
+          height,
+          backgroundColor,
+          5.0f);
 
         const auto pad = bounds.width * 0.28f;
         if (isPreviewingSound(item.path))
@@ -1060,11 +1062,13 @@ void ModelBrowserView::renderSoundPreviewButtons(
 
   auto backgroundVertexArray = gl::VertexArray::move(std::move(backgroundVertices));
   backgroundVertexArray.prepare(gl, vboManager());
+  gl.disable(GL_CULL_FACE);
   if (backgroundVertexArray.setup(gl, shader.program()))
   {
-    backgroundVertexArray.render(gl, gl::PrimType::Quads);
+    backgroundVertexArray.render(gl, gl::PrimType::Triangles);
     backgroundVertexArray.cleanup(gl, shader.program());
   }
+  gl.enable(GL_CULL_FACE);
 
   auto iconVertexArray = gl::VertexArray::move(std::move(iconVertices));
   iconVertexArray.prepare(gl, vboManager());
@@ -1164,206 +1168,9 @@ void ModelBrowserView::renderSpritePreviews(
   }
 }
 
-void ModelBrowserView::renderHoveredCellBounds(
-  gl::Gl& gl,
-  Layout& layout,
-  const float y,
-  const float height,
-  const BrowserCellType type)
-{
-  if (!m_hasHover)
-  {
-    return;
-  }
-
-  if (m_hasSelection && m_selectedType == m_hoverType && m_selectedPath == m_hoverPath)
-  {
-    return;
-  }
-
-  using BoundsVertex = gl::VertexTypes::P2C4::Vertex;
-  auto vertices = std::vector<BoundsVertex>{};
-
-  const auto rgb = browserTextColor(palette()).to<RgbF>();
-  const auto color = RgbaF{rgb, 0.10f}.toVec();
-
-  for (const auto& group : layout.groups())
-  {
-    if (group.intersectsY(y, height))
-    {
-      for (const auto& row : group.rows())
-      {
-        if (row.intersectsY(y, height))
-        {
-          for (const auto& cell : row.cells())
-          {
-            const auto& item = cellData(cell);
-            if (item.type != type || item.type != m_hoverType || item.path != m_hoverPath)
-            {
-              continue;
-            }
-
-            const auto& bounds = cell.itemBounds();
-            vertices.emplace_back(
-              vm::vec2f{bounds.left() - 2.0f, height - (bounds.top() - 2.0f - y)}, color);
-            vertices.emplace_back(
-              vm::vec2f{bounds.left() - 2.0f, height - (bounds.bottom() + 2.0f - y)},
-              color);
-            vertices.emplace_back(
-              vm::vec2f{bounds.right() + 2.0f, height - (bounds.bottom() + 2.0f - y)},
-              color);
-            vertices.emplace_back(
-              vm::vec2f{bounds.right() + 2.0f, height - (bounds.top() - 2.0f - y)},
-              color);
-          }
-        }
-      }
-    }
-  }
-
-  if (vertices.empty())
-  {
-    return;
-  }
-
-  auto vertexArray = gl::VertexArray::move(std::move(vertices));
-  auto shader =
-    gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserBorderShader};
-
-  vertexArray.prepare(gl, vboManager());
-  if (vertexArray.setup(gl, shader.program()))
-  {
-    vertexArray.render(gl, gl::PrimType::Quads);
-    vertexArray.cleanup(gl, shader.program());
-  }
-}
-
-void ModelBrowserView::renderSelectedCellBounds(
-  gl::Gl& gl,
-  Layout& layout,
-  const float y,
-  const float height,
-  const BrowserCellType type)
-{
-  if (!m_hasSelection)
-  {
-    return;
-  }
-
-  using BoundsVertex = gl::VertexTypes::P2C4::Vertex;
-  auto vertices = std::vector<BoundsVertex>{};
-
-  const auto rgb = browserTextColor(palette()).to<RgbF>();
-  const auto color = RgbaF{rgb, 0.18f}.toVec();
-
-  for (const auto& group : layout.groups())
-  {
-    if (group.intersectsY(y, height))
-    {
-      for (const auto& row : group.rows())
-      {
-        if (row.intersectsY(y, height))
-        {
-          for (const auto& cell : row.cells())
-          {
-            const auto& item = cellData(cell);
-            if (
-              item.type != type || item.type != m_selectedType
-              || item.path != m_selectedPath)
-            {
-              continue;
-            }
-
-            const auto& bounds = cell.itemBounds();
-            vertices.emplace_back(
-              vm::vec2f{bounds.left() - 2.0f, height - (bounds.top() - 2.0f - y)}, color);
-            vertices.emplace_back(
-              vm::vec2f{bounds.left() - 2.0f, height - (bounds.bottom() + 2.0f - y)},
-              color);
-            vertices.emplace_back(
-              vm::vec2f{bounds.right() + 2.0f, height - (bounds.bottom() + 2.0f - y)},
-              color);
-            vertices.emplace_back(
-              vm::vec2f{bounds.right() + 2.0f, height - (bounds.top() - 2.0f - y)},
-              color);
-          }
-        }
-      }
-    }
-  }
-
-  if (vertices.empty())
-  {
-    return;
-  }
-
-  auto vertexArray = gl::VertexArray::move(std::move(vertices));
-  auto shader =
-    gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserBorderShader};
-
-  vertexArray.prepare(gl, vboManager());
-  if (vertexArray.setup(gl, shader.program()))
-  {
-    vertexArray.render(gl, gl::PrimType::Quads);
-    vertexArray.cleanup(gl, shader.program());
-  }
-}
-
 void ModelBrowserView::renderFolders(
   gl::Gl& gl, Layout& layout, const float y, const float height)
 {
-  using Vertex = gl::VertexTypes::P2::Vertex;
-  auto vertices = std::vector<Vertex>{};
-
-  for (const auto& group : layout.groups())
-  {
-    if (group.intersectsY(y, height))
-    {
-      for (const auto& row : group.rows())
-      {
-        if (row.intersectsY(y, height))
-        {
-          for (const auto& cell : row.cells())
-          {
-            const auto& item = cellData(cell);
-            if (item.type != BrowserCellType::Folder)
-            {
-              continue;
-            }
-
-            const auto& bounds = cell.itemBounds();
-            vertices.emplace_back(vm::vec2f{bounds.left(), height - (bounds.top() - y)});
-            vertices.emplace_back(
-              vm::vec2f{bounds.left(), height - (bounds.bottom() - y)});
-            vertices.emplace_back(
-              vm::vec2f{bounds.right(), height - (bounds.bottom() - y)});
-            vertices.emplace_back(vm::vec2f{bounds.right(), height - (bounds.top() - y)});
-          }
-        }
-      }
-    }
-  }
-
-  if (vertices.empty())
-  {
-    return;
-  }
-
-  auto shader =
-    gl::ActiveShader{gl, shaderManager(), gl::Shaders::VaryingPUniformCShader};
-  shader.set("Color", RgbaF{browserGroupBackgroundColor(palette()).to<RgbF>(), 0.35f});
-
-  auto vertexArray = gl::VertexArray::move(std::move(vertices));
-  vertexArray.prepare(gl, vboManager());
-  if (vertexArray.setup(gl, shader.program()))
-  {
-    vertexArray.render(gl, gl::PrimType::Quads);
-    vertexArray.cleanup(gl, shader.program());
-  }
-
-  renderHoveredCellBounds(gl, layout, y, height, BrowserCellType::Folder);
-  renderSelectedCellBounds(gl, layout, y, height, BrowserCellType::Folder);
-
   ensureFolderIconTexture(gl);
   if (m_folderIconTextureId == 0)
   {

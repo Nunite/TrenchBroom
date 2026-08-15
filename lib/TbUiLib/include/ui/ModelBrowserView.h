@@ -36,7 +36,6 @@
 #include <set>
 #include <vector>
 
-class QEvent;
 class QContextMenuEvent;
 class QAudioOutput;
 class QMediaPlayer;
@@ -101,9 +100,6 @@ private:
   bool m_hasSelection = false;
   BrowserCellType m_selectedType = BrowserCellType::Folder;
   std::filesystem::path m_selectedPath;
-  bool m_hasHover = false;
-  BrowserCellType m_hoverType = BrowserCellType::Folder;
-  std::filesystem::path m_hoverPath;
 
 public:
   ModelBrowserView(
@@ -115,8 +111,6 @@ public:
   void setSearchText(QString searchText);
 
 private:
-  void leaveEvent(QEvent* event) override;
-
   void resourcesWereProcessed(const std::vector<mdl::ResourceId>& resources);
 
   void doInitLayout(Layout& layout) override;
@@ -129,7 +123,7 @@ private:
   void doRender(gl::Gl& gl, Layout& layout, float y, float height) override;
   bool shouldRenderFocusIndicator() const override;
   Color getBackgroundColor() override;
-  void doMouseMove(Layout& layout, float x, float y) override;
+  bool isCellSelected(const Cell& cell) const override;
   void doLeftClick(Layout& layout, float x, float y) override;
   void doDoubleClick(Layout& layout, float x, float y) override;
   void doContextMenu(Layout& layout, float x, float y, QContextMenuEvent* event) override;
@@ -151,10 +145,6 @@ private:
   const SpritePreviewTexture* ensureSpritePreviewTexture(
     gl::Gl& gl, const std::filesystem::path& path, const GoldSrcSpritePreview& preview);
 
-  void renderHoveredCellBounds(
-    gl::Gl& gl, Layout& layout, float y, float height, BrowserCellType type);
-  void renderSelectedCellBounds(
-    gl::Gl& gl, Layout& layout, float y, float height, BrowserCellType type);
   void renderFolders(gl::Gl& gl, Layout& layout, float y, float height);
   void renderModels(
     gl::Gl& gl,

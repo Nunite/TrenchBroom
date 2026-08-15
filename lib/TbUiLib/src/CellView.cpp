@@ -35,6 +35,7 @@
 #include "gl/TextureFont.h"
 #include "gl/VertexArray.h"
 #include "gl/VertexType.h"
+#include "mdl/BasicShapes.h"
 #include "prefs/Preferences.h"
 #include "render/Transformation.h"
 #include "ui/CellLayout.h"
@@ -77,6 +78,7 @@ void CellView::reloadLayout()
 {
   initLayout(); // always initialize the layout when reloading
 
+  m_hoveredCell = nullptr;
   m_layout.clear();
   doReloadLayout(m_layout);
   updateScrollBar();
@@ -113,11 +115,13 @@ CellView::CellView(AppController& appController, QScrollBar* scrollBar)
 
 void CellView::invalidate()
 {
+  m_hoveredCell = nullptr;
   m_valid = false;
 }
 
 void CellView::clear()
 {
+  m_hoveredCell = nullptr;
   m_layout.clear();
   doClear();
   m_valid = true;
@@ -126,6 +130,7 @@ void CellView::clear()
 void CellView::resizeEvent(QResizeEvent* event)
 {
   validate();
+  m_hoveredCell = nullptr;
   m_layout.setWidth(float(size().width()));
   updateScrollBar();
 
@@ -158,6 +163,7 @@ void CellView::scrollToCellInternal(const Cell& cell)
 
 void CellView::onScrollBarValueChanged()
 {
+  m_hoveredCell = nullptr;
   update();
 }
 
@@ -255,10 +261,26 @@ void CellView::mouseMoveEvent(QMouseEvent* event)
     const auto top = m_scrollBar ? m_scrollBar->value() : 0;
     const auto x = float(event->position().x());
     const auto y = float(event->position().y() + top);
+    const auto* hoveredCell = m_layout.cellAt(x, y);
+    if (m_hoveredCell != hoveredCell)
+    {
+      m_hoveredCell = hoveredCell;
+      update();
+    }
     doMouseMove(m_layout, x, y);
   }
 
   m_lastMousePos = event->pos();
+}
+
+void CellView::leaveEvent(QEvent* event)
+{
+  if (m_hoveredCell != nullptr)
+  {
+    m_hoveredCell = nullptr;
+    update();
+  }
+  RenderView::leaveEvent(event);
 }
 
 void CellView::wheelEvent(QWheelEvent* event)
@@ -393,6 +415,7 @@ void CellView::renderContents(gl::Gl& gl)
   const auto y = float(visibleRect.y());
   const auto h = float(visibleRect.height());
 
+  renderCellBackgrounds(gl, y, h);
   doRender(gl, m_layout, y, h);
 
   const auto viewLeft = float(0);
@@ -428,6 +451,95 @@ void CellView::setupGL(gl::Gl& gl)
   gl.enable(GL_DEPTH_TEST);
   gl.depthFunc(GL_LEQUAL);
   gl.shadeModel(GL_SMOOTH);
+}
+
+namespace
+{
+
+void appendRoundedRect(
+  std::vector<gl::VertexTypes::P2C4::Vertex>& vertices,
+  const LayoutBounds& bounds,
+  const float y,
+  const float height,
+  const RgbaF& color)
+{
+  constexpr auto CornerRadius = 5.0f;
+  constexpr auto CornerSegments = size_t{3};
+
+  const auto radius =
+    std::min(CornerRadius, std::min(bounds.width, bounds.height) / 2.0f);
+  const auto center = vm::vec2f{
+    bounds.left() + bounds.width / 2.0f,
+    height - (bounds.top() + bounds.height / 2.0f - y)};
+  for (const auto& vertex :
+       mdl::roundedRect2D(bounds.width, bounds.height, radius, CornerSegments))
+  {
+    vertices.emplace_back(center + vertex, color.toVec());
+  }
+}
+
+} // namespace
+
+void CellView::renderCellBackgrounds(gl::Gl& gl, const float y, const float height)
+{
+  using Vertex = gl::VertexTypes::P2C4::Vertex;
+  auto vertices = std::vector<Vertex>{};
+  const auto backgroundColor = browserCellBackgroundColor(palette()).to<RgbaF>();
+  const auto hoverColor = browserCellHoverColor(palette()).to<RgbaF>();
+  const auto selectedColor = browserCellSelectedColor(palette()).to<RgbaF>();
+
+  for (const auto& group : m_layout.groups())
+  {
+    if (!group.intersectsY(y, height))
+    {
+      continue;
+    }
+
+    for (const auto& row : group.rows())
+    {
+      if (!row.intersectsY(y, height))
+      {
+        continue;
+      }
+
+      for (const auto& cell : row.cells())
+      {
+        appendRoundedRect(vertices, cell.cellBounds(), y, height, backgroundColor);
+        if (isCellSelected(cell))
+        {
+          appendRoundedRect(vertices, cell.cellBounds(), y, height, selectedColor);
+        }
+        else if (m_hoveredCell == &cell)
+        {
+          appendRoundedRect(vertices, cell.cellBounds(), y, height, hoverColor);
+        }
+      }
+    }
+  }
+
+  if (vertices.empty())
+  {
+    return;
+  }
+
+  const auto transformation = render::Transformation{
+    gl,
+    vm::ortho_matrix(
+      -1.0f, 1.0f, 0.0f, float(size().height()), float(size().width()), 0.0f),
+    vm::view_matrix(vm::vec3f{0, 0, -1}, vm::vec3f{0, 1, 0})
+      * vm::translation_matrix(vm::vec3f{0.0f, 0.0f, 0.1f})};
+
+  auto shader =
+    gl::ActiveShader{gl, shaderManager(), gl::Shaders::MaterialBrowserBorderShader};
+  auto vertexArray = gl::VertexArray::move(std::move(vertices));
+  vertexArray.prepare(gl, vboManager());
+  gl.disable(GL_CULL_FACE);
+  if (vertexArray.setup(gl, shader.program()))
+  {
+    vertexArray.render(gl, gl::PrimType::Triangles);
+    vertexArray.cleanup(gl, shader.program());
+  }
+  gl.enable(GL_CULL_FACE);
 }
 
 void CellView::renderTitleBackgrounds(gl::Gl& gl, float y, float height)
@@ -582,6 +694,11 @@ void CellView::doMouseMove(Layout&, float, float) {}
 void CellView::doContextMenu(Layout&, float, float, QContextMenuEvent*) {}
 
 bool CellView::dndEnabled()
+{
+  return false;
+}
+
+bool CellView::isCellSelected(const Cell&) const
 {
   return false;
 }

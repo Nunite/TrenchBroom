@@ -88,6 +88,18 @@ TEST_CASE("Theme")
       toQColor(browserGroupBackgroundColor(palette))
       == palette.color(QPalette::AlternateBase));
     CHECK(toQColor(browserTextColor(palette)) == palette.color(QPalette::Text));
+    CHECK(
+      toQColor(browserCellBackgroundColor(palette))
+      == palette.color(QPalette::AlternateBase));
+    CHECK(toQColor(browserCellHoverColor(palette)) == palette.color(QPalette::Midlight));
+
+    auto expectedSelectedColor = palette.color(QPalette::Highlight);
+    expectedSelectedColor.setAlpha(64);
+    CHECK(toQColor(browserCellSelectedColor(palette)) == expectedSelectedColor);
+    CHECK(toQColor(browserErrorColor(palette)) == (QColor{196, 43, 28}));
+    CHECK(
+      toQColor(browserErrorColor(makeThemePalette(makeDarkThemeTokens())))
+      == (QColor{244, 135, 113}));
 
     const auto customBackground = Color{RgbF{0.2f, 0.3f, 0.4f}};
     setPref(Preferences::BrowserBackgroundColor, customBackground);

@@ -68,6 +68,10 @@ QPalette makeThemePalette(const ThemeTokens& tokens);
 Color browserBackgroundColor(const QPalette& palette);
 Color browserGroupBackgroundColor(const QPalette& palette);
 Color browserTextColor(const QPalette& palette);
+Color browserCellBackgroundColor(const QPalette& palette);
+Color browserCellHoverColor(const QPalette& palette);
+Color browserCellSelectedColor(const QPalette& palette);
+Color browserErrorColor(const QPalette& palette);
 
 /**
  * Expands @tb-* placeholders without changing styleSheet if an unknown token remains.

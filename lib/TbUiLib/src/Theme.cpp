@@ -240,6 +240,30 @@ Color browserTextColor(const QPalette& palette)
     Preferences::BrowserTextColor, palette.color(QPalette::Active, QPalette::Text));
 }
 
+Color browserCellBackgroundColor(const QPalette& palette)
+{
+  return fromQColor(palette.color(QPalette::Active, QPalette::AlternateBase));
+}
+
+Color browserCellHoverColor(const QPalette& palette)
+{
+  return fromQColor(palette.color(QPalette::Active, QPalette::Midlight));
+}
+
+Color browserCellSelectedColor(const QPalette& palette)
+{
+  auto color = palette.color(QPalette::Active, QPalette::Highlight);
+  color.setAlpha(64);
+  return fromQColor(color);
+}
+
+Color browserErrorColor(const QPalette& palette)
+{
+  const auto lightBackground =
+    palette.color(QPalette::Active, QPalette::Base).lightnessF() > 0.5f;
+  return fromQColor(lightBackground ? QColor{196, 43, 28} : QColor{244, 135, 113});
+}
+
 bool expandThemeStyleSheet(QString& styleSheet, const ThemeTokens& tokens, QString* error)
 {
   const auto replacements = std::array{

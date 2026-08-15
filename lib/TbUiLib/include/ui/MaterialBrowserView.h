@@ -108,6 +108,7 @@ private:
   void doRender(gl::Gl& gl, Layout& layout, float y, float height) override;
   bool shouldRenderFocusIndicator() const override;
   Color getBackgroundColor() override;
+  bool isCellSelected(const Cell& cell) const override;
 
   void renderBounds(gl::Gl& gl, Layout& layout, float y, float height);
   const Color& materialColor(const gl::Material& material) const;

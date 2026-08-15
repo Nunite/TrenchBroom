@@ -4,8 +4,8 @@
 
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
-- Last updated: 2026-08-15
-- Current stage: Phase 4 supporting surfaces and preferences modernization complete
+- Last updated: 2026-08-16
+- Current stage: Phase 4.1 browser content and Face Inspector refinement complete
 
 ## Objective
 
@@ -145,6 +145,23 @@ Status: complete
 Expected benefit: medium. These changes complete consistency after the main editing
 surface has established the visual language.
 
+### Phase 4.1: Browser Content And Face Inspector Refinement
+
+Status: complete
+
+- [x] Draw shared rounded cell surfaces with palette-derived default, hover, and selected
+      states in the OpenGL-backed Entity, Material, and Assets browsers.
+- [x] Remove nested square Assets backgrounds and apply theme-aware sprite, sound, prefab,
+      audio-control, and error presentation.
+- [x] Separate Face tools, attributes, UV controls, and browser controls into stable styled
+      sections without introducing nested cards.
+- [x] Verify the affected supporting surfaces in Light and Dark themes at 100%, 150%, and
+      200% scale factors.
+
+Expected benefit: medium to high. The most visible custom-rendered content now follows the
+same rounded component language as the surrounding Qt workbench instead of only sharing its
+colors.
+
 ### Phase 5: Optional Structural Work
 
 Status: deferred
@@ -254,4 +271,7 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Fixed | Made the default Entity, Material, Asset, and UV browser background, group, and text colors follow the active Light/Dark palette while preserving non-default user color preferences. |
 | 2026-08-16 | Complete | Added Entity Browser, Face Inspector, and constrained Command Palette snapshot targets, expanding the default visual acceptance matrix from 36 to 54 states. |
 | 2026-08-16 | Verified | Passed `Theme` and `MapWindow` (119 assertions) plus `ModelBrowserView` and `GoldSrcSpritePreview` (43 assertions), built Release `TrenchBroom`, and visually confirmed all affected Light/Dark pages at 100%, 150%, and 200% in `20260815-235531-161`, `20260815-235755-213`, and `20260815-235941-408`. |
-| 2026-08-16 | Next | Collect user feedback before considering the deferred Phase 5 title-bar, document-tab, or docking changes. |
+| 2026-08-16 | Complete | Added shared rounded browser cells with centralized hover/selection state, removed nested Assets tiles, and made custom placeholder, audio, and error rendering theme-aware. |
+| 2026-08-16 | Complete | Refined Face/UV and Entity/Material browser section hierarchy with stable QSS object names and secondary field labels. |
+| 2026-08-16 | Verified | Passed `Theme`, `ModelBrowserView`, and `MapWindow` (162 assertions), built Release `TrenchBroom`, and visually confirmed the 18 affected Light/Dark states at 100%, 150%, and 200% in `20260816-002459-821` and `20260816-002756-942`. |
+| 2026-08-16 | Next | Collect hands-on feedback on browser density and Face Inspector ergonomics before selecting another low-risk Phase 4 refinement or a deferred Phase 5 structural experiment. |

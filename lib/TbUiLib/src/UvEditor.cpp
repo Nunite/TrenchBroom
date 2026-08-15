@@ -66,6 +66,7 @@ void UvEditor::updateButtons()
 
 void UvEditor::createGui(AppController& appController)
 {
+  setObjectName(QStringLiteral("UvEditor"));
   m_uvView = new UvView{appController, m_document};
 
   m_resetUvButton = createBitmapButton("ResetUV.svg", tr("Reset UV alignment"), this);
@@ -131,11 +132,16 @@ void UvEditor::createGui(AppController& appController)
   bottomLayout->addWidget(new QLabel{"Y:"});
   bottomLayout->addWidget(m_ySubDivisionEditor);
 
+  auto* toolbar = new QWidget{};
+  toolbar->setObjectName(QStringLiteral("UvEditor_Toolbar"));
+  toolbar->setAttribute(Qt::WA_StyledBackground);
+  toolbar->setLayout(bottomLayout);
+
   auto* outerLayout = new QVBoxLayout{};
   outerLayout->setContentsMargins(0, 0, 0, 0);
   outerLayout->setSpacing(LayoutConstants::NarrowVMargin);
   outerLayout->addWidget(m_uvView, 1);
-  outerLayout->addLayout(bottomLayout);
+  outerLayout->addWidget(toolbar);
   setLayout(outerLayout);
 
   updateButtons();

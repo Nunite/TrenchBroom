@@ -323,6 +323,11 @@ Color MaterialBrowserView::getBackgroundColor()
   return browserBackgroundColor(palette());
 }
 
+bool MaterialBrowserView::isCellSelected(const Cell& cell) const
+{
+  return &cellData(cell) == m_selectedMaterial;
+}
+
 void MaterialBrowserView::renderBounds(
   gl::Gl& gl, Layout& layout, const float y, const float height)
 {

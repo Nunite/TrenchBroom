@@ -65,6 +65,7 @@ void EntityBrowser::reload()
 
 void EntityBrowser::createGui(AppController& appController)
 {
+  setObjectName(QStringLiteral("EntityBrowser"));
   m_scrollBar = new QScrollBar{Qt::Vertical};
   m_view = new EntityBrowserView{appController, m_scrollBar, m_document};
 
@@ -122,11 +123,16 @@ void EntityBrowser::createGui(AppController& appController)
   controlSizer->addWidget(m_usedButton, 0);
   controlSizer->addWidget(m_filterBox, 1);
 
+  auto* controls = new QWidget{};
+  controls->setObjectName(QStringLiteral("EntityBrowser_Controls"));
+  controls->setAttribute(Qt::WA_StyledBackground);
+  controls->setLayout(controlSizer);
+
   auto* outerSizer = new QVBoxLayout{};
   outerSizer->setContentsMargins(0, 0, 0, 0);
   outerSizer->setSpacing(0);
   outerSizer->addWidget(browserPanel, 1);
-  outerSizer->addLayout(controlSizer, 0);
+  outerSizer->addWidget(controls, 0);
 
   setLayout(outerSizer);
 }
