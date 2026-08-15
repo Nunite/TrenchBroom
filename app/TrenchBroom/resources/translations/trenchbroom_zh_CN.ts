@@ -2286,7 +2286,15 @@ Hold %1 to cycle backwards.</source>
     <message>
         <location filename="../../../../lib/TbUiLib/src/KeyboardPreferencePane.cpp" line="81"/>
         <source>Double-click an item to begin editing it. Click anywhere else to end editing.</source>
-        <translation>双击项目开始编辑。点击其他任意位置结束编辑。</translation>
+        <translation>双击快捷键单元格开始编辑，点击其他位置结束编辑。</translation>
+    </message>
+    <message>
+        <source>Shortcut Conflicts</source>
+        <translation>快捷键冲突</translation>
+    </message>
+    <message>
+        <source>Please fix all conflicting shortcuts highlighted in red.</source>
+        <translation>请修复所有标红的快捷键冲突。</translation>
     </message>
 </context>
 <context>
@@ -2297,14 +2305,18 @@ Hold %1 to cycle backwards.</source>
         <translation>快捷键</translation>
     </message>
     <message>
+        <source>Alternative</source>
+        <translation>备用快捷键</translation>
+    </message>
+    <message>
         <location filename="../../../../lib/TbUiLib/src/KeyboardShortcutModel.cpp" line="130"/>
         <source>Context</source>
-        <translation>上下文</translation>
+        <translation>适用范围</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/KeyboardShortcutModel.cpp" line="131"/>
         <source>Description</source>
-        <translation>描述</translation>
+        <translation>命令</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/KeyboardShortcutModel.cpp" line="247"/>
@@ -2320,6 +2332,189 @@ Hold %1 to cycle backwards.</source>
         <location filename="../../../../lib/TbUiLib/src/KeyboardShortcutModel.cpp" line="268"/>
         <source>Entity Definitions</source>
         <translation>实体定义</translation>
+    </message>
+    <message>
+        <source>Fly Forward</source>
+        <translation>向前飞行</translation>
+    </message>
+    <message>
+        <source>Fly Left</source>
+        <translation>向左飞行</translation>
+    </message>
+    <message>
+        <source>Fly Backward</source>
+        <translation>向后飞行</translation>
+    </message>
+    <message>
+        <source>Fly Right</source>
+        <translation>向右飞行</translation>
+    </message>
+    <message>
+        <source>Fly Up</source>
+        <translation>向上飞行</translation>
+    </message>
+    <message>
+        <source>Fly Down</source>
+        <translation>向下飞行</translation>
+    </message>
+    <message>
+        <source>any</source>
+        <translation>全局</translation>
+    </message>
+    <message>
+        <source>any view</source>
+        <translation>任意视图</translation>
+    </message>
+    <message>
+        <source>3D view</source>
+        <translation>3D 视图</translation>
+    </message>
+    <message>
+        <source>2D view</source>
+        <translation>2D 视图</translation>
+    </message>
+    <message>
+        <source>any or no selection</source>
+        <translation>任意选择状态</translation>
+    </message>
+    <message>
+        <source>any selection</source>
+        <translation>已选择内容</translation>
+    </message>
+    <message>
+        <source>no selection</source>
+        <translation>未选择内容</translation>
+    </message>
+    <message>
+        <source>objects selected</source>
+        <translation>已选择对象</translation>
+    </message>
+    <message>
+        <source>faces selected</source>
+        <translation>已选择面</translation>
+    </message>
+    <message>
+        <source>selection owned by tool</source>
+        <translation>选择由工具控制</translation>
+    </message>
+    <message>
+        <source>any or no tool</source>
+        <translation>任意工具状态</translation>
+    </message>
+    <message>
+        <source>any tool</source>
+        <translation>任意工具启用时</translation>
+    </message>
+    <message>
+        <source>no tool</source>
+        <translation>未启用工具</translation>
+    </message>
+    <message>
+        <source>brush tool</source>
+        <translation>笔刷工具</translation>
+    </message>
+    <message>
+        <source>clip tool</source>
+        <translation>剪裁工具</translation>
+    </message>
+    <message>
+        <source>rotate tool</source>
+        <translation>旋转工具</translation>
+    </message>
+    <message>
+        <source>scale tool</source>
+        <translation>缩放工具</translation>
+    </message>
+    <message>
+        <source>shear tool</source>
+        <translation>倾斜工具</translation>
+    </message>
+    <message>
+        <source>path tool</source>
+        <translation>路径工具</translation>
+    </message>
+    <message>
+        <source>any vertex tool</source>
+        <translation>任意顶点编辑工具</translation>
+    </message>
+    <message>
+        <source>control point tool</source>
+        <translation>控制点工具</translation>
+    </message>
+    <message>
+        <source>sweep tool</source>
+        <translation>扫掠工具</translation>
+    </message>
+</context>
+<context>
+    <name>tb::ui::PreferenceDialog</name>
+    <message>
+        <source>Preferences</source>
+        <translation>偏好设置</translation>
+    </message>
+    <message>
+        <source>Unsaved Preference Changes</source>
+        <translation>偏好设置更改尚未保存</translation>
+    </message>
+    <message>
+        <source>You have unsaved preference changes. Would you like to save or discard them?</source>
+        <translation>偏好设置包含未保存的更改。要保存还是放弃这些更改？</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>保存</translation>
+    </message>
+    <message>
+        <source>Discard</source>
+        <translation>放弃</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <source>Games</source>
+        <translation>游戏</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>视图</translation>
+    </message>
+    <message>
+        <source>Colors</source>
+        <translation>颜色</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>鼠标</translation>
+    </message>
+    <message>
+        <source>Keyboard</source>
+        <translation>快捷键</translation>
+    </message>
+    <message>
+        <source>Misc</source>
+        <translation>其他</translation>
+    </message>
+    <message>
+        <source>MCP</source>
+        <translation>MCP</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>更新</translation>
+    </message>
+    <message>
+        <source>Restore Defaults</source>
+        <translation>恢复默认设置</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>确定</translation>
+    </message>
+    <message>
+        <source>Apply</source>
+        <translation>应用</translation>
     </message>
 </context>
 <context>

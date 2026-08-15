@@ -81,7 +81,7 @@ PreferenceDialog::PreferenceDialog(
   , m_appController{appController}
   , m_document{document}
 {
-  setWindowTitle("Preferences");
+  setWindowTitle(tr("Preferences"));
   setWindowIconTB(this);
   createGui();
   setMinimumSize(PreferenceDialogMinWidth, PreferenceDialogMinHeight);
@@ -108,10 +108,14 @@ void PreferenceDialog::closeEvent(QCloseEvent* event)
     {
       auto msgBox = QMessageBox{
         QMessageBox::Question,
-        "Unsaved Preference Changes",
-        "You have unsaved preference changes. Would you like to save or discard them?",
+        tr("Unsaved Preference Changes"),
+        tr(
+          "You have unsaved preference changes. Would you like to save or discard them?"),
         QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
         this};
+      msgBox.button(QMessageBox::Save)->setText(tr("Save"));
+      msgBox.button(QMessageBox::Discard)->setText(tr("Discard"));
+      msgBox.button(QMessageBox::Cancel)->setText(tr("Cancel"));
 
       switch (msgBox.exec())
       {
@@ -154,15 +158,17 @@ void PreferenceDialog::createGui()
   m_toolBar->setFloatable(false);
   m_toolBar->setMovable(false);
   m_toolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-  m_toolBar->addAction(gamesImage, "Games", [&]() { switchToPane(PrefPane::Games); });
-  m_toolBar->addAction(viewImage, "View", [&]() { switchToPane(PrefPane::View); });
-  m_toolBar->addAction(colorsImage, "Colors", [&]() { switchToPane(PrefPane::Colors); });
-  m_toolBar->addAction(mouseImage, "Mouse", [&]() { switchToPane(PrefPane::Mouse); });
+  m_toolBar->addAction(gamesImage, tr("Games"), [&]() { switchToPane(PrefPane::Games); });
+  m_toolBar->addAction(viewImage, tr("View"), [&]() { switchToPane(PrefPane::View); });
   m_toolBar->addAction(
-    keyboardImage, "Keyboard", [&]() { switchToPane(PrefPane::Keyboard); });
-  m_toolBar->addAction(miscImage, "Misc", [&]() { switchToPane(PrefPane::Misc); });
-  m_toolBar->addAction(mcpImage, "MCP", [&]() { switchToPane(PrefPane::Mcp); });
-  m_toolBar->addAction(updateImage, "Update", [&]() { switchToPane(PrefPane::Update); });
+    colorsImage, tr("Colors"), [&]() { switchToPane(PrefPane::Colors); });
+  m_toolBar->addAction(mouseImage, tr("Mouse"), [&]() { switchToPane(PrefPane::Mouse); });
+  m_toolBar->addAction(
+    keyboardImage, tr("Keyboard"), [&]() { switchToPane(PrefPane::Keyboard); });
+  m_toolBar->addAction(miscImage, tr("Misc"), [&]() { switchToPane(PrefPane::Misc); });
+  m_toolBar->addAction(mcpImage, tr("MCP"), [&]() { switchToPane(PrefPane::Mcp); });
+  m_toolBar->addAction(
+    updateImage, tr("Update"), [&]() { switchToPane(PrefPane::Update); });
 
   // Don't display tooltips for pane switcher buttons...
   for (auto* button : m_toolBar->findChildren<QToolButton*>())
@@ -188,10 +194,15 @@ void PreferenceDialog::createGui()
     this};
 
   auto* resetButton = m_buttonBox->button(QDialogButtonBox::RestoreDefaults);
+  resetButton->setText(tr("Restore Defaults"));
   connect(resetButton, &QPushButton::clicked, this, &PreferenceDialog::resetToDefaults);
 
   if (!PreferenceManager::instance().saveInstantly())
   {
+    m_buttonBox->button(QDialogButtonBox::Ok)->setText(tr("OK"));
+    m_buttonBox->button(QDialogButtonBox::Apply)->setText(tr("Apply"));
+    m_buttonBox->button(QDialogButtonBox::Cancel)->setText(tr("Cancel"));
+
     connect(
       m_buttonBox->button(QDialogButtonBox::Ok), &QPushButton::clicked, this, [&]() {
         auto& prefs = PreferenceManager::instance();

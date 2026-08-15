@@ -17,6 +17,9 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QHeaderView>
+#include <QSortFilterProxyModel>
+#include <QTableView>
 #include <QToolBar>
 
 #include "ui/AppControllerFixture.h"
@@ -102,6 +105,26 @@ TEST_CASE("PreferenceDialog.preferencePanes")
   {
     auto pane =
       std::make_unique<KeyboardPreferencePane>(fixture.appController(), nullptr);
+
+    auto* table =
+      pane->findChild<QTableView*>(QStringLiteral("KeyboardPreference_Table"));
+    REQUIRE(table != nullptr);
+    auto* header = table->horizontalHeader();
+    REQUIRE(header != nullptr);
+
+    CHECK(header->logicalIndex(0) == 3);
+    CHECK(header->sectionResizeMode(3) == QHeaderView::Stretch);
+    CHECK(header->sectionResizeMode(2) == QHeaderView::Fixed);
+    CHECK(header->sectionSize(2) == 190);
+
+    auto* proxy = qobject_cast<QSortFilterProxyModel*>(table->model());
+    REQUIRE(proxy != nullptr);
+    CHECK(proxy->filterKeyColumn() == -1);
+    CHECK(
+      proxy->headerData(3, Qt::Horizontal).toString() == QStringLiteral("Description"));
+    REQUIRE(proxy->rowCount() > 0);
+    CHECK_FALSE(proxy->data(proxy->index(0, 3)).toString().isEmpty());
+
     pane.reset();
   }
 

@@ -41,6 +41,14 @@
 
 namespace tb::ui
 {
+namespace
+{
+
+constexpr auto ShortcutColumnWidth = 104;
+constexpr auto AlternativeColumnWidth = 116;
+constexpr auto ContextColumnWidth = 190;
+
+} // namespace
 
 KeyboardPreferencePane::KeyboardPreferencePane(
   AppController& appController, MapDocument* document, QWidget* parent)
@@ -52,18 +60,24 @@ KeyboardPreferencePane::KeyboardPreferencePane(
 {
   m_proxy->setSourceModel(m_model);
   m_proxy->setFilterCaseSensitivity(Qt::CaseInsensitive);
-  m_proxy->setFilterKeyColumn(3); // Filter based on the text in the Description column
+  m_proxy->setFilterKeyColumn(-1);
 
+  m_table->setObjectName(QStringLiteral("KeyboardPreference_Table"));
+  m_table->setCornerButtonEnabled(false);
   m_table->setModel(m_proxy);
 
-  m_table->setHorizontalHeader(new QHeaderView(Qt::Horizontal));
-  m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeMode::Fixed);
-  m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeMode::Fixed);
-  m_table->horizontalHeader()->resizeSection(0, 100);
-  m_table->horizontalHeader()->resizeSection(1, 100);
-  m_table->horizontalHeader()->setSectionResizeMode(
-    2, QHeaderView::ResizeMode::ResizeToContents);
-  m_table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeMode::Stretch);
+  auto* header = new QHeaderView{Qt::Horizontal};
+  m_table->setHorizontalHeader(header);
+  header->setSectionsMovable(false);
+  header->setSectionResizeMode(0, QHeaderView::ResizeMode::Fixed);
+  header->setSectionResizeMode(1, QHeaderView::ResizeMode::Fixed);
+  header->setSectionResizeMode(2, QHeaderView::ResizeMode::Fixed);
+  header->setSectionResizeMode(3, QHeaderView::ResizeMode::Stretch);
+  header->resizeSection(0, ShortcutColumnWidth);
+  header->resizeSection(1, AlternativeColumnWidth);
+  header->resizeSection(2, ContextColumnWidth);
+  header->moveSection(header->visualIndex(3), 0);
+  m_table->setTextElideMode(Qt::ElideRight);
 
   // Tighter than default vertical row height, without the overhead of autoresizing
   m_table->verticalHeader()->setDefaultSectionSize(
@@ -142,7 +156,9 @@ bool KeyboardPreferencePane::validate()
   if (m_model->hasConflicts())
   {
     QMessageBox::warning(
-      this, "Conflicts", "Please fix all conflicting shortcuts (highlighted in red).");
+      this,
+      tr("Shortcut Conflicts"),
+      tr("Please fix all conflicting shortcuts highlighted in red."));
     return false;
   }
   return true;

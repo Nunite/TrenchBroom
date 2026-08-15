@@ -20,7 +20,9 @@
 #include "ui/KeyboardShortcutModel.h"
 
 #include <QBrush>
+#include <QCoreApplication>
 #include <QKeySequence>
+#include <QStringList>
 
 #include "base/Macros.h"
 #include "base/PreferenceManager.h"
@@ -41,6 +43,28 @@
 
 namespace tb::ui
 {
+namespace
+{
+
+QString actionContextDisplayName(const ActionContext::Type actionContext)
+{
+  auto components = QString::fromStdString(actionContextName(actionContext)).split(", ");
+  for (auto& component : components)
+  {
+    const auto sourceText = component.toUtf8();
+    component = QCoreApplication::translate(
+      "tb::ui::KeyboardShortcutModel", sourceText.constData());
+  }
+  return components.join(QStringLiteral(" / "));
+}
+
+QString actionDisplayPath(const std::filesystem::path& path)
+{
+  auto result = pathAsGenericQString(path);
+  return result.replace('/', QStringLiteral(" > "));
+}
+
+} // namespace
 
 KeyboardShortcutModel::KeyboardShortcutModel(
   ActionManager& actionManager, MapDocument* document, QObject* parent)
@@ -103,6 +127,11 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     return QVariant{};
   }
 
+  if (role == Qt::ToolTipRole && (index.column() == 2 || index.column() == 3))
+  {
+    return data(index, Qt::DisplayRole);
+  }
+
   if (role == Qt::DisplayRole || role == Qt::EditRole)
   {
     const auto& actionInfo = this->actionInfo(index.row());
@@ -122,9 +151,9 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
         keyboardShortcuts.size() > 1 ? toQKeySequence(keyboardShortcuts[1])
                                      : QKeySequence{});
     case 2:
-      return QString::fromStdString(actionContextName(actionInfo.actionContext()));
+      return actionContextDisplayName(actionInfo.actionContext());
     case 3:
-      return pathAsGenericQString(actionInfo.displayPath());
+      return actionDisplayPath(actionInfo.displayPath());
     }
   }
 
@@ -287,34 +316,35 @@ void KeyboardShortcutModel::initializeViewActions()
 
 void KeyboardShortcutModel::initializeKeys()
 {
+  const auto mapViewPath = pathFromQString(tr("Map View"));
   m_actions.emplace_back(
     ActionInfoType::Key,
-    std::filesystem::path{"Map View"} / "Fly Forward",
+    mapViewPath / pathFromQString(tr("Fly Forward")),
     ActionContext::FlyMode,
     Preferences::CameraFlyForward);
   m_actions.emplace_back(
     ActionInfoType::Key,
-    std::filesystem::path{"Map View"} / "Fly Left",
+    mapViewPath / pathFromQString(tr("Fly Left")),
     ActionContext::FlyMode,
     Preferences::CameraFlyLeft);
   m_actions.emplace_back(
     ActionInfoType::Key,
-    std::filesystem::path{"Map View"} / "Fly Backward",
+    mapViewPath / pathFromQString(tr("Fly Backward")),
     ActionContext::FlyMode,
     Preferences::CameraFlyBackward);
   m_actions.emplace_back(
     ActionInfoType::Key,
-    std::filesystem::path{"Map View"} / "Fly Right",
+    mapViewPath / pathFromQString(tr("Fly Right")),
     ActionContext::FlyMode,
     Preferences::CameraFlyRight);
   m_actions.emplace_back(
     ActionInfoType::Key,
-    std::filesystem::path{"Map View"} / "Fly Up",
+    mapViewPath / pathFromQString(tr("Fly Up")),
     ActionContext::FlyMode,
     Preferences::CameraFlyUp);
   m_actions.emplace_back(
     ActionInfoType::Key,
-    std::filesystem::path{"Map View"} / "Fly Down",
+    mapViewPath / pathFromQString(tr("Fly Down")),
     ActionContext::FlyMode,
     Preferences::CameraFlyDown);
 }

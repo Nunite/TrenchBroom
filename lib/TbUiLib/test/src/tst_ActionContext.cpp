@@ -26,6 +26,12 @@
 namespace tb::ui
 {
 
+TEST_CASE("actionContextName")
+{
+  CHECK(actionContextName(ActionContext::ScaleTool) == "scale tool");
+  CHECK(actionContextName(ActionContext::ShearTool) == "shear tool");
+}
+
 TEST_CASE("actionContextMatches")
 {
   SECTION("with mask")

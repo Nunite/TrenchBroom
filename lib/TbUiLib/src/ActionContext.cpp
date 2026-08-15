@@ -119,6 +119,14 @@ std::string actionContextName(const ActionContext::Type actionContext)
     {
       actionContexts.emplace_back("rotate tool");
     }
+    if (actionContext & ActionContext::ScaleTool)
+    {
+      actionContexts.emplace_back("scale tool");
+    }
+    if (actionContext & ActionContext::ShearTool)
+    {
+      actionContexts.emplace_back("shear tool");
+    }
     if (actionContext & ActionContext::PathTool)
     {
       actionContexts.emplace_back("path tool");
