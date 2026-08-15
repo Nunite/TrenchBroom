@@ -70,6 +70,12 @@ class McpHttpServer;
 class RecentDocuments;
 class WelcomeWindow;
 
+struct AppControllerOptions
+{
+  bool enableBackgroundServices = true;
+  bool showMapWindows = true;
+};
+
 class AppController : public QObject
 {
   Q_OBJECT
@@ -104,7 +110,7 @@ public:
     std::unique_ptr<kdl::task_manager> taskManager,
     std::unique_ptr<mdl::EnvironmentConfig> environmentConfig,
     std::unique_ptr<mdl::GameManager> gameManager,
-    bool enableBackgroundServices = true);
+    AppControllerOptions options = {});
 
   static constexpr auto useSDI =
 #if defined(Q_OS_WIN)
@@ -113,8 +119,7 @@ public:
     false;
 #endif
 
-  static Result<std::unique_ptr<AppController>> create(
-    bool enableBackgroundServices = true);
+  static Result<std::unique_ptr<AppController>> create(AppControllerOptions options = {});
 
   ~AppController() override;
 

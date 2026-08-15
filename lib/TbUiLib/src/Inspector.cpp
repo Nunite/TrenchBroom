@@ -22,6 +22,7 @@
 #include <QByteArray>
 #include <QDataStream>
 #include <QIODevice>
+#include <QLabel>
 #include <QVBoxLayout>
 
 #include "ui/EntityInspector.h"
@@ -55,8 +56,14 @@ Inspector::Inspector(AppController& appController, MapDocument& document, QWidge
   m_tabBook->addPage(m_outlinerInspector, "Outliner");
   m_tabBook->addPage(m_pluginInspector, "Plugin");
 
+  auto* title = new QLabel{tr("Inspector").toUpper()};
+  title->setObjectName("WorkbenchPanelTitle");
+  title->setFixedHeight(28);
+
   auto* layout = new QVBoxLayout{};
   layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(0);
+  layout->addWidget(title);
   layout->addWidget(m_tabBook);
   setLayout(layout);
 

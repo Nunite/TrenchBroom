@@ -46,6 +46,7 @@
 #include "ui/Contracts.h"
 #include "ui/CrashReporter.h"
 #include "ui/FileEventFilter.h"
+#include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/QPathUtils.h"
 #include "ui/QPreferenceStore.h"
@@ -221,9 +222,10 @@ ThemeTokens loadStyle(
   return makeSystemThemeTokens(app.palette());
 }
 
-auto createAppController(const bool enableBackgroundServices = true)
+auto createAppController(const bool snapshotMode = false)
 {
-  return AppController::create(enableBackgroundServices) | kdl::if_error([](auto e) {
+  const auto options = AppControllerOptions{!snapshotMode, !snapshotMode};
+  return AppController::create(options) | kdl::if_error([](auto e) {
            const auto msg =
              fmt::format(R"(Game configurations could not be loaded: {})", e.msg);
 
@@ -295,7 +297,7 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     QStringList{"enableDraftReleaseUpdates"}, "Enable draft release updates."};
   const auto uiSnapshotOption = QCommandLineOption{
     QStringList{"ui-snapshot"},
-    "Capture the welcome window for automated UI acceptance and exit.",
+    "Capture the welcome window, or a map workbench when one map is provided, and exit.",
     "path"};
   const auto uiSnapshotThemeOption = QCommandLineOption{
     QStringList{"ui-snapshot-theme"},
@@ -323,9 +325,9 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     return options;
   }
 
-  if (!options.fileNames.empty())
+  if (options.fileNames.size() > 1)
   {
-    qCritical() << "--ui-snapshot cannot be combined with map files";
+    qCritical() << "--ui-snapshot accepts at most one map file";
     return std::nullopt;
   }
 
@@ -355,22 +357,25 @@ WelcomeWindow* findWelcomeWindow()
   return nullptr;
 }
 
-void scheduleUiSnapshot(QApplication& app, const UiSnapshotCommandLineOptions& options)
+void scheduleUiSnapshot(
+  QApplication& app,
+  QWidget& targetWidget,
+  const QString& targetName,
+  const UiSnapshotCommandLineOptions& options)
 {
-  QTimer::singleShot(0, &app, [&app, options]() {
-    auto* welcomeWindow = findWelcomeWindow();
-    if (welcomeWindow == nullptr)
+  const auto guardedWidget = QPointer<QWidget>{&targetWidget};
+  QTimer::singleShot(0, &app, [&app, guardedWidget, targetName, options]() {
+    if (guardedWidget.isNull())
     {
-      qCritical() << "UI snapshot target was not created: welcome";
+      qCritical() << "UI snapshot target was destroyed before layout:" << targetName;
       app.exit(3);
       return;
     }
 
-    welcomeWindow->ensurePolished();
-    welcomeWindow->update();
-    const auto guardedWindow = QPointer<WelcomeWindow>{welcomeWindow};
-    QTimer::singleShot(100, &app, [&app, guardedWindow, options]() {
-      if (guardedWindow.isNull())
+    guardedWidget->ensurePolished();
+    guardedWidget->update();
+    QTimer::singleShot(250, &app, [&app, guardedWidget, targetName, options]() {
+      if (guardedWidget.isNull())
       {
         qCritical() << "UI snapshot target was destroyed before capture";
         app.exit(3);
@@ -380,10 +385,10 @@ void scheduleUiSnapshot(QApplication& app, const UiSnapshotCommandLineOptions& o
       auto error = QString{};
       const auto snapshotOptions = UiSnapshotOptions{
         options.outputPath,
-        "welcome",
+        targetName,
         options.theme,
         qEnvironmentVariable("QT_SCALE_FACTOR", "system")};
-      if (!saveUiSnapshot(*guardedWindow, snapshotOptions, &error))
+      if (!saveUiSnapshot(*guardedWidget, snapshotOptions, &error))
       {
         qCritical().noquote() << "UI snapshot failed:" << error;
         app.exit(4);
@@ -523,7 +528,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  auto appController = createAppController(!commandLineOptions->uiSnapshot.has_value());
+  auto appController = createAppController(commandLineOptions->uiSnapshot.has_value());
   auto crashReporter = CrashReporter{*appController};
   setContractViolationHandler(crashReporter);
 
@@ -540,15 +545,39 @@ int main(int argc, char* argv[])
 
   if (commandLineOptions->uiSnapshot)
   {
-    auto* welcomeWindow = findWelcomeWindow();
-    if (welcomeWindow == nullptr)
+    auto* targetWidget = static_cast<QWidget*>(nullptr);
+    auto targetName = QString{};
+
+    if (commandLineOptions->fileNames.empty())
     {
-      qCritical() << "UI snapshot target was not created: welcome";
+      targetWidget = findWelcomeWindow();
+      targetName = QStringLiteral("welcome");
+      if (targetWidget != nullptr)
+      {
+        targetWidget->resize(700, 500);
+      }
+    }
+    else
+    {
+      targetName = QStringLiteral("workbench");
+      if (openFiles(*appController, commandLineOptions->fileNames))
+      {
+        targetWidget = appController->mapWindowManager().topMapWindow();
+        if (targetWidget != nullptr)
+        {
+          targetWidget->resize(1440, 900);
+        }
+      }
+    }
+
+    if (targetWidget == nullptr)
+    {
+      qCritical() << "UI snapshot target was not created:" << targetName;
       return 3;
     }
-    welcomeWindow->setAttribute(Qt::WA_DontShowOnScreen);
-    appController->showWelcomeWindow();
-    scheduleUiSnapshot(app, *commandLineOptions->uiSnapshot);
+    targetWidget->setAttribute(Qt::WA_DontShowOnScreen);
+    targetWidget->show();
+    scheduleUiSnapshot(app, *targetWidget, targetName, *commandLineOptions->uiSnapshot);
     return app.exec();
   }
 

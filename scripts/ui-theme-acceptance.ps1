@@ -1,8 +1,10 @@
 param(
   [string] $BuildDir = "build-release-codex",
   [string] $QtBin = "D:\Qtx\6.11.1\msvc2022_64\bin",
+  [string[]] $Targets = @("welcome", "workbench"),
   [string[]] $Themes = @("light", "dark"),
   [string[]] $ScaleFactors = @("1", "1.5", "2"),
+  [string] $MapPath = "lib\TbMdlLib\test\fixture\mdl\Map\initialMap.map",
   [string] $OutputDir = "",
   [int] $TimeoutSeconds = 45,
   [switch] $SkipBuild
@@ -13,6 +15,7 @@ $ErrorActionPreference = "Stop"
 function Assert-UiSnapshotMetadata {
   param(
     [pscustomobject] $Metadata,
+    [string] $ExpectedTarget,
     [string] $ExpectedTheme,
     [string] $ExpectedScale,
     [string] $ImagePath
@@ -21,8 +24,8 @@ function Assert-UiSnapshotMetadata {
   if ($Metadata.status -ne "ok") {
     throw "Snapshot manifest did not report success: $ImagePath"
   }
-  if ($Metadata.target -ne "welcome") {
-    throw "Unexpected snapshot target '$($Metadata.target)': $ImagePath"
+  if ($Metadata.target -ne $ExpectedTarget) {
+    throw "Expected target '$ExpectedTarget', got '$($Metadata.target)': $ImagePath"
   }
   if ($Metadata.theme -ne $ExpectedTheme) {
     throw "Expected theme '$ExpectedTheme', got '$($Metadata.theme)': $ImagePath"
@@ -95,13 +98,20 @@ function New-UiSnapshotContactSheet {
       $row = [math]::Floor($index / $ColumnCount)
       $x = $padding + $column * ($cellWidth + $padding)
       $y = $padding + $row * ($labelHeight + $cellHeight + $padding)
-      $label = "$($run.Theme)  $($run.Scale)x  $($run.PixelSize)"
+      $label = "$($run.Target)  $($run.Theme)  $($run.Scale)x  $($run.PixelSize)"
       $graphics.DrawString($label, $font, $labelBrush, $x, $y)
 
       $source = [Drawing.Image]::FromFile($run.Image)
       try {
+        $imageScale = [math]::Min(
+          [double] $cellWidth / $source.Width,
+          [double] $cellHeight / $source.Height)
+        $imageWidth = [math]::Round($source.Width * $imageScale)
+        $imageHeight = [math]::Round($source.Height * $imageScale)
+        $imageX = $x + [math]::Floor(($cellWidth - $imageWidth) / 2)
+        $imageY = $y + $labelHeight + [math]::Floor(($cellHeight - $imageHeight) / 2)
         $destination = [Drawing.Rectangle]::new(
-          $x, $y + $labelHeight, $cellWidth, $cellHeight)
+          $imageX, $imageY, $imageWidth, $imageHeight)
         $graphics.DrawImage($source, $destination)
       } finally {
         $source.Dispose()
@@ -117,6 +127,12 @@ function New-UiSnapshotContactSheet {
   }
 }
 
+$normalizedTargets = @($Targets | ForEach-Object { $_.ToLowerInvariant() })
+foreach ($target in $normalizedTargets) {
+  if ($target -notin @("welcome", "workbench")) {
+    throw "Unsupported target '$target'. Expected welcome or workbench."
+  }
+}
 foreach ($theme in $Themes) {
   if ($theme -notin @("light", "dark")) {
     throw "Unsupported theme '$theme'. Expected light or dark."
@@ -145,6 +161,11 @@ if (-not $SkipBuild) {
 
 $resolvedBuildDir = Resolve-Path -Path $BuildDir
 $resolvedQtBin = Resolve-Path -Path $QtBin
+$resolvedMapPath = if ($normalizedTargets -contains "workbench") {
+  Resolve-Path -Path $MapPath
+} else {
+  $null
+}
 $executable = Join-Path $resolvedBuildDir.Path "app\TrenchBroom\TrenchBroom.exe"
 if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
   throw "TrenchBroom executable not found: $executable"
@@ -165,77 +186,84 @@ $runDirectory = Join-Path $acceptanceRoot (Get-Date -Format "yyyyMMdd-HHmmss-fff
 New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 
 $results = @()
-foreach ($theme in $Themes) {
-  foreach ($scaleFactor in $ScaleFactors) {
-    $scaleName = $scaleFactor.Replace(".", "_")
-    $baseName = "welcome-$theme-$scaleName"
-    $imagePath = Join-Path $runDirectory "$baseName.png"
-    $manifestPath = Join-Path $runDirectory "$baseName.json"
+foreach ($target in $normalizedTargets) {
+  foreach ($theme in $Themes) {
+    foreach ($scaleFactor in $ScaleFactors) {
+      $scaleName = $scaleFactor.Replace(".", "_")
+      $baseName = "$target-$theme-$scaleName"
+      $imagePath = Join-Path $runDirectory "$baseName.png"
+      $manifestPath = Join-Path $runDirectory "$baseName.json"
 
-    $processInfo = [Diagnostics.ProcessStartInfo]::new()
-    $processInfo.FileName = $executable
-    $processInfo.Arguments =
-      "--ui-snapshot `"$imagePath`" --ui-snapshot-theme $theme"
-    $processInfo.WorkingDirectory = Split-Path -Parent $executable
-    $processInfo.UseShellExecute = $false
-    $processInfo.CreateNoWindow = $true
-    $processInfo.RedirectStandardOutput = $true
-    $processInfo.RedirectStandardError = $true
-    $processInfo.EnvironmentVariables["PATH"] =
-      "$($resolvedQtBin.Path);$($processInfo.EnvironmentVariables['PATH'])"
-    $processInfo.EnvironmentVariables["QT_QPA_PLATFORM"] = "windows"
-    $processInfo.EnvironmentVariables["QT_QPA_PLATFORM_PLUGIN_PATH"] = $platformPluginDir
-    $processInfo.EnvironmentVariables["QT_AUTO_SCREEN_SCALE_FACTOR"] = "0"
-    $processInfo.EnvironmentVariables["QT_SCALE_FACTOR"] = $scaleFactor
+      $processInfo = [Diagnostics.ProcessStartInfo]::new()
+      $processInfo.FileName = $executable
+      $processInfo.Arguments =
+        "--ui-snapshot `"$imagePath`" --ui-snapshot-theme $theme"
+      if ($target -eq "workbench") {
+        $processInfo.Arguments += " `"$($resolvedMapPath.Path)`""
+      }
+      $processInfo.WorkingDirectory = Split-Path -Parent $executable
+      $processInfo.UseShellExecute = $false
+      $processInfo.CreateNoWindow = $true
+      $processInfo.RedirectStandardOutput = $true
+      $processInfo.RedirectStandardError = $true
+      $processInfo.EnvironmentVariables["PATH"] =
+        "$($resolvedQtBin.Path);$($processInfo.EnvironmentVariables['PATH'])"
+      $processInfo.EnvironmentVariables["QT_QPA_PLATFORM"] = "windows"
+      $processInfo.EnvironmentVariables["QT_QPA_PLATFORM_PLUGIN_PATH"] = $platformPluginDir
+      $processInfo.EnvironmentVariables["QT_AUTO_SCREEN_SCALE_FACTOR"] = "0"
+      $processInfo.EnvironmentVariables["QT_SCALE_FACTOR"] = $scaleFactor
 
-    Write-Host "==> Capture welcome theme=$theme scale=$scaleFactor"
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $processInfo
-    [void] $process.Start()
-    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-      $process.Kill()
-      $process.WaitForExit()
-      throw "UI snapshot timed out after $TimeoutSeconds seconds: $imagePath"
-    }
+      Write-Host "==> Capture $target theme=$theme scale=$scaleFactor"
+      $process = [Diagnostics.Process]::new()
+      $process.StartInfo = $processInfo
+      [void] $process.Start()
+      if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        $process.Kill()
+        $process.WaitForExit()
+        throw "UI snapshot timed out after $TimeoutSeconds seconds: $imagePath"
+      }
 
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
-    if ($process.ExitCode -ne 0) {
-      throw @"
+      $stdout = $process.StandardOutput.ReadToEnd()
+      $stderr = $process.StandardError.ReadToEnd()
+      if ($process.ExitCode -ne 0) {
+        throw @"
 UI snapshot failed with exit code $($process.ExitCode): $imagePath
 stdout:
 $stdout
 stderr:
 $stderr
 "@
-    }
-    if (-not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
-      throw "UI snapshot image was not created: $imagePath"
-    }
-    if ((Get-Item -LiteralPath $imagePath).Length -lt 1024) {
-      throw "UI snapshot image is unexpectedly small: $imagePath"
-    }
-    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
-      throw "UI snapshot manifest was not created: $manifestPath"
-    }
+      }
+      if (-not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
+        throw "UI snapshot image was not created: $imagePath"
+      }
+      if ((Get-Item -LiteralPath $imagePath).Length -lt 1024) {
+        throw "UI snapshot image is unexpectedly small: $imagePath"
+      }
+      if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+        throw "UI snapshot manifest was not created: $manifestPath"
+      }
 
-    $metadata = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    Assert-UiSnapshotMetadata `
-      -Metadata $metadata `
-      -ExpectedTheme $theme `
-      -ExpectedScale $scaleFactor `
-      -ImagePath $imagePath
+      $metadata = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+      Assert-UiSnapshotMetadata `
+        -Metadata $metadata `
+        -ExpectedTarget $target `
+        -ExpectedTheme $theme `
+        -ExpectedScale $scaleFactor `
+        -ImagePath $imagePath
 
-    $results += [pscustomobject]@{
-      Theme = $theme
-      Scale = $scaleFactor
-      LogicalSize = "$($metadata.logicalSize.width)x$($metadata.logicalSize.height)"
-      PixelSize = "$($metadata.pixelSize.width)x$($metadata.pixelSize.height)"
-      Colors = $metadata.sampledColorCount
-      LuminanceRange = $metadata.luminanceRange
-      Image = $imagePath
-      Manifest = $manifestPath
-      Sha256 = $metadata.sha256
+      $results += [pscustomobject]@{
+        Target = $target
+        Theme = $theme
+        Scale = $scaleFactor
+        LogicalSize = "$($metadata.logicalSize.width)x$($metadata.logicalSize.height)"
+        PixelSize = "$($metadata.pixelSize.width)x$($metadata.pixelSize.height)"
+        Colors = $metadata.sampledColorCount
+        LuminanceRange = $metadata.luminanceRange
+        Image = $imagePath
+        Manifest = $manifestPath
+        Sha256 = $metadata.sha256
+      }
     }
   }
 }
@@ -247,15 +275,17 @@ New-UiSnapshotContactSheet `
   -Path $contactSheetPath
 
 $reportPath = Join-Path $runDirectory "report.json"
+$reportMapPath = if ($null -eq $resolvedMapPath) { $null } else { $resolvedMapPath.Path }
 @{
   status = "ok"
   executable = $executable
   qtBin = $resolvedQtBin.Path
+  mapPath = $reportMapPath
   contactSheet = $contactSheetPath
   runs = $results
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
 Write-Host ""
-$results | Format-Table Theme, Scale, LogicalSize, PixelSize, Colors, LuminanceRange
+$results | Format-Table Target, Theme, Scale, LogicalSize, PixelSize, Colors, LuminanceRange
 Write-Host "Contact sheet: $contactSheetPath"
 Write-Host "UI theme acceptance passed: $reportPath"

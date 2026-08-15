@@ -61,10 +61,12 @@ class MapWindowManager : public QObject
 private:
   AppController& m_appController;
   bool m_singleMapWindow;
+  bool m_showMapWindows;
   std::vector<MapWindow*> m_mapWindows;
 
 public:
-  MapWindowManager(AppController& appController, bool singleMapWindow);
+  MapWindowManager(
+    AppController& appController, bool singleMapWindow, bool showMapWindows = true);
   ~MapWindowManager() override;
 
   Result<void> createDocument(

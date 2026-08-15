@@ -45,7 +45,7 @@
   ```powershell
   powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1
   ```
-  It builds `TrenchBroom`, then captures the welcome window without showing a native window for Light and Dark themes at 100%, 150%, and 200% scale. PNG snapshots, JSON manifests, an Agent-friendly contact sheet, and the combined report are written under `build-release-codex\codex-logs\ui-theme-acceptance`. Pass `-SkipBuild` only when the executable is already current.
+  It builds `TrenchBroom`, then captures both the welcome window and a representative map workbench without showing a native window for Light and Dark themes at 100%, 150%, and 200% scale. PNG snapshots, JSON manifests, an Agent-friendly contact sheet, and the combined report are written under `build-release-codex\codex-logs\ui-theme-acceptance`. Use `-Targets welcome` or `-Targets workbench` for a focused matrix, and pass `-SkipBuild` only when the executable is already current.
 - For UI/library work, build the focused test target first. If the filtered wrapper is unavailable, use the explicit Visual Studio environment form:
   ```powershell
   cmd.exe /c 'call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build build-release-codex --target TbUiLibTest --config Release --parallel'

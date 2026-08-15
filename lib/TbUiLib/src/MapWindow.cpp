@@ -28,7 +28,10 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPainterPath>
 #include <QPushButton>
+#include <QRegion>
+#include <QResizeEvent>
 #include <QSettings>
 #include <QStatusBar>
 #include <QString>
@@ -149,6 +152,31 @@ namespace tb::ui
 {
 namespace
 {
+
+class WorkbenchSurface : public QWidget
+{
+public:
+  WorkbenchSurface(const QString& objectName, QWidget* content)
+  {
+    setObjectName(objectName);
+    setAttribute(Qt::WA_StyledBackground);
+
+    auto* layout = new QVBoxLayout{this};
+    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setSpacing(0);
+    layout->addWidget(content);
+  }
+
+protected:
+  void resizeEvent(QResizeEvent* event) override
+  {
+    QWidget::resizeEvent(event);
+
+    auto path = QPainterPath{};
+    path.addRoundedRect(QRectF{rect()}, 8.0, 8.0);
+    setMask(QRegion{path.toFillPolygon().toPolygon()});
+  }
+};
 
 void showModelessDialog(QDialog* dialog)
 {
@@ -457,10 +485,12 @@ void MapWindow::createGui()
 
   m_hSplitter = new Splitter{Qt::Horizontal, DrawKnob::No};
   m_hSplitter->setChildrenCollapsible(false);
+  m_hSplitter->setHandleWidth(4);
   m_hSplitter->setObjectName("MapWindow_HorizontalSplitter");
 
   m_vSplitter = new Splitter{Qt::Vertical, DrawKnob::No};
   m_vSplitter->setChildrenCollapsible(false);
+  m_vSplitter->setHandleWidth(4);
   m_vSplitter->setObjectName("MapWindow_VerticalSplitterSplitter");
 
   m_infoPanel = new InfoPanel{m_appController, document()};
@@ -479,12 +509,19 @@ void MapWindow::createGui()
 
   m_mapView->connectTopWidgets(m_inspector);
 
+  m_mapViewSurface =
+    new WorkbenchSurface{QStringLiteral("MapWindow_EditorSurface"), m_mapView};
+  m_infoPanelSurface =
+    new WorkbenchSurface{QStringLiteral("MapWindow_InfoPanelSurface"), m_infoPanel};
+  m_inspectorSurface =
+    new WorkbenchSurface{QStringLiteral("MapWindow_InspectorSurface"), m_inspector};
+
   // Add widgets to splitters
-  m_vSplitter->addWidget(m_mapView);
-  m_vSplitter->addWidget(m_infoPanel);
+  m_vSplitter->addWidget(m_mapViewSurface);
+  m_vSplitter->addWidget(m_infoPanelSurface);
 
   m_hSplitter->addWidget(m_vSplitter);
-  m_hSplitter->addWidget(m_inspector);
+  m_hSplitter->addWidget(m_inspectorSurface);
 
   // configure minimum sizes
   m_mapView->setMinimumSize(100, 100);
@@ -504,12 +541,14 @@ void MapWindow::createGui()
   m_vSplitter->setSizes(QList<int>{1'000'000, 1});
 
   auto* windowLayout = new QVBoxLayout{};
-  windowLayout->setContentsMargins(0, 0, 0, 0);
+  windowLayout->setContentsMargins(6, 4, 6, 4);
   windowLayout->addWidget(m_hSplitter);
 
   // NOTE: you can't set the layout of a QMainWindow, so make another widget to wrap this
   // layout in
   auto* layoutWrapper = new QWidget{};
+  layoutWrapper->setObjectName("MapWindow_WorkbenchShell");
+  layoutWrapper->setAttribute(Qt::WA_StyledBackground);
   layoutWrapper->setLayout(windowLayout);
 
   setCentralWidget(layoutWrapper);
@@ -518,6 +557,9 @@ void MapWindow::createGui()
   restoreWidgetState(m_vSplitter);
   restoreWidgetState(m_inspector);
   restoreWidgetState(m_infoPanel);
+
+  m_inspectorSurface->setHidden(m_inspector->isHidden());
+  m_infoPanelSurface->setHidden(m_infoPanel->isHidden());
 }
 
 void MapWindow::createToolBar()
@@ -534,17 +576,6 @@ void MapWindow::createToolBar()
       auto context = ActionExecutionContext{m_appController, this, currentMapViewBase()};
       tbAction.execute(context);
     });
-
-  m_gridChoice = new QComboBox{};
-  m_gridChoice->setObjectName("MapWindow_GridChoice");
-  for (int i = mdl::Grid::MinSize; i <= mdl::Grid::MaxSize; ++i)
-  {
-    const auto gridSize = mdl::Grid::actualSize(i);
-    const auto gridSizeStr = tr("Grid %1").arg(QString::number(gridSize, 'g'));
-    m_gridChoice->addItem(gridSizeStr, QVariant(i));
-  }
-
-  m_toolBar->addWidget(m_gridChoice);
 }
 
 void MapWindow::updateToolBarWidgets()
@@ -558,7 +589,20 @@ void MapWindow::updateToolBarWidgets()
 void MapWindow::createStatusBar()
 {
   m_statusBarLabel = new QLabel{};
+  m_statusBarLabel->setObjectName("MapWindow_StatusLabel");
+
+  m_gridChoice = new QComboBox{};
+  m_gridChoice->setObjectName("MapWindow_GridChoice");
+  m_gridChoice->setToolTip(tr("Grid size"));
+  for (int i = mdl::Grid::MinSize; i <= mdl::Grid::MaxSize; ++i)
+  {
+    const auto gridSize = mdl::Grid::actualSize(i);
+    const auto gridSizeStr = tr("Grid %1").arg(QString::number(gridSize, 'g'));
+    m_gridChoice->addItem(gridSizeStr, QVariant(i));
+  }
+
   statusBar()->addWidget(m_statusBarLabel, 1);
+  statusBar()->addPermanentWidget(m_gridChoice);
   statusBar()->addWidget(m_appController.updater().createUpdateIndicator());
 }
 
@@ -2197,6 +2241,7 @@ void MapWindow::showAll()
 
 void MapWindow::switchToInspectorPage(const InspectorPage page)
 {
+  m_inspectorSurface->show();
   m_inspector->show();
   m_inspector->switchToPage(page);
 }
@@ -2213,22 +2258,26 @@ bool MapWindow::toolbarVisible() const
 
 void MapWindow::toggleInfoPanel()
 {
-  m_infoPanel->setHidden(!m_infoPanel->isHidden());
+  const auto hidden = !m_infoPanelSurface->isHidden();
+  m_infoPanel->setHidden(hidden);
+  m_infoPanelSurface->setHidden(hidden);
 }
 
 bool MapWindow::infoPanelVisible() const
 {
-  return m_infoPanel->isVisible();
+  return m_infoPanelSurface->isVisible();
 }
 
 void MapWindow::toggleInspector()
 {
-  m_inspector->setHidden(!m_inspector->isHidden());
+  const auto hidden = !m_inspectorSurface->isHidden();
+  m_inspector->setHidden(hidden);
+  m_inspectorSurface->setHidden(hidden);
 }
 
 bool MapWindow::inspectorVisible() const
 {
-  return m_inspector->isVisible();
+  return m_inspectorSurface->isVisible();
 }
 
 void MapWindow::toggleMaximizeCurrentView()

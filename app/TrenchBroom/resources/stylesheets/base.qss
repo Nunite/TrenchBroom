@@ -14,7 +14,7 @@ QMenuBar {
 
 QMenuBar::item {
   background: transparent;
-  border-radius: 3px;
+  border-radius: 4px;
   padding: 4px 7px;
 }
 
@@ -34,7 +34,7 @@ QMenu {
 }
 
 QMenu::item {
-  border-radius: 3px;
+  border-radius: 4px;
   padding: 4px 28px 4px 8px;
 }
 
@@ -64,7 +64,7 @@ QToolBar {
 QToolBar QToolButton {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: 5px;
   padding: 3px;
 }
 
@@ -83,10 +83,60 @@ QToolBar QToolButton:disabled {
   color: @tb-disabled-text;
 }
 
+QToolBar#MapWindowToolBar {
+  background: @tb-window-background;
+  border: none;
+  padding: 4px 6px;
+  spacing: 3px;
+}
+
+QToolBar#MapWindowToolBar QToolButton {
+  min-height: 26px;
+  min-width: 26px;
+  padding: 0;
+}
+
+QToolBar#MapWindowToolBar::separator {
+  background: @tb-border;
+  margin: 5px 4px;
+  width: 1px;
+}
+
+QWidget#MapWindow_WorkbenchShell {
+  background: @tb-window-background;
+}
+
+QWidget#MapWindow_EditorSurface,
+QWidget#MapWindow_InfoPanelSurface,
+QWidget#MapWindow_InspectorSurface {
+  border: 1px solid @tb-border;
+  border-radius: 8px;
+}
+
+QWidget#MapWindow_EditorSurface {
+  background: @tb-editor-background;
+}
+
+QWidget#MapWindow_InfoPanelSurface {
+  background: @tb-panel-background;
+}
+
+QWidget#MapWindow_InspectorSurface {
+  background: @tb-sidebar-background;
+}
+
+QLabel#WorkbenchPanelTitle {
+  background: @tb-sidebar-background;
+  color: @tb-secondary-text;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 0 10px;
+}
+
 QPushButton {
   background: @tb-button-background;
   border: 1px solid @tb-strong-border;
-  border-radius: 3px;
+  border-radius: 6px;
   color: @tb-text;
   min-height: 22px;
   padding: 2px 8px;
@@ -116,7 +166,7 @@ QSpinBox,
 QDoubleSpinBox {
   background: @tb-input-background;
   border: 1px solid @tb-border;
-  border-radius: 3px;
+  border-radius: 5px;
   color: @tb-text;
   min-height: 22px;
   padding: 1px 5px;
@@ -195,13 +245,15 @@ QHeaderView::section {
 
 QTabWidget::pane {
   border: 1px solid @tb-border;
+  border-radius: 6px;
 }
 
 QTabBar::tab {
   background: @tb-panel-background;
-  border: none;
-  border-right: 1px solid @tb-border;
+  border: 1px solid transparent;
+  border-radius: 5px;
   color: @tb-secondary-text;
+  margin: 3px 2px;
   min-height: 26px;
   padding: 0 10px;
 }
@@ -213,24 +265,64 @@ QTabBar::tab:hover {
 
 QTabBar::tab:selected {
   background: @tb-editor-background;
-  border-top: 1px solid @tb-accent;
+  border-color: @tb-border;
   color: @tb-text;
+}
+
+QWidget#TabBarButton {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+QWidget#TabBarButton:hover {
+  background: @tb-hover-background;
+}
+
+QWidget#TabBarButton[active="true"] {
+  background: @tb-pressed-background;
+  border-color: @tb-border;
+}
+
+QWidget#TabBarButton QLabel#TabBarButtonLabel {
+  color: @tb-secondary-text;
+}
+
+QWidget#TabBarButton[active="true"] QLabel#TabBarButtonLabel {
+  color: @tb-text;
+  font-weight: bold;
 }
 
 QStatusBar {
   background: @tb-panel-background;
   border-top: 1px solid @tb-border;
   color: @tb-secondary-text;
+  min-height: 24px;
+  padding: 0 6px;
 }
 
 QStatusBar::item {
   border: none;
 }
 
+QStatusBar QComboBox#MapWindow_GridChoice {
+  background: transparent;
+  border-color: transparent;
+  min-height: 20px;
+  min-width: 72px;
+  padding: 0 5px;
+}
+
+QStatusBar QComboBox#MapWindow_GridChoice:hover {
+  background: @tb-hover-background;
+  border-color: @tb-border;
+}
+
 QToolTip {
   background: @tb-elevated-background;
   border: 1px solid @tb-strong-border;
   color: @tb-text;
+  border-radius: 5px;
   padding: 3px 5px;
 }
 
@@ -250,7 +342,7 @@ QScrollBar:horizontal {
 
 QScrollBar::handle {
   background: @tb-strong-border;
-  border-radius: 3px;
+  border-radius: 5px;
   min-height: 24px;
   min-width: 24px;
 }
@@ -273,6 +365,11 @@ QSplitter::handle {
   background: @tb-border;
 }
 
+QSplitter#MapWindow_HorizontalSplitter::handle,
+QSplitter#MapWindow_VerticalSplitterSplitter::handle {
+  background: transparent;
+}
+
 QListWidget#controlListBox_listWidget {
   border: none;
 }
@@ -284,7 +381,7 @@ QCheckBox#entityDefinition_checkboxWidget {
 QToolButton#toolButton_withBorder {
   background: transparent;
   border: 1px solid @tb-border;
-  border-radius: 3px;
+  border-radius: 5px;
 }
 
 QToolButton#toolButton_withBorder:hover {
@@ -350,7 +447,7 @@ QLineEdit#outlinerPropertyAddKey,
 QLineEdit#outlinerPropertyAddValue {
   background: @tb-input-background;
   border: 1px solid @tb-border;
-  border-radius: 3px;
+  border-radius: 5px;
   padding: 2px 5px;
 }
 
@@ -372,7 +469,7 @@ QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder,
 QWidget#outlinerPropertyAddBar QToolButton#toolButton_withBorder {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: 5px;
 }
 
 QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder:hover,
@@ -390,7 +487,7 @@ QWidget#outlinerPropertyAddBar QToolButton#toolButton_withBorder:pressed {
 QToolButton#outlinerPropertyColorButton {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: 5px;
 }
 
 QToolButton#outlinerPropertyColorButton:hover {
@@ -414,7 +511,7 @@ QLabel#smartSkyboxTitle {
 QToolButton#smartSkyboxRefreshButton {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: 5px;
 }
 
 QToolButton#smartSkyboxRefreshButton:hover {

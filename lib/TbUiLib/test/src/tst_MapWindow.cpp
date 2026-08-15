@@ -25,6 +25,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QStatusBar>
 #include <QWidget>
 #include <QtTest/QTest>
 
@@ -163,6 +164,32 @@ TEST_CASE("MapWindow")
   UNSCOPED_INFO("creating MapWindow");
   auto window = MapWindow{appController, std::move(document)};
   UNSCOPED_INFO("MapWindow created");
+
+  SECTION("uses modern workbench surfaces and status controls")
+  {
+    auto* editorSurface = window.findChild<QWidget*>("MapWindow_EditorSurface");
+    auto* infoPanelSurface = window.findChild<QWidget*>("MapWindow_InfoPanelSurface");
+    auto* inspectorSurface = window.findChild<QWidget*>("MapWindow_InspectorSurface");
+    REQUIRE(editorSurface != nullptr);
+    REQUIRE(infoPanelSurface != nullptr);
+    REQUIRE(inspectorSurface != nullptr);
+
+    auto* gridChoice = window.findChild<QComboBox*>("MapWindow_GridChoice");
+    REQUIRE(gridChoice != nullptr);
+    CHECK(gridChoice->parentWidget() == window.statusBar());
+
+    const auto infoPanelWasHidden = infoPanelSurface->isHidden();
+    window.toggleInfoPanel();
+    CHECK(infoPanelSurface->isHidden() != infoPanelWasHidden);
+    window.toggleInfoPanel();
+    CHECK(infoPanelSurface->isHidden() == infoPanelWasHidden);
+
+    const auto inspectorWasHidden = inspectorSurface->isHidden();
+    window.toggleInspector();
+    CHECK(inspectorSurface->isHidden() != inspectorWasHidden);
+    window.toggleInspector();
+    CHECK(inspectorSurface->isHidden() == inspectorWasHidden);
+  }
 
   SECTION("copy prefixes worldspawn header when enabled")
   {

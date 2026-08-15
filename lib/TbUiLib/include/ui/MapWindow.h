@@ -102,6 +102,10 @@ private:
   QSplitter* m_hSplitter = nullptr;
   QSplitter* m_vSplitter = nullptr;
 
+  QWidget* m_mapViewSurface = nullptr;
+  QWidget* m_infoPanelSurface = nullptr;
+  QWidget* m_inspectorSurface = nullptr;
+
   SwitchableMapViewContainer* m_mapView = nullptr;
   /**
    * Last focused MapViewBase. It's a QPointer to handle changing from e.g. a 2-pane map

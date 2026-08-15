@@ -39,13 +39,11 @@ class TabBarButton : public QWidget
   Q_OBJECT
 private:
   QLabel* m_label = nullptr;
-  QWidget* m_indicator = nullptr;
-  bool m_pressed = false;
 
 public:
   explicit TabBarButton(const QString& label = "", QWidget* parent = nullptr);
   /**
-   * Update the label color
+   * Update the active visual state.
    */
   void setPressed(bool pressed);
 
@@ -54,9 +52,6 @@ protected:
 
 signals:
   void clicked();
-
-private:
-  void updateState();
 };
 
 class TabBar : public ContainerBar

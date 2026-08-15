@@ -124,9 +124,9 @@ auto createGameManager()
            });
 }
 
-auto createMapWindowManager(AppController& appController)
+auto createMapWindowManager(AppController& appController, const bool showMapWindows)
 {
-  return new MapWindowManager{appController, AppController::useSDI};
+  return new MapWindowManager{appController, AppController::useSDI, showMapWindows};
 }
 
 auto createRecentDocuments(QObject* parent)
@@ -179,7 +179,7 @@ AppController::AppController(
   std::unique_ptr<kdl::task_manager> taskManager,
   std::unique_ptr<mdl::EnvironmentConfig> environmentConfig,
   std::unique_ptr<mdl::GameManager> gameManager,
-  const bool enableBackgroundServices)
+  const AppControllerOptions options)
   : m_taskManager{std::move(taskManager)}
   , m_environmentConfig{std::move(environmentConfig)}
   , m_gameManager{std::move(gameManager)}
@@ -190,7 +190,7 @@ AppController::AppController(
   , m_processResourcesTimer{new QTimer{this}}
   , m_httpClient{new upd::QtHttpClient{*m_networkManager}}
   , m_updater{new upd::Updater{*m_httpClient, makeUpdateConfig(), this}}
-  , m_mapWindowManager{createMapWindowManager(*this)}
+  , m_mapWindowManager{createMapWindowManager(*this, options.showMapWindows)}
   , m_recentDocuments{createRecentDocuments(this)}
   , m_actionManager{std::make_unique<ActionManager>()}
   , m_mcpBridgeServer{std::make_unique<McpBridgeServer>(*this)}
@@ -203,7 +203,7 @@ AppController::AppController(
   connectObservers();
 
   m_recentDocuments->reload();
-  if (enableBackgroundServices)
+  if (options.enableBackgroundServices)
   {
     m_reloadRecentDocumentsTimer->start(1s);
     m_processResourcesTimer->start(20ms);
@@ -212,20 +212,19 @@ AppController::AppController(
 }
 
 Result<std::unique_ptr<AppController>> AppController::create(
-  const bool enableBackgroundServices)
+  const AppControllerOptions options)
 {
-  return createGameManager()
-         | kdl::transform([enableBackgroundServices](auto gameManager) {
-             auto taskManager =
-               std::make_unique<kdl::task_manager>(std::thread::hardware_concurrency());
-             auto environmentConfig = createEnvironmentConfig();
+  return createGameManager() | kdl::transform([options](auto gameManager) {
+           auto taskManager =
+             std::make_unique<kdl::task_manager>(std::thread::hardware_concurrency());
+           auto environmentConfig = createEnvironmentConfig();
 
-             return std::make_unique<AppController>(
-               std::move(taskManager),
-               std::move(environmentConfig),
-               std::move(gameManager),
-               enableBackgroundServices);
-           });
+           return std::make_unique<AppController>(
+             std::move(taskManager),
+             std::move(environmentConfig),
+             std::move(gameManager),
+             options);
+         });
 }
 
 AppController::~AppController()

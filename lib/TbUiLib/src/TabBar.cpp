@@ -21,7 +21,9 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QStackedLayout>
+#include <QStyle>
 
 #include "ui/QStyleUtils.h"
 #include "ui/TabBook.h"
@@ -36,44 +38,42 @@ namespace tb::ui
 TabBarButton::TabBarButton(const QString& label, QWidget* parent)
   : QWidget{parent}
   , m_label{new QLabel{label}}
-  , m_indicator{new QWidget{}}
 {
+  setObjectName("TabBarButton");
+  setAttribute(Qt::WA_Hover);
+  setAttribute(Qt::WA_StyledBackground);
+  setFixedHeight(30);
+  m_label->setObjectName("TabBarButtonLabel");
+
   auto* labelLayout = new QHBoxLayout{};
   labelLayout->setContentsMargins(
     LayoutConstants::WideHMargin, 0, LayoutConstants::WideHMargin, 0);
   labelLayout->addWidget(m_label);
 
   auto* outerLayout = new QVBoxLayout{};
-  outerLayout->setContentsMargins(0, 1, 0, 1); // needs extra vertical space!
+  outerLayout->setContentsMargins(0, 3, 0, 3);
   outerLayout->setSpacing(0);
-
-  outerLayout->addSpacing(LayoutConstants::MediumVMargin);
-  outerLayout->addSpacing(LayoutConstants::NarrowVMargin);
   outerLayout->addLayout(labelLayout);
-  outerLayout->addSpacing(LayoutConstants::NarrowVMargin);
-  outerLayout->addWidget(m_indicator);
 
-  setEmphasizedStyle(m_label);
-  m_indicator->setFixedHeight(LayoutConstants::MediumVMargin);
-  m_indicator->setAutoFillBackground(true);
+  setUnemphasizedSTyle(m_label);
 
   setLayout(outerLayout);
 }
 
 void TabBarButton::setPressed(const bool pressed)
 {
-  m_pressed = pressed;
-  updateState();
+  setProperty("active", pressed);
+  style()->unpolish(this);
+  style()->polish(this);
+  update();
 }
 
-void TabBarButton::mousePressEvent(QMouseEvent*)
+void TabBarButton::mousePressEvent(QMouseEvent* event)
 {
-  emit clicked();
-}
-
-void TabBarButton::updateState()
-{
-  m_indicator->setBackgroundRole(m_pressed ? QPalette::Highlight : QPalette::NoRole);
+  if (event->button() == Qt::LeftButton)
+  {
+    emit clicked();
+  }
 }
 
 // TabBar
@@ -88,9 +88,9 @@ TabBar::TabBar(TabBook* tabBook)
   connect(m_tabBook, &TabBook::pageChanged, this, &TabBar::tabBookPageChanged);
 
   m_controlLayout = new QHBoxLayout{};
-  m_controlLayout->setContentsMargins(0, 0, 0, 0);
-  m_controlLayout->setSpacing(0);
-  m_controlLayout->addSpacing(LayoutConstants::TabBarBarLeftMargin);
+  m_controlLayout->setContentsMargins(0, 2, 0, 2);
+  m_controlLayout->setSpacing(2);
+  m_controlLayout->addSpacing(LayoutConstants::NarrowHMargin);
   m_controlLayout->addStretch(1);
   m_controlLayout->addLayout(m_barBook, 0);
   m_controlLayout->setAlignment(m_barBook, Qt::AlignVCenter);

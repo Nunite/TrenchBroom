@@ -5,7 +5,7 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-15
-- Current stage: Phase 1 complete; Phase 2 workbench shell ready to start
+- Current stage: Phase 2 main workbench shell complete; Phase 3 ready to start
 
 ## Objective
 
@@ -28,6 +28,11 @@ a runtime or source dependency on Code - OSS.
    `QPalette`, `QProxyStyle`, QSS, and editor overlay colors.
 6. Defer custom native title bars and general-purpose drag-and-drop docking until the
    lower-risk visual work has been evaluated.
+7. Follow Code - OSS Modern UI's 4 px card gaps, 6 px compact-control radius, and 8 px
+   workbench-surface radius without copying its DOM or adding a source dependency.
+8. Keep inspector modes as labeled horizontal segmented navigation for now. A narrow
+   icon-only activity rail would reduce clarity with the current icon set and remains an
+   optional structural change.
 
 ## Repository Findings
 
@@ -91,14 +96,16 @@ without changing window structure.
 
 ### Phase 2: Main Workbench Shell
 
-Status: pending
+Status: complete
 
-- [ ] Reduce toolbar height and visual noise.
-- [ ] Move persistent grid and editing state into compact status-bar segments where
+- [x] Reduce toolbar height and visual noise.
+- [x] Move persistent grid and editing state into compact status-bar segments where
       appropriate.
-- [ ] Restyle map-view tabs and contextual tool controls.
-- [ ] Give the inspector and bottom panel consistent headers and panel borders.
-- [ ] Evaluate a narrow activity bar for switching primary inspector modes.
+- [x] Restyle map-view tabs and contextual tool controls.
+- [x] Give the editor, inspector, and bottom panel consistent card borders, gaps, and
+      rounded corners.
+- [x] Evaluate a narrow activity bar and retain labeled segmented inspector navigation
+      for this phase.
 
 Expected benefit: very high. This phase creates most of the recognizable compact
 workbench layout while retaining the current splitter ownership model.
@@ -159,20 +166,26 @@ testing shows that the earlier phases do not meet the product goal.
 - Run relevant focused Catch2 filters for every changed component.
 - Build the Release `TrenchBroom` target before completing a workbench phase.
 - Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
-  capture the isolated welcome window in light and dark themes at 100%, 150%, and
-  200% scale. The script validates image dimensions, device-pixel ratio, nonblank
-  pixels, font support, and image hashes, then writes PNG and JSON evidence plus a
+  capture the isolated welcome window and representative map workbench in light and
+  dark themes at 100%, 150%, and 200% scale. The script validates image dimensions,
+  device-pixel ratio, nonblank pixels, font support, and image hashes, then writes PNG
+  and JSON evidence plus a
   labeled visual-comparison contact sheet under
   `build-release-codex\codex-logs\ui-theme-acceptance`.
-- Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark` for a focused
-  single capture. Snapshot mode uses temporary preferences, disables background
-  services, and renders through the native Qt platform without showing the window.
+- Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark [map-file]` for a
+  focused single capture. Omitting the map captures Welcome; supplying one captures the
+  workbench. Snapshot mode uses temporary preferences, disables background services,
+  and renders through the native Qt platform without showing the window.
 - Verify keyboard-only navigation, focus visibility, disabled states, and text fit.
 - Keep generated screenshots and temporary visual reports out of commits unless they
   are intentionally selected as maintained references.
 
 ## External References
 
+- Code - OSS Modern UI floating panels (pinned reference):
+  <https://github.com/microsoft/vscode/blob/6c27443ce6fdf6ac798c64025d45175e2e23c4b4/src/vs/workbench/browser/media/floatingPanels.css>
+- Code - OSS corner-radius sizes (pinned reference):
+  <https://github.com/microsoft/vscode/blob/6c27443ce6fdf6ac798c64025d45175e2e23c4b4/src/vs/platform/theme/common/sizes/baseSizes.ts>
 - VS Code theme color reference:
   <https://code.visualstudio.com/api/references/theme-color>
 - VS Code Dark Modern theme:
@@ -195,4 +208,8 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-15 | Verified | Passed the Release `TbUiLibTest "Theme"` test, built `TrenchBroom`, and completed a warning-free current-theme startup and screenshot check. |
 | 2026-08-15 | Complete | Added first-class light theme tokens and deterministic in-process UI snapshot capture with PNG, JSON, and a labeled comparison contact sheet. |
 | 2026-08-15 | Verified | Passed `UiSnapshot` and `Theme` tests, built Release `TrenchBroom`, and passed the hidden Light/Dark acceptance matrix at 100%, 150%, and 200% scale with readable native fonts. |
-| 2026-08-15 | Next | Start Phase 2 by modernizing the main workbench shell. |
+| 2026-08-15 | Complete | Pinned Code - OSS reference commit `6c27443c` and adapted its 4/6/8 px spacing and corner-radius hierarchy to Qt. |
+| 2026-08-15 | Complete | Added rounded editor, inspector, and bottom-panel surfaces; compact segmented tabs; an inspector header; and a quieter toolbar with Grid moved to the status bar. |
+| 2026-08-15 | Complete | Extended deterministic acceptance to capture a real map workbench as well as Welcome without showing native windows. |
+| 2026-08-15 | Verified | Passed `MapWindow`, `Theme`, and `UiSnapshot` tests, built Release `TrenchBroom`, and passed the 12-state Welcome/Workbench Light/Dark DPI matrix. |
+| 2026-08-15 | Next | Start Phase 3 by modernizing inspector and outliner row density, actions, and property layout. |

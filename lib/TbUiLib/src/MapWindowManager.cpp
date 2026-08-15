@@ -36,10 +36,11 @@ namespace tb::ui
 {
 
 MapWindowManager::MapWindowManager(
-  AppController& appController, const bool singleMapWindow)
+  AppController& appController, const bool singleMapWindow, const bool showMapWindows)
   : QObject{&appController}
   , m_appController{appController}
   , m_singleMapWindow{singleMapWindow}
+  , m_showMapWindows{showMapWindows}
 {
   connect(qApp, &QApplication::focusChanged, this, &MapWindowManager::onFocusChange);
 }
@@ -143,8 +144,11 @@ MapWindow* MapWindowManager::createMapWindow(std::unique_ptr<MapDocument> docume
   mapWindow->positionOnScreen(topMapWindow());
   m_mapWindows.insert(m_mapWindows.begin(), mapWindow);
 
-  mapWindow->show();
-  mapWindow->activateWindow();
+  if (m_showMapWindows)
+  {
+    mapWindow->show();
+    mapWindow->activateWindow();
+  }
   return mapWindow;
 }
 
