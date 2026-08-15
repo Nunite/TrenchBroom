@@ -19,8 +19,11 @@
 
 #include "ui/ClickableTitleBar.h"
 
+#include <QBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLayout>
+#include <QToolButton>
 
 #include "ui/QStyleUtils.h"
 #include "ui/ViewConstants.h"
@@ -32,21 +35,77 @@ ClickableTitleBar::ClickableTitleBar(
   const QString& title, const QString& stateText, QWidget* parent)
   : TitleBar{title, parent, LayoutConstants::NarrowHMargin, LayoutConstants::NarrowVMargin, true}
   , m_stateText{new QLabel{stateText}}
+  , m_stateIcon{new QToolButton{this}}
 {
+  setObjectName("ClickableTitleBar");
+  setAttribute(Qt::WA_StyledBackground, true);
+  setFocusPolicy(Qt::StrongFocus);
+  setAccessibleName(title);
+
+  m_titleLabel->setObjectName("ClickableTitleBar_Title");
+
+  m_stateIcon->setObjectName("ClickableTitleBar_StateIcon");
+  m_stateIcon->setAutoRaise(true);
+  m_stateIcon->setFixedSize(QSize{22, 22});
+  m_stateIcon->setIconSize(QSize{12, 12});
+  m_stateIcon->setFocusPolicy(Qt::NoFocus);
+  m_stateIcon->hide();
+
+  if (auto* boxLayout = qobject_cast<QBoxLayout*>(layout()))
+  {
+    boxLayout->insertWidget(0, m_stateIcon);
+  }
+
+  m_stateText->setObjectName("ClickableTitleBar_StateText");
   m_stateText->setFont(m_titleLabel->font());
   setInfoStyle(m_stateText);
 
   layout()->addWidget(m_stateText);
+
+  connect(m_stateIcon, &QToolButton::clicked, this, &ClickableTitleBar::titleBarClicked);
 }
 
 void ClickableTitleBar::setStateText(const QString& stateText)
 {
   m_stateText->setText(stateText);
+  m_stateText->show();
+  m_stateIcon->hide();
 }
 
-void ClickableTitleBar::mousePressEvent(QMouseEvent* /* event */)
+void ClickableTitleBar::setStateIcon(const QIcon& icon, const QString& tooltip)
 {
-  emit titleBarClicked();
+  m_stateIcon->setIcon(icon);
+  m_stateIcon->setToolTip(tooltip);
+  m_stateIcon->setAccessibleName(tooltip);
+  m_stateIcon->show();
+  m_stateText->hide();
+}
+
+void ClickableTitleBar::mousePressEvent(QMouseEvent* event)
+{
+  if (event->button() == Qt::LeftButton)
+  {
+    setFocus(Qt::MouseFocusReason);
+    emit titleBarClicked();
+    event->accept();
+    return;
+  }
+
+  TitleBar::mousePressEvent(event);
+}
+
+void ClickableTitleBar::keyPressEvent(QKeyEvent* event)
+{
+  if (
+    event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter
+    || event->key() == Qt::Key_Space)
+  {
+    emit titleBarClicked();
+    event->accept();
+    return;
+  }
+
+  TitleBar::keyPressEvent(event);
 }
 
 } // namespace tb::ui

@@ -24,6 +24,9 @@
 #include "ui/TitleBar.h"
 
 class QLabel;
+class QIcon;
+class QKeyEvent;
+class QToolButton;
 
 namespace tb::ui
 {
@@ -34,17 +37,20 @@ class ClickableTitleBar : public TitleBar
   Q_OBJECT
 private:
   QLabel* m_stateText = nullptr;
+  QToolButton* m_stateIcon = nullptr;
 
 public:
   ClickableTitleBar(
     const QString& title, const QString& stateText, QWidget* parent = nullptr);
 
   void setStateText(const QString& stateText);
+  void setStateIcon(const QIcon& icon, const QString& tooltip);
 signals:
   void titleBarClicked();
 
 protected:
   void mousePressEvent(QMouseEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
 };
 
 } // namespace tb::ui

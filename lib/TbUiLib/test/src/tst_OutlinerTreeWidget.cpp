@@ -136,6 +136,13 @@ struct OutlinerTreeFixture
     mdl::addNodes(map, {{&mdl::parentForNodes(map), {lightEntity, infoEntity, group}}});
   }
 };
+
+class TestOutlinerTreeWidget : public OutlinerTreeWidget
+{
+public:
+  using OutlinerTreeWidget::OutlinerTreeWidget;
+  using OutlinerTreeWidget::dropSelectedItemsOnItem;
+};
 } // namespace
 
 TEST_CASE("OutlinerTreeWidget")
@@ -144,7 +151,7 @@ TEST_CASE("OutlinerTreeWidget")
   auto& document = fixture.document;
   auto& map = fixture.map;
 
-  auto tree = OutlinerTreeWidget{document};
+  auto tree = TestOutlinerTreeWidget{document};
   processOutlinerTreeUpdates();
 
   SECTION("uses compact workbench metrics")
@@ -283,6 +290,57 @@ TEST_CASE("OutlinerTreeWidget")
 
     CHECK(!map.selection().hasAny());
     CHECK(tree.selectedItems().empty());
+  }
+
+  SECTION("supports keyboard row navigation")
+  {
+    tree.resize(600, 400);
+    tree.show();
+    processOutlinerTreeUpdates();
+
+    auto* infoItem = itemForNode(tree, fixture.infoEntity);
+    auto* lightItem = itemForNode(tree, fixture.lightEntity);
+    REQUIRE(infoItem != nullptr);
+    REQUIRE(lightItem != nullptr);
+
+    tree.setCurrentItem(infoItem);
+    tree.setFocus();
+    QTest::keyClick(&tree, Qt::Key_Down);
+    CHECK(tree.currentItem() == lightItem);
+
+    QTest::keyClick(&tree, Qt::Key_Up);
+    CHECK(tree.currentItem() == infoItem);
+  }
+
+  SECTION("keeps rename actions outside inline tree editing")
+  {
+    for (auto* item : allItems(tree))
+    {
+      CHECK_FALSE(item->flags().testFlag(Qt::ItemIsEditable));
+    }
+  }
+
+  SECTION("moves selected objects to another layer through the drop path")
+  {
+    auto* targetLayer = new mdl::LayerNode{mdl::Layer{"Target"}};
+    mdl::addNodes(map, {{&map.worldNode(), {targetLayer}}});
+    processOutlinerTreeUpdates();
+
+    mdl::selectNodes(map, {fixture.infoEntity});
+    processOutlinerTreeUpdates();
+
+    auto* targetItem = itemForNode(tree, targetLayer);
+    REQUIRE(targetItem != nullptr);
+    REQUIRE(tree.dropSelectedItemsOnItem(targetItem));
+    processOutlinerTreeUpdates();
+
+    CHECK(fixture.infoEntity->parent() == targetLayer);
+    REQUIRE(map.selection().entities.size() == 1);
+    CHECK(map.selection().entities.front() == fixture.infoEntity);
+
+    auto* movedItem = itemForNode(tree, fixture.infoEntity);
+    REQUIRE(movedItem != nullptr);
+    CHECK(movedItem->parent() == itemForNode(tree, targetLayer));
   }
 
   SECTION("locally refreshes a layer when map nodes are added")

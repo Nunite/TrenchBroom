@@ -2291,6 +2291,19 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
         return;
     }
 
+    if (dropSelectedItemsOnItem(targetItem)) {
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
+}
+
+bool OutlinerTreeWidget::dropSelectedItemsOnItem(QTreeWidgetItem* targetItem)
+{
+    if (!targetItem) {
+        return false;
+    }
+
     if (auto* worldspawnItem = isWorldspawnItem(targetItem) ? targetItem : targetItem->parent();
         isWorldspawnItem(worldspawnItem)) {
         auto& map = m_document.map();
@@ -2300,8 +2313,7 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
             selectedItems(), [this](QTreeWidgetItem* item) { return nodeFromItem(item); }, layerNode);
 
         if (nodesToMove.empty()) {
-            event->ignore();
-            return;
+            return false;
         }
 
         auto transaction = mdl::Transaction{map, "Move Brushes to worldspawn"};
@@ -2311,22 +2323,19 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
         nodesToAdd[layerNode] = nodesToMove;
         if (!mdl::reparentNodes(map, nodesToAdd)) {
             transaction.cancel();
-            event->ignore();
-            return;
+            return false;
         }
 
         mdl::selectNodes(map, nodesToMove);
         transaction.commit();
 
         scheduleUpdateTree(layerNode);
-        event->acceptProposedAction();
-        return;
+        return true;
     }
 
     auto* targetNode = nodeFromItem(targetItem);
     if (!targetNode) {
-        event->ignore();
-        return;
+        return false;
     }
 
     if (auto* targetLayer = dynamic_cast<mdl::LayerNode*>(targetNode)) {
@@ -2338,8 +2347,7 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
             targetLayer);
 
         if (nodesToMove.empty()) {
-            event->ignore();
-            return;
+            return false;
         }
 
         auto transaction = mdl::Transaction{map, "Move Objects to Layer " + targetLayer->name()};
@@ -2349,16 +2357,14 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
         nodesToAdd[targetLayer] = nodesToMove;
         if (!mdl::reparentNodes(map, nodesToAdd)) {
             transaction.cancel();
-            event->ignore();
-            return;
+            return false;
         }
 
         mdl::selectNodes(map, nodesToMove);
         transaction.commit();
 
         scheduleUpdateTree(targetLayer);
-        event->acceptProposedAction();
-        return;
+        return true;
     }
 
     if (auto* targetGroup = dynamic_cast<mdl::GroupNode*>(targetNode)) {
@@ -2370,8 +2376,7 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
             targetGroup);
 
         if (nodesToMove.empty()) {
-            event->ignore();
-            return;
+            return false;
         }
 
         auto transaction = mdl::Transaction{map, "Move Objects to " + targetGroup->name()};
@@ -2381,16 +2386,14 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
         nodesToAdd[targetGroup] = nodesToMove;
         if (!mdl::reparentNodes(map, nodesToAdd)) {
             transaction.cancel();
-            event->ignore();
-            return;
+            return false;
         }
 
         mdl::selectNodes(map, nodesToMove);
         transaction.commit();
 
         scheduleUpdateTree(targetGroup);
-        event->acceptProposedAction();
-        return;
+        return true;
     }
 
     if (auto* targetEntity = dynamic_cast<mdl::EntityNode*>(targetNode)) {
@@ -2400,8 +2403,7 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
                 selectedItems(), [this](QTreeWidgetItem* item) { return nodeFromItem(item); }, targetEntity);
 
             if (nodesToMove.empty()) {
-                event->ignore();
-                return;
+                return false;
             }
 
             auto transaction =
@@ -2412,20 +2414,18 @@ void OutlinerTreeWidget::dropEvent(QDropEvent* event)
             nodesToAdd[targetEntity] = nodesToMove;
             if (!mdl::reparentNodes(map, nodesToAdd)) {
                 transaction.cancel();
-                event->ignore();
-                return;
+                return false;
             }
 
             mdl::selectNodes(map, nodesToMove);
             transaction.commit();
 
             scheduleUpdateTree(targetEntity);
-            event->acceptProposedAction();
-            return;
+            return true;
         }
     }
 
-    event->ignore();
+    return false;
 }
 
 void OutlinerTreeWidget::updateVisibilityIconRecursively(QTreeWidgetItem* item, bool isVisible)

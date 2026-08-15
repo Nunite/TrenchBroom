@@ -457,6 +457,39 @@ QSplitter#OutlinerInspector_Splitter::handle {
   height: 5px;
 }
 
+QWidget#ClickableTitleBar {
+  background: @tb-panel-background;
+  border: 1px solid transparent;
+  min-height: 28px;
+}
+
+QWidget#ClickableTitleBar:hover {
+  background: @tb-hover-background;
+}
+
+QWidget#ClickableTitleBar:focus {
+  border-color: @tb-focus-border;
+}
+
+QWidget#ClickableTitleBar QLabel#ClickableTitleBar_Title {
+  color: @tb-text;
+}
+
+QWidget#ClickableTitleBar QLabel#ClickableTitleBar_StateText {
+  color: @tb-secondary-text;
+}
+
+QWidget#ClickableTitleBar QToolButton#ClickableTitleBar_StateIcon {
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 0;
+}
+
+QWidget#ClickableTitleBar QToolButton#ClickableTitleBar_StateIcon:hover {
+  background: @tb-pressed-background;
+}
+
 tb--ui--BitmapButton {
   border: none;
 }

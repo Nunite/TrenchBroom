@@ -22,8 +22,8 @@
 #include <QByteArray>
 #include <QDataStream>
 #include <QIODevice>
-#include <QLabel>
 #include <QLayout>
+#include <QStyle>
 
 #include "ui/BorderLine.h"
 #include "ui/ClickableTitleBar.h"
@@ -40,6 +40,9 @@ CollapsibleTitledPanel::CollapsibleTitledPanel(
   , m_panel{new QWidget{}}
   , m_expanded{initiallyExpanded}
 {
+  setProperty("expanded", m_expanded);
+  m_titleBar->setProperty("collapsible", true);
+
   auto* sizer = new QVBoxLayout{};
   sizer->setContentsMargins(0, 0, 0, 0);
   sizer->setSpacing(0);
@@ -109,17 +112,20 @@ bool CollapsibleTitledPanel::restoreState(const QByteArray& state)
 
 void CollapsibleTitledPanel::updateExpanded()
 {
+  setProperty("expanded", m_expanded);
+  m_titleBar->setProperty("expanded", m_expanded);
+
   if (m_expanded)
   {
     m_divider->show();
     m_panel->show();
-    m_titleBar->setStateText(tr("hide"));
+    m_titleBar->setStateIcon(style()->standardIcon(QStyle::SP_ArrowDown), tr("Collapse"));
   }
   else
   {
     m_divider->hide();
     m_panel->hide();
-    m_titleBar->setStateText(tr("show"));
+    m_titleBar->setStateIcon(style()->standardIcon(QStyle::SP_ArrowRight), tr("Expand"));
   }
 }
 

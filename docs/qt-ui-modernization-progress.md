@@ -5,7 +5,7 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-15
-- Current stage: Phase 2 main workbench shell complete; Phase 3 ready to start
+- Current stage: Phase 3 inspector and outliner modernization complete; Phase 4 ready to start
 
 ## Objective
 
@@ -112,7 +112,7 @@ workbench layout while retaining the current splitter ownership model.
 
 ### Phase 3: Inspector And Outliner
 
-Status: in progress (first visual pass complete)
+Status: complete
 
 - [x] Standardize tree row height, indentation, rounded selection, hover, and inactive
       states.
@@ -120,10 +120,14 @@ Status: in progress (first visual pass complete)
       and group indicators in the name hierarchy.
 - [x] Add a consistent inset search, sort, and properties action row.
 - [x] Align property names, values, and actions into a predictable responsive layout.
-- [ ] Introduce reusable collapsible section headers.
+- [x] Introduce reusable collapsible section headers.
 - [x] Verify multi-selection, Escape handling, and lock/visibility hit targets.
-- [ ] Add warning indicators when the outliner has a stable warning data source.
-- [ ] Complete manual keyboard navigation, inline editing, and drag-and-drop acceptance.
+- [x] Verify keyboard row navigation and cross-layer drag-and-drop through the production
+      transaction and tree-refresh path.
+- [x] Preserve the existing explicit layer/group rename actions; inline tree editing is
+      intentionally not introduced because it is not part of the current interaction model.
+- [x] Evaluate warning indicators and defer them until the outliner has a stable warning
+      data source.
 
 Expected benefit: very high. Difficulty is medium to high because the outliner has
 significant custom interaction and painting code.
@@ -192,6 +196,8 @@ testing shows that the earlier phases do not meet the product goal.
   <https://github.com/microsoft/vscode/blob/6c27443ce6fdf6ac798c64025d45175e2e23c4b4/src/vs/workbench/browser/media/floatingPanels.css>
 - Code - OSS corner-radius sizes (pinned reference):
   <https://github.com/microsoft/vscode/blob/6c27443ce6fdf6ac798c64025d45175e2e23c4b4/src/vs/platform/theme/common/sizes/baseSizes.ts>
+- Code - OSS sidebar section headers (pinned reference):
+  <https://github.com/microsoft/vscode/blob/6c27443ce6fdf6ac798c64025d45175e2e23c4b4/src/vs/workbench/browser/parts/sidebar/media/sidebarpart.css>
 - VS Code theme color reference:
   <https://code.visualstudio.com/api/references/theme-color>
 - VS Code Dark Modern theme:
@@ -221,4 +227,7 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-15 | Complete | Added an inset Outliner toolbar, icon-only state columns, compact hierarchy metrics, rounded full-row interaction states, and a quieter responsive entity-property layout. |
 | 2026-08-15 | Complete | Added deterministic Outliner snapshot setup with expanded hierarchy, visible properties, and active selection. |
 | 2026-08-15 | Verified | Passed `OutlinerTreeWidget`, `OutlinerEntityPropertyEditor`, `MapWindow`, `Theme`, and `UiSnapshot` tests, built Release `TrenchBroom`, and passed the 18-state Welcome/Workbench/Outliner Light/Dark DPI matrix. |
-| 2026-08-15 | Next | Finish Phase 3 with reusable collapsible section styling and manual inline-editing and drag-and-drop acceptance. |
+| 2026-08-15 | Complete | Replaced collapsible section show/hide text with compact chevron headers, full-row mouse activation, keyboard activation, hover, and focus states while preserving switchable panel text states. |
+| 2026-08-15 | Complete | Extracted the Outliner drop execution path for deterministic acceptance and covered keyboard row navigation, deliberate non-inline rename behavior, cross-layer reparenting, selection retention, and local tree refresh. |
+| 2026-08-15 | Verified | Passed `CollapsibleTitledPanel` (31 assertions), `OutlinerTreeWidget` (86), `OutlinerEntityPropertyEditor` (107), `MapWindow` (70), `Theme` (19), and `UiSnapshot` (18), built Release `TrenchBroom`, and passed the 18-state matrix at `20260815-221023-403`. |
+| 2026-08-15 | Next | Begin Phase 4 with the Console, Issues, Python, and Assets supporting surfaces. |
