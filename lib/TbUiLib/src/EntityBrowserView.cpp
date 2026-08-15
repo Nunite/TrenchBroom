@@ -44,6 +44,7 @@
 #include "prefs/Preferences.h"
 #include "render/Transformation.h"
 #include "ui/MapDocument.h"
+#include "ui/Theme.h"
 
 #include "kd/contracts.h"
 #include "kd/string_compare.h"
@@ -312,9 +313,9 @@ bool EntityBrowserView::shouldRenderFocusIndicator() const
   return false;
 }
 
-const Color& EntityBrowserView::getBackgroundColor()
+Color EntityBrowserView::getBackgroundColor()
 {
-  return pref(Preferences::BrowserBackgroundColor);
+  return browserBackgroundColor(palette());
 }
 
 void EntityBrowserView::renderBounds(

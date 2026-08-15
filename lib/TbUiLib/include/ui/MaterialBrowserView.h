@@ -107,7 +107,7 @@ private:
   void doClear() override;
   void doRender(gl::Gl& gl, Layout& layout, float y, float height) override;
   bool shouldRenderFocusIndicator() const override;
-  const Color& getBackgroundColor() override;
+  Color getBackgroundColor() override;
 
   void renderBounds(gl::Gl& gl, Layout& layout, float y, float height);
   const Color& materialColor(const gl::Material& material) const;

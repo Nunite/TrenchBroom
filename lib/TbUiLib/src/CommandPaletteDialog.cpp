@@ -20,11 +20,17 @@
 #include "ui/CommandPaletteDialog.h"
 
 #include <QAbstractItemView>
+#include <QApplication>
 #include <QEvent>
+#include <QFontMetrics>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPainter>
 #include <QStringList>
+#include <QStyle>
+#include <QStyleOptionViewItem>
+#include <QStyledItemDelegate>
 #include <QVBoxLayout>
 
 #include "base/PreferenceManager.h"
@@ -41,6 +47,138 @@ namespace tb::ui
 
 namespace
 {
+
+constexpr auto LabelRole = Qt::UserRole + 1;
+constexpr auto PathRole = Qt::UserRole + 2;
+constexpr auto ShortcutRole = Qt::UserRole + 3;
+
+class CommandPaletteItemDelegate : public QStyledItemDelegate
+{
+public:
+  explicit CommandPaletteItemDelegate(QObject* parent)
+    : QStyledItemDelegate{parent}
+  {
+    setObjectName(QStringLiteral("CommandPalette_ItemDelegate"));
+  }
+
+  void paint(
+    QPainter* painter,
+    const QStyleOptionViewItem& sourceOption,
+    const QModelIndex& index) const override
+  {
+    const auto label = index.data(LabelRole).toString();
+    if (label.isEmpty())
+    {
+      QStyledItemDelegate::paint(painter, sourceOption, index);
+      return;
+    }
+
+    auto option = sourceOption;
+    initStyleOption(&option, index);
+    option.text.clear();
+
+    const auto* style =
+      option.widget != nullptr ? option.widget->style() : QApplication::style();
+    style->drawControl(QStyle::CE_ItemViewItem, &option, painter, option.widget);
+
+    const auto contentRect = option.rect.adjusted(9, 5, -9, -5);
+    if (contentRect.isEmpty())
+    {
+      return;
+    }
+
+    const auto path = index.data(PathRole).toString();
+    const auto shortcut = index.data(ShortcutRole).toString();
+    const auto primaryMetrics = QFontMetrics{option.font};
+
+    auto secondaryFont = option.font;
+    if (secondaryFont.pointSizeF() > 8.0)
+    {
+      secondaryFont.setPointSizeF(secondaryFont.pointSizeF() - 1.0);
+    }
+    const auto secondaryMetrics = QFontMetrics{secondaryFont};
+
+    const auto firstLine = QRect{
+      contentRect.left(),
+      contentRect.top(),
+      contentRect.width(),
+      primaryMetrics.height()};
+    const auto secondLine = QRect{
+      contentRect.left(),
+      contentRect.bottom() - secondaryMetrics.height() + 1,
+      contentRect.width(),
+      secondaryMetrics.height()};
+
+    constexpr auto ColumnGap = 16;
+    const auto shortcutWidth = shortcut.isEmpty()
+                                 ? 0
+                                 : std::min(
+                                     secondaryMetrics.horizontalAdvance(shortcut),
+                                     std::max(0, firstLine.width() / 2));
+    const auto gap = shortcutWidth > 0 ? ColumnGap : 0;
+    const auto labelWidth = std::max(0, firstLine.width() - shortcutWidth - gap);
+    const auto labelRect =
+      QRect{firstLine.left(), firstLine.top(), labelWidth, firstLine.height()};
+    const auto shortcutRect = QRect{
+      firstLine.right() - shortcutWidth + 1,
+      firstLine.top(),
+      shortcutWidth,
+      firstLine.height()};
+
+    const auto selected = option.state.testFlag(QStyle::State_Selected);
+    const auto enabled = option.state.testFlag(QStyle::State_Enabled);
+    const auto primaryRole = selected ? QPalette::HighlightedText : QPalette::Text;
+    const auto primaryColor =
+      option.palette.color(enabled ? QPalette::Active : QPalette::Disabled, primaryRole);
+    auto secondaryColor =
+      selected
+        ? option.palette.color(QPalette::Active, QPalette::HighlightedText)
+        : option.palette.color(
+            enabled ? QPalette::Active : QPalette::Disabled, QPalette::PlaceholderText);
+    if (selected)
+    {
+      secondaryColor.setAlpha(205);
+    }
+
+    painter->save();
+    painter->setFont(option.font);
+    painter->setPen(primaryColor);
+    painter->drawText(
+      labelRect,
+      Qt::AlignLeft | Qt::AlignVCenter,
+      primaryMetrics.elidedText(label, Qt::ElideRight, labelRect.width()));
+
+    painter->setFont(secondaryFont);
+    painter->setPen(secondaryColor);
+    if (shortcutWidth > 0)
+    {
+      painter->drawText(
+        shortcutRect,
+        Qt::AlignRight | Qt::AlignVCenter,
+        secondaryMetrics.elidedText(shortcut, Qt::ElideLeft, shortcutRect.width()));
+    }
+    painter->drawText(
+      secondLine,
+      Qt::AlignLeft | Qt::AlignVCenter,
+      secondaryMetrics.elidedText(path, Qt::ElideRight, secondLine.width()));
+    painter->restore();
+  }
+
+  QSize sizeHint(
+    const QStyleOptionViewItem& option, const QModelIndex& index) const override
+  {
+    auto size = QStyledItemDelegate::sizeHint(option, index);
+    const auto primaryHeight = QFontMetrics{option.font}.height();
+    auto secondaryFont = option.font;
+    if (secondaryFont.pointSizeF() > 8.0)
+    {
+      secondaryFont.setPointSizeF(secondaryFont.pointSizeF() - 1.0);
+    }
+    const auto secondaryHeight = QFontMetrics{secondaryFont}.height();
+    size.setHeight(std::max(46, primaryHeight + secondaryHeight + 12));
+    return size;
+  }
+};
 
 QString makeDisplayPath(QString path)
 {
@@ -122,6 +260,9 @@ CommandPaletteDialog::CommandPaletteDialog(
   m_actionList->setObjectName("CommandPalette_ActionList");
   m_actionList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_actionList->setAlternatingRowColors(false);
+  m_actionList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_actionList->setUniformItemSizes(true);
+  m_actionList->setItemDelegate(new CommandPaletteItemDelegate{m_actionList});
   m_actionList->installEventFilter(this);
 
   auto* layout = new QVBoxLayout{};
@@ -206,17 +347,11 @@ void CommandPaletteDialog::reloadActions()
       continue;
     }
 
-    auto text = entry.label;
-    if (!entry.shortcut.isEmpty())
-    {
-      text += QStringLiteral("    ");
-      text += entry.shortcut;
-    }
-    text += QStringLiteral("\n");
-    text += entry.displayPath;
-
-    auto* item = new QListWidgetItem{text, m_actionList};
+    auto* item = new QListWidgetItem{entry.label, m_actionList};
     item->setData(Qt::UserRole, entry.preferencePath);
+    item->setData(LabelRole, entry.label);
+    item->setData(PathRole, entry.displayPath);
+    item->setData(ShortcutRole, entry.shortcut);
     item->setToolTip(entry.preferencePath);
   }
 

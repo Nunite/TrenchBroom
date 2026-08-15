@@ -31,7 +31,6 @@
 
 #include "base/Macros.h"
 #include "base/PreferenceManager.h"
-#include "prefs/Preferences.h"
 #include "fs/DiskIO.h"
 #include "fs/PathInfo.h"
 #include "gl/ActiveShader.h"
@@ -50,11 +49,13 @@
 #include "mdl/GameFileSystem.h"
 #include "mdl/GoldSrcMdlScaler.h"
 #include "mdl/Map.h"
+#include "prefs/Preferences.h"
 #include "render/Transformation.h"
 #include "ui/AppController.h"
 #include "ui/ImageUtils.h"
 #include "ui/MapDocument.h"
 #include "ui/QPathUtils.h"
+#include "ui/Theme.h"
 
 #include "kd/path_utils.h"
 #include "kd/ranges/repeat_view.h"
@@ -556,9 +557,9 @@ bool ModelBrowserView::shouldRenderFocusIndicator() const
   return false;
 }
 
-const Color& ModelBrowserView::getBackgroundColor()
+Color ModelBrowserView::getBackgroundColor()
 {
-  return pref(Preferences::BrowserBackgroundColor);
+  return browserBackgroundColor(palette());
 }
 
 void ModelBrowserView::doLeftClick(Layout& layout, const float x, const float y)
@@ -1183,7 +1184,7 @@ void ModelBrowserView::renderHoveredCellBounds(
   using BoundsVertex = gl::VertexTypes::P2C4::Vertex;
   auto vertices = std::vector<BoundsVertex>{};
 
-  const auto rgb = pref(Preferences::BrowserTextColor).to<RgbF>();
+  const auto rgb = browserTextColor(palette()).to<RgbF>();
   const auto color = RgbaF{rgb, 0.10f}.toVec();
 
   for (const auto& group : layout.groups())
@@ -1252,7 +1253,7 @@ void ModelBrowserView::renderSelectedCellBounds(
   using BoundsVertex = gl::VertexTypes::P2C4::Vertex;
   auto vertices = std::vector<BoundsVertex>{};
 
-  const auto rgb = pref(Preferences::BrowserTextColor).to<RgbF>();
+  const auto rgb = browserTextColor(palette()).to<RgbF>();
   const auto color = RgbaF{rgb, 0.18f}.toVec();
 
   for (const auto& group : layout.groups())
@@ -1350,8 +1351,7 @@ void ModelBrowserView::renderFolders(
 
   auto shader =
     gl::ActiveShader{gl, shaderManager(), gl::Shaders::VaryingPUniformCShader};
-  shader.set(
-    "Color", RgbaF{pref(Preferences::BrowserGroupBackgroundColor).to<RgbF>(), 0.35f});
+  shader.set("Color", RgbaF{browserGroupBackgroundColor(palette()).to<RgbF>(), 0.35f});
 
   auto vertexArray = gl::VertexArray::move(std::move(vertices));
   vertexArray.prepare(gl, vboManager());

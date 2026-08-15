@@ -39,6 +39,7 @@
 #include "render/Transformation.h"
 #include "ui/CellLayout.h"
 #include "ui/RenderView.h"
+#include "ui/Theme.h"
 
 #include "kd/ranges/repeat_view.h"
 #include "kd/ranges/stride_view.h"
@@ -452,7 +453,7 @@ void CellView::renderTitleBackgrounds(gl::Gl& gl, float y, float height)
 
   auto shader =
     gl::ActiveShader{gl, shaderManager(), gl::Shaders::VaryingPUniformCShader};
-  shader.set("Color", pref(Preferences::BrowserGroupBackgroundColor));
+  shader.set("Color", browserGroupBackgroundColor(palette()));
 
   auto vertexArray = gl::VertexArray::move(std::move(vertices));
   vertexArray.prepare(gl, vboManager());
@@ -468,14 +469,18 @@ namespace
 {
 
 auto collectStringVertices(
-  CellLayout& layout, const float y, const float height, gl::FontManager& fontManager)
+  CellLayout& layout,
+  const float y,
+  const float height,
+  gl::FontManager& fontManager,
+  const QPalette& palette)
 {
   using TextVertex = gl::VertexTypes::P2Uv2C4::Vertex;
 
   auto defaultFont = gl::FontDescriptor{
     pref(Preferences::RendererFontPath), size_t(pref(Preferences::BrowserFontSize))};
 
-  const auto textColor = pref(Preferences::BrowserTextColor);
+  const auto textColor = browserTextColor(palette);
 
   auto stringVertices = std::map<gl::FontDescriptor, std::vector<TextVertex>>{};
   for (const auto& group : layout.groups())
@@ -546,7 +551,7 @@ void CellView::renderTitleStrings(gl::Gl& gl, float y, float height)
   auto stringRenderers = StringRendererMap{};
 
   for (const auto& [descriptor, vertices] :
-       collectStringVertices(m_layout, y, height, fontManager()))
+       collectStringVertices(m_layout, y, height, fontManager(), palette()))
   {
     stringRenderers[descriptor] = gl::VertexArray::ref(vertices);
     stringRenderers[descriptor].prepare(gl, vboManager());

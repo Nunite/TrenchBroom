@@ -24,6 +24,10 @@
 #include <QRegularExpression>
 #include <QString>
 
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
+#include "ui/QColorUtils.h"
+
 #include <array>
 #include <cmath>
 #include <utility>
@@ -58,6 +62,14 @@ QString styleSheetColor(const QColor& color)
     .arg(color.green())
     .arg(color.blue())
     .arg(color.alpha());
+}
+
+Color preferenceOrPaletteColor(
+  const Preference<Color>& preference, const QColor& paletteColor)
+{
+  const auto& configuredColor = pref(preference);
+  return configuredColor == preference.defaultValue ? fromQColor(paletteColor)
+                                                    : configuredColor;
 }
 
 } // namespace
@@ -207,6 +219,25 @@ QPalette makeThemePalette(const ThemeTokens& tokens)
   palette.setColor(QPalette::Disabled, QPalette::ButtonText, tokens.disabledText);
 
   return palette;
+}
+
+Color browserBackgroundColor(const QPalette& palette)
+{
+  return preferenceOrPaletteColor(
+    Preferences::BrowserBackgroundColor, palette.color(QPalette::Active, QPalette::Base));
+}
+
+Color browserGroupBackgroundColor(const QPalette& palette)
+{
+  return preferenceOrPaletteColor(
+    Preferences::BrowserGroupBackgroundColor,
+    palette.color(QPalette::Active, QPalette::AlternateBase));
+}
+
+Color browserTextColor(const QPalette& palette)
+{
+  return preferenceOrPaletteColor(
+    Preferences::BrowserTextColor, palette.color(QPalette::Active, QPalette::Text));
 }
 
 bool expandThemeStyleSheet(QString& styleSheet, const ThemeTokens& tokens, QString* error)

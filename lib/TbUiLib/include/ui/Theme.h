@@ -23,6 +23,8 @@
 #include <QPalette>
 #include <QString>
 
+#include "base/Color.h"
+
 namespace tb::ui
 {
 
@@ -62,6 +64,10 @@ ThemeTokens makeLightThemeTokens();
 ThemeTokens makeDarkThemeTokens();
 
 QPalette makeThemePalette(const ThemeTokens& tokens);
+
+Color browserBackgroundColor(const QPalette& palette);
+Color browserGroupBackgroundColor(const QPalette& palette);
+Color browserTextColor(const QPalette& palette);
 
 /**
  * Expands @tb-* placeholders without changing styleSheet if an unknown token remains.

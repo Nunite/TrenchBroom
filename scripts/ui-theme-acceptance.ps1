@@ -5,7 +5,10 @@ param(
     "welcome",
     "workbench",
     "outliner",
+    "entity-browser",
+    "face-inspector",
     "supporting",
+    "command-palette",
     "preferences",
     "preferences-colors"
   ),
@@ -140,11 +143,14 @@ foreach ($target in $normalizedTargets) {
       "welcome",
       "workbench",
       "outliner",
+      "entity-browser",
+      "face-inspector",
       "supporting",
+      "command-palette",
       "preferences",
       "preferences-colors"
     )) {
-    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, supporting, preferences, or preferences-colors."
+    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, entity-browser, face-inspector, supporting, command-palette, preferences, or preferences-colors."
   }
 }
 foreach ($theme in $Themes) {
@@ -178,7 +184,10 @@ $resolvedQtBin = Resolve-Path -Path $QtBin
 $resolvedMapPath = if (
   $normalizedTargets -contains "workbench" -or
   $normalizedTargets -contains "outliner" -or
-  $normalizedTargets -contains "supporting") {
+  $normalizedTargets -contains "entity-browser" -or
+  $normalizedTargets -contains "face-inspector" -or
+  $normalizedTargets -contains "supporting" -or
+  $normalizedTargets -contains "command-palette") {
   Resolve-Path -Path $MapPath
 } else {
   $null
@@ -218,7 +227,13 @@ foreach ($target in $normalizedTargets) {
       if ($target -ne "welcome" -and $target -ne "workbench") {
         $processInfo.Arguments += " --ui-snapshot-page $target"
       }
-      if ($target -eq "workbench" -or $target -eq "outliner" -or $target -eq "supporting") {
+      if (
+        $target -eq "workbench" -or
+        $target -eq "outliner" -or
+        $target -eq "entity-browser" -or
+        $target -eq "face-inspector" -or
+        $target -eq "supporting" -or
+        $target -eq "command-palette") {
         $processInfo.Arguments += " `"$($resolvedMapPath.Path)`""
       }
       $processInfo.WorkingDirectory = Split-Path -Parent $executable

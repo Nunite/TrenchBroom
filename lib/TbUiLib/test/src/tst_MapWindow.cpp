@@ -28,6 +28,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QStatusBar>
+#include <QStyleOptionViewItem>
 #include <QToolButton>
 #include <QWidget>
 #include <QtTest/QTest>
@@ -238,6 +239,23 @@ TEST_CASE("MapWindow")
     CHECK_FALSE(actionList->alternatingRowColors());
     CHECK(actionList->selectionMode() == QAbstractItemView::SingleSelection);
     CHECK(actionList->count() > 0);
+    CHECK(actionList->horizontalScrollBarPolicy() == Qt::ScrollBarAlwaysOff);
+    CHECK(actionList->uniformItemSizes());
+    CHECK(actionList->itemDelegate()->objectName() == "CommandPalette_ItemDelegate");
+
+    const auto* firstItem = actionList->item(0);
+    REQUIRE(firstItem != nullptr);
+    CHECK_FALSE(firstItem->data(Qt::UserRole + 1).toString().isEmpty());
+    CHECK_FALSE(firstItem->data(Qt::UserRole + 2).toString().isEmpty());
+    CHECK_FALSE(firstItem->text().contains('\n'));
+
+    auto itemOption = QStyleOptionViewItem{};
+    itemOption.font = actionList->font();
+    CHECK(
+      actionList->itemDelegate()
+        ->sizeHint(itemOption, actionList->model()->index(0, 0))
+        .height()
+      >= 46);
   }
 
   SECTION("copy prefixes worldspawn header when enabled")

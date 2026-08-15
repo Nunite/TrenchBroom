@@ -41,6 +41,7 @@
 #include "render/RenderContext.h"
 #include "render/Renderable.h"
 #include "ui/MapDocument.h"
+#include "ui/Theme.h"
 #include "ui/UvCameraTool.h"
 #include "ui/UvOffsetTool.h"
 #include "ui/UvOriginTool.h"
@@ -283,9 +284,9 @@ bool UvView::shouldRenderFocusIndicator() const
   return false;
 }
 
-const Color& UvView::getBackgroundColor()
+Color UvView::getBackgroundColor()
 {
-  return pref(Preferences::BrowserBackgroundColor);
+  return browserBackgroundColor(palette());
 }
 
 void UvView::setupGL(render::RenderContext& renderContext)

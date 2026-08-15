@@ -48,6 +48,7 @@
 #include "ui/ActionBuilder.h"
 #include "ui/ActionExecutionContext.h"
 #include "ui/AppController.h"
+#include "ui/CommandPaletteDialog.h"
 #include "ui/Contracts.h"
 #include "ui/CrashReporter.h"
 #include "ui/FileEventFilter.h"
@@ -317,8 +318,8 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "system"};
   const auto uiSnapshotPageOption = QCommandLineOption{
     QStringList{"ui-snapshot-page"},
-    "Select the surface to capture: map, outliner, supporting, preferences, or "
-    "preferences-colors.",
+    "Select the surface to capture: map, outliner, entity-browser, face-inspector, "
+    "supporting, command-palette, preferences, or preferences-colors.",
     "page",
     "map"};
 
@@ -361,7 +362,10 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
   const auto snapshotPage = parser.value(uiSnapshotPageOption).trimmed().toLower();
   if (
     snapshotPage != QStringLiteral("map") && snapshotPage != QStringLiteral("outliner")
+    && snapshotPage != QStringLiteral("entity-browser")
+    && snapshotPage != QStringLiteral("face-inspector")
     && snapshotPage != QStringLiteral("supporting")
+    && snapshotPage != QStringLiteral("command-palette")
     && snapshotPage != QStringLiteral("preferences")
     && snapshotPage != QStringLiteral("preferences-colors"))
   {
@@ -396,8 +400,9 @@ WelcomeWindow* findWelcomeWindow()
 
 void configureOutlinerSnapshot(QWidget& targetWidget)
 {
-  if (auto* propertiesToggle = targetWidget.findChild<QAbstractButton*>(
-        QStringLiteral("OutlinerInspector_PropertiesToggle")))
+  if (
+    auto* propertiesToggle = targetWidget.findChild<QAbstractButton*>(
+      QStringLiteral("OutlinerInspector_PropertiesToggle")))
   {
     if (!propertiesToggle->isChecked())
     {
@@ -405,8 +410,9 @@ void configureOutlinerSnapshot(QWidget& targetWidget)
     }
   }
 
-  if (auto* tree =
-        targetWidget.findChild<QTreeWidget*>(QStringLiteral("OutlinerTreeWidget")))
+  if (
+    auto* tree =
+      targetWidget.findChild<QTreeWidget*>(QStringLiteral("OutlinerTreeWidget")))
   {
     tree->expandAll();
     if (auto* firstItem = tree->topLevelItem(0))
@@ -435,6 +441,25 @@ void configureSupportingSnapshot(QWidget& targetWidget)
       QStringLiteral("MapWindow_VerticalSplitterSplitter")))
   {
     splitter->setSizes(QList<int>{560, 340});
+  }
+}
+
+void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName)
+{
+  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
+  if (mapWindow == nullptr)
+  {
+    return;
+  }
+
+  mapWindow->switchToInspectorPage(
+    targetName == QStringLiteral("entity-browser") ? InspectorPage::Entity
+                                                   : InspectorPage::Face);
+  if (
+    auto* splitter =
+      mapWindow->findChild<QSplitter*>(QStringLiteral("MapWindow_HorizontalSplitter")))
+  {
+    splitter->setSizes(QList<int>{940, 500});
   }
 }
 
@@ -472,6 +497,12 @@ void scheduleUiSnapshot(
     {
       configureSupportingSnapshot(*guardedWidget);
     }
+    else if (
+      targetName == QStringLiteral("entity-browser")
+      || targetName == QStringLiteral("face-inspector"))
+    {
+      configureInspectorSnapshot(*guardedWidget, targetName);
+    }
     else if (targetName.startsWith(QStringLiteral("preferences")))
     {
       configurePreferencesSnapshot(*guardedWidget, targetName);
@@ -493,6 +524,12 @@ void scheduleUiSnapshot(
       else if (targetName == QStringLiteral("supporting"))
       {
         configureSupportingSnapshot(*guardedWidget);
+      }
+      else if (
+        targetName == QStringLiteral("entity-browser")
+        || targetName == QStringLiteral("face-inspector"))
+      {
+        configureInspectorSnapshot(*guardedWidget, targetName);
       }
       else if (targetName.startsWith(QStringLiteral("preferences")))
       {
@@ -664,6 +701,7 @@ int main(int argc, char* argv[])
     auto* targetWidget = static_cast<QWidget*>(nullptr);
     auto targetName = QString{};
     auto preferencesDialog = std::unique_ptr<PreferenceDialog>{};
+    auto commandPaletteDialog = std::unique_ptr<CommandPaletteDialog>{};
 
     if (commandLineOptions->uiSnapshot->page.startsWith(QStringLiteral("preferences")))
     {
@@ -690,18 +728,40 @@ int main(int argc, char* argv[])
       if (openFiles(*appController, commandLineOptions->fileNames))
       {
         auto* mapWindow = appController->mapWindowManager().topMapWindow();
-        targetWidget = mapWindow;
         if (mapWindow != nullptr)
         {
-          mapWindow->resize(1440, 900);
-          if (commandLineOptions->uiSnapshot->page == QStringLiteral("outliner"))
+          if (commandLineOptions->uiSnapshot->page == QStringLiteral("command-palette"))
           {
-            mapWindow->switchToInspectorPage(InspectorPage::Outliner);
-            configureOutlinerSnapshot(*mapWindow);
+            auto context = ActionExecutionContext{
+              *appController, mapWindow, mapWindow->currentMapViewBase()};
+            commandPaletteDialog = std::make_unique<CommandPaletteDialog>(
+              appController->actionManager(),
+              context,
+              std::filesystem::path{"Menu/View/Command Palette..."},
+              mapWindow);
+            targetWidget = commandPaletteDialog.get();
+            targetWidget->resize(640, 480);
           }
-          else if (commandLineOptions->uiSnapshot->page == QStringLiteral("supporting"))
+          else
           {
-            configureSupportingSnapshot(*mapWindow);
+            targetWidget = mapWindow;
+            mapWindow->resize(1440, 900);
+            if (commandLineOptions->uiSnapshot->page == QStringLiteral("outliner"))
+            {
+              mapWindow->switchToInspectorPage(InspectorPage::Outliner);
+              configureOutlinerSnapshot(*mapWindow);
+            }
+            else if (commandLineOptions->uiSnapshot->page == QStringLiteral("supporting"))
+            {
+              configureSupportingSnapshot(*mapWindow);
+            }
+            else if (
+              commandLineOptions->uiSnapshot->page == QStringLiteral("entity-browser")
+              || commandLineOptions->uiSnapshot->page == QStringLiteral("face-inspector"))
+            {
+              configureInspectorSnapshot(
+                *mapWindow, commandLineOptions->uiSnapshot->page);
+            }
           }
         }
       }

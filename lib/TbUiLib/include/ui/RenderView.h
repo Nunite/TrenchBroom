@@ -107,7 +107,7 @@ protected:
   virtual bool doInitializeGL();
 
 private:
-  virtual const Color& getBackgroundColor();
+  virtual Color getBackgroundColor();
   virtual void updateViewport(int x, int y, int width, int height);
   virtual bool shouldRenderFocusIndicator() const = 0;
   virtual void renderContents(gl::Gl& gl) = 0;

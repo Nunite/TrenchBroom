@@ -43,6 +43,7 @@
 #include "prefs/Preferences.h"
 #include "render/Transformation.h"
 #include "ui/MapDocument.h"
+#include "ui/Theme.h"
 
 #include "kd/contracts.h"
 #include "kd/ranges/to.h"
@@ -317,9 +318,9 @@ bool MaterialBrowserView::shouldRenderFocusIndicator() const
   return false;
 }
 
-const Color& MaterialBrowserView::getBackgroundColor()
+Color MaterialBrowserView::getBackgroundColor()
 {
-  return pref(Preferences::BrowserBackgroundColor);
+  return browserBackgroundColor(palette());
 }
 
 void MaterialBrowserView::renderBounds(

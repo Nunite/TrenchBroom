@@ -128,7 +128,7 @@ private:
   void doClear() override;
   void doRender(gl::Gl& gl, Layout& layout, float y, float height) override;
   bool shouldRenderFocusIndicator() const override;
-  const Color& getBackgroundColor() override;
+  Color getBackgroundColor() override;
   void doMouseMove(Layout& layout, float x, float y) override;
   void doLeftClick(Layout& layout, float x, float y) override;
   void doDoubleClick(Layout& layout, float x, float y) override;

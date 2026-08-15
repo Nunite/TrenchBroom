@@ -176,22 +176,24 @@ testing shows that the earlier phases do not meet the product goal.
 - Build the Release `TrenchBroom` target before completing a workbench phase.
 - Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
   capture the isolated welcome window, representative map workbench, and deterministic
-  expanded Outliner/entity-properties, supporting Assets-panel, and Preferences View
-  and Colors states in light and dark themes at 100%, 150%, and 200% scale. The 36-state
-  matrix validates
+  expanded Outliner/entity-properties, Entity Browser, Face Inspector, supporting
+  Assets panel, Command Palette, and Preferences View and Colors states in light and
+  dark themes at 100%, 150%, and 200% scale. The 54-state matrix validates
   image dimensions, device-pixel ratio, nonblank pixels, font support, and image hashes,
   then writes PNG and JSON evidence plus a labeled visual-comparison contact sheet under
   `build-release-codex\codex-logs\ui-theme-acceptance`.
 - Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark
-  [--ui-snapshot-page map|outliner|supporting|preferences|preferences-colors]
+  [--ui-snapshot-page map|outliner|entity-browser|face-inspector|supporting|command-palette|preferences|preferences-colors]
   [map-file]` for a focused
   single capture. Omitting the map captures Welcome unless `preferences` or
   `preferences-colors` is selected; supplying one captures the workbench. The Outliner
-  page expands its hierarchy,
-  properties panel, and active selection before rendering; the Supporting page opens
-  Assets and expands the bottom panel; the Preferences pages select View or Colors in the
-  category sidebar. Snapshot mode uses temporary preferences, disables background services,
-  and renders through the native Qt platform without showing the window.
+  page expands its hierarchy, properties panel, and active selection before rendering;
+  the Entity Browser and Face Inspector pages widen the inspector for browser-color
+  review; the Supporting page opens Assets and expands the bottom panel; the Command
+  Palette uses a constrained 640 x 480 layout; the Preferences pages select View or
+  Colors in the category sidebar. Snapshot mode uses temporary preferences, disables
+  background services, and renders through the native Qt platform without showing the
+  window.
 - Verify keyboard-only navigation, focus visibility, disabled states, and text fit.
 - Keep generated screenshots and temporary visual reports out of commits unless they
   are intentionally selected as maintained references.
@@ -248,4 +250,8 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-15 | Fixed | Added the missing explicit Light theme preference and restored visible color swatches using decoration data that cannot be covered by table QSS. |
 | 2026-08-15 | Complete | Added the Preferences Colors page to deterministic UI acceptance, expanding the default matrix from 30 to 36 states. |
 | 2026-08-15 | Verified | Passed `PreferenceDialog`, `PreferenceDialog.preferencePanes`, `Theme`, and `UiSnapshot` (88 assertions), built Release `TrenchBroom`, and visually confirmed Light/Dark Preferences Colors snapshots at `20260815-233423-160`. |
-| 2026-08-15 | Next | Collect user feedback before considering the deferred Phase 5 title-bar, document-tab, or docking changes. |
+| 2026-08-16 | Fixed | Replaced Command Palette's space-separated item text with a fixed-height two-line delegate that reserves an independent right-aligned shortcut column and elides each field within its own bounds. |
+| 2026-08-16 | Fixed | Made the default Entity, Material, Asset, and UV browser background, group, and text colors follow the active Light/Dark palette while preserving non-default user color preferences. |
+| 2026-08-16 | Complete | Added Entity Browser, Face Inspector, and constrained Command Palette snapshot targets, expanding the default visual acceptance matrix from 36 to 54 states. |
+| 2026-08-16 | Verified | Passed `Theme` and `MapWindow` (119 assertions) plus `ModelBrowserView` and `GoldSrcSpritePreview` (43 assertions), built Release `TrenchBroom`, and visually confirmed all affected Light/Dark pages at 100%, 150%, and 200% in `20260815-235531-161`, `20260815-235755-213`, and `20260815-235941-408`. |
+| 2026-08-16 | Next | Collect user feedback before considering the deferred Phase 5 title-bar, document-tab, or docking changes. |

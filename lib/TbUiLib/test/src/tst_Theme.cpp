@@ -21,6 +21,9 @@
 #include <QPalette>
 #include <QString>
 
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
+#include "ui/QColorUtils.h"
 #include "ui/Theme.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -63,6 +66,36 @@ TEST_CASE("Theme")
       palette.color(QPalette::Inactive, QPalette::Highlight)
       == tokens.inactiveSelectionBackground);
     CHECK(palette.color(QPalette::Disabled, QPalette::Text) == tokens.disabledText);
+  }
+
+  SECTION("browser colors follow the theme until they are customized")
+  {
+    const auto originalBackground = pref(Preferences::BrowserBackgroundColor);
+    const auto originalGroupBackground = pref(Preferences::BrowserGroupBackgroundColor);
+    const auto originalText = pref(Preferences::BrowserTextColor);
+    const auto palette = makeThemePalette(makeLightThemeTokens());
+
+    setPref(
+      Preferences::BrowserBackgroundColor,
+      Preferences::BrowserBackgroundColor.defaultValue);
+    setPref(
+      Preferences::BrowserGroupBackgroundColor,
+      Preferences::BrowserGroupBackgroundColor.defaultValue);
+    setPref(Preferences::BrowserTextColor, Preferences::BrowserTextColor.defaultValue);
+
+    CHECK(toQColor(browserBackgroundColor(palette)) == palette.color(QPalette::Base));
+    CHECK(
+      toQColor(browserGroupBackgroundColor(palette))
+      == palette.color(QPalette::AlternateBase));
+    CHECK(toQColor(browserTextColor(palette)) == palette.color(QPalette::Text));
+
+    const auto customBackground = Color{RgbF{0.2f, 0.3f, 0.4f}};
+    setPref(Preferences::BrowserBackgroundColor, customBackground);
+    CHECK(browserBackgroundColor(palette) == customBackground);
+
+    setPref(Preferences::BrowserBackgroundColor, originalBackground);
+    setPref(Preferences::BrowserGroupBackgroundColor, originalGroupBackground);
+    setPref(Preferences::BrowserTextColor, originalText);
   }
 
   SECTION("expandThemeStyleSheet")
