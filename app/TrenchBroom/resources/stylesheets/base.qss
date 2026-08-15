@@ -485,9 +485,10 @@ QSplitter#ModelBrowser_Splitter::handle {
 }
 
 QStatusBar {
-  background: @tb-accent;
+  background: @tb-window-background;
   border: none;
-  color: @tb-inverse-text;
+  border-top: 1px solid @tb-border;
+  color: @tb-secondary-text;
   min-height: 24px;
   padding: 0 4px;
 }
@@ -498,40 +499,51 @@ QStatusBar::item {
 
 QStatusBar QLabel#MapWindow_StatusLabel,
 QStatusBar QLabel {
-  color: @tb-inverse-text;
+  color: @tb-secondary-text;
 }
 
 QStatusBar QToolButton#MapWindow_SnapToggle {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
-  color: @tb-inverse-text;
+  color: @tb-secondary-text;
   min-height: 20px;
   padding: 0 6px;
 }
 
 QStatusBar QToolButton#MapWindow_SnapToggle:hover {
-  border-color: @tb-inverse-text;
+  background: @tb-hover-background;
+  border-color: @tb-border;
+  color: @tb-text;
+}
+
+QStatusBar QToolButton#MapWindow_SnapToggle:focus {
+  border-color: @tb-focus-border;
 }
 
 QStatusBar QToolButton#MapWindow_SnapToggle:checked {
-  background: @tb-inverse-text;
+  background: @tb-pressed-background;
+  border-color: @tb-accent;
   color: @tb-accent;
 }
 
 QStatusBar QComboBox#MapWindow_GridChoice {
   background: transparent;
   border-color: transparent;
-  color: @tb-inverse-text;
+  color: @tb-secondary-text;
   min-height: 20px;
   min-width: 72px;
   padding: 0 5px;
 }
 
 QStatusBar QComboBox#MapWindow_GridChoice:hover {
-  background: @tb-inverse-text;
-  border-color: @tb-inverse-text;
-  color: @tb-accent;
+  background: @tb-hover-background;
+  border-color: @tb-border;
+  color: @tb-text;
+}
+
+QStatusBar QComboBox#MapWindow_GridChoice:focus {
+  border-color: @tb-focus-border;
 }
 
 QDialog#CommandPalette_Dialog {
