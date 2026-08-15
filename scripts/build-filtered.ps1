@@ -229,7 +229,11 @@ if (-not $NoVsDevCmd) {
   if (-not (Test-Path $VsDevCmd)) {
     throw "VsDevCmd not found: $VsDevCmd"
   }
-  $cmakeCommand = "call `"$VsDevCmd`" -arch=x64 -host_arch=x64 >nul && $cmakeCommand"
+  # Ninja's MSVC dependency parser expects the English /showIncludes prefix.
+  $cmakeCommand =
+    "call `"$VsDevCmd`" -arch=x64 -host_arch=x64 >nul && set `"VSLANG=1033`" && $cmakeCommand"
+} else {
+  $cmakeCommand = "set `"VSLANG=1033`" && $cmakeCommand"
 }
 $cmakeCommand = Add-PathPrefixToCommand $cmakeCommand $QtBin
 

@@ -6,6 +6,8 @@ set QT_PREFIX=D:/Qtx/6.11.1/msvc2022_64
 call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
 if errorlevel 1 exit /b %errorlevel%
 
+rem Ninja's MSVC dependency parser expects the English /showIncludes prefix.
+set "VSLANG=1033"
 set "PATH=D:\Qtx\6.11.1\msvc2022_64\bin;%PATH%"
 
 if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"

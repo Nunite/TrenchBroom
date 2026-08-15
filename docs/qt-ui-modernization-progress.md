@@ -240,4 +240,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-15 | Complete | Applied the shared themed action footer to Game, Compile, Replace, Export, Launch, Crash, and related high-traffic dialogs. |
 | 2026-08-15 | Complete | Added a deterministic Preferences snapshot page and expanded the default visual acceptance matrix from 24 to 30 states. |
 | 2026-08-15 | Verified | Passed `PreferenceDialog,CompilationDialog` (42 assertions), built Release `TrenchBroom`, and passed the 30-state matrix at `20260815-224706-711`. |
+| 2026-08-15 | Fixed | Diagnosed the Preferences-close crash as stale MSVC object code caused by localized `/showIncludes` output; forced English compiler diagnostics in the checked-in Release build wrappers so Ninja records header dependencies. |
+| 2026-08-15 | Verified | Completed a clean Release `TrenchBroom` rebuild, confirmed `AppController.cpp.obj` has 454 Ninja dependency entries including `PreferenceDialog.h`, and passed the production-entry `PreferenceDialog` open/close regression test (27 assertions) from a freshly built `TbUiLibTest`. |
 | 2026-08-15 | Next | Collect user feedback before considering the deferred Phase 5 title-bar, document-tab, or docking changes. |

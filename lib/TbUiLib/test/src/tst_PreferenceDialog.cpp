@@ -17,12 +17,14 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QApplication>
 #include <QHeaderView>
 #include <QLabel>
 #include <QListWidget>
 #include <QSortFilterProxyModel>
 #include <QStackedWidget>
 #include <QTableView>
+#include <QTimer>
 #include <QtTest/QTest>
 
 #include "ui/AppControllerFixture.h"
@@ -86,6 +88,24 @@ TEST_CASE("PreferenceDialog")
     QTest::keyClick(navigation, Qt::Key_Down);
     CHECK(navigation->currentRow() == 1);
     CHECK(pages->currentIndex() == 1);
+  }
+
+  SECTION("opens and closes through AppController")
+  {
+    auto dialogWasClosed = false;
+    QTimer::singleShot(0, [&]() {
+      auto* modalDialog =
+        qobject_cast<PreferenceDialog*>(QApplication::activeModalWidget());
+      if (modalDialog != nullptr)
+      {
+        dialogWasClosed = true;
+        modalDialog->close();
+      }
+    });
+
+    fixture.appController().showPreferences();
+
+    CHECK(dialogWasClosed);
   }
 
   dialog.reset();
