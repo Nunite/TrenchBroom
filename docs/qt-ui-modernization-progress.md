@@ -5,7 +5,7 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-15
-- Current stage: discovery and roadmap complete; implementation has not started
+- Current stage: Phase 1 theme foundation implemented; visual matrix verification pending
 
 ## Objective
 
@@ -76,13 +76,13 @@ Status: complete
 
 ### Phase 1: Theme Foundation
 
-Status: pending
+Status: in progress
 
-- [ ] Add a TrenchBroom theme token model.
-- [ ] Generate `QPalette` and QSS values from the same token source.
-- [ ] Extend `QProxyStyle` for shared control metrics and focus behavior.
-- [ ] Standardize hover, pressed, checked, selected, disabled, and focus-visible states.
-- [ ] Standardize 16 px and 20 px monochrome icon usage.
+- [x] Add a TrenchBroom theme token model.
+- [x] Generate `QPalette` and QSS values from the same token source.
+- [x] Extend `QProxyStyle` for shared control metrics and focus behavior.
+- [x] Standardize hover, pressed, checked, selected, disabled, and focus-visible states.
+- [x] Standardize 16 px and 20 px icon metrics.
 - [ ] Add visual checks for light and dark themes at common DPI scale factors.
 
 Expected benefit: high. This should remove most of the platform-default Qt appearance
@@ -183,4 +183,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-15 | Complete | Reviewed the current Qt, document, tool, and OpenGL boundaries. |
 | 2026-08-15 | Complete | Chose incremental Qt modernization over an appearance-driven Electron/Rust rewrite. |
 | 2026-08-15 | Complete | Defined the phased roadmap, initial token scope, and acceptance criteria. |
-| 2026-08-15 | Next | Create a focused main-window visual specification and implement the theme-token foundation. |
+| 2026-08-15 | Complete | Added the theme-token foundation, palette generation, QSS expansion, and compact shared control styling. |
+| 2026-08-15 | Verified | Passed the Release `TbUiLibTest "Theme"` test, built `TrenchBroom`, and completed a warning-free current-theme startup and screenshot check. |
+| 2026-08-15 | Next | Verify light and dark themes at common DPI scale factors before starting the workbench shell. |

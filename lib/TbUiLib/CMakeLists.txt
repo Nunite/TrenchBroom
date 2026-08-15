@@ -226,6 +226,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TabBar.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TabBook.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TextOutputAdapter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Theme.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThreePaneMapView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TitleBar.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TitledPanel.cpp
@@ -449,6 +450,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TabBar.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TabBook.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TextOutputAdapter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Theme.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ThreePaneMapView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TitleBar.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TitledPanel.h

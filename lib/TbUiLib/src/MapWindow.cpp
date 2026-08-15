@@ -526,11 +526,8 @@ void MapWindow::createToolBar()
   m_toolBar->setObjectName("MapWindowToolBar");
   m_toolBar->setFloatable(false);
   m_toolBar->setMovable(false);
-  // macOS Qt bug: with the 32x32 default icon size, 24x24 highdpi icons get scaled up to
-  // 32x32. We expect them to be drawn at 24x24 logical pixels centered in a 32x32 box, as
-  // is the case with non-highdpi icons. As a workaround, just lower the toolbar size to
-  // 24x24 (we could alternatively render the icons at 32x32).
-  m_toolBar->setIconSize(QSize(24, 24));
+  // Keep toolbar icons compact and aligned with the shared application style metric.
+  m_toolBar->setIconSize(QSize(20, 20));
 
   populateToolBar(
     m_appController.actionManager(), *m_toolBar, m_actionMap, [&](const auto& tbAction) {

@@ -23,12 +23,12 @@
 #include <QFile>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QPalette>
 #include <QProxyStyle>
 #include <QSettings>
 #include <QString>
 #include <QStyleHints>
 #include <QSurfaceFormat>
+#include <QTextStream>
 #include <QTranslator>
 #include <QtGlobal>
 
@@ -46,6 +46,7 @@
 #include "ui/QPreferenceStore.h"
 #include "ui/RecentDocuments.h"
 #include "ui/SystemPaths.h"
+#include "ui/Theme.h"
 
 using namespace tb;
 using namespace tb::ui;
@@ -58,7 +59,7 @@ extern void qt_set_sequence_auto_mnemonic(bool b);
 namespace
 {
 
-bool loadStyleSheets()
+bool loadStyleSheets(const ThemeTokens& themeTokens)
 {
   const auto path = SystemPaths::findResourceFile("stylesheets/base.qss");
   if (auto file = QFile{pathAsQPath(path)}; file.exists())
@@ -68,7 +69,13 @@ bool loadStyleSheets()
     {
       return false;
     }
-    qApp->setStyleSheet(QTextStream{&file}.readAll());
+    auto styleSheet = QTextStream{&file}.readAll();
+    if (auto error = QString{}; !expandThemeStyleSheet(styleSheet, themeTokens, &error))
+    {
+      return false;
+    }
+
+    qApp->setStyleSheet(styleSheet);
 
     return true;
   }
@@ -89,52 +96,7 @@ void loadTranslations(QApplication& app)
   }
 }
 
-QPalette darkPalette()
-{
-  const auto button = QColor{35, 35, 35};
-  const auto text = QColor{207, 207, 207};
-  const auto highlight = QColor{62, 112, 205};
-
-  // Build an initial palette based on the button color
-  auto palette = QPalette{button};
-
-  // Window colors
-  palette.setColor(QPalette::Active, QPalette::Window, QColor{50, 50, 50});
-  palette.setColor(QPalette::Inactive, QPalette::Window, QColor{40, 40, 40});
-  palette.setColor(QPalette::Disabled, QPalette::Window, QColor{50, 50, 50}.darker(200));
-
-  // List box backgrounds, text entry backgrounds, menu backgrounds
-  palette.setColor(QPalette::Base, button.darker(130));
-
-  // Button text
-  palette.setColor(QPalette::Active, QPalette::ButtonText, text);
-  palette.setColor(QPalette::Inactive, QPalette::ButtonText, text);
-  palette.setColor(QPalette::Disabled, QPalette::ButtonText, text.darker(200));
-
-  // WindowText is supposed to be against QPalette::Window
-  palette.setColor(QPalette::Active, QPalette::WindowText, text);
-  palette.setColor(QPalette::Inactive, QPalette::WindowText, text);
-  palette.setColor(QPalette::Disabled, QPalette::WindowText, text.darker(200));
-
-  // Menu text, text edit text, table cell text
-  palette.setColor(QPalette::Active, QPalette::Text, text.darker(115));
-  palette.setColor(QPalette::Inactive, QPalette::Text, text.darker(115));
-
-  // Disabled menu item text color
-  palette.setColor(QPalette::Disabled, QPalette::Text, QColor{102, 102, 102});
-
-  // Disabled menu item text shadow
-  palette.setColor(QPalette::Disabled, QPalette::Light, button.darker(200));
-
-  // Highlight (selected list box row, selected grid cell background, selected tab text
-  palette.setColor(QPalette::Active, QPalette::Highlight, highlight);
-  palette.setColor(QPalette::Inactive, QPalette::Highlight, highlight);
-  palette.setColor(QPalette::Disabled, QPalette::Highlight, highlight);
-
-  return palette;
-}
-
-void loadStyle(QApplication& app)
+ThemeTokens loadStyle(QApplication& app)
 {
   // We can't use auto mnemonics in TrenchBroom. e.g. by default with Qt, Alt+D opens
   // the "Debug" menu, Alt+S activates the "Show default properties" checkbox in the
@@ -169,20 +131,44 @@ void loadStyle(QApplication& app)
                ? 0
                : QProxyStyle::styleHint(hint, option, widget, returnData);
     }
+
+    int pixelMetric(
+      PixelMetric metric,
+      const QStyleOption* option = nullptr,
+      const QWidget* widget = nullptr) const override
+    {
+      switch (metric)
+      {
+      case QStyle::PM_SmallIconSize:
+      case QStyle::PM_ButtonIconSize:
+      case QStyle::PM_TabBarIconSize:
+        return 16;
+      case QStyle::PM_ToolBarIconSize:
+        return 20;
+      case QStyle::PM_ToolBarItemSpacing:
+      case QStyle::PM_ToolBarItemMargin:
+        return 2;
+      case QStyle::PM_FocusFrameHMargin:
+      case QStyle::PM_FocusFrameVMargin:
+        return 1;
+      default:
+        return QProxyStyle::pixelMetric(metric, option, widget);
+      }
+    }
   };
 
   // Apply either the Fusion style + dark palette, or the system style
   if (pref(Preferences::Theme) == Preferences::DarkTheme)
   {
     app.setStyle(new TrenchBroomProxyStyle{"Fusion"});
-    app.setPalette(darkPalette());
+    const auto themeTokens = makeDarkThemeTokens();
+    app.setPalette(makeThemePalette(themeTokens));
     app.styleHints()->setColorScheme(Qt::ColorScheme::Dark);
+    return themeTokens;
   }
-  else
-  {
-    // System
-    app.setStyle(new TrenchBroomProxyStyle{});
-  }
+
+  app.setStyle(new TrenchBroomProxyStyle{});
+  return makeSystemThemeTokens(app.palette());
 }
 
 auto createAppController()
@@ -345,10 +331,10 @@ int main(int argc, char* argv[])
 
   loadTranslations(app);
 
-  // Style sheets must be loaded before creating the app controller, or they won't apply
-  // to the welcome window, which the app controller creates
-  loadStyleSheets();
-  loadStyle(app);
+  // Styles must be loaded before creating the app controller, or they won't apply to
+  // the welcome window, which the app controller creates.
+  const auto themeTokens = loadStyle(app);
+  loadStyleSheets(themeTokens);
 
   auto appController = createAppController();
   auto crashReporter = CrashReporter{*appController};
