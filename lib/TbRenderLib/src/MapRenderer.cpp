@@ -234,11 +234,13 @@ void MapRenderer::overrideSelectionColors(const Color& color, const float mix)
   m_selectionRenderer->setBrushEdgeColor(edgeColor);
   m_selectionRenderer->setOccludedEdgeColor(occludedEdgeColor);
   m_selectionRenderer->setTintColor(tintColor);
+  m_skyRenderer->setSelectionColor(tintColor);
 }
 
 void MapRenderer::restoreSelectionColors()
 {
   setupSelectionRenderer(*m_selectionRenderer);
+  m_skyRenderer->setSelectionColor(pref(Preferences::SelectedFaceColor));
 }
 
 void MapRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
@@ -355,6 +357,7 @@ void MapRenderer::setupRenderers()
   setupDefaultRenderer(*m_defaultRenderer);
   setupSelectionRenderer(*m_selectionRenderer);
   setupLockedRenderer(*m_lockedRenderer);
+  m_skyRenderer->setSelectionColor(pref(Preferences::SelectedFaceColor));
 }
 
 void MapRenderer::updateSkyFaceRendering(RenderContext& renderContext)

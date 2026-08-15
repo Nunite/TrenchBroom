@@ -20,7 +20,6 @@
 #include "render/SkyRenderer.h"
 
 #include "base/PreferenceManager.h"
-#include "prefs/Preferences.h"
 #include "fs/PathInfo.h"
 #include "gl/ActiveShader.h"
 #include "gl/Camera.h"
@@ -48,6 +47,7 @@
 #include "mdl/Node.h"
 #include "mdl/PatchNode.h"
 #include "mdl/WorldNode.h"
+#include "prefs/Preferences.h"
 #include "render/RenderBatch.h"
 #include "render/RenderContext.h"
 #include "render/Renderable.h"
@@ -69,6 +69,13 @@ namespace tb::render
 namespace
 {
 using Vertex = gl::VertexTypes::P3Uv2::Vertex;
+
+struct SkyBrushFaceVertices
+{
+  std::vector<Vertex> vertices;
+  size_t selectedVertexCount = 0u;
+};
+
 constexpr auto SkyFaceCount = size_t{6};
 struct SkyFaceMapping
 {
@@ -118,8 +125,7 @@ std::shared_ptr<gl::TextureResource> loadLooseSkyTexture(
       continue;
     }
 
-    auto textureResource =
-      gl::createTextureResource(std::move(texture) | kdl::value());
+    auto textureResource = gl::createTextureResource(std::move(texture) | kdl::value());
     resourceManager.addResource(textureResource);
     return textureResource;
   }
@@ -140,9 +146,9 @@ std::array<std::shared_ptr<gl::TextureResource>, 6> findSkyTextures(
   return textures;
 }
 
-std::vector<Vertex> makeSkyBrushFaceVertices(const mdl::Map& map)
+SkyBrushFaceVertices makeSkyBrushFaceVertices(const mdl::Map& map)
 {
-  auto vertices = std::vector<Vertex>{};
+  auto result = SkyBrushFaceVertices{};
 
   const auto addBrush = [&](const mdl::BrushNode& brushNode) {
     if (!map.editorContext().visible(brushNode))
@@ -157,6 +163,8 @@ std::vector<Vertex> makeSkyBrushFaceVertices(const mdl::Map& map)
         continue;
       }
 
+      const auto selected = brushNode.transitivelySelected() || face.selected();
+      const auto selectionMarker = vm::vec2f{selected ? 1.0f : 0.0f, 0.0f};
       const auto faceVertices = face.vertexPositions();
       if (faceVertices.size() < 3)
       {
@@ -165,10 +173,10 @@ std::vector<Vertex> makeSkyBrushFaceVertices(const mdl::Map& map)
 
       for (size_t i = 1; i + 1 < faceVertices.size(); ++i)
       {
-        vertices.emplace_back(vm::vec3f{faceVertices.front()}, vm::vec2f{0.0f, 0.0f});
-        vertices.emplace_back(
-          vm::vec3f{faceVertices[i + 1]}, vm::vec2f{0.0f, 0.0f});
-        vertices.emplace_back(vm::vec3f{faceVertices[i]}, vm::vec2f{0.0f, 0.0f});
+        result.vertices.emplace_back(vm::vec3f{faceVertices.front()}, selectionMarker);
+        result.vertices.emplace_back(vm::vec3f{faceVertices[i + 1]}, selectionMarker);
+        result.vertices.emplace_back(vm::vec3f{faceVertices[i]}, selectionMarker);
+        result.selectedVertexCount += selected ? 3u : 0u;
       }
     }
   };
@@ -190,7 +198,7 @@ std::vector<Vertex> makeSkyBrushFaceVertices(const mdl::Map& map)
     [](const mdl::PatchNode&) {});
 
   map.worldNode().accept(visitNode);
-  return vertices;
+  return result;
 }
 
 class SkyRenderable : public DirectRenderable
@@ -198,13 +206,16 @@ class SkyRenderable : public DirectRenderable
 private:
   std::array<std::shared_ptr<gl::TextureResource>, 6> m_textures;
   gl::VertexArray m_vertexArray;
+  Color m_selectionColor;
 
 public:
   SkyRenderable(
     std::array<std::shared_ptr<gl::TextureResource>, 6> textures,
-    gl::VertexArray vertexArray)
+    gl::VertexArray vertexArray,
+    Color selectionColor)
     : m_textures{std::move(textures)}
     , m_vertexArray{std::move(vertexArray)}
+    , m_selectionColor{std::move(selectionColor)}
   {
   }
 
@@ -224,6 +235,7 @@ public:
     gl.depthFunc(GL_LEQUAL);
     shader.set("Material", 0);
     shader.set("CameraPosition", renderContext.camera().position());
+    shader.set("TintColor", m_selectionColor);
 
     if (m_vertexArray.setup(gl, shader.program()))
     {
@@ -299,7 +311,12 @@ bool skyTexturesReady(const std::array<std::shared_ptr<gl::TextureResource>, 6>&
 
 size_t skyBrushFaceVertexCount(const mdl::Map& map)
 {
-  return makeSkyBrushFaceVertices(map).size();
+  return makeSkyBrushFaceVertices(map).vertices.size();
+}
+
+size_t selectedSkyBrushFaceVertexCount(const mdl::Map& map)
+{
+  return makeSkyBrushFaceVertices(map).selectedVertexCount;
 }
 
 SkyRenderer::SkyRenderer(mdl::Map& map)
@@ -315,8 +332,11 @@ void SkyRenderer::invalidate()
   m_textures = {};
 }
 
-void SkyRenderer::invalidateBrushFaces()
+void SkyRenderer::invalidateBrushFaces() {}
+
+void SkyRenderer::setSelectionColor(const Color& selectionColor)
 {
+  m_selectionColor = selectionColor;
 }
 
 bool SkyRenderer::canRender(RenderContext& renderContext)
@@ -343,13 +363,15 @@ void SkyRenderer::render(RenderContext& renderContext, RenderBatch& renderBatch)
   }
 
   auto skyBrushFaceVertices = makeSkyBrushFaceVertices(m_map);
-  if (skyBrushFaceVertices.empty())
+  if (skyBrushFaceVertices.vertices.empty())
   {
     return;
   }
 
-  renderBatch.addOneShot(
-    new SkyRenderable{m_textures, gl::VertexArray::move(std::move(skyBrushFaceVertices))});
+  renderBatch.addOneShot(new SkyRenderable{
+    m_textures,
+    gl::VertexArray::move(std::move(skyBrushFaceVertices.vertices)),
+    m_selectionColor});
 }
 
 bool SkyRenderer::validate()

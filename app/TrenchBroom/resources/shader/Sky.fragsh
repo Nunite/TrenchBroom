@@ -22,6 +22,9 @@
 uniform sampler2D Material;
 uniform vec3 CameraPosition;
 uniform int SkyFaceIndex;
+uniform vec4 TintColor;
+
+varying float selected;
 
 const float SkyUvMin = 1.0 / 512.0;
 const float SkyUvMax = 1.0 - SkyUvMin;
@@ -90,4 +93,12 @@ void main(void)
   }
 
   gl_FragColor = texture2D(Material, skyUv(dir, SkyFaceIndex));
+  if (selected > 0.5)
+  {
+    gl_FragColor =
+      vec4(gl_FragColor.rgb * TintColor.rgb * TintColor.a, gl_FragColor.a);
+    float brightnessCorrection =
+      1.0 / max(max(abs(TintColor.r), abs(TintColor.g)), abs(TintColor.b));
+    gl_FragColor = clamp(brightnessCorrection * gl_FragColor, 0.0, 1.0);
+  }
 }

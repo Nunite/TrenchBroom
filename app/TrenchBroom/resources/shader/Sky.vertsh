@@ -19,9 +19,11 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+varying float selected;
+
 void main(void)
 {
   gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * gl_Vertex;
   gl_TexCoord[1] = gl_Vertex;
-  gl_TexCoord[0] = gl_MultiTexCoord0;
+  selected = gl_MultiTexCoord0.x;
 }

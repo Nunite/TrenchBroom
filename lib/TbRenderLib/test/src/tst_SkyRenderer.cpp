@@ -18,11 +18,13 @@
  */
 
 #include "gl/Material.h"
+#include "mdl/BrushFaceHandle.h"
 #include "mdl/BrushNode.h"
 #include "mdl/MapFixture.h"
 #include "mdl/Map_NodeLocking.h"
 #include "mdl/Map_NodeVisibility.h"
 #include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
 #include "mdl/TestFactory.h"
 #include "render/SkyRenderer.h"
 
@@ -79,6 +81,22 @@ TEST_CASE("SkyRenderer.skyBrushFaceVertexCount")
   mdl::addNodes(map, {{&mdl::parentForNodes(map), {static_cast<mdl::Node*>(skyBrush)}}});
 
   CHECK(skyBrushFaceVertexCount(map) > 0);
+  CHECK(selectedSkyBrushFaceVertexCount(map) == 0);
+
+  SECTION("selected sky brush is marked for tinting")
+  {
+    mdl::selectNodes(map, {skyBrush});
+
+    CHECK(selectedSkyBrushFaceVertexCount(map) == skyBrushFaceVertexCount(map));
+  }
+
+  SECTION("selected sky face is marked for tinting")
+  {
+    mdl::selectBrushFaces(map, {mdl::BrushFaceHandle{skyBrush, 0u}});
+
+    CHECK(selectedSkyBrushFaceVertexCount(map) > 0);
+    CHECK(selectedSkyBrushFaceVertexCount(map) < skyBrushFaceVertexCount(map));
+  }
 
   SECTION("locked sky brush is still collected")
   {

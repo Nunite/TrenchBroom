@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "base/Color.h"
 #include "base/Macros.h"
 #include "gl/TextureResource.h"
 
@@ -60,6 +61,7 @@ bool skyTexturesReady(
   const std::array<std::shared_ptr<gl::TextureResource>, 6>& textures);
 
 size_t skyBrushFaceVertexCount(const mdl::Map& map);
+size_t selectedSkyBrushFaceVertexCount(const mdl::Map& map);
 
 class SkyRenderer
 {
@@ -67,6 +69,7 @@ private:
   mdl::Map& m_map;
   std::optional<std::string> m_cachedSkyname;
   std::array<std::shared_ptr<gl::TextureResource>, 6> m_textures = {};
+  Color m_selectionColor;
 
 public:
   explicit SkyRenderer(mdl::Map& map);
@@ -76,6 +79,7 @@ public:
 
   void invalidate();
   void invalidateBrushFaces();
+  void setSelectionColor(const Color& selectionColor);
   bool canRender(RenderContext& renderContext);
   void render(RenderContext& renderContext, RenderBatch& renderBatch);
 
