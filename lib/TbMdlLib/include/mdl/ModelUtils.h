@@ -40,6 +40,19 @@ class EntityNodeBase;
 class LayerNode;
 class EditorContext;
 
+enum class SmartFaceSelectionMode
+{
+  FaceStrip,
+  Parallel
+};
+
+struct SmartFaceSelectionOptions
+{
+  SmartFaceSelectionMode mode = SmartFaceSelectionMode::FaceStrip;
+  double angleTolerance = 15.0;
+  double gapTolerance = 0.0;
+};
+
 template <typename T, typename U>
 class octree;
 
@@ -121,6 +134,19 @@ std::vector<BrushFaceHandle> collectConnectedCoplanarFaces(
   const BrushFaceHandle& startFace,
   const EditorContext& editorContext,
   const NodeTree& nodeTree);
+
+/**
+ * Floods from the seed faces across shared or nearby edge segments.
+ *
+ * FaceStrip follows bends by comparing each candidate to the previous face.
+ * Parallel compares candidates to the seeds, preventing angular drift.
+ * Hidden and locked faces are excluded by editorContext.
+ */
+std::vector<BrushFaceHandle> collectSmartFaceSelection(
+  const std::vector<BrushFaceHandle>& seedFaces,
+  const EditorContext& editorContext,
+  const NodeTree& nodeTree,
+  const SmartFaceSelectionOptions& options);
 
 vm::bbox3d computeLogicalBounds(
   const std::vector<Node*>& nodes, const vm::bbox3d& defaultBounds = vm::bbox3d());

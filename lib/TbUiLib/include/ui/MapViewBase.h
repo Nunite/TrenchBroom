@@ -32,6 +32,7 @@
 #include <vector>
 
 class QMenu;
+class QResizeEvent;
 class QShortcut;
 class QString;
 class QAction;
@@ -76,6 +77,7 @@ class AppController;
 class MapDocument;
 class MapViewToolBox;
 class SignalDelayer;
+class SmartFaceSelectionPanel;
 class Tool;
 
 class MapViewBase : public RenderView,
@@ -225,6 +227,10 @@ public: // tool mode actions
 
   void performSweep();
 
+public: // smart face selection
+  void startSmartFaceSelection();
+  bool canStartSmartFaceSelection() const;
+
 public: // misc actions
   void resetCameraZoom();
   void cancel();
@@ -358,6 +364,8 @@ private: // implement RenderView interface
 
   void renderMcpOverlay(
     render::RenderContext& renderContext, render::RenderBatch& renderBatch);
+  void renderSmartFaceSelectionPreview(
+    render::RenderContext& renderContext, render::RenderBatch& renderBatch);
   void renderCompass(render::RenderBatch& renderBatch);
   void renderFPS(render::RenderContext& renderContext, render::RenderBatch& renderBatch);
 
@@ -377,12 +385,20 @@ private:
   virtual void beforePopupMenu();
 
 protected: // QWidget overrides
+  void resizeEvent(QResizeEvent* event) override;
   void dragEnterEvent(QDragEnterEvent* event) override;
   void dragLeaveEvent(QDragLeaveEvent* event) override;
   void dragMoveEvent(QDragMoveEvent* event) override;
   void dropEvent(QDropEvent* event) override;
 
 private:
+  SmartFaceSelectionPanel* smartFaceSelectionPanel() const;
+  void updateSmartFaceSelectionPreview();
+  void positionSmartFaceSelectionPanel();
+  void confirmSmartFaceSelection();
+  void cancelSmartFaceSelection();
+  void closeSmartFaceSelection();
+
   QMenu* makeEntityGroupsMenu(mdl::EntityDefinitionType type);
 
   bool canMergeGroups() const;

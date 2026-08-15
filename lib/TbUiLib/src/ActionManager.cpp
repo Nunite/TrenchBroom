@@ -1338,6 +1338,16 @@ void ActionManager::createSelectionMenu()
       return context.hasDocument() && context.mapWindow().canDeselect();
     },
   }));
+  selectionMenu.addItem(addAction(Action{
+    std::filesystem::path{"Menu/Edit/Smart Face Selection..."},
+    "Smart Face Selection...",
+    ActionContext::View3D | ActionContext::FaceSelection | ActionContext::NoTool,
+    KeySequence{},
+    [](auto& context) { context.mapView().startSmartFaceSelection(); },
+    [](const auto& context) {
+      return context.hasDocument() && context.mapView().canStartSmartFaceSelection();
+    },
+  }));
   selectionMenu.addSeparator();
   selectionMenu.addItem(addAction(Action{
     "Menu/Edit/Select Siblings",

@@ -32,10 +32,13 @@
 #include "kd/vector_utils.h"
 
 #include "vm/bbox.h"
+#include "vm/distance.h"
 #include "vm/intersection.h"
+#include "vm/scalar.h"
 #include "vm/segment.h"
 
 #include <algorithm>
+#include <cmath>
 #include <ranges>
 #include <unordered_map>
 #include <utility>
@@ -506,6 +509,136 @@ std::vector<BrushFaceHandle> collectConnectedCoplanarFaces(
   }
 
   return region;
+}
+
+std::vector<BrushFaceHandle> collectSmartFaceSelection(
+  const std::vector<BrushFaceHandle>& seedFaces,
+  const EditorContext& editorContext,
+  const NodeTree& nodeTree,
+  const SmartFaceSelectionOptions& options)
+{
+  if (seedFaces.empty())
+  {
+    return {};
+  }
+
+  constexpr auto epsilon = vm::constants<double>::almost_zero();
+  const auto gapTolerance = std::max(0.0, options.gapTolerance);
+  const auto maxAngle = std::clamp(options.angleTolerance, 0.0, 180.0);
+  const auto minNormalDot = std::cos(vm::to_radians(maxAngle));
+
+  struct Candidate
+  {
+    BrushFaceHandle handle;
+    vm::vec3d normal;
+    std::vector<vm::segment3d> edges;
+    vm::bbox3d bounds;
+  };
+
+  const auto makeCandidate = [&](const BrushFaceHandle& handle) {
+    const auto vertices = handle.face().vertexPositions();
+    const auto edges =
+      handle.face().edges()
+      | std::views::transform([](const auto* edge) { return edge->segment(); });
+
+    auto builder = vm::bbox3d::builder{};
+    builder.add(std::begin(vertices), std::end(vertices));
+
+    return Candidate{
+      handle,
+      handle.face().normal(),
+      edges | kdl::ranges::to<std::vector>(),
+      builder.bounds().expand(gapTolerance + epsilon),
+    };
+  };
+
+  const auto edgesWithinTolerance = [&](const auto& lhs, const auto& rhs) {
+    const auto maxDistanceSquared = gapTolerance * gapTolerance;
+    const auto allEdgePairs = kdl::views::cartesian_product(lhs, rhs);
+    return std::ranges::any_of(allEdgePairs, [&](const auto& edgePair) {
+      const auto& [lhsEdge, rhsEdge] = edgePair;
+      if (vm::segments_overlap(lhsEdge, rhsEdge, epsilon))
+      {
+        return true;
+      }
+      if (gapTolerance <= 0.0)
+      {
+        return false;
+      }
+
+      return vm::squared_distance(lhsEdge, rhsEdge.start()).distance <= maxDistanceSquared
+             || vm::squared_distance(lhsEdge, rhsEdge.end()).distance
+                  <= maxDistanceSquared
+             || vm::squared_distance(rhsEdge, lhsEdge.start()).distance
+                  <= maxDistanceSquared
+             || vm::squared_distance(rhsEdge, lhsEdge.end()).distance
+                  <= maxDistanceSquared;
+    });
+  };
+
+  const auto seedNormals =
+    seedFaces
+    | std::views::transform([](const auto& handle) { return handle.face().normal(); })
+    | kdl::ranges::to<std::vector>();
+
+  const auto normalMatches = [&](const Candidate& current, const Candidate& candidate) {
+    if (options.mode == SmartFaceSelectionMode::FaceStrip)
+    {
+      return vm::dot(current.normal, candidate.normal) >= minNormalDot;
+    }
+    return std::ranges::any_of(seedNormals, [&](const auto& seedNormal) {
+      return vm::dot(seedNormal, candidate.normal) >= minNormalDot;
+    });
+  };
+
+  auto nodeCache = std::unordered_map<Node*, std::vector<BrushFaceHandle>>{};
+  const auto selectableFacesOf = [&](Node* node) -> const std::vector<BrushFaceHandle>& {
+    auto [it, inserted] = nodeCache.emplace(node, std::vector<BrushFaceHandle>{});
+    if (inserted)
+    {
+      it->second = collectSelectableBrushFaces(std::vector<Node*>{node}, editorContext);
+    }
+    return it->second;
+  };
+
+  auto result = std::vector<BrushFaceHandle>{};
+  auto visited = kdl::vector_set<BrushFaceHandle>{};
+  auto pending = std::vector<Candidate>{};
+  for (const auto& seedFace : seedFaces)
+  {
+    if (visited.insert(seedFace).second)
+    {
+      pending.push_back(makeCandidate(seedFace));
+    }
+  }
+
+  while (!pending.empty())
+  {
+    const auto current = kdl::vec_pop_back(pending);
+    result.push_back(current.handle);
+
+    for (auto* node : nodeTree.find_intersectors(current.bounds))
+    {
+      for (const auto& handle : selectableFacesOf(node))
+      {
+        if (visited.count(handle) != 0)
+        {
+          continue;
+        }
+
+        auto candidate = makeCandidate(handle);
+        if (
+          current.bounds.intersects(candidate.bounds) && normalMatches(current, candidate)
+          && edgesWithinTolerance(current.edges, candidate.edges))
+        {
+          visited.insert(handle);
+          pending.push_back(std::move(candidate));
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 vm::bbox3d computeLogicalBounds(

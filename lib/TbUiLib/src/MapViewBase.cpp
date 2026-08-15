@@ -29,6 +29,7 @@
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMimeData>
+#include <QResizeEvent>
 #include <QShortcut>
 #include <QString>
 #include <QStringList>
@@ -94,6 +95,7 @@
 #include "ui/QKeySequenceUtils.h"
 #include "ui/SelectionTool.h"
 #include "ui/SignalDelayer.h"
+#include "ui/SmartFaceSelectionPanel.h"
 
 #include "kd/contracts.h"
 #include "kd/ranges/to.h"
@@ -120,6 +122,8 @@ namespace
 
 constexpr auto McpOverlayColor = RgbaF{0.15f, 0.75f, 1.0f, 1.0f};
 constexpr auto McpOverlayBackgroundColor = RgbaF{0.02f, 0.04f, 0.06f, 0.85f};
+constexpr auto SmartFaceSelectionAddColor = RgbaF{0.16f, 0.85f, 0.48f, 0.32f};
+constexpr auto SmartFaceSelectionRemoveColor = RgbaF{0.95f, 0.28f, 0.24f, 0.32f};
 
 std::optional<vm::vec3d> vec3FromJsonValue(const QJsonValue& value)
 {
@@ -243,6 +247,10 @@ MapViewBase::~MapViewBase()
 
 void MapViewBase::setIsCurrent(const bool isCurrent)
 {
+  if (m_isCurrent && !isCurrent)
+  {
+    closeSmartFaceSelection();
+  }
   m_isCurrent = isCurrent;
 }
 
@@ -345,12 +353,14 @@ void MapViewBase::createActionsAndUpdatePicking()
 
 void MapViewBase::documentWasLoaded()
 {
+  closeSmartFaceSelection();
   createActionsAndUpdatePicking();
   update();
 }
 
 void MapViewBase::documentDidChange()
 {
+  closeSmartFaceSelection();
   updatePickResult();
   updateActionStates();
   update();
@@ -358,6 +368,7 @@ void MapViewBase::documentDidChange()
 
 void MapViewBase::selectionDidChange(const mdl::SelectionChange&)
 {
+  closeSmartFaceSelection();
   updatePickResult();
   updateActionStates();
   update();
@@ -365,6 +376,7 @@ void MapViewBase::selectionDidChange(const mdl::SelectionChange&)
 
 void MapViewBase::toolChanged(Tool&)
 {
+  closeSmartFaceSelection();
   updatePickResult();
   updateActionStates();
   update();
@@ -387,16 +399,19 @@ void MapViewBase::modsDidChange()
 
 void MapViewBase::editorContextDidChange()
 {
+  closeSmartFaceSelection();
   update();
 }
 
 void MapViewBase::nodeVisibilityDidChange(const std::vector<mdl::Node*>&)
 {
+  closeSmartFaceSelection();
   update();
 }
 
 void MapViewBase::nodeLockingDidChange(const std::vector<mdl::Node*>&)
 {
+  closeSmartFaceSelection();
   update();
 }
 
@@ -784,6 +799,40 @@ void MapViewBase::performSweep()
   m_toolBox.performSweep();
 }
 
+void MapViewBase::startSmartFaceSelection()
+{
+  if (auto* panel = smartFaceSelectionPanel())
+  {
+    panel->raise();
+    panel->setFocus(Qt::ShortcutFocusReason);
+    return;
+  }
+  if (!canStartSmartFaceSelection())
+  {
+    return;
+  }
+
+  const auto& selectedFaces = m_document.map().selection().brushFaces;
+  auto* panel = new SmartFaceSelectionPanel{
+    selectedFaces,
+    [this] { updateSmartFaceSelectionPreview(); },
+    [this] { confirmSmartFaceSelection(); },
+    [this] { cancelSmartFaceSelection(); },
+    this};
+  panel->show();
+  panel->raise();
+  updateSmartFaceSelectionPreview();
+  panel->setFocus(Qt::ShortcutFocusReason);
+}
+
+bool MapViewBase::canStartSmartFaceSelection() const
+{
+  return smartFaceSelectionPanel() == nullptr
+         && m_document.map().selection().hasBrushFaces()
+         && (viewActionContext() & ActionContext::View3D) != 0
+         && (actionContext() & ActionContext::NoTool) != 0;
+}
+
 void MapViewBase::resetCameraZoom()
 {
   camera().setZoom(1.0f);
@@ -791,6 +840,11 @@ void MapViewBase::resetCameraZoom()
 
 void MapViewBase::cancel()
 {
+  if (smartFaceSelectionPanel())
+  {
+    cancelSmartFaceSelection();
+    return;
+  }
   if (!ToolBoxConnector::cancel())
   {
     auto& map = m_document.map();
@@ -1189,6 +1243,7 @@ void MapViewBase::renderContents(gl::Gl& gl)
     renderPointFile(renderContext, renderBatch);
     renderPortalFile(renderContext, renderBatch);
     renderMcpOverlay(renderContext, renderBatch);
+    renderSmartFaceSelectionPreview(renderContext, renderBatch);
     renderCompass(renderBatch);
     renderFPS(renderContext, renderBatch);
   }
@@ -1405,6 +1460,40 @@ void MapViewBase::renderMcpOverlay(
   }
 }
 
+void MapViewBase::renderSmartFaceSelectionPreview(
+  render::RenderContext& renderContext, render::RenderBatch& renderBatch)
+{
+  const auto* panel = smartFaceSelectionPanel();
+  if (!panel)
+  {
+    return;
+  }
+
+  const auto fillColor = panel->operation() == SmartFaceSelectionOperation::Remove
+                           ? SmartFaceSelectionRemoveColor
+                           : SmartFaceSelectionAddColor;
+  const auto outlineColor = RgbaF{fillColor.to<RgbF>(), 0.95f};
+
+  auto renderService = render::RenderService{renderContext, renderBatch};
+  renderService.setShowOccludedObjectsTransparent();
+  renderService.setLineWidth(2.0f);
+
+  for (const auto& handle : panel->candidates())
+  {
+    const auto offset = handle.face().normal() * 0.05;
+    const auto positions = handle.face().vertexPositions()
+                           | std::views::transform([&](const auto& position) {
+                               return vm::vec3f{position + offset};
+                             })
+                           | kdl::ranges::to<std::vector>();
+
+    renderService.setForegroundColor(fillColor);
+    renderService.renderFilledPolygon(positions);
+    renderService.setForegroundColor(outlineColor);
+    renderService.renderPolygonOutline(positions);
+  }
+}
+
 void MapViewBase::renderCompass(render::RenderBatch& renderBatch)
 {
   if (m_compass)
@@ -1425,11 +1514,30 @@ void MapViewBase::renderFPS(
 
 void MapViewBase::processEvent(const KeyEvent& event)
 {
+  if (smartFaceSelectionPanel() && event.type == KeyEvent::Type::Down)
+  {
+    if (event.key == Qt::Key_Return || event.key == Qt::Key_Enter)
+    {
+      confirmSmartFaceSelection();
+      return;
+    }
+    if (event.key == Qt::Key_Escape)
+    {
+      cancelSmartFaceSelection();
+      return;
+    }
+  }
   ToolBoxConnector::processEvent(event);
 }
 
 void MapViewBase::processEvent(const MouseEvent& event)
 {
+  if (
+    smartFaceSelectionPanel() && event.button != MouseEvent::Button::None
+    && event.button != MouseEvent::Button::Middle)
+  {
+    return;
+  }
   ToolBoxConnector::processEvent(event);
 }
 
@@ -1445,6 +1553,11 @@ void MapViewBase::processEvent(const GestureEvent& event)
 
 void MapViewBase::processEvent(const CancelEvent& event)
 {
+  if (smartFaceSelectionPanel())
+  {
+    cancelSmartFaceSelection();
+    return;
+  }
   ToolBoxConnector::processEvent(event);
 }
 
@@ -1671,6 +1784,12 @@ void MapViewBase::showPopupMenuLater()
 
 void MapViewBase::beforePopupMenu() {}
 
+void MapViewBase::resizeEvent(QResizeEvent* event)
+{
+  RenderView::resizeEvent(event);
+  positionSmartFaceSelectionPanel();
+}
+
 /**
  * Forward drag and drop events from QWidget to ToolBoxConnector
  */
@@ -1706,6 +1825,90 @@ void MapViewBase::dropEvent(QDropEvent* dropEvent)
     static_cast<float>(dropEvent->position().y()),
     dropEvent->mimeData()->text().toStdString());
   dropEvent->acceptProposedAction();
+}
+
+SmartFaceSelectionPanel* MapViewBase::smartFaceSelectionPanel() const
+{
+  return findChild<SmartFaceSelectionPanel*>(
+    QStringLiteral("smartFaceSelectionPanel"), Qt::FindDirectChildrenOnly);
+}
+
+void MapViewBase::updateSmartFaceSelectionPreview()
+{
+  auto* panel = smartFaceSelectionPanel();
+  if (!panel)
+  {
+    return;
+  }
+
+  auto& map = m_document.map();
+  panel->setCandidates(mdl::collectSmartFaceSelection(
+    panel->initialSelection(),
+    map.editorContext(),
+    map.worldNode().nodeTree(),
+    panel->options()));
+  positionSmartFaceSelectionPanel();
+  update();
+}
+
+void MapViewBase::positionSmartFaceSelectionPanel()
+{
+  auto* panel = smartFaceSelectionPanel();
+  if (!panel)
+  {
+    return;
+  }
+
+  constexpr auto margin = 12;
+  const auto availableWidth = std::max(1, width() - 2 * margin);
+  panel->setFixedWidth(std::min(292, availableWidth));
+  panel->adjustSize();
+  panel->move(margin, std::max(0, height() - panel->height() - margin));
+}
+
+void MapViewBase::confirmSmartFaceSelection()
+{
+  auto* panel = smartFaceSelectionPanel();
+  if (!panel)
+  {
+    return;
+  }
+
+  const auto candidates = panel->candidates();
+  const auto operation = panel->operation();
+  closeSmartFaceSelection();
+
+  auto& map = m_document.map();
+  auto transaction = mdl::Transaction{map, "Smart Face Selection"};
+  switch (operation)
+  {
+  case SmartFaceSelectionOperation::Replace:
+    mdl::deselectAll(map);
+    mdl::selectBrushFaces(map, candidates);
+    break;
+  case SmartFaceSelectionOperation::Add:
+    mdl::selectBrushFaces(map, candidates);
+    break;
+  case SmartFaceSelectionOperation::Remove:
+    mdl::deselectBrushFaces(map, candidates);
+    break;
+  }
+  transaction.commit();
+}
+
+void MapViewBase::cancelSmartFaceSelection()
+{
+  closeSmartFaceSelection();
+}
+
+void MapViewBase::closeSmartFaceSelection()
+{
+  if (auto* panel = smartFaceSelectionPanel())
+  {
+    panel->setObjectName(QStringLiteral("smartFaceSelectionPanelClosing"));
+    panel->close();
+    update();
+  }
 }
 
 QMenu* MapViewBase::makeEntityGroupsMenu(const mdl::EntityDefinitionType type)

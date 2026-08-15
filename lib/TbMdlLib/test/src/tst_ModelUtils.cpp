@@ -825,6 +825,133 @@ TEST_CASE("ModelUtils")
         UnorderedEquals(std::vector<BrushFaceHandle>{topFace(a), topFace(b)}));
     }
   }
+
+  SECTION("collectSmartFaceSelection")
+  {
+    constexpr auto worldBounds = vm::bbox3d{8192.0};
+    constexpr auto mapFormat = MapFormat::Standard;
+    const auto builder = BrushBuilder{mapFormat, worldBounds};
+
+    auto worldNode = WorldNode{{}, {}, mapFormat};
+    auto editorContext = EditorContext{};
+    const auto& nodeTree = worldNode.nodeTree();
+
+    const auto addBrush = [&](Brush brush) {
+      auto* node = new BrushNode{std::move(brush)};
+      worldNode.defaultLayer()->addChild(node);
+      return node;
+    };
+
+    const auto box = [&](const vm::bbox3d& bounds) {
+      return addBrush(builder.createCuboid(bounds, "material") | kdl::value());
+    };
+
+    const auto topFace = [](auto* node) {
+      return BrushFaceHandle{node, *node->brush().findFace(vm::vec3d{0, 0, 1})};
+    };
+
+    SECTION("Empty seeds produce no candidates")
+    {
+      CHECK(collectSmartFaceSelection(
+              {}, editorContext, nodeTree, SmartFaceSelectionOptions{})
+              .empty());
+    }
+
+    SECTION("Face strip follows connected coplanar faces and stops at sharp corners")
+    {
+      auto* a = box({{0, 0, 0}, {64, 64, 64}});
+      auto* b = box({{64, 0, 0}, {128, 64, 64}});
+
+      const auto result = collectSmartFaceSelection(
+        {topFace(a)},
+        editorContext,
+        nodeTree,
+        {SmartFaceSelectionMode::FaceStrip, 15.0, 0.0});
+
+      CHECK_THAT(
+        result, UnorderedEquals(std::vector<BrushFaceHandle>{topFace(a), topFace(b)}));
+    }
+
+    SECTION("Gap tolerance only bridges nearby face edges when requested")
+    {
+      auto* a = box({{0, 0, 0}, {64, 64, 64}});
+      auto* b = box({{65, 0, 0}, {129, 64, 64}});
+
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {topFace(a)},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 0.0, 0.0}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{topFace(a)}));
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {topFace(a)},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 0.0, 1.01}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{topFace(a), topFace(b)}));
+    }
+
+    SECTION("Face strip follows gradual bends while parallel mode prevents drift")
+    {
+      const auto slopedBrush =
+        [&](const double x0, const double x1, const double z0, const double z1) {
+          return addBrush(
+            builder.createBrush(
+              std::vector<vm::vec3d>{
+                {x0, 0, 0},
+                {x1, 0, 0},
+                {x0, 64, 0},
+                {x1, 64, 0},
+                {x0, 0, z0},
+                {x1, 0, z1},
+                {x0, 64, z0},
+                {x1, 64, z1}},
+              "material")
+            | kdl::value());
+        };
+      const auto slopeFace = [](auto* node, const double rise) {
+        const auto normal = vm::normalize(vm::vec3d{-rise, 0, 64});
+        return BrushFaceHandle{node, *node->brush().findFace(normal)};
+      };
+
+      auto* a = slopedBrush(0, 64, 64, 64);
+      auto* b = slopedBrush(64, 128, 64, 80);
+      auto* c = slopedBrush(128, 192, 80, 112);
+      const auto aTop = slopeFace(a, 0);
+      const auto bTop = slopeFace(b, 16);
+      const auto cTop = slopeFace(c, 32);
+
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {aTop},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 20.0, 0.0}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{aTop, bTop, cTop}));
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {aTop}, editorContext, nodeTree, {SmartFaceSelectionMode::Parallel, 20.0, 0.0}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{aTop, bTop}));
+    }
+
+    SECTION("Locked faces do not enter or bridge the result")
+    {
+      auto* a = box({{0, 0, 0}, {64, 64, 64}});
+      auto* b = box({{64, 0, 0}, {128, 64, 64}});
+      box({{128, 0, 0}, {192, 64, 64}});
+      b->setLockState(LockState::Locked);
+
+      CHECK_THAT(
+        collectSmartFaceSelection(
+          {topFace(a)},
+          editorContext,
+          nodeTree,
+          {SmartFaceSelectionMode::FaceStrip, 15.0, 0.0}),
+        UnorderedEquals(std::vector<BrushFaceHandle>{topFace(a)}));
+    }
+  }
 }
 
 } // namespace tb::mdl

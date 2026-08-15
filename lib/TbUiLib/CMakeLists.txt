@@ -209,6 +209,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartChoiceEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartColorEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartDefaultPropertyEditor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartFaceSelectionPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartFlagsEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartModelEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SmartPropertyEditor.cpp
@@ -431,6 +432,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartChoiceEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartColorEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartDefaultPropertyEditor.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartFaceSelectionPanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartFlagsEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartModelEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/SmartPropertyEditor.h

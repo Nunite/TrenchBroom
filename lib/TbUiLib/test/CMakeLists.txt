@@ -46,6 +46,7 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QWidgetUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PathTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_RecentDocuments.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SmartFaceSelectionPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SmartModelEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_SmartSkyboxEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_KeyboardShortcutUtils.cpp
