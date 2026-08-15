@@ -22,13 +22,14 @@
 
 ### Windows Release build used by this branch
 - The active local Release build tree is usually `build-release-codex`.
-- On this machine, prefer the checked-in wrapper script instead of hand-written CMake commands:
+- For initial configuration or a recovery clean build on this machine, use the checked-in wrapper script instead of hand-written CMake commands:
   ```powershell
   scripts\build_release_codex.cmd
   ```
 - This is important because the local Windows SDK tools are installed under `D:\Windows Kits\10\...`, not only the default Visual Studio-discovered path. The wrapper script pins `VsDevCmd.bat`, `rc.exe`, and `mt.exe` so Release rebuilds stay reproducible.
 - This branch's local Qt is `D:\Qtx\6.11.1\msvc2022_64`. Keep its `bin` directory first in `PATH` for both builds and direct test runs; if old Qt 6.9.3 DLLs are earlier in `PATH`, Qt-linked test executables can fail with `0xc0000139` during Catch2 discovery or test startup.
-- The wrapper script deletes and recreates the target build directory before configuring. Do not point it at an arbitrary directory unless you intentionally want a full clean rebuild there.
+- Treat `build_release_codex.cmd` as a recovery-only full-clean operation. It deletes the entire target build directory, including FetchContent sources under `_deps`; the next configure repopulates every dependency and may download the third-party repositories again. Do not use it for routine builds or validation.
+- Use the clean wrapper only when the build tree does not exist, the compiler/Qt/dependency configuration changed, or the dependency database is broadly corrupted and a targeted rebuild cannot recover it. State the reason before running it. Do not point it at an arbitrary directory unless you intentionally want a full clean rebuild there.
 - If you need the same clean Release flow for another directory, pass it explicitly:
   ```powershell
   scripts\build_release_codex.cmd build-release-other
@@ -50,8 +51,8 @@
   ```powershell
   cmd.exe /c 'call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build build-release-codex --target TbUiLibTest --config Release --parallel'
   ```
-- If a plain `cmake --build build-release-codex ...` fails with missing SDK tools, missing `kernel32.lib`, or `type_traits`/STL lookup errors, assume the shell environment is incomplete and go back to `scripts\build_release_codex.cmd` instead of debugging source code first.
-- If Release crashes after changing a class layout in a header, suspect stale `.obj` files before chasing random Qt stacks. This happened after adding a `MapViewToolBox` member: `SwitchableMapViewContainer.cpp.obj` was not rebuilt, so `make_unique<MapViewToolBox>` allocated the old size and the constructor corrupted the heap. Force-rebuild the dependent target or delete the stale object/build tree.
+- If a plain `cmake --build build-release-codex ...` fails with missing SDK tools, missing `kernel32.lib`, or `type_traits`/STL lookup errors, assume the shell environment is incomplete and retry through `scripts\build-filtered.ps1` when the build tree already exists. Use `scripts\build_release_codex.cmd` only when the tree also needs recovery reconfiguration; do not erase a valid tree merely to restore the shell environment.
+- If Release crashes after changing a class layout in a header, suspect stale `.obj` files before chasing random Qt stacks. This happened after adding a `MapViewToolBox` member: `SwitchableMapViewContainer.cpp.obj` was not rebuilt, so `make_unique<MapViewToolBox>` allocated the old size and the constructor corrupted the heap. Force-rebuild the dependent target or use the targeted stale-object helper below; reserve a full clean rebuild for broadly corrupted dependency tracking.
 - Never use `ninja -t clean <object-file>` as a substitute for deleting one stale `.obj`. Ninja follows the target's dependency graph; an observed attempt to clean only `MapViewToolBox.cpp.obj` removed 1199 build outputs. Use the checked-in helper, which accepts only one relative `.obj` path inside a configured repository build tree and can rebuild one narrow target afterward:
   ```powershell
   powershell -ExecutionPolicy Bypass -File scripts\remove-stale-object.ps1 -ObjectPath "lib\TbUiLib\CMakeFiles\TbUiLib.dir\src\MapViewToolBox.cpp.obj" -Target TbUiLibTest
