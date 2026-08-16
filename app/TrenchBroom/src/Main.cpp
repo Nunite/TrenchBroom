@@ -167,7 +167,7 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     QStringList{"ui-snapshot-page"},
     "Select the surface to capture: map, outliner, entity-browser, "
     "entity-browser-empty, face-inspector, material-browser-empty, supporting, "
-    "command-palette, preferences, or preferences-colors.",
+    "command-palette, preferences, preferences-colors, or preferences-mouse.",
     "page",
     "map"};
   const auto uiSnapshotGamePathOption = QCommandLineOption{
@@ -224,15 +224,15 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     && snapshotPage != QStringLiteral("supporting")
     && snapshotPage != QStringLiteral("command-palette")
     && snapshotPage != QStringLiteral("preferences")
-    && snapshotPage != QStringLiteral("preferences-colors"))
+    && snapshotPage != QStringLiteral("preferences-colors")
+    && snapshotPage != QStringLiteral("preferences-mouse"))
   {
     qCritical() << "Unsupported UI snapshot page:" << snapshotPage;
     return std::nullopt;
   }
   if (
     options.fileNames.empty() && snapshotPage != QStringLiteral("map")
-    && snapshotPage != QStringLiteral("preferences")
-    && snapshotPage != QStringLiteral("preferences-colors"))
+    && !snapshotPage.startsWith(QStringLiteral("preferences")))
   {
     qCritical() << "The selected UI snapshot page requires one map file";
     return std::nullopt;

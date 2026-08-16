@@ -57,9 +57,12 @@ private:
     const auto mixed = option->state.testFlag(QStyle::State_NoChange);
 
     const auto side = std::min(option->rect.width(), option->rect.height());
+    // QRect::center() rounds even-sized rectangles toward the top-left, which puts
+    // half of the 1 px border outside the indicator's paint clip.
+    const auto center = QRectF{option->rect}.center();
     const auto indicatorRect = QRectF{
-      option->rect.center().x() - side / 2.0 + 0.5,
-      option->rect.center().y() - side / 2.0 + 0.5,
+      center.x() - side / 2.0 + 0.5,
+      center.y() - side / 2.0 + 0.5,
       side - 1.0,
       side - 1.0};
     const auto scale = side / 18.0;

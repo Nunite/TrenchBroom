@@ -12,7 +12,8 @@ param(
     "supporting",
     "command-palette",
     "preferences",
-    "preferences-colors"
+    "preferences-colors",
+    "preferences-mouse"
   ),
   [string[]] $Themes = @("light", "dark"),
   [string[]] $ScaleFactors = @("1", "1.5", "2"),
@@ -155,9 +156,10 @@ foreach ($target in $normalizedTargets) {
       "supporting",
       "command-palette",
       "preferences",
-      "preferences-colors"
+      "preferences-colors",
+      "preferences-mouse"
     )) {
-    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, supporting, command-palette, preferences, or preferences-colors."
+    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, supporting, command-palette, preferences, preferences-colors, or preferences-mouse."
   }
 }
 foreach ($theme in $Themes) {
