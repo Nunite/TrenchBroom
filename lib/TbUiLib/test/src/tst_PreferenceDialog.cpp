@@ -157,6 +157,7 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     REQUIRE(table != nullptr);
     REQUIRE(table->model() != nullptr);
     REQUIRE(table->model()->rowCount() > 0);
+    CHECK(table->verticalHeader()->isHidden());
 
     const auto swatch = table->model()
                           ->data(table->model()->index(0, 0), Qt::DecorationRole)
@@ -184,6 +185,7 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     auto* header = table->horizontalHeader();
     REQUIRE(header != nullptr);
 
+    CHECK(table->verticalHeader()->isHidden());
     CHECK(header->logicalIndex(0) == 3);
     CHECK(header->sectionResizeMode(3) == QHeaderView::Stretch);
     CHECK(header->sectionResizeMode(2) == QHeaderView::Fixed);

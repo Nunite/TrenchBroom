@@ -258,18 +258,19 @@ testing shows that the earlier phases do not meet the product goal.
 - Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
   capture the isolated welcome window, representative map workbench, and deterministic
   expanded Outliner/entity-properties, Entity Browser, Face Inspector, supporting
-  Assets panel, Command Palette, Preferences View, Colors, and Mouse, and Entity/Material
-  empty result states in light and dark themes at 100%, 150%, and 200% scale. The 72-state
-  matrix validates image dimensions, device-pixel ratio, nonblank pixels, font support,
-  and image hashes, then writes PNG and JSON evidence plus a labeled visual-comparison
-  contact sheet under `build-release-codex\codex-logs\ui-theme-acceptance`.
+  Assets panel, Command Palette, Preferences pages for View, Colors, Mouse, and Keyboard,
+  plus Entity/Material empty result states in light and dark themes at 100%, 150%, and
+  200% scale. The 78-state matrix validates image dimensions, device-pixel ratio,
+  nonblank pixels, font support, and image hashes, then writes PNG and JSON evidence plus
+  a labeled visual-comparison contact sheet under
+  `build-release-codex\codex-logs\ui-theme-acceptance`.
 - Face Inspector and Material empty-result captures use the checked-in Quake 2 map/game
   fixtures rather than the generic empty map. Snapshot mode keeps external background services
   disabled but continues GL resource processing, waits up to five seconds for every fixture
   texture to reach GPU-ready state, and fails on missing, failed, or pending resources. Failures
   write a sibling `.error.txt` file which the acceptance script includes in its exception.
 - Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark
-  [--ui-snapshot-page map|outliner|entity-browser|entity-browser-empty|face-inspector|material-browser-empty|supporting|command-palette|preferences|preferences-colors|preferences-mouse]
+  [--ui-snapshot-page map|outliner|entity-browser|entity-browser-empty|face-inspector|material-browser-empty|supporting|command-palette|preferences|preferences-colors|preferences-mouse|preferences-keyboard]
   [--ui-snapshot-game-path game-directory] [map-file]` for a focused
   single capture. Omitting the map captures Welcome unless a `preferences*` page is
   selected; supplying one captures the workbench. The Outliner
@@ -277,9 +278,10 @@ testing shows that the earlier phases do not meet the product goal.
   the Entity Browser and Face Inspector pages widen the inspector for browser-color
   review; the Supporting page opens Assets and expands the bottom panel; the Command
   Palette uses a constrained 640 x 480 layout; the Preferences pages select View,
-  Colors, or Mouse in the category sidebar. Snapshot mode uses temporary preferences,
-  disables background services, and renders through the native Qt platform without
-  showing the window. Material targets require loaded, GPU-ready textures before capture.
+  Colors, Mouse, or Keyboard in the category sidebar. Snapshot mode uses temporary
+  preferences, disables background services, and renders through the native Qt platform
+  without showing the window. Material targets require loaded, GPU-ready textures before
+  capture.
 - Verify keyboard-only navigation, focus visibility, disabled states, and text fit.
 - Keep generated screenshots and temporary visual reports out of commits unless they
   are intentionally selected as maintained references.
@@ -360,4 +362,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Verified | Passed `Theme,UiSnapshot,PreferenceDialog,MapWindow` (256 assertions), rebuilt Release `TrenchBroom`, visually checked the complete 66-state Light/Dark snapshot matrix at 100%, 150%, and 200% in `20260816-102151-481`, and rechecked the corrected explicit Outliner target in `20260816-102935-344`. |
 | 2026-08-16 | Fixed | Centered the custom 18 px checkbox indicator with floating-point `QRectF` geometry so even-sized indicator rectangles no longer place the left and top half-pixel of their border outside Qt's paint clip. Added the Mouse preferences snapshot target to the default acceptance matrix, expanding it from 66 to 72 states. |
 | 2026-08-16 | Verified | Passed `Theme,UiSnapshot,PreferenceDialog,MapWindow` (256 assertions), rebuilt Release `TrenchBroom`, visually checked the focused Mouse preferences matrix in `20260816-105354-479`, and passed the complete 72-state Light/Dark matrix at 100%, 150%, and 200% in `20260816-104915-316`. |
+| 2026-08-16 | Fixed | Removed the blank leading column from the Keyboard and Colors preference tables by explicitly hiding their unused vertical headers. Added the Keyboard preferences target to the default acceptance matrix, expanding it from 72 to 78 states. |
+| 2026-08-16 | Verified | Passed `PreferenceDialog` (27 assertions) and `PreferenceDialog.preferencePanes` (26 assertions), rebuilt Release `TrenchBroom`, and visually checked Keyboard and Colors in Light/Dark at 100%, 150%, and 200% in `20260816-110526-478` and `20260816-110546-071`. |
 | 2026-08-16 | Next | Finish Phase 4.4's mixed-aspect grid behavior and inline size control before considering any deferred Phase 5 structural experiment. |

@@ -296,9 +296,10 @@ void configurePreferencesSnapshot(QWidget& targetWidget, const QString& targetNa
     auto* navigation = targetWidget.findChild<QListWidget*>(
       QStringLiteral("PreferenceDialog_NavigationList")))
   {
-    const auto row = targetName == QStringLiteral("preferences-colors")  ? 2
-                     : targetName == QStringLiteral("preferences-mouse") ? 3
-                                                                         : 1;
+    const auto row = targetName == QStringLiteral("preferences-colors")     ? 2
+                     : targetName == QStringLiteral("preferences-mouse")    ? 3
+                     : targetName == QStringLiteral("preferences-keyboard") ? 4
+                                                                            : 1;
     navigation->setCurrentRow(row);
     navigation->setFocus(Qt::OtherFocusReason);
   }

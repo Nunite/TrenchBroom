@@ -58,6 +58,7 @@ ColorsPreferencePane::ColorsPreferencePane(QWidget* parent)
   m_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeMode::Stretch);
 
   // Tighter than default vertical row height, without the overhead of autoresizing
+  m_table->verticalHeader()->setVisible(false);
   m_table->verticalHeader()->setDefaultSectionSize(
     m_table->fontMetrics().lineSpacing() + 2);
 
