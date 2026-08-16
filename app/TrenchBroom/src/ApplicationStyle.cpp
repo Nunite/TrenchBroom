@@ -35,11 +35,25 @@
 #include "ui/Theme.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace tb::ui
 {
 namespace
 {
+
+QColor blendColor(const QColor& background, const QColor& foreground, const double amount)
+{
+  const auto channel = [amount](const int backgroundValue, const int foregroundValue) {
+    return int(std::lround(
+      double(backgroundValue) * (1.0 - amount) + double(foregroundValue) * amount));
+  };
+
+  return {
+    channel(background.red(), foreground.red()),
+    channel(background.green(), foreground.green()),
+    channel(background.blue(), foreground.blue())};
+}
 
 class TrenchBroomProxyStyle : public QProxyStyle
 {
@@ -71,9 +85,11 @@ private:
                             : pressed ? m_themeTokens.pressedBackground
                             : hovered ? m_themeTokens.hoverBackground
                                       : m_themeTokens.inputBackground;
-    const auto border = !enabled  ? m_themeTokens.border
-                        : focused ? m_themeTokens.focusBorder
-                                  : m_themeTokens.strongBorder;
+    const auto border =
+      !enabled ? m_themeTokens.disabledText
+      : focused
+        ? m_themeTokens.focusBorder
+        : blendColor(background, m_themeTokens.text, hovered || pressed ? 0.60 : 0.45);
     const auto foreground = !enabled   ? m_themeTokens.disabledText
                             : selected ? m_themeTokens.inverseText
                                        : m_themeTokens.text;
