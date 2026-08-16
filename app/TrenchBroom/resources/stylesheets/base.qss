@@ -650,12 +650,11 @@ QStatusBar::item {
   border: none;
 }
 
-QStatusBar QWidget#MapWindow_StatusLabel QLabel,
+QStatusBar QLabel#MapWindow_StatusLabel,
 QStatusBar QLabel {
   color: @tb-secondary-text;
 }
 
-QStatusBar QToolButton#MapWindow_McpToggle,
 QStatusBar QToolButton#MapWindow_SnapToggle {
   background: transparent;
   border: 1px solid transparent;
@@ -665,28 +664,20 @@ QStatusBar QToolButton#MapWindow_SnapToggle {
   padding: 0 6px;
 }
 
-QStatusBar QToolButton#MapWindow_McpToggle:hover,
 QStatusBar QToolButton#MapWindow_SnapToggle:hover {
   background: @tb-hover-background;
   border-color: @tb-border;
   color: @tb-text;
 }
 
-QStatusBar QToolButton#MapWindow_McpToggle:focus,
 QStatusBar QToolButton#MapWindow_SnapToggle:focus {
   border-color: @tb-focus-border;
 }
 
-QStatusBar QToolButton#MapWindow_McpToggle:checked,
 QStatusBar QToolButton#MapWindow_SnapToggle:checked {
   background: @tb-pressed-background;
   border-color: @tb-accent;
   color: @tb-text;
-}
-
-QStatusBar QToolButton#MapWindow_McpToggle[mcpError="true"] {
-  border-color: @tb-error;
-  color: @tb-error;
 }
 
 QStatusBar QComboBox#MapWindow_GridChoice {

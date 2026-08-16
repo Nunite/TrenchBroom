@@ -62,7 +62,6 @@
 #include "ui/AppControllerFixture.h"
 #include "ui/CatchConfig.h"
 #include "ui/CommandPaletteDialog.h"
-#include "ui/ElidedLabel.h"
 #include "ui/InfoPanel.h"
 #include "ui/Inspector.h"
 #include "ui/MapDocument.h"
@@ -185,31 +184,12 @@ TEST_CASE("MapWindow")
     REQUIRE(inspectorSurface != nullptr);
 
     auto* gridChoice = window.findChild<QComboBox*>("MapWindow_GridChoice");
-    auto* mcpToggle = window.findChild<QToolButton*>("MapWindow_McpToggle");
     auto* snapToggle = window.findChild<QToolButton*>("MapWindow_SnapToggle");
-    auto* statusLabel =
-      dynamic_cast<ElidedLabel*>(window.findChild<QWidget*>("MapWindow_StatusLabel"));
     REQUIRE(gridChoice != nullptr);
-    REQUIRE(mcpToggle != nullptr);
     REQUIRE(snapToggle != nullptr);
-    REQUIRE(statusLabel != nullptr);
     CHECK(gridChoice->parentWidget() == window.statusBar());
-    CHECK(mcpToggle->parentWidget() == window.statusBar());
     CHECK(snapToggle->parentWidget() == window.statusBar());
-    CHECK(mcpToggle->text() == QStringLiteral("MCP Off"));
-    CHECK_FALSE(mcpToggle->isChecked());
-    CHECK(statusLabel->minimumSizeHint().width() == -1);
     CHECK(snapToggle->isChecked() == window.document().map().grid().snap());
-
-    QTest::mouseClick(mcpToggle, Qt::LeftButton);
-    CHECK(mcpToggle->text() == QStringLiteral("MCP Read-only"));
-    CHECK(mcpToggle->isChecked());
-    CHECK(appController.mcpConfig().mode == mcp::McpMode::ReadOnly);
-
-    QTest::mouseClick(mcpToggle, Qt::LeftButton);
-    CHECK(mcpToggle->text() == QStringLiteral("MCP Off"));
-    CHECK_FALSE(mcpToggle->isChecked());
-    CHECK(appController.mcpConfig().mode == mcp::McpMode::Off);
 
     QTest::mouseClick(snapToggle, Qt::LeftButton);
     CHECK_FALSE(window.document().map().grid().snap());
@@ -226,41 +206,6 @@ TEST_CASE("MapWindow")
     CHECK(inspectorSurface->isHidden() != inspectorWasHidden);
     window.toggleInspector();
     CHECK(inspectorSurface->isHidden() == inspectorWasHidden);
-  }
-
-  SECTION("shows selected entity identity and dimensions in the status bar")
-  {
-    auto& map = window.document().map();
-    auto* entityNode = new mdl::EntityNode{mdl::Entity{{
-      {mdl::EntityPropertyKeys::Classname, "light"},
-      {mdl::EntityPropertyKeys::Targetname, "hall_light"},
-    }}};
-    mdl::addNodes(map, {{map.worldNode().defaultLayer(), {entityNode}}});
-    mdl::selectNodes(map, {entityNode});
-    QApplication::processEvents();
-
-    auto* statusLabel =
-      dynamic_cast<ElidedLabel*>(window.findChild<QWidget*>("MapWindow_StatusLabel"));
-    REQUIRE(statusLabel != nullptr);
-    QTRY_VERIFY_WITH_TIMEOUT(
-      statusLabel->text().contains("1 entity (light, targetname \"hall_light\")"),
-      1000);
-    CHECK(statusLabel->text().startsWith("1 entity (light, targetname \"hall_light\")"));
-
-    const auto builder = mdl::BrushBuilder{
-      map.worldNode().mapFormat(),
-      map.worldBounds(),
-      map.gameInfo().gameConfig.faceAttribsConfig.defaultUvAttributes,
-      map.gameInfo().gameConfig.faceAttribsConfig.defaultSurfaceAttributes};
-    auto* brushNode =
-      new mdl::BrushNode{builder.createCube(64.0, "status_material") | kdl::value()};
-    mdl::addNodes(map, {{map.worldNode().defaultLayer(), {brushNode}}});
-    mdl::deselectAll(map);
-    mdl::selectNodes(map, {brushNode});
-    QTRY_VERIFY_WITH_TIMEOUT(
-      statusLabel->text().contains("1 brush (worldspawn) [6 faces, status_material]"),
-      1000);
-    CHECK(statusLabel->text().contains("Size 64 x 64 x 64"));
   }
 
   SECTION("switches to the supporting Assets surface")

@@ -38,6 +38,7 @@ public:
 private:
   void createGui();
   void loadConfig();
+  bool saveConfig();
   void applyConfigChange();
   void modeChanged(int index);
   void toolProfileChanged(int index);

@@ -44,7 +44,7 @@ QGroupBox* createGroupBox(const QString& title, QLayout* contentLayout)
 } // namespace
 
 MiscPreferencePane::MiscPreferencePane(AppController& appController, QWidget* parent)
-  : MiscPreferencePane{appController, appController.mcpConfigPath(), parent}
+  : MiscPreferencePane{appController, mcp::defaultConfigPath(), parent}
 {
 }
 

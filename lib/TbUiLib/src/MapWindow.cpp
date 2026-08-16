@@ -36,7 +36,6 @@
 #include <QStatusBar>
 #include <QString>
 #include <QStringList>
-#include <QStyle>
 #include <QTableWidget>
 #include <QTimer>
 #include <QToolBar>
@@ -54,7 +53,6 @@
 #include "mdl/Entity.h"
 #include "mdl/EntityNode.h"
 #include "mdl/EntityNodeBase.h"
-#include "mdl/EntityProperties.h"
 #include "mdl/EnvironmentConfig.h"
 #include "mdl/ExportOptions.h"
 #include "mdl/GameInfo.h"
@@ -94,7 +92,6 @@
 #include "ui/Console.h"
 #include "ui/CrashReporter.h"
 #include "ui/EdgeTool.h"
-#include "ui/ElidedLabel.h"
 #include "ui/FaceInspector.h"
 #include "ui/FaceTool.h"
 #include "ui/InfoPanel.h"
@@ -593,13 +590,8 @@ void MapWindow::updateToolBarWidgets()
 
 void MapWindow::createStatusBar()
 {
-  m_statusBarLabel = new ElidedLabel{Qt::ElideRight};
+  m_statusBarLabel = new QLabel{};
   m_statusBarLabel->setObjectName("MapWindow_StatusLabel");
-
-  m_mcpToggle = new QToolButton{};
-  m_mcpToggle->setObjectName("MapWindow_McpToggle");
-  m_mcpToggle->setCheckable(true);
-  updateMcpStatus();
 
   m_gridChoice = new QComboBox{};
   m_gridChoice->setObjectName("MapWindow_GridChoice");
@@ -618,7 +610,6 @@ void MapWindow::createStatusBar()
   m_snapToggle->setCheckable(true);
 
   statusBar()->addWidget(m_statusBarLabel, 1);
-  statusBar()->addPermanentWidget(m_mcpToggle);
   statusBar()->addPermanentWidget(m_snapToggle);
   statusBar()->addPermanentWidget(m_gridChoice);
   statusBar()->addWidget(m_appController.updater().createUpdateIndicator());
@@ -653,50 +644,6 @@ std::optional<std::string> commonClassnameForEntityList(
            : std::nullopt;
 }
 
-std::optional<std::string> commonMaterialForFaceList(
-  const std::vector<mdl::BrushFaceHandle>& faces)
-{
-  return !faces.empty()
-             && std::ranges::all_of(
-               faces,
-               [&](const auto& face) {
-                 return face.face().materialName() == faces.front().face().materialName();
-               })
-           ? std::optional{faces.front().face().materialName()}
-           : std::nullopt;
-}
-
-std::optional<std::string> commonMaterialForBrush(const mdl::BrushNode& brushNode)
-{
-  const auto& brush = brushNode.brush();
-  if (brush.faceCount() == 0u)
-  {
-    return std::nullopt;
-  }
-
-  const auto& materialName = brush.face(0u).materialName();
-  return std::ranges::all_of(
-           brush.faces(),
-           [&](const auto& face) { return face.materialName() == materialName; })
-           ? std::optional{materialName}
-           : std::nullopt;
-}
-
-QString describeSelectionSize(const mdl::Map& map)
-{
-  const auto& bounds = map.selectionBounds();
-  if (!bounds)
-  {
-    return {};
-  }
-
-  const auto size = bounds->size();
-  return QObject::tr("Size %1 x %2 x %3")
-    .arg(QString::number(size.x(), 'g', 6))
-    .arg(QString::number(size.y(), 'g', 6))
-    .arg(QString::number(size.z(), 'g', 6));
-}
-
 std::string numberWithSuffix(
   size_t count, const std::string& singular, const std::string& plural)
 {
@@ -710,11 +657,11 @@ QString describeSelection(const mdl::Map& map)
   const auto Arrow = QString(" ") + QString(QChar(0x203A)) + QString(" ");
 
   auto pipeSeparatedSections = QStringList{};
-  auto contextSections = QStringList{
-    QString::fromStdString(map.gameInfo().gameConfig.name),
-    QString::fromStdString(mdl::formatName(map.worldNode().mapFormat())),
-    QString::fromStdString(editorContext.currentLayer()->name()),
-  };
+
+  pipeSeparatedSections << QString::fromStdString(map.gameInfo().gameConfig.name)
+                        << QString::fromStdString(
+                             mdl::formatName(map.worldNode().mapFormat()))
+                        << QString::fromStdString(editorContext.currentLayer()->name());
 
   // open groups
   auto groups = std::vector<mdl::GroupNode*>{};
@@ -737,7 +684,7 @@ QString describeSelection(const mdl::Map& map)
 
     const auto openGroupsString =
       QObject::tr("Open groups: %1").arg(openGroups.join(Arrow));
-    contextSections << openGroupsString;
+    pipeSeparatedSections << openGroupsString;
   }
 
   // build a vector of strings describing the things that are selected
@@ -754,16 +701,6 @@ QString describeSelection(const mdl::Map& map)
     auto token = numberWithSuffix(selection.brushes.size(), "brush", "brushes");
     token += commonEntityNode ? " (" + commonEntityNode->entity().classname() + ")"
                               : " (multiple entities)";
-    if (selection.brushes.size() == 1u)
-    {
-      const auto& brush = selection.brushes.front()->brush();
-      token += " [" + std::to_string(brush.faceCount()) + " faces";
-      if (const auto commonMaterial = commonMaterialForBrush(*selection.brushes.front()))
-      {
-        token += ", " + *commonMaterial;
-      }
-      token += "]";
-    }
     tokens.push_back(token);
   }
 
@@ -776,19 +713,14 @@ QString describeSelection(const mdl::Map& map)
     auto token = numberWithSuffix(selection.patches.size(), "patch", "patches");
     token += commonEntityNode ? " (" + commonEntityNode->entity().classname() + ")"
                               : " (multiple entities)";
-    if (selection.patches.size() == 1u)
-    {
-      token += " [" + selection.patches.front()->patch().materialName() + "]";
-    }
     tokens.push_back(token);
   }
 
   // selected brush faces
   if (map.selection().hasBrushFaces())
   {
-    auto token = numberWithSuffix(map.selection().brushFaces.size(), "face", "faces");
-    const auto commonMaterial = commonMaterialForFaceList(map.selection().brushFaces);
-    token += commonMaterial ? " [" + *commonMaterial + "]" : " [multiple materials]";
+    const auto token =
+      numberWithSuffix(map.selection().brushFaces.size(), "face", "faces");
     tokens.push_back(token);
   }
 
@@ -798,29 +730,14 @@ QString describeSelection(const mdl::Map& map)
     const auto commonClassname = commonClassnameForEntityList(selection.entities);
 
     auto token = numberWithSuffix(selection.entities.size(), "entity", "entities");
-    token += " (" + commonClassname.value_or("multiple classnames");
-    if (selection.entities.size() == 1u)
-    {
-      if (
-        const auto* targetname = selection.entities.front()->entity().property(
-          mdl::EntityPropertyKeys::Targetname))
-      {
-        token += ", targetname \"" + *targetname + "\"";
-      }
-    }
-    token += ")";
+    token += " (" + commonClassname.value_or("multiple classnames") + ") ";
     tokens.push_back(token);
   }
 
   // groups
   if (selection.hasGroups())
   {
-    auto token = numberWithSuffix(selection.groups.size(), "group", "groups");
-    if (selection.groups.size() == 1u)
-    {
-      token += " (\"" + selection.groups.front()->name() + "\")";
-    }
-    tokens.push_back(token);
+    tokens.push_back(numberWithSuffix(selection.groups.size(), "group", "groups"));
   }
 
   // get the layers of the selected nodes
@@ -845,15 +762,7 @@ QString describeSelection(const mdl::Map& map)
                                .arg(QString::fromStdString(
                                  kdl::str_join(tokens, ", ", ", and ", " and ")))
                                .arg(layersDescription);
-
-    const auto selectionSize = describeSelectionSize(map);
-    if (!selectionSize.isEmpty())
-    {
-      pipeSeparatedSections << selectionSize;
-    }
   }
-
-  pipeSeparatedSections.append(contextSections);
 
   // count hidden objects
   size_t hiddenGroups = 0u;
@@ -935,56 +844,6 @@ void MapWindow::updateStatusBar()
 void MapWindow::updateStatusBarDelayed()
 {
   m_updateStatusBarSignalDelayer->queueSignal();
-}
-
-void MapWindow::updateMcpStatus()
-{
-  const auto mode = m_appController.mcpConfig().mode;
-  const auto startupError = m_appController.mcpStartupError();
-  const auto hasError = !startupError.isEmpty();
-
-  m_mcpToggle->setChecked(mode != mcp::McpMode::Off);
-  m_mcpToggle->setProperty("mcpError", hasError);
-  if (hasError)
-  {
-    m_mcpToggle->setText(tr("MCP Error"));
-    m_mcpToggle->setToolTip(tr("MCP startup failed: %1").arg(startupError));
-  }
-  else if (mode == mcp::McpMode::Edit || mode == mcp::McpMode::Danger)
-  {
-    m_mcpToggle->setText(tr("MCP Edit"));
-    m_mcpToggle->setToolTip(tr("MCP can edit maps. Click to turn it off."));
-  }
-  else if (mode == mcp::McpMode::ReadOnly)
-  {
-    m_mcpToggle->setText(tr("MCP Read-only"));
-    m_mcpToggle->setToolTip(tr("MCP is read-only. Click to turn it off."));
-  }
-  else
-  {
-    m_mcpToggle->setText(tr("MCP Off"));
-    m_mcpToggle->setToolTip(tr("Enable local MCP access in read-only mode."));
-  }
-
-  m_mcpToggle->style()->unpolish(m_mcpToggle);
-  m_mcpToggle->style()->polish(m_mcpToggle);
-}
-
-void MapWindow::toggleMcp()
-{
-  const auto nextMode = m_appController.mcpConfig().mode == mcp::McpMode::Off
-                          ? mcp::McpMode::ReadOnly
-                          : mcp::McpMode::Off;
-  auto error = QString{};
-  if (!m_appController.setMcpMode(nextMode, &error))
-  {
-    m_mcpToggle->setChecked(m_appController.mcpConfig().mode != mcp::McpMode::Off);
-    m_mcpToggle->setProperty("mcpError", true);
-    m_mcpToggle->setText(tr("MCP Error"));
-    m_mcpToggle->setToolTip(tr("Could not update MCP access: %1").arg(error));
-    m_mcpToggle->style()->unpolish(m_mcpToggle);
-    m_mcpToggle->style()->polish(m_mcpToggle);
-  }
 }
 
 void MapWindow::reloadPythonPlugins()
@@ -1244,9 +1103,6 @@ void MapWindow::bindEvents()
     this,
     [this](const int index) { setGridSize(index + mdl::Grid::MinSize); });
   connect(m_snapToggle, &QToolButton::clicked, this, &MapWindow::toggleSnapToGrid);
-  connect(m_mcpToggle, &QToolButton::clicked, this, &MapWindow::toggleMcp);
-  connect(
-    &m_appController, &AppController::mcpStateChanged, this, &MapWindow::updateMcpStatus);
   connect(QApplication::clipboard(), &QClipboard::dataChanged, this, [this]() {
     // update the "Paste" menu items
     this->updateActionState();

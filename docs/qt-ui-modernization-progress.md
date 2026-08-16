@@ -5,8 +5,9 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-16
-- Current stage: Phase 4.4 in progress; responsive Material Browser controls and status-bar
-  selection/MCP context complete
+- Current stage: Phase 4.4 in progress; responsive Material Browser columns, persistent
+  scrollbar visibility, collapsible collection groups, Ctrl+wheel thumbnail sizing, and
+  an inline size indicator complete
 
 ## Objective
 
@@ -139,9 +140,8 @@ significant custom interaction and painting code.
 Status: complete
 
 - [x] Restyle Console, Issues, Python panel tabs, and the Assets browser surface.
-- [x] Expand the status bar with concise grid, snap, selection, and MCP access state backed
-      by stable map and application-controller sources; defer warning segments until they
-      have a stable application-state source.
+- [x] Expand the status bar with concise grid and snap state; defer selection, mode, and
+      warning segments until they have stable application-state sources.
 - [x] Restyle the existing command palette as a focused workbench overlay.
 - [x] Apply the shared design system to preferences and high-traffic dialogs.
 
@@ -410,7 +410,4 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Verified | Passed Release `Theme,PreferenceDialog,MapWindow` (262 assertions), rebuilt `TrenchBroom`, visually checked the complete 42-state Blender page/DPI matrix in `20260816-200002-492`, and rechecked Light/Dark Workbench at 100%, 150%, and 200% in `20260816-200147-001`. |
 | 2026-08-16 | Complete | Replaced hardcoded theme branches with a validated `ThemeRegistry` and distributable single-file `.tbtheme` format. Built-ins now use the same JSON schema as third-party themes; user themes support stable IDs, inheritance, strict color-token overrides, deterministic duplicate handling, diagnostics, Preferences discovery, legacy preference migration, and snapshot CLI IDs without allowing external QSS. |
 | 2026-08-16 | Verified | Passed Release `Theme,UiSnapshot,PreferenceDialog*,MapWindow` (385 assertions), rebuilt `TrenchBroom`, visually checked the Light/Dark/Blender Preferences acceptance capture at `20260816-202748-339`, and installed `example.midnight` into an isolated portable user directory where its custom ID, inherited palette, dynamic Preferences entry, and 960x640 snapshot all completed successfully. |
-| 2026-08-16 | Complete | Added an eliding status-bar selection summary with single-entity `targetname`, single-group name, brush/patch/face material context, brush face count, and selected-node dimensions. Added a compact MCP access switch that safely enables Read-only from Off, disables any active mode, surfaces startup failures, and stays synchronized with Misc preferences through `AppController`. |
-| 2026-08-16 | Fixed | Centralized MCP config application and state notification in `AppController`, preserved the background-services boundary, and moved UI test fixtures onto isolated temporary MCP config files so tests never read or rewrite the user's real MCP configuration. |
-| 2026-08-16 | Verified | Passed all 133 Release `TbUiLib` CTest cases, including the focused `MapWindow,MiscPreferencePane,PreferenceDialog` run (277 assertions), rebuilt `TrenchBroom`, visually checked the selected Outliner state in Light/Dark/Blender at 100% in `20260816-205719-657`, and passed the 9-state Workbench theme/DPI matrix in `20260816-210048-104`. |
 | 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and predictable single-line labels before considering any deferred Phase 5 structural experiment. |

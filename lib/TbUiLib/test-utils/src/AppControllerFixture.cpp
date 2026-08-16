@@ -22,7 +22,6 @@
 #include "mdl/EnvironmentConfig.h"
 #include "mdl/GameManager.h"
 #include "mdl/TestUtils.h"
-#include "ui/QPathUtils.h"
 
 #include <filesystem>
 
@@ -91,13 +90,7 @@ AppControllerFixture::AppControllerFixture(
   : m_appController{
       createTestTaskManager(),
       createEnvironmentConfig(m_testEnvironment),
-      createGameManager(m_testEnvironment, gameManagerInitializer),
-      AppControllerOptions{
-        .enableBackgroundServices = false,
-        .showMapWindows = true,
-        .enableGlResourceProcessing = true,
-        .mcpConfigPath =
-          pathAsQString(m_testEnvironment.dir() / "mcp-config.json")}}
+      createGameManager(m_testEnvironment, gameManagerInitializer)}
 {
 }
 

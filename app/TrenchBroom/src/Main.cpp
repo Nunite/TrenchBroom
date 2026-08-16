@@ -85,10 +85,7 @@ void loadTranslations(QApplication& app)
 
 auto createAppController(const bool snapshotMode = false)
 {
-  const auto options = AppControllerOptions{
-    .enableBackgroundServices = !snapshotMode,
-    .showMapWindows = !snapshotMode,
-    .enableGlResourceProcessing = true};
+  const auto options = AppControllerOptions{!snapshotMode, !snapshotMode, true};
   return AppController::create(options) | kdl::if_error([](auto e) {
            const auto msg =
              fmt::format(R"(Game configurations could not be loaded: {})", e.msg);
