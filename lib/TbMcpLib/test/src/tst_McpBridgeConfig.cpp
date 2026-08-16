@@ -168,6 +168,34 @@ TEST_CASE("McpBridgeConfig")
     CHECK_FALSE(migrated.contains("token"));
     CHECK(migrated.value("mode").toString() == "ReadOnly");
   }
+
+  SECTION("a failed legacy token cleanup does not reject a valid config")
+  {
+    auto tempDir = QTemporaryDir{};
+    REQUIRE(tempDir.isValid());
+
+    const auto path = QDir{tempDir.path()}.filePath("config.json");
+    auto file = QFile{path};
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    file.write(QJsonDocument{
+      QJsonObject{
+        {"pipeName", "test-pipe"},
+        {"token", "legacy-secret"},
+        {"mode", "ReadOnly"},
+      }}.toJson());
+    file.close();
+    REQUIRE(QFile::setPermissions(path, QFileDevice::ReadOwner));
+
+    auto error = QString{};
+    const auto config = readOrCreateBridgeConfig(path, &error);
+    REQUIRE(config);
+    CHECK(error.isEmpty());
+    CHECK(config->pipeName == "test-pipe");
+    CHECK(config->mode == McpMode::ReadOnly);
+
+    REQUIRE(
+      QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner));
+  }
 }
 
 } // namespace tb::mcp

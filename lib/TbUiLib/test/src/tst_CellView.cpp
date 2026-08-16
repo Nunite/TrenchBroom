@@ -37,6 +37,8 @@ class TestCellView : public CellView
 private:
   bool m_collapsed = false;
   size_t m_toggleCount = 0u;
+  size_t m_reloadCount = 0u;
+  float m_initializedWidth = 0.0f;
 
 public:
   TestCellView(AppController& appController, QScrollBar* scrollBar)
@@ -46,10 +48,18 @@ public:
 
   bool collapsed() const { return m_collapsed; }
   size_t toggleCount() const { return m_toggleCount; }
+  size_t reloadCount() const { return m_reloadCount; }
+  float initializedWidth() const { return m_initializedWidth; }
+  void resizeLayoutForTest()
+  {
+    invalidate();
+    resizeLayout(float(width()));
+  }
 
 private:
   void doInitLayout(Layout& layout) override
   {
+    m_initializedWidth = layout.width();
     layout.setWidth(float(width()));
     layout.setGroupMargin(6.0f);
     layout.setRowMargin(8.0f);
@@ -59,6 +69,7 @@ private:
 
   void doReloadLayout(Layout& layout) override
   {
+    ++m_reloadCount;
     layout.addGroup("Group", 24.0f, 3u);
     if (!m_collapsed)
     {
@@ -84,6 +95,12 @@ private:
   }
 
   bool shouldRenderFocusIndicator() const override { return false; }
+
+  void resizeEvent(QResizeEvent* event) override
+  {
+    invalidate();
+    CellView::resizeEvent(event);
+  }
 };
 
 } // namespace
@@ -131,6 +148,17 @@ TEST_CASE("CellView")
 
     CHECK(view.collapsed());
     CHECK(scrollBar.value() == 0);
+  }
+
+  SECTION("rebuilds a width-dependent layout once per resize")
+  {
+    const auto reloadCount = view.reloadCount();
+
+    view.resize(320, 160);
+    view.resizeLayoutForTest();
+
+    CHECK(view.reloadCount() == reloadCount + 1u);
+    CHECK(view.initializedWidth() == 320.0f);
   }
 }
 

@@ -2161,40 +2161,6 @@ void OutlinerTreeWidget::keyPressEvent(QKeyEvent* event)
     QTreeWidget::keyPressEvent(event);
 }
 
-void OutlinerTreeWidget::drawRow(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
-{
-    auto rowOption = option;
-    const auto selected = option.state.testFlag(QStyle::State_Selected);
-    const auto hovered = option.state.testFlag(QStyle::State_MouseOver);
-
-    if (selected || hovered) {
-        const auto colorGroup = hasFocus() ? QPalette::Active : QPalette::Inactive;
-        const auto background = selected
-            ? option.palette.color(colorGroup, QPalette::Highlight)
-            : option.palette.color(QPalette::Midlight);
-
-        auto backgroundRect = option.rect;
-        backgroundRect.setLeft(0);
-        backgroundRect.setRight(viewport()->width() - 1);
-
-        painter->save();
-        painter->setPen(Qt::NoPen);
-        painter->setBrush(background);
-        painter->drawRoundedRect(backgroundRect.adjusted(3, 1, -3, -1), 4, 4);
-        painter->restore();
-
-        rowOption.state.setFlag(QStyle::State_Selected, false);
-        rowOption.state.setFlag(QStyle::State_MouseOver, false);
-        if (selected) {
-            const auto highlightedText = option.palette.color(QPalette::HighlightedText);
-            rowOption.palette.setColor(QPalette::Text, highlightedText);
-            rowOption.palette.setColor(QPalette::WindowText, highlightedText);
-        }
-    }
-
-    QTreeWidget::drawRow(painter, rowOption, index);
-}
-
 void OutlinerTreeWidget::dragEnterEvent(QDragEnterEvent* event)
 {
     event->acceptProposedAction(); // Simplify for now

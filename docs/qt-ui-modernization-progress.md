@@ -270,9 +270,14 @@ testing shows that the earlier phases do not meet the product goal.
   Assets panel, Command Palette, Preferences pages for View, Colors, Mouse, and Keyboard,
   plus Entity/Material empty result states in light and dark themes at 100%, 150%, and
   200% scale. The 78-state matrix validates image dimensions, device-pixel ratio,
-  nonblank pixels, font support, and image hashes, then writes PNG and JSON evidence plus
+  nonblank pixels, font support, and file integrity, then writes PNG and JSON evidence plus
   a labeled visual-comparison contact sheet under
   `build-release-codex\codex-logs\ui-theme-acceptance`.
+- Pass `-BaselineDir <approved-run-directory>` to turn the matrix into a visual regression
+  gate. It compares downsampled pixels with configurable per-pixel and changed-area
+  tolerances and fails when an expected baseline is missing or exceeded. Baselines must come
+  from the same OS, Qt version, installed fonts, and renderer; a run without this option is a
+  capture-integrity smoke test, not a visual regression test.
 - Face Inspector and Material empty-result captures use the checked-in Quake 2 map/game
   fixtures rather than the generic empty map. Snapshot mode keeps external background services
   disabled but continues GL resource processing, waits up to five seconds for every fixture
@@ -388,4 +393,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Verified | Passed Release `MaterialBrowserView,MapWindow` (194 assertions), rebuilt Release `TrenchBroom`, and visually checked the inline percentage indicator without clipping or toolbar overlap in Face Inspector Light/Dark snapshots at 100%, 150%, and 200% in `20260816-140448-183`. |
 | 2026-08-16 | Complete | Changed the shared Material Browser thumbnail range to nine 50% steps from 100% through 500%, including the inline selector, View preferences, Ctrl+wheel bounds, legacy below-range clamping, and the maximum-size acceptance state. |
 | 2026-08-16 | Verified | Passed Release `MaterialBrowserView,PreferenceDialog,MapWindow` (223 assertions), rebuilt Release `TrenchBroom`, and visually checked the `500%` Face Inspector state plus View preferences in Light/Dark at 100%, 150%, and 200% in `20260816-141642-333`. |
+| 2026-08-16 | Fixed | Removed duplicate browser resize/reload work, made legacy MCP token cleanup non-blocking, consolidated Outliner row background painting in its delegate, and added asynchronous snapshot log capture plus optional pixel-tolerant baseline comparison. |
+| 2026-08-16 | Verified | Passed Release `CellView`, `MaterialBrowserView`, `OutlinerTreeWidget`, and `McpBridgeConfig` (158 assertions), rebuilt Release `TrenchBroom`, confirmed identical Welcome captures report zero changed pixels, rejected a deliberately wrong baseline at 91.477%, and kept the selected Outliner row within the approved 0.2% visual tolerance. |
 | 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and predictable single-line labels before considering any deferred Phase 5 structural experiment. |

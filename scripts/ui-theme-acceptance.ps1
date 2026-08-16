@@ -23,11 +23,15 @@ param(
     "lib\TbMdlLib\test\fixture\mdl\Map\reloadMaterialCollectionsQ2.map",
   [string] $MaterialGamePath = "lib\TbUiLib\test\fixture\mdl\Game\Quake2",
   [string] $OutputDir = "",
+  [string] $BaselineDir = "",
+  [int] $PixelDifferenceThreshold = 24,
+  [double] $MaxChangedPixelRatio = 0.002,
   [int] $TimeoutSeconds = 45,
   [switch] $SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
+Add-Type -AssemblyName System.Drawing
 
 function Assert-UiSnapshotMetadata {
   param(
@@ -86,8 +90,6 @@ function New-UiSnapshotContactSheet {
     [string] $Path
   )
 
-  Add-Type -AssemblyName System.Drawing
-
   $padding = 12
   $labelHeight = 28
   $cellWidth = 700
@@ -144,6 +146,80 @@ function New-UiSnapshotContactSheet {
   }
 }
 
+function Compare-UiSnapshot {
+  param(
+    [string] $ActualPath,
+    [string] $BaselinePath,
+    [int] $DifferenceThreshold,
+    [double] $AllowedChangedPixelRatio
+  )
+
+  $actual = [Drawing.Bitmap]::new($ActualPath)
+  $baseline = [Drawing.Bitmap]::new($BaselinePath)
+  try {
+    if ($actual.Width -ne $baseline.Width -or $actual.Height -ne $baseline.Height) {
+      throw "UI snapshot size differs from baseline: $ActualPath is $($actual.Width)x$($actual.Height), baseline is $($baseline.Width)x$($baseline.Height)"
+    }
+
+    $sampleWidth = [math]::Min(320, $actual.Width)
+    $sampleHeight = [math]::Max(
+      1,
+      [math]::Round([double] $actual.Height * $sampleWidth / $actual.Width))
+    $actualSample = [Drawing.Bitmap]::new($sampleWidth, $sampleHeight)
+    $baselineSample = [Drawing.Bitmap]::new($sampleWidth, $sampleHeight)
+    try {
+      foreach ($pair in @(
+          @{ Source = $actual; Destination = $actualSample },
+          @{ Source = $baseline; Destination = $baselineSample }
+        )) {
+        $graphics = [Drawing.Graphics]::FromImage($pair.Destination)
+        try {
+          $graphics.InterpolationMode =
+            [Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+          $graphics.PixelOffsetMode = [Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+          $graphics.DrawImage($pair.Source, 0, 0, $sampleWidth, $sampleHeight)
+        } finally {
+          $graphics.Dispose()
+        }
+      }
+
+      $changedPixels = 0
+      for ($y = 0; $y -lt $sampleHeight; ++$y) {
+        for ($x = 0; $x -lt $sampleWidth; ++$x) {
+          $actualPixel = $actualSample.GetPixel($x, $y)
+          $baselinePixel = $baselineSample.GetPixel($x, $y)
+          $maxDifference = [math]::Max(
+            [math]::Abs([int] $actualPixel.R - [int] $baselinePixel.R),
+            [math]::Max(
+              [math]::Abs([int] $actualPixel.G - [int] $baselinePixel.G),
+              [math]::Abs([int] $actualPixel.B - [int] $baselinePixel.B)))
+          if ($maxDifference -gt $DifferenceThreshold) {
+            ++$changedPixels
+          }
+        }
+      }
+
+      $sampledPixels = $sampleWidth * $sampleHeight
+      $changedPixelRatio = [double] $changedPixels / $sampledPixels
+      if ($changedPixelRatio -gt $AllowedChangedPixelRatio) {
+        throw "UI snapshot differs from baseline by $([math]::Round($changedPixelRatio * 100, 3))% (allowed $([math]::Round($AllowedChangedPixelRatio * 100, 3))%): $ActualPath"
+      }
+
+      return [pscustomobject]@{
+        ChangedPixels = $changedPixels
+        SampledPixels = $sampledPixels
+        ChangedPixelRatio = $changedPixelRatio
+      }
+    } finally {
+      $actualSample.Dispose()
+      $baselineSample.Dispose()
+    }
+  } finally {
+    $actual.Dispose()
+    $baseline.Dispose()
+  }
+}
+
 $normalizedTargets = @($Targets | ForEach-Object { $_.ToLowerInvariant() })
 foreach ($target in $normalizedTargets) {
   if ($target -notin @(
@@ -181,6 +257,12 @@ foreach ($scaleFactor in $ScaleFactors) {
   ) {
     throw "Invalid scale factor '$scaleFactor'."
   }
+}
+if ($PixelDifferenceThreshold -lt 0 -or $PixelDifferenceThreshold -gt 255) {
+  throw "PixelDifferenceThreshold must be between 0 and 255."
+}
+if ($MaxChangedPixelRatio -lt 0.0 -or $MaxChangedPixelRatio -gt 1.0) {
+  throw "MaxChangedPixelRatio must be between 0 and 1."
 }
 
 if (-not $SkipBuild) {
@@ -225,6 +307,11 @@ $acceptanceRoot = if ([string]::IsNullOrWhiteSpace($OutputDir)) {
   Join-Path $resolvedBuildDir.Path "codex-logs\ui-theme-acceptance"
 } else {
   [IO.Path]::GetFullPath($OutputDir)
+}
+$resolvedBaselineDir = if ([string]::IsNullOrWhiteSpace($BaselineDir)) {
+  $null
+} else {
+  Resolve-Path -LiteralPath $BaselineDir
 }
 $runDirectory = Join-Path $acceptanceRoot (Get-Date -Format "yyyyMMdd-HHmmss-fff")
 New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
@@ -281,14 +368,24 @@ foreach ($target in $normalizedTargets) {
       $process = [Diagnostics.Process]::new()
       $process.StartInfo = $processInfo
       [void] $process.Start()
+      $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+      $stderrTask = $process.StandardError.ReadToEndAsync()
       if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
         $process.Kill()
         $process.WaitForExit()
-        throw "UI snapshot timed out after $TimeoutSeconds seconds: $imagePath"
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        throw @"
+UI snapshot timed out after $TimeoutSeconds seconds: $imagePath
+stdout:
+$stdout
+stderr:
+$stderr
+"@
       }
 
-      $stdout = $process.StandardOutput.ReadToEnd()
-      $stderr = $process.StandardError.ReadToEnd()
+      $stdout = $stdoutTask.GetAwaiter().GetResult()
+      $stderr = $stderrTask.GetAwaiter().GetResult()
       if ($process.ExitCode -ne 0) {
         $snapshotError = if (Test-Path -LiteralPath $errorPath -PathType Leaf) {
           Get-Content -LiteralPath $errorPath -Raw
@@ -323,6 +420,20 @@ $stderr
         -ExpectedScale $scaleFactor `
         -ImagePath $imagePath
 
+      $baselinePath = $null
+      $comparison = $null
+      if ($null -ne $resolvedBaselineDir) {
+        $baselinePath = Join-Path $resolvedBaselineDir.Path "$baseName.png"
+        if (-not (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {
+          throw "UI snapshot baseline was not found: $baselinePath"
+        }
+        $comparison = Compare-UiSnapshot `
+          -ActualPath $imagePath `
+          -BaselinePath $baselinePath `
+          -DifferenceThreshold $PixelDifferenceThreshold `
+          -AllowedChangedPixelRatio $MaxChangedPixelRatio
+      }
+
       $results += [pscustomobject]@{
         Target = $target
         Theme = $theme
@@ -337,6 +448,9 @@ $stderr
         Image = $imagePath
         Manifest = $manifestPath
         Sha256 = $metadata.sha256
+        Baseline = $baselinePath
+        ChangedPixelRatio =
+          if ($null -eq $comparison) { $null } else { $comparison.ChangedPixelRatio }
       }
     }
   }
@@ -362,6 +476,10 @@ $reportMaterialGamePath =
   materialMapPath = $reportMaterialMapPath
   materialGamePath = $reportMaterialGamePath
   contactSheet = $contactSheetPath
+  baselineDirectory =
+    if ($null -eq $resolvedBaselineDir) { $null } else { $resolvedBaselineDir.Path }
+  pixelDifferenceThreshold = $PixelDifferenceThreshold
+  maxChangedPixelRatio = $MaxChangedPixelRatio
   runs = $results
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 

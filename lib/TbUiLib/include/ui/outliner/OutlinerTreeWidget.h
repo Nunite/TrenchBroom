@@ -69,8 +69,6 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
-    void drawRow(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
-
     // Drag and Drop
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragMoveEvent(QDragMoveEvent* event) override;

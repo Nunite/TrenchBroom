@@ -272,12 +272,17 @@ void CellView::clear()
   m_valid = true;
 }
 
+void CellView::resizeLayout(const float width)
+{
+  m_hoveredCell = nullptr;
+  m_layout.setWidth(width);
+  validate();
+  updateScrollBar();
+}
+
 void CellView::resizeEvent(QResizeEvent* event)
 {
-  validate();
-  m_hoveredCell = nullptr;
-  m_layout.setWidth(float(size().width()));
-  updateScrollBar();
+  resizeLayout(float(size().width()));
 
   RenderView::resizeEvent(event);
 }

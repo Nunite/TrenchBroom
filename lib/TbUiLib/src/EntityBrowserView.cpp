@@ -156,8 +156,8 @@ void EntityBrowserView::setFilterText(const std::string& filterText)
 
 void EntityBrowserView::resizeEvent(QResizeEvent* event)
 {
-  CellView::resizeEvent(event);
   invalidate();
+  CellView::resizeEvent(event);
 }
 
 void EntityBrowserView::doInitLayout(Layout& layout)

@@ -227,8 +227,8 @@ void MaterialBrowserView::reloadMaterials()
 
 void MaterialBrowserView::resizeEvent(QResizeEvent* event)
 {
-  CellView::resizeEvent(event);
   invalidate();
+  CellView::resizeEvent(event);
 }
 
 void MaterialBrowserView::wheelEvent(QWheelEvent* event)
@@ -265,7 +265,6 @@ void MaterialBrowserView::wheelEvent(QWheelEvent* event)
     if (newSize != currentSize)
     {
       setPref(Preferences::MaterialBrowserIconSize, newSize);
-      reloadMaterials();
     }
   }
 

@@ -325,9 +325,15 @@ std::optional<McpBridgeConfig> readOrCreateBridgeConfig(
       return std::nullopt;
     }
 
-    if (json->contains("token") && !writeBridgeConfig(*config, filePath, error))
+    if (json->contains("token"))
     {
-      return std::nullopt;
+      auto migrationError = QString{};
+      if (!writeBridgeConfig(*config, filePath, &migrationError))
+      {
+        qWarning().noquote()
+          << QString{"Could not remove the legacy token from MCP config: %1"}.arg(
+               migrationError);
+      }
     }
     return config;
   }

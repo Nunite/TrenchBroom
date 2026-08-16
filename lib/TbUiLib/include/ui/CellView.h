@@ -45,6 +45,8 @@ protected:
   using Row = LayoutRow;
   using Cell = LayoutCell;
 
+  void resizeLayout(float width);
+
 private:
   Layout m_layout;
   const Cell* m_hoveredCell = nullptr;
