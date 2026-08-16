@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <QPointer>
 #include <QWidget>
 
 namespace tb::ui
@@ -27,12 +28,18 @@ namespace tb::ui
 class PopupWindow : public QWidget
 {
   Q_OBJECT
+private:
+  QPointer<QWidget> m_refWidget;
+
 public:
   explicit PopupWindow(QWidget* parent = nullptr);
   void positionTouchingWidget(QWidget* refWidget);
 
+protected: // QObject overrides
+  bool eventFilter(QObject* watched, QEvent* event) override;
+
 protected: // QWidget overrides
-  void closeEvent(QCloseEvent* event) override;
+  void hideEvent(QHideEvent* event) override;
   void showEvent(QShowEvent* event) override;
 
 signals:

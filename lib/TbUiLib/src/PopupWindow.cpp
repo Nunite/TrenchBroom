@@ -20,9 +20,8 @@
 #include "ui/PopupWindow.h"
 
 #include <QApplication>
-#include <QDebug>
+#include <QMouseEvent>
 #include <QScreen>
-#include <QWindow>
 
 namespace tb::ui
 {
@@ -73,6 +72,8 @@ PopupWindow::PopupWindow(QWidget* parent)
 
 void PopupWindow::positionTouchingWidget(QWidget* refWidget)
 {
+  m_refWidget = refWidget;
+
   auto* screen = refWidget->screen();
   const auto screenGeom = screen ? screen->availableGeometry()
                                  : QGuiApplication::primaryScreen()->availableGeometry();
@@ -89,13 +90,39 @@ void PopupWindow::positionTouchingWidget(QWidget* refWidget)
   setGeometry(QRect{desiredPointInParentCoords, ourSize});
 }
 
-void PopupWindow::closeEvent(QCloseEvent*)
+bool PopupWindow::eventFilter(QObject* watched, QEvent* event)
 {
+  if (isVisible() && m_refWidget && event->type() == QEvent::MouseButtonPress)
+  {
+    const auto* mouseEvent = static_cast<QMouseEvent*>(event);
+    const auto refWidgetPos =
+      m_refWidget->mapFromGlobal(mouseEvent->globalPosition().toPoint());
+    if (
+      mouseEvent->button() == Qt::LeftButton
+      && m_refWidget->rect().contains(refWidgetPos))
+    {
+      close();
+      return true;
+    }
+  }
+
+  return QWidget::eventFilter(watched, event);
+}
+
+void PopupWindow::hideEvent(QHideEvent* event)
+{
+  if (qApp)
+  {
+    qApp->removeEventFilter(this);
+  }
+  QWidget::hideEvent(event);
   emit visibilityChanged(false);
 }
 
-void PopupWindow::showEvent(QShowEvent*)
+void PopupWindow::showEvent(QShowEvent* event)
 {
+  QWidget::showEvent(event);
+  qApp->installEventFilter(this);
   emit visibilityChanged(true);
 }
 
