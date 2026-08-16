@@ -24,6 +24,9 @@
 #include "ui/CellLayout.h"
 #include "ui/RenderView.h"
 
+#include <optional>
+#include <string>
+
 class QScrollBar;
 class QDrag;
 class QEvent;
@@ -45,6 +48,9 @@ protected:
 private:
   Layout m_layout;
   const Cell* m_hoveredCell = nullptr;
+  std::optional<std::string> m_hoveredGroupTitle;
+  std::optional<std::string> m_pressedGroupTitle;
+  std::optional<std::string> m_focusedGroupTitle;
   bool m_layoutInitialized = false;
 
   bool m_valid = false;
@@ -57,6 +63,12 @@ private:
   void initLayout();
   void reloadLayout();
   void validate();
+  const Group* groupTitleAt(float x, float y);
+  const Group* groupWithTitle(const std::string& title);
+  void scrollToGroup(const Group& group);
+  void toggleGroup(const Group& group);
+  bool selectAdjacentGroup(int offset);
+  bool activateFocusedGroup();
 
 public:
   explicit CellView(AppController& appController, QScrollBar* scrollBar = nullptr);
@@ -130,6 +142,9 @@ private:
   virtual void doClear();
   virtual void doRender(gl::Gl& gl, Layout& layout, float y, float height) = 0;
   virtual QString emptyMessage() const;
+  virtual bool isGroupCollapsible(const Group& group) const;
+  virtual bool isGroupCollapsed(const Group& group) const;
+  virtual void doToggleGroup(const Group& group);
   virtual void doLeftClick(Layout& layout, float x, float y);
   virtual void doDoubleClick(Layout& layout, float x, float y);
   virtual void doMouseMove(Layout& layout, float x, float y);

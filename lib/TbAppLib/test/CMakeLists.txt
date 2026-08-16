@@ -6,6 +6,7 @@ target_sources(TbAppLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RunAllTests.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_CameraTool3D.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ChamferTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_CellLayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ClipTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ClipToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ControlPointTool.cpp

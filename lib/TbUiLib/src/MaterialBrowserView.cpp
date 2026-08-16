@@ -67,6 +67,7 @@ namespace
 {
 constexpr auto MaterialBrowserOuterMargin = 5.0f;
 constexpr auto MaterialBrowserCellMargin = 10.0f;
+constexpr auto MaterialBrowserGroupTitleHeight = 24.0f;
 constexpr auto MinimumMaterialCellWidth = 16.0f;
 constexpr auto MinimumMaterialCellWidthScale = 0.875f;
 
@@ -161,6 +162,22 @@ void MaterialBrowserView::setSelectedMaterial(const gl::Material* selectedMateri
 
 void MaterialBrowserView::revealMaterial(const gl::Material* material)
 {
+  if (m_group && material)
+  {
+    for (const auto* collection : getCollections())
+    {
+      const auto containsMaterial = std::ranges::any_of(
+        collection->materials(),
+        [&](const auto& candidate) { return &candidate == material; });
+      if (containsMaterial)
+      {
+        m_collapsedGroups.erase(collection->path().string());
+        reloadMaterials();
+        break;
+      }
+    }
+  }
+
   scrollToCell([&](const Cell& cell) {
     const auto& cellMaterial = cellData(cell);
     return &cellMaterial == material;
@@ -213,8 +230,15 @@ void MaterialBrowserView::doReloadLayout(Layout& layout)
     {
       if (const auto materials = getMaterials(*collection); !materials.empty())
       {
-        layout.addGroup(collection->path().string(), float(fontSize) + 2.0f);
-        addMaterialsToLayout(layout, materials, font);
+        const auto groupTitle = collection->path().string();
+        layout.addGroup(
+          groupTitle,
+          std::max(MaterialBrowserGroupTitleHeight, float(fontSize) + 8.0f),
+          materials.size());
+        if (!m_collapsedGroups.contains(groupTitle))
+        {
+          addMaterialsToLayout(layout, materials, font);
+        }
       }
     }
   }
@@ -359,6 +383,30 @@ QString MaterialBrowserView::emptyMessage() const
 {
   return !m_filterText.empty() || m_hideUnused ? tr("No matching materials")
                                                : tr("No materials available");
+}
+
+bool MaterialBrowserView::isGroupCollapsible(const Group& group) const
+{
+  return m_group && group.itemCount().has_value();
+}
+
+bool MaterialBrowserView::isGroupCollapsed(const Group& group) const
+{
+  return m_collapsedGroups.contains(group.title());
+}
+
+void MaterialBrowserView::doToggleGroup(const Group& group)
+{
+  if (const auto it = m_collapsedGroups.find(group.title());
+      it != m_collapsedGroups.end())
+  {
+    m_collapsedGroups.erase(it);
+  }
+  else
+  {
+    m_collapsedGroups.insert(group.title());
+  }
+  reloadMaterials();
 }
 
 bool MaterialBrowserView::shouldRenderFocusIndicator() const

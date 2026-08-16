@@ -5,8 +5,8 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-16
-- Current stage: Phase 4.4 in progress; responsive Material Browser columns and persistent
-  scrollbar visibility complete
+- Current stage: Phase 4.4 in progress; responsive Material Browser columns, persistent
+  scrollbar visibility, and collapsible collection groups complete
 
 ## Objective
 
@@ -212,6 +212,9 @@ preferences.
       mixed texture dimensions produce aligned rows without distorting the image.
 - [x] Distribute residual browser width across complete material columns around the selected
       thumbnail size, and keep the scrollbar thumb visible before hover.
+- [x] Replace passive collection labels with compact disclosure headers showing material counts,
+      full-row pointer states, persistent collapse state, sticky expanded headers, and keyboard
+      navigation/activation.
 - [ ] Elide long labels to one predictable line while retaining the full material name and
       dimensions in the existing tooltip.
 - [ ] Add an inline compact thumbnail-size control backed by the existing
@@ -371,4 +374,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Complete | Made Material Browser columns responsive around the selected thumbnail size so complete rows consume the viewport without a residual right strip. Increased resting scrollbar contrast while retaining distinct hover and pressed feedback. |
 | 2026-08-16 | Complete | Hardened the Face Inspector snapshot to use 3x material thumbnails, directly covering the constrained two-column layout and persistent scrollbar instead of relying on the default small-tile state. |
 | 2026-08-16 | Verified | Passed `Theme,MapWindow` (211 assertions), rebuilt Release `TrenchBroom`, and visually checked the responsive two-column grid and resting scrollbar in Light/Dark at 100%, 150%, and 200% in `20260816-121008-032`. |
+| 2026-08-16 | Complete | Turned Material Browser collection labels into 24 px disclosure headers with chevrons, right-aligned material counts, full-row hover/pressed/focus feedback, compact collapsed geometry, persistent collapse state, keyboard operation, and automatic expansion when revealing a material. |
+| 2026-08-16 | Verified | Passed `CellLayout` (13 assertions) and `CellView,Theme,MapWindow,ModelBrowserView` (251 assertions), rebuilt Release `TrenchBroom`, and visually checked grouped 3x thumbnails plus visible disclosure indicators in Light/Dark at 100%, 150%, and 200% in `20260816-124357-565`. |
 | 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and the inline thumbnail-size control before considering any deferred Phase 5 structural experiment. |

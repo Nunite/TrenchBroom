@@ -20,6 +20,7 @@
 #pragma once
 
 #include <any>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -163,6 +164,7 @@ class LayoutGroup
 {
 private:
   std::string m_title;
+  std::optional<size_t> m_itemCount;
   float m_cellMargin;
   float m_titleMargin;
   float m_rowMargin;
@@ -180,6 +182,7 @@ private:
 public:
   LayoutGroup(
     std::string title,
+    std::optional<size_t> itemCount,
     float x,
     float y,
     float cellMargin,
@@ -209,6 +212,7 @@ public:
     float maxCellHeight);
 
   const std::string& title() const;
+  const std::optional<size_t>& itemCount() const;
 
   const LayoutBounds& titleBounds() const;
   LayoutBounds titleBoundsForVisibleRect(float y, float height, float groupMargin) const;
@@ -294,7 +298,8 @@ public:
   const std::vector<LayoutGroup>& groups();
   const LayoutCell* cellAt(float x, float y);
 
-  void addGroup(std::string title, float titleHeight);
+  void addGroup(
+    std::string title, float titleHeight, std::optional<size_t> itemCount = std::nullopt);
   void addItem(
     std::any item,
     std::string title,

@@ -53,6 +53,7 @@
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
+#include "ui/MaterialBrowser.h"
 #include "ui/PreferenceDialog.h"
 #include "ui/QPathUtils.h"
 #include "ui/UiSnapshot.h"
@@ -270,6 +271,10 @@ void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName
   if (targetName == QStringLiteral("face-inspector"))
   {
     setPref(Preferences::MaterialBrowserIconSize, 3.0f);
+    if (auto* materialBrowser = mapWindow->findChild<MaterialBrowser*>())
+    {
+      materialBrowser->setGroup(true);
+    }
   }
 
   const auto showEntityBrowser = targetName.startsWith(QStringLiteral("entity-browser"));

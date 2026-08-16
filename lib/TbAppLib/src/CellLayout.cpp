@@ -344,6 +344,7 @@ void LayoutRow::readjustItems()
 
 LayoutGroup::LayoutGroup(
   std::string title,
+  std::optional<size_t> itemCount,
   const float x,
   const float y,
   const float cellMargin,
@@ -358,6 +359,7 @@ LayoutGroup::LayoutGroup(
   const float minCellHeight,
   const float maxCellHeight)
   : m_title{std::move(title)}
+  , m_itemCount{itemCount}
   , m_cellMargin{cellMargin}
   , m_titleMargin{titleMargin}
   , m_rowMargin{rowMargin}
@@ -404,6 +406,11 @@ const std::string& LayoutGroup::title() const
   return m_title;
 }
 
+const std::optional<size_t>& LayoutGroup::itemCount() const
+{
+  return m_itemCount;
+}
+
 const LayoutBounds& LayoutGroup::titleBounds() const
 {
   return m_titleBounds;
@@ -412,7 +419,7 @@ const LayoutBounds& LayoutGroup::titleBounds() const
 LayoutBounds LayoutGroup::titleBoundsForVisibleRect(
   const float y, const float height, const float groupMargin) const
 {
-  if (intersectsY(y, height) && m_titleBounds.top() < y)
+  if (!m_rows.empty() && intersectsY(y, height) && m_titleBounds.top() < y)
   {
     if (y > m_contentBounds.bottom() - m_titleBounds.height + groupMargin)
     {
@@ -435,6 +442,11 @@ const LayoutBounds& LayoutGroup::contentBounds() const
 
 LayoutBounds LayoutGroup::bounds() const
 {
+  if (m_rows.empty())
+  {
+    return m_titleBounds;
+  }
+
   return LayoutBounds{
     m_titleBounds.left(),
     m_titleBounds.top(),
@@ -832,7 +844,8 @@ const LayoutCell* CellLayout::cellAt(const float x, const float y)
   return nullptr;
 }
 
-void CellLayout::addGroup(std::string title, const float titleHeight)
+void CellLayout::addGroup(
+  std::string title, const float titleHeight, const std::optional<size_t> itemCount)
 {
   if (!m_valid)
   {
@@ -848,6 +861,7 @@ void CellLayout::addGroup(std::string title, const float titleHeight)
 
   m_groups.emplace_back(
     std::move(title),
+    itemCount,
     m_outerMargin,
     y,
     m_cellMargin,
@@ -929,7 +943,7 @@ void CellLayout::validate()
 
     for (auto& group : copy)
     {
-      addGroup(group.title(), group.titleBounds().height);
+      addGroup(group.title(), group.titleBounds().height, group.itemCount());
       for (const auto& row : group.rows())
       {
         for (const auto& cell : row.cells())

@@ -24,6 +24,7 @@
 #include "ui/CellView.h"
 
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 class QScrollBar;
@@ -59,6 +60,7 @@ private:
   bool m_hideUnused = false;
   MaterialSortOrder m_sortOrder = MaterialSortOrder::Name;
   std::string m_filterText;
+  std::unordered_set<std::string> m_collapsedGroups;
 
   const gl::Material* m_selectedMaterial = nullptr;
 
@@ -108,6 +110,9 @@ private:
   void doClear() override;
   void doRender(gl::Gl& gl, Layout& layout, float y, float height) override;
   QString emptyMessage() const override;
+  bool isGroupCollapsible(const Group& group) const override;
+  bool isGroupCollapsed(const Group& group) const override;
+  void doToggleGroup(const Group& group) override;
   bool shouldRenderFocusIndicator() const override;
   Color getBackgroundColor() override;
   bool isCellSelected(const Cell& cell) const override;

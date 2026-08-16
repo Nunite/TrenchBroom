@@ -39,6 +39,7 @@
 #include "prefs/Preferences.h"
 #include "render/Transformation.h"
 #include "ui/CellLayout.h"
+#include "ui/QColorUtils.h"
 #include "ui/RenderView.h"
 #include "ui/Theme.h"
 
@@ -52,6 +53,8 @@
 #include <algorithm>
 #include <map>
 #include <ranges>
+#include <string>
+#include <vector>
 
 namespace tb::ui
 {
@@ -84,6 +87,11 @@ void CellView::reloadLayout()
   doReloadLayout(m_layout);
   updateScrollBar();
 
+  if (m_focusedGroupTitle && groupWithTitle(*m_focusedGroupTitle) == nullptr)
+  {
+    m_focusedGroupTitle.reset();
+  }
+
   m_valid = true;
 }
 
@@ -93,6 +101,137 @@ void CellView::validate()
   {
     reloadLayout();
   }
+}
+
+const CellView::Group* CellView::groupTitleAt(const float x, const float y)
+{
+  const auto visible = visibleRect();
+  const auto visibleY = float(visible.y());
+  const auto visibleHeight = float(visible.height());
+
+  for (const auto& group : m_layout.groups())
+  {
+    if (!isGroupCollapsible(group) || !group.intersectsY(visibleY, visibleHeight))
+    {
+      continue;
+    }
+
+    const auto titleBounds =
+      m_layout.titleBoundsForVisibleRect(group, visibleY, visibleHeight);
+    if (titleBounds.containsPoint(x, y))
+    {
+      return &group;
+    }
+  }
+
+  return nullptr;
+}
+
+const CellView::Group* CellView::groupWithTitle(const std::string& title)
+{
+  const auto& groups = m_layout.groups();
+  const auto it = std::ranges::find(groups, title, &Group::title);
+  return it != groups.end() && isGroupCollapsible(*it) ? &*it : nullptr;
+}
+
+void CellView::scrollToGroup(const Group& group)
+{
+  if (!m_scrollBar)
+  {
+    return;
+  }
+
+  const auto visible = visibleRect();
+  const auto& bounds = group.titleBounds();
+  if (bounds.top() < float(visible.top()))
+  {
+    m_scrollBar->setValue(int(bounds.top()));
+  }
+  else if (bounds.bottom() > float(visible.bottom()))
+  {
+    m_scrollBar->setValue(int(bounds.bottom()) - visible.height());
+  }
+}
+
+void CellView::toggleGroup(const Group& group)
+{
+  const auto title = group.title();
+  auto titleViewportOffset = 0.0f;
+  if (m_scrollBar)
+  {
+    const auto visible = visibleRect();
+    const auto visibleTitleBounds = m_layout.titleBoundsForVisibleRect(
+      group, float(visible.top()), float(visible.height()));
+    titleViewportOffset = visibleTitleBounds.top() - float(visible.top());
+  }
+
+  doToggleGroup(group);
+  validate();
+
+  if (const auto* reloadedGroup = groupWithTitle(title))
+  {
+    m_focusedGroupTitle = title;
+    if (m_scrollBar)
+    {
+      m_scrollBar->setValue(
+        int(reloadedGroup->titleBounds().top() - titleViewportOffset));
+    }
+  }
+  update();
+}
+
+bool CellView::selectAdjacentGroup(const int offset)
+{
+  const auto& groups = m_layout.groups();
+  auto collapsibleGroups = std::vector<const Group*>{};
+  for (const auto& group : groups)
+  {
+    if (isGroupCollapsible(group))
+    {
+      collapsibleGroups.push_back(&group);
+    }
+  }
+  if (collapsibleGroups.empty())
+  {
+    return false;
+  }
+
+  auto index = offset > 0 ? 0 : int(collapsibleGroups.size()) - 1;
+  if (m_focusedGroupTitle)
+  {
+    const auto it =
+      std::ranges::find(collapsibleGroups, *m_focusedGroupTitle, [](const auto* group) {
+        return group->title();
+      });
+    if (it != collapsibleGroups.end())
+    {
+      index = std::clamp(
+        int(std::distance(collapsibleGroups.begin(), it)) + offset,
+        0,
+        int(collapsibleGroups.size()) - 1);
+    }
+  }
+
+  const auto& group = *collapsibleGroups[size_t(index)];
+  m_focusedGroupTitle = group.title();
+  scrollToGroup(group);
+  update();
+  return true;
+}
+
+bool CellView::activateFocusedGroup()
+{
+  if (!m_focusedGroupTitle)
+  {
+    return false;
+  }
+
+  if (const auto* group = groupWithTitle(*m_focusedGroupTitle))
+  {
+    toggleGroup(*group);
+    return true;
+  }
+  return false;
 }
 
 CellView::CellView(AppController& appController, QScrollBar* scrollBar)
@@ -117,12 +256,17 @@ CellView::CellView(AppController& appController, QScrollBar* scrollBar)
 void CellView::invalidate()
 {
   m_hoveredCell = nullptr;
+  m_hoveredGroupTitle.reset();
+  m_pressedGroupTitle.reset();
   m_valid = false;
 }
 
 void CellView::clear()
 {
   m_hoveredCell = nullptr;
+  m_hoveredGroupTitle.reset();
+  m_pressedGroupTitle.reset();
+  m_focusedGroupTitle.reset();
   m_layout.clear();
   doClear();
   m_valid = true;
@@ -165,6 +309,7 @@ void CellView::scrollToCellInternal(const Cell& cell)
 void CellView::onScrollBarValueChanged()
 {
   m_hoveredCell = nullptr;
+  m_hoveredGroupTitle.reset();
   update();
 }
 
@@ -207,6 +352,21 @@ void CellView::mousePressEvent(QMouseEvent* event)
   validate();
   if (event->button() == Qt::LeftButton)
   {
+    const auto top = m_scrollBar ? m_scrollBar->value() : 0;
+    const auto x = float(event->position().x());
+    const auto y = float(event->position().y() + top);
+    if (const auto* group = groupTitleAt(x, y))
+    {
+      m_pressedGroupTitle = group->title();
+      m_focusedGroupTitle = group->title();
+      m_potentialDrag = false;
+      setFocus(Qt::MouseFocusReason);
+      update();
+      event->accept();
+      return;
+    }
+
+    m_focusedGroupTitle.reset();
     m_potentialDrag = true;
   }
   else if (event->button() == Qt::RightButton)
@@ -226,6 +386,22 @@ void CellView::mouseReleaseEvent(QMouseEvent* event)
     const auto top = m_scrollBar ? m_scrollBar->value() : 0;
     const auto x = float(event->position().x());
     const auto y = float(event->position().y() + top);
+
+    if (m_pressedGroupTitle)
+    {
+      const auto pressedTitle = std::move(*m_pressedGroupTitle);
+      m_pressedGroupTitle.reset();
+      if (const auto* group = groupTitleAt(x, y); group && group->title() == pressedTitle)
+      {
+        toggleGroup(*group);
+      }
+      m_potentialDrag = false;
+      update();
+      event->accept();
+      return;
+    }
+
+    m_potentialDrag = false;
     doLeftClick(m_layout, x, y);
   }
 }
@@ -262,10 +438,14 @@ void CellView::mouseMoveEvent(QMouseEvent* event)
     const auto top = m_scrollBar ? m_scrollBar->value() : 0;
     const auto x = float(event->position().x());
     const auto y = float(event->position().y() + top);
-    const auto* hoveredCell = m_layout.cellAt(x, y);
-    if (m_hoveredCell != hoveredCell)
+    const auto* hoveredGroup = groupTitleAt(x, y);
+    const auto hoveredGroupTitle =
+      hoveredGroup ? std::optional<std::string>{hoveredGroup->title()} : std::nullopt;
+    const auto* hoveredCell = hoveredGroup ? nullptr : m_layout.cellAt(x, y);
+    if (m_hoveredCell != hoveredCell || m_hoveredGroupTitle != hoveredGroupTitle)
     {
       m_hoveredCell = hoveredCell;
+      m_hoveredGroupTitle = hoveredGroupTitle;
       update();
     }
     doMouseMove(m_layout, x, y);
@@ -276,9 +456,10 @@ void CellView::mouseMoveEvent(QMouseEvent* event)
 
 void CellView::leaveEvent(QEvent* event)
 {
-  if (m_hoveredCell != nullptr)
+  if (m_hoveredCell != nullptr || m_hoveredGroupTitle)
   {
     m_hoveredCell = nullptr;
+    m_hoveredGroupTitle.reset();
     update();
   }
   RenderView::leaveEvent(event);
@@ -549,48 +730,109 @@ void CellView::renderCellBackgrounds(gl::Gl& gl, const float y, const float heig
 
 void CellView::renderTitleBackgrounds(gl::Gl& gl, float y, float height)
 {
-  using Vertex = gl::VertexTypes::P2::Vertex;
-  auto vertices = std::vector<Vertex>{};
+  using Vertex = gl::VertexTypes::P2C4::Vertex;
+  auto backgroundVertices = std::vector<Vertex>{};
+  auto indicatorVertices = std::vector<Vertex>{};
+
+  const auto baseColor = browserGroupBackgroundColor(palette()).to<RgbaF>();
+  const auto hoverColor = browserCellHoverColor(palette()).to<RgbaF>();
+  const auto pressedColor = browserCellSelectedColor(palette()).to<RgbaF>();
+  const auto dividerColor =
+    fromQColor(palette().color(QPalette::Active, QPalette::Mid)).to<RgbaF>();
+  const auto focusColor =
+    fromQColor(palette().color(QPalette::Active, QPalette::Highlight)).to<RgbaF>();
+  const auto indicatorColor = browserTextColor(palette()).to<RgbaF>();
+
+  const auto appendQuad = [&](const LayoutBounds& bounds, const RgbaF& color) {
+    backgroundVertices.emplace_back(
+      vm::vec2f{bounds.left(), height - (bounds.top() - y)}, color.toVec());
+    backgroundVertices.emplace_back(
+      vm::vec2f{bounds.left(), height - (bounds.bottom() - y)}, color.toVec());
+    backgroundVertices.emplace_back(
+      vm::vec2f{bounds.right(), height - (bounds.bottom() - y)}, color.toVec());
+    backgroundVertices.emplace_back(
+      vm::vec2f{bounds.right(), height - (bounds.top() - y)}, color.toVec());
+  };
 
   for (const auto& group : m_layout.groups())
   {
     if (group.intersectsY(y, height) && !group.title().empty())
     {
       const auto titleBounds = m_layout.titleBoundsForVisibleRect(group, y, height);
-      vertices.emplace_back(
-        vm::vec2f{titleBounds.left(), height - (titleBounds.top() - y)});
-      vertices.emplace_back(
-        vm::vec2f{titleBounds.left(), height - (titleBounds.bottom() - y)});
-      vertices.emplace_back(
-        vm::vec2f{titleBounds.right(), height - (titleBounds.bottom() - y)});
-      vertices.emplace_back(
-        vm::vec2f{titleBounds.right(), height - (titleBounds.top() - y)});
+      const auto interactive = isGroupCollapsible(group);
+      const auto pressed = interactive && m_pressedGroupTitle == group.title();
+      const auto hovered = interactive && m_hoveredGroupTitle == group.title();
+      appendQuad(titleBounds, pressed ? pressedColor : hovered ? hoverColor : baseColor);
+      appendQuad(
+        LayoutBounds{
+          titleBounds.left(), titleBounds.bottom() - 1.0f, titleBounds.width, 1.0f},
+        dividerColor);
+
+      if (!interactive)
+      {
+        continue;
+      }
+
+      if (hasFocus() && m_focusedGroupTitle == group.title())
+      {
+        appendQuad(
+          LayoutBounds{titleBounds.left(), titleBounds.top(), 2.0f, titleBounds.height},
+          focusColor);
+      }
+
+      const auto centerX = titleBounds.left() + 12.0f;
+      const auto centerY = height - (titleBounds.top() + titleBounds.height / 2.0f - y);
+      if (isGroupCollapsed(group))
+      {
+        indicatorVertices.emplace_back(
+          vm::vec2f{centerX - 2.5f, centerY + 4.0f}, indicatorColor.toVec());
+        indicatorVertices.emplace_back(
+          vm::vec2f{centerX - 2.5f, centerY - 4.0f}, indicatorColor.toVec());
+        indicatorVertices.emplace_back(
+          vm::vec2f{centerX + 2.5f, centerY}, indicatorColor.toVec());
+      }
+      else
+      {
+        indicatorVertices.emplace_back(
+          vm::vec2f{centerX - 4.0f, centerY + 2.5f}, indicatorColor.toVec());
+        indicatorVertices.emplace_back(
+          vm::vec2f{centerX, centerY - 2.5f}, indicatorColor.toVec());
+        indicatorVertices.emplace_back(
+          vm::vec2f{centerX + 4.0f, centerY + 2.5f}, indicatorColor.toVec());
+      }
     }
   }
 
-  auto shader =
-    gl::ActiveShader{gl, shaderManager(), gl::Shaders::VaryingPUniformCShader};
-  shader.set("Color", browserGroupBackgroundColor(palette()));
+  auto shader = gl::ActiveShader{gl, shaderManager(), gl::Shaders::VaryingPCShader};
+  auto backgrounds = gl::VertexArray::move(std::move(backgroundVertices));
+  backgrounds.prepare(gl, vboManager());
 
-  auto vertexArray = gl::VertexArray::move(std::move(vertices));
-  vertexArray.prepare(gl, vboManager());
-
-  if (vertexArray.setup(gl, shader.program()))
+  if (backgrounds.setup(gl, shader.program()))
   {
-    vertexArray.render(gl, gl::PrimType::Quads);
-    vertexArray.cleanup(gl, shader.program());
+    backgrounds.render(gl, gl::PrimType::Quads);
+    backgrounds.cleanup(gl, shader.program());
+  }
+
+  auto indicators = gl::VertexArray::move(std::move(indicatorVertices));
+  indicators.prepare(gl, vboManager());
+  if (indicators.setup(gl, shader.program()))
+  {
+    indicators.render(gl, gl::PrimType::Triangles);
+    indicators.cleanup(gl, shader.program());
   }
 }
 
 namespace
 {
 
+template <typename IsGroupCollapsible>
 auto collectStringVertices(
   CellLayout& layout,
   const float y,
   const float height,
   gl::FontManager& fontManager,
-  const QPalette& palette)
+  const QPalette& palette,
+  IsGroupCollapsible&& isGroupCollapsible)
 {
   using TextVertex = gl::VertexTypes::P2Uv2C4::Vertex;
 
@@ -598,6 +840,8 @@ auto collectStringVertices(
     pref(Preferences::RendererFontPath), size_t(pref(Preferences::BrowserFontSize))};
 
   const auto textColor = browserTextColor(palette);
+  const auto secondaryTextColor =
+    fromQColor(palette.color(QPalette::Active, QPalette::PlaceholderText));
 
   auto stringVertices = std::map<gl::FontDescriptor, std::vector<TextVertex>>{};
   for (const auto& group : layout.groups())
@@ -608,11 +852,25 @@ auto collectStringVertices(
       if (!groupTitle.empty())
       {
         const auto titleBounds = layout.titleBoundsForVisibleRect(group, y, height);
-        const auto offset = vm::vec2f(
-          titleBounds.left() + 2.0f,
-          height - (titleBounds.top() - y) - titleBounds.height);
-
-        auto& font = fontManager.font(defaultFont);
+        const auto interactive = isGroupCollapsible(group);
+        const auto leftPadding = interactive ? 24.0f : 8.0f;
+        const auto rightPadding = 8.0f;
+        const auto countText =
+          group.itemCount() ? std::to_string(*group.itemCount()) : std::string{};
+        auto& countFont = fontManager.font(defaultFont);
+        const auto countSize = countFont.measure(countText);
+        const auto countGap = countText.empty() ? 0.0f : 12.0f;
+        const auto availableTitleWidth = std::max(
+          titleBounds.width - leftPadding - rightPadding - countSize.x() - countGap,
+          1.0f);
+        const auto titleFontDescriptor =
+          fontManager.selectFontSize(defaultFont, groupTitle, availableTitleWidth, 6);
+        auto& font = fontManager.font(titleFontDescriptor);
+        const auto textSize = font.measure(groupTitle);
+        const auto offset = vm::vec2f{
+          titleBounds.left() + leftPadding,
+          height - (titleBounds.bottom() - y)
+            + std::max((titleBounds.height - textSize.y()) / 2.0f, 0.0f)};
         const auto quads = font.quads(groupTitle, false, offset);
 
         const auto titleVertices = TextVertex::toList(kdl::views::zip(
@@ -620,9 +878,23 @@ auto collectStringVertices(
           quads | std::views::drop(1) | kdl::views::stride(2),
           kdl::views::repeat(textColor.to<RgbaF>().toVec())));
 
-        auto& vertices = stringVertices[defaultFont];
+        auto& vertices = stringVertices[titleFontDescriptor];
         vertices.insert(
           std::end(vertices), std::begin(titleVertices), std::end(titleVertices));
+
+        if (!countText.empty())
+        {
+          const auto countOffset = vm::vec2f{
+            titleBounds.right() - rightPadding - countSize.x(),
+            height - (titleBounds.bottom() - y)
+              + std::max((titleBounds.height - countSize.y()) / 2.0f, 0.0f)};
+          const auto countQuads = countFont.quads(countText, false, countOffset);
+          const auto countVertices = TextVertex::toList(kdl::views::zip(
+            countQuads | kdl::views::stride(2),
+            countQuads | std::views::drop(1) | kdl::views::stride(2),
+            kdl::views::repeat(secondaryTextColor.to<RgbaF>().toVec())));
+          kdl::vec_append(stringVertices[defaultFont], countVertices);
+        }
       }
 
       for (const auto& row : group.rows())
@@ -667,8 +939,10 @@ void CellView::renderTitleStrings(gl::Gl& gl, float y, float height)
   using StringRendererMap = std::map<gl::FontDescriptor, gl::VertexArray>;
   auto stringRenderers = StringRendererMap{};
 
-  for (const auto& [descriptor, vertices] :
-       collectStringVertices(m_layout, y, height, fontManager(), palette()))
+  for (const auto& [descriptor, vertices] : collectStringVertices(
+         m_layout, y, height, fontManager(), palette(), [&](const auto& group) {
+           return isGroupCollapsible(group);
+         }))
   {
     stringRenderers[descriptor] = gl::VertexArray::ref(vertices);
     stringRenderers[descriptor].prepare(gl, vboManager());
@@ -694,9 +968,10 @@ void CellView::renderTitleStrings(gl::Gl& gl, float y, float height)
 
 bool CellView::layoutHasCells()
 {
-  return std::ranges::any_of(m_layout.groups(), [](const auto& group) {
-    return std::ranges::any_of(
-      group.rows(), [](const auto& row) { return !row.cells().empty(); });
+  return std::ranges::any_of(m_layout.groups(), [&](const auto& group) {
+    return (isGroupCollapsible(group) && !group.title().empty())
+           || std::ranges::any_of(
+             group.rows(), [](const auto& row) { return !row.cells().empty(); });
   });
 }
 
@@ -746,6 +1021,15 @@ QString CellView::emptyMessage() const
 {
   return {};
 }
+bool CellView::isGroupCollapsible(const Group&) const
+{
+  return false;
+}
+bool CellView::isGroupCollapsed(const Group&) const
+{
+  return false;
+}
+void CellView::doToggleGroup(const Group&) {}
 void CellView::doLeftClick(Layout&, float, float) {}
 void CellView::doDoubleClick(Layout&, float, float) {}
 void CellView::doMouseMove(Layout&, float, float) {}
@@ -778,7 +1062,45 @@ QString CellView::tooltip(const Cell&)
   return "";
 }
 
-void CellView::processEvent(const KeyEvent& /* event */) {}
+void CellView::processEvent(const KeyEvent& event)
+{
+  if (event.type != KeyEvent::Type::Down || event.modifiers != Qt::NoModifier)
+  {
+    return;
+  }
+
+  validate();
+  if (event.key == Qt::Key_Down)
+  {
+    selectAdjacentGroup(1);
+  }
+  else if (event.key == Qt::Key_Up)
+  {
+    selectAdjacentGroup(-1);
+  }
+  else if (
+    event.key == Qt::Key_Return || event.key == Qt::Key_Enter
+    || event.key == Qt::Key_Space)
+  {
+    activateFocusedGroup();
+  }
+  else if (event.key == Qt::Key_Right && m_focusedGroupTitle)
+  {
+    if (const auto* group = groupWithTitle(*m_focusedGroupTitle);
+        group && isGroupCollapsed(*group))
+    {
+      toggleGroup(*group);
+    }
+  }
+  else if (event.key == Qt::Key_Left && m_focusedGroupTitle)
+  {
+    if (const auto* group = groupWithTitle(*m_focusedGroupTitle);
+        group && !isGroupCollapsed(*group))
+    {
+      toggleGroup(*group);
+    }
+  }
+}
 void CellView::processEvent(const MouseEvent& /* event */) {}
 void CellView::processEvent(const ScrollEvent& /* event */) {}
 void CellView::processEvent(const GestureEvent& /* event */) {}
