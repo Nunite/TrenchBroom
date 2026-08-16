@@ -57,7 +57,6 @@
 #include "vm/vec.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <ranges>
 #include <string>
@@ -74,15 +73,6 @@ constexpr auto MinimumMaterialCellWidth = 16.0f;
 constexpr auto MinimumMaterialCellWidthScale = 0.875f;
 constexpr auto WheelAnglePerStep = 120.0;
 constexpr auto WheelPixelsPerStep = 60.0;
-constexpr auto MaterialBrowserIconSizes = std::array{
-  0.25f,
-  0.5f,
-  1.0f,
-  1.5f,
-  2.0f,
-  2.5f,
-  3.0f,
-};
 
 float stepMaterialBrowserIconSize(float currentSize, int steps)
 {

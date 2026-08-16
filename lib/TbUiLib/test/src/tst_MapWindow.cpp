@@ -240,6 +240,8 @@ TEST_CASE("MapWindow")
       auto* filterRow =
         window.findChild<QWidget*>(browserName + QStringLiteral("_FilterRow"));
       auto* sort = window.findChild<QComboBox*>(browserName + QStringLiteral("_Sort"));
+      auto* iconSize =
+        window.findChild<QComboBox*>(browserName + QStringLiteral("_IconSize"));
       auto* groupToggle =
         window.findChild<QToolButton*>(browserName + QStringLiteral("_GroupToggle"));
       auto* usedToggle =
@@ -258,10 +260,34 @@ TEST_CASE("MapWindow")
       CHECK(controls->layout()->count() == 2);
       CHECK(controls->layout()->indexOf(search) == 0);
       CHECK(controls->layout()->indexOf(filterRow) == 1);
-      CHECK(filterRow->layout()->count() == 3);
+      const auto isMaterialBrowser = browserName == QStringLiteral("MaterialBrowser");
+      CHECK(filterRow->layout()->count() == (isMaterialBrowser ? 4 : 3));
       CHECK(filterRow->layout()->indexOf(sort) == 0);
       CHECK(filterRow->layout()->indexOf(groupToggle) == 1);
       CHECK(filterRow->layout()->indexOf(usedToggle) == 2);
+      if (isMaterialBrowser)
+      {
+        const auto originalIconSize = pref(Preferences::MaterialBrowserIconSize);
+        REQUIRE(iconSize != nullptr);
+        CHECK(filterRow->layout()->indexOf(iconSize) == 3);
+        CHECK(iconSize->count() == 7);
+        CHECK(
+          iconSize->currentData().toFloat()
+          == pref(Preferences::MaterialBrowserIconSize));
+
+        setPref(Preferences::MaterialBrowserIconSize, 1.5f);
+        CHECK(iconSize->currentText() == QStringLiteral("150%"));
+
+        iconSize->setCurrentIndex(4);
+        iconSize->activated(4);
+        CHECK(pref(Preferences::MaterialBrowserIconSize) == 2.0f);
+
+        setPref(Preferences::MaterialBrowserIconSize, originalIconSize);
+      }
+      else
+      {
+        CHECK(iconSize == nullptr);
+      }
       CHECK(search->placeholderText() == "Search...");
       CHECK(sort->count() == 2);
       CHECK(groupToggle->isCheckable());

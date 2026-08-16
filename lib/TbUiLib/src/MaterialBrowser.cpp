@@ -23,6 +23,7 @@
 #include <QHBoxLayout>
 #include <QLineEdit>
 #include <QScrollBar>
+#include <QSignalBlocker>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QtGlobal>
@@ -38,11 +39,29 @@
 #include "ui/SearchBox.h"
 #include "ui/ViewConstants.h"
 
+#include <optional>
+
 // for use in QVariant
 Q_DECLARE_METATYPE(tb::ui::MaterialSortOrder)
 
 namespace tb::ui
 {
+namespace
+{
+
+std::optional<float> iconSizeForComboIndex(QComboBox* combo, const int index)
+{
+  if (!combo || index < 0)
+  {
+    return std::nullopt;
+  }
+
+  auto ok = false;
+  const auto value = combo->itemData(index).toFloat(&ok);
+  return ok ? std::optional<float>{value} : std::nullopt;
+}
+
+} // namespace
 
 MaterialBrowser::MaterialBrowser(
   AppController& appController, MapDocument& document, QWidget* parent)
@@ -135,6 +154,26 @@ void MaterialBrowser::createGui(AppController& appController)
       m_view->setSortOrder(sortOrder);
     });
 
+  m_iconSizeChoice = new QComboBox{};
+  m_iconSizeChoice->setObjectName(QStringLiteral("MaterialBrowser_IconSize"));
+  m_iconSizeChoice->setToolTip(tr("Material thumbnail size"));
+  m_iconSizeChoice->setAccessibleName(tr("Material thumbnail size"));
+  for (const auto size : MaterialBrowserIconSizes)
+  {
+    m_iconSizeChoice->addItem(QStringLiteral("%1%").arg(qRound(size * 100.0f)), size);
+  }
+  updateIconSizeChoice();
+  connect(
+    m_iconSizeChoice,
+    QOverload<int>::of(&QComboBox::activated),
+    this,
+    [&](const int index) {
+      if (const auto size = iconSizeForComboIndex(m_iconSizeChoice, index))
+      {
+        setPref(Preferences::MaterialBrowserIconSize, *size);
+      }
+    });
+
   m_groupButton = new QToolButton{};
   m_groupButton->setText(tr("Group"));
   m_groupButton->setObjectName(QStringLiteral("MaterialBrowser_GroupToggle"));
@@ -169,6 +208,7 @@ void MaterialBrowser::createGui(AppController& appController)
   filterRowLayout->addWidget(m_sortOrderChoice, 1);
   filterRowLayout->addWidget(m_groupButton, 0);
   filterRowLayout->addWidget(m_usedButton, 0);
+  filterRowLayout->addWidget(m_iconSizeChoice, 0);
 
   auto* filterRow = new QWidget{};
   filterRow->setObjectName(QStringLiteral("MaterialBrowser_FilterRow"));
@@ -221,6 +261,10 @@ void MaterialBrowser::connectObservers()
         path == pref(m_document.map().gameInfo().gamePathPreference)
         || path == Preferences::MaterialBrowserIconSize.path)
       {
+        if (path == Preferences::MaterialBrowserIconSize.path)
+        {
+          updateIconSizeChoice();
+        }
         reload();
       }
       else
@@ -238,6 +282,28 @@ void MaterialBrowser::reload()
     m_view->invalidate();
     m_view->update();
   }
+}
+
+void MaterialBrowser::updateIconSizeChoice()
+{
+  if (!m_iconSizeChoice)
+  {
+    return;
+  }
+
+  const auto currentSize = pref(Preferences::MaterialBrowserIconSize);
+  auto currentIndex = 2;
+  for (auto i = 0; i < m_iconSizeChoice->count(); ++i)
+  {
+    if (iconSizeForComboIndex(m_iconSizeChoice, i) == currentSize)
+    {
+      currentIndex = i;
+      break;
+    }
+  }
+
+  const auto blocker = QSignalBlocker{m_iconSizeChoice};
+  m_iconSizeChoice->setCurrentIndex(currentIndex);
 }
 
 void MaterialBrowser::updateSelectedMaterial()

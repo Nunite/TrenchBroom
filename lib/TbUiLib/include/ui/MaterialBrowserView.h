@@ -23,6 +23,7 @@
 #include "gl/FontDescriptor.h"
 #include "ui/CellView.h"
 
+#include <array>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -49,6 +50,16 @@ enum class MaterialSortOrder
 {
   Name,
   Usage
+};
+
+inline constexpr auto MaterialBrowserIconSizes = std::array{
+  0.25f,
+  0.5f,
+  1.0f,
+  1.5f,
+  2.0f,
+  2.5f,
+  3.0f,
 };
 
 class MaterialBrowserView : public CellView

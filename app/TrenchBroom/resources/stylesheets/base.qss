@@ -551,8 +551,14 @@ QWidget#MaterialBrowser_FilterRow {
 QLineEdit#EntityBrowser_Search,
 QLineEdit#MaterialBrowser_Search,
 QComboBox#EntityBrowser_Sort,
-QComboBox#MaterialBrowser_Sort {
+QComboBox#MaterialBrowser_Sort,
+QComboBox#MaterialBrowser_IconSize {
   min-height: 24px;
+}
+
+QComboBox#MaterialBrowser_IconSize {
+  max-width: 66px;
+  min-width: 58px;
 }
 
 QToolButton[browserFilterToggle="true"] {

@@ -51,6 +51,7 @@ class MaterialBrowser : public QWidget
 private:
   MapDocument& m_document;
   QComboBox* m_sortOrderChoice = nullptr;
+  QComboBox* m_iconSizeChoice = nullptr;
   QToolButton* m_groupButton = nullptr;
   QToolButton* m_usedButton = nullptr;
   QLineEdit* m_filterBox = nullptr;
@@ -81,6 +82,7 @@ private:
   void connectObservers();
 
   void reload();
+  void updateIconSizeChoice();
   void updateSelectedMaterial();
 };
 

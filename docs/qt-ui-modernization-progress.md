@@ -6,8 +6,8 @@
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-16
 - Current stage: Phase 4.4 in progress; responsive Material Browser columns, persistent
-  scrollbar visibility, collapsible collection groups, and Ctrl+wheel thumbnail sizing
-  complete
+  scrollbar visibility, collapsible collection groups, Ctrl+wheel thumbnail sizing, and
+  an inline size indicator complete
 
 ## Objective
 
@@ -221,7 +221,7 @@ preferences.
       accumulation, and unchanged ordinary scrolling.
 - [ ] Elide long labels to one predictable line while retaining the full material name and
       dimensions in the existing tooltip.
-- [ ] Add an inline compact thumbnail-size control backed by the existing
+- [x] Add an inline compact thumbnail-size control backed by the existing
       `MaterialBrowserIconSize` preference; reuse the established Assets browser control
       pattern instead of creating a second size setting.
 - [ ] Add a quiet selected-material information row for the full name, dimensions, collection,
@@ -384,4 +384,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Verified | Passed Release `TbUiLibTest "Theme"` (31 assertions), rebuilt Release `TrenchBroom`, and visually compared the focused Mouse preferences Light/Dark snapshots at 100% in `20260816-133344-413` against the previous acceptance capture. |
 | 2026-08-16 | Complete | Added Ctrl+wheel Material Browser thumbnail resizing across the existing 25%-300% preference steps, including high-resolution wheel accumulation, bounds handling, persisted preference updates, and unchanged unmodified scrolling. |
 | 2026-08-16 | Verified | Passed the new Release `MaterialBrowserView` interaction test (7 assertions), passed `CellView,Theme,MapWindow,ModelBrowserView` (251 assertions), and rebuilt Release `TrenchBroom`. |
-| 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and the inline thumbnail-size control before considering any deferred Phase 5 structural experiment. |
+| 2026-08-16 | Complete | Added a compact Material Browser percentage indicator and selector to the filter row. It shares the existing 25%-300% preference steps, stays synchronized with Ctrl+wheel and View preferences, and keeps sort/filter controls stable at constrained Inspector widths. |
+| 2026-08-16 | Verified | Passed Release `MaterialBrowserView,MapWindow` (194 assertions), rebuilt Release `TrenchBroom`, and visually checked the inline `300%` indicator without clipping or toolbar overlap in Face Inspector Light/Dark snapshots at 100%, 150%, and 200% in `20260816-140448-183`. |
+| 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and predictable single-line labels before considering any deferred Phase 5 structural experiment. |
