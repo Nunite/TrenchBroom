@@ -31,6 +31,8 @@
 #include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPainterPath>
 #include <QPointer>
 #include <QProxyStyle>
 #include <QSettings>
@@ -78,6 +80,7 @@
 #include "ui/UiSnapshot.h"
 #include "ui/WelcomeWindow.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 
@@ -171,15 +174,103 @@ ThemeTokens loadStyle(
 
   class TrenchBroomProxyStyle : public QProxyStyle
   {
+  private:
+    ThemeTokens m_themeTokens;
+
+    void drawCheckBoxIndicator(const QStyleOption* option, QPainter* painter) const
+    {
+      const auto enabled = option->state.testFlag(QStyle::State_Enabled);
+      const auto hovered = option->state.testFlag(QStyle::State_MouseOver);
+      const auto pressed = option->state.testFlag(QStyle::State_Sunken);
+      const auto focused = option->state.testFlag(QStyle::State_HasFocus);
+      const auto selected = option->state.testFlag(QStyle::State_Selected);
+      const auto checked = option->state.testFlag(QStyle::State_On);
+      const auto mixed = option->state.testFlag(QStyle::State_NoChange);
+
+      const auto side = std::min(option->rect.width(), option->rect.height());
+      const auto indicatorRect = QRectF{
+        option->rect.center().x() - side / 2.0 + 0.5,
+        option->rect.center().y() - side / 2.0 + 0.5,
+        side - 1.0,
+        side - 1.0};
+      const auto scale = side / 18.0;
+
+      const auto background = !enabled  ? m_themeTokens.windowBackground
+                              : pressed ? m_themeTokens.pressedBackground
+                              : hovered ? m_themeTokens.hoverBackground
+                                        : m_themeTokens.inputBackground;
+      const auto border = !enabled  ? m_themeTokens.border
+                          : focused ? m_themeTokens.focusBorder
+                                    : m_themeTokens.strongBorder;
+      const auto foreground = !enabled   ? m_themeTokens.disabledText
+                              : selected ? m_themeTokens.inverseText
+                                         : m_themeTokens.text;
+
+      painter->save();
+      painter->setRenderHint(QPainter::Antialiasing, true);
+      painter->setPen(QPen{border, 1.0});
+      painter->setBrush(background);
+      painter->drawRoundedRect(indicatorRect, 3.0 * scale, 3.0 * scale);
+
+      if (checked || mixed)
+      {
+        auto mark = QPainterPath{};
+        if (mixed)
+        {
+          mark.moveTo(indicatorRect.left() + 4.0 * scale, indicatorRect.center().y());
+          mark.lineTo(indicatorRect.right() - 4.0 * scale, indicatorRect.center().y());
+        }
+        else
+        {
+          mark.moveTo(
+            indicatorRect.left() + 4.0 * scale, indicatorRect.top() + 9.0 * scale);
+          mark.lineTo(
+            indicatorRect.left() + 7.0 * scale, indicatorRect.top() + 12.0 * scale);
+          mark.lineTo(
+            indicatorRect.left() + 14.0 * scale, indicatorRect.top() + 5.0 * scale);
+        }
+
+        auto markPen = QPen{foreground, std::max(1.5, 2.0 * scale)};
+        markPen.setCapStyle(Qt::RoundCap);
+        markPen.setJoinStyle(Qt::RoundJoin);
+        painter->setPen(markPen);
+        painter->setBrush(Qt::NoBrush);
+        painter->drawPath(mark);
+      }
+      painter->restore();
+    }
+
   public:
-    explicit TrenchBroomProxyStyle(const QString& key)
+    TrenchBroomProxyStyle(const QString& key, const ThemeTokens& themeTokens)
       : QProxyStyle{key}
+      , m_themeTokens{themeTokens}
     {
     }
 
-    explicit TrenchBroomProxyStyle(QStyle* style = nullptr)
+    explicit TrenchBroomProxyStyle(
+      const ThemeTokens& themeTokens, QStyle* style = nullptr)
       : QProxyStyle{style}
+      , m_themeTokens{themeTokens}
     {
+    }
+
+    void setThemeTokens(const ThemeTokens& themeTokens) { m_themeTokens = themeTokens; }
+
+    void drawPrimitive(
+      const PrimitiveElement element,
+      const QStyleOption* option,
+      QPainter* painter,
+      const QWidget* widget = nullptr) const override
+    {
+      if (
+        element == QStyle::PE_IndicatorCheckBox
+        || element == QStyle::PE_IndicatorItemViewItemCheck)
+      {
+        drawCheckBoxIndicator(option, painter);
+        return;
+      }
+
+      QProxyStyle::drawPrimitive(element, option, painter, widget);
     }
 
     int styleHint(
@@ -200,6 +291,9 @@ ThemeTokens loadStyle(
     {
       switch (metric)
       {
+      case QStyle::PM_IndicatorWidth:
+      case QStyle::PM_IndicatorHeight:
+        return 18;
       case QStyle::PM_SmallIconSize:
       case QStyle::PM_ButtonIconSize:
       case QStyle::PM_TabBarIconSize:
@@ -228,8 +322,8 @@ ThemeTokens loadStyle(
   // Explicit themes use Fusion for deterministic cross-platform rendering.
   if (useDarkTheme)
   {
-    app.setStyle(new TrenchBroomProxyStyle{"Fusion"});
     const auto themeTokens = makeDarkThemeTokens();
+    app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
     app.setPalette(makeThemePalette(themeTokens));
     app.styleHints()->setColorScheme(Qt::ColorScheme::Dark);
     return themeTokens;
@@ -237,15 +331,18 @@ ThemeTokens loadStyle(
 
   if (useLightTheme)
   {
-    app.setStyle(new TrenchBroomProxyStyle{"Fusion"});
     const auto themeTokens = makeLightThemeTokens();
+    app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
     app.setPalette(makeThemePalette(themeTokens));
     app.styleHints()->setColorScheme(Qt::ColorScheme::Light);
     return themeTokens;
   }
 
-  app.setStyle(new TrenchBroomProxyStyle{});
-  return makeSystemThemeTokens(app.palette());
+  auto* systemStyle = new TrenchBroomProxyStyle{makeSystemThemeTokens(app.palette())};
+  app.setStyle(systemStyle);
+  const auto themeTokens = makeSystemThemeTokens(app.palette());
+  systemStyle->setThemeTokens(themeTokens);
+  return themeTokens;
 }
 
 auto createAppController(const bool snapshotMode = false)

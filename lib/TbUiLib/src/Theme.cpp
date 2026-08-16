@@ -300,6 +300,16 @@ bool expandThemeStyleSheet(QString& styleSheet, const ThemeTokens& tokens, QStri
     expanded.replace(placeholder, styleSheetColor(color));
   }
 
+  const auto darkTheme = tokens.windowBackground.lightnessF() <= 0.5f;
+  expanded.replace(
+    QStringLiteral("@tb-combo-arrow-image"),
+    darkTheme ? QStringLiteral("url(:/controls/chevron-down-dark)")
+              : QStringLiteral("url(:/controls/chevron-down-light)"));
+  expanded.replace(
+    QStringLiteral("@tb-combo-arrow-disabled-image"),
+    darkTheme ? QStringLiteral("url(:/controls/chevron-down-disabled-dark)")
+              : QStringLiteral("url(:/controls/chevron-down-disabled-light)"));
+
   const auto unknownTokenExpression =
     QRegularExpression{QStringLiteral(R"(@tb-[a-z0-9-]+)")};
   const auto match = unknownTokenExpression.match(expanded);

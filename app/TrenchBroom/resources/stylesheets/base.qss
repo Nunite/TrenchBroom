@@ -211,6 +211,70 @@ QDoubleSpinBox {
   selection-color: @tb-inverse-text;
 }
 
+QComboBox {
+  border-radius: 4px;
+  padding: 1px 7px;
+}
+
+QComboBox:editable {
+  min-width: 64px;
+}
+
+QComboBox::drop-down {
+  background: transparent;
+  border: none;
+  subcontrol-origin: padding;
+  subcontrol-position: top right;
+  width: 22px;
+}
+
+QComboBox::down-arrow {
+  height: 12px;
+  image: @tb-combo-arrow-image;
+  width: 12px;
+}
+
+QComboBox::down-arrow:disabled {
+  image: @tb-combo-arrow-disabled-image;
+}
+
+QComboBox QAbstractItemView {
+  background: @tb-elevated-background;
+  border: 1px solid @tb-strong-border;
+  border-radius: 8px;
+  color: @tb-text;
+  outline: none;
+  padding: 4px;
+  selection-background-color: @tb-selection-background;
+  selection-color: @tb-inverse-text;
+}
+
+QComboBox QAbstractItemView::item {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  min-height: 22px;
+  padding: 1px 6px;
+}
+
+QComboBox QAbstractItemView::item:hover {
+  background: @tb-hover-background;
+}
+
+QComboBox QAbstractItemView::item:selected {
+  background: @tb-selection-background;
+  color: @tb-inverse-text;
+}
+
+QCheckBox {
+  color: @tb-text;
+  min-height: 20px;
+  spacing: 7px;
+}
+
+QCheckBox:disabled {
+  color: @tb-disabled-text;
+}
+
 QLineEdit:hover,
 QComboBox:hover,
 QSpinBox:hover,

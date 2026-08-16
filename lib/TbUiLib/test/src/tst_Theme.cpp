@@ -113,14 +113,35 @@ TEST_CASE("Theme")
   SECTION("expandThemeStyleSheet")
   {
     const auto tokens = makeDarkThemeTokens();
-    auto styleSheet =
-      QStringLiteral("QWidget { color: @tb-text; background: @tb-window-background; }");
+    auto styleSheet = QStringLiteral(
+      "QWidget { color: @tb-text; background: @tb-window-background; "
+      "image: @tb-combo-arrow-image; }");
     auto error = QString{};
 
     CHECK(expandThemeStyleSheet(styleSheet, tokens, &error));
     CHECK(error.isEmpty());
     CHECK(
-      styleSheet == QStringLiteral("QWidget { color: #cccccc; background: #181818; }"));
+      styleSheet
+      == QStringLiteral("QWidget { color: #cccccc; background: #181818; "
+                        "image: url(:/controls/chevron-down-dark); }"));
+  }
+
+  SECTION("expandThemeStyleSheet selects light control assets")
+  {
+    const auto tokens = makeLightThemeTokens();
+    auto styleSheet = QStringLiteral(
+      "QComboBox::down-arrow { image: @tb-combo-arrow-image; } "
+      "QComboBox::down-arrow:disabled { image: @tb-combo-arrow-disabled-image; }");
+    auto error = QString{};
+
+    CHECK(expandThemeStyleSheet(styleSheet, tokens, &error));
+    CHECK(error.isEmpty());
+    CHECK(
+      styleSheet
+      == QStringLiteral(
+        "QComboBox::down-arrow { image: url(:/controls/chevron-down-light); } "
+        "QComboBox::down-arrow:disabled { image: "
+        "url(:/controls/chevron-down-disabled-light); }"));
   }
 
   SECTION("expandThemeStyleSheet rejects unknown tokens without changing the input")
