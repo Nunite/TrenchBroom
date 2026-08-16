@@ -18,11 +18,14 @@
  */
 
 #include <QCheckBox>
+#include <QDir>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QTemporaryDir>
 
 #include "base/PreferenceManager.h"
+#include "mcp/McpBridgeConfig.h"
 #include "prefs/Preferences.h"
 #include "ui/AppController.h"
 #include "ui/AppControllerFixture.h"
@@ -44,7 +47,14 @@ TEST_CASE("MiscPreferencePane")
   prefs.set(Preferences::PieMenuAction, "Menu/Edit/Undo|Menu/Edit/Redo");
   prefs.set(Preferences::PrefabDirectory, "C:/tb/prefabs");
 
-  auto pane = MiscPreferencePane{appControllerFixture.appController()};
+  auto tempDir = QTemporaryDir{};
+  REQUIRE(tempDir.isValid());
+  const auto mcpConfigPath = QDir{tempDir.path()}.filePath("mcp-config.json");
+  auto mcpConfig = mcp::defaultBridgeConfig();
+  mcpConfig.mode = mcp::McpMode::Edit;
+  mcpConfig.toolProfile = mcp::McpToolProfile::Full;
+  REQUIRE(mcp::writeBridgeConfig(mcpConfig, mcpConfigPath));
+  auto pane = MiscPreferencePane{appControllerFixture.appController(), mcpConfigPath};
 
   SECTION("loads general misc preferences")
   {
@@ -78,7 +88,7 @@ TEST_CASE("MiscPreferencePane")
     CHECK(foundChinese);
   }
 
-  SECTION("reset only resets lightweight misc preferences")
+  SECTION("reset restores misc and MCP preferences")
   {
     pane.resetToDefaults();
 
@@ -88,6 +98,11 @@ TEST_CASE("MiscPreferencePane")
     CHECK(prefs.get(Preferences::PythonPluginDirectories) == "C:/tb/plugin");
     CHECK(prefs.get(Preferences::PieMenuAction) == "Menu/Edit/Undo|Menu/Edit/Redo");
     CHECK(prefs.get(Preferences::PrefabDirectory).empty());
+
+    const auto resetMcpConfig = mcp::readBridgeConfig(mcpConfigPath);
+    REQUIRE(resetMcpConfig);
+    CHECK(resetMcpConfig->mode == mcp::McpMode::Off);
+    CHECK(resetMcpConfig->toolProfile == mcp::McpToolProfile::Modeling);
   }
 
   SECTION("loads prefab directory preference")

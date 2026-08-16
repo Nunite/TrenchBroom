@@ -120,7 +120,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialBrowserView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialCollectionEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MiniToolBarLayout.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/McpPreferencePane.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/McpSettingsWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MiscPreferencePane.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelBrowser.cpp
@@ -371,7 +371,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MaterialBrowserView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MaterialCollectionEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MiniToolBarLayout.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/McpPreferencePane.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/McpSettingsWidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/MiscPreferencePane.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ModEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ModelBrowser.h

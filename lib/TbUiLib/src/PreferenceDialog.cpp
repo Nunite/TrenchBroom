@@ -36,7 +36,6 @@
 #include "ui/GamesPreferencePane.h"
 #include "ui/ImageUtils.h"
 #include "ui/KeyboardPreferencePane.h"
-#include "ui/McpPreferencePane.h"
 #include "ui/MiscPreferencePane.h"
 #include "ui/MousePreferencePane.h"
 #include "ui/PreferencePane.h"
@@ -67,9 +66,8 @@ enum class PreferenceDialog::PrefPane
   Mouse = 3,
   Keyboard = 4,
   Misc = 5,
-  Mcp = 6,
-  Update = 7,
-  Last = 7
+  Update = 6,
+  Last = 6
 } PrefPane;
 
 
@@ -150,7 +148,6 @@ void PreferenceDialog::createGui()
   const auto mouseImage = loadSVGIcon("MousePreferences.svg");
   const auto keyboardImage = loadSVGIcon("KeyboardPreferences.svg");
   const auto miscImage = loadSVGIcon("GeneralPreferences.svg");
-  const auto mcpImage = loadSVGIcon("GeneralPreferences.svg");
   const auto updateImage = loadSVGIcon("UpdatePreferences.svg");
 
   m_navigation = new QListWidget{};
@@ -167,7 +164,6 @@ void PreferenceDialog::createGui()
   new QListWidgetItem{mouseImage, tr("Mouse"), m_navigation};
   new QListWidgetItem{keyboardImage, tr("Keyboard"), m_navigation};
   new QListWidgetItem{miscImage, tr("Misc"), m_navigation};
-  new QListWidgetItem{mcpImage, tr("MCP"), m_navigation};
   new QListWidgetItem{updateImage, tr("Update"), m_navigation};
 
   auto* navigationTitle = new QLabel{tr("SETTINGS")};
@@ -193,7 +189,6 @@ void PreferenceDialog::createGui()
   m_stackedWidget->addWidget(new MousePreferencePane{});
   m_stackedWidget->addWidget(new KeyboardPreferencePane{m_appController, m_document});
   m_stackedWidget->addWidget(new MiscPreferencePane{m_appController});
-  m_stackedWidget->addWidget(new McpPreferencePane{m_appController});
   m_stackedWidget->addWidget(new UpdatePreferencePane{m_appController});
 
   m_buttonBox = new QDialogButtonBox{

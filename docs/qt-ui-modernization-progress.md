@@ -267,9 +267,10 @@ testing shows that the earlier phases do not meet the product goal.
 - Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
   capture the isolated welcome window, representative map workbench, and deterministic
   expanded Outliner/entity-properties, Entity Browser, Face Inspector, supporting
-  Assets panel, Command Palette, Preferences pages for View, Colors, Mouse, and Keyboard,
+  Assets panel, Command Palette, Preferences pages for View, Colors, Mouse, Keyboard, and
+  Misc/MCP,
   plus Entity/Material empty result states in light and dark themes at 100%, 150%, and
-  200% scale. The 78-state matrix validates image dimensions, device-pixel ratio,
+  200% scale. The 84-state matrix validates image dimensions, device-pixel ratio,
   nonblank pixels, font support, and file integrity, then writes PNG and JSON evidence plus
   a labeled visual-comparison contact sheet under
   `build-release-codex\codex-logs\ui-theme-acceptance`.
@@ -395,4 +396,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Verified | Passed Release `MaterialBrowserView,PreferenceDialog,MapWindow` (223 assertions), rebuilt Release `TrenchBroom`, and visually checked the `500%` Face Inspector state plus View preferences in Light/Dark at 100%, 150%, and 200% in `20260816-141642-333`. |
 | 2026-08-16 | Fixed | Removed duplicate browser resize/reload work, made legacy MCP token cleanup non-blocking, consolidated Outliner row background painting in its delegate, and added asynchronous snapshot log capture plus optional pixel-tolerant baseline comparison. |
 | 2026-08-16 | Verified | Passed Release `CellView`, `MaterialBrowserView`, `OutlinerTreeWidget`, and `McpBridgeConfig` (158 assertions), rebuilt Release `TrenchBroom`, confirmed identical Welcome captures report zero changed pixels, rejected a deliberately wrong baseline at 91.477%, and kept the selected Outliner row within the approved 0.2% visual tolerance. |
+| 2026-08-16 | Complete | Replaced the standalone MCP preference page with a compact `McpSettingsWidget` embedded in Misc, reduced navigation to seven pages, removed compatibility pipe/config fields, and replaced the clipped command field with dedicated URL and Claude Code copy actions. Added an isolated config-path seam so preference reset tests never rewrite the user's MCP config. |
+| 2026-08-16 | Verified | Passed Release `MiscPreferencePane`, `PreferenceDialog`, and `PreferenceDialog.preferencePanes` (100 assertions) plus `McpBridgeConfig` (53 assertions), rebuilt Release `TrenchBroom`, and passed zero-difference Light/Dark baseline comparisons for the new `preferences-misc` snapshot target in `20260816-170134-884`. |
 | 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and predictable single-line labels before considering any deferred Phase 5 structural experiment. |

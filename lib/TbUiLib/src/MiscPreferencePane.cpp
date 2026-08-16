@@ -16,11 +16,14 @@
 #include "base/PreferenceManager.h"
 #include "prefs/Preferences.h"
 #include "ui/AppController.h"
+#include "ui/McpSettingsWidget.h"
 #include "ui/PieMenuSettingsDialog.h"
 #include "ui/PrefabAsset.h"
 #include "ui/QPathUtils.h"
 #include "ui/QStyleUtils.h"
 #include "ui/ViewConstants.h"
+
+#include <utility>
 
 namespace tb::ui
 {
@@ -41,8 +44,15 @@ QGroupBox* createGroupBox(const QString& title, QLayout* contentLayout)
 } // namespace
 
 MiscPreferencePane::MiscPreferencePane(AppController& appController, QWidget* parent)
+  : MiscPreferencePane{appController, mcp::defaultConfigPath(), parent}
+{
+}
+
+MiscPreferencePane::MiscPreferencePane(
+  AppController& appController, QString mcpConfigPath, QWidget* parent)
   : PreferencePane{parent}
   , m_appController{appController}
+  , m_mcpConfigPath{std::move(mcpConfigPath)}
 {
   createGui();
   updateControls();
@@ -160,6 +170,8 @@ void MiscPreferencePane::createGui()
   toolLayout->addWidget(m_pieMenuSettingsButton);
   toolLayout->addWidget(m_pythonPluginManagerButton);
 
+  m_mcpSettingsWidget = new McpSettingsWidget{m_appController, m_mcpConfigPath};
+
   auto* layout = new QVBoxLayout{};
   layout->setContentsMargins(
     LayoutConstants::DialogOuterMargin,
@@ -170,6 +182,7 @@ void MiscPreferencePane::createGui()
   layout->addWidget(createGroupBox(tr("Language"), languageLayout));
   layout->addWidget(createGroupBox(tr("Editor"), editorLayout));
   layout->addWidget(createGroupBox(tr("Tools"), toolLayout));
+  layout->addWidget(m_mcpSettingsWidget);
   layout->addStretch(1);
   setLayout(layout);
 }
@@ -186,6 +199,7 @@ void MiscPreferencePane::doResetToDefaults()
   prefs.resetToDefault(Preferences::PrefixWorldspawnHeaderOnCopy);
   prefs.resetToDefault(Preferences::Enable2DBoxSelection);
   prefs.resetToDefault(Preferences::PrefabDirectory);
+  m_mcpSettingsWidget->resetToDefaults();
   updateControls();
 }
 
@@ -205,6 +219,7 @@ void MiscPreferencePane::updateControls()
   m_enable2DBoxSelectionCheckBox->setChecked(pref(Preferences::Enable2DBoxSelection));
   m_prefabDirectoryEdit->setText(pathAsQString(
     PreferenceManager::instance().getPendingValue(Preferences::PrefabDirectory)));
+  m_mcpSettingsWidget->updateControls();
 }
 
 bool MiscPreferencePane::validate()
