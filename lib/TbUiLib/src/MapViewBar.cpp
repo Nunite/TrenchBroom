@@ -54,9 +54,11 @@ void MapViewBar::createGui(MapDocument& document)
   m_viewEditor = new ViewPopupEditor{document};
 
 #if defined(Q_OS_MACOS)
-  const auto vMargin = pref(Preferences::Theme) == Preferences::DarkTheme
-                         ? LayoutConstants::MediumVMargin
-                         : 0;
+  const auto theme = pref(Preferences::Theme);
+  const auto vMargin =
+    theme == Preferences::DarkTheme || theme == Preferences::BlenderTheme
+      ? LayoutConstants::MediumVMargin
+      : 0;
 #else
   const auto vMargin = LayoutConstants::MediumVMargin;
 #endif

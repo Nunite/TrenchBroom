@@ -91,8 +91,8 @@ Status: complete
 - [x] Extend `QProxyStyle` for shared control metrics and focus behavior.
 - [x] Standardize hover, pressed, checked, selected, disabled, and focus-visible states.
 - [x] Standardize 16 px and 20 px icon metrics.
-- [x] Add deterministic visual checks for light and dark themes at 100%, 150%, and
-      200% scale factors.
+- [x] Add deterministic visual checks for light, dark, and Blender themes at 100%,
+      150%, and 200% scale factors.
 
 Expected benefit: high. This should remove most of the platform-default Qt appearance
 without changing window structure.
@@ -269,8 +269,8 @@ testing shows that the earlier phases do not meet the product goal.
   expanded Outliner/entity-properties, Entity Browser, Face Inspector, supporting
   Assets panel, Command Palette, Preferences pages for View, Colors, Mouse, Keyboard, and
   Misc/MCP,
-  plus Entity/Material empty result states in light and dark themes at 100%, 150%, and
-  200% scale. The 84-state matrix validates image dimensions, device-pixel ratio,
+  plus Entity/Material empty result states in light, dark, and Blender themes at 100%,
+  150%, and 200% scale. The 126-state matrix validates image dimensions, device-pixel ratio,
   nonblank pixels, font support, and file integrity, then writes PNG and JSON evidence plus
   a labeled visual-comparison contact sheet under
   `build-release-codex\codex-logs\ui-theme-acceptance`.
@@ -284,8 +284,8 @@ testing shows that the earlier phases do not meet the product goal.
   disabled but continues GL resource processing, waits up to five seconds for every fixture
   texture to reach GPU-ready state, and fails on missing, failed, or pending resources. Failures
   write a sibling `.error.txt` file which the acceptance script includes in its exception.
-- Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark
-  [--ui-snapshot-page map|outliner|entity-browser|entity-browser-empty|face-inspector|material-browser-empty|supporting|command-palette|preferences|preferences-colors|preferences-mouse|preferences-keyboard]
+- Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark|blender
+  [--ui-snapshot-page map|outliner|entity-browser|entity-browser-empty|face-inspector|material-browser-empty|supporting|command-palette|preferences|preferences-colors|preferences-mouse|preferences-keyboard|preferences-misc]
   [--ui-snapshot-game-path game-directory] [map-file]` for a focused
   single capture. Omitting the map captures Welcome unless a `preferences*` page is
   selected; supplying one captures the workbench. The Outliner
@@ -315,6 +315,8 @@ testing shows that the earlier phases do not meet the product goal.
   <https://github.com/microsoft/vscode/blob/main/extensions/theme-defaults/themes/dark_modern.json>
 - VS Code 2026 Dark theme:
   <https://github.com/microsoft/vscode/blob/main/extensions/theme-defaults/themes/2026-dark.json>
+- Blender 5.2 default UI theme (pinned reference):
+  <https://projects.blender.org/blender/blender/src/commit/fbe6228777e7d9afefcd61a413844e790ae75db7/release/datafiles/userdef/userdef_default_theme.c>
 - Qt style sheets:
   <https://doc.qt.io/qt-6/stylesheet.html>
 - Qt `QProxyStyle`:
@@ -404,4 +406,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Verified | Added a compact-height Misc regression covering scrollbar activation and MCP row separation, passed `MiscPreferencePane` (42 assertions), `PreferenceDialog` (25 assertions), and `PreferenceDialog.preferencePanes` (46 assertions), rebuilt Release `TrenchBroom`, and passed the `920x560` Light/Dark snapshot matrix at 100%, 150%, and 200% in `20260816-192300-167`. |
 | 2026-08-16 | Complete | Extended the `SETTINGS` region-anchor language through a shared semantic style used by Preferences and Inspector, and strengthened the existing bottom-panel tabs as uppercase `CONSOLE`, `PYTHON CONSOLE`, `ISSUES`, and `ASSETS` anchors without adding a duplicate title row. |
 | 2026-08-16 | Verified | Passed Release `PreferenceDialog,MapWindow` (220 assertions) and `Theme` (31 assertions), rebuilt `TrenchBroom`, and visually checked Supporting, Preferences, and Outliner in Light/Dark at 100%, 150%, and 200% in `20260816-193347-889`. |
+| 2026-08-16 | Complete | Added a persistent fourth `Blender` theme derived from Blender 5.2's pinned default UI palette, including layered editor/sidebar/panel backgrounds, native control and selection colors, Preferences integration, dark platform semantics, and `--ui-snapshot-theme blender` support. Expanded the default visual matrix from 84 to 126 states. |
+| 2026-08-16 | Verified | Passed Release `Theme,PreferenceDialog,MapWindow` (262 assertions), rebuilt `TrenchBroom`, visually checked the complete 42-state Blender page/DPI matrix in `20260816-200002-492`, and rechecked Light/Dark Workbench at 100%, 150%, and 200% in `20260816-200147-001`. |
 | 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and predictable single-line labels before considering any deferred Phase 5 structural experiment. |

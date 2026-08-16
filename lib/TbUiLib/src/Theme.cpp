@@ -181,6 +181,43 @@ ThemeTokens makeDarkThemeTokens()
   return tokens;
 }
 
+ThemeTokens makeBlenderThemeTokens()
+{
+  auto tokens = ThemeTokens{};
+
+  // Adapted from Blender 5.2's default UI theme at commit
+  // fbe6228777e7d9afefcd61a413844e790ae75db7.
+  tokens.windowBackground = QColor{24, 24, 24};
+  tokens.editorBackground = QColor{48, 48, 48};
+  tokens.sidebarBackground = QColor{40, 40, 40};
+  tokens.panelBackground = QColor{48, 48, 48};
+  tokens.elevatedBackground = QColor{24, 24, 24};
+  tokens.inputBackground = QColor{29, 29, 29};
+  tokens.alternateBackground = QColor{40, 40, 40};
+  tokens.buttonBackground = QColor{84, 84, 84};
+
+  tokens.hoverBackground = QColor{61, 61, 61};
+  tokens.pressedBackground = QColor{71, 114, 179};
+  tokens.selectionBackground = QColor{71, 114, 179};
+  tokens.inactiveSelectionBackground = QColor{51, 77, 128};
+
+  tokens.border = QColor{22, 22, 22};
+  tokens.strongBorder = QColor{61, 61, 61};
+  tokens.focusBorder = QColor{71, 114, 179};
+
+  tokens.text = QColor{230, 230, 230};
+  tokens.secondaryText = QColor{152, 152, 152};
+  tokens.disabledText = QColor{112, 112, 112};
+  tokens.inverseText = QColor{255, 255, 255};
+
+  tokens.accent = QColor{111, 169, 230};
+  tokens.error = QColor{255, 77, 132};
+  tokens.warning = QColor{172, 135, 55};
+  tokens.success = QColor{149, 214, 0};
+
+  return tokens;
+}
+
 QPalette makeThemePalette(const ThemeTokens& tokens)
 {
   auto palette = QPalette{tokens.buttonBackground};

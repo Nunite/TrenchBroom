@@ -21,6 +21,7 @@
 
 #include <QAbstractButton>
 #include <QApplication>
+#include <QComboBox>
 #include <QDeadlineTimer>
 #include <QDebug>
 #include <QDir>
@@ -303,7 +304,8 @@ void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName
   }
 }
 
-void configurePreferencesSnapshot(QWidget& targetWidget, const QString& targetName)
+void configurePreferencesSnapshot(
+  QWidget& targetWidget, const QString& targetName, const QString& theme = {})
 {
   if (
     auto* navigation = targetWidget.findChild<QListWidget*>(
@@ -316,6 +318,18 @@ void configurePreferencesSnapshot(QWidget& targetWidget, const QString& targetNa
                                                                             : 1;
     navigation->setCurrentRow(row);
     navigation->setFocus(Qt::OtherFocusReason);
+  }
+
+  if (auto* themeCombo =
+        targetWidget.findChild<QComboBox*>(QStringLiteral("ViewPreference_ThemeCombo"));
+      !theme.isEmpty() && themeCombo != nullptr)
+  {
+    const auto themeName = theme == QStringLiteral("light")  ? Preferences::LightTheme
+                           : theme == QStringLiteral("dark") ? Preferences::DarkTheme
+                           : theme == QStringLiteral("blender")
+                             ? Preferences::BlenderTheme
+                             : Preferences::SystemTheme;
+    themeCombo->setCurrentText(QString::fromStdString(themeName));
   }
 
   if (targetName == QStringLiteral("preferences-misc"))
@@ -527,7 +541,7 @@ int runUiSnapshot(
     targetWidget->resize(
       targetName == QStringLiteral("preferences-misc") ? QSize{920, 560}
                                                        : QSize{960, 640});
-    configurePreferencesSnapshot(*targetWidget, targetName);
+    configurePreferencesSnapshot(*targetWidget, targetName, options.theme);
   }
   else if (fileNames.empty())
   {

@@ -53,6 +53,23 @@ TEST_CASE("Theme")
     CHECK(tokens.text == (QColor{204, 204, 204}));
   }
 
+  SECTION("makeBlenderThemeTokens")
+  {
+    const auto tokens = makeBlenderThemeTokens();
+
+    CHECK(tokens.windowBackground == (QColor{24, 24, 24}));
+    CHECK(tokens.editorBackground == (QColor{48, 48, 48}));
+    CHECK(tokens.sidebarBackground == (QColor{40, 40, 40}));
+    CHECK(tokens.elevatedBackground == (QColor{24, 24, 24}));
+    CHECK(tokens.inputBackground == (QColor{29, 29, 29}));
+    CHECK(tokens.buttonBackground == (QColor{84, 84, 84}));
+    CHECK(tokens.selectionBackground == (QColor{71, 114, 179}));
+    CHECK(tokens.focusBorder == (QColor{71, 114, 179}));
+    CHECK(tokens.text == (QColor{230, 230, 230}));
+    CHECK(tokens.secondaryText == (QColor{152, 152, 152}));
+    CHECK(tokens.accent == (QColor{111, 169, 230}));
+  }
+
   SECTION("makeThemePalette")
   {
     const auto tokens = makeDarkThemeTokens();

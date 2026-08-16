@@ -677,7 +677,7 @@ QStatusBar QToolButton#MapWindow_SnapToggle:focus {
 QStatusBar QToolButton#MapWindow_SnapToggle:checked {
   background: @tb-pressed-background;
   border-color: @tb-accent;
-  color: @tb-accent;
+  color: @tb-text;
 }
 
 QStatusBar QComboBox#MapWindow_GridChoice {

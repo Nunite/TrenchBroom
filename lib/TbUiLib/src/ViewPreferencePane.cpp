@@ -118,6 +118,7 @@ QWidget* ViewPreferencePane::createViewPreferences()
     QString::fromStdString(Preferences::SystemTheme),
     QString::fromStdString(Preferences::LightTheme),
     QString::fromStdString(Preferences::DarkTheme),
+    QString::fromStdString(Preferences::BlenderTheme),
   });
   auto* themeInfo = new QLabel{};
   themeInfo->setText(tr("Requires restart after changing"));

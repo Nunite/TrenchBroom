@@ -210,24 +210,32 @@ ThemeTokens installProxyStyle(
   const auto useLightTheme =
     (themeOverride && *themeOverride == QStringLiteral("light"))
     || (!themeOverride && pref(Preferences::Theme) == Preferences::LightTheme);
+  const auto useBlenderTheme =
+    (themeOverride && *themeOverride == QStringLiteral("blender"))
+    || (!themeOverride && pref(Preferences::Theme) == Preferences::BlenderTheme);
+
+  const auto installExplicitTheme =
+    [&app](const ThemeTokens& themeTokens, const Qt::ColorScheme colorScheme) {
+      app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
+      app.setPalette(makeThemePalette(themeTokens));
+      app.styleHints()->setColorScheme(colorScheme);
+      return themeTokens;
+    };
 
   // Explicit themes use Fusion for deterministic cross-platform rendering.
   if (useDarkTheme)
   {
-    const auto themeTokens = makeDarkThemeTokens();
-    app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
-    app.setPalette(makeThemePalette(themeTokens));
-    app.styleHints()->setColorScheme(Qt::ColorScheme::Dark);
-    return themeTokens;
+    return installExplicitTheme(makeDarkThemeTokens(), Qt::ColorScheme::Dark);
   }
 
   if (useLightTheme)
   {
-    const auto themeTokens = makeLightThemeTokens();
-    app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
-    app.setPalette(makeThemePalette(themeTokens));
-    app.styleHints()->setColorScheme(Qt::ColorScheme::Light);
-    return themeTokens;
+    return installExplicitTheme(makeLightThemeTokens(), Qt::ColorScheme::Light);
+  }
+
+  if (useBlenderTheme)
+  {
+    return installExplicitTheme(makeBlenderThemeTokens(), Qt::ColorScheme::Dark);
   }
 
   auto* systemStyle = new TrenchBroomProxyStyle{makeSystemThemeTokens(app.palette())};

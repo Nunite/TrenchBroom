@@ -137,10 +137,11 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     auto* themeCombo =
       pane->findChild<QComboBox*>(QStringLiteral("ViewPreference_ThemeCombo"));
     REQUIRE(themeCombo != nullptr);
-    CHECK(themeCombo->count() == 3);
+    CHECK(themeCombo->count() == 4);
     CHECK(themeCombo->itemText(0).toStdString() == Preferences::SystemTheme);
     CHECK(themeCombo->itemText(1).toStdString() == Preferences::LightTheme);
     CHECK(themeCombo->itemText(2).toStdString() == Preferences::DarkTheme);
+    CHECK(themeCombo->itemText(3).toStdString() == Preferences::BlenderTheme);
 
     auto* materialBrowserIconSizeCombo = pane->findChild<QComboBox*>(
       QStringLiteral("ViewPreference_MaterialBrowserIconSizeCombo"));
@@ -155,10 +156,10 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     const auto previousTheme = prefs.get(Preferences::Theme);
     const auto previousMaterialBrowserIconSize =
       prefs.get(Preferences::MaterialBrowserIconSize);
-    themeCombo->setCurrentIndex(1);
+    themeCombo->setCurrentIndex(3);
     REQUIRE(QMetaObject::invokeMethod(
-      themeCombo, "activated", Qt::DirectConnection, Q_ARG(int, 1)));
-    CHECK(prefs.getPendingValue(Preferences::Theme) == Preferences::LightTheme);
+      themeCombo, "activated", Qt::DirectConnection, Q_ARG(int, 3)));
+    CHECK(prefs.getPendingValue(Preferences::Theme) == Preferences::BlenderTheme);
     prefs.set(Preferences::Theme, previousTheme);
 
     materialBrowserIconSizeCombo->setCurrentIndex(8);

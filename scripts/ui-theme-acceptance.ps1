@@ -17,7 +17,7 @@ param(
     "preferences-keyboard",
     "preferences-misc"
   ),
-  [string[]] $Themes = @("light", "dark"),
+  [string[]] $Themes = @("light", "dark", "blender"),
   [string[]] $ScaleFactors = @("1", "1.5", "2"),
   [string] $MapPath = "lib\TbMdlLib\test\fixture\mdl\Map\initialMap.map",
   [string] $MaterialMapPath =
@@ -243,8 +243,8 @@ foreach ($target in $normalizedTargets) {
   }
 }
 foreach ($theme in $Themes) {
-  if ($theme -notin @("light", "dark")) {
-    throw "Unsupported theme '$theme'. Expected light or dark."
+  if ($theme -notin @("light", "dark", "blender")) {
+    throw "Unsupported theme '$theme'. Expected light, dark, or blender."
   }
 }
 foreach ($scaleFactor in $ScaleFactors) {
