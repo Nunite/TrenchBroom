@@ -203,7 +203,7 @@ QSpinBox,
 QDoubleSpinBox {
   background: @tb-input-background;
   border: 1px solid @tb-border;
-  border-radius: 5px;
+  border-radius: 4px;
   color: @tb-text;
   min-height: 22px;
   padding: 1px 5px;
@@ -236,6 +236,84 @@ QComboBox::down-arrow {
 
 QComboBox::down-arrow:disabled {
   image: @tb-combo-arrow-disabled-image;
+}
+
+QSpinBox,
+QDoubleSpinBox {
+  padding-right: 24px;
+}
+
+QSpinBox::up-button,
+QDoubleSpinBox::up-button,
+QSpinBox::down-button,
+QDoubleSpinBox::down-button {
+  background: transparent;
+  border: none;
+  border-left: 1px solid @tb-border;
+  subcontrol-origin: border;
+  width: 19px;
+}
+
+QSpinBox::up-button,
+QDoubleSpinBox::up-button {
+  border-bottom: 1px solid @tb-border;
+  border-top-right-radius: 3px;
+  subcontrol-position: top right;
+}
+
+QSpinBox::down-button,
+QDoubleSpinBox::down-button {
+  border-bottom-right-radius: 3px;
+  subcontrol-position: bottom right;
+}
+
+QSpinBox::up-arrow,
+QDoubleSpinBox::up-arrow,
+QSpinBox::down-arrow,
+QDoubleSpinBox::down-arrow {
+  height: 8px;
+  width: 8px;
+}
+
+QSpinBox::up-arrow,
+QDoubleSpinBox::up-arrow {
+  image: @tb-spin-up-arrow-image;
+}
+
+QSpinBox::down-arrow,
+QDoubleSpinBox::down-arrow {
+  image: @tb-combo-arrow-image;
+}
+
+QSpinBox::up-arrow:disabled,
+QDoubleSpinBox::up-arrow:disabled {
+  image: @tb-spin-up-arrow-disabled-image;
+}
+
+QSpinBox::down-arrow:disabled,
+QDoubleSpinBox::down-arrow:disabled {
+  image: @tb-combo-arrow-disabled-image;
+}
+
+QSpinBox::up-button:hover,
+QDoubleSpinBox::up-button:hover,
+QSpinBox::down-button:hover,
+QDoubleSpinBox::down-button:hover {
+  background: @tb-hover-background;
+}
+
+QSpinBox::up-button:pressed,
+QDoubleSpinBox::up-button:pressed,
+QSpinBox::down-button:pressed,
+QDoubleSpinBox::down-button:pressed {
+  background: @tb-pressed-background;
+}
+
+QSpinBox::up-button:disabled,
+QDoubleSpinBox::up-button:disabled,
+QSpinBox::down-button:disabled,
+QDoubleSpinBox::down-button:disabled {
+  background: transparent;
 }
 
 QComboBox QAbstractItemView {

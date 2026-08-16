@@ -131,7 +131,9 @@ TEST_CASE("Theme")
     const auto tokens = makeLightThemeTokens();
     auto styleSheet = QStringLiteral(
       "QComboBox::down-arrow { image: @tb-combo-arrow-image; } "
-      "QComboBox::down-arrow:disabled { image: @tb-combo-arrow-disabled-image; }");
+      "QComboBox::down-arrow:disabled { image: @tb-combo-arrow-disabled-image; } "
+      "QSpinBox::up-arrow { image: @tb-spin-up-arrow-image; } "
+      "QSpinBox::up-arrow:disabled { image: @tb-spin-up-arrow-disabled-image; }");
     auto error = QString{};
 
     CHECK(expandThemeStyleSheet(styleSheet, tokens, &error));
@@ -141,7 +143,10 @@ TEST_CASE("Theme")
       == QStringLiteral(
         "QComboBox::down-arrow { image: url(:/controls/chevron-down-light); } "
         "QComboBox::down-arrow:disabled { image: "
-        "url(:/controls/chevron-down-disabled-light); }"));
+        "url(:/controls/chevron-down-disabled-light); } "
+        "QSpinBox::up-arrow { image: url(:/controls/chevron-up-light); } "
+        "QSpinBox::up-arrow:disabled { image: "
+        "url(:/controls/chevron-up-disabled-light); }"));
   }
 
   SECTION("expandThemeStyleSheet rejects unknown tokens without changing the input")

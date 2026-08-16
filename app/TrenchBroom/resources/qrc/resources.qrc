@@ -7,6 +7,10 @@
     <file alias="chevron-down-disabled-dark">controls/chevron-down-disabled-dark.svg</file>
     <file alias="chevron-down-disabled-light">controls/chevron-down-disabled-light.svg</file>
     <file alias="chevron-down-light">controls/chevron-down-light.svg</file>
+    <file alias="chevron-up-dark">controls/chevron-up-dark.svg</file>
+    <file alias="chevron-up-disabled-dark">controls/chevron-up-disabled-dark.svg</file>
+    <file alias="chevron-up-disabled-light">controls/chevron-up-disabled-light.svg</file>
+    <file alias="chevron-up-light">controls/chevron-up-light.svg</file>
 </qresource>
 <qresource prefix="/translations">
     <file alias="trenchbroom_zh_CN">../translations/trenchbroom_zh_CN.qm</file>
