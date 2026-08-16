@@ -32,6 +32,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 project(TrenchBroom C CXX)
 
+option(TB_BUILD_MCP_STDIO_SHIM "Build the legacy TrenchBroom MCP stdio shim" OFF)
+
 include(CTest)
 
 # Configure CCache if available and requested

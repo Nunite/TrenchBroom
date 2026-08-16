@@ -33,7 +33,6 @@ namespace tb::mcp
 struct McpBridgeConfig
 {
   QString pipeName;
-  QString token;
   McpMode mode = McpMode::Off;
   bool httpEnabled = true;
   QString httpHost = "127.0.0.1";
@@ -43,7 +42,6 @@ struct McpBridgeConfig
 
 QString defaultConfigDirectory();
 QString defaultConfigPath();
-QString generateBridgeToken();
 McpBridgeConfig defaultBridgeConfig();
 
 QJsonObject toJson(const McpBridgeConfig& config);

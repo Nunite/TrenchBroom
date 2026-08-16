@@ -11,7 +11,7 @@ active TrenchBroom MCP instance.
 
 - The active map and TrenchBroom undo/redo state.
 - Unsaved user work in every open document.
-- The MCP Bearer token and local configuration.
+- The local MCP configuration.
 - Stable object ids, operation history, metadata, modules, previews, and review
   resources held in memory.
 - Local files read or written by IR, review, export, heightmap, and compile tools.
@@ -20,11 +20,12 @@ active TrenchBroom MCP instance.
 ## Trust Boundaries
 
 The MCP client is outside the editor trust boundary. Loopback networking narrows
-exposure but does not authenticate callers: any process running as the user can
-connect to a local port. The Bearer token authenticates the client to TrenchBroom.
+exposure but does not authenticate callers: when MCP is enabled, any process running
+as the local user may connect to the endpoint. Enabling `ReadOnly` or `Edit` is an
+explicit decision to trust local processes at that privilege level.
 
 The stdio shim is also outside the editor process. It reads the same TrenchBroom
-config and forwards requests through the authenticated local pipe. Skill recipes
+config and forwards requests through the local pipe. Skill recipes
 are untrusted input producers: they may write IR, but only the C++ kernel may
 validate and apply it.
 
@@ -32,9 +33,9 @@ validate and apply it.
 
 | Threat | Control |
 | --- | --- |
-| Unauthenticated local process calls MCP | Every `/mcp` GET and POST requires `Authorization: Bearer <token>`; failures return `401` and `WWW-Authenticate: Bearer`. |
-| Browser-origin request abuses loopback | OPTIONS allows `Authorization`; CORS echoes only the accepted request origin. Authentication remains mandatory. |
-| Token leaks through UI or generated config | Preferences hides the token. Copy actions insert it only into the clipboard command. Codex uses `TB_MCP_TOKEN` through `--bearer-token-env-var`. Config writes attempt owner read/write permissions. |
+| Untrusted local process calls MCP | MCP is `Off` by default. Enabling `ReadOnly` or `Edit` explicitly trusts local-user processes; mode checks bound available operations and users should disable MCP when that trust is not acceptable. |
+| Browser-origin request abuses loopback | CORS echoes only accepted loopback origins and rejects non-loopback origins. Preflight permits only the protocol and content headers used by MCP. |
+| Local configuration is modified | Configuration contains no credential. Config writes still attempt owner read/write permissions, and startup validates loopback host, port, mode, and tool profile. |
 | Client requests more privilege than configured | The effective mode is the stricter of configured mode and `requestedMode`. Tool catalog mode checks run before dispatch. |
 | Write reaches the wrong map | Mutating tools accept `expectedDocumentPath` and `expectedDocumentFingerprint`; when both are present, both must match. |
 | Partial IR mutation leaves inconsistent editor/session state | `ir_apply` uses one outer native transaction and stages history, counters, metadata, modules, and object registry state. Any stage failure rolls back all state. |
@@ -54,15 +55,17 @@ validate and apply it.
 - `params` must be an object; other values return `-32602`.
 - Initialize advertises only protocol `2025-06-18`.
 - HTTP listens on loopback only.
+- HTTP requests do not carry an authentication header or shared secret.
 - The stdio shim uses the TrenchBroom application config path, not a separate
   `trenchbroom-mcp` config directory.
 
 ## Residual Risks
 
-The token protects the endpoint from accidental and cross-process access, but any
-process that can read the user's config or environment can impersonate the client.
-Bearer authentication does not isolate hostile software running as the same OS
-user.
+There is no caller authentication between local-user processes. Any such process can
+read map data in `ReadOnly` mode and can mutate maps in `Edit` mode while MCP is
+enabled. Loopback binding and Origin checks reduce network and browser exposure but
+do not isolate hostile local software. Keep MCP `Off` outside active sessions and use
+the least-privileged mode that supports the workflow.
 
 Compile profiles and `python_generate_blockout` can execute local programs. Their
 mode checks do not make untrusted scripts safe. Agents must obtain user approval
@@ -84,7 +87,8 @@ powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target TbUi
 powershell -ExecutionPolicy Bypass -File scripts\mcp-reliability-acceptance.ps1
 ```
 
-The real acceptance script uses disposable maps and checks HTTP authentication,
+The real acceptance script uses disposable maps and checks tokenless loopback HTTP,
 atomic IR undo/redo, rollback after entity failure, preview tampering, document
-guards, a controlled stdio request longer than five seconds, review resource reads,
-review-resource eviction recovery, and crash-log counts.
+guards, review resource reads, review-resource eviction recovery, and crash-log
+counts. Pass `-IncludeStdio` only when the optional compatibility shim was built and
+a controlled stdio request should also be checked.

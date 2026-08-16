@@ -31,7 +31,7 @@ The reviewed branch currently has:
 - 142 catalog entries, 140 implemented tools, and 53 tools visible in the Modeling
   profile.
 - Approximately 1.0 MiB and 32,000 lines under `lib/TbUiLib/src/mcp`.
-- Loopback HTTP and local-socket transports protected by a bearer token.
+- Loopback HTTP without caller authentication and a local-socket compatibility transport.
 - Document path and fingerprint guards for mutating tools.
 - Transaction-backed map mutation, MCP history, stable object ids, bounded session
   state, guarded module replacement, and atomic IR application.
@@ -41,7 +41,7 @@ The reviewed branch currently has:
 
 The review identified three main gaps:
 
-1. HTTP and local-socket request framing is not fully bounded before authentication.
+1. HTTP and local-socket request framing is not fully bounded before dispatch.
 2. The stdio shim ignores the configured tool profile and cannot read operation or
    review resources that are readable through HTTP.
 3. The tool registry registers every implemented catalog entry through one legacy
@@ -104,12 +104,12 @@ HTTP requirements:
   equal to those two budgets plus the four-byte header terminator.
 - Reject duplicate `Content-Length` fields and every `Transfer-Encoding` payload; the
   server does not implement chunked request decoding.
-- Apply a 10-second deadline from connection acceptance until a complete authenticated
+- Apply a 10-second deadline from connection acceptance until a complete
   HTTP request has been received.
-- Allow at most 32 ordinary active HTTP connections and 8 authenticated long-lived SSE
+- Allow at most 32 ordinary active HTTP connections and 8 long-lived SSE
   connections. Reject excess connections with `503 Service Unavailable` before
   reading a body.
-- Preserve loopback binding, bearer authentication, allowed-origin behavior, and the
+- Preserve loopback binding, explicit local-process trust, allowed-origin behavior, and the
   existing response contract.
 
 Local-socket requirements:
@@ -238,8 +238,7 @@ For mutating calls:
   is unsafe, and recovery requires `tb_status` plus `history_status` or operation
   inspection.
 
-Transport limits should not disclose bearer tokens or echo untrusted request bodies in
-logs.
+Transport limits should not echo untrusted request bodies in logs.
 
 ## Testing and Verification
 

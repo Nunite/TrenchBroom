@@ -130,13 +130,12 @@ TEST_CASE(
   {
     auto server = makeServer(McpBridgeTransportLimits{512, 10'000, 4});
     const auto pipeName = uniqueBridgePipeName();
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{pipeName, mcp::McpMode::ReadOnly}));
     auto socket = QLocalSocket{};
     socket.connectToServer(pipeName);
     REQUIRE(socket.waitForConnected(1000));
     auto line = QJsonDocument{mcp::toJson(mcp::McpBridgeRequest{
-                                "1", "secret", "tb_status", {}, mcp::McpMode::ReadOnly})}
+                                "1", "tb_status", {}, mcp::McpMode::ReadOnly})}
                   .toJson(QJsonDocument::Compact)
                 + "\n";
     const auto split = line.size() / 2;
@@ -151,8 +150,7 @@ TEST_CASE(
   {
     auto server = makeServer(McpBridgeTransportLimits{64, 10'000, 4});
     const auto pipeName = uniqueBridgePipeName();
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{pipeName, mcp::McpMode::ReadOnly}));
     auto socket = QLocalSocket{};
     socket.connectToServer(pipeName);
     REQUIRE(socket.waitForConnected(1000));
@@ -168,8 +166,7 @@ TEST_CASE(
   {
     auto server = makeServer(McpBridgeTransportLimits{512, 50, 4});
     const auto pipeName = uniqueBridgePipeName();
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{pipeName, mcp::McpMode::ReadOnly}));
     auto socket = QLocalSocket{};
     socket.connectToServer(pipeName);
     REQUIRE(socket.waitForConnected(1000));
@@ -184,8 +181,7 @@ TEST_CASE(
   {
     auto server = makeServer(McpBridgeTransportLimits{512, 10'000, 1});
     const auto pipeName = uniqueBridgePipeName();
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{pipeName, mcp::McpMode::ReadOnly}));
     auto first = QLocalSocket{};
     first.connectToServer(pipeName);
     REQUIRE(first.waitForConnected(1000));
@@ -208,21 +204,20 @@ TEST_CASE(
     auto third = QLocalSocket{};
     third.connectToServer(pipeName);
     REQUIRE(third.waitForConnected(1000));
-    const auto line =
-      QJsonDocument{mcp::toJson(mcp::McpBridgeRequest{
-                      "3", "secret", "tb_status", {}, mcp::McpMode::ReadOnly})}
-        .toJson(QJsonDocument::Compact)
-      + "\n";
+    const auto line = QJsonDocument{mcp::toJson(mcp::McpBridgeRequest{
+                                      "3", "tb_status", {}, mcp::McpMode::ReadOnly})}
+                        .toJson(QJsonDocument::Compact)
+                      + "\n";
     REQUIRE(third.write(line) == line.size());
     CHECK(readBridgeResponse(third).ok);
   }
 
-  SECTION("serves authenticated typed resource list and read requests")
+  SECTION("serves typed resource list and read requests")
   {
     auto server = makeServer(McpBridgeTransportLimits{1024, 10'000, 4});
     const auto pipeName = uniqueBridgePipeName();
-    REQUIRE(server.start(mcp::McpBridgeConfig{
-      pipeName, "secret", mcp::McpMode::ReadOnly, true, "127.0.0.1", 0}));
+    REQUIRE(server.start(
+      mcp::McpBridgeConfig{pipeName, mcp::McpMode::ReadOnly, true, "127.0.0.1", 0}));
     auto socket = QLocalSocket{};
     socket.connectToServer(pipeName);
     REQUIRE(socket.waitForConnected(1000));
@@ -236,28 +231,14 @@ TEST_CASE(
 
     const auto create = writeRequest(mcp::McpBridgeRequest{
       "create",
-      "secret",
       "render_review_current_scene",
       {},
       mcp::McpMode::ReadOnly,
     });
     REQUIRE(create.ok);
 
-    const auto unauthorized = writeRequest(mcp::McpBridgeRequest{
-      "unauthorized",
-      "wrong-token",
-      {},
-      {},
-      std::nullopt,
-      mcp::McpBridgeRequestType::ResourcesList,
-    });
-    CHECK_FALSE(unauthorized.ok);
-    REQUIRE(unauthorized.error);
-    CHECK(unauthorized.error->code == mcp::McpErrorCode::Unauthorized);
-
     const auto listed = writeRequest(mcp::McpBridgeRequest{
       "list",
-      "secret",
       {},
       {},
       std::nullopt,
@@ -272,7 +253,6 @@ TEST_CASE(
 
     const auto read = writeRequest(mcp::McpBridgeRequest{
       "read",
-      "secret",
       {},
       QJsonObject{{"uri", "tbmcp://review/transport-review"}},
       std::nullopt,
@@ -856,8 +836,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
   SECTION("off mode does not listen")
   {
     auto error = QString{};
-    CHECK(server.start(
-      mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Off}, &error));
+    CHECK(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Off}, &error));
     CHECK(error.isEmpty());
     CHECK(!server.isListening());
   }
@@ -869,33 +848,18 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     REQUIRE(activeServer.listen(pipeName));
 
     auto error = QString{};
-    CHECK_FALSE(server.start(
-      mcp::McpBridgeConfig{pipeName, "secret", mcp::McpMode::ReadOnly}, &error));
+    CHECK_FALSE(
+      server.start(mcp::McpBridgeConfig{pipeName, mcp::McpMode::ReadOnly}, &error));
     CHECK(error.contains("already listening"));
     CHECK(activeServer.isListening());
   }
 
-  SECTION("rejects wrong token")
-  {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
-
-    const auto response = server.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "wrong", "tb_status", {}, mcp::McpMode::ReadOnly});
-
-    CHECK(!response.ok);
-    REQUIRE(response.error);
-    CHECK(response.error->code == mcp::McpErrorCode::Unauthorized);
-  }
-
   SECTION("requested mode can only reduce configured permissions")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
-      "secret",
       "entity_create",
       QJsonObject{{"classname", "info_player_start"}},
       mcp::McpMode::ReadOnly});
@@ -908,11 +872,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("serves tb_status")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto response = server.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "secret", "tb_status", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"1", "tb_status", {}, mcp::McpMode::ReadOnly});
 
     CHECK(response.ok);
     CHECK(response.result.value("application").toString() == "TrenchBroom");
@@ -920,15 +883,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("caches review resources returned by tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1",
-      "secret",
-      "render_review_current_scene",
-      QJsonObject{},
-      mcp::McpMode::ReadOnly});
+      "1", "render_review_current_scene", QJsonObject{}, mcp::McpMode::ReadOnly});
 
     REQUIRE(response.ok);
     CHECK(
@@ -953,14 +911,12 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
          QString{"tbmcp://review/review-%1"}.arg(index, 3, 10, QLatin1Char{'0'})},
       });
     }};
-    REQUIRE(resourceServer.start(
-      mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(resourceServer.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     for (auto i = 0; i <= static_cast<int>(McpSessionState::MaxReviewResources); ++i)
     {
       const auto response = resourceServer.dispatchRequest(mcp::McpBridgeRequest{
         QString::number(i),
-        "secret",
         "render_review_current_scene",
         QJsonObject{{"index", i}},
         mcp::McpMode::ReadOnly});
@@ -984,11 +940,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     auto appControllerFixture = AppControllerFixture{};
     auto& appController = appControllerFixture.appController();
     auto appServer = McpBridgeServer{appController};
-    REQUIRE(
-      appServer.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(appServer.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto summaryResponse = appServer.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "secret", "tb_doctor", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"1", "tb_doctor", {}, mcp::McpMode::ReadOnly});
     REQUIRE(summaryResponse.ok);
     CHECK(summaryResponse.result.value("detail").toString() == "summary");
     CHECK_FALSE(summaryResponse.result.contains("implementedTools"));
@@ -1020,11 +975,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
       QJsonDocument{summaryResponse.result}.toJson(QJsonDocument::Compact).size() < 4096);
 
     const auto fullResponse = appServer.dispatchRequest(mcp::McpBridgeRequest{
-      "2",
-      "secret",
-      "tb_doctor",
-      QJsonObject{{"detail", "full"}},
-      mcp::McpMode::ReadOnly});
+      "2", "tb_doctor", QJsonObject{{"detail", "full"}}, mcp::McpMode::ReadOnly});
     REQUIRE(fullResponse.ok);
     CHECK(fullResponse.result.value("detail").toString() == "full");
     CHECK(fullResponse.result.value("toolDiagnostics").isArray());
@@ -1050,12 +1001,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     auto appControllerFixture = AppControllerFixture{};
     auto& appController = appControllerFixture.appController();
     auto appServer = McpBridgeServer{appController};
-    REQUIRE(
-      appServer.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(appServer.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto broadResponse = appServer.dispatchRequest(mcp::McpBridgeRequest{
       "1",
-      "secret",
       "tb_tools_search",
       QJsonObject{{"query", "selector"}, {"detail", "schema"}},
       mcp::McpMode::ReadOnly});
@@ -1073,7 +1022,6 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
     const auto exactResponse = appServer.dispatchRequest(mcp::McpBridgeRequest{
       "2",
-      "secret",
       "tb_tools_search",
       QJsonObject{{"query", "blockout_create_batch"}, {"detail", "schema"}},
       mcp::McpMode::ReadOnly});
@@ -1087,7 +1035,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
   {
     auto appControllerFixture = AppControllerFixture{};
     auto& appController = appControllerFixture.appController();
-    auto config = mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit};
+    auto config = mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit};
     config.httpPort = 45678;
 
     const auto status =
@@ -1111,11 +1059,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("serves wired read-only tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto response = server.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "secret", "documents_list", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"1", "documents_list", {}, mcp::McpMode::ReadOnly});
 
     CHECK(response.ok);
     CHECK(response.result.value("count").toInt() == 0);
@@ -1123,21 +1070,15 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("serves read-only document and selection parity tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto activateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1",
-      "secret",
-      "documents_activate",
-      QJsonObject{{"index", 0}},
-      mcp::McpMode::ReadOnly});
+      "1", "documents_activate", QJsonObject{{"index", 0}}, mcp::McpMode::ReadOnly});
     CHECK(activateResponse.ok);
     CHECK(activateResponse.result.value("activated").toBool());
 
     const auto boundsResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "3",
-      "secret",
       "selection_by_bounds",
       QJsonObject{
         {"min", QJsonArray{0, 0, 0}},
@@ -1147,12 +1088,11 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     CHECK(boundsResponse.ok);
 
     const auto growResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"4", "secret", "selection_grow", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"4", "selection_grow", {}, mcp::McpMode::ReadOnly});
     CHECK(growResponse.ok);
 
     const auto geometryReviewResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "10e",
-      "secret",
       "render_review_targets",
       QJsonObject{
         {"objectIds", QJsonArray{"node:0/0"}},
@@ -1168,15 +1108,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("serves map_search")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1",
-      "secret",
-      "map_search",
-      QJsonObject{{"query", "worldspawn"}},
-      mcp::McpMode::ReadOnly});
+      "1", "map_search", QJsonObject{{"query", "worldspawn"}}, mcp::McpMode::ReadOnly});
 
     CHECK(response.ok);
     CHECK(response.result.value("query").toString() == "worldspawn");
@@ -1185,11 +1120,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("serves selection_set")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto response = server.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "secret", "selection_set", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"1", "selection_set", {}, mcp::McpMode::ReadOnly});
 
     CHECK(response.ok);
     CHECK(response.result.value("selectedCount").toInt() == 0);
@@ -1197,12 +1131,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("serves selection_inspect")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
-      "secret",
       "selection_inspect",
       QJsonObject{{"detail", "summary"}},
       mcp::McpMode::ReadOnly});
@@ -1213,12 +1145,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("serves overlay_set")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
-      "secret",
       "overlay_set",
       QJsonObject{{"highlightObjectIds", QJsonArray{}}},
       mcp::McpMode::ReadOnly});
@@ -1229,12 +1159,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("mode gating rejects edit tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
-      "secret",
       "texture_apply_by_filter",
       QJsonObject{{"material", "test"}},
       mcp::McpMode::Edit});
@@ -1245,7 +1173,6 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
     const auto pythonResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "2",
-      "secret",
       "python_generate_blockout",
       QJsonObject{{"script", "print('{}')"}},
       mcp::McpMode::Edit});
@@ -1255,7 +1182,6 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
     const auto textureResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "3",
-      "secret",
       "texture_apply_by_filter",
       QJsonObject{{"material", "test"}},
       mcp::McpMode::Edit});
@@ -1266,11 +1192,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("registered unsupported tools report not implemented")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto response = server.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "secret", "brush_create_arch", {}, mcp::McpMode::Edit});
+      mcp::McpBridgeRequest{"1", "brush_create_arch", {}, mcp::McpMode::Edit});
 
     CHECK(!response.ok);
     REQUIRE(response.error);
@@ -1280,12 +1205,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("read-only mode rejects document mutation tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
-      "secret",
       "documents_save",
       QJsonObject{{"path", "C:/tmp/test.map"}},
       mcp::McpMode::Edit});
@@ -1297,23 +1220,20 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("serves FGD list tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
-    const auto listResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1", "secret", "fgd_entities_list", {}, mcp::McpMode::ReadOnly});
+    const auto listResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"1", "fgd_entities_list", {}, mcp::McpMode::ReadOnly});
     CHECK(listResponse.ok);
     CHECK(listResponse.result.value("count").toInt() == 1);
   }
 
   SECTION("edit mode serves FGD entity mutation tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto createResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
-      "secret",
       "entity_create_from_schema",
       QJsonObject{{"classname", "light"}},
       mcp::McpMode::Edit});
@@ -1322,7 +1242,6 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
     const auto checkedBatchResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "2",
-      "secret",
       "entity_create_checked_batch",
       QJsonObject{{"entities", QJsonArray{}}},
       mcp::McpMode::Edit});
@@ -1332,12 +1251,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("edit mode serves document lifecycle tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto openResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
-      "secret",
       "documents_open",
       QJsonObject{{"path", "C:/tmp/test.map"}},
       mcp::McpMode::Edit});
@@ -1345,7 +1262,6 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
     const auto saveResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "2",
-      "secret",
       "documents_save",
       QJsonObject{{"path", "C:/tmp/test.map"}},
       mcp::McpMode::Edit});
@@ -1354,11 +1270,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("read-only mode serves history_status")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto statusResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"2", "secret", "history_status", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"2", "history_status", {}, mcp::McpMode::ReadOnly});
     CHECK(statusResponse.ok);
     CHECK(statusResponse.result.value("historyCount").toInt() == 0);
     CHECK(
@@ -1368,12 +1283,10 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("edit mode serves asset placement")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
       "1",
-      "secret",
       "asset_place_model",
       QJsonObject{{"path", "models/player.mdl"}},
       mcp::McpMode::Edit});
@@ -1384,8 +1297,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("edit mode serves texture and face mutation tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     for (const auto& toolName :
          {"texture_apply",
@@ -1397,7 +1309,7 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
                             ? QJsonObject{{"textureLock", true}, {"uvLock", true}}
                             : QJsonObject{{"material", "test"}};
       const auto response = server.dispatchRequest(
-        mcp::McpBridgeRequest{"1", "secret", toolName, params, mcp::McpMode::Edit});
+        mcp::McpBridgeRequest{"1", toolName, params, mcp::McpMode::Edit});
       CHECK(response.ok);
       if (toolName == QString{"texture_lock_set"})
       {
@@ -1413,54 +1325,46 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("read-only mode serves validation tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto validateResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"1", "secret", "map_validate", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"1", "map_validate", {}, mcp::McpMode::ReadOnly});
     CHECK(validateResponse.ok);
     CHECK(validateResponse.result.value("valid").toBool());
 
     const auto problemsResponse = server.dispatchRequest(
-      mcp::McpBridgeRequest{"2", "secret", "problems_check", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"2", "problems_check", {}, mcp::McpMode::ReadOnly});
     CHECK(problemsResponse.ok);
     CHECK(problemsResponse.result.value("count").toInt() == 0);
   }
 
   SECTION("read-only mode serves compile profile and log tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
-    const auto profilesResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1", "secret", "compile_profiles_list", {}, mcp::McpMode::ReadOnly});
+    const auto profilesResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"1", "compile_profiles_list", {}, mcp::McpMode::ReadOnly});
     CHECK(profilesResponse.ok);
     CHECK(profilesResponse.result.value("count").toInt() == 1);
 
-    const auto logResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "2", "secret", "compile_log_tail", {}, mcp::McpMode::ReadOnly});
+    const auto logResponse = server.dispatchRequest(
+      mcp::McpBridgeRequest{"2", "compile_log_tail", {}, mcp::McpMode::ReadOnly});
     CHECK(logResponse.ok);
     CHECK(logResponse.result.value("lineCount").toInt() == 0);
   }
 
   SECTION("read-only mode rejects compile run and pointfile loading")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto compileResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1",
-      "secret",
-      "compile_run",
-      QJsonObject{{"profile", "default"}},
-      mcp::McpMode::Edit});
+      "1", "compile_run", QJsonObject{{"profile", "default"}}, mcp::McpMode::Edit});
     CHECK(!compileResponse.ok);
     REQUIRE(compileResponse.error);
     CHECK(compileResponse.error->code == mcp::McpErrorCode::Forbidden);
 
     const auto pointfileResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "2",
-      "secret",
       "leaks_load_pointfile",
       QJsonObject{{"path", "C:/tmp/test.pts"}},
       mcp::McpMode::Edit});
@@ -1471,21 +1375,15 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("edit mode serves compile run and pointfile loading")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto compileResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1",
-      "secret",
-      "compile_run",
-      QJsonObject{{"profile", "default"}},
-      mcp::McpMode::Edit});
+      "1", "compile_run", QJsonObject{{"profile", "default"}}, mcp::McpMode::Edit});
     CHECK(compileResponse.ok);
     CHECK(compileResponse.result.value("started").toBool());
 
     const auto pointfileResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "2",
-      "secret",
       "leaks_load_pointfile",
       QJsonObject{{"path", "C:/tmp/test.pts"}},
       mcp::McpMode::Edit});
@@ -1495,37 +1393,27 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("read-only mode serves geometry analysis and spiral validation")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     const auto analysisResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1", "secret", "geometry_analyze_selection", {}, mcp::McpMode::ReadOnly});
+      "1", "geometry_analyze_selection", {}, mcp::McpMode::ReadOnly});
     CHECK(analysisResponse.ok);
     CHECK(analysisResponse.result.value("invalidBrushCount").toInt() == 0);
 
     const auto validateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "2",
-      "secret",
-      "blockout_validate_spiral_stairs",
-      QJsonObject{},
-      mcp::McpMode::ReadOnly});
+      "2", "blockout_validate_spiral_stairs", QJsonObject{}, mcp::McpMode::ReadOnly});
     CHECK(validateResponse.ok);
     CHECK(validateResponse.result.value("valid").toBool());
   }
 
   SECTION("read-only mode serves operation detail tools")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::ReadOnly}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::ReadOnly}));
 
     for (const auto& toolName : {"operation_inspect", "operation_validate"})
     {
       const auto response = server.dispatchRequest(mcp::McpBridgeRequest{
-        "1",
-        "secret",
-        toolName,
-        QJsonObject{{"operationId", "mcp-op-3"}},
-        mcp::McpMode::ReadOnly});
+        "1", toolName, QJsonObject{{"operationId", "mcp-op-3"}}, mcp::McpMode::ReadOnly});
       CHECK(response.ok);
       CHECK(response.result.value("operationId").toString() == "mcp-op-3");
     }
@@ -1533,15 +1421,14 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
   SECTION("edit mode serves blockout creation")
   {
-    REQUIRE(
-      server.start(mcp::McpBridgeConfig{"test-pipe", "secret", mcp::McpMode::Edit}));
+    REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe", mcp::McpMode::Edit}));
 
     const auto removedRoomParams = QJsonObject{
       {"min", QJsonArray{0, 0, 0}},
       {"max", QJsonArray{128, 128, 128}},
     };
     const auto removedRoomResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-      "1", "secret", "blockout_create_room", removedRoomParams, mcp::McpMode::Edit});
+      "1", "blockout_create_room", removedRoomParams, mcp::McpMode::Edit});
 
     CHECK_FALSE(removedRoomResponse.ok);
     REQUIRE(removedRoomResponse.error);
@@ -1550,7 +1437,6 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
     const auto spiralResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "2",
-      "secret",
       "blockout_create_spiral_stairs",
       QJsonObject{{"steps", 24}},
       mcp::McpMode::Edit});
@@ -1562,7 +1448,6 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
     const auto batchResponse = server.dispatchRequest(mcp::McpBridgeRequest{
       "3",
-      "secret",
       "blockout_create_batch",
       QJsonObject{{"operations", QJsonArray{QJsonObject{{"type", "box"}}}}},
       mcp::McpMode::Edit});
@@ -1578,18 +1463,18 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
                                            const QString& toolName, const QJsonObject&) {
       if (toolName == "tb_status")
       {
-        nestedResponse = nestedServer->dispatchRequest(mcp::McpBridgeRequest{
-          "nested", "secret", "tb_doctor", {}, mcp::McpMode::ReadOnly});
+        nestedResponse = nestedServer->dispatchRequest(
+          mcp::McpBridgeRequest{"nested", "tb_doctor", {}, mcp::McpMode::ReadOnly});
         return McpBridgeToolResult::success(QJsonObject{{"application", "TrenchBroom"}});
       }
       return McpBridgeToolResult::success(QJsonObject{{"ok", true}});
     }};
     nestedServer = &guardedServer;
     REQUIRE(guardedServer.start(
-      mcp::McpBridgeConfig{"test-pipe-nested", "secret", mcp::McpMode::ReadOnly}));
+      mcp::McpBridgeConfig{"test-pipe-nested", mcp::McpMode::ReadOnly}));
 
     const auto response = guardedServer.dispatchRequest(
-      mcp::McpBridgeRequest{"outer", "secret", "tb_status", {}, mcp::McpMode::ReadOnly});
+      mcp::McpBridgeRequest{"outer", "tb_status", {}, mcp::McpMode::ReadOnly});
 
     REQUIRE(response.ok);
     REQUIRE(nestedResponse);
@@ -1627,14 +1512,14 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
       },
       [&map]() -> mdl::Map* { return &map; }};
     REQUIRE(guardedServer.start(
-      mcp::McpBridgeConfig{"test-pipe-expected-doc", "secret", mcp::McpMode::Edit}));
+      mcp::McpBridgeConfig{"test-pipe-expected-doc", mcp::McpMode::Edit}));
 
     const auto guardedBatchParams = QJsonObject{
       {"expectedDocumentPath", "D:/does/not/match.map"},
       {"operations", QJsonArray{QJsonObject{{"type", "box"}}}},
     };
     const auto response = guardedServer.dispatchRequest(mcp::McpBridgeRequest{
-      "1", "secret", "blockout_create_batch", guardedBatchParams, mcp::McpMode::Edit});
+      "1", "blockout_create_batch", guardedBatchParams, mcp::McpMode::Edit});
 
     CHECK(!response.ok);
     REQUIRE(response.error);
@@ -1652,7 +1537,6 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
     const auto fingerprint = McpObjectRegistry{}.documentFingerprint(map);
     const auto fingerprintResponse = guardedServer.dispatchRequest(mcp::McpBridgeRequest{
       "2",
-      "secret",
       "blockout_create_batch",
       QJsonObject{
         {"expectedDocumentPath", expectedPath},
@@ -1673,7 +1557,6 @@ TEST_CASE("McpBridgeServer", "[McpBridgeServer]")
 
     const auto matchingResponse = guardedServer.dispatchRequest(mcp::McpBridgeRequest{
       "3",
-      "secret",
       "blockout_create_batch",
       QJsonObject{
         {"expectedDocumentPath", expectedPath},
@@ -3985,12 +3868,10 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
         mcp::McpErrorCode::ToolNotFound, QString{"Unexpected tool: %1"}.arg(toolName));
     },
     [&map]() -> mdl::Map* { return &map; }};
-  REQUIRE(server.start(
-    mcp::McpBridgeConfig{"test-pipe-stable-id", "secret", mcp::McpMode::Edit}));
+  REQUIRE(server.start(mcp::McpBridgeConfig{"test-pipe-stable-id", mcp::McpMode::Edit}));
 
   const auto createResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "1",
-    "secret",
     "blockout_create_batch",
     QJsonObject{
       {"operations",
@@ -4022,7 +3903,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto inspectIdsResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "1b",
-    "secret",
     "operation_inspect",
     QJsonObject{
       {"operationId", createResponse.result.value("operationId").toString()},
@@ -4034,7 +3914,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto selectResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "2",
-    "secret",
     "selection_set",
     QJsonObject{{"objectIds", QJsonArray{stableId}}},
     mcp::McpMode::ReadOnly});
@@ -4096,7 +3975,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto pathShiftResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "3",
-    "secret",
     "blockout_create_batch",
     QJsonObject{
       {"operations",
@@ -4134,7 +4012,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto deleteShiftedSiblingResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "4",
-    "secret",
     "objects_delete",
     QJsonObject{{"objectIds", QJsonArray{deletedStableId}}},
     mcp::McpMode::Edit});
@@ -4161,7 +4038,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto offGridCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "5",
-    "secret",
     "blockout_create_batch",
     QJsonObject{
       {"operations",
@@ -4186,7 +4062,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto analyzeResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "6",
-    "secret",
     "geometry_analyze_selection",
     QJsonObject{{"grid", 1}, {"detail", "summary"}},
     mcp::McpMode::ReadOnly});
@@ -4199,7 +4074,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto deleteCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "7",
-    "secret",
     "blockout_create_batch",
     QJsonObject{
       {"operations",
@@ -4222,7 +4096,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto deleteResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "8",
-    "secret",
     "objects_delete",
     QJsonObject{{"objectIds", QJsonArray{stableDeleteTarget}}},
     mcp::McpMode::Edit});
@@ -4239,7 +4112,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto inspectDeleteResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "9",
-    "secret",
     "operation_inspect",
     QJsonObject{
       {"operationId", deleteResponse.result.value("operationId").toString()},
@@ -4254,7 +4126,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
 
   const auto fullDeleteCreateResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "10",
-    "secret",
     "blockout_create_batch",
     QJsonObject{
       {"operations",
@@ -4273,7 +4144,6 @@ TEST_CASE("McpBridgeServer stable MCP object identity", "[McpBridgeServer]")
                                   .toString();
   const auto fullDeleteResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "11",
-    "secret",
     "objects_delete",
     QJsonObject{{"objectIds", QJsonArray{fullDeleteTarget}}, {"idsMode", "full"}},
     mcp::McpMode::Edit});
@@ -4681,12 +4551,11 @@ TEST_CASE("McpBridgeServer externalizes native group object ids", "[McpBridgeSer
         mcp::McpErrorCode::ToolNotFound, QString{"Unexpected tool: %1"}.arg(toolName));
     },
     [&map]() -> mdl::Map* { return &map; }};
-  REQUIRE(server.start(
-    mcp::McpBridgeConfig{"test-pipe-group-stable-id", "secret", mcp::McpMode::Edit}));
+  REQUIRE(
+    server.start(mcp::McpBridgeConfig{"test-pipe-group-stable-id", mcp::McpMode::Edit}));
 
   const auto createResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "1",
-    "secret",
     "blockout_create_batch",
     QJsonObject{
       {"select", true},
@@ -4710,7 +4579,6 @@ TEST_CASE("McpBridgeServer externalizes native group object ids", "[McpBridgeSer
 
   const auto groupResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "2",
-    "secret",
     "group_create_from_selection",
     QJsonObject{{"name", "stable-group"}, {"idsMode", "count"}},
     mcp::McpMode::Edit});
@@ -4730,11 +4598,7 @@ TEST_CASE("McpBridgeServer externalizes native group object ids", "[McpBridgeSer
     groupResponse.result.value("childCounts").toObject().value("brushes").toInt() == 2);
 
   const auto inspectResponse = server.dispatchRequest(mcp::McpBridgeRequest{
-    "3",
-    "secret",
-    "group_inspect",
-    QJsonObject{{"objectId", groupId}},
-    mcp::McpMode::ReadOnly});
+    "3", "group_inspect", QJsonObject{{"objectId", groupId}}, mcp::McpMode::ReadOnly});
   REQUIRE(inspectResponse.ok);
   CHECK(
     inspectResponse.result.value("receivedLegacyPath").toString().startsWith("node:"));
@@ -6429,11 +6293,10 @@ TEST_CASE("McpBridgeServer object transform summaries", "[McpBridgeServer]")
     },
     [&map]() -> mdl::Map* { return &map; }};
   REQUIRE(server.start(
-    mcp::McpBridgeConfig{"test-pipe-transform-summary", "secret", mcp::McpMode::Edit}));
+    mcp::McpBridgeConfig{"test-pipe-transform-summary", mcp::McpMode::Edit}));
 
   const auto createResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "1",
-    "secret",
     "blockout_create_batch",
     QJsonObject{
       {"operations",
@@ -6453,7 +6316,6 @@ TEST_CASE("McpBridgeServer object transform summaries", "[McpBridgeServer]")
 
   const auto transformResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "2",
-    "secret",
     "objects_transform",
     QJsonObject{
       {"objectIds", objectIds},
@@ -6488,7 +6350,6 @@ TEST_CASE("McpBridgeServer object transform summaries", "[McpBridgeServer]")
 
   const auto transformByOperationResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "3",
-    "secret",
     "objects_transform",
     QJsonObject{
       {"operationId", createResponse.result.value("operationId").toString()},
@@ -6507,7 +6368,6 @@ TEST_CASE("McpBridgeServer object transform summaries", "[McpBridgeServer]")
 
   const auto transformSelectionResponse = server.dispatchRequest(mcp::McpBridgeRequest{
     "4",
-    "secret",
     "objects_transform",
     QJsonObject{
       {"operation", "translate"},

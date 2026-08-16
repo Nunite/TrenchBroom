@@ -630,7 +630,7 @@ const std::vector<McpToolDefinition>& defaultToolCatalog()
     },
     {
       "tb_doctor",
-      "Diagnose MCP bridge configuration, mode, token presence, and tool availability.",
+      "Diagnose MCP bridge configuration, mode, local trust, and tool availability.",
       McpMode::ReadOnly,
       false,
       true,

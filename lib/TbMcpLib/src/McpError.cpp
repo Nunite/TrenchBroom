@@ -28,8 +28,6 @@ QString errorCodeName(const McpErrorCode code)
 {
   switch (code)
   {
-  case McpErrorCode::Unauthorized:
-    return "Unauthorized";
   case McpErrorCode::Forbidden:
     return "Forbidden";
   case McpErrorCode::ToolNotFound:
@@ -49,10 +47,6 @@ QString errorCodeName(const McpErrorCode code)
 
 std::optional<McpErrorCode> parseErrorCode(const QString& value)
 {
-  if (value == "Unauthorized")
-  {
-    return McpErrorCode::Unauthorized;
-  }
   if (value == "Forbidden")
   {
     return McpErrorCode::Forbidden;

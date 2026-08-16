@@ -335,19 +335,19 @@ may preserve a missing requested name with a warning; `requireMaterialAvailable:
 must reject the full mutation during preflight. Successful mutations must report a
 `completionState` that keeps save, visual review, and BSP compile status explicit.
 
-### Rule 16: Local Transport Still Requires Authentication
+### Rule 16: Local Transport Uses Explicit Local Trust
 
-HTTP listens only on loopback and requires `Authorization: Bearer <token>` for
-every `/mcp` GET and POST. Missing and incorrect credentials return `401` with
-`WWW-Authenticate: Bearer`. CORS may echo only an allowed request origin and must
-allow the `Authorization` header for preflight.
+HTTP listens only on loopback and does not authenticate requests. Enabling MCP in
+`ReadOnly` or `Edit` mode explicitly trusts processes running as the local user to
+connect to `/mcp`. The UI and client setup must state this trust boundary clearly;
+do not add shared tokens, authorization headers, or credentials to `config.json`.
 
-The token is a secret. UI text may show placeholders, but copied client commands
-must add the real value only at copy time. Codex configurations should use
-`--bearer-token-env-var`; scripts resolve credentials in this order: explicit
-`-Token`, `TB_MCP_TOKEN`, then the TrenchBroom config.
+CORS may echo only an allowed loopback request origin. Request size, connection,
+timeout, mode, document guard, transaction, and undo/redo controls remain mandatory.
+MCP stays `Off` by default, and users should disable it when local-process trust is
+not acceptable.
 
-The stdio shim and TrenchBroom must read the same config path. JSON-RPC requests
+The opt-in stdio shim and TrenchBroom must read the same config path. JSON-RPC requests
 must declare `jsonrpc:"2.0"`; params must be an object; initialize advertises only
 the supported `2025-06-18` protocol. The effective mode is the stricter of the
 configured mode and `requestedMode`.

@@ -19,9 +19,9 @@
 
 ## 启动检查
 
-优先通过 loopback HTTP 连接 `/mcp`。每个 GET/POST 都必须携带
-`Authorization: Bearer <token>`；Codex 使用 `--bearer-token-env-var
-TB_MCP_TOKEN`。`trenchbroom-mcp.exe` 仅作为兼容 stdio shim，并读取与
+优先通过 loopback HTTP 连接 `/mcp`，无需鉴权 Header。MCP 默认关闭；切换到
+`ReadOnly` 或 `Edit` 就表示用户显式信任当前本机用户下的进程。
+`trenchbroom-mcp.exe` 仅作为默认不构建的兼容 stdio shim，并读取与
 TrenchBroom 相同的配置文件。连接后，Agent 应先执行：
 
 1. `tools/list`
@@ -32,10 +32,8 @@ TrenchBroom 相同的配置文件。连接后，Agent 应先执行：
 判断规则：
 
 - `tools/list` 为空且 `tb_status` 返回 `Forbidden`：TrenchBroom MCP mode 仍是 `Off`。
-- HTTP 返回 `401`：Bearer token 缺失或错误。按 `-Token`、
-  `TB_MCP_TOKEN`、TrenchBroom config 的顺序检查；不要把 token 写入日志或文档。
-- `tb_status` 连接失败：TrenchBroom 未运行、bridge 未启动，或配置
-  token、pipeName、端口不匹配。
+- `tb_status` 连接失败：TrenchBroom 未运行、bridge 未启动，MCP mode 仍是
+  `Off`，或配置的 pipeName、端口不匹配。
 - `tb_status.processId`、`bridgeInstanceId`、`activeDocumentPath`、`documentFingerprint` 是本轮请求链路的身份锚点。写入前必须确认它们指向预期 TrenchBroom 进程和预期地图。
 - 写入前记录 `problems_check` 的 stable problem ids、`totalCount`、`returnedCount` 和 `truncated`。前后结果都未截断时比较 introduced/resolved/pre-existing ids；发生截断时只比较 grouped counts，并标记低置信。
 - `documents_list` 不可调用：用 `tb_status.openDocumentsSummary` 或 `tb_doctor` 的文档摘要作为低置信 fallback，并在报告里说明；`documents_list` 为空：需要先让用户打开地图，或在 `Edit` mode 下使用 `documents_open_verified` 打开绝对路径。
@@ -97,7 +95,7 @@ scripts\mcp-config.ps1 -Print
 9. 所有写入都应同时传 expectedDocumentPath 和 expectedDocumentFingerprint；两者都提供时必须同时匹配。
 10. 最终验收读取 acceptancePassed、qualityStatus、walkableContinuous、shellContinuous 和 notEvaluated；Review 的 `renderReadable` 只表示输出图像可读，`qualityValid` 是旧兼容别名，不代表几何语义正确。Review 是可选证据，不替代静态验证。
 11. 保存、关闭 dirty 文档、运行 compile_run 前必须先说明影响并等待用户确认；确认保存当前地图后用 `documents_save_current`，临时文档或另存用 `documents_save_as`。
-12. 如果工具返回 unsupported、Forbidden 或 Unauthorized，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
+12. 如果工具返回 unsupported 或 Forbidden，不要猜测修复；先向用户报告缺少的 mode、权限或当前实现限制。
 ```
 
 ## 读取地图

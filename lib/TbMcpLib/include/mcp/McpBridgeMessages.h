@@ -40,7 +40,6 @@ enum class McpBridgeRequestType
 struct McpBridgeRequest
 {
   QString id;
-  QString token;
   QString tool;
   QJsonObject params;
   std::optional<McpMode> requestedMode;

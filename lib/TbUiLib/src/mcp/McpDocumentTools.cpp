@@ -1030,7 +1030,7 @@ QJsonObject doctorJson(
     {"pipeName", config.pipeName},
     {"mode", mcp::modeName(config.mode)},
     {"toolProfile", mcp::toolProfileName(config.toolProfile)},
-    {"tokenPresent", !config.token.isEmpty()},
+    {"authentication", "none"},
     {"listening", config.mode != mcp::McpMode::Off},
     {"documentCount",
      static_cast<int>(appController.mapWindowManager().mapWindows().size())},

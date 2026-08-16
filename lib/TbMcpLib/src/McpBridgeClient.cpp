@@ -149,7 +149,6 @@ McpBridgeResponse McpBridgeClient::request(
     config,
     McpBridgeRequest{
       std::move(requestId),
-      config.token,
       toolName,
       std::move(params),
       config.mode,

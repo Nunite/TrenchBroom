@@ -32,7 +32,6 @@ TEST_CASE("McpBridgeMessages")
   {
     const auto request = McpBridgeRequest{
       "1",
-      "secret",
       "tb_status",
       QJsonObject{{"verbose", true}},
       McpMode::ReadOnly,
@@ -42,12 +41,12 @@ TEST_CASE("McpBridgeMessages")
 
     REQUIRE(parsed);
     CHECK(parsed->id == request.id);
-    CHECK(parsed->token == request.token);
     CHECK(parsed->tool == request.tool);
     CHECK(parsed->params.value("verbose").toBool());
     REQUIRE(parsed->requestedMode);
     CHECK(*parsed->requestedMode == McpMode::ReadOnly);
     CHECK(parsed->type == McpBridgeRequestType::ToolCall);
+    CHECK_FALSE(toJson(request).contains("token"));
     CHECK(toJson(request).value("type").toString() == "tool_call");
   }
 
@@ -55,7 +54,6 @@ TEST_CASE("McpBridgeMessages")
   {
     const auto listRequest = McpBridgeRequest{
       "list-1",
-      "secret",
       {},
       QJsonObject{{"cursor", "opaque-cursor"}},
       std::nullopt,
@@ -63,7 +61,6 @@ TEST_CASE("McpBridgeMessages")
     };
     const auto readRequest = McpBridgeRequest{
       "read-1",
-      "secret",
       {},
       QJsonObject{{"uri", "tbmcp://operation/mcp-op-1"}},
       std::nullopt,
@@ -82,11 +79,10 @@ TEST_CASE("McpBridgeMessages")
     CHECK(parsedRead->params.value("uri").toString() == "tbmcp://operation/mcp-op-1");
   }
 
-  SECTION("legacy requests without a type remain tool calls")
+  SECTION("tokenless legacy requests without a type remain tool calls")
   {
     const auto parsed = bridgeRequestFromJson(QJsonObject{
       {"id", "legacy-1"},
-      {"token", "secret"},
       {"tool", "tb_status"},
       {"params", QJsonObject{}},
     });
@@ -102,7 +98,6 @@ TEST_CASE("McpBridgeMessages")
     const auto parsed = bridgeRequestFromJson(
       QJsonObject{
         {"id", "1"},
-        {"token", "secret"},
         {"type", "unknown"},
         {"params", QJsonObject{}},
       },
@@ -117,7 +112,6 @@ TEST_CASE("McpBridgeMessages")
     auto error = QString{};
     auto json = QJsonObject{
       {"id", "1"},
-      {"token", "secret"},
       {"tool", "tb_status"},
       {"params", true},
     };
@@ -145,8 +139,8 @@ TEST_CASE("McpBridgeMessages")
     const auto response = McpBridgeResponse::failure(
       "1",
       McpError{
-        McpErrorCode::Unauthorized,
-        "bad token",
+        McpErrorCode::Forbidden,
+        "denied",
         QJsonObject{{"stderrBytes", 12}},
       });
 
@@ -156,8 +150,8 @@ TEST_CASE("McpBridgeMessages")
     CHECK(parsed->id == response.id);
     CHECK(!parsed->ok);
     REQUIRE(parsed->error);
-    CHECK(parsed->error->code == McpErrorCode::Unauthorized);
-    CHECK(parsed->error->message == "bad token");
+    CHECK(parsed->error->code == McpErrorCode::Forbidden);
+    CHECK(parsed->error->message == "denied");
     CHECK(parsed->error->details.value("stderrBytes").toInt() == 12);
   }
 }

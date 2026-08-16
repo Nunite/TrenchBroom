@@ -31,7 +31,6 @@ private:
   QLabel* m_errorLabel = nullptr;
   QPushButton* m_copyClaudeCommandButton = nullptr;
   QPushButton* m_openConfigFolderButton = nullptr;
-  QPushButton* m_rotateTokenButton = nullptr;
 
 public:
   explicit McpPreferencePane(AppController& appController, QWidget* parent = nullptr);
@@ -50,7 +49,6 @@ private:
   void toolProfileChanged(int index);
   void pipeNameChanged(const QString& text);
   void copyClaudeCommand();
-  void rotateToken();
   void openConfigFolder();
 };
 

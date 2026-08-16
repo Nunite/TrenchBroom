@@ -30,7 +30,6 @@
 
 #include "mcp/McpJsonRpc.h"
 
-#include <algorithm>
 #include <optional>
 #include <utility>
 
@@ -53,8 +52,6 @@ QByteArray reasonPhrase(const int statusCode)
     return "Accepted";
   case 400:
     return "Bad Request";
-  case 401:
-    return "Unauthorized";
   case 403:
     return "Forbidden";
   case 404:
@@ -115,26 +112,6 @@ std::optional<QByteArray> allowedOrigin(const QList<QByteArray>& lines)
     return origin.toUtf8();
   }
   return std::nullopt;
-}
-
-bool constantTimeEquals(const QByteArray& lhs, const QByteArray& rhs)
-{
-  const auto count = std::max(lhs.size(), rhs.size());
-  auto difference = static_cast<unsigned int>(lhs.size() ^ rhs.size());
-  for (auto i = qsizetype{0}; i < count; ++i)
-  {
-    const auto left = i < lhs.size() ? static_cast<unsigned char>(lhs[i]) : 0u;
-    const auto right = i < rhs.size() ? static_cast<unsigned char>(rhs[i]) : 0u;
-    difference |= left ^ right;
-  }
-  return difference == 0u;
-}
-
-bool hasValidAuthorization(const QList<QByteArray>& lines, const QString& configuredToken)
-{
-  const auto authorization = headerValue(lines, "Authorization").toUtf8();
-  const auto expected = QByteArray{"Bearer "} + configuredToken.toUtf8();
-  return constantTimeEquals(authorization, expected);
 }
 
 QString methodFromRequestLine(const QByteArray& requestLine)
@@ -492,20 +469,6 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
     return;
   }
 
-  if (!hasValidAuthorization(lines, m_config.token))
-  {
-    writeHttpResponse(
-      socket,
-      401,
-      reasonPhrase(401),
-      "application/json",
-      jsonBody("Missing or invalid bearer token"),
-      *responseOrigin,
-      "WWW-Authenticate: Bearer\r\n");
-    socket.disconnectFromHost();
-    return;
-  }
-
   if (method == "GET")
   {
     if (m_sseConnections.size() >= m_limits.maxSseConnections)
@@ -564,7 +527,6 @@ void McpHttpServer::handleSocketReadyRead(QTcpSocket& socket)
       const QJsonObject& params) {
       const auto request = mcp::McpBridgeRequest{
         "http",
-        m_config.token,
         toolName,
         params,
         m_config.mode,
@@ -626,9 +588,7 @@ void McpHttpServer::writeHttpResponse(
   {
     response += "Access-Control-Allow-Origin: " + allowedOrigin + "\r\n";
     response += "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
-    response +=
-      "Access-Control-Allow-Headers: Authorization, Content-Type, "
-      "MCP-Protocol-Version\r\n";
+    response += "Access-Control-Allow-Headers: Content-Type, MCP-Protocol-Version\r\n";
     response += "Vary: Origin\r\n";
   }
   response += extraHeaders;

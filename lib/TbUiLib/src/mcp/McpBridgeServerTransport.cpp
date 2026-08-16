@@ -407,12 +407,6 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchToolCall(
       "MCP bridge is already handling another request; retry after it finishes");
   }
 
-  if (request.token != m_config.token)
-  {
-    return makeFailure(
-      request, mcp::McpErrorCode::Unauthorized, "Invalid MCP bridge token");
-  }
-
   const auto tool = mcp::findToolDefinition(request.tool);
   if (!tool)
   {
@@ -654,12 +648,6 @@ mcp::McpBridgeResponse McpBridgeServer::dispatchRequest(
   if (request.type == mcp::McpBridgeRequestType::ToolCall)
   {
     return dispatchToolCall(request);
-  }
-
-  if (request.token != m_config.token)
-  {
-    return makeFailure(
-      request, mcp::McpErrorCode::Unauthorized, "Invalid MCP bridge token");
   }
 
   if (request.type == mcp::McpBridgeRequestType::ResourcesList)

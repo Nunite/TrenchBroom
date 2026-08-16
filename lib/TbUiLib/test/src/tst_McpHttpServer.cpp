@@ -39,8 +39,6 @@ namespace mcp = tb::mcp;
 namespace
 {
 
-constexpr auto TestToken = "secret-token";
-
 struct HttpResponse
 {
   int statusCode = 0;
@@ -53,7 +51,6 @@ mcp::McpBridgeConfig makeConfig(const mcp::McpMode mode)
   return mcp::McpBridgeConfig{
     QString{"tb-http-%1"}.arg(
       QUuid::createUuid().toString(QUuid::WithoutBraces).left(12)),
-    TestToken,
     mode,
     true,
     "127.0.0.1",
@@ -95,17 +92,12 @@ QByteArray makeHttpRequest(
   const QByteArray& method,
   const QByteArray& path,
   const QByteArray& body = {},
-  const QByteArray& token = TestToken,
   const QByteArray& origin = {})
 {
   auto request = QByteArray{};
   request += method + " " + path + " HTTP/1.1\r\n";
   request += "Host: 127.0.0.1\r\n";
   request += "Connection: close\r\n";
-  if (!token.isEmpty())
-  {
-    request += "Authorization: Bearer " + token + "\r\n";
-  }
   if (!origin.isEmpty())
   {
     request += "Origin: " + origin + "\r\n";
@@ -563,22 +555,7 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     CHECK(response.body.contains("TrenchBroom MCP stream ready"));
   }
 
-  SECTION("get rejects requests without authorization")
-  {
-    auto bridgeServer = makeBridgeServer();
-    auto httpServer = McpHttpServer{bridgeServer};
-    const auto config = makeConfig(mcp::McpMode::ReadOnly);
-    REQUIRE(bridgeServer.start(config));
-    REQUIRE(httpServer.start(config));
-
-    const auto response =
-      sendRequest(httpServer.port(), makeHttpRequest("GET", "/mcp", {}, {}));
-
-    CHECK(response.statusCode == 401);
-    CHECK(response.headers.contains("WWW-Authenticate: Bearer"));
-  }
-
-  SECTION("localhost requests require authorization header")
+  SECTION("localhost requests do not require authorization")
   {
     auto bridgeServer = makeBridgeServer();
     auto httpServer = McpHttpServer{bridgeServer};
@@ -587,26 +564,9 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     REQUIRE(httpServer.start(config));
 
     const auto response = sendRequest(
-      httpServer.port(),
-      makeHttpRequest("POST", "/mcp", jsonRequest(3, "tools/list"), {}));
+      httpServer.port(), makeHttpRequest("POST", "/mcp", jsonRequest(3, "tools/list")));
 
-    CHECK(response.statusCode == 401);
-    CHECK(response.headers.contains("WWW-Authenticate: Bearer"));
-  }
-
-  SECTION("localhost requests reject an invalid bearer token")
-  {
-    auto bridgeServer = makeBridgeServer();
-    auto httpServer = McpHttpServer{bridgeServer};
-    const auto config = makeConfig(mcp::McpMode::ReadOnly);
-    REQUIRE(bridgeServer.start(config));
-    REQUIRE(httpServer.start(config));
-
-    const auto response = sendRequest(
-      httpServer.port(),
-      makeHttpRequest("POST", "/mcp", jsonRequest(3, "tools/list"), "wrong-token"));
-
-    CHECK(response.statusCode == 401);
+    CHECK(response.statusCode == 200);
   }
 
   SECTION("cors preflight echoes an allowed origin")
@@ -618,13 +578,14 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     REQUIRE(httpServer.start(config));
 
     const auto response = sendRequest(
-      httpServer.port(),
-      makeHttpRequest("OPTIONS", "/mcp", {}, {}, "http://localhost:3000"));
+      httpServer.port(), makeHttpRequest("OPTIONS", "/mcp", {}, "http://localhost:3000"));
 
     CHECK(response.statusCode == 204);
     CHECK(
       response.headers.contains("Access-Control-Allow-Origin: http://localhost:3000"));
-    CHECK(response.headers.contains("Access-Control-Allow-Headers: Authorization"));
+    CHECK(response.headers.contains(
+      "Access-Control-Allow-Headers: Content-Type, MCP-Protocol-Version"));
+    CHECK_FALSE(response.headers.contains("Authorization"));
   }
 
   SECTION("cors rejects non-loopback origins")
@@ -638,7 +599,7 @@ TEST_CASE("McpHttpServer", "[McpHttpServer]")
     const auto response = sendRequest(
       httpServer.port(),
       makeHttpRequest(
-        "POST", "/mcp", jsonRequest(3, "tools/list"), TestToken, "https://example.com"));
+        "POST", "/mcp", jsonRequest(3, "tools/list"), "https://example.com"));
 
     CHECK(response.statusCode == 403);
     CHECK_FALSE(response.headers.contains("Access-Control-Allow-Origin"));

@@ -27,7 +27,6 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QStandardPaths>
-#include <QUuid>
 
 namespace tb::mcp
 {
@@ -75,6 +74,32 @@ bool ensureParentDirectory(const QString& filePath, QString* error)
   return true;
 }
 
+std::optional<QJsonObject> readConfigJson(const QString& filePath, QString* error)
+{
+  auto file = QFile{filePath};
+  if (!file.open(QIODevice::ReadOnly))
+  {
+    if (error)
+    {
+      *error = QString{"Could not open MCP config: %1"}.arg(file.errorString());
+    }
+    return std::nullopt;
+  }
+
+  auto parseError = QJsonParseError{};
+  const auto document = QJsonDocument::fromJson(file.readAll(), &parseError);
+  if (parseError.error != QJsonParseError::NoError || !document.isObject())
+  {
+    if (error)
+    {
+      *error = QString{"Could not parse MCP config: %1"}.arg(parseError.errorString());
+    }
+    return std::nullopt;
+  }
+
+  return document.object();
+}
+
 } // namespace
 
 QString defaultConfigDirectory()
@@ -89,16 +114,10 @@ QString defaultConfigPath()
   return QDir{defaultConfigDirectory()}.filePath("config.json");
 }
 
-QString generateBridgeToken()
-{
-  return QUuid::createUuid().toString(QUuid::WithoutBraces);
-}
-
 McpBridgeConfig defaultBridgeConfig()
 {
   return McpBridgeConfig{
     QString{"trenchbroom-mcp-%1"}.arg(currentUserName()),
-    generateBridgeToken(),
     McpMode::Off,
     true,
     "127.0.0.1",
@@ -111,7 +130,6 @@ QJsonObject toJson(const McpBridgeConfig& config)
 {
   return QJsonObject{
     {"pipeName", config.pipeName},
-    {"token", config.token},
     {"mode", modeName(config.mode)},
     {"httpEnabled", config.httpEnabled},
     {"httpHost", config.httpHost},
@@ -129,16 +147,6 @@ std::optional<McpBridgeConfig> bridgeConfigFromJson(
     if (error)
     {
       *error = "MCP pipeName is missing or empty";
-    }
-    return std::nullopt;
-  }
-
-  const auto token = json.value("token");
-  if (!token.isString() || token.toString().trimmed().isEmpty())
-  {
-    if (error)
-    {
-      *error = "MCP token is missing or empty";
     }
     return std::nullopt;
   }
@@ -243,7 +251,6 @@ std::optional<McpBridgeConfig> bridgeConfigFromJson(
 
   return McpBridgeConfig{
     pipeName.toString(),
-    token.toString(),
     *mode,
     httpEnabled,
     httpHost,
@@ -254,28 +261,13 @@ std::optional<McpBridgeConfig> bridgeConfigFromJson(
 
 std::optional<McpBridgeConfig> readBridgeConfig(const QString& filePath, QString* error)
 {
-  auto file = QFile{filePath};
-  if (!file.open(QIODevice::ReadOnly))
+  const auto json = readConfigJson(filePath, error);
+  if (!json)
   {
-    if (error)
-    {
-      *error = QString{"Could not open MCP config: %1"}.arg(file.errorString());
-    }
     return std::nullopt;
   }
 
-  auto parseError = QJsonParseError{};
-  const auto document = QJsonDocument::fromJson(file.readAll(), &parseError);
-  if (parseError.error != QJsonParseError::NoError || !document.isObject())
-  {
-    if (error)
-    {
-      *error = QString{"Could not parse MCP config: %1"}.arg(parseError.errorString());
-    }
-    return std::nullopt;
-  }
-
-  return bridgeConfigFromJson(document.object(), error);
+  return bridgeConfigFromJson(*json, error);
 }
 
 bool writeBridgeConfig(
@@ -321,7 +313,23 @@ std::optional<McpBridgeConfig> readOrCreateBridgeConfig(
 {
   if (QFileInfo::exists(filePath))
   {
-    return readBridgeConfig(filePath, error);
+    const auto json = readConfigJson(filePath, error);
+    if (!json)
+    {
+      return std::nullopt;
+    }
+
+    const auto config = bridgeConfigFromJson(*json, error);
+    if (!config)
+    {
+      return std::nullopt;
+    }
+
+    if (json->contains("token") && !writeBridgeConfig(*config, filePath, error))
+    {
+      return std::nullopt;
+    }
+    return config;
   }
 
   auto config = defaultBridgeConfig();

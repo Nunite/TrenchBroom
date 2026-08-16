@@ -35,7 +35,7 @@ optimization order, see `docs/custom-feature-architecture-review.md`.
 
 ### MCP / Agent Bridge
 
-- 风险：MCP 会把编辑器控制能力暴露给外部进程，如果 mode、token 和工具边界没有持续收紧，很容易变成过宽的本地远控入口。
+- 风险：MCP 会把编辑器控制能力暴露给本机进程；它没有调用方鉴权，如果 mode 和工具边界没有持续收紧，很容易变成过宽的本地远控入口。
 - 风险：`action_execute` 已经接入，但 action 可能间接修改地图；它必须继续要求 `Edit` 模式，不能放回 `ReadOnly`。
 - 风险：后续 entity/brush 编辑工具如果绕过 `MapDocument` transaction 或直接改 `.map` 文件，undo/redo、selection、dirty 状态都会和普通编辑器行为分裂。
 - 风险：让 Agent 直接创建任意 brush 顶点很容易生成非法或难排查的 BSP 几何；白盒生成必须优先走语义 Blockout IR 和确定性 brush primitive 编译。
@@ -46,7 +46,7 @@ optimization order, see `docs/custom-feature-architecture-review.md`.
 - 风险：Blockout IR 第一版已经避免直接拼任意 brush 顶点，但 snap、尺寸约束、房间开口规则和错误报告还比较基础。
 - 风险：如果 Agent 默认使用大量 atomic brush tools，tool definitions 和中间结果会快速挤占上下文，并且更容易生成局部正确但整体不连贯的几何。
 - 风险：`operation_*` resource store 当前是会话级内存状态；文档 reload/close 后旧 object id 可能失效，后续必须持续返回明确 stale/live 诊断，不能静默选择错误对象。
-- 建议修复：MCP 默认关闭，HTTP 只绑定 localhost，旧 stdio/pipe token 仅作兼容路径；协议层继续放在 `TbMcpLib`；新增 bridge tool handler 继续按领域拆分；所有写操作继续使用命名 transaction 并补 rollback/真实地图集成测试；overlay 下一步应并入统一视图叠加层管理器；默认 `Modeling` profile 应保留建模工作流能力，只隐藏 action、overlay、viewport 等 UI/可视反馈入口；复杂结构优先走 `blockout_create_batch` 或 `python_generate_blockout`；不要开放任意内部脚本执行，除非先有严格 validation 和显式危险模式。
+- 建议修复：MCP 默认关闭，HTTP 只绑定 localhost，并在 UI 中明确启用即信任本机用户进程；stdio shim 保持默认不构建的兼容路径；协议层继续放在 `TbMcpLib`；新增 bridge tool handler 继续按领域拆分；所有写操作继续使用命名 transaction 并补 rollback/真实地图集成测试；overlay 下一步应并入统一视图叠加层管理器；默认 `Modeling` profile 应保留建模工作流能力，只隐藏 action、overlay、viewport 等 UI/可视反馈入口；复杂结构优先走 `blockout_create_batch` 或 `python_generate_blockout`；不要开放任意内部脚本执行，除非先有严格 validation 和显式危险模式。
 
 ## Medium Priority
 

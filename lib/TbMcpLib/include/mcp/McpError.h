@@ -29,7 +29,6 @@ namespace tb::mcp
 
 enum class McpErrorCode
 {
-  Unauthorized,
   Forbidden,
   ToolNotFound,
   InvalidRequest,

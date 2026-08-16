@@ -98,7 +98,7 @@ public:
 
 McpBridgeConfig testConfig()
 {
-  return McpBridgeConfig{"test-pipe", "secret", McpMode::Edit};
+  return McpBridgeConfig{"test-pipe", McpMode::Edit};
 }
 
 McpBridgeClient makeClient(
@@ -153,7 +153,7 @@ TEST_CASE("McpBridgeClient", "[McpStdioClient]")
 
     const auto request = QJsonDocument::fromJson(state->written.trimmed()).object();
     CHECK(request.value("id").toString() == "request-1");
-    CHECK(request.value("token").toString() == "secret");
+    CHECK_FALSE(request.contains("token"));
     CHECK(request.value("type").toString() == "tool_call");
     CHECK(request.value("tool").toString() == "documents_list");
     CHECK(request.value("mode").toString() == "Edit");

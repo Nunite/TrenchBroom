@@ -38,12 +38,6 @@ namespace
 
 McpBridgeResponse protocolBridgeResponse(const McpBridgeRequest& request)
 {
-  if (request.token != "secret")
-  {
-    return McpBridgeResponse::failure(
-      request.id, McpError{McpErrorCode::Unauthorized, "Invalid token"});
-  }
-
   switch (request.type)
   {
   case McpBridgeRequestType::ToolCall:
@@ -188,8 +182,7 @@ void runProtocolContract(const ProtocolAdapter& adapter)
 TEST_CASE(
   "MCP HTTP and stdio adapters share one protocol contract", "[McpProtocolParity]")
 {
-  auto config =
-    McpBridgeConfig{"test-pipe", "secret", McpMode::ReadOnly, true, "127.0.0.1", 0};
+  auto config = McpBridgeConfig{"test-pipe", McpMode::ReadOnly, true, "127.0.0.1", 0};
   config.toolProfile = McpToolProfile::Core;
 
   SECTION("direct protocol adapter")
@@ -201,7 +194,6 @@ TEST_CASE(
         [](const McpBridgeRequestType type, const QString& tool, QJsonObject params) {
           return protocolBridgeResponse(McpBridgeRequest{
             "direct",
-            "secret",
             tool,
             std::move(params),
             McpMode::ReadOnly,

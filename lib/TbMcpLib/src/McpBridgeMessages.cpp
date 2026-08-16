@@ -73,7 +73,6 @@ QJsonObject toJson(const McpBridgeRequest& request)
 {
   auto json = QJsonObject{
     {"id", request.id},
-    {"token", request.token},
     {"params", request.params},
     {"type", requestTypeName(request.type)},
   };
@@ -100,16 +99,6 @@ std::optional<McpBridgeRequest> bridgeRequestFromJson(
     if (error)
     {
       *error = "MCP request id is missing or empty";
-    }
-    return std::nullopt;
-  }
-
-  const auto token = json.value("token");
-  if (!token.isString())
-  {
-    if (error)
-    {
-      *error = "MCP request token is missing or not a string";
     }
     return std::nullopt;
   }
@@ -193,7 +182,6 @@ std::optional<McpBridgeRequest> bridgeRequestFromJson(
 
   return McpBridgeRequest{
     id.toString(),
-    token.toString(),
     toolName,
     params,
     requestedMode,

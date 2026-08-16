@@ -18,6 +18,8 @@
  */
 
 #include <QDir>
+#include <QFile>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QTemporaryDir>
 
@@ -30,12 +32,11 @@ namespace tb::mcp
 
 TEST_CASE("McpBridgeConfig")
 {
-  SECTION("default config is disabled and authenticated")
+  SECTION("default config is disabled and loopback only")
   {
     const auto config = defaultBridgeConfig();
 
     CHECK(config.pipeName.startsWith("trenchbroom-mcp-"));
-    CHECK(!config.token.isEmpty());
     CHECK(config.mode == McpMode::Off);
     CHECK(config.httpEnabled);
     CHECK(config.httpHost == "127.0.0.1");
@@ -46,19 +47,12 @@ TEST_CASE("McpBridgeConfig")
   SECTION("json roundtrip")
   {
     const auto config = McpBridgeConfig{
-      "test-pipe",
-      "secret-token",
-      McpMode::ReadOnly,
-      true,
-      "localhost",
-      37667,
-      McpToolProfile::Full};
+      "test-pipe", McpMode::ReadOnly, true, "localhost", 37667, McpToolProfile::Full};
 
     const auto parsed = bridgeConfigFromJson(toJson(config));
 
     REQUIRE(parsed);
     CHECK(parsed->pipeName == config.pipeName);
-    CHECK(parsed->token == config.token);
     CHECK(parsed->mode == config.mode);
     CHECK(parsed->httpEnabled == config.httpEnabled);
     CHECK(parsed->httpHost == config.httpHost);
@@ -66,7 +60,7 @@ TEST_CASE("McpBridgeConfig")
     CHECK(parsed->toolProfile == config.toolProfile);
   }
 
-  SECTION("legacy json gets default http settings")
+  SECTION("legacy token is ignored and omitted when rewritten")
   {
     const auto parsed = bridgeConfigFromJson(QJsonObject{
       {"pipeName", "test-pipe"},
@@ -75,6 +69,7 @@ TEST_CASE("McpBridgeConfig")
     });
 
     REQUIRE(parsed);
+    CHECK_FALSE(toJson(*parsed).contains("token"));
     CHECK(parsed->httpEnabled);
     CHECK(parsed->httpHost == "127.0.0.1");
     CHECK(parsed->httpPort == 37666);
@@ -85,7 +80,6 @@ TEST_CASE("McpBridgeConfig")
   {
     const auto parsed = bridgeConfigFromJson(QJsonObject{
       {"pipeName", "test-pipe"},
-      {"token", "secret-token"},
       {"mode", "ReadOnly"},
       {"toolProfile", "Core"},
     });
@@ -95,7 +89,6 @@ TEST_CASE("McpBridgeConfig")
 
     const auto modeling = bridgeConfigFromJson(QJsonObject{
       {"pipeName", "test-pipe"},
-      {"token", "secret-token"},
       {"mode", "ReadOnly"},
       {"toolProfile", "Modeling"},
     });
@@ -104,7 +97,6 @@ TEST_CASE("McpBridgeConfig")
 
     const auto balanced = bridgeConfigFromJson(QJsonObject{
       {"pipeName", "test-pipe"},
-      {"token", "secret-token"},
       {"mode", "ReadOnly"},
       {"toolProfile", "Balanced"},
     });
@@ -123,7 +115,6 @@ TEST_CASE("McpBridgeConfig")
     CHECK(!bridgeConfigFromJson(
       QJsonObject{
         {"pipeName", "test-pipe"},
-        {"token", "secret-token"},
         {"mode", "ReadOnly"},
         {"toolProfile", "Tiny"},
       },
@@ -147,8 +138,35 @@ TEST_CASE("McpBridgeConfig")
     auto loaded = readBridgeConfig(path, &error);
     REQUIRE(loaded);
     CHECK(loaded->pipeName == created->pipeName);
-    CHECK(loaded->token == created->token);
     CHECK(loaded->mode == created->mode);
+    CHECK_FALSE(toJson(*loaded).contains("token"));
+  }
+
+  SECTION("read or create removes a legacy token from disk")
+  {
+    auto tempDir = QTemporaryDir{};
+    REQUIRE(tempDir.isValid());
+
+    const auto path = QDir{tempDir.path()}.filePath("config.json");
+    auto file = QFile{path};
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    file.write(QJsonDocument{
+      QJsonObject{
+        {"pipeName", "test-pipe"},
+        {"token", "legacy-secret"},
+        {"mode", "ReadOnly"},
+      }}.toJson());
+    file.close();
+
+    auto error = QString{};
+    const auto config = readOrCreateBridgeConfig(path, &error);
+    REQUIRE(config);
+    CHECK(error.isEmpty());
+
+    REQUIRE(file.open(QIODevice::ReadOnly));
+    const auto migrated = QJsonDocument::fromJson(file.readAll()).object();
+    CHECK_FALSE(migrated.contains("token"));
+    CHECK(migrated.value("mode").toString() == "ReadOnly");
   }
 }
 
