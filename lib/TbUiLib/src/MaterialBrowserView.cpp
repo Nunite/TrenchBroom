@@ -55,12 +55,43 @@
 #include "vm/mat_ext.h"
 #include "vm/vec.h"
 
+#include <algorithm>
+#include <cmath>
 #include <ranges>
 #include <string>
 #include <vector>
 
 namespace tb::ui
 {
+namespace
+{
+constexpr auto MaterialBrowserOuterMargin = 5.0f;
+constexpr auto MaterialBrowserCellMargin = 10.0f;
+constexpr auto MinimumMaterialCellWidth = 16.0f;
+constexpr auto MinimumMaterialCellWidthScale = 0.875f;
+
+float responsiveMaterialCellWidth(const float layoutWidth, const float preferredCellWidth)
+{
+  const auto availableWidth =
+    std::max(1.0f, layoutWidth - 2.0f * MaterialBrowserOuterMargin);
+  const auto minimumCellWidth = std::max(
+    MinimumMaterialCellWidth, preferredCellWidth * MinimumMaterialCellWidthScale);
+  const auto preferredColumnCount = std::max(
+    1,
+    int(std::round(
+      (availableWidth + MaterialBrowserCellMargin)
+      / (preferredCellWidth + MaterialBrowserCellMargin))));
+  const auto maximumColumnCount = std::max(
+    1,
+    int(std::floor(
+      (availableWidth + MaterialBrowserCellMargin)
+      / (minimumCellWidth + MaterialBrowserCellMargin))));
+  const auto columnCount = std::min(preferredColumnCount, maximumColumnCount);
+
+  return (availableWidth - float(columnCount - 1) * MaterialBrowserCellMargin)
+         / float(columnCount);
+}
+} // namespace
 
 MaterialBrowserView::MaterialBrowserView(
   AppController& appController, QScrollBar* scrollBar, MapDocument& document)
@@ -147,16 +178,24 @@ void MaterialBrowserView::reloadMaterials()
   update();
 }
 
+void MaterialBrowserView::resizeEvent(QResizeEvent* event)
+{
+  CellView::resizeEvent(event);
+  invalidate();
+}
+
 void MaterialBrowserView::doInitLayout(Layout& layout)
 {
   const auto scaleFactor = pref(Preferences::MaterialBrowserIconSize);
+  const auto preferredCellWidth = scaleFactor * 64.0f;
 
-  layout.setOuterMargin(5.0f);
+  layout.setOuterMargin(MaterialBrowserOuterMargin);
   layout.setGroupMargin(5.0f);
   layout.setRowMargin(15.0f);
-  layout.setCellMargin(10.0f);
+  layout.setCellMargin(MaterialBrowserCellMargin);
   layout.setTitleMargin(2.0f);
-  layout.setCellWidth(scaleFactor * 64.0f, scaleFactor * 64.0f);
+  const auto cellWidth = responsiveMaterialCellWidth(layout.width(), preferredCellWidth);
+  layout.setCellWidth(cellWidth, cellWidth);
   layout.setCellHeight(scaleFactor * 64.0f, scaleFactor * 128.0f);
 }
 

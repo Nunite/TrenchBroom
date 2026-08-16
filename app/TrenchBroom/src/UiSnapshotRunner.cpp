@@ -267,6 +267,11 @@ void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName
     return;
   }
 
+  if (targetName == QStringLiteral("face-inspector"))
+  {
+    setPref(Preferences::MaterialBrowserIconSize, 3.0f);
+  }
+
   const auto showEntityBrowser = targetName.startsWith(QStringLiteral("entity-browser"));
   mapWindow->switchToInspectorPage(
     showEntityBrowser ? InspectorPage::Entity : InspectorPage::Face);

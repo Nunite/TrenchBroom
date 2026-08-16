@@ -5,8 +5,8 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-16
-- Current stage: Phase 4.3 complete; Material Browser acceptance hardened and Phase 4.4
-  scoped
+- Current stage: Phase 4.4 in progress; responsive Material Browser columns and persistent
+  scrollbar visibility complete
 
 ## Objective
 
@@ -200,7 +200,7 @@ blank content region when filters have no results.
 
 ### Phase 4.4: Material Browser Density And Selection Context
 
-Status: proposed
+Status: in progress
 
 The resource-backed acceptance capture shows that the current browser is functional, but its
 content layout still reflects the legacy texture-at-native-aspect approach. Tall textures set
@@ -210,6 +210,8 @@ preferences.
 
 - [ ] Put every material in a stable preview frame and aspect-fit the texture within it so
       mixed texture dimensions produce aligned rows without distorting the image.
+- [x] Distribute residual browser width across complete material columns around the selected
+      thumbnail size, and keep the scrollbar thumb visible before hover.
 - [ ] Elide long labels to one predictable line while retaining the full material name and
       dimensions in the existing tooltip.
 - [ ] Add an inline compact thumbnail-size control backed by the existing
@@ -366,4 +368,7 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Verified | Passed `PreferenceDialog` (27 assertions) and `PreferenceDialog.preferencePanes` (26 assertions), rebuilt Release `TrenchBroom`, and visually checked Keyboard and Colors in Light/Dark at 100%, 150%, and 200% in `20260816-110526-478` and `20260816-110546-071`. |
 | 2026-08-16 | Complete | Aligned global integer and floating-point spin boxes with the compact control language: stable 19 px stepper columns, 4 px outer corners, subtle dividers, flat hover/pressed feedback, and theme-specific chevrons with distinct disabled states. |
 | 2026-08-16 | Verified | Passed `Theme,MapWindow` (211 assertions), rebuilt Release `TrenchBroom`, and visually checked enabled and disabled spin boxes in the Face Inspector Light/Dark snapshots at 100%, 150%, and 200% in `20260816-113138-605`. |
-| 2026-08-16 | Next | Finish Phase 4.4's mixed-aspect grid behavior and inline size control before considering any deferred Phase 5 structural experiment. |
+| 2026-08-16 | Complete | Made Material Browser columns responsive around the selected thumbnail size so complete rows consume the viewport without a residual right strip. Increased resting scrollbar contrast while retaining distinct hover and pressed feedback. |
+| 2026-08-16 | Complete | Hardened the Face Inspector snapshot to use 3x material thumbnails, directly covering the constrained two-column layout and persistent scrollbar instead of relying on the default small-tile state. |
+| 2026-08-16 | Verified | Passed `Theme,MapWindow` (211 assertions), rebuilt Release `TrenchBroom`, and visually checked the responsive two-column grid and resting scrollbar in Light/Dark at 100%, 150%, and 200% in `20260816-121008-032`. |
+| 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and the inline thumbnail-size control before considering any deferred Phase 5 structural experiment. |

@@ -814,7 +814,7 @@ QScrollBar:horizontal {
 }
 
 QScrollBar::handle {
-  background: @tb-strong-border;
+  background: @tb-disabled-text;
   border-radius: 5px;
   min-height: 24px;
   min-width: 24px;
@@ -822,6 +822,10 @@ QScrollBar::handle {
 
 QScrollBar::handle:hover {
   background: @tb-secondary-text;
+}
+
+QScrollBar::handle:pressed {
+  background: @tb-text;
 }
 
 QScrollBar::add-line,
