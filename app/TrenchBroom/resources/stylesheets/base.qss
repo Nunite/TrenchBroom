@@ -126,11 +126,16 @@ QWidget#MapWindow_InspectorSurface {
 }
 
 QLabel#WorkbenchPanelTitle,
-QLabel#Inspector_PageTitle {
-  background: @tb-sidebar-background;
+QLabel[regionAnchor="true"],
+QWidget[regionAnchorTabs="true"] QLabel#TabBarButtonLabel {
   color: @tb-secondary-text;
   font-size: 11px;
   font-weight: bold;
+}
+
+QLabel#WorkbenchPanelTitle,
+QLabel#Inspector_PageTitle {
+  background: @tb-sidebar-background;
   padding: 0 10px;
 }
 
@@ -504,7 +509,7 @@ QWidget#InfoPanel_TabBar QWidget#TabBarButton[active="true"] {
 
 QWidget#InfoPanel_TabBar QWidget#TabBarButton[active="true"] QLabel#TabBarButtonLabel {
   color: @tb-text;
-  font-weight: normal;
+  font-weight: bold;
 }
 
 QTextEdit#Console_TextView {
@@ -708,9 +713,6 @@ QWidget#PreferenceDialog_Navigation {
 }
 
 QLabel#PreferenceDialog_NavigationTitle {
-  color: @tb-secondary-text;
-  font-size: 11px;
-  font-weight: bold;
   min-height: 22px;
   padding: 0 7px;
 }

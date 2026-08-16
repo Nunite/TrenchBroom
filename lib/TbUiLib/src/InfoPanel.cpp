@@ -42,6 +42,7 @@ InfoPanel::InfoPanel(AppController& appController, MapDocument& document, QWidge
   m_tabBook = new TabBook{};
   m_tabBook->setObjectName("InfoPanel_TabBook");
   m_tabBook->tabBar()->setObjectName("InfoPanel_TabBar");
+  m_tabBook->tabBar()->setProperty("regionAnchorTabs", true);
 
   m_console = new Console{};
   m_console->setObjectName("InfoPanel_Console");
@@ -52,10 +53,10 @@ InfoPanel::InfoPanel(AppController& appController, MapDocument& document, QWidge
   m_modelInspector = new ModelInspector{appController, document};
   m_modelInspector->setObjectName("InfoPanel_Assets");
 
-  m_tabBook->addPage(m_console, tr("Console"));
-  m_tabBook->addPage(m_pythonConsole, tr("Python Console"));
-  m_tabBook->addPage(m_issueBrowser, tr("Issues"));
-  m_tabBook->addPage(m_modelInspector, tr("Assets"));
+  m_tabBook->addPage(m_console, tr("Console").toUpper());
+  m_tabBook->addPage(m_pythonConsole, tr("Python Console").toUpper());
+  m_tabBook->addPage(m_issueBrowser, tr("Issues").toUpper());
+  m_tabBook->addPage(m_modelInspector, tr("Assets").toUpper());
 
   auto* sizer = new QVBoxLayout{};
   sizer->setContentsMargins(0, 0, 0, 0);

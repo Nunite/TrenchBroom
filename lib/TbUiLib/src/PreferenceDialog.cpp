@@ -168,6 +168,7 @@ void PreferenceDialog::createGui()
 
   auto* navigationTitle = new QLabel{tr("SETTINGS")};
   navigationTitle->setObjectName("PreferenceDialog_NavigationTitle");
+  navigationTitle->setProperty("regionAnchor", true);
 
   auto* navigationLayout = new QVBoxLayout{};
   navigationLayout->setContentsMargins(8, 12, 8, 8);

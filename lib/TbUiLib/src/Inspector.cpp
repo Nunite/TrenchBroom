@@ -67,6 +67,7 @@ Inspector::Inspector(AppController& appController, MapDocument& document, QWidge
 
   m_pageTitle = new QLabel{};
   m_pageTitle->setObjectName("Inspector_PageTitle");
+  m_pageTitle->setProperty("regionAnchor", true);
   m_pageTitle->setFixedHeight(28);
 
   auto* navigationRail = new QWidget{};

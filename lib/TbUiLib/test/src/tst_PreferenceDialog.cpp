@@ -68,13 +68,17 @@ TEST_CASE("PreferenceDialog")
     CHECK(dialog->objectName() == "PreferenceDialog_Dialog");
 
     auto* navigation = dialog->findChild<QListWidget*>("PreferenceDialog_NavigationList");
+    auto* navigationTitle =
+      dialog->findChild<QLabel*>("PreferenceDialog_NavigationTitle");
     auto* pages = dialog->findChild<QStackedWidget*>("PreferenceDialog_Pages");
     auto* pageTitle = dialog->findChild<QLabel*>("PreferenceDialog_PageTitle");
     auto* buttonBar = dialog->findChild<QWidget*>("DialogButtonBar");
     REQUIRE(navigation != nullptr);
+    REQUIRE(navigationTitle != nullptr);
     REQUIRE(pages != nullptr);
     REQUIRE(pageTitle != nullptr);
     REQUIRE(buttonBar != nullptr);
+    CHECK(navigationTitle->property("regionAnchor").toBool());
 
     auto paneNames = QStringList{};
     for (auto i = 0; i < navigation->count(); ++i)

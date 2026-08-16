@@ -213,6 +213,17 @@ TEST_CASE("MapWindow")
     auto* infoPanel = window.findChild<InfoPanel*>("MapWindow_InfoPanel");
     REQUIRE(infoPanel != nullptr);
 
+    auto* infoPanelTabBar = infoPanel->findChild<QWidget*>("InfoPanel_TabBar");
+    REQUIRE(infoPanelTabBar != nullptr);
+    CHECK(infoPanelTabBar->property("regionAnchorTabs").toBool());
+
+    auto tabNames = QStringList{};
+    for (auto* tabLabel : infoPanelTabBar->findChildren<QLabel*>("TabBarButtonLabel"))
+    {
+      tabNames << tabLabel->text();
+    }
+    CHECK(tabNames == QStringList{"CONSOLE", "PYTHON CONSOLE", "ISSUES", "ASSETS"});
+
     window.switchToInfoPanelPage(InfoPanelPage::Assets);
 
     CHECK(infoPanel->currentPage() == InfoPanelPage::Assets);
@@ -320,6 +331,7 @@ TEST_CASE("MapWindow")
     REQUIRE(faceButton != nullptr);
     REQUIRE(outlinerButton != nullptr);
     REQUIRE(pluginButton != nullptr);
+    CHECK(pageTitle->property("regionAnchor").toBool());
 
     CHECK(navigationRail->width() == 44);
     CHECK(legacyTabBar->isHidden());
