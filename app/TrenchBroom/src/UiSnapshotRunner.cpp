@@ -29,8 +29,11 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPointer>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QSignalBlocker>
 #include <QSplitter>
+#include <QStackedWidget>
 #include <QTextStream>
 #include <QTimer>
 #include <QTreeWidget>
@@ -314,6 +317,22 @@ void configurePreferencesSnapshot(QWidget& targetWidget, const QString& targetNa
     navigation->setCurrentRow(row);
     navigation->setFocus(Qt::OtherFocusReason);
   }
+
+  if (targetName == QStringLiteral("preferences-misc"))
+  {
+    if (auto* pages = targetWidget.findChild<QStackedWidget*>(
+          QStringLiteral("PreferenceDialog_Pages"));
+        pages != nullptr)
+    {
+      if (
+        auto* scrollArea = pages->currentWidget()->findChild<QScrollArea*>(
+          QStringLiteral("PreferencePane_ScrollArea")))
+      {
+        scrollArea->verticalScrollBar()->setValue(
+          scrollArea->verticalScrollBar()->maximum());
+      }
+    }
+  }
 }
 
 void configureSnapshot(QWidget& targetWidget, const QString& targetName)
@@ -505,7 +524,9 @@ int runUiSnapshot(
     preferencesDialog = std::make_unique<PreferenceDialog>(appController, nullptr);
     targetWidget = preferencesDialog.get();
     targetName = options.page;
-    targetWidget->resize(960, 640);
+    targetWidget->resize(
+      targetName == QStringLiteral("preferences-misc") ? QSize{920, 560}
+                                                       : QSize{960, 640});
     configurePreferencesSnapshot(*targetWidget, targetName);
   }
   else if (fileNames.empty())

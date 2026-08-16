@@ -17,11 +17,16 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QApplication>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDir>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QTemporaryDir>
 
 #include "base/PreferenceManager.h"
@@ -135,6 +140,33 @@ TEST_CASE("MiscPreferencePane")
 
     CHECK(foundPieMenuButton);
     CHECK(foundPluginButton);
+  }
+
+  SECTION("scrolls compact content without compressing MCP rows")
+  {
+    pane.resize(720, 420);
+    pane.show();
+    QApplication::processEvents();
+
+    auto* scrollArea = pane.findChild<QScrollArea*>("PreferencePane_ScrollArea");
+    auto* modeCombo = pane.findChild<QComboBox*>("McpSettings_Mode");
+    auto* toolProfileCombo = pane.findChild<QComboBox*>("McpSettings_ToolProfile");
+    auto* statusLabel = pane.findChild<QLabel*>("McpSettings_Status");
+    auto* httpUrl = pane.findChild<QLineEdit*>("McpSettings_HttpUrl");
+    auto* copyClaudeCommand =
+      pane.findChild<QPushButton*>("McpSettings_CopyClaudeCommand");
+    REQUIRE(scrollArea != nullptr);
+    REQUIRE(modeCombo != nullptr);
+    REQUIRE(toolProfileCombo != nullptr);
+    REQUIRE(statusLabel != nullptr);
+    REQUIRE(httpUrl != nullptr);
+    REQUIRE(copyClaudeCommand != nullptr);
+
+    CHECK(scrollArea->verticalScrollBar()->maximum() > 0);
+    CHECK(modeCombo->geometry().bottom() < toolProfileCombo->geometry().top());
+    CHECK(toolProfileCombo->geometry().bottom() < statusLabel->geometry().top());
+    CHECK(statusLabel->geometry().bottom() < httpUrl->geometry().top());
+    CHECK(httpUrl->geometry().bottom() < copyClaudeCommand->geometry().top());
   }
 }
 

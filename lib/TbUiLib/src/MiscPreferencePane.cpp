@@ -184,7 +184,7 @@ void MiscPreferencePane::createGui()
   layout->addWidget(createGroupBox(tr("Tools"), toolLayout));
   layout->addWidget(m_mcpSettingsWidget);
   layout->addStretch(1);
-  setLayout(layout);
+  createScrollableContent(layout);
 }
 
 bool MiscPreferencePane::canResetToDefaults()
