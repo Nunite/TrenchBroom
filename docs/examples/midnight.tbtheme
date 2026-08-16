@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "example.midnight",
+  "name": "Midnight",
+  "author": "TrenchBroom Example",
+  "appearance": "dark",
+  "inherits": "builtin.dark",
+  "colors": {
+    "accent": "#4f9bd8",
+    "focusBorder": "#4f9bd8",
+    "selectionBackground": "#24577a"
+  }
+}

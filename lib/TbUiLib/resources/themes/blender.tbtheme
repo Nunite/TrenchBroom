@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.blender",
+  "name": "Blender",
+  "author": "Blender Foundation / TrenchBroom",
+  "appearance": "dark",
+  "inherits": "builtin.dark",
+  "colors": {
+    "editorBackground": "#303030",
+    "sidebarBackground": "#282828",
+    "panelBackground": "#303030",
+    "elevatedBackground": "#181818",
+    "inputBackground": "#1d1d1d",
+    "alternateBackground": "#282828",
+    "buttonBackground": "#545454",
+    "hoverBackground": "#3d3d3d",
+    "pressedBackground": "#4772b3",
+    "selectionBackground": "#4772b3",
+    "inactiveSelectionBackground": "#334d80",
+    "border": "#161616",
+    "strongBorder": "#3d3d3d",
+    "focusBorder": "#4772b3",
+    "text": "#e6e6e6",
+    "secondaryText": "#989898",
+    "disabledText": "#707070",
+    "accent": "#6fa9e6",
+    "error": "#ff4d84",
+    "warning": "#ac8737",
+    "success": "#95d600"
+  }
+}

@@ -33,6 +33,7 @@
 #include "ui/MaterialBrowserIconSize.h"
 #include "ui/QStyleUtils.h"
 #include "ui/SliderWithLabel.h"
+#include "ui/ThemeRegistry.h"
 #include "ui/ViewConstants.h"
 
 #include "kd/contracts.h"
@@ -114,12 +115,14 @@ QWidget* ViewPreferencePane::createViewPreferences()
 
   m_themeCombo = new QComboBox{};
   m_themeCombo->setObjectName(QStringLiteral("ViewPreference_ThemeCombo"));
-  m_themeCombo->addItems({
-    QString::fromStdString(Preferences::SystemTheme),
-    QString::fromStdString(Preferences::LightTheme),
-    QString::fromStdString(Preferences::DarkTheme),
-    QString::fromStdString(Preferences::BlenderTheme),
-  });
+  for (const auto& theme : ThemeRegistry::instance().themes())
+  {
+    m_themeCombo->addItem(theme.name, theme.id);
+    const auto toolTip = theme.author.isEmpty()
+                           ? tr("ID: %1").arg(theme.id)
+                           : tr("ID: %1\nBy %2").arg(theme.id, theme.author);
+    m_themeCombo->setItemData(m_themeCombo->count() - 1, toolTip, Qt::ToolTipRole);
+  }
   auto* themeInfo = new QLabel{};
   themeInfo->setText(tr("Requires restart after changing"));
   setInfoStyle(themeInfo);
@@ -361,7 +364,11 @@ bool ViewPreferencePane::validate()
 
 int ViewPreferencePane::findThemeIndex(const QString& theme) const
 {
-  return m_themeCombo->findText(theme);
+  const auto themeId = ThemeRegistry::instance().canonicalThemeId(theme);
+  const auto index = m_themeCombo->findData(themeId);
+  return index >= 0
+           ? index
+           : m_themeCombo->findData(QString::fromStdString(Preferences::SystemTheme));
 }
 
 void ViewPreferencePane::layoutChanged(const int index)
@@ -426,10 +433,15 @@ void ViewPreferencePane::filterModeChanged(const int value)
   prefs.set(Preferences::TextureMagFilter, magFilter);
 }
 
-void ViewPreferencePane::themeChanged(int /*index*/)
+void ViewPreferencePane::themeChanged(const int index)
 {
+  if (index < 0 || index >= m_themeCombo->count())
+  {
+    return;
+  }
+
   auto& prefs = PreferenceManager::instance();
-  prefs.set(Preferences::Theme, m_themeCombo->currentText().toStdString());
+  prefs.set(Preferences::Theme, m_themeCombo->itemData(index).toString().toStdString());
 }
 
 void ViewPreferencePane::materialBrowserIconSizeChanged(const int index)

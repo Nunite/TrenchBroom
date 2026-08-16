@@ -60,6 +60,7 @@
 #include "ui/MaterialBrowser.h"
 #include "ui/PreferenceDialog.h"
 #include "ui/QPathUtils.h"
+#include "ui/ThemeRegistry.h"
 #include "ui/UiSnapshot.h"
 #include "ui/WelcomeWindow.h"
 
@@ -324,12 +325,12 @@ void configurePreferencesSnapshot(
         targetWidget.findChild<QComboBox*>(QStringLiteral("ViewPreference_ThemeCombo"));
       !theme.isEmpty() && themeCombo != nullptr)
   {
-    const auto themeName = theme == QStringLiteral("light")  ? Preferences::LightTheme
-                           : theme == QStringLiteral("dark") ? Preferences::DarkTheme
-                           : theme == QStringLiteral("blender")
-                             ? Preferences::BlenderTheme
-                             : Preferences::SystemTheme;
-    themeCombo->setCurrentText(QString::fromStdString(themeName));
+    const auto themeId = ThemeRegistry::instance().canonicalThemeId(theme);
+    const auto index = themeCombo->findData(themeId);
+    if (index >= 0)
+    {
+      themeCombo->setCurrentIndex(index);
+    }
   }
 
   if (targetName == QStringLiteral("preferences-misc"))

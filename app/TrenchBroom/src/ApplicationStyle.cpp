@@ -20,6 +20,7 @@
 #include "ApplicationStyle.h"
 
 #include <QApplication>
+#include <QDebug>
 #include <QFile>
 #include <QPainter>
 #include <QPainterPath>
@@ -33,6 +34,7 @@
 #include "ui/QPathUtils.h"
 #include "ui/SystemPaths.h"
 #include "ui/Theme.h"
+#include "ui/ThemeRegistry.h"
 
 #include <algorithm>
 #include <cmath>
@@ -204,45 +206,44 @@ ThemeTokens installProxyStyle(
 {
   // Alt is part of TrenchBroom's fundamental fly-navigation controls. The proxy style
   // prevents an Alt press and release from unexpectedly focusing the menu bar.
-  const auto useDarkTheme =
-    (themeOverride && *themeOverride == QStringLiteral("dark"))
-    || (!themeOverride && pref(Preferences::Theme) == Preferences::DarkTheme);
-  const auto useLightTheme =
-    (themeOverride && *themeOverride == QStringLiteral("light"))
-    || (!themeOverride && pref(Preferences::Theme) == Preferences::LightTheme);
-  const auto useBlenderTheme =
-    (themeOverride && *themeOverride == QStringLiteral("blender"))
-    || (!themeOverride && pref(Preferences::Theme) == Preferences::BlenderTheme);
+  const auto& registry = ThemeRegistry::instance();
+  for (const auto& diagnostic : registry.diagnostics())
+  {
+    qWarning().noquote() << "Theme" << diagnostic.source << diagnostic.message;
+  }
 
-  const auto installExplicitTheme =
-    [&app](const ThemeTokens& themeTokens, const Qt::ColorScheme colorScheme) {
-      app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
-      app.setPalette(makeThemePalette(themeTokens));
-      app.styleHints()->setColorScheme(colorScheme);
-      return themeTokens;
-    };
+  const auto storedTheme = QString::fromStdString(pref(Preferences::Theme));
+  const auto requestedTheme = themeOverride.value_or(storedTheme);
+  const auto canonicalTheme = registry.canonicalThemeId(requestedTheme);
+  const auto* selectedTheme = registry.findTheme(canonicalTheme);
+  if (selectedTheme == nullptr)
+  {
+    qWarning().noquote() << "Theme unavailable, falling back to builtin.system:"
+                         << requestedTheme;
+  }
+  const auto& theme = registry.resolveTheme(canonicalTheme);
+
+  if (!themeOverride && canonicalTheme != storedTheme && selectedTheme != nullptr)
+  {
+    setPref(Preferences::Theme, canonicalTheme.toStdString());
+  }
+
+  if (theme.appearance == ThemeAppearance::System)
+  {
+    auto* systemStyle = new TrenchBroomProxyStyle{theme.tokens};
+    app.setStyle(systemStyle);
+    const auto systemTokens = makeSystemThemeTokens(app.palette());
+    systemStyle->setThemeTokens(systemTokens);
+    return systemTokens;
+  }
 
   // Explicit themes use Fusion for deterministic cross-platform rendering.
-  if (useDarkTheme)
-  {
-    return installExplicitTheme(makeDarkThemeTokens(), Qt::ColorScheme::Dark);
-  }
-
-  if (useLightTheme)
-  {
-    return installExplicitTheme(makeLightThemeTokens(), Qt::ColorScheme::Light);
-  }
-
-  if (useBlenderTheme)
-  {
-    return installExplicitTheme(makeBlenderThemeTokens(), Qt::ColorScheme::Dark);
-  }
-
-  auto* systemStyle = new TrenchBroomProxyStyle{makeSystemThemeTokens(app.palette())};
-  app.setStyle(systemStyle);
-  const auto themeTokens = makeSystemThemeTokens(app.palette());
-  systemStyle->setThemeTokens(themeTokens);
-  return themeTokens;
+  app.setStyle(new TrenchBroomProxyStyle{"Fusion", theme.tokens});
+  app.setPalette(makeThemePalette(theme.tokens));
+  app.styleHints()->setColorScheme(
+    theme.appearance == ThemeAppearance::Dark ? Qt::ColorScheme::Dark
+                                              : Qt::ColorScheme::Light);
+  return theme.tokens;
 }
 
 bool loadStyleSheet(QApplication& app, const ThemeTokens& themeTokens, QString* error)

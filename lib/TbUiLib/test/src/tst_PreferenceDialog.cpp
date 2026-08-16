@@ -137,11 +137,15 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     auto* themeCombo =
       pane->findChild<QComboBox*>(QStringLiteral("ViewPreference_ThemeCombo"));
     REQUIRE(themeCombo != nullptr);
-    CHECK(themeCombo->count() == 4);
-    CHECK(themeCombo->itemText(0).toStdString() == Preferences::SystemTheme);
-    CHECK(themeCombo->itemText(1).toStdString() == Preferences::LightTheme);
-    CHECK(themeCombo->itemText(2).toStdString() == Preferences::DarkTheme);
-    CHECK(themeCombo->itemText(3).toStdString() == Preferences::BlenderTheme);
+    CHECK(themeCombo->count() >= 4);
+    CHECK(themeCombo->itemText(0) == QStringLiteral("System"));
+    CHECK(themeCombo->itemText(1) == QStringLiteral("Light"));
+    CHECK(themeCombo->itemText(2) == QStringLiteral("Dark"));
+    CHECK(themeCombo->itemText(3) == QStringLiteral("Blender"));
+    CHECK(themeCombo->itemData(0).toString().toStdString() == Preferences::SystemTheme);
+    CHECK(themeCombo->itemData(1).toString().toStdString() == Preferences::LightTheme);
+    CHECK(themeCombo->itemData(2).toString().toStdString() == Preferences::DarkTheme);
+    CHECK(themeCombo->itemData(3).toString().toStdString() == Preferences::BlenderTheme);
 
     auto* materialBrowserIconSizeCombo = pane->findChild<QComboBox*>(
       QStringLiteral("ViewPreference_MaterialBrowserIconSizeCombo"));

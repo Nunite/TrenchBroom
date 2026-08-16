@@ -2,6 +2,7 @@ add_library(TbUiLib STATIC)
 
 target_sources(TbUiLib
   PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/themes.qrc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AboutDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Action.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ActionBuilder.cpp
@@ -227,6 +228,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TabBook.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TextOutputAdapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Theme.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThemeRegistry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThreePaneMapView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TitleBar.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TitledPanel.cpp
@@ -453,6 +455,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TabBook.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TextOutputAdapter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Theme.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ThemeRegistry.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ThreePaneMapView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TitleBar.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TitledPanel.h
@@ -514,7 +517,7 @@ target_compile_definitions(TbUiLib
     TB_PYTHON3_EXECUTABLE="${Python3_EXECUTABLE}"
 )
 
-set_target_properties(TbUiLib PROPERTIES AUTOMOC TRUE)
+set_target_properties(TbUiLib PROPERTIES AUTOMOC TRUE AUTORCC TRUE)
 
 execute_process(
   COMMAND "${GIT_EXECUTABLE}" rev-parse --git-path HEAD

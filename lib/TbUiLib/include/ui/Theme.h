@@ -60,9 +60,6 @@ struct ThemeTokens
 };
 
 ThemeTokens makeSystemThemeTokens(const QPalette& palette);
-ThemeTokens makeLightThemeTokens();
-ThemeTokens makeDarkThemeTokens();
-ThemeTokens makeBlenderThemeTokens();
 
 QPalette makeThemePalette(const ThemeTokens& tokens);
 

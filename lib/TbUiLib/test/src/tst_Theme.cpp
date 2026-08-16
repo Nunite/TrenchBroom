@@ -18,13 +18,20 @@
  */
 
 #include <QColor>
+#include <QFile>
+#include <QGuiApplication>
 #include <QPalette>
 #include <QString>
+#include <QTemporaryDir>
 
 #include "base/PreferenceManager.h"
 #include "prefs/Preferences.h"
 #include "ui/QColorUtils.h"
+#include "ui/QPathUtils.h"
 #include "ui/Theme.h"
+#include "ui/ThemeRegistry.h"
+
+#include <algorithm>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -33,9 +40,36 @@ namespace tb::ui
 
 TEST_CASE("Theme")
 {
-  SECTION("makeLightThemeTokens")
+  const auto builtInThemes = ThemeRegistry{QGuiApplication::palette()};
+
+  SECTION("loads built-in themes from distributable definitions")
   {
-    const auto tokens = makeLightThemeTokens();
+    REQUIRE(builtInThemes.themes().size() == 4u);
+
+    const auto* systemTheme = builtInThemes.findTheme(QStringLiteral("builtin.system"));
+    const auto* lightTheme = builtInThemes.findTheme(QStringLiteral("builtin.light"));
+    const auto* darkTheme = builtInThemes.findTheme(QStringLiteral("builtin.dark"));
+    const auto* blenderTheme = builtInThemes.findTheme(QStringLiteral("builtin.blender"));
+    REQUIRE(systemTheme != nullptr);
+    REQUIRE(lightTheme != nullptr);
+    REQUIRE(darkTheme != nullptr);
+    REQUIRE(blenderTheme != nullptr);
+
+    CHECK(systemTheme->name == QStringLiteral("System"));
+    CHECK(systemTheme->appearance == ThemeAppearance::System);
+    CHECK(lightTheme->name == QStringLiteral("Light"));
+    CHECK(lightTheme->appearance == ThemeAppearance::Light);
+    CHECK(darkTheme->name == QStringLiteral("Dark"));
+    CHECK(darkTheme->appearance == ThemeAppearance::Dark);
+    CHECK(blenderTheme->name == QStringLiteral("Blender"));
+    CHECK(blenderTheme->appearance == ThemeAppearance::Dark);
+    CHECK(builtInThemes.diagnostics().empty());
+  }
+
+  SECTION("loads light theme tokens")
+  {
+    const auto& tokens =
+      builtInThemes.resolveTheme(QStringLiteral("builtin.light")).tokens;
 
     CHECK(tokens.windowBackground == (QColor{243, 243, 243}));
     CHECK(tokens.editorBackground == (QColor{255, 255, 255}));
@@ -43,9 +77,10 @@ TEST_CASE("Theme")
     CHECK(tokens.text == (QColor{31, 31, 31}));
   }
 
-  SECTION("makeDarkThemeTokens")
+  SECTION("loads dark theme tokens")
   {
-    const auto tokens = makeDarkThemeTokens();
+    const auto& tokens =
+      builtInThemes.resolveTheme(QStringLiteral("builtin.dark")).tokens;
 
     CHECK(tokens.windowBackground == (QColor{24, 24, 24}));
     CHECK(tokens.editorBackground == (QColor{31, 31, 31}));
@@ -53,9 +88,10 @@ TEST_CASE("Theme")
     CHECK(tokens.text == (QColor{204, 204, 204}));
   }
 
-  SECTION("makeBlenderThemeTokens")
+  SECTION("resolves inherited Blender theme tokens")
   {
-    const auto tokens = makeBlenderThemeTokens();
+    const auto& tokens =
+      builtInThemes.resolveTheme(QStringLiteral("builtin.blender")).tokens;
 
     CHECK(tokens.windowBackground == (QColor{24, 24, 24}));
     CHECK(tokens.editorBackground == (QColor{48, 48, 48}));
@@ -72,7 +108,8 @@ TEST_CASE("Theme")
 
   SECTION("makeThemePalette")
   {
-    const auto tokens = makeDarkThemeTokens();
+    const auto& tokens =
+      builtInThemes.resolveTheme(QStringLiteral("builtin.dark")).tokens;
     const auto palette = makeThemePalette(tokens);
 
     CHECK(palette.color(QPalette::Active, QPalette::Window) == tokens.windowBackground);
@@ -90,7 +127,8 @@ TEST_CASE("Theme")
     const auto originalBackground = pref(Preferences::BrowserBackgroundColor);
     const auto originalGroupBackground = pref(Preferences::BrowserGroupBackgroundColor);
     const auto originalText = pref(Preferences::BrowserTextColor);
-    const auto palette = makeThemePalette(makeLightThemeTokens());
+    const auto palette = makeThemePalette(
+      builtInThemes.resolveTheme(QStringLiteral("builtin.light")).tokens);
 
     setPref(
       Preferences::BrowserBackgroundColor,
@@ -115,7 +153,8 @@ TEST_CASE("Theme")
     CHECK(toQColor(browserCellSelectedColor(palette)) == expectedSelectedColor);
     CHECK(toQColor(browserErrorColor(palette)) == (QColor{196, 43, 28}));
     CHECK(
-      toQColor(browserErrorColor(makeThemePalette(makeDarkThemeTokens())))
+      toQColor(browserErrorColor(makeThemePalette(
+        builtInThemes.resolveTheme(QStringLiteral("builtin.dark")).tokens)))
       == (QColor{244, 135, 113}));
 
     const auto customBackground = Color{RgbF{0.2f, 0.3f, 0.4f}};
@@ -129,7 +168,8 @@ TEST_CASE("Theme")
 
   SECTION("expandThemeStyleSheet")
   {
-    const auto tokens = makeDarkThemeTokens();
+    const auto& tokens =
+      builtInThemes.resolveTheme(QStringLiteral("builtin.dark")).tokens;
     auto styleSheet = QStringLiteral(
       "QWidget { color: @tb-text; background: @tb-window-background; "
       "image: @tb-combo-arrow-image; }");
@@ -145,7 +185,8 @@ TEST_CASE("Theme")
 
   SECTION("expandThemeStyleSheet selects light control assets")
   {
-    const auto tokens = makeLightThemeTokens();
+    const auto& tokens =
+      builtInThemes.resolveTheme(QStringLiteral("builtin.light")).tokens;
     auto styleSheet = QStringLiteral(
       "QComboBox::down-arrow { image: @tb-combo-arrow-image; } "
       "QComboBox::down-arrow:disabled { image: @tb-combo-arrow-disabled-image; } "
@@ -168,7 +209,8 @@ TEST_CASE("Theme")
 
   SECTION("expandThemeStyleSheet rejects unknown tokens without changing the input")
   {
-    const auto tokens = makeDarkThemeTokens();
+    const auto& tokens =
+      builtInThemes.resolveTheme(QStringLiteral("builtin.dark")).tokens;
     const auto original = QStringLiteral("QWidget { color: @tb-unknown-color; }");
     auto styleSheet = original;
     auto error = QString{};
@@ -176,6 +218,141 @@ TEST_CASE("Theme")
     CHECK_FALSE(expandThemeStyleSheet(styleSheet, tokens, &error));
     CHECK(styleSheet == original);
     CHECK(error == QStringLiteral("Unknown theme token: @tb-unknown-color"));
+  }
+
+  SECTION("maps legacy built-in names and aliases to stable IDs")
+  {
+    CHECK(
+      builtInThemes.canonicalThemeId(QStringLiteral("System"))
+      == QStringLiteral("builtin.system"));
+    CHECK(
+      builtInThemes.canonicalThemeId(QStringLiteral("light"))
+      == QStringLiteral("builtin.light"));
+    CHECK(
+      builtInThemes.canonicalThemeId(QStringLiteral("Dark"))
+      == QStringLiteral("builtin.dark"));
+    CHECK(
+      builtInThemes.canonicalThemeId(QStringLiteral("blender"))
+      == QStringLiteral("builtin.blender"));
+    CHECK(
+      builtInThemes.canonicalThemeId(QStringLiteral("publisher.custom"))
+      == QStringLiteral("publisher.custom"));
+  }
+
+  SECTION("loads validated user themes with inheritance")
+  {
+    auto directory = QTemporaryDir{};
+    REQUIRE(directory.isValid());
+
+    const auto writeTheme = [&](const QString& fileName, const QByteArray& contents) {
+      auto file = QFile{directory.filePath(fileName)};
+      REQUIRE(file.open(QFile::WriteOnly));
+      REQUIRE(file.write(contents) == contents.size());
+    };
+
+    writeTheme(QStringLiteral("10-midnight.tbtheme"), QByteArray{R"({
+        "schemaVersion": 1,
+        "id": "acme.midnight",
+        "name": "Midnight",
+        "author": "Acme",
+        "appearance": "dark",
+        "inherits": "builtin.dark",
+        "colors": {
+          "accent": "#123456",
+          "focusBorder": "#654321"
+        }
+      })"});
+    writeTheme(QStringLiteral("20-unknown-field.tbtheme"), QByteArray{R"({
+        "schemaVersion": 1,
+        "id": "acme.unsafe",
+        "name": "Unsafe",
+        "appearance": "dark",
+        "inherits": "builtin.dark",
+        "colors": {},
+        "stylesheet": "QWidget { margin: 100px; }"
+      })"});
+    writeTheme(QStringLiteral("30-duplicate.tbtheme"), QByteArray{R"({
+        "schemaVersion": 1,
+        "id": "builtin.dark",
+        "name": "Replacement Dark",
+        "appearance": "dark",
+        "inherits": "builtin.dark",
+        "colors": {}
+      })"});
+    writeTheme(QStringLiteral("31-duplicate-first.tbtheme"), QByteArray{R"({
+        "schemaVersion": 1,
+        "id": "acme.duplicate",
+        "name": "First Duplicate",
+        "appearance": "dark",
+        "inherits": "builtin.dark",
+        "colors": {}
+      })"});
+    writeTheme(QStringLiteral("32-duplicate-second.tbtheme"), QByteArray{R"({
+        "schemaVersion": 1,
+        "id": "acme.duplicate",
+        "name": "Second Duplicate",
+        "appearance": "dark",
+        "inherits": "builtin.dark",
+        "colors": {}
+      })"});
+    writeTheme(QStringLiteral("40-missing-parent.tbtheme"), QByteArray{R"({
+        "schemaVersion": 1,
+        "id": "acme.orphan",
+        "name": "Orphan",
+        "appearance": "dark",
+        "inherits": "missing.theme",
+        "colors": {}
+      })"});
+    writeTheme(QStringLiteral("50-cycle-a.tbtheme"), QByteArray{R"({
+        "schemaVersion": 1,
+        "id": "acme.cycle-a",
+        "name": "Cycle A",
+        "appearance": "dark",
+        "inherits": "acme.cycle-b",
+        "colors": {}
+      })"});
+    writeTheme(QStringLiteral("60-cycle-b.tbtheme"), QByteArray{R"({
+        "schemaVersion": 1,
+        "id": "acme.cycle-b",
+        "name": "Cycle B",
+        "appearance": "dark",
+        "inherits": "acme.cycle-a",
+        "colors": {}
+      })"});
+
+    const auto registry =
+      ThemeRegistry{QGuiApplication::palette(), pathFromQString(directory.path())};
+    const auto* theme = registry.findTheme(QStringLiteral("acme.midnight"));
+    REQUIRE(theme != nullptr);
+    CHECK(theme->name == QStringLiteral("Midnight"));
+    CHECK(theme->author == QStringLiteral("Acme"));
+    CHECK(theme->tokens.accent == (QColor{0x12, 0x34, 0x56}));
+    CHECK(theme->tokens.focusBorder == (QColor{0x65, 0x43, 0x21}));
+    CHECK(theme->tokens.editorBackground == (QColor{31, 31, 31}));
+
+    const auto* duplicate = registry.findTheme(QStringLiteral("acme.duplicate"));
+    REQUIRE(duplicate != nullptr);
+    CHECK(duplicate->name == QStringLiteral("First Duplicate"));
+
+    CHECK(registry.findTheme(QStringLiteral("acme.unsafe")) == nullptr);
+    CHECK(registry.findTheme(QStringLiteral("acme.orphan")) == nullptr);
+    CHECK(registry.findTheme(QStringLiteral("acme.cycle-a")) == nullptr);
+    CHECK(registry.findTheme(QStringLiteral("acme.cycle-b")) == nullptr);
+    CHECK(
+      registry.resolveTheme(QStringLiteral("builtin.dark")).name
+      == QStringLiteral("Dark"));
+
+    const auto hasDiagnostic = [&](const QString& text) {
+      return std::ranges::any_of(registry.diagnostics(), [&](const auto& diagnostic) {
+        return diagnostic.message.contains(text);
+      });
+    };
+    CHECK(hasDiagnostic(QStringLiteral("Unknown field: stylesheet")));
+    CHECK(
+      hasDiagnostic(QStringLiteral("Theme IDs beginning with builtin. are reserved")));
+    CHECK(hasDiagnostic(QStringLiteral("Duplicate theme ID ignored: acme.duplicate")));
+    CHECK(hasDiagnostic(QStringLiteral("Inherited theme not found: missing.theme")));
+    CHECK(hasDiagnostic(QStringLiteral("Cyclic theme inheritance")));
   }
 }
 

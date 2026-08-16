@@ -46,6 +46,7 @@
 #include "ui/QPreferenceStore.h"
 #include "ui/RecentDocuments.h"
 #include "ui/SystemPaths.h"
+#include "ui/ThemeRegistry.h"
 
 #include <cstring>
 #include <memory>
@@ -160,7 +161,7 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "path"};
   const auto uiSnapshotThemeOption = QCommandLineOption{
     QStringList{"ui-snapshot-theme"},
-    "Override the snapshot theme with system, light, dark, or blender.",
+    "Override the snapshot theme by ID (system/light/dark/blender aliases supported).",
     "theme",
     "system"};
   const auto uiSnapshotPageOption = QCommandLineOption{
@@ -207,10 +208,7 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
   }
 
   const auto snapshotTheme = parser.value(uiSnapshotThemeOption).trimmed().toLower();
-  if (
-    snapshotTheme != QStringLiteral("system") && snapshotTheme != QStringLiteral("light")
-    && snapshotTheme != QStringLiteral("dark")
-    && snapshotTheme != QStringLiteral("blender"))
+  if (ThemeRegistry::instance().findTheme(snapshotTheme) == nullptr)
   {
     qCritical() << "Unsupported UI snapshot theme:" << snapshotTheme;
     return std::nullopt;

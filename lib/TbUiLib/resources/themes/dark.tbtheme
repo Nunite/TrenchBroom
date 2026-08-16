@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.dark",
+  "name": "Dark",
+  "author": "TrenchBroom",
+  "appearance": "dark",
+  "colors": {
+    "windowBackground": "#181818",
+    "editorBackground": "#1f1f1f",
+    "sidebarBackground": "#181818",
+    "panelBackground": "#181818",
+    "elevatedBackground": "#252526",
+    "inputBackground": "#2a2a2a",
+    "alternateBackground": "#232323",
+    "buttonBackground": "#2d2d2d",
+    "hoverBackground": "#2a2d2e",
+    "pressedBackground": "#37373d",
+    "selectionBackground": "#094771",
+    "inactiveSelectionBackground": "#37373d",
+    "border": "#2b2b2b",
+    "strongBorder": "#454545",
+    "focusBorder": "#007fd4",
+    "text": "#cccccc",
+    "secondaryText": "#9d9d9d",
+    "disabledText": "#656565",
+    "inverseText": "#ffffff",
+    "accent": "#0078d4",
+    "error": "#f48771",
+    "warning": "#cca700",
+    "success": "#89d185"
+  }
+}

@@ -1,0 +1,8 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource prefix="/themes">
+    <file alias="00-system.tbtheme">themes/system.tbtheme</file>
+    <file alias="10-light.tbtheme">themes/light.tbtheme</file>
+    <file alias="20-dark.tbtheme">themes/dark.tbtheme</file>
+    <file alias="30-blender.tbtheme">themes/blender.tbtheme</file>
+</qresource>
+</RCC>

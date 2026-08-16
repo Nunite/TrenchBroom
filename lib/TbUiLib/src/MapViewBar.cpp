@@ -27,6 +27,7 @@
 #include "base/PreferenceManager.h"
 #include "prefs/Preferences.h"
 #include "ui/MapDocument.h"
+#include "ui/ThemeRegistry.h"
 #include "ui/ViewConstants.h"
 #include "ui/ViewEditor.h"
 
@@ -54,11 +55,10 @@ void MapViewBar::createGui(MapDocument& document)
   m_viewEditor = new ViewPopupEditor{document};
 
 #if defined(Q_OS_MACOS)
-  const auto theme = pref(Preferences::Theme);
+  const auto& theme = ThemeRegistry::instance().resolveTheme(
+    QString::fromStdString(pref(Preferences::Theme)));
   const auto vMargin =
-    theme == Preferences::DarkTheme || theme == Preferences::BlenderTheme
-      ? LayoutConstants::MediumVMargin
-      : 0;
+    theme.appearance == ThemeAppearance::Dark ? LayoutConstants::MediumVMargin : 0;
 #else
   const auto vMargin = LayoutConstants::MediumVMargin;
 #endif
