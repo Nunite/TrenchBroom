@@ -21,6 +21,7 @@
 
 #include <QDesktopServices>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QOffscreenSurface>
@@ -188,6 +189,7 @@ AppController::AppController(
   , m_networkManager{new QNetworkAccessManager{this}}
   , m_reloadRecentDocumentsTimer{new QTimer{this}}
   , m_processResourcesTimer{new QTimer{this}}
+  , m_backgroundServicesEnabled{options.enableBackgroundServices}
   , m_httpClient{new upd::QtHttpClient{*m_networkManager}}
   , m_updater{new upd::Updater{*m_httpClient, makeUpdateConfig(), this}}
   , m_mapWindowManager{createMapWindowManager(*this, options.showMapWindows)}
@@ -195,6 +197,8 @@ AppController::AppController(
   , m_actionManager{std::make_unique<ActionManager>()}
   , m_mcpBridgeServer{std::make_unique<McpBridgeServer>(*this)}
   , m_mcpHttpServer{std::make_unique<McpHttpServer>(*m_mcpBridgeServer)}
+  , m_mcpConfigPath{options.mcpConfigPath.isEmpty() ? mcp::defaultConfigPath() : options.mcpConfigPath}
+  , m_mcpConfig{mcp::defaultBridgeConfig()}
   , m_welcomeWindow{std::make_unique<WelcomeWindow>(*this)}
   , m_aboutDialog{std::make_unique<AboutDialog>(*this)}
 {
@@ -303,6 +307,56 @@ void AppController::restartMcpBridge()
   m_mcpBridgeServer->stop();
   m_mcpHttpServer->stop();
   startMcpBridge();
+  emit mcpStateChanged();
+}
+
+const QString& AppController::mcpConfigPath() const
+{
+  return m_mcpConfigPath;
+}
+
+const mcp::McpBridgeConfig& AppController::mcpConfig() const
+{
+  return m_mcpConfig;
+}
+
+bool AppController::applyMcpConfig(
+  const mcp::McpBridgeConfig& config, const QString& configPath, QString* error)
+{
+  if (!mcp::writeBridgeConfig(config, configPath, error))
+  {
+    return false;
+  }
+
+  if (
+    QFileInfo{configPath}.absoluteFilePath()
+    == QFileInfo{m_mcpConfigPath}.absoluteFilePath())
+  {
+    if (m_backgroundServicesEnabled)
+    {
+      restartMcpBridge();
+    }
+    else
+    {
+      m_mcpConfig = config;
+      m_mcpStartupError.clear();
+      emit mcpStateChanged();
+    }
+  }
+  return true;
+}
+
+bool AppController::setMcpMode(const mcp::McpMode mode, QString* error)
+{
+  const auto config = mcp::readOrCreateBridgeConfig(m_mcpConfigPath, error);
+  if (!config)
+  {
+    return false;
+  }
+
+  auto updatedConfig = *config;
+  updatedConfig.mode = mode;
+  return applyMcpConfig(updatedConfig, m_mcpConfigPath, error);
 }
 
 bool AppController::mcpBridgeIsListening() const
@@ -514,13 +568,15 @@ void AppController::startMcpBridge()
 {
   m_mcpStartupError.clear();
   auto error = QString{};
-  const auto config = mcp::readOrCreateBridgeConfig(mcp::defaultConfigPath(), &error);
+  const auto config = mcp::readOrCreateBridgeConfig(m_mcpConfigPath, &error);
   if (!config)
   {
     m_mcpStartupError = QString{"Could not initialize MCP bridge config: %1"}.arg(error);
     FileLogger::instance().warn() << m_mcpStartupError.toStdString();
     return;
   }
+
+  m_mcpConfig = *config;
 
   if (!m_mcpBridgeServer->start(*config, &error) && config->mode != mcp::McpMode::Off)
   {

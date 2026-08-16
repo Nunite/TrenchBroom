@@ -70,7 +70,7 @@ QString claudeCommand(const QString& url)
 } // namespace
 
 McpSettingsWidget::McpSettingsWidget(AppController& appController, QWidget* parent)
-  : McpSettingsWidget{appController, mcp::defaultConfigPath(), parent}
+  : McpSettingsWidget{appController, appController.mcpConfigPath(), parent}
 {
 }
 
@@ -85,6 +85,10 @@ McpSettingsWidget::McpSettingsWidget(
   loadConfig();
   createGui();
   updateControls();
+  connect(&m_appController, &AppController::mcpStateChanged, this, [this]() {
+    loadConfig();
+    updateControls();
+  });
 }
 
 void McpSettingsWidget::createGui()
@@ -222,25 +226,16 @@ void McpSettingsWidget::loadConfig()
   }
 }
 
-bool McpSettingsWidget::saveConfig()
-{
-  auto error = QString{};
-  if (mcp::writeBridgeConfig(m_config, m_configPath, &error))
-  {
-    m_error.clear();
-    return true;
-  }
-
-  m_error = error;
-  updateControls();
-  return false;
-}
-
 void McpSettingsWidget::applyConfigChange()
 {
-  if (saveConfig())
+  auto error = QString{};
+  if (m_appController.applyMcpConfig(m_config, m_configPath, &error))
   {
-    m_appController.restartMcpBridge();
+    m_error.clear();
+  }
+  else
+  {
+    m_error = error;
   }
   updateControls();
 }

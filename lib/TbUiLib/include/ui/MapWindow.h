@@ -75,6 +75,7 @@ class Action;
 class AppController;
 class CompilationDialog;
 class Console;
+class ElidedLabel;
 class InfoPanel;
 enum class InfoPanelPage;
 class Inspector;
@@ -120,8 +121,9 @@ private:
   Inspector* m_inspector = nullptr;
 
   QComboBox* m_gridChoice = nullptr;
+  QToolButton* m_mcpToggle = nullptr;
   QToolButton* m_snapToggle = nullptr;
-  QLabel* m_statusBarLabel = nullptr;
+  ElidedLabel* m_statusBarLabel = nullptr;
 
   QPointer<CompilationDialog> m_compilationDialog;
   QPointer<ObjExportDialog> m_objExportDialog;
@@ -187,6 +189,8 @@ private: // status bar
   void createStatusBar();
   void updateStatusBar();
   void updateStatusBarDelayed();
+  void updateMcpStatus();
+  void toggleMcp();
 
 private: // gui creation
   void createGui();

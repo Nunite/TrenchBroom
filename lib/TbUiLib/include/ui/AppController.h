@@ -24,6 +24,7 @@
 #include <QtSystemDetection>
 
 #include "base/Result.h"
+#include "mcp/McpBridgeConfig.h"
 
 #include <filesystem>
 #include <memory>
@@ -75,6 +76,7 @@ struct AppControllerOptions
   bool enableBackgroundServices = true;
   bool showMapWindows = true;
   bool enableGlResourceProcessing = true;
+  QString mcpConfigPath;
 };
 
 class AppController : public QObject
@@ -93,6 +95,7 @@ private:
   QNetworkAccessManager* m_networkManager = nullptr;
   QTimer* m_reloadRecentDocumentsTimer = nullptr;
   QTimer* m_processResourcesTimer = nullptr;
+  bool m_backgroundServicesEnabled = true;
 
   upd::HttpClient* m_httpClient = nullptr;
   upd::Updater* m_updater = nullptr;
@@ -102,6 +105,8 @@ private:
   std::unique_ptr<ActionManager> m_actionManager;
   std::unique_ptr<McpBridgeServer> m_mcpBridgeServer;
   std::unique_ptr<McpHttpServer> m_mcpHttpServer;
+  QString m_mcpConfigPath;
+  mcp::McpBridgeConfig m_mcpConfig;
   QString m_mcpStartupError;
   std::unique_ptr<WelcomeWindow> m_welcomeWindow;
   std::unique_ptr<AboutDialog> m_aboutDialog;
@@ -144,6 +149,13 @@ public:
   const QJsonObject& mcpOverlayState() const;
   void refreshMcpOverlayViews();
   void restartMcpBridge();
+  const QString& mcpConfigPath() const;
+  const mcp::McpBridgeConfig& mcpConfig() const;
+  bool applyMcpConfig(
+    const mcp::McpBridgeConfig& config,
+    const QString& configPath,
+    QString* error = nullptr);
+  bool setMcpMode(mcp::McpMode mode, QString* error = nullptr);
   bool mcpBridgeIsListening() const;
   bool mcpHttpServerIsListening() const;
   QString mcpHttpServerUrl() const;
@@ -164,6 +176,9 @@ public:
   void showPythonPluginManager();
   void showAboutDialog();
   void debugShowCrashReportDialog();
+
+signals:
+  void mcpStateChanged();
 
 private:
   void connectObservers();

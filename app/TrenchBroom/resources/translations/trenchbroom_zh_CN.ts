@@ -1109,6 +1109,10 @@
         <translation>%1%2 已选中</translation>
     </message>
     <message>
+        <source>Size %1 x %2 x %3</source>
+        <translation>尺寸 %1 x %2 x %3</translation>
+    </message>
+    <message>
         <location filename="../../../../lib/TbUiLib/src/MapWindow.cpp" line="761"/>
         <source>%1 hidden</source>
         <translation>%1 隐藏</translation>
@@ -2822,6 +2826,54 @@ Please choose a different file name to export to.</source>
         <location filename="../../../../lib/TbUiLib/src/MapWindow.cpp" line="528"/>
         <source>Grid %1</source>
         <translation>网格 %1</translation>
+    </message>
+    <message>
+        <source>Grid size</source>
+        <translation>网格尺寸</translation>
+    </message>
+    <message>
+        <source>Snap</source>
+        <translation>吸附</translation>
+    </message>
+    <message>
+        <source>Snap to grid</source>
+        <translation>吸附到网格</translation>
+    </message>
+    <message>
+        <source>MCP Off</source>
+        <translation>MCP 已关闭</translation>
+    </message>
+    <message>
+        <source>MCP Read-only</source>
+        <translation>MCP 只读</translation>
+    </message>
+    <message>
+        <source>MCP Edit</source>
+        <translation>MCP 编辑</translation>
+    </message>
+    <message>
+        <source>MCP Error</source>
+        <translation>MCP 错误</translation>
+    </message>
+    <message>
+        <source>Enable local MCP access in read-only mode.</source>
+        <translation>以只读模式启用本机 MCP 访问。</translation>
+    </message>
+    <message>
+        <source>MCP is read-only. Click to turn it off.</source>
+        <translation>MCP 当前为只读模式。点击关闭。</translation>
+    </message>
+    <message>
+        <source>MCP can edit maps. Click to turn it off.</source>
+        <translation>MCP 当前可编辑地图。点击关闭。</translation>
+    </message>
+    <message>
+        <source>MCP startup failed: %1</source>
+        <translation>MCP 启动失败：%1</translation>
+    </message>
+    <message>
+        <source>Could not update MCP access: %1</source>
+        <translation>无法更新 MCP 访问状态：%1</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/MapWindow.cpp" line="1071"/>
