@@ -17,72 +17,40 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <QAbstractButton>
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
-#include <QDeadlineTimer>
 #include <QDebug>
-#include <QDir>
-#include <QEvent>
-#include <QFile>
 #include <QFileInfo>
-#include <QLineEdit>
-#include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QPainter>
-#include <QPainterPath>
-#include <QPointer>
-#include <QProxyStyle>
 #include <QSettings>
-#include <QSignalBlocker>
-#include <QSplitter>
 #include <QString>
-#include <QStyleHints>
 #include <QSurfaceFormat>
 #include <QTemporaryDir>
-#include <QTextStream>
-#include <QTimer>
 #include <QTranslator>
-#include <QTreeWidget>
 #include <QtGlobal>
 
+#include "ApplicationStyle.h"
+#include "UiSnapshotRunner.h"
 #include "base/PreferenceManager.h"
-#include "fs/DiskIO.h"
-#include "gl/Material.h"
-#include "gl/MaterialManager.h"
-#include "gl/Resource.h"
-#include "gl/Texture.h"
-#include "mdl/GameManager.h"
-#include "mdl/Map.h"
-#include "mdl/MapHeader.h"
 #include "prefs/Preferences.h"
 #include "ui/Action.h"
 #include "ui/ActionBuilder.h"
 #include "ui/ActionExecutionContext.h"
 #include "ui/AppController.h"
-#include "ui/CommandPaletteDialog.h"
 #include "ui/Contracts.h"
 #include "ui/CrashReporter.h"
 #include "ui/FileEventFilter.h"
-#include "ui/InfoPanel.h"
-#include "ui/Inspector.h"
-#include "ui/MapDocument.h"
-#include "ui/MapWindow.h"
-#include "ui/MapWindowManager.h"
-#include "ui/PreferenceDialog.h"
 #include "ui/QPathUtils.h"
 #include "ui/QPreferenceStore.h"
 #include "ui/RecentDocuments.h"
 #include "ui/SystemPaths.h"
-#include "ui/Theme.h"
-#include "ui/UiSnapshot.h"
-#include "ui/WelcomeWindow.h"
 
-#include <algorithm>
+#include <cstring>
 #include <memory>
 #include <optional>
+#include <unordered_map>
 
 using namespace tb;
 using namespace tb::ui;
@@ -90,18 +58,8 @@ using namespace tb::ui;
 static_assert(
   QT_VERSION >= QT_VERSION_CHECK(6, 8, 0), "TrenchBroom requires Qt 6.8.0 or later");
 
-extern void qt_set_sequence_auto_mnemonic(bool b);
-
 namespace
 {
-
-struct UiSnapshotCommandLineOptions
-{
-  QString outputPath;
-  QString theme;
-  QString page;
-  QString gamePath;
-};
 
 struct CommandLineOptions
 {
@@ -109,41 +67,6 @@ struct CommandLineOptions
   QStringList fileNames;
   std::optional<UiSnapshotCommandLineOptions> uiSnapshot;
 };
-
-bool loadStyleSheets(const ThemeTokens& themeTokens, QString* error = nullptr)
-{
-  const auto path = SystemPaths::findResourceFile("stylesheets/base.qss");
-  if (auto file = QFile{pathAsQPath(path)}; file.exists())
-  {
-    // closed automatically by destructor
-    if (!file.open(QFile::ReadOnly | QFile::Text))
-    {
-      if (error != nullptr)
-      {
-        *error = file.errorString();
-      }
-      return false;
-    }
-    auto styleSheet = QTextStream{&file}.readAll();
-    if (!expandThemeStyleSheet(styleSheet, themeTokens, error))
-    {
-      return false;
-    }
-
-    qApp->setStyleSheet(styleSheet);
-    if (error != nullptr)
-    {
-      error->clear();
-    }
-    return true;
-  }
-
-  if (error != nullptr)
-  {
-    *error = QStringLiteral("Could not find stylesheet: %1").arg(pathAsQString(path));
-  }
-  return false;
-}
 
 void loadTranslations(QApplication& app)
 {
@@ -159,192 +82,6 @@ void loadTranslations(QApplication& app)
   }
 }
 
-ThemeTokens loadStyle(
-  QApplication& app, const std::optional<QString>& themeOverride = std::nullopt)
-{
-  // We can't use auto mnemonics in TrenchBroom. e.g. by default with Qt, Alt+D opens
-  // the "Debug" menu, Alt+S activates the "Show default properties" checkbox in the
-  // entity inspector. Flying with Alt held down and pressing WASD is a fundamental
-  // behaviour in TB, so we can't have shortcuts randomly activating.
-  //
-  // Previously were calling `qt_set_sequence_auto_mnemonic(false);` in main(), but it
-  // turns out we also need to suppress an Alt press followed by release from focusing
-  // the menu bar (https://github.com/TrenchBroom/TrenchBroom/issues/3140), so the
-  // following QProxyStyle disables that completely.
-
-  class TrenchBroomProxyStyle : public QProxyStyle
-  {
-  private:
-    ThemeTokens m_themeTokens;
-
-    void drawCheckBoxIndicator(const QStyleOption* option, QPainter* painter) const
-    {
-      const auto enabled = option->state.testFlag(QStyle::State_Enabled);
-      const auto hovered = option->state.testFlag(QStyle::State_MouseOver);
-      const auto pressed = option->state.testFlag(QStyle::State_Sunken);
-      const auto focused = option->state.testFlag(QStyle::State_HasFocus);
-      const auto selected = option->state.testFlag(QStyle::State_Selected);
-      const auto checked = option->state.testFlag(QStyle::State_On);
-      const auto mixed = option->state.testFlag(QStyle::State_NoChange);
-
-      const auto side = std::min(option->rect.width(), option->rect.height());
-      const auto indicatorRect = QRectF{
-        option->rect.center().x() - side / 2.0 + 0.5,
-        option->rect.center().y() - side / 2.0 + 0.5,
-        side - 1.0,
-        side - 1.0};
-      const auto scale = side / 18.0;
-
-      const auto background = !enabled  ? m_themeTokens.windowBackground
-                              : pressed ? m_themeTokens.pressedBackground
-                              : hovered ? m_themeTokens.hoverBackground
-                                        : m_themeTokens.inputBackground;
-      const auto border = !enabled  ? m_themeTokens.border
-                          : focused ? m_themeTokens.focusBorder
-                                    : m_themeTokens.strongBorder;
-      const auto foreground = !enabled   ? m_themeTokens.disabledText
-                              : selected ? m_themeTokens.inverseText
-                                         : m_themeTokens.text;
-
-      painter->save();
-      painter->setRenderHint(QPainter::Antialiasing, true);
-      painter->setPen(QPen{border, 1.0});
-      painter->setBrush(background);
-      painter->drawRoundedRect(indicatorRect, 3.0 * scale, 3.0 * scale);
-
-      if (checked || mixed)
-      {
-        auto mark = QPainterPath{};
-        if (mixed)
-        {
-          mark.moveTo(indicatorRect.left() + 4.0 * scale, indicatorRect.center().y());
-          mark.lineTo(indicatorRect.right() - 4.0 * scale, indicatorRect.center().y());
-        }
-        else
-        {
-          mark.moveTo(
-            indicatorRect.left() + 4.0 * scale, indicatorRect.top() + 9.0 * scale);
-          mark.lineTo(
-            indicatorRect.left() + 7.0 * scale, indicatorRect.top() + 12.0 * scale);
-          mark.lineTo(
-            indicatorRect.left() + 14.0 * scale, indicatorRect.top() + 5.0 * scale);
-        }
-
-        auto markPen = QPen{foreground, std::max(1.5, 2.0 * scale)};
-        markPen.setCapStyle(Qt::RoundCap);
-        markPen.setJoinStyle(Qt::RoundJoin);
-        painter->setPen(markPen);
-        painter->setBrush(Qt::NoBrush);
-        painter->drawPath(mark);
-      }
-      painter->restore();
-    }
-
-  public:
-    TrenchBroomProxyStyle(const QString& key, const ThemeTokens& themeTokens)
-      : QProxyStyle{key}
-      , m_themeTokens{themeTokens}
-    {
-    }
-
-    explicit TrenchBroomProxyStyle(
-      const ThemeTokens& themeTokens, QStyle* style = nullptr)
-      : QProxyStyle{style}
-      , m_themeTokens{themeTokens}
-    {
-    }
-
-    void setThemeTokens(const ThemeTokens& themeTokens) { m_themeTokens = themeTokens; }
-
-    void drawPrimitive(
-      const PrimitiveElement element,
-      const QStyleOption* option,
-      QPainter* painter,
-      const QWidget* widget = nullptr) const override
-    {
-      if (
-        element == QStyle::PE_IndicatorCheckBox
-        || element == QStyle::PE_IndicatorItemViewItemCheck)
-      {
-        drawCheckBoxIndicator(option, painter);
-        return;
-      }
-
-      QProxyStyle::drawPrimitive(element, option, painter, widget);
-    }
-
-    int styleHint(
-      StyleHint hint,
-      const QStyleOption* option = nullptr,
-      const QWidget* widget = nullptr,
-      QStyleHintReturn* returnData = nullptr) const override
-    {
-      return hint == QStyle::SH_MenuBar_AltKeyNavigation
-               ? 0
-               : QProxyStyle::styleHint(hint, option, widget, returnData);
-    }
-
-    int pixelMetric(
-      PixelMetric metric,
-      const QStyleOption* option = nullptr,
-      const QWidget* widget = nullptr) const override
-    {
-      switch (metric)
-      {
-      case QStyle::PM_IndicatorWidth:
-      case QStyle::PM_IndicatorHeight:
-        return 18;
-      case QStyle::PM_SmallIconSize:
-      case QStyle::PM_ButtonIconSize:
-      case QStyle::PM_TabBarIconSize:
-        return 16;
-      case QStyle::PM_ToolBarIconSize:
-        return 20;
-      case QStyle::PM_ToolBarItemSpacing:
-      case QStyle::PM_ToolBarItemMargin:
-        return 2;
-      case QStyle::PM_FocusFrameHMargin:
-      case QStyle::PM_FocusFrameVMargin:
-        return 1;
-      default:
-        return QProxyStyle::pixelMetric(metric, option, widget);
-      }
-    }
-  };
-
-  const auto useDarkTheme =
-    (themeOverride && *themeOverride == QStringLiteral("dark"))
-    || (!themeOverride && pref(Preferences::Theme) == Preferences::DarkTheme);
-  const auto useLightTheme =
-    (themeOverride && *themeOverride == QStringLiteral("light"))
-    || (!themeOverride && pref(Preferences::Theme) == Preferences::LightTheme);
-
-  // Explicit themes use Fusion for deterministic cross-platform rendering.
-  if (useDarkTheme)
-  {
-    const auto themeTokens = makeDarkThemeTokens();
-    app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
-    app.setPalette(makeThemePalette(themeTokens));
-    app.styleHints()->setColorScheme(Qt::ColorScheme::Dark);
-    return themeTokens;
-  }
-
-  if (useLightTheme)
-  {
-    const auto themeTokens = makeLightThemeTokens();
-    app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
-    app.setPalette(makeThemePalette(themeTokens));
-    app.styleHints()->setColorScheme(Qt::ColorScheme::Light);
-    return themeTokens;
-  }
-
-  auto* systemStyle = new TrenchBroomProxyStyle{makeSystemThemeTokens(app.palette())};
-  app.setStyle(systemStyle);
-  const auto themeTokens = makeSystemThemeTokens(app.palette());
-  systemStyle->setThemeTokens(themeTokens);
-  return themeTokens;
-}
-
 auto createAppController(const bool snapshotMode = false)
 {
   const auto options = AppControllerOptions{!snapshotMode, !snapshotMode, true};
@@ -358,7 +95,6 @@ auto createAppController(const bool snapshotMode = false)
          })
          | kdl::value();
 }
-
 
 [[maybe_unused]] void populateMainMenu(AppController& appController)
 {
@@ -406,50 +142,6 @@ bool openFiles(AppController& appController, const QStringList& fileNames)
   }
 
   return anyDocumentOpened;
-}
-
-bool configureUiSnapshotGamePath(
-  AppController& appController,
-  const UiSnapshotCommandLineOptions& options,
-  const QStringList& fileNames)
-{
-  if (options.gamePath.isEmpty())
-  {
-    return true;
-  }
-
-  if (fileNames.empty())
-  {
-    qCritical() << "--ui-snapshot-game-path requires one map file";
-    return false;
-  }
-
-  return fs::Disk::withInputStream(pathFromQString(fileNames.front()), mdl::readMapHeader)
-         | kdl::transform([&](const auto& detectedGameAndFormat) {
-             const auto& gameName = detectedGameAndFormat.first;
-             if (!gameName)
-             {
-               qCritical() << "Could not detect the snapshot map's game";
-               return false;
-             }
-
-             auto* gameInfo = appController.gameManager().gameInfo(*gameName);
-             if (gameInfo == nullptr)
-             {
-               qCritical() << "Snapshot map uses an unavailable game:"
-                           << QString::fromStdString(*gameName);
-               return false;
-             }
-
-             setPref(gameInfo->gamePathPreference, pathFromQString(options.gamePath));
-             return true;
-           })
-         | kdl::transform_error([](const auto& error) {
-             qCritical().noquote() << "Could not read the snapshot map header:"
-                                   << QString::fromStdString(error.msg);
-             return false;
-           })
-         | kdl::value();
 }
 
 std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
@@ -569,371 +261,6 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
   return options;
 }
 
-WelcomeWindow* findWelcomeWindow()
-{
-  for (auto* widget : QApplication::topLevelWidgets())
-  {
-    if (auto* welcomeWindow = qobject_cast<WelcomeWindow*>(widget))
-    {
-      return welcomeWindow;
-    }
-  }
-  return nullptr;
-}
-
-void configureOutlinerSnapshot(QWidget& targetWidget)
-{
-  if (
-    auto* propertiesToggle = targetWidget.findChild<QAbstractButton*>(
-      QStringLiteral("OutlinerInspector_PropertiesToggle")))
-  {
-    if (!propertiesToggle->isChecked())
-    {
-      propertiesToggle->click();
-    }
-  }
-
-  if (
-    auto* tree =
-      targetWidget.findChild<QTreeWidget*>(QStringLiteral("OutlinerTreeWidget")))
-  {
-    tree->expandAll();
-    if (auto* firstItem = tree->topLevelItem(0))
-    {
-      const auto signalBlocker = QSignalBlocker{tree};
-      auto* snapshotItem = firstItem->childCount() > 0 ? firstItem->child(0) : firstItem;
-      tree->clearSelection();
-      tree->setCurrentItem(snapshotItem);
-      snapshotItem->setSelected(true);
-      tree->setFocus(Qt::OtherFocusReason);
-    }
-  }
-}
-
-void configureSupportingSnapshot(QWidget& targetWidget)
-{
-  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
-  if (mapWindow == nullptr)
-  {
-    return;
-  }
-
-  mapWindow->switchToInfoPanelPage(InfoPanelPage::Assets);
-  if (
-    auto* splitter = mapWindow->findChild<QSplitter*>(
-      QStringLiteral("MapWindow_VerticalSplitterSplitter")))
-  {
-    splitter->setSizes(QList<int>{560, 340});
-  }
-}
-
-bool isInspectorSnapshotTarget(const QString& targetName)
-{
-  return targetName == QStringLiteral("entity-browser")
-         || targetName == QStringLiteral("entity-browser-empty")
-         || targetName == QStringLiteral("face-inspector")
-         || targetName == QStringLiteral("material-browser-empty");
-}
-
-bool isMaterialBrowserSnapshotTarget(const QString& targetName)
-{
-  return targetName == QStringLiteral("face-inspector")
-         || targetName == QStringLiteral("material-browser-empty");
-}
-
-enum class UiSnapshotReadinessState
-{
-  Ready,
-  Pending,
-  Failed,
-};
-
-struct UiSnapshotReadiness
-{
-  UiSnapshotReadinessState state;
-  QString detail;
-};
-
-UiSnapshotReadiness uiSnapshotReadiness(QWidget& targetWidget, const QString& targetName)
-{
-  if (!isMaterialBrowserSnapshotTarget(targetName))
-  {
-    return {UiSnapshotReadinessState::Ready, {}};
-  }
-
-  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
-  if (mapWindow == nullptr)
-  {
-    return {
-      UiSnapshotReadinessState::Failed,
-      QStringLiteral("Material browser snapshot target is not a map window")};
-  }
-
-  const auto& materials = mapWindow->document().map().materialManager().materials();
-  if (materials.empty())
-  {
-    return {
-      UiSnapshotReadinessState::Pending,
-      QStringLiteral("Material browser snapshot has no loaded materials")};
-  }
-
-  auto readyCount = size_t{0};
-  auto pendingCount = size_t{0};
-  auto failedNames = QStringList{};
-  for (const auto* material : materials)
-  {
-    const auto& resource = material->textureResource();
-    if (const auto* failed = std::get_if<gl::ResourceFailed>(&resource.state()))
-    {
-      failedNames.push_back(QStringLiteral("%1 (%2)").arg(
-        QString::fromStdString(material->name()), QString::fromStdString(failed->error)));
-    }
-    else if (const auto* texture = material->texture();
-             texture != nullptr && texture->isReady())
-    {
-      ++readyCount;
-    }
-    else
-    {
-      ++pendingCount;
-    }
-  }
-
-  if (!failedNames.empty())
-  {
-    return {
-      UiSnapshotReadinessState::Failed,
-      QStringLiteral("Material textures failed: %1")
-        .arg(failedNames.mid(0, 3).join(QStringLiteral("; ")))};
-  }
-
-  const auto detail = QStringLiteral("Material textures ready: %1/%2; pending: %3")
-                        .arg(readyCount)
-                        .arg(materials.size())
-                        .arg(pendingCount);
-  return {
-    pendingCount == 0 ? UiSnapshotReadinessState::Ready
-                      : UiSnapshotReadinessState::Pending,
-    detail};
-}
-
-void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName)
-{
-  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
-  if (mapWindow == nullptr)
-  {
-    return;
-  }
-
-  const auto showEntityBrowser = targetName.startsWith(QStringLiteral("entity-browser"));
-  mapWindow->switchToInspectorPage(
-    showEntityBrowser ? InspectorPage::Entity : InspectorPage::Face);
-  if (
-    auto* splitter =
-      mapWindow->findChild<QSplitter*>(QStringLiteral("MapWindow_HorizontalSplitter")))
-  {
-    splitter->setSizes(QList<int>{940, 500});
-  }
-
-  if (targetName.endsWith(QStringLiteral("-empty")))
-  {
-    const auto searchName = showEntityBrowser ? QStringLiteral("EntityBrowser_Search")
-                                              : QStringLiteral("MaterialBrowser_Search");
-    if (auto* search = mapWindow->findChild<QLineEdit*>(searchName))
-    {
-      const auto filterText = QStringLiteral("__ui_snapshot_no_match__");
-      search->setText(filterText);
-      search->textEdited(filterText);
-    }
-  }
-}
-
-void configurePreferencesSnapshot(QWidget& targetWidget, const QString& targetName)
-{
-  if (
-    auto* navigation = targetWidget.findChild<QListWidget*>(
-      QStringLiteral("PreferenceDialog_NavigationList")))
-  {
-    navigation->setCurrentRow(targetName == QStringLiteral("preferences-colors") ? 2 : 1);
-    navigation->setFocus(Qt::OtherFocusReason);
-  }
-}
-
-void failUiSnapshot(
-  QApplication& app,
-  const UiSnapshotCommandLineOptions& options,
-  const QString& message,
-  const int exitCode)
-{
-  qCritical().noquote() << message;
-
-  const auto outputInfo = QFileInfo{options.outputPath};
-  if (QDir{}.mkpath(outputInfo.absolutePath()))
-  {
-    auto failureFile =
-      QFile{outputInfo.dir().filePath(outputInfo.completeBaseName() + ".error.txt")};
-    if (failureFile.open(QIODevice::WriteOnly | QIODevice::Text))
-    {
-      QTextStream{&failureFile} << message << Qt::endl;
-    }
-  }
-  app.exit(exitCode);
-}
-
-void captureUiSnapshot(
-  QApplication& app,
-  const QPointer<QWidget>& guardedWidget,
-  const QString& targetName,
-  const UiSnapshotCommandLineOptions& options)
-{
-  if (guardedWidget.isNull())
-  {
-    failUiSnapshot(app, options, "UI snapshot target was destroyed before capture", 3);
-    return;
-  }
-
-  const auto readiness = uiSnapshotReadiness(*guardedWidget, targetName);
-  if (readiness.state != UiSnapshotReadinessState::Ready)
-  {
-    failUiSnapshot(
-      app,
-      options,
-      QStringLiteral("UI snapshot state validation failed: %1").arg(readiness.detail),
-      3);
-    return;
-  }
-
-  auto error = QString{};
-  const auto snapshotOptions = UiSnapshotOptions{
-    options.outputPath,
-    targetName,
-    options.theme,
-    qEnvironmentVariable("QT_SCALE_FACTOR", "system")};
-  if (!saveUiSnapshot(*guardedWidget, snapshotOptions, &error))
-  {
-    failUiSnapshot(app, options, QStringLiteral("UI snapshot failed: %1").arg(error), 4);
-    return;
-  }
-
-  qInfo().noquote() << "UI snapshot saved:" << options.outputPath;
-  app.exit(0);
-}
-
-void waitForUiSnapshotReadiness(
-  QApplication& app,
-  const QPointer<QWidget>& guardedWidget,
-  const QString& targetName,
-  const UiSnapshotCommandLineOptions& options,
-  const QDeadlineTimer deadline)
-{
-  if (guardedWidget.isNull())
-  {
-    failUiSnapshot(
-      app, options, "UI snapshot target was destroyed while waiting for resources", 3);
-    return;
-  }
-
-  const auto readiness = uiSnapshotReadiness(*guardedWidget, targetName);
-  if (readiness.state == UiSnapshotReadinessState::Failed)
-  {
-    failUiSnapshot(
-      app,
-      options,
-      QStringLiteral("UI snapshot resource validation failed: %1").arg(readiness.detail),
-      3);
-    return;
-  }
-  if (readiness.state == UiSnapshotReadinessState::Pending)
-  {
-    if (deadline.hasExpired())
-    {
-      failUiSnapshot(
-        app,
-        options,
-        QStringLiteral("UI snapshot resource wait timed out: %1").arg(readiness.detail),
-        3);
-      return;
-    }
-
-    QTimer::singleShot(50, &app, [&app, guardedWidget, targetName, options, deadline]() {
-      waitForUiSnapshotReadiness(app, guardedWidget, targetName, options, deadline);
-    });
-    return;
-  }
-
-  if (!readiness.detail.isEmpty())
-  {
-    qInfo().noquote() << "UI snapshot resources ready:" << readiness.detail;
-  }
-  guardedWidget->update();
-  QTimer::singleShot(100, &app, [&app, guardedWidget, targetName, options]() {
-    captureUiSnapshot(app, guardedWidget, targetName, options);
-  });
-}
-
-void scheduleUiSnapshot(
-  QApplication& app,
-  QWidget& targetWidget,
-  const QString& targetName,
-  const UiSnapshotCommandLineOptions& options)
-{
-  const auto guardedWidget = QPointer<QWidget>{&targetWidget};
-  QTimer::singleShot(0, &app, [&app, guardedWidget, targetName, options]() {
-    if (guardedWidget.isNull())
-    {
-      failUiSnapshot(
-        app,
-        options,
-        QStringLiteral("UI snapshot target was destroyed before layout: %1")
-          .arg(targetName),
-        3);
-      return;
-    }
-
-    if (targetName == QStringLiteral("outliner"))
-    {
-      configureOutlinerSnapshot(*guardedWidget);
-    }
-    else if (targetName == QStringLiteral("supporting"))
-    {
-      configureSupportingSnapshot(*guardedWidget);
-    }
-    else if (isInspectorSnapshotTarget(targetName))
-    {
-      configureInspectorSnapshot(*guardedWidget, targetName);
-    }
-    else if (targetName.startsWith(QStringLiteral("preferences")))
-    {
-      configurePreferencesSnapshot(*guardedWidget, targetName);
-    }
-    guardedWidget->ensurePolished();
-    guardedWidget->update();
-    QTimer::singleShot(250, &app, [&app, guardedWidget, targetName, options]() {
-      if (!guardedWidget.isNull())
-      {
-        if (targetName == QStringLiteral("outliner"))
-        {
-          configureOutlinerSnapshot(*guardedWidget);
-        }
-        else if (targetName == QStringLiteral("supporting"))
-        {
-          configureSupportingSnapshot(*guardedWidget);
-        }
-        else if (isInspectorSnapshotTarget(targetName))
-        {
-          configureInspectorSnapshot(*guardedWidget, targetName);
-        }
-        else if (targetName.startsWith(QStringLiteral("preferences")))
-        {
-          configurePreferencesSnapshot(*guardedWidget, targetName);
-        }
-      }
-      waitForUiSnapshotReadiness(
-        app, guardedWidget, targetName, options, QDeadlineTimer{5000});
-    });
-  });
-}
-
 void enableDraftReleaseUpdates()
 {
   auto& prefs = PreferenceManager::instance();
@@ -941,7 +268,6 @@ void enableDraftReleaseUpdates()
   prefs.set(Preferences::IncludeDraftReleaseUpdates, true);
   prefs.saveChanges();
 }
-
 
 } // namespace
 
@@ -994,7 +320,7 @@ int main(int argc, char* argv[])
   {
     for (int i = 1; i < argc; i++)
     {
-      if (strcmp(argv[i], "--portable") == 0)
+      if (std::strcmp(argv[i], "--portable") == 0)
       {
         SystemPaths::setPortable();
         QSettings::setPath(
@@ -1051,8 +377,7 @@ int main(int argc, char* argv[])
   {
     themeOverride = commandLineOptions->uiSnapshot->theme;
   }
-  const auto themeTokens = loadStyle(app, themeOverride);
-  if (auto error = QString{}; !loadStyleSheets(themeTokens, &error))
+  if (auto error = QString{}; !installApplicationStyle(app, themeOverride, &error))
   {
     qWarning().noquote() << "Could not load application stylesheet:" << error;
     if (commandLineOptions->uiSnapshot)
@@ -1078,88 +403,12 @@ int main(int argc, char* argv[])
 
   if (commandLineOptions->uiSnapshot)
   {
-    if (!configureUiSnapshotGamePath(
-          *appController, *commandLineOptions->uiSnapshot, commandLineOptions->fileNames))
-    {
-      return 3;
-    }
-
-    auto* targetWidget = static_cast<QWidget*>(nullptr);
-    auto targetName = QString{};
-    auto preferencesDialog = std::unique_ptr<PreferenceDialog>{};
-    auto commandPaletteDialog = std::unique_ptr<CommandPaletteDialog>{};
-
-    if (commandLineOptions->uiSnapshot->page.startsWith(QStringLiteral("preferences")))
-    {
-      preferencesDialog = std::make_unique<PreferenceDialog>(*appController, nullptr);
-      targetWidget = preferencesDialog.get();
-      targetName = commandLineOptions->uiSnapshot->page;
-      targetWidget->resize(960, 640);
-      configurePreferencesSnapshot(*targetWidget, targetName);
-    }
-    else if (commandLineOptions->fileNames.empty())
-    {
-      targetWidget = findWelcomeWindow();
-      targetName = QStringLiteral("welcome");
-      if (targetWidget != nullptr)
-      {
-        targetWidget->resize(700, 500);
-      }
-    }
-    else
-    {
-      targetName = commandLineOptions->uiSnapshot->page == QStringLiteral("map")
-                     ? QStringLiteral("workbench")
-                     : commandLineOptions->uiSnapshot->page;
-      if (openFiles(*appController, commandLineOptions->fileNames))
-      {
-        auto* mapWindow = appController->mapWindowManager().topMapWindow();
-        if (mapWindow != nullptr)
-        {
-          if (commandLineOptions->uiSnapshot->page == QStringLiteral("command-palette"))
-          {
-            auto context = ActionExecutionContext{
-              *appController, mapWindow, mapWindow->currentMapViewBase()};
-            commandPaletteDialog = std::make_unique<CommandPaletteDialog>(
-              appController->actionManager(),
-              context,
-              std::filesystem::path{"Menu/View/Command Palette..."},
-              mapWindow);
-            targetWidget = commandPaletteDialog.get();
-            targetWidget->resize(640, 480);
-          }
-          else
-          {
-            targetWidget = mapWindow;
-            mapWindow->resize(1440, 900);
-            if (commandLineOptions->uiSnapshot->page == QStringLiteral("outliner"))
-            {
-              mapWindow->switchToInspectorPage(InspectorPage::Outliner);
-              configureOutlinerSnapshot(*mapWindow);
-            }
-            else if (commandLineOptions->uiSnapshot->page == QStringLiteral("supporting"))
-            {
-              configureSupportingSnapshot(*mapWindow);
-            }
-            else if (isInspectorSnapshotTarget(commandLineOptions->uiSnapshot->page))
-            {
-              configureInspectorSnapshot(
-                *mapWindow, commandLineOptions->uiSnapshot->page);
-            }
-          }
-        }
-      }
-    }
-
-    if (targetWidget == nullptr)
-    {
-      qCritical() << "UI snapshot target was not created:" << targetName;
-      return 3;
-    }
-    targetWidget->setAttribute(Qt::WA_DontShowOnScreen);
-    targetWidget->show();
-    scheduleUiSnapshot(app, *targetWidget, targetName, *commandLineOptions->uiSnapshot);
-    return app.exec();
+    return runUiSnapshot(
+      app,
+      *appController,
+      *commandLineOptions->uiSnapshot,
+      commandLineOptions->fileNames,
+      [&](const auto& fileNames) { return openFiles(*appController, fileNames); });
   }
 
   appController->askForAutoUpdates();

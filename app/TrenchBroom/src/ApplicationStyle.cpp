@@ -1,0 +1,264 @@
+/*
+ Copyright (C) 2026 Kristian Duske
+
+ This file is part of TrenchBroom.
+
+ TrenchBroom is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ TrenchBroom is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "ApplicationStyle.h"
+
+#include <QApplication>
+#include <QFile>
+#include <QPainter>
+#include <QPainterPath>
+#include <QProxyStyle>
+#include <QStyleHints>
+#include <QStyleOption>
+#include <QTextStream>
+
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
+#include "ui/QPathUtils.h"
+#include "ui/SystemPaths.h"
+#include "ui/Theme.h"
+
+#include <algorithm>
+
+namespace tb::ui
+{
+namespace
+{
+
+class TrenchBroomProxyStyle : public QProxyStyle
+{
+private:
+  ThemeTokens m_themeTokens;
+
+  void drawCheckBoxIndicator(const QStyleOption* option, QPainter* painter) const
+  {
+    const auto enabled = option->state.testFlag(QStyle::State_Enabled);
+    const auto hovered = option->state.testFlag(QStyle::State_MouseOver);
+    const auto pressed = option->state.testFlag(QStyle::State_Sunken);
+    const auto focused = option->state.testFlag(QStyle::State_HasFocus);
+    const auto selected = option->state.testFlag(QStyle::State_Selected);
+    const auto checked = option->state.testFlag(QStyle::State_On);
+    const auto mixed = option->state.testFlag(QStyle::State_NoChange);
+
+    const auto side = std::min(option->rect.width(), option->rect.height());
+    const auto indicatorRect = QRectF{
+      option->rect.center().x() - side / 2.0 + 0.5,
+      option->rect.center().y() - side / 2.0 + 0.5,
+      side - 1.0,
+      side - 1.0};
+    const auto scale = side / 18.0;
+
+    const auto background = !enabled  ? m_themeTokens.windowBackground
+                            : pressed ? m_themeTokens.pressedBackground
+                            : hovered ? m_themeTokens.hoverBackground
+                                      : m_themeTokens.inputBackground;
+    const auto border = !enabled  ? m_themeTokens.border
+                        : focused ? m_themeTokens.focusBorder
+                                  : m_themeTokens.strongBorder;
+    const auto foreground = !enabled   ? m_themeTokens.disabledText
+                            : selected ? m_themeTokens.inverseText
+                                       : m_themeTokens.text;
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(QPen{border, 1.0});
+    painter->setBrush(background);
+    painter->drawRoundedRect(indicatorRect, 3.0 * scale, 3.0 * scale);
+
+    if (checked || mixed)
+    {
+      auto mark = QPainterPath{};
+      if (mixed)
+      {
+        mark.moveTo(indicatorRect.left() + 4.0 * scale, indicatorRect.center().y());
+        mark.lineTo(indicatorRect.right() - 4.0 * scale, indicatorRect.center().y());
+      }
+      else
+      {
+        mark.moveTo(
+          indicatorRect.left() + 4.0 * scale, indicatorRect.top() + 9.0 * scale);
+        mark.lineTo(
+          indicatorRect.left() + 7.0 * scale, indicatorRect.top() + 12.0 * scale);
+        mark.lineTo(
+          indicatorRect.left() + 14.0 * scale, indicatorRect.top() + 5.0 * scale);
+      }
+
+      auto markPen = QPen{foreground, std::max(1.5, 2.0 * scale)};
+      markPen.setCapStyle(Qt::RoundCap);
+      markPen.setJoinStyle(Qt::RoundJoin);
+      painter->setPen(markPen);
+      painter->setBrush(Qt::NoBrush);
+      painter->drawPath(mark);
+    }
+    painter->restore();
+  }
+
+public:
+  TrenchBroomProxyStyle(const QString& key, const ThemeTokens& themeTokens)
+    : QProxyStyle{key}
+    , m_themeTokens{themeTokens}
+  {
+  }
+
+  explicit TrenchBroomProxyStyle(const ThemeTokens& themeTokens, QStyle* style = nullptr)
+    : QProxyStyle{style}
+    , m_themeTokens{themeTokens}
+  {
+  }
+
+  void setThemeTokens(const ThemeTokens& themeTokens) { m_themeTokens = themeTokens; }
+
+  void drawPrimitive(
+    const PrimitiveElement element,
+    const QStyleOption* option,
+    QPainter* painter,
+    const QWidget* widget = nullptr) const override
+  {
+    if (
+      element == QStyle::PE_IndicatorCheckBox
+      || element == QStyle::PE_IndicatorItemViewItemCheck)
+    {
+      drawCheckBoxIndicator(option, painter);
+      return;
+    }
+
+    QProxyStyle::drawPrimitive(element, option, painter, widget);
+  }
+
+  int styleHint(
+    StyleHint hint,
+    const QStyleOption* option = nullptr,
+    const QWidget* widget = nullptr,
+    QStyleHintReturn* returnData = nullptr) const override
+  {
+    return hint == QStyle::SH_MenuBar_AltKeyNavigation
+             ? 0
+             : QProxyStyle::styleHint(hint, option, widget, returnData);
+  }
+
+  int pixelMetric(
+    PixelMetric metric,
+    const QStyleOption* option = nullptr,
+    const QWidget* widget = nullptr) const override
+  {
+    switch (metric)
+    {
+    case QStyle::PM_IndicatorWidth:
+    case QStyle::PM_IndicatorHeight:
+      return 18;
+    case QStyle::PM_SmallIconSize:
+    case QStyle::PM_ButtonIconSize:
+    case QStyle::PM_TabBarIconSize:
+      return 16;
+    case QStyle::PM_ToolBarIconSize:
+      return 20;
+    case QStyle::PM_ToolBarItemSpacing:
+    case QStyle::PM_ToolBarItemMargin:
+      return 2;
+    case QStyle::PM_FocusFrameHMargin:
+    case QStyle::PM_FocusFrameVMargin:
+      return 1;
+    default:
+      return QProxyStyle::pixelMetric(metric, option, widget);
+    }
+  }
+};
+
+ThemeTokens installProxyStyle(
+  QApplication& app, const std::optional<QString>& themeOverride)
+{
+  // Alt is part of TrenchBroom's fundamental fly-navigation controls. The proxy style
+  // prevents an Alt press and release from unexpectedly focusing the menu bar.
+  const auto useDarkTheme =
+    (themeOverride && *themeOverride == QStringLiteral("dark"))
+    || (!themeOverride && pref(Preferences::Theme) == Preferences::DarkTheme);
+  const auto useLightTheme =
+    (themeOverride && *themeOverride == QStringLiteral("light"))
+    || (!themeOverride && pref(Preferences::Theme) == Preferences::LightTheme);
+
+  // Explicit themes use Fusion for deterministic cross-platform rendering.
+  if (useDarkTheme)
+  {
+    const auto themeTokens = makeDarkThemeTokens();
+    app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
+    app.setPalette(makeThemePalette(themeTokens));
+    app.styleHints()->setColorScheme(Qt::ColorScheme::Dark);
+    return themeTokens;
+  }
+
+  if (useLightTheme)
+  {
+    const auto themeTokens = makeLightThemeTokens();
+    app.setStyle(new TrenchBroomProxyStyle{"Fusion", themeTokens});
+    app.setPalette(makeThemePalette(themeTokens));
+    app.styleHints()->setColorScheme(Qt::ColorScheme::Light);
+    return themeTokens;
+  }
+
+  auto* systemStyle = new TrenchBroomProxyStyle{makeSystemThemeTokens(app.palette())};
+  app.setStyle(systemStyle);
+  const auto themeTokens = makeSystemThemeTokens(app.palette());
+  systemStyle->setThemeTokens(themeTokens);
+  return themeTokens;
+}
+
+bool loadStyleSheet(QApplication& app, const ThemeTokens& themeTokens, QString* error)
+{
+  const auto path = SystemPaths::findResourceFile("stylesheets/base.qss");
+  if (auto file = QFile{pathAsQPath(path)}; file.exists())
+  {
+    if (!file.open(QFile::ReadOnly | QFile::Text))
+    {
+      if (error != nullptr)
+      {
+        *error = file.errorString();
+      }
+      return false;
+    }
+
+    auto styleSheet = QTextStream{&file}.readAll();
+    if (!expandThemeStyleSheet(styleSheet, themeTokens, error))
+    {
+      return false;
+    }
+
+    app.setStyleSheet(styleSheet);
+    if (error != nullptr)
+    {
+      error->clear();
+    }
+    return true;
+  }
+
+  if (error != nullptr)
+  {
+    *error = QStringLiteral("Could not find stylesheet: %1").arg(pathAsQString(path));
+  }
+  return false;
+}
+
+} // namespace
+
+bool installApplicationStyle(
+  QApplication& app, const std::optional<QString>& themeOverride, QString* error)
+{
+  return loadStyleSheet(app, installProxyStyle(app, themeOverride), error);
+}
+
+} // namespace tb::ui

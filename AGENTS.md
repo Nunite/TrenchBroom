@@ -8,6 +8,15 @@
 - Each library usually has a <Name>LibTest target for its tests, for example TbMdlLibTest.
 - Some libraries also have a <Name>TestUtilsLib target for shared test helpers, and some of those have a matching <Name>TestUtilsLibTest target.
 
+## Application entry point discipline
+- Treat `app/TrenchBroom/src/Main.cpp` as the application composition root. It may configure process-wide Qt state, parse command-line options, create application services, and select the top-level startup path.
+- Keep implementation details out of `Main.cpp`. Do not define reusable widgets, local or nested classes, `QStyle` / `QProxyStyle` implementations, custom painting, theme or stylesheet loaders, state machines, test-scene construction, or domain behavior there.
+- Apart from cohesive command-line parsing, anonymous-namespace helpers in `Main.cpp` must be stateless, limited to one startup concern, and exist only to make startup ordering and top-level dispatch readable. Do not use helpers to hide implementation that belongs to another module.
+- Move logic into a named module when it owns state, overrides virtual functions, manages a nontrivial lifetime, has independently testable behavior, or combines more than one clear startup concern. Prefer extending an existing owner such as `ApplicationStyle` or `UiSnapshotRunner` before creating another entry-point helper.
+- Keep command-line validation near parsing, but place execution of specialized modes behind a narrow typed interface. `Main.cpp` should select a mode; the owning module should construct and run it.
+- Do not use a line-count limit as an architectural target. Review `Main.cpp` changes by responsibility, dependency direction, and testability instead.
+- After changing entry-point structure, build the Release `TrenchBroom` target and run the focused tests or snapshot targets for every extracted or affected startup path.
+
 ## Build and test
 - TrenchBroom uses CMake as its build system.
 - In Visual Studio Code, prefer CMake Tools for builds.

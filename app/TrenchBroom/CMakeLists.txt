@@ -4,7 +4,11 @@ set(APP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(TB_RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 
 set(APP_SOURCE
+    "${APP_SOURCE_DIR}/ApplicationStyle.cpp"
+    "${APP_SOURCE_DIR}/ApplicationStyle.h"
     "${APP_SOURCE_DIR}/Main.cpp"
+    "${APP_SOURCE_DIR}/UiSnapshotRunner.cpp"
+    "${APP_SOURCE_DIR}/UiSnapshotRunner.h"
     "${TB_RESOURCE_DIR}/qrc/resources.qrc")
 
 # OS X app bundle configuration, must happen before the executable is added
