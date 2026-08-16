@@ -270,7 +270,7 @@ void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName
 
   if (targetName == QStringLiteral("face-inspector"))
   {
-    setPref(Preferences::MaterialBrowserIconSize, 3.0f);
+    setPref(Preferences::MaterialBrowserIconSize, 5.0f);
     if (auto* materialBrowser = mapWindow->findChild<MaterialBrowser*>())
     {
       materialBrowser->setGroup(true);

@@ -95,13 +95,13 @@ TEST_CASE("MaterialBrowserView")
     sendWheelEvent(view, Qt::ControlModifier, QPoint{0, 30}, {});
     CHECK(pref(Preferences::MaterialBrowserIconSize) == 1.5f);
 
-    setPref(Preferences::MaterialBrowserIconSize, 3.0f);
+    setPref(Preferences::MaterialBrowserIconSize, 5.0f);
     sendWheelEvent(view, Qt::ControlModifier, {}, QPoint{0, 120});
-    CHECK(pref(Preferences::MaterialBrowserIconSize) == 3.0f);
+    CHECK(pref(Preferences::MaterialBrowserIconSize) == 5.0f);
 
-    setPref(Preferences::MaterialBrowserIconSize, 0.25f);
+    setPref(Preferences::MaterialBrowserIconSize, 1.0f);
     sendWheelEvent(view, Qt::ControlModifier, {}, QPoint{0, -120});
-    CHECK(pref(Preferences::MaterialBrowserIconSize) == 0.25f);
+    CHECK(pref(Preferences::MaterialBrowserIconSize) == 1.0f);
   }
 
   setPref(Preferences::MaterialBrowserIconSize, originalIconSize);

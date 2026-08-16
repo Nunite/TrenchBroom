@@ -30,6 +30,7 @@
 #include "gl/MiniGl.h"
 #include "prefs/Preferences.h"
 #include "ui/FormWithSectionsLayout.h"
+#include "ui/MaterialBrowserIconSize.h"
 #include "ui/QStyleUtils.h"
 #include "ui/SliderWithLabel.h"
 #include "ui/ViewConstants.h"
@@ -170,13 +171,13 @@ QWidget* ViewPreferencePane::createViewPreferences()
   m_enableMsaa->setToolTip("Enable multisampling");
 
   m_materialBrowserIconSizeCombo = new QComboBox{};
-  m_materialBrowserIconSizeCombo->addItem("25%");
-  m_materialBrowserIconSizeCombo->addItem("50%");
-  m_materialBrowserIconSizeCombo->addItem("100%");
-  m_materialBrowserIconSizeCombo->addItem("150%");
-  m_materialBrowserIconSizeCombo->addItem("200%");
-  m_materialBrowserIconSizeCombo->addItem("250%");
-  m_materialBrowserIconSizeCombo->addItem("300%");
+  m_materialBrowserIconSizeCombo->setObjectName(
+    QStringLiteral("ViewPreference_MaterialBrowserIconSizeCombo"));
+  for (const auto size : MaterialBrowserIconSizes)
+  {
+    m_materialBrowserIconSizeCombo->addItem(
+      QStringLiteral("%1%").arg(qRound(size * 100.0f)), size);
+  }
   m_materialBrowserIconSizeCombo->setToolTip(
     "Sets the icon size in the material browser.");
 
@@ -343,34 +344,10 @@ void ViewPreferencePane::updateControls()
 
   const auto materialBrowserIconSize =
     prefs.getPendingValue(Preferences::MaterialBrowserIconSize);
-  if (materialBrowserIconSize == 0.25f)
-  {
-    m_materialBrowserIconSizeCombo->setCurrentIndex(0);
-  }
-  else if (materialBrowserIconSize == 0.5f)
-  {
-    m_materialBrowserIconSizeCombo->setCurrentIndex(1);
-  }
-  else if (materialBrowserIconSize == 1.5f)
-  {
-    m_materialBrowserIconSizeCombo->setCurrentIndex(3);
-  }
-  else if (materialBrowserIconSize == 2.0f)
-  {
-    m_materialBrowserIconSizeCombo->setCurrentIndex(4);
-  }
-  else if (materialBrowserIconSize == 2.5f)
-  {
-    m_materialBrowserIconSizeCombo->setCurrentIndex(5);
-  }
-  else if (materialBrowserIconSize == 3.0f)
-  {
-    m_materialBrowserIconSizeCombo->setCurrentIndex(6);
-  }
-  else
-  {
-    m_materialBrowserIconSizeCombo->setCurrentIndex(2);
-  }
+  const auto materialBrowserIconSizeIndex =
+    m_materialBrowserIconSizeCombo->findData(materialBrowserIconSize);
+  m_materialBrowserIconSizeCombo->setCurrentIndex(
+    materialBrowserIconSizeIndex >= 0 ? materialBrowserIconSizeIndex : 0);
 
   m_rendererFontSizeCombo->setCurrentText(
     QString::asprintf("%i", prefs.getPendingValue(Preferences::RendererFontSize)));
@@ -456,31 +433,16 @@ void ViewPreferencePane::themeChanged(int /*index*/)
 
 void ViewPreferencePane::materialBrowserIconSizeChanged(const int index)
 {
-  auto& prefs = PreferenceManager::instance();
-
-  switch (index)
+  if (index < 0 || index >= m_materialBrowserIconSizeCombo->count())
   {
-  case 0:
-    prefs.set(Preferences::MaterialBrowserIconSize, 0.25f);
-    break;
-  case 1:
-    prefs.set(Preferences::MaterialBrowserIconSize, 0.5f);
-    break;
-  case 2:
-    prefs.set(Preferences::MaterialBrowserIconSize, 1.0f);
-    break;
-  case 3:
-    prefs.set(Preferences::MaterialBrowserIconSize, 1.5f);
-    break;
-  case 4:
-    prefs.set(Preferences::MaterialBrowserIconSize, 2.0f);
-    break;
-  case 5:
-    prefs.set(Preferences::MaterialBrowserIconSize, 2.5f);
-    break;
-  case 6:
-    prefs.set(Preferences::MaterialBrowserIconSize, 3.0f);
-    break;
+    return;
+  }
+
+  auto ok = false;
+  const auto iconSize = m_materialBrowserIconSizeCombo->itemData(index).toFloat(&ok);
+  if (ok)
+  {
+    PreferenceManager::instance().set(Preferences::MaterialBrowserIconSize, iconSize);
   }
 }
 

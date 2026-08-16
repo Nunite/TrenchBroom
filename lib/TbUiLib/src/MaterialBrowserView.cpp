@@ -44,6 +44,7 @@
 #include "prefs/Preferences.h"
 #include "render/Transformation.h"
 #include "ui/MapDocument.h"
+#include "ui/MaterialBrowserIconSize.h"
 #include "ui/Theme.h"
 
 #include "kd/contracts.h"
@@ -273,7 +274,10 @@ void MaterialBrowserView::wheelEvent(QWheelEvent* event)
 
 void MaterialBrowserView::doInitLayout(Layout& layout)
 {
-  const auto scaleFactor = pref(Preferences::MaterialBrowserIconSize);
+  const auto scaleFactor = std::clamp(
+    pref(Preferences::MaterialBrowserIconSize),
+    MaterialBrowserIconSizes.front(),
+    MaterialBrowserIconSizes.back());
   const auto preferredCellWidth = scaleFactor * 64.0f;
 
   layout.setOuterMargin(MaterialBrowserOuterMargin);
@@ -337,7 +341,10 @@ void MaterialBrowserView::addMaterialToLayout(
   const auto materialName = std::filesystem::path{material.name()}.filename().string();
   const auto titleHeight = fontManager().font(font).measure(materialName).y();
 
-  const auto scaleFactor = pref(Preferences::MaterialBrowserIconSize);
+  const auto scaleFactor = std::clamp(
+    pref(Preferences::MaterialBrowserIconSize),
+    MaterialBrowserIconSizes.front(),
+    MaterialBrowserIconSizes.back());
   const auto* texture = material.texture();
   const auto textureSize = texture ? texture->sizef() : vm::vec2f{64, 64};
   const auto scaledTextureSize = vm::round(scaleFactor * textureSize);

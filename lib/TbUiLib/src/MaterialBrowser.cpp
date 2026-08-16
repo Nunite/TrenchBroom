@@ -35,6 +35,7 @@
 #include "mdl/Map.h"
 #include "prefs/Preferences.h"
 #include "ui/MapDocument.h"
+#include "ui/MaterialBrowserIconSize.h"
 #include "ui/MaterialBrowserView.h"
 #include "ui/SearchBox.h"
 #include "ui/ViewConstants.h"
@@ -292,7 +293,7 @@ void MaterialBrowser::updateIconSizeChoice()
   }
 
   const auto currentSize = pref(Preferences::MaterialBrowserIconSize);
-  auto currentIndex = 2;
+  auto currentIndex = 0;
   for (auto i = 0; i < m_iconSizeChoice->count(); ++i)
   {
     if (iconSizeForComboIndex(m_iconSizeChoice, i) == currentSize)

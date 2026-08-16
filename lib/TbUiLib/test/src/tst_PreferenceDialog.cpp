@@ -138,13 +138,28 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     CHECK(themeCombo->itemText(1).toStdString() == Preferences::LightTheme);
     CHECK(themeCombo->itemText(2).toStdString() == Preferences::DarkTheme);
 
+    auto* materialBrowserIconSizeCombo = pane->findChild<QComboBox*>(
+      QStringLiteral("ViewPreference_MaterialBrowserIconSizeCombo"));
+    REQUIRE(materialBrowserIconSizeCombo != nullptr);
+    CHECK(materialBrowserIconSizeCombo->count() == 9);
+    CHECK(materialBrowserIconSizeCombo->itemText(0) == QStringLiteral("100%"));
+    CHECK(materialBrowserIconSizeCombo->itemData(0).toFloat() == 1.0f);
+    CHECK(materialBrowserIconSizeCombo->itemText(8) == QStringLiteral("500%"));
+    CHECK(materialBrowserIconSizeCombo->itemData(8).toFloat() == 5.0f);
+
     auto& prefs = PreferenceManager::instance();
     const auto previousTheme = prefs.get(Preferences::Theme);
+    const auto previousMaterialBrowserIconSize =
+      prefs.get(Preferences::MaterialBrowserIconSize);
     themeCombo->setCurrentIndex(1);
     REQUIRE(QMetaObject::invokeMethod(
       themeCombo, "activated", Qt::DirectConnection, Q_ARG(int, 1)));
     CHECK(prefs.getPendingValue(Preferences::Theme) == Preferences::LightTheme);
     prefs.set(Preferences::Theme, previousTheme);
+
+    materialBrowserIconSizeCombo->setCurrentIndex(8);
+    CHECK(prefs.getPendingValue(Preferences::MaterialBrowserIconSize) == 5.0f);
+    prefs.set(Preferences::MaterialBrowserIconSize, previousMaterialBrowserIconSize);
 
     pane.reset();
   }

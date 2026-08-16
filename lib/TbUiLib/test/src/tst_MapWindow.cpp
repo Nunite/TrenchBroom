@@ -270,7 +270,9 @@ TEST_CASE("MapWindow")
         const auto originalIconSize = pref(Preferences::MaterialBrowserIconSize);
         REQUIRE(iconSize != nullptr);
         CHECK(filterRow->layout()->indexOf(iconSize) == 3);
-        CHECK(iconSize->count() == 7);
+        CHECK(iconSize->count() == 9);
+        CHECK(iconSize->itemText(0) == QStringLiteral("100%"));
+        CHECK(iconSize->itemText(8) == QStringLiteral("500%"));
         CHECK(
           iconSize->currentData().toFloat()
           == pref(Preferences::MaterialBrowserIconSize));
@@ -278,8 +280,8 @@ TEST_CASE("MapWindow")
         setPref(Preferences::MaterialBrowserIconSize, 1.5f);
         CHECK(iconSize->currentText() == QStringLiteral("150%"));
 
-        iconSize->setCurrentIndex(4);
-        iconSize->activated(4);
+        iconSize->setCurrentIndex(2);
+        iconSize->activated(2);
         CHECK(pref(Preferences::MaterialBrowserIconSize) == 2.0f);
 
         setPref(Preferences::MaterialBrowserIconSize, originalIconSize);
