@@ -61,6 +61,7 @@ private:
   MaterialSortOrder m_sortOrder = MaterialSortOrder::Name;
   std::string m_filterText;
   std::unordered_set<std::string> m_collapsedGroups;
+  double m_zoomWheelSteps = 0.0;
 
   const gl::Material* m_selectedMaterial = nullptr;
 
@@ -87,6 +88,7 @@ private:
   void reloadMaterials();
 
   void resizeEvent(QResizeEvent* event) override;
+  void wheelEvent(QWheelEvent* event) override;
   void doInitLayout(Layout& layout) override;
   void doReloadLayout(Layout& layout) override;
 

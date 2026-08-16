@@ -6,7 +6,8 @@
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-16
 - Current stage: Phase 4.4 in progress; responsive Material Browser columns, persistent
-  scrollbar visibility, and collapsible collection groups complete
+  scrollbar visibility, collapsible collection groups, and Ctrl+wheel thumbnail sizing
+  complete
 
 ## Objective
 
@@ -215,6 +216,9 @@ preferences.
 - [x] Replace passive collection labels with compact disclosure headers showing material counts,
       full-row pointer states, persistent collapse state, sticky expanded headers, and keyboard
       navigation/activation.
+- [x] Support Ctrl+wheel thumbnail resizing through the existing persisted
+      `MaterialBrowserIconSize` preference, with discrete size steps, high-resolution wheel
+      accumulation, and unchanged ordinary scrolling.
 - [ ] Elide long labels to one predictable line while retaining the full material name and
       dimensions in the existing tooltip.
 - [ ] Add an inline compact thumbnail-size control backed by the existing
@@ -378,4 +382,6 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Verified | Passed `CellLayout` (13 assertions) and `CellView,Theme,MapWindow,ModelBrowserView` (251 assertions), rebuilt Release `TrenchBroom`, and visually checked grouped 3x thumbnails plus visible disclosure indicators in Light/Dark at 100%, 150%, and 200% in `20260816-124357-565`. |
 | 2026-08-16 | Fixed | Increased unchecked checkbox edge contrast without changing global control borders: enabled borders now blend against each interaction-state background, hover and pressed states receive stronger emphasis, disabled borders remain distinguishable, and focus retains the theme accent. |
 | 2026-08-16 | Verified | Passed Release `TbUiLibTest "Theme"` (31 assertions), rebuilt Release `TrenchBroom`, and visually compared the focused Mouse preferences Light/Dark snapshots at 100% in `20260816-133344-413` against the previous acceptance capture. |
+| 2026-08-16 | Complete | Added Ctrl+wheel Material Browser thumbnail resizing across the existing 25%-300% preference steps, including high-resolution wheel accumulation, bounds handling, persisted preference updates, and unchanged unmodified scrolling. |
+| 2026-08-16 | Verified | Passed the new Release `MaterialBrowserView` interaction test (7 assertions), passed `CellView,Theme,MapWindow,ModelBrowserView` (251 assertions), and rebuilt Release `TrenchBroom`. |
 | 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and the inline thumbnail-size control before considering any deferred Phase 5 structural experiment. |

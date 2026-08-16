@@ -23,6 +23,7 @@
 #include <QClipboard>
 #include <QMenu>
 #include <QTextStream>
+#include <QWheelEvent>
 
 #include "base/PreferenceManager.h"
 #include "gl/ActiveShader.h"
@@ -56,6 +57,7 @@
 #include "vm/vec.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <ranges>
 #include <string>
@@ -70,6 +72,43 @@ constexpr auto MaterialBrowserCellMargin = 10.0f;
 constexpr auto MaterialBrowserGroupTitleHeight = 24.0f;
 constexpr auto MinimumMaterialCellWidth = 16.0f;
 constexpr auto MinimumMaterialCellWidthScale = 0.875f;
+constexpr auto WheelAnglePerStep = 120.0;
+constexpr auto WheelPixelsPerStep = 60.0;
+constexpr auto MaterialBrowserIconSizes = std::array{
+  0.25f,
+  0.5f,
+  1.0f,
+  1.5f,
+  2.0f,
+  2.5f,
+  3.0f,
+};
+
+float stepMaterialBrowserIconSize(float currentSize, int steps)
+{
+  constexpr auto Epsilon = 0.001f;
+
+  while (steps > 0)
+  {
+    const auto next =
+      std::ranges::upper_bound(MaterialBrowserIconSizes, currentSize + Epsilon);
+    currentSize =
+      next != MaterialBrowserIconSizes.end() ? *next : MaterialBrowserIconSizes.back();
+    --steps;
+  }
+
+  while (steps < 0)
+  {
+    const auto next =
+      std::ranges::lower_bound(MaterialBrowserIconSizes, currentSize - Epsilon);
+    currentSize = next != MaterialBrowserIconSizes.begin()
+                    ? *std::prev(next)
+                    : MaterialBrowserIconSizes.front();
+    ++steps;
+  }
+
+  return currentSize;
+}
 
 float responsiveMaterialCellWidth(const float layoutWidth, const float preferredCellWidth)
 {
@@ -199,6 +238,47 @@ void MaterialBrowserView::resizeEvent(QResizeEvent* event)
 {
   CellView::resizeEvent(event);
   invalidate();
+}
+
+void MaterialBrowserView::wheelEvent(QWheelEvent* event)
+{
+  if (!event->modifiers().testFlag(Qt::ControlModifier))
+  {
+    m_zoomWheelSteps = 0.0;
+    CellView::wheelEvent(event);
+    return;
+  }
+
+  const auto angleDelta = event->angleDelta().y();
+  const auto pixelDelta = event->pixelDelta().y();
+  const auto steps = angleDelta != 0 ? double(angleDelta) / WheelAnglePerStep
+                                     : double(pixelDelta) / WheelPixelsPerStep;
+  if (steps == 0.0)
+  {
+    event->accept();
+    return;
+  }
+
+  if (m_zoomWheelSteps * steps < 0.0)
+  {
+    m_zoomWheelSteps = 0.0;
+  }
+  m_zoomWheelSteps += steps;
+
+  const auto wholeSteps = int(std::trunc(m_zoomWheelSteps));
+  if (wholeSteps != 0)
+  {
+    m_zoomWheelSteps -= double(wholeSteps);
+    const auto currentSize = pref(Preferences::MaterialBrowserIconSize);
+    const auto newSize = stepMaterialBrowserIconSize(currentSize, wholeSteps);
+    if (newSize != currentSize)
+    {
+      setPref(Preferences::MaterialBrowserIconSize, newSize);
+      reloadMaterials();
+    }
+  }
+
+  event->accept();
 }
 
 void MaterialBrowserView::doInitLayout(Layout& layout)
