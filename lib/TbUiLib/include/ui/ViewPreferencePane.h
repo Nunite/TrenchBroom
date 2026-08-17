@@ -46,6 +46,7 @@ private:
   QComboBox* m_themeCombo = nullptr;
   QComboBox* m_materialBrowserIconSizeCombo = nullptr;
   QComboBox* m_rendererFontSizeCombo = nullptr;
+  QComboBox* m_pythonConsoleFontFamilyCombo = nullptr;
   QSpinBox* m_pythonConsoleFontSizeSpin = nullptr;
 
 public:
@@ -75,6 +76,7 @@ private slots:
   void themeChanged(int index);
   void materialBrowserIconSizeChanged(int index);
   void rendererFontSizeChanged(const QString& text);
+  void pythonConsoleFontFamilyChanged(int index);
   void pythonConsoleFontSizeChanged(int value);
 };
 

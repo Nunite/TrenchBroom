@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QFontDatabase>
 #include <QLabel>
 #include <QPlainTextEdit>
 #include <QTextEdit>
@@ -56,6 +57,7 @@ TEST_CASE("PythonConsole")
   CHECK(runButton->parentWidget() == actions);
   CHECK(clearButton->parentWidget() == actions);
   CHECK(input->isReadOnly() == false);
+  const auto previousFontFamily = pref(Preferences::PythonConsoleFontFamily);
   const auto previousFontSize = pref(Preferences::PythonConsoleFontSize);
   const auto expectedFontSize = std::clamp(
     previousFontSize,
@@ -108,6 +110,26 @@ TEST_CASE("PythonConsole")
   CHECK(output->font() == input->font());
   CHECK(output->document()->defaultFont() == input->font());
   setPref(Preferences::PythonConsoleFontSize, previousFontSize);
+
+  auto availableFontFamily = QString{};
+  for (const auto& family : QFontDatabase::families())
+  {
+    if (
+      QFontDatabase::isFixedPitch(family)
+      && family.compare(QString::fromStdString(previousFontFamily), Qt::CaseInsensitive)
+           != 0)
+    {
+      availableFontFamily = family;
+      break;
+    }
+  }
+  REQUIRE_FALSE(availableFontFamily.isEmpty());
+  setPref(Preferences::PythonConsoleFontFamily, availableFontFamily.toStdString());
+  CHECK(input->font().family().compare(availableFontFamily, Qt::CaseInsensitive) == 0);
+  CHECK(prompt->font() == input->font());
+  CHECK(output->font() == input->font());
+  CHECK(output->document()->defaultFont() == input->font());
+  setPref(Preferences::PythonConsoleFontFamily, previousFontFamily);
 }
 
 } // namespace tb::ui

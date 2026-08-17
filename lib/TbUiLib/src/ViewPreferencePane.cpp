@@ -22,6 +22,7 @@
 #include <QBoxLayout>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFontDatabase>
 #include <QLabel>
 #include <QSignalBlocker>
 #include <QSpinBox>
@@ -195,6 +196,25 @@ QWidget* ViewPreferencePane::createViewPreferences()
                                      "28", "32", "36", "40", "48", "56", "64", "72"});
   m_rendererFontSizeCombo->setValidator(new QIntValidator{1, 96});
 
+  m_pythonConsoleFontFamilyCombo = new QComboBox{};
+  m_pythonConsoleFontFamilyCombo->setObjectName(
+    QStringLiteral("ViewPreference_PythonConsoleFontFamilyCombo"));
+  m_pythonConsoleFontFamilyCombo->setMinimumContentsLength(20);
+  m_pythonConsoleFontFamilyCombo->setSizeAdjustPolicy(
+    QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  m_pythonConsoleFontFamilyCombo->setToolTip(
+    tr("Sets the monospace font used by the Python console."));
+  m_pythonConsoleFontFamilyCombo->addItem(tr("System Monospace"), QString{});
+  for (const auto& family : QFontDatabase::families())
+  {
+    if (QFontDatabase::isFixedPitch(family))
+    {
+      m_pythonConsoleFontFamilyCombo->addItem(family, family);
+      m_pythonConsoleFontFamilyCombo->setItemData(
+        m_pythonConsoleFontFamilyCombo->count() - 1, QFont{family}, Qt::FontRole);
+    }
+  }
+
   m_pythonConsoleFontSizeSpin = new QSpinBox{};
   m_pythonConsoleFontSizeSpin->setObjectName(
     QStringLiteral("ViewPreference_PythonConsoleFontSizeSpin"));
@@ -204,6 +224,12 @@ QWidget* ViewPreferencePane::createViewPreferences()
   m_pythonConsoleFontSizeSpin->setMaximumWidth(120);
   m_pythonConsoleFontSizeSpin->setToolTip(
     tr("Sets the font size of Python console output and input."));
+
+  auto* pythonConsoleFontLayout = new QHBoxLayout{};
+  pythonConsoleFontLayout->setContentsMargins(0, 0, 0, 0);
+  pythonConsoleFontLayout->setSpacing(LayoutConstants::NarrowHMargin);
+  pythonConsoleFontLayout->addWidget(m_pythonConsoleFontFamilyCombo, 1);
+  pythonConsoleFontLayout->addWidget(m_pythonConsoleFontSizeSpin);
 
   auto* layout = new FormWithSectionsLayout{};
   layout->setContentsMargins(
@@ -232,7 +258,7 @@ QWidget* ViewPreferencePane::createViewPreferences()
 
   layout->addSection("Fonts");
   layout->addRow("Renderer Font Size", m_rendererFontSizeCombo);
-  layout->addRow(tr("Python Console Font Size"), m_pythonConsoleFontSizeSpin);
+  layout->addRow(tr("Python Console"), pythonConsoleFontLayout);
 
   viewBox->setLayout(layout);
 
@@ -294,6 +320,11 @@ void ViewPreferencePane::bindEvents()
     this,
     &ViewPreferencePane::rendererFontSizeChanged);
   connect(
+    m_pythonConsoleFontFamilyCombo,
+    QOverload<int>::of(&QComboBox::currentIndexChanged),
+    this,
+    &ViewPreferencePane::pythonConsoleFontFamilyChanged);
+  connect(
     m_pythonConsoleFontSizeSpin,
     &QSpinBox::valueChanged,
     this,
@@ -320,6 +351,7 @@ void ViewPreferencePane::doResetToDefaults()
   prefs.resetToDefault(Preferences::Theme);
   prefs.resetToDefault(Preferences::MaterialBrowserIconSize);
   prefs.resetToDefault(Preferences::RendererFontSize);
+  prefs.resetToDefault(Preferences::PythonConsoleFontFamily);
   prefs.resetToDefault(Preferences::PythonConsoleFontSize);
 }
 
@@ -341,6 +373,8 @@ void ViewPreferencePane::updateControls()
     QSignalBlocker{m_materialBrowserIconSizeCombo};
 
   const auto rendererFontSizeBlocker = QSignalBlocker{m_rendererFontSizeCombo};
+  const auto pythonConsoleFontFamilyBlocker =
+    QSignalBlocker{m_pythonConsoleFontFamilyCombo};
   const auto pythonConsoleFontSizeBlocker = QSignalBlocker{m_pythonConsoleFontSizeSpin};
 
   auto& prefs = PreferenceManager::instance();
@@ -374,6 +408,12 @@ void ViewPreferencePane::updateControls()
 
   m_rendererFontSizeCombo->setCurrentText(
     QString::asprintf("%i", prefs.getPendingValue(Preferences::RendererFontSize)));
+  const auto pythonConsoleFontFamily =
+    QString::fromStdString(prefs.getPendingValue(Preferences::PythonConsoleFontFamily));
+  const auto pythonConsoleFontFamilyIndex =
+    m_pythonConsoleFontFamilyCombo->findData(pythonConsoleFontFamily);
+  m_pythonConsoleFontFamilyCombo->setCurrentIndex(
+    pythonConsoleFontFamilyIndex >= 0 ? pythonConsoleFontFamilyIndex : 0);
   m_pythonConsoleFontSizeSpin->setValue(
     prefs.getPendingValue(Preferences::PythonConsoleFontSize));
 }
@@ -488,6 +528,16 @@ void ViewPreferencePane::rendererFontSizeChanged(const QString& str)
   {
     auto& prefs = PreferenceManager::instance();
     prefs.set(Preferences::RendererFontSize, value);
+  }
+}
+
+void ViewPreferencePane::pythonConsoleFontFamilyChanged(const int index)
+{
+  if (index >= 0 && index < m_pythonConsoleFontFamilyCombo->count())
+  {
+    PreferenceManager::instance().set(
+      Preferences::PythonConsoleFontFamily,
+      m_pythonConsoleFontFamilyCombo->itemData(index).toString().toStdString());
   }
 }
 

@@ -158,6 +158,12 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     CHECK(materialBrowserIconSizeCombo->itemText(8) == QStringLiteral("500%"));
     CHECK(materialBrowserIconSizeCombo->itemData(8).toFloat() == 5.0f);
 
+    auto* pythonConsoleFontFamilyCombo = pane->findChild<QComboBox*>(
+      QStringLiteral("ViewPreference_PythonConsoleFontFamilyCombo"));
+    REQUIRE(pythonConsoleFontFamilyCombo != nullptr);
+    CHECK(pythonConsoleFontFamilyCombo->count() > 1);
+    CHECK(pythonConsoleFontFamilyCombo->itemData(0).toString().isEmpty());
+
     auto* pythonConsoleFontSizeSpin = pane->findChild<QSpinBox*>(
       QStringLiteral("ViewPreference_PythonConsoleFontSizeSpin"));
     REQUIRE(pythonConsoleFontSizeSpin != nullptr);
@@ -170,6 +176,8 @@ TEST_CASE("PreferenceDialog.preferencePanes")
       prefs.get(Preferences::MaterialBrowserIconSize);
     const auto previousPythonConsoleFontSize =
       prefs.get(Preferences::PythonConsoleFontSize);
+    const auto previousPythonConsoleFontFamily =
+      prefs.get(Preferences::PythonConsoleFontFamily);
     themeCombo->setCurrentIndex(3);
     REQUIRE(QMetaObject::invokeMethod(
       themeCombo, "activated", Qt::DirectConnection, Q_ARG(int, 3)));
@@ -179,6 +187,12 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     materialBrowserIconSizeCombo->setCurrentIndex(8);
     CHECK(prefs.getPendingValue(Preferences::MaterialBrowserIconSize) == 5.0f);
     prefs.set(Preferences::MaterialBrowserIconSize, previousMaterialBrowserIconSize);
+
+    pythonConsoleFontFamilyCombo->setCurrentIndex(1);
+    CHECK(
+      prefs.getPendingValue(Preferences::PythonConsoleFontFamily)
+      == pythonConsoleFontFamilyCombo->itemData(1).toString().toStdString());
+    prefs.set(Preferences::PythonConsoleFontFamily, previousPythonConsoleFontFamily);
 
     const auto newPythonConsoleFontSize = previousPythonConsoleFontSize == 16 ? 17 : 16;
     pythonConsoleFontSizeSpin->setValue(newPythonConsoleFontSize);

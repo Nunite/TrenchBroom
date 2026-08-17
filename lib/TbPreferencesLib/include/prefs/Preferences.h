@@ -52,6 +52,8 @@ inline const auto BlenderTheme = std::string{"builtin.blender"};
 inline auto Theme = Preference<std::string>{"Theme", SystemTheme};
 inline constexpr auto MinPythonConsoleFontSize = 8;
 inline constexpr auto MaxPythonConsoleFontSize = 32;
+inline auto PythonConsoleFontFamily =
+  Preference<std::string>{"Python Console/Font family", ""};
 inline auto PythonConsoleFontSize = Preference<int>{"Python Console/Font size", 11};
 inline const auto EnglishLanguage = std::string{"English"};
 inline const auto ChineseLanguage = std::string{"Chinese"};

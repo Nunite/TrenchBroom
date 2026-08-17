@@ -20,6 +20,7 @@
 #include "ui/PythonConsole.h"
 
 #include <QEvent>
+#include <QFontDatabase>
 #include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -50,6 +51,20 @@ constexpr auto MaxVisibleInputLines = 4;
 QFont consoleFont()
 {
   auto font = Fonts::fixedWidthFont();
+  const auto requestedFamily =
+    QString::fromStdString(pref(Preferences::PythonConsoleFontFamily)).trimmed();
+  for (const auto& availableFamily : QFontDatabase::families())
+  {
+    if (
+      availableFamily.compare(requestedFamily, Qt::CaseInsensitive) == 0
+      && QFontDatabase::isFixedPitch(availableFamily))
+    {
+      font.setFamily(availableFamily);
+      break;
+    }
+  }
+  font.setStyleHint(QFont::TypeWriter);
+  font.setFixedPitch(true);
   font.setPointSize(std::clamp(
     pref(Preferences::PythonConsoleFontSize),
     Preferences::MinPythonConsoleFontSize,
@@ -133,7 +148,9 @@ PythonConsole::PythonConsole(QWidget* parent)
   auto& prefs = PreferenceManager::instance();
   m_notifierConnection +=
     prefs.preferenceDidChangeNotifier.connect([this](const auto& path) {
-      if (path == Preferences::PythonConsoleFontSize.path)
+      if (
+        path == Preferences::PythonConsoleFontFamily.path
+        || path == Preferences::PythonConsoleFontSize.path)
       {
         updateFont();
       }

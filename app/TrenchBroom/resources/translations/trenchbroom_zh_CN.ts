@@ -4106,14 +4106,24 @@ They may contain new features or bug fixes that are not yet part of a stable rel
         <translation>更改后需要重启</translation>
     </message>
     <message>
-        <location filename="../../../../lib/TbUiLib/src/ViewPreferencePane.cpp" line="206"/>
+        <location filename="../../../../lib/TbUiLib/src/ViewPreferencePane.cpp" line="226"/>
         <source>Sets the font size of Python console output and input.</source>
         <translation>设置 Python 控制台输出和输入的字号。</translation>
     </message>
     <message>
-        <location filename="../../../../lib/TbUiLib/src/ViewPreferencePane.cpp" line="235"/>
-        <source>Python Console Font Size</source>
-        <translation>Python 控制台字号</translation>
+        <location filename="../../../../lib/TbUiLib/src/ViewPreferencePane.cpp" line="206"/>
+        <source>Sets the monospace font used by the Python console.</source>
+        <translation>设置 Python 控制台使用的等宽字体。</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/ViewPreferencePane.cpp" line="207"/>
+        <source>System Monospace</source>
+        <translation>系统等宽字体</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/ViewPreferencePane.cpp" line="261"/>
+        <source>Python Console</source>
+        <translation>Python 控制台</translation>
     </message>
 </context>
 <context>
