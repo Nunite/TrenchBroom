@@ -474,9 +474,6 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/WadUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/WelcomeWindow.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/WidgetState.h
-
-  PRIVATE FILE_SET version_header TYPE HEADERS
-    BASE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
 target_link_libraries(TbUiLib
@@ -490,6 +487,7 @@ target_link_libraries(TbUiLib
     Qt6::Multimedia
     ctre::ctre
     Qt6::Svg
+    TbVersionLib
   PUBLIC
     KdLib
     Qt6::Network
@@ -516,45 +514,6 @@ target_compile_definitions(TbUiLib
 )
 
 set_target_properties(TbUiLib PROPERTIES AUTOMOC TRUE AUTORCC TRUE)
-
-execute_process(
-  COMMAND "${GIT_EXECUTABLE}" rev-parse --git-path HEAD
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  OUTPUT_VARIABLE TB_GIT_HEAD_PATH
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(
-  COMMAND "${GIT_EXECUTABLE}" symbolic-ref -q HEAD
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  OUTPUT_VARIABLE TB_GIT_HEAD_REF
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-set(TB_GIT_VERSION_DEPENDS
-  "${CMAKE_SOURCE_DIR}/${TB_GIT_HEAD_PATH}"
-  "${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Version.h.in"
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersion.cmake"
-  "${CMAKE_SOURCE_DIR}/cmake/Utils.cmake")
-if(TB_GIT_HEAD_REF)
-  list(APPEND TB_GIT_VERSION_DEPENDS "${CMAKE_SOURCE_DIR}/.git/${TB_GIT_HEAD_REF}")
-endif()
-
-set(TB_GENERATED_VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/ui/Version.h")
-add_custom_command(
-  OUTPUT "${TB_GENERATED_VERSION_HEADER}"
-  COMMAND ${CMAKE_COMMAND}
-  "-DUTILS=${CMAKE_SOURCE_DIR}/cmake/Utils.cmake"
-  "-DAPP_BUILD_TYPE=${APP_BUILD_TYPE}"
-  "-DSRC=${CMAKE_CURRENT_SOURCE_DIR}/include/ui/Version.h.in"
-  "-DDST=${TB_GENERATED_VERSION_HEADER}"
-  "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
-  -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersion.cmake"
-  DEPENDS ${TB_GIT_VERSION_DEPENDS}
-  VERBATIM)
-add_custom_target(TbUiLib_GenerateVersion DEPENDS "${TB_GENERATED_VERSION_HEADER}")
-add_dependencies(TbUiLib TbUiLib_GenerateVersion)
-set_source_files_properties(
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/GetVersion.cpp"
-  PROPERTIES OBJECT_DEPENDS "${TB_GENERATED_VERSION_HEADER}")
-
 if(APPLE)
     # Silence macOS OpenGL deprecation warnings
     target_compile_definitions(TbUiLib PRIVATE GL_SILENCE_DEPRECATION)

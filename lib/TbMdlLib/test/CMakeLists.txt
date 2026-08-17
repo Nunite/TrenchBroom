@@ -36,7 +36,6 @@ target_sources(TbMdlLibTest PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_GroupNode.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_Hit.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_HitFilter.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_ImageLoader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_Issue.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_Layer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LayerNode.cpp
@@ -47,7 +46,7 @@ target_sources(TbMdlLibTest PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LoadDdsTexture.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LoadDkmModel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LoadFmModel.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LoadFreeImageTexture.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LoadImageTexture.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LoadM8Texture.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LoadM32Texture.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_LoadMaterialCollections.cpp
@@ -131,6 +130,7 @@ target_link_libraries(TbMdlLibTest
     TbFsTestUtilsLib
     TbMdlLib
     TbMdlTestUtilsLib
+    TbVersionLib
 )
 
 # Copy fixtures

@@ -99,6 +99,7 @@
 #include "mdl/WorldNode.h" // IWYU pragma: keep
 #include "mdl/WorldNodePathSeparatorValidator.h"
 #include "mdl/WorldReader.h"
+#include "version/Version.h"
 
 #include "kd/contracts.h"
 #include "kd/path_utils.h"
@@ -894,8 +895,12 @@ Result<void> Map::saveTo(const std::filesystem::path& path) const
 
   m_logger.info() << "Saving document to " << path;
 
+  const auto generator =
+    fmt::format("TrenchBroom {} (Build {})", VERSION_STR, BUILD_ID_STR);
+
   fs::Disk::withOutputStream(path, [&](auto& stream) {
-    writeMapHeader(stream, gameInfo().gameConfig.name, m_worldNode->mapFormat());
+    writeMapHeader(
+      stream, gameInfo().gameConfig.name, m_worldNode->mapFormat(), generator);
 
     auto writer = NodeWriter{*m_worldNode, stream};
     writer.setExporting(false);
@@ -1261,6 +1266,12 @@ void Map::loadMaterials()
     m_gameFileSystem->reloadWads(
       gameInfo().gameConfig.materialConfig.root, searchPaths, wadPaths, logger());
   }
+
+  // rescans the loose-file search path mounts (e.g. reloadWads above only replaces the
+  // wad mounts, it doesn't pick up files added to or removed from disk directories)
+  m_gameFileSystem->reload() | kdl::transform_error([&](auto e) {
+    m_logger.error() << "Could not reload game file systems: " + e.msg;
+  });
 
   m_materialManager->clear();
 

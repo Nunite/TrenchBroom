@@ -38,8 +38,6 @@
 #include "ui/QStringUtils.h"
 
 #include "kd/contracts.h"
-#include "kd/set_adapter.h"
-#include "kd/vector_utils.h"
 
 namespace tb::ui
 {
@@ -108,13 +106,13 @@ QVariant KeyboardShortcutModel::headerData(
     switch (section)
     {
     case 0:
-      return tr("Shortcut");
-    case 1:
-      return tr("Alternative");
-    case 2:
-      return tr("Context");
-    case 3:
       return tr("Description");
+    case 1:
+      return tr("Context");
+    case 2:
+      return tr("Shortcut");
+    case 3:
+      return tr("Alternative");
     }
   }
   return QVariant{};
@@ -127,7 +125,7 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     return QVariant{};
   }
 
-  if (role == Qt::ToolTipRole && (index.column() == 2 || index.column() == 3))
+  if (role == Qt::ToolTipRole && (index.column() == 0 || index.column() == 1))
   {
     return data(index, Qt::DisplayRole);
   }
@@ -143,23 +141,34 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     switch (index.column())
     {
     case 0:
+      return actionDisplayPath(actionInfo.displayPath());
+    case 1:
+      return actionContextDisplayName(actionInfo.actionContext());
+    case 2:
       return QVariant::fromValue(
         !keyboardShortcuts.empty() ? toQKeySequence(keyboardShortcuts[0])
                                    : QKeySequence{});
-    case 1:
+    case 3:
       return QVariant::fromValue(
         keyboardShortcuts.size() > 1 ? toQKeySequence(keyboardShortcuts[1])
                                      : QKeySequence{});
-    case 2:
-      return actionContextDisplayName(actionInfo.actionContext());
-    case 3:
-      return actionDisplayPath(actionInfo.displayPath());
     }
   }
 
   if (role == Qt::ForegroundRole && hasConflicts(index))
   {
     return QBrush{Qt::red};
+  }
+
+  if (role == ConflictRole)
+  {
+    // Encode the row's original position into the sort value so that resorting a single
+    // row (e.g. when a conflict is resolved) reinserts it at the correct position instead
+    // of just at the end of its group: QSortFilterProxyModel's incremental resort finds
+    // the new position via binary search against the current proxy order, which only
+    // lands on the correct spot if lessThan() defines a strict total order, i.e. no two
+    // rows compare equal.
+    return hasConflicts(index) ? index.row() : totalActionCount() + index.row();
   }
 
   return QVariant{};
@@ -186,14 +195,14 @@ bool KeyboardShortcutModel::setData(
 
   switch (index.column())
   {
-  case 0:
+  case 2:
     if (keyboardShortcuts.empty())
     {
       keyboardShortcuts.emplace_back();
     }
     keyboardShortcuts[0] = fromQKeySequence(keySequence);
     break;
-  case 1:
+  case 3:
     if (keyboardShortcuts.empty())
     {
       keyboardShortcuts.emplace_back();
@@ -225,8 +234,8 @@ Qt::ItemFlags KeyboardShortcutModel::flags(const QModelIndex& index) const
 
   switch (index.column())
   {
-  case 0:
-  case 1:
+  case 2:
+  case 3:
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
   default:
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
@@ -265,7 +274,7 @@ bool KeyboardShortcutModel::hasConflicts(const QModelIndex& index) const
     return false;
   }
 
-  return kdl::wrap_set(m_conflicts).count(index.row()) > 0u;
+  return m_conflicts.count(size_t(index.row())) > 0u;
 }
 
 void KeyboardShortcutModel::initializeActions()
@@ -378,10 +387,15 @@ void KeyboardShortcutModel::initializeEntityDefinitionActions()
 
 void KeyboardShortcutModel::updateConflicts()
 {
-  m_conflicts = kdl::vec_static_cast<int>(findConflicts(m_actions));
-  for (const auto& row : m_conflicts)
+  auto changedRows = std::exchange(m_conflicts, findConflicts(m_actions));
+
+  // Notify rows that either gained or lost conflict status, so the sort proxy re-queries
+  // ConflictRole for them and moves them accordingly.
+  changedRows.insert(m_conflicts.begin(), m_conflicts.end());
+
+  for (const auto& row : changedRows)
   {
-    const auto index = createIndex(row, 0);
+    const auto index = createIndex(int(row), 0);
     emit dataChanged(index, index, {Qt::DisplayRole});
   }
 }

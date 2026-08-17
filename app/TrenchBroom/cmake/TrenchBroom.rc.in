@@ -1,4 +1,4 @@
-#include "@CMAKE_BINARY_DIR@/lib/TbUiLib/generated/ui/Version.h"
+#include "@CMAKE_BINARY_DIR@/lib/TbVersionLib/generated/version/Version.h"
 
 AAAAAAAA                ICON                    "@TB_RESOURCE_DIR@/win32/icons/AppIcon.ico"
 APPICON                 ICON                    "@TB_RESOURCE_DIR@/win32/icons/DocIcon.ico"
@@ -26,7 +26,7 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "TrenchBroom"
             VALUE "FileDescription", "TrenchBroom Level Editor"
-            VALUE "FileVersion", VERSION_STR
+            VALUE "FileVersion", VERSION_WIN_RC
             VALUE "InternalName", "TrenchBroom.exe"
             VALUE "LegalCopyright", "Copyright (C) 2010"
             VALUE "OriginalFilename", "TrenchBroom.exe"

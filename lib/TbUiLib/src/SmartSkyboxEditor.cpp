@@ -17,7 +17,7 @@
 #include "gl/Texture.h"
 #include "mdl/EntityNodeBase.h"
 #include "mdl/GameFileSystem.h"
-#include "mdl/LoadFreeImageTexture.h"
+#include "mdl/LoadImageTexture.h"
 #include "mdl/Map.h"
 #include "ui/BitmapButton.h"
 #include "ui/MapDocument.h"
@@ -383,7 +383,7 @@ QIcon SmartSkyboxEditor::iconForSkybox(const SmartSkyboxItem& skybox)
   }
 
   auto reader = fileResult.value()->reader().buffer();
-  auto textureResult = mdl::loadFreeImageTexture(reader);
+  auto textureResult = mdl::loadImageTexture(reader);
   if (textureResult.is_error())
   {
     return {};

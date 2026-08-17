@@ -23,7 +23,6 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
-#include <QMessageBox>
 #include <QSortFilterProxyModel>
 #include <QTableView>
 #include <QTimer>
@@ -61,22 +60,31 @@ KeyboardPreferencePane::KeyboardPreferencePane(
   m_proxy->setSourceModel(m_model);
   m_proxy->setFilterCaseSensitivity(Qt::CaseInsensitive);
   m_proxy->setFilterKeyColumn(-1);
+  m_proxy->setSortRole(KeyboardShortcutModel::ConflictRole);
+  m_proxy->sort(0); // Sort rows with conflicts to the top
 
   m_table->setObjectName(QStringLiteral("KeyboardPreference_Table"));
   m_table->setCornerButtonEnabled(false);
   m_table->setModel(m_proxy);
 
+  // Keep the edited row visible when resolving a conflict changes the sort order.
+  connect(m_proxy, &QAbstractItemModel::layoutChanged, this, [this] {
+    if (const auto currentIndex = m_table->currentIndex(); currentIndex.isValid())
+    {
+      m_table->scrollTo(currentIndex);
+    }
+  });
+
   auto* header = new QHeaderView{Qt::Horizontal};
   m_table->setHorizontalHeader(header);
   header->setSectionsMovable(false);
-  header->setSectionResizeMode(0, QHeaderView::ResizeMode::Fixed);
+  header->setSectionResizeMode(0, QHeaderView::ResizeMode::Stretch);
   header->setSectionResizeMode(1, QHeaderView::ResizeMode::Fixed);
   header->setSectionResizeMode(2, QHeaderView::ResizeMode::Fixed);
-  header->setSectionResizeMode(3, QHeaderView::ResizeMode::Stretch);
-  header->resizeSection(0, ShortcutColumnWidth);
-  header->resizeSection(1, AlternativeColumnWidth);
-  header->resizeSection(2, ContextColumnWidth);
-  header->moveSection(header->visualIndex(3), 0);
+  header->setSectionResizeMode(3, QHeaderView::ResizeMode::Fixed);
+  header->resizeSection(1, ContextColumnWidth);
+  header->resizeSection(2, ShortcutColumnWidth);
+  header->resizeSection(3, AlternativeColumnWidth);
   m_table->setTextElideMode(Qt::ElideRight);
 
   // Tighter than default vertical row height, without the overhead of autoresizing
@@ -154,14 +162,6 @@ void KeyboardPreferencePane::updateControls()
 
 bool KeyboardPreferencePane::validate()
 {
-  if (m_model->hasConflicts())
-  {
-    QMessageBox::warning(
-      this,
-      tr("Shortcut Conflicts"),
-      tr("Please fix all conflicting shortcuts highlighted in red."));
-    return false;
-  }
   return true;
 }
 
