@@ -25,6 +25,7 @@
 
 class QCheckBox;
 class QComboBox;
+class QSpinBox;
 
 namespace tb::ui
 {
@@ -45,6 +46,7 @@ private:
   QComboBox* m_themeCombo = nullptr;
   QComboBox* m_materialBrowserIconSizeCombo = nullptr;
   QComboBox* m_rendererFontSizeCombo = nullptr;
+  QSpinBox* m_pythonConsoleFontSizeSpin = nullptr;
 
 public:
   explicit ViewPreferencePane(QWidget* parent = nullptr);
@@ -73,6 +75,7 @@ private slots:
   void themeChanged(int index);
   void materialBrowserIconSizeChanged(int index);
   void rendererFontSizeChanged(const QString& text);
+  void pythonConsoleFontSizeChanged(int value);
 };
 
 } // namespace tb::ui

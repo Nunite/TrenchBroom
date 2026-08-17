@@ -28,10 +28,13 @@
 #include <QSizePolicy>
 #include <QTextBlock>
 #include <QTextCursor>
+#include <QTextDocument>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "ui/FixedWidthFont.h"
 
 #include <algorithm>
@@ -43,24 +46,14 @@ namespace
 {
 constexpr auto MaxHistorySize = size_t{100u};
 constexpr auto MaxVisibleInputLines = 4;
-constexpr auto MinConsoleFontPointSize = 11.0;
-constexpr auto MinConsoleFontPixelSize = 15;
 
 QFont consoleFont()
 {
   auto font = Fonts::fixedWidthFont();
-  if (font.pointSizeF() > 0.0)
-  {
-    font.setPointSizeF(std::max(font.pointSizeF(), MinConsoleFontPointSize));
-  }
-  else if (font.pixelSize() > 0)
-  {
-    font.setPixelSize(std::max(font.pixelSize(), MinConsoleFontPixelSize));
-  }
-  else
-  {
-    font.setPointSizeF(MinConsoleFontPointSize);
-  }
+  font.setPointSize(std::clamp(
+    pref(Preferences::PythonConsoleFontSize),
+    Preferences::MinPythonConsoleFontSize,
+    Preferences::MaxPythonConsoleFontSize));
   return font;
 }
 
@@ -88,22 +81,18 @@ PythonConsole::PythonConsole(QWidget* parent)
   , m_runButton{new QToolButton{this}}
   , m_clearButton{new QToolButton{this}}
 {
-  const auto font = consoleFont();
   textView()->setObjectName("PythonConsole_Output");
-  textView()->setFont(font);
 
   auto* inputBar = new QWidget{this};
   inputBar->setObjectName("PythonConsole_InputBar");
   inputBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
 
-  auto* prompt = new QLabel{QStringLiteral(">>>"), inputBar};
-  prompt->setObjectName("PythonConsole_Prompt");
-  prompt->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
-  prompt->setFont(font);
+  m_prompt = new QLabel{QStringLiteral(">>>"), inputBar};
+  m_prompt->setObjectName("PythonConsole_Prompt");
+  m_prompt->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
 
   m_input->setObjectName("PythonConsole_Input");
   m_input->setAccessibleName(tr("Python command input"));
-  m_input->setFont(font);
   m_input->setLineWrapMode(QPlainTextEdit::NoWrap);
   m_input->setTabChangesFocus(false);
   m_input->installEventFilter(this);
@@ -136,11 +125,20 @@ PythonConsole::PythonConsole(QWidget* parent)
   auto* inputLayout = new QHBoxLayout{inputBar};
   inputLayout->setContentsMargins(12, 2, 12, 8);
   inputLayout->setSpacing(8);
-  inputLayout->addWidget(prompt);
+  inputLayout->addWidget(m_prompt);
   inputLayout->addWidget(m_input, 1);
 
   layout()->addWidget(inputBar);
-  updateInputHeight();
+
+  auto& prefs = PreferenceManager::instance();
+  m_notifierConnection +=
+    prefs.preferenceDidChangeNotifier.connect([this](const auto& path) {
+      if (path == Preferences::PythonConsoleFontSize.path)
+      {
+        updateFont();
+      }
+    });
+  updateFont();
 }
 
 QWidget* PythonConsole::createTabBarPage(QWidget* parent)
@@ -233,6 +231,16 @@ void PythonConsole::updateRunButtonEnabled()
 {
   m_runButton->setEnabled(
     m_commandExecutor && !m_input->toPlainText().trimmed().isEmpty());
+}
+
+void PythonConsole::updateFont()
+{
+  const auto font = consoleFont();
+  textView()->setFont(font);
+  textView()->document()->setDefaultFont(font);
+  m_prompt->setFont(font);
+  m_input->setFont(font);
+  updateInputHeight();
 }
 
 void PythonConsole::updateInputHeight()

@@ -4105,6 +4105,16 @@ They may contain new features or bug fixes that are not yet part of a stable rel
         <source>Requires restart after changing</source>
         <translation>更改后需要重启</translation>
     </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/ViewPreferencePane.cpp" line="206"/>
+        <source>Sets the font size of Python console output and input.</source>
+        <translation>设置 Python 控制台输出和输入的字号。</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/ViewPreferencePane.cpp" line="235"/>
+        <source>Python Console Font Size</source>
+        <translation>Python 控制台字号</translation>
+    </message>
 </context>
 <context>
     <name>tb::ui::SmartFaceSelectionPanel</name>

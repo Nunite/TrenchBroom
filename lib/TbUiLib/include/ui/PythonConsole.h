@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "base/NotifierConnection.h"
 #include "ui/Console.h"
 
 #include <functional>
@@ -26,6 +27,7 @@
 #include <vector>
 
 class QEvent;
+class QLabel;
 class QPlainTextEdit;
 class QToolButton;
 class QWidget;
@@ -37,12 +39,14 @@ class PythonConsole : public Console
 {
 private:
   QPlainTextEdit* m_input = nullptr;
+  QLabel* m_prompt = nullptr;
   QToolButton* m_runButton = nullptr;
   QToolButton* m_clearButton = nullptr;
   std::function<void(const std::string&)> m_commandExecutor;
   std::vector<std::string> m_history;
   size_t m_historyIndex = 0u;
   std::string m_historyDraft;
+  NotifierConnection m_notifierConnection;
 
 public:
   explicit PythonConsole(QWidget* parent = nullptr);
@@ -53,6 +57,7 @@ public:
 
 private:
   bool eventFilter(QObject* watched, QEvent* event) override;
+  void updateFont();
   void updateInputHeight();
   void updateRunButtonEnabled();
   void showPreviousHistoryEntry();

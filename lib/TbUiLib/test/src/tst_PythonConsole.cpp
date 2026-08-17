@@ -23,8 +23,11 @@
 #include <QToolButton>
 #include <QtTest/QTest>
 
+#include "base/PreferenceManager.h"
+#include "prefs/Preferences.h"
 #include "ui/PythonConsole.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -53,7 +56,12 @@ TEST_CASE("PythonConsole")
   CHECK(runButton->parentWidget() == actions);
   CHECK(clearButton->parentWidget() == actions);
   CHECK(input->isReadOnly() == false);
-  CHECK((input->font().pointSizeF() >= 11.0 || input->font().pixelSize() >= 15));
+  const auto previousFontSize = pref(Preferences::PythonConsoleFontSize);
+  const auto expectedFontSize = std::clamp(
+    previousFontSize,
+    Preferences::MinPythonConsoleFontSize,
+    Preferences::MaxPythonConsoleFontSize);
+  CHECK(input->font().pointSize() == expectedFontSize);
   CHECK(prompt->font() == input->font());
   CHECK(output->font() == input->font());
   CHECK(runButton->isEnabled() == false);
@@ -92,6 +100,14 @@ TEST_CASE("PythonConsole")
   QTest::keyClick(input, Qt::Key_Return, Qt::ControlModifier);
   REQUIRE(commands.size() == 2u);
   CHECK(commands.back() == "2 + 2");
+
+  const auto newFontSize = expectedFontSize == 16 ? 17 : 16;
+  setPref(Preferences::PythonConsoleFontSize, newFontSize);
+  CHECK(input->font().pointSize() == newFontSize);
+  CHECK(prompt->font() == input->font());
+  CHECK(output->font() == input->font());
+  CHECK(output->document()->defaultFont() == input->font());
+  setPref(Preferences::PythonConsoleFontSize, previousFontSize);
 }
 
 } // namespace tb::ui

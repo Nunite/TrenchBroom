@@ -24,6 +24,7 @@
 #include <QComboBox>
 #include <QLabel>
 #include <QSignalBlocker>
+#include <QSpinBox>
 #include <QtGlobal>
 
 #include "base/PreferenceManager.h"
@@ -194,6 +195,16 @@ QWidget* ViewPreferencePane::createViewPreferences()
                                      "28", "32", "36", "40", "48", "56", "64", "72"});
   m_rendererFontSizeCombo->setValidator(new QIntValidator{1, 96});
 
+  m_pythonConsoleFontSizeSpin = new QSpinBox{};
+  m_pythonConsoleFontSizeSpin->setObjectName(
+    QStringLiteral("ViewPreference_PythonConsoleFontSizeSpin"));
+  m_pythonConsoleFontSizeSpin->setRange(
+    Preferences::MinPythonConsoleFontSize, Preferences::MaxPythonConsoleFontSize);
+  m_pythonConsoleFontSizeSpin->setSuffix(QStringLiteral(" pt"));
+  m_pythonConsoleFontSizeSpin->setMaximumWidth(120);
+  m_pythonConsoleFontSizeSpin->setToolTip(
+    tr("Sets the font size of Python console output and input."));
+
   auto* layout = new FormWithSectionsLayout{};
   layout->setContentsMargins(
     LayoutConstants::DialogOuterMargin,
@@ -221,6 +232,7 @@ QWidget* ViewPreferencePane::createViewPreferences()
 
   layout->addSection("Fonts");
   layout->addRow("Renderer Font Size", m_rendererFontSizeCombo);
+  layout->addRow(tr("Python Console Font Size"), m_pythonConsoleFontSizeSpin);
 
   viewBox->setLayout(layout);
 
@@ -281,6 +293,11 @@ void ViewPreferencePane::bindEvents()
     &QComboBox::currentTextChanged,
     this,
     &ViewPreferencePane::rendererFontSizeChanged);
+  connect(
+    m_pythonConsoleFontSizeSpin,
+    &QSpinBox::valueChanged,
+    this,
+    &ViewPreferencePane::pythonConsoleFontSizeChanged);
 }
 
 bool ViewPreferencePane::canResetToDefaults()
@@ -303,6 +320,7 @@ void ViewPreferencePane::doResetToDefaults()
   prefs.resetToDefault(Preferences::Theme);
   prefs.resetToDefault(Preferences::MaterialBrowserIconSize);
   prefs.resetToDefault(Preferences::RendererFontSize);
+  prefs.resetToDefault(Preferences::PythonConsoleFontSize);
 }
 
 void ViewPreferencePane::updateControls()
@@ -323,6 +341,7 @@ void ViewPreferencePane::updateControls()
     QSignalBlocker{m_materialBrowserIconSizeCombo};
 
   const auto rendererFontSizeBlocker = QSignalBlocker{m_rendererFontSizeCombo};
+  const auto pythonConsoleFontSizeBlocker = QSignalBlocker{m_pythonConsoleFontSizeSpin};
 
   auto& prefs = PreferenceManager::instance();
 
@@ -355,6 +374,8 @@ void ViewPreferencePane::updateControls()
 
   m_rendererFontSizeCombo->setCurrentText(
     QString::asprintf("%i", prefs.getPendingValue(Preferences::RendererFontSize)));
+  m_pythonConsoleFontSizeSpin->setValue(
+    prefs.getPendingValue(Preferences::PythonConsoleFontSize));
 }
 
 bool ViewPreferencePane::validate()
@@ -468,6 +489,11 @@ void ViewPreferencePane::rendererFontSizeChanged(const QString& str)
     auto& prefs = PreferenceManager::instance();
     prefs.set(Preferences::RendererFontSize, value);
   }
+}
+
+void ViewPreferencePane::pythonConsoleFontSizeChanged(const int value)
+{
+  PreferenceManager::instance().set(Preferences::PythonConsoleFontSize, value);
 }
 
 } // namespace tb::ui

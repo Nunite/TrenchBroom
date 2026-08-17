@@ -27,6 +27,7 @@
 #include <QMetaObject>
 #include <QPushButton>
 #include <QSortFilterProxyModel>
+#include <QSpinBox>
 #include <QStackedWidget>
 #include <QTableView>
 #include <QTimer>
@@ -157,10 +158,18 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     CHECK(materialBrowserIconSizeCombo->itemText(8) == QStringLiteral("500%"));
     CHECK(materialBrowserIconSizeCombo->itemData(8).toFloat() == 5.0f);
 
+    auto* pythonConsoleFontSizeSpin = pane->findChild<QSpinBox*>(
+      QStringLiteral("ViewPreference_PythonConsoleFontSizeSpin"));
+    REQUIRE(pythonConsoleFontSizeSpin != nullptr);
+    CHECK(pythonConsoleFontSizeSpin->minimum() == Preferences::MinPythonConsoleFontSize);
+    CHECK(pythonConsoleFontSizeSpin->maximum() == Preferences::MaxPythonConsoleFontSize);
+
     auto& prefs = PreferenceManager::instance();
     const auto previousTheme = prefs.get(Preferences::Theme);
     const auto previousMaterialBrowserIconSize =
       prefs.get(Preferences::MaterialBrowserIconSize);
+    const auto previousPythonConsoleFontSize =
+      prefs.get(Preferences::PythonConsoleFontSize);
     themeCombo->setCurrentIndex(3);
     REQUIRE(QMetaObject::invokeMethod(
       themeCombo, "activated", Qt::DirectConnection, Q_ARG(int, 3)));
@@ -170,6 +179,13 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     materialBrowserIconSizeCombo->setCurrentIndex(8);
     CHECK(prefs.getPendingValue(Preferences::MaterialBrowserIconSize) == 5.0f);
     prefs.set(Preferences::MaterialBrowserIconSize, previousMaterialBrowserIconSize);
+
+    const auto newPythonConsoleFontSize = previousPythonConsoleFontSize == 16 ? 17 : 16;
+    pythonConsoleFontSizeSpin->setValue(newPythonConsoleFontSize);
+    CHECK(
+      prefs.getPendingValue(Preferences::PythonConsoleFontSize)
+      == newPythonConsoleFontSize);
+    prefs.set(Preferences::PythonConsoleFontSize, previousPythonConsoleFontSize);
 
     pane.reset();
   }

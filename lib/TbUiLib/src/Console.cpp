@@ -117,7 +117,6 @@ void Console::logToConsole(const LogLevel level, const std::string& message)
 
   auto format = QTextCharFormat{};
   format.setForeground(getForegroundBrush(level, m_textView->palette()));
-  format.setFont(m_textView->font());
 
   auto cursor = QTextCursor{m_textView->document()};
   cursor.movePosition(QTextCursor::MoveOperation::End);
