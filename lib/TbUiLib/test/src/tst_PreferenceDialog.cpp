@@ -38,6 +38,7 @@
 #include "ui/ColorsPreferencePane.h"
 #include "ui/GamesPreferencePane.h"
 #include "ui/KeyboardPreferencePane.h"
+#include "ui/KeyboardShortcutModel.h"
 #include "ui/McpSettingsWidget.h"
 #include "ui/MiscPreferencePane.h"
 #include "ui/MousePreferencePane.h"
@@ -210,18 +211,44 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     REQUIRE(header != nullptr);
 
     CHECK(table->verticalHeader()->isHidden());
-    CHECK(header->logicalIndex(0) == 3);
-    CHECK(header->sectionResizeMode(3) == QHeaderView::Stretch);
-    CHECK(header->sectionResizeMode(2) == QHeaderView::Fixed);
-    CHECK(header->sectionSize(2) == 190);
+    CHECK_FALSE(header->sectionsMovable());
+    CHECK(
+      header->sectionResizeMode(KeyboardShortcutModel::DescriptionColumn)
+      == QHeaderView::Stretch);
+    CHECK(
+      header->sectionResizeMode(KeyboardShortcutModel::ContextColumn)
+      == QHeaderView::Fixed);
+    CHECK(header->sectionSize(KeyboardShortcutModel::ContextColumn) == 190);
+    CHECK(
+      header->sectionResizeMode(KeyboardShortcutModel::ShortcutColumn)
+      == QHeaderView::Fixed);
+    CHECK(header->sectionSize(KeyboardShortcutModel::ShortcutColumn) == 104);
+    CHECK(
+      header->sectionResizeMode(KeyboardShortcutModel::AlternativeColumn)
+      == QHeaderView::Fixed);
+    CHECK(header->sectionSize(KeyboardShortcutModel::AlternativeColumn) == 116);
 
     auto* proxy = qobject_cast<QSortFilterProxyModel*>(table->model());
     REQUIRE(proxy != nullptr);
     CHECK(proxy->filterKeyColumn() == -1);
     CHECK(
-      proxy->headerData(3, Qt::Horizontal).toString() == QStringLiteral("Description"));
+      proxy->headerData(KeyboardShortcutModel::DescriptionColumn, Qt::Horizontal)
+        .toString()
+      == QStringLiteral("Description"));
+    CHECK(
+      proxy->headerData(KeyboardShortcutModel::ContextColumn, Qt::Horizontal).toString()
+      == QStringLiteral("Context"));
+    CHECK(
+      proxy->headerData(KeyboardShortcutModel::ShortcutColumn, Qt::Horizontal).toString()
+      == QStringLiteral("Shortcut"));
+    CHECK(
+      proxy->headerData(KeyboardShortcutModel::AlternativeColumn, Qt::Horizontal)
+        .toString()
+      == QStringLiteral("Alternative"));
     REQUIRE(proxy->rowCount() > 0);
-    CHECK_FALSE(proxy->data(proxy->index(0, 3)).toString().isEmpty());
+    CHECK_FALSE(proxy->data(proxy->index(0, KeyboardShortcutModel::DescriptionColumn))
+                  .toString()
+                  .isEmpty());
 
     pane.reset();
   }

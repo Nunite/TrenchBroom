@@ -83,7 +83,9 @@ void KeyboardShortcutModel::reset()
   updateConflicts();
   if (totalActionCount() > 0)
   {
-    emit dataChanged(createIndex(0, 0), createIndex(totalActionCount() - 1, 3));
+    emit dataChanged(
+      createIndex(0, DescriptionColumn),
+      createIndex(totalActionCount() - 1, AlternativeColumn));
   }
 }
 
@@ -94,8 +96,7 @@ int KeyboardShortcutModel::rowCount(const QModelIndex& /* parent */) const
 
 int KeyboardShortcutModel::columnCount(const QModelIndex& /* parent */) const
 {
-  // Shortcut, Alternative, Context, Description
-  return 4;
+  return ColumnCount;
 }
 
 QVariant KeyboardShortcutModel::headerData(
@@ -105,13 +106,13 @@ QVariant KeyboardShortcutModel::headerData(
   {
     switch (section)
     {
-    case 0:
+    case DescriptionColumn:
       return tr("Description");
-    case 1:
+    case ContextColumn:
       return tr("Context");
-    case 2:
+    case ShortcutColumn:
       return tr("Shortcut");
-    case 3:
+    case AlternativeColumn:
       return tr("Alternative");
     }
   }
@@ -125,7 +126,9 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
     return QVariant{};
   }
 
-  if (role == Qt::ToolTipRole && (index.column() == 0 || index.column() == 1))
+  if (
+    role == Qt::ToolTipRole
+    && (index.column() == DescriptionColumn || index.column() == ContextColumn))
   {
     return data(index, Qt::DisplayRole);
   }
@@ -140,15 +143,15 @@ QVariant KeyboardShortcutModel::data(const QModelIndex& index, const int role) c
 
     switch (index.column())
     {
-    case 0:
+    case DescriptionColumn:
       return actionDisplayPath(actionInfo.displayPath());
-    case 1:
+    case ContextColumn:
       return actionContextDisplayName(actionInfo.actionContext());
-    case 2:
+    case ShortcutColumn:
       return QVariant::fromValue(
         !keyboardShortcuts.empty() ? toQKeySequence(keyboardShortcuts[0])
                                    : QKeySequence{});
-    case 3:
+    case AlternativeColumn:
       return QVariant::fromValue(
         keyboardShortcuts.size() > 1 ? toQKeySequence(keyboardShortcuts[1])
                                      : QKeySequence{});
@@ -195,14 +198,14 @@ bool KeyboardShortcutModel::setData(
 
   switch (index.column())
   {
-  case 2:
+  case ShortcutColumn:
     if (keyboardShortcuts.empty())
     {
       keyboardShortcuts.emplace_back();
     }
     keyboardShortcuts[0] = fromQKeySequence(keySequence);
     break;
-  case 3:
+  case AlternativeColumn:
     if (keyboardShortcuts.empty())
     {
       keyboardShortcuts.emplace_back();
@@ -234,8 +237,8 @@ Qt::ItemFlags KeyboardShortcutModel::flags(const QModelIndex& index) const
 
   switch (index.column())
   {
-  case 2:
-  case 3:
+  case ShortcutColumn:
+  case AlternativeColumn:
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
   default:
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
@@ -395,7 +398,7 @@ void KeyboardShortcutModel::updateConflicts()
 
   for (const auto& row : changedRows)
   {
-    const auto index = createIndex(int(row), 0);
+    const auto index = createIndex(int(row), DescriptionColumn);
     emit dataChanged(index, index, {Qt::DisplayRole});
   }
 }

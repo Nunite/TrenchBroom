@@ -78,13 +78,17 @@ KeyboardPreferencePane::KeyboardPreferencePane(
   auto* header = new QHeaderView{Qt::Horizontal};
   m_table->setHorizontalHeader(header);
   header->setSectionsMovable(false);
-  header->setSectionResizeMode(0, QHeaderView::ResizeMode::Stretch);
-  header->setSectionResizeMode(1, QHeaderView::ResizeMode::Fixed);
-  header->setSectionResizeMode(2, QHeaderView::ResizeMode::Fixed);
-  header->setSectionResizeMode(3, QHeaderView::ResizeMode::Fixed);
-  header->resizeSection(1, ContextColumnWidth);
-  header->resizeSection(2, ShortcutColumnWidth);
-  header->resizeSection(3, AlternativeColumnWidth);
+  header->setSectionResizeMode(
+    KeyboardShortcutModel::DescriptionColumn, QHeaderView::ResizeMode::Stretch);
+  header->setSectionResizeMode(
+    KeyboardShortcutModel::ContextColumn, QHeaderView::ResizeMode::Fixed);
+  header->setSectionResizeMode(
+    KeyboardShortcutModel::ShortcutColumn, QHeaderView::ResizeMode::Fixed);
+  header->setSectionResizeMode(
+    KeyboardShortcutModel::AlternativeColumn, QHeaderView::ResizeMode::Fixed);
+  header->resizeSection(KeyboardShortcutModel::ContextColumn, ContextColumnWidth);
+  header->resizeSection(KeyboardShortcutModel::ShortcutColumn, ShortcutColumnWidth);
+  header->resizeSection(KeyboardShortcutModel::AlternativeColumn, AlternativeColumnWidth);
   m_table->setTextElideMode(Qt::ElideRight);
 
   // Tighter than default vertical row height, without the overhead of autoresizing

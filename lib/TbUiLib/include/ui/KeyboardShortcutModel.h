@@ -46,6 +46,15 @@ private:
   std::unordered_set<size_t> m_conflicts;
 
 public:
+  enum Column
+  {
+    DescriptionColumn = 0,
+    ContextColumn,
+    ShortcutColumn,
+    AlternativeColumn,
+    ColumnCount,
+  };
+
   static constexpr int ConflictRole = Qt::UserRole + 1;
 
   explicit KeyboardShortcutModel(
