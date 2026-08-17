@@ -51,7 +51,7 @@ void DrawShapeToolPage::createGui()
   auto* label = new QLabel{tr("Shape")};
   m_extensionButton = createBitmapButton(
     m_extensionManager.currentExtension().iconPath(), tr("Click to select a shape"));
-  m_extensionButton->setObjectName("toolButton_withBorder");
+  m_extensionButton->setProperty("tbControlRole", "outlined");
 
   auto* extensionMenu = new QMenu{m_extensionButton};
   const auto extensions = m_extensionManager.extensions();

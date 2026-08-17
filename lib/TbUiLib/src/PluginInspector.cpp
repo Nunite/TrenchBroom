@@ -94,7 +94,9 @@ QWidget* PluginInspector::addPluginPanel(const QString& title)
 
     auto* closeButton = new QToolButton{titleBar};
     closeButton->setObjectName("PluginInspector_CloseButton");
+    closeButton->setProperty("tbControlRole", "compact");
     closeButton->setAutoRaise(true);
+    closeButton->setFixedSize(QSize{18, 18});
     closeButton->setText(QStringLiteral("×"));
     closeButton->setToolTip(tr("Close"));
 

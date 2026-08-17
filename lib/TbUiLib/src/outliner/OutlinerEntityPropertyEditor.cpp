@@ -508,7 +508,7 @@ OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(
   addActionsLayout->setSpacing(2);
 
   auto* addButton = createBitmapButton("Add.svg", tr("Add property"), addActions);
-  addButton->setObjectName("toolButton_withBorder");
+  addButton->setProperty("tbControlRole", "compact");
   addButton->setIconSize(QSize{16, 16});
   addButton->setFixedSize(QSize{24, 24});
   addActionsLayout->addWidget(addButton);
@@ -916,14 +916,14 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     }
 
     auto* activateButton = createBitmapButton("Add.svg", tr("Activate property"), row);
-    activateButton->setObjectName("toolButton_withBorder");
+    activateButton->setProperty("tbControlRole", "compact");
     activateButton->setIconSize(QSize{16, 16});
     activateButton->setFixedSize(QSize{24, 24});
     activateButton->setProperty("propertyKey", QString::fromStdString(key));
     activateButton->setHidden(!inactive);
 
     auto* removeButton = createBitmapButton("Remove.svg", tr("Remove property"), row);
-    removeButton->setObjectName("toolButton_withBorder");
+    removeButton->setProperty("tbControlRole", "compact");
     removeButton->setIconSize(QSize{16, 16});
     removeButton->setFixedSize(QSize{24, 24});
     removeButton->setProperty("propertyKey", QString::fromStdString(key));
@@ -949,7 +949,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     if (!inactive && key == "model")
     {
       modelBrowseButton = createBitmapButton("Folder.svg", tr("Load model file"), row);
-      modelBrowseButton->setObjectName("toolButton_withBorder");
+      modelBrowseButton->setProperty("tbControlRole", "compact");
       modelBrowseButton->setIconSize(QSize{16, 16});
       modelBrowseButton->setFixedSize(QSize{24, 24});
       if (propertyDef && propertyDef->readOnly)
@@ -965,6 +965,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     {
       colorButton = new QToolButton{row};
       colorButton->setObjectName("outlinerPropertyColorButton");
+      colorButton->setProperty("tbControlRole", "compact");
       colorButton->setFixedSize(QSize{24, 24});
       colorButton->setIconSize(QSize{14, 14});
       colorButton->setProperty("propertyKey", QString::fromStdString(key));
@@ -1020,7 +1021,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
       && std::holds_alternative<mdl::PropertyValueTypes::Flags>(propertyDef->valueType))
     {
       spawnflagsToggleButton = new QToolButton{row};
-      spawnflagsToggleButton->setObjectName("toolButton_withBorder");
+      spawnflagsToggleButton->setProperty("tbControlRole", "compact");
       spawnflagsToggleButton->setCheckable(true);
       spawnflagsToggleButton->setFixedSize(QSize{24, 24});
       spawnflagsToggleButton->setToolTip(tr("Show spawnflags editor"));
@@ -1040,7 +1041,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     if (canShowWadEditor && key == *wadKey)
     {
       wadToggleButton = new QToolButton{row};
-      wadToggleButton->setObjectName("toolButton_withBorder");
+      wadToggleButton->setProperty("tbControlRole", "compact");
       wadToggleButton->setCheckable(true);
       wadToggleButton->setFixedSize(QSize{24, 24});
       wadToggleButton->setToolTip(tr("Show wad file editor"));
@@ -1054,7 +1055,7 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     if (canShowSkyboxEditor && key == mdl::EntityPropertyKeys::Skyname)
     {
       skyboxToggleButton = new QToolButton{row};
-      skyboxToggleButton->setObjectName("toolButton_withBorder");
+      skyboxToggleButton->setProperty("tbControlRole", "compact");
       skyboxToggleButton->setCheckable(true);
       skyboxToggleButton->setFixedSize(QSize{24, 24});
       skyboxToggleButton->setProperty("propertyKey", QString::fromStdString(key));

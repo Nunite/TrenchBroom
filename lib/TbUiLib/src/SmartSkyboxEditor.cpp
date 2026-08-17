@@ -251,6 +251,7 @@ void SmartSkyboxEditor::createGui()
 
   m_refreshButton = createBitmapButton("Refresh.svg", tr("Refresh skyboxes"), header);
   m_refreshButton->setObjectName("smartSkyboxRefreshButton");
+  m_refreshButton->setProperty("tbControlRole", "compact");
   m_refreshButton->setFixedSize(QSize{24, 24});
 
   headerLayout->addWidget(title);

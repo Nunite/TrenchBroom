@@ -146,17 +146,17 @@ DrawShapeToolCircularShapeExtensionPage::DrawShapeToolCircularShapeExtensionPage
   auto* edgeAlignedCircleButton =
     createBitmapToggleButton("CircleEdgeAligned.svg", tr("Align edge to bounding box"));
   edgeAlignedCircleButton->setIconSize({24, 24});
-  edgeAlignedCircleButton->setObjectName("toolButton_withBorder");
+  edgeAlignedCircleButton->setProperty("tbControlRole", "outlined");
 
   auto* vertexAlignedCircleButton = createBitmapToggleButton(
     "CircleVertexAligned.svg", tr("Align vertices to bounding box"));
   vertexAlignedCircleButton->setIconSize({24, 24});
-  vertexAlignedCircleButton->setObjectName("toolButton_withBorder");
+  vertexAlignedCircleButton->setProperty("tbControlRole", "outlined");
 
   auto* scalableCircleButton =
     createBitmapToggleButton("CircleScalable.svg", tr("Scalable circle shape"));
   scalableCircleButton->setIconSize({24, 24});
-  scalableCircleButton->setObjectName("toolButton_withBorder");
+  scalableCircleButton->setProperty("tbControlRole", "outlined");
 
   auto* radiusModeButtonGroup = new QButtonGroup{};
   radiusModeButtonGroup->addButton(edgeAlignedCircleButton);

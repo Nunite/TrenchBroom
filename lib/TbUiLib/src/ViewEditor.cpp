@@ -22,6 +22,7 @@
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QRadioButton>
@@ -195,7 +196,10 @@ void EntityDefinitionCheckBoxList::createGui()
       });
 
       m_defCheckBoxes.push_back(defCB);
-      scrollWidgetLayout->addWidget(defCB);
+      auto* definitionLayout = new QHBoxLayout{};
+      definitionLayout->setContentsMargins(11, 0, 0, 0);
+      definitionLayout->addWidget(defCB);
+      scrollWidgetLayout->addLayout(definitionLayout);
     }
   }
 

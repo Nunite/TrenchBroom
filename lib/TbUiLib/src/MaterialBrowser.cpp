@@ -157,6 +157,8 @@ void MaterialBrowser::createGui(AppController& appController)
 
   m_iconSizeChoice = new QComboBox{};
   m_iconSizeChoice->setObjectName(QStringLiteral("MaterialBrowser_IconSize"));
+  m_iconSizeChoice->setMinimumWidth(58);
+  m_iconSizeChoice->setMaximumWidth(66);
   m_iconSizeChoice->setToolTip(tr("Material thumbnail size"));
   m_iconSizeChoice->setAccessibleName(tr("Material thumbnail size"));
   for (const auto size : MaterialBrowserIconSizes)

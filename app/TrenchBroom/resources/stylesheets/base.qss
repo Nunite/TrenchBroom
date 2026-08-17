@@ -29,6 +29,7 @@ QMenuBar::item:pressed {
 QMenu {
   background: @tb-elevated-background;
   border: 1px solid @tb-strong-border;
+  border-radius: 6px;
   color: @tb-text;
   padding: 4px;
 }
@@ -43,8 +44,26 @@ QMenu::item:selected {
   color: @tb-inverse-text;
 }
 
+QMenu::item:checked {
+  background: @tb-pressed-background;
+}
+
+QMenu::item:checked:selected {
+  background: @tb-selection-background;
+}
+
 QMenu::item:disabled {
   color: @tb-disabled-text;
+}
+
+QMenu::item:disabled:selected {
+  background: @tb-hover-background;
+  color: @tb-disabled-text;
+}
+
+QMenu::indicator {
+  height: 16px;
+  width: 16px;
 }
 
 QMenu::separator {
@@ -224,6 +243,52 @@ QToolButton:checked {
 }
 
 QToolButton:disabled {
+  color: @tb-disabled-text;
+}
+
+QToolButton[tbControlRole="compact"] {
+  border-radius: 4px;
+  min-height: 18px;
+  min-width: 18px;
+  padding: 0;
+}
+
+QToolButton[tbControlRole="outlined"] {
+  background: transparent;
+  border-color: @tb-border;
+}
+
+QToolButton[tbControlRole="outlined"]:hover,
+QToolButton[tbControlRole="outlined"]:focus {
+  background: @tb-hover-background;
+  border-color: @tb-focus-border;
+}
+
+QToolButton[tbControlRole="outlined"]:pressed,
+QToolButton[tbControlRole="outlined"]:checked {
+  background: @tb-pressed-background;
+  border-color: @tb-strong-border;
+}
+
+QGroupBox {
+  background: transparent;
+  border: 1px solid @tb-border;
+  border-radius: 6px;
+  color: @tb-text;
+  margin-top: 8px;
+  padding: 8px 6px 6px 6px;
+}
+
+QGroupBox::title {
+  color: @tb-secondary-text;
+  left: 8px;
+  padding: 0 4px;
+  subcontrol-origin: margin;
+  subcontrol-position: top left;
+}
+
+QGroupBox:disabled,
+QGroupBox::title:disabled {
   color: @tb-disabled-text;
 }
 
@@ -489,12 +554,31 @@ QAbstractItemView::item:hover {
   background: @tb-hover-background;
 }
 
+QAbstractItemView::item:selected {
+  background: @tb-selection-background;
+  color: @tb-inverse-text;
+}
+
 QAbstractItemView::item:selected:!active {
   background: @tb-inactive-selection-background;
 }
 
+QAbstractItemView::item:focus {
+  border-color: @tb-focus-border;
+}
+
+QAbstractItemView:disabled {
+  background: @tb-panel-background;
+  color: @tb-disabled-text;
+}
+
+QAbstractItemView::item:disabled {
+  color: @tb-disabled-text;
+}
+
 QTreeView::item,
 QListView::item {
+  border-radius: 4px;
   min-height: 22px;
   padding: 1px 4px;
 }
@@ -516,6 +600,21 @@ QHeaderView::section {
   color: @tb-secondary-text;
   min-height: 22px;
   padding: 2px 6px;
+}
+
+QHeaderView::section:hover {
+  background: @tb-hover-background;
+  color: @tb-text;
+}
+
+QHeaderView::section:pressed,
+QHeaderView::section:checked {
+  background: @tb-pressed-background;
+  color: @tb-text;
+}
+
+QHeaderView::section:disabled {
+  color: @tb-disabled-text;
 }
 
 QTabWidget::pane {
@@ -542,6 +641,15 @@ QTabBar::tab:selected {
   background: @tb-editor-background;
   border-color: @tb-border;
   color: @tb-text;
+}
+
+QTabBar::tab:focus {
+  border-color: @tb-focus-border;
+}
+
+QTabBar::tab:disabled {
+  background: transparent;
+  color: @tb-disabled-text;
 }
 
 QWidget#TabBarButton {
@@ -704,11 +812,6 @@ QWidget#MaterialBrowser_FilterRow {
   background: transparent;
 }
 
-QComboBox#MaterialBrowser_IconSize {
-  max-width: 66px;
-  min-width: 58px;
-}
-
 QToolButton[browserFilterToggle="true"] {
   background: @tb-button-background;
   border: 1px solid @tb-border;
@@ -742,26 +845,6 @@ QWidget#ModelBrowser_BreadcrumbBar {
   border-radius: 5px;
 }
 
-QToolButton#ModelBrowser_ReloadButton,
-QToolButton#ModelBrowser_SavePrefabButton {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  min-height: 24px;
-  min-width: 24px;
-  padding: 0;
-}
-
-QToolButton#ModelBrowser_ReloadButton:hover,
-QToolButton#ModelBrowser_SavePrefabButton:hover {
-  background: @tb-hover-background;
-  border-color: @tb-border;
-}
-
-QComboBox#ModelBrowser_IconSize {
-  min-width: 58px;
-}
-
 QTreeWidget#ModelBrowser_FolderTree {
   background: @tb-panel-background;
   border: none;
@@ -792,7 +875,7 @@ QStatusBar QLabel {
   color: @tb-secondary-text;
 }
 
-QStatusBar QToolButton#MapWindow_SnapToggle {
+QStatusBar QToolButton[tbControlRole="compact"] {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -801,17 +884,17 @@ QStatusBar QToolButton#MapWindow_SnapToggle {
   padding: 0 6px;
 }
 
-QStatusBar QToolButton#MapWindow_SnapToggle:hover {
+QStatusBar QToolButton[tbControlRole="compact"]:hover {
   background: @tb-hover-background;
   border-color: @tb-border;
   color: @tb-text;
 }
 
-QStatusBar QToolButton#MapWindow_SnapToggle:focus {
+QStatusBar QToolButton[tbControlRole="compact"]:focus {
   border-color: @tb-focus-border;
 }
 
-QStatusBar QToolButton#MapWindow_SnapToggle:checked {
+QStatusBar QToolButton[tbControlRole="compact"]:checked {
   background: @tb-pressed-background;
   border-color: @tb-accent;
   color: @tb-text;
@@ -973,6 +1056,14 @@ QScrollBar::handle:pressed {
   background: @tb-text;
 }
 
+QScrollBar:disabled {
+  background: transparent;
+}
+
+QScrollBar::handle:disabled {
+  background: @tb-border;
+}
+
 QScrollBar::add-line,
 QScrollBar::sub-line,
 QScrollBar::add-page,
@@ -987,6 +1078,14 @@ QSplitter::handle {
   background: @tb-border;
 }
 
+QSplitter::handle:hover {
+  background: @tb-secondary-text;
+}
+
+QSplitter::handle:pressed {
+  background: @tb-accent;
+}
+
 QSplitter#MapWindow_HorizontalSplitter::handle,
 QSplitter#MapWindow_VerticalSplitterSplitter::handle {
   background: transparent;
@@ -996,51 +1095,9 @@ QListWidget#controlListBox_listWidget {
   border: none;
 }
 
-QCheckBox#entityDefinition_checkboxWidget {
-  margin-left: 11px;
-}
-
-QToolButton#toolButton_withBorder {
-  background: transparent;
-  border: 1px solid @tb-border;
-  border-radius: 5px;
-}
-
-QToolButton#toolButton_withBorder:hover {
-  background: @tb-hover-background;
-}
-
-QToolButton#toolButton_withBorder:checked {
-  background: @tb-pressed-background;
-}
-
 QWidget#OutlinerInspector_Toolbar {
   background: @tb-sidebar-background;
   border-bottom: 1px solid @tb-border;
-}
-
-QComboBox#OutlinerInspector_Sort {
-  min-width: 74px;
-}
-
-QToolButton#OutlinerInspector_AddLayer,
-QToolButton#OutlinerInspector_PropertiesToggle {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-}
-
-QToolButton#OutlinerInspector_AddLayer:hover,
-QToolButton#OutlinerInspector_PropertiesToggle:hover {
-  background: @tb-hover-background;
-  border-color: @tb-border;
-}
-
-QToolButton#OutlinerInspector_AddLayer:pressed,
-QToolButton#OutlinerInspector_PropertiesToggle:pressed,
-QToolButton#OutlinerInspector_PropertiesToggle:checked {
-  background: @tb-pressed-background;
-  border-color: @tb-strong-border;
 }
 
 QTreeWidget#OutlinerTreeWidget {
@@ -1132,14 +1189,14 @@ QWidget#ClickableTitleBar QLabel#ClickableTitleBar_StateText {
   color: @tb-secondary-text;
 }
 
-QWidget#ClickableTitleBar QToolButton#ClickableTitleBar_StateIcon {
+QWidget#ClickableTitleBar QToolButton[tbControlRole="compact"] {
   background: transparent;
   border: none;
   border-radius: 5px;
   padding: 0;
 }
 
-QWidget#ClickableTitleBar QToolButton#ClickableTitleBar_StateIcon:hover {
+QWidget#ClickableTitleBar QToolButton[tbControlRole="compact"]:hover {
   background: @tb-pressed-background;
 }
 
@@ -1172,28 +1229,6 @@ QWidget#PluginInspector_PluginPanel > QWidget {
   border: none;
   border-bottom-left-radius: 5px;
   border-bottom-right-radius: 5px;
-}
-
-QToolButton#PluginInspector_CloseButton {
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: @tb-secondary-text;
-  margin-left: 6px;
-  max-height: 18px;
-  max-width: 18px;
-  min-height: 18px;
-  min-width: 18px;
-  padding: 0;
-}
-
-QToolButton#PluginInspector_CloseButton:hover {
-  background: @tb-hover-background;
-  color: @tb-text;
-}
-
-QToolButton#PluginInspector_CloseButton:pressed {
-  background: @tb-pressed-background;
 }
 
 tb--ui--BitmapButton {
@@ -1263,44 +1298,10 @@ QWidget#outlinerPropertyKey[inactive="true"] QLabel {
   color: @tb-secondary-text;
 }
 
-QWidget#outlinerPropertyRow[inactive="true"] QLineEdit#outlinerPropertyValue,
-QWidget#outlinerPropertyRow[inactive="true"] QComboBox#outlinerPropertyValue {
+QWidget#outlinerPropertyRow[inactive="true"] QLineEdit,
+QWidget#outlinerPropertyRow[inactive="true"] QComboBox {
   background: @tb-window-background;
   border-color: @tb-border;
-}
-
-QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder,
-QWidget#outlinerPropertyAddBar QToolButton#toolButton_withBorder {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
-}
-
-QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder:hover,
-QWidget#outlinerPropertyAddBar QToolButton#toolButton_withBorder:hover {
-  background: @tb-hover-background;
-  border-color: @tb-border;
-}
-
-QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder:pressed,
-QWidget#outlinerPropertyActions QToolButton#toolButton_withBorder:checked,
-QWidget#outlinerPropertyAddBar QToolButton#toolButton_withBorder:pressed {
-  background: @tb-pressed-background;
-}
-
-QToolButton#outlinerPropertyColorButton {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
-}
-
-QToolButton#outlinerPropertyColorButton:hover {
-  background: @tb-hover-background;
-  border-color: @tb-border;
-}
-
-QToolButton#outlinerPropertyColorButton:pressed {
-  background: @tb-pressed-background;
 }
 
 QWidget#smartSkyboxHeader {
@@ -1310,17 +1311,6 @@ QWidget#smartSkyboxHeader {
 QLabel#smartSkyboxTitle {
   color: @tb-text;
   font-weight: bold;
-}
-
-QToolButton#smartSkyboxRefreshButton {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
-}
-
-QToolButton#smartSkyboxRefreshButton:hover {
-  background: @tb-hover-background;
-  border-color: @tb-border;
 }
 
 QListWidget#smartSkyboxList {

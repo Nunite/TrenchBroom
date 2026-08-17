@@ -23,7 +23,7 @@
 - Keep canonical control geometry and states in `app/TrenchBroom/resources/stylesheets/base.qss`, theme-selectable colors in `ThemeTokens`, and platform-independent primitives or metrics in `ApplicationStyle`.
 - Runtime data visualization such as a color swatch is the narrow local-style exception. Document any other exception and cover it with a focused visual target.
 - After changing a foundational component family, run the `components` UI snapshot matrix plus representative real-screen targets.
-- Run `powershell -ExecutionPolicy Bypass -File scripts\check-ui-style-governance.ps1` before committing UI changes. The check rejects new feature-local `setStyleSheet()` calls outside the global application style and the data-driven color swatch allowlist.
+- Run `powershell -ExecutionPolicy Bypass -File scripts\check-ui-style-governance.ps1` before committing UI changes. The check rejects new feature-local `setStyleSheet()` calls outside the global application style and the data-driven color swatch allowlist, plus object-name selectors that restyle foundational controls.
 
 ## Build and test
 - TrenchBroom uses CMake as its build system.

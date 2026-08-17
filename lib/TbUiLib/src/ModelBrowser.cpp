@@ -268,13 +268,18 @@ void ModelBrowser::createGui(AppController& appController)
   m_reloadButton->setIcon(loadSVGIcon(std::filesystem::path{"Refresh.svg"}));
   m_reloadButton->setToolTip(tr("Reload assets"));
   m_reloadButton->setAutoRaise(true);
+  m_reloadButton->setProperty("tbControlRole", "compact");
+  m_reloadButton->setFixedSize(QSize{24, 24});
 
   m_savePrefabButton = createBitmapButton("Add.svg", tr("Save selection as prefab"));
   m_savePrefabButton->setObjectName("ModelBrowser_SavePrefabButton");
+  m_savePrefabButton->setProperty("tbControlRole", "compact");
+  m_savePrefabButton->setFixedSize(QSize{24, 24});
   m_savePrefabButton->setEnabled(false);
 
   m_iconSizeCombo = new QComboBox{};
   m_iconSizeCombo->setObjectName("ModelBrowser_IconSize");
+  m_iconSizeCombo->setMinimumWidth(58);
   m_iconSizeCombo->setToolTip(tr("Asset icon size"));
   m_iconSizeCombo->addItem("50%", 0.5f);
   m_iconSizeCombo->addItem("75%", 0.75f);

@@ -612,6 +612,7 @@ void MapWindow::createStatusBar()
 
   m_snapToggle = new QToolButton{};
   m_snapToggle->setObjectName("MapWindow_SnapToggle");
+  m_snapToggle->setProperty("tbControlRole", "compact");
   m_snapToggle->setText(tr("Snap"));
   m_snapToggle->setToolTip(tr("Snap to grid"));
   m_snapToggle->setCheckable(true);

@@ -237,7 +237,7 @@ new docking or a separate full-size material browser window.
 
 ### Phase 4.5: Foundational Component Governance
 
-Status: in progress
+Status: complete
 
 TrenchBroom now follows a central component contract inspired by Blender's separation between
 feature layout and shared widget rendering. Feature screens declare content, behavior, layout,
@@ -246,17 +246,22 @@ the visual implementation.
 
 - [x] Add `docs/ui-component-style-governance.md` and make it required guidance for UI work.
 - [x] Add a deterministic `components` snapshot covering input, choice, numeric, multiline,
-      checkbox, radio, range, push-button, and tool-button states.
+      checkbox, radio, range, push-button, tool-button, group, collection, header, tab, menu,
+      scroll-bar, and splitter states.
 - [x] Add canonical multiline input, radio, slider, and tool-button styling to the global
       component layer.
 - [x] Make radio indicators use the same theme-aware application style path as checkboxes.
 - [x] Replace Command Palette and status-bar object-name styling with explicit semantic roles.
 - [x] Remove first-pass browser, Outliner, Smart Face, MCP error, and plugin-output style
       duplication while retaining behavioral object names.
-- [ ] Consolidate group surfaces and remaining button-specific selectors.
-- [ ] Consolidate item views, headers, tabs, menus, and scroll bars around explicit component
-      roles.
-- [ ] Audit custom delegates and paint paths for accidental foundational-control rendering.
+- [x] Consolidate group surfaces and remove foundational button styling based on object names,
+      retaining `compact` and `outlined` semantic roles for real density and boundary needs.
+- [x] Consolidate item views, headers, tabs, menus, scroll bars, and splitters around canonical
+      states and move feature-owned width constraints back into their layouts.
+- [x] Audit custom delegates and paint paths. Command Palette delegates reuse the canonical
+      item background and only lay out semantic text; entity-property and shortcut delegates
+      only provide editors. Outliner full-row state and skybox preview painting remain documented
+      compound/data-renderer exceptions.
 
 Expected benefit: high. New and plugin-created standard Qt controls inherit a coherent default,
 and intentional density differences remain reviewable instead of becoming page-specific visual
@@ -446,3 +451,5 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-17 | Verified | Passed Release `MapWindow` (203 assertions), rebuilt `TrenchBroom`, and visually checked Map- and Outliner-selected rail states in the 18-state Workbench/Outliner Light, Dark, and Blender matrix at 100%, 150%, and 200% in `20260817-140520-086`. |
 | 2026-08-17 | Complete | Added foundational component governance modeled on Blender's centralized semantic-control pipeline, made it required agent guidance, added a local preflight guard against feature-local styles, and introduced a deterministic component gallery. Consolidated the first input, choice, numeric, multiline, checkbox, radio, slider, push-button, and tool-button families while replacing page-specific visual overrides with shared defaults or explicit semantic roles. |
 | 2026-08-17 | Verified | Passed the style-governance preflight, strict-compiled all nine changed C++ translation units, passed Release `MapWindow`, `PythonV2`, `SmartFaceSelectionPanel`, and `MiscPreferencePane` (634 assertions), rebuilt `TrenchBroom`, passed the 9-state component matrix at `20260817-205042-050`, and visually checked 72 affected Workbench, Outliner, Entity Browser, Face Inspector, Command Palette, View preferences, Misc/MCP, and Supporting states at `20260817-204311-158`. |
+| 2026-08-17 | Complete | Finished foundational component consolidation for group surfaces, item views, headers, tabs, menus, scroll bars, and splitters; replaced remaining foundational object-name selectors with canonical defaults or `compact` / `outlined` roles; and extended governance enforcement and the component gallery. Audited all item delegates, retaining only behavior, semantic-content, full-row compound, and data-preview rendering. |
+| 2026-08-17 | Verified | Passed the strengthened style-governance check, strict-compiled all 13 changed C++ translation units, passed nine focused Release UI test cases (561 assertions), rebuilt `TrenchBroom`, passed and visually checked the 9-state component matrix at `20260817-212125-443`, 54 affected real-screen states at `20260817-212214-243`, and 9 compact Misc/MCP states at `20260817-212452-697`. |

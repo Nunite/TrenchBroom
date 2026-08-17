@@ -31,4 +31,25 @@ $($violations -join "`n")
 "@
 }
 
-Write-Host "UI style governance: no feature-local setStyleSheet() calls"
+$styleSheetPath = Join-Path $repositoryRoot "app\TrenchBroom\resources\stylesheets\base.qss"
+$foundationalSelectorPattern =
+  'Q(?:LineEdit|ComboBox|SpinBox|DoubleSpinBox|CheckBox|RadioButton|Slider|PushButton|ToolButton)#[A-Za-z_]'
+$selectorViolations = @(
+  Select-String -LiteralPath $styleSheetPath -Pattern $foundationalSelectorPattern |
+    ForEach-Object {
+      $relativePath = $_.Path.Substring($repositoryRoot.Length + 1).Replace('\', '/')
+      "$relativePath`:$($_.LineNumber):$($_.Line.Trim())"
+    }
+)
+
+if ($selectorViolations.Count -gt 0) {
+  throw @"
+Found object-name selectors for foundational controls. Use the canonical default or an
+approved tbControlRole; object names may identify compound surfaces, not restyle controls:
+$($selectorViolations -join "`n")
+"@
+}
+
+Write-Host (
+  "UI style governance: no feature-local setStyleSheet() calls or foundational " +
+  "object-name selectors")

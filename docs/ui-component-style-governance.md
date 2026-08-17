@@ -55,6 +55,8 @@ remain related to the default control.
   workflow.
 - `navigation`: an icon or tab used to change application regions rather than execute a
   document command.
+- `outlined`: an icon command whose persistent boundary communicates a mode or selectable
+  tool outside a toolbar. It is not a general-purpose way to make one button look stronger.
 
 New roles require a documented interaction or density reason and a component snapshot.
 "This page looks different" is not a valid reason.
@@ -118,17 +120,19 @@ The `components` UI snapshot is the primary visual contract for foundational con
 powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1 -Targets components
 ```
 
-The snapshot must cover representative normal, focused, checked, read-only, and disabled
-states at 100%, 150%, and 200% scale for Light, Dark, and Blender themes. A component change
-also requires focused tests for affected behavior and the representative real screens which
-use the component.
+The snapshot must cover representative normal, focused, checked, read-only, selected, and
+disabled states for inputs, commands, group surfaces, item views, headers, tabs, menus,
+scroll bars, and splitters at 100%, 150%, and 200% scale for Light, Dark, and Blender themes.
+A component change also requires focused tests for affected behavior and the representative
+real screens which use the component.
 
 Before completing a component-style change:
 
 1. Search for `setStyleSheet`, object-name QSS selectors, custom delegates, and custom paint
    paths affecting the component family.
 2. Run `scripts\check-ui-style-governance.ps1`; it rejects feature-local styles outside the
-   global application style and the data-driven color swatch allowlist.
+   global application style and the data-driven color swatch allowlist, as well as object-name
+   selectors that restyle foundational controls.
 3. Confirm that feature code only declares semantics or a documented controlled role.
 4. Build the narrowest affected test target, then the Release `TrenchBroom` target.
 5. Run the `components` snapshot matrix and focused real-screen snapshots.

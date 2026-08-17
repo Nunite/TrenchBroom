@@ -56,6 +56,7 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent)
   m_sortBox = new QComboBox(topRowWidget);
   m_sortBox->setObjectName("OutlinerInspector_Sort");
   m_sortBox->setToolTip(tr("Sort outliner"));
+  m_sortBox->setMinimumWidth(74);
   m_sortBox->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   m_sortBox->addItem(
     tr("Default"), static_cast<int>(OutlinerTreeWidget::SortMode::Default));
@@ -77,6 +78,7 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent)
   auto* addLayerButton =
     createBitmapButton("Add.svg", tr("Add a new layer"), topRowWidget);
   addLayerButton->setObjectName("OutlinerInspector_AddLayer");
+  addLayerButton->setProperty("tbControlRole", "compact");
   addLayerButton->setAccessibleName(tr("Add a new layer"));
   addLayerButton->setIconSize(QSize{16, 16});
   addLayerButton->setFixedSize(QSize{28, 28});
@@ -85,6 +87,7 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent)
   auto* propertiesToggle =
     createBitmapToggleButton("Map_entity.svg", tr("Toggle properties panel"), this);
   propertiesToggle->setObjectName("OutlinerInspector_PropertiesToggle");
+  propertiesToggle->setProperty("tbControlRole", "compact");
   propertiesToggle->setIconSize(QSize{16, 16});
   propertiesToggle->setFixedSize(QSize{28, 28});
   topRow->addWidget(propertiesToggle);

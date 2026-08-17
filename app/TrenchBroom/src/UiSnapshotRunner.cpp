@@ -635,7 +635,7 @@ int runUiSnapshot(
     componentSnapshot = createUiComponentSnapshot();
     targetWidget = componentSnapshot.get();
     targetName = options.page;
-    targetWidget->resize(820, 700);
+    targetWidget->resize(1080, 760);
   }
   else if (options.page.startsWith(QStringLiteral("preferences")))
   {

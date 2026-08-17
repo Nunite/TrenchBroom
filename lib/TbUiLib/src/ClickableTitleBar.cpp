@@ -45,6 +45,7 @@ ClickableTitleBar::ClickableTitleBar(
   m_titleLabel->setObjectName("ClickableTitleBar_Title");
 
   m_stateIcon->setObjectName("ClickableTitleBar_StateIcon");
+  m_stateIcon->setProperty("tbControlRole", "compact");
   m_stateIcon->setAutoRaise(true);
   m_stateIcon->setFixedSize(QSize{22, 22});
   m_stateIcon->setIconSize(QSize{12, 12});
