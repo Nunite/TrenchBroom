@@ -164,7 +164,7 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     REQUIRE(pythonConsoleFontFamilyCombo != nullptr);
     CHECK(pythonConsoleFontFamilyCombo->count() > 1);
     CHECK(pythonConsoleFontFamilyCombo->itemData(0).toString().isEmpty());
-    CHECK(pythonConsoleFontFamilyCombo->maxVisibleItems() == 12);
+    CHECK(pythonConsoleFontFamilyCombo->maxVisibleItems() == 10);
     auto* pythonConsoleFontList =
       qobject_cast<QListView*>(pythonConsoleFontFamilyCombo->view());
     REQUIRE(pythonConsoleFontList != nullptr);

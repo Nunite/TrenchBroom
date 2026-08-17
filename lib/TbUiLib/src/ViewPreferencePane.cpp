@@ -51,7 +51,7 @@ namespace tb::ui
 {
 namespace
 {
-constexpr auto PythonConsoleFontPopupRows = 12;
+constexpr auto PythonConsoleFontPopupRows = 10;
 constexpr auto PythonConsoleFontPopupMaxHeight = 320;
 
 struct FilterMode

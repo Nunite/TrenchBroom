@@ -168,9 +168,16 @@ public:
     const QWidget* widget = nullptr,
     QStyleHintReturn* returnData = nullptr) const override
   {
-    return hint == QStyle::SH_MenuBar_AltKeyNavigation
-             ? 0
-             : QProxyStyle::styleHint(hint, option, widget, returnData);
+    switch (hint)
+    {
+    case QStyle::SH_MenuBar_AltKeyNavigation:
+      return 0;
+    case QStyle::SH_ComboBox_Popup:
+      // Use the compact list popup on every platform so maxVisibleItems is respected.
+      return 0;
+    default:
+      return QProxyStyle::styleHint(hint, option, widget, returnData);
+    }
   }
 
   int pixelMetric(
