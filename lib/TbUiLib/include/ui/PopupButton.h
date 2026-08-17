@@ -41,7 +41,6 @@ public:
 
 private:
   void buttonClicked(bool checked);
-  void popupVisibilityChanged(bool visible);
 };
 
 } // namespace tb::ui

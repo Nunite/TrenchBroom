@@ -45,8 +45,8 @@ PopupButton::PopupButton(const QString& caption, QWidget* parent)
   connect(
     m_window,
     &PopupWindow::visibilityChanged,
-    this,
-    &PopupButton::popupVisibilityChanged);
+    m_button,
+    &QAbstractButton::setChecked);
 }
 
 QWidget* PopupButton::GetPopupWindow() const
@@ -71,11 +71,6 @@ void PopupButton::buttonClicked(bool checked)
   {
     m_window->close();
   }
-}
-
-void PopupButton::popupVisibilityChanged(bool visible)
-{
-  m_button->setChecked(visible);
 }
 
 } // namespace tb::ui
