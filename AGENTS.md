@@ -111,6 +111,22 @@
   rg -n "^(<<<<<<<|=======$|>>>>>>>)( |$)" lib app CMakeLists.txt
   ```
 
+## Documentation and offline manual development
+- The offline manual source files live under `app/TrenchBroom/resources/documentation/manual/` (`00-introduction.md` to `12-references.md` in `en/` and `zh_CN/`).
+- For rapid iteration on manual contents, stylesheets, or templates, **do not run `ci-preflight.ps1` for every change**. Instead, build only the `GenerateManual` target in ~1.5s without recompiling C++ binaries:
+  ```powershell
+  cmake --build build-release-codex --target GenerateManual
+  ```
+  or through the filtered wrapper:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target GenerateManual
+  ```
+- Validate manual structure and bilingual alignment with:
+  ```powershell
+  python app/TrenchBroom/resources/documentation/manual/validate_manual.py --manual-root app/TrenchBroom/resources/documentation/manual --generated-root build-release-codex/app/TrenchBroom/gen-manual
+  ```
+- Run `ci-preflight.ps1` once as the final gatekeeper before committing or pushing changes.
+
 ## Current custom branch notes
 - The active feature branch is `feature/latest-upstream-merge`; it contains upstream master plus local custom features. Do not assume upstream TrenchBroom behavior when touching custom areas.
 - Important custom feature areas include:
