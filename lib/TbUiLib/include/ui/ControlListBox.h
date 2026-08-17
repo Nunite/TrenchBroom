@@ -21,9 +21,11 @@
 
 #include <QWidget>
 
+class QEvent;
 class QLabel;
 class QListWidget;
 class QListWidgetItem;
+class QPalette;
 
 namespace tb::ui
 {
@@ -45,7 +47,7 @@ protected:
 
 public:
   virtual void updateItem();
-  virtual void setSelected(bool selected, const QListWidget* listWidget);
+  virtual void setSelected(bool selected, const QPalette& palette);
 signals:
   void doubleClicked(size_t index);
 };
@@ -98,6 +100,8 @@ public:
   void setCurrentRow(int currentRow);
 
 protected:
+  bool eventFilter(QObject* watched, QEvent* event) override;
+
   /**
    * Deletes all item renderers, re-fetches the item count from `itemCount()`, and
    * rebuilds the item renderers using `createItemRenderer()`.
@@ -119,6 +123,7 @@ protected:
   ControlListBoxItemRendererWrapper* wrapper(int i);
 
 private:
+  void updateItemPalettes();
   void addItemRenderer(ControlListBoxItemRenderer* renderer);
 
 private:

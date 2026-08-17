@@ -22,6 +22,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QDebug>
+#include <QIconEngine>
 #include <QImage>
 #include <QPainter>
 #include <QPalette>
@@ -35,6 +36,7 @@
 #include "kd/contracts.h"
 
 #include <map>
+#include <tuple>
 
 namespace tb::ui
 {
@@ -76,7 +78,8 @@ QImage renderSvgToImage(
   QSvgRenderer& svgSource,
   const QString& imagePathString,
   const bool invert,
-  const qreal devicePixelRatio)
+  const qreal devicePixelRatio,
+  const QSize& requestedSize = {})
 {
   currentSvgRenderPathValue = imagePathString.toStdString();
   if (!svgSource.isValid())
@@ -95,9 +98,12 @@ QImage renderSvgToImage(
     return QImage{};
   }
 
+  const auto logicalSize = requestedSize.isValid() && !requestedSize.isEmpty()
+                             ? defaultSize.scaled(requestedSize, Qt::KeepAspectRatio)
+                             : defaultSize;
   auto image = QImage{
-    int(svgSource.defaultSize().width() * devicePixelRatio),
-    int(svgSource.defaultSize().height() * devicePixelRatio),
+    int(logicalSize.width() * devicePixelRatio),
+    int(logicalSize.height() * devicePixelRatio),
     QImage::Format_ARGB32_Premultiplied};
   if (image.isNull())
   {
@@ -121,28 +127,124 @@ QImage renderSvgToImage(
   return image;
 }
 
-void renderSvgToIcon(
-  QSvgRenderer& svgSource,
-  const QString& imagePathString,
-  QIcon& icon,
-  const QIcon::State state,
-  const bool invert,
-  const qreal devicePixelRatio)
+bool usesDarkIconColors()
 {
-  if (!svgSource.isValid())
-  {
-    return;
-  }
-
-  auto image = renderSvgToImage(svgSource, imagePathString, invert, devicePixelRatio);
-  if (image.isNull())
-  {
-    return;
-  }
-
-  icon.addPixmap(QPixmap::fromImage(image), QIcon::Normal, state);
-  icon.addPixmap(QPixmap::fromImage(createDisabledState(image)), QIcon::Disabled, state);
+  return QApplication::palette().color(QPalette::Active, QPalette::Window).lightness()
+         <= 127;
 }
+
+QString svgIconPath(const std::filesystem::path& imagePath, const QIcon::State state)
+{
+  const auto onPath =
+    imagePathToString(imagePath.parent_path() / imagePath.stem() += "_on.svg");
+  const auto offPath =
+    imagePathToString(imagePath.parent_path() / imagePath.stem() += "_off.svg");
+  if (!onPath.isEmpty() && !offPath.isEmpty())
+  {
+    return state == QIcon::On ? onPath : offPath;
+  }
+
+  return imagePathToString(imagePath);
+}
+
+class PaletteAwareSvgIconEngine : public QIconEngine
+{
+private:
+  using CacheKey = std::tuple<int, int, int, int, bool, int>;
+
+  std::filesystem::path m_imagePath;
+  mutable std::map<CacheKey, QPixmap> m_cache;
+
+public:
+  explicit PaletteAwareSvgIconEngine(std::filesystem::path imagePath)
+    : m_imagePath{std::move(imagePath)}
+  {
+  }
+
+  QIconEngine* clone() const override
+  {
+    return new PaletteAwareSvgIconEngine{m_imagePath};
+  }
+
+  QString key() const override
+  {
+    return QStringLiteral("PaletteAwareSvgIcon");
+  }
+
+  bool isNull() override
+  {
+    return m_imagePath.empty() || svgIconPath(m_imagePath, QIcon::Off).isEmpty();
+  }
+
+  QSize actualSize(
+    const QSize& size, const QIcon::Mode, const QIcon::State state) override
+  {
+    auto renderer = QSvgRenderer{svgIconPath(m_imagePath, state)};
+    return renderer.isValid() ? renderer.defaultSize().scaled(size, Qt::KeepAspectRatio)
+                              : QSize{};
+  }
+
+  QList<QSize> availableSizes(
+    const QIcon::Mode = QIcon::Normal, const QIcon::State state = QIcon::Off) override
+  {
+    auto renderer = QSvgRenderer{svgIconPath(m_imagePath, state)};
+    return renderer.isValid() ? QList<QSize>{renderer.defaultSize()} : QList<QSize>{};
+  }
+
+  void paint(
+    QPainter* painter,
+    const QRect& rect,
+    const QIcon::Mode mode,
+    const QIcon::State state) override
+  {
+    const auto scale = painter->device()->devicePixelRatioF();
+    painter->drawPixmap(rect, scaledPixmap(rect.size(), mode, state, scale));
+  }
+
+  QPixmap pixmap(
+    const QSize& size, const QIcon::Mode mode, const QIcon::State state) override
+  {
+    return scaledPixmap(size, mode, state, 1.0);
+  }
+
+  QPixmap scaledPixmap(
+    const QSize& size,
+    const QIcon::Mode mode,
+    const QIcon::State state,
+    const qreal scale) override
+  {
+    const auto dark = usesDarkIconColors();
+    const auto cacheKey = CacheKey{
+      size.width(),
+      size.height(),
+      int(mode),
+      int(state),
+      dark,
+      qRound(scale * 1000.0)};
+    if (const auto it = m_cache.find(cacheKey); it != m_cache.end())
+    {
+      return it->second;
+    }
+
+    const auto sourcePath = svgIconPath(m_imagePath, state);
+    auto renderer = QSvgRenderer{sourcePath};
+    if (!renderer.isValid())
+    {
+      qWarning() << "Failed to load SVG" << sourcePath;
+      return {};
+    }
+
+    auto image = renderSvgToImage(renderer, sourcePath, dark, scale, size);
+    if (mode == QIcon::Disabled)
+    {
+      image = createDisabledState(image);
+    }
+
+    auto pixmap = QPixmap::fromImage(image);
+    m_cache.emplace(cacheKey, pixmap);
+    return pixmap;
+  }
+};
 
 } // namespace
 
@@ -160,15 +262,14 @@ QPixmap loadSVGPixmap(const std::filesystem::path& imagePath)
 {
   contract_pre(isMainThread());
 
-  static auto cache = std::map<std::filesystem::path, QPixmap>{};
-  if (const auto it = cache.find(imagePath); it != cache.end())
+  using CacheKey = std::pair<std::filesystem::path, bool>;
+  static auto cache = std::map<CacheKey, QPixmap>{};
+  const auto darkTheme = usesDarkIconColors();
+  const auto cacheKey = CacheKey{imagePath, darkTheme};
+  if (const auto it = cache.find(cacheKey); it != cache.end())
   {
     return it->second;
   }
-
-  const auto palette = QPalette{};
-  const auto windowColor = palette.color(QPalette::Active, QPalette::Window);
-  const auto darkTheme = windowColor.lightness() <= 127;
 
   // Cache miss, load the image
   if (!imagePath.empty())
@@ -182,11 +283,11 @@ QPixmap loadSVGPixmap(const std::filesystem::path& imagePath)
 
     auto pixmap =
       QPixmap::fromImage(renderSvgToImage(renderer, imagePathString, darkTheme, 1.0));
-    cache[imagePath] = pixmap;
+    cache[cacheKey] = pixmap;
     return pixmap;
   }
 
-  cache[imagePath] = QPixmap{};
+  cache[cacheKey] = QPixmap{};
   return QPixmap{};
 }
 
@@ -205,55 +306,9 @@ QIcon loadSVGIcon(const std::filesystem::path& imagePath)
     return it->second;
   }
 
-  const auto palette = QPalette{};
-  const auto windowColor = palette.color(QPalette::Active, QPalette::Window);
-  const auto darkTheme = windowColor.lightness() <= 127;
-
-  // Cache miss, load the icon
-  auto result = QIcon{};
-  if (!imagePath.empty())
-  {
-    const auto onPath =
-      imagePathToString(imagePath.parent_path() / imagePath.stem() += "_on.svg");
-    const auto offPath =
-      imagePathToString(imagePath.parent_path() / imagePath.stem() += "_off.svg");
-    const auto imagePathString = imagePathToString(imagePath);
-
-    if (!onPath.isEmpty() && !offPath.isEmpty())
-    {
-      auto onRenderer = QSvgRenderer{onPath};
-      if (!onRenderer.isValid())
-      {
-        qWarning() << "Failed to load SVG " << onPath;
-      }
-
-      auto offRenderer = QSvgRenderer{offPath};
-      if (!offRenderer.isValid())
-      {
-        qWarning() << "Failed to load SVG " << offPath;
-      }
-
-      renderSvgToIcon(onRenderer, onPath, result, QIcon::On, darkTheme, 1.0);
-      renderSvgToIcon(onRenderer, onPath, result, QIcon::On, darkTheme, 2.0);
-      renderSvgToIcon(offRenderer, offPath, result, QIcon::Off, darkTheme, 1.0);
-      renderSvgToIcon(offRenderer, offPath, result, QIcon::Off, darkTheme, 2.0);
-    }
-    else if (!imagePathString.isEmpty())
-    {
-      auto renderer = QSvgRenderer{imagePathString};
-      if (!renderer.isValid())
-      {
-        qWarning() << "Failed to load SVG " << imagePathString;
-      }
-
-      renderSvgToIcon(renderer, imagePathString, result, QIcon::Off, darkTheme, 1.0);
-      renderSvgToIcon(renderer, imagePathString, result, QIcon::Off, darkTheme, 2.0);
-    }
-    else
-    {
-      qWarning() << "Couldn't find image for path: " << pathAsQString(imagePath);
-    }
-  }
+  auto result = imagePath.empty()
+                  ? QIcon{}
+                  : QIcon{new PaletteAwareSvgIconEngine{imagePath}};
 
   cache[imagePath] = result;
 

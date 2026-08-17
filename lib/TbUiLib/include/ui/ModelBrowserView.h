@@ -38,6 +38,7 @@
 
 class QContextMenuEvent;
 class QAudioOutput;
+class QEvent;
 class QMediaPlayer;
 class QScrollBar;
 
@@ -85,6 +86,7 @@ private:
   NotifierConnection m_notifierConnection;
   QImage m_folderIconImage;
   GLuint m_folderIconTextureId = 0;
+  bool m_folderIconTextureDirty = true;
   AssetPreviewMap m_assetPreviews;
   struct SpritePreviewTexture
   {
@@ -111,6 +113,8 @@ public:
   void setSearchText(QString searchText);
 
 private:
+  void changeEvent(QEvent* event) override;
+
   void resourcesWereProcessed(const std::vector<mdl::ResourceId>& resources);
 
   void doInitLayout(Layout& layout) override;
@@ -137,6 +141,7 @@ private:
 
   void ensureFolderIconTexture(gl::Gl& gl);
   void destroyFolderIconTexture();
+  void reloadFolderIcon();
   const AssetPreviewState* assetPreview(const std::filesystem::path& path) const;
   void removeStalePreviews(const std::vector<BrowserAsset>& assets);
   void loadMissingVisiblePreviews(Layout& layout, float y, float height);

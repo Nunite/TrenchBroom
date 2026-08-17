@@ -23,9 +23,11 @@
 #include <QString>
 #include <QtSystemDetection>
 
+#include "base/NotifierConnection.h"
 #include "base/Result.h"
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 
 class QJsonObject;
@@ -62,6 +64,9 @@ struct EnvironmentConfig;
 
 namespace ui
 {
+using ApplicationThemeApplier =
+  std::function<bool(const QString& themeId, QString* error)>;
+
 class AboutDialog;
 class ActionManager;
 class MapWindowManager;
@@ -75,6 +80,7 @@ struct AppControllerOptions
   bool enableBackgroundServices = true;
   bool showMapWindows = true;
   bool enableGlResourceProcessing = true;
+  ApplicationThemeApplier applyTheme;
 };
 
 class AppController : public QObject
@@ -105,6 +111,8 @@ private:
   QString m_mcpStartupError;
   std::unique_ptr<WelcomeWindow> m_welcomeWindow;
   std::unique_ptr<AboutDialog> m_aboutDialog;
+  ApplicationThemeApplier m_applyTheme;
+  NotifierConnection m_notifierConnection;
 
 public:
   AppController(
@@ -140,6 +148,8 @@ public:
   RecentDocuments& recentDocuments();
 
   ActionManager& actionManager();
+
+  bool applyTheme(const QString& themeId, QString* error = nullptr);
 
   const QJsonObject& mcpOverlayState() const;
   void refreshMcpOverlayViews();

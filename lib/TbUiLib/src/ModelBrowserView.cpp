@@ -21,6 +21,7 @@
 
 #include <QAudioOutput>
 #include <QContextMenuEvent>
+#include <QEvent>
 #include <QInputDialog>
 #include <QMediaPlayer>
 #include <QMenu>
@@ -203,11 +204,7 @@ ModelBrowserView::ModelBrowserView(
       scrollBar, &QAbstractSlider::valueChanged, this, [this](const int) { update(); });
   }
 
-  const auto pixmap = loadSVGPixmap(std::filesystem::path{"Map_folder.svg"});
-  if (!pixmap.isNull())
-  {
-    m_folderIconImage = pixmap.toImage().convertToFormat(QImage::Format_RGBA8888);
-  }
+  reloadFolderIcon();
 }
 
 ModelBrowserView::~ModelBrowserView()
@@ -215,6 +212,16 @@ ModelBrowserView::~ModelBrowserView()
   stopSoundPreview();
   destroyFolderIconTexture();
   clear();
+}
+
+void ModelBrowserView::changeEvent(QEvent* event)
+{
+  CellView::changeEvent(event);
+  if (event->type() == QEvent::PaletteChange)
+  {
+    reloadFolderIcon();
+    update();
+  }
 }
 
 void ModelBrowserView::setAssets(
@@ -331,7 +338,7 @@ void ModelBrowserView::doRender(
 
 void ModelBrowserView::ensureFolderIconTexture(gl::Gl& gl)
 {
-  if (m_folderIconTextureId != 0)
+  if (m_folderIconTextureId != 0 && !m_folderIconTextureDirty)
   {
     return;
   }
@@ -341,7 +348,10 @@ void ModelBrowserView::ensureFolderIconTexture(gl::Gl& gl)
     return;
   }
 
-  gl.genTextures(1, &m_folderIconTextureId);
+  if (m_folderIconTextureId == 0)
+  {
+    gl.genTextures(1, &m_folderIconTextureId);
+  }
   gl.bindTexture(GL_TEXTURE_2D, m_folderIconTextureId);
   gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -361,6 +371,7 @@ void ModelBrowserView::ensureFolderIconTexture(gl::Gl& gl)
     m_folderIconImage.constBits());
 
   gl.bindTexture(GL_TEXTURE_2D, 0);
+  m_folderIconTextureDirty = false;
 }
 
 void ModelBrowserView::destroyFolderIconTexture()
@@ -371,6 +382,15 @@ void ModelBrowserView::destroyFolderIconTexture()
   }
 
   m_folderIconTextureId = 0;
+  m_folderIconTextureDirty = true;
+}
+
+void ModelBrowserView::reloadFolderIcon()
+{
+  const auto pixmap = loadSVGPixmap(std::filesystem::path{"Map_folder.svg"});
+  m_folderIconImage =
+    pixmap.isNull() ? QImage{} : pixmap.toImage().convertToFormat(QImage::Format_RGBA8888);
+  m_folderIconTextureDirty = true;
 }
 
 const AssetPreviewState* ModelBrowserView::assetPreview(

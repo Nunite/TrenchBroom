@@ -19,10 +19,14 @@
 
 #include "ui/Console.h"
 
+#include <QApplication>
 #include <QDebug>
+#include <QEvent>
 #include <QMenu>
 #include <QMutexLocker>
 #include <QScrollBar>
+#include <QTextBlock>
+#include <QTextDocument>
 #include <QTextEdit>
 #include <QThread>
 #include <QTimer>
@@ -42,6 +46,8 @@ namespace tb::ui
 {
 namespace
 {
+
+constexpr auto LogLevelTextFormatProperty = QTextFormat::UserProperty;
 
 auto getForegroundBrush(const LogLevel level, const QPalette& palette)
 {
@@ -75,6 +81,7 @@ Console::Console(QWidget* parent)
   m_textView->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(
     m_textView, &QWidget::customContextMenuRequested, this, &Console::showContextMenu);
+  qApp->installEventFilter(this);
 
   auto* sizer = new QVBoxLayout{};
   sizer->setContentsMargins(0, 0, 0, 0);
@@ -83,6 +90,15 @@ Console::Console(QWidget* parent)
 
   connect(m_timer, &QTimer::timeout, this, &Console::logCachedMessages);
   m_timer->start(50);
+}
+
+bool Console::eventFilter(QObject* watched, QEvent* event)
+{
+  if (watched == qApp && event->type() == QEvent::ApplicationPaletteChange)
+  {
+    QTimer::singleShot(0, this, &Console::updateLogColors);
+  }
+  return TabBookPage::eventFilter(watched, event);
 }
 
 void Console::doLog(const LogLevel level, const std::string_view message)
@@ -106,6 +122,7 @@ void Console::logToConsole(const LogLevel level, const std::string& message)
   auto format = QTextCharFormat{};
   format.setForeground(getForegroundBrush(level, m_textView->palette()));
   format.setFont(Fonts::fixedWidthFont());
+  format.setProperty(LogLevelTextFormatProperty, static_cast<int>(level));
 
   auto cursor = QTextCursor{m_textView->document()};
   cursor.movePosition(QTextCursor::MoveOperation::End);
@@ -114,6 +131,40 @@ void Console::logToConsole(const LogLevel level, const std::string& message)
   cursor.insertText("\n");
 
   m_textView->moveCursor(QTextCursor::MoveOperation::End);
+}
+
+void Console::updateLogColors()
+{
+  auto* document = m_textView->document();
+  for (auto block = document->begin(); block.isValid(); block = block.next())
+  {
+    for (auto it = block.begin(); !it.atEnd(); ++it)
+    {
+      const auto fragment = it.fragment();
+      if (!fragment.isValid())
+      {
+        continue;
+      }
+
+      const auto levelValue =
+        fragment.charFormat().property(LogLevelTextFormatProperty);
+      if (!levelValue.isValid())
+      {
+        continue;
+      }
+
+      auto cursor = QTextCursor{document};
+      cursor.setPosition(fragment.position());
+      cursor.setPosition(
+        fragment.position() + fragment.length(), QTextCursor::KeepAnchor);
+
+      auto format = QTextCharFormat{};
+      format.setForeground(
+        getForegroundBrush(
+          static_cast<LogLevel>(levelValue.toInt()), QApplication::palette()));
+      cursor.mergeCharFormat(format);
+    }
+  }
 }
 
 void Console::logCachedMessages()

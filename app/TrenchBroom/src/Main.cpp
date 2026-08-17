@@ -83,9 +83,15 @@ void loadTranslations(QApplication& app)
   }
 }
 
-auto createAppController(const bool snapshotMode = false)
+auto createAppController(QApplication& app, const bool snapshotMode = false)
 {
-  const auto options = AppControllerOptions{!snapshotMode, !snapshotMode, true};
+  const auto options = AppControllerOptions{
+    !snapshotMode,
+    !snapshotMode,
+    true,
+    [&app](const QString& themeId, QString* error) {
+      return applyApplicationTheme(app, themeId, error);
+    }};
   return AppController::create(options) | kdl::if_error([](auto e) {
            const auto msg =
              fmt::format(R"(Game configurations could not be loaded: {})", e.msg);
@@ -166,10 +172,10 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "system"};
   const auto uiSnapshotPageOption = QCommandLineOption{
     QStringList{"ui-snapshot-page"},
-    "Select the surface to capture: map, outliner, entity-browser, "
+    "Select the surface to capture: map, workbench-theme-live, outliner, entity-browser, "
     "entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, "
     "supporting, command-palette, preferences, preferences-colors, preferences-mouse, "
-    "preferences-keyboard, or preferences-misc.",
+    "preferences-keyboard, preferences-misc, or preferences-theme-live.",
     "page",
     "map"};
   const auto uiSnapshotGamePathOption = QCommandLineOption{
@@ -216,7 +222,9 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
 
   const auto snapshotPage = parser.value(uiSnapshotPageOption).trimmed().toLower();
   if (
-    snapshotPage != QStringLiteral("map") && snapshotPage != QStringLiteral("outliner")
+    snapshotPage != QStringLiteral("map")
+    && snapshotPage != QStringLiteral("workbench-theme-live")
+    && snapshotPage != QStringLiteral("outliner")
     && snapshotPage != QStringLiteral("entity-browser")
     && snapshotPage != QStringLiteral("entity-browser-empty")
     && snapshotPage != QStringLiteral("face-inspector")
@@ -228,7 +236,8 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     && snapshotPage != QStringLiteral("preferences-colors")
     && snapshotPage != QStringLiteral("preferences-mouse")
     && snapshotPage != QStringLiteral("preferences-keyboard")
-    && snapshotPage != QStringLiteral("preferences-misc"))
+    && snapshotPage != QStringLiteral("preferences-misc")
+    && snapshotPage != QStringLiteral("preferences-theme-live"))
   {
     qCritical() << "Unsupported UI snapshot page:" << snapshotPage;
     return std::nullopt;
@@ -389,7 +398,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  auto appController = createAppController(commandLineOptions->uiSnapshot.has_value());
+  auto appController = createAppController(app, commandLineOptions->uiSnapshot.has_value());
   auto crashReporter = CrashReporter{*appController};
   setContractViolationHandler(crashReporter);
 

@@ -28,12 +28,14 @@ class QComboBox;
 
 namespace tb::ui
 {
+class AppController;
 class SliderWithLabel;
 
 class ViewPreferencePane : public PreferencePane
 {
   Q_OBJECT
 private:
+  AppController* m_appController = nullptr;
   QComboBox* m_layoutCombo = nullptr;
   QCheckBox* m_link2dCameras = nullptr;
   SliderWithLabel* m_brightnessSlider = nullptr;
@@ -48,6 +50,7 @@ private:
 
 public:
   explicit ViewPreferencePane(QWidget* parent = nullptr);
+  ViewPreferencePane(AppController& appController, QWidget* parent = nullptr);
 
 private:
   void createGui();
@@ -61,6 +64,7 @@ private:
   bool validate() override;
 
   int findThemeIndex(const QString& theme) const;
+  bool previewTheme(const QString& themeId);
 private slots:
   void layoutChanged(int index);
   void link2dCamerasChanged(int state);

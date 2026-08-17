@@ -63,6 +63,8 @@ private:
   void switchToPane(PrefPane pane);
   PreferencePane* currentPane() const;
   void connectObservers();
+  void saveChanges();
+  void discardChanges();
 private slots:
   void resetToDefaults();
 };

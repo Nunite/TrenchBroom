@@ -18,6 +18,7 @@
  */
 
 #include "UiSnapshotRunner.h"
+#include "ApplicationStyle.h"
 
 #include <QAbstractButton>
 #include <QApplication>
@@ -26,12 +27,14 @@
 #include <QDebug>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPalette>
 #include <QPointer>
 #include <QPushButton>
 #include <QScrollArea>
@@ -402,6 +405,100 @@ void configurePreferencesSnapshot(
   }
 }
 
+QStringList liveThemeSwitchSequence(const QString& finalTheme)
+{
+  auto themeIds = QStringList{
+    QStringLiteral("builtin.light"),
+    QStringLiteral("builtin.dark"),
+    QStringLiteral("builtin.blender"),
+    QStringLiteral("builtin.system")};
+  themeIds.push_back(ThemeRegistry::instance().canonicalThemeId(finalTheme));
+  return themeIds;
+}
+
+bool validateActiveTheme(const QString& themeId, QString* error)
+{
+  if (activeApplicationThemeId() != themeId)
+  {
+    *error = QStringLiteral("Theme %1 did not become active (active: %2)")
+               .arg(themeId, activeApplicationThemeId());
+    return false;
+  }
+
+  const auto& theme = ThemeRegistry::instance().resolveTheme(themeId);
+  if (
+    theme.appearance != ThemeAppearance::System
+    && (QApplication::palette().color(QPalette::Window) != theme.tokens.windowBackground
+        || QApplication::palette().color(QPalette::Base) != theme.tokens.editorBackground))
+  {
+    *error = QStringLiteral("Theme %1 did not update the application palette").arg(themeId);
+    return false;
+  }
+
+  return true;
+}
+
+bool verifyPreferenceLiveThemeSwitch(
+  QWidget& targetWidget,
+  const QString& finalTheme,
+  QString* error)
+{
+  auto* themeCombo =
+    targetWidget.findChild<QComboBox*>(QStringLiteral("ViewPreference_ThemeCombo"));
+  if (themeCombo == nullptr)
+  {
+    *error = QStringLiteral("Theme selector was not found");
+    return false;
+  }
+
+  for (const auto& themeId : liveThemeSwitchSequence(finalTheme))
+  {
+    const auto index = themeCombo->findData(themeId);
+    if (index < 0)
+    {
+      *error = QStringLiteral("Theme selector does not contain %1").arg(themeId);
+      return false;
+    }
+
+    themeCombo->setCurrentIndex(index);
+    if (!QMetaObject::invokeMethod(
+          themeCombo, "activated", Qt::DirectConnection, Q_ARG(int, index)))
+    {
+      *error = QStringLiteral("Could not activate theme %1").arg(themeId);
+      return false;
+    }
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
+    if (!validateActiveTheme(themeId, error))
+    {
+      return false;
+    }
+  }
+
+  error->clear();
+  return true;
+}
+
+bool verifyWorkbenchLiveThemeSwitch(
+  AppController& appController, const QString& finalTheme, QString* error)
+{
+  for (const auto& themeId : liveThemeSwitchSequence(finalTheme))
+  {
+    if (!appController.applyTheme(themeId, error))
+    {
+      return false;
+    }
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    if (!validateActiveTheme(themeId, error))
+    {
+      return false;
+    }
+  }
+
+  error->clear();
+  return true;
+}
+
 void configureSnapshot(QWidget& targetWidget, const QString& targetName)
 {
   if (targetName == QStringLiteral("outliner"))
@@ -648,6 +745,24 @@ int runUiSnapshot(
 
   targetWidget->setAttribute(Qt::WA_DontShowOnScreen);
   targetWidget->show();
+  if (targetName == QStringLiteral("preferences-theme-live"))
+  {
+    auto error = QString{};
+    if (!verifyPreferenceLiveThemeSwitch(*targetWidget, options.theme, &error))
+    {
+      qCritical().noquote() << "Live theme switch validation failed:" << error;
+      return 3;
+    }
+  }
+  else if (targetName == QStringLiteral("workbench-theme-live"))
+  {
+    auto error = QString{};
+    if (!verifyWorkbenchLiveThemeSwitch(appController, options.theme, &error))
+    {
+      qCritical().noquote() << "Live workbench theme switch validation failed:" << error;
+      return 3;
+    }
+  }
   scheduleUiSnapshot(app, *targetWidget, targetName, options);
   return app.exec();
 }

@@ -6,6 +6,7 @@
 
 #include <vector>
 
+class QEvent;
 class QLabel;
 class QLineEdit;
 class QScrollArea;
@@ -63,7 +64,11 @@ public:
   ~OutlinerEntityPropertyEditor() override;
   void onChoiceComboPopupHidden();
 
+protected:
+  bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
+  void updateThemeDependentUi();
   void connectObservers();
   void scheduleUpdate(bool force = false);
   void updateFromSelection();

@@ -37,4 +37,12 @@ bool installApplicationStyle(
   const std::optional<QString>& themeOverride = std::nullopt,
   QString* error = nullptr);
 
+/**
+ * Applies a registered theme to the running application.
+ * Returns false without changing the current theme if the theme or stylesheet is invalid.
+ */
+bool applyApplicationTheme(QApplication& app, const QString& themeId, QString* error = nullptr);
+
+QString activeApplicationThemeId();
+
 } // namespace tb::ui

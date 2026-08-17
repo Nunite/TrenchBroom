@@ -23,12 +23,14 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
+#include <QMessageBox>
 #include <QSignalBlocker>
 #include <QtGlobal>
 
 #include "base/PreferenceManager.h"
 #include "gl/MiniGl.h"
 #include "prefs/Preferences.h"
+#include "ui/AppController.h"
 #include "ui/FormWithSectionsLayout.h"
 #include "ui/MaterialBrowserIconSize.h"
 #include "ui/QStyleUtils.h"
@@ -92,6 +94,14 @@ ViewPreferencePane::ViewPreferencePane(QWidget* parent)
   bindEvents();
 }
 
+ViewPreferencePane::ViewPreferencePane(AppController& appController, QWidget* parent)
+  : PreferencePane{parent}
+  , m_appController{&appController}
+{
+  createGui();
+  bindEvents();
+}
+
 void ViewPreferencePane::createGui()
 {
   auto* viewPreferences = createViewPreferences();
@@ -123,13 +133,9 @@ QWidget* ViewPreferencePane::createViewPreferences()
                            : tr("ID: %1\nBy %2").arg(theme.id, theme.author);
     m_themeCombo->setItemData(m_themeCombo->count() - 1, toolTip, Qt::ToolTipRole);
   }
-  auto* themeInfo = new QLabel{};
-  themeInfo->setText(tr("Requires restart after changing"));
-  setInfoStyle(themeInfo);
   auto* themeLayout = new QHBoxLayout{};
   themeLayout->addWidget(m_themeCombo);
-  themeLayout->addSpacing(LayoutConstants::NarrowHMargin);
-  themeLayout->addWidget(themeInfo);
+  themeLayout->addStretch();
   themeLayout->setContentsMargins(0, 0, 0, 0);
 
   m_layoutCombo = new QComboBox{};
@@ -300,7 +306,10 @@ void ViewPreferencePane::doResetToDefaults()
   prefs.resetToDefault(Preferences::EnableMSAA);
   prefs.resetToDefault(Preferences::TextureMinFilter);
   prefs.resetToDefault(Preferences::TextureMagFilter);
-  prefs.resetToDefault(Preferences::Theme);
+  if (previewTheme(QString::fromStdString(Preferences::Theme.defaultValue)))
+  {
+    prefs.resetToDefault(Preferences::Theme);
+  }
   prefs.resetToDefault(Preferences::MaterialBrowserIconSize);
   prefs.resetToDefault(Preferences::RendererFontSize);
 }
@@ -440,8 +449,37 @@ void ViewPreferencePane::themeChanged(const int index)
     return;
   }
 
-  auto& prefs = PreferenceManager::instance();
-  prefs.set(Preferences::Theme, m_themeCombo->itemData(index).toString().toStdString());
+  const auto themeId = m_themeCombo->itemData(index).toString();
+  if (!previewTheme(themeId))
+  {
+    const auto blocker = QSignalBlocker{m_themeCombo};
+    const auto& pendingTheme =
+      PreferenceManager::instance().getPendingValue(Preferences::Theme);
+    m_themeCombo->setCurrentIndex(findThemeIndex(QString::fromStdString(pendingTheme)));
+    return;
+  }
+
+  PreferenceManager::instance().set(Preferences::Theme, themeId.toStdString());
+}
+
+bool ViewPreferencePane::previewTheme(const QString& themeId)
+{
+  if (m_appController == nullptr)
+  {
+    return true;
+  }
+
+  auto error = QString{};
+  if (m_appController->applyTheme(themeId, &error))
+  {
+    return true;
+  }
+
+  QMessageBox::warning(
+    this,
+    tr("Theme Preview Failed"),
+    tr("Could not preview the selected theme:\n%1").arg(error));
+  return false;
 }
 
 void ViewPreferencePane::materialBrowserIconSizeChanged(const int index)

@@ -4,6 +4,7 @@ param(
   [string[]] $Targets = @(
     "welcome",
     "workbench",
+    "workbench-theme-live",
     "outliner",
     "entity-browser",
     "entity-browser-empty",
@@ -16,7 +17,8 @@ param(
     "preferences-colors",
     "preferences-mouse",
     "preferences-keyboard",
-    "preferences-misc"
+    "preferences-misc",
+    "preferences-theme-live"
   ),
   [string[]] $Themes = @("light", "dark", "blender"),
   [string[]] $ScaleFactors = @("1", "1.5", "2"),
@@ -227,6 +229,7 @@ foreach ($target in $normalizedTargets) {
   if ($target -notin @(
       "welcome",
       "workbench",
+      "workbench-theme-live",
       "outliner",
       "entity-browser",
       "entity-browser-empty",
@@ -239,9 +242,10 @@ foreach ($target in $normalizedTargets) {
       "preferences-colors",
       "preferences-mouse",
       "preferences-keyboard",
-      "preferences-misc"
+      "preferences-misc",
+      "preferences-theme-live"
     )) {
-    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, supporting, command-palette, preferences, preferences-colors, preferences-mouse, preferences-keyboard, or preferences-misc."
+    throw "Unsupported target '$target'. Expected welcome, workbench, workbench-theme-live, outliner, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, supporting, command-palette, preferences, preferences-colors, preferences-mouse, preferences-keyboard, preferences-misc, or preferences-theme-live."
   }
 }
 foreach ($theme in $Themes) {
@@ -287,6 +291,7 @@ $resolvedMaterialGamePath =
   if ($usesMaterialFixture) { Resolve-Path -Path $MaterialGamePath } else { $null }
 $resolvedMapPath = if (
   $normalizedTargets -contains "workbench" -or
+  $normalizedTargets -contains "workbench-theme-live" -or
   $normalizedTargets -contains "outliner" -or
   $normalizedTargets -contains "entity-browser" -or
   $normalizedTargets -contains "entity-browser-empty" -or
@@ -348,6 +353,7 @@ foreach ($target in $normalizedTargets) {
       }
       if (
         $target -eq "workbench" -or
+        $target -eq "workbench-theme-live" -or
         $target -eq "outliner" -or
         $target -eq "entity-browser" -or
         $target -eq "entity-browser-empty" -or

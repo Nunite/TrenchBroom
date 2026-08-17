@@ -56,10 +56,6 @@ RenderView::RenderView(AppController& appController, QWidget* parent)
   : QOpenGLWidget{parent}
   , m_appController{appController}
 {
-  auto pal = QPalette{};
-  const auto color = pal.color(QPalette::Highlight);
-  m_focusColor = fromQColor(color);
-
   // FPS counter
   auto* fpsCounter = new QTimer{this};
 
@@ -262,8 +258,10 @@ void RenderView::renderFocusIndicator(gl::Gl& gl)
 {
   if (shouldRenderFocusIndicator() && hasFocus())
   {
-    const auto outer = m_focusColor.to<RgbaF>();
-    const auto inner = m_focusColor.to<RgbaF>();
+    const auto focusColor =
+      fromQColor(palette().color(QPalette::Active, QPalette::Highlight)).to<RgbaF>();
+    const auto outer = focusColor;
+    const auto inner = focusColor;
 
     const auto r = devicePixelRatioF();
     const auto w = float(width() * r);

@@ -141,7 +141,7 @@ void setInactiveEditorPalette(QWidget* editor)
   palette.setColor(
     QPalette::Disabled,
     QPalette::PlaceholderText,
-    palette.color(QPalette::Disabled, QPalette::Text));
+    QApplication::palette().color(QPalette::Disabled, QPalette::Text));
   editor->setPalette(palette);
 }
 
@@ -541,11 +541,41 @@ OutlinerEntityPropertyEditor::OutlinerEntityPropertyEditor(
   layout->setSpacing(0);
   layout->addWidget(m_propertiesPanel, 1);
 
+  qApp->installEventFilter(this);
   connectObservers();
   scheduleUpdate();
 }
 
 OutlinerEntityPropertyEditor::~OutlinerEntityPropertyEditor() = default;
+
+bool OutlinerEntityPropertyEditor::eventFilter(QObject* watched, QEvent* event)
+{
+  if (watched == qApp && event->type() == QEvent::ApplicationPaletteChange)
+  {
+    QTimer::singleShot(0, this, &OutlinerEntityPropertyEditor::updateThemeDependentUi);
+  }
+  return QWidget::eventFilter(watched, event);
+}
+
+void OutlinerEntityPropertyEditor::updateThemeDependentUi()
+{
+  for (auto* editor : findChildren<QLineEdit*>())
+  {
+    if (editor->property("inactive").toBool())
+    {
+      setInactiveEditorPalette(editor);
+    }
+  }
+
+  for (auto* button : findChildren<QToolButton*>("outlinerPropertyColorButton"))
+  {
+    const auto displayColor = button->property("displayColor").value<QColor>();
+    if (displayColor.isValid())
+    {
+      button->setIcon(colorSwatchIcon(displayColor, QApplication::palette()));
+    }
+  }
+}
 
 void OutlinerEntityPropertyEditor::connectObservers()
 {
@@ -852,6 +882,10 @@ void OutlinerEntityPropertyEditor::rebuildPropertyRows(
     if (valueCombo)
     {
       valueCombo->setProperty("inactive", inactive);
+      if (auto* comboLineEdit = valueCombo->lineEdit())
+      {
+        comboLineEdit->setProperty("inactive", inactive);
+      }
     }
     if (valueEdit)
     {

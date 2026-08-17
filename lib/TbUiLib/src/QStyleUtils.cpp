@@ -25,6 +25,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPalette>
+#include <QStyle>
 #include <QString>
 #include <QWidget>
 #include <QtSystemDetection>
@@ -37,11 +38,25 @@
 
 namespace tb::ui
 {
+namespace
+{
+
+void refreshStyle(QWidget* widget)
+{
+  widget->style()->unpolish(widget);
+  widget->style()->polish(widget);
+  widget->update();
+}
+
+} // namespace
 
 QWidget* setDefaultStyle(QWidget* widget)
 {
   widget->setFont(QFont{});
   widget->setPalette(QPalette{});
+  widget->setProperty("tbInfoStyle", false);
+  widget->setProperty("tbErrorStyle", false);
+  refreshStyle(widget);
   return widget;
 }
 
@@ -65,15 +80,8 @@ QWidget* setInfoStyle(QWidget* widget)
 
   widget = setSmallStyle(widget);
 
-  const auto defaultPalette = QPalette{};
-  auto palette = widget->palette();
-  // Set all color groups (active, inactive, disabled) to use the disabled color, so it's
-  // dimmer
-  palette.setColor(
-    QPalette::WindowText, defaultPalette.color(QPalette::Disabled, QPalette::WindowText));
-  palette.setColor(
-    QPalette::Text, defaultPalette.color(QPalette::Disabled, QPalette::Text));
-  widget->setPalette(palette);
+  widget->setProperty("tbInfoStyle", true);
+  refreshStyle(widget);
   return widget;
 }
 
@@ -96,10 +104,8 @@ QWidget* setHeaderStyle(QWidget* widget)
 
 QWidget* setErrorStyle(QWidget* widget)
 {
-  auto palette = widget->palette();
-  palette.setColor(QPalette::Normal, QPalette::WindowText, Qt::red);
-  palette.setColor(QPalette::Normal, QPalette::Text, Qt::red);
-  widget->setPalette(palette);
+  widget->setProperty("tbErrorStyle", true);
+  refreshStyle(widget);
   return widget;
 }
 

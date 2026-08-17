@@ -21,6 +21,7 @@
 
 #include <QBoxLayout>
 #include <QColorDialog>
+#include <QEvent>
 #include <QPushButton>
 
 #include "ui/ViewConstants.h"
@@ -58,17 +59,35 @@ ColorButton::ColorButton(QWidget* parent)
 
 void ColorButton::setColor(const QColor& color)
 {
-  const auto borderColor = palette().color(QPalette::Active, QPalette::Mid);
   if (color != m_color)
   {
     m_color = color;
-    m_colorIndicator->setStyleSheet(
-      "QWidget { background-color: " + m_color.name()
-      + "; border-radius: 3px; border: 1px solid " + borderColor.name() + ";}");
-
+    updateColorIndicator();
     update();
     emit colorChanged(m_color);
   }
+}
+
+void ColorButton::changeEvent(QEvent* event)
+{
+  QWidget::changeEvent(event);
+  if (event->type() == QEvent::PaletteChange)
+  {
+    updateColorIndicator();
+  }
+}
+
+void ColorButton::updateColorIndicator()
+{
+  if (!m_color.isValid())
+  {
+    return;
+  }
+
+  const auto borderColor = palette().color(QPalette::Active, QPalette::Mid);
+  m_colorIndicator->setStyleSheet(
+    "QWidget { background-color: " + m_color.name()
+    + "; border-radius: 3px; border: 1px solid " + borderColor.name() + ";}");
 }
 
 } // namespace tb::ui
