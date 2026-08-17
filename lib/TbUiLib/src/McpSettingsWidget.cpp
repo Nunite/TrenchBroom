@@ -152,7 +152,7 @@ void McpSettingsWidget::createGui()
   m_errorLabel = new QLabel{};
   m_errorLabel->setObjectName("McpSettings_Error");
   m_errorLabel->setWordWrap(true);
-  setErrorStyle(m_errorLabel);
+  m_errorLabel->setStyleSheet("color: #b00020;");
 
   auto* layout = new QFormLayout{};
   layout->setContentsMargins(

@@ -209,7 +209,11 @@ void EntityDefinitionFileChooser::refresh()
     }
 
     m_externalLabel->setText(tr("use builtin"));
-    m_externalLabel->setDisabled(true);
+
+    auto lightText = QPalette{};
+    lightText.setColor(
+      QPalette::WindowText, lightText.color(QPalette::Disabled, QPalette::WindowText));
+    m_externalLabel->setPalette(lightText);
 
     auto font = m_externalLabel->font();
     font.setStyle(QFont::StyleOblique);
@@ -223,7 +227,9 @@ void EntityDefinitionFileChooser::refresh()
 
     m_builtin->clearSelection();
     m_externalLabel->setText(pathAsQString(spec->path));
-    m_externalLabel->setEnabled(true);
+
+    auto normalPal = QPalette{};
+    m_externalLabel->setPalette(normalPal);
 
     auto font = m_externalLabel->font();
     font.setStyle(QFont::StyleNormal);

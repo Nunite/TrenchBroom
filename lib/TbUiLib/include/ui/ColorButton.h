@@ -22,7 +22,6 @@
 #include <QWidget>
 
 class QPushButton;
-class QEvent;
 class QResizeEvent;
 
 namespace tb::ui
@@ -54,12 +53,6 @@ public slots:
    * emitted.
    */
   void setColor(const QColor& color);
-
-protected:
-  void changeEvent(QEvent* event) override;
-
-private:
-  void updateColorIndicator();
 };
 
 } // namespace tb::ui

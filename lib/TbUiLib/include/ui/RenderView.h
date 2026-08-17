@@ -48,6 +48,7 @@ class RenderView : public QOpenGLWidget, public InputEventProcessor
 {
   Q_OBJECT
 private:
+  Color m_focusColor;
   AppController& m_appController;
   InputEventRecorder m_eventRecorder;
 

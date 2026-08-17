@@ -19,13 +19,10 @@
 
 #include "ui/ControlListBox.h"
 
-#include <QApplication>
-#include <QEvent>
 #include <QLabel>
 #include <QListWidget>
 #include <QMouseEvent>
 #include <QSizePolicy>
-#include <QTimer>
 #include <QVBoxLayout>
 
 #include "ui/BorderLine.h"
@@ -64,34 +61,34 @@ void ControlListBoxItemRenderer::mouseDoubleClickEvent(QMouseEvent* event)
 void ControlListBoxItemRenderer::updateItem() {}
 
 void ControlListBoxItemRenderer::setSelected(
-  const bool selected, const QPalette& listPalette)
+  const bool selected, const QListWidget* listWidget)
 {
   auto backgroundPalette = QPalette{};
   backgroundPalette.setColor(
     QPalette::Active,
     QPalette::Highlight,
-    listPalette.color(QPalette::Active, QPalette::Highlight));
+    listWidget->palette().color(QPalette::Active, QPalette::Highlight));
   backgroundPalette.setColor(
     QPalette::Inactive,
     QPalette::Highlight,
-    listPalette.color(QPalette::Inactive, QPalette::Highlight));
+    listWidget->palette().color(QPalette::Inactive, QPalette::Highlight));
   backgroundPalette.setColor(
     QPalette::Disabled,
     QPalette::Highlight,
-    listPalette.color(QPalette::Disabled, QPalette::Highlight));
+    listWidget->palette().color(QPalette::Disabled, QPalette::Highlight));
 
   backgroundPalette.setColor(
     QPalette::Active,
     QPalette::Base,
-    listPalette.color(QPalette::Active, QPalette::Base));
+    listWidget->palette().color(QPalette::Active, QPalette::Base));
   backgroundPalette.setColor(
     QPalette::Inactive,
     QPalette::Base,
-    listPalette.color(QPalette::Inactive, QPalette::Base));
+    listWidget->palette().color(QPalette::Inactive, QPalette::Base));
   backgroundPalette.setColor(
     QPalette::Disabled,
     QPalette::Base,
-    listPalette.color(QPalette::Disabled, QPalette::Base));
+    listWidget->palette().color(QPalette::Disabled, QPalette::Base));
   setPalette(backgroundPalette);
   // macOS: we'd prefer setPalette(listWidget->palette()); but this doesn't work, whereas
   // the above does.
@@ -120,28 +117,28 @@ void ControlListBoxItemRenderer::setSelected(
     labelPalette.setColor(
       QPalette::Active,
       QPalette::HighlightedText,
-      listPalette.color(QPalette::Active, QPalette::HighlightedText));
+      listWidget->palette().color(QPalette::Active, QPalette::HighlightedText));
     labelPalette.setColor(
       QPalette::Inactive,
       QPalette::HighlightedText,
-      listPalette.color(QPalette::Inactive, QPalette::HighlightedText));
+      listWidget->palette().color(QPalette::Inactive, QPalette::HighlightedText));
     labelPalette.setColor(
       QPalette::Disabled,
       QPalette::HighlightedText,
-      listPalette.color(QPalette::Disabled, QPalette::HighlightedText));
+      listWidget->palette().color(QPalette::Disabled, QPalette::HighlightedText));
 
     labelPalette.setColor(
       QPalette::Active,
       QPalette::Text,
-      listPalette.color(QPalette::Active, QPalette::Text));
+      listWidget->palette().color(QPalette::Active, QPalette::Text));
     labelPalette.setColor(
       QPalette::Inactive,
       QPalette::Text,
-      listPalette.color(QPalette::Inactive, QPalette::Text));
+      listWidget->palette().color(QPalette::Inactive, QPalette::Text));
     labelPalette.setColor(
       QPalette::Disabled,
       QPalette::Text,
-      listPalette.color(QPalette::Disabled, QPalette::Text));
+      listWidget->palette().color(QPalette::Disabled, QPalette::Text));
     child->setPalette(labelPalette);
     // macOS: we'd prefer child->setPalette(listWidget->palette()); but this doesn't work,
     // whereas the above does.
@@ -204,7 +201,7 @@ ControlListBox::ControlListBox(
     &QListWidget::itemSelectionChanged,
     this,
     &ControlListBox::listItemSelectionChanged);
-  qApp->installEventFilter(this);
+
   m_emptyTextLabel->setWordWrap(true);
   m_emptyTextLabel->setDisabled(true);
   m_emptyTextLabel->setAlignment(Qt::AlignHCenter);
@@ -271,24 +268,6 @@ int ControlListBox::selectedRow() const
 void ControlListBox::setCurrentRow(const int currentRow)
 {
   m_listWidget->setCurrentRow(currentRow);
-}
-
-bool ControlListBox::eventFilter(QObject* watched, QEvent* event)
-{
-  if (watched == qApp && event->type() == QEvent::ApplicationPaletteChange)
-  {
-    QTimer::singleShot(0, this, &ControlListBox::updateItemPalettes);
-  }
-  return QWidget::eventFilter(watched, event);
-}
-
-void ControlListBox::updateItemPalettes()
-{
-  const auto listPalette = QApplication::palette(m_listWidget);
-  for (auto row = 0; row < count(); ++row)
-  {
-    renderer(row)->setSelected(m_listWidget->item(row)->isSelected(), listPalette);
-  }
 }
 
 void ControlListBox::reload()
@@ -389,8 +368,7 @@ void ControlListBox::addItemRenderer(ControlListBoxItemRenderer* renderer)
   m_listWidget->setItemWidget(widgetItem, wrapper);
   widgetItem->setSizeHint(renderer->minimumSizeHint());
   renderer->updateItem();
-  renderer->setSelected(
-    m_listWidget->currentItem() == widgetItem, m_listWidget->palette());
+  renderer->setSelected(m_listWidget->currentItem() == widgetItem, m_listWidget);
 }
 
 void ControlListBox::selectedRowChanged(const int /* index */) {}
@@ -408,7 +386,7 @@ void ControlListBox::listItemSelectionChanged()
     // FIXME: this uses QListWidgetItem::isSelected() but addItemRenderer() is doing
     // it based on QListWidget::currentItem() - should be consistent.
     // (see: https://github.com/TrenchBroom/TrenchBroom/issues/3104)
-    renderer->setSelected(listItem->isSelected(), m_listWidget->palette());
+    renderer->setSelected(listItem->isSelected(), m_listWidget);
     if (listItem->isSelected())
     {
       selectedRowChanged(row);

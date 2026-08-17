@@ -20,7 +20,6 @@
 #include <QApplication>
 #include <QColor>
 #include <QComboBox>
-#include <QDialogButtonBox>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
@@ -55,13 +54,7 @@ namespace tb::ui
 
 TEST_CASE("PreferenceDialog")
 {
-  auto appliedThemes = QStringList{};
-  auto options = AppControllerOptions{};
-  options.applyTheme = [&](const QString& themeId, QString*) {
-    appliedThemes.push_back(themeId);
-    return true;
-  };
-  auto fixture = AppControllerFixture{[](const auto&) {}, std::move(options)};
+  auto fixture = AppControllerFixture{};
   auto dialog = std::make_unique<PreferenceDialog>(fixture.appController(), nullptr);
 
   SECTION("opens at a usable size")
@@ -122,47 +115,6 @@ TEST_CASE("PreferenceDialog")
     fixture.appController().showPreferences();
 
     CHECK(dialogWasClosed);
-  }
-
-  SECTION("previews themes and restores the last applied theme on cancel")
-  {
-    auto& prefs = PreferenceManager::instance();
-    if (!prefs.saveInstantly())
-    {
-      const auto originalTheme = prefs.get(Preferences::Theme);
-      auto* themeCombo =
-        dialog->findChild<QComboBox*>(QStringLiteral("ViewPreference_ThemeCombo"));
-      auto* buttonBox =
-        dialog->findChild<QDialogButtonBox*>(QStringLiteral("PreferenceDialog_ButtonBox"));
-      REQUIRE(themeCombo != nullptr);
-      REQUIRE(buttonBox != nullptr);
-
-      const auto activateTheme = [&](const std::string& themeId) {
-        const auto index = themeCombo->findData(QString::fromStdString(themeId));
-        REQUIRE(index >= 0);
-        themeCombo->setCurrentIndex(index);
-        REQUIRE(QMetaObject::invokeMethod(
-          themeCombo, "activated", Qt::DirectConnection, Q_ARG(int, index)));
-      };
-
-      activateTheme(Preferences::LightTheme);
-      CHECK(appliedThemes.back() == QString::fromStdString(Preferences::LightTheme));
-      CHECK(prefs.getPendingValue(Preferences::Theme) == Preferences::LightTheme);
-
-      buttonBox->button(QDialogButtonBox::Apply)->click();
-      CHECK(prefs.get(Preferences::Theme) == Preferences::LightTheme);
-
-      activateTheme(Preferences::DarkTheme);
-      CHECK(appliedThemes.back() == QString::fromStdString(Preferences::DarkTheme));
-      CHECK(prefs.getPendingValue(Preferences::Theme) == Preferences::DarkTheme);
-
-      buttonBox->button(QDialogButtonBox::Cancel)->click();
-      CHECK(prefs.get(Preferences::Theme) == Preferences::LightTheme);
-      CHECK(appliedThemes.back() == QString::fromStdString(Preferences::LightTheme));
-
-      prefs.set(Preferences::Theme, originalTheme);
-      prefs.saveChanges();
-    }
   }
 
   dialog.reset();

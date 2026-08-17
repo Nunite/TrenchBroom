@@ -4,14 +4,6 @@ QDialog {
   color: @tb-text;
 }
 
-QWidget[tbInfoStyle="true"] {
-  color: @tb-disabled-text;
-}
-
-QWidget[tbErrorStyle="true"] {
-  color: @tb-error;
-}
-
 QMenuBar {
   background: @tb-window-background;
   border-bottom: 1px solid @tb-border;

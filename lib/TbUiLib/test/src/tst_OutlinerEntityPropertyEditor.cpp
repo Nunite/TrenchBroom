@@ -52,21 +52,6 @@ namespace tb::ui
 {
 namespace
 {
-void processOutlinerUpdates();
-
-class ApplicationPaletteRestorer
-{
-private:
-  QPalette m_palette{QApplication::palette()};
-
-public:
-  ~ApplicationPaletteRestorer()
-  {
-    QApplication::setPalette(m_palette);
-    processOutlinerUpdates();
-  }
-};
-
 void processOutlinerUpdates()
 {
   QApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
@@ -207,7 +192,6 @@ TEST_CASE("OutlinerEntityPropertyEditor")
 
   SECTION("uses the disabled text palette for inactive properties")
   {
-    const auto paletteRestorer = ApplicationPaletteRestorer{};
     map.entityDefinitionManager().setDefinitions({{
       "inactive_test",
       {},
@@ -242,16 +226,6 @@ TEST_CASE("OutlinerEntityPropertyEditor")
     CHECK(
       valueEdit->palette().color(QPalette::Disabled, QPalette::PlaceholderText)
       == valueEdit->palette().color(QPalette::Disabled, QPalette::Text));
-
-    auto changedPalette = QApplication::palette();
-    const auto changedDisabledText = QColor{17, 83, 149};
-    changedPalette.setColor(
-      QPalette::Disabled, QPalette::Text, changedDisabledText);
-    QApplication::setPalette(changedPalette);
-    processOutlinerUpdates();
-    CHECK(
-      valueEdit->palette().color(QPalette::Disabled, QPalette::PlaceholderText)
-      == changedDisabledText);
 
     auto* choiceRow = propertyRow(editor, "optional_choice");
     REQUIRE(choiceRow != nullptr);

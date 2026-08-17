@@ -46,8 +46,7 @@ private:
 
 public:
   explicit AppControllerFixture(
-    const GameManagerInitializer& gameManagerInitializer = [](const auto&) {},
-    AppControllerOptions options = {});
+    const GameManagerInitializer& gameManagerInitializer = [](const auto&) {});
   ~AppControllerFixture();
 
   AppController& appController();

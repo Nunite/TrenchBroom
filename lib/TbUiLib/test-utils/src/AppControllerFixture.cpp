@@ -86,12 +86,11 @@ auto createGameManager(
 } // namespace
 
 AppControllerFixture::AppControllerFixture(
-  const GameManagerInitializer& gameManagerInitializer, AppControllerOptions options)
+  const GameManagerInitializer& gameManagerInitializer)
   : m_appController{
       createTestTaskManager(),
       createEnvironmentConfig(m_testEnvironment),
-      createGameManager(m_testEnvironment, gameManagerInitializer),
-      std::move(options)}
+      createGameManager(m_testEnvironment, gameManagerInitializer)}
 {
 }
 

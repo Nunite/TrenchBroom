@@ -20,7 +20,6 @@
 #include "ui/AppController.h"
 
 #include <QDesktopServices>
-#include <QDebug>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
@@ -198,7 +197,6 @@ AppController::AppController(
   , m_mcpHttpServer{std::make_unique<McpHttpServer>(*m_mcpBridgeServer)}
   , m_welcomeWindow{std::make_unique<WelcomeWindow>(*this)}
   , m_aboutDialog{std::make_unique<AboutDialog>(*this)}
-  , m_applyTheme{options.applyTheme}
 {
   using namespace std::chrono_literals;
 
@@ -282,20 +280,6 @@ RecentDocuments& AppController::recentDocuments()
 ActionManager& AppController::actionManager()
 {
   return *m_actionManager;
-}
-
-bool AppController::applyTheme(const QString& themeId, QString* error)
-{
-  if (!m_applyTheme)
-  {
-    if (error != nullptr)
-    {
-      error->clear();
-    }
-    return true;
-  }
-
-  return m_applyTheme(themeId, error);
 }
 
 const QJsonObject& AppController::mcpOverlayState() const
@@ -512,21 +496,6 @@ void AppController::debugShowCrashReportDialog()
 
 void AppController::connectObservers()
 {
-  auto& prefs = PreferenceManager::instance();
-  m_notifierConnection += prefs.preferenceDidChangeNotifier.connect(
-    [this](const std::filesystem::path& path) {
-      if (path != Preferences::Theme.path)
-      {
-        return;
-      }
-
-      auto error = QString{};
-      if (!applyTheme(QString::fromStdString(pref(Preferences::Theme)), &error))
-      {
-        qWarning().noquote() << "Could not apply changed application theme:" << error;
-      }
-    });
-
   connect(
     m_recentDocuments,
     &RecentDocuments::loadDocument,

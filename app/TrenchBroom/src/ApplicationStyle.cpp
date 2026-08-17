@@ -24,9 +24,7 @@
 #include <QFile>
 #include <QPainter>
 #include <QPainterPath>
-#include <QPixmapCache>
 #include <QProxyStyle>
-#include <QStyle>
 #include <QStyleHints>
 #include <QStyleOption>
 #include <QTextStream>
@@ -40,7 +38,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <optional>
 
 namespace tb::ui
 {
@@ -204,124 +201,11 @@ public:
   }
 };
 
-struct ApplicationStyleState
+ThemeTokens installProxyStyle(
+  QApplication& app, const std::optional<QString>& themeOverride)
 {
-  QApplication* app = nullptr;
-  QString systemStyleName;
-  QPalette systemPalette;
-  Qt::ColorScheme systemColorScheme = Qt::ColorScheme::Unknown;
-  QString activeThemeId;
-};
-
-ApplicationStyleState& applicationStyleState()
-{
-  static auto state = ApplicationStyleState{};
-  return state;
-}
-
-void initializeApplicationStyleState(QApplication& app)
-{
-  auto& state = applicationStyleState();
-  if (state.app == &app)
-  {
-    return;
-  }
-
-  state = ApplicationStyleState{
-    &app,
-    app.style()->name(),
-    app.palette(),
-    app.styleHints()->colorScheme(),
-    {}};
-}
-
-ThemeTokens themeTokens(
-  const Theme& theme, const ApplicationStyleState& state)
-{
-  return theme.appearance == ThemeAppearance::System
-           ? makeSystemThemeTokens(state.systemPalette)
-           : theme.tokens;
-}
-
-std::optional<QString> expandedApplicationStyleSheet(
-  const ThemeTokens& themeTokens, QString* error)
-{
-  const auto path = SystemPaths::findResourceFile("stylesheets/base.qss");
-  auto file = QFile{pathAsQPath(path)};
-  if (!file.exists())
-  {
-    if (error != nullptr)
-    {
-      *error = QStringLiteral("Could not find stylesheet: %1").arg(pathAsQString(path));
-    }
-    return std::nullopt;
-  }
-
-  if (!file.open(QFile::ReadOnly | QFile::Text))
-  {
-    if (error != nullptr)
-    {
-      *error = file.errorString();
-    }
-    return std::nullopt;
-  }
-
-  auto styleSheet = QTextStream{&file}.readAll();
-  if (!expandThemeStyleSheet(styleSheet, themeTokens, error))
-  {
-    return std::nullopt;
-  }
-
-  return styleSheet;
-}
-
-bool applyResolvedTheme(
-  QApplication& app, const Theme& theme, const QString& themeId, QString* error)
-{
-  initializeApplicationStyleState(app);
-  auto& state = applicationStyleState();
-  const auto tokens = themeTokens(theme, state);
-  const auto styleSheet = expandedApplicationStyleSheet(tokens, error);
-  if (!styleSheet)
-  {
-    return false;
-  }
-
   // Alt is part of TrenchBroom's fundamental fly-navigation controls. The proxy style
   // prevents an Alt press and release from unexpectedly focusing the menu bar.
-  if (theme.appearance == ThemeAppearance::System)
-  {
-    app.setStyle(new TrenchBroomProxyStyle{state.systemStyleName, tokens});
-    app.setPalette(state.systemPalette);
-    app.styleHints()->setColorScheme(state.systemColorScheme);
-  }
-  else
-  {
-    // Explicit themes use Fusion for deterministic cross-platform rendering.
-    app.setStyle(new TrenchBroomProxyStyle{"Fusion", tokens});
-    app.setPalette(makeThemePalette(tokens));
-    app.styleHints()->setColorScheme(
-      theme.appearance == ThemeAppearance::Dark ? Qt::ColorScheme::Dark
-                                                : Qt::ColorScheme::Light);
-  }
-
-  QPixmapCache::clear();
-  app.setStyleSheet(*styleSheet);
-  state.activeThemeId = themeId;
-  if (error != nullptr)
-  {
-    error->clear();
-  }
-  return true;
-}
-
-} // namespace
-
-bool installApplicationStyle(
-  QApplication& app, const std::optional<QString>& themeOverride, QString* error)
-{
-  initializeApplicationStyleState(app);
-
   const auto& registry = ThemeRegistry::instance();
   for (const auto& diagnostic : registry.diagnostics())
   {
@@ -338,35 +222,51 @@ bool installApplicationStyle(
                          << requestedTheme;
   }
   const auto& theme = registry.resolveTheme(canonicalTheme);
-  if (!applyResolvedTheme(app, theme, theme.id, error))
-  {
-    return false;
-  }
 
   if (!themeOverride && canonicalTheme != storedTheme && selectedTheme != nullptr)
   {
     setPref(Preferences::Theme, canonicalTheme.toStdString());
   }
-  return true;
-}
 
-bool applyApplicationTheme(QApplication& app, const QString& themeId, QString* error)
-{
-  initializeApplicationStyleState(app);
-  const auto& registry = ThemeRegistry::instance();
-  const auto canonicalTheme = registry.canonicalThemeId(themeId);
-  const auto* theme = registry.findTheme(canonicalTheme);
-  if (theme == nullptr)
+  if (theme.appearance == ThemeAppearance::System)
   {
-    if (error != nullptr)
-    {
-      *error = QStringLiteral("Unknown theme: %1").arg(themeId);
-    }
-    return false;
+    auto* systemStyle = new TrenchBroomProxyStyle{theme.tokens};
+    app.setStyle(systemStyle);
+    const auto systemTokens = makeSystemThemeTokens(app.palette());
+    systemStyle->setThemeTokens(systemTokens);
+    return systemTokens;
   }
 
-  if (applicationStyleState().activeThemeId == canonicalTheme)
+  // Explicit themes use Fusion for deterministic cross-platform rendering.
+  app.setStyle(new TrenchBroomProxyStyle{"Fusion", theme.tokens});
+  app.setPalette(makeThemePalette(theme.tokens));
+  app.styleHints()->setColorScheme(
+    theme.appearance == ThemeAppearance::Dark ? Qt::ColorScheme::Dark
+                                              : Qt::ColorScheme::Light);
+  return theme.tokens;
+}
+
+bool loadStyleSheet(QApplication& app, const ThemeTokens& themeTokens, QString* error)
+{
+  const auto path = SystemPaths::findResourceFile("stylesheets/base.qss");
+  if (auto file = QFile{pathAsQPath(path)}; file.exists())
   {
+    if (!file.open(QFile::ReadOnly | QFile::Text))
+    {
+      if (error != nullptr)
+      {
+        *error = file.errorString();
+      }
+      return false;
+    }
+
+    auto styleSheet = QTextStream{&file}.readAll();
+    if (!expandThemeStyleSheet(styleSheet, themeTokens, error))
+    {
+      return false;
+    }
+
+    app.setStyleSheet(styleSheet);
     if (error != nullptr)
     {
       error->clear();
@@ -374,12 +274,19 @@ bool applyApplicationTheme(QApplication& app, const QString& themeId, QString* e
     return true;
   }
 
-  return applyResolvedTheme(app, *theme, canonicalTheme, error);
+  if (error != nullptr)
+  {
+    *error = QStringLiteral("Could not find stylesheet: %1").arg(pathAsQString(path));
+  }
+  return false;
 }
 
-QString activeApplicationThemeId()
+} // namespace
+
+bool installApplicationStyle(
+  QApplication& app, const std::optional<QString>& themeOverride, QString* error)
 {
-  return applicationStyleState().activeThemeId;
+  return loadStyleSheet(app, installProxyStyle(app, themeOverride), error);
 }
 
 } // namespace tb::ui

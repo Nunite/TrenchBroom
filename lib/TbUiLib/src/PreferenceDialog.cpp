@@ -21,7 +21,6 @@
 
 #include <QBoxLayout>
 #include <QCloseEvent>
-#include <QDebug>
 #include <QDialogButtonBox>
 #include <QLabel>
 #include <QListWidget>
@@ -32,8 +31,6 @@
 #include <QStackedWidget>
 
 #include "base/PreferenceManager.h"
-#include "prefs/Preferences.h"
-#include "ui/AppController.h"
 #include "ui/ColorsPreferencePane.h"
 #include "ui/DialogButtonLayout.h"
 #include "ui/GamesPreferencePane.h"
@@ -120,11 +117,11 @@ void PreferenceDialog::closeEvent(QCloseEvent* event)
       switch (msgBox.exec())
       {
       case QMessageBox::Save:
-        saveChanges();
+        prefs.saveChanges();
         event->accept();
         break;
       case QMessageBox::Discard:
-        discardChanges();
+        prefs.discardChanges();
         event->accept();
         break;
       default:
@@ -188,7 +185,7 @@ void PreferenceDialog::createGui()
   m_stackedWidget = new QStackedWidget{};
   m_stackedWidget->setObjectName("PreferenceDialog_Pages");
   m_stackedWidget->addWidget(new GamesPreferencePane{m_appController, m_document});
-  m_stackedWidget->addWidget(new ViewPreferencePane{m_appController});
+  m_stackedWidget->addWidget(new ViewPreferencePane{});
   m_stackedWidget->addWidget(new ColorsPreferencePane{});
   m_stackedWidget->addWidget(new MousePreferencePane{});
   m_stackedWidget->addWidget(new KeyboardPreferencePane{m_appController, m_document});
@@ -215,16 +212,19 @@ void PreferenceDialog::createGui()
 
     connect(
       m_buttonBox->button(QDialogButtonBox::Ok), &QPushButton::clicked, this, [&]() {
-        saveChanges();
+        auto& prefs = PreferenceManager::instance();
+        prefs.saveChanges();
         this->close();
       });
     connect(
       m_buttonBox->button(QDialogButtonBox::Apply), &QPushButton::clicked, this, [&]() {
-        saveChanges();
+        auto& prefs = PreferenceManager::instance();
+        prefs.saveChanges();
       });
     connect(
       m_buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked, this, [&]() {
-        discardChanges();
+        auto& prefs = PreferenceManager::instance();
+        prefs.discardChanges();
         this->close();
       });
   }
@@ -308,23 +308,6 @@ void PreferenceDialog::connectObservers()
   auto& prefs = PreferenceManager::instance();
   m_notifierConnection += prefs.preferenceDidChangeNotifier.connect(
     [this](const auto&) { currentPane()->updateControls(); });
-}
-
-void PreferenceDialog::saveChanges()
-{
-  PreferenceManager::instance().saveChanges();
-}
-
-void PreferenceDialog::discardChanges()
-{
-  auto& prefs = PreferenceManager::instance();
-  prefs.discardChanges();
-
-  auto error = QString{};
-  if (!m_appController.applyTheme(QString::fromStdString(pref(Preferences::Theme)), &error))
-  {
-    qWarning().noquote() << "Could not restore saved application theme:" << error;
-  }
 }
 
 void PreferenceDialog::resetToDefaults()

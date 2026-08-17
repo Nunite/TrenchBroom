@@ -19,7 +19,6 @@ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
 
 #include <QApplication>
 #include <QListWidget>
-#include <QPalette>
 #include <QToolButton>
 #include <QtTest/QSignalSpy>
 #include <QtTest/QTest>
@@ -38,29 +37,6 @@ along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
 
 namespace tb::ui
 {
-namespace
-{
-
-void processPaletteUpdates()
-{
-  QApplication::processEvents();
-  QApplication::processEvents();
-}
-
-class ApplicationPaletteRestorer
-{
-private:
-  QPalette m_palette{QApplication::palette()};
-
-public:
-  ~ApplicationPaletteRestorer()
-  {
-    QApplication::setPalette(m_palette);
-    processPaletteUpdates();
-  }
-};
-
-} // namespace
 
 TEST_CASE("CompilationProfileManager")
 {
@@ -71,32 +47,6 @@ TEST_CASE("CompilationProfileManager")
   auto& document = fixture.create();
 
   auto config = mdl::CompilationConfig{};
-
-  SECTION("profile row palettes follow application palette changes")
-  {
-    const auto paletteRestorer = ApplicationPaletteRestorer{};
-    config.profiles.push_back(mdl::CompilationProfile{"test", "", {}});
-    auto profileListBox = CompilationProfileListBox{config};
-
-    auto* renderer =
-      profileListBox.findChild<CompilationProfileItemRenderer*>();
-    REQUIRE(renderer != nullptr);
-
-    auto changedPalette = QApplication::palette();
-    const auto changedBase = QColor{13, 37, 61};
-    const auto changedHighlight = QColor{71, 101, 131};
-    const auto changedText = QColor{191, 211, 231};
-    changedPalette.setColor(QPalette::Active, QPalette::Base, changedBase);
-    changedPalette.setColor(QPalette::Active, QPalette::Highlight, changedHighlight);
-    changedPalette.setColor(QPalette::Active, QPalette::Text, changedText);
-    QApplication::setPalette(changedPalette);
-    processPaletteUpdates();
-
-    CHECK(renderer->palette().color(QPalette::Active, QPalette::Base) == changedBase);
-    CHECK(
-      renderer->palette().color(QPalette::Active, QPalette::Highlight)
-      == changedHighlight);
-  }
 
   SECTION("selectedProfile")
   {

@@ -17,90 +17,26 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <QApplication>
 #include <QColor>
 #include <QFile>
 #include <QGuiApplication>
-#include <QImage>
 #include <QPalette>
-#include <QPixmapCache>
 #include <QString>
 #include <QTemporaryDir>
-#include <QTextBlock>
-#include <QTextDocument>
-#include <QTextEdit>
-#include <QtTest/QTest>
 
 #include "base/PreferenceManager.h"
 #include "prefs/Preferences.h"
-#include "ui/Console.h"
-#include "ui/ImageUtils.h"
 #include "ui/QColorUtils.h"
 #include "ui/QPathUtils.h"
 #include "ui/Theme.h"
 #include "ui/ThemeRegistry.h"
 
 #include <algorithm>
-#include <optional>
 
 #include <catch2/catch_test_macros.hpp>
 
 namespace tb::ui
 {
-namespace
-{
-
-class ApplicationPaletteRestorer
-{
-private:
-  QPalette m_palette{QApplication::palette()};
-
-public:
-  ~ApplicationPaletteRestorer()
-  {
-    QApplication::setPalette(m_palette);
-    QPixmapCache::clear();
-    QApplication::processEvents();
-  }
-};
-
-std::optional<double> averageOpaqueLightness(const QPixmap& pixmap)
-{
-  const auto image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
-  auto lightness = 0.0;
-  auto count = 0;
-  for (auto y = 0; y < image.height(); ++y)
-  {
-    for (auto x = 0; x < image.width(); ++x)
-    {
-      const auto pixel = image.pixelColor(x, y);
-      if (pixel.alpha() > 32)
-      {
-        lightness += pixel.lightnessF();
-        ++count;
-      }
-    }
-  }
-  return count > 0 ? std::optional{lightness / double(count)} : std::nullopt;
-}
-
-std::optional<QColor> firstTextColor(const QTextEdit& textEdit)
-{
-  for (
-    auto block = textEdit.document()->begin(); block.isValid(); block = block.next())
-  {
-    for (auto it = block.begin(); !it.atEnd(); ++it)
-    {
-      if (const auto fragment = it.fragment(); fragment.isValid() && !fragment.text().isEmpty())
-      {
-        return fragment.charFormat().foreground().color();
-      }
-    }
-  }
-  return std::nullopt;
-}
-
-} // namespace
 
 TEST_CASE("Theme")
 {
@@ -184,58 +120,6 @@ TEST_CASE("Theme")
       palette.color(QPalette::Inactive, QPalette::Highlight)
       == tokens.inactiveSelectionBackground);
     CHECK(palette.color(QPalette::Disabled, QPalette::Text) == tokens.disabledText);
-  }
-
-  SECTION("SVG icons follow runtime palette changes")
-  {
-    const auto paletteRestorer = ApplicationPaletteRestorer{};
-    const auto icon = loadSVGIcon(std::filesystem::path{"Search.svg"});
-    REQUIRE_FALSE(icon.isNull());
-
-    QApplication::setPalette(makeThemePalette(
-      builtInThemes.resolveTheme(QStringLiteral("builtin.light")).tokens));
-    QPixmapCache::clear();
-    const auto lightIconLightness = averageOpaqueLightness(icon.pixmap(QSize{16, 16}));
-
-    QApplication::setPalette(makeThemePalette(
-      builtInThemes.resolveTheme(QStringLiteral("builtin.dark")).tokens));
-    QPixmapCache::clear();
-    const auto darkIconLightness = averageOpaqueLightness(icon.pixmap(QSize{16, 16}));
-
-    REQUIRE(lightIconLightness.has_value());
-    REQUIRE(darkIconLightness.has_value());
-    CHECK(*lightIconLightness < 0.4);
-    CHECK(*darkIconLightness > 0.6);
-  }
-
-  SECTION("existing console messages follow runtime palette changes")
-  {
-    const auto paletteRestorer = ApplicationPaletteRestorer{};
-    const auto lightPalette = makeThemePalette(
-      builtInThemes.resolveTheme(QStringLiteral("builtin.light")).tokens);
-    const auto darkPalette = makeThemePalette(
-      builtInThemes.resolveTheme(QStringLiteral("builtin.dark")).tokens);
-
-    QApplication::setPalette(lightPalette);
-    QApplication::processEvents();
-
-    auto console = Console{};
-    console.log(LogLevel::Info, "runtime theme log");
-    QTest::qWait(75);
-
-    auto* textEdit = console.findChild<QTextEdit*>(QStringLiteral("Console_TextView"));
-    REQUIRE(textEdit != nullptr);
-    const auto lightTextColor = firstTextColor(*textEdit);
-    REQUIRE(lightTextColor.has_value());
-    CHECK(*lightTextColor == lightPalette.color(QPalette::Normal, QPalette::Text));
-
-    QApplication::setPalette(darkPalette);
-    QApplication::processEvents();
-
-    const auto darkTextColor = firstTextColor(*textEdit);
-    REQUIRE(darkTextColor.has_value());
-    CHECK(*darkTextColor == darkPalette.color(QPalette::Normal, QPalette::Text));
-    CHECK(*darkTextColor != *lightTextColor);
   }
 
   SECTION("browser colors follow the theme until they are customized")

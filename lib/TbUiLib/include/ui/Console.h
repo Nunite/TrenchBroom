@@ -27,7 +27,6 @@
 
 #include <string_view>
 
-class QEvent;
 class QTextEdit;
 class QTimer;
 class QWidget;
@@ -48,12 +47,9 @@ public:
   void clear();
 
 private:
-  bool eventFilter(QObject* watched, QEvent* event) override;
-
   void doLog(LogLevel level, std::string_view message) override;
   void logToDebugOut(LogLevel level, const std::string& message);
   void logToConsole(LogLevel level, const std::string& message);
-  void updateLogColors();
 
   void logCachedMessages();
 
