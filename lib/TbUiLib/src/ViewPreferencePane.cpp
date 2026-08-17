@@ -24,6 +24,7 @@
 #include <QComboBox>
 #include <QFontDatabase>
 #include <QLabel>
+#include <QListView>
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QtGlobal>
@@ -50,6 +51,9 @@ namespace tb::ui
 {
 namespace
 {
+constexpr auto PythonConsoleFontPopupRows = 12;
+constexpr auto PythonConsoleFontPopupMaxHeight = 320;
+
 struct FilterMode
 {
   int minFilter;
@@ -200,10 +204,22 @@ QWidget* ViewPreferencePane::createViewPreferences()
   m_pythonConsoleFontFamilyCombo->setObjectName(
     QStringLiteral("ViewPreference_PythonConsoleFontFamilyCombo"));
   m_pythonConsoleFontFamilyCombo->setMinimumContentsLength(20);
+  m_pythonConsoleFontFamilyCombo->setMaxVisibleItems(PythonConsoleFontPopupRows);
   m_pythonConsoleFontFamilyCombo->setSizeAdjustPolicy(
     QComboBox::AdjustToMinimumContentsLengthWithIcon);
   m_pythonConsoleFontFamilyCombo->setToolTip(
     tr("Sets the monospace font used by the Python console."));
+
+  auto* pythonConsoleFontList = new QListView{m_pythonConsoleFontFamilyCombo};
+  pythonConsoleFontList->setObjectName(
+    QStringLiteral("ViewPreference_PythonConsoleFontList"));
+  pythonConsoleFontList->setUniformItemSizes(true);
+  pythonConsoleFontList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  pythonConsoleFontList->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  pythonConsoleFontList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  pythonConsoleFontList->setMaximumHeight(PythonConsoleFontPopupMaxHeight);
+  m_pythonConsoleFontFamilyCombo->setView(pythonConsoleFontList);
+
   m_pythonConsoleFontFamilyCombo->addItem(tr("System Monospace"), QString{});
   for (const auto& family : QFontDatabase::families())
   {

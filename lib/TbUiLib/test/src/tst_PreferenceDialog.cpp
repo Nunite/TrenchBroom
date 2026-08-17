@@ -23,6 +23,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListView>
 #include <QListWidget>
 #include <QMetaObject>
 #include <QPushButton>
@@ -163,6 +164,21 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     REQUIRE(pythonConsoleFontFamilyCombo != nullptr);
     CHECK(pythonConsoleFontFamilyCombo->count() > 1);
     CHECK(pythonConsoleFontFamilyCombo->itemData(0).toString().isEmpty());
+    CHECK(pythonConsoleFontFamilyCombo->maxVisibleItems() == 12);
+    auto* pythonConsoleFontList =
+      qobject_cast<QListView*>(pythonConsoleFontFamilyCombo->view());
+    REQUIRE(pythonConsoleFontList != nullptr);
+    CHECK(pythonConsoleFontList->uniformItemSizes());
+    CHECK(pythonConsoleFontList->maximumHeight() == 320);
+    CHECK(pythonConsoleFontList->verticalScrollBarPolicy() == Qt::ScrollBarAsNeeded);
+
+    pane->resize(800, 600);
+    pane->show();
+    pythonConsoleFontFamilyCombo->showPopup();
+    QTRY_VERIFY_WITH_TIMEOUT(pythonConsoleFontList->isVisible(), 500);
+    CHECK(pythonConsoleFontList->window()->height() <= 336);
+    pythonConsoleFontFamilyCombo->hidePopup();
+    pane->hide();
 
     auto* pythonConsoleFontSizeSpin = pane->findChild<QSpinBox*>(
       QStringLiteral("ViewPreference_PythonConsoleFontSizeSpin"));
