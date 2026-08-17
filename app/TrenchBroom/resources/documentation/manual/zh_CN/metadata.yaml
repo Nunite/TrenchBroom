@@ -1,0 +1,19 @@
+html-lang: zh-CN
+manual-title: TrenchBroom 使用手册
+manual-label: 手册
+introduction-label: 简介
+contents-label: 目录
+navigation-label: 手册导航
+navigation-toggle: 打开手册导航
+navigation-close: 关闭手册导航
+search-placeholder: 搜索手册
+search-empty: 章节标题
+search-no-results: 没有匹配的章节
+language-label: 手册语言
+theme-toggle: 切换浅色与深色外观
+page-navigation-label: 本页内容
+resource-prefix: ..
+shortcuts-file: shortcuts.zh_CN.js
+english-href: ../index.html
+chinese-href: index.html
+chinese-current: true

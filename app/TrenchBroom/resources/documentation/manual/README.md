@@ -1,31 +1,56 @@
 # TrenchBroom manual documentation
 
-## The Build Process
+The offline manual is built from Markdown with Pandoc and opened in the system browser. It has no Node, online, Qt WebEngine, or runtime package dependency.
 
-TrenchBroom's documentation is contained in a single markdown file (index.md). This file is converted into HTML using [pandoc](http://www.pandoc.org) during the build process. The build process also converts our custom macros (see below) into javascript snippets that output some information into the help document.
+## Source layout
 
-If you want to preview the generated HTML without doing a full build, you can just build the GenerateHelp target. Change into your build directory and run
+English is the canonical source. The `en` and `zh_CN` directories contain the same eight chapter filenames in the same order:
 
-    cmake --build . --target GenerateManual
+1. `00-introduction.md`
+2. `01-getting-started.md`
+3. `02-selection-editing.md`
+4. `03-materials-assets.md`
+5. `04-entities-outliner-layers.md`
+6. `05-preferences-extension.md`
+7. `06-advanced-topics.md`
+8. `07-involvement-references.md`
 
-You will find the generated documentation files in a directory called "gen-manual" (`<build dir>/app/gen-manual`). If you add new resources such as images to the manual's files, you have to refresh your cmake cache first by running
+Every heading must have an explicit, language-independent `{#anchor}`. Translate visible text only. Keep anchors, macro arguments, code, paths, image targets, link targets, and inline code unchanged. Use `terminology.tsv` for the frozen core vocabulary.
 
-    cmake ..
+Shared presentation files are `template.html`, `manual.css`, and `manual.js`. Images are stored once under `images`. Language-specific labels and relative resource paths are defined in each language's `metadata.yaml`.
 
-## Custom Macros
+## Build and validation
 
-We use two macros to output keyboard shortcuts and menu entries (with full paths) into the documentation. This is to avoid hard coding the defaults for these into the documentation, as they might change later on. However, the keyboard shortcuts and menu structure must be available to the web browser when the help file is displayed. Both the shortcuts and the menu structure are therefore stored in the file shortcuts.js, which is automatically generated during the build process.
+Build the focused targets from an existing configured build tree:
 
-The macros are used as follows.
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target GenerateManual
+powershell -ExecutionPolicy Bypass -File scripts\build-filtered.ps1 -Target ValidateManual
+```
 
-- Print a keyboard shortcut, the default of which is stored in the preferences under the given path:
+The generated entry points are:
 
-    \#action('Controls/Map view/Duplicate and move objects up; Duplicate and move objects forward‘)
-    
-- Print a menu entry, the default of which is again stored under the given path in the preferences:
+- `<build>/app/TrenchBroom/gen-manual/index.html`
+- `<build>/app/TrenchBroom/gen-manual/zh_CN/index.html`
 
-    \#menu('Menu/Edit/Show All‘)
+`ValidateManual` checks mirrored heading structure and anchors, stable macros and tokens, unchanged code blocks and targets, local files and fragments, generated HTML IDs and language metadata, unresolved placeholders, and translation freshness.
 
-- Print a key. You can find the key numbers in the shortcuts.js file.
+`translation-status.json` records the English SHA-256 used by each Chinese chapter. After updating an English chapter and its Chinese translation, refresh the fingerprints and rerun validation:
 
-    \#key(123)
+```powershell
+python app/TrenchBroom/resources/documentation/manual/validate_manual.py `
+  --manual-root app/TrenchBroom/resources/documentation/manual `
+  --update-fingerprints
+```
+
+Do not update a fingerprint until the corresponding Chinese chapter is current.
+
+## Custom macros
+
+The build generates `shortcuts.en.js` and `shortcuts.zh_CN.js` from the application action registry. Action keys and preference paths remain stable English identifiers; only final menu labels are translated.
+
+- `#action(Controls/Map view/Duplicate and move objects)` prints the current shortcut for an action preference path.
+- `#menu(Menu/Edit/Show All)` prints the translated menu path and its current shortcut.
+- `#key(Return)` prints a localized key label.
+
+Never translate macro arguments. `TransformKeyboardShortcuts.cmake` converts these macros into calls implemented by `manual.js`.

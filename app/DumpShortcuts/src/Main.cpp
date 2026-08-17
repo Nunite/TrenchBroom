@@ -24,6 +24,7 @@
 #include <QKeySequence>
 #include <QSettings>
 #include <QTextStream>
+#include <QTranslator>
 
 #include "KeyStrings.h"
 #include "base/PreferenceManager.h"
@@ -33,6 +34,7 @@
 #include "ui/QKeySequenceUtils.h"
 #include "ui/QPathUtils.h"
 #include "ui/QPreferenceStore.h"
+#include "ui/QStringUtils.h"
 #include "ui/SystemPaths.h"
 
 #include <array>
@@ -45,7 +47,12 @@ namespace
 {
 QString escapeString(const QString& str)
 {
-  return str == "'" ? "\\'" : str == "\\" ? "\\\\" : str;
+  auto result = str;
+  result.replace("\\", "\\\\");
+  result.replace("'", "\\'");
+  result.replace("\r", "\\r");
+  result.replace("\n", "\\n");
+  return result;
 }
 
 void printKeys(QTextStream& out)
@@ -66,9 +73,9 @@ QString toString(const QStringList& path, const QString& suffix)
   result += "[";
   for (const auto& component : path)
   {
-    result += "'" + component + "', ";
+    result += "'" + escapeString(component) + "', ";
   }
-  result += "'" + suffix + "'";
+  result += "'" + escapeString(suffix) + "'";
   result += "]";
   return result;
 }
@@ -136,11 +143,11 @@ void printMenuShortcuts(ActionManager& actionManager, QTextStream& out)
     [&](const MenuAction& actionItem) {
       out << "    '" << pathAsGenericQString(actionItem.action.preference().path) << "': "
           << "{ path: "
-          << toString(currentPath, QString::fromStdString(actionItem.action.label()))
+          << toString(currentPath, translateUiText(actionItem.action.label()))
           << ", shortcut: " << toString(pref(actionItem.action.preference())) << " },\n";
     },
     [&](const auto& thisLambda, const Menu& menu) {
-      currentPath.push_back(QString::fromStdString(menu.name));
+      currentPath.push_back(translateUiText(menu.name));
       menu.visitEntries(thisLambda);
       currentPath.pop_back();
     }));
@@ -210,12 +217,48 @@ int main(int argc, char* argv[])
   auto parser = QCommandLineParser{};
   parser.setApplicationDescription("Dump TrenchBroom keyboard shortcuts as JavaScript.");
   parser.addHelpOption();
+  const auto languageOption = QCommandLineOption{
+    {"l", "language"},
+    "Language used for menu labels (en or zh_CN).",
+    "language",
+    "en"};
+  const auto translationOption = QCommandLineOption{
+    {"t", "translation"},
+    "Qt translation file used for non-English menu labels.",
+    "file"};
+  parser.addOption(languageOption);
+  parser.addOption(translationOption);
   parser.addPositionalArgument(
     "output", "Write output to this file instead of stdout.", "output");
   if (!parser.parse(app.arguments()))
   {
     QTextStream{stderr} << parser.errorText() << Qt::endl;
     return 1;
+  }
+
+  const auto language = parser.value(languageOption);
+  if (language != "en" && language != "zh_CN")
+  {
+    QTextStream{stderr} << "Unsupported language: " << language << Qt::endl;
+    return 1;
+  }
+
+  auto translator = QTranslator{};
+  if (language == "zh_CN")
+  {
+    const auto translationPath = parser.value(translationOption);
+    if (translationPath.isEmpty())
+    {
+      QTextStream{stderr} << "--translation is required for zh_CN." << Qt::endl;
+      return 1;
+    }
+    if (!translator.load(translationPath))
+    {
+      QTextStream{stderr} << "Could not load translation file: " << translationPath
+                          << Qt::endl;
+      return 1;
+    }
+    app.installTranslator(&translator);
   }
 
   const auto positionalArguments = parser.positionalArguments();

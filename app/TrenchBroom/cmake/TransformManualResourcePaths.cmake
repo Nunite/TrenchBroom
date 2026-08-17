@@ -1,0 +1,11 @@
+if(NOT DEFINED INPUT OR NOT DEFINED OUTPUT OR NOT DEFINED RESOURCE_PREFIX)
+  message(FATAL_ERROR "INPUT, OUTPUT, and RESOURCE_PREFIX are required")
+endif()
+
+file(READ "${INPUT}" CONTENT)
+string(REPLACE
+  "src=\"images/"
+  "src=\"${RESOURCE_PREFIX}/images/"
+  CONTENT
+  "${CONTENT}")
+file(WRITE "${OUTPUT}" "${CONTENT}")

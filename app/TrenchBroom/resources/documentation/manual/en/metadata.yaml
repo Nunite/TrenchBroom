@@ -1,0 +1,19 @@
+html-lang: en
+manual-title: TrenchBroom Manual
+manual-label: Manual
+introduction-label: Introduction
+contents-label: Contents
+navigation-label: Manual navigation
+navigation-toggle: Open manual navigation
+navigation-close: Close manual navigation
+search-placeholder: Search the manual
+search-empty: Section heading
+search-no-results: No matching sections
+language-label: Manual language
+theme-toggle: Toggle light and dark appearance
+page-navigation-label: On this page
+resource-prefix: .
+shortcuts-file: shortcuts.en.js
+english-href: index.html
+chinese-href: zh_CN/index.html
+english-current: true

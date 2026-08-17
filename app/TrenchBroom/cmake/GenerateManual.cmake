@@ -1,119 +1,207 @@
-# Generate help documents
+# Generate the offline English and Simplified Chinese manuals.
 
-# Create the cmake script for adding the version information to the manual
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/AddVersionToManual.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/AddVersionToManual.cmake" @ONLY)
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/AddVersionToManual.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/AddVersionToManual.cmake"
+  @ONLY)
 
-# Configure paths
 set(DOC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources/documentation")
 set(DOC_MANUAL_SOURCE_DIR "${DOC_DIR}/manual")
 set(DOC_MANUAL_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/gen-manual")
-
 set(DOC_MANUAL_IMAGES_SOURCE_DIR "${DOC_MANUAL_SOURCE_DIR}/images")
 set(DOC_MANUAL_IMAGES_TARGET_DIR "${DOC_MANUAL_TARGET_DIR}/images")
-
 set(PANDOC_TEMPLATE_PATH "${DOC_MANUAL_SOURCE_DIR}/template.html")
-set(PANDOC_INPUT_PATH    "${DOC_MANUAL_SOURCE_DIR}/index.md")
-set(PANDOC_OUTPUT_PATH   "${DOC_MANUAL_TARGET_DIR}/index.html.tmp")
-set(INDEX_OUTPUT_PATH    "${DOC_MANUAL_TARGET_DIR}/index.html")
+set(DOC_MANUAL_VALIDATION_SCRIPT "${DOC_MANUAL_SOURCE_DIR}/validate_manual.py")
+set(DOC_MANUAL_TRANSLATION_STATUS "${DOC_MANUAL_SOURCE_DIR}/translation-status.json")
+set(DOC_MANUAL_VALIDATION_STAMP "${DOC_MANUAL_TARGET_DIR}/manual-validation.stamp")
 
-fix_win32_path(PANDOC_TEMPLATE_PATH)
-fix_win32_path(PANDOC_INPUT_PATH)
-fix_win32_path(PANDOC_OUTPUT_PATH)
-
-# Generate manual
-# 1. Create target directory
-# 2. Run pandoc to create a temporary HTML file
-# 3. Run AddVersionToManual.cmake on the temporary HTML file
-# 4. Run TransformKeyboardShortcuts.cmake on the temporary HTML file
-# 5. Copy the temporary HTML file to its target
-# 6. Remove the temporary HTML file
-add_custom_command(OUTPUT "${INDEX_OUTPUT_PATH}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${DOC_MANUAL_TARGET_DIR}"
-    COMMAND ${PANDOC_PATH} --standalone --toc --toc-depth=2 --template "${PANDOC_TEMPLATE_PATH}" --from=markdown --to=html5 -o "${PANDOC_OUTPUT_PATH}" "${PANDOC_INPUT_PATH}"
-    COMMAND ${CMAKE_COMMAND} -DINPUT="${PANDOC_OUTPUT_PATH}" -DOUTPUT="${PANDOC_OUTPUT_PATH}" -P "${CMAKE_CURRENT_BINARY_DIR}/AddVersionToManual.cmake"
-    COMMAND ${CMAKE_COMMAND} -DINPUT="${PANDOC_OUTPUT_PATH}" -DOUTPUT="${PANDOC_OUTPUT_PATH}" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/TransformKeyboardShortcuts.cmake"
-    COMMAND ${CMAKE_COMMAND} -E copy "${PANDOC_OUTPUT_PATH}" "${INDEX_OUTPUT_PATH}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${PANDOC_OUTPUT_PATH}"
-    DEPENDS "${PANDOC_TEMPLATE_PATH}" "${PANDOC_INPUT_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/TransformKeyboardShortcuts.cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/AddVersionToManual.cmake.in"
+set(DOC_MANUAL_CHAPTER_NAMES
+  00-introduction.md
+  01-getting-started.md
+  02-interface-and-tools.md
+  03-brush-editing.md
+  04-vertex-and-csg.md
+  05-materials-and-uv.md
+  06-assets-and-prefabs.md
+  07-entities-and-organization.md
+  08-preferences-and-compilation.md
+  09-python-plugins-guide.md
+  10-mcp-automation.md
+  11-game-config-and-expressions.md
+  12-references.md
 )
 
-# Dump the keyboard shortcuts
-set(DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE "${DOC_MANUAL_TARGET_DIR}/shortcuts.js")
+set(DOC_MANUAL_EN_CHAPTER_PATHS)
+set(DOC_MANUAL_ZH_CN_CHAPTER_PATHS)
+foreach(CHAPTER_NAME IN LISTS DOC_MANUAL_CHAPTER_NAMES)
+  list(APPEND DOC_MANUAL_EN_CHAPTER_PATHS
+    "${DOC_MANUAL_SOURCE_DIR}/en/${CHAPTER_NAME}")
+  list(APPEND DOC_MANUAL_ZH_CN_CHAPTER_PATHS
+    "${DOC_MANUAL_SOURCE_DIR}/zh_CN/${CHAPTER_NAME}")
+endforeach()
+
+function(tb_add_manual_language LANGUAGE OUTPUT_SUBDIRECTORY RESOURCE_PREFIX OUTPUT_VARIABLE)
+  set(LANGUAGE_SOURCE_DIR "${DOC_MANUAL_SOURCE_DIR}/${LANGUAGE}")
+  set(METADATA_PATH "${LANGUAGE_SOURCE_DIR}/metadata.yaml")
+  set(CHAPTER_PATHS)
+  foreach(CHAPTER_NAME IN LISTS DOC_MANUAL_CHAPTER_NAMES)
+    list(APPEND CHAPTER_PATHS "${LANGUAGE_SOURCE_DIR}/${CHAPTER_NAME}")
+  endforeach()
+
+  if(OUTPUT_SUBDIRECTORY)
+    set(OUTPUT_DIR "${DOC_MANUAL_TARGET_DIR}/${OUTPUT_SUBDIRECTORY}")
+  else()
+    set(OUTPUT_DIR "${DOC_MANUAL_TARGET_DIR}")
+  endif()
+  set(OUTPUT_PATH "${OUTPUT_DIR}/index.html")
+  set(TEMP_OUTPUT_PATH "${OUTPUT_PATH}.tmp")
+
+  add_custom_command(
+    OUTPUT "${OUTPUT_PATH}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${OUTPUT_DIR}"
+    COMMAND ${PANDOC_PATH}
+      --standalone
+      --toc
+      --toc-depth=2
+      --template "${PANDOC_TEMPLATE_PATH}"
+      --metadata-file "${METADATA_PATH}"
+      --from=markdown
+      --to=html5
+      -o "${TEMP_OUTPUT_PATH}"
+      ${CHAPTER_PATHS}
+    COMMAND ${CMAKE_COMMAND}
+      "-DINPUT=${TEMP_OUTPUT_PATH}"
+      "-DOUTPUT=${TEMP_OUTPUT_PATH}"
+      -P "${CMAKE_CURRENT_BINARY_DIR}/AddVersionToManual.cmake"
+    COMMAND ${CMAKE_COMMAND}
+      "-DINPUT=${TEMP_OUTPUT_PATH}"
+      "-DOUTPUT=${TEMP_OUTPUT_PATH}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/TransformKeyboardShortcuts.cmake"
+    COMMAND ${CMAKE_COMMAND}
+      "-DINPUT=${TEMP_OUTPUT_PATH}"
+      "-DOUTPUT=${TEMP_OUTPUT_PATH}"
+      "-DRESOURCE_PREFIX=${RESOURCE_PREFIX}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/TransformManualResourcePaths.cmake"
+    COMMAND ${CMAKE_COMMAND} -E copy "${TEMP_OUTPUT_PATH}" "${OUTPUT_PATH}"
+    COMMAND ${CMAKE_COMMAND} -E remove "${TEMP_OUTPUT_PATH}"
+    DEPENDS
+      "${PANDOC_TEMPLATE_PATH}"
+      "${METADATA_PATH}"
+      ${CHAPTER_PATHS}
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/TransformKeyboardShortcuts.cmake"
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/TransformManualResourcePaths.cmake"
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/AddVersionToManual.cmake.in"
+      "${DOC_MANUAL_VALIDATION_STAMP}"
+    VERBATIM)
+
+  set(${OUTPUT_VARIABLE} "${OUTPUT_PATH}" PARENT_SCOPE)
+endfunction()
+
+tb_add_manual_language(en "" . INDEX_OUTPUT_PATH)
+tb_add_manual_language(zh_CN zh_CN .. DOC_MANUAL_ZH_CN_INDEX_OUTPUT_PATH)
+set(DOC_MANUAL_INDEX_FILES_ABSOLUTE
+  "${INDEX_OUTPUT_PATH}"
+  "${DOC_MANUAL_ZH_CN_INDEX_OUTPUT_PATH}")
+
+# Dump language-specific menu labels while preserving stable English action keys.
+set(DOC_MANUAL_SHORTCUTS_EN_TARGET "${DOC_MANUAL_TARGET_DIR}/shortcuts.en.js")
+set(DOC_MANUAL_SHORTCUTS_ZH_CN_TARGET "${DOC_MANUAL_TARGET_DIR}/shortcuts.zh_CN.js")
+set(DOC_MANUAL_SHORTCUTS_JS_TARGET_FILES_ABSOLUTE
+  "${DOC_MANUAL_SHORTCUTS_EN_TARGET}"
+  "${DOC_MANUAL_SHORTCUTS_ZH_CN_TARGET}")
+set(DOC_MANUAL_ZH_CN_TRANSLATION_PATH
+  "${CMAKE_CURRENT_SOURCE_DIR}/resources/translations/trenchbroom_zh_CN.qm")
+
 add_custom_command(
-      OUTPUT "${DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE}"
-      COMMAND ${CMAKE_COMMAND} -E make_directory "${DOC_MANUAL_TARGET_DIR}"
-      COMMAND ${CMAKE_COMMAND} -E env "QT_QPA_PLATFORM=offscreen" "$<TARGET_FILE:DumpShortcuts>" "${DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE}"
-      DEPENDS DumpShortcuts
-      VERBATIM)
+  OUTPUT ${DOC_MANUAL_SHORTCUTS_JS_TARGET_FILES_ABSOLUTE}
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${DOC_MANUAL_TARGET_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E env "QT_QPA_PLATFORM=offscreen"
+    "$<TARGET_FILE:DumpShortcuts>"
+    --language en
+    "${DOC_MANUAL_SHORTCUTS_EN_TARGET}"
+  COMMAND ${CMAKE_COMMAND} -E env "QT_QPA_PLATFORM=offscreen"
+    "$<TARGET_FILE:DumpShortcuts>"
+    --language zh_CN
+    --translation "${DOC_MANUAL_ZH_CN_TRANSLATION_PATH}"
+    "${DOC_MANUAL_SHORTCUTS_ZH_CN_TARGET}"
+  DEPENDS DumpShortcuts "${DOC_MANUAL_ZH_CN_TRANSLATION_PATH}"
+  VERBATIM)
 
-# Collect resources and copy them to the correct locations
-# DOC_MANUAL_SOURCE_FILES_ABSOLUTE contains the absolute paths to all source resource files
-# DOC_MANUAL_SOURCE_IMAGE_FILES_RELATIVE contains the relative paths to all source resource files, relative to DOC_MANUAL_IMAGES_SOURCE_DIR
-# DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE contains the absolute paths to all target resource files (used for dependency tracking)
+# Shared CSS and JavaScript are copied once to the manual root.
+set(DOC_MANUAL_SOURCE_FILES_RELATIVE manual.css manual.js)
+set(DOC_MANUAL_SOURCE_FILES_ABSOLUTE)
+set(DOC_MANUAL_TARGET_FILES_ABSOLUTE)
+foreach(MANUAL_SOURCE_FILE_RELATIVE IN LISTS DOC_MANUAL_SOURCE_FILES_RELATIVE)
+  list(APPEND DOC_MANUAL_SOURCE_FILES_ABSOLUTE
+    "${DOC_MANUAL_SOURCE_DIR}/${MANUAL_SOURCE_FILE_RELATIVE}")
+  list(APPEND DOC_MANUAL_TARGET_FILES_ABSOLUTE
+    "${DOC_MANUAL_TARGET_DIR}/${MANUAL_SOURCE_FILE_RELATIVE}")
+endforeach()
 
-# Collect resources
-file(GLOB DOC_MANUAL_SOURCE_FILES_ABSOLUTE
-    "${DOC_MANUAL_SOURCE_DIR}/*.css"
-    "${DOC_MANUAL_SOURCE_DIR}/*.js"
-)
+add_custom_command(
+  OUTPUT ${DOC_MANUAL_TARGET_FILES_ABSOLUTE}
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${DOC_MANUAL_TARGET_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${DOC_MANUAL_SOURCE_FILES_RELATIVE}
+    "${DOC_MANUAL_TARGET_DIR}"
+  DEPENDS ${DOC_MANUAL_SOURCE_FILES_ABSOLUTE}
+  WORKING_DIRECTORY "${DOC_MANUAL_SOURCE_DIR}"
+  VERBATIM)
 
-# Get relative source and absolute target paths
-foreach(MANUAL_SOURCE_FILE_ABSOLUTE ${DOC_MANUAL_SOURCE_FILES_ABSOLUTE})
-    get_filename_component(MANUAL_SOURCE_FILE_NAME "${MANUAL_SOURCE_FILE_ABSOLUTE}" NAME)
-    set(MANUAL_TARGET_FILE_ABSOLUTE "${DOC_MANUAL_TARGET_DIR}/${MANUAL_SOURCE_FILE_NAME}")
+# Images are shared by both languages. CONFIGURE_DEPENDS notices newly added screenshots.
+file(GLOB DOC_MANUAL_SOURCE_IMAGE_FILES_ABSOLUTE CONFIGURE_DEPENDS
+  "${DOC_MANUAL_IMAGES_SOURCE_DIR}/*.png"
+  "${DOC_MANUAL_IMAGES_SOURCE_DIR}/*.gif")
 
-    file(RELATIVE_PATH MANUAL_SOURCE_FILE_RELATIVE "${DOC_MANUAL_SOURCE_DIR}" "${MANUAL_SOURCE_FILE_ABSOLUTE}")
-    set(DOC_MANUAL_SOURCE_FILES_RELATIVE
-        ${DOC_MANUAL_SOURCE_FILES_RELATIVE}
-        "${MANUAL_SOURCE_FILE_RELATIVE}")
+add_custom_command(
+  OUTPUT "${DOC_MANUAL_VALIDATION_STAMP}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${DOC_MANUAL_TARGET_DIR}"
+  COMMAND "${Python3_EXECUTABLE}"
+    "${DOC_MANUAL_VALIDATION_SCRIPT}"
+    --manual-root "${DOC_MANUAL_SOURCE_DIR}"
+    --fingerprints "${DOC_MANUAL_TRANSLATION_STATUS}"
+  COMMAND ${CMAKE_COMMAND} -E touch "${DOC_MANUAL_VALIDATION_STAMP}"
+  DEPENDS
+    "${DOC_MANUAL_VALIDATION_SCRIPT}"
+    "${DOC_MANUAL_TRANSLATION_STATUS}"
+    "${DOC_MANUAL_SOURCE_DIR}/terminology.tsv"
+    ${DOC_MANUAL_EN_CHAPTER_PATHS}
+    ${DOC_MANUAL_ZH_CN_CHAPTER_PATHS}
+    ${DOC_MANUAL_SOURCE_IMAGE_FILES_ABSOLUTE}
+  VERBATIM)
 
-    set(DOC_MANUAL_TARGET_FILES_ABSOLUTE
-        ${DOC_MANUAL_TARGET_FILES_ABSOLUTE}
-        "${MANUAL_TARGET_FILE_ABSOLUTE}")
-endforeach(MANUAL_SOURCE_FILE_ABSOLUTE)
+set(DOC_MANUAL_SOURCE_IMAGE_FILES_RELATIVE)
+set(DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE)
+foreach(IMAGE_SOURCE_FILE_ABSOLUTE IN LISTS DOC_MANUAL_SOURCE_IMAGE_FILES_ABSOLUTE)
+  get_filename_component(IMAGE_FILE_NAME "${IMAGE_SOURCE_FILE_ABSOLUTE}" NAME)
+  list(APPEND DOC_MANUAL_SOURCE_IMAGE_FILES_RELATIVE "${IMAGE_FILE_NAME}")
+  list(APPEND DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE
+    "${DOC_MANUAL_IMAGES_TARGET_DIR}/${IMAGE_FILE_NAME}")
+endforeach()
 
-# Copy the files using the relative paths (absolute paths would yield very long command lines which are then truncated by MSVC)
-add_custom_command(OUTPUT ${DOC_MANUAL_TARGET_FILES_ABSOLUTE}
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${DOC_MANUAL_TARGET_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DOC_MANUAL_SOURCE_FILES_RELATIVE} "${DOC_MANUAL_TARGET_DIR}"
-    DEPENDS ${DOC_MANUAL_SOURCE_FILES_ABSOLUTE}
-    WORKING_DIRECTORY "${DOC_MANUAL_SOURCE_DIR}"
-)
+add_custom_command(
+  OUTPUT ${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE}
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${DOC_MANUAL_IMAGES_TARGET_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${DOC_MANUAL_SOURCE_IMAGE_FILES_RELATIVE}
+    "${DOC_MANUAL_IMAGES_TARGET_DIR}"
+  DEPENDS ${DOC_MANUAL_SOURCE_IMAGE_FILES_ABSOLUTE}
+  WORKING_DIRECTORY "${DOC_MANUAL_IMAGES_SOURCE_DIR}"
+  VERBATIM)
 
-# Collect images and copy them to the correct locations
-# DOC_MANUAL_SOURCE_IMAGE_FILES_ABSOLUTE contains the absolute paths to all source image files
-# DOC_MANUAL_SOURCE_IMAGE_FILES_RELATIVE contains the relative paths to all source image files, relative to DOC_MANUAL_IMAGES_SOURCE_DIR
-# DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE contains the absolute paths to all target image files (used for dependency tracking)
-
-# Collect images
-file(GLOB DOC_MANUAL_SOURCE_IMAGE_FILES_ABSOLUTE
-    "${DOC_MANUAL_IMAGES_SOURCE_DIR}/*.png"
-    "${DOC_MANUAL_IMAGES_SOURCE_DIR}/*.gif"
-)
-
-# Get relative source and absolute target paths
-foreach(IMAGE_SOURCE_FILE_ABSOLUTE ${DOC_MANUAL_SOURCE_IMAGE_FILES_ABSOLUTE})
-    get_filename_component(IMAGE_FILE_NAME "${IMAGE_SOURCE_FILE_ABSOLUTE}" NAME)
-    set(IMAGE_TARGET_FILE "${DOC_MANUAL_IMAGES_TARGET_DIR}/${IMAGE_FILE_NAME}")
-
-    file(RELATIVE_PATH IMAGE_SOURCE_FILE_RELATIVE "${DOC_MANUAL_IMAGES_SOURCE_DIR}" "${IMAGE_SOURCE_FILE_ABSOLUTE}")
-    set(DOC_MANUAL_SOURCE_IMAGE_FILES_RELATIVE
-        ${DOC_MANUAL_SOURCE_IMAGE_FILES_RELATIVE}
-        "${IMAGE_SOURCE_FILE_RELATIVE}")
-
-    set(DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE
-        ${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE}
-        "${IMAGE_TARGET_FILE}"
-    )
-endforeach(IMAGE_SOURCE_FILE_ABSOLUTE)
-
-# Copy the images using the relative paths (absolute paths would yield very long command lines which are then truncated by MSVC)
-add_custom_command(OUTPUT ${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE}
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${DOC_MANUAL_IMAGES_TARGET_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DOC_MANUAL_SOURCE_IMAGE_FILES_RELATIVE} "${DOC_MANUAL_IMAGES_TARGET_DIR}"
-    DEPENDS ${DOC_MANUAL_SOURCE_IMAGE_FILES_ABSOLUTE}
-    WORKING_DIRECTORY "${DOC_MANUAL_IMAGES_SOURCE_DIR}"
-)
-
-add_custom_target(GenerateManual DEPENDS ${INDEX_OUTPUT_PATH} ${DOC_MANUAL_TARGET_FILES_ABSOLUTE} ${DOC_MANUAL_SHORTCUTS_JS_TARGET_ABSOLUTE} ${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE})
+add_custom_target(GenerateManual DEPENDS
+  "${DOC_MANUAL_VALIDATION_STAMP}"
+  ${DOC_MANUAL_INDEX_FILES_ABSOLUTE}
+  ${DOC_MANUAL_TARGET_FILES_ABSOLUTE}
+  ${DOC_MANUAL_SHORTCUTS_JS_TARGET_FILES_ABSOLUTE}
+  ${DOC_MANUAL_TARGET_IMAGE_FILES_ABSOLUTE})
 add_dependencies(GenerateManual DumpShortcuts)
+
+add_custom_target(ValidateManual
+  COMMAND "${Python3_EXECUTABLE}"
+    "${DOC_MANUAL_VALIDATION_SCRIPT}"
+    --manual-root "${DOC_MANUAL_SOURCE_DIR}"
+    --fingerprints "${DOC_MANUAL_TRANSLATION_STATUS}"
+    --generated-root "${DOC_MANUAL_TARGET_DIR}"
+  DEPENDS GenerateManual
+  VERBATIM)

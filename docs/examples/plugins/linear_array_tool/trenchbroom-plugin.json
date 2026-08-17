@@ -1,0 +1,10 @@
+{
+  "id": "com.trenchbroom.example.linear_array",
+  "name": "Linear Array Generator",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "pluginType": "ui",
+  "entry": "main.py",
+  "description": "Duplicates and translates the current selection in an array.",
+  "author": "TrenchBroom Team"
+}

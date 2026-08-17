@@ -1,0 +1,20 @@
+English	简体中文	Type	Policy	Source	Notes
+TrenchBroom	TrenchBroom	Product	Keep English	Product name	Do not translate
+Brush	Brush	Domain	Keep English	Existing UI translation	Use “Brush” for the map primitive
+Face	面	Domain	Translate	Existing UI translation	Use “面检查器” for Face Inspector
+Entity	实体	Domain	Translate	Existing UI translation
+Material	材质	Domain	Translate	Existing UI translation	Do not use “纹理” as a generic replacement
+Material Browser	材质浏览器	UI	Translate	Current UI
+Entity Browser	实体浏览器	UI	Translate	Current UI
+Asset Browser	资产浏览器	UI	Translate	Current UI
+Outliner	Outliner	UI	Keep English	Current UI	First occurrence may say “Outliner（实体浏览器）”
+Layer	图层	Domain	Translate	Existing UI translation
+Group	组	Domain	Translate	Existing UI translation
+Linked Group	链接组	Domain	Translate	Existing UI translation
+Face Inspector	面检查器	UI	Translate	Current UI
+Command Palette	命令面板	UI	Translate	Current UI
+Python Console	Python 控制台	UI	Mixed	Current UI
+Pie Menu	饼状菜单	UI	Translate	Current UI
+Path Tool	路径工具	UI	Translate	Current UI
+Theme	主题	UI	Translate	Current UI
+MCP	MCP	Protocol	Keep English	Protocol name

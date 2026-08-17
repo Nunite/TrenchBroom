@@ -1,0 +1,164 @@
+# 顶点编辑与 CSG 操作 {#vertex_and_csg}
+
+## 顶点编辑 {#vertex_editing}
+
+TrenchBroom 包含三个用于编辑 Brush 顶点的独立工具：用于编辑单个顶点的[顶点工具](#vertex_tool)、用于编辑单个边的[边工具](#edge_tool)以及用于编辑单个面的[面工具](#face_tool)。顶点工具是三者中功能最强大的，因为除了移动顶点之外，你还可以从 Brush 中添加和移除顶点。相反，边工具和面工具仅允许你移动面。
+
+#### 顶点工具 {#vertex_tool}
+
+使用顶点工具，你可以在 3D 空间中移动单个顶点。此外，你可以向 Brush 添加顶点，也可以从 Brush 中移除顶点。要激活顶点工具，请选择 #menu(Menu/Edit/Tools/Vertex Tool)。当顶点工具处于激活状态时，选中的 Brush 顶点处会出现黄色手柄以便进行操作。
+
+![Vertex Handles](images/VertexToolHandles.png)
+
+将鼠标指针移到顶点手柄上方会以红色圆形轮廓高亮显示该手柄，并且该手柄的位置会显示在其上方。
+
+选择顶点手柄的处理方式与选择对象相同。单击手柄即可选中它。按住 #key(Ctrl) 可以选择多个手柄。顶点工具还允许你使用选择套索选择多个手柄：按住鼠标左键拖动以创建矩形选择套索。松开鼠标左键后，套索内的所有手柄都将被选中。如果套索矩形包含已选中的顶点手柄，则该手柄将被取消选择。要确保套索内的所有顶点手柄都被选中（无论其先前的选择状态如何），请按住 #key(Ctrl)。
+
+选中某些顶点手柄后，你可以按住鼠标左键拖动来移动它们。移动顶点手柄（及其对应的顶点）的工作方式与移动对象类似，因此在 3D 视图中，你可以在 XY 平面上移动它们，或者按住 #key(Alt) 垂直移动它们。在 2D 视图中，你可以在该视图的视平面上移动顶点手柄。如果你从未选中的顶点手柄上开始拖动，该顶点手柄将自动被选中，因此如果你只想移动单个顶点，无需先选中它。在顶点手柄上按下鼠标左键开始拖动时，会出现黄色引导线，帮助你确定顶点相对于其他对象的位置。移动顶点手柄时，移动距离会按分量吸附到当前网格大小，就像移动对象时一样。如果你更希望将绝对顶点位置吸附到网格，可以在拖动过程中使用 #key(Ctrl) 在相对吸附和绝对吸附之间切换。
+
+![切分面](images/VertexToolFaceChopping.gif) TrenchBroom 确保你不会使用顶点工具创建无效的 Brush。例如，通过将顶点推入 Brush 内部来使其变为凹面体是不可能的。为此，TrenchBroom 会根据顶点移动的方向，将与该顶点关联的面切分为三角形。在左侧的动画中，你可以看到在第一次向下移动顶点的操作中，立方体的顶面被切掉了一个三角形；而在第二次向外移动顶点的操作中，前面的面被切分成了一个三角扇。有时，如果移动会将顶点推入 Brush 内部（从而使其变为凹面体），TrenchBroom 甚至会删除该顶点。在这种情况下，顶点移动即告结束。
+
+顶点工具还允许你熔合相邻顶点。如果顶点在移动过程中落在了相邻顶点上，这两个顶点将被熔合。但这并不会结束移动，你可以继续移动熔合后的顶点，且该顶点仍保持选中状态。请注意，移动边或面时不进行熔合，尽管一次移动多个顶点时确实会发生熔合。
+
+如果你希望快速将一个顶点吸附到另一个顶点上而无需拖动，只需在按住 #key(Shift)#key(Alt) 的同时单击目标顶点即可。
+
+<br clear="all" />
+
+![分割](images/VertexToolSplitting.gif) 除了移动、熔合和删除顶点之外，你还可以使用顶点工具向 Brush 添加新顶点。按住 #key(Shift) 并将鼠标移到网格上你希望添加顶点的位置。请注意，当鼠标指针靠近该点时，会显示一个新的顶点手柄。单击并拖动手柄即可添加新顶点。
+
+此外，你可以通过选择 #menu(Menu/Edit/Delete) 从 Brush 中删除选中的顶点、边和面。请注意，仅当删除后当前选中的所有 Brush 都不会变为无效时，此操作才会成功，也就是说，只有当删除后所有选中的 Brush 仍保持三维实体时，你才能删除顶点、边或面。如果情况并非如此，TrenchBroom 将拒绝整个操作。
+
+<br clear="all" />
+
+![顶点汇聚](images/VertexToolVertexClumping.gif) 顶点编辑不仅限于处理单个 Brush。选择多个 Brush 并激活顶点工具将使选中内容中的所有 Brush 都显示顶点手柄。这在处理地形等有机结构时非常有用。你可以构建一大组 Brush 并一次性修改它们，而无需更改选择。TrenchBroom 会识别多个 Brush 的顶点何时共享相同位置。在这种情况下，尝试移动某个顶点时，TrenchBroom 会同时移动所有这些顶点，从而使编辑地形变得更加快捷容易。在下面的动画中，光标下方的顶点通过单次拖动操作一起移动，因为它们共享相同的位置。
+
+<br clear="all" />
+
+顶点工具还提供了一些用于移动顶点的键盘快捷键。下表列出了这些快捷键。
+
+方向          快捷键 (2D)                                                              快捷键 (3D)
+---------     -------------                                                            -------------
+左            #action(Controls/Map view/Move objects left)                             #action(Controls/Map view/Move objects left)
+右            #action(Controls/Map view/Move objects right)                            #action(Controls/Map view/Move objects right)
+上            #action(Controls/Map view/Move objects up; Move objects forward)         #action(Controls/Map view/Move objects backward; Move objects up)
+下            #action(Controls/Map view/Move objects down; Move objects backward)      #action(Controls/Map view/Move objects forward; Move objects down)
+前            #action(Controls/Map view/Move objects forward; Move objects down)       #action(Controls/Map view/Move objects up; Move objects forward)
+后            #action(Controls/Map view/Move objects backward; Move objects up)        #action(Controls/Map view/Move objects down; Move objects backward)
+
+除了移动顶点外，顶点工具还可以旋转、缩放和剪切顶点。要旋转顶点，请通过 #menu(Menu/Edit/Tools/Rotate Tool) 调出[旋转工具](#rotating_objects)，然后照常使用旋转手柄。要缩放它们，请使用 #menu(Menu/Edit/Tools/Scale Tool) 启用[缩放工具](#scaling_objects)，并使用 #menu(Menu/Edit/Tools/Shear Tool) 通过[剪切工具](#shearing_objects)对其进行剪切。
+
+顶点工具的功能介绍到此结束。虽然它非常强大，但也应谨慎使用，因为顶点编辑有时会在地图中创建无效的 Brush 和微泄漏。为帮助你避免此类问题，下一节包含使用顶点工具时应牢记的一些最佳实践。
+
+
+#### 边工具 {#edge_tool}
+
+使用边工具，你可以在 3D 空间中移动单个边。要激活边工具，请选择 #menu(Menu/Edit/Tools/Edge Tool)。当边工具处于激活状态时，选中 Brush 的边将渲染为黄色，表示允许进行操作。此外，每条边的中心都会出现一个手柄。
+
+![边手柄](images/EdgeTool.png)
+
+将鼠标指针移到边手柄上方会以红色高亮显示该手柄。选择边手柄的工作方式与选择顶点手柄相同。单击手柄即可选中它。按住 #key(Ctrl) 可以选择多个手柄。选中的手柄显示为红色。边工具还允许你使用选择套索选择多个手柄：按住鼠标左键拖动以创建矩形选择套索，松开鼠标左键后，套索中包含的所有手柄都将被选中。如果套索矩形包含已选中的边手柄，则该手柄将被取消选择。要确保套索中包含的所有边手柄都被选中（无论其先前的选择状态如何），请按住 #key(Ctrl)。
+
+选中某些边手柄后，你可以按住鼠标左键拖动来移动它们。移动边手柄（及其对应的边）的工作方式与移动顶点相同，不同之处在于该工具仅支持移动距离的相对吸附。与顶点工具一样，边工具会自动检测两个或多个 Brush 是否共享某条边，如果移动了共享边，则会同时移动所有选中 Brush 的边。
+
+最后，边工具还支持与顶点工具相同的键盘命令。
+
+#### 面工具 {#face_tool}
+
+使用面工具，你可以在 3D 空间中移动单个面。要激活面工具，请选择 #menu(Menu/Edit/Tools/Face Tool)。当面工具处于激活状态时，选中 Brush 的面将渲染为黄色，表示允许进行操作。此外，该工具在面的中心显示点状手柄；这些手柄允许选择和操作面。请注意，这些手柄还允许你选择和操作背向摄像机的面。
+
+![面手柄](images/FaceTool.png)
+
+将鼠标指针移到面手柄上方会以红色轮廓高亮显示该手柄。此外，面的边缘会显示得更粗。选择面手柄的工作方式与选择顶点手柄相同。单击手柄即可选中它。按住 #key(Ctrl) 可以选择多个手柄。选中的手柄显示为红色。面工具还允许你使用选择套索选择多个面：按住鼠标左键拖动以创建矩形选择套索，松开鼠标左键后，套索中包含的所有面手柄都将被选中。如果套索矩形包含已选中的面手柄，则该手柄将被取消选择。要确保套索中包含的所有面手柄都被选中（无论其先前的选择状态如何），请按住 #key(Ctrl)。
+
+选中某些面手柄后，你可以按住鼠标左键拖动来移动它们。移动面手柄（及其对应的面）的工作方式与移动顶点相同，不同之处在于该工具仅支持移动距离的相对吸附。与顶点工具一样，面工具会自动检测两个或多个 Brush 是否共享某个面，如果移动了共享面，则会同时移动所有选中 Brush 的面。
+
+最后，面工具还支持与顶点工具相同的键盘命令。
+
+#### 顶点编辑最佳实践 {#vertex-editing-best-practices}
+
+- 不要对密封 Brush 过度使用顶点编辑，最好用于细节装饰。
+- 不要一次性进行过多编辑，应经常编译和测试。
+- 制作地形时，创建四边形或三角形网格表面 (quad- or trisoup)，并仅垂直于网格平面（沿平面法线）移动顶点。不要横向移动顶点。
+- 小心处理细节 Brush，它们可能会打通可视门户 (vis portal)。
+- 细节过多也可能导致 PVS 叶节点包含过多信息，最好将某些细节转换为实际 Brush 以强制 vis 将房间分成几个 PVS 叶节点，或者使用 hint Brush 强制 vis 添加更多叶节点。
+
+#### UV 锁定 {#uv_lock}
+
+常规的“对齐锁定”偏好设置不适用于顶点编辑 —— 相反，可以使用 #menu(Menu/Edit/UV Lock) 或 UV 锁定工具栏按钮切换名为 UV 锁定的单独偏好设置：
+
+![UV 锁定工具栏按钮](images/UVLock.png)
+
+启用此设置后，在使用顶点编辑工具或[移动面](#moving_faces)时，TrenchBroom 将尝试保持顶点 UV 坐标不变。
+
+## CSG 操作 {#csg-operations}
+
+CSG 代表构造实体几何 (Constructive Solid Geometry)。CSG 是专业建模工具中使用的一种技术，通过使用集合运算符（如并集/加法、差集/减法和交集）组合简单形状来创建复杂形状。然而，CSG 并集和相减不能直接应用于 Brush，因为它们可能会产生凹形形状，而 Brush 无法直接表示凹形（请记住 Brush 始终是凸面体）。但其中一些运算符可以通过 Brush 进行模拟。TrenchBroom 支持 _凸合并_ 操作（代替并集）、_相减_ 操作（通过创建新的 Brush 来表示生成的凹形形状进行模拟）以及 _相交_ 操作（直接支持）。
+
+#### CSG 凸合并 {#csg-convex-merge}
+
+凸合并将一组 Brush 作为输入，计算这些 Brush 所有顶点的 _凸包_，并创建一个具有该凸包形状的新 Brush。一组点的凸包是包含所有点的最小凸体积。在下面的动画中，两个 Brush 正在合并为一个。该操作获取两个 Brush 的顶点并计算其凸包。原始 Brush 的某些顶点最终成为凸包的顶点，而其中一些顶点则被丢弃（例如 2D 视图中左上角 Brush 右下角的顶点）。被丢弃的顶点是那些最终位于凸包内部的顶点。
+
+![CSG 凸合并](images/CSGConvexMerge.gif)
+
+如你所见，新建的 Brush 覆盖了原始 Brush 未覆盖的一些区域。这遵循了生成的 Brush 必须为凸面体的限制。生成的 Brush 是否覆盖此类先前为空的区域取决于输入的 Brush 彼此之间如何对齐。要执行凸合并，请选择要合并的 Brush，然后选择 #menu(Menu/Edit/CSG/Convex Merge)。
+
+#### CSG 相减 {#csg-subtraction}
+
+CSG 相减获取选中的 Brush（减数），并从地图中其余可选且可见的 Brush（被减数）中减去它们。由于 CSG 相减的结果可能是凹形的，TrenchBroom 会使用减数 Brush 的面切割被减数 Brush，从而创建表示该凹形形状的多个 Brush。
+
+![通过 CSG 相减创建拱形](images/CSGSubtractArch.gif)
+
+上图展示了通过相减创建拱门的示例。结果包含八个完美呈现拱门的 Brush。要执行 CSG 相减，请选择减数（你想要从世界中减去的 Brush），然后选择 #menu(Menu/Edit/CSG/Subtract)。
+
+要从相减操作中排除某些 Brush，可以先使用 #menu(Menu/View/Hide) 将它们隐藏。
+
+#### CSG 挖空 {#csg-hollow}
+
+
+CSG 挖空是从 Brush 自身减去其较小版本的快捷方式。这对于快速搭建房间轮廓非常有用。只需选择一个 Brush 并选择 #menu(Menu/Edit/CSG/Hollow) 即可挖空选中的 Brush。生成的墙体厚度等于当前网格大小。
+
+![CSG 挖空](images/CSGHollow.gif)
+
+在此示例中，一个立方体被挖空，留下了六个 Brush，构成所得房间的墙壁、地板和天花板。请注意，墙体厚度由网格大小决定。
+
+#### CSG 相交 {#csg-intersection}
+
+CSG 相交获取一组 Brush 并计算它们的交集，即计算包含在每个输入 Brush 中的最大 Brush。另一种理解方式是：相交提取所有输入 Brush 重叠的部分，并创建一个表示该部分的新 Brush。如果没有重叠部分，则输入 Brush 是不相交的，它们的交集为空。随后输入的 Brush 将从地图中移除。
+
+![两个长方体的 CSG 相交](images/CSGIntersect.gif)
+
+你可以通过选择要相交的 Brush，然后选择 #menu(Menu/Edit/CSG/Intersect) 来执行 CSG 相交。
+
+#### 材质与 CSG 操作 {#materials_and_csg_operations}
+
+在每个 CSG 操作中，都会创建新的 Brush，TrenchBroom 必须为其面分配材质。为了确定为新 Brush 面分配哪种材质，TrenchBroom 会尝试在输入的 Brush 中找到一个与新创建的面具有相同平面的面。如果找到了这样的面，TrenchBroom 会将该 Brush 面的材质和属性分配给新创建的 Brush 面。否则，它将分配[当前材质](#working_with_materials)。
+
+![CSG 材质处理](images/CSGTexturing.gif)
+
+在上面的示例中，一个 Brush 从另一个 Brush 中减去以形成一个拱门通道。减数具有蓝色砖块材质，被减数具有深色金属材质。相减之后，结果中与减数的面对齐的那些面也被分配了蓝色砖块材质，而与被减数 Brush 的面对齐的面则被分配了深色金属材质。结果 Brush 的某些面是不可见的（因为它们被其他 Brush 共享）—— 这些面被分配了当前材质，因为减数或被减数中没有任何面与它们对齐。
+
+## 特殊 Brush 和面类型 {#special_brush_face_types}
+
+大多数基于 Quake 的游戏都具有某些特殊类型的 Brush 和面。特殊 Brush 类型的一个例子是触发某种游戏逻辑的 *触发器 Brush* (trigger brush)。特殊面类型可能是一个带有不可见但能阻挡玩家通行的特殊 _clip_ 材质的面。在 Quake 3 中，_caulk_ 面经常用于告知 BSP 编译器跳过某些面，因为它们是不可见的。
+
+只要在游戏的[游戏配置文件](#game_configuration_files)中进行了配置，TrenchBroom 就能识别这些特殊的 Brush 和面类型。TrenchBroom 可以通过以下方式检测特殊 Brush 或面类型：
+
+* **Brush 类型**
+  - **Entity Classname Pattern**（实体 Classname 模式）：如果 Brush 包含在类名匹配特定模式的实体中，它将获得特殊 Brush 类型（例如：trigger Brush）。
+* **面类型**
+  - **Material Name Pattern**（材质名称模式）：如果 Brush 面的材质名称匹配特定模式，它将获得特殊面类型（例如：clip 材质）。
+  - **Content Flags**（内容标志）：如果 Brush 面具有多个内容标志之一，它将获得特殊面类型。
+  - **Surface Flags**（表面标志）：如果 Brush 面具有多个表面标志之一，它将获得特殊面类型。
+  - **Surface Parm**（表面参数）：如果 Brush 面具有特定的表面参数，它将获得特殊面类型。
+
+TrenchBroom 允许你在[过滤和渲染选项](#filtering_rendering_options)中对特殊 Brush 和面类型进行过滤。此外，你可以分配键盘快捷键来设置或取消设置特殊 Brush 类型（如果支持）。以下特殊 Brush 和面类型可以通过这种方式进行设置 / 取消设置：
+
+* **Brush 类型**
+  - **Entity Classname Pattern**（实体 Classname 模式）：可设置和取消设置。设置 Brush 类型会将选中的 Brush 包装在新建的实体中，该实体的类名与该模式匹配。如果当前加载的实体定义中有多个类名与该模式匹配，则会显示一个下拉菜单供你选择其中一个选项。取消设置 Brush 类型只需将选中的 Brush 移回 world 即可。
+* **面类型**
+  - **Material Name Pattern**（材质名称模式）：仅可设置。设置面类型会在选中的面上应用名称与该模式匹配的材质。如果当前加载的材质集合中有多个材质与该模式匹配，则会显示一个下拉菜单供你选择其中一个选项。
+  - **Content Flags**（内容标志）：可设置和取消设置。设置面类型会在选中的面上设置所配置的内容标志之一。如果配置了多个内容标志，则会显示一个下拉菜单供你选择其中一个选项。取消设置将清除所有配置的内容标志。
+  - **Surface Flags**（表面标志）：可设置和取消设置。设置面类型会在选中的面上设置所配置的表面标志之一。如果配置了多个表面标志，则会显示一个下拉菜单供你选择其中一个选项。取消设置将清除所有配置的表面标志。
+  - **Surface Parm**（表面参数）：既不能设置也不能取消设置。
+
+最后，每个支持取消设置的特殊 Brush 或面类型都可以使用 *Make Structural* 命令 #action(Controls/Map view/Make structural) 进行清除。
