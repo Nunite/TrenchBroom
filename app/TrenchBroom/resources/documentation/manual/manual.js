@@ -136,11 +136,11 @@ const print_action = (key) => document.write(action_str(key));
           targetLi = topUl.firstElementChild;
         }
 
-        if (targetLi && targetLi.parentElement === topUl) {
+        if (targetLi && targetLi.parentElement) {
           const caption = document.createElement("div");
           caption.className = "manual-category-caption";
           caption.textContent = cat.title;
-          topUl.insertBefore(caption, targetLi);
+          targetLi.parentElement.insertBefore(caption, targetLi);
         }
       });
     }

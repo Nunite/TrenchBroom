@@ -2,6 +2,26 @@
 
 Welcome to the TrenchBroom Python API reference documentation. TrenchBroom embeds a high-performance Python v2 (`tb2`) runtime that allows developers and level designers to automate geometry generation, manipulate entities, inspect maps, and build declarative native UI panels.
 
+::: {.api-grid}
+[**1. Quickstart & Concepts**\
+Transaction context managers, atomic undo/redo, and coordinate systems.](#quickstart){.api-card}
+
+[**2. tb2 Root Module**\
+Document handles, panel factories, and 3D vector/plane mathematics.](#the_tb2_root_module){.api-card}
+
+[**3. Document Access**\
+Map data queries, entity spawning, layer hierarchies, and groups.](#tb2_document){.api-card}
+
+[**4. Selection & Transforms**\
+Spatial manipulation (translate/rotate/scale), cloning, and chamfering.](#tb2_selection){.api-card}
+
+[**5. Geometry & Elements**\
+Polyhedral Brush, polygon Face UV alignments, and Entity properties.](#geometry_and_elements){.api-card}
+
+[**6. PluginPanel UI**\
+Declarative forms, spinboxes, color pickers, tables, and tree views.](#tb2_pluginpanel){.api-card}
+:::
+
 ## Quickstart & Architecture {#quickstart}
 
 All scripting in TrenchBroom interacts with the editor through the built-in `tb2` module. You can execute commands interactively in the **Python Console** or author persistent manifest-based plugins.

@@ -2,6 +2,26 @@
 
 欢迎查阅 TrenchBroom Python API 参考文档。TrenchBroom 内置了高性能的 Python v2（`tb2`）运行时，允许开发者与关卡设计师自动化生成几何体、操作实体、检查地图结构，并构建声明式的原生交互 UI 面板。
 
+::: {.api-grid}
+[**1. 快速入门与核心架构**\
+事务上下文、原子撤销/重做机制与 TrenchBroom 世界坐标系体系。](#quickstart){.api-card}
+
+[**2. tb2 核心根模块**\
+活动文档句柄获取、插件面板工厂函数与三维向量/平面数学基元。](#the_tb2_root_module){.api-card}
+
+[**3. Document 地图文档访问**\
+地图数据块访问、实体检索与生成、图层组织与逻辑对象组。](#tb2_document){.api-card}
+
+[**4. Selection 选区与几何变换**\
+几何空间变换（平移/旋转/缩放）、多边形克隆与顶点/棱边倒角。](#tb2_selection){.api-card}
+
+[**5. 地图图元与几何对象**\
+凸多面体 Brush、多边形 Face 表面与 UV 对齐、Entity 键值属性读写。](#geometry_and_elements){.api-card}
+
+[**6. PluginPanel 插件界面系统**\
+声明式原生表单、微调输入框、调色板、多列表格与树形视图。](#tb2_pluginpanel){.api-card}
+:::
+
 ## 快速入门与核心架构 {#quickstart}
 
 TrenchBroom 中的所有脚本均通过内置的 `tb2` 模块与编辑器进行交互。你可以在 **Python 控制台** 中交互式执行命令，也可以编写基于清单的常驻插件。
