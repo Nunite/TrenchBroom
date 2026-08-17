@@ -70,6 +70,7 @@ Console::Console(QWidget* parent)
 {
   m_textView = new QTextEdit{};
   m_textView->setObjectName("Console_TextView");
+  m_textView->setFont(Fonts::fixedWidthFont());
   m_textView->setReadOnly(true);
   m_textView->setWordWrapMode(QTextOption::NoWrap);
   m_textView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -116,7 +117,7 @@ void Console::logToConsole(const LogLevel level, const std::string& message)
 
   auto format = QTextCharFormat{};
   format.setForeground(getForegroundBrush(level, m_textView->palette()));
-  format.setFont(Fonts::fixedWidthFont());
+  format.setFont(m_textView->font());
 
   auto cursor = QTextCursor{m_textView->document()};
   cursor.movePosition(QTextCursor::MoveOperation::End);

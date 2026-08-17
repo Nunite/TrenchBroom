@@ -17,6 +17,7 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QLabel>
 #include <QPlainTextEdit>
 #include <QTextEdit>
 #include <QToolButton>
@@ -37,12 +38,14 @@ TEST_CASE("PythonConsole")
   auto console = PythonConsole{};
   auto* actions = console.createTabBarPage(&console);
   auto* input = console.findChild<QPlainTextEdit*>("PythonConsole_Input");
+  auto* prompt = console.findChild<QLabel*>("PythonConsole_Prompt");
   auto* runButton = console.findChild<QToolButton*>("PythonConsole_Run");
   auto* clearButton = console.findChild<QToolButton*>("PythonConsole_Clear");
   auto* output = console.findChild<QTextEdit*>("PythonConsole_Output");
 
   REQUIRE(actions != nullptr);
   REQUIRE(input != nullptr);
+  REQUIRE(prompt != nullptr);
   REQUIRE(runButton != nullptr);
   REQUIRE(clearButton != nullptr);
   REQUIRE(output != nullptr);
@@ -50,6 +53,9 @@ TEST_CASE("PythonConsole")
   CHECK(runButton->parentWidget() == actions);
   CHECK(clearButton->parentWidget() == actions);
   CHECK(input->isReadOnly() == false);
+  CHECK((input->font().pointSizeF() >= 11.0 || input->font().pixelSize() >= 15));
+  CHECK(prompt->font() == input->font());
+  CHECK(output->font() == input->font());
   CHECK(runButton->isEnabled() == false);
 
   const auto singleLineHeight = input->height();
