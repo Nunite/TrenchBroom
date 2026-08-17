@@ -48,7 +48,6 @@
 
 #include <algorithm>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace tb::ui
@@ -223,32 +222,15 @@ bool LayerEditor::canSelectAllInLayer() const
 
 void LayerEditor::onAddLayer()
 {
-  auto& map = m_document.map();
-
   const auto name = queryLayerName(this, "Unnamed");
-  if (!name.empty())
+  if (name.empty())
   {
-    auto layer = mdl::Layer{name};
+    return;
+  }
 
-    // Sort it at the bottom of the list
-    const auto customLayers = map.worldNode().customLayersUserSorted();
-    layer.setSortIndex(
-      !customLayers.empty() ? customLayers.back()->layer().sortIndex() + 1 : 0);
-
-    auto* layerNode = new mdl::LayerNode{std::move(layer)};
-
-    auto transaction = mdl::Transaction{map, "Create Layer " + layerNode->name()};
-    if (addNodes(map, {{&map.worldNode(), {layerNode}}}).empty())
-    {
-      transaction.cancel();
-      return;
-    }
-
-    setCurrentLayer(map, layerNode);
-    transaction.commit();
-
+  if (auto* layerNode = mdl::createLayer(m_document.map(), name))
+  {
     m_layerList->setSelectedLayer(layerNode);
-
     updateButtons();
   }
 }

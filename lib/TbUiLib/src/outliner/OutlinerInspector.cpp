@@ -1,24 +1,28 @@
 #include "ui/outliner/OutlinerInspector.h"
-#include "ui/outliner/OutlinerTreeWidget.h"
-#include "ui/outliner/OutlinerEntityPropertyEditor.h"
+
+#include <QAbstractButton>
+#include <QComboBox>
+#include <QHBoxLayout>
+#include <QLineEdit>
+#include <QSettings>
+#include <QSize>
+#include <QSizePolicy>
+#include <QTimer>
+#include <QToolButton>
+#include <QVBoxLayout>
+#include <QWidget>
+
+#include "mdl/LayerNode.h"
+#include "mdl/Map_Layers.h"
 #include "ui/BitmapButton.h"
 #include "ui/MapDocument.h"
 #include "ui/QWidgetUtils.h"
 #include "ui/SearchBox.h"
 #include "ui/Splitter.h"
+#include "ui/ViewUtils.h"
 #include "ui/WidgetState.h"
-
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QAbstractButton>
-#include <QLineEdit>
-#include <QComboBox>
-#include <QToolButton>
-#include <QSettings>
-#include <QSizePolicy>
-#include <QSize>
-#include <QTimer>
-#include <QWidget>
+#include "ui/outliner/OutlinerEntityPropertyEditor.h"
+#include "ui/outliner/OutlinerTreeWidget.h"
 
 namespace tb::ui
 {
@@ -66,6 +70,16 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
     }
     topRow->addWidget(m_sortBox);
 
+    auto* addLayerButton = createBitmapButton(
+        "Add.svg",
+        tr("Add a new layer"),
+        topRowWidget);
+    addLayerButton->setObjectName("OutlinerInspector_AddLayer");
+    addLayerButton->setAccessibleName(tr("Add a new layer"));
+    addLayerButton->setIconSize(QSize{16, 16});
+    addLayerButton->setFixedSize(QSize{28, 28});
+    topRow->addWidget(addLayerButton);
+
     auto* propertiesToggle = createBitmapToggleButton(
         "Map_entity.svg",
         tr("Toggle properties panel"),
@@ -87,6 +101,18 @@ OutlinerInspector::OutlinerInspector(MapDocument& document, QWidget* parent) :
 
     m_propertyEditor = new OutlinerEntityPropertyEditor{m_document, m_splitter};
     m_splitter->addWidget(m_propertyEditor);
+
+    connect(addLayerButton, &QAbstractButton::clicked, this, [this]() {
+        const auto name = queryLayerName(this, "Unnamed");
+        if (name.empty()) {
+            return;
+        }
+
+        if (auto* layerNode = mdl::createLayer(m_document.map(), name)) {
+            m_searchField->clear();
+            m_treeWidget->revealNode(layerNode);
+        }
+    });
 
     m_splitter->setStretchFactor(0, 3);
     m_splitter->setStretchFactor(1, 2);

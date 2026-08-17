@@ -27,6 +27,12 @@ namespace tb::mdl
 class LayerNode;
 class Map;
 
+/**
+ * Creates a custom layer at the end of the user-defined layer order and makes it current.
+ * Returns nullptr if the transaction cannot be committed.
+ */
+LayerNode* createLayer(Map& map, std::string name);
+
 void setCurrentLayer(Map& map, LayerNode* currentLayer);
 bool canSetCurrentLayer(const Map& map, LayerNode* currentLayer);
 

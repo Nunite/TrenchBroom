@@ -61,6 +61,7 @@ public:
     ~OutlinerTreeWidget() override;
 
     void updateTree();
+    void revealNode(mdl::Node* node);
     void setFilterText(const QString& text);
     void setSortMode(SortMode mode);
 

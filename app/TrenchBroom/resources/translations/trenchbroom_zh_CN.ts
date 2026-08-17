@@ -3240,6 +3240,11 @@ Please choose a different file name to export to.</source>
 <context>
     <name>tb::ui::OutlinerInspector</name>
     <message>
+        <location filename="../../../../lib/TbUiLib/src/outliner/OutlinerInspector.cpp" line="75"/>
+        <source>Add a new layer</source>
+        <translation>添加新图层</translation>
+    </message>
+    <message>
         <location filename="../../../../lib/TbUiLib/src/outliner/OutlinerInspector.cpp" line="48"/>
         <source>Default</source>
         <translation>默认</translation>

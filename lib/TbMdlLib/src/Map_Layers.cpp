@@ -21,6 +21,8 @@
 
 #include "mdl/ApplyAndSwap.h"
 #include "mdl/EditorContext.h"
+#include "mdl/Layer.h"
+#include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/Map_Groups.h"
 #include "mdl/Map_NodeLocking.h"
@@ -30,12 +32,14 @@
 #include "mdl/NodeQueries.h"
 #include "mdl/SetCurrentLayerCommand.h"
 #include "mdl/Transaction.h"
+#include "mdl/WorldNode.h"
 
 #include "kd/contracts.h"
 #include "kd/range_utils.h"
 #include "kd/vector_utils.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace tb::mdl
 {
@@ -87,6 +91,34 @@ bool moveLayerByOne(Map& map, LayerNode* layerNode, const MoveDirection directio
 }
 
 } // namespace
+
+LayerNode* createLayer(Map& map, std::string name)
+{
+  contract_pre(!name.empty());
+
+  auto layer = Layer{std::move(name)};
+
+  const auto customLayers = map.worldNode().customLayersUserSorted();
+  layer.setSortIndex(
+    !customLayers.empty() ? customLayers.back()->layer().sortIndex() + 1 : 0);
+
+  auto* layerNode = new LayerNode{std::move(layer)};
+
+  auto transaction = Transaction{map, "Create Layer " + layerNode->name()};
+  if (addNodes(map, {{&map.worldNode(), {layerNode}}}).empty())
+  {
+    transaction.cancel();
+    return nullptr;
+  }
+
+  setCurrentLayer(map, layerNode);
+  if (!transaction.commit())
+  {
+    return nullptr;
+  }
+
+  return layerNode;
+}
 
 void setCurrentLayer(Map& map, LayerNode* layerNode)
 {

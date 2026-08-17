@@ -4,7 +4,7 @@
 
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
-- Last updated: 2026-08-16
+- Last updated: 2026-08-17
 - Current stage: Phase 4.4 in progress; responsive Material Browser columns, persistent
   scrollbar visibility, collapsible collection groups, Ctrl+wheel thumbnail sizing, and
   an inline size indicator complete
@@ -411,3 +411,5 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-16 | Complete | Replaced hardcoded theme branches with a validated `ThemeRegistry` and distributable single-file `.tbtheme` format. Built-ins now use the same JSON schema as third-party themes; user themes support stable IDs, inheritance, strict color-token overrides, deterministic duplicate handling, diagnostics, Preferences discovery, legacy preference migration, and snapshot CLI IDs without allowing external QSS. |
 | 2026-08-16 | Verified | Passed Release `Theme,UiSnapshot,PreferenceDialog*,MapWindow` (385 assertions), rebuilt `TrenchBroom`, visually checked the Light/Dark/Blender Preferences acceptance capture at `20260816-202748-339`, and installed `example.midnight` into an isolated portable user directory where its custom ID, inherited palette, dynamic Preferences entry, and 960x640 snapshot all completed successfully. |
 | 2026-08-16 | Next | Continue Phase 4.4 with stable mixed-aspect preview frames and predictable single-line labels before considering any deferred Phase 5 structural experiment. |
+| 2026-08-17 | Complete | Added a compact Outliner toolbar action for creating layers, backed by a shared model operation so Outliner and the legacy Layers panel use identical ordering, transaction, undo, and active-layer behavior. New layers clear active filtering and are revealed immediately. |
+| 2026-08-17 | Verified | Passed Release `Map_Layers` (191 assertions) and `OutlinerTreeWidget` (91 assertions), rebuilt `TrenchBroom`, and visually checked the focused Outliner matrix in Light, Dark, and Blender themes at 100%, 150%, and 200% in `20260817-133138-953`. |

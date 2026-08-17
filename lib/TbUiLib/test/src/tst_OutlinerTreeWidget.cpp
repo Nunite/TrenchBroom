@@ -19,6 +19,7 @@
 
 #include <QApplication>
 #include <QHeaderView>
+#include <QScrollBar>
 #include <QTreeWidgetItem>
 #include <QtTest/QTest>
 
@@ -33,6 +34,9 @@
 #include "ui/MapDocument.h"
 #include "ui/MapDocumentFixture.h"
 #include "ui/outliner/OutlinerTreeWidget.h"
+
+#include <string>
+#include <vector>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -356,6 +360,35 @@ TEST_CASE("OutlinerTreeWidget")
     REQUIRE(addedItem != nullptr);
     CHECK(addedItem->data(0, Qt::UserRole).value<mdl::Node*>() == addedEntity);
     CHECK(itemForNode(tree, fixture.defaultLayer) == layerItemBefore);
+  }
+
+  SECTION("reveals a newly added layer")
+  {
+    tree.resize(600, 100);
+    tree.show();
+
+    auto layers = std::vector<mdl::Node*>{};
+    for (auto i = 0; i < 12; ++i)
+    {
+      layers.push_back(new mdl::LayerNode{mdl::Layer{"Layer " + std::to_string(i)}});
+    }
+    auto* targetLayer = new mdl::LayerNode{mdl::Layer{"zz Target"}};
+    layers.push_back(targetLayer);
+
+    mdl::addNodes(map, {{&map.worldNode(), layers}});
+    processOutlinerTreeUpdates();
+
+    auto* targetItem = itemForNode(tree, targetLayer);
+    REQUIRE(targetItem != nullptr);
+    CHECK_FALSE(tree.viewport()->rect().intersects(tree.visualItemRect(targetItem)));
+
+    tree.revealNode(targetLayer);
+    processOutlinerTreeUpdates();
+
+    targetItem = itemForNode(tree, targetLayer);
+    REQUIRE(targetItem != nullptr);
+    CHECK(tree.viewport()->rect().intersects(tree.visualItemRect(targetItem)));
+    CHECK(tree.verticalScrollBar()->value() > 0);
   }
 
   SECTION("locally refreshes a group when nested nodes change")

@@ -892,17 +892,20 @@ QComboBox#OutlinerInspector_Sort {
   min-width: 74px;
 }
 
+QToolButton#OutlinerInspector_AddLayer,
 QToolButton#OutlinerInspector_PropertiesToggle {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
 }
 
+QToolButton#OutlinerInspector_AddLayer:hover,
 QToolButton#OutlinerInspector_PropertiesToggle:hover {
   background: @tb-hover-background;
   border-color: @tb-border;
 }
 
+QToolButton#OutlinerInspector_AddLayer:pressed,
 QToolButton#OutlinerInspector_PropertiesToggle:pressed,
 QToolButton#OutlinerInspector_PropertiesToggle:checked {
   background: @tb-pressed-background;

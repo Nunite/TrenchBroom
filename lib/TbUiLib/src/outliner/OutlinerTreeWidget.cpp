@@ -618,6 +618,11 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
 
 OutlinerTreeWidget::~OutlinerTreeWidget() = default;
 
+void OutlinerTreeWidget::revealNode(mdl::Node* node)
+{
+    scheduleUpdateTree(node);
+}
+
 void OutlinerTreeWidget::scheduleUpdateTree(mdl::Node* revealNode)
 {
     if (revealNode) {

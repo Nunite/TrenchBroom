@@ -64,6 +64,35 @@ TEST_CASE("Map_Layers")
   auto fixture = MapFixture{};
   auto& map = fixture.create();
 
+  SECTION("createLayer")
+  {
+    auto* defaultLayer = map.worldNode().defaultLayer();
+
+    auto* firstLayer = createLayer(map, "First");
+    REQUIRE(firstLayer != nullptr);
+    CHECK(firstLayer->name() == "First");
+    CHECK(firstLayer->parent() == &map.worldNode());
+    CHECK(firstLayer->layer().sortIndex() == 0);
+    CHECK(map.editorContext().currentLayer() == firstLayer);
+
+    auto* secondLayer = createLayer(map, "Second");
+    REQUIRE(secondLayer != nullptr);
+    CHECK(secondLayer->layer().sortIndex() == 1);
+    CHECK(map.editorContext().currentLayer() == secondLayer);
+    CHECK(
+      map.worldNode().customLayersUserSorted()
+      == std::vector<LayerNode*>{firstLayer, secondLayer});
+
+    map.undoCommand();
+    CHECK(
+      map.worldNode().customLayersUserSorted() == std::vector<LayerNode*>{firstLayer});
+    CHECK(map.editorContext().currentLayer() == firstLayer);
+
+    map.undoCommand();
+    CHECK(map.worldNode().customLayersUserSorted().empty());
+    CHECK(map.editorContext().currentLayer() == defaultLayer);
+  }
+
   SECTION("setCurrentLayer")
   {
     SECTION("Switching layers notifies map observers")
