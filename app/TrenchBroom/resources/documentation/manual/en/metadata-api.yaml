@@ -1,0 +1,25 @@
+title: TrenchBroom Python API
+html-lang: en
+manual-title: TrenchBroom Python API
+manual-label: Python API
+introduction-label: Quickstart & Architecture
+contents-label: Contents
+navigation-label: Python API navigation
+navigation-toggle: Open Python API navigation
+navigation-close: Close Python API navigation
+search-placeholder: Search Python API
+search-empty: API symbol or method
+search-no-results: No matching API symbols
+language-label: API language
+theme-toggle: Toggle light and dark appearance
+page-navigation-label: On this page
+resource-prefix: .
+shortcuts-file: shortcuts.en.js
+english-href: python-api.html
+chinese-href: zh_CN/python-api.html
+english-current: true
+manual-tab-label: Manual
+api-tab-label: Python API
+manual-href: index.html
+api-href: python-api.html
+api-current: true

@@ -40,20 +40,16 @@ foreach(CHAPTER_NAME IN LISTS DOC_MANUAL_CHAPTER_NAMES)
     "${DOC_MANUAL_SOURCE_DIR}/zh_CN/${CHAPTER_NAME}")
 endforeach()
 
-function(tb_add_manual_language LANGUAGE OUTPUT_SUBDIRECTORY RESOURCE_PREFIX OUTPUT_VARIABLE)
+function(tb_add_manual_page LANGUAGE OUTPUT_SUBDIRECTORY RESOURCE_PREFIX PAGE_NAME METADATA_FILENAME SOURCE_CHAPTERS OUTPUT_VARIABLE)
   set(LANGUAGE_SOURCE_DIR "${DOC_MANUAL_SOURCE_DIR}/${LANGUAGE}")
-  set(METADATA_PATH "${LANGUAGE_SOURCE_DIR}/metadata.yaml")
-  set(CHAPTER_PATHS)
-  foreach(CHAPTER_NAME IN LISTS DOC_MANUAL_CHAPTER_NAMES)
-    list(APPEND CHAPTER_PATHS "${LANGUAGE_SOURCE_DIR}/${CHAPTER_NAME}")
-  endforeach()
+  set(METADATA_PATH "${LANGUAGE_SOURCE_DIR}/${METADATA_FILENAME}")
 
   if(OUTPUT_SUBDIRECTORY)
     set(OUTPUT_DIR "${DOC_MANUAL_TARGET_DIR}/${OUTPUT_SUBDIRECTORY}")
   else()
     set(OUTPUT_DIR "${DOC_MANUAL_TARGET_DIR}")
   endif()
-  set(OUTPUT_PATH "${OUTPUT_DIR}/index.html")
+  set(OUTPUT_PATH "${OUTPUT_DIR}/${PAGE_NAME}")
   set(TEMP_OUTPUT_PATH "${OUTPUT_PATH}.tmp")
 
   add_custom_command(
@@ -69,7 +65,7 @@ function(tb_add_manual_language LANGUAGE OUTPUT_SUBDIRECTORY RESOURCE_PREFIX OUT
       --from=markdown
       --to=html5
       -o "${TEMP_OUTPUT_PATH}"
-      ${CHAPTER_PATHS}
+      ${SOURCE_CHAPTERS}
     COMMAND ${CMAKE_COMMAND}
       "-DINPUT=${TEMP_OUTPUT_PATH}"
       "-DOUTPUT=${TEMP_OUTPUT_PATH}"
@@ -88,7 +84,7 @@ function(tb_add_manual_language LANGUAGE OUTPUT_SUBDIRECTORY RESOURCE_PREFIX OUT
     DEPENDS
       "${PANDOC_TEMPLATE_PATH}"
       "${METADATA_PATH}"
-      ${CHAPTER_PATHS}
+      ${SOURCE_CHAPTERS}
       "${CMAKE_CURRENT_SOURCE_DIR}/cmake/TransformKeyboardShortcuts.cmake"
       "${CMAKE_CURRENT_SOURCE_DIR}/cmake/TransformManualResourcePaths.cmake"
       "${CMAKE_CURRENT_SOURCE_DIR}/cmake/AddVersionToManual.cmake.in"
@@ -98,11 +94,17 @@ function(tb_add_manual_language LANGUAGE OUTPUT_SUBDIRECTORY RESOURCE_PREFIX OUT
   set(${OUTPUT_VARIABLE} "${OUTPUT_PATH}" PARENT_SCOPE)
 endfunction()
 
-tb_add_manual_language(en "" . INDEX_OUTPUT_PATH)
-tb_add_manual_language(zh_CN zh_CN .. DOC_MANUAL_ZH_CN_INDEX_OUTPUT_PATH)
+tb_add_manual_page(en "" . "index.html" "metadata.yaml" "${DOC_MANUAL_EN_CHAPTER_PATHS}" EN_INDEX_OUTPUT_PATH)
+tb_add_manual_page(zh_CN zh_CN .. "index.html" "metadata.yaml" "${DOC_MANUAL_ZH_CN_CHAPTER_PATHS}" ZH_CN_INDEX_OUTPUT_PATH)
+
+tb_add_manual_page(en "" . "python-api.html" "metadata-api.yaml" "${DOC_MANUAL_SOURCE_DIR}/en/python-api.md" EN_API_OUTPUT_PATH)
+tb_add_manual_page(zh_CN zh_CN .. "python-api.html" "metadata-api.yaml" "${DOC_MANUAL_SOURCE_DIR}/zh_CN/python-api.md" ZH_CN_API_OUTPUT_PATH)
+
 set(DOC_MANUAL_INDEX_FILES_ABSOLUTE
-  "${INDEX_OUTPUT_PATH}"
-  "${DOC_MANUAL_ZH_CN_INDEX_OUTPUT_PATH}")
+  "${EN_INDEX_OUTPUT_PATH}"
+  "${ZH_CN_INDEX_OUTPUT_PATH}"
+  "${EN_API_OUTPUT_PATH}"
+  "${ZH_CN_API_OUTPUT_PATH}")
 
 # Dump language-specific menu labels while preserving stable English action keys.
 set(DOC_MANUAL_SHORTCUTS_EN_TARGET "${DOC_MANUAL_TARGET_DIR}/shortcuts.en.js")

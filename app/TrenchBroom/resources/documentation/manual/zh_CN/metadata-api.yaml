@@ -1,0 +1,25 @@
+title: TrenchBroom Python API
+html-lang: zh-CN
+manual-title: TrenchBroom Python API
+manual-label: Python API
+introduction-label: 快速入门与核心架构
+contents-label: 目录
+navigation-label: Python API 导航
+navigation-toggle: 打开 Python API 导航
+navigation-close: 关闭 Python API 导航
+search-placeholder: 搜索 Python API
+search-empty: API 符号或方法
+search-no-results: 没有匹配的 API 符号
+language-label: API 语言
+theme-toggle: 切换浅色与深色外观
+page-navigation-label: 本页内容
+resource-prefix: ..
+shortcuts-file: shortcuts.zh_CN.js
+english-href: ../python-api.html
+chinese-href: python-api.html
+chinese-current: true
+manual-tab-label: 手册
+api-tab-label: Python API
+manual-href: index.html
+api-href: python-api.html
+api-current: true

@@ -222,6 +222,33 @@ a:hover {
   margin-left: auto;
 }
 
+.doc-switcher {
+  display: flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+
+.doc-switcher a {
+  padding: 4px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-sunken);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.doc-switcher a:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.doc-switcher a[aria-current="page"] {
+  background: var(--brand-primary);
+  color: #ffffff;
+}
+
 .language-switcher {
   display: flex;
   border: 1px solid var(--border-subtle);
@@ -236,6 +263,12 @@ a:hover {
   color: var(--text-secondary);
   background: var(--bg-sunken);
   text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.language-switcher a:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .language-switcher a[aria-current="page"] {
@@ -1174,4 +1207,160 @@ tr:last-child td {
   .pagination-bar {
     grid-template-columns: 1fr;
   }
+}
+
+/* ==========================================================================
+   BLENDER PYTHON API DOCUMENTATION COMPONENTS
+   ========================================================================== */
+.api-module-header {
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.api-entry {
+  margin: 28px 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.api-signature {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 18px;
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 14.5px;
+  color: var(--text-primary);
+}
+
+.api-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--font-sans);
+}
+
+.api-badge-func { background: rgba(83, 155, 245, 0.18); color: var(--brand-primary); border: 1px solid rgba(83, 155, 245, 0.3); }
+.api-badge-class { background: rgba(240, 136, 62, 0.18); color: #e67e22; border: 1px solid rgba(240, 136, 62, 0.3); }
+.api-badge-prop { background: rgba(52, 211, 153, 0.18); color: #2ecc71; border: 1px solid rgba(52, 211, 153, 0.3); }
+
+.sig-name {
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
+.sig-return {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.api-body {
+  padding: 18px 20px;
+}
+
+.api-body > p:first-child {
+  margin-top: 0;
+  font-size: 15.5px;
+  color: var(--text-primary);
+}
+
+.field-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field-group {
+  border-left: 3px solid var(--brand-primary);
+  padding-left: 12px;
+}
+
+.field-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.field-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-item {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.param-name {
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--brand-primary);
+  margin: 0 4px;
+}
+
+.api-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.api-card {
+  padding: 16px 18px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  transition: all var(--transition-fast);
+  text-decoration: none;
+  color: inherit;
+}
+
+.api-card:hover {
+  border-color: var(--brand-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--card-shadow-hover);
+}
+
+.api-card h3 {
+  margin: 0 0 6px 0;
+  font-size: 17px;
+  color: var(--brand-primary);
+}
+
+.api-card p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
 }

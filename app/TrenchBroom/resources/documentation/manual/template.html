@@ -24,6 +24,12 @@
       </div>
 
       <div class="header-right">
+        $if(manual-href)$
+        <nav class="doc-switcher" aria-label="Documentation section switcher">
+          <a href="$manual-href$"$if(manual-current)$ aria-current="page"$endif$>$manual-tab-label$</a>
+          <a href="$api-href$"$if(api-current)$ aria-current="page"$endif$>$api-tab-label$</a>
+        </nav>
+        $endif$
         <nav class="language-switcher" aria-label="$language-label$">
           <a href="$english-href$"$if(english-current)$ aria-current="page"$endif$>EN</a>
           <a href="$chinese-href$"$if(chinese-current)$ aria-current="page"$endif$>中文</a>

@@ -1,3 +1,4 @@
+title: TrenchBroom Manual
 html-lang: en
 manual-title: TrenchBroom Manual
 manual-label: Manual
@@ -17,3 +18,8 @@ shortcuts-file: shortcuts.en.js
 english-href: index.html
 chinese-href: zh_CN/index.html
 english-current: true
+manual-tab-label: Manual
+api-tab-label: Python API
+manual-href: index.html
+api-href: python-api.html
+manual-current: true

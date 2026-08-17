@@ -27,6 +27,7 @@ CHAPTERS = (
     "10-mcp-automation.md",
     "11-game-config-and-expressions.md",
     "12-references.md",
+    "python-api.md",
 )
 EXPECTED_HTML_LANG = {"en": "en", "zh_CN": "zh-CN"}
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s+\{#([^}]+)\}\s*$")

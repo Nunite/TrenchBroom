@@ -87,19 +87,40 @@ const print_action = (key) => document.write(action_str(key));
     // =========================================================================
     const topUl = navigation.querySelector(".manual-navigation-scroll > ul");
     if (topUl) {
-      const categories = isZh ? [
-        { afterIndex: 0, title: "1. 入门与基础" },
-        { targetId: "toc-brush_editing_and_creation", title: "2. 几何建模与关卡构建" },
-        { targetId: "toc-materials_and_uv", title: "3. 材质、资产与场景组织" },
-        { targetId: "toc-preferences_and_compilation", title: "4. 编译、扩展与自动化" },
-        { targetId: "toc-getting-involved", fallbackId: "toc-references_and_links", title: "5. 社区与参考" }
-      ] : [
-        { afterIndex: 0, title: "1. GETTING STARTED" },
-        { targetId: "toc-brush_editing_and_creation", title: "2. LEVEL MODELING" },
-        { targetId: "toc-materials_and_uv", title: "3. MATERIALS & SCENE" },
-        { targetId: "toc-preferences_and_compilation", title: "4. PIPELINE & EXTENSIONS" },
-        { targetId: "toc-getting-involved", fallbackId: "toc-references_and_links", title: "5. REFERENCE & LINKS" }
-      ];
+      const isApiPage = window.location.pathname.includes("python-api");
+      let categories = [];
+
+      if (isApiPage) {
+        categories = isZh ? [
+          { targetId: "toc-quickstart", title: "1. 架构与快速入门" },
+          { targetId: "toc-the_tb2_root_module", title: "2. 核心模块与基元" },
+          { targetId: "toc-tb2_document", title: "3. 文档与选区操作" },
+          { targetId: "toc-geometry_and_elements", title: "4. 几何对象与图元" },
+          { targetId: "toc-tb2_pluginpanel", title: "5. 插件界面与控件" },
+          { targetId: "toc-runnable_examples", title: "6. 完整实战示例" }
+        ] : [
+          { targetId: "toc-quickstart", title: "1. QUICKSTART & CONCEPTS" },
+          { targetId: "toc-the_tb2_root_module", title: "2. CORE MODULE & MATH" },
+          { targetId: "toc-tb2_document", title: "3. DOCUMENT & SELECTION" },
+          { targetId: "toc-geometry_and_elements", title: "4. GEOMETRY & ELEMENTS" },
+          { targetId: "toc-tb2_pluginpanel", title: "5. PLUGIN UI & CONTROLS" },
+          { targetId: "toc-runnable_examples", title: "6. COMPLETE EXAMPLES" }
+        ];
+      } else {
+        categories = isZh ? [
+          { afterIndex: 0, title: "1. 入门与基础" },
+          { targetId: "toc-brush_editing_and_creation", title: "2. 几何建模与关卡构建" },
+          { targetId: "toc-materials_and_uv", title: "3. 材质、资产与场景组织" },
+          { targetId: "toc-preferences_and_compilation", title: "4. 编译、扩展与自动化" },
+          { targetId: "toc-getting-involved", fallbackId: "toc-references_and_links", title: "5. 社区与参考" }
+        ] : [
+          { afterIndex: 0, title: "1. GETTING STARTED" },
+          { targetId: "toc-brush_editing_and_creation", title: "2. LEVEL MODELING" },
+          { targetId: "toc-materials_and_uv", title: "3. MATERIALS & SCENE" },
+          { targetId: "toc-preferences_and_compilation", title: "4. PIPELINE & EXTENSIONS" },
+          { targetId: "toc-getting-involved", fallbackId: "toc-references_and_links", title: "5. REFERENCE & LINKS" }
+        ];
+      }
 
       categories.forEach(cat => {
         let targetLi = null;

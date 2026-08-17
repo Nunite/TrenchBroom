@@ -1,3 +1,4 @@
+title: TrenchBroom 使用手册
 html-lang: zh-CN
 manual-title: TrenchBroom 使用手册
 manual-label: 手册
@@ -17,3 +18,8 @@ shortcuts-file: shortcuts.zh_CN.js
 english-href: ../index.html
 chinese-href: index.html
 chinese-current: true
+manual-tab-label: 手册
+api-tab-label: Python API
+manual-href: index.html
+api-href: python-api.html
+manual-current: true

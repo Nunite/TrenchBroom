@@ -15,6 +15,7 @@
     "09-python-plugins-guide.md": "2cb7d820c932cc76299e4888e68ba2fa7ce5af59f14cd54b504bf57e017a0b9b",
     "10-mcp-automation.md": "e58ccc833d546cddcd7672feccdcb5f6f059c261aec0ba68c1a129e1ebff8115",
     "11-game-config-and-expressions.md": "acae88f8f9ce49c87af123040621299e662a8b2ad8e5d123b6883787d1c6e59a",
-    "12-references.md": "8fb0b41410c5e900b4ec66e6e0e536e519d685cc4ac2c77bc221345a9a973847"
+    "12-references.md": "8fb0b41410c5e900b4ec66e6e0e536e519d685cc4ac2c77bc221345a9a973847",
+    "python-api.md": "57b826d3d0a381e56fbdb111bf046d879e42b853149c8a3c9d7c2165f31bfbdf"
   }
 }
