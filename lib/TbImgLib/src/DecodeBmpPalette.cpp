@@ -87,7 +87,7 @@ Result<std::vector<unsigned char>> decodeBmpPalette(
     // this is supremely evil, but FreeImage guarantees that it will not modify wrapped
     // memory
     auto* address = const_cast<unsigned char*>(begin);
-    const auto length = DWORD(end - begin);
+    const auto length = static_cast<DWORD>(end - begin);
 
     auto stream =
       kdl::resource{FreeImage_OpenMemory(address, length), FreeImage_CloseMemory};

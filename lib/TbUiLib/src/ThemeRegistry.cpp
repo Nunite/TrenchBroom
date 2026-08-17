@@ -380,8 +380,9 @@ ThemeRegistry::ThemeRegistry(
     }
   }
 
-  auto declarationIndices = QHash<QString, int>{};
   auto uniqueDeclarations = std::vector<ThemeDeclaration>{};
+  using DeclarationIndex = decltype(uniqueDeclarations)::size_type;
+  auto declarationIndices = QHash<QString, DeclarationIndex>{};
   uniqueDeclarations.reserve(declarations.size());
   for (auto& declaration : declarations)
   {
@@ -393,14 +394,14 @@ ThemeRegistry::ThemeRegistry(
         QStringLiteral("Duplicate theme ID ignored: %1").arg(declaration.id));
       continue;
     }
-    declarationIndices.insert(declaration.id, int(uniqueDeclarations.size()));
+    declarationIndices.insert(declaration.id, uniqueDeclarations.size());
     uniqueDeclarations.push_back(std::move(declaration));
   }
 
   auto states = std::vector<int>(uniqueDeclarations.size(), 0);
   auto resolved = std::vector<std::optional<Theme>>(uniqueDeclarations.size());
-  auto resolve = std::function<std::optional<Theme>(int)>{};
-  resolve = [&](const int index) -> std::optional<Theme> {
+  auto resolve = std::function<std::optional<Theme>(DeclarationIndex)>{};
+  resolve = [&](const DeclarationIndex index) -> std::optional<Theme> {
     if (states[index] == 2)
     {
       return resolved[index];
@@ -471,7 +472,7 @@ ThemeRegistry::ThemeRegistry(
     return resolved[index];
   };
 
-  for (auto i = 0; i < int(uniqueDeclarations.size()); ++i)
+  for (auto i = DeclarationIndex{0}; i < uniqueDeclarations.size(); ++i)
   {
     if (auto theme = resolve(i))
     {

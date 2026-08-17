@@ -163,6 +163,7 @@ TEST_CASE("OutlinerTreeWidget")
     CHECK(tree.objectName() == "OutlinerTreeWidget");
     CHECK(tree.indentation() == 14);
     CHECK(tree.iconSize() == QSize{16, 16});
+    CHECK(tree.header()->minimumSectionSize() == 28);
     CHECK(tree.header()->sectionSize(2) == 28);
     CHECK(tree.header()->sectionSize(3) == 28);
     CHECK(tree.headerItem()->text(2).isEmpty());

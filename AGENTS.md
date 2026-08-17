@@ -51,6 +51,16 @@
   ```
 - Do not run two `build-filtered.ps1` / Ninja builds against the same `build-release-codex` tree at the same time. Shared targets such as `TbMdlLib` can race while writing `.obj` files and fail with `Permission denied`; run those wrapper builds serially.
 - If the filtered output hides something relevant, rerun with `-NoFilter` or inspect the matching log in `build-release-codex\codex-logs`.
+- Before pushing, run the checked-in local CI preflight from PowerShell 7:
+  ```powershell
+  & scripts\ci-preflight.ps1
+  ```
+  It checks patch whitespace, verifies that local Qt matches CI, strict-compiles changed C/C++ translation units with `clang-cl` conversion warnings treated as errors, and builds/runs the affected library tests. It reuses the existing `build-release-codex` Ninja graph and does not clean the build tree or download dependencies.
+- For broad CMake, shared infrastructure, compiler, Qt, or CI changes, run the full local matrix instead:
+  ```powershell
+  & scripts\ci-preflight.ps1 -Full
+  ```
+  Use `-BaseRef <ref>` or `-Paths @('path1', 'path2')` only to narrow an intentional investigation; do not skip checks in the final push preflight without recording why.
 - For deterministic UI theme acceptance, run the checked-in snapshot matrix:
   ```powershell
   powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1

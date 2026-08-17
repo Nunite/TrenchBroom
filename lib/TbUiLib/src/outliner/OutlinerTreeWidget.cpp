@@ -57,6 +57,8 @@ namespace tb::ui
 
 namespace
 {
+constexpr auto StateColumnWidth = 28;
+
 class OutlinerItemDelegate : public QStyledItemDelegate
 {
 private:
@@ -527,14 +529,15 @@ OutlinerTreeWidget::OutlinerTreeWidget(MapDocument& document, QWidget* parent)
   header()->setSectionsClickable(false);
   header()->setHighlightSections(false);
   header()->setFixedHeight(26);
+  header()->setMinimumSectionSize(StateColumnWidth);
   header()->setStretchLastSection(false);
   header()->setSectionResizeMode(0, QHeaderView::Stretch);
   header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
   header()->setSectionResizeMode(2, QHeaderView::Fixed);
   header()->setSectionResizeMode(3, QHeaderView::Fixed);
 
-  header()->resizeSection(2, 28);
-  header()->resizeSection(3, 28);
+  header()->resizeSection(2, StateColumnWidth);
+  header()->resizeSection(3, StateColumnWidth);
 
   loadIcons();
   headerItem()->setIcon(2, m_lockedIcon);
