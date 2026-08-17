@@ -15,7 +15,7 @@ TrenchBroom 内置了嵌入式 Python v2 运行时与扩展系统。打开 **Pre
 TrenchBroom 区分两种插件类型：
 
 - **UI 插件 (`pluginType: "ui"`)**：声明了 `trenchbroom-plugin.json` 清单的常驻插件。它们在启动或刷新插件管理器时加载，并可在 **Plugins** 检查器标签页中注册自定义面板、全局动作、事件监听器和定时器。
-- **脚本插件 (`pluginType: "script"`)**：通过 #menu(Menu/File/Run Python Script) 或在 [Python 控制台](#python_console) 中按需执行的独立脚本。旧版 `tb` 兼容性已不再属于活动插件路径的一部分；现有脚本应使用 `tb2` 或 `import tb2 as tb`。
+- **脚本插件 (`pluginType: "script"`)**：通过 [Python 控制台](#python_console) 或自定义动作按需执行的独立脚本。旧版 `tb` 兼容性已不再属于活动插件路径的一部分；现有脚本应使用 `tb2` 或 `import tb2 as tb`。
 
 #### 插件清单格式 {#plugin_manifest_format}
 

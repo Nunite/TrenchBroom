@@ -15,7 +15,7 @@ TrenchBroom features an embedded Python v2 runtime and extension system. Open **
 TrenchBroom distinguishes between two plugin types:
 
 - **UI Plugins (`pluginType: "ui"`)**: Persistent plugins that declare a `trenchbroom-plugin.json` manifest. They are loaded at startup or when refreshing the plugin manager, and can register custom panels in the **Plugins** inspector tab, global actions, event listeners, and timers.
-- **Script Plugins (`pluginType: "script"`)**: Standalone scripts executed on demand via #menu(Menu/File/Run Python Script) or in the [Python Console](#python_console). Legacy `tb` compatibility is not part of the active plugin path; scripts should use `tb2` or `import tb2 as tb`.
+- **Script plugins (`pluginType: "script"`)**: Standalone scripts executed on demand through the [Python Console](#python_console) or custom actions. Legacy `tb` compatibility is no longer part of the active plugin path; existing scripts should use `tb2` or `import tb2 as tb`.
 
 #### Manifest File Format {#plugin_manifest_format}
 

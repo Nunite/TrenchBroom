@@ -65,6 +65,7 @@ function(tb_add_manual_language LANGUAGE OUTPUT_SUBDIRECTORY RESOURCE_PREFIX OUT
       --toc-depth=2
       --template "${PANDOC_TEMPLATE_PATH}"
       --metadata-file "${METADATA_PATH}"
+      --wrap=none
       --from=markdown
       --to=html5
       -o "${TEMP_OUTPUT_PATH}"

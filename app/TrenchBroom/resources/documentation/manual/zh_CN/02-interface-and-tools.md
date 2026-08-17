@@ -123,7 +123,7 @@ TrenchBroom 的所有编辑功能都由工具提供。工具分为两类：永�
 
 ### 命令面板 {#command_palette}
 
-选择 #menu(Menu/View/Command Palette...)或按 #action(Menu/View/Command Palette...)打开可搜索的命令列表。输入命令名称或菜单路径的一部分，使用方向键改变高亮结果，然后按 #key(Return)运行。面板还会显示每个结果当前的快捷键。按 #key(Esc)可关闭面板而不运行命令。
+选择 #menu(Menu/View/Command Palette...) 或按下 <kbd>Ctrl</kbd> + <kbd>P</kbd>（macOS 上为 <kbd>Cmd</kbd> + <kbd>P</kbd>）可以打开可搜索的命令列表。输入命令名称或菜单路径的一部分，使用方向键切换高亮结果，按 #key(Return) 即可执行。命令面板还会显示每个结果的当前快捷键。按 #key(Esc) 可以在不执行任何命令的情况下关闭它。
 
 当你知道操作名称却不记得菜单位置或快捷键时，命令面板非常有用。当前不可用的命令会以禁用状态列出，因此面板也会反映当前文档、选择和工具上下文。
 

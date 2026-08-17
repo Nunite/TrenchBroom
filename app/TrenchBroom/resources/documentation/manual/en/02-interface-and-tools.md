@@ -123,7 +123,7 @@ You can learn more about these tools in later sections. But before you can learn
 
 ### Command Palette {#command_palette}
 
-Choose #menu(Menu/View/Command Palette...) or press #action(Menu/View/Command Palette...) to open a searchable list of commands. Type part of a command name or menu path, use the arrow keys to change the highlighted result, and press #key(Return) to run it. The palette also shows the current shortcut for each result. Press #key(Esc) to close it without running a command.
+Choose #menu(Menu/View/Command Palette...) or press <kbd>Ctrl</kbd> + <kbd>P</kbd> (macOS: <kbd>Cmd</kbd> + <kbd>P</kbd>) to open a searchable list of commands. Type part of a command name or menu path, use the arrow keys to change the highlighted result, and press #key(Return) to run it. The palette also shows the current shortcut for each result. Press #key(Esc) to close it without running a command.
 
 The Command Palette is useful when you know what an operation is called but do not remember its menu location or shortcut. It lists commands that are currently unavailable as disabled, so it also reflects the active document, selection, and tool context.
 
