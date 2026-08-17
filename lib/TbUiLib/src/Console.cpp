@@ -78,11 +78,22 @@ Console::Console(QWidget* parent)
 
   auto* sizer = new QVBoxLayout{};
   sizer->setContentsMargins(0, 0, 0, 0);
+  sizer->setSpacing(0);
   sizer->addWidget(m_textView);
   setLayout(sizer);
 
   connect(m_timer, &QTimer::timeout, this, &Console::logCachedMessages);
   m_timer->start(50);
+}
+
+void Console::clear()
+{
+  m_textView->clear();
+}
+
+QTextEdit* Console::textView() const
+{
+  return m_textView;
 }
 
 void Console::doLog(const LogLevel level, const std::string_view message)

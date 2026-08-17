@@ -512,7 +512,8 @@ QWidget#InfoPanel_TabBar QWidget#TabBarButton[active="true"] QLabel#TabBarButton
   font-weight: bold;
 }
 
-QTextEdit#Console_TextView {
+QTextEdit#Console_TextView,
+QTextEdit#PythonConsole_Output {
   background: @tb-editor-background;
   border: none;
   color: @tb-text;
@@ -521,28 +522,63 @@ QTextEdit#Console_TextView {
   selection-color: @tb-inverse-text;
 }
 
+QTextEdit#PythonConsole_Output {
+  padding: 7px 12px 0 12px;
+}
+
 QWidget#PythonConsole_InputBar {
-  background: @tb-panel-background;
-  border-top: 1px solid @tb-border;
+  background: @tb-editor-background;
+  border: none;
 }
 
 QLabel#PythonConsole_Prompt {
   color: @tb-accent;
-  padding-top: 5px;
+  padding-top: 2px;
 }
 
 QPlainTextEdit#PythonConsole_Input {
-  background: @tb-input-background;
-  border: 1px solid @tb-border;
-  border-radius: 4px;
+  background: @tb-editor-background;
+  border: none;
+  border-radius: 0;
   color: @tb-text;
-  padding: 3px 5px;
+  padding: 2px 0;
   selection-background-color: @tb-selection-background;
   selection-color: @tb-inverse-text;
 }
 
 QPlainTextEdit#PythonConsole_Input:focus {
-  border-color: @tb-focus-border;
+  border: none;
+}
+
+QWidget#PythonConsole_TabActions {
+  background: transparent;
+}
+
+QWidget#PythonConsole_TabActions QToolButton {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: @tb-secondary-text;
+  min-height: 22px;
+  padding: 1px 7px;
+}
+
+QWidget#PythonConsole_TabActions QToolButton:hover,
+QWidget#PythonConsole_TabActions QToolButton:focus {
+  background: @tb-hover-background;
+  border-color: @tb-border;
+  color: @tb-text;
+}
+
+QWidget#PythonConsole_TabActions QToolButton:pressed {
+  background: @tb-pressed-background;
+  border-color: @tb-strong-border;
+}
+
+QWidget#PythonConsole_TabActions QToolButton:disabled {
+  background: transparent;
+  border-color: transparent;
+  color: @tb-disabled-text;
 }
 
 QWidget#IssueBrowser_TabActions {

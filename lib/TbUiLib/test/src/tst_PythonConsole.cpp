@@ -18,8 +18,8 @@
  */
 
 #include <QPlainTextEdit>
-#include <QPushButton>
 #include <QTextEdit>
+#include <QToolButton>
 #include <QtTest/QTest>
 
 #include "ui/PythonConsole.h"
@@ -35,15 +35,24 @@ namespace tb::ui
 TEST_CASE("PythonConsole")
 {
   auto console = PythonConsole{};
+  auto* actions = console.createTabBarPage(&console);
   auto* input = console.findChild<QPlainTextEdit*>("PythonConsole_Input");
-  auto* runButton = console.findChild<QPushButton*>("PythonConsole_Run");
-  auto* output = console.findChild<QTextEdit*>("Console_TextView");
+  auto* runButton = console.findChild<QToolButton*>("PythonConsole_Run");
+  auto* clearButton = console.findChild<QToolButton*>("PythonConsole_Clear");
+  auto* output = console.findChild<QTextEdit*>("PythonConsole_Output");
 
+  REQUIRE(actions != nullptr);
   REQUIRE(input != nullptr);
   REQUIRE(runButton != nullptr);
+  REQUIRE(clearButton != nullptr);
   REQUIRE(output != nullptr);
+  CHECK(actions->objectName() == QStringLiteral("PythonConsole_TabActions"));
+  CHECK(runButton->parentWidget() == actions);
+  CHECK(clearButton->parentWidget() == actions);
   CHECK(input->isReadOnly() == false);
   CHECK(runButton->isEnabled() == false);
+
+  const auto singleLineHeight = input->height();
 
   auto commands = std::vector<std::string>{};
   console.setCommandExecutor(
@@ -52,15 +61,20 @@ TEST_CASE("PythonConsole")
 
   input->setPlainText(QStringLiteral("value = 41\nvalue + 1"));
   CHECK(runButton->isEnabled());
+  CHECK(input->height() > singleLineHeight);
   runButton->click();
   REQUIRE(commands.size() == 1u);
   CHECK(commands.back() == "value = 41\nvalue + 1");
   CHECK(input->toPlainText().isEmpty());
+  CHECK(input->height() == singleLineHeight);
   CHECK_FALSE(runButton->isEnabled());
 
   QTRY_VERIFY_WITH_TIMEOUT(
     output->toPlainText().contains(QStringLiteral(">>> value = 41")), 500);
   CHECK(output->toPlainText().contains(QStringLiteral("... value + 1")));
+
+  clearButton->click();
+  CHECK(output->toPlainText().isEmpty());
 
   input->setPlainText(QStringLiteral("draft"));
   QTest::keyClick(input, Qt::Key_Up);

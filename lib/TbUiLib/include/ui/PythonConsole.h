@@ -27,7 +27,7 @@
 
 class QEvent;
 class QPlainTextEdit;
-class QPushButton;
+class QToolButton;
 class QWidget;
 
 namespace tb::ui
@@ -37,7 +37,8 @@ class PythonConsole : public Console
 {
 private:
   QPlainTextEdit* m_input = nullptr;
-  QPushButton* m_runButton = nullptr;
+  QToolButton* m_runButton = nullptr;
+  QToolButton* m_clearButton = nullptr;
   std::function<void(const std::string&)> m_commandExecutor;
   std::vector<std::string> m_history;
   size_t m_historyIndex = 0u;
@@ -46,11 +47,13 @@ private:
 public:
   explicit PythonConsole(QWidget* parent = nullptr);
 
+  QWidget* createTabBarPage(QWidget* parent = nullptr) override;
   void setCommandExecutor(std::function<void(const std::string&)> executor);
   void executeCurrentInput();
 
 private:
   bool eventFilter(QObject* watched, QEvent* event) override;
+  void updateInputHeight();
   void updateRunButtonEnabled();
   void showPreviousHistoryEntry();
   void showNextHistoryEntry();

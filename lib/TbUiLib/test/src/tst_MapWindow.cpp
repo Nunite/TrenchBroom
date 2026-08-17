@@ -244,8 +244,8 @@ TEST_CASE("MapWindow")
     REQUIRE(pythonConsole != nullptr);
 
     auto* input = pythonConsole->findChild<QPlainTextEdit*>("PythonConsole_Input");
-    auto* runButton = pythonConsole->findChild<QPushButton*>("PythonConsole_Run");
-    auto* output = pythonConsole->findChild<QTextEdit*>("Console_TextView");
+    auto* runButton = infoPanel->findChild<QToolButton*>("PythonConsole_Run");
+    auto* output = pythonConsole->findChild<QTextEdit*>("PythonConsole_Output");
     REQUIRE(input != nullptr);
     REQUIRE(runButton != nullptr);
     REQUIRE(output != nullptr);

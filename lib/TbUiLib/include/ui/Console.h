@@ -46,6 +46,9 @@ public:
   explicit Console(QWidget* parent = nullptr);
   void clear();
 
+protected:
+  QTextEdit* textView() const;
+
 private:
   void doLog(LogLevel level, std::string_view message) override;
   void logToDebugOut(LogLevel level, const std::string& message);

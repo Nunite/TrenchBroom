@@ -43,6 +43,7 @@
 #include <QStackedWidget>
 #include <QTextStream>
 #include <QTimer>
+#include <QToolButton>
 #include <QTreeWidget>
 
 #include "base/PreferenceManager.h"
@@ -200,7 +201,7 @@ void configurePythonConsoleSnapshot(QWidget& targetWidget)
   auto* input =
     mapWindow->findChild<QPlainTextEdit*>(QStringLiteral("PythonConsole_Input"));
   auto* runButton =
-    mapWindow->findChild<QPushButton*>(QStringLiteral("PythonConsole_Run"));
+    mapWindow->findChild<QToolButton*>(QStringLiteral("PythonConsole_Run"));
   if (
     input != nullptr && runButton != nullptr
     && !mapWindow->property("uiSnapshotPythonConsoleExecuted").toBool())

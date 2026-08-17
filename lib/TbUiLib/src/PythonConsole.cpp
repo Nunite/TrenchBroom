@@ -20,13 +20,15 @@
 #include "ui/PythonConsole.h"
 
 #include <QEvent>
+#include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QPlainTextEdit>
-#include <QPushButton>
+#include <QSizePolicy>
 #include <QTextBlock>
 #include <QTextCursor>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -40,6 +42,7 @@ namespace tb::ui
 namespace
 {
 constexpr auto MaxHistorySize = size_t{100u};
+constexpr auto MaxVisibleInputLines = 4;
 
 std::string utf8String(const QString& string)
 {
@@ -62,10 +65,14 @@ QString formatPrompt(const QString& source)
 PythonConsole::PythonConsole(QWidget* parent)
   : Console{parent}
   , m_input{new QPlainTextEdit{this}}
-  , m_runButton{new QPushButton{tr("Run"), this}}
+  , m_runButton{new QToolButton{this}}
+  , m_clearButton{new QToolButton{this}}
 {
+  textView()->setObjectName("PythonConsole_Output");
+
   auto* inputBar = new QWidget{this};
   inputBar->setObjectName("PythonConsole_InputBar");
+  inputBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
 
   auto* prompt = new QLabel{QStringLiteral(">>>"), inputBar};
   prompt->setObjectName("PythonConsole_Prompt");
@@ -77,24 +84,56 @@ PythonConsole::PythonConsole(QWidget* parent)
   m_input->setFont(Fonts::fixedWidthFont());
   m_input->setLineWrapMode(QPlainTextEdit::NoWrap);
   m_input->setTabChangesFocus(false);
-  m_input->setFixedHeight(54);
   m_input->installEventFilter(this);
 
   m_runButton->setObjectName("PythonConsole_Run");
+  m_runButton->setText(tr("Run"));
+  m_runButton->setToolTip(tr("Run current command"));
+  m_runButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+  m_runButton->setAutoRaise(true);
+  m_runButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   m_runButton->setEnabled(false);
-  m_runButton->setFixedWidth(58);
-  connect(m_runButton, &QPushButton::clicked, this, &PythonConsole::executeCurrentInput);
+  connect(m_runButton, &QToolButton::clicked, this, &PythonConsole::executeCurrentInput);
+
+  m_clearButton->setObjectName("PythonConsole_Clear");
+  m_clearButton->setText(tr("Clear"));
+  m_clearButton->setToolTip(tr("Clear console output"));
+  m_clearButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+  m_clearButton->setAutoRaise(true);
+  m_clearButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  connect(m_clearButton, &QToolButton::clicked, this, &Console::clear);
+
   connect(
     m_input, &QPlainTextEdit::textChanged, this, &PythonConsole::updateRunButtonEnabled);
+  connect(
+    m_input->document(),
+    &QTextDocument::blockCountChanged,
+    this,
+    &PythonConsole::updateInputHeight);
 
   auto* inputLayout = new QHBoxLayout{inputBar};
-  inputLayout->setContentsMargins(7, 6, 7, 6);
-  inputLayout->setSpacing(6);
+  inputLayout->setContentsMargins(12, 2, 12, 8);
+  inputLayout->setSpacing(8);
   inputLayout->addWidget(prompt);
   inputLayout->addWidget(m_input, 1);
-  inputLayout->addWidget(m_runButton, 0, Qt::AlignVCenter);
 
   layout()->addWidget(inputBar);
+  updateInputHeight();
+}
+
+QWidget* PythonConsole::createTabBarPage(QWidget* parent)
+{
+  auto* actions = new QWidget{parent};
+  actions->setObjectName("PythonConsole_TabActions");
+
+  auto* actionsLayout = new QHBoxLayout{actions};
+  actionsLayout->setContentsMargins(0, 0, 0, 0);
+  actionsLayout->setSpacing(2);
+  actionsLayout->addStretch(1);
+  actionsLayout->addWidget(m_runButton, 0, Qt::AlignVCenter);
+  actionsLayout->addWidget(m_clearButton, 0, Qt::AlignVCenter);
+
+  return actions;
 }
 
 void PythonConsole::setCommandExecutor(std::function<void(const std::string&)> executor)
@@ -172,6 +211,16 @@ void PythonConsole::updateRunButtonEnabled()
 {
   m_runButton->setEnabled(
     m_commandExecutor && !m_input->toPlainText().trimmed().isEmpty());
+}
+
+void PythonConsole::updateInputHeight()
+{
+  const auto blockCount = m_input->document()->blockCount();
+  const auto lineCount = std::clamp(blockCount, 1, MaxVisibleInputLines);
+  const auto lineHeight = QFontMetrics{m_input->font()}.lineSpacing();
+  m_input->setVerticalScrollBarPolicy(
+    blockCount > MaxVisibleInputLines ? Qt::ScrollBarAsNeeded : Qt::ScrollBarAlwaysOff);
+  m_input->setFixedHeight(lineCount * lineHeight + 10);
 }
 
 void PythonConsole::showPreviousHistoryEntry()

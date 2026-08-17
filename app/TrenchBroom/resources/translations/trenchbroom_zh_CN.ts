@@ -3422,12 +3422,27 @@ This panel is reserved for plugin-provided UI.</source>
 <context>
     <name>tb::ui::PythonConsole</name>
     <message>
-        <location filename="../../../../lib/TbUiLib/src/PythonConsole.cpp" line="65"/>
+        <location filename="../../../../lib/TbUiLib/src/PythonConsole.cpp" line="90"/>
         <source>Run</source>
         <translation>运行</translation>
     </message>
     <message>
-        <location filename="../../../../lib/TbUiLib/src/PythonConsole.cpp" line="76"/>
+        <location filename="../../../../lib/TbUiLib/src/PythonConsole.cpp" line="91"/>
+        <source>Run current command</source>
+        <translation>运行当前命令</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/PythonConsole.cpp" line="99"/>
+        <source>Clear</source>
+        <translation>清空</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/PythonConsole.cpp" line="100"/>
+        <source>Clear console output</source>
+        <translation>清空控制台输出</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/PythonConsole.cpp" line="83"/>
         <source>Python command input</source>
         <translation>Python 命令输入</translation>
     </message>
