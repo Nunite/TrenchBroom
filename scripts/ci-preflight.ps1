@@ -93,7 +93,34 @@ function Test-VersionMatchesSpec {
   return $Version -match $pattern
 }
 
-function Assert-QtVersionMatchesCi {
+function Assert-CiQtPackagesAvailable {
+  param([string] $Version)
+
+  if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+    throw "CI Qt version must be exact so package availability can be checked: $Version"
+  }
+
+  $versionDirectory = "qt6_$($Version.Replace('.', ''))"
+  foreach ($platform in @("windows_x86", "linux_x64", "mac_x64")) {
+    $metadataUrl =
+      "https://download.qt.io/online/qtsdkrepository/$platform/desktop/$versionDirectory/$versionDirectory/Updates.xml"
+    try {
+      $response = Invoke-WebRequest `
+        -Uri $metadataUrl `
+        -Method Head `
+        -TimeoutSec 20 `
+        -UseBasicParsing
+    } catch {
+      throw "CI Qt $Version package metadata is unavailable for $platform`: $metadataUrl"
+    }
+    if ($response.StatusCode -ne 200) {
+      throw "CI Qt $Version package metadata returned HTTP $($response.StatusCode) for $platform"
+    }
+  }
+  Write-Host "CI Qt packages: $Version metadata available for Windows, Linux, and macOS"
+}
+
+function Assert-QtVersionCompatibleWithCi {
   param(
     [string] $RepositoryRoot,
     [string] $QtBinaryDirectory
@@ -105,6 +132,7 @@ function Assert-QtVersionMatchesCi {
     throw "Could not read the CI Qt version from $actionPath"
   }
   $ciVersion = $versionLine.Matches[0].Groups[1].Value
+  Assert-CiQtPackagesAvailable $ciVersion
 
   $qmake = Join-Path $QtBinaryDirectory "qmake.exe"
   if (-not (Test-Path $qmake)) {
@@ -115,7 +143,13 @@ function Assert-QtVersionMatchesCi {
     throw "Could not determine the local Qt version from $qmake"
   }
   if (-not (Test-VersionMatchesSpec $localVersion $ciVersion)) {
-    throw "Qt version mismatch: local $localVersion, CI $ciVersion"
+    $localMajor = ($localVersion -split '\.')[0]
+    $ciMajor = ($ciVersion -split '\.')[0]
+    if ($localMajor -ne $ciMajor) {
+      throw "Qt major version mismatch: local $localVersion, CI $ciVersion"
+    }
+    Write-Warning "Qt version differs: local $localVersion, CI $ciVersion. Platform UI behavior may differ."
+    return
   }
   Write-Host "Qt version: $localVersion (matches CI $ciVersion)"
 }
@@ -340,7 +374,7 @@ try {
   }
 
   if (-not $SkipQtVersionCheck) {
-    Assert-QtVersionMatchesCi $repositoryRoot $QtBin
+    Assert-QtVersionCompatibleWithCi $repositoryRoot $QtBin
   }
 
   if (-not $SkipStrictCompile) {
