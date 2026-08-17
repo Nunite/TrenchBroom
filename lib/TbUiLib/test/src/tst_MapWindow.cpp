@@ -340,6 +340,13 @@ TEST_CASE("MapWindow")
     CHECK_FALSE(faceButton->icon().isNull());
     CHECK_FALSE(outlinerButton->icon().isNull());
     CHECK_FALSE(pluginButton->icon().isNull());
+    for (const auto* button :
+         {mapButton, entityButton, faceButton, outlinerButton, pluginButton})
+    {
+      const auto iconImage = button->icon().pixmap(QSize{20, 20}).toImage();
+      CHECK(iconImage.size() == QSize{20, 20});
+      CHECK(iconImage.isGrayscale());
+    }
     CHECK(mapButton->accessibleName() == "Map Inspector");
     CHECK(mapButton->toolTip().contains("Ctrl+1"));
     CHECK(entityButton->toolTip().contains("Ctrl+2"));

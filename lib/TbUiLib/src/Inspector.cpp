@@ -111,31 +111,31 @@ Inspector::Inspector(AppController& appController, MapDocument& document, QWidge
     tr("Map Inspector"),
     tr("Map Inspector (Ctrl+1)"),
     "Inspector_NavigationMap",
-    "Map_cube.svg");
+    "InspectorMap.svg");
   addNavigationButton(
     InspectorPage::Entity,
     tr("Entity Inspector"),
     tr("Entity Inspector (Ctrl+2)"),
     "Inspector_NavigationEntity",
-    "Map_entity.svg");
+    "InspectorEntity.svg");
   addNavigationButton(
     InspectorPage::Face,
     tr("Face Inspector"),
     tr("Face Inspector (Ctrl+3)"),
     "Inspector_NavigationFace",
-    "FaceTool.svg");
+    "InspectorFace.svg");
   addNavigationButton(
     InspectorPage::Outliner,
     tr("Outliner"),
     tr("Outliner"),
     "Inspector_NavigationOutliner",
-    "Folder.svg");
+    "InspectorOutliner.svg");
   addNavigationButton(
     InspectorPage::Plugin,
     tr("Plugins"),
     tr("Plugins"),
     "Inspector_NavigationPlugin",
-    "GeneralPreferences.svg");
+    "InspectorPlugin.svg");
   navigationLayout->addStretch(1);
   navigationRail->setLayout(navigationLayout);
 
