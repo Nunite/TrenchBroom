@@ -25,14 +25,19 @@
 #include <QDeadlineTimer>
 #include <QDebug>
 #include <QDir>
+#include <QDoubleSpinBox>
 #include <QFile>
 #include <QFileInfo>
+#include <QFormLayout>
+#include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPointer>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSignalBlocker>
+#include <QSpinBox>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTextStream>
@@ -180,7 +185,8 @@ bool isInspectorSnapshotTarget(const QString& targetName)
   return targetName == QStringLiteral("entity-browser")
          || targetName == QStringLiteral("entity-browser-empty")
          || targetName == QStringLiteral("face-inspector")
-         || targetName == QStringLiteral("material-browser-empty");
+         || targetName == QStringLiteral("material-browser-empty")
+         || targetName == QStringLiteral("plugin-inspector");
 }
 
 bool isMaterialBrowserSnapshotTarget(const QString& targetName)
@@ -273,7 +279,50 @@ void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName
     return;
   }
 
-  if (targetName == QStringLiteral("face-inspector"))
+  const auto showPluginInspector = targetName == QStringLiteral("plugin-inspector");
+  if (showPluginInspector)
+  {
+    mapWindow->switchToInspectorPage(InspectorPage::Plugin);
+    if (
+      mapWindow->findChild<QWidget*>(QStringLiteral("UiSnapshot_PluginPanelContent"))
+      == nullptr)
+    {
+      auto* content = mapWindow->addPluginPanel(QStringLiteral("Chamfer Tool"));
+      content->setObjectName(QStringLiteral("UiSnapshot_PluginPanelContent"));
+
+      auto* status = new QLabel{QStringLiteral("Ready"), content};
+      auto* distance = new QDoubleSpinBox{content};
+      distance->setObjectName(QStringLiteral("UiSnapshot_PluginDistance"));
+      distance->setDecimals(1);
+      distance->setRange(0.1, 1024.0);
+      distance->setValue(8.0);
+
+      auto* segments = new QSpinBox{content};
+      segments->setRange(1, 64);
+      segments->setValue(1);
+
+      auto* edgeButton = new QPushButton{QStringLiteral("Chamfer Edge Handles"), content};
+      auto* vertexButton =
+        new QPushButton{QStringLiteral("Chamfer Vertex Handles"), content};
+
+      auto* panelLayout = new QFormLayout{};
+      panelLayout->setContentsMargins(8, 8, 8, 8);
+      panelLayout->addRow(QStringLiteral("Status:"), status);
+      panelLayout->addRow(QStringLiteral("Distance:"), distance);
+      panelLayout->addRow(QStringLiteral("Segments:"), segments);
+      panelLayout->addRow(edgeButton);
+      panelLayout->addRow(vertexButton);
+      content->setLayout(panelLayout);
+    }
+
+    if (auto* distance =
+          mapWindow->findChild<QDoubleSpinBox*>(QStringLiteral("UiSnapshot_PluginDistance")))
+    {
+      distance->setFocus(Qt::OtherFocusReason);
+      distance->selectAll();
+    }
+  }
+  else if (targetName == QStringLiteral("face-inspector"))
   {
     setPref(Preferences::MaterialBrowserIconSize, 5.0f);
     if (auto* materialBrowser = mapWindow->findChild<MaterialBrowser*>())
@@ -283,8 +332,11 @@ void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName
   }
 
   const auto showEntityBrowser = targetName.startsWith(QStringLiteral("entity-browser"));
-  mapWindow->switchToInspectorPage(
-    showEntityBrowser ? InspectorPage::Entity : InspectorPage::Face);
+  if (!showPluginInspector)
+  {
+    mapWindow->switchToInspectorPage(
+      showEntityBrowser ? InspectorPage::Entity : InspectorPage::Face);
+  }
   if (
     auto* splitter =
       mapWindow->findChild<QSplitter*>(QStringLiteral("MapWindow_HorizontalSplitter")))

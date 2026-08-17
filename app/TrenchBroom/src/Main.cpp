@@ -167,8 +167,8 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
   const auto uiSnapshotPageOption = QCommandLineOption{
     QStringList{"ui-snapshot-page"},
     "Select the surface to capture: map, outliner, entity-browser, "
-    "entity-browser-empty, face-inspector, material-browser-empty, supporting, "
-    "command-palette, preferences, preferences-colors, preferences-mouse, "
+    "entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, "
+    "supporting, command-palette, preferences, preferences-colors, preferences-mouse, "
     "preferences-keyboard, or preferences-misc.",
     "page",
     "map"};
@@ -221,6 +221,7 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     && snapshotPage != QStringLiteral("entity-browser-empty")
     && snapshotPage != QStringLiteral("face-inspector")
     && snapshotPage != QStringLiteral("material-browser-empty")
+    && snapshotPage != QStringLiteral("plugin-inspector")
     && snapshotPage != QStringLiteral("supporting")
     && snapshotPage != QStringLiteral("command-palette")
     && snapshotPage != QStringLiteral("preferences")

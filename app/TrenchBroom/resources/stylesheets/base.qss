@@ -1012,6 +1012,59 @@ QWidget#ClickableTitleBar QToolButton#ClickableTitleBar_StateIcon:hover {
   background: @tb-pressed-background;
 }
 
+QWidget#PluginInspector_PluginPanel {
+  background: @tb-elevated-background;
+  border: 1px solid @tb-strong-border;
+  border-radius: 6px;
+}
+
+QWidget#PluginInspector_PluginPanel:hover {
+  border-color: @tb-focus-border;
+}
+
+QWidget#PluginInspector_PluginPanel > QWidget#ClickableTitleBar {
+  background: @tb-button-background;
+  border: none;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+
+QWidget#PluginInspector_PluginPanel > QFrame {
+  background: @tb-border;
+  border: none;
+  min-height: 1px;
+  max-height: 1px;
+}
+
+QWidget#PluginInspector_PluginPanel > QWidget {
+  background: @tb-panel-background;
+  border: none;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
+QToolButton#PluginInspector_CloseButton {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: @tb-secondary-text;
+  margin-left: 6px;
+  max-height: 18px;
+  max-width: 18px;
+  min-height: 18px;
+  min-width: 18px;
+  padding: 0;
+}
+
+QToolButton#PluginInspector_CloseButton:hover {
+  background: @tb-hover-background;
+  color: @tb-text;
+}
+
+QToolButton#PluginInspector_CloseButton:pressed {
+  background: @tb-pressed-background;
+}
+
 tb--ui--BitmapButton {
   border: none;
 }
