@@ -3,15 +3,16 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Fira Code", "Cascadia Code", Consolas, Monaco, "Courier New", monospace;
 
-  --sidebar-width: 260px;
-  --toc-width: 210px;
-  --header-height: 44px;
+  --shell-max-width: 1400px;
+  --sidebar-width: 270px;
+  --toc-width: 230px;
+  --header-height: 48px;
   --content-max-width: 860px;
 
   --radius-xs: 3px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
 
   --transition-fast: 0.12s ease;
   --transition-normal: 0.2s ease;
@@ -30,7 +31,7 @@
   --border-focus: #265787;
 
   --text-primary: #1e293b;
-  --text-secondary: #475569;
+  --text-secondary: #334155;
   --text-muted: #64748b;
 
   --brand-primary: #265787;
@@ -56,7 +57,7 @@
   --kbd-shadow: #94a3b8;
 
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --card-shadow-hover: 0 4px 10px -2px rgba(38, 87, 135, 0.08);
+  --card-shadow-hover: 0 6px 14px -2px rgba(38, 87, 135, 0.08);
 }
 
 /* Blender Furo Dark Theme Palette */
@@ -76,8 +77,8 @@ body[data-theme="dark"] {
   --border-focus: #539bf5;
 
   --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
 
   --brand-primary: #539bf5;
   --brand-primary-hover: #79b8ff;
@@ -119,8 +120,8 @@ body[data-theme="dark"] {
     --border-strong: #3b3f49;
     --border-focus: #539bf5;
     --text-primary: #e2e8f0;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
     --brand-primary: #539bf5;
     --brand-primary-hover: #79b8ff;
     --brand-accent: #f0883e;
@@ -145,7 +146,7 @@ body[data-theme="dark"] {
 }
 
 /* ==========================================================================
-   GLOBAL RESET & COMPACT BASE
+   GLOBAL RESET & CLEAR READABLE BASE
    ========================================================================== */
 * {
   box-sizing: border-box;
@@ -154,7 +155,7 @@ body[data-theme="dark"] {
 }
 
 html {
-  scroll-padding-top: calc(var(--header-height) + 14px);
+  scroll-padding-top: calc(var(--header-height) + 16px);
   background: var(--bg-page);
 }
 
@@ -162,8 +163,8 @@ body {
   font-family: var(--font-sans);
   background: var(--bg-page);
   color: var(--text-primary);
-  line-height: 1.54;
-  font-size: 13.5px;
+  line-height: 1.64;
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
   min-width: 320px;
 }
@@ -180,7 +181,7 @@ a:hover {
 }
 
 /* ==========================================================================
-   TOPBAR HEADER (SLEEK DESKTOP/MOBILE HEADER)
+   TOPBAR HEADER (CENTERED ALIGNMENT)
    ========================================================================== */
 .manual-header {
   position: fixed;
@@ -193,7 +194,7 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 calc(max(16px, (100vw - var(--shell-max-width)) / 2 + 16px));
   z-index: 100;
   backdrop-filter: blur(8px);
 }
@@ -201,7 +202,7 @@ a:hover {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .header-brand-mobile {
@@ -210,14 +211,14 @@ a:hover {
   gap: 8px;
   text-decoration: none;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-left: auto;
 }
 
@@ -229,8 +230,8 @@ a:hover {
 }
 
 .language-switcher a {
-  padding: 2px 6px;
-  font-size: 11px;
+  padding: 3px 8px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   background: var(--bg-sunken);
@@ -243,8 +244,8 @@ a:hover {
 }
 
 .icon-button {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   background: var(--bg-sunken);
@@ -252,7 +253,7 @@ a:hover {
   border-radius: var(--radius-xs);
   color: var(--text-primary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   transition: all var(--transition-fast);
 }
 
@@ -263,25 +264,29 @@ a:hover {
 
 .nav-toggle {
   display: none;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 /* ==========================================================================
-   SHELL (3-COLUMN BLENDER FURO LAYOUT)
+   SHELL (CENTERED 3-COLUMN LAYOUT)
    ========================================================================== */
 .manual-shell {
   display: flex;
+  justify-content: center;
+  max-width: var(--shell-max-width);
+  margin: var(--header-height) auto 0 auto;
   min-height: calc(100vh - var(--header-height));
-  margin-top: var(--header-height);
+  width: 100%;
 }
 
-/* LEFT SIDEBAR (BLENDER FURO SIDEBAR DRAWER) */
+/* LEFT SIDEBAR (FLANKING THE CENTER TEXT) */
 .manual-navigation {
   width: var(--sidebar-width);
   flex-shrink: 0;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-subtle);
-  padding: 14px 10px 32px 10px;
+  border-left: 1px solid var(--border-subtle);
+  padding: 16px 12px 36px 12px;
   position: sticky;
   top: var(--header-height);
   max-height: calc(100vh - var(--header-height));
@@ -297,7 +302,7 @@ a:hover {
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   text-decoration: none;
   color: var(--text-primary);
 }
@@ -308,30 +313,30 @@ a:hover {
 }
 
 .sidebar-brand-text strong {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.2px;
   line-height: 1.2;
 }
 
 .sidebar-brand-text span {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
 
 .sidebar-search-wrap {
   position: relative;
-  margin: 0 4px 12px 4px;
+  margin: 0 4px 14px 4px;
 }
 
 .sidebar-search {
   width: 100%;
-  height: 30px;
+  height: 32px;
   background: var(--bg-sunken);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xs);
-  padding: 0 32px 0 28px;
+  padding: 0 34px 0 30px;
   display: flex;
   align-items: center;
   position: relative;
@@ -346,11 +351,11 @@ a:hover {
 
 .search-icon {
   position: absolute;
-  left: 8px;
+  left: 9px;
   top: 50%;
   transform: translateY(-50%);
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   opacity: 0.5;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'%3E%3C/path%3E%3C/svg%3E") no-repeat center center / contain;
 }
@@ -360,7 +365,7 @@ a:hover {
   background: transparent;
   border: none;
   outline: none;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-primary);
 }
 
@@ -369,8 +374,8 @@ a:hover {
   right: 5px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 9.5px;
-  padding: 1px 3.5px;
+  font-size: 10px;
+  padding: 1px 4px;
 }
 
 .manual-search-results {
@@ -382,14 +387,14 @@ a:hover {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: var(--card-shadow-hover);
-  max-height: 360px;
+  max-height: 380px;
   overflow-y: auto;
   z-index: 200;
   padding: 4px;
 }
 
 .manual-navigation-title {
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -398,12 +403,12 @@ a:hover {
 }
 
 .manual-category-caption {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text-muted);
-  margin: 14px 0 3px 6px;
+  margin: 16px 0 4px 6px;
 }
 
 .manual-category-caption:first-child {
@@ -419,20 +424,20 @@ a:hover {
 }
 
 .manual-navigation-scroll > ul > li {
-  margin-bottom: 1px;
+  margin-bottom: 1.5px;
 }
 
 .manual-navigation-scroll a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 3.5px 7px;
+  padding: 4.5px 8px;
   border-radius: var(--radius-xs);
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 1.3;
+  line-height: 1.35;
   transition: all var(--transition-fast);
 }
 
@@ -450,31 +455,31 @@ a:hover {
 }
 
 .manual-navigation-scroll ul ul {
-  padding-left: 8px;
+  padding-left: 10px;
   margin-top: 1px;
 }
 
 .manual-navigation-scroll ul ul a {
-  font-size: 11px;
-  padding: 2.5px 5px;
+  font-size: 12px;
+  padding: 3px 6px;
 }
 
-/* CENTER ARTICLE CONTENT (COMPACT PADDING) */
+/* CENTER ARTICLE CONTENT */
 .manual-content {
   flex: 1;
   min-width: 0;
   max-width: var(--content-max-width);
-  padding: 20px 32px 50px 32px;
-  margin: 0 auto;
+  padding: 28px 40px 60px 40px;
+  margin: 0;
 }
 
 .manual-breadcrumb {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
+  gap: 6px;
+  font-size: 12.5px;
   color: var(--text-muted);
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .manual-breadcrumb span:last-child {
@@ -482,25 +487,26 @@ a:hover {
   font-weight: 600;
 }
 
-/* RIGHT ON-THIS-PAGE TOC (COMPACT) */
+/* RIGHT ON-THIS-PAGE TOC (FLANKING RIGHT SIDE) */
 .page-navigation {
   width: var(--toc-width);
   flex-shrink: 0;
-  padding: 20px 12px;
+  padding: 28px 14px;
   position: sticky;
   top: var(--header-height);
   max-height: calc(100vh - var(--header-height));
   overflow-y: auto;
   border-left: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
 }
 
 .page-navigation-title {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text-muted);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 #page-navigation-links {
@@ -510,19 +516,19 @@ a:hover {
 }
 
 #page-navigation-links a {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-secondary);
   text-decoration: none;
-  padding: 2px 0 2px 8px;
+  padding: 2.5px 0 2.5px 10px;
   margin-left: -1px;
   border-left: 2px solid transparent;
-  line-height: 1.3;
+  line-height: 1.35;
   transition: all var(--transition-fast);
 }
 
 #page-navigation-links a.depth-3 {
-  padding-left: 14px;
-  font-size: 11px;
+  padding-left: 16px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -537,83 +543,83 @@ a:hover {
 }
 
 /* ==========================================================================
-   TYPOGRAPHY & CONTENT STYLING (BLENDER FURO STANDARD)
+   TYPOGRAPHY & CONTENT STYLING (COMFORTABLE & CLEAR)
    ========================================================================== */
 #manual-article h1 {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
   color: var(--text-primary);
-  margin: 0 0 12px 0;
+  margin: 0 0 16px 0;
   line-height: 1.25;
 }
 
 #manual-article h1:not(:first-of-type) {
-  margin-top: 48px;
-  padding-top: 20px;
+  margin-top: 56px;
+  padding-top: 28px;
   border-top: 1px solid var(--border-subtle);
 }
 
 #manual-article h2 {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.3px;
   color: var(--text-primary);
-  margin: 24px 0 8px 0;
-  padding-bottom: 3px;
+  margin: 32px 0 12px 0;
+  padding-bottom: 5px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 #manual-article h3 {
-  font-size: 14.5px;
+  font-size: 16.5px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 18px 0 6px 0;
+  margin: 22px 0 8px 0;
 }
 
 #manual-article h4 {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--text-secondary);
-  margin: 12px 0 4px 0;
+  margin: 16px 0 6px 0;
 }
 
 #manual-article p {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   color: var(--text-secondary);
 }
 
 #manual-article ul,
 #manual-article ol {
-  margin: 0 0 10px 18px;
+  margin: 0 0 14px 22px;
   color: var(--text-secondary);
 }
 
 #manual-article li {
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 /* ==========================================================================
    DEFINITION LISTS (DL, DT, DD) - FOR CONTEXT MENUS & PARAMETERS
    ========================================================================== */
 #manual-article dl {
-  margin: 12px 0 16px 0;
+  margin: 14px 0 20px 0;
   background: var(--bg-sunken);
   border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--brand-primary);
-  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
-  padding: 10px 14px;
+  border-left: 3.5px solid var(--brand-primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 14px 18px;
 }
 
 #manual-article dt {
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 14px;
   font-family: var(--font-mono);
   color: var(--text-primary);
-  margin-top: 8px;
+  margin-top: 10px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 #manual-article dt:first-child {
@@ -621,10 +627,10 @@ a:hover {
 }
 
 #manual-article dd {
-  margin: 2px 0 6px 0;
-  font-size: 12.5px;
+  margin: 3px 0 8px 0;
+  font-size: 14px;
   color: var(--text-secondary);
-  line-height: 1.45;
+  line-height: 1.55;
 }
 
 #manual-article dd:last-child {
@@ -636,14 +642,14 @@ a:hover {
   height: auto;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
-  margin: 10px 0;
+  margin: 14px 0;
   display: block;
 }
 
 #manual-article p img {
   display: inline-block;
   vertical-align: middle;
-  margin: 0 3px;
+  margin: 0 4px;
 }
 
 /* ==========================================================================
@@ -654,20 +660,20 @@ a:hover {
   border: 1px solid var(--border-subtle);
   border-left: 3.5px solid var(--brand-accent);
   border-radius: var(--radius-xs);
-  padding: 6px 10px;
-  margin: 8px 0 12px 0;
-  font-size: 11.5px;
+  padding: 8px 12px;
+  margin: 10px 0 14px 0;
+  font-size: 13px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 12px;
+  gap: 6px 16px;
 }
 
 .ref-item,
 .ref-item p {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   margin: 0;
 }
 
@@ -675,7 +681,7 @@ a:hover {
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  font-size: 9.5px;
+  font-size: 11px;
   letter-spacing: 0.4px;
 }
 
@@ -685,31 +691,31 @@ a:hover {
 }
 
 /* ==========================================================================
-   BLENDER-STYLE HERO PORTAL BANNER & QUICK TAGS (COMPACT)
+   BLENDER-STYLE HERO PORTAL BANNER & QUICK TAGS
    ========================================================================== */
 .manual-hero-banner {
   background: linear-gradient(135deg, var(--bg-surface), var(--bg-sunken));
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 14px 18px;
-  margin-bottom: 16px;
+  padding: 20px 24px;
+  margin-bottom: 22px;
   box-shadow: var(--card-shadow);
 }
 
 .manual-hero-banner > p:first-child strong {
   display: block;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 800;
   color: var(--text-primary);
-  margin-bottom: 3px;
+  margin-bottom: 5px;
   letter-spacing: -0.2px;
 }
 
 .manual-hero-banner > p:nth-child(2) {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-secondary);
-  line-height: 1.45;
-  margin-bottom: 10px;
+  line-height: 1.55;
+  margin-bottom: 14px;
 }
 
 .manual-quick-tags,
@@ -717,12 +723,12 @@ a:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px 6px;
+  gap: 6px 8px;
   margin: 0;
 }
 
 .manual-quick-tag-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -734,14 +740,14 @@ a:hover {
   white-space: nowrap;
   background: var(--bg-raised);
   border: 1px solid var(--border-subtle);
-  padding: 2.5px 8px;
+  padding: 3.5px 11px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   text-decoration: none;
   transition: all var(--transition-fast);
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .manual-tag:hover {
@@ -753,13 +759,13 @@ a:hover {
 }
 
 /* ==========================================================================
-   BLENDER BENTO CARD MATRIX GRID (COMPACT)
+   BLENDER BENTO CARD MATRIX GRID
    ========================================================================== */
 .manual-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px;
-  margin: 14px 0 22px 0;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 18px 0 28px 0;
 }
 
 .manual-card {
@@ -767,7 +773,7 @@ a:hover {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 12px 14px;
+  padding: 16px 18px;
   box-shadow: var(--card-shadow);
   transition: all var(--transition-fast);
   display: flex;
@@ -781,33 +787,33 @@ a:hover {
 }
 
 .manual-card > p:first-child {
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .manual-card > p:first-child strong {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--text-primary);
   display: block;
 }
 
 .manual-card > p:nth-child(2) {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
-  line-height: 1.4;
-  margin-bottom: 8px;
+  line-height: 1.48;
+  margin-bottom: 10px;
   flex: 1;
 }
 
 .manual-card > p:last-child {
   margin-bottom: 0;
   margin-top: auto;
-  padding-top: 6px;
+  padding-top: 8px;
   border-top: 1px dashed var(--border-subtle);
 }
 
 .manual-card > p:last-child a {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--brand-primary);
   text-decoration: none;
@@ -831,24 +837,24 @@ a:hover {
 }
 
 /* ==========================================================================
-   CALLOUTS / ADMONITIONS (COMPACT)
+   CALLOUTS / ADMONITIONS
    ========================================================================== */
 .callout {
-  margin: 12px 0;
-  padding: 10px 14px;
-  border-radius: var(--radius-xs);
-  border-left: 3px solid;
-  font-size: 12.5px;
-  line-height: 1.5;
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  border-left: 3.5px solid;
+  font-size: 14px;
+  line-height: 1.58;
 }
 
 .callout-header {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-weight: 700;
-  font-size: 11.5px;
-  margin-bottom: 3px;
+  font-size: 12.5px;
+  margin-bottom: 4px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
@@ -882,13 +888,13 @@ a:hover {
 .callout-danger .callout-header { color: var(--callout-danger-border); }
 
 /* ==========================================================================
-   INTERACTIVE MULTI-ENGINE TAB SWITCHER (COMPACT)
+   INTERACTIVE MULTI-ENGINE TAB SWITCHER
    ========================================================================== */
 .tab-box {
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  margin: 14px 0;
+  margin: 16px 0;
   background: var(--bg-surface);
   box-shadow: var(--card-shadow);
 }
@@ -901,8 +907,8 @@ a:hover {
 }
 
 .tab-btn {
-  padding: 5px 12px;
-  font-size: 11.5px;
+  padding: 6px 14px;
+  font-size: 12.5px;
   font-weight: 600;
   background: transparent;
   border: none;
@@ -924,7 +930,7 @@ a:hover {
 }
 
 .tab-panel {
-  padding: 12px 14px;
+  padding: 14px 18px;
   display: none;
 }
 
@@ -933,48 +939,48 @@ a:hover {
 }
 
 /* ==========================================================================
-   KEYCAPS, SHORTCUTS, BLOCKQUOTES & TABLES (COMPACT)
+   KEYCAPS, SHORTCUTS, BLOCKQUOTES & TABLES
    ========================================================================== */
 kbd,
 .shortcut {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   background: var(--kbd-bg);
   color: var(--text-primary);
   border: 1px solid var(--kbd-border);
   box-shadow: 0 1px 0 1px var(--kbd-shadow);
-  padding: 1px 4.5px;
+  padding: 1.5px 5.5px;
   border-radius: var(--radius-xs);
   display: inline-block;
   white-space: nowrap;
-  margin: 0 1.5px;
+  margin: 0 2px;
   line-height: 1.25;
   vertical-align: baseline;
 }
 
 code {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13.5px;
   background: var(--bg-sunken);
   color: var(--brand-primary);
-  padding: 1px 4.5px;
-  border-radius: 3px;
+  padding: 1.5px 5.5px;
+  border-radius: 4px;
 }
 
 blockquote {
-  margin: 12px 0;
-  padding: 8px 12px;
+  margin: 14px 0;
+  padding: 10px 14px;
   background: var(--bg-sunken);
-  border-left: 3px solid var(--brand-primary);
+  border-left: 3.5px solid var(--brand-primary);
   border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
   color: var(--text-secondary);
   font-style: normal;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 blockquote p {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 blockquote p:last-child {
@@ -982,12 +988,12 @@ blockquote p:last-child {
 }
 
 figure {
-  margin: 16px 0;
+  margin: 18px 0;
   text-align: center;
 }
 
 figcaption {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-muted);
   font-style: italic;
   margin-top: 4px;
@@ -996,14 +1002,14 @@ figcaption {
 pre {
   background: var(--code-bg);
   border: 1px solid var(--code-border);
-  border-radius: var(--radius-xs);
-  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
   overflow-x: auto;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--code-text);
-  line-height: 1.42;
-  margin: 12px 0;
+  line-height: 1.48;
+  margin: 14px 0;
   position: relative;
 }
 
@@ -1016,10 +1022,10 @@ pre code {
 table {
   width: 100%;
   border-collapse: collapse;
-  margin: 14px 0;
-  font-size: 12px;
+  margin: 16px 0;
+  font-size: 13.5px;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   box-shadow: var(--card-shadow);
 }
@@ -1030,7 +1036,7 @@ thead {
 
 th {
   background: var(--bg-sunken);
-  padding: 6px 9px;
+  padding: 8px 11px;
   text-align: left;
   font-weight: 700;
   color: var(--text-primary);
@@ -1038,7 +1044,7 @@ th {
 }
 
 td {
-  padding: 6px 9px;
+  padding: 8px 11px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
 }
@@ -1060,20 +1066,20 @@ tr:last-child td {
 }
 
 /* ==========================================================================
-   PAGINATION FOOTER (DUAL CARD PREV / NEXT - COMPACT)
+   PAGINATION FOOTER (DUAL CARD PREV / NEXT)
    ========================================================================== */
 .pagination-bar {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 36px;
-  padding-top: 16px;
+  gap: 12px;
+  margin-top: 40px;
+  padding-top: 18px;
   border-top: 1px solid var(--border-subtle);
 }
 
 .pag-card {
-  padding: 10px 12px;
-  border-radius: var(--radius-xs);
+  padding: 12px 15px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   text-decoration: none;
@@ -1096,7 +1102,7 @@ tr:last-child td {
 }
 
 .pag-label {
-  font-size: 9.5px;
+  font-size: 10.5px;
   text-transform: uppercase;
   font-weight: 700;
   color: var(--text-muted);
@@ -1104,31 +1110,31 @@ tr:last-child td {
 }
 
 .pag-title {
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--brand-primary);
 }
 
 .manual-footer {
-  margin-top: 32px;
-  padding-top: 12px;
+  margin-top: 36px;
+  padding-top: 14px;
   border-top: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
 /* ==========================================================================
    RESPONSIVE MEDIA QUERIES
    ========================================================================== */
-@media (max-width: 1120px) {
+@media (max-width: 1200px) {
   .page-navigation {
     display: none;
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .header-brand-mobile {
     display: flex;
   }
@@ -1149,7 +1155,7 @@ tr:last-child td {
     box-shadow: 0 0 30px rgba(0,0,0,0.3);
   }
   .manual-content {
-    padding: 16px 14px;
+    padding: 20px 18px;
   }
   .pagination-bar {
     grid-template-columns: 1fr;
