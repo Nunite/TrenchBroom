@@ -198,6 +198,35 @@ QPushButton:disabled {
   color: @tb-disabled-text;
 }
 
+QToolButton {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: @tb-text;
+  min-height: 22px;
+  min-width: 22px;
+  padding: 2px;
+}
+
+QToolButton:hover {
+  background: @tb-hover-background;
+  border-color: @tb-border;
+}
+
+QToolButton:focus {
+  border-color: @tb-focus-border;
+}
+
+QToolButton:pressed,
+QToolButton:checked {
+  background: @tb-pressed-background;
+  border-color: @tb-strong-border;
+}
+
+QToolButton:disabled {
+  color: @tb-disabled-text;
+}
+
 QWidget#DialogButtonBar {
   background: @tb-panel-background;
 }
@@ -214,6 +243,24 @@ QDoubleSpinBox {
   padding: 1px 5px;
   selection-background-color: @tb-selection-background;
   selection-color: @tb-inverse-text;
+}
+
+QTextEdit,
+QPlainTextEdit {
+  background: @tb-input-background;
+  border: 1px solid @tb-border;
+  border-radius: 4px;
+  color: @tb-text;
+  padding: 4px 5px;
+  selection-background-color: @tb-selection-background;
+  selection-color: @tb-inverse-text;
+}
+
+QLineEdit:read-only,
+QTextEdit[readOnly="true"],
+QPlainTextEdit[readOnly="true"] {
+  background: @tb-panel-background;
+  color: @tb-secondary-text;
 }
 
 QComboBox {
@@ -348,36 +395,80 @@ QComboBox QAbstractItemView::item:selected {
   color: @tb-inverse-text;
 }
 
-QCheckBox {
+QCheckBox,
+QRadioButton {
   color: @tb-text;
   min-height: 20px;
   spacing: 7px;
 }
 
-QCheckBox:disabled {
+QCheckBox:disabled,
+QRadioButton:disabled {
   color: @tb-disabled-text;
 }
 
 QLineEdit:hover,
 QComboBox:hover,
 QSpinBox:hover,
-QDoubleSpinBox:hover {
+QDoubleSpinBox:hover,
+QTextEdit:hover,
+QPlainTextEdit:hover {
   border-color: @tb-strong-border;
 }
 
 QLineEdit:focus,
 QComboBox:focus,
 QSpinBox:focus,
-QDoubleSpinBox:focus {
+QDoubleSpinBox:focus,
+QTextEdit:focus,
+QPlainTextEdit:focus {
   border-color: @tb-focus-border;
 }
 
 QLineEdit:disabled,
 QComboBox:disabled,
 QSpinBox:disabled,
-QDoubleSpinBox:disabled {
+QDoubleSpinBox:disabled,
+QTextEdit:disabled,
+QPlainTextEdit:disabled {
   background: @tb-window-background;
   color: @tb-disabled-text;
+}
+
+QSlider::groove:horizontal {
+  background: @tb-border;
+  border: none;
+  border-radius: 2px;
+  height: 4px;
+}
+
+QSlider::sub-page:horizontal {
+  background: @tb-accent;
+  border-radius: 2px;
+}
+
+QSlider::handle:horizontal {
+  background: @tb-button-background;
+  border: 1px solid @tb-strong-border;
+  border-radius: 6px;
+  margin: -5px 0;
+  width: 12px;
+}
+
+QSlider::handle:horizontal:hover,
+QSlider::handle:horizontal:focus {
+  background: @tb-hover-background;
+  border-color: @tb-focus-border;
+}
+
+QSlider::groove:horizontal:disabled,
+QSlider::sub-page:horizontal:disabled {
+  background: @tb-border;
+}
+
+QSlider::handle:horizontal:disabled {
+  background: @tb-window-background;
+  border-color: @tb-border;
 }
 
 QAbstractItemView {
@@ -613,14 +704,6 @@ QWidget#MaterialBrowser_FilterRow {
   background: transparent;
 }
 
-QLineEdit#EntityBrowser_Search,
-QLineEdit#MaterialBrowser_Search,
-QComboBox#EntityBrowser_Sort,
-QComboBox#MaterialBrowser_Sort,
-QComboBox#MaterialBrowser_IconSize {
-  min-height: 24px;
-}
-
 QComboBox#MaterialBrowser_IconSize {
   max-width: 66px;
   min-width: 58px;
@@ -659,11 +742,6 @@ QWidget#ModelBrowser_BreadcrumbBar {
   border-radius: 5px;
 }
 
-QLineEdit#ModelBrowser_Search,
-QLineEdit#ModelBrowser_FolderEdit {
-  min-height: 24px;
-}
-
 QToolButton#ModelBrowser_ReloadButton,
 QToolButton#ModelBrowser_SavePrefabButton {
   background: transparent;
@@ -681,7 +759,6 @@ QToolButton#ModelBrowser_SavePrefabButton:hover {
 }
 
 QComboBox#ModelBrowser_IconSize {
-  min-height: 24px;
   min-width: 58px;
 }
 
@@ -740,7 +817,7 @@ QStatusBar QToolButton#MapWindow_SnapToggle:checked {
   color: @tb-text;
 }
 
-QStatusBar QComboBox#MapWindow_GridChoice {
+QStatusBar QComboBox[tbControlRole="compact"] {
   background: transparent;
   border-color: transparent;
   color: @tb-secondary-text;
@@ -749,13 +826,13 @@ QStatusBar QComboBox#MapWindow_GridChoice {
   padding: 0 5px;
 }
 
-QStatusBar QComboBox#MapWindow_GridChoice:hover {
+QStatusBar QComboBox[tbControlRole="compact"]:hover {
   background: @tb-hover-background;
   border-color: @tb-border;
   color: @tb-text;
 }
 
-QStatusBar QComboBox#MapWindow_GridChoice:focus {
+QStatusBar QComboBox[tbControlRole="compact"]:focus {
   border-color: @tb-focus-border;
 }
 
@@ -828,7 +905,7 @@ QScrollArea#PreferencePane_ScrollArea {
   border: none;
 }
 
-QLineEdit#CommandPalette_SearchBox {
+QLineEdit[tbControlRole="prominent"] {
   background: @tb-input-background;
   border: 1px solid @tb-strong-border;
   border-radius: 6px;
@@ -940,12 +1017,6 @@ QToolButton#toolButton_withBorder:checked {
 QWidget#OutlinerInspector_Toolbar {
   background: @tb-sidebar-background;
   border-bottom: 1px solid @tb-border;
-}
-
-QLineEdit#OutlinerInspector_Search,
-QComboBox#OutlinerInspector_Sort {
-  border-radius: 6px;
-  min-height: 26px;
 }
 
 QComboBox#OutlinerInspector_Sort {
@@ -1192,24 +1263,6 @@ QWidget#outlinerPropertyKey[inactive="true"] QLabel {
   color: @tb-secondary-text;
 }
 
-QLineEdit#outlinerPropertyValue,
-QComboBox#outlinerPropertyValue,
-QLineEdit#outlinerPropertyAddKey,
-QLineEdit#outlinerPropertyAddValue {
-  background: @tb-input-background;
-  border: 1px solid @tb-border;
-  border-radius: 5px;
-  padding: 2px 5px;
-}
-
-QLineEdit#outlinerPropertyValue:focus,
-QComboBox#outlinerPropertyValue:focus,
-QLineEdit#outlinerPropertyAddKey:focus,
-QLineEdit#outlinerPropertyAddValue:focus {
-  background: @tb-input-background;
-  border-color: @tb-focus-border;
-}
-
 QWidget#outlinerPropertyRow[inactive="true"] QLineEdit#outlinerPropertyValue,
 QWidget#outlinerPropertyRow[inactive="true"] QComboBox#outlinerPropertyValue {
   background: @tb-window-background;
@@ -1273,4 +1326,29 @@ QToolButton#smartSkyboxRefreshButton:hover {
 QListWidget#smartSkyboxList {
   background: transparent;
   outline: none;
+}
+
+QLabel#McpSettings_Error {
+  color: @tb-error;
+}
+
+QTextBrowser[pluginPanelOutput="true"] {
+  background: transparent;
+  border: none;
+}
+
+QFrame#smartFaceSelectionPanel {
+  background: @tb-window-background;
+  border: 1px solid @tb-border;
+  border-radius: 6px;
+}
+
+QFrame#smartFaceSelectionPanel QLabel {
+  background: transparent;
+  border: none;
+}
+
+QFrame#smartFaceSelectionPanel QToolButton {
+  min-height: 24px;
+  min-width: 24px;
 }

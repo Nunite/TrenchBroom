@@ -2665,7 +2665,7 @@ void defineModule(py::module_& module)
         browser->setHtml(QString::fromStdString(html));
         browser->setOpenExternalLinks(false);
         browser->setFrameShape(QFrame::NoFrame);
-        browser->setStyleSheet(QStringLiteral("background-color: transparent;"));
+        browser->setProperty("pluginPanelOutput", true);
         browser->setTextInteractionFlags(Qt::LinksAccessibleByMouse);
         if (height > 0 && height <= 40)
         {

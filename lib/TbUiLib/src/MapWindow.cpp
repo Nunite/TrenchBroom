@@ -601,6 +601,7 @@ void MapWindow::createStatusBar()
 
   m_gridChoice = new QComboBox{};
   m_gridChoice->setObjectName("MapWindow_GridChoice");
+  m_gridChoice->setProperty("tbControlRole", "compact");
   m_gridChoice->setToolTip(tr("Grid size"));
   for (int i = mdl::Grid::MinSize; i <= mdl::Grid::MaxSize; ++i)
   {

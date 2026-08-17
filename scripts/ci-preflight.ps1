@@ -366,6 +366,11 @@ try {
   Invoke-GitCheck @("diff", "--cached", "--check", "--")
   Invoke-GitCheck @("diff", "--check", "--")
 
+  & (Join-Path $PSScriptRoot "check-ui-style-governance.ps1")
+  if ($LASTEXITCODE -ne 0) {
+    throw "UI style governance check failed"
+  }
+
   $changedFiles = @(Get-ChangedFiles $effectiveBaseRef $Paths)
   Write-Host "Changed files considered: $($changedFiles.Count)"
   if ($changedFiles.Count -eq 0) {

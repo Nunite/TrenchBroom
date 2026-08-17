@@ -121,33 +121,6 @@ void SmartFaceSelectionPanel::createGui()
   setFrameShape(QFrame::StyledPanel);
   setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   setMinimumWidth(292);
-  setStyleSheet(R"(
-    QFrame#smartFaceSelectionPanel {
-      background-color: palette(window);
-      border: 1px solid palette(mid);
-      border-radius: 6px;
-    }
-    QFrame#smartFaceSelectionPanel QLabel {
-      border: none;
-      background: transparent;
-    }
-    QFrame#smartFaceSelectionPanel QToolButton {
-      min-width: 24px;
-      min-height: 24px;
-      border: 1px solid transparent;
-      border-radius: 4px;
-      background: transparent;
-    }
-    QFrame#smartFaceSelectionPanel QToolButton:hover {
-      border-color: palette(mid);
-      background-color: palette(button);
-    }
-    QFrame#smartFaceSelectionPanel QComboBox,
-    QFrame#smartFaceSelectionPanel QDoubleSpinBox,
-    QFrame#smartFaceSelectionPanel QPushButton {
-      min-height: 24px;
-    }
-  )");
 
   m_collapseButton = new QToolButton{};
   m_collapseButton->setObjectName(QStringLiteral("smartFaceSelectionCollapse"));

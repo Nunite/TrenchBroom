@@ -13,6 +13,7 @@ param(
     "supporting",
     "python-console",
     "command-palette",
+    "components",
     "preferences",
     "preferences-colors",
     "preferences-mouse",
@@ -237,13 +238,14 @@ foreach ($target in $normalizedTargets) {
       "supporting",
       "python-console",
       "command-palette",
+      "components",
       "preferences",
       "preferences-colors",
       "preferences-mouse",
       "preferences-keyboard",
       "preferences-misc"
     )) {
-    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, supporting, python-console, command-palette, preferences, preferences-colors, preferences-mouse, preferences-keyboard, or preferences-misc."
+    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, supporting, python-console, command-palette, components, preferences, preferences-colors, preferences-mouse, preferences-keyboard, or preferences-misc."
   }
 }
 foreach ($theme in $Themes) {

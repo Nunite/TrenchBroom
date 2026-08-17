@@ -5,9 +5,9 @@
 - Branch: `codex/qt-ui-modernization`
 - Baseline commit: `4d3a1dca7` (`Restore shortcut preference semantics`)
 - Last updated: 2026-08-17
-- Current stage: Phase 4.4 in progress; responsive Material Browser columns, persistent
-  scrollbar visibility, collapsible collection groups, Ctrl+wheel thumbnail sizing, and
-  an inline size indicator complete
+- Current stage: Phases 4.4 and 4.5 in progress; Material Browser density work continues,
+  while foundational component governance, canonical first-pass controls, and component
+  snapshot acceptance are complete
 
 ## Objective
 
@@ -235,6 +235,33 @@ Expected benefit: high for repeated material-selection work. Difficulty is mediu
 OpenGL cell layout and hit testing must change together, but this remains much lower risk than
 new docking or a separate full-size material browser window.
 
+### Phase 4.5: Foundational Component Governance
+
+Status: in progress
+
+TrenchBroom now follows a central component contract inspired by Blender's separation between
+feature layout and shared widget rendering. Feature screens declare content, behavior, layout,
+and one of a small set of semantic roles; `ThemeTokens`, `ApplicationStyle`, and `base.qss` own
+the visual implementation.
+
+- [x] Add `docs/ui-component-style-governance.md` and make it required guidance for UI work.
+- [x] Add a deterministic `components` snapshot covering input, choice, numeric, multiline,
+      checkbox, radio, range, push-button, and tool-button states.
+- [x] Add canonical multiline input, radio, slider, and tool-button styling to the global
+      component layer.
+- [x] Make radio indicators use the same theme-aware application style path as checkboxes.
+- [x] Replace Command Palette and status-bar object-name styling with explicit semantic roles.
+- [x] Remove first-pass browser, Outliner, Smart Face, MCP error, and plugin-output style
+      duplication while retaining behavioral object names.
+- [ ] Consolidate group surfaces and remaining button-specific selectors.
+- [ ] Consolidate item views, headers, tabs, menus, and scroll bars around explicit component
+      roles.
+- [ ] Audit custom delegates and paint paths for accidental foundational-control rendering.
+
+Expected benefit: high. New and plugin-created standard Qt controls inherit a coherent default,
+and intentional density differences remain reviewable instead of becoming page-specific visual
+forks.
+
 ### Phase 5: Optional Structural Work
 
 Status: deferred
@@ -266,11 +293,11 @@ testing shows that the earlier phases do not meet the product goal.
 - Build the Release `TrenchBroom` target before completing a workbench phase.
 - Run `powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1` to
   capture the isolated welcome window, representative map workbench, and deterministic
-  expanded Outliner/entity-properties, Entity Browser, Face Inspector, supporting
-  Assets panel, Command Palette, Preferences pages for View, Colors, Mouse, Keyboard, and
-  Misc/MCP,
-  plus Entity/Material empty result states in light, dark, and Blender themes at 100%,
-  150%, and 200% scale. The 126-state matrix validates image dimensions, device-pixel ratio,
+  foundational component contract, expanded Outliner/entity-properties, Entity Browser,
+  Face Inspector, supporting Assets panel, Python Console, plugin inspector, Command Palette,
+  Preferences pages for View, Colors, Mouse, Keyboard, and Misc/MCP, plus Entity/Material empty
+  result states in Light, Dark, and Blender themes at 100%, 150%, and 200% scale. The 153-state
+  matrix validates image dimensions, device-pixel ratio,
   nonblank pixels, font support, and file integrity, then writes PNG and JSON evidence plus
   a labeled visual-comparison contact sheet under
   `build-release-codex\codex-logs\ui-theme-acceptance`.
@@ -285,9 +312,9 @@ testing shows that the earlier phases do not meet the product goal.
   texture to reach GPU-ready state, and fails on missing, failed, or pending resources. Failures
   write a sibling `.error.txt` file which the acceptance script includes in its exception.
 - Use `--ui-snapshot <path> --ui-snapshot-theme system|light|dark|blender
-  [--ui-snapshot-page map|outliner|entity-browser|entity-browser-empty|face-inspector|material-browser-empty|supporting|command-palette|preferences|preferences-colors|preferences-mouse|preferences-keyboard|preferences-misc]
+  [--ui-snapshot-page map|components|outliner|entity-browser|entity-browser-empty|face-inspector|material-browser-empty|plugin-inspector|supporting|python-console|command-palette|preferences|preferences-colors|preferences-mouse|preferences-keyboard|preferences-misc]
   [--ui-snapshot-game-path game-directory] [map-file]` for a focused
-  single capture. Omitting the map captures Welcome unless a `preferences*` page is
+  single capture. Omitting the map captures Welcome unless `components` or a `preferences*` page is
   selected; supplying one captures the workbench. The Outliner
   page expands its hierarchy, properties panel, and active selection before rendering;
   the Entity Browser and Face Inspector pages widen the inspector for browser-color
@@ -417,3 +444,5 @@ testing shows that the earlier phases do not meet the product goal.
 | 2026-08-17 | Verified | Passed Release `TbUiLibTest "Outliner*"` (198 assertions), rebuilt `TrenchBroom`, and visually checked the focused Outliner matrix in Light, Dark, and Blender themes at 100%, 150%, and 200% in `20260817-134611-809`. |
 | 2026-08-17 | Complete | Replaced the Inspector rail's reused cube, entity, face-tool, folder, and settings artwork with a coherent monochrome 24 px semantic set for map layers, entities, selected faces, hierarchy, and plugins. The new icons share stroke weight and optical bounds, remain theme-invertible, and preserve the existing navigation layout and state treatment. |
 | 2026-08-17 | Verified | Passed Release `MapWindow` (203 assertions), rebuilt `TrenchBroom`, and visually checked Map- and Outliner-selected rail states in the 18-state Workbench/Outliner Light, Dark, and Blender matrix at 100%, 150%, and 200% in `20260817-140520-086`. |
+| 2026-08-17 | Complete | Added foundational component governance modeled on Blender's centralized semantic-control pipeline, made it required agent guidance, added a local preflight guard against feature-local styles, and introduced a deterministic component gallery. Consolidated the first input, choice, numeric, multiline, checkbox, radio, slider, push-button, and tool-button families while replacing page-specific visual overrides with shared defaults or explicit semantic roles. |
+| 2026-08-17 | Verified | Passed the style-governance preflight, strict-compiled all nine changed C++ translation units, passed Release `MapWindow`, `PythonV2`, `SmartFaceSelectionPanel`, and `MiscPreferencePane` (634 assertions), rebuilt `TrenchBroom`, passed the 9-state component matrix at `20260817-205042-050`, and visually checked 72 affected Workbench, Outliner, Entity Browser, Face Inspector, Command Palette, View preferences, Misc/MCP, and Supporting states at `20260817-204311-158`. |

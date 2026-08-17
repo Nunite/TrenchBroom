@@ -130,6 +130,51 @@ private:
     painter->restore();
   }
 
+  void drawRadioButtonIndicator(const QStyleOption* option, QPainter* painter) const
+  {
+    const auto enabled = option->state.testFlag(QStyle::State_Enabled);
+    const auto hovered = option->state.testFlag(QStyle::State_MouseOver);
+    const auto pressed = option->state.testFlag(QStyle::State_Sunken);
+    const auto focused = option->state.testFlag(QStyle::State_HasFocus);
+    const auto checked = option->state.testFlag(QStyle::State_On);
+
+    const auto side = std::min(option->rect.width(), option->rect.height());
+    const auto center = QRectF{option->rect}.center();
+    const auto indicatorRect = QRectF{
+      center.x() - side / 2.0 + 0.5,
+      center.y() - side / 2.0 + 0.5,
+      side - 1.0,
+      side - 1.0};
+    const auto scale = side / 18.0;
+
+    const auto background = !enabled  ? m_themeTokens.windowBackground
+                            : pressed ? m_themeTokens.pressedBackground
+                            : hovered ? m_themeTokens.hoverBackground
+                                      : m_themeTokens.inputBackground;
+    const auto border =
+      !enabled ? m_themeTokens.disabledText
+      : focused
+        ? m_themeTokens.focusBorder
+        : blendColor(background, m_themeTokens.text, hovered || pressed ? 0.60 : 0.45);
+    const auto foreground = enabled ? m_themeTokens.text : m_themeTokens.disabledText;
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(QPen{border, 1.0});
+    painter->setBrush(background);
+    painter->drawEllipse(indicatorRect);
+
+    if (checked)
+    {
+      const auto dotRect =
+        indicatorRect.adjusted(5.0 * scale, 5.0 * scale, -5.0 * scale, -5.0 * scale);
+      painter->setPen(Qt::NoPen);
+      painter->setBrush(foreground);
+      painter->drawEllipse(dotRect);
+    }
+    painter->restore();
+  }
+
 public:
   TrenchBroomProxyStyle(const QString& key, const ThemeTokens& themeTokens)
     : QProxyStyle{key}
@@ -156,6 +201,11 @@ public:
       || element == QStyle::PE_IndicatorItemViewItemCheck)
     {
       drawCheckBoxIndicator(option, painter);
+      return;
+    }
+    if (element == QStyle::PE_IndicatorRadioButton)
+    {
+      drawRadioButtonIndicator(option, painter);
       return;
     }
 
@@ -189,6 +239,8 @@ public:
     {
     case QStyle::PM_IndicatorWidth:
     case QStyle::PM_IndicatorHeight:
+    case QStyle::PM_ExclusiveIndicatorWidth:
+    case QStyle::PM_ExclusiveIndicatorHeight:
       return 18;
     case QStyle::PM_SmallIconSize:
     case QStyle::PM_ButtonIconSize:

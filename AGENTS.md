@@ -17,6 +17,14 @@
 - Do not use a line-count limit as an architectural target. Review `Main.cpp` changes by responsibility, dependency direction, and testability instead.
 - After changing entry-point structure, build the Release `TrenchBroom` target and run the focused tests or snapshot targets for every extracted or affected startup path.
 
+## UI component style governance
+- Before adding or changing foundational Qt control appearance, read and follow `docs/ui-component-style-governance.md`.
+- Business widgets declare content, behavior, layout, and the approved `tbControlRole`; they must not create another visual implementation of a foundational control with local `setStyleSheet()`, custom painting, or object-name geometry overrides.
+- Keep canonical control geometry and states in `app/TrenchBroom/resources/stylesheets/base.qss`, theme-selectable colors in `ThemeTokens`, and platform-independent primitives or metrics in `ApplicationStyle`.
+- Runtime data visualization such as a color swatch is the narrow local-style exception. Document any other exception and cover it with a focused visual target.
+- After changing a foundational component family, run the `components` UI snapshot matrix plus representative real-screen targets.
+- Run `powershell -ExecutionPolicy Bypass -File scripts\check-ui-style-governance.ps1` before committing UI changes. The check rejects new feature-local `setStyleSheet()` calls outside the global application style and the data-driven color swatch allowlist.
+
 ## Build and test
 - TrenchBroom uses CMake as its build system.
 - In Visual Studio Code, prefer CMake Tools for builds.
@@ -65,7 +73,7 @@
   ```powershell
   powershell -ExecutionPolicy Bypass -File scripts\ui-theme-acceptance.ps1
   ```
-  It builds `TrenchBroom`, then captures the welcome window, representative map workbench, focused Outliner and supporting-panel states, and the View, Colors, Mouse, Keyboard, and Misc/MCP preference pages without showing a native window for Light and Dark themes at 100%, 150%, and 200% scale. PNG snapshots, JSON manifests, an Agent-friendly contact sheet, and the combined report are written under `build-release-codex\codex-logs\ui-theme-acceptance`. Use targets such as `-Targets welcome`, `-Targets workbench`, `-Targets preferences-keyboard`, or `-Targets preferences-misc` for a focused matrix, and pass `-SkipBuild` only when the executable is already current. A normal run checks capture integrity; pass `-BaselineDir <approved-run-directory>` to additionally fail on visual differences. Baselines are environment-specific, so compare runs produced by the same OS, Qt version, fonts, and renderer.
+  It builds `TrenchBroom`, then captures the foundational `components` contract, welcome window, representative map workbench, focused Outliner and supporting-panel states, and the View, Colors, Mouse, Keyboard, and Misc/MCP preference pages without showing a native window for Light, Dark, and Blender themes at 100%, 150%, and 200% scale. PNG snapshots, JSON manifests, an Agent-friendly contact sheet, and the combined report are written under `build-release-codex\codex-logs\ui-theme-acceptance`. Use targets such as `-Targets components`, `-Targets workbench`, `-Targets preferences-keyboard`, or `-Targets preferences-misc` for a focused matrix, and pass `-SkipBuild` only when the executable is already current. A normal run checks capture integrity; pass `-BaselineDir <approved-run-directory>` to additionally fail on visual differences. Baselines are environment-specific, so compare runs produced by the same OS, Qt version, fonts, and renderer.
 - Material Browser acceptance uses a dedicated checked-in Quake 2 map/game fixture. Keep `face-inspector` and `material-browser-empty` on that fixture, and do not weaken their success condition to material-count or nonblank-image checks: every fixture texture must reach GPU-ready state. Snapshot mode may disable MCP, update checks, and other external services, but it must keep GL resource processing active. On failure, inspect the sibling `.error.txt` file surfaced by the acceptance script.
 - For UI/library work, build the focused test target first. If the filtered wrapper is unavailable, use the explicit Visual Studio environment form:
   ```powershell

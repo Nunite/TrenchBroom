@@ -46,6 +46,7 @@
 #include <QToolButton>
 #include <QTreeWidget>
 
+#include "UiComponentSnapshot.h"
 #include "base/PreferenceManager.h"
 #include "fs/DiskIO.h"
 #include "gl/Material.h"
@@ -625,10 +626,18 @@ int runUiSnapshot(
 
   auto* targetWidget = static_cast<QWidget*>(nullptr);
   auto targetName = QString{};
+  auto componentSnapshot = std::unique_ptr<QWidget>{};
   auto preferencesDialog = std::unique_ptr<PreferenceDialog>{};
   auto commandPaletteDialog = std::unique_ptr<CommandPaletteDialog>{};
 
-  if (options.page.startsWith(QStringLiteral("preferences")))
+  if (options.page == QStringLiteral("components"))
+  {
+    componentSnapshot = createUiComponentSnapshot();
+    targetWidget = componentSnapshot.get();
+    targetName = options.page;
+    targetWidget->resize(820, 700);
+  }
+  else if (options.page.startsWith(QStringLiteral("preferences")))
   {
     preferencesDialog = std::make_unique<PreferenceDialog>(appController, nullptr);
     targetWidget = preferencesDialog.get();

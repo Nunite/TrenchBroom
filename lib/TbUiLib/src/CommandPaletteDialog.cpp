@@ -254,6 +254,7 @@ CommandPaletteDialog::CommandPaletteDialog(
   });
 
   m_searchBox->setObjectName("CommandPalette_SearchBox");
+  m_searchBox->setProperty("tbControlRole", "prominent");
   m_searchBox->setPlaceholderText(tr("Search commands..."));
   m_searchBox->installEventFilter(this);
 
