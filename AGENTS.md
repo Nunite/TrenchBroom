@@ -128,7 +128,7 @@
 - Run `ci-preflight.ps1` once as the final gatekeeper before committing or pushing changes.
 
 ## Current custom branch notes
-- The active feature branch is `feature/latest-upstream-merge`; it contains upstream master plus local custom features. Do not assume upstream TrenchBroom behavior when touching custom areas.
+- This repository is a custom TrenchBroom fork containing upstream master plus local custom extensions. Do not assume vanilla upstream TrenchBroom behavior when touching custom areas.
 - Important custom feature areas include:
   - Python v2 plugin/runtime work (`tb2`) and manifest-style plugins.
   - Unified GoldSrc asset browser for `.mdl`, `.spr`, and `.wav`.
@@ -160,7 +160,13 @@
 - Modeling profile growth requires justification. Prefer hidden/searchable expert tools over visible duplicate convenience aliases.
 - For dense old maps or ambiguous brush ownership, prefer user selection plus selection-aware MCP tools instead of complex automatic brush matching.
 
-### Code coverage
+## Test structure and code coverage
+- For each compilation unit, tests are usually in one file named tst_<CompilationUnit>.cpp.
+- Prefer one test case per class.
+- Prefer one section per member function.
+- For free functions, prefer one test case per file and one section per function.
+
+### Code coverage instrumentation
 - **Enable coverage instrumentation**: Pass `-DTB_ENABLE_GCOV=1` for gcov-compatible coverage (works with GCC or Clang) or `-DTB_ENABLE_LCOV=1` for LLVM source-based coverage (Clang only).
 - **Generate coverage data**:
   - For gcov: Build and run tests normally. `.gcno` and `.gcda` files are automatically generated in the build tree.
@@ -171,12 +177,6 @@
   - Improve existing tests to cover branch conditions not yet exercised.
   - Identify edge cases or exception handling that lack test coverage.
 - **Reference coverage in commit messages**: When submitting test improvements motivated by coverage analysis, mention that coverage-guided testing was used to identify gaps.
-
-## Test structure
-- For each compilation unit, tests are usually in one file named tst_<CompilationUnit>.cpp.
-- Prefer one test case per class.
-- Prefer one section per member function.
-- For free functions, prefer one test case per file and one section per function.
 
 ## Code style
 - Format changes with clang-format. The repository style is defined in /.clang-format.
