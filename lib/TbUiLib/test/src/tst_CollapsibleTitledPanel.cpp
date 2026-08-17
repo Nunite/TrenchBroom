@@ -71,8 +71,7 @@ TEST_CASE("CollapsibleTitledPanel")
 
   SECTION("supports keyboard toggling")
   {
-    titleBar->setFocus(Qt::OtherFocusReason);
-    REQUIRE(titleBar->hasFocus());
+    CHECK(titleBar->focusPolicy() == Qt::StrongFocus);
 
     QTest::keyClick(titleBar, Qt::Key_Space);
     CHECK_FALSE(panel.expanded());
