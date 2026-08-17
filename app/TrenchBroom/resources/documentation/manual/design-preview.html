@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="blender-portal" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrenchBroom 手册全新主题与布局架构演示</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       0. CSS VARIABLES & RESET
+       ========================================================================== */
+    :root {
+      --font-sans: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "Fira Code", Consolas, Monaco, monospace;
+      --transition-fast: 0.15s ease;
+      --transition-normal: 0.25s ease;
+    }
+
+    [data-theme="light"] {
+      --bg-body: #ffffff;
+      --bg-header: #ffffff;
+      --bg-sidebar: #f8f9fa;
+      --bg-card: #ffffff;
+      --bg-sunken: #f1f3f5;
+      --bg-raised: #ffffff;
+      --border-color: #e9ecef;
+      --border-hover: #ced4da;
+      --text-main: #212529;
+      --text-sub: #495057;
+      --text-muted: #868e96;
+      --primary: #265787;
+      --primary-light: #e7f1ff;
+      --accent: #e87d0d;
+      --callout-tip-bg: #e6fcf5;
+      --callout-tip-border: #20c997;
+      --callout-warn-bg: #fff9db;
+      --callout-warn-border: #fcc419;
+      --code-bg: #1e1e1e;
+      --code-text: #f8f9fa;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 28px rgba(0,0,0,0.12);
+    }
+
+    [data-theme="dark"] {
+      --bg-body: #16181b;
+      --bg-header: #1c1f24;
+      --bg-sidebar: #191c21;
+      --bg-card: #20242b;
+      --bg-sunken: #121417;
+      --bg-raised: #282d36;
+      --border-color: #2e3440;
+      --border-hover: #434c5e;
+      --text-main: #eceff4;
+      --text-sub: #d8dee9;
+      --text-muted: #7e8a9d;
+      --primary: #5e81ac;
+      --primary-light: rgba(94, 129, 172, 0.18);
+      --accent: #d08770;
+      --callout-tip-bg: rgba(163, 190, 140, 0.12);
+      --callout-tip-border: #a3be8c;
+      --callout-warn-bg: rgba(235, 203, 139, 0.14);
+      --callout-warn-border: #ebcb8b;
+      --code-bg: #0d0e11;
+      --code-text: #e5e9f0;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+      --shadow-lg: 0 16px 36px rgba(0,0,0,0.6);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-body);
+      color: var(--text-main);
+      line-height: 1.6;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      transition: background var(--transition-normal), color var(--transition-normal);
+    }
+
+    /* ==========================================================================
+       SUPER CONTROLLER: 选型控制条 (全屏吸顶)
+       ========================================================================== */
+    .super-bar {
+      position: sticky;
+      top: 0;
+      z-index: 9999;
+      background: #111317;
+      color: #ffffff;
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #e87d0d;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+    .super-title {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .super-badge {
+      background: #e87d0d;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .super-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .layout-switcher {
+      display: flex;
+      background: #20242b;
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid #3b4252;
+    }
+    .layout-btn {
+      background: transparent;
+      border: none;
+      color: #9aa5b6;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all var(--transition-fast);
+    }
+    .layout-btn:hover { color: #ffffff; }
+    .layout-btn.active {
+      background: #5e81ac;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .theme-btn {
+      background: #20242b;
+      border: 1px solid #3b4252;
+      color: #ffffff;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .theme-btn:hover { border-color: #5e81ac; }
+
+    /* ==========================================================================
+       共通组件
+       ========================================================================== */
+    kbd {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--bg-sunken);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 1px 0 1px rgba(0,0,0,0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    code {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .callout {
+      margin: 20px 0;
+      padding: 16px 20px;
+      border-radius: 8px;
+      border-left: 4px solid;
+      background: var(--bg-card);
+      font-size: 14px;
+    }
+    .callout-tip { background: var(--callout-tip-bg); border-left-color: var(--callout-tip-border); }
+    .callout-warn { background: var(--callout-warn-bg); border-left-color: var(--callout-warn-border); }
+    .callout-title { font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+
+    .code-box {
+      background: var(--code-bg);
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      margin: 20px 0;
+      overflow: hidden;
+    }
+    .code-box-header {
+      background: rgba(255,255,255,0.05);
+      padding: 8px 16px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+    pre {
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      color: var(--code-text);
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    /* ==========================================================================
+       LAYOUT 1: 【BLENDER 官方门户与分册多页式】(Blender Hub & Book Layout)
+       ========================================================================== */
+    .layout-container-blender { display: none; }
+    [data-layout="blender-portal"] .layout-container-blender { display: block; }
+
+    .b-header {
+      height: 56px;
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+    .b-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 16px; }
+    .b-logo {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, #e87d0d, #265787);
+      border-radius: 6px;
+      display: grid; place-items: center; color: white; font-size: 14px;
+    }
+    .b-search {
+      flex: 1; max-width: 420px;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 6px 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; color: var(--text-muted);
+    }
+    .b-shell { display: flex; min-height: calc(100vh - 114px); }
+    .b-sidebar {
+      width: 280px; flex-shrink: 0;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      padding: 24px 16px;
+    }
+    .b-category-title {
+      font-size: 11px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--text-muted); margin: 20px 0 8px 8px;
+    }
+    .b-category-title:first-child { margin-top: 0; }
+    .b-menu { list-style: none; }
+    .b-menu-item a {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 12px; font-size: 13.5px; color: var(--text-sub);
+      text-decoration: none; border-radius: 6px; font-weight: 500;
+    }
+    .b-menu-item a:hover { background: var(--bg-card); color: var(--text-main); }
+    .b-menu-item a.active {
+      background: var(--bg-card); color: var(--primary);
+      font-weight: 700; border-left: 3px solid var(--primary);
+    }
+    .b-content { flex: 1; max-width: 900px; padding: 40px 48px; }
+
+    /* Blender Portal Hero Grid */
+    .b-hero-banner {
+      background: linear-gradient(135deg, var(--bg-card), var(--bg-sunken));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 32px;
+    }
+    .b-hero-title { font-size: 26px; font-weight: 800; margin-bottom: 8px; }
+    .b-hero-desc { font-size: 15px; color: var(--text-sub); margin-bottom: 20px; }
+    .b-quick-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .b-tag {
+      background: var(--bg-raised); border: 1px solid var(--border-color);
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      color: var(--text-sub); text-decoration: none;
+    }
+    .b-tag:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* Bento Grid */
+    .b-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin: 24px 0 40px 0;
+    }
+    .b-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 20px;
+      text-decoration: none;
+      color: inherit;
+      box-shadow: var(--shadow-sm);
+      transition: all var(--transition-fast);
+    }
+    .b-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .b-card-icon { font-size: 24px; margin-bottom: 8px; }
+    .b-card-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .b-card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+    .b-card-links { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 12px; color: var(--primary); }
+
+    /* ==========================================================================
+       LAYOUT 2: 【现代开发者全景工作台 / 顶部 MEGA-TABS 架构】(Studio & Mega-Tabs)
+       ========================================================================== */
+    .layout-container-studio { display: none; }
+    [data-layout="studio-tabs"] .layout-container-studio { display: block; }
+
+    .s-header {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .s-header-top {
+      height: 50px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    .s-mega-tabs {
+      display: flex;
+      padding: 0 24px;
+      gap: 4px;
+      overflow-x: auto;
+    }
+    .s-mega-tab {
+      padding: 10px 16px;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all var(--transition-fast);
+    }
+    .s-mega-tab:hover { color: var(--text-main); }
+    .s-mega-tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .s-shell { display: flex; }
+    .s-sidebar {
+      width: 250px; flex-shrink: 0;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      padding: 20px 12px;
+    }
+    .s-content-split {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 32px;
+      padding: 36px 40px;
+    }
+    .s-side-panel {
+      position: sticky;
+      top: 130px;
+      height: fit-content;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .s-panel-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; }
+    .s-pill-list { display: flex; flex-direction: column; gap: 8px; }
+    .s-pill {
+      background: var(--bg-sunken);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* ==========================================================================
+       LAYOUT 3: 【沉浸式分步教程与多选项卡书卷式】(Tabbed Stepper & Reader)
+       ========================================================================== */
+    .layout-container-reader { display: none; }
+    [data-layout="tabbed-reader"] .layout-container-reader { display: block; }
+
+    .r-shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+    .r-stepper-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px 24px;
+      margin-bottom: 32px;
+      box-shadow: var(--shadow-sm);
+    }
+    .r-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .r-step.active { color: var(--primary); }
+    .r-step-num {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--bg-sunken);
+      display: grid; place-items: center;
+      font-size: 12px; font-weight: 700;
+    }
+    .r-step.active .r-step-num {
+      background: var(--primary); color: white;
+    }
+    .r-step-arrow { color: var(--border-color); }
+
+    /* Interactive Tab Switcher within Article */
+    .r-tabs-box {
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 24px 0;
+      background: var(--bg-card);
+    }
+    .r-tabs-nav {
+      display: flex;
+      background: var(--bg-sunken);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .r-tab-item {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+    }
+    .r-tab-item.active {
+      color: var(--primary);
+      background: var(--bg-card);
+      border-bottom-color: var(--primary);
+    }
+    .r-tab-content { padding: 20px; }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       SUPER CONTROLLER (顶级方案切换器)
+       ========================================================================== */
+  -->
+  <div class="super-bar">
+    <div class="super-title">
+      <span>📐 TrenchBroom 3 大全新主题与页面布局架构选型演示</span>
+      <span class="super-badge" id="layout-badge">布局 1：Blender 官方门户与分册多页式</span>
+    </div>
+
+    <div class="super-actions">
+      <div class="layout-switcher">
+        <button class="layout-btn active" onclick="setLayout('blender-portal', '布局 1：Blender 官方门户与分册多页式 (Portal & Book)')">
+          <span>🏛️ 布局 1: Blender 门户</span>
+        </button>
+        <button class="layout-btn" onclick="setLayout('studio-tabs', '布局 2：顶级 Mega-Tabs 与开发分屏工作台 (Studio & Tabs)')">
+          <span>🚀 布局 2: Studio 顶级分栏</span>
+        </button>
+        <button class="layout-btn" onclick="setLayout('tabbed-reader', '布局 3：沉浸式教程分步与多引擎切换书卷 (Tabbed Stepper)')">
+          <span>📖 布局 3: 沉浸式分步书卷</span>
+        </button>
+      </div>
+
+      <button class="theme-btn" onclick="toggleGlobalTheme()">
+        <span id="theme-icon-indicator">🌙</span>
+        <span>切换深浅色</span>
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ==========================================================================
+       布局 1：BLENDER 官方门户与多页分册式架构 (PORTAL & BOOK)
+       ========================================================================== -->
+  <div class="layout-container-blender">
+    <header class="b-header">
+      <div class="b-brand">
+        <div class="b-logo">TB</div>
+        <span>TrenchBroom Manual</span>
+        <span style="font-size:11px; padding:2px 6px; background:var(--bg-sunken); border-radius:4px; font-family:var(--font-mono)">v2026.8 LTS</span>
+      </div>
+      <div class="b-search">
+        <span>🔍 搜索手册章节、工具或快捷键 (如: extrude, CSG)...</span>
+        <kbd>Ctrl K</kbd>
+      </div>
+      <div style="font-size:12px; font-weight:600; color:var(--primary)">EN / 简体中文</div>
+    </header>
+
+    <div class="b-shell">
+      <aside class="b-sidebar">
+        <div class="b-category-title">1. 入门与基础</div>
+        <ul class="b-menu">
+          <li class="b-menu-item"><a href="#"><span>00 简介与关于</span></a></li>
+          <li class="b-menu-item"><a href="#"><span>01 概念与 3D/2D 导航</span></a></li>
+          <li class="b-menu-item"><a href="#"><span>02 界面与效率工具</span></a></li>
+        </ul>
+
+        <div class="b-category-title">2. 建模与关卡构建</div>
+        <ul class="b-menu">
+          <li class="b-menu-item"><a href="#"><span>03 Brush 图元生成与形变</span></a></li>
+          <li class="b-menu-item"><a href="#" class="active"><span>04 顶点编辑与 CSG 运算</span></a></li>
+        </ul>
+
+        <div class="b-category-title">3. 材质与场景组织</div>
+        <ul class="b-menu">
+          <li class="b-menu-item"><a href="#"><span>05 材质系统与 UV 视图</span></a></li>
+          <li class="b-menu-item"><a href="#"><span>06 统一资产浏览器与预制体</span></a></li>
+          <li class="b-menu-item"><a href="#"><span>07 实体与 Outliner 组织</span></a></li>
+        </ul>
+
+        <div class="b-category-title">4. 扩展与高级开发</div>
+        <ul class="b-menu">
+          <li class="b-menu-item"><a href="#"><span>08 首选项与地图编译</span></a></li>
+          <li class="b-menu-item"><a href="#"><span>09 Python v2 插件开发指南</span></a></li>
+          <li class="b-menu-item"><a href="#"><span>10 MCP 智能体自动化接口</span></a></li>
+        </ul>
+      </aside>
+
+      <main class="b-content">
+        <!-- PORTAL HERO -->
+        <div class="b-hero-banner">
+          <h1 class="b-hero-title">🧱 关卡几何与 CSG 建模系统</h1>
+          <p class="b-hero-desc">掌握 TrenchBroom 高效的凸多面体 Brush 塑形、顶点切分、面挤出与 CSG 布尔几何运算。</p>
+          <div class="b-quick-tags">
+            <span style="font-size:12px; font-weight:700; color:var(--text-muted)">高频直达：</span>
+            <a href="#" class="b-tag">⚡ 挤出工具 (Extrude)</a>
+            <a href="#" class="b-tag">✂️ 裁剪平面 (Clip Tool)</a>
+            <a href="#" class="b-tag">🔄 扫掠放样 (Sweep)</a>
+            <a href="#" class="b-tag">🟣 CSG 挖空与相减</a>
+          </div>
+        </div>
+
+        <!-- BENTO MODULE CARDS -->
+        <h2 style="font-size:18px; margin-bottom:12px">📚 本模块核心子系统</h2>
+        <div class="b-grid">
+          <a href="#" class="b-card">
+            <div class="b-card-icon">📐</div>
+            <div class="b-card-title">Brush 基础图元与形变</div>
+            <div class="b-card-desc">长方体、圆柱、拱形、球体、CZG 曲线生成以及移动、旋转、缩放等变换操作。</div>
+            <div class="b-card-links">查看 8 个子章节 ➔</div>
+          </a>
+          <a href="#" class="b-card">
+            <div class="b-card-icon">✂️</div>
+            <div class="b-card-title">高级塑形与裁剪</div>
+            <div class="b-card-desc">Extrude 拉伸挤出、冲压 (Stamp)、三点裁剪面 (Clip) 以及多边形扫掠 (Sweep)。</div>
+            <div class="b-card-links">查看 5 个工具详解 ➔</div>
+          </a>
+          <a href="#" class="b-card">
+            <div class="b-card-icon">🧩</div>
+            <div class="b-card-title">CSG 布尔几何运算</div>
+            <div class="b-card-desc">凸合并 (Convex Merge)、相减 (Subtract)、挖空 (Hollow) 与材质自动继承规则。</div>
+            <div class="b-card-links">查看 CSG 实战示例 ➔</div>
+          </a>
+        </div>
+
+        <!-- RICH CONTENT -->
+        <h2 style="font-size:20px; font-weight:700; margin:32px 0 16px 0; border-bottom:1px solid var(--border-color); padding-bottom:8px">
+          CSG 相减与挖空操作规范
+        </h2>
+        <p style="margin-bottom:16px; color:var(--text-sub)">
+          使用 CSG 相减可以将一个或多个选中 Brush 的体积从目标 Brush 中扣除。使用快捷键 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>-</kbd> 执行操作。
+        </p>
+
+        <div class="callout callout-tip">
+          <div class="callout-title">💡 技巧提示 (Tip)</div>
+          <div>在执行复杂形状的 CSG 挖空时，建议开启网格吸附（Grid 16 或 32），以避免产生微小的共面浮点误差裂缝。</div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+
+  <!-- ==========================================================================
+       布局 2：顶级 MEGA-TABS 与开发分屏工作台 (STUDIO & TABS)
+       ========================================================================== -->
+  <div class="layout-container-studio">
+    <header class="s-header">
+      <div class="s-header-top">
+        <div style="font-weight:800; font-size:15px; display:flex; align-items:center; gap:8px">
+          <span style="background:var(--primary); color:white; padding:3px 8px; border-radius:4px">TB</span>
+          <span>TrenchBroom Developer Studio Docs</span>
+        </div>
+        <div style="font-size:13px; color:var(--text-muted)">
+          按 <kbd>Ctrl</kbd> <kbd>K</kbd> 呼出命令面板
+        </div>
+      </div>
+      <!-- TOP MEGA TABS -->
+      <nav class="s-mega-tabs">
+        <a href="#" class="s-mega-tab"><span>🚀 1. 入门上手</span></a>
+        <a href="#" class="s-mega-tab"><span>🖥️ 2. 界面与视口</span></a>
+        <a href="#" class="s-mega-tab"><span>🧱 3. 关卡建模</span></a>
+        <a href="#" class="s-mega-tab"><span>🎨 4. 材质与资产</span></a>
+        <a href="#" class="s-mega-tab active"><span>🐍 5. Python 扩展与 API</span></a>
+      </nav>
+    </header>
+
+    <div class="s-shell">
+      <aside class="s-sidebar">
+        <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:12px">PYTHON V2 EXTENSION</div>
+        <ul style="list-style:none; display:flex; flex-direction:column; gap:4px">
+          <li><a href="#" style="text-decoration:none; color:var(--primary); font-weight:700; display:block; padding:6px 10px; background:var(--bg-card); border-radius:6px">tb2 核心 API 速查</a></li>
+          <li><a href="#" style="text-decoration:none; color:var(--text-sub); display:block; padding:6px 10px">PluginPanel 控件库</a></li>
+          <li><a href="#" style="text-decoration:none; color:var(--text-sub); display:block; padding:6px 10px">插件清单规范</a></li>
+          <li><a href="#" style="text-decoration:none; color:var(--text-sub); display:block; padding:6px 10px">实战阵列生成器示例</a></li>
+        </ul>
+      </aside>
+
+      <!-- DUAL-PANE WORKSPACE CONTENT -->
+      <div class="s-content-split">
+        <div>
+          <h1 style="font-size:26px; font-weight:800; margin-bottom:12px">tb2.Document 事务与几何修改</h1>
+          <p style="color:var(--text-sub); margin-bottom:20px">
+            所有对地图 Brush、Entity 的修改必须运行在 <code>Document.transaction()</code> 上下文管理器中，以确保原子性和撤销历史完整。
+          </p>
+
+          <div class="code-box">
+            <div class="code-box-header">
+              <span>main.py (事务与选区平移)</span>
+              <span>Python 3.11</span>
+            </div>
+            <pre><code>import tb2
+
+doc = tb2.current_document()
+with doc.transaction("Duplicate & Array"):
+    for _ in range(5):
+        doc.selection.duplicate()
+        doc.selection.translate(64.0, 0.0, 0.0)</code></pre>
+          </div>
+
+          <div class="callout callout-warn">
+            <div class="callout-title">⚠️ 安全规则</div>
+            <div>严禁在事务外直接调用 <code>selection.translate()</code>，否则可能导致撤销树断裂。</div>
+          </div>
+        </div>
+
+        <!-- RIGHT FAST REFERENCE PANEL -->
+        <div class="s-side-panel">
+          <div class="s-panel-title">⚡ 快速参数参考 (Quick Specs)</div>
+          <div class="s-pill-list">
+            <div class="s-pill">
+              <span><code>current_document()</code></span>
+              <span style="font-size:11px; color:var(--primary)">-&gt; Document</span>
+            </div>
+            <div class="s-pill">
+              <span><code>selection.brushes</code></span>
+              <span style="font-size:11px; color:var(--primary)">list[Brush]</span>
+            </div>
+            <div class="s-pill">
+              <span><code>transaction(name)</code></span>
+              <span style="font-size:11px; color:var(--accent)">Context</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==========================================================================
+       布局 3：沉浸式分步教程与多选项卡书卷式 (TABBED STEPPER & READER)
+       ========================================================================== -->
+  <div class="layout-container-reader">
+    <div class="r-shell">
+      <!-- STEPPER PROGRESS -->
+      <div class="r-stepper-bar">
+        <div class="r-step active">
+          <div class="r-step-num">1</div>
+          <span>配置游戏引擎</span>
+        </div>
+        <div class="r-step-arrow">➔</div>
+        <div class="r-step active">
+          <div class="r-step-num">2</div>
+          <span>创建基本房间</span>
+        </div>
+        <div class="r-step-arrow">➔</div>
+        <div class="r-step">
+          <div class="r-step-num">3</div>
+          <span>放置玩家实体</span>
+        </div>
+        <div class="r-step-arrow">➔</div>
+        <div class="r-step">
+          <div class="r-step-num">4</div>
+          <span>编译并测试运行</span>
+        </div>
+      </div>
+
+      <h1 style="font-size:30px; font-weight:800; margin-bottom:16px">第一步：创建封闭房间与贴图对齐</h1>
+      <p style="font-size:16px; color:var(--text-sub); margin-bottom:24px">
+        本教程将指导您从零搭建一个标准的封闭中空房间，并根据您所使用的游戏引擎选择不同的贴图与实体规范。
+      </p>
+
+      <!-- INTERACTIVE TAB SWITCHER -->
+      <div class="r-tabs-box">
+        <div class="r-tabs-nav">
+          <div class="r-tab-item active" onclick="switchInnerTab(0)">Quake 1 / 2 (标准轴对齐)</div>
+          <div class="r-tab-item" onclick="switchInnerTab(1)">GoldSrc / Half-Life (Valve 220 投影)</div>
+          <div class="r-tab-item" onclick="switchInnerTab(2)">Quake 3 Arena (曲面 Patches)</div>
+        </div>
+        <div class="r-tab-content" id="tab-c-0">
+          <h3 style="font-size:16px; margin-bottom:8px">Quake 经典贴图锁定机制</h3>
+          <p style="font-size:14px; color:var(--text-sub)">使用标准 <code>[x, y, z]</code> 轴对齐投影，移动 Brush 时按住 <kbd>L</kbd> 可切换纹理锁定（Texture Lock）状态。</p>
+        </div>
+        <div class="r-tab-content" id="tab-c-1" style="display:none">
+          <h3 style="font-size:16px; margin-bottom:8px">GoldSrc Valve 220 纹理系统</h3>
+          <p style="font-size:14px; color:var(--text-sub)">支持任意斜面 3D 旋转 UV，贴图比例和旋转角度将在几何变换时由 Valve 220 算法精确锁定。</p>
+        </div>
+        <div class="r-tab-content" id="tab-c-2" style="display:none">
+          <h3 style="font-size:16px; margin-bottom:8px">Quake 3 贝塞尔曲面生成</h3>
+          <p style="font-size:14px; color:var(--text-sub)">支持按 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> 将选中的长方体转换为光滑贝塞尔网格曲面。</p>
+        </div>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-title">💡 自动中空 (Hollow) 捷径</div>
+        <div>拉伸出一个长方体后，直接按下 #menu(Tools/CSG/Hollow) 并输入壁厚 <code>16</code>，即可一键生成无漏风的封闭空心房间！</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==========================================================================
+       INTERACTIVE SCRIPTS
+       ========================================================================== -->
+  <script>
+    function setLayout(layout, badgeText) {
+      document.documentElement.setAttribute('data-layout', layout);
+      document.querySelectorAll('.layout-btn').forEach(btn => btn.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+      document.getElementById('layout-badge').textContent = badgeText;
+    }
+
+    function toggleGlobalTheme() {
+      const cur = document.documentElement.getAttribute('data-theme');
+      const next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      document.getElementById('theme-icon-indicator').textContent = next === 'dark' ? '🌙' : '☀️';
+    }
+
+    function switchInnerTab(idx) {
+      document.querySelectorAll('.r-tab-item').forEach((t, i) => {
+        t.classList.toggle('active', i === idx);
+      });
+      document.getElementById('tab-c-0').style.display = idx === 0 ? 'block' : 'none';
+      document.getElementById('tab-c-1').style.display = idx === 1 ? 'block' : 'none';
+      document.getElementById('tab-c-2').style.display = idx === 2 ? 'block' : 'none';
+    }
+  </script>
+</body>
+</html>

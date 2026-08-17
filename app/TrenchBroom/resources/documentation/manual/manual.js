@@ -69,6 +69,7 @@ const print_action = (key) => document.write(action_str(key));
 
   window.addEventListener("DOMContentLoaded", () => {
     const body = document.body;
+    const isZh = document.documentElement.lang.startsWith("zh");
     const article = document.getElementById("manual-article");
     const searchInput = document.getElementById("manual-search-input");
     const searchResults = document.getElementById("manual-search-results");
@@ -79,7 +80,131 @@ const print_action = (key) => document.write(action_str(key));
     const pageNavigation = document.getElementById("page-navigation-links");
     const currentSectionLabel = document.getElementById("current-section-label");
     const headings = [...article.querySelectorAll("h1[id], h2[id], h3[id]")];
+    const topHeadings = [...article.querySelectorAll("h1[id]")];
+
+    // =========================================================================
+    // 1. INJECT BLENDER-STYLE CATEGORY CAPTIONS INTO SIDEBAR TOC
+    // =========================================================================
+    const topUl = navigation.querySelector(".manual-navigation-scroll > ul");
+    if (topUl) {
+      const categories = isZh ? [
+        { afterIndex: 0, title: "1. 入门与基础" },
+        { targetId: "toc-brush_editing_and_creation", title: "2. 几何建模与关卡构建" },
+        { targetId: "toc-materials_and_uv", title: "3. 材质、资产与场景组织" },
+        { targetId: "toc-preferences_and_compilation", title: "4. 编译、扩展与自动化" },
+        { targetId: "toc-getting-involved", fallbackId: "toc-references_and_links", title: "5. 社区与参考" }
+      ] : [
+        { afterIndex: 0, title: "1. GETTING STARTED" },
+        { targetId: "toc-brush_editing_and_creation", title: "2. LEVEL MODELING" },
+        { targetId: "toc-materials_and_uv", title: "3. MATERIALS & SCENE" },
+        { targetId: "toc-preferences_and_compilation", title: "4. PIPELINE & EXTENSIONS" },
+        { targetId: "toc-getting-involved", fallbackId: "toc-references_and_links", title: "5. REFERENCE & LINKS" }
+      ];
+
+      categories.forEach(cat => {
+        let targetLi = null;
+        if (cat.targetId) {
+          const a = document.getElementById(cat.targetId);
+          if (a) targetLi = a.closest("li");
+        }
+        if (!targetLi && cat.fallbackId) {
+          const a = document.getElementById(cat.fallbackId);
+          if (a) targetLi = a.closest("li");
+        }
+        if (!targetLi && cat.afterIndex === 0) {
+          targetLi = topUl.firstElementChild;
+        }
+
+        if (targetLi && targetLi.parentElement === topUl) {
+          const caption = document.createElement("div");
+          caption.className = "manual-category-caption";
+          caption.textContent = cat.title;
+          topUl.insertBefore(caption, targetLi);
+        }
+      });
+    }
+
     const navLinks = [...navigation.querySelectorAll("a[href^='#']")];
+
+    // =========================================================================
+    // 2. INTERACTIVE CODE COPY BUTTONS
+    // =========================================================================
+    article.querySelectorAll("pre").forEach(pre => {
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "code-copy-btn";
+      copyBtn.type = "button";
+      copyBtn.textContent = isZh ? "复制" : "Copy";
+      copyBtn.style.cssText = "position:absolute; top:8px; right:8px; font-size:11px; padding:3px 8px; border-radius:4px; border:1px solid var(--border-subtle); background:var(--bg-surface); color:var(--text-secondary); cursor:pointer;";
+
+      copyBtn.addEventListener("click", () => {
+        const text = pre.querySelector("code")?.textContent || pre.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          copyBtn.textContent = isZh ? "已复制!" : "Copied!";
+          setTimeout(() => { copyBtn.textContent = isZh ? "复制" : "Copy"; }, 2000);
+        });
+      });
+      pre.style.position = "relative";
+      pre.appendChild(copyBtn);
+    });
+
+    // =========================================================================
+    // 3. INTERACTIVE MULTI-ENGINE TAB SWITCHERS
+    // =========================================================================
+    document.querySelectorAll(".tab-box").forEach(box => {
+      const btns = box.querySelectorAll(".tab-btn");
+      const panels = box.querySelectorAll(".tab-panel");
+      btns.forEach((btn, idx) => {
+        btn.addEventListener("click", () => {
+          btns.forEach(b => b.classList.remove("active"));
+          panels.forEach(p => p.classList.remove("active"));
+          btn.classList.add("active");
+          if (panels[idx]) panels[idx].classList.add("active");
+        });
+      });
+    });
+
+    // =========================================================================
+    // 4. BOTTOM PREV / NEXT CHAPTER DUAL-CARD PAGINATION
+    // =========================================================================
+    let paginationBar = document.querySelector(".pagination-bar");
+    if (!paginationBar) {
+      paginationBar = document.createElement("div");
+      paginationBar.className = "pagination-bar";
+      article.appendChild(paginationBar);
+    }
+
+    const updatePagination = (currentH1) => {
+      paginationBar.replaceChildren();
+      if (!currentH1) return;
+      const idx = topHeadings.indexOf(currentH1);
+      if (idx === -1) return;
+
+      const prevH1 = idx > 0 ? topHeadings[idx - 1] : null;
+      const nextH1 = idx < topHeadings.length - 1 ? topHeadings[idx + 1] : null;
+
+      if (prevH1) {
+        const prevCard = document.createElement("a");
+        prevCard.className = "pag-card prev";
+        prevCard.href = `#${prevH1.id}`;
+        prevCard.innerHTML = `<span class="pag-label">${isZh ? "⬅️ 上一章" : "⬅️ PREVIOUS"}</span><span class="pag-title">${escapeShortcutText(prevH1.textContent.trim())}</span>`;
+        paginationBar.appendChild(prevCard);
+      } else {
+        const placeholder = document.createElement("div");
+        paginationBar.appendChild(placeholder);
+      }
+
+      if (nextH1) {
+        const nextCard = document.createElement("a");
+        nextCard.className = "pag-card next";
+        nextCard.href = `#${nextH1.id}`;
+        nextCard.innerHTML = `<span class="pag-label">${isZh ? "下一章 ➡️" : "NEXT ➡️"}</span><span class="pag-title">${escapeShortcutText(nextH1.textContent.trim())}</span>`;
+        paginationBar.appendChild(nextCard);
+      }
+    };
+
+    // =========================================================================
+    // 5. SEARCH SYSTEM
+    // =========================================================================
     const searchIndex = headings.map((heading) => ({
       id: heading.id,
       title: heading.textContent.trim(),
@@ -133,6 +258,7 @@ const print_action = (key) => document.write(action_str(key));
       if (matches.length === 0) {
         const message = document.createElement("p");
         message.className = "search-message";
+        message.style.cssText = "padding:12px; font-size:13px; color:var(--text-muted);";
         message.textContent = body.dataset.searchNoResults;
         searchResults.append(message);
       } else {
@@ -142,10 +268,13 @@ const print_action = (key) => document.write(action_str(key));
           const context = document.createElement("span");
           button.type = "button";
           button.className = "search-result";
+          button.style.cssText = "display:flex; flex-direction:column; width:100%; text-align:left; padding:8px 12px; border:none; background:transparent; cursor:pointer; border-radius:4px; margin-bottom:2px;";
           button.setAttribute("role", "option");
           button.setAttribute("aria-selected", "false");
           title.textContent = entry.title;
-          context.textContent = entry.text.slice(0, 150) || body.dataset.searchEmpty;
+          title.style.cssText = "font-size:13px; color:var(--brand-primary); margin-bottom:2px;";
+          context.textContent = entry.text.slice(0, 140) || body.dataset.searchEmpty;
+          context.style.cssText = "font-size:11.5px; color:var(--text-muted); line-height:1.4;";
           button.append(title, context);
           button.addEventListener("click", () => openSection(entry.id));
           searchResults.append(button);
@@ -190,12 +319,15 @@ const print_action = (key) => document.write(action_str(key));
       }
     });
 
+    // =========================================================================
+    // 6. NAVIGATION DRAWER & THEMES
+    // =========================================================================
     const setNavigationOpen = (open) => {
-      body.classList.toggle("navigation-open", open);
+      navigation.classList.toggle("open", open);
       navToggle.setAttribute("aria-expanded", String(open));
       navScrim.hidden = !open;
     };
-    navToggle.addEventListener("click", () => setNavigationOpen(!body.classList.contains("navigation-open")));
+    navToggle.addEventListener("click", () => setNavigationOpen(!navigation.classList.contains("open")));
     navScrim.addEventListener("click", () => setNavigationOpen(false));
     navLinks.forEach((link) => link.addEventListener("click", () => setNavigationOpen(false)));
 
@@ -253,6 +385,7 @@ const print_action = (key) => document.write(action_str(key));
       if (pageNavigation.dataset.section !== topLevel?.id) {
         pageNavigation.dataset.section = topLevel?.id || "";
         renderPageNavigation(topLevel);
+        updatePagination(topLevel);
       }
       [...pageNavigation.querySelectorAll("a")].forEach((link) => {
         link.classList.toggle("active", link.hash === `#${heading.id}`);
@@ -260,7 +393,7 @@ const print_action = (key) => document.write(action_str(key));
     };
 
     headings.forEach((heading) => heading.tabIndex = -1);
-    const headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--header-height"), 10);
+    const headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--header-height"), 10) || 56;
     const observer = new IntersectionObserver((entries) => {
       const visible = entries.filter((entry) => entry.isIntersecting)
         .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);

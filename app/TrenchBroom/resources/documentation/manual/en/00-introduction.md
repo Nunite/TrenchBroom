@@ -4,7 +4,57 @@
 
 # Introduction {#introduction}
 
-TrenchBroom is a level editor for brush-based game engines such as Quake, Quake 2, and Hexen 2. It is easy to use and provides simple and advanced tools for creating complex and interesting levels. This document is the TrenchBroom manual. Reading it will teach you how to use TrenchBroom and its advanced features.
+TrenchBroom is a modern, cross-platform level editor for brush-based game engines such as Quake, Quake 2, Hexen 2, and GoldSrc (Half-Life). It provides an intuitive workflow, high-performance rendering, and comprehensive modeling and extension tools.
+
+::: manual-hero-banner
+**🚀 Welcome to TrenchBroom Documentation**
+
+Explore the complete user guide, modeling tools, material and asset browsers, Python scripting, and editor automation.
+
+::: manual-quick-tags
+[⚡ Getting Started](#getting_started){.manual-tag}
+[📐 Brush Modeling](#brush_editing_and_creation){.manual-tag}
+[✂️ CSG & Vertex Editing](#vertex_and_csg){.manual-tag}
+[🎨 Materials & UV](#materials_and_uv){.manual-tag}
+[📦 Asset Browser](#assets_and_prefabs){.manual-tag}
+[🐍 Python v2 Plugins](#python_scripting_and_plugins){.manual-tag}
+[🤖 MCP Automation](#mcp_automation){.manual-tag}
+:::
+:::
+
+::: manual-card-grid
+::: manual-card
+**🚀 1. Getting Started**
+
+Fundamental concepts, map hierarchy (World, Layers, Brushes, Entities), and 3D/2D viewport navigation.
+
+[➔ 3 Chapters](#getting_started)
+:::
+
+::: manual-card
+**🧱 2. Level Modeling & CSG**
+
+Brush primitives, extrusion, clipping, sweeping, vertex editing, and CSG boolean operations.
+
+[➔ 2 Chapters](#brush_editing_and_creation)
+:::
+
+::: manual-card
+**🎨 3. Materials, Assets & Scene**
+
+Material browser, UV editor, unified GoldSrc asset browser (MDL, SPR, WAV), prefabs, and Outliner.
+
+[➔ 3 Chapters](#materials_and_uv)
+:::
+
+::: manual-card
+**⚙️ 4. Pipeline & Extensions**
+
+Preferences, compiler toolchains, engine testing, Python v2 plugins, and MCP automation.
+
+[➔ 4 Chapters](#preferences_and_compilation)
+:::
+:::
 
 ## Features {#features}
 
@@ -21,15 +71,14 @@ TrenchBroom is a level editor for brush-based game engines such as Quake, Quake 
   - Run external compilers and launch game engines
   - Interactive Python Console and manifest-based Python v2 plugins
   - Optional localhost MCP endpoint for guarded editor automation
-  - Point file support
-  - Portal file support
+  - Point file and portal file support
   - Automatic backups
   - Free and cross platform
 * **Brush Editing**
   - Robust vertex editing with edge and face splitting and manipulating multiple vertices together
   - Clipping tool with two and three points
   - Scale and shear tools
-  - CSG operations: merge, subtract, hollow
+  - CSG operations: merge, subtract, hollow, intersect
   - UV view for easy texturing manipulations
   - Precise alignment lock for all brush editing operations
   - Multiple material collections
