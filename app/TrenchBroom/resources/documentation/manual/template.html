@@ -15,25 +15,15 @@
   </head>
   <body data-search-empty="$search-empty$" data-search-no-results="$search-no-results$">
     <header class="manual-header">
-      <div class="manual-brand">
+      <div class="header-left">
         <button class="icon-button nav-toggle" type="button" aria-label="$navigation-toggle$" aria-controls="manual-navigation" aria-expanded="false">&#9776;</button>
-        <img src="$resource-prefix$/images/icon.png" alt="" width="28" height="28">
-        <div class="manual-brand-copy">
+        <a class="header-brand-mobile" href="#">
+          <img src="$resource-prefix$/images/icon.png" alt="" width="20" height="20">
           <strong>$manual-title$</strong>
-          <span>__TB_BUILD_ID__</span>
-        </div>
+        </a>
       </div>
 
-      <div class="manual-search-wrap">
-        <label class="manual-search" for="manual-search-input">
-          <span class="search-icon" aria-hidden="true"></span>
-          <input id="manual-search-input" type="search" autocomplete="off" placeholder="$search-placeholder$" aria-controls="manual-search-results" aria-expanded="false">
-          <kbd>Ctrl K</kbd>
-        </label>
-        <div id="manual-search-results" class="manual-search-results" role="listbox" hidden></div>
-      </div>
-
-      <div class="manual-actions">
+      <div class="header-right">
         <nav class="language-switcher" aria-label="$language-label$">
           <a href="$english-href$"$if(english-current)$ aria-current="page"$endif$>EN</a>
           <a href="$chinese-href$"$if(chinese-current)$ aria-current="page"$endif$>中文</a>
@@ -45,7 +35,25 @@
     <div class="manual-shell">
       $if(toc)$
       <nav id="manual-navigation" class="manual-navigation" aria-label="$navigation-label$">
-        <div class="manual-navigation-title">$contents-label$</div>
+        <div class="sidebar-brand-container">
+          <a class="sidebar-brand" href="#">
+            <img src="$resource-prefix$/images/icon.png" alt="Logo" width="24" height="24">
+            <div class="sidebar-brand-text">
+              <strong>$manual-title$</strong>
+              <span>__TB_BUILD_ID__</span>
+            </div>
+          </a>
+        </div>
+
+        <div class="sidebar-search-wrap">
+          <label class="sidebar-search" for="manual-search-input">
+            <span class="search-icon" aria-hidden="true"></span>
+            <input id="manual-search-input" type="search" autocomplete="off" placeholder="$search-placeholder$" aria-controls="manual-search-results" aria-expanded="false">
+            <kbd>Ctrl K</kbd>
+          </label>
+          <div id="manual-search-results" class="manual-search-results" role="listbox" hidden></div>
+        </div>
+
         <div class="manual-navigation-scroll">
           $toc$
         </div>

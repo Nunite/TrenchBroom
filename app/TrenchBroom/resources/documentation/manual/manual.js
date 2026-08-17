@@ -314,7 +314,7 @@ const print_action = (key) => document.write(action_str(key));
     });
 
     document.addEventListener("click", (event) => {
-      if (!event.target.closest(".manual-search-wrap")) {
+      if (!event.target.closest(".sidebar-search-wrap") && !event.target.closest(".manual-search-wrap")) {
         closeSearch();
       }
     });
