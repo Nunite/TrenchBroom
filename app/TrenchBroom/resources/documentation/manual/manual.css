@@ -1331,36 +1331,43 @@ tr:last-child td {
 
 .api-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
-  margin: 20px 0;
+  margin: 24px 0 32px 0;
+}
+
+.api-grid > p {
+  margin: 0 !important;
+  display: flex;
 }
 
 .api-card {
-  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 16px 20px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
+  box-shadow: var(--card-shadow);
   transition: all var(--transition-fast);
   text-decoration: none;
-  color: inherit;
+  color: var(--text-secondary);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.api-card strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-primary);
 }
 
 .api-card:hover {
   border-color: var(--brand-primary);
   transform: translateY(-2px);
   box-shadow: var(--card-shadow-hover);
-}
-
-.api-card h3 {
-  margin: 0 0 6px 0;
-  font-size: 17px;
-  color: var(--brand-primary);
-}
-
-.api-card p {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-  line-height: 1.5;
+  color: var(--text-primary);
 }
