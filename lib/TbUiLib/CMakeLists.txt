@@ -164,7 +164,6 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OnePaneMapView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/outliner/OutlinerEntityPropertyEditor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/outliner/OutlinerInspector.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/outliner/OutlinerModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/outliner/OutlinerTreeWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PathTool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PathToolController.cpp
@@ -389,7 +388,6 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/OnePaneMapView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/outliner/OutlinerEntityPropertyEditor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/outliner/OutlinerInspector.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/outliner/OutlinerModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/outliner/OutlinerTreeWidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PathTool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PathToolController.h

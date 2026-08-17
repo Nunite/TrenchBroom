@@ -144,8 +144,8 @@ struct OutlinerTreeFixture
 class TestOutlinerTreeWidget : public OutlinerTreeWidget
 {
 public:
-  using OutlinerTreeWidget::OutlinerTreeWidget;
   using OutlinerTreeWidget::dropSelectedItemsOnItem;
+  using OutlinerTreeWidget::OutlinerTreeWidget;
 };
 } // namespace
 
@@ -269,7 +269,10 @@ TEST_CASE("OutlinerTreeWidget")
       const auto x = tree.header()->sectionViewportPosition(column)
                      + tree.header()->sectionSize(column) / 2;
       QTest::mouseClick(
-        tree.viewport(), Qt::LeftButton, Qt::NoModifier, QPoint{x, itemRect.center().y()});
+        tree.viewport(),
+        Qt::LeftButton,
+        Qt::NoModifier,
+        QPoint{x, itemRect.center().y()});
       processOutlinerTreeUpdates();
     };
 

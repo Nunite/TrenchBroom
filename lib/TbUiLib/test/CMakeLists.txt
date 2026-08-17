@@ -31,7 +31,6 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_McpSessionState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_McpToolRegistry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_OutlinerEntityPropertyEditor.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_OutlinerModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_OutlinerTreeWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PieMenu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PieMenuSettingsDialog.cpp
