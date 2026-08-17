@@ -236,6 +236,33 @@ print("hello stderr", file=sys.stderr)
       != logger.messages.end());
   }
 
+  SECTION("runs persistent console commands")
+  {
+    auto logger = TestLogger{};
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &logger;
+
+    auto& runtime = PythonRuntime::instance();
+    REQUIRE(runtime.runConsoleCommand(context, "console_value = 41"));
+    REQUIRE(runtime.runConsoleCommand(context, "console_value + 1"));
+    CHECK(logger.messages.back() == "42");
+
+    REQUIRE(
+      runtime.runConsoleCommand(context, "tb2.current_document().entities[0].classname"));
+    CHECK(logger.messages.back() == "'worldspawn'");
+
+    CHECK_FALSE(runtime.runConsoleCommand(context, "1 / 0"));
+    CHECK(runtime.lastError().find("ZeroDivisionError") != std::string::npos);
+
+    runtime.cleanupDocument(window);
+    CHECK_FALSE(runtime.runConsoleCommand(context, "console_value"));
+    CHECK(runtime.lastError().find("NameError") != std::string::npos);
+  }
+
   SECTION("reports tracebacks and plugin load errors")
   {
     auto env = fs::TestEnvironment{};

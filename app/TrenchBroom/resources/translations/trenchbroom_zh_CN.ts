@@ -3420,6 +3420,19 @@ This panel is reserved for plugin-provided UI.</source>
     </message>
 </context>
 <context>
+    <name>tb::ui::PythonConsole</name>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/PythonConsole.cpp" line="65"/>
+        <source>Run</source>
+        <translation>运行</translation>
+    </message>
+    <message>
+        <location filename="../../../../lib/TbUiLib/src/PythonConsole.cpp" line="76"/>
+        <source>Python command input</source>
+        <translation>Python 命令输入</translation>
+    </message>
+</context>
+<context>
     <name>tb::ui::PythonPluginManagerDialog</name>
     <message>
         <location filename="../../../../lib/TbUiLib/src/PythonPluginManagerDialog.cpp" line="93"/>

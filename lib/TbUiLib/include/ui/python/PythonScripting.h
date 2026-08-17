@@ -22,6 +22,7 @@
 #include "base/Macros.h"
 
 #include <filesystem>
+#include <string_view>
 
 namespace tb::ui
 {
@@ -38,7 +39,7 @@ public:
   static PythonScripting& instance();
 
   bool runScript(MapWindow& frame, const std::filesystem::path& path);
+  bool runConsoleCommand(MapWindow& frame, std::string_view source);
 };
 
 } // namespace tb::ui
-

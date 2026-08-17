@@ -29,6 +29,7 @@
 #include "ui/IssueBrowser.h"
 #include "ui/MapDocument.h"
 #include "ui/ModelInspector.h"
+#include "ui/PythonConsole.h"
 #include "ui/TabBar.h"
 #include "ui/TabBook.h"
 #include "ui/WidgetState.h"
@@ -76,7 +77,7 @@ Console* InfoPanel::console() const
   return m_console;
 }
 
-Console* InfoPanel::pythonConsole() const
+PythonConsole* InfoPanel::pythonConsole() const
 {
   return m_pythonConsole;
 }

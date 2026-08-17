@@ -85,6 +85,7 @@ class MapView3D;
 enum class MapViewLayout;
 class MapViewToolBox;
 class ObjExportDialog;
+class PythonConsole;
 class SignalDelayer;
 class SwitchableMapViewContainer;
 class Tool;
@@ -116,7 +117,7 @@ private:
   QPointer<MapViewBase> m_currentMapView;
   InfoPanel* m_infoPanel = nullptr;
   Console* m_console = nullptr;
-  Console* m_pythonConsole = nullptr;
+  PythonConsole* m_pythonConsole = nullptr;
   Inspector* m_inspector = nullptr;
 
   QComboBox* m_gridChoice = nullptr;

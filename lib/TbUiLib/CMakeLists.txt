@@ -177,6 +177,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PrefabToolController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PreferenceDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PreferencePane.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PythonConsole.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PythonPluginManagerDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonHandleRegistry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginManifest.cpp
@@ -401,6 +402,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PrefabToolController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PreferenceDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PreferencePane.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PythonConsole.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PythonPluginManagerDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonHandleRegistry.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonExecutionContext.h

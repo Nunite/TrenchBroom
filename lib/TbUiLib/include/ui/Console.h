@@ -56,10 +56,4 @@ private:
   void showContextMenu(const QPoint& pos);
 };
 
-class PythonConsole : public Console
-{
-public:
-  explicit PythonConsole(QWidget* parent = nullptr);
-};
-
 } // namespace tb::ui

@@ -12,13 +12,20 @@
 #endif
 
 #include <Python.h>
+
 #include <fstream>
 #include <optional>
 #include <sstream>
 #include <string_view>
+#include <unordered_map>
 
 namespace tb::ui
 {
+struct PythonRuntimeState
+{
+  std::unordered_map<MapWindow*, PyObject*> consoleGlobals;
+};
+
 namespace
 {
 thread_local PythonExecutionContext* g_currentExecutionContext = nullptr;
@@ -259,9 +266,40 @@ std::string readFile(const std::filesystem::path& path)
   buffer << stream.rdbuf();
   return buffer.str();
 }
+
+PyObject* createConsoleGlobals()
+{
+  auto* globals = PyDict_New();
+  if (globals == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto* name = PyUnicode_FromString("__tb_console__");
+  auto* tb2Module = PyImport_ImportModule("tb2");
+  const auto initialized =
+    name != nullptr && tb2Module != nullptr
+    && PyDict_SetItemString(globals, "__builtins__", PyEval_GetBuiltins()) == 0
+    && PyDict_SetItemString(globals, "__name__", name) == 0
+    && PyDict_SetItemString(globals, "tb2", tb2Module) == 0;
+  Py_XDECREF(name);
+  Py_XDECREF(tb2Module);
+
+  if (!initialized)
+  {
+    Py_DECREF(globals);
+    return nullptr;
+  }
+  return globals;
+}
 } // namespace
 
-PythonRuntime::PythonRuntime() = default;
+PythonRuntime::PythonRuntime()
+  : m_state{std::make_unique<PythonRuntimeState>()}
+{
+}
+
+PythonRuntime::~PythonRuntime() = default;
 
 PythonRuntime& PythonRuntime::instance()
 {
@@ -313,6 +351,103 @@ bool PythonRuntime::runScript(
 bool PythonRuntime::runScript(PythonPluginSession& session)
 {
   return runScript(session.context(), session.context().scriptPath, &session);
+}
+
+bool PythonRuntime::runConsoleCommand(
+  const PythonExecutionContext& context, const std::string_view source)
+{
+  m_lastError.clear();
+  if (context.mapWindow == nullptr)
+  {
+    m_lastError = "Python console requires an active map window";
+    if (context.logger != nullptr)
+    {
+      context.logger->error() << m_lastError;
+    }
+    return false;
+  }
+  if (!ensureInitialized())
+  {
+    m_lastError = "Python v2 initialization failed";
+    if (context.logger != nullptr)
+    {
+      context.logger->error() << m_lastError;
+    }
+    return false;
+  }
+
+  auto gil = PyGILState_Ensure();
+  auto releaseGil = kdl::invoke_later{[&]() { PyGILState_Release(gil); }};
+  auto scopedContext = ScopedExecutionContext{context};
+  auto scopedStdStreamRedirect = ScopedStdStreamRedirect{};
+  const auto reportError = [&]() {
+    m_lastError = formatCurrentException();
+    if (context.logger != nullptr)
+    {
+      context.logger->error() << m_lastError;
+    }
+    return false;
+  };
+
+  auto [globalsIt, inserted] =
+    m_state->consoleGlobals.try_emplace(context.mapWindow, nullptr);
+  if (inserted)
+  {
+    globalsIt->second = createConsoleGlobals();
+    if (globalsIt->second == nullptr)
+    {
+      m_state->consoleGlobals.erase(globalsIt);
+      return reportError();
+    }
+  }
+  auto* globals = globalsIt->second;
+
+  const auto sourceString = std::string{source};
+  auto expression = true;
+  auto* code = Py_CompileString(sourceString.c_str(), "<console>", Py_eval_input);
+  if (code == nullptr && PyErr_ExceptionMatches(PyExc_SyntaxError))
+  {
+    PyErr_Clear();
+    expression = false;
+    code = Py_CompileString(sourceString.c_str(), "<console>", Py_file_input);
+  }
+  if (code == nullptr)
+  {
+    return reportError();
+  }
+
+  auto* result = PyEval_EvalCode(code, globals, globals);
+  Py_DECREF(code);
+  if (result == nullptr)
+  {
+    return reportError();
+  }
+
+  if (expression && result != Py_None && context.logger != nullptr)
+  {
+    auto* representation = PyObject_Repr(result);
+    if (representation == nullptr)
+    {
+      Py_DECREF(result);
+      return reportError();
+    }
+
+    auto representationSize = Py_ssize_t{0};
+    const auto* representationText =
+      PyUnicode_AsUTF8AndSize(representation, &representationSize);
+    if (representationText == nullptr)
+    {
+      Py_DECREF(representation);
+      Py_DECREF(result);
+      return reportError();
+    }
+    context.logger->info() << std::string_view{
+      representationText, static_cast<size_t>(representationSize)};
+    Py_DECREF(representation);
+  }
+
+  Py_DECREF(result);
+  return true;
 }
 
 void PythonRuntime::runCallback(PythonPluginSession& session, void* callback)
@@ -526,6 +661,12 @@ void PythonRuntime::cleanupDocument(MapWindow& mapWindow)
   }
 
   auto gil = PyGILState_Ensure();
+  if (const auto globalsIt = m_state->consoleGlobals.find(&mapWindow);
+      globalsIt != std::end(m_state->consoleGlobals))
+  {
+    Py_DECREF(globalsIt->second);
+    m_state->consoleGlobals.erase(globalsIt);
+  }
   auto* module = PyImport_ImportModule("tb2");
   if (module != nullptr)
   {

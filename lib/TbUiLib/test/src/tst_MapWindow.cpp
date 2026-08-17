@@ -27,9 +27,11 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QStatusBar>
 #include <QStyleOptionViewItem>
+#include <QTextEdit>
 #include <QToolButton>
 #include <QWidget>
 #include <QtTest/QTest>
@@ -69,6 +71,7 @@
 #include "ui/MapViewBase.h"
 #include "ui/MapWindow.h"
 #include "ui/PieMenu.h"
+#include "ui/PythonConsole.h"
 #include "ui/QPathUtils.h"
 #include "ui/python/PythonScripting.h"
 
@@ -231,6 +234,33 @@ TEST_CASE("MapWindow")
     CHECK(window.findChild<QWidget*>("InfoPanel_Assets") != nullptr);
     CHECK(window.findChild<QWidget*>("ModelBrowser_Controls") != nullptr);
     CHECK(window.findChild<QWidget*>("ModelBrowser_FolderTree") != nullptr);
+  }
+
+  SECTION("runs commands from the Python console")
+  {
+    auto* infoPanel = window.findChild<InfoPanel*>("MapWindow_InfoPanel");
+    REQUIRE(infoPanel != nullptr);
+    auto* pythonConsole = infoPanel->pythonConsole();
+    REQUIRE(pythonConsole != nullptr);
+
+    auto* input = pythonConsole->findChild<QPlainTextEdit*>("PythonConsole_Input");
+    auto* runButton = pythonConsole->findChild<QPushButton*>("PythonConsole_Run");
+    auto* output = pythonConsole->findChild<QTextEdit*>("Console_TextView");
+    REQUIRE(input != nullptr);
+    REQUIRE(runButton != nullptr);
+    REQUIRE(output != nullptr);
+    REQUIRE_FALSE(runButton->isEnabled());
+
+    input->setPlainText(QStringLiteral("console_value = 41"));
+    REQUIRE(runButton->isEnabled());
+    runButton->click();
+    input->setPlainText(QStringLiteral("console_value + 1"));
+    runButton->click();
+    input->setPlainText(QStringLiteral("tb2.current_document().entities[0].classname"));
+    runButton->click();
+
+    QTRY_VERIFY_WITH_TIMEOUT(output->toPlainText().contains(QStringLiteral("42")), 500);
+    CHECK(output->toPlainText().contains(QStringLiteral("'worldspawn'")));
   }
 
   SECTION("exposes styled inspector and browser sections")

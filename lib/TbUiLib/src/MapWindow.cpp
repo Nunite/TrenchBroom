@@ -106,6 +106,7 @@
 #include "ui/MapWindowManager.h"
 #include "ui/ObjExportDialog.h"
 #include "ui/PluginInspector.h"
+#include "ui/PythonConsole.h"
 #include "ui/QPathUtils.h"
 #include "ui/QStringUtils.h"
 #include "ui/QStyleUtils.h"
@@ -270,6 +271,7 @@ MapWindow::MapWindow(AppController& appController, std::unique_ptr<MapDocument> 
 MapWindow::~MapWindow()
 {
   m_pythonPluginManager.unloadPlugins(*this);
+  PythonRuntime::instance().cleanupDocument(*this);
   disconnect(qApp, &QApplication::focusChanged, this, &MapWindow::focusChange);
 
   // Stop the autosave timer
@@ -504,6 +506,10 @@ void MapWindow::createGui()
 
   // SwitchableMapViewContainer should have constructed a MapViewBase
   contract_assert(m_currentMapView);
+
+  m_pythonConsole->setCommandExecutor([this](const std::string& source) {
+    PythonScripting::instance().runConsoleCommand(*this, source);
+  });
 
   m_inspector = new Inspector{m_appController, document()};
   m_inspector->setObjectName("Inspector");

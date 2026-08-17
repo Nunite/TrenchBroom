@@ -32,6 +32,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPlainTextEdit>
 #include <QPointer>
 #include <QPushButton>
 #include <QScrollArea>
@@ -177,6 +178,42 @@ void configureSupportingSnapshot(QWidget& targetWidget)
       QStringLiteral("MapWindow_VerticalSplitterSplitter")))
   {
     splitter->setSizes(QList<int>{560, 340});
+  }
+}
+
+void configurePythonConsoleSnapshot(QWidget& targetWidget)
+{
+  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
+  if (mapWindow == nullptr)
+  {
+    return;
+  }
+
+  mapWindow->switchToInfoPanelPage(InfoPanelPage::PythonConsole);
+  if (
+    auto* splitter = mapWindow->findChild<QSplitter*>(
+      QStringLiteral("MapWindow_VerticalSplitterSplitter")))
+  {
+    splitter->setSizes(QList<int>{560, 340});
+  }
+
+  auto* input =
+    mapWindow->findChild<QPlainTextEdit*>(QStringLiteral("PythonConsole_Input"));
+  auto* runButton =
+    mapWindow->findChild<QPushButton*>(QStringLiteral("PythonConsole_Run"));
+  if (
+    input != nullptr && runButton != nullptr
+    && !mapWindow->property("uiSnapshotPythonConsoleExecuted").toBool())
+  {
+    input->setPlainText(QStringLiteral("tb2.current_document().entities[0].classname"));
+    runButton->click();
+    mapWindow->setProperty("uiSnapshotPythonConsoleExecuted", true);
+  }
+
+  if (input != nullptr)
+  {
+    input->setPlainText(QStringLiteral("print('Ready')"));
+    input->setFocus(Qt::OtherFocusReason);
   }
 }
 
@@ -411,6 +448,10 @@ void configureSnapshot(QWidget& targetWidget, const QString& targetName)
   else if (targetName == QStringLiteral("supporting"))
   {
     configureSupportingSnapshot(targetWidget);
+  }
+  else if (targetName == QStringLiteral("python-console"))
+  {
+    configurePythonConsoleSnapshot(targetWidget);
   }
   else if (isInspectorSnapshotTarget(targetName))
   {

@@ -32,6 +32,7 @@ class AppController;
 class IssueBrowser;
 class MapDocument;
 class ModelInspector;
+class PythonConsole;
 class TabBook;
 
 enum class InfoPanelPage
@@ -48,7 +49,7 @@ class InfoPanel : public QWidget
 private:
   TabBook* m_tabBook = nullptr;
   Console* m_console = nullptr;
-  Console* m_pythonConsole = nullptr;
+  PythonConsole* m_pythonConsole = nullptr;
   IssueBrowser* m_issueBrowser = nullptr;
   ModelInspector* m_modelInspector = nullptr;
 
@@ -57,7 +58,7 @@ public:
   ~InfoPanel() override;
 
   Console* console() const;
-  Console* pythonConsole() const;
+  PythonConsole* pythonConsole() const;
   void switchToPage(InfoPanelPage page);
   InfoPanelPage currentPage() const;
 

@@ -45,4 +45,15 @@ bool PythonScripting::runScript(MapWindow& frame, const std::filesystem::path& p
   return PythonRuntime::instance().runScript(context, path);
 }
 
+bool PythonScripting::runConsoleCommand(MapWindow& frame, const std::string_view source)
+{
+  auto context = PythonExecutionContext{};
+  context.mapWindow = &frame;
+  context.document = &frame.document();
+  context.appController = &frame.appController();
+  context.currentMapView = frame.currentMapViewBase();
+  context.logger = &frame.pythonLogger();
+  return PythonRuntime::instance().runConsoleCommand(context, source);
+}
+
 } // namespace tb::ui

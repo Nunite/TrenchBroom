@@ -5,11 +5,13 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace tb::ui
 {
 class PythonPluginSession;
+struct PythonRuntimeState;
 
 class PythonRuntime
 {
@@ -18,11 +20,13 @@ private:
 
 public:
   static PythonRuntime& instance();
+  ~PythonRuntime();
 
   bool ensureInitialized();
   bool runScript(
     const PythonExecutionContext& context, const std::filesystem::path& path);
   bool runScript(PythonPluginSession& session);
+  bool runConsoleCommand(const PythonExecutionContext& context, std::string_view source);
   void runCallback(PythonPluginSession& session, void* callback);
   void emitEvent(const std::string& eventName, MapWindow& mapWindow);
   void emitEvent(
@@ -36,6 +40,7 @@ public:
 
 private:
   std::string m_lastError;
+  std::unique_ptr<PythonRuntimeState> m_state;
 
   bool runScript(
     const PythonExecutionContext& context,
