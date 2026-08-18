@@ -22,6 +22,51 @@
 
 Python 内置 `print(...)` 函数的所有标准输出均会自动捕获并流式输出至控制台中。当发生未捕获的异常或语法错误时，控制台会自动以红色高亮打印带有源文件行号的完整 Traceback 调用栈信息。
 
+### 实用控制台操作示例 {#console_examples}
+
+#### 检查选区与打印 Brush 详细信息 {#example_inspect_selection}
+
+```python
+doc = tb2.current_document()
+brushes = doc.selection.brushes
+print(f"Selected {len(brushes)} brush(es):")
+for i, brush in enumerate(brushes):
+    faces = brush.faces()
+    print(f"  Brush #{i}: {len(faces)} faces")
+    for face in faces:
+        print(f"    - Material: {face.material}, Vertices: {len(face.vertices)}")
+```
+
+#### 复制选区并平移移动 Brush {#example_duplicate_and_translate}
+
+```python
+doc = tb2.current_document()
+with doc.transaction("Duplicate Selection"):
+    doc.selection.duplicate()
+    doc.selection.translate(0, 0, 64)
+```
+
+#### 循环生成阶梯阵列 {#example_step_array}
+
+```python
+doc = tb2.current_document()
+with doc.transaction("Generate Step Array"):
+    for _ in range(8):
+        doc.selection.duplicate()
+        doc.selection.translate(64, 0, 16)
+```
+
+#### 批量赋予表面材质 {#example_batch_face_materials}
+
+```python
+doc = tb2.current_document()
+with doc.transaction("Apply Face Material"):
+    for face in doc.selection.brush_faces:
+        face.set_material("common/caulk")
+```
+
+#### 批量规范化实体属性 {#example_batch_entity_properties}
+
 ```python
 doc = tb2.current_document()
 with doc.transaction("Batch Align Entities"):

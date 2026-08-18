@@ -22,6 +22,51 @@ The console provides an interactive REPL with dual-mode evaluation:
 
 All standard output from Python's built-in `print(...)` function is captured and streamed directly into the console. When an unhandled exception or syntax error occurs, a formatted traceback with source line numbers is printed in red.
 
+### Practical Console Examples {#console_examples}
+
+#### Inspecting Selection and Brush Information {#example_inspect_selection}
+
+```python
+doc = tb2.current_document()
+brushes = doc.selection.brushes
+print(f"Selected {len(brushes)} brush(es):")
+for i, brush in enumerate(brushes):
+    faces = brush.faces()
+    print(f"  Brush #{i}: {len(faces)} faces")
+    for face in faces:
+        print(f"    - Material: {face.material}, Vertices: {len(face.vertices)}")
+```
+
+#### Duplicating and Translating Brushes {#example_duplicate_and_translate}
+
+```python
+doc = tb2.current_document()
+with doc.transaction("Duplicate Selection"):
+    doc.selection.duplicate()
+    doc.selection.translate(0, 0, 64)
+```
+
+#### Generating a Step Array {#example_step_array}
+
+```python
+doc = tb2.current_document()
+with doc.transaction("Generate Step Array"):
+    for _ in range(8):
+        doc.selection.duplicate()
+        doc.selection.translate(64, 0, 16)
+```
+
+#### Batch Applying Face Materials {#example_batch_face_materials}
+
+```python
+doc = tb2.current_document()
+with doc.transaction("Apply Face Material"):
+    for face in doc.selection.brush_faces:
+        face.set_material("common/caulk")
+```
+
+#### Batch Normalizing Entity Properties {#example_batch_entity_properties}
+
 ```python
 doc = tb2.current_document()
 with doc.transaction("Batch Align Entities"):
