@@ -10,6 +10,8 @@ Model cells render their model preview, sprite cells render the first supported 
 
 Drag a model or sprite into a viewport to create an entity using that asset. Drag a sound to assign or create the appropriate sound reference where the current game and editor context support it. Drag a prefab to place its stored map objects.
 
+![Asset Browser](images/AssetBrowser.png)
+
 ### Reusable Prefabs {#reusable_prefabs}
 
 Select map objects and click **Save selection as prefab** in the Assets toolbar to create a `.tbprefab` file and thumbnail. The prefab directory is configured under **Preferences > Misc > Tools**. Prefabs appear under the `prefabs` root and can be dragged into the map; right-click a prefab to rename or delete it.

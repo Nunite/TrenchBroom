@@ -110,6 +110,8 @@ with doc.transaction("Batch Align Entities"):
 
 TrenchBroom features an embedded Python v2 runtime and extension system. Open **Preferences > Misc > Python Plugin Manager** to manage manifest-based UI plugins. The manager lists configured plugin directories, detected plugins, load status, metadata, and errors. Use search or **Only show issues** to diagnose larger plugin sets, then refresh after changing files.
 
+![Plugin Inspector](images/PluginInspector.png)
+
 #### Plugin Types and Lifecycle {#plugin_types_and_lifecycle}
 
 TrenchBroom distinguishes between two plugin types:

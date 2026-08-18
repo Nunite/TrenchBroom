@@ -29,7 +29,7 @@
 
 ## 视图布局与渲染 {#view_layout_and_rendering}
 
-![视图首选项（macOS）](images/ViewPreferences.png)
+![视图首选项](images/ViewPreferences.png)
 
 在此首选项窗格中，你可以选择编辑区域的布局。共有四种可用布局：
 
@@ -146,7 +146,7 @@ TrenchBroom 会在以下位置通知你有新更新：
 
 在上图中，更新器尚未执行检查，因此链接显示为“Check for updates”。点击该链接会开始检查更新。
 
-![更新偏好设置（macOS）](images/UpdatePreferences.png)
+![更新偏好设置](images/UpdatePreferences.png)
 
 可以在偏好设置中配置更新器。可用设置如下：
 

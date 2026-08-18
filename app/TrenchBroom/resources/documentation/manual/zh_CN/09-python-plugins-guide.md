@@ -110,6 +110,8 @@ with doc.transaction("Batch Align Entities"):
 
 TrenchBroom 内置了嵌入式 Python v2 运行时与扩展系统。打开 **Preferences > Misc > Python Plugin Manager** 可管理基于清单的 UI 插件。管理器会列出配置的插件目录、检测到的插件、加载状态、元数据和错误。使用搜索或 **Only show issues** 可以诊断规模较大的插件集，在修改文件后点击刷新即可。
 
+![插件检查器面板](images/PluginInspector.png)
+
 #### 插件类型与生命周期 {#plugin_types_and_lifecycle}
 
 TrenchBroom 区分两种插件类型：

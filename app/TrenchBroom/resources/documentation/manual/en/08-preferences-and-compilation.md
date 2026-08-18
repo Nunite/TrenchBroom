@@ -29,7 +29,7 @@ You can also add [custom game configurations](#game_configuration_files) to suit
 
 ## View Layout and Rendering {#view_layout_and_rendering}
 
-![View Preferences (macOS)](images/ViewPreferences.png)
+![View Preferences](images/ViewPreferences.png)
 
 In this preference pane, you can choose the layout of the editing area. There are four layouts available:
 
@@ -146,7 +146,7 @@ In each of these places, the status of the updater will be shown as text. If a u
 
 In the above screenshot, the updater hasn't performed an update check yet, so the link is labeled "Check for updates". Clicking this link will start an update check.
 
-![Update Preferences (macOS)](images/UpdatePreferences.png)
+![Update Preferences](images/UpdatePreferences.png)
 
 The updater can be configured in the Preferences. The following settings are available:
 

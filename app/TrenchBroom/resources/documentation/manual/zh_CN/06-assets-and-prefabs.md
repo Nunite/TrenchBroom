@@ -10,6 +10,8 @@
 
 将模型或精灵拖入视口，可创建使用该资源的实体。在当前游戏和编辑器上下文支持的情况下，将声音拖入可分配或创建相应的声音引用。拖入预制体可放置其中存储的地图对象。
 
+![统一资产浏览器](images/AssetBrowser.png)
+
 ### 可复用预制体 {#reusable_prefabs}
 
 选中地图对象，然后点击 Assets 工具栏中的 **Save selection as prefab**，即可创建 `.tbprefab` 文件和缩略图。预制体目录在 **Preferences > Misc > Tools** 下配置。预制体会显示在 `prefabs` 根目录下，可以将其拖入地图；右键点击预制体可重命名或删除它。
