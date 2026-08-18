@@ -32,9 +32,9 @@ To make interactive mapping and geometry transformations as fast as possible, th
 
 ### Keyboard Shortcuts and History {#console_shortcuts_and_history}
 
-- **Execute**: Press #key(Return) (or #key(Ctrl)+#key(Return)) or click **Run** to execute the script in the editor.
-- **Newline**: Press #key(Shift)+#key(Return) to insert a newline without running the script.
-- **Code Completion**: Press #key(Ctrl)+#key(Space) or #key(Tab) to open the completion popup; press #key(Tab) or #key(Return) to insert the selected completion.
+- **Execute**: Press #key(Enter) (or #key(Ctrl)+#key(Enter)) or click **Run** to execute the script in the editor.
+- **Newline**: Press #key(Shift)+#key(Enter) to insert a newline without running the script.
+- **Code Completion**: Press #key(Ctrl)+#key(Space) or #key(Tab) to open the completion popup; press #key(Tab) or #key(Enter) to insert the selected completion.
 - **History Navigation**: Press #key(Up) on the first line or #key(Down) on the last line to navigate through previous scripts (up to 100 history entries). Unsubmitted text in the editor is automatically preserved as a draft while browsing history.
 - **Clear Output**: Click **Clear** in the tab header to clear all output logs.
 - **Font Customization**: Configure the family and size under **Preferences > View > Fonts > Python Console**; only installed monospace families are listed.
