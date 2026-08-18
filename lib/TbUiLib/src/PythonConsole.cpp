@@ -26,6 +26,7 @@
 #include <QEvent>
 #include <QFontDatabase>
 #include <QFontMetrics>
+#include <QFontMetricsF>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -972,6 +973,11 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
       updateCompleter(true);
       return true;
     }
+    if (key == Qt::Key_Tab)
+    {
+      m_input->insertPlainText(QStringLiteral("    "));
+      return true;
+    }
     return Console::eventFilter(watched, event);
   }
 
@@ -1033,6 +1039,8 @@ void PythonConsole::updateFont()
   m_prompt->setFont(font);
   m_input->setFont(font);
   m_input->document()->setDefaultFont(font);
+  const auto spaceWidth = QFontMetricsF{font}.horizontalAdvance(' ');
+  m_input->setTabStopDistance(spaceWidth * 4.0);
 }
 
 void PythonConsole::showPreviousHistoryEntry()

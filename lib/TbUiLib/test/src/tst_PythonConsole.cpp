@@ -195,6 +195,13 @@ TEST_CASE("PythonConsole")
   QTest::keyClick(input, Qt::Key_Tab);
   CHECK(input->toPlainText() == QStringLiteral("doc.selection"));
   CHECK(console.completer()->popup()->isVisible() == false);
+
+  // Test Tab key indentation (4 spaces)
+  input->setPlainText(QStringLiteral(""));
+  cursor = input->textCursor();
+  input->setTextCursor(cursor);
+  QTest::keyClick(input, Qt::Key_Tab);
+  CHECK(input->toPlainText() == QStringLiteral("    "));
 }
 
 } // namespace tb::ui
