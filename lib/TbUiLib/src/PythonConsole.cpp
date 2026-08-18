@@ -327,11 +327,36 @@ QString formatPrompt(const QString& source)
 std::vector<SuggestionItem> suggestionItemsForContext(
   const QString& baseQualifier)
 {
+  auto normalized = baseQualifier.trimmed();
+  while (normalized.endsWith(')'))
+  {
+    const auto openParen = normalized.lastIndexOf('(');
+    if (openParen != -1)
+    {
+      normalized = normalized.left(openParen).trimmed();
+    }
+    else
+    {
+      break;
+    }
+  }
+  while (normalized.endsWith(']'))
+  {
+    const auto openBracket = normalized.lastIndexOf('[');
+    if (openBracket != -1)
+    {
+      normalized = normalized.left(openBracket).trimmed();
+    }
+    else
+    {
+      break;
+    }
+  }
+
   if (
-    baseQualifier.compare(QStringLiteral("doc"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(
-         QStringLiteral("tb2.current_document()"), Qt::CaseInsensitive)
-         == 0)
+    normalized.compare(QStringLiteral("doc"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("document"), Qt::CaseInsensitive) == 0
+    || normalized.endsWith(QStringLiteral("current_document"), Qt::CaseInsensitive))
   {
     return {
       {QStringLiteral("selection"), SuggestionKind::Property, QStringLiteral("Selection")},
@@ -347,15 +372,14 @@ std::vector<SuggestionItem> suggestionItemsForContext(
   }
 
   if (
-    baseQualifier.compare(QStringLiteral("sel"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("doc.selection"), Qt::CaseInsensitive)
-         == 0
-    || baseQualifier.compare(QStringLiteral("selection"), Qt::CaseInsensitive)
-         == 0)
+    normalized.compare(QStringLiteral("sel"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("selection"), Qt::CaseInsensitive) == 0
+    || normalized.endsWith(QStringLiteral("selection"), Qt::CaseInsensitive))
   {
     return {
       {QStringLiteral("brushes"), SuggestionKind::Property, QStringLiteral("list[Brush]")},
       {QStringLiteral("entities"), SuggestionKind::Property, QStringLiteral("list[Entity]")},
+      {QStringLiteral("all_entities"), SuggestionKind::Property, QStringLiteral("list[Entity]")},
       {QStringLiteral("brush_faces"), SuggestionKind::Property, QStringLiteral("list[Face]")},
       {QStringLiteral("translate"), SuggestionKind::Method, QStringLiteral("(dx, dy, dz)")},
       {QStringLiteral("rotate"), SuggestionKind::Method, QStringLiteral("(rx, ry, rz)")},
@@ -371,26 +395,28 @@ std::vector<SuggestionItem> suggestionItemsForContext(
   }
 
   if (
-    baseQualifier.compare(QStringLiteral("brush"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("b"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("b2"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(
-         QStringLiteral("first_brush"), Qt::CaseInsensitive)
-         == 0)
+    normalized.compare(QStringLiteral("brush"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("b"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("b2"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("first_brush"), Qt::CaseInsensitive) == 0
+    || normalized.endsWith(QStringLiteral(".brush"), Qt::CaseInsensitive)
+    || normalized.endsWith(QStringLiteral("brushes"), Qt::CaseInsensitive))
   {
     return {
+      {QStringLiteral("entity"), SuggestionKind::Property, QStringLiteral("Entity")},
       {QStringLiteral("faces"), SuggestionKind::Method, QStringLiteral("() -> list[Face]")},
       {QStringLiteral("bounds"), SuggestionKind::Method, QStringLiteral("() -> Box3")},
       {QStringLiteral("center"), SuggestionKind::Method, QStringLiteral("() -> Vec3")},
       {QStringLiteral("material"), SuggestionKind::Property, QStringLiteral("str")},
       {QStringLiteral("id"), SuggestionKind::Property, QStringLiteral("int")},
-      {QStringLiteral("entity"), SuggestionKind::Property, QStringLiteral("Entity")},
     };
   }
 
   if (
-    baseQualifier.compare(QStringLiteral("face"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("f"), Qt::CaseInsensitive) == 0)
+    normalized.compare(QStringLiteral("face"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("f"), Qt::CaseInsensitive) == 0
+    || normalized.endsWith(QStringLiteral(".face"), Qt::CaseInsensitive)
+    || normalized.endsWith(QStringLiteral("faces"), Qt::CaseInsensitive))
   {
     return {
       {QStringLiteral("material"), SuggestionKind::Property, QStringLiteral("str")},
@@ -407,26 +433,31 @@ std::vector<SuggestionItem> suggestionItemsForContext(
   }
 
   if (
-    baseQualifier.compare(QStringLiteral("ent"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("entity"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("e"), Qt::CaseInsensitive) == 0)
+    normalized.compare(QStringLiteral("ent"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("entity"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("e"), Qt::CaseInsensitive) == 0
+    || normalized.endsWith(QStringLiteral("entity"), Qt::CaseInsensitive)
+    || normalized.endsWith(QStringLiteral("entities"), Qt::CaseInsensitive))
   {
     return {
       {QStringLiteral("classname"), SuggestionKind::Property, QStringLiteral("str")},
       {QStringLiteral("origin"), SuggestionKind::Property, QStringLiteral("Vec3")},
+      {QStringLiteral("properties"), SuggestionKind::Property, QStringLiteral("dict")},
+      {QStringLiteral("brushes"), SuggestionKind::Property, QStringLiteral("list[Brush]")},
       {QStringLiteral("get"), SuggestionKind::Method, QStringLiteral("(key, default)")},
       {QStringLiteral("set"), SuggestionKind::Method, QStringLiteral("(key, value)")},
       {QStringLiteral("remove"), SuggestionKind::Method, QStringLiteral("(key)")},
-      {QStringLiteral("properties"), SuggestionKind::Property, QStringLiteral("dict")},
-      {QStringLiteral("brushes"), SuggestionKind::Property, QStringLiteral("list[Brush]")},
+      {QStringLiteral("keys"), SuggestionKind::Method, QStringLiteral("() -> list[str]")},
+      {QStringLiteral("values"), SuggestionKind::Method, QStringLiteral("() -> list[str]")},
+      {QStringLiteral("items"), SuggestionKind::Method, QStringLiteral("() -> list[tuple]")},
       {QStringLiteral("id"), SuggestionKind::Property, QStringLiteral("int")},
     };
   }
 
   if (
-    baseQualifier.compare(QStringLiteral("Vec3"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("vec"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("v"), Qt::CaseInsensitive) == 0)
+    normalized.compare(QStringLiteral("Vec3"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("vec"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("v"), Qt::CaseInsensitive) == 0)
   {
     return {
       {QStringLiteral("x"), SuggestionKind::Property, QStringLiteral("float")},
@@ -440,9 +471,9 @@ std::vector<SuggestionItem> suggestionItemsForContext(
   }
 
   if (
-    baseQualifier.compare(QStringLiteral("Plane"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("plane"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("p"), Qt::CaseInsensitive) == 0)
+    normalized.compare(QStringLiteral("Plane"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("plane"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("p"), Qt::CaseInsensitive) == 0)
   {
     return {
       {QStringLiteral("normal"), SuggestionKind::Property, QStringLiteral("Vec3")},
@@ -452,19 +483,20 @@ std::vector<SuggestionItem> suggestionItemsForContext(
   }
 
   if (
-    baseQualifier.compare(QStringLiteral("tb2"), Qt::CaseInsensitive) == 0
-    || baseQualifier.compare(QStringLiteral("tb"), Qt::CaseInsensitive) == 0)
+    normalized.compare(QStringLiteral("tb2"), Qt::CaseInsensitive) == 0
+    || normalized.compare(QStringLiteral("tb"), Qt::CaseInsensitive) == 0)
   {
     return {
       {QStringLiteral("current_document"), SuggestionKind::Function, QStringLiteral("() -> Doc")},
-      {QStringLiteral("create_brush"), SuggestionKind::Function, QStringLiteral("(verts) -> Brush")},
-      {QStringLiteral("create_plugin_panel"), SuggestionKind::Function, QStringLiteral("(id, title)")},
-      {QStringLiteral("selected_brushes"), SuggestionKind::Function, QStringLiteral("() -> list")},
-      {QStringLiteral("selectedBrushes"), SuggestionKind::Function, QStringLiteral("() -> list")},
-      {QStringLiteral("selected_entities"), SuggestionKind::Function, QStringLiteral("() -> list")},
-      {QStringLiteral("selectedEntities"), SuggestionKind::Function, QStringLiteral("() -> list")},
-      {QStringLiteral("selected_faces"), SuggestionKind::Function, QStringLiteral("() -> list")},
-      {QStringLiteral("selectedFaces"), SuggestionKind::Function, QStringLiteral("() -> list")},
+      {QStringLiteral("selection"), SuggestionKind::Function, QStringLiteral("() -> Selection")},
+      {QStringLiteral("selected_all_entities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
+      {QStringLiteral("selectedAllEntities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
+      {QStringLiteral("selected_brushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
+      {QStringLiteral("selectedBrushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
+      {QStringLiteral("selected_entities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
+      {QStringLiteral("selectedEntities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
+      {QStringLiteral("selected_faces"), SuggestionKind::Function, QStringLiteral("() -> list[Face]")},
+      {QStringLiteral("selectedFaces"), SuggestionKind::Function, QStringLiteral("() -> list[Face]")},
       {QStringLiteral("translate"), SuggestionKind::Function, QStringLiteral("(dx, dy, dz)")},
       {QStringLiteral("rotate"), SuggestionKind::Function, QStringLiteral("(rx, ry, rz)")},
       {QStringLiteral("scale"), SuggestionKind::Function, QStringLiteral("(sx, sy, sz)")},
@@ -475,6 +507,8 @@ std::vector<SuggestionItem> suggestionItemsForContext(
       {QStringLiteral("deselectAll"), SuggestionKind::Function, QStringLiteral("()")},
       {QStringLiteral("execute_action"), SuggestionKind::Function, QStringLiteral("(action)")},
       {QStringLiteral("list_actions"), SuggestionKind::Function, QStringLiteral("() -> list")},
+      {QStringLiteral("create_brush"), SuggestionKind::Function, QStringLiteral("(verts) -> Brush")},
+      {QStringLiteral("create_plugin_panel"), SuggestionKind::Function, QStringLiteral("(id, title)")},
       {QStringLiteral("Vec3"), SuggestionKind::Class, QStringLiteral("(x, y, z)")},
       {QStringLiteral("Plane"), SuggestionKind::Class, QStringLiteral("(norm, dist)")},
       {QStringLiteral("Document"), SuggestionKind::Class, QStringLiteral("class")},
@@ -488,6 +522,9 @@ std::vector<SuggestionItem> suggestionItemsForContext(
   return {
     {QStringLiteral("doc"), SuggestionKind::Variable, QStringLiteral("Document")},
     {QStringLiteral("sel"), SuggestionKind::Variable, QStringLiteral("Selection")},
+    {QStringLiteral("selection"), SuggestionKind::Function, QStringLiteral("() -> Selection")},
+    {QStringLiteral("selected_all_entities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
+    {QStringLiteral("selectedAllEntities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
     {QStringLiteral("selected_brushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
     {QStringLiteral("selectedBrushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
     {QStringLiteral("selected_entities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
@@ -508,6 +545,7 @@ std::vector<SuggestionItem> suggestionItemsForContext(
     {QStringLiteral("Vec3"), SuggestionKind::Class, QStringLiteral("(x, y, z)")},
     {QStringLiteral("Plane"), SuggestionKind::Class, QStringLiteral("(norm, dist)")},
     {QStringLiteral("tb2"), SuggestionKind::Module, QStringLiteral("module")},
+    {QStringLiteral("tb"), SuggestionKind::Module, QStringLiteral("module")},
     {QStringLiteral("for"), SuggestionKind::Keyword, QStringLiteral("keyword")},
     {QStringLiteral("in"), SuggestionKind::Keyword, QStringLiteral("keyword")},
     {QStringLiteral("range"), SuggestionKind::Function, QStringLiteral("(stop) -> list")},
@@ -759,12 +797,49 @@ std::pair<QString, QString> PythonConsole::completionContextUnderCursor() const
     beforePrefix = beforePrefix.trimmed();
 
     auto baseStart = beforePrefix.length();
-    while (baseStart > 0
-           && (beforePrefix[baseStart - 1].isLetterOrNumber()
-               || beforePrefix[baseStart - 1] == '_'
-               || beforePrefix[baseStart - 1] == '.'))
+    auto bracketDepth = 0;
+    auto parenDepth = 0;
+    while (baseStart > 0)
     {
-      --baseStart;
+      const auto ch = beforePrefix[baseStart - 1];
+      if (ch == ']')
+      {
+        ++bracketDepth;
+        --baseStart;
+      }
+      else if (ch == '[')
+      {
+        if (bracketDepth > 0)
+        {
+          --bracketDepth;
+        }
+        --baseStart;
+      }
+      else if (ch == ')')
+      {
+        ++parenDepth;
+        --baseStart;
+      }
+      else if (ch == '(')
+      {
+        if (parenDepth > 0)
+        {
+          --parenDepth;
+        }
+        --baseStart;
+      }
+      else if (bracketDepth > 0 || parenDepth > 0)
+      {
+        --baseStart;
+      }
+      else if (ch.isLetterOrNumber() || ch == '_' || ch == '.')
+      {
+        --baseStart;
+      }
+      else
+      {
+        break;
+      }
     }
     const auto baseQualifier = beforePrefix.mid(baseStart);
     return {baseQualifier, prefix};

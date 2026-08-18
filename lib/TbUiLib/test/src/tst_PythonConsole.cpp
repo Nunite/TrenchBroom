@@ -178,6 +178,41 @@ TEST_CASE("PythonConsole")
   console.insertCompletion(QStringLiteral("selected_brushes"));
   CHECK(input->toPlainText() == QStringLiteral("selected_brushes"));
 
+  // Test chained and indexed expression completion
+  input->setPlainText(QStringLiteral("b.entity.prop"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  const auto [base4, prefix4] = console.completionContextUnderCursor();
+  CHECK(base4 == QStringLiteral("b.entity"));
+  CHECK(prefix4 == QStringLiteral("prop"));
+  console.updateCompleter(true);
+  console.insertCompletion(QStringLiteral("properties"));
+  CHECK(input->toPlainText() == QStringLiteral("b.entity.properties"));
+
+  input->setPlainText(QStringLiteral("sel.brushes[0].ent"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  const auto [base5, prefix5] = console.completionContextUnderCursor();
+  CHECK(base5 == QStringLiteral("sel.brushes[0]"));
+  CHECK(prefix5 == QStringLiteral("ent"));
+  console.updateCompleter(true);
+  console.insertCompletion(QStringLiteral("entity"));
+  CHECK(input->toPlainText() == QStringLiteral("sel.brushes[0].entity"));
+
+  // Test selection all_entities completion
+  input->setPlainText(QStringLiteral("sel.all_"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  const auto [base6, prefix6] = console.completionContextUnderCursor();
+  CHECK(base6 == QStringLiteral("sel"));
+  CHECK(prefix6 == QStringLiteral("all_"));
+  console.updateCompleter(true);
+  console.insertCompletion(QStringLiteral("all_entities"));
+  CHECK(input->toPlainText() == QStringLiteral("sel.all_entities"));
+
   // Test deletion and auto-dismissal
   input->setPlainText(QStringLiteral(""));
   cursor = input->textCursor();
