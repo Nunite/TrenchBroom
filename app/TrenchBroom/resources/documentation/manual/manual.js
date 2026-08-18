@@ -341,21 +341,49 @@ const print_action = (key) => document.write(action_str(key));
         pageNavigation.append(link);
       });
 
-      // Observe sub-headings for scrolling within the chapter
+      // Observe all headings in the chapter for real-time left and right TOC synchronization
       if (inChapterObserver) inChapterObserver.disconnect();
-      if (subHeadings.length > 0) {
+      const allChapterHeadings = [...chapterSection.querySelectorAll("h1[id], h2[id], h3[id]")];
+      if (allChapterHeadings.length > 0) {
         const headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--header-height"), 10) || 54;
         inChapterObserver = new IntersectionObserver((entries) => {
           const visible = entries.filter((entry) => entry.isIntersecting)
             .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
           if (visible.length > 0) {
             const activeId = visible[0].target.id;
+
+            // 1. Synchronize Right Sidebar (On-this-page TOC)
             [...pageNavigation.querySelectorAll("a")].forEach((a) => {
               a.classList.toggle("active", a.hash === `#${activeId}`);
             });
+
+            // 2. Synchronize Left Sidebar Navigation
+            navLinks.forEach((link) => {
+              const linkHash = link.hash ? link.hash.replace(/^#/, "") : "";
+              link.classList.toggle("active", linkHash === activeId);
+            });
+
+            // Fallback: If no sub-link matched (e.g. at top H1), ensure chapter's main title is active
+            const hasActiveLeft = navLinks.some((link) => link.classList.contains("active"));
+            if (!hasActiveLeft && currentActiveChapterId) {
+              navLinks.forEach((link) => {
+                const linkHash = link.hash ? link.hash.replace(/^#/, "") : "";
+                link.classList.toggle("active", linkHash === currentActiveChapterId);
+              });
+            }
+
+            // Scroll the left navigation gently to keep active section in viewport
+            const activeLeftLink = navLinks.find((link) => link.classList.contains("active"));
+            if (activeLeftLink) {
+              activeLeftLink.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            }
+
+            // 3. Keep URL hash and language switchers in sync
+            history.replaceState(null, "", `#${activeId}`);
+            updateAlternateLanguageLinks(activeId);
           }
         }, { rootMargin: `-${headerHeight + 10}px 0px -70% 0px` });
-        subHeadings.forEach(sh => inChapterObserver.observe(sh));
+        allChapterHeadings.forEach(h => inChapterObserver.observe(h));
       }
     };
 

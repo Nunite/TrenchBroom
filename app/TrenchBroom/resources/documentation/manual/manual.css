@@ -656,8 +656,10 @@ html:not([data-theme="dark"]) .theme-icon-moon {
 
 .manual-navigation-scroll ul ul a.active {
   color: var(--brand-primary);
-  border-left: none;
-  font-weight: 600;
+  background: var(--brand-primary-soft);
+  font-weight: 700;
+  border-left: 2px solid var(--brand-primary);
+  padding-left: 8px;
 }
 
 /* CENTER ARTICLE CONTENT */
