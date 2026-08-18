@@ -137,7 +137,7 @@ YZ          +Y            +Z         +X             侧视图
 
 检查器位于主窗口右侧，分布在多个页面中的各种控件用于修改当前选中对象的属性。选择 #menu(Menu/View/Toggle Inspector)可以显示或隐藏检查器。要直接切换到某个检查器页面，可分别选择 #menu(Menu/View/Switch to Map Inspector)打开地图检查器，选择 #menu(Menu/View/Switch to Entity Inspector)打开实体检查器，或选择 #menu(Menu/View/Switch to Face Inspector)打开面检查器。
 
-![地图、实体和面检查器（Mac OS X）](images/Inspector.png)
+![Outliner、实体与面检查器](images/Inspector.png)
 
 **地图检查器**用于编辑[图层](#layers)、配置显示的[地图边界](#map_bounds)，以及设置当前使用的游戏 Mod（[Mod](#mods)）。**实体检查器**用于修改实体的[属性](#entity_properties)。它还包含实体浏览器，你可以将实体从浏览器拖到视图中以[创建新实体](#creating_entities)，也可以[设置实体定义](#entity_definitions)。此外，还可以在实体检查器中管理实体定义文件。面检查器用于编辑当前选中面的属性，顶部提供图形化的 [UV 编辑器](#uv_editor)，下方可以直接修改面属性值。要为当前选中的面选择材质，可以使用[材质浏览器](#material_browser)。
 
