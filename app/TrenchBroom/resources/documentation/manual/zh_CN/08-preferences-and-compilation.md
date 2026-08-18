@@ -90,6 +90,8 @@ Python Console font and size  用于控制台输入和输出的等宽字体系�
 
 ## 颜色首选项 {#color_preferences}
 
+![颜色首选项](images/ColorPreferences.png)
+
 **Colors** 页面控制编辑器特有的颜色，例如网格、选择、控制柄、叠加层和浏览器状态。这些颜色独立于控件主题：**View > Theme** 用于应用程序外观界面，而 **Colors** 用于地图和工具可视化。色块显示待定的颜色，并在点击时打开颜色选择器。
 
 ## 鼠标输入 {#mouse_input}

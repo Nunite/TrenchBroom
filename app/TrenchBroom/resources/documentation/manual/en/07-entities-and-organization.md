@@ -425,3 +425,16 @@ Right-click a layer in the layer editor to open its context menu:
 - Remove Layer
 
 The [map view context menu](#map_view_context_menu) also has some layer related shortcuts.
+
+## Entity Templates {#entity_templates}
+
+When building complex level mechanics with recurring custom entities (such as functional doors, triggers, buttons, or monster configurations), you can capture any existing entity as a template and apply it across multiple brushes in a single step:
+
+1. **Set as Entity Template**: Right-click an entity in the viewport (or any brush belonging to that entity) and select **Set CLASSNAME as Entity Template**. TrenchBroom stores the entity classname and all of its properties as the active template.
+2. **Apply Entity Template**: Select one or more geometry brushes, right-click, and select **Apply Entity Template (CLASSNAME)**.
+
+TrenchBroom will automatically instantiate a separate entity clone from the template for each selected brush, reparent each brush into its new entity, and keep all brushes selected. The entire multi-entity creation and reparenting operation is executed in a single atomic transaction and can be undone or redone with a single #key(Ctrl)+#key(Z).
+
+## 3D Skybox Rendering {#3d_sky_rendering}
+
+For GoldSrc and supported game configurations, setting the `skyname` property on `worldspawn` enables real-time 3D skybox rendering in the 3D viewport. The 6-sided environment cubemap is rendered at infinite depth, allowing you to preview the environment backdrop, horizon line, and atmospheric context directly while sculpting map geometry.

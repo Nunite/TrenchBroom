@@ -376,4 +376,8 @@ Brush 挤出工具提供了一种快速移动 Brush 单个面的方法。开始�
 
 ### 倒角 {#chamfering}
 
-选择 #menu(Menu/Edit/Tools/Chamfer Tool) 对选中的 Brush 边进行斜角处理，或从选中的面上切角。
+选择 #menu(Menu/Edit/Tools/Chamfer Tool) 对选中的 Brush 边进行斜角处理，或从选中的面上切角。在边模式与顶点模式之间切换手柄，调整倒角距离即可直观预览并应用几何倒角。多段边倒角支持平滑的圆角轮廓。
+
+### 路径工具 {#path_tool_editing}
+
+选择 #menu(Menu/Edit/Tools/Path Tool) 或点击工具栏中的路径工具按钮，可用于创建、检查与连接实体路径节点（如巡逻路径 `path_corner` 或列车轨道）。在路径工具激活时，在 2D 或 3D 视口中点击即可连续放置路径路标点，并自动连接其 `target` 与 `targetname` 属性。选中现有节点可随时插入新路标、反转路径方向或重新连接路径分支。

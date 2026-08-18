@@ -377,3 +377,7 @@ Hit #action(Controls/Map view/Perform sweep) to fill the gap with brushes and se
 ### Chamfering {#chamfering}
 
 Choose #menu(Menu/Edit/Tools/Chamfer Tool) to bevel selected brush edges or cut selected brush corners. The target selector switches between edge and vertex handles. Select one or more handles to preview the result, then adjust the chamfer distance and apply the operation. Edge chamfers also support multiple segments for a rounded profile. UV Lock controls how the affected face projections are preserved.
+
+### Path Tool {#path_tool_editing}
+
+Choose #menu(Menu/Edit/Tools/Path Tool) or click the Path Tool button on the toolbar to create, inspect, and connect waypoint entities (such as `path_corner` or train tracks). While in Path Tool mode, clicking in a 2D or 3D viewport places consecutive waypoint nodes and automatically links their `target` and `targetname` properties. Selecting existing nodes allows inserting new waypoints, reversing directions, or reconnecting path segments.

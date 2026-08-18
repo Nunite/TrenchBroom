@@ -90,6 +90,8 @@ Theme IDs use lowercase letters, digits, dots, dashes, and underscores; `builtin
 
 ## Color Preferences {#color_preferences}
 
+![Color Preferences](images/ColorPreferences.png)
+
 The **Colors** page controls editor-specific colors such as the grid, selections, handles, overlays, and browser states. These colors are separate from the widget theme: use **View > Theme** for the application chrome and **Colors** for map and tool visualization. Color swatches show the pending color and open a color chooser when clicked.
 
 ## Mouse Input {#mouse_input}

@@ -425,3 +425,16 @@ Group B (translated by 128 0 0)
 - 移除图层
 
 [地图视图上下文菜单](#map_view_context_menu)中也包含一些与图层相关的快捷方式。
+
+## 实体模板 {#entity_templates}
+
+在构建具有复杂机关逻辑与复用属性的关卡时（例如特定门、触发器、按钮或预设怪物），你可以将任意现有实体快速暂存为模板，并一键批量应用到地图中的多个 Brush 上：
+
+1. **设置实体模板（Set as Entity Template）**：在视口中右键点击任意实体（或属于该实体的某个 Brush），选择 **Set CLASSNAME as Entity Template**。TrenchBroom 会将该实体的类名以及所有键值参数保存为活动模板。
+2. **应用实体模板（Apply Entity Template）**：在地图中选择一个或多个几何 Brush，右键打开上下文菜单并选择 **Apply Entity Template (CLASSNAME)**。
+
+TrenchBroom 会自动为每一个选中的 Brush 分别克隆创建一个独立的实体实例，将 Brush 归属（Reparent）至该实体下，并保持所有选区状态。整个批量创建和层级重归属操作封装在单次原子事务中，支持使用 #key(Ctrl)+#key(Z) 一键撤销与重做。
+
+## 3D 天空盒渲染 {#3d_sky_rendering}
+
+对于 GoldSrc 及支持的游戏引擎配置，在 `worldspawn` 实体上设置 `skyname` 属性会在 3D 视口中启用实时的 3D 天空盒渲染。6 面的环境天空盒立方体纹理会以无限远景深进行无缝拼接渲染，便于你在搭建几何场景时即时预览天空背景、地平线与光照氛围。

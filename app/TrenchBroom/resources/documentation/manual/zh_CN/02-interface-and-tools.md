@@ -125,6 +125,8 @@ TrenchBroom 的所有编辑功能都由工具提供。工具分为两类：永�
 
 选择 #menu(Menu/View/Command Palette...) 或按下 <kbd>Ctrl</kbd> + <kbd>P</kbd>（macOS 上为 <kbd>Cmd</kbd> + <kbd>P</kbd>）可以打开可搜索的命令列表。输入命令名称或菜单路径的一部分，使用方向键切换高亮结果，按 #key(Return) 即可执行。命令面板还会显示每个结果的当前快捷键。按 #key(Esc) 可以在不执行任何命令的情况下关闭它。
 
+![命令面板](images/CommandPalette.png)
+
 当你知道操作名称却不记得菜单位置或快捷键时，命令面板非常有用。当前不可用的命令会以禁用状态列出，因此面板也会反映当前文档、选择和工具上下文。
 
 ### 饼状菜单 {#pie_menu}
@@ -224,3 +226,13 @@ Create Point Entity
 
 Create Brush Entity
 :   使用选中的 Brush 创建 [Brush 实体](#brush_entities)。
+
+Set CLASSNAME as Entity Template
+:   将选中实体的 classname 及全部属性暂存为活动的[实体模板](#entity_templates)。
+
+Apply Entity Template (CLASSNAME)
+:   为选中的每一个 Brush 分别克隆创建独立的模板实体，并将 Brush 归属（Reparent）至该实体中。
+
+## 2D 可读描边线 {#readable_outlines_2d}
+
+在密集复杂的地形或重叠结构中，2D 正交视口会自动为几何体绘制高对比度轮廓线，使得各个独立 Brush 在网格背景与相邻表面中依然清晰可辨。
