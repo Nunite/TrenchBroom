@@ -750,6 +750,19 @@ html:not([data-theme="dark"]) .theme-icon-moon {
 /* ==========================================================================
    TYPOGRAPHY & CONTENT HEADINGS
    ========================================================================== */
+.manual-hero-banner,
+.manual-card-grid,
+.tab-box,
+.ref-box,
+.api-entry,
+#manual-article table,
+#manual-article dl,
+#manual-article figure,
+#manual-article pre {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 300px;
+}
+
 #manual-article h1 {
   font-size: 30px;
   font-weight: 800;
