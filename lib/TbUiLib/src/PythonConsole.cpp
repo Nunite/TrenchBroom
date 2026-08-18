@@ -720,6 +720,7 @@ void PythonConsole::setupCompleter()
   popup->setSelectionMode(QAbstractItemView::SingleSelection);
   popup->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   popup->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  popup->installEventFilter(this);
 
   connect(
     m_completer,
@@ -799,6 +800,59 @@ void PythonConsole::updateCompleter(const bool explicitTrigger)
   auto cr = m_input->cursorRect();
   cr.setWidth(320);
   m_completer->complete(cr);
+
+  // Pre-select 1st row (VS Code behavior) so Tab/Enter immediately inserts the top candidate
+  if (auto* popup = m_completer->popup())
+  {
+    const auto firstIndex = m_completer->completionModel()->index(0, 0);
+    if (firstIndex.isValid())
+    {
+      popup->setCurrentIndex(firstIndex);
+    }
+  }
+}
+
+void PythonConsole::insertActiveCompletion()
+{
+  if (!m_completer)
+  {
+    return;
+  }
+
+  auto completionText = QString{};
+  if (auto* popup = m_completer->popup())
+  {
+    const auto currentIndex = popup->currentIndex();
+    if (currentIndex.isValid())
+    {
+      completionText = currentIndex.data(Qt::DisplayRole).toString();
+    }
+  }
+
+  if (
+    completionText.isEmpty() && m_completer->completionModel()
+    && m_completer->completionModel()->rowCount() > 0)
+  {
+    completionText = m_completer->completionModel()
+                       ->index(0, 0)
+                       .data(Qt::DisplayRole)
+                       .toString();
+  }
+
+  if (completionText.isEmpty())
+  {
+    completionText = m_completer->currentCompletion();
+  }
+
+  if (!completionText.isEmpty())
+  {
+    insertCompletion(completionText);
+  }
+
+  if (m_completer->popup() && m_completer->popup()->isVisible())
+  {
+    m_completer->popup()->hide();
+  }
 }
 
 void PythonConsole::insertCompletion(const QString& completion)
@@ -818,7 +872,7 @@ void PythonConsole::insertCompletion(const QString& completion)
 
 bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
 {
-  if (watched != m_input || event->type() != QEvent::KeyPress)
+  if (event->type() != QEvent::KeyPress)
   {
     return Console::eventFilter(watched, event);
   }
@@ -826,13 +880,58 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
   auto* keyEvent = static_cast<QKeyEvent*>(event);
   const auto key = keyEvent->key();
   const auto modifiers = keyEvent->modifiers();
+  const auto popupVisible =
+    m_completer && m_completer->popup() && m_completer->popup()->isVisible();
+
+  // If popup is visible, Tab, Enter, Return, Escape, and Navigation keys are intercepted
+  if (popupVisible)
+  {
+    if (
+      key == Qt::Key_Tab || key == Qt::Key_Return || key == Qt::Key_Enter
+      || key == Qt::Key_Backtab)
+    {
+      insertActiveCompletion();
+      return true;
+    }
+
+    if (key == Qt::Key_Escape)
+    {
+      m_completer->popup()->hide();
+      return true;
+    }
+
+    if (
+      key == Qt::Key_Up || key == Qt::Key_Down || key == Qt::Key_PageUp
+      || key == Qt::Key_PageDown)
+    {
+      if (watched == m_input)
+      {
+        QCoreApplication::sendEvent(m_completer->popup(), event);
+        return true;
+      }
+      return false;
+    }
+  }
+
+  // If event arrived on popup but was not handled above, refocus input and forward
+  if (m_completer && watched == m_completer->popup())
+  {
+    m_input->setFocus();
+    QCoreApplication::sendEvent(m_input, event);
+    return true;
+  }
+
+  if (watched != m_input)
+  {
+    return Console::eventFilter(watched, event);
+  }
 
   // 1. Ctrl+Enter always executes current script
   if (
     (key == Qt::Key_Return || key == Qt::Key_Enter)
     && modifiers.testFlag(Qt::ControlModifier))
   {
-    if (m_completer && m_completer->popup()->isVisible())
+    if (popupVisible)
     {
       m_completer->popup()->hide();
     }
@@ -840,53 +939,21 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     return true;
   }
 
-  // 2. Navigation / confirmation when completer popup is visible
-  if (m_completer && m_completer->popup()->isVisible())
-  {
-    switch (key)
-    {
-    case Qt::Key_Enter:
-    case Qt::Key_Return:
-    case Qt::Key_Tab:
-      if (m_completer->popup()->currentIndex().isValid())
-      {
-        insertCompletion(
-          m_completer->completionModel()
-            ->data(m_completer->popup()->currentIndex(), Qt::DisplayRole)
-            .toString());
-      }
-      else if (m_completer->currentCompletion().length() > 0)
-      {
-        insertCompletion(m_completer->currentCompletion());
-      }
-      m_completer->popup()->hide();
-      return true;
-
-    case Qt::Key_Escape:
-      m_completer->popup()->hide();
-      return true;
-
-    case Qt::Key_Up:
-    case Qt::Key_Down:
-    case Qt::Key_PageUp:
-    case Qt::Key_PageDown:
-      return false;
-
-    default:
-      break;
-    }
-  }
-
-  // 3. Explicit completion trigger
+  // 2. Tab or Ctrl+Space when popup is NOT visible
   if (
     (key == Qt::Key_Space && modifiers.testFlag(Qt::ControlModifier))
     || (key == Qt::Key_Tab && modifiers == Qt::NoModifier))
   {
-    updateCompleter(true);
-    return true;
+    const auto [baseQualifier, prefix] = completionContextUnderCursor();
+    if (!baseQualifier.isEmpty() || !prefix.isEmpty())
+    {
+      updateCompleter(true);
+      return true;
+    }
+    return Console::eventFilter(watched, event);
   }
 
-  // 4. History navigation (when completer is not visible)
+  // 3. History navigation (when completer is not visible)
   if (
     modifiers == Qt::NoModifier && key == Qt::Key_Up
     && m_input->textCursor().blockNumber() == 0)
@@ -904,7 +971,7 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     return true;
   }
 
-  // 5. Reactive completion for typing, Backspace, Delete, and Dot
+  // 4. Reactive completion for typing, Backspace, Delete, and Dot
   const auto text = keyEvent->text();
   const auto isEditKey =
     (key == Qt::Key_Backspace || key == Qt::Key_Delete
@@ -921,7 +988,7 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     key == Qt::Key_Left || key == Qt::Key_Right || key == Qt::Key_Home
     || key == Qt::Key_End)
   {
-    if (m_completer && m_completer->popup()->isVisible())
+    if (popupVisible)
     {
       m_completer->popup()->hide();
     }

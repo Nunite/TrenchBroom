@@ -177,6 +177,17 @@ TEST_CASE("PythonConsole")
   input->setTextCursor(cursor);
   console.updateCompleter(false);
   CHECK(console.completer()->popup()->isVisible() == false);
+
+  // Test Tab key completion workflow
+  input->setPlainText(QStringLiteral("doc.sele"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  CHECK(console.completer()->popup()->isVisible());
+  QTest::keyClick(input, Qt::Key_Tab);
+  CHECK(input->toPlainText() == QStringLiteral("doc.selection"));
+  CHECK(console.completer()->popup()->isVisible() == false);
 }
 
 } // namespace tb::ui

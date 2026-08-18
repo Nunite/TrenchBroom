@@ -64,6 +64,7 @@ public:
   QCompleter* completer() const;
   void updateCompleter(bool explicitTrigger = true);
   void insertCompletion(const QString& completion);
+  void insertActiveCompletion();
   std::pair<QString, QString> completionContextUnderCursor() const;
 
 private:
