@@ -17,6 +17,8 @@
  along with TrenchBroom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QAbstractItemView>
+#include <QCompleter>
 #include <QFontDatabase>
 #include <QLabel>
 #include <QPlainTextEdit>
@@ -168,6 +170,13 @@ TEST_CASE("PythonConsole")
   console.updateCompleter(true);
   console.insertCompletion(QStringLiteral("selected_brushes"));
   CHECK(input->toPlainText() == QStringLiteral("selected_brushes"));
+
+  // Test deletion and auto-dismissal
+  input->setPlainText(QStringLiteral(""));
+  cursor = input->textCursor();
+  input->setTextCursor(cursor);
+  console.updateCompleter(false);
+  CHECK(console.completer()->popup()->isVisible() == false);
 }
 
 } // namespace tb::ui

@@ -21,6 +21,7 @@
 
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
+#include <QAbstractListModel>
 #include <QCompleter>
 #include <QEvent>
 #include <QFontDatabase>
@@ -28,11 +29,13 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QListView>
+#include <QPainter>
 #include <QPlainTextEdit>
 #include <QScrollBar>
 #include <QSizePolicy>
 #include <QSplitter>
-#include <QStringListModel>
+#include <QStyledItemDelegate>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
@@ -47,12 +50,232 @@
 
 #include <algorithm>
 #include <utility>
+#include <vector>
 
 namespace tb::ui
 {
 namespace
 {
 constexpr auto MaxHistorySize = size_t{100u};
+
+enum class SuggestionKind
+{
+  Function,
+  Method,
+  Property,
+  Keyword,
+  Class,
+  Variable,
+  Module
+};
+
+struct SuggestionItem
+{
+  QString label;
+  SuggestionKind kind;
+  QString detail;
+};
+
+class SuggestionModel : public QAbstractListModel
+{
+private:
+  std::vector<SuggestionItem> m_items;
+
+public:
+  explicit SuggestionModel(QObject* parent = nullptr)
+    : QAbstractListModel{parent}
+  {
+  }
+
+  int rowCount(const QModelIndex& parent = QModelIndex{}) const override
+  {
+    return parent.isValid() ? 0 : static_cast<int>(m_items.size());
+  }
+
+  QVariant data(const QModelIndex& index, const int role) const override
+  {
+    if (
+      !index.isValid() || index.row() < 0
+      || static_cast<size_t>(index.row()) >= m_items.size())
+    {
+      return {};
+    }
+
+    const auto& item = m_items[static_cast<size_t>(index.row())];
+    switch (role)
+    {
+    case Qt::DisplayRole:
+    case Qt::EditRole:
+      return item.label;
+    case Qt::UserRole + 1:
+      return static_cast<int>(item.kind);
+    case Qt::UserRole + 2:
+      return item.detail;
+    default:
+      return {};
+    }
+  }
+
+  void setItems(std::vector<SuggestionItem> items)
+  {
+    beginResetModel();
+    m_items = std::move(items);
+    std::sort(
+      m_items.begin(),
+      m_items.end(),
+      [](const auto& a, const auto& b) {
+        return a.label.compare(b.label, Qt::CaseInsensitive) < 0;
+      });
+    endResetModel();
+  }
+};
+
+class SuggestionItemDelegate : public QStyledItemDelegate
+{
+public:
+  explicit SuggestionItemDelegate(QObject* parent = nullptr)
+    : QStyledItemDelegate{parent}
+  {
+  }
+
+  void paint(
+    QPainter* painter,
+    const QStyleOptionViewItem& option,
+    const QModelIndex& index) const override
+  {
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+
+    const auto label = index.data(Qt::DisplayRole).toString();
+    const auto kind =
+      static_cast<SuggestionKind>(index.data(Qt::UserRole + 1).toInt());
+    const auto detail = index.data(Qt::UserRole + 2).toString();
+
+    const auto isSelected = (option.state & QStyle::State_Selected) != 0;
+    const auto isHovered = (option.state & QStyle::State_MouseOver) != 0;
+
+    auto rowRect = option.rect.adjusted(2, 1, -2, -1);
+
+    if (isSelected)
+    {
+      painter->setPen(Qt::NoPen);
+      painter->setBrush(option.palette.highlight());
+      painter->drawRoundedRect(rowRect, 4, 4);
+    }
+    else if (isHovered)
+    {
+      auto hoverColor = option.palette.highlight().color();
+      hoverColor.setAlpha(35);
+      painter->setPen(Qt::NoPen);
+      painter->setBrush(hoverColor);
+      painter->drawRoundedRect(rowRect, 4, 4);
+    }
+
+    // Kind Badge
+    auto badgeBg = QColor{60, 60, 60};
+    auto badgeFg = QColor{255, 255, 255};
+    auto badgeText = QStringLiteral("txt");
+
+    switch (kind)
+    {
+    case SuggestionKind::Method:
+      badgeBg = QColor{30, 110, 190};
+      badgeText = QStringLiteral("m");
+      break;
+    case SuggestionKind::Function:
+      badgeBg = QColor{36, 120, 204};
+      badgeText = QStringLiteral("fn");
+      break;
+    case SuggestionKind::Property:
+      badgeBg = QColor{35, 134, 54};
+      badgeText = QStringLiteral("prop");
+      break;
+    case SuggestionKind::Keyword:
+      badgeBg = QColor{137, 87, 229};
+      badgeText = QStringLiteral("kw");
+      break;
+    case SuggestionKind::Class:
+      badgeBg = QColor{210, 153, 34};
+      badgeText = QStringLiteral("cls");
+      break;
+    case SuggestionKind::Variable:
+      badgeBg = QColor{56, 139, 253};
+      badgeText = QStringLiteral("var");
+      break;
+    case SuggestionKind::Module:
+      badgeBg = QColor{187, 128, 9};
+      badgeText = QStringLiteral("mod");
+      break;
+    }
+
+    const auto badgeRect = QRect{
+      rowRect.left() + 4,
+      rowRect.top() + (rowRect.height() - 16) / 2,
+      28,
+      16};
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(badgeBg);
+    painter->drawRoundedRect(badgeRect, 3, 3);
+
+    auto badgeFont = option.font;
+    badgeFont.setPixelSize(10);
+    badgeFont.setBold(true);
+    painter->setFont(badgeFont);
+    painter->setPen(badgeFg);
+    painter->drawText(badgeRect, Qt::AlignCenter, badgeText);
+
+    // Label Text
+    auto labelFont = option.font;
+    labelFont.setPixelSize(12);
+    painter->setFont(labelFont);
+    painter->setPen(
+      isSelected ? option.palette.highlightedText().color()
+                 : option.palette.text().color());
+
+    const auto textLeft = badgeRect.right() + 8;
+    const auto detailWidth = 110;
+    const auto labelWidth =
+      std::max(40, rowRect.width() - (textLeft - rowRect.left()) - detailWidth);
+    const auto labelRect =
+      QRect{textLeft, rowRect.top(), labelWidth, rowRect.height()};
+    painter->drawText(labelRect, Qt::AlignLeft | Qt::AlignVCenter, label);
+
+    // Detail Text on Right
+    if (!detail.isEmpty())
+    {
+      auto detailFont = option.font;
+      detailFont.setPixelSize(11);
+      painter->setFont(detailFont);
+
+      auto detailColor = isSelected
+                           ? option.palette.highlightedText().color()
+                           : option.palette.placeholderText().color();
+      if (!isSelected)
+      {
+        detailColor.setAlpha(170);
+      }
+      painter->setPen(detailColor);
+
+      const auto detailRect = QRect{
+        rowRect.right() - detailWidth,
+        rowRect.top(),
+        detailWidth - 6,
+        rowRect.height()};
+      painter->drawText(detailRect, Qt::AlignRight | Qt::AlignVCenter, detail);
+    }
+
+    painter->restore();
+  }
+
+  QSize sizeHint(
+    const QStyleOptionViewItem& option,
+    const QModelIndex& index) const override
+  {
+    Q_UNUSED(option);
+    Q_UNUSED(index);
+    return QSize{320, 24};
+  }
+};
 
 QFont consoleFont()
 {
@@ -95,7 +318,8 @@ QString formatPrompt(const QString& source)
   return result;
 }
 
-QStringList completionCandidatesForContext(const QString& baseQualifier)
+std::vector<SuggestionItem> suggestionItemsForContext(
+  const QString& baseQualifier)
 {
   if (
     baseQualifier.compare(QStringLiteral("doc"), Qt::CaseInsensitive) == 0
@@ -104,15 +328,16 @@ QStringList completionCandidatesForContext(const QString& baseQualifier)
          == 0)
   {
     return {
-      QStringLiteral("selection"),
-      QStringLiteral("entities"),
-      QStringLiteral("transaction"),
-      QStringLiteral("path"),
-      QStringLiteral("name"),
-      QStringLiteral("is_modified"),
-      QStringLiteral("nodes"),
-      QStringLiteral("layer"),
-      QStringLiteral("layers")};
+      {QStringLiteral("selection"), SuggestionKind::Property, QStringLiteral("Selection")},
+      {QStringLiteral("entities"), SuggestionKind::Property, QStringLiteral("list[Entity]")},
+      {QStringLiteral("transaction"), SuggestionKind::Method, QStringLiteral("(name) -> Tx")},
+      {QStringLiteral("path"), SuggestionKind::Property, QStringLiteral("str")},
+      {QStringLiteral("name"), SuggestionKind::Property, QStringLiteral("str")},
+      {QStringLiteral("is_modified"), SuggestionKind::Property, QStringLiteral("bool")},
+      {QStringLiteral("nodes"), SuggestionKind::Property, QStringLiteral("list[Node]")},
+      {QStringLiteral("layer"), SuggestionKind::Method, QStringLiteral("(name) -> Layer")},
+      {QStringLiteral("layers"), SuggestionKind::Property, QStringLiteral("list[Layer]")},
+    };
   }
 
   if (
@@ -123,19 +348,20 @@ QStringList completionCandidatesForContext(const QString& baseQualifier)
          == 0)
   {
     return {
-      QStringLiteral("brushes"),
-      QStringLiteral("entities"),
-      QStringLiteral("brush_faces"),
-      QStringLiteral("translate"),
-      QStringLiteral("rotate"),
-      QStringLiteral("scale"),
-      QStringLiteral("duplicate"),
-      QStringLiteral("chamfer_vertices"),
-      QStringLiteral("chamfer_edges"),
-      QStringLiteral("set"),
-      QStringLiteral("clear"),
-      QStringLiteral("empty"),
-      QStringLiteral("count")};
+      {QStringLiteral("brushes"), SuggestionKind::Property, QStringLiteral("list[Brush]")},
+      {QStringLiteral("entities"), SuggestionKind::Property, QStringLiteral("list[Entity]")},
+      {QStringLiteral("brush_faces"), SuggestionKind::Property, QStringLiteral("list[Face]")},
+      {QStringLiteral("translate"), SuggestionKind::Method, QStringLiteral("(dx, dy, dz)")},
+      {QStringLiteral("rotate"), SuggestionKind::Method, QStringLiteral("(rx, ry, rz)")},
+      {QStringLiteral("scale"), SuggestionKind::Method, QStringLiteral("(sx, sy, sz)")},
+      {QStringLiteral("duplicate"), SuggestionKind::Method, QStringLiteral("() -> list")},
+      {QStringLiteral("chamfer_vertices"), SuggestionKind::Method, QStringLiteral("(dist)")},
+      {QStringLiteral("chamfer_edges"), SuggestionKind::Method, QStringLiteral("(dist)")},
+      {QStringLiteral("set"), SuggestionKind::Method, QStringLiteral("([objects])")},
+      {QStringLiteral("clear"), SuggestionKind::Method, QStringLiteral("()")},
+      {QStringLiteral("empty"), SuggestionKind::Property, QStringLiteral("bool")},
+      {QStringLiteral("count"), SuggestionKind::Property, QStringLiteral("int")},
+    };
   }
 
   if (
@@ -147,12 +373,13 @@ QStringList completionCandidatesForContext(const QString& baseQualifier)
          == 0)
   {
     return {
-      QStringLiteral("faces"),
-      QStringLiteral("bounds"),
-      QStringLiteral("center"),
-      QStringLiteral("material"),
-      QStringLiteral("id"),
-      QStringLiteral("entity")};
+      {QStringLiteral("faces"), SuggestionKind::Method, QStringLiteral("() -> list[Face]")},
+      {QStringLiteral("bounds"), SuggestionKind::Method, QStringLiteral("() -> Box3")},
+      {QStringLiteral("center"), SuggestionKind::Method, QStringLiteral("() -> Vec3")},
+      {QStringLiteral("material"), SuggestionKind::Property, QStringLiteral("str")},
+      {QStringLiteral("id"), SuggestionKind::Property, QStringLiteral("int")},
+      {QStringLiteral("entity"), SuggestionKind::Property, QStringLiteral("Entity")},
+    };
   }
 
   if (
@@ -160,16 +387,17 @@ QStringList completionCandidatesForContext(const QString& baseQualifier)
     || baseQualifier.compare(QStringLiteral("f"), Qt::CaseInsensitive) == 0)
   {
     return {
-      QStringLiteral("material"),
-      QStringLiteral("vertices"),
-      QStringLiteral("offset"),
-      QStringLiteral("scale"),
-      QStringLiteral("rotation"),
-      QStringLiteral("plane"),
-      QStringLiteral("set_material"),
-      QStringLiteral("set_offset"),
-      QStringLiteral("set_scale"),
-      QStringLiteral("set_rotation")};
+      {QStringLiteral("material"), SuggestionKind::Property, QStringLiteral("str")},
+      {QStringLiteral("vertices"), SuggestionKind::Property, QStringLiteral("list[Vec3]")},
+      {QStringLiteral("offset"), SuggestionKind::Property, QStringLiteral("Vec2")},
+      {QStringLiteral("scale"), SuggestionKind::Property, QStringLiteral("Vec2")},
+      {QStringLiteral("rotation"), SuggestionKind::Property, QStringLiteral("float")},
+      {QStringLiteral("plane"), SuggestionKind::Property, QStringLiteral("Plane")},
+      {QStringLiteral("set_material"), SuggestionKind::Method, QStringLiteral("(mat)")},
+      {QStringLiteral("set_offset"), SuggestionKind::Method, QStringLiteral("(u, v)")},
+      {QStringLiteral("set_scale"), SuggestionKind::Method, QStringLiteral("(u, v)")},
+      {QStringLiteral("set_rotation"), SuggestionKind::Method, QStringLiteral("(angle)")},
+    };
   }
 
   if (
@@ -178,14 +406,15 @@ QStringList completionCandidatesForContext(const QString& baseQualifier)
     || baseQualifier.compare(QStringLiteral("e"), Qt::CaseInsensitive) == 0)
   {
     return {
-      QStringLiteral("classname"),
-      QStringLiteral("origin"),
-      QStringLiteral("get"),
-      QStringLiteral("set"),
-      QStringLiteral("remove"),
-      QStringLiteral("properties"),
-      QStringLiteral("brushes"),
-      QStringLiteral("id")};
+      {QStringLiteral("classname"), SuggestionKind::Property, QStringLiteral("str")},
+      {QStringLiteral("origin"), SuggestionKind::Property, QStringLiteral("Vec3")},
+      {QStringLiteral("get"), SuggestionKind::Method, QStringLiteral("(key, default)")},
+      {QStringLiteral("set"), SuggestionKind::Method, QStringLiteral("(key, value)")},
+      {QStringLiteral("remove"), SuggestionKind::Method, QStringLiteral("(key)")},
+      {QStringLiteral("properties"), SuggestionKind::Property, QStringLiteral("dict")},
+      {QStringLiteral("brushes"), SuggestionKind::Property, QStringLiteral("list[Brush]")},
+      {QStringLiteral("id"), SuggestionKind::Property, QStringLiteral("int")},
+    };
   }
 
   if (
@@ -194,13 +423,14 @@ QStringList completionCandidatesForContext(const QString& baseQualifier)
     || baseQualifier.compare(QStringLiteral("v"), Qt::CaseInsensitive) == 0)
   {
     return {
-      QStringLiteral("x"),
-      QStringLiteral("y"),
-      QStringLiteral("z"),
-      QStringLiteral("length"),
-      QStringLiteral("normalized"),
-      QStringLiteral("dot"),
-      QStringLiteral("cross")};
+      {QStringLiteral("x"), SuggestionKind::Property, QStringLiteral("float")},
+      {QStringLiteral("y"), SuggestionKind::Property, QStringLiteral("float")},
+      {QStringLiteral("z"), SuggestionKind::Property, QStringLiteral("float")},
+      {QStringLiteral("length"), SuggestionKind::Method, QStringLiteral("() -> float")},
+      {QStringLiteral("normalized"), SuggestionKind::Method, QStringLiteral("() -> Vec3")},
+      {QStringLiteral("dot"), SuggestionKind::Method, QStringLiteral("(other) -> float")},
+      {QStringLiteral("cross"), SuggestionKind::Method, QStringLiteral("(other) -> Vec3")},
+    };
   }
 
   if (
@@ -209,9 +439,10 @@ QStringList completionCandidatesForContext(const QString& baseQualifier)
     || baseQualifier.compare(QStringLiteral("p"), Qt::CaseInsensitive) == 0)
   {
     return {
-      QStringLiteral("normal"),
-      QStringLiteral("dist"),
-      QStringLiteral("distance_to")};
+      {QStringLiteral("normal"), SuggestionKind::Property, QStringLiteral("Vec3")},
+      {QStringLiteral("dist"), SuggestionKind::Property, QStringLiteral("float")},
+      {QStringLiteral("distance_to"), SuggestionKind::Method, QStringLiteral("(pt) -> float")},
+    };
   }
 
   if (
@@ -219,106 +450,88 @@ QStringList completionCandidatesForContext(const QString& baseQualifier)
     || baseQualifier.compare(QStringLiteral("tb"), Qt::CaseInsensitive) == 0)
   {
     return {
-      QStringLiteral("current_document"),
-      QStringLiteral("create_brush"),
-      QStringLiteral("create_plugin_panel"),
-      QStringLiteral("selected_brushes"),
-      QStringLiteral("selectedBrushes"),
-      QStringLiteral("selected_entities"),
-      QStringLiteral("selectedEntities"),
-      QStringLiteral("selected_faces"),
-      QStringLiteral("selectedFaces"),
-      QStringLiteral("translate"),
-      QStringLiteral("rotate"),
-      QStringLiteral("scale"),
-      QStringLiteral("duplicate"),
-      QStringLiteral("delete_selection"),
-      QStringLiteral("deleteSelection"),
-      QStringLiteral("deselect_all"),
-      QStringLiteral("deselectAll"),
-      QStringLiteral("execute_action"),
-      QStringLiteral("list_actions"),
-      QStringLiteral("Vec3"),
-      QStringLiteral("Plane"),
-      QStringLiteral("Document"),
-      QStringLiteral("Selection"),
-      QStringLiteral("Brush"),
-      QStringLiteral("Face"),
-      QStringLiteral("Entity")};
+      {QStringLiteral("current_document"), SuggestionKind::Function, QStringLiteral("() -> Doc")},
+      {QStringLiteral("create_brush"), SuggestionKind::Function, QStringLiteral("(verts) -> Brush")},
+      {QStringLiteral("create_plugin_panel"), SuggestionKind::Function, QStringLiteral("(id, title)")},
+      {QStringLiteral("selected_brushes"), SuggestionKind::Function, QStringLiteral("() -> list")},
+      {QStringLiteral("selectedBrushes"), SuggestionKind::Function, QStringLiteral("() -> list")},
+      {QStringLiteral("selected_entities"), SuggestionKind::Function, QStringLiteral("() -> list")},
+      {QStringLiteral("selectedEntities"), SuggestionKind::Function, QStringLiteral("() -> list")},
+      {QStringLiteral("selected_faces"), SuggestionKind::Function, QStringLiteral("() -> list")},
+      {QStringLiteral("selectedFaces"), SuggestionKind::Function, QStringLiteral("() -> list")},
+      {QStringLiteral("translate"), SuggestionKind::Function, QStringLiteral("(dx, dy, dz)")},
+      {QStringLiteral("rotate"), SuggestionKind::Function, QStringLiteral("(rx, ry, rz)")},
+      {QStringLiteral("scale"), SuggestionKind::Function, QStringLiteral("(sx, sy, sz)")},
+      {QStringLiteral("duplicate"), SuggestionKind::Function, QStringLiteral("(obj=None)")},
+      {QStringLiteral("delete_selection"), SuggestionKind::Function, QStringLiteral("()")},
+      {QStringLiteral("deleteSelection"), SuggestionKind::Function, QStringLiteral("()")},
+      {QStringLiteral("deselect_all"), SuggestionKind::Function, QStringLiteral("()")},
+      {QStringLiteral("deselectAll"), SuggestionKind::Function, QStringLiteral("()")},
+      {QStringLiteral("execute_action"), SuggestionKind::Function, QStringLiteral("(action)")},
+      {QStringLiteral("list_actions"), SuggestionKind::Function, QStringLiteral("() -> list")},
+      {QStringLiteral("Vec3"), SuggestionKind::Class, QStringLiteral("(x, y, z)")},
+      {QStringLiteral("Plane"), SuggestionKind::Class, QStringLiteral("(norm, dist)")},
+      {QStringLiteral("Document"), SuggestionKind::Class, QStringLiteral("class")},
+      {QStringLiteral("Selection"), SuggestionKind::Class, QStringLiteral("class")},
+      {QStringLiteral("Brush"), SuggestionKind::Class, QStringLiteral("class")},
+      {QStringLiteral("Face"), SuggestionKind::Class, QStringLiteral("class")},
+      {QStringLiteral("Entity"), SuggestionKind::Class, QStringLiteral("class")},
+    };
   }
 
   return {
-    QStringLiteral("doc"),
-    QStringLiteral("sel"),
-    QStringLiteral("selected_brushes"),
-    QStringLiteral("selectedBrushes"),
-    QStringLiteral("selected_entities"),
-    QStringLiteral("selectedEntities"),
-    QStringLiteral("selected_faces"),
-    QStringLiteral("selectedFaces"),
-    QStringLiteral("translate"),
-    QStringLiteral("rotate"),
-    QStringLiteral("scale"),
-    QStringLiteral("duplicate"),
-    QStringLiteral("delete_selection"),
-    QStringLiteral("deleteSelection"),
-    QStringLiteral("deselect_all"),
-    QStringLiteral("deselectAll"),
-    QStringLiteral("create_brush"),
-    QStringLiteral("execute_action"),
-    QStringLiteral("list_actions"),
-    QStringLiteral("Vec3"),
-    QStringLiteral("Plane"),
-    QStringLiteral("tb2"),
-    QStringLiteral("and"),
-    QStringLiteral("as"),
-    QStringLiteral("break"),
-    QStringLiteral("continue"),
-    QStringLiteral("def"),
-    QStringLiteral("del"),
-    QStringLiteral("elif"),
-    QStringLiteral("else"),
-    QStringLiteral("except"),
-    QStringLiteral("False"),
-    QStringLiteral("finally"),
-    QStringLiteral("for"),
-    QStringLiteral("from"),
-    QStringLiteral("if"),
-    QStringLiteral("import"),
-    QStringLiteral("in"),
-    QStringLiteral("is"),
-    QStringLiteral("None"),
-    QStringLiteral("not"),
-    QStringLiteral("or"),
-    QStringLiteral("pass"),
-    QStringLiteral("raise"),
-    QStringLiteral("return"),
-    QStringLiteral("True"),
-    QStringLiteral("try"),
-    QStringLiteral("while"),
-    QStringLiteral("with"),
-    QStringLiteral("yield"),
-    QStringLiteral("print"),
-    QStringLiteral("len"),
-    QStringLiteral("range"),
-    QStringLiteral("enumerate"),
-    QStringLiteral("zip"),
-    QStringLiteral("list"),
-    QStringLiteral("dict"),
-    QStringLiteral("set"),
-    QStringLiteral("tuple"),
-    QStringLiteral("int"),
-    QStringLiteral("float"),
-    QStringLiteral("str"),
-    QStringLiteral("bool"),
-    QStringLiteral("sum"),
-    QStringLiteral("min"),
-    QStringLiteral("max"),
-    QStringLiteral("abs"),
-    QStringLiteral("all"),
-    QStringLiteral("any"),
-    QStringLiteral("isinstance"),
-    QStringLiteral("type")};
+    {QStringLiteral("doc"), SuggestionKind::Variable, QStringLiteral("Document")},
+    {QStringLiteral("sel"), SuggestionKind::Variable, QStringLiteral("Selection")},
+    {QStringLiteral("selected_brushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
+    {QStringLiteral("selectedBrushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
+    {QStringLiteral("selected_entities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
+    {QStringLiteral("selectedEntities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
+    {QStringLiteral("selected_faces"), SuggestionKind::Function, QStringLiteral("() -> list[Face]")},
+    {QStringLiteral("selectedFaces"), SuggestionKind::Function, QStringLiteral("() -> list[Face]")},
+    {QStringLiteral("translate"), SuggestionKind::Function, QStringLiteral("(dx, dy, dz)")},
+    {QStringLiteral("rotate"), SuggestionKind::Function, QStringLiteral("(rx, ry, rz)")},
+    {QStringLiteral("scale"), SuggestionKind::Function, QStringLiteral("(sx, sy, sz)")},
+    {QStringLiteral("duplicate"), SuggestionKind::Function, QStringLiteral("(obj=None)")},
+    {QStringLiteral("delete_selection"), SuggestionKind::Function, QStringLiteral("()")},
+    {QStringLiteral("deleteSelection"), SuggestionKind::Function, QStringLiteral("()")},
+    {QStringLiteral("deselect_all"), SuggestionKind::Function, QStringLiteral("()")},
+    {QStringLiteral("deselectAll"), SuggestionKind::Function, QStringLiteral("()")},
+    {QStringLiteral("create_brush"), SuggestionKind::Function, QStringLiteral("(verts)")},
+    {QStringLiteral("execute_action"), SuggestionKind::Function, QStringLiteral("(action)")},
+    {QStringLiteral("list_actions"), SuggestionKind::Function, QStringLiteral("() -> list")},
+    {QStringLiteral("Vec3"), SuggestionKind::Class, QStringLiteral("(x, y, z)")},
+    {QStringLiteral("Plane"), SuggestionKind::Class, QStringLiteral("(norm, dist)")},
+    {QStringLiteral("tb2"), SuggestionKind::Module, QStringLiteral("module")},
+    {QStringLiteral("for"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("in"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("range"), SuggestionKind::Function, QStringLiteral("(stop) -> list")},
+    {QStringLiteral("with"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("def"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("if"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("else"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("elif"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("return"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("import"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("as"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("while"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("break"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("continue"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("pass"), SuggestionKind::Keyword, QStringLiteral("keyword")},
+    {QStringLiteral("True"), SuggestionKind::Keyword, QStringLiteral("bool")},
+    {QStringLiteral("False"), SuggestionKind::Keyword, QStringLiteral("bool")},
+    {QStringLiteral("None"), SuggestionKind::Keyword, QStringLiteral("NoneType")},
+    {QStringLiteral("print"), SuggestionKind::Function, QStringLiteral("(*values)")},
+    {QStringLiteral("len"), SuggestionKind::Function, QStringLiteral("(obj) -> int")},
+    {QStringLiteral("enumerate"), SuggestionKind::Function, QStringLiteral("(iterable)")},
+    {QStringLiteral("zip"), SuggestionKind::Function, QStringLiteral("(*iterables)")},
+    {QStringLiteral("list"), SuggestionKind::Class, QStringLiteral("type")},
+    {QStringLiteral("dict"), SuggestionKind::Class, QStringLiteral("type")},
+    {QStringLiteral("set"), SuggestionKind::Class, QStringLiteral("type")},
+    {QStringLiteral("int"), SuggestionKind::Class, QStringLiteral("type")},
+    {QStringLiteral("float"), SuggestionKind::Class, QStringLiteral("type")},
+    {QStringLiteral("str"), SuggestionKind::Class, QStringLiteral("type")},
+    {QStringLiteral("bool"), SuggestionKind::Class, QStringLiteral("type")},
+  };
 }
 } // namespace
 
@@ -389,6 +602,21 @@ PythonConsole::PythonConsole(QWidget* parent)
     &QPlainTextEdit::textChanged,
     this,
     &PythonConsole::updateRunButtonEnabled);
+
+  connect(
+    m_input,
+    &QPlainTextEdit::cursorPositionChanged,
+    this,
+    [this]() {
+      if (m_completer && m_completer->popup() && m_completer->popup()->isVisible())
+      {
+        const auto [baseQualifier, prefix] = completionContextUnderCursor();
+        if (prefix.isEmpty() && baseQualifier.isEmpty())
+        {
+          m_completer->popup()->hide();
+        }
+      }
+    });
 
   rightLayout->addWidget(m_prompt);
   rightLayout->addWidget(m_input, 1);
@@ -474,9 +702,24 @@ void PythonConsole::setupCompleter()
   m_completer->setWidget(m_input);
   m_completer->setCompletionMode(QCompleter::PopupCompletion);
   m_completer->setCaseSensitivity(Qt::CaseInsensitive);
-  m_completer->setModelSorting(QCompleter::CaseInsensitivelySortedModel);
-  m_completionModel = new QStringListModel{m_completer};
+  m_completer->setFilterMode(Qt::MatchStartsWith);
+
+  auto* suggestModel = new SuggestionModel{m_completer};
+  m_completionModel = suggestModel;
   m_completer->setModel(m_completionModel);
+
+  auto* popup = m_completer->popup();
+  popup->setProperty("tbControlRole", "suggest-popup");
+  popup->setItemDelegate(new SuggestionItemDelegate{popup});
+  if (auto* listView = qobject_cast<QListView*>(popup))
+  {
+    listView->setUniformItemSizes(true);
+    listView->setLayoutMode(QListView::Batched);
+  }
+  popup->setSelectionBehavior(QAbstractItemView::SelectRows);
+  popup->setSelectionMode(QAbstractItemView::SingleSelection);
+  popup->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  popup->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
   connect(
     m_completer,
@@ -540,10 +783,8 @@ void PythonConsole::updateCompleter(const bool explicitTrigger)
     return;
   }
 
-  auto candidates = completionCandidatesForContext(baseQualifier);
-  candidates.sort(Qt::CaseInsensitive);
-  m_completionModel->setStringList(candidates);
-
+  auto* suggestModel = static_cast<SuggestionModel*>(m_completionModel);
+  suggestModel->setItems(suggestionItemsForContext(baseQualifier));
   m_completer->setCompletionPrefix(prefix);
 
   if (m_completer->completionCount() == 0)
@@ -556,9 +797,7 @@ void PythonConsole::updateCompleter(const bool explicitTrigger)
   }
 
   auto cr = m_input->cursorRect();
-  cr.setWidth(
-    m_completer->popup()->sizeHintForColumn(0)
-    + m_completer->popup()->verticalScrollBar()->sizeHint().width() + 24);
+  cr.setWidth(320);
   m_completer->complete(cr);
 }
 
@@ -588,7 +827,7 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
   const auto key = keyEvent->key();
   const auto modifiers = keyEvent->modifiers();
 
-  // 1. Ctrl+Enter always executes the current input
+  // 1. Ctrl+Enter always executes current script
   if (
     (key == Qt::Key_Return || key == Qt::Key_Enter)
     && modifiers.testFlag(Qt::ControlModifier))
@@ -601,7 +840,7 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     return true;
   }
 
-  // 2. Completer handling when popup is visible
+  // 2. Navigation / confirmation when completer popup is visible
   if (m_completer && m_completer->popup()->isVisible())
   {
     switch (key)
@@ -638,7 +877,7 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     }
   }
 
-  // 3. Explicit completion triggers: Ctrl+Space or Tab (when not at beginning of line)
+  // 3. Explicit completion trigger
   if (
     (key == Qt::Key_Space && modifiers.testFlag(Qt::ControlModifier))
     || (key == Qt::Key_Tab && modifiers == Qt::NoModifier))
@@ -665,15 +904,27 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     return true;
   }
 
-  // 5. Automatic completion trigger on character typing
+  // 5. Reactive completion for typing, Backspace, Delete, and Dot
   const auto text = keyEvent->text();
-  if (
-    !text.isEmpty()
-    && (text[0].isLetterOrNumber() || text[0] == '_' || text[0] == '.'))
+  const auto isEditKey =
+    (key == Qt::Key_Backspace || key == Qt::Key_Delete
+     || (!text.isEmpty()
+         && (text[0].isLetterOrNumber() || text[0] == '_' || text[0] == '.')));
+
+  if (isEditKey)
   {
     QTimer::singleShot(0, this, [this]() {
       updateCompleter(false);
     });
+  }
+  else if (
+    key == Qt::Key_Left || key == Qt::Key_Right || key == Qt::Key_Home
+    || key == Qt::Key_End)
+  {
+    if (m_completer && m_completer->popup()->isVisible())
+    {
+      m_completer->popup()->hide();
+    }
   }
 
   return Console::eventFilter(watched, event);

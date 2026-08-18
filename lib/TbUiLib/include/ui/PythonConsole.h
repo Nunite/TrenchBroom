@@ -26,12 +26,12 @@
 #include <string>
 #include <vector>
 
+class QAbstractItemModel;
 class QCompleter;
 class QEvent;
 class QLabel;
 class QPlainTextEdit;
 class QSplitter;
-class QStringListModel;
 class QToolButton;
 class QWidget;
 
@@ -47,7 +47,7 @@ private:
   QToolButton* m_runButton = nullptr;
   QToolButton* m_clearButton = nullptr;
   QCompleter* m_completer = nullptr;
-  QStringListModel* m_completionModel = nullptr;
+  QAbstractItemModel* m_completionModel = nullptr;
   std::function<void(const std::string&)> m_commandExecutor;
   std::vector<std::string> m_history;
   size_t m_historyIndex = 0u;
