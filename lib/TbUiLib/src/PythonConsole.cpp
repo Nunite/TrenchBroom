@@ -564,7 +564,8 @@ PythonConsole::PythonConsole(QWidget* parent)
   rightLayout->setContentsMargins(8, 4, 8, 8);
   rightLayout->setSpacing(4);
 
-  m_prompt = new QLabel{tr("Script Editor (Ctrl+Enter to run)"), rightPane};
+  m_prompt =
+    new QLabel{tr("Script Editor (Enter to run, Shift+Enter for newline)"), rightPane};
   m_prompt->setObjectName("PythonConsole_Prompt");
   m_prompt->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
@@ -581,7 +582,7 @@ PythonConsole::PythonConsole(QWidget* parent)
 
   m_runButton->setObjectName("PythonConsole_Run");
   m_runButton->setText(tr("Run"));
-  m_runButton->setToolTip(tr("Run current command (Ctrl+Enter)"));
+  m_runButton->setToolTip(tr("Run current script (Enter)"));
   m_runButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
   m_runButton->setAutoRaise(true);
   m_runButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -880,14 +881,16 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
   auto* keyEvent = static_cast<QKeyEvent*>(event);
   const auto key = keyEvent->key();
   const auto modifiers = keyEvent->modifiers();
+  const auto isReturn = (key == Qt::Key_Return || key == Qt::Key_Enter);
   const auto popupVisible =
     m_completer && m_completer->popup() && m_completer->popup()->isVisible();
 
-  // If popup is visible, Tab, Enter, Return, Escape, and Navigation keys are intercepted
+  // If popup is visible, Tab, Return (without Shift), Escape, and Navigation keys are intercepted
   if (popupVisible)
   {
     if (
-      key == Qt::Key_Tab || key == Qt::Key_Return || key == Qt::Key_Enter
+      key == Qt::Key_Tab
+      || (isReturn && !modifiers.testFlag(Qt::ShiftModifier))
       || key == Qt::Key_Backtab)
     {
       insertActiveCompletion();
@@ -897,6 +900,13 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     if (key == Qt::Key_Escape)
     {
       m_completer->popup()->hide();
+      return true;
+    }
+
+    if (isReturn && modifiers.testFlag(Qt::ShiftModifier))
+    {
+      m_completer->popup()->hide();
+      m_input->insertPlainText(QStringLiteral("\n"));
       return true;
     }
 
@@ -926,10 +936,17 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     return Console::eventFilter(watched, event);
   }
 
-  // 1. Ctrl+Enter always executes current script
+  // 1. Shift+Enter inserts newline in the editor
+  if (isReturn && modifiers.testFlag(Qt::ShiftModifier))
+  {
+    m_input->insertPlainText(QStringLiteral("\n"));
+    return true;
+  }
+
+  // 2. Enter (or Ctrl+Enter) executes current script
   if (
-    (key == Qt::Key_Return || key == Qt::Key_Enter)
-    && modifiers.testFlag(Qt::ControlModifier))
+    isReturn
+    && (modifiers == Qt::NoModifier || modifiers.testFlag(Qt::ControlModifier)))
   {
     if (popupVisible)
     {
@@ -939,7 +956,7 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     return true;
   }
 
-  // 2. Tab or Ctrl+Space when popup is NOT visible
+  // 3. Tab or Ctrl+Space when popup is NOT visible
   if (
     (key == Qt::Key_Space && modifiers.testFlag(Qt::ControlModifier))
     || (key == Qt::Key_Tab && modifiers == Qt::NoModifier))
@@ -953,7 +970,7 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     return Console::eventFilter(watched, event);
   }
 
-  // 3. History navigation (when completer is not visible)
+  // 4. History navigation (when completer is not visible)
   if (
     modifiers == Qt::NoModifier && key == Qt::Key_Up
     && m_input->textCursor().blockNumber() == 0)
@@ -971,7 +988,7 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
     return true;
   }
 
-  // 4. Reactive completion for typing, Backspace, Delete, and Dot
+  // 5. Reactive completion for typing, Backspace, Delete, and Dot
   const auto text = keyEvent->text();
   const auto isEditKey =
     (key == Qt::Key_Backspace || key == Qt::Key_Delete

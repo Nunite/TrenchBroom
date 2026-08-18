@@ -101,8 +101,15 @@ TEST_CASE("PythonConsole")
   QTest::keyClick(input, Qt::Key_Down);
   CHECK(input->toPlainText() == QStringLiteral("draft"));
 
+  input->setPlainText(QStringLiteral("first line"));
+  auto lineCursor = input->textCursor();
+  lineCursor.movePosition(QTextCursor::End);
+  input->setTextCursor(lineCursor);
+  QTest::keyClick(input, Qt::Key_Return, Qt::ShiftModifier);
+  CHECK(input->toPlainText() == QStringLiteral("first line\n"));
+
   input->setPlainText(QStringLiteral("2 + 2"));
-  QTest::keyClick(input, Qt::Key_Return, Qt::ControlModifier);
+  QTest::keyClick(input, Qt::Key_Return);
   REQUIRE(commands.size() == 2u);
   CHECK(commands.back() == "2 + 2");
 
