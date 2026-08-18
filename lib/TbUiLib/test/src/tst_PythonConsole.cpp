@@ -189,16 +189,16 @@ TEST_CASE("PythonConsole")
   CHECK(input->toPlainText() == QStringLiteral("selected_brushes"));
 
   // Test chained and indexed expression completion
-  input->setPlainText(QStringLiteral("b.entity.prop"));
+  input->setPlainText(QStringLiteral("sel.brush.entity.prop"));
   cursor = input->textCursor();
   cursor.movePosition(QTextCursor::End);
   input->setTextCursor(cursor);
   const auto [base4, prefix4] = console.completionContextUnderCursor();
-  CHECK(base4 == QStringLiteral("b.entity"));
+  CHECK(base4 == QStringLiteral("sel.brush.entity"));
   CHECK(prefix4 == QStringLiteral("prop"));
   console.updateCompleter(true);
   console.insertCompletion(QStringLiteral("properties"));
-  CHECK(input->toPlainText() == QStringLiteral("b.entity.properties"));
+  CHECK(input->toPlainText() == QStringLiteral("sel.brush.entity.properties"));
 
   input->setPlainText(QStringLiteral("sel.brushes[0].ent"));
   cursor = input->textCursor();
@@ -243,7 +243,7 @@ TEST_CASE("PythonConsole")
   CHECK(std::ranges::find(labels, QStringLiteral("materials")) != labels.end());
   CHECK(std::ranges::find(labels, QStringLiteral("layers")) == labels.end());
 
-  input->setPlainText(QStringLiteral("brush."));
+  input->setPlainText(QStringLiteral("sel.brush."));
   cursor = input->textCursor();
   cursor.movePosition(QTextCursor::End);
   input->setTextCursor(cursor);
@@ -251,6 +251,77 @@ TEST_CASE("PythonConsole")
   labels = completionLabels();
   CHECK(std::ranges::find(labels, QStringLiteral("faces")) != labels.end());
   CHECK(std::ranges::find(labels, QStringLiteral("bounds")) == labels.end());
+
+  // Lists do not expose their element members until explicitly indexed.
+  input->setPlainText(QStringLiteral("sel.brush.entity.brushes."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  CHECK(completionLabels().empty());
+  CHECK_FALSE(console.completer()->popup()->isVisible());
+
+  input->setPlainText(QStringLiteral("sel.brush.entity.brushes[0]."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  labels = completionLabels();
+  CHECK(std::ranges::find(labels, QStringLiteral("entity")) != labels.end());
+
+  input->setPlainText(QStringLiteral("selected_brushes()[0]."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  labels = completionLabels();
+  CHECK(std::ranges::find(labels, QStringLiteral("faces")) != labels.end());
+
+  input->setPlainText(QStringLiteral("unknown_name."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  CHECK(completionLabels().empty());
+
+  console.setCompletionRootProvider([](const std::string_view name) {
+    if (name == "api")
+    {
+      return PythonCompletionRoot{true, PythonApiValueType{PythonApiType::Module}};
+    }
+    if (name == "x")
+    {
+      return PythonCompletionRoot{true, PythonApiValueType{PythonApiType::Brush}};
+    }
+    if (name == "e")
+    {
+      return PythonCompletionRoot{true, std::nullopt};
+    }
+    return PythonCompletionRoot{};
+  });
+
+  input->setPlainText(QStringLiteral("api.current_document().selection."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  labels = completionLabels();
+  CHECK(std::ranges::find(labels, QStringLiteral("brush")) != labels.end());
+
+  input->setPlainText(QStringLiteral("x."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  labels = completionLabels();
+  CHECK(std::ranges::find(labels, QStringLiteral("entity")) != labels.end());
+
+  input->setPlainText(QStringLiteral("e."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  CHECK(completionLabels().empty());
 
   input->setPlainText(QStringLiteral("tb"));
   cursor = input->textCursor();
@@ -268,6 +339,22 @@ TEST_CASE("PythonConsole")
   console.updateCompleter(false);
   CHECK(console.completer()->popup()->isVisible() == false);
 
+  input->setPlainText(QStringLiteral("'sel.br"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  const auto [stringBase, stringPrefix] = console.completionContextUnderCursor();
+  CHECK(stringBase.isEmpty());
+  CHECK(stringPrefix.isEmpty());
+
+  input->setPlainText(QStringLiteral("value = 1 # sel.br"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  const auto [commentBase, commentPrefix] = console.completionContextUnderCursor();
+  CHECK(commentBase.isEmpty());
+  CHECK(commentPrefix.isEmpty());
+
   // Test Tab key completion workflow
   input->setPlainText(QStringLiteral("doc.selecti"));
   cursor = input->textCursor();
@@ -278,6 +365,20 @@ TEST_CASE("PythonConsole")
   QTest::keyClick(input, Qt::Key_Tab);
   CHECK(input->toPlainText() == QStringLiteral("doc.selection"));
   CHECK(console.completer()->popup()->isVisible() == false);
+
+  // Punctuation dismisses stale completions, and Enter executes rather than accepting.
+  input->setPlainText(QStringLiteral("doc.save"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  REQUIRE(console.completer()->popup()->isVisible());
+  QTest::keyClick(input, Qt::Key_ParenLeft);
+  CHECK_FALSE(console.completer()->popup()->isVisible());
+  QTest::keyClick(input, Qt::Key_ParenRight);
+  QTest::keyClick(input, Qt::Key_Return);
+  REQUIRE(commands.size() == 3u);
+  CHECK(commands.back() == "doc.save()");
 
   // Test Tab key indentation (4 spaces)
   input->setPlainText(QStringLiteral(""));

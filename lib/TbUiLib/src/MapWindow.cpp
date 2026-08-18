@@ -511,6 +511,9 @@ void MapWindow::createGui()
   m_pythonConsole->setCommandExecutor([this](const std::string& source) {
     PythonScripting::instance().runConsoleCommand(*this, source);
   });
+  m_pythonConsole->setCompletionRootProvider([this](const std::string_view name) {
+    return PythonScripting::instance().consoleCompletionRoot(*this, name);
+  });
 
   m_inspector = new Inspector{m_appController, document()};
   m_inspector->setObjectName("Inspector");

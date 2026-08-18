@@ -52,11 +52,11 @@
 #include "ui/FixedWidthFont.h"
 #include "ui/QThreadUtils.h"
 #include "ui/python/PythonApiCatalog.h"
+#include "ui/python/PythonCompletionEngine.h"
 
 #include "kd/contracts.h"
 
 #include <algorithm>
-#include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -348,92 +348,6 @@ std::vector<SuggestionItem> suggestionItems(const PythonApiType type)
   return result;
 }
 
-std::optional<PythonApiType> apiTypeForQualifier(QString normalized)
-{
-  normalized = normalized.trimmed();
-  while (normalized.endsWith(')'))
-  {
-    const auto openParen = normalized.lastIndexOf('(');
-    if (openParen == -1)
-    {
-      break;
-    }
-    normalized = normalized.left(openParen).trimmed();
-  }
-  while (normalized.endsWith(']'))
-  {
-    const auto openBracket = normalized.lastIndexOf('[');
-    if (openBracket == -1)
-    {
-      break;
-    }
-    normalized = normalized.left(openBracket).trimmed();
-  }
-
-  const auto equals = [&](const char* value) {
-    return normalized.compare(QString::fromLatin1(value), Qt::CaseInsensitive) == 0;
-  };
-  const auto endsWith = [&](const char* value) {
-    return normalized.endsWith(QString::fromLatin1(value), Qt::CaseInsensitive);
-  };
-
-  if (equals("tb2") || equals("tb"))
-  {
-    return PythonApiType::Module;
-  }
-  if (equals("doc") || equals("document") || endsWith("current_document"))
-  {
-    return PythonApiType::Document;
-  }
-  if (equals("sel") || equals("selection") || endsWith(".selection"))
-  {
-    return PythonApiType::Selection;
-  }
-  if (equals("panel") || endsWith("_panel") || endsWith(".panel"))
-  {
-    return PythonApiType::PluginPanel;
-  }
-  if (equals("tx") || equals("transaction") || endsWith(".transaction"))
-  {
-    return PythonApiType::Transaction;
-  }
-  if (endsWith("material_collections"))
-  {
-    return PythonApiType::MaterialCollection;
-  }
-  if (equals("material") || endsWith(".material") || endsWith("materials"))
-  {
-    return PythonApiType::Material;
-  }
-  if (
-    equals("entity") || equals("ent") || equals("e") || endsWith(".entity")
-    || endsWith("entities"))
-  {
-    return PythonApiType::Entity;
-  }
-  if (
-    equals("brush") || equals("b") || equals("b2") || endsWith(".brush")
-    || endsWith("brushes"))
-  {
-    return PythonApiType::Brush;
-  }
-  if (
-    equals("face") || equals("f") || endsWith(".face") || endsWith("faces")
-    || endsWith("brush_faces"))
-  {
-    return PythonApiType::Face;
-  }
-  if (equals("Vec3") || equals("vec") || equals("v"))
-  {
-    return PythonApiType::Vec3;
-  }
-  if (equals("Plane") || equals("plane") || equals("p"))
-  {
-    return PythonApiType::Plane;
-  }
-  return std::nullopt;
-}
-
 std::vector<SuggestionItem> globalSuggestionItems()
 {
   auto result = std::vector<SuggestionItem>{
@@ -489,13 +403,87 @@ std::vector<SuggestionItem> globalSuggestionItems()
   return result;
 }
 
-std::vector<SuggestionItem> suggestionItemsForContext(const QString& baseQualifier)
+bool isPythonCodeAtCursor(const QString& text, const qsizetype cursorPosition)
 {
-  if (const auto apiType = apiTypeForQualifier(baseQualifier))
+  enum class StringState
   {
-    return suggestionItems(*apiType);
+    None,
+    SingleQuoted,
+    DoubleQuoted,
+    TripleSingleQuoted,
+    TripleDoubleQuoted,
+  };
+
+  auto stringState = StringState::None;
+  auto inComment = false;
+  auto escaped = false;
+  for (auto i = qsizetype{0}; i < cursorPosition; ++i)
+  {
+    const auto ch = text[i];
+    if (inComment)
+    {
+      if (ch == '\n')
+      {
+        inComment = false;
+      }
+      continue;
+    }
+
+    if (stringState != StringState::None)
+    {
+      const auto quote = stringState == StringState::SingleQuoted
+                             || stringState == StringState::TripleSingleQuoted
+                           ? '\''
+                           : '"';
+      const auto triple = stringState == StringState::TripleSingleQuoted
+                          || stringState == StringState::TripleDoubleQuoted;
+      if (escaped)
+      {
+        escaped = false;
+      }
+      else if (ch == '\\')
+      {
+        escaped = true;
+      }
+      else if (
+        ch == quote
+        && (!triple || (i + 2 < cursorPosition && text[i + 1] == quote && text[i + 2] == quote)))
+      {
+        stringState = StringState::None;
+        if (triple)
+        {
+          i += 2;
+        }
+      }
+      continue;
+    }
+
+    if (ch == '#')
+    {
+      inComment = true;
+    }
+    else if (ch == '\'' || ch == '"')
+    {
+      const auto triple =
+        i + 2 < cursorPosition && text[i + 1] == ch && text[i + 2] == ch;
+      if (ch == '\'')
+      {
+        stringState =
+          triple ? StringState::TripleSingleQuoted : StringState::SingleQuoted;
+      }
+      else
+      {
+        stringState =
+          triple ? StringState::TripleDoubleQuoted : StringState::DoubleQuoted;
+      }
+      if (triple)
+      {
+        i += 2;
+      }
+    }
   }
-  return globalSuggestionItems();
+
+  return !inComment && stringState == StringState::None;
 }
 } // namespace
 
@@ -620,6 +608,11 @@ void PythonConsole::setCommandExecutor(std::function<void(const std::string&)> e
   updateRunButtonEnabled();
 }
 
+void PythonConsole::setCompletionRootProvider(PythonCompletionRootProvider provider)
+{
+  m_completionRootProvider = std::move(provider);
+}
+
 void PythonConsole::executeCurrentInput()
 {
   const auto sourceText = m_input->toPlainText();
@@ -688,6 +681,10 @@ void PythonConsole::setupCompleter()
 std::pair<QString, QString> PythonConsole::completionContextUnderCursor() const
 {
   const auto cursor = m_input->textCursor();
+  if (!isPythonCodeAtCursor(m_input->toPlainText(), cursor.position()))
+  {
+    return {};
+  }
   const auto blockText = cursor.block().text();
   const auto posInBlock = cursor.positionInBlock();
   const auto lineToCursor = blockText.left(posInBlock);
@@ -778,7 +775,18 @@ void PythonConsole::updateCompleter(const bool explicitTrigger)
   }
 
   auto* suggestModel = static_cast<SuggestionModel*>(m_completionModel);
-  suggestModel->setItems(suggestionItemsForContext(baseQualifier));
+  auto items = std::vector<SuggestionItem>{};
+  if (baseQualifier.isEmpty())
+  {
+    items = globalSuggestionItems();
+  }
+  else if (const auto type = pythonCompletionTypeForExpression(
+             utf8String(baseQualifier), m_completionRootProvider);
+           type && type->sequenceDepth == 0u)
+  {
+    items = suggestionItems(type->type);
+  }
+  suggestModel->setItems(std::move(items));
   m_completer->setCompletionPrefix(prefix);
 
   if (m_completer->completionCount() == 0)
@@ -794,8 +802,7 @@ void PythonConsole::updateCompleter(const bool explicitTrigger)
   cr.setWidth(320);
   m_completer->complete(cr);
 
-  // Pre-select 1st row (VS Code behavior) so Tab/Enter immediately inserts the top
-  // candidate
+  // Pre-select the first row so Tab immediately inserts the top candidate.
   if (auto* popup = m_completer->popup())
   {
     const auto firstIndex = m_completer->completionModel()->index(0, 0);
@@ -876,13 +883,10 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
   const auto popupVisible =
     m_completer && m_completer->popup() && m_completer->popup()->isVisible();
 
-  // If popup is visible, Tab, Return (without Shift), Escape, and Navigation keys are
-  // intercepted
+  // Tab accepts a completion. Enter always retains its console execution behavior.
   if (popupVisible)
   {
-    if (
-      key == Qt::Key_Tab || (isReturn && !modifiers.testFlag(Qt::ShiftModifier))
-      || key == Qt::Key_Backtab)
+    if (key == Qt::Key_Tab || key == Qt::Key_Backtab)
     {
       insertActiveCompletion();
       return true;
@@ -930,6 +934,10 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
   // 1. Shift+Enter inserts newline in the editor
   if (isReturn && modifiers.testFlag(Qt::ShiftModifier))
   {
+    if (popupVisible)
+    {
+      m_completer->popup()->hide();
+    }
     m_input->insertPlainText(QStringLiteral("\n"));
     return true;
   }
@@ -992,6 +1000,10 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
   if (isEditKey)
   {
     QTimer::singleShot(0, this, [this]() { updateCompleter(false); });
+  }
+  else if (!text.isEmpty() && popupVisible)
+  {
+    m_completer->popup()->hide();
   }
   else if (
     key == Qt::Key_Left || key == Qt::Key_Right || key == Qt::Key_Home

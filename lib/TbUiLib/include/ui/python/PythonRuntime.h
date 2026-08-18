@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ui/python/PythonCompletionEngine.h"
 #include "ui/python/PythonExecutionContext.h"
 
 #include <filesystem>
@@ -27,6 +28,8 @@ public:
     const PythonExecutionContext& context, const std::filesystem::path& path);
   bool runScript(PythonPluginSession& session);
   bool runConsoleCommand(const PythonExecutionContext& context, std::string_view source);
+  PythonCompletionRoot consoleCompletionRoot(
+    MapWindow& mapWindow, std::string_view name) const;
   void runCallback(PythonPluginSession& session, void* callback);
   void emitEvent(const std::string& eventName, MapWindow& mapWindow);
   void emitEvent(

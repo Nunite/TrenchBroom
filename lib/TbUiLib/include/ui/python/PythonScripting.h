@@ -20,6 +20,7 @@
 #pragma once
 
 #include "base/Macros.h"
+#include "ui/python/PythonCompletionEngine.h"
 
 #include <filesystem>
 #include <string_view>
@@ -40,6 +41,8 @@ public:
 
   bool runScript(MapWindow& frame, const std::filesystem::path& path);
   bool runConsoleCommand(MapWindow& frame, std::string_view source);
+  PythonCompletionRoot consoleCompletionRoot(
+    MapWindow& frame, std::string_view name) const;
 };
 
 } // namespace tb::ui

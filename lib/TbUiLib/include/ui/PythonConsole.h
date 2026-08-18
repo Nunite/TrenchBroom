@@ -21,6 +21,7 @@
 
 #include "base/NotifierConnection.h"
 #include "ui/Console.h"
+#include "ui/python/PythonCompletionEngine.h"
 
 #include <functional>
 #include <string>
@@ -49,6 +50,7 @@ private:
   QCompleter* m_completer = nullptr;
   QAbstractItemModel* m_completionModel = nullptr;
   std::function<void(const std::string&)> m_commandExecutor;
+  PythonCompletionRootProvider m_completionRootProvider;
   std::vector<std::string> m_history;
   size_t m_historyIndex = 0u;
   std::string m_historyDraft;
@@ -59,6 +61,7 @@ public:
 
   QWidget* createTabBarPage(QWidget* parent = nullptr) override;
   void setCommandExecutor(std::function<void(const std::string&)> executor);
+  void setCompletionRootProvider(PythonCompletionRootProvider provider);
   void executeCurrentInput();
 
   QCompleter* completer() const;

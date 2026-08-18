@@ -312,6 +312,49 @@ PyObject* createConsoleGlobals()
   }
   return globals;
 }
+
+std::optional<PythonApiValueType> apiValueTypeForObject(
+  PyObject* object, const size_t sequenceDepth = 0u)
+{
+  if (PyModule_Check(object))
+  {
+    const auto* moduleName = PyModule_GetName(object);
+    if (moduleName != nullptr && std::string_view{moduleName} == "tb2")
+    {
+      return PythonApiValueType{PythonApiType::Module, sequenceDepth};
+    }
+    PyErr_Clear();
+    return std::nullopt;
+  }
+
+  const auto typeName = std::string_view{Py_TYPE(object)->tp_name};
+  for (const auto& apiType : pythonApiTypes())
+  {
+    auto expectedName = std::string{"tb2."};
+    expectedName += apiType.name;
+    if (typeName == expectedName)
+    {
+      return PythonApiValueType{apiType.type, sequenceDepth};
+    }
+  }
+
+  const auto sequenceSize = PyList_Check(object)    ? PyList_GET_SIZE(object)
+                            : PyTuple_Check(object) ? PyTuple_GET_SIZE(object)
+                                                    : Py_ssize_t{-1};
+  for (auto i = Py_ssize_t{0}; i < sequenceSize; ++i)
+  {
+    auto* item =
+      PyList_Check(object) ? PyList_GET_ITEM(object, i) : PyTuple_GET_ITEM(object, i);
+    if (item != Py_None)
+    {
+      if (const auto itemType = apiValueTypeForObject(item, sequenceDepth + 1u))
+      {
+        return itemType;
+      }
+    }
+  }
+  return std::nullopt;
+}
 } // namespace
 
 PythonRuntime::PythonRuntime()
@@ -518,6 +561,28 @@ bool PythonRuntime::runConsoleCommand(
 
   Py_DECREF(result);
   return true;
+}
+
+PythonCompletionRoot PythonRuntime::consoleCompletionRoot(
+  MapWindow& mapWindow, const std::string_view name) const
+{
+  if (!Py_IsInitialized())
+  {
+    return {};
+  }
+
+  auto gil = PyGILState_Ensure();
+  auto releaseGil = kdl::invoke_later{[&]() { PyGILState_Release(gil); }};
+  const auto globalsIt = m_state->consoleGlobals.find(&mapWindow);
+  if (globalsIt == std::end(m_state->consoleGlobals))
+  {
+    return {};
+  }
+
+  const auto rootName = std::string{name};
+  auto* object = PyDict_GetItemString(globalsIt->second, rootName.c_str());
+  return object != nullptr ? PythonCompletionRoot{true, apiValueTypeForObject(object)}
+                           : PythonCompletionRoot{};
 }
 
 void PythonRuntime::runCallback(PythonPluginSession& session, void* callback)

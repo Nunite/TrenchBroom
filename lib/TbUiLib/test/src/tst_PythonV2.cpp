@@ -305,6 +305,24 @@ print("hello stderr", file=sys.stderr)
     REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
     CHECK(logger.messages.back() == "=> 1");
 
+    REQUIRE(runtime.runConsoleCommand(context, "import tb2 as api"));
+    REQUIRE(runtime.runConsoleCommand(context, "brush_list = selected_brushes()"));
+    REQUIRE(runtime.runConsoleCommand(context, "e = 1"));
+    const auto apiRoot = runtime.consoleCompletionRoot(window, "api");
+    CHECK(apiRoot.exists);
+    CHECK(apiRoot.type == PythonApiValueType{PythonApiType::Module});
+    const auto brushRoot = runtime.consoleCompletionRoot(window, "b");
+    CHECK(brushRoot.exists);
+    CHECK(brushRoot.type == PythonApiValueType{PythonApiType::Brush});
+    const auto brushListRoot = runtime.consoleCompletionRoot(window, "brush_list");
+    const auto brushListType = PythonApiValueType{PythonApiType::Brush, 1u};
+    CHECK(brushListRoot.exists);
+    CHECK(brushListRoot.type == brushListType);
+    const auto unsupportedRoot = runtime.consoleCompletionRoot(window, "e");
+    CHECK(unsupportedRoot.exists);
+    CHECK_FALSE(unsupportedRoot.type);
+    CHECK_FALSE(runtime.consoleCompletionRoot(window, "missing").exists);
+
     REQUIRE(runtime.runConsoleCommand(context, "translate(0, 0, 64)"));
     REQUIRE(runtime.runConsoleCommand(context, "rotate(0, 0, 90)"));
     REQUIRE(runtime.runConsoleCommand(context, "duplicate()"));

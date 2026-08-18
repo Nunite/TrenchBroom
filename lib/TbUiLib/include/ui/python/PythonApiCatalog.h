@@ -1,5 +1,8 @@
 #pragma once
 
+#include <compare>
+#include <cstddef>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -30,11 +33,20 @@ enum class PythonApiSymbolKind
   Method,
 };
 
+struct PythonApiValueType
+{
+  PythonApiType type;
+  size_t sequenceDepth = 0u;
+
+  auto operator<=>(const PythonApiValueType&) const = default;
+};
+
 struct PythonApiSymbol
 {
   std::string_view name;
   PythonApiSymbolKind kind;
   std::string_view detail;
+  std::optional<PythonApiValueType> resultType = std::nullopt;
 };
 
 struct PythonApiTypeInfo

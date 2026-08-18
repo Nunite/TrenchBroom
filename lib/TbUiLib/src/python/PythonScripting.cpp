@@ -56,4 +56,10 @@ bool PythonScripting::runConsoleCommand(MapWindow& frame, const std::string_view
   return PythonRuntime::instance().runConsoleCommand(context, source);
 }
 
+PythonCompletionRoot PythonScripting::consoleCompletionRoot(
+  MapWindow& frame, const std::string_view name) const
+{
+  return PythonRuntime::instance().consoleCompletionRoot(frame, name);
+}
+
 } // namespace tb::ui
