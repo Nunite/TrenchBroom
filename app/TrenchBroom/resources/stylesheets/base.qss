@@ -310,6 +310,26 @@ QDoubleSpinBox {
   selection-color: @tb-inverse-text;
 }
 
+QLineEdit QToolButton {
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  margin: 0;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+QLineEdit QToolButton:hover {
+  background: @tb-hover-background;
+  border: none;
+}
+
+QLineEdit QToolButton:pressed {
+  background: @tb-pressed-background;
+  border: none;
+}
+
 QTextEdit,
 QPlainTextEdit {
   background: @tb-input-background;
