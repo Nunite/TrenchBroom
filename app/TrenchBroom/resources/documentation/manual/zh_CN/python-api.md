@@ -271,8 +271,8 @@ with doc.transaction("Duplicate and Move"):
 
 表示由半空间平面围成的凸三维多面体。
 
-- `brush.faces() -> list[Face]`：返回构成该 Brush 的所有多边形面列表。
-- `brush.bounding_box() -> tuple[Vec3, Vec3]`：返回 `(min_bounds, max_bounds)` 包围盒。
+- `brush.entity` (*Entity*)：返回拥有该 Brush 的父实体。
+- `brush.faces()` (*list[Face]*)：返回构成该 Brush 的所有多边形面列表。
 
 ### 面 Face {#tb2_face}
 
@@ -290,15 +290,20 @@ with doc.transaction("Duplicate and Move"):
 
 ### 实体 Entity {#tb2_entity}
 
-代表点实体（如光源、生成点、怪物）和 Brush 实体（如 `func_door`、`trigger_multiple`）。
+代表点实体（如光源、生成点、怪物）和 Brush 实体（如 `func_door`、`trigger_multiple`、`worldspawn`）。支持标准 Python 字典操作与遍历。
 
 - `entity.classname` (*str*)：实体类定义名称。
-- `entity.origin` (*tb2.Vec3*)：实体的世界坐标原点位置。
-- `entity.get(key: str, default: str = "") -> str`：获取指定的属性键值字符串。
+- `entity.properties` (*dict[str, str]*)：包含该实体所有键值对属性的 Python 字典。
+- `entity.brushes` (*list[Brush]*)：该实体所拥有的所有 Brush 几何体。
+- `entity[key]` / `entity[key] = value`：使用下标语法读写实体属性。
+- `key in entity` (*bool*)：判断实体是否包含指定属性键。
+- `entity.keys()` (*list[str]*)：所有属性键名列表。
+- `entity.values()` (*list[str]*)：所有属性值列表。
+- `entity.items()` (*list[tuple[str, str]]*)：所有 `(key, value)` 元组列表。
+- `entity.get(key: str, default: str = None) -> str`：获取指定属性值，缺失时返回默认值。
 - `entity.set(key: str, value: str)`：设置或更新属性键值对。
 - `entity.remove(key: str)`：移除指定的属性键值。
-- `entity.is_brush_entity` (*bool*)：若实体包含 Brush 几何体则为 True。
-- `entity.is_point_entity` (*bool*)：若实体为独立点标记则为 True。
+- `len(entity)` (*int*)：实体包含的属性数量。
 
 ---
 

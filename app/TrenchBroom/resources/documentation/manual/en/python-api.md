@@ -271,8 +271,8 @@ Bevels selected brush edges.
 
 Represents a convex 3D polyhedron bounded by half-space planes.
 
-- `brush.faces() -> list[Face]`: Returns the list of polygon faces comprising the brush.
-- `brush.bounding_box() -> tuple[Vec3, Vec3]`: Returns `(min_bounds, max_bounds)` bounding box.
+- `brush.entity` (*Entity*): Returns the parent entity owning this brush.
+- `brush.faces()` (*list[Face]*): Returns the list of polygon faces comprising the brush.
 
 ### Face {#tb2_face}
 
@@ -290,15 +290,20 @@ Represents a single planar boundary polygon of a brush.
 
 ### Entity {#tb2_entity}
 
-Represents point entities (monsters, lights, spawn points) and brush entities (`func_door`, `trigger_multiple`).
+Represents point entities (monsters, lights, spawn points) and brush entities (`func_door`, `trigger_multiple`, `worldspawn`). Supports standard Python dictionary operations.
 
 - `entity.classname` (*str*): Entity class definition.
-- `entity.origin` (*tb2.Vec3*): Position origin of the entity.
-- `entity.get(key: str, default: str = "") -> str`: Retrieves a keyvalue string property.
-- `entity.set(key: str, value: str)`: Sets or updates a keyvalue property.
-- `entity.remove(key: str)`: Removes a keyvalue property.
-- `entity.is_brush_entity` (*bool*): True if entity contains brush geometry.
-- `entity.is_point_entity` (*bool*): True if entity is a point marker.
+- `entity.properties` (*dict[str, str]*): Dictionary containing all entity key-value properties.
+- `entity.brushes` (*list[Brush]*): All brush geometry owned by this entity.
+- `entity[key]` / `entity[key] = value`: Subscript reading and writing of entity properties.
+- `key in entity` (*bool*): Checks if a property key exists on the entity.
+- `entity.keys()` (*list[str]*): List of property keys.
+- `entity.values()` (*list[str]*): List of property values.
+- `entity.items()` (*list[tuple[str, str]]*): List of `(key, value)` pairs.
+- `entity.get(key: str, default: str = None) -> str`: Retrieves a property value, or default if missing.
+- `entity.set(key: str, value: str)`: Sets or updates a key-value property.
+- `entity.remove(key: str)`: Removes a key-value property.
+- `len(entity)` (*int*): Number of properties defined on the entity.
 
 ---
 

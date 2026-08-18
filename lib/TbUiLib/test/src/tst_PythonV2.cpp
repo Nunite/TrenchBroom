@@ -699,6 +699,64 @@ assert entity.get("message") is None
     CHECK(window.document().map().worldNode().entity().property("message") == nullptr);
   }
 
+  SECTION("supports pythonic entity dict protocol and brush entity lookup")
+  {
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_entity_dict_protocol.py",
+      R"(
+import tb2 as tb
+
+doc = tb.current_document()
+entity = doc.entities[0]
+
+# Subscript access and assignment
+entity["message"] = "magic_door"
+assert entity["message"] == "magic_door"
+assert "message" in entity
+assert len(entity) > 0
+
+# Dictionary extraction and iteration
+props = entity.properties
+assert isinstance(props, dict)
+assert props["message"] == "magic_door"
+assert ("message", "magic_door") in entity.items()
+assert "magic_door" in entity.values()
+
+# Repr / str output
+r = repr(entity)
+assert "Entity(classname=" in r
+assert "'message': 'magic_door'" in r
+
+# Brush entity reverse lookup
+if entity.brushes:
+    brush = entity.brushes[0]
+    assert brush.entity.classname == entity.classname
+
+# Selection helpers
+sel = tb.selection()
+assert sel is not None
+all_ents = tb.selected_all_entities()
+assert isinstance(all_ents, list)
+inc_ents = tb.selected_entities(include_brushes=True)
+assert isinstance(inc_ents, list)
+
+del entity["message"]
+assert "message" not in entity
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_entity_dict_protocol.py";
+
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+    CHECK(window.document().map().worldNode().entity().property("message") == nullptr);
+  }
+
   SECTION("rolls back entity edits on script failure")
   {
     auto env = fs::TestEnvironment{};

@@ -768,6 +768,21 @@ std::vector<BrushHandle> entityBrushes(EntityHandle& entity)
   return result;
 }
 
+EntityHandle brushEntity(BrushHandle& self)
+{
+  auto& brushNode = self.get();
+  auto* entityNode = brushNode.entity();
+  if (entityNode == nullptr)
+  {
+    throw std::runtime_error{"Brush does not belong to any entity"};
+  }
+  return EntityHandle{
+    self.document,
+    self.generation,
+    entityNode,
+    PythonHandleRegistry::instance().nodeGeneration(entityNode)};
+}
+
 std::vector<EntityHandle> selectedEntities(SelectionHandle& selection)
 {
   auto& document = selection.getDocument();
@@ -2042,6 +2057,16 @@ void defineModule(py::module_& module)
     .def_property_readonly(
       "classname", [](EntityHandle& self) { return self.get().entity().classname(); })
     .def_property_readonly("brushes", entityBrushes)
+    .def_property_readonly(
+      "properties",
+      [](EntityHandle& self) {
+        auto dict = py::dict{};
+        for (const auto& property : self.get().entity().properties())
+        {
+          dict[py::cast(property.key())] = py::cast(property.value());
+        }
+        return dict;
+      })
     .def(
       "keys",
       [](EntityHandle& self) {
@@ -2049,6 +2074,26 @@ void defineModule(py::module_& module)
         for (const auto& property : self.get().entity().properties())
         {
           result.push_back(property.key());
+        }
+        return result;
+      })
+    .def(
+      "values",
+      [](EntityHandle& self) {
+        auto result = std::vector<std::string>{};
+        for (const auto& property : self.get().entity().properties())
+        {
+          result.push_back(property.value());
+        }
+        return result;
+      })
+    .def(
+      "items",
+      [](EntityHandle& self) {
+        auto result = std::vector<std::pair<std::string, std::string>>{};
+        for (const auto& property : self.get().entity().properties())
+        {
+          result.emplace_back(property.key(), property.value());
         }
         return result;
       })
@@ -2061,9 +2106,87 @@ void defineModule(py::module_& module)
       py::arg("key"),
       py::arg("default") = py::none())
     .def("set", setEntityProperty)
-    .def("remove", removeEntityProperty);
+    .def("remove", removeEntityProperty)
+    .def(
+      "__getitem__",
+      [](EntityHandle& self, const std::string& key) {
+        const auto* value = self.get().entity().property(key);
+        if (value == nullptr)
+        {
+          throw py::key_error("Entity has no property '" + key + "'");
+        }
+        return *value;
+      })
+    .def(
+      "__setitem__",
+      [](EntityHandle& self, const std::string& key, const std::string& value) {
+        setEntityProperty(self, key, value);
+      })
+    .def(
+      "__delitem__",
+      [](EntityHandle& self, const std::string& key) {
+        removeEntityProperty(self, key);
+      })
+    .def(
+      "__contains__",
+      [](EntityHandle& self, const std::string& key) {
+        return self.get().entity().hasProperty(key);
+      })
+    .def(
+      "__len__",
+      [](EntityHandle& self) {
+        return self.get().entity().properties().size();
+      })
+    .def(
+      "__iter__",
+      [](EntityHandle& self) {
+        auto keys = std::vector<std::string>{};
+        for (const auto& property : self.get().entity().properties())
+        {
+          keys.push_back(property.key());
+        }
+        return py::iter(py::cast(keys));
+      })
+    .def(
+      "__repr__",
+      [](EntityHandle& self) {
+        const auto& ent = self.get().entity();
+        auto propsStr = std::string{"{"};
+        bool first = true;
+        for (const auto& property : ent.properties())
+        {
+          if (!first)
+          {
+            propsStr += ", ";
+          }
+          first = false;
+          propsStr += "'" + property.key() + "': '" + property.value() + "'";
+        }
+        propsStr += "}";
+        return "Entity(classname='" + ent.classname() + "', properties=" + propsStr + ")";
+      })
+    .def(
+      "__str__",
+      [](EntityHandle& self) {
+        const auto& ent = self.get().entity();
+        auto propsStr = std::string{"{"};
+        bool first = true;
+        for (const auto& property : ent.properties())
+        {
+          if (!first)
+          {
+            propsStr += ", ";
+          }
+          first = false;
+          propsStr += "'" + property.key() + "': '" + property.value() + "'";
+        }
+        propsStr += "}";
+        return "Entity(classname='" + ent.classname() + "', properties=" + propsStr + ")";
+      });
 
-  py::class_<BrushHandle>(module, "Brush").def("faces", [](BrushHandle& self) {
+  py::class_<BrushHandle>(module, "Brush")
+    .def_property_readonly("entity", brushEntity)
+    .def("faces", [](BrushHandle& self) {
     auto result = std::vector<FaceHandle>{};
     const auto& brush = self.get().brush();
     result.reserve(brush.faceCount());
@@ -2727,8 +2850,12 @@ void defineModule(py::module_& module)
     }
     return result;
   };
-  auto selectedEntities = [currentSelection]() {
+  auto selectedEntities = [currentSelection](bool includeBrushes = false) {
     auto selection = currentSelection();
+    if (includeBrushes)
+    {
+      return selectedAllEntities(selection);
+    }
     return tb::ui::selectedEntities(selection);
   };
   auto selectedFaces = [currentSelection]() {
@@ -3027,8 +3154,25 @@ void defineModule(py::module_& module)
 
   module.def("selected_brushes", selectedBrushes);
   module.def("selectedBrushes", selectedBrushes);
-  module.def("selected_entities", selectedEntities);
-  module.def("selectedEntities", selectedEntities);
+  module.def(
+    "selected_entities",
+    selectedEntities,
+    py::arg("include_brushes") = false);
+  module.def(
+    "selectedEntities",
+    selectedEntities,
+    py::arg("include_brushes") = false);
+  module.def("selected_all_entities", [currentSelection]() {
+    auto selection = currentSelection();
+    return selectedAllEntities(selection);
+  });
+  module.def("selectedAllEntities", [currentSelection]() {
+    auto selection = currentSelection();
+    return selectedAllEntities(selection);
+  });
+  module.def("selection", [currentSelection]() {
+    return currentSelection();
+  });
   module.def("selected_faces", selectedFaces);
   module.def("selectedFaces", selectedFaces);
   module.def("translate", translateHelper);
