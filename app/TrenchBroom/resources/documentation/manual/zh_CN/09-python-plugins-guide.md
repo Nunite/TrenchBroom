@@ -77,6 +77,17 @@ for _ in range(8):
     translate(64, 0, 16)
 ```
 
+#### 创建基础几何体 Brush {#example_create_brush}
+
+```python
+# Create a 64x64x64 cube brush centered at origin and select it
+b = create_brush([
+    (-32, -32, -32), (32, -32, -32), (32, 32, -32), (-32, 32, -32),
+    (-32, -32, 32), (32, -32, 32), (32, 32, 32), (-32, 32, 32)
+])
+sel.set([b])
+```
+
 #### 批量赋予表面材质 {#example_batch_face_materials}
 
 ```python

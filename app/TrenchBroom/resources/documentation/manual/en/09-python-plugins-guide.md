@@ -77,6 +77,17 @@ for _ in range(8):
     translate(64, 0, 16)
 ```
 
+#### Creating a Base Brush {#example_create_brush}
+
+```python
+# Create a 64x64x64 cube brush centered at origin and select it
+b = create_brush([
+    (-32, -32, -32), (32, -32, -32), (32, 32, -32), (-32, 32, -32),
+    (-32, -32, 32), (32, -32, 32), (32, 32, 32), (-32, 32, 32)
+])
+sel.set([b])
+```
+
 #### Batch Applying Face Materials {#example_batch_face_materials}
 
 ```python
