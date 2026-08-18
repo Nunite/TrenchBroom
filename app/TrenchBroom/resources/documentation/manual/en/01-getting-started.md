@@ -72,7 +72,7 @@ Multiple material collections may contain a material with the same name, resulti
 
 The first thing you will see when TrenchBroom starts is the welcome window. This window allows you to open one of your most recently edited maps, to create a new map or to browse your computer for an existing map you wish to open in TrenchBroom.
 
-![TrenchBroom's welcome window (Mac OS X)](images/WelcomeWindow.png)
+![TrenchBroom's welcome window](images/WelcomeWindow.png)
 
 You can click the button labeled "New map..." to create a new map or you can click the button labeled "Browse..." to find a map file on your computer. Double click one of the documents in the list on the right of the window to open it. The light gray text on the left gives you some information about which version of TrenchBroom you are currently running. The version information is useful if you wish to report a problem with the editor (see [here](#reporting_bugs) for more information).
 
@@ -88,7 +88,7 @@ Once you have selected a game and a map format, TrenchBroom will open the main e
 
 The main window consists of a menu bar, a toolbar, the editing area, an inspector on the right and an info panel at the bottom. In the screenshot below, there are three editing areas: one 3D viewport and two orthographic 2D editing areas.
 
-![The main editing window (Ubuntu Linux)](images/MainWindow.png)
+![The main editing window](images/MainWindow.png)
 
 The sizes of the editing area, the inspector and the info bar can be changed by dragging the dividers with the mouse. This applies to some of the dividers in the inspector as well. If a divider is 2 pixels thick, it can be dragged with the mouse. The positions of the dividers and the size of the editing window are saved when you close a window. The following subsections introduce the most important parts of the main window: the editing area, the inspector, and the info bar. The toolbar and the menu will be explained in more detail in later sections.
 

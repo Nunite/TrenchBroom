@@ -94,7 +94,7 @@ Python Console font and size  用于控制台输入和输出的等宽字体系�
 
 ## 鼠标输入 {#mouse_input}
 
-![鼠标配置对话框（macOS）](images/MousePreferences.png)
+![鼠标配置对话框](images/MousePreferences.png)
 
 鼠标输入首选项窗格允许你更改 TrenchBroom 解释鼠标移动的方式。
 
@@ -107,7 +107,7 @@ Fly Mode    控制飞行模式速度的滑块。键盘快捷键可以在键盘�
 
 ## 键盘快捷键 {#keyboard_shortcuts}
 
-![键盘配置对话框（Ubuntu Linux）](images/KeyboardPreferences.png)
+![键盘配置对话框](images/KeyboardPreferences.png)
 
 在此首选项窗格中，你可以更改 TrenchBroom 中使用的键盘快捷键。表格列出了所有可用的快捷键、其上下文和说明。要更改键盘快捷键，在表格第一列的快捷键上单击两次（不要双击）并输入新快捷键。上下文决定了该快捷键在何时可用，例如，根据旋转工具是否处于激活状态，PgDn 键会触发不同的操作。最后，说明列解释了快捷键在特定上下文中的作用。有时，快捷键触发的操作取决于使用该快捷键的视口是 3D 还是 2D 视口。例如，PgDn 键在 2D 视口中可以将对象向后移动（远离摄像机），而在 3D 视口中则可以沿 Z 轴向下移动对象。这些不同的操作会在说明列中列在一起，但用分号分隔。
 

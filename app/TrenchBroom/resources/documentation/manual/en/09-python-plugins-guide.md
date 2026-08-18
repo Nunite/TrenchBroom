@@ -11,6 +11,8 @@ The console features a modern side-by-side split workspace:
 - **Left Pane (Output Log)**: Displays execution logs, standard output from `print(...)`, interactive evaluation results, and error tracebacks.
 - **Right Pane (Script Editor)**: A full multiline code editor for authoring and running single-line expressions, quick snippets, or complex procedural scripts. Drag the center splitter bar to adjust the width between the log and the editor.
 
+![Python Console](images/PythonConsole.png)
+
 ### Zero-Boilerplate Global Helpers {#console_global_helpers}
 
 To make interactive mapping and geometry transformations as fast as possible, the Python console automatically binds the active document, active selection, math primitives, and high-level transform functions into the global namespace without needing imports or manual transaction wrapping:

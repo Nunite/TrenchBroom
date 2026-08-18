@@ -94,7 +94,7 @@ The **Colors** page controls editor-specific colors such as the grid, selections
 
 ## Mouse Input {#mouse_input}
 
-![Mouse Configuration Dialog (macOS)](images/MousePreferences.png)
+![Mouse Configuration Dialog](images/MousePreferences.png)
 
 The mouse input preference pane allows you to change how TrenchBroom interprets mouse movements.
 
@@ -107,7 +107,7 @@ Fly Mode    A slider to control the speed in fly mode. The keyboard shortcuts ca
 
 ## Keyboard Shortcuts {#keyboard_shortcuts}
 
-![Keyboard Configuration Dialog (Ubuntu Linux)](images/KeyboardPreferences.png)
+![Keyboard Configuration Dialog](images/KeyboardPreferences.png)
 
 In this preference pane, you can change the keyboard shortcuts used in TrenchBroom. The table lists all available shortcuts, their context, and the description. To change a keyboard shortcut, click twice (do not double click) on the shortcut in the first column of the table and enter the new shortcut. The context determines when this shortcut is available, for example, the PgDn key triggers different actions depending on whether the rotate tool is active or not. Finally, the description column explains what a shortcut does in a particular context. Sometimes a shortcut triggers different actions depending on whether the viewport in which it was used is a 3D or a 2D viewport. For example, the PgDn key can move objects backward (away from the camera) in a 2D viewport or down along the Z axis in the 3D viewport. These different actions are listed together in the description column, but they are separated with a semicolon.
 
