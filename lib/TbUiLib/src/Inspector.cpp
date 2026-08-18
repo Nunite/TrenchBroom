@@ -73,10 +73,10 @@ Inspector::Inspector(AppController& appController, MapDocument& document, QWidge
   auto* navigationRail = new QWidget{};
   navigationRail->setObjectName("Inspector_NavigationRail");
   navigationRail->setAttribute(Qt::WA_StyledBackground);
-  navigationRail->setFixedWidth(44);
+  navigationRail->setFixedWidth(40);
 
   auto* navigationLayout = new QVBoxLayout{};
-  navigationLayout->setContentsMargins(2, 4, 2, 4);
+  navigationLayout->setContentsMargins(4, 6, 4, 6);
   navigationLayout->setSpacing(4);
 
   const auto addNavigationButton = [this, navigationRail, navigationLayout](
@@ -96,7 +96,7 @@ Inspector::Inspector(AppController& appController, MapDocument& document, QWidge
     button->setFocusPolicy(Qt::StrongFocus);
     button->setIcon(loadSVGIcon(iconPath));
     button->setIconSize(QSize{20, 20});
-    button->setFixedSize(QSize{40, 40});
+    button->setFixedSize(QSize{32, 32});
 
     connect(button, &QToolButton::clicked, this, [this, page]() {
       m_tabBook->switchToPage(static_cast<int>(page));

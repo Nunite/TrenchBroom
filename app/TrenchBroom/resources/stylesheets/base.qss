@@ -174,20 +174,26 @@ QWidget#Inspector_NavigationRail {
 
 QToolButton[inspectorNavigation="true"] {
   background: transparent;
-  border: none;
-  border-left: 2px solid transparent;
-  border-radius: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
   padding: 0;
 }
 
 QToolButton[inspectorNavigation="true"]:hover,
 QToolButton[inspectorNavigation="true"]:focus {
   background: @tb-hover-background;
+  border-color: @tb-border;
 }
 
 QToolButton[inspectorNavigation="true"]:checked {
   background: @tb-pressed-background;
-  border-left-color: @tb-accent;
+  border-color: transparent;
+}
+
+QToolButton[inspectorNavigation="true"]:checked:hover,
+QToolButton[inspectorNavigation="true"]:checked:focus {
+  background: @tb-pressed-background;
+  border-color: @tb-focus-border;
 }
 
 QPushButton {
