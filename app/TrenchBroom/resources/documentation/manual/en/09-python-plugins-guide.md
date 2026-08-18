@@ -36,7 +36,7 @@ To make interactive mapping and geometry transformations as fast as possible, th
 
 - **Execute**: Press #key(Enter) (or #key(Ctrl)+#key(Enter)) or click **Run** to execute the script in the editor.
 - **Newline**: Press #key(Shift)+#key(Enter) to insert a newline without running the script.
-- **Code Completion**: Press #key(Ctrl)+#key(Space) or #key(Tab) to open the completion popup; press #key(Tab) or #key(Enter) to insert the selected completion.
+- **Code Completion**: Press #key(Ctrl)+#key(Space) or #key(Tab) to open the completion popup; press #key(Tab) to insert the selected completion. #key(Enter) executes the current script even while the popup is visible.
 - **History Navigation**: Press #key(Up) on the first line or #key(Down) on the last line to navigate through previous scripts (up to 100 history entries). Unsubmitted text in the editor is automatically preserved as a draft while browsing history.
 - **Clear Output**: Click **Clear** in the tab header to clear all output logs.
 - **Font Customization**: Configure the family and size under **Preferences > View > Fonts > Python Console**; only installed monospace families are listed.
@@ -46,6 +46,32 @@ To make interactive mapping and geometry transformations as fast as possible, th
 All output from `print(...)` and evaluation results are logged to the output view. If an exception occurs, a formatted traceback with line numbers is printed in red.
 
 ### Practical Console Examples {#console_examples}
+
+These examples can be pasted directly into the console. Before accessing an object in a list, use `[0]` to retrieve one element or a `for` loop to process each element; for example, `selected_brushes()[0].entity` is the owning entity of the first selected brush.
+
+#### Common Read-Only Commands {#example_common_queries}
+
+```python
+# Print the active map path / 打印当前地图路径
+print(doc.path)
+
+# Count selected brushes / 统计选中的 Brush 数量
+print(f"Selected brushes: {len(sel.brushes)}")
+
+# Print the owning entity and properties of one selected brush / 打印一个选中 Brush 所属实体及其属性
+brush = sel.brush
+if brush is not None:
+    entity = brush.entity
+    print(f"classname = {entity.classname}")
+    for key, value in entity.items():
+        print(f"{key} = {value}")
+else:
+    print("Select one brush first")
+
+# Print materials used by selected faces / 打印选中面的材质
+for face in selected_faces():
+    print(face.material)
+```
 
 #### Quick Selection Transforms {#example_quick_transforms}
 

@@ -36,7 +36,7 @@
 
 - **执行脚本**：按 #key(Enter)（或 #key(Ctrl)+#key(Enter)）或点击 **Run** 按钮即可立即执行编辑器中的脚本。
 - **换行编辑**：按 #key(Shift)+#key(Enter) 可在编辑器中换行，方便编写多行脚本。
-- **代码智能补全**：按 #key(Ctrl)+#key(Space) 或 #key(Tab) 可主动呼出补全浮窗；按 #key(Tab) 或 #key(Enter) 确认插入选中的补全项。
+- **代码智能补全**：按 #key(Ctrl)+#key(Space) 或 #key(Tab) 可主动呼出补全浮窗；按 #key(Tab) 插入选中的补全项。即使浮窗可见，按 #key(Enter) 也会执行当前脚本。
 - **历史记录翻阅**：在编辑器首行按 #key(Up) 或在尾行按 #key(Down) 可快速翻阅历史脚本（最多 100 条）。若当前输入框中有未提交的代码，翻阅历史时会自动暂存为草稿。
 - **清除输出**：点击顶部的 **Clear** 按钮可清空所有日志。
 - **外观字体设置**：可在 **Preferences > View > Fonts > Python Console** 下自定义控制台的等宽字体系列和字号大小。
@@ -46,6 +46,32 @@
 所有 `print(...)` 打印内容与表达式结果均会实时记录于输出视图中。当发生异常时，会自动以红色高亮显示带有行号的 Traceback 诊断信息。
 
 ### 实用控制台操作示例 {#console_examples}
+
+以下示例可以直接粘贴到控制台。访问列表中的对象时，应先使用 `[0]` 取得一个元素，或者使用 `for` 循环逐个处理；例如 `selected_brushes()[0].entity` 表示第一个选中 Brush 所属的实体。
+
+#### 常用只读命令 {#example_common_queries}
+
+```python
+# Print the active map path / 打印当前地图路径
+print(doc.path)
+
+# Count selected brushes / 统计选中的 Brush 数量
+print(f"Selected brushes: {len(sel.brushes)}")
+
+# Print the owning entity and properties of one selected brush / 打印一个选中 Brush 所属实体及其属性
+brush = sel.brush
+if brush is not None:
+    entity = brush.entity
+    print(f"classname = {entity.classname}")
+    for key, value in entity.items():
+        print(f"{key} = {value}")
+else:
+    print("Select one brush first")
+
+# Print materials used by selected faces / 打印选中面的材质
+for face in selected_faces():
+    print(face.material)
+```
 
 #### 快速变换与选区操作 {#example_quick_transforms}
 
