@@ -155,14 +155,14 @@ TrenchBroom 区分两种插件类型：
 
 - `tb2.current_document()`：返回代表当前打开地图的活动 `Document` 句柄。
 - `doc.transaction(name)`：事务上下文管理器（`with doc.transaction("Action Name"):`），将修改合并为一个撤销/重做步骤，并在发生 Python 异常时自动回滚。
-- `doc.selection`：用于查询选中对象（`brushes`、`entities`、`brush_faces`）并应用几何变换（`translate`、`rotate`、`scale`、`duplicate`、`chamfer_vertices`、`chamfer_edges`）的 `Selection` 句柄。
+- `doc.selection`：用于查询选中对象（`entity`、`brush`、`entities`、`all_entities`、`brushes`、`brush_faces`）的 `Selection` 句柄；`sel[key]` 从首个相关实体读取，`sel[key] = value` 写入全部选中实体；同时支持 `translate`、`rotate`、`scale`、`duplicate`、`chamfer_vertices` 和 `chamfer_edges` 等几何变换。
 - `doc.entities`：地图中所有 `Entity` 对象的列表。使用 `.get(key, default)` 和 `.set(key, value)` 访问属性。
 - `brush.faces()`：返回构成 Brush 的多边形 `Face` 对象列表，支持访问 `.material`、`.offset`、`.scale`、`.rotation` 和 `.vertices`。
 - `tb2.Vec3(x, y, z)` 与 `tb2.Plane(normal, dist)`：三维向量与平面数学基元。
 
 #### 构建自定义 UI 面板 {#building_custom_ui_panels}
 
-UI 插件使用 `tb2.create_plugin_panel(panel_id, title)` 在 **Plugins** 检查器标签页中创建交互式面板。返回的 `PluginPanel` 提供声明式控件：
+UI 插件使用 `tb2.create_plugin_panel(title)` 在 **Plugins** 检查器标签页中创建交互式面板。返回的 `PluginPanel` 提供声明式控件：
 
 - **标签与文本**：`.add_label(text)`、`.add_label_named(key, text)`、`.set_label_text(key, text)` 以及 `.add_html_view(key, html, height, callback)`。
 - **表单输入**：`.add_text_field(key, label, value)`、`.add_text_area(key, label, value)`、`.add_int_field(key, label, value, min, max)`、`.add_float_field(key, label, value, min, max, decimals, step)`、`.add_checkbox(key, text, checked)`、`.add_combo_box(key, label, items, callback, current)` 以及 `.add_color_field(key, label, color)`。
@@ -199,7 +199,7 @@ def on_generate():
 
 def init_plugin():
     global panel
-    panel = tb2.create_plugin_panel("com.example.array_tool", "Array Generator")
+    panel = tb2.create_plugin_panel("Array Generator")
     panel.add_label("Duplicate the active selection along an offset vector:")
 
     group = panel.add_group("config", "Parameters")

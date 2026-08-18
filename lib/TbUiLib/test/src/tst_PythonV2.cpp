@@ -157,6 +157,38 @@ with open("python-v2-smoke-ok.txt", "w", encoding="utf-8") as f:
     CHECK(env.loadFile("python-v2-smoke-ok.txt") == "worldspawn");
   }
 
+  SECTION("keeps the public API catalog synchronized with tb2 bindings")
+  {
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_api_catalog.py",
+      R"(
+import tb2 as tb
+
+for type_name, expected_names in tb._api_catalog.items():
+    target = tb if type_name == "tb2" else getattr(tb, type_name)
+    actual_names = {name for name in vars(target) if not name.startswith("_")}
+    assert actual_names == set(expected_names), (
+        type_name,
+        sorted(actual_names - set(expected_names)),
+        sorted(set(expected_names) - actual_names),
+    )
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_api_catalog.py";
+
+    const auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+  }
+
   SECTION("loads manifest plugin and emits events")
   {
     auto env = fs::TestEnvironment{};
@@ -266,7 +298,9 @@ print("hello stderr", file=sys.stderr)
 
     REQUIRE(runtime.runConsoleCommand(
       context,
-      "b = create_brush([(-32,-32,-32),(32,-32,-32),(32,32,-32),(-32,32,-32),(-32,-32,32),(32,-32,32),(32,32,32),(-32,32,32)])"));
+      "b = "
+      "create_brush([(-32,-32,-32),(32,-32,-32),(32,32,-32),(-32,32,-32),(-32,-32,32),("
+      "32,-32,32),(32,32,32),(-32,32,32)])"));
     REQUIRE(runtime.runConsoleCommand(context, "sel.set([b])"));
     REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
     CHECK(logger.messages.back() == "=> 1");
@@ -283,21 +317,26 @@ print("hello stderr", file=sys.stderr)
 
     REQUIRE(runtime.runConsoleCommand(
       context,
-      "b2 = create_brush([(-16,-16,-16),(16,-16,-16),(16,16,-16),(-16,16,-16),(-16,-16,16),(16,-16,16),(16,16,16),(-16,16,16)])"));
+      "b2 = "
+      "create_brush([(-16,-16,-16),(16,-16,-16),(16,16,-16),(-16,16,-16),(-16,-16,16),("
+      "16,-16,16),(16,16,16),(-16,16,16)])"));
     REQUIRE(runtime.runConsoleCommand(context, "sel.set([b2])"));
-    REQUIRE(runtime.runConsoleCommand(context, "initial_brush_count = len(doc.entities[0].brushes)"));
+    REQUIRE(runtime.runConsoleCommand(
+      context, "initial_brush_count = len(doc.entities[0].brushes)"));
 
     REQUIRE(runtime.runConsoleCommand(
       context,
       "for _ in range(8):\n"
       "    duplicate()\n"
       "    translate(64, 0, 16)\n"));
-    REQUIRE(runtime.runConsoleCommand(context, "len(doc.entities[0].brushes) == initial_brush_count + 8"));
+    REQUIRE(runtime.runConsoleCommand(
+      context, "len(doc.entities[0].brushes) == initial_brush_count + 8"));
     CHECK(logger.messages.back() == "=> True");
 
     // A single undo step reverts the entire 8-step procedural generation loop at once
     window.document().map().undoCommand();
-    REQUIRE(runtime.runConsoleCommand(context, "len(doc.entities[0].brushes) == initial_brush_count"));
+    REQUIRE(runtime.runConsoleCommand(
+      context, "len(doc.entities[0].brushes) == initial_brush_count"));
     CHECK(logger.messages.back() == "=> True");
 
     CHECK_FALSE(runtime.runConsoleCommand(context, "1 / 0"));
@@ -414,6 +453,80 @@ tb._cached_entity.classname
       context, env.dir() / "v2_use_cached_entity.py"));
     CHECK(
       PythonRuntime::instance().lastError().find("Entity is no longer valid")
+      != std::string::npos);
+  }
+
+  SECTION("invalidates entity, brush, and face handles when a subtree is removed")
+  {
+    auto& map = window.document().map();
+    auto entity = mdl::Entity{};
+    entity.setClassname("func_detail");
+    auto* entityNode = new mdl::EntityNode{std::move(entity)};
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "cached") | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {entityNode}}});
+    mdl::addNodes(map, {{entityNode, {brushNode}}});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_cache_brush.py",
+      R"(
+import tb2 as tb
+
+tb._cached_entity = next(e for e in tb.current_document().entities if e.classname == "func_detail")
+tb._cached_brush = tb._cached_entity.brushes[0]
+tb._cached_face = tb._cached_brush.faces()[0]
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_cache_brush.py";
+
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+    mdl::removeNodes(map, {entityNode});
+
+    env.createFile(
+      "v2_use_cached_entity.py",
+      R"(
+import tb2 as tb
+
+tb._cached_entity.classname
+)");
+    CHECK_FALSE(PythonRuntime::instance().runScript(
+      context, env.dir() / "v2_use_cached_entity.py"));
+    CHECK(
+      PythonRuntime::instance().lastError().find("Entity is no longer valid")
+      != std::string::npos);
+
+    env.createFile(
+      "v2_use_cached_brush.py",
+      R"(
+import tb2 as tb
+
+tb._cached_brush.faces()
+)");
+    CHECK_FALSE(
+      PythonRuntime::instance().runScript(context, env.dir() / "v2_use_cached_brush.py"));
+    CHECK(
+      PythonRuntime::instance().lastError().find("Brush is no longer valid")
+      != std::string::npos);
+
+    env.createFile(
+      "v2_use_cached_face.py",
+      R"(
+import tb2 as tb
+
+tb._cached_face.material
+)");
+    CHECK_FALSE(
+      PythonRuntime::instance().runScript(context, env.dir() / "v2_use_cached_face.py"));
+    CHECK(
+      PythonRuntime::instance().lastError().find("Brush is no longer valid")
       != std::string::npos);
   }
 
@@ -701,6 +814,13 @@ assert entity.get("message") is None
 
   SECTION("supports pythonic entity dict protocol and brush entity lookup")
   {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "selection") | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
+    mdl::selectNodes(map, {brushNode});
+
     auto env = fs::TestEnvironment{};
     env.createFile(
       "v2_entity_dict_protocol.py",
@@ -740,19 +860,24 @@ assert sel is not None
 assert "Selection(" in repr(sel)
 assert "Document(" in repr(doc)
 
-# Selection direct property access
-if sel.brushes or sel.entities:
-    assert sel.entity is not None
-    assert isinstance(sel.properties, dict)
-    sel["test_sel_key"] = "test_val"
-    assert sel["test_sel_key"] == "test_val"
-    assert "test_sel_key" in sel
+# Selection direct property access reads the first selected entity. Assignment applies
+# to every selected entity, matching set_property().
+assert sel.entity is not None
+assert sel.brush is not None
+assert sel.classname == "worldspawn"
+assert isinstance(sel.properties, dict)
+sel["test_sel_key"] = "test_val"
+assert sel["test_sel_key"] == "test_val"
+assert "test_sel_key" in sel
+sel.entity.remove("test_sel_key")
+assert "test_sel_key" not in sel
 
 all_ents = tb.selected_all_entities()
 assert isinstance(all_ents, list)
 inc_ents = tb.selected_entities(include_brushes=True)
 assert isinstance(inc_ents, list)
 
+entity = sel.entity
 del entity["message"]
 assert "message" not in entity
 )");

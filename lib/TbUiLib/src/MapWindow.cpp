@@ -73,6 +73,7 @@
 #include "mdl/Map_Selection.h"
 #include "mdl/ModelUtils.h"
 #include "mdl/Node.h"
+#include "mdl/NodeQueries.h"
 #include "mdl/PasteType.h"
 #include "mdl/PatchNode.h"
 #include "mdl/VisualEffect.h"
@@ -898,6 +899,13 @@ void MapWindow::connectObservers()
     m_document->selectionDidChangeNotifier.connect(this, &MapWindow::selectionDidChange);
   m_notifierConnection += m_document->nodesDidChangeNotifier.connect(
     [](const auto& nodes) { PythonHandleRegistry::instance().invalidateNodes(nodes); });
+  m_notifierConnection +=
+    m_document->nodesWillBeRemovedNotifier.connect([](const auto& nodes) {
+      const auto removedNodes = mdl::collectNodesAndDescendants(nodes);
+      auto& registry = PythonHandleRegistry::instance();
+      registry.invalidateNodes(removedNodes);
+      registry.invalidateNodeLifetimes(removedNodes);
+    });
   m_notifierConnection += m_document->currentLayerDidChangeNotifier.connect(
     this, &MapWindow::currentLayerDidChange);
   m_notifierConnection +=
@@ -2791,9 +2799,7 @@ void MapWindow::changeEvent(QEvent*)
 
 void MapWindow::closeEvent(QCloseEvent* event)
 {
-  if (
-    !closeCompileDialog()
-    || (!m_discardChangesOnClose && !confirmOrDiscardChanges()))
+  if (!closeCompileDialog() || (!m_discardChangesOnClose && !confirmOrDiscardChanges()))
   {
     m_discardChangesOnClose = false;
     event->ignore();

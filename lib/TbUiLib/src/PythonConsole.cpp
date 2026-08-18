@@ -51,10 +51,13 @@
 #include "prefs/Preferences.h"
 #include "ui/FixedWidthFont.h"
 #include "ui/QThreadUtils.h"
+#include "ui/python/PythonApiCatalog.h"
 
 #include "kd/contracts.h"
 
 #include <algorithm>
+#include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -126,12 +129,9 @@ public:
   {
     beginResetModel();
     m_items = std::move(items);
-    std::sort(
-      m_items.begin(),
-      m_items.end(),
-      [](const auto& a, const auto& b) {
-        return a.label.compare(b.label, Qt::CaseInsensitive) < 0;
-      });
+    std::sort(m_items.begin(), m_items.end(), [](const auto& a, const auto& b) {
+      return a.label.compare(b.label, Qt::CaseInsensitive) < 0;
+    });
     endResetModel();
   }
 };
@@ -153,8 +153,7 @@ public:
     painter->setRenderHint(QPainter::Antialiasing, true);
 
     const auto label = index.data(Qt::DisplayRole).toString();
-    const auto kind =
-      static_cast<SuggestionKind>(index.data(Qt::UserRole + 1).toInt());
+    const auto kind = static_cast<SuggestionKind>(index.data(Qt::UserRole + 1).toInt());
     const auto detail = index.data(Qt::UserRole + 2).toString();
 
     const auto isSelected = (option.state & QStyle::State_Selected) != 0;
@@ -214,11 +213,8 @@ public:
       break;
     }
 
-    const auto badgeRect = QRect{
-      rowRect.left() + 4,
-      rowRect.top() + (rowRect.height() - 16) / 2,
-      28,
-      16};
+    const auto badgeRect =
+      QRect{rowRect.left() + 4, rowRect.top() + (rowRect.height() - 16) / 2, 28, 16};
     painter->setPen(Qt::NoPen);
     painter->setBrush(badgeBg);
     painter->drawRoundedRect(badgeRect, 3, 3);
@@ -242,8 +238,7 @@ public:
     const auto detailWidth = 110;
     const auto labelWidth =
       std::max(40, rowRect.width() - (textLeft - rowRect.left()) - detailWidth);
-    const auto labelRect =
-      QRect{textLeft, rowRect.top(), labelWidth, rowRect.height()};
+    const auto labelRect = QRect{textLeft, rowRect.top(), labelWidth, rowRect.height()};
     painter->drawText(labelRect, Qt::AlignLeft | Qt::AlignVCenter, label);
 
     // Detail Text on Right
@@ -253,9 +248,8 @@ public:
       detailFont.setPixelSize(11);
       painter->setFont(detailFont);
 
-      auto detailColor = isSelected
-                           ? option.palette.highlightedText().color()
-                           : option.palette.placeholderText().color();
+      auto detailColor = isSelected ? option.palette.highlightedText().color()
+                                    : option.palette.placeholderText().color();
       if (!isSelected)
       {
         detailColor.setAlpha(170);
@@ -263,10 +257,7 @@ public:
       painter->setPen(detailColor);
 
       const auto detailRect = QRect{
-        rowRect.right() - detailWidth,
-        rowRect.top(),
-        detailWidth - 6,
-        rowRect.height()};
+        rowRect.right() - detailWidth, rowRect.top(), detailWidth - 6, rowRect.height()};
       painter->drawText(detailRect, Qt::AlignRight | Qt::AlignVCenter, detail);
     }
 
@@ -274,8 +265,7 @@ public:
   }
 
   QSize sizeHint(
-    const QStyleOptionViewItem& option,
-    const QModelIndex& index) const override
+    const QStyleOptionViewItem& option, const QModelIndex& index) const override
   {
     Q_UNUSED(option);
     Q_UNUSED(index);
@@ -324,228 +314,147 @@ QString formatPrompt(const QString& source)
   return result;
 }
 
-std::vector<SuggestionItem> suggestionItemsForContext(
-  const QString& baseQualifier)
+QString apiString(const std::string_view value)
 {
-  auto normalized = baseQualifier.trimmed();
+  return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
+}
+
+SuggestionKind suggestionKind(const PythonApiSymbolKind kind)
+{
+  switch (kind)
+  {
+  case PythonApiSymbolKind::Class:
+    return SuggestionKind::Class;
+  case PythonApiSymbolKind::Function:
+    return SuggestionKind::Function;
+  case PythonApiSymbolKind::Property:
+    return SuggestionKind::Property;
+  case PythonApiSymbolKind::Method:
+    return SuggestionKind::Method;
+  }
+  return SuggestionKind::Property;
+}
+
+std::vector<SuggestionItem> suggestionItems(const PythonApiType type)
+{
+  auto result = std::vector<SuggestionItem>{};
+  const auto symbols = pythonApiSymbols(type);
+  result.reserve(symbols.size());
+  for (const auto& symbol : symbols)
+  {
+    result.push_back(SuggestionItem{
+      apiString(symbol.name), suggestionKind(symbol.kind), apiString(symbol.detail)});
+  }
+  return result;
+}
+
+std::optional<PythonApiType> apiTypeForQualifier(QString normalized)
+{
+  normalized = normalized.trimmed();
   while (normalized.endsWith(')'))
   {
     const auto openParen = normalized.lastIndexOf('(');
-    if (openParen != -1)
-    {
-      normalized = normalized.left(openParen).trimmed();
-    }
-    else
+    if (openParen == -1)
     {
       break;
     }
+    normalized = normalized.left(openParen).trimmed();
   }
   while (normalized.endsWith(']'))
   {
     const auto openBracket = normalized.lastIndexOf('[');
-    if (openBracket != -1)
-    {
-      normalized = normalized.left(openBracket).trimmed();
-    }
-    else
+    if (openBracket == -1)
     {
       break;
     }
+    normalized = normalized.left(openBracket).trimmed();
   }
 
-  if (
-    normalized.compare(QStringLiteral("doc"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("document"), Qt::CaseInsensitive) == 0
-    || normalized.endsWith(QStringLiteral("current_document"), Qt::CaseInsensitive))
+  const auto equals = [&](const char* value) {
+    return normalized.compare(QString::fromLatin1(value), Qt::CaseInsensitive) == 0;
+  };
+  const auto endsWith = [&](const char* value) {
+    return normalized.endsWith(QString::fromLatin1(value), Qt::CaseInsensitive);
+  };
+
+  if (equals("tb2") || equals("tb"))
   {
-    return {
-      {QStringLiteral("selection"), SuggestionKind::Property, QStringLiteral("Selection")},
-      {QStringLiteral("entities"), SuggestionKind::Property, QStringLiteral("list[Entity]")},
-      {QStringLiteral("transaction"), SuggestionKind::Method, QStringLiteral("(name) -> Tx")},
-      {QStringLiteral("path"), SuggestionKind::Property, QStringLiteral("str")},
-      {QStringLiteral("name"), SuggestionKind::Property, QStringLiteral("str")},
-      {QStringLiteral("is_modified"), SuggestionKind::Property, QStringLiteral("bool")},
-      {QStringLiteral("nodes"), SuggestionKind::Property, QStringLiteral("list[Node]")},
-      {QStringLiteral("layer"), SuggestionKind::Method, QStringLiteral("(name) -> Layer")},
-      {QStringLiteral("layers"), SuggestionKind::Property, QStringLiteral("list[Layer]")},
-    };
+    return PythonApiType::Module;
   }
-
-  if (
-    normalized.compare(QStringLiteral("sel"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("selection"), Qt::CaseInsensitive) == 0
-    || normalized.endsWith(QStringLiteral("selection"), Qt::CaseInsensitive))
+  if (equals("doc") || equals("document") || endsWith("current_document"))
   {
-    return {
-      {QStringLiteral("brushes"), SuggestionKind::Property, QStringLiteral("list[Brush]")},
-      {QStringLiteral("entities"), SuggestionKind::Property, QStringLiteral("list[Entity]")},
-      {QStringLiteral("all_entities"), SuggestionKind::Property, QStringLiteral("list[Entity]")},
-      {QStringLiteral("brush_faces"), SuggestionKind::Property, QStringLiteral("list[Face]")},
-      {QStringLiteral("translate"), SuggestionKind::Method, QStringLiteral("(dx, dy, dz)")},
-      {QStringLiteral("rotate"), SuggestionKind::Method, QStringLiteral("(rx, ry, rz)")},
-      {QStringLiteral("scale"), SuggestionKind::Method, QStringLiteral("(sx, sy, sz)")},
-      {QStringLiteral("duplicate"), SuggestionKind::Method, QStringLiteral("() -> list")},
-      {QStringLiteral("chamfer_vertices"), SuggestionKind::Method, QStringLiteral("(dist)")},
-      {QStringLiteral("chamfer_edges"), SuggestionKind::Method, QStringLiteral("(dist)")},
-      {QStringLiteral("set"), SuggestionKind::Method, QStringLiteral("([objects])")},
-      {QStringLiteral("clear"), SuggestionKind::Method, QStringLiteral("()")},
-      {QStringLiteral("empty"), SuggestionKind::Property, QStringLiteral("bool")},
-      {QStringLiteral("count"), SuggestionKind::Property, QStringLiteral("int")},
-    };
+    return PythonApiType::Document;
   }
-
-  if (
-    normalized.compare(QStringLiteral("brush"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("b"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("b2"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("first_brush"), Qt::CaseInsensitive) == 0
-    || normalized.endsWith(QStringLiteral(".brush"), Qt::CaseInsensitive)
-    || normalized.endsWith(QStringLiteral("brushes"), Qt::CaseInsensitive))
+  if (equals("sel") || equals("selection") || endsWith(".selection"))
   {
-    return {
-      {QStringLiteral("entity"), SuggestionKind::Property, QStringLiteral("Entity")},
-      {QStringLiteral("faces"), SuggestionKind::Method, QStringLiteral("() -> list[Face]")},
-      {QStringLiteral("bounds"), SuggestionKind::Method, QStringLiteral("() -> Box3")},
-      {QStringLiteral("center"), SuggestionKind::Method, QStringLiteral("() -> Vec3")},
-      {QStringLiteral("material"), SuggestionKind::Property, QStringLiteral("str")},
-      {QStringLiteral("id"), SuggestionKind::Property, QStringLiteral("int")},
-    };
+    return PythonApiType::Selection;
   }
-
-  if (
-    normalized.compare(QStringLiteral("face"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("f"), Qt::CaseInsensitive) == 0
-    || normalized.endsWith(QStringLiteral(".face"), Qt::CaseInsensitive)
-    || normalized.endsWith(QStringLiteral("faces"), Qt::CaseInsensitive))
+  if (equals("panel") || endsWith("_panel") || endsWith(".panel"))
   {
-    return {
-      {QStringLiteral("material"), SuggestionKind::Property, QStringLiteral("str")},
-      {QStringLiteral("vertices"), SuggestionKind::Property, QStringLiteral("list[Vec3]")},
-      {QStringLiteral("offset"), SuggestionKind::Property, QStringLiteral("Vec2")},
-      {QStringLiteral("scale"), SuggestionKind::Property, QStringLiteral("Vec2")},
-      {QStringLiteral("rotation"), SuggestionKind::Property, QStringLiteral("float")},
-      {QStringLiteral("plane"), SuggestionKind::Property, QStringLiteral("Plane")},
-      {QStringLiteral("set_material"), SuggestionKind::Method, QStringLiteral("(mat)")},
-      {QStringLiteral("set_offset"), SuggestionKind::Method, QStringLiteral("(u, v)")},
-      {QStringLiteral("set_scale"), SuggestionKind::Method, QStringLiteral("(u, v)")},
-      {QStringLiteral("set_rotation"), SuggestionKind::Method, QStringLiteral("(angle)")},
-    };
+    return PythonApiType::PluginPanel;
   }
-
-  if (
-    normalized.compare(QStringLiteral("ent"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("entity"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("e"), Qt::CaseInsensitive) == 0
-    || normalized.endsWith(QStringLiteral("entity"), Qt::CaseInsensitive)
-    || normalized.endsWith(QStringLiteral("entities"), Qt::CaseInsensitive))
+  if (equals("tx") || equals("transaction") || endsWith(".transaction"))
   {
-    return {
-      {QStringLiteral("classname"), SuggestionKind::Property, QStringLiteral("str")},
-      {QStringLiteral("origin"), SuggestionKind::Property, QStringLiteral("Vec3")},
-      {QStringLiteral("properties"), SuggestionKind::Property, QStringLiteral("dict")},
-      {QStringLiteral("brushes"), SuggestionKind::Property, QStringLiteral("list[Brush]")},
-      {QStringLiteral("get"), SuggestionKind::Method, QStringLiteral("(key, default)")},
-      {QStringLiteral("set"), SuggestionKind::Method, QStringLiteral("(key, value)")},
-      {QStringLiteral("remove"), SuggestionKind::Method, QStringLiteral("(key)")},
-      {QStringLiteral("keys"), SuggestionKind::Method, QStringLiteral("() -> list[str]")},
-      {QStringLiteral("values"), SuggestionKind::Method, QStringLiteral("() -> list[str]")},
-      {QStringLiteral("items"), SuggestionKind::Method, QStringLiteral("() -> list[tuple]")},
-      {QStringLiteral("id"), SuggestionKind::Property, QStringLiteral("int")},
-    };
+    return PythonApiType::Transaction;
   }
-
-  if (
-    normalized.compare(QStringLiteral("Vec3"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("vec"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("v"), Qt::CaseInsensitive) == 0)
+  if (endsWith("material_collections"))
   {
-    return {
-      {QStringLiteral("x"), SuggestionKind::Property, QStringLiteral("float")},
-      {QStringLiteral("y"), SuggestionKind::Property, QStringLiteral("float")},
-      {QStringLiteral("z"), SuggestionKind::Property, QStringLiteral("float")},
-      {QStringLiteral("length"), SuggestionKind::Method, QStringLiteral("() -> float")},
-      {QStringLiteral("normalized"), SuggestionKind::Method, QStringLiteral("() -> Vec3")},
-      {QStringLiteral("dot"), SuggestionKind::Method, QStringLiteral("(other) -> float")},
-      {QStringLiteral("cross"), SuggestionKind::Method, QStringLiteral("(other) -> Vec3")},
-    };
+    return PythonApiType::MaterialCollection;
   }
-
-  if (
-    normalized.compare(QStringLiteral("Plane"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("plane"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("p"), Qt::CaseInsensitive) == 0)
+  if (equals("material") || endsWith(".material") || endsWith("materials"))
   {
-    return {
-      {QStringLiteral("normal"), SuggestionKind::Property, QStringLiteral("Vec3")},
-      {QStringLiteral("dist"), SuggestionKind::Property, QStringLiteral("float")},
-      {QStringLiteral("distance_to"), SuggestionKind::Method, QStringLiteral("(pt) -> float")},
-    };
+    return PythonApiType::Material;
   }
-
   if (
-    normalized.compare(QStringLiteral("tb2"), Qt::CaseInsensitive) == 0
-    || normalized.compare(QStringLiteral("tb"), Qt::CaseInsensitive) == 0)
+    equals("entity") || equals("ent") || equals("e") || endsWith(".entity")
+    || endsWith("entities"))
   {
-    return {
-      {QStringLiteral("current_document"), SuggestionKind::Function, QStringLiteral("() -> Doc")},
-      {QStringLiteral("selection"), SuggestionKind::Function, QStringLiteral("() -> Selection")},
-      {QStringLiteral("selected_all_entities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
-      {QStringLiteral("selectedAllEntities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
-      {QStringLiteral("selected_brushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
-      {QStringLiteral("selectedBrushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
-      {QStringLiteral("selected_entities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
-      {QStringLiteral("selectedEntities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
-      {QStringLiteral("selected_faces"), SuggestionKind::Function, QStringLiteral("() -> list[Face]")},
-      {QStringLiteral("selectedFaces"), SuggestionKind::Function, QStringLiteral("() -> list[Face]")},
-      {QStringLiteral("translate"), SuggestionKind::Function, QStringLiteral("(dx, dy, dz)")},
-      {QStringLiteral("rotate"), SuggestionKind::Function, QStringLiteral("(rx, ry, rz)")},
-      {QStringLiteral("scale"), SuggestionKind::Function, QStringLiteral("(sx, sy, sz)")},
-      {QStringLiteral("duplicate"), SuggestionKind::Function, QStringLiteral("(obj=None)")},
-      {QStringLiteral("delete_selection"), SuggestionKind::Function, QStringLiteral("()")},
-      {QStringLiteral("deleteSelection"), SuggestionKind::Function, QStringLiteral("()")},
-      {QStringLiteral("deselect_all"), SuggestionKind::Function, QStringLiteral("()")},
-      {QStringLiteral("deselectAll"), SuggestionKind::Function, QStringLiteral("()")},
-      {QStringLiteral("execute_action"), SuggestionKind::Function, QStringLiteral("(action)")},
-      {QStringLiteral("list_actions"), SuggestionKind::Function, QStringLiteral("() -> list")},
-      {QStringLiteral("create_brush"), SuggestionKind::Function, QStringLiteral("(verts) -> Brush")},
-      {QStringLiteral("create_plugin_panel"), SuggestionKind::Function, QStringLiteral("(id, title)")},
-      {QStringLiteral("Vec3"), SuggestionKind::Class, QStringLiteral("(x, y, z)")},
-      {QStringLiteral("Plane"), SuggestionKind::Class, QStringLiteral("(norm, dist)")},
-      {QStringLiteral("Document"), SuggestionKind::Class, QStringLiteral("class")},
-      {QStringLiteral("Selection"), SuggestionKind::Class, QStringLiteral("class")},
-      {QStringLiteral("Brush"), SuggestionKind::Class, QStringLiteral("class")},
-      {QStringLiteral("Face"), SuggestionKind::Class, QStringLiteral("class")},
-      {QStringLiteral("Entity"), SuggestionKind::Class, QStringLiteral("class")},
-    };
+    return PythonApiType::Entity;
   }
+  if (
+    equals("brush") || equals("b") || equals("b2") || endsWith(".brush")
+    || endsWith("brushes"))
+  {
+    return PythonApiType::Brush;
+  }
+  if (
+    equals("face") || equals("f") || endsWith(".face") || endsWith("faces")
+    || endsWith("brush_faces"))
+  {
+    return PythonApiType::Face;
+  }
+  if (equals("Vec3") || equals("vec") || equals("v"))
+  {
+    return PythonApiType::Vec3;
+  }
+  if (equals("Plane") || equals("plane") || equals("p"))
+  {
+    return PythonApiType::Plane;
+  }
+  return std::nullopt;
+}
 
-  return {
+std::vector<SuggestionItem> globalSuggestionItems()
+{
+  auto result = std::vector<SuggestionItem>{
     {QStringLiteral("doc"), SuggestionKind::Variable, QStringLiteral("Document")},
     {QStringLiteral("sel"), SuggestionKind::Variable, QStringLiteral("Selection")},
-    {QStringLiteral("selection"), SuggestionKind::Function, QStringLiteral("() -> Selection")},
-    {QStringLiteral("selected_all_entities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
-    {QStringLiteral("selectedAllEntities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
-    {QStringLiteral("selected_brushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
-    {QStringLiteral("selectedBrushes"), SuggestionKind::Function, QStringLiteral("() -> list[Brush]")},
-    {QStringLiteral("selected_entities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
-    {QStringLiteral("selectedEntities"), SuggestionKind::Function, QStringLiteral("() -> list[Entity]")},
-    {QStringLiteral("selected_faces"), SuggestionKind::Function, QStringLiteral("() -> list[Face]")},
-    {QStringLiteral("selectedFaces"), SuggestionKind::Function, QStringLiteral("() -> list[Face]")},
-    {QStringLiteral("translate"), SuggestionKind::Function, QStringLiteral("(dx, dy, dz)")},
-    {QStringLiteral("rotate"), SuggestionKind::Function, QStringLiteral("(rx, ry, rz)")},
-    {QStringLiteral("scale"), SuggestionKind::Function, QStringLiteral("(sx, sy, sz)")},
-    {QStringLiteral("duplicate"), SuggestionKind::Function, QStringLiteral("(obj=None)")},
-    {QStringLiteral("delete_selection"), SuggestionKind::Function, QStringLiteral("()")},
-    {QStringLiteral("deleteSelection"), SuggestionKind::Function, QStringLiteral("()")},
-    {QStringLiteral("deselect_all"), SuggestionKind::Function, QStringLiteral("()")},
-    {QStringLiteral("deselectAll"), SuggestionKind::Function, QStringLiteral("()")},
-    {QStringLiteral("create_brush"), SuggestionKind::Function, QStringLiteral("(verts)")},
-    {QStringLiteral("execute_action"), SuggestionKind::Function, QStringLiteral("(action)")},
-    {QStringLiteral("list_actions"), SuggestionKind::Function, QStringLiteral("() -> list")},
-    {QStringLiteral("Vec3"), SuggestionKind::Class, QStringLiteral("(x, y, z)")},
-    {QStringLiteral("Plane"), SuggestionKind::Class, QStringLiteral("(norm, dist)")},
     {QStringLiteral("tb2"), SuggestionKind::Module, QStringLiteral("module")},
-    {QStringLiteral("tb"), SuggestionKind::Module, QStringLiteral("module")},
+  };
+
+  const auto moduleSymbols = pythonApiSymbols(PythonApiType::Module);
+  for (const auto helperName : pythonConsoleHelperNames())
+  {
+    const auto symbol = std::find_if(
+      moduleSymbols.begin(), moduleSymbols.end(), [&](const auto& candidate) {
+        return candidate.name == helperName;
+      });
+    contract_assert(symbol != moduleSymbols.end());
+    result.push_back(SuggestionItem{
+      apiString(symbol->name), suggestionKind(symbol->kind), apiString(symbol->detail)});
+  }
+
+  const auto builtins = std::vector<SuggestionItem>{
     {QStringLiteral("for"), SuggestionKind::Keyword, QStringLiteral("keyword")},
     {QStringLiteral("in"), SuggestionKind::Keyword, QStringLiteral("keyword")},
     {QStringLiteral("range"), SuggestionKind::Function, QStringLiteral("(stop) -> list")},
@@ -576,6 +485,17 @@ std::vector<SuggestionItem> suggestionItemsForContext(
     {QStringLiteral("str"), SuggestionKind::Class, QStringLiteral("type")},
     {QStringLiteral("bool"), SuggestionKind::Class, QStringLiteral("type")},
   };
+  result.insert(result.end(), builtins.begin(), builtins.end());
+  return result;
+}
+
+std::vector<SuggestionItem> suggestionItemsForContext(const QString& baseQualifier)
+{
+  if (const auto apiType = apiTypeForQualifier(baseQualifier))
+  {
+    return suggestionItems(*apiType);
+  }
+  return globalSuggestionItems();
 }
 } // namespace
 
@@ -631,8 +551,7 @@ PythonConsole::PythonConsole(QWidget* parent)
   m_runButton->setAutoRaise(true);
   m_runButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   m_runButton->setEnabled(false);
-  connect(
-    m_runButton, &QToolButton::clicked, this, &PythonConsole::executeCurrentInput);
+  connect(m_runButton, &QToolButton::clicked, this, &PythonConsole::executeCurrentInput);
 
   m_clearButton->setObjectName("PythonConsole_Clear");
   m_clearButton->setText(tr("Clear"));
@@ -643,25 +562,18 @@ PythonConsole::PythonConsole(QWidget* parent)
   connect(m_clearButton, &QToolButton::clicked, this, &Console::clear);
 
   connect(
-    m_input,
-    &QPlainTextEdit::textChanged,
-    this,
-    &PythonConsole::updateRunButtonEnabled);
+    m_input, &QPlainTextEdit::textChanged, this, &PythonConsole::updateRunButtonEnabled);
 
-  connect(
-    m_input,
-    &QPlainTextEdit::cursorPositionChanged,
-    this,
-    [this]() {
-      if (m_completer && m_completer->popup() && m_completer->popup()->isVisible())
+  connect(m_input, &QPlainTextEdit::cursorPositionChanged, this, [this]() {
+    if (m_completer && m_completer->popup() && m_completer->popup()->isVisible())
+    {
+      const auto [baseQualifier, prefix] = completionContextUnderCursor();
+      if (prefix.isEmpty() && baseQualifier.isEmpty())
       {
-        const auto [baseQualifier, prefix] = completionContextUnderCursor();
-        if (prefix.isEmpty() && baseQualifier.isEmpty())
-        {
-          m_completer->popup()->hide();
-        }
+        m_completer->popup()->hide();
       }
-    });
+    }
+  });
 
   rightLayout->addWidget(m_prompt);
   rightLayout->addWidget(m_input, 1);
@@ -702,8 +614,7 @@ QWidget* PythonConsole::createTabBarPage(QWidget* parent)
   return actions;
 }
 
-void PythonConsole::setCommandExecutor(
-  std::function<void(const std::string&)> executor)
+void PythonConsole::setCommandExecutor(std::function<void(const std::string&)> executor)
 {
   m_commandExecutor = std::move(executor);
   updateRunButtonEnabled();
@@ -782,9 +693,9 @@ std::pair<QString, QString> PythonConsole::completionContextUnderCursor() const
   const auto lineToCursor = blockText.left(posInBlock);
 
   auto prefixStart = posInBlock;
-  while (prefixStart > 0
-         && (lineToCursor[prefixStart - 1].isLetterOrNumber()
-             || lineToCursor[prefixStart - 1] == '_'))
+  while (
+    prefixStart > 0
+    && (lineToCursor[prefixStart - 1].isLetterOrNumber() || lineToCursor[prefixStart - 1] == '_'))
   {
     --prefixStart;
   }
@@ -883,7 +794,8 @@ void PythonConsole::updateCompleter(const bool explicitTrigger)
   cr.setWidth(320);
   m_completer->complete(cr);
 
-  // Pre-select 1st row (VS Code behavior) so Tab/Enter immediately inserts the top candidate
+  // Pre-select 1st row (VS Code behavior) so Tab/Enter immediately inserts the top
+  // candidate
   if (auto* popup = m_completer->popup())
   {
     const auto firstIndex = m_completer->completionModel()->index(0, 0);
@@ -915,10 +827,8 @@ void PythonConsole::insertActiveCompletion()
     completionText.isEmpty() && m_completer->completionModel()
     && m_completer->completionModel()->rowCount() > 0)
   {
-    completionText = m_completer->completionModel()
-                       ->index(0, 0)
-                       .data(Qt::DisplayRole)
-                       .toString();
+    completionText =
+      m_completer->completionModel()->index(0, 0).data(Qt::DisplayRole).toString();
   }
 
   if (completionText.isEmpty())
@@ -947,7 +857,7 @@ void PythonConsole::insertCompletion(const QString& completion)
   const auto [baseQualifier, prefix] = completionContextUnderCursor();
   auto cursor = m_input->textCursor();
   cursor.movePosition(
-    QTextCursor::Left, QTextCursor::KeepAnchor, prefix.length());
+    QTextCursor::Left, QTextCursor::KeepAnchor, static_cast<int>(prefix.length()));
   cursor.insertText(completion);
   m_input->setTextCursor(cursor);
 }
@@ -966,12 +876,12 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
   const auto popupVisible =
     m_completer && m_completer->popup() && m_completer->popup()->isVisible();
 
-  // If popup is visible, Tab, Return (without Shift), Escape, and Navigation keys are intercepted
+  // If popup is visible, Tab, Return (without Shift), Escape, and Navigation keys are
+  // intercepted
   if (popupVisible)
   {
     if (
-      key == Qt::Key_Tab
-      || (isReturn && !modifiers.testFlag(Qt::ShiftModifier))
+      key == Qt::Key_Tab || (isReturn && !modifiers.testFlag(Qt::ShiftModifier))
       || key == Qt::Key_Backtab)
     {
       insertActiveCompletion();
@@ -1026,8 +936,7 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
 
   // 2. Enter (or Ctrl+Enter) executes current script
   if (
-    isReturn
-    && (modifiers == Qt::NoModifier || modifiers.testFlag(Qt::ControlModifier)))
+    isReturn && (modifiers == Qt::NoModifier || modifiers.testFlag(Qt::ControlModifier)))
   {
     if (popupVisible)
     {
@@ -1078,14 +987,11 @@ bool PythonConsole::eventFilter(QObject* watched, QEvent* event)
   const auto text = keyEvent->text();
   const auto isEditKey =
     (key == Qt::Key_Backspace || key == Qt::Key_Delete
-     || (!text.isEmpty()
-         && (text[0].isLetterOrNumber() || text[0] == '_' || text[0] == '.')));
+     || (!text.isEmpty() && (text[0].isLetterOrNumber() || text[0] == '_' || text[0] == '.')));
 
   if (isEditKey)
   {
-    QTimer::singleShot(0, this, [this]() {
-      updateCompleter(false);
-    });
+    QTimer::singleShot(0, this, [this]() { updateCompleter(false); });
   }
   else if (
     key == Qt::Key_Left || key == Qt::Key_Right || key == Qt::Key_Home
@@ -1170,10 +1076,8 @@ void PythonConsole::logToConsole(const LogLevel level, const std::string& messag
     isDark ? QColor{63, 185, 80} : QColor{26, 127, 55}; // Mint / Green
   const auto resultTextColor =
     isDark ? QColor{165, 214, 255} : QColor{5, 80, 174}; // Soft bright result text
-  const auto errorColor =
-    isDark ? QColor{248, 81, 73} : QColor{207, 34, 46}; // Coral Red
-  const auto warnColor =
-    isDark ? QColor{210, 153, 34} : QColor{154, 103, 0}; // Amber
+  const auto errorColor = isDark ? QColor{248, 81, 73} : QColor{207, 34, 46}; // Coral Red
+  const auto warnColor = isDark ? QColor{210, 153, 34} : QColor{154, 103, 0}; // Amber
   const auto normalTextColor = edit->palette().color(QPalette::Text);
 
   auto cursor = QTextCursor{edit->document()};

@@ -58,6 +58,7 @@
 #include "ui/Inspector.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
+#include "ui/python/PythonApiCatalog.h"
 #include "ui/python/PythonExecutionContext.h"
 #include "ui/python/PythonHandleRegistry.h"
 #include "ui/python/PythonPluginSession.h"
@@ -229,12 +230,15 @@ struct BrushHandle
   MapDocument* document = nullptr;
   size_t generation = 0;
   mdl::BrushNode* brush = nullptr;
-  size_t nodeGeneration = 0;
+  size_t nodeLifetimeGeneration = 0;
 
   mdl::BrushNode& get() const
   {
     DocumentHandle{document, generation}.get();
-    if (brush == nullptr)
+    if (
+      brush == nullptr
+      || nodeLifetimeGeneration
+           != PythonHandleRegistry::instance().nodeLifetimeGeneration(brush))
     {
       throw std::runtime_error{"Brush is no longer valid"};
     }
@@ -247,12 +251,13 @@ struct FaceHandle
   MapDocument* document = nullptr;
   size_t generation = 0;
   mdl::BrushNode* brush = nullptr;
-  size_t nodeGeneration = 0;
+  size_t nodeLifetimeGeneration = 0;
   size_t faceIndex = 0;
 
   const mdl::BrushFace& get() const
   {
-    auto& brushNode = BrushHandle{document, generation, brush, nodeGeneration}.get();
+    auto& brushNode =
+      BrushHandle{document, generation, brush, nodeLifetimeGeneration}.get();
     if (faceIndex >= brushNode.brush().faceCount())
     {
       throw std::runtime_error{"Face is no longer valid"};
@@ -763,7 +768,7 @@ std::vector<BrushHandle> entityBrushes(EntityHandle& entity)
       entity.document,
       entity.generation,
       brush,
-      PythonHandleRegistry::instance().nodeGeneration(brush)});
+      PythonHandleRegistry::instance().nodeLifetimeGeneration(brush)});
   }
   return result;
 }
@@ -835,7 +840,7 @@ py::object selectionFirstBrush(SelectionHandle& self)
       &self.getDocument(),
       self.generation,
       brush,
-      PythonHandleRegistry::instance().nodeGeneration(brush)});
+      PythonHandleRegistry::instance().nodeLifetimeGeneration(brush)});
   }
   return py::none();
 }
@@ -1000,7 +1005,7 @@ std::vector<FaceHandle> selectedBrushFaces(SelectionHandle& selection)
       &selection.getDocument(),
       selection.generation,
       brushNode,
-      PythonHandleRegistry::instance().nodeGeneration(brushNode),
+      PythonHandleRegistry::instance().nodeLifetimeGeneration(brushNode),
       faceHandle.faceIndex()});
   }
   return result;
@@ -1452,7 +1457,8 @@ bool setDocumentFaceUVsImpl(
       return false;
     }
     auto& brushNode =
-      BrushHandle{face.document, face.generation, face.brush, face.nodeGeneration}.get();
+      BrushHandle{face.document, face.generation, face.brush, face.nodeLifetimeGeneration}
+        .get();
     if (face.faceIndex >= brushNode.brush().faceCount())
     {
       throw std::runtime_error{"Face is no longer valid"};
@@ -1516,7 +1522,8 @@ bool setFaceUVLoops(FaceHandle& face, const py::iterable& loopObjects)
 {
   auto& document = DocumentHandle{face.document, face.generation}.get();
   auto& brushNode =
-    BrushHandle{face.document, face.generation, face.brush, face.nodeGeneration}.get();
+    BrushHandle{face.document, face.generation, face.brush, face.nodeLifetimeGeneration}
+      .get();
   if (face.faceIndex >= brushNode.brush().faceCount())
   {
     throw std::runtime_error{"Face is no longer valid"};
@@ -1549,7 +1556,8 @@ bool setFaceUVLoops(FaceHandle& face, const py::iterable& loopObjects)
       vertices,
       uvs,
     }});
-  face.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(face.brush);
+  face.nodeLifetimeGeneration =
+    PythonHandleRegistry::instance().nodeLifetimeGeneration(face.brush);
   return ok;
 }
 
@@ -1557,7 +1565,8 @@ void setFaceMaterial(FaceHandle& face, const std::string& materialName)
 {
   auto& document = DocumentHandle{face.document, face.generation}.get();
   auto& brushNode =
-    BrushHandle{face.document, face.generation, face.brush, face.nodeGeneration}.get();
+    BrushHandle{face.document, face.generation, face.brush, face.nodeLifetimeGeneration}
+      .get();
   if (face.faceIndex >= brushNode.brush().faceCount())
   {
     throw std::runtime_error{"Face is no longer valid"};
@@ -1569,14 +1578,16 @@ void setFaceMaterial(FaceHandle& face, const std::string& materialName)
     return mdl::setBrushFaceAttributes(map, {.materialName = materialName});
   });
 
-  face.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(face.brush);
+  face.nodeLifetimeGeneration =
+    PythonHandleRegistry::instance().nodeLifetimeGeneration(face.brush);
 }
 
 void updateFace(FaceHandle& face, mdl::UpdateBrushFaceAttributes update)
 {
   auto& document = DocumentHandle{face.document, face.generation}.get();
   auto& brushNode =
-    BrushHandle{face.document, face.generation, face.brush, face.nodeGeneration}.get();
+    BrushHandle{face.document, face.generation, face.brush, face.nodeLifetimeGeneration}
+      .get();
   if (face.faceIndex >= brushNode.brush().faceCount())
   {
     throw std::runtime_error{"Face is no longer valid"};
@@ -1588,7 +1599,8 @@ void updateFace(FaceHandle& face, mdl::UpdateBrushFaceAttributes update)
     return mdl::setBrushFaceAttributes(map, update);
   });
 
-  face.nodeGeneration = PythonHandleRegistry::instance().nodeGeneration(face.brush);
+  face.nodeLifetimeGeneration =
+    PythonHandleRegistry::instance().nodeLifetimeGeneration(face.brush);
 }
 
 void setFaceOffset(FaceHandle& face, const py::object& offset)
@@ -1675,7 +1687,7 @@ BrushHandle createBrush(const py::iterable& pointObjects, py::object materialNam
     &document,
     generation,
     brushNode,
-    PythonHandleRegistry::instance().nodeGeneration(brushNode)};
+    PythonHandleRegistry::instance().nodeLifetimeGeneration(brushNode)};
 }
 
 void executeAction(const std::string& actionPath)
@@ -2015,37 +2027,38 @@ void defineModule(py::module_& module)
           throw;
         }
       })
-    .def("clear_selection", [](DocumentHandle& self) {
-      auto& document = self.get();
-      auto transaction = ScopedPythonTransaction{document, "Python v2 Clear Selection"};
-      try
-      {
-        mdl::deselectAll(document.map());
-        if (!transaction.commit())
+    .def(
+      "clear_selection",
+      [](DocumentHandle& self) {
+        auto& document = self.get();
+        auto transaction = ScopedPythonTransaction{document, "Python v2 Clear Selection"};
+        try
         {
-          throw std::runtime_error{"Could not clear selection"};
+          mdl::deselectAll(document.map());
+          if (!transaction.commit())
+          {
+            throw std::runtime_error{"Could not clear selection"};
+          }
         }
-      }
-      catch (...)
-      {
-        transaction.cancel();
-        throw;
-      }
-    })
+        catch (...)
+        {
+          transaction.cancel();
+          throw;
+        }
+      })
     .def(
       "__repr__",
       [](DocumentHandle& self) {
         const auto& path = self.get().map().path();
-        const auto name = path.empty() ? std::string{"untitled"} : path.filename().string();
+        const auto name =
+          path.empty() ? std::string{"untitled"} : path.filename().string();
         return "Document(name='" + name + "')";
       })
-    .def(
-      "__str__",
-      [](DocumentHandle& self) {
-        const auto& path = self.get().map().path();
-        const auto name = path.empty() ? std::string{"untitled"} : path.filename().string();
-        return "Document(name='" + name + "')";
-      });
+    .def("__str__", [](DocumentHandle& self) {
+      const auto& path = self.get().map().path();
+      const auto name = path.empty() ? std::string{"untitled"} : path.filename().string();
+      return "Document(name='" + name + "')";
+    });
 
   py::class_<SelectionHandle>(module, "Selection")
     .def_property_readonly("entity", selectionFirstEntity)
@@ -2075,7 +2088,7 @@ void defineModule(py::module_& module)
             &self.getDocument(),
             self.generation,
             brush,
-            PythonHandleRegistry::instance().nodeGeneration(brush)});
+            PythonHandleRegistry::instance().nodeLifetimeGeneration(brush)});
         }
         return result;
       })
@@ -2156,13 +2169,11 @@ void defineModule(py::module_& module)
         return "Selection(brushes=" + std::to_string(sel.brushes.size())
                + ", entities=" + std::to_string(sel.entities.size()) + ")";
       })
-    .def(
-      "__str__",
-      [](SelectionHandle& self) {
-        const auto& sel = self.getDocument().map().selection();
-        return "Selection(brushes=" + std::to_string(sel.brushes.size())
-               + ", entities=" + std::to_string(sel.entities.size()) + ")";
-      });
+    .def("__str__", [](SelectionHandle& self) {
+      const auto& sel = self.getDocument().map().selection();
+      return "Selection(brushes=" + std::to_string(sel.brushes.size())
+             + ", entities=" + std::to_string(sel.entities.size()) + ")";
+    });
 
   py::class_<EntityHandle>(module, "Entity")
     .def_property_readonly(
@@ -2235,9 +2246,7 @@ void defineModule(py::module_& module)
       })
     .def(
       "__delitem__",
-      [](EntityHandle& self, const std::string& key) {
-        removeEntityProperty(self, key);
-      })
+      [](EntityHandle& self, const std::string& key) { removeEntityProperty(self, key); })
     .def(
       "__contains__",
       [](EntityHandle& self, const std::string& key) {
@@ -2245,9 +2254,7 @@ void defineModule(py::module_& module)
       })
     .def(
       "__len__",
-      [](EntityHandle& self) {
-        return self.get().entity().properties().size();
-      })
+      [](EntityHandle& self) { return self.get().entity().properties().size(); })
     .def(
       "__iter__",
       [](EntityHandle& self) {
@@ -2276,38 +2283,38 @@ void defineModule(py::module_& module)
         propsStr += "}";
         return "Entity(classname='" + ent.classname() + "', properties=" + propsStr + ")";
       })
-    .def(
-      "__str__",
-      [](EntityHandle& self) {
-        const auto& ent = self.get().entity();
-        auto propsStr = std::string{"{"};
-        bool first = true;
-        for (const auto& property : ent.properties())
+    .def("__str__", [](EntityHandle& self) {
+      const auto& ent = self.get().entity();
+      auto propsStr = std::string{"{"};
+      bool first = true;
+      for (const auto& property : ent.properties())
+      {
+        if (!first)
         {
-          if (!first)
-          {
-            propsStr += ", ";
-          }
-          first = false;
-          propsStr += "'" + property.key() + "': '" + property.value() + "'";
+          propsStr += ", ";
         }
-        propsStr += "}";
-        return "Entity(classname='" + ent.classname() + "', properties=" + propsStr + ")";
-      });
+        first = false;
+        propsStr += "'" + property.key() + "': '" + property.value() + "'";
+      }
+      propsStr += "}";
+      return "Entity(classname='" + ent.classname() + "', properties=" + propsStr + ")";
+    });
 
   py::class_<BrushHandle>(module, "Brush")
     .def_property_readonly("entity", brushEntity)
-    .def("faces", [](BrushHandle& self) {
-      auto result = std::vector<FaceHandle>{};
-      const auto& brush = self.get().brush();
-      result.reserve(brush.faceCount());
-      for (size_t i = 0; i < brush.faceCount(); ++i)
-      {
-        result.push_back(
-          FaceHandle{self.document, self.generation, self.brush, self.nodeGeneration, i});
-      }
-      return result;
-    })
+    .def(
+      "faces",
+      [](BrushHandle& self) {
+        auto result = std::vector<FaceHandle>{};
+        const auto& brush = self.get().brush();
+        result.reserve(brush.faceCount());
+        for (size_t i = 0; i < brush.faceCount(); ++i)
+        {
+          result.push_back(FaceHandle{
+            self.document, self.generation, self.brush, self.nodeLifetimeGeneration, i});
+        }
+        return result;
+      })
     .def(
       "__repr__",
       [](BrushHandle& self) {
@@ -2315,19 +2322,17 @@ void defineModule(py::module_& module)
         auto* entityNode = self.get().entity();
         const auto classname =
           (entityNode != nullptr) ? entityNode->entity().classname() : "worldspawn";
-        return "Brush(faces=" + std::to_string(brush.faceCount())
-               + ", entity='" + classname + "')";
+        return "Brush(faces=" + std::to_string(brush.faceCount()) + ", entity='"
+               + classname + "')";
       })
-    .def(
-      "__str__",
-      [](BrushHandle& self) {
-        const auto& brush = self.get().brush();
-        auto* entityNode = self.get().entity();
-        const auto classname =
-          (entityNode != nullptr) ? entityNode->entity().classname() : "worldspawn";
-        return "Brush(faces=" + std::to_string(brush.faceCount())
-               + ", entity='" + classname + "')";
-      });
+    .def("__str__", [](BrushHandle& self) {
+      const auto& brush = self.get().brush();
+      auto* entityNode = self.get().entity();
+      const auto classname =
+        (entityNode != nullptr) ? entityNode->entity().classname() : "worldspawn";
+      return "Brush(faces=" + std::to_string(brush.faceCount()) + ", entity='" + classname
+             + "')";
+    });
 
   py::class_<FaceHandle>(module, "Face")
     .def_property_readonly("vertices", faceVertices)
@@ -2380,11 +2385,9 @@ void defineModule(py::module_& module)
       [](FaceHandle& self) {
         return "Face(material='" + self.get().materialName() + "')";
       })
-    .def(
-      "__str__",
-      [](FaceHandle& self) {
-        return "Face(material='" + self.get().materialName() + "')";
-      });
+    .def("__str__", [](FaceHandle& self) {
+      return "Face(material='" + self.get().materialName() + "')";
+    });
 
   py::class_<MaterialHandle>(module, "Material")
     .def_property_readonly("name", [](MaterialHandle& self) { return self.get().name(); })
@@ -2987,7 +2990,7 @@ void defineModule(py::module_& module)
         &selection.getDocument(),
         selection.generation,
         brush,
-        PythonHandleRegistry::instance().nodeGeneration(brush)});
+        PythonHandleRegistry::instance().nodeLifetimeGeneration(brush)});
     }
     return result;
   };
@@ -3062,15 +3065,18 @@ void defineModule(py::module_& module)
       {
         if (rx != 0.0)
         {
-          rotateSelection(selection, 1.0, 0.0, 0.0, rx, std::nullopt, std::nullopt, std::nullopt);
+          rotateSelection(
+            selection, 1.0, 0.0, 0.0, rx, std::nullopt, std::nullopt, std::nullopt);
         }
         if (ry != 0.0)
         {
-          rotateSelection(selection, 0.0, 1.0, 0.0, ry, std::nullopt, std::nullopt, std::nullopt);
+          rotateSelection(
+            selection, 0.0, 1.0, 0.0, ry, std::nullopt, std::nullopt, std::nullopt);
         }
         if (rz != 0.0)
         {
-          rotateSelection(selection, 0.0, 0.0, 1.0, rz, std::nullopt, std::nullopt, std::nullopt);
+          rotateSelection(
+            selection, 0.0, 0.0, 1.0, rz, std::nullopt, std::nullopt, std::nullopt);
         }
         return transaction.commit();
       }
@@ -3096,20 +3102,24 @@ void defineModule(py::module_& module)
         const auto ry = py::cast<double>(args[2]);
         const auto rz = py::cast<double>(args[3]);
         auto& document = selection.getDocument();
-        auto transaction = ScopedPythonTransaction{document, "Python v2 Rotate Selection"};
+        auto transaction =
+          ScopedPythonTransaction{document, "Python v2 Rotate Selection"};
         try
         {
           if (rx != 0.0)
           {
-            rotateSelection(selection, 1.0, 0.0, 0.0, rx, std::nullopt, std::nullopt, std::nullopt);
+            rotateSelection(
+              selection, 1.0, 0.0, 0.0, rx, std::nullopt, std::nullopt, std::nullopt);
           }
           if (ry != 0.0)
           {
-            rotateSelection(selection, 0.0, 1.0, 0.0, ry, std::nullopt, std::nullopt, std::nullopt);
+            rotateSelection(
+              selection, 0.0, 1.0, 0.0, ry, std::nullopt, std::nullopt, std::nullopt);
           }
           if (rz != 0.0)
           {
-            rotateSelection(selection, 0.0, 0.0, 1.0, rz, std::nullopt, std::nullopt, std::nullopt);
+            rotateSelection(
+              selection, 0.0, 0.0, 1.0, rz, std::nullopt, std::nullopt, std::nullopt);
           }
           return transaction.commit();
         }
@@ -3194,7 +3204,8 @@ void defineModule(py::module_& module)
       if (py::isinstance<Vec3>(args[0]) || py::isinstance<py::sequence>(args[0]))
       {
         const auto v = vec3FromObject(args[0]);
-        return scaleSelection(selection, v.x, v.y, v.z, std::nullopt, std::nullopt, std::nullopt);
+        return scaleSelection(
+          selection, v.x, v.y, v.z, std::nullopt, std::nullopt, std::nullopt);
       }
       const auto s = py::cast<double>(args[0]);
       return scaleSelection(selection, s, s, s, std::nullopt, std::nullopt, std::nullopt);
@@ -3212,7 +3223,8 @@ void defineModule(py::module_& module)
       if (py::isinstance<Vec3>(args[1]) || py::isinstance<py::sequence>(args[1]))
       {
         const auto v = vec3FromObject(args[1]);
-        return scaleSelection(selection, v.x, v.y, v.z, std::nullopt, std::nullopt, std::nullopt);
+        return scaleSelection(
+          selection, v.x, v.y, v.z, std::nullopt, std::nullopt, std::nullopt);
       }
       const auto s = py::cast<double>(args[1]);
       return scaleSelection(selection, s, s, s, std::nullopt, std::nullopt, std::nullopt);
@@ -3222,7 +3234,8 @@ void defineModule(py::module_& module)
       const auto sx = py::cast<double>(args[0]);
       const auto sy = py::cast<double>(args[1]);
       const auto sz = py::cast<double>(args[2]);
-      return scaleSelection(selection, sx, sy, sz, std::nullopt, std::nullopt, std::nullopt);
+      return scaleSelection(
+        selection, sx, sy, sz, std::nullopt, std::nullopt, std::nullopt);
     }
     if (args.size() == 4)
     {
@@ -3237,12 +3250,14 @@ void defineModule(py::module_& module)
       const auto sx = py::cast<double>(args[1]);
       const auto sy = py::cast<double>(args[2]);
       const auto sz = py::cast<double>(args[3]);
-      return scaleSelection(selection, sx, sy, sz, std::nullopt, std::nullopt, std::nullopt);
+      return scaleSelection(
+        selection, sx, sy, sz, std::nullopt, std::nullopt, std::nullopt);
     }
     throw py::type_error{"scale() takes 1, 2, 3, or 4 arguments"};
   };
 
-  auto duplicateHelper = [currentSelection, selectedBrushes](const py::args& args) -> py::object {
+  auto duplicateHelper = [currentSelection,
+                          selectedBrushes](const py::args& args) -> py::object {
     auto selection = currentSelection();
     if (args.size() == 1)
     {
@@ -3295,14 +3310,8 @@ void defineModule(py::module_& module)
 
   module.def("selected_brushes", selectedBrushes);
   module.def("selectedBrushes", selectedBrushes);
-  module.def(
-    "selected_entities",
-    selectedEntities,
-    py::arg("include_brushes") = false);
-  module.def(
-    "selectedEntities",
-    selectedEntities,
-    py::arg("include_brushes") = false);
+  module.def("selected_entities", selectedEntities, py::arg("include_brushes") = false);
+  module.def("selectedEntities", selectedEntities, py::arg("include_brushes") = false);
   module.def("selected_all_entities", [currentSelection]() {
     auto selection = currentSelection();
     return selectedAllEntities(selection);
@@ -3311,9 +3320,7 @@ void defineModule(py::module_& module)
     auto selection = currentSelection();
     return selectedAllEntities(selection);
   });
-  module.def("selection", [currentSelection]() {
-    return currentSelection();
-  });
+  module.def("selection", [currentSelection]() { return currentSelection(); });
   module.def("selected_faces", selectedFaces);
   module.def("selectedFaces", selectedFaces);
   module.def("translate", translateHelper);
@@ -3337,6 +3344,19 @@ void defineModule(py::module_& module)
   module.def("set_interval", setInterval);
   module.def("clear_interval", clearInterval);
   module.def("set_timeout", setTimeout);
+
+  auto apiCatalog = py::dict{};
+  for (const auto& typeInfo : pythonApiTypes())
+  {
+    auto symbols = py::list{};
+    for (const auto& symbol : pythonApiSymbols(typeInfo.type))
+    {
+      symbols.append(std::string{symbol.name});
+    }
+    apiCatalog[std::string{typeInfo.name}.c_str()] = std::move(symbols);
+  }
+  module.attr("_api_catalog") = std::move(apiCatalog);
+
   module.def("_emit_event", emitEvent);
   module.def("_has_event_callbacks", hasEventCallbacks);
   module.def("_cleanup_plugin", cleanupPlugin);

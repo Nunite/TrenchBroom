@@ -10,7 +10,7 @@
 活动文档句柄获取、插件面板工厂函数与三维向量/平面数学基元。](#the_tb2_root_module){.api-card}
 
 [**3. Document 地图文档访问**\
-地图数据块访问、实体检索与生成、图层组织与逻辑对象组。](#tb2_document){.api-card}
+地图查询、选区、材质、事务与 UV 更新。](#tb2_document){.api-card}
 
 [**4. Selection 选区与几何变换**\
 几何空间变换（平移/旋转/缩放）、多边形克隆与顶点/棱边倒角。](#tb2_selection){.api-card}
@@ -33,14 +33,12 @@ import tb2
 doc = tb2.current_document()
 
 # Wrap modifications in a named transaction for atomic undo/redo
-with doc.transaction("Create Light Grid"):
-    for x in range(-256, 384, 128):
-        for y in range(-256, 384, 128):
-            ent = doc.create_entity("light", tb2.Vec3(x, y, 64))
-            ent.set("light", "200")
-            ent.set("_color", "1 0.8 0.6")
+with doc.transaction("Normalize Selected Lights"):
+    for ent in doc.selection.all_entities:
+        if ent.classname == "light":
+            ent["light"] = "200"
 
-print(f"Generated {len(doc.entities)} total entities in map.")
+print(f"Map contains {len(doc.entities)} entities.")
 ```
 
 ### 核心概念 {#key_concepts}
@@ -61,27 +59,26 @@ print(f"Generated {len(doc.entities)} total entities in map.")
 
 返回编辑器中当前打开的活动地图文档句柄。
 
-- **返回值**：<span class="type-badge">Document</span> 活动地图文档对象；若未打开任何地图则返回 `None`。
+- **返回值**：<span class="type-badge">Document</span> 活动地图文档对象。
 - **返回类型**：`tb2.Document`
+- **异常**：没有活动地图文档时抛出 `RuntimeError`。
 
 ```python
 doc = tb2.current_document()
-if doc is None:
-    print("No map is currently open.")
+print(doc.path)
 ```
 
-#### `tb2.create_plugin_panel(panel_id, title)` {#tb2_create_plugin_panel}
+#### `tb2.create_plugin_panel(title)` {#tb2_create_plugin_panel}
 
 在 **Plugins** 检查器标签页中创建并注册一个声明式交互面板。
 
 - **参数**：
-  - `panel_id` (*str*) – 面板的全局唯一标识符（例如 `"com.author.my_tool"`）。
   - `title` (*str*) – 检查器面板顶部显示的标题名称。
 - **返回值**：<span class="type-badge">PluginPanel</span> 创建的面板实例对象。
 - **返回类型**：`tb2.PluginPanel`
 
 ```python
-panel = tb2.create_plugin_panel("com.example.align_tool", "Surface Aligner")
+panel = tb2.create_plugin_panel("Surface Aligner")
 panel.add_label("Align selected faces to the world grid.")
 ```
 
@@ -91,9 +88,9 @@ panel.add_label("Align selected faces to the world grid.")
 
 - **返回值**：`list[tb2.Brush]`
 
-#### `tb2.selected_entities()` / `tb2.selectedEntities()` {#tb2_selected_entities}
+#### `tb2.selected_entities(include_brushes=False)` / `tb2.selectedEntities(include_brushes=False)` {#tb2_selected_entities}
 
-返回当前活动选区中的所有 `Entity` 句柄列表。
+返回直接选中的 `Entity` 句柄。传入 `include_brushes=True` 时，还会包含选中 Brush 的父实体。
 
 - **返回值**：`list[tb2.Entity]`
 
@@ -129,7 +126,7 @@ panel.add_label("Align selected faces to the world grid.")
 
 ### 数学与几何基元 {#math_primitives}
 
-#### `tb2.Vec3(x=0.0, y=0.0, z=0.0)` {#tb2_vec3}
+#### `tb2.Vec3(x, y, z)` {#tb2_vec3}
 
 表示坐标、偏移量和方向的三维笛卡尔向量。
 
@@ -161,7 +158,7 @@ target = pos + offset
 
 ## 地图文档访问：Document {#tb2_document}
 
-`Document` 类代表当前打开的地图文件，负责管理撤销事务、选择状态、实体列表以及 Brush 几何体。
+`Document` 类代表当前打开的地图文件，提供地图查询、事务、选区控制和 UV 更新。
 
 ### 属性列表 {#document_properties}
 
@@ -169,9 +166,9 @@ target = pos + offset
 | :--- | :--- | :--- |
 | `selection` | <span class="type-badge">Selection</span> | 活动选区容器，用于查询和空间变换选中的对象。 |
 | `entities` | <span class="type-badge">list[Entity]</span> | 文档中的所有点实体与 Brush 实体列表。 |
-| `brushes` | <span class="type-badge">list[Brush]</span> | 地图中的所有结构与细节 Brush 列表。 |
-| `layers` | <span class="type-badge">list[Layer]</span> | 地图组织图层。 |
-| `groups` | <span class="type-badge">list[Group]</span> | 逻辑对象组与链接组预制件。 |
+| `path` | <span class="type-badge">str \| None</span> | 地图绝对路径；未保存文档为 `None`。 |
+| `materials` | <span class="type-badge">list[Material]</span> | 当前地图加载的材质。 |
+| `material_collections` | <span class="type-badge">list[MaterialCollection]</span> | 当前加载的材质集合。 |
 
 ### 核心方法 {#document_methods}
 
@@ -188,26 +185,7 @@ with doc.transaction("Duplicate and Move"):
     doc.selection.translate(0, 0, 64)
 ```
 
-#### `doc.create_entity(classname, origin)` {#doc_create_entity}
-
-在世界坐标的指定原点处生成一个新的点实体。
-
-- **参数**：
-  - `classname` (*str*) – 实体类型名称（例如 `"info_player_start"`、`"light"`）。
-  - `origin` (*tb2.Vec3*) – 世界坐标位置。
-- **返回值**：<span class="type-badge">Entity</span> 新创建的实体对象。
-
-#### `doc.find_entity(targetname)` {#doc_find_entity}
-
-在文档中查找 `targetname` 属性匹配指定字符串的第一个实体。
-
-- **参数**：
-  - `targetname` (*str*) – 要匹配的目标名称字符串。
-- **返回值**：<span class="type-badge">Entity | None</span> 匹配的实体对象；若未找到则返回 `None`。
-
-#### `doc.delete_selection()` {#doc_delete_selection}
-
-从地图中删除当前选中的所有 Brush、实体与多边形面。
+其他文档方法包括 `save()`、`reload()`、`select(objects)`、`clear_selection()`、`vertex_tool_vertices()`、`set_triangle_uvs(triangles)`、`set_face_uvs(updates)` 和 `set_face_uvs_with_split(updates)`。
 
 ---
 
@@ -217,10 +195,16 @@ with doc.transaction("Duplicate and Move"):
 
 ### 查询属性 {#selection_queries}
 
-- `sel.brushes` (*list[Brush]*)：选中的 Brush 列表。
-- `sel.entities` (*list[Entity]*)：选中的点实体列表。
+- `sel.entity` (*Entity | None*)：首个相关实体，包括选中 Brush 的父实体。
+- `sel.brush` (*Brush | None*)：首个选中的 Brush。
+- `sel.properties` (*dict[str, str] | None*)：首个相关实体的属性快照。
+- `sel.classname` (*str | None*)：首个相关实体的 classname。
+- `sel.entities` (*list[Entity]*)：直接选中的实体。
+- `sel.all_entities` (*list[Entity]*)：直接选中的实体，以及选中 Brush 的父实体。
+- `sel.brushes` (*list[Brush]*)：选中的 Brush。
 - `sel.brush_faces` (*list[Face]*)：单独选中的 Brush 表面列表。
-- `sel.vertices` (*list[Vec3]*)：顶点编辑模式下选中的顶点坐标列表。
+
+`sel[key]` 和 `key in sel` 从首个相关实体读取。`sel[key] = value` 等价于 `sel.set_property(key, value)`，会写入所有选中实体。对 `set_property()` 使用 `create_if_missing=False` 可只更新已经包含该属性键的实体。
 
 ### 几何变换方法 {#selection_transforms}
 
@@ -231,22 +215,17 @@ with doc.transaction("Duplicate and Move"):
 - **参数**：
   - `dx`, `dy`, `dz` (*float*) – 沿 X、Y、Z 轴的位移增量。
 
-#### `sel.rotate(center, axis, angle_degrees)` {#sel_rotate}
+#### `sel.rotate(axis_x, axis_y, axis_z, angle_degrees, center_x=None, center_y=None, center_z=None)` {#sel_rotate}
 
 围绕指定旋转中心和轴向量旋转选中对象。
 
-- **参数**：
-  - `center` (*tb2.Vec3*) – 旋转中心点。
-  - `axis` (*tb2.Vec3*) – 旋转轴单位向量。
-  - `angle_degrees` (*float*) – 旋转角度（角度制，顺时针方向）。
+- **参数**：旋转轴分量、角度值和可选的旋转中心分量。
 
-#### `sel.scale(center, scale_vector)` {#sel_scale}
+#### `sel.scale(scale_x, scale_y, scale_z, center_x=None, center_y=None, center_z=None)` {#sel_scale}
 
 相对于中心点缩放选中的对象。
 
-- **参数**：
-  - `center` (*tb2.Vec3*) – 缩放中心基准点。
-  - `scale_vector` (*tb2.Vec3*) – 各轴向的缩放倍率向量。
+- **参数**：各轴缩放倍率和可选的缩放中心分量。
 
 #### `sel.duplicate()` {#sel_duplicate}
 
@@ -259,7 +238,7 @@ with doc.transaction("Duplicate and Move"):
 - **参数**：
   - `distance` (*float*) – 距原顶点的切削内缩距离。
 
-#### `sel.chamfer_edges(distance)` {#sel_chamfer_edges}
+#### `sel.chamfer_edges(distance, segments=1)` {#sel_chamfer_edges}
 
 对选中的 Brush 棱边执行倒角操作。
 
@@ -279,14 +258,17 @@ with doc.transaction("Duplicate and Move"):
 表示 Brush 的单个平面多边形边界表面。
 
 - `face.material` (*str*)：赋予该面的材质/纹理名称。
+- `face.texture_name` (*str*)：材质/纹理名称的别名。
 - `face.vertices` (*list[Vec3]*)：按序排列的表面边界多边形顶点。
-- `face.plane` (*Plane*)：该表面所在的空间几何平面。
-- `face.offset` (*Vec3*)：UV 纹理平移偏移（U, V）。
-- `face.scale` (*Vec3*)：UV 纹理缩放比例因子。
+- `face.uv_loops` (*list*)：UV 循环数据。
+- `face.offset` (*tuple[float, float]*)：UV 纹理平移偏移（U, V）。
+- `face.scale` (*tuple[float, float]*)：UV 纹理缩放比例因子。
 - `face.rotation` (*float*)：UV 纹理旋转角度（角度制）。
+- `face.surface_contents` (*int | None*)：表面 contents 值。
+- `face.surface_flags` (*int | None*)：表面 flags 值。
+- `face.surface_value` (*float | None*)：表面 value 值。
 - `face.set_material(name: str)`：为该表面赋予新的材质。
-- `face.align_to_world()`：将表面纹理坐标重置对齐到世界网格。
-- `face.align_to_face(reference_face: Face)`：将 UV 贴图与相邻参考面匹配对齐。
+- `face.set_uv_loops(loops)`：写入 UV 循环数据。
 
 ### 实体 Entity {#tb2_entity}
 
@@ -322,7 +304,7 @@ with doc.transaction("Duplicate and Move"):
 | `add_float_field(key, label, value, min, max, decimals, step)` | `key, label, value: float, min, max, decimals: int, step: float` | 浮点数数值输入框。 |
 | `add_checkbox(key, text, checked)` | `key: str, text: str, checked: bool` | 布尔值复选切换框。 |
 | `add_combo_box(key, label, items, callback, current)` | `key, label, items: list[str], callback: callable, current: int` | 下拉选项选择框。 |
-| `add_color_field(key, label, color)` | `key: str, label: str, color: str` | 颜色拾取选择器（`"R G B"` 格式）。 |
+| `add_color_field(key, label, color)` | `key: str, label: str, color: tuple[int, int, int]` | RGB 颜色拾取器。 |
 | `add_button(text, callback)` | `text: str, callback: callable` | 触发 Python 回调函数的按钮。 |
 
 ### 数据视图与布局容器 {#pluginpanel_containers}
@@ -363,15 +345,15 @@ def on_generate():
 
 def init_plugin():
     global panel
-    panel = tb2.create_plugin_panel("com.tb.array_gen", "Array Generator")
+    panel = tb2.create_plugin_panel("Array Generator")
     panel.add_label("Duplicate active selection along a vector:")
-    
+
     group = panel.add_group("params", "Parameters")
     group.add_int_field("count", "Count", value=4, min=1, max=100)
     group.add_float_field("dx", "Step X", value=128.0, min=-4096.0, max=4096.0, decimals=1, step=16.0)
     group.add_float_field("dy", "Step Y", value=0.0, min=-4096.0, max=4096.0, decimals=1, step=16.0)
     group.add_float_field("dz", "Step Z", value=0.0, min=-4096.0, max=4096.0, decimals=1, step=16.0)
-    
+
     panel.add_button("Generate Array", on_generate)
     panel.add_label_named("status", "Ready")
 

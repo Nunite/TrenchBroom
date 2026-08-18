@@ -10,6 +10,7 @@ namespace
 {
 std::unordered_map<MapDocument*, size_t> g_documentGenerations;
 std::unordered_map<mdl::Node*, size_t> g_nodeGenerations;
+std::unordered_map<mdl::Node*, size_t> g_nodeLifetimeGenerations;
 } // namespace
 
 PythonHandleRegistry::PythonHandleRegistry() = default;
@@ -59,6 +60,26 @@ void PythonHandleRegistry::invalidateNodes(const std::vector<mdl::Node*>& nodes)
   for (auto* node : nodes)
   {
     invalidateNode(node);
+  }
+}
+
+size_t PythonHandleRegistry::nodeLifetimeGeneration(mdl::Node* node)
+{
+  if (node == nullptr)
+  {
+    return 0;
+  }
+  return g_nodeLifetimeGenerations[node];
+}
+
+void PythonHandleRegistry::invalidateNodeLifetimes(const std::vector<mdl::Node*>& nodes)
+{
+  for (auto* node : nodes)
+  {
+    if (node != nullptr)
+    {
+      ++g_nodeLifetimeGenerations[node];
+    }
   }
 }
 

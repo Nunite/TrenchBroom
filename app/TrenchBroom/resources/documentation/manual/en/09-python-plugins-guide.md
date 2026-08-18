@@ -155,14 +155,14 @@ All Python scripts and plugins access TrenchBroom through the embedded `tb2` mod
 
 - `tb2.current_document()`: Returns the active `Document` handle representing the open map.
 - `doc.transaction(name)`: A context manager (`with doc.transaction("Action Name"):`) that groups modifications into a single undo/redo step and automatically rolls back on Python exceptions.
-- `doc.selection`: The `Selection` handle for querying selected objects (`brushes`, `entities`, `brush_faces`) and applying transformations (`translate`, `rotate`, `scale`, `duplicate`, `chamfer_vertices`, `chamfer_edges`).
+- `doc.selection`: The `Selection` handle for querying selected objects (`entity`, `brush`, `entities`, `all_entities`, `brushes`, `brush_faces`), reading the first relevant entity with `sel[key]`, writing all selected entities with `sel[key] = value`, and applying transformations (`translate`, `rotate`, `scale`, `duplicate`, `chamfer_vertices`, `chamfer_edges`).
 - `doc.entities`: List of all `Entity` objects in the map. Access properties using `.get(key, default)` and `.set(key, value)`.
 - `brush.faces()`: Returns the polygon `Face` objects comprising a brush, providing access to `.material`, `.offset`, `.scale`, `.rotation`, and `.vertices`.
 - `tb2.Vec3(x, y, z)` and `tb2.Plane(normal, dist)`: 3D vector and plane math primitives.
 
 #### Building Custom UI Panels {#building_custom_ui_panels}
 
-UI plugins create interactive panels on the **Plugins** inspector tab using `tb2.create_plugin_panel(panel_id, title)`. The returned `PluginPanel` provides declarative controls:
+UI plugins create interactive panels on the **Plugins** inspector tab using `tb2.create_plugin_panel(title)`. The returned `PluginPanel` provides declarative controls:
 
 - **Labels & Text**: `.add_label(text)`, `.add_label_named(key, text)`, `.set_label_text(key, text)`, and `.add_html_view(key, html, height, callback)`.
 - **Form Inputs**: `.add_text_field(key, label, value)`, `.add_text_area(key, label, value)`, `.add_int_field(key, label, value, min, max)`, `.add_float_field(key, label, value, min, max, decimals, step)`, `.add_checkbox(key, text, checked)`, `.add_combo_box(key, label, items, callback, current)`, and `.add_color_field(key, label, color)`.
@@ -199,7 +199,7 @@ def on_generate():
 
 def init_plugin():
     global panel
-    panel = tb2.create_plugin_panel("com.example.array_tool", "Array Generator")
+    panel = tb2.create_plugin_panel("Array Generator")
     panel.add_label("Duplicate the active selection along an offset vector:")
 
     group = panel.add_group("config", "Parameters")

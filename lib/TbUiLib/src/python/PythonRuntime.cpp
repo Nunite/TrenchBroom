@@ -3,6 +3,7 @@
 #include "base/Logger.h"
 #include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
+#include "ui/python/PythonApiCatalog.h"
 #include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonV2Module.h"
 
@@ -286,38 +287,12 @@ PyObject* createConsoleGlobals()
 
   if (initialized && tb2Module != nullptr)
   {
-    static const char* const helpers[] = {
-      "selected_brushes",
-      "selectedBrushes",
-      "selected_entities",
-      "selectedEntities",
-      "selected_faces",
-      "selectedFaces",
-      "translate",
-      "rotate",
-      "scale",
-      "duplicate",
-      "delete_selection",
-      "deleteSelection",
-      "deselect_all",
-      "deselectAll",
-      "current_document",
-      "document",
-      "selection",
-      "selected_all_entities",
-      "selectedAllEntities",
-      "create_brush",
-      "execute_action",
-      "list_actions",
-      "Vec3",
-      "Plane",
-    };
-    for (const auto* helper : helpers)
+    for (const auto helper : pythonConsoleHelperNames())
     {
-      auto* attr = PyObject_GetAttrString(tb2Module, helper);
+      auto* attr = PyObject_GetAttrString(tb2Module, helper.data());
       if (attr != nullptr)
       {
-        PyDict_SetItemString(globals, helper, attr);
+        PyDict_SetItemString(globals, helper.data(), attr);
         Py_DECREF(attr);
       }
       else
@@ -421,12 +396,13 @@ bool PythonRuntime::runConsoleCommand(
     return false;
   }
 
-  auto* mapDoc = context.document != nullptr
-                   ? context.document
-                   : (context.mapWindow != nullptr ? &context.mapWindow->document() : nullptr);
-  auto consoleTx = mapDoc != nullptr
-                     ? std::make_unique<PythonDocumentTransaction>(*mapDoc, "Python Console Command")
-                     : nullptr;
+  auto* mapDoc =
+    context.document != nullptr
+      ? context.document
+      : (context.mapWindow != nullptr ? &context.mapWindow->document() : nullptr);
+  auto consoleTx = mapDoc != nullptr ? std::make_unique<PythonDocumentTransaction>(
+                                         *mapDoc, "Python Console Command")
+                                     : nullptr;
 
   auto gil = PyGILState_Ensure();
   auto releaseGil = kdl::invoke_later{[&]() { PyGILState_Release(gil); }};

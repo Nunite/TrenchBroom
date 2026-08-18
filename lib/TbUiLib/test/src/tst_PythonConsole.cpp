@@ -143,6 +143,16 @@ TEST_CASE("PythonConsole")
 
   REQUIRE(console.completer() != nullptr);
 
+  const auto completionLabels = [&]() {
+    auto result = std::vector<QString>{};
+    auto* model = console.completer()->completionModel();
+    for (auto row = 0; row < model->rowCount(); ++row)
+    {
+      result.push_back(model->index(row, 0).data(Qt::DisplayRole).toString());
+    }
+    return result;
+  };
+
   // Test dot completion context extraction and insertion
   input->setPlainText(QStringLiteral("doc.sele"));
   auto cursor = input->textCursor();
@@ -213,6 +223,44 @@ TEST_CASE("PythonConsole")
   console.insertCompletion(QStringLiteral("all_entities"));
   CHECK(input->toPlainText() == QStringLiteral("sel.all_entities"));
 
+  // Completion members come from the public tb2 API catalog.
+  input->setPlainText(QStringLiteral("sel."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  auto labels = completionLabels();
+  CHECK(std::ranges::find(labels, QStringLiteral("entity")) != labels.end());
+  CHECK(std::ranges::find(labels, QStringLiteral("properties")) != labels.end());
+  CHECK(std::ranges::find(labels, QStringLiteral("empty")) == labels.end());
+
+  input->setPlainText(QStringLiteral("doc."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  labels = completionLabels();
+  CHECK(std::ranges::find(labels, QStringLiteral("materials")) != labels.end());
+  CHECK(std::ranges::find(labels, QStringLiteral("layers")) == labels.end());
+
+  input->setPlainText(QStringLiteral("brush."));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  labels = completionLabels();
+  CHECK(std::ranges::find(labels, QStringLiteral("faces")) != labels.end());
+  CHECK(std::ranges::find(labels, QStringLiteral("bounds")) == labels.end());
+
+  input->setPlainText(QStringLiteral("tb"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  console.updateCompleter(true);
+  labels = completionLabels();
+  CHECK(std::ranges::find(labels, QStringLiteral("tb2")) != labels.end());
+  CHECK(std::ranges::find(labels, QStringLiteral("tb")) == labels.end());
+
   // Test deletion and auto-dismissal
   input->setPlainText(QStringLiteral(""));
   cursor = input->textCursor();
@@ -221,7 +269,7 @@ TEST_CASE("PythonConsole")
   CHECK(console.completer()->popup()->isVisible() == false);
 
   // Test Tab key completion workflow
-  input->setPlainText(QStringLiteral("doc.sele"));
+  input->setPlainText(QStringLiteral("doc.selecti"));
   cursor = input->textCursor();
   cursor.movePosition(QTextCursor::End);
   input->setTextCursor(cursor);

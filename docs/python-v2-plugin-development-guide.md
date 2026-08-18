@@ -140,9 +140,17 @@ with doc.transaction("My Custom Operation"):
 sel = doc.selection
 
 # 查询选中项
-selected_entities = sel.entities          # 选中的点实体与 Brush 实体
+first_entity     = sel.entity             # 首个相关实体（含 Brush 的父实体）
+first_brush      = sel.brush              # 首个选中的 Brush
+selected_entities = sel.entities          # 直接选中的实体
+all_entities     = sel.all_entities       # 直接实体与选中 Brush 的父实体
 selected_brushes  = sel.brushes           # 选中的 Brush 列表
 selected_faces    = sel.brush_faces       # 选中的 Brush 面列表
+
+# 读取首个相关实体；写入会作用于全部选中实体
+if "targetname" in sel:
+    print(sel["targetname"])
+sel["targetname"] = "box_01"
 
 # 几何变换
 sel.translate(dx, dy, dz)                 # 平移
@@ -248,8 +256,8 @@ def on_run_clicked():
     with doc.transaction("Plugin Action"):
         doc.selection.translate(0, 0, 64)
 
-# 创建面板 (panel_id 需保持唯一，标题将显示在 Plugins 检查器中)
-panel = tb2.create_plugin_panel("com.example.my_panel", "My Custom Tool")
+# 创建面板（标题显示在 Plugins 检查器中）
+panel = tb2.create_plugin_panel("My Custom Tool")
 
 # 添加说明文本
 panel.add_label("选中对象并点击下方按钮以快速抬升：")
@@ -308,10 +316,10 @@ panel.add_button("执行平移", on_run_clicked)
 ### 异步定时任务
 ```python
 # 单次延迟执行（毫秒）
-timer_id = tb2.set_timeout(500, lambda: print("Executed after 500ms"))
+timer_id = tb2.set_timeout(lambda: print("Executed after 500ms"), 500)
 
 # 周期定时执行
-interval_id = tb2.set_interval(1000, lambda: print("Tick every 1s"))
+interval_id = tb2.set_interval(lambda: print("Tick every 1s"), 1000)
 
 # 取消定时任务
 tb2.clear_interval(interval_id)
@@ -435,7 +443,7 @@ def generate_array():
 
 def init_ui():
     global panel
-    panel = tb2.create_plugin_panel("com.trenchbroom.array_generator", "阵列生成器")
+    panel = tb2.create_plugin_panel("阵列生成器")
 
     panel.add_label("将当前选中的对象按指定偏移量批量阵列复制：")
 

@@ -10,7 +10,7 @@ Transaction context managers, atomic undo/redo, and coordinate systems.](#quicks
 Document handles, panel factories, and 3D vector/plane mathematics.](#the_tb2_root_module){.api-card}
 
 [**3. Document Access**\
-Map data queries, entity spawning, layer hierarchies, and groups.](#tb2_document){.api-card}
+Map queries, selections, materials, transactions, and UV updates.](#tb2_document){.api-card}
 
 [**4. Selection & Transforms**\
 Spatial manipulation (translate/rotate/scale), cloning, and chamfering.](#tb2_selection){.api-card}
@@ -33,14 +33,12 @@ import tb2
 doc = tb2.current_document()
 
 # Wrap modifications in a named transaction for atomic undo/redo
-with doc.transaction("Create Light Grid"):
-    for x in range(-256, 384, 128):
-        for y in range(-256, 384, 128):
-            ent = doc.create_entity("light", tb2.Vec3(x, y, 64))
-            ent.set("light", "200")
-            ent.set("_color", "1 0.8 0.6")
+with doc.transaction("Normalize Selected Lights"):
+    for ent in doc.selection.all_entities:
+        if ent.classname == "light":
+            ent["light"] = "200"
 
-print(f"Generated {len(doc.entities)} total entities in map.")
+print(f"Map contains {len(doc.entities)} entities.")
 ```
 
 ### Key Concepts {#key_concepts}
@@ -61,27 +59,26 @@ The root `tb2` module provides top-level access to the active document, plugin U
 
 Returns a handle to the active map document currently open in the editor.
 
-- **Returns**: <span class="type-badge">Document</span> The active map document, or `None` if no map is loaded.
+- **Returns**: <span class="type-badge">Document</span> The active map document.
 - **Return Type**: `tb2.Document`
+- **Raises**: `RuntimeError` if no map document is active.
 
 ```python
 doc = tb2.current_document()
-if doc is None:
-    print("No map is currently open.")
+print(doc.path)
 ```
 
-#### `tb2.create_plugin_panel(panel_id, title)` {#tb2_create_plugin_panel}
+#### `tb2.create_plugin_panel(title)` {#tb2_create_plugin_panel}
 
 Creates and registers a declarative interactive panel in the **Plugins** inspector tab.
 
 - **Parameters**:
-  - `panel_id` (*str*) – Global unique identifier for the panel (e.g. `"com.author.my_tool"`).
   - `title` (*str*) – Display title shown in the inspector tab header.
 - **Returns**: <span class="type-badge">PluginPanel</span> The created panel instance.
 - **Return Type**: `tb2.PluginPanel`
 
 ```python
-panel = tb2.create_plugin_panel("com.example.align_tool", "Surface Aligner")
+panel = tb2.create_plugin_panel("Surface Aligner")
 panel.add_label("Align selected faces to the world grid.")
 ```
 
@@ -91,9 +88,9 @@ Returns a list of all `Brush` handles in the active selection.
 
 - **Returns**: `list[tb2.Brush]`
 
-#### `tb2.selected_entities()` / `tb2.selectedEntities()` {#tb2_selected_entities}
+#### `tb2.selected_entities(include_brushes=False)` / `tb2.selectedEntities(include_brushes=False)` {#tb2_selected_entities}
 
-Returns a list of all `Entity` handles in the active selection.
+Returns directly selected `Entity` handles. Pass `include_brushes=True` to also include the parent entities of selected brushes.
 
 - **Returns**: `list[tb2.Entity]`
 
@@ -129,7 +126,7 @@ Clears the active map selection.
 
 ### Math & Geometry Primitives {#math_primitives}
 
-#### `tb2.Vec3(x=0.0, y=0.0, z=0.0)` {#tb2_vec3}
+#### `tb2.Vec3(x, y, z)` {#tb2_vec3}
 
 Three-dimensional Cartesian vector representing coordinates, offsets, and directions.
 
@@ -161,7 +158,7 @@ Hessian normal form plane definition ($N \cdot P - D = 0$).
 
 ## Document Access: Document {#tb2_document}
 
-The `Document` class represents an open map file and manages undo transactions, selections, entity lists, and brush geometry.
+The `Document` class represents an open map file and provides map queries, transactions, selection control, and UV updates.
 
 ### Properties {#document_properties}
 
@@ -169,9 +166,9 @@ The `Document` class represents an open map file and manages undo transactions, 
 | :--- | :--- | :--- |
 | `selection` | <span class="type-badge">Selection</span> | Active selection container for querying and transforming objects. |
 | `entities` | <span class="type-badge">list[Entity]</span> | All point and brush entities in the document. |
-| `brushes` | <span class="type-badge">list[Brush]</span> | All structural and detail brushes across the map. |
-| `layers` | <span class="type-badge">list[Layer]</span> | Map organization layers. |
-| `groups` | <span class="type-badge">list[Group]</span> | Logical object groups and linked prefabs. |
+| `path` | <span class="type-badge">str \| None</span> | Absolute map path, or `None` for an unsaved document. |
+| `materials` | <span class="type-badge">list[Material]</span> | Materials currently loaded by the map. |
+| `material_collections` | <span class="type-badge">list[MaterialCollection]</span> | Loaded material collections. |
 
 ### Methods {#document_methods}
 
@@ -188,26 +185,7 @@ with doc.transaction("Duplicate and Move"):
     doc.selection.translate(0, 0, 64)
 ```
 
-#### `doc.create_entity(classname, origin)` {#doc_create_entity}
-
-Spawns a new point entity in the world at the specified origin.
-
-- **Parameters**:
-  - `classname` (*str*) – Entity definition type (e.g. `"info_player_start"`, `"light"`).
-  - `origin` (*tb2.Vec3*) – World coordinate position.
-- **Returns**: <span class="type-badge">Entity</span> The newly created entity.
-
-#### `doc.find_entity(targetname)` {#doc_find_entity}
-
-Searches the document for the first entity matching the `targetname` key.
-
-- **Parameters**:
-  - `targetname` (*str*) – Target name string to match.
-- **Returns**: <span class="type-badge">Entity | None</span> Matching entity, or `None` if not found.
-
-#### `doc.delete_selection()` {#doc_delete_selection}
-
-Deletes all currently selected brushes, entities, and faces from the map.
+Other document methods include `save()`, `reload()`, `select(objects)`, `clear_selection()`, `vertex_tool_vertices()`, `set_triangle_uvs(triangles)`, `set_face_uvs(updates)`, and `set_face_uvs_with_split(updates)`.
 
 ---
 
@@ -217,10 +195,16 @@ The `Selection` object provides direct access to highlighted geometry and high-l
 
 ### Query Properties {#selection_queries}
 
-- `sel.brushes` (*list[Brush]*): List of selected brushes.
-- `sel.entities` (*list[Entity]*): List of selected point entities.
+- `sel.entity` (*Entity | None*): First relevant entity, including the parent entity of a selected brush.
+- `sel.brush` (*Brush | None*): First selected brush.
+- `sel.properties` (*dict[str, str] | None*): Property snapshot of the first relevant entity.
+- `sel.classname` (*str | None*): Classname of the first relevant entity.
+- `sel.entities` (*list[Entity]*): Directly selected entities.
+- `sel.all_entities` (*list[Entity]*): Directly selected entities plus parent entities of selected brushes.
+- `sel.brushes` (*list[Brush]*): Selected brushes.
 - `sel.brush_faces` (*list[Face]*): List of individually selected brush faces.
-- `sel.vertices` (*list[Vec3]*): List of selected vertex points in vertex edit mode.
+
+`sel[key]` and `key in sel` read the first relevant entity. `sel[key] = value` is equivalent to `sel.set_property(key, value)` and writes to every selected entity. Use `create_if_missing=False` with `set_property()` to update only entities that already contain the key.
 
 ### Transformation Methods {#selection_transforms}
 
@@ -231,22 +215,17 @@ Translates all selected objects by the given coordinate delta.
 - **Parameters**:
   - `dx`, `dy`, `dz` (*float*) – Displacement offsets along X, Y, and Z axes.
 
-#### `sel.rotate(center, axis, angle_degrees)` {#sel_rotate}
+#### `sel.rotate(axis_x, axis_y, axis_z, angle_degrees, center_x=None, center_y=None, center_z=None)` {#sel_rotate}
 
 Rotates selected objects around a pivot point and axis vector.
 
-- **Parameters**:
-  - `center` (*tb2.Vec3*) – Center of rotation pivot.
-  - `axis` (*tb2.Vec3*) – Rotation axis unit vector.
-  - `angle_degrees` (*float*) – Rotation angle in degrees (clockwise).
+- **Parameters**: Axis components, angle in degrees, and optional center components.
 
-#### `sel.scale(center, scale_vector)` {#sel_scale}
+#### `sel.scale(scale_x, scale_y, scale_z, center_x=None, center_y=None, center_z=None)` {#sel_scale}
 
 Scales selected objects relative to a center point.
 
-- **Parameters**:
-  - `center` (*tb2.Vec3*) – Pivot center.
-  - `scale_vector` (*tb2.Vec3*) – Scaling factors along each axis.
+- **Parameters**: Per-axis scale factors and optional center components.
 
 #### `sel.duplicate()` {#sel_duplicate}
 
@@ -259,7 +238,7 @@ Bevels selected vertices by cutting corners at the specified distance.
 - **Parameters**:
   - `distance` (*float*) – Inset cut distance from original vertices.
 
-#### `sel.chamfer_edges(distance)` {#sel_chamfer_edges}
+#### `sel.chamfer_edges(distance, segments=1)` {#sel_chamfer_edges}
 
 Bevels selected brush edges.
 
@@ -279,14 +258,17 @@ Represents a convex 3D polyhedron bounded by half-space planes.
 Represents a single planar boundary polygon of a brush.
 
 - `face.material` (*str*): Material/texture name assigned to the face.
+- `face.texture_name` (*str*): Alias for the material/texture name.
 - `face.vertices` (*list[Vec3]*): Ordered boundary polygon vertices.
-- `face.plane` (*Plane*): Geometric plane of the face.
-- `face.offset` (*Vec3*): UV translation offset (U, V).
-- `face.scale` (*Vec3*): UV scale multipliers.
+- `face.uv_loops` (*list*): UV loop data.
+- `face.offset` (*tuple[float, float]*): UV translation offset (U, V).
+- `face.scale` (*tuple[float, float]*): UV scale multipliers.
 - `face.rotation` (*float*): UV rotation angle in degrees.
+- `face.surface_contents` (*int | None*): Surface contents value.
+- `face.surface_flags` (*int | None*): Surface flags value.
+- `face.surface_value` (*float | None*): Surface value.
 - `face.set_material(name: str)`: Assigns a new material to the face.
-- `face.align_to_world()`: Re-aligns face texture coordinates to the world grid.
-- `face.align_to_face(reference_face: Face)`: Matches UV alignment to an adjacent face.
+- `face.set_uv_loops(loops)`: Writes UV loop data.
 
 ### Entity {#tb2_entity}
 
@@ -322,7 +304,7 @@ The `PluginPanel` class allows Python plugins to construct rich, responsive inte
 | `add_float_field(key, label, value, min, max, decimals, step)` | `key, label, value: float, min, max, decimals: int, step: float` | Floating-point numerical input field. |
 | `add_checkbox(key, text, checked)` | `key: str, text: str, checked: bool` | Boolean toggle checkbox. |
 | `add_combo_box(key, label, items, callback, current)` | `key, label, items: list[str], callback: callable, current: int` | Dropdown selection box. |
-| `add_color_field(key, label, color)` | `key: str, label: str, color: str` | Color picker input (`"R G B"` format). |
+| `add_color_field(key, label, color)` | `key: str, label: str, color: tuple[int, int, int]` | RGB color picker input. |
 | `add_button(text, callback)` | `text: str, callback: callable` | Push button triggering a Python function. |
 
 ### Data Views & Containers {#pluginpanel_containers}
@@ -363,15 +345,15 @@ def on_generate():
 
 def init_plugin():
     global panel
-    panel = tb2.create_plugin_panel("com.tb.array_gen", "Array Generator")
+    panel = tb2.create_plugin_panel("Array Generator")
     panel.add_label("Duplicate active selection along a vector:")
-    
+
     group = panel.add_group("params", "Parameters")
     group.add_int_field("count", "Count", value=4, min=1, max=100)
     group.add_float_field("dx", "Step X", value=128.0, min=-4096.0, max=4096.0, decimals=1, step=16.0)
     group.add_float_field("dy", "Step Y", value=0.0, min=-4096.0, max=4096.0, decimals=1, step=16.0)
     group.add_float_field("dz", "Step Z", value=0.0, min=-4096.0, max=4096.0, decimals=1, step=16.0)
-    
+
     panel.add_button("Generate Array", on_generate)
     panel.add_label_named("status", "Ready")
 

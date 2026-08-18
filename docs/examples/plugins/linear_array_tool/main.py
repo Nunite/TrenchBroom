@@ -32,7 +32,7 @@ def generate_array():
 
 def init_plugin():
     global panel
-    panel = tb2.create_plugin_panel("com.trenchbroom.example.linear_array", "Linear Array Generator")
+    panel = tb2.create_plugin_panel("Linear Array Generator")
     panel.add_label("Duplicates the active selection along an offset vector.")
 
     group = panel.add_group("config", "Parameters")

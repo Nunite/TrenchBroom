@@ -24,12 +24,12 @@ tb2
 └── 模块全局函数 (Functions)
     ├── current_document() -> Document
     ├── document() -> Document
-    ├── create_plugin_panel(id, title) -> PluginPanel
+    ├── create_plugin_panel(title) -> PluginPanel
     ├── create_brush(points, material=None) -> Brush
     ├── list_actions() -> list[str]
     ├── execute_action(action_id)
-    ├── set_timeout(delay_ms, fn) -> int
-    ├── set_interval(interval_ms, fn) -> int
+    ├── set_timeout(callback, milliseconds) -> int
+    ├── set_interval(callback, milliseconds) -> int
     └── clear_interval(timer_id)
 ```
 
@@ -105,6 +105,10 @@ tb2
 选区变换与批量操作控制器。
 
 #### 属性
+- `entity: Entity | None` - 首个相关实体（包括选中 Brush 的父实体）
+- `brush: Brush | None` - 首个选中的 Brush
+- `properties: dict[str, str] | None` - 首个相关实体的属性快照
+- `classname: str | None` - 首个相关实体的 classname
 - `entities: list[Entity]` - 直接选中的实体对象（不含 Brush 所属实体）
 - `all_entities: list[Entity]` - 全部选中的实体（包含被选中 Brush 的父级实体）
 - `brushes: list[Brush]` - 选中的所有 Brush 对象
@@ -112,6 +116,10 @@ tb2
 
 #### 方法
 - `set_property(key: str, value: str, create_if_missing: bool = True)` - 批量向选中实体写入属性
+- `brush_vertices() -> list[list[Vec3]]` - 获取选中 Brush 的顶点列表
+- `triangle_uvs() -> dict` - 获取选中面的三角形 UV 数据
+- `set(objects)` - 用给定对象替换选区
+- `add(objects)` - 将给定对象加入选区
 - `translate(dx: float, dy: float, dz: float)` - 平移当前选区
 - `rotate(axis_x: float, axis_y: float, axis_z: float, angle_degrees: float, center_x: float = None, center_y: float = None, center_z: float = None)` - 绕轴旋转选区
 - `scale(scale_x: float, scale_y: float, scale_z: float, center_x: float = None, center_y: float = None, center_z: float = None)` - 缩放选区
@@ -119,6 +127,10 @@ tb2
 - `chamfer_vertices(distance: float)` - 对选中 Brush 的顶点执行倒角
 - `chamfer_edges(distance: float, segments: int = 1)` - 对选中 Brush 的边执行多段倒角
 - `deselect_all()` / `clear()` - 取消选中
+
+#### 实体属性下标
+- `sel[key]` / `key in sel` - 从首个相关实体读取或检查属性
+- `sel[key] = value` - 等同 `set_property(key, value)`，向所有选中实体写入属性
 
 ---
 
@@ -128,9 +140,12 @@ tb2
 #### 属性
 - `classname: str` - 实体的 classname（例如 `"light"`, `"worldspawn"`, `"func_door"`）
 - `brushes: list[Brush]` - 属于该实体的所有 Brush 几何体（点实体返回空列表）
+- `properties: dict[str, str]` - 实体属性的字典快照
 
 #### 方法
 - `keys() -> list[str]` - 获取该实体已定义的所有属性键名列表
+- `values() -> list[str]` - 获取所有属性值
+- `items() -> list[tuple[str, str]]` - 获取所有属性键值对
 - `get(key: str, default: Any = None) -> str | Any` - 获取指定属性值
 - `set(key: str, value: str)` - 设置或新增指定属性键值对
 - `remove(key: str)` - 删除指定属性
@@ -139,6 +154,9 @@ tb2
 
 ### `tb2.Brush`
 凸多面体 Brush 几何体。
+
+#### 属性
+- `entity: Entity` - Brush 所属的父实体
 
 #### 方法
 - `faces() -> list[Face]` - 获取构成该 Brush 的所有多边形面列表
@@ -252,10 +270,10 @@ with doc.transaction("My Custom Edit"):
 ## 2. 全局模块函数
 
 - `tb2.current_document() -> Document` - 获取当前激活的地图文档（若无打开地图则抛出异常）
-- `tb2.create_plugin_panel(id: str, title: str) -> PluginPanel` - 在 Plugins 检查器中注册并创建可视化面板
+- `tb2.create_plugin_panel(title: str) -> PluginPanel` - 在 Plugins 检查器中创建可视化面板
 - `tb2.create_brush(points: list[Vec3], material: str = None) -> Brush` - 根据凸包顶点集合生成 Brush
 - `tb2.list_actions() -> list[str]` - 列出当前所有已注册的编辑器 Action 标识符
 - `tb2.execute_action(action_id: str)` - 触发执行指定 Action
-- `tb2.set_timeout(delay_ms: int, callback: Callable[[], None]) -> int` - 注册单次定时器
-- `tb2.set_interval(interval_ms: int, callback: Callable[[], None]) -> int` - 注册循环定时器
+- `tb2.set_timeout(callback: Callable[[], None], milliseconds: int) -> int` - 注册单次定时器
+- `tb2.set_interval(callback: Callable[[], None], milliseconds: int) -> int` - 注册循环定时器
 - `tb2.clear_interval(timer_id: int)` - 取消定时器
