@@ -249,37 +249,37 @@ print("hello stderr", file=sys.stderr)
     auto& runtime = PythonRuntime::instance();
     REQUIRE(runtime.runConsoleCommand(context, "console_value = 41"));
     REQUIRE(runtime.runConsoleCommand(context, "console_value + 1"));
-    CHECK(logger.messages.back() == "42");
+    CHECK(logger.messages.back() == "=> 42");
 
     REQUIRE(
       runtime.runConsoleCommand(context, "tb2.current_document().entities[0].classname"));
-    CHECK(logger.messages.back() == "'worldspawn'");
+    CHECK(logger.messages.back() == "=> 'worldspawn'");
 
     REQUIRE(runtime.runConsoleCommand(context, "doc.entities[0].classname"));
-    CHECK(logger.messages.back() == "'worldspawn'");
+    CHECK(logger.messages.back() == "=> 'worldspawn'");
 
     REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
-    CHECK(logger.messages.back() == "0");
+    CHECK(logger.messages.back() == "=> 0");
 
     REQUIRE(runtime.runConsoleCommand(context, "len(selectedBrushes())"));
-    CHECK(logger.messages.back() == "0");
+    CHECK(logger.messages.back() == "=> 0");
 
     REQUIRE(runtime.runConsoleCommand(
       context,
       "b = create_brush([(-32,-32,-32),(32,-32,-32),(32,32,-32),(-32,32,-32),(-32,-32,32),(32,-32,32),(32,32,32),(-32,32,32)])"));
     REQUIRE(runtime.runConsoleCommand(context, "sel.set([b])"));
     REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
-    CHECK(logger.messages.back() == "1");
+    CHECK(logger.messages.back() == "=> 1");
 
     REQUIRE(runtime.runConsoleCommand(context, "translate(0, 0, 64)"));
     REQUIRE(runtime.runConsoleCommand(context, "rotate(0, 0, 90)"));
     REQUIRE(runtime.runConsoleCommand(context, "duplicate()"));
     REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
-    CHECK(logger.messages.back() == "1");
+    CHECK(logger.messages.back() == "=> 1");
 
     REQUIRE(runtime.runConsoleCommand(context, "delete_selection()"));
     REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
-    CHECK(logger.messages.back() == "0");
+    CHECK(logger.messages.back() == "=> 0");
 
     REQUIRE(runtime.runConsoleCommand(
       context,
@@ -293,12 +293,12 @@ print("hello stderr", file=sys.stderr)
       "    duplicate()\n"
       "    translate(64, 0, 16)\n"));
     REQUIRE(runtime.runConsoleCommand(context, "len(doc.entities[0].brushes) == initial_brush_count + 8"));
-    CHECK(logger.messages.back() == "True");
+    CHECK(logger.messages.back() == "=> True");
 
     // A single undo step reverts the entire 8-step procedural generation loop at once
     window.document().map().undoCommand();
     REQUIRE(runtime.runConsoleCommand(context, "len(doc.entities[0].brushes) == initial_brush_count"));
-    CHECK(logger.messages.back() == "True");
+    CHECK(logger.messages.back() == "=> True");
 
     CHECK_FALSE(runtime.runConsoleCommand(context, "1 / 0"));
     CHECK(runtime.lastError().find("ZeroDivisionError") != std::string::npos);

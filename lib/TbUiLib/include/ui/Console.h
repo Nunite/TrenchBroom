@@ -48,11 +48,11 @@ public:
 
 protected:
   QTextEdit* textView() const;
+  virtual void logToConsole(LogLevel level, const std::string& message);
 
 private:
   void doLog(LogLevel level, std::string_view message) override;
   void logToDebugOut(LogLevel level, const std::string& message);
-  void logToConsole(LogLevel level, const std::string& message);
 
   void logCachedMessages();
 

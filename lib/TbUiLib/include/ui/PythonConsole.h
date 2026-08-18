@@ -67,6 +67,9 @@ public:
   void insertActiveCompletion();
   std::pair<QString, QString> completionContextUnderCursor() const;
 
+protected:
+  void logToConsole(LogLevel level, const std::string& message) override;
+
 private:
   bool eventFilter(QObject* watched, QEvent* event) override;
   void setupCompleter();

@@ -530,8 +530,10 @@ bool PythonRuntime::runConsoleCommand(
       Py_DECREF(result);
       return reportError();
     }
-    context.logger->info() << std::string_view{
-      representationText, static_cast<size_t>(representationSize)};
+    context.logger->info() << "=> "
+                           << std::string_view{
+                                representationText,
+                                static_cast<size_t>(representationSize)};
     Py_DECREF(representation);
   }
 

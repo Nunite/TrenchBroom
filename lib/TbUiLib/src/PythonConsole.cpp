@@ -37,8 +37,10 @@
 #include <QSplitter>
 #include <QStyledItemDelegate>
 #include <QTextBlock>
+#include <QTextCharFormat>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTextEdit>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -47,6 +49,9 @@
 #include "base/PreferenceManager.h"
 #include "prefs/Preferences.h"
 #include "ui/FixedWidthFont.h"
+#include "ui/QThreadUtils.h"
+
+#include "kd/contracts.h"
 
 #include <algorithm>
 #include <utility>
@@ -1061,6 +1066,111 @@ void PythonConsole::showHistoryEntry(const std::string& command)
   auto cursor = m_input->textCursor();
   cursor.movePosition(QTextCursor::End);
   m_input->setTextCursor(cursor);
+}
+
+void PythonConsole::logToConsole(const LogLevel level, const std::string& message)
+{
+  contract_pre(isMainThread());
+
+  auto* edit = textView();
+  if (edit == nullptr)
+  {
+    return;
+  }
+
+  const auto isDark = (edit->palette().color(QPalette::Base).lightness() < 128);
+  const auto promptColor =
+    isDark ? QColor{88, 166, 255} : QColor{9, 105, 218}; // Electric blue / Cyan
+  const auto subPromptColor =
+    isDark ? QColor{139, 148, 158} : QColor{101, 109, 118}; // Secondary muted slate
+  const auto resultPrefixColor =
+    isDark ? QColor{63, 185, 80} : QColor{26, 127, 55}; // Mint / Green
+  const auto resultTextColor =
+    isDark ? QColor{165, 214, 255} : QColor{5, 80, 174}; // Soft bright result text
+  const auto errorColor =
+    isDark ? QColor{248, 81, 73} : QColor{207, 34, 46}; // Coral Red
+  const auto warnColor =
+    isDark ? QColor{210, 153, 34} : QColor{154, 103, 0}; // Amber
+  const auto normalTextColor = edit->palette().color(QPalette::Text);
+
+  auto cursor = QTextCursor{edit->document()};
+  cursor.movePosition(QTextCursor::End);
+
+  const auto qMsg = QString::fromStdString(message);
+  const auto lines = qMsg.split('\n');
+
+  for (auto i = 0; i < lines.size(); ++i)
+  {
+    const auto& line = lines[i];
+
+    if (level == LogLevel::Error)
+    {
+      auto fmt = QTextCharFormat{};
+      fmt.setForeground(errorColor);
+      cursor.insertText(line, fmt);
+      cursor.insertText(QStringLiteral("\n"));
+    }
+    else if (level == LogLevel::Warn)
+    {
+      auto fmt = QTextCharFormat{};
+      fmt.setForeground(warnColor);
+      cursor.insertText(line, fmt);
+      cursor.insertText(QStringLiteral("\n"));
+    }
+    else if (line.startsWith(QStringLiteral(">>> ")))
+    {
+      if (!cursor.atStart())
+      {
+        auto prevBlock = cursor.block();
+        if (!prevBlock.text().trimmed().isEmpty())
+        {
+          cursor.insertText(QStringLiteral("\n"));
+        }
+      }
+
+      auto promptFmt = QTextCharFormat{};
+      promptFmt.setForeground(promptColor);
+      promptFmt.setFontWeight(QFont::Bold);
+      cursor.insertText(QStringLiteral(">>> "), promptFmt);
+
+      auto codeFmt = QTextCharFormat{};
+      codeFmt.setForeground(normalTextColor);
+      cursor.insertText(line.mid(4), codeFmt);
+      cursor.insertText(QStringLiteral("\n"));
+    }
+    else if (line.startsWith(QStringLiteral("... ")))
+    {
+      auto promptFmt = QTextCharFormat{};
+      promptFmt.setForeground(subPromptColor);
+      cursor.insertText(QStringLiteral("... "), promptFmt);
+
+      auto codeFmt = QTextCharFormat{};
+      codeFmt.setForeground(normalTextColor);
+      cursor.insertText(line.mid(4), codeFmt);
+      cursor.insertText(QStringLiteral("\n"));
+    }
+    else if (line.startsWith(QStringLiteral("=> ")))
+    {
+      auto resPromptFmt = QTextCharFormat{};
+      resPromptFmt.setForeground(resultPrefixColor);
+      resPromptFmt.setFontWeight(QFont::Bold);
+      cursor.insertText(QStringLiteral("=> "), resPromptFmt);
+
+      auto resTextFmt = QTextCharFormat{};
+      resTextFmt.setForeground(resultTextColor);
+      cursor.insertText(line.mid(3), resTextFmt);
+      cursor.insertText(QStringLiteral("\n"));
+    }
+    else
+    {
+      auto fmt = QTextCharFormat{};
+      fmt.setForeground(normalTextColor);
+      cursor.insertText(line, fmt);
+      cursor.insertText(QStringLiteral("\n"));
+    }
+  }
+
+  edit->moveCursor(QTextCursor::End);
 }
 
 } // namespace tb::ui
