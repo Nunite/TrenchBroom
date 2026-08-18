@@ -281,6 +281,25 @@ print("hello stderr", file=sys.stderr)
     REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
     CHECK(logger.messages.back() == "0");
 
+    REQUIRE(runtime.runConsoleCommand(
+      context,
+      "b2 = create_brush([(-16,-16,-16),(16,-16,-16),(16,16,-16),(-16,16,-16),(-16,-16,16),(16,-16,16),(16,16,16),(-16,16,16)])"));
+    REQUIRE(runtime.runConsoleCommand(context, "sel.set([b2])"));
+    REQUIRE(runtime.runConsoleCommand(context, "initial_brush_count = len(doc.entities[0].brushes)"));
+
+    REQUIRE(runtime.runConsoleCommand(
+      context,
+      "for _ in range(8):\n"
+      "    duplicate()\n"
+      "    translate(64, 0, 16)\n"));
+    REQUIRE(runtime.runConsoleCommand(context, "len(doc.entities[0].brushes) == initial_brush_count + 8"));
+    CHECK(logger.messages.back() == "True");
+
+    // A single undo step reverts the entire 8-step procedural generation loop at once
+    window.document().map().undoCommand();
+    REQUIRE(runtime.runConsoleCommand(context, "len(doc.entities[0].brushes) == initial_brush_count"));
+    CHECK(logger.messages.back() == "True");
+
     CHECK_FALSE(runtime.runConsoleCommand(context, "1 / 0"));
     CHECK(runtime.lastError().find("ZeroDivisionError") != std::string::npos);
 

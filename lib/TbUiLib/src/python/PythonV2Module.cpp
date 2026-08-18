@@ -3087,4 +3087,88 @@ bool installPythonV2Module()
   return true;
 }
 
+struct PythonDocumentTransaction::Impl
+{
+  std::unique_ptr<mdl::Transaction> transaction;
+};
+
+PythonDocumentTransaction::PythonDocumentTransaction(
+  MapDocument& document, std::string name)
+  : m_document{&document}
+  , m_impl{std::make_unique<Impl>()}
+{
+  if (g_activePythonTransactions[m_document] == 0u)
+  {
+    m_impl->transaction =
+      std::make_unique<mdl::Transaction>(m_document->map(), std::move(name));
+  }
+  ++g_activePythonTransactions[m_document];
+}
+
+PythonDocumentTransaction::~PythonDocumentTransaction()
+{
+  cancel();
+}
+
+PythonDocumentTransaction::PythonDocumentTransaction(
+  PythonDocumentTransaction&& other) noexcept
+  : m_document{other.m_document}
+  , m_impl{std::move(other.m_impl)}
+{
+  other.m_document = nullptr;
+}
+
+PythonDocumentTransaction& PythonDocumentTransaction::operator=(
+  PythonDocumentTransaction&& other) noexcept
+{
+  if (this != &other)
+  {
+    cancel();
+    m_document = other.m_document;
+    m_impl = std::move(other.m_impl);
+    other.m_document = nullptr;
+  }
+  return *this;
+}
+
+bool PythonDocumentTransaction::commit()
+{
+  if (m_document == nullptr)
+  {
+    return true;
+  }
+  auto result = true;
+  if (m_impl && m_impl->transaction)
+  {
+    result = m_impl->transaction->commit();
+    m_impl->transaction.reset();
+  }
+  if (auto it = g_activePythonTransactions.find(m_document);
+      it != std::end(g_activePythonTransactions) && it->second > 0u)
+  {
+    --it->second;
+  }
+  m_document = nullptr;
+  return result;
+}
+
+void PythonDocumentTransaction::cancel()
+{
+  if (m_document == nullptr)
+  {
+    return;
+  }
+  if (m_impl && m_impl->transaction)
+  {
+    m_impl->transaction->cancel();
+    m_impl->transaction.reset();
+  }
+  if (auto it = g_activePythonTransactions.find(m_document);
+      it != std::end(g_activePythonTransactions) && it->second > 0u)
+  {
+    --it->second;
+  }
+  m_document = nullptr;
+}
+
 } // namespace tb::ui

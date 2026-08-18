@@ -1,6 +1,7 @@
 #include "ui/python/PythonRuntime.h"
 
 #include "base/Logger.h"
+#include "ui/MapDocument.h"
 #include "ui/MapWindow.h"
 #include "ui/python/PythonPluginSession.h"
 #include "ui/python/PythonV2Module.h"
@@ -417,11 +418,22 @@ bool PythonRuntime::runConsoleCommand(
     return false;
   }
 
+  auto* mapDoc = context.document != nullptr
+                   ? context.document
+                   : (context.mapWindow != nullptr ? &context.mapWindow->document() : nullptr);
+  auto consoleTx = mapDoc != nullptr
+                     ? std::make_unique<PythonDocumentTransaction>(*mapDoc, "Python Console Command")
+                     : nullptr;
+
   auto gil = PyGILState_Ensure();
   auto releaseGil = kdl::invoke_later{[&]() { PyGILState_Release(gil); }};
   auto scopedContext = ScopedExecutionContext{context};
   auto scopedStdStreamRedirect = ScopedStdStreamRedirect{};
   const auto reportError = [&]() {
+    if (consoleTx)
+    {
+      consoleTx->cancel();
+    }
     m_lastError = formatCurrentException();
     if (context.logger != nullptr)
     {
@@ -489,6 +501,15 @@ bool PythonRuntime::runConsoleCommand(
   if (result == nullptr)
   {
     return reportError();
+  }
+
+  if (consoleTx)
+  {
+    if (!consoleTx->commit())
+    {
+      Py_DECREF(result);
+      return reportError();
+    }
   }
 
   if (expression && result != Py_None && context.logger != nullptr)
