@@ -395,6 +395,49 @@ TEST_CASE("Map_Entities")
     }
   }
 
+  SECTION("createBrushEntitiesFromTemplate")
+  {
+    auto templateEntity = Entity{{
+      {EntityPropertyKeys::Classname, "func_door"},
+      {"speed", "100"},
+      {"wait", "4"},
+    }};
+
+    auto* brushNode1 = createBrushNode(map, "some_material");
+    auto* brushNode2 = createBrushNode(map, "some_material");
+    addNodes(map, {{&parentForNodes(map), {brushNode1, brushNode2}}});
+
+    selectNodes(map, {brushNode1, brushNode2});
+    CHECK(createBrushEntitiesFromTemplate(map, templateEntity));
+
+    auto* ent1 = dynamic_cast<EntityNode*>(brushNode1->parent());
+    auto* ent2 = dynamic_cast<EntityNode*>(brushNode2->parent());
+    REQUIRE(ent1 != nullptr);
+    REQUIRE(ent2 != nullptr);
+    CHECK(ent1 != ent2);
+    CHECK(ent1->entity().classname() == "func_door");
+    CHECK(ent2->entity().classname() == "func_door");
+    CHECK(ent1->entity().property("speed") != nullptr);
+    CHECK(*ent1->entity().property("speed") == "100");
+    CHECK(ent2->entity().property("speed") != nullptr);
+    CHECK(*ent2->entity().property("speed") == "100");
+    CHECK(map.selection().nodes == (std::vector<Node*>{brushNode1, brushNode2}));
+
+    SECTION("Undo and redo")
+    {
+      map.undoCommand();
+      CHECK_THAT(
+        map.worldNode().defaultLayer()->children(),
+        Catch::Matchers::UnorderedEquals(std::vector<Node*>{brushNode1, brushNode2}));
+      CHECK(map.selection().nodes == (std::vector<Node*>{brushNode1, brushNode2}));
+
+      map.redoCommand();
+      CHECK(brushNode1->parent() == ent1);
+      CHECK(brushNode2->parent() == ent2);
+      CHECK(map.selection().nodes == (std::vector<Node*>{brushNode1, brushNode2}));
+    }
+  }
+
   SECTION("setEntityProperty")
   {
     SECTION("Add an entity property")

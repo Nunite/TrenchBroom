@@ -45,6 +45,7 @@
 #include "mdl/BrushFace.h"
 #include "mdl/BrushNode.h"
 #include "mdl/EditorContext.h"
+#include "mdl/Entity.h"
 #include "mdl/EntityDefinition.h"
 #include "mdl/EntityDefinitionGroup.h"
 #include "mdl/EntityDefinitionManager.h"
@@ -1762,6 +1763,38 @@ void MapViewBase::showPopupMenuLater()
   menu.addMenu(makeEntityGroupsMenu(mdl::EntityDefinitionType::Point));
   menu.addMenu(makeEntityGroupsMenu(mdl::EntityDefinitionType::Brush));
 
+  // Entity template operations
+  if (nodes.size() == 1u)
+  {
+    const auto* node = nodes.front();
+    const auto* entityNode = dynamic_cast<const mdl::EntityNode*>(node);
+    if (entityNode == nullptr)
+    {
+      if (const auto* brushNode = dynamic_cast<const mdl::BrushNode*>(node))
+      {
+        entityNode = dynamic_cast<const mdl::EntityNode*>(brushNode->parent());
+      }
+    }
+
+    if (entityNode != nullptr && !entityNode->entity().classname().empty() && entityNode->entity().classname() != "worldspawn")
+    {
+      const auto classname = entityNode->entity().classname();
+      menu.addAction(
+        tr("Set %1 as Entity Template").arg(QString::fromStdString(classname)),
+        this,
+        [this, entityNode]() { setTemplateEntity(entityNode); });
+    }
+  }
+
+  if (hasTemplateEntity() && map.selection().hasOnlyGeometryNodes() && map.selection().hasNodes())
+  {
+    menu.addSeparator();
+    menu.addAction(
+      tr("Apply Entity Template (%1)").arg(QString::fromStdString(m_templateEntityClassName)),
+      this,
+      &MapViewBase::applyEntityTemplate);
+  }
+
   menu.exec(QCursor::pos());
 
   // Generate a synthetic mouse move event to update the mouse position after the popup
@@ -2174,6 +2207,51 @@ bool MapViewBase::canMakeSelectionStructural() const
 {
   const auto& map = m_document.map();
   return mdl::canMakeStructural(map, map.selection().nodes);
+}
+
+bool MapViewBase::hasTemplateEntity() const
+{
+  return m_templateEntity != nullptr;
+}
+
+void MapViewBase::setTemplateEntity(const mdl::EntityNode* entityNode)
+{
+  if (entityNode != nullptr)
+  {
+    m_templateEntity = std::make_unique<mdl::Entity>(entityNode->entity());
+    m_templateEntityClassName = entityNode->entity().classname();
+  }
+  else
+  {
+    clearTemplateEntity();
+  }
+}
+
+void MapViewBase::clearTemplateEntity()
+{
+  m_templateEntity.reset();
+  m_templateEntityClassName.clear();
+}
+
+const mdl::Entity* MapViewBase::templateEntity() const
+{
+  return m_templateEntity.get();
+}
+
+void MapViewBase::applyEntityTemplate()
+{
+  if (!hasTemplateEntity())
+  {
+    return;
+  }
+
+  auto& map = m_document.map();
+  if (!map.selection().hasOnlyGeometryNodes() || !map.selection().hasNodes())
+  {
+    return;
+  }
+
+  mdl::createBrushEntitiesFromTemplate(map, *m_templateEntity);
 }
 
 } // namespace tb::ui

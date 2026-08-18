@@ -27,6 +27,7 @@
 
 namespace tb::mdl
 {
+class Entity;
 class EntityNode;
 class Map;
 
@@ -38,6 +39,7 @@ struct EntityDefinition;
 EntityNode* createPointEntity(
   Map& map, const EntityDefinition& definition, const vm::vec3d& delta);
 EntityNode* createBrushEntity(Map& map, const EntityDefinition& definition);
+bool createBrushEntitiesFromTemplate(Map& map, const Entity& templateEntity);
 
 bool setEntityProperty(
   Map& map,

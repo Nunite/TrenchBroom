@@ -181,6 +181,40 @@ EntityNode* createBrushEntity(Map& map, const EntityDefinition& definition)
   return entityNode;
 }
 
+bool createBrushEntitiesFromTemplate(Map& map, const Entity& templateEntity)
+{
+  contract_pre(map.selection().hasOnlyGeometryNodes());
+
+  const auto nodes = map.selection().nodes;
+  if (nodes.empty())
+  {
+    return false;
+  }
+
+  auto transaction = Transaction{map, "Apply Entity Template"};
+  deselectAll(map);
+
+  for (auto* node : nodes)
+  {
+    auto entity = templateEntity;
+    auto* entityNode = new EntityNode{std::move(entity)};
+
+    if (addNodes(map, {{&parentForNodes(map), {entityNode}}}).empty())
+    {
+      transaction.cancel();
+      return false;
+    }
+    if (!reparentNodes(map, {{entityNode, {node}}}))
+    {
+      transaction.cancel();
+      return false;
+    }
+  }
+
+  selectNodes(map, nodes);
+  return transaction.commit();
+}
+
 bool setEntityProperty(
   Map& map,
   const std::string& key,

@@ -46,6 +46,8 @@ class Camera;
 
 namespace mdl
 {
+class Entity;
+class EntityNode;
 class GroupNode;
 class Map;
 class Node;
@@ -110,6 +112,9 @@ private:
   SignalDelayer* m_updateActionStatesSignalDelayer = nullptr;
 
   NotifierConnection m_notifierConnection;
+
+  std::unique_ptr<mdl::Entity> m_templateEntity;
+  std::string m_templateEntityClassName;
 
 private: // shortcuts
   MapDocumentActionCache m_actionCache;
@@ -288,6 +293,13 @@ public: // tags
 public: // make structural / move to entity
   void makeSelectionStructural();
   void moveSelectedNodesToEntity();
+
+public: // entity template
+  bool hasTemplateEntity() const;
+  void setTemplateEntity(const mdl::EntityNode* entityNode);
+  void clearTemplateEntity();
+  const mdl::Entity* templateEntity() const;
+  void applyEntityTemplate();
 
 public: // entity definitions
   void toggleEntityDefinitionVisible(const mdl::EntityDefinition& definition);
