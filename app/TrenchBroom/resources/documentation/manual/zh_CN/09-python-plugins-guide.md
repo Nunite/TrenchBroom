@@ -2,9 +2,33 @@
 
 ## Python 控制台 {#python_console}
 
-打开底部信息面板中的 **Python Console** 标签页，以针对活动的 TrenchBroom 会话运行 Python v2 命令。输入一行或多行并点击 **Run**，或按 #key(Ctrl)+#key(Return)。命令及其输出将追加到控制台中。在第一行或最后一行输入行使用 #key(Up) 和 #key(Down) 可在最多 100 条历史记录之间切换，点击 **Clear** 可清除控制台输出。
+打开底部信息面板中的 **Python** 标签页，以针对当前活动的 TrenchBroom 会话交互式运行 Python v2 命令。
 
-控制台使用等宽字体。可在 **Preferences > View > Fonts > Python Console** 下选择字体系列和字号；列表中仅列出已安装的等宽字体系列，**System Monospace** 则使用平台默认字体。
+### 交互式执行与多行输入 {#console_execution}
+
+控制台提供了具备双模式编译的交互式 REPL：
+
+- **表达式求值**：单行表达式（如 `tb2.current_document().selection.brushes` 或 `tb2.Vec3(128, 64, 0).length()`）会被即时求值，并自动将格式化后的字符串表示（`repr`）打印至控制台输出区。
+- **复合语句块**：包含 `for` 循环、函数定义或 `with doc.transaction("Action"):` 上下文的多行复合代码可直接输入或粘贴到输入框中。输入框高度会随代码行数自动自适应扩展（1 至 4 行）。
+
+### 快捷键与历史记录 {#console_shortcuts_and_history}
+
+- **执行指令**：按 #key(Ctrl)+#key(Return) 或点击 **Run** 按钮即可立即执行命令。
+- **历史记录翻阅**：在输入框第一行或最后一行使用 #key(Up) 和 #key(Down) 可翻阅最多 100 条历史指令。若当前输入框中有未提交的代码，翻阅历史时会自动暂存为草稿，并在按 #key(Down) 翻回底部时完整恢复。
+- **清除输出**：点击 **Clear** 按钮可一键清空控制台的所有历史输出。
+- **外观字体设置**：可在 **Preferences > View > Fonts > Python Console** 下自定义控制台的等宽字体系列和字号大小；列表中仅列出已安装的等宽字体系列，**System Monospace** 则使用平台默认字体。
+
+### 输出重定向与错误追踪 {#console_output_and_errors}
+
+Python 内置 `print(...)` 函数的所有标准输出均会自动捕获并流式输出至控制台中。当发生未捕获的异常或语法错误时，控制台会自动以红色高亮打印带有源文件行号的完整 Traceback 调用栈信息。
+
+```python
+doc = tb2.current_document()
+with doc.transaction("Batch Align Entities"):
+    for ent in doc.entities:
+        if ent.classname == "light" and not ent.get("light"):
+            ent.set("light", "300")
+```
 
 ## Python 插件 {#python_plugins}
 

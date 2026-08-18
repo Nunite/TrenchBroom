@@ -2,9 +2,33 @@
 
 ## Python Console {#python_console}
 
-Open the **Python Console** tab in the bottom info panel to run Python v2 commands against the active TrenchBroom session. Enter one or more lines and click **Run**, or press #key(Ctrl)+#key(Return). The command and its output are appended to the console. Use #key(Up) and #key(Down) at the first or last input line to move through up to 100 history entries, and click **Clear** to remove console output.
+Open the **Python** tab in the bottom info panel to run Python v2 commands interactively against the active TrenchBroom session.
 
-The console uses a fixed-pitch font. Choose the family and point size under **Preferences > View > Fonts > Python Console**; only installed monospace families are listed, and **System Monospace** uses the platform default.
+### Interactive Execution and Multiline Input {#console_execution}
+
+The console provides an interactive REPL with dual-mode evaluation:
+
+- **Expression Evaluation**: Single expressions (such as `tb2.current_document().selection.brushes` or `tb2.Vec3(128, 64, 0).length()`) are evaluated immediately, and their formatted string representation (`repr`) is printed to the console output.
+- **Statement Blocks**: Complex multiline blocks containing `for` loops, function definitions, or `with doc.transaction("Action"):` contexts can be entered or pasted directly into the input field. The input field automatically expands to fit up to 4 lines of code.
+
+### Keyboard Shortcuts and History {#console_shortcuts_and_history}
+
+- **Execute**: Press #key(Ctrl)+#key(Return) or click **Run** to execute the command.
+- **History Navigation**: Use #key(Up) and #key(Down) at the first or last input line to navigate through up to 100 previous commands. If you have unsubmitted text in the input box, it is automatically preserved as a draft while browsing history and restored when you return to the bottom with #key(Down).
+- **Clear Output**: Click **Clear** to remove all logged console output.
+- **Font Customization**: Configure the family and size under **Preferences > View > Fonts > Python Console**; only installed monospace families are listed, and **System Monospace** uses the platform default.
+
+### Output and Error Reporting {#console_output_and_errors}
+
+All standard output from Python's built-in `print(...)` function is captured and streamed directly into the console. When an unhandled exception or syntax error occurs, a formatted traceback with source line numbers is printed in red.
+
+```python
+doc = tb2.current_document()
+with doc.transaction("Batch Align Entities"):
+    for ent in doc.entities:
+        if ent.classname == "light" and not ent.get("light"):
+            ent.set("light", "300")
+```
 
 ## Python Plugins {#python_plugins}
 
