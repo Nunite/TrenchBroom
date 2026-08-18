@@ -732,10 +732,22 @@ assert "'message': 'magic_door'" in r
 if entity.brushes:
     brush = entity.brushes[0]
     assert brush.entity.classname == entity.classname
+    assert "Brush(" in repr(brush)
 
 # Selection helpers
 sel = tb.selection()
 assert sel is not None
+assert "Selection(" in repr(sel)
+assert "Document(" in repr(doc)
+
+# Selection direct property access
+if sel.brushes or sel.entities:
+    assert sel.entity is not None
+    assert isinstance(sel.properties, dict)
+    sel["test_sel_key"] = "test_val"
+    assert sel["test_sel_key"] == "test_val"
+    assert "test_sel_key" in sel
+
 all_ents = tb.selected_all_entities()
 assert isinstance(all_ents, list)
 inc_ents = tb.selected_entities(include_brushes=True)

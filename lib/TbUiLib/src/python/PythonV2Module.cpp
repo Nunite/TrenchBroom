@@ -815,6 +815,46 @@ std::vector<EntityHandle> selectedAllEntities(SelectionHandle& selection)
   return result;
 }
 
+py::object selectionFirstEntity(SelectionHandle& self)
+{
+  auto allEnts = selectedAllEntities(self);
+  if (!allEnts.empty())
+  {
+    return py::cast(allEnts.front());
+  }
+  return py::none();
+}
+
+py::object selectionFirstBrush(SelectionHandle& self)
+{
+  const auto& brushes = self.getDocument().map().selection().brushes;
+  if (!brushes.empty())
+  {
+    auto* brush = brushes.front();
+    return py::cast(BrushHandle{
+      &self.getDocument(),
+      self.generation,
+      brush,
+      PythonHandleRegistry::instance().nodeGeneration(brush)});
+  }
+  return py::none();
+}
+
+py::object selectionProperties(SelectionHandle& self)
+{
+  auto allEnts = selectedAllEntities(self);
+  if (!allEnts.empty())
+  {
+    auto dict = py::dict{};
+    for (const auto& property : allEnts.front().get().entity().properties())
+    {
+      dict[py::cast(property.key())] = py::cast(property.value());
+    }
+    return dict;
+  }
+  return py::none();
+}
+
 std::vector<Vec3> vertexToolVertices(DocumentHandle& document)
 {
   auto result = std::vector<Vec3>{};
@@ -1991,9 +2031,36 @@ void defineModule(py::module_& module)
         transaction.cancel();
         throw;
       }
-    });
+    })
+    .def(
+      "__repr__",
+      [](DocumentHandle& self) {
+        const auto& path = self.get().map().path();
+        const auto name = path.empty() ? std::string{"untitled"} : path.filename().string();
+        return "Document(name='" + name + "')";
+      })
+    .def(
+      "__str__",
+      [](DocumentHandle& self) {
+        const auto& path = self.get().map().path();
+        const auto name = path.empty() ? std::string{"untitled"} : path.filename().string();
+        return "Document(name='" + name + "')";
+      });
 
   py::class_<SelectionHandle>(module, "Selection")
+    .def_property_readonly("entity", selectionFirstEntity)
+    .def_property_readonly("brush", selectionFirstBrush)
+    .def_property_readonly("properties", selectionProperties)
+    .def_property_readonly(
+      "classname",
+      [](SelectionHandle& self) -> py::object {
+        auto ent = selectionFirstEntity(self);
+        if (!ent.is_none())
+        {
+          return py::cast(ent.cast<EntityHandle>().get().entity().classname());
+        }
+        return py::none();
+      })
     .def_property_readonly("entities", selectedEntities)
     .def_property_readonly("all_entities", selectedAllEntities)
     .def_property_readonly(
@@ -2051,7 +2118,51 @@ void defineModule(py::module_& module)
       "chamfer_edges",
       chamferSelectionEdges,
       py::arg("distance"),
-      py::arg("segments") = 1);
+      py::arg("segments") = 1)
+    .def(
+      "__getitem__",
+      [](SelectionHandle& self, const std::string& key) {
+        auto allEnts = selectedAllEntities(self);
+        if (allEnts.empty())
+        {
+          throw py::key_error{"No entity in current selection"};
+        }
+        const auto* value = allEnts.front().get().entity().property(key);
+        if (value == nullptr)
+        {
+          throw py::key_error{"Entity has no property '" + key + "'"};
+        }
+        return *value;
+      })
+    .def(
+      "__setitem__",
+      [](SelectionHandle& self, const std::string& key, const std::string& value) {
+        setSelectionProperty(self, key, value, true);
+      })
+    .def(
+      "__contains__",
+      [](SelectionHandle& self, const std::string& key) {
+        auto allEnts = selectedAllEntities(self);
+        if (allEnts.empty())
+        {
+          return false;
+        }
+        return allEnts.front().get().entity().hasProperty(key);
+      })
+    .def(
+      "__repr__",
+      [](SelectionHandle& self) {
+        const auto& sel = self.getDocument().map().selection();
+        return "Selection(brushes=" + std::to_string(sel.brushes.size())
+               + ", entities=" + std::to_string(sel.entities.size()) + ")";
+      })
+    .def(
+      "__str__",
+      [](SelectionHandle& self) {
+        const auto& sel = self.getDocument().map().selection();
+        return "Selection(brushes=" + std::to_string(sel.brushes.size())
+               + ", entities=" + std::to_string(sel.entities.size()) + ")";
+      });
 
   py::class_<EntityHandle>(module, "Entity")
     .def_property_readonly(
@@ -2187,16 +2298,36 @@ void defineModule(py::module_& module)
   py::class_<BrushHandle>(module, "Brush")
     .def_property_readonly("entity", brushEntity)
     .def("faces", [](BrushHandle& self) {
-    auto result = std::vector<FaceHandle>{};
-    const auto& brush = self.get().brush();
-    result.reserve(brush.faceCount());
-    for (size_t i = 0; i < brush.faceCount(); ++i)
-    {
-      result.push_back(
-        FaceHandle{self.document, self.generation, self.brush, self.nodeGeneration, i});
-    }
-    return result;
-  });
+      auto result = std::vector<FaceHandle>{};
+      const auto& brush = self.get().brush();
+      result.reserve(brush.faceCount());
+      for (size_t i = 0; i < brush.faceCount(); ++i)
+      {
+        result.push_back(
+          FaceHandle{self.document, self.generation, self.brush, self.nodeGeneration, i});
+      }
+      return result;
+    })
+    .def(
+      "__repr__",
+      [](BrushHandle& self) {
+        const auto& brush = self.get().brush();
+        auto* entityNode = self.get().entity();
+        const auto classname =
+          (entityNode != nullptr) ? entityNode->entity().classname() : "worldspawn";
+        return "Brush(faces=" + std::to_string(brush.faceCount())
+               + ", entity='" + classname + "')";
+      })
+    .def(
+      "__str__",
+      [](BrushHandle& self) {
+        const auto& brush = self.get().brush();
+        auto* entityNode = self.get().entity();
+        const auto classname =
+          (entityNode != nullptr) ? entityNode->entity().classname() : "worldspawn";
+        return "Brush(faces=" + std::to_string(brush.faceCount())
+               + ", entity='" + classname + "')";
+      });
 
   py::class_<FaceHandle>(module, "Face")
     .def_property_readonly("vertices", faceVertices)
@@ -2243,7 +2374,17 @@ void defineModule(py::module_& module)
       },
       setFaceSurfaceValue)
     .def("set_uv_loops", setFaceUVLoops)
-    .def("set_material", setFaceMaterial);
+    .def("set_material", setFaceMaterial)
+    .def(
+      "__repr__",
+      [](FaceHandle& self) {
+        return "Face(material='" + self.get().materialName() + "')";
+      })
+    .def(
+      "__str__",
+      [](FaceHandle& self) {
+        return "Face(material='" + self.get().materialName() + "')";
+      });
 
   py::class_<MaterialHandle>(module, "Material")
     .def_property_readonly("name", [](MaterialHandle& self) { return self.get().name(); })
