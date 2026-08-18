@@ -192,7 +192,6 @@ const print_action = (key) => document.write(action_str(key));
         chapterList.push({ id: h1.id, title: chapterSection.dataset.chapterTitle, section: chapterSection, h1: h1 });
       });
 
-      // Insert all chapters before paginationBar
       chapterList.forEach(item => {
         article.insertBefore(item.section, paginationBar);
         item.section.querySelectorAll("[id]").forEach(el => {
@@ -269,10 +268,10 @@ const print_action = (key) => document.write(action_str(key));
     });
 
     // =========================================================================
-    // 7. CHAPTER ACTIVATION & ROUTING CONTROLLER
+    // 7. CHAPTER ACTIVATION & SCROLL SYNCHRONIZATION ENGINE
     // =========================================================================
     let currentActiveChapterId = null;
-    let inChapterObserver = null;
+    let isProgrammaticScrolling = false;
 
     const updateAlternateLanguageLinks = (targetHash) => {
       const hash = targetHash ? `#${targetHash.replace(/^#/, "")}` : location.hash;
@@ -335,57 +334,119 @@ const print_action = (key) => document.write(action_str(key));
           e.preventDefault();
           history.pushState(null, "", `#${heading.id}`);
           updateAlternateLanguageLinks(heading.id);
+          isProgrammaticScrolling = true;
           heading.scrollIntoView({ behavior: "smooth", block: "start" });
+          setTimeout(() => { isProgrammaticScrolling = false; updateActiveHeadingOnScroll(); }, 400);
           [...pageNavigation.querySelectorAll("a")].forEach((a) => a.classList.toggle("active", a === link));
         });
         pageNavigation.append(link);
       });
-
-      // Observe all headings in the chapter for real-time left and right TOC synchronization
-      if (inChapterObserver) inChapterObserver.disconnect();
-      const allChapterHeadings = [...chapterSection.querySelectorAll("h1[id], h2[id], h3[id]")];
-      if (allChapterHeadings.length > 0) {
-        const headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--header-height"), 10) || 54;
-        inChapterObserver = new IntersectionObserver((entries) => {
-          const visible = entries.filter((entry) => entry.isIntersecting)
-            .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-          if (visible.length > 0) {
-            const activeId = visible[0].target.id;
-
-            // 1. Synchronize Right Sidebar (On-this-page TOC)
-            [...pageNavigation.querySelectorAll("a")].forEach((a) => {
-              a.classList.toggle("active", a.hash === `#${activeId}`);
-            });
-
-            // 2. Synchronize Left Sidebar Navigation
-            navLinks.forEach((link) => {
-              const linkHash = link.hash ? link.hash.replace(/^#/, "") : "";
-              link.classList.toggle("active", linkHash === activeId);
-            });
-
-            // Fallback: If no sub-link matched (e.g. at top H1), ensure chapter's main title is active
-            const hasActiveLeft = navLinks.some((link) => link.classList.contains("active"));
-            if (!hasActiveLeft && currentActiveChapterId) {
-              navLinks.forEach((link) => {
-                const linkHash = link.hash ? link.hash.replace(/^#/, "") : "";
-                link.classList.toggle("active", linkHash === currentActiveChapterId);
-              });
-            }
-
-            // Scroll the left navigation gently to keep active section in viewport
-            const activeLeftLink = navLinks.find((link) => link.classList.contains("active"));
-            if (activeLeftLink) {
-              activeLeftLink.scrollIntoView({ block: "nearest", behavior: "smooth" });
-            }
-
-            // 3. Keep URL hash and language switchers in sync
-            history.replaceState(null, "", `#${activeId}`);
-            updateAlternateLanguageLinks(activeId);
-          }
-        }, { rootMargin: `-${headerHeight + 10}px 0px -70% 0px` });
-        allChapterHeadings.forEach(h => inChapterObserver.observe(h));
-      }
     };
+
+    const getActiveHeadingInChapter = (chapterSection) => {
+      const headings = [...chapterSection.querySelectorAll("h1[id], h2[id], h3[id]")];
+      if (headings.length === 0) return null;
+
+      const headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--header-height"), 10) || 54;
+      const threshold = headerHeight + 50;
+
+      // Check if at the bottom of the page
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 30) {
+        return headings[headings.length - 1];
+      }
+
+      let active = headings[0];
+      for (let i = 0; i < headings.length; i++) {
+        const top = headings[i].getBoundingClientRect().top;
+        if (top <= threshold) {
+          active = headings[i];
+        } else {
+          break;
+        }
+      }
+      return active;
+    };
+
+    const updateActiveHeadingOnScroll = () => {
+      if (isProgrammaticScrolling) return;
+      const activeChapterItem = chapterList.find(c => c.id === currentActiveChapterId);
+      if (!activeChapterItem) return;
+
+      const activeHeading = getActiveHeadingInChapter(activeChapterItem.section);
+      if (!activeHeading) return;
+
+      const activeId = activeHeading.id;
+
+      // 1. Synchronize Right Sidebar
+      if (pageNavigation) {
+        [...pageNavigation.querySelectorAll("a")].forEach((a) => {
+          a.classList.toggle("active", a.hash === `#${activeId}`);
+        });
+      }
+
+      // 2. Synchronize Left Sidebar
+      // If activeHeading is H3, find its parent H2
+      let targetLeftId = activeId;
+      if (activeHeading.tagName === "H3") {
+        let prev = activeHeading.previousElementSibling;
+        while (prev) {
+          if (prev.tagName === "H2" && prev.id) {
+            targetLeftId = prev.id;
+            break;
+          }
+          prev = prev.previousElementSibling;
+        }
+      }
+
+      const allLeftLinks = navigation ? [...navigation.querySelectorAll(".manual-navigation-scroll a")] : [];
+      let hasExactMatch = false;
+
+      allLeftLinks.forEach((link) => {
+        const linkHash = link.hash ? link.hash.replace(/^#/, "") : "";
+        if (linkHash === activeId) {
+          link.classList.add("active");
+          hasExactMatch = true;
+        } else {
+          link.classList.remove("active");
+        }
+      });
+
+      if (!hasExactMatch) {
+        allLeftLinks.forEach((link) => {
+          const linkHash = link.hash ? link.hash.replace(/^#/, "") : "";
+          if (linkHash === targetLeftId || (!targetLeftId && linkHash === currentActiveChapterId)) {
+            link.classList.add("active");
+          }
+        });
+      }
+
+      // Mark parent chapter <li> in left sidebar
+      if (navigation) {
+        [...navigation.querySelectorAll(".manual-navigation-scroll > ul > li")].forEach(li => {
+          const chapterLink = li.querySelector(":scope > a");
+          const isThisChapter = chapterLink && (chapterLink.hash ? chapterLink.hash.replace(/^#/, "") : "") === currentActiveChapterId;
+          li.classList.toggle("current-chapter", Boolean(isThisChapter));
+        });
+
+        const activeLeftLink = navigation.querySelector(".manual-navigation-scroll a.active");
+        if (activeLeftLink) {
+          activeLeftLink.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }
+      }
+
+      // 3. Keep URL hash and language switcher updated
+      history.replaceState(null, "", `#${activeId}`);
+      updateAlternateLanguageLinks(activeId);
+    };
+
+    let scrollRaf = null;
+    window.addEventListener("scroll", () => {
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = null;
+        updateActiveHeadingOnScroll();
+      });
+    }, { passive: true });
 
     const activateChapter = (targetChapterId, targetAnchorId = null, shouldScroll = true) => {
       let chapterIndex = chapterList.findIndex(c => c.id === targetChapterId);
@@ -418,10 +479,19 @@ const print_action = (key) => document.write(action_str(key));
 
       // 4. Update left sidebar active links
       const anchorToMatch = targetAnchorId || targetChapterId;
-      navLinks.forEach(link => {
+      const allLeftLinks = navigation ? [...navigation.querySelectorAll(".manual-navigation-scroll a")] : [];
+      allLeftLinks.forEach(link => {
         const linkHash = link.hash ? link.hash.replace(/^#/, "") : "";
-        link.classList.toggle("active", linkHash === anchorToMatch || linkHash === targetChapterId);
+        link.classList.toggle("active", linkHash === anchorToMatch);
       });
+
+      if (navigation) {
+        [...navigation.querySelectorAll(".manual-navigation-scroll > ul > li")].forEach(li => {
+          const chapterLink = li.querySelector(":scope > a");
+          const isThisChapter = chapterLink && (chapterLink.hash ? chapterLink.hash.replace(/^#/, "") : "") === currentActiveChapterId;
+          li.classList.toggle("current-chapter", Boolean(isThisChapter));
+        });
+      }
 
       // 5. Update URL state and Language switchers
       const finalHash = targetAnchorId || targetChapterId;
@@ -433,11 +503,16 @@ const print_action = (key) => document.write(action_str(key));
         if (targetAnchorId && targetAnchorId !== targetChapterId) {
           const targetEl = document.getElementById(targetAnchorId);
           if (targetEl) {
+            isProgrammaticScrolling = true;
             targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            setTimeout(() => { isProgrammaticScrolling = false; updateActiveHeadingOnScroll(); }, 400);
           }
         } else {
           window.scrollTo({ top: 0, behavior: "instant" });
+          updateActiveHeadingOnScroll();
         }
+      } else {
+        updateActiveHeadingOnScroll();
       }
     };
 
@@ -451,7 +526,6 @@ const print_action = (key) => document.write(action_str(key));
       const href = link.getAttribute("href");
       if (!href || !href.includes("#")) return;
 
-      // If external link or language switcher or theme button, skip
       if (link.closest(".language-switcher") || link.closest(".theme-toggle") || link.target === "_blank") return;
 
       const hashMatch = href.match(/#([a-zA-Z0-9_\-]+)/);
@@ -644,11 +718,11 @@ const print_action = (key) => document.write(action_str(key));
     // 11. BACK TO TOP BUTTON LOGIC
     // =========================================================================
     if (backToTopBtn) {
-      let scrollTimer = null;
+      let bttTimer = null;
       window.addEventListener("scroll", () => {
-        if (scrollTimer) return;
-        scrollTimer = setTimeout(() => {
-          scrollTimer = null;
+        if (bttTimer) return;
+        bttTimer = setTimeout(() => {
+          bttTimer = null;
           if (window.scrollY > 300) {
             backToTopBtn.removeAttribute("hidden");
           } else {
