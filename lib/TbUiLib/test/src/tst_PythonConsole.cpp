@@ -20,6 +20,7 @@
 #include <QFontDatabase>
 #include <QLabel>
 #include <QPlainTextEdit>
+#include <QSplitter>
 #include <QTextEdit>
 #include <QToolButton>
 #include <QtTest/QTest>
@@ -68,7 +69,9 @@ TEST_CASE("PythonConsole")
   CHECK(output->font() == input->font());
   CHECK(runButton->isEnabled() == false);
 
-  const auto singleLineHeight = input->height();
+  auto* splitter = console.findChild<QSplitter*>("PythonConsole_Splitter");
+  REQUIRE(splitter != nullptr);
+  CHECK(splitter->count() == 2);
 
   auto commands = std::vector<std::string>{};
   console.setCommandExecutor(
@@ -77,12 +80,10 @@ TEST_CASE("PythonConsole")
 
   input->setPlainText(QStringLiteral("value = 41\nvalue + 1"));
   CHECK(runButton->isEnabled());
-  CHECK(input->height() > singleLineHeight);
   runButton->click();
   REQUIRE(commands.size() == 1u);
   CHECK(commands.back() == "value = 41\nvalue + 1");
   CHECK(input->toPlainText().isEmpty());
-  CHECK(input->height() == singleLineHeight);
   CHECK_FALSE(runButton->isEnabled());
 
   QTRY_VERIFY_WITH_TIMEOUT(

@@ -27,6 +27,7 @@
 #include <QLabel>
 #include <QPlainTextEdit>
 #include <QSizePolicy>
+#include <QSplitter>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
@@ -46,7 +47,6 @@ namespace tb::ui
 namespace
 {
 constexpr auto MaxHistorySize = size_t{100u};
-constexpr auto MaxVisibleInputLines = 4;
 
 QFont consoleFont()
 {
@@ -98,23 +98,43 @@ PythonConsole::PythonConsole(QWidget* parent)
 {
   textView()->setObjectName("PythonConsole_Output");
 
-  auto* inputBar = new QWidget{this};
-  inputBar->setObjectName("PythonConsole_InputBar");
-  inputBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+  if (auto* baseLayout = layout())
+  {
+    baseLayout->removeWidget(textView());
+  }
 
-  m_prompt = new QLabel{QStringLiteral(">>>"), inputBar};
+  m_splitter = new QSplitter{Qt::Horizontal, this};
+  m_splitter->setObjectName("PythonConsole_Splitter");
+
+  auto* leftPane = new QWidget{m_splitter};
+  leftPane->setObjectName("PythonConsole_LeftPane");
+  auto* leftLayout = new QVBoxLayout{leftPane};
+  leftLayout->setContentsMargins(0, 0, 0, 0);
+  leftLayout->setSpacing(0);
+  leftLayout->addWidget(textView());
+
+  auto* rightPane = new QWidget{m_splitter};
+  rightPane->setObjectName("PythonConsole_RightPane");
+  auto* rightLayout = new QVBoxLayout{rightPane};
+  rightLayout->setContentsMargins(8, 4, 8, 8);
+  rightLayout->setSpacing(4);
+
+  m_prompt = new QLabel{tr("Script Editor (Ctrl+Enter to run)"), rightPane};
   m_prompt->setObjectName("PythonConsole_Prompt");
-  m_prompt->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+  m_prompt->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
   m_input->setObjectName("PythonConsole_Input");
   m_input->setAccessibleName(tr("Python command input"));
   m_input->setLineWrapMode(QPlainTextEdit::NoWrap);
   m_input->setTabChangesFocus(false);
+  m_input->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  m_input->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  m_input->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   m_input->installEventFilter(this);
 
   m_runButton->setObjectName("PythonConsole_Run");
   m_runButton->setText(tr("Run"));
-  m_runButton->setToolTip(tr("Run current command"));
+  m_runButton->setToolTip(tr("Run current command (Ctrl+Enter)"));
   m_runButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
   m_runButton->setAutoRaise(true);
   m_runButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -131,19 +151,17 @@ PythonConsole::PythonConsole(QWidget* parent)
 
   connect(
     m_input, &QPlainTextEdit::textChanged, this, &PythonConsole::updateRunButtonEnabled);
-  connect(
-    m_input->document(),
-    &QTextDocument::blockCountChanged,
-    this,
-    &PythonConsole::updateInputHeight);
 
-  auto* inputLayout = new QHBoxLayout{inputBar};
-  inputLayout->setContentsMargins(12, 2, 12, 8);
-  inputLayout->setSpacing(8);
-  inputLayout->addWidget(m_prompt);
-  inputLayout->addWidget(m_input, 1);
+  rightLayout->addWidget(m_prompt);
+  rightLayout->addWidget(m_input, 1);
 
-  layout()->addWidget(inputBar);
+  m_splitter->addWidget(leftPane);
+  m_splitter->addWidget(rightPane);
+  m_splitter->setStretchFactor(0, 1);
+  m_splitter->setStretchFactor(1, 1);
+  m_splitter->setSizes({420, 380});
+
+  layout()->addWidget(m_splitter);
 
   auto& prefs = PreferenceManager::instance();
   m_notifierConnection +=
@@ -257,17 +275,7 @@ void PythonConsole::updateFont()
   textView()->document()->setDefaultFont(font);
   m_prompt->setFont(font);
   m_input->setFont(font);
-  updateInputHeight();
-}
-
-void PythonConsole::updateInputHeight()
-{
-  const auto blockCount = m_input->document()->blockCount();
-  const auto lineCount = std::clamp(blockCount, 1, MaxVisibleInputLines);
-  const auto lineHeight = QFontMetrics{m_input->font()}.lineSpacing();
-  m_input->setVerticalScrollBarPolicy(
-    blockCount > MaxVisibleInputLines ? Qt::ScrollBarAsNeeded : Qt::ScrollBarAlwaysOff);
-  m_input->setFixedHeight(lineCount * lineHeight + 10);
+  m_input->document()->setDefaultFont(font);
 }
 
 void PythonConsole::showPreviousHistoryEntry()

@@ -2,33 +2,63 @@
 
 ## Python 控制台 {#python_console}
 
-打开底部信息面板中的 **Python** 标签页，以针对当前活动的 TrenchBroom 会话交互式运行 Python v2 命令。
+打开底部信息面板中的 **Python** 标签页，以针对当前活动的 TrenchBroom 会话运行 Python v2 脚本与快捷指令。
 
-### 交互式执行与多行输入 {#console_execution}
+### 左右分栏工作区 {#console_execution}
 
-控制台提供了具备双模式编译的交互式 REPL：
+控制台采用了现代化的左右分栏工作区布局：
 
-- **表达式求值**：单行表达式（如 `tb2.current_document().selection.brushes` 或 `tb2.Vec3(128, 64, 0).length()`）会被即时求值，并自动将格式化后的字符串表示（`repr`）打印至控制台输出区。
-- **复合语句块**：包含 `for` 循环、函数定义或 `with doc.transaction("Action"):` 上下文的多行复合代码可直接输入或粘贴到输入框中。输入框高度会随代码行数自动自适应扩展（1 至 4 行）。
+- **左侧窗格（输出日志区）**：展示指令执行日志、`print(...)` 的标准输出、表达式求值结果以及报错调用栈。
+- **右侧窗格（脚本编辑器）**：提供完整的多行代码编辑器，便于编写和执行单行表达式、快速片段或复杂的过程化生成脚本。拖拽中央分隔条可自由调整日志与编辑器的宽度比例。
+
+### 零样板全局快捷函数与变量 {#console_global_helpers}
+
+为了使关卡设计与几何变换的操作尽可能高效便捷，Python 控制台会自动将当前活动文档、选区、数学原语以及高频空间变换函数直接注入全局命名空间，无需手动 import 或包裹事务：
+
+- **全局对象**：
+  - `doc`：当前活动地图文档 `Document` 句柄。
+  - `sel`：当前活动选区 `Selection` 句柄。
+  - `Vec3`, `Plane`：3D 向量与平面几何数学类。
+- **全局快捷变换函数**：
+  - `selected_brushes()` / `selectedBrushes()`：返回当前选中的所有 `Brush` 列表。
+  - `selected_entities()` / `selectedEntities()`：返回当前选中的所有 `Entity` 列表。
+  - `selected_faces()` / `selectedFaces()`：返回当前选中的所有 `Face` 表面列表。
+  - `translate(dx, dy, dz)` 或 `translate(object, dx, dy, dz)`：移动活动选区或指定对象。
+  - `rotate(rx, ry, rz)` 或 `rotate(object, rx, ry, rz)` 或 `rotate(ax, ay, az, angle)`：旋转活动选区或指定对象。
+  - `scale(s)` 或 `scale(sx, sy, sz)` 或 `scale(object, sx, sy, sz)`：缩放活动选区或指定对象。
+  - `duplicate()` 或 `duplicate(object)`：复制选区或指定对象。
+  - `delete_selection()` / `deleteSelection()`：删除当前选中的所有几何体与实体。
+  - `deselect_all()` / `deselectAll()`：清除当前选区。
 
 ### 快捷键与历史记录 {#console_shortcuts_and_history}
 
-- **执行指令**：按 #key(Ctrl)+#key(Return) 或点击 **Run** 按钮即可立即执行命令。
-- **历史记录翻阅**：在输入框第一行或最后一行使用 #key(Up) 和 #key(Down) 可翻阅最多 100 条历史指令。若当前输入框中有未提交的代码，翻阅历史时会自动暂存为草稿，并在按 #key(Down) 翻回底部时完整恢复。
-- **清除输出**：点击 **Clear** 按钮可一键清空控制台的所有历史输出。
-- **外观字体设置**：可在 **Preferences > View > Fonts > Python Console** 下自定义控制台的等宽字体系列和字号大小；列表中仅列出已安装的等宽字体系列，**System Monospace** 则使用平台默认字体。
+- **执行脚本**：按 #key(Ctrl)+#key(Return) 或点击 **Run** 按钮即可立即执行编辑器中的脚本。
+- **历史记录翻阅**：在编辑器首行按 #key(Up) 或在尾行按 #key(Down) 可快速翻阅历史脚本（最多 100 条）。若当前输入框中有未提交的代码，翻阅历史时会自动暂存为草稿。
+- **清除输出**：点击顶部的 **Clear** 按钮可清空所有日志。
+- **外观字体设置**：可在 **Preferences > View > Fonts > Python Console** 下自定义控制台的等宽字体系列和字号大小。
 
 ### 输出重定向与错误追踪 {#console_output_and_errors}
 
-Python 内置 `print(...)` 函数的所有标准输出均会自动捕获并流式输出至控制台中。当发生未捕获的异常或语法错误时，控制台会自动以红色高亮打印带有源文件行号的完整 Traceback 调用栈信息。
+所有 `print(...)` 打印内容与表达式结果均会实时记录于输出视图中。当发生异常时，会自动以红色高亮显示带有行号的 Traceback 诊断信息。
 
 ### 实用控制台操作示例 {#console_examples}
+
+#### 快速变换与选区操作 {#example_quick_transforms}
+
+```python
+# Rotate the first selected brush by 45 degrees around the Z axis
+first_brush = selected_brushes()[0]
+rotate(first_brush, 0, 0, 45)
+
+# Duplicate the active selection and translate it 64 units up
+duplicate()
+translate(0, 0, 64)
+```
 
 #### 检查选区与打印 Brush 详细信息 {#example_inspect_selection}
 
 ```python
-doc = tb2.current_document()
-brushes = doc.selection.brushes
+brushes = selected_brushes()
 print(f"Selected {len(brushes)} brush(es):")
 for i, brush in enumerate(brushes):
     faces = brush.faces()
@@ -37,38 +67,24 @@ for i, brush in enumerate(brushes):
         print(f"    - Material: {face.material}, Vertices: {len(face.vertices)}")
 ```
 
-#### 复制选区并平移移动 Brush {#example_duplicate_and_translate}
-
-```python
-doc = tb2.current_document()
-with doc.transaction("Duplicate Selection"):
-    doc.selection.duplicate()
-    doc.selection.translate(0, 0, 64)
-```
-
 #### 循环生成阶梯阵列 {#example_step_array}
 
 ```python
-doc = tb2.current_document()
-with doc.transaction("Generate Step Array"):
-    for _ in range(8):
-        doc.selection.duplicate()
-        doc.selection.translate(64, 0, 16)
+for _ in range(8):
+    duplicate()
+    translate(64, 0, 16)
 ```
 
 #### 批量赋予表面材质 {#example_batch_face_materials}
 
 ```python
-doc = tb2.current_document()
-with doc.transaction("Apply Face Material"):
-    for face in doc.selection.brush_faces:
-        face.set_material("common/caulk")
+for face in selected_faces():
+    face.set_material("common/caulk")
 ```
 
 #### 批量规范化实体属性 {#example_batch_entity_properties}
 
 ```python
-doc = tb2.current_document()
 with doc.transaction("Batch Align Entities"):
     for ent in doc.entities:
         if ent.classname == "light" and not ent.get("light"):

@@ -282,6 +282,47 @@ PyObject* createConsoleGlobals()
     && PyDict_SetItemString(globals, "__builtins__", PyEval_GetBuiltins()) == 0
     && PyDict_SetItemString(globals, "__name__", name) == 0
     && PyDict_SetItemString(globals, "tb2", tb2Module) == 0;
+
+  if (initialized && tb2Module != nullptr)
+  {
+    static const char* const helpers[] = {
+      "selected_brushes",
+      "selectedBrushes",
+      "selected_entities",
+      "selectedEntities",
+      "selected_faces",
+      "selectedFaces",
+      "translate",
+      "rotate",
+      "scale",
+      "duplicate",
+      "delete_selection",
+      "deleteSelection",
+      "deselect_all",
+      "deselectAll",
+      "current_document",
+      "document",
+      "create_brush",
+      "execute_action",
+      "list_actions",
+      "Vec3",
+      "Plane",
+    };
+    for (const auto* helper : helpers)
+    {
+      auto* attr = PyObject_GetAttrString(tb2Module, helper);
+      if (attr != nullptr)
+      {
+        PyDict_SetItemString(globals, helper, attr);
+        Py_DECREF(attr);
+      }
+      else
+      {
+        PyErr_Clear();
+      }
+    }
+  }
+
   Py_XDECREF(name);
   Py_XDECREF(tb2Module);
 
@@ -401,6 +442,33 @@ bool PythonRuntime::runConsoleCommand(
     }
   }
   auto* globals = globalsIt->second;
+
+  auto* tb2Module = PyImport_ImportModule("tb2");
+  if (tb2Module != nullptr)
+  {
+    auto* docFunc = PyObject_GetAttrString(tb2Module, "current_document");
+    if (docFunc != nullptr)
+    {
+      auto* docObj = PyObject_CallNoArgs(docFunc);
+      if (docObj != nullptr)
+      {
+        PyDict_SetItemString(globals, "doc", docObj);
+        auto* selObj = PyObject_GetAttrString(docObj, "selection");
+        if (selObj != nullptr)
+        {
+          PyDict_SetItemString(globals, "sel", selObj);
+          Py_DECREF(selObj);
+        }
+        Py_DECREF(docObj);
+      }
+      else
+      {
+        PyErr_Clear();
+      }
+      Py_DECREF(docFunc);
+    }
+    Py_DECREF(tb2Module);
+  }
 
   const auto sourceString = std::string{source};
   auto expression = true;

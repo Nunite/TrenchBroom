@@ -100,6 +100,9 @@ tb_add_manual_page(zh_CN zh_CN .. "index.html" "metadata.yaml" "${DOC_MANUAL_ZH_
 tb_add_manual_page(en "" . "python-api.html" "metadata-api.yaml" "${DOC_MANUAL_SOURCE_DIR}/en/python-api.md" EN_API_OUTPUT_PATH)
 tb_add_manual_page(zh_CN zh_CN .. "python-api.html" "metadata-api.yaml" "${DOC_MANUAL_SOURCE_DIR}/zh_CN/python-api.md" ZH_CN_API_OUTPUT_PATH)
 
+set(INDEX_OUTPUT_PATH "${EN_INDEX_OUTPUT_PATH}")
+set(DOC_MANUAL_ZH_CN_INDEX_OUTPUT_PATH "${ZH_CN_INDEX_OUTPUT_PATH}")
+
 set(DOC_MANUAL_INDEX_FILES_ABSOLUTE
   "${EN_INDEX_OUTPUT_PATH}"
   "${ZH_CN_INDEX_OUTPUT_PATH}"

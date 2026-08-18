@@ -343,14 +343,16 @@ if(WIN32 OR ${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
     tb_add_post_build_copy_files(
         TrenchBroom
         "${APP_RESOURCE_DEST_DIR}/manual"
-        "${INDEX_OUTPUT_PATH}"
+        "${EN_INDEX_OUTPUT_PATH}"
+        "${EN_API_OUTPUT_PATH}"
         ${DOC_MANUAL_SHORTCUTS_JS_TARGET_FILES_ABSOLUTE}
         ${DOC_MANUAL_TARGET_FILES_ABSOLUTE}
     )
     tb_add_post_build_copy_files(
         TrenchBroom
         "${APP_RESOURCE_DEST_DIR}/manual/zh_CN"
-        "${DOC_MANUAL_ZH_CN_INDEX_OUTPUT_PATH}"
+        "${ZH_CN_INDEX_OUTPUT_PATH}"
+        "${ZH_CN_API_OUTPUT_PATH}"
     )
     tb_add_post_build_copy_files(
         TrenchBroom

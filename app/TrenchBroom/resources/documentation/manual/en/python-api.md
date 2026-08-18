@@ -85,6 +85,48 @@ panel = tb2.create_plugin_panel("com.example.align_tool", "Surface Aligner")
 panel.add_label("Align selected faces to the world grid.")
 ```
 
+#### `tb2.selected_brushes()` / `tb2.selectedBrushes()` {#tb2_selected_brushes}
+
+Returns a list of all `Brush` handles in the active selection.
+
+- **Returns**: `list[tb2.Brush]`
+
+#### `tb2.selected_entities()` / `tb2.selectedEntities()` {#tb2_selected_entities}
+
+Returns a list of all `Entity` handles in the active selection.
+
+- **Returns**: `list[tb2.Entity]`
+
+#### `tb2.selected_faces()` / `tb2.selectedFaces()` {#tb2_selected_faces}
+
+Returns a list of all `Face` handles across all selected brushes.
+
+- **Returns**: `list[tb2.Face]`
+
+#### `tb2.translate(...)` {#tb2_translate}
+
+Translates the active selection or a target object along the specified offset vector with automatic undo transaction.
+
+#### `tb2.rotate(...)` {#tb2_rotate}
+
+Rotates the active selection or a target object. Supports Euler angles `rotate(rx, ry, rz)` or axis-angle `rotate(ax, ay, az, angle)`.
+
+#### `tb2.scale(...)` {#tb2_scale}
+
+Scales the active selection or a target object uniformly or non-uniformly with automatic undo transaction.
+
+#### `tb2.duplicate(target=None)` {#tb2_duplicate}
+
+Duplicates the active selection (or target object) and updates the active selection to the cloned copies.
+
+#### `tb2.delete_selection()` / `tb2.deleteSelection()` {#tb2_delete_selection}
+
+Deletes all currently selected geometry and entities from the active map.
+
+#### `tb2.deselect_all()` / `tb2.deselectAll()` {#tb2_deselect_all}
+
+Clears the active map selection.
+
 ### Math & Geometry Primitives {#math_primitives}
 
 #### `tb2.Vec3(x=0.0, y=0.0, z=0.0)` {#tb2_vec3}

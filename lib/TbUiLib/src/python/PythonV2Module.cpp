@@ -2707,6 +2707,339 @@ void defineModule(py::module_& module)
       }
     });
 
+  auto currentSelection = []() {
+    auto doc = currentDocument();
+    return SelectionHandle{&doc.get(), doc.generation};
+  };
+
+  auto selectedBrushes = [currentSelection]() {
+    auto selection = currentSelection();
+    auto result = std::vector<BrushHandle>{};
+    const auto& brushes = selection.getDocument().map().selection().brushes;
+    result.reserve(brushes.size());
+    for (auto* brush : brushes)
+    {
+      result.push_back(BrushHandle{
+        &selection.getDocument(),
+        selection.generation,
+        brush,
+        PythonHandleRegistry::instance().nodeGeneration(brush)});
+    }
+    return result;
+  };
+  auto selectedEntities = [currentSelection]() {
+    auto selection = currentSelection();
+    return tb::ui::selectedEntities(selection);
+  };
+  auto selectedFaces = [currentSelection]() {
+    auto selection = currentSelection();
+    return selectedBrushFaces(selection);
+  };
+
+  auto translateHelper = [currentSelection](const py::args& args) {
+    auto selection = currentSelection();
+    if (args.size() == 1)
+    {
+      const auto v = vec3FromObject(args[0]);
+      return translateSelection(selection, v.x, v.y, v.z);
+    }
+    if (args.size() == 2)
+    {
+      if (py::isinstance<py::iterable>(args[0]) && !py::isinstance<py::str>(args[0]))
+      {
+        setSelection(selection, py::reinterpret_borrow<py::iterable>(args[0]));
+      }
+      else
+      {
+        setSelection(selection, py::make_tuple(args[0]));
+      }
+      const auto v = vec3FromObject(args[1]);
+      return translateSelection(selection, v.x, v.y, v.z);
+    }
+    if (args.size() == 3)
+    {
+      const auto x = py::cast<double>(args[0]);
+      const auto y = py::cast<double>(args[1]);
+      const auto z = py::cast<double>(args[2]);
+      return translateSelection(selection, x, y, z);
+    }
+    if (args.size() == 4)
+    {
+      if (py::isinstance<py::iterable>(args[0]) && !py::isinstance<py::str>(args[0]))
+      {
+        setSelection(selection, py::reinterpret_borrow<py::iterable>(args[0]));
+      }
+      else
+      {
+        setSelection(selection, py::make_tuple(args[0]));
+      }
+      const auto x = py::cast<double>(args[1]);
+      const auto y = py::cast<double>(args[2]);
+      const auto z = py::cast<double>(args[3]);
+      return translateSelection(selection, x, y, z);
+    }
+    throw py::type_error{"translate() takes 1, 2, 3, or 4 arguments"};
+  };
+
+  auto rotateHelper = [currentSelection](const py::args& args) {
+    auto selection = currentSelection();
+    if (args.size() == 3)
+    {
+      const auto rx = py::cast<double>(args[0]);
+      const auto ry = py::cast<double>(args[1]);
+      const auto rz = py::cast<double>(args[2]);
+      auto& document = selection.getDocument();
+      auto transaction = ScopedPythonTransaction{document, "Python v2 Rotate Selection"};
+      try
+      {
+        if (rx != 0.0)
+        {
+          rotateSelection(selection, 1.0, 0.0, 0.0, rx, std::nullopt, std::nullopt, std::nullopt);
+        }
+        if (ry != 0.0)
+        {
+          rotateSelection(selection, 0.0, 1.0, 0.0, ry, std::nullopt, std::nullopt, std::nullopt);
+        }
+        if (rz != 0.0)
+        {
+          rotateSelection(selection, 0.0, 0.0, 1.0, rz, std::nullopt, std::nullopt, std::nullopt);
+        }
+        return transaction.commit();
+      }
+      catch (...)
+      {
+        transaction.cancel();
+        throw;
+      }
+    }
+    if (args.size() == 4)
+    {
+      if (!py::isinstance<py::float_>(args[0]) && !py::isinstance<py::int_>(args[0]))
+      {
+        if (py::isinstance<py::iterable>(args[0]) && !py::isinstance<py::str>(args[0]))
+        {
+          setSelection(selection, py::reinterpret_borrow<py::iterable>(args[0]));
+        }
+        else
+        {
+          setSelection(selection, py::make_tuple(args[0]));
+        }
+        const auto rx = py::cast<double>(args[1]);
+        const auto ry = py::cast<double>(args[2]);
+        const auto rz = py::cast<double>(args[3]);
+        auto& document = selection.getDocument();
+        auto transaction = ScopedPythonTransaction{document, "Python v2 Rotate Selection"};
+        try
+        {
+          if (rx != 0.0)
+          {
+            rotateSelection(selection, 1.0, 0.0, 0.0, rx, std::nullopt, std::nullopt, std::nullopt);
+          }
+          if (ry != 0.0)
+          {
+            rotateSelection(selection, 0.0, 1.0, 0.0, ry, std::nullopt, std::nullopt, std::nullopt);
+          }
+          if (rz != 0.0)
+          {
+            rotateSelection(selection, 0.0, 0.0, 1.0, rz, std::nullopt, std::nullopt, std::nullopt);
+          }
+          return transaction.commit();
+        }
+        catch (...)
+        {
+          transaction.cancel();
+          throw;
+        }
+      }
+      else
+      {
+        return rotateSelection(
+          selection,
+          py::cast<double>(args[0]),
+          py::cast<double>(args[1]),
+          py::cast<double>(args[2]),
+          py::cast<double>(args[3]),
+          std::nullopt,
+          std::nullopt,
+          std::nullopt);
+      }
+    }
+    if (args.size() == 5)
+    {
+      if (py::isinstance<py::iterable>(args[0]) && !py::isinstance<py::str>(args[0]))
+      {
+        setSelection(selection, py::reinterpret_borrow<py::iterable>(args[0]));
+      }
+      else
+      {
+        setSelection(selection, py::make_tuple(args[0]));
+      }
+      return rotateSelection(
+        selection,
+        py::cast<double>(args[1]),
+        py::cast<double>(args[2]),
+        py::cast<double>(args[3]),
+        py::cast<double>(args[4]),
+        std::nullopt,
+        std::nullopt,
+        std::nullopt);
+    }
+    if (args.size() == 7)
+    {
+      return rotateSelection(
+        selection,
+        py::cast<double>(args[0]),
+        py::cast<double>(args[1]),
+        py::cast<double>(args[2]),
+        py::cast<double>(args[3]),
+        py::cast<double>(args[4]),
+        py::cast<double>(args[5]),
+        py::cast<double>(args[6]));
+    }
+    if (args.size() == 8)
+    {
+      if (py::isinstance<py::iterable>(args[0]) && !py::isinstance<py::str>(args[0]))
+      {
+        setSelection(selection, py::reinterpret_borrow<py::iterable>(args[0]));
+      }
+      else
+      {
+        setSelection(selection, py::make_tuple(args[0]));
+      }
+      return rotateSelection(
+        selection,
+        py::cast<double>(args[1]),
+        py::cast<double>(args[2]),
+        py::cast<double>(args[3]),
+        py::cast<double>(args[4]),
+        py::cast<double>(args[5]),
+        py::cast<double>(args[6]),
+        py::cast<double>(args[7]));
+    }
+    throw py::type_error{"rotate() takes 3, 4, 5, 7, or 8 arguments"};
+  };
+
+  auto scaleHelper = [currentSelection](const py::args& args) {
+    auto selection = currentSelection();
+    if (args.size() == 1)
+    {
+      if (py::isinstance<Vec3>(args[0]) || py::isinstance<py::sequence>(args[0]))
+      {
+        const auto v = vec3FromObject(args[0]);
+        return scaleSelection(selection, v.x, v.y, v.z, std::nullopt, std::nullopt, std::nullopt);
+      }
+      const auto s = py::cast<double>(args[0]);
+      return scaleSelection(selection, s, s, s, std::nullopt, std::nullopt, std::nullopt);
+    }
+    if (args.size() == 2)
+    {
+      if (py::isinstance<py::iterable>(args[0]) && !py::isinstance<py::str>(args[0]))
+      {
+        setSelection(selection, py::reinterpret_borrow<py::iterable>(args[0]));
+      }
+      else
+      {
+        setSelection(selection, py::make_tuple(args[0]));
+      }
+      if (py::isinstance<Vec3>(args[1]) || py::isinstance<py::sequence>(args[1]))
+      {
+        const auto v = vec3FromObject(args[1]);
+        return scaleSelection(selection, v.x, v.y, v.z, std::nullopt, std::nullopt, std::nullopt);
+      }
+      const auto s = py::cast<double>(args[1]);
+      return scaleSelection(selection, s, s, s, std::nullopt, std::nullopt, std::nullopt);
+    }
+    if (args.size() == 3)
+    {
+      const auto sx = py::cast<double>(args[0]);
+      const auto sy = py::cast<double>(args[1]);
+      const auto sz = py::cast<double>(args[2]);
+      return scaleSelection(selection, sx, sy, sz, std::nullopt, std::nullopt, std::nullopt);
+    }
+    if (args.size() == 4)
+    {
+      if (py::isinstance<py::iterable>(args[0]) && !py::isinstance<py::str>(args[0]))
+      {
+        setSelection(selection, py::reinterpret_borrow<py::iterable>(args[0]));
+      }
+      else
+      {
+        setSelection(selection, py::make_tuple(args[0]));
+      }
+      const auto sx = py::cast<double>(args[1]);
+      const auto sy = py::cast<double>(args[2]);
+      const auto sz = py::cast<double>(args[3]);
+      return scaleSelection(selection, sx, sy, sz, std::nullopt, std::nullopt, std::nullopt);
+    }
+    throw py::type_error{"scale() takes 1, 2, 3, or 4 arguments"};
+  };
+
+  auto duplicateHelper = [currentSelection, selectedBrushes](const py::args& args) -> py::object {
+    auto selection = currentSelection();
+    if (args.size() == 1)
+    {
+      if (py::isinstance<py::iterable>(args[0]) && !py::isinstance<py::str>(args[0]))
+      {
+        setSelection(selection, py::reinterpret_borrow<py::iterable>(args[0]));
+      }
+      else
+      {
+        setSelection(selection, py::make_tuple(args[0]));
+      }
+    }
+    else if (args.size() > 1)
+    {
+      setSelection(selection, args);
+    }
+    duplicateSelection(selection);
+    const auto brushes = selectedBrushes();
+    if (!brushes.empty())
+    {
+      return py::cast(brushes);
+    }
+    return py::cast(tb::ui::selectedEntities(selection));
+  };
+
+  auto deleteSelectionHelper = [currentSelection]() {
+    auto selection = currentSelection();
+    auto& document = selection.getDocument();
+    auto transaction = ScopedPythonTransaction{document, "Python v2 Delete Selection"};
+    try
+    {
+      mdl::removeSelectedNodes(document.map());
+      if (!transaction.commit())
+      {
+        throw std::runtime_error{"Could not delete selection"};
+      }
+      return true;
+    }
+    catch (...)
+    {
+      transaction.cancel();
+      throw;
+    }
+  };
+
+  auto deselectAllHelper = [currentSelection]() {
+    auto selection = currentSelection();
+    return deselectAllSelection(selection);
+  };
+
+  module.def("selected_brushes", selectedBrushes);
+  module.def("selectedBrushes", selectedBrushes);
+  module.def("selected_entities", selectedEntities);
+  module.def("selectedEntities", selectedEntities);
+  module.def("selected_faces", selectedFaces);
+  module.def("selectedFaces", selectedFaces);
+  module.def("translate", translateHelper);
+  module.def("rotate", rotateHelper);
+  module.def("scale", scaleHelper);
+  module.def("duplicate", duplicateHelper);
+  module.def("delete_selection", deleteSelectionHelper);
+  module.def("deleteSelection", deleteSelectionHelper);
+  module.def("deselect_all", deselectAllHelper);
+  module.def("deselectAll", deselectAllHelper);
+
   module.def("current_document", currentDocument);
   module.def("document", currentDocument);
   module.def("execute_action", executeAction);

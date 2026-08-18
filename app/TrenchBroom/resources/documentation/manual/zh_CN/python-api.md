@@ -85,6 +85,48 @@ panel = tb2.create_plugin_panel("com.example.align_tool", "Surface Aligner")
 panel.add_label("Align selected faces to the world grid.")
 ```
 
+#### `tb2.selected_brushes()` / `tb2.selectedBrushes()` {#tb2_selected_brushes}
+
+返回当前活动选区中的所有 `Brush` 句柄列表。
+
+- **返回值**：`list[tb2.Brush]`
+
+#### `tb2.selected_entities()` / `tb2.selectedEntities()` {#tb2_selected_entities}
+
+返回当前活动选区中的所有 `Entity` 句柄列表。
+
+- **返回值**：`list[tb2.Entity]`
+
+#### `tb2.selected_faces()` / `tb2.selectedFaces()` {#tb2_selected_faces}
+
+返回当前所有选中 Brush 表面包含的所有 `Face` 句柄列表。
+
+- **返回值**：`list[tb2.Face]`
+
+#### `tb2.translate(...)` {#tb2_translate}
+
+按指定偏移向量平移活动选区或目标对象（自动事务保护）。
+
+#### `tb2.rotate(...)` {#tb2_rotate}
+
+旋转活动选区或目标对象。支持欧拉角 `rotate(rx, ry, rz)` 或轴角 `rotate(ax, ay, az, angle)`。
+
+#### `tb2.scale(...)` {#tb2_scale}
+
+统一或非统一缩放活动选区或目标对象（自动事务保护）。
+
+#### `tb2.duplicate(target=None)` {#tb2_duplicate}
+
+复制活动选区（或指定目标对象），并将活动选区更新为新克隆的副本。
+
+#### `tb2.delete_selection()` / `tb2.deleteSelection()` {#tb2_delete_selection}
+
+从活动地图中删除当前选中的所有几何体和实体。
+
+#### `tb2.deselect_all()` / `tb2.deselectAll()` {#tb2_deselect_all}
+
+清除当前活动地图中的所有选区。
+
 ### 数学与几何基元 {#math_primitives}
 
 #### `tb2.Vec3(x=0.0, y=0.0, z=0.0)` {#tb2_vec3}

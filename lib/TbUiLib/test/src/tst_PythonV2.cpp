@@ -255,6 +255,32 @@ print("hello stderr", file=sys.stderr)
       runtime.runConsoleCommand(context, "tb2.current_document().entities[0].classname"));
     CHECK(logger.messages.back() == "'worldspawn'");
 
+    REQUIRE(runtime.runConsoleCommand(context, "doc.entities[0].classname"));
+    CHECK(logger.messages.back() == "'worldspawn'");
+
+    REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
+    CHECK(logger.messages.back() == "0");
+
+    REQUIRE(runtime.runConsoleCommand(context, "len(selectedBrushes())"));
+    CHECK(logger.messages.back() == "0");
+
+    REQUIRE(runtime.runConsoleCommand(
+      context,
+      "b = create_brush([(-32,-32,-32),(32,-32,-32),(32,32,-32),(-32,32,-32),(-32,-32,32),(32,-32,32),(32,32,32),(-32,32,32)])"));
+    REQUIRE(runtime.runConsoleCommand(context, "sel.set([b])"));
+    REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
+    CHECK(logger.messages.back() == "1");
+
+    REQUIRE(runtime.runConsoleCommand(context, "translate(0, 0, 64)"));
+    REQUIRE(runtime.runConsoleCommand(context, "rotate(0, 0, 90)"));
+    REQUIRE(runtime.runConsoleCommand(context, "duplicate()"));
+    REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
+    CHECK(logger.messages.back() == "1");
+
+    REQUIRE(runtime.runConsoleCommand(context, "delete_selection()"));
+    REQUIRE(runtime.runConsoleCommand(context, "len(selected_brushes())"));
+    CHECK(logger.messages.back() == "0");
+
     CHECK_FALSE(runtime.runConsoleCommand(context, "1 / 0"));
     CHECK(runtime.lastError().find("ZeroDivisionError") != std::string::npos);
 

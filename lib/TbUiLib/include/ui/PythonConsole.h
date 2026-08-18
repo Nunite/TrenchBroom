@@ -29,6 +29,7 @@
 class QEvent;
 class QLabel;
 class QPlainTextEdit;
+class QSplitter;
 class QToolButton;
 class QWidget;
 
@@ -38,6 +39,7 @@ namespace tb::ui
 class PythonConsole : public Console
 {
 private:
+  QSplitter* m_splitter = nullptr;
   QPlainTextEdit* m_input = nullptr;
   QLabel* m_prompt = nullptr;
   QToolButton* m_runButton = nullptr;
@@ -58,7 +60,6 @@ public:
 private:
   bool eventFilter(QObject* watched, QEvent* event) override;
   void updateFont();
-  void updateInputHeight();
   void updateRunButtonEnabled();
   void showPreviousHistoryEntry();
   void showNextHistoryEntry();

@@ -2,33 +2,63 @@
 
 ## Python Console {#python_console}
 
-Open the **Python** tab in the bottom info panel to run Python v2 commands interactively against the active TrenchBroom session.
+Open the **Python** tab in the bottom info panel to run Python v2 scripts and quick commands against the active TrenchBroom session.
 
-### Interactive Execution and Multiline Input {#console_execution}
+### Side-by-Side Split Workspace {#console_execution}
 
-The console provides an interactive REPL with dual-mode evaluation:
+The console features a modern side-by-side split workspace:
 
-- **Expression Evaluation**: Single expressions (such as `tb2.current_document().selection.brushes` or `tb2.Vec3(128, 64, 0).length()`) are evaluated immediately, and their formatted string representation (`repr`) is printed to the console output.
-- **Statement Blocks**: Complex multiline blocks containing `for` loops, function definitions, or `with doc.transaction("Action"):` contexts can be entered or pasted directly into the input field. The input field automatically expands to fit up to 4 lines of code.
+- **Left Pane (Output Log)**: Displays execution logs, standard output from `print(...)`, interactive evaluation results, and error tracebacks.
+- **Right Pane (Script Editor)**: A full multiline code editor for authoring and running single-line expressions, quick snippets, or complex procedural scripts. Drag the center splitter bar to adjust the width between the log and the editor.
+
+### Zero-Boilerplate Global Helpers {#console_global_helpers}
+
+To make interactive mapping and geometry transformations as fast as possible, the Python console automatically binds the active document, active selection, math primitives, and high-level transform functions into the global namespace without needing imports or manual transaction wrapping:
+
+- **Global Objects**:
+  - `doc`: The active `Document` handle.
+  - `sel`: The active `Selection` handle.
+  - `Vec3`, `Plane`: 3D vector and plane mathematics classes.
+- **Global Helper Functions**:
+  - `selected_brushes()` / `selectedBrushes()`: Returns a list of all currently selected `Brush` objects.
+  - `selected_entities()` / `selectedEntities()`: Returns a list of all currently selected `Entity` objects.
+  - `selected_faces()` / `selectedFaces()`: Returns a list of all currently selected `Face` objects.
+  - `translate(dx, dy, dz)` or `translate(object, dx, dy, dz)`: Translates the active selection or a specific object.
+  - `rotate(rx, ry, rz)` or `rotate(object, rx, ry, rz)` or `rotate(ax, ay, az, angle)`: Rotates the active selection or a specific object.
+  - `scale(s)` or `scale(sx, sy, sz)` or `scale(object, sx, sy, sz)`: Scales the active selection or a specific object.
+  - `duplicate()` or `duplicate(object)`: Duplicates the selection or object and selects the new copies.
+  - `delete_selection()` / `deleteSelection()`: Deletes all currently selected geometry and entities.
+  - `deselect_all()` / `deselectAll()`: Clears the current selection.
 
 ### Keyboard Shortcuts and History {#console_shortcuts_and_history}
 
-- **Execute**: Press #key(Ctrl)+#key(Return) or click **Run** to execute the command.
-- **History Navigation**: Use #key(Up) and #key(Down) at the first or last input line to navigate through up to 100 previous commands. If you have unsubmitted text in the input box, it is automatically preserved as a draft while browsing history and restored when you return to the bottom with #key(Down).
-- **Clear Output**: Click **Clear** to remove all logged console output.
-- **Font Customization**: Configure the family and size under **Preferences > View > Fonts > Python Console**; only installed monospace families are listed, and **System Monospace** uses the platform default.
+- **Execute**: Press #key(Ctrl)+#key(Return) or click **Run** to execute the script in the editor.
+- **History Navigation**: Press #key(Up) on the first line or #key(Down) on the last line to navigate through previous scripts (up to 100 history entries). Unsubmitted text in the editor is automatically preserved as a draft while browsing history.
+- **Clear Output**: Click **Clear** in the tab header to clear all output logs.
+- **Font Customization**: Configure the family and size under **Preferences > View > Fonts > Python Console**; only installed monospace families are listed.
 
 ### Output and Error Reporting {#console_output_and_errors}
 
-All standard output from Python's built-in `print(...)` function is captured and streamed directly into the console. When an unhandled exception or syntax error occurs, a formatted traceback with source line numbers is printed in red.
+All output from `print(...)` and evaluation results are logged to the output view. If an exception occurs, a formatted traceback with line numbers is printed in red.
 
 ### Practical Console Examples {#console_examples}
+
+#### Quick Selection Transforms {#example_quick_transforms}
+
+```python
+# Rotate the first selected brush by 45 degrees around the Z axis
+first_brush = selected_brushes()[0]
+rotate(first_brush, 0, 0, 45)
+
+# Duplicate the active selection and translate it 64 units up
+duplicate()
+translate(0, 0, 64)
+```
 
 #### Inspecting Selection and Brush Information {#example_inspect_selection}
 
 ```python
-doc = tb2.current_document()
-brushes = doc.selection.brushes
+brushes = selected_brushes()
 print(f"Selected {len(brushes)} brush(es):")
 for i, brush in enumerate(brushes):
     faces = brush.faces()
@@ -37,38 +67,24 @@ for i, brush in enumerate(brushes):
         print(f"    - Material: {face.material}, Vertices: {len(face.vertices)}")
 ```
 
-#### Duplicating and Translating Brushes {#example_duplicate_and_translate}
-
-```python
-doc = tb2.current_document()
-with doc.transaction("Duplicate Selection"):
-    doc.selection.duplicate()
-    doc.selection.translate(0, 0, 64)
-```
-
 #### Generating a Step Array {#example_step_array}
 
 ```python
-doc = tb2.current_document()
-with doc.transaction("Generate Step Array"):
-    for _ in range(8):
-        doc.selection.duplicate()
-        doc.selection.translate(64, 0, 16)
+for _ in range(8):
+    duplicate()
+    translate(64, 0, 16)
 ```
 
 #### Batch Applying Face Materials {#example_batch_face_materials}
 
 ```python
-doc = tb2.current_document()
-with doc.transaction("Apply Face Material"):
-    for face in doc.selection.brush_faces:
-        face.set_material("common/caulk")
+for face in selected_faces():
+    face.set_material("common/caulk")
 ```
 
 #### Batch Normalizing Entity Properties {#example_batch_entity_properties}
 
 ```python
-doc = tb2.current_document()
 with doc.transaction("Batch Align Entities"):
     for ent in doc.entities:
         if ent.classname == "light" and not ent.get("light"):
