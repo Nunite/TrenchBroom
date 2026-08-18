@@ -82,8 +82,6 @@ const print_action = (key) => document.write(action_str(key));
     const pageNavigation = document.getElementById("page-navigation-links");
     const currentSectionLabel = document.getElementById("current-section-label");
     const backToTopBtn = document.getElementById("back-to-top");
-    const headings = [...article.querySelectorAll("h1[id], h2[id], h3[id]")];
-    const topHeadings = [...article.querySelectorAll("h1[id]")];
 
     // =========================================================================
     // 1. LAZY IMAGE PERFORMANCE OPTIMIZATION
@@ -156,31 +154,76 @@ const print_action = (key) => document.write(action_str(key));
       });
     }
 
-    const navLinks = navigation ? [...navigation.querySelectorAll("a[href^='#']")] : [];
+    const navLinks = navigation ? [...navigation.querySelectorAll("a[href*='#']")] : [];
 
     // =========================================================================
-    // 3. HEADING ANCHOR LINKS
+    // 3. CHAPTER PARTITIONING ENGINE (MODERN MULTI-CHAPTER ARCHITECTURE)
     // =========================================================================
-    headings.forEach(heading => {
+    let paginationBar = document.querySelector(".pagination-bar");
+    if (!paginationBar) {
+      paginationBar = document.createElement("div");
+      paginationBar.className = "pagination-bar";
+      article.appendChild(paginationBar);
+    }
+
+    const topHeadings = [...article.querySelectorAll("h1[id]")];
+    const anchorToChapter = new Map();
+    const chapterMap = new Map();
+    const chapterList = [];
+
+    if (topHeadings.length > 1) {
+      topHeadings.forEach((h1) => {
+        const chapterSection = document.createElement("section");
+        chapterSection.className = "manual-chapter";
+        chapterSection.id = `chapter-${h1.id}`;
+        chapterSection.dataset.chapterId = h1.id;
+        chapterSection.dataset.chapterTitle = h1.textContent.replace(/^#\s*/, "").trim();
+
+        const nodes = [h1];
+        let next = h1.nextElementSibling;
+        while (next && next.tagName !== "H1" && !next.classList.contains("pagination-bar") && !next.classList.contains("manual-chapter")) {
+          const current = next;
+          next = next.nextElementSibling;
+          nodes.push(current);
+        }
+
+        nodes.forEach(node => chapterSection.appendChild(node));
+        chapterMap.set(h1.id, chapterSection);
+        chapterList.push({ id: h1.id, title: chapterSection.dataset.chapterTitle, section: chapterSection, h1: h1 });
+      });
+
+      // Insert all chapters before paginationBar
+      chapterList.forEach(item => {
+        article.insertBefore(item.section, paginationBar);
+        item.section.querySelectorAll("[id]").forEach(el => {
+          anchorToChapter.set(el.id, item.id);
+        });
+      });
+    } else if (topHeadings.length === 1) {
+      const h1 = topHeadings[0];
+      chapterMap.set(h1.id, article);
+      chapterList.push({ id: h1.id, title: h1.textContent.replace(/^#\s*/, "").trim(), section: article, h1: h1 });
+      article.querySelectorAll("[id]").forEach(el => {
+        anchorToChapter.set(el.id, h1.id);
+      });
+    }
+
+    // =========================================================================
+    // 4. HEADING ANCHOR LINKS (#) & COPY TO CLIPBOARD
+    // =========================================================================
+    const allHeadings = [...article.querySelectorAll("h1[id], h2[id], h3[id]")];
+    allHeadings.forEach(heading => {
       if (!heading.id) return;
       const anchor = document.createElement("a");
       anchor.className = "header-anchor";
       anchor.href = `#${heading.id}`;
       anchor.setAttribute("aria-label", "Direct link to heading");
       anchor.textContent = "#";
-      anchor.addEventListener("click", (e) => {
-        e.preventDefault();
-        history.pushState(null, "", `#${heading.id}`);
-        heading.scrollIntoView({ behavior: "smooth", block: "start" });
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(window.location.href);
-        }
-      });
       heading.prepend(anchor);
     });
 
     // =========================================================================
-    // 4. INTERACTIVE CODE COPY BUTTONS WITH SVG ICONS
+    // 5. INTERACTIVE CODE COPY BUTTONS WITH SVG ICONS
     // =========================================================================
     const copySvg = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
     const checkSvg = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
@@ -210,7 +253,7 @@ const print_action = (key) => document.write(action_str(key));
     });
 
     // =========================================================================
-    // 5. INTERACTIVE MULTI-ENGINE TAB SWITCHERS
+    // 6. INTERACTIVE MULTI-ENGINE TAB SWITCHERS
     // =========================================================================
     document.querySelectorAll(".tab-box").forEach(box => {
       const btns = box.querySelectorAll(".tab-btn");
@@ -226,80 +269,191 @@ const print_action = (key) => document.write(action_str(key));
     });
 
     // =========================================================================
-    // 6. BOTTOM PREV / NEXT CHAPTER DUAL-CARD PAGINATION
+    // 7. CHAPTER ACTIVATION & ROUTING CONTROLLER
     // =========================================================================
-    let paginationBar = document.querySelector(".pagination-bar");
-    if (!paginationBar) {
-      paginationBar = document.createElement("div");
-      paginationBar.className = "pagination-bar";
-      article.appendChild(paginationBar);
-    }
+    let currentActiveChapterId = null;
+    let inChapterObserver = null;
 
-    const updatePagination = (currentH1) => {
+    const updateAlternateLanguageLinks = (targetHash) => {
+      const hash = targetHash ? `#${targetHash.replace(/^#/, "")}` : location.hash;
+      document.querySelectorAll(".language-switcher a:not([aria-current])").forEach((link) => {
+        const baseHref = link.getAttribute("href").split("#")[0];
+        link.href = `${baseHref}${hash}`;
+      });
+    };
+
+    const updatePagination = (chapterIndex) => {
       paginationBar.replaceChildren();
-      if (!currentH1) return;
-      const idx = topHeadings.indexOf(currentH1);
-      if (idx === -1) return;
+      if (chapterIndex < 0 || chapterIndex >= chapterList.length) return;
 
-      const prevH1 = idx > 0 ? topHeadings[idx - 1] : null;
-      const nextH1 = idx < topHeadings.length - 1 ? topHeadings[idx + 1] : null;
+      const prevItem = chapterIndex > 0 ? chapterList[chapterIndex - 1] : null;
+      const nextItem = chapterIndex < chapterList.length - 1 ? chapterList[chapterIndex + 1] : null;
 
-      if (prevH1) {
+      if (prevItem) {
         const prevCard = document.createElement("a");
         prevCard.className = "pag-card prev";
-        prevCard.href = `#${prevH1.id}`;
-        prevCard.innerHTML = `<span class="pag-label">${isZh ? "⬅️ 上一章" : "⬅️ PREVIOUS"}</span><span class="pag-title">${escapeShortcutText(prevH1.textContent.replace(/^#\s*/, "").trim())}</span>`;
+        prevCard.href = `#${prevItem.id}`;
+        prevCard.innerHTML = `<span class="pag-label">${isZh ? "⬅️ 上一章" : "⬅️ PREVIOUS"}</span><span class="pag-title">${escapeShortcutText(prevItem.title)}</span>`;
+        prevCard.addEventListener("click", (e) => {
+          e.preventDefault();
+          activateChapter(prevItem.id, prevItem.id, true);
+        });
         paginationBar.appendChild(prevCard);
       } else {
         const placeholder = document.createElement("div");
         paginationBar.appendChild(placeholder);
       }
 
-      if (nextH1) {
+      if (nextItem) {
         const nextCard = document.createElement("a");
         nextCard.className = "pag-card next";
-        nextCard.href = `#${nextH1.id}`;
-        nextCard.innerHTML = `<span class="pag-label">${isZh ? "下一章 ➡️" : "NEXT ➡️"}</span><span class="pag-title">${escapeShortcutText(nextH1.textContent.replace(/^#\s*/, "").trim())}</span>`;
+        nextCard.href = `#${nextItem.id}`;
+        nextCard.innerHTML = `<span class="pag-label">${isZh ? "下一章 ➡️" : "NEXT ➡️"}</span><span class="pag-title">${escapeShortcutText(nextItem.title)}</span>`;
+        nextCard.addEventListener("click", (e) => {
+          e.preventDefault();
+          activateChapter(nextItem.id, nextItem.id, true);
+        });
         paginationBar.appendChild(nextCard);
       }
     };
 
-    // =========================================================================
-    // 7. BACK TO TOP BUTTON LOGIC
-    // =========================================================================
-    if (backToTopBtn) {
-      let scrollTimer = null;
-      window.addEventListener("scroll", () => {
-        if (scrollTimer) return;
-        scrollTimer = setTimeout(() => {
-          scrollTimer = null;
-          if (window.scrollY > 300) {
-            backToTopBtn.removeAttribute("hidden");
-          } else {
-            backToTopBtn.setAttribute("hidden", "");
-          }
-        }, 100);
-      }, { passive: true });
+    const renderPageNavigation = (chapterSection, activeHeadingId) => {
+      if (!pageNavigation) return;
+      pageNavigation.replaceChildren();
+      if (!chapterSection) return;
 
-      backToTopBtn.addEventListener("click", () => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+      const subHeadings = [...chapterSection.querySelectorAll("h2[id], h3[id]")];
+      subHeadings.forEach((heading) => {
+        const link = document.createElement("a");
+        link.href = `#${heading.id}`;
+        link.textContent = heading.textContent.replace(/^#\s*/, "").trim();
+        link.className = heading.tagName === "H3" ? "depth-3" : "depth-2";
+        if (heading.id === activeHeadingId) {
+          link.classList.add("active");
+        }
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          history.pushState(null, "", `#${heading.id}`);
+          updateAlternateLanguageLinks(heading.id);
+          heading.scrollIntoView({ behavior: "smooth", block: "start" });
+          [...pageNavigation.querySelectorAll("a")].forEach((a) => a.classList.toggle("active", a === link));
+        });
+        pageNavigation.append(link);
       });
-    }
+
+      // Observe sub-headings for scrolling within the chapter
+      if (inChapterObserver) inChapterObserver.disconnect();
+      if (subHeadings.length > 0) {
+        const headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--header-height"), 10) || 54;
+        inChapterObserver = new IntersectionObserver((entries) => {
+          const visible = entries.filter((entry) => entry.isIntersecting)
+            .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+          if (visible.length > 0) {
+            const activeId = visible[0].target.id;
+            [...pageNavigation.querySelectorAll("a")].forEach((a) => {
+              a.classList.toggle("active", a.hash === `#${activeId}`);
+            });
+          }
+        }, { rootMargin: `-${headerHeight + 10}px 0px -70% 0px` });
+        subHeadings.forEach(sh => inChapterObserver.observe(sh));
+      }
+    };
+
+    const activateChapter = (targetChapterId, targetAnchorId = null, shouldScroll = true) => {
+      let chapterIndex = chapterList.findIndex(c => c.id === targetChapterId);
+      if (chapterIndex === -1) {
+        chapterIndex = 0;
+        targetChapterId = chapterList[0]?.id || "";
+      }
+      const activeItem = chapterList[chapterIndex];
+      if (!activeItem) return;
+
+      currentActiveChapterId = targetChapterId;
+
+      // 1. Toggle chapter visibility
+      chapterList.forEach((item, idx) => {
+        if (idx === chapterIndex) {
+          item.section.classList.add("active");
+        } else {
+          item.section.classList.remove("active");
+        }
+      });
+
+      // 2. Update breadcrumbs
+      if (currentSectionLabel) {
+        currentSectionLabel.textContent = activeItem.title;
+      }
+
+      // 3. Update right TOC & bottom pagination
+      renderPageNavigation(activeItem.section, targetAnchorId);
+      updatePagination(chapterIndex);
+
+      // 4. Update left sidebar active links
+      const anchorToMatch = targetAnchorId || targetChapterId;
+      navLinks.forEach(link => {
+        const linkHash = link.hash ? link.hash.replace(/^#/, "") : "";
+        link.classList.toggle("active", linkHash === anchorToMatch || linkHash === targetChapterId);
+      });
+
+      // 5. Update URL state and Language switchers
+      const finalHash = targetAnchorId || targetChapterId;
+      history.replaceState(null, "", `#${finalHash}`);
+      updateAlternateLanguageLinks(finalHash);
+
+      // 6. Handle Scrolling
+      if (shouldScroll) {
+        if (targetAnchorId && targetAnchorId !== targetChapterId) {
+          const targetEl = document.getElementById(targetAnchorId);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        } else {
+          window.scrollTo({ top: 0, behavior: "instant" });
+        }
+      }
+    };
 
     // =========================================================================
-    // 8. HIGH-PERFORMANCE ON-DEMAND LAZY SEARCH SYSTEM
+    // 8. GLOBAL LINK CLICK INTERCEPTION (ZERO-LAG CHAPTER ROUTING)
+    // =========================================================================
+    document.addEventListener("click", (e) => {
+      const link = e.target.closest("a");
+      if (!link) return;
+
+      const href = link.getAttribute("href");
+      if (!href || !href.includes("#")) return;
+
+      // If external link or language switcher or theme button, skip
+      if (link.closest(".language-switcher") || link.closest(".theme-toggle") || link.target === "_blank") return;
+
+      const hashMatch = href.match(/#([a-zA-Z0-9_\-]+)/);
+      if (hashMatch) {
+        const anchorId = hashMatch[1];
+        const destChapterId = anchorToChapter.get(anchorId) || (chapterMap.has(anchorId) ? anchorId : null);
+        if (destChapterId) {
+          e.preventDefault();
+          activateChapter(destChapterId, anchorId, true);
+          if (navigation && navigation.classList.contains("open")) {
+            navigation.classList.remove("open");
+            if (navScrim) navScrim.hidden = true;
+          }
+        }
+      }
+    });
+
+    // =========================================================================
+    // 9. HIGH-PERFORMANCE LAZY SEARCH SYSTEM
     // =========================================================================
     let searchIndex = null;
     const ensureSearchIndex = () => {
       if (searchIndex !== null) return;
-      searchIndex = headings.map((heading) => ({
+      searchIndex = allHeadings.map((heading) => ({
         id: heading.id,
         title: heading.textContent.replace(/^#\s*/, "").trim(),
         text: sectionText(heading),
       }));
     };
 
-    // Idle pre-warm search index when browser has spare cycles
     if ("requestIdleCallback" in window) {
       requestIdleCallback(ensureSearchIndex, { timeout: 3000 });
     } else {
@@ -335,12 +489,8 @@ const print_action = (key) => document.write(action_str(key));
     const openSection = (id) => {
       closeSearch();
       if (searchInput) searchInput.blur();
-      history.pushState(null, "", `#${id}`);
-      const heading = document.getElementById(id);
-      if (heading) {
-        heading.scrollIntoView({ behavior: "smooth", block: "start" });
-        heading.focus({ preventScroll: true });
-      }
+      const destChapterId = anchorToChapter.get(id) || id;
+      activateChapter(destChapterId, id, true);
     };
 
     const renderSearchResults = () => {
@@ -438,7 +588,7 @@ const print_action = (key) => document.write(action_str(key));
     });
 
     // =========================================================================
-    // 9. NAVIGATION DRAWER & THEMES
+    // 10. NAVIGATION DRAWER & THEMES
     // =========================================================================
     if (navigation && navToggle && navScrim) {
       const setNavigationOpen = (open) => {
@@ -448,7 +598,6 @@ const print_action = (key) => document.write(action_str(key));
       };
       navToggle.addEventListener("click", () => setNavigationOpen(!navigation.classList.contains("open")));
       navScrim.addEventListener("click", () => setNavigationOpen(false));
-      navLinks.forEach((link) => link.addEventListener("click", () => setNavigationOpen(false)));
     }
 
     if (themeToggle) {
@@ -463,82 +612,50 @@ const print_action = (key) => document.write(action_str(key));
       });
     }
 
-    const updateAlternateLanguageLinks = () => {
-      document.querySelectorAll(".language-switcher a:not([aria-current])").forEach((link) => {
-        const baseHref = link.getAttribute("href").split("#")[0];
-        link.href = `${baseHref}${location.hash}`;
+    // =========================================================================
+    // 11. BACK TO TOP BUTTON LOGIC
+    // =========================================================================
+    if (backToTopBtn) {
+      let scrollTimer = null;
+      window.addEventListener("scroll", () => {
+        if (scrollTimer) return;
+        scrollTimer = setTimeout(() => {
+          scrollTimer = null;
+          if (window.scrollY > 300) {
+            backToTopBtn.removeAttribute("hidden");
+          } else {
+            backToTopBtn.setAttribute("hidden", "");
+          }
+        }, 100);
+      }, { passive: true });
+
+      backToTopBtn.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
       });
-    };
-    window.addEventListener("hashchange", updateAlternateLanguageLinks);
-    updateAlternateLanguageLinks();
-
-    const topLevelFor = (heading) => {
-      let current = heading;
-      while (current && current.tagName !== "H1") {
-        current = current.previousElementSibling;
-      }
-      return current;
-    };
-
-    const renderPageNavigation = (topLevelHeading) => {
-      if (!pageNavigation) return;
-      pageNavigation.replaceChildren();
-      if (!topLevelHeading) {
-        return;
-      }
-      if (currentSectionLabel) {
-        currentSectionLabel.textContent = topLevelHeading.textContent.replace(/^#\s*/, "").trim();
-      }
-      let current = topLevelHeading.nextElementSibling;
-      while (current && current.tagName !== "H1") {
-        if ((current.tagName === "H2" || current.tagName === "H3") && current.id) {
-          const link = document.createElement("a");
-          link.href = `#${current.id}`;
-          link.textContent = current.textContent.replace(/^#\s*/, "").trim();
-          link.className = current.tagName === "H3" ? "depth-3" : "depth-2";
-          link.addEventListener("click", (e) => {
-            e.preventDefault();
-            const targetEl = document.getElementById(current.id);
-            if (targetEl) {
-              history.pushState(null, "", `#${current.id}`);
-              targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
-            }
-          });
-          pageNavigation.append(link);
-        }
-        current = current.nextElementSibling;
-      }
-    };
-
-    const setActiveHeading = (heading) => {
-      navLinks.forEach((link) => link.classList.toggle("active", link.hash === `#${heading.id}`));
-      const topLevel = topLevelFor(heading);
-      if (pageNavigation && pageNavigation.dataset.section !== topLevel?.id) {
-        pageNavigation.dataset.section = topLevel?.id || "";
-        renderPageNavigation(topLevel);
-        updatePagination(topLevel);
-      }
-      if (pageNavigation) {
-        [...pageNavigation.querySelectorAll("a")].forEach((link) => {
-          link.classList.toggle("active", link.hash === `#${heading.id}`);
-        });
-      }
-    };
-
-    headings.forEach((heading) => heading.tabIndex = -1);
-    const headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--header-height"), 10) || 54;
-    const observer = new IntersectionObserver((entries) => {
-      const visible = entries.filter((entry) => entry.isIntersecting)
-        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-      if (visible.length > 0) {
-        setActiveHeading(visible[0].target);
-      }
-    }, { rootMargin: `-${headerHeight + 10}px 0px -70% 0px` });
-    headings.forEach((heading) => observer.observe(heading));
-
-    const initialHeading = location.hash ? document.getElementById(location.hash.slice(1)) : headings[0];
-    if (initialHeading) {
-      setActiveHeading(initialHeading);
     }
+
+    // =========================================================================
+    // 12. INITIALIZATION ROUTING (FROM HASH OR DEFAULT FIRST CHAPTER)
+    // =========================================================================
+    const initialHash = location.hash ? location.hash.replace(/^#/, "") : "";
+    let initChapterId = chapterList[0]?.id || "";
+    if (initialHash) {
+      const foundChapter = anchorToChapter.get(initialHash) || (chapterMap.has(initialHash) ? initialHash : null);
+      if (foundChapter) {
+        initChapterId = foundChapter;
+      }
+    }
+
+    activateChapter(initChapterId, initialHash, Boolean(initialHash && initialHash !== initChapterId));
+
+    window.addEventListener("hashchange", () => {
+      const newHash = location.hash ? location.hash.replace(/^#/, "") : "";
+      if (newHash) {
+        const targetChapter = anchorToChapter.get(newHash) || (chapterMap.has(newHash) ? newHash : null);
+        if (targetChapter && targetChapter !== currentActiveChapterId) {
+          activateChapter(targetChapter, newHash, true);
+        }
+      }
+    });
   });
 })();
