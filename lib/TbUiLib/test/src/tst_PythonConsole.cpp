@@ -131,6 +131,43 @@ TEST_CASE("PythonConsole")
   CHECK(output->font() == input->font());
   CHECK(output->document()->defaultFont() == input->font());
   setPref(Preferences::PythonConsoleFontFamily, previousFontFamily);
+
+  REQUIRE(console.completer() != nullptr);
+
+  // Test dot completion context extraction and insertion
+  input->setPlainText(QStringLiteral("doc.sele"));
+  auto cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  const auto [base1, prefix1] = console.completionContextUnderCursor();
+  CHECK(base1 == QStringLiteral("doc"));
+  CHECK(prefix1 == QStringLiteral("sele"));
+  console.updateCompleter(true);
+  console.insertCompletion(QStringLiteral("selection"));
+  CHECK(input->toPlainText() == QStringLiteral("doc.selection"));
+
+  // Test global shortcut context extraction and insertion
+  input->setPlainText(QStringLiteral("sel.tra"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  const auto [base2, prefix2] = console.completionContextUnderCursor();
+  CHECK(base2 == QStringLiteral("sel"));
+  CHECK(prefix2 == QStringLiteral("tra"));
+  console.updateCompleter(true);
+  console.insertCompletion(QStringLiteral("translate"));
+  CHECK(input->toPlainText() == QStringLiteral("sel.translate"));
+
+  input->setPlainText(QStringLiteral("selected_b"));
+  cursor = input->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  input->setTextCursor(cursor);
+  const auto [base3, prefix3] = console.completionContextUnderCursor();
+  CHECK(base3.isEmpty());
+  CHECK(prefix3 == QStringLiteral("selected_b"));
+  console.updateCompleter(true);
+  console.insertCompletion(QStringLiteral("selected_brushes"));
+  CHECK(input->toPlainText() == QStringLiteral("selected_brushes"));
 }
 
 } // namespace tb::ui

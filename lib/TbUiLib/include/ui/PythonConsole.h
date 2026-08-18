@@ -26,10 +26,12 @@
 #include <string>
 #include <vector>
 
+class QCompleter;
 class QEvent;
 class QLabel;
 class QPlainTextEdit;
 class QSplitter;
+class QStringListModel;
 class QToolButton;
 class QWidget;
 
@@ -44,6 +46,8 @@ private:
   QLabel* m_prompt = nullptr;
   QToolButton* m_runButton = nullptr;
   QToolButton* m_clearButton = nullptr;
+  QCompleter* m_completer = nullptr;
+  QStringListModel* m_completionModel = nullptr;
   std::function<void(const std::string&)> m_commandExecutor;
   std::vector<std::string> m_history;
   size_t m_historyIndex = 0u;
@@ -57,8 +61,14 @@ public:
   void setCommandExecutor(std::function<void(const std::string&)> executor);
   void executeCurrentInput();
 
+  QCompleter* completer() const;
+  void updateCompleter(bool explicitTrigger = true);
+  void insertCompletion(const QString& completion);
+  std::pair<QString, QString> completionContextUnderCursor() const;
+
 private:
   bool eventFilter(QObject* watched, QEvent* event) override;
+  void setupCompleter();
   void updateFont();
   void updateRunButtonEnabled();
   void showPreviousHistoryEntry();

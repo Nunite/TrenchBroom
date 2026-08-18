@@ -33,6 +33,7 @@
 ### 快捷键与历史记录 {#console_shortcuts_and_history}
 
 - **执行脚本**：按 #key(Ctrl)+#key(Return) 或点击 **Run** 按钮即可立即执行编辑器中的脚本。
+- **代码智能补全**：按 #key(Ctrl)+#key(Space) 或 #key(Tab) 可主动呼出补全浮窗；按 #key(Tab) 或 #key(Return) 确认插入选中的补全项。
 - **历史记录翻阅**：在编辑器首行按 #key(Up) 或在尾行按 #key(Down) 可快速翻阅历史脚本（最多 100 条）。若当前输入框中有未提交的代码，翻阅历史时会自动暂存为草稿。
 - **清除输出**：点击顶部的 **Clear** 按钮可清空所有日志。
 - **外观字体设置**：可在 **Preferences > View > Fonts > Python Console** 下自定义控制台的等宽字体系列和字号大小。
