@@ -573,10 +573,10 @@ html:not([data-theme="dark"]) .theme-icon-moon {
 }
 
 .manual-category-caption {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.6px;
   color: var(--text-muted);
   margin: 22px 0 6px 8px;
   display: flex;
@@ -607,20 +607,20 @@ html:not([data-theme="dark"]) .theme-icon-moon {
 }
 
 .manual-navigation-scroll > ul > li {
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .manual-navigation-scroll a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 7px 12px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
   transition: all var(--transition-fast);
 }
 
@@ -640,14 +640,15 @@ html:not([data-theme="dark"]) .theme-icon-moon {
 
 .manual-navigation-scroll ul ul {
   padding-left: 10px;
-  margin: 2px 0 4px 6px;
+  margin: 2px 0 5px 6px;
   border-left: 1px solid var(--border-subtle);
 }
 
 .manual-navigation-scroll ul ul a {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-muted);
-  padding: 4px 8px;
+  padding: 5px 10px;
+  font-weight: 500;
 }
 
 .manual-navigation-scroll ul ul a:hover {
@@ -659,7 +660,7 @@ html:not([data-theme="dark"]) .theme-icon-moon {
   background: var(--brand-primary-soft);
   font-weight: 700;
   border-left: 2px solid var(--brand-primary);
-  padding-left: 8px;
+  padding-left: 10px;
 }
 
 /* CENTER ARTICLE CONTENT */
@@ -703,7 +704,7 @@ html:not([data-theme="dark"]) .theme-icon-moon {
 }
 
 .page-navigation-title {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.7px;
@@ -722,10 +723,10 @@ html:not([data-theme="dark"]) .theme-icon-moon {
 }
 
 #page-navigation-links a {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-muted);
   text-decoration: none;
-  padding: 4px 0 4px 12px;
+  padding: 5px 0 5px 12px;
   margin-left: -1px;
   border-left: 2px solid transparent;
   line-height: 1.45;
@@ -734,7 +735,7 @@ html:not([data-theme="dark"]) .theme-icon-moon {
 
 #page-navigation-links a.depth-3 {
   padding-left: 20px;
-  font-size: 12px;
+  font-size: 12.5px;
   opacity: 0.85;
 }
 
