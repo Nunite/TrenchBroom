@@ -71,6 +71,8 @@ const print_action = (key) => document.write(action_str(key));
     const body = document.body;
     const isZh = document.documentElement.lang.startsWith("zh");
     const article = document.getElementById("manual-article");
+    if (!article) return;
+
     const searchInput = document.getElementById("manual-search-input");
     const searchResults = document.getElementById("manual-search-results");
     const navigation = document.getElementById("manual-navigation");
@@ -84,7 +86,15 @@ const print_action = (key) => document.write(action_str(key));
     const topHeadings = [...article.querySelectorAll("h1[id]")];
 
     // =========================================================================
-    // 1. INJECT BLENDER/VITEPRESS CATEGORY CAPTIONS INTO SIDEBAR TOC
+    // 1. LAZY IMAGE PERFORMANCE OPTIMIZATION
+    // =========================================================================
+    article.querySelectorAll("img").forEach(img => {
+      if (!img.getAttribute("loading")) img.setAttribute("loading", "lazy");
+      if (!img.getAttribute("decoding")) img.setAttribute("decoding", "async");
+    });
+
+    // =========================================================================
+    // 2. INJECT CATEGORY CAPTIONS INTO SIDEBAR TOC
     // =========================================================================
     const topUl = navigation ? navigation.querySelector(".manual-navigation-scroll > ul") : null;
     if (topUl) {
@@ -149,7 +159,7 @@ const print_action = (key) => document.write(action_str(key));
     const navLinks = navigation ? [...navigation.querySelectorAll("a[href^='#']")] : [];
 
     // =========================================================================
-    // 2. HEADING ANCHOR LINKS (CLICK TO COPY SECTION URL)
+    // 3. HEADING ANCHOR LINKS
     // =========================================================================
     headings.forEach(heading => {
       if (!heading.id) return;
@@ -170,7 +180,7 @@ const print_action = (key) => document.write(action_str(key));
     });
 
     // =========================================================================
-    // 3. INTERACTIVE CODE COPY BUTTONS WITH SVG ICONS
+    // 4. INTERACTIVE CODE COPY BUTTONS WITH SVG ICONS
     // =========================================================================
     const copySvg = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
     const checkSvg = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
@@ -200,7 +210,7 @@ const print_action = (key) => document.write(action_str(key));
     });
 
     // =========================================================================
-    // 4. INTERACTIVE MULTI-ENGINE TAB SWITCHERS
+    // 5. INTERACTIVE MULTI-ENGINE TAB SWITCHERS
     // =========================================================================
     document.querySelectorAll(".tab-box").forEach(box => {
       const btns = box.querySelectorAll(".tab-btn");
@@ -216,7 +226,7 @@ const print_action = (key) => document.write(action_str(key));
     });
 
     // =========================================================================
-    // 5. BOTTOM PREV / NEXT CHAPTER DUAL-CARD PAGINATION
+    // 6. BOTTOM PREV / NEXT CHAPTER DUAL-CARD PAGINATION
     // =========================================================================
     let paginationBar = document.querySelector(".pagination-bar");
     if (!paginationBar) {
@@ -255,15 +265,20 @@ const print_action = (key) => document.write(action_str(key));
     };
 
     // =========================================================================
-    // 6. BACK TO TOP BUTTON LOGIC
+    // 7. BACK TO TOP BUTTON LOGIC
     // =========================================================================
     if (backToTopBtn) {
+      let scrollTimer = null;
       window.addEventListener("scroll", () => {
-        if (window.scrollY > 300) {
-          backToTopBtn.removeAttribute("hidden");
-        } else {
-          backToTopBtn.setAttribute("hidden", "");
-        }
+        if (scrollTimer) return;
+        scrollTimer = setTimeout(() => {
+          scrollTimer = null;
+          if (window.scrollY > 300) {
+            backToTopBtn.removeAttribute("hidden");
+          } else {
+            backToTopBtn.setAttribute("hidden", "");
+          }
+        }, 100);
       }, { passive: true });
 
       backToTopBtn.addEventListener("click", () => {
@@ -272,13 +287,25 @@ const print_action = (key) => document.write(action_str(key));
     }
 
     // =========================================================================
-    // 7. SEARCH SYSTEM
+    // 8. HIGH-PERFORMANCE ON-DEMAND LAZY SEARCH SYSTEM
     // =========================================================================
-    const searchIndex = headings.map((heading) => ({
-      id: heading.id,
-      title: heading.textContent.replace(/^#\s*/, "").trim(),
-      text: sectionText(heading),
-    }));
+    let searchIndex = null;
+    const ensureSearchIndex = () => {
+      if (searchIndex !== null) return;
+      searchIndex = headings.map((heading) => ({
+        id: heading.id,
+        title: heading.textContent.replace(/^#\s*/, "").trim(),
+        text: sectionText(heading),
+      }));
+    };
+
+    // Idle pre-warm search index when browser has spare cycles
+    if ("requestIdleCallback" in window) {
+      requestIdleCallback(ensureSearchIndex, { timeout: 3000 });
+    } else {
+      setTimeout(ensureSearchIndex, 1000);
+    }
+
     let activeResult = -1;
 
     const closeSearch = () => {
@@ -311,13 +338,15 @@ const print_action = (key) => document.write(action_str(key));
       history.pushState(null, "", `#${id}`);
       const heading = document.getElementById(id);
       if (heading) {
-        heading.scrollIntoView({ block: "start" });
+        heading.scrollIntoView({ behavior: "smooth", block: "start" });
         heading.focus({ preventScroll: true });
       }
     };
 
     const renderSearchResults = () => {
       if (!searchInput || !searchResults) return;
+      ensureSearchIndex();
+
       const query = normalize(searchInput.value);
       searchResults.replaceChildren();
       activeResult = -1;
@@ -369,6 +398,7 @@ const print_action = (key) => document.write(action_str(key));
     };
 
     if (searchInput) {
+      searchInput.addEventListener("focus", ensureSearchIndex);
       searchInput.addEventListener("input", renderSearchResults);
       searchInput.addEventListener("keydown", (event) => {
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -392,6 +422,7 @@ const print_action = (key) => document.write(action_str(key));
       if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "k") {
         event.preventDefault();
         if (searchInput) {
+          ensureSearchIndex();
           searchInput.focus();
           searchInput.select();
         }
@@ -407,7 +438,7 @@ const print_action = (key) => document.write(action_str(key));
     });
 
     // =========================================================================
-    // 8. NAVIGATION DRAWER & THEMES
+    // 9. NAVIGATION DRAWER & THEMES
     // =========================================================================
     if (navigation && navToggle && navScrim) {
       const setNavigationOpen = (open) => {
@@ -420,17 +451,15 @@ const print_action = (key) => document.write(action_str(key));
       navLinks.forEach((link) => link.addEventListener("click", () => setNavigationOpen(false)));
     }
 
-    const storedTheme = localStorage.getItem("tb-manual-theme");
-    if (storedTheme === "light" || storedTheme === "dark") {
-      document.documentElement.dataset.theme = storedTheme;
-    }
     if (themeToggle) {
       themeToggle.addEventListener("click", () => {
-        const effectiveDark = document.documentElement.dataset.theme === "dark"
-          || (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
-        const nextTheme = effectiveDark ? "light" : "dark";
+        const currentTheme = document.documentElement.dataset.theme ||
+          (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        const nextTheme = currentTheme === "dark" ? "light" : "dark";
         document.documentElement.dataset.theme = nextTheme;
-        localStorage.setItem("tb-manual-theme", nextTheme);
+        try {
+          localStorage.setItem("tb-manual-theme", nextTheme);
+        } catch (e) {}
       });
     }
 
@@ -467,6 +496,14 @@ const print_action = (key) => document.write(action_str(key));
           link.href = `#${current.id}`;
           link.textContent = current.textContent.replace(/^#\s*/, "").trim();
           link.className = current.tagName === "H3" ? "depth-3" : "depth-2";
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            const targetEl = document.getElementById(current.id);
+            if (targetEl) {
+              history.pushState(null, "", `#${current.id}`);
+              targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
           pageNavigation.append(link);
         }
         current = current.nextElementSibling;
