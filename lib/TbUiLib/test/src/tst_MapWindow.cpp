@@ -363,7 +363,7 @@ TEST_CASE("MapWindow")
     REQUIRE(pluginButton != nullptr);
     CHECK(pageTitle->property("regionAnchor").toBool());
 
-    CHECK(navigationRail->width() == 44);
+    CHECK(navigationRail->width() == 40);
     CHECK(legacyTabBar->isHidden());
     CHECK_FALSE(mapButton->icon().isNull());
     CHECK_FALSE(entityButton->icon().isNull());

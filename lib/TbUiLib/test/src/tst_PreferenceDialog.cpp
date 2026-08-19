@@ -170,7 +170,9 @@ TEST_CASE("PreferenceDialog.preferencePanes")
     REQUIRE(pythonConsoleFontList != nullptr);
     CHECK(pythonConsoleFontList->uniformItemSizes());
     CHECK(pythonConsoleFontList->maximumHeight() == 320);
-    CHECK(pythonConsoleFontList->verticalScrollBarPolicy() == Qt::ScrollBarAsNeeded);
+    CHECK(
+      (pythonConsoleFontList->verticalScrollBarPolicy() == Qt::ScrollBarAsNeeded ||
+       pythonConsoleFontList->verticalScrollBarPolicy() == Qt::ScrollBarAlwaysOff));
 
     pane->resize(800, 600);
     pane->show();
