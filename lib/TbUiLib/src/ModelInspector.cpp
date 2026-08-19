@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2026
+ Copyright (C) 2026 XiangXtreme
 
  This file is part of TrenchBroom.
  
