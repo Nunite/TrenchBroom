@@ -42,7 +42,7 @@ UNRESOLVED_RE = re.compile(r"__TB_[A-Z0-9_]+__|\$[A-Za-z][A-Za-z0-9_-]*\$")
 
 
 def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def extract_code_blocks(text: str) -> tuple[str, ...]:
