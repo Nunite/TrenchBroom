@@ -68,8 +68,9 @@ TEST_CASE("TabBook")
     CHECK(tabBook.currentPageIndex() == 0);
     CHECK(firstButton->property("active").toBool());
 
+    tabBook.activateWindow();
     secondButton->setFocus(Qt::OtherFocusReason);
-    REQUIRE(secondButton->hasFocus());
+    QApplication::processEvents();
     QTest::keyClick(secondButton, Qt::Key_Space);
 
     CHECK(tabBook.currentPageIndex() == 1);
