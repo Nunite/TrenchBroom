@@ -250,9 +250,17 @@ void KeyStrings::putKey(const Qt::Key key)
 {
   const auto keySequence = QKeySequence{key};
 
-  m_keys.emplace_back(
-    keySequence.toString(QKeySequence::PortableText),
-    keySequence.toString(QKeySequence::NativeText));
+  auto portableLabel = keySequence.toString(QKeySequence::PortableText);
+  auto nativeLabel = keySequence.toString(QKeySequence::NativeText);
+
+#ifndef Q_OS_MACOS
+  if (key == Qt::Key_Return)
+  {
+    nativeLabel = QStringLiteral("Enter");
+  }
+#endif
+
+  m_keys.emplace_back(std::move(portableLabel), std::move(nativeLabel));
 }
 
 void KeyStrings::putModifier(int key)
