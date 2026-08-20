@@ -6,16 +6,16 @@
     "00-introduction.md": "8e35dd61ca31749e8aed6a93b92d99ea6c028465642d7d81fd9f9c439c32d576",
     "01-getting-started.md": "b9fdc399d83a052587b1e88fe2157b29f2f97aa2db0166def417bb719570d455",
     "02-interface-and-tools.md": "9a85d16994160af19ea9aa6f9dc05ea174197bc9c334cec57deb01dbc56f6b0c",
-    "03-brush-editing.md": "07e1d3d20af92b86b116bd5eed1801f79e864a50d272bc0f1f98e0e2976d8648",
-    "04-vertex-and-csg.md": "194399adfefcbe230f8997eb9a2688996e45d02200818b3aa833ed993c1f0598",
+    "03-brush-editing.md": "f65bbe4810559cd1d0bb8041edfac1a817b8dcb5fd3d28b1fbc3f4471308495e",
+    "04-vertex-and-csg.md": "27752b4fa128305435b30acfc68da89b936cb87fc6416a6c1c1da077200d617f",
     "05-materials-and-uv.md": "24a31327dbeda77fdf9a442003ed74d19aa697eae71f087202fcbba5de83d960",
     "06-assets-and-prefabs.md": "dea13f58a0fa0205f61085171dc33adc4a7f2cdb64ef97ed7268d2c9a89dd88a",
-    "07-entities-and-organization.md": "72fba3995dc8e7b8c860d7e40c102ed6d90cff5c786275111dd6c9bbe4a44098",
+    "07-entities-and-organization.md": "1bb5d806d7f1f83d4b19c9cf6a615228574d2295089b11cfb217a2c38e7dc58f",
     "08-preferences-and-compilation.md": "849a00e5ec7635d854cceee47bc0f548e70b7f3c5334ea32eef2459660344364",
     "09-python-plugins-guide.md": "16d47fd935bcfa9be131ee874673afc9b24f3aec4a21ecefbff8d91563242158",
     "10-mcp-automation.md": "1a1f7aa73dd3375004cc1ff2a5df6fcabb3fd22ba0ea33db8795cc8a9cb27316",
-    "11-game-config-and-expressions.md": "985ea235f0063fcd6eccb5c30258d0e0ddaade813490a53e24ffc794fc2fe2ce",
-    "12-references.md": "fa5d25cb60f3e91f0be8c73e41837cc396c43a4b94a0010e1b9fcaf1254dac1d",
+    "11-game-config-and-expressions.md": "9d18217148fd2eaa99929f6c9eff260cb411dff57d0c1b9ef4c48c8e4fea8408",
+    "12-references.md": "2c33b7f9a3df24f410c488d5c00e4f418997495fc2953a831ed1ab69118dd11a",
     "python-api.md": "3cc2e572cec4ecf5b90059b8af24f867c9be921c4f811c86507eebb5b8514ae0"
   }
 }

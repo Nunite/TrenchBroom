@@ -890,7 +890,7 @@ surfaceparm  匹配着色器表面参数                     有                
 根据 `match` 键的值，需要额外的键来配置匹配器。
 
 * 对于 `classname` 匹配器，键 `pattern` 包含与包含该 Brush 的 Brush 实体的 classname 匹配的模式。允许使用通配符 `*` 和 `?`。使用反斜杠转义字面量 `*` 和 `?` 字符。
-    - Additionally, the `classname` matcher can contain an optional `material` key. When this tag is applied by the use of its keyboard shortcut, then the selected brushes will receive the material with the name given as the value of this key (e.g. `"material": "trigger"` will assign the `trigger` material).
+  - 此外，`classname` 匹配器还可以包含可选的 `material` 键。通过键盘快捷键应用该标签时，选中的 Brush 会获得以该键值命名的材质（例如，`"material": "trigger"` 会分配 `trigger` 材质）。
 * 对于 `material` 匹配器，键 `pattern` 包含与面的材质名称匹配的模式。如果模式*不*包含斜杠，则它仅与材质名称中最后一个斜杠（如果有）之后的段进行匹配。允许使用通配符 `*` 和 `?`。使用反斜杠转义字面量 `*` 和 `?` 字符。
 * 对于 `contentflag` 和 `surfaceflag` 匹配器，键 `flags` 包含要匹配的内容标志或表面标志名称列表（有关内容标志和表面标志的更多信息，请参见下文）。
 * 对于 `surfaceparm` 匹配器，键 `pattern` 包含与面的着色器表面参数匹配的名称。不允许使用通配符；参数名称必须完全匹配。在游戏配置格式的版本 4 中，你可以为此值指定一个 surfaceparm 名称*列表*，如果着色器具有这些 surfaceparm 中的任何一个，则将与着色器匹配。

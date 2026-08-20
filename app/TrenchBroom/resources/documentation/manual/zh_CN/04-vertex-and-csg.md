@@ -2,7 +2,7 @@
 
 ## 顶点编辑 {#vertex_editing}
 
-TrenchBroom 包含三个用于编辑 Brush 顶点的独立工具：用于编辑单个顶点的[顶点工具](#vertex_tool)、用于编辑单个边的[边工具](#edge_tool)以及用于编辑单个面的[面工具](#face_tool)。顶点工具是三者中功能最强大的，因为除了移动顶点之外，你还可以从 Brush 中添加和移除顶点。相反，边工具和面工具仅允许你移动面。
+TrenchBroom 包含三个用于编辑 Brush 几何体的独立工具：用于编辑单个顶点的[顶点工具](#vertex_tool)、用于编辑单条边的[边工具](#edge_tool)以及用于编辑单个面的[面工具](#face_tool)。顶点工具是三者中功能最强大的，因为除了移动顶点外，它还可以添加和移除顶点。相比之下，边工具和面工具只移动现有的边或面，不会添加或移除顶点。
 
 #### 顶点工具 {#vertex_tool}
 
@@ -34,18 +34,9 @@ TrenchBroom 包含三个用于编辑 Brush 顶点的独立工具：用于编辑�
 
 <br clear="all" />
 
-顶点工具还提供了一些用于移动顶点的键盘快捷键。下表列出了这些快捷键。
+顶点工具使用与[移动对象](#moving_objects)相同的键盘快捷键。每次按键都会按当前网格大小，在对应的 2D 或 3D 方向上移动选中的顶点。
 
-方向          快捷键 (2D)                                                              快捷键 (3D)
----------     -------------                                                            -------------
-左            #action(Controls/Map view/Move objects left)                             #action(Controls/Map view/Move objects left)
-右            #action(Controls/Map view/Move objects right)                            #action(Controls/Map view/Move objects right)
-上            #action(Controls/Map view/Move objects up; Move objects forward)         #action(Controls/Map view/Move objects backward; Move objects up)
-下            #action(Controls/Map view/Move objects down; Move objects backward)      #action(Controls/Map view/Move objects forward; Move objects down)
-前            #action(Controls/Map view/Move objects forward; Move objects down)       #action(Controls/Map view/Move objects up; Move objects forward)
-后            #action(Controls/Map view/Move objects backward; Move objects up)        #action(Controls/Map view/Move objects down; Move objects backward)
-
-除了移动顶点外，顶点工具还可以旋转、缩放和剪切顶点。要旋转顶点，请通过 #menu(Menu/Edit/Tools/Rotate Tool) 调出[旋转工具](#rotating_objects)，然后照常使用旋转手柄。要缩放它们，请使用 #menu(Menu/Edit/Tools/Scale Tool) 启用[缩放工具](#scaling_objects)，并使用 #menu(Menu/Edit/Tools/Shear Tool) 通过[剪切工具](#shearing_objects)对其进行剪切。
+除了移动顶点外，顶点工具还可以旋转、缩放和切变顶点。要旋转顶点，请通过 #menu(Menu/Edit/Tools/Rotate Tool) 调出[旋转工具](#rotating_objects)，然后照常使用旋转手柄。要缩放它们，请使用 #menu(Menu/Edit/Tools/Scale Tool) 启用[缩放工具](#scaling_objects)；要使其发生切变，请使用 #menu(Menu/Edit/Tools/Shear Tool) 启用[切变工具](#shearing_objects)。
 
 顶点工具的功能介绍到此结束。虽然它非常强大，但也应谨慎使用，因为顶点编辑有时会在地图中创建无效的 Brush 和微泄漏。为帮助你避免此类问题，下一节包含使用顶点工具时应牢记的一些最佳实践。
 

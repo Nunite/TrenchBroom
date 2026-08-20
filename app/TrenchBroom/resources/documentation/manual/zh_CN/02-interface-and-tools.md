@@ -97,22 +97,22 @@ TrenchBroom 的所有编辑功能都由工具提供。工具分为两类：永�
 实体拖拽工具          2D, 3D       永久          通过拖放创建实体
 调整大小工具          2D, 3D       永久*         拖动面调整 Brush 大小
 旋转工具              2D, 3D       模态          旋转对象
-扫掠工具              3D           模态          沿路径生成 Brush 序列
+路径放样工具          3D           模态          沿路径生成 Brush 序列
 缩放工具              2D, 3D       模态          缩放对象
-剪切工具              2D, 3D       模态          剪切对象
+切变工具              2D, 3D       模态          使对象沿平面切变
 裁剪工具              2D, 3D       模态          将 Brush 裁切为多块
 顶点工具              2D, 3D       模态          移动、添加和移除顶点
 路径工具              2D, 3D       模态          创建链接的 path_corner 实体
 
-标记为星号 (*) 的工具只有在没有其他模态工具激活时才可用。以下模态工具可通过快捷键或主菜单激活：
+标记为星号 (*) 的永久工具会在模态工具激活时停用。例如，顶点工具激活时无法创建长方体 Brush。同一时间最多只能激活一个模态工具。可以使用下表中的菜单项和键盘快捷键激活或停用模态工具：
 
 工具                  菜单
 ----                  -----------
 复杂形状工具          #menu(Menu/Edit/Tools/Brush Tool)
 旋转工具              #menu(Menu/Edit/Tools/Rotate Tool)
-扫掠工具              #menu(Menu/Edit/Tools/Sweep Tool)
+路径放样工具          #menu(Menu/Edit/Tools/Sweep Tool)
 缩放工具              #menu(Menu/Edit/Tools/Scale Tool)
-剪切工具              #menu(Menu/Edit/Tools/Shear Tool)
+切变工具              #menu(Menu/Edit/Tools/Shear Tool)
 裁剪工具              #menu(Menu/Edit/Tools/Clip Tool)
 顶点工具              #menu(Menu/Edit/Tools/Vertex Tool)
 路径工具              #menu(Menu/Edit/Tools/Path Tool)
@@ -155,7 +155,7 @@ TrenchBroom 的所有编辑功能都由工具提供。工具分为两类：永�
 -----                 ------
 复杂形状工具          丢弃所有已放置点；停用工具
 裁剪工具              丢弃最近放置的裁剪点；停用工具
-扫掠工具              将目标端盖移回选中面；停用工具
+路径放样工具          将目标端面移回选中面；停用工具
 顶点工具              丢弃当前顶点选择；停用工具
 选择工具              丢弃当前选择
 
@@ -239,6 +239,6 @@ Set CLASSNAME as Entity Template
 Apply Entity Template (CLASSNAME)
 :   为选中的每一个 Brush 分别克隆创建独立的模板实体，并将 Brush 归属（Reparent）至该实体中。
 
-## 2D 可读描边线 {#readable_outlines_2d}
+## 2D 清晰轮廓线 {#readable_outlines_2d}
 
 在密集复杂的地形或重叠结构中，2D 正交视口会自动为几何体绘制高对比度轮廓线，使得各个独立 Brush 在网格背景与相邻表面中依然清晰可辨。

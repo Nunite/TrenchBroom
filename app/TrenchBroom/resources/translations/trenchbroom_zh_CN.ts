@@ -102,19 +102,19 @@
     </message>
     <message>
         <source>Decrease Sweep Scale</source>
-        <translation>减小扫掠缩放</translation>
+        <translation>缩小目标截面</translation>
     </message>
     <message>
         <source>Increase Sweep Scale</source>
-        <translation>增大扫掠缩放</translation>
+        <translation>放大目标截面</translation>
     </message>
     <message>
         <source>Perform Sweep</source>
-        <translation>执行扫掠</translation>
+        <translation>执行路径放样</translation>
     </message>
     <message>
         <source>Sweep Tool</source>
-        <translation>扫掠工具</translation>
+        <translation>路径放样工具</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="75"/>
@@ -748,7 +748,7 @@
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1446"/>
         <source>Clip Tool</source>
-        <translation>剪切工具</translation>
+        <translation>裁剪工具</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1460"/>
@@ -763,7 +763,7 @@
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1488"/>
         <source>Shear Tool</source>
-        <translation>剪切工具</translation>
+        <translation>切变工具</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1502"/>
@@ -972,7 +972,7 @@
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1858"/>
         <source>Show Outliner Inspector</source>
-        <translation>显示大纲检查器</translation>
+        <translation>显示 Outliner 检查器</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/ActionManager.cpp" line="1868"/>
@@ -2411,11 +2411,11 @@ Hold %1 to cycle backwards.</source>
     </message>
     <message>
         <source>brush tool</source>
-        <translation>笔刷工具</translation>
+        <translation>Brush 工具</translation>
     </message>
     <message>
         <source>clip tool</source>
-        <translation>剪裁工具</translation>
+        <translation>裁剪工具</translation>
     </message>
     <message>
         <source>rotate tool</source>
@@ -2427,7 +2427,7 @@ Hold %1 to cycle backwards.</source>
     </message>
     <message>
         <source>shear tool</source>
-        <translation>倾斜工具</translation>
+        <translation>切变工具</translation>
     </message>
     <message>
         <source>path tool</source>
@@ -2443,7 +2443,7 @@ Hold %1 to cycle backwards.</source>
     </message>
     <message>
         <source>sweep tool</source>
-        <translation>扫掠工具</translation>
+        <translation>路径放样工具</translation>
     </message>
 </context>
 <context>
@@ -4059,7 +4059,7 @@ They may contain new features or bug fixes that are not yet part of a stable rel
     <message>
         <location filename="../../../../lib/TbUiLib/src/ViewEditor.cpp" line="514"/>
         <source>Restore Defaults</source>
-        <translation>恢复默认值</translation>
+        <translation>恢复默认设置</translation>
     </message>
 </context>
 <context>

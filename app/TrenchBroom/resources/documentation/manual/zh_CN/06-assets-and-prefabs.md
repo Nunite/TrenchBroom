@@ -1,6 +1,6 @@
 # 资产浏览器与预制体 {#assets_and_prefabs}
 
-## 统一资源浏览器 {#asset_browser}
+## 统一资产浏览器 {#asset_browser}
 
 底部信息面板中的 **Assets** 标签页提供了一个用于浏览游戏资源和可复用预制体的浏览器。对于已启用的 GoldSrc mod，它会显示 `models`、`sprites` 和 `sound` 根目录，以及用户 `prefabs` 根目录。浏览器可识别 `.mdl`、`.spr`、`.wav` 和 `.tbprefab` 文件。
 

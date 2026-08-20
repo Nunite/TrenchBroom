@@ -14,18 +14,20 @@
 - 手册源文件：`app/TrenchBroom/resources/documentation/manual/{en,zh_CN}`
 - 手册共用图片目录：`app/TrenchBroom/resources/documentation/manual/images`
 
-从 merge base 到当前 `main` 约有 800 个提交、661 个文件发生变化。已回滚的实验功能
+从 merge base 到首次盘点基线约有 800 个提交、661 个文件发生变化。已回滚的实验功能
 不作为当前功能列出；尚未合并的本地分支单独列出，不能提前写成当前版本已经支持的
 功能。
 
 ### 状态说明
 
-- **较完整**：已有可操作的文字说明和有效图片。
-- **简略**：已经提到该功能，但缺少完整步骤、状态说明或对应截图。
+- **较完整**：文字已覆盖主要工作流；截图状态由右侧列单独说明。
+- **简略**：已经提到该功能，但缺少完整步骤或关键状态说明。
 - **缺失**：手册中没有形成有效说明。
+- **已入册**：确定性截图已经加入中英文手册。
 - **可直接截图**：现有确定性 snapshot target 可以生成可用界面图。
 - **需要场景**：截图框架已经存在，但要补测试地图、资源或确定的 UI 状态。
 - **需要 target**：需要给 `UiSnapshotRunner` 新增专用截图入口。
+- **不适用**：该内容使用代码、JSON 或流程说明比 UI 截图更合适。
 
 ## 当前 `main` 功能清单
 
@@ -33,19 +35,19 @@
 
 | 功能 | 手册状态 | 截图能力 |
 | --- | --- | --- |
-| 统一显示 Layer、Group、点实体、Brush Entity、worldspawn 和普通 Brush | 较完整 | 已插入 `outliner-hierarchy` 截图 |
+| 统一显示 Layer、Group、点实体、Brush Entity、worldspawn 和普通 Brush | 较完整 | 已入册：`outliner-hierarchy` |
 | Outliner 与视口双向同步选择 | 较完整 | 已复用层级截图说明 |
 | 高亮当前 Layer、当前 Group 和 Linked Group | 简略 | 需要场景 |
-| 按文字、对象类型和选中状态过滤 | 较完整 | 已插入 `outliner-filter` 截图 |
+| 按文字、对象类型和选中状态过滤 | 较完整 | 已入册：`outliner-filter` |
 | 默认、类型和文件顺序排序 | 较完整 | 已复用过滤截图说明 |
 | 直接切换可见性、锁定和导出排除状态 | 简略 | 需要场景 |
 | Layer、Group、实体、Brush、聚焦、隔离、重命名和删除右键菜单 | 简略 | 需要打开菜单的 target |
 | 在 Outliner 中创建 Layer | 简略 | 需要 target |
 | Delete/Backspace 删除、Esc 清除选择和键盘行导航 | 简略 | 需要交互状态或步骤图 |
-| 将对象拖到另一个 Layer 或 Group | Layer 较完整；Group 缺失 | Layer 前后截图已插入；Group 尚需 target |
-| 将普通 Brush 拖入 Brush Entity | 较完整 | 前后截图已插入 |
+| 将对象拖到另一个 Layer 或 Group | Layer 较完整；Group 缺失 | Layer 前后图已入册；Group 尚需 target |
+| 将普通 Brush 拖入 Brush Entity | 较完整 | 前后图已入册 |
 | 将 Brush Entity 中的 Brush 拖回目标 Layer 的 worldspawn | 文字较完整 | 仍需要拖放前后状态 |
-| 内嵌编辑 worldspawn 和实体属性 | 实体较完整；worldspawn 简略 | 实体属性截图已插入；worldspawn 尚需 target |
+| 内嵌编辑 worldspawn 和实体属性 | 实体较完整；worldspawn 简略 | 实体属性图已入册；worldspawn 尚需 target |
 | 批量属性、choice、spawnflags、WAD、skyname、新增/删除属性和复制属性键 | 缺失 | 需要专用实体属性场景 |
 
 这里常说的“Brush 拖动合并”实际是把 Brush 重归属到 Brush Entity，并不是 CSG
@@ -93,10 +95,10 @@
 | Smart Face Selection：Face Strip 和 Parallel Faces | 缺失 | 需要 target |
 | Smart Face 的 Replace、Add 和 Remove 操作 | 缺失 | 需要 target |
 | Smart Face 的角度/间隙容差、种子方向、分支停止和同材质过滤 | 缺失 | 需要能显示候选预览的场景 |
-| Sweep Tool：Straight、Arc 和 S-bend 路径 | 较完整 | 现有 GIF 可用，可再补当前控制面板截图 |
+| Sweep Tool（路径放样工具）：Straight、Arc 和 S-bend 路径 | 较完整 | 现有 GIF 可用，可再补当前控制面板截图 |
 | Sweep 扭曲、锥化、迭代、吸附和连续 UV | 较完整 | 需要当前控制状态图 |
 | Sweep Bridge 连接两个独立面组件 | 简略 | 需要前、预览、后三个状态 |
-| Path Tool 网格吸附的路径点放置和预览 | 较完整 | 已插入 `path-tool-preview` 截图 |
+| Path Tool 网格吸附的路径点放置和预览 | 较完整 | 已入册：`path-tool-preview` |
 | Path Tool 预览点撤销/恢复及自动 `target`/`targetname` 链 | 较完整 | 操作和提交结果已用文字说明 |
 | Command Palette 动作搜索、菜单路径、可用状态和快捷键 | 较完整 | 可直接截图 |
 | Pie Menu 长按调用、上下文动作和拖动配置 | 简略 | Pie Menu 与设置对话框都需要 target |
@@ -253,87 +255,20 @@ preferences-keyboard
 preferences-misc
 ```
 
-### 实际验证结果
+### 截图链路结论
 
-2026-08-20 使用当前 Release 可执行文件运行了以下命令：
+现有系统足以自动捕获已有 target 并将选定图片加入手册。尚未覆盖的功能主要缺少确定
+性的地图、资源、选区、工具、弹出菜单或操作前后状态，而不是缺少图片保存能力。
 
-```powershell
-& scripts/ui-theme-acceptance.ps1 `
-  -Targets @(
-    'outliner',
-    'supporting',
-    'python-console',
-    'command-palette',
-    'preferences-misc') `
-  -Themes @('dark') `
-  -ScaleFactors @('1') `
-  -SkipBuild
-```
+已经完成并入册的专用链路如下。临时 PNG、manifest 和运行日志只保留在
+`build-release-codex/codex-logs/ui-theme-acceptance`，不在本文档中记录带时间戳的目录。
 
-五个 target 均通过图片完整性和 manifest 校验：
-
-| Target | 输出尺寸 | 结果 |
+| 功能链路 | 确定性状态 | 手册结果 |
 | --- | --- | --- |
-| `outliner` | 1440x900 | 当时的基础层级树和属性面板清晰；此后已改用专用层级 fixture |
-| `supporting` | 1440x900 | Assets 布局清晰，但只有空资源根目录 |
-| `python-console` | 1440x900 | 可以直接用于手册 |
-| `command-palette` | 640x480 | 可以直接用于手册 |
-| `preferences-misc` | 920x560 | Prefab 和 MCP 设置清晰，但顶部控件被滚动隐藏 |
+| Outliner | 仓库内 Quake 层级 fixture；8 个 target 通过节点/父级语义、PNG、manifest 和视觉检查 | 7 张专用截图已加入中英文第 7 章，覆盖层级、过滤、属性和两类拖放重归属 |
+| Path Tool | `path-tool-preview` 构造 4 个固定预览点，并校验工具状态和点坐标 | 截图已加入中英文第 2 章，操作与提交行为由正文说明 |
 
-验证生成物位于
-`build-release-codex/codex-logs/ui-theme-acceptance/20260820-141345-548`，属于构建日志，
-不会作为仓库资源提交。
-
-### 是否足够让我自行截图并插入手册
-
-**结论：现有系统已经足以让我自动截取已有概览 target，并将选定图片放入手册；但还
-不足以独立完成所有新增功能的教程截图。**
-
-当前限制不是图片保存能力，而是缺少确定性的功能场景。很多功能需要特定地图、游戏
-资源、选区、激活工具、弹出菜单、拖放预览或操作前后状态，现有 target 没有构造这些
-条件。
-
-现在可以直接覆盖：
-
-- Command Palette。
-- Python Console。
-- Path Tool 四点预览。
-- Outliner 总体布局和基础内嵌属性面板。
-- Assets 总体布局，但不包含真实预览。
-- 主题和标准 Preferences 页面。
-- Misc 中的 Prefab 目录和 MCP 设置。
-- Entity Browser、Face Inspector、Material Browser 和 Plugin Inspector 概览。
-
-第一批 Outliner 确定性截图链路已于 2026-08-20 完成：
-
-- 新增仓库内 Quake 层级 fixture，包含 3 个自定义 Layer、3 个 Group、点实体、
-  Brush Entity、worldspawn Brush，以及锁定和导出排除状态。
-- 新增层级、类型过滤、实体属性、移动 Layer 前后和 Brush 归入 Brush Entity 前后共
-  7 个专用 target。
-- `scripts/ui-theme-acceptance.ps1` 会将所有 `outliner-*` target 路由到该 fixture，
-  同时保留默认矩阵只捕获 `outliner` 概览。
-- 8 个 Outliner target 已在 Dark、100% 缩放下通过专用节点/父级语义校验、PNG、
-  manifest 和人工视觉检查。
-  Layer 前后图显示对象从 `Gameplay` 移至 `Architecture`；Brush Entity 前后图显示
-  `func_door` 的子 Brush 数量从 1 变为 2。
-- 其中 7 张专用截图已复制到共用手册图片目录，并插入中英文第 7 章；该章现已说明
-  层级选择、完整过滤语法、三种排序、内嵌实体属性和拖放重归属工作流。
-
-验证生成物位于
-`build-release-codex/codex-logs/ui-theme-acceptance/20260820-160619-029`，只作为构建日志，
-不提交到仓库。
-
-Path Tool 确定性截图链路已于 2026-08-20 完成：
-
-- 新增 `path-tool-preview` target，使用标准 Quake 地图激活 Path Tool 并构造
-  4 个尚未提交的固定预览点。
-- readiness 校验同时确认工具处于激活状态且预览点坐标完全一致。
-- Dark、100% 截图已通过 PNG、manifest 和人工视觉检查，并插入中英文
-  第 2 章的 Path Tool 教程。
-
-验证生成物位于
-`build-release-codex/codex-logs/ui-theme-acceptance/20260820-164744-829`，只作为构建日志，
-不提交到仓库。
+### 剩余场景缺口
 
 要覆盖其余功能，还需要补充：
 
@@ -383,22 +318,28 @@ Outliner 拖放和 Entity Template 更适合使用操作前后两张图。指针
 
 当对应 target 完成后，可以不手工操作窗口，按以下流程补图：
 
-1. 构建当前 Release `TrenchBroom` target。
-2. 使用 Dark 主题、100% 缩放捕获主手册图片。
-3. 检查图片中的内容、选区、资源、文字、重叠和用户隐私数据。
-4. 将批准的 PNG 以稳定、描述性的名称放入
+1. 先确认功能名称和中英文术语；如涉及 UI 文案，同步更新 `.ts`、`.qm` 与
+   `terminology.tsv`。
+2. 构建当前 Release `TrenchBroom` target。
+3. 使用 Dark 主题、100% 缩放捕获主手册图片。
+4. 检查图片中的内容、选区、资源、文字、重叠和用户隐私数据。
+5. 将批准的 PNG 以稳定、描述性的名称放入
    `app/TrenchBroom/resources/documentation/manual/images`。
-5. 在英文和中文手册中引用同一图片，并分别填写本地化 alt text。
-6. 迭代期间只构建 `GenerateManual`。
-7. 运行 `validate_manual.py` 检查双语结构和生成结果。
-8. 在桌面宽度和窄窗口下目视检查生成手册。
-9. 最后只运行一次 `ci-preflight.ps1` 作为提交前门禁。
+6. 在英文和中文手册中引用同一图片，并分别填写本地化 alt text。
+7. 迭代期间只构建 `GenerateManual`。
+8. 中英文内容同步后刷新翻译指纹，再运行完整手册校验。
+9. 在桌面宽度和窄窗口下目视检查生成手册。
+10. 最后只运行一次 `ci-preflight.ps1` 作为提交前门禁。
 
 常用命令：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/build-filtered.ps1 `
   -Target GenerateManual
+
+python app/TrenchBroom/resources/documentation/manual/validate_manual.py `
+  --manual-root app/TrenchBroom/resources/documentation/manual `
+  --update-fingerprints
 
 python app/TrenchBroom/resources/documentation/manual/validate_manual.py `
   --manual-root app/TrenchBroom/resources/documentation/manual `

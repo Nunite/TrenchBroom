@@ -150,7 +150,7 @@ Positioning of objects pasted into a 2D viewport attempts to achieve a similar e
 
 ## Editing Objects {#editing-objects}
 
-The following section is divided into several sub sections: First, we introduce editing operations that can be applied to all objects, such as moving, rotating, or deleting them. Then we proceed with the tools to shape brushes, such as the clip tool, the vertex tool, and the CSG operations. Afterwards we explain how you work with materials in TrenchBroom, and then we move on to editing entities and their properties. The final subsection deals with TrenchBroom's undo and redo capabilities.
+The following sections first cover editing operations that apply to all objects, such as moving, rotating, scaling, and deleting. They then introduce the brush-shaping tools covered in this chapter: extrusion, clipping, sweeping, and chamfering. Vertex editing and CSG, materials, and entity organization are covered in the following chapters. This chapter concludes with TrenchBroom's undo and redo behavior.
 
 ### Moving Objects {#moving_objects}
 
@@ -274,7 +274,7 @@ Deleting objects is as simple as selecting them and choosing #menu(Menu/Edit/Del
 
 ## Shaping Brushes {#shaping-brushes}
 
-TrenchBroom offers several tools to change the shapes of brushes. The most powerful of these tools, and also the one that requires the most care, is the vertex tool. Before we discuss this tool, we will introduce the clip tool with which you can chop parts off of brushes. But first, we introduce the extrude tool which, as the name suggests, allows you to quickly change the size of brushes. Finally, we explain how you can shape brushes using TrenchBroom's CSG operations.
+TrenchBroom offers several tools for changing brush shapes. This chapter starts with extrusion for extending brushes, stamping new brushes, or moving faces. It then covers clipping, sweeping faces along generated paths, and chamfering edges or corners. The more general vertex editing and CSG operations follow in the next chapter.
 
 ### Extrusion {#extrusion}
 
@@ -378,6 +378,12 @@ Hit #action(Controls/Map view/Perform sweep) to fill the gap with brushes and se
 
 Choose #menu(Menu/Edit/Tools/Chamfer Tool) to bevel selected brush edges or cut selected brush corners. The target selector switches between edge and vertex handles. Select one or more handles to preview the result, then adjust the chamfer distance and apply the operation. Edge chamfers also support multiple segments for a rounded profile. UV Lock controls how the affected face projections are preserved.
 
-### Path Tool {#path_tool_editing}
+## Undo and Redo {#undo_redo}
 
-Choose #menu(Menu/Edit/Tools/Path Tool) or click the Path Tool button on the toolbar to create a new linked `path_corner` chain. The tool places a preview in either 2D or 3D views and does not edit existing path nodes. See [Path Tool](#path_tool) for point placement, preview controls, and commit behavior.
+Almost everything that you do in TrenchBroom can be undone by choosing #menu(Menu/Edit/Undo). This applies to every action that somehow modifies the map file (such as moving objects), but it also applies to some actions that do not change the map file, such as selection, hiding, and locking. There is no limit to how many actions you can undo, and once an action is undone, you can redo it by choosing #menu(Menu/Edit/Redo).
+
+### Undo Collation and Transactions {#undo-collation-and-transactions}
+
+TrenchBroom groups certain sequences of actions into transactions which can be undone and redone as one. For example, if you select a few objects and then hide them, the objects are automatically deselected. Both the action of deselecting the objects to be hidden and hiding them are grouped together into a transaction, so when you undo, the objects will be unhidden and reselected at the same time.
+
+TrenchBroom also merges sequences of the same action if they happen within one mouse drag or within a certain time. If you move a brush around, all steps of the move are merged into one action. If you move a brush by pressing the appropriate keyboard shortcuts several times within a short period, those actions are merged as well. This saves memory and allows the entire sequence to be undone in one step.

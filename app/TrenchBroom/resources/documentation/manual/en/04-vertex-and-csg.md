@@ -2,7 +2,7 @@
 
 ## Vertex Editing {#vertex_editing}
 
-TrenchBroom includes three separate tools to edit a brush's vertices: the [vertex tool](#vertex_tool) for editing individual vertices, the [edge tool](#edge_tool) for editing individual edges, and the [face tool](#face_tool) for editing individual faces. The vertex tool is the most powerful of the three because in addition to moving vertices around, you can also add and remove vertices from the brush(es). Conversely, the edge and face tools only allow you to move faces around.
+TrenchBroom includes three separate tools to edit a brush's geometry: the [vertex tool](#vertex_tool) for editing individual vertices, the [edge tool](#edge_tool) for editing individual edges, and the [face tool](#face_tool) for editing individual faces. The vertex tool is the most powerful of the three because, in addition to moving vertices, it can add and remove them. By contrast, the edge and face tools move existing edges or faces without adding or removing vertices.
 
 #### Vertex Tool {#vertex_tool}
 
@@ -34,16 +34,7 @@ Additionally, you can delete the selected vertices, edges, and faces from brushe
 
 <br clear="all" />
 
-The vertex tool also provides some keyboard shortcuts to move vertices. These are listed in the following table.
-
-Direction     Shortcut (2D)                                                            Shortcut (3D)
----------     -------------                                                            -------------
-Left          #action(Controls/Map view/Move objects left)                             #action(Controls/Map view/Move objects left)
-Right         #action(Controls/Map view/Move objects right)                            #action(Controls/Map view/Move objects right)
-Up            #action(Controls/Map view/Move objects up; Move objects forward)         #action(Controls/Map view/Move objects backward; Move objects up)
-Down          #action(Controls/Map view/Move objects down; Move objects backward)      #action(Controls/Map view/Move objects forward; Move objects down)
-Forward       #action(Controls/Map view/Move objects forward; Move objects down)       #action(Controls/Map view/Move objects up; Move objects forward)
-Backward      #action(Controls/Map view/Move objects backward; Move objects up)        #action(Controls/Map view/Move objects down; Move objects backward)
+The vertex tool uses the same keyboard shortcuts as [moving objects](#moving_objects). Each key press moves the selected vertices by the current grid size in the corresponding 2D or 3D direction.
 
 In addition to moving vertices, the vertex tool can also rotate, scale and shear vertices. To rotate vertices, bring up the [rotate tool](#rotating_objects) via #menu(Menu/Edit/Tools/Rotate Tool), then use the rotation handle as usual. To scale them, use #menu(Menu/Edit/Tools/Scale Tool) to enable the [scale tool](#scaling_objects), and use #menu(Menu/Edit/Tools/Shear Tool) to shear them with the [shear tool](#shearing_objects).
 

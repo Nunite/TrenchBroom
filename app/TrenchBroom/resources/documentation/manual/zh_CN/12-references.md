@@ -1,4 +1,4 @@
-# 参与贡献 {#getting-involved}
+# 参与贡献与参考资料 {#getting-involved}
 
 ## 建议功能 {#suggesting-a-feature}
 
@@ -27,7 +27,7 @@
 
 - [TrenchBroom Discord]
 
-# 参考与链接 {#references_and_links}
+## 参考与链接 {#references_and_links}
 
 - [TrenchBroom on GitHub] - TrenchBroom 的 GitHub 页面
 - [func_msgboard] - Quake 地图制作论坛

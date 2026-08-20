@@ -77,17 +77,7 @@ An entity link that is connected to a currently selected entity is rendered as a
 
 In the screenshot above, the link between the two info_null entities is rendered in green because neither of the entities is selected.
 
-## Undo and Redo {#undo_redo}
-
-Almost everything that you do in TrenchBroom can be undone by choosing #menu(Menu/Edit/Undo). This applies to every action that somehow modifies the map file (such as moving objects), but it also applies to some actions that do not change the map file, such as selection, hiding, and locking. There is no limit to how many actions you can undo, and once an action is undone, you can redo it by choosing #menu(Menu/Edit/Redo).
-
-### Undo Collation and Transactions {#undo-collation-and-transactions}
-
-Note that TrenchBroom groups certain sequences of actions into transactions which can be undone and redone as one. For example, if you select a few objects and then hide them, the objects are automatically deselected. Both the action of deselecting the objects to be hidden and hiding them are grouped together into a transaction, so when you undo, the objects will be unhidden and reselected at the same time.
-
-On top of that, TrenchBroom will merge sequences of the same action if they happen within one mouse drag or within a certain time. So if you move a brush around, all steps of the move will be merged into one action, or if you move a brush around by pressing the appropriate keyboard shortcuts within a certain time, all these actions will also be merged into one. In practice, this saves memory and it allows you to undo such sequences in one fell swoop.
-
-# Keeping an Overview {#keeping_an_overview}
+## Keeping an Overview {#keeping_an_overview}
 
 If you are working on large maps, it can become cumbersome to manage the objects in the map and to keep an overview over them. Some areas may be crowded with a lot of brushes and entities so that it becomes difficult to edit a particular object that is occluded by other things. TrenchBroom provides you with a number of tools to easily keep an overview over your map and to remove clutter in crowded areas.
 

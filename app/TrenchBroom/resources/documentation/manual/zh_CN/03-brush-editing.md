@@ -150,7 +150,7 @@ Patch 是从 Brush 面创建的。创建一个 Brush 并选择其一个或多个
 
 ## 编辑对象 {#editing-objects}
 
-以下小节分为几个部分：首先介绍适用于所有对象的编辑操作，如移动、旋转或删除。然后介绍塑造 Brush 的工具，如裁剪工具、顶点工具和 CSG 操作。随后说明如何在 TrenchBroom 中使用材质，接着介绍编辑实体及其属性。最后一个小节介绍 TrenchBroom 的撤销和重做功能。
+以下各节首先介绍适用于所有对象的编辑操作，例如移动、旋转、缩放和删除，然后说明本章涉及的 Brush 塑形工具：挤出、裁剪、路径放样和倒角。后续章节将分别介绍顶点编辑与 CSG、材质以及实体组织。本章最后说明 TrenchBroom 的撤销与重做行为。
 
 ### 移动对象 {#moving_objects}
 
@@ -260,13 +260,13 @@ Patch 是从 Brush 面创建的。创建一个 Brush 并选择其一个或多个
     ![Dragging a side of the bounding box](images/Scale3DSideCenter.gif)
 
 
-### 剪切对象 {#shearing_objects}
+### 切变对象 {#shearing_objects}
 
-按 #menu(Menu/Edit/Tools/Shear Tool) 激活剪切工具。拖动包围盒的一个面沿该平面进行剪切。如果不是剪切包围盒的顶面或底面，可以加上 #key(Alt) 键进行垂直拖动。
+按 #menu(Menu/Edit/Tools/Shear Tool) 激活切变工具。拖动包围盒的一个面可使对象沿该平面发生切变。如果切变的不是包围盒顶面或底面，可以同时按住 #key(Alt) 进行垂直拖动。
 
-剪切工具中的对齐锁定仅在 Valve 220 格式的地图中有效。
+切变工具中的对齐锁定仅在 Valve 220 格式的地图中有效。
 
-![在 3D 视图中垂直剪切](images/Shear3DVertical.gif)
+![在 3D 视图中的垂直切变](images/Shear3DVertical.gif)
 
 ### 删除对象 {#deleting-objects}
 
@@ -274,7 +274,7 @@ Patch 是从 Brush 面创建的。创建一个 Brush 并选择其一个或多个
 
 ## 塑造 Brush {#shaping-brushes}
 
-在基于 Quake 的游戏中，任何地图最重要的元素都是 Brush。Brush 用于创建地图的几何体。在 TrenchBroom 中，你可以使用几种不同的工具来塑造 Brush，每种工具都针对一组特定的操作量身定制。在本节中，我们将详细介绍这些工具。
+TrenchBroom 提供了多种改变 Brush 形状的工具。本章先介绍如何通过挤出来延伸 Brush、冲压新 Brush 或移动面，然后介绍裁剪、沿生成路径对面进行放样，以及对边或顶角进行倒角。更通用的顶点编辑与 CSG 操作将在下一章介绍。
 
 ### 挤出 {#extrusion}
 
@@ -347,37 +347,43 @@ Brush 挤出工具提供了一种快速移动 Brush 单个面的方法。开始�
 
 ![匹配裁剪平面](images/MatchingClipPlane.gif) 裁剪平面也可以通过与现有 Brush 面对齐来定义。要在 3D 视图中使裁剪平面与现有 Brush 面对齐，必须双击该面。这样该 Brush 面将显示橙色轮廓，并定义一个与该面的平面完全匹配的裁剪平面。在使几何体与其他几何体贴合时，这非常有用。请注意，裁剪平面的平面点就是所匹配 Brush 面的平面点，因此使用此特定功能时不会出现微泄漏 (microleak) 问题。
 
-### 扫掠 {#sweeping}
+### 路径放样 {#sweeping}
 
-扫掠工具使用一系列 Brush 填充选中的 Brush 面与其副本（称为目标端盖）之间的空隙。根据放置目标端盖的位置和选择的路径，这可以沿直线放样面，绕轴旋转面以构建拱门和管道，或通过 S 形曲线进行路由，并可在过程中选择扭曲和锥化。在 Valve 风格的地图格式中，UV 设置可以保留源投影，或者在相连的边界表面和扫掠分段之间连续旋转纹理对齐。连续对齐保留了纹理缩放，并在封闭轮廓周围留下一条接缝。要使用扫掠工具，请选择一个或多个 Brush 面并选择 #menu(Menu/Edit/Tools/Sweep Tool)。
+路径放样工具会在选中的 Brush 面与这些面的副本（称为目标端面）之间生成一系列 Brush 来填充空隙。根据目标端面的放置位置和所选路径，它可以沿直线对面进行放样、绕轴旋转以构建拱门或管道，或沿 S 形曲线生成路径，并可同时产生扭转和渐扩或渐缩效果。对于 Valve 风格的地图格式，UV 设置既可以保留源面的投影，也可以在相连的边界面和各个放样分段之间连续旋转纹理对齐。连续对齐会保留纹理缩放，并在闭合轮廓上留下一条接缝。要使用路径放样工具，请选择一个或多个 Brush 面，然后选择 #menu(Menu/Edit/Tools/Sweep Tool)。
 
-桥接模式连接不同 Brush 上两个未连接的选中面组件。每个组件可以包含一个或多个边相连的面，并且两个组件必须具有匹配的面、顶点和共享边拓扑。第一个组件提供入口几何体和侧面材质；第二个组件是精确且锁定的目标端。使用 **Swap ends** 可反转该方向。桥接模式会自动匹配循环和反向的顶点顺序，并使用原始端点顶点，使生成的 Brush 与两个选中的组件无缝衔接而不会产生坐标接缝。如果插值分段无法形成有效的凸 Brush，预览将报告受影响的分段，而不是应用不完整的几何体。
+桥接模式连接不同 Brush 上两个互不相连的选中面组件。每个组件可以包含一个或多个边相连的面，并且两个组件必须具有匹配的面、顶点和共享边拓扑。第一个组件提供入口几何体和侧面材质；第二个组件是精确且锁定的目标端。使用 **Swap ends** 可反转该方向。桥接模式会自动匹配循环或反向的顶点顺序，并使用原始端点顶点，使生成的 Brush 与两个选中组件无缝衔接而不会产生坐标接缝。如果某个插值分段无法形成有效的凸 Brush，预览会报告受影响的分段，而不会应用不完整的几何体。
 
-![使用扫掠工具旋转面形成弯头](images/SweepTool.gif)
+![使用路径放样工具旋转面形成弯头](images/SweepTool.gif)
 
-当扫掠工具处于激活状态时，虚影轮廓会显示目标端盖的最终位置，并且手柄允许你放置它：
+路径放样工具激活时，虚影轮廓会显示目标端面的最终位置，手柄可用于调整它：
 
-- 拖动手柄中心可移动目标端盖。
+- 拖动手柄中心可移动目标端面。
 - 拖动其中一个圆环可使其绕相应轴旋转。
-- 拖动绿色手柄可对其进行均匀缩放，从而使扫掠展开或锥化。
-- 按 #action(Controls/Map view/Move objects up; Move objects forward) 和其他移动快捷键可将目标端盖移动一个网格步长。
-- 按 #action(Controls/Map view/Roll objects clockwise) 和其他旋转快捷键可将目标端盖旋转一个角度吸附步长。
-- 按 #action(Controls/Map view/Increase sweep scale) 或 #action(Controls/Map view/Decrease sweep scale) 可向外或向内移动缩放手柄一个网格步长，从而放大或缩小目标端盖。
+- 拖动绿色手柄可对目标端面进行均匀缩放，使放样形状渐扩或渐缩。
+- 按 #action(Controls/Map view/Move objects up; Move objects forward) 和其他移动快捷键可将目标端面移动一个网格步长。
+- 按 #action(Controls/Map view/Roll objects clockwise) 和其他旋转快捷键可将目标端面旋转一个角度吸附步长。
+- 按 #action(Controls/Map view/Increase sweep scale) 或 #action(Controls/Map view/Decrease sweep scale) 可将缩放手柄向外或向内移动一个网格步长，从而放大或缩小目标端面。
 
-在放置目标端盖时，生成的 Brush 会在视图中以预览形式显示。在停用该工具之前，作用于选择内容的快捷键（包括 UV 编辑）均不可用。编辑视图上方的控件决定了如何填充间隙：
+调整目标端面时，生成的 Brush 会以预览形式显示在视图中。在停用该工具之前，作用于选区的快捷键（包括 UV 编辑）均不可用。编辑视图上方的控件决定如何填充空隙：
 
-- **Segments**（分段数）是选中的面与目标端盖之间创建的 Brush 数量。
-- **Path**（路径）选择 Brush 的布局方式：Arc（圆弧）绕基于旋转派生的轴旋转面，Straight（直线）沿直线放样面，S-bend（S 弯）通过 S 形曲线进行路由。在每种模式下，目标端盖最终都位于相同位置。
-- **Iterations**（迭代次数）重复扫掠，从上一个目标端盖继续延伸。例如，在转弯时上升的圆弧经过多次迭代扫掠后会变成螺旋楼梯。
+- **Segments**（分段数）是选中面与目标端面之间创建的 Brush 数量。
+- **Path**（路径）选择 Brush 的布局方式：Arc（圆弧）绕根据旋转推导出的轴旋转面，Straight（直线）沿直线对面进行放样，S-bend（S 弯）使其沿 S 形曲线延伸。三种模式下的目标端面最终都位于相同位置。
+- **Iterations**（迭代次数）重复执行路径放样，并从上一个目标端面继续延伸。例如，一段在转弯时升高的圆弧经过多次迭代后会形成螺旋楼梯。
 - **Snap to integer grid**（吸附到整数网格）将生成 Brush 的顶点舍入到整数坐标。
-- **Reset**（重置）将目标端盖移回选中的面上。
+- **Reset**（重置）将目标端面移回选中的面上。
 
-按 #action(Controls/Map view/Perform sweep) 可用 Brush 填充间隙并选中它们。按 #action(Controls/Map view/Cancel) 可将目标端盖恢复到起始位置。
+按 #action(Controls/Map view/Perform sweep) 可用 Brush 填充空隙并选中生成结果。按 #action(Controls/Map view/Cancel) 会将目标端面恢复到起始位置；再次按下该快捷键会停用路径放样工具。
 
 ### 倒角 {#chamfering}
 
-选择 #menu(Menu/Edit/Tools/Chamfer Tool) 对选中的 Brush 边进行斜角处理，或从选中的面上切角。在边模式与顶点模式之间切换手柄，调整倒角距离即可直观预览并应用几何倒角。多段边倒角支持平滑的圆角轮廓。
+选择 #menu(Menu/Edit/Tools/Chamfer Tool) 可对选中的 Brush 边进行倒角，或切去选中的 Brush 顶角。目标选择器用于在边手柄和顶点手柄之间切换。选择一个或多个手柄以预览结果，然后调整倒角距离并应用操作。边倒角还支持多个分段，以生成圆滑轮廓。UV Lock 决定如何保留受影响面的投影。
 
-### 路径工具 {#path_tool_editing}
+## 撤销与重做 {#undo_redo}
 
-选择 #menu(Menu/Edit/Tools/Path Tool) 或点击工具栏中的路径工具按钮，可创建新的已链接 `path_corner` 链。该工具可在 2D 或 3D 视图中放置预览，但不会编辑现有路径节点。有关路径点放置、预览控制和提交行为，请参阅[路径工具](#path_tool)。
+在 TrenchBroom 中执行的几乎所有操作都可以通过选择 #menu(Menu/Edit/Undo) 撤销。这不仅适用于移动对象等修改地图文件的操作，也适用于选择、隐藏和锁定等不改变地图文件的操作。可撤销的操作次数没有限制；撤销操作后，可以选择 #menu(Menu/Edit/Redo) 将其重做。
+
+### 撤销合并与事务 {#undo-collation-and-transactions}
+
+TrenchBroom 会将某些连续操作组合为一个事务，以便作为整体撤销和重做。例如，选中若干对象后将其隐藏时，这些对象会自动取消选中。取消选择与隐藏对象会被组合到同一个事务中，因此撤销时，对象会同时恢复显示并重新被选中。
+
+如果相同操作发生在一次鼠标拖动中或较短时间内，TrenchBroom 还会将它们合并。例如，拖动 Brush 时，整个移动过程会合并为一个操作；短时间内连续按移动快捷键时，这些移动也会合并。这样既节省内存，也能用一次撤销还原整个操作序列。

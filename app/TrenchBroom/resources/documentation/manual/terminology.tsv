@@ -7,7 +7,7 @@ Material	材质	Domain	Translate	Existing UI translation	Do not use “纹理”
 Material Browser	材质浏览器	UI	Translate	Current UI
 Entity Browser	实体浏览器	UI	Translate	Current UI
 Asset Browser	资产浏览器	UI	Translate	Current UI
-Outliner	Outliner	UI	Keep English	Current UI	First occurrence may say “Outliner（实体浏览器）”
+Outliner	Outliner	UI	Keep English	Current UI	Do not confuse with Entity Browser
 Layer	图层	Domain	Translate	Existing UI translation
 Group	组	Domain	Translate	Existing UI translation
 Linked Group	链接组	Domain	Translate	Existing UI translation
@@ -16,5 +16,9 @@ Command Palette	命令面板	UI	Translate	Current UI
 Python Console	Python 控制台	UI	Mixed	Current UI
 Pie Menu	饼状菜单	UI	Translate	Current UI
 Path Tool	路径工具	UI	Translate	Current UI
+Sweep Tool	路径放样工具	UI	Translate	Current UI	Use “路径放样” for the operation
+Shear Tool	切变工具	UI	Translate	Current UI	Keep distinct from Clip Tool
+Clip Tool	裁剪工具	UI	Translate	Current UI	Keep distinct from Shear Tool
+Extrude Tool	挤出工具	UI	Translate	Current UI
 Theme	主题	UI	Translate	Current UI
 MCP	MCP	Protocol	Keep English	Protocol name

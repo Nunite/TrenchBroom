@@ -1,4 +1,4 @@
-# Getting Involved {#getting-involved}
+# Getting Involved and References {#getting-involved}
 
 ## Suggesting a Feature {#suggesting-a-feature}
 
@@ -27,7 +27,7 @@ Open the "About TrenchBroom" dialog from the menu. The light gray text on the le
 
 - [TrenchBroom Discord]
 
-# References and Links {#references_and_links}
+## References and Links {#references_and_links}
 
 - [TrenchBroom on GitHub] - TrenchBroom's GitHub page
 - [func_msgboard] - Quake Mapping Forum
