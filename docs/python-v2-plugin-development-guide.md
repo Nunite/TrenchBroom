@@ -18,7 +18,7 @@ TrenchBroom 引入了基于 Python v2 架构的嵌入式脚本与插件系统（
 6. [事件系统与定时器](#6-事件系统与定时器)
 7. [动作执行与快捷键集成](#7-动作执行与快捷键集成)
 8. [完整实战项目示例](#8-完整实战项目示例)
-   - [实战示例 1：实体快速对齐与光源生成脚本 (Script Plugin)](#实战示例-1实体快速对齐与光源生成脚本-script-plugin)
+   - [实战示例 1：计算选中 Brush 的建议光源位置 (Script Plugin)](#实战示例-1计算选中-brush-的建议光源位置-script-plugin)
    - [实战示例 2：全功能几何阵列复制面板插件 (UI Plugin)](#实战示例-2全功能几何阵列复制面板插件-ui-plugin)
 
 ---
@@ -56,8 +56,9 @@ my_plugins_folder/
 
 ### 首选项配置
 打开 **Preferences > Misc > Tools**：
-- 在 **Python Plugin Directories** 中添加您的插件根目录（支持配置多个目录，以 `|` 分隔）。
-- 点击 **Python Plugin Manager** 对话框可查看已扫描到的插件列表、激活状态及清单语法错误。
+- 点击 **Python Plugin Manager...** 打开插件管理器。
+- 在管理器的 **Plugin Directories** 区域点击 **Install UI Plugin...**，选择单个 UI 插件目录或包含多个插件子目录的根目录。
+- 使用 **Refresh** 重新扫描，并在 **Detected Plugins** 中查看加载状态、元数据及清单错误。
 
 ---
 
@@ -73,7 +74,7 @@ my_plugins_folder/
 | `name` | string | 是 | - | 在 UI 和插件管理器中展示的可读名称 |
 | `version` | string | 是 | - | 语义化版本号，如 `"1.0.0"` |
 | `apiVersion` | integer | 是 | `2` | 插件 API 版本，当前必须固定为 `2` |
-| `pluginType` | string | 否 | `"ui"` | 插件类型：`"ui"`（常驻 UI 插件）或 `"script"`（脚本插件） |
+| `pluginType` | string | 否 | `"script"` | 插件类型：`"ui"`（常驻 UI 插件）或 `"script"`（按需运行脚本） |
 | `entry` | string | 是 | - | 插件入口 Python 脚本文件名（相对于清单文件路径，如 `"main.py"`） |
 | `description` | string | 否 | `""` | 插件功能简短介绍 |
 | `author` | string | 否 | `""` | 插件作者信息或组织名称 |
@@ -92,6 +93,8 @@ my_plugins_folder/
   "author": "Community Developer"
 }
 ```
+
+常驻 UI 插件必须显式设置 `"pluginType": "ui"`。省略该字段或设置为 `"script"` 时，插件管理器只报告这是按需运行脚本，不会自动执行入口文件；请使用 **Run > Run Python Script...** 直接选择对应的 `.py` 文件。
 
 ---
 
@@ -120,7 +123,7 @@ with doc.transaction("My Custom Operation"):
 ```
 
 #### Document 常用属性与方法
-- `doc.path`: 当前地图文件的绝对路径字符串（未保存的草稿为 `None`）。
+- `doc.path`: 当前地图路径；新建未保存文档通常为 `"unnamed.map"`，仅内部路径为空时为 `None`。
 - `doc.entities`: 获取当前地图中的所有实体列表（`list[tb2.Entity]`）。
 - `doc.selection`: 获取当前文档的选区对象（`tb2.Selection`）。
 - `doc.materials`: 获取当前地图已加载的所有材质列表（`list[tb2.Material]`）。
@@ -140,12 +143,12 @@ with doc.transaction("My Custom Operation"):
 sel = doc.selection
 
 # 查询选中项
-first_entity     = sel.entity             # 首个相关实体（含 Brush 的父实体）
+first_entity     = sel.entity             # 首个相关实体（含 Brush 或选中面的父实体）
 first_brush      = sel.brush              # 首个选中的 Brush
 selected_entities = sel.entities          # 直接选中的实体
-all_entities     = sel.all_entities       # 直接实体与选中 Brush 的父实体
+all_entities     = sel.all_entities       # 直接实体与选中 Brush/面的父实体
 selected_brushes  = sel.brushes           # 选中的 Brush 列表
-selected_faces    = sel.brush_faces       # 选中的 Brush 面列表
+selected_faces    = sel.brush_faces       # 单独选中的 Brush 面列表
 
 # 读取首个相关实体；写入会作用于全部选中实体
 if "targetname" in sel:
@@ -165,6 +168,12 @@ sel.chamfer_edges(distance=8.0, segments=2) # 边倒角
 # 属性批量设置
 sel.set_property("targetname", "box_01", create_if_missing=True)
 ```
+
+空选区时，`sel.entity`、`sel.properties` 和 `sel.classname` 为 `None`，`sel.all_entities` 为空列表。只有面被选中时，相关实体是该面所属 Brush 的父实体；`sel.brush` 仍为 `None`。使用 `create_if_missing=False` 时，只更新已经包含该属性键的相关实体，没有匹配实体则返回 `False`。
+
+### 对象句柄生命周期
+
+`Document`、`Entity`、`Brush` 和 `Face` 是指向当前编辑器状态的句柄。文档关闭或重新加载、节点删除后，相关句柄会失效；Brush 几何发生变化后，此前取得的 `Face` 句柄也会失效。访问失效句柄会抛出 `RuntimeError`。不要在长期回调中永久缓存这些对象；应从 `tb2.current_document()`、当前选区或父对象重新获取。
 
 ---
 
@@ -276,6 +285,7 @@ panel.add_button("执行平移", on_run_clicked)
 - `panel.add_html_view(key, html_content, height=200, callback=None)`：添加富文本/HTML 视图（支持点击链接回调）。
 
 #### 2. 表单输入控件
+- `panel.add_line_edit(text, callback)`：添加无命名键的即时回调文本框（兼容接口）。
 - `panel.add_text_field(key, label, value="", placeholder="")`：单行文本输入框。
 - `panel.get_text_field(key) -> str` / `panel.set_text_field(key, value)`：读写文本。
 - `panel.add_text_area(key, label, value="", height=120, placeholder="")`：多行文本编辑框。
@@ -293,6 +303,7 @@ panel.add_button("执行平移", on_run_clicked)
 
 #### 3. 按钮与操作
 - `panel.add_button(text, callback_fn)`：标准操作按钮。
+- `panel.add_button_callback(text, callback_fn)`：`add_button` 的兼容别名。
 
 #### 4. 列表与数据表格
 - `panel.add_table_widget(key, columns, rows, height=200, callback=None)`：只读数据表格（支持行选中回调）。
@@ -313,6 +324,19 @@ panel.add_button("执行平移", on_run_clicked)
 
 插件可以注册全局编辑器事件或定时器任务，以响应用户的交互行为：
 
+### 编辑器事件
+```python
+def on_selection_changed():
+    print(f"Selected related entities: {len(tb2.selection().all_entities)}")
+
+callback_id = tb2.register_callback("selection_changed", on_selection_changed)
+
+# 需要提前停止监听时：
+tb2.unregister_callback(callback_id)
+```
+
+当前编辑器发出的事件为 `selection_changed`、`document_loaded` 和 `document_saved`。回调不接收参数，可在回调中通过 `tb2.current_document()` 获取最新状态。
+
 ### 异步定时任务
 ```python
 # 单次延迟执行（毫秒）
@@ -324,6 +348,8 @@ interval_id = tb2.set_interval(lambda: print("Tick every 1s"), 1000)
 # 取消定时任务
 tb2.clear_interval(interval_id)
 ```
+
+定时器要求活动的常驻 UI 插件会话；从 Python 控制台或 **Run Python Script...** 直接调用会抛出 `RuntimeError`。
 
 ### 插件卸载与会话清理
 当插件被重新加载或文档关闭时，TrenchBroom 会自动清理该插件注册的所有面板控件、定时器与回调函数，无需开发者手动注销。
@@ -339,54 +365,52 @@ tb2.clear_interval(interval_id)
 actions = tb2.list_actions()
 
 # 触发指定动作（如取消全选、网格切换等）
-tb2.execute_action("Edit/Deselect All")
+tb2.execute_action("Menu/Edit/Deselect All")
 ```
 
 ---
 
 ## 8. 完整实战项目示例
 
-### 实战示例 1：实体快速对齐与光源生成脚本 (Script Plugin)
+### 实战示例 1：计算选中 Brush 的建议光源位置 (Script Plugin)
 
-本脚本演示如何遍历选中项，在每个选中 Brush 的中心正上方 32 单位处自动创建一个 `light` 点实体并绑定目标名。
+本脚本演示如何遍历选中项，计算每个选中 Brush 中心正上方 32 单位处的建议光源位置。当前 `tb2` API 尚未公开点实体创建接口，因此脚本输出坐标供后续使用，不会修改地图。
 
 ```python
 # align_and_light.py
 import tb2
 
-def create_lights_above_selected():
+def print_light_positions_above_selected():
     doc = tb2.current_document()
     brushes = doc.selection.brushes
     if not brushes:
         print("[警告] 请先在编辑器中选中至少一个 Brush！")
         return
 
-    with doc.transaction("Auto Create Lights Above"):
-        created_count = 0
-        for i, brush in enumerate(brushes):
-            # 计算该 Brush 所有顶点的中心包围点
-            all_verts = []
-            for face in brush.faces():
-                all_verts.extend(face.vertices)
+    planned_count = 0
+    for brush in brushes:
+        # 计算该 Brush 所有顶点的中心包围点
+        all_verts = []
+        for face in brush.faces():
+            all_verts.extend(face.vertices)
 
-            if not all_verts:
-                continue
+        if not all_verts:
+            continue
 
-            cx = sum(v.x for v in all_verts) / len(all_verts)
-            cy = sum(v.y for v in all_verts) / len(all_verts)
-            max_z = max(v.z for v in all_verts)
+        cx = sum(v.x for v in all_verts) / len(all_verts)
+        cy = sum(v.y for v in all_verts) / len(all_verts)
+        max_z = max(v.z for v in all_verts)
 
-            # 在顶点最高面上方 32 单位生成 light
-            light_pos = f"{cx:.1f} {cy:.1f} {max_z + 32.0:.1f}"
+        # 计算顶点最高面上方 32 单位的位置
+        light_pos = f"{cx:.1f} {cy:.1f} {max_z + 32.0:.1f}"
 
-            # 创建实体并配置属性 (这里可结合游戏配置实体库)
-            print(f"已在位置 {light_pos} 规划光源")
-            created_count += 1
+        print(f"建议 light origin: {light_pos}")
+        planned_count += 1
 
-        print(f"[成功] 批量生成完成，共处理 {created_count} 个对象！")
+    print(f"共计算 {planned_count} 个建议光源位置")
 
 if __name__ == "__main__":
-    create_lights_above_selected()
+    print_light_positions_above_selected()
 ```
 
 ---

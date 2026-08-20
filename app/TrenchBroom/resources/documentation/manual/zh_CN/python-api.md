@@ -90,13 +90,13 @@ panel.add_label("Align selected faces to the world grid.")
 
 #### `tb2.selected_entities(include_brushes=False)` / `tb2.selectedEntities(include_brushes=False)` {#tb2_selected_entities}
 
-返回直接选中的 `Entity` 句柄。传入 `include_brushes=True` 时，还会包含选中 Brush 的父实体。
+返回直接选中的 `Entity` 句柄。传入 `include_brushes=True` 时，还会包含选中 Brush 和单独选中面的父实体。
 
 - **返回值**：`list[tb2.Entity]`
 
 #### `tb2.selected_faces()` / `tb2.selectedFaces()` {#tb2_selected_faces}
 
-返回当前所有选中 Brush 表面包含的所有 `Face` 句柄列表。
+返回单独选中的 `Face` 句柄列表。选中整个 Brush 不会自动展开为该 Brush 的全部面。
 
 - **返回值**：`list[tb2.Face]`
 
@@ -123,6 +123,15 @@ panel.add_label("Align selected faces to the world grid.")
 #### `tb2.deselect_all()` / `tb2.deselectAll()` {#tb2_deselect_all}
 
 清除当前活动地图中的所有选区。
+
+#### 选区与事件辅助函数 {#tb2_selection_and_event_helpers}
+
+- `tb2.selection() -> Selection`：返回当前选区句柄。
+- `tb2.selected_all_entities()` / `tb2.selectedAllEntities()`：返回直接选中的实体，以及选中 Brush 和面的父实体。
+- `tb2.register_callback(event, callback) -> int`：为 `selection_changed`、`document_loaded` 或 `document_saved` 注册无参数回调。
+- `tb2.unregister_callback(token)`：注销事件回调。
+- `tb2.set_timeout(callback, milliseconds)` / `tb2.set_interval(callback, milliseconds)`：创建插件会话定时器；定时器要求常驻 UI 插件会话。
+- `tb2.clear_interval(timer_id)`：取消任一类型的定时器。
 
 ### 数学与几何基元 {#math_primitives}
 
@@ -166,7 +175,7 @@ target = pos + offset
 | :--- | :--- | :--- |
 | `selection` | <span class="type-badge">Selection</span> | 活动选区容器，用于查询和空间变换选中的对象。 |
 | `entities` | <span class="type-badge">list[Entity]</span> | 文档中的所有点实体与 Brush 实体列表。 |
-| `path` | <span class="type-badge">str \| None</span> | 地图绝对路径；未保存文档为 `None`。 |
+| `path` | <span class="type-badge">str \| None</span> | 当前地图路径；新建未保存地图通常为 `"unnamed.map"`，仅内部路径为空时返回 `None`。 |
 | `materials` | <span class="type-badge">list[Material]</span> | 当前地图加载的材质。 |
 | `material_collections` | <span class="type-badge">list[MaterialCollection]</span> | 当前加载的材质集合。 |
 
@@ -187,6 +196,10 @@ with doc.transaction("Duplicate and Move"):
 
 其他文档方法包括 `save()`、`reload()`、`select(objects)`、`clear_selection()`、`vertex_tool_vertices()`、`set_triangle_uvs(triangles)`、`set_face_uvs(updates)` 和 `set_face_uvs_with_split(updates)`。
 
+### 句柄生命周期 {#python_handle_lifetime}
+
+`Document`、`Entity`、`Brush` 和 `Face` 对象是实时句柄，而不是数据快照。关闭或重新加载文档、删除节点会使相关句柄失效；改变 Brush 几何也会使此前取得的 `Face` 句柄失效。访问失效句柄会抛出 `RuntimeError`。发生这些变化后，应从 `tb2.current_document()`、当前选区或父对象重新获取需要长期使用的对象。
+
 ---
 
 ## 选择集与几何变换：Selection {#tb2_selection}
@@ -195,16 +208,16 @@ with doc.transaction("Duplicate and Move"):
 
 ### 查询属性 {#selection_queries}
 
-- `sel.entity` (*Entity | None*)：首个相关实体，包括选中 Brush 的父实体。
+- `sel.entity` (*Entity | None*)：首个相关实体，包括选中 Brush 或面的父实体；空选区返回 `None`。
 - `sel.brush` (*Brush | None*)：首个选中的 Brush。
 - `sel.properties` (*dict[str, str] | None*)：首个相关实体的属性快照。
 - `sel.classname` (*str | None*)：首个相关实体的 classname。
 - `sel.entities` (*list[Entity]*)：直接选中的实体。
-- `sel.all_entities` (*list[Entity]*)：直接选中的实体，以及选中 Brush 的父实体。
+- `sel.all_entities` (*list[Entity]*)：直接选中的实体，以及选中 Brush 和单独选中面的父实体；空选区返回空列表。
 - `sel.brushes` (*list[Brush]*)：选中的 Brush。
 - `sel.brush_faces` (*list[Face]*)：单独选中的 Brush 表面列表。
 
-`sel[key]` 和 `key in sel` 从首个相关实体读取。`sel[key] = value` 等价于 `sel.set_property(key, value)`，会写入所有选中实体。对 `set_property()` 使用 `create_if_missing=False` 可只更新已经包含该属性键的实体。
+`sel[key]` 和 `key in sel` 从首个相关实体读取。`sel[key] = value` 等价于 `sel.set_property(key, value)`，会写入所有相关实体。只有面被选中时，目标是该面所属 Brush 的父实体。对 `set_property()` 使用 `create_if_missing=False` 可只更新已经包含该属性键的实体；没有匹配实体时返回 `False`。
 
 ### 几何变换方法 {#selection_transforms}
 
@@ -299,20 +312,30 @@ with doc.transaction("Duplicate and Move"):
 | :--- | :--- | :--- |
 | `add_label(text)` | `text: str` | 添加静态提示文本。 |
 | `add_label_named(key, text)` | `key: str, text: str` | 添加动态标签，其内容后续可通过 `set_label_text(key, text)` 动态更新。 |
+| `add_html_view(key, html, height, callback)` | `key, html, height, callback` | 添加富 HTML 内容，可用 `set_html_view(key, html)` 更新。 |
+| `add_line_edit(text, callback)` | `text: str, callback: callable` | 文本变化时调用回调的兼容文本框。 |
 | `add_text_field(key, label, value)` | `key: str, label: str, value: str` | 单行文本输入框。 |
+| `add_text_area(key, label, value, height)` | `key, label, value, height` | 多行文本输入框。 |
 | `add_int_field(key, label, value, min, max)` | `key, label, value: int, min: int, max: int` | 带有上下限的整数微调输入框。 |
 | `add_float_field(key, label, value, min, max, decimals, step)` | `key, label, value: float, min, max, decimals: int, step: float` | 浮点数数值输入框。 |
 | `add_checkbox(key, text, checked)` | `key: str, text: str, checked: bool` | 布尔值复选切换框。 |
 | `add_combo_box(key, label, items, callback, current)` | `key, label, items: list[str], callback: callable, current: int` | 下拉选项选择框。 |
 | `add_color_field(key, label, color)` | `key: str, label: str, color: tuple[int, int, int]` | RGB 颜色拾取器。 |
 | `add_button(text, callback)` | `text: str, callback: callable` | 触发 Python 回调函数的按钮。 |
+| `add_button_callback(text, callback)` | `text: str, callback: callable` | `add_button` 的兼容别名。 |
+
+命名字段提供对应的读取方法，包括 `get_text_field`、`get_text_area`、`get_int_field`、`get_float_field`、`get_checkbox`、`get_combo_box_text` 和 `get_color_field`。文本字段与文本区域还提供 `set_text_field` 和 `set_text_area`。
 
 ### 数据视图与布局容器 {#pluginpanel_containers}
 
 - `add_table_widget(key, columns, rows, height, callback)`：显示支持多行选中的多列表格数据视图。
+- `set_table_widget_rows(key, rows)`：替换表格行。
 - `add_tree_widget(key, columns, rows, height, callback)`：显示支持节点折叠与展开的树形视图。
+- `set_tree_widget_items(key, rows)`：替换树形列表项。
 - `add_group(key, title)`：创建可折叠的可视化分组容器。
 - `add_row(key)` / `add_column(key)`：横向与纵向排版布局容器。
+- `set_widget_visible(key, visible)`：显示或隐藏命名控件。
+- `clear()`：清空当前面板容器中的所有控件。
 
 ---
 

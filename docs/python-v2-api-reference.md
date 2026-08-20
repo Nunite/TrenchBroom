@@ -22,12 +22,22 @@ tb2
 │   └── PluginPanel           # 声明式 UI 面板容器
 │
 └── 模块全局函数 (Functions)
+    ├── selected_brushes() -> list[Brush]
+    ├── selected_entities(include_brushes=False) -> list[Entity]
+    ├── selected_all_entities() -> list[Entity]
+    ├── selection() -> Selection
+    ├── selected_faces() -> list[Face]
+    ├── translate(...) / rotate(...) / scale(...)
+    ├── duplicate(target=None)
+    ├── delete_selection() / deselect_all()
     ├── current_document() -> Document
     ├── document() -> Document
     ├── create_plugin_panel(title) -> PluginPanel
     ├── create_brush(points, material=None) -> Brush
     ├── list_actions() -> list[str]
     ├── execute_action(action_id)
+    ├── register_callback(event, callback) -> int
+    ├── unregister_callback(token)
     ├── set_timeout(callback, milliseconds) -> int
     ├── set_interval(callback, milliseconds) -> int
     └── clear_interval(timer_id)
@@ -83,7 +93,7 @@ tb2
 表示当前在 TrenchBroom 中打开的地图文档。
 
 #### 属性
-- `path: str | None` - 当前地图文件的绝对路径（只读；若为新建未保存文档则为 `None`）
+- `path: str | None` - 当前地图路径（只读）；新建未保存文档通常为 `"unnamed.map"`，仅内部路径为空时为 `None`
 - `entities: list[Entity]` - 地图中包含的所有实体列表（只读）
 - `selection: Selection` - 获取当前文档的选区控制器（只读）
 - `materials: list[Material]` - 当前地图已加载的全部材质对象（只读）
@@ -105,14 +115,14 @@ tb2
 选区变换与批量操作控制器。
 
 #### 属性
-- `entity: Entity | None` - 首个相关实体（包括选中 Brush 的父实体）
+- `entity: Entity | None` - 首个相关实体（包括选中 Brush 或单独选中面的父实体；空选区为 `None`）
 - `brush: Brush | None` - 首个选中的 Brush
 - `properties: dict[str, str] | None` - 首个相关实体的属性快照
 - `classname: str | None` - 首个相关实体的 classname
 - `entities: list[Entity]` - 直接选中的实体对象（不含 Brush 所属实体）
-- `all_entities: list[Entity]` - 全部选中的实体（包含被选中 Brush 的父级实体）
+- `all_entities: list[Entity]` - 直接选中的实体，以及选中 Brush 或单独选中面的父实体；空选区为空列表
 - `brushes: list[Brush]` - 选中的所有 Brush 对象
-- `brush_faces: list[Face]` - 选中的所有 Brush 面对象
+- `brush_faces: list[Face]` - 单独选中的 Brush 面对象，不会展开选中 Brush 的全部面
 
 #### 方法
 - `set_property(key: str, value: str, create_if_missing: bool = True)` - 批量向选中实体写入属性
@@ -131,6 +141,7 @@ tb2
 #### 实体属性下标
 - `sel[key]` / `key in sel` - 从首个相关实体读取或检查属性
 - `sel[key] = value` - 等同 `set_property(key, value)`，向所有选中实体写入属性
+- `set_property(..., create_if_missing=False)` - 只更新已经包含该属性键的相关实体；没有匹配实体时返回 `False`
 
 ---
 
@@ -221,6 +232,11 @@ with doc.transaction("My Custom Edit"):
 
 ---
 
+### 句柄生命周期
+`Document`、`Entity`、`Brush` 和 `Face` 是指向当前编辑器状态的句柄，不是对象快照。关闭或重新加载文档、删除节点后，相关句柄会失效；改变 Brush 几何也会使此前取得的 `Face` 句柄失效。访问失效句柄会抛出 `RuntimeError`。跨回调或跨几何修改保存对象时，应从 `current_document()`、当前选区或父对象重新获取句柄。
+
+---
+
 ### `tb2.PluginPanel`
 声明式 UI 控件面板容器。
 
@@ -232,6 +248,7 @@ with doc.transaction("My Custom Edit"):
 - `set_html_view(key: str, html: str)` - 动态更新 HTML 视图内容
 
 #### 表单与输入
+- `add_line_edit(text: str, callback: Callable[[str], None])` - 添加无命名键的即时回调文本框（兼容接口）
 - `add_text_field(key: str, label: str, value: str = "", placeholder: str = "")`
 - `get_text_field(key: str) -> str`
 - `set_text_field(key: str, value: str)`
@@ -251,6 +268,7 @@ with doc.transaction("My Custom Edit"):
 
 #### 按钮
 - `add_button(text: str, callback: Callable[[], None])`
+- `add_button_callback(text: str, callback: Callable[[], None])` - `add_button` 的兼容别名
 
 #### 表格与树形组件
 - `add_table_widget(key: str, columns: list[str], rows: list[list[str]], height: int = 200, callback: Callable[[int, int], None] = None)`
@@ -270,10 +288,24 @@ with doc.transaction("My Custom Edit"):
 ## 2. 全局模块函数
 
 - `tb2.current_document() -> Document` - 获取当前激活的地图文档（若无打开地图则抛出异常）
+- `tb2.document() -> Document` - `current_document()` 的兼容别名
+- `tb2.selected_brushes()` / `tb2.selectedBrushes() -> list[Brush]` - 获取直接选中的 Brush
+- `tb2.selected_entities(include_brushes=False)` / `tb2.selectedEntities(...) -> list[Entity]` - 获取直接选中的实体；传入 `True` 时还包含选中 Brush 或单独选中面的父实体
+- `tb2.selected_all_entities()` / `tb2.selectedAllEntities() -> list[Entity]` - 获取所有相关实体，语义与 `selection().all_entities` 相同
+- `tb2.selection() -> Selection` - 获取当前选区句柄
+- `tb2.selected_faces()` / `tb2.selectedFaces() -> list[Face]` - 获取单独选中的 Brush 面
+- `tb2.translate(...)` / `tb2.rotate(...)` / `tb2.scale(...)` - 变换当前选区，或先将传入对象设为选区后变换
+- `tb2.duplicate(target=None)` - 复制当前选区或指定对象
+- `tb2.delete_selection()` / `tb2.deleteSelection()` - 删除当前选区
+- `tb2.deselect_all()` / `tb2.deselectAll()` - 清空当前选区
 - `tb2.create_plugin_panel(title: str) -> PluginPanel` - 在 Plugins 检查器中创建可视化面板
 - `tb2.create_brush(points: list[Vec3], material: str = None) -> Brush` - 根据凸包顶点集合生成 Brush
 - `tb2.list_actions() -> list[str]` - 列出当前所有已注册的编辑器 Action 标识符
 - `tb2.execute_action(action_id: str)` - 触发执行指定 Action
+- `tb2.register_callback(event: str, callback: Callable[[], None]) -> int` - 注册 `selection_changed`、`document_loaded` 或 `document_saved` 事件回调并返回 token
+- `tb2.unregister_callback(token: int)` - 注销事件回调
 - `tb2.set_timeout(callback: Callable[[], None], milliseconds: int) -> int` - 注册单次定时器
 - `tb2.set_interval(callback: Callable[[], None], milliseconds: int) -> int` - 注册循环定时器
 - `tb2.clear_interval(timer_id: int)` - 取消定时器
+
+事件回调与定时器用于常驻 UI 插件。插件卸载时会自动清理其回调和定时器；`set_timeout`、`set_interval` 和 `clear_interval` 在没有活动插件会话时会抛出 `RuntimeError`。

@@ -23,8 +23,8 @@ To make interactive mapping and geometry transformations as fast as possible, th
   - `Vec3`, `Plane`: 3D vector and plane mathematics classes.
 - **Global Helper Functions**:
   - `selected_brushes()` / `selectedBrushes()`: Returns a list of all currently selected `Brush` objects.
-  - `selected_entities()` / `selectedEntities()`: Returns a list of all currently selected `Entity` objects.
-  - `selected_faces()` / `selectedFaces()`: Returns a list of all currently selected `Face` objects.
+  - `selected_entities()` / `selectedEntities()`: Returns directly selected `Entity` objects. Pass `include_brushes=True` to include parent entities of selected brushes and individually selected faces.
+  - `selected_faces()` / `selectedFaces()`: Returns individually selected `Face` objects; selecting a whole brush does not expand it into all faces.
   - `translate(dx, dy, dz)` or `translate(object, dx, dy, dz)`: Translates the active selection or a specific object.
   - `rotate(rx, ry, rz)` or `rotate(object, rx, ry, rz)` or `rotate(ax, ay, az, angle)`: Rotates the active selection or a specific object.
   - `scale(s)` or `scale(sx, sy, sz)` or `scale(object, sx, sy, sz)`: Scales the active selection or a specific object.
@@ -134,7 +134,7 @@ with doc.transaction("Batch Align Entities"):
 
 ## Python Plugins {#python_plugins}
 
-TrenchBroom features an embedded Python v2 runtime and extension system. Open **Preferences > Misc > Python Plugin Manager** to manage manifest-based UI plugins. The manager lists configured plugin directories, detected plugins, load status, metadata, and errors. Use search or **Only show issues** to diagnose larger plugin sets, then refresh after changing files.
+TrenchBroom features an embedded Python v2 runtime and extension system. Open **Preferences > Misc**, then click **Python Plugin Manager...** in the **Tools** section to manage manifest-based UI plugins. Configure directories with **Install UI Plugin...** inside the manager. It lists detected plugins, load status, metadata, and errors; use search or **Only show issues** to diagnose larger plugin sets, then refresh after changing files.
 
 ![Plugin Inspector](images/PluginInspector.png)
 
@@ -143,7 +143,7 @@ TrenchBroom features an embedded Python v2 runtime and extension system. Open **
 TrenchBroom distinguishes between two plugin types:
 
 - **UI Plugins (`pluginType: "ui"`)**: Persistent plugins that declare a `trenchbroom-plugin.json` manifest. They are loaded at startup or when refreshing the plugin manager, and can register custom panels in the **Plugins** inspector tab, global actions, event listeners, and timers.
-- **Script plugins (`pluginType: "script"`)**: Standalone scripts executed on demand through the [Python Console](#python_console) or custom actions. Legacy `tb` compatibility is no longer part of the active plugin path; existing scripts should use `tb2` or `import tb2 as tb`.
+- **Script plugins (`pluginType: "script"`)**: Standalone scripts executed on demand through the [Python Console](#python_console), **Run > Run Python Script...**, or custom actions. The plugin manager reports script manifests but does not execute their entry files. Legacy `tb` compatibility is no longer part of the active plugin path; existing scripts should use `tb2` or `import tb2 as tb`.
 
 #### Manifest File Format {#plugin_manifest_format}
 
@@ -175,26 +175,44 @@ The manifest fields are defined as follows:
 | `description` | string | Optional description of the plugin |
 | `author` | string | Optional author name or contact |
 
+`pluginType` defaults to `"script"`. Persistent UI plugins must set `"pluginType": "ui"` explicitly or the plugin manager will not load them.
+
 #### The tb2 Python API {#the_tb2_python_api}
 
 All Python scripts and plugins access TrenchBroom through the embedded `tb2` module (`import tb2`). Key components include:
 
 - `tb2.current_document()`: Returns the active `Document` handle representing the open map.
 - `doc.transaction(name)`: A context manager (`with doc.transaction("Action Name"):`) that groups modifications into a single undo/redo step and automatically rolls back on Python exceptions.
-- `doc.selection`: The `Selection` handle for querying selected objects (`entity`, `brush`, `entities`, `all_entities`, `brushes`, `brush_faces`), reading the first relevant entity with `sel[key]`, writing all selected entities with `sel[key] = value`, and applying transformations (`translate`, `rotate`, `scale`, `duplicate`, `chamfer_vertices`, `chamfer_edges`).
+- `doc.selection`: The `Selection` handle for querying selected objects (`entity`, `brush`, `entities`, `all_entities`, `brushes`, `brush_faces`), reading the first relevant entity with `sel[key]`, writing all relevant entities with `sel[key] = value`, and applying transformations (`translate`, `rotate`, `scale`, `duplicate`, `chamfer_vertices`, `chamfer_edges`). Face-only selections expose the face's parent entity through `entity` and `all_entities`; an empty selection returns `None`/empty results.
 - `doc.entities`: List of all `Entity` objects in the map. Access properties using `.get(key, default)` and `.set(key, value)`.
 - `brush.faces()`: Returns the polygon `Face` objects comprising a brush, providing access to `.material`, `.offset`, `.scale`, `.rotation`, and `.vertices`.
 - `tb2.Vec3(x, y, z)` and `tb2.Plane(normal, dist)`: 3D vector and plane math primitives.
+
+These objects are live handles rather than snapshots. Closing or reloading a document and deleting nodes invalidates related handles; changing brush geometry also invalidates previously acquired `Face` handles. Access raises `RuntimeError` after invalidation, so reacquire objects after such changes.
 
 #### Building Custom UI Panels {#building_custom_ui_panels}
 
 UI plugins create interactive panels on the **Plugins** inspector tab using `tb2.create_plugin_panel(title)`. The returned `PluginPanel` provides declarative controls:
 
 - **Labels & Text**: `.add_label(text)`, `.add_label_named(key, text)`, `.set_label_text(key, text)`, and `.add_html_view(key, html, height, callback)`.
-- **Form Inputs**: `.add_text_field(key, label, value)`, `.add_text_area(key, label, value)`, `.add_int_field(key, label, value, min, max)`, `.add_float_field(key, label, value, min, max, decimals, step)`, `.add_checkbox(key, text, checked)`, `.add_combo_box(key, label, items, callback, current)`, and `.add_color_field(key, label, color)`.
-- **Buttons**: `.add_button(text, callback)`.
-- **Data Views**: `.add_table_widget(key, columns, rows, height, callback)` and `.add_tree_widget(key, columns, rows, height, callback)`.
-- **Layout Containers**: `.add_group(key, title)`, `.add_row(key)`, and `.add_column(key)`.
+- **Form Inputs**: `.add_text_field(key, label, value)`, `.add_text_area(key, label, value)`, `.add_int_field(key, label, value, min, max)`, `.add_float_field(key, label, value, min, max, decimals, step)`, `.add_checkbox(key, text, checked)`, `.add_combo_box(key, label, items, callback, current)`, and `.add_color_field(key, label, color)`. Named controls have corresponding `get_*` methods; text fields and areas also have `set_*` methods. `.add_line_edit(text, callback)` is the compatibility callback form.
+- **Buttons**: `.add_button(text, callback)`; `.add_button_callback(...)` is its compatibility alias.
+- **Data Views**: `.add_table_widget(key, columns, rows, height, callback)` and `.add_tree_widget(key, columns, rows, height, callback)`, with `set_table_widget_rows` and `set_tree_widget_items` for updates.
+- **Layout Containers**: `.add_group(key, title)`, `.add_row(key)`, and `.add_column(key)`. Use `.set_widget_visible(key, visible)` to change visibility and `.clear()` to rebuild a container.
+
+#### Events and Timers {#plugin_events_and_timers}
+
+Persistent UI plugins can react to editor events:
+
+```python
+def on_selection_changed():
+    print(len(tb2.selection().all_entities))
+
+token = tb2.register_callback("selection_changed", on_selection_changed)
+# tb2.unregister_callback(token)  # Stop early when needed.
+```
+
+The emitted event names are `selection_changed`, `document_loaded`, and `document_saved`; callbacks receive no arguments. `set_timeout`, `set_interval`, and `clear_interval` are also available inside persistent UI plugin sessions. Timers raise `RuntimeError` when called from the console or **Run Python Script...**. Plugin unload automatically removes its panels, callbacks, and timers.
 
 #### Plugin Example {#plugin_example}
 

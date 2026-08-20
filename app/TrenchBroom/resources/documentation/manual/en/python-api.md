@@ -90,13 +90,13 @@ Returns a list of all `Brush` handles in the active selection.
 
 #### `tb2.selected_entities(include_brushes=False)` / `tb2.selectedEntities(include_brushes=False)` {#tb2_selected_entities}
 
-Returns directly selected `Entity` handles. Pass `include_brushes=True` to also include the parent entities of selected brushes.
+Returns directly selected `Entity` handles. Pass `include_brushes=True` to also include the parent entities of selected brushes and individually selected faces.
 
 - **Returns**: `list[tb2.Entity]`
 
 #### `tb2.selected_faces()` / `tb2.selectedFaces()` {#tb2_selected_faces}
 
-Returns a list of all `Face` handles across all selected brushes.
+Returns the individually selected `Face` handles. Selecting a whole brush does not expand it into all of its faces.
 
 - **Returns**: `list[tb2.Face]`
 
@@ -123,6 +123,15 @@ Deletes all currently selected geometry and entities from the active map.
 #### `tb2.deselect_all()` / `tb2.deselectAll()` {#tb2_deselect_all}
 
 Clears the active map selection.
+
+#### Selection and Event Helpers {#tb2_selection_and_event_helpers}
+
+- `tb2.selection() -> Selection`: Returns the current selection handle.
+- `tb2.selected_all_entities()` / `tb2.selectedAllEntities()`: Returns directly selected entities plus parent entities of selected brushes and faces.
+- `tb2.register_callback(event, callback) -> int`: Registers a no-argument callback for `selection_changed`, `document_loaded`, or `document_saved`.
+- `tb2.unregister_callback(token)`: Unregisters an event callback.
+- `tb2.set_timeout(callback, milliseconds)` / `tb2.set_interval(callback, milliseconds)`: Creates a plugin-session timer. Timers require a persistent UI plugin session.
+- `tb2.clear_interval(timer_id)`: Cancels either type of timer.
 
 ### Math & Geometry Primitives {#math_primitives}
 
@@ -166,7 +175,7 @@ The `Document` class represents an open map file and provides map queries, trans
 | :--- | :--- | :--- |
 | `selection` | <span class="type-badge">Selection</span> | Active selection container for querying and transforming objects. |
 | `entities` | <span class="type-badge">list[Entity]</span> | All point and brush entities in the document. |
-| `path` | <span class="type-badge">str \| None</span> | Absolute map path, or `None` for an unsaved document. |
+| `path` | <span class="type-badge">str \| None</span> | Current map path. New unsaved maps normally use `"unnamed.map"`; `None` is returned only when the internal path is empty. |
 | `materials` | <span class="type-badge">list[Material]</span> | Materials currently loaded by the map. |
 | `material_collections` | <span class="type-badge">list[MaterialCollection]</span> | Loaded material collections. |
 
@@ -187,6 +196,10 @@ with doc.transaction("Duplicate and Move"):
 
 Other document methods include `save()`, `reload()`, `select(objects)`, `clear_selection()`, `vertex_tool_vertices()`, `set_triangle_uvs(triangles)`, `set_face_uvs(updates)`, and `set_face_uvs_with_split(updates)`.
 
+### Handle Lifetime {#python_handle_lifetime}
+
+`Document`, `Entity`, `Brush`, and `Face` objects are live handles, not snapshots. Closing or reloading a document and deleting nodes invalidates related handles. Changing brush geometry also invalidates previously acquired `Face` handles. Accessing an invalid handle raises `RuntimeError`; reacquire long-lived objects from `tb2.current_document()`, the current selection, or their parent object after such changes.
+
 ---
 
 ## Selection & Transforms: Selection {#tb2_selection}
@@ -195,16 +208,16 @@ The `Selection` object provides direct access to highlighted geometry and high-l
 
 ### Query Properties {#selection_queries}
 
-- `sel.entity` (*Entity | None*): First relevant entity, including the parent entity of a selected brush.
+- `sel.entity` (*Entity | None*): First relevant entity, including the parent entity of a selected brush or face. Returns `None` for an empty selection.
 - `sel.brush` (*Brush | None*): First selected brush.
 - `sel.properties` (*dict[str, str] | None*): Property snapshot of the first relevant entity.
 - `sel.classname` (*str | None*): Classname of the first relevant entity.
 - `sel.entities` (*list[Entity]*): Directly selected entities.
-- `sel.all_entities` (*list[Entity]*): Directly selected entities plus parent entities of selected brushes.
+- `sel.all_entities` (*list[Entity]*): Directly selected entities plus parent entities of selected brushes and individually selected faces. Returns an empty list for an empty selection.
 - `sel.brushes` (*list[Brush]*): Selected brushes.
 - `sel.brush_faces` (*list[Face]*): List of individually selected brush faces.
 
-`sel[key]` and `key in sel` read the first relevant entity. `sel[key] = value` is equivalent to `sel.set_property(key, value)` and writes to every selected entity. Use `create_if_missing=False` with `set_property()` to update only entities that already contain the key.
+`sel[key]` and `key in sel` read the first relevant entity. `sel[key] = value` is equivalent to `sel.set_property(key, value)` and writes to every relevant entity. Face-only selections target the parent entity of the face's brush. Use `create_if_missing=False` with `set_property()` to update only entities that already contain the key; it returns `False` when none match.
 
 ### Transformation Methods {#selection_transforms}
 
@@ -299,20 +312,30 @@ The `PluginPanel` class allows Python plugins to construct rich, responsive inte
 | :--- | :--- | :--- |
 | `add_label(text)` | `text: str` | Adds static informational text. |
 | `add_label_named(key, text)` | `key: str, text: str` | Adds a dynamic label whose text can be updated via `set_label_text(key, text)`. |
+| `add_html_view(key, html, height, callback)` | `key, html, height, callback` | Adds rich HTML content; update it with `set_html_view(key, html)`. |
+| `add_line_edit(text, callback)` | `text: str, callback: callable` | Compatibility text field that invokes a callback as text changes. |
 | `add_text_field(key, label, value)` | `key: str, label: str, value: str` | Single-line string input field. |
+| `add_text_area(key, label, value, height)` | `key, label, value, height` | Multi-line text input field. |
 | `add_int_field(key, label, value, min, max)` | `key, label, value: int, min: int, max: int` | Integer spinbox with bounded limits. |
 | `add_float_field(key, label, value, min, max, decimals, step)` | `key, label, value: float, min, max, decimals: int, step: float` | Floating-point numerical input field. |
 | `add_checkbox(key, text, checked)` | `key: str, text: str, checked: bool` | Boolean toggle checkbox. |
 | `add_combo_box(key, label, items, callback, current)` | `key, label, items: list[str], callback: callable, current: int` | Dropdown selection box. |
 | `add_color_field(key, label, color)` | `key: str, label: str, color: tuple[int, int, int]` | RGB color picker input. |
 | `add_button(text, callback)` | `text: str, callback: callable` | Push button triggering a Python function. |
+| `add_button_callback(text, callback)` | `text: str, callback: callable` | Compatibility alias for `add_button`. |
+
+Named fields expose matching getters such as `get_text_field`, `get_text_area`, `get_int_field`, `get_float_field`, `get_checkbox`, `get_combo_box_text`, and `get_color_field`. Text fields and text areas also provide `set_text_field` and `set_text_area`.
 
 ### Data Views & Containers {#pluginpanel_containers}
 
 - `add_table_widget(key, columns, rows, height, callback)`: Displays multi-column tabular data with selectable rows.
+- `set_table_widget_rows(key, rows)`: Replaces table rows.
 - `add_tree_widget(key, columns, rows, height, callback)`: Displays hierarchical tree data with expandable nodes.
+- `set_tree_widget_items(key, rows)`: Replaces tree items.
 - `add_group(key, title)`: Creates a collapsible visual section group.
 - `add_row(key)` / `add_column(key)`: Horizontal and vertical layout containers.
+- `set_widget_visible(key, visible)`: Shows or hides a named control.
+- `clear()`: Removes all controls from the current panel container.
 
 ---
 
