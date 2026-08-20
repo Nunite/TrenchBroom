@@ -166,7 +166,10 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "system"};
   const auto uiSnapshotPageOption = QCommandLineOption{
     QStringList{"ui-snapshot-page"},
-    "Select the surface to capture: map, outliner, entity-browser, "
+    "Select the surface to capture: map, outliner, "
+    "outliner-hierarchy, outliner-filter, outliner-properties-entity, "
+    "outliner-reparent-layer-before, outliner-reparent-layer-after, "
+    "outliner-brush-entity-before, outliner-brush-entity-after, entity-browser, "
     "entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, "
     "supporting, python-console, command-palette, components, preferences, "
     "preferences-colors, preferences-mouse, preferences-keyboard, or preferences-misc.",
@@ -215,30 +218,12 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
   }
 
   const auto snapshotPage = parser.value(uiSnapshotPageOption).trimmed().toLower();
-  if (
-    snapshotPage != QStringLiteral("map") && snapshotPage != QStringLiteral("outliner")
-    && snapshotPage != QStringLiteral("entity-browser")
-    && snapshotPage != QStringLiteral("entity-browser-empty")
-    && snapshotPage != QStringLiteral("face-inspector")
-    && snapshotPage != QStringLiteral("material-browser-empty")
-    && snapshotPage != QStringLiteral("plugin-inspector")
-    && snapshotPage != QStringLiteral("supporting")
-    && snapshotPage != QStringLiteral("python-console")
-    && snapshotPage != QStringLiteral("command-palette")
-    && snapshotPage != QStringLiteral("components")
-    && snapshotPage != QStringLiteral("preferences")
-    && snapshotPage != QStringLiteral("preferences-colors")
-    && snapshotPage != QStringLiteral("preferences-mouse")
-    && snapshotPage != QStringLiteral("preferences-keyboard")
-    && snapshotPage != QStringLiteral("preferences-misc"))
+  if (!isSupportedUiSnapshotPage(snapshotPage))
   {
     qCritical() << "Unsupported UI snapshot page:" << snapshotPage;
     return std::nullopt;
   }
-  if (
-    options.fileNames.empty() && snapshotPage != QStringLiteral("map")
-    && snapshotPage != QStringLiteral("components")
-    && !snapshotPage.startsWith(QStringLiteral("preferences")))
+  if (options.fileNames.empty() && uiSnapshotPageRequiresMap(snapshotPage))
   {
     qCritical() << "The selected UI snapshot page requires one map file";
     return std::nullopt;

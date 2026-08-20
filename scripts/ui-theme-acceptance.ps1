@@ -23,6 +23,8 @@ param(
   [string[]] $Themes = @("light", "dark", "blender"),
   [string[]] $ScaleFactors = @("1", "1.5", "2"),
   [string] $MapPath = "lib\TbMdlLib\test\fixture\mdl\Map\initialMap.map",
+  [string] $OutlinerMapPath =
+    "lib\TbUiLib\test\fixture\ui\UiSnapshot\outlinerHierarchy.map",
   [string] $MaterialMapPath =
     "lib\TbMdlLib\test\fixture\mdl\Map\reloadMaterialCollectionsQ2.map",
   [string] $MaterialGamePath = "lib\TbUiLib\test\fixture\mdl\Game\Quake2",
@@ -230,6 +232,13 @@ foreach ($target in $normalizedTargets) {
       "welcome",
       "workbench",
       "outliner",
+      "outliner-hierarchy",
+      "outliner-filter",
+      "outliner-properties-entity",
+      "outliner-reparent-layer-before",
+      "outliner-reparent-layer-after",
+      "outliner-brush-entity-before",
+      "outliner-brush-entity-after",
       "entity-browser",
       "entity-browser-empty",
       "face-inspector",
@@ -245,7 +254,7 @@ foreach ($target in $normalizedTargets) {
       "preferences-keyboard",
       "preferences-misc"
     )) {
-    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, supporting, python-console, command-palette, components, preferences, preferences-colors, preferences-mouse, preferences-keyboard, or preferences-misc."
+    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, outliner-hierarchy, outliner-filter, outliner-properties-entity, outliner-reparent-layer-before, outliner-reparent-layer-after, outliner-brush-entity-before, outliner-brush-entity-after, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, supporting, python-console, command-palette, components, preferences, preferences-colors, preferences-mouse, preferences-keyboard, or preferences-misc."
   }
 }
 foreach ($theme in $Themes) {
@@ -289,9 +298,12 @@ $resolvedMaterialMapPath =
   if ($usesMaterialFixture) { Resolve-Path -Path $MaterialMapPath } else { $null }
 $resolvedMaterialGamePath =
   if ($usesMaterialFixture) { Resolve-Path -Path $MaterialGamePath } else { $null }
+$usesOutlinerFixture =
+  @($normalizedTargets | Where-Object { $_.StartsWith("outliner") }).Count -gt 0
+$resolvedOutlinerMapPath =
+  if ($usesOutlinerFixture) { Resolve-Path -Path $OutlinerMapPath } else { $null }
 $resolvedMapPath = if (
   $normalizedTargets -contains "workbench" -or
-  $normalizedTargets -contains "outliner" -or
   $normalizedTargets -contains "entity-browser" -or
   $normalizedTargets -contains "entity-browser-empty" -or
   $normalizedTargets -contains "plugin-inspector" -or
@@ -345,15 +357,22 @@ foreach ($target in $normalizedTargets) {
       }
       $useMaterialFixture =
         $target -eq "face-inspector" -or $target -eq "material-browser-empty"
+      $useOutlinerFixture = $target.StartsWith("outliner")
       $targetMapPath =
-        if ($useMaterialFixture) { $resolvedMaterialMapPath } else { $resolvedMapPath }
+        if ($useMaterialFixture) {
+          $resolvedMaterialMapPath
+        } elseif ($useOutlinerFixture) {
+          $resolvedOutlinerMapPath
+        } else {
+          $resolvedMapPath
+        }
       if ($useMaterialFixture) {
         $processInfo.Arguments +=
           " --ui-snapshot-game-path `"$($resolvedMaterialGamePath.Path)`""
       }
       if (
         $target -eq "workbench" -or
-        $target -eq "outliner" -or
+        $target.StartsWith("outliner") -or
         $target -eq "entity-browser" -or
         $target -eq "entity-browser-empty" -or
         $target -eq "face-inspector" -or
@@ -478,6 +497,8 @@ $reportPath = Join-Path $runDirectory "report.json"
 $reportMapPath = if ($null -eq $resolvedMapPath) { $null } else { $resolvedMapPath.Path }
 $reportMaterialMapPath =
   if ($null -eq $resolvedMaterialMapPath) { $null } else { $resolvedMaterialMapPath.Path }
+$reportOutlinerMapPath =
+  if ($null -eq $resolvedOutlinerMapPath) { $null } else { $resolvedOutlinerMapPath.Path }
 $reportMaterialGamePath =
   if ($null -eq $resolvedMaterialGamePath) { $null } else { $resolvedMaterialGamePath.Path }
 @{
@@ -485,6 +506,7 @@ $reportMaterialGamePath =
   executable = $executable
   qtBin = $resolvedQtBin.Path
   mapPath = $reportMapPath
+  outlinerMapPath = $reportOutlinerMapPath
   materialMapPath = $reportMaterialMapPath
   materialGamePath = $reportMaterialGamePath
   contactSheet = $contactSheetPath

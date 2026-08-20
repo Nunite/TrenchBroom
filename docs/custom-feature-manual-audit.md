@@ -33,19 +33,19 @@
 
 | 功能 | 手册状态 | 截图能力 |
 | --- | --- | --- |
-| 统一显示 Layer、Group、点实体、Brush Entity、worldspawn 和普通 Brush | 简略 | 可直接截图，但现有地图内容太少 |
+| 统一显示 Layer、Group、点实体、Brush Entity、worldspawn 和普通 Brush | 简略 | 可直接截图（`outliner-hierarchy`） |
 | Outliner 与视口双向同步选择 | 简略 | 需要场景 |
 | 高亮当前 Layer、当前 Group 和 Linked Group | 简略 | 需要场景 |
-| 按文字、对象类型和选中状态过滤 | 简略 | 需要 target |
+| 按文字、对象类型和选中状态过滤 | 简略 | 可直接截图（`outliner-filter`） |
 | 默认、类型和文件顺序排序 | 简略 | 需要 target |
 | 直接切换可见性、锁定和导出排除状态 | 简略 | 需要场景 |
 | Layer、Group、实体、Brush、聚焦、隔离、重命名和删除右键菜单 | 简略 | 需要打开菜单的 target |
 | 在 Outliner 中创建 Layer | 简略 | 需要 target |
 | Delete/Backspace 删除、Esc 清除选择和键盘行导航 | 简略 | 需要交互状态或步骤图 |
-| 将对象拖到另一个 Layer 或 Group | 缺失 | 需要拖放前后状态 |
-| 将普通 Brush 拖入 Brush Entity | 缺失 | 需要拖放前后状态 |
+| 将对象拖到另一个 Layer 或 Group | 缺失 | Layer 前后状态可直接截图；Group 尚需 target |
+| 将普通 Brush 拖入 Brush Entity | 缺失 | 可直接截图（`outliner-brush-entity-before/after`） |
 | 将 Brush Entity 中的 Brush 拖回目标 Layer 的 worldspawn | 缺失 | 需要拖放前后状态 |
-| 内嵌编辑 worldspawn 和实体属性 | 缺失 | 基础面板可直接截图，完整内容需要场景 |
+| 内嵌编辑 worldspawn 和实体属性 | 缺失 | 实体属性可直接截图（`outliner-properties-entity`）；worldspawn 尚需 target |
 | 批量属性、choice、spawnflags、WAD、skyname、新增/删除属性和复制属性键 | 缺失 | 需要专用实体属性场景 |
 
 这里常说的“Brush 拖动合并”实际是把 Brush 重归属到 Brush Entity，并不是 CSG
@@ -229,6 +229,13 @@ TrenchBroom.exe --ui-snapshot OUTPUT.png \
 welcome
 workbench
 outliner
+outliner-hierarchy
+outliner-filter
+outliner-properties-entity
+outliner-reparent-layer-before
+outliner-reparent-layer-after
+outliner-brush-entity-before
+outliner-brush-entity-after
 entity-browser
 entity-browser-empty
 face-inspector
@@ -266,7 +273,7 @@ preferences-misc
 
 | Target | 输出尺寸 | 结果 |
 | --- | --- | --- |
-| `outliner` | 1440x900 | 层级树和属性面板清晰，但场景只有一个 worldspawn Brush |
+| `outliner` | 1440x900 | 当时的基础层级树和属性面板清晰；此后已改用专用层级 fixture |
 | `supporting` | 1440x900 | Assets 布局清晰，但只有空资源根目录 |
 | `python-console` | 1440x900 | 可以直接用于手册 |
 | `command-palette` | 640x480 | 可以直接用于手册 |
@@ -295,33 +302,42 @@ preferences-misc
 - Misc 中的 Prefab 目录和 MCP 设置。
 - Entity Browser、Face Inspector、Material Browser 和 Plugin Inspector 概览。
 
-要覆盖其余功能，需要补充：
+第一批 Outliner 确定性截图链路已于 2026-08-20 完成：
 
-1. 一张包含多个 Layer、Group、点实体、Brush Entity、worldspawn Brush、Linked Group、
-   隐藏和锁定状态的仓库内层级 fixture。
-2. Outliner 过滤、排序、右键菜单、属性类型和拖放前后状态 target。
-3. 包含小型合法 MDL、SPR、WAV、skybox、WAD 和 Prefab 的 GoldSrc fixture。资源必须可
+- 新增仓库内 Quake 层级 fixture，包含 3 个自定义 Layer、3 个 Group、点实体、
+  Brush Entity、worldspawn Brush，以及锁定和导出排除状态。
+- 新增层级、类型过滤、实体属性、移动 Layer 前后和 Brush 归入 Brush Entity 前后共
+  7 个专用 target。
+- `scripts/ui-theme-acceptance.ps1` 会将所有 `outliner-*` target 路由到该 fixture，
+  同时保留默认矩阵只捕获 `outliner` 概览。
+- 8 个 Outliner target 已在 Dark、100% 缩放下通过专用节点/父级语义校验、PNG、
+  manifest 和人工视觉检查。
+  Layer 前后图显示对象从 `Gameplay` 移至 `Architecture`；Brush Entity 前后图显示
+  `func_door` 的子 Brush 数量从 1 变为 2。
+
+验证生成物位于
+`build-release-codex/codex-logs/ui-theme-acceptance/20260820-160619-029`，只作为构建日志，
+不提交到仓库。
+
+要覆盖其余功能，还需要补充：
+
+1. 为 Outliner 补 Linked Group、隐藏状态、右键菜单、创建 Layer、worldspawn 属性、
+   拖入 Group 和 Brush Entity 拖回 worldspawn 等专用状态。
+2. 包含小型合法 MDL、SPR、WAV、skybox、WAD 和 Prefab 的 GoldSrc fixture。资源必须可
    追踪许可证，或由仓库脚本自行生成。
-4. 等待所有可见资源预览就绪的 Asset Browser readiness 检查，不能只判断非空图片。
-5. 为 Chamfer、Smart Face、Sweep、Sweep Bridge 和 Path Tool 准备带预选面、边和顶点
+3. 等待所有可见资源预览就绪的 Asset Browser readiness 检查，不能只判断非空图片。
+4. 为 Chamfer、Smart Face、Sweep、Sweep Bridge 和 Path Tool 准备带预选面、边和顶点
    的建模 fixture。
-6. 为 Pie Menu、右键菜单、IntelliSense 和 Plugin Manager 增加可捕获弹窗的 target。
-7. 把 Misc Preferences 拆成顶部和 MCP 两个状态，避免控件因滚动被隐藏。
-8. 为 2D 可读轮廓、FPS、天空盒成功/回退以及资源或 Prefab 拖放预览增加视口 target。
+5. 为 Pie Menu、右键菜单、IntelliSense 和 Plugin Manager 增加可捕获弹窗的 target。
+6. 把 Misc Preferences 拆成顶部和 MCP 两个状态，避免控件因滚动被隐藏。
+7. 为 2D 可读轮廓、FPS、天空盒成功/回退以及资源或 Prefab 拖放预览增加视口 target。
 
-### 建议新增的截图 target
+### 后续建议新增的截图 target
 
 ```text
-outliner-hierarchy
-outliner-filter
 outliner-layer-menu
 outliner-group-menu
-outliner-properties-entity
 outliner-properties-worldspawn
-outliner-reparent-layer-before
-outliner-reparent-layer-after
-outliner-brush-entity-before
-outliner-brush-entity-after
 asset-browser-models
 asset-browser-sprites
 asset-browser-sounds

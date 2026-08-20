@@ -38,6 +38,10 @@ struct UiSnapshotCommandLineOptions
   QString gamePath;
 };
 
+bool isSupportedUiSnapshotPage(const QString& page);
+
+bool uiSnapshotPageRequiresMap(const QString& page);
+
 using OpenFilesForUiSnapshot = std::function<bool(const QStringList&)>;
 
 int runUiSnapshot(

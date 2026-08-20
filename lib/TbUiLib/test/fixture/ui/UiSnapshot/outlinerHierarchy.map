@@ -1,0 +1,146 @@
+// Game: Quake
+// Format: Standard
+// entity 0
+{
+"classname" "worldspawn"
+// brush 0: source for the brush-entity reparenting snapshot
+{
+( -224 -32 0 ) ( -224 -31 0 ) ( -224 -32 1 ) snapshot_entity_source 0 0 0 1 1
+( -224 -32 0 ) ( -224 -32 1 ) ( -223 -32 0 ) snapshot_entity_source 0 0 0 1 1
+( -224 -32 0 ) ( -223 -32 0 ) ( -224 -31 0 ) snapshot_entity_source 0 0 0 1 1
+( -160 32 64 ) ( -160 33 64 ) ( -159 32 64 ) snapshot_entity_source 0 0 0 1 1
+( -160 32 64 ) ( -159 32 64 ) ( -160 32 65 ) snapshot_entity_source 0 0 0 1 1
+( -160 32 64 ) ( -160 32 65 ) ( -160 33 64 ) snapshot_entity_source 0 0 0 1 1
+}
+}
+// entity 1
+{
+"classname" "func_group"
+"_tb_type" "_tb_layer"
+"_tb_name" "Gameplay"
+"_tb_id" "1"
+"_tb_layer_sort_index" "0"
+"_tb_layer_color" "0.30 0.58 0.92"
+// brush 0: source for the layer reparenting snapshot
+{
+( -96 -32 0 ) ( -96 -31 0 ) ( -96 -32 1 ) snapshot_layer_source 0 0 0 1 1
+( -96 -32 0 ) ( -96 -32 1 ) ( -95 -32 0 ) snapshot_layer_source 0 0 0 1 1
+( -96 -32 0 ) ( -95 -32 0 ) ( -96 -31 0 ) snapshot_layer_source 0 0 0 1 1
+( -32 32 64 ) ( -32 33 64 ) ( -31 32 64 ) snapshot_layer_source 0 0 0 1 1
+( -32 32 64 ) ( -31 32 64 ) ( -32 32 65 ) snapshot_layer_source 0 0 0 1 1
+( -32 32 64 ) ( -32 32 65 ) ( -32 33 64 ) snapshot_layer_source 0 0 0 1 1
+}
+}
+// entity 2
+{
+"classname" "func_group"
+"_tb_type" "_tb_layer"
+"_tb_name" "Architecture"
+"_tb_id" "2"
+"_tb_layer_sort_index" "1"
+"_tb_layer_color" "0.31 0.76 0.48"
+}
+// entity 3
+{
+"classname" "func_group"
+"_tb_type" "_tb_layer"
+"_tb_name" "Reference and Lighting"
+"_tb_id" "3"
+"_tb_layer_sort_index" "2"
+"_tb_layer_color" "0.88 0.56 0.24"
+"_tb_layer_locked" "1"
+"_tb_layer_omit_from_export" "1"
+}
+// entity 4
+{
+"classname" "func_group"
+"_tb_type" "_tb_group"
+"_tb_name" "Entry Hall"
+"_tb_id" "10"
+"_tb_layer" "1"
+// brush 0
+{
+( 0 -32 0 ) ( 0 -31 0 ) ( 0 -32 1 ) snapshot_group 0 0 0 1 1
+( 0 -32 0 ) ( 0 -32 1 ) ( 1 -32 0 ) snapshot_group 0 0 0 1 1
+( 0 -32 0 ) ( 1 -32 0 ) ( 0 -31 0 ) snapshot_group 0 0 0 1 1
+( 64 32 64 ) ( 64 33 64 ) ( 65 32 64 ) snapshot_group 0 0 0 1 1
+( 64 32 64 ) ( 65 32 64 ) ( 64 32 65 ) snapshot_group 0 0 0 1 1
+( 64 32 64 ) ( 64 32 65 ) ( 64 33 64 ) snapshot_group 0 0 0 1 1
+}
+}
+// entity 5
+{
+"classname" "info_null"
+"origin" "32 0 88"
+"targetname" "entry_marker"
+"_tb_group" "10"
+}
+// entity 6
+{
+"classname" "light"
+"origin" "32 0 144"
+"targetname" "entry_key_light"
+"light" "450"
+"color" "255 210 160"
+"style" "0"
+"_tb_group" "10"
+}
+// entity 7
+{
+"classname" "func_door"
+"targetname" "entry_door"
+"angle" "90"
+"speed" "120"
+"wait" "3"
+"_tb_layer" "1"
+// brush 0
+{
+( 96 -32 0 ) ( 96 -31 0 ) ( 96 -32 1 ) snapshot_door 0 0 0 1 1
+( 96 -32 0 ) ( 96 -32 1 ) ( 97 -32 0 ) snapshot_door 0 0 0 1 1
+( 96 -32 0 ) ( 97 -32 0 ) ( 96 -31 0 ) snapshot_door 0 0 0 1 1
+( 160 32 96 ) ( 160 33 96 ) ( 161 32 96 ) snapshot_door 0 0 0 1 1
+( 160 32 96 ) ( 161 32 96 ) ( 160 32 97 ) snapshot_door 0 0 0 1 1
+( 160 32 96 ) ( 160 32 97 ) ( 160 33 96 ) snapshot_door 0 0 0 1 1
+}
+}
+// entity 8
+{
+"classname" "func_group"
+"_tb_type" "_tb_group"
+"_tb_name" "Architecture Shell"
+"_tb_id" "20"
+"_tb_layer" "2"
+// brush 0
+{
+( -32 96 0 ) ( -32 97 0 ) ( -32 96 1 ) snapshot_architecture 0 0 0 1 1
+( -32 96 0 ) ( -32 96 1 ) ( -31 96 0 ) snapshot_architecture 0 0 0 1 1
+( -32 96 0 ) ( -31 96 0 ) ( -32 97 0 ) snapshot_architecture 0 0 0 1 1
+( 32 160 64 ) ( 32 161 64 ) ( 33 160 64 ) snapshot_architecture 0 0 0 1 1
+( 32 160 64 ) ( 33 160 64 ) ( 32 160 65 ) snapshot_architecture 0 0 0 1 1
+( 32 160 64 ) ( 32 160 65 ) ( 32 161 64 ) snapshot_architecture 0 0 0 1 1
+}
+}
+// entity 9
+{
+"classname" "info_null"
+"origin" "0 128 88"
+"targetname" "architecture_anchor"
+"_tb_group" "20"
+}
+// entity 10
+{
+"classname" "func_group"
+"_tb_type" "_tb_group"
+"_tb_name" "Lighting Rig"
+"_tb_id" "30"
+"_tb_layer" "3"
+}
+// entity 11
+{
+"classname" "light"
+"origin" "-128 128 160"
+"targetname" "locked_fill_light"
+"light" "250"
+"color" "160 190 255"
+"_tb_group" "30"
+}

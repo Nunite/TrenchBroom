@@ -53,9 +53,18 @@
 #include "gl/MaterialManager.h"
 #include "gl/Resource.h"
 #include "gl/Texture.h"
+#include "mdl/BrushFace.h"
+#include "mdl/BrushNode.h"
+#include "mdl/EntityNode.h"
 #include "mdl/GameManager.h"
+#include "mdl/GroupNode.h"
+#include "mdl/LayerNode.h"
 #include "mdl/Map.h"
 #include "mdl/MapHeader.h"
+#include "mdl/Map_Nodes.h"
+#include "mdl/Map_Selection.h"
+#include "mdl/Node.h"
+#include "mdl/WorldNode.h"
 #include "prefs/Preferences.h"
 #include "ui/ActionExecutionContext.h"
 #include "ui/AppController.h"
@@ -72,12 +81,49 @@
 #include "ui/UiSnapshot.h"
 #include "ui/WelcomeWindow.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <memory>
 #include <variant>
 
 namespace tb::ui
 {
+
+bool isSupportedUiSnapshotPage(const QString& page)
+{
+  static const auto pages = QStringList{
+    QStringLiteral("map"),
+    QStringLiteral("outliner"),
+    QStringLiteral("outliner-hierarchy"),
+    QStringLiteral("outliner-filter"),
+    QStringLiteral("outliner-properties-entity"),
+    QStringLiteral("outliner-reparent-layer-before"),
+    QStringLiteral("outliner-reparent-layer-after"),
+    QStringLiteral("outliner-brush-entity-before"),
+    QStringLiteral("outliner-brush-entity-after"),
+    QStringLiteral("entity-browser"),
+    QStringLiteral("entity-browser-empty"),
+    QStringLiteral("face-inspector"),
+    QStringLiteral("material-browser-empty"),
+    QStringLiteral("plugin-inspector"),
+    QStringLiteral("supporting"),
+    QStringLiteral("python-console"),
+    QStringLiteral("command-palette"),
+    QStringLiteral("components"),
+    QStringLiteral("preferences"),
+    QStringLiteral("preferences-colors"),
+    QStringLiteral("preferences-mouse"),
+    QStringLiteral("preferences-keyboard"),
+    QStringLiteral("preferences-misc")};
+  return pages.contains(page);
+}
+
+bool uiSnapshotPageRequiresMap(const QString& page)
+{
+  return page != QStringLiteral("map") && page != QStringLiteral("components")
+         && !page.startsWith(QStringLiteral("preferences"));
+}
+
 namespace
 {
 
@@ -137,16 +183,207 @@ WelcomeWindow* findWelcomeWindow()
   return nullptr;
 }
 
-void configureOutlinerSnapshot(QWidget& targetWidget)
+bool isOutlinerSnapshotTarget(const QString& targetName)
 {
+  return targetName.startsWith(QStringLiteral("outliner"));
+}
+
+template <typename NodeType, typename Predicate>
+NodeType* findSnapshotNode(mdl::Node& node, const Predicate& predicate)
+{
+  if (auto* typedNode = dynamic_cast<NodeType*>(&node);
+      typedNode && predicate(*typedNode))
+  {
+    return typedNode;
+  }
+
+  for (auto* child : node.children())
+  {
+    if (auto* result = findSnapshotNode<NodeType>(*child, predicate))
+    {
+      return result;
+    }
+  }
+  return nullptr;
+}
+
+mdl::LayerNode* findSnapshotLayer(mdl::WorldNode& worldNode, const std::string& name)
+{
+  const auto layers = worldNode.customLayers();
+  const auto it = std::ranges::find_if(
+    layers, [&](const auto* layer) { return layer->name() == name; });
+  return it != layers.end() ? *it : nullptr;
+}
+
+mdl::BrushNode* findSnapshotBrush(mdl::WorldNode& worldNode, const std::string& material)
+{
+  return findSnapshotNode<mdl::BrushNode>(worldNode, [&](const auto& brushNode) {
+    return brushNode.brush().faceCount() > 0u
+           && brushNode.brush().face(0u).materialName() == material;
+  });
+}
+
+mdl::EntityNode* findSnapshotEntity(
+  mdl::WorldNode& worldNode, const std::string& classname)
+{
+  return findSnapshotNode<mdl::EntityNode>(worldNode, [&](const auto& entityNode) {
+    return entityNode.entity().classname() == classname;
+  });
+}
+
+mdl::GroupNode* findSnapshotGroup(mdl::WorldNode& worldNode, const std::string& name)
+{
+  return findSnapshotNode<mdl::GroupNode>(
+    worldNode, [&](const auto& groupNode) { return groupNode.name() == name; });
+}
+
+QTreeWidgetItem* findSnapshotTreeItem(QTreeWidget& tree, const mdl::Node* selectedNode)
+{
+  if (selectedNode == nullptr)
+  {
+    return nullptr;
+  }
+
+  auto stack = QList<QTreeWidgetItem*>{};
+  for (auto i = 0; i < tree.topLevelItemCount(); ++i)
+  {
+    stack.push_back(tree.topLevelItem(i));
+  }
+
+  while (!stack.empty())
+  {
+    auto* item = stack.takeLast();
+    if (item->data(0, Qt::UserRole).value<mdl::Node*>() == selectedNode)
+    {
+      return item;
+    }
+    for (auto i = 0; i < item->childCount(); ++i)
+    {
+      stack.push_back(item->child(i));
+    }
+  }
+  return nullptr;
+}
+
+mdl::Node* configureOutlinerSnapshotModel(MapWindow& mapWindow, const QString& targetName)
+{
+  auto& map = mapWindow.document().map();
+  auto& worldNode = map.worldNode();
+  auto* selectedNode = static_cast<mdl::Node*>(nullptr);
+
+  if (
+    targetName == QStringLiteral("outliner-properties-entity")
+    || targetName == QStringLiteral("outliner"))
+  {
+    selectedNode = findSnapshotEntity(worldNode, "light");
+  }
+  else if (
+    targetName == QStringLiteral("outliner-filter")
+    || targetName == QStringLiteral("outliner-hierarchy"))
+  {
+    selectedNode = findSnapshotGroup(worldNode, "Entry Hall");
+  }
+  else if (
+    targetName == QStringLiteral("outliner-reparent-layer-before")
+    || targetName == QStringLiteral("outliner-reparent-layer-after"))
+  {
+    auto* sourceBrush = findSnapshotBrush(worldNode, "snapshot_layer_source");
+    auto* targetLayer = findSnapshotLayer(worldNode, "Architecture");
+    if (
+      targetName == QStringLiteral("outliner-reparent-layer-after")
+      && sourceBrush != nullptr && targetLayer != nullptr
+      && sourceBrush->parent() != targetLayer)
+    {
+      if (!mdl::reparentNodes(map, {{targetLayer, {sourceBrush}}}))
+      {
+        return nullptr;
+      }
+    }
+    selectedNode = sourceBrush;
+  }
+  else if (
+    targetName == QStringLiteral("outliner-brush-entity-before")
+    || targetName == QStringLiteral("outliner-brush-entity-after"))
+  {
+    auto* sourceBrush = findSnapshotBrush(worldNode, "snapshot_entity_source");
+    auto* targetEntity = findSnapshotEntity(worldNode, "func_door");
+    const auto showAfter = targetName == QStringLiteral("outliner-brush-entity-after");
+    if (
+      showAfter && sourceBrush != nullptr && targetEntity != nullptr
+      && sourceBrush->parent() != targetEntity)
+    {
+      if (!mdl::reparentNodes(map, {{targetEntity, {sourceBrush}}}))
+      {
+        return nullptr;
+      }
+    }
+    selectedNode = showAfter ? static_cast<mdl::Node*>(targetEntity)
+                             : static_cast<mdl::Node*>(sourceBrush);
+  }
+
+  if (selectedNode != nullptr)
+  {
+    mdl::deselectAll(map);
+    mdl::selectNodes(map, {selectedNode});
+  }
+  return selectedNode;
+}
+
+void configureOutlinerSnapshot(QWidget& targetWidget, const QString& targetName)
+{
+  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
+  if (mapWindow == nullptr)
+  {
+    return;
+  }
+
+  auto* selectedNode = configureOutlinerSnapshotModel(*mapWindow, targetName);
+  const auto showProperties =
+    targetName == QStringLiteral("outliner")
+    || targetName == QStringLiteral("outliner-properties-entity");
+
   if (
     auto* propertiesToggle = targetWidget.findChild<QAbstractButton*>(
       QStringLiteral("OutlinerInspector_PropertiesToggle")))
   {
-    if (!propertiesToggle->isChecked())
+    if (propertiesToggle->isChecked() != showProperties)
     {
       propertiesToggle->click();
     }
+  }
+
+  if (
+    auto* horizontalSplitter =
+      mapWindow->findChild<QSplitter*>(QStringLiteral("MapWindow_HorizontalSplitter")))
+  {
+    horizontalSplitter->setSizes(QList<int>{860, 580});
+  }
+
+  if (auto* outlinerSplitter =
+        mapWindow->findChild<QSplitter*>(QStringLiteral("OutlinerInspector_Splitter"));
+      outlinerSplitter != nullptr && showProperties)
+  {
+    outlinerSplitter->setSizes(QList<int>{330, 470});
+  }
+
+  if (
+    auto* search =
+      targetWidget.findChild<QLineEdit*>(QStringLiteral("OutlinerInspector_Search")))
+  {
+    const auto filter = targetName == QStringLiteral("outliner-filter")
+                          ? QStringLiteral("type:group")
+                          : QString{};
+    if (search->text() != filter)
+    {
+      search->setText(filter);
+    }
+  }
+
+  if (auto* sort =
+        targetWidget.findChild<QComboBox*>(QStringLiteral("OutlinerInspector_Sort"));
+      sort != nullptr && targetName == QStringLiteral("outliner-filter"))
+  {
+    sort->setCurrentIndex(1);
   }
 
   if (
@@ -154,10 +391,9 @@ void configureOutlinerSnapshot(QWidget& targetWidget)
       targetWidget.findChild<QTreeWidget*>(QStringLiteral("OutlinerTreeWidget")))
   {
     tree->expandAll();
-    if (auto* firstItem = tree->topLevelItem(0))
+    if (auto* snapshotItem = findSnapshotTreeItem(*tree, selectedNode))
     {
       const auto signalBlocker = QSignalBlocker{tree};
-      auto* snapshotItem = firstItem->childCount() > 0 ? firstItem->child(0) : firstItem;
       tree->clearSelection();
       tree->setCurrentItem(snapshotItem);
       snapshotItem->setSelected(true);
@@ -247,8 +483,127 @@ struct UiSnapshotReadiness
   QString detail;
 };
 
+UiSnapshotReadiness outlinerSnapshotReadiness(
+  QWidget& targetWidget, const QString& targetName)
+{
+  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
+  if (mapWindow == nullptr)
+  {
+    return {
+      UiSnapshotReadinessState::Failed,
+      QStringLiteral("Outliner snapshot target is not a map window")};
+  }
+
+  auto* tree = mapWindow->findChild<QTreeWidget*>(QStringLiteral("OutlinerTreeWidget"));
+  if (tree == nullptr)
+  {
+    return {
+      UiSnapshotReadinessState::Failed,
+      QStringLiteral("Outliner tree widget was not found")};
+  }
+  if (tree->topLevelItemCount() == 0)
+  {
+    return {
+      UiSnapshotReadinessState::Pending, QStringLiteral("Outliner tree has no rows")};
+  }
+
+  if (targetName == QStringLiteral("outliner"))
+  {
+    return {UiSnapshotReadinessState::Ready, {}};
+  }
+
+  auto& worldNode = mapWindow->document().map().worldNode();
+  auto* expectedNode = static_cast<mdl::Node*>(nullptr);
+  auto* parentedNode = static_cast<mdl::Node*>(nullptr);
+  auto* expectedParent = static_cast<mdl::Node*>(nullptr);
+  auto checkParent = false;
+  auto expectParent = false;
+  auto expectedDescription = QString{};
+
+  if (
+    targetName == QStringLiteral("outliner-hierarchy")
+    || targetName == QStringLiteral("outliner-filter"))
+  {
+    expectedNode = findSnapshotGroup(worldNode, "Entry Hall");
+    expectedDescription = QStringLiteral("Entry Hall group");
+  }
+  else if (targetName == QStringLiteral("outliner-properties-entity"))
+  {
+    expectedNode = findSnapshotEntity(worldNode, "light");
+    expectedDescription = QStringLiteral("light entity");
+  }
+  else if (targetName.startsWith(QStringLiteral("outliner-reparent-layer-")))
+  {
+    expectedNode = findSnapshotBrush(worldNode, "snapshot_layer_source");
+    parentedNode = expectedNode;
+    expectedParent = findSnapshotLayer(worldNode, "Architecture");
+    checkParent = true;
+    expectParent = targetName.endsWith(QStringLiteral("-after"));
+    expectedDescription = QStringLiteral("layer reparent source brush");
+  }
+  else if (targetName.startsWith(QStringLiteral("outliner-brush-entity-")))
+  {
+    auto* sourceBrush = findSnapshotBrush(worldNode, "snapshot_entity_source");
+    expectedParent = findSnapshotEntity(worldNode, "func_door");
+    checkParent = true;
+    expectParent = targetName.endsWith(QStringLiteral("-after"));
+    parentedNode = sourceBrush;
+    expectedNode = expectParent ? static_cast<mdl::Node*>(expectedParent)
+                                : static_cast<mdl::Node*>(sourceBrush);
+    expectedDescription = expectParent
+                            ? QStringLiteral("func_door entity")
+                            : QStringLiteral("brush entity reparent source brush");
+  }
+
+  if (expectedNode == nullptr)
+  {
+    return {
+      UiSnapshotReadinessState::Failed,
+      QStringLiteral("Outliner fixture is missing the %1").arg(expectedDescription)};
+  }
+  if (checkParent && expectedParent == nullptr)
+  {
+    return {
+      UiSnapshotReadinessState::Failed,
+      QStringLiteral("Outliner fixture is missing the target for the %1")
+        .arg(expectedDescription)};
+  }
+  if (checkParent && parentedNode == nullptr)
+  {
+    return {
+      UiSnapshotReadinessState::Failed,
+      QStringLiteral("Outliner fixture is missing the reparent source node")};
+  }
+  if (checkParent && (parentedNode->parent() == expectedParent) != expectParent)
+  {
+    return {
+      UiSnapshotReadinessState::Failed,
+      QStringLiteral("Outliner fixture has the wrong parent for the %1")
+        .arg(expectedDescription)};
+  }
+  auto* expectedItem = findSnapshotTreeItem(*tree, expectedNode);
+  if (
+    expectedItem == nullptr || expectedItem->isHidden()
+    || tree->currentItem() != expectedItem || !expectedItem->isSelected())
+  {
+    return {
+      UiSnapshotReadinessState::Pending,
+      QStringLiteral("Outliner tree has not revealed and selected the %1")
+        .arg(expectedDescription)};
+  }
+
+  return {
+    UiSnapshotReadinessState::Ready,
+    QStringLiteral("Outliner state ready: %1").arg(expectedDescription)};
+}
+
 UiSnapshotReadiness uiSnapshotReadiness(QWidget& targetWidget, const QString& targetName)
 {
+  if (isOutlinerSnapshotTarget(targetName))
+  {
+    return outlinerSnapshotReadiness(targetWidget, targetName);
+  }
+
   if (!isMaterialBrowserSnapshotTarget(targetName))
   {
     return {UiSnapshotReadinessState::Ready, {}};
@@ -354,8 +709,9 @@ void configureInspectorSnapshot(QWidget& targetWidget, const QString& targetName
       content->setLayout(panelLayout);
     }
 
-    if (auto* distance =
-          mapWindow->findChild<QDoubleSpinBox*>(QStringLiteral("UiSnapshot_PluginDistance")))
+    if (
+      auto* distance = mapWindow->findChild<QDoubleSpinBox*>(
+        QStringLiteral("UiSnapshot_PluginDistance")))
     {
       distance->setFocus(Qt::OtherFocusReason);
       distance->selectAll();
@@ -443,9 +799,9 @@ void configurePreferencesSnapshot(
 
 void configureSnapshot(QWidget& targetWidget, const QString& targetName)
 {
-  if (targetName == QStringLiteral("outliner"))
+  if (isOutlinerSnapshotTarget(targetName))
   {
-    configureOutlinerSnapshot(targetWidget);
+    configureOutlinerSnapshot(targetWidget, targetName);
   }
   else if (targetName == QStringLiteral("supporting"))
   {
@@ -681,7 +1037,7 @@ int runUiSnapshot(
         {
           targetWidget = mapWindow;
           mapWindow->resize(1440, 900);
-          if (targetName == QStringLiteral("outliner"))
+          if (isOutlinerSnapshotTarget(targetName))
           {
             mapWindow->switchToInspectorPage(InspectorPage::Outliner);
           }
