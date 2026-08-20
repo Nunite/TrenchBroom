@@ -33,19 +33,19 @@
 
 | 功能 | 手册状态 | 截图能力 |
 | --- | --- | --- |
-| 统一显示 Layer、Group、点实体、Brush Entity、worldspawn 和普通 Brush | 简略 | 可直接截图（`outliner-hierarchy`） |
-| Outliner 与视口双向同步选择 | 简略 | 需要场景 |
+| 统一显示 Layer、Group、点实体、Brush Entity、worldspawn 和普通 Brush | 较完整 | 已插入 `outliner-hierarchy` 截图 |
+| Outliner 与视口双向同步选择 | 较完整 | 已复用层级截图说明 |
 | 高亮当前 Layer、当前 Group 和 Linked Group | 简略 | 需要场景 |
-| 按文字、对象类型和选中状态过滤 | 简略 | 可直接截图（`outliner-filter`） |
-| 默认、类型和文件顺序排序 | 简略 | 需要 target |
+| 按文字、对象类型和选中状态过滤 | 较完整 | 已插入 `outliner-filter` 截图 |
+| 默认、类型和文件顺序排序 | 较完整 | 已复用过滤截图说明 |
 | 直接切换可见性、锁定和导出排除状态 | 简略 | 需要场景 |
 | Layer、Group、实体、Brush、聚焦、隔离、重命名和删除右键菜单 | 简略 | 需要打开菜单的 target |
 | 在 Outliner 中创建 Layer | 简略 | 需要 target |
 | Delete/Backspace 删除、Esc 清除选择和键盘行导航 | 简略 | 需要交互状态或步骤图 |
-| 将对象拖到另一个 Layer 或 Group | 缺失 | Layer 前后状态可直接截图；Group 尚需 target |
-| 将普通 Brush 拖入 Brush Entity | 缺失 | 可直接截图（`outliner-brush-entity-before/after`） |
-| 将 Brush Entity 中的 Brush 拖回目标 Layer 的 worldspawn | 缺失 | 需要拖放前后状态 |
-| 内嵌编辑 worldspawn 和实体属性 | 缺失 | 实体属性可直接截图（`outliner-properties-entity`）；worldspawn 尚需 target |
+| 将对象拖到另一个 Layer 或 Group | Layer 较完整；Group 缺失 | Layer 前后截图已插入；Group 尚需 target |
+| 将普通 Brush 拖入 Brush Entity | 较完整 | 前后截图已插入 |
+| 将 Brush Entity 中的 Brush 拖回目标 Layer 的 worldspawn | 文字较完整 | 仍需要拖放前后状态 |
+| 内嵌编辑 worldspawn 和实体属性 | 实体较完整；worldspawn 简略 | 实体属性截图已插入；worldspawn 尚需 target |
 | 批量属性、choice、spawnflags、WAD、skyname、新增/删除属性和复制属性键 | 缺失 | 需要专用实体属性场景 |
 
 这里常说的“Brush 拖动合并”实际是把 Brush 重归属到 Brush Entity，并不是 CSG
@@ -314,6 +314,8 @@ preferences-misc
   manifest 和人工视觉检查。
   Layer 前后图显示对象从 `Gameplay` 移至 `Architecture`；Brush Entity 前后图显示
   `func_door` 的子 Brush 数量从 1 变为 2。
+- 其中 7 张专用截图已复制到共用手册图片目录，并插入中英文第 7 章；该章现已说明
+  层级选择、完整过滤语法、三种排序、内嵌实体属性和拖放重归属工作流。
 
 验证生成物位于
 `build-release-codex/codex-logs/ui-theme-acceptance/20260820-160619-029`，只作为构建日志，

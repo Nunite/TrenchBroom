@@ -95,14 +95,72 @@ If you are working on large maps, it can become cumbersome to manage the objects
 
 The Outliner page in the inspector displays layers, groups, entities, and brushes as one hierarchy. Selecting an item selects the corresponding map object, and expanding groups or entities exposes their children. It is particularly useful when geometry overlaps in the viewports or when you need to understand nested groups.
 
+![Layers, groups, entities, and brushes in the Outliner](images/OutlinerHierarchy.png)
+
+### Navigating and Selecting {#outliner_navigation}
+
+Each layer is a top-level row. Groups and entities appear beneath the layer or group that contains them. A `worldspawn` branch collects the ordinary brushes in each layer, while a brush entity such as `func_door` exposes its own brushes as children. The Info column shows useful counts such as the number of objects in a layer or brushes in an entity.
+
+Selection is synchronized in both directions: selecting a row highlights the object in the viewports, and selecting an object in a viewport reveals and selects its row. Use #key(Ctrl) or #key(Shift) for multiple rows. #key(Esc) clears the selection. #key(Del) and #key(Backspace) delete selected groups, entities, or brushes, but do not delete layer rows.
+
+The two state columns on the right show locking and visibility. Click an icon in either column to toggle that state for the row and its contents. The active layer, open group, linked groups, locked rows, and hidden rows use distinct visual states so that editing context remains visible while navigating the tree.
+
 The toolbar provides these controls:
 
 - The search field filters the hierarchy after a short delay. Clear it to restore the full tree.
-- **Default** preserves the normal hierarchy order, **Type** groups comparable object types, and **File Order** follows object order in the map file. The chosen mode is remembered.
+- **Default** sorts siblings alphabetically, **Type** groups comparable object types and then sorts by name, and **File Order** follows object order in the map file. The chosen mode is remembered.
 - The plus button creates a named layer and reveals it in the tree.
 - The properties button opens a resizable entity property panel below the tree. Toggle it off to devote the full inspector height to the hierarchy.
 
 Layer visibility, locking, current-layer state, and group nesting remain visible in the Outliner, so it can be used alongside the dedicated map and entity inspectors rather than as a separate data model.
+
+### Filtering and Sorting {#outliner_filtering}
+
+Enter one or more words to match row names without regard to case. All plain words must match. The Outliner keeps the ancestors of every result visible, so a matching object still shows which group and layer contain it.
+
+The search field also recognizes these filters, which can be combined with each other and with plain words:
+
+Filter                                      Result
+------                                      ------
+`type:group`                                Show groups. Other types are `layer`, `entity`, `brush`, `patch`, `worldspawn`, `world`, and `other`.
+`type:group,entity`                         Show any of the comma-separated types.
+`vis:visible` or `vis:hidden`               Show rows by visibility.
+`lock:locked` or `lock:unlocked`            Show rows by lock state.
+`selected`                                  Show selected rows and the ancestors needed to locate them.
+
+For example, the following view uses `type:group` and **Type** sorting. Only the three matching groups and their layer ancestors remain visible.
+
+![Filtering the Outliner to show groups](images/OutlinerFilter.png)
+
+Clearing the field restores both the complete tree and the expansion state from before filtering. Filtering changes only what the tree displays; it does not hide objects in the map viewports.
+
+### Editing Entity Properties {#outliner_entity_properties}
+
+Click the properties button at the right of the toolbar to open the inline property editor. Select a point entity, brush entity, or `worldspawn` row to edit it without switching inspector pages. Drag the divider between the tree and editor to allocate more space to either area.
+
+![Editing a light entity in the Outliner](images/OutlinerEntityProperties.png)
+
+The inline editor supports the same property operations and definition-aware controls described in [Entity Properties](#entity_properties), including adding and removing keys, editing choices and spawnflags, and using smart color or resource controls where available. Changes apply to the map immediately and can be undone normally.
+
+### Reorganizing Objects by Dragging {#outliner_dragging}
+
+Dragging a row onto another container changes the object's parent in the map hierarchy. It does not perform a CSG merge or change the brush geometry. Each successful drop is one undoable transaction.
+
+To move objects to another layer, select their rows and drag them onto the destination layer row. The first image shows the selected world brush in `Gameplay`; the second shows the same brush beneath the `Architecture` layer.
+
+![A world brush before moving it to another layer](images/OutlinerMoveToLayerBefore.png)
+
+![The world brush after moving it to the Architecture layer](images/OutlinerMoveToLayerAfter.png)
+
+Dropping a child brush from a brush entity onto a layer row moves the entire brush entity to that layer. To detach individual brushes instead, drop their brush rows onto the destination layer's `worldspawn` row or one of its child brushes.
+
+To add ordinary brushes to an existing brush entity, select only brush rows and drag them onto the brush entity row. The first image shows a brush beneath the Default Layer's `worldspawn`; after the drop, `func_door` contains two brushes.
+
+![A world brush before adding it to a brush entity](images/OutlinerBrushEntityBefore.png)
+
+![The func_door brush entity after receiving the brush](images/OutlinerBrushEntityAfter.png)
+
+If moving brushes leaves their former brush entity empty, the empty entity is removed automatically. To move one or more brushes back out, drag their rows onto the `worldspawn` branch of the desired layer. Dragging layer rows does not reorder layers; the sort dropdown changes only how the existing hierarchy is displayed.
 
 ## Filtering {#filtering_rendering_options}
 

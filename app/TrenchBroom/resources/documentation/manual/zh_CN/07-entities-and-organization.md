@@ -95,14 +95,72 @@ No                     不显示任何实体链接。
 
 检查器中的 Outliner 页面将图层、组、实体和 Brush 显示为一个层级树。选择某个项目会选中对应的地图对象，展开组或实体则会显示其子对象。当视口中的几何体发生重叠，或者你需要理清嵌套组时，它特别有用。
 
+![Outliner 中的图层、组、实体和 Brush](images/OutlinerHierarchy.png)
+
+### 浏览与选择 {#outliner_navigation}
+
+每个图层都是一个顶层行。组和实体显示在包含它们的图层或组下方。每个图层中的普通 Brush 汇总在 `worldspawn` 分支中，而 `func_door` 之类的 Brush Entity 会将自己的 Brush 显示为子项。信息（Info）列会显示图层中的对象数量、实体中的 Brush 数量等信息。
+
+选择会双向同步：选择树中的行会在视口中高亮对应对象，在视口中选择对象也会定位并选中对应行。使用 #key(Ctrl) 或 #key(Shift) 可以选择多行。#key(Esc) 清除选择。#key(Del) 和 #key(Backspace) 可以删除选中的组、实体或 Brush，但不会删除图层行。
+
+右侧两个状态列分别显示锁定和可见性。点击其中的图标可以切换该行及其内容的对应状态。当前图层、已打开的组、链接组、锁定行和隐藏行采用不同的视觉状态，因此在浏览树时仍能看清当前编辑上下文。
+
 工具栏提供了以下控件：
 
 - 搜索字段在短暂延迟后过滤层级结构。清空搜索框可恢复完整树形结构。
-- **默认（Default）**保留常规层级顺序，**类型（Type）**将可比较的对象类型分组，**文件顺序（File Order）**遵循地图文件中的对象顺序。所选模式会被记住。
+- **默认（Default）**按名称对同级项目排序，**类型（Type）**先将可比较的对象类型分组再按名称排序，**文件顺序（File Order）**遵循地图文件中的对象顺序。所选模式会被记住。
 - 加号按钮创建一个具名图层并在树中显示它。
 - 属性按钮在树下方打开一个可调整大小的实体属性面板。将其关闭可将检查器的全部高度用于层级树。
 
 图层可见性、锁定状态、当前图层状态以及组嵌套在 Outliner 中保持可见，因此它可以与专用的地图和实体检查器配合使用，而不是作为一个单独的数据模型。
+
+### 过滤与排序 {#outliner_filtering}
+
+输入一个或多个单词可以按名称过滤行，不区分大小写。所有普通单词都必须匹配。Outliner 会保留每个结果的祖先，因此仍能看出匹配对象位于哪个组和图层中。
+
+搜索字段还支持以下过滤器。它们可以相互组合，也可以与普通单词组合：
+
+过滤器                                    结果
+------                                    ------
+`type:group`                              显示组。其他类型包括 `layer`、`entity`、`brush`、`patch`、`worldspawn`、`world` 和 `other`。
+`type:group,entity`                       显示逗号分隔类型中的任意一种。
+`vis:visible` 或 `vis:hidden`             按可见性显示行。
+`lock:locked` 或 `lock:unlocked`          按锁定状态显示行。
+`selected`                                显示选中行，以及定位它们所需的祖先行。
+
+例如，下图使用 `type:group` 和**类型（Type）**排序。树中只保留三个匹配的组及其图层祖先。
+
+![过滤 Outliner 以显示组](images/OutlinerFilter.png)
+
+清空搜索字段会恢复完整树，以及过滤前的展开状态。过滤只会改变树中显示的内容，不会在地图视口中隐藏对象。
+
+### 编辑实体属性 {#outliner_entity_properties}
+
+点击工具栏右侧的属性按钮可打开内嵌属性编辑器。选择点实体、Brush Entity 或 `worldspawn` 行，即可在不切换检查器页面的情况下编辑它。拖动树与编辑器之间的分隔条，可以为任一区域分配更多空间。
+
+![在 Outliner 中编辑 light 实体](images/OutlinerEntityProperties.png)
+
+内嵌编辑器支持[实体属性](#entity_properties)中介绍的相同属性操作和基于实体定义的控件，包括添加和删除键、编辑 choice 与 spawnflags，以及在可用时使用智能颜色或资源控件。更改会立即应用到地图，并可按常规方式撤销。
+
+### 通过拖放重组对象 {#outliner_dragging}
+
+将一行拖到另一个容器上会更改对象在地图层级中的父级。它不会执行 CSG 合并，也不会改变 Brush 几何体。每次成功的拖放都是一个可撤销的事务。
+
+要将对象移动到另一个图层，请选中它们的行并拖到目标图层行。第一张图显示 `Gameplay` 中选中的 world Brush；第二张图显示同一个 Brush 已位于 `Architecture` 图层下。
+
+![将 world Brush 移动到另一个图层之前](images/OutlinerMoveToLayerBefore.png)
+
+![world Brush 移动到 Architecture 图层之后](images/OutlinerMoveToLayerAfter.png)
+
+如果将 Brush Entity 的子 Brush 拖到图层行，整个 Brush Entity 都会移动到该图层。若要拆出单独的 Brush，应将其 Brush 行拖到目标图层的 `worldspawn` 行或该分支中的任意子 Brush 上。
+
+要将普通 Brush 添加到已有 Brush Entity，请只选择 Brush 行，然后将它们拖到 Brush Entity 行。第一张图显示 Default Layer 的 `worldspawn` 下有一个 Brush；拖放完成后，`func_door` 中包含两个 Brush。
+
+![将 world Brush 添加到 Brush Entity 之前](images/OutlinerBrushEntityBefore.png)
+
+![func_door 接收 Brush 之后](images/OutlinerBrushEntityAfter.png)
+
+如果移动 Brush 后原 Brush Entity 变空，该空实体会自动删除。要将一个或多个 Brush 移回 world，请将它们的行拖到所需图层的 `worldspawn` 分支。拖动图层行不会重新排列图层；排序下拉框只会改变现有层级的显示方式。
 
 ## 过滤 {#filtering_rendering_options}
 
