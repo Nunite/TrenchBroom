@@ -34,6 +34,7 @@
 #include "mdl/MapFormat.h"
 #include "mdl/Map_Brushes.h"
 #include "mdl/Map_Entities.h"
+#include "mdl/Map_Geometry.h"
 #include "mdl/Map_Nodes.h"
 #include "mdl/Map_Selection.h"
 #include "mdl/NodeHandles.h"
@@ -53,6 +54,7 @@
 
 #include <fstream>
 #include <map>
+#include <string>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -548,6 +550,57 @@ tb._cached_face.material
       != std::string::npos);
   }
 
+  SECTION("invalidates face handles when brush geometry changes")
+  {
+    auto& map = window.document().map();
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "cached") | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {brushNode}}});
+
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_cache_face.py",
+      R"(
+import tb2 as tb
+
+tb._cached_brush = tb.current_document().entities[0].brushes[0]
+tb._cached_face = tb._cached_brush.faces()[0]
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_cache_face.py";
+
+    REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
+
+    mdl::selectNodes(map, {brushNode});
+    REQUIRE(mdl::translateSelection(map, vm::vec3d{128.0, 0.0, 0.0}));
+
+    env.createFile(
+      "v2_use_cached_face_after_geometry_change.py",
+      R"(
+import tb2 as tb
+
+assert len(tb._cached_brush.faces()) == 6
+try:
+    tb._cached_face.material
+except RuntimeError as error:
+    assert "Face is no longer valid" in str(error)
+else:
+    raise AssertionError("Cached face remained valid after brush geometry changed")
+)");
+
+    const auto scriptSucceeded = PythonRuntime::instance().runScript(
+      context, env.dir() / "v2_use_cached_face_after_geometry_change.py");
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+  }
+
   SECTION("runs and clears session timers")
   {
     auto env = fs::TestEnvironment{};
@@ -910,6 +963,112 @@ assert "message" not in entity
 
     REQUIRE(PythonRuntime::instance().runScript(context, context.scriptPath));
     CHECK(window.document().map().worldNode().entity().property("message") == nullptr);
+  }
+
+  SECTION("uses actual selected entities for selection property access")
+  {
+    auto& map = window.document().map();
+    auto env = fs::TestEnvironment{};
+    env.createFile(
+      "v2_empty_selection_properties.py",
+      R"(
+import tb2 as tb
+
+sel = tb.current_document().selection
+assert sel.entity is None
+assert sel.properties is None
+assert sel.classname is None
+assert sel.all_entities == []
+assert tb.selected_all_entities() == []
+assert "classname" not in sel
+assert not sel.set_property("empty_selection_key", "value")
+try:
+    sel["classname"]
+except KeyError:
+    pass
+else:
+    raise AssertionError("Empty selection exposed worldspawn properties")
+)");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_empty_selection_properties.py";
+
+    auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+    CHECK(map.worldNode().entity().property("empty_selection_key") == nullptr);
+
+    auto entity = mdl::Entity{};
+    entity.setClassname("func_detail");
+    entity.addOrUpdateProperty("message", "face owner");
+    auto* entityNode = new mdl::EntityNode{std::move(entity)};
+    auto builder = mdl::BrushBuilder{mdl::MapFormat::Valve, vm::bbox3d{8192.0}};
+    auto* brushNode =
+      new mdl::BrushNode{builder.createCube(64.0, "selection") | kdl::value()};
+    mdl::addNodes(map, {{&mdl::parentForNodes(map), {entityNode}}});
+    mdl::addNodes(map, {{entityNode, {brushNode}}});
+    mdl::selectBrushFaces(map, {mdl::BrushFaceHandle{brushNode, 0u}});
+
+    env.createFile(
+      "v2_face_selection_properties.py",
+      R"(
+import tb2 as tb
+
+sel = tb.current_document().selection
+assert sel.entity.classname == "func_detail"
+assert sel.classname == "func_detail"
+assert sel.properties["message"] == "face owner"
+assert [entity.classname for entity in sel.all_entities] == ["func_detail"]
+assert sel["message"] == "face owner"
+assert "message" in sel
+assert not sel.set_property("missing", "ignored", create_if_missing=False)
+assert sel.set_property("face_selection_key", "value")
+assert sel["face_selection_key"] == "value"
+)");
+
+    scriptSucceeded = PythonRuntime::instance().runScript(
+      context, env.dir() / "v2_face_selection_properties.py");
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
+    CHECK(entityNode->entity().property("face_selection_key") != nullptr);
+    CHECK(entityNode->entity().property("missing") == nullptr);
+    CHECK(map.worldNode().entity().property("face_selection_key") == nullptr);
+  }
+
+  SECTION("represents non-ASCII document names as UTF-8")
+  {
+    auto env = fs::TestEnvironment{};
+    const auto filename = std::filesystem::path{std::u8string{u8"\u5730\u56fe.map"}};
+    REQUIRE(window.document().map().saveAs(env.dir() / filename));
+
+    env.createFile(
+      "v2_document_repr.py",
+      R"PY(
+import tb2 as tb
+
+doc = tb.current_document()
+assert repr(doc) == "Document(name='\u5730\u56fe.map')"
+assert str(doc) == "Document(name='\u5730\u56fe.map')"
+)PY");
+
+    auto context = PythonExecutionContext{};
+    context.mapWindow = &window;
+    context.document = &window.document();
+    context.appController = &window.appController();
+    context.currentMapView = window.currentMapViewBase();
+    context.logger = &window.pythonLogger();
+    context.scriptPath = env.dir() / "v2_document_repr.py";
+
+    const auto scriptSucceeded =
+      PythonRuntime::instance().runScript(context, context.scriptPath);
+    CAPTURE(PythonRuntime::instance().lastError());
+    REQUIRE(scriptSucceeded);
   }
 
   SECTION("rolls back entity edits on script failure")

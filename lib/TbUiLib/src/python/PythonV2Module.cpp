@@ -79,6 +79,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -104,6 +105,17 @@ void throwIfError(const Result& result)
   {
     throw std::runtime_error{*message};
   }
+}
+
+std::string filenameAsUtf8(const std::filesystem::path& path)
+{
+  if (path.empty())
+  {
+    return "untitled";
+  }
+
+  const auto filename = path.filename().u8string();
+  return {reinterpret_cast<const char*>(filename.data()), filename.size()};
 }
 
 struct Vec3
@@ -252,9 +264,10 @@ struct FaceHandle
   size_t generation = 0;
   mdl::BrushNode* brush = nullptr;
   size_t nodeLifetimeGeneration = 0;
+  vm::plane3d boundary;
   size_t faceIndex = 0;
 
-  const mdl::BrushFace& get() const
+  mdl::BrushNode& getBrushNode() const
   {
     auto& brushNode =
       BrushHandle{document, generation, brush, nodeLifetimeGeneration}.get();
@@ -262,6 +275,17 @@ struct FaceHandle
     {
       throw std::runtime_error{"Face is no longer valid"};
     }
+    if (!vm::is_equal(
+          brushNode.brush().face(faceIndex).boundary(), boundary, vm::Cd::almost_zero()))
+    {
+      throw std::runtime_error{"Face is no longer valid"};
+    }
+    return brushNode;
+  }
+
+  const mdl::BrushFace& get() const
+  {
+    auto& brushNode = getBrushNode();
     return brushNode.brush().face(faceIndex);
   }
 };
@@ -804,12 +828,39 @@ std::vector<EntityHandle> selectedEntities(SelectionHandle& selection)
   return result;
 }
 
+std::vector<mdl::EntityNodeBase*> selectedEntityNodes(SelectionHandle& selection)
+{
+  const auto& mapSelection = selection.getDocument().map().selection();
+  auto result = std::vector<mdl::EntityNodeBase*>{};
+  auto visitNode = std::function<void(mdl::Node&)>{};
+  visitNode = [&](mdl::Node& node) {
+    node.accept(kdl::overload(
+      [](mdl::WorldNode&) {},
+      [](mdl::LayerNode&) {},
+      [&](mdl::GroupNode& groupNode) { groupNode.visitChildren(visitNode); },
+      [&](mdl::EntityNode& entityNode) { result.push_back(&entityNode); },
+      [&](mdl::BrushNode& brushNode) { result.push_back(brushNode.entity()); },
+      [&](mdl::PatchNode& patchNode) { result.push_back(patchNode.entity()); }));
+  };
+
+  for (auto* node : mapSelection.nodes)
+  {
+    visitNode(*node);
+  }
+  for (const auto& faceHandle : mapSelection.brushFaces)
+  {
+    result.push_back(faceHandle.node()->entity());
+  }
+
+  return kdl::vec_sort_and_remove_duplicates(std::move(result));
+}
+
 std::vector<EntityHandle> selectedAllEntities(SelectionHandle& selection)
 {
   auto& document = selection.getDocument();
   auto result = std::vector<EntityHandle>{};
   const auto generation = PythonHandleRegistry::instance().documentGeneration(&document);
-  for (auto* entity : document.map().selection().allEntities())
+  for (auto* entity : selectedEntityNodes(selection))
   {
     result.push_back(EntityHandle{
       &document,
@@ -1006,6 +1057,7 @@ std::vector<FaceHandle> selectedBrushFaces(SelectionHandle& selection)
       selection.generation,
       brushNode,
       PythonHandleRegistry::instance().nodeLifetimeGeneration(brushNode),
+      faceHandle.face().boundary(),
       faceHandle.faceIndex()});
   }
   return result;
@@ -1344,23 +1396,25 @@ bool setSelectionProperty(
   const bool createIfMissing)
 {
   auto& document = selection.getDocument();
-  auto transaction =
-    ScopedPythonTransaction{document, "Python v2 Set Selection Property"};
-  try
+  auto entityNodes = selectedEntityNodes(selection);
+  if (!createIfMissing)
   {
-    const auto result =
-      mdl::setEntityProperty(document.map(), key, value, createIfMissing);
-    if (result && !transaction.commit())
-    {
-      throw std::runtime_error{"Could not set selection property"};
-    }
-    return result;
+    std::erase_if(entityNodes, [&](const auto* entityNode) {
+      return !entityNode->entity().hasProperty(key);
+    });
   }
-  catch (...)
+  if (entityNodes.empty())
   {
-    transaction.cancel();
-    throw;
+    return false;
   }
+
+  const auto nodes = std::vector<mdl::Node*>{entityNodes.begin(), entityNodes.end()};
+  withPreservedSelection(document, "Python v2 Set Selection Property", [&](auto& map) {
+    mdl::deselectAll(map);
+    mdl::selectNodes(map, nodes);
+    return mdl::setEntityProperty(map, key, value);
+  });
+  return true;
 }
 
 py::list triangleListFromObject(const py::handle& object)
@@ -1456,13 +1510,7 @@ bool setDocumentFaceUVsImpl(
     {
       return false;
     }
-    auto& brushNode =
-      BrushHandle{face.document, face.generation, face.brush, face.nodeLifetimeGeneration}
-        .get();
-    if (face.faceIndex >= brushNode.brush().faceCount())
-    {
-      throw std::runtime_error{"Face is no longer valid"};
-    }
+    auto& brushNode = face.getBrushNode();
 
     const auto vertices = brushNode.brush().face(face.faceIndex).vertexPositions();
     const auto loops = py::reinterpret_borrow<py::list>(update["loops"]);
@@ -1521,13 +1569,7 @@ bool setDocumentFaceUVsWithSplit(
 bool setFaceUVLoops(FaceHandle& face, const py::iterable& loopObjects)
 {
   auto& document = DocumentHandle{face.document, face.generation}.get();
-  auto& brushNode =
-    BrushHandle{face.document, face.generation, face.brush, face.nodeLifetimeGeneration}
-      .get();
-  if (face.faceIndex >= brushNode.brush().faceCount())
-  {
-    throw std::runtime_error{"Face is no longer valid"};
-  }
+  auto& brushNode = face.getBrushNode();
 
   const auto vertices = brushNode.brush().face(face.faceIndex).vertexPositions();
   auto uvs = std::vector<vm::vec2f>(vertices.size());
@@ -1556,51 +1598,31 @@ bool setFaceUVLoops(FaceHandle& face, const py::iterable& loopObjects)
       vertices,
       uvs,
     }});
-  face.nodeLifetimeGeneration =
-    PythonHandleRegistry::instance().nodeLifetimeGeneration(face.brush);
   return ok;
 }
 
 void setFaceMaterial(FaceHandle& face, const std::string& materialName)
 {
   auto& document = DocumentHandle{face.document, face.generation}.get();
-  auto& brushNode =
-    BrushHandle{face.document, face.generation, face.brush, face.nodeLifetimeGeneration}
-      .get();
-  if (face.faceIndex >= brushNode.brush().faceCount())
-  {
-    throw std::runtime_error{"Face is no longer valid"};
-  }
+  auto& brushNode = face.getBrushNode();
 
   withPreservedSelection(document, "Python v2 Set Face Material", [&](auto& map) {
     mdl::deselectAll(map);
     mdl::selectBrushFaces(map, {mdl::BrushFaceHandle{&brushNode, face.faceIndex}});
     return mdl::setBrushFaceAttributes(map, {.materialName = materialName});
   });
-
-  face.nodeLifetimeGeneration =
-    PythonHandleRegistry::instance().nodeLifetimeGeneration(face.brush);
 }
 
 void updateFace(FaceHandle& face, mdl::UpdateBrushFaceAttributes update)
 {
   auto& document = DocumentHandle{face.document, face.generation}.get();
-  auto& brushNode =
-    BrushHandle{face.document, face.generation, face.brush, face.nodeLifetimeGeneration}
-      .get();
-  if (face.faceIndex >= brushNode.brush().faceCount())
-  {
-    throw std::runtime_error{"Face is no longer valid"};
-  }
+  auto& brushNode = face.getBrushNode();
 
   withPreservedSelection(document, "Python v2 Set Face Attributes", [&](auto& map) {
     mdl::deselectAll(map);
     mdl::selectBrushFaces(map, {mdl::BrushFaceHandle{&brushNode, face.faceIndex}});
     return mdl::setBrushFaceAttributes(map, update);
   });
-
-  face.nodeLifetimeGeneration =
-    PythonHandleRegistry::instance().nodeLifetimeGeneration(face.brush);
 }
 
 void setFaceOffset(FaceHandle& face, const py::object& offset)
@@ -2049,15 +2071,10 @@ void defineModule(py::module_& module)
     .def(
       "__repr__",
       [](DocumentHandle& self) {
-        const auto& path = self.get().map().path();
-        const auto name =
-          path.empty() ? std::string{"untitled"} : path.filename().string();
-        return "Document(name='" + name + "')";
+        return "Document(name='" + filenameAsUtf8(self.get().map().path()) + "')";
       })
     .def("__str__", [](DocumentHandle& self) {
-      const auto& path = self.get().map().path();
-      const auto name = path.empty() ? std::string{"untitled"} : path.filename().string();
-      return "Document(name='" + name + "')";
+      return "Document(name='" + filenameAsUtf8(self.get().map().path()) + "')";
     });
 
   py::class_<SelectionHandle>(module, "Selection")
@@ -2311,7 +2328,12 @@ void defineModule(py::module_& module)
         for (size_t i = 0; i < brush.faceCount(); ++i)
         {
           result.push_back(FaceHandle{
-            self.document, self.generation, self.brush, self.nodeLifetimeGeneration, i});
+            self.document,
+            self.generation,
+            self.brush,
+            self.nodeLifetimeGeneration,
+            brush.face(i).boundary(),
+            i});
         }
         return result;
       })
