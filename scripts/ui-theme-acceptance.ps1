@@ -245,6 +245,7 @@ foreach ($target in $normalizedTargets) {
       "material-browser-empty",
       "plugin-inspector",
       "supporting",
+      "path-tool-preview",
       "python-console",
       "command-palette",
       "components",
@@ -254,7 +255,7 @@ foreach ($target in $normalizedTargets) {
       "preferences-keyboard",
       "preferences-misc"
     )) {
-    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, outliner-hierarchy, outliner-filter, outliner-properties-entity, outliner-reparent-layer-before, outliner-reparent-layer-after, outliner-brush-entity-before, outliner-brush-entity-after, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, supporting, python-console, command-palette, components, preferences, preferences-colors, preferences-mouse, preferences-keyboard, or preferences-misc."
+    throw "Unsupported target '$target'. Expected welcome, workbench, outliner, outliner-hierarchy, outliner-filter, outliner-properties-entity, outliner-reparent-layer-before, outliner-reparent-layer-after, outliner-brush-entity-before, outliner-brush-entity-after, entity-browser, entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, supporting, path-tool-preview, python-console, command-palette, components, preferences, preferences-colors, preferences-mouse, preferences-keyboard, or preferences-misc."
   }
 }
 foreach ($theme in $Themes) {
@@ -308,6 +309,7 @@ $resolvedMapPath = if (
   $normalizedTargets -contains "entity-browser-empty" -or
   $normalizedTargets -contains "plugin-inspector" -or
   $normalizedTargets -contains "supporting" -or
+  $normalizedTargets -contains "path-tool-preview" -or
   $normalizedTargets -contains "python-console" -or
   $normalizedTargets -contains "command-palette") {
   Resolve-Path -Path $MapPath
@@ -379,6 +381,7 @@ foreach ($target in $normalizedTargets) {
         $target -eq "material-browser-empty" -or
         $target -eq "plugin-inspector" -or
         $target -eq "supporting" -or
+        $target -eq "path-tool-preview" -or
         $target -eq "python-console" -or
         $target -eq "command-palette") {
         $processInfo.Arguments += " `"$($targetMapPath.Path)`""

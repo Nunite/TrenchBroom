@@ -8,7 +8,7 @@
 本次盘点日期为 2026-08-20，检查基线如下：
 
 - 当前分支：`main`
-- 当前提交：`93c8a9615`（`Update Python v2 usage documentation`）
+- 首次盘点基线：`93c8a9615`（`Update Python v2 usage documentation`）
 - 与官方 `upstream/master` 的 merge base：
   `ce0e9d4bb58ef1e08e8c533159f320592d4daffc`
 - 手册源文件：`app/TrenchBroom/resources/documentation/manual/{en,zh_CN}`
@@ -96,8 +96,8 @@
 | Sweep Tool：Straight、Arc 和 S-bend 路径 | 较完整 | 现有 GIF 可用，可再补当前控制面板截图 |
 | Sweep 扭曲、锥化、迭代、吸附和连续 UV | 较完整 | 需要当前控制状态图 |
 | Sweep Bridge 连接两个独立面组件 | 简略 | 需要前、预览、后三个状态 |
-| Path Tool 网格吸附的路径点放置和预览 | 简略 | 需要 target |
-| Path Tool 预览点撤销/恢复及自动 `target`/`targetname` 链 | 简略 | 需要前后状态 |
+| Path Tool 网格吸附的路径点放置和预览 | 较完整 | 已插入 `path-tool-preview` 截图 |
+| Path Tool 预览点撤销/恢复及自动 `target`/`targetname` 链 | 较完整 | 操作和提交结果已用文字说明 |
 | Command Palette 动作搜索、菜单路径、可用状态和快捷键 | 较完整 | 可直接截图 |
 | Pie Menu 长按调用、上下文动作和拖动配置 | 简略 | Pie Menu 与设置对话框都需要 target |
 | 可选的 Ctrl+拖动 2D 框选 | 简略 | 偏好设置可直接截，交互状态需要 target |
@@ -105,9 +105,9 @@
 | Material Browser 可折叠分组、100%-500% 缩放、Ctrl+滚轮和缩放比例 | 较完整 | 可复用 Face Inspector target |
 | 按指定材质选择全部面或 Brush | 文字较完整 | 如需教程细节，应补右键菜单截图 |
 
-当前手册对 Path Tool 存在一处超前描述：`03-brush-editing.md` 声称可以插入现有
-节点、反转方向和重新连接路径。当前 `PathTool` 实现只支持创建新的 `path_corner` 链，
-以及撤销/恢复尚未提交的预览点。补图之前应先纠正文案。
+手册中曾有一处 Path Tool 超前描述，声称可以插入现有节点、反转方向和
+重新连接路径。该文案现已纠正：当前 `PathTool` 只支持创建新的 `path_corner` 链，
+以及撤销/恢复尚未提交的预览点。
 
 ### 4. GoldSrc 与视图增强
 
@@ -242,6 +242,7 @@ face-inspector
 material-browser-empty
 plugin-inspector
 supporting
+path-tool-preview
 python-console
 command-palette
 components
@@ -296,6 +297,7 @@ preferences-misc
 
 - Command Palette。
 - Python Console。
+- Path Tool 四点预览。
 - Outliner 总体布局和基础内嵌属性面板。
 - Assets 总体布局，但不包含真实预览。
 - 主题和标准 Preferences 页面。
@@ -321,6 +323,18 @@ preferences-misc
 `build-release-codex/codex-logs/ui-theme-acceptance/20260820-160619-029`，只作为构建日志，
 不提交到仓库。
 
+Path Tool 确定性截图链路已于 2026-08-20 完成：
+
+- 新增 `path-tool-preview` target，使用标准 Quake 地图激活 Path Tool 并构造
+  4 个尚未提交的固定预览点。
+- readiness 校验同时确认工具处于激活状态且预览点坐标完全一致。
+- Dark、100% 截图已通过 PNG、manifest 和人工视觉检查，并插入中英文
+  第 2 章的 Path Tool 教程。
+
+验证生成物位于
+`build-release-codex/codex-logs/ui-theme-acceptance/20260820-164744-829`，只作为构建日志，
+不提交到仓库。
+
 要覆盖其余功能，还需要补充：
 
 1. 为 Outliner 补 Linked Group、隐藏状态、右键菜单、创建 Layer、worldspawn 属性、
@@ -328,7 +342,7 @@ preferences-misc
 2. 包含小型合法 MDL、SPR、WAV、skybox、WAD 和 Prefab 的 GoldSrc fixture。资源必须可
    追踪许可证，或由仓库脚本自行生成。
 3. 等待所有可见资源预览就绪的 Asset Browser readiness 检查，不能只判断非空图片。
-4. 为 Chamfer、Smart Face、Sweep、Sweep Bridge 和 Path Tool 准备带预选面、边和顶点
+4. 为 Chamfer、Smart Face、Sweep 和 Sweep Bridge 准备带预选面、边和顶点
    的建模 fixture。
 5. 为 Pie Menu、右键菜单、IntelliSense 和 Plugin Manager 增加可捕获弹窗的 target。
 6. 把 Misc Preferences 拆成顶部和 MCP 两个状态，避免控件因滚动被隐藏。
@@ -351,7 +365,6 @@ smart-face-strip
 smart-face-parallel
 sweep-controls
 sweep-bridge-preview
-path-tool-preview
 pie-menu
 pie-menu-settings
 python-completion
@@ -397,14 +410,12 @@ python app/TrenchBroom/resources/documentation/manual/validate_manual.py `
 
 ## 建议补充顺序
 
-1. Outliner 层级和拖放重归属教程。
-2. 填充真实资源的 Assets 与 Prefab 工作流。
-3. Smart Face Selection。
-4. Chamfer Tool 和 Sweep Bridge。
-5. 纠正 Path Tool 文案并补当前真实工作流。
-6. GoldSrc 天空盒和 2D 可读轮廓。
-7. Entity Template 操作前后流程。
-8. Pie Menu 和 Python Plugin Manager。
-9. MCP 端到端工作流示例。
+1. 填充真实资源的 Assets 与 Prefab 工作流。
+2. Smart Face Selection。
+3. Chamfer Tool 和 Sweep Bridge。
+4. GoldSrc 天空盒和 2D 可读轮廓。
+5. Entity Template 操作前后流程。
+6. Pie Menu 和 Python Plugin Manager。
+7. MCP 端到端工作流示例。
 
 这个顺序优先补齐普通制图工作流中的最大缺口，再扩展插件和自动化教程。

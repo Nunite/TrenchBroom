@@ -380,4 +380,4 @@ Brush 挤出工具提供了一种快速移动 Brush 单个面的方法。开始�
 
 ### 路径工具 {#path_tool_editing}
 
-选择 #menu(Menu/Edit/Tools/Path Tool) 或点击工具栏中的路径工具按钮，可用于创建、检查与连接实体路径节点（如巡逻路径 `path_corner` 或列车轨道）。在路径工具激活时，在 2D 或 3D 视口中点击即可连续放置路径路标点，并自动连接其 `target` 与 `targetname` 属性。选中现有节点可随时插入新路标、反转路径方向或重新连接路径分支。
+选择 #menu(Menu/Edit/Tools/Path Tool) 或点击工具栏中的路径工具按钮，可创建新的已链接 `path_corner` 链。该工具可在 2D 或 3D 视图中放置预览，但不会编辑现有路径节点。有关路径点放置、预览控制和提交行为，请参阅[路径工具](#path_tool)。

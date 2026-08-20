@@ -72,9 +72,11 @@
 #include "ui/InfoPanel.h"
 #include "ui/Inspector.h"
 #include "ui/MapDocument.h"
+#include "ui/MapViewToolBox.h"
 #include "ui/MapWindow.h"
 #include "ui/MapWindowManager.h"
 #include "ui/MaterialBrowser.h"
+#include "ui/PathTool.h"
 #include "ui/PreferenceDialog.h"
 #include "ui/QPathUtils.h"
 #include "ui/ThemeRegistry.h"
@@ -107,6 +109,7 @@ bool isSupportedUiSnapshotPage(const QString& page)
     QStringLiteral("material-browser-empty"),
     QStringLiteral("plugin-inspector"),
     QStringLiteral("supporting"),
+    QStringLiteral("path-tool-preview"),
     QStringLiteral("python-console"),
     QStringLiteral("command-palette"),
     QStringLiteral("components"),
@@ -186,6 +189,17 @@ WelcomeWindow* findWelcomeWindow()
 bool isOutlinerSnapshotTarget(const QString& targetName)
 {
   return targetName.startsWith(QStringLiteral("outliner"));
+}
+
+const std::vector<vm::vec3d>& pathToolSnapshotPoints()
+{
+  static const auto points = std::vector<vm::vec3d>{
+    {-80.0, -48.0, 56.0},
+    {-24.0, -64.0, 72.0},
+    {24.0, -24.0, 80.0},
+    {64.0, -48.0, 64.0},
+  };
+  return points;
 }
 
 template <typename NodeType, typename Predicate>
@@ -419,6 +433,41 @@ void configureSupportingSnapshot(QWidget& targetWidget)
   }
 }
 
+void configurePathToolSnapshot(QWidget& targetWidget)
+{
+  auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
+  if (mapWindow == nullptr)
+  {
+    return;
+  }
+
+  auto& toolBox = mapWindow->toolBox();
+  if (!toolBox.pathToolActive())
+  {
+    toolBox.togglePathTool();
+  }
+
+  auto& pathTool = toolBox.pathTool();
+  pathTool.clearPoints();
+  for (const auto& point : pathToolSnapshotPoints())
+  {
+    pathTool.addPoint(point);
+  }
+
+  if (
+    auto* horizontalSplitter =
+      mapWindow->findChild<QSplitter*>(QStringLiteral("MapWindow_HorizontalSplitter")))
+  {
+    horizontalSplitter->setSizes(QList<int>{1080, 360});
+  }
+  if (
+    auto* verticalSplitter = mapWindow->findChild<QSplitter*>(
+      QStringLiteral("MapWindow_VerticalSplitterSplitter")))
+  {
+    verticalSplitter->setSizes(QList<int>{800, 100});
+  }
+}
+
 void configurePythonConsoleSnapshot(QWidget& targetWidget)
 {
   auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
@@ -602,6 +651,30 @@ UiSnapshotReadiness uiSnapshotReadiness(QWidget& targetWidget, const QString& ta
   if (isOutlinerSnapshotTarget(targetName))
   {
     return outlinerSnapshotReadiness(targetWidget, targetName);
+  }
+
+  if (targetName == QStringLiteral("path-tool-preview"))
+  {
+    auto* mapWindow = qobject_cast<MapWindow*>(&targetWidget);
+    if (mapWindow == nullptr)
+    {
+      return {
+        UiSnapshotReadinessState::Failed,
+        QStringLiteral("Path Tool snapshot target is not a map window")};
+    }
+
+    auto& toolBox = mapWindow->toolBox();
+    const auto& pathTool = toolBox.pathTool();
+    if (!toolBox.pathToolActive() || pathTool.points() != pathToolSnapshotPoints())
+    {
+      return {
+        UiSnapshotReadinessState::Pending,
+        QStringLiteral("Path Tool preview points are not ready")};
+    }
+    return {
+      UiSnapshotReadinessState::Ready,
+      QStringLiteral("Path Tool preview ready with %1 points")
+        .arg(pathTool.points().size())};
   }
 
   if (!isMaterialBrowserSnapshotTarget(targetName))
@@ -806,6 +879,10 @@ void configureSnapshot(QWidget& targetWidget, const QString& targetName)
   else if (targetName == QStringLiteral("supporting"))
   {
     configureSupportingSnapshot(targetWidget);
+  }
+  else if (targetName == QStringLiteral("path-tool-preview"))
+  {
+    configurePathToolSnapshot(targetWidget);
   }
   else if (targetName == QStringLiteral("python-console"))
   {

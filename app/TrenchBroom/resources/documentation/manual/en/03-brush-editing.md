@@ -380,4 +380,4 @@ Choose #menu(Menu/Edit/Tools/Chamfer Tool) to bevel selected brush edges or cut 
 
 ### Path Tool {#path_tool_editing}
 
-Choose #menu(Menu/Edit/Tools/Path Tool) or click the Path Tool button on the toolbar to create, inspect, and connect waypoint entities (such as `path_corner` or train tracks). While in Path Tool mode, clicking in a 2D or 3D viewport places consecutive waypoint nodes and automatically links their `target` and `targetname` properties. Selecting existing nodes allows inserting new waypoints, reversing directions, or reconnecting path segments.
+Choose #menu(Menu/Edit/Tools/Path Tool) or click the Path Tool button on the toolbar to create a new linked `path_corner` chain. The tool places a preview in either 2D or 3D views and does not edit existing path nodes. See [Path Tool](#path_tool) for point placement, preview controls, and commit behavior.

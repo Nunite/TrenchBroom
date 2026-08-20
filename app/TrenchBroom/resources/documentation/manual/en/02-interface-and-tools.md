@@ -139,7 +139,13 @@ Open **Preferences > Misc > Pie Menu Settings** to choose the actions, remove en
 
 Choose #menu(Menu/Edit/Tools/Path Tool) or press #action(Menu/Edit/Tools/Path Tool) to create a chain of `path_corner` entities. The active game must provide a `path_corner` entity definition.
 
-Left-click brush geometry, or an empty viewport plane, to add grid-snapped path points. The preview draws the points and their connecting segments. Press #key(Left) to remove the last point, #key(Right) to restore the most recently removed point, and #key(Return) or double-click to create the chain. TrenchBroom assigns unique `targetname` values and links each entity to the next with `target`. Press #key(Esc) to leave the tool without creating the remaining preview points.
+Left-click brush geometry, or an empty viewport plane, to add grid-snapped path points. The preview draws the points and their connecting segments.
+
+![Four uncommitted points in the Path Tool preview](images/PathToolPreview.png)
+
+Press #key(Left) to remove the last point, #key(Right) to restore the most recently removed point, and #key(Return) or double-click to create the chain. TrenchBroom assigns unique `targetname` values and links each entity to the next with `target`. Press #key(Esc) to leave the tool without creating the remaining preview points.
+
+The Path Tool creates a new linear `path_corner` chain. It does not insert nodes into an existing path, reverse a path, or reconnect existing branches.
 
 ### Canceling Operations and Tools {#canceling}
 

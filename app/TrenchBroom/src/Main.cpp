@@ -171,7 +171,8 @@ std::optional<CommandLineOptions> parseCommandLine(QApplication& app)
     "outliner-reparent-layer-before, outliner-reparent-layer-after, "
     "outliner-brush-entity-before, outliner-brush-entity-after, entity-browser, "
     "entity-browser-empty, face-inspector, material-browser-empty, plugin-inspector, "
-    "supporting, python-console, command-palette, components, preferences, "
+    "supporting, path-tool-preview, python-console, command-palette, components, "
+    "preferences, "
     "preferences-colors, preferences-mouse, preferences-keyboard, or preferences-misc.",
     "page",
     "map"};

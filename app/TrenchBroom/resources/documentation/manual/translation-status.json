@@ -5,8 +5,8 @@
   "chapters": {
     "00-introduction.md": "8e35dd61ca31749e8aed6a93b92d99ea6c028465642d7d81fd9f9c439c32d576",
     "01-getting-started.md": "b9fdc399d83a052587b1e88fe2157b29f2f97aa2db0166def417bb719570d455",
-    "02-interface-and-tools.md": "615a24f04ae9443109ec115fd20bca539f7026d30e9ee93b9ab40c0debeb6130",
-    "03-brush-editing.md": "2821bff88b8d7c256476f2775f2debcf556ee9ccbdae20da63db7f0cfdb15a6b",
+    "02-interface-and-tools.md": "9a85d16994160af19ea9aa6f9dc05ea174197bc9c334cec57deb01dbc56f6b0c",
+    "03-brush-editing.md": "07e1d3d20af92b86b116bd5eed1801f79e864a50d272bc0f1f98e0e2976d8648",
     "04-vertex-and-csg.md": "194399adfefcbe230f8997eb9a2688996e45d02200818b3aa833ed993c1f0598",
     "05-materials-and-uv.md": "24a31327dbeda77fdf9a442003ed74d19aa697eae71f087202fcbba5de83d960",
     "06-assets-and-prefabs.md": "dea13f58a0fa0205f61085171dc33adc4a7f2cdb64ef97ed7268d2c9a89dd88a",

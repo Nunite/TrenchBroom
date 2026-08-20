@@ -139,7 +139,13 @@ TrenchBroom 的所有编辑功能都由工具提供。工具分为两类：永�
 
 选择 #menu(Menu/Edit/Tools/Path Tool)或按 #action(Menu/Edit/Tools/Path Tool)创建一串 `path_corner` 实体。当前游戏必须提供 `path_corner` 实体定义。
 
-左键单击 Brush 几何体或空白视图平面，添加吸附到网格的路径点。预览会绘制点及其连接线段。按 #key(Left)删除最后一个点，按 #key(Right)恢复最近删除的点，按 #key(Return)或双击创建链。TrenchBroom 会分配唯一的 `targetname` 值，并使用 `target` 将每个实体链接到下一个实体。按 #key(Esc)退出工具而不创建剩余的预览点。
+左键单击 Brush 几何体或空白视图平面，添加吸附到网格的路径点。预览会绘制点及其连接线段。
+
+![路径工具预览中尚未提交的四个点](images/PathToolPreview.png)
+
+按 #key(Left)删除最后一个点，按 #key(Right)恢复最近删除的点，按 #key(Return)或双击创建链。TrenchBroom 会分配唯一的 `targetname` 值，并使用 `target` 将每个实体链接到下一个实体。按 #key(Esc)退出工具而不创建剩余的预览点。
+
+路径工具只会创建新的线性 `path_corner` 链。它不会在现有路径中插入节点、反转路径或重新连接现有分支。
 
 ### 取消操作和工具 {#canceling}
 
