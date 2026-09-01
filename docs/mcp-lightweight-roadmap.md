@@ -39,7 +39,7 @@ Use this table before adding any new MCP tool or recipe.
 | Selector/module identity, live/stale object recovery | C++ MCP | It depends on the current document and session. |
 | Geometry facts, slope/continuity analysis, map validation | C++ MCP | It needs reliable map geometry. |
 | Gameplay difficulty, aesthetics, route intent, final judgment | Skill or Agent | MCP should report facts, not design taste. |
-| Human UI plugin flows | `tb2` plugin | They serve interactive users, not Agent automation. |
+| Human UI plugin flows | `trenchbroom` plugin | They serve interactive users, not Agent automation. |
 
 Escalate a recipe need into C++ MCP only when at least two independent recipes need it and the behavior cannot be expressed with existing IR operations or selector/module tools.
 
@@ -271,8 +271,8 @@ Key work:
   - show when to use each recipe
   - show required validation path
 - Add new recipes only when they are reusable enough to justify scripted generation.
-- Do not let recipes call TrenchBroom, MCP, or `tb2` directly. Recipes emit IR only.
-- If the human-facing `tb2` plugin needs prefab behavior later, it should reuse recipe scripts to emit IR.
+- Do not let recipes call TrenchBroom, MCP, or `trenchbroom` directly. Recipes emit IR only.
+- If the human-facing `trenchbroom` plugin needs prefab behavior later, it should reuse recipe scripts to emit IR.
 - Keep recipe scripts deterministic. Same params must produce the same canonical IR.
 - Add recipe-level expected validation:
   - which selectors to inspect

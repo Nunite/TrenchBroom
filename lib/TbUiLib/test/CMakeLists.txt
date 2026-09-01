@@ -42,7 +42,7 @@ target_sources(TbUiLibTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonCompletionEngine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PluginInspector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonPluginManifest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonV2.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_PythonApi.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPathUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPreferenceStore.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tst_QPreferenceStoreUtils.cpp
@@ -114,7 +114,7 @@ add_custom_command(TARGET TbUiLibTest POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${TB_RESOURCE_DIR}/games" "${TEST_FIXTURE_DEST_DIR}/games"
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${TB_RESOURCE_DIR}/games-testing" "${TEST_FIXTURE_DEST_DIR}/games"
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${TB_RESOURCE_DIR}/graphics/images" "$<TARGET_FILE_DIR:TbUiLibTest>/images"
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/python/examples/v2" "$<TARGET_FILE_DIR:TbUiLibTest>/python/examples/v2"
+  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/python/examples" "$<TARGET_FILE_DIR:TbUiLibTest>/python/examples"
 )
 
 include(Catch)

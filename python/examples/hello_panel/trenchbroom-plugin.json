@@ -1,0 +1,10 @@
+{
+  "id": "trenchbroom.examples.hello_panel",
+  "name": "Hello Panel",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "pluginType": "ui",
+  "entry": "main.py",
+  "description": "Creates a simple trenchbroom plugin panel.",
+  "author": "TrenchBroom"
+}

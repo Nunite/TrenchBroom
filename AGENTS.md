@@ -94,7 +94,7 @@
   ```powershell
   build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "ModelBrowserView"
   build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "GoldSrcSpritePreview"
-  build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "PythonV2"
+  build-release-codex\lib\TbUiLib\test\TbUiLibTest.exe "PythonApi"
   ```
 - Before linking `TrenchBroom.exe`, make sure the Release app is not running. If link fails with `LINK : fatal error LNK1104: cannot open file 'app\TrenchBroom\TrenchBroom.exe'`, check for a stale process:
   ```powershell
@@ -130,7 +130,7 @@
 ## Current custom branch notes
 - This repository is a custom TrenchBroom fork containing upstream master plus local custom extensions. Do not assume vanilla upstream TrenchBroom behavior when touching custom areas.
 - Important custom feature areas include:
-  - Python v2 plugin/runtime work (`tb2`) and manifest-style plugins.
+  - Python API plugin/runtime work (`trenchbroom`) and manifest-style plugins.
   - Unified GoldSrc asset browser for `.mdl`, `.spr`, and `.wav`.
   - GoldSrc sprite preview decoding and `ERROR` fallback placeholders.
   - Model browser drag/drop behavior for model and sprite assets.
@@ -138,12 +138,12 @@
   - 2D readable brush outlines.
   - Path Tool and Pie Menu action wiring.
   - Outliner and property editor customizations.
-- Legacy Python `tb` compatibility was intentionally removed from the active plugin path. Do not reintroduce legacy `tb` module registration unless explicitly requested; new plugin examples should use `tb2` or `import tb2 as tb`.
+- The canonical embedded Python module is `trenchbroom`. Do not register additional module aliases unless explicitly requested; examples should use `import trenchbroom as tb`.
 - If a change touches the unified asset browser, run at least `TbUiLibTest "ModelBrowserView"` and any specific parser/preview tests such as `GoldSrcSpritePreview`.
 - In `ModelBrowser` toolbar-style buttons, prefer existing helpers such as `createBitmapButton(...)` instead of hand-rolling `QToolButton + loadSVGIcon(...)`; the helper keeps button setup consistent while investigating icon/resource issues.
 - Qt6 QtSvg has known crash-class parser/render bugs on affected 6.x versions. One observed crash was Qt 6.9.3 loading `Map_folder.svg` through `loadSVGPixmap(...)`, ending in `QSvgRenderer` / `QSvgHandler` / `QPainterPath::cubicTo`; upgrading the local Release build to Qt 6.11.1 fixed the observed startup/test path. If a similar SVG crash returns, first verify the app/test is really loading Qt 6.11.1 DLLs, then inspect the SVG asset: prefer tiny static SVG made from simple polygons/lines or PNG, and avoid Inkscape-heavy SVG features, arcs, markers, masks, filters, CSS, and complex paths. Community workarounds such as simplifying SVGs, converting to PNG, or patching QtSvg are useful context; do not add QWebEngine or custom icon loaders for a toolbar icon unless the simple asset fix fails.
 - `MapWindow` manually emits `documentWasLoadedNotifier()` after constructing the UI. Child widgets such as `ViewEditor` must treat this startup notification as a refresh for the same map, not a reason to delete and rebuild complex QWidget trees; rebuilding there has caused intermittent Qt6 Release crashes in `QObject`/`QWidget` destruction while opening maps.
-- If a change touches Python plugins, run focused `TbUiLibTest` filters for `PythonV2` and `PythonPluginManifest`, plus any relevant panel/timer tests.
+- If a change touches Python plugins, run focused `TbUiLibTest` filters for `PythonApi` and `PythonPluginManifest`, plus any relevant panel/timer tests.
 - If a change touches rendering, be careful with Release-only behavior and OpenGL resource lifetime. Several previous issues only reproduced in Release builds, so build the Release executable before declaring rendering work done.
 - Keep local noise out of commits. In this project, `.codegraph/`, temporary markdown experiments, generated crash logs, and ad hoc asset/debug files should not be committed unless the user explicitly asks.
 - When using web or external research for GoldSrc formats, prefer primary/simple references and record the practical decision in code or docs. Avoid copying large third-party implementations or license-sensitive code.

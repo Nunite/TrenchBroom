@@ -260,7 +260,7 @@ Current Phase 2 status:
 - `scripts/validate_recipes.py` validates params, builds IR twice to check
   deterministic output, checks metadata coverage, required parts, quality/review
   policies, and can emit a concise markdown report plus generated IR files.
-- Recipe scripts only emit IR JSON. They do not call TrenchBroom, MCP, or `tb2`
+- Recipe scripts only emit IR JSON. They do not call TrenchBroom, MCP, or `trenchbroom`
   directly.
 - The canonical skill source is tracked under
   `skills/trenchbroom-mcp-scene-workflow`; sync it to the runtime skill directory
@@ -435,7 +435,7 @@ no known external client depends on the old payload shape.
 | Review screenshots | kept in C++ |
 | KZ/domain difficulty judgment | skill |
 | Temple/cottage/route layout planning | recipe |
-| Human UI prefab workflows | future `tb2` reuse of recipes |
+| Human UI prefab workflows | future `trenchbroom` reuse of recipes |
 
 ## Risks
 
@@ -448,14 +448,14 @@ Mitigation:
 - Keep validation, review, selector, module, group, history, and safe mutation in C++.
 - Recipes only generate IR. They do not replace MCP.
 
-### Risk: Skill Recipes Duplicate `tb2`
+### Risk: Skill Recipes Duplicate `trenchbroom`
 
-The `tb2` plugin is for human interactive UI. Skill recipes are for Agent generation.
+The `trenchbroom` plugin is for human interactive UI. Skill recipes are for Agent generation.
 
 Mitigation:
 
 - Put shared prefab logic in recipe scripts that emit IR.
-- Let future `tb2` prefab UI reuse those scripts instead of rewriting layout logic.
+- Let future `trenchbroom` prefab UI reuse those scripts instead of rewriting layout logic.
 
 ### Risk: More Layers Make Debugging Harder
 

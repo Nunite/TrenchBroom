@@ -187,7 +187,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonPluginSession.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonRuntime.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonScripting.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonV2Module.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python/PythonApiModule.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/QColorUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/QKeySequenceUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/QPathUtils.cpp
@@ -415,7 +415,7 @@ target_sources(TbUiLib
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonPluginSession.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonRuntime.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonScripting.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonV2Module.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/python/PythonApiModule.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/QColorUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/QKeySequenceUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/QPathUtils.h

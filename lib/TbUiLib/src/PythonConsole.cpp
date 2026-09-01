@@ -353,7 +353,7 @@ std::vector<SuggestionItem> globalSuggestionItems()
   auto result = std::vector<SuggestionItem>{
     {QStringLiteral("doc"), SuggestionKind::Variable, QStringLiteral("Document")},
     {QStringLiteral("sel"), SuggestionKind::Variable, QStringLiteral("Selection")},
-    {QStringLiteral("tb2"), SuggestionKind::Module, QStringLiteral("module")},
+    {QStringLiteral("trenchbroom"), SuggestionKind::Module, QStringLiteral("module")},
   };
 
   const auto moduleSymbols = pythonApiSymbols(PythonApiType::Module);

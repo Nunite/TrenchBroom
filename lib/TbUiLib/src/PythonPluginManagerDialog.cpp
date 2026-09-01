@@ -100,7 +100,7 @@ PythonPluginManagerDialog::PythonPluginManagerDialog(QWidget* parent)
 void PythonPluginManagerDialog::createGui()
 {
   auto* introLabel = new QLabel{
-    tr("Manage Python v2 UI plugin directories. Script-only plugins should be run with "
+    tr("Manage Python UI plugin directories. Script-only plugins should be run with "
        "Run Python Script.")};
   setInfoStyle(introLabel);
 

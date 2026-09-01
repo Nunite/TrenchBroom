@@ -3456,8 +3456,8 @@ This panel is reserved for plugin-provided UI.</source>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/PythonPluginManagerDialog.cpp" line="103"/>
-        <source>Manage Python v2 UI plugin directories. Script-only plugins should be run with Run Python Script.</source>
-        <translation>管理 Python v2 UI 插件目录。仅脚本插件应通过“运行 Python 脚本”执行。</translation>
+        <source>Manage Python UI plugin directories. Script-only plugins should be run with Run Python Script.</source>
+        <translation>管理 Python UI 插件目录。仅脚本插件应通过“运行 Python 脚本”执行。</translation>
     </message>
     <message>
         <location filename="../../../../lib/TbUiLib/src/PythonPluginManagerDialog.cpp" line="111"/>

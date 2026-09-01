@@ -160,7 +160,7 @@ Common recipe path:
    `ir_compile_preview_from_file`, then apply with the returned `previewId`.
 6. Recover targets with `module_inspect` / `selector_preview`, validate, and review.
 
-Recipes must not call TrenchBroom, MCP, or `tb2` directly. MCP remains the only
+Recipes must not call TrenchBroom, MCP, or `trenchbroom` directly. MCP remains the only
 map mutation layer.
 
 Prefab-like recipes must declare `qualityPolicy` and

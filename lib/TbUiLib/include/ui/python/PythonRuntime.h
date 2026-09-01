@@ -49,7 +49,7 @@ private:
     const PythonExecutionContext& context,
     const std::filesystem::path& path,
     PythonPluginSession* session);
-  bool installV2Module();
+  bool installApiModule();
   bool prependSysPath(const std::filesystem::path& path);
 };
 

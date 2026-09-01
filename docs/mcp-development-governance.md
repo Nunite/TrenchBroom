@@ -34,7 +34,7 @@ Skill recipe scripts own reusable scene composition and domain intent:
 - gameplay interpretation, difficulty judgement, and route intent narratives
 - parameterized scene families that can emit deterministic IR
 
-Recipes must emit IR JSON files. They must not call TrenchBroom, MCP, or `tb2`
+Recipes must emit IR JSON files. They must not call TrenchBroom, MCP, or `trenchbroom`
 directly, and they must not edit `.map` files.
 
 ### IR Owns

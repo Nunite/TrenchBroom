@@ -256,7 +256,7 @@ TEST_CASE("MapWindow")
     runButton->click();
     input->setPlainText(QStringLiteral("console_value + 1"));
     runButton->click();
-    input->setPlainText(QStringLiteral("tb2.current_document().entities[0].classname"));
+    input->setPlainText(QStringLiteral("trenchbroom.current_document().entities[0].classname"));
     runButton->click();
 
     QTRY_VERIFY_WITH_TIMEOUT(output->toPlainText().contains(QStringLiteral("42")), 500);
@@ -554,7 +554,7 @@ TEST_CASE("MapWindow")
     env.createFile(
       "smoke.py",
       R"(
-import tb2 as tb
+import trenchbroom as tb
 
 doc = tb.current_document()
 assert doc is not None
@@ -581,7 +581,7 @@ with open("python-smoke-ok.txt", "w", encoding="utf-8") as f:
     env.createFile(
       "transaction.py",
       R"(
-import tb2 as tb
+import trenchbroom as tb
 
 doc = tb.current_document()
 entity = doc.entities[0]
@@ -604,7 +604,7 @@ with doc.transaction("python smoke transaction"):
     env.createFile(
       "selection_callback.py",
       R"(
-import tb2 as tb
+import trenchbroom as tb
 
 count = 0
 
@@ -644,7 +644,7 @@ callback_token = tb.register_callback("selection_changed", on_selection_changed)
     env.createFile(
       "actions.py",
       R"(
-import tb2 as tb
+import trenchbroom as tb
 
 actions = tb.list_actions()
 assert len(actions) > 0
@@ -679,7 +679,7 @@ else:
     env.createFile(
       "plugin_panel.py",
       R"(
-import tb2 as tb
+import trenchbroom as tb
 
 panel = tb.create_plugin_panel("Codex Panel")
 panel.add_label("Ready")
@@ -731,7 +731,7 @@ panel.add_button("Run", lambda: print("run"))
     env.createFile(
       "plugin/main.py",
       R"(
-import tb2 as tb
+import trenchbroom as tb
 
 panel = tb.create_plugin_panel("Reloaded Plugin")
 panel.add_label("Loaded from preferences")

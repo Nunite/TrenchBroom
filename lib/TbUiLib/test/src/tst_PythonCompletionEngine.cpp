@@ -38,7 +38,7 @@ TEST_CASE("PythonCompletionEngine")
   SECTION("resolves module calls and rejects unknown members")
   {
     CHECK(
-      pythonCompletionTypeForExpression("tb2.current_document().selection.brush")
+      pythonCompletionTypeForExpression("trenchbroom.current_document().selection.brush")
       == brushType);
     CHECK(
       pythonCompletionTypeForExpression(

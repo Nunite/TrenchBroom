@@ -10,7 +10,7 @@ Agent 直接编辑 `.map` 文件，也不是把 Python 插件系统暴露成一�
 - 让后续 Agent 能通过结构化工具创建实体、放置资产和生成白盒关卡。
 - 所有写操作必须进入 `MapDocument` transaction，并保留 undo/redo 语义。
 - AI 不直接操作 brush 顶点；白盒生成先进入 Blockout IR，再由确定性代码生成合法 brush。
-- MCP 相关代码与 `tb2`、资产浏览器、视图 overlay 保持边界清晰，避免形成新的巨型模块。
+- MCP 相关代码与 `trenchbroom`、资产浏览器、视图 overlay 保持边界清晰，避免形成新的巨型模块。
 
 ## 总体架构
 
@@ -116,7 +116,7 @@ TrenchBroom，减少额外 exe、pipe 配置和鉴权状态不同步带来的维
 - `Off`：默认值，不启动 bridge。
 - `ReadOnly`：允许读取地图、选择、动作列表，以及设置/清理 MCP overlay 等安全 UI 状态操作。
 - `Edit`：允许结构化写操作，所有写入进入 transaction。
-- `Danger`：预留给未来 `run_tb2_script` 或专家级能力；第一版不实现。
+- `Danger`：预留给未来 `run_trenchbroom_script` 或专家级能力；第一版不实现。
 
 HTTP 主路径不要求 bearer token；它只绑定 `127.0.0.1`，并由 Preferences 中的
 `Off` / `ReadOnly` / `Edit` mode 控制是否监听和允许哪些工具。旧 stdio shim 到

@@ -9,7 +9,7 @@ namespace
 using enum PythonApiSymbolKind;
 
 constexpr auto ApiTypes = std::array{
-  PythonApiTypeInfo{PythonApiType::Module, "tb2"},
+  PythonApiTypeInfo{PythonApiType::Module, "trenchbroom"},
   PythonApiTypeInfo{PythonApiType::Vec3, "Vec3"},
   PythonApiTypeInfo{PythonApiType::Plane, "Plane"},
   PythonApiTypeInfo{PythonApiType::Document, "Document"},

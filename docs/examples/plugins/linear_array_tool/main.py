@@ -1,15 +1,15 @@
 """
-Linear Array Generator Plugin for TrenchBroom (tb2 API)
+Linear Array Generator Plugin for TrenchBroom (trenchbroom API)
 Demonstrates creating a UI panel on the Plugins inspector page,
 reading input widgets, and performing safe undoable transformations.
 """
 
-import tb2
+import trenchbroom as tb
 
 panel = None
 
 def generate_array():
-    doc = tb2.current_document()
+    doc = tb.current_document()
     if not doc.selection.brushes and not doc.selection.entities:
         panel.set_label_text("status", "Status: Please select at least one brush or entity.")
         return
@@ -32,7 +32,7 @@ def generate_array():
 
 def init_plugin():
     global panel
-    panel = tb2.create_plugin_panel("Linear Array Generator")
+    panel = tb.create_plugin_panel("Linear Array Generator")
     panel.add_label("Duplicates the active selection along an offset vector.")
 
     group = panel.add_group("config", "Parameters")

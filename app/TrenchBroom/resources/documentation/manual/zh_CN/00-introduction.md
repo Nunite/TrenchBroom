@@ -17,7 +17,7 @@ TrenchBroom 是一款面向 Quake、Quake 2、Hexen 2 和 GoldSrc (Half-Life) �
 [✂️ CSG 与顶点编辑](#vertex_and_csg){.manual-tag}
 [🎨 材质与 UV](#materials_and_uv){.manual-tag}
 [📦 资产浏览器](#assets_and_prefabs){.manual-tag}
-[🐍 Python v2 插件](#python_scripting_and_plugins){.manual-tag}
+[🐍 Python API 插件](#python_scripting_and_plugins){.manual-tag}
 [🤖 MCP 自动化](#mcp_automation){.manual-tag}
 :::
 :::
@@ -50,7 +50,7 @@ Brush 图元、挤出、裁剪、路径放样、顶点编辑与 CSG 布尔运算
 ::: manual-card
 **⚙️ 4. 编译、扩展与自动化**
 
-首选项设置、外部编译器配置、游戏引擎运行、Python v2 插件开发与 MCP 自动化接口。
+首选项设置、外部编译器配置、游戏引擎运行、Python API 插件开发与 MCP 自动化接口。
 
 [➔ 共 4 章](#preferences_and_compilation)
 :::
@@ -69,7 +69,7 @@ Brush 图元、挤出、裁剪、路径放样、顶点编辑与 CSG 布尔运算
   - 支持创建图层和内联实体属性的可搜索 Outliner
   - 带自动快速修复的问题浏览器
   - 运行外部编译器并启动游戏引擎
-  - 交互式 Python 控制台和基于清单的 Python v2 插件
+  - 交互式 Python 控制台和基于清单的 Python API 插件
   - 可选的本地主机 MCP 端点，用于受保护的编辑器自动化
   - 点文件和 Portal 文件支持
   - 自动备份

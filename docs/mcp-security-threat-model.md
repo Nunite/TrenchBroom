@@ -47,7 +47,7 @@ validate and apply it.
 | Unbounded session data exhausts memory | Session limits are 1024 operation records, 128 reviews, 64 previews with a 10-minute TTL, and four document fingerprints. Status and doctor expose counts and evictions. |
 | Stale or evicted resource is mistaken for live state | Resource reads return structured eviction and recovery guidance. Object resolution reports stale/live/mismatch state. |
 | Second instance steals an active bridge endpoint | Startup probes the pipe and HTTP listener. It refuses an active instance and removes only an inactive stale endpoint. |
-| Arbitrary local execution through compile or Python | These tools require Edit mode, remain hidden/legacy where appropriate, and require explicit user authorization in Agent workflows. Scene recipes cannot call MCP, `tb2`, or edit `.map` files. |
+| Arbitrary local execution through compile or Python | These tools require Edit mode, remain hidden/legacy where appropriate, and require explicit user authorization in Agent workflows. Scene recipes cannot call MCP, `trenchbroom`, or edit `.map` files. |
 
 ## Protocol Requirements
 

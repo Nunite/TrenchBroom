@@ -1,36 +1,36 @@
 # TrenchBroom Python API Reference {#python_api_reference}
 
-Welcome to the TrenchBroom Python API reference documentation. TrenchBroom embeds a high-performance Python v2 (`tb2`) runtime that allows developers and level designers to automate geometry generation, manipulate entities, inspect maps, and build declarative native UI panels.
+Welcome to the TrenchBroom Python API reference documentation. TrenchBroom embeds a high-performance Python API (`trenchbroom`) runtime that allows developers and level designers to automate geometry generation, manipulate entities, inspect maps, and build declarative native UI panels.
 
 ::: {.api-grid}
 [**1. Quickstart & Concepts**\
 Transaction context managers, atomic undo/redo, and coordinate systems.](#quickstart){.api-card}
 
-[**2. tb2 Root Module**\
-Document handles, panel factories, and 3D vector/plane mathematics.](#the_tb2_root_module){.api-card}
+[**2. trenchbroom Root Module**\
+Document handles, panel factories, and 3D vector/plane mathematics.](#the_trenchbroom_root_module){.api-card}
 
 [**3. Document Access**\
-Map queries, selections, materials, transactions, and UV updates.](#tb2_document){.api-card}
+Map queries, selections, materials, transactions, and UV updates.](#trenchbroom_document){.api-card}
 
 [**4. Selection & Transforms**\
-Spatial manipulation (translate/rotate/scale), cloning, and chamfering.](#tb2_selection){.api-card}
+Spatial manipulation (translate/rotate/scale), cloning, and chamfering.](#trenchbroom_selection){.api-card}
 
 [**5. Geometry & Elements**\
 Polyhedral Brush, polygon Face UV alignments, and Entity properties.](#geometry_and_elements){.api-card}
 
 [**6. PluginPanel UI**\
-Declarative forms, spinboxes, color pickers, tables, and tree views.](#tb2_pluginpanel){.api-card}
+Declarative forms, spinboxes, color pickers, tables, and tree views.](#trenchbroom_pluginpanel){.api-card}
 :::
 
 ## Quickstart & Architecture {#quickstart}
 
-All scripting in TrenchBroom interacts with the editor through the built-in `tb2` module. You can execute commands interactively in the **Python Console** or author persistent manifest-based plugins.
+All scripting in TrenchBroom interacts with the editor through the built-in `trenchbroom` module. You can execute commands interactively in the **Python Console** or author persistent manifest-based plugins.
 
 ```python
-import tb2
+import trenchbroom as tb
 
 # Access the active map document
-doc = tb2.current_document()
+doc = tb.current_document()
 
 # Wrap modifications in a named transaction for atomic undo/redo
 with doc.transaction("Normalize Selected Lights"):
@@ -49,93 +49,93 @@ print(f"Map contains {len(doc.entities)} entities.")
 
 ---
 
-## Core Module: tb2 {#the_tb2_root_module}
+## Core Module: trenchbroom {#the_trenchbroom_root_module}
 
-The root `tb2` module provides top-level access to the active document, plugin UI factory functions, and vector mathematics primitives.
+The root `trenchbroom` module provides top-level access to the active document, plugin UI factory functions, and vector mathematics primitives.
 
-### Top-Level Functions {#tb2_functions}
+### Top-Level Functions {#trenchbroom_functions}
 
-#### `tb2.current_document()` {#tb2_current_document}
+#### `trenchbroom.current_document()` {#trenchbroom_current_document}
 
 Returns a handle to the active map document currently open in the editor.
 
 - **Returns**: <span class="type-badge">Document</span> The active map document.
-- **Return Type**: `tb2.Document`
+- **Return Type**: `trenchbroom.Document`
 - **Raises**: `RuntimeError` if no map document is active.
 
 ```python
-doc = tb2.current_document()
+doc = tb.current_document()
 print(doc.path)
 ```
 
-#### `tb2.create_plugin_panel(title)` {#tb2_create_plugin_panel}
+#### `trenchbroom.create_plugin_panel(title)` {#trenchbroom_create_plugin_panel}
 
 Creates and registers a declarative interactive panel in the **Plugins** inspector tab.
 
 - **Parameters**:
   - `title` (*str*) – Display title shown in the inspector tab header.
 - **Returns**: <span class="type-badge">PluginPanel</span> The created panel instance.
-- **Return Type**: `tb2.PluginPanel`
+- **Return Type**: `trenchbroom.PluginPanel`
 
 ```python
-panel = tb2.create_plugin_panel("Surface Aligner")
+panel = tb.create_plugin_panel("Surface Aligner")
 panel.add_label("Align selected faces to the world grid.")
 ```
 
-#### `tb2.selected_brushes()` / `tb2.selectedBrushes()` {#tb2_selected_brushes}
+#### `trenchbroom.selected_brushes()` / `trenchbroom.selectedBrushes()` {#trenchbroom_selected_brushes}
 
 Returns a list of all `Brush` handles in the active selection.
 
-- **Returns**: `list[tb2.Brush]`
+- **Returns**: `list[trenchbroom.Brush]`
 
-#### `tb2.selected_entities(include_brushes=False)` / `tb2.selectedEntities(include_brushes=False)` {#tb2_selected_entities}
+#### `trenchbroom.selected_entities(include_brushes=False)` / `trenchbroom.selectedEntities(include_brushes=False)` {#trenchbroom_selected_entities}
 
 Returns directly selected `Entity` handles. Pass `include_brushes=True` to also include the parent entities of selected brushes and individually selected faces.
 
-- **Returns**: `list[tb2.Entity]`
+- **Returns**: `list[trenchbroom.Entity]`
 
-#### `tb2.selected_faces()` / `tb2.selectedFaces()` {#tb2_selected_faces}
+#### `trenchbroom.selected_faces()` / `trenchbroom.selectedFaces()` {#trenchbroom_selected_faces}
 
 Returns the individually selected `Face` handles. Selecting a whole brush does not expand it into all of its faces.
 
-- **Returns**: `list[tb2.Face]`
+- **Returns**: `list[trenchbroom.Face]`
 
-#### `tb2.translate(...)` {#tb2_translate}
+#### `trenchbroom.translate(...)` {#trenchbroom_translate}
 
 Translates the active selection or a target object along the specified offset vector with automatic undo transaction.
 
-#### `tb2.rotate(...)` {#tb2_rotate}
+#### `trenchbroom.rotate(...)` {#trenchbroom_rotate}
 
 Rotates the active selection or a target object. Supports Euler angles `rotate(rx, ry, rz)` or axis-angle `rotate(ax, ay, az, angle)`.
 
-#### `tb2.scale(...)` {#tb2_scale}
+#### `trenchbroom.scale(...)` {#trenchbroom_scale}
 
 Scales the active selection or a target object uniformly or non-uniformly with automatic undo transaction.
 
-#### `tb2.duplicate(target=None)` {#tb2_duplicate}
+#### `trenchbroom.duplicate(target=None)` {#trenchbroom_duplicate}
 
 Duplicates the active selection (or target object) and updates the active selection to the cloned copies.
 
-#### `tb2.delete_selection()` / `tb2.deleteSelection()` {#tb2_delete_selection}
+#### `trenchbroom.delete_selection()` / `trenchbroom.deleteSelection()` {#trenchbroom_delete_selection}
 
 Deletes all currently selected geometry and entities from the active map.
 
-#### `tb2.deselect_all()` / `tb2.deselectAll()` {#tb2_deselect_all}
+#### `trenchbroom.deselect_all()` / `trenchbroom.deselectAll()` {#trenchbroom_deselect_all}
 
 Clears the active map selection.
 
-#### Selection and Event Helpers {#tb2_selection_and_event_helpers}
+#### Selection and Event Helpers {#trenchbroom_selection_and_event_helpers}
 
-- `tb2.selection() -> Selection`: Returns the current selection handle.
-- `tb2.selected_all_entities()` / `tb2.selectedAllEntities()`: Returns directly selected entities plus parent entities of selected brushes and faces.
-- `tb2.register_callback(event, callback) -> int`: Registers a no-argument callback for `selection_changed`, `document_loaded`, or `document_saved`.
-- `tb2.unregister_callback(token)`: Unregisters an event callback.
-- `tb2.set_timeout(callback, milliseconds)` / `tb2.set_interval(callback, milliseconds)`: Creates a plugin-session timer. Timers require a persistent UI plugin session.
-- `tb2.clear_interval(timer_id)`: Cancels either type of timer.
+- `trenchbroom.selection() -> Selection`: Returns the current selection handle.
+- `trenchbroom.selected_all_entities()` / `trenchbroom.selectedAllEntities()`: Returns directly selected entities plus parent entities of selected brushes and faces.
+- `trenchbroom.register_callback(event, callback) -> int`: Registers a no-argument callback for `selection_changed`, `document_loaded`, or `document_saved`.
+- `trenchbroom.unregister_callback(token)`: Unregisters an event callback.
+- `trenchbroom.set_timeout(callback, milliseconds)` / `trenchbroom.set_interval(callback, milliseconds)`: Creates a plugin-session timer. Timers require a persistent UI plugin session.
+- `trenchbroom.clear_interval(timer_id)`: Cancels either type of timer.
 
 ### Math & Geometry Primitives {#math_primitives}
 
-#### `tb2.Vec3(x, y, z)` {#tb2_vec3}
+#### `trenchbroom.Vec3(x, y, z)` {#trenchbroom_vec3}
 
 Three-dimensional Cartesian vector representing coordinates, offsets, and directions.
 
@@ -150,22 +150,22 @@ Three-dimensional Cartesian vector representing coordinates, offsets, and direct
   - `cross(other: Vec3) -> Vec3`: Cross product.
 
 ```python
-pos = tb2.Vec3(128.0, 64.0, 32.0)
-offset = tb2.Vec3(0.0, 0.0, 16.0)
+pos = tb.Vec3(128.0, 64.0, 32.0)
+offset = tb.Vec3(0.0, 0.0, 16.0)
 target = pos + offset
 ```
 
-#### `tb2.Plane(normal, dist)` {#tb2_plane}
+#### `trenchbroom.Plane(normal, dist)` {#trenchbroom_plane}
 
 Hessian normal form plane definition ($N \cdot P - D = 0$).
 
 - **Parameters**:
-  - `normal` (*tb2.Vec3*) – Normalized plane normal vector.
+  - `normal` (*trenchbroom.Vec3*) – Normalized plane normal vector.
   - `dist` (*float*) – Distance from coordinate origin along the normal.
 
 ---
 
-## Document Access: Document {#tb2_document}
+## Document Access: Document {#trenchbroom_document}
 
 The `Document` class represents an open map file and provides map queries, transactions, selection control, and UV updates.
 
@@ -198,11 +198,11 @@ Other document methods include `save()`, `reload()`, `select(objects)`, `clear_s
 
 ### Handle Lifetime {#python_handle_lifetime}
 
-`Document`, `Entity`, `Brush`, and `Face` objects are live handles, not snapshots. Closing or reloading a document and deleting nodes invalidates related handles. Changing brush geometry also invalidates previously acquired `Face` handles. Accessing an invalid handle raises `RuntimeError`; reacquire long-lived objects from `tb2.current_document()`, the current selection, or their parent object after such changes.
+`Document`, `Entity`, `Brush`, and `Face` objects are live handles, not snapshots. Closing or reloading a document and deleting nodes invalidates related handles. Changing brush geometry also invalidates previously acquired `Face` handles. Accessing an invalid handle raises `RuntimeError`; reacquire long-lived objects from `trenchbroom.current_document()`, the current selection, or their parent object after such changes.
 
 ---
 
-## Selection & Transforms: Selection {#tb2_selection}
+## Selection & Transforms: Selection {#trenchbroom_selection}
 
 The `Selection` object provides direct access to highlighted geometry and high-level spatial manipulation functions.
 
@@ -259,14 +259,14 @@ Bevels selected brush edges.
 
 ## Map Elements & Geometry {#geometry_and_elements}
 
-### Brush {#tb2_brush}
+### Brush {#trenchbroom_brush}
 
 Represents a convex 3D polyhedron bounded by half-space planes.
 
 - `brush.entity` (*Entity*): Returns the parent entity owning this brush.
 - `brush.faces()` (*list[Face]*): Returns the list of polygon faces comprising the brush.
 
-### Face {#tb2_face}
+### Face {#trenchbroom_face}
 
 Represents a single planar boundary polygon of a brush.
 
@@ -283,7 +283,7 @@ Represents a single planar boundary polygon of a brush.
 - `face.set_material(name: str)`: Assigns a new material to the face.
 - `face.set_uv_loops(loops)`: Writes UV loop data.
 
-### Entity {#tb2_entity}
+### Entity {#trenchbroom_entity}
 
 Represents point entities (monsters, lights, spawn points) and brush entities (`func_door`, `trigger_multiple`, `worldspawn`). Supports standard Python dictionary operations.
 
@@ -302,7 +302,7 @@ Represents point entities (monsters, lights, spawn points) and brush entities (`
 
 ---
 
-## UI & Plugin Panels: PluginPanel {#tb2_pluginpanel}
+## UI & Plugin Panels: PluginPanel {#trenchbroom_pluginpanel}
 
 The `PluginPanel` class allows Python plugins to construct rich, responsive interfaces in the **Plugins** inspector tab.
 
@@ -344,12 +344,12 @@ Named fields expose matching getters such as `get_text_field`, `get_text_area`, 
 ### Example 1: Linear Array Generator {#example_linear_array}
 
 ```python
-import tb2
+import trenchbroom as tb
 
 panel = None
 
 def on_generate():
-    doc = tb2.current_document()
+    doc = tb.current_document()
     if not doc or (not doc.selection.brushes and not doc.selection.entities):
         panel.set_label_text("status", "Error: Please select objects to duplicate.")
         return
@@ -368,7 +368,7 @@ def on_generate():
 
 def init_plugin():
     global panel
-    panel = tb2.create_plugin_panel("Array Generator")
+    panel = tb.create_plugin_panel("Array Generator")
     panel.add_label("Duplicate active selection along a vector:")
 
     group = panel.add_group("params", "Parameters")
@@ -386,10 +386,10 @@ init_plugin()
 ### Example 2: Batch Light Color Modifier {#example_batch_lights}
 
 ```python
-import tb2
+import trenchbroom as tb
 
 def randomize_light_colors():
-    doc = tb2.current_document()
+    doc = tb.current_document()
     if not doc:
         return
 

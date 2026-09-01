@@ -343,7 +343,7 @@ MCP 写操作的公共结果包括：
 ## 当前限制
 
 - MCP 默认关闭，需要用户在 Preferences 中启用。
-- `Danger` 模式和任意 `tb2` 脚本执行还没有开放。
+- `Danger` 模式和任意 `trenchbroom` 脚本执行还没有开放。
 - `prefabs_list` / `prefab_create` 已从 MCP catalog 移除；recipe catalog 由 skill 的 `scripts/list_recipes.py` 管理。
 - `brush_create_arch` / `brush_create_torus` 当前标记为 unsupported。
 - Overlay 第一版能画 object bounds、point、bounds 和 label，但还不是全局通用 overlay manager。

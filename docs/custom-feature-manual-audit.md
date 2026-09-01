@@ -8,7 +8,7 @@
 本次盘点日期为 2026-08-20，检查基线如下：
 
 - 当前分支：`main`
-- 首次盘点基线：`93c8a9615`（`Update Python v2 usage documentation`）
+- 首次盘点基线：`93c8a9615`
 - 与官方 `upstream/master` 的 merge base：
   `ce0e9d4bb58ef1e08e8c533159f320592d4daffc`
 - 手册源文件：`app/TrenchBroom/resources/documentation/manual/{en,zh_CN}`
@@ -124,11 +124,11 @@
 | GoldSrc MDL 内嵌纹理、透明材质、方向和缩放支持 | 缺失 | 需要模型 fixture |
 | Counter-Strike FGD 中的 SDHLT 模型阴影、BSP、双面、厚度和碰撞选项 | 缺失 | 需要实体属性 target |
 
-### 5. Python v2 与插件系统
+### 5. Python API 与插件系统
 
 | 功能 | 手册状态 | 截图能力 |
 | --- | --- | --- |
-| 嵌入式 `tb2` runtime 和 manifest 插件 | 较完整 | 主要使用代码示例，不依赖截图 |
+| 嵌入式 `trenchbroom` runtime 和 manifest 插件 | 较完整 | 主要使用代码示例，不依赖截图 |
 | 插件自动发现、session 和资源生命周期 | 较完整 | 如补 UI 教程，需要插件管理器状态 |
 | 独立 Python Plugin Manager 和 Plugin Inspector | 简略 | Inspector 可直接截，Manager 需要 target |
 | 双栏 Python Console、多行编辑器和输出日志 | 较完整 | 可直接截图 |
@@ -137,7 +137,7 @@
 | Document、Selection、Entity、Brush、Face、Material、变换、几何、倒角和 UV API | 较完整 | 代码示例比 UI 截图更有效 |
 | Form、Table、Tree、HTML、事件回调和 session timer | 较完整 | 如需截图，应构造示例 Panel |
 | Brush Builder、Chamfer、Curve Sweep、Distribute、Texture、Git 和 Blender 示例插件 | 部分覆盖 | 应选择典型工作流；这些不是内置核心面板 |
-| legacy `tb` 已移除，活动插件使用 `tb2` | 较完整 | 无需截图 |
+| legacy `tb` 已移除，活动插件使用 `trenchbroom` | 较完整 | 无需截图 |
 
 ### 6. MCP 与 Agent 自动化
 

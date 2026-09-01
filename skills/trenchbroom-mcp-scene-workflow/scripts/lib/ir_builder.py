@@ -2,7 +2,7 @@
 """Small helpers for TrenchBroom MCP skill recipes.
 
 Recipes intentionally emit plain IR JSON only. They do not talk to TrenchBroom,
-MCP, or tb2 directly; C++ MCP remains responsible for transactions, guards,
+MCP, or trenchbroom directly; C++ MCP remains responsible for transactions, guards,
 validation, selector/module tracking, and review.
 """
 

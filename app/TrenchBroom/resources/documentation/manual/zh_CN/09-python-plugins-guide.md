@@ -2,7 +2,7 @@
 
 ## Python 控制台 {#python_console}
 
-打开底部信息面板中的 **Python** 标签页，以针对当前活动的 TrenchBroom 会话运行 Python v2 脚本与快捷指令。
+打开底部信息面板中的 **Python** 标签页，以针对当前活动的 TrenchBroom 会话运行 Python API 脚本与快捷指令。
 
 ### 左右分栏工作区 {#console_execution}
 
@@ -134,7 +134,7 @@ with doc.transaction("Batch Align Entities"):
 
 ## Python 插件 {#python_plugins}
 
-TrenchBroom 内置了嵌入式 Python v2 运行时与扩展系统。打开 **Preferences > Misc**，然后在 **Tools** 分组中点击 **Python Plugin Manager...** 管理基于清单的 UI 插件。在管理器内使用 **Install UI Plugin...** 配置目录。管理器会列出检测到的插件、加载状态、元数据和错误；使用搜索或 **Only show issues** 可以诊断规模较大的插件集，在修改文件后点击刷新即可。
+TrenchBroom 内置了嵌入式 Python API 运行时与扩展系统。打开 **Preferences > Misc**，然后在 **Tools** 分组中点击 **Python Plugin Manager...** 管理基于清单的 UI 插件。在管理器内使用 **Install UI Plugin...** 配置目录。管理器会列出检测到的插件、加载状态、元数据和错误；使用搜索或 **Only show issues** 可以诊断规模较大的插件集，在修改文件后点击刷新即可。
 
 ![插件检查器面板](images/PluginInspector.png)
 
@@ -143,7 +143,7 @@ TrenchBroom 内置了嵌入式 Python v2 运行时与扩展系统。打开 **Pre
 TrenchBroom 区分两种插件类型：
 
 - **UI 插件 (`pluginType: "ui"`)**：声明了 `trenchbroom-plugin.json` 清单的常驻插件。它们在启动或刷新插件管理器时加载，并可在 **Plugins** 检查器标签页中注册自定义面板、全局动作、事件监听器和定时器。
-- **脚本插件 (`pluginType: "script"`)**：通过 [Python 控制台](#python_console)、**Run > Run Python Script...** 或自定义动作按需执行的独立脚本。插件管理器会报告脚本清单，但不会执行其入口文件。旧版 `tb` 兼容性已不再属于活动插件路径的一部分；现有脚本应使用 `tb2` 或 `import tb2 as tb`。
+- **脚本插件 (`pluginType: "script"`)**：通过 [Python 控制台](#python_console)、**Run > Run Python Script...** 或自定义动作按需执行的独立脚本。插件管理器会报告脚本清单，但不会执行其入口文件。脚本使用 `import trenchbroom as tb` 访问编辑器。
 
 #### 插件清单格式 {#plugin_manifest_format}
 
@@ -169,7 +169,7 @@ TrenchBroom 区分两种插件类型：
 | `id` | string | 插件全局唯一标识符 |
 | `name` | string | 界面上展示的插件名称 |
 | `version` | string | 语义化版本号 |
-| `apiVersion` | integer | Python v2 必须固定为 `2` |
+| `apiVersion` | integer | 当前 API 兼容级别必须固定为 `2` |
 | `pluginType` | string | `"ui"` 为常驻 UI 插件，`"script"` 为脚本 |
 | `entry` | string | Python 入口脚本的相对路径 |
 | `description` | string | 插件功能可选描述 |
@@ -177,22 +177,22 @@ TrenchBroom 区分两种插件类型：
 
 `pluginType` 的默认值是 `"script"`。常驻 UI 插件必须显式设置 `"pluginType": "ui"`，否则插件管理器不会加载它。
 
-#### tb2 Python API {#the_tb2_python_api}
+#### trenchbroom Python API {#the_trenchbroom_python_api}
 
-所有 Python 脚本和插件均通过内置的 `tb2` 模块（`import tb2`）访问 TrenchBroom。核心组件包括：
+所有 Python 脚本和插件均通过内置的 `trenchbroom` 模块（`import trenchbroom as tb`）访问 TrenchBroom。核心组件包括：
 
-- `tb2.current_document()`：返回代表当前打开地图的活动 `Document` 句柄。
+- `trenchbroom.current_document()`：返回代表当前打开地图的活动 `Document` 句柄。
 - `doc.transaction(name)`：事务上下文管理器（`with doc.transaction("Action Name"):`），将修改合并为一个撤销/重做步骤，并在发生 Python 异常时自动回滚。
 - `doc.selection`：用于查询选中对象（`entity`、`brush`、`entities`、`all_entities`、`brushes`、`brush_faces`）的 `Selection` 句柄；`sel[key]` 从首个相关实体读取，`sel[key] = value` 写入全部相关实体；同时支持 `translate`、`rotate`、`scale`、`duplicate`、`chamfer_vertices` 和 `chamfer_edges` 等几何变换。只有面被选中时，`entity` 与 `all_entities` 会返回该面的父实体；空选区返回 `None` 或空结果。
 - `doc.entities`：地图中所有 `Entity` 对象的列表。使用 `.get(key, default)` 和 `.set(key, value)` 访问属性。
 - `brush.faces()`：返回构成 Brush 的多边形 `Face` 对象列表，支持访问 `.material`、`.offset`、`.scale`、`.rotation` 和 `.vertices`。
-- `tb2.Vec3(x, y, z)` 与 `tb2.Plane(normal, dist)`：三维向量与平面数学基元。
+- `trenchbroom.Vec3(x, y, z)` 与 `trenchbroom.Plane(normal, dist)`：三维向量与平面数学基元。
 
 这些对象是实时句柄，而不是数据快照。关闭或重新加载文档、删除节点会使相关句柄失效；改变 Brush 几何也会使此前取得的 `Face` 句柄失效。失效后访问会抛出 `RuntimeError`，因此应在这些变化后重新获取对象。
 
 #### 构建自定义 UI 面板 {#building_custom_ui_panels}
 
-UI 插件使用 `tb2.create_plugin_panel(title)` 在 **Plugins** 检查器标签页中创建交互式面板。返回的 `PluginPanel` 提供声明式控件：
+UI 插件使用 `trenchbroom.create_plugin_panel(title)` 在 **Plugins** 检查器标签页中创建交互式面板。返回的 `PluginPanel` 提供声明式控件：
 
 - **标签与文本**：`.add_label(text)`、`.add_label_named(key, text)`、`.set_label_text(key, text)` 以及 `.add_html_view(key, html, height, callback)`。
 - **表单输入**：`.add_text_field(key, label, value)`、`.add_text_area(key, label, value)`、`.add_int_field(key, label, value, min, max)`、`.add_float_field(key, label, value, min, max, decimals, step)`、`.add_checkbox(key, text, checked)`、`.add_combo_box(key, label, items, callback, current)` 以及 `.add_color_field(key, label, color)`。命名控件提供对应的 `get_*` 方法，文本字段与文本区域还提供 `set_*` 方法；`.add_line_edit(text, callback)` 是兼容回调形式。
@@ -205,11 +205,13 @@ UI 插件使用 `tb2.create_plugin_panel(title)` 在 **Plugins** 检查器标签
 常驻 UI 插件可以响应编辑器事件：
 
 ```python
-def on_selection_changed():
-    print(len(tb2.selection().all_entities))
+import trenchbroom as tb
 
-token = tb2.register_callback("selection_changed", on_selection_changed)
-# tb2.unregister_callback(token)  # Stop early when needed.
+def on_selection_changed():
+    print(len(tb.selection().all_entities))
+
+token = tb.register_callback("selection_changed", on_selection_changed)
+# tb.unregister_callback(token)  # Stop early when needed.
 ```
 
 当前事件名为 `selection_changed`、`document_loaded` 和 `document_saved`，回调不接收参数。常驻 UI 插件会话中还可使用 `set_timeout`、`set_interval` 和 `clear_interval`。从控制台或 **Run Python Script...** 调用定时器会抛出 `RuntimeError`。插件卸载时会自动清理其面板、回调和定时器。
@@ -219,12 +221,12 @@ token = tb2.register_callback("selection_changed", on_selection_changed)
 以下是一个完整可运行的 UI 插件脚本，用于复制当前选区并沿偏移向量阵列平移：
 
 ```python
-import tb2
+import trenchbroom as tb
 
 panel = None
 
 def on_generate():
-    doc = tb2.current_document()
+    doc = tb.current_document()
     if not doc.selection.brushes and not doc.selection.entities:
         panel.set_label_text("status", "Please select at least one brush or entity.")
         return
@@ -243,7 +245,7 @@ def on_generate():
 
 def init_plugin():
     global panel
-    panel = tb2.create_plugin_panel("Array Generator")
+    panel = tb.create_plugin_panel("Array Generator")
     panel.add_label("Duplicate the active selection along an offset vector:")
 
     group = panel.add_group("config", "Parameters")

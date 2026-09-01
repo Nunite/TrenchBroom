@@ -223,7 +223,7 @@ TEST_CASE("PythonConsole")
   console.insertCompletion(QStringLiteral("all_entities"));
   CHECK(input->toPlainText() == QStringLiteral("sel.all_entities"));
 
-  // Completion members come from the public tb2 API catalog.
+  // Completion members come from the public trenchbroom API catalog.
   input->setPlainText(QStringLiteral("sel."));
   cursor = input->textCursor();
   cursor.movePosition(QTextCursor::End);
@@ -323,13 +323,13 @@ TEST_CASE("PythonConsole")
   console.updateCompleter(true);
   CHECK(completionLabels().empty());
 
-  input->setPlainText(QStringLiteral("tb"));
+  input->setPlainText(QStringLiteral("tren"));
   cursor = input->textCursor();
   cursor.movePosition(QTextCursor::End);
   input->setTextCursor(cursor);
   console.updateCompleter(true);
   labels = completionLabels();
-  CHECK(std::ranges::find(labels, QStringLiteral("tb2")) != labels.end());
+  CHECK(std::ranges::find(labels, QStringLiteral("trenchbroom")) != labels.end());
   CHECK(std::ranges::find(labels, QStringLiteral("tb")) == labels.end());
 
   // Test deletion and auto-dismissal

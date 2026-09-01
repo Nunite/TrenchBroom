@@ -102,17 +102,17 @@ const print_action = (key) => document.write(action_str(key));
       if (isApiPage) {
         categories = isZh ? [
           { targetId: "toc-quickstart", title: "1. 架构与快速入门" },
-          { targetId: "toc-the_tb2_root_module", title: "2. 核心模块与基元" },
-          { targetId: "toc-tb2_document", title: "3. 文档与选区操作" },
+          { targetId: "toc-the_trenchbroom_root_module", title: "2. 核心模块与基元" },
+          { targetId: "toc-trenchbroom_document", title: "3. 文档与选区操作" },
           { targetId: "toc-geometry_and_elements", title: "4. 几何对象与图元" },
-          { targetId: "toc-tb2_pluginpanel", title: "5. 插件界面与控件" },
+          { targetId: "toc-trenchbroom_pluginpanel", title: "5. 插件界面与控件" },
           { targetId: "toc-runnable_examples", title: "6. 完整实战示例" }
         ] : [
           { targetId: "toc-quickstart", title: "1. QUICKSTART & CONCEPTS" },
-          { targetId: "toc-the_tb2_root_module", title: "2. CORE MODULE & MATH" },
-          { targetId: "toc-tb2_document", title: "3. DOCUMENT & SELECTION" },
+          { targetId: "toc-the_trenchbroom_root_module", title: "2. CORE MODULE & MATH" },
+          { targetId: "toc-trenchbroom_document", title: "3. DOCUMENT & SELECTION" },
           { targetId: "toc-geometry_and_elements", title: "4. GEOMETRY & ELEMENTS" },
-          { targetId: "toc-tb2_pluginpanel", title: "5. PLUGIN UI & CONTROLS" },
+          { targetId: "toc-trenchbroom_pluginpanel", title: "5. PLUGIN UI & CONTROLS" },
           { targetId: "toc-runnable_examples", title: "6. COMPLETE EXAMPLES" }
         ];
       } else {

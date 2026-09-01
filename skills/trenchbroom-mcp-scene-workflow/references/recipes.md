@@ -2,7 +2,7 @@
 
 Use recipe scripts for complex prefab-like scenes that would otherwise tempt
 adding scene-specific C++ MCP tools. Recipes generate IR JSON only; they must
-not call TrenchBroom, MCP, or `tb2` directly.
+not call TrenchBroom, MCP, or `trenchbroom` directly.
 
 ## Boundary
 
@@ -13,7 +13,7 @@ not call TrenchBroom, MCP, or `tb2` directly.
 - Every recipe declares `qualityPolicy` and
   `reviewPolicy:{recommended:true,required:false}`. The manifest must include a
   review path, but review is optional evidence and is not a static validation gate.
-- Python `tb2` plugins are human-facing UI/plugin workflows. If UI plugins need
+- Python `trenchbroom` plugins are human-facing UI/plugin workflows. If UI plugins need
   prefab logic later, reuse recipe scripts to emit IR instead of duplicating
   generation rules.
 

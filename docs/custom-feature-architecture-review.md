@@ -88,16 +88,16 @@
 - 避免统一资产浏览器退化成另一个堆满特殊分支的 Model Browser。
 - 每类资产都可以清楚定义自己的刷新、预览和放置行为。
 
-### Python v2 绑定文件仍是大风险
+### Python API 绑定文件仍是大风险
 
 证据：
 
-- 现有风险文档已经指出 `PythonV2Module.cpp` 是一个混合了大量职责的大绑定文件。
-- 当前分支增加了大量 v2 示例，并继续把 Python 插件作为重要自定义方向。
+- 现有风险文档已经指出 `PythonApiModule.cpp` 是一个混合了大量职责的大绑定文件。
+- 当前分支增加了大量 Python API 示例，并继续把 Python 插件作为重要自定义方向。
 
 风险：
 
-- 每增加一个 API，`PythonV2Module.cpp` 在生命周期、transaction、handle invalidation 和 GIL 行为上都更难审查。
+- 每增加一个 API，`PythonApiModule.cpp` 在生命周期、transaction、handle invalidation 和 GIL 行为上都更难审查。
 - 插件 UI 和资产浏览器最终很可能需要 Python 扩展点，不应该继续叠在一个单体绑定文件上。
 
 建议重构：
@@ -250,7 +250,7 @@
 
 1. 先抽出 `AssetBrowserViewModel` 和 `AssetAudioPreviewController`。
 2. 在接 WAD 纹理前增加 `AssetSource` / `AssetRegistry`。
-3. 在增加资产/插件扩展 API 前，按领域拆分 `PythonV2Module.cpp`。
+3. 在增加资产/插件扩展 API 前，按领域拆分 `PythonApiModule.cpp`。
 4. 抽出 `CommandPaletteModel` 并补 focused tests。
 5. 给 FGD 增量补来源说明和解析 smoke check。
 6. 将 `scripts/build_release_codex.cmd` 参数化，减少本机路径绑定。
@@ -273,10 +273,10 @@ GoldSrc 专项开发的结构风险。
 | `python/src/trenchbroom_api.egg-info/SOURCES.txt` | 同上 | 记录的文件列表会随本地构建变化，容易产生无意义 diff | 已删除，并加入 `.gitignore` |
 | `python/src/trenchbroom_api.egg-info/dependency_links.txt` | 同上 | 生成物，无源码价值 | 已删除，并加入 `.gitignore` |
 | `python/src/trenchbroom_api.egg-info/top_level.txt` | 同上 | 生成物，无源码价值 | 已删除，并加入 `.gitignore` |
-| `python/src/tb/__init__.py` | 当前运行时入口已统一为 `tb2`，代码和测试都导入 `tb2`；此文件仍描述 legacy `tb` | 如果被安装到编辑器环境，会让补全和示例继续指向已移除的 `tb` API | 已删除；后续如需类型包，应新建 `tb2` stub |
-| `python/src/tb/py.typed` | 只服务上面的 `tb` stub 包 | 和当前 `tb2` 入口不一致 | 已删除 |
-| `python/pyproject.toml` | 包名为 `trenchbroom-api`，描述仍是 embedded module `tb` 的 type stubs | 发布或本地安装后会继续宣传错误入口 | 已删除；等 `tb2` stub 成熟后重新建立 |
-| `python/upload_pypi.bat` | 直接执行 `twine upload dist/*`，没有和当前 `tb2` stub 策略同步 | 误触会发布过期 `tb` 类型包 | 已删除 |
+| `python/src/tb/__init__.py` | 当前运行时入口已统一为 `trenchbroom`，代码和测试都导入 `trenchbroom`；此文件仍描述 legacy `tb` | 如果被安装到编辑器环境，会让补全和示例继续指向已移除的 `tb` API | 已删除；后续如需类型包，应新建 `trenchbroom` stub |
+| `python/src/tb/py.typed` | 只服务上面的 `tb` stub 包 | 和当前 `trenchbroom` 入口不一致 | 已删除 |
+| `python/pyproject.toml` | 包名为 `trenchbroom-api`，描述仍是 embedded module `tb` 的 type stubs | 发布或本地安装后会继续宣传错误入口 | 已删除；等 `trenchbroom` stub 成熟后重新建立 |
+| `python/upload_pypi.bat` | 直接执行 `twine upload dist/*`，没有和当前 `trenchbroom` stub 策略同步 | 误触会发布过期 `tb` 类型包 | 已删除 |
 | `app/TrenchBroom/resources/graphics/images/LanguagePreferences.svg` | 当前没有代码引用；但 `graphics/images` 会整体复制到 Release 包 | 增加无用资源；容易误导后续认为存在独立语言偏好页 | 已删除 |
 
 ### 建议归档或重写说明
@@ -287,7 +287,7 @@ GoldSrc 专项开发的结构风险。
 | `app/TrenchBroom/resources/games/Halflife/models.fgd` | 当前没有被 `GameConfig.cfg` 引用 | 大型生成式 entity 列表会误导维护者，以为模型资产仍靠 FGD 暴露 | 已删除，模型浏览交给统一资产浏览器 |
 | `app/TrenchBroom/resources/games/Halflife/sprites.fgd` | 当前没有被 `GameConfig.cfg` 引用 | 同上；可能与资产浏览器的 sprite 扫描职责重复 | 已删除，sprite 浏览交给统一资产浏览器 |
 | `docs/Outliner_Implementation_Plan.md` | 功能已经实现，文件仍是实现计划口吻 | 后续接手时可能把历史计划当作当前设计 | 已删除 |
-| `docs/python_api_improvement_plan.md` | 当前 Python 已全面切到 `tb2`，但文件仍混合计划、状态和迁移说明 | 容易和实际 v2 实现状态不一致 | 已删除；后续单独写当前 `tb2` API 文档 |
+| `docs/python_api_improvement_plan.md` | 当前 Python 已全面切到 `trenchbroom`，但文件仍混合计划、状态和迁移说明 | 容易和实际 API 实现状态不一致 | 已删除；后续单独写当前 `trenchbroom` API 文档 |
 | `docs/custom-feature-refactor-notes.md` | 文件包含多阶段历史记录和旧结论 | 作为“当前事实”阅读时容易误导 | 已删除，保留当前架构审查和维护风险文档 |
 | `lib_docs/index.md` | 未被 CMake/docs 系统引用，内部含本机 `file:///d:/...` 路径 | 对其他机器不可用，且可能和当前源码不再同步 | 已删除 |
 | `lib_docs/kdl.md` | 同上 | 同上 | 已删除 |

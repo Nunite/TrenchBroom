@@ -17,7 +17,7 @@ Explore the complete user guide, modeling tools, material and asset browsers, Py
 [✂️ CSG & Vertex Editing](#vertex_and_csg){.manual-tag}
 [🎨 Materials & UV](#materials_and_uv){.manual-tag}
 [📦 Asset Browser](#assets_and_prefabs){.manual-tag}
-[🐍 Python v2 Plugins](#python_scripting_and_plugins){.manual-tag}
+[🐍 Python API Plugins](#python_scripting_and_plugins){.manual-tag}
 [🤖 MCP Automation](#mcp_automation){.manual-tag}
 :::
 :::
@@ -50,7 +50,7 @@ Material browser, UV editor, unified GoldSrc asset browser (MDL, SPR, WAV), pref
 ::: manual-card
 **⚙️ 4. Pipeline & Extensions**
 
-Preferences, compiler toolchains, engine testing, Python v2 plugins, and MCP automation.
+Preferences, compiler toolchains, engine testing, Python API plugins, and MCP automation.
 
 [➔ 4 Chapters](#preferences_and_compilation)
 :::
@@ -69,7 +69,7 @@ Preferences, compiler toolchains, engine testing, Python v2 plugins, and MCP aut
   - Searchable Outliner with layer creation and inline entity properties
   - Issue browser with automatic quick fixes
   - Run external compilers and launch game engines
-  - Interactive Python Console and manifest-based Python v2 plugins
+  - Interactive Python Console and manifest-based Python API plugins
   - Optional localhost MCP endpoint for guarded editor automation
   - Point file and portal file support
   - Automatic backups

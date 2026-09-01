@@ -5,7 +5,7 @@
 #include "ui/MapWindow.h"
 #include "ui/python/PythonApiCatalog.h"
 #include "ui/python/PythonPluginSession.h"
-#include "ui/python/PythonV2Module.h"
+#include "ui/python/PythonApiModule.h"
 
 #include "kd/invoke.h"
 
@@ -245,7 +245,7 @@ bool ensureLogWriterType()
     {nullptr, nullptr, 0, nullptr}};
 
   static auto type = PyTypeObject{};
-  type.tp_name = "tb2._LogWriter";
+  type.tp_name = "trenchbroom._LogWriter";
   type.tp_basicsize = sizeof(PyRuntimeLogWriter);
   type.tp_flags = Py_TPFLAGS_DEFAULT;
   type.tp_methods = methods;
@@ -278,18 +278,18 @@ PyObject* createConsoleGlobals()
   }
 
   auto* name = PyUnicode_FromString("__tb_console__");
-  auto* tb2Module = PyImport_ImportModule("tb2");
+  auto* trenchbroomModule = PyImport_ImportModule("trenchbroom");
   const auto initialized =
-    name != nullptr && tb2Module != nullptr
+    name != nullptr && trenchbroomModule != nullptr
     && PyDict_SetItemString(globals, "__builtins__", PyEval_GetBuiltins()) == 0
     && PyDict_SetItemString(globals, "__name__", name) == 0
-    && PyDict_SetItemString(globals, "tb2", tb2Module) == 0;
+    && PyDict_SetItemString(globals, "trenchbroom", trenchbroomModule) == 0;
 
-  if (initialized && tb2Module != nullptr)
+  if (initialized && trenchbroomModule != nullptr)
   {
     for (const auto helper : pythonConsoleHelperNames())
     {
-      auto* attr = PyObject_GetAttrString(tb2Module, helper.data());
+      auto* attr = PyObject_GetAttrString(trenchbroomModule, helper.data());
       if (attr != nullptr)
       {
         PyDict_SetItemString(globals, helper.data(), attr);
@@ -303,7 +303,7 @@ PyObject* createConsoleGlobals()
   }
 
   Py_XDECREF(name);
-  Py_XDECREF(tb2Module);
+  Py_XDECREF(trenchbroomModule);
 
   if (!initialized)
   {
@@ -319,7 +319,7 @@ std::optional<PythonApiValueType> apiValueTypeForObject(
   if (PyModule_Check(object))
   {
     const auto* moduleName = PyModule_GetName(object);
-    if (moduleName != nullptr && std::string_view{moduleName} == "tb2")
+    if (moduleName != nullptr && std::string_view{moduleName} == "trenchbroom")
     {
       return PythonApiValueType{PythonApiType::Module, sequenceDepth};
     }
@@ -330,7 +330,7 @@ std::optional<PythonApiValueType> apiValueTypeForObject(
   const auto typeName = std::string_view{Py_TYPE(object)->tp_name};
   for (const auto& apiType : pythonApiTypes())
   {
-    auto expectedName = std::string{"tb2."};
+    auto expectedName = std::string{"trenchbroom."};
     expectedName += apiType.name;
     if (typeName == expectedName)
     {
@@ -372,7 +372,7 @@ PythonRuntime& PythonRuntime::instance()
 
 bool PythonRuntime::ensureInitialized()
 {
-  if (!installV2Module())
+  if (!installApiModule())
   {
     return false;
   }
@@ -393,14 +393,14 @@ bool PythonRuntime::ensureInitialized()
     return false;
   }
 
-  auto* tb2Module = PyImport_ImportModule("tb2");
-  if (tb2Module == nullptr)
+  auto* trenchbroomModule = PyImport_ImportModule("trenchbroom");
+  if (trenchbroomModule == nullptr)
   {
     PyGILState_Release(gil);
     return false;
   }
 
-  Py_DECREF(tb2Module);
+  Py_DECREF(trenchbroomModule);
   PyGILState_Release(gil);
   return true;
 }
@@ -431,7 +431,7 @@ bool PythonRuntime::runConsoleCommand(
   }
   if (!ensureInitialized())
   {
-    m_lastError = "Python v2 initialization failed";
+    m_lastError = "Python API initialization failed";
     if (context.logger != nullptr)
     {
       context.logger->error() << m_lastError;
@@ -477,10 +477,10 @@ bool PythonRuntime::runConsoleCommand(
   }
   auto* globals = globalsIt->second;
 
-  auto* tb2Module = PyImport_ImportModule("tb2");
-  if (tb2Module != nullptr)
+  auto* trenchbroomModule = PyImport_ImportModule("trenchbroom");
+  if (trenchbroomModule != nullptr)
   {
-    auto* docFunc = PyObject_GetAttrString(tb2Module, "current_document");
+    auto* docFunc = PyObject_GetAttrString(trenchbroomModule, "current_document");
     if (docFunc != nullptr)
     {
       auto* docObj = PyObject_CallNoArgs(docFunc);
@@ -501,7 +501,7 @@ bool PythonRuntime::runConsoleCommand(
       }
       Py_DECREF(docFunc);
     }
-    Py_DECREF(tb2Module);
+    Py_DECREF(trenchbroomModule);
   }
 
   const auto sourceString = std::string{source};
@@ -619,7 +619,7 @@ bool PythonRuntime::runScript(
   {
     if (context.logger)
     {
-      m_lastError = "Python v2 initialization failed";
+      m_lastError = "Python API initialization failed";
       context.logger->error() << m_lastError;
     }
     return false;
@@ -714,7 +714,7 @@ void PythonRuntime::emitEvent(
 
   auto gil = PyGILState_Ensure();
   auto scopedContext = ScopedExecutionContext{context};
-  auto* module = PyImport_ImportModule("tb2");
+  auto* module = PyImport_ImportModule("trenchbroom");
   if (module != nullptr)
   {
     auto* hasCallbacks =
@@ -746,7 +746,7 @@ void PythonRuntime::cleanupPlugin(const std::string& pluginId)
     return;
   }
   auto gil = PyGILState_Ensure();
-  auto* module = PyImport_ImportModule("tb2");
+  auto* module = PyImport_ImportModule("trenchbroom");
   if (module != nullptr)
   {
     auto* result = PyObject_CallMethod(module, "_cleanup_plugin", "s", pluginId.c_str());
@@ -764,7 +764,7 @@ void PythonRuntime::cleanupPluginSession(PythonPluginSession& session)
   }
 
   auto gil = PyGILState_Ensure();
-  auto* module = PyImport_ImportModule("tb2");
+  auto* module = PyImport_ImportModule("trenchbroom");
   if (module != nullptr)
   {
     auto* capsule = PyCapsule_New(&session, nullptr, nullptr);
@@ -802,7 +802,7 @@ void PythonRuntime::cleanupDocument(MapWindow& mapWindow)
     Py_DECREF(globalsIt->second);
     m_state->consoleGlobals.erase(globalsIt);
   }
-  auto* module = PyImport_ImportModule("tb2");
+  auto* module = PyImport_ImportModule("trenchbroom");
   if (module != nullptr)
   {
     auto* capsule = PyCapsule_New(&mapWindow.document(), nullptr, nullptr);
@@ -898,9 +898,9 @@ const std::string& PythonRuntime::lastError() const
   return m_lastError;
 }
 
-bool PythonRuntime::installV2Module()
+bool PythonRuntime::installApiModule()
 {
-  return installPythonV2Module();
+  return installPythonApiModule();
 }
 
 PythonExecutionContext* currentPythonExecutionContext()

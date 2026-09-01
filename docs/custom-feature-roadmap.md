@@ -14,10 +14,10 @@
   - 当前定位：第一版可搜索并执行现有 `ActionManager` 动作。
   - 后续重点：接入 Python 插件命令、最近使用命令和更细的分类/排序。
 
-- Python 插件 v2 / `tb2`
-  - 已接入 `PythonRuntime`、`tb2` pybind11 模块、manifest 插件目录、
+- Python 插件 API / `trenchbroom`
+  - 已接入 `PythonRuntime`、`trenchbroom` pybind11 模块、manifest 插件目录、
     `PythonPluginManager`、插件 session、timer、event、panel 和示例插件。
-  - 当前定位：可用的 v2 基础架构。
+  - 当前定位：可用的 Python API 基础架构。
   - 后续重点：拆分大型绑定文件、完善 handle invalidation、补齐 API 文档和端到端测试。
 
 - 插件 UI 与插件管理
@@ -79,10 +79,10 @@
   - 状态：底层协议、`TbMcpLib`、内置 HTTP `/mcp`、stdio 兼容 shim、tool catalog、安全模式、只读工具、选择设置、action 执行、事务型 entity/brush 编辑、MCP history、GoldSrc 资产/材质工具、overlay/capture、compile/leak 辅助、Blockout IR、批量 `blockout_create_batch`、`operation_*` 详情工具、`resources/read` 和 tool profile 已接入；默认关闭，不直接开放任意 Python 脚本。
   - 重点：TrenchBroom 是唯一真实状态；写操作必须走 `MapDocument` transaction；白盒生成优先使用高层 outcome tools 和 Batch Blockout IR，不让 AI 默认直接拼 brush 顶点。
   - 下一步：把 MCP overlay 收束进统一视图叠加层管理器，补 prefab provider、高级 UV 对齐、更细的 Blockout validation/snap 规则、更多 GoldSrc 常用结构模板，以及真实 MCP client 端到端回归。
-  - 依赖：视图叠加层管理器用于 overlay/截图反馈，统一资产浏览器用于模型/Sprite/声音放置，`tb2` 稳定 API 可作为后续插件扩展基础。
+  - 依赖：视图叠加层管理器用于 overlay/截图反馈，统一资产浏览器用于模型/Sprite/声音放置，`trenchbroom` 稳定 API 可作为后续插件扩展基础。
 
-- [ ] Python 插件 v2 生产级收尾
-  - 目标：让 `tb2` 优先稳定插件生命周期、卸载清理、错误展示和示例文档，再扩展大 API 面。
+- [ ] Python 插件 API 生产级收尾
+  - 目标：让 `trenchbroom` 优先稳定插件生命周期、卸载清理、错误展示和示例文档，再扩展大 API 面。
   - 状态：runtime、manifest、session、timer、panel 和示例已有基础；主要债务在绑定拆分、handle 生命周期和测试夹具。
   - 重点：不要继续扩大 legacy `tb` 兼容负担。
 
@@ -159,7 +159,7 @@
 ## 建议近期推进顺序
 
 1. 先做 GoldSrc 资产浏览器第二阶段：Sprite、声音、WAD 纹理和实体属性路径选择。
-2. 同步加固 Python v2：拆分绑定、稳定插件 session、补齐插件管理 UI 的测试。
+2. 同步加固 Python API：拆分绑定、稳定插件 session、补齐插件管理 UI 的测试。
 3. 做 GoldSrc / VHLT 配置向导和编译日志分析器，因为这两项对 CS 1.6 mapper 的日常收益最高。
 4. 建立 MCP 底层适配框架，但先只开放只读和结构化工具，避免过早把任意脚本执行暴露给外部 Agent。
 5. 最后整理 View Options / Overlay 管理模型，把 FPS、sky、2D 线条、MCP overlay 和后续 debug overlay 收到一个清晰入口。

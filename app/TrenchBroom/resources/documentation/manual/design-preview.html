@@ -547,7 +547,7 @@
         <div class="b-category-title">4. 扩展与高级开发</div>
         <ul class="b-menu">
           <li class="b-menu-item"><a href="#"><span>08 首选项与地图编译</span></a></li>
-          <li class="b-menu-item"><a href="#"><span>09 Python v2 插件开发指南</span></a></li>
+          <li class="b-menu-item"><a href="#"><span>09 Python API 插件开发指南</span></a></li>
           <li class="b-menu-item"><a href="#"><span>10 MCP 智能体自动化接口</span></a></li>
         </ul>
       </aside>
@@ -632,9 +632,9 @@
 
     <div class="s-shell">
       <aside class="s-sidebar">
-        <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:12px">PYTHON V2 EXTENSION</div>
+        <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:12px">TRENCHBROOM PYTHON API</div>
         <ul style="list-style:none; display:flex; flex-direction:column; gap:4px">
-          <li><a href="#" style="text-decoration:none; color:var(--primary); font-weight:700; display:block; padding:6px 10px; background:var(--bg-card); border-radius:6px">tb2 核心 API 速查</a></li>
+          <li><a href="#" style="text-decoration:none; color:var(--primary); font-weight:700; display:block; padding:6px 10px; background:var(--bg-card); border-radius:6px">trenchbroom 核心 API 速查</a></li>
           <li><a href="#" style="text-decoration:none; color:var(--text-sub); display:block; padding:6px 10px">PluginPanel 控件库</a></li>
           <li><a href="#" style="text-decoration:none; color:var(--text-sub); display:block; padding:6px 10px">插件清单规范</a></li>
           <li><a href="#" style="text-decoration:none; color:var(--text-sub); display:block; padding:6px 10px">实战阵列生成器示例</a></li>
@@ -644,7 +644,7 @@
       <!-- DUAL-PANE WORKSPACE CONTENT -->
       <div class="s-content-split">
         <div>
-          <h1 style="font-size:26px; font-weight:800; margin-bottom:12px">tb2.Document 事务与几何修改</h1>
+          <h1 style="font-size:26px; font-weight:800; margin-bottom:12px">trenchbroom.Document 事务与几何修改</h1>
           <p style="color:var(--text-sub); margin-bottom:20px">
             所有对地图 Brush、Entity 的修改必须运行在 <code>Document.transaction()</code> 上下文管理器中，以确保原子性和撤销历史完整。
           </p>
@@ -654,9 +654,9 @@
               <span>main.py (事务与选区平移)</span>
               <span>Python 3.11</span>
             </div>
-            <pre><code>import tb2
+            <pre><code>import trenchbroom as tb
 
-doc = tb2.current_document()
+doc = tb.current_document()
 with doc.transaction("Duplicate & Array"):
     for _ in range(5):
         doc.selection.duplicate()

@@ -1,10 +1,10 @@
 # Linear Array Generator Example Plugin
 
-An example UI plugin demonstrating TrenchBroom's `tb2` Python v2 plugin system.
+An example UI plugin demonstrating TrenchBroom's `trenchbroom` Python API plugin system.
 
 ## Features Demonstrated
 1. **Manifest Configuration**: Defined in `trenchbroom-plugin.json` (`pluginType: "ui"`).
-2. **Custom UI Panel**: Registered on the **Plugins** inspector tab via `tb2.create_plugin_panel`.
+2. **Custom UI Panel**: Registered on the **Plugins** inspector tab via `trenchbroom.create_plugin_panel`.
 3. **Form Controls**: Integer input (`add_int_field`), float input (`add_float_field`), buttons, and status labels.
 4. **Transaction Safety**: Batched geometric operations inside `with doc.transaction(...):` for clean single-step Undo/Redo.
 

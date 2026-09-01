@@ -232,7 +232,7 @@ std::optional<PythonApiValueType> resolveSymbol(
 
 std::optional<PythonApiValueType> resolveStaticRoot(const ExpressionSegment& segment)
 {
-  if (segment.name == "tb2")
+  if (segment.name == "trenchbroom")
   {
     return applyPostfixes(
       PythonApiValueType{PythonApiType::Module}, segment.postfixes, false);

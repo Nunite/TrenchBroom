@@ -7,11 +7,11 @@ optimization order, see `docs/custom-feature-architecture-review.md`.
 
 ## High Priority
 
-### Python v2 Runtime and Plugin API
+### Python API Runtime and Plugin API
 
-- Risk: `PythonV2Module.cpp` is a large mixed module containing bindings, UI panel construction, callbacks, transactions, and geometry helpers.
+- Risk: `PythonApiModule.cpp` is a large mixed module containing bindings, UI panel construction, callbacks, transactions, and geometry helpers.
 - Risk: process-global callback, event, handle, and transaction state makes document/window/plugin unload behavior harder to reason about.
-- Suggested fix: split the v2 bindings by domain (`document`, `selection`, `geometry`, `panel`, `events`, `actions`) and move callback/timer ownership fully into `PythonPluginSession`.
+- Suggested fix: split the Python API bindings by domain (`document`, `selection`, `geometry`, `panel`, `events`, `actions`) and move callback/timer ownership fully into `PythonPluginSession`.
 
 ### Outliner Tree and Property Editor
 
@@ -21,7 +21,7 @@ optimization order, see `docs/custom-feature-architecture-review.md`.
 - Risk: embedded smart editors that scan filesystem resources or load preview icons can make ordinary selection changes slow if they are rebuilt repeatedly.
 - Suggested fix: move the tree to a model/view design with stable node ids or explicit invalidation; split property row creation into a row factory and update individual row values when possible; cache smart-editor resource scans and previews by game path, with explicit manual refresh for expensive reloads.
 
-### Python v2 Event Dispatch
+### Python API Event Dispatch
 
 - Risk: editor notifications such as selection changes can become unexpectedly expensive if they initialize Python or import plugin modules when no plugin callback is registered.
 - Suggested fix: keep event emission lazy; do not initialize Python for passive editor notifications, and check for registered callbacks before entering plugin dispatch.

@@ -1,36 +1,36 @@
 # TrenchBroom Python API 参考手册 {#python_api_reference}
 
-欢迎查阅 TrenchBroom Python API 参考文档。TrenchBroom 内置了高性能的 Python v2（`tb2`）运行时，允许开发者与关卡设计师自动化生成几何体、操作实体、检查地图结构，并构建声明式的原生交互 UI 面板。
+欢迎查阅 TrenchBroom Python API 参考文档。TrenchBroom 内置了高性能的 Python API（`trenchbroom`）运行时，允许开发者与关卡设计师自动化生成几何体、操作实体、检查地图结构，并构建声明式的原生交互 UI 面板。
 
 ::: {.api-grid}
 [**1. 快速入门与核心架构**\
 事务上下文、原子撤销/重做机制与 TrenchBroom 世界坐标系体系。](#quickstart){.api-card}
 
-[**2. tb2 核心根模块**\
-活动文档句柄获取、插件面板工厂函数与三维向量/平面数学基元。](#the_tb2_root_module){.api-card}
+[**2. trenchbroom 核心根模块**\
+活动文档句柄获取、插件面板工厂函数与三维向量/平面数学基元。](#the_trenchbroom_root_module){.api-card}
 
 [**3. Document 地图文档访问**\
-地图查询、选区、材质、事务与 UV 更新。](#tb2_document){.api-card}
+地图查询、选区、材质、事务与 UV 更新。](#trenchbroom_document){.api-card}
 
 [**4. Selection 选区与几何变换**\
-几何空间变换（平移/旋转/缩放）、多边形克隆与顶点/棱边倒角。](#tb2_selection){.api-card}
+几何空间变换（平移/旋转/缩放）、多边形克隆与顶点/棱边倒角。](#trenchbroom_selection){.api-card}
 
 [**5. 地图图元与几何对象**\
 凸多面体 Brush、多边形 Face 表面与 UV 对齐、Entity 键值属性读写。](#geometry_and_elements){.api-card}
 
 [**6. PluginPanel 插件界面系统**\
-声明式原生表单、微调输入框、调色板、多列表格与树形视图。](#tb2_pluginpanel){.api-card}
+声明式原生表单、微调输入框、调色板、多列表格与树形视图。](#trenchbroom_pluginpanel){.api-card}
 :::
 
 ## 快速入门与核心架构 {#quickstart}
 
-TrenchBroom 中的所有脚本均通过内置的 `tb2` 模块与编辑器进行交互。你可以在 **Python 控制台** 中交互式执行命令，也可以编写基于清单的常驻插件。
+TrenchBroom 中的所有脚本均通过内置的 `trenchbroom` 模块与编辑器进行交互。你可以在 **Python 控制台** 中交互式执行命令，也可以编写基于清单的常驻插件。
 
 ```python
-import tb2
+import trenchbroom as tb
 
 # Access the active map document
-doc = tb2.current_document()
+doc = tb.current_document()
 
 # Wrap modifications in a named transaction for atomic undo/redo
 with doc.transaction("Normalize Selected Lights"):
@@ -49,93 +49,93 @@ print(f"Map contains {len(doc.entities)} entities.")
 
 ---
 
-## 核心根模块：tb2 {#the_tb2_root_module}
+## 核心根模块：trenchbroom {#the_trenchbroom_root_module}
 
-根模块 `tb2` 提供了对活动文档的顶层访问、插件 UI 工厂函数以及三维向量数学基元。
+根模块 `trenchbroom` 提供了对活动文档的顶层访问、插件 UI 工厂函数以及三维向量数学基元。
 
-### 顶层函数 {#tb2_functions}
+### 顶层函数 {#trenchbroom_functions}
 
-#### `tb2.current_document()` {#tb2_current_document}
+#### `trenchbroom.current_document()` {#trenchbroom_current_document}
 
 返回编辑器中当前打开的活动地图文档句柄。
 
 - **返回值**：<span class="type-badge">Document</span> 活动地图文档对象。
-- **返回类型**：`tb2.Document`
+- **返回类型**：`trenchbroom.Document`
 - **异常**：没有活动地图文档时抛出 `RuntimeError`。
 
 ```python
-doc = tb2.current_document()
+doc = tb.current_document()
 print(doc.path)
 ```
 
-#### `tb2.create_plugin_panel(title)` {#tb2_create_plugin_panel}
+#### `trenchbroom.create_plugin_panel(title)` {#trenchbroom_create_plugin_panel}
 
 在 **Plugins** 检查器标签页中创建并注册一个声明式交互面板。
 
 - **参数**：
   - `title` (*str*) – 检查器面板顶部显示的标题名称。
 - **返回值**：<span class="type-badge">PluginPanel</span> 创建的面板实例对象。
-- **返回类型**：`tb2.PluginPanel`
+- **返回类型**：`trenchbroom.PluginPanel`
 
 ```python
-panel = tb2.create_plugin_panel("Surface Aligner")
+panel = tb.create_plugin_panel("Surface Aligner")
 panel.add_label("Align selected faces to the world grid.")
 ```
 
-#### `tb2.selected_brushes()` / `tb2.selectedBrushes()` {#tb2_selected_brushes}
+#### `trenchbroom.selected_brushes()` / `trenchbroom.selectedBrushes()` {#trenchbroom_selected_brushes}
 
 返回当前活动选区中的所有 `Brush` 句柄列表。
 
-- **返回值**：`list[tb2.Brush]`
+- **返回值**：`list[trenchbroom.Brush]`
 
-#### `tb2.selected_entities(include_brushes=False)` / `tb2.selectedEntities(include_brushes=False)` {#tb2_selected_entities}
+#### `trenchbroom.selected_entities(include_brushes=False)` / `trenchbroom.selectedEntities(include_brushes=False)` {#trenchbroom_selected_entities}
 
 返回直接选中的 `Entity` 句柄。传入 `include_brushes=True` 时，还会包含选中 Brush 和单独选中面的父实体。
 
-- **返回值**：`list[tb2.Entity]`
+- **返回值**：`list[trenchbroom.Entity]`
 
-#### `tb2.selected_faces()` / `tb2.selectedFaces()` {#tb2_selected_faces}
+#### `trenchbroom.selected_faces()` / `trenchbroom.selectedFaces()` {#trenchbroom_selected_faces}
 
 返回单独选中的 `Face` 句柄列表。选中整个 Brush 不会自动展开为该 Brush 的全部面。
 
-- **返回值**：`list[tb2.Face]`
+- **返回值**：`list[trenchbroom.Face]`
 
-#### `tb2.translate(...)` {#tb2_translate}
+#### `trenchbroom.translate(...)` {#trenchbroom_translate}
 
 按指定偏移向量平移活动选区或目标对象（自动事务保护）。
 
-#### `tb2.rotate(...)` {#tb2_rotate}
+#### `trenchbroom.rotate(...)` {#trenchbroom_rotate}
 
 旋转活动选区或目标对象。支持欧拉角 `rotate(rx, ry, rz)` 或轴角 `rotate(ax, ay, az, angle)`。
 
-#### `tb2.scale(...)` {#tb2_scale}
+#### `trenchbroom.scale(...)` {#trenchbroom_scale}
 
 统一或非统一缩放活动选区或目标对象（自动事务保护）。
 
-#### `tb2.duplicate(target=None)` {#tb2_duplicate}
+#### `trenchbroom.duplicate(target=None)` {#trenchbroom_duplicate}
 
 复制活动选区（或指定目标对象），并将活动选区更新为新克隆的副本。
 
-#### `tb2.delete_selection()` / `tb2.deleteSelection()` {#tb2_delete_selection}
+#### `trenchbroom.delete_selection()` / `trenchbroom.deleteSelection()` {#trenchbroom_delete_selection}
 
 从活动地图中删除当前选中的所有几何体和实体。
 
-#### `tb2.deselect_all()` / `tb2.deselectAll()` {#tb2_deselect_all}
+#### `trenchbroom.deselect_all()` / `trenchbroom.deselectAll()` {#trenchbroom_deselect_all}
 
 清除当前活动地图中的所有选区。
 
-#### 选区与事件辅助函数 {#tb2_selection_and_event_helpers}
+#### 选区与事件辅助函数 {#trenchbroom_selection_and_event_helpers}
 
-- `tb2.selection() -> Selection`：返回当前选区句柄。
-- `tb2.selected_all_entities()` / `tb2.selectedAllEntities()`：返回直接选中的实体，以及选中 Brush 和面的父实体。
-- `tb2.register_callback(event, callback) -> int`：为 `selection_changed`、`document_loaded` 或 `document_saved` 注册无参数回调。
-- `tb2.unregister_callback(token)`：注销事件回调。
-- `tb2.set_timeout(callback, milliseconds)` / `tb2.set_interval(callback, milliseconds)`：创建插件会话定时器；定时器要求常驻 UI 插件会话。
-- `tb2.clear_interval(timer_id)`：取消任一类型的定时器。
+- `trenchbroom.selection() -> Selection`：返回当前选区句柄。
+- `trenchbroom.selected_all_entities()` / `trenchbroom.selectedAllEntities()`：返回直接选中的实体，以及选中 Brush 和面的父实体。
+- `trenchbroom.register_callback(event, callback) -> int`：为 `selection_changed`、`document_loaded` 或 `document_saved` 注册无参数回调。
+- `trenchbroom.unregister_callback(token)`：注销事件回调。
+- `trenchbroom.set_timeout(callback, milliseconds)` / `trenchbroom.set_interval(callback, milliseconds)`：创建插件会话定时器；定时器要求常驻 UI 插件会话。
+- `trenchbroom.clear_interval(timer_id)`：取消任一类型的定时器。
 
 ### 数学与几何基元 {#math_primitives}
 
-#### `tb2.Vec3(x, y, z)` {#tb2_vec3}
+#### `trenchbroom.Vec3(x, y, z)` {#trenchbroom_vec3}
 
 表示坐标、偏移量和方向的三维笛卡尔向量。
 
@@ -150,22 +150,22 @@ panel.add_label("Align selected faces to the world grid.")
   - `cross(other: Vec3) -> Vec3`：向量叉积。
 
 ```python
-pos = tb2.Vec3(128.0, 64.0, 32.0)
-offset = tb2.Vec3(0.0, 0.0, 16.0)
+pos = tb.Vec3(128.0, 64.0, 32.0)
+offset = tb.Vec3(0.0, 0.0, 16.0)
 target = pos + offset
 ```
 
-#### `tb2.Plane(normal, dist)` {#tb2_plane}
+#### `trenchbroom.Plane(normal, dist)` {#trenchbroom_plane}
 
 黑塞法线式平面定义（$N \cdot P - D = 0$）。
 
 - **参数**：
-  - `normal` (*tb2.Vec3*) – 归一化的平面法线向量。
+  - `normal` (*trenchbroom.Vec3*) – 归一化的平面法线向量。
   - `dist` (*float*) – 原点沿法线方向到平面的距离。
 
 ---
 
-## 地图文档访问：Document {#tb2_document}
+## 地图文档访问：Document {#trenchbroom_document}
 
 `Document` 类代表当前打开的地图文件，提供地图查询、事务、选区控制和 UV 更新。
 
@@ -198,11 +198,11 @@ with doc.transaction("Duplicate and Move"):
 
 ### 句柄生命周期 {#python_handle_lifetime}
 
-`Document`、`Entity`、`Brush` 和 `Face` 对象是实时句柄，而不是数据快照。关闭或重新加载文档、删除节点会使相关句柄失效；改变 Brush 几何也会使此前取得的 `Face` 句柄失效。访问失效句柄会抛出 `RuntimeError`。发生这些变化后，应从 `tb2.current_document()`、当前选区或父对象重新获取需要长期使用的对象。
+`Document`、`Entity`、`Brush` 和 `Face` 对象是实时句柄，而不是数据快照。关闭或重新加载文档、删除节点会使相关句柄失效；改变 Brush 几何也会使此前取得的 `Face` 句柄失效。访问失效句柄会抛出 `RuntimeError`。发生这些变化后，应从 `trenchbroom.current_document()`、当前选区或父对象重新获取需要长期使用的对象。
 
 ---
 
-## 选择集与几何变换：Selection {#tb2_selection}
+## 选择集与几何变换：Selection {#trenchbroom_selection}
 
 `Selection` 对象提供对高亮选中几何体的直接查询与高级空间几何变换操作。
 
@@ -259,14 +259,14 @@ with doc.transaction("Duplicate and Move"):
 
 ## 地图图元与几何对象 {#geometry_and_elements}
 
-### Brush {#tb2_brush}
+### Brush {#trenchbroom_brush}
 
 表示由半空间平面围成的凸三维多面体。
 
 - `brush.entity` (*Entity*)：返回拥有该 Brush 的父实体。
 - `brush.faces()` (*list[Face]*)：返回构成该 Brush 的所有多边形面列表。
 
-### 面 Face {#tb2_face}
+### 面 Face {#trenchbroom_face}
 
 表示 Brush 的单个平面多边形边界表面。
 
@@ -283,7 +283,7 @@ with doc.transaction("Duplicate and Move"):
 - `face.set_material(name: str)`：为该表面赋予新的材质。
 - `face.set_uv_loops(loops)`：写入 UV 循环数据。
 
-### 实体 Entity {#tb2_entity}
+### 实体 Entity {#trenchbroom_entity}
 
 代表点实体（如光源、生成点、怪物）和 Brush 实体（如 `func_door`、`trigger_multiple`、`worldspawn`）。支持标准 Python 字典操作与遍历。
 
@@ -302,7 +302,7 @@ with doc.transaction("Duplicate and Move"):
 
 ---
 
-## 插件界面与控件：PluginPanel {#tb2_pluginpanel}
+## 插件界面与控件：PluginPanel {#trenchbroom_pluginpanel}
 
 `PluginPanel` 类允许 Python 插件在 **Plugins** 检查器标签页中构建交互式原生控件。
 
@@ -344,12 +344,12 @@ with doc.transaction("Duplicate and Move"):
 ### 示例 1：线性阵列复制生成器 {#example_linear_array}
 
 ```python
-import tb2
+import trenchbroom as tb
 
 panel = None
 
 def on_generate():
-    doc = tb2.current_document()
+    doc = tb.current_document()
     if not doc or (not doc.selection.brushes and not doc.selection.entities):
         panel.set_label_text("status", "Error: Please select objects to duplicate.")
         return
@@ -368,7 +368,7 @@ def on_generate():
 
 def init_plugin():
     global panel
-    panel = tb2.create_plugin_panel("Array Generator")
+    panel = tb.create_plugin_panel("Array Generator")
     panel.add_label("Duplicate active selection along a vector:")
 
     group = panel.add_group("params", "Parameters")
@@ -386,10 +386,10 @@ init_plugin()
 ### 示例 2：批量光源属性规范化工具 {#example_batch_lights}
 
 ```python
-import tb2
+import trenchbroom as tb
 
 def randomize_light_colors():
-    doc = tb2.current_document()
+    doc = tb.current_document()
     if not doc:
         return
 
