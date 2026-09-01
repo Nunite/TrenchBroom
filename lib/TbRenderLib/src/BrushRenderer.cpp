@@ -22,10 +22,10 @@
 #include "gl/Material.h"
 #include "mdl/Brush.h"
 #include "mdl/BrushFace.h"
+#include "mdl/BrushGeometry.h"
 #include "mdl/BrushNode.h"
 #include "mdl/BrushRendererBrushCache.h"
 #include "mdl/EditorContext.h"
-#include "mdl/Polyhedron.h"
 #include "mdl/TagAttribute.h"
 #include "render/BrushRendererArrays.h"
 #include "render/RenderContext.h"
@@ -341,8 +341,8 @@ void BrushRenderer::clear()
   m_opaqueFaces = std::make_shared<MaterialToBrushIndicesMap>();
 
   m_opaqueFaceRenderer = FaceRenderer{m_vertexArray, m_opaqueFaces, m_faceColor};
-  m_transparentFaceRenderer =
-    FaceRenderer{m_vertexArray, m_transparentFaces, m_faceColor};
+  m_transparentFaceRenderer = FaceRenderer{
+    m_vertexArray, m_transparentFaces, m_faceColor, collectTransparentDrawItems()};
   m_edgeRenderer = IndexedEdgeRenderer{m_vertexArray, m_edgeIndices};
   m_coloredEdgeRenderer = DirectEdgeRenderer{};
 }
@@ -487,6 +487,7 @@ void BrushRenderer::renderTransparentFaces(RenderBatch& renderBatch)
   m_transparentFaceRenderer.setTint(m_tint);
   m_transparentFaceRenderer.setTintColor(m_tintColor);
   m_transparentFaceRenderer.setAlpha(m_transparencyAlpha);
+  m_transparentFaceRenderer.setDisableDepthWrite(true);
   m_transparentFaceRenderer.render(renderBatch);
 }
 
@@ -522,8 +523,8 @@ void BrushRenderer::validate()
   contract_assert(valid());
 
   m_opaqueFaceRenderer = FaceRenderer{m_vertexArray, m_opaqueFaces, m_faceColor};
-  m_transparentFaceRenderer =
-    FaceRenderer{m_vertexArray, m_transparentFaces, m_faceColor};
+  m_transparentFaceRenderer = FaceRenderer{
+    m_vertexArray, m_transparentFaces, m_faceColor, collectTransparentDrawItems()};
   m_edgeRenderer = IndexedEdgeRenderer{m_vertexArray, m_edgeIndices};
   m_coloredEdgeRenderer = DirectEdgeRenderer{
     gl::VertexArray::move(std::move(m_coloredEdgeVertices)), gl::PrimType::Lines};
@@ -560,11 +561,23 @@ void addMarkedEdgeVertices(
 } // namespace
 
 bool BrushRenderer::shouldDrawFaceInTransparentPass(
-  const mdl::BrushNode& brushNode, const mdl::BrushFace& face) const
+  const mdl::BrushNode& brushNode,
+  const mdl::BrushFace& face,
+  const gl::Material* material) const
 {
+  // A material with real per-pixel blending must always be drawn in the transparent pass
+  // (with depth-writes off) regardless of the X-ray/hidden-brush preference below --
+  // that preference only concerns the whole-brush fade, an unrelated feature.
+  if (
+    material
+    && material->effectiveBlendFunc().enable == gl::MaterialBlendFunc::Enable::UseFactors)
+  {
+    return true;
+  }
+
   if (m_transparencyAlpha >= 1.0f)
   {
-    // In this case, draw everything in the opaque pass
+    // In this case, draw everything else in the opaque pass
     // see: https://github.com/TrenchBroom/TrenchBroom/issues/2848
     return false;
   }
@@ -679,7 +692,7 @@ void BrushRenderer::validateBrush(const mdl::BrushNode& brushNode)
       if (cache.face->isMarked() && !(m_skipSkyFaces && isSkyFace(*cache.face)))
       {
         contract_assert(cache.material == material);
-        if (shouldDrawFaceInTransparentPass(brushNode, *cache.face))
+        if (shouldDrawFaceInTransparentPass(brushNode, *cache.face, material))
         {
           transparentIndexCount += triIndicesCountForPolygon(cache.vertexCount);
         }
@@ -702,17 +715,17 @@ void BrushRenderer::validateBrush(const mdl::BrushNode& brushNode)
 
       auto [key, insertDest] =
         holderPtr->getPointerToInsertElementsAt(transparentIndexCount);
-      info.transparentFaceIndicesKeys.emplace_back(material, key);
 
       // process all faces with this material (they'll be consecutive)
       auto* currentDest = insertDest;
+      auto sortPositionSum = vm::vec3f{};
+      auto sortPositionCount = size_t{0};
       for (size_t j = i; j < nextI; ++j)
       {
         const auto& cache = facesSortedByMaterial[j];
         if (
-          cache.face->isMarked()
-          && !(m_skipSkyFaces && isSkyFace(*cache.face))
-          && shouldDrawFaceInTransparentPass(brushNode, *cache.face))
+          cache.face->isMarked() && !(m_skipSkyFaces && isSkyFace(*cache.face))
+          && shouldDrawFaceInTransparentPass(brushNode, *cache.face, material))
         {
           addTriIndicesForPolygon(
             currentDest,
@@ -721,10 +734,19 @@ void BrushRenderer::validateBrush(const mdl::BrushNode& brushNode)
             cache.vertexCount);
 
           currentDest += triIndicesCountForPolygon(cache.vertexCount);
+
+          // Used to sort this (brush, material) group against every other transparent
+          // group by distance to the camera -- see FaceRenderer's sorted-draw mode.
+          sortPositionSum = sortPositionSum + vm::vec3f{cache.face->center()};
+          ++sortPositionCount;
         }
       }
 
       contract_assert(currentDest == (insertDest + transparentIndexCount));
+      contract_assert(sortPositionCount > 0);
+
+      info.transparentFaceIndicesKeys.emplace_back(
+        material, key, sortPositionSum / static_cast<float>(sortPositionCount));
     }
 
     if (opaqueIndexCount > 0)
@@ -746,9 +768,8 @@ void BrushRenderer::validateBrush(const mdl::BrushNode& brushNode)
       {
         const auto& cache = facesSortedByMaterial[j];
         if (
-          cache.face->isMarked()
-          && !(m_skipSkyFaces && isSkyFace(*cache.face))
-          && !shouldDrawFaceInTransparentPass(brushNode, *cache.face))
+          cache.face->isMarked() && !(m_skipSkyFaces && isSkyFace(*cache.face))
+          && !shouldDrawFaceInTransparentPass(brushNode, *cache.face, material))
         {
           addTriIndicesForPolygon(
             currentDest,
@@ -763,6 +784,21 @@ void BrushRenderer::validateBrush(const mdl::BrushNode& brushNode)
       contract_assert(currentDest == (insertDest + opaqueIndexCount));
     }
   }
+}
+
+std::shared_ptr<std::vector<TransparentDrawItem>> BrushRenderer::
+  collectTransparentDrawItems() const
+{
+  auto items = std::make_shared<std::vector<TransparentDrawItem>>();
+  for (const auto& [brushNode, info] : m_brushInfo)
+  {
+    for (const auto& key : info.transparentFaceIndicesKeys)
+    {
+      items->push_back(TransparentDrawItem{
+        key.material, key.block->pos, key.block->size, key.sortPosition});
+    }
+  }
+  return items;
 }
 
 void BrushRenderer::addBrush(const mdl::BrushNode& brushNode)
@@ -839,16 +875,16 @@ void BrushRenderer::removeBrushFromVbo(const mdl::BrushNode& brushNode)
       m_opaqueFaces->erase(material);
     }
   }
-  for (const auto& [material, transparentKey] : info.transparentFaceIndicesKeys)
+  for (const auto& transparentKey : info.transparentFaceIndicesKeys)
   {
-    auto faceIndexHolder = m_transparentFaces->at(material);
-    faceIndexHolder->zeroElementsWithKey(transparentKey);
+    auto faceIndexHolder = m_transparentFaces->at(transparentKey.material);
+    faceIndexHolder->zeroElementsWithKey(transparentKey.block);
 
     if (!faceIndexHolder->hasValidIndices())
     {
       // There are no indices left to render for this material, so delete the <Material,
       // BrushIndexArray> entry from the map
-      m_transparentFaces->erase(material);
+      m_transparentFaces->erase(transparentKey.material);
     }
   }
 

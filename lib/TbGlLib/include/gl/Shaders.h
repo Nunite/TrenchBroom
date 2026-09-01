@@ -51,13 +51,17 @@ inline const ShaderConfig MiniMapEdgeShader = ShaderConfig{
 inline const ShaderConfig EntityModelShader = ShaderConfig{
   "Entity Model",
   {"EntityModel.vertsh"},
-  {"MapBounds.fragsh", "EntityModel.fragsh"},
+  {"AlphaFunc.fragsh", "MapBounds.fragsh", "EntityModel.fragsh"},
 };
 
 inline const ShaderConfig FaceShader = ShaderConfig{
   "Face",
   {"Face.vertsh"},
-  {"GridCommon.fragsh", "Grid.fragsh", "MapBounds.fragsh", "Face.fragsh"},
+  {"AlphaFunc.fragsh",
+   "GridCommon.fragsh",
+   "Grid.fragsh",
+   "MapBounds.fragsh",
+   "Face.fragsh"},
 };
 
 inline const ShaderConfig SkyShader = ShaderConfig{
@@ -69,7 +73,11 @@ inline const ShaderConfig SkyShader = ShaderConfig{
 inline const ShaderConfig PatchShader = ShaderConfig{
   "Patch",
   {"Face.vertsh"},
-  {"GridCommon.fragsh", "Grid.fragsh", "MapBounds.fragsh", "Face.fragsh"},
+  {"AlphaFunc.fragsh",
+   "GridCommon.fragsh",
+   "Grid.fragsh",
+   "MapBounds.fragsh",
+   "Face.fragsh"},
 };
 
 inline const ShaderConfig EdgeShader = ShaderConfig{
@@ -99,7 +107,7 @@ inline const ShaderConfig TextBackgroundShader = ShaderConfig{
 inline const ShaderConfig MaterialBrowserShader = ShaderConfig{
   "Material Browser",
   {"MaterialBrowser.vertsh"},
-  {"MaterialBrowser.fragsh"},
+  {"AlphaFunc.fragsh", "MaterialBrowser.fragsh"},
 };
 
 inline const ShaderConfig MaterialBrowserBorderShader = ShaderConfig{
@@ -159,7 +167,7 @@ inline const ShaderConfig TriangleShader = ShaderConfig{
 inline const ShaderConfig UvViewShader = ShaderConfig{
   "UV View",
   {"UvView.vertsh"},
-  {"GridCommon.fragsh", "UvView.fragsh"},
+  {"AlphaFunc.fragsh", "GridCommon.fragsh", "UvView.fragsh"},
 };
 
 } // namespace tb::gl::Shaders

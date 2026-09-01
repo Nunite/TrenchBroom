@@ -5,6 +5,7 @@ on:
 permissions:
   packages: write
   contents: write
+  actions: write
 
 jobs:
   macos:
@@ -22,6 +23,7 @@ jobs:
 
     env:
       TB_PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      TB_ENABLE_LTO: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
 
     steps:
       - name: Checkout code
@@ -86,7 +88,11 @@ jobs:
       - name: Initialize ccache
         run: |
           mkdir -p "$CCACHE_DIR"
-          ccache --set-config=max_size=1G
+          if [[ "${{ matrix.tb-build-type }}" == "sanitize" ]]; then
+            ccache --set-config=max_size=2G
+          else
+            ccache --set-config=max_size=1G
+          fi
           ccache --zero-stats
 
       - name: Build

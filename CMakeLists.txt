@@ -1,6 +1,9 @@
 # Using target_link_library to link an object library to qt requires 3.12
 # 3.14 is required for generator expressions in install(CODE)
-cmake_minimum_required(VERSION 3.25)
+# 3.28 is required for FetchContent_Declare's EXCLUDE_FROM_ALL option, used in
+# cmake/dependencies/ to keep fetched dependencies' own install() rules out of
+# the packaged build.
+cmake_minimum_required(VERSION 3.28)
 
 # Fix warning with Ninja and cotire (see https://github.com/sakra/cotire/issues/81)
 if(POLICY CMP0058)
@@ -29,6 +32,11 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT T
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# TrenchBroom doesn't use C++20 modules. With Ninja and a scanning-capable compiler,
+# CMake defaults this to ON for C++20+, adding a "Scanning ... for CXX dependencies"
+# compiler invocation per translation unit that ccache cannot cache.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 project(TrenchBroom C CXX)
 
@@ -74,6 +82,7 @@ if(WIN32)
 endif()
 
 include(cmake/Utils.cmake)
+include(cmake/Sanitizers.cmake)
 include(cmake/CompilerConfig.cmake)
 include(cmake/PrecompileHeaders.cmake)
 
@@ -103,6 +112,7 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 
 include(cmake/Dependencies.cmake)
+include(cmake/Lto.cmake)
 
 # Populate version variables using git
 get_git_describe("${GIT_EXECUTABLE}" "${CMAKE_SOURCE_DIR}" GIT_DESCRIBE)

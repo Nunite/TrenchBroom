@@ -45,6 +45,7 @@ cmake .. \
   -DCMAKE_EXE_LINKER_FLAGS="-Wl,-fatal_warnings" \
   -DTB_ENABLE_CCACHE=1 \
   -DTB_ENABLE_PCH=0 \
+  -DTB_ENABLE_LTO="${TB_ENABLE_LTO:-0}" \
   -DTB_ENABLE_ASAN="$TB_ENABLE_ASAN" \
   -DTB_ENABLE_TSAN="$TB_ENABLE_TSAN" \
   -DTB_ENABLE_UBSAN="$TB_ENABLE_UBSAN" \
@@ -56,7 +57,7 @@ cmake .. \
   -DTB_NOTARIZATION_PASSWORD="$TB_NOTARIZATION_PASSWORD" \
   || exit 1
 
-cmake --build . --config "$TB_BUILD_TYPE" || exit 1
+cmake --build . --config "$TB_BUILD_TYPE" --parallel || exit 1
 
 BUILD_DIR=$(pwd)
 ctest --test-dir "$BUILD_DIR" --output-on-failure -j || exit 1

@@ -5,6 +5,7 @@ on:
 permissions:
   packages: write
   contents: write
+  actions: write
 
 jobs:
   linux:
@@ -14,6 +15,7 @@ jobs:
       TB_LINUX_CONTAINER_IMAGE: tb-linux-ci:ubuntu22-gcc13
       TB_BUILD_TYPE: release
       TB_ARCH: default-arch
+      TB_ENABLE_LTO: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
 
     steps:
       - name: Checkout code
@@ -48,7 +50,7 @@ jobs:
             -v "${{ github.workspace }}:${{ github.workspace }}" \
             -w "${{ github.workspace }}" \
             "${{ env.TB_LINUX_CONTAINER_IMAGE }}" \
-            bash -lc 'mkdir -p "${CCACHE_DIR}" && ccache --set-config=max_size=1G && ccache --zero-stats'
+            bash -lc 'mkdir -p "${CCACHE_DIR}" && ccache --set-config=max_size=2G && ccache --zero-stats'
 
       - name: Build in container
         env:
@@ -64,6 +66,7 @@ jobs:
             -e CCACHE_COMPILERCHECK=content \
             -e CC=gcc-13 \
             -e CXX=g++-13 \
+            -e TB_ENABLE_LTO="${{ env.TB_ENABLE_LTO }}" \
             -v "${{ github.workspace }}:${{ github.workspace }}" \
             -v "${QT_ROOT_DIR}:${QT_ROOT_DIR}:ro" \
             -w "${{ github.workspace }}" \

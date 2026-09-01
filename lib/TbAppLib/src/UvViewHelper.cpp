@@ -23,8 +23,8 @@
 #include "gl/OrthographicCamera.h"
 #include "gl/Texture.h"
 #include "mdl/BrushFace.h"
+#include "mdl/BrushGeometry.h"
 #include "mdl/PickResult.h"
-#include "mdl/Polyhedron.h"
 #include "mdl/UvUtils.h"
 
 #include "kd/contracts.h"
@@ -91,7 +91,7 @@ vm::vec2d UvViewHelper::stripeSize() const
 {
   contract_pre(valid());
 
-  if (const auto* texture = getTexture(face()->material()))
+  if (const auto* texture = gl::getTexture(face()->material()))
   {
     return vm::vec2d{texture->sizef()} / vm::vec2d{m_subDivisions};
   }
@@ -144,7 +144,7 @@ void UvViewHelper::pickUvGrid(
 {
   contract_pre(valid());
 
-  if (face()->material())
+  if (gl::getTexture(material()))
   {
     const auto& boundary = face()->boundary();
     if (const auto distance = vm::intersect_ray_plane(ray, boundary))
