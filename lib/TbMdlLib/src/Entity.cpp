@@ -182,6 +182,18 @@ const EntityModelFrame* Entity::modelFrame() const
          | kdl::value_or(nullptr);
 }
 
+void Entity::invalidateModelDependentCachesIfNeeded() const
+{
+  const auto* modelData = m_model ? m_model->data() : nullptr;
+  const auto pitchType = modelData ? modelData->pitchType() : PitchType::Normal;
+  if (m_cachedModelPitchType != pitchType)
+  {
+    m_cachedModelPitchType = pitchType;
+    m_cachedRotation = std::nullopt;
+    m_cachedModelTransformation = std::nullopt;
+  }
+}
+
 Result<ModelSpecification> Entity::modelSpecification() const
 {
   if (const auto* pointEntityDefinition = getPointEntityDefinition(definition()))
@@ -195,6 +207,7 @@ Result<ModelSpecification> Entity::modelSpecification() const
 const vm::mat4x4d& Entity::modelTransformation(
   const std::optional<el::ExpressionNode>& defaultModelScaleExpression) const
 {
+  invalidateModelDependentCachesIfNeeded();
   if (!m_cachedModelTransformation)
   {
     if (const auto* pointDefinition = getPointEntityDefinition(definition()))
@@ -415,6 +428,7 @@ void Entity::setOrigin(const vm::vec3d& origin)
 
 const vm::mat4x4d& Entity::rotation() const
 {
+  invalidateModelDependentCachesIfNeeded();
   if (!m_cachedRotation)
   {
     m_cachedRotation = entityRotation(*this);

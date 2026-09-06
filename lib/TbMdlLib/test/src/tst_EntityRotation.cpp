@@ -227,6 +227,37 @@ TEST_CASE("EntityRotation")
     CHECK(entityRotation(properties, info) == vm::approx{expectedTransformation});
   }
 
+  SECTION("rotation cache follows asynchronously loaded model pitch type")
+  {
+    auto modelResource = std::make_shared<EntityModelDataResource>([]() {
+      return Result<EntityModelData>{
+        EntityModelData{PitchType::MdlInverted, Orientation::Oriented}};
+    });
+    auto model = EntityModel{"studio.mdl", modelResource};
+    const auto definition = EntityDefinition{
+      "cycler_sprite",
+      Color{},
+      "",
+      {},
+      PointEntityDefinition{vm::bbox3d{16.0}, {}, {}},
+    };
+
+    auto entity = Entity{{{"classname", "cycler_sprite"}, {"angles", "15 0 0"}}};
+    entity.setDefinition(&definition);
+    entity.setModel(&model);
+
+    const auto normalPitchRotation = vm::rotation_matrix(0.0, vm::to_radians(15.0), 0.0);
+    REQUIRE(entity.rotation() == vm::approx{normalPitchRotation});
+    REQUIRE(entity.modelTransformation(std::nullopt) == vm::approx{normalPitchRotation});
+
+    modelResource->loadSync();
+
+    const auto goldSrcPitchRotation =
+      vm::rotation_matrix(0.0, vm::to_radians(-15.0), 0.0);
+    CHECK(entity.rotation() == vm::approx{goldSrcPitchRotation});
+    CHECK(entity.modelTransformation(std::nullopt) == vm::approx{goldSrcPitchRotation});
+  }
+
   SECTION("entityYawPitchRoll")
   {
     using T = std::tuple<double, double, double, vm::mat4x4d, vm::vec3d>;
@@ -284,6 +315,28 @@ TEST_CASE("EntityRotation")
     CAPTURE(properties, info, transform);
 
     CHECK(applyEntityRotation(properties, info, transform) == expectedProperty);
+  }
+
+  SECTION("GoldSrc Euler angles preserve rotations around every axis")
+  {
+    const auto properties = std::vector<EntityProperty>{{"angles", "15 0 0"}};
+    const auto info = EntityRotationInfo{
+      EntityRotationType::Euler, "angles", EntityRotationUsage::Allowed};
+    const auto originalRotation = entityRotation(properties, info);
+
+    for (const auto& transform : {
+           vm::rotation_matrix(vm::vec3d{1, 0, 0}, vm::to_radians(90.0)),
+           vm::rotation_matrix(vm::vec3d{0, 1, 0}, vm::to_radians(90.0)),
+           vm::rotation_matrix(vm::vec3d{0, 0, 1}, vm::to_radians(90.0)),
+         })
+    {
+      const auto result = applyEntityRotation(properties, info, transform);
+      REQUIRE(result.has_value());
+
+      CHECK(
+        entityRotation(std::vector<EntityProperty>{*result}, info)
+        == vm::approx{transform * originalRotation, 1e-6});
+    }
   }
 }
 
