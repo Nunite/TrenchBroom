@@ -165,12 +165,14 @@ void compensateOffset(
       * *vertex};
     const auto delta = previousUvCoords - newUvCoords;
 
+    // cannot fail: only compensates the offset of an already-valid face
     evaluate(
       UpdateBrushFaceAttributes{
         .xOffset = mdl::AddValue{delta.x()},
         .yOffset = mdl::AddValue{delta.y()},
       },
-      brushFace);
+      brushFace)
+      | kdl::ignore();
   }
   else
   {
@@ -191,11 +193,14 @@ bool applyFaceUV(BrushFace& face, const FaceUVUpdate& update)
     return false;
   }
 
-  face.setUvAttributes(UvAttributes{
-    .offset = projection->offset,
-    .scale = vm::vec2f{1, 1},
-    .rotation = 0.0f,
-  });
+  if (!face.setUvAttributes(UvAttributes{
+        .offset = projection->offset,
+        .scale = vm::vec2f{1, 1},
+        .rotation = 0.0f,
+      }))
+  {
+    return false;
+  }
   face.restoreUvCoordSystemSnapshot(
     UvCoordSystemSnapshot{projection->uAxis, projection->vAxis});
   if (update.materialName)
@@ -210,11 +215,14 @@ bool applyFaceUVProjection(
   const FaceUVProjection& projection,
   const std::optional<std::string>& materialName)
 {
-  face.setUvAttributes(UvAttributes{
-    .offset = projection.offset,
-    .scale = vm::vec2f{1, 1},
-    .rotation = 0.0f,
-  });
+  if (!face.setUvAttributes(UvAttributes{
+        .offset = projection.offset,
+        .scale = vm::vec2f{1, 1},
+        .rotation = 0.0f,
+      }))
+  {
+    return false;
+  }
   face.restoreUvCoordSystemSnapshot(
     UvCoordSystemSnapshot{projection.uAxis, projection.vAxis});
   if (materialName)
@@ -377,8 +385,10 @@ bool setBrushFaceAttributes(Map& map, const UpdateBrushFaceAttributes& update)
 {
   return applyAndSwap(
     map, "Change Face Attributes", map.selection().allBrushFaces(), [&](auto& brushFace) {
-      evaluate(update, brushFace);
-      return true;
+      return evaluate(update, brushFace) | kdl::if_error([&](auto e) {
+               map.logger().error() << "Could not set face attributes: " << e.msg;
+             })
+             | kdl::is_success();
     });
 }
 
@@ -603,8 +613,10 @@ bool translateUv(
 bool rotateUv(Map& map, const float angle)
 {
   return applyAndSwap(map, "Rotate UV", map.selection().allBrushFaces(), [&](auto& face) {
-    face.rotateUv(angle);
-    return true;
+    return face.rotateUv(angle) | kdl::if_error([&](auto e) {
+             map.logger().error() << "Could not rotate UV: " << e.msg;
+           })
+           | kdl::is_success();
   });
 }
 
@@ -640,7 +652,8 @@ void alignUv(Map& map, const UvPolicy uvPolicy)
 {
   applyAndSwap(
     map, "Align Texture", map.selection().allBrushFaces(), [&](auto& brushFace) {
-      evaluate(mdl::align(brushFace, uvPolicy), brushFace);
+      // cannot fail: only adjusts the offset of an already-valid face
+      evaluate(mdl::align(brushFace, uvPolicy), brushFace) | kdl::ignore();
       return true;
     });
 }
@@ -653,7 +666,9 @@ void justifyUv(
       const auto [uvAxis, uvSign] =
         convertJustifyDirection(brushFace, uvJustifyDirection);
 
-      evaluate(mdl::justify(brushFace, uvAxis, uvSign, uvPolicy), brushFace);
+      // cannot fail: only adjusts the offset of an already-valid face
+      evaluate(mdl::justify(brushFace, uvAxis, uvSign, uvPolicy), brushFace)
+        | kdl::ignore();
       return true;
     });
 }
@@ -669,7 +684,9 @@ void fitUv(
 
     const auto invariantVertex = anchorVertex(brushFace, uvAxis, uvSign);
     compensateOffset(brushFace, invariantVertex, [&] {
-      evaluate(mdl::fit(brushFace, uvAxis, uvPolicy, uvFitMode), brushFace);
+      // cannot fail: only adjusts the scale/offset of an already-valid face
+      evaluate(mdl::fit(brushFace, uvAxis, uvPolicy, uvFitMode), brushFace)
+        | kdl::ignore();
     });
     return true;
   });
@@ -679,25 +696,28 @@ void autoFitUv(Map& map)
 {
   applyAndSwap(
     map, "Auto Fit Texture", map.selection().allBrushFaces(), [&](auto& brushFace) {
-      evaluate(mdl::align(brushFace, UvPolicy::best), brushFace);
+      // cannot fail: these calls only adjust the scale/offset of an already-valid face
+      evaluate(mdl::align(brushFace, UvPolicy::best), brushFace) | kdl::ignore();
 
       evaluate(
-        mdl::justify(brushFace, UvAxis::u, UvSign::plus, UvPolicy::best), brushFace);
+        mdl::justify(brushFace, UvAxis::u, UvSign::plus, UvPolicy::best), brushFace)
+        | kdl::ignore();
       evaluate(
-        mdl::justify(brushFace, UvAxis::v, UvSign::plus, UvPolicy::best), brushFace);
+        mdl::justify(brushFace, UvAxis::v, UvSign::plus, UvPolicy::best), brushFace)
+        | kdl::ignore();
 
       const auto invariantUVertex = anchorVertex(brushFace, UvAxis::u, UvSign::plus);
       compensateOffset(brushFace, invariantUVertex, [&] {
         evaluate(
-          mdl::fit(brushFace, UvAxis::u, UvPolicy::best, UvFitMode::fitToFace),
-          brushFace);
+          mdl::fit(brushFace, UvAxis::u, UvPolicy::best, UvFitMode::fitToFace), brushFace)
+          | kdl::ignore();
       });
 
       const auto invariantVVertex = anchorVertex(brushFace, UvAxis::v, UvSign::plus);
       compensateOffset(brushFace, invariantVVertex, [&] {
         evaluate(
-          mdl::fit(brushFace, UvAxis::v, UvPolicy::best, UvFitMode::fitToFace),
-          brushFace);
+          mdl::fit(brushFace, UvAxis::v, UvPolicy::best, UvFitMode::fitToFace), brushFace)
+          | kdl::ignore();
       });
 
       return true;

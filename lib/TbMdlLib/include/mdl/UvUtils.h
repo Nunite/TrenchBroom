@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "base/Result.h"
+
 #include "vm/constants.h"
 #include "vm/mat.h"
 #include "vm/scalar.h"
@@ -47,6 +49,8 @@ struct FaceUVProjection
 std::optional<FaceUVProjection> solveFaceUVProjection(
   const std::vector<vm::vec3d>& points, const std::vector<vm::vec2f>& uvs);
 
+struct UvAttributes;
+
 /**
  * Return the up and right axes for a camera that looks at the given face.
  */
@@ -54,13 +58,28 @@ std::tuple<vm::vec3d, vm::vec3d> computeCameraAxesForFaceNormal(const vm::vec3d&
 
 /**
  * Returns the angular deviation from orthogonality of the UV axes after projecting
+ *
  * them
  * onto the face plane. A value of 0 means that the mapping has no affine skew.
- * Returns
- * nullopt if either projected axis is degenerate.
+ *
+ * Returns nullopt if either projected axis is degenerate.
  */
 std::optional<float> measureUvSkew(
   const vm::vec3d& uAxis, const vm::vec3d& vAxis, const vm::vec3d& faceNormal);
+
+/**
+ * Checks that the given UV axes are finite and that they produce an invertible UV
+ *
+ * coordinate system matrix, both with a neutral offset/scale and with the given
+ *
+ * uvAttributes' actual offset/scale -- a finite but extreme scale can make an otherwise
+ * fine pair of axes non-invertible even though the axes alone would be fine.
+ */
+Result<void> validateUvCoordSystem(
+  const vm::vec3d& uAxis,
+  const vm::vec3d& vAxis,
+  const vm::vec3d& normal,
+  const UvAttributes& uvAttributes);
 
 /**
  * Returns the given scaling factor, or 1 if it is 0.

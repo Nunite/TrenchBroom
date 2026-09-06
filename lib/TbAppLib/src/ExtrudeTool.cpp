@@ -534,7 +534,7 @@ void copyFaceAttributesWrapped(
   gl::MaterialManager& materialManager)
 {
   targetFace.setMaterialName(sourceFace.materialName());
-  targetFace.setUvAttributes(sourceFace.uvAttributes());
+  targetFace.setUvAttributes(sourceFace.uvAttributes()) | kdl::ignore();
   targetFace.setSurfaceAttributes(sourceFace.surfaceAttributes());
   targetFace.setMaterial(materialManager.material(sourceFace.materialName()));
 
@@ -608,13 +608,13 @@ void orthogonalizeStampSideUvs(
     vAlongSeam * seamDirection + currentHandedness * uAlongSeam * perpendicular;
 
   uvAttributes.offset = vm::vec2f::zero();
-  targetFace.setUvAttributes(uvAttributes);
+  targetFace.setUvAttributes(uvAttributes) | kdl::ignore();
   targetFace.restoreUvCoordSystemSnapshot(mdl::UvCoordSystemSnapshot{uAxis, vAxis});
   uvAttributes.offset =
     sourceStartUv
     - mdl::computeUvCoords(
       seam.start(), targetFace.uAxis(), targetFace.vAxis(), uvAttributes.scale);
-  targetFace.setUvAttributes(uvAttributes);
+  targetFace.setUvAttributes(uvAttributes) | kdl::ignore();
 }
 
 void applyStampFaceAttributes(

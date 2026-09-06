@@ -1359,7 +1359,7 @@ void applyFaceAttributes(
   gl::MaterialManager& materialManager)
 {
   face.setMaterialName(attributes.materialName);
-  face.setUvAttributes(attributes.uvAttributes);
+  face.setUvAttributes(attributes.uvAttributes) | kdl::ignore();
   face.setSurfaceAttributes(attributes.surfaceAttributes);
 
   if (attributes.uvCoordSystemSnapshot)
@@ -1409,7 +1409,10 @@ bool applyContinuousFaceUvs(
   uvAttributes.offset = projection->offset;
   uvAttributes.scale = vm::vec2f{
     usableUvScale(uvAttributes.scale.x()), usableUvScale(uvAttributes.scale.y())};
-  face.setUvAttributes(uvAttributes);
+  if (!face.setUvAttributes(uvAttributes))
+  {
+    return false;
+  }
   face.restoreUvCoordSystemSnapshot(mdl::UvCoordSystemSnapshot{
     projection->uAxis * double(uvAttributes.scale.x()),
     projection->vAxis * double(uvAttributes.scale.y())});
